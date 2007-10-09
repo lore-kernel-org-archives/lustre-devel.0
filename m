@@ -1,38 +1,25 @@
-From: Sheila Barthel <sbarthel@clusterfs.com>
-Date: Wed, 3 Oct 2007 20:38:16 -0600
-Subject: [Lustre-devel] Announcement for Lustre 1.6 Operations Manual
-	(document edition v1_8)
-Message-ID: <837874b50710031938x1a5af63ehe0a117a465fde759@mail.gmail.com>
+From: serge at terascala.com <serge@terascala.com>
+Date: Tue, 9 Oct 2007 14:52:12 -0600
+Subject: [Lustre-devel] [Bug 13840] New: Problems compiling with OFED 1.2.5
+Message-ID: <200710092052.l99KqCI1019435@shell.clusterfs.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Dear Lustre users:
+Please don't reply to lustre-devel. Instead, comment in Bugzilla by using the following link:
+https://bugzilla.lustre.org/show_bug.cgi?id=13840
 
-We are pleased to announce an updated document edition (v1_8) of the Lustre(r)
-1.6 Operations Manual, is available in both PDF and HTML formats at
-http://www.manual.lustre.org.
 
-This edition of the Operations Manual includes the following enhancements:
 
-* New POSIX chapter
-* New Benchmarking chapter
-* New Lustre Recovery chapter
-* Updated content in Configuring Quotas chapter
-* Updated content in More Complicated Configurations chapter
-* Updated content in Lustre /proc chapter
-* Updated content in RAID chapter
-* Updated content in Configuring Lustre Examples chapter
-* Updated content in Configuration Files Module Parameters chapter
-* Merged MXLND information in Lustre manual
+When I try to compile the lnet module o2ib with OFED 1.2.5.1, I get the
+following error: 
+/local/home/serge/2.6.16-46/bnx2/lustre/1.6.2/trunk/lustre_shadow_dir/lnet/klnds/o2iblnd/o2iblnd.c
+In file included from
+/usr/local/home/serge/2.6.16-46/bnx2/lustre/1.6.2/trunk/lustre_shadow_dir/lnet/klnds/o2iblnd/o2iblnd.c:24:
+/usr/local/home/serge/2.6.16-46/bnx2/lustre/1.6.2/trunk/lustre_shadow_dir/lnet/klnds/o2iblnd/o2iblnd.h:330:
+error: parse error before "DECLARE_PCI_UNMAP_ADDR"
 
-If you have any questions, comments, or recommended edits to the manual,
-please file a ticket in Bugzilla, https://bugzilla.lustre.org/enter_bug.cgi,
-specifying Documentation as the product.
-
-Sun Lustre Documentation Team
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20071003/5b5c5f7f/attachment.html>
+Serge Pirotte
+Terascala
