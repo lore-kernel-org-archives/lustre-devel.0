@@ -1,19 +1,52 @@
-From: shadow at clusterfs.com <shadow@clusterfs.com>
-Date: Wed, 17 Oct 2007 08:50:41 -0600
-Subject: [Lustre-devel] [Bug 13913] New:
-	ASSERTION(atomic_read(&ctxt_->loc_refcount) > 0) failed
-Message-ID: <200710171450.l9HEofZK001376@shell.clusterfs.com>
+From: jmferrer <jmferrer@caton.es>
+Date: Mon, 22 Oct 2007 12:56:37 +0200
+Subject: [Lustre-devel] The mds_connect operation failed with -11
+Message-ID: <471C81E5.5000601@caton.es>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Please don't reply to lustre-devel. Instead, comment in Bugzilla by using the following link:
-https://bugzilla.lustre.org/show_bug.cgi?id=13913
+Hi, list:
+
+
+I'm trying configure lustre with:
+
+1 MGS -------------> 192.168.3.100 with mkfs.lustre --mgs /dev/md1 ;
+mount -t lustre ...
+
+1 MDT ------------> 192.168.3.101 with mkfs.lustre --fsname=datafs00
+--mdt --mgsnode=192.168.3.100 /dev/sda3 ; mount -t lustre ...
+
+
+4 ost -----------> 192.168.3.102-104 with mkfs.lustre --fsname=datafs00
+--ost --mgsnode=192.168.3.100 at tcp0 /dev/sda3  ; mount -t lustre.....
+foreach node
 
 
 
-while run sanity on loop devices i got assetion.
-ASSERTION(atomic_read(&ctxt_->loc_refcount) > 0) failed
-this after loop device error and got ENOMEM.
+But when I try mount from any node:
+
+LOG IN NODE:
+LustreError: 4743:0:(obd_mount.c:1927:lustre_fill_super()) Unable to
+mount  (-22)
+LustreError: 11-0: an error occurred while communicating with
+192.168.3.101 at tcp. The mds_connect operation failed with -11
+LustreError: Skipped 1 previous similar message
+LustreError: 11-0: an error occurred while communicating with
+192.168.3.101 at tcp. The mds_connect operation failed with -11
+LustreError: Skipped 5 previous similar messages
+LustreError: 11-0: an error occurred while communicating with
+192.168.3.101 at tcp. The mds_connect operation failed with -11
+LustreError: Skipped 10 previous similar messages
+LustreError: 11-0: an error occurred while communicating with
+192.168.3.101 at tcp. The mds_connect operation failed with -11
+LustreError: Skipped 20 previous similar messages
+
+
+LOG IN MGS:
+    ---------
+
+
+thanks and sorry for my english.
