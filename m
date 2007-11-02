@@ -1,40 +1,22 @@
 From: Karen Li <Jingjing.Li@Sun.COM>
-Date: Tue, 30 Oct 2007 13:43:56 +0800
-Subject: [Lustre-devel] Last Chance! Lustre Level I training sessions on
-	November 7-9 in Reno
-Message-ID: <4726C49C.60800@sun.com>
+Date: Fri, 02 Nov 2007 15:06:40 +0800
+Subject: [Lustre-devel] Lustre Level I training sessions next week! Only a
+	few seats remaining!
+Message-ID: <472ACC80.9060205@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Lustre Administration & Support training will be offered on November 7-9 
-in Reno, Nevada.
+Lustre Administration & Support training will be offered next week, on 
+November 7-9, in Reno, Nevada.
 
-Only a few spaces remaining! Click here to register today!
+Only a few seats remaining! Click here to register today!
 http://www.acteva.com/go/clusterfilesystems
 
-Lustre Administration & Support (CFS1A)
-
-This three day course is ideal for people new to the Lustre File System 
-and will cover a host of introductory architectural, administration and 
-support issues. The session will provide a hands-on experience and 
-culminate with a Level I certification exam.
-
-Course Content:
-Day 1:
-  * Understanding Lustre
-  * Architecting and profiling a Lustre Cluster
-Day 2:
-  * Configuring Lustre
-  * Hands on Lab
-Day 3:    
-  * Troubleshooting Lustre
-  * CFS Lustre Level I certification exam
-
 Price:
-US$3,000 for 3 days of in-depth technical hands-on instruction
+US$3,000 for 3 days of in-depth technical hands-on instruction.
 
 Location
 * Circus Circus Hotel
@@ -43,8 +25,7 @@ Location
 * Toll-free: 1-800-648-5010
 * http://www.circusreno.com/
 
-ENROLL NOW!
-http://www.acteva.com/go/clusterfilesystems
+ENROLL NOW! http://www.acteva.com/go/clusterfilesystems
 
 Questions regarding Lustre courses can be sent to training at clusterfs.com
 
