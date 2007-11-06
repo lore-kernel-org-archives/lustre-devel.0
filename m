@@ -1,32 +1,26 @@
-From: Karen Li <Jingjing.Li@Sun.COM>
-Date: Fri, 02 Nov 2007 15:06:40 +0800
-Subject: [Lustre-devel] Lustre Level I training sessions next week! Only a
-	few seats remaining!
-Message-ID: <472ACC80.9060205@sun.com>
+From: RS RS <rs2006ts@hotmail.com>
+Date: Tue, 6 Nov 2007 11:59:26 -0500
+Subject: [Lustre-devel] Checksum Algorithm
+Message-ID: <BLU115-W12E96D373F497BF1EDDCD0CD890@phx.gbl>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Lustre Administration & Support training will be offered next week, on 
-November 7-9, in Reno, Nevada.
+Hi,
 
-Only a few seats remaining! Click here to register today!
-http://www.acteva.com/go/clusterfilesystems
+We have seen a huge performance drop in 1.6.3, due to the checksum being enabled by default.  I looked at the algorithm being used, and it is actually a CRC32, which is a very strong algorithm for detecting all sorts of problems, such as single bit errors, swapped bytes, and missing bytes.
 
-Price:
-US$3,000 for 3 days of in-depth technical hands-on instruction.
+I've been experimenting with using a simple XOR algorithm.  I've been able to recover most of the lost performance.  This algorithm will detected corrupted bytes and words.  This algorithm will not detect swapped bytes errors, but I think that these are pretty rare.  This algorithm will not detect missing bytes, but I suspect that other things in Lustre or LNET will detect this problem.  This algorithm will not detect two errors that offset each other, such as a single bit error in two words that are a multiple of 4 bytes apart.
 
-Location
-* Circus Circus Hotel
-* 500 N. Sierra Street, Reno, NV 89503
-* Phone: 1-775-329-0711
-* Toll-free: 1-800-648-5010
-* http://www.circusreno.com/
+Should we consider using a more efficient checksum algorithm, in order to regain performance?  Should the algorithm be configurable?  
 
-ENROLL NOW! http://www.acteva.com/go/clusterfilesystems
+-Roger
 
-Questions regarding Lustre courses can be sent to training at clusterfs.com
-
-Visit www.clusterfs.com/events.html for more information.
+_________________________________________________________________
+Boo!?Scare away worms, viruses and so much more! Try Windows Live OneCare!
+http://onecare.live.com/standard/en-us/purchase/trial.aspx?s_cid=wl_hotmailnews
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20071106/30a2c755/attachment.htm>
