@@ -1,45 +1,34 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Wed, 7 Nov 2007 13:05:20 -0700
-Subject: [Lustre-devel] Checksum Algorithm
-In-Reply-To: <BLU115-W12E96D373F497BF1EDDCD0CD890@phx.gbl>
-References: <BLU115-W12E96D373F497BF1EDDCD0CD890@phx.gbl>
-Message-ID: <20071107200520.GD3966@webber.adilger.int>
+From: Danny Sternkopf <dsternkopf@hpce.nec.com>
+Date: Mon, 12 Nov 2007 17:10:22 +0100
+Subject: [Lustre-devel] Lustre - HA:  lc_hb - ha.cf configuration
+In-Reply-To: <4721B252.1010808@hpce.nec.com>
+References: <4721B252.1010808@hpce.nec.com>
+Message-ID: <47387AEE.3000203@hpce.nec.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Nov 06, 2007  11:59 -0500, RS RS wrote:
-> We have seen a huge performance drop in 1.6.3, due to the checksum
-> being enabled by default.  I looked at the algorithm being used, and it is
-> actually a CRC32, which is a very strong algorithm for detecting all sorts
-> of problems, such as single bit errors, swapped bytes, and missing bytes.
+Hi,
 
-> I've been experimenting with using a simple XOR algorithm.  I've
-> been able to recover most of the lost performance.  This algorithm
-> will detected corrupted bytes and words.  This algorithm will not
-> detect swapped bytes errors, but I think that these are pretty rare.
-> This algorithm will not detect missing bytes, but I suspect that other
-> things in Lustre or LNET will detect this problem.  This algorithm will
-> not detect two errors that offset each other, such as a single bit error
-> in two words that are a multiple of 4 bytes apart.
+I dont' understand how the ha.cf configuration works.
+The file is created as follows:
+python /usr/lib64/heartbeat/haresources2cib.py --stdout
+/tmp/heartbeat/haresources.lustre > /tmp/heartbeat/cib.xml.lustre
 
-Note that it is possible to disable checksums to get the previous behaviour
-back at runtime with (on all clients that should skip checksums):
+Then it is transferred to the corresponding node.
 
-	for C in /proc/fs/lustre/osc/*/checksums; do
-		echo 0 > $C
-	done
+haresources2cib.py uses /etc/ha.d/ha.cf which is different on other
+nodes. I think the cib.xml must be created on the local host.
 
-in the lustre configuration:
+Or there should be the possibility to specify a node-specific ha.cf for
+HA configuration creation.
 
-	mgs> lctl conf_param testfs-OST0001.osc.checksums=0
+Best regards,
 
-or at compile time with "configure --disable-checksum ..."
-
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Software Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+Danny
+-- 
+Danny Sternkopf                         dsternkopf at hpce.nec.com
+NEC HPC Europe GmbH,           http://www.teraflop-workbench.de
+Stuttgart, Germany phone: +49-711-68770-35 fax: +49-711-6877145
