@@ -1,42 +1,51 @@
-From: Oleg Drokin <Oleg.Drokin@Sun.COM>
-Date: Thu, 13 Dec 2007 10:23:22 -0500
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Thu, 13 Dec 2007 12:09:28 -0700
 Subject: [Lustre-devel] read ahead
-In-Reply-To: <200712131515.lBDFFrCa014152@cmf.nrl.navy.mil>
-References: <200712131515.lBDFFrCa014152@cmf.nrl.navy.mil>
-Message-ID: <6AD2FC07-6589-4194-B92E-9844847AECD3@Sun.COM>
+In-Reply-To: <4760B247.4030505@sun.com>
+References: <475ED623.6090204@sun.com>
+	<18270.55813.185376.299242@gargle.gargle.HOWL>
+	<20071211234708.GT3214@webber.adilger.int> <475F7759.2080103@sun.com>
+	<47603E32.6070203@sun.com> <4760B247.4030505@sun.com>
+Message-ID: <47618368.7000202@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
 
-On Dec 13, 2007, at 10:15 AM, chas williams - CONTRACTOR wrote:
 
->> Yes it is.
->> DIRECT IO by it's nature is "direct", i.e. it gets straight into
->> application buffers,
->> we are not to put any more data there than application said it can
->> accept.
-> i agree with this interpretation of O_DIRECT.
+Tom.Wang wrote:
+> Hi, Peter
 >
->> And we are not allowed to cache any of that data (or to use any cache
->> to get
->> the data during reads) too.
-> this seems a bit stricter than i would expect.  while i would expect
-> O_DIRECT to bypass the kernel readahead mechanism, i think that  
-> lustre's
-> readahead is outside of the scope of O_DIRECT.
+> I just talked with Matt about his pCIFS test. In his test, there are 2 
+> clients, 2 OST, (stripe_count =2, stripe_size=1M).
+> Each client run 1 thread to read a shared file. Each thread(client) 
+> will only read data of the shared file from 1 OST, so
+> read request is discontiguous (1M step stride I/O) for each of thread, 
+> which will not trigger read-ahead,  because
+> read-ahead window will be reset once it met discontinuous  read  
+> request.  So  kept  read-ahead in the same step
+> of stride step ((stripe_count -1) * stripe_size) instead of 
+> contiguous  could just fix this problem, and it is what we are
+> working now.
+>
+Finally!  This makes a lot of sense.
 
-While technically nothing prevents us from reading some more stuff  
-into client
-cache (we cannot do any readahead into applications buffers for  
-obvious reasons)
-with readahead after genuine directio request, we cannot use the cache
-for directio requests, so if next read request comes in directio mode,  
-we MUST
-bypass cache and the whole purpose of readahead is therefore defeated.
+> Btw:  we also need this in lustre collective read  ADIO driver,  
+> since  we  will also  need  reorganize the  data  as  1client-> 1OST 
+>          model  like pCIFS does.
 
-Bye,
-     Oleg
+I now see why this stripe behavior with read-ahead is so very important 
+for Lustre in some cases.
+
+It would also be important to know that in basic cases we really get as 
+good read performance as write.
+
+- Peter -
+
+>          Another alternative way maybe move read-ahead mechanism to 
+> osc layer, but maybe a bad idea.
+> Thanks
+> WangDi
+>
