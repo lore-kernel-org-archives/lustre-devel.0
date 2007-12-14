@@ -1,51 +1,53 @@
-From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Thu, 13 Dec 2007 12:09:28 -0700
+From: Andreas Dilger <adilger@sun.com>
+Date: Thu, 13 Dec 2007 17:21:09 -0700
 Subject: [Lustre-devel] read ahead
-In-Reply-To: <4760B247.4030505@sun.com>
+In-Reply-To: <18271.30583.338003.357861@gargle.gargle.HOWL>
 References: <475ED623.6090204@sun.com>
 	<18270.55813.185376.299242@gargle.gargle.HOWL>
-	<20071211234708.GT3214@webber.adilger.int> <475F7759.2080103@sun.com>
-	<47603E32.6070203@sun.com> <4760B247.4030505@sun.com>
-Message-ID: <47618368.7000202@sun.com>
+	<20071211234708.GT3214@webber.adilger.int>
+	<18271.30583.338003.357861@gargle.gargle.HOWL>
+Message-ID: <20071214002109.GO3214@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Dec 12, 2007  08:53 +0300, Nikita Danilov wrote:
+> Andreas Dilger writes:
+>  > Two areas where our readahead is lacking are:
+>  > - strided reads (may turn the above 16 x 4kB reads into a situation
+>  >   where the client will prefetch pages instead of "random" IO, depending
+>  >   on access pattern, and will avoid prefetch of data the client is not
+>  >   expecting to use)
+>  > - limiting the readahead to the rate that the client is actually consuming
+>  >   it (currently once we detect sequential reads the readahead window grows
+>  >   eventually to the maximum even if this is far more than what the client
+>  >   needs)
+> 
+> I wonder how useful can inter-file read-ahead be. For example, starting
+> an executable almost always incurs a sequence of reads of the shared
+> libraries, compilation re-reads header files in the same order over and
+> over again, etc.
 
+Well, we already have a beginning of this kind of operation on the client
+with client-side metadata statahead.  That detects readdir->stat operation
+and prefetches the MDS attribute data.  The next step would be OST statahead,
+which could be started asynchronously as soon as the LOV EA is returned
+from the MDS instead of waiting for the userspace process to get to that
+entry and force the OST stat.
 
-Tom.Wang wrote:
-> Hi, Peter
->
-> I just talked with Matt about his pCIFS test. In his test, there are 2 
-> clients, 2 OST, (stripe_count =2, stripe_size=1M).
-> Each client run 1 thread to read a shared file. Each thread(client) 
-> will only read data of the shared file from 1 OST, so
-> read request is discontiguous (1M step stride I/O) for each of thread, 
-> which will not trigger read-ahead,  because
-> read-ahead window will be reset once it met discontinuous  read  
-> request.  So  kept  read-ahead in the same step
-> of stride step ((stripe_count -1) * stripe_size) instead of 
-> contiguous  could just fix this problem, and it is what we are
-> working now.
->
-Finally!  This makes a lot of sense.
+OST statahead will not be needed on 1.8 in many cases when size-on-MDS
+is available (if file is closed) but would still be useful for 1.6 and
+the case of "impatient user running 'ls -l' in the job output directory
+while files are being written".
 
-> Btw:  we also need this in lustre collective read  ADIO driver,  
-> since  we  will also  need  reorganize the  data  as  1client-> 1OST 
->          model  like pCIFS does.
+The logical extension would be to detect readdir + read (for e.g. updatedb,
+find ... | xargs grep, etc) type loads and prefetch the file data if it is
+not too big, or at least just the first block for "file" or similar.
 
-I now see why this stripe behavior with read-ahead is so very important 
-for Lustre in some cases.
-
-It would also be important to know that in basic cases we really get as 
-good read performance as write.
-
-- Peter -
-
->          Another alternative way maybe move read-ahead mechanism to 
-> osc layer, but maybe a bad idea.
-> Thanks
-> WangDi
->
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
