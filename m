@@ -1,136 +1,85 @@
 From: Eric Barton <eeb@sun.com>
-Date: Fri, 04 Jan 2008 17:51:59 +0000
+Date: Fri, 04 Jan 2008 18:19:44 +0000
 Subject: [Lustre-devel] 2 primitives for the NRS
-In-Reply-To: <1199468417.3722.522.camel@wheel>
-References: <00d501c84ed6$e4fb2010$0281a8c0@ebpc>
-	<1199468417.3722.522.camel@wheel>
-Message-ID: <000f01c84efa$8150dd10$0281a8c0@ebpc>
+In-Reply-To: <477E662E.30803@gmail.com>
+References: <00d501c84ed6$e4fb2010$0281a8c0@ebpc> <477E662E.30803@gmail.com>
+Message-ID: <002001c84efe$61cec660$0281a8c0@ebpc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Lee,
+Wonderful questions! 
 
-Here's the prototype + trivial exercising code.  I'm trying to run it with
-something that should roughly approximate RPC arrival order - if that's 
-full of "itself" then I really need to know :)
+> I am trying to plug in an I/O request scheduler into OSS before
+> read/write requests get dispatched to the obdfilter. 
 
-> -----Original Message-----
-> From: Lee Ward [mailto:lee at sandia.gov] 
-> Sent: 04 January 2008 5:40 PM
-> To: Eric Barton
-> Cc: lustre-devel at clusterfs.com
-> Subject: Re: [Lustre-devel] 2 primitives for the NRS
+If you base your code off b1_6, you can take a free ride on the initial
+request processing done by Nathan's adaptive timeout code.
+
+> What I am using
+> is hashed bins with a basic rb tree, assuming it would be fairly
+> reasonable to handle the number of I/O requests that can reach an
+> OSS. My interface calls are very similar to yours, except the lack
+> of plug-in comparison. I would not have more to suggest on this. 
+> But I do have a couple of questions to check for possible thoughts if
+> you have.
 > 
-> Hi Eric,
+> (1) How are you going to order the requests, say the read/write
+> ones? I assume you made it flexible with a plug-in compare(). 
+
+Yes - because I don't know yet what's going to work best.  And maybe
+different services might want different orders.  And generalisation
+when it doesn't hurt performance is a hard habit to break :)
+
+My first thoughts are about fairness to all clients in the face of
+unfairness elsewhere - e.g. a gridlocked network - so I'm thinking of
+something that picks buffered RPC requests round-robin on client ID.
+
+This is probably good for workloads of large numbers of single-client
+jobs to ensure that no individual client can be starved.  However I
+also suggest that it's good for I/O performed by a single job spread
+over many clients.  
+
+I base this on the idea that a good backend filesystem should and can
+optimize disk utilisation.  When a file is written, the file<->disk
+offset mapping is fixed for subsequent reads, so I want the NRS to
+make I/O request execution order repeatable in the face of network
+"noise" and races between clients.  Without this repeatability, we
+have to fall back on the disk elevator to re-create the "good" disk
+I/O stream on subsequent reads.  Surely it cannot do such a good job
+as the NRS since it must have orders of magnitude fewer requests to
+play with - bulk buffers must be allocated by the time it sees them.
+
+See http://arch.lustre.org/index.php?title=Network_Request_Scheduler
+
+I'm afraid I don't yet have anything even half backed to say on
+write v. read order etc.  I'd still want some empirical evidence first.
+
+> Would the order of the I/O requests based on object ID have some
+> relevance to their locality on the disks?
+
+I thinks it might make more sense for the backend F/S to use a job ID
+to help it create sequential disk offsets for the whole I/O pattern
+rather than anything coming from one individual client.
+
+> I was assuming at least the requests
+> can get smoothed out with the objID ordering.
 > 
-> Wow! That is good. I had a similar need for another project and solved
-> it using a splay tree. Overhead is ~2.5 usec/op for random 
-> inserts with
-> unique keys and ~.04 usec/op for the ordered remove, at 1M records.
-> Where might I get your implementation? Would like to see if I 
-> can adapt
-> it for my project.
-> 
-> 	--Lee
-> 
-> On Fri, 2008-01-04 at 06:37 -0700, Eric Barton wrote:
-> > What the NRS (network request scheduler) really needs is something
-> > that can order 10**[4-6] RPC requests incredibly efficiently - any
-> > overhead just eats into server efficiency and we already swamp a
-> > server with simple pings at ~30-40,000 RPCs per second.  I've
-> > implemented a heap which is already looking good at managing
-> > collections of 1,000,000+ objects with nearly sub-microsecond
-> > insert+ordered_remove overhead.
-> > 
-> > Here is the API, which also introduces a sparse 1D array 
-> suitable for
-> > use in the kernel.  The binary heap uses it as space and cache
-> > efficient means of tree walking.
-> > 
-> > Any suggestions for improving the API appreciated...
-> > 
-> > #ifndef __LIBCFS_BHEAP_H__
-> > #define __LIBCFS_BHEAP_H__
-> > 
-> > /* Auto-array
-> >  * A sparse 1D contiguous array of pointers which uses 
-> single, double and
-> >  * triple indirection maps and avoids allocating large 
-> contiguous memory.
-> >  *
-> >  * FIXME: CAA_SHIFT should be defined automatically so that
-> >  * (CAA_SIZE == CFS_PAGE_SIZE/sizeof(void *))
-> >  */
-> > 
-> > #define CAA_SHIFT  10
-> > #define CAA_SIZE   (1 << CAA_SHIFT)             /* # ptrs 
-> per level */
-> > #define CAA_MASK   (CAA_SIZE - 1)
-> > #define CAA_NOB    (CAA_SIZE * sizeof(void *))
-> > 
-> > typedef struct
-> > {
-> >         void         ****aa_3d;                 /* Triple 
-> indirect */
-> >         void          ***aa_2d;                 /* double 
-> indirect */
-> >         void           **aa_1d;                 /* single 
-> indirect */
-> > } cfs_autoarray_t;
-> > 
-> > void   cfs_aa_init(cfs_autoarray_t *aa);         /* setup */
-> > void   cfs_aa_fini(cfs_autoarray_t *aa);         /* free 
-> all allocated mem */
-> > 
-> > /* effectively &aa[idx] but you MUST know &aa[idx] exists */
-> > void **cfs_aa_index(cfs_autoarray_t *aa, unsigned int idx);
-> > 
-> > /* effectively &aa[idx] - return NULL if &aa[idx] doesn't 
-> exist and 'grow' is
-> >  * FALSE */
-> > void **cfs_aa_lookup(cfs_autoarray_t *aa, unsigned int idx, 
-> int grow);
-> > 
-> > 
-> > /* Binary heap
-> >  *
-> >  * Supports insertion and ordered removal of members sorted 
-> by the given total
-> >  * order ('compare')
-> >  */
-> > 
-> > typedef struct
-> > {
-> >         cfs_autoarray_t  cbh_members;
-> >         unsigned int     cbh_size;
-> >         unsigned int     cbh_maxsize;
-> >         int            (*cbh_compare)(void *a, void *b);
-> > } cfs_binheap_t;
-> > 
-> > void  cfs_binheap_init(cfs_binheap_t *h, int 
-> (*compare)(void *a, void *b));
-> > void  cfs_binheap_fini(cfs_binheap_t *h);
-> > int   cfs_binheap_size(cfs_binheap_t *h);
-> > int   cfs_binheap_insert(cfs_binheap_t *h, void *e);
-> > void *cfs_binheap_remove_root(cfs_binheap_t *h);
-> > 
-> > #endif /* __LIBCFS_BHEAP_H__ */
-> > 
-> > _______________________________________________
-> > Lustre-devel mailing list
-> > Lustre-devel at clusterfs.com
-> > https://mail.clusterfs.com/mailman/listinfo/lustre-devel
-> > 
-> 
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: heapnd.c
-Type: application/octet-stream
-Size: 11486 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080104/b02040ab/attachment.obj>
+> (2) Have you checked the overhead when there are many concurrent
+> threads competing for the locks associated with your heap?  The
+> performance impact thereof?
+
+I've only done sequential timings so far.  NRS ops could be "Amdhal
+moments" for the whole server so fat SMPs might require some better
+care.
+
+> (3) Do you anticipate to merge the requests in any way, or possibly
+> batch execute them?
+
+Yes, but I'm such a lazy sod that I hope the disk elevator will smile
+on me.  If not and I have to roll up my sleeves - so be it.
+
+    Cheers,
+              Eric
