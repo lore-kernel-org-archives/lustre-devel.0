@@ -1,42 +1,26 @@
-From: Weikuan Yu <weikuan.yu@gmail.com>
-Date: Fri, 04 Jan 2008 12:00:30 -0500
+From: Lee Ward <lee@sandia.gov>
+Date: Fri, 04 Jan 2008 10:40:17 -0700
 Subject: [Lustre-devel] 2 primitives for the NRS
 In-Reply-To: <00d501c84ed6$e4fb2010$0281a8c0@ebpc>
 References: <00d501c84ed6$e4fb2010$0281a8c0@ebpc>
-Message-ID: <477E662E.30803@gmail.com>
+Message-ID: <1199468417.3722.522.camel@wheel>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+Hi Eric,
 
-I am trying to plug in an I/O request scheduler into OSS before read/write 
-requests get dispatched to the obdfilter. What I am using is hashed bins 
-with a basic rb tree, assuming it would be fairly reasonable to handle the 
-number of I/O requests that can reach an OSS. My interface calls are very 
-similar to yours, except the lack of plug-in comparison. I would not have 
-more to suggest on this. But I do have a couple of questions to check for 
-possible thoughts if you have.
+Wow! That is good. I had a similar need for another project and solved
+it using a splay tree. Overhead is ~2.5 usec/op for random inserts with
+unique keys and ~.04 usec/op for the ordered remove, at 1M records.
+Where might I get your implementation? Would like to see if I can adapt
+it for my project.
 
-(1) How are you going to order the requests, say the read/write ones? I 
-assume you made it flexible with a plug-in compare(). Would the order of the 
-I/O requests based on object ID have some relevance to their locality on the 
-disks? I was assuming at least the requests can get smoothed out with the 
-objID ordering.
+	--Lee
 
-(2) Have you checked the overhead when there are many concurrent threads 
-competing for the locks associated with your heap? The performance impact 
-thereof?
-
-(3) Do you anticipate to merge the requests in any way, or possibly batch 
-execute them?
-
---Weikuan
-
-
-Eric Barton wrote:
+On Fri, 2008-01-04 at 06:37 -0700, Eric Barton wrote:
 > What the NRS (network request scheduler) really needs is something
 > that can order 10**[4-6] RPC requests incredibly efficiently - any
 > overhead just eats into server efficiency and we already swamp a
@@ -54,11 +38,11 @@ Eric Barton wrote:
 > #ifndef __LIBCFS_BHEAP_H__
 > #define __LIBCFS_BHEAP_H__
 > 
-> /* Auto-array 
+> /* Auto-array
 >  * A sparse 1D contiguous array of pointers which uses single, double and
 >  * triple indirection maps and avoids allocating large contiguous memory.
 >  *
->  * FIXME: CAA_SHIFT should be defined automatically so that 
+>  * FIXME: CAA_SHIFT should be defined automatically so that
 >  * (CAA_SIZE == CFS_PAGE_SIZE/sizeof(void *))
 >  */
 > 
@@ -86,7 +70,7 @@ Eric Barton wrote:
 > 
 > 
 > /* Binary heap
->  * 
+>  *
 >  * Supports insertion and ordered removal of members sorted by the given total
 >  * order ('compare')
 >  */
