@@ -1,46 +1,32 @@
-From: Nathan Rutman <Nathan.Rutman@Sun.COM>
-Date: Tue, 08 Jan 2008 20:01:58 -0800
-Subject: [Lustre-devel] moving /proc to $MNT/.lustre
-In-Reply-To: <47836D1D.1090200@cray.com>
-References: <47618E96.3080709@sun.com>
-	<F8F87424-C3EE-45E7-838E-95E1047F521D@Sun.COM>
-	<4782665E.1070406@sun.com> <1199729436.23325.65.camel@pc.ilinx>
-	<20080107200718.GT3351@webber.adilger.int> <47836D1D.1090200@cray.com>
-Message-ID: <47844736.8020304@sun.com>
+From: Bernd Schubert <bs@q-leap.de>
+Date: Fri, 11 Jan 2008 23:39:57 +0100
+Subject: [Lustre-devel] Question about liblustre and Lustre 2.0
+In-Reply-To: <AD0589D8-8D0E-4A4D-9DA1-40868436BE6F@sun.com>
+References: <AD0589D8-8D0E-4A4D-9DA1-40868436BE6F@sun.com>
+Message-ID: <200801112339.57756.bs@q-leap.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Nicholas Henke wrote:
-> Andreas Dilger wrote:
->>
->> It wasn't mentioned here, but this is already planned.  There will be
->> new commands "lctl get_param" and "lctl set_param" (or similar) that
->> will be usable by scripts to get/set Lustre tunables.  This will work
->> with both /proc and .../.lustre files so will allow scripts to move
->> over to the new mechanism.
->>
->> For user-space servers there will be no alternative but to use the lctl
->> mechanism since /proc entries will not exist at all.  Then again, there
->> will not be any existing systems using the old mechanism since uOSS will
->> only work with ZFS.
->>
+On Wednesday 09 January 2008 00:44:02 Peter Bojanic wrote:
+> Hi,
 >
-> How is get_param/set_param going to work for the cases like clearing 
-> the LRU - where one might not know the names of all of the parameters:
+> A customer recently asked me a couple of questions about liblustre:
 >
-> for LRU in /proc/fs/lustre/ldlm/namespaces/*/lru_size; do echo clear > 
-> $LRU; done
+> 1. Does the Lustre Group anticipate any problems with supporting
+> liblustre in Lustre 2.0 and beyond?
 >
-> Nic
-In this particular case, there will not be a "namespaces" subdirectory 
--- there will be different files in the .lustre directories of different 
-mount points:
-/mnt/test/.lustre/ldlm/lru_size
-/mnt/fast2/.lustre/ldlm/lru_size
-etc
+> 2. Are there any opportunities for the Lustre Group, or Lustre users
+> in general, to leverage liblustre for any purposes in the future?
 
-But in general, if there are any non-predefined path names for userspace 
-server parameters, we'll have to add a lctl method of listing them.
+I still plan to write a fuse client based in liblustre, just didn't have the 
+time yet.
+
+Cheers,
+Bernd
+
+-- 
+Bernd Schubert
+Q-Leap Networks GmbH
