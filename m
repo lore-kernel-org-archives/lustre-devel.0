@@ -1,27 +1,28 @@
-From: Peter J. Braam <peter.braam@sun.com>
-Date: Sun, 13 Jan 2008 11:53:41 +0300
-Subject: [Lustre-devel] MDS Striping WP - Final PDF
-In-Reply-To: <4CA3166E-57B5-44E6-ADCD-E20304BA8413@Sun.COM>
-References: <47865F41.4050309@sun.com>
-	<4CA3166E-57B5-44E6-ADCD-E20304BA8413@Sun.COM>
-Message-ID: <b9aa6a570801130053s374c15e0ve6614e2998b1e10@mail.gmail.com>
+From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
+Date: Mon, 14 Jan 2008 23:54:05 +0300
+Subject: [Lustre-devel] moving /proc to $MNT/.lustre
+In-Reply-To: <4784460F.7000102@sun.com>
+References: <47618E96.3080709@sun.com>
+	<F8F87424-C3EE-45E7-838E-95E1047F521D@Sun.COM>
+	<4782665E.1070406@sun.com> <1199729436.23325.65.camel@pc.ilinx>
+	<20080107200718.GT3351@webber.adilger.int>
+	<69573950-6797-4203-8516-CB7B0FC3271E@sun.com>
+	<20080108064815.GC3351@webber.adilger.int> <47831DF3.2070107@sun.com>
+	<4784460F.7000102@sun.com>
+Message-ID: <478BCBED.8090600@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-CFS has prepared a description of the striping attributes that are in use in
-Lustre:
+Nathan Rutman wrote:
+> No - there will be plenty of other things in .lustre as well:
+> snapshots
+> log files
+> status indications
 
-http://arch.lustre.org/index.php?title=MDS_striping_format
+hmm. and how are we going to access that in case of userspace server?
+via client?
 
-Instrumental discussed this with us and suggested it would be nice to have
-standards for this kind of thing.   We wanted to inspire the pNFS teams in
-particular.
-
-
-- Peter -
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080113/5e580c49/attachment.htm>
+thanks, Alex
