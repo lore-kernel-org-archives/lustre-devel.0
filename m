@@ -1,28 +1,26 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Mon, 14 Jan 2008 23:54:05 +0300
-Subject: [Lustre-devel] moving /proc to $MNT/.lustre
-In-Reply-To: <4784460F.7000102@sun.com>
-References: <47618E96.3080709@sun.com>
-	<F8F87424-C3EE-45E7-838E-95E1047F521D@Sun.COM>
-	<4782665E.1070406@sun.com> <1199729436.23325.65.camel@pc.ilinx>
-	<20080107200718.GT3351@webber.adilger.int>
-	<69573950-6797-4203-8516-CB7B0FC3271E@sun.com>
-	<20080108064815.GC3351@webber.adilger.int> <47831DF3.2070107@sun.com>
-	<4784460F.7000102@sun.com>
-Message-ID: <478BCBED.8090600@sun.com>
+From: LEIBOVICI Thomas <thomas.leibovici@cea.fr>
+Date: Tue, 15 Jan 2008 10:21:10 +0100
+Subject: [Lustre-devel] ZFS-DMU benchmark on Linux
+Message-ID: <478C7B06.5020805@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Nathan Rutman wrote:
-> No - there will be plenty of other things in .lustre as well:
-> snapshots
-> log files
-> status indications
+Hi all,
 
-hmm. and how are we going to access that in case of userspace server?
-via client?
+You will find in attachment to this mail some benchmarks we made on 
+Linux with pios over ZFS-DMU.
+There are some interesting things about ZFS tuning and some ideas for 
+breaking a bottleneck we identified in DMU.
 
-thanks, Alex
+Thomas LEIBOVICI
+CEA/DAM - Ile de France
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ZFS_benchs_Linux.pdf
+Type: application/pdf
+Size: 99215 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080115/2e443814/attachment.pdf>
