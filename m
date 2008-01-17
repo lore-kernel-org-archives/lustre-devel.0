@@ -1,85 +1,75 @@
-From: Ricardo M. Correia <Ricardo.M.Correia@Sun.COM>
-Date: Tue, 15 Jan 2008 15:18:08 +0000
-Subject: [Lustre-devel] ZFS-DMU benchmark on Linux
-In-Reply-To: <478C7B06.5020805@cea.fr>
-References: <478C7B06.5020805@cea.fr>
-Message-ID: <478CCEB0.2050301@Sun.COM>
+From: Nikita Danilov <Nikita.Danilov@Sun.COM>
+Date: Thu, 17 Jan 2008 19:38:38 +0300
+Subject: [Lustre-devel] architecture: "windows" reintegration/recovery
+Message-ID: <18319.39197.737814.901049@gargle.gargle.HOWL>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Thomas,
+Hello,
 
-LEIBOVICI Thomas wrote:
-> You will find in attachment to this mail some benchmarks we made on 
-> Linux with pios over ZFS-DMU.
-> There are some interesting things about ZFS tuning and some ideas for 
-> breaking a bottleneck we identified in DMU.
+first a bit of clarification: this message is probably missing important
+context for a regular lustre-discuss@ reader, and moreover, discusses
+some ideas that were introduced only very recently and are documented
+nowhere. "Windows" in the following bear no relation to the certain
+software platform. :-)
 
-Those are some very, very interesting benchmarks.
+Windows architecture is at http://arch.lustre.org/index.php?title=Windows
 
-Regarding the "ZFS striping performance", you noticed that increasing 
-the number of threads beyond a certain point didn't improve performance, 
-in fact it actually decreased.
-I think that was something expected due to the fact that the DMU already 
-has a good streamlined I/O pipeline which already parallelizes I/O, and 
-increasing the number of threads greatly beyond the number of cpus 
-causes contention to increase which causes I/O throughput to decrease.
+It seems that there is a subtle point in windows recovery/reintegration
+algorithms, that wasn't spelled out during last meeting. Specifically,
+it is not clear when it is safe to discard already sent window from the
+sender memory. Formally, window can be discarded once it is guaranteed
+that it won't be required in the future by the roll-forward phase of the
+recovery. Which, in turn, means that window can be discarded once it is
+committed on all destination servers, but here lies a problem. Let's
+look at the particular example:
 
-However, it is in fact unfortunate that more luns didn't improve 
-performance. I wonder if you were hitting a CPU wall?
-In a previous benchmark I ran, I noticed that PIOS was not getting 
-improved throughput with more disks, even though there was still a 
-significant percentage of available CPU time.
-So I guess we still have opportunities to do good optimizations.
+Suppose that we have a client C0, talking to the proxy cluster,
+consisting of two servers S0 and S1 (source nodes), that in turn talk to
+the master servers D0 and D1 (destination nodes).
 
-The "ZIO threads" is also something that I highly suspected had an 
-impact in throughput, which is why when I benchmarked the DMU on the 
-Thumper I increased them from 8 to 24. It is good to have hard data that 
-confirms this.
+    - C0 creates a file "foo", and it so happens that the parent
+    directory, where name "foo" is inserted, is on S0, while new foo
+    inode is created on S1.
 
-The section about parallelizing checksums is something that the ZFS team 
-appears to have solved already.
-You can see this code section: 
-http://www.wizy.org/mercurial/zfs-lustre/file/49c2aaa6a859/src/lib/libzfscommon/include/sys/zio_impl.h#101
+    - Some time later S0 and S1 start merging their cached modifications
+    to the D0 and D1 respectively. S0 composes a window W0, containing
+    addition of "foo", and sends it to D0; S1 composes a window W1,
+    containing creation of new foo inode, and sends it to D1. W0 and W1
+    together are form what was previously known as an "epoch": they move
+    file system from one consistent state to another. 
 
-If you take a look at the "ZIO_WRITE_COMMON_STAGES", you will notice 
-that just before the "checksum generate" stage there is an "issue async" 
-stage. This "issue async" stage basically consists in dispatching the 
-I/O (ZIO) to the ZIO thread pool, which effectively causes them to be 
-parallelized. The I/O dependencies are automatically tracked by the ZIO 
-pipeline.
+    - Yet, destination servers commit windows independently. This means
+    that S0 cannot discard W0 from its memory once D0 committed W0,
+    because it may happen that W1 is still uncommitted on D1, and whole
+    "epoch" can be rolled-back by the recovery process.
 
-All in all, this was a very good report.
+It seems that some form of communication is needed to find out when
+given "source epoch" (that is, an epoch on the source cluster S0, S1,
+represented as a set of windows W0, W1) can be discarded. Obvious
+solutions are:
 
-So far we have only done very limited benchmarking and optimization, but 
-we are already starting to work on performance improvements. One of the 
-tasks of our next development cycle will be doing this kind of analysis 
-but, of course, the sooner we see this, the better :)
+    - let's source nodes communicate with each other to find out when
+    all windows in the epoch are committed on their respective
+    destination servers, or
 
-Great work and thanks for sharing this with us!
+    - let's destination nodes to communicate with each other to find out
+    when given epoch for a given source (there might be a large number
+    of proxy clusters and WBC clients connected to the same destination
+    cluster) is fully committed.
 
-Best regards,
-Ricardo
+    It seems very tempting to re-use CUT algorithm already ticking on
+    the destination server for this, but that seems to require for
+    source epochs to nest within destination epochs, which probably
+    isn't wanted, because it introduces additional synchronization
+    between source and destination clusters.
 
--- 
-<http://www.sun.com> 	
+Similar problems arise w.r.t. question of when it is safe to discard
+undo entries on the destination servers.
 
-*Ricardo Manuel Correia*
+Any ideas?
 
-Lustre Engineering
-*Sun Microsystems, Inc.*
-Portugal
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080115/d043c2df/attachment.htm>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 6g_top.gif
-Type: image/gif
-Size: 1257 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080115/d043c2df/attachment.gif>
+Nikita.
