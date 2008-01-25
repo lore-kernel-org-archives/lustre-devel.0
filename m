@@ -1,33 +1,23 @@
-From: LUCAS Patrice <patrice.lucas@cea.fr>
-Date: Fri, 25 Jan 2008 10:45:38 +0100
-Subject: [Lustre-devel] SNMP support enhancement (a quick improvement : the
- number of request per MDS)
-Message-ID: <4799AFC2.7070209@cea.fr>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Fri, 25 Jan 2008 12:37:17 -0800
+Subject: [Lustre-devel] Feed API draft for comment
+Message-ID: <479A487D.8020602@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+RFC:
+This is draft proposal API for the user-level interface for feeds.  
+(This does not describe changelogs in general).
 
-Is Lustre team thinking about changing or improving the snmp part of the code ?
-
-We think it could be profitable to be able to monitor Lustre client, OSS and
-MDS, as any common network device by using simple snmp requests.
-
-As an example of a quick improvement, I attached a patch that adds to
-snmp-agent the feature to give the number of requests processed by an MDS node.
-(This patch applies to the 1.6.2 lustre version.)
-
-(At the same time, I submit this subject on bugzilla.lustre.org : "bug enhancement" n?14729 )
-
-Thanks
-
-Patrice LUCAS
-CEA/DAM
-
+Feeds would generally be used for two things: creating audit logs, and 
+driving a database watching for filesystem changes.
 -------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: patch_snmp_MDSNBSAMPLEDREQ_lustre_1.6.2
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080125/428bf3a2/attachment.txt>
+A non-text attachment was scrubbed...
+Name: feed_api.pdf
+Type: application/pdf
+Size: 85313 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080125/a5b52ad2/attachment.pdf>
