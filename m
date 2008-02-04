@@ -1,40 +1,40 @@
-From: Peter J Braam <Peter.Braam@Sun.COM>
-Date: Mon, 04 Feb 2008 08:17:10 -0700
-Subject: [Lustre-devel] Feed API and Changelog HLD
-In-Reply-To: <47A38894.3020002@sun.com>
-References: <47A38894.3020002@sun.com>
-Message-ID: <47A72C76.7000206@sun.com>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Mon, 04 Feb 2008 14:39:36 -0800
+Subject: [Lustre-devel] [Fwd: feed api, rev2]
+In-Reply-To: <20080201231102.GA21120@webber.adilger.int>
+References: <47A16787.4030402@sun.com>
+	<20080201231102.GA21120@webber.adilger.int>
+Message-ID: <47A79428.9060702@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On page 10 of the changelog API: recursive behavior for directories in 
-filesets must exclude directories that are mount point of other filesets 
-(as implemented for the Path Forward a few years back).
-
-I didn't see where ABORT sizes are discussed, but as I mentioned before 
-there are few cases where ditching records is possible.
-
-The storage of the records should be discussed.  The llog headers may 
-need changes and probably the API's for canceling records will change to 
-indicate what consumer is canceling.
-
-It would be wise to discuss how disk full failures etc are handled in 
-some detail.
-
-- peter -
-
-Nathaniel Rutman wrote:
-> The Feed API is a subset of the Changelog HLD.
-> Changelog HLD is not complete, but hopefully decently fleshed out at 
-> this point.
+Andreas Dilger wrote:
 >
-> ------------------------------------------------------------------------
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+> With the change to force the "ONESHOT" behaviour, this hurts the ability
+> of the userspace process to pipeline operations.  No matter how large a
+> read the user process does, it will eventually have to finish processing
+> ALL of the records before it can read any more, or they will be lost on
+> the next read and any application failure will result in lost records
+> if they are not completely processed.  I preferred the ability to
+> explicitly cancel records.
 >   
+There are arguments on both sides.   I'd really like to stay away from 
+having
+multiple cancellation mechanisms though - I think this will be extra 
+work and
+extra confusion.
+With explicit cancel and a regular file we can have multiple readers all 
+reading the same audit log,
+which is a big plus. (Record would be purged at first cancel.) This adds 
+complication
+for the users though, which is a minus: they must now a) persistently 
+keep track of
+their last-processed record ID, b) explicitly cancel records, c) map 
+record numbers
+to file offsets.  I think c) is a real hassle.
+With explicit cancel and a FIFO we have a) and b), but not c), but not 
+multiple
+readers either.
