@@ -1,40 +1,40 @@
-From: Nikita Danilov <Nikita.Danilov@Sun.COM>
-Date: Sat, 02 Feb 2008 14:22:21 +0300
-Subject: [Lustre-devel] Reducing amount of glimpses
-In-Reply-To: <A1C83110-58BF-43A2-88F3-68C6C53BFB6C@sun.com>
-References: <A1C83110-58BF-43A2-88F3-68C6C53BFB6C@sun.com>
-Message-ID: <18340.21101.635645.378808@gargle.gargle.HOWL>
+From: Peter J Braam <Peter.Braam@Sun.COM>
+Date: Mon, 04 Feb 2008 08:17:10 -0700
+Subject: [Lustre-devel] Feed API and Changelog HLD
+In-Reply-To: <47A38894.3020002@sun.com>
+References: <47A38894.3020002@sun.com>
+Message-ID: <47A72C76.7000206@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Oleg Drokin writes:
- > Hello!
- > 
- >     Doing some large scale testing at ORNL, interesting pattern came up.
- >     Suppose we are doing large-scale IOR testing on a shared file.
- >     Some unlucky client does its writing at highest offset (or, at the  
- > beginning,
- >     was unlucky enough to grab whole-object PW lock).
- >     As other clients do their writes, they would do glimpses first to  
- > find out file
- >     size. Now those glimpses turn into thousands of glimpse requests  
- > to that poor
- >     client. And many of them actually coming in parallel.
+On page 10 of the changelog API: recursive behavior for directories in 
+filesets must exclude directories that are mount point of other filesets 
+(as implemented for the Path Forward a few years back).
 
-I think there is a way to further reduce the number of glimpses sent in
-the read/write paths. In a situation when client is doing read and the
-region being read ends in a certain stripe, it's often enough to send a
-glimpse request only to the OST where this stripe is located. Indeed, if
-stripe is not a hole, then size of this stripe alone is sufficient to
-determine whether we are in a short read situation or not. Of course if
-stripe happens to end in a hole, client needs to send more glimpses, but
-in the most common case of non-sparse file, 1 RPC seems to be enough.
+I didn't see where ABORT sizes are discussed, but as I mentioned before 
+there are few cases where ditching records is possible.
 
- > 
- > Bye,
- >      Oleg
+The storage of the records should be discussed.  The llog headers may 
+need changes and probably the API's for canceling records will change to 
+indicate what consumer is canceling.
 
-Nikita.
+It would be wise to discuss how disk full failures etc are handled in 
+some detail.
+
+- peter -
+
+Nathaniel Rutman wrote:
+> The Feed API is a subset of the Changelog HLD.
+> Changelog HLD is not complete, but hopefully decently fleshed out at 
+> this point.
+>
+> ------------------------------------------------------------------------
+>
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>   
