@@ -1,48 +1,101 @@
-From: Peter Bojanic <Peter.Bojanic@Sun.COM>
-Date: Thu, 07 Feb 2008 08:54:51 -0500
-Subject: [Lustre-devel] Lustre-devel Digest, Vol 23, Issue 6
-In-Reply-To: <mailman.1673.1202381583.15814.lustre-devel@lists.lustre.org>
-References: <mailman.1673.1202381583.15814.lustre-devel@lists.lustre.org>
-Message-ID: <CD6CEBBD-3613-478B-B6FE-F6D227001AA5@sun.com>
+From: Rick Matthews <Richard.Matthews@Sun.COM>
+Date: Thu, 07 Feb 2008 10:19:51 -0600
+Subject: [Lustre-devel] Lustre HSM HLD draft
+Message-ID: <47AB2FA7.10205@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Aur?lien,
+All,
+  I'm new to this list, so I'll start with apologies. My Lustre 
+background is
+also limited; a situation I hope to fix.
+  As part of the Solaris Software Archiving group, I was asked to review 
+the HSM HLD
+by my management. That review was sent to Peter Bojanic. He suggested I 
+get involved in
+the community discussion.
+  This is a posting of my original response, based on a copy of the HLD 
+which seems to
+be the one posted. I've made a couple of minor corrections.
 
-This is fantastic to see! Thanks so much for this contribution to  
-Lustre. I expect you're going to get a lot of interest and feedback.
+Page 1, 1, Define coordinator (space coordinator?),
+        define agent, (condense Part II intro, page 14)
+        (for me, MDT, MGS and OST)
 
-You may consider logging a bug and encourage feedback through  
-comments. This way, you can have a consolidated history of feedback.  
-Someone like Johann or Andreas can offer you more detailed guidance.
+Page 8, 3.8, "use" not "used" in second sentence
 
-Cheers,
-Bojanic
+Page 9, 3.8.2 et.al., "precised" (maybe, explicit or precise)
 
-> Date: Thu, 07 Feb 2008 11:52:55 +0100
-> From: DEGREMONT Aurelien <aurelien.degremont@cea.fr>
-> Subject: [Lustre-devel] Lustre HSM HLD draft
-> To: lustre-devel at lists.lustre.org
-> Message-ID: <47AAE307.9040305@cea.fr>
-> Content-Type: text/plain; charset="utf-8"
->
-> Hello
->
-> Here is a first draft for comments of the Lustre HSM HLD.
-> It is intended to be a support for further analyzes and comments from
-> CFS/Sun.
->
-> The document covers the main parts of the HSM features but some  
-> elements
-> are still lacking.
-> The policy management and the space manager will be describe later.
->
-> Let us know your comments and ideas about it.
->
-> Regards,
->
-> Aurelien Degremont
-> CEA
+Page 9, 3.8.4, Lustre ID "if" no path
+
+Page 10, 4.1, 1) When archived? (probably in Space Manager portion)
+        SAM-QFS archives well ahead of space need.
+
+        4) External object reference must be unusable, until 5.
+
+        4.2, 2) Implies only one copy per "version"...bad idea
+
+Page 12, 5.3, Last Sentence, This enables, not This ables
+
+        6.1, 100,000 migrations make current migration list operations
+                problematic (lets say want to move last migration to
+                be next migration).
+
+Page 13, Lustre object mtime may not be good enough. There are several
+        mechanisms (like touch) to manipulate mtime, which makes it
+        unusable as a last written time.
+
+Page 15, a variant on 1.5, ask for/return last valid byte offset
+        (perhaps within a range).
+
+Page 19, Special Path, does this boil down to invisible I/O?
+
+Page 23, 2.3 and 2.4, I'm assuming that lists of tuples can be processed
+        in any order.
+
+Page 25, 1, Punch - becomes "sparse" not "spare"
+
+I think this spec needs to be more consistent with its use of data range.
+It is confusing as laid out.
+
+Page 26, 3.2 space will be exhausted, or space will be low, not space 
+will be
+        missing.
+
+Page 28, protection of Lustre extended attributes?
+
+Issues:
+        The Space manager is likely the most important piece. There is no
+        detail on it. This is where archive and other policy is enforced.
+
+        The described HSM seems to follow the "copy out" when space needed,
+        then purge, model. This function (a Space Manager function) is 
+contrary
+        to SAM, and a shortfall of many HSMs.
+
+        File/object association is an important component of SAM.
+        For example, if I access a file in a source tree, I'm likely
+        to access the others as well.
+
+        The purge (3.2, Space manager needs to make room) and 4.1
+        "needs to be atomic" is a complex operations. Sequencing is
+        important.
+
+        Coordination between agents seems important. For example,
+        if agents requested new copy-outs on objects striped on
+        10 different stores, ordering them on tape seems difficult.
+
+        What is the backup story for Lustre? How does that play with
+        the HSM?
+
+-- 
+---------------------------------------------------------------------
+Rick Matthews                           email: Rick.Matthews at sun.com
+Sun Microsystems, Inc.                  phone:+1(651) 554-1518
+1270 Eagan Industrial Road              phone(internal): 54418
+Suite 160                               fax:  +1(651) 554-1540
+Eagan, MN 55121-1231 USA                main: +1(651) 554-1500		
+---------------------------------------------------------------------
