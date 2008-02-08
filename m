@@ -1,31 +1,23 @@
-From: Alex Lyashkov <Alexey.Lyashkov@Sun.COM>
-Date: Fri, 08 Feb 2008 19:54:32 +0200
+From: Ron <ron.rex@gmail.com>
+Date: Fri, 8 Feb 2008 11:03:26 -0800 (PST)
 Subject: [Lustre-devel] 2.6.23 kernel struct file_operations sendfile
-In-Reply-To: <243f2731-0369-4d16-9e1c-74ab010ea343@m34g2000hsb.googlegroups.com>
+In-Reply-To: <1202493272.6760.27.camel@bear.shadowland>
 References: <243f2731-0369-4d16-9e1c-74ab010ea343@m34g2000hsb.googlegroups.com>
-Message-ID: <1202493272.6760.27.camel@bear.shadowland>
+	<1202493272.6760.27.camel@bear.shadowland>
+Message-ID: <3b98d27b-5256-4adf-8e83-5efe1231a25b@s13g2000prd.googlegroups.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Ron,
-
-look into bugzilla bug 14250. 
-This bug include patch for buuld patchless client against vanila
-2.4.23/24.24 kernels.
-
-On Fri, 2008-02-08 at 07:21 -0800, Ron wrote:
-> Hi,
-> In trying (just to see what happens) to build against patchless
-> 2.6.23, I see that the
-> file_operations structure no longer has the sendfile field.  Has
-> anyone in the development
-> team thought of a way around this?
-> Thanks,
-> Ron
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+Hi Alex,
+great!, Thanks.
+I'm having trouble finding a version of the source that the patch will
+apply cleaning to.
+I've tried releases 1.6.0.1, 1.6.3, 1.6.4.1, 1.6.4.2 and then, from
+cvs, a checkout of a few days ago.
+Could you please, perhaps give me a cvs tag that I can use? or some
+other way to get a source tree (to apply the patch to) and then build
+against patchless 2.6.23.12?
+Thanks.
