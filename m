@@ -1,23 +1,36 @@
-From: Ron <ron.rex@gmail.com>
-Date: Fri, 8 Feb 2008 11:03:26 -0800 (PST)
-Subject: [Lustre-devel] 2.6.23 kernel struct file_operations sendfile
-In-Reply-To: <1202493272.6760.27.camel@bear.shadowland>
-References: <243f2731-0369-4d16-9e1c-74ab010ea343@m34g2000hsb.googlegroups.com>
-	<1202493272.6760.27.camel@bear.shadowland>
-Message-ID: <3b98d27b-5256-4adf-8e83-5efe1231a25b@s13g2000prd.googlegroups.com>
+From: Peter J Braam <Peter.Braam@Sun.COM>
+Date: Fri, 08 Feb 2008 13:37:48 -0700
+Subject: [Lustre-devel] [RFC] parallel enqueue
+In-Reply-To: <47AC75E3.7010901@sun.com>
+References: <47AC75E3.7010901@sun.com>
+Message-ID: <47ACBD9C.3060402@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Alex,
-great!, Thanks.
-I'm having trouble finding a version of the source that the patch will
-apply cleaning to.
-I've tried releases 1.6.0.1, 1.6.3, 1.6.4.1, 1.6.4.2 and then, from
-cvs, a checkout of a few days ago.
-Could you please, perhaps give me a cvs tag that I can use? or some
-other way to get a source tree (to apply the patch to) and then build
-against patchless 2.6.23.12?
-Thanks.
+Yes this is a good idea, but probably not extremely urgent.
+
+- Peter -
+
+Alex Zhuravlev wrote:
+> Hi,
+>
+> in some cases (truncate, append) we still use serialized enqueue
+> when all locks have to be enqueued synchronously one by one.
+>
+> what if we could mark all locks issued by single client with some
+> unique tag (timestamp + nid?), then enqueue them all and then, in
+> case of conflict, in blocking ast handler compare tag of conflicting
+> lock with own tag, cancel our granted locks if our tag is greater
+> than tag of conflicting lock and enqueue them again?
+>
+> thanks, Alex
+>
+>
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>   
