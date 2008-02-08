@@ -1,7 +1,7 @@
-From: Ron <ron.rex@gmail.com>
-Date: Fri, 8 Feb 2008 07:21:51 -0800 (PST)
-Subject: [Lustre-devel] 2.6.23 kernel struct file_operations sendfile
-Message-ID: <243f2731-0369-4d16-9e1c-74ab010ea343@m34g2000hsb.googlegroups.com>
+From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
+Date: Fri, 08 Feb 2008 18:31:47 +0300
+Subject: [Lustre-devel] [RFC] parallel enqueue
+Message-ID: <47AC75E3.7010901@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -9,10 +9,14 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 Hi,
-In trying (just to see what happens) to build against patchless
-2.6.23, I see that the
-file_operations structure no longer has the sendfile field.  Has
-anyone in the development
-team thought of a way around this?
-Thanks,
-Ron
+
+in some cases (truncate, append) we still use serialized enqueue
+when all locks have to be enqueued synchronously one by one.
+
+what if we could mark all locks issued by single client with some
+unique tag (timestamp + nid?), then enqueue them all and then, in
+case of conflict, in blocking ast handler compare tag of conflicting
+lock with own tag, cancel our granted locks if our tag is greater
+than tag of conflicting lock and enqueue them again?
+
+thanks, Alex
