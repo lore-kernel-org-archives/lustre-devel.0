@@ -1,205 +1,61 @@
-From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
-Date: Mon, 11 Feb 2008 12:33:03 -0800
+From: Ricardo M. Correia <Ricardo.M.Correia@Sun.COM>
+Date: Mon, 11 Feb 2008 21:11:43 +0000
 Subject: [Lustre-devel] Lustre HSM HLD draft
-In-Reply-To: <47B062BA.1070809@cea.fr>
-References: <47AAE307.9040305@cea.fr> <47ACC71C.7050808@sun.com>
-	<47B062BA.1070809@cea.fr>
-Message-ID: <47B0B0FF.7060805@sun.com>
+In-Reply-To: <20080211181850.GA6552@webber.adilger.int>
+References: <47AB2FA7.10205@Sun.COM> <47AC7B75.30603@cea.fr>
+	<20080211181850.GA6552@webber.adilger.int>
+Message-ID: <1202764303.6391.42.camel@localhost>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Aurelien Degremont wrote:
-> Nathaniel Rutman a ?crit :
->   
->> 5.1 external storage list - is this to be stored on the MGS device or a 
->> separate device?  If the coordinator lives on the MGS, why not it's 
->> storage as well?  In any case, it should be possible to co-locate the 
->> coordinator on the MGS and used the MGS's storage device, in the same 
->> way that the MGS can currently co-locate with the MDT.
->> How does the coordinator request activity from an agent?  If the 
->> coordinator is the RPC server, then it's up to the agents to make 
->> requests; agents aren't listening for RPC requests themselves.
->>     
->
-> Presently, it is never said that the coordinator will live on the MGS.
-> The Coordinator constrains are:
->   1 - Must receive various migration requests from OST/MDT.
->   2 - Should be able to communicate with Agents and asks them migrations.
->   3 - Should store configuration and migration logs.
->   
-> I think #1 and #2 are two differents API. The coordinator is clearly a 
-> RPC server for the first one. How #2 should be implemented is not so 
-> clear. What would be be the "Lustre-way" here?
->   
-With userspace servers, presumably we have some way of passing LNET 
-messages
-from kernel to userspace.  We should probably still go through LNET for 
-#2 in order
-to use the broadest range of network fabrics.  So it could be the same 
-or similar
-RPC.  There is no "Lustre-way" for this area - we've never done this 
-kind of thing before.
-> For #3, the few logs that will be backed up here are not huge, and it 
-> surely could be colocated with another Target, but I'm not sure this 
-> should be mandatory. This device should be available to several servers, 
-> for failover like the other Targets. We could imagine having more than 1 
-> coordinator at long term. I'm not sure it is a good idea to stick it to 
-> another target.
->   
-Not mandatory, but possible is nice.  Minimize the number of required 
-partitions.
->   
->> 6.3 object ref should include version number.  Also include checksum?
->>     
->
-> For data coherency? Should we add a explicit checksum for those values 
-> (stored in an EA) or used a possible backend feature (Can ZFS and 
-> ldiskfs detect EA value corruption by themselves?) ?
->   
-ZFS can, ldiskfs cannot.  Anyhow, it was just a thought.  Doesn't hurt 
-to allow space for it.
->   
->> 2.1Archiving one Lustre file
->> There should not be a cache miss when archiving a lustre file; perhaps 
->> open-by-fid is intended to bypass atime updates
->> so that the file isn't marked as "recently accessed"?
->>     
->  > Transparent access - should this avoid modification of atime/mtime?
->
-> I would say yes.
->
->   
->> 2.2Restoring a file
->> "External ID" presumably contains all information required to retrieve 
->> the file - tape #, path name, etc?
->> Once file is copied back, we should probably restore original ctime, 
->> mtime, atime - coordinator is storing this, correct?
->>     
->
-> External ID is an opaque value manage by the archiving tool. If the HSM 
-> can store a lot of metadata, only a ref is needed, if not, the tool is 
-> responsible for storing all the data it needs. Anyway, this is totally 
-> opaque for Lustre.
-> I hope the HSMs will not need so many data in this field. HPSS does not 
-> need so many data, it uses its internal DB to store them. I suppose SAM 
-> also.
->   
-What about restore of original ctime, mtime, atime?  I think we must 
-store it
-in the coordinator because we must work with all HSMs, and I think it is 
-important
-to restore it. 
+Hi,
 
->   
->> IV2 - why not multiple purged windows?  Seems like if you're going to 
->> purge 1 object out of a file, you might want to purge more.
->> Specifically, it will probably be a common case to purge every object of 
->> a file from a particular OST.  This is not contiguous in a
->> striped file.
->> I don't see any reason to purge anything smaller than an entire object 
->> on an OST - is there good reason for this? 
->>     
->
-> Multiple purged window is subtle. If you permit this feature, you could 
-> technically have, in the worst case, one purged window per byte, and 
-> this could be very huge to store. Do you think you will do several holes 
-> in the same file? In which cases?
->   
-Like I said, I don't see any reason to purge anything smaller than a 
-full object; I
-would in fact disallow purging of an arbitrary byte range, and only 
-allow purging
-on full-object boundaries.
-> In fact, the more common case is to totally purge a file which have been 
->   migrated on HSM, and it is only an optimisation to keep the start and 
-> the end of the file on disk, to avoid triggering tons of cache misses 
-> with commands like "file foo/*" or a tool like Nautilus or Windows 
-> Explorer browsing the directory.
->   
-Again, since Lustre is optimized to work with 1MB chunks anyhow, I don't 
-think
-it helps much to keep less than that in the beginning / end objects, so 
-I would
-say just keep the first and last blocks instead.
-> The purged window is stored by per object, OST object and MDT object.
-> So, if several objects are purged, each object will store its own purged 
-> window. But the MDT object describing this file will store a special 
-> purged window which starts at the smallest unavailable bytes and ends at 
-> the first available one. The MDT purged window indicates "if you do I/O 
-> in this range, you're not sure the date are there." or "Outside of this 
-> area, I guarantee data are present."
-> Maintain multiple purged windows will be an headache, with no real need 
-> I think.
-> Moreover, people have asked for an OST-object based migration, even if I 
-> think whole file migration will be the most common case.
->
->
->  > If that's the case, then it
->   
->> the OST must keep track of purged objects, not ranges within an existing 
->> object.
->>     
->
-> Objects are not removed, only their datas. All metadata are kept.
->
->   
->> If the MDT is tracking purged areas also, then there's a good potential 
->> synergy here with a missing OST --
->> If the missing OST's objects are marked as purged, then we can 
->> potentially recover them automatically from
->> HSM...
->>     
->
-> What do you call a "missing OST" ? A corrupt one ? A offline one? 
-> Unavailable?
->   
-Yes.  All of the above. Obviously we need to distinguish between 
-"permanently
-gone" and "temporarily gone".
-> Where will you copy back the object data ? On another OST object ?
->   
-Yes.  Some kind of recovery will take place to generate a new object on 
-a different OST and
-we can restore the data there.
-> With the purged window on each OST object and MDT and the file stripping 
-> info, we could easily restore the missing parts.
->   
-Exactly.  This is why I say we should think about this now, to allow for 
-this
-possibility.
->   
->> 4.2 How is a purge request recovered?  For example, MDT says purge obj1 
->> from ost1, ost1 replies "ok", but then dies before it actually
->> does the purge.  Reboots, doesn't know anything about purge request now, 
->> but MDT has marked it as purged.
->>     
->
-> The OST asynchronously acknowledges the purge when it is done. The MDT 
-> marks it purged only when it is really done. I will clarify this.
->
->   
->> V2.1 How long does OST wait for completion?  Is there a timeout?    We 
->> probably need a "no timeout if progress is being
->> made" kind of function - clients currently do this kind of thing with OSTs.
->>     
->
-> I'm sure Lustre already has similar mechanisms for optimized timeout in 
-> this kind of situation we could reused here.
-> What you describe is a good approach I think.
->
->   
->> V2.2 No need to copy-in purged data on full-object-size writes.
->>     
->
-> True. We could had such optimization. But this is only useful for small 
-> files or very widely stripped ones, doesn't it?
->   
-No, we very frequently write entire stripes (objects).  Lustre clients 
-can optimize for this.
->
-> Thanks for your comments.
->
->   
+On Seg, 2008-02-11 at 11:18 -0700, Andreas Dilger wrote:
+
+> On Feb 08, 2008  16:55 +0100, Aurelien Degremont wrote:
+> > But the touch could be problematic. Lustre gurus, is there another time 
+> > field we could use instead ? Should we add a 
+> > "last-modification-field-which-ignore-touch" ? Is this really a problem 
+> > is we use display a "touched" time ? In this case, we display what the 
+> > user set on the file, we suppose he did it in purpose.
+> 
+> (snip)
+> 
+> In ZFS I believe there is also a "last modified transaction group" (txg)
+> number stored with each dnode that could be used in a similar manner.
+
+
+Hmm.. I think ZFS only has zp_gen in the dnode/znode, which is the txg
+of the file creation. We also cannot use the txg birth time of the block
+where the dnode is stored because a metadnode block holds several
+dnodes.
+
+I may be missing something here, but isn't the "ctime" the appropriate
+value to use here?
+
+Regards,
+Ricardo
+
+--
+
+Ricardo Manuel Correia
+Lustre Engineering
+
+Sun Microsystems, Inc.
+Portugal
+Phone +351.214134023 / x58723
+Mobile +351.912590825
+Email Ricardo.M.Correia at Sun.COM
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080211/03b52971/attachment.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 6g_top.gif
+Type: image/gif
+Size: 1257 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080211/03b52971/attachment.gif>
