@@ -1,64 +1,109 @@
-From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
-Date: Tue, 12 Feb 2008 15:24:34 -0800
-Subject: [Lustre-devel] Lustre HSM HLD draft
-In-Reply-To: <20080212172321.GQ3029@webber.adilger.int>
-References: <47AAE307.9040305@cea.fr> <47ACC71C.7050808@sun.com>
-	<47B062BA.1070809@cea.fr> <47B0B0FF.7060805@sun.com>
-	<20080212035557.GP3029@webber.adilger.int>
-	<026801c86d67$01a0beb0$0281a8c0@ebpc> <47B1BA52.8040304@cea.fr>
-	<20080212172321.GQ3029@webber.adilger.int>
-Message-ID: <47B22AB2.9010109@sun.com>
+From: Ron <ron.rex@gmail.com>
+Date: Tue, 12 Feb 2008 16:50:43 -0800 (PST)
+Subject: [Lustre-devel] lustre client goes wacky?
+Message-ID: <b1b2daf5-5ad9-4384-b880-1686ee17c167@i29g2000prf.googlegroups.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Andreas Dilger wrote:
-> On Feb 12, 2008  16:25 +0100, Aurelien Degremont wrote:
->   
->> Eric Barton a ?crit :
->>     
->>> Sorry if these questions duplicates previous debate.
->>>
->>> Have I understood correctly that the design allows individual objects
->>> within a lustre file (i.e. stripes?) to be purged independently?
->>>
->>> If so why is this needed?
->>>
->>> I would have thought that when you purge a file, you need only record
->>> the purged extent as an attribute of the whole lustre file and punch
->>> its stripes to free the space.  Am I missing a use case?
->>>       
->> Since the beginning CFS required this feature. It seems a lab ask for 
->> it. I do not know who. Unfortunately we have no use case for what they 
->> want to do with this.
->> I'm wondering if their need could not be met with other features like 
->> the internal Lustre migration...
->>     
->
-> That is my understanding also - I believe one of the Labs wanted this
-> (to be able to do HSM on a per-stripe basis instead of a per-file basis).
->   
-This doesn't make any sense to me.  Layouts may change;
-a stripe on one filesystem may not correspond to a stripe on a replica 
-of the filesystem;
-exposing stripes to user apps is a bad idea.
+Hi,
+I don't know if this is a bug or it's it's a misconfig or something
+else.
 
-I'm going to propose what I think we need:
-1. Punch a single, arbitrary byte range from the middle of a file (thus
-    leaving beginning and end for file type, icons, filesize.
-2. No other arbitrary punch patterns.
-3. The punched range is stored on the MDT alone.
-4. Once punched, the OST may forget about any fully-punched stripes it
-    used to hold.
-5. Clients must take a layout lock (CR) when they retrieve the layout from
-    the MDT.  If the MDT punches from the middle, it revokes the layout 
-lock,
-    and clients must re-enqueue it for further read/write on the file.  
-The MDT
-    is the sole keeper of the layout, and it must be protected by a lock.
-6. Client access within a punched range results in an RPC to the MDT.  The
-    MDT decides where to put the restored data, organizes the restoration
-    (via the coordinator), and rewrites the layout (under lock, of course).
-    Client gets the new layout, and can contact the appropriate OST.
+What I have is:
+    server = 1.6.4.1+vanilla 2.6.18.8   (mgs+2*ost+mdt all on a single
+server)
+   clients = cvs.20080116+2.6.23.12
+
+I mounted the server from several clients and several hours later
+noticed the top display below.  dmesg show some lustre errors (also
+below).Can someone comment on what could be going on?
+
+Thanks,
+Ron
+
+top - 18:28:09 up 5 days,  3:36,  1 user,  load average: 12.00, 12.00,
+11.94
+Tasks: 168 total,  13 running, 136 sleeping,   0 stopped,  19 zombie
+Cpu(s):  0.0% us, 37.5% sy,  0.0% ni, 62.5% id,  0.0% wa,  0.0% hi,
+0.0% si
+Mem:  16468196k total,   526828k used, 15941368k free,    42996k
+buffers
+Swap:  4192924k total,        0k used,  4192924k free,   294916k
+cached
+
+  PID USER      PR  NI  VIRT  RES  SHR S %CPU %MEM    TIME+
+COMMAND
+ 1533 root      20   0     0    0    0 R  100  0.0 308:54.05
+ll_cfg_requeue
+32071 root      20   0     0    0    0 R  100  0.0 308:15.95
+socknal_reaper
+32073 root      20   0     0    0    0 R  100  0.0 308:48.90
+ptlrpcd
+    1 root      20   0  4832  588  492 R    0  0.0   0:02.48
+init
+    2 root      15  -5     0    0    0 S    0  0.0   0:00.00
+kthreadd
+
+
+Lustre: OBD class driver, info at clusterfs.com
+        Lustre Version: 1.6.4.50
+        Build Version: b1_6-20080210103536-
+CHANGED-.usr.src.linux-2.6.23.12-2.6.23.12
+Lustre: Added LNI 192.168.241.42 at tcp [8/256]
+Lustre: Accept secure, port 988
+Lustre: Lustre Client File System; info at clusterfs.com
+Lustre: Binding irq 17 to CPU 0 with cmd: echo 1 > /proc/irq/17/
+smp_affinity
+Lustre: MGC192.168.241.247 at tcp: Reactivating import
+Lustre: setting import datafs-OST0002_UUID INACTIVE by administrator
+request
+Lustre: datafs-OST0002-osc-ffff810241ad7800.osc: set parameter
+active=0
+LustreError: 32181:0:(lov_obd.c:230:lov_connect_obd()) not connecting
+OSC datafs-OST0002_UUID; administratively disabled
+Lustre: Client datafs-client has started
+Lustre: Request x7684 sent from MGC192.168.241.247 at tcp to NID
+192.168.241.247 at tcp 15s ago has timed out (limit 15s).
+LustreError: 166-1: MGC192.168.241.247 at tcp: Connection to service MGS
+via nid 192.168.241.247 at tcp was lost; in progress operations using
+this service will fail.
+LustreError: 32073:0:(import.c:212:ptlrpc_invalidate_import()) MGS: rc
+= -110 waiting for callback (1 != 0)
+LustreError: 32073:0:(import.c:216:ptlrpc_invalidate_import()) @@@
+still on sending list  req at ffff81040fa14600 x7684/t0 o400-
+>MGS at 192.168.241.247@tcp:26/25 lens 128/256 e 0 to 11 dl 1202843837
+ref 1 fl Rpc:EXN/0/0 rc -4/0
+Lustre: Request x7685 sent from datafs-MDT0000-mdc-ffff810241ad7800 to
+NID 192.168.241.247 at tcp 115s ago has timed out (limit 15s).
+Lustre: datafs-MDT0000-mdc-ffff810241ad7800: Connection to service
+datafs-MDT0000 via nid 192.168.241.247 at tcp was lost; in progress
+operations using this service will wait for recovery to complete.
+Lustre: MGC192.168.241.247 at tcp: Reactivating import
+Lustre: MGC192.168.241.247 at tcp: Connection restored to service MGS
+using nid 192.168.241.247 at tcp.
+LustreError: 32059:0:(events.c:116:reply_in_callback()) ASSERTION(ev-
+>mlength == lustre_msg_early_size()) failed
+LustreError: 32059:0:(tracefile.c:432:libcfs_assertion_failed()) LBUG
+
+Call Trace:
+ [<ffffffff88000b53>] :libcfs:lbug_with_loc+0x73/0xc0
+ [<ffffffff88007bd4>] :libcfs:libcfs_assertion_failed+0x54/0x60
+ [<ffffffff8815c746>] :ptlrpc:reply_in_callback+0x426/0x430
+ [<ffffffff88027f35>] :lnet:lnet_enq_event_locked+0xc5/0xf0
+ [<ffffffff88028475>] :lnet:lnet_finalize+0x1e5/0x270
+ [<ffffffff880625d9>] :ksocklnd:ksocknal_process_receive+0x469/0xab0
+ [<ffffffff88060350>] :ksocklnd:ksocknal_tx_done+0x80/0x1e0
+ [<ffffffff8806301c>] :ksocklnd:ksocknal_scheduler+0x12c/0x7e0
+ [<ffffffff8024e850>] autoremove_wake_function+0x0/0x30
+ [<ffffffff8024e850>] autoremove_wake_function+0x0/0x30
+ [<ffffffff8020c918>] child_rip+0xa/0x12
+ [<ffffffff88062ef0>] :ksocklnd:ksocknal_scheduler+0x0/0x7e0
+ [<ffffffff8020c90e>] child_rip+0x0/0x12
+
+LustreError: dumping log to /tmp/lustre-log.1202843942.32059
+Lustre: Request x7707 sent from MGC192.168.241.247 at tcp to NID
+192.168.241.247 at tcp 15s ago has timed out (limit 15s).
+Lustre: Skipped 2 previous similar messages
