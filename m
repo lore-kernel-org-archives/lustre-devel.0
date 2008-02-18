@@ -1,30 +1,30 @@
-From: Alex Lyashkov <Alexey.Lyashkov@Sun.COM>
-Date: Sun, 17 Feb 2008 13:27:05 +0200
-Subject: [Lustre-devel] Global generic database
-In-Reply-To: <20080216074046.GD3029@webber.adilger.int>
-References: <47B335B6.5010703@sun.com>
-	<200802152050.28398.alexander.zarochentsev@sun.com>
-	<20080216074046.GD3029@webber.adilger.int>
-Message-ID: <1203247625.2203.23.camel@bear.shadowland>
+From: Nikita Danilov <Nikita.Danilov@Sun.COM>
+Date: Mon, 18 Feb 2008 21:49:13 +0300
+Subject: [Lustre-devel] WBC HLD: next round
+Message-ID: <18361.54057.703866.863905@gargle.gargle.HOWL>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sat, 2008-02-16 at 00:40 -0700, Andreas Dilger wrote:
-> 
-> There won't immediately be a /proc replacement for uOSS.  Instead,
-> there
-> will be a new "lctl {get,set}_param" command that reads/writes the
-> same proc entries.  At some later time we will make a .lustre/proc
-> directory which will allow access to the files currently in /proc,
-> possibly also allowing access to /proc values on all lustre nodes.
-> That hasn't been designed yet, but would definitely be convenient. 
-I think we can put all parameters into sysctl tree and write simple
-wraper for userland tools. 
-Which add functions for register/list/access to sysctl node.
+Hello,
 
--- 
-Alex Lyashkov <Alexey.lyashkov@sun.com>
-Lustre Group, Sun Microsystems
+please take a look at the next version of the High Level Design
+specification for the Write-Back Cache subsystem, that has Use Cases and
+Logical Specification sections fleshed out.
+
+I'd appreciate any comments, especially on the topics marked with "Q!"
+on a margin.
+
+Peter, can you please take a look at the description of a security hole
+on page 10?
+
+Nikita.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: wbc-hld.pdf
+Type: application/pdf
+Size: 128230 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080218/a0032b99/attachment.pdf>
