@@ -1,82 +1,34 @@
-From: Canon, Richard Shane <canonrs@ornl.gov>
-Date: Mon, 18 Feb 2008 16:51:35 -0500
-Subject: [Lustre-devel] Lustre HSM HLD draft
-In-Reply-To: <47AAE307.9040305@cea.fr>
-References: <47AAE307.9040305@cea.fr>
-Message-ID: <537C6C0940C6C143AA46A88946B854170C2EFE91@ORNLEXCHANGE.ornl.gov>
+From: Yuriy Umanets <Yury.Umanets@Sun.COM>
+Date: Mon, 18 Feb 2008 23:57:04 +0200
+Subject: [Lustre-devel] Global generic database
+In-Reply-To: <47B335B6.5010703@sun.com>
+References: <47B335B6.5010703@sun.com>
+Message-ID: <47B9FF30.6040409@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Nathaniel Rutman wrote:
+> The design of various new features in Lustre call for global (filesystem 
+> wide) databases, accessible from
+> clients or other servers:
+> A. pools - pool descriptions (pool #1 = OSTs 1-10,30-60), pool policies 
+> (all .jpg files to pool #1)
+> B. filesets - fileset policies (log creates on fileset #1 to feed "foo")
+> C. HSM - (aureleien - what was the use case here?)
+>
+> We've already implemented at least 2 of these:
+> D. Fid Location Database - (is this done?)
+>   
+This is basic service in new MDS stack. Though its implementation lacks 
+DHT support as it was designed originally. Currently it uses round-robin 
+as a policy for spreading parts of FLD over MDS nodes in a cluster. 
+Another issue is that, originally intention was to make whole Lustre FLD 
+aware but now only MDS nodes store parts of FLD as only MDS uses new fids.
 
-Aurelien and JC,
+Thanks.
 
-Sorry that my feedback is late.  Here are my questions/remarks.
-
-General
-* Any thought on how quotas will be handled?
-
-Coordinator
-* 3.4 - I was curious what the precise use case was that was driving
-this?  I don't disagree with it, but I was curious for more background
-* 3.7.1 - The coordinator could become a scaling bottleneck.  We should
-think about how this will be scaled in the future
-* 4.1 - Does the coordinator store the ext obj id or does the agent
-* 4.3 item 2 - This looks like the coordinator could become a bottle
-neck for unlinks and slow down performance.  Could this be put in some
-type of async queue to be processed later (or some type of attic space)?
-
-Use Cases
-* 2.3 (Use cases) - I'm really keen on this feature.  I think it is very
-important in order to make small file performance work well.
-Unfortunately, it isn't clear how the file list gets communicated to the
-archive tool.  The coordinator and agent seem to only take one file at a
-time.  So how would this work exactly?
-* 2.4 - The copy tool should be allowed to preemptively restage files.
-I think this will work with the design, but we should make sure of this.
-This would be useful for restaging a whole tar file versus doing things
-piece-meal.
-
-Part IV
-2 EAs - I'm worried that the EA list could get huge for holes.
-3.2 -item 3 - Who insures a file is archived before punches are made?
-3.3 - Another use case...  The user checks to see if a file has been
-archived.
-
-
-Also, someone earlier made the point about the archive tool being able
-to reorder request.  This is really important since an archival system
-wants to know all the files being restaged in order to order tape mounts
-and reads.  
-
-Thanks for taking the lead on this.  It looks like there is a lot of
-interest in it.
-
---Shane
-
------Original Message-----
-From: lustre-devel-bounces@lists.lustre.org
-[mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of DEGREMONT
-Aurelien
-Sent: Thursday, February 07, 2008 5:53 AM
-To: lustre-devel at lists.lustre.org
-Subject: [Lustre-devel] Lustre HSM HLD draft
-
-Hello
-
-Here is a first draft for comments of the Lustre HSM HLD.
-It is intended to be a support for further analyzes and comments from
-CFS/Sun.
-
-The document covers the main parts of the HSM features but some elements
-are still lacking.
-The policy management and the space manager will be describe later.
-
-Let us know your comments and ideas about it.
-
-Regards,
-
-Aurelien Degremont
-CEA
+-- 
+umka
