@@ -1,12 +1,12 @@
 From: Yuriy Umanets <Yury.Umanets@Sun.COM>
-Date: Tue, 19 Feb 2008 16:28:38 +0200
+Date: Tue, 19 Feb 2008 16:30:34 +0200
 Subject: [Lustre-devel] storing SOM epoch in EA
-In-Reply-To: <47BAC6FC.7020404@sun.com>
+In-Reply-To: <47BAC7D4.3010007@sun.com>
 References: <47BAA607.1000600@sun.com> <47BAAF3F.6030301@sun.com>
 	<200802191359.47379.vitaly@sun.com> <47BAB962.8010901@sun.com>
 	<47BABB01.8060402@sun.com> <47BAC53A.2030106@sun.com>
-	<47BAC6FC.7020404@sun.com>
-Message-ID: <47BAE796.1040403@sun.com>
+	<47BAC7D4.3010007@sun.com>
+Message-ID: <47BAE80A.8050702@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,46 +14,19 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 Alex Zhuravlev wrote:
-> I guess there is some sort of misunderstanding here.
->
-> we don't need fid->epoch mapping. we only need epoch along with other
-> inode attributes. epoch is fixed size (8 bytes, probably few more for
-> flags in future)
->
->   
-Alex,
+> btw, are you proposing to store LOV in global IAM?
+by "LOV" you mean LOV EA? If yes, well, this is too radical idea seems, 
+but it may be worse to think on. Finally using IAM with it will cost 
+almost nothing in meaning of additional development. IAM should be ready 
+for that.
 
-Yes, this is what I understand as well. And we were discussing that EA 
-approach has some downsides. In fact what you propose, that is, store it 
-in EA is logical taking into account that epoch is kind of extension to 
-inode fields. It is property of inode-object. It is logical to store it 
-with inode, I see your point. But as we saw, this has/may have some 
-downsides which may be solved with IAM. Just take this in mind when you 
-think/work on it. I do not see why IAM is such a bad here.
+Nikita, is there any limitations for value size in IAM?
 
 Thanks.
+>
 > thanks, Alex
 >
->
 > Yuriy Umanets wrote:
->   
->> Alex Zhuravlev wrote:
->>     
->>> Yuriy Umanets wrote:
->>>   
->>>       
->>>> EA is separate block is evil. It makes things slow.
->>>>     
->>>>         
->>> we have fast EAs (stored in inode, this is why we make them large) for years.
->>>   
->>>       
->> Well, people used horses for ages but this did not stop them from 
->> building cars :) Guys, I gave you idea, not worse than using EAs. I will 
->> not insist it is great. If you can't estimate its value yourself, well, 
->> let it be. We have such a nice thing as IAM and you keep talking about 
->> EAs...
->>
 >> Seriously, IMHO what is bad about EAs:
 >>
 >> 1. You need to control their size, you need to bother;
@@ -68,13 +41,7 @@ Thanks.
 >>
 >> Thanks.
 >>
->>     
 >
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
->   
 
 
 -- 
