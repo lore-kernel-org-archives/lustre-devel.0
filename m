@@ -1,41 +1,22 @@
 From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Tue, 19 Feb 2008 15:09:32 +0300
+Date: Tue, 19 Feb 2008 15:13:08 +0300
 Subject: [Lustre-devel] storing SOM epoch in EA
 In-Reply-To: <47BAC53A.2030106@sun.com>
 References: <47BAA607.1000600@sun.com> <47BAAF3F.6030301@sun.com>
 	<200802191359.47379.vitaly@sun.com> <47BAB962.8010901@sun.com>
 	<47BABB01.8060402@sun.com> <47BAC53A.2030106@sun.com>
-Message-ID: <47BAC6FC.7020404@sun.com>
+Message-ID: <47BAC7D4.3010007@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I guess there is some sort of misunderstanding here.
-
-we don't need fid->epoch mapping. we only need epoch along with other
-inode attributes. epoch is fixed size (8 bytes, probably few more for
-flags in future)
-
+btw, are you proposing to store LOV in global IAM?
 
 thanks, Alex
 
-
 Yuriy Umanets wrote:
-> Alex Zhuravlev wrote:
->> Yuriy Umanets wrote:
->>   
->>> EA is separate block is evil. It makes things slow.
->>>     
->> we have fast EAs (stored in inode, this is why we make them large) for years.
->>   
-> Well, people used horses for ages but this did not stop them from 
-> building cars :) Guys, I gave you idea, not worse than using EAs. I will 
-> not insist it is great. If you can't estimate its value yourself, well, 
-> let it be. We have such a nice thing as IAM and you keep talking about 
-> EAs...
-> 
 > Seriously, IMHO what is bad about EAs:
 > 
 > 1. You need to control their size, you need to bother;
