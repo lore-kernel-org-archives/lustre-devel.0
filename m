@@ -1,35 +1,64 @@
 From: Andreas Dilger <adilger@sun.com>
-Date: Tue, 19 Feb 2008 13:13:52 -0700
+Date: Tue, 19 Feb 2008 13:19:04 -0700
 Subject: [Lustre-devel] storing SOM epoch in EA
-In-Reply-To: <47BAE80A.8050702@sun.com>
-References: <47BAA607.1000600@sun.com> <47BAAF3F.6030301@sun.com>
-	<200802191359.47379.vitaly@sun.com> <47BAB962.8010901@sun.com>
-	<47BABB01.8060402@sun.com> <47BAC53A.2030106@sun.com>
-	<47BAC7D4.3010007@sun.com> <47BAE80A.8050702@sun.com>
-Message-ID: <20080219201352.GP3029@webber.adilger.int>
+In-Reply-To: <05e801c8730c$87cbc7a0$0281a8c0@ebpc>
+References: <47BAA607.1000600@sun.com> <05e801c8730c$87cbc7a0$0281a8c0@ebpc>
+Message-ID: <20080219201904.GQ3029@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Feb 19, 2008  16:30 +0200, Yuriy Umanets wrote:
-> Alex Zhuravlev wrote:
-> by "LOV" you mean LOV EA? If yes, well, this is too radical idea seems, 
-> but it may be worse to think on. Finally using IAM with it will cost 
-> almost nothing in meaning of additional development. IAM should be ready 
-> for that.
+On Feb 19, 2008  15:31 +0000, Eric Barton wrote:
+> Rather than discussing this one EA at a time, should we not
+> consider any other EAs (e.g. being considered in current 
+> architecture work) that might contend for space in the inode?
+
+I wouldn't object to this.  There were several other proposals to add
+EAs to the inode, but individually the overhead is high.  If we have
+a single aggregated EA struct for Lustre that would be more reasonable.
+
+> > -----Original Message-----
+> > From: lustre-devel-bounces at lists.lustre.org 
+> > [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of 
+> > Alex Zhuravlev
+> > Sent: 19 February 2008 9:49 AM
+> > To: lustre-devel at lists.lustre.org
+> > Subject: [Lustre-devel] storing SOM epoch in EA
+> > 
+> > Good day,
+> > 
+> > some time ago we discussed that it would be very helpful to
+> > store epoch in inode on mds. the perfect solution could be
+> > to store epoch in old inode body, but there is no much space
+> > for this in the body and with DMU we'll have this problem
+> > again.
+> > 
+> > given the minimal inode size we use on MDS is 512 bytes, we
+> > can store upto 13 stripes in the body. larger EAs go to a
+> > dedicated block. if we add 8 byte epoch, then we can store
+> > upto 12 stripes in the body. so, epoch stored in EA affects
+> > only files with exactly 13 stripes. files with different
+> > stripes are unaffected at all.
+> > 
+> > couple lesser concerns are:
+> > 1) cpu usage
+> > 2) epoch on old filesystem with insufficient inode space
+> > 
+> > any objections to use EA to store SOM epoch?
+> > 
+> > thanks, Alex
+> > _______________________________________________
+> > Lustre-devel mailing list
+> > Lustre-devel at lists.lustre.org
+> > http://lists.lustre.org/mailman/listinfo/lustre-devel
+> > 
 > 
-> Nikita, is there any limitations for value size in IAM?
-
-One of the major problems with IAM is that e2fsck doesn't work with it,
-it will only exist for ldiskfs (though ZAP works for DMU), and there is
-a consistency issue between items stored in IAM and in rest of filesystem.
-
-If e2fsck deletes an inode, it will not delete entry in IAM, so now we
-have to patch e2fsck to understand not only IAM, but also specific uses
-of IAM that link items there to inodes in another place.  I don't think
-that introducing dependence on IAM is practical.
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
 
 Cheers, Andreas
 --
