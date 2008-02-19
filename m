@@ -1,24 +1,51 @@
-From: Vitaly Fertman <vitaly@sun.com>
-Date: Tue, 19 Feb 2008 18:28:05 +0300
+From: Eric Barton <eeb@sun.com>
+Date: Tue, 19 Feb 2008 15:31:43 +0000
 Subject: [Lustre-devel] storing SOM epoch in EA
-In-Reply-To: <47BAF252.9050409@sun.com>
-References: <47BAA607.1000600@sun.com> <op.t6r08rkfatmt0c@garden>
-	<47BAF252.9050409@sun.com>
-Message-ID: <200802191828.05848.vitaly@sun.com>
+In-Reply-To: <47BAA607.1000600@sun.com>
+References: <47BAA607.1000600@sun.com>
+Message-ID: <05e801c8730c$87cbc7a0$0281a8c0@ebpc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-> I did not mean to put whole inode in IAM. I meant only put there fid as 
-> key and epoch as value. So way to access epoch is shorter with IAM as no 
-> need to load inode. But these all need to be well thought as all your 
-> mention more seeks, new reads, etc.
+Rather than discussing this one EA at a time, should we not
+consider any other EAs (e.g. being considered in current 
+architecture work) that might contend for space in the inode?
 
-as Alex already mentioned, we do not need fid->ioepoch mapping.
-ioepoch is a tag for inode attributes and all them need to be loaded
-together, i.e. there is a need to load inode anyway.
-
--- 
-Vitaly
+> -----Original Message-----
+> From: lustre-devel-bounces at lists.lustre.org 
+> [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of 
+> Alex Zhuravlev
+> Sent: 19 February 2008 9:49 AM
+> To: lustre-devel at lists.lustre.org
+> Subject: [Lustre-devel] storing SOM epoch in EA
+> 
+> Good day,
+> 
+> some time ago we discussed that it would be very helpful to
+> store epoch in inode on mds. the perfect solution could be
+> to store epoch in old inode body, but there is no much space
+> for this in the body and with DMU we'll have this problem
+> again.
+> 
+> given the minimal inode size we use on MDS is 512 bytes, we
+> can store upto 13 stripes in the body. larger EAs go to a
+> dedicated block. if we add 8 byte epoch, then we can store
+> upto 12 stripes in the body. so, epoch stored in EA affects
+> only files with exactly 13 stripes. files with different
+> stripes are unaffected at all.
+> 
+> couple lesser concerns are:
+> 1) cpu usage
+> 2) epoch on old filesystem with insufficient inode space
+> 
+> any objections to use EA to store SOM epoch?
+> 
+> thanks, Alex
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+> 
