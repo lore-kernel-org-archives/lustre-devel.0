@@ -1,29 +1,62 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Tue, 19 Feb 2008 17:47:29 +0300
+From: Mikhail Pershin <Mikhail.Pershin@Sun.COM>
+Date: Tue, 19 Feb 2008 17:59:05 +0300
 Subject: [Lustre-devel] storing SOM epoch in EA
-In-Reply-To: <47BAE796.1040403@sun.com>
+In-Reply-To: <47BAC53A.2030106@sun.com>
 References: <47BAA607.1000600@sun.com> <47BAAF3F.6030301@sun.com>
 	<200802191359.47379.vitaly@sun.com> <47BAB962.8010901@sun.com>
 	<47BABB01.8060402@sun.com> <47BAC53A.2030106@sun.com>
-	<47BAC6FC.7020404@sun.com> <47BAE796.1040403@sun.com>
-Message-ID: <47BAEC01.5050102@sun.com>
+Message-ID: <op.t6r08rkfatmt0c@garden>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Yuriy Umanets wrote:
-> Yes, this is what I understand as well. And we were discussing that EA 
-> approach has some downsides. In fact what you propose, that is, store it 
-> in EA is logical taking into account that epoch is kind of extension to 
-> inode fields. It is property of inode-object. It is logical to store it 
-> with inode, I see your point. But as we saw, this has/may have some 
-> downsides which may be solved with IAM. Just take this in mind when you 
-> think/work on it. I do not see why IAM is such a bad here.
+On Tue, 19 Feb 2008 15:02:02 +0300, Yuriy Umanets <Yury.Umanets@Sun.COM>  
+wrote:
 
-1) additional seek(s)
-2) shared structure (additional cost on concurrent access)
-3) inode is already 512 bytes
+> Alex Zhuravlev wrote:
+>> Yuriy Umanets wrote:
+>>
+>>> EA is separate block is evil. It makes things slow.
+>>>
+>>
+>> we have fast EAs (stored in inode, this is why we make them large) for  
+>> years.
+>>
+> Well, people used horses for ages but this did not stop them from
+> building cars :) Guys, I gave you idea, not worse than using EAs. I will
+> not insist it is great. If you can't estimate its value yourself, well,
+> let it be. We have such a nice thing as IAM and you keep talking about
+> EAs...
+>
+> Seriously, IMHO what is bad about EAs:
+>
+> 1. You need to control their size, you need to bother;
+> 2. Large-fast inodes make create/lookup slow. You need to load this
+> thing to memory after all. I think this is complement to additional
+> seeks caused by IAM;
 
-thanks, Alex
+but this is still better than extra block for EA or IAM. Btw IAM data is  
+also in memory and takes it no less than extra inode size possibly
+
+> 3. Storing epoch in EA makes you use this chain to access epoch:
+> fid->inode->epoch (in EA), IAM makes it shorter: fid->epoch (in IAM);
+
+not true actually. inode will be read anyway until you are proposing to  
+put whole inode body in IAM, so there is no benefits. Moreover inode->ea  
+is direct mapping while fid->epoch will need index lookup and may invoke  
+several blocks to read if IAM is large and it will be large in this case,  
+so IO will be not better than even EA in extra block.
+
+> 4. Large inodes consume more RAM;
+
+this is the same as 2.
+
+Guys, don't forget about DMU as well.
+
+-- 
+Mikhail Pershin
+Staff Engineer
+Lustre Group
+Sun Microsystems, Inc
