@@ -1,34 +1,16 @@
-From: Yuriy Umanets <Yury.Umanets@Sun.COM>
-Date: Mon, 18 Feb 2008 23:57:04 +0200
-Subject: [Lustre-devel] Global generic database
-In-Reply-To: <47B335B6.5010703@sun.com>
-References: <47B335B6.5010703@sun.com>
-Message-ID: <47B9FF30.6040409@sun.com>
+From: yokoyama <yok@shibatsu.co.jp>
+Date: Tue, 19 Feb 2008 12:08:21 +0900
+Subject: [Lustre-devel] Thank you
+Message-ID: <47BA4825.3090506@shibatsu.co.jp>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Nathaniel Rutman wrote:
-> The design of various new features in Lustre call for global (filesystem 
-> wide) databases, accessible from
-> clients or other servers:
-> A. pools - pool descriptions (pool #1 = OSTs 1-10,30-60), pool policies 
-> (all .jpg files to pool #1)
-> B. filesets - fileset policies (log creates on fileset #1 to feed "foo")
-> C. HSM - (aureleien - what was the use case here?)
->
-> We've already implemented at least 2 of these:
-> D. Fid Location Database - (is this done?)
->   
-This is basic service in new MDS stack. Though its implementation lacks 
-DHT support as it was designed originally. Currently it uses round-robin 
-as a policy for spreading parts of FLD over MDS nodes in a cluster. 
-Another issue is that, originally intention was to make whole Lustre FLD 
-aware but now only MDS nodes store parts of FLD as only MDS uses new fids.
+Thank you very much for your mailng many report for Lustre to me
+long time.
 
-Thanks.
+But I will retire Shinatsu coprporation next month.
 
--- 
-umka
+And  please stop these mails.
