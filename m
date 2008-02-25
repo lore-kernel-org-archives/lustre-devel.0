@@ -1,69 +1,51 @@
-From: Alexander Zarochentsev <Alexander.Zarochentsev@Sun.COM>
-Date: Mon, 25 Feb 2008 00:01:40 +0300
-Subject: [Lustre-devel] subtree locks and path re-validation avoidance
-In-Reply-To: <1203080062.19279.91.camel@linux.site>
-References: <1203080062.19279.91.camel@linux.site>
-Message-ID: <200802250001.40778.alexander.zarochentsev@sun.com>
+From: Chad Kerner <ckerner@ncsa.uiuc.edu>
+Date: Mon, 25 Feb 2008 10:06:16 -0600 (CST)
+Subject: [Lustre-devel] problem starting an mds
+Message-ID: <Pine.LNX.4.64.0802251004060.9289@ckerner.ncsa.uiuc.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+Hello,
 
-On 15 February 2008 15:54:22 Vladimir V. Saveliev wrote:
-> Hello
+ 	I have an mds with 16 ost's, when I try to start the MDS, I am 
+getting the following errors in syslog:
 
-[...]
+Feb 25 08:44:57 linc-io17  Lustre: 
+10510:0:(llog_obd.c:160:cat_cancel_cb()) processing log 
+0x13fd84c:c271bef6 at index 124 of catalog 0x13fd802
+Feb 25 08:44:57 linc-io17  LustreError: 
+10510:0:(llog_lvfs.c:552:llog_lvfs_create()) error looking up logfile 
+0x13fd84c:0xc271bef6: rc -2
+Feb 25 08:44:57 linc-io17  LustreError: 
+10510:0:(llog_cat.c:158:llog_cat_id2handle()) error opening log id 
+0x13fd84c:c271bef6: rc -2
+Feb 25 08:44:57 linc-io17  LustreError: 
+10510:0:(llog_obd.c:165:cat_cancel_cb()) Cannot find handle for log 
+0x13fd84c
+Feb 25 08:44:57 linc-io17  LustreError: 
+10510:0:(llog_obd.c:232:llog_obd_origin_setup()) llog_process with 
+cat_cancel_cb failed: -2
+Feb 25 08:44:57 linc-io17  LustreError: 
+10510:0:(lov_log.c:204:lov_llog_init()) error osc_llog_init 0
+Feb 25 08:44:57 linc-io17  LustreError: 
+10510:0:(mds_log.c:197:mds_llog_init()) error lov_llog_init
+Feb 25 08:44:57 linc-io17  LustreError: 
+10510:0:(llog_obd.c:322:llog_cat_initialize()) rc: -2
+Feb 25 08:44:57 linc-io17  LustreError: 
+10510:0:(mds_lov.c:240:mds_lov_connect()) failed to initialize catalog 
+-2
 
->
-> The problem appears when clients request locks on objects directly,
-> without doing downward lookup through a directory structure.
-> This happens, for example, when clients access directly components of
-> current working directories (CWDs).
-> If a client cancels locks on such objects (either due to a BAST or
-> voluntary) - it has to go through the path re-validation later.
->
-> Objects to which a client may access directly appear in result of
-> normal downward lookup. Therefore, they were locked, and their locks
-> can be canceled. That is the point where we can take care about
-> future accesses without re-validation.
 
-what to do if a lookup looses all its locks due to a conflict with STL 
-holder? Of course the parent lock can be correctly re-acquired but the 
-lookup result may be incorrect -- the result lock may be done for 
-STL-cached object.
+Was wondering if anyone else had seen a similar problem or had any 
+places I should start looking.
 
-There is a more detailed example:
-
-Suppose parent lock in a lookup step has been lost before acquiring a 
-lock on child. If we don't want to perform path re-validation we have 
-to inform any STL-holder that the child is not-stl-lockable. I think 
-the problem looks even worse, any ancestor of the revoked parent should 
-be not-stl-lockable.
-
-When lookup (C1) holding at least one lock, the lock is a barrier for 
-STL-holder, who can't go over the lock into the subtree. Once C1 looses 
-all its locks, an STL-holder may leak into the subtree, cache those 
-locks and cause locking correctness problems.
-
-I suggest any STL-holder to switch to ordinary locks mode when going 
-over that parent dir. The parent dir would have a marker: "well, STL 
-behave not well under this dir, please use ordinary locks instead".
-
-> On canceling a lock of directly accessible object we have to inform
-> DLM that the ordinary locking has to be used for that object. That
-> will prevent the object from getting cached under a subtree lock.
->
-> The problem with this schema is to determine which objects are
-> directly accessible. But wouldn't solving it be worth doing given
-> that it may help to avoid path re-validation deal.
->
-> Any comments are welcome.
->
-> Best regards,
-> Vladimir
->
-
-Thanks.
+Thanks,
+Chad
+--
+Chad Kerner - ckerner at ncsa.uiuc.edu
+Systems Engineer, Storage Enabling Technologies
+National Center for Supercomputing Applications
+http://www.ncsa.uiuc.edu/~ckerner
