@@ -1,79 +1,114 @@
 From: Peter J Braam <Peter.Braam@Sun.COM>
-Date: Mon, 25 Feb 2008 15:38:16 -0700
+Date: Mon, 25 Feb 2008 15:44:24 -0700
 Subject: [Lustre-devel] Lustre HSM HLD draft
-In-Reply-To: <47BD980F.50201@cea.fr>
-References: <47AAE307.9040305@cea.fr> <47BD980F.50201@cea.fr>
-Message-ID: <47C34358.6050806@sun.com>
+In-Reply-To: <537C6C0940C6C143AA46A88946B854170C2EFE91@ORNLEXCHANGE.ornl.gov>
+References: <47AAE307.9040305@cea.fr>
+	<537C6C0940C6C143AA46A88946B854170C2EFE91@ORNLEXCHANGE.ornl.gov>
+Message-ID: <47C344C8.8090203@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Just a few initial responses from me, I haven't read things 
+systematically yet.
 
+Canon, Richard Shane wrote:
+> Aurelien and JC,
+>
+> Sorry that my feedback is late.  Here are my questions/remarks.
+>
+> General
+> * Any thought on how quotas will be handled?
+>
+>   
+This is very very important and will require a lot of detail.  Well 
+spotted Shane!!!
+> Coordinator
+> * 3.4 - I was curious what the precise use case was that was driving
+> this?  I don't disagree with it, but I was curious for more background
+>   
+In internal migrations many objects will be restriped to another set of 
+objects to move the data.  The coordinator handles the completion and 
+abortion of the agents accomplishing this.
+> * 3.7.1 - The coordinator could become a scaling bottleneck.  We should
+> think about how this will be scaled in the future
+>   
+In my writings I was always anticipating a family of load balancing 
+coordinators.
+> * 4.1 - Does the coordinator store the ext obj id or does the agent
+>   
+Coordinator, I suggest, in view of the fact that many agents may be 
+required to move one file.
+> * 4.3 item 2 - This looks like the coordinator could become a bottle
+> neck for unlinks and slow down performance.  Could this be put in some
+> type of async queue to be processed later (or some type of attic space)?
+>
+>   
+I agree with this.
 
-Aurelien Degremont wrote:
+> Use Cases
+> * 2.3 (Use cases) - I'm really keen on this feature.  I think it is very
+> important in order to make small file performance work well.
+> Unfortunately, it isn't clear how the file list gets communicated to the
+> archive tool.  The coordinator and agent seem to only take one file at a
+> time.  So how would this work exactly?
+> * 2.4 - The copy tool should be allowed to preemptively restage files.
+> I think this will work with the design, but we should make sure of this.
+> This would be useful for restaging a whole tar file versus doing things
+> piece-meal.
+>
+> Part IV
+> 2 EAs - I'm worried that the EA list could get huge for holes.
+>   
+The EA merely points to an extent tree (similar to the allocation extent 
+tree).
+> 3.2 -item 3 - Who insures a file is archived before punches are made?
+>   
+The coordinator.
+> 3.3 - Another use case...  The user checks to see if a file has been
+> archived.
+>
+>
+> Also, someone earlier made the point about the archive tool being able
+> to reorder request.  This is really important since an archival system
+> wants to know all the files being restaged in order to order tape mounts
+> and reads.  
+>
+> Thanks for taking the lead on this.  It looks like there is a lot of
+> interest in it.
+>
+> --Shane
+>
+> -----Original Message-----
+> From: lustre-devel-bounces at lists.lustre.org
+> [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of DEGREMONT
+> Aurelien
+> Sent: Thursday, February 07, 2008 5:53 AM
+> To: lustre-devel at lists.lustre.org
+> Subject: [Lustre-devel] Lustre HSM HLD draft
+>
 > Hello
 >
-> I've got several wondering about some specific point in HSM 
-> implementation and I would like your opinion about them.
+> Here is a first draft for comments of the Lustre HSM HLD.
+> It is intended to be a support for further analyzes and comments from
+> CFS/Sun.
 >
-> Coordinator:
+> The document covers the main parts of the HSM features but some elements
+> are still lacking.
+> The policy management and the space manager will be describe later.
 >
-> This element will manage migration externally (HSM) and internally of 
-> Lustre (space balancing?). Is the current API acceptable (specific calls 
-> for external migration, and other ones for internal migration)?
-I would like to see a parameter indicating what agent will be used and 
-keep all other parameters the same.
->  The best 
-> way could have been to have generic call for migration, but we must also 
-> have generic objects to describe the migration sources and destinations 
-> and those are not simples.
-For migration to and from external sources, Lustre must already manage 
-this data in an extended attribute (e.g. to describe the file on tape to 
-which a Lustre file was migrated).  This data is opaque to Lustre and 
-can be passed as a blob.
->  We finally conclude with the API presented in 
-> the HLD document. Tell me if this is *really* a bad idea or if only 
-> adjustments are needed.
+> Let us know your comments and ideas about it.
 >
->   
-I have not yet looked at these.
-
-> We presented two modes of migration, explicit and implicit migrations. 
-> The first one result of an administrative request, the second one was 
-> triggered automatically (cache miss by example). Is that ok? (See the 
-> doc for all details).
->   
-Yes, that seems ok.
-> Agent:
+> Regards,
 >
-> It seems, to support Lustre internal migration, you have planned to 
-> implement specific Agents which will reside on OST.
-To avoid many complications involving locks, we decided that even the 
-agents used for internal migrations will layer on the file system.  The 
-Lustre file system will be mounted on the OST's and it will use the 
-"LOLND" to transport the data efficiently between the OST process and 
-the client file system cache.  In the internal case source and 
-destination lie in Lustre in the HSM case only one of them.
-
-As a result I believe these two cases are closer together than you may 
-think, and should be one "type".
-
-The key aspect we/you need to design is what an agent has to make sure 
-happens, for example in terms of locking file extents and in terms of 
-avoiding triggering a recursive cache miss (open by fid with a flag?).
-
-- Peter -
-
->  HSM will need 
-> specific agent on clients. Do those two kinds of agent are acceptable ? 
-> The current API only describe HSM-based agent. Maybe we should think of 
-> a generic agent framework and add specialized implementations for 
-> ost,hsm,etc ?
+> Aurelien Degremont
+> CEA
 >
->   
-
-
 >
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
 >   
