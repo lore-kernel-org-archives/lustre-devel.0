@@ -1,114 +1,82 @@
-From: Peter J Braam <Peter.Braam@Sun.COM>
-Date: Mon, 25 Feb 2008 15:44:24 -0700
+From: Aurelien Degremont <aurelien.degremont@cea.fr>
+Date: Wed, 27 Feb 2008 17:51:04 +0100
 Subject: [Lustre-devel] Lustre HSM HLD draft
-In-Reply-To: <537C6C0940C6C143AA46A88946B854170C2EFE91@ORNLEXCHANGE.ornl.gov>
-References: <47AAE307.9040305@cea.fr>
-	<537C6C0940C6C143AA46A88946B854170C2EFE91@ORNLEXCHANGE.ornl.gov>
-Message-ID: <47C344C8.8090203@sun.com>
+In-Reply-To: <47C34358.6050806@sun.com>
+References: <47AAE307.9040305@cea.fr> <47BD980F.50201@cea.fr>
+	<47C34358.6050806@sun.com>
+Message-ID: <47C594F8.20409@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Just a few initial responses from me, I haven't read things 
-systematically yet.
 
-Canon, Richard Shane wrote:
-> Aurelien and JC,
->
-> Sorry that my feedback is late.  Here are my questions/remarks.
->
-> General
-> * Any thought on how quotas will be handled?
->
->   
-This is very very important and will require a lot of detail.  Well 
-spotted Shane!!!
-> Coordinator
-> * 3.4 - I was curious what the precise use case was that was driving
-> this?  I don't disagree with it, but I was curious for more background
->   
-In internal migrations many objects will be restriped to another set of 
-objects to move the data.  The coordinator handles the completion and 
-abortion of the agents accomplishing this.
-> * 3.7.1 - The coordinator could become a scaling bottleneck.  We should
-> think about how this will be scaled in the future
->   
-In my writings I was always anticipating a family of load balancing 
-coordinators.
-> * 4.1 - Does the coordinator store the ext obj id or does the agent
->   
-Coordinator, I suggest, in view of the fact that many agents may be 
-required to move one file.
-> * 4.3 item 2 - This looks like the coordinator could become a bottle
-> neck for unlinks and slow down performance.  Could this be put in some
-> type of async queue to be processed later (or some type of attic space)?
->
->   
-I agree with this.
+Peter J Braam a ?crit :
+>> Coordinator:
+>>
+>> This element will manage migration externally (HSM) and internally of 
+>> Lustre (space balancing?). Is the current API acceptable (specific 
+>> calls for external migration, and other ones for internal migration)?
+> I would like to see a parameter indicating what agent will be used and 
+> keep all other parameters the same.
 
-> Use Cases
-> * 2.3 (Use cases) - I'm really keen on this feature.  I think it is very
-> important in order to make small file performance work well.
-> Unfortunately, it isn't clear how the file list gets communicated to the
-> archive tool.  The coordinator and agent seem to only take one file at a
-> time.  So how would this work exactly?
-> * 2.4 - The copy tool should be allowed to preemptively restage files.
-> I think this will work with the design, but we should make sure of this.
-> This would be useful for restaging a whole tar file versus doing things
-> piece-meal.
->
-> Part IV
-> 2 EAs - I'm worried that the EA list could get huge for holes.
->   
-The EA merely points to an extent tree (similar to the allocation extent 
-tree).
-> 3.2 -item 3 - Who insures a file is archived before punches are made?
->   
-The coordinator.
-> 3.3 - Another use case...  The user checks to see if a file has been
-> archived.
->
->
-> Also, someone earlier made the point about the archive tool being able
-> to reorder request.  This is really important since an archival system
-> wants to know all the files being restaged in order to order tape mounts
-> and reads.  
->
-> Thanks for taking the lead on this.  It looks like there is a lot of
-> interest in it.
->
-> --Shane
->
-> -----Original Message-----
-> From: lustre-devel-bounces at lists.lustre.org
-> [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of DEGREMONT
-> Aurelien
-> Sent: Thursday, February 07, 2008 5:53 AM
-> To: lustre-devel at lists.lustre.org
-> Subject: [Lustre-devel] Lustre HSM HLD draft
->
-> Hello
->
-> Here is a first draft for comments of the Lustre HSM HLD.
-> It is intended to be a support for further analyzes and comments from
-> CFS/Sun.
->
-> The document covers the main parts of the HSM features but some elements
-> are still lacking.
-> The policy management and the space manager will be describe later.
->
-> Let us know your comments and ideas about it.
->
-> Regards,
->
-> Aurelien Degremont
-> CEA
->
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
->   
+Agreed.
+
+>>  The best way could have been to have generic call for migration, but 
+>> we must also have generic objects to describe the migration sources 
+>> and destinations and those are not simples.
+> For migration to and from external sources, Lustre must already manage 
+> this data in an extended attribute (e.g. to describe the file on tape to 
+> which a Lustre file was migrated).  This data is opaque to Lustre and 
+> can be passed as a blob.
+>> It seems, to support Lustre internal migration, you have planned to 
+>> implement specific Agents which will reside on OST.
+> To avoid many complications involving locks, we decided that even the 
+> agents used for internal migrations will layer on the file system.  The 
+> Lustre file system will be mounted on the OST's and it will use the 
+> "LOLND" to transport the data efficiently between the OST process and 
+> the client file system cache.  In the internal case source and 
+> destination lie in Lustre in the HSM case only one of them.
+> 
+> As a result I believe these two cases are closer together than you may 
+> think, and should be one "type".
+
+
+If we unify the API, we must have a way to request some data movement like:
+
+copy elemA in placeP
+copy elemA,stored in placeP bak into Lustre
+copy elemA into placeC
+move elemB into elemB
+
+
+The elem could be unified using Lustre FID, but the places could be an 
+external storage, or a precise OST. If we want a unify API, the API call 
+should manipulate a generic object which could describe a Lustre storage 
+element (ost) or a external storage (hsm,...)
+
+ie:
+   struct storage_place {
+     ...
+   }
+   copy(fid,storage_place*)
+   move(fid,storage_place*)
+
+and their is some specific cases to handle. The other possibity:
+
+   ext_copyout(fid, external storage)
+   ext_copyin(fid, external object)
+   int_copy(fid, fid, ost)
+   int_move(fid, fid, ost)
+
+I think this one, even if the design is not the most beautiful one, if 
+the easiest one.
+
+Instead you want to create some new generic objects to manipulate lustre 
+object data and generic storage areas, the second case is the best one IMO.
+
+
+-- 
+Aurelien Degremont
+CEA
