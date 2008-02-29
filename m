@@ -1,15 +1,29 @@
-From: Andrew C. Uselton <acuselton@lbl.gov>
-Date: Fri, 29 Feb 2008 13:38:21 -0800
+From: Stephen Sugiyama <sss@cray.com>
+Date: Fri, 29 Feb 2008 16:56:20 -0600
 Subject: [Lustre-devel] Thoughts on benchmarking
-In-Reply-To: <20080229211014.GQ2997@webber.adilger.int>
-References: <47C336C8.4090108@lbl.gov>
-	<20080229211014.GQ2997@webber.adilger.int>
-Message-ID: <47C87B4D.7070803@lbl.gov>
+In-Reply-To: <47C87B4D.7070803@lbl.gov>
+References: <47C336C8.4090108@lbl.gov><20080229211014.GQ2997@webber.adilger.int>
+	<47C87B4D.7070803@lbl.gov>
+Message-ID: <925346A443D4E340BEB20248BAFCDBDF044CCFB6@CFEVS1-IP.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Hi Andrew and Andreas,
+
+In December franklin was running Lustre 1.4.9 (plus various
+patches).  Today franklin is running Lustre 1.4.11.
+
+Stephen Sugiyama
+
+
+-----Original Message-----
+From: lustre-devel-bounces@lists.lustre.org [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Andrew C. Uselton
+Sent: Friday, February 29, 2008 1:38 PM
+To: lustre-devel at lists.lustre.org
+Subject: Re: [Lustre-devel] Thoughts on benchmarking
 
 Howdy Andreas,
    Long time no electron :)
@@ -63,3 +77,8 @@ Andreas Dilger wrote:
 > Sr. Staff Engineer, Lustre Group
 > Sun Microsystems of Canada, Inc.
 > 
+
+_______________________________________________
+Lustre-devel mailing list
+Lustre-devel at lists.lustre.org
+http://lists.lustre.org/mailman/listinfo/lustre-devel
