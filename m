@@ -1,48 +1,46 @@
-From: Vladimir V. Saveliev <Vladimir.Saveliev@Sun.COM>
-Date: Fri, 29 Feb 2008 17:05:12 +0200
-Subject: [Lustre-devel] subtree locks and path re-validation avoidance
-In-Reply-To: <47BF8FBA.3090705@sun.com>
-References: <1203080062.19279.91.camel@linux.site> <47BD7D0D.6090906@sun.com>
-	<47BF8FBA.3090705@sun.com>
-Message-ID: <1204297512.24711.20.camel@linux.site>
+From: Andreas Dilger <adilger@sun.com>
+Date: Fri, 29 Feb 2008 13:10:14 -0800
+Subject: [Lustre-devel] Thoughts on benchmarking
+In-Reply-To: <C3ECC828.A1C%peter.braam@sun.com>
+References: <47C336C8.4090108@lbl.gov>
+Message-ID: <20080229211014.GQ2997@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello
+On Feb 28, 2008  20:20 -0700, Peter J. Braam wrote:
+> I see some worrying dips in the graphs - can our I/O specialists comment on
+> which ones are understood and which are not?
 
-On Fri, 2008-02-22 at 20:15 -0700, Peter J Braam wrote:
-> I'd like to make a suggestion to perhaps immediately find the right 
-> primitives for getcwd to return a reasonably correct pathname in 
-> Lustre.
+I think one of the major problems that Andrew discusses at the end of
+the test runs is described in bug 7365 "Poor performance when files share
+an OSC".  I didn't see anywhere in the paper which version of Lustre was
+being tested, but I know we did some work to improve the round-robin
+allocator to make it more uniform in more recent releases, up to a
+certain extent.
 
-Peter, would you say a bit more about that:
+That said, getting completely uniform file distribution will still need
+some effort, because the MDS doesn't do any correlation between create
+requests (e.g. from a single job, from a single client, etc).
 
-currently, there is nothing a filesystem can do in linux's getcwd. It
-simply returns instant dcache path from "." to "/". 
+> On 2/25/08 2:44 PM, "Andrew C. Uselton" <acuselton@lbl.gov> wrote:
+> >   I'd been in conversation with Cliff White over the last few weeks, and
+> > he'd expressed an interest in having me post a draft of a report I've
+> > been working on.  If you've already heard of it here it is.  For those
+> > who hadn't I'll try to describe it briefly.
+> > 
+> >   In December I assisted with some Lustre benchmark tests on the
+> > Franklin Cray XT here at NERSC.  Since then I've tried to summarize our
+> > analysis and results.  The attached pdf is a draft of that summary.  The
+> > introduction is almost completely useless, so feel free to skip (unless
+> > you want to have a laugh at the author's expense).  Section 3 has the
+> > main details about what we observed and what we thought about it.
+> > Section 2 may be amusing for those (like me) who care about methodology.
 
->   I believe this is the simplest case where I have seen pathname 
-> revalidation being important.  In the context of that example the 
-> subtree lock discussion might gain more clarity.
-> 
-> I would also like to note that I had a discussion with Linus at one of 
-> the kernel workshops in Ottawa maybe almost 4-5 years ago.  First Linus 
-> attacked the idea of using file identifiers - he suggested that doing 
-> everything with pathnames was better (which is what InterMezzo did).   
-> When we explained to him that this requires locking all parents he began 
-> to see the problems we had with this and understood the locking at the 
-> fid/name level that we use in Lustre.  I found little resistance when I 
-> mentioned to him that for this model the VFS does not have a correct 
-> implementation of getcwd, unless the dcache is kept current.
-> 
-> UCSC has received funding from the National Labs and now been turned 
-> into a peta-scale I/O institute I believe did more results on file 
-> systems implemented with pathnames.  Some things are beautiful and easy 
-> with pathnames, but others get really ugly, and so far I don't see this 
-> displacing fid ideas that govern NFS, AFS and Lustre.
-> 
-
-Best regards,
-Vladimir
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
