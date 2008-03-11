@@ -1,47 +1,32 @@
-From: Kilian CAVALOTTI <kilian@stanford.edu>
-Date: Tue, 11 Mar 2008 11:12:35 -0700
-Subject: [Lustre-devel] Feature request: expand SNMP scope
-Message-ID: <200803111112.35170.kilian@stanford.edu>
+From: Andreas Dilger <adilger@sun.com>
+Date: Tue, 11 Mar 2008 12:19:04 -0600
+Subject: [Lustre-devel] lu_dirent changes for zfs based mds
+In-Reply-To: <47D667EC.4050107@sun.com>
+References: <47D667EC.4050107@sun.com>
+Message-ID: <20080311181904.GP5851@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+On Mar 11, 2008  16:37 +0530, pravin shelar wrote:
+> Hi All,
+>         Lustre based on zfs need a change readdir page wire protocol.
+> 
+> lu_dirent->lde_hash maintains iterator cookie. with zfs - zap cursor API 
+> we have 64bit cookie (ref. zap_cursor_serialize()). So we need to change 
+> this lde_hash to 64 bit.
+> This changes layout of readdir pages which is transmitted on wire, so we 
+> need to merge it into head asap.
 
-After a discussion started on lustre-discuss@ [1], I'd like to join 
-other users [2] to make an official feature request about the Lustre 
-SNMP module.
+Note for the record that the 1.8 readdir wire protocol is already different
+from that used by 1.6 (because of use of FID and ability to have cross-MDT
+references for CMD) so changing the wire format again (before the 1.8 release)
+is not a problem.  No release is yet using the new format.
 
-I believe it could be extremely useful for Lustre systems administrators 
-to get more than just the number of free space and available objects 
-from the SNMP module.  For instance, it could be interesting to get the 
-following live stats through SNMP:
-on clients: /proc/fs/lustre/llite/*/stats 
-on OSSes:   /proc/fs/lustre/obdfilter/*/stats 
-on MDSes:   /proc/fs/lustre/mds/*/stats on MDSes.
-
-But it would be especially interesting to not limit the SNMPable values 
-to just a subset of what's available in /proc/fs/lustre. Since it looks 
-like some work has begun to rework the Lustre /proc structure [3], 
-maybe it would be the right opportunity to incorporate SNMP more 
-closely into the new UI. The idea being to translate everything 
-available in /proc into SNMP variables, so that future variables could 
-be exported too, without having to explicitly add them to the SNMP 
-code.
-
-I have little idea on how easily this can be achieved, but that would be 
-an excellent foundation stone for next-to-come Lustre monitoring 
-systems.
-
-[1]http://lists.lustre.org/pipermail/lustre-discuss/2008-March/005277.html
-[2]http://lists.lustre.org/pipermail/lustre-devel/2008-January/001504.html, 
-and bug #14729
-[3]http://lists.lustre.org/pipermail/lustre-devel/2008-January/001475.html
-
-Thanks!
+Cheers, Andreas
 --
-Kilian
-
-PS: I also created bug #15197 to keep track of this.
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
