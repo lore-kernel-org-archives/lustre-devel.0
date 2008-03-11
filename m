@@ -1,23 +1,26 @@
-From: Alexander Zarochentsev <Alexander.Zarochentsev@Sun.COM>
-Date: Fri, 07 Mar 2008 18:49:08 +0300
-Subject: [Lustre-devel] Epochs HLD
-Message-ID: <200803071849.08695.alexander.zarochentsev@sun.com>
+From: pravin shelar <Pravin.Shelar@Sun.COM>
+Date: Tue, 11 Mar 2008 16:37:24 +0530
+Subject: [Lustre-devel] lu_dirent changes for zfs based mds
+Message-ID: <47D667EC.4050107@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello,
+Hi All,
+        Lustre based on zfs need a change readdir page wire protocol.
 
-please take a look on first version of Epochs HLD.
+lu_dirent->lde_hash maintains iterator cookie. with zfs - zap cursor API 
+we have 64bit cookie (ref. zap_cursor_serialize()). So we need to change 
+this lde_hash to 64 bit.
+This changes layout of readdir pages which is transmitted on wire, so we 
+need to merge it into head asap.
+
+I have posted patch on bugzilla : 
+https://bugzilla.lustre.org/attachment.cgi?id=15817&action=edit
+
+plz post your comment there.
 
 Thanks,
-Zam.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: epochs-hld.pdf
-Type: application/pdf
-Size: 60785 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080307/a35147a4/attachment.pdf>
+Pravin.
