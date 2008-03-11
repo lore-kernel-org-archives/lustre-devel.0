@@ -1,160 +1,47 @@
-From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Tue, 11 Mar 2008 11:00:13 -0700
-Subject: [Lustre-devel] Metadata Write Back Cache - review
-In-Reply-To: <18390.43888.833221.303657@gargle.gargle.HOWL>
-Message-ID: <C3FC16BD.2BE1%peter.braam@sun.com>
+From: Kilian CAVALOTTI <kilian@stanford.edu>
+Date: Tue, 11 Mar 2008 11:12:35 -0700
+Subject: [Lustre-devel] Feature request: expand SNMP scope
+Message-ID: <200803111112.35170.kilian@stanford.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I wanted to ask one more question.  The MDS multithreading is being
-mentioned below with an indication that version recovery will take care of
-this.  
+Hi,
 
-But is version recovery really replacing ordinary recovery? Otherwise this
-argument is not correct.  Iirc version recovery has slightly different
-semantics.
+After a discussion started on lustre-discuss@ [1], I'd like to join 
+other users [2] to make an official feature request about the Lustre 
+SNMP module.
 
-- Peter -
+I believe it could be extremely useful for Lustre systems administrators 
+to get more than just the number of free space and available objects 
+from the SNMP module.  For instance, it could be interesting to get the 
+following live stats through SNMP:
+on clients: /proc/fs/lustre/llite/*/stats 
+on OSSes:   /proc/fs/lustre/obdfilter/*/stats 
+on MDSes:   /proc/fs/lustre/mds/*/stats on MDSes.
 
+But it would be especially interesting to not limit the SNMPable values 
+to just a subset of what's available in /proc/fs/lustre. Since it looks 
+like some work has begun to rework the Lustre /proc structure [3], 
+maybe it would be the right opportunity to incorporate SNMP more 
+closely into the new UI. The idea being to translate everything 
+available in /proc into SNMP variables, so that future variables could 
+be exported too, without having to explicitly add them to the SNMP 
+code.
 
-On 3/11/08 8:55 AM, "Nikita Danilov" <Nikita.Danilov@Sun.COM> wrote:
+I have little idea on how easily this can be achieved, but that would be 
+an excellent foundation stone for next-to-come Lustre monitoring 
+systems.
 
-> [I am duplicating this to lustre-rabbit-team at sun.com, because
-> lustre-devel at lists.lustre.org black-holed my previous attempt to
-> distribute this.]
-> 
-> Peter Braam writes:
->> Hi -
-> 
-> Hello,
-> 
-> here is an update of HLD. Not all review points are addressed so far,
-> but I think it makes sense to release earlier.
-> 
->> 
->> I did a quick review of the HLD for the write back cache (which is
->> in-progress).  Here is the current state and my comments, also attached is
->> the HLD itself for convenience.
-> 
-> Q1. perceived benefits---lower latency, particularly on a wide area
->     networks.
-> 
-> Added.
-> 
-> Q2. order definitions alphabetically.
-> 
-> Done.
-> 
-> Q3. define file system object.
-> 
-> Done.
-> 
-> Q4. define epoch.
-> 
-> Done.
-> 
-> Q5. QAS is what?
-> 
-> Addressed.
-> 
-> Q6. add a requirement that "grants prevent unexpected ENOSPC
->     conditions".
-> 
-> Recorded as "resource leasing" requirement.
-> 
-> Q7. add a requirement that recovery will lead to well defined results.
-> 
-> Recorded in "correctness" requirement.
-> 
-> Q8. incompleteness of functional specification.
-> 
-> In progress.
-> 
-> Q9. local sequentiality---for security should this include all preceding
->     operations on any ancestors in the namespace as well?
-> 
-> Added "Security" sub-section in functional specification that addresses
-> additional ordering constraints for reintegration, not necessary for
-> basic file system consistency.
-> 
-> There is a nice symmetry:
-> 
->     - together with any operation R relaxing permissions on a directory,
->     an epoch has to include any operation that is a descendant of R (in
->     a subtree order) and that was made earlier than R in the client
->     global time;
-> 
->     - together with any operation R an epoch has to include any
->     operation that is an ascendant of R, that tightens permissions, and
->     that was made later than R.
-> 
-> Q10. Doesn't writing out data independently also introduce a security
->      hole?
-> 
-> I think the simplest way to address this is to extend meta-data name space
-> tree to include data. Specifically, to every regular file (which is a leaf
-> node in the meta-data tree) graft "children" representing its stripe
-> sub-objects, and to every stripe sub-object graft children representing cached
-> data pages. Extension of reintegration ordering constraints to this tree
-> closes security holes for data. Added to "5.4 Data consistency".
-> 
-> Q11. To avoid ongoing negative lookups, how do you transfer full
-> directory content to the client? (use case: "make bzImage").
-> 
-> "Local lookups" sub-section added.
-> 
-> Q12. Versioning is very important. How are versions handled, how is a
-> partial reintegration completed? (the client needs to know the versions
-> to which the previous reintegration was applied perhaps?)
-> 
-> I would very much like to keep all details of recovery encapsulated in
-> the Epochs documentation. WBC design is already large and is going to be
-> much larger; separation of as much material as possible is the only way
-> I see to keep it manageable.
-> 
-> Speaking of versions, yes, I agree that every epoch has to be equipped
-> with a vector in versions for all objects updated by it.
-> 
-> Q13. What is changed in llite module, or are all changes below it?
-> 
-> Described in sub-section 6.2 of Logic specification. New functionality
-> is to be implemented below llite, but changes in the latter (and in
-> other layers too), are necessary to get rid of assumptions about
-> synchronous processing of meta-data RPCs.
-> 
-> Q14. This solution needs to work well on clients with many many CPUs and
-> eliminate disadvantages of a single threaded client.
-> 
-> Described in "7.2 Scalability": per-object logs with per-log locks should
-> improve scalability. On the other hand, with the current recovery mechanism we
-> are still limited to the maximum of 1 rpc in flight for meta-data; version
-> recovery should fix this.
-> 
-> Q15. All exported API's must be added to HLD in the functional
-> specification.
-> 
-> In progress.
-> 
-> Q16. Detailed recovery descriptions must be added; epochs is not the
-> only use case probably (e.g. networking can fail and come back).
-> 
-> In progress.
-> 
-> Q17. If you run out of memory locally, do you push out the changelog?
-> 
-> Added.
-> 
-> Q18. Note that there are many server interactions that do not require
-> writeout, such as a lookup or getting more fid sequences.
-> 
-> Clarify in 4.4.
-> 
->> 
->> This is mostly on track, but it is a very big project with many angles.
->> 
->> - Peter -
-> 
-> Nikita.
+[1]http://lists.lustre.org/pipermail/lustre-discuss/2008-March/005277.html
+[2]http://lists.lustre.org/pipermail/lustre-devel/2008-January/001504.html, 
+and bug #14729
+[3]http://lists.lustre.org/pipermail/lustre-devel/2008-January/001475.html
+
+Thanks!
+--
+Kilian
+
+PS: I also created bug #15197 to keep track of this.
