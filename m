@@ -1,32 +1,40 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Tue, 11 Mar 2008 12:19:04 -0600
-Subject: [Lustre-devel] lu_dirent changes for zfs based mds
-In-Reply-To: <47D667EC.4050107@sun.com>
-References: <47D667EC.4050107@sun.com>
-Message-ID: <20080311181904.GP5851@webber.adilger.int>
+From: Fernsler; Karen <fernsler@ncsa.uiuc.edu>
+Date: Wed, 12 Mar 2008 07:12:48 -0500
+Subject: [Lustre-devel] getting mds_hdr DB_NOTFOUND
+Message-ID: <20080312121248.GB23436@ncsa.uiuc.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mar 11, 2008  16:37 +0530, pravin shelar wrote:
-> Hi All,
->         Lustre based on zfs need a change readdir page wire protocol.
-> 
-> lu_dirent->lde_hash maintains iterator cookie. with zfs - zap cursor API 
-> we have 64bit cookie (ref. zap_cursor_serialize()). So we need to change 
-> this lde_hash to 64 bit.
-> This changes layout of readdir pages which is transmitted on wire, so we 
-> need to merge it into head asap.
+Hi,
 
-Note for the record that the 1.8 readdir wire protocol is already different
-from that used by 1.6 (because of use of FID and ability to have cross-MDT
-references for CMD) so changing the wire format again (before the 1.8 release)
-is not a problem.  No release is yet using the new format.
+I'm running:
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+e2fsck -y -v --mdsdb mdsdb --ostdb osth3_1 /dev/mapper/27l4
+
+and getting:
+
+Pass 6: Acquiring information for lfsck
+error getting mds_hdr (3685469441:8) in /post/cfg/mdsdb: DB_NOTFOUND: No matching key/data pair found
+e2fsck: aborted
+
+Any ideas how to get around this?
+
+This is
+
+e2fsck -V
+e2fsck 1.40.4.cfs1 (31-Dec-2007)
+        Using EXT2FS Library version 1.40.4.cfs1, 31-Dec-2007
+
+
+thanks,
+-k
+
+
+-- 
+Karen Fernsler Systems Engineer
+National Center for Supercomputing Applications
+ph: (217) 265 5249
+email: fernsler at ncsa.uiuc.edu
