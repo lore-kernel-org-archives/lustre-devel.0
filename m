@@ -1,66 +1,95 @@
-From: Eric Barton <eeb@sun.com>
-Date: Tue, 15 Apr 2008 02:06:51 +0200
-Subject: [Lustre-devel] DMU Force Export arch page
-In-Reply-To: <1208200444.16993.27.camel@localhost>
-Message-ID: <018501c89e8c$9c16a940$0182a8c0@bartonsoftware.com>
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Tue, 15 Apr 2008 21:20:41 -0600
+Subject: [Lustre-devel] pCIFS file layout questions
+Message-ID: <C42ACCA9.379D%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ricardo,
- 
-Yes, I'll review - but the end of this week is the earliest I can
-provide feedback...
+Hi Matt -
 
+I finally had time to read your document about pCIFS and CTDB more carefully
+and I now understand the problems you are trying to address better.
 
-  _____  
+I still want to ask a few questions, to check that my understanding is more
+or less correct and make some suggestions.
 
-From: Ricardo.M.Correia@Sun.COM [mailto:Ricardo.M.Correia at Sun.COM] 
-Sent: 14 April 2008 9:14 PM
-To: Eric Barton; Peter J Braam; Andreas Dilger; Alex Zhuravlev
-Cc: lustre-elk-team at Sun.COM; lustre-devel
-Subject: RFC: DMU Force Export arch page
+Regards,
 
+Peter
 
-Hi Eric, Peter, Andreas, Alex and anyone else interested,
+A. The CIFS client recovery is unclear to me.  If a Samba node disappears
+(a)  does the client know to try to re-establish the connection? I think
+this is based on a timeout (b) if a request was sent from the client to the
+servers, how can the client re-construct the reply or know that the server
+never executed the request?  My claim is that the CIFS protocol is not
+strong enough to shield the applications from errors and the recovery is an
+approximate recovery, of the type ?things started to work again?.
 
-Can you review the DMU Force Export architecture page to see if
-anything is wrong or missing?
+B. On the Samba CTDB nodes, how does the clustering software interact with
+software that monitors the functioning of the cluster file system?  For
+example, if Samba gets errors doing I/O to Lustre how is a failover
+initiated?
 
-This is my first attempt at writing an arch page, so any kind of
-feedback would be great.
-I have tried to describe the use cases from Lustre's point of view, as
-opposed to how one would write an arch page if one were concerned
-about more specific DMU and ZFS implementation issues.
+C. Now focus on the ?Lustre clients on the OSS approach? (which customers
+want ? they don?t want extra Lustre clients)  My thought is that with pCIFS
+we in fact do not want to use CTDB in the normal manner on the OSS nodes at
+all.  We do want it for metadata nodes.    Assuming that Samba is reasonably
+fast (we will discover this over the coming weeks) there is one optimal
+Lustre node to read/write data from, namely the OSS node that holds the
+data.  If that node fails for whatever reason, Lustre/heartbeat will create
+a new node mountain the target and heartbeat can arrange the IP takeover.
+So all we need is a Samba server that fails over from the old OSS to the new
+OSS.  Every other solution would cause OSS-to-OSS cross talk.  Is this
+correct?
 
-The URL is http://arch.lustre.org/index.php?title=DMU_Force_Export
-(BTW, I don't know how to link this page in the index of arch pages).
+D. Finally another question to verify my understanding.  If we take a normal
+CTDB setup, then many clients can open the SAME file CONCURRENTLY for I/O
+provided they use a windows share mode that allows this?  But in Samba (and
+probably in CIFS) there is no re-direction protocol that we can use to tell
+an unmodified client to use different Samba servers to fetch different parts
+of the file.
 
-Thanks,
-Ricardo
+E. Some architectural thoughts.
 
+I believe that if clients read unique pieces of files, the CTDB model
+without pCIFS is highly sub-optimal.  pCIFS which can force clients to do
+I/O with the right node is much preferable.  However, there are some
+extremely interesting exceptions to the rule.  I want to illustrate my
+thoughts.
 
---
+If each client reads its own file (this is called the ?file per process? I/O
+model in HPC) CTDB without pCIFS is most unfortunate (with the current
+Lustre data model, which would recommend to store such a file on one node).
+The chance that the client has connected to the correct client node is small
+and almost always we will needlessly pull or push the data from the Samba
+node to the OSS node that has the data.
 
+For an HPC job where all nodes read a single file fully (another very common
+scenario), the CTDB model D works out great.  The Samba nodes all act as a
+read cache.  The OSS to OSS transfer is not so expensive in this case, the
+overhead is more or less  #OSS nodes / #clients, typically 1-5%.
 
- 	Ricardo Manuel Correia
-Lustre Engineering
+But for writing things are completely different.
 
-Sun Microsystems, Inc.
-Portugal
-Phone +351.214134023 / x58723
-Mobile +351.912590825
-Email Ricardo.M.Correia at Sun.COM 	
+In many (almost all in fact) HPC jobs when files are written they are
+written they are written as disjoint pieces, so if Lustre was more clever
+and we used it with CTDB, it could accept data from all writers and write it
+into the local OSS and simply tell the MDS what the layout of the file
+should be.  This could also be applied to Lustre without CIFS exports:
+clients that don?t run on an OSS and write to a file would be told to do all
+writes through a certain OSS, nicely load balanced over all OSSs.
 
+There are many implementations that can lead to the layout management in the
+previous paragraph.  One is to start using a single lock manager for an
+entire file (not a per-oss lock manager for stripes) and to let the lock
+manager build the layout based on the extents it is seeing in requests.
+This is possible provided the cluster has a liveness mechanism.  A second
+implementation is a hierarchical protocol where the OSS negotiates layouts
+with the MDS as it goes along (and performs re-directs if the I/O must go
+somewhere else).
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080415/19f5a433/attachment.htm>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 6g_top.gif
-Type: image/gif
-Size: 1257 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080415/19f5a433/attachment.gif>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080415/b64b66b8/attachment.htm>
