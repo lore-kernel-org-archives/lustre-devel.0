@@ -1,35 +1,85 @@
-From: Ragnar =?iso-8859-15?Q?Kj=F8rstad?= <lustre@ragnark.vestdata.no>
-Date: Fri, 25 Apr 2008 10:48:04 +0200
-Subject: [Lustre-devel] Interested in cluster membership services
-In-Reply-To: <d22b6190804240530x225780ffmacea6ab0f909fe51@mail.gmail.com>
-References: <d22b6190804240530x225780ffmacea6ab0f909fe51@mail.gmail.com>
-Message-ID: <20080425084803.GW26061@vestdata.no>
+From: Andreas Dilger <adilger@sun.com>
+Date: Sat, 26 Apr 2008 23:13:05 -0600
+Subject: [Lustre-devel] New Pools DLD
+In-Reply-To: <18444.30114.732662.996066@gargle.gargle.HOWL>
+References: <20080225100425.GC3108@webber.adilger.int>
+	<18373.20125.724151.421930@gargle.gargle.HOWL>
+	<20080419002217.GC2775@webber.adilger.int>
+	<18444.30114.732662.996066@gargle.gargle.HOWL>
+Message-ID: <20080427051305.GH3047@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, Apr 24, 2008 at 03:30:46PM +0300, MihaiStanescu wrote:
-> Hello
+On Apr 21, 2008  15:08 +0400, Nikita Danilov wrote:
+> Andreas Dilger writes:
+>  > Since we are already need to change the LOV_MAGIC value, we may as well
+>  > do as you suggest and have 0x0BD3ssss instead of 0x0BD30BD0, where
+>  > ssss = size of EA in bytes.
+>  > 
+>  > That would limit us to a 65536-byte striping EA, but it still larger than
 > 
-> I am a developer working on a project involving a cluster and i
-> researched the development of cluster services (node discovery, group
-> membership, group mantainance, election, consensul) but i still have
-> many roads i can take with no experience feedback
+> If that happens to be a limiting factor, we can interpret ssss as a
+> number of __u32's or __u64's in EA.
+
+The EA size being a multiple of at least __u32 is certainly true, and the
+current EAs are also a multiple of __u64 so I don't think this is a bad idea
+at all.  This gives us an extra 8x larger EAs (512kB).
+
+> I think we need an ability to have fully general files layout, so that,
+> for example, a stripe can in turn be a striped file. This can be
+> something like
 > 
-> If someone of you could give me some practical hints, have a little
-> chat would be great.
+> struct lov_mds_md_v3 {
+>         __u32 lmm_magic;          /* 0x0BD3ssss */
+>         __u32 lmm_pattern;        /* LOV_PATTERN_RAID0, LOV_PATTERN_RAID1 */
+>         __u64 lmm_object_id;      /* LOV object ID */
+>         __u64 lmm_object_gr;      /* LOV object group */
+>         __u32 lmm_stripe_size;    /* size of stripe in bytes */
+>         __u32 lmm_stripe_count;   /* num stripes in use for this object */
+> };
+> 
+> followed by a sequence of stripe layout descriptors each starting with
+> 
+>         __u32 magic; /* 0xLLLLSSSS. where LLLL is an identifier of a
+>                       * layout type (e.g., 0bd3 is raid0 or raid1), and
+>                       * SSSS is a size. */
+> 
+> But for a common case of a striped file where all stripes have the same
+> layout, we implement a short-cut:
+> 
+> struct lov_mds_md_v4 {
+>         __u32 lmm_magic;          /* 0x0BD4ssss */
+>         __u32 lmm_pattern;        /* LOV_PATTERN_RAID0, LOV_PATTERN_RAID1 */
+>         __u64 lmm_object_id;      /* LOV object ID */
+>         __u64 lmm_object_gr;      /* LOV object group */
+>         __u32 lmm_stripe_size;    /* size of stripe in bytes */
+>         __u32 lmm_stripe_count;   /* num stripes in use for this object */
+>         __u32 lmm_stripe_magic;   /* 0xLLLLSSSS for all stripes */
+> };
+> 
+> followed by an array of stripe layout descriptor, stripped of their
+> magics.
+> 
+> Or we can go one step further and assume particular value of
+> lmm_stripe_magic for a particular lmm_magic. In this case,
+> ->lmm_stripe_magic field can be removed.
 
-I would suggest that you start by checking out the Open Cluster
-Framework (http://opencf.org/) and Service Availability Forum
-(http://www.saforum.org/) specifications for such cluster services.
+This is essentially the mechanism we use today, which is OK for
+the very common case of a single record format.  I do like the
+idea of being able to have a heirarchical LOV EA format, and
+have been thinking about that for a long time.
 
-The opencf mailinglist would be a good place for further questions or
-discussion.
+The other thing that I noticed in the pNFS layout is the ability
+to have "joined" files in a very simple manner.  The "header" part
+of the layout (equivalent to our lov_mds_md) also contains the
+length in bytes of that part of the file, and then allows mutliple
+EAs to be concatenated together.
 
-
--- 
-Ragnar Kj?rstad
-Software Engineer
-Platform Computing
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
