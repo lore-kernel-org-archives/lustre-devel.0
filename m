@@ -1,65 +1,48 @@
 From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Thu, 08 May 2008 08:57:04 -0600
-Subject: [Lustre-devel] Replication
-In-Reply-To: <18467.4769.687089.205938@gargle.gargle.HOWL>
-Message-ID: <C44870E0.410B%peter.braam@sun.com>
+Date: Thu, 08 May 2008 22:55:56 -0600
+Subject: [Lustre-devel] Wide area use of Lustre and client caches
+Message-ID: <C449357C.4160%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+During the LUG I was approached by a customer who wants to use a Lustre file
+system at the far end of a WAN link.  Since the situation may be of general
+interest, I thought I would post a short report of the discussion here.
 
+His use pattern was interesting ? a number of Windows clients must be
+browsing files stored in Lustre in this remote location.  It was expected
+that the files would be fairly large, would be viewed by multiple clients,
+and that few or no modifications would be made.
 
+After some discussion we proposed a solution that involved a deployment as
+follows:
 
-On 5/8/08 8:48 AM, "Nikita Danilov" <Nikita.Danilov@Sun.COM> wrote:
+1. A single Lustre client with lots of RAM.  The settings on the client
+would be (1) that the memory available for caching by lustre is large (2)
+that the number of locks that can be held by this client is fairly large (3)
+that this client uses the ?open cache?.
+2. A samba server on this Lustre client.
 
-> Peter Braam writes:
->> On 5/6/08 11:43 AM, "Nathaniel Rutman" <Nathan.Rutman@Sun.COM> wrote:
-> 
-> [...]
-> 
->>> 
->>> For 2 and 3, we could store the directory name for each directory in an
->>> EA, and all the fids for all the parents in some other manner.
->>> But it seems to make more sense at this point to put all this
->>> information (fid, name, parent list) in a database file stored on the
->>> MDT.  Then we just look through this database to generate our full path
-> 
-> One advantage EA has over global data-base is that the former is more
-> resilient against file system corruption. This becomes more important if
-> we ever plan to use (parent-fid, name) information for things like fsck.
-> 
->>> information; no need to lookup info in the file objects or EAs.
->>> Generating this database should be no more time consuming than writing
->>> the changelogs themselves, assuming a reasonable database structure like
->>> IAM.
-> 
-> On a lower level note, I think that changelogs and parent-database are
-> better to be implemented as a new layer separate from mdd:
-> 
->     - mdd code is already complicated enough,
-> 
->     - separate layer can be inserted into stack optionally, avoiding
->     run-time cost if change-logs are not needed (currently there is no
->     way to insert a layer after initial configuration completes though).
+With the settings above, we can expect that many of the files can be cached
+in the Lustre client, hence after the initial read, I/O would be local in
+the remote site.  With the open file cache enabled, even the open and close
+traffic will not go to the servers, but can be handled by the client.   We
+think that this will lead to a very good solution, that can work today.
 
-Yes, find a good place.
+A refinement is possible, that requires some development.  There is a
+feature in the Linux kernel to use a disk partition as a cache for a file
+system ? it is called cachefs.   This requires a few hooks in Lustre to
+store chunks of files that are transferred to the client into this cache,
+and cache invalidation calls to remove them.  It allows us to achieve the
+same performance as with the solution above, except that the disk will be a
+bit slower than memory, but it can also be much larger.
 
-Just remember that things like pNFS integrated with the Lustre servers also
-need to replicate.  In fact having this log purely at the DMU / ZFS level
-would be a valuable feature - there are no good replication solutions even
-for laptops today!
+We are eagerly awaiting the results of testing this configuration!
 
-Peter
-
-
-> 
->>> 
->> 
->> Yes I agree with all of this.
->> 
->> Peter
->> 
-> 
-> Nikita.
+- peter -
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080508/480a7bd2/attachment.htm>
