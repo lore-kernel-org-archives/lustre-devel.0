@@ -1,46 +1,77 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Fri, 09 May 2008 17:01:15 -0600
-Subject: [Lustre-devel] Wide area use of Lustre and client caches
-In-Reply-To: <C449C4F5.418F%peter.braam@sun.com>
-References: <1210343110.23307.203.camel@pc.ilinx>
-	<C449C4F5.418F%peter.braam@sun.com>
-Message-ID: <20080509230115.GO3627@webber.adilger.int>
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Tue, 20 May 2008 16:10:07 -0600
+Subject: [Lustre-devel] Replication for NRL/NGA
+In-Reply-To: <483211F2.5090305@sun.com>
+Message-ID: <C458A85F.469E%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On May 09, 2008  09:08 -0600, Peter J. Braam wrote:
-> Nono - striping should only be used to get more bandwidth from servers.  The
-> correct solution to the problem you point out is a lock conversion, planned
-> long ago, still far away maybe (Nikita?).
+>
+> ps: Nathan, to build the changelog ZFS exploits a tree structure for
+> objects, directories and blocks ? the tree structure allows the file
+> system to be searched fast for changes (log based). A missing element
+> is a fast object to path lookup. To get an approximation of the
+> metadata changelog, ZFS would use the difference on changed
+> directories at the beginning and ending snapshot (the tree structure
+> will help you to find pages that have seen insertions and removals ?
+> this function would be called zapdiff).
 
-This task is something that Oleg has been working on occasionally,
-I think there are patches around but fairly old (though not as bad
-as might be expected, because LDLM code changes relatively slowly).
+Hi Nathan -
 
-> On 5/9/08 8:25 AM, "Brian J. Murrell" <Brian.Murrell@Sun.COM> wrote:
-> > Even still it's useful during implementation to think of the use case of
-> > that remote client having read a file and caching and holding a read
-> > lock on that file, say 1GB in size, and then another client wanting to
-> > update say, 1KB in the middle of the file.  It would be beneficial for
-> > that 1GB file to have a small (but still practical) stripe size so that
-> > the amount of cache that needs to be thrown away to accommodate the
-> > write is relatively small.
+> At first glance I am interpreting this very similar to the "zfs send"
+> output stream, but the format of the stream would be
+> 1. a fixed user API
 
-Having multiple stripes would save invalidation of (nstripes - 1) / nstripes
-of the file, but in general the "update in the middle" paradigm is very
-rare in real life, so in practise I don't think this will help much.
+Hmm, don't understand this part.
 
-Even the "add a byte in the middle of a text file" case always causes
-the whole file to be rewritten because of backing up the old file.
+> 2. include full path names (or enough info to generate full path names)
+> The stream would then be passed to a userland replicator (our current
+> replication plan, and not "zfs recv")
 
-The only common applications I'm aware of that do partial-file read/write
-operations are databases and peer-to-peer file sharing.
+Yes, including policy processing, like only syncing certain subtrees.
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+> 
+> Is that about right? So we're just moving the MDT changelog generating
+> part into ZFS
+
+Yup, but careful, this is a changeset (not an ordered log) but with
+snapshots and you can change it into some kind of log that performs the same
+changes.
+
+, and assuming data changes are reflected in mtime updates
+> on the MDT's znodes (i.e. we still are only paying attention to the
+> MDTs, and not the OSTs).
+
+We use the same mechanism to make an OST change set.
+
+> 
+> And for the efficient pathname generation, the plan would still be a
+> (fid,name,parent list) database on the MDT, or something new / ZFS
+> specific? I haven't really dug into ZFS much, but I assume we could go
+> back to the "store parent znode in file EAs, store dirname in dir EAs" idea.
+> The snapshots give us a way to avoid the dynamic "current path" issue,
+> so this would be a little easier.
+
+Jeff Bonwick has extremely clear ideas about how he wants to do this (email
+him and cc me, he'll explain, should he miss this line here).
+
+
+> 
+> But a big question is are we delivering zfs-based Lustre this fall? Not
+> that I know anything about it, but aren't there licence problems with
+> zfs and Linux?
+
+My proposal is that we demo ZFS replication first and then put it in Lustre
+(and pNFS etc).
+
+BTW, we discussed other exciting things, namely that ZFS can just do the
+rollback for CMD and that it can do metadata only snapshots to avoid
+consuming lots of free space with the snapshotting of data, and Jeff even
+came up with an idea to not snapshot at all but retain a few transactions to
+roll back to.
+
+
+- Peter -
