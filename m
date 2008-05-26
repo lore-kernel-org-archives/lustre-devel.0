@@ -1,139 +1,138 @@
 From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Wed, 21 May 2008 08:23:56 +0800
-Subject: [Lustre-devel] Replication for NRL/NGA
-In-Reply-To: <483362FF.3050504@sun.com>
-Message-ID: <C4598C9C.46DA%peter.braam@sun.com>
+Date: Tue, 27 May 2008 07:28:10 +0800
+Subject: [Lustre-devel] Moving forward on Quotas
+In-Reply-To: <18490.63940.619731.992500@gargle.gargle.HOWL>
+Message-ID: <C461688A.5460%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+[please send original message to Lustre devel also]
+
+Hi 
 
 
+On 5/27/08 1:56 AM, "Nikita Danilov" <Nikita.Danilov@Sun.COM> wrote:
 
-On 5/20/08 5:47 PM, "Nathaniel Rutman" <Nathan.Rutman@Sun.COM> wrote:
-
-> Peter Braam wrote:
->>> ps: Nathan, to build the changelog ZFS exploits a tree structure for
->>> objects, directories and blocks ? the tree structure allows the file
->>> system to be searched fast for changes (log based). A missing element
->>> is a fast object to path lookup. To get an approximation of the
->>> metadata changelog, ZFS would use the difference on changed
->>> directories at the beginning and ending snapshot (the tree structure
->>> will help you to find pages that have seen insertions and removals ?
->>> this function would be called zapdiff).
->>>     
+> Johann Lombardi writes:
+>> Hi all,
 >> 
->> Hi Nathan -
+> 
+> [...]
+> 
 >> 
->>   
->>> At first glance I am interpreting this very similar to the "zfs send"
->>> output stream, but the format of the stream would be
->>> 1. a fixed user API
->>>     
+>> * item #2: Supporting quotas with CMD
 >> 
->> Hmm, don't understand this part.
->>   
-> I meant a stream that a user can read/interpret, as opposed to a closed
-> proprietary form that only "zfs receive" can understand.
+>> The quota master is the only one having a global overview of the quota usages
+>> and limits. On b1_6, the quota master is the MDS and the quota slaves are the
+>> OSSs. The code is designed in theory to support several MDT slaves too, but
+>> some
+>> shortcuts have been taken and some additional work is needed to support an
+>> architecture with 1 quota master (one of the MDT) and several OSTs/MDTs
+>> slaves.
+> 
+> From reading quota hld it is not clear that master has necessary be an
+> mdt server. Given that ost's are going to have mdt-like recovery in 2.0
+> it seems reasonable to hash uid/gid across all osts, that act as masters
+> (additionally, it seems logical to handle disk block allocation on ost's
+> rather than mdt's). Or am I missing something here?
 
-Ah, but that's merely a matter of adding API.  And while you are at it, you
-might as well ensure that the stream is rich enough for the search
-requirements we are discussing elsewhere.
+Yes - and this being possible was part of the plan originally.
 
->>   
->>> 2. include full path names (or enough info to generate full path names)
->>> The stream would then be passed to a userland replicator (our current
->>> replication plan, and not "zfs recv")
->>>     
+
+> 
 >> 
->> Yes, including policy processing, like only syncing certain subtrees.
+>> * item #3: Supporting quotas with DMU
 >> 
->>   
->>> Is that about right? So we're just moving the MDT changelog generating
->>> part into ZFS
->>>     
+>> ZFS does not support standard Unix quotas. Instead, it relies on fileset
+>> quotas.
+>> This is a problem because Lustre quotas are set on a per-uid/gid basis.
+>> To support ZFS, we are going to have to put OST objects in a dataset matching
+>> a
+>> dataset on the MDS.
+>> We also have to decide what kind of quota interface we want to have at the
+>> lustre level (do we still set quotas on uid/gid or do we switch to the
+>> dataset
+>> framework?). Things get more complicated if we want to support a MDS using
+>> ldiskfs and OSSs using ZFS (do we have to support this?).
+>> IMHO, in the future, Lustre will want to take advantage of the ZFS space
+>> reservation feature and since this also relies on dataset, I think we should
+>> adopt the ZFS quota framework at the lustre level too.
+>> That being said, my understanding of ZFS quotas is limited to this webpage:
+>> http://docs.huihoo.com/opensolaris/solaris-zfs-administration-guide/html/ch05
+>> s06.html
+>> and I haven't had the time to dig further.
+> 
+> As per discussion with ZFS team, they are going to implement per-user
+> and per-group block quotas in ZFS (inode quotas make little sense for
+> ZFS).
+
+Why do they not need file quota - what if someone wants to control file
+count?
+ 
+> Going aside, if I were designing quota from the scratch right now, I
+> would implement it completely inside of Lustre. All that is needed for
+> such an implementation is a set of call-backs that local file-system
+> invokes when it allocates/frees blocks (or inodes) for a given
+> object. Lustre would use these call-backs to transactionally update
+> local quota in its own format. That would save us a lot of hassle we
+> have dealing with the changing kernel quota interfaces, uid re-mappings,
+> and subtle differences between quota implementations on a different file
+> systems.
+
+======> IMPORTANT: get in touch with Jeff Bonwick now, let's get quota
+implemented in this way in DMU then.
+ 
+> Additionally, this is better aligned with the way we handle access
+> control: MDT implements access control checks completely within MDD,
+> without relying on underlying file system.
+> 
 >> 
->> Yup, but careful, this is a changeset (not an ordered log) but with
->> snapshots and you can change it into some kind of log that performs the same
->> changes.
->>   
-> Right, it is a set of deltas between two snapshots, not a series of
-> steps from A to B.  Once again, this makes things easier for us, because
-> we don't care about intermediary states; we can just look up "original
-> filename" and "final filename" for all changed objects.
-
-Hmm.  You need to detect renames from the feed, and order these right to
-avoid clobbering files?
-
->> , and assuming data changes are reflected in mtime updates
->>   
->>> on the MDT's znodes (i.e. we still are only paying attention to the
->>> MDTs, and not the OSTs).
->>>     
+> 
+> [...]
+> 
 >> 
->> We use the same mechanism to make an OST change set.
->>   
-> I'm not sure we ever got this straight between us: I was (am) planning
-> on using the SOM feature to give me solid mtime data on the MDT, for any
-> OST writes.
+>> * issue #2: Quota accuracy
+>> 
+>> When a slave runs out of its local quota, it sends an acquire request to the
+>> quota master. As I said earlier, the quota master is the only one having a
+>> global overview of what has been granted to slaves. If the master can satisfy
+>> the request, it grants a qunit (can be a number of blocks or inodes) to the
+>> slave. The problem is that an OST can return "quota exceeded" (=EDQUOT)
+>> whereas
+>> another OST is still having quotas. There is currently no callback to claim
+>> back the quota space that has been granted to a slave.
 
-No.  We are going to use parallel data movements using all the OSS logs
-independently to avoid a bottleneck that you would create by looking at the
-MDS log.
+Hmm - the slave should release quota.  Arguing about the last qunit of quota
+is pointless, we are NOT interested in quota that are absurdly small I
+think, they would interfere with performance and the whole architecture of
+quota uses qunits to leave performance unaffected.
 
-Given that the ZFS log has the exact blocks in objects that need to be
-moved, we would be silly not to exploit that immediately.
+> 
+> What strikes me in this description is how this is similar to DLM. It
+> almost looks like quota can be easily implemented as a special type of
+> lock, and DLM conflict resolution mechanism with cancellation AST's can
+> be used to reclaim quota.
+
+The slave should release.  That doesn't address the issue of all OST's
+consistently reporting EDQUOT.  However, doing that in a persistent way has
+its own troubles maybe, namely, how would that be released and recovery
+after power off on servers.  If not persistent, it would be pointless
+because after server reboots, since OSS's with space left would still give
+the wrong answer.
 
 Peter
 
 
->  Thus I see no need to involve changelogs on the OSTs at
-> all.  I just do an efficient copy (rsync) of my modified files list
-> (from the MDT), and all is good.  (Yes, we could do a more efficient
-> copy of only changed data blocks with the OST data, but is this worth
-> the extra synchronization effort?)
-
-
-
->>   
->>> And for the efficient pathname generation, the plan would still be a
->>> (fid,name,parent list) database on the MDT, or something new / ZFS
->>> specific? I haven't really dug into ZFS much, but I assume we could go
->>> back to the "store parent znode in file EAs, store dirname in dir EAs" idea.
->>> The snapshots give us a way to avoid the dynamic "current path" issue,
->>> so this would be a little easier.
->>>     
->> 
->> Jeff Bonwick has extremely clear ideas about how he wants to do this (email
->> him and cc me, he'll explain, should he miss this line here).
->>   
-> looking forward to it.
->> 
->>   
->>> But a big question is are we delivering zfs-based Lustre this fall? Not
->>> that I know anything about it, but aren't there licence problems with
->>> zfs and Linux?
->>>     
->> 
->> My proposal is that we demo ZFS replication first and then put it in Lustre
->> (and pNFS etc).
->>   
-> I'm going to let Bryon sell that bridge.
->> BTW, we discussed other exciting things, namely that ZFS can just do the
->> rollback for CMD and that it can do metadata only snapshots to avoid
->> consuming lots of free space with the snapshotting of data,
-> although presumably we're doing small incremental snapshots and erasing
-> them when done; shouldn't be too big in general.  I suppose we can
-> always come up with a pathologic case.
->> and Jeff even
->> came up with an idea to not snapshot at all but retain a few transactions to
->> roll back to.
->>   
 > 
+>> 
 > 
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+> [...]
+> 
+>> 
+>> Cheers,
+>> Johann
+> 
+> Nikita.
