@@ -1,84 +1,44 @@
 From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Tue, 27 May 2008 07:29:52 +0800
-Subject: [Lustre-devel] FW: Moving forward on Quotas
-In-Reply-To: <20080526224722.GE3582@lore>
-Message-ID: <C46168F0.5462%peter.braam@sun.com>
+Date: Tue, 27 May 2008 18:44:18 +0800
+Subject: [Lustre-devel] Commit on share
+Message-ID: <C4620704.5499%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+This HLD is definitely not ready at all.  It is very short, lacks
+interaction diagrams and the arguments made are not sufficiently detailed.
 
------- Forwarded Message
-From: Johann Lombardi <johann@sun.com>
-Date: Tue, 27 May 2008 00:47:22 +0200
-To: Nikita Danilov <Nikita.Danilov@Sun.COM>
-Cc: "Jessica A. Johnson" <Jessica.Johnson@Sun.COM>, Bryon Neitzel
-<Bryon.Neitzel@Sun.COM>, Eric Barton <eeb@bartonsoftware.com>, Peter Bojanic
-<Peter.Bojanic@Sun.COM>, <Peter.Braam@Sun.COM>
-Subject: Re: Moving forward on Quotas
+* the second sentence is not right.  Commit should happen before
+un-committed data coming from a client is shared with a 2nd client.
+* Is COS dependent on VBR ? no it is not, and can equally apply to normal
+recovery 
+* Section 3.2 is wrong: the recovery process will not fail with gaps in the
+sequence when there is VBR.  It only fails if there are gaps in the
+versions, and this is rare.
+* 3.3 parallel creations in one directory are protected with different,
+independent lock resources.  Isn?t that sufficient to allow parallel
+operations with COS?
+* 3.6 provide a detailed explanation please
+* GC thread is wrong mechanism this is what we have commit callbacks for
+* Why not use the DLM, then we can simply keep the client waiting ? the
+mechanism already exists for repack; I am not convinced at all by the
+reasoning that rep-ack is so different ? no real facts are quoted
+* It is left completely without explanation how the hash table (which I
+think we don?t need/want) is used
 
-On Mon, May 26, 2008 at 09:56:20PM +0400, Nikita Danilov wrote:
-> From reading quota hld it is not clear that master has necessary be an
-> mdt server.
+Regards,
 
-Indeed, the quota master could, in theory, be run on any nodes.
-The advantage of the MDS is that it already has a connection to each OST.
-
-> Given that ost's are going to have mdt-like recovery in 2.0
-> it seems reasonable to hash uid/gid across all osts, that act as masters
-> (additionally, it seems logical to handle disk block allocation on ost's
-> rather than mdt's). Or am I missing something here?
-
-It would mean that _each_ OSS has to establish a connection to all the OSTs.
-Do we already plan to do this in 2.0? I assume that it will probably be
-required
-anyway to support other striping patterns like RAID1 or RAID5.
-However, my concern is that, with OST pools, we should expect to see more
-and
-more configurations with heterogeneous OSSs. As a consequence, some uid/gid
-could end up with a very responsive quota master (connected to a fast
-network
-which can handle 10,000+ RPCs per second), whereas the quota master could
-become
-a bottleneck for others, depending on the hash function and the uid/gid
-number.
-
-> As per discussion with ZFS team, they are going to implement per-user
-> and per-group block quotas in ZFS (inode quotas make little sense for
-> ZFS).
-
-ah, great.
-
-> Going aside, if I were designing quota from the scratch right now, I
-> would implement it completely inside of Lustre. All that is needed for
-> such an implementation is a set of call-backs that local file-system
-> invokes when it allocates/frees blocks (or inodes) for a given
-> object. Lustre would use these call-backs to transactionally update
-> local quota in its own format. That would save us a lot of hassle we
-> have dealing with the changing kernel quota interfaces, uid re-mappings,
-> and subtle differences between quota implementations on a different file
-> systems.
-
-This would also mean that we have to rewrite many things that are provided
-by the kernel today (e.g. quotacheck, a tree to manage per-uid/gid quota
-data,
-...). IMO, we should really weigh the pros and cons before doing so.
-
-> Additionally, this is better aligned with the way we handle access
-> control: MDT implements access control checks completely within MDD,
-> without relying on underlying file system.
-
-ok.
-
-> What strikes me in this description is how this is similar to DLM. It
-> almost looks like quota can be easily implemented as a special type of
-> lock, and DLM conflict resolution mechanism with cancellation AST's can
-> be used to reclaim quota.
-
-Yes, that's what I think too. I've also been discussing this with Oleg.
-
-Johann
-
------- End of Forwarded Message
+Peter
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080527/11a2ef8f/attachment.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: commit-on-sharing-simple-tracking-hld.pdf
+Type: application/octet-stream
+Size: 63433 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080527/11a2ef8f/attachment.obj>
