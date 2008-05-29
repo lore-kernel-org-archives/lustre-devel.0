@@ -1,48 +1,232 @@
-From: Ricardo M. Correia <Ricardo.M.Correia@Sun.COM>
-Date: Wed, 28 May 2008 22:33:28 +0100
-Subject: [Lustre-devel] Moving forward on Quotas
-In-Reply-To: <18493.51834.832400.315440@gargle.gargle.HOWL>
-References: <C461688A.5460%peter.braam@sun.com>
-	<1211984942.11750.29.camel@localhost>
-	<18493.29199.765234.755534@gargle.gargle.HOWL>
-	<1211987642.4740.10.camel@localhost>
-	<18493.34513.370736.111492@gargle.gargle.HOWL>
-	<1211994338.14599.24.camel@localhost>
-	<18493.47971.504225.694251@gargle.gargle.HOWL>
-	<1212008833.14599.84.camel@localhost>
-	<18493.51834.832400.315440@gargle.gargle.HOWL>
-Message-ID: <1212010408.14599.105.camel@localhost>
+From: Landen tian <Zhiyong.Tian@Sun.COM>
+Date: Thu, 29 May 2008 12:49:25 +0800
+Subject: [Lustre-devel] FW: Moving forward on Quotas
+In-Reply-To: <C46168B8.5461%peter.braam@sun.com>
+References: <20080526113530.GA3582@lore> <C46168B8.5461%peter.braam@sun.com>
+Message-ID: <00c001c8c147$5f815790$1e8406b0$%tian@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Qui, 2008-05-29 at 01:11 +0400, Nikita Danilov wrote:
+Hi all:
 
-> Hm.. seems I am confused. If ZFS stores quota table internally, how this
-> table is available to the upper layers, to implement policy?
+Besides what Johann said, current problems lquota faces are:
+Recovery:
+1. the current recovery for lquota is to do "lfs quotacheck", which will
+count all blocks and inodes for all uid/gid. We should have a more elegant
+method for this. I means we can only do recovery for quota reqs which
+haven't been synced between quota master and quota slaves.
+2. customer prefer a fine-grain quotacheck. That means they want sth like
+"lfs quotacheck -u uid/-g gid". It can't be done now because ldiskfs doesn't
+support this. I hope DMU could in the future.
+3. when quotacheck is running, users have many taboos, which are from
+ldiskfs. This is quoted from manual from "man 8 quotacheck"
+  "       It is strongly recommended to run quotacheck with quotas turned
+off for the filesystem. Oth-
+       erwise, possible damage or loss to data in the quota files can
+result.  It is also unwise to
+       run  quotacheck on a live filesystem as actual usage may change
+during the scan.  To prevent
+       this, quotacheck tries to remount the filesystem read-only before
+starting the scan.   After
+       the scan is done it remounts the filesystem read-write. You can
+disable this with option -m.
+       You can also make quotacheck ignore the failure to remount  the
+filesystem  read-only  with
+       option -M."
 
 
-uint64_t dmu_get_space_usage(objset, opaque_id)?
-
---
-
-Ricardo Manuel Correia
-Lustre Engineering
+Zhiyong Landen Tian
 
 Sun Microsystems, Inc.
-Portugal
-Phone +351.214134023 / x58723
-Mobile +351.912590825
-Email Ricardo.M.Correia at Sun.COM
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080528/87c8d71f/attachment.htm>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 6g_top.gif
-Type: image/gif
-Size: 1257 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080528/87c8d71f/attachment.gif>
+10/F Chuangxin Plaza, Tsinghua Science Park 
+Bei Jing 100084 CN
+Phone x28801/+86-10-68093801
+Email zhiyong.tian at Sun.COM
+
+
+>-----Original Message-----
+From: lustre-devel-bounces@lists.lustre.org
+>[mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Peter Braam
+>Sent: Tuesday, May 27, 2008 7:29 AM
+>To: lustre-devel at lists.lustre.org
+>Subject: [Lustre-devel] FW: Moving forward on Quotas
+>
+>
+>------ Forwarded Message
+>From: Johann Lombardi <johann@sun.com>
+>Date: Mon, 26 May 2008 13:35:30 +0200
+>To: Nikita Danilov <Nikita.Danilov@Sun.COM>
+>Cc: "Jessica A. Johnson" <Jessica.Johnson@Sun.COM>, Bryon Neitzel
+><Bryon.Neitzel@Sun.COM>, Eric Barton <eeb@bartonsoftware.com>, Peter
+>Bojanic
+><Peter.Bojanic@Sun.COM>, <Peter.Braam@Sun.COM>
+>Subject: Re: Moving forward on Quotas
+>
+>Hi all,
+>
+>On Sat, May 24, 2008 at 01:33:36AM +0400, Nikita Danilov wrote:
+>> I think that to understand to what extent current quota architecture,
+>> design, and implementation need to be changed, we have --among other
+>> things-- to enumerate the problems that the current implementation has.
+>
+>For the record, I did a quota review with Peter Braam (report attached)
+back
+>in
+>March.
+>
+>> It would be very useful to get a list of issues from Johann (and maybe
+>> Andrew?).
+>
+>Sure. Actually, they are several aspects to consider:
+>
+>**************************************************************
+>* Changes required to quotas because of architecture changes *
+>**************************************************************
+>
+>* item #1: Supporting quotas on HEAD (no CMD)
+>
+>The MDT has been rewritten, but the quota code must be modified to support
+>the new framework. In addition, we were said not to land quota patches on
+>HEAD
+>until this gets fix (it was a mistake IMHO). So, we also have to port all
+>quota
+>patches from b1_6 to HEAD.
+>I don't expect this task to take a lot of time since there is no
+fundamental
+>changes in the quota logic. IIRC, Fanyong is already working on this.
+>
+>* item #2: Supporting quotas with CMD
+>
+>The quota master is the only one having a global overview of the quota
+>usages
+>and limits. On b1_6, the quota master is the MDS and the quota slaves are
+>the
+>OSSs. The code is designed in theory to support several MDT slaves too, but
+>some
+>shortcuts have been taken and some additional work is needed to support an
+>architecture with 1 quota master (one of the MDT) and several OSTs/MDTs
+>slaves.
+>
+>* item #3: Supporting quotas with DMU
+>
+>ZFS does not support standard Unix quotas. Instead, it relies on fileset
+>quotas.
+>This is a problem because Lustre quotas are set on a per-uid/gid basis.
+>To support ZFS, we are going to have to put OST objects in a dataset
+>matching a
+>dataset on the MDS.
+>We also have to decide what kind of quota interface we want to have at the
+>lustre level (do we still set quotas on uid/gid or do we switch to the
+>dataset
+>framework?). Things get more complicated if we want to support a MDS using
+>ldiskfs and OSSs using ZFS (do we have to support this?).
+>IMHO, in the future, Lustre will want to take advantage of the ZFS space
+>reservation feature and since this also relies on dataset, I think we
+should
+>adopt the ZFS quota framework at the lustre level too.
+>That being said, my understanding of ZFS quotas is limited to this webpage:
+>http://docs.huihoo.com/opensolaris/solaris-zfs-administration-guide/html/ch
+0
+>5s06.html
+>and I haven't had the time to dig further.
+>
+>****************************************************
+>* Shortcomings of the current quota implementation *
+>****************************************************
+>
+>* issue #1: Performance scalability
+>
+>Performance with quotas enabled are currently good because a single quota
+>master
+>is powerful enough to process the quota acquire/release requests. However,
+>we
+>know that the quota master is going to become a bottleneck when increasing
+>the
+>number of OSTs.
+>e.g.: 500 OSTs doing 2GB/s (~tera10) with a quota unit size of 100MB
+>requires
+>10,000 quota RPCs to be processed by the quota master.
+>Of course, we could decide to bump the default bunit, but the drawback is
+>that
+>it increases the granularity of quotas which is problematic given that
+quota
+>space cannot be revoked (see issue #2).
+>Another approach could be to take advantage of CMD and to spread the load
+>across
+>several quota masters. Distributing master could be done on a
+>per-uid/gid/dataset
+>basis, but we would still hit the same limitation if we want to reach
+>100+GB/s
+>with a single uid/gid/dataset. More complicated algorithms can also be
+>considered,
+>at the price of increasing complexity.
+>
+>* issue #2: Quota accuracy
+>
+>When a slave runs out of its local quota, it sends an acquire request to
+the
+>quota master. As I said earlier, the quota master is the only one having a
+>global overview of what has been granted to slaves. If the master can
+>satisfy
+>the request, it grants a qunit (can be a number of blocks or inodes) to the
+>slave. The problem is that an OST can return "quota exceeded" (=EDQUOT)
+>whereas
+>another OST is still having quotas. There is currently no callback to claim
+>back the quota space that has been granted to a slave.
+>Of course, this hurts quota accuracy and usually disturbs users who are
+>accustomed to use quotas with local filesystems (users do not understand
+why
+>they are getting EDQUOT while the disk usage is below the limit).
+>The dynamic qunit patch (bug 10600) has improved the situation by
+decreasing
+>qunit when the master gets closer to the quota limit, but some cases are
+>still
+>not addressed because there is still no way to claim back quota space
+>granted to
+>the slaves.
+>
+>* issue #3: Quota overruns
+>
+>Quotas are handled on the server side and the problem is that there are
+>currently no interactions between the grant cache and quotas. It means that
+>a client node can continue caching dirty data while the corresponding user
+>is over quota on the server side. When the data are written back, the
+server
+>is told that the writes have already been acknowledged to the application
+>(by
+>checking if OBD_BRW_FROM_GRANT is set) and thus accepts the write request
+>even
+>if the user is over quota. The server mentions in the bulk reply that the
+>user
+>is over quota and the client is then supposed to stop caching dirty data
+>(until
+>the server reports that the user is no longer over quota). The problem is
+>that
+>those quota overruns can be really significant since it depends on the
+>number of
+>clients:
+>max_quota_overruns = number of OSTs * number of clients * max_dirty_mb
+>e.g.               = 500            * 1,000             * 32
+>                   = 16TB :(
+>For now, only OSTs are concerned by this problem, but we will have the same
+>problem with inodes when we have a metadata writeback cache.
+>Fortunately, not all applications can run into this problem, but this can
+>happen
+>(actually, it is quite easy to reproduce with IOR/1 file per task).
+>I've been thinking of 2 approaches to tackle this problem:
+>- introduce some quota knowledge on the client side and modify the grant
+>cache
+>  to take into account the uid/gid/dataset.
+>- stop granting [0;EOF] locks when a user gets closer to the quota limit
+and
+>  only grant locks covering a region which fits within the remaining quota
+>space.
+>  I'm discussing this solution with Oleg atm.
+>
+>Cheers,
+>Johann
+>
+>------ End of Forwarded Message
