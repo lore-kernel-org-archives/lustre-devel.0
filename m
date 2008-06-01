@@ -1,38 +1,81 @@
-From: Mike Shapiro <mws@Sun.COM>
-Date: Sat, 31 May 2008 20:17:51 -0700
+From: Jeff Bonwick <Jeff.Bonwick@sun.com>
+Date: Sat, 31 May 2008 21:53:02 -0700
 Subject: [Lustre-devel] Moving forward on Quotas
-In-Reply-To: <C4682C31.5617%peter.braam@sun.com>
-References: <1212008833.14599.84.camel@localhost>
-	<C4682C31.5617%peter.braam@sun.com>
-Message-ID: <20080601031751.GA29401@sun.com>
+In-Reply-To: <C46829E1.5610%peter.braam@sun.com>
+References: <18493.29199.765234.755534@gargle.gargle.HOWL>
+	<C46829E1.5610%peter.braam@sun.com>
+Message-ID: <20080601045302.GA29979@eng.sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sun, Jun 01, 2008 at 10:36:33AM +0800, Peter Braam wrote:
-> For CIFS quota and user ids get in touch with Matt Wu and Mike Shapiro.
-> There are special interfaces in ZFS/DMU for better windows support that we
-> probably need to leverage.
+I'd suggest working with Matt Ahrens on this.
+
+Jeff
+
+On Sun, Jun 01, 2008 at 10:26:41AM +0800, Peter Braam wrote:
+> Jeff - 
+> 
+> could you get in touch with Nikita and Ricardo and assist them with a draft
+> of quota design for the DMU.  Nikita has some interesting API proposals, but
+> there are some pretty deep ZFS issues involved where help would be welcome,
+> as far as I can see.
+> 
+> Just as a heads up, quota in systems like Lustre is quite a difficult issue,
+> as many servers contribute to quota usage and this needs "acquire", and
+> "release" of quota in reasonable chunks to avoid the server server protocol
+> getting too chatty.
+> 
+> Thank you for your help!
 > 
 > Peter
-
-For the design doc of how we unified POSIX and Windows SIDs
-in the underlying filesystem and kernel see:
-
-opensolaris.org/os/community/arc/caselog/2007/064/final-materials/spec-txt/
-
-The FUID system described there is implemented in ZFS now.  If you are
-doing work to add user accounting to ZFS/DMU (which is wonderful news)
-all of that should be implemented using the FUID tables, which will
-result in it working transparently for both POSIX and Windows IDs.
-
-Any upstack expressions of this that are meant to be persistent for
-customers (i.e. a report) or sent over the wire should express the accounted-
-for entities using the generic string form of SIDs that I describe in there.
-
--Mike
-
--- 
-Mike Shapiro, Sun Microsystems Fishworks. blogs.sun.com/mws/
+> 
+> 
+> On 5/28/08 10:54 PM, "Nikita Danilov" <Nikita.Danilov@Sun.COM> wrote:
+> 
+> > Ricardo M. Correia writes:
+> >> On Ter, 2008-05-27 at 07:28 +0800, Peter Braam wrote:
+> >> 
+> >>>> Going aside, if I were designing quota from the scratch right now, I
+> >>>> would implement it completely inside of Lustre. All that is needed for
+> >>>> such an implementation is a set of call-backs that local file-system
+> >>>> invokes when it allocates/frees blocks (or inodes) for a given
+> >>>> object. Lustre would use these call-backs to transactionally update
+> >>>> local quota in its own format. That would save us a lot of hassle we
+> >>>> have dealing with the changing kernel quota interfaces, uid re-mappings,
+> >>>> and subtle differences between quota implementations on a different file
+> >>>> systems.
+> >>> 
+> >>> ======> IMPORTANT: get in touch with Jeff Bonwick now, let's get quota
+> >>> implemented in this way in DMU then.
+> >> 
+> >> 
+> >> I think this was proposed by Alex before, but AFAIU the conclusion is
+> >> that this was not possible to do with ZFS (or at least, not easy to do).
+> >> 
+> >> The problem is that ZFS uses delayed allocations, i.e., allocations
+> >> occur long after a transaction group has been closed, and therefore we
+> >> can't transactionally keep track of allocated space because by the time
+> >> the callbacks were called we are not allowed to write to the transaction
+> >> group anymore, since another 2 txgs could have been opened already.
+> > 
+> > But that problem has to be solved anyway to implement per-user quotas
+> > for ZFS, correct?
+> > 
+> > One possible solution I see is to use something like ZIL to log
+> > operations in the context of current transaction group. This log can be
+> > replayed during mount to update quota file.
+> > 
+> >> 
+> >> Since this couldn't be done transactionally, if the node crashes, there
+> >> would be no way of knowing how many blocks had been allocated on the
+> >> latest (actually, the latest 2) committed transaction groups..
+> >> 
+> >> Regards,
+> >> Ricardo
+> > 
+> > Nikita.
+> 
+> 
