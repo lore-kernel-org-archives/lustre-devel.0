@@ -1,53 +1,72 @@
-From: Rahul Deshmukh <Rahul.Deshmukh@Sun.COM>
-Date: Mon, 30 Jun 2008 20:05:50 +0530
-Subject: [Lustre-devel] [RFC] HLD Review Request: Interoperability at
- server side
-In-Reply-To: <C48A9A97.611F%peter.braam@sun.com>
-References: <C48A9A97.611F%peter.braam@sun.com>
-Message-ID: <4868EF46.7030002@sun.com>
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Sun, 01 Jun 2008 10:26:41 +0800
+Subject: [Lustre-devel] Moving forward on Quotas
+In-Reply-To: <18493.29199.765234.755534@gargle.gargle.HOWL>
+Message-ID: <C46829E1.5610%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Please see the comments inline.
+Jeff - 
 
-Peter Braam wrote:
-> Really good - well done!  I feel comfortable that this can move ahead.
->   
-Thanks !!!
-> I just want to ask you to make sure that repeated upgrade - downgrade -
-> upgrade events (in the case bugs in the new release force the user back to
-> old) are handled correctly.  I did see a discussion of up and down, but no
-> explicit mention of repeating that process multiple times.
->   
-I will update the HLD to include the details related to repeating the 
-upgrade -
-downgrade process multiple times.
-> Regards,
->
-> Peter
->
->   
-Thanks,
-Rahul.
->
->
-> On 6/25/08 11:26 PM, "Rahul Deshmukh" <Rahul.Deshmukh@Sun.COM> wrote:
->
->   
->> Hi Peter/Eric,
->>
->> Please inspect next version of "Interoperability at server side" HLD.
->>
->> Thanks,
->> Rahul.
->>
->>     
->> ------------------------------------------------------------------------
->>
->> _______________________________________________
->> Lustre-devel mailing list
->> Lustre-devel at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-devel
+could you get in touch with Nikita and Ricardo and assist them with a draft
+of quota design for the DMU.  Nikita has some interesting API proposals, but
+there are some pretty deep ZFS issues involved where help would be welcome,
+as far as I can see.
+
+Just as a heads up, quota in systems like Lustre is quite a difficult issue,
+as many servers contribute to quota usage and this needs "acquire", and
+"release" of quota in reasonable chunks to avoid the server server protocol
+getting too chatty.
+
+Thank you for your help!
+
+Peter
+
+
+On 5/28/08 10:54 PM, "Nikita Danilov" <Nikita.Danilov@Sun.COM> wrote:
+
+> Ricardo M. Correia writes:
+>> On Ter, 2008-05-27 at 07:28 +0800, Peter Braam wrote:
+>> 
+>>>> Going aside, if I were designing quota from the scratch right now, I
+>>>> would implement it completely inside of Lustre. All that is needed for
+>>>> such an implementation is a set of call-backs that local file-system
+>>>> invokes when it allocates/frees blocks (or inodes) for a given
+>>>> object. Lustre would use these call-backs to transactionally update
+>>>> local quota in its own format. That would save us a lot of hassle we
+>>>> have dealing with the changing kernel quota interfaces, uid re-mappings,
+>>>> and subtle differences between quota implementations on a different file
+>>>> systems.
+>>> 
+>>> ======> IMPORTANT: get in touch with Jeff Bonwick now, let's get quota
+>>> implemented in this way in DMU then.
+>> 
+>> 
+>> I think this was proposed by Alex before, but AFAIU the conclusion is
+>> that this was not possible to do with ZFS (or at least, not easy to do).
+>> 
+>> The problem is that ZFS uses delayed allocations, i.e., allocations
+>> occur long after a transaction group has been closed, and therefore we
+>> can't transactionally keep track of allocated space because by the time
+>> the callbacks were called we are not allowed to write to the transaction
+>> group anymore, since another 2 txgs could have been opened already.
+> 
+> But that problem has to be solved anyway to implement per-user quotas
+> for ZFS, correct?
+> 
+> One possible solution I see is to use something like ZIL to log
+> operations in the context of current transaction group. This log can be
+> replayed during mount to update quota file.
+> 
+>> 
+>> Since this couldn't be done transactionally, if the node crashes, there
+>> would be no way of knowing how many blocks had been allocated on the
+>> latest (actually, the latest 2) committed transaction groups..
+>> 
+>> Regards,
+>> Ricardo
+> 
+> Nikita.
