@@ -1,135 +1,89 @@
-From: Mikhail Pershin <Mikhail.Pershin@Sun.COM>
-Date: Sun, 01 Jun 2008 11:03:03 +0400
-Subject: [Lustre-devel] Commit on share
-In-Reply-To: <20080531024524.GB2992@webber.adilger.int>
-References: <C4620704.5499%peter.braam@sun.com> <op.ubxfheh9atmt0c@goga>
-	<20080531024524.GB2992@webber.adilger.int>
-Message-ID: <op.ub15vdu9atmt0c@goga>
+From: Nikita Danilov <Nikita.Danilov@Sun.COM>
+Date: Sun, 01 Jun 2008 17:58:36 +0400
+Subject: [Lustre-devel] Moving forward on Quotas
+In-Reply-To: <20080601045302.GA29979@eng.sun.com>
+References: <18493.29199.765234.755534@gargle.gargle.HOWL>
+	<C46829E1.5610%peter.braam@sun.com>
+	<20080601045302.GA29979@eng.sun.com>
+Message-ID: <18498.43788.847173.750390@gargle.gargle.HOWL>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sat, 31 May 2008 06:45:24 +0400, Andreas Dilger <adilger@sun.com> wrote:
+Jeff Bonwick writes:
+ > I'd suggest working with Matt Ahrens on this.
 
-> On May 29, 2008  21:42 +0400, Mike Pershin wrote:
->> The only positive effect of ACK is delay before doing sync, that give us
->> the chance to wait for commit without doing force sync. But that can be
->> done with timer to get the same results.
->
-> On a related note - I just came across bug 3621 - sync outstanding
-> transaction instead of evicting client when a rep-ack isn't received.
-> Could you please address this bug at the same time as COS.  With COS
-> this will always happen, of course, but it should also happen without
-> it to avoid client eviction if possible.
->
+Hello,
 
-OK
+we were discussing recently what is needed from the DMU to implement quotas
+and other forms of space accounting. Our basic premise is that it is desirable
+to keep DMU part of the quota support at minimum, and to implement only
+mechanism here, leaving policy to the upper layers.
 
-> RepACK is currently needed for recovery.  I don't think it is a false
-> conflict in most cases, though I agree in some cases it is.  If MDS
-> thread is only e.g. passing through a directory to do some operation
-> in a previously-existing subdirectory, or wants to stat a file that
-> existed before the conflicting lock was taken then this is a false
-> dependency.
+Questions of what exactly constitutes disk space usage for quota purposes
+(e.g., whether and how snapshots have to be accounted for, etc.) are
+orthogonal to the present interface discussion; it's assumed that
+dnode_phys_t::dn_used can be used for this.
 
-RepACK is not needed for recovery if COS is enabled, because COS will sync  
-the share cases so there is no need to be sure that client got reply and  
-will do replay as there are no dependent replays on it.
-Also the cases are creations from different clients or unlinks (operations  
-of same type). They are not dependent actually, the only dependency here  
-may be create vs unlink or unlink vs create. Currently such cases are not  
-distinguished and we block access for any operation from different client.
+Two main use cases are
 
->
->> Moreover it conflicts in general with dependency tracking we needed,
->> because it will serialize operations even when they may not depend.
->>
->> With RepACK lock we are entering in operation AFTER the checks and we
->> don't know the result of this check - was there operation from different
->> client? are changes committed? Should we do sync or not? RepACK lock
->> doesn't answer this question and we can't decide about sync is needed or
->> not.
->
-> That isn't quite true - if the changes ARE already committed, then the
-> lock is no longer needed and dropped by the commit callback.
+    - user and group quotas in ZPL, and
 
-Indeed. But I were talking about different thing. When we pass lock (enter  
-the locked area) then we don't know was the lock taken at all or not? Was  
-it dropped due to commit or ACK received? So we don't know should we do  
-commit or it was done already or it is not needed at all. Maybe we may use  
-uncommitted_replies list to determine that, but it is not perfect way too.
+    - distributed cluster-wide quota in Lustre and pNFS.
 
->> 3) But we don't know still is there conflict or not because we should
->> check client uuids, but we don't store such info anywhere and waiting on
->> lock is not reflected somehow. So we need extra data (or extra  
->> information
->>   from ldlm?) again to store uuid of client who did latest operation on  
->> that
->> object.
->
-> Wouldn't that be in the last_rcvd data for the current client?  If the
-> req->rq_export->exp_mds_data->med_mcd->mcd_last_transno is the same as
-> the VBR transno on object being modified then we know this client was
-> the last one to modify the object and there is no external dependency.
->
-but this stops working if last_transno is bigger that object version. Then  
-we lost info about who set than version.
+Surprisingly, it seems that these use cases can be implemented without any
+additional support from the DMU, except for the commit call-back, that is
+needed for other purposes too.
 
->> hash table store the following data per object:
->> struct lu_dep_info {
->>           struct ll_fid     di_object;
->>           struct obd_uuid   di_client;
->>           __u64             di_transno;
->> };
->>
->> it contains uuid of client and transno of last change from this client.
->> The uuid is compared to determine is there is conflict of not, the  
->> transno
->> shows was that data committed already or not. I described above why it  
->> is
->> needed. It is 1.6-related issue because we have only inode of object and
->> no any extra structure. The HEAD has lu_object enveloping inodes, and  
->> hash
->> will not needed, the dependency info may be stored per lu_object.
->
-> I think the commit callbacks should be able to free this data, there
-> should never be any such items on an object with di_transno >  
-> last_committed.
+General idea is that DMU user (ZPL or Lustre MDD module) maintains its own
+data-base mapping quota consumers (user and group identifiers) to their
+current space usage. A mechanism is needed to keep this data-base up to date.
 
-you mean the moment of commit? As I know the new journal_start() may start  
-after last batch is committed but before commit callbacks will be invoked.  
-So the new dep_info may occur with di_transno > last_committed, and we may  
-not free all dep_info at once in commit callback, but should distinguish  
-new from old. The good thing to have would be some notification from  
-ldiskfs about batch boundary but this is good in theory only.
+To this end, user keeps in memory a list of all DMU objects to which space was
+allocated or deallocated ("pending list"). User can do this, provided it has
+full control of the DMU (which holds for both use cases above). See below on
+how pending list is truncated. For each object, pending list also records its
+"current space usage" (dnode_phys_t::dn_used), and there is at most one record
+for a given object in this list.
 
-> Also, isn't it enough to store a single such item per object directly
-> on the object?  Once we know there is ANY such conflict that is enough
-> to invoke COS.  For per-object data this can be stored on 1.6 in the
-> i_filterdata structure that we can attach onto every server inode.
-It is per-object, yes. And this is very valuable advice about  
-i_filterdata. I thought we have no access to inode_info from upper level  
-at server side. This will reduce need for hash at all and simplify things  
-a lot.
+When a transaction group is about to be closed, user finds all objects in the
+pending list, belonging to this or previous transaction groups and, in the
+context of this transaction group, appends to a special "pending file" a
+record, containing
 
->
-> Cheers, Andreas
-> --
-> Andreas Dilger
-> Sr. Staff Engineer, Lustre Group
-> Sun Microsystems of Canada, Inc.
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+        (object id, current space usage)
 
+Next, transaction group is synced, disk space is actually allocated to the
+objects, and dnode_phys_t::dn_used is modified.
 
+When transaction group has committed, commit call-back is invoked. In this
+call-back user scans pending list, and updates its internal quota data-base:
 
--- 
-Mikhail Pershin
-Staff Engineer
-Lustre Group
-Sun Microsystems, Inc.
+        foreach (object, space_usage) in list {
+                upd_quota(object->owner, dnode->dn_used - space_usage);
+                upd_quota(object->group, dnode->dn_used - space_usage);
+                remove_record_from_list();
+        }
+
+Updates to the user's quota data-base are done in the context of
+currently open transaction.
+
+When DMU starts (possibly after a crash), the same loop as above is
+executed for all records in the pending file (as visible in last
+committed transaction group). Note that this loop is idempotent:
+executing it second time after first execution successfully committed
+has no result.
+
+In other words, the idea is to update quota data-base on the transaction
+group commit (so that updates to the data-base go into the transaction
+group in the "future" w.r.t. object operations that resulted in the
+space allocation), and to keep in pending file a list of objects
+modified during the last 2 transaction groups, so that this file can be
+used as a kind of redo log to update quota data-base in case of failure.
+
+ > 
+ > Jeff
+
+Nikita.
