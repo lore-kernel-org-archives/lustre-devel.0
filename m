@@ -1,48 +1,52 @@
 From: Andreas Dilger <adilger@sun.com>
-Date: Mon, 02 Jun 2008 11:09:37 -0600
-Subject: [Lustre-devel] Re-direction inodes
-In-Reply-To: <C4696703.566A%peter.braam@sun.com>
-References: <C4696703.566A%peter.braam@sun.com>
-Message-ID: <20080602170937.GI2961@webber.adilger.int>
+Date: Mon, 02 Jun 2008 17:24:33 -0600
+Subject: [Lustre-devel] Moving forward on Quotas
+In-Reply-To: <C4682B4E.5615%peter.braam@sun.com>
+References: <20080528080613.GN3582@lore> <C4682B4E.5615%peter.braam@sun.com>
+Message-ID: <20080602232433.GS2961@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jun 02, 2008  08:59 +0900, Peter J. Braam wrote:
-> I have a need in doing an architecture for a customer of a Lustre client
-> feature to have different data/page caches associated with an inode,
-> depending on the user that accesses it.    So when a file is read, user A
-> will read different data from user B (assume the same for writes, but I
-> think this is a read-only feature).
+On Jun 01, 2008  10:32 +0800, Peter J. Braam wrote:
+> I am quite worried about the dynamic qunit patch.
+> I am not convinced I want smaller qunits to stick around.
+> 
+> Please PROVE RIGOROUSLY that qunits are grow large quickly again, otherwise
+> they create too much server - server overhead.  The cost of 100MB of disk
+> space is barely more than a cent now; what are we trying to address withtiny
+> qunits?
+> 
+> Plan for 5000 OSS servers at the minimum and 1,000,000 clients, and up to
+> 100TB/sec in I/O.  Calculate quota RPC traffic from that.  A server cannot
+> handle more than 15,000 RPC's / sec.
+> 
+> No arguing, or opinions here, numbers please.  The original design I did 4
+> years ago limited quota calls from one OSS to the master to one per second.
+> Qunits were made adaptive without solid reasoning or design.
 
-Initially when I read this, I thought you were only trying to keep the
-client-side cache separate, which could be done by adding the UID into
-the inode lookup function for ll_test_inode() and treating these files
-separately in the client-side cache.  That would be useful to avoid e.g.
-user A reading "securefile" into memory, and user B being able to access
-it from cache due to client-local access permissions allowing it.
+Just a note - it isn't only shrinking of qunits that is possible, but also
+growth of qunits.  I think there was also work done to allow recall of
+qunits from the servers, but I'm not sure if it was landed into CVS.
 
-> I remember that in the Coda file system we could easily re-direct I/O to
-> another inode using almost standard features in the VFS/page caches.  Is
-> this still the case?  Would this work for the purpose I describe above?
 
-On later reading, it seems you want to have completely independent
-file contents for each user, but they share the same pathname.  In some
-filesystems it is possible to encode part of the pathname somewhat like:
+If we are significantly re-architecting quotas, I'd suggest that we also
+re-implement grants at the same time and use the DLM to do both of them.
+This way we can have grant + quota on a per-file basis (quota + grant are
+given to clients as part of extent lock LVB), and are also able to
+recall quota + grant.  We may not even want to have separate quota+grant,
+since we track the ownership of files on the OSTs and space allocation
+is done on a per-file basis.
 
-	/home///$UID///file
-
-but I think you are proposing a completely transparent mapping of content:
-
-alice> cat /etc/passwd
-alice:x:1000:1000:Alice:/home/alice:/bin/bash
-
-bob> cat /etc/passwd
-bob:x:1001:1001:Bob:/home/bob:/bin/bash
-
-correct?
+It would be possible, for example, to take a user's whole quota from
+the master, split it evenly into "num_osts * 2" chunks at mount time
+to pass to the OSTs, they further grant it to clients when they request
+extent locks, and then avoid ALL master->OST quota RPCs unless that user
+actually got close to exceeding their quota, either granting out some
+of the remaining "num_osts" qunits or recalling some of the outstanding
+quota (possibly via lock "conversion" to avoid revoking the quota lock).
 
 Cheers, Andreas
 --
