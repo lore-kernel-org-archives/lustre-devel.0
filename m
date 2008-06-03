@@ -1,72 +1,56 @@
-From: Nikita Danilov <Nikita.Danilov@Sun.COM>
-Date: Tue, 03 Jun 2008 11:49:45 +0400
-Subject: [Lustre-devel] Moving forward on Quotas
-In-Reply-To: <48449569.4080406@sun.com>
-References: <18493.29199.765234.755534@gargle.gargle.HOWL>
-	<C46829E1.5610%peter.braam@sun.com>
-	<20080601045302.GA29979@eng.sun.com>
-	<18498.43788.847173.750390@gargle.gargle.HOWL>
-	<48449569.4080406@sun.com>
-Message-ID: <18500.63385.570359.425911@gargle.gargle.HOWL>
+From: Andreas Dilger <adilger@sun.com>
+Date: Tue, 03 Jun 2008 12:41:51 -0600
+Subject: [Lustre-devel] Commit on share
+In-Reply-To: <op.ub15vdu9atmt0c@goga>
+References: <C4620704.5499%peter.braam@sun.com> <op.ubxfheh9atmt0c@goga>
+	<20080531024524.GB2992@webber.adilger.int> <op.ub15vdu9atmt0c@goga>
+Message-ID: <20080603184151.GA2961@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Matthew Ahrens writes:
- > Nikita Danilov wrote:
- > > Jeff Bonwick writes:
- > >  > I'd suggest working with Matt Ahrens on this.
- > > 
- > > Hello,
- > > 
- > > we were discussing recently what is needed from the DMU to implement quotas
- > > and other forms of space accounting. Our basic premise is that it is desirable
- > > to keep DMU part of the quota support at minimum, and to implement only
- > > mechanism here, leaving policy to the upper layers.
- > 
- > I agree with this premise.  However, your proposed implementation (especially 
- > the asynchronous update mechanism and associated pending file) seems 
- > unnecessarily complicated.
- > 
- > I would suggest that we simply update a "database" (eg. ZAP object or sparse 
- > array) of userid -> space usage from syncing context when the space is 
- > allocated/freed (ie, dsl_dataset_block_{born,kill}).  I believe that the 
- > problems this presents[*] will be more tractable than the method you outlined.
+On Jun 01, 2008  11:03 +0400, Mike Pershin wrote:
+> On Sat, 31 May 2008 06:45:24 +0400, Andreas Dilger <adilger@sun.com> wrote:
+>> RepACK is currently needed for recovery.  I don't think it is a false
+>> conflict in most cases, though I agree in some cases it is.  If MDS
+>> thread is only e.g. passing through a directory to do some operation
+>> in a previously-existing subdirectory, or wants to stat a file that
+>> existed before the conflicting lock was taken then this is a false
+>> dependency.
+>
+> RepACK is not needed for recovery if COS is enabled, because COS will sync 
+> the share cases so there is no need to be sure that client got reply and 
+> will do replay as there are no dependent replays on it.
+>
+> Also the cases are creations from different clients or unlinks (operations 
+> of same type). They are not dependent actually, the only dependency here 
+> may be create vs unlink or unlink vs create. Currently such cases are not 
+> distinguished and we block access for any operation from different client.
 
-Indeed, this solution is much simpler, and it was considered
-initially. I see following drawbacks in it:
+In 2.0 with per-name-hash locking we will remove almost all such false
+dependencies, so I don't know whether the intermediate optimization is
+worthwhile or not.
 
-     - a notion of a user identifier (or some opaque identifier) has to
-       be introduced in DMU interface. DMU doesn't interpret these
-       identifiers in any way, except for using them as keys in a space
-       usage database. A set of these identifiers has to be passed to
-       every DMU entry point that might result in space allocation (a
-       set is needed because there are group quotas, and to keep
-       interface more or less generic).
+>> Also, isn't it enough to store a single such item per object directly
+>> on the object?  Once we know there is ANY such conflict that is enough
+>> to invoke COS.  For per-object data this can be stored on 1.6 in the
+>> i_filterdata structure that we can attach onto every server inode.
+>
+> It is per-object, yes. And this is very valuable advice about i_filterdata. 
+> I thought we have no access to inode_info from upper level at server side. 
+> This will reduce need for hash at all and simplify things a lot.
 
-     - an implementation of chown, chgrp, and distributed quota require
-       DMU user to modify this database. Also, an interface to iterate
-       over this database is most likely needed for things like
-       distributed fsck, and user level quote reporting tools. It seems
-       that it would be quite difficult to encapsulate such a database
-       within DMU.
+Well, in 1.6/1.8 the layering isn't so strict, and in HEAD the problem
+goes away because of per-object data/locking.  I also don't think Alex's
+worry about the i_filterdata lifetime is warranted.  If the inode is
+being evicted from cache, then it surely must have been written to disk,
+so there is no need to cache the last-modified data at all as COS is
+not needed anymore.
 
- > 
- > --matt
- > 
- > [*] eg, if the DB object is stored in the user's objset, then updating it in 
- > syncing context may be problematic.  if it is stored in the MOS, carrying it 
-
-The proposal was to update the database in the context of currently open
-transaction group. That is, when transaction group T has just committed,
-commit call-back is invoked and the database is updated in the context
-of some transaction belonging to transaction group T + 2 (T + 1 being in
-sync). It is because of this that pending file has to keep track of
-objects from two last transaction groups.
-
- > along when doing snapshot operations will be painful (snapshot, clone, send, 
- > recv, rollback, etc).
-
-Nikita.
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
