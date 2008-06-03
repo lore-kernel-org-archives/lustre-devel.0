@@ -1,57 +1,72 @@
-From: Landen tian <Zhiyong.Tian@Sun.COM>
-Date: Tue, 03 Jun 2008 16:49:46 +0800
+From: Nikita Danilov <Nikita.Danilov@Sun.COM>
+Date: Tue, 03 Jun 2008 11:49:45 +0400
 Subject: [Lustre-devel] Moving forward on Quotas
-In-Reply-To: <20080602232433.GS2961@webber.adilger.int>
-References: <20080528080613.GN3582@lore> <C4682B4E.5615%peter.braam@sun.com>
-	<20080602232433.GS2961@webber.adilger.int>
-Message-ID: <007601c8c556$c904e660$5b0eb320$%tian@sun.com>
+In-Reply-To: <48449569.4080406@sun.com>
+References: <18493.29199.765234.755534@gargle.gargle.HOWL>
+	<C46829E1.5610%peter.braam@sun.com>
+	<20080601045302.GA29979@eng.sun.com>
+	<18498.43788.847173.750390@gargle.gargle.HOWL>
+	<48449569.4080406@sun.com>
+Message-ID: <18500.63385.570359.425911@gargle.gargle.HOWL>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->-----Original Message-----
-From: lustre-devel-bounces@lists.lustre.org
->[mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Andreas Dilger
->Sent: Tuesday, June 03, 2008 7:25 AM
->To: Peter Braam
->Cc: Bryon Neitzel; Johann Lombardi; Peter Bojanic; Jessica A. Johnson; Eric
->Barton; Nikita Danilov; lustre-devel at lists.lustre.org
->Subject: Re: [Lustre-devel] Moving forward on Quotas
->
->On Jun 01, 2008  10:32 +0800, Peter J. Braam wrote:
->> I am quite worried about the dynamic qunit patch.
->> I am not convinced I want smaller qunits to stick around.
->>
->> Please PROVE RIGOROUSLY that qunits are grow large quickly again,
->otherwise
->> they create too much server - server overhead.  The cost of 100MB of disk
->> space is barely more than a cent now; what are we trying to address
-withtiny
->> qunits?
->>
->> Plan for 5000 OSS servers at the minimum and 1,000,000 clients, and up to
->> 100TB/sec in I/O.  Calculate quota RPC traffic from that.  A server
-cannot
->> handle more than 15,000 RPC's / sec.
->>
->> No arguing, or opinions here, numbers please.  The original design I did
-4
->> years ago limited quota calls from one OSS to the master to one per
-second.
->> Qunits were made adaptive without solid reasoning or design.
->
->Just a note - it isn't only shrinking of qunits that is possible, but also
->growth of qunits.  I think there was also work done to allow recall of
->qunits from the servers, but I'm not sure if it was landed into CVS.
+Matthew Ahrens writes:
+ > Nikita Danilov wrote:
+ > > Jeff Bonwick writes:
+ > >  > I'd suggest working with Matt Ahrens on this.
+ > > 
+ > > Hello,
+ > > 
+ > > we were discussing recently what is needed from the DMU to implement quotas
+ > > and other forms of space accounting. Our basic premise is that it is desirable
+ > > to keep DMU part of the quota support at minimum, and to implement only
+ > > mechanism here, leaving policy to the upper layers.
+ > 
+ > I agree with this premise.  However, your proposed implementation (especially 
+ > the asynchronous update mechanism and associated pending file) seems 
+ > unnecessarily complicated.
+ > 
+ > I would suggest that we simply update a "database" (eg. ZAP object or sparse 
+ > array) of userid -> space usage from syncing context when the space is 
+ > allocated/freed (ie, dsl_dataset_block_{born,kill}).  I believe that the 
+ > problems this presents[*] will be more tractable than the method you outlined.
 
-Yes, it has. In order to prevent ping-pong effect, if qunit is reduced,
-qunit _only_ could be
-Increased after the_latest_qunit_reduction + lqc_switch_seconds(default is
-300 secs) . 
-At designing, we think accuracy is more urgent(otherwise, users will see
-earlier -EDQUOT),
-so decreasing can be done any time, but increasing has this limitation.
+Indeed, this solution is much simpler, and it was considered
+initially. I see following drawbacks in it:
 
-tianzy
+     - a notion of a user identifier (or some opaque identifier) has to
+       be introduced in DMU interface. DMU doesn't interpret these
+       identifiers in any way, except for using them as keys in a space
+       usage database. A set of these identifiers has to be passed to
+       every DMU entry point that might result in space allocation (a
+       set is needed because there are group quotas, and to keep
+       interface more or less generic).
+
+     - an implementation of chown, chgrp, and distributed quota require
+       DMU user to modify this database. Also, an interface to iterate
+       over this database is most likely needed for things like
+       distributed fsck, and user level quote reporting tools. It seems
+       that it would be quite difficult to encapsulate such a database
+       within DMU.
+
+ > 
+ > --matt
+ > 
+ > [*] eg, if the DB object is stored in the user's objset, then updating it in 
+ > syncing context may be problematic.  if it is stored in the MOS, carrying it 
+
+The proposal was to update the database in the context of currently open
+transaction group. That is, when transaction group T has just committed,
+commit call-back is invoked and the database is updated in the context
+of some transaction belonging to transaction group T + 2 (T + 1 being in
+sync). It is because of this that pending file has to keep track of
+objects from two last transaction groups.
+
+ > along when doing snapshot operations will be painful (snapshot, clone, send, 
+ > recv, rollback, etc).
+
+Nikita.
