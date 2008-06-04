@@ -1,32 +1,35 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Wed, 04 Jun 2008 16:20:08 -0600
+From: Eric Barton <eeb@sun.com>
+Date: Thu, 05 Jun 2008 00:41:49 +0100
 Subject: [Lustre-devel] hiding non-fatal communications errors
 In-Reply-To: <C46C546F.57D1%peter.braam@sun.com>
 References: <018701c8c646$6a6d56a0$0281a8c0@ebpc>
 	<C46C546F.57D1%peter.braam@sun.com>
-Message-ID: <20080604222008.GD2961@webber.adilger.int>
+Message-ID: <02f901c8c69c$8ede99d0$0281a8c0@ebpc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jun 04, 2008  14:17 -0700, Peter J. Braam wrote:
+> -----Original Message-----
+> From: Peter.Braam at Sun.COM [mailto:Peter.Braam at Sun.COM] 
+> Sent: 04 June 2008 10:17 PM
+> To: Eric Barton; 'Lustre Development Mailing List'
+> Subject: Re: [Lustre-devel] hiding non-fatal communications errors
+> 
 > Andreas has been suggesting re-transmission of these callback (aka AST) RPCs
 > for years.  If we think it through carefully, it might be a simple solution.
 
-Yes, server->client resends at least to a limited extent would help in the
-case of short-term network partitioning or e.g. a suddenly-failed router.
+Yes - carefully is the watchword - I suspect lock callback RPCs (aka ASTs)
+have some fundamentally different properties.  Nathan and I seemed to
+touch on this when we last chatted about related AT issues.
 
-We have some amount of "RPC resend before recovery" support for bulk RPCs
-in the case of checksum errors - e.g. retry the bulk RPC 5 times for a
-checksum error before returning an IO error to the application.
+Any volunteers to s/we/me/ ?
 
-I suspect this could be adapted to allowing a fixed number of retries for
-server-originated RPCs also.  In the case of LDLM blocking callbacks sent
-to a client, a resend is currently harmless (either the client is already
-processing the callback, or the lock was cancelled).
-
+> 
+> Peter
+> 
+> 
 > On 6/4/08 6:25 AM, "Eric Barton" <eeb@sun.com> wrote:
 > 
 > > Something for recovery experts...
@@ -63,13 +66,4 @@ processing the callback, or the lock was cancelled).
 > > http://lists.lustre.org/mailman/listinfo/lustre-devel
 > 
 > 
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
-
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+> 
