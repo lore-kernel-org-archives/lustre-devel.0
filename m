@@ -1,55 +1,56 @@
 From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Wed, 04 Jun 2008 10:11:11 +0900
-Subject: [Lustre-devel] Commit on share
-In-Reply-To: <20080603185010.GB2961@webber.adilger.int>
-Message-ID: <C46C1ABF.573C%peter.braam@sun.com>
+Date: Wed, 04 Jun 2008 10:17:27 +0900
+Subject: [Lustre-devel] Re-direction inodes
+In-Reply-To: <20080602170937.GI2961@webber.adilger.int>
+Message-ID: <C46C1C37.573E%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Yes - this is like a commit scheduler.  Don't jump too quickly to an
-implementation plan.
-
-It might be necessary to have good control over what gets committed in what
-order, and the dependency issues may only get more difficult and not easier.
-
-But currently the focus should be on COS.  Can COS have a design that
-mirrors that of REP-ACKs?  I'm not against committing one RPC later, but I
-doubt it really helps in relevant use cases (see my questions about getting
-to the bottom of it).
+The last sentence in your message is correct.  But it seems that Nikita and
+I have managed to design it "out of the way" - I'll write it up and share it
+with you.
 
 Peter
 
 
-On 6/4/08 3:50 AM, "Andreas Dilger" <adilger@sun.com> wrote:
+On 6/3/08 2:09 AM, "Andreas Dilger" <adilger@sun.com> wrote:
 
-> On Jun 02, 2008  12:42 +0400, Alex Zhuravlev wrote:
->> there was an idea to control recovery postponing replies.
->> can we use this idea for COS? instead of immediate sync
->> we execute request, but put reply on a special queue. then
->> reply is sent from the queue when all previous transno
->> are committed (for COS w/o VBR). if there is no requests to
->> be handled, but reply queue isn't empty server does sync.
+> On Jun 02, 2008  08:59 +0900, Peter J. Braam wrote:
+>> I have a need in doing an architecture for a customer of a Lustre client
+>> feature to have different data/page caches associated with an inode,
+>> depending on the user that accesses it.    So when a file is read, user A
+>> will read different data from user B (assume the same for writes, but I
+>> think this is a read-only feature).
 > 
-> Yes, this was proposed for the DMU OST, so that it can export
-> synchronous IO semantics to clients that do not know how to do
-> bulk IO recovery (i.e. all of them right now) without forcing
-> the DMU to limit the transaction group size too much.
+> Initially when I read this, I thought you were only trying to keep the
+> client-side cache separate, which could be done by adding the UID into
+> the inode lookup function for ll_test_inode() and treating these files
+> separately in the client-side cache.  That would be useful to avoid e.g.
+> user A reading "securefile" into memory, and user B being able to access
+> it from cache due to client-local access permissions allowing it.
 > 
-> My proposal was that the OST service threads would perform the IO
-> in the normal manner until they were ready with the reply, but
-> instead of waiting in the thread context for the commit the RPC
-> request (with attached reply) would be put as private data into
-> a commit callback.  Once the commit callbacks are run (whether
-> because of transaction size, age, or explicit sync operation)
-> the RPC requests are put into a queue and sent by one or more
-> threads to the waiting clients.
+>> I remember that in the Coda file system we could easily re-direct I/O to
+>> another inode using almost standard features in the VFS/page caches.  Is
+>> this still the case?  Would this work for the purpose I describe above?
 > 
-> This ties in fairly nicely with the network request scheduler, as
-> it can batch requests from the same or multiple clients in different
-> ways, and then "unplug" the device (sync the transaction).
+> On later reading, it seems you want to have completely independent
+> file contents for each user, but they share the same pathname.  In some
+> filesystems it is possible to encode part of the pathname somewhat like:
+> 
+> /home///$UID///file
+> 
+> but I think you are proposing a completely transparent mapping of content:
+> 
+> alice> cat /etc/passwd
+> alice:x:1000:1000:Alice:/home/alice:/bin/bash
+> 
+> bob> cat /etc/passwd
+> bob:x:1001:1001:Bob:/home/bob:/bin/bash
+> 
+> correct?
 > 
 > Cheers, Andreas
 > --
@@ -57,3 +58,7 @@ On 6/4/08 3:50 AM, "Andreas Dilger" <adilger@sun.com> wrote:
 > Sr. Staff Engineer, Lustre Group
 > Sun Microsystems of Canada, Inc.
 > 
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
