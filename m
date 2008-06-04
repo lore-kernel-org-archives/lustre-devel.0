@@ -1,69 +1,81 @@
-From: Eric Barton <eeb@sun.com>
-Date: Thu, 05 Jun 2008 00:41:49 +0100
-Subject: [Lustre-devel] hiding non-fatal communications errors
-In-Reply-To: <C46C546F.57D1%peter.braam@sun.com>
-References: <018701c8c646$6a6d56a0$0281a8c0@ebpc>
-	<C46C546F.57D1%peter.braam@sun.com>
-Message-ID: <02f901c8c69c$8ede99d0$0281a8c0@ebpc>
+From: Matthew Ahrens <Matthew.Ahrens@sun.com>
+Date: Wed, 04 Jun 2008 16:50:54 -0700
+Subject: [Lustre-devel] Moving forward on Quotas
+In-Reply-To: <18500.63385.570359.425911@gargle.gargle.HOWL>
+References: <18493.29199.765234.755534@gargle.gargle.HOWL>
+	<C46829E1.5610%peter.braam@sun.com>
+	<20080601045302.GA29979@eng.sun.com>
+	<18498.43788.847173.750390@gargle.gargle.HOWL>
+	<48449569.4080406@sun.com>
+	<18500.63385.570359.425911@gargle.gargle.HOWL>
+Message-ID: <48472A5E.501@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-> -----Original Message-----
-> From: Peter.Braam at Sun.COM [mailto:Peter.Braam at Sun.COM] 
-> Sent: 04 June 2008 10:17 PM
-> To: Eric Barton; 'Lustre Development Mailing List'
-> Subject: Re: [Lustre-devel] hiding non-fatal communications errors
+Nikita Danilov wrote:
+> Matthew Ahrens writes:
+>  > Nikita Danilov wrote:
+>  > > Jeff Bonwick writes:
+>  > >  > I'd suggest working with Matt Ahrens on this.
+>  > > 
+>  > > Hello,
+>  > > 
+>  > > we were discussing recently what is needed from the DMU to implement quotas
+>  > > and other forms of space accounting. Our basic premise is that it is desirable
+>  > > to keep DMU part of the quota support at minimum, and to implement only
+>  > > mechanism here, leaving policy to the upper layers.
+>  > 
+>  > I agree with this premise.  However, your proposed implementation (especially 
+>  > the asynchronous update mechanism and associated pending file) seems 
+>  > unnecessarily complicated.
+>  > 
+>  > I would suggest that we simply update a "database" (eg. ZAP object or sparse 
+>  > array) of userid -> space usage from syncing context when the space is 
+>  > allocated/freed (ie, dsl_dataset_block_{born,kill}).  I believe that the 
+>  > problems this presents[*] will be more tractable than the method you outlined.
 > 
-> Andreas has been suggesting re-transmission of these callback (aka AST) RPCs
-> for years.  If we think it through carefully, it might be a simple solution.
+> Indeed, this solution is much simpler, and it was considered
+> initially. I see following drawbacks in it:
 
-Yes - carefully is the watchword - I suspect lock callback RPCs (aka ASTs)
-have some fundamentally different properties.  Nathan and I seemed to
-touch on this when we last chatted about related AT issues.
+Agreed, those are possible drawbacks, depending on the implementation.  For 
+example, if the DB object is stored in the user's objset (which is preferable 
+for other reasons) then I suspect that the two drawbacks you mention below 
+will be no worse than in your proposal.
 
-Any volunteers to s/we/me/ ?
+--matt
 
+>      - a notion of a user identifier (or some opaque identifier) has to
+>        be introduced in DMU interface. DMU doesn't interpret these
+>        identifiers in any way, except for using them as keys in a space
+>        usage database. A set of these identifiers has to be passed to
+>        every DMU entry point that might result in space allocation (a
+>        set is needed because there are group quotas, and to keep
+>        interface more or less generic).
 > 
-> Peter
+>      - an implementation of chown, chgrp, and distributed quota require
+>        DMU user to modify this database. Also, an interface to iterate
+>        over this database is most likely needed for things like
+>        distributed fsck, and user level quote reporting tools. It seems
+>        that it would be quite difficult to encapsulate such a database
+>        within DMU.
 > 
+>  > 
+>  > --matt
+>  > 
+>  > [*] eg, if the DB object is stored in the user's objset, then updating it in 
+>  > syncing context may be problematic.  if it is stored in the MOS, carrying it 
 > 
-> On 6/4/08 6:25 AM, "Eric Barton" <eeb@sun.com> wrote:
+> The proposal was to update the database in the context of currently open
+> transaction group. That is, when transaction group T has just committed,
+> commit call-back is invoked and the database is updated in the context
+> of some transaction belonging to transaction group T + 2 (T + 1 being in
+> sync). It is because of this that pending file has to keep track of
+> objects from two last transaction groups.
 > 
-> > Something for recovery experts...
-> > 
-> > Communications may timeout for non-fatal reasons e.g...
-> > 
-> > 1. Adaptive timeouts were too aggressive (e.g. if server load has
-> >    suddenly become extreme).
-> > 
-> > 2. An LNET router has failed but one or more of its peers hasn't
-> >    detected this yet.
-> > 
-> > When a lustre client times out an RPC it sent to a server, it (a) allows
-> > pending signals to be delivered (i.e. you can now ^C the process doing
-> > the I/O) and (b) tries to reconnect and/or fail over.  If it reconnects
-> > and confirms that the server has not rebooted, the RPC is resent and
-> > may now succeed.
-> > 
-> > This should work in all "normal" RPCs (i.e. all RPCs apart from ldlm
-> > callbacks (ASTs)) since the server knows whether it actually processed
-> > the RPC or not and can handle the resent request appropriately.
-> > 
-> > However I think there is a problem if the RPC is an ldlm callback.  In
-> > this case, the lustre server sends the RPC to the lustre client and
-> > AFAIK the request is not resent if it times out.  If the request is a
-> > blocking AST, the lustre client isn't notified to clean its cache and
-> > cancel locks - and it risks being evicted.
-> > 
-> > How should this be handled?
-> > 
-> > _______________________________________________
-> > Lustre-devel mailing list
-> > Lustre-devel at lists.lustre.org
-> > http://lists.lustre.org/mailman/listinfo/lustre-devel
+>  > along when doing snapshot operations will be painful (snapshot, clone, send, 
+>  > recv, rollback, etc).
 > 
-> 
-> 
+> Nikita.
