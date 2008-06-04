@@ -1,33 +1,59 @@
-From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
-Date: Wed, 04 Jun 2008 10:22:02 -0700
-Subject: [Lustre-devel] Replacing a dead OST (fixed subject line)
-In-Reply-To: <C46BFD6B.5720%peter.braam@sun.com>
-References: <C46BFD6B.5720%peter.braam@sun.com>
-Message-ID: <4846CF3A.8070602@sun.com>
+From: Eric Barton <eeb@sun.com>
+Date: Wed, 04 Jun 2008 18:47:28 +0100
+Subject: [Lustre-devel] security: MGS connection
+In-Reply-To: <4846C394.1020801@sun.com>
+References: <C46C26CE.574E%peter.braam@sun.com> <4846C394.1020801@sun.com>
+Message-ID: <023e01c8c66b$0eabce80$0281a8c0@ebpc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Peter Braam wrote:
-> There is tremendous value in fixing this bug (15345), because it turns an un-usual
-> usage of our tools for recovery into something that is done more routinely.
->
-> When I listened to this group, my impression was that it was not so hard to
-> rebuild the OSS, but it does require scanning the primary MDS, finding the
-> pathnames for affected files (with objects on the failed OSS), and using
-> that list of files to re-write on the cluster where the OSS was lost.
->
-> Nathan - this is a special case of the recovery mechanisms we are talking
-> about (with the log being constructed in a different way). I think you
-> should design the solution for this problem.
->   
-I am taking this to mean we should design the general case of 
-"dead/missing OST" into the HSM/migration architecture, and not 
-something to do with recovery per se.   That's actually really 
-interesting - you could deactivate an OST, and yet still read the files 
-from it transparently.
+Eric,
 
+> Here is the user interface change according to previous discussion, 
+> please review:
+> 
+> - The security flavor of MGS connection is determined by each node, not 
+>   controllable by MGS.
 
-Should I make a "luste-hsm" mail alias, or should we put it on lustre-devel?
+Is this an unavoidable fact of life or a design decision?  See below "XXX"
+
+> - By default there's no protection.
+
+See below "XXX"
+
+> 
+> - Given the GSS/Kerberos env is ready, mount option "mgssec=flavor" 
+> could be supplied. Pre-configured machine credential will be used, so no 
+> need to supply password or whatsoever.
+> 
+> - For MDT/OST, the option "mgssec=flavor" could also be written on disk, 
+> like other parameters, but will be override if mount option supplied.
+> 
+> - The flavor of MGS connection won't change until umount, no matter how 
+> rest of connection flavors change at runtime.
+
+> - MGC->MGS connection is one per node, so only one flavor could be used. 
+> For example, suppose 2 OSTs live in a single node, we do:
+>    # mount -t lustre -o mgssec=krb5p /dev/sda1 /mnt/ost1
+>    # mount -t lustre -o mgssec=null /dev/sda1 /mnt/ost2
+> then only 'mgssec=krb5p' will take effect, the second 'mgssec=null' will 
+> be ignored.
+
+I don't think it's acceptable to allow a previous mount to compromise
+the security of a later mount.
+
+XXX
+
+This raises the interesting question of whether servers (MGS included) can
+demand a minimim level of security from clients connecting to them.  Is this
+normally part of configuring security on a given node (e.g. to set the
+machine credentials you mentioned above)?
+
+> Are these (especially the last one) reasonable? Thanks.
+> 
+> -- 
+> Eric
+> 
