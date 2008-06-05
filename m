@@ -1,90 +1,42 @@
-From: Robert Read <rread@sun.com>
-Date: Thu, 05 Jun 2008 09:42:21 -0700
-Subject: [Lustre-devel] hiding non-fatal communications errors
-In-Reply-To: <E5C69299-B24B-439F-90F6-53398543C3B8@sun.com>
-References: <018701c8c646$6a6d56a0$0281a8c0@ebpc>
-	<C46C546F.57D1%peter.braam@sun.com>
-	<20080604222008.GD2961@webber.adilger.int>
-	<E5C69299-B24B-439F-90F6-53398543C3B8@sun.com>
-Message-ID: <C756F41E-2CF2-4DAD-9920-F1CB2A2BECA6@sun.com>
+From: Eric Mei <Eric.Mei@Sun.COM>
+Date: Thu, 05 Jun 2008 10:54:54 -0600
+Subject: [Lustre-devel] security: MGS connection
+In-Reply-To: <028801c8c678$922e1d50$0281a8c0@ebpc>
+References: <C46C26CE.574E%peter.braam@sun.com> <4846C394.1020801@sun.com>
+	<023e01c8c66b$0eabce80$0281a8c0@ebpc> <4846E11A.7010604@sun.com>
+	<028801c8c678$922e1d50$0281a8c0@ebpc>
+Message-ID: <48481A5E.4050200@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Eric,
 
-On Jun 4, 2008, at 21:12 , Oleg Drokin wrote:
+Here is an updated user interface proposal, please review:
 
-> Hello!
->
-> On Jun 4, 2008, at 6:20 PM, Andreas Dilger wrote:
->
->> I suspect this could be adapted to allowing a fixed number of
->> retries for
->> server-originated RPCs also.  In the case of LDLM blocking callbacks
->> sent
->> to a client, a resend is currently harmless (either the client is
->> already
->> processing the callback, or the lock was cancelled).
->
-> We need to be careful here and decide on a good strategy on when to
-> resend.
-> E.g. recent case at ORNL (even if a bit pathologic) is they pound
-> through
-> thousands of clients to 4 OSSes via 2 routers. That creates request
-> waiting
-> lists on OSSes well into tens of thousands. When we block on a lock
-> and send
-> blocking AST to the client, it quickly turns around and puts in his
-> data...
-> at the end of our list that takes hundreds of seconds (more than
-> obd_timeout,
-> obviously). No matter how much you resend, it won't help.
+- MGS can be configured to "only allow RPC with certain level of 
+security from certain node". The default is 'allow any'.
 
+- Each node choose what security flavor to use to connect MGS when 
+mounting target device or client, by mount option "mgssec=flavor". By 
+default 'null' (no protection) is chosen.
 
-This looks like the poster child for adaptive timeouts, although we  
-might want need some version of the early margin update patch on  
-15501.  Have you tried enabling AT?
+- For MDT/OST, the option "mgssec=flavor" could also be written on disk, 
+like other parameters, but will be override if mount option supplied.
 
->
-> Now a good argument is before we kill such clients (or do any sort of
-> resend),
-> perhaps it makes sense to check incoming queue to see if there is
-> anything?
-> On the other hand that would be like half of request scheduler,
-> probably, and
-> with such queues, it would take ages, I guess.
-> BTW, AT code changes lock waiting from obd_timeout to obd_timeout/2,
-> why is that?
-> (when AT is disabled). All this is bug 15332.
->
+- If flavor of GSS/Kerberos is specified, some pre-configured machine 
+credential will be used, so no need to supply password or whatsoever.
 
-Maybe that's was done to discourage people from disabling AT?  
-Seriously, though, I don't know why that was changed. Perhaps it was  
-done on b1_6 before to AT landed?
+- The flavor of MGS connection won't change until umount, no matter how 
+rest of connection flavors change at runtime.
 
-robert
+- If there's multiple mounts on one node, they must specify the same 
+security flavor. For example, if we do:
+   # mount -t lustre -o mgssec=krb5p /dev/sda1 /mnt/ost1
+   # mount -t lustre -o mgssec=null /dev/sda1 /mnt/ost2
+then the second mount will fail immediately.
 
-
-> Or was the resend meant just for initial RPC where we do not get a
-> confirmation
-> soon? Yes, there it makes sense to retry soon, but this case above
-> needs to be
-> still considered, since currently we do not retry writeouts too, which
-> has as
-> much of a bad effect on dirty client caches, and of course all the
-> above is very
-> true in such cases too.
-> Also without lnet patch in 15332, where small messages are prioritized
-> on routers,
-> it is way too easy to timeout ast response because of router
-> congestion and no
-> amount of resending would help then.
->
-> Bye,
->     Oleg
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+-- 
+Eric
