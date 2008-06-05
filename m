@@ -1,42 +1,65 @@
-From: Eric Mei <Eric.Mei@Sun.COM>
-Date: Thu, 05 Jun 2008 10:54:54 -0600
-Subject: [Lustre-devel] security: MGS connection
-In-Reply-To: <028801c8c678$922e1d50$0281a8c0@ebpc>
-References: <C46C26CE.574E%peter.braam@sun.com> <4846C394.1020801@sun.com>
-	<023e01c8c66b$0eabce80$0281a8c0@ebpc> <4846E11A.7010604@sun.com>
-	<028801c8c678$922e1d50$0281a8c0@ebpc>
-Message-ID: <48481A5E.4050200@sun.com>
+From: Oleg Drokin <Oleg.Drokin@Sun.COM>
+Date: Thu, 05 Jun 2008 12:59:27 -0400
+Subject: [Lustre-devel] hiding non-fatal communications errors
+In-Reply-To: <C756F41E-2CF2-4DAD-9920-F1CB2A2BECA6@sun.com>
+References: <018701c8c646$6a6d56a0$0281a8c0@ebpc>
+	<C46C546F.57D1%peter.braam@sun.com>
+	<20080604222008.GD2961@webber.adilger.int>
+	<E5C69299-B24B-439F-90F6-53398543C3B8@sun.com>
+	<C756F41E-2CF2-4DAD-9920-F1CB2A2BECA6@sun.com>
+Message-ID: <1F3456C3-7172-4762-93DB-8589B44189D2@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Eric,
+Hello!
 
-Here is an updated user interface proposal, please review:
+On Jun 5, 2008, at 12:42 PM, Robert Read wrote:
 
-- MGS can be configured to "only allow RPC with certain level of 
-security from certain node". The default is 'allow any'.
+>>> I suspect this could be adapted to allowing a fixed number of
+>>> retries for
+>>> server-originated RPCs also.  In the case of LDLM blocking callbacks
+>>> sent
+>>> to a client, a resend is currently harmless (either the client is
+>>> already
+>>> processing the callback, or the lock was cancelled).
+>> We need to be careful here and decide on a good strategy on when to
+>> resend.
+>> E.g. recent case at ORNL (even if a bit pathologic) is they pound
+>> through
+>> thousands of clients to 4 OSSes via 2 routers. That creates request
+>> waiting
+>> lists on OSSes well into tens of thousands. When we block on a lock
+>> and send
+>> blocking AST to the client, it quickly turns around and puts in his
+>> data...
+>> at the end of our list that takes hundreds of seconds (more than
+>> obd_timeout,
+>> obviously). No matter how much you resend, it won't help.
+> This looks like the poster child for adaptive timeouts, although we  
+> might want need some version of the early margin update patch on  
+> 15501.  Have you tried enabling AT?
 
-- Each node choose what security flavor to use to connect MGS when 
-mounting target device or client, by mount option "mgssec=flavor". By 
-default 'null' (no protection) is chosen.
+The problem is AT does not handle this specific case, there is no way to
+deliver "early replay" from a client to server that "I am working on  
+it" outside of
+just sending dirty data. But dirty data gets into a queue for way too  
+long.
+There re no timed out requests, the only thing timing out is lock that  
+is not
+cancelled in time.
+AT was not tried - this is hard to do at ORNL, as client side is Cray  
+XT4 machine,
+and updating clients is hard. So they are on 1.4.11 of some sort.
+They can easily update servers, but this won't help, of course.
 
-- For MDT/OST, the option "mgssec=flavor" could also be written on disk, 
-like other parameters, but will be override if mount option supplied.
+> Maybe that's was done to discourage people from disabling AT?  
+> Seriously, though, I don't know why that was changed. Perhaps it was  
+> done on b1_6 before to AT landed?
 
-- If flavor of GSS/Kerberos is specified, some pre-configured machine 
-credential will be used, so no need to supply password or whatsoever.
+hm, indeed. I see this change in 1.6.3.
 
-- The flavor of MGS connection won't change until umount, no matter how 
-rest of connection flavors change at runtime.
-
-- If there's multiple mounts on one node, they must specify the same 
-security flavor. For example, if we do:
-   # mount -t lustre -o mgssec=krb5p /dev/sda1 /mnt/ost1
-   # mount -t lustre -o mgssec=null /dev/sda1 /mnt/ost2
-then the second mount will fail immediately.
-
--- 
-Eric
+Bye,
+     Oleg
