@@ -1,81 +1,67 @@
-From: Matthew Ahrens <Matthew.Ahrens@sun.com>
-Date: Wed, 04 Jun 2008 16:50:54 -0700
-Subject: [Lustre-devel] Moving forward on Quotas
-In-Reply-To: <18500.63385.570359.425911@gargle.gargle.HOWL>
-References: <18493.29199.765234.755534@gargle.gargle.HOWL>
-	<C46829E1.5610%peter.braam@sun.com>
-	<20080601045302.GA29979@eng.sun.com>
-	<18498.43788.847173.750390@gargle.gargle.HOWL>
-	<48449569.4080406@sun.com>
-	<18500.63385.570359.425911@gargle.gargle.HOWL>
-Message-ID: <48472A5E.501@sun.com>
+From: Oleg Drokin <Oleg.Drokin@Sun.COM>
+Date: Thu, 05 Jun 2008 00:12:14 -0400
+Subject: [Lustre-devel] hiding non-fatal communications errors
+In-Reply-To: <20080604222008.GD2961@webber.adilger.int>
+References: <018701c8c646$6a6d56a0$0281a8c0@ebpc>
+	<C46C546F.57D1%peter.braam@sun.com>
+	<20080604222008.GD2961@webber.adilger.int>
+Message-ID: <E5C69299-B24B-439F-90F6-53398543C3B8@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Nikita Danilov wrote:
-> Matthew Ahrens writes:
->  > Nikita Danilov wrote:
->  > > Jeff Bonwick writes:
->  > >  > I'd suggest working with Matt Ahrens on this.
->  > > 
->  > > Hello,
->  > > 
->  > > we were discussing recently what is needed from the DMU to implement quotas
->  > > and other forms of space accounting. Our basic premise is that it is desirable
->  > > to keep DMU part of the quota support at minimum, and to implement only
->  > > mechanism here, leaving policy to the upper layers.
->  > 
->  > I agree with this premise.  However, your proposed implementation (especially 
->  > the asynchronous update mechanism and associated pending file) seems 
->  > unnecessarily complicated.
->  > 
->  > I would suggest that we simply update a "database" (eg. ZAP object or sparse 
->  > array) of userid -> space usage from syncing context when the space is 
->  > allocated/freed (ie, dsl_dataset_block_{born,kill}).  I believe that the 
->  > problems this presents[*] will be more tractable than the method you outlined.
-> 
-> Indeed, this solution is much simpler, and it was considered
-> initially. I see following drawbacks in it:
+Hello!
 
-Agreed, those are possible drawbacks, depending on the implementation.  For 
-example, if the DB object is stored in the user's objset (which is preferable 
-for other reasons) then I suspect that the two drawbacks you mention below 
-will be no worse than in your proposal.
+On Jun 4, 2008, at 6:20 PM, Andreas Dilger wrote:
 
---matt
+> I suspect this could be adapted to allowing a fixed number of  
+> retries for
+> server-originated RPCs also.  In the case of LDLM blocking callbacks  
+> sent
+> to a client, a resend is currently harmless (either the client is  
+> already
+> processing the callback, or the lock was cancelled).
 
->      - a notion of a user identifier (or some opaque identifier) has to
->        be introduced in DMU interface. DMU doesn't interpret these
->        identifiers in any way, except for using them as keys in a space
->        usage database. A set of these identifiers has to be passed to
->        every DMU entry point that might result in space allocation (a
->        set is needed because there are group quotas, and to keep
->        interface more or less generic).
-> 
->      - an implementation of chown, chgrp, and distributed quota require
->        DMU user to modify this database. Also, an interface to iterate
->        over this database is most likely needed for things like
->        distributed fsck, and user level quote reporting tools. It seems
->        that it would be quite difficult to encapsulate such a database
->        within DMU.
-> 
->  > 
->  > --matt
->  > 
->  > [*] eg, if the DB object is stored in the user's objset, then updating it in 
->  > syncing context may be problematic.  if it is stored in the MOS, carrying it 
-> 
-> The proposal was to update the database in the context of currently open
-> transaction group. That is, when transaction group T has just committed,
-> commit call-back is invoked and the database is updated in the context
-> of some transaction belonging to transaction group T + 2 (T + 1 being in
-> sync). It is because of this that pending file has to keep track of
-> objects from two last transaction groups.
-> 
->  > along when doing snapshot operations will be painful (snapshot, clone, send, 
->  > recv, rollback, etc).
-> 
-> Nikita.
+We need to be careful here and decide on a good strategy on when to  
+resend.
+E.g. recent case at ORNL (even if a bit pathologic) is they pound  
+through
+thousands of clients to 4 OSSes via 2 routers. That creates request  
+waiting
+lists on OSSes well into tens of thousands. When we block on a lock  
+and send
+blocking AST to the client, it quickly turns around and puts in his  
+data...
+at the end of our list that takes hundreds of seconds (more than  
+obd_timeout,
+obviously). No matter how much you resend, it won't help.
+Now a good argument is before we kill such clients (or do any sort of  
+resend),
+perhaps it makes sense to check incoming queue to see if there is  
+anything?
+On the other hand that would be like half of request scheduler,  
+probably, and
+with such queues, it would take ages, I guess.
+BTW, AT code changes lock waiting from obd_timeout to obd_timeout/2,  
+why is that?
+(when AT is disabled). All this is bug 15332.
+
+Or was the resend meant just for initial RPC where we do not get a  
+confirmation
+soon? Yes, there it makes sense to retry soon, but this case above  
+needs to be
+still considered, since currently we do not retry writeouts too, which  
+has as
+much of a bad effect on dirty client caches, and of course all the  
+above is very
+true in such cases too.
+Also without lnet patch in 15332, where small messages are prioritized  
+on routers,
+it is way too easy to timeout ast response because of router  
+congestion and no
+amount of resending would help then.
+
+Bye,
+     Oleg
