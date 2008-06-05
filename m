@@ -1,48 +1,45 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@sun.com>
-Date: Thu, 05 Jun 2008 16:27:27 +0400
-Subject: [Lustre-devel] some thoughts on COS
-Message-ID: <4847DBAF.5020001@sun.com>
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Thu, 05 Jun 2008 06:45:36 -0700
+Subject: [Lustre-devel] Moving forward on Quotas
+In-Reply-To: <20080605122708.GR6283@lore>
+Message-ID: <C46D3C11.5835%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+Well, this protocol hasn't been published yet; why not include the server
+side uid / gid then?
 
-I think it could be great if we can use LDLM for COS. at the very first view
-it looks possible:
-1) each server lock is tagged with client unique id (uuid/export addr/etc)
-2) mds registers own blocking AST function
-3) locks to be used rep-ack's aren't released upon ACK, only upon commit
-4) whenever conflict is observed by LDLM at enqueue time, MDS's blocking AST
-    function is called and depending on whetner conflicting locks are taken on
-    behalf same or different clients, the function issues sync causing commit
-    and old lock to be released later
+But more seriously, how is this encoded in such a way that the OST can trust
+the information - it must be in the capability too?
 
-but one use case isn't that obvious. it's OK when first lock L1 was from client
-C1 with PW mode and new lock is also from C1/PW. but then we have a situation
-with same client, but locks are PW then PR:
-1) we wouldn't want to sync just because client does mkdir a; touch a
-2) thus we have to grant PR lock (so, first problem - sometimes PW and PR doesn't
-    conflict?)
-3) if we cancel PW to grant PR, then we'd have to make this PR conflicting with
-    any PR coming from different client?
-4) changing PR to PW in order to inherit state? (client side doesn't expect such
-    locks_
+Peter
 
-all of this doesn't sound like a good solution, IMHO. at least it'd require serious
-changes in LDLM while we're talking about 1.6/1.8 ... so we need another way.
 
-probably we could re-use VBR as each inode change goes with new persistent version
-and version is numerically equal to transno, comparing inode's version with last
-committed transno we can learn whether the inode is committed?
+On 6/5/08 5:27 AM, "Johann Lombardi" <johann@sun.com> wrote:
 
-next problem is to learn source of change, i.e. client. in the worst case all changes
-are from different clients, thus every change means sync. but if we *cache* source
-information we probably can avoid majority of syncs. IOW, we don't need to track
-source all the time, it should be enough if we have this information most of time.
-so, storing it in in-core inode is good enough probably. following this way we don't
-need to care about inode's lifetime.
-
-thanks, Alex
+> On Thu, Jun 05, 2008 at 04:09:41AM -0700, Peter Braam wrote:
+>> Quota are determined by the owner of the file, not by the uid of the
+>> process.
+> 
+> In my understanding, the client is not aware of the server-side uid/gid and
+> the file owner returned to the client is translated too. Please let me know
+> if I misunderstood how the uid/gid mapping feature works.
+> 
+>> We have been propagating owners / gid of files from MDS to OSS for this
+>> reason.
+>> 
+>> I don't understand the issue.
+> 
+> The problem is that the owner / group is propagated to the OSTs through the
+> client the first time it sends a bulk write rpc (by setting the
+> OBD_MD_FLUID/GID flags) and those identifiers - supplied by the client -
+> must be translated too.
+> 
+> Johann
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
