@@ -1,66 +1,31 @@
-From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Thu, 05 Jun 2008 04:10:45 -0700
-Subject: [Lustre-devel] FW: Quotas for Lustre 2.0
-In-Reply-To: <9CE57CB7-C0BA-463D-8F62-AEC4E2DC1335@Sun.COM>
-Message-ID: <C46D17C5.5812%peter.braam@sun.com>
+From: Johann Lombardi <johann@sun.com>
+Date: Thu, 05 Jun 2008 14:27:08 +0200
+Subject: [Lustre-devel] Moving forward on Quotas
+In-Reply-To: <C46D1785.5811%peter.braam@sun.com>
+References: <20080605083957.GQ6283@lore> <C46D1785.5811%peter.braam@sun.com>
+Message-ID: <20080605122708.GR6283@lore>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Thu, Jun 05, 2008 at 04:09:41AM -0700, Peter Braam wrote:
+> Quota are determined by the owner of the file, not by the uid of the
+> process.
 
+In my understanding, the client is not aware of the server-side uid/gid and
+the file owner returned to the client is translated too. Please let me know
+if I misunderstood how the uid/gid mapping feature works.
 
-> From: Peter Braam <Peter.Braam@Sun.COM>
-> Date: June 4, 2008 8:01:20 PM ADT
-> To: Peter Bojanic <Peter.Bojanic@Sun.COM>, Nikita Danilov
-<Nikita.Danilov@Sun.COM
-> >, Johann Lombardi <johann@sun.com>
-> Cc: Eric Barton <eeb@sun.com>, Nathaniel Rutman
-> <Nathan.Rutman@Sun.COM>
-> Subject: Re: Quotas for Lustre 2.0
+> We have been propagating owners / gid of files from MDS to OSS for this
+> reason.
 >
-> Customers need quota, so we need it with the DMU.
->
-> There are two architectures being discussed simultaneously: one is
-> quota for
-> the DMU, that is new and Nikita has given a good approach.  The
-> second is
-> adjustments to the Lustre quota architecture, which has problems,
-> but it
-> seems it is not a case of a re-write. So the 120 hours may not be a
-> total
-> waste.
->
-> Nathan should have been Johann for this thread?
->
-> Peter
->
->
->
->
->
-> On 6/4/08 3:47 PM, "Peter Bojanic" <Peter.Bojanic@Sun.COM> wrote:
->
->> Nikita, Peter (Braam),
->>
->> More thinking on quotas...
->>
->> Porting the existing flawed architecture from HEAD will take ~120
->> hours (be prepared to double that). It would be a shame to waste that
->> effort as a throw-away. Would the new approach that is being
->> discussed
->> on lustre-devel afford us an ldiskfs-based quotas feature on HEAD
->> before we get DMU servers? Another thought: could we have quotas
->> support for ldiskfs and disable quotas for DMU object stores if
->> necessary?
->>
->> The dependencies here are maddening.
->>
->> Thanks,
->> Bojanic
->
->
+> I don't understand the issue.
 
+The problem is that the owner / group is propagated to the OSTs through the
+client the first time it sends a bulk write rpc (by setting the
+OBD_MD_FLUID/GID flags) and those identifiers - supplied by the client -
+must be translated too.
 
------- End of Forwarded Message
+Johann
