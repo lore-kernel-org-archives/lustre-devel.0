@@ -1,70 +1,69 @@
 From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Thu, 05 Jun 2008 20:16:03 -0700
-Subject: [Lustre-devel] security: MGS connection
-In-Reply-To: <48489540.80808@sun.com>
-Message-ID: <C46DFA03.5872%peter.braam@sun.com>
+Date: Thu, 05 Jun 2008 20:29:48 -0700
+Subject: [Lustre-devel] hiding non-fatal communications errors
+In-Reply-To: <1F3456C3-7172-4762-93DB-8589B44189D2@Sun.COM>
+Message-ID: <C46DFD3C.587B%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Out of curiosity - do we secure OSC - OST connections with GSS?  We send
-capabilities over them that are encrypted so perhaps it is not necessary.
-
-Peter
+Why can we not send early replies?
 
 
-On 6/5/08 6:39 PM, "Eric Mei" <Eric.Mei@Sun.COM> wrote:
+On 6/5/08 9:59 AM, "Oleg Drokin" <Oleg.Drokin@Sun.COM> wrote:
 
-> Eric Barton wrote:
->>> Here is an updated user interface proposal, please review:
->>> 
->>> - MGS can be configured to "only allow RPC with certain level of
->>> security from certain node". The default is 'allow any'.
->> 
->> Fine.
->> 
->>> - Each node choose what security flavor to use to connect MGS when
->>> mounting target device or client, by mount option "mgssec=flavor". By
->>> default 'null' (no protection) is chosen.
->> 
->> Fine.
->> 
->>> - For MDT/OST, the option "mgssec=flavor" could also be written on disk,
->>> like other parameters, but will be override if mount option supplied.
->> 
->> How can "mgssec=flavor" apply to MDT/OST connections?  What mount option
->> will override saved MDT/OST parameters?
+> Hello!
 > 
-> Sorry I was not clear enough. I meant connection from MDT or OST to MGS.
-> The "mgssec=flavor" could be specified as mount parameter, or stored on
-> disk by mkfs.lustre or tune2fs. If both present, mount option wins.
-> Anyway it's just some details.
+> On Jun 5, 2008, at 12:42 PM, Robert Read wrote:
 > 
->> IMHO we have to make an extremely clear separation between MGS connection
->> security (which can only be specified in the mount command) and lustre server
->> connection security (which can be stored on the MGS).  Anything that blurs
->> the
->> distinction will be error prone.
+>>>> I suspect this could be adapted to allowing a fixed number of
+>>>> retries for
+>>>> server-originated RPCs also.  In the case of LDLM blocking callbacks
+>>>> sent
+>>>> to a client, a resend is currently harmless (either the client is
+>>>> already
+>>>> processing the callback, or the lock was cancelled).
+>>> We need to be careful here and decide on a good strategy on when to
+>>> resend.
+>>> E.g. recent case at ORNL (even if a bit pathologic) is they pound
+>>> through
+>>> thousands of clients to 4 OSSes via 2 routers. That creates request
+>>> waiting
+>>> lists on OSSes well into tens of thousands. When we block on a lock
+>>> and send
+>>> blocking AST to the client, it quickly turns around and puts in his
+>>> data...
+>>> at the end of our list that takes hundreds of seconds (more than
+>>> obd_timeout,
+>>> obviously). No matter how much you resend, it won't help.
+>> This looks like the poster child for adaptive timeouts, although we
+>> might want need some version of the early margin update patch on
+>> 15501.  Have you tried enabling AT?
 > 
-> Yes exactly, they're completely separated.
+> The problem is AT does not handle this specific case, there is no way to
+> deliver "early replay" from a client to server that "I am working on
+> it" outside of
+> just sending dirty data. But dirty data gets into a queue for way too
+> long.
+> There re no timed out requests, the only thing timing out is lock that
+> is not
+> cancelled in time.
+> AT was not tried - this is hard to do at ORNL, as client side is Cray
+> XT4 machine,
+> and updating clients is hard. So they are on 1.4.11 of some sort.
+> They can easily update servers, but this won't help, of course.
 > 
->> 
->>> - If flavor of GSS/Kerberos is specified, some pre-configured machine
->>> credential will be used, so no need to supply password or whatsoever.
->> 
->> Fine.
->> 
->>> - The flavor of MGS connection won't change until umount, no matter how
->>> rest of connection flavors change at runtime.
->> 
->> Fine.
->> 
->>> - If there's multiple mounts on one node, they must specify the same
->>> security flavor. For example, if we do:
->>>    # mount -t lustre -o mgssec=krb5p /dev/sda1 /mnt/ost1
->>>    # mount -t lustre -o mgssec=null /dev/sda1 /mnt/ost2
->>> then the second mount will fail immediately.
->> 
->> Fine.
+>> Maybe that's was done to discourage people from disabling AT?
+>> Seriously, though, I don't know why that was changed. Perhaps it was
+>> done on b1_6 before to AT landed?
+> 
+> hm, indeed. I see this change in 1.6.3.
+> 
+> Bye,
+>      Oleg
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
