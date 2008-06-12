@@ -1,72 +1,57 @@
-From: Alexander Zarochentsev <Alexander.Zarochentsev@Sun.COM>
-Date: Wed, 11 Jun 2008 20:46:13 +0400
-Subject: [Lustre-devel] Commit on share
-In-Reply-To: <C4754ABB.5AB3%peter.braam@sun.com>
-References: <C4754ABB.5AB3%peter.braam@sun.com>
-Message-ID: <200806112046.13903.alexander.zarochentsev@sun.com>
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Wed, 11 Jun 2008 21:38:46 -0600
+Subject: [Lustre-devel] COS
+Message-ID: <C475F666.5B11%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 11 June 2008 19:26:19 Peter Braam wrote:
-> On 6/11/08 8:21 AM, "Alexander Zarochentsev"
->
-> <Alexander.Zarochentsev@Sun.COM> wrote:
-> > Hello,
-> >
-> > On 27 May 2008 14:44:18 Peter Braam wrote:
-> >> This HLD is definitely not ready at all.  It is very short, lacks
-> >> interaction diagrams and the arguments made are not sufficiently
-> >> detailed.
-> >
-> > is the following definition of dependent operation more clear?
-> >
-> > Operation B depends on operation A if:
-> >
-> > 1. A and B modify the same object
-> > 2. B modifies the object after A (LDLM serializes object access)
-> > 3. A isn't committed yet
-> > 4. A and B are issued by different clients
->
-> This shows a fundamental mistake, and one I was afraid of.  If a
-> second client only reads uncommitted data there is already a
-> dependency.
+>> A question: the definition still counts parallel file creation as
+>> dependent operation but actually the operations can be replayed
+>> independently. Is the definition OK for CoS?
 
-The definition above is intentionally done that way.
-It is just to fit requirements from the arch page, one of them is
-".. avoid non-recoverable requests". A non-recoverable request is a 
-request which cannot be replayed due to object version / request 
-version mismatch. CoS doesn't care about requests which are not 
-replayable and the definition reflects that.
+I don?t care for the definition that was given, but parallel file creation
+in one directory is definitely worth discussing.
 
-Well, I understand now you want more than an optimization to VBR but I 
-had to explain the mistake.
+Intuitively (in the absence of a definition) only the server is making
+multiple updates to the directory content and mtime, and these are not
+shared with the clients.  As a result, there are no dependencies for the
+part of the transaction that updates the directory as long as clients do not
+try to gain access with stat or readdir to the new entries in the directory.
 
-s/modify/access/ :
+To challenge you a little further ? might it be possible to get a definition
+of dependencies that covers cases correctly and coincides with the DLM
+usage?  (Notice that the book I pointed you was called ?concurrency
+control...?.)
 
-1. A and B access the same object, A is a write access.
-2. B accesses the object after A (LDLM serializes object access)
-3. A isn't committed yet
-4. A and B are issued by different clients
 
-A question: the definition still counts parallel file creation as 
-dependent operation but actually the operations can be replayed 
-independently. Is the definition OK for CoS?
+From Alex:
 
-Or we can add (results implementation complexity)
-5. A depends on the result of B: file creation and readdir, creation and 
-deletion of the same file and so on.
+it seems in recent ping-pong about version (what 1.8/2.0 is based on,
+features,
+etc) we forgot about busy inode issue with VBR. originally we planned to
+build
+VBR with fids as fid is unique ?
 
-> You need to read the database literature - this is standard stuff,
-> here is a link to a great book:
->
-> http://research.microsoft.com/~philbe/ccontrol/
+thanks, Alex
 
-> Peter
+-------------------
+I?m extremely glad you are catching this.  Let me try to only guide the
+design process and not discuss how we might solve this (you are much better
+at that).
 
--- 
-Alexander "Zam" Zarochentsev
-Staff Engineer
-Lustre Group, Sun Microsystems
+
+In a good design, issues like this are traceable.  If they are not, we have
+found a defect in the design.  Mike, Zam ? how do busy inodes play into use
+cases and requirements shown in the design document?  To take things one
+step further, please define a busy inode (and I?m having this feeling that
+once you define this, you will immediately add a new requirement to the
+design document).
+
+Peter
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080611/8e214a89/attachment.htm>
