@@ -1,30 +1,29 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Tue, 17 Jun 2008 11:10:59 -0600
-Subject: [Lustre-devel] maximum MDT inode count
-Message-ID: <20080617171058.GF3726@webber.adilger.int>
+From: Jakob Goldbach <jakob@goldbach.dk>
+Date: Tue, 17 Jun 2008 20:54:39 +0200
+Subject: [Lustre-devel] [Lustre-discuss] maximum MDT inode count
+In-Reply-To: <20080617171058.GF3726@webber.adilger.int>
+References: <20080617171058.GF3726@webber.adilger.int>
+Message-ID: <1213728879.11174.21.camel@arven.one.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-For future filesystem compatibility, we are wondering if there are any
-Lustre MDT filesystems in existence that have 2B or more total inodes?
+>   Otherwise,
+> I think people would be interested to know what the larger MDT sizes
+> are (even if they aren't as high as 2B inodes).
+> 
 
-This is fairly unlikely, because it would require an MDT filesystem
-that is > 8TB in size (which isn't even supported yet) and/or has been
-formatted with specific options to increase the total number of inodes.
+I have three clusters of 400M inodes each. MDT formated with an inode
+size of 256 and one inode per 1024 byte: '-I 256 -i 1024'. 
 
-This can be checked with "dumpe2fs -h /dev/{mdtdev} | grep 'Inode count'"
-on the MDT.  
+The cluster is split in three primarily to keep an eventual restore time
+low but ideally this would be one big cluster with 1.2G inodes.
 
+To other users: Note the inode size is less than recommended. My
+stripecount is one so this is feasible without a performance hit but
+Andreas warned me about future features which might add more user
+attributes.  
 
-If there are issues with privacy, please email me directly.  Otherwise,
-I think people would be interested to know what the larger MDT sizes
-are (even if they aren't as high as 2B inodes).
-
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+/Jakob
