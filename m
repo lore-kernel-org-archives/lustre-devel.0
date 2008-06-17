@@ -1,28 +1,30 @@
-From: Alex Lyashkov <Alexey.Lyashkov@Sun.COM>
-Date: Tue, 17 Jun 2008 10:30:07 +0300
-Subject: [Lustre-devel] cvs down?
-In-Reply-To: <4856E7F4.2090409@psc.edu>
-References: <4856E7F4.2090409@psc.edu>
-Message-ID: <1213687807.3551.41.camel@bear.shadowland>
+From: Andreas Dilger <adilger@sun.com>
+Date: Tue, 17 Jun 2008 11:10:59 -0600
+Subject: [Lustre-devel] maximum MDT inode count
+Message-ID: <20080617171058.GF3726@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Thanks for alert.
-Message forwarded to sysads and will be fixed quickly.
+For future filesystem compatibility, we are wondering if there are any
+Lustre MDT filesystems in existence that have 2B or more total inodes?
 
-On Mon, 2008-06-16 at 18:23 -0400, Benjamin Bennett wrote:
-> $ cvs up
-> cvs [update aborted]: connect to [cvs.lustre.org]:2401 failed: 
-> Connection refused
-> 
-> Any estimates on when it will be available?
-> 
-> 
-> --ben
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+This is fairly unlikely, because it would require an MDT filesystem
+that is > 8TB in size (which isn't even supported yet) and/or has been
+formatted with specific options to increase the total number of inodes.
+
+This can be checked with "dumpe2fs -h /dev/{mdtdev} | grep 'Inode count'"
+on the MDT.  
+
+
+If there are issues with privacy, please email me directly.  Otherwise,
+I think people would be interested to know what the larger MDT sizes
+are (even if they aren't as high as 2B inodes).
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
