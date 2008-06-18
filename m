@@ -1,29 +1,21 @@
-From: Jakob Goldbach <jakob@goldbach.dk>
-Date: Tue, 17 Jun 2008 20:54:39 +0200
-Subject: [Lustre-devel] [Lustre-discuss] maximum MDT inode count
-In-Reply-To: <20080617171058.GF3726@webber.adilger.int>
-References: <20080617171058.GF3726@webber.adilger.int>
-Message-ID: <1213728879.11174.21.camel@arven.one.com>
+From: Alex Lyashkov <Alexey.Lyashkov@Sun.COM>
+Date: Wed, 18 Jun 2008 20:12:21 +0300
+Subject: [Lustre-devel] security_inode_unlink in obdfilter.
+Message-ID: <1213809141.3681.35.camel@bear.shadowland>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->   Otherwise,
-> I think people would be interested to know what the larger MDT sizes
-> are (even if they aren't as high as 2B inodes).
-> 
+Hello list,
 
-I have three clusters of 400M inodes each. MDT formated with an inode
-size of 256 and one inode per 1024 byte: '-I 256 -i 1024'. 
+Is anybody know - why filter use this function in filter_vfs_unlink?
+From my point view this only add Selinux checks for OST objects, but ost
+not set any selinux context for object and this do nothing.
+I see only one possible variant for usage are log events via audit log.
+Is we really need this?
 
-The cluster is split in three primarily to keep an eventual restore time
-low but ideally this would be one big cluster with 1.2G inodes.
-
-To other users: Note the inode size is less than recommended. My
-stripecount is one so this is feasible without a performance hit but
-Andreas warned me about future features which might add more user
-attributes.  
-
-/Jakob
+-- 
+Alex Lyashkov <Alexey.lyashkov@sun.com>
+Lustre Group, Sun Microsystems
