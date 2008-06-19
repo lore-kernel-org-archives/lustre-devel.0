@@ -1,28 +1,68 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Thu, 19 Jun 2008 00:29:00 -0600
-Subject: [Lustre-devel] security_inode_unlink in obdfilter.
-In-Reply-To: <1213809141.3681.35.camel@bear.shadowland>
-References: <1213809141.3681.35.camel@bear.shadowland>
-Message-ID: <20080619062900.GP3726@webber.adilger.int>
+From: D. Marc Stearman <marc@llnl.gov>
+Date: Thu, 19 Jun 2008 08:13:42 -0700
+Subject: [Lustre-devel] maximum MDT inode count
+In-Reply-To: <20080617171058.GF3726@webber.adilger.int>
+References: <20080617171058.GF3726@webber.adilger.int>
+Message-ID: <03F8D5A8-99C0-4877-BEF2-819D7F24A160@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jun 18, 2008  20:12 +0300, Alexey Lyashkov wrote:
-> Is anybody know - why filter use this function in filter_vfs_unlink?
-> >From my point view this only add Selinux checks for OST objects, but ost
-> not set any selinux context for object and this do nothing.
-> I see only one possible variant for usage are log events via audit log.
-> Is we really need this?
+On our filesystem that was built to support BGL, we have 2B inodes  
+with 2T of capacity.
 
-This is just to keep filter_vfs_unlink() the same as vfs_unlink(),
-to be consistent in case SELinux or other security framework is in
-place.  If SELinux is NOT in use, then it just ends up as a no-op.
+Inode count: 2097315840
+Inodes per group: 32768
+Inode blocks per group: 4096
+Inode size: 512
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+We explicitly chose this number and put it in the XML when the  
+filesystem was built.  Then the users changed their I/O pattern and  
+did not end up creating nearly as many files as we estimated.  Since  
+then we have created file systems with a smaller number of inodes to  
+reduce fsck time.  (Not really an issue as much now, though with the  
+fast fsck feature).
+
+-Marc
+
+----
+D. Marc Stearman
+LC Lustre Administration Lead
+marc at llnl.gov
+925.423.9670
+Pager: 1.888.203.0641
+
+
+
+On Jun 17, 2008, at 10:10 AM, Andreas Dilger wrote:
+
+> For future filesystem compatibility, we are wondering if there are any
+> Lustre MDT filesystems in existence that have 2B or more total inodes?
+>
+> This is fairly unlikely, because it would require an MDT filesystem
+> that is > 8TB in size (which isn't even supported yet) and/or has been
+> formatted with specific options to increase the total number of  
+> inodes.
+>
+> This can be checked with "dumpe2fs -h /dev/{mdtdev} | grep 'Inode  
+> count'"
+> on the MDT.
+>
+>
+> If there are issues with privacy, please email me directly.   
+> Otherwise,
+> I think people would be interested to know what the larger MDT sizes
+> are (even if they aren't as high as 2B inodes).
+>
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Sr. Staff Engineer, Lustre Group
+> Sun Microsystems of Canada, Inc.
+>
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
