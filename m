@@ -1,68 +1,47 @@
-From: D. Marc Stearman <marc@llnl.gov>
-Date: Thu, 19 Jun 2008 08:13:42 -0700
-Subject: [Lustre-devel] maximum MDT inode count
-In-Reply-To: <20080617171058.GF3726@webber.adilger.int>
-References: <20080617171058.GF3726@webber.adilger.int>
-Message-ID: <03F8D5A8-99C0-4877-BEF2-819D7F24A160@llnl.gov>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Thu, 19 Jun 2008 13:24:42 -0700
+Subject: [Lustre-devel] hiding non-fatal communications errors
+In-Reply-To: <067b01c8c7c6$530dbb40$0281a8c0@ebpc>
+References: <2D6B10E2-7BED-4390-A241-7E3D57C0CDF5@Sun.COM>
+	<C46DFFAB.5883%peter.braam@sun.com>
+	<20080606044135.GJ2961@webber.adilger.int>
+	<067b01c8c7c6$530dbb40$0281a8c0@ebpc>
+Message-ID: <485AC08A.7070907@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On our filesystem that was built to support BGL, we have 2B inodes  
-with 2T of capacity.
+Eric Barton wrote:
+> Oleg's comments about congestion and the ORNL discussions I've been
+> involved in are effectively presenting arguments for allowing
+> expedited communications.  This is possible but comes at a cost.
+>   
+> The "proper" implementation effectively holds an uncongested network
+> in reserve for expedited communications.  That's a high price to pay
+> because it pretty well means doubling up all the LNET state - twice
+> the number of queues/sockets/queuepairs/connections.  That's
+> unavoidable since we're using these structures for backpressure and
+> once they're "full" you can only bypass with an additional connection.
+>   
+That's assuming network congestion is the cause of the lock timeout.  
+What if the server disk is busy doing who knows what, the client's cache 
+flush RPCs are all sitting on the server in the request queue just 
+waiting for some disk time.  Furthermore assume that a bunch of other 
+clients are all doing the same thing, so that we can't simply prioritize 
+this clients RPCs over everybody else's. 
 
-Inode count: 2097315840
-Inodes per group: 32768
-Inode blocks per group: 4096
-Inode size: 512
+I think the method suggested by Oleg has the most potential in this 
+case: "sniff" the incoming RPCs to see if they are cache flushes, and do 
+not decide to evict those clients until after those RPCs have been 
+processed.  As mentioned, we already do sniff the incoming reqs to check 
+adaptive timeout deadlines (ptlrpc_server_handle_req_in).
 
-We explicitly chose this number and put it in the XML when the  
-filesystem was built.  Then the users changed their I/O pattern and  
-did not end up creating nearly as many files as we estimated.  Since  
-then we have created file systems with a smaller number of inodes to  
-reduce fsck time.  (Not really an issue as much now, though with the  
-fast fsck feature).
-
--Marc
-
-----
-D. Marc Stearman
-LC Lustre Administration Lead
-marc at llnl.gov
-925.423.9670
-Pager: 1.888.203.0641
-
-
-
-On Jun 17, 2008, at 10:10 AM, Andreas Dilger wrote:
-
-> For future filesystem compatibility, we are wondering if there are any
-> Lustre MDT filesystems in existence that have 2B or more total inodes?
->
-> This is fairly unlikely, because it would require an MDT filesystem
-> that is > 8TB in size (which isn't even supported yet) and/or has been
-> formatted with specific options to increase the total number of  
-> inodes.
->
-> This can be checked with "dumpe2fs -h /dev/{mdtdev} | grep 'Inode  
-> count'"
-> on the MDT.
->
->
-> If there are issues with privacy, please email me directly.   
-> Otherwise,
-> I think people would be interested to know what the larger MDT sizes
-> are (even if they aren't as high as 2B inodes).
->
-> Cheers, Andreas
-> --
-> Andreas Dilger
-> Sr. Staff Engineer, Lustre Group
-> Sun Microsystems of Canada, Inc.
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+One further thing I would like to do is respond to "easy" RPCs 
+immediately (in a reserved thread).  "Easy" would certainly include 
+pings, maybe others that have no disk access.  This would allow us to 
+free up LNET buffers and other resources, prevent us from evicting 
+clients "we haven't heard from in X seconds" (although I just realized 
+we could fix that right now in ptlrpc_server_handle_req_in), and more 
+quickly determine network and server loading remotely.
