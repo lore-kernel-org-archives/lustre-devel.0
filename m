@@ -1,21 +1,25 @@
-From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
-Date: Mon, 23 Jun 2008 14:52:33 -0700
-Subject: [Lustre-devel] changelog interface
-Message-ID: <48601B21.8030209@sun.com>
+From: Andreas Dilger <adilger@sun.com>
+Date: Tue, 24 Jun 2008 21:40:04 -0600
+Subject: [Lustre-devel] CEA Lustre HSM Solution
+In-Reply-To: <9c21eeae0806231444y647cca00l47c436119c590210@mail.gmail.com>
+References: <9c21eeae0806231444y647cca00l47c436119c590210@mail.gmail.com>
+Message-ID: <20080625034004.GV6239@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Peter, early in the changelog arch we had designed the changelog user 
-API as a series of files that would show up under a special .lustre 
-directory.  After the ZFS changelog investigation, I think it makes more 
-sense to try and match the ZFS API so that changes to user tools are 
-minimized.
+On Jun 23, 2008  14:44 -0700, David Brown wrote:
+> I was wondering if anyone would know who specifically to contact about
+> the lustre HSM being thought up by CEA? Email contact information
+> would be prefered.
 
-So, as "zfs diff snap1 snap2" produces a stream to stdout, I think we 
-should make "lctl diff startrec [endrec]" produce a similar stream.  We 
-would also need a "lctl purge endrec" to clear out old changelog records.
+That would be Jacques-Charles Lafoucriere <jc.lafoucriere@cea.fr>
+and Aurelien Degremont <aurelien.degremont@cea.fr>.
 
-Any objections?
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
