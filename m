@@ -1,66 +1,43 @@
-From: Ricardo M. Correia <Ricardo.M.Correia@Sun.COM>
-Date: Wed, 25 Jun 2008 22:01:40 +0100
-Subject: [Lustre-devel] Changes in b_hd_dmu and zfs-lustre
-Message-ID: <1214427700.6751.45.camel@localhost>
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Fri, 27 Jun 2008 13:24:38 -0600
+Subject: [Lustre-devel] [RFC] HLD Review Request: Interoperability at
+	server side
+In-Reply-To: <48632894.1050204@sun.com>
+Message-ID: <C48A9A97.611F%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+Really good - well done!  I feel comfortable that this can move ahead.
 
-If you are using or developing in the b_hd_dmu branch and/or zfs-lustre,
-please be aware of the following points to avoid problems due to the
-recent changes related to bug 14778:
+I just want to ask you to make sure that repeated upgrade - downgrade -
+upgrade events (in the case bugs in the new release force the user back to
+old) are handled correctly.  I did see a discussion of up and down, but no
+explicit mention of repeating that process multiple times.
 
-* If you have any zfs-lustre tools installed in your machine, please run
-"scons -c install" or manually remove
-the /usr/local/sbin/{lzfs,lzfsd,lztest,lzdb,lzpool} files before
-updating your tree.
-The new tools will be installed in /usr/sbin by default (similarly to
-lustre).
+Regards,
 
-* If you have any local patches against zfs-lustre, you will need to
-update them to use the new library paths.
-You can do that with the following 2 commands:
+Peter
 
 
-$ sed -i "s/\/src\/lib\/lib/\/src\/lib\//" <patch>
-$ sed -i "s/\/src\/lib\/dmu-ctl\//\/src\/lib\/ctl\//" <patch>
 
 
-* The build procedure has been simplified, SCons is no longer required
-to be installed.
-As always, please refer to
-http://wiki.lustre.org/index.php?title=Lustre_OSS/MDS_with_ZFS_DMU for
-instructions.
-Note that the "--with-dmu" configure option no longer exists, you will
-need to use the zfs-lustre tree that lustrecvs sets up in
-lustre/zfs-lustre.
+On 6/25/08 11:26 PM, "Rahul Deshmukh" <Rahul.Deshmukh@Sun.COM> wrote:
 
-Please let me know if you have any problems.
+> Hi Peter/Eric,
+> 
+> Please inspect next version of "Interoperability at server side" HLD.
+> 
+> Thanks,
+> Rahul.
+> 
 
-Best regards,
-Ricardo
-
---
-
-Ricardo Manuel Correia
-Lustre Engineering
-
-Sun Microsystems, Inc.
-Portugal
-Phone +351.214134023 / x58723
-Mobile +351.912590825
-Email Ricardo.M.Correia at Sun.COM
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080625/ad40cb97/attachment.htm>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 6g_top.gif
-Type: image/gif
-Size: 1257 bytes
+Name: interop_disk_fidea.pdf
+Type: application/octet-stream
+Size: 121109 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080625/ad40cb97/attachment.gif>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080627/86b98293/attachment.obj>
