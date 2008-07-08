@@ -1,58 +1,46 @@
-From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Tue, 08 Jul 2008 11:43:39 -0600
+From: Benjamin Bennett <ben@psc.edu>
+Date: Tue, 08 Jul 2008 14:41:39 -0400
 Subject: [Lustre-devel] GSS cross-realm on MDT -> OST
-In-Reply-To: <4873A38C.4040507@sun.com>
-Message-ID: <C499036B.4E46%peter.braam@sun.com>
+In-Reply-To: <C499036B.4E46%peter.braam@sun.com>
+References: <C499036B.4E46%peter.braam@sun.com>
+Message-ID: <4873B4E3.2010609@psc.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Yes, it will be very important that we can separate OST's/MDT's widely.
+Peter Braam wrote:
+> Yes, it will be very important that we can separate OST's/MDT's widely.
+> 
+> But placing them in different realms, I'm not sure about.  Can PSC explain
+> what administrative model warrants that?  Why can a remote OST not be part
+> of the realm of the MDS that controls it?
 
-But placing them in different realms, I'm not sure about.  Can PSC explain
-what administrative model warrants that?  Why can a remote OST not be part
-of the realm of the MDS that controls it?
+The OSTs will be distributed among several resource provider 
+organizations, each with their own existing domain name space and 
+kerberos realm.  There is also a centrally managed teragrid realm which 
+could be used to provide cross-realm transit between the resource 
+provider realms.  With this kerberos authentication infrastructure 
+already in place the issue comes down to that of authorizing a principal 
+as an MDS, the logic of which I believe should be reconsidered 
+regardless of cross-realm issues.
 
-Peter
+Currently an OSS's authz of an MDS is inherent in the name of the 
+principal (lustre_mds/host) so AFAICT one cannot safely run two distinct 
+lustre clusters within a single kerberos realm.  Moreover, this makes 
+the assumption that all kerberos admins are knowledgeable enough about 
+lustre to only issue lustre_mds/host principals to entities that should 
+have MDS privileges throughout the entire realm.  Please do correct me 
+if I'm wrong here.
 
 
-On 7/8/08 11:27 AM, "Eric Mei" <Eric.Mei@Sun.COM> wrote:
+--ben
 
-> Hi Ben,
-> 
-> Benjamin Bennett wrote:
->> Hi Eric,
->> 
->>   If you could give me your input on something I'd greatly appreciate
->> it.  Or, if I should just sent this to -devel let me know...
-> 
-> Yes you can always send to -devel for open discussions. I'm CCing it.
-> 
->>   For Lustre-WAN across TeraGrid we were hoping to distribute OSSs
->> across several resource providers (sites), leveraging existing kerberos
->> infrastructure, placing OSSs in each resource provider's local kerberos
->> realm, and the MDS in the teragrid realm.  Unfortunately, MDT -> OST
->> connections will not allow the MDT and OST to be in different realms,
->> since an OSS considers an MDS to be anyone holding a lustre_mds
->> principal in their local realm.
->> 
->>   This also seems undesirable within a single-realm where multiple
->> lustre clusters may exist, as an OSS in cluster A will trust an MDS for
->> cluster B, and an OSS for cluster B will trust an MDS for cluster A.
->> 
->>   My first thought was to add functionality to tell the OSSs lsvcgssd
->> what the trusted MDS principals should be (local or not).  Do you have
->> any thoughts on this?
-> 
-> We just never thought the usage that OSS could locate in multiple
-> realms. I agree with you in this case, we can make OSS configurable to
-> only accept designated lustre_mds principals, local or remote.
-> 
-> I'v questions just for curiosity: 1) is the benefit of cross site OSSs
-> about bandwidth? 2) in the future with CMD (clustered metadata, multiple
-> MDS nodes), would it be useful to distribute MDSs across multiple site
-> as well?
-> 
-> Thanks
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 189 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080708/a5cd273e/attachment.pgp>
