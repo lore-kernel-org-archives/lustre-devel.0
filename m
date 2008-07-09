@@ -1,82 +1,91 @@
-From: Benjamin Bennett <ben@psc.edu>
-Date: Tue, 08 Jul 2008 16:38:21 -0400
-Subject: [Lustre-devel] GSS cross-realm on MDT -> OST
-In-Reply-To: <C4991E97.4E5B%peter.braam@sun.com>
-References: <C4991E97.4E5B%peter.braam@sun.com>
-Message-ID: <4873D03D.5060002@psc.edu>
+From: Aurelien Degremont <aurelien.degremont@cea.fr>
+Date: Wed, 09 Jul 2008 15:25:38 +0200
+Subject: [Lustre-devel] How store HSM metadata in MDT ?
+In-Reply-To: <C49902D6.4E45%peter.braam@sun.com>
+References: <C49902D6.4E45%peter.braam@sun.com>
+Message-ID: <4874BC52.10604@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Peter Braam wrote:
-> Hmm. Perhaps there are implementation issues here that overshadow the
-> architecture.
+Peter Braam a ?crit :
+> 1. The HSM or a database associated with it implements a table to map FIDs
+> to stored HSM versions of a file, with other metadata it may need to
+> maintain its archives.
+
+Ok
+
+> 2. An HSM utility can query and learn about the versions stored for a fid
+> (or file name).  A "restore" function can copy any version out of the HSM
+> and place it in the file system.  This is similar to restoring a file from a
+> backup archive.
+
+Ok, that's copy-in.
+
+> 3. The file system only has attributes to indicate the state of the primary
+> archived copy (probably the last fully archived copy of the file), and can
+> retrieve that file on demand (without user intervention).
+
+Ok. Still need to store the purge window on MDT and OST to raise cache 
+misses.
+How Lustre will update this information if user can use a HSM command 
+directly, by-passing Lustre? He can change the file copies present in 
+the HSM without Lustre knowing it.
+
+> 4. The HSM database will allow files in snapshots to be encoded with (fsid,
+> fid) or something similar.
+
+Can we consider there is always a default snapshot?
+The ID will always be done with FSID+FID ? Or should we consider a 
+special case when snapshotting is not enabled ?
+
+>> There is no namespace tricks, no huge API changes, always one version of
+>> a file in Lustre, just few functions added to 'lfs' command.
 > 
-> To interact with MDS nodes that are part of one file system, the MDS needs
-> to be part of a realm.  The MDS performs authorization based on a principal
-> to MDS (i.e. Lustre) user/group database.   Within one Lustre file system
-> each MDS MUST HAVE the same user group database.  We will likely want to
-> place MDS's distributedly in the longer term future, so take clear note of
-> this: one Kerberos realm owns the entire MDS cluster for a file system.
+> NO - this will not be an lfs command.  This is an HSM command.
 
-Could you explain more on why this requires a single realm and not just 
-consistent mappings across all MDSs?
+Could you present a use case of how user will explicitly make backups 
+and restore an older copy using the HSM command and no Lustre component?
 
-> There can be multiple MDS clusters, i.e. Lustre file systems, in a single
-> realm, each serving their own file system.  Each Lustre file system can have
-> its own user/group database.  No restrictions here.
+Doing this, the client nodes should be able to communicate with the HSM 
+infrastructure, using specific network protocols, and so on.
+You will need to set up your Lustre network and then your HSM network 
+even if HSM just need to talk with the Lustre agent.
 
-Well, that's the problem with multiple clusters in a single realm, lack 
-of restriction... ;-)
+> 1. how is a bare metal restore arranged (ie. How is metadata moved into the
+> HSM)?  Can this restore put files in a file system different than Lustre?
 
-> For a given file system the MDS nodes produce capabilities which the OSS
-> nodes use for authorization.   It is important that the MDS can maken
-> authenticated RPC's to the OSS nodes in its file system and for this we use
-> Kerberos (this is not a "must have" - it could have been done with a
-> different key sharing mechanism).
+Until now, the metadata were stored inside Lustre, so this was not 
+needed. Now, we must add a way for the archiving tool to "setattr" this 
+data when restoring a file.
 
-With multiple clusters in a single realm an MDS from any cluster could 
-authenticate and authorize as an MDS to an OSS in any cluster.  This 
-would allow an MDS in one cluster to change the key used for 
-capabilities on the OSSs in another cluster, no?
+About a different filesystem, this will depend on the features used by 
+the archiving tool to copy back the data and metadata. If those are 
+standard, the file could be put in a different filesystem.
 
-> ==> So the first issue you have to become clear about is how you authorize
-> an MDS to contact one of its OSS nodes, wherever these are place.
+> 2. how are small files grouped then "tar'd up" and how are we setting the
+> attributes of the inodes of the files that have been placed in the HSM after
+> this?  How does the index entry for the fids in the HSM database function?
 
-I've changed lsvcgssd on the OSSs to take an arbitrary number of '-M 
-lustre_mds/mdshost at REALM' and use this list to determine MDS 
-authorization.  Is there a way in which an OSS is already aware of its 
-appropriate MDSs?
+Presently, just the archiving tool was supposed to support such feature, 
+to avoid having to recode them later (various tools will be needed for 
+the various existing HSMs and their development won't be centralized) 
+when we will add this kind of feature.
+There is no defined mechanism for grouping file into the HSM presently.
 
-> Similarly the Kerberos connections are used by the clients to connect to the
-> OSS, but they are not used to authenticate anything (but optionally the
-> node), they are used merely to provide privacy and/or authenticity for
-> transporting data between the client and the OSS nodes.  With relatively
-> little effort this could be done without Kerberos at all, on the other hand,
-> probably using Kerberos for this leads to a more easily understood
-> architecture.
-> 
-> So, to repeat,  the authorization uses capabilities, which authenticate the
-> requestor and contain authorization information, independent of a server
-> user/group database on the OSS.
-> 
-> ==> The second issue you need to be clear about is how you authenticate
-> client NODES (NOT users) to OSS nodes.
+> 3. how are multiple coordinators and agents utilized to distribute load so
+> that the HSM can keep up with massive small file creation?
 
-Client nodes are issued lustre_root/host credentials from their local 
-realm.  This works just fine for Client -> OST since the only 
-[kerberos-related] authorization check is a "lustre_root" service part.
+One coordinator per MDT.
+The coordinator deals only with its MDT files.
+The coordinator dispatches their requests on the agents with a 
+round-robin. Agents can refuse requests if they cannot handle them (too 
+busy). Coordinator try another one. If no agent are available, it 
+postpones the request.
 
-> Peter
 
---ben
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 189 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080708/128df10d/attachment.pgp>
+-- 
+Aurelien Degremont
+CEA
