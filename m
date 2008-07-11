@@ -1,52 +1,49 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Fri, 11 Jul 2008 15:32:07 -0600
-Subject: [Lustre-devel] GSS cross-realm on MDT -> OST
-In-Reply-To: <20080709211013.GA8132@lanczos.q-leap.de>
-References: <C49A27F8.4E91%peter.braam@sun.com> <4874F47B.4010209@sun.com>
-	<20080709202937.GB6239@webber.adilger.int>
-	<20080709211013.GA8132@lanczos.q-leap.de>
-Message-ID: <20080711213207.GK6239@webber.adilger.int>
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Fri, 11 Jul 2008 15:57:30 -0600
+Subject: [Lustre-devel] How store HSM metadata in MDT ?
+In-Reply-To: <48776ECD.3000501@cea.fr>
+Message-ID: <C49D336A.63D9%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jul 09, 2008  23:10 +0200, Bernd Schubert wrote:
-> On Wed, Jul 09, 2008 at 02:29:38PM -0600, Andreas Dilger wrote:
-> > Please see bug 15827 with some details of the problem.
-> > 
-> > For the non-kerberos case having administrator action at the MGS is
-> > the most secure.  Enabling a shared secret key passed to mkfs.lustre
-> > like "--mgs-key e85021aee637f7250e482a9a5b23cb0d" sent from the
-> > MDT/OST to the MGS at first connect time at least provides some
-> > restriction on adding new devices to the filesystem.
+A one time event to build a database or log is acceptable.
+
+However, the proposal so far would require frequent scans because the
+metadata would be in the wrong place, that is what I want to avoid.
+
+Maintaining that metadata is very simple, and can solve some problems that
+you cannot easily solve without maintaining a database in conjunction with
+the HSM (such as cleaning partial, aborted copies into the HSM).  You?d
+simply ask the moving script to contact a database and make a record.  The
+database may not be able to keep up with all file creations in the FS but it
+can probably keep up with the activities that one moving node does to/from
+the HSM.
+
+Peter
+
+
+On 7/11/08 8:31 AM, "Jacques-Charles Lafoucriere" <jc.lafoucriere@cea.fr>
+wrote:
+
 > 
-> Hmm, is a secret key really neccessary, for me this sounds a bit like
-> security by obscurity. Wouldn't it be better to to have a two way
-> MDT/OST registration?
 > 
-> 1.) As it is, simply mount the filesystem on the MDT/OST. But this will
-> put this filesystem into a registered, but unconfirmed state on the MGS.
+> Peter Braam wrote:
+>>  
+>> 
+>> There is a rule in Lustre - no scanning, ever.  This rule will not be broken
+>> by HSM.  
+>>   
+> If a site wants to connect an HSM to an existing file system (close to be
+> full)
+> how do we do without fast scanning ?
+> We cannot restrict the use of HSM binding only on new file systems
 > 
-> 2.) Introduce a lctl command for the MGS to list all
-> registered-but-unconfirmed systems. And another command to confirm the 
-> registration.
+> JC
+> 
 
-Yes, this is defintely the minimum requirement, and it should be the
-default behaviour.  For the case when completely automated configuration
-is needed (e.g. during automated regression testing) then having the
---mgs-key mount option would still prevent "random" OSTs from joining the
-filesystem (as in bug 15827).
-
-> On on the other hand, this approach might conflict with the writeconf concept.
-
-No, I think 2-step authentication is the most secure, but there needs
-to some way to circumvent it, only if the MGS allows it of course.  If
-the MGS is compromised then all bets are off...
-
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080711/61dbfe02/attachment.htm>
