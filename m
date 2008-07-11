@@ -1,9 +1,9 @@
 From: Jacques-Charles Lafoucriere <jc.lafoucriere@cea.fr>
-Date: Fri, 11 Jul 2008 16:31:41 +0200
+Date: Fri, 11 Jul 2008 16:32:48 +0200
 Subject: [Lustre-devel] How store HSM metadata in MDT ?
-In-Reply-To: <C4959727.4DA5%peter.braam@sun.com>
-References: <C4959727.4DA5%peter.braam@sun.com>
-Message-ID: <48776ECD.3000501@cea.fr>
+In-Reply-To: <C49A1E05.4E85%peter.braam@sun.com>
+References: <C49A1E05.4E85%peter.braam@sun.com>
+Message-ID: <48776F10.60008@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,16 +13,25 @@ To: lustre-devel@lists.lustre.org
 
 
 Peter Braam wrote:
+>>> 3. how are multiple coordinators and agents utilized to distribute load so
+>>> that the HSM can keep up with massive small file creation?
+>>>       
+>> One coordinator per MDT.
+>>     
 >
-> There is a rule in Lustre - no scanning, ever.  This rule will not be broken
-> by HSM.  
+> No - these must be independent considerations.  A coordinator may be much
+> slower than an MDS node in handling a single file.  I say this because this
+> has been the experience in the industry so far - with small files the HSM
+> can not at all keep up.
 >   
-If a site wants to connect an HSM to an existing file system (close to 
-be full)
-how do we do without fast scanning ?
-We cannot restrict the use of HSM binding only on new file systems
+
+Why a coordinator should be on a slower node than a MDS ?
+Coordinator is a Lustre service  like other Lustre services so it will 
+be on a right hardware
+
+Do you mean a coordinator is not part of the Lustre cluster ?
 
 JC
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080711/8f0e1d63/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080711/506825c7/attachment.htm>
