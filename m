@@ -1,51 +1,27 @@
-From: Rick Matthews <Richard.Matthews@Sun.COM>
-Date: Mon, 21 Jul 2008 15:29:19 -0500
-Subject: [Lustre-devel] Cross posting of ADM information on
-	opensolaris.org
-In-Reply-To: <4884A4BA.3010409@Sun.COM>
-References: <4884A4BA.3010409@Sun.COM>
-Message-ID: <4884F19F.40604@Sun.COM>
+From: Tom.Wang <Tom.Wang@Sun.COM>
+Date: Tue, 22 Jul 2008 17:44:54 -0400
+Subject: [Lustre-devel] [Fwd: Re: Lustre IO discussion between CERN and
+	Lustre]
+Message-ID: <488654D6.7010303@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The link to the PSARC documentation referenced below is:
-
-http://opensolaris.org/os/community/arc/policies/fma-event-protocol/
-
-Rick Matthews wrote:
-> For reference in HSM discussions, I am cross-posing the location of the
-> ADM (Automatic Data Migration) project page within OpenSolaris. Please 
-> note
-> the following:
->    1) The OpenSolaris page refers to ADM as  an HSM for ZFS and 
-> OpenSolaris
->       based appliances using ZFS. No changes have been made to include 
-> potential
->       Lustre consumables.
->    2) The project page seems to be missing a link to the ADM PSARC 
-> case (2007/210).
->       We are working to get that corrected. The PSARC case 
-> documentation includes
->       most of the detailed specifications for ADM components.
->
-> The ADM project page is at:
->    http://opensolaris.org/os/project/adm/
->
-> Interesting links from there are: 
-> http://opensolaris.org/os/project/adm/WhatisADM/
-> and the demo on that page. Of course, the link to the PSARC case will 
-> also be added.
->  
-
 
 -- 
----------------------------------------------------------------------
-Rick Matthews                           email: Rick.Matthews at sun.com
-Sun Microsystems, Inc.                  phone:+1(651) 554-1518
-1270 Eagan Industrial Road              phone(internal): 54418
-Suite 160                               fax:  +1(651) 554-1540
-Eagan, MN 55121-1231 USA                main: +1(651) 554-1500		
----------------------------------------------------------------------
+Regards,
+Tom Wangdi    
+--
+Sun Lustre Group
+System Software Engineer 
+http://www.sun.com
+
+-------------- next part --------------
+An embedded message was scrubbed...
+From: "Teige,  Scott W" <steige@indiana.edu>
+Subject: Re: [Lustre-devel] Lustre IO discussion between CERN and Lustre
+Date: Mon, 21 Jul 2008 16:17:39 -0400
+Size: 131339
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080722/82219038/attachment.eml>
