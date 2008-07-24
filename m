@@ -1,33 +1,49 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Tue, 22 Jul 2008 19:20:28 -0600
-Subject: [Lustre-devel] Lustre version patchless kernel?
-In-Reply-To: <Pine.LNX.4.64.0807222059350.7033@pscuxa.psc.edu>
-References: <4884A4BA.3010409@Sun.COM> <4884F19F.40604@Sun.COM>
-	<Pine.LNX.4.64.0807222059350.7033@pscuxa.psc.edu>
-Message-ID: <20080723012028.GC20749@webber.adilger.int>
+From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
+Date: Thu, 24 Jul 2008 14:19:43 +0400
+Subject: [Lustre-devel] statahead feature
+Message-ID: <4888573F.4010506@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jul 22, 2008  21:02 -0400, Josephine Palencia wrote:
-> 
-> For the lustre version, the kernel portion indicates patchless...
-> Should it be something else?
-> 
-> [root at operon22 lustre]# more /proc/fs/lustre/version
-> > lustre: 1.9.50
-> > kernel: patchless
-> > build:  1.9.50-19691231190000-PRISTINE-.extra.linux-2.6.18-92.1.6-2.6.18-92.1.6-lustre-1.9.50
+Hi,
 
-This is correct.  For patched kernels there will be a version number here,
-indicating the VFS patch API version number.  This hasn't changed in a
-long time because we are no longer changing the kernel VFS patches, and
-only a few older kernels still need them.
+due to some experiments with dcache related code we've been doing with shadow
+and others, it became clear that statahead code is quite complicated. probably
+for no reason. the most hard part to follow is interaction with dcache. the
+feature does number of complex things and make other parts (like ll_lookup_it())
+harder to follow too.
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+after amount of discussions with people we'd like to share our vision on the
+feature and propose slightly different solution.
+
+we think statahead should do nothing with dcache. it's about inodes and attributes
+only. thus, it would be good to decouple it from dcache. the only thing statahead
+should do is:
+1) detect statahead is needed (policy, out of the message's scope)
+2) scan part of directory (probably using readdir(), skip RPCs)
+3) finds/creates inodes for found fids
+4) lock these inodes (notice we propose to use inodes as a serialization point
+    so that lockless getattr can be used)
+5) issue getattr RPCs (probably lockless)
+6) unlock inodes upon getattr's completion
+
+then stat(2) is called, it first has to lookup fid by name. for this we can use
+pagecache just filled with MDS_READDIR. if directory isn't being modified at the
+time, then entries will be there and we can create dentries in the dcache. they
+will be valid till UPDATE lock is cancelled - no even LOOKUP lock is needed.
+
+
+another possible thing for optimization is lockless getattr. given most of supported
+kernel don't pass intent to ->getattr(), it's possible that stat(2) needs two RPCs:
+one in ll_lookup_it() and another in ll_getattr_it() as lock is released between them.
+stat(2) gives no warranty about attributes, it gives a shot of them. attributes can
+change right before userspace application get them. so, why don't we introduce some
+simple mechanism making attributes valid for short time at least for process executed
+lookup. this could help statahead as well, we think.
+
+comments? suggestions?
+
+thanks, Alex
