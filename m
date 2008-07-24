@@ -1,49 +1,41 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Thu, 24 Jul 2008 14:19:43 +0400
+From: Alex Lyashkov <Alexey.Lyashkov@Sun.COM>
+Date: Thu, 24 Jul 2008 14:35:06 +0300
 Subject: [Lustre-devel] statahead feature
-Message-ID: <4888573F.4010506@sun.com>
+In-Reply-To: <4888573F.4010506@sun.com>
+References: <4888573F.4010506@sun.com>
+Message-ID: <1216899306.16594.68.camel@bear.shadowland>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+On Thu, 2008-07-24 at 14:19 +0400, Alex Zhuravlev wrote:
+> we think statahead should do nothing with dcache. it's about inodes
+> and attributes
+> only. thus, it would be good to decouple it from dcache. the only
+> thing statahead
+> should do is:
+> 1) detect statahead is needed (policy, out of the message's scope)
+> 2) scan part of directory (probably using readdir(), skip RPCs)
+> 3) finds/creates inodes for found fids
+> 4) lock these inodes (notice we propose to use inodes as a
+> serialization point
+>     so that lockless getattr can be used)
+> 5) issue getattr RPCs (probably lockless)
+> 6) unlock inodes upon getattr's completion
 
-due to some experiments with dcache related code we've been doing with shadow
-and others, it became clear that statahead code is quite complicated. probably
-for no reason. the most hard part to follow is interaction with dcache. the
-feature does number of complex things and make other parts (like ll_lookup_it())
-harder to follow too.
+other point view - statahead never create dentry or inode, this function
+(or thread) only send all need lock enqueue to MDS and put granted lock
+to cache. user thread will call ->lookup and will be sleep until lock is
+granted on mdc_enqueue so none new wait queue need.
 
-after amount of discussions with people we'd like to share our vision on the
-feature and propose slightly different solution.
+At this case statahead will be very simple - call ->readdir() in
+background, in fill callback skip dot/dotdot files, skip hidden files if
+it not need, possible something other. in result new rpc added to
+ptlrpcd or own set.
+and very simple interpret callback which only process granted lock.
 
-we think statahead should do nothing with dcache. it's about inodes and attributes
-only. thus, it would be good to decouple it from dcache. the only thing statahead
-should do is:
-1) detect statahead is needed (policy, out of the message's scope)
-2) scan part of directory (probably using readdir(), skip RPCs)
-3) finds/creates inodes for found fids
-4) lock these inodes (notice we propose to use inodes as a serialization point
-    so that lockless getattr can be used)
-5) issue getattr RPCs (probably lockless)
-6) unlock inodes upon getattr's completion
-
-then stat(2) is called, it first has to lookup fid by name. for this we can use
-pagecache just filled with MDS_READDIR. if directory isn't being modified at the
-time, then entries will be there and we can create dentries in the dcache. they
-will be valid till UPDATE lock is cancelled - no even LOOKUP lock is needed.
-
-
-another possible thing for optimization is lockless getattr. given most of supported
-kernel don't pass intent to ->getattr(), it's possible that stat(2) needs two RPCs:
-one in ll_lookup_it() and another in ll_getattr_it() as lock is released between them.
-stat(2) gives no warranty about attributes, it gives a shot of them. attributes can
-change right before userspace application get them. so, why don't we introduce some
-simple mechanism making attributes valid for short time at least for process executed
-lookup. this could help statahead as well, we think.
-
-comments? suggestions?
-
-thanks, Alex
+-- 
+Alex Lyashkov <Alexey.lyashkov@sun.com>
+Lustre Group, Sun Microsystems
