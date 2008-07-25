@@ -1,40 +1,45 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Fri, 25 Jul 2008 09:17:04 +0400
+From: Alex Lyashkov <Alexey.Lyashkov@Sun.COM>
+Date: Fri, 25 Jul 2008 12:37:56 +0300
 Subject: [Lustre-devel] statahead feature
-In-Reply-To: <37e3b1470807242204x6ab9037bif384e8a37595b6c6@mail.gmail.com>
+In-Reply-To: <4889597A.6060109@sun.com>
 References: <4888573F.4010506@sun.com> <488957EC.1040701@sun.com>
 	<4889597A.6060109@sun.com>
-	<37e3b1470807242204x6ab9037bif384e8a37595b6c6@mail.gmail.com>
-Message-ID: <488961D0.9060709@sun.com>
+Message-ID: <1216978676.16594.104.camel@bear.shadowland>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ragnar Kj?rstad wrote:
-> On Thu, Jul 24, 2008 at 9:41 PM, Alex Zhuravlev <Alex.Zhuravlev@sun.com> wrote:
->> no, I don't think we need lock always: you just did getattr and fill inode
->> with fresh attributes, then you release lock, somebody changes attributes
->> on the server and only then userspace application gets attributes (already
->> non-fresh). so, what lock gives you in this case?
+On Fri, 2008-07-25 at 08:41 +0400, Alex Zhuravlev wrote:
+
 > 
-> If I have an application that does:
-> 1. Update stat data on one node.
-> 2. Barrier
-> 3. Read the same stat data on a different node
+> > Another optimization (maybe) to be considered is that whether it is 
+> > necessary to start one statahead thread
+> > for each "ls -l" operation or not? As said by Nikita, maybe we can use a 
+> > single thread for all the statahead.
 > 
-> I should be guaranteed to get the correct data, right?
-> So stat should return data that was valid either when the system call
-> started, when it ended, or somewhere in between. (not data that was
-> invalid even before the systemcall started)
+> I'm not sure we need any statahead thread at all. what's wrong with issuing
+> number of async RPCs from ll_getattr_it()? this way user's application drives
+> statahead directly: each time stat(2) is called you tune statahead window and
+> send few more RPCs again -- like data read-ahead does.
+> 
+not need any statahead thread.
+as alex say:
+if we have UPDATE lock to parent - we can create valid dentry without
+lookup and add new locked inode to him.
+---
+this looks easy to implement - call ll_readdir with i_mutex held and
+pass custom fill callback.
+in callback we allocate new dentry + empty locked inode (or attach new
+dentry to inode if we have only update lock /ll_find_alias/ ?? ), also
+submit async getattr rpc into ptlrpcd if need.
+rpc completion callback set md_lock to inode and unlock inode.
+also ll_getattr_it should call wait_on_inode for be sure statahead is
+finished.
 
-indeed. we can't use this trick in all the cases. I think it's a subject
-of discussion what we consider a barrier, for regular stat(2) it can be
-start of system call. for ls -l case it can be open(2). isn't this a
-reasonable cost for significant performance improvement of ls -l ?
 
-my understanding is that for NFS with readdir+ support, the barrier will
-be open(2).
 
-thanks for this good point, Alex
+-- 
+Alex Lyashkov <Alexey.lyashkov@sun.com>
+Lustre Group, Sun Microsystems
