@@ -1,43 +1,32 @@
-From: Kossey, Robert <bob.kossey@hp.com>
-Date: Tue, 22 Jul 2008 23:22:15 -0400
-Subject: [Lustre-devel] Lustre version patchless kernel?
-In-Reply-To: <4886A29C.2000009@hp.com>
-References: <4886A29C.2000009@hp.com>
-Message-ID: <4886A3E7.6050904@hp.com>
+From: =?ISO-8859-1?Q?Ragnar_Kj=F8rstad?= <rk@ragnarkjorstad.com>
+Date: Thu, 24 Jul 2008 22:04:53 -0700
+Subject: [Lustre-devel] statahead feature
+In-Reply-To: <4889597A.6060109@sun.com>
+References: <4888573F.4010506@sun.com> <488957EC.1040701@sun.com>
+	<4889597A.6060109@sun.com>
+Message-ID: <37e3b1470807242204x6ab9037bif384e8a37595b6c6@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-We also see this on recent releases like 1.6.5.1.  Why do you bother to 
-distribute kernel-lustre-smp RPMs if the kernels are not patched?
+On Thu, Jul 24, 2008 at 9:41 PM, Alex Zhuravlev <Alex.Zhuravlev@sun.com> wrote:
+> no, I don't think we need lock always: you just did getattr and fill inode
+> with fresh attributes, then you release lock, somebody changes attributes
+> on the server and only then userspace application gets attributes (already
+> non-fresh). so, what lock gives you in this case?
 
-Thanks,
-Bob
+If I have an application that does:
+1. Update stat data on one node.
+2. Barrier
+3. Read the same stat data on a different node
 
->> / 
-> />/ For the lustre version, the kernel portion indicates patchless...
-> />/ Should it be something else?
-> />/ />/ [root at operon22 
-> <http://lists.lustre.org/mailman/listinfo/lustre-devel> lustre]# more 
-> /proc/fs/lustre/version
-> />/ > lustre: 1.9.50
-> />/ > kernel: patchless
-> />/ > build:  
-> 1.9.50-19691231190000-PRISTINE-.extra.linux-2.6.18-92.1.6-2.6.18-92.1.6-lustre-1.9.50 
->
-> /
-> This is correct.  For patched kernels there will be a version number 
-> here,
-> indicating the VFS patch API version number.  This hasn't changed in a
-> long time because we are no longer changing the kernel VFS patches, and
-> only a few older kernels still need them.
->
-> Cheers, Andreas
-> -- 
-> Andreas Dilger
-> Sr. Staff Engineer, Lustre Group
-> Sun Microsystems of Canada, Inc.
->
->
+I should be guaranteed to get the correct data, right?
+So stat should return data that was valid either when the system call
+started, when it ended, or somewhere in between. (not data that was
+invalid even before the systemcall started)
+
+
+-- 
+Ragnar Kj?rstad
