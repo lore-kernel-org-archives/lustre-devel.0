@@ -1,32 +1,37 @@
-From: =?ISO-8859-1?Q?Ragnar_Kj=F8rstad?= <rk@ragnarkjorstad.com>
-Date: Thu, 24 Jul 2008 22:04:53 -0700
-Subject: [Lustre-devel] statahead feature
-In-Reply-To: <4889597A.6060109@sun.com>
-References: <4888573F.4010506@sun.com> <488957EC.1040701@sun.com>
-	<4889597A.6060109@sun.com>
-Message-ID: <37e3b1470807242204x6ab9037bif384e8a37595b6c6@mail.gmail.com>
+From: Brian J. Murrell <Brian.Murrell@Sun.COM>
+Date: Mon, 28 Jul 2008 09:03:03 -0400
+Subject: [Lustre-devel] Lustre version patchless kernel?
+In-Reply-To: <4886A3E7.6050904@hp.com>
+References: <4886A29C.2000009@hp.com> <4886A3E7.6050904@hp.com>
+Message-ID: <1217250183.22114.110.camel@pc.ilinx>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, Jul 24, 2008 at 9:41 PM, Alex Zhuravlev <Alex.Zhuravlev@sun.com> wrote:
-> no, I don't think we need lock always: you just did getattr and fill inode
-> with fresh attributes, then you release lock, somebody changes attributes
-> on the server and only then userspace application gets attributes (already
-> non-fresh). so, what lock gives you in this case?
+On Tue, 2008-07-22 at 23:22 -0400, Kossey, Robert wrote:
+> We also see this on recent releases like 1.6.5.1.  Why do you bother to 
+> distribute kernel-lustre-smp RPMs if the kernels are not patched?
 
-If I have an application that does:
-1. Update stat data on one node.
-2. Barrier
-3. Read the same stat data on a different node
+MDS and OSS kernels *are* patched.  My 1.6.5 here does not report it's
+patchless:
 
-I should be guaranteed to get the correct data, right?
-So stat should return data that was valid either when the system call
-started, when it ended, or somewhere in between. (not data that was
-invalid even before the systemcall started)
+lustre: 1.6.5
+kernel: 47
+build:  1.6.5-19691231190000-PRISTINE-.cache.OLDRPMS.20080513015618.linux-smp-2.6.9-67.0.7.EL_lustre.1.6.5.i686-2.6.9-67.0.7.EL_lustre.1.6.5smp
 
+If you are using our kernel on your MDS/OSS and it's reporting
+patchless, this indeed is a bug.  Could you please search our bugzilla
+to see if there is a similar bug and if not found, file a bug in our
+bugzilla about it?
 
--- 
-Ragnar Kj?rstad
+b.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 189 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080728/ecc8bcdc/attachment.pgp>
