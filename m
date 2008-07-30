@@ -1,35 +1,34 @@
-From: Brian J. Murrell <Brian.Murrell@Sun.COM>
-Date: Wed, 30 Jul 2008 10:41:20 -0400
-Subject: [Lustre-devel] Centos 5.2 with Lustre 1.6.5.1
-In-Reply-To: <52ce537f0807291125r5d27fcf1m5710838a8e27e93c@mail.gmail.com>
-References: <52ce537f0807291125r5d27fcf1m5710838a8e27e93c@mail.gmail.com>
-Message-ID: <1217428880.13569.247.camel@pc.ilinx>
+From: Andreas Dilger <adilger@Sun.COM>
+Date: Wed, 30 Jul 2008 15:19:26 -0600
+Subject: [Lustre-devel] Lustre version patchless kernel?
+In-Reply-To: <93703EDD1F125544A59BD25384B175621F5A36DCF0@G1W0485.americas.hpqcorp.net>
+References: <488DD7C1.7010807@hp.com> <488DD9D0.5080902@hp.com>
+	<20080730093550.GS3342@webber.adilger.int>
+	<93703EDD1F125544A59BD25384B175621F5A36DCF0@G1W0485.americas.hpqcorp.net>
+Message-ID: <20080730211926.GA3342@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 2008-07-29 at 11:25 -0700, SoVo Le wrote:
-> Hi,
+On Jul 30, 2008  15:52 +0000, Kossey, Robert wrote:
+> Thanks for the explanation.  I actually sent my response, and created
+> bug 16516, before you sent your response, but my posting was delayed
+> by the list moderator since I am not a list subscriber.  I modifed the
+> bug to request that the wording of the program output be changed to
+> something like:
+>
+> kernel: no VFS patches
 > 
-> If someone could help me out on this:  Why can't I mount lustre ?  
+> This could reduce the confusion that Brian and I and probably others
+> would have with the current wording.
 
-This list is for discussions of lustre development only.  Please use
-lustre-discuss for questions such as this.
+Yes, the wording will be changed to "kernel: patchless client", because
+several of the regression tests depend on "patchless" being there.
 
-I have an answer for your question but in order to prevent any further
-follow-up to this list of this topic I will hold off answering it until
-you post your question to lustre-discuss.
-
-Cheers,
-b.
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 189 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080730/02f0b13e/attachment.pgp>
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
