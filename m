@@ -1,49 +1,82 @@
-From: Kossey, Robert <bob.kossey@hp.com>
-Date: Wed, 30 Jul 2008 15:52:26 +0000
-Subject: [Lustre-devel] Lustre version patchless kernel?
-In-Reply-To: <20080730093550.GS3342@webber.adilger.int>
-References: <488DD7C1.7010807@hp.com> <488DD9D0.5080902@hp.com>
-	<20080730093550.GS3342@webber.adilger.int>
-Message-ID: <93703EDD1F125544A59BD25384B175621F5A36DCF0@G1W0485.americas.hpqcorp.net>
+From: Rahul Deshmukh <Rahul.Deshmukh@Sun.COM>
+Date: Fri, 01 Aug 2008 15:41:40 +0530
+Subject: [Lustre-devel] [RFC] HLD Review Request: Interoperability at
+ server side
+In-Reply-To: <4868EF46.7030002@sun.com>
+References: <C48A9A97.611F%peter.braam@sun.com> <4868EF46.7030002@sun.com>
+Message-ID: <4892E15C.2020203@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Andreas,
+Hi Peter/Eric,
 
-Thanks for the explanation.  I actually sent my response, and created bug 16516, before you sent your response, but my posting was delayed by the list moderator since I am not a list subscriber.  I modifed the bug to request that the wording of the program output be changed to something like:
-
-kernel: no VFS patches
-
-This could reduce the confusion that Brian and I and probably others would have with the current wording.
+Please inspect updated version of "Interoperability at server side" HLD.
 
 Thanks,
-Bob
+Rahul.
 
-> -----Original Message-----
-> From: Andreas.Dilger at sun.com [mailto:Andreas.Dilger at sun.com]
-> On Behalf Of Andreas Dilger
-> Sent: Wednesday, July 30, 2008 5:36 AM
-> To: Kossey, Robert
-> Cc: lustre-devel at lists.lustre.org
-> Subject: Re: [Lustre-devel] Lustre version patchless kernel?
+Rahul Deshmukh wrote:
+> Please see the comments inline.
 >
-> On Jul 28, 2008  10:38 -0400, Kossey, Robert wrote:
-> > Yes, we see patchless reported on our RHEL5U1 Opteron servers with
-> > 1.6.5.1and 1.6.4.3:
-> >
-> > In  both cases, these nodes are running kernels from the
-> > kernel-lustre-smp RPMs downloaded from the Sun Lustre site. I don't
-> > see a bug reported for this, so I will submit one.
+> Peter Braam wrote:
+>   
+>> Really good - well done!  I feel comfortable that this can move ahead.
+>>   
+>>     
+> Thanks !!!
+>   
+>> I just want to ask you to make sure that repeated upgrade - downgrade -
+>> upgrade events (in the case bugs in the new release force the user back to
+>> old) are handled correctly.  I did see a discussion of up and down, but no
+>> explicit mention of repeating that process multiple times.
+>>   
+>>     
+> I will update the HLD to include the details related to repeating the 
+> upgrade -
+> downgrade process multiple times.
+>   
+>> Regards,
+>>
+>> Peter
+>>
+>>   
+>>     
+> Thanks,
+> Rahul.
+>   
+>> On 6/25/08 11:26 PM, "Rahul Deshmukh" <Rahul.Deshmukh@Sun.COM> wrote:
+>>
+>>   
+>>     
+>>> Hi Peter/Eric,
+>>>
+>>> Please inspect next version of "Interoperability at server side" HLD.
+>>>
+>>> Thanks,
+>>> Rahul.
+>>>
+>>>     
+>>> ------------------------------------------------------------------------
+>>>
+>>> _______________________________________________
+>>> Lustre-devel mailing list
+>>> Lustre-devel at lists.lustre.org
+>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>       
 >
-> You missed my reply.  This is normal, please do not file a bug.
->
-> Cheers, Andreas
-> --
-> Andreas Dilger
-> Sr. Staff Engineer, Lustre Group
-> Sun Microsystems of Canada, Inc.
->
->
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>   
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: interop_disk_fidea.pdf
+Type: application/pdf
+Size: 122847 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080801/9abb4e4d/attachment.pdf>
