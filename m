@@ -1,34 +1,88 @@
-From: Eric Mei <Eric.Mei@Sun.COM>
-Date: Mon, 11 Aug 2008 13:51:48 -0600
-Subject: [Lustre-devel] Security issues
-In-Reply-To: <C4C5F044.6C46%peter.braam@sun.com>
-References: <C4C5F044.6C46%peter.braam@sun.com>
-Message-ID: <48A09854.8010401@sun.com>
+From: Rick Matthews <Richard.Matthews@Sun.COM>
+Date: Tue, 12 Aug 2008 10:09:23 -0500
+Subject: [Lustre-devel] [Fwd: Re: Cross posting of ADM information on
+	opensolaris.org]
+Message-ID: <48A1A7A3.6060906@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Peter Braam wrote:
->>> You do need to sign it and encrypt it - for multiple purposes, to secure the
->>> wire transaction and for storage on the server.
->> Sorry I'm still a little confused. To be exactly clear, do you mean: In
->> the future we'll use NASD-style protocol to secure the bulk data's wire
->> transfer & storage on server; and for now we can simply leave the bulk
->> data unprotected?
-> 
-> No you need to be able to encrypt it.
-> 
-> I'm just stating that if you the current solution (which gives privacy using
-> GSS between client and OSS iirc) is going to be changed, then please change
-> it in the correct way to accommodate re-using checksums and re-using the
-> encrypted data for storage.  Doing either of these things twice is
-> pointless.
-> 
-> Probably there should be options not to do so as part of the configuration.
+All,
+  My original post on ADM PSARC information (more detailed design)
+was bogus. It wasn't until I looked to forward it to someone else that
+I realized that. It does explain the lack of discussion/comment, however ;>)
 
-Peter, Thanks for clarifying this! Yes that's what we're thinking.
+  The correct URL to the ADM PSARC case (PSARC/2007/210), which contains
+more detailed design documentation on ADM, is in:
+    http://opensolaris.org/os/community/arc/caselog/2007/210/
+
+  Sorry for the confusion.
+--
+Rick M
+
+-------- Original Message --------
+Subject: 	Re: Cross posting of ADM information on opensolaris.org
+Date: 	Mon, 21 Jul 2008 15:29:19 -0500
+From: 	Rick Matthews <Richard.Matthews@Sun.COM>
+Reply-To: 	Richard.Matthews at Sun.COM
+To: 	lustre-devel at lists.lustre.org
+References: 	<4884A4BA.3010409@Sun.COM>
+
+
+
+The link to the PSARC documentation referenced below is:
+
+http://opensolaris.org/os/community/arc/policies/fma-event-protocol/
+
+Rick Matthews wrote:
+> For reference in HSM discussions, I am cross-posing the location of the
+> ADM (Automatic Data Migration) project page within OpenSolaris. Please 
+> note
+> the following:
+>    1) The OpenSolaris page refers to ADM as  an HSM for ZFS and 
+> OpenSolaris
+>       based appliances using ZFS. No changes have been made to include 
+> potential
+>       Lustre consumables.
+>    2) The project page seems to be missing a link to the ADM PSARC 
+> case (2007/210).
+>       We are working to get that corrected. The PSARC case 
+> documentation includes
+>       most of the detailed specifications for ADM components.
+>
+> The ADM project page is at:
+>    http://opensolaris.org/os/project/adm/
+>
+> Interesting links from there are: 
+> http://opensolaris.org/os/project/adm/WhatisADM/
+> and the demo on that page. Of course, the link to the PSARC case will 
+> also be added.
+>  
+
 
 -- 
-Eric
+---------------------------------------------------------------------
+Rick Matthews                           email: Rick.Matthews at sun.com
+Sun Microsystems, Inc.                  phone:+1(651) 554-1518
+1270 Eagan Industrial Road              phone(internal): 54418
+Suite 160                               fax:  +1(651) 554-1540
+Eagan, MN 55121-1231 USA                main: +1(651) 554-1500		
+---------------------------------------------------------------------
+
+
+
+
+-- 
+---------------------------------------------------------------------
+Rick Matthews                           email: Rick.Matthews at sun.com
+Sun Microsystems, Inc.                  phone:+1(651) 554-1518
+1270 Eagan Industrial Road              phone(internal): 54418
+Suite 160                               fax:  +1(651) 554-1540
+Eagan, MN 55121-1231 USA                main: +1(651) 554-1500		
+---------------------------------------------------------------------
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080812/6eb0a486/attachment.htm>
