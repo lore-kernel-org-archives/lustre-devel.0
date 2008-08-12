@@ -1,88 +1,95 @@
-From: Rick Matthews <Richard.Matthews@Sun.COM>
-Date: Tue, 12 Aug 2008 10:09:23 -0500
-Subject: [Lustre-devel] [Fwd: Re: Cross posting of ADM information on
-	opensolaris.org]
-Message-ID: <48A1A7A3.6060906@Sun.COM>
+From: Eric Barton <eeb@sun.com>
+Date: Tue, 12 Aug 2008 19:05:01 +0100
+Subject: [Lustre-devel] Completion callbacks
+Message-ID: <7B72F4D61F2D44C6ADCCF1BC952B9365@ebpc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-All,
-  My original post on ADM PSARC information (more detailed design)
-was bogus. It wasn't until I looked to forward it to someone else that
-I realized that. It does explain the lack of discussion/comment, however ;>)
+Hi,
 
-  The correct URL to the ADM PSARC case (PSARC/2007/210), which contains
-more detailed design documentation on ADM, is in:
-    http://opensolaris.org/os/community/arc/caselog/2007/210/
+I've been discussing how to improve LNET performance on multi-core
+nodes with the Lustre networking team.  The current code uses a single
+spinlock for almost everything - this has the advantage of simplicity
+but at the obvious expense of serialising everything.
 
-  Sorry for the confusion.
+Where usage is simply to safeguard global table handling (e.g. to add
+an MD to the global MD hash table), we're inclined to stick with the
+single global lock.  In such cases, it's not clear concurrency gains
+will justify additional code complication.  So we're really focussing
+on the 2 main issues where the global lock can potentially be held for
+extended periods.
+
+1. ME matching.
+
+When an LNET GET or PUT arrives, it must be matched against an ME
+queued on its destination portal.  There can potentially be many
+thousands of these and they can potentially be searched sequentially
+with the global lock held.
+
+In fact, Lustre uses MEs in only 2 ways - (a) match-any for incoming
+RPC requests and (b) match-unique for everything else.  (a) is
+effectively the only place Lustre does actual message queueing - (b)
+is used for everything else (i.e. bulk data and RPC replies) and I
+think of it as an RDMA, where the matchbits+peerid is the RDMA
+descriptor.
+
+(a) always matches the first entry in the list of MEs, so even though
+we post 1,000s of request buffers on a server, we never search the
+whole list. (b) can potentially lead to a full list search.
+
+The change we're considering is to detect when a portal is used
+exclusively for match-unique MEs (situation (b) - we already use
+different portals for (a) and (b)) and match using a hash table rather
+than a list search.
+
+2. EQ callbacks.
+
+EQ callbacks are currently serialised by the single global LNET lock.
+Holding the lock for the duration of the callback greatly simplifies
+the LNET event handling code, but unfortunately is open to abuse by
+the handler itself (see below).  
+
+The change we're considering is to use one lock per EQ so that we
+get better concurrency by using many EQs.  This avoids complicating
+the existing EQ locking code, but it does require Lustre changes.  
+However making Lustre use a pool of EQs (say 1 per CPU) should be a
+very simple and self-contained change.
+
+I'd appreciate any feedback on these suggested changes.
+
 --
-Rick M
 
--------- Original Message --------
-Subject: 	Re: Cross posting of ADM information on opensolaris.org
-Date: 	Mon, 21 Jul 2008 15:29:19 -0500
-From: 	Rick Matthews <Richard.Matthews@Sun.COM>
-Reply-To: 	Richard.Matthews at Sun.COM
-To: 	lustre-devel at lists.lustre.org
-References: 	<4884A4BA.3010409@Sun.COM>
+While I'm talking about EQ callbacks, I _do_ think there is still a
+need to restructure some of Lustre's event handlers.  EQ callbacks are
+meant to provide notification and nothing else.  Originally they could
+even be called in interrupt context, so all you are supposed to do in
+them is update status and schedule anything significant for later.
+Nowadays, EQ callbacks are only called in thread context, but the
+general guidance on doing very little apart from notification remains.
 
+Except things are never quite as black-and-white as that.  For
+example, request_out_callback() has always called
+ptlrpc_req_finished() - and whereas this most usually decrements a
+refcount and maybe frees the request, during shutdown this can
+actually recurse into a complete import cleanup.
 
+This blatant flouting of the EQ callback rules has never been fixed
+since it didn't actually break anything and didn't hurt performance
+during normal operation.  However problems like this can be compounded
+as new features are developed (e.g. additional code in these callbacks
+to support secure ptlrpc).  So I think it's time to review what can
+happen inside the lustre event handlers and consider what might need
+to be restructured.  Even with improved EQ handler concurrency, you're
+still tying down an LNET thread for the duration of the EQ callback
+with possible unforseen consequences.
 
-The link to the PSARC documentation referenced below is:
+For example, some LNDs use a pool of worker threads - one thread per
+CPU.  If the LND assigns particular connections to particular worker
+threads (e.g. socklnd), none of these connections can make progress
+while the worker thread is executing the event callback handler.
 
-http://opensolaris.org/os/community/arc/policies/fma-event-protocol/
-
-Rick Matthews wrote:
-> For reference in HSM discussions, I am cross-posing the location of the
-> ADM (Automatic Data Migration) project page within OpenSolaris. Please 
-> note
-> the following:
->    1) The OpenSolaris page refers to ADM as  an HSM for ZFS and 
-> OpenSolaris
->       based appliances using ZFS. No changes have been made to include 
-> potential
->       Lustre consumables.
->    2) The project page seems to be missing a link to the ADM PSARC 
-> case (2007/210).
->       We are working to get that corrected. The PSARC case 
-> documentation includes
->       most of the detailed specifications for ADM components.
->
-> The ADM project page is at:
->    http://opensolaris.org/os/project/adm/
->
-> Interesting links from there are: 
-> http://opensolaris.org/os/project/adm/WhatisADM/
-> and the demo on that page. Of course, the link to the PSARC case will 
-> also be added.
->  
-
-
--- 
----------------------------------------------------------------------
-Rick Matthews                           email: Rick.Matthews at sun.com
-Sun Microsystems, Inc.                  phone:+1(651) 554-1518
-1270 Eagan Industrial Road              phone(internal): 54418
-Suite 160                               fax:  +1(651) 554-1540
-Eagan, MN 55121-1231 USA                main: +1(651) 554-1500		
----------------------------------------------------------------------
-
-
-
-
--- 
----------------------------------------------------------------------
-Rick Matthews                           email: Rick.Matthews at sun.com
-Sun Microsystems, Inc.                  phone:+1(651) 554-1518
-1270 Eagan Industrial Road              phone(internal): 54418
-Suite 160                               fax:  +1(651) 554-1540
-Eagan, MN 55121-1231 USA                main: +1(651) 554-1500		
----------------------------------------------------------------------
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080812/6eb0a486/attachment.htm>
+    Cheers,
+              Eric
