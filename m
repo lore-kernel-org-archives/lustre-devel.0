@@ -1,126 +1,86 @@
-From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Tue, 16 Sep 2008 10:00:28 -0600
-Subject: [Lustre-devel] CMD directory split
-In-Reply-To: <831F789FF0CC4FFD8D5C15DC082731AF@ebpc>
-Message-ID: <C4F5343C.7AA6%peter.braam@sun.com>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Fri, 19 Sep 2008 10:39:48 -0700
+Subject: [Lustre-devel] Changelog API
+Message-ID: <48D3E3E4.1030006@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-If these dynamic layout changes are being considered, doing so for file data
-first or in parallel might make sense.
-
-I think that fixed directory striping patterns may in fact be fine for a
-long tim to come. Spread directory entries over a particular pool or over
-any nodes using a certain width may be all we need.
-
-Peter
+A metadata changelog feature will be added in Lustre 2.0.  Changelogs 
+are per-MDD persistent logs that record namespace change events, e.g. 
+file creation, deletion, rename, mtime changes, etc.  Progress can be 
+followed in bug 15699.
 
 
-On 9/16/08 5:05 AM, "Eric Barton" <eeb@sun.com> wrote:
+Changelog API
 
-> Guys,
-> 
-> I'm cc-ing lustre-devel - it's of general interest.
-> 
-> I definitely think the first CMD product releases should stick to
-> static directory layouts with all directories contained within a
-> single MDT by default - i.e. you have to do something special to
-> create a striped dir.  Meanwhile we should start ASAP on completing
-> the design of automatic dir splitting to handle _all_ the recovery
-> cases.
-> 
-> IMHO, a one-time-only directory split seems a bit too all-or-nothing.
-> What is the reasoning behind the assumption that further splitting is
-> not required?  Also, directory size doesn't necessarily seem like the
-> only or even the best clue about when to split and how.  So here are a
-> couple of suggestions.
-> 
-> 1. Consider the split from 1 MDT to several just as a special case of
->    migration - i.e. allow arbitrary n->m re-layout over MDTs.  We
->    would like to support metadata migration in any case for space
->    management.  Andreas' ideas about migration by mirroring seem
->    equally applicable to directories (furthermore mirrored directories
->    seem like a valuable component of a namespace availability and
->    resilience feature).
-> 
-> 2. Keep the discussion on policy (when to split) separate from
->    mechanism (how to split).
-> 
->     Cheers,
->               Eric
-> 
->> 
->> -----Original Message-----
->> From: Andreas.Dilger at Sun.COM [mailto:Andreas.Dilger at Sun.COM] On Behalf Of
->> Andreas Dilger
->> Sent: 16 September 2008 9:23 AM
->> To: Nikita Danilov
->> Cc: Yury Umanets; Eric Barton; Alex Zhuravlev
->> Subject: Re: CMD directory split
->> 
->> On Sep 15, 2008  14:20 +0400, Nikita Danilov wrote:
->>> Andreas Dilger writes:
->>>> I think we can have a very simple directory split if we
->>>> consider the directory split like file IO instead of inserting
->>>> thousands of dirents.
->>> 
->>> In some sense this is already done. Split (cmm/cmm_split.c) uses
->>> the same interface as readdir to construct a pagesful of directory
->>> entries and to send them to a slave mdt, where they are
->>> inserted. It is not raw `write', because actual directory page
->>> format is encapsulated within osd
->> 
->> Yes, I was thinking of something like this, I didn't know that is
->> how it is actually handled.  The other issue is that the directory
->> creation and insertions should be done in a single transaction in
->> order to simplify recovery.  In that case we don't have to worry
->> about the case where the directory is partially created and
->> populated.
->> 
->>> It's my impression that other source of trouble with split is a
->>> complicated locking scheme that it requires to keep clients happy.
->> 
->> How is the locking of the directory any different than the locking
->> on the LOV EA needed to restripe a file for migration?  The locks on
->> the inodes themselves do not change, because the inodes are not
->> moving.  The pages on the directory itself are revoked on a regular
->> basis whenever there is a new insertion in any case (i.e. when the
->> directory is split).
->> 
->> It would seem that the only thing which needs to be changed is the
->> LMV EA on the clients.
->> 
->>> It would be _much_ easier if directories were split at the time of
->>> creation like files are. That would also eliminate almost all
->>> recovery issues and page-shuffling mechanics.
->> 
->> This might be possible for a simple initial implementation, but it
->> isn't a good long-term solution.  Consider the problems we face even
->> today with widely-striped files - stat slowdowns to track the
->> size/mtime/ctime, readdir will always have to do RPCs to each MDT to
->> get the entries even if there are only a few entries, unlinks will
->> need multiple RPCs, etc.
->> 
->> In contrast, we can tune the split threshold so that the majority of
->> small directories remain on a single MDT, and only large directories
->> are split (with some small overhead for the split).
->> 
->> In the future we have to consider configurations with hundreds or
->> even thousands of MDTs, perhaps one on each OST, in order to scale
->> metadata and small file performance dramatically.
->> 
->> Cheers, Andreas
->> --
->> Andreas Dilger
->> Sr. Staff Engineer, Lustre Group
->> Sun Microsystems of Canada, Inc.
->> 
->> 
-> 
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+
+Configuring changelogs - lctl commands:
+> lctl set_param mdd.*.changelog <on|off>
+Enable/disable changelog record keeping
+
+> lctl set_param -n mdd.*.changelog_mask "[[+|-]<event>] ..."
+Set or modify the event types that are recorded in the changelog
+e.g. > lctl set_param  mdd.*.changelog_mask "all -attr -slink -open -close"
+     > lctl get_param "mdd.*.changelog_mask"
+     mdd.lustre-MDT0000.changelog_mask=
+     MARK CREAT MKDIR HLINK UNLNK RMDIR RNMFM RNMTO IOCTL TRUNC XATTR UNKNW
+
+
+Using changelogs - LFS commands:
+> lfs diff
+Show the metadata changes in a filesystem between two snapshot times.
+usage: diff [--follow] <mdtname> [startrec [endrec]]
+The --follow flag causes this command to block waiting for new changelog events.
+
+> lfs clear_changelog
+clear_changelog: Purge old changelog records up to <endrec> to free up space.
+usage: clear_changelog <mdtname> <endrec>
+
+
+Data format is ascii text, 1 record per line:
+<record_#> <commandtype> <timestamp> t=<target_fid> p=<parent_fid> <filename>
+
+xen1:/r/cfs/b_hd_changelog/lustre/tests# lfs diff lustre
+1 00MARK  4405821883 t=[0x0/0x10001] p=[0x0/0x0] mdd_obd-lustre-MDT0000-0
+2 02MKDIR 4405821890 t=[0x100000400/0x5] p=[0x100000400/0x4] pics
+3 02MKDIR 4405821892 t=[0x100000400/0x6] p=[0x100000400/0x5] 2008
+4 02MKDIR 4405821894 t=[0x100000400/0x7] p=[0x100000400/0x6] zachy
+5 01CREAT 4405821898 t=[0x100000400/0x8] p=[0x100000400/0x7] timestamp
+6 01CREAT 4405821904 t=[0x100000400/0x9] p=[0x100000400/0x7] pic1.jpg
+7 07RNMFM 4405821915 t=[0x100000400/0x7] p=[0x100000400/0x6] zachy
+8 08RNMTO 4405821915 t=[0x100000400/0x7] p=[0x100000400/0x5] zach
+9 03HLINK 4405821922 t=[0x100000400/0x9] p=[0x100000400/0x6] portland.jpg
+10 04SLINK 4405821926 t=[0x100000400/0xa] p=[0x100000400/0x5] desktop.jpg
+11 05UNLNK 4405821929 t=[0x100000400/0xa] p=[0x100000400/0x5] desktop.jpg
+
+
+Record types are:
+MARK    internal record keeping
+CREAT   regular file creation
+MKDIR   directory creation
+HLINK   hardlink
+SLINK   softlink
+UNLNK   regular file removal
+RMDIR   directory removal
+RNMFM   rename, original
+RNMTO   rename, final
+OPEN    file opened for write
+CLOSE   file closed for write
+IOCTL   ioctl on file or dir
+TRUNC   regular file truncated
+ATTR    attribute change
+XATTR   extended attribute change
+UNKNW   unknown op
+
+
+Writing your own changelog consumer -- llapi interface:
+int llapi_changelog_open(const char *mdtname, long long startrec);
+  Returns a file descriptor for a read-only file representation of the changelog, starting from
+record <startrec>.  The file descriptor can be used with select(2) or poll(2) to wait for new
+events.
+
+int llapi_changelog_clear(const char *mdtname, long long endrec);
+  Permanently removes old changelog records through <endrec>, freeing up disk space.
