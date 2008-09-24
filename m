@@ -1,54 +1,77 @@
-From: Peter Braam <Peter.Braam@Sun.COM>
-Date: Wed, 24 Sep 2008 10:50:51 +0800
-Subject: [Lustre-devel] Doubly indexed tree / changelogs
-In-Reply-To: <18648.40197.532872.168033@gargle.gargle.HOWL>
-Message-ID: <C4FFCC0B.7DC3%peter.braam@sun.com>
+From: Nathan Roberts <nroberts@yahoo-inc.com>
+Date: Wed, 24 Sep 2008 10:43:32 -0500
+Subject: [Lustre-devel] Question on iopen_lookup()
+Message-ID: <48DA6024.5080507@yahoo-inc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The idea is ok, but scale may turn out to be different than expected.
+(Sorry if this is duplicated, mailing wasn't cooperating)
+Hello,
 
-There could be a huge amount of filesets containing the word "Bin Laden",
-say 100,000 of them.
+I've got a quick question on the open_by_inode support that ldiskfs
+is using.
 
-Would two directories work?
+Since there is only a single magic ".inode" directory inode, AND
+real_lookup() locks the directory mutex when performing the lookup
+of the actual file inode, I'm seeing major contention for this lock.
+The contention makes it impossible for the io scheduler to do anything
+intelligent when there are lots of opens occurring at the same time,
+thus killing small file performance.
+
+Since this directory isn't real I don't think there is a reason
+we need to hold the lock during this type of lookup. I added
+a couple of lines to drop and re-aquire this lock around the
+expensive iget() just to see if it removes the bottleneck. My
+read request rate went up from 96 ops/second to 565 so it does
+seem to help.
+
+Can you see any danger in this type of approach? If it is a completely
+broken approach, any suggestions on how to go about removing this
+contention?
+
+Thanks for any insight.
+Nathan Roberts
 
 
-Peter
+----
 
 
-On 9/23/08 3:38 PM, "Nikita Danilov" <Nikita.Danilov@Sun.COM> wrote:
+static struct dentry *iopen_lookup(struct inode * dir, struct dentry *dentry,
+                                    struct nameidata *nd)
+{
+         struct inode *inode;
+         unsigned long ino;
+         struct list_head *lp;
+         struct dentry *alternate;
+         char buf[IOPEN_NAME_LEN];
 
-> Peter Braam writes:
->> Hi Nikita, Nathan -
->> 
->> After some pondering I have come to two conclusions.
->> 
->> To encode filesets, we need a tree that makes two iterations fast:
->> 
->> 1. list all filesets that contain a certain object
->> 2. list all objects in a certain fileset
->> 
->> Is there a doubly indexed tree for this?
-> 
-> I don't know of a data-structure that provides ready solution for this.
-> As Alex pointed out k-d-trees do not fit there (they effectively use a
-> key composed of the alternating sequences of bits of the original keys),
-> and `geographical trees' that data bases use to store 2-d data use very
-> special notion of proximity.
-> 
-> But, thinking about a fileset as a generalized directory, isn't this the
-> same problem as `list all files in directory' and `find all parent
-> directories of a file'? It probably makes sense to use the same
-> mechanism to deal with directories and filesets.
-> 
-> Our current solution is to use EA to keep track of all parent
-> directories, do you see any problems with applying it to filesets?
-> 
->> 
->> Peter
-> 
-> Nikita.
+         if (dentry->d_name.len >= IOPEN_NAME_LEN)
+                 return ERR_PTR(-ENAMETOOLONG);
+
+         memcpy(buf, dentry->d_name.name, dentry->d_name.len);
+         buf[dentry->d_name.len] = 0;
+
+         if (strcmp(buf, ".") == 0)
+                 ino = dir->i_ino;
+         else if (strcmp(buf, "..") == 0)
+                 ino = EXT3_ROOT_INO;
+         else
+                 ino = simple_strtoul(buf, 0, 0);
+
+         if ((ino != EXT3_ROOT_INO &&
+              ino < EXT3_FIRST_INO(dir->i_sb)) ||
+             ino > le32_to_cpu(EXT3_SB(dir->i_sb)->s_es->s_inodes_count))
+                 return ERR_PTR(-ENOENT);
+
++       mutex_unlock(&dir->i_mutex);
+	inode = iget(dir->i_sb, ino);
++	mutex_lock(&dir->i_mutex);
+         if (!inode)
+                 return ERR_PTR(-EACCES);
+         if (is_bad_inode(inode)) {
+                 iput(inode);
+                 return ERR_PTR(-ENOENT);
+         }
