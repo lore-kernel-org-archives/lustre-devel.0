@@ -1,77 +1,79 @@
-From: Nathan Roberts <nroberts@yahoo-inc.com>
-Date: Wed, 24 Sep 2008 10:43:32 -0500
-Subject: [Lustre-devel] Question on iopen_lookup()
-Message-ID: <48DA6024.5080507@yahoo-inc.com>
+From: Eric Barton <eeb@sun.com>
+Date: Thu, 25 Sep 2008 16:54:51 +0100
+Subject: [Lustre-devel] Simpifying Interoperation
+Message-ID: <CF0D4EA95C1945F18F74426BB95008CE@ebpc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-(Sorry if this is duplicated, mailing wasn't cooperating)
-Hello,
+Here are some first thoughts on Huang Hua's idea to simplify version
+interoperation, and an invitation for further comments...
 
-I've got a quick question on the open_by_inode support that ldiskfs
-is using.
+1. This scheme should not interfere with upgrade via failover pairs,
+   and it must also allow the MDS to be upgraded separately from the
+   OSSs.  I think this means in general that we have to allow
+   piecemeal server upgrades.
 
-Since there is only a single magic ".inode" directory inode, AND
-real_lookup() locks the directory mutex when performing the lookup
-of the actual file inode, I'm seeing major contention for this lock.
-The contention makes it impossible for the io scheduler to do anything
-intelligent when there are lots of opens occurring at the same time,
-thus killing small file performance.
+2. This scheme need a mechanism that...
 
-Since this directory isn't real I don't think there is a reason
-we need to hold the lock during this type of lookup. I added
-a couple of lines to drop and re-aquire this lock around the
-expensive iget() just to see if it removes the bottleneck. My
-read request rate went up from 96 ops/second to 565 so it does
-seem to help.
+   a) notifies clients when a particular server is about to upgrade so
+      that update operations are blocked until the upgrade completes
+      and the client reconnects to the upgraded (and/or failed over)
+      server.
 
-Can you see any danger in this type of approach? If it is a completely
-broken approach, any suggestions on how to go about removing this
-contention?
+   b) notifies the server when all clients have completed preparation
+      for the upgrade so that no further requests require resend.
 
-Thanks for any insight.
-Nathan Roberts
+   c) notifies clients when all outstanding updates have been
+      committed.  If the server crashes before this point, client
+      replay is still required.  Clients must not poll for this since
+      the server is shutting down.
 
+   The DLM seems the right basic mechanism to notify clients, however
+   current assumptions about acquisition timeouts might be an issue.
 
-----
+   We must also ensure that the race between this server upgrade
+   process and connection establishment (including any new
+   notification locks) by new clients is handled consistently.
+   
+3. It's not clear to me that we need to evict, or even clean the
+   client cache provided the client doesn't attempt any more writes
+   until it has connected to the failover server.  The client can
+   re-acquire all the locks covering its cache during recovery after
+   the upgrade - and there is no need for request refomatting here
+   since locks are replayed explicitly (i.e. new requests are
+   formatted from scratch using the correct protocol version).
 
+   It does seem advisable however to clean the cache before such a
+   significant system incident.
 
-static struct dentry *iopen_lookup(struct inode * dir, struct dentry *dentry,
-                                    struct nameidata *nd)
-{
-         struct inode *inode;
-         unsigned long ino;
-         struct list_head *lp;
-         struct dentry *alternate;
-         char buf[IOPEN_NAME_LEN];
+4. We can avoid reformatting requests during open replay if this is
+   also done explicity.
 
-         if (dentry->d_name.len >= IOPEN_NAME_LEN)
-                 return ERR_PTR(-ENAMETOOLONG);
+5. This scheme prevents recovery on clients that were disconnected
+   when the upgrade began.  Such clients will simply be evicted when
+   they reconnect even though the server should actually have
+   committed all their replayable requests.
 
-         memcpy(buf, dentry->d_name.name, dentry->d_name.len);
-         buf[dentry->d_name.len] = 0;
+   If this can be prevented, we can probably also dispense with much
+   of the notification described in (2) above.  However it would
+   require (a) a change in the connection protocol to get clients to
+   purge their own replay queue and (b) changes to ensure resent
+   requests can be reconstructed from scratch (but maybe (b) is just
+   another way of saying "request reformatting").
 
-         if (strcmp(buf, ".") == 0)
-                 ino = dir->i_ino;
-         else if (strcmp(buf, "..") == 0)
-                 ino = EXT3_ROOT_INO;
-         else
-                 ino = simple_strtoul(buf, 0, 0);
+   If this is doable - it further begs the question of whether simply
+   making all server requests synchronous during upgrades is enough to
+   simply most interoperation issues.
 
-         if ((ino != EXT3_ROOT_INO &&
-              ino < EXT3_FIRST_INO(dir->i_sb)) ||
-             ino > le32_to_cpu(EXT3_SB(dir->i_sb)->s_es->s_inodes_count))
-                 return ERR_PTR(-ENOENT);
+6. This is all about client/server communications. Are there any
+   issues for inter-server interoperation?
 
-+       mutex_unlock(&dir->i_mutex);
-	inode = iget(dir->i_sb, ino);
-+	mutex_lock(&dir->i_mutex);
-         if (!inode)
-                 return ERR_PTR(-EACCES);
-         if (is_bad_inode(inode)) {
-                 iput(inode);
-                 return ERR_PTR(-ENOENT);
-         }
+7. Clients and servers may have to run with different versions for
+   extended periods (one customer ran like this for months).  Does
+   this raise any issues with this scheme?
+
+    Cheers,
+              Eric
