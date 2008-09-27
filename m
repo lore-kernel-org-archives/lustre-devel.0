@@ -1,101 +1,57 @@
 From: Andreas Dilger <adilger@sun.com>
-Date: Fri, 26 Sep 2008 13:51:30 -0600
-Subject: [Lustre-devel] Simpifying Interoperation
-In-Reply-To: <CF0D4EA95C1945F18F74426BB95008CE@ebpc>
-References: <CF0D4EA95C1945F18F74426BB95008CE@ebpc>
-Message-ID: <20080926195130.GE10950@webber.adilger.int>
+Date: Sat, 27 Sep 2008 00:15:02 -0600
+Subject: [Lustre-devel] Question on iopen_lookup()
+In-Reply-To: <48DA6024.5080507@yahoo-inc.com>
+References: <48DA6024.5080507@yahoo-inc.com>
+Message-ID: <20080927061502.GK10950@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sep 25, 2008  16:54 +0100, Eric Barton wrote:
-> 1. This scheme should not interfere with upgrade via failover pairs,
->    and it must also allow the MDS to be upgraded separately from the
->    OSSs.  I think this means in general that we have to allow
->    piecemeal server upgrades.
+On Sep 24, 2008  10:43 -0500, Nathan Roberts wrote:
+> I've got a quick question on the open_by_inode support that ldiskfs
+> is using.
 > 
-> 2. This scheme need a mechanism that...
-> 
->    a) notifies clients when a particular server is about to upgrade so
->       that update operations are blocked until the upgrade completes
->       and the client reconnects to the upgraded (and/or failed over)
->       server.
-> 
->    b) notifies the server when all clients have completed preparation
->       for the upgrade so that no further requests require resend.
-> 
->    c) notifies clients when all outstanding updates have been
->       committed.  If the server crashes before this point, client
->       replay is still required.  Clients must not poll for this since
->       the server is shutting down.
-> 
->    The DLM seems the right basic mechanism to notify clients, however
->    current assumptions about acquisition timeouts might be an issue.
-> 
->    We must also ensure that the race between this server upgrade
->    process and connection establishment (including any new
->    notification locks) by new clients is handled consistently.
+> Since there is only a single magic ".inode" directory inode, AND
+> real_lookup() locks the directory mutex when performing the lookup
+> of the actual file inode, I'm seeing major contention for this lock.
+> The contention makes it impossible for the io scheduler to do anything
+> intelligent when there are lots of opens occurring at the same time,
+> thus killing small file performance.
 
-Having the MGS handle the locking here seems like the right thing.
-Something like a persistent "all access" lock that is held by the
-client in the MGS namespace indefinitely, but if the MGS ever revokes
-it the client must block all operations until it can re-get it.
+We're always interested in improving the metadata performance of
+Lustre, and it sounds like you have an interesting patch.
 
-> 3. It's not clear to me that we need to evict, or even clean the
->    client cache provided the client doesn't attempt any more writes
->    until it has connected to the failover server.  The client can
->    re-acquire all the locks covering its cache during recovery after
->    the upgrade - and there is no need for request refomatting here
->    since locks are replayed explicitly (i.e. new requests are
->    formatted from scratch using the correct protocol version).
+> Since this directory isn't real I don't think there is a reason
+> we need to hold the lock during this type of lookup. I added
+> a couple of lines to drop and re-aquire this lock around the
+> expensive iget() just to see if it removes the bottleneck. My
+> read request rate went up from 96 ops/second to 565 so it does
+> seem to help.
 > 
->    It does seem advisable however to clean the cache before such a
->    significant system incident.
+> Can you see any danger in this type of approach? If it is a completely
+> broken approach, any suggestions on how to go about removing this
+> contention?
 
-Definitely, yes, flushing the client's dirty data to disk is a good
-idea.  That would also minimize the number and type of things that
-can go wrong during an upgrade.  I wouldn't totally be against the
-server cancelling all of the client locks during an upgrade.  The
-frequency of upgrades is low enough that the cost of repopulating
-the cache is reasonable.  This may also simplify locking changes in
-the future (e.g. if extra data is needed in the LVB or new flags).
+> +       mutex_unlock(&dir->i_mutex);
+> 	inode = iget(dir->i_sb, ino);
+> +	mutex_lock(&dir->i_mutex);
 
-> 4. We can avoid reformatting requests during open replay if this is
->    also done explicity.
+It looks reasonable to make the change you are proposing.  In fact,
+we are also discussing to replace __iopen__ with ext3_fh_to_dentry(),
+which calls ext3_nfs_get_inode() internally and it also does iget()
+without any locking from looking at these functions and callers.
 
-No, open replay is done by replaying the original open RPC, which is
-kept indefinitely using the original transaction number.
+The benefit of replacing __iopen__ with the ext3_export_ops() is that
+we don't have to maintain the twisty mazes of the __iopen__ code in
+the face of constantly changing kernel APIs.  This would also be one
+step closer to having a patchless server kernel.
 
-> 5. This scheme prevents recovery on clients that were disconnected
->    when the upgrade began.  Such clients will simply be evicted when
->    they reconnect even though the server should actually have
->    committed all their replayable requests.
-> 
->    If this can be prevented, we can probably also dispense with much
->    of the notification described in (2) above.  However it would
->    require (a) a change in the connection protocol to get clients to
->    purge their own replay queue and (b) changes to ensure resent
->    requests can be reconstructed from scratch (but maybe (b) is just
->    another way of saying "request reformatting").
-> 
->    If this is doable - it further begs the question of whether simply
->    making all server requests synchronous during upgrades is enough to
->    simply most interoperation issues.
-> 
-> 6. This is all about client/server communications. Are there any
->    issues for inter-server interoperation?
-
-The current 2.0 update does not change the MDS->OSS protocol in any
-way (AFAIK).  Changes like CROW and FID-on-OST are not yet implemented.
-
-> 7. Clients and servers may have to run with different versions for
->    extended periods (one customer ran like this for months).  Does
->    this raise any issues with this scheme?
-
-I don't think so, because the need to interoperate for even a minute
-is no different than a month, once the support is there.
+We haven't had anyone working on this previously, but if you'd like
+to take a crack at it I think we could get both the performance and
+reduction in code complexity at the same time.
 
 Cheers, Andreas
 --
