@@ -1,25 +1,36 @@
-From: Google Adwords Alert <support@google.com>
-Date: Mon, 29 Sep 2008 22:48:16 -0000
-Subject: [Lustre-devel] Google Adwords Services
-Message-ID: <95185.kelley@orazio>
+From: Eric Barton <eeb@sun.com>
+Date: Mon, 06 Oct 2008 03:53:26 +0100
+Subject: [Lustre-devel] MDWBC and how much to trust clients
+Message-ID: <1FEDA9D966B34039AF0EC15DBD0E4BAA@eblap>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Attention GOOGLE ADWORDS Customers! 
+Nikita,
 
-For certain services, such as our advertising programs, we request 128-bit SSL security information which we maintain in encrypted form on secure servers. 
-We take appropriate security measures to protect against unauthorized access to our unauthorized alteration, disclosure or destruction of data.
-Please download latest SSL protection certificate
+Do you agree that a buggy or malicious MDWBC could disrupt the
+namespace (e.g. links to missing files, orphaned files) if
+it splits up operations across multiple MDTs into sub-operations
+for the individual targets?  I think it will be an issue for
+security if we just trust the MDWBC to do such operations
+correctly, and so I'm wondering how we can fix this.  
 
-Read more>>
+Using a master MDT to coordinate the operation across itself and
+the remaining MDTs seems part of, but not all of the solution.
+We have to process batches in bulk to retain a significant
+performance advantage, so I wonder if that requires us to trust
+that these batches have been created correctly.  
 
-Unprotected browsers will not be able to Log in after September 30, 2008
-Sincerely, Bobbi Romero.
+If so, we're stuck with the MDWBC being something we can only
+do in a single trust domain - i.e. not across a WAN. That seems
+unfortunate since WAN performance should be a major beneficiary
+of the MDWBC.  Maybe in this case, we can still send batches over
+the WAN, but to a single target which proxies for the remote client
+and can be trusted to split multi-target ops over batches correctly.
 
-2008 Google Adwords, Developing new services.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20080929/21fddc66/attachment.htm>
+Thoughts?
+
+    Cheers,
+              Eric
