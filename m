@@ -1,12 +1,14 @@
 From: Alexander Zarochentsev <Alexander.Zarochentsev@Sun.COM>
-Date: Wed, 08 Oct 2008 10:40:30 +0400
+Date: Wed, 08 Oct 2008 15:44:07 +0400
 Subject: [Lustre-devel] COS performance issues
-Message-ID: <200810081040.31363.alexander.zarochentsev@sun.com>
+Message-ID: <200810081544.08292.alexander.zarochentsev@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+sending to lustre-recovery@ as well
 
 Hello,
 
