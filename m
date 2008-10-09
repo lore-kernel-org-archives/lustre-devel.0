@@ -1,51 +1,77 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Wed, 08 Oct 2008 15:48:50 +0400
-Subject: [Lustre-devel] COS performance issues
-In-Reply-To: <200810081544.08292.alexander.zarochentsev@sun.com>
-References: <200810081544.08292.alexander.zarochentsev@sun.com>
-Message-ID: <48EC9E22.2090403@sun.com>
+From: Peter Braam <Peter.Braam@Sun.COM>
+Date: Thu, 09 Oct 2008 08:04:08 -0600
+Subject: [Lustre-devel] MDWBC and how much to trust clients
+In-Reply-To: <18667.10276.857149.242018@gargle.gargle.HOWL>
+Message-ID: <C5136B78.6085%peter.braam@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-try to profile with single CPU? you'll probably get an idea how "per-cpu"
-approach can help.
+You'll need to limit this to the requests that have dependencies.  With the
+algorithm below every server starts looking at every request - that probably
+kills the scaling you want to achieve.
 
-thanks, Alex
+Peter
 
-Alexander Zarochentsev wrote:
-> I have a patch to avoid using of obd_uncommitted_replies_lock 
-> in ptlrpc_server_handle_reply but it has minimal effect, 
-> ptlrpc_server_handle_reply still the most cpu consuming function
-> because of svc->srv_lock contention.
+
+On 10/7/08 3:13 AM, "Nikita Danilov" <Nikita.Danilov@Sun.COM> wrote:
+
+> Nikita Danilov writes:
+>> Eric Barton writes:
+>>> Nikita,
+>> 
+>> Hello,
 > 
-> I think the problem is that COS defers processing of replies to transaction commit time.
-> When commit happens, MDS has to process thousands of replies (about 14k replies per
-> commit in the test 3.a) in short period of time. I guess the mdt service threads 
-> all woken up and spin trying to get the service svr_lock. Processing of new requests may
-> also suffer of this.
+> [...]
 > 
-> I ran the tests with with CONFIG_DEBUG_SPINLOCK_SLEEP debugging compiled into a kernel, it found no
-> sleep under spinlock bugs.
+>> 
+>> as Peter mentioned, we discussed this topic during the Moscow
+>> meeting. If I am not mistaken, we converged to the idea that before
+>> committing an epoch, every mdt composes some kind of a `summary',
+>> containing enough information for verification of a global consistency,
+>> and this summary is passed though every server as a ticket, with every
 > 
-> Further optimization may include 
-> 1. per-reply spin locks.
-> 2. per-cpu structures and threads to process reply queues.
+> This can be simplified. Suppose total amount of `data', describing all
+> updates within given epoch is D, and there are N md servers in a cmd
+> cluster. Then total network traffic incurred by this algorithm is
 > 
-> Any comments?
+>              D   /* updates from client to all servers */ +
+>              D*N /* cycle summary through all servers */
 > 
-> Thanks.
+> that is, (N + 1)*D bytes, transferred in 2*N messages. So we won't
+> increase network traffic by broadcasting _all_ epoch updates to _every_
+> server (so that each server gets complete set of all updates within the
+> epoch). In this latter case, servers can prove that epoch is consistent
+> by
 > 
-> PS. the test results are much better when MDS server is sata20 machine with 4 cores
-> (the MDS from Washie1 has 2 cores), COS=0 and COS=1 have only %3 difference:
+>     - checking global consistency locally,
 > 
-> COS=1
-> Rate: 3101.77 creates/sec (total: 2 threads 930530 creates 300 secs)
-> Rate: 3096.94 creates/sec (total: 2 threads 929083 creates 300 secs)
+>     - calculating md5 signature of all epoch updates, and
 > 
-> COS=0
-> Rate: 3184.01 creates/sec (total: 2 threads 958388 creates 301 secs)
-> Rate: 3152.89 creates/sec (total: 2 threads 945868 creates 300 secs)
+>     - exchanging these signatures, to check that client sent the same
+>       set of updates to everybody.
 > 
+> This results in
+> 
+>              D*N /* broadcast epoch updates to all servers */ +
+>              e*N /* exchange signatures */
+> 
+> that is N*(D + e), for some small e, bytes transferred in 2*N
+> messages. Having complete set of updates on every server would probably
+> help in other places too.
+> 
+> 
+>> server `approving' some bits in the summary accumulated so far, and
+> 
+> [...]
+> 
+>>> 
+>>> Thoughts?
+>>> 
+>>>     Cheers,
+>>>               Eric
+>> 
+> 
+> Nikita.
