@@ -1,33 +1,33 @@
-From: Eric Barton <eeb@sun.com>
-Date: Fri, 10 Oct 2008 21:11:32 +0100
-Subject: [Lustre-devel] proposal to increase seek in sgpdd_survey
-In-Reply-To: <1223665357.11840.138.camel@brian-laptop>
-References: <1222817771.26779.75.camel@pc.ilinx>
-	<244CBACA73094649889DFE28A43F7B2E@ebpc>
-	<1223665357.11840.138.camel@brian-laptop>
-Message-ID: <BC160A91CD43413FB9B898E767854EC2@ebpc>
+From: Andreas Dilger <adilger@sun.com>
+Date: Sat, 11 Oct 2008 10:00:10 -0600
+Subject: [Lustre-devel] COS performance issues
+In-Reply-To: <200810081544.08292.alexander.zarochentsev@sun.com>
+References: <200810081544.08292.alexander.zarochentsev@sun.com>
+Message-ID: <20081011160010.GR2009@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Brian,
+On Oct 08, 2008  15:44 +0400, Alexander Zarochentsev wrote:
+> I think the problem is that COS defers processing of replies to
+> transaction commit time.  When commit happens, MDS has to process
+> thousands of replies (about 14k replies per commit in the test 3.a)
+> in short period of time. I guess the mdt service threads all woken
+> up and spin trying to get the service svr_lock. Processing of new
+> requests may also suffer of this.
 
-> Just for clarification Eric...  Are you advocating num_gaps ==
-> num_regions or num_gaps == num_regions-1?  i.e. in a two region test
-> should the second region start at 50% of the disk or 100%-$region_size
-> so that the last byte of the second region is written to the last byte
-> of the disk?
-> 
-> It seems to me that the first option provides a more "middle of the
-> road" (which might correlate to real-world averages more closely)
-> average as it only incorporates a seek of half the disk whereas the
-> second option provides a more worst case performance result.
+Can you please explain what replies are being blocked?  It can't be the
+create replies or the clients would be blocked waiting after starting a
+single create each.
 
-Not quite so bothered by that and it gets less intersting with more
-regions.  Maybe leave it in as a non-default option, in case it's
-a real disk killer.
+I think the thread and lock contention is only part of the issue - if all
+of these replies are blocked until transaction commit this wastes all of
+the bandwidth on the network while the replies are being held.
 
-    Cheers,
-              Eric
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
