@@ -1,119 +1,160 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Mon, 13 Oct 2008 19:04:51 +0400
-Subject: [Lustre-devel] COS performance issues
-In-Reply-To: <200810131836.37447.alexander.zarochentsev@sun.com>
-References: <200810081544.08292.alexander.zarochentsev@sun.com>
-	<200810122241.58982.alexander.zarochentsev@sun.com>
-	<48F24C0A.9070301@sun.com>
-	<200810131836.37447.alexander.zarochentsev@sun.com>
-Message-ID: <48F36393.9020406@sun.com>
+From: Aurelien Degremont <aurelien.degremont@cea.fr>
+Date: Mon, 13 Oct 2008 18:39:16 +0200
+Subject: [Lustre-devel] "Simple" HSM straw man
+In-Reply-To: <48EE87A1.7000003@sun.com>
+References: <48EE87A1.7000003@sun.com>
+Message-ID: <48F379B4.6040209@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-cool! do you have profile with COS disabled? how is it different?
-I guess ldlm_resorce_find() is result of COS as now we've got 10K times
-more locks and resorces, but what about try_to_wake_up() and __wake_up_common() ?
+Nathaniel Rutman a ?crit :
+>     c. restore on file open, not data read/write
+
+take care of the difficulties to move this behavious to a 
+restore-on-first-I/O later
+
+>     d. interfaces with hardware-specific copy tool to access HSM files
+rather "HSM-specific"
+
+>     e. kernel process encompasses service threads listening for 
+> coordinator requests, passes these up to userspace process via upcall.  
+> No interaction with the client is needed; this is a simple message 
+> passing service.
+
+Depending on how you can manage a user-space process, but, AFAIK, to be 
+able to manage the copy tool process, that means:
+  - start this process
+  - send a signal
+  - get its output (for "complex" hsm, we will need feedback from copy 
+tool process)
+  - wait for the process end
+  - ...
+All of this is easily doable from userspace, and very hard in 
+kernel-space (we cannot use the fire-and-forget call call_usermodehelper).
+So I rather imagine:
+  - a kernel space mover, simply getting LNET messages and passing them 
+to user-space mover
+  - a user-space mover, forking, spawning and managing the copy tool 
+process.
+
+Maybe it will need to manage several copy tool processes, so it will 
+need queues, process list, etc...
+
+So I think this tool needs a bit more than just a "simple message 
+passing service".
+
+>     b. lov EA changes
+>        i.  flags: file_is_purged "purged", copyout_begin, 
+> file_in_HSM_is_out_of_date "hsm_dirty", copyout_complete.  The purged 
+> flag is always manipulated under a write layout lock, the other flags 
+> are not.
+>        ii: "window" EA range of non-purged data (rev2)
+
+If you add a window EA (will be needed anyway for hsm v2), you do not 
+need a purged flag:
+
+window.start ==window.end is comparable to a purged flag unset. (or 
+window.end == 0)
 
 
-thanks, Alex
+>     c. new file ioctls: HSMCopyOut, HSMPurge, HSMCopyinDone
+> 
+> 
+> Algorithms
+> 1. copyout
+>     a. Policy engine decides to copy a file to HSM, executes HSMCopyOut 
+> ioctl on file
+>     b. ioctl handled by MDT, which passes request to Coordinator
+>     c. coordinator dispatches request to mover.  request should include 
+> file extents (for future purposes)
+>     d. normal extents read lock is taken by mover running on client
+>     e. mover sets "copyout_begin" bit and clears "hsm_dirty" bit in EA.
+>     f. any writes to the file set the "hsm_dirty" bit (may be 
+> lazy/delayed with mtime or filesize change updates on MDT).  Note that 
+> file writes need not cancel copyout; for a fs with a single big file, we 
+> don't want to keep interrupting copyout or it will never finish. 
 
-Alexander Zarochentsev wrote:
-> On 12 October 2008 23:12:10 Alex Zhuravlev wrote:
->> would be good to look at profiles as the next one was
->> ldlm_resource_get()
+Is it interesting to have a file that is outdated and possibly uncoherent?
+
+>     g. when done, mover checks hsm_dirty bit.  If set, clears 
+> copyout_begin, indicating current file is not in HSM.  If not set,  
+> mover sets "copyout_complete" bit.  File layout write lock is not taken 
+> during mover flag manipulation.  (Note: file modifications after copyout 
+> is complete will have both copyout_complete and hsm_dirty bits set.)
 > 
-> Alex, look, ptlrpc_server_handle_reply has gone:
+> 2. purge (aka punch)
+>     a. Policy engine decides to purge a file, exectues HSMPurge ioctl on 
+> file
+>     b. ioctl handled by MDT
+>     c. MDT takes a write lock on the file layout lock
+>     d. MDT enques write locks on all extents of the file.  After these 
+> are granted, then no client has any dirty cache and no child can take 
+> new extent locks until layout lock is released.  MDT drops all extent locks.
+>     e. MDT verifies that hsm_dirty bit is clear and copyout_complete bit 
+> is set
+>     f. MDT marks the LOV EA as "purged"
+>     g. MDT sends destroys the OST objects, using destroy llog entries to 
+> guard against object leakage during OST failover
+
+Are you sure you want to remove those objects if we will need them 
+later, in "complex" HSM?
+As this mecanism will need to change a lot when we will implement the 
+restore-in-place feature, i'm not sure this is the best idea.
+
+
+>     h. MDT drops layout lock.
 > 
-> CPU: P4 / Xeon, speed 2800.25 MHz (estimated)
-> Counted GLOBAL_POWER_EVENTS events (time during which processor is not stopped
-> with a unit mask of 0x01 (mandatory) count
->  100000
-> samples  %        image name               app name                 symbol name
-> 312318    4.7857  vmlinux                  vmlinux                  try_to_wake_up
-> 259690    3.9792  ptlrpc.ko                ptlrpc                   ldlm_resource_find
-> 175916    2.6956  vmlinux                  vmlinux                  __wake_up_common
-> 160912    2.4657  e1000.ko                 e1000                    e1000_irq_enable
-> 157031    2.4062  obdclass.ko              obdclass                 htable_lookup
-> 134309    2.0580  e1000.ko                 e1000                    e1000_intr_msi
-> 121261    1.8581  lvfs.ko                  lvfs                     lprocfs_counter_add
-> 87613     1.3425  vmlinux                  vmlinux                  __find_get_block
-> 87562     1.3417  oprofiled                oprofiled                (no symbols)
-> 77926     1.1941  vmlinux                  vmlinux                  memset
-> 74561     1.1425  vmlinux                  vmlinux                  __kmalloc
-> 70952     1.0872  vmlinux                  vmlinux                  __switch_to
-> 67288     1.0311  mds.ko                   mds                      mds_lov_dump_objids
-> 67085     1.0279  vmlinux                  vmlinux                  memmove
-> 66521     1.0193  vmlinux                  vmlinux                  kfree
-> 55112     0.8445  ptlrpc.ko                ptlrpc                   ptlrpc_main
-> 54357     0.8329  vmlinux                  vmlinux                  schedule
-> 53501     0.8198  vmlinux                  vmlinux                  find_get_page
-> 
->> thanks, Alex
->>
->> Alexander Zarochentsev wrote:
->>> On 8 October 2008 15:48:50 Alex Zhuravlev wrote:
->>>> try to profile with single CPU? you'll probably get an idea how
->>>> "per-cpu" approach can help.
->>> I booted the MDS server with maxcpus=1 kernel parameter and here
->>> are the results:
->>>
->>> cos=0
->>> 2039.31 creates/sec (total: 2 threads 611794 creates 300 secs)
->>> 2037.80 creates/sec (total: 2 threads 611341 creates 300 secs)
->>> 2076.21 creates/sec (total: 2 threads 622864 creates 300 secs)
->>>
->>> cos=1
->>> 1874.93 creates/sec (total: 2 threads 564354 creates 301 secs)
->>> 1923.97 creates/sec (total: 2 threads 577191 creates 300 secs)
->>> 1892.61 creates/sec (total: 2 threads 567783 creates 300 secs)
->>> 1874.74 creates/sec (total: 2 threads 562421 creates 300 secs)
->>>
->>> unfortunately profiling info isn't available yet, the results are
->>> done with SLES10 which can boot with maxcpus=1 but has no oprofile
->>> installed.
->>>
->>>> Alexander Zarochentsev wrote:
->>>>> I have a patch to avoid using of obd_uncommitted_replies_lock
->>>>> in ptlrpc_server_handle_reply but it has minimal effect,
->>>>> ptlrpc_server_handle_reply still the most cpu consuming function
->>>>> because of svc->srv_lock contention.
->>>>>
->>>>> I think the problem is that COS defers processing of replies to
->>>>> transaction commit time. When commit happens, MDS has to process
->>>>> thousands of replies (about 14k replies per commit in the test
->>>>> 3.a) in short period of time. I guess the mdt service threads all
->>>>> woken up and spin trying to get the service svr_lock. Processing
->>>>> of new requests may also suffer of this.
->>>>>
->>>>> I ran the tests with with CONFIG_DEBUG_SPINLOCK_SLEEP debugging
->>>>> compiled into a kernel, it found no sleep under spinlock bugs.
->>>>>
->>>>> Further optimization may include
->>>>> 1. per-reply spin locks.
->>>>> 2. per-cpu structures and threads to process reply queues.
->>>>>
->>>>> Any comments?
->>>>>
->>>>> Thanks.
->>>>>
->>>>> PS. the test results are much better when MDS server is sata20
->>>>> machine with 4 cores (the MDS from Washie1 has 2 cores), COS=0
->>>>> and COS=1 have only %3 difference:
->>>>>
->>>>> COS=1
->>>>> Rate: 3101.77 creates/sec (total: 2 threads 930530 creates 300
->>>>> secs) Rate: 3096.94 creates/sec (total: 2 threads 929083 creates
->>>>> 300 secs)
->>>>>
->>>>> COS=0
->>>>> Rate: 3184.01 creates/sec (total: 2 threads 958388 creates 301
->>>>> secs) Rate: 3152.89 creates/sec (total: 2 threads 945868 creates
->>>>> 300 secs)
->>>> _______________________________________________
->>>> Lustre-devel mailing list
->>>> Lustre-devel at lists.lustre.org
->>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> 
+> 3. restore (aka copyin aka cache miss)
+>     a. Client open intent enques layout read lock. 
+>     b. MDT checks "purged" bit; if purged, lock request response 
+> includes "wait forever" flag, causing client to block the open.
+>     c. MDT creates a new layout with a similar stripe pattern as the 
+> original, allocating new objects on new OSTs.  (We should try to respect 
+> specific layout settings (pool, stripecount, stripesize), but be 
+> flexible if e.g. pool doesn't exist anymore.  Maybe we want to ignore 
+> offset and/or specific ost allocations in order to rebalance.)
+>     d. MDT sends request to coordinator requesting copyin of the file to 
+> .lustre/fid/XXXX with extents 0-EOF. Extents may be used in the future 
+> to (a) copy in part of a file, in low-disk-space situations; (b) copy in 
+> individual stripes simultaneously on multiple OSTs.
+>     e. Coordinator distributes that request to an appropriate mover.
+>     f. Writes into .lustre/fid/* are not required to hold layout read 
+> lock (or special flag is passed to open, or group write lock on layout 
+> is passed to mover)
+>     g. Mover copies data from HSM
+>     h. When finished, mover calls ioctl HSM_COPYIN_DONE on the file
+>     i. MDT clears "purged" bit from LOV EA
+>     j. MDT releases the layout lock
+>     k. This sends a completion AST to the original client, who now 
+> completes his open. 
+
+
+
+
+Concerning the new flag copyout_begin/copyout_complete, I'm not a 
+ldlm/recovery specialist but is it possible to have the mover to take a 
+kind of write extent lock on the area it has to copied in/out and 
+downgrade it on a smaller range as the copy tool goes along.
+
+Copy-out
+- Mover take a specific lock on range (0-EOF for the moment)
+- On this range, reads pass, writes raise a callback on the mover.
+- Receiving this callback, if the mover release its lock, the copyout is 
+cancelled, if not, the write i/o is blocked
+- When the mover has copied [0 - cursor], it can downgrade its lock to 
+[cursor - EOF] and release the lock on [ 0 - cursor].
+
+Same thing could be done for copy in.
+
+The two key points are:
+  - Could we have a layout lock on a specific range?
+  - Is it possible to downgrade a range lock with ldlm?
+
+
+
+-- 
+Aurelien Degremont
+CEA
