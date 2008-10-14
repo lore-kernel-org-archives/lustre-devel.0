@@ -1,160 +1,131 @@
-From: Aurelien Degremont <aurelien.degremont@cea.fr>
-Date: Mon, 13 Oct 2008 18:39:16 +0200
-Subject: [Lustre-devel] "Simple" HSM straw man
-In-Reply-To: <48EE87A1.7000003@sun.com>
-References: <48EE87A1.7000003@sun.com>
-Message-ID: <48F379B4.6040209@cea.fr>
+From: Andreas Dilger <adilger@sun.com>
+Date: Tue, 14 Oct 2008 11:48:45 -0600
+Subject: [Lustre-devel] HSM cache-miss locking
+In-Reply-To: <48EE574E.2010808@sun.com>
+References: <20081009080425.GJ2009@webber.adilger.int>
+	<48EE574E.2010808@sun.com>
+Message-ID: <20081014174845.GN2009@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Nathaniel Rutman a ?crit :
->     c. restore on file open, not data read/write
+On Oct 09, 2008  12:11 -0700, Nathaniel Rutman wrote:
+> Andreas Dilger wrote:
+>>     The only reason the agent is restoring into the temp file is to avoid
+>>     needing to open the file while the MDS is blocking layout lock access,
+>>     but maybe that isn't a big obstacle (e.g. open flag).
+>
+> You mean open flag O_IGNORE_LAYOUT_LOCK?  So the one problem I see with  
+> this is the case of a stuck agent - if we want to start another agent  
+> doing copyin we have to insure that the first agent doesn't try to write  
+> anything else.
 
-take care of the difficulties to move this behavious to a 
-restore-on-first-I/O later
+Having two agents on the same file wouldn't itself be harmful, because they
+should both be restoring the same data to the same place.  That said, we
+would still want to be able to kill the stuck agent to avoid it continuing
+to "restore" the file over new user data after the second agent had reported
+"file is available" and the user process started writing to it.
 
->     d. interfaces with hardware-specific copy tool to access HSM files
-rather "HSM-specific"
+>> 2) client enqueues extent lock on OST
+>>     - object was previously marked fully/partly invalid during purge
+>>     - object may have persistent invalid map of extent(s) that indicate
+>>       which parts of object require copy-in
+>
+> I'll read this as if you're proposing your 2,3 (call it "per-object  
+> invalid ranges held on OSTs") as a new method to do the copyin in-place.  
+> This is not the original in-place idea proposed in Menlo Park (see 
+> below), and so I'll comment with an eye toward the differences.
 
->     e. kernel process encompasses service threads listening for 
-> coordinator requests, passes these up to userspace process via upcall.  
-> No interaction with the client is needed; this is a simple message 
-> passing service.
+Correct, this is something Eric and I recently discussed in the context
+of being able to begin using a file before copyin had completed.
 
-Depending on how you can manage a user-space process, but, AFAIK, to be 
-able to manage the copy tool process, that means:
-  - start this process
-  - send a signal
-  - get its output (for "complex" hsm, we will need feedback from copy 
-tool process)
-  - wait for the process end
-  - ...
-All of this is easily doable from userspace, and very hard in 
-kernel-space (we cannot use the fire-and-forget call call_usermodehelper).
-So I rather imagine:
-  - a kernel space mover, simply getting LNET messages and passing them 
-to user-space mover
-  - a user-space mover, forking, spawning and managing the copy tool 
-process.
+> I think we can't assume we're restoring back to the original OSTs.  
 
-Maybe it will need to manage several copy tool processes, so it will 
-need queues, process list, etc...
+Definitely not.
 
-So I think this tool needs a bit more than just a "simple message 
-passing service".
+> Therefore the MDT must create new empty objects on the OSTs and have the  
+> OSTs mark them purged before the layout lock can be granted to the 
+> clients.
 
->     b. lov EA changes
->        i.  flags: file_is_purged "purged", copyout_begin, 
-> file_in_HSM_is_out_of_date "hsm_dirty", copyout_complete.  The purged 
-> flag is always manipulated under a write layout lock, the other flags 
-> are not.
->        ii: "window" EA range of non-purged data (rev2)
+Correct.
 
-If you add a window EA (will be needed anyway for hsm v2), you do not 
-need a purged flag:
+>>     - access to invalid parts of object trigger copy-in upcall to coordinator
+>   
+> Now we need to figure out how to map the object back to a particular  
+> range extent of a particular file (are we storing this in an EA with  
+> each object now?)
 
-window.start ==window.end is comparable to a purged flag unset. (or 
-window.end == 0)
+We had also discussed the need for this with migration.  The OSTs already
+store the MDS FID on each object, and even if the OSTs cannot do the
+object->file extent mapping, their upcall to the coordinator can do this
+with the LOV EA and the object extent.
 
+> We also need to initiate OST->coordinator  
+> communication, so either coordinator becomes a distributed function on  
+> the OSTs or we need new services going the reverse of the normal  
+> mdt->ost direction.  Maybe the coordinator-as-distributed-function works  
+> - the coordinators must all choose the same agent for objects belonging  
+> to the same file, yet distribute load among agents: I think the  
+> coordinator just got a lot more complicated.
 
->     c. new file ioctls: HSMCopyOut, HSMPurge, HSMCopyinDone
-> 
-> 
-> Algorithms
-> 1. copyout
->     a. Policy engine decides to copy a file to HSM, executes HSMCopyOut 
-> ioctl on file
->     b. ioctl handled by MDT, which passes request to Coordinator
->     c. coordinator dispatches request to mover.  request should include 
-> file extents (for future purposes)
->     d. normal extents read lock is taken by mover running on client
->     e. mover sets "copyout_begin" bit and clears "hsm_dirty" bit in EA.
->     f. any writes to the file set the "hsm_dirty" bit (may be 
-> lazy/delayed with mtime or filesize change updates on MDT).  Note that 
-> file writes need not cancel copyout; for a fs with a single big file, we 
-> don't want to keep interrupting copyout or it will never finish. 
+I don't think this implies the need for a distributed coordinator.  The
+OSTs would contact the coordinator (as MDS does at file access in "simple"
+model) with MDS FID (+OST extent?) and coordinator determines if there is
+an existing copyin for that FID or not.
 
-Is it interesting to have a file that is outdated and possibly uncoherent?
+>>     ? group locks on invalid part of file block writes to missing data
+>
+> The issue here is that we can't allow any client to write and then have  
+> the agent overwrite the new data with old data being restored.  So we  
+> could have the OST give a group lock to agent via coordinator,  
+> preventing all other writes.  But it seems that we can check the special  
+> "clear invalid" flag used by the agent (see (3) below), and silently  
+> drop writes into areas not in the "invalid extents" list.  Any client  
+> write to any extent will clear the invalid flag for those extents.  And  
+> then we only ever need to block on reading.
 
->     g. when done, mover checks hsm_dirty bit.  If set, clears 
-> copyout_begin, indicating current file is not in HSM.  If not set,  
-> mover sets "copyout_complete" bit.  File layout write lock is not taken 
-> during mover flag manipulation.  (Note: file modifications after copyout 
-> is complete will have both copyout_complete and hsm_dirty bits set.)
-> 
-> 2. purge (aka punch)
->     a. Policy engine decides to purge a file, exectues HSMPurge ioctl on 
-> file
->     b. ioctl handled by MDT
->     c. MDT takes a write lock on the file layout lock
->     d. MDT enques write locks on all extents of the file.  After these 
-> are granted, then no client has any dirty cache and no child can take 
-> new extent locks until layout lock is released.  MDT drops all extent locks.
->     e. MDT verifies that hsm_dirty bit is clear and copyout_complete bit 
-> is set
->     f. MDT marks the LOV EA as "purged"
->     g. MDT sends destroys the OST objects, using destroy llog entries to 
-> guard against object leakage during OST failover
+Eric and I discussed this at length.  The solution we came up with is to
+have "agent" writes that are restoring the file be flagged as such and
+only be allowed for parts of the file which are still marked "in HSM".
+This allows normal writes to proceed without danger of being overwritten,
+and for operations like "truncate" it would remove the need to restore
+some/any of the file data because it would also clear the "in HSM" marker
+from the truncated parts of the file.
 
-Are you sure you want to remove those objects if we will need them 
-later, in "complex" HSM?
-As this mecanism will need to change a lot when we will implement the 
-restore-in-place feature, i'm not sure this is the best idea.
+NB: we haven't discussed truncates/unlinks in the context of HSM, but this
+should _definitely_ not start a copyin of the file data.
 
+> What about reads to missing data?  OST refuses to grant read locks on  
+> invalid extents, needs clients to wait forever.
 
->     h. MDT drops layout lock.
-> 
-> 3. restore (aka copyin aka cache miss)
->     a. Client open intent enques layout read lock. 
->     b. MDT checks "purged" bit; if purged, lock request response 
-> includes "wait forever" flag, causing client to block the open.
->     c. MDT creates a new layout with a similar stripe pattern as the 
-> original, allocating new objects on new OSTs.  (We should try to respect 
-> specific layout settings (pool, stripecount, stripesize), but be 
-> flexible if e.g. pool doesn't exist anymore.  Maybe we want to ignore 
-> offset and/or specific ost allocations in order to rebalance.)
->     d. MDT sends request to coordinator requesting copyin of the file to 
-> .lustre/fid/XXXX with extents 0-EOF. Extents may be used in the future 
-> to (a) copy in part of a file, in low-disk-space situations; (b) copy in 
-> individual stripes simultaneously on multiple OSTs.
->     e. Coordinator distributes that request to an appropriate mover.
->     f. Writes into .lustre/fid/* are not required to hold layout read 
-> lock (or special flag is passed to open, or group write lock on layout 
-> is passed to mover)
->     g. Mover copies data from HSM
->     h. When finished, mover calls ioctl HSM_COPYIN_DONE on the file
->     i. MDT clears "purged" bit from LOV EA
->     j. MDT releases the layout lock
->     k. This sends a completion AST to the original client, who now 
-> completes his open. 
+This would also trigger HSM copy-in.  If the HSM decides this data is
+permanently inaccessible then the object (or parts thereof) should be
+marked as such and client reads should get -EIO.
 
+>> 3) coordinator contacts agent(s) to retrieve FID N from HSM
+>>     - agents write to actual object to be restored with "clear invalid" flag
+>>     - writes by agent shrink invalid extent, periodically update on-disk
+>>       invalid extent and release locks on that part of file (on commit?)
+>
+> The OST should keep track of all invalid extents.  Invalid extents list  
+> changes should be stored on disk, transactionally with the data write.
 
+Yes, definitely it needs to be stored on disk, and it should be kept with
+the object itself.  For completely purged objects, the MDS needs to mark
+the whole file as "in HSM", and it would also truncate the objects to the
+right size as soon as they are created (this already happens today when
+the MDS file has no objects and is storing the size).
 
+Remember this is all in the "complex" case where we want concurrent file
+access with HSM copyin, and in simple case client will just block until
+the copyin is finished.  Similarly, if copyin crashes in the middle, it
+would have to start at the beginning, but that should be rare enough to
+ignore it until the full solution is implemented.
 
-Concerning the new flag copyout_begin/copyout_complete, I'm not a 
-ldlm/recovery specialist but is it possible to have the mover to take a 
-kind of write extent lock on the area it has to copied in/out and 
-downgrade it on a smaller range as the copy tool goes along.
-
-Copy-out
-- Mover take a specific lock on range (0-EOF for the moment)
-- On this range, reads pass, writes raise a callback on the mover.
-- Receiving this callback, if the mover release its lock, the copyout is 
-cancelled, if not, the write i/o is blocked
-- When the mover has copied [0 - cursor], it can downgrade its lock to 
-[cursor - EOF] and release the lock on [ 0 - cursor].
-
-Same thing could be done for copy in.
-
-The two key points are:
-  - Could we have a layout lock on a specific range?
-  - Is it possible to downgrade a range lock with ldlm?
-
-
-
--- 
-Aurelien Degremont
-CEA
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
