@@ -1,60 +1,48 @@
-From: Google-AdWords-Noreply <support@google.com>
-Date: Sat, 11 Oct 2008 17:44:42 +0100
-Subject: [Lustre-devel] Submit your payment information.
-Message-ID: <01c92bc9$0a6b6100$c0445252@fisky>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Wed, 15 Oct 2008 14:52:53 -0700
+Subject: [Lustre-devel] "Simple" HSM straw man
+In-Reply-To: <48F4F5DA.7090000@sun.com>
+References: <48EE87A1.7000003@sun.com> <48F379B4.6040209@cea.fr>
+	<48F4F5DA.7090000@sun.com>
+Message-ID: <48F66635.3040006@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
--------------------------
-
-Hello 
-
-
-Please update your credit card information in order to trigger our
-billing system to try processing your payment again. If you plan to use
-the same credit card(s), please use the 'Retry Card' button on the
-Billing Preferences page of your account. Otherwise, please follow the
-steps below to update the information in your AdWords account.
-
-Our system was unable to process a payment  for your 
-outstanding Google AdWords account balance using your primary credit
-card. For the time being, your account is still open, and your ads are
-still running. However, we require you to update the payment
-information in your AdWords account very soon in order to ensure
-continued ad serving.
-
-1. Log in to your AdWords account
-2. Click the 'My Account' tab.
-3. Click 'Billing Preferences' link.
-4. Click Edit next to the appropriate 'Payment Details' section.
-5. Enter your new or updated payment information.
-6. Click 'Save Changes' when you have finished.
-
-Tip: You can review the status of your billing on the Billing Summary
-page, under the 'My Account' tab. If a payment has been declined,
-click 'Payment Declined' beside the line item to review information for
-that particular payment. Once your payment has been processed
-successfully, you can view and print an invoice from your Billing
-Summary page.
-
----------------------------------------------------------------------
-This message was sent from a notification-only email address that does
-not accept incoming email. Please do not reply to this message. If you
-have any questions, please visit the Google AdWords Help Centre at
-https://adwords.google.com/support/?hl=en_GB to find answers to
-frequently asked questions and a 'contact us' link near the bottom of
-the page.
-------------------------------------------------
------------------------------------
-
-Thank you for advertising with Google AdWords. We look forward to
-providing you with the most effective advertising available.
-
-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20081011/cd527f13/attachment.htm>
+Nathaniel Rutman wrote:
+>
+>>>     b. lov EA changes
+>>>        i.  flags: file_is_purged "purged", copyout_begin, 
+>>> file_in_HSM_is_out_of_date "hsm_dirty", copyout_complete.  The purged 
+>>> flag is always manipulated under a write layout lock, the other flags 
+>>> are not.
+>>>        ii: "window" EA range of non-purged data (rev2)
+>>>       
+>> If you add a window EA (will be needed anyway for hsm v2), you do not 
+>> need a purged flag:
+>>
+>> window.start ==window.end is comparable to a purged flag unset. (or 
+>> window.end == 0)
+>>     
+> True, but I don't really see a large market for partially purged files, 
+> so I don't really believe that it is worth the effort.  One of the 
+> important points here is that we are deleting stripes off the OSTs, 
+> freeing up space, and we won't necessarily restore to those same OSTs.  
+> As soon as we have partially purged files that's no longer the case, and 
+> I think complicates things too much.
+>   
+Ok, I've been told I'm dead wrong here, and this will absolutely be 
+required for "complex" HSM (not "simple"), and so therefore we should at 
+least think about the arch now.  Supposedly we need to keep X bytes at 
+the beginning of the file for the unix "file" command, and supposedly 
+icon/preview data, and Y bytes at the end of the file, not sure exactly 
+why.
+We would still plan on deleting the OST objects in the middle.  And 
+clearly, a simple beginning/ending byte count is insufficient for the 
+final "complex" requirement of enabling partial file reads while doing a 
+copyin (where we would at a minimum need a per-object cursor). 
+Anyhow, as I write this none of this sounds like something that can't be 
+implemented at a later time, so I think we should stick with the 
+simplest of the simple options for now.
