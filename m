@@ -1,181 +1,128 @@
-From: Robert Read <rread@sun.com>
-Date: Wed, 22 Oct 2008 11:06:11 -0700
-Subject: [Lustre-devel] Simpifying Interoperation
-In-Reply-To: <48FEBDA6.4070200@sun.com>
-References: <CF0D4EA95C1945F18F74426BB95008CE@ebpc> <48FEBDA6.4070200@sun.com>
-Message-ID: <26338A6E-C0A5-4E7F-8957-A8694AD566E1@sun.com>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Mon, 27 Oct 2008 16:02:34 -0700
+Subject: [Lustre-devel] HSM comments
+In-Reply-To: <4905F121.6000501@cea.fr>
+References: <4905F121.6000501@cea.fr>
+Message-ID: <4906488A.8030006@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Huang,
+Aurelien Degremont wrote:
+> Hello all
+>
+> I'm sending this e-mail directly because for some unknown reasons, it 
+> did not reach the mailing lists (either lustre-hsm-core-ext or 
+> lustre-devel) last week.
+>
+> Find attached, 2 schemas presenting the various messages exchanged by 
+> Lustre HSM components for copyin and copyout. Tell me if this is not 
+> what you were expecting, I can fix them for tomorrow conf call. I 
+> think I will add some other schemas also.
+>
+>
+>
+> Some points we did not discuss at last conf call:
+>
+> * File unlinks:
+>
+> - HSM object removal should be async.
+Agreed, trigger should just be changelog unlink entry.
+>
+> - We should not link hsm object, even in v1. Could we manage hsm object
+> deletion like ost object deletion and manage orphan in the same way?
+Since the unlink event trigger is the changelog record, the policy 
+engine should simply not cancel the changelog record until the HSM 
+confirms the unlink.  
+>
+> - Presently, we could also leak hsm objects if the file is dirtied when
+> being copied out. In this case, the file will be tagged dirtied, with no
+> copyout_begin/complete flag. So the MDT will not request for HSM removal
+> but their is something to delete there. Maybe the copyout mechanisms
+> should be adapted.
+How about we never clear the copyout_begin bit?  This is really for the 
+coordinator's benefit so it knows a copyout is in progress on that file, 
+but since we're having regular status updates to the coordinator from 
+the agent, there's no real need for that bit.  So instead we have the 
+bit "a_file_exists_in_hsm" aka hsm_exists.
+But we don't even need that - the MDT does not "request for HSM 
+removal", but instead the policy engine just watches the changelog for 
+unlink events.  Ah, now I see the problem with using the changelog - 
+this forces the policy engine to remember which files are on HSM, or 
+accept an error return code, but in any case may result in much undue 
+load on the HSM when deleting non-HSM'ed files.  So what do we do?  
+Ignore the changelog and have the MDT directly signal the coordinator to 
+do HSM unlinks?  That may be fine.  In that case, I think if we leak 
+files after we tell the coordinator to delete them it is not much of a 
+problem.
 
-Have you seen the new recovery interop architecture that came out of  
-the menlo park meetings?
-
-http://arch.lustre.org/index.php?title=Simplified_Interoperation
-
-robert
-
-On Oct 21, 2008, at 22:44 , Huang Hua wrote:
-
-> Hello Eric,
-> I have some updates on the interop development.
 >
-> 1. I have implemented a "Barrier" on client, (by a read write  
-> semaphore,
-> but Andreas suggests to use mutex).
-> Before upgrade the MDS/OSS, we setup barrier on all clients, stopping
-> new requests being sent to MDS and OSS.
-> Currently, this will be done manually, e.g. run a command on all  
-> clients
-> to barrier them.
-> And then, user can explicitly sync lustre from clients, MDS and OSS,  
-> to
-> insure that no outstanding requests are there.
-> And then, cancel all mdc and osc locks on clients manually. Maybe this
-> step is optional. I will do more testing.
+> * HSM dirty bit.
 >
-> 2. User can upgrade MDS now. In this step, we need to "tunefs.lustre
-> --write_conf" to erase all configuration, because these
-> configuration can not be recognized by 2.0 MDS.
+> - should be updated with laziness.
+> - Is it possible to implement it like the lazy file size? That means,
+> manage the dirty bit, per OST object, and lazily update it on the MDT?
+Since file mtime/size is already updated this way, we can just use any 
+attr change as the dirty indicator; we don't need an actual bit per 
+object.  Any setattr should update MDT dirty bit, most setxattr should 
+(not the hardlink/parent xattr however, maybe no XATTR_TRUSTED_PREFIX 
+ones).  
 >
-> 3. User has to upgrade OSS, or restart OSS to re-generate the  
-> configuration.
-> Both are OK.
+> - Also, if, instead of setting hsm_dirty bit to 1 when the file is
+> modified, can we do counter += 1 ? That way 'counter' could be use as
+> 'light' file revision. You compare two versions of this variable, is 
+> their differ, the file has been modified  (this is not
+> intended to check 'counter_c1 < counter_c2' but just 'counter_c1 !=
+> counter_c2', that way, you can have circular counters.) 
+I have no objection, although I don't see the benefit right now.  E.g. 
+how is that different than checking the mtime?
+> - Could a policy test could be based on file path (not just filename and
+> properties) ? This is a rule we presently used in our hsm tools. I do
+> not see how have the filepath from the changelogs data ?
+The changelog data has file and parent FID, if you want more path than 
+this you can do a "lfs fid2path" to reconstruct the entire path name.  
+Note however this returns only the "first" path of a hardlinked file.  
+(Is this a limitation?  Do I need to fix fid2path?)
 >
-> 4. After that, we can cleanup the barrier on client manually. Client
-> will reconnect to server, recover, and continue to run seamlessly.
+> - Could this flag be exposed to userspace via liblustreapi? Maybe this
+> flag should be set on file creation also? Doing this, Policy Engines
+> could use this flag to know easily if the file is udate to date in hsm
+> or not.
+Sounds good.
 >
+> * Policy Engine
 >
-> The problems here is that we have to setup and cleanup barrier on all
-> clients by hand.
-> Ideally, we should do it on a MDS/MGS by DLM lock, or something  
-> similar.
-> If this is strongly required, I will implement this later.
-> Till now, preliminary upgrade/downgrade tests passed. More testing are
-> underway.
+> - It needs to:
+> . read changelogs (mdt)
+> . df (mdt/client)
+> . lfs df (per ost) (mdt/client)
+> . scan namespace (client)
+> . lfs getstripe by fid (client)
+> . stat file by fid (client)
 >
-> I will answer some of your questions inlinely. Please see the  
-> followings.
->
->
->
->
-> Eric Barton wrote:
->> Here are some first thoughts on Huang Hua's idea to simplify version
->> interoperation, and an invitation for further comments...
->>
->> 1. This scheme should not interfere with upgrade via failover pairs,
->>   and it must also allow the MDS to be upgraded separately from the
->>   OSSs.  I think this means in general that we have to allow
->>   piecemeal server upgrades.
->>
->> 2. This scheme need a mechanism that...
->>
->>   a) notifies clients when a particular server is about to upgrade so
->>      that update operations are blocked until the upgrade completes
->>      and the client reconnects to the upgraded (and/or failed over)
->>      server.
->>
-> Now, this notification is done on every client, manually, by a  
-> command.
->
->>   b) notifies the server when all clients have completed preparation
->>      for the upgrade so that no further requests require resend.
->>
-> This is done when barriers have been setup on all clients, and sync  
-> have
-> been run on clients.
->
->>   c) notifies clients when all outstanding updates have been
->>      committed.  If the server crashes before this point, client
->>      replay is still required.  Clients must not poll for this since
->>      the server is shutting down.
->>
->>   The DLM seems the right basic mechanism to notify clients, however
->>   current assumptions about acquisition timeouts might be an issue.
->>
->>   We must also ensure that the race between this server upgrade
->>   process and connection establishment (including any new
->>   notification locks) by new clients is handled consistently.
->>
-> I think these races should be avoided by user.
+> The only thing the engine will lack on a client is the changelogs. May
+> be it could be a good idea to export the changelogs on some 'trusted
+> clients' ?
+I think it's sticky to impose certain priviledged clients, but maybe 
+exporting to all clients isn't so bad.  Superuser privs on any client 
+gives them access.  If anyone really hates this, we can add a tunable on 
+the MDT to allow/disallow all client access.
+> If not, we will be force to have MDT, client mount and policy engine on
+> the same node or split the policy engine into two components (very bad
+> idea to impose that on the engine). Potential overhead?
 >
 >
->>
->> 3. It's not clear to me that we need to evict, or even clean the
->>   client cache provided the client doesn't attempt any more writes
->>   until it has connected to the failover server.
-> While upgrade, we do not need to evict the clients.
-> but, in downgrade, we have to evict clients, because
-> the 1.8 mds server does not understand FIDs, it only knows inode  
-> number.
-> But while 1.8 client is talking to 2.0 MDS, they talk in FIDs, and  
-> know
-> nothing about real inode numbers.
+ok, client access to changelogs sounds like a reasonable requirement.  
+[Note: this actually happens to solve a problem I haven't figured out 
+yet, which is to limit access to only disk-committed changelog records.]
 >
 >
->> The client can
->>   re-acquire all the locks covering its cache during recovery after
->>   the upgrade - and there is no need for request refomatting here
->>   since locks are replayed explicitly (i.e. new requests are
->>   formatted from scratch using the correct protocol version).
->>
->>   It does seem advisable however to clean the cache before such a
->>   significant system incident.
->>
->> 4. We can avoid reformatting requests during open replay if this is
->>   also done explicity.
->>
-> while upgrading, the client will do open replay.
-> The server has already committed this open.
-> So, 2.0 MDS only need to "open" that file, and return handle back to  
-> client.
+> ------------------------------------------------------------------------
 >
 >
->> 5. This scheme prevents recovery on clients that were disconnected
->>   when the upgrade began.  Such clients will simply be evicted when
->>   they reconnect even though the server should actually have
->>   committed all their replayable requests.
->>
->>   If this can be prevented, we can probably also dispense with much
->>   of the notification described in (2) above.  However it would
->>   require (a) a change in the connection protocol to get clients to
->>   purge their own replay queue and (b) changes to ensure resent
->>   requests can be reconstructed from scratch (but maybe (b) is just
->>   another way of saying "request reformatting").
->>
->>   If this is doable - it further begs the question of whether simply
->>   making all server requests synchronous during upgrades is enough to
->>   simply most interoperation issues.
->>
->> 6. This is all about client/server communications. Are there any
->>   issues for inter-server interoperation?
->>
+#10 is "open reply", not "i/o reply", but a very nice diagram!  Can you 
+add these to the wiki?
+> ------------------------------------------------------------------------
 >
-> The protocol for mds-oss does not change much.
-> As I tested, there is no inter-server interop issues.
->
->
->> 7. Clients and servers may have to run with different versions for
->>   extended periods (one customer ran like this for months).  Does
->>   this raise any issues with this scheme?
->>
-> I do not see any issues.
-> More testing is needed.
->
-> Thanks,
-> Huang Hua
->
->>    Cheers,
->>              Eric
->>
->>
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
