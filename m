@@ -1,86 +1,61 @@
-From: DEGREMONT Aurelien <aurelien.degremont@cea.fr>
-Date: Tue, 28 Oct 2008 16:42:09 +0100
+From: Andreas Dilger <adilger@sun.com>
+Date: Tue, 28 Oct 2008 12:26:13 -0600
 Subject: [Lustre-devel] HSM comments
-In-Reply-To: <4906488A.8030006@sun.com>
-References: <4905F121.6000501@cea.fr> <4906488A.8030006@sun.com>
-Message-ID: <490732D1.8060103@cea.fr>
+In-Reply-To: <4907249E.60904@cea.fr>
+References: <4905F121.6000501@cea.fr>
+	<20081027231204.GP3184@webber.adilger.int> <4907249E.60904@cea.fr>
+Message-ID: <20081028182613.GX3184@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Nathaniel Rutman a ?crit :
->> - HSM object removal should be async.
-> Agreed, trigger should just be changelog unlink entry.
-I'm not sure Lustre need the policy engine for managing the hsm removals.
-It could triggers them automatically (like the copy-in mechanisms) when 
-the file is deleted in Lustre.
-Lustre could still live for a long moment without the PolicyEngine/Space 
-Manager, we could imagine this for several hours.
+On Oct 28, 2008  15:41 +0100, DEGREMONT Aurelien wrote:
+> Andreas Dilger a ?crit :
+>> I would recommend that we can keep a reference to a "dirty" HSM object
+>> even if the copyout did not complete successfully, and HSM policy engine
+>> should decide if the dirty object is kept or deleted.  In some cases
+>> it may never be possible to do a complete copyout of the file, and having
+>> some copy of the file would be better than having none at all.
+>   
+> So we will have three states for the hsm object:
+> - exist
+> - completed (exist & copy was completed)
+> - uptodate (exist, copy was completed and the lustre file was not dirtied)
 
->> - We should not link hsm object, even in v1. Could we manage hsm object
->> deletion like ost object deletion and manage orphan in the same way?
-> Since the unlink event trigger is the changelog record, the policy 
-> engine should simply not cancel the changelog record until the HSM 
-> confirms the unlink.
-For the moment, the PolicyEngine has no way to know the copytool has 
-successfully deleted the file.
-> How about we never clear the copyout_begin bit?  This is really for 
-> the coordinator's benefit so it knows a copyout is in progress on that 
-> file, but since we're having regular status updates to the coordinator 
-> from the agent, there's no real need for that bit.  So instead we have 
-> the bit "a_file_exists_in_hsm" aka hsm_exists.
-> But we don't even need that - the MDT does not "request for HSM 
-> removal", but instead the policy engine just watches the changelog for 
-> unlink events.  Ah, now I see the problem with using the changelog - 
-> this forces the policy engine to remember which files are on HSM, or 
-> accept an error return code, but in any case may result in much undue 
-> load on the HSM when deleting non-HSM'ed files.  So what do we do?  
-> Ignore the changelog and have the MDT directly signal the coordinator 
-> to do HSM unlinks?  That may be fine.  In that case, I think if we 
-> leak files after we tell the coordinator to delete them it is not much 
-> of a problem.
-If we store in a llog the hsm objects that need to be removed and only 
-delete them when copytool says it's fine, we will not leak files and if 
-coordinator crashes, the copyin and removal requests will be resent 
-automatically. The PolicyEngine will also re-send copy-out requests.
->> * HSM dirty bit.
->>
->> - should be updated with laziness.
->> - Is it possible to implement it like the lazy file size? That means,
->> manage the dirty bit, per OST object, and lazily update it on the MDT?
->
-> Since file mtime/size is already updated this way, we can just use any 
-> attr change as the dirty indicator; we don't need an actual bit per 
-> object.  
-Dirty means data were changed, not metadata.
+We already need to have the distinction between "completed" and "uptodate"
+because an "uptodate" HSM copy stop being uptodate as soon as the file is
+again modified.
 
->> - Also, if, instead of setting hsm_dirty bit to 1 when the file is
->> modified, can we do counter += 1 ? That way 'counter' could be use as
->> 'light' file revision. You compare two versions of this variable, is 
->> their differ, the file has been modified  (this is not
->> intended to check 'counter_c1 < counter_c2' but just 'counter_c1 !=
->> counter_c2', that way, you can have circular counters.) 
-> I have no objection, although I don't see the benefit right now.  E.g. 
-> how is that different than checking the mtime?
-mtime could not be trust. mtime is a user exposed value that could be 
-changed by user as he likes it.
+I was a bit unclear when I wrote "...a complete copyout of the file".  What
+I meant was "impossible to ever complete an uptodate copyout of the file
+if it is continually changing".  I don't think we need to make any distinction
+between "exist" and "complete" because both mean "not uptodate".
 
-$ touch -t 200101010000 foo
-$ ls -l foo
--rw-r--r-- 1 degremont user 0 Jan  1  2001 foo
+>>> - Also, if, instead of setting hsm_dirty bit to 1 when the file is
+>>> modified, can we do counter += 1 ? That way 'counter' could be use as
+>>> 'light' file revision. You compare two versions of this variable, is
+>>> their differ, the file has been modified  (this is not intended to check
+>>> 'counter_c1 < counter_c2' but just 'counter_c1 != counter_c2', that way,
+>>> you can have circular counters.)
+>>>     
+>> The MDS in 1.8 (and soon 2.0) will already keep a version counter for all
+>> changes to the MDS inode.  The OSTs will also keep version numbers for
+>> all of the objects there.
+>>   
+> In our first (and old) hlds, we based several mechanisms on such  
+> information.  But we were told that the version will be available
+> for MDT but not for OST object
 
-> The changelog data has file and parent FID, if you want more path than 
-> this you can do a "lfs fid2path" to reconstruct the entire path name.  
-> Note however this returns only the "first" path of a hardlinked file.  
-> (Is this a limitation?  Do I need to fix fid2path?)
-Ok this is fine, enough for our needs.
+This hasn't changed - the OST object versions are local to the OSTs.
+We could get this OST version information at the agent (just like with
+file size being fetched from all OSTs) and store it with the HSM archive
+copy.  This can be a later optimization, however.  I think mtime is
+itself sufficient for an initial indication for file data changes.
 
-> #10 is "open reply", not "i/o reply", but a very nice diagram!  Can 
-> you add these to the wiki?
->
-Thanks. Done.
-
-
-Aur?lien
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
