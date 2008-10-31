@@ -1,98 +1,82 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Mon, 27 Oct 2008 17:12:04 -0600
-Subject: [Lustre-devel] HSM comments
-In-Reply-To: <4905F121.6000501@cea.fr>
-References: <4905F121.6000501@cea.fr>
-Message-ID: <20081027231204.GP3184@webber.adilger.int>
+From: Josephine Palencia <josephin@psc.edu>
+Date: Fri, 31 Oct 2008 00:54:06 -0400 (EDT)
+Subject: [Lustre-devel] Interoperability between Lustre 1.9.50 and 1.9.80?
+Message-ID: <Pine.LNX.4.64.0810310042430.4907@pscuxa.psc.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Oct 27, 2008  17:49 +0100, Aurelien Degremont wrote:
-> Some points we did not discuss at last conf call:
->
-> * File unlinks:
->
-> - HSM object removal should be async.
-> - We should not link hsm object, even in v1. Could we manage hsm object
-> deletion like ost object deletion and manage orphan in the same way?
 
-I wouldn't object to this - there could be an "HSM unlink" llog, similar
-to the OST unlink llog that the HSM coordinator (either in the kernel,
-or in userspace) processes at startup.  The difficulty is to know when
-the llog record can be cancelled.
+Hi,
 
-> - Presently, we could also leak hsm objects if the file is dirtied when
-> being copied out. In this case, the file will be tagged dirtied, with no
-> copyout_begin/complete flag. So the MDT will not request for HSM removal
-> but their is something to delete there. Maybe the copyout mechanisms
-> should be adapted.
+NB: Kerberos cross-realm authentication (testing) enabled
 
-I would recommend that we can keep a reference to a "dirty" HSM object
-even if the copyout did not complete successfully, and HSM policy engine
-should decide if the dirty object is kept or deleted.  In some cases
-it may never be possible to do a complete copyout of the file, and having
-some copy of the file would be better than having none at all.
+Mounting of lustre-1.9.50 lustre filesystem by a client built 
+with lustre-1.9.5 produces the following error below:
 
-> * HSM dirty bit.
->
-> - should be updated with laziness.
-> - Is it possible to implement it like the lazy file size? That means,
-> manage the dirty bit, per OST object, and lazily update it on the MDT?
-
-> - Also, if, instead of setting hsm_dirty bit to 1 when the file is
-> modified, can we do counter += 1 ? That way 'counter' could be use as
-> 'light' file revision. You compare two versions of this variable, is
-> their differ, the file has been modified  (this is not intended to check
-> 'counter_c1 < counter_c2' but just 'counter_c1 != counter_c2', that way,
-> you can have circular counters.)
-
-The MDS in 1.8 (and soon 2.0) will already keep a version counter for all
-changes to the MDS inode.  The OSTs will also keep version numbers for
-all of the objects there.
-
-> - Could this flag be exposed to userspace via liblustreapi? Maybe this
-> flag should be set on file creation also? Doing this, Policy Engines
-> could use this flag to know easily if the file is udate to date in hsm
-> or not.
->
-> * Policy Engine
->
-> - It needs to:
-> . read changelogs (mdt)
-> . df (mdt/client)
-> . lfs df (per ost) (mdt/client)
-> . scan namespace (client)
-> . lfs getstripe by fid (client)
-> . stat file by fid (client)
->
-> The only thing the engine will lack on a client is the changelogs. May
-> be it could be a good idea to export the changelogs on some 'trusted
-> clients' ?
-
-Yes, that is already considered.
-
-> If not, we will be force to have MDT, client mount and policy engine on
-> the same node or split the policy engine into two components (very bad
-> idea to impose that on the engine). Potential overhead?
-
-If the policy engine is running via an external database (e.g. MySQL),
-it wouldn't be impossible to just have the Changelog reader do the
-database insertions remotely, after looking up the pathname.
-
-> - Could a policy test could be based on file path (not just filename and
-> properties) ? This is a rule we presently used in our hsm tools. I do
-> not see how have the filepath from the changelogs data (lfs fid2path?) ?
-
-I believe the Changelog will report a full pathname (relative to the root
-of the filesystem).  This will be exported via llapi to userspace.  Nathan?
+> > Lustre: Added LNI 198.202.115.111 at tcp [8/256]
+> > Lustre: Accept secure, port 988
+> > Lustre: OBD class driver, http://www.lustre.org/
+> > Lustre:         Lustre Version: 1.9.80
+> > Lustre:         Build Version:
+> >
+> 1.9.80-19691231160000-PRISTINE-.usr.src.redhat.BUILD.kernel-lustre-2.6
+> > .1 8.linux-2.6.18.x86_64-2.6.18-92.1.10.el5_lustre.1.9.80
+> > Lustre: Lustre LU module (ffffffff88506740).
+> > Lustre: 3586:0:(sec.c:1340:sptlrpc_import_sec_adapt()) import
+> > ffff8104264a7000 (MGC128.182.112.70 at tcp->MGC128.182.112.70 at tcp_0)
+> > netid
+> > 20000: select initial flavor (null, null/null)
+> > LustreError: 3620:0:(pack_generic.c:391:lustre_msg_buf_v2()) msg
+> > ffff810425c37480 buffer[0] size 88 too small (required 152)
+> > LustreError:
+> > 3620:0:(pack_generic.c:577:lustre_unpack_ptlrpc_body_v2())
+> > error unpacking ptlrpc body
+> > LustreError: 3620:0:(pack_generic.c:1083:lustre_msg_get_status())
+> > invalid msg ffff810425c37480: no ptlrpc body!
+> > LustreError: 3620:0:(pack_generic.c:805:lustre_msg_get_flags())
+> > invalid msg ffff810425c37480: no ptlrpc body!
+> > LustreError: 3620:0:(client.c:291:unpack_reply()) @@@ unpack ptlrpc
+> > body
+> > failed: -14  req at ffff8104264b0800 x1284919012622337/t0(0)
+> > o250->MGS at MGC128.182.112.70@tcp_0:26/25 lens 368/200 e 0 to 11 dl
+> > 1225394272 ref 1 fl Rpc:R/0/0 rc 0/-22
+> > LustreError: 3620:0:(layout.c:1410:__req_capsule_get()) @@@ Wrong
+> > buffer for field `cdata' (1 of 2) in format `MDS_CONNECT':
+> 72 vs. 200
+> > (server)  req at ffff8104264b0800 x1284919012622337/t0(0)
+> > o250->MGS at MGC128.182.112.70@tcp_0:26/25 lens 368/200 e 0 to 11 dl
+> > 1225394272 ref 1 fl Interpret:R/0/0 rc -71/-22
+> > LustreError: 3586:0:(client.c:850:ptlrpc_import_delay_req()) @@@
+> > IMP_INVALID  req at ffff8104264b0400 x1284919012622339/t0(0)
+> > o501->MGS at MGC128.182.112.70@tcp_0:26/25 lens 264/240 e 0 to 11 dl 0
+> > o501->ref
+> > 1 fl Rpc:/0/ffffffff rc 0/-1
+> > LustreError: 15c-8: MGC128.182.112.70 at tcp: The
+> configuration from log
+> > 'testfs-client' failed (-108). This may be the result of
+> communication
+> > errors between this node and the MGS, a bad configuration, or other
+> > errors. See the syslog for more information.
+> > LustreError: 3586:0:(llite_lib.c:1079:ll_fill_super()) Unable to
+> > process
+> > log: -108
+> > Lustre: client ffff81043be0c800 umount complete
+> > LustreError: 3586:0:(obd_mount.c:1982:lustre_fill_super())
+> Unable to
+> > mount  (-108)
 
 
+Error seems to point to the size of ptlrpc_body which is 152byes on 2.0 
+and 88bytes in 1.8. However both lustre versions are minor versions of the 
+major release..?
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+Short of me rebuilding/upgrading to lustre 1.9.80 or the client site 
+downgrading to 1.9.50, any suggested work-arounds or something I am 
+missing?
+
+
+THank you,
+Josephine
