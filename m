@@ -1,9 +1,9 @@
 From: kcruci <yjluan@gmail.com>
-Date: Mon, 3 Nov 2008 05:39:24 -0800 (PST)
+Date: Mon, 3 Nov 2008 05:48:18 -0800 (PST)
 Subject: [Lustre-devel] java successfully call the Native functions,
 	:-) but there are still some problems like "Lustre mount failed:
 	Invalid argument", when i call the 	__liblustre_setup_().
-Message-ID: <bfe9780e-a03e-4e21-916e-44f5a4db8dba@v39g2000pro.googlegroups.com>
+Message-ID: <d74e0ab8-37f7-47b0-8e5b-9bc0c6d83cba@w39g2000prb.googlegroups.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
