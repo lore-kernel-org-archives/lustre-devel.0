@@ -1,66 +1,104 @@
-From: DEGREMONT Aurelien <aurelien.degremont@cea.fr>
-Date: Mon, 03 Nov 2008 16:30:02 +0100
-Subject: [Lustre-devel] HSM comments
-In-Reply-To: <490B6B6B.1070401@sun.com>
-References: <4905F121.6000501@cea.fr> <4906488A.8030006@sun.com>
-	<490732D1.8060103@cea.fr> <490B6B6B.1070401@sun.com>
-Message-ID: <490F18FA.5040509@cea.fr>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Mon, 03 Nov 2008 12:20:54 -0800
+Subject: [Lustre-devel] Agent/Coordinator RPC mechanisms.
+In-Reply-To: <490F2F10.1040302@cea.fr>
+References: <490F2F10.1040302@cea.fr>
+Message-ID: <490F5D26.3000105@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Nathaniel Rutman a ?crit :
->      5.4 unlink
+Aurelien Degremont wrote:
 >
->   1. A client issues an unlink for a file to the MDT.
->   2. The MDT includes the "hsm_exists" bit in the changelog unlink entry
->   3. The policy engine determines if the file should be removed from HSM
->   4. Policy engine sends HSMunlink FID to coordinator via MDT ioctl
->         1. Yuck - we can't do direct ioctls on the MDT from a client
->            node. We can only do ioctls on a file.
->
->                maybe we need to implement a .lustre/device/XXX dir,
->                where all MDT/OSTs are listed, and act as stub files for
->                handling ioctls.                or maybe policy engine 
-> talks to agent / tool directly
->                for unlinks?
-
-Can't we add an ioctl on /dev/obd or /mnt/lustre root dir ? or even on 
-.lustre/fid and passing the fid in ioctl args?
-I'm not fond of .lustre/device/XXX dirs...
->   5. The coordinator sends a request to one of its agent for the
->      corresponding removal.
->   6. The agent spawns the HSM tool to do this removal.
->   7. When HSM removal is complete, policy engine cancels changelog
->      unlink record
->         1. How does agent/HSM tool signal to policy engine that HSM
->            removal is complete?
->   8. In case of agent crash, unlink record will remain uncancelled in
->      the changelog; policy engine should restart processing at the
->      first uncancelled record.
+> Agent/coordinator mechanisms to discuss at next conf call.
+> If you have strong disagreement, do not hesitate to send them now so i
+> can modify them before next conf call.
 >
 >
-> There's two open issues:
-> - How for policy engine to tell coordinator to unlink an HSM object, 
-> when no corresponding object exists on the MDT for us to ioctl() on
->    -which coordinator to talk to for CMD?
-If we implement an ioctl like
-ioctl(.lustre/fid, HSMUnlink, fid=0x0000121561), can the API find the 
-good MDT from the FID ? FLD can do this for an already removed file?)
+> A - Coordinator/Agent start
+> ---
+>
+> 1 - MDT starts (Coordinator features are available by default as the
+> coordinator reuse MDT threads)
+> 2 - Client start with a agent flag (mount -o agent)
+> 3 - Client connects to MDT (piggyback the coordinator registration on
+> the MDT connection RPC (with a flag?) ?)
+yes, I think so, just use a connect flag
+> 4 - If no direct registration, Client send a registration request to the
+> coordinator through MDT connection after it was initiated.
+don't see a need, unless there's some agent data we want to report at 
+registration
+> 5 - Agent is ready.
+>
+> B - Request dispatch
+> ---
+>
+> 1 - Coordinator receives a request. It writes in its llog file the
+> migration request.
+> 2 - Coordinator sends a migration request to one of its registered agents.
+On the client's reverse import, presumably.  So we need to add a service 
+during
+agent startup, probably mdc startup.   No agents on a liblustre client.
+>
+> 3 - The agent manages the requests.
+> 4 - The agent sends periodically some migration status update to
+> coordinator.
+We were talking about the copytool sending updates via file ioctls
+> 5 - When coordinator receives status finished, it cleans its llog entry
+> for this migration.
+This works for copyin/copyout, but not unlink, since there's no file for
+an agent to do an update ioctl on.
+>
+> C - MDT crash
+> ---
+>
+> 1 - MDT crashes.
+> 2 - MDT is restarted.
+> 3 - The coordinator recreates its migration list, reading the its llog.
+> 4 - The client, when doing its recovery with the MDT, reconnects to the
+> coordinator. It also sends the current status of its migrations.
+Status is sent by copytools periodically, asynchronously from reconnect.
+As far as the copytools/agent is concerned, the MDT restart is invisible.
+> 5 - Thanks to this, the coordinator has rebuilt its migration list and
+> agent list.
+> (as this is standard mdt recovery, this supports failover also)
+The agent list is rebuild at reconnect time.  The migration list is simply
+the list of unfinished migrations; it reads that from the llog whenever 
+it wants to
+(no need to keep it in memory all the time) and decides to restart
+stuck/broken migrations as usual.  (E.g. it could read the log once 
+every minute
+checking for last_status_update_time's older than X.)  I don't see any 
+reason it needs
+to be in memory all the time.
+So logs should contain fid, request type, agent_id (for aborts), 
+last_status_update_time, last_status.
+>
+> E - Client crash
+> ---
+>
+> 1 - Client crashes
+> 2 - MDT notices the client node did not respond anymore. The node is
+> evicted, its migrations are dispatched on another nodes. Node eviction
+> (oss are supposed to evict it also) prevent the movers from this node to
+> go on their migration. We could restart it on another agent without 
+> issue.
+2. MDT evicts client
+3. Eviction triggers coordinator to re-dispatch immediately all of the 
+migrations from that agent
+4. For copyin, MDT must force any existing agent I/O to stop.  Hmm, but 
+agents are ignoring
+the layout lock - how are we going to do this?  Maybe it's not so bad if 
+two agents are trying to
+copyin the file at the same time?  File data is the same...
 
-> - How does HSMunlinkHelper return a signal to the policy engine that 
-> the removal is complete
->    -if policy engine directly calls HSMunlinkHelper this is easy...
-I think there is a more general issue concerning feedback for the 
-PolicyEngine. Surely the PolicyEngine will need information for other 
-request it sent to the Coordinator. We should think of a more general 
-mechanism to inform it of the success or failure of its requests.
-
-Should the HSM (succesfull) event become changelog 
-events....(hsm_copyin/hsm_copyout/hsm_remove)? Can another program be 
-interested in such events?
-
-
-Aur?lien
+F - Copytool crash
+Copytool crash is different from a client crash, since the client will 
+not get evicted
+1. Copytool crashes
+2. Coordinator periodically scans the list of open migrations for old 
+last_status_update_time's
+3. Coordinator sends abort signal to old agent
+4. Coordinator re-dispatches migration
