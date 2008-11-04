@@ -1,53 +1,41 @@
-From: Brian J. Murrell <Brian.Murrell@Sun.COM>
-Date: Tue, 04 Nov 2008 08:48:35 -0500
-Subject: [Lustre-devel] java successfully call the Native functions,
- :-) but there are still some problems like "Lustre mount
- failed:	Invalid argument", when i call the 	__liblustre_setup_().
-In-Reply-To: <bfe9780e-a03e-4e21-916e-44f5a4db8dba@v39g2000pro.googlegroups.com>
-References: <bfe9780e-a03e-4e21-916e-44f5a4db8dba@v39g2000pro.googlegroups.com>
-Message-ID: <1225806515.2247.240.camel@brian-laptop>
+From: Google-AdWords <adwords-noreply@google.com>
+Date: Tue, 4 Nov 2008 11:07:48 +0530
+Subject: [Lustre-devel] Please Update Your Billing Information.
+Message-ID: <635613786.93752099913252@yahoo.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, 2008-11-03 at 05:39 -0800, kcruci wrote:
-> Hi all,
-> I follow the JNI rules to write Javawrapper for the liblustre code,
+---------------------------------------------------------------------------
+This message was sent from a notification-only email address that does
+not accept incoming email. Please do not reply to this message. If you
+have any questions, please visit the Google AdWords Help Centre  
+-----------------------------------------------------------------------------------
+Hello Advertiser,
 
-A good rule to follow when trying to debug a problem is to reduce it to
-it's simplest case.  In your case that means stripping the problem of
-all of this Java and dealing with the basic problem which is:
+Our attempt to charge your credit card for your
+outstanding Google AdWords account balance was declined.
+Your account is still open. However, your ads have been suspended. Once
+we are able to charge your card and receive payment for your account
+balance, we will re-activate your ads.
 
-> ...
-> 1225417124.467324:6009:grid.scut.edu.cn:(class_obd.c:
-> 543:init_obdclass()):
-> Lustre: 6009-grid.scut.edu.cn:(class_obd.c:543:init_obdclass()): OBD
-> class driver, http://www.lustre.org/
-> 1225417124.467374:6009:grid.scut.edu.cn:(class_obd.c:
-> 544:init_obdclass()):
-> Lustre: 6009-grid.scut.edu.cn:(class_obd.c:544:init_obdclass()):
-> Lustre
-> Version: 1.9.80
-> 1225417124.467400:6009:grid.scut.edu.cn:(class_obd.c:
-> 545:init_obdclass()):
-> Lustre: 6009-grid.scut.edu.cn:(class_obd.c:545:init_obdclass()): Build
-> Version:
-> 1.9.80-20081019111435-CHANGED-.usr.src.linux-2.6.18-92.1.10-2.6.18-
-> prep
-> Lustre mount failed: Invalid argument
+Please update your billing information, even if you plan to use the
+same credit card. This will trigger our billing system to try charging
+your card again. You do not need to contact us to reactivate your
+account.
 
-So why did the mount fail?  Did you set the environment as required for
-liblustre?  I notice you are using 1.9.80.  This branch is still in
-development and it could be entirely possible that liblustre on that
-branch is simply not (yet) working.  Have you tried to reproduce your
-problem with a stable, known-working release?
+To update your primary payment information, please follow these steps:
 
-If you really want to debug the problem with 1.9.80 you need to use more
-basic methods of calling liblustre and when, and only when you know that
-works, start layering your Java wrapper on top of it.  Maybe
-lustre/tests/acceptance-small.sh and/or lustre/liblustre/tests/sanity.c
-can be of help there.
+1. Log in to your account
+2. Enter your primary payment information.
+3. Click 'Update' when you have finished.
 
-b.
+Thank you for advertising with Google AdWords. We look forward to
+providing you with the most effective advertising available.
+
+(c) AdWords Team 2008
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20081104/a235749e/attachment.htm>
