@@ -1,41 +1,49 @@
-From: Google-AdWords <adwords-noreply@google.com>
-Date: Tue, 4 Nov 2008 11:07:48 +0530
-Subject: [Lustre-devel] Please Update Your Billing Information.
-Message-ID: <635613786.93752099913252@yahoo.com>
+From: Josephine Palencia <josephin@psc.edu>
+Date: Tue, 4 Nov 2008 11:41:45 -0500 (EST)
+Subject: [Lustre-devel] Mounted successfully : Interoperability between
+ Lustre 1.9.50 and 1.9.80?
+Message-ID: <Pine.LNX.4.64.0811041136361.4963@pscuxa.psc.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
----------------------------------------------------------------------------
-This message was sent from a notification-only email address that does
-not accept incoming email. Please do not reply to this message. If you
-have any questions, please visit the Google AdWords Help Centre  
------------------------------------------------------------------------------------
-Hello Advertiser,
 
-Our attempt to charge your credit card for your
-outstanding Google AdWords account balance was declined.
-Your account is still open. However, your ads have been suspended. Once
-we are able to charge your card and receive payment for your account
-balance, we will re-activate your ads.
+Mounting of PSC's lustre-wan filesystem (kerberos, cross-realm) by SDSC now successful.
+We used the same lustre-version. We'll refine and continue to explore other features.
 
-Please update your billing information, even if you plan to use the
-same credit card. This will trigger our billing system to try charging
-your card again. You do not need to contact us to reactivate your
-account.
+Thanks,
+Josephin
 
-To update your primary payment information, please follow these steps:
 
-1. Log in to your account
-2. Enter your primary payment information.
-3. Click 'Update' when you have finished.
+-----------------
 
-Thank you for advertising with Google AdWords. We look forward to
-providing you with the most effective advertising available.
 
-(c) AdWords Team 2008
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20081104/a235749e/attachment.htm>
+Andreas Dilger adilger at sun.com
+Mon Nov 3 03:32:49 PST 2008
+
+> On Fri, 31 Oct 2008, Josephine Palencia wrote:
+>
+> > NB: Kerberos cross-realm authentication (testing) enabled
+> >
+> > Mounting of lustre-1.9.50 lustre filesystem by a client built with
+> > lustre-1.9.80 produces the following error below:
+
+Note that lustre 1.9 is an unsupported alpha branch, and there is
+absolutely no guarantee nor attempt at keeping interoperability
+between builds at this stage.  There is actually a considerable amount
+of change to the wire protocol underway in order to make it interoperate
+with the 1.8.0 release (which is also getting similar change before
+release), and to be more performant in the final 2.0 release.
+
+It is great that you are testing this release, but please always ensure
+that the same version of code is being run on both the client and server
+at this stage.  As we get closer to the 2.0 final release the wire
+protocol changes will be finished.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
