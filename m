@@ -1,34 +1,35 @@
 From: kcruci <yjluan@gmail.com>
-Date: Tue, 4 Nov 2008 18:11:06 -0800 (PST)
+Date: Tue, 4 Nov 2008 19:01:38 -0800 (PST)
 Subject: [Lustre-devel] java successfully call the Native functions,
 	:-) but there are still some problems like "Lustre mount failed:
 	Invalid argument", when i call 	the  __liblustre_setup_().
 In-Reply-To: <1225806515.2247.240.camel@brian-laptop>
 References: <bfe9780e-a03e-4e21-916e-44f5a4db8dba@v39g2000pro.googlegroups.com>
 	<1225806515.2247.240.camel@brian-laptop>
-Message-ID: <989e3cb9-e0f3-42f2-89ab-1b73df203e41@v16g2000prc.googlegroups.com>
+Message-ID: <a257968a-472f-43bd-93bf-5dfc96d3bd1f@u18g2000pro.googlegroups.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I use the release version 1.6.5.1, and the programme still halt
-on"Lustre mount failed: Invalid argument".
+
+I check the system environment(LIBLUSTRE_MOUNT_TARGET) and redo it
+with the reseased version 1.6.5.1, but the programme still halt at
+"Lustre mount failed: Invalid argument ".
 
 I write a test in c which call the function in liblustremkdir.so, and
-gcc it with liblustremkdir.so, the c test run successfully.
+gcc it with liblustremkdir.so, the c tests run seccessfuly.
 
-After some tests, I make a bold assumption that the function "mount"
-was targeted to the system call instead of catching by libsysio when
-using JNI.
+So I make a bold assumption that the function "mount" was target  to
+system call instead of catching by libsysio.
 
-After that, I add some print in the src code, the log and my print is
-same at the first half, the second half, c test run successfully, but
-java does not.
+After that I add some print in source code, and the print is same
+between c and java tests at the first half, but java halt at  "Lustre
+mount failed: Invalid argument " and c run successfully.
 
-Here is the java log:
-========================================
+Here is the Java logs:
+====
 [root at ost JNItests]# java org.lustre.liblustre.test.MkDir
 begin to run Native method
 
@@ -42,48 +43,18 @@ liblustre/llite_lib.c:_sysio_lustre_init has RUNed!
 Lustre mount failed: Invalid argument
 [root at ost JNItests]#
 
-=====================================
+====
 
-Review the above print, both _sysio_lustre_init() and _sysio_init()
-has successfully runed, so that the "lustre" has registered to the
-libsysio.
+As can be seen in the above log, the _sysio_init() and
+_sysio_lustre_init() has runed, so that the libsysio was inited and
+the "lustre" must be successfully registered to libsysio.
 
-My question is: When using java, why the libsysio cannot catch the
-"mount", even  the libsysio is runing and the "lustre" has registered
-to the libsysio.
+So, my question is that why libsysio cannot catch the "mount" even the
+_sysio_init() and _sysio_lustre_init() has runed when using JNI.
 
-
-> [root at grid JNItests]# vim *org_lustre_liblustre_test_MkDir.c *
-> #include <jni.h>
-> #include "org_lustre_liblustre_test_MkDir.h"
->
-> extern void __liblustre_setup_(void);
-> extern void __liblustre_cleanup_(void);
->
-> JNIEXPORT void JNICALL
-> Java_org_lustre_liblustre_test_MkDir_init(JNIEnv
-> * env, jclass inclass)
-> {
-> __liblustre_setup_();
-> printf("liblustre setup!!\n");
-> __liblustre_cleanup_();
-> return;
->
-> }
->
-> Here is my filelist:
->
-> *org.lustre.liblustre.test.MkDir.java
-> org_lustre_liblustre_test_MkDir.h
-> org_lustre_liblustre_test_MkDir.c
-> liblustremkdir.so.1.0
-> liblustremkdir.so
-> *liblustre.a
-> libcap.so.1.10
-> libpthread-2.5.so
-> libz.so.1.2.3
->
-
+--
+Thanks!
+Ya-Jian.Luan
 
 
 On Nov 4, 9:48?pm, "Brian J. Murrell" <Brian.Murr...@Sun.COM> wrote:
