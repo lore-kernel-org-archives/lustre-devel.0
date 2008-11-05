@@ -1,41 +1,40 @@
-From: Google-AdWords <reactivation@google.com>
-Date: Wed, 5 Nov 2008 14:25:46 +0000
-Subject: [Lustre-devel] Please Update Your Billing Information.
-Message-ID: <01c93f52$64561100$3e34eb5c@floridacanuk>
+From: Brian J. Murrell <Brian.Murrell@Sun.COM>
+Date: Wed, 05 Nov 2008 14:58:10 -0500
+Subject: [Lustre-devel] java successfully call the Native functions,
+ :-) but there are still some problems like "Lustre mount
+ failed:	Invalid argument", when i call 	the  __liblustre_setup_().
+In-Reply-To: <a257968a-472f-43bd-93bf-5dfc96d3bd1f@u18g2000pro.googlegroups.com>
+References: <bfe9780e-a03e-4e21-916e-44f5a4db8dba@v39g2000pro.googlegroups.com>
+	<1225806515.2247.240.camel@brian-laptop>
+	<a257968a-472f-43bd-93bf-5dfc96d3bd1f@u18g2000pro.googlegroups.com>
+Message-ID: <1225915091.3785.57.camel@pc.interlinx.bc.ca>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
--------------------------------------------------------------
-Dear Advertiser,
+On Tue, 2008-11-04 at 19:01 -0800, kcruci wrote:
+> 
+> I write a test in c which call the function in liblustremkdir.so, and
+> gcc it with liblustremkdir.so, the c tests run seccessfuly.
 
-Our attempt to charge your credit card for your
-outstanding Google AdWords account balance was declined.
-Your account is still open. However, your ads have been suspended. Once
-we are able to charge your card and receive payment for your account
-balance, we will re-activate your ads.
+Ahhh.  Good.
 
-Please update your billing information, even if you plan to use the
-same credit card. This will trigger our billing system to try charging
-your card again. You do not need to contact us to reactivate your
-account.
+> So, my question is that why libsysio cannot catch the "mount" even the
+> _sysio_init() and _sysio_lustre_init() has runed when using JNI.
 
-To update your primary payment information, please follow these steps:
+Sorry, I have no idea.  I know nothing at all about developing in Java.
+Sounds like this is more a Java question than a Lustre question though.
+Maybe there is a different audience you can target that would know more
+about Java and external libraries than you will probably find here.
 
-1. Log in to your account
-2. Enter your primary payment information.
-3. Click 'Update' when you have finished.
+b.
 
-Thank you for advertising with Google AdWords. We look forward to
-providing you with the most effective advertising available.
-
---------------------------------------------------------------------------------------
-This message was sent from a notification-only email address that does
-not accept incoming email. Please do not reply to this message. If you
-have any questions, please visit the Google AdWords Help Centre  
------------------------------------------------------------------------------------
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20081105/e876fbe1/attachment.htm>
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20081105/b17f06a6/attachment.pgp>
