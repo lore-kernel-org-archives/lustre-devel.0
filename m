@@ -1,40 +1,63 @@
-From: Brian J. Murrell <Brian.Murrell@Sun.COM>
-Date: Wed, 05 Nov 2008 14:58:10 -0500
-Subject: [Lustre-devel] java successfully call the Native functions,
- :-) but there are still some problems like "Lustre mount
- failed:	Invalid argument", when i call 	the  __liblustre_setup_().
-In-Reply-To: <a257968a-472f-43bd-93bf-5dfc96d3bd1f@u18g2000pro.googlegroups.com>
-References: <bfe9780e-a03e-4e21-916e-44f5a4db8dba@v39g2000pro.googlegroups.com>
-	<1225806515.2247.240.camel@brian-laptop>
-	<a257968a-472f-43bd-93bf-5dfc96d3bd1f@u18g2000pro.googlegroups.com>
-Message-ID: <1225915091.3785.57.camel@pc.interlinx.bc.ca>
+From: Aurelien Degremont <aurelien.degremont@cea.fr>
+Date: Thu, 06 Nov 2008 16:47:23 +0100
+Subject: [Lustre-devel] [Lustre-shine-commits] SF.net SVN:
+	lustre-shine:[43]	branches/0.9-clusterdb/lib/Shine
+In-Reply-To: <E1KwzeG-0006Hy-4p@d5vjzd1.ch3.sourceforge.com>
+References: <E1KwzeG-0006Hy-4p@d5vjzd1.ch3.sourceforge.com>
+Message-ID: <4913118B.4080301@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 2008-11-04 at 19:01 -0800, kcruci wrote:
-> 
-> I write a test in c which call the function in liblustremkdir.so, and
-> gcc it with liblustremkdir.so, the c tests run seccessfuly.
 
-Ahhh.  Good.
+Quelques petites remarques pas m?chantes :)
 
-> So, my question is that why libsysio cannot catch the "mount" even the
-> _sysio_init() and _sysio_lustre_init() has runed when using JNI.
 
-Sorry, I have no idea.  I know nothing at all about developing in Java.
-Sounds like this is more a Java question than a Lustre question though.
-Maybe there is a different audience you can target that would know more
-about Java and external libraries than you will probably find here.
 
-b.
+ > +(dans Commands/Tune.py)
+ > +            tuning = TuningModel(filename="/etc/shine/tuning.conf")
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20081105/b17f06a6/attachment.pgp>
+Ne pas oublier que le fichier peut ?tre chang? dans shine.conf :)
+tuning = TuningModel(filename=Globals().get_tuning_file())
+
+
+
+> +    def __open_file(self):    
+> +        """
+> +        Function used to open the tuning configuration file specified in the __filename attribute
+> +        """
+> +        if self.__file != None:
+> +            # If the fil is already open raise an exception
+> +            raise Exception("File %s is already open" %(self.__filename))
+> +        else:
+> +            try:    
+> +                # Open the file
+> +                self.__file = open(self.__filename, "r")
+> +            except IOError, e:
+> +                    raise Exception("Failed to open the tuning configuration file : %s" %(str(e)))
+> +            
+
+- Fait attention ? ne pas lever des exceptions 'Exception', fait une 
+sous-classe avec un nom explicit et une petite ligne de doc.
+Sinon, un appelant ne peut pas 'catcher' cette erreur l? en particulier 
+et laisser remonter les autres. (Ne pas faire non plus 1 class par raise 
+dans le code :), certaines sont certainement du meme type :-)
+
+
+Es-tu sur d'avoir besoin d'un __open_file, __close_file alors qu'ils ne 
+sont appel? que dans __load_file ?
+Je pense que tu peux simplifier tout ca :)
+
+
+- Je me demandais, ? propos de la commande Tuning, dans quelle mesure 
+vous ?tes oblig? de coller ? la syntaxe de fichiers tuning.conf de 
+LustreUtil ?
+Ne serait-ce pas l'occasion de la rendre plus user-friendly?
+
+
+
+-- 
+Aurelien Degremont
+CEA
