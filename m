@@ -1,43 +1,26 @@
-From: Robert Latham <robl@mcs.anl.gov>
-Date: Wed, 12 Nov 2008 11:35:48 -0600
-Subject: [Lustre-devel] [Lustre-discuss] a new Lustre ADIO driver
-In-Reply-To: <49114151.10908@sun.com>
-References: <49110B1A.5030201@sun.com> <49114151.10908@sun.com>
-Message-ID: <20081112173548.GC16693@mcs.anl.gov>
+From: neutron <neutronsharc@gmail.com>
+Date: Tue, 11 Nov 2008 23:57:43 -0500
+Subject: [Lustre-devel] hello all
+Message-ID: <7d5928b30811112057k61ae3230q7d75e6f34cfb0042@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Nov 05, 2008 at 02:46:41PM +0800, emoly.liu wrote:
-> Hi,
->
-> Here is some description and performance results for the new Lustre ADIO  
-> driver. You might be interested.
->
-> The main purpose of the new lustre adio driver is to collect the small  
-> size I/O requests into fewer number of larger ones according to Lustre's  
-> striping feature with low overhead automatically. We also provide some  
-> hints for performance tuning.
->
-> In the following graph, the recent FLASH I/O benchmarking result shows  
-> that the new driver performs much better than the old one, especially  
-> for a large-scale system.
-> In this test, FLASH I/O blocksize is 4*4*4 that means each 3 clients  
-> write 40KB, 40.5KB and 42KB respectively. The I/O operation iteration  
-> (nvar) is set to 1024.
+hi all,
 
-Hi LiuYing
 
-Since this patch is for ROMIO and not really for Lustre, could you
-send this to romio-maint at mcs.anl.gov ?  It will reach more of the
-ROMIO developers that way.
+I'm a beginner with lustre.  I have played with an already setup
+lustre FS for a couple of days.  Now I want to roll up my sleeves and
+do some simple works inside lustre.  For example, I want to add some
+"printk"s in lustre code, and collect some statistic information.  But
+I don't know where the lustre code is:(
 
-Thanks
-==rob
+"uname -r" gives kernel as "2.6.9.67.0.7.EL_lustre.1.6.5.1".  I think
+the kernel is lustre-patched, but cannot see where lustre codes are.
+Where can I see the lustre sources ? and where shall I start from?
+Thanks a lot!
 
--- 
-Rob Latham
-Mathematics and Computer Science Division    A215 0178 EA2D B059 8CDF
-Argonne National Lab, IL USA                 B29D F333 664A 4280 315B
+
+-neutron
