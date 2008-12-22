@@ -1,62 +1,87 @@
-From: Nikita Danilov <Nikita.Danilov@Sun.COM>
-Date: Mon, 22 Dec 2008 17:21:26 +0300
+From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
+Date: Mon, 22 Dec 2008 17:44:56 +0300
 Subject: [Lustre-devel] global epochs [an alternative proposal,
- long and dry].
-In-Reply-To: <200812221648.19278.alexander.zarochentsev@sun.com>
+	long and dry].
+In-Reply-To: <18767.35839.133024.625896@gargle.gargle.HOWL>
 References: <18767.18277.958956.959956@gargle.gargle.HOWL>
 	<494F7F6B.9080509@sun.com>
 	<18767.35839.133024.625896@gargle.gargle.HOWL>
-	<200812221648.19278.alexander.zarochentsev@sun.com>
-Message-ID: <18767.41574.948255.718042@gargle.gargle.HOWL>
+Message-ID: <494FA7E8.7030200@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Alexander Zarochentsev writes:
- > On 22 December 2008 15:45:51 Nikita Danilov wrote:
- > > Alex Zhuravlev writes:
- > >  > Hello,
- > >
- > >  > I'm not sure it scales well as any failed node may cause global
- > >  > stuck in undo/redo pruning.
- > >
- > > Only until this node is evicted, and I think that no matter what is
- > > the pattern of failures, a single level of `tree reduction', can be
- > > delayed by no more than a single eviction timeout.
- > 
- > It introduces unneeded dependency between nodes, any node cannot prune 
- > its own undo logs if all nodes have an agreement that the epoch can be 
- > pruned. IMO it is what scalable system should avoid. 
+Nikita Danilov wrote:
+>  > I find this relying on explicit request (lock in this case) as a disadvantage:
+>  > lock can be taken long before reintegration meaning epoch might be pinned for
+> 
+> Hm.. a lock doesn't pin an epoch in any way.
 
-This is a price paid for the cheap introduction of new epochs. If epoch
-scope is limited to a known group of nodes, then retiring such an epoch
-requires consensus only between nodes of this group (cheaper than a
-global consensus), but introduction of new epochs requires coordination
-between groups. In various designs that we considered where epochs are
-per-client this manifests itself as an absence of total ordering between
-epochs that requires translation between client epochs and server
-transaction identifiers.
+well, I think it does as you don't want to use epoch received few minutes ago with lock.
+if node is in WBC mode and granted some STL-like lock, then it may be sending few MBs
+batch every, say, 5 minutes. there might be no interaction between batches. this means
+client would need to refresh epoch. depending on workload it may happen that client
+won't be able to send batch awaiting new epoch or client may refresh epoch with no real
+batches after that.
 
-All in all, I have a feeling that _all_ such algorithms have similar
-communication overhead for the `usual' workload.
+> Locks are only needed to make proof of S2 possible. Once lockless
+> operation or SNS guarantee in some domain-specific way that no epoch can
+> depend on a future one, we are fine.
 
- > 
- > If we would have a disaster in a part of the cluster, client nodes would 
- > disconnect and reconnect often, the undo logs will be overloaded, and 
- > the cluster will stop, no?
+well, I guess "in some domain-specific way" means another complexity.
 
-Well it won't stop, because a node either manages to reconnect in time
-(in which case it communicates its state to the superior), or it is
-evicted on a timeout. In any case, stabilization algorithm progresses.
+>  > this means client actually should maintain many epochs at same time as any lock
+>  > enqueue can advance epoch.
+> 
+> I don't understand what is meant by "maintaining an epoch" here. Epoch
+> is just a number. Surely a client will keep in its memory (in the redo
+> log) a list of updates tagged by multiple epochs, but I don't see any
+> problem with this.
 
-Then, I think that even the simplest global epoch based recovery is very
-challenging to implement.
+the problem is that with out-of-order epochs sent to different servers client can't
+use notion of "last_committed" anymore.
 
- > 
- > Thanks,
- > -- 
- > Alexander "Zam" Zarochentsev
+>  > I think having SC is also drawback:
+>  > 1) choosing such node is additional complexity and delay
+>  > 2) failing of such node would need global resend of states
+>  > 3) many unrelated nodes can get stuck due to large redo logs
+> 
+> As I pointed out, only the simplest `1-level star' form of a stability
+> algorithm was described for simplicity. This algorithms is amendable to
+> a lot of optimization, because it, in effect, has to find a running
+> minimum in a distributed array, and this can be done in a scalable way:
 
-Nikita.
+the bad think, IMHO, in all this is that all nodes making decision must
+understand topology. server should separate epochs from different clients,
+it's hard to send batches via some intermediate server/node.
+
+> Note, that this requires _no_ additional rpcs from the clients.
+
+disagree. at least for distributed operations client has to report non-volatile
+epoch from time to time. in some cases we can use protocol like ping, in some - not.
+
+>  > given current epoch can be advanced by lock enqueue, client can get many used
+>  > epochs at same time, thus we'd have to track them all in the protocol.
+> 
+> I am not sure I understand this. _Any_ message (including lock enqueue,
+> REINT, MIN_VOLATILE, CONNECT, EVICT, etc.) potentially updates the epoch
+> of a receiving node.
+
+correct, this means client may have many epochs to track. thus no last_committed anymore.
+
+> Only until this node is evicted, and I think that no matter what is the
+> pattern of failures, a single level of `tree reduction', can be delayed
+> by no more than a single eviction timeout.
+
+the problem is that may affect non-related nodes very easily.
+
+> Actually, single-server operation can be discarded from a redo log as
+> soon as it commits on the target server, because the later can always
+> redo it (possibly after undo). Given that majority of operations are
+> single server, redo logs won't be much larger than they are to-day.
+
+undo to redo? even longer recovery?
+
+thanks, Alex
