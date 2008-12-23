@@ -1,8 +1,8 @@
-From: Nikita Danilov <Nikita.Danilov@Sun.COM>
-Date: Tue, 23 Dec 2008 14:06:50 +0300
+From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
+Date: Tue, 23 Dec 2008 14:31:36 +0300
 Subject: [Lustre-devel] global epochs [an alternative proposal,
 	long and dry].
-In-Reply-To: <4950BBBD.4030405@sun.com>
+In-Reply-To: <18768.50762.865900.238376@gargle.gargle.HOWL>
 References: <18767.18277.958956.959956@gargle.gargle.HOWL>
 	<494F7F6B.9080509@sun.com>
 	<18767.35839.133024.625896@gargle.gargle.HOWL>
@@ -12,81 +12,54 @@ References: <18767.18277.958956.959956@gargle.gargle.HOWL>
 	<495088CB.5070506@sun.com>
 	<18768.46808.716111.644627@gargle.gargle.HOWL>
 	<4950BBBD.4030405@sun.com>
-Message-ID: <18768.50762.865900.238376@gargle.gargle.HOWL>
+	<18768.50762.865900.238376@gargle.gargle.HOWL>
+Message-ID: <4950CC18.1090005@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Alex Zhuravlev writes:
- > Nikita Danilov wrote:
- > > If we have no more than 1 reintegration in a given epoch on a given
- > > client, then the server that received an OP = (U(0), ..., U(N)) in epoch
- > > E from a client, can send to SC a message telling it that this client
- > > contains N volatile updates in epoch E, and whenever some server commits
- > > one of U's it sends to SC a message asking it to decrease a counter for
- > > this client. Most obvious implementation will batch these notification,
- > > i.e., when a server commits a transaction group it notifies SC about all
- > > changes in one message. I personally don't think that is the best
- > > approach.
- > 
- > essentially this is very similar to dependency-based recovery, but with
- > no it's advantages and with SC tracking all states and being single point
- > of failure. I think we need more scalable solution.
+Nikita Danilov wrote:
+> We are talking about few megabytes of data in network or in memory. It's
+> easy to replicate this state.
 
-We are talking about few megabytes of data in network or in memory. It's
-easy to replicate this state.
+I disagree - whole state can be distributed over 100K and more nodes and
+some operations many need all nodes to communicate their state. this is
+especially problem with lossy network.
 
- > 
- > > Yes, and this mechanism (if it is correct at all) will guarantee that an
- > > epoch cannot depend on a future epoch.
- > 
- > again, it's not about dependency, it's about network overhead of global epochs.
+> Again, global epochs do not depend on DLM to propagate epochs. E.g.,
+> lockless IO can be implemented without any additional rpcs.
 
-Again, global epochs do not depend on DLM to propagate epochs. E.g.,
-lockless IO can be implemented without any additional rpcs.
+sorry, I said nothing about DLM. I said "additional RPC", which is required
+in some cases. ping, for example, can issue RPC once per 60s. more over,
+ping also can use tree or some different topology making epoch refresh more
+complex.
 
- > 
- > >  > just to list my observations about global epochs:
- > >  >   * it's a problem to implement synchronous operations
- > >  >   * network overhead even with local-only changes depending on workload
- > >  >   * disk overhead even with local-only changes
- > >  >   * SC is a single point of failure with any topology as it's the only place to
- > >  >     find final minimum
- > >  >   * tree reduction isn't obvious thing because client can't report its minimum
- > >  >     to any node, instead tree is rather static thing and any change should be
- > >  >     done very carefully. otherwise it's very easy to lose minimum
- > > 
- > > Unfortunately, as far as I know, no other solution was described with a
- > > level of detail sufficient to compare. :-)
- > 
- > I could say the same about tree reduction, for example ;)
+> Tree reduction is but an optimization. I am pretty convinced that core
+> algorithm works, because this can be proved.
 
-Tree reduction is but an optimization. I am pretty convinced that core
-algorithm works, because this can be proved.
+sorry, works doesn't always mean "meet requirements". in our case scalability
+is the top one. in this regard I don't see how this model can work well with
+synchronous operations. at same time it was stated that we have to support
+such operations well, e.g. for nfs exports. I also tried to point out onto
+few overheads in the algorithm.
 
- > 
- > dependency-based recovery was discussed with many details I think.
+>>   * once some distributed transaction is committed on all involved servers, we can prune
+>>     it and all its local successors
+> 
+> Either I am misunderstanding this, or this is not correct, because not
+> only a given operation, but also all operations it depends on have to be
+> committed, and it is not clear how this is determined.
 
-Let's see...
+the algorithm works starting from oldest operations and discards them when there is no
+undo before this one.
 
->   * when client issues transaction it labels it with unique id
->   * server executing operation write atomically undo record with:
->     * VBR versions so that we can build chains of really depended operations
->     * unique transaction id generated by client
->     * number of servers involved in transaction
->   * periodically servers exchange their committed unique transaction ids
->     (only distributed transaction are involved in this)
->   * once some distributed transaction is committed on all involved servers, we can prune
->     it and all its local successors
+> One reason I wrote so lengthy a text was that I want to spell out
+> everything explicitly and unambiguously (and obviously failed in the
+> latter, as ensued discussion has shown).
 
-Either I am misunderstanding this, or this is not correct, because not
-only a given operation, but also all operations it depends on have to be
-committed, and it is not clear how this is determined.
+yes, it's well written and proven thing. the point is different - if it's clear that
+in some cases it doesn't work well (see sync requirement), what the proof does?
 
-One reason I wrote so lengthy a text was that I want to spell out
-everything explicitly and unambiguously (and obviously failed in the
-latter, as ensued discussion has shown).
-
-Nikita.
+thanks, Alex
