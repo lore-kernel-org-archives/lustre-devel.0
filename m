@@ -1,64 +1,142 @@
-From: Robert Read <rread@sun.com>
-Date: Fri, 09 Jan 2009 20:44:36 -0800
-Subject: [Lustre-devel] imperative recovery
-In-Reply-To: <20090110005016.GL13721@webber.adilger.int>
-References: <1906DB02-F9DF-4F49-9A9A-23FE7E799EA8@sun.com>
-	<046101c95ef4$2fe3a8d0$8faafa70$@com> <494AAF4A.4030304@sun.com>
-	<49676CF9.5050805@cray.com>
-	<C8209894-129B-4115-94BC-0F4B80EFADCE@sun.com>
-	<20090110005016.GL13721@webber.adilger.int>
-Message-ID: <D97F57E7-D8B1-489F-9B67-1887BE312F87@sun.com>
+From: 'Andreas Dilger' <adilger@sun.com>
+Date: Tue, 13 Jan 2009 08:26:40 +0800
+Subject: [Lustre-devel] RAID-1 SNS / migration discussion summary
+Message-ID: <20090113002639.GA8409@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Further discussion on migration using RAID-1 uncovered a number of issues
+that need careful attention.  I don't think I've captured all of them
+here, so I'd welcome some review of this document.
 
-On Jan 9, 2009, at 4:50 PM, Andreas Dilger wrote:
+While full RAID-1 coherency while to the file is much nicer technically,
+it will be significantly more complex to implement (more time, more
+bugs), and we could have basic functionality earlier with the "simple
+space balance migration".  That is similar to the proposal to have a
+"basic HSM" (blocks IO during copyin) and "complex HSM" (allows file IO
+during copyin ASAP when data is available).
 
-> On Jan 09, 2009  09:04 -0800, Robert Read wrote:
->> On Jan 9, 2009, at 07:27 , Nicholas Henke wrote:
->>> This would be a great enhancement for OSS failover or reboot, it is
->>> really the only way we'll get to recovery times under ~2.5 x  
->>> obd_timeout.
->>>
->>> I do think this will miss a significant case: combo MGS+MDS. A
->>> majority of our customers are deploying with this configuration.
->>> Perhaps exposing this mechanism on the clients via a /proc file
->>> would be enough - that way a failover framework
->>> could manually trigger the timeout and/or nid switching.
->>
->> Yes, exactly what I was thinking. Exposing this feature via proc (or
->> lctl) on the clients is the first step. It's has minimal impact,
->> requires no changes to the server, and should integrate well with
->> existing failover frameworks.  We also need to get the server to end
->> recovery sooner (without waiting for all the stale exports), but VBR
->> should help with that.
->
-> Hey, wouldn't (essentially) "lctl --device $foo recover" do the trick
-> today?
+As with "basic HSM", "simple space balance migration" clients would
+be blocked during file access if the file is being migrated, with the
+option of killing the migration if it is estimated to take too long.
+The clients would also be blocked on the MDS layout lock during migration,
+as with HSM.
 
-The main difference is we need to specify the nid to connect to. Also,  
-since  lctl isn't always available we should do this with a /proc file  
-(and  set_param), so something like this:
+Below is the description of migration using RAID-1.  Most of the
+mechanism is in the RAID-1 functionality, very little of it relates to
+migration itself.  It would also be desirable if the implementation of
+RAID-1 was agnostic to the number of data copies, because if we need
+to migrate a RAID-1 object this might need 3 copies of the data at one
+time, and some environments may want to have multiple copies of the data
+(e.g. remote caches, many replicas of binaries).
 
-echo $new_ost_nid > /proc/fs/lustre/osc/OSC_FOO_01/target_nid
+-------------------------------------
 
-or
+A client initiates migration by requesting the MDT for this file to
+change the LOV EA layout to instantiate a second mirror copy of the file.
+When a file migration is requested, the MDS handles this by revoking the
+file layout from all clients and adding a new RAID-1 mirror to the layout.
 
-lctl set_param osc.osc_FOO_01.target_nid $new_ost_nid
+We didn't discuss specifics on how this mirror file should be created,
+but in light of the later discussion about HSM copy-in I'll suggest that
+the file be created by the client using normal file striping parameters,
+and then request that the MDT "attach" the new file as an additional
+mirror copy.
 
-robert
+The new objects of the RAID-1 mirror would be marked "stale" in some
+manner (in the MDS layout, or on the objects themselves as is proposed
+for HSM).  Eric and I also discussed a "stale map" for each object that
+is persistent on disk, so that an object can be partially updated and
+reads can be satisfied from the valid parts of the disk even in the case
+of multiple OST failures.
 
->
-> Cheers, Andreas
-> --
-> Andreas Dilger
-> Sr. Staff Engineer, Lustre Group
-> Sun Microsystems of Canada, Inc.
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+A simplifying assumption was to keep the stripe size the same on both
+copies of the file, so that a chunk on one OST maps directly to another
+OST, instead of possibly being split in the middle.
+
+All reads from the file will only be handled by the valid mirror(s).
+It should be possible to do reads from either copy of the file by only
+getting a single lock on that object+extent.  Writes need to have a
+write lock over the same extents on all copies while writing.  This will
+allow the file to continue being used while it is being resynced.
+
+The writes in the filesystem are done via COW (as in ldiskfs hardening)
+and the llog records are atomically committed with the object's metadata
+describing the newly-allocated extent update to ensure that if the OST
+crashes that the old file data is not overwritten.  This implies that
+non-COW backing filesystems cannot participate in RAID-1.
+
+
+Writes to each stripe will cause the local OST to generate an llog record
+that describes what part of the object was modified, and the llog cookie
+will be sent back to the client in the reply.  These llog records will in
+essence be "stale data map" updates for the _remote_ objects.
+
+[Q] We discussed having "tags" that are sent with each write, so that the
+    secondary copy knows which llog cookies are cancelled with each write.
+    We would need to have a way for tags to be (relatively) unique and
+    generated by the clients, because false collisions could result in
+    missed data updates on the backup objects.
+
+[Q] For lockless IO the "tags" on the writes are critical because there
+    is no coherent locking of the object between OSTs, unless the OST
+    itself is doing the mirroring while locking the remote object?  How
+    would we detect racing overlapping IO to different copies of the file?
+
+We said during our discussion that when the write is complete on the
+mirror the client will cancel the llog cookie to indicate that both
+sides of the write are up-to-date.
+
+[Q] What happens on a write-caching OST?  The initial writes will
+    generate an llog cookie on one side, and the cookie will be
+    cancelled by the client.  Instead it seems that the client needs
+    to pass the cookie on to the mirror OST and they are only cancelled
+    when the data is persistent on disk (one transaction later).
+
+The resync of the new copy proceeds by the client/agent reading the
+file data (from the non-stale copy only) and writing data to the
+mirror copy.
+
+If a client gets a timeout when writing to one stripe after having
+written to the partner stripe, then it is up to the OSTs to do recovery
+of the stale parts of the file. <begin hand waving> The object on the
+updated OST needs to be able to detect that the other copy was not
+updated independently of the client (presumably by a timeout), and then
+cause the other OST to replay its llog records.
+
+A similar mechanism will be needed in case an up-to-date mirror's OST
+goes offline and writes are not being sent there.
+
+We have currently mandated a restriction that the stripe size of both
+copies be the same, in order to facilitate logging of updates.  If the
+stripe size is the same then a write to one chunk of an object will map
+to whole chunk on the mirror copy.  Nikita has suggested that the OSTs
+keep a copy of the LOV EA locally so that each OST can generate appropriate
+llog update records.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
+
+
+----- End forwarded message -----
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
+
+
+----- End forwarded message -----
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
