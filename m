@@ -1,7 +1,7 @@
 From: Vicky White <vyw@ornl.gov>
-Date: Wed, 28 Jan 2009 15:30:37 -0500
+Date: Thu, 29 Jan 2009 10:35:01 -0500
 Subject: [Lustre-devel] SAM-QFS, ADM, and Lustre HSM
-In-Reply-To: <9365C284-E805-46B6-95B2-226C1E2ED112@Sun.COM>
+In-Reply-To: <4980C06D.3000309@ornl.gov>
 References: <D262D095-D17F-4119-B908-FBE502201835@Sun.COM>
 	<49480788.7080306@sun.com>
 	<FCBC9AEA-C61C-4EEA-847B-FE283D19A7BF@Sun.COM>
@@ -16,7 +16,8 @@ References: <D262D095-D17F-4119-B908-FBE502201835@Sun.COM>
 	<4977647D.5010503@sun.com>
 	<4977E5BD.7000706@sun.com> <4978DB1E.30507@sun.com>
 	<9365C284-E805-46B6-95B2-226C1E2ED112@Sun.COM>
-Message-ID: <4980C06D.3000309@ornl.gov>
+	<4980C06D.3000309@ornl.gov>
+Message-ID: <4981CCA5.6070005@ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -24,65 +25,37 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-Comments on several messages; I am slowly catching up.
+>> Looks like HPSS will support EA in 7.1.2.0, June 2009
+>> I have asked Vicky here at ORNL to dig a bit into what the EA 
+>> features will look like.   
+>
+> The last draft of this design I saw was from November.    Work on this 
+> is picking up right now and has been bumped to a high priority, due 
+> for release this June, as Galen says.   I am trying to find out if 
+> there is a later design and how much about it I can share.
 
 
-> I do see work to switch the HPSS APIs to ftp or pftp. If this is  
-> already supported by HPSS, then, yes, no changes are required.
->   
+There is a more recent draft, though the main change seems to be change 
+the name from "Extended Attributes" to "User Defined Attributes" (UDAs).
 
-HPSS supports ftp and pftp.   However, this seems to be a moot point as 
-Thomas points out that CEA is using the HPSS client API library for 
-their copy tool:
+The gist of the current draft is that a new database table would be 
+added to the HPSS schema which would consist of two columns, an object 
+ID and an XML document.   The XML document would define all the UDAs for 
+some HPSS name space object (file, directory, symlink, hard link, etc.) 
+in some key/value format.   It would take advantage of the new 
+capability in version 9 of DB2 of handling XML columns and being able to 
+index and query them as XML, not just as a text string.   The object ID 
+column of the new table would hold the ID of the HPSS name space object  
+to which the extended attribute(s) apply.
 
+The design is intended to handle small UDAs, up to 512 bytes in length 
+for the total XML document, in order to be able to store the data in the 
+same row; larger documents will be accepted but would have to be stored 
+in a large object (LOB) area external to the main table, reducing 
+efficiency.   This is something to keep in mind if we start talking 
+about putting full (or even relative) pathnames in as UDAs.
 
-> At CEA, we are using our own copytool that directly uses HPSS API. 
-> This already exists and is in production for years.
-> I think there will be few modifications to adapt it to Lustre-HSM purpose
-> (basically, add fid <-> HSM id mapping and backup of attributes, path, 
-> stripe...)
-
-
->   There is also "htar" which is a tar-like interface to
-> HPSS, but I don't think that was anyone's intention to use.
-
-
-htar is a well proven and valuable tool for aggregation to HPSS.   It is 
-widely used at HPSS sites as a stand-alone utility and has been 
-incorporated into other interfaces. 
-
-
-> Looks like HPSS will support EA in 7.1.2.0, June 2009
-> I have asked Vicky here at ORNL to dig a bit into what the EA features will look like. 
->   
-
-The last draft of this design I saw was from November.    Work on this 
-is picking up right now and has been bumped to a high priority, due for 
-release this June, as Galen says.   I am trying to find out if there is 
-a later design and how much about it I can share.
-
-
-> Do we have a set of requirements for EAs for HSM integration?
-
-I never saw an answer to Galen's question above; did I miss it?  Now is 
-the time to speak up if we need to influence the design of the HPSS EAs.
-
-
->   > We would need to decide whether the HPSS implementation can/should
->   > handle aggregating multiple small files into a single archive object.
->   > I think that is useful, and this is one reason I advocate being able
->   > to pass multiple files at once from the coordinator to the agent.
-> Last I knew, they still don't build a container for small files. They 
-> write
-> a tape mark between each file. This means they are start/stopping the
-> tape for small files. A lot of sites use SRB which builds a tar container.
-
-As of HPSS 7.1, we build a container for small files before copying them 
-to tape.  It's called Tape Aggregation and we call the container an 
-aggregate.   Tape Aggregation is controlled via the HPSS migration 
-policy, where the sysadm can configure whether or not to aggregate, the 
-minimum and maximum files to place in each aggregate, and the maximum 
-size of each aggregate.
-
+I understand that the CEA folks have a copy of this draft of the design 
+and are in communication with its authors.
 
 Vicky
