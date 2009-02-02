@@ -1,7 +1,7 @@
 From: Vicky White <vyw@ornl.gov>
-Date: Mon, 02 Feb 2009 14:54:06 -0500
+Date: Mon, 02 Feb 2009 16:02:46 -0500
 Subject: [Lustre-devel] Lustre HSM - some talking points.
-In-Reply-To: <4987489D.4050909@Sun.COM>
+In-Reply-To: <49875ABC.8000400@Sun.COM>
 References: <3DF0F4AF-F4D6-476E-98F7-CD912C49FC18@Sun.COM>
 	<2734A30F-2C76-4725-9F3A-29AD4245B7E8@Sun.COM>
 	<496FCA67.6000500@sun.com>
@@ -18,56 +18,39 @@ References: <3DF0F4AF-F4D6-476E-98F7-CD912C49FC18@Sun.COM>
 	<367E32B4-A759-45AD-9D2C-48C051FE1D62@Sun.COM>
 	<49872C9B.7060708@Sun.COM>
 	<498734AA.7010704@ornl.gov> <4987489D.4050909@Sun.COM>
-Message-ID: <49874F5E.6030203@ornl.gov>
+	<49874F5E.6030203@ornl.gov> <49875ABC.8000400@Sun.COM>
+Message-ID: <49875F76.303@ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Colin Ngam wrote:
-> I do not see why we need to query these EAs in normal operation.  
-> These EAs will only be accessed when we need to perform Ultimate 
-> Disaster Recovery - when you have lost all data on disks and all you 
-> have are tapes.
 
 
-That would help.  I don't know what it would cost to store the EA in a 
-separate object to begin with, though, and that would be incurred on 
-every file.   Plus you have to consider the space it takes up.
+> PS-The programmer's reference is close to 400 pages!  
+
+Alas, yes.
+
+Take two steps backward from it.   Think of chapter 2 as "posix on 
+hpss", because that's basically what it is - a client api interface to 
+map all the posix calls into corresponding hpss calls.   The first half 
+of the chapter describes the functions and the second half the relevant 
+data structures.
+
+The other chapters are gravy - additional kinds of features you can use 
+but wouldn't have to right off the bat, and some of which you'd never use.
+
+Funny...I thought there used to be some programming examples in the 
+back, but maybe that was in another book.
 
 
-> I was thinking about XML - but it is "opaque" to Object SAMQFS so, it 
-> is up to the Lustre side.  Whatever it is, the Applications - 
-> Lustre-Restore for example, is the one that has to understand the 
-> format.  I am not a Tar Header expert - but I assume that these EAs 
-> can go with the file in the tar ball.
+> Perhaps I should start with User's Guide.
 
 
-I think what you put in the tar ball is up to you.   Putting the EAs in 
-there regardless of what the hsm was might simplify the design, so you 
-wouldn't have to extract the EA in a different way for each hsm.
-
-I was just trying to keep the hpss EA design in front of folks so that 
-if we were considering using that, we knew all the tradeoffs.
-
-
-> I do not expect to keep any of it on line on disk cache, on the SAMFS 
-> side.  I see no reason.
->
-> With respect to whether it should be consistent with HPSS - I would 
-> say if that is all we need and it is sufficient - why not.  Otherwise, 
-> let's make it better than HPSS.  It must be in SUN's best interest to 
-> sell SAMQFS?
-
-
-Oh, I'm sure it is.
-
-
-> I do apologize Vicky, are you a SUN employee?
-
-
-No.   Were you going to feel sorry for me if I worked for Sun? ;)
+I always think of that as just an explanation of the standard user 
+interfaces like ftp and vfs, but you're right, it does talk about some 
+hpss concepts that would be a useful intro.
 
 
 Vicky
