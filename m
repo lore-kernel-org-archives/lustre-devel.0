@@ -1,5 +1,5 @@
 From: Vicky White <vyw@ornl.gov>
-Date: Mon, 02 Feb 2009 12:46:03 -0500
+Date: Mon, 02 Feb 2009 13:00:10 -0500
 Subject: [Lustre-devel] Lustre HSM - some talking points.
 In-Reply-To: <49872C9B.7060708@Sun.COM>
 References: <3DF0F4AF-F4D6-476E-98F7-CD912C49FC18@Sun.COM>
@@ -17,21 +17,30 @@ References: <3DF0F4AF-F4D6-476E-98F7-CD912C49FC18@Sun.COM>
 	<8585251D-41D7-4B42-99F9-BDBFA2CF88C1@Sun.COM> <4987098F.402@Sun.COM>
 	<367E32B4-A759-45AD-9D2C-48C051FE1D62@Sun.COM>
 	<49872C9B.7060708@Sun.COM>
-Message-ID: <4987315B.50202@ornl.gov>
+Message-ID: <498734AA.7010704@ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Colin Ngam wrote:
 
-> Before I forget - can someone point me to HPSS API??
+> 6.  No namepace.  No namespace.  Lustre pathnames can be stored as Extended
+> Attributes.
 
 
-See http://www.hpss-collaboration.org/hpss/users/user_doc.jsp.  You 
-would want the most recent (6.2) version of the HPSS Programmer's 
-Reference Guide, Volume 1.   The 7.1 version should be out very soon.
+I realize you are talking about SAMQFS, but do we want to keep the 
+design consistent with what we do for hpss?
 
+HPSS will support Extended Attributes in release 7.2, to be available 
+September 2009, but it will be expensive to use these EAs for pathnames, 
+though it can be done.   The current design is to specify EAs in XML, 
+and for the most efficient storage of the EA in the database, the 
+containing XML document needs to be 512 bytes or fewer so that it can be 
+stored inline.  Larger XML objects will have to be stored externally as 
+LOBs (large objects), which will make queries cost more.
+
+So we need to think about what that cost will be when we are considering 
+repositories with millions or billions of files.
 
 Vicky
