@@ -1,26 +1,25 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Tue, 17 Feb 2009 09:17:23 +0300
-Subject: [Lustre-devel] Some investigations on  MDS creation rate
-In-Reply-To: <CB88ADF9-B0C6-41FA-AFCE-F9CA1E2416BD@Sun.COM>
-References: <DC147A4B-16CC-41B7-9C27-2F9BE64805FD@Sun.COM>
-	<FE7ACA5E-C11C-41B7-BF1D-05F9A73C72DF@sun.com>
-	<499985A7.7000600@sun.com>
-	<CB88ADF9-B0C6-41FA-AFCE-F9CA1E2416BD@Sun.COM>
-Message-ID: <499A5673.4060103@sun.com>
+From: Eric Barton <eeb@sun.com>
+Date: Tue, 17 Feb 2009 20:37:42 +0000
+Subject: [Lustre-devel] Security configuration
+Message-ID: <014901c9913f$94f0b560$bed22020$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Oleg Drokin wrote:
->> notice HEAD takes two ldlm locks for each create, 1.6 takes one.
-> 
-> What is the other one? I am looking at mdt_md_create and I see it locks 
-> parent, but not child, just like b1_6.
+Nathan,
 
-one lock on whole parent directory (to invalidate client's cache), another
-lock on part of parent directory with given hash. this is workaround for
-slow creates from multiple clients due to rep-ack mechanism.
+We'd like to be able to describe a set of nodes and say that
+as far as security is concerned, they are all equivalent - i.e. if
+an MDT authorizes eeb at node1 to perform a certain action, then
+eeb at nodex is implicitly authorized provided node1 and nodex are in
+the same set.
 
-thanks, Alex
+Leaving aside for now, the question of how the sets are described
+(they could be whole LNETs or whole Kerberos realms, or NID lists),
+is the MGS the right place to stash this config?
+
+
+    Cheers,
+              Eric
