@@ -1,33 +1,37 @@
-From: Nicolas Williams <Nicolas.Williams@sun.com>
-Date: Wed, 18 Feb 2009 17:19:00 -0600
-Subject: [Lustre-devel] Security configuration
-In-Reply-To: <014901c9913f$94f0b560$bed22020$@com>
-References: <014901c9913f$94f0b560$bed22020$@com>
-Message-ID: <20090218231900.GQ9992@Sun.COM>
+From: Terry Rutledge <Terry.Rutledge@Sun.COM>
+Date: Fri, 20 Feb 2009 15:31:10 -0800
+Subject: [Lustre-devel] New tags recently added to CVS
+Message-ID: <499F3D3E.7060408@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Feb 17, 2009 at 08:37:42PM +0000, Eric Barton wrote:
-> We'd like to be able to describe a set of nodes and say that
-> as far as security is concerned, they are all equivalent - i.e. if
-> an MDT authorizes eeb at node1 to perform a certain action, then
-> eeb at nodex is implicitly authorized provided node1 and nodex are in
-> the same set.
-> 
-> Leaving aside for now, the question of how the sets are described
-> (they could be whole LNETs or whole Kerberos realms, or NID lists),
-> is the MGS the right place to stash this config?
+Hi all,
 
-As far as Kerberos V principal names go, then the name will be eeb at REALM
-throughout.
+Just wanted to make you aware of a couple of new
+CVS tags that I've created.
 
-As for what happens with identities on the wire (for GET/SETATTR), this
-is where ID mapping comes in.  Here the configuration that matters will
-be local to each client (what domain name to assert) and to the MDS
-(what clients to trust).
+*HEAD:*
+*v1_9_160* - Biweekly build for the 2.0 Release.
+    This is not an official release, just a build
+    to be used for internal testing.
 
-Nico
--- 
+*b_release_1_8_0:*
+*v1_8_0_RC2* - Second Release Candidate for the 1.8.0
+    Release.  This is not the final release, as we
+    know that we will be producing RC3 in the near
+    future.
+
+*b_release_1_6_7:*
+*v1_6_7* - This is the official release for Lustre 1.6.7.
+    Previously this was v1_6_7_RC5.
+
+
+I'll send further updates when I've created new tags.
+
+Terry
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090220/c522fe94/attachment.htm>
