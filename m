@@ -1,41 +1,48 @@
-From: di wang <di.wang@sun.com>
-Date: Mon, 23 Feb 2009 20:04:05 -0500
-Subject: [Lustre-devel] moving obd_fail_check to libcfs
-In-Reply-To: <49A336FB.1040908@cray.com>
-References: <49A18841.7030200@cray.com>
-	<56B06EF4-AAF5-448C-96C0-55E5E9A1AA44@sun.com>
-	<010b01c995ff$43083420$c9189c60$@com> <49A32851.50803@sun.com>
-	<49A336FB.1040908@cray.com>
-Message-ID: <49A34785.5020007@sun.com>
+From: Scott Atchley <atchley@myri.com>
+Date: Tue, 24 Feb 2009 13:32:25 -0500
+Subject: [Lustre-devel] Credits, peer credits and concurrent sends
+Message-ID: <FCCFA143-03D6-45C3-93EC-61F106BF8193@myri.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello,
+Hi all,
 
-Nicholas Henke wrote:
->
-> Is there a branch name I could checkout to look at this ? I'd like to 
-> make sure the fail_loc move would be easy to tie into that.
-It is in the b_hd_params, and you can also check bug 15384.
+I am updating MXLND. I am looking at O2IBLND as a reference and I am  
+wondering what is the difference between the above module parameters?
 
-Thanks
-WangDi
->> The only difference for those sysctl parameters is that you may not 
->> use /etc/sysctl.conf to control them anymore, and lctl set_param is 
->> the only interface here.
->>
->> Actually, you can also move this now. but it means you need move 
->> those obd proc api to libcfs layer,  which  might  not  be  small  
->> amount  of  work.
->
-> It isn't too bad - they use the CFS_PROC_PROTO and not all of the 
-> lprocfs_XXX() functionality.
->
-> It should like this would have a limited lifetime in 1.6.X and 1.8.X, 
-> but I'm fine with that. That gives us a bit of time :-)
->
-> Nic
->
+The o2iblnd_modparams.c file has:
+
+static int credits = 64;
+CFS_MODULE_PARM(credits, "i", int, 0444,
+                 "# concurrent sends");
+
+static int peer_credits = 8;
+CFS_MODULE_PARM(peer_credits, "i", int, 0444,
+                 "# concurrent sends to 1 peer");
+
+#if IBLND_MAP_ON_DEMAND
+static int concurrent_sends = IBLND_RX_MSGS;
+#else
+static int concurrent_sends = IBLND_MSG_QUEUE_SIZE;
+#endif
+CFS_MODULE_PARM(concurrent_sends, "i", int, 0444,
+                 "send work-queue sizing");
+
+where IBLND_MSG_QUEUE_SIZE is 8.
+
+Can anyone elaborate on differences and relationships (e.g. what does  
+it mean if concurrent_sends is greater than peer_credits or is that  
+not allowed)?
+
+Thanks,
+
+Scott
+
+
+--
+Scott Atchley
+Myricom Inc.
+http://www.myri.com
