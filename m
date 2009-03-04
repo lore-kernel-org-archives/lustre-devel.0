@@ -1,62 +1,64 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Mon, 02 Mar 2009 13:45:01 -0700
-Subject: [Lustre-devel] LustreFS performance
-In-Reply-To: <8AD540D2-0B50-4630-B794-E65443352696@Sun.COM>
-References: <3376C558-E29A-4BB5-8C4C-3E8F4537A195@sun.com>
-	<02FEAA2B-8D98-4C2D-9CE8-FF6E1EB135A2@sun.com>
-	<8AD540D2-0B50-4630-B794-E65443352696@Sun.COM>
-Message-ID: <20090302204501.GQ3199@webber.adilger.int>
+From: Oleg Drokin <Oleg.Drokin@Sun.COM>
+Date: Wed, 04 Mar 2009 12:14:17 -0500
+Subject: [Lustre-devel] Fast checkpoints in Lustre today,
+	at essentially zero cost.
+Message-ID: <7636AEA6-3D56-491E-A085-C85CA4D96020@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mar 02, 2009  20:04 +0300, Vitaly Fertman wrote:
->    RAM: enough to have a tmpfs for MDS;
- 
-Note that strictly speaking we need to use ldiskfs on a ramdisk, not
-tmpfs, because we don't have an fsfilt_tmpfs.
+Hello!
 
-> Q:  which raid?
-> A: raid5, as it seems to be the most popular.
+    I was having a discussion with Mike Booth just now about how  
+application programmers are willing to sacrifice robustness of their
+    checkpoint files and go the the previous version if the last one  
+did not made it to the disk if only the checkpointing itself could
+    be done quick (even if not persistent).
+    I also remembered how we discussed using of ramdisks on the  
+compute nodes and then have some background agent to actually copy the  
+data to
+    Lustre later on when the application is happily computing still.
 
-I would propose:
-- for MDT it needs to be RAID-1+0, because of small, random IO sizes
-- for OST it needs to be RAID-6, because of double-failure risk (see
-  Lustre Manual "RAID" section for discussion)
+    It now suddenly appeared to me (duh!) that we can get that all for  
+free with buffer cache right now. We are artificially limiting our  
+dirty memory to
+    32M/osc on every node (which is probably way to low today too),  
+but if we lift the limit significantly (or remove it altogether) such
+    checkpointing applications (and I verified that many of them use  
+10-20% of RAM for checkpointing) would benefit tremendously
+    (as long as they do not do fsync at the end of checkpoint, of  
+course). Currently there is a way to achieve this same goal, but to do  
+this
+    we essentially need to select a very suboptimal stripe pattern  
+(essentially drag your file to be striped across as many OSTs as  
+possible with small stripe size to
+    maximize allowed dirty memory cache in use at the expense of a lot  
+of seeking at the OSTs since that would essentially mean every client  
+would be
+    writing to every OST).
 
-> **** Statistics ****
-> 
-> During all the tests the following is supposed to be running on all  
-> the servers:
-> 1) vmstat
-> 2) iostat, if there is some disk activity.
-> smth else?
+    The old justification for the small dirty memory limit was to do  
+with lock timeouts and stuff, but now that we have lock prolonging and  
+indefinite waiting for
+    locks on clients on the other, there is no reason to limit  
+ourselves anymore, I think.
+    I plan to speak with ORNL later today to conduct an experiment (if  
+they would agree) and to lift their dirty memory limit on some of the  
+scratch filesystems
+    often used for scratch files to see what the effect would be. I  
+expect it to be very positive myself.
 
-I would propose either LLNL's LMT or HP's collectl, which both also
-collect Lustre stats.  Those both provide more information than the
-above, and having the IO/CPU load correlated to Lustre RPC counts is
-very useful.
+    At the same time Mike is doing a test right now with some real  
+world applications + the above-mentioned suboptimal striping pattern  
+to see the effects as well.
 
-> MDST3
-> 
-> Q: do we want to test stat(2) with other then tmpfs disk on OST?
-> what journal should it have if so?
+    I think that allows us to take advantage of huge amounts of wasted  
+memory on compute nodes today for this caching and benefit many  
+application with this
+    checkpointing model (essentially superseding old "flash-cache"  
+idea at a fraction of the cost and effort).
 
-I would be quite interested in the performance numbers from just
-the ramdisk MDT+OST, to see what the upper limit of the protocol
-and network are.
-
-> 9. find
-> Q: despite the fact we currently have a large downgrade with
-> "find -f type", do we want to have this test in the general test set?
-
-Some of that performance loss should have been fixed recently.  We
-should continue to test it.
-
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+Bye,
+     Oleg
