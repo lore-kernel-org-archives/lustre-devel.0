@@ -1,35 +1,32 @@
-From: Jeff Darcy <jeffd@sicortex.com>
-Date: Wed, 04 Mar 2009 12:28:08 -0500
-Subject: [Lustre-devel] LustreFS performance
-In-Reply-To: <5BC7F78A-7FD4-4F54-A1C9-F7A632EA7200@sun.com>
-References: <3376C558-E29A-4BB5-8C4C-3E8F4537A195@sun.com>	<02FEAA2B-8D98-4C2D-9CE8-FF6E1EB135A2@sun.com>	<8AD540D2-0B50-4630-B794-E65443352696@Sun.COM>	<20090302204501.GQ3199@webber.adilger.int>
-	<5BC7F78A-7FD4-4F54-A1C9-F7A632EA7200@sun.com>
-Message-ID: <49AEBA28.5050700@sicortex.com>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Thu, 05 Mar 2009 10:05:22 -0800
+Subject: [Lustre-devel] Security configuration
+In-Reply-To: <014901c9913f$94f0b560$bed22020$@com>
+References: <014901c9913f$94f0b560$bed22020$@com>
+Message-ID: <49B01462.1020001@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Oleg Drokin wrote:
-> On Mar 2, 2009, at 3:45 PM, Andreas Dilger wrote:
+Eric Barton wrote:
+> Nathan,
 >
->   
->> On Mar 02, 2009  20:04 +0300, Vitaly Fertman wrote:
->>     
->>>   RAM: enough to have a tmpfs for MDS;
->>>       
->> Note that strictly speaking we need to use ldiskfs on a ramdisk, not
->> tmpfs, because we don't have an fsfilt_tmpfs.
->>     
+> We'd like to be able to describe a set of nodes and say that
+> as far as security is concerned, they are all equivalent - i.e. if
+> an MDT authorizes eeb at node1 to perform a certain action, then
+> eeb at nodex is implicitly authorized provided node1 and nodex are in
+> the same set.
 >
-> The idea was loop device on tmpfs, I think.
+> Leaving aside for now, the question of how the sets are described
+> (they could be whole LNETs or whole Kerberos realms, or NID lists),
+> is the MGS the right place to stash this config?
 >   
-
-FYI, this is exactly what we do with our FabriCache feature - i.e. both 
-MDT and OSTs are actually loopback files on tmpfs.  Modulo a few issues 
-with preallocated write space eating all storage leaving none for actual 
-data, it works rather well producing high performance numbers and giving 
-LNDs a good workout.  BTW, the loopback driver does copies and is 
-disturbingly single-threaded, which can create a bottleneck.  This can 
-be worked around with multiple instances per node, though.
+Yes, I think the MGS is the right place to stash any config.
+FWIW we're pretty seriously thinking about removing all the distributed 
+configuration we can (mkfs/tunefs.lustre settings and module parameters) 
+and concentrating it all on the MGS node in a text-based config file.   
+Exceptions would have to be made for the network setup, so that everyone 
+could talk to the MGS -- so lnet networks and MGS nids would still have 
+to be stored locally.
