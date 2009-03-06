@@ -1,121 +1,100 @@
-From: Eric Barton <eeb@sun.com>
-Date: Fri, 06 Mar 2009 13:25:49 +0000
-Subject: [Lustre-devel] create performance
-In-Reply-To: <20090305214620.GJ3199@webber.adilger.int>
-References: <49AEE953.2030401@sun.com> <m3ocwg61jc.fsf@bzzz.home.net>
-	<49B00E4D.2080806@sun.com> <20090305214620.GJ3199@webber.adilger.int>
-Message-ID: <049301c99e5f$10ee3c60$32cab520$@com>
+From: Andreas Dilger <adilger@sun.com>
+Date: Fri, 06 Mar 2009 12:16:20 -0700
+Subject: [Lustre-devel] layout lock / extent lock interaction
+In-Reply-To: <49B16509.9000409@sun.com>
+References: <20090130233253.GK3652@webber.adilger.int>
+	<63CF2DAF-59F7-4124-8AE9-188927051AAB@sun.com>
+	<C68908D1-8287-4870-903E-DDCDED6E31D0@Sun.COM>
+	<5882C1BC-E01E-42FF-A728-08885E997075@sun.com>
+	<20090221002109.GA3863@webber.adilger.int> <49B16509.9000409@sun.com>
+Message-ID: <20090306191620.GB3199@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Moving this discussion to lustre-devel...
+On Mar 06, 2009  10:01 -0800, Nathaniel Rutman wrote:
+> I think we need to explicitly list the extent / layout lock interactions  
+> so we don't miss anything in the implementation:
+> 1. Create
+>
+>    * MDT generates new layout lock at open
+>    * client gets Common Reader layout lock
+>    * client can get new extents read/write locks as long it holds CR
+>      layout lock
+>
+> 2. Layout change
+>
+>    * MDT takes PW layout lock, revoking all client CR locks
+>    * in parallel, MDT takes PW lock on all extents on all OSTs for this
+>      file
+>    * Clients drop layout lock and requeue
+>    * Clients flush cache and drop their extent locks
+>    * MDT changes layout
+>    * MDT releases layout lock and extents locks
+>    * Clients get CR layout lock and can now requeue their extent locks
+>
+> 3. Client / MDT network partition
+>
+>    * client can continue reading/writing to currently held extents
+>    * when client determines it has been disconnected from MDT it drops
+>      layout lock
+>    * client can't get new extent locks, but can continue writing to
+>      currently held extents
+>    * if MDT changes layout, it first PW locks all extents, causing OSTs
+>      to revoke client's extents locks
+>    * Client must requeue layout lock before requeueing extents locks
+>
+>    What if client hasn't noticed it's been disconnected from the MDT by
+>    the time it tries to requeue extent locks?  It doesn't know that the
+>    layout lock its holding is invalid...
 
-OST object placement is a hard problem with conflicting requirements
-including...
+That is a thorny problem.  I'll go through several partial solutions
+and see why they do not work, then hopefully a safe solution at the end.
 
-1. Even server space balance
-2. Even server load balance
-3. Minimal network congestion
-4. Scalable ultra-wide file layout descriptor
-5. Scalable placement algorithm
+One possibility is that the AST sent to the clients during the extent lock
+revocation would contain a flag that indicates "the layout is changing"
+(similar to the truncate/discard data flag), so the clients get notified
+even if disconnected from the MDS.  It still isn't enough, however,
+as the clients will only get this AST if they currently have an extent
+lock, and it isn't always true.
 
-Implementing a placement algorithm with a centralized server clearly
-isn't scalable and will have to be reworked for CMD.  A starting
-point might be to explore how to ensure CROW goes some way to
-satisfy requirements 1-3 above.
+A second option is in case a client holding a layout lock is evicted AND
+the layout is being changed then the MDS can't release the extent locks
+until at least one ping interval (assuming any still-alive client would
+have detected this and try reconnecting).  This is also not 100% safe because
+the client might have been evicted moments earlier due to some other lock
+and the "wait for one ping interval" heuristic would no longer apply.
 
-BTW, I've long believed that it's a mistake not to give Lustre any
-inkling that all the creates done by a FPP parallel application are
-somehow related - e.g. via a cluster-wide job identifier.  Surely
-file-per-process placement is very close to shared file placement
-(minus extent locking conflicts :)?  I recognize that fixing this
-still leaves the problem of how to get best F/S utilization when
-different applications share a cluster - but I don't think they are
-necessarily the same problem and trying to address them both with the
-same solution seems wrong.
+We cannot depend on the layout change to be drastic and the objects would
+no longer exist to be written to (CROW issues aside).  If we are changing
+the layout to add a mirror that wouldn't help and we would now have
+inconsistent data on each half of the mirror.
 
-    Cheers,
-              Eric
+Another option is something like "imperative eviction" so that clients
+being evicted are actively told they are being evicted, but that has
+the issue of the "you are evicted" RPC will normally be sent to a node
+which is already dead and slow down the MDS and/or block all of its
+LNET credits so isn't really even a usable option.
 
-> -----Original Message-----
-> From: Andreas.Dilger at Sun.COM [mailto:Andreas.Dilger at Sun.COM] On Behalf Of Andreas Dilger
-> Sent: 05 March 2009 9:46 PM
-> To: Nathaniel Rutman
-> Cc: lustre-tech-leads at sun.com
-> Subject: Re: create performance
-> 
-> On Mar 05, 2009  09:39 -0800, Nathaniel Rutman wrote:
-> > Alex Zhuravlav wrote:
-> >>>>>>> Nathaniel Rutman (NR) writes:
-> >>  NR> What about preallocating objects per client, on the clients?
-> >>  NR> Client still needs to get a namespace entry from MDT, but could then
-> >>  NR> hold a write layout lock
-> >>  NR> and do it's own round-robin allocation.  For clients with subtree
-> >>  NR> locks this could avoid any need to talk to the MDT and wouldn't need
-> >>  NR> the writeback cache.
-> >>
-> >> I thought "avoid any need to talk to MDT" implies "writeback cache"
-> >
-> > Hmm, well, maybe you consider this a limited version of writeback cache?
-> > It would be kind of a notification of "here is the layout/objects of my
-> > new file, with my new fid."  Fid ranges and object numbers would be
-> > granted to clients for their own use, and the MDT would only have to do
-> > the namespace entry, asynchronously.  I suppose there's recovery issues
-> > we have to worry about then.
-> >
-> > What I was really trying to get at was to avoid the two step process of
-> > client -> MDT -> OST stripe allocation, which includes an extra network
-> > hop in some precreation starvation cases, and always includes some (a
-> > little?) cpu on the MDT:
-> > 1. clients get object grants for every OST.
-> > 2. clients assign objects to new files and send in reqs to MDT, which
-> > just records the objects in the LOV EA
-> > 3. MDT batches up the assigned objects and sends to OSTs for orphan
-> > cleanup llog.
-> 
-> The main problem with having many clients do precreation themselves is
-> that this will invariably cause load imbalance on the OSTs, which will
-> cause long-term file IO performance problems (much in excess of the
-> performance problems hit during precreate).
-> 
-> Cray recently filed a bug on the read performance of files being noticably
-> hurt by QOS object allocation due to space imbalance, even thoguh the MDS
-> is trying to balance across OSTs locally, but is using random numbers to
-> do this and is not selecting OSTs evenly.
-> 
-> In a file-per-process checkpoint (say 100 processes/files on 100 OSTs)
-> the MDS round-robin will allocate 1 object per OST evenly across all
-> OSTs (excluding the case where an OSC is out of preallocated objects).
-> If clients are doing the allocation (or in the past when the MDS did
-> "random" OST selection) then the chance of all 100 clients allocating
-> on 100 OSTs is vanishingly small.  Instead it is likely that some OSTs
-> will have no objects used, and some will have 2 or 3 or 4, and the
-> aggregate write performance will FOREVER be 50% or 33% or 25% of the
-> MDS-round-robin allocated objects for that set of files.  That is far
-> worse than waiting 1s for the MDS to allocate the objects.
-> 
-> IMHO, if we are doing WBC on the client, then there is no _requirement_
-> that the client has to allocate objects for the files at all, and any
-> write data could just be in the client page cache.  Until the new file
-> is visible on the MDS to another client nobody can even try to access
-> the data.  Once the WBC cache is flushed to the MDS then objects can
-> be allocated by the MDS evenly (granting an exclusive layout lock to the
-> client in the process) until the cached client data is either flushed to
-> disk or at least protected by extent locks and can be partially flushed
-> as needed.
-> 
-> Note that I don't totally object to WBC clients doing object allocations
-> if they are creating a large number of files, in essence becoming an
-> MDS that is tracking the load on the OSTs and balancing object creation
-> appropriately.  What I object to is the more common case where each
-> client is creating a single file for a large FPP checkpoint, and the
-> clients all selecting the OSTs separately.
-> 
-> Cheers, Andreas
-> --
-> Andreas Dilger
-> Sr. Staff Engineer, Lustre Group
-> Sun Microsystems of Canada, Inc.
+
+A safe option (AFAICS) is to have MDS eviction force OST eviction (via
+obd_set_info_async(EVICT_BY_NID).  That would also resolve some other
+recovery problems, but might be overly drastic if e.g. the client is
+being evicted from the MDS due to router failure or simple network
+partition.  Having a proper health network and also server-side RPC
+resending would help avoid such problems.
+
+This is one of the main reasons why having DLM servers on one node
+controlling resources on another node is a bad idea.  We had similar
+issues in the past when we locked all objects via the OST only on
+stripe index 0, and we might have similar problems with subtree locks
+in the future with CMD or any SNS RAID that is only locking a subset
+of objects.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
