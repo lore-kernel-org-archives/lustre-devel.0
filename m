@@ -1,54 +1,27 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Mon, 09 Mar 2009 02:29:58 -0600
-Subject: [Lustre-devel] LustreFS performance
-In-Reply-To: <80354020-87CB-4704-8020-D775AEE09A6D@Sun.COM>
-References: <3376C558-E29A-4BB5-8C4C-3E8F4537A195@sun.com>
-	<02FEAA2B-8D98-4C2D-9CE8-FF6E1EB135A2@sun.com>
-	<8AD540D2-0B50-4630-B794-E65443352696@Sun.COM>
-	<20090302204501.GQ3199@webber.adilger.int>
-	<5BC7F78A-7FD4-4F54-A1C9-F7A632EA7200@sun.com>
-	<49AEBA28.5050700@sicortex.com>
-	<20090305212700.GI3199@webber.adilger.int>
-	<80354020-87CB-4704-8020-D775AEE09A6D@Sun.COM>
-Message-ID: <20090309082826.GL3199@webber.adilger.int>
+From: Eric Barton <eeb@sun.com>
+Date: Mon, 09 Mar 2009 14:39:23 +0000
+Subject: [Lustre-devel] statahead_performance.pdf - Adobe Reader
+Message-ID: <070201c9a0c4$d6fe8b50$84fba1f0$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mar 08, 2009  22:50 -0400, Oleg Drokin wrote:
-> On Mar 5, 2009, at 4:27 PM, Andreas Dilger wrote:
->> Even better, if you have some development skills, would be to  
->> implement (or possibly resurrect) an fsfilt-tmpfs layer.  Since
->> tmpfs isn't going to be recoverable anyways (I assume you just
->> reformat from scratch when there is a crash), then you can make
->> all of the transaction handling as no-ops, and just implement
->> the minimal interfaces needed to work.
->>
->> That would allow unlinked files to release space from tmpfs, and also
->> avoid the fixed allocation overhead and journaling of ldiskfs, probably
->> saving you 5% of RAM (more on the MDS) and a LOT of memcpy() overhead.
->
-> This is exactly what I was trying to avoid.
-> I tried to measure things as if I had an infinitely fast disk only, and I
-> still needed all the journal/blockdevice and other such things to take
-> the CPU they would normally take.
-> After all we cannot expect people to actually run real MDSes on tmpfs
-> unless they have some means to replicate that MDS somewhere else.
+Fan Yong,
 
-In fact, it wasn't my proposal for the metadata performance testing
-itself, but rather SiCortex are apparently running with RAM-backed
-filesystems for some kind of fast cache filesystem (e.g. distributed
-shared memory or similar).  I was only proposing their implementation
-could be more efficient.
+The attached PDF shows the results you gathered in a form
+that makes it easier to understand the results and helps
+comparison.  Please could you review it for correctness.
 
-I could imagine that for flash-cache type applications that storing
-checkpoints for a short time in a RAM-backed OST pool before migrating
-it to persistent storage.
+    Cheers,
+              Eric
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: statahead_performance.pdf
+Type: application/pdf
+Size: 80910 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090309/0d1a4b05/attachment.pdf>
