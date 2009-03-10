@@ -1,62 +1,108 @@
-From: Vitaly Fertman <Vitaly.Fertman@Sun.COM>
-Date: Tue, 10 Mar 2009 19:40:53 +0300
-Subject: [Lustre-devel] LustreFS performance
-In-Reply-To: <49B65524.6080707@sun.com>
-References: <3376C558-E29A-4BB5-8C4C-3E8F4537A195@sun.com>
-	<02FEAA2B-8D98-4C2D-9CE8-FF6E1EB135A2@sun.com>
-	<8AD540D2-0B50-4630-B794-E65443352696@Sun.COM>
-	<49B65524.6080707@sun.com>
-Message-ID: <861E8C51-4422-4C51-9062-DC3916DB96D6@Sun.COM>
+From: Andreas Dilger <adilger@sun.com>
+Date: Tue, 10 Mar 2009 13:07:42 -0600
+Subject: [Lustre-devel] statahead_performance.pdf
+In-Reply-To: <49B632CE.4040500@sun.com>
+References: <070201c9a0c4$d6fe8b50$84fba1f0$@com> <49B544FA.9020009@sun.com>
+	<002901c9a0dd$22249850$666dc8f0$@com> <49B632CE.4040500@sun.com>
+Message-ID: <20090310190742.GS3199@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mar 10, 2009, at 2:55 PM, Mallik Ragampudi wrote:
+On Mar 10, 2009  17:28 +0800, Yong Fan wrote:
+> Sorry, some test resources budgeting limit delayed the test
+> a little. This is the last test result:
+> TCP2, IB and Routed IB were tested on the same cluster
+> with the same scale. TPC1 was tested on another cluster.
 
-> Vitaly,
->
-> This is very comprehensive. Few comments:
->
-> 1) I think it would be good to start with LLT2 (lustre-iokit: ior- 
-> survey) and get an out-of-the-box performance
-> picture/comparison (1.6 and 2.0) from the whole cluster before  
-> testing the individual layers.
+Fan Yong,
+thanks for the updated numbers.  These are MUCH easier to understand
+than without the graphs.
 
-LLT2 is about underlying local fs on servers, not Lustre.
-the overall ior-survey is OSTT3 (it was wrongly mentioned as ost-survey
-in the document header, sorry, it must be ior-survey as written
-in the detailed section)
+Minor note - the graphs should be "X-Y" graphs, with the first column
+(% files) as the X axis instead of a label.  That makes it clear in
+the first case that the files vs. directories performance is in fact
+linear with the percentage of files in the directory.
 
-> 2) Can this plan be extended to include CMD performance testing as  
-> well ? I would expect that most
-> of your test cases apply for the CMD as well ?
+What else this exposes is that the statahead performance is really
+limited by the lack of OST statahead and/or SOM.  The 100% files
+case (as I expected) is limited by the need to do the OST stat before
+returning anything to userspace, so Amdahl's law says it can take at
+minimum 50% as long as without statahead.  For the 0% files case
+(all subdirs), and when SOM is available, there is no such limitation
+and the stat rate can increase significantly more.
 
-sure, I will extend it.
+> Regards,
+> --
+> Fan Yong
+> > Fan Yong,
+> >
+> > I don't think the factor of ~2 can be explained simply by node
+> > performance.  But why debate the point when it will be simpler
+> > to repeat the measurements (i.e. repeating the tests exactly
+> > with the same parameters e.g. # dirents) using 1GigE on the
+> > same nodes that were used to measure IB.
+> >
+> >     Cheers,
+> >               Eric
+> >
+> >   
+> >> -----Original Message-----
+> >> From: Yong.Fan at Sun.COM [mailto:Yong.Fan at Sun.COM]
+> >> Sent: 09 March 2009 4:34 PM
+> >> To: Eric Barton
+> >> Cc: lustre-devel at lists.lustre.org
+> >> Subject: Re: statahead_performance.pdf - Adobe Reader
+> >>
+> >> Eric Barton ??:
+> >>     
+> >>> Fan Yong,
+> >>>
+> >>> The attached PDF shows the results you gathered in a form
+> >>> that makes it easier to understand the results and helps
+> >>> comparison.  Please could you review it for correctness.
+> >>>
+> >>>
+> >>>       
+> >> Yes, it is much help to understand the performance improvement
+> >> by statahead with the chart.
+> >>
+> >> But I think the first chart for "Statahead Dirents/second" maybe
+> >> some misguide, since the TCP result and IB result are from different
+> >> hardware environment (I mean the CPU and memory), that the speed
+> >> of stating under IB is faster than TCP case is meaningless.
+> >>
+> >> Relatively, the second chart for "Statahead Speedup" is more useful,
+> >> which is relatively independent from hardware (CPU and memory).
+> >> It gives the trend of upper bound on performance improvement from
+> >> statahead under different network configure, and different dir/file ratio.
+> >>
+> >>
+> >> Thanks!
+> >> --
+> >> Fan Yong
+> >>     
+> >>>     Cheers,
+> >>>               Eric
+> >>>
+> >>>
+> >>>       
+> >
+> >
+> >   
+> 
 
-> 3) I assume the "CPU" parameter in your methodology refers to # of  
-> CPUs in MDS, right ?
 
-to the server which is being tested at the moment, i.e. OST for OST*  
-tests,
-MDS fro MDS* tests. In the mixed section it refers to MDS indeed.
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
 
-> 4) I am not sure if we can test 32 cores without hitting other  
-> bottlenecks beyond 8 coress on the servers.
 
-if we hit some bottleneck, we will get a problem to solve, what is  
-good ;)
-however, to see the bottleneck from these results, it is better to run  
-MT
-tests with different amount of CPUs (the same as for all the CPU  
-tests, 1,2,8,32).
-
-> This will cut down some combinations in the matrix.
->
-> Thanks,
-> Mallik
->
-
+Cheers, Andreas
 --
-Vitaly
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
