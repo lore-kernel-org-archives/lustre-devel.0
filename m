@@ -1,95 +1,84 @@
-From: Alex Zhuravlev <bzzz@sun.com>
-Date: Tue, 10 Mar 2009 09:41:05 +0300
-Subject: [Lustre-devel] some observations about metadata writeback cache
-Message-ID: <m37i2x3mny.fsf@bzzz.home.net>
+From: Yong Fan <Yong.Fan@Sun.COM>
+Date: Tue, 10 Mar 2009 17:28:46 +0800
+Subject: [Lustre-devel] statahead_performance.pdf - Adobe Reader
+In-Reply-To: <002901c9a0dd$22249850$666dc8f0$@com>
+References: <070201c9a0c4$d6fe8b50$84fba1f0$@com> <49B544FA.9020009@sun.com>
+	<002901c9a0dd$22249850$666dc8f0$@com>
+Message-ID: <49B632CE.4040500@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Sorry, some test resources budgeting limit delayed the test
+a little. This is the last test result:
+TCP2, IB and Routed IB were tested on the same cluster
+with the same scale. TPC1 was tested on another cluster.
 
-Hello,
+Regards,
+--
+Fan Yong
+> Fan Yong,
+>
+> I don't think the factor of ~2 can be explained simply by node
+> performance.  But why debate the point when it will be simpler
+> to repeat the measurements (i.e. repeating the tests exactly
+> with the same parameters e.g. # dirents) using 1GigE on the
+> same nodes that were used to measure IB.
+>
+>     Cheers,
+>               Eric
+>
+>   
+>> -----Original Message-----
+>> From: Yong.Fan at Sun.COM [mailto:Yong.Fan at Sun.COM]
+>> Sent: 09 March 2009 4:34 PM
+>> To: Eric Barton
+>> Cc: lustre-devel at lists.lustre.org
+>> Subject: Re: statahead_performance.pdf - Adobe Reader
+>>
+>> Eric Barton ??:
+>>     
+>>> Fan Yong,
+>>>
+>>> The attached PDF shows the results you gathered in a form
+>>> that makes it easier to understand the results and helps
+>>> comparison.  Please could you review it for correctness.
+>>>
+>>>
+>>>       
+>> Yes, it is much help to understand the performance improvement
+>> by statahead with the chart.
+>>
+>> But I think the first chart for "Statahead Dirents/second" maybe
+>> some misguide, since the TCP result and IB result are from different
+>> hardware environment (I mean the CPU and memory), that the speed
+>> of stating under IB is faster than TCP case is meaningless.
+>>
+>> Relatively, the second chart for "Statahead Speedup" is more useful,
+>> which is relatively independent from hardware (CPU and memory).
+>> It gives the trend of upper bound on performance improvement from
+>> statahead under different network configure, and different dir/file ratio.
+>>
+>>
+>> Thanks!
+>> --
+>> Fan Yong
+>>     
+>>>     Cheers,
+>>>               Eric
+>>>
+>>>
+>>>       
+>
+>
+>   
 
-I spent quite amount time thinking of wbc problem and I'd like to share
-the thoughts.
-
-for wbc we store metadata in local memory for two purposes:
-1) later reintegration 
-2) read access (lookup, getattr, readdir) w/o server involvement
-
-for (2) it makes sense to store everything as "state". e.g. directory
-contains all alive entries, inode contains last valid attributes, etc.
-let's call it state cache.
-
-in theory reintegration can be done from the state cache and this is
-probably the most efficient way (in terms of network traffic and memory
-footprint). but for simpler implementation we can introduce log of
-changes for (1). in turn, the log can be per-object or just global log
-for given filesystem.
-
-it's hard to implement state cache in terms of operations because usual
-operation involves more than one object (e.g. parent directory + file).
-it's much simpler when state cache is per-object. literally the best
-example is linux's dcache and inode cache.
-
-it's also fairly simple to maintain such cache at level where single
-object is being modified. for our purposes this matches layer implementing
-OSD API - because all operations in OSD API are per single object.
-
-the same applies to reintegration because:
-* we need to break complex operations to be sent to different servers anyway
-* if we'd need to optimize log (i.e., create/unlink), then it's simpler
-  to collapse log entries when they are basic operations
-* when we'd want to reintegrate from state cache
-
-we also need a layer to take metadata operations and translate them into
-per-object basic operations (updates). responsbility of this layer is:
-* to grab all required ldlm locks
-  as the layer understands operation's nature, locking rules, etc
-* to check current state
-  whether name exists alread (for create), permissions
-* to apply updates to state cache (and reintegration backend, if required)
-* to release ldlm locks
-
-essentially this is what current metadata server does. the difference is
-* locks to be acquired on remote node
-* current state can be on remote node (not in local state cache)
-* updates can be stored in local memory for later reintegration
-  (perhaps this applies to usual mds)
-
-it looks quite obvious that it'd make sense to use metadata server code to
-implement wbc:
-* ldlm hides where lock is being mastered
-* dedicated osd layer below metadata server can maintain state cache needed
-  to check existing names, attributes, permissions, etc
-* dedicated osd layer below metadata server can take care of reintegration
-
-
-implementation would look like set of the following modules:
-* mdf - metadata filter
-  this is location-free metadata server operating on top of osd api, grabs
-  ldlm locks, check current state, apply changes.
-* cosd - caching osd
-  this is dedicated layer with osd api, it maintains state cache and all data
-  needed for reintegration. it also tries to use network efficient: regular
-  lookup can be implemented via underlying readdir, etc.
-* gosd - global osd
-  very specific module allowing node to talk to remote storage over osd api,
-  it's stateless, something similar to current mdc, but using different apis.
-
-
-some obvious cons of this approach:
-* implementation doesn't rely on any system specific thing like dcache/icache
-* we can unify the code and re-use it to implement regular metadata server,
-  wbc and metadata proxy server
-* overall simplicity
-  inter-layer interaction is well defined and simple, same about layer's
-  functionality
-* clustered metadata fits this model very well because metadata server
-  doesn't need to know whether some update local or remote
-
-any comments and suggestions are very welcome!
-
-
-thanks, Alex
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: statahead_performance.ods
+Type: application/vnd.oasis.opendocument.spreadsheet
+Size: 32448 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090310/633988a7/attachment.ods>
