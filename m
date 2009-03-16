@@ -1,110 +1,64 @@
-From: Eric Barton <eeb@sun.com>
-Date: Mon, 16 Mar 2009 12:56:45 +0000
-Subject: [Lustre-devel] Oleg/Mike Work on Apps Metrics - FW: Mike Booth
- week ending 2009.03.15
-In-Reply-To: <48A6CF99-F630-4581-9FFC-05E3AFF66FA0@Sun.COM>
-References: <D691F7E6-6030-4EB9-896C-77201445D865@Sun.COM>
-	<C5E2A328.36EE0%Daniel.Ferber@Sun.Com>
-	<015c01c9a5a7$cb2f83a0$618e8ae0$@com>
-	<52E982EB-3ADE-46FA-A7BC-D1645961DF0B@Sun.COM>
-	<018101c9a5b6$25dbc300$71934900$@com>
-	<48A6CF99-F630-4581-9FFC-05E3AFF66FA0@Sun.COM>
-Message-ID: <023201c9a636$a987e4b0$fc97ae10$@com>
+From: Andrew C. Uselton <acuselton@lbl.gov>
+Date: Mon, 16 Mar 2009 13:41:40 -0700
+Subject: [Lustre-devel] protocol backofs
+In-Reply-To: <029901c9a66b$d7107020$85315060$@com>
+References: <49BEA192.2050701@lbl.gov> <029901c9a66b$d7107020$85315060$@com>
+Message-ID: <49BEB984.5030206@lbl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Mike,
+Howdy Isaac,
+   Nice to meet you.  As Eric suggested I am also cc:ing Nick Henke, 
+since he might find this an interesting discussion.  For all you 
+lustre-devel dwellers out there, feel free to chime in.
+   I have been running a few tests on the Franklin Cray XT at NERSC and 
+also on Jaguar (Cray XT at ORNL) and on Jacquard (Opteron/Infiniband 
+w/GPFS at NERSC).  You can see a lot of what I have done here:
 
-Yes, it would be fun to discuss - but I'm probably not going to be
-available for a discussion like that for a week or 2.
+	http://www.nersc.gov/~uselton/ipm-io.html
 
-BTW, I'm cc-ing lustre-devel since this is of general interest.
+In particular, this link shows something of interest:
 
-I _do_ agree that for some apps, if there was sufficient memory on the
-app node to buffer the local component of a checkpoint and let it
-"dribble" out to disk would achieve better utilization of the compute
-resource.  However parallel apps can be very sensitive to "noise" on
-the network they're using for inter- process communication - i.e. the
-checkpoint data has either to be written all the way to disk, or at
-least buffered somewhere so that moving it to disk will not interfere
-with the app's own communications.
+	http://www.nersc.gov/~uselton/frank_jag/
 
-This latter concept is the basis for the "flash cache" concept.
-Actually, I think it's worth exploring the economics of it in more
-detail.
+These tests use Madbench, which has a somewhat unusual I/O pattern.  It 
+is implementing an out-of-core solution to a series of very large matrix 
+operations.  The third row of graphs gives an idea of the aggregate I/O 
+emerging from the application over the course of the run.  It has a 
+pattern of writes, reads and writes, then reads.  Each of the I/O spikes 
+is from every task writing or reading a single 300 MB buffer.  The last 
+row of graphs gives a sense of the task by task behavior.
 
-The variables are aggregate network bandwidth into the distributed
-checkpoint cache, which determines the checkpoint time, and aggregate
-path-minimum bandwidth (i.e. lesser of network and disk bandwidth)
-from the cache to disk, which determines how soon the cache can be
-ready for the next checkpoint.  The cache could be dedicated nodes and
-storage (e.g. flash) or additional storage on the OSSes, or any
-combination of either.  And the interesting relationship is how
-compute cluster utilisation varies with the cost of the server and
-cache subsystems.
+The "frank_jag" page shows data collected during 4 test with 256 tasks 
+(4 tasks per node on 64 nodes).  The target is a single file striped 
+across all OSTs of the Lustre file system.   Two tests are on Franklin 
+and two on Jaguar.  Each machine runs a test using the POSIX I/O 
+interface and another using the MPI-I/O interface.  In the third column 
+the Franklin, MPI-I/O test has extremely long delays in the reads in the 
+middle phase, but not during the other reads or any of the writes.  This 
+does not happen for POSIX, nor does it happen for Jaguar using MPI-I/O. 
+  The results shown are entirely reproducible and not due to 
+interference from other jobs on the system.  The only difference between 
+the Franklin and Jaguar configurations is that Jaguar has 144 OSTs on 72 
+OSSs instead of 80 OSTs on 20 OSSs.
 
--- 
+Eric put the notion in my head that that we may be looking at a 
+contention issue in the Sea-Star network.  Since the I/O is being necked 
+down to 20 OSSs in the case of Franklin, this seems plausible.  If you 
+guys have a moment to consider the subject I'd like to think about:
+a)  Why would contention introduce the catastrophic delays rather than 
+just slow things down generally and more or less evenly?  Is there some 
+form of back-off in the protocol(s) that could occasionally get kicked 
+up to tens of seconds?
+b)  Why is the contention introduced only in the MPI-I/O test and not in 
+the POSIX test?  Does the MPI-I/O from Cray's xt-mpt/3.1.0 divert I/O to 
+a subset of nodes so that all the I/O is going through a smaller section 
+of the torus?
 
-        Cheers,
-                   Eric
-
-> -----Original Message-----
-> From: Michael.Booth at Sun.COM [mailto:Michael.Booth at Sun.COM]
-> Sent: 16 March 2009 3:06 AM
-> To: Eric Barton
-> Subject: Re: Oleg/Mike Work on Apps Metrics - FW: Mike Booth week ending 2009.03.15
-> 
-> Eric,
-> 
-> This is too bad.  I should run the test on my laptop and see if I get
-> the same behavior.
-> 
-> The huge bandwidth requirements (30+ gbyes/sec) that I see for
-> checkpoint-style I/O is driven in burst that last about 1/10 of the
-> time of the following computation.  There is not a desire to assure
-> that everything is on disk before resuming computations.  If while the
-> computations proceeded the system cleared out the cache, the next
-> write would go to cache at memory speed if the previous clean pages
-> could be reused for the next write.  The bandwidth requirement to
-> achieve what appears to be memory speed I/o could be achieved in this
-> case with 3 gbytes/sec.
-> 
->   There are middleware schemes being developed to do asynchronous I/O
-> on "other" nodes to transfer the checkpoint data out to the other
-> nodes so they write it all out.  To me this is the middleware working
-> at odds with what the system software should naturally do for the
-> application.
-> 
-> I think it is safe to say it is a minority of scientific applications
-> that are writing out and quickly reading it back like a typical linux
-> application, like web browsers.  This type of I/O is usually limited
-> to codes that are larger than the sum  of the nodes memory,, which is
-> rarer and rarer these days.
-> 
-> I believe that making this work for these codes is a win in three ways;,
-> 
->    One: reduces the need for high burst rate I/O to disk for many
-> programs while giving the perception of much faster I/O to the
-> application.
-> 
->    Two:  helps to reduce the impact of filesystem performance
-> variability,
-> 
->    Three: Overall in the system, not having the system being hit with
-> huge burst of I/O by tens of thousands of cores at seemingly random
-> times, could reduce the variability of the complete file system.
-> 
-> Should we discuss on the phone, with Oleg?
-> 
-> Thanks,, this is fun,
-> 
-> Mike
-> 
-> 
-> Michael Booth
-> michael.booth at sun.com
-> mobile  512-289-3805
-> 
+If I have been too terse in this note feel free to ask questions and 
+I'll try to add more detail.
+Cheers,
+Andrew
