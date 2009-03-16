@@ -1,158 +1,110 @@
-From: Vitaly Fertman <Vitaly.Fertman@Sun.COM>
-Date: Fri, 13 Mar 2009 18:32:00 +0300
-Subject: [Lustre-devel] SOM Recovery of open files
-Message-ID: <C7C2EDB9-409A-4BEA-9C9E-5A9CC3927653@sun.com>
+From: Eric Barton <eeb@sun.com>
+Date: Mon, 16 Mar 2009 12:56:45 +0000
+Subject: [Lustre-devel] Oleg/Mike Work on Apps Metrics - FW: Mike Booth
+ week ending 2009.03.15
+In-Reply-To: <48A6CF99-F630-4581-9FFC-05E3AFF66FA0@Sun.COM>
+References: <D691F7E6-6030-4EB9-896C-77201445D865@Sun.COM>
+	<C5E2A328.36EE0%Daniel.Ferber@Sun.Com>
+	<015c01c9a5a7$cb2f83a0$618e8ae0$@com>
+	<52E982EB-3ADE-46FA-A7BC-D1645961DF0B@Sun.COM>
+	<018101c9a5b6$25dbc300$71934900$@com>
+	<48A6CF99-F630-4581-9FFC-05E3AFF66FA0@Sun.COM>
+Message-ID: <023201c9a636$a987e4b0$fc97ae10$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi All,
+Mike,
 
-this is the summary of our following discussion with Andreas from Feb24,
-it includes the problem use cases of SOM recovery and interoperability,
-describes problems of each use case and suggests possible solutions.
+Yes, it would be fun to discuss - but I'm probably not going to be
+available for a discussion like that for a week or 2.
 
-UseCase1. Client is evicted from MDS and re-connects.
-UseCase2. MDS failover.
-UseCase3. Client eviction and following MDS failover.
+BTW, I'm cc-ing lustre-devel since this is of general interest.
 
-Problem1 File opened for write is not re-opened;
-Problem2. File opened (precisely, with IOEpoch opened) for truncate is  
-not re-opened;
-Problem3. Client is able to write (new syscall) to a not re-opened file
-(MDS has no control over IO happened in the cluster).
-Problem4. Client is able to flush dirty data to OST for a not re- 
-opened file.
-Problem5. Client is able to re-send a write RPC to OST for a not re- 
-opened file.
+I _do_ agree that for some apps, if there was sufficient memory on the
+app node to buffer the local component of a checkpoint and let it
+"dribble" out to disk would achieve better utilization of the compute
+resource.  However parallel apps can be very sensitive to "noise" on
+the network they're using for inter- process communication - i.e. the
+checkpoint data has either to be written all the way to disk, or at
+least buffered somewhere so that moving it to disk will not interfere
+with the app's own communications.
 
-Solution1: New OPEN rpc on recovery.
-Problem1.1: does not work for client eviction so far, when no MDS  
-recovery is involved.
-Problem1.2. even if recovery is involved but the client is already  
-evicted, it does not work.
-Problem1.2: does not work for truncate. The situation is pretty rare  
-as client does not
-cache punches, but what if at the time of the client eviction from  
-MDS, the connection
-between this client and an OST is unstable so that punches will hang  
-in the re-send list
-for a while, enough for another client to modify the file -- MDS gets  
-a new SOM cache,
-and later punch will modify the file.
+This latter concept is the basis for the "flash cache" concept.
+Actually, I think it's worth exploring the economics of it in more
+detail.
 
-Solution2: LOV EA lock, client blocks new IO if absent.
-Problem2.1: LOV EA works for new syscalls only, not for  
-(Problem4,Problem5).
+The variables are aggregate network bandwidth into the distributed
+checkpoint cache, which determines the checkpoint time, and aggregate
+path-minimum bandwidth (i.e. lesser of network and disk bandwidth)
+from the cache to disk, which determines how soon the cache can be
+ready for the next checkpoint.  The cache could be dedicated nodes and
+storage (e.g. flash) or additional storage on the OSSes, or any
+combination of either.  And the interesting relationship is how
+compute cluster utilisation varies with the cost of the server and
+cache subsystems.
 
-Solution3: SOM cache is removed upon client eviction for all the  
-opened IOEpochs
-Problem3.1. works until SOM cache is re-validated before some later  
-IO  happens
-from a lost client.
+-- 
 
-Solution4: client's dirty cache is controlled from OST through extent  
-locks.
-MDS removes SOM cache for inode on client eviction, next file writer  
-sees there is no
-cache on MDS upon file open, thus the cache is re-obtained under  
-[0;EOF] extent lock,
-what flushes all the data on OST.
-Problem4.1: Lockless IO (write,truncate) is not handled this way. rpc  
-may be sitting in
-the re-send list enough for another client to modify the file, SOM  
-cache is re-obtained
-to MDS, and delayed write/punch makes it invalid.
-Problem4.2: Locked truncate is not handled this way. Enqueue may be  
-sitting in re-send
-list similar to 4.1.
+        Cheers,
+                   Eric
 
-Solution5: Cluster flush on MDS-OST synchronization.
-SOM is disabled for a file until all the OSTs from its stripe are  
-synchronized with MDS;
-Synchronization includes: all the clients flushes their dirty cache to  
-OST, llog cookie is
-sent to MDS, MDS removes SOM cache for files involved. It means, a new  
-IOEpoch opens
-but cache is not re-validated at the end; getattr does not obtain SOM  
-cache.
-Problem5.1. Lockless IO (write,truncate) is not handled this way.
-Problem5.2. Locked truncate is not handled this way (see Problem4.2)
-
-UseCase4. Upgrade to SOM-enabled Lustre.
-All the above problems exists.
-
-Problem6. No IOEpoch has been opened (however, the SOM cache is  
-removed synchronously
-on open) truncate does not close "opened" file at all, i.e. MDS has no  
-control over IO happened
-in the cluster and later punch may destroy the SOM cache on MDS.
-
-Solution6. Send done_writing even if SOM is disabled.
-
-UseCase5. MDS fails over, a client has dirty cache but does not  
-participate in the recovery.
-
-Solution7. Invalidate SOM cache on MDS on close.
-I.e. instead of blocking IO on the client, remove SOM cache in advance.
-Problem7.1. the solution does not work, thus we cannot depend on  
-client as it may be evicted
-(UseCase5) if close is not committed yet, lockless IO still may happen  
-with a delay..
-
-Solution8. Evict client from OST once client is evicted from MDS (via  
-MDS->OSS connection and
-set_info(KEY_EVICT_BY_NID)). Or cancel this client extent locks only.  
-Therefore, prevent any IO
-happen since then.
-Problem8.1. if 2 mds failovers happen right one after another, it  
-seems mds is already not able to tell
-which clients are lost over failover -- after the first failover it  
-lets the clients to re-connect and
-overwrites the previous info about connected clients but does not  
-succeeds to tell ost to evict
-the client -- and here the 2nd mds failure happens.
-This solution could be probably done in some different way -- (a)  
-client itself informs OST it is
-evicted; (b) MDS provides the full list of connected clients to OST on  
-boot and then informs OSTs
-about client evictions;
-
-Solution9. Invalidate SOM cache on open for write.
-Problem1. Unless written synchronously, MDS may fail before open gets  
-committed.
-Problem2. Even if committed, a new IOEPOCH may re-validate SOM cache  
-which could become
-wrong due to a later lockless IO reached OST or a such.
-
-Still missed solutions:
-(*) block truncate and lockless IO (either it is a new syscall, an  
-enqueue rpc is in re-send
-list; lockless IO (write,truncate) is in the re-send list) until the  
-connection to MDS is restored.
-Problem: a possible race between time MDS restarts and client detects  
-it is evicted. I.e. client
-may continue to send IO to OST but it must detect the time (and block  
-its IO until file is re-opened)
-when MDS is up, MDS-OST synchronization is completed;
-
-Solution10. Cause the OST to get an ioepoch for the file and  
-invalidate the SOM cache on the
-MDS by itself BEFORE allowing the lockless operation to complete.
-
-Solution11. Client could wait for an open+SOM invalidate to commit  
-before sending the lockless
-operation.
-
-Solution12. OST may send a new RPC to all the clients once MDS-OST  
-synchronization starts.
-Clients re-validate its connection to MDS and re-opens files on MDS is  
-so, client blocks its IO
-to OST until done. If client re-connects to OST, it must re-validate  
-MDS connection as well
-right before that.
-
---
-Vitaly
+> -----Original Message-----
+> From: Michael.Booth at Sun.COM [mailto:Michael.Booth at Sun.COM]
+> Sent: 16 March 2009 3:06 AM
+> To: Eric Barton
+> Subject: Re: Oleg/Mike Work on Apps Metrics - FW: Mike Booth week ending 2009.03.15
+> 
+> Eric,
+> 
+> This is too bad.  I should run the test on my laptop and see if I get
+> the same behavior.
+> 
+> The huge bandwidth requirements (30+ gbyes/sec) that I see for
+> checkpoint-style I/O is driven in burst that last about 1/10 of the
+> time of the following computation.  There is not a desire to assure
+> that everything is on disk before resuming computations.  If while the
+> computations proceeded the system cleared out the cache, the next
+> write would go to cache at memory speed if the previous clean pages
+> could be reused for the next write.  The bandwidth requirement to
+> achieve what appears to be memory speed I/o could be achieved in this
+> case with 3 gbytes/sec.
+> 
+>   There are middleware schemes being developed to do asynchronous I/O
+> on "other" nodes to transfer the checkpoint data out to the other
+> nodes so they write it all out.  To me this is the middleware working
+> at odds with what the system software should naturally do for the
+> application.
+> 
+> I think it is safe to say it is a minority of scientific applications
+> that are writing out and quickly reading it back like a typical linux
+> application, like web browsers.  This type of I/O is usually limited
+> to codes that are larger than the sum  of the nodes memory,, which is
+> rarer and rarer these days.
+> 
+> I believe that making this work for these codes is a win in three ways;,
+> 
+>    One: reduces the need for high burst rate I/O to disk for many
+> programs while giving the perception of much faster I/O to the
+> application.
+> 
+>    Two:  helps to reduce the impact of filesystem performance
+> variability,
+> 
+>    Three: Overall in the system, not having the system being hit with
+> huge burst of I/O by tens of thousands of cores at seemingly random
+> times, could reduce the variability of the complete file system.
+> 
+> Should we discuss on the phone, with Oleg?
+> 
+> Thanks,, this is fun,
+> 
+> Mike
+> 
+> 
+> Michael Booth
+> michael.booth at sun.com
+> mobile  512-289-3805
+> 
