@@ -1,109 +1,56 @@
-From: Andrew C. Uselton <acuselton@lbl.gov>
-Date: Tue, 17 Mar 2009 14:45:59 -0700
-Subject: [Lustre-devel] protocol backofs
-In-Reply-To: <20090317152844.GG17185@sun.com>
-References: <49BEA192.2050701@lbl.gov> <029901c9a66b$d7107020$85315060$@com>
-	<49BEB984.5030206@lbl.gov> <20090317152844.GG17185@sun.com>
-Message-ID: <49C01A17.6070108@lbl.gov>
+From: Oleg Drokin <Oleg.Drokin@Sun.COM>
+Date: Wed, 18 Mar 2009 16:31:50 -0400
+Subject: [Lustre-devel] Oleg/Mike Work on Apps Metrics - FW: Mike Booth
+ week ending 2009.03.15
+In-Reply-To: <023201c9a636$a987e4b0$fc97ae10$@com>
+References: <D691F7E6-6030-4EB9-896C-77201445D865@Sun.COM>
+	<C5E2A328.36EE0%Daniel.Ferber@Sun.Com>
+	<015c01c9a5a7$cb2f83a0$618e8ae0$@com>
+	<52E982EB-3ADE-46FA-A7BC-D1645961DF0B@Sun.COM>
+	<018101c9a5b6$25dbc300$71934900$@com>
+	<48A6CF99-F630-4581-9FFC-05E3AFF66FA0@Sun.COM>
+	<023201c9a636$a987e4b0$fc97ae10$@com>
+Message-ID: <5CE22E46-771C-47EE-9CAC-26A37C87C466@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Isaac Huang wrote:
-> On Mon, Mar 16, 2009 at 01:41:40PM -0700, Andrew C. Uselton wrote:
->> Howdy Isaac,
-...
-> Hello Andrew, please see my comments inline.
-> 
->> ......
->> The "frank_jag" page shows data collected during 4 test with 256 tasks  
->> (4 tasks per node on 64 nodes).  The target is a single file striped  
->> across all OSTs of the Lustre file system.   Two tests are on Franklin  
->> and two on Jaguar.  Each machine runs a test using the POSIX I/O  
->> interface and another using the MPI-I/O interface.  In the third column  
->> the Franklin, MPI-I/O test has extremely long delays in the reads in the  
->> middle phase, but not during the other reads or any of the writes.  This  
-> 
-> I've got zero knowledge on MPI-IO. Could you please elaborate for a
-> bit on how this "delays in the reads" are measured and what "the
-> middle phase" is?
-> 
-All discussion is related to figures in:
+Hello!
 
-	http://www.nersc.gov/~uselton/frank_jag/
+On Mar 16, 2009, at 8:56 AM, Eric Barton wrote:
+> I _do_ agree that for some apps, if there was sufficient memory on the
+> app node to buffer the local component of a checkpoint and let it
+> "dribble" out to disk would achieve better utilization of the compute
+> resource.  However parallel apps can be very sensitive to "noise" on
+> the network they're using for inter- process communication - i.e. the
+> checkpoint data has either to be written all the way to disk, or at
+> least buffered somewhere so that moving it to disk will not interfere
+> with the app's own communications.
+> This latter concept is the basis for the "flash cache" concept.
+> Actually, I think it's worth exploring the economics of it in more
+> detail.
 
-The application in question is MADbench.  I can send a reference or two 
-if you want detail on how MADbench works.  In short it is an MPI 
-application that solves a very large matrix problem with an out-of-core 
-algorithm.  That is, It works on a matrix problem that fills all the 
-memory on all the nodes, 64 nodes/256 tasks in this case.  It must write 
-out intermediate results and the read them back in.  As such, every task 
-must execute a write of 300 MB at each step in "phase 1".  In our 
-example phase 1 has eight steps, so eight 300 MB writes from each of 256 
-tasks.  In "phase 2", each of the eight matrices must be read in turn, a 
-result calculated, and the result written out - for(i=0;i<8i++){read(300 
-MB); compute(); write(300 MB);}.  In "phase 3" the eight results are 
-again read back in and a final value calculated.
+This turns out to be a very true assertion. We (I) do see a huge delay
+in e.g. MPI barriers done immediately after write.
 
-So the reads in the middle phase take a long time when using an MPI-I/O 
-interface and a single-file I/O model.  If you follow along in the 
-graphs you should be able ot pick out the above actions and see where 
-the slow reads are.
+> The variables are aggregate network bandwidth into the distributed
+> checkpoint cache, which determines the checkpoint time, and aggregate
+> path-minimum bandwidth (i.e. lesser of network and disk bandwidth)
+> from the cache to disk, which determines how soon the cache can be
+> ready for the next checkpoint.  The cache could be dedicated nodes and
+> storage (e.g. flash) or additional storage on the OSSes, or any
+> combination of either.  And the interesting relationship is how
+> compute cluster utilisation varies with the cost of the server and
+> cache subsystems.
 
-The data for identifying this behavior comes from augmenting the 
-application with the "Integrated Performance Monitoring" library (IPM). 
-  That tool provides an event trace across the whole application of 
-library call, result, and timeing information.  Whith that one may 
-reconstruct the trace graphs see in the web page.  Other interesting 
-manipulations of that data also appear, for instance a histogram of 
-frequency of occurence versus bandwidth exibited by individual I/Os.
+The thing is, if we can just flush out data from the cache at the moment
+when there is no network-latency critical activity on the app side  
+(somehow
+signaled by the app), why would we need the flash storage at all? We can
+write nice sequential chunks to normal disks just as fast, I presume.
+It is the random i/o patterns that make flash shine.
 
-> 
-> Not sure about Franklin, but on Jaguar, depending on the file-system in
-> use, the OSSs could reside in either the Sea-Star network or an IB
-> network (accessed via lnet routers). I think it might be worthwhile to 
-> double check what server network had been used.
-> 
-I was using /lustre/scr144 on Jaguar.  I believe that is SeaStar.
-
-> 
-> It involves many layers:
-> 1. At Lustre/PTLRPC layer, there is a limit on the number of in-flight
-> RPCs to a server. This is end-to-end, and the limit could change at
-> runtime.
-The amount of I/O (1.2 GB per node, per step) is large enough I'd assume 
-we hit steady state in the RPC mechanism.  Most of the time all 
-available system "cache" is full and RPCs are being issued as quickly as 
-they can be completed.
-
-> 2. At lnet/lnd layer, for ptllnd and o2iblnd, there's a credit-based
-> mechanism to prevent a sending node from overrunning buffers at the
-> remote end. This is not end-to-end, and the number of pre-granted
-> credits doesn't change over runtime. 
-
-I am only vaguely familiar with the credit mechanism.   That would be 
-relevant for the writes, yes?  Is it possible to exhaust the available 
-credits and get blocked trying to clear "cache" such that the reads 
-(which got started after) can't complete until the writes are drained 
-from "cache".  that would certain address why the delays only occur in 
-the read,write,read,write... (middle) phase.
-
-> 3. Cray Portals and the Sea-Star network runs beneath lnet/ptllnd, 
-> and I'd think that there could also be some similar mechanisms.
-
-Yes, I'm shopping for an understanding of how things can get bogged down 
-this way, and why it only appears to happen for MPI-I/O not POSIX.
-
-> 
-> Thanks,
-> Isaac
-
-Your follow-up note about congestion is consistent with Eric's comment. 
-  It may be that the cross-section bandwidth to the region with the OSSs 
-is not high enough to forestall congestion.  This could be worse on 
-Franklin (20 OSSs) than on Jaguar (72 OSSs) even if Jaguar does have a 
-problem with it.
-Cheers,
-Andrew
+Bye,
+     Oleg
