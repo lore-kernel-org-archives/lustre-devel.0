@@ -1,40 +1,34 @@
-From: Alex Zhuravlev <bzzz@sun.com>
-Date: Wed, 25 Mar 2009 19:59:48 +0300
+From: Oleg Drokin <Oleg.Drokin@Sun.COM>
+Date: Wed, 25 Mar 2009 13:48:09 -0400
 Subject: [Lustre-devel] some observations about metadata writeback cache
-In-Reply-To: <3AF28E58-CF74-49C9-AED7-86BDBB5EEC65@sun.com>
+In-Reply-To: <m3prg5lerf.fsf@bzzz.home.net>
 References: <m37i2x3mny.fsf@bzzz.home.net>
 	<3AF28E58-CF74-49C9-AED7-86BDBB5EEC65@sun.com>
-Message-ID: <m3prg5lerf.fsf@bzzz.home.net>
+	<m3prg5lerf.fsf@bzzz.home.net>
+Message-ID: <878C772A-9A7F-4B1B-A7FB-31815306CA42@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->>>>> Robert Read (RR) writes:
+Hello!
 
- RR> Hi Alex,
- RR> I'm trying to figure out how untrusted (what I'm calling simple)
- RR> clients and trusted WBC-type clients will work together at the same
- RR> time. Simple clients will need to participate in the oldest volatile
- RR> epoch calculation, but will need to retain operations for replay.
- RR> I've draw a simplified picture of how I think things are beginning to
- RR> fit together, but more thought is needed here.
+On Mar 25, 2009, at 12:59 PM, Alex Zhuravlev wrote:
+> RR> Simple clients
+> RR>     - don't participate in global epochs
+> hmm. if committed (in terms of transno) request can be reverted
+> during global recovery, then even simple client has to retain
+> request on replay list till it's stable in terms of epochs?
 
- RR> Simple clients
- RR>     - don't participate in global epochs
+Supposedly, server that performed the operation on behalf of the client
+can do this? So the simple client semantic does not change - the moment
+server has some stable record about hte operation, client can throw the
+data away (otherwise simple clients would need to know how to  
+participate
+in rollback/replay even when the server the operation was sent to did  
+not
+go down).
 
-hmm. if committed (in terms of transno) request can be reverted
-during global recovery, then even simple client has to retain
-request on replay list till it's stable in terms of epochs?
-
- RR>     - don't have a node epoch or add epochs to messages
- RR>     - sends operations to MD server
- RR>     - replies include extended opaque "replay" data field
-
-probably we could simplify code a lot if we don't need to put
-reply into request in order to do replay? IOW, make all request's
-fields client-generated?
-
-
-thanks, Alex
+Bye,
+     Oleg
