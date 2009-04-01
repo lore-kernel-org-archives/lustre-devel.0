@@ -1,6 +1,6 @@
-From: Oleg Drokin <Oleg.Drokin@Sun.COM>
-Date: Tue, 31 Mar 2009 16:58:36 -0400
-Subject: [Lustre-devel] Oleg/Mike Work on Apps Metrics - FW: Mike Booth
+From: di wang <di.wang@sun.com>
+Date: Tue, 31 Mar 2009 23:35:24 -0400
+Subject: [Lustre-devel] Oleg/Mike Work on Apps Metrics - FW: Mike	Booth
  week ending 2009.03.15
 In-Reply-To: <20090331185111.GL3199@webber.adilger.int>
 References: <D691F7E6-6030-4EB9-896C-77201445D865@Sun.COM>
@@ -12,44 +12,38 @@ References: <D691F7E6-6030-4EB9-896C-77201445D865@Sun.COM>
 	<023201c9a636$a987e4b0$fc97ae10$@com>
 	<5CE22E46-771C-47EE-9CAC-26A37C87C466@sun.com>
 	<20090331185111.GL3199@webber.adilger.int>
-Message-ID: <179D81CC-3A2F-4D39-9A48-9BFA2F4D6BB0@Sun.COM>
+Message-ID: <49D2E0FC.4040605@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+Hello,
+Andreas Dilger wrote:
+> If each compute timestep takes 0.1s during IO vs 0.01s without IO and
+> you would get 990 timesteps during the write flush in the second case
+> until the cache was cleared, vs. none in the first case.  I suspect
+> that the overhead of the MPI communication on the Lustre IO is small,
+> since the IO will be limited by the OST network and disk bandwidth,
+> which is generally a small fraction of the cross-sectional bandwidth.
+>
+> This could be tested fairly easily with a real application that is
+> doing computation between IO, instead of a benchmark that is only doing
+> IO or only sleeping between IO, simply by increasing the per-OSC write
+> cache limit from 32MB to e.g. 1GB in the above case (or 2GB to avoid the
+> case where 2 processes on the same node are writing to the same OST).
+> Then, measure the time taken for the application to do, say, 1M timesteps
+> and 100 checkpoints with the 32MB and the 2GB write cache sizes.
+>
+>   
+Can we implement aio here? for  example  the  aio buffer can be treated  
+different as other dirty buffer, not
+being pushed aggressively to server. It seems with buffer_write, the 
+user have to deal with fs buffer cache
+issue in his application, not sure it is good for them, and we may not 
+even output these features to the
+application.
 
-On Mar 31, 2009, at 2:51 PM, Andreas Dilger wrote:
->>> This latter concept is the basis for the "flash cache" concept.
->>> Actually, I think it's worth exploring the economics of it in more
->>> detail.
->> This turns out to be a very true assertion. We (I) do see a huge  
->> delay
->> in e.g. MPI barriers done immediately after write.
-> While this is true, I still believe that the amount of delay seen by
-> the application cannot possibly be worse than waiting for all of the
-> IO to complete.  Also, the question is whether you are measuring the
-
-Absolutely.
-
-> FIRST MPI barrier after the write, vs e.g. the SECOND MPI barrier
-> after the write?  Since Lustre is currently aggressively flushing the
-> write cache then the first MPI barrier is essentially waiting for all
-> of the IO to complete, which is of course very slow.  The real item
-> of interest is how long the SECOND MPI barrier takes, which is what
-> the overhead of Lustre IO is on the network performance.
-
-Second MPI takes 1.5 seconds for me.
-
-> It is impossible that Lustre IO completely saturates the entire
-> cross-sectional bandwidth of the system OR the client CPUs, so having
-> some amount of computation for "free" during IO is still better than
-> waiting for the IO to complete.
-
-No arguments about that from me, I am advocating this same thing from
-the very beginning
-
-Bye,
-     Oleg
+Thanks
+WangDi
