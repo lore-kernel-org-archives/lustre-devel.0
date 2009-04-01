@@ -1,163 +1,78 @@
-From: Oleg Drokin <Oleg.Drokin@Sun.COM>
-Date: Wed, 01 Apr 2009 12:35:29 -0400
-Subject: [Lustre-devel] SeaStar message priority
-In-Reply-To: <1238601506.5091.65.camel@wheel>
-References: <74EA92D6-25E8-42DA-A4FD-BDDCED233244@Sun.COM>
-	<1238596005.5091.31.camel@wheel>
-	<D3750FED-36ED-4B07-9499-A8ABA7A2FCDA@Sun.COM>
-	<1238601506.5091.65.camel@wheel>
-Message-ID: <F939F52D-614F-4CA8-A80F-50CE31E3303A@Sun.COM>
+From: Michael Booth <Michael.Booth@Sun.COM>
+Date: Wed, 01 Apr 2009 07:41:44 -0400
+Subject: [Lustre-devel] Oleg/Mike Work on Apps Metrics - FW: Mike	Booth
+ week ending 2009.03.15
+In-Reply-To: <5D5BFAF6-9BE2-4778-AE81-A5EEF2A7026A@Sun.COM>
+References: <D691F7E6-6030-4EB9-896C-77201445D865@Sun.COM>
+	<C5E2A328.36EE0%Daniel.Ferber@Sun.Com>
+	<015c01c9a5a7$cb2f83a0$618e8ae0$@com>
+	<52E982EB-3ADE-46FA-A7BC-D1645961DF0B@Sun.COM>
+	<018101c9a5b6$25dbc300$71934900$@com>
+	<48A6CF99-F630-4581-9FFC-05E3AFF66FA0@Sun.COM>
+	<023201c9a636$a987e4b0$fc97ae10$@com>
+	<5CE22E46-771C-47EE-9CAC-26A37C87C466@sun.com>
+	<20090331185111.GL3199@webber.adilger.int> <49D2E0FC.4040605@sun.com>
+	<9BDC2632-E80E-4BA8-9ACF-8D7E70A9B236@Sun.COM>
+	<5D5BFAF6-9BE2-4778-AE81-A5EEF2A7026A@Sun.COM>
+Message-ID: <D68D6931-6B66-468A-A869-9097FC36A08D@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
 
-On Apr 1, 2009, at 11:58 AM, Lee Ward wrote:
-> I think my point was that there is already a priority scheme in the
-> Seastar. Are there additional bits related to priority that you might
-> use, also?
 
-But if we cannot use it, there is none.
-Like we want mpi rpcs go out first to some degree.
+On Apr 1, 2009, at 12:34 AM, Oleg Drokin wrote:
 
->>> I strongly suspect OS jitter, probably related to FS activity, is a
->>> much
->>> more likely explanation for the above. If just one node has the
->>> process/rank suspended then it can't service the barrier; All will
->>> wait
->>> until it can.
->> That's of course right and possible too.
->> Though given how nothing else is running on the nodes, I would think
->> it is somewhat irrelevant, since there is nothing else to give
->> resources to.
-> How and where memory is used on two nodes is different. How, where,
+> Hello!
+>
+> On Mar 31, 2009, at 11:55 PM, Michael Booth wrote:
+>> (My Opinion) The large size of the I/O request put onto the SeaStar
+>> by the Lustre client is giving it an artificially high priority.
+>> Barriers are just a few bytes, the I/Os from the client are in
+>> megabytes.   SeaStar has no priority in is queue, but  the amount of
+>> time it takes to clear megabyte request results in a priority that
+>> is thousands of times more impact on the hardware than the small
+>> synchronization requests of many collectives.  I am wondering if the
+>> interference from I/O to computation is more an artifact of message
+>> size and bursts,  than of congestion or routing inefficiencies in
+>> seastar..
+>> If there are hundreds of megabytes of request queued up on the
+>> network, and there is no priority way to push a barrier or other
+>> small mpi request up on the queue, it is bound to create a  
+>> disruption.
+>> To borrow the elevator metaphor from Eric,  if all the elevators are
+>> queued up from 8:00 to 9:00 delivering office supplies on carts that
+>> occupy the entire elevator, maybe the carts should be smaller, and
+>> limited to a few per elevator trip.
+>
+> As we discussed in the past, just sending small i/o messages is going
+> to uncover all kinds of slowdowns all the way back to the disk  
+> storage,
+> and the collateral damage would be other tasks that do need fast i/o
+> and do send big chunks of data.
+>
+> Bye,
+>     Oleg
+> _______________________________________________
 
-That's irrelevant.
+Don't take my explanation as a general suggestion for all I/O, It is a  
+suggestion for I/O taking place during times of need for high response  
+for mpi.  How to know when the need is high is another issue.
 
-> when, scheduling occurs on two nodes is different. Any two nodes, even
-> running the same app with barrier synchronization, perform things at
-> different times outside of the barriers; They very quickly  
-> desynchronize
-> in the presence of jitter.
+To over extend the metaphor, can the size of the office supply carts  
+be small and the amount number allowed on the elevator up be limited  
+from 8:00 to 9:00 am when the office people traffic is in need of high  
+response?
 
-But since the only thing I have in my app inside barriers is write call,
-there is no much way to desynchronize.
+It is clear to the application  when they are doing synchronous i/o  
+and don't care so much about mpi response and when they are in a stage  
+that a collective response is important.  For example:  the barrier  
+after an fsync is definitely desiring highest response to I/O  
+request.   After a barrier is complete, mpi would likely need highest  
+response, until another user synchronous i/o call, (not to include  
+printf's).  I could even be an explicit call to the Lustre client from  
+the application to switch the priority between states.
 
->> The Lustre processing of the outgoing queue is pretty fast in  
->> itself at
->> this phase.
->> Do you think it would be useful if I just run 1 thread per node,  
->> there
->> would be
->> 3 empty cores to adsorb all the jitter there might be then?
-> You will still get jitter. I would hope less, though, so it wouldn't
-> hurt to try to leave at least one idle core. We've toyed with the idea
-> of leaving a core idle for IO and other background processing in the
-> past. The idea was a non-starter with our apps folks though. Maybe the
-> ORNL folks will feel differently?
-
-No, I do not think they would like the idea to forfeit 1/4 of their
-CPU just so io is better.
-If the jitter is due to cpu occupied with io, and apps stalled due to  
-this
-(though I have hard time believing an app to be not given a cpu for  
-4.5 seconds,
-even though there are potentially 4 idle cpus, or even 3 (remember  
-other cores are
-also idle waiting on a barrier).
-
->>> Jitter gets a bad rap. Usually for good reason. However, in this  
->>> case,
->>> it doesn't seem something to worry overly much about as it will  
->>> cease.
->>> Your test says the 1st barrier after the write completes in 4.5 sec
->>> and
->>> the 2nd in 1.5 sec. That seems to imply the jitter is settling  
->>> pretty
->>> rapidly. Jitter is really only bad when it is chronic.
->> Well, 4.5*1200 = 1.5 hours of completely wasted cputime for my
->> specific job.
-> That 1200 is the number of checkpoints? If so, I agree. If it's the
-> number of nodes, I do not.
-
-1200 is number of cores waiting on a barrier.
-Every core spends 4.5 seconds == total wasted single-cpu core time is  
-1.5 hours.
-And the more often this happens the worse.
-
->> So I thought it would be a good idea to get to the root of it.
->> We hear many arguments here at the lab that "what good the buffered  
->> io
->> is for
->> me when my app performance is degraded if I don't do sync. I'll  
->> just do
->> the sync and be over with it". Of course I believe there is still
->> benefit to not
->> doing the sync, but that's just me.
-> If the time to settle the jitter is on the order of 10 seconds but it
-> takes 15 seconds to sync, it would be better to live with the jitter,
-> no? I suggested an experiment to make this comparison. Why argue with
-> them? just do the experiment and you can know which strategy is  
-> better.
-
-I know which one is better. I did the experiment. (though I have no  
-realistic way
-to measure when "jitter" settles out).
-
->>> To me, you are worrying way too much about the situation immediately
->>> after a write. Checkpoints are relatively rare, with long periods
->>> between. Why worry about something that's only going to affect a  
->>> very
->>> small portion of the overall job? As long as the jitter dissipates
->>> in a
->>> short time, things will work out fine.
->> I worry abut it specifically because users tend to do sync after the
->> write and that
->> wastes a lot of time. So as a result - I want as much of data to  
->> enter
->> into cache
->> and then trickle out all by itself and I want users not to see any  
->> bad
->> effects
->> (or otherwise to show to them that there are still benefits).
-> Users tend to do sync for more reasons than making the IO  
-> deterministic.
-> They should be doing it so that they can have some faith that the last
-> checkpoint is actually persistent when interrupted.
-
-For that they only need to do fsync before their next checkpoint,
-to make sure that the previous one completed.
-
-> However, they should do the sync right before they enter the IO phase,
-> in order to also get the benefits of write-back caching. Not after the
-> IO phase. In the event of an interrupt, this forces them to throw away
-> an in-progress checkpoint and the last one before that, to be safe,  
-> but
-> the one before the last should be good.
-
-Right.
-Yet they do some microbenchmark and decide it is bad idea.
-Besides, reducing jitter, or whatever is the cause for the delays
-would still be useful.
-
-> In some cases, your app programmers will be unfortunately correct. An
-> app that uses so much memory that the system cannot buffer the entire
-> write will incur at least some issues while doing IO; Some of the IO
-> must move synchronously and that amount will differ from node to node.
-> This will have the effect of magnifying this post-IO jitter they are  
-> so
-> worried about. It is also why I wrote in the original requirements for
-
-Why would it? There still is potentially a benefit for the available
-cache size.
-
-> Lustre that if write-back caching is employed there must be a way to
-> turn it off.
-
-There is around 3 ways to do that that I am aware of.
-
-Bye,
-     Oleg
+Mike
