@@ -1,91 +1,71 @@
-From: Oleg Drokin <Oleg.Drokin@Sun.COM>
-Date: Wed, 01 Apr 2009 11:14:19 -0400
-Subject: [Lustre-devel] SeaStar message priority
-In-Reply-To: <1238596005.5091.31.camel@wheel>
-References: <74EA92D6-25E8-42DA-A4FD-BDDCED233244@Sun.COM>
-	<1238596005.5091.31.camel@wheel>
-Message-ID: <D3750FED-36ED-4B07-9499-A8ABA7A2FCDA@Sun.COM>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Wed, 01 Apr 2009 08:16:40 -0700
+Subject: [Lustre-devel] [Lustre-discuss] Start the MGS first?
+In-Reply-To: <1238103314.4115.11.camel@sledge.emsl.pnl.gov>
+References: <49CA8A73.9080103@sun.com>
+	<1238103314.4115.11.camel@sledge.emsl.pnl.gov>
+Message-ID: <49D38558.2040709@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
-
-On Apr 1, 2009, at 10:26 AM, Lee Ward wrote:
->>   It came to my attention that seastar network does not implement
->> message priorities for various reasons.
-> That is incorrect. The seastar network does implement at least one
-> priority scheme based on age. It's not something an application can  
-> play
-> with if I remember right.
-
-Well, then it's as good as none for our purposes, I think?
-
-> I strongly suspect OS jitter, probably related to FS activity, is a  
-> much
-> more likely explanation for the above. If just one node has the
-> process/rank suspended then it can't service the barrier; All will  
-> wait
-> until it can.
-
-That's of course right and possible too.
-Though given how nothing else is running on the nodes, I would think
-it is somewhat irrelevant, since there is nothing else to give  
-resources to.
-The Lustre processing of the outgoing queue is pretty fast in itself at
-this phase.
-Do you think it would be useful if I just run 1 thread per node, there  
-would be
-3 empty cores to adsorb all the jitter there might be then?
-
-> Jitter gets a bad rap. Usually for good reason. However, in this case,
-> it doesn't seem something to worry overly much about as it will cease.
-> Your test says the 1st barrier after the write completes in 4.5 sec  
-> and
-> the 2nd in 1.5 sec. That seems to imply the jitter is settling pretty
-> rapidly. Jitter is really only bad when it is chronic.
-
-Well, 4.5*1200 = 1.5 hours of completely wasted cputime for my  
-specific job.
-So I thought it would be a good idea to get to the root of it.
-We hear many arguments here at the lab that "what good the buffered io  
-is for
-me when my app performance is degraded if I don't do sync. I'll just do
-the sync and be over with it". Of course I believe there is still  
-benefit to not
-doing the sync, but that's just me.
-
-> To me, you are worrying way too much about the situation immediately
-> after a write. Checkpoints are relatively rare, with long periods
-> between. Why worry about something that's only going to affect a very
-> small portion of the overall job? As long as the jitter dissipates  
-> in a
-> short time, things will work out fine.
-
-I worry abut it specifically because users tend to do sync after the  
-write and that
-wastes a lot of time. So as a result - I want as much of data to enter  
-into cache
-and then trickle out all by itself and I want users not to see any bad  
-effects
-(or otherwise to show to them that there are still benefits).
-
-> Maybe you could convince yourself of the efficacy of write-back  
-> caching
-> in this scenario by altering the  app to do an fsync() after the write
-> phase on the node but before the barrier? If the app can get back to
-> computing, even with the jitter-disrupted barrier, faster than it  
-> could
-> by waiting for the outstanding dirty buffers to be flushed then it's a
-> net win to just live with the jitter, no?
-
-I do not need to convince myself. IT's the app programmers that are  
-fixated
-on "oh, look, my program is slower after the write if I do not do  
-sync, I must
-do sync!"
-
-Bye,
-     Oleg
+Kevin Fox wrote:
+> On Wed, 2009-03-25 at 12:48 -0700, Nathaniel Rutman wrote:
+>   
+>> As of Lustre 1.6, servers can be started in any order (after the
+>> initial registration at first startup).  Internally, this required
+>> significant bending of our connection rules, and with a move toward
+>> ZFS becomes even more burdensome. 
+>> So my question to the Lustre community is this: would anyone
+>> strenuously object to a startup ordering requirement that the MGS must
+>> be started before any other servers? 
+>> This would probably be in the Lustre 3.0 timeframe.  It is also likely
+>> that we will have to divorce the MGS and MDT onto separate devices --
+>> no more "combo" MDT/MGSes.
+>>
+>>     
+>
+> "server startup" being, things wont start working until the MGS is up,
+> or, server startup commands will fail if the MGS is not up?
+>
+> The former, is much better then the latter. It allows the system to
+> potentially bring itself back up automatically if things get rebooted
+> (power bump, spike, etc).
+>
+>   
+The former.  Server mount commands would just block until the MGS was 
+available (probably with an optional timeout).  So the only thing that 
+would fail is serialized startup of OST before MGS -- independent, 
+unordered startup would sort itself out.
+> Kevin
+>
+>   
+>>>>  NR> I think the only reason to have a local config file is to be
+>>>>         
+>> able to
+>>     
+>>>>  NR> start a server in the absence of the MGS.  How much effort do
+>>>>         
+>> we want
+>>     
+>>>>  NR> to expend to be able to keep that ability?  I don't think
+>>>>         
+>> it's a huge
+>>     
+>>>>  NR> burden to say "MGS must be started first".
+>>>>         
+>> _______________________________________________
+>> Lustre-discuss mailing list
+>> Lustre-discuss at lists.lustre.org
+>> http://lists.lustre.org/mailman/listinfo/lustre-discuss
+>>
+>>
+>>     
+>
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>   
