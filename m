@@ -1,86 +1,103 @@
-From: Lee Ward <lee@sandia.gov>
-Date: Wed, 1 Apr 2009 08:26:45 -0600
+From: Oleg Drokin <Oleg.Drokin@Sun.COM>
+Date: Wed, 01 Apr 2009 11:02:04 -0400
 Subject: [Lustre-devel] SeaStar message priority
-In-Reply-To: <74EA92D6-25E8-42DA-A4FD-BDDCED233244@Sun.COM>
+In-Reply-To: <49D3644A.9090001@cray.com>
 References: <74EA92D6-25E8-42DA-A4FD-BDDCED233244@Sun.COM>
-Message-ID: <1238596005.5091.31.camel@wheel>
+	<49D3644A.9090001@cray.com>
+Message-ID: <55153681-EA57-489A-ACD0-6A65EC03B6AB@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 2009-03-31 at 22:43 -0600, Oleg Drokin wrote:
-> Hello!
-> 
->    It came to my attention that seastar network does not implement  
-> message priorities for various reasons.
+Hello!
 
-That is incorrect. The seastar network does implement at least one
-priority scheme based on age. It's not something an application can play
-with if I remember right.
+On Apr 1, 2009, at 8:55 AM, Nic Henke wrote:
+>>   It came to my attention that seastar network does not implement
+>> message priorities for various reasons.
+>>   I really think there is very valid case for the priorities of some
+>> sort to allow MPI and other
+>>   latency-critical traffic to go in front of bulk IO traffic on the
+>> wire.
+> In the ptllnd, the bulk traffic is setup via short messages, so if the
+> barrier is sent right after the write() returns, it really isn't  
+> backed
+> up behind the bulk data.
 
->    I really think there is very valid case for the priorities of some  
-> sort to allow MPI and other
->    latency-critical traffic to go in front of bulk IO traffic on the  
-> wire.
+Yes, it is.
+Lustre starts to send RPCs as soon as 1M (+16) pages of data per RPC  
+become
+available for sending.
+So by the time write() syscall for 250M returns, I already potentially  
+have
+16 (stripe count) * 4 (core count) * 8 (rpcs in flight) MB in flight
+from this particular node (since chances are OSTs already accepted the
+transfers if there are free threads).
 
-That would be very difficult to implement without making starvation
-scenarios trivial.
+> This sounds much more like barrier jitter than backup. The network is
+> capable of servicing the 250M in < .15s. It would be my guess that  
+> some
+> of the writes() are taking longer than others and this is causing the
+> barrier to be delayed.
 
->    Consider this test I was running the other day on Jaguar. The  
-> application writes 250M of data from every
->    core with plain write() system call, the write() syscall returns  
-> very fast (less than 0.5 sec == 400+Mb/sec
->    app-perceived bandwidth) because the data just goes to the memory  
-> cache to be flushed later.
->    Then I do 2 barriers one by one with nothing in between.
->    If I run it at sufficient scale (say 1200 cores), the first barrier  
-> takes 4.5 seconds to complete and
->    the second one 1.5 seconds, all due to MPI RPCs being stuck behind  
-> huge bulk data requests on the clients,
->    presumably (I do not have any other good explanations at least).
->    This makes for a lot of wasted time in applications that would like  
-> to use the buffering capabilities provided
->    by the OS.
+No.
+I time each individual write separately.
+I know all writes start at the same time (there is barrier before them),
+I know that each write finishes in aprox 0.5 sec as well.
 
-I strongly suspect OS jitter, probably related to FS activity, is a much
-more likely explanation for the above. If just one node has the
-process/rank suspended then it can't service the barrier; All will wait
-until it can.
+> A few questions:
+> - how many OSS/OSTs are you writing to ?
 
-Jitter gets a bad rap. Usually for good reason. However, in this case,
-it doesn't seem something to worry overly much about as it will cease.
-Your test says the 1st barrier after the write completes in 4.5 sec and
-the 2nd in 1.5 sec. That seems to imply the jitter is settling pretty
-rapidly. Jitter is really only bad when it is chronic.
+up to 16 * 4 from a single node.
 
-To me, you are worrying way too much about the situation immediately
-after a write. Checkpoints are relatively rare, with long periods
-between. Why worry about something that's only going to affect a very
-small portion of the overall job? As long as the jitter dissipates in a
-short time, things will work out fine.
+> - can you post the MPI app you are using to do this ?
 
-Maybe you could convince yourself of the efficacy of write-back caching
-in this scenario by altering the  app to do an fsync() after the write
-phase on the node but before the barrier? If the app can get back to
-computing, even with the jitter-disrupted barrier, faster than it could
-by waiting for the outstanding dirty buffers to be flushed then it's a
-net win to just live with the jitter, no?
+Sure.
+Attached. (with example output)
 
-		--Lee
+> The application folks @ ORNL should be able to help you use Craypat or
+> Apprentice to get some runtime data on this app to find where the time
+> is going. Until we have hard data, I don't think we can blame the  
+> network.
 
-> 
->    Do you think something like this could be organized if not for  
-> current revision then at least for the next
->    version?
-> 
-> Bye,
->      Oleg
->   
->   
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> 
+Interesting idea.
+Please notice if I run the code at a scale of 4, barrier is instant.
+As I scale up node count, barrier time begins to rise.
+
+In the output you can see I run the code twice in a row.
+This is done to make sure the grant is primed in case it was not, to  
+take
+entire amount of data into the cache (otherwise in some runs some
+individual writes take significant time to complete invalidating the  
+test).
+Another thing of note is that since I did not want to take any chances,
+the working files are precreated externally so that no files
+share any ost for a single node, and the app itself just opens the  
+files,
+not creates them.
+
+
+Bye,
+     Oleg
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: writespeed-big.c
+Type: application/octet-stream
+Size: 3955 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090401/adcae1f6/attachment.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: writespeed_big.o555745
+Type: application/octet-stream
+Size: 320418 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090401/adcae1f6/attachment-0001.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: writespeed_big.pbs
+Type: application/octet-stream
+Size: 362 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090401/adcae1f6/attachment-0002.obj>
