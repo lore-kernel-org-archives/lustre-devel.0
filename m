@@ -1,7 +1,7 @@
 From: Alexander Zarochentsev <Alexander.Zarochentsev@Sun.COM>
-Date: Sun, 05 Apr 2009 23:50:27 +0300
-Subject: [Lustre-devel] [RFC] two ideas for Meta Data Write Back Cache
-Message-ID: <200904060050.27903.alexander.zarochentsev@sun.com>
+Date: Mon, 06 Apr 2009 07:29:25 +0300
+Subject: [Lustre-devel] two ideas for Meta Data Write Back Cache
+Message-ID: <200904060829.26043.alexander.zarochentsev@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
