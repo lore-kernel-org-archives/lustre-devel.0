@@ -1,53 +1,43 @@
-From: Nikita Danilov <danilov@gmail.com>
-Date: Mon, 6 Apr 2009 11:43:01 +0400
-Subject: [Lustre-devel] OSD iterator interface
-In-Reply-To: <m3tz526ycz.fsf@bzzz.home.net>
-References: <E14DEA02-826C-4F15-8A22-9FA616EFDBC4@Sun.COM>
-	<49D51B32.2020404@sun.com> <m3tz526ycz.fsf@bzzz.home.net>
-Message-ID: <8acda98c0904060043j289382dfodea4616cb6883f9c@mail.gmail.com>
+From: di wang <di.wang@sun.com>
+Date: Mon, 06 Apr 2009 18:02:14 -0400
+Subject: [Lustre-devel] [RFC] two ideas for Meta Data Write Back Cache
+In-Reply-To: <m3zleu5b8f.fsf@bzzz.home.net>
+References: <200904061339.02850.alexander.zarochentsev@sun.com>
+	<20090406100345.GO3199@webber.adilger.int>
+	<m3zleu5b8f.fsf@bzzz.home.net>
+Message-ID: <49DA7BE6.6070006@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-2009/4/6 Alex Zhuravlev <bzzz@sun.com>
 
-Hello,
+> 2) "create w/o name" (this is what MDT accepts these days) isn't operation,
+>    it's partial operation. but for partial operations we already have OSD
+>    - clear, simple and generic. having one more "partial operations" adds
+>    nothing besides confusion, IMHO
+>   
+I am not sure you can( or should) translate all the MD partial 
+operation  into object  RPC for these partial
+MD operation.  For example rename,  (a/b  ---> c/d,  a/b in MDS1, c/d in 
+MDS2).
 
+     RPC goes to MDS1.
 
-> I agree with what Oleg said. I think there are two-stages processing here:
-> 1) osd should be able to clean "value" from compatibility stuff like inodes
-> 2) mdd should be able to store this value in own buffer in, possible, some
->   efficient form
->
-> >>>>> di wang (dw) writes:
->
+     1) delete d (entry and object) from c in MDS2.
+     2) create b entry under c in MDS2.
+     3) delete b entry under a in MDS1.
 
-[...]
+So if you do 1) and 2) by object rpc (skip mdd), then you might need 
+create create all 4 objects
+(a and b are local object, c and d are remote object),  and permission 
+check locally (whether
+you can delete d under c). Not sure it is a good way.  And also some 
+quota stuff are handled
+in these partial operation in remote MDD, so I am not sure we should 
+skip mdd totally here.
+Am I miss sth?
 
-
->
->  >>
->  >> Am I missing something stupid? Are there any objections, would
->  >> this break anything?
->
-
-the  reason dt_it_ops have one-entry-at-a-time interface is that originally
-iterators were able to update indices as well. *E.g.*, it was expected that
-/orphan index processing would read one entry, handle it, and then delete it
-from the index (a possibly mistaken belief in the virtue of simplicity and
-evilness of premature optimization also played its r?le). Eventually all
-existing use cases for the updating iterators were eliminated and ->set_*()
-methods were dropped from dt_it_ops.
-
-
->  >>
->  >> Bye,
->  >> Oleg
->
-
-Nikita.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090406/5b040647/attachment.htm>
+Thanks
+WangDi
