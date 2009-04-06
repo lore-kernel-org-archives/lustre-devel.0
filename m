@@ -1,93 +1,71 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Mon, 06 Apr 2009 04:03:45 -0600
-Subject: [Lustre-devel] [RFC] two ideas for Meta Data Write Back Cache
-In-Reply-To: <200904061339.02850.alexander.zarochentsev@sun.com>
-References: <200904061339.02850.alexander.zarochentsev@sun.com>
-Message-ID: <20090406100345.GO3199@webber.adilger.int>
+From: Alexander Zarochentsev <Alexander.Zarochentsev@Sun.COM>
+Date: Mon, 06 Apr 2009 13:23:51 +0300
+Subject: [Lustre-devel] WBC HLD outline
+In-Reply-To: <00a001c9b2a2$45665430$d032fc90$@com>
+References: <200903240058.30343.alexander.zarochentsev@sun.com>
+	<00a001c9b2a2$45665430$d032fc90$@com>
+Message-ID: <200904061423.51437.alexander.zarochentsev@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Apr 06, 2009  13:39 +0400, Alexander Zarochentsev wrote:
-> There are ideas about WBC client MD stack, WBC protocol and changes 
-> needed at server side. They are Global OSD and another idea (let's name 
-> it CMD3+) explained in the WBC HLD outline draft.
->  
-> Brief descriptions of the ideas:
-> 
-> GOSD: 
-> 
-> a portable component (called MDS in Alex's presentation) transates MD 
-> operations into OSD operations (updates).
-> 
-> MDS may be at client side (WBC-client), proxy server or MD server.
-> 
-> The MDS component is very similar to current MDD (Local MD server) layer 
-> in CMD3 server stack. I.e. it works like a local MD server, but the OSD 
-> layer below is not local, it is GOSD. 
-> 
-> It is simple as the local MD server and simplifies MD server stack a 
-> lot. Current MD stack processes MD operations at any level of MDT, CMM 
-> and MDD. First two levels should understand what is CMD and MDD layer 
-> should understand that some MD operations can be partial. It sounds 
-> like a unneeded complication. With GOSD those layers will be replaced 
-> by only one as simple as MDD layer! (however LDLM locking should be 
-> added).
+Hello Eric,
 
-My internal thoughts (in the absence of ever haven taken a close look
-at the HEAD MD stack) have always been that we would essentially be
-moving the CMM to the client, and have it always connect to remote
-MDTs (i.e. no local MDD) if we want to split "operations" into "updates".
+Thanks for the review,
 
-I'd always visualized that the MDT accepts "operations" (as it does
-today) and CMM is the component that decides what parts of the operation
-are local (passed to MDD) and which are remote (passed to MDC).
+On 1 April 2009 12:17:17 Eric Barton wrote:
+> Zam,
+>
+> Some notes on the WBC HLD outline
 
-Maybe the MD stack layering isn't quite as clean as this?
+[...]
 
-> CMD3+:
-> 
-> The component running on WBC client is based on MDT excluding transport 
-> things. Code reuse is possible.
-> 
-> The WBC protocol logically is the current MD protocol with the partial 
-> MD operations (object create w/o name, for example). Partial operations 
+>
+> 5. Is ensuring file data is delayed until file creation is
+>    reintegrated sufficient for correct operation?  Are we not
+>    effectively doing create-on-write with a WBC?  I'm sure there
+>    are more issues (e.g. orphans).
+>
+>    Does including the OSTs in epoch recovery solve all the issues? 
+> If so, what are the expected bounds on client redo and server undo
+> storage?  Can we avoid needing server undo for data with some
+> compromises?  Can we exploit the DMU at all?
 
-partial operations == updates?
+I think we can't avoid tagging OST object creation w/ epoch counter.
+Would Lustre users complain if file writes are out-of-epochs?
 
-> are already used between MD servers for distributed MD operations. MD 
-> operations will be packed into batches.
-> 
-> Both ideas (GOSD and CMD3+) assume a cache manager at WBC client to do 
-> caching & redo-logging of operations.
-> 
-> I think CMD3+ has minimum impact to current Lustre-2.x design. It is 
-> closer to the original goal of just implementation of WBC feature. But 
-> the GOSD is an attractive idea and may be potentially better.
-> 
-> With GOSD I am worrying about making Lustre 2.x unstable for some period 
-> of time. It would be good to think about a plan of incremental 
-> integration of new stack into existing code.
+So a write to existing OST object may survive loosing the context of MD 
+operations where the write operation was issued, object 
+creation/deletion may not.
 
-Wouldn't GOSD just end up being a new ptlrpc interface that exports the
-OSD protocol to the network?  This would mean that we need to be able
-to have multiple services working on the same OSD (both MDD for classic
-clients, and GOSD for WBC clients).  That isn't a terrible idea, because
-we have also discussed having both MDT and OST exports of the same OSD
-so that we can efficiently store small files directly on the MDT and/or
-scale the number of MDTs == OSTs for massive metadata performance.
+The alternative is to implement undo logging for file data. It would 
+require support from underlaying server fs. It could be done for 
+ldiskfs, not sure about DMU.
 
-I'd like to keep this kind of layering in mind also.  Whether it makes
-sense to export yet another network protocol to clients, or instead to
-add new operations to the existing service handlers so that they can
-handle all of the operation types (with efficient passthrough to lower
-layers as needed) and be able to multiplex the underlying device
-to clients.
+There is a security problem with out-of-epochs writes and setting 
+file attributes (especially permissions):
+chmod 400 foo; cat /etc/secret-file >> foo. Chmod/chown can be a special 
+case which triggers wbc flush.
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+> 6. The section on recovering from WBC client death seems imprecise.
+>    Is (a) just describing V1-4 in Nikita's original post - similarly
+>    (b) for V1-2, V3'-5'?  Also, for (c) I think we may have discussed
+>    the possibility of always sending updates as the full operation +
+>    context to select which updates apply locally so that an operation
+>    can always be recovered from any of its updates.
+
+It is only a rough schema of client eviction to list what support might 
+be needed in wbc protocol, like sending full MD op instead of update-- 
+what you just mentioned. BTW, I thought Epochs HLD would cover the 
+detailed algorithm descriptions, no?
+
+>     Cheers,
+>               Eric
+
+Thanks,
+-- 
+Alexander "Zam" Zarochentsev
+Staff Engineer
+Lustre Group, Sun Microsystems
