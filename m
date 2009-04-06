@@ -1,66 +1,69 @@
-From: Alex Zhuravlev <bzzz@sun.com>
-Date: Mon, 06 Apr 2009 11:21:48 +0400
-Subject: [Lustre-devel] OSD iterator interface
-In-Reply-To: <49D51B32.2020404@sun.com>
-References: <E14DEA02-826C-4F15-8A22-9FA616EFDBC4@Sun.COM>
-	<49D51B32.2020404@sun.com>
-Message-ID: <m3tz526ycz.fsf@bzzz.home.net>
+From: Alexander Zarochentsev <Alexander.Zarochentsev@Sun.COM>
+Date: Mon, 06 Apr 2009 13:39:02 +0400
+Subject: [Lustre-devel] [RFC] two ideas for Meta Data Write Back Cache
+Message-ID: <200904061339.02850.alexander.zarochentsev@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+... lustre-devel@ doesn't want to deliver the message, so I am adding CC 
+list this time.
 
-I agree with what Oleg said. I think there are two-stages processing here:
-1) osd should be able to clean "value" from compatibility stuff like inodes
-2) mdd should be able to store this value in own buffer in, possible, some
-   efficient form
+Hello,
 
->>>>> di wang (dw) writes:
+There are ideas about WBC client MD stack, WBC protocol and changes 
+needed at server side. They are Global OSD and another idea (let's name 
+it CMD3+) explained in the WBC HLD outline draft.
+ 
+Brief descriptions of the ideas:
 
- dw> Hello,
- dw> In new MDS stack, osd suppose do not understand Directory (IMHO), and
- dw> it only provides
- dw> index API. MDD  will  use  the index API  to fill the dir entries.
+GOSD: 
 
- dw> The filldir in current EA index API is just for compatible with old version
- dw> of  MDS.  Maybe we need bulk index API for readdir ?  But Alex should
- dw> know more.
+a portable component (called MDS in Alex's presentation) transates MD 
+operations into OSD operations (updates).
 
- dw> Thanks
- dw> WangDi
+MDS may be at client side (WBC-client), proxy server or MD server.
 
- dw> Oleg Drokin wrote:
- >> Hello!
- >> 
- >> While inspecting patches in bug 17560 it struck me as odd that
- >> we  are fetching the data one entry at a time from the filesystem,
- >> so I  asked a many-entries at a time
- >> approach to be implemented. Now the patch in the bug just fills
- >> the osd buffer with entries (after parsing them) and then actual
- >> user  (e.g. __mdd_readpage)
- >> reparses the osd buffer and copies data to its own. This is a
- >> lot  of wasted processing, copies and then some extra memory usage.
- >> So in my opinion the iterator interface should be reworked to
- >> accept an iterator and a buffer and then __mdd_readdir will pass in
- >> its own
- >> parsing of the data (with possible generalized preparsing from
- >> osd  so that we are fs-neutral) and will directly fill its own
- >> buffer to  the amount it actually needs,
- >> kind of like any kernel filldir functions already work right now.
- >> 
- >> Am I missing something stupid? Are there any objections, would
- >> this break anything?
- >> 
- >> Bye,
- >> Oleg
- >> _______________________________________________
- >> Lustre-devel mailing list
- >> Lustre-devel at lists.lustre.org
- >> http://lists.lustre.org/mailman/listinfo/lustre-devel
- >> 
+The MDS component is very similar to current MDD (Local MD server) layer 
+in CMD3 server stack. I.e. it works like a local MD server, but the OSD 
+layer below is not local, it is GOSD. 
 
+It is simple as the local MD server and simplifies MD server stack a 
+lot. Current MD stack processes MD operations at any level of MDT, CMM 
+and MDD. First two levels should understand what is CMD and MDD layer 
+should understand that some MD operations can be partial. It sounds 
+like a unneeded complication. With GOSD those layers will be replaced 
+by only one as simple as MDD layer! (however LDLM locking should be 
+added).
 
+CMD3+:
+
+The component running on WBC client is based on MDT excluding transport 
+things. Code reuse is possible.
+
+The WBC protocol logically is the current MD protocol with the partial 
+MD operations (object create w/o name, for example). Partial operations 
+are already used between MD servers for distributed MD operations. MD 
+operations will be packed into batches.
+
+Both ideas (GOSD and CMD3+) assume a cache manager at WBC client to do 
+caching & redo-logging of operations.
+
+I think CMD3+ has minimum impact to current Lustre-2.x design. It is 
+closer to the original goal of just implementation of WBC feature. But 
+the GOSD is an attractive idea and may be potentially better.
+
+With GOSD I am worrying about making Lustre 2.x unstable for some period 
+of time. It would be good to think about a plan of incremental 
+integration of new stack into existing code.
+
+It is a request for comments and new ideas because design mistakes would 
+be too costly.
+
+Thanks,
 -- 
-thanks, Alex
+Alexander "Zam" Zarochentsev
+Staff Engineer
+Lustre Group, Sun Microsystems
