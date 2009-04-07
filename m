@@ -1,48 +1,45 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Mon, 06 Apr 2009 23:18:43 -0700
+From: Alex Zhuravlev <bzzz@sun.com>
+Date: Tue, 07 Apr 2009 10:30:11 +0400
 Subject: [Lustre-devel] WBC HLD outline
-In-Reply-To: <200904061423.51437.alexander.zarochentsev@sun.com>
+In-Reply-To: <20090407061843.GA3204@webber.adilger.int>
 References: <200903240058.30343.alexander.zarochentsev@sun.com>
 	<00a001c9b2a2$45665430$d032fc90$@com>
 	<200904061423.51437.alexander.zarochentsev@sun.com>
-Message-ID: <20090407061843.GA3204@webber.adilger.int>
+	<20090407061843.GA3204@webber.adilger.int>
+Message-ID: <m3k55x3rik.fsf@bzzz.home.net>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Apr 06, 2009  13:23 +0300, Alexander Zarochentsev wrote:
-> On 1 April 2009 12:17:17 Eric Barton wrote:
-> I think we can't avoid tagging OST object creation w/ epoch counter.
-> Would Lustre users complain if file writes are out-of-epochs?
-> 
-> There is a security problem with out-of-epochs writes and setting 
-> file attributes (especially permissions):
-> chmod 400 foo; cat /etc/secret-file >> foo. Chmod/chown can be a special 
-> case which triggers wbc flush.
+>>>>> Andreas Dilger (AD) writes:
 
-While this example has been given many times as a security issue that
-forces many strange actions on the part of Lustre, the example is
-fundamentally broken because POSIX allows "foo" to be opened before the
-chmod, and kept open until after the write and then read the "secret-file"
-content.  The "foo" file needs to be created securely in the first place
-to be safe.
+ AD> On Apr 06, 2009  13:23 +0300, Alexander Zarochentsev wrote:
+ >> On 1 April 2009 12:17:17 Eric Barton wrote:
+ >> I think we can't avoid tagging OST object creation w/ epoch counter.
+ >> Would Lustre users complain if file writes are out-of-epochs?
+ >> 
+ >> There is a security problem with out-of-epochs writes and setting 
+ >> file attributes (especially permissions):
+ >> chmod 400 foo; cat /etc/secret-file >> foo. Chmod/chown can be a special 
+ >> case which triggers wbc flush.
 
-> > 6. The section on recovering from WBC client death seems imprecise.
-> >    Is (a) just describing V1-4 in Nikita's original post - similarly
-> >    (b) for V1-2, V3'-5'?  Also, for (c) I think we may have discussed
-> >    the possibility of always sending updates as the full operation +
-> >    context to select which updates apply locally so that an operation
-> >    can always be recovered from any of its updates.
-> 
-> It is only a rough schema of client eviction to list what support might 
-> be needed in wbc protocol, like sending full MD op instead of update-- 
-> what you just mentioned. BTW, I thought Epochs HLD would cover the 
-> detailed algorithm descriptions, no?
+ AD> While this example has been given many times as a security issue that
+ AD> forces many strange actions on the part of Lustre, the example is
+ AD> fundamentally broken because POSIX allows "foo" to be opened before the
+ AD> chmod, and kept open until after the write and then read the "secret-file"
+ AD> content.  The "foo" file needs to be created securely in the first place
+ AD> to be safe.
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+yup, and there is no way in posix to even check whether file is opened.
+
+my take on this and similar security related issues is that we probably
+should provide two modes:
+1) strict, when no optimizations in order of flush is done
+2) relaxed, when order is not garanteed and user should use some form of sync
+   but lustre can improve performance
+
+
+-- 
+thanks, Alex
