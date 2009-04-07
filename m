@@ -1,68 +1,48 @@
-From: Alex Zhuravlev <bzzz@sun.com>
-Date: Tue, 07 Apr 2009 08:27:05 +0400
-Subject: [Lustre-devel] [RFC] two ideas for Meta Data Write Back Cache
-In-Reply-To: <49DA7BE6.6070006@sun.com>
-References: <200904061339.02850.alexander.zarochentsev@sun.com>
-	<20090406100345.GO3199@webber.adilger.int>
-	<m3zleu5b8f.fsf@bzzz.home.net> <49DA7BE6.6070006@sun.com>
-Message-ID: <m3y6ud3x7q.fsf@bzzz.home.net>
+From: Andreas Dilger <adilger@sun.com>
+Date: Mon, 06 Apr 2009 23:18:43 -0700
+Subject: [Lustre-devel] WBC HLD outline
+In-Reply-To: <200904061423.51437.alexander.zarochentsev@sun.com>
+References: <200903240058.30343.alexander.zarochentsev@sun.com>
+	<00a001c9b2a2$45665430$d032fc90$@com>
+	<200904061423.51437.alexander.zarochentsev@sun.com>
+Message-ID: <20090407061843.GA3204@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->>>>> di wang (dw) writes:
+On Apr 06, 2009  13:23 +0300, Alexander Zarochentsev wrote:
+> On 1 April 2009 12:17:17 Eric Barton wrote:
+> I think we can't avoid tagging OST object creation w/ epoch counter.
+> Would Lustre users complain if file writes are out-of-epochs?
+> 
+> There is a security problem with out-of-epochs writes and setting 
+> file attributes (especially permissions):
+> chmod 400 foo; cat /etc/secret-file >> foo. Chmod/chown can be a special 
+> case which triggers wbc flush.
 
- dw> I am not sure you can( or should) translate all the MD partial 
- dw> operation  into object  RPC for these partial
- dw> MD operation.  For example rename,  (a/b  ---> c/d,  a/b in MDS1, c/d in 
- dw> MDS2).
+While this example has been given many times as a security issue that
+forces many strange actions on the part of Lustre, the example is
+fundamentally broken because POSIX allows "foo" to be opened before the
+chmod, and kept open until after the write and then read the "secret-file"
+content.  The "foo" file needs to be created securely in the first place
+to be safe.
 
- dw>      RPC goes to MDS1.
+> > 6. The section on recovering from WBC client death seems imprecise.
+> >    Is (a) just describing V1-4 in Nikita's original post - similarly
+> >    (b) for V1-2, V3'-5'?  Also, for (c) I think we may have discussed
+> >    the possibility of always sending updates as the full operation +
+> >    context to select which updates apply locally so that an operation
+> >    can always be recovered from any of its updates.
+> 
+> It is only a rough schema of client eviction to list what support might 
+> be needed in wbc protocol, like sending full MD op instead of update-- 
+> what you just mentioned. BTW, I thought Epochs HLD would cover the 
+> detailed algorithm descriptions, no?
 
- dw>      1) delete d (entry and object) from c in MDS2.
- dw>      2) create b entry under c in MDS2.
- dw>      3) delete b entry under a in MDS1.
-
- dw> So if you do 1) and 2) by object rpc (skip mdd), then you might need 
- dw> create create all 4 objects
- dw> (a and b are local object, c and d are remote object),  and permission 
- dw> check locally (whether
- dw> you can delete d under c). Not sure it is a good way.  
-
-sorry, I don't quite understand what you mean. for this rename you'd need to:
-
-if you're worried about additional RPCs, then we can (should) optimize this
-with intents-like mechanism: mdd_rename() (or caller initialize intent
-describing rename in terms of fids and names), then network-aware layer
-(something like current MDC accepting OSD API) can put additional osd calls
-into enqueue RPC.
-
-for example, when it finds enqueue on c, it can form compound RPC consisting
-of: enqueue itself, osd's attr_get(c), osd's lookup(c, d)
-
-also notice, for such rename you need to check that you won't create
-disconnected subtree, which is much worse than just few additional RPCs.
-
- dw> And also some quota stuff are handled
- dw> in these partial operation in remote MDD, so I am not sure we should 
- dw> skip mdd totally here.
- dw> Am I miss sth?
-
-can you explain why do we need MDD on a server for quota?
-
-given we're about to use OSD for data and metadata I'd think that:
-1) for chown/chgrp MDD (wherever it runs) finds LOV EA and uses epoch
-   (for example) to change uid/gid on MDS and all OSTs in atomical manner
-2) quota code isn't part of data or metadata stack, rather it's side
-   service like ldlm
-3) quota code register hooks (or probably adds very small module right
-   above OSD) to see all quota-related activity: attr_set, write,
-   index insert, etc
-
-also I think we still don't have proper design for quota, this is yet to be
-done to implement quota for DMU.
-
-
-thanks, Alex
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
