@@ -1,84 +1,50 @@
-From: Nikita Danilov <danilov@gmail.com>
-Date: Tue, 7 Apr 2009 11:50:29 +0400
-Subject: [Lustre-devel] WBC HLD outline
-In-Reply-To: <m3k55x3rik.fsf@bzzz.home.net>
-References: <200903240058.30343.alexander.zarochentsev@sun.com>
-	<00a001c9b2a2$45665430$d032fc90$@com>
-	<200904061423.51437.alexander.zarochentsev@sun.com>
-	<20090407061843.GA3204@webber.adilger.int>
-	<m3k55x3rik.fsf@bzzz.home.net>
-Message-ID: <8acda98c0904070050p269492eeq89f18191997f230@mail.gmail.com>
+From: Andreas Dilger <adilger@sun.com>
+Date: Tue, 07 Apr 2009 00:54:03 -0700
+Subject: [Lustre-devel] Oleg/Mike Work on Apps Metrics - FW: Mike
+	Booth	week ending 2009.03.15
+In-Reply-To: <49DA7E4E.2080401@sun.com>
+References: <52E982EB-3ADE-46FA-A7BC-D1645961DF0B@Sun.COM>
+	<018101c9a5b6$25dbc300$71934900$@com>
+	<48A6CF99-F630-4581-9FFC-05E3AFF66FA0@Sun.COM>
+	<023201c9a636$a987e4b0$fc97ae10$@com>
+	<5CE22E46-771C-47EE-9CAC-26A37C87C466@sun.com>
+	<20090331185111.GL3199@webber.adilger.int> <49D2E0FC.4040605@sun.com>
+	<9BDC2632-E80E-4BA8-9ACF-8D7E70A9B236@Sun.COM>
+	<20090402224310.GM3199@webber.adilger.int> <49DA7E4E.2080401@sun.com>
+Message-ID: <20090407075403.GO3204@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-2009/4/7 Alex Zhuravlev <bzzz@sun.com>
-
-> >>>>> Andreas Dilger (AD) writes:
-
-
-Hello,
-
-
+On Apr 06, 2009  18:12 -0400, di wang wrote:
+> I am not sure the current IO is "async" enough, since it still includes  
+> some sync "process", for example, locks, read for partial page, some
+> other stack overhead in commit_write, sometimes you can not ignore
+> these overhead. For example, even without hit the dirty max limit, you  
+> might get quite different write time for writing same data. I guess
+> some of the reason might be the VM is just "out of control".
 >
+> With AIO,
 >
->  AD> On Apr 06, 2009  13:23 +0300, Alexander Zarochentsev wrote:
->  >> On 1 April 2009 12:17:17 Eric Barton wrote:
->  >> I think we can't avoid tagging OST object creation w/ epoch counter.
->  >> Would Lustre users complain if file writes are out-of-epochs?
->  >>
->  >> There is a security problem with out-of-epochs writes and setting
->  >> file attributes (especially permissions):
->  >> chmod 400 foo; cat /etc/secret-file >> foo. Chmod/chown can be a
-> special
->  >> case which triggers wbc flush.
+> 1) The application  can  skip  these "sync" process?  For example by  
+> creating an daemon to do the those routine  process.
+> 2) We can control the write_page(sent to OST) ourselves, instead of rely  
+> on VM.
+> 3) These aio pages do not need comply the dirty max limit in the  
+> submit_io(AIO) process, So user application do "real" memory for writing.
 >
->  AD> While this example has been given many times as a security issue that
->  AD> forces many strange actions on the part of Lustre, the example is
->  AD> fundamentally broken because POSIX allows "foo" to be opened before
-> the
->  AD> chmod, and kept open until after the write and then read the
-> "secret-file"
->  AD> content.  The "foo" file needs to be created securely in the first
-> place
->  AD> to be safe.
+> Yes, AIO will be indeed complex for the application, but not that much,  
 
+There was just a discussion about Linux AIO today (from former Linux AIO
+maintainer, as it is currently unmaintained) and his statements were that
+AIO is not really async at all, as it will block for local filesystems
+on any file allocation, or any buffered IO.  Only preallocated files and
+O_DIRECT even have a chance at AIO, and even that will not always work.
 
-the original "partial write-back" problem was demonstrated with the use case
-
-$ mkdir -m 0700 a # nobody but me can access things under "a"
-$ umask 000
-$ mkdir -m 0777 -p a/b/c/d
-$ echo "secret data" > a/b/c/d/file
-$ sync # time passes...
-$ echo > a/b/c/d/file # truncate secret data
-$ chmod 777 a # relax permissions
-
-Note that here an ordering between data and meta-data updates on _different_
-objects is important.
-
-
->
-> yup, and there is no way in posix to even check whether file is opened.
->
-> my take on this and similar security related issues is that we probably
-> should provide two modes:
-> 1) strict, when no optimizations in order of flush is done
-> 2) relaxed, when order is not garanteed and user should use some form of
-> sync
->   but lustre can improve performance
-
-
-The old (and outdated) WBC HLD has a section "Partial write-out" describing
-these issues.
-
+Cheers, Andreas
 --
-> thanks, Alex
-
-
-Nikita.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090407/0c4ebdd4/attachment.htm>
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
