@@ -1,42 +1,68 @@
-From: Oleg Drokin <Oleg.Drokin@Sun.COM>
-Date: Wed, 08 Apr 2009 23:04:47 -0400
+From: Nikita Danilov <danilov@gmail.com>
+Date: Thu, 9 Apr 2009 12:58:41 +0400
 Subject: [Lustre-devel] WBC HLD outline
-In-Reply-To: <m3k55x3rik.fsf@bzzz.home.net>
+In-Reply-To: <200904082041.28945.alexander.zarochentsev@sun.com>
 References: <200903240058.30343.alexander.zarochentsev@sun.com>
-	<00a001c9b2a2$45665430$d032fc90$@com>
-	<200904061423.51437.alexander.zarochentsev@sun.com>
-	<20090407061843.GA3204@webber.adilger.int>
 	<m3k55x3rik.fsf@bzzz.home.net>
-Message-ID: <2508C191-5730-4B4D-990C-9465C57DC18D@sun.com>
+	<8acda98c0904070050p269492eeq89f18191997f230@mail.gmail.com>
+	<200904082041.28945.alexander.zarochentsev@sun.com>
+Message-ID: <8acda98c0904090158k722a13c5o96d624671734f7e2@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+2009/4/8 Alexander Zarochentsev <Alexander.Zarochentsev@sun.com>
 
-On Apr 7, 2009, at 2:30 AM, Alex Zhuravlev wrote:
-> AD> While this example has been given many times as a security issue  
-> that
-> AD> forces many strange actions on the part of Lustre, the example is
-> AD> fundamentally broken because POSIX allows "foo" to be opened  
-> before the
-> AD> chmod, and kept open until after the write and then read the  
-> "secret-file"
-> AD> content.  The "foo" file needs to be created securely in the  
-> first place
-> AD> to be safe.
-> yup, and there is no way in posix to even check whether file is  
-> opened.
+> Hello Nikita!
+>
+> On 7 April 2009 11:50:29 Nikita Danilov wrote:
+> > 2009/4/7 Alex Zhuravlev <bzzz@sun.com>
+> >
+> > > >>>>> Andreas Dilger (AD) writes:
+> >
+> > Hello,
+> >
+>
 
-I do not know if file leases are POSIX or not (and cannot check right  
-now),
-but they do in fact allow you not only to ensure the file is not  
-opened in certain
-mode, but would also allow you to get notified when somebody attempts  
-to open
-a file on which you have obtained such a lease.
+[...]
 
-Bye,
-    Oleg
+
+> > $ echo > a/b/c/d/file # truncate secret data
+> > $ chmod 777 a # relax permissions
+> >
+> > Note that here an ordering between data and meta-data updates on
+> > _different_ objects is important.
+>
+> If we only guarantee no reordering in MD updates, Lustre behavior would
+> be like ext3 without data journalling? I think it is not terrible.
+
+
+It's not terrible, but it is non-intuitive, in my opinion. More enlightened
+file systems, like ZFS, reiser4, and NTFS provide stronger consistency
+guarantees, ignoring the petty distinctions between data and meta-data. :-)
+
+But even limiting consistency to meta-data leaves some issues opened. For
+example, think about an md proxy server acting as a WBC client for a higher
+tier server. To be efficient such proxy might need to cache very large
+amount of meta-data, and it most likely cannot afford to keep a log of all
+operations. In this situation, when a lock on a top-level directory gets a
+blocking AST, proxy would have --to guarantee ordering of visible meta-data
+updates-- to write back all cached dirty meta-data under this directory
+before the lock can be cancelled, which might result in unacceptable
+latency.
+
+>
+> > > thanks, Alex
+> >
+> > Nikita.
+>
+> --
+> Alexander "Zam" Zarochentsev
+>
+
+Nikita.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090409/ffcd5ed0/attachment.htm>
