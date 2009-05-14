@@ -1,46 +1,55 @@
 From: Andreas Dilger <adilger@sun.com>
-Date: Thu, 14 May 2009 14:54:49 -0600
+Date: Thu, 14 May 2009 15:28:33 -0600
 Subject: [Lustre-devel] Thinking of Hacks around bug #12329
-In-Reply-To: <9c21eeae0905140905u1aecbe95tfa2ed890668338ef@mail.gmail.com>
+In-Reply-To: <C4317953-7323-4FD0-9D36-A78DA94EF216@sun.com>
 References: <9c21eeae0905131106w23032105tdcf9a2399fb550df@mail.gmail.com>
 	<20090514062224.GD3209@webber.adilger.int>
-	<9c21eeae0905140905u1aecbe95tfa2ed890668338ef@mail.gmail.com>
-Message-ID: <20090514205449.GM3209@webber.adilger.int>
+	<13983758-B9C5-4770-A4AC-39AAF75C6980@sun.com>
+	<C4317953-7323-4FD0-9D36-A78DA94EF216@sun.com>
+Message-ID: <20090514212833.GN3209@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On May 14, 2009  09:05 -0700, David Brown wrote:
-> > Hmm, even projecting out to the future I'm not certain we will get
-> > to systems with 18000 OSTs. ?The capacity of the disks is growing
-> > contiuously, and with ZFS we can have very large individual OSTs
-> > so even 2-3 years from now we're only looking at 1200 OSTs on 400 OSS
-> > nodes (115 PB filesystem with 30x4TB disks/OST in RAID-6 8+2 = 96TB/OST).
-> 
-> So How fast is this theoretical 115PB system?
+On May 14, 2009  11:48 -0400, Oleg Drokin wrote:
+> On May 14, 2009, at 10:25 AM, Oleg Drokin wrote:
+>> Actually just to combat situqtion like this MGCs are doing a bit of a
+>> pause
+>> for a few seconds before refetching config, I remember there was a bug
+>> and this measure was introduced as a fix.
+>
+> Nic actually tuned in and said that the backoff (set at 3 seconds now)
+> is certainly not enough, since it takes this long to only mount actual
+> on-disk fs.
 
-About 1.5TB/s fast, if the math holds true.
+> Anyway that got me thinking that we have a "coarse-grained" locking  
+> problem.  Since OSTs don't connect to other OSTs, they do not care about
+> OST connections, and perhaps if we introduce bit-locks to MGS locks as
+> well to indicate client type, then locks from OSTs would only be revoked
+> when MDS connects or disconnects, MDS locks would only be revoked when
+> OSTs connect or disconnect and client locks would be revoked always.
+> Or alternatively we can split our single resource right now to a few  
+> separate:
 
-> With innovations like SSDs getting cheeper and larger, we may get
-> faster and better performance. However, I'm still not sure we're going
-> to be keeping up with the curve that processors are going to be doing.
+> one for osts one for MDSes for example, sure that would mean clients  
+> would not have to take two locks, but on the other hand there would
+> be supposedly less information to reparse when one of those locks is
+> invalidated.
 
-Sure, we are already testing SSDs and what we can do to improve the
-filesystem to take advantage of them.  They aren't quite at the price
-point where people will be jumping on them, but I expect in a year or
-two they will become much more affordable.
+I would tend to prefer the latter.  Having separate resource IDs for
+the different llogs makes it a lot cleaner in the end.  Ideally,
+picking a relatively unique resource ID for that config log would
+allow us to separate the configs between different filesystems.
 
-> However, I guess you guys really aren't too concerned about the
-> processing power increasing particularly. Just make a file system that
-> can save all the memory in a super computer in N minutes really.
-
-Well, CPU power -> more RAM to feed CPU -> more disk to feed/purge RAM.
-So even though CPU/RAM size is increasing exponentially, disk size and
-more importantly perf is not growing so quickly.  Even worse, seeks are
-almost static for spinning disks (8ms or so => 125 IOPS), so SSDs are
-really the only hope to keep up with filesystem requirements.
+The OSTs in fact don't really need to read the same llog as the client for
+very many things (some shared tunables, perhaps), and there also isn't
+a big problem IMHO to store the same tunables in two different config
+llogs (one for servers and one for clients).  Generally, the server-side
+tunables are not used by the client, and vice versa.  Probably the only
+place that would need to read two config llogs is the MDS, which is both
+a server and a client of the OSTs.
 
 Cheers, Andreas
 --
