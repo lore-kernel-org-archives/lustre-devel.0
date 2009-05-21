@@ -1,59 +1,41 @@
-From: Brian J. Murrell <Brian.Murrell@Sun.COM>
-Date: Wed, 20 May 2009 14:41:21 -0400
-Subject: [Lustre-devel] cvs question
-In-Reply-To: <200905201939.16472.bs_lists@aakef.fastmail.fm>
-References: <200905201939.16472.bs_lists@aakef.fastmail.fm>
-Message-ID: <1242844881.22400.178.camel@pc.interlinx.bc.ca>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 21 May 2009 15:46:20 +0100 (BST)
+Subject: [Lustre-devel] new to lustre and bug 18539
+Message-ID: <alpine.LFD.2.00.0905191416100.22823@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, 2009-05-20 at 19:39 +0200, Bernd Schubert wrote:
-> Hello, 
 
-Hi,
+Hello!!
 
-> cvs annotate lnet/libcfs/watchdog.c
-> 
-> 1.2          (eeb      09-Dec-04): static void lcw_cb(unsigned long data)
-> 1.2          (eeb      09-Dec-04): {
-> 1.2          (eeb      09-Dec-04):         struct lc_watchdog *lcw = (struct 
-> lc_watchdog *)data;
-> 1.2          (eeb      09-Dec-04):
-> 1.2          (eeb      09-Dec-04):         ENTRY;
-> 1.2          (eeb      09-Dec-04):
-> 1.2          (eeb      09-Dec-04):         if (lcw->lcw_state != 
-> LC_WATCHDOG_ENABLED) {
-> 1.2          (eeb      09-Dec-04):                 EXIT;
-> 1.2          (eeb      09-Dec-04):                 return;
-> 1.2          (eeb      09-Dec-04):         }
-> 1.2          (eeb      09-Dec-04):
-> 1.2          (eeb      09-Dec-04):         lcw->lcw_state = 
-> LC_WATCHDOG_EXPIRED;
-> 1.2          (eeb      09-Dec-04):
-> 1.6          (nathan   10-Feb-07):         /* NB this warning should appear on 
-> the console, but may not get into
-> 1.6          (nathan   10-Feb-07):          * the logs since we're running in 
-> a softirq handler */
-> 1.6          (nathan   10-Feb-07):
-> 1.7          (nathan   26-Feb-07):         CWARN("Watchdog triggered for pid 
-> %d: it was inactive for %lds\n",
-> 1.7          (nathan   26-Feb-07):               (int)lcw->lcw_pid, 
-> cfs_duration_sec(lcw->lcw_time));
-> 1.6          (nathan   10-Feb-07):         lcw_dump(lcw);
-
-Notice the revision numbers.  They are all off of HEAD, which on b1_6,
-this file is almost certainly not.  Perhaps you need to add a "-r b1_6"
-to your cvs annotate command.
-
-b.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090520/cc8f8ce7/attachment.pgp>
+	As you can tell I'm new to this project but I'm looking forward to 
+contributing. Recently I have worked on some patch for the lustre utilies 
+and I'm now looking to the core file system code. 
+	For my first dive into the code I'm tackling bug 18539. Of course 
+looking at the code base opened up alot of questions. Looking at what was
+recommended by Andreas Dilger was to make use of the oscc_flags. The other 
+part of the solution was to bump up the return value of osc_precreate.
+	My first set of questions delas with the places where the 
+oscc_flag is used in some fashion. I noticed one spot for its use was 
+osc_set_info_async. Looking through the code it appears to be only called 
+by a osc shrink grant which itself appears to happen on a osc disconnect.
+This is correct or is this function used in other places? The next 
+question is about osc_import_events. Does this function handle events 
+coming from multiple sources, clients, mds, ost? Also are these events
+the type that are sent out when a state changes versus someone sending a 
+rpc to request the state? 
+	My second set of questions deals with osc_statfs*. From the notes
+in the bugzilla osc_statfs_interpret is a MDS side function. Looking at 
+the code I noticed it is the call back to osc_statfs_async. Knowing 
+that osc_statfs_async is a obd_ops and thus has a wrapper, obd_statfs_async.
+I scanning the code for this and noticed that this wrapper used with the 
+proper obd_device for the osc was used in the lov layer. The two areas in 
+the lov layer where lov_statfs_async and qos_statfs_update handled this.
+If I remember right this is on the client side of the code. Where does the 
+mds fit into this? Lov_statfs_async is for when the client queries data 
+about the file. Whereas qos_statfs_update is what is called durning 
+inital file create or when the statfs info is to old. Please correct me if 
+I'm wrong. 
