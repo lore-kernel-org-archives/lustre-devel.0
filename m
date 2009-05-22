@@ -1,51 +1,32 @@
-From: Oleg Drokin <Oleg.Drokin@Sun.COM>
-Date: Fri, 22 May 2009 11:25:41 -0400
-Subject: [Lustre-devel] new to lustre and bug 18539
-In-Reply-To: <alpine.LFD.2.00.0905221406320.28089@casper.infradead.org>
-References: <alpine.LFD.2.00.0905191416100.22823@casper.infradead.org>
-	<EDB5B425-FEE9-43EA-B0B5-C082367D43DE@sun.com>
-	<alpine.LFD.2.00.0905221406320.28089@casper.infradead.org>
-Message-ID: <2AC331CC-827A-4266-809D-85CE6756E717@Sun.COM>
+From: James Simmons <jsimmons@infradead.org>
+Date: Fri, 22 May 2009 18:21:07 +0100 (BST)
+Subject: [Lustre-devel] bz-18539 and osc_statfs_interpret
+Message-ID: <alpine.LFD.2.00.0905221738460.28089@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
 
-On May 22, 2009, at 9:29 AM, James Simmons wrote:
+Form bugzilla the approach recommended to set the oscc_flag was to use
+the MDS-side code in osc_statfs_interpret(). First question is why this 
+approach instead of defining a new osc_import_event. On the OST we will 
+be setting the state with something like: 
 
->>> 	My second set of questions deals with osc_statfs*. From the notes
->>> in the bugzilla osc_statfs_interpret is a MDS side function.  
->>> Looking at
->>> the code I noticed it is the call back to osc_statfs_async. Knowing
->>> that osc_statfs_async is a obd_ops and thus has a wrapper,  
->>> obd_statfs_async.
->>> I scanning the code for this and noticed that this wrapper used  
->>> with the
->>> proper obd_device for the osc was used in the lov layer. The two  
->>> areas in
->>> the lov layer where lov_statfs_async and qos_statfs_update handled  
->>> this.
->>> If I remember right this is on the client side of the code. Where  
->>> does the
->>> mds fit into this? Lov_statfs_async is for when the client queries  
->>> data
->> MDS is a client to OSTs, that's why it has client bits to deal with  
->> them
->> (LOV and OSCs).
-> Because the lov is present also on the MDS as well as the client  
-> then the
-> callback, aa->aa_oi->oi_cb_up, is going to depend on it being a MDS  
-> or a
-> cleint. Correct or am I wrong?
+/proc/fs/lustre/obdfilter/*/degraded_raid 
 
-Actually what I see in the code is LOV always assigns the same value,  
-so it
-should be the same. On the other hand it is a possibility to pass down  
-such a callback
-from a layer above LOV, then it might be different.
+So the flow will be from the OST to the OSC. Just curious why it is not 
+done this way.
 
-Bye,
-     Oleg
+	The second question deals with setting the oscc_flag from 
+osc_statfs_interpret. After looking at the code I noticed oscc_flag is a 
+field in struct osc_creator. The only place I could find osc_creator was
+in struct client_obd which I could only find in struct obd_device or
+struct osc_brw_async_args which we are not using for this. 
+	Now for struct osc_async_args which is passed into 
+osc_statfs_interpret just contains a pointer to struct obd_info. Looking
+at the components for struct obd_info I don't see a easy way to get the 
+proper obd_device to get the client_obd I need. What am I missing? 
+ 
+  
