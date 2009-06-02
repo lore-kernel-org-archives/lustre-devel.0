@@ -1,46 +1,64 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Mon, 25 May 2009 16:48:15 -0600
-Subject: [Lustre-devel] bz-18539 and osc_statfs_interpret
-In-Reply-To: <alpine.LFD.2.00.0905221738460.28089@casper.infradead.org>
-References: <alpine.LFD.2.00.0905221738460.28089@casper.infradead.org>
-Message-ID: <20090525224814.GK19035@webber.adilger.int>
+From: Nicholas Henke <nic@cray.com>
+Date: Tue, 02 Jun 2009 12:12:40 -0500
+Subject: [Lustre-devel] faking LNET scale
+In-Reply-To: <49E8CB7A.1090106@sun.com>
+References: <49E8B7E9.5080101@cray.com> <49E8CB7A.1090106@sun.com>
+Message-ID: <4A255D88.10409@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On May 22, 2009  18:21 +0100, James Simmons wrote:
-> Form bugzilla the approach recommended to set the oscc_flag was to use
-> the MDS-side code in osc_statfs_interpret(). First question is why this 
-> approach instead of defining a new osc_import_event. On the OST we will 
-> be setting the state with something like: 
+Liang Zhen wrote:
+> Nic,
+> It's very late night for me now, my head is not clear enough for me to 
+> make sure whether I'm saying something crazy, :)
+> LNet always thinks target is remote network(needs router) if it can't 
+> find a NI with same network ID, for example, if local NI is (ptl0) and 
+> caller wants to send message to (ptl1), then LNet will:
+> 1. Try to find local  NI for ptl1, and failed then:
+> 2. try to find if ptl1 is a remote network and whether there is router 
+> for this network (ptl1)
 > 
-> /proc/fs/lustre/obdfilter/*/degraded_raid 
-> 
-> So the flow will be from the OST to the OSC. Just curious why it is not 
-> done this way.
+> So if you want your server has only one NI instance and can talk with a 
+> set of different networks, and at the same time, it can talk with other 
+> remote networks via routers,  I would suggest:
+> 1. create a new command, for example: lctl add_local_net ptl0 ptl[1-N], 
+> which means LNet should allow NI(ptl0) accessing networks( ptl[1-N] as 
+> local networks.
+> 2. add a new structure in LNet, i.e:
+> struct  {
+>      struct list_head ln_list;
+>    __u32                ln_net;
+>     lnet_ni_t          *ln_localni;
+>     ......
+> }lnet_localnet_t;
+> As you see, it's very like current structure lnet_remotenet_t, which is 
+> pending on lnet_t::ln_remote_nets; we can create a lnet_locallnet_t 
+> object and add it to global list (i.e: lnet_t::ln_local_nets) by the 
+> command we mentioned above: lctl add_local_net
+> 3. once upper layer caller sending message, lnet_send() should check 
+> lnet_t::ln_local_nets firstly (before thinking it's a remote network and 
+> checking on lnet_t::ln_remote_nets), if it is on 
+> lnet_t::ln_local_netsthen we can take the local NI. on 
+> lnet_locanet_t::ln_localni;
+> 4. We need add a new flag for LND, only LND with the flag can support 
+> command lctl add_local_net.
+> 5. make the LND wouldn't reject messages from different networks.
+> again, hope I'm answering what you are asking, :)
 
-The reason osc_import_event can't be used is that this is only a local
-event notification.  The "degraded_raid" state will be set on the OSS
-node, while the osc_import_event can only be called on the client node
-(in this case the MDS).
+This is almost working - I'm running into one problem: lnet_accept wants to 
+match the ni->ni_nid against the requested NID. It is failing as the nets don't 
+match (ptl1 vs ptl0).
 
-> 	The second question deals with setting the oscc_flag from 
-> osc_statfs_interpret. After looking at the code I noticed oscc_flag is a 
-> field in struct osc_creator. The only place I could find osc_creator was
-> in struct client_obd which I could only find in struct obd_device or
-> struct osc_brw_async_args which we are not using for this. 
-> 	Now for struct osc_async_args which is passed into 
-> osc_statfs_interpret just contains a pointer to struct obd_info. Looking
-> at the components for struct obd_info I don't see a easy way to get the 
-> proper obd_device to get the client_obd I need. What am I missing? 
+It looks like there are a fair number of places like this, most using 
+lnet_ptlcompat_match{net,nid}.
 
-You can get the struct obd_device pointer for the OBD in question via
-req->rq_export->exp_obd and get the proper struct osc_creator from that
+How should I handle those? Add another clause like ptlcompat (like ln_aliases) 
+and if that is set (we have aliases set), do a search to find the alias and see 
+if there is an alias that would allow NIDNET(lnet_net) == NIDNET(ptl_net)?
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+Is there a cleaner way?
+
+Nic
