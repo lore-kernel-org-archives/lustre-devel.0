@@ -1,34 +1,77 @@
-From: Eric Barton <eeb@sun.com>
-Date: Mon, 08 Jun 2009 18:10:37 +0100
-Subject: [Lustre-devel] Linux kernel lock smp scalability
-In-Reply-To: <4A2D2FF2.7080703@sun.com>
-References: <4A2D2FF2.7080703@sun.com>
-Message-ID: <015f01c9e85c$0b0238a0$2106a9e0$@com>
+From: Nathaniel Rutman <Nathan.Rutman@Sun.COM>
+Date: Tue, 16 Jun 2009 20:04:28 -0700
+Subject: [Lustre-devel] Thinking of Hacks around bug #12329
+In-Reply-To: <20090514212833.GN3209@webber.adilger.int>
+References: <9c21eeae0905131106w23032105tdcf9a2399fb550df@mail.gmail.com>
+	<20090514062224.GD3209@webber.adilger.int>
+	<13983758-B9C5-4770-A4AC-39AAF75C6980@sun.com>
+	<C4317953-7323-4FD0-9D36-A78DA94EF216@sun.com>
+	<20090514212833.GN3209@webber.adilger.int>
+Message-ID: <4A385D3C.6080906@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Liang,
+Sorry for taking so long to respond...
 
-Here's a graph of _aggregate_ ops/sec...
-
-> -----Original Message-----
-> From: lustre-devel-bounces at lists.lustre.org [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Liang Zhen
-> Sent: 08 June 2009 4:36 PM
-> To: 'lustre-devel'
-> Subject: [Lustre-devel] Linux kernel lock smp scalability
-> 
-> Hi there,
-> Some interesting data from 16-cores system, FYI
-> 
-> Regards
-> Liang
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smp lockops graph.pdf
-Type: application/pdf
-Size: 37263 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090608/a52c1d18/attachment.pdf>
+Andreas Dilger wrote:
+> On May 14, 2009  11:48 -0400, Oleg Drokin wrote:
+>   
+>> On May 14, 2009, at 10:25 AM, Oleg Drokin wrote:
+>>     
+>>> Actually just to combat situqtion like this MGCs are doing a bit of a
+>>> pause
+>>> for a few seconds before refetching config, I remember there was a bug
+>>> and this measure was introduced as a fix.
+>>>       
+>> Nic actually tuned in and said that the backoff (set at 3 seconds now)
+>> is certainly not enough, since it takes this long to only mount actual
+>> on-disk fs
+This is probably the easiest thing to try out for fixing bug 12329.   
+Put this up at 30s or 60s or something -- it's just the amount of time 
+it takes to update after a config change.  These will be rare and 
+asynchronous, so there's no real penalty for waiting.  Preventing 
+thousands of clients from trying to re-read the config log every few 
+seconds seems like a no-brainer.  See mgc_requeue_thread.
+>> Anyway that got me thinking that we have a "coarse-grained" locking  
+>> problem.  Since OSTs don't connect to other OSTs, they do not care about
+>> OST connections, and perhaps if we introduce bit-locks to MGS locks as
+>> well to indicate client type, then locks from OSTs would only be revoked
+>> when MDS connects or disconnects, MDS locks would only be revoked when
+>> OSTs connect or disconnect and client locks would be revoked always.
+>> Or alternatively we can split our single resource right now to a few  
+>> separate:
+>>     
+>> one for osts one for MDSes for example, sure that would mean clients  
+>> would not have to take two locks, but on the other hand there would
+>> be supposedly less information to reparse when one of those locks is
+>> invalidated.
+>>     
+>
+> I would tend to prefer the latter.  Having separate resource IDs for
+> the different llogs makes it a lot cleaner in the end.  Ideally,
+> picking a relatively unique resource ID for that config log would
+> allow us to separate the configs between different filesystems.
+>
+> The OSTs in fact don't really need to read the same llog as the client for
+> very many things (some shared tunables, perhaps), and there also isn't
+> a big problem IMHO to store the same tunables in two different config
+> llogs (one for servers and one for clients).  Generally, the server-side
+> tunables are not used by the client, and vice versa.  Probably the only
+> place that would need to read two config llogs is the MDS, which is both
+> a server and a client of the OSTs.
+>   
+The OSTs in fact do read a separate llog than the client.  But there is 
+still a single
+config lock per fs on the MGS, so that doesn't really matter.  Revoking 
+the lock
+causes everybody in the fs to try to update, even if there's nothing new 
+in their
+particular log.  Oleg's fine-grained idea, or simply separate locks, 
+would help in this case.
+But I think the big win is backing off the requeue time for big clusters.
+We could even automate this a bit; increase the requeue time on the 
+clients as the number of
+OSTs increase.
