@@ -1,50 +1,54 @@
 From: Nicolas Williams <Nicolas.Williams@sun.com>
-Date: Tue, 7 Jul 2009 11:14:27 -0500
+Date: Tue, 7 Jul 2009 11:50:41 -0500
 Subject: [Lustre-devel] Recovering opens by reconstruction
-In-Reply-To: <op.uwpaclw3atmt0c@garden>
+In-Reply-To: <op.uwph1qacatmt0c@garden>
 References: <20090702223944.GR15302@Sun.COM> <op.uwh9t2mnatmt0c@garden>
 	<20090703215528.GY15302@Sun.COM> <op.uwi7j3uaatmt0c@garden>
 	<20090706173441.GL15302@Sun.COM> <op.uwpaclw3atmt0c@garden>
-Message-ID: <20090707161427.GE15302@Sun.COM>
+	<20090707152105.GM5073@webber.adilger.int>
+	<op.uwph1qacatmt0c@garden>
+Message-ID: <20090707165041.GG15302@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Jul 07, 2009 at 05:56:36PM +0400, Mikhail Pershin wrote:
-> What will we get for this? Sorry for my annoyance, but it looks for me  
-> that it can be solved in simpler ways. E.g. you can add MGS_OPEN_REPLAY  
-> flag to such requests, so it will be also different in wire from  
-> transaction replays. Or we could re-use lock replay functionality somehow.  
+On Tue, Jul 07, 2009 at 08:42:52PM +0400, Mikhail Pershin wrote:
+> On Tue, 07 Jul 2009 19:21:05 +0400, Andreas Dilger <adilger@sun.com> wrote:
+> >This actually has a second benefit in that we don't have to keep huge
+> >lists of open RPCs in the replay list that will be skipped each time we
+> >are trying to cancel committed RPCs.  For HPCS we need to handle 100k
+> >opens on a single client, and cancelling RPCs from the replay list is
+> >an O(n^2) operation since it does a list walk to find just-committed  
+> >RPCs.
 
-Making the open replays look different on the wire is exactly what this
-is about.  They'll look different from other replays in that they will
-not have a replay signature.  But replay signatures are a PTLRPC layer
-feature, so how should PTLRPC know whether to allow such a replay to
-pass through?  One way is to let it pass through replays with valid
-signatures and non-replays, and then let the MDT have non-replay
-handlers only for anon open by FID during recovery.  Then the client
-might as well not bother caching open RPCs forever, just until they
-commit -- it can re-construct open RPCs from in-core state (vnode, ...)
-anytime it needs to.
+This seems like a problem that could be solved anyways, but then, having
+to cache these RPCs forever is a waste of resources.
 
-Using DLM locks to represent open state is interesting.  It would
-require either recovering those first or deferring final unlinks at
-transaction recover time.
+> Absolutely, all benefits are clear and I fully agree but all of them are  
+> not in reply signature context. I was just afraid that inside replay  
+> signature task such big changes will defer replay signature itself. But if  
+> we have time to make it in right way then it is good.
 
-Another problem with using locks for open state is that establishing the
-lock atomically with an open w/ create won't be easy.  The MDT would
-have to enqueue a lock for itself atomically with the create, then the
-client would have to enquee its lock, then the MDT would have to drop
-its lock.  Would this not be much more complex that open RPC
-reconstruction?
+Adding replay signature renewal just to avoid this restructuring seems
+equally bad.  Not adding replay signature renewal and not bothering with
+rekeying is OK in the short-term, but eventually it'd become a problem.
+Given all the other benefits of doing committed open state recovery by
+reconstruction, it seems like a good idea to just do it.
 
-> The locks are not kept as saved RPC too but enqueued as new requests. The  
-> open is very close to this, I agree with idea that open handle has all  
-> needed info and no need to keep original RPC in this case.
+> >It would be possible to flag the unlink RPCs with a special flag (maybe
+> >just OBD_MD_FLEASIZE/OBD_MD_FLCOOKIE) to distinguish between unlinks
+> >that also destroy the objects, and unlinks that cause open-unlinked  
+> >files.
+> >For replayed unlinks that cause objects to be destroyed we know that
+> >there are no other clients holding the file open after that point and
+> >we don't have to put the inode into PENDING at all.
+> 
+> I've just thought about the same, it is quite obvious solution here.
 
-Yes.
+An excellent idea.  Replay signatures would have to cover that bit.
+I'll add that to the HLD.
 
 Nico
 -- 
