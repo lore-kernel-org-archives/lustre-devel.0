@@ -1,26 +1,33 @@
-From: Alex Zhuravlev <Alex.Zhuravlev@Sun.COM>
-Date: Wed, 08 Jul 2009 21:15:51 +0400
-Subject: [Lustre-devel] Recovering opens by reconstruction
-In-Reply-To: <20090707161427.GE15302@Sun.COM>
-References: <20090702223944.GR15302@Sun.COM> <op.uwh9t2mnatmt0c@garden>
-	<20090703215528.GY15302@Sun.COM> <op.uwi7j3uaatmt0c@garden>
-	<20090706173441.GL15302@Sun.COM> <op.uwpaclw3atmt0c@garden>
-	<20090707161427.GE15302@Sun.COM>
-Message-ID: <4A54D447.5090506@sun.com>
+From: Scott Atchley <atchley@myri.com>
+Date: Thu, 16 Jul 2009 17:10:44 -0400
+Subject: [Lustre-devel] Testing LNET
+Message-ID: <9A79889B-CA4B-43E7-9824-79A1F7949AFE@myri.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Nicolas Williams wrote:
-> Another problem with using locks for open state is that establishing the
-> lock atomically with an open w/ create won't be easy.  The MDT would
-> have to enqueue a lock for itself atomically with the create, then the
-> client would have to enquee its lock, then the MDT would have to drop
-> its lock.  Would this not be much more complex that open RPC
-> reconstruction?
+Hi all,
 
-we already have open locks which are taken in atomical manner with create.
+I have implemented handling of hosts with different PAGE_SIZE in  
+MXLND. I am running tests to make sure that I did not accidentally  
+break something else. So far, I have been using lctl and pinging back  
+and forth as well as with obdecho (using loadgen).
 
-thanks, Alex
+When running loadgen tests or lctl test_brw with loadgen's echosrv  
+running, if I kill a host (either client or server) and bring it back  
+up, LNET seems happy (MXLND reconnects normally), but loadgen does not  
+resume. When using lctl test_brw and I restart a server, the client  
+reconnects but then fails an assertion when it connects to a new  
+server with:
+
+LustreError: 6295:0:(echo_client.c:1341:echo_client_cleanup())  
+ASSERTION(eco->eco_refcount == 0) failed
+
+If this the proper way to test a LND? What other methods can you  
+suggest?
+
+Thanks,
+
+Scott
