@@ -1,71 +1,44 @@
-From: office at hailoo.com <office@hailoo.com>
-Date: Tue, 11 Aug 2009 13:24:05 -0400
+From: Oleg Drokin <Oleg.Drokin@Sun.COM>
+Date: Thu, 13 Aug 2009 14:00:55 -0400
 Subject: [Lustre-devel] Role of the Metadata Server during File I/O
-In-Reply-To: <034001ca1a93$cd8ec140$68ac43c0$@com>
+In-Reply-To: <20090811172405.5AA7420DBF8C@hailoo.com>
 References: <20090810223137.E018520DBF8C@hailoo.com>
 	<034001ca1a93$cd8ec140$68ac43c0$@com>
-Message-ID: <20090811172405.5AA7420DBF8C@hailoo.com>
+	<20090811172405.5AA7420DBF8C@hailoo.com>
+Message-ID: <A1589B4A-DAE8-4022-A352-8D3709C163D5@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Thanks for the information.  Doesn't this entail that for every call to 
-write() involving a striped file, Lustre must necessarily consult all OSSs, 
-in order to determine 1) the file size and 2) if the current write operation 
-will extend the file? 
+Hello!
 
-If so, then I think it would be advisable for Lustre clients working with 
-striped files to avoid small unbuffered file writes, since every call to 
-write() requires a lot of network overhead. 
+On Aug 11, 2009, at 1:24 PM, office at hailoo.com wrote:
 
-Eric Barton writes: 
+> Thanks for the information.  Doesn't this entail that for every call  
+> to write() involving a striped file, Lustre must necessarily consult  
+> all OSSs, in order to determine 1) the file size and 2) if the  
+> current write operation will extend the file?
 
-> The file size is computed from the sizes of all its stripes to avoid 
-> 
-> unnecessary communication with the MDS while a file is being 
-> 
-> extended. 
-> 
->   
-> 
-> Obviously the next question is ?does that mean you have to consult all 
-> 
-> the OSTs whenever you stat a file?? and currently the answer is yes. 
-> 
-> However we are developing a new feature to allow Lustre to cache the 
-> 
-> sizes of inactive files on the MDS to give us the best of both worlds. 
-> 
-> Cheers, 
->                    Eric  
-> 
->   
-> 
-> From: lustre-devel-bounces at lists.lustre.org [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of office at hailoo.com
-> Sent: 11 August 2009 12:32 AM
-> To: lustre-devel at lists.lustre.org
-> Subject: [Lustre-devel] Role of the Metadata Server during File I/O 
-> 
->   
-> 
-> One of Lustre's key innovations seems to be the separation of metadata from file data.  According to Sun, "Lustre file operations bypass the MetaData server completely and fully utilize the parallel data paths to all OSSs in the cluster."  (See http://www.sun.com/software/products/lustre/features.xml)  
-> 
-> However, can this really be the case?  
-> 
-> In POSIX-compliant file I/O, a call to write() that starts at an offset which is greater than the file size must write zeroes to disk to make up for the missing space.  So if you have a file size of 0 bytes, and then you write a single byte at offset 10, bytes 0 through 9 of the file will contain zeros.   
-> 
-> But if a file on a Lustre system is striped across multiple OSTs, how does Lustre avoid communicating with the Metadata Server at every write operation?  Consider the following scenario:  
-> 
-> You have 4 OSTs and you create a new file and stripe it across all 4 OSTs, and you set the stripe size to 4 bytes.  (I know that is too small but I'm just keeping this simple.)  
-> 
-> Now, suppose you call write() and write 1 byte to the file at offset 5.  Lustre must now write 4 zero bytes on the first OST, and 1 non-zero byte on the second OST.  But in order to know that it is necessary to write zeroes to the first OST, the client would need access to global information about the total size of the file.  Therefore, wouldn't it need to check with the Metadata Server to determine the total file size before every call to write()?  
-> 
-> Any information anyone can provide me on the implementation details/strategies used here would be greatly appreciated.  
-> 
-> -Charles Salvia  
-> 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20090811/9c3100c1/attachment.htm>
+Why does write need to know the entire file size? We only care if we  
+are extending currently accessed stripe. We know this the moment we  
+obtained the lock on
+the stripe region we are interested in.
+> If so, then I think it would be advisable for Lustre clients working  
+> with striped files to avoid small unbuffered file writes, since  
+> every call to write() requires a lot of network overhead.
+>
+
+It is indeed not advisable to use small unbuffered writes (though we  
+relieved the situation somewhat), but not because of the network  
+overhead, rather the lustre
+code is not exactly light-weight doing thelock processing and lookup  
+and stuff.
+I remember when LLNL performed experiments, and 4 byte unbuffered  
+writes were 100 times slower than 1M writes.
+But since then we improved the situation and I am no longer sure how  
+these compare.
+
+Bye,
+     Oleg
