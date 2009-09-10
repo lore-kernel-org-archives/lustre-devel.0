@@ -1,7 +1,7 @@
 From: Tuve Nordius <tuve@swedisk.se>
-Date: Thu, 10 Sep 2009 14:34:33 +0200
-Subject: [Lustre-devel] Mac OS client
-Message-ID: <064780CA-3CD7-4FD6-8967-0871DA3D6A20@swedisk.se>
+Date: Thu, 10 Sep 2009 14:52:35 +0200
+Subject: [Lustre-devel] Multithreaded liblustre
+Message-ID: <68880AC1-3DDB-4B20-AE49-55227D64F295@swedisk.se>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -10,5 +10,7 @@ To: lustre-devel@lists.lustre.org
 
 Hi
 
-I am happy to announce that I have a pre alpha lustre client for mac  
-os x, based on liblustre (lustre version 1.9.240) and mac fuse. 
+Does anyone know what need to be done/ the main obstacles  in order to  
+make liblustre multithreaded?
+
+Best Regards Tuve Nordius
