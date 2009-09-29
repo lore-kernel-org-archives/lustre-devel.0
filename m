@@ -1,42 +1,37 @@
 From: Nic Henke <nic@cray.com>
-Date: Tue, 29 Sep 2009 13:02:25 -0500
+Date: Tue, 29 Sep 2009 13:03:57 -0500
 Subject: [Lustre-devel] using LST for performance testing
-In-Reply-To: <1254245568.5827.5.camel@lap75545.ornl.gov>
+In-Reply-To: <4AC23B21.2030207@cray.com>
 References: <4ABBD78E.50506@cray.com> <20090928173554.GA4911@sun.com>
 	<4AC23B21.2030207@cray.com>
-	<1254245568.5827.5.camel@lap75545.ornl.gov>
-Message-ID: <4AC24BB1.8040502@cray.com>
+Message-ID: <4AC24C0D.9030409@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-David Dillow wrote:
-> On Tue, 2009-09-29 at 11:51 -0500, Nic Henke wrote:
+Nic Henke wrote:
+> Isaac Huang wrote:
 >   
->> I'm wondering if we couldn't add a new 'batch_stat' command. The idea is 
->> that the client code will fill in the start/stop times for each test and 
->> then after the test is done, 'batch_stat' would collect this data. The 
->> collection would still be passive and a new command should minimize the 
->> protocol changes. The per-test data would allow us to get accurate perf 
->> numbers and also provide some data into how parallel the tests were, if 
->> there are any unfairness issues, etc.
+>> On Thu, Sep 24, 2009 at 03:33:18PM -0500, Nic Henke wrote:
 >>     
 >
-> Along these lines, it would be nice if we could specify a run time for
-> each test rather than an amount of data to be transferred -- it makes it
-> easier to get aggregate bandwidth numbers, and often shows imbalances
-> nicely -- the node getting starved is the one that transfers less data.
->   
-> It may also make sense to add a 'delay' parameter that causes each test
-> to wait a specified amount of time from the 'go' signal. This allows the
-> signal to propagate without running into congestion from the test,
-> helping to cause all of the clients to start the test closer to
-> simultaneously.
+> I'm wondering if we couldn't add a new 'batch_stat' command. The idea is 
 >   
 
-Interesting - can you elaborate, perhaps in the form of a patch  ? :-) I 
-like both ideas, but not signing up to code them just yet.
+So - for a current swag:
+
+- I'm thinking of timing the 'test instance' run (sfw_test_instance_t) - 
+this would get timing for each test run end-to-end but be detailed 
+enough to show the different timing with --concurrency > 1 is used. 
+Doing per-RPC timing seemed to heavy and I'm not sure that level of 
+resolution is really needed.
+
+- the new command 'test_stat' would collect this data ala the current 
+'stat' but allow CSV dumping for more fine-grained analysis. I'd 
+probably dump some node & group info as well to make easier to do 
+'group' stats.
+
 
 Nic
