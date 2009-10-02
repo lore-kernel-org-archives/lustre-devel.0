@@ -1,38 +1,50 @@
-From: David Dillow <dillowda@ornl.gov>
-Date: Wed, 30 Sep 2009 09:53:15 -0400
-Subject: [Lustre-devel] using LST for performance testing
-In-Reply-To: <4AC24BB1.8040502@cray.com>
-References: <4ABBD78E.50506@cray.com> <20090928173554.GA4911@sun.com>
-	<4AC23B21.2030207@cray.com> <1254245568.5827.5.camel@lap75545.ornl.gov>
-	<4AC24BB1.8040502@cray.com>
-Message-ID: <1254318795.3114.1.camel@lap75545.ornl.gov>
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Thu, 01 Oct 2009 19:14:29 -0700
+Subject: [Lustre-devel] Lustre version number and rpm "Release"
+Message-ID: <4AC56205.5060403@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 2009-09-29 at 14:02 -0400, Nic Henke wrote:
-> David Dillow wrote:
-> > Along these lines, it would be nice if we could specify a run time for
-> > each test rather than an amount of data to be transferred -- it makes it
-> > easier to get aggregate bandwidth numbers, and often shows imbalances
-> > nicely -- the node getting starved is the one that transfers less data.
-> >   
-> > It may also make sense to add a 'delay' parameter that causes each test
-> > to wait a specified amount of time from the 'go' signal. This allows the
-> > signal to propagate without running into congestion from the test,
-> > helping to cause all of the clients to start the test closer to
-> > simultaneously.
-> >   
-> 
-> Interesting - can you elaborate, perhaps in the form of a patch  ? :-) I 
-> like both ideas, but not signing up to code them just yet.
+I am in the process of creating our LLNL branch of Lustre which is based
+on b1_8.  Our build system for our branch of 1.6.6 was an additional top
+level directory of make files, scripts, and our own custom lustre.spec
+file.  As part of moving to 1.8, I want to try to get rid of that upper
+layer and make the upstream 1.8 code our top level directory.
 
-Maybe, but it is going to be well down the list -- I owe Oleg a large
-amount of testing before I think of doing anything else. :)
--- 
-Dave Dillow
-National Center for Computational Science
-Oak Ridge National Laboratory
-(865) 241-6602 office
+In bug 16424 there was discussion about setting custom version strings.
+ The recommended method seems to be to set the LUSTRE_VERS string.  I
+gave this a try, but it doesn't appear to be of much use to us as it stands.
+
+As far as I can tell, setting LUSTRE_VERS will change the "Build
+Version:" string that you see on the console upon loading the lustre
+modules, and not much else.
+
+Mainly here at LLNL we just want to append our own local version number
+extension to Lustre's version number.  If the upstream version is
+"1.8.1.50", we want our local build to have the version
+"1.8.1.50-3chaos".  LUSTRE_VERS mostly covers this part.
+
+But we also want to prefix the rpm Release string with the same number.
+
+In other words, when we build rpms we get:
+
+$ rpm -qpi lustre-1.8.1.50-2.6.18_70chaos_200910011803.x86_64.rpm
+Name        : lustre                       Relocations: (not relocatable)
+Version     : 1.8.1.50                          Vendor: (none)
+Release     : 2.6.18_70chaos_200910011803   Build Date: Thu Oct  1
+18:11:30 2009
+
+And instead we want this:
+
+$ rpm -qpi lustre-1.8.1.50-3chaos_2.6.18_70chaos_200910011803.x86_64.rpm
+Name        : lustre                       Relocations: (not relocatable)
+Version     : 1.8.1.50                          Vendor: (none)
+Release     : 3chaos_2.6.18_70chaos_200910011803   Build Date: Thu Oct
+1 18:11:30 2009
+
+Is there current a method for doing that?
+
+Chris
