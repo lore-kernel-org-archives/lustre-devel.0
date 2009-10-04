@@ -1,50 +1,42 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Fri, 02 Oct 2009 17:36:11 -0700
-Subject: [Lustre-devel] Lustre version number and rpm "Release"
-In-Reply-To: <1254491700.26203.251.camel@pc.interlinx.bc.ca>
-References: <4AC56205.5060403@llnl.gov>
-	<1254491700.26203.251.camel@pc.interlinx.bc.ca>
-Message-ID: <4AC69C7B.2020201@llnl.gov>
+From: Andreas Dilger <adilger@sun.com>
+Date: Sun, 04 Oct 2009 01:34:27 -0600
+Subject: [Lustre-devel] Needed: insight on obd_set_info_async()
+In-Reply-To: <20091002220611.GU887@Sun.COM>
+References: <20091002220611.GU887@Sun.COM>
+Message-ID: <20091004073427.GN3789@webber.adilger.int>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Brian J. Murrell wrote:
+On Oct 02, 2009  17:06 -0500, Nicolas Williams wrote:
+> I'm trying to find out which uses of obd_set_info_async() involve values
+> that come from a PTLRPC message buffer, and which ones don't.  It would
+> help to know what obd_set_info_async() is for...  It seems it's a
+> glorified ioctl()...
 
->> $ rpm -qpi lustre-1.8.1.50-2.6.18_70chaos_200910011803.x86_64.rpm
->> Name        : lustre                       Relocations: (not relocatable)
->> Version     : 1.8.1.50                          Vendor: (none)
->> Release     : 2.6.18_70chaos_200910011803   Build Date: Thu Oct  1
-> 
-> Then presumably the kernel you built against is 2.6.18_70chaos.  Is that
-> correct?
+Sort of, yes, though I would characterize it more like a "get/set system
+xattr".  It can get/set key,value pairs on a local or remote node.  The
+"async" part means that the caller is the one in charge of handling waiting
+for completion of the operation.  This is important when doing an operation
+that may involve many OSTs, since we want the RPCs to happen in parallel
+instead of in series.
 
-That is correct.
+> I'm tempted to augment it to always take a struct ptlrpc_request *req
+> argument, so that req == NULL || val == NULL, and when req != NULL the
+> value will be obtained using req_capsule_*_get().  Between that and
+> enhancements to req_capsule_extend() and what not we might be able to
+> ensure that 'val' is always swabbed by capsule code.
 
-> %{!?release: %define release @RELEASE@}
-> 
-> That means you can define Release for your rpm build on the command line
-> with:
-> 
-> $ rpmbuild --define 'release whatever_you_want' ... lustre.spec
+I can't comment on the HEAD capsule code, maybe someone else can...
 
-Well, that is true, except that we just want to prefix the release, not
-replace it.  If we replace it with our own definition, we have to repeat
-the kernel detection, and timestamp part.  So really, we'll want an
-additional "release_prefix" rpm variable.
+> But if the uses of obd_set_info_async() are very clearly distinguishable
+> it might be better to introduce a variant that takes a struct
+> ptlrpc_request *req _instead_ of val/vallen.
 
-There is an additional wrinkle that I didn't mention.  Our automated
-build system is designed to take source rpms and build the binary rpms
-from that.  If we just set "release" at source rpm build time, I don't
-think that it will be remember later when the binary rpms are built.
-
-Part of the reason that our build farm works that way is that we would
-like other users of our linux distribution to be able to easily rebuild
-lustre (and any other kernel modules) from the source rpm.
-
-In the end though, it looks like the most reasonable way to handle this
-is to have our own spec file for the chaos linux distribution.
-
-Chris
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
