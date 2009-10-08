@@ -1,44 +1,37 @@
-From: Nicolas Williams <Nicolas.Williams@sun.com>
-Date: Mon, 5 Oct 2009 14:00:54 -0500
-Subject: [Lustre-devel] Needed: insight on obd_set_info_async()
-In-Reply-To: <20091005171532.GV3789@webber.adilger.int>
-References: <20091002220611.GU887@Sun.COM>
-	<20091004073427.GN3789@webber.adilger.int>
-	<20091004171118.GV887@Sun.COM>
-	<20091005171532.GV3789@webber.adilger.int>
-Message-ID: <20091005190053.GD887@Sun.COM>
+From: Isaac Huang <He.Huang@Sun.COM>
+Date: Thu, 08 Oct 2009 15:36:43 -0400
+Subject: [Lustre-devel] using LST for performance testing
+In-Reply-To: <1254245568.5827.5.camel@lap75545.ornl.gov>
+References: <4ABBD78E.50506@cray.com> <20090928173554.GA4911@sun.com>
+	<4AC23B21.2030207@cray.com> <1254245568.5827.5.camel@lap75545.ornl.gov>
+Message-ID: <20091008193643.GW4767@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Oct 05, 2009 at 11:15:32AM -0600, Andreas Dilger wrote:
-> On Oct 04, 2009  12:11 -0500, Nicolas Williams wrote:
-> > But does it always go over the wire?  Is it always executed with a 'val'
-> > that came off the wire?
+On Tue, Sep 29, 2009 at 01:32:48PM -0400, David Dillow wrote:
+> On Tue, 2009-09-29 at 11:51 -0500, Nic Henke wrote:
+> > I'm wondering if we couldn't add a new 'batch_stat' command. The idea is 
+> > that the client code will fill in the start/stop times for each test and 
+> > then after the test is done, 'batch_stat' would collect this data. The 
+> > collection would still be passive and a new command should minimize the 
+> > protocol changes. The per-test data would allow us to get accurate perf 
+> > numbers and also provide some data into how parallel the tests were, if 
+> > there are any unfairness issues, etc.
 > 
-> No, getinfo/setinfo also operate locally in many places.  The caller isn't
-> supposed to know at what lower layer the request will be processed.
-> 
-> In that regard, the early design goal of the Lustre stack was that it
-> has a single API throughout the stack and is transparent whether the
-> operations are happening on a local or remote node, but I wasn't at all
-> involved in the 2.0 development and that goal has fallen by the wayside.
+> Along these lines, it would be nice if we could specify a run time for
+> each test rather than an amount of data to be transferred -- it makes it
+> easier to get aggregate bandwidth numbers, and often shows imbalances
+> nicely -- the node getting starved is the one that transfers less data.
 
-Thanks.  This helps.  Also, it seems, from what I can tell, that 'val'
-is expected to be in local byte order, which also helps.
+This would be a very useful feature. We're working on to add LST tests
+to our automatic tests, where we met a problem that we could never
+tell how long the test would run by looking at '--loop' and
+'--concurrency'.
 
-I've figured out what to do.  There's only a handful of PTLRPCs that
-devolve into calls to obd_set_info_async() with 'val's taken from an RPC
-buffer, and at each of those places there's a call to ptlrpc_req_need_swab()
-and swabbing code.  Each such RPC handler will change the req's format
-to one that properly models the 'val', so that it gets swabbed properly
-(this was my original plan, but I wasn't sure if obd_set_info_async()
-might be doing additional swabbing below, and now it's clear that it
-does not).
+The LST already implemented a timer mechanism which is good at second
+resolution, which should suffice for controlling test run time.
 
-I'll make sure to check every call to KEY_IS() as well.
-
-Nico
--- 
+Isaac
