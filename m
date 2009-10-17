@@ -1,94 +1,71 @@
-From: jan julian <julian@arsc.edu>
-Date: Fri, 16 Oct 2009 10:01:50 -0800
-Subject: [Lustre-devel] lustre-to-LNET API: big non-aligned bulk
-	transfers
-In-Reply-To: <4AD8A41F.10403@sun.com>
-References: <4AD5ECBC.20003@sun.com> <088e01ca4cf2$f5f9dcf0$e1ed96d0$@com>
-	<4AD8A41F.10403@sun.com>
-Message-ID: <A1F15B48-3FC1-4616-958B-61F079E40CAF@arsc.edu>
+From: Andreas Dilger <adilger@sun.com>
+Date: Sat, 17 Oct 2009 11:53:12 -0600
+Subject: [Lustre-devel] max_dirty_mb and fsync
+In-Reply-To: <4AD76F52.4040706@ornl.gov>
+References: <4AD76F52.4040706@ornl.gov>
+Message-ID: <F0F8DECF-1BD9-4B47-A183-23B6697D79F8@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Just so your aware, the21057  bugzilla's assignment yesterday was as  
-follows.  Who can I get to move this forward so that I can
-exchange messages with someone.
+On 15-Oct-09, at 12:52, Bradley W. Settlemyer wrote:
+>  What is the difference between setting the max_dirty_mb setting in
+> /proc to 4 and making sure that all of my applications fsync every  
+> 4MBs
+> of data that are transmitted?
+>
+>  I would guess that one difference is the 32MB is a filesystem-wide
+> setting rather than a per file setting -- so the sync occurs  
+> regardless
+> of the number of files receiving data.  But are there any other
+> differences with regards to the interaction with the file system.
+>
+>  More to the point perhaps, does an fsync have additional side effects
+> beyond those that occur for the max_dirty_mb threshhold being  
+> exceeded?
 
-People
-Reporter:	pravin shelar <pravin.shelar@sun.com>
-Assigned To:	pravin shelar <pravin.shelar@sun.com>
-Add CC:	
-CC:	
-Remove selected CCs
-On Oct 16, 2009, at 8:49 AM, Maxim V. Patlasov wrote:
 
-> Eric,
->
-> To make things 100% clear - did you answer positively ('It  
-> should...') because there are some lustre use-cases for such  
-> transfers or just because it would be natural for LNET to support  
-> both aligned and not-aligned big bulk transfers?
->
-> Thanks in advance,
-> Maxim
->
-> On 10/14/2009 09:22 PM, Eric Barton wrote:
->>
->> Maxim,
->>
->> It should support such transfers, but you have to be careful about
->> the number of fragments this can introduce.  This issue has already
->> been observed in routers, which buffer LNET message payloads at
->> the same page offset, irrespective of the sender's page offset (of
->> which it has no knowledge).  For example, this can force the o2iblnd,
->> if configured to pre-map all memory, to need double the number of  
->> RDMA
->> fragments and therefore fail the transfer.  Chat with Liang - he  
->> knows
->> all about this...
->>
->>     Cheers,
->>               Eric
->>
->>
->>> -----Original Message-----
->>> From: lustre-devel-bounces at lists.lustre.org [mailto:lustre-devel-bounces at lists.lustre.org 
->>> ] On Behalf Of Maxim V.
->>> Patlasov
->>> Sent: 14 October 2009 8:23 AM
->>> To: lustre-devel at lists.lustre.org
->>> Subject: [Lustre-devel] lustre-to-LNET API: big non-aligned bulk  
->>> transfers
->>>
->>> Hi lustre-devel,
->>>
->>> I'd like to gather some opinions about the following question:
->>>
->>> Is it allowed or possible for lustre to submit relatively big bulk
->>> transfer request (e.g. >512K) to LNET layer when offset in the very
->>> first page to fetch bulk data from (on sender side) is not equal  
->>> to the
->>> offset in the very first page to store data (on receiver side)? In  
->>> the
->>> other words - should LNET support such transfers?
->>>
->>> Thanks in advance,
->>> Maxim
->>> _______________________________________________
->>> Lustre-devel mailing list
->>> Lustre-devel at lists.lustre.org
->>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>>
->>
->>
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+One important distinction between max_dirty_mb (which is a Lustre  
+mechanism
+to avoid too much file cache memory pressure on the client node causing
+application data to be paged out of memory) and an fsync() is  
+max_dirty_mb
+only pushes out file data to the OSTs on an as-needed basis, while  
+fsync()
+flushes ALL of the data, and also guarantees that you can ACCESS that  
+data
+after it was written to the OSTs/disks.
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20091016/2b6f7e97/attachment.htm>
+Whether on Lustre or a local filesystem, just because the blocks are  
+on disk,
+it doesn't mean that the metadata (either Lustre on the MDS, or ext3/ 
+xfs/etc)
+to access that data (whether for the pathname traversal, or the inode  
+itself)
+is also safe on disk.  This is one of the issues being discussed a lot  
+on
+linux-fsdevel regarding the semantics of O_DIRECT, which guarantees  
+that the
+DATA is on disk but it doesn't mean that the just-created inode or the  
+mapping
+for just-allocated blocks have made it to the disk at all.
+
+That behaviour is fine for a database, which will generally always  
+preallocate
+the file on disk, so the only thing changing is the file data, but it  
+may be
+a surprise to other users of O_DIRECT.
+
+That said, Lustre WILL of course write all of this data to disk as  
+soon as
+practical, without forcing everything to a standstill while the  
+fsync() is
+completed.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
