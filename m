@@ -1,138 +1,66 @@
-From: Nikita Danilov <nikita.danilov@clusterstor.com>
-Date: Fri, 4 Dec 2009 21:19:27 +0300
-Subject: [Lustre-devel] Lustre client I/O
-In-Reply-To: <4B1873C7.3060600@sun.com>
-References: <8acda98c0912031432j5747b1aaxeb49ec27885fbeaf@mail.gmail.com>
-	<4250440D-BD4C-43D8-B619-86AA0F59ED2D@Sun.COM>
-	<4B1873C7.3060600@sun.com>
-Message-ID: <8acda98c0912041019m7bec896cp71e582325cc9066b@mail.gmail.com>
+From: Yuriy Umanets <yuriy.umanets@clusterstor.com>
+Date: Sat, 5 Dec 2009 15:21:47 +0200
+Subject: [Lustre-devel] loadgen improvements
+Message-ID: <3ed212d00912050521l530cefc4oc6c44afce48faaa@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-[Lustre-devel copied.]
+hello Lustre hackers,
 
-Hello,
+ClusterStor would like to start doing real contributions to Lustre stability
+and popularity. First off, we would like to improve loadgen utility, written
+by Nathan Rutman. We think loadgen is a really good tool for testing and
+what is not less important, it is implemented right way from architecture
+point of view.
 
-see comments below.
+However, these days it has number of issues:
+1. Wrong stack size for threads, that results in segfault (find the patch in
+attachment);
+2. Little locking issues (push_kid() function);
+3. Absence of striping functionality, it only may create load on one
+OST/ECHO server.
 
-2009/12/4 jay <Jinshan.Xiong@sun.com>:
-> Oleg Drokin wrote:
->>
->> Hello!
->>
->> On Dec 3, 2009, at 5:32 PM, Nikita Danilov wrote:
->>
->>
->>>
->>> Hello Oleg,
->>>
->>> Peter Braam told me you pointed him to some issues with CLIO. Could
->>> you provide details? I am probably owing an explanation of why things
->>> were done in this or that way. May be on lustre-devel?
->>>
->>
->> ? Actually I did not dig too much into details myself yet.
->> Jay and WangDi are the best people to ask about specific deficiencies,
->> I think I remember there were mentioned some missed state machine states,
->> then clio takes locks in random order for the same file, so it was
->> deadlock prone.
->> See bug 19906 for some of that. There are many more.
->>
->
-> Mostly implementation defects. For 19906, it turns out to be lack of error
-> handling at some point, for example, if lock wait fails, we have to
-> de-referenced the enqueued sublocks.
->
->> I did some measurements and it is very slow too, over 30% slower than b1_8
->> code
->> for the case of local access.
->>
->
-> We've never done any performance tune against clio.
->>
->> Certain questions are raised by Eric Barton if we ever need another cache
->> for compound locks if we already have ldlm cache for locks, since that
->> other
->> cache adds a lot of complications too. And I sort of agree the current
->> clio code
->> looks like a total overkill and very complicated.
->>
->
-> Yes, the two-level cached lock mechanism makes cl_lock extremely complex and
-> fragile - it can be simplified by removing the top level cache.
+We plan to add striping functionality to loadgen. General idea is to use LOV
+module, which already has all the needed code. Loadgen itself and
+echo_client also have related code, so it seems this functionality was
+planned anyway, though it's not working currently. Currently an attempt to
+attach to a LOV results in assertion failures.
 
-I agree that caching top- and bottom- locks adds considerable
-complexity. Performance advantages of caching alone probably cannot
-justify it. On the other hand, removing top-lock caching only makes
-sense when layering is fixed: in a general IO stack layers must have
-uniform caching behaviour.
+Let's discuss these matters. The way we're going to implement this may be
+roughly expressed as follows:
 
->
-> CLIO is still in its childhood, it has never been verified at customer's
-> side. It's quite common that we meet new problems when running a new test
-> suite. As a matter of fact, most clio bugs were found in new test suites -
-> we don't have new issues in these days, because no new test suite is
-> introduced.
->
-> Before diving into the good and bad side of clio, let's check up what's the
-> initiatives of having clio, and whether we have reached those targets or not
-> in current implementation. We don't need to focus on those defects in
-> implementation.
-> This is the design goals of clio:
->
-> clear layering;
-> controlled state sharing;
-> simplified layer interface;
-> real stacking;
-> reuse of mdt server layering;
-> improving portability.
+1. Attach to LOV device in loadgen, using "device" command. To do so we need
+to construct new LOV instance, used by loadgen only, as we cannot use LOV
+instance used by LLITE. This requires changes to handling function for
+command "device". It should accept more than one OST target;
 
-Those are mostly achieved. "Mostly" because few things, like
-read-ahead, are still at a wrong level. As an example of advantages of
-improved layering, implementation of lock-less IO in CLIO re-uses the
-same code paths as a normal caching IO: DLM interaction details are
-encapsulated within osc and it is possible to substitute "surrogate
-locks" there without rest of the stack noticing. (As a note, CLIO
-lock-less IO doesn't currently handle sub-page lockless read as
-efficiently as 1.8, because it fetches the whole page from the server
-first, but this is easy to fix or maybe it is already fixed.)
+2. Stripe size and stripe count of new LOV instance should also be specified
+while constructing it using "device" command;
 
-> support for:
-> ?SNS;
-> ?read-only p2p caching;
-> ?lock-less IO and ost intents;
->
->> Feel free to add lustre-devel at any point.
+3. Setup of virtual clients should take into account that LOV may be used as
+a target. In this case attaching dedicated OSCs to created echo_client's is
+not needed.
 
-One of the more confusing parts of CLIO is its file and stripe lock
-implementation, even putting top-lock caching aside for a moment.
-There are, I think, two main reasons for this:
+4. In order to be able to run thousands of threads, we need the following:
+ - reasonable stack size for threads;
+ - change 8192 OBD number limit to something more reasonable.
 
-    * locks are implemented as non-blocking state machines. This is
-rather unusual and definitely not common programming style looking
-somewhat inside-out-ish at first sight. The justification for this is
-support for a "parallel IO", i.e., a mode where a write, instead of
-blocking on a full per-OST cache, proceeds to the next stripe. The
-upside is that once non-blocking infrastructure is in place in cl_lock
-and cl_io, many other interesting things, like concurrent copy_*_user
-and "lock-ahead", are easier to do;
+5. Load itself is created in the way being currently used - via obd_brw().
 
-    * concurrency control for cl_lock is fiendishly difficult. I now
-think it was a mistake to strive for finer-grained locking. Eric
-Barton noted that a lock on a top-object could protect state of all
-locks on the object and its sub-objects. This would greatly simplify
-things without intolerable decrease in concurrency.
+Thanks.
 
->>
->> Bye,
->> ? ?Oleg
->>
-
-Thank you,
-Nikita.
-
->
->
+-- 
+umka
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20091205/3f9cc0b6/attachment.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: loadgen-stacksize.patch
+Type: application/octet-stream
+Size: 1193 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20091205/3f9cc0b6/attachment.obj>
