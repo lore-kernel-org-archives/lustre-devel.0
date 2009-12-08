@@ -1,76 +1,60 @@
-From: Brian Reitz <Brian.Reitz@Sun.COM>
-Date: Mon, 07 Dec 2009 18:18:25 -0600
-Subject: [Lustre-devel] Flag Day : Lustre ( b1_6,
- b1_8 and HEAD ) transition to GIT on Dec 14th, 2009
-Message-ID: <0EDE0A63-71C6-4757-96E0-7DA104F022C2@Sun.COM>
+From: Yuriy Umanets <yuriy.umanets@clusterstor.com>
+Date: Tue, 8 Dec 2009 14:27:29 +0200
+Subject: [Lustre-devel] loadgen improvements
+Message-ID: <3ed212d00912080427t184eecf0wf49373cfab555548@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-What is happening?
+hello Lustre hackers,
 
-The Lustre source repository is moving from CVS, where it has lived for the last 7+ years to Git.  This will simplify ongoing development of Lustre in a number of ways, including tracking of changes and history, improved merging of development branches into releases, and offline development.
+ClusterStor would like to start doing real contributions to Lustre stability
+and popularity. First off, we would like to improve loadgen utility, written
+by Nathan Rutman. We think loadgen is a really good tool for testing and
+what is not less important, it is implemented right way from architecture
+point of view.
 
-Unfortunately, due to the lengthy use and abuse of CVS to manage the Lustre code, it is not possible to do a straight import of the entire CVS repository into Git using any existing tools.  Rather than simply importing the current state of the code into Git and lose all of the history, we've worked to import the major development branches along with their full history into a single Git repository to maximize its usefulness.
+However, these days it has number of issues:
+1. Wrong stack size for threads, that results in segfault (find the patch in
+attachment);
+2. Little locking issues (push_kid() function);
+3. Absence of striping functionality, it only may create load on one
+OST/ECHO server.
 
-When is this happening?
+We plan to add striping functionality to loadgen. General idea is to use LOV
+module, which already has all the needed code. Loadgen itself and
+echo_client also have related code, so it seems this functionality was
+planned anyway, though it's not working currently. Currently an attempt to
+attach to a LOV results in assertion failures.
 
-Monday December 14 2009 is the target date for switching all Lustre development from CVS to Git. 
+Let's discuss these matters. The way we're going to implement this may be
+roughly expressed as follows:
 
-All CVS Repositories will transition to read-only state on Friday December 11, 2009 at 9:00 am CST. The CVS repository will remain in this read-only state for the duration of the conversion process.  Please make your plans accordingly.
+1. Attach to LOV device in loadgen, using "device" command. To do so we need
+to construct new LOV instance, used by loadgen only, as we cannot use LOV
+instance used by LLITE. This requires changes to handling function for
+command "device". It should accept more than one OST target;
 
-The conversion to Git will be done over the weekend (12/11/2009 - 12/13/2009).  The resulting Git repository will be available on Monday December 14 2009 at 12:00 PM CST.  The CVS tree will remain in a read-only state from this point on.  All subsequent code changes must be done via Git.
+2. Stripe size and stripe count of new LOV instance should also be specified
+while constructing it using "device" command;
 
-Instructions on using Git with the Lustre code base can be found here: 
+3. Setup of virtual clients should take into account that LOV may be used as
+a target. In this case attaching dedicated OSCs to created echo_client's is
+not needed.
 
-http://wiki.lustre.org/index.php/Accessing_Lustre_Code
-http://wiki.lustre.org/index.php/Applying_Lustre_Patches_to_a_Kernel
-http://wiki.lustre.org/index.php/Submitting_Patches
+4. In order to be able to run thousands of threads, we need the following:
+ - reasonable stack size for threads;
+ - change 8192 OBD number limit to something more reasonable.
 
-What is supported?
+5. Load itself is created in the way being currently used - via obd_brw().
 
-Following Branches are migrated to GIT
+Thanks.
 
-	b1_6
- 	b1_8
- 	b_release_1_6_7
- 	b_release_1_8_0
- 	b_release_1_8_1
- 	master aka HEAD represents 2.0 work
 
-A limited number of tags are also supported in the git repository.  Only v* tags post 1.6.7 are supported.  
-
-What is not supported?
-
-	b1_4 branch will not be migrated and will be maintained under cvs.
-
-Developer Migration Notes
-
-To make your migration to git easier you should update any of your development CVS branches from the base, and land outstanding work in those development branches before Friday December 11, 2009.  Working directories that contain uncommitted changes should also be updated, but can be done after the migration while the CVS repository is in a read-only mode.
- 
-Tags will be placed in the CVS repository to mark the point were the conversion was done:
-
-        B1_6_GIT_BASE
-        B1_8_GIT_BASE
-        B_RELEASE_1_6_7_GIT_BASE
-        B_RELEASE_1_8_0_GIT_BASE
-        B_RELEASE_1_8_1_GIT_BASE
-        B2_0_GIT_BASE
-
-In addition tags will also be in place in the Git repository marking the spot of the conversion:
-
-        GIT_EPOCH_B1_6
-        GIT_EPOCH_B1_8
-        GIT_EPOCH_B_RELEASE_1_6_7
-        GIT_EPOCH_B_RELEASE_1_8_0
-        GIT_EPOCH_B_RELEASE_1_8_1
-        GIT_EPOCH_MASTER
-
-Support
-
-lustre-devel at sun.com
+-- 
+umka
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20091207/f7050d4e/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20091208/a730c324/attachment.htm>
