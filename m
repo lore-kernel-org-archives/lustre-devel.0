@@ -1,65 +1,172 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Tue, 08 Dec 2009 23:35:32 -0700
+From: Yuriy Umanets <yuriy.umanets@clusterstor.com>
+Date: Wed, 9 Dec 2009 15:28:40 +0200
 Subject: [Lustre-devel] loadgen improvements
-In-Reply-To: <1260335244.9521.114.camel@berloga.shadowland>
+In-Reply-To: <5250C925-EDB4-48FA-AD3C-AC37B212BB2B@sun.com>
 References: <3ed212d00912050521l530cefc4oc6c44afce48faaa@mail.gmail.com>
 	<5250C925-EDB4-48FA-AD3C-AC37B212BB2B@sun.com>
-	<1260335244.9521.114.camel@berloga.shadowland>
-Message-ID: <20C3E301-9A42-47D9-A1A7-BA06814D396F@sun.com>
+Message-ID: <3ed212d00912090528j75a99bdby77d8e293bb58def@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2009-12-08, at 22:07, Alexey Lyashkov wrote:
-> This can be something similar as
->>
->     pattern $name $pool_name $operation [$stripe_size [$stripe_count]]
+On Tue, Dec 8, 2009 at 9:10 PM, Andreas Dilger <adilger@sun.com> wrote:
+
+> Hello Yuriy,
 >
-> where
-> name - is pattern name
-> pool_name - is name of OST pools assigned to this pattern
-> operation - is one of READ or WRITE.
-> stripe_size - if set, workload need to setup LOV and add linkage  
-> between
-> LOV and OSC targets, and separate single operation to stripes.
-> stripe_count - if set, workload should be use for only part of OST  
-> pool
-> to each echo object.
-
-Please do not use positional parameters.  That makes it nearly  
-impossible to change the input format in the future, or to skip some  
-fields and leave them as defaults.  This needs to use getopt() and  
-named parameters:
-
-  --pool=pool_name, --stripe_size=N,  --stripe_count=N
-
-> next stage is prepare clients.
-> In this stage we should be send obd_connect to echo client and wait
-> until all osc targets is connected (via send obd_statfs() or something
-> similar).
-> To start clients we can uses:
+>
+> On 2009-12-05, at 06:21, Yuriy Umanets wrote:
+>
+>> ClusterStor would like to start doing real contributions to Lustre
+>> stability and popularity. First off, we would like to improve loadgen
+>> utility, written by Nathan Rutman. We think loadgen is a really good tool
+>> for testing and what is not less important, it is implemented right way from
+>> architecture point of view.
 >>
->     clients $name $count $workload_name [shared]
-> where
-> name - is client group name
-> count - is client's count in that group
-> workload_name - is name of workload parameters.
-> shared - if set, clients in this pattern is share single OSC or LOV
-> target. if don't set - each worker have own lustre stack.
-> At this stage we also create echo objects with requested LSM for each
-> client.
+>
+> Great.  We look forward to working with you again.
+>
+> Thank you all guys.
 
-Same as above - please use named parameters instead of positional ones.
+>
+>  However, these days it has number of issues:
+>> 1. Wrong stack size for threads, that results in segfault (find the patch
+>> in attachment);
+>> 2. Little locking issues (push_kid() function);
+>> 3. Absence of striping functionality, it only may create load on one
+>> OST/ECHO server.
+>>
+>
+> Can you please file a bug for this, and attach this patch and later ones
+> there.  That will ensure that it follows the proper inspection and testing
+> process.
 
-It probably also makes sense to look at the functions provided by LST  
-(LNET self test) so that we might have these two tools operate in a  
-similar manner. LST testing at the LNET level, loadgen testing at the  
-OBD/CLIO level.
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+Sure, will do.
+
+>
+>
+>  We plan to add striping functionality to loadgen. General idea is to use
+>> LOV module, which already has all the needed code. Loadgen itself and
+>> echo_client also have related code, so it seems this functionality was
+>> planned anyway, though it's not working currently. Currently an attempt to
+>> attach to a LOV results in assertion failures.
+>>
+>
+> Right - Eric and I worked on that some years ago, but it was never used
+> fully.  Can you please ensure that you include a test in sanity.sh that
+> exercises the functionality you are adding to loadgen, as with echo_client
+> in test 180.  More complex load tests should go into their own script.
+>
+> Ok
+
+>
+>  Let's discuss these matters. The way we're going to implement this may be
+>> roughly expressed as follows:
+>>
+>> 1. Attach to LOV device in loadgen, using "device" command. To do so we
+>> need to construct new LOV instance, used by loadgen only, as we cannot use
+>> LOV instance used by LLITE. This requires changes to handling function for
+>> command "device". It should accept more than one OST target;
+>>
+>
+> This sounds reasonable.  It might be useful to support the wildcard
+> specification of OSTs like "lustre-OST00[0-30]" or "lustre-OST00[0,3,6,9].
+>  Some of that functionality already exists in lustre/utils/nidlist.c.
+
+
+Looks reasonable. We can even use "dl" command output to validate the names
+and prevent using not existing local obd names.
+
+>
+>
+>  2. Stripe size and stripe count of new LOV instance should also be
+>> specified while constructing it using "device" command;
+>>
+>
+> It probably makes sense to have this specified with a separate command, so
+> that these parameters can be changed without having to tear down the devices
+> and recreate them just to change the striping, and it avoids overloading the
+> "device" command (which will soon become much more complex by allowing many
+> OSTs to be specified).
+
+
+Tend to agree with Shadow's idea to use something like a "pool" command
+instead of --stripe_count to minimize changes.
+
+>
+>
+>  3. Setup of virtual clients should take into account that LOV may be used
+>> as a target. In this case attaching dedicated OSCs to created echo_client's
+>> is not needed.
+>>
+>> 4. In order to be able to run thousands of threads, we need the following:
+>>  - reasonable stack size for threads;
+>>  - change 8192 OBD number limit to something more reasonable.
+>>
+>
+> If you are going beyond 8192 OBD devices just for the loadgen usage
+> (presumably you need a new LOV device for each thread?) then it would make
+> sense to have the obd_devs array be dynamically allocated and remove any
+> upper limit on the number of devices.
+>
+> Event for current functionality, which we want to preserve, when we have 2
+OBDs per thread (echo_client and its OSC) this limit will not allow us to
+start more than ?4K threads. I think our goal should be at least 100K of
+them.
+
+
+> Most of this work has already been done - all of the access to obd_devs[]
+> is localized in lustre/obdclass/genops.c, with the exception of the array
+> initialization, and an old EXPORT_SYMBOL(obd_devs), which isn't used
+> anymore. The obd_devs[] declaration can be made static to genops.c and the
+> initialization moved to obd_init_caches(), and then the actual
+> representation of obd_devs[] can be changed without affecting the interface.
+>
+Agreed.
+
+>
+> Note that the index number of the device is still exported to userspace, so
+> it isn't possible/practical to simply go with a linked-list implementation.
+>  The actual obd_device structures are already allocated and freed
+> dynamically, just the master obd_devs[] array is static.  Probably a master
+> array of pointers to pages that hold segments of the the obd_devs[] array in
+> order is sufficient.  The master array will be quite small (1 pointer per
+> 512 obd_devices) and can be reallocated under a rwlock, since nothing
+> references it directly.  There is no need to be able to shrink the master
+> array.
+>
+> It would be trivial to also make the obd_types and obd_types_lock
+> declarations static to genops.c, and the initialization in obd_init_caches()
+> to properly isolate that code as well.
+>
+> Ok
+
+>
+>  5. Load itself is created in the way being currently used - via obd_brw().
+>>
+>
+>
+> Actually, the real code does not use obd_brw() directly anymore, but rather
+> obd_brw_async().  I think Nic Henke submitted a patch to change that, I'm
+> not sure of the current status of that patch.
+>
+> Ok.
+
+Thanks!
+
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Sr. Staff Engineer, Lustre Group
+> Sun Microsystems of Canada, Inc.
+>
+>
+
+
+-- 
+umka
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20091209/844d67ad/attachment.htm>
