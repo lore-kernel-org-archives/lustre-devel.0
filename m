@@ -1,38 +1,73 @@
-From: Yuriy Umanets <yuriy.umanets@clusterstor.com>
-Date: Wed, 9 Dec 2009 15:42:53 +0200
+From: Andreas Dilger <adilger@sun.com>
+Date: Thu, 10 Dec 2009 00:33:25 -0700
 Subject: [Lustre-devel] loadgen improvements
-In-Reply-To: <5250C925-EDB4-48FA-AD3C-AC37B212BB2B@sun.com>
+In-Reply-To: <1260341830.9521.132.camel@berloga.shadowland>
 References: <3ed212d00912050521l530cefc4oc6c44afce48faaa@mail.gmail.com>
 	<5250C925-EDB4-48FA-AD3C-AC37B212BB2B@sun.com>
-Message-ID: <3ed212d00912090542t1bca852er135ed80238921699@mail.gmail.com>
+	<1260335244.9521.114.camel@berloga.shadowland>
+	<20C3E301-9A42-47D9-A1A7-BA06814D396F@sun.com>
+	<1260341830.9521.132.camel@berloga.shadowland>
+Message-ID: <5F06E9CF-6386-4809-A6B1-1DA61502EC20@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Dec 8, 2009 at 9:10 PM, Andreas Dilger <adilger@sun.com> wrote:
-
-> Hello Yuriy,
+On 2009-12-08, at 23:57, Alexey Lyashkov wrote:
+> On Tue, 2009-12-08 at 23:35 -0700, Andreas Dilger wrote:
+>> On 2009-12-08, at 22:07, Alexey Lyashkov wrote:
+>>> This can be something similar as
+>>
+>>>
+>>>    pattern $name $pool_name $operation [$stripe_size  
+>>> [$stripe_count]]
+>>
+>> Please do not use positional parameters.  That makes it nearly
+>> impossible to change the input format in the future, or to skip some
+>> fields and leave them as defaults.  This needs to use getopt() and
+>> named parameters:
+>>
+>>  --pool=pool_name, --stripe_size=N,  --stripe_count=N
 >
-
-
-> Can you please file a bug for this, and attach this patch and later ones
-> there.  That will ensure that it follows the proper inspection and testing
-> process.
+> This possible, but unlikely. because need will be save current pool
+> name, instead have parsed as single command.
 >
->
-> Bug https://bugzilla.lustre.org/show_bug.cgi?id=21571 is created. Please
-attach it to right tracker. I'm not aware of any valid these days.
+> And I don't have plan to rewrite loadgen to use getopt, instead of
+> current Parser() function which is used in lctl, lfs, and other.
 
-Nathan, Andreas, I requested your inspections there. Hope you don't mind.
+Note that the existing parser function passes argc, argv to the helper  
+function, which is free to use getopt() or getopt_long() internally as  
+desired.  See, for example, lustre/utils/lfs.c::lfs_setstripe(), which  
+handles the parsing of "lfs setstripe --count N --pool {pool} ...".
 
-Thanks.
+> How about this style
+>>
+> pool $name { targets:"OST1, OST2" }
+> pattern $pat { stripe_count:X stripe_size:Y block_size:Z };
+> clients $pattern { count:XX pattern: pat shared }
 
 
->
->> --
-umka
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20091209/a5305147/attachment.htm>
+I have no objection to splitting up the functionality into multiple  
+sub-commands.  Allowing declarations of pools and patterns that are re- 
+used for each client definition makes a lot of sense.
+
+What I dislike is the introduction of a completely new input format  
+and parsing engine for no apparent benefit.  Why not change the above  
+to:
+
+loadgen> pool --targets="OST1,OST2,..." NAME
+loadgen> pattern --stripe_count=X --stripe_size=Y --block_size=Z PATTERN
+loadgen> clients --count=XX --pattern=PATTERN ...
+
+and use well-known input conventions?
+
+It also makes sense to look at how LNET Self Test handles the setup of  
+testing loads, and try and make the loadgen usage similar to that, as  
+much as possible?
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
