@@ -1,71 +1,36 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Mon, 14 Dec 2009 17:00:31 -0800
-Subject: [Lustre-devel] Fwd: The Lustre community and GIT
-In-Reply-To: <2b20c7140912131047qf0417f1mf3f3d9a8fc751dc0@mail.gmail.com>
-References: <2b20c7140912130831t658c2790hb38c3752c18ec128@mail.gmail.com>
-	<2b20c7140912131047qf0417f1mf3f3d9a8fc751dc0@mail.gmail.com>
-Message-ID: <4B26DFAF.2020906@llnl.gov>
+From: Andreas Dilger <adilger@sun.com>
+Date: Mon, 14 Dec 2009 18:06:09 -0700
+Subject: [Lustre-devel] Flag Day : Lustre ( b1_6,
+ b1_8 and HEAD ) transition to GIT on Dec 14th, 2009
+In-Reply-To: <alpine.LFD.2.00.0912142024590.28627@casper.infradead.org>
+References: <0EDE0A63-71C6-4757-96E0-7DA104F022C2@Sun.COM>
+	<alpine.LFD.2.00.0912142024590.28627@casper.infradead.org>
+Message-ID: <01075A95-285A-41EE-8457-4A7E1DE4D84C@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Peter Braam wrote:
+On 2009-12-14, at 13:25, James Simmons wrote:
+> Attempted to do a checkout.
+>
+> git clone git://git.lustre.org/prime/lustre.git
+> Initialized empty Git repository in /home/ffrwfr/lustre/.git/
+> git.lustre.org[0: 192.18.100.206]: errno=Connection timed out
+> fatal: unable to connect a socket (Connection timed out)
+>
+> Is it ready yet?
 
-> My group at ClusterStor has reserved the "lustre" project at Github and we
-> will give keys to any and all organizations that wish to make serious
-> contributions to Lustre.  I was in particular hoping that LLNL would be
-> willing to commit their releases to that public place.
 
-First, I'd like to say thanks to Sun.  We are thrilled that they went 
-through the effort of switching the repository over to git.
+James, were you able to do a clone?   I don't know if someone already  
+contacted you, but I tested this a little while ago and it was working  
+OK.  We also have a torrent set up for the initial repository clone,  
+since it is about 120MB and we weren't sure how much load there was  
+initially going to be on the repository.
 
-Yes, we at LLNL are happy to make our tree more public.  We have wanted 
-to do this for a while, but hadn't spent the time to figure out a 
-reasonable method of distribution.  Even with the move to git, it is not 
-immediately clear how we should share our branch of Lustre given our 
-current work flow.
-
-For a long time, we used a script to create a tarball from Sun's CVS 
-repo, and then imported that tree into a branch of our local Subversion 
-repo.  All of our changes and maintained a quilt stack of patches.
-
-For a number of reasons, when we started planning our 1.8.2-based 
-release a couple of months ago, I transitioned us from Subversion to 
-git.  We currently maintain all of our patches using topgit, which 
-maintains each "patch" as a separate real "topic" branch in git.
-
-topgit is nice in some ways, but one of its down sides is that it makes 
-the git history pretty ugly, with dozens and dozens of merges.  topgit 
-allows a DAG of topic branch dependencies, but I decided to keep it 
-simple with a stack-like arrangement of patches.
-
-But to make a long story short, I doubt that anyone wants to see our 
-topgit noise in a public repo.  So how would we handle an llnl branch in 
-a repo on github?
-
-We are willing to change our workflow, and even give up using topgit, if 
-someone can suggest a better way.  To some extent, we can try to improve 
-our patch development process.  Instead of creating a new quilt 
-patch/topgit branch, we could just:
-
-  1) Create git temporary branch
-  2) Develop fix, commit, commit, commit...
-  3) Condense development branch into one clean commit on the llnl branch.
-
-One issue will be that in parallel, we are going to be submitting this 
-patch to Sun via bugzilla.  It is often a month or more before this 
-patch is revised and landed upstream.  And if a different version IS 
-landed upstream, merging later could be problematic.  At the very least, 
-there will be conflicts, but those are easily dealt with.
-
-More worrying is when Sun comes up with a better fix that touches other 
-code that our fix.  When we merge from Sun, there is no obvious clue 
-that we now have two fixes for the same bug, and while it may not have 
-conflicted from git's point of view, the code is now probably broken.
-
-So what is the best way for us to carry our long-term patches in git? 
-Any suggestions?
-
-Chris
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
