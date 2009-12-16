@@ -1,105 +1,94 @@
-From: Liang Zhen <Zhen.Liang@Sun.COM>
-Date: Wed, 16 Dec 2009 10:55:11 +0800
-Subject: [Lustre-devel] client side reply handling
-In-Reply-To: <2b20c7140912151801m78871060pd20e5136c105b507@mail.gmail.com>
-References: <2b20c7140912090705s47667951w26fe6c95e81f2c8f@mail.gmail.com>
-	<3ed212d00912150828u2fc58cf2v541c95989d220a85@mail.gmail.com>
-	<2b20c7140912151801m78871060pd20e5136c105b507@mail.gmail.com>
-Message-ID: <4B284C0F.3080303@sun.com>
+From: Andreas Dilger <adilger@sun.com>
+Date: Wed, 16 Dec 2009 00:34:55 -0700
+Subject: [Lustre-devel] Fwd: The Lustre community and GIT
+In-Reply-To: <4B283577.3070905@llnl.gov>
+References: <2b20c7140912130831t658c2790hb38c3752c18ec128@mail.gmail.com>
+	<2b20c7140912131047qf0417f1mf3f3d9a8fc751dc0@mail.gmail.com>
+	<5F225623-87E0-4A91-988C-8B789B63E46D@sun.com>
+	<4B280B89.3010303@llnl.gov>
+	<F661C7A0-E3C8-4B69-A275-F23844DDFCAB@sun.com>
+	<4B283577.3070905@llnl.gov>
+Message-ID: <9784AD2F-B1E4-4A48-BDB5-6B932437EBD9@sun.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Peter,
+On 2009-12-15, at 18:18, Christopher J. Morrone wrote:
+> Lets say that I DON'T use topgit, because it is just going to be  
+> confusing for anyone else who tries to look at our repo.  And lets  
+> say that I have a branch of lustre that has 50 "patches" against the  
+> upstream code (our 1.6.6 branch had 175 patches! lets hope we don't  
+> diverge that much again...)
+>
+> How do I keep track of the logical set of patches?  I am not worried  
+> that I will lose them, I'm worried that cruft will accumulate, and  
+> that their will be hidden conflicts.  I am worried that llnl will  
+> fix the problem one way, and then Sun will fix it another, and now  
+> we have two fixes that don't get along in our tree.  Its entirely  
+> possible that there will be no contextual conflicts, even thought  
+> the fixes don't work together.
 
-It depends on how buffers are attached to portal, ptlrpc has three cases 
-of this:
-1. If buffer is for incoming request (not for RDMA, so it's not unique 
-match)
-    the MD is constructed with lnet_md_t::threshold = LNET_MD_THRESH_INF,
-    so it will be unlinked only for two cases:
-    a) user call LNetMDUnlink explicitly
-    b) the buffer is exhausted (lnet_md_exhausted() return 1 in LNet)
-    Once LNet get a request for that buffer, it will change offset of 
-the buffer so
-it wouldn't be overwritten by the next match, it's possible that upper 
-layer is handing
-the request, and the buffer is still on match list
+I know that Brian Behlendorf and Ricardo investigated a number of  
+different tools for managing patches, and topgit was the one they  
+chose.  Another tool in this vein is "guilt", which manages a patch  
+series in a way similar to "quilt".
 
-2. If buffer is for bulk (it's unique)
-    the MD is constructed with lnet_md_t::threshold = 1, and
-    LNetMDAttach(...LNET_UNLINK...)
-    so LNet will auto-unlink the buffer from match list once it got a 
-match, I think
-this is the case you want
+For developers that aren't keeping a huge number of patches, and  
+especially not a large number of dependent patches, "git rebase" is  
+probably sufficient. That will refresh the patches against changes in  
+the upstream repository.
 
-3. If the buffer is for reply (it's unique as well)
-    the MD is constructed with lnet_md_t::threshold = LNET_MD_THRESH_INF,
-so it's same as 1), the buffer wouldn't be unlinked unless user call  
-LNetMDUnlink
-or LNetMEUnlink, so safety of reply buffer can be guaranteed only if user is
-sure the buffer is unlinked.
+As for tracking hidden semantic conflicts that do not have contextual  
+conflicts, that is of course more difficult.  I think one important  
+way to track this is that our own commit message policy will be to  
+include the bug number into the "short" (one line) patch description,  
+and if you do a "git rebase" against the updated repo and your patch  
+for that bug does not disappear due to the upstream commit for that  
+bug, the patch should be reviewed.
 
-Regards
-Liang
+I believe there are scripts that can automatically generate "shortlog"  
+summaries of git commits, and if LLNL's commit policy is also to  
+include our bug number along with some LLNL-specific marker into the  
+short description then a simple "sort" should make it fairly simple to  
+detect automatically where there are LLNL-applied and Sun patches in  
+your repo for the same bug.
 
+> Also, if we commit all of our work to one tree, how do we keep track  
+> of which commits belong to the same "bug"?
 
-Peter Braam wrote:
-> No - buffers can and probably should (because, for example, 
-> re-delivery may leaver buffer state undefined) be unlinked from the 
-> match list before passing the buffer up to any other layer. 
->  Portals/LNET certainly can do this.  
+Via the commit message, as we are doing, is probably the easiest.
+
+> Sun is never going to perform a full "pull" from the "llnl" branch.   
+> And rightly so, that would just be too many disparate fixes to  
+> digest.  So (at llnl) have two somewhat conflicting goals:
 >
-> The question is why isn't this done, Eric, Isaac, Andreas?
+> 1) Keep every logical change separate (so we can interact with Sun  
+> sanely)
+> 2) Keep all changes together (so we can tag and install it :))
 >
-> Peter
->
-> On Tue, Dec 15, 2009 at 9:28 AM, Yuriy Umanets 
-> <yuriy.umanets at clusterstor.com <mailto:yuriy.umanets@clusterstor.com>> 
-> wrote:
->
->
->
->     2009/12/9 Peter Braam <peter.braam@clusterstor.com
->     <mailto:peter.braam@clusterstor.com>>
->
->         Hi, 
->
->     hi Peter,
->      
->
->         I wonder if LNET doesn't have an atomic operation that unlinks
->         the packet from the delivery process upon receiving a packet.
->           Iirc it does.  Why wouldn't one use that?
->
->     That is probably because it still may be in use by upper layers
->     (ptlrpc, etc), i.e. it is up to upper layer to decide should its
->     buffers be still linked for access or not.
->
->     Thanks.
->
->
->         Peter
->
->         _______________________________________________
->         Lustre-devel mailing list
->         Lustre-devel at lists.lustre.org
->         <mailto:Lustre-devel@lists.lustre.org>
->         http://lists.lustre.org/mailman/listinfo/lustre-devel
->
->
->
->
->     -- 
->     umka
->
->
-> ------------------------------------------------------------------------
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
->   
+> Previously we solved the problem with quilt, and now we solve this  
+> with topgit.  As long as we do not publish our repo, using topgit is  
+> probably going to be fine.  But I am worried that if we publish our  
+> repo, the history will just look like nonsense to other (because of  
+> topgit), and not be terribly useful beyond those folks that just  
+> want to blindly use our latest tag.
+
+I think that depends on how topgit is doing the updates against the  
+upstream repository.  If it is doing a "rebase" each time, then there  
+should only be a single git branch (each with a single commit) for  
+each patch that you have applied.  If it does this via a "merge" then  
+there will be new commits for each pull that you do from upstream that  
+is resolving conflicts, and the repo will become a mess.
+
+Topgit is actually reasonably well suited to this, because it keeps  
+every patch in a separate branch, and it would be possible (I think)  
+to pull from just that branch, or possibly to make a clone and then  
+delete all of the other branches, and then pull from that.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Sr. Staff Engineer, Lustre Group
+Sun Microsystems of Canada, Inc.
