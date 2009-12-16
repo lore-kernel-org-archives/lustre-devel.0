@@ -1,93 +1,74 @@
-From: Andreas Dilger <adilger@sun.com>
-Date: Tue, 15 Dec 2009 16:25:07 -0700
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Tue, 15 Dec 2009 17:18:47 -0800
 Subject: [Lustre-devel] Fwd: The Lustre community and GIT
-In-Reply-To: <4B280B89.3010303@llnl.gov>
+In-Reply-To: <F661C7A0-E3C8-4B69-A275-F23844DDFCAB@sun.com>
 References: <2b20c7140912130831t658c2790hb38c3752c18ec128@mail.gmail.com>
 	<2b20c7140912131047qf0417f1mf3f3d9a8fc751dc0@mail.gmail.com>
 	<5F225623-87E0-4A91-988C-8B789B63E46D@sun.com>
 	<4B280B89.3010303@llnl.gov>
-Message-ID: <F661C7A0-E3C8-4B69-A275-F23844DDFCAB@sun.com>
+	<F661C7A0-E3C8-4B69-A275-F23844DDFCAB@sun.com>
+Message-ID: <4B283577.3070905@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2009-12-15, at 15:19, Christopher J. Morrone wrote:
-> Andreas Dilger wrote:
->> For people not familiar with Git, it should be clarified that  
->> limiting
->> commits to the Sun Prime repository does not in any way restrict
->> access to the Lustre code, or the ability of non-Sun developers to
->> share their own Git clone with the Lustre community.  Developers will
->> be able to host their own Lustre clones (essentially full
->> repositories) as and where they wish.
->
-> Ah, right, good point.  We would probably just have an llnl lustre  
-> repo
-> on github (if not one for each developer...), once we figure out how  
-> to
-> make our branch more presentable.
+Andreas Dilger wrote:
+> On 2009-12-15, at 15:19, Christopher J. Morrone wrote:
+>> Andreas Dilger wrote:
+>>> For people not familiar with Git, it should be clarified that limiting
+>>> commits to the Sun Prime repository does not in any way restrict
+>>> access to the Lustre code, or the ability of non-Sun developers to
+>>> share their own Git clone with the Lustre community.  Developers will
+>>> be able to host their own Lustre clones (essentially full
+>>> repositories) as and where they wish.
+>>
+>> Ah, right, good point.  We would probably just have an llnl lustre repo
+>> on github (if not one for each developer...), once we figure out how to
+>> make our branch more presentable.
+> 
+> You would should rebase your repository against the Lustre git repo, but 
+> that should be fairly straight forward since topgit keeps each patch in 
+> a separate branch.  In general, users can use git rebase for keeping 
+> their patches updated against a remote tree, but since you started with 
+> a completely different git repo it probably will fail horribly.
 
-You would should rebase your repository against the Lustre git repo,  
-but that should be fairly straight forward since topgit keeps each  
-patch in a separate branch.  In general, users can use git rebase for  
-keeping their patches updated against a remote tree, but since you  
-started with a completely different git repo it probably will fail  
-horribly.
+I'm not really clear what you mean here.  I am not worried about merging 
+in the latest from Sun's repo, that can be done a number of ways easily 
+enough.
 
->> This is the same model used by the Linux kernel, and has proven to
->> work well with Git.  Each kernel developer hosts their own clone(s)  
->> at
->> git.kernel.org, or at some other site like repo.or.cz, or github.com,
->> and when they have changes to submit upstream they send an email
->> (usually containing both the patch, and the git URL to pull from) to
->> the subsystem maintainer, or to Linus directly, requesting that he
->> pull their changes.  This pull request is normally only sent after  
->> the
->> patch has been reviewed, possibly multiple times,  by the appropriate
->> subsystem maintainers.  Each developer has full control over their  
->> own
->> clone, and in fact it is rare that more than one person has push
->> access to a clone.
->
-> Has Sun given any thought to how git might be more integrated into the
-> Bugzilla patch review process?  In particular, for external  
-> developers?
+Lets say that I DON'T use topgit, because it is just going to be 
+confusing for anyone else who tries to look at our repo.  And lets say 
+that I have a branch of lustre that has 50 "patches" against the 
+upstream code (our 1.6.6 branch had 175 patches! lets hope we don't 
+diverge that much again...)
 
-Actually, Robert found a few tools that allow attaching patches to  
-bugzilla directly from git that seem very useful.  I don't have the  
-names offhand, but it was very simple, like "git bz send-patch  
-[bugno]" or similar.  Ideally, the gatekeeper would also be able to  
-automatically mark the patch as landed on the appropriate release  
-branch, but I suspect that would need a bit more scripting.  There has  
-also been some investigation of "Review Board", but I don't know where  
-that is today.
+How do I keep track of the logical set of patches?  I am not worried 
+that I will lose them, I'm worried that cruft will accumulate, and that 
+their will be hidden conflicts.  I am worried that llnl will fix the 
+problem one way, and then Sun will fix it another, and now we have two 
+fixes that don't get along in our tree.  Its entirely possible that 
+there will be no contextual conflicts, even thought the fixes don't work 
+together.
 
->  I see there is an internal "Lustre GIT page" that I can't access, and
-> external contributors are just told to follow the "submitting patches"
-> guidelines.
->
-> We would love to be able to tell Sun to pull from a branch to get our
-> unreviewed patches, and vice versa.
+Also, if we commit all of our work to one tree, how do we keep track of 
+which commits belong to the same "bug"?
 
+Maybe I am just overthinking the problem.  I'm hoping that I am.
 
-I agree that doing git pulls instead of patch submission is cleaner,  
-but it definitely isn't a good way to do patch review.  For the kernel  
-all of the patch review is done via email, but that has the drawback  
-that the discussion about a given patch isn't kept in a single place,  
-and it isn't clear who has agreed with or objected to a patch without  
-trolling the whole thread each time.
+Sun is never going to perform a full "pull" from the "llnl" branch.  And 
+rightly so, that would just be too many disparate fixes to digest.  So 
+(at llnl) have two somewhat conflicting goals:
 
-We're still investigating how to improve the patch workflow, and  
-welcome input.  The first priority was to make a Git repository  
-available, and then we can look at improving how patches are handled  
-(tracking, inspections, testing, landing).  I didn't want to entangle  
-those two major process changes, as it would have delayed the Git  
-transition even further.
+1) Keep every logical change separate (so we can interact with Sun sanely)
+2) Keep all changes together (so we can tag and install it :))
 
-Cheers, Andreas
---
-Andreas Dilger
-Sr. Staff Engineer, Lustre Group
-Sun Microsystems of Canada, Inc.
+Previously we solved the problem with quilt, and now we solve this with 
+topgit.  As long as we do not publish our repo, using topgit is probably 
+going to be fine.  But I am worried that if we publish our repo, the 
+history will just look like nonsense to other (because of topgit), and 
+not be terribly useful beyond those folks that just want to blindly use 
+our latest tag.
+
+Chris
