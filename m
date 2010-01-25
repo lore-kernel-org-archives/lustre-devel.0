@@ -1,75 +1,73 @@
-From: jay <Jinshan.Xiong@Sun.COM>
-Date: Mon, 25 Jan 2010 14:17:13 +0800
+From: Matt Wu <Qiang.Wu@Sun.COM>
+Date: Mon, 25 Jan 2010 14:55:09 +0800
 Subject: [Lustre-devel] proposal on implementing a new readahead in clio
-In-Reply-To: <1264324726.11892.76.camel@berloga.shadowland>
+In-Reply-To: <20100125040516.GC1061@Sun.COM>
 References: <4B56F907.3090308@sun.com> <4B598390.5030504@sun.com>
 	<1264230566.11892.62.camel@berloga.shadowland>
-	<4B5B9BFA.9080301@sun.com>
-	<1264324726.11892.76.camel@berloga.shadowland>
-Message-ID: <4B5D3769.9040703@sun.com>
+	<4B5B9BFA.9080301@sun.com> <20100125040516.GC1061@Sun.COM>
+Message-ID: <4B5D404D.605@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+We need do readahead asynchronously, but Windows kernel doesn't give us an 
+easy solution. Here are the issues for Windows readahead:
 
-Nico and shadow,
+1, Windows kenrel (VM) doesn't provide kernel drivers an equivalent 
+grab_cache_page_nowait_gfp() to allocate an empty/invalid page. So in 
+ll_readpage(), it's too late for WNC to grab more pages for readahead.
 
-Since you have the same question about windows, I just replied them in 
-one email. Also I got Matt involved - he is a windows expert.
+2, The routines provided by Windows kernel to allocate page cache are 
+synchronous and they won't return until the requested pages are fetched.
+
+So we plan to start a thread pool, and dispatch the readahead requests to 
+these threads instead of blocking user thread.
+
+We can group the threads by several ways:
+1, request per random thread, without any specify order. we just start a 
+fixed number of threads and queue the readahead request to any thread of 
+the thread pool.
+    this is the decision we made during WNC readahead meeting last week.
+2, thread per file (file) or thread per open instance (fd)
+3, thread per ost, we need divide the readahead request to several which 
+are stripe boundary aligned.
 
 
-Alexey Lyashkov wrote:
-> On Sun, 2010-01-24 at 09:01 +0800, jay wrote:
->   
+regards,
+matt
+
+On 2010/1/25 12:05, Nicolas Williams wrote:
+> On Sun, Jan 24, 2010 at 09:01:46AM +0800, jay wrote:
 >> Alexey Lyashkov wrote:
->>     
->>> We have an idea to spawn a per file readahead thread for each process,
->>> and this thread can be used to issue the readahead RPC async.
->>>   
 >>> I correctly understand: you suggest a spawn one new thread per open
 >>> file?
 >>> so if client have 10 processes, and each process is open 100 files, you
 >>> need spawn 1000 new threads?
->>>   
->>>       
->> No, per process readahead, or some system readahead thread pool, this is 
->> because most of those threads are sleeping, and it consumes little time 
->> to issue readahead requests. The idea behind the scheme is to issue 
+>>>
+>> No, per process readahead, or some system readahead thread pool, this is
+>> because most of those threads are sleeping, and it consumes little time
+>> to issue readahead requests. The idea behind the scheme is to issue
 >> readahead rpcs async.
->>     
-> first case is same as i say (i think) - 10 processes reading from own
-> files, so will be spawn 1000 new threads.
-> in second case you will be lost readahead requests on hardloaded client.
->   
-Nod - that's why I'm not going to do it in linux - as the design doc 
-said - don't you see section 8.1? :-)
->   
->> BTW, I'm not going to implement what you mentioned in linux, because I 
->> don't think this is a good idea, as what I said in design doc. However, 
->> we HAVE to have an async thread pool to implement readahead for windows. 
->> Windows doesn't have an interface of issuing async read request, lack of 
->> a mechanism to have page lock or similar things - what a pity!
->>     
-> hm.. looks i don't understand problem. Currently linux client is using
-> ->readpage() to generate OST_READ RPC and sending via ptlrpcd-io.
-> Why isn't generate this RPC directly for Windows? Or you mean about
-> update asynchronous update VM cache ?
->   
-
-The problem is that we have to wait for the RPC(which may just contain 
-readahead pages) to be finished before we can return to user space. You 
-may ask why we can't do this, the answer is that we should pipeline the 
-readahead request, instead of reading a chunk of data to support readahead.
-
-The problem of windows is that it's lack of interfaces to manipulate 
-pages. I'm not a windows expert - please ask matt if you have windows 
-specific questions.
-
 >
->   
-
-
--- 
-Good good study, day day up
+> Sleeping threads do consume memory resources, and context switches
+> between them do add cache pressure.  The read ahead work should all be
+> async, in which case you need no more readahead threads than you have
+> CPUs.
+>
+>> BTW, I'm not going to implement what you mentioned in linux, because I
+>> don't think this is a good idea, as what I said in design doc. However,
+>> we HAVE to have an async thread pool to implement readahead for windows.
+>> Windows doesn't have an interface of issuing async read request, lack of
+>> a mechanism to have page lock or similar things - what a pity!
+>
+> But surely you can still do the readaheads asynchronously.  Say you
+> think that block N of some file will be needed soon: so you issue the
+> read ahead of time.  You'll need to place the data somewhere, and
+> hopefully that will be somewhere that the host OS's VFS sub-system
+> (Windows in your case) can either provide or accept -- if not you'll
+> need to do a copy later, but you're still able to send the read request,
+> and process the reply, asynchronously.
+>
+> Nico
