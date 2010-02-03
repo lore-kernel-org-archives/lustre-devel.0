@@ -1,24 +1,19 @@
-From: Kit Westneat <kwestneat@ddn.com>
-Date: Tue, 2 Feb 2010 13:51:40 -0500
-Subject: [Lustre-devel] e2fsprogs and git
-Message-ID: <4B68743C.8020000@ddn.com>
+From: Vilobh Meshram <vilobh.meshram@gmail.com>
+Date: Wed, 3 Feb 2010 01:01:21 -0500
+Subject: [Lustre-devel] Need info on NAL and LNET
+Message-ID: <ef958901002022201s5f6353eeg13ba36fb49acf2c3@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Lustre group,
+Hi,
 
-I was wondering if the Sun modified e2fsprogs source was under git 
-control and if the repo was public. I guess the same question goes for 
-some of the other tools not distributed in the main Lustre branch, (eg tar).
+I am looking for some design docs on Network abstraction layer and LNET.Can
+you please point me to them?
 
-Thanks,
-Kit
-
--- 
----
-Kit Westneat
-kwestneat at datadirectnet.com
-812-484-8485
+Thanks.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100203/89a54592/attachment.htm>
