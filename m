@@ -1,33 +1,53 @@
-From: David Dillow <dillowda@ornl.gov>
-Date: Fri, 05 Feb 2010 12:35:07 -0500
-Subject: [Lustre-devel] Fwd: The Lustre community and GIT
-In-Reply-To: <1cbd6f831002050516v13ac0a17u2f312dd967a3a1fc@mail.gmail.com>
-References: <2b20c7140912130831t658c2790hb38c3752c18ec128@mail.gmail.com>
-	<2b20c7140912131047qf0417f1mf3f3d9a8fc751dc0@mail.gmail.com>
-	<5F225623-87E0-4A91-988C-8B789B63E46D@sun.com>
-	<0BF036E2-E2A0-4612-B567-4C78794B0C45@clusterstor.com>
-	<1cbd6f830912271649n188095dcp9c65d96bd16eb71e@mail.gmail.com>
-	<18F59523-4EFC-4FA5-9F46-29D2D3AB2C6A@sun.com>
-	<2b20c7140912301820k72f100c2q22d7e482ac560da5@mail.gmail.com>
-	<1cbd6f831002050516v13ac0a17u2f312dd967a3a1fc@mail.gmail.com>
-Message-ID: <1265391307.7005.1.camel@lap75545.ornl.gov>
+From: Nicolas Williams <Nicolas.Williams@sun.com>
+Date: Fri, 5 Feb 2010 14:20:13 -0600
+Subject: [Lustre-devel] server-side resending & bulk transfer
+In-Reply-To: <002d01caa686$72c40d40$584c27c0$@com>
+References: <20100205163524.GW236@granier.hd.free.fr>
+	<002d01caa686$72c40d40$584c27c0$@com>
+Message-ID: <20100205202013.GN1061@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, 2010-02-05 at 08:16 -0500, Mag Gam wrote:
-> There was a lot of steam about the GIT conversion but it seems there
-> haven't been any commits since Dec 14 2009. Or is there another site I
-> can see for the updates?
+On Fri, Feb 05, 2010 at 05:12:51PM +0000, Eric Barton wrote:
+> On Feb 5, 2010, at 8:35 AM, Johann Lombardi wrote:
+> > Unlike lock callback rpcs, losing the start bulk signal is not fatal since
+> > the bulk transfer will timeout on the server side, the request be dropped
+> > and the client will resend after reconnection. This is indeed harmless,
+> > but still causes slowdown which could be avoided according to LLNL if we
+> > try to resend the start bulk signal (bug 21714). Brian Behlendorf's
+> > proposal is to resend the start bulk signal after the first l_wait_event()
+> > timeout in ost_brw_write(). However, we don't know if this is safe to do,
+> > e.g. how does the client react if it receives duplicated start bulk signals?
+> 
+> Yes, the server could retry the bulk if it times out and this
+> will be safe for the client since its bulk buffer is auto-unlinked,
+> so only 1 bulk PUT/GET can match it.  But if the problem happens
+> on the way back to the server rather than the way out to the client,
+> you're hosed since the bulk has completed from the client's POV.
+> 
+> This should be an exceptional circumstance - i.e. a router has
+> actually failed - so I think it's better just to stick with the
+> client retrying from scratch rather than tying down a server thread
+> until it has decided whether there was a router failure or the
+> client really crashed.
 
-I don't see the problem here -- I have been getting updates regularly.
-Are you doing a "git pull" in your cloned repository prior to running
-"git log" or "gitk"?
+I agree that tying down a server thread on a long block is not a good
+thing.  If the LLNL proposal (resend the start bulk signal) is on the
+money, then the thing to do would be to create a queue and separate
+service thread(s) to handle such resends.
 
+> Roll on the health network! :)
+
+Well, if the deadline here is on the order of 1s or thereabouts then the
+health network isn't likely to help much because we're not going to get
+sub-second dead node detection.  (Well, if we jack up the ping rate and
+reduce the time-to-declare-death low enough, and make sure that HN
+threads and messaging are suitably prioritized, then we might be able to
+get sub-second dead node detection, but my gut feeling is that any
+heuristic approach should wait for longer than 1s.)
+
+Nico
 -- 
-Dave Dillow
-National Center for Computational Science
-Oak Ridge National Laboratory
-(865) 241-6602 office
