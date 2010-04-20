@@ -1,20 +1,31 @@
-From: Oleg Drokin <oleg.drokin@oracle.com>
-Date: Tue, 20 Apr 2010 15:57:37 -0400
+From: Nicolas Williams <Nicolas.Williams@oracle.com>
+Date: Tue, 20 Apr 2010 15:27:40 -0500
 Subject: [Lustre-devel] Flush on file close
-In-Reply-To: <8AE7A7A2-C300-4E9F-908A-0996804242F8@oracle.com>
+In-Reply-To: <201004192230.48196.andrew.perepechko@sun.com>
 References: <201004192230.48196.andrew.perepechko@sun.com>
-	<5395043C-A24E-46B0-9E63-5F4DB570DDFD@oracle.com>
-	<32DB67DD-B971-408E-8CD7-6B10344D7576@oracle.com>
-	<72C27251-2B14-48FE-BDD0-8B5252C7957A@earthlink.net>
-	<8AE7A7A2-C300-4E9F-908A-0996804242F8@oracle.com>
-Message-ID: <A07310FC-CD6C-463D-9996-847ABA6273A8@oracle.com>
+Message-ID: <20100420202740.GY10389@Sun.COM>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-> It's all internal within NFS. There is no way for the client to say
-> "these writes are async", "now do commit" aside from
+POSIX behavior is that close(2) can fail, so if you care, you should
+check its error status.  POSIX behavior is also that close(2) doesn't
+imply an fsync(2) (much less a sync(2)).
 
-I meant to say "no way for the application" here.
+NFS clients implement fsync(2)-on-close, but that's another story.
+
+However, when writes deferred at close(2) time fail on a local
+filesystem...  chances are that subsequent I/O will just fail.  Or at
+least that's probably what many users will expect.  But does POSIX
+require that?  I don't have it handy, but I'm pretty sure the answer is
+"no".  With Lustre we could also have a close(2) whose deferred writes
+fail long after the process that could handle the failure is gone.
+
+Databases and so on should always fsync(2) when they need to ensure
+consistent on-disk state.  Many apps that write(2) don't need to
+fsync(2) (think of writes to log files).
+
+Nico
+-- 
