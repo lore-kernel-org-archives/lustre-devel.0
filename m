@@ -1,48 +1,49 @@
-From: Yuriy Umanets <yuriy.umanets@clusterstor.com>
-Date: Thu, 22 Apr 2010 14:42:55 +0300
-Subject: [Lustre-devel] about lustre lock
-In-Reply-To: <q2id272ddfb1004210106w4170f6fcja89d40c2e99a1333@mail.gmail.com>
-References: <q2id272ddfb1004210106w4170f6fcja89d40c2e99a1333@mail.gmail.com>
-Message-ID: <r2x3ed212d01004220442n6dad8e6fr241f75916cdbd47e@mail.gmail.com>
+From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
+Date: Fri, 23 Apr 2010 12:27:11 -0400
+Subject: [Lustre-devel] Build system and portability
+Message-ID: <201004231627.o3NGRBxu029735@hedwig.cmf.nrl.navy.mil>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-hello,
+(I wanted to start some discussions on portability.  This is one of the
+earliest things that I ran into for the MacOS X port).
 
-I think this is used in parallel dir operations in 2.0 branch. In this case
-we allow multiple threads to modify the same dir if entries fall into
-different physical blocks (and take care about locking on lower layers in
-MDS if entries come to the same block). But as this is a dir modification
-operation, we want to let clients know about this, so that they can flush
-their dentry cache.
+So, the build system was one of my earliest challenges, and I wanted to get
+some ideas from other people.
 
-Thanks.
+Aside from the various Linux-specific autoconf tests (those are relatively
+straightforward to deal with), one big issue that has cropped up is the
+way that the build system ends up building Makefiles.
 
-2010/4/21 Tonney Kaiven Cheung <zhangys04@gmail.com>
+Specifically, there seems to be a disconnect between Makefile.in and
+autoMakefile.am.  Let's take lustre/obdclass as an example.
 
-> Dear everyone!
->
-> It has been said that Lustre Filesystem has six lock modes. And one of the
-> lock mode is *concurrent write mode*. Would you please give me explanation
-> that in which condition a *concurrent write mode lock* will be asked?
-> Thanks!
->
-> Yuksam Cheung
-> 2010-04-21
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
->
->
+The object files for the kernel module for Linux are listed in Makefile.in
+(they're in the variables obdclass-linux-objs and obdclass-all-objs, and
+those are combined into obdclass-objs).  However, the actual definitions
+of the modules to build get set in autoMakefile.am (by setting the
+modulefs_DATA variable).
 
+For MacOS X, the kext is listed under macos_PROGRAM, and the _sources_
+are listed (instead of objects).  This all happens in autoMakefile.am
+(and is ifdef'd protected for DARWIN only); it doesn't use anything in
+Makefile.in.  The special flags needed for MacOS X module builds are
+overridden for those builds by setting obdclass_CFLAGS (or whatever is
+the appropriate name for the module you're building).
 
--- 
-umka
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100422/183de366/attachment.htm>
+This feels ... inelegant to me.  For one, if new source code files are added,
+you have to add them two places (this bit me a number of times).  And it's
+a lot of extra work to support different OS's.
+
+Now I inherited this build system and it was 90% of the way there, so I
+can't complain about it that much.  But I think we could do better.
+
+What do people think about what this current mess?  Should it be normalized?
+What's the right way to clean this up?  If it's to support module building
+similar to the way Linux kernel modules are declared in the
+Makefile/autoMakefile, then I'm okay with that.
+
+--Ken
