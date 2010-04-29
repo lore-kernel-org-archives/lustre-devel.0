@@ -1,67 +1,162 @@
-From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
-Date: Mon, 26 Apr 2010 21:37:30 -0400
-Subject: [Lustre-devel] Build system and portability
-In-Reply-To: <0C946F67-6483-4781-ADB6-465F25D3B828@oracle.com>
-Message-ID: <201004270137.o3R1bUYE001797@hedwig.cmf.nrl.navy.mil>
+From: di.wang <di.wang@oracle.com>
+Date: Wed, 28 Apr 2010 21:25:53 -0400
+Subject: [Lustre-devel] (no subject)
+In-Reply-To: <000c01cae6ee$1d4693d0$57d3bb70$@barton@oracle.com>
+References: <000c01cae6ee$1d4693d0$57d3bb70$@barton@oracle.com>
+Message-ID: <4BD8E021.7050302@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->I suspect that we might be able to get something like a "Makefile fragment"
->that is containing all of the build targets, that is included in an
->arch-specific top-level Makefile to specify exactly how those files will
->be built.  Sadly, I don't know anything about this area.
+Hello, Michael
 
-I am thinking along these lines as well; the wrinkle is the way that
-the Linux module building process works.
+There is a logfile parser script in the attachment, which was written by 
+Eric.
 
->The intention of "component" is e.g. "what part of the code the defect is in
->(e.g. client, server, quota, etc).  I'd think most of your problems are in
->"Build/Release Engineering" and "OS X", though some will be "llite/mdc",
->"llite/vfs", and "IO/llite/lov/osc".
+This script is very simple, but it should help you understand how we 
+retrieve time step information from lustre debug log. On the server 
+side, if you enable rpc_trace log, whenever the request arrive/start 
+being processed/end of processing, there will be corresponding records 
+being written into the debug log. Basically, you can get all the time 
+step information from these records (actually only two of these records 
+would be enough).
 
-Well, take a look at bug 22692 as an example.  That doesn't feel like
-build/release engineering.  And it's not really MacOS X either.
 
-Another example: if I include a bunch of patches to clean up lock leaks
-in libcfs ... where should that go?  Perhaps it's not a huge deal; I can
-just take my best guess at it and go from there.
+a. 
+00000100:00100000:0.0:1272313858.472660:0:31581:0:(service.c:1625:ptlrpc_server_handle_request()) 
+Handling RPC pname:cluuid+ref:pid:xid:nid:opc 
+ll_mgs_00:7d4fb15c-1b1c-295f-e466-ea7d77089b52+10:4055:x1334115493386242:12345-0 at lo:400
 
-(Actually, can we add MacOS X as one of the "OS" choices?).
+This record means the req will being handled, so you can get the start 
+time stamp(1272313858.472660) operation type (opc: 400, ping), xid 
+(1334115493386242), client nid(12345-0 at lo) and so on.
 
->In this light, it would be interesting to know whether you were able to
->re-use parts of the lustre/llite code (e.g. llite_lib.c) and it should be
->moved into a shared directory like lustre/lclient (which is supposed to be
->entirely portable).  Spending some time to incrementally move (and get
->upstream) parts of the llite code that are portable between linux and
->macos would ensure that the ongoing maintenance is reduced.  The problem
->with making too many changes in a port and not returning them upstream
->is that eventually the code diverges so much that the ongoing 
+b. 
+00000100:00100000:0.0:1272313858.472687:0:31581:0:(service.c:1672:ptlrpc_server_handle_request()) 
+Handled RPC pname:cluuid+ref:pid:xid:nid:opc 
+ll_mgs_00:7d4fb15c-1b1c-295f-e466-ea7d77089b52+9:4055:x1334115493386242:12345-0 at lo:400 
+Request procesed in 45us (77us total) trans 0 rc 0/0
 
-Sadly, I could not use anything from llite_lib.c (or anything from
-llite, really) at all; it's way Linux-specific.  Given the way the
-code is structured, I'm not sure there is any alternative; Linux
-is so different in terms of filesystem implementation I don't see
-very much in llite that could be made generic (I guess I could
-imagine some generic stuff, but it would probably be a mess of
-ifdefs).  It's actually even worse than that; the "generic" code
-in obdclass/mount.c is also Linux-specific (that file had to be
-split off into a Linux and Darwin version, although I think that
-could be cleaned up a fair amount; I am unclear as to why some of
-that split exists, although it might be required for the server
-support).  I did steal a few routines from lclient, but a large
-number of those routines were extrememly non-portable so I couldn't
-use those files as-is; I didn't want to have a huge mess of ifdef's
-in there so I just stole the few routines I needed.
+This record means the req is already being handled, so you can get the 
+end time stamp(1272313858.472687), operation type (opc: 400, ping), xid 
+(1334115493386242), client nid(12345-0 at lo) and so no.
 
-However ... I think the changes for the Mac client are pretty
-self-contained; the vast majority of the "real" magic is in libcfs
-and lvnode.  From my experience in tracking master, very few changes
-affect me.
+Note: (77us total) means how long it takes from the request arriving to 
+the end of processing. so you can also get the request arriving time 
+stamp here by (1272313858 - 77 = 1272312781).
 
-(You can look at this yourself once we get the repository stuff
-straightened out; I think we're almost there).
 
---Ken
+So with these information you can draw the graph Eric mentioned in his 
+email. If you have any questions, please let me know.
+
+Thanks
+WangDi
+
+
+Eric Barton wrote:
+>
+> ------------------------------------------------------------------------
+>
+> Subject:
+> RE: Visualising Lustre RPCs
+> To:
+> "Michael Kluge" <Michael.Kluge@tu-dresden.de>, "wangdi" 
+> <Tom.Wang@Sun.COM>
+>
+> To:
+> "Michael Kluge" <Michael.Kluge@tu-dresden.de>, "wangdi" 
+> <Tom.Wang@Sun.COM>
+> CC:
+> <lustre-devel@lists.lustre.org>, "Galen M. Shipman" <gshipman@ornl.gov>
+>
+>
+> Michael,
+>
+> The previous Lustre RPC visualisation effort I mentioned at the LUG 
+> used the
+>
+> Lustre debug log entries of type D_RPCTRACE. We disabled all but these
+>
+> log messages and then used the Lustre debug daemon to collect them while
+>
+> we ran I/O tests. We then ran a simple logfile parser which used just 
+> the log entries
+>
+> for request arrival?
+>
+> , start of processing and end of processing to graph request
+>
+> queue depth (arrival->end) and the number of requests being serviced 
+> by type
+>
+> over time ? e.g?
+>
+> read3d
+>
+> ?which shows request queue depth (vertical) over time (axis labelled 
+> 20-25) by
+>
+> server (axis labelled 0-80).
+>
+> *From:* Michael Kluge [mailto:Michael.Kluge at tu-dresden.de]
+> *Sent:* 17 April 2010 6:26 AM
+> *To:* Galen M. Shipman; Eric Barton
+> *Subject:* Visualising Lustre RPCs
+>
+> Hi Galen, Eric,
+>
+> in order to get this little project started, I think what I need at 
+> first to
+>
+> write a prototype for a converter are the following things:
+>
+> A set of test traces collected on maybe a handful of clients and some 
+> servers
+>
+> is probably a good point to start with. It would be even better if we know
+>
+> what is in this traces so that we have an expectation what kind of things
+>
+> we want to see on the Vampir displays. This little program that Eric 
+> mentioned
+>
+> that can read the trace file would be very helpful as well. And as the 
+> last
+>
+> idea I have right now, a technical contact. I might come up with a couple
+>
+> of question after I have taken the first look onto the original trace 
+> data
+>
+> and before I start writing code.
+>
+> Regards, Michael
+>
+>
+> -- 
+>
+> Michael Kluge, M.Sc.
+>
+> Technische Universit?t Dresden
+> Center for Information Services and
+> High Performance Computing (ZIH)
+> D-01062 Dresden
+> Germany
+>
+> Contact:
+> Willersbau, Room WIL A 208
+> Phone: (+49) 351 463-34217
+> Fax: (+49) 351 463-37773
+> e-mail: michael.kluge at tu-dresden.de <mailto:michael.kluge@tu-dresden.de>
+> WWW: http://www.tu-dresden.de/zih
+>
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: rpc_parse.tgz
+Type: application/x-compressed-tar
+Size: 30287 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100428/e7d90469/attachment.bin>
