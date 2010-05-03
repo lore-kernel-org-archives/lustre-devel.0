@@ -1,41 +1,229 @@
-From: Oleg Drokin <oleg.drokin@oracle.com>
-Date: Fri, 30 Apr 2010 17:14:07 -0400
-Subject: [Lustre-devel] question about ldlm_server_glimpse_ast
-In-Reply-To: <4BDB469E.4040005@ices.utexas.edu>
-References: <w2je5fcbd181004291959wb9790719ic4dc3a2bd9b64eb@mail.gmail.com>
-	<4BDAD47E.401@ices.utexas.edu>
-	<B1CC7901-3220-4BD6-89EE-B37C825DCB03@oracle.com>
-	<4BDB469E.4040005@ices.utexas.edu>
-Message-ID: <EF06CB80-B231-4AAF-A11C-16CBF8BBF490@oracle.com>
+From: Michael Kluge <Michael.Kluge@tu-dresden.de>
+Date: Mon, 03 May 2010 10:41:32 +0200
+Subject: [Lustre-devel] Lustre RPC visualization
+In-Reply-To: <4BD9CF75.8030204@oracle.com>
+References: <000c01cae6ee$1d4693d0$57d3bb70$@barton@oracle.com>
+	<4BD8E021.7050302@oracle.com> <4BD90FB9.5030702@tu-dresden.de>
+	<4BD9CF75.8030204@oracle.com>
+Message-ID: <4BDE8C3C.2050505@tu-dresden.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+Hi WangDi,
 
-On Apr 30, 2010, at 5:07 PM, John Hammond wrote:
+I have a small problem understanding the logical order of the events. 
+Here is one example from the logs where the client reports an RPC as 
+completed before the server says that it has finished the RPC handling. 
+The difference is about 1.5 ms.
 
-> Are there any nonobvious ramifications of changing ldlm_timeout?  I noticed that it was set to 20 seconds (except for MDS's?) in 1.8.2. Also there is some suspect looking logic in obd_config.c and elsewhere to keep it from being set too high relative to obd_timeout:
-> 
->    if (ldlm_timeout >= obd_timeout)
->        ldlm_timeout = max(obd_timeout / 3, 1U);
-> 
-> Does this mean that ldlm_timeout should not exceed 1/3 of obd_timeout?
+Is that due to the fact that the server waits until the client has 
+ack'ed the result of the RPC? Or are the clocks between the servers not 
+well synchronized? Or are the timestamps in the logfile sometimes not 
+correct (log message could not be flushed or whatever)?
 
-ldlm_timeout should not be set too high, because if a client that holds a lock dies
-this is for how long nobody will be able to get a conflicting lock.
-Of course if your network might delay packets (roundtrip) for more than
-ldlm_timeout, then you need to lift the limit.
-1/3 is there so that if your network delay is potentially this big (and you do not
-use AT), there should be enough time to do some processing still and then send a reply
-to the client (obd_timeout is used for the client to determine when the reply should
-come) before the client times out that request.
+In the first case I don't have a chance to figure out when the server 
+has finished working on the RPC and is going to send out the result, 
+correct?
 
-Also see the comment from Cory, that if you use AT it is all not controlled
-by at_min setting instead and then is dynamically adjusted as the system detects your
-network latency.
+../debug_log/rpc_client.debug:00000100:00100000:1.0:1272565278.263430:0:3479:0:(client.c:1532:ptlrpc_check_set()) 
+Completed RPC pname:cluuid:pid:xid:nid:opc 
+ptlrpcd-brw:3f7723dc-06a3-0b5e-9e96-f5b86e8d1b1c:3479:1334380768266050:10.8.0.126 at tcp:4
 
-Bye,
-    Oleg
+../debug_log/rpc_oss.debug:00000100:00100000:1.0:1272565278.265039:0:7385:0:(service.c:1672:ptlrpc_server_handle_request()) 
+Handled RPC pname:cluuid+ref:pid:xid:nid:opc 
+ll_ost_io_24:3f7723dc-06a3-0b5e-9e96-f5b86e8d1b1c+27:3479:x1334380768266050:12345-10.8.0.104 at tcp:4 
+Request procesed in 238391us (239698us total) trans 266 rc 0/0
+
+
+For this RPC I see in the oss log:
+
+1272565278.025337: incoming x1334380768266050
+1272565278.026649: Handling RPC x1334380768266050
+1272565278.265039: Handled RPC x1334380768266050:Request procesed in 
+238391us (239698us total)
+
+So, by doing the math I get: 265039-026649=238390 (just 1 off target, 
+might be wathever) and 265039-025337=239702 (4 off target). So I guess 
+the times reported by the last message are calculated by using a 
+different data source than the log time stamps?
+
+
+Regards, Michael
+
+
+Am 29.04.2010 20:27, schrieb di.wang:
+> Hello, Michael
+>
+> Here is a small debug log example you can use for your development.
+>
+> Thanks
+> WangDi
+> Michael Kluge wrote:
+>> Hi WangDi,
+>>
+>> OK, thanks for input. I'll go ahead and try to write a converter.
+>> Could you please collect a set test traces that belong together from a
+>> couple servers and clients and put them somewhere so that I can
+>> download them?
+>>
+>>
+>> Thanks, Michael
+>>
+>> Am 29.04.2010 03:25, schrieb di.wang:
+>>> Hello, Michael
+>>>
+>>> There is a logfile parser script in the attachment, which was written by
+>>> Eric.
+>>>
+>>> This script is very simple, but it should help you understand how we
+>>> retrieve time step information from lustre debug log. On the server
+>>> side, if you enable rpc_trace log, whenever the request arrive/start
+>>> being processed/end of processing, there will be corresponding records
+>>> being written into the debug log. Basically, you can get all the time
+>>> step information from these records (actually only two of these records
+>>> would be enough).
+>>>
+>>>
+>>> a.
+>>> 00000100:00100000:0.0:1272313858.472660:0:31581:0:(service.c:1625:ptlrpc_server_handle_request())
+>>>
+>>> Handling RPC pname:cluuid+ref:pid:xid:nid:opc
+>>> ll_mgs_00:7d4fb15c-1b1c-295f-e466-ea7d77089b52+10:4055:x1334115493386242:12345-0 at lo:400
+>>>
+>>>
+>>>
+>>> This record means the req will being handled, so you can get the start
+>>> time stamp(1272313858.472660) operation type (opc: 400, ping), xid
+>>> (1334115493386242), client nid(12345-0 at lo) and so on.
+>>>
+>>> b.
+>>> 00000100:00100000:0.0:1272313858.472687:0:31581:0:(service.c:1672:ptlrpc_server_handle_request())
+>>>
+>>> Handled RPC pname:cluuid+ref:pid:xid:nid:opc
+>>> ll_mgs_00:7d4fb15c-1b1c-295f-e466-ea7d77089b52+9:4055:x1334115493386242:12345-0 at lo:400
+>>>
+>>> Request procesed in 45us (77us total) trans 0 rc 0/0
+>>>
+>>> This record means the req is already being handled, so you can get the
+>>> end time stamp(1272313858.472687), operation type (opc: 400, ping), xid
+>>> (1334115493386242), client nid(12345-0 at lo) and so no.
+>>>
+>>> Note: (77us total) means how long it takes from the request arriving to
+>>> the end of processing. so you can also get the request arriving time
+>>> stamp here by (1272313858 - 77 = 1272312781).
+>>>
+>>>
+>>> So with these information you can draw the graph Eric mentioned in his
+>>> email. If you have any questions, please let me know.
+>>>
+>>> Thanks
+>>> WangDi
+>>>
+>>>
+>>> Eric Barton wrote:
+>>>>
+>>>> ------------------------------------------------------------------------
+>>>>
+>>>>
+>>>> Subject:
+>>>> RE: Visualising Lustre RPCs
+>>>> To:
+>>>> "Michael Kluge" <Michael.Kluge@tu-dresden.de>, "wangdi"
+>>>> <Tom.Wang@Sun.COM>
+>>>>
+>>>> To:
+>>>> "Michael Kluge" <Michael.Kluge@tu-dresden.de>, "wangdi"
+>>>> <Tom.Wang@Sun.COM>
+>>>> CC:
+>>>> <lustre-devel@lists.lustre.org>, "Galen M. Shipman" <gshipman@ornl.gov>
+>>>>
+>>>>
+>>>> Michael,
+>>>>
+>>>> The previous Lustre RPC visualisation effort I mentioned at the LUG
+>>>> used the
+>>>>
+>>>> Lustre debug log entries of type D_RPCTRACE. We disabled all but these
+>>>>
+>>>> log messages and then used the Lustre debug daemon to collect them
+>>>> while
+>>>>
+>>>> we ran I/O tests. We then ran a simple logfile parser which used just
+>>>> the log entries
+>>>>
+>>>> for request arrival?
+>>>>
+>>>> , start of processing and end of processing to graph request
+>>>>
+>>>> queue depth (arrival->end) and the number of requests being serviced
+>>>> by type
+>>>>
+>>>> over time ? e.g?
+>>>>
+>>>> read3d
+>>>>
+>>>> ?which shows request queue depth (vertical) over time (axis labelled
+>>>> 20-25) by
+>>>>
+>>>> server (axis labelled 0-80).
+>>>>
+>>>> *From:* Michael Kluge [mailto:Michael.Kluge at tu-dresden.de]
+>>>> *Sent:* 17 April 2010 6:26 AM
+>>>> *To:* Galen M. Shipman; Eric Barton
+>>>> *Subject:* Visualising Lustre RPCs
+>>>>
+>>>> Hi Galen, Eric,
+>>>>
+>>>> in order to get this little project started, I think what I need at
+>>>> first to
+>>>>
+>>>> write a prototype for a converter are the following things:
+>>>>
+>>>> A set of test traces collected on maybe a handful of clients and some
+>>>> servers
+>>>>
+>>>> is probably a good point to start with. It would be even better if we
+>>>> know
+>>>>
+>>>> what is in this traces so that we have an expectation what kind of
+>>>> things
+>>>>
+>>>> we want to see on the Vampir displays. This little program that Eric
+>>>> mentioned
+>>>>
+>>>> that can read the trace file would be very helpful as well. And as the
+>>>> last
+>>>>
+>>>> idea I have right now, a technical contact. I might come up with a
+>>>> couple
+>>>>
+>>>> of question after I have taken the first look onto the original trace
+>>>> data
+>>>>
+>>>> and before I start writing code.
+>>>>
+>>>> Regards, Michael
+>>>>
+>>>>
+>>>> --
+>>>>
+>>>> Michael Kluge, M.Sc.
+>>>>
+>>>> Technische Universit?t Dresden
+>>>> Center for Information Services and
+>>>> High Performance Computing (ZIH)
+>>>> D-01062 Dresden
+>>>> Germany
+>>>>
+>>>> Contact:
+>>>> Willersbau, Room WIL A 208
+>>>> Phone: (+49) 351 463-34217
+>>>> Fax: (+49) 351 463-37773
+>>>> e-mail: michael.kluge at tu-dresden.de
+>>>> <mailto:michael.kluge@tu-dresden.de>
+>>>> WWW: http://www.tu-dresden.de/zih
+>>
+>
