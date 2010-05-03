@@ -1,44 +1,48 @@
-From: Brian J. Murrell <Brian.Murrell@oracle.com>
-Date: Mon, 03 May 2010 15:16:41 -0400
-Subject: [Lustre-devel] Unsubscribe to list
-In-Reply-To: <20100503150939.zbvdmuj2hw4w08ko@webmail.iu.edu>
-References: <20100503150939.zbvdmuj2hw4w08ko@webmail.iu.edu>
-Message-ID: <1272914201.4321.74.camel@pc.interlinx.bc.ca>
+From: Michael Kluge <Michael.Kluge@tu-dresden.de>
+Date: Mon, 03 May 2010 21:32:12 +0200
+Subject: [Lustre-devel] Lustre RPC visualization
+In-Reply-To: <4BDF1CC7.5020502@oracle.com>
+References: <000c01cae6ee$1d4693d0$57d3bb70$@barton@oracle.com>
+	<4BD8E021.7050302@oracle.com> <4BD90FB9.5030702@tu-dresden.de>
+	<4BD9CF75.8030204@oracle.com> <4BDE8C3C.2050505@tu-dresden.de>
+	<699F57EF-52E6-41D1-A04B-3C39D469D133@oracle.com>
+	<4BDF1199.2030007@tu-dresden.de> <4BDF1CC7.5020502@oracle.com>
+Message-ID: <4BDF24BC.9050701@tu-dresden.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, 2010-05-03 at 15:09 -0400, Teige, Scott W wrote: 
-> Greetings,
+Hi WangDi,
 
-Hi,
+>> OK, so logically the "Completed RPC" on the client side is supposed to
+>> show up after the server has written his "Handled RPC" to its log (if
+>> clocks are snyc'ed perfectly).
+> Yes.
 
-> I subscribed to this list back when it was lustre-devel at clusterfs.com.
-> My un-subscribe instructions no longer work, how do I un-subscribe?
-> (same story for luster-discuss)
+Thanks.
 
-In every message sent to the list, the following header are included:
+>> One more question: RPC 1334380768266400 (in the log WangDi sent me)
+>> has on the client side only a "Sending RPC" message, thus missing the
+>> "Completed RPC". The server has all three (received,start work, done
+>> work). Has this RPC vanished on the way back to the client? There is
+>> no further indication what happend. The last timestamp in the client
+>> log is:
+>> 1272565368.228628
+>> and the server says it finished the processing of the request at:
+>> 1272565281.379471
+>> So the client log has been recorded long enough to contain the
+>> "Completed RPC" message for this RPC if it arrived ever ...
+> Logically, yes. But in some cases, some debug logs might be abandoned
+> for some reasons(actually, it happens not rarely), and probably you need
+> maintain an average time from server "Handled RPC" to client "Completed
+> RPC", then you just guess the client "Completed RPC" time in this case.
 
-List-unsubscribe: <http://lists.lustre.org/mailman/listinfo/lustre-devel>, <mailto:lustre-devel-request@lists.lustre.org?subject=unsubscribe>
+Oh my gosh ;) I don't want to start speculations about the helpfulness 
+of incomplete debug logs. Anyway, what can get lost? Any kind of message 
+on the servers and clients?  I think I'd like to know what cases have to 
+be handled while I try to track individual RPC's on their way.
 
-But you might not be able to see that header if your MUA is not
-configured to show it, so we also append the following to every message
-send to the list(s).
 
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
-
-Follow the URL and you will find out how to unsubscribe.
-
-b.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100503/be863b96/attachment.pgp>
+Regards, Michael
