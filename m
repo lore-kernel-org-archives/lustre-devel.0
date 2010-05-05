@@ -1,69 +1,66 @@
-From: Liang Zhen <Zhen.Liang@Sun.COM>
-Date: Wed, 05 May 2010 19:55:59 +0800
+From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
+Date: Wed, 05 May 2010 08:38:58 -0400
 Subject: [Lustre-devel] lnet NAT friendliness
-In-Reply-To: <201005041419.o44EJbee026119@hedwig.cmf.nrl.navy.mil>
-References: <201005041419.o44EJbee026119@hedwig.cmf.nrl.navy.mil>
-Message-ID: <4BE15CCF.5080308@sun.com>
+In-Reply-To: <4BE15CCF.5080308@sun.com>
+Message-ID: <201005051238.o45Ccwtt006732@hedwig.cmf.nrl.navy.mil>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ken,
+>LNet requires destination address of message to be same with address of 
+>LNet NI (unless it's a router), I'm afraid it's not easy to make it  be 
+>tunable.
+>
+>I would suggest to run lustre (lnet) router on the gateway (if your 
+>gateway is Linux...)
 
-LNet requires destination address of message to be same with address of 
-LNet NI (unless it's a router), I'm afraid it's not easy to make it  be 
-tunable.
-I would suggest to run lustre (lnet) router on the gateway (if your 
-gateway is Linux...)
+Well, that's not really feasible, because a) many times we don't
+control the gateway (think sitting in Starbucks; and while some people
+would say that they don't want to use Lustre from Starbucks, I would
+say, "Why not?"; with Kerberos authentication, I think it would be
+perfectly reasonable), and b) even if you control the gateway, that
+doesn't really scale, because while that might work for one person,
+I don't see how you would do it for more than one person (how would
+you configure the routing back if more than one person are using the
+same NAT address range?).
 
-Regards
-Liang
+I admit I have no love for NAT and I would prefer it if we were living
+in a world where the end-to-end principle worked everywhere, but that
+battle was lost years ago.
 
-Ken Hornstein wrote:
-> In my work with the MacOS X client, I did some work from home.  While
-> that had the added "benefit" of exposing the issues associated with the
-> lack of attribute caching from the MacOS X client, I noticed something
-> else: lnet is unfortunately rather NAT-unfriendly.
->
-> Obviously putting your servers behind a NAT is extremely challenging, but
-> I was operating in the not-so-uncommon situation where a client was behind
-> a NAT and the servers all had publically routable IP addresses.  Note that
-> I am aware that by default Lustre requires connections from reserved ports;
-> I worked around that issue (until I discovered the way to turn off that
-> check via a configuration knob).
->
-> Specifically, I can connect to the MGS okay, but after that initial
-> connection I get the following error from lnet_parse() on the client
-> (okay, I reconstructed this from memory, but I think it is reasonably
-> close)
->
-> src server.addr at tcp: bad dest nid 1.2.3.4 at tcp (should have been sent direct)
->
-> Where "1.2.3.4 at tcp" is the external address of my NAT box at home.  It
-> is worth noting that there are no other known networking issues with
-> this setup; if I put this machine on the external-facing network, I can
-> mount the Lustre filesystem in queston fine.
->
-> Obviously the problem here is that a message is being sent to my home
-> box, but instead of using the "internal" IP address as the destination NID,
-> the server is using the external address (the one it obviously is getting
-> from the TCP socket).
->
-> I haven't yet had a chance to play with this more, but it makes me wonder
-> if anyone else has tried out Lustre from behind a NAT (with 2.0-based
-> Lustre, obviously), and if they did, did it work for you?  I am perfectly
-> willing to believe this is an issue with the Mac client, but from looking
-> at the code it doesn't feel like it would be.
->
-> Also ... it seems like it would be easy to add a configuration knob that
-> would let you bypass this particular check, and that might make it work.
-> Anyone have any thoughts about that?
->
-> --Ken
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
->   
+So, I did a little more work on this last night.  And I respectfully
+disagree it would be hard to make those things tunable.  In fact, I
+got Lustre working fine with a few simple client-only changes.
+
+I ran into two issues.  First, in lib-move.c:lnet_parse(), the variable
+for_me is set if the network interface nid matches the destination nid.
+I simply set for_me to 1 all of the time, and that solved that problem.
+That's a one-line change, and it would be easy to make that tunable.
+
+However, that exposed another problem.  lnet_nid2ni_locked() would then
+fail because it would try to look up the network interface associated
+with the "external" address (I don't remember exactly who called this
+right now, but I suppose it doesn't matter).  You have to be more
+careful here, because if you just make lnet_nid2ni_locked() return the
+first match you end up returning the loopback interface and that makes
+other things unhappy.  What I settled on was just matching the first
+interface that had the same network and type.
+
+I made these two changes, and Lustre worked fine.  Okay, it wasn't
+exactly an exhaustive test: I cd'd to the filesystem and ran "ls -l".
+As noted before, the Lustre MacOS X client doesn't do any caching yet
+so issues with AST notifications may come up.  But I think this shows
+that making Lustre clients work from behind a NAT is not a set of huge
+changes, at least for the simple case.
+
+Are these changes appropriate for the general case?  No, and I wouldn't
+suggest otherwise.  But I think the case of a client with a single
+network interface from behind a NAT, these changes are reasonable; if
+they are made tunable and default to being off, I can't see how it
+would be harmful, and it might actually help some people.  I admit that
+it occurs to me that I don't know what would happen if more than one
+Lustre client was behind the same NAT in this situation.
+
+--Ken
