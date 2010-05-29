@@ -1,162 +1,106 @@
-From: Michael Kluge <Michael.Kluge@tu-dresden.de>
-Date: Fri, 28 May 2010 16:54:33 +0200
-Subject: [Lustre-devel] Lustre RPC visualization
-In-Reply-To: <4BFC7177.9000808@oracle.com>
-References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
-	<4BD8E021.7050302@oracle.com> <4BD90FB9.5030702@tu-dresden.de>
-	<4BD9CF75.8030204@oracle.com> <4BDE8C3C.2050505@tu-dresden.de>
-	<699F57EF-52E6-41D1-A04B-3C39D469D133@oracle.com>
-	<4BDF1199.2030007@tu-dresden.de> <4BDF1CC7.5020502@oracle.com>
-	<4BDF24BC.9050701@tu-dresden.de> <4BDF2999.2000207@oracle.com>
-	<4BEFBB07.4030403@tu-dresden.de> <1274788995.2261.110.camel@radar>
-	<4BFC7177.9000808@oracle.com>
-Message-ID: <1275058473.21591.14.camel@radar>
+From: Yuriy Umanets <yuriy.umanets@clusterstor.com>
+Date: Sat, 29 May 2010 12:56:44 +0300
+Subject: [Lustre-devel] a bug in "lfs find" command (patch attached)
+Message-ID: <AANLkTilhS3lwnn0q-V0VdoDfj6j1x_gt0vWNurpDJihB@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi WangDi,
+hi Lustre people,
 
-> Looks great! Just query, as you said, "All these counter can be broken 
-> down by the type of RPC (op code)" , you actually implemented that, but 
-> not shown in the attached picture? 
+One of our clients has found the bug in lfs find, which we have fixed. Patch
+is attached. Issue is that find_value_cmp() and how it gets params are
+buggy. Inversion made by inverting sign is completely wrong idea. Please see
+the patch for details.
 
-Yes.
+Examples:
 
-> And could you please also add "Server queued RPCs" over time ?
+Let's create some files and try to find them:
 
-Already done.
+[root at victim tests]# touch /mnt/lustre/a
+[root at victim tests]# touch /mnt/lustre/b
+[root at victim tests]# echo 1 > /mnt/lustre/c
+[root at victim tests]# ls -la /mnt/lustre/
+total 12
+drwxr-xr-x  2 root root 4096 May 29 12:31 .
+drwxr-xr-x 11 root root 4096 May  4 22:50 ..
+-rw-r--r--  1 root root    0 May 29 12:31 a
+-rw-r--r--  1 root root    0 May 29 12:31 b
+-rw-r--r--  1 root root    2 May 29 12:31 c
 
-One good news: The Feature that Vampir can show something like a heat
-map (Eric asked about this) comes back with the release at ISC. It is
-now called "performance radar". It can produce a heat map for a counter
-and does some other things as well. I could send a picture around, but
-need at first an bigger trace (more hosts generating traces in
-parallel).
+As you can see, there are 2 zero length files and one 2 bytes long file.
 
+Example of how it worked before fix:
 
-Regards, Michael
+[root at victim tests]# ../utils/lfs find /mnt/lustre -s 0
 
-> Thanks
-> WangDi
-> 
-> Michael Kluge wrote:
-> > Hi WangDi,
-> >
-> > so, for the moment I am done with what I promised. The work to be done
-> > is mainly debugging with more input data sets. Screenshot of Vampir
-> > showing the derived counter values for the RPC processing/queue times on
-> > the server and the client is attached. Units for the values are either
-> > microseconds or just a number.
-> >
-> >
-> > Regards, Michael
-> >
-> > Am Sonntag, den 16.05.2010, 11:29 +0200 schrieb Michael Kluge: 
-> >   
-> >> Hi WangDi,
-> >>
-> >> the first version works. Screenshot is attached. I have a couple of 
-> >> counter realized: RPC's in flight and RPC's completed in total on the 
-> >> client, RPC's enqueued, RPC's in processing and RPC'c completed in total 
-> >> on the server. All these counter can be broken down by the type of RPC 
-> >> (op code). The picture has not yet the lines that show each single RPC, 
-> >> I still have to do counter like "avg. time to complete an RPC over the 
-> >> last second" and there are some more TODO's. Like the timer 
-> >> synchronization. (In the screenshot the first and the last counter show 
-> >> total values while the one in the middle shows a rate.)
-> >>
-> >> What I like to have is a complete set of traces from a small cluster 
-> >> (<100 nodes) including the servers. Would that be possible?
-> >>
-> >> Is one of you in Hamburg May, 31-June, 3 for ISC'2010? I'll be there and 
-> >> like to talk about what would be useful for the next steps.
-> >>
-> >>
-> >> Regards, Michael
-> >>
-> >> Am 03.05.2010 21:52, schrieb di.wang:
-> >>     
-> >>> Michael Kluge wrote:
-> >>>       
-> >>>>>> One more question: RPC 1334380768266400 (in the log WangDi sent me)
-> >>>>>> has on the client side only a "Sending RPC" message, thus missing the
-> >>>>>> "Completed RPC". The server has all three (received,start work, done
-> >>>>>> work). Has this RPC vanished on the way back to the client? There is
-> >>>>>> no further indication what happend. The last timestamp in the client
-> >>>>>> log is:
-> >>>>>> 1272565368.228628
-> >>>>>> and the server says it finished the processing of the request at:
-> >>>>>> 1272565281.379471
-> >>>>>> So the client log has been recorded long enough to contain the
-> >>>>>> "Completed RPC" message for this RPC if it arrived ever ...
-> >>>>>>             
-> >>>>> Logically, yes. But in some cases, some debug logs might be abandoned
-> >>>>> for some reasons(actually, it happens not rarely), and probably you need
-> >>>>> maintain an average time from server "Handled RPC" to client "Completed
-> >>>>> RPC", then you just guess the client "Completed RPC" time in this case.
-> >>>>>           
-> >>>> Oh my gosh ;) I don't want to start speculations about the helpfulness
-> >>>> of incomplete debug logs. Anyway, what can get lost? Any kind of
-> >>>> message on the servers and clients? I think I'd like to know what
-> >>>> cases have to be handled while I try to track individual RPC's on
-> >>>> their way.
-> >>>>         
-> >>> Any records can get lost here. Unfortunately, there are not any messages
-> >>> indicate the missing happened. :(
-> >>> (Usually, I would check the time stamp in the log, i.e. no records for a
-> >>> "long" time, for example several seconds, but this is not the accurate
-> >>> way).
-> >>>
-> >>> I guess you can just ignore these uncompleted records in your first
-> >>> step? Let's see how these incomplete log will
-> >>> impact the profiling result, then we will decide how to deal with this?
-> >>>
-> >>> Thanks
-> >>> Wangdi
-> >>>       
-> >>>> Regards, Michael
-> >>>> _______________________________________________
-> >>>> Lustre-devel mailing list
-> >>>> Lustre-devel at lists.lustre.org
-> >>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> >>>>         
-> >>>       
-> >> _______________________________________________
-> >> Lustre-devel mailing list
-> >> Lustre-devel at lists.lustre.org
-> >> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> >>     
-> >
-> >   
-> >
-> > ------------------------------------------------------------------------
-> >
-> 
-> 
+That is nothing found.
 
+[root at victim tests]# ../utils/lfs find /mnt/lustre -s 2
+
+Again nothing is found.
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre ! -s 0
+
+Search for non zero length files also gives nothing.
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre ! -s 1
+/mnt/lustre/a
+/mnt/lustre/b
+
+This finds two zero files but does not find one 2 bytes long file.
+
+After the fix:
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre -s 0
+/mnt/lustre/a
+/mnt/lustre/b
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre -s 2
+/mnt/lustre/c
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre ! -s 0
+/mnt/lustre
+/mnt/lustre/c
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre ! -s 1
+/mnt/lustre
+/mnt/lustre/a
+/mnt/lustre/b
+/mnt/lustre/c
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre -s +1
+/mnt/lustre
+/mnt/lustre/c
+
+This found all with size 1 and more.
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre -s -1
+/mnt/lustre/a
+/mnt/lustre/b
+
+This found all smaller than 1 byte long.
+
+[root at victim tests]# ../utils/lfs find /mnt/lustre -s -0
+/mnt/lustre/a
+/mnt/lustre/b
+
+This found all that 0 or smaller :)
+
+Should I create bug in bugzilla or posting it to lustre-devel@ is ok?
+
+Thanks.
 -- 
-
-Michael Kluge, M.Sc.
-
-Technische Universit?t Dresden
-Center for Information Services and
-High Performance Computing (ZIH)
-D-01062 Dresden
-Germany
-
-Contact:
-Willersbau, Room A 208
-Phone:  (+49) 351 463-34217
-Fax:    (+49) 351 463-37773
-e-mail: michael.kluge at tu-dresden.de
-WWW:    http://www.tu-dresden.de/zih
+umka
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100529/4eefb2e7/attachment.htm>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5997 bytes
+Name: lfs-find-1.8.2.patch
+Type: application/octet-stream
+Size: 10073 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100528/3897d501/attachment.bin>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100529/4eefb2e7/attachment.obj>
