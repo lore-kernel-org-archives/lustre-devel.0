@@ -1,155 +1,136 @@
-From: Yuriy Umanets <yuriy.umanets@clusterstor.com>
-Date: Sat, 29 May 2010 21:42:32 +0300
-Subject: [Lustre-devel] a bug in "lfs find" command (patch attached)
-In-Reply-To: <58780E32-8CA1-404C-9A37-FC14CD4CB002@oracle.com>
-References: <AANLkTilhS3lwnn0q-V0VdoDfj6j1x_gt0vWNurpDJihB@mail.gmail.com>
-	<58780E32-8CA1-404C-9A37-FC14CD4CB002@oracle.com>
-Message-ID: <AANLkTikOxHWT4gcwC24upvdWJlVBqq3iUFZnKOOCPWeT@mail.gmail.com>
+From: Eric Barton <eric.barton@oracle.com>
+Date: Tue, 1 Jun 2010 16:58:48 +0100
+Subject: [Lustre-devel] Lustre RPC visualization
+In-Reply-To: <4C04F3F0.9040708@oracle.com>
+References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
+	<4BD8E021.7050302@oracle.com> <4BD90FB9.5030702@tu-dresden.de>
+	<4BD9CF75.8030204@oracle.com> <4BDE8C3C.2050505@tu-dresden.de>
+	<699F57EF-52E6-41D1-A04B-3C39D469D133@oracle.com>
+	<4BDF1199.2030007@tu-dresden.de> <4BDF1CC7.5020502@oracle.com>
+	<4BDF24BC.9050701@tu-dresden.de> <4BDF2999.2000207@oracle.com>
+	<4BEFBB07.4030403@tu-dresden.de>
+	<1274788995.2261.110.camel@radar> <4BFC7177.9000808@oracle.com>
+	<1275058473.21591.14.camel@radar> <4BFFA456.7030502@oracle.com>
+	<C671351E-110C-4D2C-B216-4E8BE23A943A@oracle.com>
+	<1FF3D25F-3369-462E-9651-62D56319612A@tu-dresden.de>
+	<D29ED098-3DEB-4AF4-AA68-B52B4E2BF5EA@oracle.com>
+	<4C04F3F0.9040708@oracle.com>
+Message-ID: <001601cb01a3$546c93d0$fd45bb70$@barton@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-hi Andreas,
+I'd really like to see how vampire handles _all_ the trace data
+we can throw at it.  If 600 clients is a pain, how bad will it
+be at 60,000?   
 
-On Sat, May 29, 2010 at 7:22 PM, Andreas Dilger
-<andreas.dilger@oracle.com>wrote:
+What in particular makes collecting traces from all the clients
++ servers hard?  How can/should we automate it or otherwise make
+it easier?
 
-> Yuriy, thanks for looking into this.  However, I think that the patch is
-> not quite correct (though I haven't tested it yet). The issue is that the
-> negation applies to each parameter individually, and not globally as you
-> have changed it to be.
->
-> That means that tests like:
->
-> lfs find -mtime +1 ! -size 4
->
-> Will now negate both the mtime and the size checks.  It seems that the
-> correct thing to do is to store a per-test negation in the find params.
->
+    Cheers,
+              Eric
 
-Yes, you are right. Lets make a bug in your bugzilla and work on this patch
-there a bit.
-
->
-> It is probably best to submit patches directly via bugzilla so that they
-> don't get lost.
->
-ok
-
->
-> Please also make sure that there is an appropriate test in sanity.sh for
-> the functionality being fixed.  There are already a number of lfs find
-> tests, so new tests should be pit together.
->
-> ok, got it.
-
-> Cheers, Andreas
->
-> Thanks!
-
->
-> On 2010-05-29, at 3:56, Yuriy Umanets <yuriy.umanets@clusterstor.com>
-> wrote:
->
->  hi Lustre people,
->>
->> One of our clients has found the bug in lfs find, which we have fixed.
->> Patch is attached. Issue is that find_value_cmp() and how it gets params are
->> buggy. Inversion made by inverting sign is completely wrong idea. Please see
->> the patch for details.
->>
->> Examples:
->>
->> Let's create some files and try to find them:
->>
->> [root at victim tests]# touch /mnt/lustre/a
->> [root at victim tests]# touch /mnt/lustre/b
->> [root at victim tests]# echo 1 > /mnt/lustre/c
->> [root at victim tests]# ls -la /mnt/lustre/
->> total 12
->> drwxr-xr-x  2 root root 4096 May 29 12:31 .
->> drwxr-xr-x 11 root root 4096 May  4 22:50 ..
->> -rw-r--r--  1 root root    0 May 29 12:31 a
->> -rw-r--r--  1 root root    0 May 29 12:31 b
->> -rw-r--r--  1 root root    2 May 29 12:31 c
->>
->> As you can see, there are 2 zero length files and one 2 bytes long file.
->>
->> Example of how it worked before fix:
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre -s 0
->>
->> That is nothing found.
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre -s 2
->>
->> Again nothing is found.
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre ! -s 0
->>
->> Search for non zero length files also gives nothing.
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre ! -s 1
->> /mnt/lustre/a
->> /mnt/lustre/b
->>
->> This finds two zero files but does not find one 2 bytes long file.
->>
->> After the fix:
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre -s 0
->> /mnt/lustre/a
->> /mnt/lustre/b
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre -s 2
->> /mnt/lustre/c
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre ! -s 0
->> /mnt/lustre
->> /mnt/lustre/c
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre ! -s 1
->> /mnt/lustre
->> /mnt/lustre/a
->> /mnt/lustre/b
->> /mnt/lustre/c
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre -s +1
->> /mnt/lustre
->> /mnt/lustre/c
->>
->> This found all with size 1 and more.
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre -s -1
->> /mnt/lustre/a
->> /mnt/lustre/b
->>
->> This found all smaller than 1 byte long.
->>
->> [root at victim tests]# ../utils/lfs find /mnt/lustre -s -0
->> /mnt/lustre/a
->> /mnt/lustre/b
->>
->> This found all that 0 or smaller :)
->>
->> Should I create bug in bugzilla or posting it to lustre-devel@ is ok?
->>
->> Thanks.
->> --
->> umka
->> <lfs-find-1.8.2.patch>
->> _______________________________________________
->> Lustre-devel mailing list
->> Lustre-devel at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>
->
-
-
--- 
-umka
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100529/23ff00ae/attachment.htm>
+> -----Original Message-----
+> From: di.wang [mailto:di.wang at oracle.com]
+> Sent: 01 June 2010 12:50 PM
+> To: Robert Read
+> Cc: Michael Kluge; Eric Barton; Galen M. Shipman
+> Subject: Re: [Lustre-devel] Lustre RPC visualization
+> 
+> Hello,
+> 
+> IMHO, just run IOR with whatever parameters, and get rpctrace
+> log(probably only enable rpctrace) from 1 OST and some of clients
+> (probably 2 is enough).
+> Note: please make sure these 2 clients did communicate the OST during
+> the IOR.
+> 
+> Michael, I do not think you need all the trace logs from the clients. right?
+> 
+> Robert
+> 
+> If there are available time slots for this test on Hyperion, who can
+> help to get these logs?
+> 
+> Thanks
+> Wangdi
+> 
+> Robert Read wrote:
+> > What should I run then? Do have scripts to capture this?
+> >
+> > robert
+> >
+> > On May 31, 2010, at 2:39 , Michael Kluge wrote:
+> >
+> >> Hi Robert,
+> >>
+> >> 600 is a nice number. Plus the traces from the server an I am happy.
+> >>
+> >>
+> >> Michael
+> >>
+> >> Am 28.05.2010 um 17:53 schrieb Robert Read:
+> >>
+> >>>
+> >>> On May 28, 2010, at 4:09 , di.wang wrote:
+> >>>
+> >>>> Hello, Michael
+> >>>>
+> >>>>> One good news: The Feature that Vampir can show something like a heat
+> >>>>> map (Eric asked about this) comes back with the release at ISC. It is
+> >>>>> now called "performance radar". It can produce a heat map for a
+> >>>>> counter
+> >>>>> and does some other things as well. I could send a picture around, but
+> >>>>> need at first an bigger trace (more hosts generating traces in
+> >>>>> parallel).
+> >>>>>
+> >>>> Right now I do not have big clusters available to generate the trace.
+> >>>> I will see what I can do here.
+> >>>
+> >>> If ~600 clients is big enough we could generate that on Hyperion.
+> >>>
+> >>> robert
+> >>>
+> >>>>
+> >>>> Thanks
+> >>>> WangDi
+> >>>>>
+> >>>>>
+> >>>>>
+> >>>>>>>
+> >>>>>>>
+> >>>>>>
+> >>>>>
+> >>>>> ------------------------------------------------------------------------
+> >>>>>
+> >>>>> _______________________________________________
+> >>>>> Lustre-devel mailing list
+> >>>>> Lustre-devel at lists.lustre.org <mailto:Lustre-devel@lists.lustre.org>
+> >>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+> >>>>>
+> >>>>
+> >>>
+> >>>
+> >>
+> >>
+> >> --
+> >>
+> >> Michael Kluge, M.Sc.
+> >>
+> >> Technische Universit?t Dresden
+> >> Center for Information Services and
+> >> High Performance Computing (ZIH)
+> >> D-01062 Dresden
+> >> Germany
+> >>
+> >> Contact:
+> >> Willersbau, Room WIL A 208
+> >> Phone:  (+49) 351 463-34217
+> >> Fax:    (+49) 351 463-37773
+> >> e-mail: michael.kluge at tu-dresden.de <mailto:michael.kluge@tu-dresden.de>
+> >> WWW:    http://www.tu-dresden.de/zih
+> >>
+> >
