@@ -1,71 +1,237 @@
-From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
-Date: Wed, 09 Jun 2010 12:42:29 -0400
-Subject: [Lustre-devel] Attribute caching and OBD_CONNECT_ATTRFID
-Message-ID: <201006091642.o59GgTll020727@hedwig.cmf.nrl.navy.mil>
+From: Michael Kluge <Michael.Kluge@tu-dresden.de>
+Date: Wed, 16 Jun 2010 10:46:06 +0200
+Subject: [Lustre-devel] Lustre RPC visualization
+In-Reply-To: <4DBE6FF1-62B0-484C-81F8-B231E332BFB5@tu-dresden.de>
+References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
+	<4BD8E021.7050302@oracle.com> <4BD90FB9.5030702@tu-dresden.de>
+	<4BD9CF75.8030204@oracle.com> <4BDE8C3C.2050505@tu-dresden.de>
+	<699F57EF-52E6-41D1-A04B-3C39D469D133@oracle.com>
+	<4BDF1199.2030007@tu-dresden.de> <4BDF1CC7.5020502@oracle.com>
+	<4BDF24BC.9050701@tu-dresden.de> <4BDF2999.2000207@oracle.com>
+	<4BEFBB07.4030403@tu-dresden.de>
+	<1274788995.2261.110.camel@radar> <4BFC7177.9000808@oracle.com>
+	<1275058473.21591.14.camel@radar> <4BFFA456.7030502@oracle.com>
+	<C671351E-110C-4D2C-B216-4E8BE23A943A@oracle.com>
+	<1FF3D25F-3369-462E-9651-62D56319612A@tu-dresden.de>
+	<D29ED098-3DEB-4AF4-AA68-B52B4E2BF5EA@oracle.com>
+	<4C04F3F0.9040708@oracle.com>
+	<001601cb01a3$546c93d0$fd45bb70$%barton@oracle.com>
+	<4C04F94A.2050908@oracle.com>
+	<7B05EBAF-67C5-4EE1-B1EC-CB1C554BEA3E@oracle.com>
+	<4DBE6FF1-62B0-484C-81F8-B231E332BFB5@tu-dresden.de>
+Message-ID: <1BFD6845-6D5A-459F-8164-4F75FD759060@tu-dresden.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-So I've been working on attribute caching for Lustre for the MacOS X port,
-and I've run into a bit of a snag.
+Hi Robert,
 
-A bit of a brief explanation: unlike Linux, where (as I understand it)
-filesystems have to store attributes in the vnode as they change, on
-BSD-derived vnode filesystems you have a getattr function that gets
-called to find out the attributes of a file.  You get passed a pointer
-to the vnode (a sort-of virtual inode) and in that contains a pointer
-to a structure which the filesystem manages; in Lustre's case, that
-contains among other things a copy of the FID.  So just to recap, when
-MacOS X wants the attributes of a file, it's done via FID, not by
-filename.  I am aware that you can get attributes at lookup time, and I
-plan on implementing that, but I figure I'd start with this first.
+thanks for the trace files. Every single file contains log entries like:
 
-It is my understanding that to properly implement attribute caching, I
-need to call md_intent_lock with the right op_data and an intent
-structure with it_op set to IT_GETATTR.  When those attributes change,
-I'll get notified in my ast callback.  If that's wrong, then please
-correct me.
+line: 00000100:00100000:2.0F:1275433209.964416:0:7924:0:(events.c:285:request_in_callback())               incoming req at ffff8101b32f5400 x1337373369608379 msgsize 296
 
-First off, I see that one of the options at connect time is
-OBD_CONNECT_ATTRFID, and looking at the comments and the llite code for
-this option it seems pretty self explanatory - you can fetch file
-attributes by FID.  Perfect!  Well, like the llite code I test to make
-sure OBD_CONNECT_ATTRFID is set in the connect flags, and I discover
-that it is _not_.
+Are in the tarball 684 server logs? Or am I wrong with the assumption that the lines with an "incoming req@" can only show up on the servers?
 
-The reason for this is that it's commented out of the
-MDT_CONNECT_SUPPORTED macro in lustre_idl.h (and that's used to mask
-out the reply you get indicating what is supported).  Now, it's not
-clear to me why that was done: this happened back in 2007 as part of
-commit d2d56f38, and the commit entry just says, "make HEAD from
-b_post_cmd3", and it's been that way ever since.
 
-The code still seems to exist on the server, so I figure I'll give it
-a try anyway,  First issue: you need to include the parent when using
-CONNECT_ATTRFID; I have to confess that I don't understand why, because
-you would think that it wouldn't be necessary just to get the attributes
-for a file, but this in enforced on the server (unfortunately, by
-kicking an LBUG).  This is a problem for the root directory since it's
-the first one looked up _and_ it doesn't have a parent, but I can special
-case that; for all other vnodes, the parent is easy to find (the filesystem
-layer keeps track of it).
+Michael
 
-When I try doing _that_, I get an error from the lmv routines that I haven't
-tracked down yet.  But the whole thing makes me wonder if perhaps I'm
-doing the wrong thing.
+Am 01.06.2010 um 21:39 schrieb Michael Kluge:
 
-From what I see, attributes are also cached at open/lookup time and as
-part of the statahead code; I can do that relatively easy.  But if
-attributes _change_, then I have to wonder what is supposed to happen
-next.  Since current Lustre servers don't return OBD_CONNECT_ATTRFID as
-being set anymore, the code in the client doesn't seem like it will
-cache the attribute (for files, anyway) anymore.  It's entirely possible 
-that I'm missing something; that happens a lot.
+>> On 2010-06-01, at 06:12, di.wang wrote:
+>>> Michael, I do not think you need all the trace logs from the clients. right?
+>> 
+>> Actually, I think he does want trace logs from all of the clients.
+> 
+> Yes, 600 is a good number. Vampir can easily handle this. If possible, I'd like to have all server traces as well to include this information. Right now I am only putting these RPC's in the trace where all 5 events (client send,server recv/start/done,client done) are present. I see the "client send/done" events in the OSS log as well, probably it is talking to the MDS or MGS. Events that are incomplete are being ignored but counted in "dumped events" counter. But that could be changed.
+> 
+> 
+> Michael
+> 
+>>> I had thought the current target is to make sure vampire can handle
+>>> the trace from "big" enough clusters.
+>>> 
+>>> Actually, I am not sure whether vampire(with this trace analyse) should 
+>>> work in this way as we do now?  i.e. running job exclusively on the cluster, get rpctrace log, then get graph by vampire?
+>>> 
+>>> Or I miss sth here? Michale, could you please explain a bit? What is 
+>>> your idea how vampire could help the end users? or the target here is 
+>>> just helping the developers and sysadmin to understand the system?
+>> 
+>> My thoughts on this in the past were that it should be possible to use ONLY the client logs to plot syscall latencies (using client VFSTRACE lines) and the RPC latencies (using client RPCTRACE lines) and locking (using DLMTRACE lines).  Some code rework would be needed to allow regular users to run "lctl dk", and it would filter out the lines specific to their own processes.  This would allow regular users to collect and analyze their application without assistance or coordination from the sysadmin.
+>> 
+>> In order to allow regular users to trace such information, the VFSTRACE calls should report the UID of the process doing the system call, which would immediately map to a PID.  The PID can be used to track the majority of the debug entries, but not always those done in another thread (e.g. ptlrpcd).  The RPCTRACE messages also contain the PID, so that would be helpful, but it would mean that there has to be a parser/filter in the kernel to ensure users cannot access trace information that is not their own.  That would be a significant undertaking, I think.
+>> 
+>> In the meantime, for testing purposes and initial usage (with sysadmin assistance) the full debug log can be extracted from the kernel and filtered in userspace as needed.
+>> 
+>>>>> -----Original Message-----
+>>>>> From: di.wang [mailto:di.wang at oracle.com]
+>>>>> Sent: 01 June 2010 12:50 PM
+>>>>> To: Robert Read
+>>>>> Cc: Michael Kluge; Eric Barton; Galen M. Shipman
+>>>>> Subject: Re: [Lustre-devel] Lustre RPC visualization
+>>>>> 
+>>>>> Hello,
+>>>>> 
+>>>>> IMHO, just run IOR with whatever parameters, and get rpctrace
+>>>>> log(probably only enable rpctrace) from 1 OST and some of clients
+>>>>> (probably 2 is enough).
+>>>>> Note: please make sure these 2 clients did communicate the OST during
+>>>>> the IOR.
+>>>>> 
+>>>>> Michael, I do not think you need all the trace logs from the clients. right?
+>>>>> 
+>>>>> Robert
+>>>>> 
+>>>>> If there are available time slots for this test on Hyperion, who can
+>>>>> help to get these logs?
+>>>>> 
+>>>>> Thanks
+>>>>> Wangdi
+>>>>> 
+>>>>> Robert Read wrote:
+>>>>> 
+>>>>>> What should I run then? Do have scripts to capture this?
+>>>>>> 
+>>>>>> robert
+>>>>>> 
+>>>>>> On May 31, 2010, at 2:39 , Michael Kluge wrote:
+>>>>>> 
+>>>>>> 
+>>>>>>> Hi Robert,
+>>>>>>> 
+>>>>>>> 600 is a nice number. Plus the traces from the server an I am happy.
+>>>>>>> 
+>>>>>>> 
+>>>>>>> Michael
+>>>>>>> 
+>>>>>>> Am 28.05.2010 um 17:53 schrieb Robert Read:
+>>>>>>> 
+>>>>>>> 
+>>>>>>>> On May 28, 2010, at 4:09 , di.wang wrote:
+>>>>>>>> 
+>>>>>>>> 
+>>>>>>>>> Hello, Michael
+>>>>>>>>> 
+>>>>>>>>> 
+>>>>>>>>>> One good news: The Feature that Vampir can show something like a heat
+>>>>>>>>>> map (Eric asked about this) comes back with the release at ISC. It is
+>>>>>>>>>> now called "performance radar". It can produce a heat map for a
+>>>>>>>>>> counter
+>>>>>>>>>> and does some other things as well. I could send a picture around, but
+>>>>>>>>>> need at first an bigger trace (more hosts generating traces in
+>>>>>>>>>> parallel).
+>>>>>>>>>> 
+>>>>>>>>>> 
+>>>>>>>>> Right now I do not have big clusters available to generate the trace.
+>>>>>>>>> I will see what I can do here.
+>>>>>>>>> 
+>>>>>>>> If ~600 clients is big enough we could generate that on Hyperion.
+>>>>>>>> 
+>>>>>>>> robert
+>>>>>>>> 
+>>>>>>>> 
+>>>>>>>>> Thanks
+>>>>>>>>> WangDi
+>>>>>>>>> 
+>>>>>>>>>> 
+>>>>>>>>>> 
+>>>>>>>>>>>> 
+>>>>>>>>>> ------------------------------------------------------------------------
+>>>>>>>>>> 
+>>>>>>>>>> _______________________________________________
+>>>>>>>>>> Lustre-devel mailing list
+>>>>>>>>>> Lustre-devel at lists.lustre.org <mailto:Lustre-devel@lists.lustre.org>
+>>>>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>>>>>>>> 
+>>>>>>>>>> 
+>>>>>>>> 
+>>>>>>> --
+>>>>>>> 
+>>>>>>> Michael Kluge, M.Sc.
+>>>>>>> 
+>>>>>>> Technische Universit?t Dresden
+>>>>>>> Center for Information Services and
+>>>>>>> High Performance Computing (ZIH)
+>>>>>>> D-01062 Dresden
+>>>>>>> Germany
+>>>>>>> 
+>>>>>>> Contact:
+>>>>>>> Willersbau, Room WIL A 208
+>>>>>>> Phone:  (+49) 351 463-34217
+>>>>>>> Fax:    (+49) 351 463-37773
+>>>>>>> e-mail: michael.kluge at tu-dresden.de <mailto:michael.kluge@tu-dresden.de>
+>>>>>>> WWW:    http://www.tu-dresden.de/zih
+>>>>>>> 
+>>>>>>> 
+>>>> 
+>>>> 
+>>>> _______________________________________________
+>>>> Lustre-devel mailing list
+>>>> Lustre-devel at lists.lustre.org
+>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>> 
+>>> 
+>>> _______________________________________________
+>>> Lustre-devel mailing list
+>>> Lustre-devel at lists.lustre.org
+>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>> 
+>> 
+>> Cheers, Andreas
+>> --
+>> Andreas Dilger
+>> Lustre Technical Lead
+>> Oracle Corporation Canada Inc.
+>> 
+>> _______________________________________________
+>> Lustre-devel mailing list
+>> Lustre-devel at lists.lustre.org
+>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>> 
+> 
+> 
+> -- 
+> 
+> Michael Kluge, M.Sc.
+> 
+> Technische Universit?t Dresden
+> Center for Information Services and
+> High Performance Computing (ZIH)
+> D-01062 Dresden
+> Germany
+> 
+> Contact:
+> Willersbau, Room WIL A 208
+> Phone:  (+49) 351 463-34217
+> Fax:    (+49) 351 463-37773
+> e-mail: michael.kluge at tu-dresden.de
+> WWW:    http://www.tu-dresden.de/zih
+> 
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
 
-So, I guess the question I have is ... if you get your lock broken when
-you have it on a file's attributes, exactly what is supposed to happen next?
-What's the mechanism for getting it again?
 
---Ken
+-- 
+
+Michael Kluge, M.Sc.
+
+Technische Universit?t Dresden
+Center for Information Services and
+High Performance Computing (ZIH)
+D-01062 Dresden
+Germany
+
+Contact:
+Willersbau, Room WIL A 208
+Phone:  (+49) 351 463-34217
+Fax:    (+49) 351 463-37773
+e-mail: michael.kluge at tu-dresden.de
+WWW:    http://www.tu-dresden.de/zih
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100616/4755505c/attachment.htm>
