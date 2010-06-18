@@ -1,278 +1,124 @@
-From: Michael Kluge <Michael.Kluge@tu-dresden.de>
-Date: Thu, 17 Jun 2010 16:02:09 +0200
-Subject: [Lustre-devel] Lustre RPC visualization
-In-Reply-To: <B25C28C7-7D9C-4BAC-9218-A9CAEB0C21E6@oracle.com>
-References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
-	<4BD8E021.7050302@oracle.com> <4BD90FB9.5030702@tu-dresden.de>
-	<4BD9CF75.8030204@oracle.com> <4BDE8C3C.2050505@tu-dresden.de>
-	<699F57EF-52E6-41D1-A04B-3C39D469D133@oracle.com>
-	<4BDF1199.2030007@tu-dresden.de> <4BDF1CC7.5020502@oracle.com>
-	<4BDF24BC.9050701@tu-dresden.de> <4BDF2999.2000207@oracle.com>
-	<4BEFBB07.4030403@tu-dresden.de> <1274788995.2261.110.camel@radar>
-	<4BFC7177.9000808@oracle.com> <1275058473.21591.14.camel@radar>
-	<4BFFA456.7030502@oracle.com>
-	<C671351E-110C-4D2C-B216-4E8BE23A943A@oracle.com>
-	<1FF3D25F-3369-462E-9651-62D56319612A@tu-dresden.de>
-	<D29ED098-3DEB-4AF4-AA68-B52B4E2BF5EA@oracle.com>
-	<4C04F3F0.9040708@oracle.com>
-	<001601cb01a3$546c93d0$fd45bb70$%barton@oracle.com>
-	<4C04F94A.2050908@oracle.com>
-	<7B05EBAF-67C5-4EE1-B1EC-CB1C554BEA3E@oracle.com>
-	<4DBE6FF1-62B0-484C-81F8-B231E332BFB5@tu-dresden.de>
-	<1BFD6845-6D5A-459F-8164-4F75FD759060@tu-dresden.de>
-	<B25C28C7-7D9C-4BAC-9218-A9CAEB0C21E6@oracle.com>
-Message-ID: <1276783329.499.322.camel@radar>
+From: Andreas Dilger <andreas.dilger@oracle.com>
+Date: Fri, 18 Jun 2010 15:35:35 -0600
+Subject: [Lustre-devel] Attribute caching and OBD_CONNECT_ATTRFID
+In-Reply-To: <201006091642.o59GgTll020727@hedwig.cmf.nrl.navy.mil>
+References: <201006091642.o59GgTll020727@hedwig.cmf.nrl.navy.mil>
+Message-ID: <A7BFC57F-AB97-41F2-95A8-B867E89C4875@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hmm. Ok. Is there a way to figure out what type of file I have if I have
-nothing like the (most probably incomplete) file itself? Whether it is a
-client or a server log and which NID the node has had? Right now the
-code is executing a not-so-easy mapping algorithm over all files to
-figure this out. The way to distinguish between client and server was to
-look at those lines which I expected to see only on the server (the
-"incoming req at .....").
+On 2010-06-09, at 10:42, Ken Hornstein wrote:
+> So I've been working on attribute caching for Lustre for the MacOS X port,
+> and I've run into a bit of a snag.
 
-Michael
+Ken,
+sorry for the delay in replying, this mail disappeared off the top of my inbox.
 
-Am Mittwoch, den 16.06.2010, 08:50 -0600 schrieb Andreas Dilger: 
-> On 2010-06-16, at 02:46, Michael Kluge wrote:
-> > thanks for the trace files. Every single file contains log entries like:
-> > 
-> > line: 00000100:00100000:2.0F:1275433209.964416:0:7924:0:(events.c:285:request_in_callback())               incoming req at ffff8101b32f5400 x1337373369608379 msgsize 296
-> > 
-> > Are in the tarball 684 server logs? Or am I wrong with the assumption that the lines with an "incoming req@" can only show up on the servers?
-> 
-> Clients can receive requests from the server for things like lock cancellations, so this line will appear in both client and server logs.  We don't have a test system with 684 servers...
-> 
-> > Am 01.06.2010 um 21:39 schrieb Michael Kluge:
-> > 
-> >>> On 2010-06-01, at 06:12, di.wang wrote:
-> >>>> Michael, I do not think you need all the trace logs from the clients. right?
-> >>> 
-> >>> Actually, I think he does want trace logs from all of the clients.
-> >> 
-> >> Yes, 600 is a good number. Vampir can easily handle this. If possible, I'd like to have all server traces as well to include this information. Right now I am only putting these RPC's in the trace where all 5 events (client send,server recv/start/done,client done) are present. I see the "client send/done" events in the OSS log as well, probably it is talking to the MDS or MGS. Events that are incomplete are being ignored but counted in "dumped events" counter. But that could be changed.
-> >> 
-> >> 
-> >> Michael
-> >> 
-> >>>> I had thought the current target is to make sure vampire can handle
-> >>>> the trace from "big" enough clusters.
-> >>>> 
-> >>>> Actually, I am not sure whether vampire(with this trace analyse) should 
-> >>>> work in this way as we do now?  i.e. running job exclusively on the cluster, get rpctrace log, then get graph by vampire?
-> >>>> 
-> >>>> Or I miss sth here? Michale, could you please explain a bit? What is 
-> >>>> your idea how vampire could help the end users? or the target here is 
-> >>>> just helping the developers and sysadmin to understand the system?
-> >>> 
-> >>> My thoughts on this in the past were that it should be possible to use ONLY the client logs to plot syscall latencies (using client VFSTRACE lines) and the RPC latencies (using client RPCTRACE lines) and locking (using DLMTRACE lines).  Some code rework would be needed to allow regular users to run "lctl dk", and it would filter out the lines specific to their own processes.  This would allow regular users to collect and analyze their application without assistance or coordination from the sysadmin.
-> >>> 
-> >>> In order to allow regular users to trace such information, the VFSTRACE calls should report the UID of the process doing the system call, which would immediately map to a PID.  The PID can be used to track the majority of the debug entries, but not always those done in another thread (e.g. ptlrpcd).  The RPCTRACE messages also contain the PID, so that would be helpful, but it would mean that there has to be a parser/filter in the kernel to ensure users cannot access trace information that is not their own.  That would be a significant undertaking, I think.
-> >>> 
-> >>> In the meantime, for testing purposes and initial usage (with sysadmin assistance) the full debug log can be extracted from the kernel and filtered in userspace as needed.
-> >>> 
-> >>>>>> -----Original Message-----
-> >>>>>> From: di.wang [mailto:di.wang at oracle.com]
-> >>>>>> Sent: 01 June 2010 12:50 PM
-> >>>>>> To: Robert Read
-> >>>>>> Cc: Michael Kluge; Eric Barton; Galen M. Shipman
-> >>>>>> Subject: Re: [Lustre-devel] Lustre RPC visualization
-> >>>>>> 
-> >>>>>> Hello,
-> >>>>>> 
-> >>>>>> IMHO, just run IOR with whatever parameters, and get rpctrace
-> >>>>>> log(probably only enable rpctrace) from 1 OST and some of clients
-> >>>>>> (probably 2 is enough).
-> >>>>>> Note: please make sure these 2 clients did communicate the OST during
-> >>>>>> the IOR.
-> >>>>>> 
-> >>>>>> Michael, I do not think you need all the trace logs from the clients. right?
-> >>>>>> 
-> >>>>>> Robert
-> >>>>>> 
-> >>>>>> If there are available time slots for this test on Hyperion, who can
-> >>>>>> help to get these logs?
-> >>>>>> 
-> >>>>>> Thanks
-> >>>>>> Wangdi
-> >>>>>> 
-> >>>>>> Robert Read wrote:
-> >>>>>> 
-> >>>>>>> What should I run then? Do have scripts to capture this?
-> >>>>>>> 
-> >>>>>>> robert
-> >>>>>>> 
-> >>>>>>> On May 31, 2010, at 2:39 , Michael Kluge wrote:
-> >>>>>>> 
-> >>>>>>> 
-> >>>>>>>> Hi Robert,
-> >>>>>>>> 
-> >>>>>>>> 600 is a nice number. Plus the traces from the server an I am happy.
-> >>>>>>>> 
-> >>>>>>>> 
-> >>>>>>>> Michael
-> >>>>>>>> 
-> >>>>>>>> Am 28.05.2010 um 17:53 schrieb Robert Read:
-> >>>>>>>> 
-> >>>>>>>> 
-> >>>>>>>>> On May 28, 2010, at 4:09 , di.wang wrote:
-> >>>>>>>>> 
-> >>>>>>>>> 
-> >>>>>>>>>> Hello, Michael
-> >>>>>>>>>> 
-> >>>>>>>>>> 
-> >>>>>>>>>>> One good news: The Feature that Vampir can show something like a heat
-> >>>>>>>>>>> map (Eric asked about this) comes back with the release at ISC. It is
-> >>>>>>>>>>> now called "performance radar". It can produce a heat map for a
-> >>>>>>>>>>> counter
-> >>>>>>>>>>> and does some other things as well. I could send a picture around, but
-> >>>>>>>>>>> need at first an bigger trace (more hosts generating traces in
-> >>>>>>>>>>> parallel).
-> >>>>>>>>>>> 
-> >>>>>>>>>>> 
-> >>>>>>>>>> Right now I do not have big clusters available to generate the trace.
-> >>>>>>>>>> I will see what I can do here.
-> >>>>>>>>>> 
-> >>>>>>>>> If ~600 clients is big enough we could generate that on Hyperion.
-> >>>>>>>>> 
-> >>>>>>>>> robert
-> >>>>>>>>> 
-> >>>>>>>>> 
-> >>>>>>>>>> Thanks
-> >>>>>>>>>> WangDi
-> >>>>>>>>>> 
-> >>>>>>>>>>> 
-> >>>>>>>>>>> 
-> >>>>>>>>>>>>> 
-> >>>>>>>>>>> ------------------------------------------------------------------------
-> >>>>>>>>>>> 
-> >>>>>>>>>>> _______________________________________________
-> >>>>>>>>>>> Lustre-devel mailing list
-> >>>>>>>>>>> Lustre-devel at lists.lustre.org <mailto:Lustre-devel@lists.lustre.org>
-> >>>>>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> >>>>>>>>>>> 
-> >>>>>>>>>>> 
-> >>>>>>>>> 
-> >>>>>>>> --
-> >>>>>>>> 
-> >>>>>>>> Michael Kluge, M.Sc.
-> >>>>>>>> 
-> >>>>>>>> Technische Universit?t Dresden
-> >>>>>>>> Center for Information Services and
-> >>>>>>>> High Performance Computing (ZIH)
-> >>>>>>>> D-01062 Dresden
-> >>>>>>>> Germany
-> >>>>>>>> 
-> >>>>>>>> Contact:
-> >>>>>>>> Willersbau, Room WIL A 208
-> >>>>>>>> Phone:  (+49) 351 463-34217
-> >>>>>>>> Fax:    (+49) 351 463-37773
-> >>>>>>>> e-mail: michael.kluge at tu-dresden.de <mailto:michael.kluge@tu-dresden.de>
-> >>>>>>>> WWW:    http://www.tu-dresden.de/zih
-> >>>>>>>> 
-> >>>>>>>> 
-> >>>>> 
-> >>>>> 
-> >>>>> _______________________________________________
-> >>>>> Lustre-devel mailing list
-> >>>>> Lustre-devel at lists.lustre.org
-> >>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> >>>>> 
-> >>>> 
-> >>>> _______________________________________________
-> >>>> Lustre-devel mailing list
-> >>>> Lustre-devel at lists.lustre.org
-> >>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> >>> 
-> >>> 
-> >>> Cheers, Andreas
-> >>> --
-> >>> Andreas Dilger
-> >>> Lustre Technical Lead
-> >>> Oracle Corporation Canada Inc.
-> >>> 
-> >>> _______________________________________________
-> >>> Lustre-devel mailing list
-> >>> Lustre-devel at lists.lustre.org
-> >>> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> >>> 
-> >> 
-> >> 
-> >> -- 
-> >> 
-> >> Michael Kluge, M.Sc.
-> >> 
-> >> Technische Universit?t Dresden
-> >> Center for Information Services and
-> >> High Performance Computing (ZIH)
-> >> D-01062 Dresden
-> >> Germany
-> >> 
-> >> Contact:
-> >> Willersbau, Room WIL A 208
-> >> Phone:  (+49) 351 463-34217
-> >> Fax:    (+49) 351 463-37773
-> >> e-mail: michael.kluge at tu-dresden.de
-> >> WWW:    http://www.tu-dresden.de/zih
-> >> 
-> >> _______________________________________________
-> >> Lustre-devel mailing list
-> >> Lustre-devel at lists.lustre.org
-> >> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> > 
-> > 
-> > -- 
-> > 
-> > Michael Kluge, M.Sc.
-> > 
-> > Technische Universit?t Dresden
-> > Center for Information Services and
-> > High Performance Computing (ZIH)
-> > D-01062 Dresden
-> > Germany
-> > 
-> > Contact:
-> > Willersbau, Room WIL A 208
-> > Phone:  (+49) 351 463-34217
-> > Fax:    (+49) 351 463-37773
-> > e-mail: michael.kluge at tu-dresden.de
-> > WWW:    http://www.tu-dresden.de/zih
-> > 
-> 
-> 
-> Cheers, Andreas
-> --
-> Andreas Dilger
-> Lustre Technical Lead
-> Oracle Corporation Canada Inc.
-> 
-> 
+> A bit of a brief explanation: unlike Linux, where (as I understand it)
+> filesystems have to store attributes in the vnode as they change, on
+> BSD-derived vnode filesystems you have a getattr function that gets
+> called to find out the attributes of a file.
 
--- 
+Linux VFS is kind of half-way between that.  There is a "common" inode structure that has information needed for any kind of inode (owner, size, blocks, etc), and then a "private" inode structure with filesystem-specific data, pointers, etc.
 
-Michael Kluge, M.Sc.
+>  You get passed a pointer
+> to the vnode (a sort-of virtual inode) and in that contains a pointer
+> to a structure which the filesystem manages; in Lustre's case, that
+> contains among other things a copy of the FID.  So just to recap, when
+> MacOS X wants the attributes of a file, it's done via FID, not by
+> filename. I am aware that you can get attributes at lookup time, and I
+> plan on implementing that, but I figure I'd start with this first.
 
-Technische Universit?t Dresden
-Center for Information Services and
-High Performance Computing (ZIH)
-D-01062 Dresden
-Germany
+Right, this getattr-by-FID is done when revalidating an inode, but as you write it is normally done at lookup time.
 
-Contact:
-Willersbau, Room A 208
-Phone:  (+49) 351 463-34217
-Fax:    (+49) 351 463-37773
-e-mail: michael.kluge at tu-dresden.de
-WWW:    http://www.tu-dresden.de/zih
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5997 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100617/5402077b/attachment.bin>
+> It is my understanding that to properly implement attribute caching, I
+> need to call md_intent_lock with the right op_data and an intent
+> structure with it_op set to IT_GETATTR.  When those attributes change,
+> I'll get notified in my ast callback.  If that's wrong, then please
+> correct me.
+
+The "intent" part of the locking is that the client is trying to write-lock the directory with the intent looking up the file to open+create it.  In all cases today the MDS does not grant the write lock on the directory, and replies to the client essentially "you can't have the directory lock, but I opened/created the file for you, and here are the attributes".
+
+> First off, I see that one of the options at connect time is
+> OBD_CONNECT_ATTRFID, and looking at the comments and the llite code for
+> this option it seems pretty self explanatory - you can fetch file
+> attributes by FID.  Perfect!  Well, like the llite code I test to make
+> sure OBD_CONNECT_ATTRFID is set in the connect flags, and I discover
+> that it is _not_.
+> 
+> The reason for this is that it's commented out of the
+> MDT_CONNECT_SUPPORTED macro in lustre_idl.h (and that's used to mask
+> out the reply you get indicating what is supported).  Now, it's not
+> clear to me why that was done: this happened back in 2007 as part of
+> commit d2d56f38, and the commit entry just says, "make HEAD from
+> b_post_cmd3", and it's been that way ever since.
+
+I was going to point out where this wasn't correct, but it seems this IS commented out, and it would seem to be a legitimate problem.  I wasn't involved in CMD3 so offhand I can't say either why it was changed.  I'm doing some spelunking in CVS to see if there is an explanation for it.  From what I can gather, the commit comment is:
+
+revision 1.1.14.82.2.12
+date: 2007/06/14 06:54:00;  author: tappro
+- disable ATTRFID feature due to cmd restriction
+  bz12718
+r:huanghua,fanyong
+
+
+And in bugzilla bug 12718 (among the dozens of other patches landed from that bug) there is a comment:
+
+>> Created an attachment (id=11067)  ATTRFID disable
+>> 
+>> ATTRFID should be disabled in CMD. The reason for that is locking - getting attr by fid require LOOKUP|UPDATE lock (LOOKUP is for access rights attributes) but in CMD LOOKUP lock can be already taken on another MDS - on name.
+>> This is old CMD issue and the solution will be provided later, it seems we need new lock (e.g. PERMISSION) to protect such attributes. For now we just disable ATTRFID support.       
+> 
+> But disabling ATTRFID will cause sanity 29 to fail.
+> Please investigate, or find solution for sanity 29.
+
+But this question was never answered, and the patch was landed.  To my reading, the lack of ATTRFID support would prevent attribute caching on clients connected to 2.x servers once they lose their lock - they will repeatedly to MDS_GETATTR RPCs and never be able to cache them.
+
+Seeing as 2.0 does not support CMD, and even in 2.x when we support CMD not all systems will be configured with CMD it should be possible to enable ATTRFID if no CMD is enabled.  
+
+> The code still seems to exist on the server, so I figure I'll give it
+> a try anyway,  First issue: you need to include the parent when using
+> CONNECT_ATTRFID; I have to confess that I don't understand why, because
+> you would think that it wouldn't be necessary just to get the attributes
+> for a file, but this in enforced on the server (unfortunately, by
+> kicking an LBUG).
+
+It is a serious defect to LBUG() on the server due to bad client data/request.  Could you please file a bug on that?
+
+>  This is a problem for the root directory since it's
+> the first one looked up _and_ it doesn't have a parent, but I can special
+> case that; for all other vnodes, the parent is easy to find (the filesystem
+> layer keeps track of it).
+
+I think that is fixing the symptom and not the cause.  I'm not sure why we need the parent FID to get a lock on the child by itself, but even the client can't be 100% sure that it will have the parent.  For example, if the Lustre client is re-exporting the filesystem via NFS, then it has crashed and lost the in-memory directory hierarchy, and then gets a revalidation/getattr request from its NFS client without the parent it won't have the parent directory.  IIRC, this is the original reason we added ATTRFID support, was for NFS to be able to cache attributes for such inodes.
+
+> When I try doing _that_, I get an error from the lmv routines that I haven't
+> tracked down yet.  But the whole thing makes me wonder if perhaps I'm
+> doing the wrong thing.
+> 
+> From what I see, attributes are also cached at open/lookup time and as
+> part of the statahead code; I can do that relatively easy.  But if
+> attributes _change_, then I have to wonder what is supposed to happen
+> next.
+
+If there is a lock on the attributes, the lock will be revoked and the client's attributes will no longer be valid.  Presumably, either the client will do another lookup by name and re-get the lock on that inode, or the internal revalidation will just keep on doing MDS_GETATTR RPCs and the attributes will not be cached.
+
+> Since current Lustre servers don't return OBD_CONNECT_ATTRFID as
+> being set anymore, the code in the client doesn't seem like it will
+> cache the attribute (for files, anyway) anymore.  It's entirely possible 
+> that I'm missing something; that happens a lot.
+> 
+> So, I guess the question I have is ... if you get your lock broken when
+> you have it on a file's attributes, exactly what is supposed to happen next?
+> What's the mechanism for getting it again?
+
+Well, it should do a getattr-by-FID and re-fetch the lock, which is exactly what happens with 1.6/1.8 servers.  I wonder if we even have a test workload that would expose this difference, since many tests like "ls -l" will always do a stat(filename), and I suspect very few tests will keep a filehandle open and do fstat(fd) for a long enough time for the client to lose its lock on the inode.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Technical Lead
+Oracle Corporation Canada Inc.
