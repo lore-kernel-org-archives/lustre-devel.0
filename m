@@ -1,56 +1,361 @@
-From: Andreas Dilger <andreas.dilger@oracle.com>
-Date: Mon, 21 Jun 2010 15:35:26 -0600
-Subject: [Lustre-devel] Attribute caching and OBD_CONNECT_ATTRFID
-In-Reply-To: <201006211917.o5LJH9G4023021@hedwig.cmf.nrl.navy.mil>
-References: <201006211917.o5LJH9G4023021@hedwig.cmf.nrl.navy.mil>
-Message-ID: <9B242A89-CFDA-47D6-9726-4C2754DA141F@oracle.com>
+From: Michael Kluge <Michael.Kluge@tu-dresden.de>
+Date: Tue, 22 Jun 2010 17:12:58 +0200
+Subject: [Lustre-devel] Lustre RPC visualization
+In-Reply-To: <4C1E7D95.80100@tu-dresden.de>
+References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
+	<4BDE8C3C.2050505@tu-dresden.de>
+	<699F57EF-52E6-41D1-A04B-3C39D469D133@oracle.com>
+	<4BDF1199.2030007@tu-dresden.de> <4BDF1CC7.5020502@oracle.com>
+	<4BDF24BC.9050701@tu-dresden.de> <4BDF2999.2000207@oracle.com>
+	<4BEFBB07.4030403@tu-dresden.de>
+	<1274788995.2261.110.camel@radar> <4BFC7177.9000808@oracle.com>
+	<1275058473.21591.14.camel@radar> <4BFFA456.7030502@oracle.com>
+	<C671351E-110C-4D2C-B216-4E8BE23A943A@oracle.com>
+	<1FF3D25F-3369-462E-9651-62D56319612A@tu-dresden.de>
+	<D29ED098-3DEB-4AF4-AA68-B52B4E2BF5EA@oracle.com>
+	<4C04F3F0.9040708@oracle.com>
+	<001601cb01a3$546c93d0$fd45bb70$%barton@oracle.com>
+	<4C04F94A.2050908@oracle.com>
+	<7B05EBAF-67C5-4EE1-B1EC-CB1C554BEA3E@oracle.com>
+	<4DBE6FF1-62B0-484C-81F8-B231E332BFB5@tu-dresden.de>
+	<1BFD6845-6D5A-459F-8164-4F75FD759060@tu-dresden.de>
+	<B25C28C7-7D9C-4BAC-9218-A9CAEB0C21E6@orr! acle.com>
+	<1276783329.499.322.camel@radar>
+	<4169315E-9A94-4430-8970-92068222EF15@oracle.com>
+	<4C1E7D95.80100@tu-dresden.de>
+Message-ID: <96A6F62D-08C6-4A3D-9C2A-785F0DA00428@tu-dresden.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2010-06-21, at 13:17, Ken Hornstein wrote:
->> This is in fact the right way to do it. If the lock is cancelledq then  
->> the client has no way of knowing whether that name will continue to  
->> point at the same FID or not.
+The remaining problems of the counter calculations have been fixed. There is a screenshot attached showing some values. The code is in a gforge server that we operate here in Dresden (gforge.zih.tu-dresden.de). The converter runs on Linux and on MAC OS X and you need Vampir to take a look at the OTF trace file.
+
+Eric, Galen, for the moment I think I am done with the stuff I promised you at LUG this year? Are there any more ideas?
+
+
+Michael
+
+
+
+
+
+
+
+
+Am 20.06.2010 um 22:44 schrieb Michael Kluge:
+
+> OK, I found time do do programming again. There are still some issues, but I got a first screenshot with the data from Roberts log.
 > 
-> I guess I was thinking in terms of inodebits locks, you may (for example)
-> get the file size invalidated, but the name/FID is still the same.  Is
-> my understanding of inodebits locks wrong?  It's entirely possible that
-> it is.
-
-That is correct.  It is possible to grant multiple ibits on the same lock, or it is possible to grant separate ibits on different locks.  Currently, we don't have DLM lock conversion, to allow e.g. cancelling only one bit from a granted lock.  That means if one lock bit is conflicting the whole lock (i.e. all its bits) will be cancelled.  The client will re-request only the ibits that it needs to avoid future contention.
-
->> Also note we recently changed the Linux client to invalidate the inode  
->> when all of the DLM locks related to that inode are cancelled.  This  
->> ensures the client 'forgets' about deleted inodes even when another  
->> client deleted it. Otherwise, the client will accumulate a lot of  
->> unnecessary inodes in cache.
+> Michael
 > 
-> I guess I could simply revoke the vnode when all of the DLM locks for
-> it are cancelled (that tells the upper layer to forget everything you
-> knew about the vnode).  That seems ... well, I guess I can't see
-> anything wrong with it.  I guess now that you mention it, if another
-> client deletes a file and you don't have a lock on it, you're not
-> necessarily going to know that the delete happened, will you?
-> But what happens if that file that's been invalidated is in use?
-
-Currently, the Linux VFS will flag it as "DCACHE_INVALID" and it needs to be revalidated before use.
-
-> Hm, actually, I see now that revoking the vnode has unintended
-> consequences if someone has it open (as in, you won't be able to do
-> anything but close it).  Perhaps a recycle is better; I'll have to
-> figure that one out.
+> Am 17.06.2010 16:35, schrieb Robert Read:
+>> I don't have the nids handy (I'll try to get that later today), but these are the server logs:
+>> 
+>> ior-634/hyperion-sun-ost6.ior.log
+>> ior-634/hyperion-sun-ost7.ior.log
+>> ior-634/hyperion-sun-ost5.ior.log
+>> ior-634/hyperion-mds7.ior.log
+>> 
+>> robert
+>> 
+>> On Jun 17, 2010, at 7:02 , Michael Kluge wrote:
+>> 
+>>> Hmm. Ok. Is there a way to figure out what type of file I have if I have
+>>> nothing like the (most probably incomplete) file itself? Whether it is a
+>>> client or a server log and which NID the node has had? Right now the
+>>> code is executing a not-so-easy mapping algorithm over all files to
+>>> figure this out. The way to distinguish between client and server was to
+>>> look at those lines which I expected to see only on the server (the
+>>> "incoming req at .....").
+>>> 
+>>> Michael
+>>> 
+>>> Am Mittwoch, den 16.06.2010, 08:50 -0600 schrieb Andreas Dilger:
+>>>> On 2010-06-16, at 02:46, Michael Kluge wrote:
+>>>>> thanks for the trace files. Every single file contains log entries like:
+>>>>> 
+>>>>> line: 00000100:00100000:2.0F:1275433209.964416:0:7924:0:(events.c:285:request_in_callback())               incoming req at ffff8101b32f5400 x1337373369608379 msgsize 296
+>>>>> 
+>>>>> Are in the tarball 684 server logs? Or am I wrong with the assumption that the lines with an "incoming req@" can only show up on the servers?
+>>>> 
+>>>> Clients can receive requests from the server for things like lock cancellations, so this line will appear in both client and server logs.  We don't have a test system with 684 servers...
+>>>> 
+>>>>> Am 01.06.2010 um 21:39 schrieb Michael Kluge:
+>>>>> 
+>>>>>>> On 2010-06-01, at 06:12, di.wang wrote:
+>>>>>>>> Michael, I do not think you need all the trace logs from the clients. right?
+>>>>>>> 
+>>>>>>> Actually, I think he does want trace logs from all of the clients.
+>>>>>> 
+>>>>>> Yes, 600 is a good number. Vampir can easily handle this. If possible, I'd like to have all server traces as well to include this information. Right now I am only putting these RPC's in the trace where all 5 events (client send,server recv/start/done,client done) are present. I see the "client send/done" events in the OSS log as well, probably it is talking to the MDS or MGS. Events that are incomplete are being ignored but counted in "dumped events" counter. But that could be changed.
+>>>>>> 
+>>>>>> 
+>>>>>> Michael
+>>>>>> 
+>>>>>>>> I had thought the current target is to make sure vampire can handle
+>>>>>>>> the trace from "big" enough clusters.
+>>>>>>>> 
+>>>>>>>> Actually, I am not sure whether vampire(with this trace analyse) should
+>>>>>>>> work in this way as we do now?  i.e. running job exclusively on the cluster, get rpctrace log, then get graph by vampire?
+>>>>>>>> 
+>>>>>>>> Or I miss sth here? Michale, could you please explain a bit? What is
+>>>>>>>> your idea how vampire could help the end users? or the target here is
+>>>>>>>> just helping the developers and sysadmin to understand the system?
+>>>>>>> 
+>>>>>>> My thoughts on this in the past were that it should be possible to use ONLY the client logs to plot syscall latencies (using client VFSTRACE lines) and the RPC latencies (using client RPCTRACE lines) and locking (using DLMTRACE lines).  Some code rework would be needed to allow regular users to run "lctl dk", and it would filter out the lines specific to their own processes.  This would allow regular users to collect and analyze their application without assistance or coordination from the sysadmin.
+>>>>>>> 
+>>>>>>> In order to allow regular users to trace such information, the VFSTRACE calls should report the UID of the process doing the system call, which would immediately map to a PID.  The PID can be used to track the majority of the debug entries, but not always those done in another thread (e.g. ptlrpcd).  The RPCTRACE messages also contain the PID, so that would be helpful, but it would mean that there has to be a parser/filter in the kernel to ensure users cannot access trace information that is not their own.  That would be a significant undertaking, I think.
+>>>>>>> 
+>>>>>>> In the meantime, for testing purposes and initial usage (with sysadmin assistance) the full debug log can be extracted from the kernel and filtered in userspace as needed.
+>>>>>>> 
+>>>>>>>>>> -----Original Message-----
+>>>>>>>>>> From: di.wang [mailto:di.wang at oracle.com]
+>>>>>>>>>> Sent: 01 June 2010 12:50 PM
+>>>>>>>>>> To: Robert Read
+>>>>>>>>>> Cc: Michael Kluge; Eric Barton; Galen M. Shipman
+>>>>>>>>>> Subject: Re: [Lustre-devel] Lustre RPC visualization
+>>>>>>>>>> 
+>>>>>>>>>> Hello,
+>>>>>>>>>> 
+>>>>>>>>>> IMHO, just run IOR with whatever parameters, and get rpctrace
+>>>>>>>>>> log(probably only enable rpctrace) from 1 OST and some of clients
+>>>>>>>>>> (probably 2 is enough).
+>>>>>>>>>> Note: please make sure these 2 clients did communicate the OST during
+>>>>>>>>>> the IOR.
+>>>>>>>>>> 
+>>>>>>>>>> Michael, I do not think you need all the trace logs from the clients. right?
+>>>>>>>>>> 
+>>>>>>>>>> Robert
+>>>>>>>>>> 
+>>>>>>>>>> If there are available time slots for this test on Hyperion, who can
+>>>>>>>>>> help to get these logs?
+>>>>>>>>>> 
+>>>>>>>>>> Thanks
+>>>>>>>>>> Wangdi
+>>>>>>>>>> 
+>>>>>>>>>> Robert Read wrote:
+>>>>>>>>>> 
+>>>>>>>>>>> What should I run then? Do have scripts to capture this?
+>>>>>>>>>>> 
+>>>>>>>>>>> robert
+>>>>>>>>>>> 
+>>>>>>>>>>> On May 31, 2010, at 2:39 , Michael Kluge wrote:
+>>>>>>>>>>> 
+>>>>>>>>>>> 
+>>>>>>>>>>>> Hi Robert,
+>>>>>>>>>>>> 
+>>>>>>>>>>>> 600 is a nice number. Plus the traces from the server an I am happy.
+>>>>>>>>>>>> 
+>>>>>>>>>>>> 
+>>>>>>>>>>>> Michael
+>>>>>>>>>>>> 
+>>>>>>>>>>>> Am 28.05.2010 um 17:53 schrieb Robert Read:
+>>>>>>>>>>>> 
+>>>>>>>>>>>> 
+>>>>>>>>>>>>> On May 28, 2010, at 4:09 , di.wang wrote:
+>>>>>>>>>>>>> 
+>>>>>>>>>>>>> 
+>>>>>>>>>>>>>> Hello, Michael
+>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>>> One good news: The Feature that Vampir can show something like a heat
+>>>>>>>>>>>>>>> map (Eric asked about this) comes back with the release at ISC. It is
+>>>>>>>>>>>>>>> now called "performance radar". It can produce a heat map for a
+>>>>>>>>>>>>>>> counter
+>>>>>>>>>>>>>>> and does some other things as well. I could send a picture around, but
+>>>>>>>>>>>>>>> need at first an bigger trace (more hosts generating traces in
+>>>>>>>>>>>>>>> parallel).
+>>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>> Right now I do not have big clusters available to generate the trace.
+>>>>>>>>>>>>>> I will see what I can do here.
+>>>>>>>>>>>>>> 
+>>>>>>>>>>>>> If ~600 clients is big enough we could generate that on Hyperion.
+>>>>>>>>>>>>> 
+>>>>>>>>>>>>> robert
+>>>>>>>>>>>>> 
+>>>>>>>>>>>>> 
+>>>>>>>>>>>>>> Thanks
+>>>>>>>>>>>>>> WangDi
+>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>>> ------------------------------------------------------------------------
+>>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>>> _______________________________________________
+>>>>>>>>>>>>>>> Lustre-devel mailing list
+>>>>>>>>>>>>>>> Lustre-devel at lists.lustre.org<mailto:Lustre-devel@lists.lustre.org>
+>>>>>>>>>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>>>>>>>>>>>>> 
+>>>>>>>>>>>>>>> 
+>>>>>>>>>>>>> 
+>>>>>>>>>>>> --
+>>>>>>>>>>>> 
+>>>>>>>>>>>> Michael Kluge, M.Sc.
+>>>>>>>>>>>> 
+>>>>>>>>>>>> Technische Universit?t Dresden
+>>>>>>>>>>>> Center for Information Services and
+>>>>>>>>>>>> High Performance Computing (ZIH)
+>>>>>>>>>>>> D-01062 Dresden
+>>>>>>>>>>>> Germany
+>>>>>>>>>>>> 
+>>>>>>>>>>>> Contact:
+>>>>>>>>>>>> Willersbau, Room WIL A 208
+>>>>>>>>>>>> Phone:  (+49) 351 463-34217
+>>>>>>>>>>>> Fax:    (+49) 351 463-37773
+>>>>>>>>>>>> e-mail: michael.kluge at tu-dresden.de<mailto:michael.kluge@tu-dresden.de>
+>>>>>>>>>>>> WWW:    http://www.tu-dresden.de/zih
+>>>>>>>>>>>> 
+>>>>>>>>>>>> 
+>>>>>>>>> 
+>>>>>>>>> 
+>>>>>>>>> _______________________________________________
+>>>>>>>>> Lustre-devel mailing list
+>>>>>>>>> Lustre-devel at lists.lustre.org
+>>>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>>>>>>> 
+>>>>>>>> 
+>>>>>>>> _______________________________________________
+>>>>>>>> Lustre-devel mailing list
+>>>>>>>> Lustre-devel at lists.lustre.org
+>>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>>>>> 
+>>>>>>> 
+>>>>>>> Cheers, Andreas
+>>>>>>> --
+>>>>>>> Andreas Dilger
+>>>>>>> Lustre Technical Lead
+>>>>>>> Oracle Corporation Canada Inc.
+>>>>>>> 
+>>>>>>> _______________________________________________
+>>>>>>> Lustre-devel mailing list
+>>>>>>> Lustre-devel at lists.lustre.org
+>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>>>>> 
+>>>>>> 
+>>>>>> 
+>>>>>> --
+>>>>>> 
+>>>>>> Michael Kluge, M.Sc.
+>>>>>> 
+>>>>>> Technische Universit?t Dresden
+>>>>>> Center for Information Services and
+>>>>>> High Performance Computing (ZIH)
+>>>>>> D-01062 Dresden
+>>>>>> Germany
+>>>>>> 
+>>>>>> Contact:
+>>>>>> Willersbau, Room WIL A 208
+>>>>>> Phone:  (+49) 351 463-34217
+>>>>>> Fax:    (+49) 351 463-37773
+>>>>>> e-mail: michael.kluge at tu-dresden.de
+>>>>>> WWW:    http://www.tu-dresden.de/zih
+>>>>>> 
+>>>>>> _______________________________________________
+>>>>>> Lustre-devel mailing list
+>>>>>> Lustre-devel at lists.lustre.org
+>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>>> 
+>>>>> 
+>>>>> --
+>>>>> 
+>>>>> Michael Kluge, M.Sc.
+>>>>> 
+>>>>> Technische Universit?t Dresden
+>>>>> Center for Information Services and
+>>>>> High Performance Computing (ZIH)
+>>>>> D-01062 Dresden
+>>>>> Germany
+>>>>> 
+>>>>> Contact:
+>>>>> Willersbau, Room WIL A 208
+>>>>> Phone:  (+49) 351 463-34217
+>>>>> Fax:    (+49) 351 463-37773
+>>>>> e-mail: michael.kluge at tu-dresden.de
+>>>>> WWW:    http://www.tu-dresden.de/zih
+>>>>> 
+>>>> 
+>>>> 
+>>>> Cheers, Andreas
+>>>> --
+>>>> Andreas Dilger
+>>>> Lustre Technical Lead
+>>>> Oracle Corporation Canada Inc.
+>>>> 
+>>>> 
+>>> 
+>>> --
+>>> 
+>>> Michael Kluge, M.Sc.
+>>> 
+>>> Technische Universit?t Dresden
+>>> Center for Information Services and
+>>> High Performance Computing (ZIH)
+>>> D-01062 Dresden
+>>> Germany
+>>> 
+>>> Contact:
+>>> Willersbau, Room A 208
+>>> Phone:  (+49) 351 463-34217
+>>> Fax:    (+49) 351 463-37773
+>>> e-mail: michael.kluge at tu-dresden.de
+>>> WWW:    http://www.tu-dresden.de/zih
+>>> _______________________________________________
+>>> Lustre-devel mailing list
+>>> Lustre-devel at lists.lustre.org
+>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>> 
+>> 
 > 
-> Could you point me to the section of the code in the Linux client that
-> does the inode invalidation upon lock cancellation?  I want to make sure
-> that I follow it and I'm doing the right thing.
+> 
+> -- 
+> Michael Kluge, M.Sc.
+> 
+> Technische Universit?t Dresden
+> Center for Information Services and
+> High Performance Computing (ZIH)
+> D-01062 Dresden
+> Germany
+> 
+> Contact:
+> Willersbau, Room WIL A 208
+> Phone:  (+49) 351 463-34217
+> Fax:    (+49) 351 463-37773
+> e-mail: michael.kluge at tu-dresden.de
+> WWW:    http://www.tu-dresden.de/zih
+> <lustre2.png><lustre1.png>_______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
 
-The majority of this work was done in bug 20433.
 
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Technical Lead
-Oracle Corporation Canada Inc.
+-- 
+
+Michael Kluge, M.Sc.
+
+Technische Universit?t Dresden
+Center for Information Services and
+High Performance Computing (ZIH)
+D-01062 Dresden
+Germany
+
+Contact:
+Willersbau, Room WIL A 208
+Phone:  (+49) 351 463-34217
+Fax:    (+49) 351 463-37773
+e-mail: michael.kluge at tu-dresden.de
+WWW:    http://www.tu-dresden.de/zih
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100622/644c5c4f/attachment.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: lustre3.png
+Type: image/png
+Size: 153070 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100622/644c5c4f/attachment.png>
