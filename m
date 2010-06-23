@@ -1,7 +1,7 @@
-From: Michael Kluge <Michael.Kluge@tu-dresden.de>
-Date: Tue, 22 Jun 2010 17:12:58 +0200
+From: Alexey Lyashkov <alexey.lyashkov@clusterstor.com>
+Date: Wed, 23 Jun 2010 14:29:01 +0400
 Subject: [Lustre-devel] Lustre RPC visualization
-In-Reply-To: <4C1E7D95.80100@tu-dresden.de>
+In-Reply-To: <96A6F62D-08C6-4A3D-9C2A-785F0DA00428@tu-dresden.de>
 References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
 	<4BDE8C3C.2050505@tu-dresden.de>
 	<699F57EF-52E6-41D1-A04B-3C39D469D133@oracle.com>
@@ -23,339 +23,44 @@ References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
 	<1276783329.499.322.camel@radar>
 	<4169315E-9A94-4430-8970-92068222EF15@oracle.com>
 	<4C1E7D95.80100@tu-dresden.de>
-Message-ID: <96A6F62D-08C6-4A3D-9C2A-785F0DA00428@tu-dresden.de>
+	<96A6F62D-08C6-4A3D-9C2A-785F0DA00428@tu-dresden.de>
+Message-ID: <4B610316-4D3A-4087-B4AD-15F94615D3C3@clusterstor.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The remaining problems of the counter calculations have been fixed. There is a screenshot attached showing some values. The code is in a gforge server that we operate here in Dresden (gforge.zih.tu-dresden.de). The converter runs on Linux and on MAC OS X and you need Vampir to take a look at the OTF trace file.
-
-Eric, Galen, for the moment I think I am done with the stuff I promised you at LUG this year? Are there any more ideas?
+I think better to use client UUID instead of NID as client identification. Because in your's case - you can't separate info from two clients which run on same node.
 
 
-Michael
+On Jun 22, 2010, at 19:12, Michael Kluge wrote:
 
-
-
-
-
-
-
-
-Am 20.06.2010 um 22:44 schrieb Michael Kluge:
-
-> OK, I found time do do programming again. There are still some issues, but I got a first screenshot with the data from Roberts log.
+> The remaining problems of the counter calculations have been fixed. There is a screenshot attached showing some values. The code is in a gforge server that we operate here in Dresden (gforge.zih.tu-dresden.de). The converter runs on Linux and on MAC OS X and you need Vampir to take a look at the OTF trace file.
+> 
+> Eric, Galen, for the moment I think I am done with the stuff I promised you at LUG this year? Are there any more ideas?
+> 
 > 
 > Michael
 > 
-> Am 17.06.2010 16:35, schrieb Robert Read:
->> I don't have the nids handy (I'll try to get that later today), but these are the server logs:
->> 
->> ior-634/hyperion-sun-ost6.ior.log
->> ior-634/hyperion-sun-ost7.ior.log
->> ior-634/hyperion-sun-ost5.ior.log
->> ior-634/hyperion-mds7.ior.log
->> 
->> robert
->> 
->> On Jun 17, 2010, at 7:02 , Michael Kluge wrote:
->> 
->>> Hmm. Ok. Is there a way to figure out what type of file I have if I have
->>> nothing like the (most probably incomplete) file itself? Whether it is a
->>> client or a server log and which NID the node has had? Right now the
->>> code is executing a not-so-easy mapping algorithm over all files to
->>> figure this out. The way to distinguish between client and server was to
->>> look at those lines which I expected to see only on the server (the
->>> "incoming req at .....").
->>> 
->>> Michael
->>> 
->>> Am Mittwoch, den 16.06.2010, 08:50 -0600 schrieb Andreas Dilger:
->>>> On 2010-06-16, at 02:46, Michael Kluge wrote:
->>>>> thanks for the trace files. Every single file contains log entries like:
->>>>> 
->>>>> line: 00000100:00100000:2.0F:1275433209.964416:0:7924:0:(events.c:285:request_in_callback())               incoming req at ffff8101b32f5400 x1337373369608379 msgsize 296
->>>>> 
->>>>> Are in the tarball 684 server logs? Or am I wrong with the assumption that the lines with an "incoming req@" can only show up on the servers?
->>>> 
->>>> Clients can receive requests from the server for things like lock cancellations, so this line will appear in both client and server logs.  We don't have a test system with 684 servers...
->>>> 
->>>>> Am 01.06.2010 um 21:39 schrieb Michael Kluge:
->>>>> 
->>>>>>> On 2010-06-01, at 06:12, di.wang wrote:
->>>>>>>> Michael, I do not think you need all the trace logs from the clients. right?
->>>>>>> 
->>>>>>> Actually, I think he does want trace logs from all of the clients.
->>>>>> 
->>>>>> Yes, 600 is a good number. Vampir can easily handle this. If possible, I'd like to have all server traces as well to include this information. Right now I am only putting these RPC's in the trace where all 5 events (client send,server recv/start/done,client done) are present. I see the "client send/done" events in the OSS log as well, probably it is talking to the MDS or MGS. Events that are incomplete are being ignored but counted in "dumped events" counter. But that could be changed.
->>>>>> 
->>>>>> 
->>>>>> Michael
->>>>>> 
->>>>>>>> I had thought the current target is to make sure vampire can handle
->>>>>>>> the trace from "big" enough clusters.
->>>>>>>> 
->>>>>>>> Actually, I am not sure whether vampire(with this trace analyse) should
->>>>>>>> work in this way as we do now?  i.e. running job exclusively on the cluster, get rpctrace log, then get graph by vampire?
->>>>>>>> 
->>>>>>>> Or I miss sth here? Michale, could you please explain a bit? What is
->>>>>>>> your idea how vampire could help the end users? or the target here is
->>>>>>>> just helping the developers and sysadmin to understand the system?
->>>>>>> 
->>>>>>> My thoughts on this in the past were that it should be possible to use ONLY the client logs to plot syscall latencies (using client VFSTRACE lines) and the RPC latencies (using client RPCTRACE lines) and locking (using DLMTRACE lines).  Some code rework would be needed to allow regular users to run "lctl dk", and it would filter out the lines specific to their own processes.  This would allow regular users to collect and analyze their application without assistance or coordination from the sysadmin.
->>>>>>> 
->>>>>>> In order to allow regular users to trace such information, the VFSTRACE calls should report the UID of the process doing the system call, which would immediately map to a PID.  The PID can be used to track the majority of the debug entries, but not always those done in another thread (e.g. ptlrpcd).  The RPCTRACE messages also contain the PID, so that would be helpful, but it would mean that there has to be a parser/filter in the kernel to ensure users cannot access trace information that is not their own.  That would be a significant undertaking, I think.
->>>>>>> 
->>>>>>> In the meantime, for testing purposes and initial usage (with sysadmin assistance) the full debug log can be extracted from the kernel and filtered in userspace as needed.
->>>>>>> 
->>>>>>>>>> -----Original Message-----
->>>>>>>>>> From: di.wang [mailto:di.wang at oracle.com]
->>>>>>>>>> Sent: 01 June 2010 12:50 PM
->>>>>>>>>> To: Robert Read
->>>>>>>>>> Cc: Michael Kluge; Eric Barton; Galen M. Shipman
->>>>>>>>>> Subject: Re: [Lustre-devel] Lustre RPC visualization
->>>>>>>>>> 
->>>>>>>>>> Hello,
->>>>>>>>>> 
->>>>>>>>>> IMHO, just run IOR with whatever parameters, and get rpctrace
->>>>>>>>>> log(probably only enable rpctrace) from 1 OST and some of clients
->>>>>>>>>> (probably 2 is enough).
->>>>>>>>>> Note: please make sure these 2 clients did communicate the OST during
->>>>>>>>>> the IOR.
->>>>>>>>>> 
->>>>>>>>>> Michael, I do not think you need all the trace logs from the clients. right?
->>>>>>>>>> 
->>>>>>>>>> Robert
->>>>>>>>>> 
->>>>>>>>>> If there are available time slots for this test on Hyperion, who can
->>>>>>>>>> help to get these logs?
->>>>>>>>>> 
->>>>>>>>>> Thanks
->>>>>>>>>> Wangdi
->>>>>>>>>> 
->>>>>>>>>> Robert Read wrote:
->>>>>>>>>> 
->>>>>>>>>>> What should I run then? Do have scripts to capture this?
->>>>>>>>>>> 
->>>>>>>>>>> robert
->>>>>>>>>>> 
->>>>>>>>>>> On May 31, 2010, at 2:39 , Michael Kluge wrote:
->>>>>>>>>>> 
->>>>>>>>>>> 
->>>>>>>>>>>> Hi Robert,
->>>>>>>>>>>> 
->>>>>>>>>>>> 600 is a nice number. Plus the traces from the server an I am happy.
->>>>>>>>>>>> 
->>>>>>>>>>>> 
->>>>>>>>>>>> Michael
->>>>>>>>>>>> 
->>>>>>>>>>>> Am 28.05.2010 um 17:53 schrieb Robert Read:
->>>>>>>>>>>> 
->>>>>>>>>>>> 
->>>>>>>>>>>>> On May 28, 2010, at 4:09 , di.wang wrote:
->>>>>>>>>>>>> 
->>>>>>>>>>>>> 
->>>>>>>>>>>>>> Hello, Michael
->>>>>>>>>>>>>> 
->>>>>>>>>>>>>> 
->>>>>>>>>>>>>>> One good news: The Feature that Vampir can show something like a heat
->>>>>>>>>>>>>>> map (Eric asked about this) comes back with the release at ISC. It is
->>>>>>>>>>>>>>> now called "performance radar". It can produce a heat map for a
->>>>>>>>>>>>>>> counter
->>>>>>>>>>>>>>> and does some other things as well. I could send a picture around, but
->>>>>>>>>>>>>>> need at first an bigger trace (more hosts generating traces in
->>>>>>>>>>>>>>> parallel).
->>>>>>>>>>>>>>> 
->>>>>>>>>>>>>>> 
->>>>>>>>>>>>>> Right now I do not have big clusters available to generate the trace.
->>>>>>>>>>>>>> I will see what I can do here.
->>>>>>>>>>>>>> 
->>>>>>>>>>>>> If ~600 clients is big enough we could generate that on Hyperion.
->>>>>>>>>>>>> 
->>>>>>>>>>>>> robert
->>>>>>>>>>>>> 
->>>>>>>>>>>>> 
->>>>>>>>>>>>>> Thanks
->>>>>>>>>>>>>> WangDi
->>>>>>>>>>>>>> 
->>>>>>>>>>>>>>> 
->>>>>>>>>>>>>>> 
->>>>>>>>>>>>>>>>> 
->>>>>>>>>>>>>>> ------------------------------------------------------------------------
->>>>>>>>>>>>>>> 
->>>>>>>>>>>>>>> _______________________________________________
->>>>>>>>>>>>>>> Lustre-devel mailing list
->>>>>>>>>>>>>>> Lustre-devel at lists.lustre.org<mailto:Lustre-devel@lists.lustre.org>
->>>>>>>>>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>>>>>>>>>>>>>> 
->>>>>>>>>>>>>>> 
->>>>>>>>>>>>> 
->>>>>>>>>>>> --
->>>>>>>>>>>> 
->>>>>>>>>>>> Michael Kluge, M.Sc.
->>>>>>>>>>>> 
->>>>>>>>>>>> Technische Universit?t Dresden
->>>>>>>>>>>> Center for Information Services and
->>>>>>>>>>>> High Performance Computing (ZIH)
->>>>>>>>>>>> D-01062 Dresden
->>>>>>>>>>>> Germany
->>>>>>>>>>>> 
->>>>>>>>>>>> Contact:
->>>>>>>>>>>> Willersbau, Room WIL A 208
->>>>>>>>>>>> Phone:  (+49) 351 463-34217
->>>>>>>>>>>> Fax:    (+49) 351 463-37773
->>>>>>>>>>>> e-mail: michael.kluge at tu-dresden.de<mailto:michael.kluge@tu-dresden.de>
->>>>>>>>>>>> WWW:    http://www.tu-dresden.de/zih
->>>>>>>>>>>> 
->>>>>>>>>>>> 
->>>>>>>>> 
->>>>>>>>> 
->>>>>>>>> _______________________________________________
->>>>>>>>> Lustre-devel mailing list
->>>>>>>>> Lustre-devel at lists.lustre.org
->>>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>>>>>>>> 
->>>>>>>> 
->>>>>>>> _______________________________________________
->>>>>>>> Lustre-devel mailing list
->>>>>>>> Lustre-devel at lists.lustre.org
->>>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>>>>>> 
->>>>>>> 
->>>>>>> Cheers, Andreas
->>>>>>> --
->>>>>>> Andreas Dilger
->>>>>>> Lustre Technical Lead
->>>>>>> Oracle Corporation Canada Inc.
->>>>>>> 
->>>>>>> _______________________________________________
->>>>>>> Lustre-devel mailing list
->>>>>>> Lustre-devel at lists.lustre.org
->>>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>>>>>> 
->>>>>> 
->>>>>> 
->>>>>> --
->>>>>> 
->>>>>> Michael Kluge, M.Sc.
->>>>>> 
->>>>>> Technische Universit?t Dresden
->>>>>> Center for Information Services and
->>>>>> High Performance Computing (ZIH)
->>>>>> D-01062 Dresden
->>>>>> Germany
->>>>>> 
->>>>>> Contact:
->>>>>> Willersbau, Room WIL A 208
->>>>>> Phone:  (+49) 351 463-34217
->>>>>> Fax:    (+49) 351 463-37773
->>>>>> e-mail: michael.kluge at tu-dresden.de
->>>>>> WWW:    http://www.tu-dresden.de/zih
->>>>>> 
->>>>>> _______________________________________________
->>>>>> Lustre-devel mailing list
->>>>>> Lustre-devel at lists.lustre.org
->>>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>>>> 
->>>>> 
->>>>> --
->>>>> 
->>>>> Michael Kluge, M.Sc.
->>>>> 
->>>>> Technische Universit?t Dresden
->>>>> Center for Information Services and
->>>>> High Performance Computing (ZIH)
->>>>> D-01062 Dresden
->>>>> Germany
->>>>> 
->>>>> Contact:
->>>>> Willersbau, Room WIL A 208
->>>>> Phone:  (+49) 351 463-34217
->>>>> Fax:    (+49) 351 463-37773
->>>>> e-mail: michael.kluge at tu-dresden.de
->>>>> WWW:    http://www.tu-dresden.de/zih
->>>>> 
->>>> 
->>>> 
->>>> Cheers, Andreas
->>>> --
->>>> Andreas Dilger
->>>> Lustre Technical Lead
->>>> Oracle Corporation Canada Inc.
->>>> 
->>>> 
->>> 
->>> --
->>> 
->>> Michael Kluge, M.Sc.
->>> 
->>> Technische Universit?t Dresden
->>> Center for Information Services and
->>> High Performance Computing (ZIH)
->>> D-01062 Dresden
->>> Germany
->>> 
->>> Contact:
->>> Willersbau, Room A 208
->>> Phone:  (+49) 351 463-34217
->>> Fax:    (+49) 351 463-37773
->>> e-mail: michael.kluge at tu-dresden.de
->>> WWW:    http://www.tu-dresden.de/zih
->>> _______________________________________________
->>> Lustre-devel mailing list
->>> Lustre-devel at lists.lustre.org
->>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->> 
->> 
 > 
 > 
-> -- 
-> Michael Kluge, M.Sc.
+> <lustre3.png>
 > 
-> Technische Universit?t Dresden
-> Center for Information Services and
-> High Performance Computing (ZIH)
-> D-01062 Dresden
-> Germany
 > 
-> Contact:
-> Willersbau, Room WIL A 208
-> Phone:  (+49) 351 463-34217
-> Fax:    (+49) 351 463-37773
-> e-mail: michael.kluge at tu-dresden.de
-> WWW:    http://www.tu-dresden.de/zih
-> <lustre2.png><lustre1.png>_______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
+> 
+> 
 > http://lists.lustre.org/mailman/listinfo/lustre-devel
 
 
--- 
 
-Michael Kluge, M.Sc.
+--------------------------------------
+Alexey Lyashkov
+alexey.lyashkov at clusterstor.com
 
-Technische Universit?t Dresden
-Center for Information Services and
-High Performance Computing (ZIH)
-D-01062 Dresden
-Germany
 
-Contact:
-Willersbau, Room WIL A 208
-Phone:  (+49) 351 463-34217
-Fax:    (+49) 351 463-37773
-e-mail: michael.kluge at tu-dresden.de
-WWW:    http://www.tu-dresden.de/zih
+
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100622/644c5c4f/attachment.htm>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: lustre3.png
-Type: image/png
-Size: 153070 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100622/644c5c4f/attachment.png>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100623/f04b9bb3/attachment.htm>
