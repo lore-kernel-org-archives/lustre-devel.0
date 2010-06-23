@@ -1,5 +1,5 @@
-From: Alexey Lyashkov <alexey.lyashkov@clusterstor.com>
-Date: Wed, 23 Jun 2010 16:09:47 +0400
+From: Andreas Dilger <andreas.dilger@oracle.com>
+Date: Wed, 23 Jun 2010 09:55:00 -0600
 Subject: [Lustre-devel] Lustre RPC visualization
 In-Reply-To: <313DF9B2-FDA8-4862-9FC6-DB674EF4B68D@tu-dresden.de>
 References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
@@ -21,47 +21,27 @@ References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
 	<1BFD6845-6D5A-459F-8164-4F75FD759060@tu-dresden.de>
 	<B25C28C7-7D9C-4BAC-9218-A9CAEB0C21E6@orr! acle.com>
 	<1276783329.499.322.camel@radar>
-	<4169315E-9A94-4430-8970-92068222EF15@oracle.com>
-	<4C1E7D95.80100@tu-dresden.de>
+	<4169315E-9A94-4430-8970-92068222EF15@oracle.com!
+	> <4C1E7D95.80100@tu-dresden.de>
 	<96A6F62D-08C6-4A3D-9C2A-785F0DA00428@tu-dresden.de>
 	<4B610316-4D3A-4087-B4AD-15F94615D3C3@clusterstor.com>
 	<313DF9B2-FDA8-4862-9FC6-DB674EF4B68D@tu-dresden.de>
-Message-ID: <58E41731-0438-40BE-A619-6B57B09843BF@clusterstor.com>
+Message-ID: <3BF1EC13-3865-41C8-B860-E190EF0DE876@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Mchael,
-
-that easy to get from logs.
->>
-00000100:00100000:0:1197446488.301126:0:28197:0:(service.c:721:ptlrpc_server_handle_request()) Handled RPC pname:cluuid+ref:pi
-d:xid:nid:opc ll_ost_26:lustre-MDT0000-mdtlov_UUID+5:27309:266:12345-0 at lo:400
->>
-so..
-ll_ost_26 - thread name, which handle request,
-lustre-MDT0000-mdtlov_UUID - client which send request.
-+5 - number references to that request (unneed for you).
-27309 - pid which handle request (or which send on client)
-266 - xid - internal request id.
-12345-0 - sender NID
-@lo - LND used to deliver request = @lo -> loopback, tcp -> tcp, @o2ib,  - IB hardware, @ptl - cray portals.
-400 - command, you can look to enums "*_cmd_t " to decode that command identifier (in that example - 400 OBD_PING)
-
-as other suggestions fix scaling, at you example only few clients has 100 requests in flight, but legend on bottom show up to 510.
-
-
-On Jun 23, 2010, at 15:50, Michael Kluge wrote:
-
-> Hi Alexey,
-> 
+On 2010-06-23, at 05:50, Michael Kluge wrote:
 > thanks  for the note. How do I do this if I only have a debug log? I see a field "cluuid+ref" in those lines of the log file that we are interested in. cluuid is probably "client uuid". This UUID is definitely associated to the node, that also owns the NID that appears in the same log line? What does "+ref" stands for?
-> 
-> 
-> Michael
-> 
+
+While Alexey's comment is correct, in that there can be multiple Lustre client mounts on a single node, this is generally only used for testing.  For client connections the UUID is just a random value like "f4726b1e-f7eb-479f-b163-784ea45adf32", so using the NID is much more useful to the viewer in the vast majority of cases.
+
+If you wanted to distinguish the multiple mounts from a single client it would be best to just do this internally by tracking both the NID and the UUID, but only printing the NID on the output.  For the rare case where requests have the same NID but a different UUID you could show this as "NID:2", "NID:3" or similar.  That preserves the distinction between client connections, while not making the output completely useless.
+
+Even better than plain numeric NIDs would be to do IP->hostname conversion for the case of TCP and IB LNDs, if this works.
+
 > Am 23.06.2010 um 12:29 schrieb Alexey Lyashkov:
 > 
 >> I think better to use client UUID instead of NID as client identification. Because in your's case - you can't separate info from two clients which run on same node.
@@ -113,7 +93,14 @@ On Jun 23, 2010, at 15:50, Michael Kluge wrote:
 > e-mail: michael.kluge at tu-dresden.de
 > WWW:    http://www.tu-dresden.de/zih
 > 
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100623/b973f159/attachment.htm>
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Technical Lead
+Oracle Corporation Canada Inc.
