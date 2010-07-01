@@ -1,29 +1,25 @@
-From: Nic Henke <nic@cray.com>
-Date: Thu, 1 Jul 2010 11:18:43 -0500
-Subject: [Lustre-devel] o2iblnd bug ?
-Message-ID: <4C2CBFE3.4040901@cray.com>
+From: Andreas Dilger <andreas.dilger@oracle.com>
+Date: Thu, 1 Jul 2010 11:13:41 -0600
+Subject: [Lustre-devel] [Lustre-discuss] configuration error while
+	building lustre , please help !
+In-Reply-To: <AANLkTilCTq2Q011hC9_esdkMgHarLzx7Hc3Ypyu9jvNz@mail.gmail.com>
+References: <AANLkTilCTq2Q011hC9_esdkMgHarLzx7Hc3Ypyu9jvNz@mail.gmail.com>
+Message-ID: <38816E5D-2B5D-4941-9CC4-09334998BB0F@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-There looks to be a bug in the o2iblnd (and maybe other LNDs...) in 
-kiblnd_tx_done.
+On 2010-07-01, at 05:58, Onkar Mahajan wrote:
+> I am trying to compile lustre like this : 
+> 
+> [onkar at localhost build-lustre]$ ./configure --with-kernel-source-header=/home/onkar/LUSTRE/linux-2.6.33.3/include --with-linux=/home/onkar/LUSTRE/linux-2.6.33.3 --with-linux-obj=/home/onkar/LUSTRE/linux-2.6.33.3 --with-linux-config=/home/onkar/LUSTRE/linux-2.6.33.3
 
-When tx_lntmsg[1] has a reply allocated (lnet_create_reply_msg) for a 
-GET_REQ, we are committed to lnet_finalize that no matter the status of 
-the RDMA. However, kiblnd_tx_done will call lnet_finalize() with the 
-'error' status on both the request (lntmsg[0]) and the allocated reply. 
-This could lead to the upper layer receiving a REPLY event for a message 
-it has already nuked due to the EIO on the originial request.
+Lustre doesn't yet support 2.6.33.  Please use one of the supported vendor kernels (as listed at the top of lustre/ChangeLog).
 
-In the pttlnd and qswlnd, they seem to handle this properly. They will 
-complete the request with rc=0, then complete the reply with rc=-EIO.
-
-So - is this really a bug or just inconsequential differences ?
-
-This looks to be present in HEAD, as well as b1_8 and friends.
-
-Cheers,
-Nic
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Technical Lead
+Oracle Corporation Canada Inc.
