@@ -1,33 +1,48 @@
-From: Onkar Mahajan <kern.devel@gmail.com>
-Date: Sat, 3 Jul 2010 16:59:58 +0530
-Subject: [Lustre-devel] patching FC13 kernel with Lustre
-Message-ID: <AANLkTikbAqaDc_JaqIqOfoeeRXA6nd6HeWGhPL86DXJC@mail.gmail.com>
+From: Kevin Van Maren <kevin.van.maren@oracle.com>
+Date: Sat, 03 Jul 2010 07:33:28 -0600
+Subject: [Lustre-devel] [Lustre-discuss] patching FC13 kernel with Lustre
+In-Reply-To: <AANLkTikbAqaDc_JaqIqOfoeeRXA6nd6HeWGhPL86DXJC@mail.gmail.com>
+References: <AANLkTikbAqaDc_JaqIqOfoeeRXA6nd6HeWGhPL86DXJC@mail.gmail.com>
+Message-ID: <4C2F3C28.5070300@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+You can open a bugzilla and store patches there.  Look at what was done 
+for the 2.6.32 FC13 kernel, 
+https://bugzilla.lustre.org/show_bug.cgi?id=21951
 
-I am trying to merge Lustre into Fedora 13 kernel
-(2.6.33.3-85.fc13.i686.PAE)
-I plan to submit the patches and continue to develop features on this
-kernel.
-will I get any assistance from the lustre development team.
-Can I maintain  this patch on lustre website ?
+Kevin
 
-Regards,
-Onkar
 
--- 
-****************************************************
-A 1965 Ford Mustang is a great car. But if you want to go to the moon,
-I don't think that's the right vehicle. You'd better design a space craft.
-- Sunay Tripathi
- Distinguished Engineer,
- Sun Microsystems
-*******************************************************
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100703/0136656f/attachment.htm>
+Onkar Mahajan wrote:
+> Hi,
+>
+> I am trying to merge Lustre into Fedora 13 kernel 
+> (2.6.33.3-85.fc13.i686.PAE)
+> I plan to submit the patches and continue to develop features on this 
+> kernel.
+> will I get any assistance from the lustre development team.
+> Can I maintain  this patch on lustre website ?
+>
+> Regards,
+> Onkar
+>
+> -- 
+> ****************************************************
+> A 1965 Ford Mustang is a great car. But if you want to go to the moon,
+> I don't think that's the right vehicle. You'd better design a space 
+> craft.
+> - Sunay Tripathi
+>  Distinguished Engineer,
+>  Sun Microsystems
+> *******************************************************
+> ------------------------------------------------------------------------
+>
+> _______________________________________________
+> Lustre-discuss mailing list
+> Lustre-discuss at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-discuss
+>   
