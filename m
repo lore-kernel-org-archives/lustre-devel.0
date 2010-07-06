@@ -1,44 +1,64 @@
-From: Nicolas Williams <Nicolas.Williams@oracle.com>
-Date: Mon, 5 Jul 2010 12:58:30 -0500
-Subject: [Lustre-devel] Integrity and corruption - can file systems be
- scalable?
-In-Reply-To: <4C315739.6040304@oracle.com>
-References: <AANLkTilbGHD1tSW3vHcRmKGbvfeP6_M3cLspoCgEwBww@mail.gmail.com>
-	<4C2E518D.30802@oracle.com>
-	<AANLkTim773u3UsE0zo0T-a6nzTkqKiv0qxByxx918vgY@mail.gmail.com>
-	<4C2E57B0.6010408@oracle.com>
-	<AANLkTin1hOwVV2EzBvnPSGoHQr7kPYo_ulncZP77KL5H@mail.gmail.com>
-	<20100702222151.GG15407@oracle.com> <4C2EB090.5030003@oracle.com>
-	<20100704235600.GI15407@oracle.com> <4C315739.6040304@oracle.com>
-Message-ID: <20100705175829.GK15407@oracle.com>
+From: Dan Bassett <dbassett@oreilly.com>
+Date: Tue, 06 Jul 2010 14:05:24 -0500
+Subject: [Lustre-devel] e2fsprogs-1.41.10.sun2-0redhat provides issues
+Message-ID: <4C337E74.2060306@oreilly.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sun, Jul 04, 2010 at 11:53:29PM -0400, Dmitry Zogin wrote:
-> What I really mean is the defragmentation issue and not the
-> fragmentation itself. All file systems becomes fragmented, as it is
-> unavoidable. But the defragmentation of the file system using hash
-> trees really becomes a problem.
+I have e2fsprogs-1.41.10.sun2-0redhat from the lustre downloads page 
+installed as part of my lustre 1.8.3 installation and it's causing some 
+weird dependency issues on my OSS's.  When I attempt to upgrade or 
+install new packages on the system I get errors like:
 
-That is emphatically not true.
+krb5-libs-1.6.1-36.el5_5.4.i386 from updates has depsolving problems
+  --> Missing Dependency: libcom_err.so.2 is needed by package 
+krb5-libs-1.6.1-36.el5_5.4.i386 (updates)
 
-To defragment a ZFS-like filesystem all you need to do is traverse the
-metadata looking for live blocks from old transaction groups, then
-relocate those by writing them out again almost as if an application had
-written to them (except with no mtime updates).
+libcom_err.so.2 is provided as part of the lustre patched e2fsprogs 
+package, whereas it is usually part of e2fsprogs-libs if you get it 
+directly from redhat.  The issue seems to be in how the provides are 
+defined for the package:
 
-In ZFS we call this block pointer rewrite, or bp rewrite.
+[root at oss0 ~]# rpm -q --provides e2fsprogs
+e2fsprogs-libs = 1.41.10.sun2
+ldiskfsprogs 
+libblkid.so.1()(64bit) 
+libcom_err.so.2()(64bit) 
+libe2p.so.2()(64bit) 
+libext2fs.so.2()(64bit) 
+libss.so.2()(64bit) 
+libuuid.so.1()(64bit) 
+e2fsprogs = 1.41.10.sun2-0redhat
 
-> >Everything we do involves trade-offs.
-> >
-> Yes, but if the performance drop becomes unacceptable, any gain in
-> the integrity is miserable.
+And on a CentOS 5 machine that doesn't have lustre installed:
 
-I believe ZFS has shown that unacceptable performance losses are not
-required in order to get the additional integrity protection.
+[root at node2 ~]# rpm -q --provides e2fsprogs-libs
+libblkid.so.1()(64bit) 
+libcom_err.so.2()(64bit) 
+libe2p.so.2()(64bit) 
+libext2fs.so.2()(64bit) 
+libss.so.2()(64bit) 
+libuuid.so.1()(64bit) 
+e2fsprogs-libs = 1.39-23.el5
+libblkid.so.1 
+libcom_err.so.2 
+libe2p.so.2 
+libext2fs.so.2 
+libss.so.2 
+libuuid.so.1 
+e2fsprogs-libs = 1.39-23.el5
 
-Nico
--- 
+More to the point:
+[root at oss0 ~]# rpm -q --whatprovides libcom_err.so.2
+no package provides libcom_err.so.2
+[root at oss0 ~]# rpm -q --whatprovides "libcom_err.so.2()(64bit)"
+e2fsprogs-1.41.10.sun2-0redhat
+
+The library is installed, however my guess is that due to the extra 
+"()(64bit)" in the provides, rpm refuses to recognize it.  Is this 
+something that can be fixed in the e2fsprogs package?  Thanks!
+
+Dan
