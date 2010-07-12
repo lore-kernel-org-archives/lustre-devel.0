@@ -1,33 +1,33 @@
-From: Aurelien Degremont <aurelien.degremont@cea.fr>
-Date: Mon, 12 Jul 2010 12:10:04 +0200
-Subject: [Lustre-devel] async write and abort_recov
-Message-ID: <4C3AE9FC.5010705@cea.fr>
+From: Yuriy Umanets <yuriy.umanets@clusterstor.com>
+Date: Mon, 12 Jul 2010 13:24:45 +0300
+Subject: [Lustre-devel] is lustre 2.0.x from repo is broken?
+Message-ID: <AANLkTimsvGSd0kJINLjqSWX9fvZS5nXJ1ZSYt-icG7_Z@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello
+hi all,
 
-I'm wondering how Lustre client handles recovery when OST restarts with abort_recov flag set.
+Recently I tried 2.0.x from git repo and basically found it quite broken.
 
-Let's say a client has page to flush to OST, but OST is stopped, then restarts with -o abort_recov.
-There is no recovery, so:
-1- client retakes extent locks and then re-try to flush its pages
-or
-2- client cannot flush anymore and drop the i/o, returns an error to the caller.
+Issues:
 
+1. Built lustre with default options does not work due to constant
+permission denied and quota errors in dmesg despite messages that quota is
+disabled;
 
-If #2, what if the process has already closed the file ?
-What is the file is still opened and the process try to do another I/O, will it have an error for the former bad i/o?
+2. configure --disable-quota - does not build at all;
 
+3. if one tries to fix build issues from (2) and start lustre again, it does
+not work either due to quota errors :) It seemed to be not completely
+disabled and keeps sending quota_ctl to server which does not handle it.
 
-abort_recov is used only at first start, or the OST uses this flag until it is stopped for any other recovery-like
-mechanisms?
-
-
-Thanks
+Thanks.
 
 -- 
-Aurelien Degremont
+umka
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100712/2fc2cada/attachment.htm>
