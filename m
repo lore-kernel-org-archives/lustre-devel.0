@@ -1,57 +1,44 @@
-From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
-Date: Thu, 15 Jul 2010 14:43:29 -0400
-Subject: [Lustre-devel] Size-On-Metadata suboptimality
-Message-ID: <201007151843.o6FIhUZV028069@hedwig.cmf.nrl.navy.mil>
+From: John Hammond <jhammond@ices.utexas.edu>
+Date: Thu, 15 Jul 2010 13:57:51 -0500
+Subject: [Lustre-devel] async write and abort_recov
+In-Reply-To: <F8ED1D1B-A853-4C8B-8236-9CC514EF8F52@oracle.com>
+References: <4C3AE9FC.5010705@cea.fr>	<4EC6AD38-0BE5-4DDC-B98A-C1C835292305@oracle.com>	<4C3EC133.2030800@cea.fr>
+	<F8ED1D1B-A853-4C8B-8236-9CC514EF8F52@oracle.com>
+Message-ID: <4C3F5A2F.2010105@ices.utexas.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-So, still working on attribute caching ... and I guess there's some things
-I've discovered, and some things I don't understand.
+On 07/15/2010 11:19 AM, Andreas Dilger wrote:
+> On 2010-07-15, at 02:05, Aurelien Degremont wrote:
+>> Andreas Dilger a ?crit :
+>>> While I know Lustre will save errors from async write RPCs into
+>>> the file descriptor for later write calls or fsync), I don't know
+>>> if we save any IO error into the file descriptor if we discard
+>>> pages due to eviction.  I think only errors due to currently
+>>> in-flight RPCs that are aborted due to client eviction are
+>>> returned.
 
-- The actual size-on-metadata support is kinda hard to get going.  You have
-  to set the right mgs parameter, _and_ you have to make sure the metadata
-  server is started with no clients are running.  Even if you have it running
-  and have clients connected that are using SOM, if you restart the metadata
-  server SOM will be disabled when you restart the metadata server.  I'm
-  assuming that's a bug.
+If the async write fails due to eviction then writepage() will store 
+-ESHUTDOWN in the inode info's lli_async_rc member.
 
-- Because of the previous issue, it's very likely that your files will have
-  any SOM information.  However, from what I can tell if your client does need
-  to make any attribute changes to the file SOM data will be stored for those
-  files, which is helpful (to verify that the SOM data exists, I figured out
-  where it is stored in the extended attributes).  Although that only happens
-  when you do something like touch the file, unfortunately (I guess "chown"
-  might work as well, but I haven't checked that yet).
+>> Sounds like a bug to me?  That means, if a process write data on a
+>> client, those data goes to page cache.  Not yet to OST if there is
+>> no local memory pressure. At that moment, if the client is evicted,
+>> those pages are dropped. Then client reconnect, the process writes
+>> other data. Those I/O are successful, client has missed that some
+>> previous I/O failed?
 
-- Even if you have SOM information for a file, _and_ your server has it
-  turned on, _and_ you indicate in your connection that you support SOM,
-  the metadata server is EXTREMELY stingy about when it will hand that out.
-  As far as I can tell, this only happens when you do a metadata request
-  under an MDS_INODELOCK_UPDATE lock.
+I filed a bug because the async errors weren't being reported, see 
+https://bugzilla.lustre.org/show_bug.cgi?id=22360.  It looks like this 
+is addressed in 1.8.4.  Thereafter they should be reported on the next 
+call to close() for that inode; but note that the error need not go to 
+the processes whose writes were lost.  Tant pis!
 
-That last bit is causing me extreme amounts of discomfort, and it's also
-confusing.  How come the MDS server will only return SOM information under
-an update lock?  I could maybe understand if there was some protocol
-incompatibility, but the "size" parameter is already in the protocol and
-is used by directories, and it would seem that clients that are not SOM-
-aware would simply ignore that parameter (also, your client has to indicate
-that at connection time, and the server code already knows about that
-and acts accordingly).
-
-This gets me into a related issue ... what, exactly, is the correct API to
-use from a client side to lookup a file and get the right locks for it?
-From what I see, clients use md_intent_lock() have a choice between using
-an intent structure which has IT_LOOKUP or IT_GETATTR ... but looking
-at the server code makes me think that other than the locking used, there
-is no difference between these intents.  Is that accurate?
-
-Lastly ... in the case where no SOM information is available, obviously
-I need to fetch that information from the OSTs.  When I do that, is it
-possible to do that under a lock as well so that information can be cached?
-The only examples I can find in the client use obd_getattr_async(), and
-that is (from what I can tell) _not_ a function which does locking.
-
---Ken
+-- 
+John L. Hammond, Ph.D.
+ICES, The University of Texas at Austin
+jhammond at ices.utexas.edu
+(512) 471-9304
