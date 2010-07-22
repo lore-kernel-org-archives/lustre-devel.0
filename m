@@ -1,40 +1,36 @@
-From: Nikita Danilov <nikita.danilov@clusterstor.com>
-Date: Thu, 22 Jul 2010 23:18:46 +0400
+From: Andreas Dilger <andreas.dilger@oracle.com>
+Date: Thu, 22 Jul 2010 15:18:26 -0600
 Subject: [Lustre-devel] clio layer & portability
-In-Reply-To: <201007221907.o6MJ7IT8019207@hedwig.cmf.nrl.navy.mil>
-References: <AANLkTimly2Dz5LgHgCzF4qcHMdcfyZLl7s-EOXfwBLjl@mail.gmail.com>
-	<201007221907.o6MJ7IT8019207@hedwig.cmf.nrl.navy.mil>
-Message-ID: <AANLkTinvHmhHrdsqhW8dSM3ktJ8OZb2VeaLthTIKh2fo@mail.gmail.com>
+In-Reply-To: <AANLkTilM8WKU5OA5feNxLGltEc26pgN1NdV0D3JuXe-e@mail.gmail.com>
+References: <AANLkTilh5j1mgazvNUyb-gvMhfcYcOYlWfo1DHSSULpc@mail.gmail.com>
+	<201007221626.o6MGQOPm016424@hedwig.cmf.nrl.navy.mil>
+	<AANLkTimly2Dz5LgHgCzF4qcHMdcfyZLl7s-EOXfwBLjl@mail.gmail.com>
+	<F328DD91-FCAB-4182-8F89-904149A4A987@clusterstor.com>
+	<AANLkTilM8WKU5OA5feNxLGltEc26pgN1NdV0D3JuXe-e@mail.gmail.com>
+Message-ID: <C846E1E4-2096-4491-B833-02CC5DD1C349@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 22 July 2010 23:07, Ken Hornstein <kenh@cmf.nrl.navy.mil> wrote:
->>Yes, page index is a number a page has in a file that is divided in
->>equally sized pages. One subtlety here is that a file (something that
->>can be open(2)-ed) is striped over "stripe objects" and these also
->>consist of pages. CLIO page is "layered": it binds together a file
->>page and corresponding stripe object page.
->
-> Okay ... so, I take it the stripe objects are the reason for the
-> "parent" argument to cl_page_find0()? ?I will confess that was always
-> a puzzler.
 
-Exactly.
+On 2010-07-22, at 12:38, Nikita Danilov wrote:
+> On 22 July 2010 22:27, Alexey Lyashkov <alexey.lyashkov@clusterstor.com> wrote:
+>> that document should be exist here
+>> http://wiki.lustre.org/index.php/Lustre_All-Hands_Meeting_12/08
+>> but CLIO-TOI and CLIO documents have same data, so looks bug on wiki.
 
->
-> If anyone at Oracle could dig up that text document about CLIO that Nikita
-> is referring to, that sure would be helpful! ?Although the presentation that
-> Alexey referrs to certainly is useful.
->
-> Thanks for everyone's help! ?This has certainly been useful.
+I don't see that they are the same.  CLIO-TOI is 25 pages, CLIO is 19 pages, and while they share some slides there is a fair bit of different content. 
 
-Don't hesitate to ask.
+> This is a presentation. There used to be a text document ("clio-toi"
+> or something) with much more detailed description. I don't think it
+> was ever published outside of Sun.
 
->
-> --Ken
->
+Can you give me some more details on where that might be located?  On the intra wiki I can only find "CLIO: Client I/O Cleanup project", and on the external wiki I can only find the above two documents.
 
-Nikita.
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Technical Lead
+Oracle Corporation Canada Inc.
