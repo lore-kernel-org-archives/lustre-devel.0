@@ -1,30 +1,28 @@
-From: Nikita Danilov <nikita.danilov@clusterstor.com>
-Date: Thu, 22 Jul 2010 22:38:15 +0400
+From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
+Date: Thu, 22 Jul 2010 15:07:18 -0400
 Subject: [Lustre-devel] clio layer & portability
-In-Reply-To: <F328DD91-FCAB-4182-8F89-904149A4A987@clusterstor.com>
-References: <AANLkTilh5j1mgazvNUyb-gvMhfcYcOYlWfo1DHSSULpc@mail.gmail.com>
-	<201007221626.o6MGQOPm016424@hedwig.cmf.nrl.navy.mil>
-	<AANLkTimly2Dz5LgHgCzF4qcHMdcfyZLl7s-EOXfwBLjl@mail.gmail.com>
-	<F328DD91-FCAB-4182-8F89-904149A4A987@clusterstor.com>
-Message-ID: <AANLkTilM8WKU5OA5feNxLGltEc26pgN1NdV0D3JuXe-e@mail.gmail.com>
+In-Reply-To: <AANLkTimly2Dz5LgHgCzF4qcHMdcfyZLl7s-EOXfwBLjl@mail.gmail.com>
+Message-ID: <201007221907.o6MJ7IT8019207@hedwig.cmf.nrl.navy.mil>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 22 July 2010 22:27, Alexey Lyashkov <alexey.lyashkov@clusterstor.com> wrote:
->
->
-> that document should be exist here
-> http://wiki.lustre.org/index.php/Lustre_All-Hands_Meeting_12/08
-> but
+>Yes, page index is a number a page has in a file that is divided in
+>equally sized pages. One subtlety here is that a file (something that
+>can be open(2)-ed) is striped over "stripe objects" and these also
+>consist of pages. CLIO page is "layered": it binds together a file
+>page and corresponding stripe object page.
 
-This is a presentation. There used to be a text document ("clio-toi"
-or something) with much more detailed description. I don't think it
-was ever published outside of Sun.
+Okay ... so, I take it the stripe objects are the reason for the
+"parent" argument to cl_page_find0()?  I will confess that was always
+a puzzler.
 
-> CLIO-TOI and CLIO documents have same data,
-> So looks bug on wiki.
+If anyone at Oracle could dig up that text document about CLIO that Nikita
+is referring to, that sure would be helpful!  Although the presentation that
+Alexey referrs to certainly is useful.
 
-Nikita.
+Thanks for everyone's help!  This has certainly been useful.
+
+--Ken
