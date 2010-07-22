@@ -1,53 +1,34 @@
-From: Vladimir Shvedoff <vshvedoff@sgi.com>
-Date: Mon, 19 Jul 2010 16:32:18 -0500
-Subject: [Lustre-devel] Open position at SGI for a Lustre developer
-Message-ID: <7DBE7E62A57B1841AC909DEB9441BEE9E67C6B@CF--AMER002E--3.americas.sgi.com>
+From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
+Date: Thu, 22 Jul 2010 11:10:27 -0400
+Subject: [Lustre-devel] clio layer & portability
+Message-ID: <201007221510.o6MFARem014801@hedwig.cmf.nrl.navy.mil>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-http://www.sgi.com/company_info/careers/
+In conversations with Andreas, he suggested I send some of this to a wider
+audience.
 
- 
+Everyone knows by now I'm working on the MacOS X port, right?  Okay, good.
 
-Job Code: 46704 
+As part of that work, I've been working on attribute caching.  Right now
+I'm hitting a bit of a snag when it comes to caching the file size; unlike
+all of the metadata attributes, this requires getting glimpse locks on
+the OSTs.  And this starts bringing up the large outstanding issue of
+the clio layer.
 
-Job Title: Lustre Filesystem Engineer 
+Specifically, clio has ... portability problems.  The big one that
+crops up right away is the general assumption that OS memory pages are
+indexed via a radix tree.  This sort of also ties into the way memory
+management is handled (I'm not aware of any OS, other than Linux, that
+provides a callback that the OS can use if they are experiencing memory
+pressure to tell kernel modules to give up pages).
 
-City: Fremont 
+Obviously these aren't new issues.  For the first release of the MacOS port,
+I didn't use clio at all.  But now it's coming up and I'm wondering ...
+since Lustre is now being ported to other OSes, what did everyone else
+do about these issues?
 
-State/Province: CA 
-
- 
-
-Job Description: The filesystem group at SGI is looking for a
-development
-engineer with experience in the design, enhancement or
-maintenance of the Lustre filesystem code. SGI has several
-high performance hardware platforms that require development
-work in Lustre to be able to take full advantage of that
-performance. This engineer's primary role will be to work
-with a team to enhance, support and stabilize Lustre for
-that hardware. US citizenship is desired but not required. 
-
- 
-
-Job Requirements: The applicant should have several years of experience
-working with Lustre filesystem code and familiarity with the
-Linux kernel as well as the ability to work with a team and
-with the Linux and Lustre community. Experience with high
-performance storage systems or large clusters is desired.
-
-
-
-Category: US Storage & Software
-
- 
-
-Vladimir
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100719/5fa5fe9e/attachment.htm>
+--Ken
