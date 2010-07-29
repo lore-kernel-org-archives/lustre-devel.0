@@ -1,44 +1,33 @@
-From: Ben Evans <Ben.Evans@terascala.com>
-Date: Tue, 27 Jul 2010 14:03:38 -0400
-Subject: [Lustre-devel] Lnet routing preferences
-Message-ID: <2C7DE72B9BD00F44BAECA5B0CBB87395C3F4A6@hermes.terascala.com>
+From: Bernd Schubert <bs_lists@aakef.fastmail.fm>
+Date: Thu, 29 Jul 2010 02:13:12 +0200
+Subject: [Lustre-devel] dealloc in 1.8.4 and RHEL5.5
+Message-ID: <201007290213.13288.bs_lists@aakef.fastmail.fm>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I've been poking around and experimenting with the luster internals on
-my own, and ran into a question that I haven't been able to track down.
+Hi all,
 
- 
+I see that dealloc is disabled in 1.8.4 by default also for RedHat kernels. I 
+think it is a good idea to do that for RHEL 54 kernels, as I run into slight 
+filesystem corruption on our test cluster, which I cannot explain except that 
+the filesystem might have caused it. That was with 1.8.3 and ext4-ldiskfs with 
+enabled dealloc.
 
-For MDS/OSS communications, where there are multiple possible paths
-(Ethernet, IB, etc.) how does LNET (or Lustre) decide which interface to
-send messages?
+Now my question is if dealloc really should be disabled for 1.8.4, as it will 
+be based on RHEL 5.5 kernels. And as ext4 in 5.5 is based on 2.6.32, dealloc 
+should work without much risk, shouldn't it? Or does it just need some 
+testing? Unfortunately, I do not have a suitable reproducer for the issue 
+above.
 
- 
 
-Ideally, I'd like to send server-to-server messages over a private
-network and let the clients communicate over the public network.
+Thanks,
+Bernd
 
- 
 
-I'm interested in finding out if there are any gains to be made from a
-setup like this.
 
- 
-
-Thanks
-
- 
-
--Ben Evans  
-
-ben at terascala.com
-
-Terascala, inc.
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100727/66db2f23/attachment.htm>
+-- 
+Bernd Schubert
+DataDirect Networks
