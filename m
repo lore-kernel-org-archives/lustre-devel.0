@@ -1,34 +1,52 @@
-From: Vilobh Meshram <vilobh.meshram@gmail.com>
-Date: Thu, 12 Aug 2010 16:48:27 -0400
-Subject: [Lustre-devel] Lustre Message Sending/Receiving Problems
-Message-ID: <AANLkTi=HyT-QKEeQ5h_Jx8wb6t=ox7gmg9Lb13RhPtFY@mail.gmail.com>
+From: Andreas Dilger <andreas.dilger@oracle.com>
+Date: Thu, 12 Aug 2010 15:28:04 -0600
+Subject: [Lustre-devel] Caching the root directory
+In-Reply-To: <201008121912.o7CJCauK006951@hedwig.cmf.nrl.navy.mil>
+References: <201008121912.o7CJCauK006951@hedwig.cmf.nrl.navy.mil>
+Message-ID: <2E548D41-3270-4898-8482-06D813088AED@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I want to understand the message encoding and decoding logic in Lustre.I am
-planning to send the lustre_msg (lustre_msg_v2) in the ptlrpc_request with
-some additional fields to the server (MDS). But when I add those fields I
-was not able to see their values at the Server end i.e MDS.For example say
-we now have 8 values + the variable size buffer which might be able to
-include the additional entries.So I want to add some additional entries to
-the variable part of the message.
+On 2010-08-12, at 13:12, Ken Hornstein wrote:
+> So, with a not inconsiderable amount of pain, I've got attribute caching
+> working on the Mac client.  Hooray!
 
-If you can please give me some insight on the way the Lustre File system
-encodes decodes the messages sent accross nodes it would be helpful.I have
-traced down the following code path  and see that inorder to send the
-message we need only three steps :-
-ptlrpc_prep_req
-ptlrpc_req_set_repsize
-ptlrpc_queue_wait
+Yay.
 
-Do I need to take into consideration any other things ?
-Any help in this regard will be highly useful.
+> But there is one wrinkle that bugs me: I can't figure out how to cache any
+> information off of the root directory of a filesystem.
+> 
+> In MacOS X (and from what I can tell, most vnode-derived systems), you
+> never get a "lookup" call for the root node in your filesystem; it's
+> managed by the operating system, and when you traverse a mountpoint the
+> operating system then just substitutes "your" root node for the root
+> directory (there's a special function just to fetch the root node information).
 
-Thanks,
-Vilobh
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100812/faa31e96/attachment.htm>
+I believe the Linux VFS will call revalidate on the root inode as part of the path traversal, so that it can present correct information for that inode.  See, for example, ll_inode_revalidate_it().
+
+> The whole setup works out that you never end up with a lookup for the
+> root node (the filesystem path is cached so when you would look up "."
+> in the root directory, it ends up just back at the root node again
+> without a lookup call).  And now that I think about it, I'm not sure
+> how you could even do that, since one of the arguments to the lookup
+> RPC is the parent directory and what do you put in for that for the
+> root node?
+
+Just leave it blank.
+
+> Obviously I can still fetch the directory attributes when the OS asks for
+> it, but in a perfect world I'd cache that information.  I've looked at the
+> Linux client, but it's not clear what happens in the root node case.
+> Can someone shed some light on this?  Does Linux cache the root node
+> attribute information?  If so, how does it do that?
+
+Caching the entries in the root directory is important, since they are traversed all the time, and also change very rarely.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Technical Lead
+Oracle Corporation Canada Inc.
