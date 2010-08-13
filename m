@@ -1,52 +1,53 @@
-From: Andreas Dilger <andreas.dilger@oracle.com>
-Date: Thu, 12 Aug 2010 15:28:04 -0600
+From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
+Date: Thu, 12 Aug 2010 20:37:20 -0400
 Subject: [Lustre-devel] Caching the root directory
-In-Reply-To: <201008121912.o7CJCauK006951@hedwig.cmf.nrl.navy.mil>
-References: <201008121912.o7CJCauK006951@hedwig.cmf.nrl.navy.mil>
-Message-ID: <2E548D41-3270-4898-8482-06D813088AED@oracle.com>
+In-Reply-To: <2E548D41-3270-4898-8482-06D813088AED@oracle.com>
+Message-ID: <201008130037.o7D0bLYh010763@hedwig.cmf.nrl.navy.mil>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2010-08-12, at 13:12, Ken Hornstein wrote:
-> So, with a not inconsiderable amount of pain, I've got attribute caching
-> working on the Mac client.  Hooray!
+>> The whole setup works out that you never end up with a lookup for the
+>> root node (the filesystem path is cached so when you would look up "."
+>> in the root directory, it ends up just back at the root node again
+>> without a lookup call).  And now that I think about it, I'm not sure
+>> how you could even do that, since one of the arguments to the lookup
+>> RPC is the parent directory and what do you put in for that for the
+>> root node?
+>
+>Just leave it blank.
 
-Yay.
+Hrm.  I'm not sure that will work.
 
-> But there is one wrinkle that bugs me: I can't figure out how to cache any
-> information off of the root directory of a filesystem.
-> 
-> In MacOS X (and from what I can tell, most vnode-derived systems), you
-> never get a "lookup" call for the root node in your filesystem; it's
-> managed by the operating system, and when you traverse a mountpoint the
-> operating system then just substitutes "your" root node for the root
-> directory (there's a special function just to fetch the root node information).
+Obviously I can call md_getattr() with just the fid of the root directory;
+that's what is done now if no cached data exists.  But even if CONNECT_ATTRFID
+was supported (which it currently is NOT, as we've discussed previously),
+you need the parent FID in there, because if you DON'T provide it, the
+server will throw an LBUG (which, okay, we all know is a bug, but it's
+still clear that the parent fid needs to be there).
 
-I believe the Linux VFS will call revalidate on the root inode as part of the path traversal, so that it can present correct information for that inode.  See, for example, ll_inode_revalidate_it().
+In the case of md_intent_lock() .... hmmm.  I see in ll_revalidate_it()
+that mountpoints are explicitly skipped (and the attributes are fixed up
+in ll_inode_revalidate_it(), which from what I see unless there is a lock
+already, you don't get a new one).  Does d_mountpoint(de) apply to the
+root node?
 
-> The whole setup works out that you never end up with a lookup for the
-> root node (the filesystem path is cached so when you would look up "."
-> in the root directory, it ends up just back at the root node again
-> without a lookup call).  And now that I think about it, I'm not sure
-> how you could even do that, since one of the arguments to the lookup
-> RPC is the parent directory and what do you put in for that for the
-> root node?
+From what I can read ... ll_prep_md_op_data() pretty much requires that
+the first argument (the parent inode) needs to be filled in.  The server
+gets a little complicated to follow, but I do see that the server does:
 
-Just leave it blank.
+	rc = mdt_object_exists(parent);
 
-> Obviously I can still fetch the directory attributes when the OS asks for
-> it, but in a perfect world I'd cache that information.  I've looked at the
-> Linux client, but it's not clear what happens in the root node case.
-> Can someone shed some light on this?  Does Linux cache the root node
-> attribute information?  If so, how does it do that?
+inside of mdt_getattr_name_lock().  Which sure would imply to me that things
+are going to be unhappy if you don't supply a parent node.
 
-Caching the entries in the root directory is important, since they are traversed all the time, and also change very rarely.
+>Caching the entries in the root directory is important, since they are
+>traversed all the time, and also change very rarely.
 
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Technical Lead
-Oracle Corporation Canada Inc.
+Right, I haven't yet gotten to caching the directory pages yet, and everything
+_from_ the root directory down is fine .. it's just the root itself I can't
+quite figure out how to cache the attributes :-/
+
+--Ken
