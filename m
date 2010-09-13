@@ -1,30 +1,56 @@
-From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
-Date: Mon, 16 Aug 2010 11:13:32 -0400
-Subject: [Lustre-devel] Caching the root directory
-In-Reply-To: <1A6F49A5-1714-4B7F-A960-B6D1092EEBDE@oracle.com>
-Message-ID: <201008161513.o7GFDWbe023712@hedwig.cmf.nrl.navy.mil>
+From: Eric Barton <eeb@whamcloud.com>
+Date: Mon, 13 Sep 2010 14:26:04 +0900
+Subject: [Lustre-devel] Lustre community collaboration
+In-Reply-To: <EEE116340D7B44499F3DC2765F63852D@BillGWAYLAPTOP>
+References: <EEE116340D7B44499F3DC2765F63852D@BillGWAYLAPTOP>
+Message-ID: <002d01cb5304$78de72d0$6a9b5870$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->Well, there is a simple rule for a root of the fs. The rule says
->the parent of the root inode is the root inode.
+Peter,
 
-Hm, I had just tried that, but it didn't seem to work; I'll have to see
-what's going on there.
+I'd like to lend my support to the suggestions you made on community
+collaboration that Bill Boas quoted in his last HPCFS email.  It seems
+obvious to me that community discussions should take place on a
+lustre.org mailing list.  I note you mentioned lustre-discuss (which
+I've cc-ed) - but I would have assumed lustre-devel since I think
+making coherent sense of development is the single most important
+issue for the community.  Actually a new dedicated list, as you
+suggest, is better and keeps the existing list clean for technical
+issues.
 
->Besides, when you do getattr by fid (which you do from ll_inode_revalidate),
->you don't have parent anyway, so you onl supply child inode information.
+If I had to prioritise community discussion topics, I'd want to put
+the contribution process right at the top of the list.  My biggest
+concern is keeping the code clean and stable - I think taking care of
+that makes everything else 100x easier.
 
-Well, if you just call md_getattr(), yes, you can do that with just the
-FID in question; that works fine, and I do that now.  But if you want
-to get a lock so you can cache the attributes using md_intent_lock(),
-then you DEFINITELY need the parent fid; I learned the hard way that if
-you don't include it then the server will throw an LBUG().  This is
-presuming you ignore the server's indication of the lack of support for
-CONNECT_ATTRFID (see previous thread, but the short deal is that it
-was disabled somewhere between 1.8 and 2.0).
+Firstly, I think there should be a requirement for "no surprises" when
+it comes to upstream contributions.  All landings have the potential
+to destabilize the tree or introduce architectural debt so I don't
+think it's reasonable to expect upstream contributions to land at
+short notice, whether the rush is by design or by
+omission. Contributions should be planned and discussed throughout the
+development process to ensure landing proceeds smoothly for both the
+upstream gatekeeper and the contributor.  If people wish to benefit
+from the presence of a Lustre community, they must accept that
+membership also has its duties and responsibilities.
 
---Ken
+Secondly, I think providing some sort of QA collateral should be
+required for upstream contributions.  Code reviews, a test plan and a
+test history in standard formats could all relieve the burden on the
+upstream gatekeeper.  The 2.0 stabilization effort demonstrated the
+value of a test results database for visualizing the progress towards
+stability of features in development and directing testing effort on
+them. I think we'd all benefit if we could adopt a similar process
+across the community.
+
+          Cheers,
+                   Eric
+
+Eric Barton
+CTO Whamcloud, Inc.
+Tel: +44 (117) 330 1575
+Mob: +44 (7920) 797 273
