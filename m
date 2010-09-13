@@ -1,15 +1,17 @@
 From: Peter Bojanic <peter.bojanic@oracle.com>
-Date: Mon, 13 Sep 2010 04:32:30 -0700
+Date: Mon, 13 Sep 2010 04:40:50 -0700
 Subject: [Lustre-devel] Lustre community collaboration
 In-Reply-To: <002d01cb5304$78de72d0$6a9b5870$@com>
 References: <EEE116340D7B44499F3DC2765F63852D@BillGWAYLAPTOP>
 	<002d01cb5304$78de72d0$6a9b5870$@com>
-Message-ID: <4C290D83-3598-48D2-B736-171D52F5ADE7@oracle.com>
+Message-ID: <C3DFE1A8-2CB7-4DF4-A7CF-313452039E04@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+(Sorry for the re-send but the list of addresses was badly corrupted with mismatched quotes and had to be fixed. All the more reason for a mailing list, ASAP)
 
 Hi Eric,
 
@@ -17,7 +19,7 @@ I encourage folks to use the most appropriate mailing list (-discuss, -devel), e
 
 I wholeheartedly support your notion of a sustainable development and keeping the development branches healthy. I expect the use of git will help us considerable here and rigorous standards for quality assurance testing and reporting will be even more important with an increasingly diversified contributor pool.
 
-How can I convince you and Andreas to initiate and lead a "Contribution" working group that will set these standards? lustre.org may be a good repository for the working material but Google Apps is a compelling alternative. This is another possible Friday discussion topic.
+Can I convince you and Andreas to initiate and lead a "Contribution" working group that will set these standards? I'd be willing to facilitate if you require that kind of support. lustre.org may be a good repository for the working material but Google Apps is a compelling alternative. This is another possible Friday discussion topic.
 
 Cheers,
 Bojanic
@@ -61,8 +63,8 @@ On 2010-09-12, at 10:26 PM, Eric Barton wrote:
 > them. I think we'd all benefit if we could adopt a similar process
 > across the community.
 > 
->          Cheers,
->                   Eric
+>         Cheers,
+>                  Eric
 > 
 > Eric Barton
 > CTO Whamcloud, Inc.
