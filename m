@@ -1,74 +1,85 @@
-From: Peter Bojanic <peter.bojanic@oracle.com>
-Date: Mon, 13 Sep 2010 04:40:50 -0700
-Subject: [Lustre-devel] Lustre community collaboration
-In-Reply-To: <002d01cb5304$78de72d0$6a9b5870$@com>
-References: <EEE116340D7B44499F3DC2765F63852D@BillGWAYLAPTOP>
-	<002d01cb5304$78de72d0$6a9b5870$@com>
-Message-ID: <C3DFE1A8-2CB7-4DF4-A7CF-313452039E04@oracle.com>
+From: Michael Kluge <Michael.Kluge@tu-dresden.de>
+Date: Wed, 22 Sep 2010 15:46:34 +0200
+Subject: [Lustre-devel] Lustre RPC visualization
+In-Reply-To: <C671351E-110C-4D2C-B216-4E8BE23A943A@oracle.com>
+References: <000c01cae6ee$1d4693d0$57d3bb70$%barton@oracle.com>
+	<4BD8E021.7050302@oracle.com> <4BD90FB9.5030702@tu-dresden.de>
+	<4BD9CF75.8030204@oracle.com> <4BDE8C3C.2050505@tu-dresden.de>
+	<699F57EF-52E6-41D1-A04B-3C39D469D133@oracle.com>
+	<4BDF1199.2030007@tu-dresden.de> <4BDF1CC7.5020502@oracle.com>
+	<4BDF24BC.9050701@tu-dresden.de> <4BDF2999.2000207@oracle.com>
+	<4BEFBB07.4030403@tu-dresden.de> <1274788995.2261.110.camel@radar>
+	<4BFC7177.9000808@oracle.com> <1275058473.21591.14.camel@radar>
+	<4BFFA456.7030502@oracle.com>
+	<C671351E-110C-4D2C-B216-4E8BE23A943A@oracle.com>
+Message-ID: <1285163194.2244.416.camel@radar>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-(Sorry for the re-send but the list of addresses was badly corrupted with mismatched quotes and had to be fixed. All the more reason for a mailing list, ASAP)
+Hi Robert,
 
-Hi Eric,
+could please sent me the command how to generate such a log? 
 
-I encourage folks to use the most appropriate mailing list (-discuss, -devel), etc. for discussion. Perhaps Bill can add to the agenda on Friday a discussion item on this, including interest in a hpcfs-specific mailing list. It will certainly make it easier for participants to come and go and to catch up through archives on historical discussions (the lists are easily mirrored to Google Groups).
+lctl debug_daemon start /tmp/$HOSTNAME
+sysctl -w lnet.debug=+rpctrace
 
-I wholeheartedly support your notion of a sustainable development and keeping the development branches healthy. I expect the use of git will help us considerable here and rigorous standards for quality assurance testing and reporting will be even more important with an increasingly diversified contributor pool.
+Still produces some kind of binary format (at least with my 1.8.3) which
+looks different from what you sent me.
 
-Can I convince you and Andreas to initiate and lead a "Contribution" working group that will set these standards? I'd be willing to facilitate if you require that kind of support. lustre.org may be a good repository for the working material but Google Apps is a compelling alternative. This is another possible Friday discussion topic.
 
-Cheers,
-Bojanic
+Regards, Michael
 
-On 2010-09-12, at 10:26 PM, Eric Barton wrote:
+> > Right now I do not have big clusters available to generate the trace.
+> > I will see what I can do here.
+> 
+> If ~600 clients is big enough we could generate that on Hyperion.
+> 
+> robert
+> 
+> > 
+> > Thanks
+> > WangDi
+> >> 
+> >> 
+> >>  
+> >>>> 
+> >>>>      
+> >>>    
+> >> 
+> >>  ------------------------------------------------------------------------
+> >> 
+> >> _______________________________________________
+> >> Lustre-devel mailing list
+> >> Lustre-devel at lists.lustre.org
+> >> http://lists.lustre.org/mailman/listinfo/lustre-devel
+> >>  
+> > 
+> 
+> 
 
-> Peter,
-> 
-> I'd like to lend my support to the suggestions you made on community
-> collaboration that Bill Boas quoted in his last HPCFS email.  It seems
-> obvious to me that community discussions should take place on a
-> lustre.org mailing list.  I note you mentioned lustre-discuss (which
-> I've cc-ed) - but I would have assumed lustre-devel since I think
-> making coherent sense of development is the single most important
-> issue for the community.  Actually a new dedicated list, as you
-> suggest, is better and keeps the existing list clean for technical
-> issues.
-> 
-> If I had to prioritise community discussion topics, I'd want to put
-> the contribution process right at the top of the list.  My biggest
-> concern is keeping the code clean and stable - I think taking care of
-> that makes everything else 100x easier.
-> 
-> Firstly, I think there should be a requirement for "no surprises" when
-> it comes to upstream contributions.  All landings have the potential
-> to destabilize the tree or introduce architectural debt so I don't
-> think it's reasonable to expect upstream contributions to land at
-> short notice, whether the rush is by design or by
-> omission. Contributions should be planned and discussed throughout the
-> development process to ensure landing proceeds smoothly for both the
-> upstream gatekeeper and the contributor.  If people wish to benefit
-> from the presence of a Lustre community, they must accept that
-> membership also has its duties and responsibilities.
-> 
-> Secondly, I think providing some sort of QA collateral should be
-> required for upstream contributions.  Code reviews, a test plan and a
-> test history in standard formats could all relieve the burden on the
-> upstream gatekeeper.  The 2.0 stabilization effort demonstrated the
-> value of a test results database for visualizing the progress towards
-> stability of features in development and directing testing effort on
-> them. I think we'd all benefit if we could adopt a similar process
-> across the community.
-> 
->         Cheers,
->                  Eric
-> 
-> Eric Barton
-> CTO Whamcloud, Inc.
-> Tel: +44 (117) 330 1575
-> Mob: +44 (7920) 797 273
-> 
-> 
+-- 
+
+Michael Kluge, M.Sc.
+
+Technische Universit?t Dresden
+Center for Information Services and
+High Performance Computing (ZIH)
+D-01062 Dresden
+Germany
+
+Contact:
+Willersbau, Room A 208
+Phone:  (+49) 351 463-34217
+Fax:    (+49) 351 463-37773
+e-mail: michael.kluge at tu-dresden.de
+WWW:    http://www.tu-dresden.de/zih
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5997 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100922/c7d27756/attachment.bin>
