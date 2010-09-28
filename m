@@ -1,30 +1,29 @@
-From: Andreas Dilger <ANDREAS.DILGER@oracle.com>
-Date: Fri, 24 Sep 2010 18:36:48 -0600
-Subject: [Lustre-devel] List of Lustre Projects
-Message-ID: <D5E775D2-10C6-48CD-BF89-93100D46D628@ORACLE.COM>
+From: Jeremy Filizetti <jeremy.filizetti@gmail.com>
+Date: Tue, 28 Sep 2010 09:14:45 -0400
+Subject: [Lustre-devel] Large readdir RPCs project
+Message-ID: <AANLkTin42fMZpZ-eRt6gF__Ftw6Oo5BBf58Mb-376erW@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello all,
-due to a number of people asking me for Lustre projects to work on, I created a list of projects that do not currently have anyone working on them.
+Since I work mostly with Lustre over a WAN I'd definitely like to see the
+larger readdir RPCs in Lustre to save on RTTs between clients and the MDS.
+I'm just looking for some input to make sure I'm looking at the right
+changes.  I know Andreas had mentioned an issue with larger pages to me at
+LUG this year.
 
-I've created a wiki page off of the "Contribute" section, which contains other useful information about how to access Lustre via Git, procedures for developing patches, and how to contribute them to be included in Lustre:
-http://wiki.lustre.org/index.php/Contribute
+From the description I'm guessing the approach would be to request
+additioinal pages in the ll_dir_readpage similar to how read ahead is
+handled in ll_readpage.  mdc_readpage also needs to be changed to handle
+multiple pages and prep each page for bulk.  I think this makes the most
+sense because at least by default I see getdents64 only be called with a 4k
+buffer.  Otherwise it might make sense to change the ll_readdir functions to
+handle more pages and ll_get_dir_page to request additional pages and call
+read_cache_pages instead.
 
-Under Finding A Project it lists how to find both projects and bugs to work on:
-http://wiki.lustre.org/index.php/Finding_a_Project
-
-The reason I've listed  the individual pages is that there is useful information on each of them.  The actual list of projects, sorted roughly in order of difficulty (though highly dependent upon the skill of the individual) is at: http://wiki.lustre.org/index.php/Lustre_Project_List
-
-The list has links to the bugzilla tracking bugs for each of the projects, and while some of them contain detailed information, others do not.  In all cases, please discuss any projects you are interested in on the lustre-devel mailing list, to let others know you are working on this (to avoid duplication) and to get advice from the senior developers on how best to implement some of these features.
-
-Some projects that I think are of particular importance to the community at large are the cleanup and/or removal of the server-side kernel patches, and cleanup/reduction of the ldiskfs patches.
-
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Technical Lead
-Oracle Corporation Canada Inc.
+Jeremy
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100928/40575d40/attachment.htm>
