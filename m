@@ -1,54 +1,64 @@
-From: Fan Yong <yong.fan@whamcloud.com>
-Date: Thu, 30 Sep 2010 09:56:54 +0800
-Subject: [Lustre-devel] Large readdir RPCs project
-In-Reply-To: <AANLkTi=q2XwYnhWPRUJha-o8dxCV5DZ6_so_P5RbHzN4@mail.gmail.com>
-References: <AANLkTin42fMZpZ-eRt6gF__Ftw6Oo5BBf58Mb-376erW@mail.gmail.com>	<4CA2EE55.7010209@whamcloud.com>
-	<AANLkTi=q2XwYnhWPRUJha-o8dxCV5DZ6_so_P5RbHzN4@mail.gmail.com>
-Message-ID: <4CA3EE66.2040206@whamcloud.com>
+From: Robert Read <rread@whamcloud.com>
+Date: Wed, 29 Sep 2010 18:44:46 -0700
+Subject: [Lustre-devel] git pull --rebase
+In-Reply-To: <4CA28A82.9040406@llnl.gov>
+References: <4CA28A82.9040406@llnl.gov>
+Message-ID: <84CA6792-2F77-47F4-8DAA-A838A1AA35E0@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-  On 9/30/10 3:01 AM, Jeremy Filizetti wrote:
->
->
->     On the other hand, Large readdir RPCs is basic of another metadata
->     read performance improvement features - "readdir+", which is quite
->     useful for "ls -l" operation (for large directory), and reduce
->     lookup/getattr RPC as much as possible. In such feature, MDS will
->     pack more dir-item's attribute (not only name/ino as does
->     currently by readdir, but also mode/owner, and etc) information
->     back to client-side in "readdir+" RPC. That means the dir-item
->     count in one "readdir+" page is less than in the traditional
->     readdir page, then more pages to be sent back to client. If
->     without "Large readdir RPCs", the advantage of "readdir+" will be
->     discounted.
->
-> I'd be interested in working this as well but probably as a separate 
-> effort since SOM isn't in 1.8 and that's my main focus.  In our 
-> testing, SOM had significant benefits over the WAN and I'd expect even 
-> better from readdir+.  I have tried Oleg's patch for 
-> asynchronous ll_glimpse_size but oddly I've seen someone erradic 
-> performance where at times it was worse then statahead and synchronous 
-> ll_glimpse_size.
-> Jeremy
-Yes, SOM is another important feature for metadata reading performance 
-improvement by bypassing the glimpse RPC between client and OSS. 
-Engineers from Lustre Group worked for that for some time, hope can be 
-released soon.
+Thanks for pointing that out. Rebase is very helpful for topic branches, and pretty much required when managing patches that will be pushed to a review tool like Gerrit. You can also make this the default behavior for a particular branch by setting the rebase option to true:
 
-As for the asynchronous ll_glimpse_size maybe cause bad performance 
-occasionally, one possible reason is that: glimpse RPC maybe not obtain 
-extent lock(s) if some others in using such lock(s), so the file size 
-information obtained by asynchronous glimpse is invalid when it is 
-really used later, means the caller ("stat") has to send synchronous 
-glimpse again. Anyway, I did not study such patch, so it is just a guess.
+git config --add branch.<branch-name>.rebase true
+
+thanks,
+robert
 
 
-Cheers,
-Nasf
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20100930/1f1bb1a1/attachment.htm>
+
+
+On Sep 28, 2010, at 17:38 , Christopher J. Morrone wrote:
+
+> I've noticed that lustre developers may not be aware of the "git pull 
+> --rebase" option.
+> 
+> In the git history, there are frequently little forks and merges that 
+> can be avoided.  For instance, around many of the tags on master: one 
+> person will create the tag and push it to prime, meanwhile someone else 
+> has created a couple of commits on their local branch.  When they try to 
+> push to prime, they probably get a reject message because their local 
+> copy is out of date.  To resolve, they do "git pull", which results in a 
+> merge, then "git push".
+> 
+> This results in the little forks and "Merge branch 'master' of 
+> git.lustre.org:prime/lustre" commits" in the history.  At least I think 
+> that is how it happens.
+> 
+> This can be avoided by using "git pull --rebase" when you want to bring 
+> your local branch up to date with prime.  Where as "git pull" 
+> essentially does:
+> 
+>   git fetch
+>   git merge
+> 
+> "git pull --rebase" more-or-less does:
+> 
+>   git fetch
+>   git rebase
+> 
+> Its a little more complicated than that under the covers, but 
+> essentially it just temporarily removes your local commits, 
+> fast-forwards your local branch to catch up with the remote branch, and 
+> then replays the commits.
+> 
+> It is not a big deal, but using --rebase would keep the history a little 
+> cleaner.
+> 
+> Chris
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
