@@ -1,64 +1,28 @@
-From: Robert Read <rread@whamcloud.com>
-Date: Wed, 29 Sep 2010 18:44:46 -0700
-Subject: [Lustre-devel] git pull --rebase
-In-Reply-To: <4CA28A82.9040406@llnl.gov>
-References: <4CA28A82.9040406@llnl.gov>
-Message-ID: <84CA6792-2F77-47F4-8DAA-A838A1AA35E0@whamcloud.com>
+From: Cheng Renquan <crquan@gmail.com>
+Date: Thu, 7 Oct 2010 13:56:32 +0800
+Subject: [Lustre-devel] Could you setup also a lustre git over http protocol
+	(and a gitweb interface)?
+Message-ID: <AANLkTi=TUPoZG0t4U6Geu8sUiPzjO_kU8CQcoTbad8yF@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Thanks for pointing that out. Rebase is very helpful for topic branches, and pretty much required when managing patches that will be pushed to a review tool like Gerrit. You can also make this the default behavior for a particular branch by setting the rebase option to true:
+My company has a firewall that blocks git protocol (port 9418),
+that my git clone over git protocol could never succeed,
 
-git config --add branch.<branch-name>.rebase true
+http://wiki.lustre.org/index.php/Accessing_Lustre_Code
 
-thanks,
-robert
+git clone git://git.lustre.org/prime/lustre.git
 
+I think there may be many other ones also suffering this problem,
+so could you also setup git over http protocol?
 
+Thanks a lot!
 
+and if also provide a gitweb interface that would be better, like:
+http://git.kernel.org
 
-On Sep 28, 2010, at 17:38 , Christopher J. Morrone wrote:
-
-> I've noticed that lustre developers may not be aware of the "git pull 
-> --rebase" option.
-> 
-> In the git history, there are frequently little forks and merges that 
-> can be avoided.  For instance, around many of the tags on master: one 
-> person will create the tag and push it to prime, meanwhile someone else 
-> has created a couple of commits on their local branch.  When they try to 
-> push to prime, they probably get a reject message because their local 
-> copy is out of date.  To resolve, they do "git pull", which results in a 
-> merge, then "git push".
-> 
-> This results in the little forks and "Merge branch 'master' of 
-> git.lustre.org:prime/lustre" commits" in the history.  At least I think 
-> that is how it happens.
-> 
-> This can be avoided by using "git pull --rebase" when you want to bring 
-> your local branch up to date with prime.  Where as "git pull" 
-> essentially does:
-> 
->   git fetch
->   git merge
-> 
-> "git pull --rebase" more-or-less does:
-> 
->   git fetch
->   git rebase
-> 
-> Its a little more complicated than that under the covers, but 
-> essentially it just temporarily removes your local commits, 
-> fast-forwards your local branch to catch up with the remote branch, and 
-> then replays the commits.
-> 
-> It is not a big deal, but using --rebase would keep the history a little 
-> cleaner.
-> 
-> Chris
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+--
+Cheng Renquan (???), from Singapore
