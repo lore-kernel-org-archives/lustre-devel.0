@@ -1,71 +1,72 @@
-From: Alexey Lyashkov <alexey.lyashkov@clusterstor.com>
-Date: Wed, 13 Oct 2010 10:51:21 +0300
-Subject: [Lustre-devel] Query to understand the Lustre request/reply
-	message
-In-Reply-To: <20101013074345.GH1635@oracle.com>
-References: <5A70DB00-9F04-47AF-A31C-01ADA3B87D5E@clusterstor.com>
-	<AANLkTinvwRnLHaqv2-tpKpm6R2fBP51OtGR1fQCEa3KP@mail.gmail.com>
-	<17D943BA-FF0B-467F-8413-CB8C8184858C@clusterstor.com>
-	<AANLkTi==UJQRO+5iBKpUNfFVLWSHz4cumBApbjCz5xBe@mail.gmail.com>
-	<72D9946A-6452-4BC3-8C18-D2CA607D82DC@clusterstor.com>
-	<AANLkTi=8OuaC20Q5avckBL4LKZ16aYgAJneSq_Wg-sj0@mail.gmail.com>
-	<20101013054233.GC1635@oracle.com>
-	<B315579D-2A4F-482F-B02E-679441D4CA66@clusterstor.com>
-	<20101013071201.GD1635@oracle.com>
-	<49BEA69F-6931-473E-AA86-4A676A71607A@clusterstor.com>
-	<20101013074345.GH1635@oracle.com>
-Message-ID: <023F45A1-E881-4FD2-AF75-93324876C909@clusterstor.com>
+From: Jeremy Filizetti <jeremy.filizetti@gmail.com>
+Date: Wed, 13 Oct 2010 12:04:26 -0400
+Subject: [Lustre-devel] Large readdir RPCs project
+In-Reply-To: <4CA3EE66.2040206@whamcloud.com>
+References: <AANLkTin42fMZpZ-eRt6gF__Ftw6Oo5BBf58Mb-376erW@mail.gmail.com>
+	<4CA2EE55.7010209@whamcloud.com>
+	<AANLkTi=q2XwYnhWPRUJha-o8dxCV5DZ6_so_P5RbHzN4@mail.gmail.com>
+	<4CA3EE66.2040206@whamcloud.com>
+Message-ID: <AANLkTikAwYzfEMbSzE5Yhpj5KrbwMhTjV7dqtWQNBwH6@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+I've put together a small patch to modify ll_dir_readpage and mdc_readpage
+to read extra pages (if available) with each RPC.  It is posted under the
+bug (https://bugzilla.lustre.org/show_bug.cgi?id=17833).  I see you we're
+the original assignee when you were at Sun/Oracle.
 
-On Oct 13, 2010, at 10:43, Nicolas Williams wrote:
+Jeremy
 
-> On Wed, Oct 13, 2010 at 10:27:55AM +0300, Alexey Lyashkov wrote:
->> eh.. Nicolas,
->> 
->> Format for messages which want to reconstructed after resend and don't
->> want recontructed - is different.
->> 
->> As quick example it is OPEN request (via MDS_REINT command), that type
->> message need a have extra buffer to store LOV EA, which to be send to
->> MDS in replay case (with additional flag in header).  (client have a
->> copy data from a mds reply after ptlrpc finish processing request).
->> That is why i say about "Reconstruct/replay case"
-> 
-> Sure, but this buffer needs to be declared a priori.  If you won't know
-> whether you'll need a buffer until later, that's OK: you declare it
-> anyways and you set its size to zero if you don't need it.
-> 
-> You can't change a capsule's format to add buffers; you can only set the
-> size of unnecessary buffers to zero.  
-but you can reassing format for a message :)
-if you look to MDT code, you can see - for MDS_REINT you have first format 
-for operation inside REINT lustre use second format
+2010/9/29 Fan Yong <yong.fan@whamcloud.com>
 
-static int mdt_reint(struct mdt_thread_info *info)                                                                   
-{                                                                                                                    
-        long opc;                                                                                                    
-        int  rc;                                                                                                     
-                                                                                                                     
-        static const struct req_format *reint_fmts[REINT_MAX] = {                                                    
-                [REINT_SETATTR]  = &RQF_MDS_REINT_SETATTR,                                                           
-                [REINT_CREATE]   = &RQF_MDS_REINT_CREATE,                                                            
-                [REINT_LINK]     = &RQF_MDS_REINT_LINK,                                                              
-                [REINT_UNLINK]   = &RQF_MDS_REINT_UNLINK,                                                            
-                [REINT_RENAME]   = &RQF_MDS_REINT_RENAME,                                                            
-                [REINT_OPEN]     = &RQF_MDS_REINT_OPEN,                                                              
-                [REINT_SETXATTR] = &RQF_MDS_REINT_SETXATTR                                                           
-        };
-
-..
-
-understand me ?
-
-
---------------------------------------
-Alexey Lyashkov
-alexey.lyashkov at clusterstor.com
+>   On 9/30/10 3:01 AM, Jeremy Filizetti wrote:
+>
+>
+>> On the other hand, Large readdir RPCs is basic of another metadata read
+>> performance improvement features - "readdir+", which is quite useful for "ls
+>> -l" operation (for large directory), and reduce lookup/getattr RPC as much
+>> as possible. In such feature, MDS will pack more dir-item's attribute (not
+>> only name/ino as does currently by readdir, but also mode/owner, and etc)
+>> information back to client-side in "readdir+" RPC. That means the dir-item
+>> count in one "readdir+" page is less than in the traditional readdir page,
+>> then more pages to be sent back to client. If without "Large readdir RPCs",
+>> the advantage of "readdir+" will be discounted.
+>>
+>
+> I'd be interested in working this as well but probably as a separate
+> effort since SOM isn't in 1.8 and that's my main focus.  In our testing, SOM
+> had significant benefits over the WAN and I'd expect even better from
+> readdir+.  I have tried Oleg's patch for asynchronous ll_glimpse_size but
+> oddly I've seen someone erradic performance where at times it was worse then
+> statahead and synchronous ll_glimpse_size.
+>
+> Jeremy
+>
+>
+> Yes, SOM is another important feature for metadata reading performance
+> improvement by bypassing the glimpse RPC between client and OSS. Engineers
+> from Lustre Group worked for that for some time, hope can be released soon.
+>
+> As for the asynchronous ll_glimpse_size maybe cause bad performance
+> occasionally, one possible reason is that: glimpse RPC maybe not obtain
+> extent lock(s) if some others in using such lock(s), so the file size
+> information obtained by asynchronous glimpse is invalid when it is really
+> used later, means the caller ("stat") has to send synchronous glimpse again.
+> Anyway, I did not study such patch, so it is just a guess.
+>
+>
+> Cheers,
+> Nasf
+>
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101013/df19abc3/attachment.htm>
