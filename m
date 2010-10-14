@@ -1,19 +1,43 @@
 From: Andreas Dilger <andreas.dilger@oracle.com>
-Date: Thu, 14 Oct 2010 08:24:45 -0600
-Subject: [Lustre-devel] New lustre-community mailing list
-In-Reply-To: <FF79AE27-4FD8-4210-9B33-D3F506D74717@oracle.com>
-References: <FF79AE27-4FD8-4210-9B33-D3F506D74717@oracle.com>
-Message-ID: <E5993628-6C5F-4F52-865E-D13B80E8FBB5@oracle.com>
+Date: Thu, 14 Oct 2010 08:31:26 -0600
+Subject: [Lustre-devel] Query to understand the Lustre request/reply
+	message
+In-Reply-To: <20101014051852.GZ1635@oracle.com>
+References: <AANLkTi=8OuaC20Q5avckBL4LKZ16aYgAJneSq_Wg-sj0@mail.gmail.com>
+	<20101013054233.GC1635@oracle.com>
+	<B315579D-2A4F-482F-B02E-679441D4CA66@clusterstor.com>
+	<20101013071201.GD1635@oracle.com>
+	<49BEA69F-6931-473E-AA86-4A676A71607A@clusterstor.com>
+	<20101013074345.GH1635@oracle.com>
+	<023F45A1-E881-4FD2-AF75-93324876C909@clusterstor.com>
+	<AANLkTinJOer5Uid0X3pG3nK_RYkxzsoYsmtLPA20Lsj4@mail.gmail.com>
+	<20101014002844.GY1635@oracle.com>
+	<FC5171E3-DC54-4FC2-B723-7787BE41BD80@clusterstor.com>
+	<20101014051852.GZ1635@oracle.com>
+Message-ID: <E95A1DEA-5447-4B6D-95B7-0BB8D96BDDDE@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2010-10-13, at 13:08, Andreas Dilger wrote:
-> I'd like to announce the creation of a new lustre-community at lists.lustre.org mailing list.  After discussions with the various Lustre parties in the community, we thought there should be a new list to focus the "meta" discussion related to Lustre development in the community, such as how feature design, code development, patch contribution, and landing is coordinated, and how to test the resulting code, test harnesses for simplifying this, the mechanics of code inspections, etc.
+On 2010-10-13, at 23:18, Nicolas Williams wrote:
+> On Thu, Oct 14, 2010 at 06:38:16AM +0300, Alexey Lyashkov wrote:
+>> On Oct 14, 2010, at 03:28, Nicolas Williams wrote:
+>>> Yes, it's possible to add buffers to requests.  It's not possible to add
+>>> buffers to _replies_ to existing RPCs unless you know the client expects
+>>> those additional buffers -- existing clients expect a given maxsize for
+>>> each reply, and if your reply is bigger then it will get dropped.
+>> It is wrong for last ~1year.
+>> ~1year ago i add code to ptlrpc layer which a adjust buffer for reply, and resend a request.
+> 
+> Ah, I didn't know that was in 1.8.  Are there interop issues (with older
+> clients) though with sending larger replies than expected?
 
-Sorry not to have mentioned it in the original email, but to subscribe to this list visit http://lists.lustre.org/mailman/listinfo/lustre-community, or send an email to lustre-community-request at lists.lustre.org with the subject "subscribe".
+Nico, it has always been possible in the past to increase the size of any buffer in a request, or in a reply (if the total reply size will fit into the pre-allocated reply buffer).  An older peer would just ignore the bytes beyond the known part of the buffer.
+
+Is that not true with the 2.x RPC handling?
+
 
 Cheers, Andreas
 --
