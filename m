@@ -1,45 +1,22 @@
-From: Alexey Lyashkov <alexey.lyashkov@clusterstor.com>
-Date: Thu, 14 Oct 2010 11:44:57 +0300
-Subject: [Lustre-devel] Query to understand the Lustre request/reply
-	message
-In-Reply-To: <AANLkTinJOer5Uid0X3pG3nK_RYkxzsoYsmtLPA20Lsj4@mail.gmail.com>
-References: <5A70DB00-9F04-47AF-A31C-01ADA3B87D5E@clusterstor.com>
-	<AANLkTinvwRnLHaqv2-tpKpm6R2fBP51OtGR1fQCEa3KP@mail.gmail.com>
-	<17D943BA-FF0B-467F-8413-CB8C8184858C@clusterstor.com>
-	<AANLkTi==UJQRO+5iBKpUNfFVLWSHz4cumBApbjCz5xBe@mail.gmail.com>
-	<72D9946A-6452-4BC3-8C18-D2CA607D82DC@clusterstor.com>
-	<AANLkTi=8OuaC20Q5avckBL4LKZ16aYgAJneSq_Wg-sj0@mail.gmail.com>
-	<20101013054233.GC1635@oracle.com>
-	<B315579D-2A4F-482F-B02E-679441D4CA66@clusterstor.com>
-	<20101013071201.GD1635@oracle.com>
-	<49BEA69F-6931-473E-AA86-4A676A71607A@clusterstor.com>
-	<20101013074345.GH1635@oracle.com>
-	<023F45A1-E881-4FD2-AF75-93324876C909@clusterstor.com>
-	<AANLkTinJOer5Uid0X3pG3nK_RYkxzsoYsmtLPA20Lsj4@mail.gmail.com>
-Message-ID: <589D5419-E22E-4006-AEDA-22957F25290F@clusterstor.com>
+From: Andreas Dilger <andreas.dilger@oracle.com>
+Date: Thu, 14 Oct 2010 08:24:45 -0600
+Subject: [Lustre-devel] New lustre-community mailing list
+In-Reply-To: <FF79AE27-4FD8-4210-9B33-D3F506D74717@oracle.com>
+References: <FF79AE27-4FD8-4210-9B33-D3F506D74717@oracle.com>
+Message-ID: <E5993628-6C5F-4F52-865E-D13B80E8FBB5@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On 2010-10-13, at 13:08, Andreas Dilger wrote:
+> I'd like to announce the creation of a new lustre-community at lists.lustre.org mailing list.  After discussions with the various Lustre parties in the community, we thought there should be a new list to focus the "meta" discussion related to Lustre development in the community, such as how feature design, code development, patch contribution, and landing is coordinated, and how to test the resulting code, test harnesses for simplifying this, the mechanics of code inspections, etc.
 
-On Oct 14, 2010, at 02:51, Vilobh Meshram wrote:
-> 
-> 
-> 1) Is it possible that without writing a new RPC in Lustre 1.8.1.1 I can append some string such as "Hello" to the exsisting message sent by the Client (with the buffer size set at client side by the count,size fields).I tried modifying the "size" of the request for one of the RPC in-built in Lustre 
-> 
->          __u32 size[2] = { [MSG_PTLRPC_BODY_OFF] = sizeof(struct ptlrpc_body),
->                                     [DLM_LOCKREQ_OFF]     = sizeof(struct ldlm_request) };
-> 
-> ---->> 
->      __u32 size[3] = { [MSG_PTLRPC_BODY_OFF] = sizeof(struct ptlrpc_body),
->                                   [DLM_LOCKREQ_OFF]     = sizeof(struct ldlm_request) ,
->                                   //how to add "char *str=Hello" ofcourse we will have sizeof(str) but how to choose the MACRO like DLM_LOCKREQ_OFF bcz for a specific kind of RPC there are limited number of such MACROS
->              
-should be better if you complete describe - what you want to do, because some requests can't changed easy without compatibility lost, - 
-like ELC (early lock cancel) feature which add extra buffer in messages and have special connect flag, to check request format changes.
+Sorry not to have mentioned it in the original email, but to subscribe to this list visit http://lists.lustre.org/mailman/listinfo/lustre-community, or send an email to lustre-community-request at lists.lustre.org with the subject "subscribe".
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101014/cbd91c27/attachment.htm>
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Technical Lead
+Oracle Corporation Canada Inc.
