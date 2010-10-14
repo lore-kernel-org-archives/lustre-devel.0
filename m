@@ -1,9 +1,14 @@
 From: Alexey Lyashkov <alexey.lyashkov@clusterstor.com>
-Date: Thu, 14 Oct 2010 08:46:24 +0300
+Date: Thu, 14 Oct 2010 11:44:57 +0300
 Subject: [Lustre-devel] Query to understand the Lustre request/reply
 	message
-In-Reply-To: <20101014051852.GZ1635@oracle.com>
-References: <AANLkTi=8OuaC20Q5avckBL4LKZ16aYgAJneSq_Wg-sj0@mail.gmail.com>
+In-Reply-To: <AANLkTinJOer5Uid0X3pG3nK_RYkxzsoYsmtLPA20Lsj4@mail.gmail.com>
+References: <5A70DB00-9F04-47AF-A31C-01ADA3B87D5E@clusterstor.com>
+	<AANLkTinvwRnLHaqv2-tpKpm6R2fBP51OtGR1fQCEa3KP@mail.gmail.com>
+	<17D943BA-FF0B-467F-8413-CB8C8184858C@clusterstor.com>
+	<AANLkTi==UJQRO+5iBKpUNfFVLWSHz4cumBApbjCz5xBe@mail.gmail.com>
+	<72D9946A-6452-4BC3-8C18-D2CA607D82DC@clusterstor.com>
+	<AANLkTi=8OuaC20Q5avckBL4LKZ16aYgAJneSq_Wg-sj0@mail.gmail.com>
 	<20101013054233.GC1635@oracle.com>
 	<B315579D-2A4F-482F-B02E-679441D4CA66@clusterstor.com>
 	<20101013071201.GD1635@oracle.com>
@@ -11,10 +16,7 @@ References: <AANLkTi=8OuaC20Q5avckBL4LKZ16aYgAJneSq_Wg-sj0@mail.gmail.com>
 	<20101013074345.GH1635@oracle.com>
 	<023F45A1-E881-4FD2-AF75-93324876C909@clusterstor.com>
 	<AANLkTinJOer5Uid0X3pG3nK_RYkxzsoYsmtLPA20Lsj4@mail.gmail.com>
-	<20101014002844.GY1635@oracle.com>
-	<FC5171E3-DC54-4FC2-B723-7787BE41BD80@clusterstor.com>
-	<20101014051852.GZ1635@oracle.com>
-Message-ID: <D879E022-A163-4BC8-B1A5-DFAEBCA0016D@clusterstor.com>
+Message-ID: <589D5419-E22E-4006-AEDA-22957F25290F@clusterstor.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -22,41 +24,22 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-On Oct 14, 2010, at 08:18, Nicolas Williams wrote:
-
-> On Thu, Oct 14, 2010 at 06:38:16AM +0300, Alexey Lyashkov wrote:
->> On Oct 14, 2010, at 03:28, Nicolas Williams wrote:
->>> Yes, it's possible to add buffers to requests.  It's not possible to add
->>> buffers to _replies_ to existing RPCs unless you know the client expects
->>> those additional buffers -- existing clients expect a given maxsize for
->>> each reply, and if your reply is bigger then it will get dropped.
->> It is wrong for last ~1year.
->> ~1year ago i add code to ptlrpc layer which a adjust buffer for reply, and resend a request.
+On Oct 14, 2010, at 02:51, Vilobh Meshram wrote:
 > 
-> Ah, I didn't know that was in 1.8.
-that is added near of 1.8.1 and easy to check by grep -rn rq_reply_truncate in ptlrpc directory.
+> 
+> 1) Is it possible that without writing a new RPC in Lustre 1.8.1.1 I can append some string such as "Hello" to the exsisting message sent by the Client (with the buffer size set at client side by the count,size fields).I tried modifying the "size" of the request for one of the RPC in-built in Lustre 
+> 
+>          __u32 size[2] = { [MSG_PTLRPC_BODY_OFF] = sizeof(struct ptlrpc_body),
+>                                     [DLM_LOCKREQ_OFF]     = sizeof(struct ldlm_request) };
+> 
+> ---->> 
+>      __u32 size[3] = { [MSG_PTLRPC_BODY_OFF] = sizeof(struct ptlrpc_body),
+>                                   [DLM_LOCKREQ_OFF]     = sizeof(struct ldlm_request) ,
+>                                   //how to add "char *str=Hello" ofcourse we will have sizeof(str) but how to choose the MACRO like DLM_LOCKREQ_OFF bcz for a specific kind of RPC there are limited number of such MACROS
+>              
+should be better if you complete describe - what you want to do, because some requests can't changed easy without compatibility lost, - 
+like ELC (early lock cancel) feature which add extra buffer in messages and have special connect flag, to check request format changes.
 
-Severity   : normal
-Bugzilla   : 19526
-Description: can't stat file in some situation.
-Details    : improve initialize osc date when target is added to mds and
-             ability to resend too big getattr request is client isn't have info
-             about ost.
-
-
->  Are there interop issues (with older
-> clients) though with sending larger replies than expected?
-I not clearly understand that question, but 
-
-main propose of that change - problem with LOV EA buffer size for files with ACL (look to some conf-sanity tests).
-In some situation - MDS can have larger LOV EA buffer, when client expected 
-(some files with wide striping have a reference to OST which removed from a cluster, or configuration lost, or new OST added but OST isn't connected to client or bad call shrink reply buffer, or other ... - you can find more references in bugzilla.)
-in that case MDS have send larger buffer to client.
-older client have infinity loop on connect  or in stat syscall (because of messages without rq_no_resend flag)
-new client have a resend message - and adjust maximal size of LOV EA after got a valid reply, to avoid that's problem in future.
-
-
-
---------------------------------------
-Alexey Lyashkov
-alexey.lyashkov at clusterstor.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101014/cbd91c27/attachment.htm>
