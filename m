@@ -1,42 +1,64 @@
-From: Paul Nowoczynski <pauln@psc.edu>
-Date: Wed, 20 Oct 2010 13:11:58 -0400
+From: Nicolas Williams <Nicolas.Williams@Oracle.com>
+Date: Wed, 20 Oct 2010 12:13:49 -0500
 Subject: [Lustre-devel] Queries regarding LDLM_ENQUEUE
-In-Reply-To: <4CBF1D82.60508@gmail.com>
-References: <AANLkTimj53P0mnF1Wy=bN2+Sb=NnMyg8UgYKLyB7ks8=@mail.gmail.com>	<AANLkTimyq1J0gcDTeYaTNP6zbg6cRCkvFZVZ_c5izKRo@mail.gmail.com>	<D3E302FC-B752-4E9D-9E84-40F04626E8DA@oracle.com>	<AANLkTik53-vQLA9DTj858=San9fgMB+94i8eChvHomEK@mail.gmail.com>	<EF473480-D749-4AF4-B843-697A2EDE10A2@oracle.com>	<4CBEA415.80307@gmail.com>	<9C26CBA7-8DBD-4875-8E14-FB663B749096@oracle.com>	<4CBEA8A9.9080802@gmail.com>	<00d001cb705a$fd64cb80$f82e6280$@com>
-	<4CBF01DA.3090505@psc.edu>	<4CBF094A.9020302@gmail.com>
-	<4CBF1C42.1090109@psc.edu> <4CBF1D82.60508@gmail.com>
-Message-ID: <4CBF22DE.9080204@psc.edu>
+In-Reply-To: <269E1A0D-2117-4ADC-BCDE-67A60EA9B974@oracle.com>
+References: <D3E302FC-B752-4E9D-9E84-40F04626E8DA@oracle.com>
+	<AANLkTik53-vQLA9DTj858=San9fgMB+94i8eChvHomEK@mail.gmail.com>
+	<EF473480-D749-4AF4-B843-697A2EDE10A2@oracle.com>
+	<4CBEA415.80307@gmail.com>
+	<9C26CBA7-8DBD-4875-8E14-FB663B749096@oracle.com>
+	<4CBEA8A9.9080802@gmail.com> <00d001cb705a$fd64cb80$f82e6280$@com>
+	<90E83093-2655-4C70-ACEA-E75D7E8C5511@oracle.com>
+	<4CBF1D00.9080402@psc.edu>
+	<269E1A0D-2117-4ADC-BCDE-67A60EA9B974@oracle.com>
+Message-ID: <20101020171348.GU1635@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-bzzz.tomas at gmail.com wrote:
-> On 10/20/10 8:43 PM, Paul Nowoczynski wrote:
->   
->> It's for scalability reasons. When N clients traverse the namespace with
->> the purpose of opening the same file the result is a storm of RPC
->> requests which bear down on the metadata server. This type of activity
->> becomes prohibitive especially when you start considering client counts
->>  > 10^4. An operation such as this is ripe for optimization because
->> every client in the network is trying to build the same state. If you
->> have a method for a single client to 'learn' the final state, i.e. the
->> pathname -> fid translation, and broadcast it to its cohorts, it's a
->> huge win because it eliminates an O(N) operation.
->> paul
->>     
->
-> clear enough, but what is the bottleneck here: MDS to handle lots of
-> RPCs or network to pass RPCs ?
-I could be wrong but my guess is that the network congestion caused by 
-this communication pattern is a more serious problem.  The mds should be 
-able to easily service lookup rpc's since only the first few necessitate 
-a read I/O from the disk.
-> thanks, z
->
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
->   
+On Wed, Oct 20, 2010 at 11:00:53AM -0600, Andreas Dilger wrote:
+> On 2010-10-20, at 10:46, Paul Nowoczynski <pauln@psc.edu> wrote:
+> >> The name_to_handle() only needs to be called on a single node, and
+> >> open_by_handle() is called on the other nodes. I agree that this
+> >> doesn't avoid the full O(n) RPCs for the open itself  but at least
+> >> it does avoid the full path traversal from every client and on the
+> >> MDS (replacing it with an MPI broadcast of the handle).
+> > 
+> > excuse my ignorance, but why does open_by_handle() need to issue an
+> > RPC?  If it's to obtain the layout, couldn't the layout be encoded
+> > into the 'handle'?
+> 
+> In theory, yes. Practically, there is a size limit on the handle, and
+> in large filesystems the layout is larger than this limit. 
+> 
+> Also, it depends on whether we want the MDS to have consistent
+> behavior with the resulting open file descriptor or not.
+> 
+> I suppose in many cases it would be possible to fake out an open file
+> on the client without telling the MDS, but then there will be strange
+> problems in some cases (e.g. stat() of the file, errors on close,
+> etc.) that would result since the MDS won't know anything about the
+> other openers. Maybe that is acceptable, I don't know. 
+
+Well, if we're going to add openg() (or whatever its name), we might as
+well add variants of stat() that don't require getting the size when the
+app doesn't need it, and forget about SOM, or forget about SOM when we
+know that a file might be open by unknown clients (recover issues here).
+
+Another possibility is that the handle encodes the current size, and
+that to write past that size requires an RPC to establish open state,
+but this ignores truncation.
+
+Another possibility is to say that a handle is only good as long as the
+original file descriptor remains open (recovery issues here), and that
+client can tell the MDS that it will be sharing its handle with other
+clients.  Or that client could tell the MDS what all the clients are
+that will share that handle (recovery issues here too).
+
+Some sort of additional RPC seems hard to avoid here, but maybe it could
+be async for clients opening by handle.
+
+Nico
+-- 
