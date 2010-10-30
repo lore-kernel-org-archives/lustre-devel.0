@@ -1,103 +1,45 @@
-From: Norman Morse <Norman.Morse@OpenSFS.org>
-Date: Thu, 28 Oct 2010 15:40:01 -0500
-Subject: [Lustre-devel] OpenSFS Information Meeting In Parallel With SC10
-Message-ID: <AANLkTi=8mKzjvRkCbmrb_T8CrHA+r_0nm6J=_t7Fz614@mail.gmail.com>
+From: Jacques-Charles Lafoucriere <jacques-charles.lafoucriere@cea.fr>
+Date: Sat, 30 Oct 2010 12:48:14 +0200
+Subject: [Lustre-devel] layout lock bug with 118k
+In-Reply-To: <18180EC5-3EFB-4C92-8F6A-4169A1DBA2D7@oracle.com>
+References: <4CC82688.4050801@cea.fr>
+	<18180EC5-3EFB-4C92-8F6A-4169A1DBA2D7@oracle.com>
+Message-ID: <4CCBF7EE.2070904@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
- *Inaugural OpenSFS Meeting At SC10 To Promote Open Parallel File System
-Advancement & Community Participation*
 
 
-
-HPC Industry Leaders To Host Session On The Lustre File System and Open
-Source Collaboration
-
-
-
-*Livermore, California, October 28, 2010 ? * OpenSFS, a non-profit
-corporation focused on advancing the collaborative development of
-open-source parallel file system technologies, today announced its first
-annual SC Informational Meeting to be scheduled at this year?s SC10
-International Conference for High Performance Computing, Networking, Storage
-and Analysis in New Orleans, LA.  At this open session, OpenSFS members and
-prospective members are invited to participate in a forum designed to
-introduce this newly-formed and substantially-funded organization and its
-focus on the Lustre? open source parallel file system.
-
-
-
-At this first formal meeting of the OpenSFS organization, members of the
-Lustre community will engage in a structured series of discussions that will
-span several of current topics, including:
-
-?         End-user perspective on the status of the Lustre support and
-development ecosystem
-
-?         Organizational structure, objectives and development framework
-
-?         Sustainable long-term file system evolution initiatives through
-coordinated investment and community development
-
-?         Community engagement opportunities and consortium participation
-
-
-
-?The OpenSFS consortium has been designed from the ground up to provide a
-positive long-term benefit to Lustre users through the coordinated
-requirements gathering and investment from the worldwide user community.?
-said Norm Morse, CEO of OpenSFS.  ?The organization has been designed to
-very openly engage users of all sizes.  With membership fees as low as
-$5,000 annually ? stakeholders are provided a forum to influence the future
-of open-source file system technology while working within budgetary
-constraints.?
-
-
-
-Details of the meeting are as follows:
-
-What:                2010 Annual OpenSFS SC Informational Meeting
-
-When:               Tuesday, Nov 16th ? 2:30-4PM CST, 2010
-
-Where:              Ritz-Carlton, 921 Canal St. New Orleans, LA
-
-            Broadmoor Room (1st floor)
-
-To Attend:         Email event at opensfs.org with the number of attendees from
-your organization
-
-
-
-
-
-*About OpenSFS*
-
-Founded in 2010, OpenSFS is a non-profit California corporation focused on
-high-end, open-source file system technologies. The goals of the
-organization are to provide a forum for collaboration among entities
-deploying file systems on leading edge HPC systems, to communicate future
-requirements to open-source file system developers, and to support file
-system releases which have been designed to meet these goals. The group's
-initial focus is the Lustre parallel file system, which supports many of the
-requirements of leadership class HPC simulation environments, has a diverse
-development community and is open-source software.
-
-
-
-Founded by Cray Inc., Data Direct Networks (DDN) Inc., Lawrence Livermore
-National Laboratory (LLNL) and Oak Ridge National Laboratory (ORNL), OpenSFS
-draws from over $2 million of combined funding to ensure substantial and
-sustained community benefit through advancing the stability, usability and
-scalability of sophisticated open-source file system technology.  More
-information can be found online at www.opensfs.org.
-
-
-
-All trademarks are the property of their respective owners.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101028/5699fad3/attachment.htm>
+On 10/29/2010 05:26 PM, Andreas Dilger wrote:
+> On 2010-10-27, at 21:18, Jacques-Charles Lafoucriere wrote:
+>    
+>> I have found a bug in layout lock (the bug was seen with test 118k, this is the last known).
+>>
+>> A simpler reproducer is to make an rm during a long file write.
+>>
+>> A lock timeout is trigged because during the writes the client hold the layout lock which is in the same lock as a lookup (muliple inode_bits in the same lock). So when the MDS try to get an LCK_EX on the object (before calling  mdo_unlink), the lock is not freed because of the ref count.
+>>      
+> The client should only be holding a reference on the layout lock for 1MB chunks of IO.  Between each IO the layout lock reference should be dropped, and if there was a blocking callback on the lock the client should also cancel the lock at that time.
+>
+>    
+The client hold the layout lock only around the IO. So between I/O's, 
+the lock should be canceled. The issue comes from that the same lock is 
+also referenced because of the other inodes bits.
+>> A solution is the request a LCK_CR on the object before the mdo_unlink (the directory is still protected by a strong lock).  Is it a good solution ? Do you have another one ?
+>>      
+> We discussed this issue recently, and the preferred solution is to release the layout lock as soon as the OST extent locks are referenced, since we don't actually require the layout lock once we hold the object extent lock(s).
+>
+> We discussed this before, and it is a bit tricky, because the ll_layout_lock_get() and ll_layout_lock_put() currently wrap the IO function. One proposal is to refcount the lsm structure under the layout lock, and then drop the last lsm reference in the LOV code after the object lock is held, and that would release the lsm lock.
+>    
+I will see how to do this
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Lustre Technical Lead
+> Oracle Corporation Canada Inc.
+>
+>
+>    
