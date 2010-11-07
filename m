@@ -1,59 +1,65 @@
-From: Andreas Dilger <ANDREAS.DILGER@oracle.com>
-Date: Fri, 5 Nov 2010 17:04:34 -0600
-Subject: [Lustre-devel] List of Lustre Projects
-In-Reply-To: <AANLkTimKhPsaqDMQwOyFPn-Q4EVWwJGJBeDLhiAyu+BD@mail.gmail.com>
-References: <D5E775D2-10C6-48CD-BF89-93100D46D628@ORACLE.COM>
-	<alpine.LFD.2.00.1011011619420.24330@casper.infradead.org>
-	<8391C33C-F871-4895-A9CC-7BC5C5A90255@oracle.com>
-	<AANLkTimKhPsaqDMQwOyFPn-Q4EVWwJGJBeDLhiAyu+BD@mail.gmail.com>
-Message-ID: <94BE7409-317D-4CF3-869A-24879DFCE365@oracle.com>
+From: Vilobh Meshram <vilobh.meshram@gmail.com>
+Date: Sun, 7 Nov 2010 18:43:24 -0500
+Subject: [Lustre-devel] Lustre RPC related information
+Message-ID: <AANLkTik96oNGfaK5sPaLcuWO=pUTN9gs9+ynN6=V4mgU@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2010-11-05, at 16:19, Mag Gam wrote:
-> Thanks for putting this together. Are there any plans for SNS?
+Hi All,
 
-There are always plans for SNS, so it isn't really worthwhile to discuss it until implementation is actually underway...
-
-> On Mon, Nov 1, 2010 at 3:43 PM, Andreas Dilger
-> <ANDREAS.DILGER@oracle.com> wrote:
->> On 2010-11-01, at 10:21, James Simmons wrote:
->>>> due to a number of people asking me for Lustre projects to work on, I created a list of projects that do not currently have anyone working on them.
->>>> 
->> [snip]
->>>> 
->>>> Some projects that I think are of particular importance to the community at large are the cleanup and/or removal of the
->>>> server-side kernel patches, and cleanup/reduction of the ldiskfs patches.
->>> 
->>> Could you also include wide stripe support (bug 4424) and SMP scaling (bug
->>> 19411) as well. It would be nice to have those in Lustre 2.1.
->> 
->> Those projects already have dedicated developers and do not really need extra development assistance from the community (though testing is always welcome).
->> 
->> The intent of the Lustre Project List is to steer developers that are looking for projects to work on to a project that benefits many users.
->> 
->> Cheers, Andreas
->> --
->> Andreas Dilger
->> Lustre Technical Lead
->> Oracle Corporation Canada Inc.
->> 
->> _______________________________________________
->> Lustre-devel mailing list
->> Lustre-devel at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-devel
->> 
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+Amongst all these RPC which all are for lock related request and which do
+not ask for locks .E.g OBD_PING does not asks for locks where as
+LDLM_ENQUEUE is the main entry point for handling lock related request.It
+would also be great if you can tell me with which system call which RPC
+might be invoked.Thanks.
 
 
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Technical Lead
-Oracle Corporation Canada Inc.
+MDS_CONNECT
+MDS_DISCONNECT
+MDS_GETSTATUS
+MDS_GETATTR
+MDS_SETXATTR
+MDS_GETXATTR
+MDS_GETATTR_NAME
+MDS_STATFS
+MDS_READPAGE
+MDS_REINT
+MDS_CLOSE
+MDS_DONE_WRITING
+MDS_PIN
+
+MDS_SYNC
+MDS_SET_INFO
+MDS_QUOTACHECK
+MDS_QUOTACTL
+MDS_GETXATTR
+MDS_SETXATTR
+MDS_WRITEPAGE
+MDS_IS_SUBDIR
+
+
+OBD_PING
+OBD_LOG_CANCEL
+OBD_QC_CALLBACK
+
+LDLM_ENQUEUE
+LDLM_CONVERT
+LDLM_CANCEL
+LDLM_BL_CALLBACK
+LDLM_CP_CALLBACK
+LDLM_GL_CALLBACK
+
+
+
+
+Thanks,
+Vilobh
+*Graduate Research Associate
+Department of Computer Science
+The Ohio State University Columbus Ohio*
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101107/39c6ac93/attachment.htm>
