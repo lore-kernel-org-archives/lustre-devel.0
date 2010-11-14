@@ -1,78 +1,116 @@
-From: Robert Read <rread@bitsoflight.com>
-Date: Fri, 12 Nov 2010 15:41:48 -0800
-Subject: [Lustre-devel] changelog for whole filesystem?
-In-Reply-To: <006901cb81cb$bb90e310$32b2a930$@com>
-References: <855B43E2-1D24-4095-ABE7-643A3ADAD67D@oracle.com>
-	<4CC84509.4050609@cea.fr>
-	<9759789F-8FD0-464F-9632-E31F0F45287C@oracle.com>
-	<4CC97DF7.8040206@cea.fr> <022a01cb7789$55cc7a40$01656ec0$@com>
-	<2E7B2EC5-BDCB-41A4-A566-42EC7A72943C@oracle.com>
-	<73AED5C780AE05478241DB067651A92101D11E83@XYUS-EX22.xyus.xyratex.com>
-	<006901cb81cb$bb90e310$32b2a930$@com>
-Message-ID: <D31AC958-39B7-470B-B674-7C9E6E510945@bitsoflight.com>
+From: Andreas Dilger <andreas.dilger@oracle.com>
+Date: Sun, 14 Nov 2010 15:48:50 -0600
+Subject: [Lustre-devel] Lustre RPC related information
+In-Reply-To: <AANLkTikTxeZQdUo1pmLaoHFQq77gMqz1w9WLMz2p6oOK@mail.gmail.com>
+References: <AANLkTik96oNGfaK5sPaLcuWO=pUTN9gs9+ynN6=V4mgU@mail.gmail.com>
+	<AANLkTikTxeZQdUo1pmLaoHFQq77gMqz1w9WLMz2p6oOK@mail.gmail.com>
+Message-ID: <6EB2F76C-1A7D-4B92-AAB3-B4022EEA970F@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-It seems simpler to do the iteration on  a snapshot, instead of a live filesystem, and allow post-snapshot changes to accumulate on the regular changelog for processing once the "from empty" iteration was complete.  
+Vilobh Meshram wrote:
+> Amongst all these RPC which all are for lock related request and which do not ask for locks .E.g OBD_PING does not asks for locks where as LDLM_ENQUEUE is the main entry point for handling lock related request.It would also be great if you can tell me with which system call which RPC might be invoked.Thanks.
+> 
+> 
+> MDS_CONNECT
+> MDS_DISCONNECT
 
-robert
+These are used to do initial connect to the MDS service. 
 
-On Nov 11, 2010, at 10:10 AM, Eric Barton wrote:
+> MDS_GETSTATUS
 
-> Nathan wrote...
-> 
->> This same "initial population of a database from objects" problem
->> occurs when trying to replicate a Lustre filesystem using the
->> changelog.
-> 
-> That must be a great test case.  If we can reliably reconstruct an
-> exact replica using a "from empty" changelog, we must have got it
-> right :)
-> 
->> The problem is actually more complicated even for a single changelog
->> consumer: since iterating through the virtual changelog takes non-0
->> time, you're not sure if a virtual record was created before or
->> after an actual changelog entry.  E.g. you might try to resolve the
->> name of a file for a virtual record either before or after a rename,
->> and then later you would see the rename in the changelog, leading to
->> an inconsistent view of the namespace.
->> 
->> If you don't care about having the exact right name, then it's easy
->> enough to ignore inapplicable changelog records.
-> 
-> I was trying to hint at the need to filter changes for individual
-> consumers depending on how far through the initial "from empty"
-> iteration they are in my original post.  Andreas stated it more
-> explicitly.  I think you just need to enumerate the cases - e.g. for
-> rename...
-> 
-> Iterated over yet?               Record
-> Source Inode   Target Inode      emitted
-> no             no                none
-> no             yes               delete target
-> yes            yes               rename source + delete target
-> yes            no                rename source
-> 
-> The final case just looks like a rename where the target name didn't
-> exist already.  In any case, the only real requirement on the stream
-> of changelog records constructed in the initial iteration is that
-> consistent filesystem state be reconstructed after the last record
-> is consumed.
-> 
-> -- 
-> 
->                Cheers,
->                        Eric
-> 
-> Eric Barton
-> CTO Whamcloud, Inc.
-> Tel: +44 117 330 1575
-> Mob: +44 7920 797 273
-> 
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+Gets the root inode for the filesystem. 
+
+> MDS_GETATTR
+> MDS_GETATTR_NAME
+
+
+Gets inode attributes (by inode number or by name), but not used very often since client prefers to get attributes in conjunction with a lock. 
+
+> MDS_SETXATTR
+> MDS_GETXATTR 
+
+For getting or setting extended attributes (e.g. ACLs or user xattrs). 
+
+> MDS_STATFS
+
+Gets filesystem space usage (blocks and inodes). 
+
+> MDS_READPAGE
+
+Read aone or more directory pages. 
+
+> MDS_REINT
+
+All filesystem modifying RPCs. 
+
+> MDS_CLOSE
+
+Close a file. 
+> MDS_DONE_WRITING
+
+For size-on-mds, currently unused. 
+
+> MDS_PIN
+
+Pin current working directory, currently unused. 
+
+> MDS_SYNC
+
+Sync MDT filesystem  operations to disk. 
+
+> MDS_SET_INFO
+
+Misc flags setting (e.g. Set client export read-only). 
+
+> MDS_QUOTACHECK  
+> MDS_QUOTACTL 
+> OBD_QC_CALLBACK
+
+
+For quota checks. 
+
+> MDS_WRITEPAGE 
+
+Currently unused (for CMD directory split, but will probably be removed and done differently). 
+
+> MDS_IS_SUBDIR    
+
+For CMD directory loop checking. 
+
+> OBD_PING
+
+Export keepalive from client. 
+
+> OBD_LOG_CANCEL
+
+Complete distributed transaction. 
+
+> LDLM_ENQUEUE  
+
+Enqueue a new lock. 
+
+> LDLM_CONVERT   
+
+Convert existing lock type (unused) 
+
+> LDLM_CANCEL  
+
+Cancel lock. 
+
+> LDLM_BL_CALLBACK 
+> LDLM_CP_CALLBACK  
+
+Callback from server to client to cancel existing lock or grant pending lock. 
+
+> LDLM_GL_CALLBACK
+
+Trylock or return lock state to caller (for  ls -l). 
+
+Cheers, Andreasw
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101114/62ea2e3f/attachment.htm>
