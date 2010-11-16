@@ -1,23 +1,31 @@
-From: Shipman, Galen M. <gshipman@ornl.gov>
-Date: Tue, 16 Nov 2010 00:41:39 -0500
-Subject: [Lustre-devel] LUG 2011 - Save the date
-Message-ID: <44FF7E16-D85E-4153-B1BA-F985D15A3C8B@ornl.gov>
+From: Nic Henke <nic@cray.com>
+Date: Tue, 16 Nov 2010 10:00:42 -0600
+Subject: [Lustre-devel] extend lnet_notify to public LNet API
+Message-ID: <4CE2AAAA.3000508@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Save the date for LUG 2011
-April 12th ? 14th 2011
-Marriott World Center Orlando
+We'd like to allow upper layers (Lustre, Cray DVS, etc) to register a 
+callback that would be called from lnet_notify. This will allow them to 
+be notified when the lower layers have seen network problems between 
+NIDs and let them take appropriate action. The upper layer could also be 
+notified when that peer has returned to 'network health' after the LND 
+gets its act together.
 
-LUG 2011 will be held in Orlando, Florida from Tuesday, April 12th 2011 through Thursday, April 14th 2011 at the Marriott World Center Golf and Spa resort. This 2 ? day event is the primary venue for discussion and seminars on open source parallel file system technologies with a unique focus on the Lustre(tm) parallel file system. LUG 2011 is a user-led event whose organizing committee is made up of representatives from Commissariat ? l''?nergie atomique (CEA), Indiana University ? Pervasive Technology Institute (IU), Lawrence Livermore National Laboratory (LLNL), Naval Research Laboratory (NRL), Oak Ridge National Laboratory (ORNL), Sandia National Laboratories (SNL), and Texas Advanced Computing Center (TACC).
+This would help allow upper layers to aggressively resend/reconnect in 
+the cases where all TX have completed successfully (meaning no LNet -EIO 
+on LND errors) but there are LNET_MSG_ACK or other REPLY traffic 
+outstanding.
 
-Call for participation:
+Initial proposal is on the verbose side, giving all data that 
+lnet_notify sees:
+- lnet_nid_t
+- is_alive (boolean)
+- cfs_time_t when (unsigned long on Linux) - jiffies when last alive
 
-The LUG program committee would like to invite members of the Lustre community to submit presentation abstracts for inclusion in this year's meeting. It is not necessary to submit a technical paper, just an abstract of your proposed talk no more than a page in length.  Talks should target a half an hour in length and reflect the work that you or your site are doing with Lustre(tm).  The deadline to submit presentation abstracts is February 14, 2012.  For questions or to submit a presentation abstract, contact the program committee chair, Stephen Simms: lug-submissions at ornl.gov<mailto:lug-submissions@ornl.gov>
+Is this workable and likely to be accepted up-stream ?
 
-Registration for LUG 2011
-
-Registration for LUG 2011 will be available soon. Please pre-register now at http://www.nccs.gov/lug2011 to allow an accurate estimate of attendees and space requirements.
+Nic
