@@ -1,34 +1,37 @@
 From: Nic Henke <nic@cray.com>
-Date: Mon, 22 Nov 2010 11:23:36 -0600
+Date: Mon, 22 Nov 2010 11:29:47 -0600
 Subject: [Lustre-devel] extend lnet_notify to public LNet API
-In-Reply-To: <4CE3EDDF.2090007@cray.com>
+In-Reply-To: <4CE2AAAA.3000508@cray.com>
 References: <4CE2AAAA.3000508@cray.com>
-	<9EC72A67-A9FB-41A8-8564-99903E08F047@clusterstor.com>
-	<4CE3EDDF.2090007@cray.com>
-Message-ID: <4CEAA718.50000@cray.com>
+Message-ID: <4CEAA88B.4080406@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 11/17/2010 08:59 AM, Nic Henke wrote:
-> On 11/17/2010 01:52 AM, Alexey Lyashkov wrote:
->> Nic,
->>
->> that idea discussed some time ago (as i remember with green and maxim), but have some objection.
->> Currently LNet hide from ptlrpc layer any network flaps, and LNet will resend request without notify ptlrpc about flap until ptlrpc request timeout.
+On 11/16/2010 10:00 AM, Nic Henke wrote:
+> We'd like to allow upper layers (Lustre, Cray DVS, etc) to register a
+> callback that would be called from lnet_notify. This will allow them to
+> be notified when the lower layers have seen network problems between
+> NIDs and let them take appropriate action. The upper layer could also be
+> notified when that peer has returned to 'network health' after the LND
+> gets its act together.
 >
-> I'm missing something - to my knowledge, LNet never retries messages.
+> This would help allow upper layers to aggressively resend/reconnect in
+> the cases where all TX have completed successfully (meaning no LNet -EIO
+> on LND errors) but there are LNET_MSG_ACK or other REPLY traffic
+> outstanding.
 >
->> But if ptlrpc will see node down event, ptlrpc will try reconnect  - that will produce extra overhead, because need to resend too much requests from sending and delay lists instead of lots requests in network flap time.
->> So, you need separate network flap from node down situation - before implementing that.
->> currently node marked down if node don't respond for request in ptlrpc timeout, which include network transmit and processing times, but it different then LNet message timeout.
+> Initial proposal is on the verbose side, giving all data that
+> lnet_notify sees:
+> - lnet_nid_t
+> - is_alive (boolean)
+> - cfs_time_t when (unsigned long on Linux) - jiffies when last alive
 >
-> I think that is a valid upper layer decision to make, but separate from
-> implementing the LNet callbacks on network 'flap'. I wouldn't want to
-> force ptlrpc to use it.
 
-Any response to this ?
+One oddity - if the LND has peer_health disabled (no ni_peertimeout 
+value), there doesn't seem to be anything that'd set the peer back to 
+'up'. Am I missing something or is this as desired ?
 
 Nic
