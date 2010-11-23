@@ -1,26 +1,27 @@
 From: Andreas Dilger <andreas.dilger@oracle.com>
-Date: Tue, 23 Nov 2010 14:40:31 -0700
+Date: Tue, 23 Nov 2010 14:47:40 -0700
 Subject: [Lustre-devel] Stripe offset default
-In-Reply-To: <016b01cb8b32$cc3a9c90$64afd5b0$@com>
+In-Reply-To: <4FE51862-3264-4248-948F-CF70C56FD8AD@xyratex.com>
 References: <016b01cb8b32$cc3a9c90$64afd5b0$@com>
-Message-ID: <B167E04A-8D08-4E24-A7A8-D25CD37C0A5E@oracle.com>
+	<4FE51862-3264-4248-948F-CF70C56FD8AD@xyratex.com>
+Message-ID: <70CD76E6-0E31-4E98-8937-175C9C17C352@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2010-11-23, at 10:20, Eric Barton wrote:
-> ... setting the default stripe offset is positively dangerous.
+On 2010-11-23, at 13:50, Peter Braam wrote:
+> The  proposal for acl / Group / users violates Posix, and may lead to results users don't expect.  Sgid directories and inheritance on ACLs are safer I think.
 
-Replied to this on Chris Morrone's email, though it seems his email lost Nick from the CC list...  I wouldn't go so far as to call it "dangerous", but the use of old 1.4.x or 1.6.x positional parameters should be eliminated.  That is something that only Nick can manage, since it doesn't matter what we do in newer Lustre releases if the users are only running old versions of the tools.
+I think you misunderstood Eric's comment.  He wasn't suggesting that the use of an OST pool would set the user, group, or ACL of a file created within that pool.  That would indeed be confusing to users.
 
-Starting by applying the "positional parameters return an error" to his 1.6.x lfs would be a good start.  I made this available as attachment 32308 on bug 14836, where that usage was originally deprecated.
 
-> P.S. Do people also agree that setting user/group/ACL permissions on
-> OST pools would be a Good Thing?
+Rather, Eric was suggesting that there should be a user/group/ACL permission check for the _use_ of a particular pool, so that only allowed users/groups could access the "SSD" pool, for instance.  That has been under discussion for a long time already, and is a natural extension of the base OST pool functionality.  Extending this further to allow and/or select pools based on the originating client NID or the filename also makes sense.
 
-Sure - being able to limit the use of pools, including the default "use all OSTs" pool, to specific users/groups/nodes/networks would be great.  Similarly, being able to specify certain pools as defaults for particular users/groups/nodes/networks is equally desirable.  Both would need some effort in the LOV QOS code on the MDS, to allow the layout to come from something other than the parent directory.
+> On Nov 23, 2010, at 10:20, "Eric Barton" <eeb@whamcloud.com> wrote:
+>> P.S. Do people also agree that setting user/group/ACL permissions on
+>> OST pools would be a Good Thing?
 
 Cheers, Andreas
 --
