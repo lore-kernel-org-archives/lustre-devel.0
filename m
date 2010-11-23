@@ -1,37 +1,39 @@
-From: Nic Henke <nic@cray.com>
-Date: Mon, 22 Nov 2010 11:29:47 -0600
-Subject: [Lustre-devel] extend lnet_notify to public LNet API
-In-Reply-To: <4CE2AAAA.3000508@cray.com>
-References: <4CE2AAAA.3000508@cray.com>
-Message-ID: <4CEAA88B.4080406@cray.com>
+From: Eric Barton <eeb@whamcloud.com>
+Date: Tue, 23 Nov 2010 17:20:58 -0000
+Subject: [Lustre-devel] Stripe offset default
+Message-ID: <016b01cb8b32$cc3a9c90$64afd5b0$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 11/16/2010 10:00 AM, Nic Henke wrote:
-> We'd like to allow upper layers (Lustre, Cray DVS, etc) to register a
-> callback that would be called from lnet_notify. This will allow them to
-> be notified when the lower layers have seen network problems between
-> NIDs and let them take appropriate action. The upper layer could also be
-> notified when that peer has returned to 'network health' after the LND
-> gets its act together.
->
-> This would help allow upper layers to aggressively resend/reconnect in
-> the cases where all TX have completed successfully (meaning no LNet -EIO
-> on LND errors) but there are LNET_MSG_ACK or other REPLY traffic
-> outstanding.
->
-> Initial proposal is on the verbose side, giving all data that
-> lnet_notify sees:
-> - lnet_nid_t
-> - is_alive (boolean)
-> - cfs_time_t when (unsigned long on Linux) - jiffies when last alive
->
 
-One oddity - if the LND has peer_health disabled (no ni_peertimeout 
-value), there doesn't seem to be anything that'd set the peer back to 
-'up'. Am I missing something or is this as desired ?
+Nick Cardo at NERSC mentioned at the LUG, and again when I chatted
+with him at SC10, that setting the default stripe offset is positively
+dangerous.  I think he has a point.
 
-Nic
+Setting file layout precisely can be essential for applications that
+know precisely what they're doing and want to control how aggregate
+OST load is balanced.  But the default file layout is another matter
+entirely.  Setting the default to a fixed layout, or even just a fixed
+starting OST has got to be the most direct path to achieving OST load
+imbalance.
+
+I believe, now that lfs setstripe uses options rather than positional
+parameters, that the risk of unintentional errors is much less.  But
+that still leaves the filesystem vulnerable to na?ve or malicious
+users.  So I propose that we should continue to check permissions
+normally when setting the default stripe _count_, but restrict the
+ability to set a specific default stripe _offset_ to the superuser.
+
+Thoughts?
+
+P.S. Do people also agree that setting user/group/ACL permissions on
+OST pools would be a Good Thing?
+
+          Cheers,
+                   Eric
+
+Eric Barton
+CTO Whamcloud, Inc.
