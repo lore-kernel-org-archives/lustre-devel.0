@@ -1,76 +1,29 @@
-From: Peter Braam <peter_braam@xyratex.com>
-Date: Tue, 23 Nov 2010 13:50:02 -0700
+From: Andreas Dilger <andreas.dilger@oracle.com>
+Date: Tue, 23 Nov 2010 14:40:31 -0700
 Subject: [Lustre-devel] Stripe offset default
 In-Reply-To: <016b01cb8b32$cc3a9c90$64afd5b0$@com>
 References: <016b01cb8b32$cc3a9c90$64afd5b0$@com>
-Message-ID: <4FE51862-3264-4248-948F-CF70C56FD8AD@xyratex.com>
+Message-ID: <B167E04A-8D08-4E24-A7A8-D25CD37C0A5E@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The  proposal for acl / Group / users violates Posix, and may lead to results users don't expect.  Sgid directories and inheritance on ACLs are safer I think.
+On 2010-11-23, at 10:20, Eric Barton wrote:
+> ... setting the default stripe offset is positively dangerous.
 
-Peter
+Replied to this on Chris Morrone's email, though it seems his email lost Nick from the CC list...  I wouldn't go so far as to call it "dangerous", but the use of old 1.4.x or 1.6.x positional parameters should be eliminated.  That is something that only Nick can manage, since it doesn't matter what we do in newer Lustre releases if the users are only running old versions of the tools.
 
-Sent from my iPad
+Starting by applying the "positional parameters return an error" to his 1.6.x lfs would be a good start.  I made this available as attachment 32308 on bug 14836, where that usage was originally deprecated.
 
-On Nov 23, 2010, at 10:20, "Eric Barton" <eeb@whamcloud.com> wrote:
-
-> 
-> Nick Cardo at NERSC mentioned at the LUG, and again when I chatted
-> with him at SC10, that setting the default stripe offset is positively
-> dangerous.  I think he has a point.
-> 
-> Setting file layout precisely can be essential for applications that
-> know precisely what they're doing and want to control how aggregate
-> OST load is balanced.  But the default file layout is another matter
-> entirely.  Setting the default to a fixed layout, or even just a fixed
-> starting OST has got to be the most direct path to achieving OST load
-> imbalance.
-> 
-> I believe, now that lfs setstripe uses options rather than positional
-> parameters, that the risk of unintentional errors is much less.  But
-> that still leaves the filesystem vulnerable to na?ve or malicious
-> users.  So I propose that we should continue to check permissions
-> normally when setting the default stripe _count_, but restrict the
-> ability to set a specific default stripe _offset_ to the superuser.
-> 
-> Thoughts?
-> 
 > P.S. Do people also agree that setting user/group/ACL permissions on
 > OST pools would be a Good Thing?
-> 
->          Cheers,
->                   Eric
-> 
-> Eric Barton
-> CTO Whamcloud, Inc.
-> 
-> 
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> ______________________________________________________________________
-> This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
-> 
-> Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
-> 
-> Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
-> 
-> The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
-> ______________________________________________________________________
-> 
-> 
-______________________________________________________________________
-This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
- 
-Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
- 
-Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
- 
-The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
-______________________________________________________________________
- 
+
+Sure - being able to limit the use of pools, including the default "use all OSTs" pool, to specific users/groups/nodes/networks would be great.  Similarly, being able to specify certain pools as defaults for particular users/groups/nodes/networks is equally desirable.  Both would need some effort in the LOV QOS code on the MDS, to allow the layout to come from something other than the parent directory.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Technical Lead
+Oracle Corporation Canada Inc.
