@@ -1,33 +1,88 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Tue, 23 Nov 2010 14:59:23 -0800
-Subject: [Lustre-devel] Stripe offset default
-In-Reply-To: <AA2C4DA2-1607-4509-9BF2-7F05A352B269@oracle.com>
-References: <016b01cb8b32$cc3a9c90$64afd5b0$@com> <4CEC1AB8.2040507@llnl.gov>
-	<AA2C4DA2-1607-4509-9BF2-7F05A352B269@oracle.com>
-Message-ID: <4CEC474B.1010609@llnl.gov>
+From: Eric Barton <eeb@whamcloud.com>
+Date: Wed, 24 Nov 2010 13:10:51 -0000
+Subject: [Lustre-devel] extend lnet_notify to public LNet API
+In-Reply-To: <4CEAA88B.4080406@cray.com>
+References: <4CE2AAAA.3000508@cray.com> <4CEAA88B.4080406@cray.com>
+Message-ID: <01a701cb8bd9$05b20cf0$111626d0$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 11/23/2010 01:19 PM, Andreas Dilger wrote:
-> On 2010-11-23, at 12:49, Christopher J. Morrone wrote:
->> On 11/23/2010 09:20 AM, Eric Barton wrote:
->>> I believe, now that lfs setstripe uses options rather than positional
->>> parameters, that the risk of unintentional errors is much less.  But
->>> that still leaves the filesystem vulnerable to na?ve or malicious
->>> users.  So I propose that we should continue to check permissions
->>> normally when setting the default stripe _count_, but restrict the
->>> ability to set a specific default stripe _offset_ to the superuser.
->>
->> At the very least bug 18547 MUST be completed before doing this.
->> Lustre's default layout mechanism is too uneven, and leads to too much
->> of a performance problem right now to take away users' only ability to
->> lay files out evenly on their own.
->
-> I guess the subtle distinction in Eric's question is for "default striping parameters specified on a directory" and not "striping parameters set on a per-file basis".  In IRC I discussed with Eric that it is like that specifying the starting OST on a directory default layout is _probably_ not what a user wants to do.
+Nic,
 
-Ah, ok, I did miss that.  I am less opposed to that, since I can't think 
-of a particularly compelling use case for a fixed offset default on 
-directories.
+There's no fundamental reason we wouldn't want to add the ability to
+register callbacks to be called from lnet_notify().  But we should
+take care of the following details...
+
+0. You will never receive notifications about NIDs that you are not on
+   your local LNDs.  For example, if you're a client on a routed
+   network, you'll only find out about router health, never about
+   server health.
+
+1. Don't just assume only 1 callback can be registered - if this is
+   generally useful, several LNET users might want such notification
+   and so the API and implementation should allow for it.
+
+2. lnet_notify_locked() is where all notifications arrive.  It's
+   called (as the name suggests) holding LNET locks, so any callback
+   handling must complete in very well bounded time just like event
+   callbacks.
+
+Shadow wrote...
+
+> that idea discussed some time ago (as i remember with green and
+> maxim), but have some objection.  Currently LNet hide from ptlrpc
+> layer any network flaps, and LNet will resend request without notify
+> ptlrpc about flap until ptlrpc request timeout.  
+
+LNET does not resend.  LNet itself doesn't know about "network flaps"
+- all it has to go on is whether communications with individual peer
+nodes succeed or fail.  
+
+Isaac (correct me if this is too broad brush) most recently worked on
+fixing some pathalogical issues with dead peers to ensure that
+communications with a _known_ dead peer complete quickly with failure.
+Now, the only time communications can be blocked for the whole LND
+timeout should be on initial connection establishment to a peer in an
+unknown state, or at the point that the peer dies.
+
+> But if ptlrpc will see node down event, ptlrpc will try reconnect -
+> that will produce extra overhead, because need to resend too much
+> requests from sending and delay lists instead of lots requests in
+> network flap time.  
+
+Ptlrpc reconnect to a know dead peer will fail immediately.  However
+this communication attempt will cause the LND to attempt connection
+re-establishment and if this is successful, LNET will mark the peer
+alive.  Subsequent communication attempts should now succeed.
+
+> So, you need separate network flap from node down situation - before
+> implementing that.  currently node marked down if node don't respond
+> for request in ptlrpc timeout, which include network transmit and
+> processing times, but it different then LNet message timeout.
+
+Indeed.  This is further complicated by LNET routing.  Communications
+buffered in a router are lost when the router fails, so you have to
+regard routed LNETs as potentially lossy.
+
+Nic wrote...
+
+> One oddity - if the LND has peer_health disabled (no ni_peertimeout 
+> value), there doesn't seem to be anything that'd set the peer back to 
+> 'up'. Am I missing something or is this as desired ?
+
+Hmmm - I originally implemented peer aliveness only for LNET routers
+to ensure known dead routers were avoided - so the status of
+non-router peers was not used or maintained properly (mea maxima
+culpa).
+
+Isaac fixed this more generally as I mentioned above, but it looks
+like only socklnd and o2iblnd have the support.  Shouldn't be too hard
+to add for ptllnd though :)
+
+-- 
+
+                Cheers,
+                        Eric
