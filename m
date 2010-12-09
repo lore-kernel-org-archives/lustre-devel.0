@@ -1,53 +1,52 @@
-From: Aurelien Degremont <aurelien.degremont@cea.fr>
-Date: Thu, 02 Dec 2010 15:22:58 +0100
-Subject: [Lustre-devel] Cannot easily build from master source anymore
-In-Reply-To: <DA432BB3-C1EC-433B-8936-923B98D7C446@oracle.com>
-References: <4CF6209A.6020401@cea.fr>
-	<alpine.LFD.2.00.1012011944370.22096@casper.infradead.org>
-	<DA432BB3-C1EC-433B-8936-923B98D7C446@oracle.com>
-Message-ID: <4CF7ABC2.3000400@cea.fr>
+From: Nikitas Angelinas <Nikitas_Angelinas@xyratex.com>
+Date: Thu, 9 Dec 2010 11:07:46 -0000
+Subject: [Lustre-devel] Git commit message format
+Message-ID: <9E373505737CCD46890A96FA1877E8DA01D9824E@XY01EX22.xy01.xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Andreas Dilger a ?crit :
-> On 2010-12-01, at 12:45, James Simmons wrote:
->>> I noticed there was a refactor for packaging and versioning in Lustre 
->>> prime master branch.
->>> Unfortunately, we cannot simply do anymore
->>>
->>> git clone ...
->>> sh ./autogen.sh
->>> ./configure ..
->>> make
->>>
->>> to build lustre source
->>>
->>> What's the trick now ?
->>> Maybe it could be useful to update Wiki page: 
->>> http://wiki.lustre.org/index.php/Building_Lustre_Code
->> Let me guess. 
->>
->> checking for stdint.h... yes
->> checking for unistd.h... yes
->> checking whether to configure just enough for make dist... no
->> checking for buildid... configure: error: most recent tag found: v2_0_0 
->> does not match current version 2.0.56.
->> make: *** No rule to make target `rpms'.  Stop.
->> make: *** No rule to make target `rpms'.  Stop.
-> 
-> My recollection from Brian's previous postings is that this is somehow related to an old "git" version being used.
+Hi all,
 
-We are using either git v1.5.5.6. Is this so old?
+ 
 
-> That said, I'd be happy to remove this as a requirement, and just stick with the version if there is a mismatch, printing only a warning if the git version is too old.
+ 
 
-I think it will be a good idea
+The 'Submitting Patches' page in the wiki
+http://wiki.lustre.org/index.php/Submitting_Patches describes the commit
+message format to be used. It states that 'i=<inspector name>' should be
+used to denote the patch inspectors; while this is used in the majority
+of commits, some make use of an 'a=' (e.g. commit
+0fda09a56aaf8105c7c5cb0326d0c8fcec6fc04c), 'r=' (e.g. same commit
+0fda09a56aaf8105c7c5cb0326d0c8fcec6fc04c), or 'o=' (e.g. commit
+80da07e3994946f85cc14f32888ed0c8ffd5d39e). I can't seem to be able to
+find any info on these; could someone please let me know what they're
+used for?
+
+ 
+
+ 
+
+Kind Regards,
+
+Nikitas
+
+ 
 
 
+______________________________________________________________________
+This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
+ 
+Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
+ 
+Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
+ 
+The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
+______________________________________________________________________
+ 
 
--- 
-Aurelien Degremont
-CEA
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101209/43f06fa1/attachment.htm>
