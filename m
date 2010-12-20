@@ -1,20 +1,15 @@
-From: Andreas Dilger <andreas.dilger@oracle.com>
-Date: Fri, 17 Dec 2010 22:02:04 -0700
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 20 Dec 2010 13:51:29 +0000 (GMT)
 Subject: [Lustre-devel] ldiskfs build problem with rhel5.5
 In-Reply-To: <4D0C03AF.2060800@sgi.com>
 References: <4D0C03AF.2060800@sgi.com>
-Message-ID: <92290CF5-B024-4110-8214-979943201E7F@oracle.com>
+Message-ID: <alpine.LFD.2.00.1012201345350.18487@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-You shouldn't apply the ldiskfs patches to the kernel at all. They are applied to a copy if the ext3/4 sources during the Lustre build process. 
-
-Cheers, Andreas
-
-On 2010-12-17, at 17:43, Jay Lan <jlan@sgi.com> wrote:
 
 > Hi,
 > 
@@ -27,12 +22,10 @@ On 2010-12-17, at 17:43, Jay Lan <jlan@sgi.com> wrote:
 > did not provide fs/ext4/*.[ch], which the build process would need.
 > 
 > Is there a kernel patch for this problem?
-> 
-> Regards,
-> Jay
-> 
-> 
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+
+Does it deal with export_decode_fh ? Do you build againt OFED 1.5.2 ? If 
+that is the case then I ran into that issue last week. OFED alters your 
+kernel to build the modules but it doesn't alter the source tree. When  
+lustre builds it looks at your source tree which is different then what 
+the biniaries export. The solution is to copy what is in include-nfs/linux 
+from OFED to your kernel source tree include/linux directory.
