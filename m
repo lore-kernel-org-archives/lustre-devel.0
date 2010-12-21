@@ -1,7 +1,9 @@
 From: Daniel Raj <danielraj2006@gmail.com>
-Date: Tue, 21 Dec 2010 10:00:20 +0530
-Subject: [Lustre-devel] Reg /// OSS rebooted automatically
-Message-ID: <AANLkTinCbZUiN2tVqeMdQuMWhSRQJy9S3twFt4CgpUM3@mail.gmail.com>
+Date: Tue, 21 Dec 2010 10:04:09 +0530
+Subject: [Lustre-devel] Fwd: Reg /// OSS rebooted automatically
+In-Reply-To: <AANLkTinCbZUiN2tVqeMdQuMWhSRQJy9S3twFt4CgpUM3@mail.gmail.com>
+References: <AANLkTinCbZUiN2tVqeMdQuMWhSRQJy9S3twFt4CgpUM3@mail.gmail.com>
+Message-ID: <AANLkTimo_UxNAkftXQtZHrzEOtpU-+8kMDahMdz6v6=e@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -37,4 +39,4 @@ Regards,
 Daniel A
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101221/c097948b/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101221/7e7a2091/attachment.htm>
