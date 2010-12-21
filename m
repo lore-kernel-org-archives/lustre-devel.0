@@ -1,42 +1,44 @@
-From: Daniel Raj <danielraj2006@gmail.com>
-Date: Tue, 21 Dec 2010 10:04:09 +0530
-Subject: [Lustre-devel] Fwd: Reg /// OSS rebooted automatically
+From: Brian J. Murrell <brian.murrell@oracle.com>
+Date: Tue, 21 Dec 2010 09:35:10 -0500
+Subject: [Lustre-devel] Reg /// OSS rebooted automatically
 In-Reply-To: <AANLkTinCbZUiN2tVqeMdQuMWhSRQJy9S3twFt4CgpUM3@mail.gmail.com>
 References: <AANLkTinCbZUiN2tVqeMdQuMWhSRQJy9S3twFt4CgpUM3@mail.gmail.com>
-Message-ID: <AANLkTimo_UxNAkftXQtZHrzEOtpU-+8kMDahMdz6v6=e@mail.gmail.com>
+Message-ID: <1292942110.1548.47.camel@pc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Genius,
+On Tue, 2010-12-21 at 10:00 +0530, Daniel Raj wrote: 
+> Hi Genius,
+> 
+> 
+> Good Day  !!!!!!!!!!!!!!!!!!
+> 
+> 
+> I am Daniel. My OSS getting  automatically rebooted again and again . kindly
+> help to me
 
+Daniel,
 
-Good Day  !!!!!!!!!!!!!!!!!!
+This is inappropriate content for this list.  This list is for
+discussing issues about the development of Lustre.
 
+You already posted this same message to lustre-discuss and I responded
+there telling you that you have not provided enough information and that
+it's entirely possible (probable perhaps) that your problem is not even
+related to Lustre since what you are getting are full reboots.
 
-I am Daniel. My OSS getting  automatically rebooted again and again . kindly
-help to me
+Please direct any followups to lustre-discuss, not this list.
 
-Its showing the below error messages
+Thanx,
+b.
 
-
- *kernel: LustreError: 23351:0:(ldlm_lib.c:1892:target_send_reply_msg()) @@@
-processing error (-19)  req at ffff810400e24400 x1353488904620274/t0
-o8-><?>@<?>:0/0 lens 368/0 e 0 to 0 dl 1292738958 ref 1 fl Interpret:/0/0 rc
--19/0
-kernel: LustreError: 137-5: UUID 'south-ost7_UUID' is not available  for
-connect (no target)
-kernel: LustreError: 23284:0:(ldlm_lib.c:1892:target_send_reply_msg()) @@@
-processing error (-19)  req at ffff8101124c7c00 x1353488904620359/t0
-o8-><?>@<?>:0/0 lens 368/0 e 0 to 0 dl 1292739025 ref 1 fl Interpret:/0/0 rc
--19/0
-*
-
-Regards,
-
-Daniel A
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101221/7e7a2091/attachment.htm>
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20101221/fa80c230/attachment.pgp>
