@@ -1,9 +1,9 @@
-From: Mikhail Pershin <tappro@whamcloud.com>
-Date: Fri, 14 Jan 2011 22:04:40 +0300
+From: Mikhail Pershin <mike.tappro@gmail.com>
+Date: Fri, 14 Jan 2011 22:14:37 +0300
 Subject: [Lustre-devel] Setting attributes at open.
 In-Reply-To: <alpine.LFD.2.00.1101141827450.5594@casper.infradead.org>
 References: <alpine.LFD.2.00.1101141827450.5594@casper.infradead.org>
-Message-ID: <op.vpba9oe9f7bdb6@garden>
+Message-ID: <op.vpbbqmjpcckvm4@garden>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,18 +12,18 @@ To: lustre-devel@lists.lustre.org
 
 Hello,
 
-just quick idea. The mdd_open_sanity_check() is called under  
+just quick idea. The mdd_open_sanity_check() is called under
 mdd_write_lock():
 >         mdd_write_lock(env, mdd_obj, MOR_TGT_CHILD);
 > -        rc = mdd_open_sanity_check(env, mdd_obj, flags);
 > +        rc = mdd_open_sanity_check(env, obj, ma, flags);
 
 You've added mdd_attr_set(env, o, ma); in it causing deadlock it seems,
-because it calls mdd_attr_set_internal_locked() which is taking the same  
+because it calls mdd_attr_set_internal_locked() which is taking the same
 lock.
 
 
-On Fri, 14 Jan 2011 21:48:24 +0300, James Simmons <jsimmons@infradead.org>  
+On Fri, 14 Jan 2011 21:48:24 +0300, James Simmons <jsimmons@infradead.org>
 wrote:
 
 >
