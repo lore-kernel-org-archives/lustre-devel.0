@@ -1,29 +1,24 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 14 Jan 2011 20:04:11 +0000 (GMT)
-Subject: [Lustre-devel] Setting attributes at open.
-In-Reply-To: <op.vpba9oe9f7bdb6@garden>
-References: <alpine.LFD.2.00.1101141827450.5594@casper.infradead.org>
-	<op.vpba9oe9f7bdb6@garden>
-Message-ID: <alpine.LFD.2.00.1101142000590.5594@casper.infradead.org>
+From: Vilobh Meshram <vilobh.meshram@gmail.com>
+Date: Sat, 29 Jan 2011 14:16:53 -0500
+Subject: [Lustre-devel] How can the name_to_handle() syscall benefit Lustre
+Message-ID: <AANLkTikENzMTe_M=OPEUTKbHy+7FR=LP3sPUUDGKvWx+@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Hi All,
 
-> Hello,
-> 
-> just quick idea. The mdd_open_sanity_check() is called under  
-> mdd_write_lock():
-> >         mdd_write_lock(env, mdd_obj, MOR_TGT_CHILD);
-> > -        rc = mdd_open_sanity_check(env, mdd_obj, flags);
-> > +        rc = mdd_open_sanity_check(env, obj, ma, flags);
-> 
-> You've added mdd_attr_set(env, o, ma); in it causing deadlock it seems,
-> because it calls mdd_attr_set_internal_locked() which is taking the same  
-> lock.
+How can the name_to_handle() syscall benefit Lustre ?
 
-Perhaps mdd_attr_set is to heavy of a function. I wonder would calling
-mdd_setattr_txn_param_build be light enough to do what we want or do we 
-really need to write to the change logs that happs in mdd_attr_set.
+Any insights will be helpful.
+
+Thanks,
+Vilobh
+*Graduate Research Associate
+Department of Computer Science
+The Ohio State University Columbus Ohio*
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110129/8ce8b36d/attachment.htm>
