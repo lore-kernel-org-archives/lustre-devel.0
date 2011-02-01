@@ -1,53 +1,57 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Mon, 31 Jan 2011 14:35:01 -0700
-Subject: [Lustre-devel] How can the name_to_handle() syscall benefit
-	Lustre
-In-Reply-To: <alpine.LFD.2.00.1101311645200.19399@casper.infradead.org>
-References: <AANLkTikENzMTe_M=OPEUTKbHy+7FR=LP3sPUUDGKvWx+@mail.gmail.com>
-	<6DF98AF0-95CC-4C5B-A40F-E5F3244CE18D@whamcloud.com>
-	<alpine.LFD.2.00.1101311645200.19399@casper.infradead.org>
-Message-ID: <E99BB0DE-BCF4-4B0D-82D1-FE6A19D487E2@whamcloud.com>
+From: Shipman, Galen M. <gshipman@ornl.gov>
+Date: Tue, 01 Feb 2011 10:54:39 -0500
+Subject: [Lustre-devel] LUG 2011 - Registration is Open
+Message-ID: <C96D96EF.2DD59%gshipman@ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2011-01-31, at 09:52, James Simmons wrote:
-> Andreas Dilger wrote:
->> This is something that I think would be very useful for Lustre in conjunction with the Lustre MPI ADIO driver. The MPI rank-0 node
->> could do the path traversal and generate a file handle via name_to_handle() and then MPI broadcast the file handle to all of the
->> other MPI processes, which can use it to open the shared file. This could save many thousands of MDS RPCs to do path traversal for
->> each client in a large MPI job. 
-> 
-> I thought the name_to_handle syscall idea was shot down? 
+LUG 2011 will be held in Orlando, Florida from 8:30 AM Tuesday, April 12,
+2011 through 12:00 noon April 14, 2011 at the Marriott World Center Golf
+and Spa resort. This two-and-a-half-day event is the primary venue for
+discussion and seminars on open source parallel file system technologies
+with a unique focus on the Lustre parallel file system.
 
-I don't think it was shot down, as much as it hasn't yet been accepted.  I've tried to support it in a form that would be useful to Lustre/MPI, and while it isn't quite where I'd like it to be, I think the flaws in the implementation are not insurmountable.
+The conference is generously supported by the following corporate
+sponsors: Bull, DataDirect Networks, Dell, HP, LSI, Oracle, SGI,
+Terascala, Whamcloud, and Xyratex.
 
-The current proposal is lacking a well-defined permanent filesystem identifier in each handle (i.e. a UUID as part of the public fh structure), but I think Lustre can still include the UUID as part of the private fh and have the userspace code map that back to a specific Lustre mountpoint, since it would be implemented as part of the Lustre ADIO layer.
+REGISTRATION IS NOW OPEN
 
->> On 2011-01-29, at 12:16, Vilobh Meshram <vilobh.meshram@gmail.com> wrote:
->> How can the name_to_handle() syscall benefit Lustre ?
->> 
->> Any insights will be helpful.
->> 
->> Thanks,
->> Vilobh
->> Graduate Research Associate
->> Department of Computer Science
->> The Ohio State University Columbus Ohio
->> 
->>      _______________________________________________
->>      Lustre-devel mailing list
->>      Lustre-devel at lists.lustre.org
->>      http://lists.lustre.org/mailman/listinfo/lustre-devel
->> 
->> 
->> 
+You can now register for LUG 2011 via the conference website at
+http://www.olcf.ornl.gov/event/lug-2011/  (click on the registration tab)
+
+Early bird registration (through March 15) is $400 per person, while
+standard registration (after March 15) is $550 per person for the entire
+two-and-a-half-day event.
+
+Hotel reservations can be made using the website or phone number below:
+https://resweb.passkey.com/go/LUG2011
+Tel: 1-800-266-9432
+
+$179.00 (non-government)
+$104.00 (government  or prevailing government rate)
 
 
-Cheers, Andreas
---
-Andreas Dilger 
-Principal Engineer
-Whamcloud, Inc.
+
+CALL FOR PARTICIPATION
+
+The LUG program committee would like to invite members of the Lustre
+community to submit presentation abstracts for inclusion in this year?s
+meeting. It is not necessary to submit a technical paper, just an abstract
+of the proposed talk no more than a page in length. Talks should be
+approximately half an hour in length and reflect the work that you or your
+site are doing with Lustre. The deadline to submit presentation abstracts
+is February 14, 2011. For questions or to submit a presentation abstract
+contact the program committee chair, Stephen Simms, at
+lug-submissions at ornl.gov.
+
+LUG 2011 is user-led with an organizing committee made up of
+representatives from Commissariat ? l''?nergie atomique (CEA), Indiana
+University ? Pervasive Technology Institute (IU), Lawrence Livermore
+National Laboratory (LLNL), Naval Research Laboratory (NRL), ORNL, Sandia
+National Laboratories (SNL), and Texas Advanced Computing Center (TACC).
+
+http://www.olcf.ornl.gov/event/lug-2011/
