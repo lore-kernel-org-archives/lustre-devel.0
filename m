@@ -1,44 +1,33 @@
-From: Shipman, Galen M. <gshipman@ornl.gov>
-Date: Mon, 21 Feb 2011 13:08:12 -0500
-Subject: [Lustre-devel] LUG 2011 - Program Agenda Available - Register Today
-Message-ID: <C988143C.3A8AC%gshipman@ornl.gov>
+From: Ravi <raviprakashdrbh@aol.com>
+Date: Tue, 22 Feb 2011 22:54:00 -0500 (EST)
+Subject: [Lustre-devel] problem with CMD
+Message-ID: <8CDA124706596DF-23EC-3368C@webmail-d045.sysops.aol.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-LUG 2011 will be held in Orlando, Florida from 8:30 AM Tuesday, April 12,
-2011 through 12:00 noon April 14, 2011 at the Marriott World Center Golf
-and Spa resort. This two-and-a-half-day event is the primary venue for
-discussion and seminars on open source parallel file system technologies
-with a unique focus on the Lustre parallel file system.
-
-The conference is generously supported by the following corporate
-sponsors: Bull, DataDirect Networks, Dell, HP, LSI, Oracle, SGI,
-Terascala, Whamcloud, and Xyratex.
-
-The LUG program committee has put together a great agenda for this event,
-featuring presentations on Lustre features, upcoming enhancements,
-site-specific experiences, lessons learned, community organizations, and
-much more. 
-
-You can find the entire LUG agenda via the LUG website at
-http://www.olcf.ornl.gov/event/lug-2011/ (click on the agenda tab)
 
 
-REGISTER TODAY
 
-You can register for LUG 2011 via the LUG website at
-http://www.olcf.ornl.gov/event/lug-2011/  (click on the registration tab)
+Hello  All 
 
-Early bird registration (through March 15) is $400 per person, while
-standard registration (after March 15) is $550 per person for the entire
-two-and-a-half-day event.
 
-Hotel reservations can be made using the website or phone number below:
-https://resweb.passkey.com/go/LUG2011
-Tel: 1-800-266-9432
 
-$179.00 (non-government)
-$104.00 (government  or prevailing government rate)
+I have been working on lustre for 3-4 months and now want to move CMD(clustered meta data).i am using lustre-2.0.0.I was not able to  get any links or documents which  could help me install it.I  came across some documents one which  asked me to format the one MDT(drive) and mount it on 2 MDS and the MDS takes care of notifying the client.Another document said i should format 2 (separate )drives as MDT and then mount it on the 2 MDS.Also i read that CMD has a master MDS and Slave MDS.Do we have to configure it differently ? Also i could get some rpms for patched kernel from lustre download site for lustre-ldiskfs-3.2.0-2.6.18_164.11.1.el5_lustre.2.0.0.1.x86_64.rpm
+lustre-modules-2.0.0.1-2.6.18_164.11.1.el5_lustre.2.0.0.1.x86_64.rpm, kernel-2.6.18-164.11.1.el5_lustre.2.0.0.1.x86_64.rpm.But i am not sure if i can use the same patched kernel i was using for Single MDS setup. I am not exactly able to figure out how this should be done.Any help would be appreciated.Thanks    
+
+
+
+
+
+
+Raviprakash Darbha 
+
+
+
+ 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110222/23e1a021/attachment.htm>
