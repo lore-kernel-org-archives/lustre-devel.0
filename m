@@ -1,15 +1,30 @@
 From: Ravi <raviprakashdrbh@aol.com>
-Date: Mon, 28 Feb 2011 11:42:06 -0500 (EST)
+Date: Mon, 28 Feb 2011 11:44:56 -0500 (EST)
 Subject: [Lustre-devel] problem with CMD
-In-Reply-To: <AANLkTik3fH85X8kxc=9PCWm-UJdKmt4L2wW9CrqJjzQv@mail.gmail.com>
-References: <8CDA124706596DF-23EC-3368C@webmail-d045.sysops.aol.com><4D6559B0.1040503@whamcloud.com><8CDA453BDAF3CCD-1BB0-24B96@webmail-d139.sysops.aol.com>
-	<AANLkTik3fH85X8kxc=9PCWm-UJdKmt4L2wW9CrqJjzQv@mail.gmail.com>
-Message-ID: <8CDA57D917C4CC9-2060-145E7@angweb-usd022.sysops.aol.com>
+In-Reply-To: <8CDA57D917C4CC9-2060-145E7@angweb-usd022.sysops.aol.com>
+References: <8CDA124706596DF-23EC-3368C@webmail-d045.sysops.aol.com><4D6559B0.1040503@whamcloud.com><8CDA453BDAF3CCD-1BB0-24B96@webmail-d139.sysops.aol.com><AANLkTik3fH85X8kxc=9PCWm-UJdKmt4L2wW9CrqJjzQv@mail.gmail.com>
+	<8CDA57D917C4CC9-2060-145E7@angweb-usd022.sysops.aol.com>
+Message-ID: <8CDA57DF73AD243-2060-146E8@angweb-usd022.sysops.aol.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Sry  the link is
+
+http://wiki.lustre.org/index.php/Clustered_Metadata 
+
+
+
+
+
+-----Original Message-----
+From: Ravi <raviprakashdrbh@aol.com>
+To: tsrjzq <tsrjzq@gmail.com>; Lustre-devel <Lustre-devel@lists.lustre.org>
+Sent: Mon, Feb 28, 2011 6:42 am
+Subject: Re: [Lustre-devel] problem with CMD
+
 
 Hey 
 I found some info abt CMD on lustre site .Could anyone please comment on this ..  
@@ -92,6 +107,14 @@ seems that none of lustre supports CMD
 
  
 
+ 
+_______________________________________________
+Lustre-devel mailing list
+Lustre-devel at lists.lustre.org
+http://lists.lustre.org/mailman/listinfo/lustre-devel
+
+
+ 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110228/f0e052ab/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110228/0e546e7c/attachment.htm>
