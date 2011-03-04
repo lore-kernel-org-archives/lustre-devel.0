@@ -1,184 +1,142 @@
 From: Jeremy Filizetti <jeremy.filizetti@gmail.com>
-Date: Thu, 03 Mar 2011 23:48:57 -0500
+Date: Fri, 04 Mar 2011 01:12:47 -0500
 Subject: [Lustre-devel] lustre 1.8+ issues with automounter
-Message-ID: <4D706F39.2070807@gmail.com>
+In-Reply-To: <FD878C30-2103-400A-A02D-C3745DBEBF1F@xyratex.com>
+References: <4D706F39.2070807@gmail.com>
+	<FD878C30-2103-400A-A02D-C3745DBEBF1F@xyratex.com>
+Message-ID: <4D7082DF.2040705@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ever since we moved from Lustre 1.6.6 to 1.8 I've seen issues with using
-the automounter and Lustre.  I've finally got around to looking at what
-the issue is, but I'm not quite sure what the correct way to resolve it
-is.  I think the issue will remain in 2.0+ but I didn't look closely at
-the code.  The issue is that lov_connect which calls lov_connect_obd is
-an asynchronous connect that does not wait for all OSCs to be connected
-before returning.  In the end lustre_fill_super can return before all
-OSCs have been set active so any file operations that caused the
-automount may return an error.  Many lov functions check to make sure
-the lov_tgt_desc ltd_active flag is 1 or return -EIO. 
+An example is below with some comments and a handful of the log
+removed.  I don't actually have this many OSTs but I just created a lot
+of OSTs to easily reproduce the problem in a VM.  autofs is setup to
+mount lustre.  The autofs attempts to mount the file system when I typed
+"ls -l  /lustre/xen1/tmp/testfile" where testfile is allocated on the
+192nd OST IIRC.
 
-The following patch handles things correctly by waiting until all OSC's
-that are set to be activated are active before returning from filling
-the super block.  There are a few problems that I'm not sure of what the
-expected results are with Lustre.  For example if an OST has not been
-mounted the client will attempt to connect and end up returning -ENODEV
-and setting the import_state as LUSTRE_IMP_DISCON.  Without the patch
-the client mounts immediately even though the OSC is unavailable, with
-it the mount would not return until the user kills the process, the OBD
-is set inactive, or the state changes.  To provide the same
-functionality an extra condition would need to be added to the
-l_wait_event condition to monitor the import state is not connecting. 
-However if I do that, I'm not sure things handle failover nodes
-correctly.  So what I'm wondering is what are the expected actions for
-the different conditions of OSTs.
+Mount kicked off by the above command by the automounter.
+00000020:01200004:2:1298954011.295906:0:8398:0:(obd_mount.c:2001:lustre_fill_super())
+VFS Op: sb ffff8801e7e22c00
+00000020:01000004:2:1298954011.295920:0:8398:0:(obd_mount.c:2015:lustre_fill_super())
+Mounting client xen1-client
+00000080:00200000:2:1298954011.301889:0:8398:0:(llite_lib.c:1017:ll_fill_super())
+VFS Op: sb ffff8801e7e22c00
+00000080:01000000:2:1298954011.431273:0:8398:0:(llite_lib.c:1115:ll_fill_super())
+Found profile xen1-client: mdc=xen1-MDT0000-mdc osc=xen1-clilov
+00000080:00000010:2:1298954011.431274:0:8398:0:(llite_lib.c:1118:ll_fill_super())
+kmalloced 'osc': 29 at ffff8801e7efd9a0.
+00000080:00000010:2:1298954011.431276:0:8398:0:(llite_lib.c:1124:ll_fill_super())
+kmalloced 'mdc': 34 at ffff8801dcb56ec0.
+00000080:00000010:2:1298954011.431277:0:8398:0:(llite_lib.c:267:client_common_fill_super())
+kmalloced 'data': 72 at ffff8801e9deedc0.
+00000080:00100000:2:1298954011.432116:0:8398:0:(llite_lib.c:409:client_common_fill_super())
+ocd_connect_flags: 0xe1440478 ocd_version: 17302784 ocd_grant: 0
+00020000:01000000:1:1298954011.432928:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0000_UUID active
+00020000:01000000:1:1298954011.432977:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0002_UUID active
+00020000:01000000:1:1298954011.433025:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0004_UUID active
+.
+.
+.
+00020000:01000000:2:1298954011.455806:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0094_UUID active
+00020000:01000000:2:1298954011.455924:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0095_UUID active
+00020000:01000000:2:1298954011.456042:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0096_UUID active
+00020000:01000000:2:1298954011.456161:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0097_UUID active
+00020000:01000000:2:1298954011.457417:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0098_UUID active
+00000080:00000004:1:1298954011.457543:0:8398:0:(llite_lib.c:467:client_common_fill_super())
+rootfid 16:[0x10:0xababf859:0x4000]
+00020000:01000000:2:1298954011.457573:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST0099_UUID active
+00020000:01000000:2:1298954011.457705:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST009a_UUID active
+00000080:00000010:1:1298954011.457830:0:8398:0:(super25.c:57:ll_alloc_inode())
+slab-alloced '(lli)': 928 at ffff8801e0de4bc0.
+00020000:01000000:2:1298954011.457855:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST009b_UUID active
+00000080:00000010:1:1298954011.457938:0:8398:0:(llite_lib.c:528:client_common_fill_super())
+kfreed 'data': 72 at ffff8801e9deedc0.
+00000080:00000010:1:1298954011.457977:0:8398:0:(llite_lib.c:1151:ll_fill_super())
+kfreed 'mdc': 34 at ffff8801dcb56ec0.
+00000080:00000010:1:1298954011.457979:0:8398:0:(llite_lib.c:1153:ll_fill_super())
+kfreed 'osc': 29 at ffff8801e7efd9a0.
+00000080:02000400:1:1298954011.457979:0:8398:0:(llite_lib.c:1157:ll_fill_super())
+Client xen1-client has started
+00000020:00000004:1:1298954011.457980:0:8398:0:(obd_mount.c:2053:lustre_fill_super())
+Mount 192.168.66.2 at tcp8:/xen1 complete
+
+We just returned from filling the super block so now the file system is
+accessible, but as you can see by the lov_set_osc_active not all OSC's
+have been set active yet.
+
+00020000:01000000:2:1298954011.457981:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST009c_UUID active
+00020000:01000000:2:1298954011.458108:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST009d_UUID active
+.
+.
+.
+00020000:01000000:2:1298954011.460053:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST00ac_UUID active
+00020000:01000000:2:1298954011.460187:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST00ad_UUID active
+00000080:00000010:1:1298954011.461272:0:8395:0:(super25.c:57:ll_alloc_inode())
+slab-alloced '(lli)': 928 at ffff8801e0de4800.
+00020000:01000000:2:1298954011.461487:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST00ae_UUID active
+00000080:00000010:1:1298954011.461589:0:8395:0:(super25.c:57:ll_alloc_inode())
+slab-alloced '(lli)': 928 at ffff8801e0de4440.
+00000080:00010000:1:1298954011.461624:0:8395:0:(file.c:965:ll_glimpse_size())
+Glimpsing inode 218
+00000080:00020000:1:1298954011.461636:0:8395:0:(file.c:995:ll_glimpse_size())
+obd_enqueue returned rc -5, returning -EIO
+
+Now glimpsing the inode from above that is allocated on xen-OST00bf
+which is not yet active so the set is empty and returns -EIO.
+
+00020000:01000000:2:1298954011.461644:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST00af_UUID active
+00020000:01000000:2:1298954011.461782:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST00b0_UUID active
+.
+.
+.
+00020000:01000000:2:1298954011.463766:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST00be_UUID active
+00020000:01000000:2:1298954011.463911:0:11545:0:(lov_obd.c:570:lov_set_osc_active())
+Marking OSC xen1-OST00bf_UUID active
+
+Finally the last OSC is set active, this is where
+client_common_fill_super should, ll_fill_super, lustre_fill_super should
+return from the mount syscall because the file system is now all accessible.
+
+I will take a look at your suggestion below tomorrow to see if it will
+handle this situate.
+
 
 Thanks,
 Jeremy
 
-diff --git a/lustre/include/obd.h b/lustre/include/obd.h
-index e89805d..3046a5c 100644
---- a/lustre/include/obd.h
-+++ b/lustre/include/obd.h
-@@ -754,6 +754,8 @@ struct lov_tgt_desc {
-         unsigned long       ltd_active:1,/* is this target up for
-requests */
-                             ltd_activate:1,/* should this target be
-activated */
-                             ltd_reap:1;  /* should this target be
-deleted */
-+    cfs_waitq_t         ltd_started; /* waitqueue to notify tgt has
-been fully started
-+                                      * so IO can start */
- };
- 
- /* Pool metadata */
-@@ -942,6 +944,8 @@ enum obd_notify_event {
-         OBD_NOTIFY_ACTIVE,
-         /* Device deactivated */
-         OBD_NOTIFY_INACTIVE,
-+        /* Device disconnected */
-+        OBD_NOTIFY_DISCON,
-         /* Connect data for import were changed */
-         OBD_NOTIFY_OCD,
-         /* Sync request */
-diff --git a/lustre/lov/lov_obd.c b/lustre/lov/lov_obd.c
-index 8b2d848..ff4a04a 100644
---- a/lustre/lov/lov_obd.c
-+++ b/lustre/lov/lov_obd.c
-@@ -222,7 +222,33 @@ static int lov_notify(struct obd_device *obd,
-struct obd_device *watched,
-                 }
-                 /* active event should be pass lov target index as data */
-                 data = &rc;
--        }
-+        } else if (ev == OBD_NOTIFY_DISCON) {
-+        struct lov_tgt_desc *tgt;
-+        struct lov_obd *lov = &obd->u.lov;
-+        int i;
-+
-+        LASSERT(watched);
-+                if (strcmp(watched->obd_type->typ_name, LUSTRE_OSC_NAME)) {
-+                        CERROR("unexpected notification of %s %s!\n",
-+                               watched->obd_type->typ_name,
-+                               watched->obd_name);
-+                        RETURN(-EINVAL);
-+        }
-+
-+        obd_getref(obd);
-+        for (i = 0; i < lov->desc.ld_tgt_count; i++) {
-+            tgt = lov->lov_tgts[i];
-+            if (!tgt || !tgt->ltd_exp)
-+                continue;
-+
-+            if (obd_uuid_equals(&watched->u.cli.cl_target_uuid,
-&tgt->ltd_uuid)) {
-+                cfs_waitq_signal(&lov->lov_tgts[i]->ltd_started);
-+                data = &i;
-+                break;
-+            }
-+        }
-+        obd_putref(obd);
-+    }
- 
-         /* Pass the notification up the chain. */
-         if (watched) {
-@@ -424,6 +450,27 @@ static int lov_connect(struct lustre_handle *conn,
-struct obd_device *obd,
-                                obd->obd_name, rc);
-                 }
-         }
-+
-+    /* Wait for all the connections to complete before returning so
-that all
-+         * obds are set active that should be.  Otherwise IO that
-happens immediately
-+     * after mount could (autofs) could glimpse or touch objects before
-the connecction
-+     * is established */
-+    for (i = 0; i < lov->desc.ld_tgt_count; i++) {
-+        struct l_wait_info lwi = { 0 };
-+
-+        tgt = lov->lov_tgts[i];
-+        if (!tgt || !tgt->ltd_exp || obd_uuid_empty(&tgt->ltd_uuid))
-+            continue;
-+
-+        if (tgt->ltd_activate == tgt->ltd_active)
-+            continue;
-+
-+        CDEBUG(D_CONFIG, "Target %s activate/active %d/%d, waiting on
-state change\n",
-+               tgt->ltd_obd->obd_name, tgt->ltd_activate, tgt->ltd_active);
-+
-+        l_wait_event(tgt->ltd_started, tgt->ltd_activate ==
-tgt->ltd_active ||
-+                     tgt->ltd_obd->u.cli.cl_import->imp_deactive, &lwi);
-+    }
-         obd_putref(obd);
- 
-         RETURN(0);
-@@ -445,6 +492,9 @@ static int lov_disconnect_obd(struct obd_device
-*obd, struct lov_tgt_desc *tgt)
-                 tgt->ltd_active = 0;
-                 lov->desc.ld_active_tgt_count--;
-                 tgt->ltd_exp->exp_obd->obd_inactive = 1;
-+
-+        /* If state change wake up wait queue */
-+        cfs_waitq_signal(&tgt->ltd_started);
-         }
- 
-         lov_proc_dir = lprocfs_srch(obd->obd_proc_entry, "target_obds");
-@@ -582,6 +632,9 @@ static int lov_set_osc_active(struct obd_device
-*obd, struct obd_uuid *uuid,
-         lov->lov_tgts[i]->ltd_qos.ltq_penalty = 0;
- 
-  out:
-+    if (i >= 0)
-+        cfs_waitq_signal(&lov->lov_tgts[i]->ltd_started);
-+
-         obd_putref(obd);
-         RETURN(i);
- }
-@@ -673,6 +726,8 @@ static int lov_add_target(struct obd_device *obd,
-struct obd_uuid *uuidp,
-         if (index >= lov->desc.ld_tgt_count)
-                 lov->desc.ld_tgt_count = index + 1;
- 
-+    cfs_waitq_init(&tgt->ltd_started);
-+
-         mutex_up(&lov->lov_lock);
- 
-         CDEBUG(D_CONFIG, "idx=%d ltd_gen=%d ld_tgt_count=%d\n",
-diff --git a/lustre/osc/osc_request.c b/lustre/osc/osc_request.c
-index 7dd8667..cfc6ccf 100644
---- a/lustre/osc/osc_request.c
-+++ b/lustre/osc/osc_request.c
-@@ -4398,6 +4398,7 @@ static int osc_import_event(struct obd_device *obd,
-                 cli->cl_lost_grant = 0;
-                 client_obd_list_unlock(&cli->cl_loi_list_lock);
-                 ptlrpc_import_setasync(imp, -1);
-+        obd_notify_observer(obd, obd, OBD_NOTIFY_DISCON, NULL);
- 
-                 break;
-         }
+> you patch is wrong in case some OSC targets will be inaccessible (in maintenance, or network troubles).
+> In that case lov_connect will stick in waiting for infinity time, but that is don't expected behavior. 
+> Can you provide more details about what is situation confuses automount ?
+> or try to move
+>>>
+>         err = obd_statfs(obd, &osfs, cfs_time_current_64() - HZ, 0);                                                                  
+>         if (err)                                                                                                                      
+>                 GOTO(out_mdc, err);                                                                                                   
+>>>
+> from current location to something after get root fid.
+>
+> if FS mounted without lazystatfs option, obd_statfs will blocked until all connection requests is finished.
+> so you will have same behavior but without changes in obd_connect() code.
