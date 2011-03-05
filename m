@@ -1,24 +1,32 @@
 From: Ravi <raviprakashdrbh@aol.com>
-Date: Fri, 4 Mar 2011 20:30:26 -0500 (EST)
-Subject: [Lustre-devel] LNetPoll  undefined
-Message-ID: <8CDA8EC0A0C0017-A90-CEFA@webmail-d097.sysops.aol.com>
+Date: Fri, 4 Mar 2011 20:37:38 -0500 (EST)
+Subject: [Lustre-devel] LnetEQPoll undefined
+Message-ID: <8CDA8ED0BAAFC11-A90-CFB2@webmail-d097.sysops.aol.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello 
+Hello
+The error before crashing is 
 
-I am using LNetWait (blocking call ) on a particular event .After i recevie this event i break from the loop which waits for this event and proceed  but when another event is added into the event queue the system crashes.I thought LNetPoll would be better as  i can just  poll for that particular event without disturbing the event queue but when i make i get undefined.Any thoughts .
+Mar  4 20:35:27 ws11 kernel: BUG: soft lockup - CPU#0 stuck for 10s! [insmod:4609]
+
+
+searched a lot for what it means but couldnt figure out.
+
+Thanks 
+
+
+
+
 
  
 
- Thanks 
-Ravi 
-
+ 
 
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110304/64b7f91c/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110304/bf2efb06/attachment.htm>
