@@ -1,154 +1,50 @@
-From: Liang Zhen <liang@whamcloud.com>
-Date: Mon, 7 Mar 2011 09:35:29 +0800
-Subject: [Lustre-devel] LNetPoll  undefined
-In-Reply-To: <8CDA97D68228C90-21C-11D97@webmail-m099.sysops.aol.com>
-References: <8CDA8EC0A0C0017-A90-CEFA@webmail-d097.sysops.aol.com>
-	<7E84F671-5637-4253-95BB-6999A17F3C4E@whamcloud.com>
-	<8CDA97D68228C90-21C-11D97@webmail-m099.sysops.aol.com>
-Message-ID: <B712E39F-0B82-4788-836E-12F1AF43C376@whamcloud.com>
+From: Shipman, Galen M. <gshipman@ornl.gov>
+Date: Tue, 08 Mar 2011 16:55:13 -0500
+Subject: [Lustre-devel] LUG 2011 - One week left for early bird registration
+Message-ID: <D5C677B8-F359-42C9-99A1-07BA73042F60@ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ravi,
+Early bird registration ends March 15th and our room block is quickly filling up.
+Register and book your room ASAP to ensure your spot!
 
-I think the soft lockup probably is because the thread is polling on the EQ and expecting EVENT_PUT, however, there are a lot of EVENT_SEND(server keeps calling LNetPut or LNetGet with MD on the same EQ?) so it became to a busy loop which is always trying to get LNET_LOCK to poll new event, and kernel can't schedule watchdog on some CPUs then raise the warning.
+LUG 2011 will be held in Orlando, Florida from 8:30 AM Tuesday, April 12,
+2011 through 12:00 noon April 14, 2011 at the Marriott World Center Golf
+and Spa resort. This two-and-a-half-day event is the primary venue for
+discussion and seminars on open source parallel file system technologies
+with a unique focus on the Lustre parallel file system.
 
-pseudo code for eq_callback is like 
+The conference is generously supported by the following corporate
+sponsors: Bull, DataDirect Networks, Dell, HP, LSI, Oracle, SGI,
+Terascala, Whamcloud, and Xyratex.
 
-wait_queue_head_t my_waitq;
-struct list_head req_list;
+The LUG program committee has put together a great agenda for this event,
+featuring presentations on Lustre features, upcoming enhancements,
+site-specific experiences, lessons learned, community organizations, and
+much more.
 
-void my_callback(lnet_event_t *ev)
-{
-	if (ev->type != LNET_EVENT_PUT)
-		return;
-
-	/* construct request form data in MD */
-	req = ....;
-	...
-	add_req_to_queue(req, req_list);
-	wake_up(my_waitq);
-}
-
-my_thread()
-{
-     	...
-	rc = LNetEQAlloc(1024, my_callback, &eqh);
-	...
-	while (1) {
-		while (!list_empty(&req_list)) {
-			req = list_entry(req_list.next, ...);
-			list_del(&req->list);
-			handle_request(req);
-		}
-
-		init_waitqueue_entry(wait, current);
-		add_wait_queue(my_waitq, wait)
-		
-		if (list_empty(&req_list))
-			schedule();
-
-		remove_wait_queue(my_waitq, wait);
-	}
-}
-
-NB: this is just pseudo code and there should be some locks to protect, if you want some real code that is using eq_callback, please lookup into lnet/selftest/rpc.c
-
-Yes, LNetEQPoll is not exported... so if you really want to use it, please just add this line to lnet/lnet/module.c:
-EXPORT_SYMBOL(LNetEQPoll);
-Though they should be exact samely for your case.
-
-Regards
-Liang
+You can find the entire LUG agenda via the LUG website at
+http://www.olcf.ornl.gov/event/lug-2011/ (click on the agenda tab)
 
 
-On Mar 6, 2011, at 2:51 AM, Ravi wrote:
+REGISTER TODAY
 
-> Hello 
-> Thanks for the reply.I am  using lustre-1.8.1.1 .I am working on a new module which  is used for some kind of delegation operations.I am using Lnet operations in this  module.
-> 
-> 
-> The code which fails is  
->  do {
->                         rc = LNetEQWait(lnet_eq_hd, &ev);
->                       if( ev.type == LNET_EVENT_PUT )
->                                break;
-> 
->                 } while ( rc != 0);
->                 
-> 
-> 
-> 
-> Here i am waiting on some PUT event from a client and then break from the loop.And do some operations accordingly.But next time when i perform some PUT operation (for example) and it gets logged into  the event queue i try reading from that event but the MDS fails.
-> I also tried using these functions  //rc = LNetEQPoll( &lnet_eq_hd, 1,2000, &ev, &which); in place of LNetEQWait  but it says undefined .
-> 
-> Can you please throw some light on eq_callback function as i havnt found it in Lnet manual to go through.
->                                               
-> 
-> The log before crashing shows :
-> 
-> 
-> Mar  4 20:35:08 ws11 kernel:     type=LNET_EVENT_SEND, pt-idx=53, mbits=0x1234abcd, rlen=64, mlen=64, md.user_ptr=0xaaaabbbb, hdr-data=0x0
-> Mar  4 20:35:08 ws11 kernel:     status=0, unlnk=0, offset=0, seq=2 
-> 
-> //Iam asssuming it fails here as till here it prints fine.I also want to mention that  this operation is successful as well. 
-> 
-> 
-> Mar  4 20:35:27 ws11 kernel: BUG: soft lockup - CPU#0 stuck for 10s! [insmod:4609]
-> Mar  4 20:35:27 ws11 kernel: CPU 0:
-> Mar  4 20:35:27 ws11 kernel: Modules linked in: tmod(U) ksocklnd(U) ko2iblnd(FU) lnet(U) libcfs(U) autofs4(U) hidp(U) nfs(U) fscache(U) nfs_acl(U) rfcomm(U) l2cap(U) bluetooth(U) lockd(U) sunrpc(U) cpufreq_ondemand(U) acpi_cpufreq(U) freq_table(U) ip_conntrack_netbios_ns(U) ipt_REJECT(U) xt_state(U) ip_conntrack(U) nfnetlink(U) iptable_filter(U) ip_tables(U) ip6t_REJECT(U) xt_tcpudp(U) ip6table_filter(U) ip6_tables(U) x_tables(U) rdma_ucm(U) ib_sdp(U) rdma_cm(U) iw_cm(U) ib_addr(U) ib_ipoib(U) ipoib_helper(U) ib_cm(U) ib_sa(U) ipv6(U) xfrm_nalgo(U) crypto_api(U) ib_uverbs(U) ib_umad(U) mlx4_en(U) mlx4_ib(U) mlx4_core(U) loop(U) dm_multipath(U) scsi_dh(U) video(U) hwmon(U) backlight(U) sbs(U) i2c_ec(U) button(U) battery(U) asus_acpi(U) acpi_memhotplug(U) ac(U) lp(U) snd_hda_intel(U) snd_seq_dummy(U) snd_seq_oss(U) snd_seq_midi_event(U) snd_seq(U) snd_seq_device(U) snd_pcm_oss(U) snd_mixer_oss(U) ib_mthca(U) snd_pcm(U) snd_timer(U) snd_page_alloc(U) ib_mad(U) snd_hwdep(U) snd(U) sg(U) ib_core(U) e100(U) ide_cd(
-> Mar  4 20:35:27 ws11 kernel: ) mii(U) serio_raw(U) pcspkr(U) i2c_i801(U) cdrom(U) soundcore(U) parport_pc(U) shpchp(U) i2c_core(U) parport(U) dm_raid45(U) dm_message(U) dm_region_hash(U) dm_mem_cache(U) dm_snapshot(U) dm_zero(U) dm_mirror(U) dm_log(U) dm_mod(U) ata_piix(U) libata(U) sd_mod(U) scsi_mod(U) ext3(U) jbd(U) uhci_hcd(U) ohci_hcd(U) ehci_hcd(U)
-> Mar  4 20:35:27 ws11 kernel: Pid: 4609, comm: insmod Tainted: GF     2.6.18-128.7.1.el5-lustre.1.8.1.1smp-cust #2
-> Mar  4 20:35:27 ws11 kernel: RIP: 0010:[<ffffffff80064c54>]  [<ffffffff80064c54>] .text.lock.spinlock+0x2/0x30
-> Mar  4 20:35:27 ws11 kernel: RSP: 0018:ffff810021099d10  EFLAGS: 00000286
-> Mar  4 20:35:27 ws11 kernel: RAX: 0000000000000002 RBX: 00000000ffffffff RCX: ffff810021099df8
-> Mar  4 20:35:27 ws11 kernel: RDX: 0000000000000001 RSI: 0000000000000001 RDI: ffffffff8888a7a0
-> Mar  4 20:35:27 ws11 kernel: RBP: ffff81003a04e1c0 R08: ffff810021099ddc R09: 000000001234abcd
-> .......
-> 
-> 
-> 
-> I hope this helps 
-> 
-> Thanks  
-> 
-> 
-> 
-> 
-> 
-> -----Original Message-----
-> From: Liang Zhen <liang@whamcloud.com>
-> To: Ravi <raviprakashdrbh@aol.com>
-> Cc: lustre-devel <lustre-devel@lists.lustre.org>
-> Sent: Fri, Mar 4, 2011 8:54 pm
-> Subject: Re: [Lustre-devel] LNetPoll undefined
-> 
-> Hi Ravi,
-> 
-> Which version of Lustre/LNet are you trying with? Are you trying to build some new code over LNet? Could you show us some example code if you don't mind?
-> btw, If you are trying this in kernel space, I would suggest to use eq_callback (LNetEQAlloc(...eq_callback)) instead of LNetEQPoll/LNetEQWait, which is better for performance. Polling is not good for performance because all EQs share one single waitq in LNet. 
-> 
-> Regards
-> Liang
-> 
-> On Mar 5, 2011, at 9:30 AM, Ravi wrote:
-> 
->> Hello 
->> 
->> I am using LNetWait (blocking call ) on a particular event .After i recevie this event i break from the loop which waits for this event and proceed  but when another event is added into the event queue the system crashes.I thought LNetPoll would be better as  i can just  poll for that particular event without disturbing the event queue but when i make i get undefined.Any thoughts .
->> 
->> Thanks 
->> Ravi 
->> 
->> _______________________________________________
->> Lustre-devel mailing list
->> Lustre-devel at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> 
+You can register for LUG 2011 via the LUG website at
+http://www.olcf.ornl.gov/event/lug-2011/  (click on the registration tab)
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110307/878da137/attachment.htm>
+Early bird registration (through March 15) is $400 per person, while
+standard registration (after March 15) is $550 per person for the entire
+two-and-a-half-day event.
+
+Hotel reservations can be made using the website or phone number below:
+https://resweb.passkey.com/go/LUG2011
+Tel: 1-800-266-9432
+
+$179.00 (non-government)
+$104.00 (government  or prevailing government rate)
+
+(Apologies  if you are receiving this message more than once, it
+has been sent to multiple lists)
