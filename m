@@ -1,64 +1,78 @@
 From: Nikita Danilov <Nikita_Danilov@xyratex.com>
-Date: Sat, 26 Mar 2011 00:52:49 -0700
+Date: Sat, 26 Mar 2011 07:38:46 -0700
 Subject: [Lustre-devel] The good usage of lustre *_thread_info structure
-In-Reply-To: <4D8D16E6.8050708@cea.fr>
-References: <4D8D16E6.8050708@cea.fr>
-Message-ID: <73AED5C780AE05478241DB067651A92102000E2A@XYUS-EX22.xyus.xyratex.com>
+In-Reply-To: <4D8DF6A1.8000004@cea.fr>
+References: <4D8D16E6.8050708@cea.fr> <4D8D2DE5.30209@whamcloud.com>
+	<4D8DF6A1.8000004@cea.fr>
+Message-ID: <73AED5C780AE05478241DB067651A92102000E2C@XYUS-EX22.xyus.xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mar 26, 2011, at 01:27 , Aur?lien Degr?mont wrote:
 
-> Hello
+On Mar 26, 2011, at 17:22 , Aur?lien Degr?mont wrote:
 
-Hello Aur?lien,
+> Le 26/03/2011 01:05, wangdi said:
+>> This thread_info will be initialized in the beginning of the request
+>> handling (ptlrpc_server_handle_request ->  lu_context_init, and attached
+>> to the request), and currently the request will only be processed by a
+>> single thread, i.e. no other threads will try to access the request and
+>> the thread info. so it is safe to use this  info within the service thread.
+>> 
+>> This thread_info is actually designed for providing large temporary
+>> memory to functions, so they can get these memories in a cheap way,
+>> instead of allocating/freeing every time
+> To be sure, what is the bad aspect we want to avoid here?
 
-> 
-> Doing some coding in Lustre, I'm wondering for a while was it the 
-> correct usage of thread_info structure like mdt_thread_info or 
-> mdd_thread_info.
-> They contain pre-allocated data or pointer to pass this between function 
-> call and layer without overloading the stack.
-> My concern is: if a function decide to use of them to store some of its 
-> data, how can it be sure that it was not used by an upper layer or a 
-> calling function?
-> How can I be sure it is safe to use them?
-
-the answer is: by trusting everybody to follow the convention. In the meta-data stack each "method" takes a pointer to struct lu_env is a parameter. This environment contains two "contexts" (struct lu_ctx): lu_env::le_ctx and lu_env::le_ses.
-
-By convention, lu_env::le_ctx should be used only as a substitute for an automatic variables, that is, it is used to conserve a space on the stack (which is a rather limited resource in kernel space) and should never me used to pass information between functions. lu_env::le_ses is a context embedded into a request, which can  be used to store some request-global information, like credentials.
-
-For the call chains within a layer it is up to the programmer to ascertain that the same element of lu_env::le_ctx is not re-used improperly. To some extent this can be done automatically, e.g., by introducing an interface to access sub-structures in struct mdt_thread_info, which would maintain a "busy" flag and check it on access. 
-
-Hope this helps,
-Nikita.
+Kernel stack space is severely limited (4KB or 8KB) and dynamic memory allocation is too expensive for some  paths.
 
 > 
-> By example :
 > 
-> struct mdt_thread_info {
->    ...
->         /*
->          * Object attributes.
->          */
->         struct md_attr             mti_attr;
->     ...
-> }
+> Le 26/03/2011 08:52, Nikita Danilov said:
+>> For the call chains within a layer it is up to the programmer to ascertain that the same element of lu_env::le_ctx is not re-used improperly. To some extent this can be done automatically, e.g., by introducing an interface to access sub-structures in struct mdt_thread_info, which would maintain a "busy" flag and check it on access.
+> So it is rather a DIY :)
 > 
-> A function in MDT layer could decide it will use this structure 
-> (mti_attr) for its own need, then it will call several functions that 
-> could have the same need. How can those functions know that they can or 
-> cannot re-use this structure? Same issues for pointers.
+> If I take an example :
 > 
-> Thanks for any help
+> mdd_thread_info.mti_xattr_buf
+> 
+> is there to be used when reading/changing a XATTR. If I code an helper 
+> method in MDD which needs to manipulate an XATTR, this field looks 
+> really interesting. But, I do not know for sure that all callers we not 
+> be using it? So the only solution is that I verify each of them are not 
+> using it (and their callers)? And latter, if someone add a new way to 
+> call my method, he must looks for what stuff i'm using in the 
+> thread_info to be sure it does not conflict with what he currently uses? 
+> This seems a lot of code to check...
+
+Well, c'est la vie. :-) I just ran a grep and found that ->mti_xattr_buf is used by 
+
+    * mdd_create(), 
+
+    * __mdd_lma_get(),
+
+    * __mdd_lma_set(),
+
+    * mdd_acl_chmod() and
+
+    * mdd_check_acl().
+
+Generally, foo_thread_info fields can only be used within the foo layer and one modifying it, is assumed to understand the layer.
+
+Thank you,
+Nikita. 
+
+> 
+> 
+> And so, how can I chose that this field is relevant to be added to 
+> thread_info instead of allocating/freeing it inside my function?
+> 
+> 
+> Thanks for both your help
 > 
 > Aur?lien
-> 
-> 
-> 
 > _______________________________________________
 > Lustre-devel mailing list
 > Lustre-devel at lists.lustre.org
