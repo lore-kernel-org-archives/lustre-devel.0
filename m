@@ -1,82 +1,77 @@
-From: Eric Barton <eeb@whamcloud.com>
-Date: Tue, 19 Apr 2011 14:39:57 +0100
-Subject: [Lustre-devel] Quota enforcement
-Message-ID: <011901cbfe97$46ef3630$d4cda290$@com>
+From: Nathan Rutman <Nathan_Rutman@xyratex.com>
+Date: Mon, 18 Apr 2011 15:41:10 -0700
+Subject: [Lustre-devel] MDS threading model?
+In-Reply-To: <73AED5C780AE05478241DB067651A92102000E75@XYUS-EX22.xyus.xyratex.com>
+References: <2B947DB7-D404-4E77-B066-2FBCBBD90C0B@whamcloud.com>
+	<73AED5C780AE05478241DB067651A92102000E75@XYUS-EX22.xyus.xyratex.com>
+Message-ID: <73AED5C780AE05478241DB067651A9210237844F@XYUS-EX22.xyus.xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi,
+Liang, 
+we're happy to share all of our Lustre architecture and feature plans, and I'm also optimistic about the way the community has really come together at LUG.  
 
-I'd like to take a fresh look at quota enforcement.  I think the
-current approach of trying to implement quota purely through POSIX
-APIs is flawed, and I'd like to open up a debate on alternatives.
+Our plans for metadata improvements had a bit of a different tack, but it may be that with your SMP improvements there's not much more to be gained in the MDS threading model. (We're actually going to detailed investigation of your patches to see if it's worthwhile to spend more effort here.)  We actually had two ideas for MDS threading improvements - one was along your lines.  The other is a plan to move all the MDT ldiskfs calls from each RPC off into a single queue, instead of making the calls from separate threads.  The queue would be processed by a single dedicated MDT thread.  If our investigation shows there's still a lot of improvement to be gained beyond your patches, we will probably start working on a prototype for this to see if it helps.
 
-If we go back to first premises, quota enforcement is about resource
-management - tracking and enforcing limits on consumption to ensure
-some measure of insulation between different users.  In general, when
-we have 'n' resources which are all consumed independently we should
-also track and enforce limits on each of these independently.
+Another interesting thing that came out of LUG here besides your presentation was the Terascala work, which really highlighted for me that not all metadata ops are created equal: create rates have a heavy dependence on the OSTs, and that metadata ops performance isn't necessarily a metadata server problem!  It wasn't clear to me if Oleg was saying that they had resolved the OST precreate performance limitations in Lustre 2.1 or if there is still more work to be done there.  (One was a bug limiting the precreates to a small number (looks like WC LU-170 <http://jira.whamcloud.com/browse/LU-170>  just landed for 2.1?), the other is the large growth of directory entries in the OST's 32 object dirs. (bugno?))
 
-In conventional filesystems the relevant resources are inodes and
-blocks - which POSIX quota matches nicely.  Although it may seem to
-simplify quota management to equate the POSIX quota inode count with
-the MDS's inode count, and the POSIX quota block count with the sum of
-all blocks on the OSTs, it ignores the following issues...
 
-1. Block storage on the MDS must be sized to ensure it is not
-   exhausted before inodes on the MDS run out.  This requires
-   assumptions about the average size of Lustre directories and
-   utilisation of extended attributes.
 
-2. Sufficient inodes must be reserved on the OSTs to ensure they are
-   not exhausted before block storage.  This requires assumptions
-   about the average Lustre file size and number of stripes.
+On Apr 15, 2011, at 2:21 AM, Nikita Danilov wrote:
 
-3. Imbalanced OST utilization causes allocation failures while
-   resources are still available on other OSTs.
 
-(3) is the most glaringly obvious issue.  It gives you ENOSPACE when
-you extend a file if one of the OSTs it's striped over is full.  Very
-irritating if 'df' reports that plenty of space is still available and
-it's not something the quota system itself can help you avoid.  
+	Hi Nathan, Peter,
 
-In fact quota enforcement currently takes pains to allow quota
-utilisation to become imbalanced across OSTs by dynamically
-distributing the user's quota to where it's being used.  This comes at
-a performance cost as quota nears exhaustion.  Provided the user
-operates well within her quota, quota is distributed in large units
-with low overhead.  However as she nears her limit, protocol overhead
-increases as quota is distributed in successively smaller units to
-ensure it is not all consumed prematurely on one OST.
+	I received an interesting message from Liang Zhen, which he kindly permitted me to share. The source is at http://git.whamcloud.com/?p=fs%2Flustre-dev.git;a=shortlog;h=refs%2Fheads%2Fliang%2Fb_smp <http://git.whamcloud.com/?p=fs/lustre-dev.git;a=shortlog;h=refs/heads/liang/b_smp> .
 
-An alternative approach to (3) is to move the usage to where the
-resources are - i.e. implement complex/dynamic file layouts that
-effectively allow files to grow dynamically into available free space.
-This works not just for quota enforcement but for all free space.
-However it also comes at the cost of increasing overhead as
-space/quota is exhausted.  It's also much harder to implement -
-especially for overwriting "holes" rather than simply extending files.
+	Thank you,
+	Nikita.
+	
 
-I'd dearly like some surveys of real-world systems to discover exactly
-how imbalanced utilisation can really become, both for individual
-users and also in aggregate to provide guidance on how to proceed.
+	Begin forwarded message:
 
-I'm leaning towards static quota distribution since that matches the
-physical constraints, but it requires much better tools (e.g.  for
-rebalancing files and reporting not just utilization totals but also
-median/min etc).
 
-Thoughts?
+		Hello Nikita,
+		
+		How are you doing!
+		It's great to see Xyratex sharing this white paper:
+		http://www.xyratex.com/pdfs/whitepapers/Xyratex_white_paper_Lustre_Architecture_Priorities_Overview_1-0.pdf
+		
+		it makes me feel the community is stronger than ever, :-), I'm also very interesting in the section " MDS threading model" in the white paper, because I'm working a similar thing for a while, however, I can't see too much detail from the white paper, would it be possible for you to share the idea with me? I will totally understand if you can't, thanks anyway.
+		
+		Here is what I'm doing on server side threading model now, it's probably totally different thing with what's in the white paper of Xyratex, but I just want to make sure there is no rework, also, any suggestion would be appreciated:
+		- divide server resource into several subsets at all stack level: CPUs, memory pools, threads pools, message queues.....
+		- each subset is a processing unit which can process a request standalone, unless there is conflict on target resource
+		- lifetime of request will be localized on the same processing unit as possible as we can
+		- by this way, we can dramatically reduce data migration, thread migration, lock contention between CPUs, and boost performance of metadata request processing.
+		- as you can see from above, most server side threads are binding on a few CPUs (not like before, no affinity except OST IO threads)
+		- massive number of threads will overkill performance, so limit total number of threads is another key issue, and it's important to support dynamically grow/shrink thread pool
+		- ptlrpc service will start more rational number of threads (not like now, user can have thousands threads on MDS easily)
+		- we grow number of threads only if some threads in pool are long-blocked
+		- ptlrpc service will kill some threads automatically if there are too many active threads and they are not long-blocked.
+		
+		Again, it's definitely OK if you can't share those information with me, business is business, :-)
+		
+		Thanks
+		Liang
 
--- 
 
-                Cheers,
-                        Eric
 
-Eric Barton
-CTO Whamcloud, Inc.
-Tel: +44 117 330 1575
-Mob: +44 7920 797 273  
+
+______________________________________________________________________
+This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
+ 
+Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
+ 
+Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
+ 
+The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
+______________________________________________________________________
+ 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110418/5128835b/attachment.htm>
