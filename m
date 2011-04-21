@@ -1,142 +1,34 @@
-From: Mark Nelson <mark@msi.umn.edu>
-Date: Thu, 21 Apr 2011 16:47:22 -0500
-Subject: [Lustre-devel] [Lustre-discuss] Research on filesystem metadata
-	operation	distribution
-In-Reply-To: <C09F427D-51DA-420F-83B6-D10F30347750@whamcloud.com>
-References: <C09F427D-51DA-420F-83B6-D10F30347750@whamcloud.com>
-Message-ID: <4DB0A5EA.7090100@msi.umn.edu>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Thu, 21 Apr 2011 16:56:27 -0600
+Subject: [Lustre-devel] 64-bit ext4 inodes
+In-Reply-To: <73AED5C780AE05478241DB067651A92102378476@XYUS-EX22.xyus.xyratex.com>
+References: <2368DAF2-4CA9-41E4-8A56-E48AEA9D4549@xyratex.com>
+	<73AED5C780AE05478241DB067651A92102378476@XYUS-EX22.xyus.xyratex.com>
+Message-ID: <50A7CDE4-73B3-4BEB-9BF4-BE0D077A3A00@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Andreas,
+On Apr 20, 2011, at 11:07 AM, Nathan Rutman wrote:
+> We're about to start looking into 64-bit inodes on ext4 -- anybody else working on this at the moment?
 
-Here are the statistics for our current lustre storage as requested. 
-This filesystem is used for scratch on a ~8700 core cluster.
+I don't know of anyone other than Fujitsu that are looking at this.  I haven't had any kind of technical discussion with them about it, nor looked at their code, but just implied that this is what they did based on their slides.
 
-> [root at mds ~]# lctl get_param mds.*.stats | egrep "open|close|rename|link|attr|sync"
-> open                      52365106 samples [reqs]
-> close                     26309366 samples [reqs]
-> link                      164 samples [reqs]
-> unlink                    4199061 samples [reqs]
-> rename                    605499 samples [reqs]
-> getattr                   204467294 samples [reqs]
-> setattr                   6947314 samples [reqs]
-> getxattr                  1211618173 samples [reqs]
-> sync                      2399 samples [reqs]
+One important consideration to note with 64-bit inode numbers is that they cannot be used safely on 1.8 MDS filesystems.  That is because the IGIF FID namespace only has room for 2^32 inode numbers (mapped into the 2.x FID SEQ field, see ), so upgrading a 1.8 MDS with 64-bit inode numbers to 2.x would cause a huge world of hurt.  If this is limited to 2.x filesystems that only identify MDS inodes via FIDs to the clients then this is not a concern.
 
-> mark at node1083:~> lfs df
-> UUID                 1K-blocks      Used Available  Use% Mounted on
-> lustre-MDT0000_UUID  2446151592   7290552 2299069836    0% /scratch1[MDT:0]
-> lustre-OST0000_UUID  2850686364 2260170480 445708680   79% /scratch1[OST:0]
-> lustre-OST0001_UUID  2850686364 2360436928 345415236   82% /scratch1[OST:1]
-> lustre-OST0002_UUID  2850686364 2301852200 404026800   80% /scratch1[OST:2]
-> lustre-OST0003_UUID  2850686364 2297681284 408197928   80% /scratch1[OST:3]
-> lustre-OST0004_UUID  2850686364 2268630672 437220700   79% /scratch1[OST:4]
-> lustre-OST0005_UUID  2850686364 2352652832 353226340   82% /scratch1[OST:5]
-> lustre-OST0006_UUID  2850686364 2256628780 449250944   79% /scratch1[OST:6]
-> lustre-OST0007_UUID  2850686364 2239905176 465895280   78% /scratch1[OST:7]
-> lustre-OST0008_UUID  2850686364 2256707044 449145120   79% /scratch1[OST:8]
-> lustre-OST0009_UUID  2850686364 2318356564 387467160   81% /scratch1[OST:9]
-> lustre-OST000a_UUID  2850686364 2246170292 459654224   78% /scratch1[OST:10]
-> lustre-OST000b_UUID  2850686364 2289467904 416357844   80% /scratch1[OST:11]
-> lustre-OST000c_UUID  2850686364 2267773568 438077736   79% /scratch1[OST:12]
-> lustre-OST000d_UUID  2850686364 2370072892 335806104   83% /scratch1[OST:13]
-> lustre-OST000e_UUID  2850686364 2373615788 332262332   83% /scratch1[OST:14]
-> lustre-OST000f_UUID  2850686364 2268974064 436784684   79% /scratch1[OST:15]
-> lustre-OST0010_UUID  2850686364 2254083524 451795496   79% /scratch1[OST:16]
-> lustre-OST0011_UUID  2850686364 2305220652 400636828   80% /scratch1[OST:17]
-> lustre-OST0012_UUID  2850686364 2289688148 416189404   80% /scratch1[OST:18]
-> lustre-OST0013_UUID  2850686364 2248032400 457846596   78% /scratch1[OST:19]
-> lustre-OST0014_UUID  2850686364 2348553416 357297956   82% /scratch1[OST:20]
-> lustre-OST0015_UUID  2850686364 2336745344 369133676   81% /scratch1[OST:21]
-> lustre-OST0016_UUID  2850686364 2286710092 419095976   80% /scratch1[OST:22]
-> lustre-OST0017_UUID  2850686364 2258930636 446948364   79% /scratch1[OST:23]
-> lustre-OST0018_UUID  2850686364 2394833760 311045260   84% /scratch1[OST:24]
-> lustre-OST0019_UUID  2850686364 2315306792 390571460   81% /scratch1[OST:25]
-> lustre-OST001a_UUID  2850686364 2300589812 405289220   80% /scratch1[OST:26]
-> lustre-OST001b_UUID  2850686364 2296248192 409542792   80% /scratch1[OST:27]
-> lustre-OST001c_UUID  2850686364 2306921556 398957656   80% /scratch1[OST:28]
-> lustre-OST001d_UUID  2850686364 2277275716 428541804   79% /scratch1[OST:29]
-> lustre-OST001e_UUID  2850686364 2290738376 415141384   80% /scratch1[OST:30]
-> lustre-OST001f_UUID  2850686364 2358853432 347025588   82% /scratch1[OST:31]
-> lustre-OST0020_UUID  2850686364 2164837628 541041392   75% /scratch1[OST:32]
-> lustre-OST0021_UUID  2850686364 2250094264 455757108   78% /scratch1[OST:33]
-> lustre-OST0022_UUID  2850686364 2318377076 387474296   81% /scratch1[OST:34]
-> lustre-OST0023_UUID  2850686364 2287996640 417827084   80% /scratch1[OST:35]
-> lustre-OST0024_UUID  2850686364 2266655604 439213268   79% /scratch1[OST:36]
-> lustre-OST0025_UUID  2850686364 2196015760 509804940   77% /scratch1[OST:37]
-> lustre-OST0026_UUID  2850686364 2326710900 379141252   81% /scratch1[OST:38]
-> lustre-OST0027_UUID  2850686364 2263182244 442696788   79% /scratch1[OST:39]
-> lustre-OST0028_UUID  2850686364 2281411520 424466108   80% /scratch1[OST:40]
-> lustre-OST0029_UUID  2850686364 2253024788 452854156   79% /scratch1[OST:41]
-> lustre-OST002a_UUID  2850686364 2265263264 440614844   79% /scratch1[OST:42]
-> lustre-OST002b_UUID  2850686364 2358109672 347769300   82% /scratch1[OST:43]
-> lustre-OST002c_UUID  2850686364 2246612120 459253300   78% /scratch1[OST:44]
-> lustre-OST002d_UUID  2850686364 2315081464 390671376   81% /scratch1[OST:45]
-> lustre-OST002e_UUID  2850686364 2151456488 554423308   75% /scratch1[OST:46]
-> lustre-OST002f_UUID  2850686364 2276389044 429401272   79% /scratch1[OST:47]
->
-> filesystem summary:  136832945472 109819046792 20061966364   80% /scratch1
+If you are concerned with being able to upgrade 32-bit inode filesystems into 64-bit inode filesystems, you should look at the data-in-dirent patch that is currently in the 2.x ldiskfs patchset.  It was developed to allow storing the 128-bit Lustre FID in the directory entry in a compatible manner, but was also designed to allow storing the high 32 bits of a 64-bit inode number into the directory entry.  That allows compatibility for upgrades by avoiding the need to atomically upgrade a whole directory full of dirents to have 64-bit inode number fields.  It also avoids the need to store 64-bit inode numbers when most of them are 32-bit values.
 
-> mark at node1083:~> lfs df -i
-> UUID                    Inodes     IUsed     IFree IUse% Mounted on
-> lustre-MDT0000_UUID  623065492  13350254 609715238    2% /scratch1[MDT:0]
-> lustre-OST0000_UUID  147951373    356246 147595127    0% /scratch1[OST:0]
-> lustre-OST0001_UUID  122874520    348299 122526221    0% /scratch1[OST:1]
-> lustre-OST0002_UUID  137525462    310049 137215413    0% /scratch1[OST:2]
-> lustre-OST0003_UUID  138550809    340738 138210071    0% /scratch1[OST:3]
-> lustre-OST0004_UUID  145867558    363872 145503686    0% /scratch1[OST:4]
-> lustre-OST0005_UUID  124846336    353476 124492860    0% /scratch1[OST:5]
-> lustre-OST0006_UUID  148769303    334806 148434497    0% /scratch1[OST:6]
-> lustre-OST0007_UUID  153043111    338572 152704539    0% /scratch1[OST:7]
-> lustre-OST0008_UUID  148836688    343526 148493162    0% /scratch1[OST:8]
-> lustre-OST0009_UUID  133406354    332875 133073479    0% /scratch1[OST:9]
-> lustre-OST000a_UUID  151428889    318410 151110479    0% /scratch1[OST:10]
-> lustre-OST000b_UUID  140643612    370513 140273099    0% /scratch1[OST:11]
-> lustre-OST000c_UUID  146024187    317395 145706792    0% /scratch1[OST:12]
-> lustre-OST000d_UUID  120508125    334975 120173150    0% /scratch1[OST:13]
-> lustre-OST000e_UUID  119591403    335426 119255977    0% /scratch1[OST:14]
-> lustre-OST000f_UUID  145755615    354062 145401553    0% /scratch1[OST:15]
-> lustre-OST0010_UUID  149476374    334318 149142056    0% /scratch1[OST:16]
-> lustre-OST0011_UUID  136596942    304167 136292775    0% /scratch1[OST:17]
-> lustre-OST0012_UUID  140548883    326959 140221924    0% /scratch1[OST:18]
-> lustre-OST0013_UUID  150984278    329164 150655114    0% /scratch1[OST:19]
-> lustre-OST0014_UUID  125850214    335954 125514260    0% /scratch1[OST:20]
-> lustre-OST0015_UUID  128803314    340503 128462811    0% /scratch1[OST:21]
-> lustre-OST0016_UUID  141332100    356012 140976088    0% /scratch1[OST:22]
-> lustre-OST0017_UUID  148282098    332665 147949433    0% /scratch1[OST:23]
-> lustre-OST0018_UUID  114305646    341206 113964440    0% /scratch1[OST:24]
-> lustre-OST0019_UUID  134162367    320108 133842259    0% /scratch1[OST:25]
-> lustre-OST001a_UUID  137846405    346482 137499923    0% /scratch1[OST:26]
-> lustre-OST001b_UUID  138954376    354556 138599820    0% /scratch1[OST:27]
-> lustre-OST001c_UUID  136261269    314506 135946763    0% /scratch1[OST:28]
-> lustre-OST001d_UUID  143665519    346163 143319356    0% /scratch1[OST:29]
-> lustre-OST001e_UUID  140292861    310260 139982601    0% /scratch1[OST:30]
-> lustre-OST001f_UUID  123343915    374877 122969038    0% /scratch1[OST:31]
-> lustre-OST0020_UUID  171817157    349887 171467270    0% /scratch1[OST:32]
-> lustre-OST0021_UUID  150499898    352977 150146921    0% /scratch1[OST:33]
-> lustre-OST0022_UUID  133410450    335784 133074666    0% /scratch1[OST:34]
-> lustre-OST0023_UUID  140965613    325669 140639944    0% /scratch1[OST:35]
-> lustre-OST0024_UUID  146302421    339776 145962645    0% /scratch1[OST:36]
-> lustre-OST0025_UUID  163987206    343710 163643496    0% /scratch1[OST:37]
-> lustre-OST0026_UUID  131322985    361117 130961868    0% /scratch1[OST:38]
-> lustre-OST0027_UUID  147155706    296609 146859097    0% /scratch1[OST:39]
-> lustre-OST0028_UUID  142674349    344009 142330340    0% /scratch1[OST:40]
-> lustre-OST0029_UUID  149723181    332111 149391070    0% /scratch1[OST:41]
-> lustre-OST002a_UUID  146671256    320469 146350787    0% /scratch1[OST:42]
-> lustre-OST002b_UUID  123435148    350587 123084561    0% /scratch1[OST:43]
-> lustre-OST002c_UUID  151317772    343224 150974548    0% /scratch1[OST:44]
-> lustre-OST002d_UUID  134212577    353558 133859019    0% /scratch1[OST:45]
-> lustre-OST002e_UUID  175115293    326239 174789054    0% /scratch1[OST:46]
-> lustre-OST002f_UUID  143864174    326506 143537668    0% /scratch1[OST:47]
->
-> filesystem summary:  623065492  13350254 609715238    2% /scratch1
 
--- 
-Mark Nelson, HPC Systems Administrator
-Minnesota Supercomputing Institute
-Phone: (612)626-4479
-Email: mark at msi.umn.edu
+I'm not against the idea of exploring this approach, but I am concerned that e2fsck time will continue to grow with the number of inodes in a single filesystem, and scalability of a single MDT will increasingly be an issue.  
+
+AFAIK, e2fsck times are currently on the order of 1h/100M inodes, and no Lustre filesystems that I know of are above 500M inodes today just due to the average file size being so large and the long e2fsck times.  With improvements in ext4 to reduce e2fsck time like flex_bg, and SSDs, it may be possible to reduce the e2fsck time/inode ratio noticeably, but I think it would take more effort on the e2fsck side than the ext4 side to make many billions of inodes in a single MDT a practical approach.
+
+Things like metadata prefetching that Dave Dillow was doing for e2scan with event-driven completion handlers that process the blocks whenever they arrive from the disk, and multi-threading some of the passes of e2fsck with an understanding of the underlying disk layout (using the s_raid_stride and s_raid_stripe_width).
+
+Cheers, Andreas
+--
+Andreas Dilger 
+Principal Engineer
+Whamcloud, Inc.
