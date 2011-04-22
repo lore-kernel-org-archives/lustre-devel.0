@@ -1,415 +1,58 @@
-From: Felix, Evan J <Evan.Felix@pnl.gov>
-Date: Fri, 22 Apr 2011 07:55:44 -0700
-Subject: [Lustre-devel] Research on filesystem metadata
-	operation	distribution
-In-Reply-To: <C09F427D-51DA-420F-83B6-D10F30347750@whamcloud.com>
-References: <C09F427D-51DA-420F-83B6-D10F30347750@whamcloud.com>
-Message-ID: <3ED20A6EAD4D954BB360447C97BF811B01036254506B@EMAIL05.pnl.gov>
+From: D. Marc Stearman <marc@llnl.gov>
+Date: Fri, 22 Apr 2011 08:13:37 -0700
+Subject: [Lustre-devel] 64-bit ext4 inodes
+In-Reply-To: <50A7CDE4-73B3-4BEB-9BF4-BE0D077A3A00@whamcloud.com>
+References: <2368DAF2-4CA9-41E4-8A56-E48AEA9D4549@xyratex.com>
+	<73AED5C780AE05478241DB067651A92102378476@XYUS-EX22.xyus.xyratex.com>
+	<50A7CDE4-73B3-4BEB-9BF4-BE0D077A3A00@whamcloud.com>
+Message-ID: <5E5695A6-CE4E-4253-B97C-85FAD3C96FFF@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Info on our current large cluster:
+Andreas, LLNL often has file systems with more than 500M inodes in use.  We create them with 1B inodes just for that reason.  And yes, e2fsck times are horrible.  Very painful.
 
-/mscf on Chinook: 20TB - mostly home directories and application binaries/libraries.
-open                      4554527798 samples [reqs]
-close                     473872913 samples [reqs]
-link                      681239 samples [reqs]
-unlink                    24285832 samples [reqs]
-rename                    3369767 samples [reqs]
-getxattr                  3006968011 samples [reqs]
-setxattr                  995589 samples [reqs]
-setattr                   30371813 samples [reqs]
-getattr                   2067961374 samples [reqs]
+-Marc
 
-
-/dtemp on Chinook: 270TB - user data for processing and output.
-open                      946342778 samples [reqs]
-close                     136642017 samples [reqs]
-link                      1601 samples [reqs]
-unlink                    18105075 samples [reqs]
-rename                    6232018 samples [reqs]
-getxattr                  81475 samples [reqs]
-setxattr                  131891 samples [reqs]
-setattr                   34112680 samples [reqs]
-getattr                   1095110611 samples [reqs]
-
-df info:
-UUID                   1K-blocks        Used   Available Use% Mounted on
-sfs-MDT0000_UUID      1834869856     4327988  1725684272   0% /dtemp[MDT:0]
-sfs-OST0000_UUID      2064245920  1068818228   984870244  51% /dtemp[OST:0]
-sfs-OST0001_UUID      2064245920  1147446156   906245256  55% /dtemp[OST:1]
-sfs-OST0002_UUID      2064245920  1113427560   940268856  53% /dtemp[OST:2]
-sfs-OST0003_UUID      2064245920  1159010028   894677244  56% /dtemp[OST:3]
-sfs-OST0004_UUID      2064245920  1147221340   906467384  55% /dtemp[OST:4]
-sfs-OST0005_UUID      2064245920  1095167780   958527096  53% /dtemp[OST:5]
-sfs-OST0006_UUID      2064245920  1063356308   990322272  51% /dtemp[OST:6]
-sfs-OST0007_UUID      2064245920  1064588100   989099968  51% /dtemp[OST:7]
-sfs-OST0008_UUID      2064245920  1190708224   862988936  57% /dtemp[OST:8]
-sfs-OST0009_UUID      2064245920  1112665488   941024380  53% /dtemp[OST:9]
-sfs-OST000a_UUID      2064245920   945953764  1107727176  45% /dtemp[OST:10]
-sfs-OST000b_UUID      2064245920  1224351324   829342584  59% /dtemp[OST:11]
-sfs-OST000c_UUID      2064245920  1080636532   973049116  52% /dtemp[OST:12]
-sfs-OST000d_UUID      2064245920  1017028208  1036655292  49% /dtemp[OST:13]
-sfs-OST000e_UUID      2064245920  1028559680  1025142148  49% /dtemp[OST:14]
-sfs-OST000f_UUID      2064245920  1022769156  1030897212  49% /dtemp[OST:15]
-sfs-OST0010_UUID      2064245920  1100019724   953687264  53% /dtemp[OST:16]
-sfs-OST0011_UUID      2064245920  1052428920  1001264028  50% /dtemp[OST:17]
-sfs-OST0012_UUID      2064245920  1013339316  1040330552  49% /dtemp[OST:18]
-sfs-OST0013_UUID      2064245920  1080871180   972806700  52% /dtemp[OST:19]
-sfs-OST0014_UUID      2064245920   987840500  1065852152  47% /dtemp[OST:20]
-sfs-OST0015_UUID      2064245920  1103825556   949866500  53% /dtemp[OST:21]
-sfs-OST0016_UUID      2064245920  1092751864   960926824  52% /dtemp[OST:22]
-sfs-OST0017_UUID      2064245920  1076291320   977379232  52% /dtemp[OST:23]
-sfs-OST0018_UUID      2064245920  1138079040   915597952  55% /dtemp[OST:24]
-sfs-OST0019_UUID      2064245920  1135952920   917739652  55% /dtemp[OST:25]
-sfs-OST001a_UUID      2064245920  1205589392   848111684  58% /dtemp[OST:26]
-sfs-OST001b_UUID      2064245920  1073418548   980271440  52% /dtemp[OST:27]
-sfs-OST001c_UUID      2064245920  1011666464  1042017224  49% /dtemp[OST:28]
-sfs-OST001d_UUID      2064245920   952649808  1101040760  46% /dtemp[OST:29]
-sfs-OST001e_UUID      2064245920   976172548  1077586588  47% /dtemp[OST:30]
-sfs-OST001f_UUID      2064245920   986284680  1067396376  47% /dtemp[OST:31]
-sfs-OST0020_UUID      2064245920  1154685332   899011516  55% /dtemp[OST:32]
-sfs-OST0021_UUID      2064245920  1145045268   908638940  55% /dtemp[OST:33]
-sfs-OST0022_UUID      2064245920  1002669208  1051017476  48% /dtemp[OST:34]
-sfs-OST0023_UUID      2064245920  1196066908   857608280  57% /dtemp[OST:35]
-sfs-OST0024_UUID      2064245920  1099025172   954671316  53% /dtemp[OST:36]
-sfs-OST0025_UUID      2064245920  1056398932   997293372  51% /dtemp[OST:37]
-sfs-OST0026_UUID      2064245920  1178277020   875422164  57% /dtemp[OST:38]
-sfs-OST0027_UUID      2064245920  1204857620   848839936  58% /dtemp[OST:39]
-sfs-OST0028_UUID      2064245920  1040356188  1013403316  50% /dtemp[OST:40]
-sfs-OST0029_UUID      2064245920  1217397640   836297196  58% /dtemp[OST:41]
-sfs-OST002a_UUID      2064245920  1126382584   927322856  54% /dtemp[OST:42]
-sfs-OST002b_UUID      2064245920  1156904268   896788008  56% /dtemp[OST:43]
-sfs-OST002c_UUID      2064245920  1175057720   878646580  56% /dtemp[OST:44]
-sfs-OST002d_UUID      2064245920  1203375028   850316144  58% /dtemp[OST:45]
-sfs-OST002e_UUID      2064245920  1112189444   941503504  53% /dtemp[OST:46]
-sfs-OST002f_UUID      2064245920  1087356908   966328428  52% /dtemp[OST:47]
-sfs-OST0030_UUID      2064245920  1211991352   841713660  58% /dtemp[OST:48]
-sfs-OST0031_UUID      2064245920   990200212   969120668  47% /dtemp[OST:49]
-sfs-OST0032_UUID      2064245920  1069921844   889408180  51% /dtemp[OST:50]
-sfs-OST0033_UUID      2064245920  1009058432   950276708  48% /dtemp[OST:51]
-sfs-OST0034_UUID      2064245920  1165364648   793969240  56% /dtemp[OST:52]
-sfs-OST0035_UUID      2064245920  1205991652   847704532  58% /dtemp[OST:53]
-sfs-OST0036_UUID      2064245920  1013856480  1039833748  49% /dtemp[OST:54]
-sfs-OST0037_UUID      2064245920  1071568160   982125316  51% /dtemp[OST:55]
-sfs-OST0038_UUID      2064245920  1067675792   986000280  51% /dtemp[OST:56]
-sfs-OST0039_UUID      2064245920  1053890700   999813836  51% /dtemp[OST:57]
-sfs-OST003a_UUID      2064245920  1135658592   918042728  55% /dtemp[OST:58]
-sfs-OST003b_UUID      2064245920  1218140260   835564952  59% /dtemp[OST:59]
-sfs-OST003c_UUID      2064245920  1035919232  1017757280  50% /dtemp[OST:60]
-sfs-OST003d_UUID      2064245920  1016449632  1037243904  49% /dtemp[OST:61]
-sfs-OST003e_UUID      2064245920  1128825020   924881152  54% /dtemp[OST:62]
-sfs-OST003f_UUID      2064245920  1107880660   945794748  53% /dtemp[OST:63]
-sfs-OST0040_UUID      2064245920  1185860764   867836796  57% /dtemp[OST:64]
-sfs-OST0041_UUID      2064245920  1080292868   973412016  52% /dtemp[OST:65]
-sfs-OST0042_UUID      2064245920  1112667788   941016688  53% /dtemp[OST:66]
-sfs-OST0043_UUID      2064245920  1104678368   949023060  53% /dtemp[OST:67]
-sfs-OST0044_UUID      2064245920  1106512800   947174584  53% /dtemp[OST:68]
-sfs-OST0045_UUID      2064245920  1075918920   977765432  52% /dtemp[OST:69]
-sfs-OST0046_UUID      2064245920  1180045252   873641736  57% /dtemp[OST:70]
-sfs-OST0047_UUID      2064245920  1116326384   937355352  54% /dtemp[OST:71]
-sfs-OST0048_UUID      2064245920  1206908764   846776016  58% /dtemp[OST:72]
-sfs-OST0049_UUID      2064245920  1080584572   973118472  52% /dtemp[OST:73]
-sfs-OST004a_UUID      2064245920  1134900624   918780276  54% /dtemp[OST:74]
-sfs-OST004b_UUID      2064245920  1051051796  1002653240  50% /dtemp[OST:75]
-sfs-OST004c_UUID      2064245920   999055640  1054628328  48% /dtemp[OST:76]
-sfs-OST004d_UUID      2064245920  1039090536  1014603492  50% /dtemp[OST:77]
-sfs-OST004e_UUID      2064245920  1096989904   956687368  53% /dtemp[OST:78]
-sfs-OST004f_UUID      2064245920  1283380656   770315848  62% /dtemp[OST:79]
-sfs-OST0050_UUID      2064245920  1076040124   977642024  52% /dtemp[OST:80]
-sfs-OST0051_UUID      2064245920   984345000  1069336180  47% /dtemp[OST:81]
-sfs-OST0052_UUID      2064245920  1013599600  1040091552  49% /dtemp[OST:82]
-sfs-OST0053_UUID      2064245920  1160257412   893434280  56% /dtemp[OST:83]
-sfs-OST0054_UUID      2064245920  1155219336   898480408  55% /dtemp[OST:84]
-sfs-OST0055_UUID      2064245920  1123087368   930604308  54% /dtemp[OST:85]
-sfs-OST0056_UUID      2064245920  1183220488   870473776  57% /dtemp[OST:86]
-sfs-OST0057_UUID      2064245920  1017526048  1036152256  49% /dtemp[OST:87]
-sfs-OST0058_UUID      2064245920  1154269816   899422772  55% /dtemp[OST:88]
-sfs-OST0059_UUID      2064245920  1195696256   858001948  57% /dtemp[OST:89]
-sfs-OST005a_UUID      2064245920  1193575944   860118532  57% /dtemp[OST:90]
-sfs-OST005b_UUID      2064245920  1085868548   967818624  52% /dtemp[OST:91]
-sfs-OST005c_UUID      2064245920  1044960288  1008718892  50% /dtemp[OST:92]
-sfs-OST005d_UUID      2064245920  1082544472   971135872  52% /dtemp[OST:93]
-sfs-OST005e_UUID      2064245920  1075745924   977952724  52% /dtemp[OST:94]
-sfs-OST005f_UUID      2064245920  1054877620   998818084  51% /dtemp[OST:95]
-sfs-OST0060_UUID      2064245920  1118777916   934912992  54% /dtemp[OST:96]
-sfs-OST0061_UUID      2064245920  1067545756   986139120  51% /dtemp[OST:97]
-sfs-OST0062_UUID      2064245920  1023269860  1030489276  49% /dtemp[OST:98]
-sfs-OST0063_UUID      2064245920  1280644316   773067836  62% /dtemp[OST:99]
-sfs-OST0064_UUID      2064245920  1097805864   955887200  53% /dtemp[OST:100]
-sfs-OST0065_UUID      2064245920  1021619552  1032058604  49% /dtemp[OST:101]
-sfs-OST0066_UUID      2064245920  1057169164   996534968  51% /dtemp[OST:102]
-sfs-OST0067_UUID      2064245920  1146992012   906681344  55% /dtemp[OST:103]
-sfs-OST0068_UUID      2064245920  1026243604  1027447080  49% /dtemp[OST:104]
-sfs-OST0069_UUID      2064245920  1004975972  1048712764  48% /dtemp[OST:105]
-sfs-OST006a_UUID      2064245920  1084540164   969157304  52% /dtemp[OST:106]
-sfs-OST006b_UUID      2064245920  1196168044   857520712  57% /dtemp[OST:107]
-sfs-OST006c_UUID      2064245920  1061778752   991903068  51% /dtemp[OST:108]
-sfs-OST006d_UUID      2064245920  1027008356  1026677916  49% /dtemp[OST:109]
-sfs-OST006e_UUID      2064245920  1039766492  1013915812  50% /dtemp[OST:110]
-sfs-OST006f_UUID      2064245920  1145531072   908160924  55% /dtemp[OST:111]
-sfs-OST0070_UUID      2064245920  1073432604   980256548  52% /dtemp[OST:112]
-sfs-OST0071_UUID      2064245920  1040646388  1013052688  50% /dtemp[OST:113]
-sfs-OST0072_UUID      2064245920  1080501192   973182680  52% /dtemp[OST:114]
-sfs-OST0073_UUID      2064245920  1130126556   923578552  54% /dtemp[OST:115]
-sfs-OST0074_UUID      2064245920  1219314512   834380732  59% /dtemp[OST:116]
-sfs-OST0075_UUID      2064245920  1099077204   954603912  53% /dtemp[OST:117]
-sfs-OST0076_UUID      2064245920  1172247528   881433476  56% /dtemp[OST:118]
-sfs-OST0077_UUID      2064245920  1029514300  1024132536  49% /dtemp[OST:119]
-sfs-OST0078_UUID      2064245920  1091720628   961961084  52% /dtemp[OST:120]
-sfs-OST0079_UUID      2064245920  1108579792   945112504  53% /dtemp[OST:121]
-sfs-OST007a_UUID      2064245920   996134068  1057564556  48% /dtemp[OST:122]
-sfs-OST007b_UUID      2064245920  1077044384   976639468  52% /dtemp[OST:123]
-sfs-OST007c_UUID      2064245920  1145309944   908385504  55% /dtemp[OST:124]
-sfs-OST007d_UUID      2064245920  1073612880   980068604  52% /dtemp[OST:125]
-sfs-OST007e_UUID      2064245920  1075483592   978201364  52% /dtemp[OST:126]
-sfs-OST007f_UUID      2064245920  1120388952   933310856  54% /dtemp[OST:127]
-sfs-OST0080_UUID      2064245920  1156587688   897128456  56% /dtemp[OST:128]
-sfs-OST0081_UUID      2064245920  1030957312  1022709824  49% /dtemp[OST:129]
-sfs-OST0082_UUID      2064245920   999881344  1053790940  48% /dtemp[OST:130]
-sfs-OST0083_UUID      2064245920  1095521408   958174240  53% /dtemp[OST:131]
-sfs-OST0084_UUID      2064245920  1221129792   832576716  59% /dtemp[OST:132]
-sfs-OST0085_UUID      2064245920   994100256  1059584780  48% /dtemp[OST:133]
-sfs-OST0086_UUID      2064245920  1160580632   893117576  56% /dtemp[OST:134]
-sfs-OST0087_UUID      2064245920  1192673900   861027648  57% /dtemp[OST:135]
-sfs-OST0088_UUID      2064245920  1061730172   991947440  51% /dtemp[OST:136]
-sfs-OST0089_UUID      2064245920  1163157924   890531400  56% /dtemp[OST:137]
-sfs-OST008a_UUID      2064245920  1018606752  1035074608  49% /dtemp[OST:138]
-sfs-OST008b_UUID      2064245920  1135650388   918033196  55% /dtemp[OST:139]
-sfs-OST008c_UUID      2064245920  1064232464   989443304  51% /dtemp[OST:140]
-sfs-OST008d_UUID      2064245920  1157718560   895964732  56% /dtemp[OST:141]
-sfs-OST008e_UUID      2064245920  1099315156   954369152  53% /dtemp[OST:142]
-sfs-OST008f_UUID      2064245920  1021270580  1032433420  49% /dtemp[OST:143]
-
-filesystem summary:  297251412480 158088513192 137265570408  53% /dtemp
-
-UUID                   1K-blocks        Used   Available Use% Mounted on
-vader-mds1_UUID       1834869856    13282676  1716729584   0% /mscf[MDT:0]
-vader-ost1_UUID       1334535272  1068848892   252068648  80% /mscf[OST:0]
-vader-ost2_UUID       1334535272  1103266920   217654380  82% /mscf[OST:1]
-vader-ost3_UUID       1334535272  1042379244   278463360  78% /mscf[OST:2]
-vader-ost4_UUID       1334535272  1043839320   277043180  78% /mscf[OST:3]
-vader-ost5_UUID       1334535272  1069106456   251805632  80% /mscf[OST:4]
-vader-ost6_UUID       1334535272  1063143776   257762956  79% /mscf[OST:5]
-vader-ost7_UUID       1334535272  1076778096   244094912  80% /mscf[OST:6]
-vader-ost8_UUID       1334535272  1032947836   287954436  77% /mscf[OST:7]
-vader-ost9_UUID       1334535272  1087367008   233610108  81% /mscf[OST:8]
-vader-ost10_UUID      1334535272  1095883032   225037608  82% /mscf[OST:9]
-vader-ost11_UUID      1334535272  1038984844   281938072  77% /mscf[OST:10]
-vader-ost12_UUID      1334535272  1080016528   240874192  80% /mscf[OST:11]
-vader-ost13_UUID      1334535272  1023102820   297807716  76% /mscf[OST:12]
-vader-ost14_UUID      1334535272   979408332   341486352  73% /mscf[OST:13]
-vader-ost15_UUID      1334535272  1099037168   221864212  82% /mscf[OST:14]
-vader-ost16_UUID      1334535272  1045873940   275045200  78% /mscf[OST:15]
-
-filesystem summary:  21352564352 16949984212  4184510964  79% /mscf
+----
+D. Marc Stearman
+Lustre Operations Lead
+marc at llnl.gov
+925.423.9670
+Pager: 1.888.203.0641
 
 
 
-UUID                      Inodes       IUsed       IFree IUse% Mounted on
-sfs-MDT0000_UUID       474870531    17235068   457635463   3% /dtemp[MDT:0]
-sfs-OST0000_UUID       131072000      933107   130138893   0% /dtemp[OST:0]
-sfs-OST0001_UUID       131072000      909959   130162041   0% /dtemp[OST:1]
-sfs-OST0002_UUID       131072000      863249   130208751   0% /dtemp[OST:2]
-sfs-OST0003_UUID       131072000      802817   130269183   0% /dtemp[OST:3]
-sfs-OST0004_UUID       131072000     1005695   130066305   0% /dtemp[OST:4]
-sfs-OST0005_UUID       131072000      816126   130255874   0% /dtemp[OST:5]
-sfs-OST0006_UUID       131072000      820701   130251299   0% /dtemp[OST:6]
-sfs-OST0007_UUID       131072000      945117   130126883   0% /dtemp[OST:7]
-sfs-OST0008_UUID       131072000      988375   130083625   0% /dtemp[OST:8]
-sfs-OST0009_UUID       131072000      962663   130109337   0% /dtemp[OST:9]
-sfs-OST000a_UUID       131072000     1004796   130067204   0% /dtemp[OST:10]
-sfs-OST000b_UUID       131072000      908056   130163944   0% /dtemp[OST:11]
-sfs-OST000c_UUID       131072000      977148   130094852   0% /dtemp[OST:12]
-sfs-OST000d_UUID       131072000      963137   130108863   0% /dtemp[OST:13]
-sfs-OST000e_UUID       131072000      788005   130283995   0% /dtemp[OST:14]
-sfs-OST000f_UUID       131072000      716657   130355343   0% /dtemp[OST:15]
-sfs-OST0010_UUID       131072000      997047   130074953   0% /dtemp[OST:16]
-sfs-OST0011_UUID       131072000      996429   130075571   0% /dtemp[OST:17]
-sfs-OST0012_UUID       131072000      925896   130146104   0% /dtemp[OST:18]
-sfs-OST0013_UUID       131072000      974211   130097789   0% /dtemp[OST:19]
-sfs-OST0014_UUID       131072000      983833   130088167   0% /dtemp[OST:20]
-sfs-OST0015_UUID       131072000      921903   130150097   0% /dtemp[OST:21]
-sfs-OST0016_UUID       131072000      938759   130133241   0% /dtemp[OST:22]
-sfs-OST0017_UUID       131072000      778331   130293669   0% /dtemp[OST:23]
-sfs-OST0018_UUID       131072000      940254   130131746   0% /dtemp[OST:24]
-sfs-OST0019_UUID       131072000      791892   130280108   0% /dtemp[OST:25]
-sfs-OST001a_UUID       131072000      981569   130090431   0% /dtemp[OST:26]
-sfs-OST001b_UUID       131072000      953077   130118923   0% /dtemp[OST:27]
-sfs-OST001c_UUID       131072000      891157   130180843   0% /dtemp[OST:28]
-sfs-OST001d_UUID       131072000      976900   130095100   0% /dtemp[OST:29]
-sfs-OST001e_UUID       131072000     1040702   130031298   0% /dtemp[OST:30]
-sfs-OST001f_UUID       131072000      976216   130095784   0% /dtemp[OST:31]
-sfs-OST0020_UUID       131072000      912421   130159579   0% /dtemp[OST:32]
-sfs-OST0021_UUID       131072000      927803   130144197   0% /dtemp[OST:33]
-sfs-OST0022_UUID       131072000      945489   130126511   0% /dtemp[OST:34]
-sfs-OST0023_UUID       131072000      929574   130142426   0% /dtemp[OST:35]
-sfs-OST0024_UUID       131072000      904851   130167149   0% /dtemp[OST:36]
-sfs-OST0025_UUID       131072000      947878   130124122   0% /dtemp[OST:37]
-sfs-OST0026_UUID       131072000      954019   130117981   0% /dtemp[OST:38]
-sfs-OST0027_UUID       131072000      777785   130294215   0% /dtemp[OST:39]
-sfs-OST0028_UUID       131072000      924282   130147718   0% /dtemp[OST:40]
-sfs-OST0029_UUID       131072000      921669   130150331   0% /dtemp[OST:41]
-sfs-OST002a_UUID       131072000      956530   130115470   0% /dtemp[OST:42]
-sfs-OST002b_UUID       131072000     1000389   130071611   0% /dtemp[OST:43]
-sfs-OST002c_UUID       131072000      797964   130274036   0% /dtemp[OST:44]
-sfs-OST002d_UUID       131072000      986655   130085345   0% /dtemp[OST:45]
-sfs-OST002e_UUID       131072000      887212   130184788   0% /dtemp[OST:46]
-sfs-OST002f_UUID       131072000      997138   130074862   0% /dtemp[OST:47]
-sfs-OST0030_UUID       131072000      976089   130095911   0% /dtemp[OST:48]
-sfs-OST0031_UUID       131072000      898961   130173039   0% /dtemp[OST:49]
-sfs-OST0032_UUID       131072000      930610   130141390   0% /dtemp[OST:50]
-sfs-OST0033_UUID       131072000      977095   130094905   0% /dtemp[OST:51]
-sfs-OST0034_UUID       131072000      993845   130078155   0% /dtemp[OST:52]
-sfs-OST0035_UUID       131072000      911942   130160058   0% /dtemp[OST:53]
-sfs-OST0036_UUID       131072000      924638   130147362   0% /dtemp[OST:54]
-sfs-OST0037_UUID       131072000      958901   130113099   0% /dtemp[OST:55]
-sfs-OST0038_UUID       131072000      979253   130092747   0% /dtemp[OST:56]
-sfs-OST0039_UUID       131072000      980803   130091197   0% /dtemp[OST:57]
-sfs-OST003a_UUID       131072000      791658   130280342   0% /dtemp[OST:58]
-sfs-OST003b_UUID       131072000      911553   130160447   0% /dtemp[OST:59]
-sfs-OST003c_UUID       131072000      854410   130217590   0% /dtemp[OST:60]
-sfs-OST003d_UUID       131072000      966392   130105608   0% /dtemp[OST:61]
-sfs-OST003e_UUID       131072000      972723   130099277   0% /dtemp[OST:62]
-sfs-OST003f_UUID       131072000      973009   130098991   0% /dtemp[OST:63]
-sfs-OST0040_UUID       131072000      900419   130171581   0% /dtemp[OST:64]
-sfs-OST0041_UUID       131072000      899906   130172094   0% /dtemp[OST:65]
-sfs-OST0042_UUID       131072000      949489   130122511   0% /dtemp[OST:66]
-sfs-OST0043_UUID       131072000      992597   130079403   0% /dtemp[OST:67]
-sfs-OST0044_UUID       131072000     1001642   130070358   0% /dtemp[OST:68]
-sfs-OST0045_UUID       131072000      951350   130120650   0% /dtemp[OST:69]
-sfs-OST0046_UUID       131072000      956321   130115679   0% /dtemp[OST:70]
-sfs-OST0047_UUID       131072000      732851   130339149   0% /dtemp[OST:71]
-sfs-OST0048_UUID       131072000      927208   130144792   0% /dtemp[OST:72]
-sfs-OST0049_UUID       131072000      914598   130157402   0% /dtemp[OST:73]
-sfs-OST004a_UUID       131072000      903386   130168614   0% /dtemp[OST:74]
-sfs-OST004b_UUID       131072000      938516   130133484   0% /dtemp[OST:75]
-sfs-OST004c_UUID       131072000      985172   130086828   0% /dtemp[OST:76]
-sfs-OST004d_UUID       131072000      956051   130115949   0% /dtemp[OST:77]
-sfs-OST004e_UUID       131072000      946741   130125259   0% /dtemp[OST:78]
-sfs-OST004f_UUID       131072000      897018   130174982   0% /dtemp[OST:79]
-sfs-OST0050_UUID       131072000      854290   130217710   0% /dtemp[OST:80]
-sfs-OST0051_UUID       131072000      958563   130113437   0% /dtemp[OST:81]
-sfs-OST0052_UUID       131072000      888145   130183855   0% /dtemp[OST:82]
-sfs-OST0053_UUID       131072000      798914   130273086   0% /dtemp[OST:83]
-sfs-OST0054_UUID       131072000      994307   130077693   0% /dtemp[OST:84]
-sfs-OST0055_UUID       131072000      876102   130195898   0% /dtemp[OST:85]
-sfs-OST0056_UUID       131072000      992537   130079463   0% /dtemp[OST:86]
-sfs-OST0057_UUID       131072000     1025381   130046619   0% /dtemp[OST:87]
-sfs-OST0058_UUID       131072000      883171   130188829   0% /dtemp[OST:88]
-sfs-OST0059_UUID       131072000      963811   130108189   0% /dtemp[OST:89]
-sfs-OST005a_UUID       131072000      956580   130115420   0% /dtemp[OST:90]
-sfs-OST005b_UUID       131072000     1018335   130053665   0% /dtemp[OST:91]
-sfs-OST005c_UUID       131072000      921394   130150606   0% /dtemp[OST:92]
-sfs-OST005d_UUID       131072000      997103   130074897   0% /dtemp[OST:93]
-sfs-OST005e_UUID       131072000      959395   130112605   0% /dtemp[OST:94]
-sfs-OST005f_UUID       131072000      957806   130114194   0% /dtemp[OST:95]
-sfs-OST0060_UUID       131072000      961372   130110628   0% /dtemp[OST:96]
-sfs-OST0061_UUID       131072000      876284   130195716   0% /dtemp[OST:97]
-sfs-OST0062_UUID       131072000      976349   130095651   0% /dtemp[OST:98]
-sfs-OST0063_UUID       131072000      927210   130144790   0% /dtemp[OST:99]
-sfs-OST0064_UUID       131072000      942963   130129037   0% /dtemp[OST:100]
-sfs-OST0065_UUID       131072000      927662   130144338   0% /dtemp[OST:101]
-sfs-OST0066_UUID       131072000      993961   130078039   0% /dtemp[OST:102]
-sfs-OST0067_UUID       131072000      952107   130119893   0% /dtemp[OST:103]
-sfs-OST0068_UUID       131072000      960114   130111886   0% /dtemp[OST:104]
-sfs-OST0069_UUID       131072000     1019083   130052917   0% /dtemp[OST:105]
-sfs-OST006a_UUID       131072000     1004608   130067392   0% /dtemp[OST:106]
-sfs-OST006b_UUID       131072000      891039   130180961   0% /dtemp[OST:107]
-sfs-OST006c_UUID       131072000      969055   130102945   0% /dtemp[OST:108]
-sfs-OST006d_UUID       131072000      963317   130108683   0% /dtemp[OST:109]
-sfs-OST006e_UUID       131072000      994995   130077005   0% /dtemp[OST:110]
-sfs-OST006f_UUID       131072000      887923   130184077   0% /dtemp[OST:111]
-sfs-OST0070_UUID       131072000      968551   130103449   0% /dtemp[OST:112]
-sfs-OST0071_UUID       131072000      947606   130124394   0% /dtemp[OST:113]
-sfs-OST0072_UUID       131072000      941221   130130779   0% /dtemp[OST:114]
-sfs-OST0073_UUID       131072000      912978   130159022   0% /dtemp[OST:115]
-sfs-OST0074_UUID       131072000      866475   130205525   0% /dtemp[OST:116]
-sfs-OST0075_UUID       131072000      943833   130128167   0% /dtemp[OST:117]
-sfs-OST0076_UUID       131072000      966207   130105793   0% /dtemp[OST:118]
-sfs-OST0077_UUID       131072000      925939   130146061   0% /dtemp[OST:119]
-sfs-OST0078_UUID       131072000      878610   130193390   0% /dtemp[OST:120]
-sfs-OST0079_UUID       131072000      972294   130099706   0% /dtemp[OST:121]
-sfs-OST007a_UUID       131072000      983109   130088891   0% /dtemp[OST:122]
-sfs-OST007b_UUID       131072000      992429   130079571   0% /dtemp[OST:123]
-sfs-OST007c_UUID       131072000      884171   130187829   0% /dtemp[OST:124]
-sfs-OST007d_UUID       131072000      984967   130087033   0% /dtemp[OST:125]
-sfs-OST007e_UUID       131072000      974043   130097957   0% /dtemp[OST:126]
-sfs-OST007f_UUID       131072000      904518   130167482   0% /dtemp[OST:127]
-sfs-OST0080_UUID       131072000      803345   130268655   0% /dtemp[OST:128]
-sfs-OST0081_UUID       131072000      988062   130083938   0% /dtemp[OST:129]
-sfs-OST0082_UUID       131072000      952675   130119325   0% /dtemp[OST:130]
-sfs-OST0083_UUID       131072000      910066   130161934   0% /dtemp[OST:131]
-sfs-OST0084_UUID       131072000      895140   130176860   0% /dtemp[OST:132]
-sfs-OST0085_UUID       131072000     1036804   130035196   0% /dtemp[OST:133]
-sfs-OST0086_UUID       131072000      892136   130179864   0% /dtemp[OST:134]
-sfs-OST0087_UUID       131072000      809896   130262104   0% /dtemp[OST:135]
-sfs-OST0088_UUID       131072000      786857   130285143   0% /dtemp[OST:136]
-sfs-OST0089_UUID       131072000      789836   130282164   0% /dtemp[OST:137]
-sfs-OST008a_UUID       131072000     1034379   130037621   0% /dtemp[OST:138]
-sfs-OST008b_UUID       131072000      887163   130184837   0% /dtemp[OST:139]
-sfs-OST008c_UUID       131072000      975873   130096127   0% /dtemp[OST:140]
-sfs-OST008d_UUID       131072000      921621   130150379   0% /dtemp[OST:141]
-sfs-OST008e_UUID       131072000      992654   130079346   0% /dtemp[OST:142]
-sfs-OST008f_UUID       131072000      936173   130135827   0% /dtemp[OST:143]
 
-filesystem summary:    474870531    17235068   457635463   3% /dtemp
+On Apr 21, 2011, at 3:56 PM, Andreas Dilger wrote:
 
-UUID                      Inodes       IUsed       IFree IUse% Mounted on
-vader-mds1_UUID        486297503    30900708   455396795   6% /mscf[MDT:0]
-vader-ost1_UUID         68167938     1746343    66421595   2% /mscf[OST:0]
-vader-ost2_UUID         59548367     1730686    57817681   2% /mscf[OST:1]
-vader-ost3_UUID         74872494     1833651    73038843   2% /mscf[OST:2]
-vader-ost4_UUID         74466464     1792689    72673775   2% /mscf[OST:3]
-vader-ost5_UUID         68137249     1780726    66356523   2% /mscf[OST:4]
-vader-ost6_UUID         69541748     1694569    67847179   2% /mscf[OST:5]
-vader-ost7_UUID         66083245     1644111    64439134   2% /mscf[OST:6]
-vader-ost8_UUID         77159492     1762644    75396848   2% /mscf[OST:7]
-vader-ost9_UUID         63563009     1770994    61792015   2% /mscf[OST:8]
-vader-ost10_UUID        61284780     1621740    59663040   2% /mscf[OST:9]
-vader-ost11_UUID        75684308     1796701    73887607   2% /mscf[OST:10]
-vader-ost12_UUID        65304005     1674597    63629408   2% /mscf[OST:11]
-vader-ost13_UUID        79549121     1690897    77858224   2% /mscf[OST:12]
-vader-ost14_UUID        84738048     1577666    83160382   1% /mscf[OST:13]
-vader-ost15_UUID        60569734     1695209    58874525   2% /mscf[OST:14]
-vader-ost16_UUID        74029395     1864062    72165333   2% /mscf[OST:15]
-
-filesystem summary:    486297503    30900708   455396795   6% /mscf
-
-
------Original Message-----
-From: lustre-devel-bounces@lists.lustre.org [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Andreas Dilger
-Sent: Thursday, April 21, 2011 11:40 AM
-To: lustre-discuss at lists.lustre.org discuss; lustre-devel at lists.lustre.org Mailing List
-Subject: [Lustre-devel] Research on filesystem metadata operation distribution
-
-I'm trying to get some data about the relative distribution of MDS operations in the wild, and I'd be grateful if some people with production filesystems that have been running for at least a week could collect some simple stats and email them to me.  They can be collected by any regular user on the MDS node:
-
-    lctl get_param mds.*.stats | egrep "open|close|rename|link|attr|sync"
-
-It would be useful to also include "lfs df" and "lfs df -i" information, as well as a brief description of what the filesystem is used for (scratch, home, project, archive, etc).
-
-
-
-As a reminder, I'm also interested if some Lustre admins could run the "fsstats" tool from http://www.pdsi-scidac.org/fsstats/ and send me the output.  Sending the output to PDSI via their submission form may also produce some positive results.
-
-    http://www.pdsi-scidac.org/fsstats/files/fsstats-1.4.5.tar.gz
-
-
-Thanks in advance for any data.  I've set replies to go only to lustre-devel, to avoid clogging the larger readership of lustre-discuss, but it may be useful for others to have this in a list archive and/or searchable via Google in the future so I don't necessarily want to keep it all to myself.
-
-Cheers, Andreas
---
-Andreas Dilger
-Principal Engineer
-Whamcloud, Inc.
-
-
-
-_______________________________________________
-Lustre-devel mailing list
-Lustre-devel at lists.lustre.org
-http://lists.lustre.org/mailman/listinfo/lustre-devel
+> On Apr 20, 2011, at 11:07 AM, Nathan Rutman wrote:
+>> We're about to start looking into 64-bit inodes on ext4 -- anybody else working on this at the moment?
+> 
+> I don't know of anyone other than Fujitsu that are looking at this.  I haven't had any kind of technical discussion with them about it, nor looked at their code, but just implied that this is what they did based on their slides.
+> 
+> One important consideration to note with 64-bit inode numbers is that they cannot be used safely on 1.8 MDS filesystems.  That is because the IGIF FID namespace only has room for 2^32 inode numbers (mapped into the 2.x FID SEQ field, see ), so upgrading a 1.8 MDS with 64-bit inode numbers to 2.x would cause a huge world of hurt.  If this is limited to 2.x filesystems that only identify MDS inodes via FIDs to the clients then this is not a concern.
+> 
+> If you are concerned with being able to upgrade 32-bit inode filesystems into 64-bit inode filesystems, you should look at the data-in-dirent patch that is currently in the 2.x ldiskfs patchset.  It was developed to allow storing the 128-bit Lustre FID in the directory entry in a compatible manner, but was also designed to allow storing the high 32 bits of a 64-bit inode number into the directory entry.  That allows compatibility for upgrades by avoiding the need to atomically upgrade a whole directory full of dirents to have 64-bit inode number fields.  It also avoids the need to store 64-bit inode numbers when most of them are 32-bit values.
+> 
+> 
+> I'm not against the idea of exploring this approach, but I am concerned that e2fsck time will continue to grow with the number of inodes in a single filesystem, and scalability of a single MDT will increasingly be an issue.  
+> 
+> AFAIK, e2fsck times are currently on the order of 1h/100M inodes, and no Lustre filesystems that I know of are above 500M inodes today just due to the average file size being so large and the long e2fsck times.  With improvements in ext4 to reduce e2fsck time like flex_bg, and SSDs, it may be possible to reduce the e2fsck time/inode ratio noticeably, but I think it would take more effort on the e2fsck side than the ext4 side to make many billions of inodes in a single MDT a practical approach.
+> 
+> Things like metadata prefetching that Dave Dillow was doing for e2scan with event-driven completion handlers that process the blocks whenever they arrive from the disk, and multi-threading some of the passes of e2fsck with an understanding of the underlying disk layout (using the s_raid_stride and s_raid_stripe_width).
+> 
+> Cheers, Andreas
+> --
+> Andreas Dilger 
+> Principal Engineer
+> Whamcloud, Inc.
+> 
+> 
+> 
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
