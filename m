@@ -1,19 +1,46 @@
-From: Peter Jones <pjones@whamcloud.com>
-Date: Wed, 27 Apr 2011 14:19:51 -0700
-Subject: [Lustre-devel] [PATCH] Fix task IO accounting on reads
-In-Reply-To: <001F682B-CF29-4835-8A0B-5BBFA4021715@whamcloud.com>
-References: <alpine.LFD.2.01.1104261356450.21670@sys880.ldn.framestore.com>	<5870C1C1-3775-4CC8-B619-C79B6799D6E5@whamcloud.com>	<alpine.LFD.2.01.1104270854090.20691@sys880.ldn.framestore.com>	<3059315E-A6DA-4AC1-BEB9-B3AF7E48AC36@whamcloud.com>	<alpine.LFD.2.01.1104271806090.9273@sys880.ldn.framestore.com>
-	<001F682B-CF29-4835-8A0B-5BBFA4021715@whamcloud.com>
-Message-ID: <4DB88877.6000000@whamcloud.com>
+From: Eric Barton <eeb@whamcloud.com>
+Date: Fri, 29 Apr 2011 00:04:37 +0100
+Subject: [Lustre-devel] F/S stats visualisation
+Message-ID: <008a01cc05f8$a6b26840$f41738c0$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Oracle will also require that a contributor agreement is submitted - see 
-http://wiki.lustre.org/index.php/Contribution_Policy
+Hi,
 
-On 11-04-27 2:15 PM, Andreas Dilger wrote:
-> <snip>
-> for inclusion into the next 1.8 release the updated patch should be attached to a new bug at bugzilla.lustre.org, and a review requested on the patch (I can be one of the reviewers).
+I've made some histograms that visualise the F/S stats people have
+so kindly sent in.  There are a couple of surprises which seem to
+do with how the filesystems were set up (e.g. huge #s of inodes
+reserved but not used on OSTs) and used (different ratios of ops).
+
+The attached PDF has a summary for each filesystem containing...
+
+* Filesystem name
+
+* Ratio of MDS 1K blocks to MDS inodes
+  Ratio of OST 1K blocks to MDS inodes
+  Ratio of OST inodes to MDS inodes
+
+* Histogram of operation counts
+
+* Histogram of blocks total (blue) and used (red) on the MDS
+  and all OSTs
+
+* Histogram of inodes total (blue) and used (red) on the MDS
+  and all OSTs 
+
+...hope you find it useful.
+
+          Cheers,
+                   Eric
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Lustre stats.pdf
+Type: application/pdf
+Size: 619235 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110429/e5fbfcf5/attachment.pdf>
