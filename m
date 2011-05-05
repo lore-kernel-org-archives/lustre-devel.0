@@ -1,27 +1,49 @@
-From: Erich Focht <efocht@gmail.com>
-Date: Wed, 04 May 2011 18:36:36 +0200
-Subject: [Lustre-devel] accessing object version from user space?
-In-Reply-To: <AD1E6969-051D-41AA-BE5D-E89F114C0317@whamcloud.com>
-References: <4DBFF92D.6070304@gmail.com>
-	<AD1E6969-051D-41AA-BE5D-E89F114C0317@whamcloud.com>
-Message-ID: <4DC18094.6050007@gmail.com>
+From: vilobh meshram <meshram.vilobh@gmail.com>
+Date: Thu, 5 May 2011 02:57:19 -0400
+Subject: [Lustre-devel] Fwd: Question on path name resolution in Lustre
+In-Reply-To: <BANLkTimoh3K1NCv_RC1HMdpko4zk=BGTcA@mail.gmail.com>
+References: <BANLkTimoh3K1NCv_RC1HMdpko4zk=BGTcA@mail.gmail.com>
+Message-ID: <BANLkTik18X7bWw21F8E-wK2wzyG3spLdDA@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 05/03/2011 09:35 PM, Andreas Dilger wrote:
-> On May 3, 2011, at 06:46, Erich Focht wrote:
->> is there a way to access the file objects version information (epoch, transno, whatever is used
->> for version based recovery) from user space? If yes, is that possible for lustre 1.8.x, too?
->> Looking for a way to check (quickly) whether a file has changed while copying it away...
-> 
-> Comparing the ctime at the start/end of the copy should be enough for that.
+---------- Forwarded message ----------
+From: vilobh meshram <meshram.vilobh@gmail.com>
+Date: Thu, May 5, 2011 at 2:37 AM
+Subject: Question on path name resolution in Lustre
+To: lustre-discuss <lustre-discuss@lists.lustre.org>,
+lusre-devel at lists.lustre.org
 
-You mean ctime of Lustre file, or ctime of file objects on OSTs? Is there a nice way to access those?
-Maybe I'm a bit paranoid, but what if a client loses connection to MDS while continuing to write to
-OSTs? Just a thought...
 
-Thanks & best regards,
-Erich
+Hi,
+
+I have noticed that for file or directory kind of operation in Lustre, the
+Lock Manager grabs an EX (Exclusive lock) on the parent directory and then
+creates a directory or file inside it.Is there a specific reason behind this
+logic or implementation.
+
+e.g. : If we want to create foo.txt in /d1/d2/d3/d4/d5/foo.txt
+
+We grab the lock on /d1
+then we grab the lock on /d1/d2
+then we grab the lock on /d1/d2/d3
+then we grab the lock on /d1/d2/d3/d4
+then we grab the lock on /d1/d2/d3/d4/d5
+then we create the file.
+This is what I have seen in logs.
+
+Is this the correct method followed during first time file access or file
+creation ?
+
+If yes then how is the performance when the directory depth is very high ?
+
+If no can you explain me how it happens.
+
+Thanks,
+Vilobh
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110505/65724222/attachment.htm>
