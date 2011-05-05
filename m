@@ -1,35 +1,94 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Thu, 5 May 2011 10:48:45 -0600
-Subject: [Lustre-devel] accessing object version from user space?
-In-Reply-To: <4DC18094.6050007@gmail.com>
-References: <4DBFF92D.6070304@gmail.com>
-	<AD1E6969-051D-41AA-BE5D-E89F114C0317@whamcloud.com>
-	<4DC18094.6050007@gmail.com>
-Message-ID: <5468F3C7-6632-435F-B437-C2BA2AAD3968@whamcloud.com>
+From: Thomas Roth <t.roth@gsi.de>
+Date: Thu, 05 May 2011 19:54:55 +0200
+Subject: [Lustre-devel] [Lustre-discuss] Research on filesystem metadata
+	operation	distribution
+In-Reply-To: <C09F427D-51DA-420F-83B6-D10F30347750@whamcloud.com>
+References: <C09F427D-51DA-420F-83B6-D10F30347750@whamcloud.com>
+Message-ID: <4DC2E46F.5020509@gsi.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On May 4, 2011, at 10:36, Erich Focht wrote:
-> On 05/03/2011 09:35 PM, Andreas Dilger wrote:
->> On May 3, 2011, at 06:46, Erich Focht wrote:
->>> is there a way to access the file objects version information (epoch, transno, whatever is used
->>> for version based recovery) from user space? If yes, is that possible for lustre 1.8.x, too?
->>> Looking for a way to check (quickly) whether a file has changed while copying it away...
->> 
->> Comparing the ctime at the start/end of the copy should be enough for that.
-> 
-> You mean ctime of Lustre file, or ctime of file objects on OSTs? Is there a
-> nice way to access those?
-> Maybe I'm a bit paranoid, but what if a client loses connection to MDS while
-> continuing to write to OSTs? Just a thought...
+At GSI, we have
 
-The ctime is derived from the latest ctime of the MDS inode and OST objects (ctime is not allowed to go backward), so even if the client is disconnected from the MDS it will get the latest ctime from the OSTs if the files are being modified there.
+lctl get_param mds.*.stats | egrep "open|close|rename|link|attr|sync"
+open                      10302752480 samples [reqs]
+close                     528292519 samples [reqs]
+unlink                    22292174 samples [reqs]
+rename                    542512 samples [reqs]
+getxattr                  408511496 samples [reqs]
+setxattr                  838368 samples [reqs]
+setattr                   27097846 samples [reqs]
+getattr                   738233548 samples [reqs]
 
-Cheers, Andreas
---
-Andreas Dilger 
-Principal Engineer
-Whamcloud, Inc.
+Output of 'lfs df' is attached.
+
+The filesystem is used for storing HEP data from theory calculations, 
+simulations and HEP experimental data for use in analysis. People also 
+use it as a software repository, to compile their programs (ouch) and as 
+a general purpose distributed file system (a certain sysadmin is known 
+to store his music files there).
+
+Regards,
+Thomas
+
+On 04/21/2011 08:40 PM, Andreas Dilger wrote:
+> I'm trying to get some data about the relative distribution of MDS operations in the wild, and I'd be grateful if some people with production filesystems that have been running for at least a week could collect some simple stats and email them to me.  They can be collected by any regular user on the MDS node:
+>
+>      lctl get_param mds.*.stats | egrep "open|close|rename|link|attr|sync"
+>
+> It would be useful to also include "lfs df" and "lfs df -i" information, as well as a brief description of what the filesystem is used for (scratch, home, project, archive, etc).
+>
+>
+>
+> As a reminder, I'm also interested if some Lustre admins could run the "fsstats" tool from http://www.pdsi-scidac.org/fsstats/ and send me the output.  Sending the output to PDSI via their submission form may also produce some positive results.
+>
+>      http://www.pdsi-scidac.org/fsstats/files/fsstats-1.4.5.tar.gz
+>
+>
+> Thanks in advance for any data.  I've set replies to go only to lustre-devel, to avoid clogging the larger readership of lustre-discuss, but it may be useful for others to have this in a list archive and/or searchable via Google in the future so I don't necessarily want to keep it all to myself.
+>
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Principal Engineer
+> Whamcloud, Inc.
+>
+>
+>
+> _______________________________________________
+> Lustre-discuss mailing list
+> Lustre-discuss at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-discuss
+
+
+-- 
+--------------------------------------------------------------------
+Thomas Roth
+Department: Informationstechnologie
+
+GSI Helmholtzzentrum f?r Schwerionenforschung GmbH
+Planckstra?e 1
+64291 Darmstadt
+www.gsi.de
+
+Gesellschaft mit beschr?nkter Haftung
+Sitz der Gesellschaft: Darmstadt
+Handelsregister: Amtsgericht Darmstadt, HRB 1528
+
+Gesch?ftsf?hrung: Professor Dr. Dr. h.c. Horst St?cker,
+Dr. Hartmut Eickhoff
+
+Vorsitzende des Aufsichtsrates: Dr. Beatrix Vierkorn-Rudolph
+Stellvertreter: Ministerialdirigent Dr. Rolf Bernhardt
+
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: lfs_df
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110505/c14cc51a/attachment.asc>
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: lfs_df_i
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110505/c14cc51a/attachment.txt>
