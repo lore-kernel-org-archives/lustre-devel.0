@@ -1,97 +1,130 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Thu, 5 May 2011 12:05:42 -0600
-Subject: [Lustre-devel] Research on filesystem metadata
-	operation	distribution
-In-Reply-To: <4DC2E46F.5020509@gsi.de>
-References: <C09F427D-51DA-420F-83B6-D10F30347750@whamcloud.com>
-	<4DC2E46F.5020509@gsi.de>
-Message-ID: <37E4262C-6108-4F84-B883-6FF4E7B497A6@whamcloud.com>
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Fri, 06 May 2011 14:53:31 -0700
+Subject: [Lustre-devel] Technical debt in the lustre build system
+Message-ID: <4DC46DDB.4000906@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On May 5, 2011, at 11:54, Thomas Roth wrote:
-> At GSI, we have
-> 
-> lctl get_param mds.*.stats | egrep "open|close|rename|link|attr|sync"
-> open                      10302752480 samples [reqs]
-> close                     528292519 samples [reqs]
-> unlink                    22292174 samples [reqs]
-> rename                    542512 samples [reqs]
-> getxattr                  408511496 samples [reqs]
-> setxattr                  838368 samples [reqs]
-> setattr                   27097846 samples [reqs]
-> getattr                   738233548 samples [reqs]
-> 
-> Output of 'lfs df' is attached.
+Eric Barton has been raising awareness about the need to address 
+technical debt in the lustre code base.  I think we should also start 
+talking about the technical debt in the lustre build system.
 
-While it wasn't my original goal in asking for this data, a question I've been asking all of the sites that have filesystems with OSTs of different sizes is whether they use (and/or continue to use) an external process for balancing the space used on the OSTs (e.g. migrating of files, or marking OSTs inactive on the MDS once they have reached some threshold of space usage), or if the existing space balancing mechanism in the MDS was able to get this relatively uniform space utilization?
+Overtime, we've cobbled together a very complex, and very fragile build 
+system for lustre.  Every time I work on the build system, my 
+frustration level builds and I am tempted to pull the whole thing apart 
+and start from scratch.  But when I am thinking more rationally, I admit 
+that a more evolutionary approach to improving the build system would be 
+more likely to succeed.
 
-> The filesystem is used for storing HEP data from theory calculations, simulations and HEP experimental data for use in analysis. People also use it as a software repository, to compile their programs (ouch) and as a general purpose distributed file system (a certain sysadmin is known to store his music files there).
-> 
-> Regards,
-> Thomas
-> 
-> On 04/21/2011 08:40 PM, Andreas Dilger wrote:
->> I'm trying to get some data about the relative distribution of MDS operations in the wild, and I'd be grateful if some people with production filesystems that have been running for at least a week could collect some simple stats and email them to me.  They can be collected by any regular user on the MDS node:
->> 
->>     lctl get_param mds.*.stats | egrep "open|close|rename|link|attr|sync"
->> 
->> It would be useful to also include "lfs df" and "lfs df -i" information, as well as a brief description of what the filesystem is used for (scratch, home, project, archive, etc).
->> 
->> 
->> 
->> As a reminder, I'm also interested if some Lustre admins could run the "fsstats" tool from http://www.pdsi-scidac.org/fsstats/ and send me the output.  Sending the output to PDSI via their submission form may also produce some positive results.
->> 
->>     http://www.pdsi-scidac.org/fsstats/files/fsstats-1.4.5.tar.gz
->> 
->> 
->> Thanks in advance for any data.  I've set replies to go only to lustre-devel, to avoid clogging the larger readership of lustre-discuss, but it may be useful for others to have this in a list archive and/or searchable via Google in the future so I don't necessarily want to keep it all to myself.
->> 
->> Cheers, Andreas
->> --
->> Andreas Dilger
->> Principal Engineer
->> Whamcloud, Inc.
->> 
->> 
->> 
->> _______________________________________________
->> Lustre-discuss mailing list
->> Lustre-discuss at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-discuss
-> 
-> 
-> -- 
-> --------------------------------------------------------------------
-> Thomas Roth
-> Department: Informationstechnologie
-> 
-> GSI Helmholtzzentrum f?r Schwerionenforschung GmbH
-> Planckstra?e 1
-> 64291 Darmstadt
-> www.gsi.de
-> 
-> Gesellschaft mit beschr?nkter Haftung
-> Sitz der Gesellschaft: Darmstadt
-> Handelsregister: Amtsgericht Darmstadt, HRB 1528
-> 
-> Gesch?ftsf?hrung: Professor Dr. Dr. h.c. Horst St?cker,
-> Dr. Hartmut Eickhoff
-> 
-> Vorsitzende des Aufsichtsrates: Dr. Beatrix Vierkorn-Rudolph
-> Stellvertreter: Ministerialdirigent Dr. Rolf Bernhardt
-> 
-> <lfs_df.txt><lfs_df_i.txt>_______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+So I'd like to start a discussion about where we need to go with the 
+build system.  Here are some of the things off the top of my head that 
+are problems that need to be addressed, or improvements that I think we 
+should make.
 
+1) The recursive configure system should be removed.
 
-Cheers, Andreas
---
-Andreas Dilger 
-Principal Engineer
-Whamcloud, Inc.
+Each system that requires its own build system should be a standalone 
+package.  Each standalone package should have proper Requires:, 
+BuildRequires:, Provides:, etc. in the .spec file for rpm.  Appropriate 
+equivalents should be used in other packaging systems (deb).
+
+ldiskfs is a good candidate for this.  With the changes to support 
+multiple backend filesystems, making the backends separate packages 
+makes even more sense than it did in the past.  In fact, LLNL has 
+already packaged ldiskfs separately for 2.1.  It would be great if the 
+rest of the community adopted this approach in a future release.
+
+I am guessing that the snmp directory could easily be its own package as 
+well.
+
+Lets identify more things like that.
+
+2) Installed files need serious cleanup and reorganization.  Case in 
+point, the main lustre package installs this file:
+
+   /usr/bin/config.sh
+
+This pretty much wins the lifetime award for Poorly Named Command In A 
+Standard Path Location.  There are many others such as obdfilter-survey, 
+ost-survey, parse-ior, plot-obdfilter, etc. that are clearly useful 
+testing tools, but inappropriate for the main lustre rpm package.
+
+3) Remove old build system tools dealing with CVS or Subversion 
+repositories.  We've moved to git, and it is clearly superior.  We are 
+not going back.  It is time to remove the cruft.
+
+4) make_META.pl -> version_tag.pl.  Why is make_META.pl part of the 
+build system and just a symlink to version_tag.pl?  I don't understand 
+the rationale on this one.  Mighty confusing when you need to fix a bug 
+in make_META.pl, but no file named make_META.pl exists in your source tree.
+
+5) Need to keep in mind that third parties will be building this, and 
+will need the flexibility to have their own tags and versioning schemes. 
+  We can partly do this now, but it needs improvement.
+
+Some of the code to check git version numbers and tags and such seems 
+like it was well intentioned, but just adds too much complexity to an 
+already complex problem.  Lets look into ways to simplify this.
+
+6) The lustre.spec file.
+
+Lets face it, rpm's spec language is just awful.  But it is what we are 
+stuck with for most of our platforms, so we need to figure out how to 
+live with it.  Lustre's spec file is a bit of a mess now, and pretty 
+difficult for those of us downstream to use unmodified.  Some of the 
+previous suggestions will naturally improve the state of the spec file, 
+but additional improvements are needed.  I think we should take another 
+look at the decision to parse --with-linux and --with-linux-objs out of 
+%configure_args.  It just makes the interactions between various rpm 
+variables and configure arguments too complex, in my opinion.
+
+I think that we can take some inspiration here from Brian Behlendorf's 
+zfs-modules.spec.in file in his ZFS repo:
+
+   https://github.com/behlendorf/zfs
+
+Brian has gone to great lengths to make ZFS buildable under just about 
+every Linux distro under the sun, and I still am able to understand his 
+spec file.  I can't say the same for Lustre's spec file, and lustre 
+doesn't build nearly as cleanly.
+
+Grantly, lustre is a bit more complex in ways...but by splitting the 
+code into multiple projects I think we can reduce the spec file complexity.
+
+7) build/lbuild-*
+
+What is this stuff?  Does anyone outside of the core CFS/Sun/Oracle/etc. 
+team use this?  Seriously, if you do, please speak up.
+
+I know that LLNL has never used it.  Frankly, I think it should be 
+removed from the main Lustre tree.  My impression, from a brief skimming 
+of the files, is that they are the automated build system that upstream 
+has used to generate kernel packages, lustre packages, and maybe IB 
+packages.
+
+LLNL uses an automated build environment based on buildbot that builds 
+lustre and all of our other packages under a chroot environment 
+individually created for each package by "mock".  It contains only the 
+rpms needed by the package, which enforces that we have to have our spec 
+file dependencies correct (another reason why the lustre.spec often 
+doesn't work for us).
+
+That is a bit of a digression, but my point is this: we probably all 
+have our own build systems to contend with.  Those scripts shouldn't be 
+part of the main lustre tree.  They should be a separate package, or 
+just Whamcloud's internal scripts if no one else is using them.
+
+8) Lustre .src.rpm should be rebuildable.  It is now, more-or-less, but 
+could use improvement.
+
+So where do we go from here?  I think we should set up a wiki page to 
+plan the overhaul, and start opening bugs to track individual changes 
+that need to be made.
+
+Make a large overhaul for 2.1 is out of the question, but perhaps we can 
+make many of the changes in the next release.
+
+Chris
