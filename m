@@ -1,64 +1,40 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Thu, 12 May 2011 10:37:51 -0700
-Subject: [Lustre-devel] replacing Lustre pings with LNet Peer Health
-In-Reply-To: <4DCBF565.3060602@cray.com>
-References: <4DCBF565.3060602@cray.com>
-Message-ID: <4DCC1AEF.8020705@llnl.gov>
+From: Chris <chris@whamcloud.com>
+Date: Thu, 12 May 2011 19:10:53 +0100
+Subject: [Lustre-devel] Technical debt in the lustre build system
+In-Reply-To: <mailman.5319.1305221323.23683.lustre-devel@lists.lustre.org>
+References: <mailman.5319.1305221323.23683.lustre-devel@lists.lustre.org>
+Message-ID: <4DCC22AD.3050602@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I think Eric's approach is the only sane way I've heard to reduce pings.
 
-Here are some issues that I see with this:
+>> I think it would be great to see small incremental patches that fix the problems that you have detailed here. Some of them appear to be very minor changes (i.e. extra files included in the RPM packages, or poorly-named files).
+> I totally agree; I definitely think this needs an incremental approach.
+>    But also a concerted effort to drive those incremental changes.
+>
+> LLNL has tried to push up patches to clean up some of those minor
+> changes in the past and failed to gain traction.  Maybe we just didn't
+> push hard enough.  So this time I want to keep pushing.  And get more
+> people involved so hopefully they'll understand where the incremental
+> changes are leading.
+>
+Perhaps the right approach is to create a specification or document that 
+fully outlines what the objective is and get sign-up from the broader 
+community before work is started. The incremental changes can then refer 
+to the 'master document' to illustrate the reason for the change.
 
-1)  For your solution to work, you require that the lnet layer take on 
-pinging duties.  Usually the network, be it IB, TCP, whatever, will not 
-provide any active notification of a peer failure.  To notice that a 
-peer has died, the lnet LND must, you guessed it, ping.
+Little steps are a good way of making sure that we don't trip over, but 
+without an agreed long term target they don't allow people to be sure 
+where the changes are taking them.
 
-Usually the LNDs try to be smart.  They only generate their own pings if 
-no traffic has been sent to the peer in a certain period of time.  So 
-once you eliminate the higher-level pings, they will partly be replaced 
-by lower-level pings.
-
-2)  Doesn't work in a routed environment.  Would need a health network 
-for clients behind routers to learn that a server has died, and vice versa.
-
-On 05/12/2011 07:57 AM, Nic Henke wrote:
-> Just floating an idea... I'd much appreciate any feedback
->
-> Given bug 12471 where the ptlrpc pinger traffic on a large system can
-> approach the ridiculous (2.6M pings every 75s for 160 OSTs and 16K
-> clients), I'd like to consider getting rid of the pings entirely.
->
-> The idea would be to extend the idea in the attached patch where we add
-> an upper layer callback for lnet_notify() signaling a peer going down or
-> up. The ptlrpc pinger code would be then changed to record the 'down'
-> event for an import/export which would then start an eviction timer that
-> started when the LNet peer was last_alive. If the nodes comes 'up'
-> before the timer expires, no eviction. The eviction code would then only
-> operate on nodes with 'down' events and trusting that the rest are all
-> ok and functional.
->
-> Eric - I know this doesn't get us that far down the road toward your new
-> health network, but does solve a near term issue with pinger rates on
-> large systems.
->
-> Issues...
->
-> - lacks "proof" that peer nodes ptlrpc queues are moving forward, but
-> not really sure that is all that important in terms of pinger evictions.
->
-> - LNet peer health is a bit "weird" in that it requires an upper layer
-> sending a packet to trigger a node moving back to 'up'. We would need to
-> address this for proper LNet peer health as it is.
->
-> - Might need some beefing up of the standard LNDs to ensure we have good
-> peer health data.
->
-> Thoughts ?
->
-> Nic
+Chris
+---
+Chris Gearing
+Snr Engineer
+Whamcloud. Inc.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110512/6b4bdb30/attachment.htm>
