@@ -1,43 +1,49 @@
-From: rf at q-leap.de <rf@q-leap.de>
-Date: Tue, 17 May 2011 16:58:16 +0200
-Subject: [Lustre-devel] F/S stats visualisation
-In-Reply-To: <20110517135653.GC14133@granier.hd.free.fr>
-References: <008a01cc05f8$a6b26840$f41738c0$@com>
-	<84D90924-025F-4ABA-89BD-58C43C8FCDD9@ddn.com>
-	<20110502154328.GG14743@granier.hd.free.fr>
-	<19902.54024.358967.444979@gargle.gargle.HOWL>
-	<20110502163259.GI14743@granier.hd.free.fr>
-	<19922.22109.288864.530108@gargle.gargle.HOWL>
-	<20110517120305.GD2142@granier.hd.free.fr>
-	<19922.26225.948666.896428@gargle.gargle.HOWL>
-	<20110517124757.GG2142@granier.hd.free.fr>
-	<19922.31602.740562.879134@gargle.gargle.HOWL>
-	<20110517135653.GC14133@granier.hd.free.fr>
-Message-ID: <19922.36104.370380.764472@gargle.gargle.HOWL>
+From: Isaac Huang <isaac_huang@xyratex.com>
+Date: Tue, 17 May 2011 16:53:24 -0600
+Subject: [Lustre-devel] replacing Lustre pings with LNet Peer Health
+In-Reply-To: <4DCBF565.3060602@cray.com>
+References: <4DCBF565.3060602@cray.com>
+Message-ID: <20110517225324.GA2007@xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->>>>> "Johann" == Johann Lombardi <johann@whamcloud.com> writes:
+On Thu, May 12, 2011 at 09:57:41AM -0500, Nic Henke wrote:
+> ......
+> Issues...
+> 
+> - lacks "proof" that peer nodes ptlrpc queues are moving forward,
+> but not really sure that is all that important in terms of pinger
+> evictions.
+> 
+> - LNet peer health is a bit "weird" in that it requires an upper
+> layer sending a packet to trigger a node moving back to 'up'. We
+> would need to address this for proper LNet peer health as it is.
 
-    Johann> On Tue, May 17, 2011 at 03:43:14PM +0200, rf at q-leap.de
-    Johann> wrote:
-    >> I see. Unfortunately, we need that many inodes ...
+The idea was that if upper layer has no interest sending him a message
+LNet is not bothered whether he's become "up" again. But care must be
+taken such that a message from upper layer must not be dropped if it's
+destined to a peer that appears "dead" but LNet isn't so sure of it,
+i.e. that death news was too old and we haven't tried to get some
+update yet. All is so that unnecessary pings could be cut off.
 
-    Johann> Well, in your case, you could just remove the culprit code
-    Johann> from fsfilt_ext3_statfs(), as done here:
-    Johann> http://review.whamcloud.com/#patch,sidebyside,480,8,lustre/lvfs/fsfilt_ext3.c
+This is also why router pinger can't be replaced by Peer Health -
+there'd be no more message to a dead router without router pinger
+being active.
 
-Ok, that's easy. Thanks a lot for the pointer.
+As others have pointed out, Peer Health is not end-to-end.
 
-    >> Great. Thanks a lot for this hint. Do you know whether this will
-    >> eneter the 1.8 branch as well?
-
-    Johann> I would ask this question in the bugzilla ticket to have an
-    Johann> answer from someone from Oracle.
-
-I will.
-
-Roland
+Thanks,
+Isaac
+______________________________________________________________________
+This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
+ 
+Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
+ 
+Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
+ 
+The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
+______________________________________________________________________
+ 
