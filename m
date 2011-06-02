@@ -1,35 +1,24 @@
-From: Liang Zhen <liang@whamcloud.com>
-Date: Tue, 31 May 2011 23:56:11 +0800
-Subject: [Lustre-devel] Lustre and Multicore
-In-Reply-To: <BANLkTimHiGZtmzNEPNs-DRdNQk5Bg8wduQ@mail.gmail.com>
-References: <BANLkTimHiGZtmzNEPNs-DRdNQk5Bg8wduQ@mail.gmail.com>
-Message-ID: <85FA5B23-7B16-4FC1-8D9B-7E6D1B98AFB5@whamcloud.com>
+From: wang <wang@cray.com>
+Date: Wed, 1 Jun 2011 19:33:31 -0700
+Subject: [Lustre-devel] discontiguous kiov pages
+Message-ID: <4DE6F67B.6040207@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Vilobh,
+Our gnilnd is running into a hole in kiov list in Lustre 2.1:
 
-We do have work-in-progress for performance on multicores (http://jira.whamcloud.com/browse/LU-56), but these changes will be almost transparent to users, and they have nothing to do with lustre protocol.
+LustreError: 17837:0:(gnilnd_cb.c:594:kgnilnd_setup_phys_buffer()) Can't make payload
+contiguous in I/O VM:page 17, offset 0, nob 6350, kiov_offset 0 kiov_len 2254
+LustreError: 17837:0:(gnilnd_cb.c:1751:kgnilnd_send()) unable to setup buffer: -22
 
-Regards
-Liang
+Is it now legal for an internal IOV (or KIOV) page to have less than a full page size ?
 
-On May 31, 2011, at 5:56 PM, vilobh meshram wrote:
+It used to be that only the first and last page in an IOV were allowed 
+to be of a offset + length < PAGE_SIZE.
 
-> Hi ,
-> 
-> Wanted to understand will the design of Lustre(Client/MDS/OSS) change if we have Multicores.
-> 
-> Thanks,
-> Vilobh
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+It doesn't have this problem with 1.8 client and 2.1 server.
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110531/b5f4d422/attachment.htm>
+Wally
