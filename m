@@ -1,7 +1,7 @@
 From: Jianwei Liao <liaotoad@gmail.com>
-Date: Wed, 22 Jun 2011 12:44:38 +0900
-Subject: [Lustre-devel] MDS recovery in Lustre
-Message-ID: <BANLkTinomA6vF3N3oBQy64sH2tdZUtehyQ@mail.gmail.com>
+Date: Wed, 22 Jun 2011 12:49:06 +0900
+Subject: [Lustre-devel] MDS recovery
+Message-ID: <BANLkTikudy_LFXZHr1NP6wfYr8c6fpSujQ@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -24,4 +24,4 @@ Thank you very much.
 Best regards,
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110622/5af776c7/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110622/60a802fc/attachment.htm>
