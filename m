@@ -1,27 +1,28 @@
-From: Jianwei Liao <liaotoad@gmail.com>
-Date: Wed, 22 Jun 2011 12:52:34 +0900
-Subject: [Lustre-devel] MDS recovery
-Message-ID: <BANLkTi=SBNhfTz+L6Ly21KdWuhj+1wO+BA@mail.gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 22 Jun 2011 17:00:51 +0100 (BST)
+Subject: [Lustre-devel] SuSE server support
+Message-ID: <alpine.LFD.2.00.1106221653050.5547@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi all,
-I am a new comer to Lustre.
-Recently, I have read some documents about Lustre file system and am
-interested in MDS recovery.
-1) I was wondering that during MDS recovery(resend, and replay etc.), both
-the clients who involved in the recovery or the others(who are not involved
-in the recovery process) could access the MDS to get the file information or
-not.
-Simply speaking, during MDS recovery, is the MDS available or not?
-2) Compared with non-VBR recovery, how about the time needed for MDS
-recovery while using VBR.
 
-Thank you very much.
-Best regards,
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110622/9239900b/attachment.htm>
+Hello.
+
+	I just finsihed up the SuSE code port of ldiskfs for Lustre 2.1.
+The link is http://jira.whamcloud.com/browse/LU-335 and the git branch is
+http://review.whamcloud.com/#change,575. Currently two SuSE versions are 
+supported.
+
+SuSE SP0 - 2.6.27.48-0.12.1
+SuSE SP1 - 2.6.32.12-0.7
+ 
+SP0 is at the end line but at my work we still will need to support it. As 
+for SP1 that is a moving target. In order for SP1 support to work at all 
+parties involved must agree on a single kernel version to work with, which 
+is one of the reasons I posted this message. The second reason is to have
+people test this code out. Please don't use it in a production 
+environment :-) It could eat your data!! Thank  you.
+ 
