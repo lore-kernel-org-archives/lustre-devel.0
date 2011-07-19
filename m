@@ -1,34 +1,32 @@
 From: Richard Henwood <rhenwood@whamcloud.com>
-Date: Tue, 19 Jul 2011 09:31:42 -0500
+Date: Tue, 19 Jul 2011 12:03:28 -0500
 Subject: [Lustre-devel] [PATCH] Fix task IO accounting on reads
-In-Reply-To: <alpine.LFD.2.01.1104261356450.21670@sys880.ldn.framestore.com>
+In-Reply-To: <alpine.LFD.2.01.1107191701270.9249@sys880.ldn.framestore.com>
 References: <alpine.LFD.2.01.1104261356450.21670@sys880.ldn.framestore.com>
-Message-ID: <CAA6TbrM8LSL41forun6bFgaV5gvRju0rJaJJd3piFPQTwTkSJA@mail.gmail.com>
+	<CAA6TbrM8LSL41forun6bFgaV5gvRju0rJaJJd3piFPQTwTkSJA@mail.gmail.com>
+	<alpine.LFD.2.01.1107191701270.9249@sys880.ldn.framestore.com>
+Message-ID: <CAA6TbrMDSSKE1MwyjBhjP1Tfm2j=ZEhriestOFKM=kr0NQUBmw@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Apr 26, 2011 at 11:06 AM, Mark Hills <Mark.Hills@framestore.com> wrote:
-> We've often found it inconvenient that reads from Lustre mounts do not
-> correctly increment IO counts (/proc/<pid>/io).
+On Tue, Jul 19, 2011 at 11:08 AM, Mark Hills <Mark.Hills@framestore.com> wrote:
+<snip>
 >
-> Below is a patch which aims to fix this functionality.
+> I was aware of these stats (and this patch), but I concluded that they did
+> not track memory mapped access.
 >
-> The symptom is that writes are accounted for, but not reads. It seems that
-> the accounting it normally done in the kernels page writeback and
-> readahead functionality. Therefore as Lustre implements its own readahead,
-> it must also maintain its own accounting on reads (but not writes).
+> So I think our patches address two separate parts of the process. But I'm
+> happy to be corrected -- it was some time ago that I did this.
 >
 
-Hi Mark;
+It was indeed a while ago, and I'm sorry I missed this conversation
+when it was current!
 
-Are you aware of the (soon to land) patch:
-Lustre client procfs stats: read_bytes does not record the number of
-bytes transfered from the fs:
-http://jira.whamcloud.com/browse/LU-333
-
+It seems that both patches have the same motivation for reliable read
+stats, but the patches are different with complementary approaches.
 
 richard,
 -- 
