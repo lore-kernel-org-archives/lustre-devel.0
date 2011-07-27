@@ -1,10 +1,10 @@
 From: Mark Hills <Mark.Hills@framestore.com>
-Date: Wed, 27 Jul 2011 18:33:10 +0100 (BST)
+Date: Wed, 27 Jul 2011 19:57:57 +0100 (BST)
 Subject: [Lustre-devel] Hangs with cgroup memory controller
 In-Reply-To: <BE324D9D-3D7B-4D9E-8F3D-316F259871FC@whamcloud.com>
 References: <alpine.LFD.2.01.1107271556070.7176@sys880.ldn.framestore.com>
 	<BE324D9D-3D7B-4D9E-8F3D-316F259871FC@whamcloud.com>
-Message-ID: <alpine.LFD.2.01.1107271820040.6411@sys880.ldn.framestore.com>
+Message-ID: <alpine.LFD.2.01.1107271922560.7176@sys880.ldn.framestore.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,42 +13,70 @@ To: lustre-devel@lists.lustre.org
 
 On Wed, 27 Jul 2011, Andreas Dilger wrote:
 
-> Two ideas come to mind. On is that the reason you are having difficulty 
-> to reproduce the problem is that it only happens after some fault 
-> condition. Possibly you need the client to do recovery to an OST and 
-> resend a bulk RPC, or resend due to a checksum error?
-
-Is there an easy way to trigger some error cases like this?
-
-> It might also be due to application IO types (e.g. mmap, direct IO, 
-> pwrite, splice, etc).
-
-Yes, of course. Although I didn't gather any statistics, there wasn't a 
-clear standout application which was more affected than others.
-
+[...] 
 > Possibly you can correlate reproducer cases with Lustre errors on the 
 > console?
 
-Back when I tried this last year on the production system, I wasn't able 
-to see corresponding errors. But I don't have any of this data around any 
-more.
+I've managed to catch the bad state, on a clean client too -- there's no 
+errors reported from Lustre in dmesg.
 
-I'd need to do some tests on the production system to capture one case.
+Here's the information reported by the cgroup. It seems that there's a 
+discrepancy of 2x pages (the 'cache' field, pgpgin, pgpgout).
 
-> Lustre also has memory debugging that can be enabled, but without a 
-> reasonably concise reproducer it would be difficult to log/analyze so 
-> much data for hours of runtime.
+The process which was in the group terminated a long time ago.
 
-If I am able to capture a case, is there a way to, for example, dump a 
-list of Lustre pages still held by the client? And correlate these with 
-the files in question?
+I can leave the machine in this state until tomorrow, so any suggestions 
+for data to capture that could help trace this bug would be welcomed. 
+Thanks.
 
-What I am thinking is that I could stop the running processes and attempt 
-to drain all the pages, and this could hopefully leave a small number of 
-'bad' ones -- with the files in question I could at least help to identify 
-the I/O type.
+# cd /cgroup/p25321
 
-Thanks for your reply
+# echo 1 > memory.force_empty
+<hangs: the bug>
+
+# cat tasks
+<none>
+
+# cat memory.max_usage_in_bytes 
+1281351680
+
+# cat memory.usage_in_bytes 
+8192
+
+# cat memory.stat 
+cache 8192                   <--- two pages
+rss 0
+mapped_file 0
+pgpgin 396369                <--- two pages higher than pgpgout
+pgpgout 396367
+swap 0
+inactive_anon 0
+active_anon 0
+inactive_file 0
+active_file 0
+unevictable 0
+hierarchical_memory_limit 8388608000
+hierarchical_memsw_limit 10485760000
+total_cache 8192
+total_rss 0
+total_mapped_file 0
+total_pgpgin 396369
+total_pgpgout 396367
+total_swap 0
+total_inactive_anon 0
+total_active_anon 0
+total_inactive_file 0
+total_active_file 0
+total_unevictable 0
+
+# echo 1 > /proc/sys/vm/drop_caches
+<success>
+
+# echo 2 > /proc/sys/vm/drop_caches
+<success>
+
+# cat memory.stat
+<same as above>
 
 -- 
 Mark
