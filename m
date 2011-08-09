@@ -1,95 +1,112 @@
-From: Mark Hills <Mark.Hills@framestore.com>
-Date: Thu, 4 Aug 2011 18:24:28 +0100 (BST)
-Subject: [Lustre-devel] Bad page state after unlink (was Re: Hangs with
- cgroup memory controller)
-In-Reply-To: <alpine.LFD.2.01.1107291504480.15112@sys880.ldn.framestore.com>
-References: <alpine.LFD.2.01.1107271556070.7176@sys880.ldn.framestore.com>
-	<BE324D9D-3D7B-4D9E-8F3D-316F259871FC@whamcloud.com>
-	<alpine.LFD.2.01.1107271922560.7176@sys880.ldn.framestore.com>
-	<5DBD4462-2AAA-4657-9EBB-9633336DD972@whamcloud.com>
-	<alpine.LFD.2.01.1107281415530.6411@sys880.ldn.framestore.com>
-	<E33CBAC5-08FA-49CA-970C-605A4DBE7B3B@whamcloud.com>
-	<alpine.LFD.2.01.1107291504480.15112@sys880.ldn.framestore.com>
-Message-ID: <alpine.LFD.2.01.1108041707220.8709@sys880.ldn.framestore.com>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Tue, 9 Aug 2011 09:27:52 -0600
+Subject: [Lustre-devel] Parallel Data Storage Workshop 2011 CFP
+References: <CAGfFL-xcEjZQS_9ALQMroj242jBTSUSqYAdH+A80SyK4G3Nm2w@mail.gmail.com>
+Message-ID: <7464F82C-89F3-4DB7-B121-9A071A664754@dilger.ca>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, 29 Jul 2011, Mark Hills wrote:
 
-[...]
-> Hosts with Lustre mounted via an NFS gateway perform flawlessly for months 
-> (and they still have Lustre modules loaded.) Whereas a host with Lustre 
-> mounted directly (and no other changes) fails -- it can be made to block a 
-> cgroup in 10 minutes or so.
+6th Parallel Data Storage Workshop
+Sunday, November 13, 2011, 9:00am - 5:30pm
+http://www.pdsi-scidac.org/events/PDSW11/
+Held in conjunction with SC11 in Seattle, WA 
 
-Following this up, I seem to have a reproducable test case of a page bug, 
-on a kernel with more debugging features.
+************************
+PDSW11 CALL FOR PAPERS
+************************
+Workshop Abstract: Computational scientists are no longer satisfied with
+petascale infrastructures.  Their demands for finer and finer spatial and
+temporal resolutions are driving parallel storage systems to larger and larger
+scales of parallelism and concurrency.  This scale creates new problems and
+exacerbates old ones in areas such as storage capacity, performance,
+concurrency, data retrieval, reliability, availability, and manageability.
+Additionally, new technologies such as cloud storage are encouraging scientists
+to preserve more old data and to expand their analyses to include data 
+from a wider range of previous computations.  Paying special attention to
+issues in which community collaboration can be crucial such as problem
+identification, workload capture, solution interoperability, standards with
+community buy-in, and shared tools, this one-day workshop seeks contributions
+in the form of papers and posters on relevant topics, including but not limited
+to: 
 
-At first it appeared with Bonnie. I looked more closely and the bug occurs 
-on unlink() of the file shortly after it was written to. Presumably with 
-pages still in the local cache (pending writes?) It seems unlink is 
-affected, but not truncate.
+* performance and benchmarking results and tools, 
+* failure tolerance, 
+* APIs and protocols for high performance features, 
+* parallel file systems, 
+* high bandwidth storage architectures, 
+* wide area file systems, 
+* metadata intensive workloads, 
+* information extraction,
+* autonomics for HPC storage, 
+* checkpoint/restart,  
+* virtualization for storage systems,
+* archival storage advances, and 
+* resource management innovations.
 
-  $ dd if=/dev/zero of=/net/lustre/file bs=4096 count=1
-  $ rm /net/lustre/file
-  BUG: Bad page state in process rm  pfn:21fe6a
-  page:ffffea00076fa730 flags:800000000000000c count:0 mapcount:0 mapping:(null) index:1
+************************
+Paper Submissions:
+************************
+Due: Friday, September 16, 2011, 11:59 PM PDT
+Notification: Tuesday, October 11, 2011
+Camera-ready due: Sunday, November 6, 2011
+Slides due: Friday, Nov. 11, 2011 
 
-If there is a delay of a few seconds before the rm, all is okay. Truncate 
-works, but a subsequent unlink rm can fail if it is quick enough.
+The parallel data storage workshop holds a peer reviewed competitive process
+for selecting extended abstracts and short papers.  Submit a not previously
+published extended abstract of up to 5 pages, not less than 10 point font, in a
+PDF file as instructed on the workshop web site.  Submitted papers will be
+reviewed under the supervision of the workshop program committee. Submissions
+should indicate authors and affiliations.  Final papers must not be longer than
+5 pages.  Selected papers and associated talk slides will be made available on
+the workshop web site; the papers will also be published in the digital library
+of the IEEE or ACM. 
 
-The task does not need to be running in a cgroup for the "Bad page" to be 
-reported, although the kernel is build with cgroup.
+************************
+Poster Submissions:
+************************
+Due: Monday, November 7, 2011, 11:59 PM PDT
+Notification: Wednesday, November 19, 2011
 
-I can't be certain this is the same bug seen on the production system 
-(which uses packaged kernel etc.) but it seems like a good start :-) It 
-also correlates with it. It seems the production kernel glosses over this 
-bug, but when a cgroup is used the symptoms start to show.
+The PDSW program committee highly encourages authors of accepted papers to
+present posters of their work. Additional submissions for technical poster
+presentation will be considered if they are marked as such and include title
+and author list and a short abstract. Further specifications for poster
+production will be available on the workshop web site.
 
-  $ uname -a
-  Linux joker 2.6.32.28-mh #27 SMP PREEMPT Thu Aug 4 17:15:46 BST 2011 x86_64 x86_64 x86_64 GNU/Linux
+************************
+Program Committee:
+************************
+John Bent, Los Alamos National Laboratory (PC Chair)
+Randal Burns, Johns Hopkins University 
+Andreas Dilger, Whamcloud, Inc. 
+Yong Chen, Texas Tech University 
+Haryadi Gunawi, University of California, Berkeley 
+Adam Manzanares, Los Alamos National Laboratory 
+Dutch Meyer, University of British Columbia 
+Ethan Miller, University of California, Santa Cruz 
+Ron Oldfield, Sandia National Laboratory 
+Vijayan Prabhakaran, Microsoft Research 
+Karsten Schwan, Georgia Tech 
+Brad Settlemyer, Oak Ridge National Laboratory 
+Raju Rangaswami, Florida International University 
+Doug Thain, University of Notre Dame 
+Rob Ross, Argonne National Laboratory 
 
-  Lustre source: Git 9302433 (beyond v1_8_6_80)
-  Reproduced with 1.8.6 server (Whamcloud release), and also 1.8.3.
-
-Thanks
-
--- 
-Mark
-
-
-BUG: Bad page state in process rm  pfn:21fe6a
-page:ffffea00076fa730 flags:800000000000000c count:0 mapcount:0 mapping:(null) index:1
-Pid: 24724, comm: rm Tainted: G    B      2.6.32.28-mh #27
-Call Trace:
- [<ffffffff81097ebc>] ? bad_page+0xcc/0x130
- [<ffffffffa059f119>] ? ll_page_removal_cb+0x1e9/0x4d0 [lustre]
- [<ffffffffa03b17a3>] ? __ldlm_handle2lock+0x93/0x3b0 [ptlrpc]
- [<ffffffffa04c6522>] ? cache_remove_lock+0x182/0x268 [osc]
- [<ffffffffa04ad95d>] ? osc_extent_blocking_cb+0x29d/0x2d0 [osc]
- [<ffffffff81383920>] ? _spin_unlock+0x10/0x30
- [<ffffffffa03b23a5>] ? ldlm_cancel_callback+0x55/0xe0 [ptlrpc]
- [<ffffffffa03cb3c7>] ? ldlm_cli_cancel_local+0x67/0x340 [ptlrpc]
- [<ffffffff81383920>] ? _spin_unlock+0x10/0x30
- [<ffffffffa03cd65a>] ? ldlm_cancel_list+0xea/0x230 [ptlrpc]
- [<ffffffffa02e1312>] ? lnet_md_unlink+0x42/0x2d0 [lnet]
- [<ffffffff81383920>] ? _spin_unlock+0x10/0x30
- [<ffffffffa03cd939>] ? ldlm_cancel_resource_local+0x199/0x2b0 [ptlrpc]
- [<ffffffffa029a629>] ? cfs_alloc+0x89/0xf0 [libcfs]
- [<ffffffffa04b0c22>] ? osc_destroy+0x112/0x720 [osc]
- [<ffffffffa05608ab>] ? lov_prep_destroy_set+0x27b/0x960 [lov]
- [<ffffffff8138374e>] ? _spin_lock_irqsave+0x1e/0x50
- [<ffffffffa054adc4>] ? lov_destroy+0x584/0xf40 [lov]
- [<ffffffffa05575ed>] ? lov_unpackmd+0x4bd/0x8e0 [lov]
- [<ffffffffa05d9e98>] ? ll_objects_destroy+0x4c8/0x1820 [lustre]
- [<ffffffffa03f7cbe>] ? lustre_swab_buf+0xfe/0x180 [ptlrpc]
- [<ffffffff8138374e>] ? _spin_lock_irqsave+0x1e/0x50
- [<ffffffffa05db940>] ? ll_unlink_generic+0x2e0/0x3a0 [lustre]
- [<ffffffff810d7309>] ? vfs_unlink+0x89/0xd0
- [<ffffffff810e634c>] ? mnt_want_write+0x5c/0xb0
- [<ffffffff810dac89>] ? do_unlinkat+0x199/0x1d0
- [<ffffffff810cc8d5>] ? sys_faccessat+0x1a5/0x1f0
- [<ffffffff8100b5ab>] ? system_call_fastpath+0x16/0x1b
+************************
+Steering Committee:
+************************
+Scott Brandt, University of California, Santa Cruz
+Evan J. Felix, Pacific Northwest National Laboratory
+Garth A. Gibson, Carnegie Mellon University and Panasas Inc.
+Gary Grider, Los Alamos National Laboratory
+Peter Honeyman, University of Michigan, Ann Arbor, Center for Information Technology Integration
+Bill Kramer, National Center for Supercomputing Applications/University of Illinois Urbana-Champaign
+Darrell Long, University of California, Santa Cruz
+Carlos Maltzahn, University of California, Santa Cruz
+Philip C. Roth, Oak Ridge National Laboratory
+John Shalf, National Energy Research Scientific Computing Center, Lawrence Berkeley National Laboratory
+Lee Ward, Sandia National Laboratories
