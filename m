@@ -1,117 +1,61 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Fri, 19 Aug 2011 17:17:58 -0600
-Subject: [Lustre-devel] Fwd: Parallel Data Storage Workshop 2011 CFP
-References: <7464F82C-89F3-4DB7-B121-9A071A664754@dilger.ca>
-Message-ID: <BB0789DA-6566-4C9A-B01C-58CF44137CAC@whamcloud.com>
+From: Nathan Rutman <Nathan_Rutman@xyratex.com>
+Date: Wed, 24 Aug 2011 12:12:46 -0700
+Subject: [Lustre-devel] MRP-203 obdfilter not able to serve more then 32
+	requests in parallel
+In-Reply-To: <73AED5C780AE05478241DB067651A9210237875E@XYUS-EX22.xyus.xyratex.com>
+References: <73AED5C780AE05478241DB067651A9210237875E@XYUS-EX22.xyus.xyratex.com>
+Message-ID: <73AED5C780AE05478241DB067651A92102378760@XYUS-EX22.xyus.xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-6th Parallel Data Storage Workshop
-Sunday, November 13, 2011, 9:00am - 5:30pm
-http://www.pdsi-scidac.org/events/PDSW11/
-Held in conjunction with SC11 in Seattle, WA 
+Thanks Oleg.
+cc'ing lustre-devel
 
-************************
-PDSW11 CALL FOR PAPERS
-************************
-Workshop Abstract: Computational scientists are no longer satisfied with
-petascale infrastructures.  Their demands for finer and finer spatial and
-temporal resolutions are driving parallel storage systems to larger and larger
-scales of parallelism and concurrency.  This scale creates new problems and
-exacerbates old ones in areas such as storage capacity, performance,
-concurrency, data retrieval, reliability, availability, and manageability.
-Additionally, new technologies such as cloud storage are encouraging scientists
-to preserve more old data and to expand their analyses to include data 
-from a wider range of previous computations.  Paying special attention to
-issues in which community collaboration can be crucial such as problem
-identification, workload capture, solution interoperability, standards with
-community buy-in, and shared tools, this one-day workshop seeks contributions
-in the form of papers and posters on relevant topics, including but not limited
-to: 
 
-* performance and benchmarking results and tools, 
-* failure tolerance, 
-* APIs and protocols for high performance features, 
-* parallel file systems, 
-* high bandwidth storage architectures, 
-* wide area file systems, 
-* metadata intensive workloads, 
-* information extraction,
-* autonomics for HPC storage, 
-* checkpoint/restart,  
-* virtualization for storage systems,
-* archival storage advances, and 
-* resource management innovations.
+On Aug 24, 2011, at 11:22 AM, Oleg Drokin wrote:
 
-************************
-Paper Submissions:
-************************
-Due: Friday, September 16, 2011, 11:59 PM PDT
-Notification: Tuesday, October 11, 2011
-Camera-ready due: Sunday, November 6, 2011
-Slides due: Friday, Nov. 11, 2011 
 
-The parallel data storage workshop holds a peer reviewed competitive process
-for selecting extended abstracts and short papers.  Submit a not previously
-published extended abstract of up to 5 pages, not less than 10 point font, in a
-PDF file as instructed on the workshop web site.  Submitted papers will be
-reviewed under the supervision of the workshop program committee. Submissions
-should indicate authors and affiliations.  Final papers must not be longer than
-5 pages.  Selected papers and associated talk slides will be made available on
-the workshop web site; the papers will also be published in the digital library
-of the IEEE or ACM. 
+	Increasing number of dirs is fine by me, but it has implications for upgrading and downgrading.
+	For example I think number of dirs is really hardcoded everywhere instead of using value in server data.
+	Also if you want to change the value on existing OST, we need a rehash functionality,
+	and then using older releases on such filesystems would lead to corruptions which also needs to be avoided somehow.
 
-************************
-Poster Submissions:
-************************
-Due: Monday, November 7, 2011, 11:59 PM PDT
-Notification: Wednesday, November 19, 2011
 
-The PDSW program committee highly encourages authors of accepted papers to
-present posters of their work. Additional submissions for technical poster
-presentation will be considered if they are marked as such and include title
-and author list and a short abstract. Further specifications for poster
-production will be available on the workshop web site.
 
-************************
-Program Committee:
-************************
-John Bent, Los Alamos National Laboratory (PC Chair)
-Randal Burns, Johns Hopkins University 
-Andreas Dilger, Whamcloud, Inc. 
-Yong Chen, Texas Tech University 
-Haryadi Gunawi, University of California, Berkeley 
-Adam Manzanares, Los Alamos National Laboratory 
-Dutch Meyer, University of British Columbia 
-Ethan Miller, University of California, Santa Cruz 
-Ron Oldfield, Sandia National Laboratory 
-Vijayan Prabhakaran, Microsoft Research 
-Karsten Schwan, Georgia Tech 
-Brad Settlemyer, Oak Ridge National Laboratory 
-Raju Rangaswami, Florida International University 
-Doug Thain, University of Notre Dame 
-Rob Ross, Argonne National Laboratory 
+On Aug 24, 2011, at 11:06 AM, Nathan Rutman wrote:
 
-************************
-Steering Committee:
-************************
-Scott Brandt, University of California, Santa Cruz
-Evan J. Felix, Pacific Northwest National Laboratory
-Garth A. Gibson, Carnegie Mellon University and Panasas Inc.
-Gary Grider, Los Alamos National Laboratory
-Peter Honeyman, University of Michigan, Ann Arbor, Center for Information Technology Integration
-Bill Kramer, National Center for Supercomputing Applications/University of Illinois Urbana-Champaign
-Darrell Long, University of California, Santa Cruz
-Carlos Maltzahn, University of California, Santa Cruz
-Philip C. Roth, Oak Ridge National Laboratory
-John Shalf, National Energy Research Scientific Computing Center, Lawrence Berkeley National Laboratory
-Lee Ward, Sandia National Laboratories
 
-Cheers, Andreas
---
-Andreas Dilger 
-Principal Engineer
-Whamcloud, Inc.
+		currently we have to use 32 directories for object in OST. but for large scale OST it isn't enough. 
+		so we need to able to extend that number to ~1024 or more.
+
+		
+		
+
+	This was brought up at LUG (presentation attached below) and my recollection is that Oleg had some strong opinions on this -- maybe not increasing the number of dirs but certainly on any locking changes.  Oleg -- did you have any objection to increasing the number of object directories?
+	
+	
+	130-200_Ben_Evans_LUG ... - OLCF.ORNL.GOV <http://www.olcf.ornl.gov/wp-content/events/lug2011/4-13-2011/130-200_Ben_Evans_LUG-2011_Ben_Evans_V3.pptx> 
+	
+	
+	
+
+
+
+
+______________________________________________________________________
+This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
+ 
+Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
+ 
+Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
+ 
+The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
+______________________________________________________________________
+ 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110824/8a126482/attachment.htm>
