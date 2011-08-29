@@ -1,100 +1,40 @@
-From: Kilian CAVALOTTI <kilian.cavalotti.work@gmail.com>
-Date: Thu, 25 Aug 2011 11:56:02 +0200
+From: Nathan Rutman <Nathan_Rutman@xyratex.com>
+Date: Mon, 29 Aug 2011 13:22:54 -0500
 Subject: [Lustre-devel] Changelogs and xattrs
-Message-ID: <CAJz=VjFQPXFuQ=BBK3wF5UJXe_2RLv9CR=Bpi5h_8tYAH4i5xg@mail.gmail.com>
+In-Reply-To: <CAJz=VjFQPXFuQ=BBK3wF5UJXe_2RLv9CR=Bpi5h_8tYAH4i5xg@mail.gmail.com>
+References: <CAJz=VjFQPXFuQ=BBK3wF5UJXe_2RLv9CR=Bpi5h_8tYAH4i5xg@mail.gmail.com>
+Message-ID: <97EAD37B-9FD1-417A-9F37-B7538F193B7F@us.xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi all,
-
-Using version 2.0, I noticed that changelogs emitted on extended
-attributes modification depend on the namespace the xattr belongs to.
-
-For instance, when setting an attribute in user.*, an XATTR changelog
-is recorded:
-
-root:~ # setfattr -n user.foo -v bar /mnt/lustre/file
-root:~ # getfattr -d -m user.* /mnt/lustre/file
-getfattr: Removing leading '/' from absolute path names
-# file: mnt/lustre/file
-user.foo="bar"
-root:~ # lfs changelog lustre-MDT0000
-19810 00MARK ?09:17:11.709504920 2011.08.25 0x0 t=[0x40001:0x0:0x0]
-p=[0:0x0:0x0] mdd_obd-lustre-MDT0000-0
-19811 15XATTR 09:17:17.932504772 2011.08.25 0x0 t=[0x200000401:0x1634:0x0]
-
-But when I try to set an attribute in trusted.*, system.* or
-security.* the recorded changelog is of the CTIME type:
-
-root:~ # lfs changelog_clear lustre-MDT0000 cl1 0
-root:~ # lfs changelog lustre-MDT0000
-19825 00MARK ?09:30:00.495488159 2011.08.25 0x0 t=[0x40001:0x0:0x0]
-p=[0:0x0:0x0] mdd_obd-lustre-MDT0000-0
-root:~ # setfattr -n trusted.foo -v bar /mnt/lustre/testfile
-root:~ # lfs changelog lustre-MDT0000
-19825 00MARK ?09:30:00.495488159 2011.08.25 0x0 t=[0x40001:0x0:0x0]
-p=[0:0x0:0x0] mdd_obd-lustre-MDT0000-0
-19826 18CTIME 09:30:27.887487611 2011.08.25 0x4 t=[0x200000401:0x1634:0x0]
-
-Note: the CTIME changelog is only recorded after the changelogs have
-been cleared after setting an attributed in user.*. When it's not, no
-changelog is recorded at all for subsequent changes in
-{trusted,security,system}.*
-
-When the first attribute is set in user.*, an XATTR event is recorded
-in the changelog. After that, any attribute modification in
-{trusted,security,system}.* does not generate any changelog. But a
-modification in user.* still does.
-
-root:~ # lfs changelog_clear lustre-MDT0000 cl1 0
-root:~ # setfattr -n user.foo -v bar /mnt/lustre/testfile
-root:~ # lfs changelog lustre-MDT0000
-19827 00MARK ?09:34:31.733482876 2011.08.25 0x0 t=[0x40001:0x0:0x0]
-p=[0:0x0:0x0] mdd_obd-lustre-MDT0000-0
-19828 15XATTR 09:34:37.653482765 2011.08.25 0x0 t=[0x200000401:0x1634:0x0]
-root:~ # setfattr -n trusted.foo -v bar /mnt/lustre/testfile
-root:~ # lfs changelog lustre-MDT0000
-19827 00MARK ?09:34:31.733482876 2011.08.25 0x0 t=[0x40001:0x0:0x0]
-p=[0:0x0:0x0] mdd_obd-lustre-MDT0000-0
-19828 15XATTR 09:34:37.653482765 2011.08.25 0x0 t=[0x200000401:0x1634:0x0]
-root:~ # setfattr -n security.foo -v bar /mnt/lustre/testfile
-root:~ # lfs changelog lustre-MDT0000
-19827 00MARK ?09:34:31.733482876 2011.08.25 0x0 t=[0x40001:0x0:0x0]
-p=[0:0x0:0x0] mdd_obd-lustre-MDT0000-0
-19828 15XATTR 09:34:37.653482765 2011.08.25 0x0 t=[0x200000401:0x1634:0x0]
-root:~ # setfattr -n user.foo -v bar /mnt/lustre/testfile
-root:~ # lfs changelog lustre-MDT0000
-19827 00MARK ?09:34:31.733482876 2011.08.25 0x0 t=[0x40001:0x0:0x0]
-p=[0:0x0:0x0] mdd_obd-lustre-MDT0000-0
-19828 15XATTR 09:34:37.653482765 2011.08.25 0x0 t=[0x200000401:0x1634:0x0]
-19829 15XATTR 09:35:16.723482030 2011.08.25 0x0 t=[0x200000401:0x1634:0x0]
 
 
-Quickly looking at the code, it seems indeed that only user xattr
-changes are recorded. In lustre/mdd/mdd_object.c:
+On Aug 29, 2011, at 10:22 AM, "Kilian CAVALOTTI" <kilian.cavalotti.work@gmail.com> wrote:
 
-static int mdd_xattr_set(const struct lu_env *env, struct md_object *obj,
-                         const struct lu_buf *buf, const char *name,
-                         int fl)
-{
+> Hi all,
+> 
+> Using version 2.0, I noticed that changelogs emitted on extended
+> attributes modification depend on the namespace the xattr belongs to.
 ...
-        /* Only record user xattr changes */
-        if ((rc == 0) && (strncmp("user.", name, 5) == 0))
-                rc = mdd_changelog_data_store(env, mdd, CL_XATTR, 0, mdd_obj,
-...
-}
+> 
+> So my questions are:
+> 1. why are xattr changes ignored in namespaces other than user.*?
+> 2. why xattr changes in {trusted,security,system}.* generate a CTIME
+> event after the changelogs have been cleared? And not otherwise?
+> 
+The second question is actually easier - inode metadata changes (including xattr) generate CTIME events, but these are rate-limited to once per "clear" to avoid filling the logs on heavily used files. One TIME event per file in a log is sufficient to know that the file has been touched for eg backup or HSM purposes (but of course, not all purposes).  
+Why only user xattrs are recorded was initially an attempt to avoid recording the "lustre." xattr changes that would potentially have been confusing to users, but perhaps we went too far here. I can't really think of any reason to avoid the other namespaces now. 
 
-
-So my questions are:
-1. why are xattr changes ignored in namespaces other than user.*?
-2. why xattr changes in {trusted,security,system}.* generate a CTIME
-event after the changelogs have been cleared? And not otherwise?
-
-
-Thanks a lot for any insight.
-Cheers,
---
-Kilian
+BTW, Xyratex has some improvements for changelog mtime handling that we'll push upstream. ______________________________________________________________________
+This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
+ 
+Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
+ 
+Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
+ 
+The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
+______________________________________________________________________
+ 
