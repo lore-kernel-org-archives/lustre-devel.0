@@ -1,7 +1,9 @@
 From: Indivar Nair <indivar.nair@techterra.in>
-Date: Tue, 6 Sep 2011 12:03:42 +0530
+Date: Tue, 6 Sep 2011 12:13:58 +0530
 Subject: [Lustre-devel] Slow Directory Listing
-Message-ID: <CALuPYL2nPzJ9QG4GUR+-XFB0ma2UDMk_=54Uv976n+AH=j1tag@mail.gmail.com>
+In-Reply-To: <CALuPYL2nPzJ9QG4GUR+-XFB0ma2UDMk_=54Uv976n+AH=j1tag@mail.gmail.com>
+References: <CALuPYL2nPzJ9QG4GUR+-XFB0ma2UDMk_=54Uv976n+AH=j1tag@mail.gmail.com>
+Message-ID: <CALuPYL2tBssb5FDF3zrPgCHuOL-M4RNz7fQcG8FkGdzvTDamwA@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -47,4 +49,4 @@ Regards,
 Indivar Nair
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110906/a91bc43f/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110906/136d337f/attachment.htm>
