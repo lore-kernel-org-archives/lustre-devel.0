@@ -1,52 +1,19 @@
-From: Indivar Nair <indivar.nair@techterra.in>
-Date: Tue, 6 Sep 2011 12:13:58 +0530
-Subject: [Lustre-devel] Slow Directory Listing
-In-Reply-To: <CALuPYL2nPzJ9QG4GUR+-XFB0ma2UDMk_=54Uv976n+AH=j1tag@mail.gmail.com>
-References: <CALuPYL2nPzJ9QG4GUR+-XFB0ma2UDMk_=54Uv976n+AH=j1tag@mail.gmail.com>
-Message-ID: <CALuPYL2tBssb5FDF3zrPgCHuOL-M4RNz7fQcG8FkGdzvTDamwA@mail.gmail.com>
+From: He Xiaobin <allreol@gmail.com>
+Date: Sun, 18 Sep 2011 15:34:54 +0800
+Subject: [Lustre-devel] Is that possible for lnet to be a independent
+	project?
+Message-ID: <CAOM-UX0n8rvd5_RMFK8jqRMGj6uSZsetfestHwRw2n73A=0LNA@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi ...,
-
-I have a lustre storage that stores lots of small files i.e. hundreds to
-thousand of 9MB image files.
-While normal file access works fine, the directory listing is extremely
-slow.
-Depending on the number of files in a directory, the listing takes around 5
-- 15 secs.
-
-I tried 'ls --color=none' and it worked fine; listed the contents
-immediately.
-
-But that doesn't help my cause. I have Samba Gateway Servers, and all users
-access the storage through the gateway. Double clicking on directory takes a
-long long time to display.
-
-The cluster consist of -
-- two DRBD Mirrored MDS Servers (Dell R610s) with 10K RPM disks
-- four OSS Nodes (2 Node Cluster (Dell R710s) with a common storage (Dell
-MD3200))
-
-The storage consists of 12 x 1TB HDDs on both arrays, in RAID 6
-Configuration.
-
-What actually happens when one does a listing like this?
-What can I do to make the listing faster?
-Could it be an MDS issue?
-Some site suggested that this could be caused due to '-o flock' switch. Is
-it so?
-
-Kindly Help.
-The storage is in Production, and this is causing a lot of issues.
-
-Regards,
-
-
-Indivar Nair
+Lnet of Lustre shows good features of network abstraction. After
+reading Lustre documents and codes, I realized that lnet is loosely coupled
+with the other modules in Lustre system. So I think it will be a good advise
+for lnet to be a independent project with Lustre.  Such that other systems
+working in linux kernel mode can use lnet for data transferring.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110906/136d337f/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20110918/76298e98/attachment.htm>
