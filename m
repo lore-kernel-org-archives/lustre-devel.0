@@ -1,135 +1,116 @@
 From: Eric Barton <eeb@whamcloud.com>
-Date: Wed, 5 Oct 2011 18:33:51 +0100
-Subject: [Lustre-devel] question about failover
-In-Reply-To: <CAO=bG7pWxqBX-U6Vp+cJV_jZMui2JbdEUaxVWvHLMqFn6Vv24w@mail.gmail.com>
-References: <CAO=bG7pWxqBX-U6Vp+cJV_jZMui2JbdEUaxVWvHLMqFn6Vv24w@mail.gmail.com>
-Message-ID: <03d501cc8384$f39d3630$dad7a290$@com>
+Date: Wed, 5 Oct 2011 19:02:22 +0100
+Subject: [Lustre-devel] Wide striping
+In-Reply-To: <54C22AB8-783C-4B23-9CC9-B70C72CA1150@xyratex.com>
+References: <73AED5C780AE05478241DB067651A9210237883C@XYUS-EX22.xyus.xyratex.com>	<4E8BA3EE.6060300@whamcloud.com>
+	<54C22AB8-783C-4B23-9CC9-B70C72CA1150@xyratex.com>
+Message-ID: <03dd01cc8388$ef4f3c00$cdedb400$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Peter,
+Shadow,
 
- 
+Your comment describes create-on-write (CROW), which is vulnerable
+to orphan creation by clients which have been evicted from the MDS
+but are not actually dead, unless further safeguards are implemented
+such as capabilities or server-cluster-wide client eviction.
 
-I'm not sure I understand the situation you're trying to describe.
+I also think that the decision to use FIDs in the way you suggest
+has architectural implications which would benefit from further
+discussion.  The original idea was that a FID would be all you need
+to identify any object (including its target) and that using them
+uniformly in this way could help simplify the code and enable further
+development - e.g. to allow unified targets which mix namespace and
+data objects to better support small/sparse files.
 
- 
+Making the FID just a unique identifier which requires a target index
+to specify a specific object doesn't have to be inconsistent with
+uniform usage for data and metadata, but it has further knock-on
+implications which must be acknowledged and debated explicitly
+before we go further.  We really must be confident we've thought
+through all the consequences of our architectural decisions before
+we invest development effort in them.  It's just too expensive to
+reverse a bad decision otherwise.
 
-Consider 2 servers (S1, S2) connected to 2 routers (R1, R2) on 1 LNET (N1)
+          Cheers,
+                   Eric
 
-and clients connect to the routers via another LNET (N2).   Normally both R1
-
-and R2 carry traffic between any/all clients on N2 and either server.  
-
- 
-
-If (say) R1 fails, clients on N2 will see communications failures when they
-
-attempt to send to either of the servers via R1 and stop using it.  Similarly, both
-
-servers will see communications failures when they attempt to send to any client
-
-via R1 and they too will stop using it.  
-
- 
-
-Meanwhile, clients will time out RPCs that were affected by the failure of R1
-
-and try to reconnect - first using the affected OST's current NID, then trying
-
-the failover NID.  When they successfully reconnect, they will find that S1's
-
-OSTs are still the "same ones" as before and therefore just resend the failed RPCs.
-
- 
-
-LNET running on both clients and servers will continue to avoid routing traffic
-
-through R1, however they will try to ping R1 occasionally so that they notice
-
-when it comes back and can start to reuse it.
-
- 
-
-If (say) S1 fails concurrently with R1, clients reconnecting after RPCs have
-
-timed out will only reconnect successfully to the failover OST NIDs and
-
-discover that they need to participate in recovery.
-
- 
-
-For all this to work smoothly, we require (a) multiple routers between N1 and N2
-
-to ensure communications between clients and servers can continue in the face of
-
-router failures.   We also need router failure to be detected relatively promptly to
-
-minimize the number of reconnection attempts the clients make.
-
- 
-
-Cheers,
-                   Eric 
-
- 
-
- 
-
- 
-
-From: lustre-devel-bounces@lists.lustre.org [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Peter Braam
-Sent: 27 September 2011 1:47 PM
-To: lustre-devel at lists.lustre.org
-Subject: [Lustre-devel] question about failover
-
- 
-
-Greetings -
-
- 
-
-The general question is how do router failures and server failover interact?
-
- 
-
-My suspicion is that is it necessary for the routing topology and server topology to be such that server failures one wants to
-recover from always leave working servers connected to the router, so that at least some traffic makes it through that router, and
-it won't be declared failed also.  Is that right?
-
- 
-
-As an example, point to point connections between two routers and a singe failover pair are to be avoided, because it becomes
-impossible to distinguish server and router failures.  Is that a rule that is generally followed?
-
- 
-
-Thanks!
-
- 
-
-Peter
-
-______________________________________________________________________
-This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by
-Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message,
-please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
- 
-Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept
-liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept
-liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
- 
-Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
- 
-The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in
-California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic
-of China and Xyratex Japan Limited registered in Japan.
-______________________________________________________________________
- 
- 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20111005/df8826b6/attachment.htm>
+> -----Original Message-----
+> From: lustre-devel-bounces at lists.lustre.org [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf
+> Of Alexey Lyashkov
+> Sent: 05 October 2011 10:29 AM
+> To: wangdi
+> Cc: Alexander Boyko; Lustre Development Mailing List; Artem Blagodarenko; Nathan Rutman
+> Subject: Re: [Lustre-devel] Wide striping
+> 
+> Hi All,
+> >
+> > FID-on-OST is actually part of DNE(dirtribute name space) phase I.  It basically follows current fid
+> client server infrastructure.
+> >
+> > 1. MDT is the fid client, which requests fid from the OST and allocates fids for the object during
+> pre-creation.
+> > 2. OST is the fid server, which will allocate the FIDs to MDTs and requests super fid sequence from
+> fid control server (root MDT).
+> > 3. Similar as MDT FID, there will be OI to map FID to object inside OST.
+> >
+> > The code will be release with DNE sometime next year.
+> >
+> I think we not need a special FID's for OST object, except we want to migrate one object via different
+> data containers over cluster.
+> I think it's not a priority for now.
+> So we can simplify a FID management for OST now.
+> Each data object may identified via pair {OST_INDEX / OST_UUID, MDT_FID}.
+> In that case OST not need allocate any FID's, and MDT can reuse current reallocation scheme.
+> in fact we not need a assign a FID for OST object in file creation time (aka creating LSM), but we
+> need a guaranteed free OST object exist when client tried to make access to that object.
+> in that case OST can preallocate some pool and report that size to MDT,
+> MDT know it's uses some objects from that pool, but not know which object id assigned to file.
+> to avoid OST confusion client send a MDT FID to OST when need access to OST object.
+> OST look to OI database and check - is that FID assigned to something or not.
+> if assigned - IO will return a inode, otherwise OST need to grab any free object from a pool and
+> assign to that FID.
+> that's all.
+> 
+> orphan cleanup not need to be changed in that case - MDT send a last allocated objid, and OST will
+> kill a unallocated objects and return last index to the MDT.
+> open-unlink case need to be changed to put a fid in LLOG record and OST need to be changed to handle
+> FID as object index.
+> 
+> 
+> 
+> --------------------------------------------
+> Alexey Lyashkov
+> alexey_lyashkov at xyratex.com
+> 
+> 
+> 
+> 
+> ______________________________________________________________________
+> This email may contain privileged or confidential information, which should only be used for the
+> purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such
+> information. If you are not the intended recipient of this message, please notify the sender by return
+> and delete it. You may not use, copy, disclose or rely on the information contained in it.
+> 
+> Internet email is susceptible to data corruption, interception and unauthorised amendment for which
+> Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this
+> email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses
+> in this email, nor for any losses caused as a result of viruses.
+> 
+> Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone
+> Road, Havant, Hampshire, PO9 1SA.
+> 
+> The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex
+> International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia,
+> Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan
+> Limited registered in Japan.
+> ______________________________________________________________________
+> 
+> 
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
