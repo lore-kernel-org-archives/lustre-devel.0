@@ -1,58 +1,62 @@
-From: Alexey Lyashkov <alexey_lyashkov@xyratex.com>
-Date: Wed, 5 Oct 2011 13:28:47 +0400
-Subject: [Lustre-devel] Wide striping
-In-Reply-To: <4E8BA3EE.6060300@whamcloud.com>
-References: <73AED5C780AE05478241DB067651A9210237883C@XYUS-EX22.xyus.xyratex.com>
-	<4E8BA3EE.6060300@whamcloud.com>
-Message-ID: <54C22AB8-783C-4B23-9CC9-B70C72CA1150@xyratex.com>
+From: Eric Barton <eeb@whamcloud.com>
+Date: Wed, 5 Oct 2011 14:03:31 +0100
+Subject: [Lustre-devel] Erratum about indexes in robinhood DB
+In-Reply-To: <4E84346B.8060300@cea.fr>
+References: <4E84346B.8060300@cea.fr>
+Message-ID: <038c01cc835f$2f30f090$8d92d1b0$@com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi All,
+Thomas,
+
+Thanks a lot and I hope you don't mind me cc-ing lustre-devel as this
+seems to be of general interest.
+
+Do you have a feel (or measurements :) for the rate at which a changelog
+can be ingested into robinhood?  And I'm wondering about DNE and multiple
+changelogs coming from multiple MDTs.  I'd be very interested to know if
+you've thought about this and have views on what the maximum ingest rate
+could be and whether there will be issues coordinating/merging events
+across multiple feeds.
+
+          Cheers,
+                   Eric
+
+Eric Barton
+CTO Whamcloud, Inc.
+
+> -----Original Message-----
+> From: LEIBOVICI Thomas [mailto:thomas.leibovici at cea.fr]
+> Sent: 29 September 2011 10:04 AM
+> To: Eric Barton
+> Subject: Erratum about indexes in robinhood DB
 > 
-> FID-on-OST is actually part of DNE(dirtribute name space) phase I.  It basically follows current fid client server infrastructure.
+> Hello Eric,
 > 
-> 1. MDT is the fid client, which requests fid from the OST and allocates fids for the object during pre-creation. 
-> 2. OST is the fid server, which will allocate the FIDs to MDTs and requests super fid sequence from fid control server (root MDT).
-> 3. Similar as MDT FID, there will be OI to map FID to object inside OST.
+> Re-thinking about your question on indexes in robinhood DB, my answer
+> was incomplete.
+> Actually, there are indexes on user/group/type/status, but there are not
+> on the main table:
 > 
-> The code will be release with DNE sometime next year.
+> 1) As I said you, on the main table (the one that list all FS entries),
+> there are as few indexes as possible (just fid as primary key, and
+> parent fid)
+> in order to preserve a good insert/update rate on this table whatever
+> the FS size (the deeper the DB index trees, the slower those requests).
 > 
-I think we not need a special FID's for OST object, except we want to migrate one object via different data containers over cluster.
-I think it's not a priority for now.
-So we can simplify a FID management for OST now.
-Each data object may identified via pair {OST_INDEX / OST_UUID, MDT_FID}.
-In that case OST not need allocate any FID's, and MDT can reuse current reallocation scheme.
-in fact we not need a assign a FID for OST object in file creation time (aka creating LSM), but we need a guaranteed free OST object exist when client tried to make access to that object.
-in that case OST can preallocate some pool and report that size to MDT,
-MDT know it's uses some objects from that pool, but not know which object id assigned to file. 
-to avoid OST confusion client send a MDT FID to OST when need access to OST object.
-OST look to OI database and check - is that FID assigned to something or not.
-if assigned - IO will return a inode, otherwise OST need to grab any free object from a pool and assign to that FID.
-that's all.
-
-orphan cleanup not need to be changed in that case - MDT send a last allocated objid, and OST will kill a unallocated objects and return last index to the MDT.
-open-unlink case need to be changed to put a fid in LLOG record and OST need to be changed to handle FID as object index.
-
-
-
---------------------------------------------
-Alexey Lyashkov
-alexey_lyashkov at xyratex.com
-
-
-
-
-______________________________________________________________________
-This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
- 
-Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
- 
-Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
- 
-The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
-______________________________________________________________________
- 
+> 2) There is a secondary table where robinhood maintains aggregated
+> statitics like nbr entries, volume per user/group/type/(hsm)status and
+> which is updated on the fly.
+> This one as indexes on quite all its fields, which makes it possible to
+> get instantaneous stats per user, etc. without penalizing insert/update
+> rate on main table.
+> Indexes on this secondary table are less expensive, given that the set
+> of users is much more resticted that the nbr of entries.
+> 
+> This time you have a more complete answer.
+> 
+> Best regards
+> Thomas
