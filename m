@@ -1,144 +1,137 @@
-From: Nathan Rutman <Nathan_Rutman@xyratex.com>
-Date: Wed, 5 Oct 2011 11:44:07 -0700
+From: wangdi <di.wang@whamcloud.com>
+Date: Wed, 05 Oct 2011 12:44:01 -0700
 Subject: [Lustre-devel] Wide striping
-In-Reply-To: <03dd01cc8388$ef4f3c00$cdedb400$@com>
-References: <73AED5C780AE05478241DB067651A9210237883C@XYUS-EX22.xyus.xyratex.com>	<4E8BA3EE.6060300@whamcloud.com>
-	<54C22AB8-783C-4B23-9CC9-B70C72CA1150@xyratex.com>
-	<03dd01cc8388$ef4f3c00$cdedb400$@com>
-Message-ID: <73AED5C780AE05478241DB067651A92102378853@XYUS-EX22.xyus.xyratex.com>
+In-Reply-To: <73AED5C780AE05478241DB067651A92102378850@XYUS-EX22.xyus.xyratex.com>
+References: <73AED5C780AE05478241DB067651A9210237883C@XYUS-EX22.xyus.xyratex.com>
+	<4E8BA3EE.6060300@whamcloud.com>
+	<73AED5C780AE05478241DB067651A92102378850@XYUS-EX22.xyus.xyratex.com>
+Message-ID: <4E8CB381.40805@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On 10/05/2011 09:06 AM, Nathan Rutman wrote:
+>
+>>
+>>> Common
+>>> Object ID
+>>> The MDT
+>>> tracks a special range of OST object ID?s (?wide stripe
+>>> objectid? = WSO) that are used on all OSTs.  The MDT
+>>> assigns the next available WSO to the file, and this
+>>> objectid is used on all the OSTs.  The OSTs must never use
+>>> these objects for regular striped files.  A special
+>>> precreation group for these objects is probably necessary,
+>>> as well as orphan cleanup (the MDT should purge "hole"
+>>> objects that aren?t allocated from a particular OST). The
+>>> MDT should track the last assigned WSO; this will be the
+>>> starting point for new wide striped files after recovery. Objects 
+>>> cannot be migrated
+>>> from one OST to another, since this would result in
+>>> out-of-order access. Similarly, stripes can
+>>> never be added to holes.
+>>> FID-on-OST
+>>> Use a
+>>> mapping of the MDT FID to uniquely determine an OST
+>>> object.  The clients and MDT add in the OST number to the
+>>> MDT FID (probably just reserve one sequence per OST).
+>>>  (This allows the objects to potentially migrate to
+>>> different OSTs).  The OSTs then internally must map the
+>>> FID to a local object id.  Note this allows OST-local
+>>> precreation pools, getting the MDT out of the
+>>> precreate/orphan cleanup business and potentially
+>>> improving create speeds, and also facilitates "create on
+>>> write" semantics.  The FID can be assigned during the
+>>> first access to OST object.
+>>
+>> I am not sure I follow your idea here. You mean the OST needs 
+>> internally map MDT FID(added in OST number) to object id (or inode ino) ?
+> yes.
+>
+>> So there are no real OST FID?
+> I suppose -- this is just a mapping of the MDT fid to the local OST 
+> object id, via a local lookup on the OST.  There would be something 
+> like the OI to do this mapping.
+>
+>> But you also said "The FID can be
+>> assigned during the first access to OST object.", Could you please
+>> explain more here?
+>
+> Since the FID -> Objid mapping is performed locally, it doesn't need 
+> to be assigned until the first write.  This is not integral to the 
+> design, just a side effect.
 
-On Oct 5, 2011, at 11:02 AM, Eric Barton wrote:
+Ah, you mean the object ID can be assigned during the first access, 
+instead of FID? This is indeed an interesting idea, and do not need 
+extra space. But this may add some limits of the future. (what if we 
+decides to store some small file data in MDT directly?) And also it will 
+add another difference between MDT and OST, probably it conflicts with 
+the efforts of unifying MDT and OST?  I still prefer to have real OST 
+FID, i.e. every object has its own identification in the cluster. Please 
+correct me if I miss the point of your suggestion.
 
-> Shadow,
-> 
-> Your comment describes create-on-write (CROW), which is vulnerable
-> to orphan creation by clients which have been evicted from the MDS
-> but are not actually dead, unless further safeguards are implemented
-> such as capabilities or server-cluster-wide client eviction.
-create-on-write isn't really an integral part of this design, just a side thought.  Let's leave it out of the 
-discussion for now.
-> 
-> I also think that the decision to use FIDs in the way you suggest
-> has architectural implications which would benefit from further
-> discussion.  The original idea was that a FID would be all you need
-> to identify any object (including its target) and that using them
-> uniformly in this way could help simplify the code and enable further
-> development - e.g. to allow unified targets which mix namespace and
-> data objects to better support small/sparse files.
-> 
-> Making the FID just a unique identifier which requires a target index
-> to specify a specific object doesn't have to be inconsistent with
-> uniform usage for data and metadata, but it has further knock-on
-> implications which must be acknowledged and debated explicitly
-> before we go further.  We really must be confident we've thought
-> through all the consequences of our architectural decisions before
-> we invest development effort in them.  It's just too expensive to
-> reverse a bad decision otherwise.
-That's what we're trying to do now :)
+Thanks
+Wangdi
 
-The issue as I see it is that we're thinking about a feature that could be useful 
-today, and is implementable today, except for the fact that there are some 
-longer term plans that might conflict.  Our wide-striping could be implemented
-on top of WC's future FID-on-OST plans -- but would require that code to exist.
-So then we have to decide if waiting is the best option, or whether a more 
-minimal change (probably the "common object ID" from my original arch email)
-could land first, and then DNE FID-on-OST could change it later. 
+>
+>>
+>>
+>>> The big
+>>> problem here is that FID>OBJID ( or better
+>>> FID->inode id ) translation is absent from the OSTs
+>>> today. See http://wiki.lustre.org/images/e/e9/SC09-FID-on-OST.pdf
+>>> (what is the current state of this?)  There is also some
+>>> work in this direction in the OST restructuring work
+>>> (?Orion? WC branch, ORI-300(?), scheduled for Lustre 2.4).
+>>>
+>>>
+>>> There's
+>>> a few questions here, probably the first of which is "is it 
+>>> worthwhile to
+>>> spend effort on this, or is BZ4424 good enough?" Then there
+>>> is the question of object identification, where FID-on-OST
+>>> is more flexible, but also significantly more work (and
+>>> risk). Also, I thought I understood from the EOFS Summit
+>>> that WC also has a separate FID-on-OST project (separate
+>>> from Orion that is) -- can someone tell me the state of
+>>> that?
+>>
+>> FID-on-OST is actually part of DNE(dirtribute name space) phase I.  
+>> It basically follows current fid client server infrastructure.
+>>
+>> 1. MDT is the fid client, which requests fid from the OST and 
+>> allocates fids for the object during pre-creation.
+>> 2. OST is the fid server, which will allocate the FIDs to MDTs and 
+>> requests super fid sequence from fid control server (root MDT).
+>> 3. Similar as MDT FID, there will be OI to map FID to object inside OST.
+>
+> To integrate with this, we would need to have a reserved sequence on 
+> each OST that the MDT could assign FIDs from --
+> the MDT would need to use the same Object ID on all OSTs.  For DNE, 
+> there would need to be a reserved sequence per OST per MDT.
+>
+>
+>>
+>> The code will be release with DNE sometime next year.
+>>
+>> Thanks
+>> WangDi
+>>
+>>
+> ______________________________________________________________________
+> This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
+>
+> Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
+>
+> Xyratex Technology Limited (03134912), Registered in England&  Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
+>
+> The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
+> ______________________________________________________________________
+>
+>
 
-
-> 
->          Cheers,
->                   Eric
-> 
->> -----Original Message-----
->> From: lustre-devel-bounces at lists.lustre.org [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf
->> Of Alexey Lyashkov
->> Sent: 05 October 2011 10:29 AM
->> To: wangdi
->> Cc: Alexander Boyko; Lustre Development Mailing List; Artem Blagodarenko; Nathan Rutman
->> Subject: Re: [Lustre-devel] Wide striping
->> 
->> Hi All,
->>> 
->>> FID-on-OST is actually part of DNE(dirtribute name space) phase I.  It basically follows current fid
->> client server infrastructure.
->>> 
->>> 1. MDT is the fid client, which requests fid from the OST and allocates fids for the object during
->> pre-creation.
->>> 2. OST is the fid server, which will allocate the FIDs to MDTs and requests super fid sequence from
->> fid control server (root MDT).
->>> 3. Similar as MDT FID, there will be OI to map FID to object inside OST.
->>> 
->>> The code will be release with DNE sometime next year.
->>> 
->> I think we not need a special FID's for OST object, except we want to migrate one object via different
->> data containers over cluster.
->> I think it's not a priority for now.
->> So we can simplify a FID management for OST now.
->> Each data object may identified via pair {OST_INDEX / OST_UUID, MDT_FID}.
->> In that case OST not need allocate any FID's, and MDT can reuse current reallocation scheme.
->> in fact we not need a assign a FID for OST object in file creation time (aka creating LSM), but we
->> need a guaranteed free OST object exist when client tried to make access to that object.
->> in that case OST can preallocate some pool and report that size to MDT,
->> MDT know it's uses some objects from that pool, but not know which object id assigned to file.
->> to avoid OST confusion client send a MDT FID to OST when need access to OST object.
->> OST look to OI database and check - is that FID assigned to something or not.
->> if assigned - IO will return a inode, otherwise OST need to grab any free object from a pool and
->> assign to that FID.
->> that's all.
->> 
->> orphan cleanup not need to be changed in that case - MDT send a last allocated objid, and OST will
->> kill a unallocated objects and return last index to the MDT.
->> open-unlink case need to be changed to put a fid in LLOG record and OST need to be changed to handle
->> FID as object index.
->> 
->> 
->> 
->> --------------------------------------------
->> Alexey Lyashkov
->> alexey_lyashkov at xyratex.com
->> 
->> 
->> 
->> 
->> ______________________________________________________________________
->> This email may contain privileged or confidential information, which should only be used for the
->> purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such
->> information. If you are not the intended recipient of this message, please notify the sender by return
->> and delete it. You may not use, copy, disclose or rely on the information contained in it.
->> 
->> Internet email is susceptible to data corruption, interception and unauthorised amendment for which
->> Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this
->> email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses
->> in this email, nor for any losses caused as a result of viruses.
->> 
->> Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone
->> Road, Havant, Hampshire, PO9 1SA.
->> 
->> The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex
->> International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia,
->> Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan
->> Limited registered in Japan.
->> ______________________________________________________________________
->> 
->> 
->> _______________________________________________
->> Lustre-devel mailing list
->> Lustre-devel at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> 
-______________________________________________________________________
-This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
- 
-Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
- 
-Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
- 
-The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
-______________________________________________________________________
- 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20111005/837cc869/attachment.htm>
