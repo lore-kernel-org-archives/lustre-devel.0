@@ -1,105 +1,50 @@
-From: LEIBOVICI Thomas <thomas.leibovici@cea.fr>
-Date: Thu, 06 Oct 2011 13:01:45 +0200
-Subject: [Lustre-devel] Erratum about indexes in robinhood DB
-In-Reply-To: <038c01cc835f$2f30f090$8d92d1b0$@com>
-References: <4E84346B.8060300@cea.fr> <038c01cc835f$2f30f090$8d92d1b0$@com>
-Message-ID: <4E8D8A99.1010804@cea.fr>
+From: Nathan Rutman <Nathan_Rutman@xyratex.com>
+Date: Thu, 6 Oct 2011 12:09:26 -0700
+Subject: [Lustre-devel] Wide striping
+In-Reply-To: <4684D08A-A823-47CD-8C02-22A92AEE6112@whamcloud.com>
+References: <73AED5C780AE05478241DB067651A9210237883C@XYUS-EX22.xyus.xyratex.com>
+	<1317687469.23023.3.camel@obelisk.thedillows.org>
+	<73AED5C780AE05478241DB067651A92102378846@XYUS-EX22.xyus.xyratex.com>
+	<1317762984.16569.18.camel@lap75545.ornl.gov>
+	<73AED5C780AE05478241DB067651A9210237884F@XYUS-EX22.xyus.xyratex.com>
+	<1317828832.27894.8.camel@lap75545.ornl.gov>
+	<4684D08A-A823-47CD-8C02-22A92AEE6112@whamcloud.com>
+Message-ID: <73AED5C780AE05478241DB067651A92102378866@XYUS-EX22.xyus.xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello Eric,
 
-With a fast enough feeder, the ingest rate robinhood can currently 
-sustain is between 50.000/sec and 100.000/sec
-(depending on insert/update/remove ratio) with a basic MySQL DB stored 
-on a local disk.
-This can certainly still be improved with MySQL tunings and/or better HW 
-and/or enterprise class DB,
-but for now, we notice it is easily high enough for reading a MDT 
-changelog stream on a Petaflopic system.
+On Oct 5, 2011, at 6:51 PM, Andreas Dilger wrote:
 
-This rate is actually lower when processing Lustre MDT changelogs (but I 
-have no measurement) because of "stat" operations to get file attributes
-(unfortunately, changelogs do not give the new value of what has just 
-changed, e.g new uid for a chown operation, new size&mtime with a mtime 
-event...)
-SOM will probably improve that point, but it could be a good idea to add 
-more info in changelogs.
+> On 2011-10-05, at 9:33 AM, David Dillow <dillowda@ornl.gov> wrote:
+>> On Wed, 2011-10-05 at 11:06 -0400, Nathan Rutman wrote:
+>>> Sorry if I'm being unclear.
+>>> 
+>>> start_index is just an offset into the bitmap.  That's the OST where the first 
+>>> stripe will be.  Next stripe will be on the next OST index (unless a hole). 
+>>> When we get to the big hole at the end of the used OSTs, these OST index 
+>>> locations are all skipped (since they are holes), and the next stripe will 
+>>> be at OST index 0, then 1, etc, up to start_index-1 (again, unless holes).
+>> 
+>> Ok, so bitmap position 0 is always OST 0; thanks for clearing up my
+>> misunderstanding.
+> 
+> But this means that the table always needs to be as large as the maximum OST number. If the bitmap started at the starting OST index it would only need to be as large as the number of stripes. 
+Yes, the table is as large as the maximum possible OST number.  32,000 stripes fit in a bitmap in the current (non-extended) EA size.  If you started at the starting OST index, you would need to record the last OST number also.  Either way I don't see as a problem.
 
-Handling chglogs from multiple MDTs is indeed a very interesting point 
-to address.
-The main issue is the database scaling in terms of operation rate, 
-volume and entry location.
-A solution could be using an existing clustered DB engine (MySQL 
-cluster, NOSQL DBs...),
-thus we are going to take a look at the different alternatives and see 
-if they could match the need.
-For that, it would be interesting to know how records will be splitted 
-into the multiple changelog streams:
-is a given fid always reported by the same stream? what about the parent 
-fid (like in create/unlink operations)?
-If you have a document about DNE design, I think it would give a more 
-precise idea about
-what event and fid is supposed to be reported by each MDT.
-
-Thanks,
-Thomas
-
-Eric Barton wrote:
-> Thomas,
->
-> Thanks a lot and I hope you don't mind me cc-ing lustre-devel as this
-> seems to be of general interest.
->
-> Do you have a feel (or measurements :) for the rate at which a changelog
-> can be ingested into robinhood?  And I'm wondering about DNE and multiple
-> changelogs coming from multiple MDTs.  I'd be very interested to know if
-> you've thought about this and have views on what the maximum ingest rate
-> could be and whether there will be issues coordinating/merging events
-> across multiple feeds.
->
->           Cheers,
->                    Eric
->
-> Eric Barton
-> CTO Whamcloud, Inc.
->
->   
->> -----Original Message-----
->> From: LEIBOVICI Thomas [mailto:thomas.leibovici at cea.fr]
->> Sent: 29 September 2011 10:04 AM
->> To: Eric Barton
->> Subject: Erratum about indexes in robinhood DB
->>
->> Hello Eric,
->>
->> Re-thinking about your question on indexes in robinhood DB, my answer
->> was incomplete.
->> Actually, there are indexes on user/group/type/status, but there are not
->> on the main table:
->>
->> 1) As I said you, on the main table (the one that list all FS entries),
->> there are as few indexes as possible (just fid as primary key, and
->> parent fid)
->> in order to preserve a good insert/update rate on this table whatever
->> the FS size (the deeper the DB index trees, the slower those requests).
->>
->> 2) There is a secondary table where robinhood maintains aggregated
->> statitics like nbr entries, volume per user/group/type/(hsm)status and
->> which is updated on the fly.
->> This one as indexes on quite all its fields, which makes it possible to
->> get instantaneous stats per user, etc. without penalizing insert/update
->> rate on main table.
->> Indexes on this secondary table are less expensive, given that the set
->> of users is much more resticted that the nbr of entries.
->>
->> This time you have a more complete answer.
->>
->> Best regards
->> Thomas
->>     
->
->   
+> 
+> That said, the limitation if not being able to migrate objects with this layout is a major one. The ability to so online object migration is just arriving with the layout lock (from HSM), so I expect this to be useful to many users. 
+Well, that's why we added the complication of embedding the OST index into the object FIDs that the clients would ask for. Then you could migrate that object to a new OST - but really only for exceptional cases.  General migration for e.g. space rebalancing would result in a bunch of additional overhead to figure out where all the stripes moved to.  So I agree - this is a weakness of the bitmap design, which really implies a fixed ordering. =
+______________________________________________________________________
+This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
+ 
+Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
+ 
+Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
+ 
+The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
+______________________________________________________________________
+ 
