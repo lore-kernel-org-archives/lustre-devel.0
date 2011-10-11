@@ -1,32 +1,140 @@
-From: chas williams - CONTRACTOR <chas@cmf.nrl.navy.mil>
-Date: Tue, 11 Oct 2011 09:34:06 -0400
-Subject: [Lustre-devel] IPv6 NIDs
-In-Reply-To: <06e901cc8818$95acbc60$c1063520$@com>
-References: <06e901cc8818$95acbc60$c1063520$@com>
-Message-ID: <20111011093406.3063f001@thirdoffive.cmf.nrl.navy.mil>
+From: Nathan Rutman <Nathan_Rutman@xyratex.com>
+Date: Tue, 11 Oct 2011 10:12:35 -0700
+Subject: [Lustre-devel] Erratum about indexes in robinhood DB
+In-Reply-To: <06d901cc8816$50808600$f1819200$@com>
+References: <4E84346B.8060300@cea.fr> <038c01cc835f$2f30f090$8d92d1b0$@com>
+	<4E8D8A99.1010804@cea.fr> <06d901cc8816$50808600$f1819200$@com>
+Message-ID: <73AED5C780AE05478241DB067651A9210237888E@XYUS-EX22.xyus.xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 11 Oct 2011 14:20:44 +0100
-"Eric Barton" <eeb@whamcloud.com> wrote:
+We actually already did some of that for a one-off. We didn't push the changes upstream because
+there were some ugly layering violations involved.  Vitaly, do you remember the details?
 
 
-> 2. Hedge a little by reserving an additional (say) 32 bits for
->    something we've not thought of yet and keeping the total a
->    multiple of 64 bits to simplify alignment.
->    192 bits / 24 bytes total.
->
-> 3. Hedge a lot with a nice round number.
->    256 bits / 32 bytes total.
+On Oct 11, 2011, at 6:04 AM, Eric Barton wrote:
 
-i would pick this.  you never know what address size is coming in the
-future for any particular protocol.  the infiniband link layer is
-160 bits.  so if someone implemented a 'native' ib solution they
-would need 160 + 32 (192).
-
-of course, option 2 would work fine in this case.  however, unless there
-is a pressing reason i would just pick 256 because we already have a
-case that could use up your 'hedge a little'.
+> Thomas,
+> 
+> Interesting point about changelog entries requiring a 'stat'.
+> 
+> Nathan, what's your take on making changelogs tell you what has
+> changed - even if only on "easy" changes?
+> 
+>         Cheers,
+>                  Eric
+> 
+>> -----Original Message-----
+>> From: LEIBOVICI Thomas [mailto:thomas.leibovici at cea.fr]
+>> Sent: 06 October 2011 12:02 PM
+>> To: Eric Barton
+>> Cc: lustre-devel at lists.lustre.org
+>> Subject: Re: Erratum about indexes in robinhood DB
+>> 
+>> Hello Eric,
+>> 
+>> With a fast enough feeder, the ingest rate robinhood can currently
+>> sustain is between 50.000/sec and 100.000/sec
+>> (depending on insert/update/remove ratio) with a basic MySQL DB stored
+>> on a local disk.
+>> This can certainly still be improved with MySQL tunings and/or better HW
+>> and/or enterprise class DB,
+>> but for now, we notice it is easily high enough for reading a MDT
+>> changelog stream on a Petaflopic system.
+>> 
+>> This rate is actually lower when processing Lustre MDT changelogs (but I
+>> have no measurement) because of "stat" operations to get file attributes
+>> (unfortunately, changelogs do not give the new value of what has just
+>> changed, e.g new uid for a chown operation, new size&mtime with a mtime
+>> event...)
+>> SOM will probably improve that point, but it could be a good idea to add
+>> more info in changelogs.
+>> 
+>> Handling chglogs from multiple MDTs is indeed a very interesting point
+>> to address.
+>> The main issue is the database scaling in terms of operation rate,
+>> volume and entry location.
+>> A solution could be using an existing clustered DB engine (MySQL
+>> cluster, NOSQL DBs...),
+>> thus we are going to take a look at the different alternatives and see
+>> if they could match the need.
+>> For that, it would be interesting to know how records will be splitted
+>> into the multiple changelog streams:
+>> is a given fid always reported by the same stream? what about the parent
+>> fid (like in create/unlink operations)?
+>> If you have a document about DNE design, I think it would give a more
+>> precise idea about
+>> what event and fid is supposed to be reported by each MDT.
+>> 
+>> Thanks,
+>> Thomas
+>> 
+>> Eric Barton wrote:
+>>> Thomas,
+>>> 
+>>> Thanks a lot and I hope you don't mind me cc-ing lustre-devel as this
+>>> seems to be of general interest.
+>>> 
+>>> Do you have a feel (or measurements :) for the rate at which a changelog
+>>> can be ingested into robinhood?  And I'm wondering about DNE and multiple
+>>> changelogs coming from multiple MDTs.  I'd be very interested to know if
+>>> you've thought about this and have views on what the maximum ingest rate
+>>> could be and whether there will be issues coordinating/merging events
+>>> across multiple feeds.
+>>> 
+>>>         Cheers,
+>>>                  Eric
+>>> 
+>>> Eric Barton
+>>> CTO Whamcloud, Inc.
+>>> 
+>>> 
+>>>> -----Original Message-----
+>>>> From: LEIBOVICI Thomas [mailto:thomas.leibovici at cea.fr]
+>>>> Sent: 29 September 2011 10:04 AM
+>>>> To: Eric Barton
+>>>> Subject: Erratum about indexes in robinhood DB
+>>>> 
+>>>> Hello Eric,
+>>>> 
+>>>> Re-thinking about your question on indexes in robinhood DB, my answer
+>>>> was incomplete.
+>>>> Actually, there are indexes on user/group/type/status, but there are not
+>>>> on the main table:
+>>>> 
+>>>> 1) As I said you, on the main table (the one that list all FS entries),
+>>>> there are as few indexes as possible (just fid as primary key, and
+>>>> parent fid)
+>>>> in order to preserve a good insert/update rate on this table whatever
+>>>> the FS size (the deeper the DB index trees, the slower those requests).
+>>>> 
+>>>> 2) There is a secondary table where robinhood maintains aggregated
+>>>> statitics like nbr entries, volume per user/group/type/(hsm)status and
+>>>> which is updated on the fly.
+>>>> This one as indexes on quite all its fields, which makes it possible to
+>>>> get instantaneous stats per user, etc. without penalizing insert/update
+>>>> rate on main table.
+>>>> Indexes on this secondary table are less expensive, given that the set
+>>>> of users is much more resticted that the nbr of entries.
+>>>> 
+>>>> This time you have a more complete answer.
+>>>> 
+>>>> Best regards
+>>>> Thomas
+>>>> 
+>>> 
+>>> 
+> 
+______________________________________________________________________
+This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
+ 
+Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
+ 
+Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
+ 
+The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
+______________________________________________________________________
+ 
