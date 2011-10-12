@@ -1,46 +1,54 @@
-From: Isaac Huang <isaac_huang@xyratex.com>
-Date: Wed, 12 Oct 2011 00:18:36 -0600
-Subject: [Lustre-devel] IPv6 NIDs
-In-Reply-To: <06e901cc8818$95acbc60$c1063520$@com>
-References: <06e901cc8818$95acbc60$c1063520$@com>
-Message-ID: <20111012061836.GA4154@xyratex.com>
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Wed, 12 Oct 2011 14:44:32 -0700
+Subject: [Lustre-devel] Moving ldiskfs external to the Lustre tree
+Message-ID: <4E960A40.9040509@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Oct 11, 2011 at 02:20:44PM +0100, Eric Barton wrote:
-> ......
-> IPv6 compatible NID:
-> 
-> 1. Minimum: 128 bit address-within-LNET + 32 bit LNET number.
->    160 bits / 20 bytes total.
+We would like to see the ldiskfs tree removed from the lustre tree and 
+made an independent package.  I have been floating this idea 
+unofficially for a while, but I would like to now officially propose 
+this for Lustre 2.2.
 
-(1) might cause alignment problem somewhere. I remember that the
-PTLLND is picky on alignments, and there might be more such places.
+With the OBD changes that are taking place on the Orion branch, we want 
+to make lustre be able to use any of a number of backend filesystems. 
+The current tree and configure tools make it very hard to build without 
+ldiskfs (instead using zfs, btrfs, or something we haven't thought of 
+yet).  As part of cleaning that up, moving ldiskfs external to lustre 
+will help ensure that we don't have unnecessary dependencies crop up in 
+the future.
 
-> 2. Hedge a little by reserving an additional (say) 32 bits for
->    something we've not thought of yet and keeping the total a
->    multiple of 64 bits to simplify alignment.
->    192 bits / 24 bytes total.
-> 
-> 3. Hedge a lot with a nice round number.
->    256 bits / 32 bytes total.
-> 
-> (2) gets my vote currently...
+We have created an external package of the ldiskfs tree and put it up on 
+github:
 
-I'd feel happy to pay the extra 8 bytes for the peace of mind that I
-wouldn't have to handle this again.
+   https://github.com/chaos/ldiskfs
 
-- Isaac
-______________________________________________________________________
-This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
- 
-Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
- 
-Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
- 
-The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
-______________________________________________________________________
- 
+To use the new external ldiskfs package with lustre, you will also need 
+a few patches to lustre itself.  There are links to the patches in this 
+jira ticket:
+
+   http://jira.whamcloud.com/browse/LU-723
+
+On a RHEL system, ldiskfs has a build dependency on the kernel-debuginfo 
+packages by default.  That is where we find the ext4 source code.
+
+Building should be fairly straight forward.  Build and install ldiskfs 
+(in particular the lustre-ldiskfs-devel package), and then build lustre. 
+  The main new change to lustre is the addition of the configure option 
+"--with-ldiskfs-devel".  On a RHEL system if you have the 
+lustre-ldiskfs-devel package installed, you won't need to give a path.
+
+Note that we have not yet removed the in-tree ldiskfs.  Our first step 
+was to get this working.  Once this is accepted, we will be happy to 
+submit the patches to remove lustre's copy of ldiskfs and generally 
+clean up lustre's autoconf checks involving ldiskfs.
+
+We attempted to keep the changes minimal, so we didn't change the name 
+of the ldiskfs rpm packages.  But we think is would be nice to change 
+the name from "lustre-ldiskfs" to simply "ldiskfs".  If we want to make 
+that change, now is the time to do it.
+
+Chris
