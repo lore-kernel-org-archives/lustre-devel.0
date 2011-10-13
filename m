@@ -1,105 +1,95 @@
-From: Alex Kulyavtsev <aik@fnal.gov>
-Date: Thu, 20 Oct 2011 15:15:06 -0500
-Subject: [Lustre-devel] Wide striping
-In-Reply-To: <73AED5C780AE05478241DB067651A921023788CF@XYUS-EX22.xyus.xyratex.com>
-References: <73AED5C780AE05478241DB067651A9210237883C@XYUS-EX22.xyus.xyratex.com>
-	<3EDC1D49-4A97-4F3A-A9DE-BE2C976665E4@fnal.gov>
-	<AC496A61-5807-4E46-B7D9-0717E363F0BD@whamcloud.com>
-	<73AED5C780AE05478241DB067651A921023788CF@XYUS-EX22.xyus.xyratex.com>
-Message-ID: <4091F461-E2B7-413A-BEEB-D0460B72E5E1@fnal.gov>
+From: Prakash Surya <surya1@llnl.gov>
+Date: Thu, 13 Oct 2011 08:41:05 -0700
+Subject: [Lustre-devel] Moving ldiskfs external to the Lustre tree
+In-Reply-To: <2B361165-F4ED-4339-BA05-D216AE62A4AC@whamcloud.com>
+References: <4E960A40.9040509@llnl.gov>
+	<2B361165-F4ED-4339-BA05-D216AE62A4AC@whamcloud.com>
+Message-ID: <20111013154105.GL28548@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Wed, Oct 12, 2011 at 07:05:51PM -0700, Andreas Dilger wrote:
+> Chris,
+> I'm not against this in principle, but I think it may be more difficult to actually implement before the OSD changes from Orion are landed to master.  In the past we also thought about making ldiskfs as a separate package, before ext4 started in the kernel. 
+> 
+> I've seen Prakash working on those patches but will not have time to look at them until at least next week. 
+> 
+> Are those patches against the master branch or against Orion?  Also, what kernels are supported?
 
-On Oct 20, 2011, at 2:08 PM, Nathan Rutman wrote:
+The patches for Lustre are against master. I believe our plan is to
+have the patches landed and working on master, before we officially
+integrate them into Orion.
 
->
-> On Oct 20, 2011, at 11:45 AM, Andreas Dilger wrote:
->
->> On 2011-10-20, at 10:24 AM, Alex Kulyavtsev wrote:
->>> On Oct 3, 2011, at 3:15 PM, Nathan Rutman wrote:
->>>> We have been thinking about a different wide-striping method that  
->>>> doesn't have these problems. The basic idea is to create a new  
->>>> stripe type that encodes the list of OSTs compactly, and then  
->>>> using the same (or a calculable) object identifier (or FID) on  
->>>> all these OSTs.
->>>>
->>>
->>> 1) There will be holes when OST pools used: if the file can be  
->>> written only to the set of OST from specific OST POOL and if by  
->>> the virtue of configuration OSTs in the  pool do not represent  
->>> continuous set then there will be holes in OST bit map even if all  
->>> OSTs are online.
->>
->> Since the membership in a pool can change after a file is allocated,
->> there cannot be anything in the layout that depends on the current
->> membership of the pool.  In this regard, the layout of a file that
->> is allocated in the pool should be identical to a non-pool file, with
->> the exception that it saves the pool name in which the file was  
->> created.
->> That allows future operations (migration, replication, etc) to take  
->> the
->> originally requested pool of the user into account.
-> Yes, exactly like current striping works -- pool name is recorded,  
-> but is only informational: actual striping is explicitly recorded.
-Sorry for not being clear, I agree the file is laid out at creation  
-time.
-I'm just trying to make a point pool configuration is the other source  
-of holes in bitmap in addition to OSTs down.
+As far as supported kernels, I've tried to keep that consistent with
+what is already supported; although I admit most testing so far has
+been done on RHEL.
 
-Suppose user purchased eight OST each year for three years, and  
-allocated four OSTs to pool1, four to pool2.
-OST numbering get mixed and  OSTs are assigned as follows:
-1111 0000   1111 0000   1111 0000 - pool1
-0000 1111   0000 1111   0000 1111 - pool2
+What kernels are officially supported by Whamcloud? What kernels does it
+need to support?
 
-All OSTs are up, and file was striped across all OSTs in pool1. Thus  
-the file layout is like
-1111 0000   1111 0000  1111 0000
-The file has holes in OST layout because of pool configuration.
+> 
+> Cheers, Andreas
+> 
+> On 2011-10-12, at 3:44 PM, "Christopher J. Morrone" <morrone2@llnl.gov> wrote:
+> 
+> > We would like to see the ldiskfs tree removed from the lustre tree and 
+> > made an independent package.  I have been floating this idea 
+> > unofficially for a while, but I would like to now officially propose 
+> > this for Lustre 2.2.
+> > 
+> > With the OBD changes that are taking place on the Orion branch, we want 
+> > to make lustre be able to use any of a number of backend filesystems. 
+> > The current tree and configure tools make it very hard to build without 
+> > ldiskfs (instead using zfs, btrfs, or something we haven't thought of 
+> > yet).  As part of cleaning that up, moving ldiskfs external to lustre 
+> > will help ensure that we don't have unnecessary dependencies crop up in 
+> > the future.
+> > 
+> > We have created an external package of the ldiskfs tree and put it up on 
+> > github:
+> > 
+> >  https://github.com/chaos/ldiskfs
+> > 
+> > To use the new external ldiskfs package with lustre, you will also need 
+> > a few patches to lustre itself.  There are links to the patches in this 
+> > jira ticket:
+> > 
+> >  http://jira.whamcloud.com/browse/LU-723
+> > 
+> > On a RHEL system, ldiskfs has a build dependency on the kernel-debuginfo 
+> > packages by default.  That is where we find the ext4 source code.
+> > 
+> > Building should be fairly straight forward.  Build and install ldiskfs 
+> > (in particular the lustre-ldiskfs-devel package), and then build lustre. 
+> > The main new change to lustre is the addition of the configure option 
+> > "--with-ldiskfs-devel".  On a RHEL system if you have the 
+> > lustre-ldiskfs-devel package installed, you won't need to give a path.
+> > 
+> > Note that we have not yet removed the in-tree ldiskfs.  Our first step 
+> > was to get this working.  Once this is accepted, we will be happy to 
+> > submit the patches to remove lustre's copy of ldiskfs and generally 
+> > clean up lustre's autoconf checks involving ldiskfs.
+> > 
+> > We attempted to keep the changes minimal, so we didn't change the name 
+> > of the ldiskfs rpm packages.  But we think is would be nice to change 
+> > the name from "lustre-ldiskfs" to simply "ldiskfs".  If we want to make 
+> > that change, now is the time to do it.
+> > 
+> > Chris
+> > 
+> > _______________________________________________
+> > Lustre-devel mailing list
+> > Lustre-devel at lists.lustre.org
+> > http://lists.lustre.org/mailman/listinfo/lustre-devel
+> 
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
 
->
->>
->>> 2) "relatively few holes [in bitmap]" - did you consider  
->>> compressing bitmap? Like BBC or WAH described at en.wikipedia.org/ 
->>> wiki/Bitmap_index#Compression ? Reportedly you can do bitwise  
->>> operations without decompression. This way you can go up in number  
->>> of stripes (well, 32k is big number). But it may help control RPC  
->>> size - you may represent wide striping with few integers  
->>> effectively representing continuous blocks and OST holes, the size  
->>> of the descriptor is the function of # of blocks and holes and to  
->>> the less extent function of number of stripes.
->>
->> I think that having some kind of bitmap compression seems reasonable,
->> and extends the number of stripes that can be fit into a single  
->> layout
->> for most cases.  Originally I was thinking that in addition to saving
->> the starting index of the bitmap, we could also save the index at  
->> which
->> the bitmap wraps back to 0 (i.e. bit N = (start_idx + N) % wrap_idx),
->> but if there is bitmap compression then the run of zeroes between the
->> starting index and the (lower) ending index could be stored  
->> efficiently
->> as well.
->
-> I don't think there's any point of compressing this.  32,000 stripes  
-> fit in the old EA limit, and there's going to be plenty of other  
-> limits hit before
-> we start using 32,000 OSTs.  And even then, we can use the larger EA  
-> size.   So perhaps we turn the question around and ask, "how many  
-> stripes do you want to support"?
-Frankly, we do not use wide striping at this point and 32k is a "large  
-number."
-Having said that, if you have flash OST on each compute node and/or  
-have replication and can use local disk on compute node for  
-opportunistic storage ("local file replica"), the number of OSTs is  
-O(compute nodes) in the cluster and that can be "large number" too.
-
-Best regards, Alex.
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20111020/eff8fe41/attachment.htm>
+-- 
+Cheers,
+Prakash
