@@ -1,43 +1,44 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Thu, 13 Oct 2011 20:14:08 -0600
+Date: Thu, 13 Oct 2011 21:09:59 -0600
 Subject: [Lustre-devel] Moving ldiskfs external to the Lustre tree
-In-Reply-To: <73AED5C780AE05478241DB067651A921023788A5@XYUS-EX22.xyus.xyratex.com>
+In-Reply-To: <20111013154105.GL28548@llnl.gov>
 References: <4E960A40.9040509@llnl.gov>
 	<2B361165-F4ED-4339-BA05-D216AE62A4AC@whamcloud.com>
-	<73AED5C780AE05478241DB067651A921023788A5@XYUS-EX22.xyus.xyratex.com>
-Message-ID: <88AF06C1-9A91-4652-B43F-6C4ABCAC039C@whamcloud.com>
+	<20111013154105.GL28548@llnl.gov>
+Message-ID: <858C0C43-62EC-4163-B6D0-B6417CF44A5B@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2011-10-13, at 4:30 PM, "Nathan Rutman" <Nathan_Rutman@xyratex.com> wrote:
-> On Oct 12, 2011, at 7:05 PM, Andreas Dilger wrote:
->> I'm not against this in principle, but I think it may be more difficult to actually implement before the OSD changes from Orion are landed to master.  
-> 
-> You mean, it will make it more difficult to land Orion changes, right?  
-> Chris already has implemented the external build.
-
-No, I mean it will make it harder to maintain Lustre and ldiskfs separately before we get to the OSD API that has a better abstraction than the current fsfilt/lvfs interface that is used in the current Lustre code. 
-
-Granted that we don't have to change this code very often recently, it does change on occasion, and maintaining compatibility between arbitrary versions of ldiskfs and Lustre is a headache that we don't really need right now.
-
-The fact that Chris has a point-in-time version of ldiskfs and Lustre that are working together is great, but given that the OSD code migration is already underway it doesn't make sense to add a lot of code churn before that happens. 
-
-I'm not against making this change if there is no expectation that there is lomg-term compatibility between different ldiskfs and Lustre builds. If it works, great, but if there is an interface change needed then both packages will need to be upgraded. 
-
-Hopefully once we have the OSD API in use for the OSS, MGS, and the ZFS is working there will be fewer API changes needed and the number of dependent package updates can be reduced.
-
-Cheers, Andreas
-
->> In the past we also thought about making ldiskfs as a separate package, before ext4 started in the kernel. 
+On 2011-10-13, at 9:41 AM, Prakash Surya <surya1@llnl.gov> wrote:
+> On Wed, Oct 12, 2011 at 07:05:51PM -0700, Andreas Dilger wrote:
+>> 
+>> I'm not against this in principle, but I think it may be more difficult to actually implement before the OSD changes from Orion are landed to master.  In the past we also thought about making ldiskfs as a separate package, before ext4 started in the kernel. 
 >> 
 >> I've seen Prakash working on those patches but will not have time to look at them until at least next week. 
 >> 
 >> Are those patches against the master branch or against Orion?  Also, what kernels are supported?
->> 
->> Cheers, Andreas
+> 
+> The patches for Lustre are against master. I believe our plan is to
+> have the patches landed and working on master, before we officially
+> integrate them into Orion.
+> 
+> As far as supported kernels, I've tried to keep that consistent with
+> what is already supported; although I admit most testing so far has
+> been done on RHEL.
+> 
+> What kernels are officially supported by Whamcloud? What kernels does it
+> need to support?
+
+So far we only support servers with RHEL-like kernels, but I've also seen patches for SLES kernels submitted, so I don't want to rule those out.
+
+Like I previously wrote, I'm not against the patches in principle, but I haven't had a chance to look at the changes themselves yet since I'm on vacation and not supposed to be working...
+
+Have you had the ldiskfs module externally working for a while?  How much effort is it to coordinate changes in ldiskfs (exports, API changes, etc) with Lustre?
+
+Cheers, Andreas
 >> 
 >> On 2011-10-12, at 3:44 PM, "Christopher J. Morrone" <morrone2@llnl.gov> wrote:
 >> 
@@ -95,17 +96,10 @@ Cheers, Andreas
 >> Lustre-devel mailing list
 >> Lustre-devel at lists.lustre.org
 >> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> ______________________________________________________________________
-> This email may contain privileged or confidential information, which should only be used for the purpose for which it was sent by Xyratex. No further rights or licenses are granted to use such information. If you are not the intended recipient of this message, please notify the sender by return and delete it. You may not use, copy, disclose or rely on the information contained in it.
 > 
-> Internet email is susceptible to data corruption, interception and unauthorised amendment for which Xyratex does not accept liability. While we have taken reasonable precautions to ensure that this email is free of viruses, Xyratex does not accept liability for the presence of any computer viruses in this email, nor for any losses caused as a result of viruses.
-> 
-> Xyratex Technology Limited (03134912), Registered in England & Wales, Registered Office, Langstone Road, Havant, Hampshire, PO9 1SA.
-> 
-> The Xyratex group of companies also includes, Xyratex Ltd, registered in Bermuda, Xyratex International Inc, registered in California, Xyratex (Malaysia) Sdn Bhd registered in Malaysia, Xyratex Technology (Wuxi) Co Ltd registered in The People's Republic of China and Xyratex Japan Limited registered in Japan.
-> ______________________________________________________________________
-> 
-> 
+> -- 
+> Cheers,
+> Prakash
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20111013/6bc1b75a/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20111013/83dc2b90/attachment.htm>
