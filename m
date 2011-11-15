@@ -1,29 +1,24 @@
-From: Bruce Korb <bruce_korb@xyratex.com>
-Date: Tue, 15 Nov 2011 06:23:31 -0800
-Subject: [Lustre-devel] [wc-discuss] Lustre code style Git commit hooks
-In-Reply-To: <AC8A421C-129A-4E45-A9C7-FFF531DF236C@whamcloud.com>
-Message-ID: <CAE7B53C.1381%bruce_korb@xyratex.com>
+From: ravi badiger <ravibadiger24@gmail.com>
+Date: Tue, 15 Nov 2011 18:20:42 +0530
+Subject: [Lustre-devel] http://jira.whamcloud.com/browse/LU-828
+Message-ID: <CAKh5fBGma9yPky6T5-8rUQJdkON7-gjoaZrHQyZKXeTxXVNO-g@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Cool:
+Hi Cliffw,Adilger,All,
 
-On 11/15/11 12:55 AM, Andreas Dilger wrote:
+We have uploaded all Lustre server syslogs for both /home /scratch lustre
+filesystems also sample client Syslog where problem was noticed.
+Can some one please look at the cause for the below reported issue at
+whamcloud jira and how we can proceed to overcome it.
 
->On 2011-11-14, at 11:14 AM, James Simmons wrote:
->This is the error message that you would get if you try to submit an
->incorrect commit.  If people think it would be more useful, the
->prepare-commit-msg hook could go whole-hog and just replace the basic
->commit comment (which basically shows "git status") with a full sample
->commit template that has (commented out) the above template and a
->Signed-off-by: line.
+http://jira.whamcloud.com/browse/LU-828
 
-Just a brief synopsis of the "transgression" and a URL to the full
-description would be excellent.  (I don't like having to Google an
-error message to find the full docs and the full docs in an error
-message is overly verbose.)
-
-Thank you!
+Thanks & Regard
+-Ravi
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20111115/9d98a66e/attachment.htm>
