@@ -1,86 +1,93 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Tue, 15 Nov 2011 00:55:36 -0800
-Subject: [Lustre-devel] [wc-discuss] Lustre code style Git commit hooks
-In-Reply-To: <alpine.LFD.2.02.1111141913160.19436@casper.infradead.org>
-References: <E524F377-9B95-4736-92FF-22C711DD9EE8@whamcloud.com>
-	<20111103222831.GB19258@llnl.gov>
-	<8FB8F9D4-A179-490D-AE9F-61C731FD98AA@whamcloud.com>
-	<1320443263.7466.26.camel@brian-laptop>
-	<alpine.LFD.2.02.1111091624400.14374@casper.infradead.org>
-	<855EC42A-3184-49A5-AC6E-9C5012166319@whamcloud.com>
-	<alpine.LFD.2.02.1111091918270.401@casper.infradead.org>
-	<ABD9E0C9-58A5-43D6-B382-6E5EE7FE6688@whamcloud.com>
-	<alpine.LFD.2.02.1111141607030.3705@casper.infradead.org>
-	<20111114181024.GJ9136@llnl.gov>
-	<alpine.LFD.2.02.1111141913160.19436@casper.infradead.org>
-Message-ID: <AC8A421C-129A-4E45-A9C7-FFF531DF236C@whamcloud.com>
+Date: Tue, 15 Nov 2011 01:47:07 -0800
+Subject: [Lustre-devel] lustre-devel  packaging
+In-Reply-To: <CAE66FB6.134A%bruce_korb@xyratex.com>
+References: <CAE66FB6.134A%bruce_korb@xyratex.com>
+Message-ID: <8B892676-E029-4052-8A98-9DACFD170C2E@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2011-11-14, at 11:14 AM, James Simmons wrote:
->>> http://wiki.whamcloud.com/display/PUB/Using+Gerrit
->>> 
->>> Looking at the page I do see the "component:" tag, but its because I 
->>> looked for it. It needs to be more clear what is required to push a 
->>> patch. Just a outsider's view.
->> 
->> Would a more detailed explanation of each "part" of the commit message
->> help? For example, under the sample commit message:
->> 
->> * LU-000: Issue number referencing an open issue at jira.whamcloud.com
->> 
->> * component: The component(s) affected by this patch (i.e. osd-ldiskfs,
->>              lnet, etc.)
->> 
->> * Short Description: ...
+On 2011-11-14, at 7:11 AM, Bruce Korb wrote:
+> We at Xyratex are needing to develop some auxiliary utilities that
+> need internal data structures from lustre.  To accomplish this, our
+> sources have been reaching into the lustre build tree for the
+> necessary headers.
 
-Have a look at: http://wiki.whamcloud.com/display/PUB/Commit+Comments
-It has an updated description of the commit comment, and why having a
-good one is important, as well as an improved commit comment template.
-I'm submitting this va change http://review.whamcloud.com/1688, and it
-is reproduced below:
+That is messy, I agree.
 
+> Not being a particular fan of that approach, I developed a patch for
+> lustre that will create another RPM: a lustre-devel package.
 
-LU-nnn component: short description of change under 64 columns
+I like the idea of having a separate lustre-devel package, since this
+is fairly standard practise for other libraries and such.
 
-The "component:" should be a lower-case single-word subsystem of the
-Lustre code that best encompasses the change being made.  Examples of
-components include modules like: llite, lov, lmv, osc, mdc, ldlm, lnet,
-ptlrpc, mds, oss, osd, ldiskfs, libcfs, socklnd, o2iblnd; functional
-subsystems like: recovery, quota, grant; and auxilliary areas like:
-build, tests, docs.  This list is not exhaustive, but is a guideline.
+My main question would be - do you _need_ to have access to all of the
+headers that you included, or did you simply include all of the headers
+because that was the easiest thing to do?  Doing a simple check on the
+current master tree, it appears you just copied all of the headers in
+libcfs/include, lnet/include, and lustre/include (which total 186 files).
 
-The commit comment should contain a detailed explanation of the change
-being made.  This can be as long as you'd like.  Please give details
-of what problem was solved (including error messages or problems that
-were seen), a good high-level description of how it was solved, and
-which parts of the code were changed (including important functions
-that were changed, if this is useful to understand the patch, and
-for easier searching).  Wrap lines at/under 70 columns.
+By just copying everything into "public" headers, it is introducing a
+maintenance nightmare, because it is no longer clear which APIs, structs,
+constants, ioctls, etc. are private to Lustre or specific tools, and
+which ones might possibly be used by external tools and would cause those
+tools to break if they were changed for some reason.
 
-
-This is the error message that you would get if you try to submit an
-incorrect commit.  If people think it would be more useful, the
-prepare-commit-msg hook could go whole-hog and just replace the basic
-commit comment (which basically shows "git status") with a full sample
-commit template that has (commented out) the above template and a
-Signed-off-by: line.
-
->> Looking at the wiki page referenced above, it's a little hard to
->> distinguish each section from one another. They all seem to blend into a
->> single wall of text, IMO. Splitting them up into separate pages, or
->> simply using a better color scheme to distinguish the sections apart,
->> might help the page's readability as a whole.
+> The other files installed as part of lustre-devel are object
+> archives and library interface man pages:
 > 
-> Absolutely agree. I like the idea of a color scheme with the above format 
-> under the simple commit message.
+> usr/lib64/libcfsutil.a
+> usr/lib64/liblustreapi.a
+> usr/lib64/liblustre.a
+> usr/lib64/libptlctl.a
+> usr/lib64/libiam.a
 
-Yes, we started to split up these pages and improve the content, but
-SC has interrupted this process.
+Now that you post this list of libraries, it in fact appears that libiam
+is not even used by userspace at all anymore.  From simple checking of
+lustre/utils/Makefile.am, it only shows mkfs_lustre.c as a potential user,
+and that doesn't seem to use it at all.  The creation of the object index
+"oi.16", which is the only IAM-format index in the filesystem, is done in
+the kernel since before Lustre 2.0 was released.
 
+
+So, rather than simply copying everything that is available, it would be
+much better to have a discussion about what APIs you are using (or which
+ones you wish would be available), and then implement llapi_* wrappers
+for those interfaces.  This would at least give some level of abstraction
+from the low-level interfaces, and makes it much clearer which interfaces
+are actually in use by tools that are not part of the Lustre package,
+(and should try to remain relatively stable), and which interfaces, ioctls,
+structures, etc. are for internal use only (or sometimes not in use at all).
+
+> usr/share/lustre/mpich-1.2.6-lustre.patch
+
+I think a significantly improved version this patch was already included
+in the MPICH upstream release, and this one is obsolete.
+
+> usr/share/man/man3/llapi_quotactl.3.gz
+> usr/share/man/man3/llapi_file_open.3.gz
+> usr/share/man/man3/llapi_file_create.3.gz
+> usr/share/man/man3/llapi_file_get_stripe.3.gz
+
+> 
+> Below is my git-commit message.  Under separate cover, I'll post the
+> git patch under the subject "[PATCH] lustre-devel packaging"
+
+Looking at the descriptions, the patches look quite reasonable.  However,
+you need to submit patches to Gerrit in order to get them inspected,
+tested, and landed.  Please see:
+
+http://wiki.whamcloud.com/display/PUB/Submitting+Changes
+
+and in particular:
+
+http://wiki.whamcloud.com/display/PUB/Using+Gerrit
+
+There are a number of people at Xyratex already following this process
+that you can likely ask for guidance.
 
 Cheers, Andreas
 --
