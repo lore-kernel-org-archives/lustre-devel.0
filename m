@@ -1,42 +1,63 @@
-From: Alexey Lyashkov <alexey_lyashkov@xyratex.com>
-Date: Thu, 17 Nov 2011 16:08:39 +0400
-Subject: [Lustre-devel] lustre-devel  packaging - LU-482
-In-Reply-To: <ABDA628E-8DA2-4CB8-BC57-371942B013D5@whamcloud.com>
-References: <CAE97569.14B4%bruce_korb@xyratex.com>
-	<ABDA628E-8DA2-4CB8-BC57-371942B013D5@whamcloud.com>
-Message-ID: <84CBE853-0699-4AF2-B284-798CA99FD4C1@xyratex.com>
+From: Shay Seager <ssseager@gmail.com>
+Date: Tue, 6 Dec 2011 10:05:26 -0800
+Subject: [Lustre-devel] LUG 2012
+Message-ID: <DD229AED-FD1C-4D24-AA0F-D0FF7D5E6C7E@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+JOIN US IN AUSTIN!  LUG 2012 will be held at the Hyatt Regency Austin, Downtown on the Lake, Monday, April 23rd 2012 through Wednesday, April 25th 2012.
 
-On Nov 17, 2011, at 05:35, Andreas Dilger wrote:
+This 2 1/2 day event is the primary venue for discussion and seminars on open source parallel file system technologies with a unique focus on the Lustre? parallel file system.
 
-> On 2011-11-16, at 14:22, Bruce Korb <bruce_korb@xyratex.com> wrote:
->> 
->> I did do a little more due diligence:
->> 
->> On 11/15/11 7:22 AM, Bruce Korb wrote:
->>>> My main question would be - do you _need_ to have access to all of the
->>>> headers that you included, or did you simply include all of the headers
->>>> because that was the easiest thing to do?  Doing a simple check on the
->>>> current master tree, it appears you just copied all of the headers in
->>>> libcfs/include, lnet/include, and lustre/include (which total 186 files).
->>> 
->>> Lets assume I did a minimal approach and only included the necessary
->> 
->> libcfs/libcfsutil.h
->> lnet/lnetctl.h
->> lustre/liblustreapi.h
->> lustre/lustre_idl.h
->> test.h
->> utils/obdctl.h
->> 
->> These are the headers directly #include-d by our "utility"
-> 
-> Including liblustrapi.h is expected, since this is the entry point for the Lustre wrappers, and this header is already installed. 
-> 
-> I did some work several months ago to make lustre_idl.h usable from userspace for lfsck, which works OK except for the use of __u32/__u64 and friends, which needs the "types.h" header to define.
-that should be done via libcfs.h i think ?
+LUG is a user-led event whose organizing committee is made up of representatives from Indiana University (IU), Naval Research Laboratory (NRL), Oak Ridge National Laboratory (ORNL), Sandia National Laboratories (SNL), Lawrence Livermore National Laboratory (LLNL), European Open File Systems (EOFS), and Texas Advanced Computing Center (TACC).
+
+
+For more information and registration:  http://www.opensfs.org/lug
+              To register for the event http://lug-opensfs.eventbrite.com/
+              To reserve your room at  the Hyatt Regency Austin https://resweb.passkey.com/Resweb.do?mode=welcome_gi_new&groupID=6750202
+	      
+
+Want to get involved?
+The LUG program committee would like to invite members of the Lustre community to submit
+
+presentation abstracts for inclusion in this year?s meeting. It is not necessary to submit a
+
+technical paper, just an abstract of your proposed talk no more than a page in length. Talks
+
+should target a half an hour in length and reflect the work that you or your site are doing with
+
+Lustre?.
+
+The deadline to submit presentation abstracts is February 14, 2012. For questions
+
+or to submit a presentation abstract, contact the program committee chair, Stephen Simms:
+
+submissions at opensfs.org
+
+
+Contact Shay - shay at opensfs.org with any questions
+
+We look forward to seeing you in Austin!
+OpenSFS
+
+
+
+
+- - - 
+Shay Seager
+Open SFS Secretary 
+www.opensfs.org
+(925) 290-7641
+shay at opensfs.org
+
+
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20111206/477df364/attachment.htm>
