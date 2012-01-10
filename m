@@ -1,43 +1,30 @@
-From: Shay Seager <shay@opensfs.org>
-Date: Mon, 9 Jan 2012 15:48:18 -0800
-Subject: [Lustre-devel] LUG 2012 Registration is open
-Message-ID: <B12BF6A9-F03B-40E2-8AE3-85687ABAF302@opensfs.org>
+From: wangdi <di.wang@whamcloud.com>
+Date: Tue, 10 Jan 2012 15:11:18 -0800
+Subject: [Lustre-devel] FID update (reserve a bit in FID to identify it
+ refers Metadata object or data object)
+Message-ID: <4F0CC596.4020409@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
-Happy New Year!  We here at OpenSFS hope that you have had a wonderful start to your 2011.
+Hello
 
-OpenSFS would like to invite you to enjoy spring in beautiful Austin Tx - 
+Here is an update about FID in Lustre.
 
-LUG 2012 will be held at the Hyatt Regency Austin, Downtown on the Lake, Monday, April 23rd 2012 through Wednesday, April 25th 2012.
+We will implement FID on OST in lustre 2.x, so both data and metadata objects will be referred by FID in lustre. But different with the FID on MDT, OST FID will not use OI to map the real inode.(OI is container for FID->inode mapping). Instead it will still store objects under /O structure (like the current 1.8 implementation), so they can have an internal reference from the namespace to avoid problems with fsck.
 
-This 2 1/2 day event is the primary venue for discussion and seminars on open source parallel file system technologies with a unique focus on the Lustre? parallel file system.
+Then
 
-To Register please follow this link http://www.opensfs.org/lug/registration
+1. for metadata object, it will be stored under /root and referenced by OI, i.e. the target must lookup OI by FID to get the inode.
+2. for data object, it will be stored under /O and referenced by the /O structure itself, i.e. the target can lookup /O by some kind of FID hash to get the inode.
 
-LUG is a user-led event whose organizing committee is made up of representatives from Indiana University (IU), Naval Research Laboratory (NRL), Oak Ridge National Laboratory (ORNL), Sandia National Laboratories (SNL), Lawrence Livermore National Laboratory (LLNL), and Texas Advanced Computing Center (TACC).
+So the target(MDT or OST) needs to know it is meta_data object or data object, to figure out where to get the object by FID.
 
-Feel free to contact me with any questions.
+We thought to reserve the highest bit of OID to identify whether it is a metadata or data object, so the maximum OID for each sequence will shrink from 4 billion to 2 billion.
 
-Best,
+For FID related information, you can referhttp://wiki.lustre.org/index.php/Architecture_-_Interoperability_fids_zfs
 
-Shay
-
-
-
-- - - 
-Shay Seager
-Open SFS Secretary 
-www.opensfs.org
-(925) 290-7641
-shay at opensfs.org
-
-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120109/5d278bae/attachment.htm>
+Thanks
+WangDi
