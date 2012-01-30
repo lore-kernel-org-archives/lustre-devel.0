@@ -1,134 +1,71 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Sun, 22 Jan 2012 10:33:42 -0700
+From: tao.peng at emc.com <tao.peng@emc.com>
+Date: Mon, 30 Jan 2012 02:44:52 -0500
 Subject: [Lustre-devel] Lustre dcache clean up and distributed locking
-In-Reply-To: <4F1C353A.9080101@whamcloud.com>
+In-Reply-To: <CALxHnhL5Oz7cwqF15x65enx1qhgadSkftGa-=QAuY1N+9B5rSw@mail.gmail.com>
 References: <F19688880B763E40B28B2B462677FBF805E7E684CD@MX09A.corp.emc.com>
 	<AC57B2B9-5559-4713-905D-7AC9BAE3B1DB@whamcloud.com>
-	<F19688880B763E40B28B2B462677FBF805E7E6857F@MX09A.corp.emc.com>
-	<8449503C-66B3-4CDC-89BF-5B52E6D29579@whamcloud.com>
-	<5F3A45681A0F5944B3194CF8C8FB905B66FA4DD4F9@MX17A.corp.emc.com>
-	<4F19A01B.4070405@whamcloud.com>
-	<8A50205D-3704-4969-9997-3D6157C252D0@whamcloud.com>
-	<4F1C353A.9080101@whamcloud.com>
-Message-ID: <81008C6C-8D65-4FBF-A3C0-B01D0683DE9A@whamcloud.com>
+	<28CD3A7C-52EE-4E75-B00F-4280D60CE17D@whamcloud.com>
+	<CALxHnhL5Oz7cwqF15x65enx1qhgadSkftGa-=QAuY1N+9B5rSw@mail.gmail.com>
+Message-ID: <F19688880B763E40B28B2B462677FBF805E7E68AA5@MX09A.corp.emc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2012-01-22, at 9:11, Fan Yong <yong.fan@whamcloud.com> wrote:
+Hi Siyao,
 
-> On 1/21/12 2:06 AM, Andreas Dilger wrote:
->> 
->> Fan Yong,
->> About DNE locking - in order to handle the split name/permission issue, the current plan is for the client to get the LOOKUP lock for the FID on both the master MDT and the remote MDT.
-> Hi Andreas,
-> 
-> Why two LOOKUP locks on two MDTs, why not one LOOKUP lock on inode holder MDT and the other name lock (new) on name entry holder MDT? Any special advantage? I think both methods need client-side support (for protocol changes).
+Yes, ll_lookup_lock should be able to be removed. And looks like it will be handled by Yang Sheng in ?LU-506 kernel: FC15 - Dcache RCU-walk changes? as commented by Fan Yong (http://review.whamcloud.com/#patch,sidebyside,1865,2,lustre/include/linux/lustre_patchless_compat.h). I will leave it as is to let Sheng handle it.
 
-The difference between the two approaches is relatively small in terms of the functional outcome, but in terms of implementation there is a bigger difference. 
+Thanks,
+Tao
 
-Two reasons for this:
-- we already have LOOKUP locks, so less code changes are needed
-- having a single lock per FID is easier to manage compared to one lock per name
+From: Lai Siyao [mailto:laisiyao at whamcloud.com]<mailto:[mailto:laisiyao@whamcloud.com]>
+Sent: Friday, January 20, 2012 10:56 AM
+To: Oleg Drokin
+Cc: Andreas Dilger; Peng, Tao; faibish, sorin; Tang, Haiying; Liu, Xuezhao; Fan Yong; Eric Barton
+Subject: Re: Lustre dcache clean up and distributed locking
 
-Consider that chmod/chgrp/chown/ACL operations are more common in practice than hard links, then having a single LOOKUP lock is more efficient. 
- 
-Even with hard links, if the client does a lookup on a link on the master, it can find the FID from the dirent and may have the inode data cached from the remote MDT. 
+Hi Tao,
 
-I agree that name locks may have advantages in some cases, but I don't know if that is worth the extra complexity. 
+The reason why ll_lookup_lock is introduced is because in some kernels (eg. 2.6.32 for RHEL6), d_rehash_cond() doesn't exist and only d_rehash can be used, which needs unlock dcache_lock before entry, therefore there is a race here, and a similar global lock like dcache_lock is needed. The improvement can be done here is when d_rehash_cond() is exported, ll_lookup_lock lock/unlock can be a null operation, and in recent kernels, dcache_lock is removed, ll_lookup_lock should be able to be removed too.
 
-Cheers, Andreas
+I like most of the cleanups, but I don't see much benefits introducing a DENTRY bit lock, because a dentry without LOOKUP lock can hardly be used, and inodebit lock coverage upgrade/downgrade is more useful here.
 
->> If the link is removed from the master MDT, then the FID LOOKUP lock will be cancelled there, but if another hard link is remove from a different MDT then the only the LOOKUP from the other MDT needs to be cancelled.
->> 
->> This will be similar to Tao's proposal for a separate lock bit for the name, in the DNE case where the name is remote from the inode. It still suffers from some inefficiency in case of multiple hard links from the same master MDT to a remote inode (canceling the FID LOOKUP lock when unlinking one name will force it to be refetched for the other links), but since hard links are so rare this should not significantly impact performance.
->> 
->> Cheers, Andreas
->> 
->> On 2012-01-20, at 10:10, Fan Yong<yong.fan@whamcloud.com>  wrote:
->>> Excellent work. I just added some comments inside your document. Please
->>> check.
->>> 
->>> 
->>> Best Regards,
->>> Fan Yong
->>> Whamcloud, Inc.
->>> 
->>> On 1/20/12 9:34 AM, haiying.tang at emc.com wrote:
->>>> Hi Andreas,
->>>> 
->>>> Tao is on vacation now. It might be difficult for him to check emails due to limited internet access at hometown.
->>>> For urgent issue, you folks could send email to his gmail account bergwolf at gmail.com.
->>>> 
->>>> Thanks,
->>>> Haiying
->>>> 
->>>> -----Original Message-----
->>>> From: Andreas Dilger [mailto:adilger at whamcloud.com]
->>>> Sent: 2012?1?20? 1:39
->>>> To: Peng, Tao
->>>> Cc: faibish, sorin; Tang, Haiying; Liu, Xuezhao; laisiyao at whamcloud.com; yong.fan at whamcloud.com; green at whamcloud.com; eeb at whamcloud.com
->>>> Subject: Re: Lustre dcache clean up and distributed locking
->>>> 
->>>> On 2012-01-17, at 3:21 AM,<tao.peng@emc.com>  <tao.peng@emc.com>  wrote:
->>>>> Thanks Siyao and Oleg for answering my dcache revalidation question on lustre mailing list. I updated the design to reflect it.
->>>>> 
->>>>> Please see attachment.
->>>> Tao,
->>>> Fan Yong is also taking a more detailed look at your document and will
->>>> hopefully have a chance to reply before the New Year holidays.
->>>> 
->>>> Also, we are just working on landing the patches to add support for Linux
->>>> 2.6.38 for the Lustre client.  One of the patches relates to the lockless
->>>> dcache changes that were introduced in that kernel.  If you are interested
->>>> to review this patch, and become more familiar with the Lustre development
->>>> process, you should visit http://review.whamcloud.com/1865 for the patch.
->>>> 
->>>> You need to create an account in Gerrit using OpenID (Google, mostly), and
->>>> an account in our bug tracking system (http://jira.whamcloud.com) if you
->>>> haven't already.
->>>> 
->>>>>> -----Original Message-----
->>>>>> From: Andreas Dilger [mailto:adilger at whamcloud.com]
->>>>>> Sent: Tuesday, January 17, 2012 4:16 PM
->>>>>> To: Peng, Tao
->>>>>> Cc: faibish, sorin; Tang, Haiying; Liu, Xuezhao; Lai Siyao; Fan Yong; Oleg Drokin; Eric Barton
->>>>>> Subject: Re: Lustre dcache clean up and distributed locking
->>>>>> 
->>>>>> On 2012-01-16, at 9:25 PM,<tao.peng@emc.com>  wrote:
->>>>>>> I finally started to work on Lustre dcache cleanup and locking. After reading Lustre, ocfs2 and VFS
->>>>>> dcache related code, I came to a design for cleaning up Lustre dcache code and doing distributed
->>>>>> locking under dcache. For distributed locking, the main idea is to add a new inode bitlock DENTRY lock
->>>>>> to just protect valid dentry, instead of letting LOOKUP lock handle multiple purpose, which makes
->>>>>> client unable to know whether file is deleted or not when server cancels LOOKUP lock. Instead, client
->>>>>> holds PR mode DENTRY lock on all valid denties and when server cancels it, client knows the file is
->>>>>> deleted.
->>>>>>> For details, please see the attachments (I attached both word and pdf versions as I am not sure if
->>>>>> which is more convenient for you:). And please help to review and comment. Thank you!
->>>>>> 
->>>>>> Hi Tao,
->>>>>> I'm passing this on to the engineers that are most familiar with the DLM and client dcache code in
->>>>>> Lustre.  After a quick first read through your document, your investigation of the client code is very
->>>>>> insightful and looks like it will be able to remove some of the significant complexity that has grown
->>>>>> over time in the llite code.
->>>>>> 
->>>>>> Cheers, Andreas
->>>>>> --
->>>>>> Andreas Dilger                       Whamcloud, Inc.
->>>>>> Principal Engineer                   http://www.whamcloud.com/
->>>>>> 
->>>>>> 
->>>>> <dcache_distributed_locking-v2.docx>
->>>> Cheers, Andreas
->>>> --
->>>> Andreas Dilger                       Whamcloud, Inc.
->>>> Principal Engineer                   http://www.whamcloud.com/
->>>> 
->>>> 
->>>> 
->>>> 
->>>> 
->>> <dcache_distributed_locking-v2_comment.docx>
-> 
+Bye,
+- Lai
+On Fri, Jan 20, 2012 at 1:11 AM, Oleg Drokin <green at whamcloud.com<mailto:green@whamcloud.com>> wrote:
+Hello!
+
+On Jan 17, 2012, at 3:16 AM, Andreas Dilger wrote:
+
+> On 2012-01-16, at 9:25 PM, <tao.peng at emc.com<mailto:tao.peng@emc.com>> wrote:
+>> I finally started to work on Lustre dcache cleanup and locking. After reading Lustre, ocfs2 and VFS dcache related code, I came to a design for cleaning up Lustre dcache code and doing distributed locking under dcache. For distributed locking, the main idea is to add a new inode bitlock DENTRY lock to just protect valid dentry, instead of letting LOOKUP lock handle multiple purpose, which makes client unable to know whether file is deleted or not when server cancels LOOKUP lock. Instead, client holds PR mode DENTRY lock on all valid denties and when server cancels it, client knows the file is deleted.
+>>
+>> For details, please see the attachments (I attached both word and pdf versions as I am not sure if which is more convenient for you:). And please help to review and comment. Thank you!
+Thanks for looking into this.
+It is indeed possible to add another bit for just the dentry, but the problem is it would need to be granted in conjunction with
+the LOOKUP bit anyway (along with permission information), if we don't do this, then we would need to send an additional RPC to get
+this information very shortly after lookup in a lot of times and that would be pretty slow. Of course there is no way to get different
+lock mode for every bit, so in this scheme the lock mode swould really be the same.
+And the (currently) big problem with multiple bit locks is we don't have a way to cancel just subset of a lock (or degrade a lock coverage
+I should say). This was planned for quite a while ago, but somehow never ended up at the top of the priority list so was never implemented after all.
+There are minor comments on the logic flow after that too. E.g. the locks in lustre are unlocked right away on the client side, but just placed in the LRU and remain on the client in this sort of unreferenced state. When there is a conflict, the server sends the AST RPC and then the lock
+is actually released (cancelled) by client. Currently the AST is not delivered to a lock that has non-zero usage counters.
+Additionally due to the way we implement locks, it's not possible to have a separate lock for every name of the file.
+
+For your cleanup list, I think that is good. Note that item 'c' was already implemented some time ago, you can see it here:
+https://bugzilla.lustre.org/show_bug.cgi?id=16417 the patch is this: https://bugzilla.lustre.org/attachment.cgi?id=24200
+It's probably somewhat stale now. It did not work correctly back at the time due to some other logic, but should work now.
+You can read the comments in that bug for some more info.
+
+Bye,
+   Oleg
+--
+Oleg Drokin
+Senior Software Engineer
+Whamcloud, Inc.
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120130/e5aab0d3/attachment.htm>
