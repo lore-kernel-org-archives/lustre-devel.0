@@ -1,57 +1,54 @@
-From: Kevin Van Maren <KVanMaren@fusionio.com>
-Date: Tue, 7 Feb 2012 10:26:08 -0700
-Subject: [Lustre-devel] [Lustre-discuss] Lustre 1.8.7 - Setup prototype
- in Research field -	STUCK !
-In-Reply-To: <4F2C19BB020000CD00074CE1@gwmail1.harthosp.org>
-References: <4F2C19BB020000CD00074CE1@gwmail1.harthosp.org>
-Message-ID: <BF1E0D33-9545-4780-B996-BA32DB4E9810@fusionio.com>
+From: Shay Seager <shay@opensfs.org>
+Date: Wed, 8 Feb 2012 14:39:25 -0800
+Subject: [Lustre-devel] LUG 2012
+Message-ID: <BC42BF2F-671F-47B6-8100-0CF088FEEB69@opensfs.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-You can get the Oracle downloads from:
-http://downloads.lustre.org/public/lustre/v1.8/lustre_1.8.7/
+It?s that time of year again.  That?s right, LUG 2012, the Lustre parallel file system?s premier conference that joins individuals both internationally and across a wide variety of disciplines, will take place in Austin, Texas from April 23-25. 
 
-Basically, build Lustre for your kernel on the clients, but use the Lustre server kernel on the servers.
+"LUG is the preeminent venue for users of the Lustre parallel file system, drawing individuals both internationally and across a variety of disciplines,? said Oak Ridge National Laboratory?s (ORNL?s) Technology Integration Group Leader Galen Shipman.
 
-Kevin
+And because 2012 is a leap year, participants get an extra day to receive the $140 early registration discount.
+
+"The LUG offers participants opportunities to share knowledge, ideas, and achievements with a diverse audience. We're anticipating an interesting program and would encourage you to be a part of it,? said Stephen Simms, Manager of High Performance File Systems at Indiana University.
+
+To register for the event http://www.opensfs.org/lug/registration.
+
+The LUG program committee would like to invite members of the Lustre community to submit presentation abstracts for inclusion in this year's meeting. It is not necessary to submit a technical paper, just an abstract of your proposed talk no more than a page in length. Talks should target a half an hour in length and reflect the work that you or your site are doing with Lustre. The deadline to submit presentation abstracts is February 14, 2012.  For questions or to submit a presentation abstract, send mail to submissions at lists.opensfs.org<mailto:submissions@lists.opensfs.org> or contact the program committee chair, Stephen Simms (ssimms at indiana.edu<mailto:ssimms@indiana.edu>).
+
+Anyone who has ever heard the word Lustre is encouraged to attend. Your participation is key to ensuring a stable, viable, and ever-improving Lustre file system. Simply put, all users represent the future of Lustre. By attending LUG, you and your employees will gain depth, perspective, and valuable knowledge to give you a step up in the competitive HPC world.
+
+Besides two-and-a-half days of amazing speakers, technical sessions, and keystone networking experience, attendees will enjoy spring in Austin, Texas and will receive attendee gifts.
+
+Attendees are recommended to fly in on the morning of Sunday, April 22nd, due to two great events planned for that evening. From 2-5 p.m. the Open Benchmark Working Group meeting will be open to the entire HPC community, while the Whamcloud and DDN event will take place from 6-10 p.m. (details will be posted soon).
+
+Attendees are encouraged to fly out the evening of Wednesday, April 25th or the morning of April 26th, so that they can attend the OpenSFS general meeting, OpenSFS Technical Working Group Meeting, and the Community Development Working Group Meeting on Wednesday, April 25th from 1pm-5pm.
+
+All events are open to all LUG attendees. 
+
+Join us in Austin, TX this April 23-25th 2012! Hurry and register today at http://www.opensfs.org/lug/registration.
+
+And don't forget to book your hotel room with the Austin Hyatt on the Lake. Rooms are going fast and we want all attendees to get the government and room block discounted rates while they last.  To reserve a room at the Hyatt Regency Austin visit http://www.opensfs.org/lug/registration or https://resweb.passkey.com/Resweb.do?mode=welcome_gi_new&groupID=6750202.
+
+LUG 2012 would like to thank the following sponsors for making this event possible:
+Bull, Cray, DDN, Dell, EMC, Intel, NetAPP, Raid, Inc., SGI, Terascala, Whamcloud, and Xyratex.
+
+We look forward to see you in Austin!
 
 
-On Feb 7, 2012, at 9:09 AM, "Charles Cummings" <Ccummings@harthosp.org> wrote:
+- - - 
+Shay Seager
+Open SFS Secretary 
+www.opensfs.org
+(925) 290-7641
+shay at opensfs.org
 
-> Hello Everyone,
->  
-> being the local crafty busy admin for a neuroscience research branch, Lustre seems the only way to go however I'm a bit stuck and need some thoughtful guidance.
->  
-> My goal  is to setup a virtual OS environment which is a replica of our
-> Direct attached storage head node running SLES 11.0 x86 64   Kernel:  2.6.27.19-5 default #1 SMP
-> and our (2) Dell blade clusters running CentOS 5.3 x86 64   Kernel: 2.6.18-128.el5 #1 SMP
-> which I now have running as a) SLES 11 same kernel MDS  b) SLES 11 same kernel OSS   and   c) CentOS 5.3 x86 65 same kernel
-> and then get Lustre running across it.
->  
-> The trouble began when i was informed that the Lustre rpm kernel numbers MUST match the OS kernel number EXACTLY due to modprobe errors and mount errors on the client,
-> and some known messages on the servers after the rpm installs.
->  
-> My only direct access to Oracle Lustre downloads is through another person with an Oracle ID who's not very willing to help - i.e. this route is painful
->  
-> So to explain why I'm stuck:
->  
-> a) access to oracle downloads is not easy
-> b) there is so much risk with altering kernels, given all the applications and stability of the environment you could literally trash the server and spend days recovering - in addition to it being the main storage / resource for research
-> c) I can't seem to find after looking Lustre RPMs that match my kernel environment specifically, i.e. the SLES 11 AND CENTOS 5.3
-> d) I've never created rpms to a specific kernel version and that would be a deep dive into new territory and frankly another gamble
->  
-> What's the least painful and least risky to get Lustre working in this prototype which will then lend to production (equally least painful) given these statements - Help !
-> Cliff, I could use some details on how specifically wamcloud can fit this scenero - and thanks for all the enlightenment.
->  
->  
-> thanks for your help
-> Charles 
-> _______________________________________________
-> Lustre-discuss mailing list
-> Lustre-discuss at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-discuss
 
-Confidentiality Notice: This e-mail message, its contents and any attachments to it are confidential to the intended recipient, and may contain information that is privileged and/or exempt from disclosure under applicable law. If you are not the intended recipient, please immediately notify the sender and destroy the original e-mail message and any attachments (and any copies that may have been made) from your system or otherwise. Any unauthorized use, copying, disclosure or distribution of this information is strictly prohibited.  Email addresses that end with a ?-c? identify the sender as a Fusion-io contractor.
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120208/573ed01b/attachment.htm>
