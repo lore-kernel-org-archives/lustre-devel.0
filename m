@@ -1,54 +1,278 @@
-From: Shay Seager <shay@opensfs.org>
-Date: Wed, 8 Feb 2012 14:39:25 -0800
-Subject: [Lustre-devel] LUG 2012
-Message-ID: <BC42BF2F-671F-47B6-8100-0CF088FEEB69@opensfs.org>
+From: tao.peng at emc.com <tao.peng@emc.com>
+Date: Thu, 9 Feb 2012 02:15:55 -0500
+Subject: [Lustre-devel] Lustre dcache clean up and distributed locking
+In-Reply-To: <4F2C08A3.4060206@whamcloud.com>
+References: <F19688880B763E40B28B2B462677FBF805E7E684CD@MX09A.corp.emc.com>
+	<AC57B2B9-5559-4713-905D-7AC9BAE3B1DB@whamcloud.com>
+	<F19688880B763E40B28B2B462677FBF805E7E6857F@MX09A.corp.emc.com>
+	<8449503C-66B3-4CDC-89BF-5B52E6D29579@whamcloud.com>
+	<5F3A45681A0F5944B3194CF8C8FB905B66FA4DD4F9@MX17A.corp.emc.com>
+	<4F19A01B.4070405@whamcloud.com>
+	<F19688880B763E40B28B2B462677FBF805E7E68AA7@MX09A.corp.emc.com>
+	<AEB2D859-5F0D-4D32-9719-DDD993D6921A@whamcloud.com>
+	<4F27D846.6010504@whamcloud.com>
+	<F19688880B763E40B28B2B462677FBF805E803AF01@MX09A.corp.emc.com>
+	<4F2C08A3.4060206@whamcloud.com>
+Message-ID: <F19688880B763E40B28B2B462677FBF805E803B502@MX09A.corp.emc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-It?s that time of year again.  That?s right, LUG 2012, the Lustre parallel file system?s premier conference that joins individuals both internationally and across a wide variety of disciplines, will take place in Austin, Texas from April 23-25. 
 
-"LUG is the preeminent venue for users of the Lustre parallel file system, drawing individuals both internationally and across a variety of disciplines,? said Oak Ridge National Laboratory?s (ORNL?s) Technology Integration Group Leader Galen Shipman.
+> -----Original Message-----
+> From: Fan Yong [mailto:yong.fan at whamcloud.com]
+> Sent: Saturday, February 04, 2012 12:18 AM
+> To: Peng, Tao
+> Cc: adilger at whamcloud.com; bergwolf at gmail.com; Tang, Haiying; faibish, sorin; Liu, Xuezhao;
+> laisiyao at whamcloud.com; green at whamcloud.com; eeb at whamcloud.com; bryon at whamcloud.com; lustre-
+> devel at lists.lustre.org
+> Subject: Re: Lustre dcache clean up and distributed locking
+> 
+> On 2/3/12 3:37 PM, tao.peng at emc.com wrote:
+> >> -----Original Message-----
+> >> From: Fan Yong [mailto:yong.fan at whamcloud.com]
+> >> Sent: Tuesday, January 31, 2012 8:02 PM
+> >> To: Peng, Tao
+> >> Cc: Andreas Dilger; bergwolf at gmail.com; Tang, Haiying; faibish, sorin; Liu, Xuezhao;
+> >> laisiyao at whamcloud.com; green at whamcloud.com; eeb at whamcloud.com; bryon at whamcloud.com; lustre-
+> >> devel at lists.lustre.org
+> >> Subject: Re: Lustre dcache clean up and distributed locking
+> >>
+> >> On 1/31/12 7:27 AM, Andreas Dilger wrote:
+> >>> On 2012-01-30, at 12:46 AM,<tao.peng@emc.com>   wrote:
+> >>>> Sorry for the late reply. I got your email earlier but didn't have chance to read the document
+> due
+> >> to very limited internet access.
+> >>>> Thank you very much for taking detailed look at the document and giving so many valuable comments.
+> >>>>
+> >>>> About adding new inode bitlock, I must admit that I missed hardlink case. Although the lock mode
+> >> can be changed to be the same as LOOKUP lock, I agree that inode bitlock cannot sufficiently
+> protect
+> >> every name/dentry separately for hardlinked files. And I agree, as you suggested in the document,
+> >> adding a name entry based lock can solve it.
+> >>>> IIUC, to add a name entry based lock, both client and server should be modified, and LDLM need to
+> >> be changed to manage the new lock information. Like new inode bitlock, the name entry based lock
+> will
+> >> as well introduce interoperability issues as a result of on wire protocol change. And in DNE
+> >> environment as Andreas explained, the original plan is to get LOOKUP on both master MDT and remote
+> MDT.
+> >> If we introduce name entry based lock, DNE case may need some change as well.
+> >>>> I will take a closer look at the approach. In the meanwhile, could you please confirm if it is
+> the
+> >> right way to go? The benefit of above complexity seems to be better distributed dentry locking
+> under
+> >> dcache framework.
+> >>>> What do others think? Andreas?
+> >>> Tao, before we go down the road of implementing such a change, there would have to be clear
+> benefits
+> >> to the performance and/or kernel integration before we could accept the interoperability issues and
+> >> added code complexity.
+> >>> The benefits of having a per-name lock, as I see them, are:
+> >>> - can be cancelled separately from other name locks
+> >>> - can be changed independently from the inode permissions (LOOKUP)
+> >>> - potential ease of integration with the Linux dcache
+> >>>
+> >>> The drawbacks of introducing a per-name lock:
+> >>> - only useful for hard-linked files (uncommon case)
+> >>> - added code complexity for a new lock type
+> >>> - incompatibility with existing client/server
+> >>> - additional code to handle incompatibility transparently
+> >>> - lock enqueue may need extra RPC for each name lock (different resource)
+> >>> - lock cancellation may need an extra RPC for each resource
+> >>>
+> >>> The way I see it is that the DENTRY lock would need to be a different resource for each name on a
+> >> file.  The only way this is going to be useful AFAICS is if the client enqueues each DENTRY lock on
+> a
+> >> separate resource, so that it can be granted and cancelled independently of the LOOKUP lock (which
+> is
+> >> on the FID and would be common for all names that reference this inode).  That would either need an
+> >> extra RPC for every filename lookup (to enqueue both the DENTRY and LOOKUP locks) or a new
+> >> LDLM_ENQUEUE RPC that can request and be granted two different locks (FID [seq, oid, ver, 0], and
+> >> FID+name hash [seq, oid, ver, hash]) in a single RPC.
+> >>> So, the main question is how much better the client dcache/VFS integration will be with the DCACHE
+> >> lock compared to the existing mechanism with the LOOKUP (FID) lock?  Is it impossible (or very
+> >> difficult) to use the existing mechanism for the new lockless dcache code?  Or is it a matter of
+> this
+> >> being a somewhat cleaner implementation, but not critical for moving forward?
+> >>> I'm aware that our dcache code has been too complex for some time, but I haven't looked recently
+> to
+> >> see how much of this is due to using/supporting old kernel APIs, and how much of it is due to the
+> use
+> >> of the LOOKUP lock on the FID protecting too much of the state on the client.
+> >>> Cheers, Andreas
+> >> Hi Tao,
+> >>
+> >> To introduce either per-name lock or DENTRY lock is mainly for removing
+> >> Lustre special flag "DCACHE_LUSTRE_INVALID" to simply Lustre code. But
+> >> if such simplification causes more complex ldlm logic, we have to
+> >> consider whether it is worth to remove "DCACHE_LUSTRE_INVALID". It is
+> >> not impossible to make "DCACHE_LUSTRE_INVALID" accepted by linux kernel.
+> >> On the other hand, "DCACHE_LUSTRE_INVALID" can work together with
+> >> lockless dcache in new linux kernel also.
+> >>
+> >> So to push the project move forward, we can divide it as two parts
+> >> (according to your document): Lustre dcache code cleanup, and some new
+> >> ldlm logic to remove "DCACHE_LUSTRE_INVALID". Before we reach an
+> >> agreement on the second part, we can start from the first part to
+> >> cleanup Lustre dcache code. How do you think?
+> >>
+> > Thank you, Andreas and Yong. I tend to agree with you that we should avoid the complexity if there
+> is no obvious benefits. However, as we need to make sure the code is acceptable by kernel community, I
+> will try to consolidate a design for adding the new type of lock but just don't implement it at this
+> point. And if later we are asked (by kernel community developers) to do it, we just need to do the
+> implementation.
+> 
+> Hi Tao,
+> 
+> We has another way to remove Lustre special dentry flags
+> "DCACHE_LUSTRE_INVALID". To indicate the dentry in dcache without LOOKUP
+> lock protected but not unhashed yet, we can add new flags in
+> "ll_dentry_data" (pointed by "dentry::d_fsdata"). Since it is Lustre
+> private date, no need to worry about whether the new flags will conflict
+> with any other VFS standard "dentry::d_flags" or not, and maybe save
+> some effort to implement the complex DENTRY lock in your original design.
+> 
+Hi Fan Yong,
 
-And because 2012 is a leap year, participants get an extra day to receive the $140 early registration discount.
+Thanks for your great suggestion. I updated the design doc with following changes, please help to review. Thank you!
 
-"The LUG offers participants opportunities to share knowledge, ideas, and achievements with a diverse audience. We're anticipating an interesting program and would encourage you to be a part of it,? said Stephen Simms, Manager of High Performance File Systems at Indiana University.
+Changelog:
+1. Macro cleanups are removed. I prefer to do it separately while cleaning up other obsolete macros.
+2. Remove DENTRY LDLM lock proposal. Because DCACHE_LUSTRE_INVALID flag can be hidden from generic VFS layer, it is no longer necessary to introduce such complex change.
+3. Add a section to describe how to add LLD_LUSTRE_INVALID flag to ll_dentry_data structure to replace existing DCACHE_LUSTRE_INVALID flag.
 
-To register for the event http://www.opensfs.org/lug/registration.
-
-The LUG program committee would like to invite members of the Lustre community to submit presentation abstracts for inclusion in this year's meeting. It is not necessary to submit a technical paper, just an abstract of your proposed talk no more than a page in length. Talks should target a half an hour in length and reflect the work that you or your site are doing with Lustre. The deadline to submit presentation abstracts is February 14, 2012.  For questions or to submit a presentation abstract, send mail to submissions at lists.opensfs.org<mailto:submissions@lists.opensfs.org> or contact the program committee chair, Stephen Simms (ssimms at indiana.edu<mailto:ssimms@indiana.edu>).
-
-Anyone who has ever heard the word Lustre is encouraged to attend. Your participation is key to ensuring a stable, viable, and ever-improving Lustre file system. Simply put, all users represent the future of Lustre. By attending LUG, you and your employees will gain depth, perspective, and valuable knowledge to give you a step up in the competitive HPC world.
-
-Besides two-and-a-half days of amazing speakers, technical sessions, and keystone networking experience, attendees will enjoy spring in Austin, Texas and will receive attendee gifts.
-
-Attendees are recommended to fly in on the morning of Sunday, April 22nd, due to two great events planned for that evening. From 2-5 p.m. the Open Benchmark Working Group meeting will be open to the entire HPC community, while the Whamcloud and DDN event will take place from 6-10 p.m. (details will be posted soon).
-
-Attendees are encouraged to fly out the evening of Wednesday, April 25th or the morning of April 26th, so that they can attend the OpenSFS general meeting, OpenSFS Technical Working Group Meeting, and the Community Development Working Group Meeting on Wednesday, April 25th from 1pm-5pm.
-
-All events are open to all LUG attendees. 
-
-Join us in Austin, TX this April 23-25th 2012! Hurry and register today at http://www.opensfs.org/lug/registration.
-
-And don't forget to book your hotel room with the Austin Hyatt on the Lake. Rooms are going fast and we want all attendees to get the government and room block discounted rates while they last.  To reserve a room at the Hyatt Regency Austin visit http://www.opensfs.org/lug/registration or https://resweb.passkey.com/Resweb.do?mode=welcome_gi_new&groupID=6750202.
-
-LUG 2012 would like to thank the following sponsors for making this event possible:
-Bull, Cray, DDN, Dell, EMC, Intel, NetAPP, Raid, Inc., SGI, Terascala, Whamcloud, and Xyratex.
-
-We look forward to see you in Austin!
-
-
-- - - 
-Shay Seager
-Open SFS Secretary 
-www.opensfs.org
-(925) 290-7641
-shay at opensfs.org
-
-
+Cheers,
+Tao
+> Cheers,
+> Nasf
+> 
+> > Please stay tuned.
+> >
+> > Best,
+> > Tao
+> >
+> >> Cheers,
+> >> --
+> >> Nasf
+> >>
+> >>>
+> >>>>> -----Original Message-----
+> >>>>> From: Fan Yong [mailto:yong.fan at whamcloud.com]
+> >>>>> Sent: Saturday, January 21, 2012 1:11 AM
+> >>>>> To: Peng, Tao; bergwolf at gmail.com
+> >>>>> Cc: Tang, Haiying; adilger at whamcloud.com; faibish, sorin; Liu, Xuezhao; laisiyao at whamcloud.com;
+> >>>>> green at whamcloud.com; eeb at whamcloud.com; Bryon Neitzel
+> >>>>> Subject: Re: Lustre dcache clean up and distributed locking
+> >>>>>
+> >>>>> Hi Tao,
+> >>>>>
+> >>>>> Excellent work. I just added some comments inside your document. Please check.
+> >>>>>
+> >>>>>
+> >>>>> Best Regards,
+> >>>>> Fan Yong
+> >>>>> Whamcloud, Inc.
+> >>>>>
+> >>>>> On 1/20/12 9:34 AM, haiying.tang at emc.com wrote:
+> >>>>>> Hi Andreas,
+> >>>>>>
+> >>>>>> Tao is on vacation now. It might be difficult for him to check emails due to limited internet
+> >> access
+> >>>>> at hometown.
+> >>>>>> For urgent issue, you folks could send email to his gmail account bergwolf at gmail.com.
+> >>>>>>
+> >>>>>> Thanks,
+> >>>>>> Haiying
+> >>>>>>
+> >>>>>> -----Original Message-----
+> >>>>>> From: Andreas Dilger [mailto:adilger at whamcloud.com]
+> >>>>>> Sent: 2012?1?20? 1:39
+> >>>>>> To: Peng, Tao
+> >>>>>> Cc: faibish, sorin; Tang, Haiying; Liu, Xuezhao;
+> >>>>>> laisiyao at whamcloud.com; yong.fan at whamcloud.com; green at whamcloud.com;
+> >>>>>> eeb at whamcloud.com
+> >>>>>> Subject: Re: Lustre dcache clean up and distributed locking
+> >>>>>>
+> >>>>>> On 2012-01-17, at 3:21 AM,<tao.peng@emc.com>   <tao.peng@emc.com>   wrote:
+> >>>>>>> Thanks Siyao and Oleg for answering my dcache revalidation question on lustre mailing list. I
+> >>>>> updated the design to reflect it.
+> >>>>>>> Please see attachment.
+> >>>>>> Tao,
+> >>>>>> Fan Yong is also taking a more detailed look at your document and will
+> >>>>>> hopefully have a chance to reply before the New Year holidays.
+> >>>>>>
+> >>>>>> Also, we are just working on landing the patches to add support for
+> >>>>>> Linux
+> >>>>>> 2.6.38 for the Lustre client.  One of the patches relates to the
+> >>>>>> lockless dcache changes that were introduced in that kernel.  If you
+> >>>>>> are interested to review this patch, and become more familiar with the
+> >>>>>> Lustre development process, you should visit http://review.whamcloud.com/1865 for the patch.
+> >>>>>>
+> >>>>>> You need to create an account in Gerrit using OpenID (Google, mostly),
+> >>>>>> and an account in our bug tracking system (http://jira.whamcloud.com)
+> >>>>>> if you haven't already.
+> >>>>>>
+> >>>>>>>> -----Original Message-----
+> >>>>>>>> From: Andreas Dilger [mailto:adilger at whamcloud.com]
+> >>>>>>>> Sent: Tuesday, January 17, 2012 4:16 PM
+> >>>>>>>> To: Peng, Tao
+> >>>>>>>> Cc: faibish, sorin; Tang, Haiying; Liu, Xuezhao; Lai Siyao; Fan
+> >>>>>>>> Yong; Oleg Drokin; Eric Barton
+> >>>>>>>> Subject: Re: Lustre dcache clean up and distributed locking
+> >>>>>>>>
+> >>>>>>>> On 2012-01-16, at 9:25 PM,<tao.peng@emc.com>   wrote:
+> >>>>>>>>> I finally started to work on Lustre dcache cleanup and locking.
+> >>>>>>>>> After reading Lustre, ocfs2 and VFS
+> >>>>>>>> dcache related code, I came to a design for cleaning up Lustre
+> >>>>>>>> dcache code and doing distributed locking under dcache. For
+> >>>>>>>> distributed locking, the main idea is to add a new inode bitlock
+> >>>>>>>> DENTRY lock to just protect valid dentry, instead of letting LOOKUP
+> >>>>>>>> lock handle multiple purpose, which makes client unable to know
+> >>>>>>>> whether file is deleted or not when server cancels LOOKUP lock. Instead, client holds PR mode
+> >>>>> DENTRY lock on all valid denties and when server cancels it, client knows the file is deleted.
+> >>>>>>>>> For details, please see the attachments (I attached both word and
+> >>>>>>>>> pdf versions as I am not sure if
+> >>>>>>>> which is more convenient for you:). And please help to review and comment. Thank you!
+> >>>>>>>>
+> >>>>>>>> Hi Tao,
+> >>>>>>>> I'm passing this on to the engineers that are most familiar with the
+> >>>>>>>> DLM and client dcache code in Lustre.  After a quick first read
+> >>>>>>>> through your document, your investigation of the client code is very
+> >>>>>>>> insightful and looks like it will be able to remove some of the significant complexity that
+> has
+> >>>>> grown over time in the llite code.
+> >>>>>>>> Cheers, Andreas
+> >>>>>>>> --
+> >>>>>>>> Andreas Dilger                       Whamcloud, Inc.
+> >>>>>>>> Principal Engineer                   http://www.whamcloud.com/
+> >>>>>>>>
+> >>>>>>>>
+> >>>>>>> <dcache_distributed_locking-v2.docx>
+> >>>>>> Cheers, Andreas
+> >>>>>> --
+> >>>>>> Andreas Dilger                       Whamcloud, Inc.
+> >>>>>> Principal Engineer                   http://www.whamcloud.com/
+> >>>>>>
+> >>>>>>
+> >>>>>>
+> >>>>>>
+> >>>>>>
+> >>> Cheers, Andreas
+> >>> --
+> >>> Andreas Dilger                       Whamcloud, Inc.
+> >>> Principal Engineer                   http://www.whamcloud.com/
+> >>>
+> >>>
+> >>>
+> >>>
+> 
 
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120208/573ed01b/attachment.htm>
+A non-text attachment was scrubbed...
+Name: dcache_cleanup_v3.docx
+Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+Size: 24186 bytes
+Desc: dcache_cleanup_v3.docx
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120209/639046f5/attachment.bin>
