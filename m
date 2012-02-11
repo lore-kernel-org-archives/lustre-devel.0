@@ -1,7 +1,7 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Fri, 10 Feb 2012 13:37:25 -0700
+From: Peng Tao <bergwolf@gmail.com>
+Date: Sat, 11 Feb 2012 21:40:36 +0800
 Subject: [Lustre-devel] Lustre dcache clean up and distributed locking
-In-Reply-To: <F19688880B763E40B28B2B462677FBF805E803B502@MX09A.corp.emc.com>
+In-Reply-To: <FEF73DB7-4C26-4BFA-BD27-6F48A9940BB4@whamcloud.com>
 References: <F19688880B763E40B28B2B462677FBF805E7E684CD@MX09A.corp.emc.com>
 	<AC57B2B9-5559-4713-905D-7AC9BAE3B1DB@whamcloud.com>
 	<F19688880B763E40B28B2B462677FBF805E7E6857F@MX09A.corp.emc.com>
@@ -14,53 +14,72 @@ References: <F19688880B763E40B28B2B462677FBF805E7E684CD@MX09A.corp.emc.com>
 	<F19688880B763E40B28B2B462677FBF805E803AF01@MX09A.corp.emc.com>
 	<4F2C08A3.4060206@whamcloud.com>
 	<F19688880B763E40B28B2B462677FBF805E803B502@MX09A.corp.emc.com>
-Message-ID: <FEF73DB7-4C26-4BFA-BD27-6F48A9940BB4@whamcloud.com>
+	<FEF73DB7-4C26-4BFA-BD27-6F48A9940BB4@whamcloud.com>
+Message-ID: <CA+a=Yy437F0zxrWZ5-iam0pFU4tkLMZtCqNddXeyf-rmaDFtng@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2012-02-09, at 12:15 AM, <tao.peng@emc.com> <tao.peng@emc.com> wrote:
-> Fan Yong <yong.fan@whamcloud.com> wrote:
->> We has another way to remove Lustre special dentry flags
->> "DCACHE_LUSTRE_INVALID". To indicate the dentry in dcache without LOOKUP
->> lock protected but not unhashed yet, we can add new flags in
->> "ll_dentry_data" (pointed by "dentry::d_fsdata"). Since it is Lustre
->> private date, no need to worry about whether the new flags will conflict
->> with any other VFS standard "dentry::d_flags" or not, and maybe save
->> some effort to implement the complex DENTRY lock in your original design.
-> 
-> Hi Fan Yong,
-> 
-> Thanks for your great suggestion. I updated the design doc with following changes, please help to review. Thank you!
-> 
-> Changelog:
-> 1. Macro cleanups are removed. I prefer to do it separately while cleaning up other obsolete macros.
-> 2. Remove DENTRY LDLM lock proposal. Because DCACHE_LUSTRE_INVALID flag can be hidden from generic VFS layer, it is no longer necessary to introduce such complex change.
-> 3. Add a section to describe how to add LLD_LUSTRE_INVALID flag to ll_dentry_data structure to replace existing DCACHE_LUSTRE_INVALID flag.
+On Sat, Feb 11, 2012 at 4:37 AM, Andreas Dilger <adilger@whamcloud.com> wrote:
+> On 2012-02-09, at 12:15 AM, <tao.peng@emc.com> <tao.peng@emc.com> wrote:
+>> Fan Yong <yong.fan@whamcloud.com> wrote:
+>>> We has another way to remove Lustre special dentry flags
+>>> "DCACHE_LUSTRE_INVALID". To indicate the dentry in dcache without LOOKUP
+>>> lock protected but not unhashed yet, we can add new flags in
+>>> "ll_dentry_data" (pointed by "dentry::d_fsdata"). Since it is Lustre
+>>> private date, no need to worry about whether the new flags will conflict
+>>> with any other VFS standard "dentry::d_flags" or not, and maybe save
+>>> some effort to implement the complex DENTRY lock in your original design.
+>>
+>> Hi Fan Yong,
+>>
+>> Thanks for your great suggestion. I updated the design doc with following changes, please help to review. Thank you!
+>>
+>> Changelog:
+>> 1. Macro cleanups are removed. I prefer to do it separately while cleaning up other obsolete macros.
+>> 2. Remove DENTRY LDLM lock proposal. Because DCACHE_LUSTRE_INVALID flag can be hidden from generic VFS layer, it is no longer necessary to introduce such complex change.
+>> 3. Add a section to describe how to add LLD_LUSTRE_INVALID flag to ll_dentry_data structure to replace existing DCACHE_LUSTRE_INVALID flag.
+>
+> Hi Tao,
+Hi Andreas,
 
-Hi Tao,
-these cleanups look quite reasonable now.  Will you be working on making
-these changes for Lustre?  The feature freeze for the Lustre 2.2 release
-was Jan 7, so any non-bugfix changes will need to land for Lustre 2.3.
+> these cleanups look quite reasonable now. ?Will you be working on making
+> these changes for Lustre? ?The feature freeze for the Lustre 2.2 release
+> was Jan 7, so any non-bugfix changes will need to land for Lustre 2.3.
+>
+Yes, it is on my todo list. Our plan is for me to first work on
+removing the outdated configure macros and related code that are there
+to support older (older than 2.6.18-latest) kernels. Then I will work
+on the dcache cleanups based on top of the most recent dcache RCU walk
+patch.
 
-However, that doesn't prevent you from working on these patches and sending
-them to Gerrit for inspection, testing, and getting them ready for landing.
-You should base your patch on top of the most recent dcache patch in
+> However, that doesn't prevent you from working on these patches and sending
+> them to Gerrit for inspection, testing, and getting them ready for landing.
+> You should base your patch on top of the most recent dcache patch in
+>
+> http://review.whamcloud.com/1865
+>
+> If you haven't looked already, please read the following wiki pages:
+>
+> http://wiki.whamcloud.com/display/PUB/Submitting+Changes
+> http://wiki.whamcloud.com/display/PUB/Using+Gerrit
+>
+> for details on how to submit patches to Gerrit for review/testing/landing.
+>
+Thanks for sharing the links. I will make sure all patches follow the
+guidelines.
 
-http://review.whamcloud.com/1865
-
-If you haven't looked already, please read the following wiki pages:
-
-http://wiki.whamcloud.com/display/PUB/Submitting+Changes
-http://wiki.whamcloud.com/display/PUB/Using+Gerrit
-
-for details on how to submit patches to Gerrit for review/testing/landing.
-
-
-
-Cheers, Andreas
---
-Andreas Dilger                       Whamcloud, Inc.
-Principal Lustre Engineer            http://www.whamcloud.com/
+Best,
+Tao
+>
+>
+> Cheers, Andreas
+> --
+> Andreas Dilger ? ? ? ? ? ? ? ? ? ? ? Whamcloud, Inc.
+> Principal Lustre Engineer ? ? ? ? ? ?http://www.whamcloud.com/
+>
+>
+>
+>
