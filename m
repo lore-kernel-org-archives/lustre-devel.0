@@ -1,84 +1,65 @@
-From: Peng Tao <bergwolf@gmail.com>
-Date: Sat, 18 Feb 2012 13:00:47 +0800
-Subject: [Lustre-devel] [wc-discuss] Lustre 2.3 release
-In-Reply-To: <73AED5C780AE05478241DB067651A92102F107C3@XYUS-EX22.xyus.xyratex.com>
-References: <4F304E2E.9080100@whamcloud.com>
-	<F19688880B763E40B28B2B462677FBF805E803BB5C@MX09A.corp.emc.com>
-	<73AED5C780AE05478241DB067651A92102F107C3@XYUS-EX22.xyus.xyratex.com>
-Message-ID: <CA+a=Yy69UCXBngMqUVg79DXOHwB5bY_o0Zt08JD-Kpb_4WKB0Q@mail.gmail.com>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Tue, 21 Feb 2012 13:02:25 -0700
+Subject: [Lustre-devel] For ptlrpc and related modules cleanup
+In-Reply-To: <7601FECF1C5EDF4AA5A446AB4B08BB510125A787D6@MX25A.corp.emc.com>
+References: <7601FECF1C5EDF4AA5A446AB4B08BB510125A785B3@MX25A.corp.emc.com>
+	<7601FECF1C5EDF4AA5A446AB4B08BB510125A787D6@MX25A.corp.emc.com>
+Message-ID: <F6EC8E93-996A-4067-8830-E48BAB64580A@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sat, Feb 18, 2012 at 5:48 AM, Nathan Rutman
-<Nathan_Rutman@xyratex.com> wrote:
->
-> On Feb 15, 2012, at 6:15 PM, <tao.peng@emc.com> <tao.peng@emc.com> wrote:
->
->> Hi Peter,
->>
->> Thanks for bringing it up. As the target date for 2.3 is September 2012, I'd like to add some EMC tasks (not necessary features though) that we hope to land in 2.3 release cycle. Please consider including them in your planning.
->>
->> 1. remove obsolete configure macros that are there to support old kernels (older than 2.6.18-latest)
->> 2. Lustre client dcache clean up
->> 3. separate server connection handling from ptlrpc layer
-> Can you explain a little more about this one?
-Our purpose is to clean up Lustre client to some extent that we can
-push it into upstream Linux kernel. And per discussion with Andreas,
-we want to split some server code dependency from client so that we
-don't need dive deep into server code.
+On 2012-02-18, at 7:04 PM, <Xuezhao.Liu@emc.com> <Xuezhao.Liu@emc.com> wrote: 
+> 
+> Not sure if you have gotten my email
 
-Cheers,
-Tao
+Sorry for the delay in responding, I was away for a long weekend.
 
->
->> 4. client kernel API adjustment to latest upstream kernel
->> 5. client module build process change to adapt to vanilla kernel
->>
->> Cheers,
->> Tao
->>
->>> -----Original Message-----
->>> From: Peter Jones [mailto:pjones at whamcloud.com]
->>> Sent: Tuesday, February 07, 2012 6:03 AM
->>> To: cdwg at lists.opensfs.org; wc-discuss at whamcloud.com
->>> Subject: [wc-discuss] Lustre 2.3 release
->>>
->>> Hi there
->>>
->>> Although we are still very busy with Lustre 2.2, we have started
->>> planning for the content of Lustre 2.3 release. Landings for 2.3 will
->>> start as soon as Lustre 2.2 has been branched from master.
->>>
->>> Lustre 2.3 is targeted for release in September 2012 and, as such, any
->>> features to be included will need to be landed to master by the end of
->>> June at the latest in order to allow adequate time for stabilization
->>> ahead of the release. If features only become ready for landing at the
->>> end of June there may not be sufficient time to land them all, so
->>> features that are available sooner are more likely to be tested,
->>> inspected, and landed before the feature freeze.
->>>
->>> If anyone is working on features that could be candidates to include in
->>> this release then please let me know so that we can consider them in our
->>> planning.
->>>
->>> Features that were initially targeted for 2.2 but were not ready in time
->>> are already on our list -
->>> http://wiki.whamcloud.com/display/PUB/Lustre+Community+Development+in+Progress
->>>
->>> Thanks
->>>
->>> Peter
->>>
->>> --
->>> Peter Jones
->>> Whamcloud, Inc.
->>> www.whamcloud.com
->>>
->>
-> _______________________________________________
-> Lustre-devel mailing list
-> Lustre-devel at lists.lustre.org
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
+> This is Xuezhao from EMC, I will be working together with Peng Tao on Lustre related project on EMC side.
+ 
+It probably makes sense to discuss changes like this on the lustre-devel
+mailing list(s) (which I've CC'd), to keep the broader community updated.
+
+> Thanks for your previous guidance about kinds of works need to be done for pushing Lustre client to upstream Linux kernel.
+> Begin from your hints that ?separate the server connection handling from the ptlrpc layer so that many of the IO/quota/etc dependencies can be removed and those modules do not need to be loaded on the client?, we started to think about ptlrpc and related modules cleanup.
+>  
+> The attached document (with both word and pdf format) is our main considerations for the cleanup.
+> The main cleanups in our mind for ptlrpc related modules are:
+> 1)      Remove server-side connection/disconnection handling
+> 2)      Split obdecho client and server
+> 3)      Remove server-side recovery hanlding
+> 4)      Remove server-side bulk I/O
+> 5)      Remove server-side specific lock handlings which includes ASTs, ldlm_cancle_service, ldlm policy functions, and ldlm_handle_enqueue /ldlm_handle_convert etc.
+> 6)      Remove lquota module
+
+I think this list of tasks looks reasonable.  Johann should comment on the lquota module changes, since there is a considerable amount of other work being done on that code, and the changes being made should be coordinated to avoid conflict.
+
+Similarly, there are also significant code changes being done on the "orion" development branch which will be landing into the 2.3 release.  This will clean up some of the client/server code entanglement in the llog/ptlrpc code also.
+
+> The side effect of the code change and maintenance are discussed in section 2:
+> 1)      Use same or different kernel module name
+> 
+> 2)      Code maintenance (use macro to comment out, or fully split client/server/common codes)
+
+I think it would be a lot less complex if the same module name is kept for both the client and server, with only conditionally compiled code depending on whether client-only or client-and-server modules are needed.  Otherwise, the server modules will have code duplication since there are many cases where the same functions are needed in both modules.  This is Option 1 in your document.
+
+> Could you please help to shed some light on them?
+> Please feel free to let me know if you have any questions, thank you very much.
+
+
+Cheers, Andreas
+--
+Andreas Dilger                       Whamcloud, Inc.
+Principal Lustre Engineer            http://www.whamcloud.com/
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ptlrpc_cleanup.pdf
+Type: application/pdf
+Size: 21170 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120221/945d7825/attachment.pdf>
