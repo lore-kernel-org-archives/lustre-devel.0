@@ -1,26 +1,21 @@
 From: Shay Seager <shay@opensfs.org>
-Date: Wed, 29 Feb 2012 10:52:27 -0800
-Subject: [Lustre-devel] LUG Early Registration Extended!
-Message-ID: <3E47F968-BD08-4297-9E71-A2C796C4C20E@opensfs.org>
+Date: Thu, 1 Mar 2012 09:29:53 -0800
+Subject: [Lustre-devel] LUG Program Announced
+Message-ID: <E6ECDB08-7840-474D-B961-EBD6FCB92F41@opensfs.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Happy Leap Day!
+Hello Lustre Community!
 
-To celebrate getting an extra day this year we are giving you 9 extra days to register!  We are extending early bird registration to MARCH 9th, 2012, but don't wait until the last minute, our room block is filling up fast!  Make sure you get good hotel rates by registering today! 
+The LUG committee is happy to announce that we have just published the LUG Program.
+Please follow this link http://www.opensfs.org/lug/program to see what all the excitement is about.
 
-The LUG Program will be published March 1st!  Make sure you check http://www.opensfs.org/lug/program to get the full event schedule.
- 
-We have also extended government rated rooms to April 25th, so you can stay Wednesday for the OpenSFS General meeting, Technical Working Group Meeting, and Community Development Working Group Meeting.  These OpenSFS meetings are the perfect place to get your creative juices flowing and contribute to the future of Lustre and OpenSFS; with all the inspiration from 2.5 days of amazing speakers and innovative designs, you are going to be bursting with great ideas, so make sure you stick around with us from 1pm-5pm on Wednesday April 25th.
+Don't forget to register by March 9th to ensure early bird pricing and hotel room discounts!  Register here: http://www.opensfs.org/lug/registration.
 
-To ensure that you get to enjoy every ounce of LUG we recommend flying in sunday April 22 in the morning and flying out Thursday April 26th in the morning.
-
-Register today! http://www.opensfs.org/lug/registration
-
-We look forward to seeing you in Austin!
+We look forward to seeing you at LUG!
 
 - - - 
 Shay Seager
@@ -33,4 +28,4 @@ shay at opensfs.org
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120229/e5f384b4/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120301/16a88f60/attachment.htm>
