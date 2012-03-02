@@ -1,31 +1,27 @@
-From: Shay Seager <shay@opensfs.org>
-Date: Thu, 1 Mar 2012 09:29:53 -0800
-Subject: [Lustre-devel] LUG Program Announced
-Message-ID: <E6ECDB08-7840-474D-B961-EBD6FCB92F41@opensfs.org>
+From: DENIEL Philippe <philippe.deniel@cea.fr>
+Date: Fri, 02 Mar 2012 13:25:20 +0100
+Subject: [Lustre-devel] Does LUSTRE supports setfsuid/setfsgid ?
+Message-ID: <4F50BC30.5090602@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello Lustre Community!
+Hi List,
 
-The LUG committee is happy to announce that we have just published the LUG Program.
-Please follow this link http://www.opensfs.org/lug/program to see what all the excitement is about.
+I am the maintener of NFS-Ganesha, a NFS server running in User Space. 
+The server has several backends on different filesystems. One of the 
+backend is dedicated to LUSTRE, using liblustreapi.a .
+The server is generic and I faced the problem to "su" to a user inside a 
+thread for backends whose calls have no specific credentials parameter. 
+For backends like XFS, GPFS and VFS (they are accessed via the "open by 
+handle" feature in kernel > 2.6.39) I can use setfsuid/setfsgid. I works 
+pretty well and provides a way to "become" a different user in different 
+threads. I plan to use the same kind of logic with LUSTRE.
+Here comes my question : does LUSTRE supports setfsuid and setfsgid and 
+it behaves a every filesystem accessed by the VFS ?
 
-Don't forget to register by March 9th to ensure early bird pricing and hotel room discounts!  Register here: http://www.opensfs.org/lug/registration.
+    Regards
 
-We look forward to seeing you at LUG!
-
-- - - 
-Shay Seager
-Open SFS Secretary 
-www.opensfs.org
-(925) 290-7641
-shay at opensfs.org
-
-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120301/16a88f60/attachment.htm>
+       Philippe
