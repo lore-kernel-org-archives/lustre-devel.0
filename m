@@ -1,40 +1,63 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Fri, 2 Mar 2012 11:28:54 -0800
-Subject: [Lustre-devel] Does LUSTRE supports setfsuid/setfsgid ?
-In-Reply-To: <4F50BC30.5090602@cea.fr>
-References: <4F50BC30.5090602@cea.fr>
-Message-ID: <9EB68D7F-0152-4148-8330-B40E6BA0F719@whamcloud.com>
+From: kelly.zhang at emc.com <kelly.zhang@emc.com>
+Date: Thu, 8 Mar 2012 05:01:10 -0500
+Subject: [Lustre-devel] if "--enable-split" option is still (or to be)
+	supported?
+Message-ID: <F62E2618FCA29E42AB21F281C9511BB413751B6FC1@MX26A.corp.emc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2012-03-02, at 4:25 AM, DENIEL Philippe wrote:
-> I am the maintener of NFS-Ganesha, a NFS server running in User Space. 
-> The server has several backends on different filesystems. One of the 
-> backend is dedicated to LUSTRE, using liblustreapi.a .
-> The server is generic and I faced the problem to "su" to a user inside a 
-> thread for backends whose calls have no specific credentials parameter. 
-> For backends like XFS, GPFS and VFS (they are accessed via the "open by 
-> handle" feature in kernel > 2.6.39) I can use setfsuid/setfsgid. I works 
-> pretty well and provides a way to "become" a different user in different 
-> threads. I plan to use the same kind of logic with LUSTRE.
-> Here comes my question : does LUSTRE supports setfsuid and setfsgid and 
-> it behaves a every filesystem accessed by the VFS ?
+Hi All,
 
-Yes, Lustre supports this, as far as I know.  Potential difficulties include
-that if the "su" process is only partial, then the fsuid/fsgid may be wrong
-on the MDS, so the supplementary group upcall on the MDS may return the wrong
-group list for that UID.
+I am configuring and building Lustre.  While I met a problem which needs you guys to take a look.
 
-Another difficulty is that Lustre does not yet support the "open by handle"
-feature, though I worked with the original developer to ensure that it would
-work reasonably well with Lustre.  I don't think this would be too hard for
-someone to implement, but I haven't yet looked into the details.  Lustre
-already allows lookup-by-FID, which would be necessary for this feature.
+When compiling with "--enable-split" option, "make rpms" will fail.  But if without this option, it works correctly.
 
-Cheers, Andreas
---
-Andreas Dilger                       Whamcloud, Inc.
-Principal Lustre Engineer            http://www.whamcloud.com/
+The error message would look like:
+$ ./configure  --enable-split   --with-linux=/home/build/kernel/rpmbuild/BUILD/kernel-2.6.32-220.4.2.el6/linux-2.6.32-220.4.2.el6.x86_64/
+$ make rpms
+  /home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.c: In function 'cmm_object_find':
+  /home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.c:256: error: 'fid' undeclared (first use in this function)
+  /home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.c:256: error: (Each undeclared identifier is reported only once
+  /home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.c:256: error: for each function it appears in.)
+  cc1: warnings being treated as errors
+  /home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.c: In function 'cmm_split_slave_create':
+  /home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.c:309: error: format '%llu' expects type 'long long unsigned int', but argument 10 has type 'mdsno_t'
+  /home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.c: In function 'cmm_split_dir':
+  /home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.c:742: error: 'MDS_LMV_MD_NAME' undeclared (first use in this function)
+  make[8]: *** [/home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm/cmm_split.o] Error 1
+  make[7]: *** [/home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre/cmm] Error 2
+  make[6]: *** [/home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56/lustre] Error 2
+  make[5]: *** [_module_/home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56] Error 2
+  make[5]: Leaving directory `/home/build2/kernel/rpmbuild/BUILD/kernel-2.6.32-220.4.2.el6/linux-2.6.32-220.4.2.el6.x86_64'
+  make[4]: *** [modules] Error 2
+  make[4]: Leaving directory `/home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56'
+  make[3]: *** [all-recursive] Error 1
+  make[3]: Leaving directory `/home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56'
+  make[2]: *** [all] Error 2
+  make[2]: Leaving directory `/home/build2/kernel/rpmbuild/BUILD/lustre-2.1.56'
+  error: Bad exit status from /var/tmp/rpm-tmp.NXaQK0 (%build)
+
+kernel source used: 2.6.32-220.4.2.el6.x86_64
+
+After checking the related code, it seems that piece of code is either still under development or silently dropped:
+git blame cmm_split.c -L252,257
+d2d56f38 (tappro 2007-07-30 21:08:59 +0000 252) struct cmm_object *cmm_object_find(const struct lu_env *env,
+d2d56f38 (tappro 2007-07-30 21:08:59 +0000 253)                                    struct cmm_device *d,
+d2d56f38 (tappro 2007-07-30 21:08:59 +0000 254)                                    const struct lu_fid *f)
+d2d56f38 (tappro 2007-07-30 21:08:59 +0000 255) {
+0ad352cf (nikita 2008-10-18 17:14:45 +0000 256)         return md2cmm_obj(md_object_find_slice(env, &d->cmm_md_dev, fid));
+d2d56f38 (tappro 2007-07-30 21:08:59 +0000 257) }
+
+So:  Just want to confirm that if "--enable-split" is still (or to be) supported?
+
+
+Thanks for your time. Your help are much more appreciated.
+
+Best Regards,
+Kelly Zhang(EMC)
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120308/81bdb0c9/attachment.htm>
