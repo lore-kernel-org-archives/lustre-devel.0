@@ -1,46 +1,40 @@
-From: tao.peng at emc.com <tao.peng@emc.com>
-Date: Thu, 8 Mar 2012 20:54:38 -0500
-Subject: [Lustre-devel] oldest lustre supported SUSE kernel
-In-Reply-To: <alpine.LFD.2.02.1203081648010.1375@casper.infradead.org>
-References: <F19688880B763E40B28B2B462677FBF805E803B132@MX09A.corp.emc.com>
-	<9C0BB3E3-D296-42A0-89EA-67F299215215@whamcloud.com>
-	<F19688880B763E40B28B2B462677FBF805EC1D87AC@MX09A.corp.emc.com>
-	<alpine.LFD.2.02.1203081648010.1375@casper.infradead.org>
-Message-ID: <F19688880B763E40B28B2B462677FBF805EC1D87C8@MX09A.corp.emc.com>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Fri, 9 Mar 2012 13:56:42 +0800
+Subject: [Lustre-devel] Changing FID->DLM lock encoding for version
+Message-ID: <F36F2A9D-DFE0-43B5-8EAC-2ECEED8B21FB@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-> -----Original Message-----
-> From: James Simmons [mailto:jsimmons at infradead.org]
-> Sent: Friday, March 09, 2012 12:49 AM
-> To: Peng, Tao
-> Cc: adilger at whamcloud.com; wc-discuss at whamcloud.com; lustre-devel at lists.lustre.org
-> Subject: Re: [Lustre-devel] oldest lustre supported SUSE kernel
-> 
-> 
-> > > On 2012-02-06, at 2:53, <tao.peng@emc.com> wrote:
-> > > >
-> > > > As I know, the oldest lustre supported RHEL kernel is 2.6.18-latest. What is the oldest SUSE
-> kernel?
-> > > 2.6.32-latest?
-> > >
-> > > That depends on which version of Lustre you are asking about, and whether you are asking about the
-> > > client or server.
-> > >
-> > > For Lustre 2.2+ servers it will be SLES11 SP1 (2.6.32), since it matches RHEL6 (2.6.32).
-> > >
-> > > For clients it is RHEL5 (2.6.18) and SLES11 SP0 (2.6.27).
-> > >
-> > We found that latest master branch doesn't build client for SLES11 SP0 (2.6.27). Does it mean master
-> has moved on dropping SLES11 SP0 or it should be fixed?
-> 
-> I build and use lustre on SLES11 SP1 clients and routers (using server
-> version). It works fine. Is there a reason you use SP0?
-We are not using SP0. Just that we are working on cleaning up some old code and would like to make sure Lustre works as it says in the lustre/kernel_patches/which_patch
-2.6.27.19-5		(SLES11)
+I'm planning to change the FID->DLM lock encoding for the FID "version" field in order to free up some space in the DLM lock resource (potentially for directory quotas, and other uses).
 
-Thanks,
-Tao
+Currently the FID is mapped into the DLM lock as follows:
+
+    name[0] = fid_seq(fid);
+    name[1] = fid_oid(fid);
+    name[2] = fid_ver(fid);
+    name[3] = { name hash for pdirops }
+    
+The 32-bit FID VER is currently always 0 today, and I'd like to move into the high 32 bits of name[1] along with the 32-bit OID, to avoid consuming the name[2] field. The new encoding would be equivalent to the following:
+
+    name[0] = fid_seq(fid);
+    name[1] = ((__u64)fid_ver(fid) << 32) | fid_ver(fid);
+    name[2] = 0;
+    name[3] = { name hash for pdirops }
+
+but using the "fid_ver_oid(fid)" macro that is also doing something similar to encode the FID into the 64-bit "o_id" and "o_gr" fields of struct obdo and elsewhere in the OST protocol.  Since fid_ver(fid) is always zero, it doesn't really matter where we encode it today, since it doesn't affect the resulting DLM lock resource name or cause any interoperability issues, but allows more flexibility in the future.
+
+Since future use of the FID version (intended for snapshots and datasets within a single Lustre filesystem) will need changes on the client side anyway, there should never be non-zero VER seen by an older client.
+
+A patch to do this has been submitted to Gerrit master with:
+
+Change-Id: If1e500cfb277dfc25bc056bb0c5763e48e7dccdf
+
+I intend to land a similar patch for b1_8 and b2_1, but I'd like to verify that nobody is using the FID version, nor plans to use it in the near future (i.e. in the next couple of years).
+
+Cheers, Andreas
+--
+Andreas Dilger                       Whamcloud, Inc.
+Principal Lustre Engineer            http://www.whamcloud.com/
