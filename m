@@ -1,60 +1,29 @@
-From: Yuriy Umanets <yuriy_umanets@xyratex.com>
-Date: Sat, 10 Mar 2012 14:46:44 +0200
-Subject: [Lustre-devel] Changing FID->DLM lock encoding for version
-In-Reply-To: <73AED5C780AE05478241DB067651A92102F1087C@XYUS-EX22.xyus.xyratex.com>
-References: <F36F2A9D-DFE0-43B5-8EAC-2ECEED8B21FB@whamcloud.com>
-	<73AED5C780AE05478241DB067651A92102F1087C@XYUS-EX22.xyus.xyratex.com>
-Message-ID: <0FDB0AE9-5DB8-4011-9F2C-04B9EE7E7FD9@xyratex.com>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Wed, 14 Mar 2012 18:31:29 -0600
+Subject: [Lustre-devel] Lustre and cross-platform portability
+Message-ID: <5609A4E0-2356-400F-9D53-F71B7007338C@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Whamcloud and EMC are jointly investigating how to be able to contribute the Lustre client code into the upstream Linux kernel.
 
-On 9 Mar, 2012, at 20:48, Nathan Rutman wrote:
+As a prerequisite to this, EMC is working to clean up the Lustre client code to better match the kernel coding style, and one of the anticipated major obstacles to upstream kernel submission is the heavy use of code abstraction via libcfs for portability to other operating systems (most notably MacOS and WinNT, but also for liblustre, and potentially *BSD).
 
-> I don't think I have any problem with this -- Umka, the replicator uses the inode version, not the fid_ver, correct?
-We don't use any of those. Fine to change I think.
+I have no information that the WinNT project will ever be released by Oracle, and as yet there has not been any code released from the MacOS port, so the libcfs portability layer is potentially exacting a high cost in code maintenance and complexity (CLIO being a prime example) for no apparent benefit.  Similarly, the liblustre client needs a portability layer for userspace, and suffers from the same apparent lack of interest or users.
 
-> 
-> 
-> On Mar 8, 2012, at 9:56 PM, Andreas Dilger wrote:
-> 
->> I'm planning to change the FID->DLM lock encoding for the FID "version" field in order to free up some space in the DLM lock resource (potentially for directory quotas, and other uses).
->> 
->> Currently the FID is mapped into the DLM lock as follows:
->> 
->>   name[0] = fid_seq(fid);
->>   name[1] = fid_oid(fid);
->>   name[2] = fid_ver(fid);
->>   name[3] = { name hash for pdirops }
->> 
->> The 32-bit FID VER is currently always 0 today, and I'd like to move into the high 32 bits of name[1] along with the 32-bit OID, to avoid consuming the name[2] field. The new encoding would be equivalent to the following:
->> 
->>   name[0] = fid_seq(fid);
->>   name[1] = ((__u64)fid_ver(fid) << 32) | fid_ver(fid);
->>   name[2] = 0;
->>   name[3] = { name hash for pdirops }
->> 
->> but using the "fid_ver_oid(fid)" macro that is also doing something similar to encode the FID into the 64-bit "o_id" and "o_gr" fields of struct obdo and elsewhere in the OST protocol.  Since fid_ver(fid) is always zero, it doesn't really matter where we encode it today, since it doesn't affect the resulting DLM lock resource name or cause any interoperability issues, but allows more flexibility in the future.
->> 
->> Since future use of the FID version (intended for snapshots and datasets within a single Lustre filesystem) will need changes on the client side anyway, there should never be non-zero VER seen by an older client.
->> 
->> A patch to do this has been submitted to Gerrit master with:
->> 
->> Change-Id: If1e500cfb277dfc25bc056bb0c5763e48e7dccdf
->> 
->> I intend to land a similar patch for b1_8 and b2_1, but I'd like to verify that nobody is using the FID version, nor plans to use it in the near future (i.e. in the next couple of years).
->> 
->> Cheers, Andreas
->> --
->> Andreas Dilger                       Whamcloud, Inc.
->> Principal Lustre Engineer            http://www.whamcloud.com/
->> 
->> 
->> 
->> 
+I'd like to get some feedback from the Lustre community about removing the libcfs abstraction entirely, or possibly restructuring it to look like the Linux kernel API, and having the other platforms code against it as a Linux portability layer, like ZFS on Linux uses the Solaris Portability Layer (SPL) to avoid changing the core ZFS code.  A related topic is whether it would be better to replace all cfs_* functions with standard Linux kernel functions en-masse, or migrate away from cfs_* functions slowly?
 
+Also, we're planning on deprecating the liblustre client code, due to lack of interest/usage.  The current code is in disrepair, and we've been keeping it around for years without any benefit, and while I was one of the strongest advocates for keeping it in our back pocket in case of future needs, I don't see that materializing in the future.
+
+The liblustre code would be left in the tree for now, in case someone from the community is interested to get it working and maintain it, and it may be updated on a best effort basis.  If nobody steps forward to do this work, the liblustre code would be deleted from the development branch in a year or so.
+
+
+Unfortunately, after starting this thread, I may not be able to reply to questions in a timely manner due to vacation.  I look forward to a thread that concludes with unanimous agreement from all parties. :-)
+
+Cheers, Andreas
 --
-umka
+Andreas Dilger                       Whamcloud, Inc.
+Principal Lustre Engineer            http://www.whamcloud.com/
