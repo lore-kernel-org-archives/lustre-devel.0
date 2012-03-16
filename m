@@ -1,47 +1,52 @@
-From: Alexey Lyashkov <alexey_lyashkov@xyratex.com>
-Date: Sat, 17 Mar 2012 14:42:48 +0400
-Subject: [Lustre-devel] [wc-discuss] [Twg] Lustre and cross-platform
-	portability
-In-Reply-To: <201203161446.q2GEkNMO005460@hedwig.cmf.nrl.navy.mil>
-References: <201203161446.q2GEkNMO005460@hedwig.cmf.nrl.navy.mil>
-Message-ID: <C930EE77-BA97-4065-B3B1-1A26ED284407@xyratex.com>
+From: Gregory Matthews <greg.matthews@diamond.ac.uk>
+Date: Fri, 16 Mar 2012 10:11:23 +0000
+Subject: [Lustre-devel] [wc-discuss] Re: [Twg] Lustre and cross-platform
+ portability
+In-Reply-To: <4F624851.6030707@iu.edu>
+References: <201203151845.q2FIjcXV029439@hedwig.cmf.nrl.navy.mil>
+	<C481511A-14DB-4032-9071-82AF5974E263@whamcloud.com>
+	<4F624851.6030707@iu.edu>
+Message-ID: <4F6311CB.8040506@diamond.ac.uk>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Trust me.
-I (with two friends) write  a FUSE client for a FreeBSD in past.
-Most issues related to a porting libcfs/libsysio to FreeBSD, but anyway patch isn''t huge ~200kb.
-I have plan to send that patch in near time, as 2.3 landing window open.
+On 15/03/12 19:51, Joshua Walgenbach wrote:
+> For my part, a Lustre client on Windows or OS X would be used mostly
+> for visualization of data, rather than being computed against so a
+> slower user space implementation would be more than sufficient.
+> There are a few applications that are using an SMB exported Lustre
+> filesystem for data collection, but those applications are similarly
+> low bandwidth. It would be nice to remove the SMB server in the
+> middle.
+
+why bother having a windows client if you lose the performance? We have
+windows based detectors and proprietary windows based analysis software
+that would definitely benefit from higher performance access to lustre
+file systems but replacing existing CIFS servers for no gain seems a bit
+pointless.
+
+I understand the problems that a native MS client would have, without
+buy-in from Microsoft it would be a nightmare to keep the MS tree and
+the Linux tree in sync. One possible future workaround proposed by
+Whamcloud at last years LUG is pNFS.
+
+GREG
+
+>
+> - -Josh
 
 
+-- 
+Greg Matthews            01235 778658
+Senior Computer Systems Administrator
+Diamond Light Source, Oxfordshire, UK
 
-On Mar 16, 2012, at 18:46, Ken Hornstein wrote:
-
->> Also fuse client will able to run on any OS have a FUSE porting that is
->> any BSD, OpenSolaris, MacOS, in additional to the windows.  That is
->> easy way to maintain a single client for many OS.
-> 
-> It is, unfortunately, not quite that simple.
-> 
-> I can't claim to be a FUSE expert, but I've been paying attention
-> to it on other platforms.  From what I can tell, FUSE works great
-> on Linux, but on other platforms the support is iffy.  Also, it's
-> not quite implemented the same on other operating systems as it is
-> on Linux, making porting a Linux FUSE module to other platforms not
-> trivial; from what I've seen, this is due to the Linux filesystem
-> interface versus the vnode interface used by every Unix except Linux
-> (and this is part of what makes Lustre hard to port).
-> 
-> I guess what I'm saying is that don't fall into the underwear gnomes
-> trap of thinking:
-> 
-> 1) Get liblustre working with FUSE
-> 2) ???
-> 3) Lustre client everywhere!
-> 
-> It might make it easier, but I doubt it will make it easy.
-> 
-> --Ken
+-- 
+This e-mail and any attachments may contain confidential, copyright and or privileged material, and are for the use of the intended addressee only. If you are not the intended addressee or an authorised recipient of the addressee please notify us of receipt by returning the e-mail and do not use, copy, retain, distribute or disclose the information in or attached to the e-mail.
+Any opinions expressed within this e-mail are those of the individual and not necessarily of Diamond Light Source Ltd. 
+Diamond Light Source Ltd. cannot guarantee that this e-mail or any attachments are free from viruses and we cannot accept liability for any damage which you may sustain as a result of software viruses which may be transmitted in or with the message.
+Diamond Light Source Limited (company no. 4375679). Registered in England and Wales with its registered office at Diamond House, Harwell Science and Innovation Campus, Didcot, Oxfordshire, OX11 0DE, United Kingdom
+ 
