@@ -1,78 +1,63 @@
-From: kelly.zhang at emc.com <kelly.zhang@emc.com>
-Date: Fri, 23 Mar 2012 08:55:06 -0400
-Subject: [Lustre-devel] [wc-discuss] Some questions about Lustre test
-	configuration
-In-Reply-To: <165941E6-9AA2-490C-B5F1-04F75A8BE680@whamcloud.com>
-References: <F62E2618FCA29E42AB21F281C9511BB41377A43919@MX26A.corp.emc.com>
-	<165941E6-9AA2-490C-B5F1-04F75A8BE680@whamcloud.com>
-Message-ID: <F62E2618FCA29E42AB21F281C9511BB41377A43A38@MX26A.corp.emc.com>
+From: Shay Seager <shay@opensfs.org>
+Date: Tue, 27 Mar 2012 09:02:50 -1000
+Subject: [Lustre-devel] LUG is just around the corner, are you ready?
+Message-ID: <CB608945-F60E-41EE-B997-14EB15016B08@opensfs.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Got it. Thank you so much, Robert.
+Hello All,
+LUG 2012 is less than a month away; April 23rd-April 25th.  We recommend you fly in Sunday April 22nd in the morning because we have some great events for you on Sunday:
 
-Best Regards,
-Kelly Zhang(EMC)
+April 22, 2012
 
-From: Robert Read [mailto:rread at whamcloud.com]
-Sent: 2012?3?23? 1:28
-To: Zhang, Kelly
-Cc: wc-discuss at whamcloud.com; lustre-devel at lists.lustre.org; Tang, Haiying; Liu, Xuezhao; Peng, Tao
-Subject: Re: [wc-discuss] Some questions about Lustre test configuration
+2:00-5:00pm the Benchmarking Work Group will be holding our first face to face meeting.  The ?Benchmarking Work Group? will focus on identifying and defining I/O workloads for the various Lustre markets, and then define IO generation benchmarking tools that best emulates those workloads.  You are invited to help contribute to this important initiative.
 
-Hi,
+Pre LUG 2012 Party
 
+Sponsored by DataDirect Networks and Whamcloud
 
-On Mar 22, 2012, at 1:08 , <kelly.zhang at emc.com<mailto:kelly.zhang@emc.com>> <kelly.zhang at emc.com<mailto:kelly.zhang@emc.com>> wrote:
+The annual Lustre User Group is being held in Austin, TX, this year, with all the great Lustre developers, users and vendors in attendance. If you?re coming, you know some of the best connections are made outside of the talks. DDN and Whamcloud are providing beers & wine to help get it started. Come to Zax Restaurant & Bar, right next to the Hyatt Regency where LUG will be held, to kick off the week in a relaxed atmosphere. No hype, no pressure, just lots of local beers, wine and Lustre superstars. We?re closing the restaurant down, it?s just us from 7pm ? 10pm. Hope to see you there!
 
+Location: Zax Restaurant & Bar 312 Barton Springs Rd, Austin, TX 78704 (across from the Hyatt Regency)
 
-Hi all,
+Date/Time: Sun, April 22, 7-10pm
 
-I have some questions about Lustre test configuration, would somebody help on this?  Thanks a lot.
-
-1.       Seen from the test sets of Maloo, typically four nodes are used: ?Client1, Client2, MDS1, OSS(includes 7 OSTs)?.
-So in a normal regression testing, we can also follow this, right?
-When four nodes are used, what value do you set for the following two variables in file cfg/local.sh:
-mdsfailover_HOST  and ostfailover_HOST
-
-In the this configuration, I believe the failover hosts should be set to nonfailover hosts:
-
-mdsfailover_HOST=${mds_HOST}
-ostfailover_HOST=${ost_HOST}
-
-This will allow the recovery tests to do simulated failover by ummounting and and mounting the targets on the same node to trigger Lustre recovery.
+RSVP: Are you kidding? Just come on by.
 
 
+On Wednesday we will also have 3 events hosted by OpenSFS, everyone is encouraged to attend, we recommend that you set your flights for Wednesday evening or Thursday morning (note, there are government rate rooms on Wednesday night, so book them now before they are all gone):
+1pm ? 2pm OpenSFS General Meeting
 
-2.       I see that in the PDF ?Lustre 2.2 Test Plan?, these are some links introducing about the test configuration. Like the following one:
+2pm-3pm OpenSFS Technical Working Group Meeting
 
-Regression Testing
-Use auster to run automated regression tests with the following configurations.
-http://wiki.whamcloud.com/display/ENG/Auster .
-
-
+3pm-4pm OpenSFS Community Development Working Group Meeting
 
 
-                But we failed to access this kind of link.  Is this URL public to users outside Whamcloud?
+Check out our website for the whole program http://www.opensfs.org/lug/program
 
+If you have not registered your ticket, your hotel room, or your shuttle follow this link http://www.opensfs.org/lug/registration for all the resources you need to get discounted room rates and shuttle services.
 
-It wasn't  (oops), but I just  moved it so it it is now accessible to everyone here:
+At LUG we will have 2 break out rooms that will be available 24-7 throughout the event and are available for private meetings and break-out sessions.  Each room holds 20-30 people.  If you would like to reserve room space, please reply to this e-mail (Shay Seager) with your preferred time/date.
 
-http://wiki.whamcloud.com/display/PUB/Auster
+We want to make sure that this is the best LUG you have experienced, so please reply to this e-mail (to Shay Seager) to let us know if you have any dietary or special needs. (note - our menu already accommodates special diets such as vegan, vegetarian, paleo, and atkins)
 
+We also want to thank our generous sponsors: Bright Computing, Bull, Cray, DDN, Dell, EMC, Intel, Net App, RAID Inc., SGI, Terascala, Whamcloud, Xyratex.  
 
-cheers,
-robert
+Best,
+Shay
 
+- - - 
+Shay Seager
+Open SFS Secretary 
+www.opensfs.org
+(925) 290-7641
+shay at opensfs.org
 
-
-Thanks & Best Regards,
-Kelly Zhang(EMC)
 
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120323/09515863/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120327/f0cc7a86/attachment.htm>
