@@ -1,63 +1,77 @@
-From: Shay Seager <shay@opensfs.org>
-Date: Tue, 27 Mar 2012 09:02:50 -1000
-Subject: [Lustre-devel] LUG is just around the corner, are you ready?
-Message-ID: <CB608945-F60E-41EE-B997-14EB15016B08@opensfs.org>
+From: Roman Grigoryev <Roman_Grigoryev@xyratex.com>
+Date: Fri, 30 Mar 2012 11:40:16 +0400
+Subject: [Lustre-devel] [Twg] your opinion about  testing  improvements
+In-Reply-To: <4F745E90.2000001@xyratex.com>
+References: <4F745E90.2000001@xyratex.com>
+Message-ID: <4F756360.1000108@xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello All,
-LUG 2012 is less than a month away; April 23rd-April 25th.  We recommend you fly in Sunday April 22nd in the morning because we have some great events for you on Sunday:
+(Sorry for cross posting, I haven't get answers in twg).
+Hi all,
 
-April 22, 2012
+I'm working in testing team  in Xyratex.
 
-2:00-5:00pm the Benchmarking Work Group will be holding our first face to face meeting.  The ?Benchmarking Work Group? will focus on identifying and defining I/O workloads for the various Lustre markets, and then define IO generation benchmarking tools that best emulates those workloads.  You are invited to help contribute to this important initiative.
+After some time which I(and our team)  have spent on testing and
+automation activities I would like try to ask community opinion about
+two problems and suggestion in testing. This not closed list of testing
+problems but I think it is good enough for start discussion.
 
-Pre LUG 2012 Party
+Problem 1
 
-Sponsored by DataDirect Networks and Whamcloud
+Currently Lustre and test are living in one code space and build in one
+time,and often have specific dependencies between test and code.
 
-The annual Lustre User Group is being held in Austin, TX, this year, with all the great Lustre developers, users and vendors in attendance. If you?re coming, you know some of the best connections are made outside of the talks. DDN and Whamcloud are providing beers & wine to help get it started. Come to Zax Restaurant & Bar, right next to the Hyatt Regency where LUG will be held, to kick off the week in a relaxed atmosphere. No hype, no pressure, just lots of local beers, wine and Lustre superstars. We?re closing the restaurant down, it?s just us from 7pm ? 10pm. Hope to see you there!
+This situation directly affect
 
-Location: Zax Restaurant & Bar 312 Barton Springs Rd, Austin, TX 78704 (across from the Hyatt Regency)
+1) interoperability testing between different version. (because testing
+is started from client which have different test framework then server
+and client remotely execute test framework as their own. just copying
+tests for equalization could not work with big difference between versions)
 
-Date/Time: Sun, April 22, 7-10pm
+2) it is not simple execute(especially in automation) testing for test.
+F.e. a bug is fixed, the test on it added. Executing the test on an old
+revision(probably on a previous release) should show failed test result.
+But with big difference between versions where fixed and where execute
+test-framework can fail to start.
 
-RSVP: Are you kidding? Just come on by.
-
-
-On Wednesday we will also have 3 events hosted by OpenSFS, everyone is encouraged to attend, we recommend that you set your flights for Wednesday evening or Thursday morning (note, there are government rate rooms on Wednesday night, so book them now before they are all gone):
-1pm ? 2pm OpenSFS General Meeting
-
-2pm-3pm OpenSFS Technical Working Group Meeting
-
-3pm-4pm OpenSFS Community Development Working Group Meeting
-
-
-Check out our website for the whole program http://www.opensfs.org/lug/program
-
-If you have not registered your ticket, your hotel room, or your shuttle follow this link http://www.opensfs.org/lug/registration for all the resources you need to get discounted room rates and shuttle services.
-
-At LUG we will have 2 break out rooms that will be available 24-7 throughout the event and are available for private meetings and break-out sessions.  Each room holds 20-30 people.  If you would like to reserve room space, please reply to this e-mail (Shay Seager) with your preferred time/date.
-
-We want to make sure that this is the best LUG you have experienced, so please reply to this e-mail (to Shay Seager) to let us know if you have any dietary or special needs. (note - our menu already accommodates special diets such as vegan, vegetarian, paleo, and atkins)
-
-We also want to thank our generous sponsors: Bright Computing, Bull, Cray, DDN, Dell, EMC, Intel, Net App, RAID Inc., SGI, Terascala, Whamcloud, Xyratex.  
-
-Best,
-Shay
-
-- - - 
-Shay Seager
-Open SFS Secretary 
-www.opensfs.org
-(925) 290-7641
-shay at opensfs.org
+Possible solution: split Lustre and lustre tests in  code and  build
+levels. It means that lustre and tests will not be connected on code
+revision, only by logic, f.e. via keywords. Also should be added in same
+time an abstraction level in test framework which allows to execute
+lustre utils from different version of lustre.
 
 
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120327/f0cc7a86/attachment.htm>
+Problem 2
+
+(to avoid term problems, I call there: sanity = test suite, 130 = test,
+130c and 130a = test cases)
+
+Different test cases, ended with letter(f.e. 130c),  have an different
+idea of dependencies. Some test cases have dependences to previous test
+cases, some don't have.
+
+All they now can be executed with "ONLY" parameter and all they have
+separated item in result yaml file as just separated tests( which
+doesn't have test cases ended with letter, f.e. sanity 129). Also, tests
+which have testcases and don't have their own body can be execute  with
+ONLY parameter( but doesn't have their special result).
+
+So, logically, all test which can be execute via using ONLY must be not
+depended to other tests. But we have test which depended. Moreover, some
+developers prefer to consider testcases as step of full one test.
+
+What is entities which I call "testcases" and "test" from your point of
+view?
+
+Answer of this question affect automated test execution and test
+development, and maybe ask some test-framework changes.
+
+
+-- 
+Thanks,
+	Roman
