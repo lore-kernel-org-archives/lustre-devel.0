@@ -1,77 +1,39 @@
-From: Roman Grigoryev <Roman_Grigoryev@xyratex.com>
-Date: Fri, 30 Mar 2012 11:40:16 +0400
+From: Oleg Drokin <green@whamcloud.com>
+Date: Sun, 1 Apr 2012 23:08:42 -0400
 Subject: [Lustre-devel] [Twg] your opinion about  testing  improvements
-In-Reply-To: <4F745E90.2000001@xyratex.com>
-References: <4F745E90.2000001@xyratex.com>
-Message-ID: <4F756360.1000108@xyratex.com>
+In-Reply-To: <4F756360.1000108@xyratex.com>
+References: <4F745E90.2000001@xyratex.com> <4F756360.1000108@xyratex.com>
+Message-ID: <8F4579BA-FE5F-46C3-AC95-998E1195BD89@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-(Sorry for cross posting, I haven't get answers in twg).
-Hi all,
+Hello!
 
-I'm working in testing team  in Xyratex.
+On Mar 30, 2012, at 3:40 AM, Roman Grigoryev wrote:
+> 2) it is not simple execute(especially in automation) testing for test.
+> F.e. a bug is fixed, the test on it added. Executing the test on an old
+> revision(probably on a previous release) should show failed test result.
+> But with big difference between versions where fixed and where execute
+> test-framework can fail to start.
 
-After some time which I(and our team)  have spent on testing and
-automation activities I would like try to ask community opinion about
-two problems and suggestion in testing. This not closed list of testing
-problems but I think it is good enough for start discussion.
+I am not quite sure why would you want to constantly fail a test that is known not to work with a particular release due to a missing bugfix.
+I think it's enough if a developer (or somebody else) runs the test manually once on an unfixed codebase to make sure the test does without the fix.
 
-Problem 1
+The issue of running older release against a newer one is a real one, but the truth is, when you run e.g. 1.8 vs 2.x, it's not just the tests that are different, the init code is different too, so it's not just a matter of separating tests subdir in its own repository.
+On our side we just note known broken tests for such configurations and ignore the failures for the lack of better solution.
 
-Currently Lustre and test are living in one code space and build in one
-time,and often have specific dependencies between test and code.
+> Different test cases, ended with letter(f.e. 130c),  have an different
+> idea of dependencies. Some test cases have dependences to previous test
+> cases, some don't have.
 
-This situation directly affect
+Ideally dependencies should be eliminated (in my opinion, anyway).
 
-1) interoperability testing between different version. (because testing
-is started from client which have different test framework then server
-and client remotely execute test framework as their own. just copying
-tests for equalization could not work with big difference between versions)
-
-2) it is not simple execute(especially in automation) testing for test.
-F.e. a bug is fixed, the test on it added. Executing the test on an old
-revision(probably on a previous release) should show failed test result.
-But with big difference between versions where fixed and where execute
-test-framework can fail to start.
-
-Possible solution: split Lustre and lustre tests in  code and  build
-levels. It means that lustre and tests will not be connected on code
-revision, only by logic, f.e. via keywords. Also should be added in same
-time an abstraction level in test framework which allows to execute
-lustre utils from different version of lustre.
-
-
-
-Problem 2
-
-(to avoid term problems, I call there: sanity = test suite, 130 = test,
-130c and 130a = test cases)
-
-Different test cases, ended with letter(f.e. 130c),  have an different
-idea of dependencies. Some test cases have dependences to previous test
-cases, some don't have.
-
-All they now can be executed with "ONLY" parameter and all they have
-separated item in result yaml file as just separated tests( which
-doesn't have test cases ended with letter, f.e. sanity 129). Also, tests
-which have testcases and don't have their own body can be execute  with
-ONLY parameter( but doesn't have their special result).
-
-So, logically, all test which can be execute via using ONLY must be not
-depended to other tests. But we have test which depended. Moreover, some
-developers prefer to consider testcases as step of full one test.
-
-What is entities which I call "testcases" and "test" from your point of
-view?
-
-Answer of this question affect automated test execution and test
-development, and maybe ask some test-framework changes.
-
-
--- 
-Thanks,
-	Roman
+Bye,
+    Oleg
+--
+Oleg Drokin
+Senior Software Engineer
+Whamcloud, Inc.
