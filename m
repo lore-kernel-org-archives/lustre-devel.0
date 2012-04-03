@@ -1,126 +1,125 @@
-From: Roman Grigoryev <Roman_Grigoryev@xyratex.com>
-Date: Mon, 02 Apr 2012 13:43:53 +0400
-Subject: [Lustre-devel] [Twg] your opinion about  testing  improvements
-In-Reply-To: <F264939C-663E-4A1E-A63A-211026EF6881@whamcloud.com>
-References: <4F745E90.2000001@xyratex.com> <4F756360.1000108@xyratex.com>
-	<8F4579BA-FE5F-46C3-AC95-998E1195BD89@whamcloud.com>
-	<F264939C-663E-4A1E-A63A-211026EF6881@whamcloud.com>
-Message-ID: <4F7974D9.3010003@xyratex.com>
+From: Chris Gearing <chris@whamcloud.com>
+Date: Tue, 03 Apr 2012 01:26:57 +0100
+Subject: [Lustre-devel] Lustre-devel Digest, Vol 72, Issue 17
+In-Reply-To: <mailman.1.1333130401.17602.lustre-devel@lists.lustre.org>
+References: <mailman.1.1333130401.17602.lustre-devel@lists.lustre.org>
+Message-ID: <4F7A43D1.5000209@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 04/02/2012 09:33 AM, Andreas Dilger wrote:
-> On 2012-04-01, at 9:08 PM, Oleg Drokin wrote:
->> On Mar 30, 2012, at 3:40 AM, Roman Grigoryev wrote:
->>> 2) it is not simple execute(especially in automation) testing for
->>> test. F.e. a bug is fixed, the test on it added. Executing the
->>> test on an old revision(probably on a previous release) should
->>> show failed test result. But with big difference between versions
->>> where fixed and where execute test-framework can fail to start.
->> 
->> I am not quite sure why would you want to constantly fail a test
->> that is known not to work with a particular release due to a
->> missing bugfix. I think it's enough if a developer (or somebody
->> else) runs the test manually once on an unfixed codebase to make
->> sure the test does without the fix.
+Hi Roman,
 
+> Problem 1
+>
+> Currently Lustre and test are living in one code space and build in one
+> time,and often have specific dependencies between test and code.
+>
+> This situation directly affect
+>
+> 1) interoperability testing between different version. (because testing
+> is started from client which have different test framework then server
+> and client remotely execute test framework as their own. just copying
+> tests for equalization could not work with big difference between versions)
+>
+> 2) it is not simple execute(especially in automation) testing for test.
+> F.e. a bug is fixed, the test on it added. Executing the test on an old
+> revision(probably on a previous release) should show failed test result.
+> But with big difference between versions where fixed and where execute
+> test-framework can fail to start.
+>
+> Possible solution: split Lustre and lustre tests in  code and  build
+> levels. It means that lustre and tests will not be connected on code
+> revision, only by logic, f.e. via keywords. Also should be added in same
+> time an abstraction level in test framework which allows to execute
+> lustre utils from different version of lustre.
+The situation here is exactly the same as exists with the source code. 
+When we run interop tests the test system runs test scripts belonging to 
+the server version against those belonging to the client version. So we 
+might use 1.8.7 client scripts against 2.2 server scripts. These scripts 
+need to inter-operate in exactly the same way that the Lustre source 
+code itself needs to interoperate.
 
-There can be more then one reason to execute tests which expectedly
-failed and  I don't mean an obligation to execute these tests every time
-but mean an execution on automated platform in specific cases.
+If people find cases where this does not happen then they raise bugs 
+against Lustre and these are fixed using the same processes as any other 
+Lustre bug. This means people across the community investing effort to 
+rectify the incompatibilities and then posting patches for review, test 
+and inclusion in the product. Of course in a perfect world we would be 
+back at the point where 1.8.7 and 2.x forked and never allow the 
+interoperability issues in the test scripts to creep in, but the reality 
+is the issues do exist and effort does needs to be spent resolving them. 
+I am 100% sure that the resolution of the relatively few 
+incompatibilities is infinitely easier than attempting to take the 1.8, 
+2.1 and 2.2 test scripts and produce an independent one size fits all 
+solution.
 
-The main problem now is compatibility testing(see below Oleg).
-Also there is problematic connection between tests code and lustre code
-taking into account consideration that test exclusion is done in test code.
+We currently track each failing test in Jira, see here 
+http://jira.whamcloud.com/browse/LU-1193  for an example. If others find 
+issues in their testing then they should create Jira issues to track 
+them and if possible post patches to resolve them.
 
-> 
-> I think it makes sense to be able to skip a test that is failing for
-> versions of Lustre older than X, for cases where the test is
-> exercising some fix on the server.  We _do_ run interoperability
-> tests and hit these failures, and it is much better to skip the test
-> with a clear message instead of marking the test as failed.
+>
+>
+> Problem 2
+>
+> (to avoid term problems, I call there: sanity = test suite, 130 = test,
+> 130c and 130a = test cases)
+>
+> Different test cases, ended with letter(f.e. 130c),  have an different
+> idea of dependencies. Some test cases have dependences to previous test
+> cases, some don't have.
+>
+> All they now can be executed with "ONLY" parameter and all they have
+> separated item in result yaml file as just separated tests( which
+> doesn't have test cases ended with letter, f.e. sanity 129). Also, tests
+> which have testcases and don't have their own body can be execute  with
+> ONLY parameter( but doesn't have their special result).
+>
+> So, logically, all test which can be execute via using ONLY must be not
+> depended to other tests. But we have test which depended. Moreover, some
+> developers prefer to consider testcases as step of full one test.
+>
+> What is entities which I call "testcases" and "test" from your point of
+> view?
+>
+> Answer of this question affect automated test execution and test
+> development, and maybe ask some test-framework changes.
+>
+I think you highlight a very good point here that we don't really know 
+enough about the test contents, their prerequisites or other 
+dependencies. I would suggest that many attempts have been made over the 
+years to use naming conventions, numeric ordering or other similar 
+mechanisms to track such behaviour.
 
-Absolutely agree with You about skipping(maybe is good idea to somehow
-mark is as not skipped but "incompatible"?).
+What we need to make sense of the 1000+ test cases we have is an 
+extensible knowledge-base of information that can grow overtime to 
+become a rich source of information that can be used to allow automated 
+systems as well as developers to confidently use the tests in the most 
+flexible way possible.
 
-> 
-> Probably the easiest solution is for such tests to explicitly check
-> the version of the server, with a new helper function like
-> "skip_old_version" or similar.
+Because of the nature of Lustre we need to find a way that keeps this 
+knowledge within the public domain, provides for use to expand the range 
+of things we store about each test and provides for both people and 
+machines to access it with equal ease.
 
-Maybe we can use just use some kind of keywords to say to framework just
-ignore new tests on old setups. I think adding more logic on test level
-isn't so good when this new logic process meta information. Test can
-just have an attribute which can be processed by a test-framework.
+One reasonable proposal is to add a comment block at the start of each 
+test script and subtest within that script that lists the test name, 
+short and long description that includes what the test is supposed to be 
+doing, what bug (if any) it was originally added for, what part of the 
+code it is intended to cover, prerequisites (filesystem initialization, 
+min/max number of clients, OSTs, MDTs it can test with, etc) in a 
+machine readable format that it not only documents the test today but 
+that can be expanded in the future.
 
-> 
-> Tests that are checking new features (as opposed to bugs) should
-> normally be able to check via "lctl get_param
-> {mdc,osc}.*.connect_flags" output whether the server supports a given
-> feature or not.
+Once we have an agreement on an initial format for this comment block, 
+the development community can work to populate it for each subtest and 
+improve the understanding and usefulness of all existing tests.
 
-But situation when you are executing new tests on a old server could be
-when you install in old lusre new tests. Oleg described below situation
-when it is pretty hard to execute new tests(2.x) on old clients (1.8.x).
+Thanks
 
-> 
->> The issue of running older release against a newer one is a real
->> one, but the truth is, when you run e.g. 1.8 vs 2.x, it's not just
->> the tests that are different, the init code is different too, so
->> it's not just a matter of separating tests subdir in its own
->> repository.
-
-Oleg,
-i'm answering there because You are in 'To'
-
-I used term "test-framework" for init code, and I agree with you about
-reasons. My tests separating idea is mostly not for code tree but for
-logical separating, mostly in build,dependency and versioning( but
-separating in code tree force to do it too).
-
-I think, it will be good to have lusre_tests version 1.2.3 and set on
-any lustre version. I think it can be interesting also for developers
-who do fixes for old or his own branches to simply get new tests ready
-for them.
-
-
->>  On our side we just note known broken tests for such
->> configurations and ignore the failures for the lack of better
->> solution.
-
-Could you please publish the list?
-
-> 
-> As mentioned earlier - the presence of known failing tests causes
-> confusion, and it would be better to annotate these tests in a clear
-> manner by skipping them instead of just knowing that they will fail.
-> 
->>> Different test cases, ended with letter(f.e. 130c),  have an
->>> different idea of dependencies. Some test cases have dependences
->>> to previous test cases, some don't have.
->> 
->> Ideally dependencies should be eliminated (in my opinion, anyway).
-> 
-> Agreed - all of the sub-tests should be able to run independently,
-> even though they are normally run in order.
-
-Maybe it is a good idea to define and publish rules like this:
-1) test(test scenario) must have only number name (1,2,3..110...999)
-2) test cases (test step) must have number+char index (1f,2,b...99c)
-
-Test can be executed via ONLY.
-Test cases can be execute only as part of test.
-Tests must be independent.
-Test cases can have dependencies.
-Test define init, cleanup which are executing before and after test
-cases (not before-after very test case but full group).
-
-I think, these rules can somehow fix current situation with dependences
-without many changes in tests.
-
--- 
-Thanks,
-	Roman
+Chris Gearing
+Sr. Software Engineer
+Quality Engineering
+Whamcloud Inc
