@@ -1,81 +1,130 @@
-From: Alex Tomas <bzzz.tomas@gmail.com>
-Date: Thu, 5 Apr 2012 14:38:30 +0400
-Subject: [Lustre-devel] [Twg] your opinion about testing improvements
- (was Lustre-devel Digest, Vol 72, Issue 17)
-In-Reply-To: <4F7D5A70.8040006@xyratex.com>
-References: <mailman.1.1333130401.17602.lustre-devel@lists.lustre.org>
-	<4F7A43D1.5000209@whamcloud.com> <4F7A9384.80707@xyratex.com>
-	<4F7B0770.8050308@whamcloud.com> <4F7D5A70.8040006@xyratex.com>
-Message-ID: <CAOaPdDZAWe1HJFP5Dp5rQK0dkFXx0bxq0Rv9T3bKO9-JO13iMg@mail.gmail.com>
+From: DENIEL Philippe <philippe.deniel@cea.fr>
+Date: Fri, 06 Apr 2012 15:44:43 +0200
+Subject: [Lustre-devel] Who does setfsuid() work with quota in LUSTRE ?
+Message-ID: <4F7EF34B.60006@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-while technically this is possible, the framework will have to support
-different versions of Lustre
-because in some cases they implement functionality different ways with
-different side effects
-(often used in t-f). which kind of contradicts with the original idea ?
+Hi,
 
-thanks, Alex
+I am developing a NFS Server (NFS-Ganesha, see 
+http://nfs-ganesha.sf.net) in user space with a LUSTRE backend.
+The daemon runs as root, but for NFS requesy processing, I use 
+setfsuid() and setfsgid() (for setting "fs credentials") before 
+operating on the LUSTRE backend, using jointly the liblustreapi and 
+POSIX calls from the glibc. In fact, this approach works well as long as 
+quotas are not concerned.
+Inode quota works fine : if a user exceed inode hard limit, he got (via 
+NFS)  a "Disk Quota exceeded" error. That's OK. Quotas on data behave on 
+a stranger way : the written blocks are taken in account for increasing 
+"used blocks" for that user, and a expiration date appear as the soft 
+limite is passed, but the user can continue writing beyond the hard limit.
+At the beginning, I had files opened with fsuid=0 and then written with 
+fsuid=non-root, I thought the fd remember the user that created it. So I 
+wrote this small program:
 
-On Thu, Apr 5, 2012 at 12:40 PM, Alexander Lezhoev
-<Alexander_Lezhoev@xyratex.com> wrote:
-> Hi Chris,
->
-> I completely agree that the test-framework must be significantly revised. We
-> have some plans to improve it and I think, it would be useful to share our
-> ideas and visions of this task. Really we considered the separation of tests
-> and Lustre code as a part of the framework improvement. So I think, we need
-> to share our approaches and develop a conception which would be satisfactory
-> for all. What do you think about opening a discussion about new
-> test-framework?
->
-> --
-> Alexander Lezhoev.
-> Morpheus test team.
-> Xyratex.
->
->
->
->
-> On 04/03/2012 06:21 PM, Chris Gearing wrote:
->>
->>
->> We don't have a single script because the tests are at times very tightly
->> coupled to the Lustre version. There were a lot of changes between 1.8.x and
->> 2.x and a lot of corresponding changes to the test scripts. Where the tests
->> are the same and bugs were found in the 2.x test scripts these should have
->> been backported to the 1.8.x test scripts if this was not done then we
->> should do it for inclusion into the 1.8.8 release.
->>
->> The notion of making 'master' scripts work with with all versions is
->> obviously possible but it is a very significant task and given that the
->> scripts themselves are written in a language (sic) that does not provide
->> structure a single script strategy is likely to create many more
->> 'interoperability issues' than it fixes.
->>
->> Also it's worth considering that we have best part of a 1000 discrete
->> changes, whenever a test is re-engineered the test itself must be proven to
->> detect failure as well as success. i.e. If someone produced a version
->> independent test set that passed all versions we would not know that the
->> process was a success, we would need to check that each re-engineered test
->> 'failed' appropriately for each Lustre version, this is a big task that I
->> doubt can be properly achieved in bash.
->>
->> So in summary the best solution given what we have today is to back port
->> fixes to the test scripts as we back port fixes to the code. This is an
->> investment in time and requires the same discipline to test as we have for
->> coding. A single set of scripts that caters for all versions appears I
->> believe like an easy solution but actually would require huge investment
->> that would be better spent developing a modern test framework and
->> infrastructure that can support Lustre for the next ten years.
->>
->
->
-> _______________________________________________
-> twg mailing list
-> twg at lists.opensfs.org
-> http://lists.opensfs.org/listinfo.cgi/twg-opensfs.org
+    #include <unistd.h>
+    #include <stdlib.h>
+    #include <stdio.h>
+    #include <sys/fsuid.h>
+    #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <string.h>
+    #include <errno.h>
+
+    #define SIZE 10240
+    #define MOI 500
+
+    int main( int argc, char * argv[] )
+    {
+      char * buff = NULL ;
+      int fd =0 ;
+
+      buff = malloc( SIZE ) ;
+
+      fd = open( argv[1], O_CREAT|O_RDWR, 0644 ) ;
+      printf( "buff=%p, errno=%u\n", buff, errno ) ;
+
+      printf( "fd = %d\n", fd ) ;
+
+      setfsuid( MOI ) ;
+      printf( "bytes written = %d, errno=%u\n", write( fd, buff, SIZE 
+    ), errno ) ;
+
+      printf( "fsync:%d errno=%u\n", fsync( fd ), errno ) ;
+      printf( "close:%d errno=%u\n", close( fd ), errno )  ;
+    }
+
+If run as non-root user whose quota are exceeded (a user that should get 
+EDQUOT on every write operation), I got this message:
+
+    buff=0x1e22010, errno=0
+    fd = 3
+    bytes written = -1, errno=0
+    fsync:-1 errno=122
+    close:0 errno=122
+
+That really makes sense (setfsuid has no effect here). I am just a bit 
+surprised that write() set errno to 0 but writes nothing, letting 
+fsync()/close() return EDQUOT(122)
+Then I run the program as root, I saw that display:
+
+    buff=0xee8010, errno=0
+    fd = 3
+    bytes written = 10240, errno=0
+    fsync:0 errno=0
+    close:0 errno=0
+
+As you see, the IO was successful. At the same time,  "lfs quota -u 
+<user> " showed that the counter of used block for that user incresased.
+I then changed my program to have the setfsuid() called BEFORE the open 
+is made. The test code was then looking like this:
+
+    #include <unistd.h>
+    #include <stdlib.h>
+    #include <stdio.h>
+    #include <sys/fsuid.h>
+    #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <string.h>
+    #include <errno.h>
+
+    #define SIZE 10240
+    #define MOI 500
+
+    int main( int argc, char * argv[] )
+    {
+      char * buff = NULL ;
+      int fd =0 ;
+
+      buff = malloc( SIZE ) ;
+
+      *setfsuid( MOI ) ;*
+      fd = open( argv[1], O_CREAT|O_RDWR, 0644 ) ;
+      printf( "buff=%p, errno=%u\n", buff, errno ) ;
+
+      printf( "fd = %d\n", fd ) ;
+      printf( "bytes written = %d, errno=%u\n", write( fd, buff, SIZE 
+    ), errno ) ;
+
+      printf( "fsync:%d errno=%u\n", fsync( fd ), errno ) ;
+      printf( "close:%d errno=%u\n", close( fd ), errno )  ;
+    }
+
+And I ran the same test on new files, both as root and non-root (user 
+with uid=500). I got exactly the same message as above.
+It seems like setfsuid() as lesser impact on block quota. This is really 
+messy for my application.
+Do you have any idea of what happened and/or what I could do to have 
+write() returning EDQUOT after setfsuid() ?
+
+I am currently using lustre-2-1-0 RPMS.
+
+    Regards
+
+       Philippe
