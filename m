@@ -1,27 +1,32 @@
-From: Ambreen Khan <ambreen.rasheed@gmail.com>
-Date: Wed, 18 Apr 2012 16:13:17 +1000
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Wed, 18 Apr 2012 10:24:03 -0700
 Subject: [Lustre-devel] Lustre 2.0 RPMS
-Message-ID: <CANpfw9fmDdxRPZ-SuGzYAgSWE=Bb+5w2swTB98A3O-CoiY26RA@mail.gmail.com>
+In-Reply-To: <CANpfw9fmDdxRPZ-SuGzYAgSWE=Bb+5w2swTB98A3O-CoiY26RA@mail.gmail.com>
+References: <CANpfw9fmDdxRPZ-SuGzYAgSWE=Bb+5w2swTB98A3O-CoiY26RA@mail.gmail.com>
+Message-ID: <4F8EF8B3.2030608@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi
+Here is a good starting point:
 
-I have been desperately searching for lustre 2.0 packages as I would like
-to install them on my CentOS 6.2 set up. However, I always get redirected
-to the oracle download page, and I cannot find lustre there
+   http://wiki.whamcloud.com/display/PUB/Lustre+Releases
 
-www.oracle.com/technetwork/indexes/downloads/index.html
+You will probably want the latest "maintenance release", which is 2.1.1.
 
-Can you please guide me on how I can download the rpms. I would really like
-to test this clustering file system in my new project, but so far I haven't
-got any luck in installing lustre on CentOS 6.2.
+Chris
 
-Best Regards
-Ambreen
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120418/a2ae93e9/attachment.htm>
+On 04/17/2012 11:13 PM, Ambreen Khan wrote:
+> Hi
+>
+> I have been desperately searching for lustre 2.0 packages as I would like to install them on my CentOS 6.2 set up. However, I always get redirected to the oracle download page, and I cannot find lustre there
+>
+> www.oracle.com/technetwork/indexes/downloads/index.html<http://www.oracle.com/technetwork/indexes/downloads/index.html>
+>
+> Can you please guide me on how I can download the rpms. I would really like to test this clustering file system in my new project, but so far I haven't got any luck in installing lustre on CentOS 6.2.
+>
+> Best Regards
+> Ambreen
+>
