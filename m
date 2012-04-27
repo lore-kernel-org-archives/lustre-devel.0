@@ -1,19 +1,33 @@
-From: Roman Grigoryev <Roman_Grigoryev@xyratex.com>
-Date: Fri, 27 Apr 2012 14:25:56 +0400
+From: tao.peng at emc.com <tao.peng@emc.com>
+Date: Fri, 27 Apr 2012 08:33:34 -0400
 Subject: [Lustre-devel] [Lustre-discuss] [wc-discuss] Re: Lustre and
-	cross-platform portability
-In-Reply-To: <F19688880B763E40B28B2B462677FBF805EF42BD03@MX09A.corp.emc.com>
+ cross-platform portability
+In-Reply-To: <4F9A7434.6060300@xyratex.com>
 References: <5609A4E0-2356-400F-9D53-F71B7007338C@whamcloud.com>
 	<5A40CBC5-F91A-4F34-8209-0C216CCE8A5D@dilger.ca>
 	<F19688880B763E40B28B2B462677FBF805EF42BC26@MX09A.corp.emc.com>
 	<1B1F8162-5FC6-4038-810A-EA219EE3BC84@whamcloud.com>
-	<F19688880B763E40B28B2B462677FBF805EF42BD03@MX09A.corp.emc.com>
-Message-ID: <4F9A7434.6060300@xyratex.com>
+	<F19688880B763E40B28B2B462677FBF805EF42BD03@MX09A.corp.emc.com>,
+	<4F9A7434.6060300@xyratex.com>
+Message-ID: <F19688880B763E40B28B2B462677FBF805EF52D53F@MX09A.corp.emc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Hi Roman,
+
+Not sure if I misunderstand your question, but we won't push lustre/tests/* files to kernel. We only push client code and any tests will be executed out side of kernel.
+
+Cheers,
+Tao
+________________________________________
+From: Roman Grigoryev [Roman_Grigoryev at xyratex.com]
+Sent: Friday, April 27, 2012 6:25 PM
+To: Peng, Tao
+Cc: adilger at whamcloud.com; wc-discuss at whamcloud.com; lustre-discuss at lists.lustre.org; lustre-devel at lists.lustre.org
+Subject: Re: [Lustre-discuss] [wc-discuss] Re: Lustre and cross-platform portability
 
 Tao,Andreas,all,
 
@@ -24,11 +38,11 @@ infrastructure and his own test framework.
 I'm sorry if it's incorrect place for this question.
 
 Thanks,
-	Roman
+        Roman
 
 On 04/27/2012 02:15 PM, tao.peng at emc.com wrote:
 > Hi Andreas,
-> 
+>
 >> -----Original Message-----
 >> From: Andreas Dilger [mailto:adilger at whamcloud.com]
 >> Sent: Friday, April 27, 2012 11:54 AM
@@ -78,9 +92,9 @@ On 04/27/2012 02:15 PM, tao.peng at emc.com wrote:
 >> that would be even better.
 >>
 > But we do need to remove them before submitting to kernel, right? And if we enforce checkpatch.pl on every patch applied, IMHO there is not much benefit to have syntax rules on every file, not to mention that it is explicitly forbidden in kernel coding style (Documentation/CodingStyle, Chapter 18:  Editor modelines and other cruft).
-> 
+>
 > BTW, instead of just enabling tabs, how about changing checkpatch.pl to latest kernel version to make sure all future patches follow kernel coding styles?
-> 
+>
 >>> 3. Lustre uses a slightly different comment style, which need to be changed to kernel style
 >>
 >> This is DOxygen style formatting.  I had forgotten about this. We had in the past used this inline
@@ -88,7 +102,7 @@ On 04/27/2012 02:15 PM, tao.peng at emc.com wrote:
 >> for this today. In the meantime, please leave the comment style as-is.
 >>
 > OK.
-> 
+>
 >>
 >>> I created LU-1347 (http://jira.whamcloud.com/browse/LU-1347) to track the coding style changes.
 >>>
@@ -107,7 +121,7 @@ On 04/27/2012 02:15 PM, tao.peng at emc.com wrote:
 >> external tree, so patches have the most chance of applying.
 >>
 > I agree. We should minimize maintenance effort for it. And as you suggested, we can put as many of these compat macros into places like linux_compat.h as possible and have Lustre code use latest kernel APIs, so that most maintenance effort for old kernel support would be to keep linux_compat.h uptodate. For compact macros that cannot be cleaned up this way, we will have to pay the extra efforts. And of course the cleanup will be an incremental process and macros will be dealt with in a case-by-case basis.
-> 
+>
 >>> 2. For macros to mark out server code, kernel maintainers can accept it. But I think we need to make
 >> sure we don't do it too intrusive.
 >>
@@ -118,17 +132,17 @@ On 04/27/2012 02:15 PM, tao.peng at emc.com wrote:
 >> headers, etc) if that improves the code structure and readability.
 >>
 > I agree that we can do some incremental patches to split client and server code. But I hope we only do it when it is trivial and simple. IMHO if we want to entirely split client/server code, it will be large code structure change. Since kernel maintainers already agreed on HAVE_SERVER_SUPPORT, how about we keep going that way at first? And we can make some split wherever it is simple and clear. And we will try to make code structure as clear/readable as possible. Then when we summit code for review, if kernel maintainers still don't like it, we do the large restructuring. Does it make sense?
-> 
+>
 >>> 3. Lustre feature macros, we can convert them to Kconfig macros.
 >>
 >> Sure. Note that some of them may be obsolete, so before you spend too much time cleaning them up,
 >> please post a list to Jira. Maybe some of them can be dropped entirely.
 >>
 > Thanks. I will do as you suggested when it comes to converting them to Kconfig macros.
-> 
+>
 > Cheers,
 > Tao
-> 
+>
 >>>> On 2012-03-14, at 7:31 PM, Andreas Dilger wrote:
 >>>>> Whamcloud and EMC are jointly investigating how to be able to contribute the Lustre client code
 >> into
@@ -194,7 +208,7 @@ On 04/27/2012 02:15 PM, tao.peng at emc.com wrote:
 >>>>
 >>>>
 >>>
-> 
+>
 > _______________________________________________
 > Lustre-discuss mailing list
 > Lustre-discuss at lists.lustre.org
