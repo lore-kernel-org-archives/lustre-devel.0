@@ -1,45 +1,27 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Tue, 8 May 2012 14:17:41 -0600
-Subject: [Lustre-devel] Lustre coding style: use tabs for indentation
-Message-ID: <C28123A9-C33A-4C45-9DAC-0036A528A600@whamcloud.com>
+From: Richard Henwood <rhenwood@whamcloud.com>
+Date: Fri, 11 May 2012 15:23:20 -0500
+Subject: [Lustre-devel] MDS performance: SMP Node Affinity Docs for OpenSFS
+	NRE
+Message-ID: <CAA6TbrMb8kviNvHcNXPmr3D35srUkzA6un1mGuw8Rx-J07+dkA@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-NOTE TO ALL LUSTRE DEVELOPERS
-=============================
+Hi All,
 
-As previously discussed at LUG in Austin, and in these lists, we've decided to change Lustre to use the upstream Linux kernel coding style.  This is being done in order to allow merging the Lustre client code into the upstream kernel.
+OpenSFS and Whamcloud are engaged in delivering high-priority
+enhancements to Lustre for the community.
+The Solution Architecture and High Level Design for MDS Performance:
+SMP Node Affinity have been completed and are available for comments
+and feedback:
+http://wiki.whamcloud.com/display/PUB/MDS+SMP+Node+Affinity+Solution+Architecture
+http://wiki.whamcloud.com/display/PUB/MDS+SMP+Node+Affinity+High+Level+Design
 
-In most cases, the two coding styles agree, but one of the major differences is that Lustre uses 8-space indents, while the kernel uses tabs.  To ensure the transition is not disruptive to ongoing work in patches and branches, there will NOT be an en-masse change of every line of Lustre to use tabs.  This would cause 280kLOC of changes in a short time, and would break landing of all in-flight patches and branches, and the commit history of every line of code would be useless.
-
-
-Instead, there will be an incremental change to the coding style:
-* All lines of code that are modified or added by new or updated
-  patches must use tabs for indentation.  This includes tests.
-* If there are fewer than 6 unmodified lines between two modified
-  lines (i.e. normal "diff" context) still using spaces, they should
-  also be converted to using tabs.
-* If there are only a "handful" of lines remaining in a function,
-  test, structure, header, etc. that are using spaces for indentation,
-  they should also be converted to using tabs (including the function
-  declaration, if needed).  Use your judgement, but since every line
-  must be changed at some point, it is better to err on the side of
-  converting more lines to tabs than fewer.
-
-By modifying adjacent lines together, and stragglers in a file, it will not significantly increase the size or number of the patches, and it will avoid messy blocks of code that have both tabs and spaces interleaved.  If there are other whitespace or code style issues (e.g. trailing spaces or tabs, placement of braces or operators, etc.) on lines being modified, it would be useful to clean them up at the same time, to also improve the overall quality of the code.
-
-Note that in Gerrit it is possible to permanently select "Ignore Whitespace" as "All" when reviewing a patch, so that the indentation change doesn't interfere with the understanding of the patch.
-
-The build/checkpatch.pl script has already been updated to match the latest kernel version, and requires tabs for indentation.  The vim/emacs modelines that force spaces for indentation have also been removed.
-
-Given the number of lines of code that will be changing over the next year due to OSD restructuring, DNE, LNET, NRS, SMP scaling, etc., it is expected that a significant fraction of the lines will be converted by the 2.4 release.  By this time, we will evaluate whether an en-masse conversion of the remaining lines is warranted, whether for just the client code, or for all code.
-
-Thanks for your cooperation in during this change.
-
-Cheers, Andreas
---
-Andreas Dilger                       Whamcloud, Inc.
-Principal Lustre Engineer            http://www.whamcloud.com/
+With best regards,
+Richard
+-- 
+Richard.Henwood at whamcloud.com
+Whamcloud Inc.
+tel: +1 512 410 9612
