@@ -1,45 +1,31 @@
 From: kelly.zhang at emc.com <kelly.zhang@emc.com>
-Date: Wed, 30 May 2012 06:44:03 -0400
-Subject: [Lustre-devel] Fail to build Lustre on SUSE11
-Message-ID: <F62E2618FCA29E42AB21F281C9511BB4137DACAE61@MX26A.corp.emc.com>
+Date: Thu, 31 May 2012 06:17:10 -0400
+Subject: [Lustre-devel] Lustre sanity test_226 fails
+Message-ID: <F62E2618FCA29E42AB21F281C9511BB4137DACAF52@MX26A.corp.emc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello,
+Hi all,
 
-There is a compiling error when building Lustre rpms on SUSE11, at "make rpms". Would you please help to check this.
-The error is like:
-/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52/lustre/llite/llite_lib.c: In function "ll_setattr_raw":
-/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52/lustre/llite/llite_lib.c:1343: error: implicit declaration of function "inode_newsize_ok "
-make[8]: *** [/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52/lustre/llite/llite_lib.o] Error 1
-make[7]: *** [/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52/lustre/llite] Error 2
-make[6]: *** [/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52/lustre] Error 2
-make[5]: *** [_module_/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52] Error 2
-make[5]: Leaving directory `/var/tmp/kernel-source-2.6.27.19-build/usr/src/linux-2.6.27.19-5.1'
-make[4]: *** [modules] Error 2
-make[4]: Leaving directory `/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52'
-make[3]: *** [all-recursive] Error 1
-make[3]: Leaving directory `/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52'
-make[2]: *** [all] Error 2
-make[2]: Leaving directory `/home/build/kernel/rpmbuild/BUILD/lustre-2.2.52'
-error: Bad exit status from /var/tmp/rpm-tmp.54512 (%build)
+When running sanity.sh, sometimes test_226 would fail with the following error:
 
+lfs fid2path /mnt/lustre [0x200000404:0x1a:0x0]
 
-RPM build errors:
-    Bad exit status from /var/tmp/rpm-tmp.54512 (%build)
-make[1]: *** [rpms-real] Error 1
-make[1]: Leaving directory `/home/build/lustre'
-make: *** [rpms] Error 2
+ioctl err -22: Invalid argument (22)
 
-Building machine arch: x86_64
-Distribution: SUSE 11 SP1
-Kernel Version used for building: 2.6.27.19-5.1
+fid2path error: Invalid argument
+
+We tried Whamcloud master (6b1daa840a66703446c238d1efb3f13dd93012ee), and get the same error.
+Run test_226 twice, it is likely to meet one failure.
+
+I did not find such error in Maloo, so would you please help to check this? Thanks a lot.
 
 Best Regards,
 Kelly(EMC)
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120530/d0660ee3/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120531/3d674c17/attachment.htm>
