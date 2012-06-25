@@ -1,14 +1,27 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jun 2012 16:05:52 +0100 (BST)
+From: kelly.zhang at emc.com <kelly.zhang@emc.com>
+Date: Sun, 24 Jun 2012 22:05:24 -0400
 Subject: [Lustre-devel] Fail to build Lustre on SUSE11
-In-Reply-To: <F62E2618FCA29E42AB21F281C9511BB4137DACAE61@MX26A.corp.emc.com>
+In-Reply-To: <alpine.LFD.2.02.1206201657060.13780@casper.infradead.org>
 References: <F62E2618FCA29E42AB21F281C9511BB4137DACAE61@MX26A.corp.emc.com>
-Message-ID: <alpine.LFD.2.02.1206201657060.13780@casper.infradead.org>
+	<alpine.LFD.2.02.1206201657060.13780@casper.infradead.org>
+Message-ID: <F62E2618FCA29E42AB21F281C9511BB4137F42580F@MX26A.corp.emc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Thanks, that is good.
+
+Best Regards,
+Kelly
+
+-----Original Message-----
+From: James Simmons [mailto:jsimmons at infradead.org] 
+Sent: 2012?6?21? 23:06
+To: Zhang, Kelly
+Cc: lustre-devel at lists.lustre.org; wc-discuss at whamcloud.com; Tang, Haiying; Liu, Xuezhao; tirrell, jerry; faibish, sorin
+Subject: Re: [Lustre-devel] Fail to build Lustre on SUSE11
 
 
 > Hello,
