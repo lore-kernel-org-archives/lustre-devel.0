@@ -1,42 +1,35 @@
-From: Nathan Rutman <nathan_rutman@xyratex.com>
-Date: Fri, 29 Jun 2012 11:58:53 -0700
+From: Johann Lombardi <johann@whamcloud.com>
+Date: Fri, 29 Jun 2012 22:43:39 +0200
 Subject: [Lustre-devel] mmp unplug patch
-Message-ID: <5E974A8D-E444-46AE-9212-645CBC40CC4C@xyratex.com>
+In-Reply-To: <5E974A8D-E444-46AE-9212-645CBC40CC4C@xyratex.com>
+References: <5E974A8D-E444-46AE-9212-645CBC40CC4C@xyratex.com>
+Message-ID: <20120629204339.GE19971@granier.hd.free.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Can anyone explain the purpose of unplug call in this patch?  The first part of the patch I get, but why do we need to drop the existing queued items?
-Doesn't this simply result in more fragmented IO?
+On Fri, Jun 29, 2012 at 11:58:53AM -0700, Nathan Rutman wrote:
+> Can anyone explain the purpose of unplug call in this patch?
 
-raid5-mmp-unplug-dev.patch
+I guess the intent is to make sure that the MMP block updates aren't delayed by the underlying I/O scheduler and make it to the storage system in a timely manner.
 
-Force MD devices to pass SYNC reads directly to the disk
-instead of handling from cache.  This is needed for MMP
-on MD RAID devices, and in theory could be accepted in
-the upstream kernel.  Not needed for DMU.
+> The first part of the patch I get, but why do we need to drop the existing queued items?
 
-Index: linux-2.6.32-131.0.15.el6.x86_64/drivers/md/raid5.c
-===================================================================
---- linux-2.6.32-131.0.15.el6.x86_64.orig/drivers/md/raid5.c    2011-05-10 21:38:35.000000000 +0300
-+++ linux-2.6.32-131.0.15.el6.x86_64/drivers/md/raid5.c 2011-05-20 08:26:04.000000000 +0300
-@@ -2177,6 +2177,8 @@ static int add_stripe_bio(struct stripe_
-                bi->bi_next = *bip;
-        *bip = bi;
-        bi->bi_phys_segments++;
-+       if (bio_rw_flagged(bi, BIO_RW_SYNCIO) && !forwrite)
-+               clear_bit(R5_UPTODATE, &sh->dev[dd_idx].flags); /* force to read from disk. */
-        spin_unlock_irq(&conf->device_lock);
-        spin_unlock(&sh->lock);
- 
-@@ -4132,6 +4134,9 @@ static int make_request(mddev_t *mddev, 
-                bio_endio(bi, 0);
-        }
- 
-+       if (bio_rw_flagged(bi, BIO_RW_SYNCIO))
-+               md_raid5_unplug_device(conf);
-+
-        return 0;
- }
+The issue is that some I/O schedulers might not support BIO_RW_SYNC and the ones that do might still delay the request a bit, hoping to merge it with a forthcoming request. Therefore, the only way to make sure that the I/O is issued straight away is to unplug the queue.
+
+All in all, it depends on whether the I/O scheduler delay is negligible compared to the MMP update interval.
+
+> Doesn't this simply result in more fragmented IO?
+
+Yes, it might.
+
+HTH
+
+Cheers,
+Johann
+-- 
+Johann Lombardi
+Whamcloud, Inc.
+www.whamcloud.com
