@@ -1,47 +1,70 @@
-From: Roman Grigoryev <Roman_Grigoryev@xyratex.com>
-Date: Mon, 16 Jul 2012 11:31:32 -0700
-Subject: [Lustre-devel] [cdwg] broader Lustre testing
-In-Reply-To: <4FFF3A44.30106@llnl.gov>
-References: <A58D7719023A5D47A6D3BEAF8C0BE67509EA751B@CFWEX01.americas.cray.com>
-	<97EB7132-D1FA-4BFF-9EDC-9AEA4D1807E7@xyratex.com>
-	<4FFF3A44.30106@llnl.gov>
-Message-ID: <FFB285B9CC9ECE4B9EE7CA48EEB45E8D084F42@XYUS-EX21.xyus.xyratex.com>
+From: Andreas Dilger <adilger@whamcloud.com>
+Date: Mon, 16 Jul 2012 14:25:11 -0700
+Subject: [Lustre-devel] Lustre coding style: use tabs for indentation
+In-Reply-To: <055F1C75-208D-4DBF-A240-F4B9DC988CD6@gmail.com>
+References: <C28123A9-C33A-4C45-9DAC-0036A528A600@whamcloud.com>
+	<055F1C75-208D-4DBF-A240-F4B9DC988CD6@gmail.com>
+Message-ID: <1577D260-D15E-4A80-A708-1E3DD766A4D2@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Christopher,
+Nathan,
+most/all of the source files in the master repo have removed the vim/emacs modelines. Some small number of modelines are left in test scripts that have a lot of 4-space indentation, to allow conversion to 4-space tabs without ruining the readability of the code.
 
-.....
->
-> The automated regression suite that we use is great.  We should continue
-> to improve that over time.  But I would content that it is not, and
-> never will be, sufficient to tells us if Lustre is stable.
->
-> I would argue that the regressions tests are, in fact, a very low bar.
-> And Lustre is just too complicated, networks are too complicated, we
-> have too few developers, to ever come up with an automated suite with
-> any thing but a relatively low confidence level in the stability of the
-> software.
->
-> And human testers are given a very different set of goals then
-> developers.  A developer's job is to make things work.  A tester's is to
-> do whatever they can to break it.  And then create a good report of how
-> they broke it so the developers can fix it.
->
-.............
+The formatting change is not retroactive to 2.1 and 2.2.
 
-Just for proving your statement that it is not enough just execute
-automated regression suite (acc-small) for testing quality I would like to
-share coverage summary which we got:
+Cheers, Andreas
 
-958 tests was executed
-                     Hit	Total	Coverage
-Lines:	        79691	128935	61.8 %
-Functions:	6206	7935	78.2 %
-Branches:	49287	113914	43.3 %
-
-Thanks,
-	Roman
+On 2012-07-16, at 11:02, Nathan Rutman <nrutman@gmail.com> wrote:
+> Hi Andreas - should we be removing the vim/emacs modelines from source files as we generate patches?
+> 
+> 
+> On May 8, 2012, at 1:17 PM, Andreas Dilger wrote:
+> 
+>> NOTE TO ALL LUSTRE DEVELOPERS
+>> =============================
+>> 
+>> As previously discussed at LUG in Austin, and in these lists, we've decided to change Lustre to use the upstream Linux kernel coding style.  This is being done in order to allow merging the Lustre client code into the upstream kernel.
+>> 
+>> In most cases, the two coding styles agree, but one of the major differences is that Lustre uses 8-space indents, while the kernel uses tabs.  To ensure the transition is not disruptive to ongoing work in patches and branches, there will NOT be an en-masse change of every line of Lustre to use tabs.  This would cause 280kLOC of changes in a short time, and would break landing of all in-flight patches and branches, and the commit history of every line of code would be useless.
+>> 
+>> 
+>> Instead, there will be an incremental change to the coding style:
+>> * All lines of code that are modified or added by new or updated
+>> patches must use tabs for indentation.  This includes tests.
+>> * If there are fewer than 6 unmodified lines between two modified
+>> lines (i.e. normal "diff" context) still using spaces, they should
+>> also be converted to using tabs.
+>> * If there are only a "handful" of lines remaining in a function,
+>> test, structure, header, etc. that are using spaces for indentation,
+>> they should also be converted to using tabs (including the function
+>> declaration, if needed).  Use your judgement, but since every line
+>> must be changed at some point, it is better to err on the side of
+>> converting more lines to tabs than fewer.
+>> 
+>> By modifying adjacent lines together, and stragglers in a file, it will not significantly increase the size or number of the patches, and it will avoid messy blocks of code that have both tabs and spaces interleaved.  If there are other whitespace or code style issues (e.g. trailing spaces or tabs, placement of braces or operators, etc.) on lines being modified, it would be useful to clean them up at the same time, to also improve the overall quality of the code.
+>> 
+>> Note that in Gerrit it is possible to permanently select "Ignore Whitespace" as "All" when reviewing a patch, so that the indentation change doesn't interfere with the understanding of the patch.
+>> 
+>> The build/checkpatch.pl script has already been updated to match the latest kernel version, and requires tabs for indentation.  The vim/emacs modelines that force spaces for indentation have also been removed.
+>> 
+>> Given the number of lines of code that will be changing over the next year due to OSD restructuring, DNE, LNET, NRS, SMP scaling, etc., it is expected that a significant fraction of the lines will be converted by the 2.4 release.  By this time, we will evaluate whether an en-masse conversion of the remaining lines is warranted, whether for just the client code, or for all code.
+>> 
+>> Thanks for your cooperation in during this change.
+>> 
+>> Cheers, Andreas
+>> --
+>> Andreas Dilger                       Whamcloud, Inc.
+>> Principal Lustre Engineer            http://www.whamcloud.com/
+>> 
+>> 
+>> 
+>> 
+>> _______________________________________________
+>> Lustre-devel mailing list
+>> Lustre-devel at lists.lustre.org
+>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+> 
