@@ -1,63 +1,77 @@
-From: Nathan Rutman <nathan_rutman@xyratex.com>
-Date: Fri, 20 Jul 2012 11:20:54 -0700
-Subject: [Lustre-devel] [cdwg] broader Lustre testing
-In-Reply-To: <1342793622.7484.6.camel@bohr.ornl.gov>
-References: <A58D7719023A5D47A6D3BEAF8C0BE67509EA751B@CFWEX01.americas.cray.com>
-	<97EB7132-D1FA-4BFF-9EDC-9AEA4D1807E7@xyratex.com>
-	<1342793622.7484.6.camel@bohr.ornl.gov>
-Message-ID: <EEC07D6B-AAC0-442B-9660-58D28B200D07@xyratex.com>
+From: mohammad mohammadi <m_mohammadi_dinani@yahoo.com>
+Date: Thu, 2 Aug 2012 02:40:49 -0700 (PDT)
+Subject: [Lustre-devel] Build lustre 1.8 on centos 5.5
+Message-ID: <1343900449.20361.YahooMailNeo@web125602.mail.ne1.yahoo.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+To whom it may concerns,
 
-On Jul 20, 2012, at 7:13 AM, James A Simmons wrote:
+I want to build?Lustre 1.8 (or 2.1 if it's possible) on CentOS 5.5 with?kernel version 2.6.18.194.el5
+I follow the instructions provided on the wiki.
+One of the patches (applied on?drivers/scsi/isci/init.c)?is ignored, because it can't find the file.
+It also fails while running make rpm.
+The?instructions?and outputs?are:
 
-> On Thu, 2012-07-12 at 15:37 -0400, Nathan Rutman wrote:
->> 
->> On Jul 12, 2012, at 7:30 AM, John Carrier wrote:
->> 
->>> A more strategic solution is to do more testing of a feature release
->>> candidate _before_ it is released.  Even if a Community member has
->>> no
->>> interest in using a feature release in production, early testing
->>> with
->>> pre-release versions of feature releases will help identify
->>> instabilities created by the new feature with their workloads and
->>> hardware before the release is official. 
-> 
-> ...
->> So, it seems, we need to test pre-release versions of Lustre, aka
->> Master, with my applications.  To that end, how willing are people to
->> set aside a day, say once every two months, to be "filesystem beta
->> day".  Scientists, run your codes, users, do your normal work, but
->> bear in mind there may be filesystem instabilities on that day.  Make
->> sure your data is backed up.  Make sure it's not in the middle of a
->> critical week-long run.  Accept that you might have to re-run it
->> tomorrow in the worst case.  Report any problems you have.
->> What you get out of it is a much more stable Master, and an end to the
->> question of "which version should I run".  When released, you have
->> confidence that you can move up, get the great new features and
->> performance, and it runs your applications.  More people are on the
->> same release, so it sees even more testing. The maintenance branch is
->> always the latest branch, you can pull in point releases with more bug
->> fixes with ease. No more rolling your own Lustre with Frankenstein
->> sets of patches.  Latest and greatest and most stable.
->> 
->> 
->> Pipe dream?
-> 
-> Since people are now moving to help test out the current master branch
-> for whamcloud I like to purpose posting a general summary of testing
-> results people are seeing. I personally have finished a first run at
-> testing 2.2.91 this last week and would galdly share the results. Anyone
-> else can to share :-)
-> 
-> 
+# wget http://download.fedoraproject.org/pub/epel/5/i386/epel-release-5-4.noarch.rpm
+# rpm -ivh ./epel-release-5-4.noarch.rpm
+# yum -y groupinstall "Development Tools" # yum -y install rpm-build redhat-rpm-config unifdef gnupg quilt git
+# useradd -d /build build
+# su build
+# cd $HOME
+# git clone git://git.whamcloud.com/fs/lustre-release.git # cd lustre-release
+# git checkout --track -b b1_8 origin/b1_8
+# sh ./autogen.sh 
+# cd $HOME
+# mkdir -p kernel/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+# cd kernel
+# echo '%_topdir %(echo $HOME)/kernel/rpmbuild' > ~/.rpmmacros
+# rpm -i http://vault.centos.org/5.5/os/SRPMS/kernel-2.6.18-194.el5.src.rpm
+# rpmbuild -bp --target=`uname -m` ~/kernel/rpmbuild/SPECS/kernel-2.6.spec
 
-I started a page on the OpenSFS Wiki for everyone to share their test results in a free-form format.  Note that the Wiki itself is still in it's infancy - I call on the community to help populate it.
+# cd ~/kernel/rpmbuild/BUILD/kernel-2.6.18/linux-2.6.18.x86_64
+# cp ~/lustre-release/lustre/kernel_patches/kernel_configs/kernel-2.6.18-2.6-rhel5-x86_64.config .config
+# ln -s ~/lustre-release/lustre/kernel_patches/series/2.6-rhel5.series series
+# ln -s ~/lustre-release/lustre/kernel_patches/patches patches
+# quilt push -avApplying patch patches/blkdev_tunables-2.6-rhel5.patch
+patching file include/linux/blkdev.h
+Hunk #1 succeeded at 783 (offset -5 lines).
+patching file include/scsi/scsi_host.h can't find file to patch at input line 36 Perhaps you used the wrong -p or --strip option?
+The text leading up to this was:
+--------------------------
+|Index: linux-2.6.18-164.11.1/drivers/scsi/isci/init.c
+|===================================================================
+|--- linux-2.6.18-164.11.1/drivers/scsi/isci/init.c
+|+++ linux-2.6.18-164.11.1/drivers/scsi/isci/init.c
+--------------------------
+No file to patch.  Skipping patch. 1 out of 1 hunk ignored 
+
+
+# cd /build/kernel/rpmbuild/BUILD/kernel-2.6.18/linux-2.6.18.x86_64
+# make oldconfig || make menuconfig
+# make include/asm
+# make include/linux/version.h
+# make SUBDIRS=scripts
+# make include/linux/utsrelease.h
+# make rpm
+
+fs/dcache.c: In function 'd_move_locked':
+fs/dcache.c:1619: error: implicit declaration of function '__d_move'
+fs/dcache.c: At top level:
+fs/dcache.c:1645: error: redefinition of 'd_move_locked'
+fs/dcache.c:1617: error: previous definition of 'd_move_locked' was here
+make[3]: *** [fs/dcache.o] Error 1
+make[2]: *** [fs] Error 2
+error: Bad exit status from /var/tmp/rpm-tmp.6263 (%build) RPM build errors: Bad exit status from /var/tmp/rpm-tmp.6263 (%build)
+make[1]: *** [rpm] Error 1
+make: *** [rpm] Error 2
+
+I would?appreciated?it if you could help me to solve the problem.
+
+Thanks in advance
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120720/18bf46fe/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120802/dcbf28ba/attachment.htm>
