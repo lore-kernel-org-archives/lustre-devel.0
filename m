@@ -1,29 +1,50 @@
-From: Bruce Korb <bruce_korb@xyratex.com>
-Date: Tue, 07 Aug 2012 14:00:57 -0700
-Subject: [Lustre-devel] [lustre-devel]  merges to b2_<x>
-In-Reply-To: <E6EEE694-681F-4414-A41C-AD634C17800B@whamcloud.com>
-Message-ID: <CC46CE84.5D03%bruce_korb@xyratex.com>
+From: Zhang, Kelly <kelly.zhang@emc.com>
+Date: Wed, 22 Aug 2012 05:58:35 -0400
+Subject: [Lustre-devel] Test failures with Lustre latest release(2.2.93)
+Message-ID: <F62E2618FCA29E42AB21F281C9511BB413EE4CD9B0@MX26A.corp.emc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Andreas,
+Hello,
 
-On 8/7/12 12:45 PM, Andreas Dilger wrote:
->> Another way to do this would be to use the same Change-Id field for the
->> backported patch. One could grep for the Change-Id in the commit logs
->> relatively easily, although I'm not sure how the review system would
->> handle this.
->
->Using the same Change-Id on two different branches causes heartburn for
->Gerrit, unfortunately.  This has happened by accident a few times, when a
->series of patches were merged into a development branch and then
->accidentally pushed to Gerrit.  It thinks that these previously-landed
->patches are all "in progress" again, and causes every later patch on the
->original branch (usually master) to claim them as open dependencies.
+Do you guys meet the following two failures with Lustre latest release(2.2.93)?  Have they already been logged in Maloo?
 
-Maybe you could find some script maestro who could auto-insert this
-magic tag at the same time the original Change-Id gets inserted?
-Commit-Id: anyone?
+== sanity test 200: OST pools == 15:56:58 (1345449418)
+Creating new pool
+lustre1oss1: Pool lustre.cea1 created
+Waiting 90 secs for update
+Adding targets to pool
+lustre1oss1: add the named OSTs to the pool
+lustre1oss1: usage pool_add <fsname>.<poolname> <ostname indexed list>
+sanity test_200: @@@@@@ FAIL: lfs pool_list bad ost count 0 != 1
+  Trace dump:
+  = /usr/lib64/lustre/tests/test-framework.sh:3614:error_noexit()
+  = /usr/lib64/lustre/tests/sanity.sh:8564:pool_add_targets()
+  = /usr/lib64/lustre/tests/sanity.sh:8777:test_200()
+  = /usr/lib64/lustre/tests/test-framework.sh:3869:run_one()
+  = /usr/lib64/lustre/tests/test-framework.sh:3898:run_one_logged()
+  = /usr/lib64/lustre/tests/test-framework.sh:3772:run_test()
+  = /usr/lib64/lustre/tests/sanity.sh:8806:main()
+Dumping lctl log to /tmp/test_logs/2012-08-20/154136/sanity.test_200.*.1345449428.log
+
+
+== racer test 1: racer on clients: lustre1cl1 DURATION=300 == 16:47:45 (1345452465)
+lustre1cl1: Reading test skip list from /usr/lib64/lustre/tests/cfg/tests-to-skip.sh
+racers pids: 28251 28252
+
+Message from syslogd at lustre1cl1 at Aug 20 04:52:46 ...
+kernel:LustreError: 16793:0:(osc_lock.c:205:osc_lock_unuse()) ASSERTION( !ols->ols_hold ) failed:
+Message from syslogd at lustre1cl1 at Aug 20 04:52:46 ...
+kernel:LustreError: 16793:0:(osc_lock.c:205:osc_lock_unuse()) LBUG
+
+
+Best Regards,
+Kelly Zhang(EMC)
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120822/e7b2ef7e/attachment.htm>
