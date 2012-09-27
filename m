@@ -1,58 +1,23 @@
-From: Oral, H. Sarp <oralhs@ornl.gov>
-Date: Fri, 7 Sep 2012 12:10:07 -0400
-Subject: [Lustre-devel] Meeting notice for the OpenSFS BWG group (new
-	dial-in number)
-Message-ID: <CC6F949E.1FC26%oralhs@ornl.gov>
+From: Chuck Fossen <chuckf@cray.com>
+Date: Thu, 27 Sep 2012 22:35:56 +0000
+Subject: [Lustre-devel] lnet eager receive path
+Message-ID: <8396A2469279AB46BD407F36A461F14909F00976@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-All,
+LNET experts,
 
-Please make a note of the new dial-in number for the bi-weekly OpenSFS
-Benchmarking Work Group meetings.
+We are currently using the eager receive path to buffer rx messages removing them from the wire so as to not stall the network.
+Is this necessary for the proper operation of LNET? I don't see that any of the other LNDs use the eager receive path.
+Is there some history as to why the eager receive was added?
 
-Our new dial in number is: 877-709-0823
+Thanks for any input.
 
-And the new participant passcode is: 4840841
-
-
-Our next meeting will be on September 14th, 2012 at 11:30 AM Eastern.
-
-
-Main OpenSFS BWG goals are:
-
-* Research primary I/O workloads in high performance parallel file systems
-configurations
-* Provide benchmarking tools that best emulate these workloads to the
-scalable parallel file system community
-
-
-If you are not a part of our workgroup, you can check our web page at
-http://www.opensfs.org/release-planning-group/bwg for more information. If
-you would like to join to our workgroup, please drop me an email
-(oralhs at ornl.gov).
-
-
-If you need calendar invites, please let me know and I can send them out
-as needed. 
-
-Please feel free to distribute this e-mail as you see fit.
-
-
-Thanks,
-
-Sarp Oral
-OpenSFS BWG Chair
-
-
-
--- 
-Sarp Oral, PhD
-
-National Center for Computational Sciences
-Oak Ridge National Laboratory
-oralhs at ornl.gov
-865-574-2173
+Chuck Fossen
+Cray Inc.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20120927/6726fca9/attachment.htm>
