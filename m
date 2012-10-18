@@ -1,7 +1,7 @@
 From: James A Simmons <uja@ornl.gov>
-Date: Thu, 18 Oct 2012 15:11:06 -0400
+Date: Thu, 18 Oct 2012 15:15:34 -0400
 Subject: [Lustre-devel] OSD object questions
-Message-ID: <1350587466.21354.141.camel@bohr.ornl.gov>
+Message-ID: <1350587734.21354.143.camel@bohr.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -11,9 +11,8 @@ To: lustre-devel@lists.lustre.org
 Hello
 
         I have started the process of learning the new OSD design and
-have a
-few questions after reading the osd-api document as well as the code.
-The questions center around the OSD Objects which is described by
+have a few questions after reading the osd-api document as well as the
+code. The questions center around the OSD Objects which is described by
 struct lu_object. Now each object is described as being represented by a
 header (lu_header) and slices. Also the code refers to the concept of
 compound objects. Now if I'm understanding this correctly then a perfect
