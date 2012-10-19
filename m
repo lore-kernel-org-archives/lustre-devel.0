@@ -1,86 +1,49 @@
-From: James A Simmons <uja@ornl.gov>
-Date: Thu, 18 Oct 2012 15:15:34 -0400
+From: Alex Zhuravlev <bzzz@whamcloud.com>
+Date: Fri, 19 Oct 2012 22:21:47 +0400
 Subject: [Lustre-devel] OSD object questions
-Message-ID: <1350587734.21354.143.camel@bohr.ornl.gov>
+In-Reply-To: <1350587734.21354.143.camel@bohr.ornl.gov>
+References: <1350587734.21354.143.camel@bohr.ornl.gov>
+Message-ID: <CAGBrHDtrueDkRBLUBN2dvTnnX1iumkn14Jm2TRfTmxaCuJeH-g@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello
+On Thu, Oct 18, 2012 at 11:15 PM, James A Simmons <uja@ornl.gov> wrote:
+> This is not allocation the zzz_object type that would be allocated by
+> zzz_object_alloc but is instead a lower level lu_object type object.
+> Would it always one one slice lower or the lowest level i.e lu_object
+> itself? Then it forms a compound object with lu_object_add.
 
-        I have started the process of learning the new OSD design and
-have a few questions after reading the osd-api document as well as the
-code. The questions center around the OSD Objects which is described by
-struct lu_object. Now each object is described as being represented by a
-header (lu_header) and slices. Also the code refers to the concept of
-compound objects. Now if I'm understanding this correctly then a perfect
-example of a compound object is struct lovsub_object which is a super
-class of lu_object composed of two other classes. Now in this exmaple
-class lso_cl would be considered one of the allocated slices in the
-lu_object stack. Same for lso_super. Then for lov_object lo_cl would be
-a slice etc until we hit the bottom of the stack at the base class
-lu_object.
+In this specific case it's not an object being allocated, it's a slice
+- representation
+of a specific layer in this object.
 
-struct lovsub_object {
-        ...
-        struct cl_object        lso_cl;
-        struct lov_object      *lso_super;
-        ...
-}
+> That is the easy part. The part I had a hard time making out was the
+> lu_object_alloc() function in lu_object.c. You appear to allocate a
+> top level lu_object with the low level ldo_object_alloc hook but its a
+> freshly created object so I assume because you did add the top object to
+> its own list, loh_layer, that the loop you do only contains one object
+> but you loop as if alot of lu_objects will be in the loh_layers list
+> with some even allocated. Where is that list being set from so the
+> properly related objects are initialized? Which objects are being
+> initialized? The one's higher in the slice?
 
-struct lov_object {
-        struct cl_object lo_cl;
-        ...
+every layer in the stack is represented by a specific device. and that device
+is supposed to export ->ldo_object_alloc() method to allocate a slice
+of an object
+(see above).
 
+then in the loop we basically find not-initialized-yet slices
+(!(scan->lo_flags & LU_OBJECT_ALLOCATED)) and call ->loo_object_init() to
+initialize the slice. that method in turn is supposed to find layer
+below and call
+appropriate method to allocate a slice below.
 
-strict cl_object {
-        struct lu_object co_lu; 
-        ..
-}
+AFAIU, the reason it's done this way is to avoid recursion and make 4K-stack
+kernels happy.
 
-struct lu_object {
-        struct lu_header lo_header;
-        ...
-}
+probably Jinshan Xiong can help with a good example from CLIO.
 
-Now let see if I'm interrupting this correctly. I noticed many
-of the zzz_object_init functions for lu_object_operations have
-a format similar to :
-
-static int zzz_object_init(const struct lu_env *env,
-                           struct lu_object *o,
-                           const struct lu_object_conf *conf)
-{
-        struct zzz_device *d = lu2zzz_dev(o->lo_dev);
-        struct lu_device  *under;
-        struct lu_object  *below;
-        int                rc = 0;
-        ENTRY;
-
-        under = &d->yyy->dd_lu_dev;
-        below = under->ld_ops->ldo_object_alloc(env, o->lo_header,
-under);
-        if (below != NULL)
-                lu_object_add(o, below);
-        else
-                rc = -ENOMEM;
-
-        return 0;
-}
-
-This is not allocation the zzz_object type that would be allocated by
-zzz_object_alloc but is instead a lower level lu_object type object.
-Would it always one one slice lower or the lowest level i.e lu_object
-itself? Then it forms a compound object with lu_object_add.
-
-That is the easy part. The part I had a hard time making out was the 
-lu_object_alloc() function in lu_object.c. You appear to allocate a
-top level lu_object with the low level ldo_object_alloc hook but its a
-freshly created object so I assume because you did add the top object to
-its own list, loh_layer, that the loop you do only contains one object
-but you loop as if alot of lu_objects will be in the loh_layers list
-with some even allocated. Where is that list being set from so the
-properly related objects are initialized? Which objects are being
-initialized? The one's higher in the slice? 
+thanks, Alex
