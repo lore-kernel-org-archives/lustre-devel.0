@@ -1,130 +1,66 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Wed, 24 Oct 2012 13:32:15 -0700
-Subject: [Lustre-devel] [lustre-devel] Language choice for Lustre tests
-In-Reply-To: <508817B3.6010008@cea.fr>
-References: <9E235E88-FAD1-44BF-A4DC-12A5801E0467@xyratex.com>	<5086F285.6000809@cea.fr>
-	<50878B5E.1090600@xyratex.com>	<CAJz=VjGhzRQZXAWYcRCRyRhLrnhv4J4d=73cijVL15vtqnLkUQ@mail.gmail.com>
-	<5087AA89.9040000@xyratex.com> <508817B3.6010008@cea.fr>
-Message-ID: <5088504F.5020306@llnl.gov>
+From: Nathan Rutman <nathan_rutman@xyratex.com>
+Date: Wed, 24 Oct 2012 15:05:04 -0700
+Subject: [Lustre-devel] Language choice for Lustre tests
+In-Reply-To: <EA3A770421F31B4BB895DD3AB9224495706F0E@fmsmsx119.amr.corp.intel.com>
+References: <EA3A770421F31B4BB895DD3AB9224495706F0E@fmsmsx119.amr.corp.intel.com>
+Message-ID: <BF3E1573-A1E3-47DF-B1B1-866EB65A0D49@xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-We can pick a completely new language so no gets their current favorite. 
-  I nominate go (http://golang.org/).  :)
 
-On 10/24/2012 09:30 AM, DEGREMONT Aurelien wrote:
-> Hello
->
-> I've developed in Perl and Python for several years in both languages. I
-> enjoyed both.
-> Regarding starting a new project, for testing framework, here is several
-> points which are the key points for choosing the right language.
->
-> - Longevity
->
-> Perl as a long history behind it, is available in all distros, that's
-> true. But Perl is there for compatibility for running projects which
-> were starting a long time ago. Nobody is starting a really big and fancy
-> project in Perl nowadays. All new hackers are only speaking of Python or
-> Ruby. You will not attract contributors with Perl. Perl 5 is very
-> compatible because no new changes is really added to this language.
-> And do not tell me that Perl 6 is coming. If Perl 6 is an option, then
-> there is no issue with Python 3 and forget your compatibility.
->
-> - Compat
->
-> Developping in Python, for a large number of environment means coding
-> for Python 2.4+. This will run nicely on Python up to 2.7
-> As long as only Python 2 only is concerned, compat for Python is fine.
-> But I agree that Python 3 is coming, and at long term, it should be
-> taken in account even if no major distro is using it right now.
-> (No Python 3 before RHEL7 or next Ubuntu LTS (14.04))
->
-> -Lustre is for system people
->
-> Lustre is developped by system guys, which mainly use vim or emacs to
-> develop in Lustre. Very few of them are using IDE or stuff like Maven.
-> Population developing Java with Maven is the exact opposite of guys
-> coding in C, for Kernel code. Moreover, JVM are awful to install
-> regarding a standard Python, Perl or Ruby interpreter in all major distro.
->
->
-> My choice would go for Python 2 with a clear path to migrate to Python 3
-> when needed (in 1 year)
->
->
-> Aur?lien
->
->
->
-> Le 24/10/2012 10:44, Roman Grigoryev a ?crit :
->> Hi Kilian,
->>
->> if you want I could try to explain why not bash from my point of view.
->>
->> I agree that bash is language which could be used for test frameworks
->> and test-framework.sh prove it. But some
->> bash feature make current framework support pretty hard. For example, I
->> don't see good way to  use  bash unit tests for test-framework.sh
->>
->> More structured requests:
->>
->> 1) Language features. Perl/Python/Java has many features which allows
->> simple write complex logic (OOP,AOP and so on)
->> 2) Pretty wide set of libraries.
->> 3) powerful and useful unit test frameworks.
->> 4) support tools, e.g. inline documentation, schema generator based on
->> code, coverage collectiors, copyright checkers
->>
->> Ubuntu is building by Intel
->> (http://build.whamcloud.com/job/lustre-b2_3/), so looks like it is
->> important platform.
->>
->> Thanks,
->>      Roman
->>> Hi Roman,
->>>
->>> On Wed, Oct 24, 2012 at 8:31 AM, Roman Grigoryev
->>> <roman_grigoryev@xyratex.com>  wrote:
->>>> RH5 has only python2.4, SL61  has python2.4 and python2.6, and looks
->>>> like
->>>> only last Fedora will have python3.
->>> I agree that inter-version compatibility could be a problem with
->>> Python. But to take this argument literally, the best way to avoid
->>> compatibility issues is to use the widest-spread and most version
->>> consistent language across supported distributions, ie. bash.
->>>
->>>> In same time, Ubuntu says that from next
->>>> release want to have only Python 3.
->>> Since only RHEL, CentOS and SLES are supported, should we really care
->>> about python versions in Ubuntu?
->>> When installing Lustre in Ubuntu, users already have to do their own
->>> packaging, so I'm not sure that having to install a specific version
->>> of a scripting language would make much of a difference.
->>>
->>>> Now Lustre tests compatibility for wide set of system is solved by
->>>> shell and
->>>> standard utilities. Perl also has great
->>>> compatibility history, many scripts could work on latest version as
->>>> 10 years
->>>> ago. It is reason why I see Perl as
->>>> good decision.
->>> So what's wrong with bash again? If it's just "too flexible, easy to
->>> abuse", I'm afraid there's little in Perl to prevent falling into the
->>> same pitfalls. :)
->>>
->>> Cheers,
->> _______________________________________________
->> Lustre-devel mailing list
->> Lustre-devel at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-devel
->
+On Oct 24, 2012, at 1:02 PM, "Gearing, Chris" <chris.gearing@intel.com> wrote:
+
+> Nathan,
+> 
+> I'm not 100% sure what you are proposing here, your LAD presentation suggested a 'tune-up' of the current test framework rather than a complete re-write. Which of the two are we discussing?
+Both...
+> 
+> Which ever you are intending to undertake I think it is vital that before decisions are made on things such as languages a clear specification/definition of the activity is created and distributed. I am in fact working with Roman to bring such a document to the working group on the tune-up, making me somewhat confused about what is proposed here.
+> 
+> Going back to your LAD presentation for the tune-up your intention is to write some libraries to better address the requirements of the framework than is possible in bash, but those libraries would be called from the existing bash tests. This illustrates that the language used to develop the framework may not be the same language used for writing the tests, in fact I'm guessing that for both a tune-up and rewrite the requirements placed on the framework writer are different than those place on the test writer and so the languages required might well be different,
+> and in fact if this is a tune-up then surely the tests must continue to be written in bash even if the libraries are in something more applicable, we do not want a single framework with mixed languages (do we?)
+
+The ultimate goal is to produce higher-quality, more robust, well-controlled, and safer tests.  To that end, I think the eventual language of the tests must change to something meeting the requirements I stated before:
+		1. easy to use
+		2. strict structure
+		3. universally available/portable
+		4. widely maintained
+		5. widely understood
+		6. fully-featured filesystem interface: posix API
+		7. fast - replace e.g. createmany with embedded function
+		8. operate remote instances
+		9. inter-version compatibility
+The requirements on the framework language are more relaxed, but for ease of development and developer sanity, I assume that the framework language should match the test language.  So I'm using the test language as the requirements driver, and to gage community preference for that test language.
+
+Based on the responses so far, it seems that there is a fairly clear preference for Python as a test language, and so I'll propose that Python should be used shorter-term to start replacing test-framework.
+
+
+> So to return to my original question could you please provide some greater depth of insight as to what you are embarking upon, and then we can make more objective input as the language required.
+> 
+> On the complete-rewrite topic, I will post the slides I sent you before LAD to the Whamcloud wiki and then provide a link to this list so that people can share our thoughts. (Network access prevents me doing this immediately)
+> 
+> Regards
+> 
+> Chris
+> ---------------------------------------------------------------------
+> Intel Corporation (UK) Limited
+> Registered No. 1134945 (England)
+> Registered Office: Pipers Way, Swindon SN3 1RJ
+> VAT No: 860 2173 47
+> 
+> This e-mail and any attachments may contain confidential material for
+> the sole use of the intended recipient(s). Any review or distribution
+> by others is strictly prohibited. If you are not the intended
+> recipient, please contact the sender and delete all copies.
+> 
 > _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.opensfs.org
-> http://lists.opensfs.org/listinfo.cgi/lustre-devel-opensfs.org
-> .
->
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20121024/65a3879f/attachment.htm>
