@@ -1,7 +1,7 @@
-From: Roman Grigoryev <roman_grigoryev@xyratex.com>
-Date: Fri, 26 Oct 2012 12:52:42 +0400
+From: Kilian Cavalotti <kilian.cavalotti.work@gmail.com>
+Date: Fri, 26 Oct 2012 13:53:26 +0200
 Subject: [Lustre-devel] Language choice for Lustre tests
-In-Reply-To: <CAJz=VjHoqmXKWe+YbHmN-SnaWECUBK39NTaVPhEA12wcg_qTUA@mail.gmail.com>
+In-Reply-To: <508A4F5A.8000207@xyratex.com>
 References: <EA3A770421F31B4BB895DD3AB9224495706F0E@fmsmsx119.amr.corp.intel.com>
 	<BF3E1573-A1E3-47DF-B1B1-866EB65A0D49@xyratex.com>
 	<EA3A770421F31B4BB895DD3AB9224495709D89@fmsmsx119.amr.corp.intel.com>
@@ -10,35 +10,57 @@ References: <EA3A770421F31B4BB895DD3AB9224495706F0E@fmsmsx119.amr.corp.intel.com
 	<34F2324A-7C99-4B59-AB9D-9BDB60912BF3@xyratex.com>
 	<20121025215243.GF2555@llnl.gov>
 	<CAJz=VjHoqmXKWe+YbHmN-SnaWECUBK39NTaVPhEA12wcg_qTUA@mail.gmail.com>
-Message-ID: <508A4F5A.8000207@xyratex.com>
+	<508A4F5A.8000207@xyratex.com>
+Message-ID: <CAJz=VjFtyj_tL9gXBZP2faXd-VAk8jeRbEmiEdL8h64ecYiY9g@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Kilian,
-On 10/26/2012 10:24 AM, Kilian Cavalotti wrote:
-> 
-> I couldn't agree more. I'm still not sure why Bash has to be gotten
-> rid of, and what the improvement would be rewriting a whole new
-> testing framework from scratch in an other language, when a working
-> one currently exist. It can certainly be improved, but I'm pretty sure
-> Bash has been chosen for a reason at some point, and I'm not convinced
-> the reasons that lead to this choice are not valid anymore.
+Hi Roman,
 
-Few samples, which comparably hard to implement on bash than on other
-languages from my point of view (especially via evolving tes-framework.sh):
+> Few samples, which comparably hard to implement on bash than on other
+> languages from my point of view (especially via evolving tes-framework.sh):
 
- - how could be implemented for current framework random and repeatable
-test execution?
+I don't really want to engage in a code battle I would definitely
+loose, and I'm also not very familiar with the current test framework
+inner workings, but here are a few points.
 
- - how could be implemented observation of remote node status while
-command executed on it and killed it by timeout?
+> - how could be implemented for current framework random and repeatable
+> test execution?
 
- - how simple add machine-readable meta information for test, e.f. tags
-and timeouts?
+Not sure what's required here, but how about storing the list of tests
+in a Bash array, generating a list of random indexes, and using it to
+loop over the test array?
 
+> - how could be implemented observation of remote node status while
+> command executed on it and killed it by timeout?
 
-Thanks,
-	Roman
+One can read a SSH output stream with the appropriate redirections and
+act upon results, stdout or stderr contents, and/or return codes. The
+read Bash builtin takes a timeout parameter, and "timeout" is also an
+often overlooked coreutils command. :)
+
+> - how simple add machine-readable meta information for test, e.f. tags
+> and timeouts?
+
+With an associative array, for instance:
+$ declare -A TESTS
+$ TESTS=( [test1]="tag1:timeout1"
+        [test2]="tag2:timeout2"
+        [test3]="tag3:timeout3" )
+$ for test in ${!TESTS[@]}; do
+        value=${TESTS[$test]}
+        tag=${value%%:*}
+        timeout=${value##*:}
+        printf "%s is tagged with %s and has a timeout of %s.\n" $test
+$tag $timeout
+done
+test1 is tagged with tag1 and has a timeout of timeout1.
+test2 is tagged with tag2 and has a timeout of timeout2.
+test3 is tagged with tag3 and has a timeout of timeout3.
+
+Cheers,
+--
+Kilian
