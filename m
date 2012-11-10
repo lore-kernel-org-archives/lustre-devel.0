@@ -1,70 +1,20 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sat, 10 Nov 2012 00:09:09 +0000
-Subject: [Lustre-devel] Seeking contributors for Lustre User Manual
-In-Reply-To: <F4644F70-E8BA-437F-87B1-9A57FADF8254@intel.com>
-Message-ID: <CCC2E817.24EA%andreas.dilger@intel.com>
+From: Nathan Rutman <nathan_rutman@xyratex.com>
+Date: Fri, 9 Nov 2012 19:12:38 -0800
+Subject: [Lustre-devel] New test framework
+Message-ID: <3418A331-F07E-4CC0-A2C1-4C8DB7592C4F@xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-In hopes of improving the quality, coverage, and currency of the Lustre
-User Manual, I'm putting out a call to the Lustre community for
-contributors to this important resource.
+For awhile now I've believed that the current built-in Lustre tests have a number of problems and limitations that are limiting their usefulness in finding Lustre bugs or providing a good proxy for Lustre quality.  We started this initially with a discussion on TWG, further refined some ideas for our LAD presentation, and have now finally articulated them in a semi-coherent manner here:
+http://goo.gl/mCtwU
 
-The user manual is especially important for new users to Lustre, but has
-fallen into some disrepair now that there is no longer a dedicated
-documentation writer for it.  As well, there are many sections of the
-manual that have become outdated over the years (such as example output,
-command descriptions, etc) that need to be refreshed.
+Chris Gearing at Intel is also heavily interested in this, and has started turning some of these thoughts into an actual spec, but before I integrate those I'd like to get a little feedback from the community on the high-level concepts.  I'd also like to hear back from others that are interested in the topic (and hopefully willing to work on it) so we can put together a special-interest list for discussion.
 
-The Lustre User Manual is also a component of Lustre that has a much
-larger pool of potential contributors than the code itself.  If you want
-to contribute to Lustre, but are not able to contribute with patches to
-the code, then this is a great opportunity to help out.  If you benefit
-from the open source development of Lustre, then contributing to the
-manual is a chance to return something back to the community.  The Lustre
-Manual is released under a Creative Commons license, so it is open to all
-of us to improve.
+I've given everyone comment rights and Chris and Roman edit rights for this doc - if anyone else wants to be an editor, let me know.
 
-
-While there is not currently a "todo" list for the areas of the manual
-that need updating, looking through open LUDOC tickets is one option:
-
-    
-http://bugs.whamcloud.com/secure/QuickSearch.jspa?searchString=LUDOC%20open
-
-There are a number of existing documentation tickets for features that are
-under development for the Lustre 2.4 release (for which we expect to be
-completed internally), but there are also some tickets from users pointing
-out errors in the document that need to be fixed.
-
-Another way to improve the manual is to simply fetch the manual and read
-some section at random that you are either interested in, or have some
-knowledge about, and see if any of the text is confusing, outdated, or
-incorrect and needs to be updated.
-
-
-The PDF and HTML versions of the current manual are available at:
-
-    http://wiki.whamcloud.com/display/PUB/Documentation
-
-The manual source is hosted in a Git/Gerrit repository in Docbook XML
-format and can be downloaded at:
-
-    git clone http://git.whamcloud.com/doc/manual lustre-manual
-
-An account in Gerrit is required to download the manual and submit patches.
-
-There are some wiki pages that describe the process and packages needed to
-modify, build, and submit patches to the manual:
-
-    
-http://wiki.whamcloud.com/display/PUB/Making+changes+to+the+Lustre+Manual
-
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Software Architect
-Intel Corporation
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20121109/aa4018da/attachment.htm>
