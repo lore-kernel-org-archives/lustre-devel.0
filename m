@@ -1,28 +1,54 @@
-From: Oleg Drokin <green@whamcloud.com>
-Date: Wed, 5 Dec 2012 08:54:40 -0500
-Subject: [Lustre-devel] Important changes to libcfs primitives usage.
-Message-ID: <6BCDB937-AB0C-44E5-8DD7-AB801A673FDC@whamcloud.com>
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Wed, 05 Dec 2012 11:05:39 -0800
+Subject: [Lustre-devel] Question of transplanting Lustre to a non-x86
+ arch
+In-Reply-To: <1a9c0f60.edf4.13b6a28a653.Coremail.eternalregion@163.com>
+References: <220a56d5.1c243.13b64b93c40.Coremail.eternalregion@163.com>
+	<8CF388B6-4A59-4B17-A71E-D31B1AFD955A@whamcloud.com>
+	<1a9c0f60.edf4.13b6a28a653.Coremail.eternalregion@163.com>
+Message-ID: <50BF9B03.5090402@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+Just FYI, we have been successfully using Lustre clients on PowerPC 
+architectures at LLNL for years, and PowerPC has a different default 
+page size and endianness than x86.
 
-   I just landed first patch of the series to reduce usage of our libcfs_ wrappers for kernel primitives like libcfs_spin_lock/unlock...
-   You can see actual change here: http://review.whamcloud.com/#change,2829
-
-   It's highly likely that plenty of patches will be affected. To make our job easier, there is a
-   build/libcfs_cleanup.sed script included, you can run it on all your .c and .h files to make necessary replacements:
-   sed -i -f build/libcfs_cleanup.sed3  `find . -name "*.h" -or -name "*.c"`
-
-   Please be also advised that there are more changes like this are coming (timeline is not very clear ATM, we might be able to wait with the rest until
-   after feature freeze) and the sed script will be updated accordingly.
-
-Bye,
-    Oleg
---
-Oleg Drokin
-Senior Software Engineer
-Whamcloud, Inc.
+On 12/05/2012 12:22 AM, Light&ColoR wrote:
+> Big thx to you Andreas!
+>
+> At 2012-12-05 11:20:17,"Andreas Dilger" <adilger@whamcloud.com> wrote:
+>
+>     On 2012-12-04, at 0:02, Light&ColoR <eternalregion@163.com
+>     <mailto:eternalregion@163.com>> wrote:
+>>     I am a newbie, I have a little bit of experience in linux kernel,
+>>     but not transplanting Lustre. How should I identify which part of
+>>     source code in Lustre is architecture specified?
+>
+>     There is not much architecture-specific code in Lustre, and the less
+>     the better...
+>
+>     Probably the easiest is to just try compiling it and seeing where
+>     the issues are. Some are in the build system -we don't have configs
+>     for server kernels. That isn't needed on the client though.
+>
+>     Big endian severs are not really supported as we have no ability to
+>     test or fix them.
+>
+>     Please keep the list updated with your progress, since this has been
+>     asked a couple of times here recently.
+>
+>     Cheers, Andreas
+>
+>
+>
+>
+>
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>
