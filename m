@@ -1,37 +1,28 @@
-From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
-Date: Mon, 17 Dec 2012 12:21:44 -0500
+From: Oleg Drokin <green@whamcloud.com>
+Date: Mon, 17 Dec 2012 12:30:36 -0500
 Subject: [Lustre-devel] [wc-discuss] Important changes to libcfs
 	primitives usage.
-In-Reply-To: <AE8E737235CD0640B291384BFC2D8A354A3A7348@MX10A.corp.emc.com>
-Message-ID: <201212171721.qBHHLiEn023769@hedwig.cmf.nrl.navy.mil>
+In-Reply-To: <50CF51D4.2090101@tacc.utexas.edu>
+References: <6BCDB937-AB0C-44E5-8DD7-AB801A673FDC@whamcloud.com>
+	<50CF51D4.2090101@tacc.utexas.edu>
+Message-ID: <550C3ACC-1D29-451A-945C-F394214B095C@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->Current the libcfs cleanup is mainly done by replacing kinds of         
->libcfs calls with direct kernel primitives, we can implement the        
->portable layer on other OS with the same name as Linux.  I think        
->the real concern is that on other OS there is possible some kernel      
->primitives have the same name a Linux kernel but with different         
->behavior/parameters, that will cause either compiling broken or running 
->crashing etc.  I don't have the full list of the above intersecting     
->case, but it should be very rare right? We can build a separate patch(  
->which should be small) for those intersecting cases for other OS, and I 
->guess that patch need to be maintained separately.                      
+Hello!
 
-Like I said, I'm fine with that; at least in the MacOS X case I don't
-recall any symbol names which overlapped.
+On Dec 17, 2012, at 12:09 PM, John Hammond wrote:
+> I have been wondering about wrappers and typedefs not affected by this change, for example cfs_get_cpu(), cfs_atomic_read() and cfs_proc_dir_entry_t.  In new code and patches should we use the cfs names or their Linux equivalents, get_cpu(), atomic_read(), and struct proc_dir_entry?
 
->And lustre CLIO is structured that all OS-dependent glue is supposed
->to be handled in the topmost layer (VVP for linux client). For Mac or
->Windows's native client, it is possibly just implement a new thin top
->layer if interests really raised on those platform? This could reduce
->the possibility of the above intersecting cases.
+Those will be converted in later patches.
+As such it's better not to submit cfs_ style names already, though no super big harm if not.
 
-Well, it's only a "thin" layer if your VM system looks exactly like Linux;
-otherwise it ain't so thin.  Yeah, I did some of that, but it wasn't
-easy.
-
---Ken
+Bye,
+    Oleg
+--
+Oleg Drokin
+Senior Software Engineer
+Whamcloud, Inc.
