@@ -1,39 +1,37 @@
-From: John Hammond <jhammond@tacc.utexas.edu>
-Date: Mon, 17 Dec 2012 11:09:40 -0600
+From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
+Date: Mon, 17 Dec 2012 12:21:44 -0500
 Subject: [Lustre-devel] [wc-discuss] Important changes to libcfs
 	primitives usage.
-In-Reply-To: <6BCDB937-AB0C-44E5-8DD7-AB801A673FDC@whamcloud.com>
-References: <6BCDB937-AB0C-44E5-8DD7-AB801A673FDC@whamcloud.com>
-Message-ID: <50CF51D4.2090101@tacc.utexas.edu>
+In-Reply-To: <AE8E737235CD0640B291384BFC2D8A354A3A7348@MX10A.corp.emc.com>
+Message-ID: <201212171721.qBHHLiEn023769@hedwig.cmf.nrl.navy.mil>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 12/05/2012 07:54 AM, Oleg Drokin wrote:
->     I just landed first patch of the series to reduce usage of our libcfs_ wrappers for kernel primitives like libcfs_spin_lock/unlock...
->     You can see actual change here: http://review.whamcloud.com/#change,2829
->
->     It's highly likely that plenty of patches will be affected. To make our job easier, there is a
->     build/libcfs_cleanup.sed script included, you can run it on all your .c and .h files to make necessary replacements:
->     sed -i -f build/libcfs_cleanup.sed3  `find . -name "*.h" -or -name "*.c"`
->
->     Please be also advised that there are more changes like this are coming (timeline is not very clear ATM, we might be able to wait with the rest until
->     after feature freeze) and the sed script will be updated accordingly.
+>Current the libcfs cleanup is mainly done by replacing kinds of         
+>libcfs calls with direct kernel primitives, we can implement the        
+>portable layer on other OS with the same name as Linux.  I think        
+>the real concern is that on other OS there is possible some kernel      
+>primitives have the same name a Linux kernel but with different         
+>behavior/parameters, that will cause either compiling broken or running 
+>crashing etc.  I don't have the full list of the above intersecting     
+>case, but it should be very rare right? We can build a separate patch(  
+>which should be small) for those intersecting cases for other OS, and I 
+>guess that patch need to be maintained separately.                      
 
-I have been wondering about wrappers and typedefs not affected by this 
-change, for example cfs_get_cpu(), cfs_atomic_read() and 
-cfs_proc_dir_entry_t.  In new code and patches should we use the cfs 
-names or their Linux equivalents, get_cpu(), atomic_read(), and struct 
-proc_dir_entry?
+Like I said, I'm fine with that; at least in the MacOS X case I don't
+recall any symbol names which overlapped.
 
-Thanks,
+>And lustre CLIO is structured that all OS-dependent glue is supposed
+>to be handled in the topmost layer (VVP for linux client). For Mac or
+>Windows's native client, it is possibly just implement a new thin top
+>layer if interests really raised on those platform? This could reduce
+>the possibility of the above intersecting cases.
 
-John
+Well, it's only a "thin" layer if your VM system looks exactly like Linux;
+otherwise it ain't so thin.  Yeah, I did some of that, but it wasn't
+easy.
 
--- 
-John L. Hammond, Ph.D.
-TACC, The University of Texas at Austin
-jhammond at tacc.utexas.edu
-(512) 471-9304
+--Ken
