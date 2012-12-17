@@ -1,57 +1,41 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Mon, 17 Dec 2012 08:42:09 +0000
+From: Zhuravlev, Alexey <alexey.zhuravlev@intel.com>
+Date: Mon, 17 Dec 2012 07:04:36 +0000
 Subject: [Lustre-devel] [wc-discuss] Important changes to libcfs
  primitives usage.
-In-Reply-To: <201212170544.qBH5iOuM019618@hedwig.cmf.nrl.navy.mil>
-References: <201212170544.qBH5iOuM019618@hedwig.cmf.nrl.navy.mil>
-Message-ID: <395EB593-8E66-4567-B072-D8642F22E435@intel.com>
+In-Reply-To: <AE8E737235CD0640B291384BFC2D8A354A3A7348@MX10A.corp.emc.com>
+References: <2BD6B3FE-788D-4B27-8759-FFCB2EC612D6@intel.com>
+	<201212170544.qBH5iOuM019618@hedwig.cmf.nrl.navy.mil>
+	<AE8E737235CD0640B291384BFC2D8A354A3A7348@MX10A.corp.emc.com>
+Message-ID: <1C588F06-FEFD-4F95-9713-AADA786EAE24@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2012-12-16, at 22:44, Ken Hornstein <kenh@cmf.nrl.navy.mil> wrote:
 
->> While I would be thrilled if there was a native MacOS and Windows client
->> for Lustre, realistically there is nothing today.  The MacOS client is
->> not maintained, and the Windows client is stick inside Oracle.
->> 
->> In contrast, only the Linux client is on use today, so it makes sense to
->> focus effort on this instead of spending time on maintaining portability
->> code that is not useful to us.
->> 
->> If the other clients were usable, perhaps a different decision would be
->> made.
+On Dec 17, 2012, at 10:52 AM, "Liu, Xuezhao" <Xuezhao.Liu@emc.com> wrote:
+
+> Hi,
 > 
-> So, let me speak to that a bit since I was the one who did the MacOS X port
-> which has been langunishing.
-> 
-> Andreas is completely right that 90% of libcfs library for Linux at least
-> is adding to kernel internal interfaces a "cfs_" prefix.  So that part at
-> least isn't going to change the issues with porting Lustre to other operating
-> systems; you have to pretty much emulate a whole pile of Linux interfaces.
-> So that doesn't really worry me in terms of future portability.
-> 
-> What _does_ concern me is that to be portable Lustre needs some code in the
-> generic side of things.  Example: locks in MacOS X are done via allocated
-> memory, so you need to release that memory when you're done.  Lustre never
-> does this (because it's not needed under Linux since locks use statically
-> allocated memory).  So is it going to be possible in the future to put
-> generic code to aid portabiliy in Lustre?  I don't know.
+> Current the libcfs cleanup is mainly done by replacing kinds of libcfs calls with direct kernel primitives, we can implement the portable layer on other OS with the same name as Linux.
+> I think the real concern is that on other OS there is possible some kernel primitives have the same name a Linux kernel but with different behavior/parameters, that will cause either compiling broken or running crashing etc.
+> I don't have the full list of the above intersecting case, but it should be very rare right? We can build a separate patch( which should be small) for those intersecting cases for other OS, and I guess that patch need to be maintained separately.
 
-Yes, we'd discussed this in the past, but the patches for lock cleanup never got added into the core Lustre code. We will still be the maintainers of the Lustre code in the kernel, so if there are innocuous no-op calls that can be put into the code (e.g. spin_lock_free()) or something similar I think that is fine. 
+originally libcfs_ prefix was introduce to cope with name collisions in Solaris. I'm not sure how this can be solved with a separate small patch.
 
-The root of the problem, for which there was no easy solution (wrappers or not) is that there is no easy way to test for this under Linux, so without either static code analysis tools (preferably run with the prepare-commit-msg git hook), or rigorous testing on MacOS, it would always be a game of catch up for these cleanups. 
+to me the both goals look hard to achieve, so I'm fine with any solution ;)
 
-> Personally, I think putting Lustre in the Linux kernel is a terrible
-> idea, but since I was obviously in the minority on that one I figured
-> there was no reason to really say anything about it.
+thanks, Alex
 
-I'd like to understand your reasons for thinking it is a bad idea. There are definite plusses and minuses to being in the kernel, but if there is some overwhelming badness for being in the kernel is like to know about it. 
 
-Cheers, Andreas
+--------------------------------------------------------------------
+Closed Joint Stock Company Intel A/O
+Registered legal address: Krylatsky Hills Business Park, 
+17 Krylatskaya Str., Bldg 4, Moscow 121614, 
+Russian Federation
 
-> Also, it's hard
-> for me to voice objections about possible MacOS X portability issues
-> when I can't dedicate any resources to cleaning up the MacOS X port.
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
