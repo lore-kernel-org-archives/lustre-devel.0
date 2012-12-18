@@ -1,36 +1,58 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Mon, 17 Dec 2012 11:34:05 -0700
+From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
+Date: Mon, 17 Dec 2012 23:12:29 -0500
 Subject: [Lustre-devel] [wc-discuss] Important changes to libcfs
 	primitives usage.
-In-Reply-To: <50CF51D4.2090101@tacc.utexas.edu>
-References: <6BCDB937-AB0C-44E5-8DD7-AB801A673FDC@whamcloud.com>
-	<50CF51D4.2090101@tacc.utexas.edu>
-Message-ID: <C4DC6E07-A098-4778-A98B-A3FE9FFCBA87@whamcloud.com>
+In-Reply-To: <395EB593-8E66-4567-B072-D8642F22E435@intel.com>
+Message-ID: <201212180412.qBI4CTe9028934@hedwig.cmf.nrl.navy.mil>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2012-12-17, at 10:09 AM, John Hammond wrote:
-> On 12/05/2012 07:54 AM, Oleg Drokin wrote:
->>    I just landed first patch of the series to reduce usage of our libcfs_ wrappers for kernel primitives like libcfs_spin_lock/unlock...
->>    You can see actual change here: http://review.whamcloud.com/#change,2829
->> 
->>    It's highly likely that plenty of patches will be affected. To make our job easier, there is a
->>    build/libcfs_cleanup.sed script included, you can run it on all your .c and .h files to make necessary replacements:
->>    sed -i -f build/libcfs_cleanup.sed3  `find . -name "*.h" -or -name "*.c"`
->> 
->>    Please be also advised that there are more changes like this are coming (timeline is not very clear ATM, we might be able to wait with the rest until
->>    after feature freeze) and the sed script will be updated accordingly.
-> 
-> I have been wondering about wrappers and typedefs not affected by this change, for example cfs_get_cpu(), cfs_atomic_read() and cfs_proc_dir_entry_t.  In new code and patches should we use the cfs names or their Linux equivalents, get_cpu(), atomic_read(), and struct proc_dir_entry?
+>Yes, we'd discussed this in the past, but the patches for lock cleanup
+>never got added into the core Lustre code. We will still be the
+>maintainers of the Lustre code in the kernel, so if there are innocuous
+>no-op calls that can be put into the code (e.g. spin_lock_free()) or
+>something similar I think that is fine.
 
-Ideally, new patches would use the Linux primitives.  However, if they are in client-side code that is compiled for liblustre, then the liblustre builds would fail until the wrappers are renamed to their Linux equivalents (i.e. removing "cfs_" prefix).
+Well as long as that's not a problem, I don't think that will be an issue
+then.
 
-For server-side code and/or llite it should be fine to use the native Linux functions.
+>The root of the problem, for which there was no easy solution (wrappers
+>or not) is that there is no easy way to test for this under Linux, so
+>without either static code analysis tools (preferably run with the
+>prepare-commit-msg git hook), or rigorous testing on MacOS, it would
+>always be a game of catch up for these cleanups.
 
-Cheers, Andreas
---
-Andreas Dilger                       Whamcloud, Inc.
-Principal Lustre Engineer            http://www.whamcloud.com/
+I understand that, and I'm personally fine with that.  From my memory,
+the issue is not that a lot of lock structures were being created all
+of the time and then deallocated (or I was able to find all of those
+cases); it was more that a bunch of locks were leaked when Lustre shut
+down.  I understand it's going to be a constant catch-up.
+
+>I'd like to understand your reasons for thinking it is a bad idea. There
+>are definite plusses and minuses to being in the kernel, but if there is
+>some overwhelming badness for being in the kernel is like to know about
+>it.
+
+Well, fundamentally it just seems to me that you're tying your product
+to the whims of a group of people who, quite frankly, don't care about
+your product (except in a very abstract sense).  Giving away a huge amount
+of control of your product looks like a bad idea to me.
+
+But that's sort of vague; let me talk about specifics.  There's a HUGE
+difference in practice between "feature X appears in Linux kernel
+version Y" and "My RedHat release Z has a particular feature".  That's
+where life gets complicated.  Many times we're stuck on a particular
+kernel for various complicated reasons, yet we need to upgrade Lustre
+... or vice versa.  It's kind of like Infiniband in the Linux kernel ...
+at best, it doesn't hurt us, but it's always the "wrong" version (or so
+my Infiniband guys tell me).  We never end up using the Infiniband in
+the kernel, and sometimes (depending on the vagarities of the distro)
+that screws us up hard; part of that is because for a long time one
+particular distro never would distribute the development symbols for
+the Infiniband in the kernel that matched what the kernel was running.
+That won't be an issue with Lustre, but you get the idea.
+
+--Ken
