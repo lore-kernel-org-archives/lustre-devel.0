@@ -1,59 +1,44 @@
-From: Alexey Lyahkov <alexey_lyashkov@xyratex.com>
-Date: Wed, 19 Dec 2012 22:55:05 +0400
-Subject: [Lustre-devel] [wc-discuss] Important changes to libcfs
-	primitives usage.
-In-Reply-To: <AE8E737235CD0640B291384BFC2D8A354A3A763C@MX10A.corp.emc.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Wed, 19 Dec 2012 21:36:18 +0000
+Subject: [Lustre-devel] [wc-discuss] Important changes to
+	libcfs	primitives usage.
+In-Reply-To: <80C99DE6-76FF-41A8-A565-83541E8AA612@xyratex.com>
 References: <6BCDB937-AB0C-44E5-8DD7-AB801A673FDC@whamcloud.com>
 	<50CF51D4.2090101@tacc.utexas.edu>
-	<C4DC6E07-A098-4778-A98B-A3FE9FFCBA87@whamcloud.com>
+	<C4DC6E07-A098-4778-A98B-A3FE9FFCBA87@whamcloud.com>,
 	<80C99DE6-76FF-41A8-A565-83541E8AA612@xyratex.com>
-	<AE8E737235CD0640B291384BFC2D8A354A3A763C@MX10A.corp.emc.com>
-Message-ID: <2C0F5F80-4C93-44AE-BF73-C35EB32D3711@xyratex.com>
+Message-ID: <6816DF10-6081-40BE-8E73-37DDB9EFADD8@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-If you don't make a research before create a patches - why you create it?
-why we need to kill current code? just for put in kernel mainline?
-That is very bad idea before you will create a plan - how stable branches will supported.
-because stable branch need to support older kernel and i don't like a OFED way - because that is way to introduce a strange errors.
-because isn't all functions may be simulated via old API, as example a deadlock with SLES10 kernel and external OFED due bug in OFED backports.
-
-
-On Dec 19, 2012, at 19:06, Liu, Xuezhao wrote:
-
-> "Nice idea, what about conflicts with names between linux and freebsd?
-> both have a atomic but with different arguments atomic_set, atomic_add as example."
+On 2012-12-19, at 5:27, "Alexey Lyahkov" <alexey_lyashkov@xyratex.com> wrote:
+> Nice idea, what about conflicts with names between linux and freebsd?
+> both have a atomic but with different arguments
+> atomic_set, atomic_add as example.
 > 
-> For atomic_xxx in freebsd, we may refer the ofed solution. It defines atomic operations in "sys/ofed/include/asm/atomic.h".
-> For ofed, there are also some other header files to provide similar semantics of linux primitives.
-> 
-> "did you research before make that patch to be sure no conflicts exist?"
-> 
-> I made those initial cleanup patches, I did worry the possible conflicts as you said.
-> But I think the hard-to-resolve confliction cases should be very rare, we can deal with it case by case(the possible spin_lock_free for example as previous email).
+> did you research before make that patch to be sure no conflicts exist?
 
+Yes, it is possible that such conflicts exist. However, it is impossible to know of such conflicts if there is not any code in the Lustre tree that breaks, and no way to test it.
 
+I'm aware that you have been working on a FreeBSD FUSE port at times. Have you ever released the patches somewhere? There never was any code in the Lustre tree for it and I've never heard of any users. Virtually (?) all of the Lustre users are on Linux, and making it easier for Linux users to use Lustre is most important.
 
+I don't want to make it impossible to port to FreeBSD, but if there is a workaround as Xuezhao has proposed, and there are no real users of this code, then the benefits of broader Lustre acceptance outweigh the inconvenience to one or two people developing the FreeBSD FUSE port.
 
-> 
-> Thanks,
-> Xuezhao
-> 
+Cheers, Andreas
+
 > On Dec 17, 2012, at 22:34, Andreas Dilger wrote:
 > 
 >> On 2012-12-17, at 10:09 AM, John Hammond wrote:
 >>> On 12/05/2012 07:54 AM, Oleg Drokin wrote:
 >>>>  I just landed first patch of the series to reduce usage of our libcfs_ wrappers for kernel primitives like libcfs_spin_lock/unlock...
->>>>  You can see actual change here: 
->>>> http://review.whamcloud.com/#change,2829
+>>>>  You can see actual change here: http://review.whamcloud.com/#change,2829
 >>>> 
 >>>>  It's highly likely that plenty of patches will be affected. To make our job easier, there is a
 >>>>  build/libcfs_cleanup.sed script included, you can run it on all your .c and .h files to make necessary replacements:
->>>>  sed -i -f build/libcfs_cleanup.sed3  `find . -name "*.h" -or -name 
->>>> "*.c"`
+>>>>  sed -i -f build/libcfs_cleanup.sed3  `find . -name "*.h" -or -name "*.c"`
 >>>> 
 >>>>  Please be also advised that there are more changes like this are coming (timeline is not very clear ATM, we might be able to wait with the rest until
 >>>>  after feature freeze) and the sed script will be updated accordingly.
@@ -82,8 +67,3 @@ On Dec 19, 2012, at 19:06, Liu, Xuezhao wrote:
 > Lustre-devel mailing list
 > Lustre-devel at lists.lustre.org
 > http://lists.lustre.org/mailman/listinfo/lustre-devel
-> 
-
-----------------------------------------------
-Alexey Lyahkov
-alexey_lyashkov at xyratex.com
