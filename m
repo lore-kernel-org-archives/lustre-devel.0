@@ -1,73 +1,47 @@
-From: Prakash Surya <surya1@llnl.gov>
-Date: Tue, 18 Dec 2012 16:12:55 -0800
+From: Ken Hornstein <kenh@cmf.nrl.navy.mil>
+Date: Tue, 18 Dec 2012 21:30:29 -0500
 Subject: [Lustre-devel] [wc-discuss] Important changes to libcfs
- primitives usage.
+	primitives usage.
 In-Reply-To: <1355868747.22854.20.camel@brian-laptop>
-References: <201212180412.qBI4CTe9028934@hedwig.cmf.nrl.navy.mil>
-	<1355868747.22854.20.camel@brian-laptop>
-Message-ID: <20121219001255.GB5622@llnl.gov>
+Message-ID: <201212190230.qBJ2UTCl005883@hedwig.cmf.nrl.navy.mil>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Dec 18, 2012 at 05:12:27PM -0500, Brian J. Murrell wrote:
-> On Mon, 2012-12-17 at 23:12 -0500, Ken Hornstein wrote:
-> > There's a HUGE
-> > difference in practice between "feature X appears in Linux kernel
-> > version Y" and "My RedHat release Z has a particular feature".  That's
-> > where life gets complicated.  Many times we're stuck on a particular
-> > kernel for various complicated reasons, yet we need to upgrade Lustre
-> > ... or vice versa.  It's kind of like Infiniband in the Linux kernel ...
-> > at best, it doesn't hurt us, but it's always the "wrong" version (or so
-> > my Infiniband guys tell me).  We never end up using the Infiniband in
-> > the kernel, and sometimes (depending on the vagarities of the distro)
-> > that screws us up hard; part of that is because for a long time one
-> > particular distro never would distribute the development symbols for
-> > the Infiniband in the kernel that matched what the kernel was running.
-> > That won't be an issue with Lustre, but you get the idea.
-> 
-> So let me just confirm I understand your issue here.  For example, the
-> Linux kernel is at 3.12.1 (version numbers are purely hypothetical and
-> far into the future) which has Lustre 2.6.3 in it.  But RHEL 9's kernel
-> is only 3.8.1"ish" and has Lustre 2.4.2 (because that's what was in the
-> upstream Linux 3.8.1 kernel) in it.
-> 
-> The complaint is that the Lustre (2.4.2) that's in the RHEL 9 kernel
-> that you are using is too old for some reason?
-> 
-> So what's the remedy?  You can either (a) download the stand-alone
-> Lustre module source for the version of Lustre you need and build it
-> against the RHEL 9 kernel you want to use (assuming they are near enough
-> to be compatible -- which is the same situation that exists today) or
+See, now, this is EXACTLY why I didn't want to say anything.  Sigh.
 
-That is a big assumption, and is most likely false. Currently autoconf
-maintains the compatibility of Lustre with the different kernel versions.
-If the client is in tree, are we really going to maintain the same level
-of autoconf "foo" to be compatible with older kernels? And if not, we
-would have to maintain a second package, outside of the kernel, which did
-have this autoconf compatibility layer.
+>The complaint is that the Lustre (2.4.2) that's in the RHEL 9 kernel
+>that you are using is too old for some reason?
 
-I don't think option (a) is the same as what we have now.
+Right.
 
--- 
-Cheers, Prakash
+>So what's the remedy?  You can either (a) download the stand-alone
+>Lustre module source for the version of Lustre you need and build it
+>against the RHEL 9 kernel you want to use (assuming they are near enough
+>to be compatible -- which is the same situation that exists today) or
+>(b) you download the entire upstream kernel that has the version of
+>Lustre that you want to use and build that.
 
-> (b) you download the entire upstream kernel that has the version of
-> Lustre that you want to use and build that.
-> 
-> It seems to me that (a) is what everyone already has to do all of the
-> time today anyway (assuming the binary RPM that we ship for the given
-> vendor kernel is not new enough) and (b) just isn't even possible so
-> that's gravy.
-> 
-> There might be something obvious that I'm missing, but I'm failing to
-> see how having Lustre (client) in the kernel is any worse than the
-> status quo (basically scenario (a) above) and indeed should provide
-> Lustre compatibility to the current stable Linux sooner than we can
-> typically turn it around.  
-> 
-> Cheers,
-> b.
-> 
+So (b) isn't an option for us, ever.  And I think that Prakash has already
+explained why what we have today isn't exactly (a).  Generally we
+have to run one particular version of Lustre with maybe one version
+skew.
+
+>There might be something obvious that I'm missing, but I'm failing to
+>see how having Lustre (client) in the kernel is any worse than the
+>status quo (basically scenario (a) above) and indeed should provide
+>Lustre compatibility to the current stable Linux sooner than we can
+>typically turn it around.  
+
+Well, turn it around: Lustre in the Linux kernel doesn't GAIN me
+anything.  So like I said, at best it's a no-op; I can't imagine a
+situation where we'll use it.  I'm personally extremely skeptical that
+having it in the kernel will bring Lustre compatibility to stable Linux
+sooner than usual.  Of course, I'm just speaking from my view; obviously
+from the developer side of things it can look very different.
+
+And that's my last email on this topic.
+
+--Ken
