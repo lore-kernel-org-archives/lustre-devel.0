@@ -1,70 +1,73 @@
 From: Prakash Surya <surya1@llnl.gov>
-Date: Tue, 18 Dec 2012 12:29:09 -0800
+Date: Tue, 18 Dec 2012 16:12:55 -0800
 Subject: [Lustre-devel] [wc-discuss] Important changes to libcfs
  primitives usage.
-In-Reply-To: <201212180412.qBI4CTe9028934@hedwig.cmf.nrl.navy.mil>
-References: <395EB593-8E66-4567-B072-D8642F22E435@intel.com>
-	<201212180412.qBI4CTe9028934@hedwig.cmf.nrl.navy.mil>
-Message-ID: <20121218202909.GE23755@llnl.gov>
+In-Reply-To: <1355868747.22854.20.camel@brian-laptop>
+References: <201212180412.qBI4CTe9028934@hedwig.cmf.nrl.navy.mil>
+	<1355868747.22854.20.camel@brian-laptop>
+Message-ID: <20121219001255.GB5622@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Dec 17, 2012 at 11:12:29PM -0500, Ken Hornstein wrote:
-> >Yes, we'd discussed this in the past, but the patches for lock cleanup
-> >never got added into the core Lustre code. We will still be the
-> >maintainers of the Lustre code in the kernel, so if there are innocuous
-> >no-op calls that can be put into the code (e.g. spin_lock_free()) or
-> >something similar I think that is fine.
+On Tue, Dec 18, 2012 at 05:12:27PM -0500, Brian J. Murrell wrote:
+> On Mon, 2012-12-17 at 23:12 -0500, Ken Hornstein wrote:
+> > There's a HUGE
+> > difference in practice between "feature X appears in Linux kernel
+> > version Y" and "My RedHat release Z has a particular feature".  That's
+> > where life gets complicated.  Many times we're stuck on a particular
+> > kernel for various complicated reasons, yet we need to upgrade Lustre
+> > ... or vice versa.  It's kind of like Infiniband in the Linux kernel ...
+> > at best, it doesn't hurt us, but it's always the "wrong" version (or so
+> > my Infiniband guys tell me).  We never end up using the Infiniband in
+> > the kernel, and sometimes (depending on the vagarities of the distro)
+> > that screws us up hard; part of that is because for a long time one
+> > particular distro never would distribute the development symbols for
+> > the Infiniband in the kernel that matched what the kernel was running.
+> > That won't be an issue with Lustre, but you get the idea.
 > 
-> Well as long as that's not a problem, I don't think that will be an issue
-> then.
+> So let me just confirm I understand your issue here.  For example, the
+> Linux kernel is at 3.12.1 (version numbers are purely hypothetical and
+> far into the future) which has Lustre 2.6.3 in it.  But RHEL 9's kernel
+> is only 3.8.1"ish" and has Lustre 2.4.2 (because that's what was in the
+> upstream Linux 3.8.1 kernel) in it.
 > 
-> >The root of the problem, for which there was no easy solution (wrappers
-> >or not) is that there is no easy way to test for this under Linux, so
-> >without either static code analysis tools (preferably run with the
-> >prepare-commit-msg git hook), or rigorous testing on MacOS, it would
-> >always be a game of catch up for these cleanups.
+> The complaint is that the Lustre (2.4.2) that's in the RHEL 9 kernel
+> that you are using is too old for some reason?
 > 
-> I understand that, and I'm personally fine with that.  From my memory,
-> the issue is not that a lot of lock structures were being created all
-> of the time and then deallocated (or I was able to find all of those
-> cases); it was more that a bunch of locks were leaked when Lustre shut
-> down.  I understand it's going to be a constant catch-up.
-> 
-> >I'd like to understand your reasons for thinking it is a bad idea. There
-> >are definite plusses and minuses to being in the kernel, but if there is
-> >some overwhelming badness for being in the kernel is like to know about
-> >it.
-> 
-> Well, fundamentally it just seems to me that you're tying your product
-> to the whims of a group of people who, quite frankly, don't care about
-> your product (except in a very abstract sense).  Giving away a huge amount
-> of control of your product looks like a bad idea to me.
-> 
-> But that's sort of vague; let me talk about specifics.  There's a HUGE
-> difference in practice between "feature X appears in Linux kernel
-> version Y" and "My RedHat release Z has a particular feature".  That's
-> where life gets complicated.  Many times we're stuck on a particular
-> kernel for various complicated reasons, yet we need to upgrade Lustre
-> ... or vice versa.  It's kind of like Infiniband in the Linux kernel ...
+> So what's the remedy?  You can either (a) download the stand-alone
+> Lustre module source for the version of Lustre you need and build it
+> against the RHEL 9 kernel you want to use (assuming they are near enough
+> to be compatible -- which is the same situation that exists today) or
 
-Perhaps I'm being naive, but at some point it would be nice to have a
-rock solid "stable" version of a lustre client and protocol. Giving up
-some control over the ability to upgrade the client could be perceived
-as a good thing.
+That is a big assumption, and is most likely false. Currently autoconf
+maintains the compatibility of Lustre with the different kernel versions.
+If the client is in tree, are we really going to maintain the same level
+of autoconf "foo" to be compatible with older kernels? And if not, we
+would have to maintain a second package, outside of the kernel, which did
+have this autoconf compatibility layer.
+
+I don't think option (a) is the same as what we have now.
 
 -- 
 Cheers, Prakash
 
-> at best, it doesn't hurt us, but it's always the "wrong" version (or so
-> my Infiniband guys tell me).  We never end up using the Infiniband in
-> the kernel, and sometimes (depending on the vagarities of the distro)
-> that screws us up hard; part of that is because for a long time one
-> particular distro never would distribute the development symbols for
-> the Infiniband in the kernel that matched what the kernel was running.
-> That won't be an issue with Lustre, but you get the idea.
+> (b) you download the entire upstream kernel that has the version of
+> Lustre that you want to use and build that.
 > 
-> --Ken
+> It seems to me that (a) is what everyone already has to do all of the
+> time today anyway (assuming the binary RPM that we ship for the given
+> vendor kernel is not new enough) and (b) just isn't even possible so
+> that's gravy.
+> 
+> There might be something obvious that I'm missing, but I'm failing to
+> see how having Lustre (client) in the kernel is any worse than the
+> status quo (basically scenario (a) above) and indeed should provide
+> Lustre compatibility to the current stable Linux sooner than we can
+> typically turn it around.  
+> 
+> Cheers,
+> b.
+> 
