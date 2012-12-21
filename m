@@ -1,168 +1,124 @@
-From: Peng, Tao <tao.peng@emc.com>
-Date: Fri, 21 Dec 2012 04:44:32 +0000
-Subject: [Lustre-devel] [wc-discuss] Important changes to libcfs
- primitives usage.
-In-Reply-To: <AC5F4785-D28C-486A-9952-6AD54215A7B5@xyratex.com>
+From: Liu, Xuezhao <Xuezhao.Liu@emc.com>
+Date: Fri, 21 Dec 2012 02:47:54 -0500
+Subject: [Lustre-devel] OFLAGS change.
+In-Reply-To: <2A3EBFA8-6539-4378-B146-C0EC72CE6CF2@xyratex.com>
 References: <D01411ED-E27A-4245-8614-86A69F168F95@xyratex.com>
 	<CCF78FC7.BD6F%andreas.dilger@intel.com>
 	<1882637210201641A747464075FFC6490715A2@MX101CL02.corp.emc.com>
-	<AC5F4785-D28C-486A-9952-6AD54215A7B5@xyratex.com>
-Message-ID: <1882637210201641A747464075FFC64907227D@MX101CL02.corp.emc.com>
+	<8D7891D2-223E-4D47-99A3-6A40EE583439@xyratex.com>
+	<AE8E737235CD0640B291384BFC2D8A354A3A7744@MX10A.corp.emc.com>
+	<2A3EBFA8-6539-4378-B146-C0EC72CE6CF2@xyratex.com>
+Message-ID: <AE8E737235CD0640B291384BFC2D8A354A3A7807@MX10A.corp.emc.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Hi Alex,
+
+Thanks for looking into this issue.
+
+Three related commits:
+1) intent.open.file->f_flags is filled at kernel 2.6.34(482928d59db668b8d82a48717f78986d8cea72e9). 
+2) OPEN_FMODE is just the next commit(5300990c0370e804e49d9a59d928c5d53fb73487) followed the above.
+3) open_to_namei_flags was changed at kernel 3.1 (8a5e929dd2e05ab4d3d89f58c5e8fca596af8f3a).
+
+The purpose is we want to check 3) to make lustre take the lookup intent flag same as before.
+We resolved it by putting a LINUX_VERSION_CODE check, it has potential defect when vendor kernel(RHEL/SUSE) backport 3) to an older version.
+
+You proposed method that check 2), bypass open_to_namei_flags' result "intent.open.flags" and take "intent.open.file->f_flags" instead.
+It can work and has an assumption that if vendor kernel backport 2) then must also backport 1), it is possibly not a problem.
+I think the method of taking "intent.open.file->f_flags" and calculating the lookup intent flag is not so legitimate, as VFS wants FS use the passed in "intent.open.flags". Some inline handling possibly will add by VFS to open_to_namei_flags although current it only removes the special open flag 3.
+And OPEN_FMODE also possibly be changed/renamed/removed in future.
+But I don't oppose you to make another patch for that. 
+
+This issue is only an example to say that autoconf is not always so powerful to keep compatibility, get into mainline can help us release such pain. Be mainline possibly is not so terrible as current the plan is only for client-side. But this is discussed in another thread.  
+
+Thanks,
+Xuezhao
+-----Original Message-----
+From: Alexey Lyahkov [mailto:alexey_lyashkov at xyratex.com] 
+Sent: 2012?12?21? 0:18
+To: Liu, Xuezhao
+Cc: Peng, Tao; hpdd-discuss at lists.01.org; WC-Discuss; <lustre-devel@lists.lustre.org>
+Subject: Re: [Lustre-devel] OFLAGS change.
+
+I have checked on last kernel from kernel.org, so may be for other kernels that is may wrong..
+comments is appreciated. 
+
+some assumption
+- intent.open.file->f_flags filled before call a vfs code for kernels RHEL6 and up (checked for -131 kernel is first), so ANY kernels with OPEN_FMODE macro will have a f_flags filled correctly (checked by __dentry_open for all available kernels).
+- for kernels without OPEN_FMODE flag we may trust a flags from intent - because they already have a conversion to FMODE for lover bits.
+
+so we need -
+1) check if OPEN_FMODE exist, use a to conversion via OPEN_FMODE(intent.open.file->f_flags) | ~O_ACCMODE;
+2) if that macro don't exist we trust oit->flags as that don't have a FMODE -> O_ flags conversion.
+
+PS.
+that is need to pass additional parameter to ll_convert_intent nd->intent.open.file.
+may be need better check - when f_flag filled before call a vfs function..
+
+
+
+
+
+On Dec 20, 2012, at 16:08, Liu, Xuezhao wrote:
+
+> "if i correctly understand - that change have a dependence to the OPEN_FMODE macro - not a kernel version.
+> so for any kernels have a OPEN_FMODE - we need to use that function, otherwise use flags directly."
+> 
+> OPEN_FMODE was introduced at kernel 2.6.34 (5300990c0370e804e49d9a59d928c5d53fb73487).
+but exists in RHEL6 kernel - 2.6.32-343 (last 6.4 beta) - patchset for that kernel don't available on RHN, so not able to see which patch introduce it.
+
+> open_to_namei_flags was changed at kernel 3.1 (8a5e929dd2e05ab4d3d89f58c5e8fca596af8f3a).
+> So we cannot only depend on OPEN_FMODE for that.
+> 
+if you look to tree - changes was applied to code what to restore a O_ flags from FMODE_ part of open flags.
+FS (like xfs) want to use a FMODE continue to use a OPEN_FMODE and FMODE_ macroses 
+
+
+> Thanks,
+> Xuezhao
 > -----Original Message-----
-> From: Alexey Lyahkov [mailto:alexey_lyashkov at xyratex.com]
-> Sent: Thursday, December 20, 2012 6:45 PM
+> From: lustre-devel-bounces at lists.lustre.org 
+> [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Alexey 
+> Lyahkov
+> Sent: 2012?12?20? 19:07
 > To: Peng, Tao
-> Cc: Dilger, Andreas; Prakash Surya; hpdd-discuss at lists.01.org; WC-Discuss; <lustre-
-> devel at lists.lustre.org>
-> Subject: Re: [Lustre-devel] [wc-discuss] Important changes to libcfs primitives usage.
+> Cc: hpdd-discuss at lists.01.org; WC-Discuss; 
+> <lustre-devel@lists.lustre.org>
+> Subject: [Lustre-devel] OFLAGS change.
 > 
 > 
 > On Dec 20, 2012, at 06:32, Peng, Tao wrote:
-> >>
-> >>
-> >>> reason to use autoconf macroses - we can't trust a RHEL/SuSe kernel
-> >>> version/
-> > Well, there are situations that autoconf cannot handle properly, such as the open_flag change by
-> upstream commit (8a5e929dd2e05ab4d3d89f58c5e8fca596af8f3a).
-> i don't understand how it is affect to lustre, as that is internal change for VFS, but if you provide
-> more details - i try to help you. But in different thread please.
-> 
-> hm.. some minutes latter - you talk about 'static inline int ll_namei_to_lookup_intent_flag(int flag)'
-> change? can you point lustre commit in next time.
-> 
-> > The change is inline so we cannot tell it without grepping the source file (fs/namei.c) which is
-> likely unavailable when users build Lustre client from source. We currently solved it by putting a
-> LINUX_VERSION_CODE check there but as you see it is not trustworthy when vendors backport patches.
-> >
-> But what you will do if similar change will be backported by RH? they will have outdated client in own
-> tree and 'stable' client in external repository. that is need to be resolved in portable way anyway.
-> 
-If Lustre is in kernel, RH will need to backport relative changes to Lustre as part of the process of backporting kernel commit. So we won't face such problems. It only remains a problem if Lustre is maintained separately out of RH kernel tree as is today.
-
+>>> 
+>>> 
+>>>> reason to use autoconf macroses - we can't trust a RHEL/SuSe kernel 
+>>>> version/
+>> Well, there are situations that autoconf cannot handle properly, such as the open_flag change by upstream commit (8a5e929dd2e05ab4d3d89f58c5e8fca596af8f3a). The change is inline so we cannot tell it without grepping the source file (fs/namei.c) which is likely unavailable when users build Lustre client from source. We currently solved it by putting a LINUX_VERSION_CODE check there but as you see it is not trustworthy when vendors backport patches.
+>> 
+>> And IMO, the right way to solve such problems is to put Lustre in upstream/stable kernels and let vendors ship it so that they match in the first place.
 > 
 > 
-> > And IMO, the right way to solve such problems is to put Lustre in upstream/stable kernels and let
-> vendors ship it so that they match in the first place.
-> >
-> Vendor will freeze lustre source version and never update it, 
-> but RHEL have ~5-7 years to support - so
-> you will be need support that clients in own servers and maintain stable lustre client for that kernel.
-> So none difference with current situation except a two additional versions to support
-> 1) from stock vendor kernel
-> 2) from stock vanila kernel.
+> static inline int ll_namei_to_lookup_intent_flag(int flag) { #if 
+> LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0) <------>flag = (flag & 
+> ~O_ACCMODE) | OPEN_FMODE(flag); #endif <------>return flag; }
 > 
-It is the same case for any in-tree kernel modules. Besides, vendor kernels are supported by vendors as well. So I don't think it is such a burden for Lustre. Other file systems all handle it pretty well.
-
-> and that is solve very few problems with taking a much more resources for testing.
-> 
-> Put lustre code into kernel mainline good to have support a last kernel and for development without
-> stable tree. But i don't like a support for very older clients in server code - RHEL4 isn't canceled
-> to support (as i know) that is lustre 1.4 time. RHEL5 that is 1.6 time.
-> but today we have talk about dropping lustre 1.8 clients support...
-> 
-It is already answered by Andreas. We can reach a more stable point for Lustre client and network protocol. http://lists.lustre.org/pipermail/lustre-devel/2012-December/004187.html
-
-While I don't want to option about dropping 1.8 clients support, I think it is better to have a more stable support matrix than today. And if you are really serious about long term support as enterprise storage providers, most NAS vendors still support nfsv2 today. Forcing everyone to upgrade doesn't seem practical to me...
-
-Cheers,
-Tao
-
-> > Cheers,
-> > Tao
-> >>
-> >> Sure, we will need this for the out-of-tree Lustre code, as we do today,
-> >> but not
-> >> inside the kernel.  The benefit is that the in-tree code will be the
-> >> "right"
-> >> code for that particular kernel version, and no macros will be needed.
-> >>
-> >> Cheers, Andreas
-> >>
-> >>> On Dec 19, 2012, at 04:12, Prakash Surya wrote:
-> >>>>>> ]unning.
-> >>>>>> That won't be an issue with Lustre, but you get the idea.
-> >>>>>
-> >>>>> So let me just confirm I understand your issue here.  For example, the
-> >>>>> Linux kernel is at 3.12.1 (version numbers are purely hypothetical and
-> >>>>> far into the future) which has Lustre 2.6.3 in it.  But RHEL 9's kernel
-> >>>>> is only 3.8.1"ish" and has Lustre 2.4.2 (because that's what was in the
-> >>>>> upstream Linux 3.8.1 kernel) in it.
-> >>>>>
-> >>>>> The complaint is that the Lustre (2.4.2) that's in the RHEL 9 kernel
-> >>>>> that you are using is too old for some reason?
-> >>>>>
-> >>>>> So what's the remedy?  You can either (a) download the stand-alone
-> >>>>> Lustre module source for the version of Lustre you need and build it
-> >>>>> against the RHEL 9 kernel you want to use (assuming they are near
-> >>>>> enough
-> >>>>> to be compatible -- which is the same situation that exists today) or
-> >>>>
-> >>>> That is a big assumption, and is most likely false. Currently autoconf
-> >>>> maintains the compatibility of Lustre with the different kernel
-> >>>> versions.
-> >>>> If the client is in tree, are we really going to maintain the same level
-> >>>> of autoconf "foo" to be compatible with older kernels? And if not, we
-> >>>> would have to maintain a second package, outside of the kernel, which
-> >>>> did
-> >>>> have this autoconf compatibility layer.
-> >>>>
-> >>>> I don't think option (a) is the same as what we have now.
-> >>>>
-> >>>> --
-> >>>> Cheers, Prakash
-> >>>>
-> >>>>> (b) you download the entire upstream kernel that has the version of
-> >>>>> Lustre that you want to use and build that.
-> >>>>>
-> >>>>> It seems to me that (a) is what everyone already has to do all of the
-> >>>>> time today anyway (assuming the binary RPM that we ship for the given
-> >>>>> vendor kernel is not new enough) and (b) just isn't even possible so
-> >>>>> that's gravy.
-> >>>>>
-> >>>>> There might be something obvious that I'm missing, but I'm failing to
-> >>>>> see how having Lustre (client) in the kernel is any worse than the
-> >>>>> status quo (basically scenario (a) above) and indeed should provide
-> >>>>> Lustre compatibility to the current stable Linux sooner than we can
-> >>>>> typically turn it around.
-> >>>>>
-> >>>>> Cheers,
-> >>>>> b.
-> >>>>>
-> >>>
-> >>> ----------------------------------------------
-> >>> Alexey Lyahkov
-> >>> alexey_lyashkov at xyratex.com
-> >>>
-> >>>
-> >>> _______________________________________________
-> >>> Lustre-devel mailing list
-> >>> Lustre-devel at lists.lustre.org
-> >>> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> >>>
-> >>
-> >>
-> >> Cheers, Andreas
-> >> --
-> >> Andreas Dilger
-> >>
-> >> Lustre Software Architect
-> >> Intel High Performance Data Division
-> >>
-> >>
-> >> _______________________________________________
-> >> Lustre-devel mailing list
-> >> Lustre-devel at lists.lustre.org
-> >> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> >
+> if i correctly understand - that change have a dependence to the OPEN_FMODE macro - not a kernel version.
+> so for any kernels have a OPEN_FMODE - we need to use that function, otherwise use flags directly.
 > 
 > ----------------------------------------------
 > Alexey Lyahkov
 > alexey_lyashkov at xyratex.com
 > 
 > 
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+> 
+
+----------------------------------------------
+Alexey Lyahkov
+alexey_lyashkov at xyratex.com
