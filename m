@@ -1,40 +1,63 @@
-From: Liu, Xuezhao <Xuezhao.Liu@emc.com>
-Date: Fri, 21 Dec 2012 08:44:08 -0500
-Subject: [Lustre-devel] OFLAGS change.
-In-Reply-To: <0746CF84-9748-4E86-9C45-088DFDACA40D@xyratex.com>
-References: <D01411ED-E27A-4245-8614-86A69F168F95@xyratex.com>
-	<CCF78FC7.BD6F%andreas.dilger@intel.com>
-	<1882637210201641A747464075FFC6490715A2@MX101CL02.corp.emc.com>
-	<8D7891D2-223E-4D47-99A3-6A40EE583439@xyratex.com>
-	<AE8E737235CD0640B291384BFC2D8A354A3A7744@MX10A.corp.emc.com>
-	<2A3EBFA8-6539-4378-B146-C0EC72CE6CF2@xyratex.com>
-	<AE8E737235CD0640B291384BFC2D8A354A3A7807@MX10A.corp.emc.com>
-	<0746CF84-9748-4E86-9C45-088DFDACA40D@xyratex.com>
-Message-ID: <AE8E737235CD0640B291384BFC2D8A354A3A787D@MX10A.corp.emc.com>
+From: Norman Morse <Norman.Morse@OpenSFS.org>
+Date: Tue, 12 Feb 2013 18:05:52 -0600
+Subject: [Lustre-devel] LUG2013
+Message-ID: <CAO87L16E8yuitdeKHPxRdAW4P1CCnZOLc2Uah+BJvk43-aBYsA@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I agree about that is change is good example - but focusing on vanila kernel development should be don't break something else, a specially add's problems with supporting a RHEL, SuSe.
+Sun, sand and Lustre! To celebrate one of Lustre?s biggest years ? multiple
+new Lustre installations and now clocking at over 1TB/sec ? LUG '13 will
+take place in San Diego this year at the Omni Hotel in the Downtown Gaslamp
+Quarter. Sessions will be held from April 16-18.
 
-[Xuezhao] Sure, we must ensure the added code will not break any supporting or to-be-supported vendor kernels, I will make a fixing patch if the break really happens.
 
->>
-        # the implementation of cancel_dirty_page in OFED 1.4.1's SLES10 SP2
-        # backport is broken, so ignore it
-        if test -f $OFED_BACKPORT_PATH/linux/mm.h &&
-           test "$(sed -ne '/^static inline void cancel_dirty_page(struct page \*page, unsigned int account_size)$/,/^}$/p' $OFED_BACKPORT_PATH/linux/mm.h | md5sum)" = "c518cb32d6394760c5bc
->>
 
-that is from way you suggest.
-that backport produce a live lock in lustre due impossible to have correct emulation for a cancel_dirty_pages in OFED.
-and sometimes be easy create a implementation for old API via new when rewrite a lustre code to use new API and emulation for older kernels.
+We hope you?ll join us! Registration is now open. Our call for
+presentations is online and there are many sponsorship opportunities (see
+details below).
 
-[Xuezhao] I may don't know the full story of the above case, but I understand your point. 
-          OFED emulates new API based on old API on old kernel, and emulates linux API based on other OS' primitives on other OS. 
-          But I think that in the above case it does not matter whether or not have the "cfs_" prefix, even if OFED has "ofd_cancel_dirty_page" it also cannot avoid the above.
+ Be sure to register by March 15, 2013, to take advantage of our early bird
+registration discount rate of $525. Registration closes on Friday March 22,
+2013.  We?ve got a slick, easy interface this year that includes the full
+agenda, hotel information and a lot more:
+https://www.gaveledge.com/SFS1301/home
 
-Thanks,          
-Xuezhao
+Second, LUG is always about a real exchange of ideas. The LUG program
+committee would like to invite members of the Lustre community to submit
+presentation abstracts for inclusion in this year's agenda. If you?ve
+considered it before, but put it off, we want to hear from you. We?ve made
+it easy; the first step simply requires one-page abstract of your proposed
+talk. We?re looking for deep-dives, new information, and controversial
+topics in all areas of Lustre development, application, or best-practices.
+The deadline to submit presentation abstracts is March 4, 2013.
+Please submit your proposal through Easy Chair here:
+https://www.easychair.org/conferences/?conf=lug2013
+
+Finally, this is ultimately a community effort. Lustre is open source to
+its core. If your organization is interested in sponsoring LUG, we've got
+multiple ways to commit, one that will be perfect for your budget. If
+you?re into Lustre, there?s no better visibility than being at LUG:
+https://www.gaveledge.com/SFS1301/sponsorships
+
+
+
+A special thanks to our sponsors already on-board: Intel and Xyratex.  We
+welcome additional sponsors and we appreciate your support.
+
+
+
+We're really looking forward to an interesting and exciting program for
+this
+year's meeting in San Diego!
+
+If you have questions or problems, feel free to mail Stephen Simms
+(ssimms at iu.edu), LUG 2013 program chair.
+
+Sincerely,
+The LUG '13 Organizing Committee
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20130212/cbdf3065/attachment.htm>
