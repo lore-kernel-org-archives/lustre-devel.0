@@ -1,7 +1,7 @@
 From: Thomas Stibor <t.stibor@gsi.de>
-Date: Tue, 16 Apr 2013 11:15:38 +0200
+Date: Wed, 17 Apr 2013 08:46:15 +0200
 Subject: [Lustre-devel] UID/GID access control in Lustre
-Message-ID: <516D16BA.3010606@gsi.de>
+Message-ID: <516E4537.4000806@gsi.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,8 +16,7 @@ is the following: Here at GSI we have currently a reserved uid/gid space
 which partner institutes are using to access our exported Lustre mounts.
 However, we currently have no mechanism to control (guaranty) that the
 reserved uid/gid space are used. We can control the access on IP based
-firewall level
-but not on a UID/GID level.
+firewall level but not on a UID/GID level.
 
 The kernel module reads input via /proc/lugac (Lustre User Group Access
 Control), e.g.
