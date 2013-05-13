@@ -1,139 +1,34 @@
-From: Joshua Walgenbach <jjw@iu.edu>
-Date: Wed, 17 Apr 2013 17:22:43 -0400
-Subject: [Lustre-devel] UID/GID access control in Lustre
-In-Reply-To: <516D16BA.3010606@gsi.de>
-References: <516D16BA.3010606@gsi.de>
-Message-ID: <516F12A3.4080200@iu.edu>
+From: James Vanns <james.vanns@framestore.com>
+Date: Mon, 13 May 2013 14:19:38 +0100 (BST)
+Subject: [Lustre-devel] Export over NFS sets rsize to 1MB?
+In-Reply-To: <1212911910.19338063.1368451002112.JavaMail.root@framestore.com>
+Message-ID: <1975652007.19339235.1368451178426.JavaMail.root@framestore.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Hello dev list. Apologies for a post to perhaps the wrong group but I'm having a
+bit of difficulty locating any document or wiki describing how and/or where the
+preferred read and write block size for NFS exports of a Lustre filesystem are
+set to 1MB?
 
+Basically we have two Lustre filesystems exported over NFSv3. Our lustre block size
+is 4k and the max r/w size is 1MB. Without any special rsize/wsize options set for
+the export the default one suggested to clients (MOUNT->FSINFO RPC) as the preferred
+size is set to 1MB. How does Lustre figure this out? Other non-Lustre exports are generally
+much less; 4, 8, 16 or 32 kilobytes.
 
-Hi Thomas,
+Any hints would be appreciated. Documentation or code paths welcome as are annotated /proc locations.
 
-We've been working on something similar. I think Aur?lien sent you a
-pointer to the contract with OpenSFS, which should have all the
-documentation for our project. We've had a basic uidmapping scheme
-running in production since 2008, and we are working to get an
-expanded implementation into master.
+Thanks,
 
-I'm happy to share anything we've done with you if it will help.
-Additionally, a colleague of mine committed some Kerberos patches to
-master that may address the broken-ness in 2.3. I'll pass your mail on
-to him and see if he has any insights. I pushed our initial set of
-patches up to bugzilla.lustre.org, and its available at
-https://projectlava.xyratex.com/show_bug.cgi?id=13479.
+Jim
 
-http://wiki.opensfs.org/Contract_SFS-DEV-002
-http://www.opensfs.org/wp-content/uploads/2011/11/LUG2012.pdf
-http://racinfo.indiana.edu/pubs/enabling-lustre-wan-production-use-teragrid-lightweight-uid-mapping-scheme
+PS. This is Lustre 1.8.8 on Linux 2.6.32
 
-Let me know if there is anything I can do to help you out. I'm happy
-to do it on the list or one on one in email.
-
-- -Josh
-
-On 4/16/13 5:15 AM, Thomas Stibor wrote:
-> Hello list members,
-> 
-> I started to develop a kernel module which hooks into Lustre 2.3
-> for controlling data access based on nid and uid/gid. The
-> background is the following: Here at GSI we have currently a
-> reserved uid/gid space which partner institutes are using to access
-> our exported Lustre mounts. However, we currently have no mechanism
-> to control (guaranty) that the reserved uid/gid space are used. We
-> can control the access on IP based firewall level but not on a
-> UID/GID level.
-> 
-> The kernel module reads input via /proc/lugac (Lustre User Group
-> Access Control), e.g.
-> 
-> echo "10.10.[1-10].[1-128]@tcp5 [100-200] [100-200]" > /proc/lugac
-> 
-> and stores this information within a c-struct which is stored as a
-> node in a linked-list. The kernel module exports the function:
-> 
-> int allow_access_nugid(const char *const nid, const uid_t uid,
-> const gid_t gid)
-> 
-> which tells whether access for a certain nid, uid and gid is
-> granted. I did some "integration experiments" after studying the
-> Lustre 2.3 code and tracing the function calls with lctl
-> debug_daemon and sysctl -w lnet.debug=+trace sysctl -w
-> lnet.debug=+info sysctl -w lnet.debug=+inode sysctl -w
-> lnet.debug=+super sysctl -w lnet.debug=+ext2 ....
-> 
-> and integrated the function allow_access_nugid(...) in 
-> lustre/mdt/mdt_lib.c inside
-> 
-> static int old_init_ucred(struct mdt_thread_info *info, struct
-> mdt_body *body) { struct md_ucred *uc = mdt_ucred(info); struct
-> mdt_device  *mdt = info->mti_mdt; struct md_identity *identity =
-> NULL;
-> 
-> ENTRY;
-> 
-> uc->mu_valid = UCRED_INVALID; uc->mu_o_uid = uc->mu_uid =
-> body->uid; uc->mu_o_gid = uc->mu_gid = body->gid; uc->mu_o_fsuid =
-> uc->mu_fsuid = body->fsuid; uc->mu_o_fsgid = uc->mu_fsgid =
-> body->fsgid; uc->mu_suppgids[0] = body->suppgid; uc->mu_suppgids[1]
-> = -1; uc->mu_ginfo = NULL; if
-> (!is_identity_get_disabled(mdt->mdt_identity_cache)) { identity =
-> mdt_identity_get(mdt->mdt_identity_cache, uc->mu_fsuid); if
-> (IS_ERR(identity)) { if (unlikely(PTR_ERR(identity) == -EREMCHG))
-> { identity = NULL; } else { CDEBUG(D_SEC, "Deny access without 
-> identity: " "uid %u\n", uc->mu_fsuid); RETURN(-EACCES); } } } /*
-> MODIFICATION: UID/GID access control verification. */ if 
-> (allow_access_nugid(libcfs_nid2str(mdt_info_req(info)->rq_peer.nid),
->
-> 
-body->uid, body->gid)) {
-> CDEBUG(D_INFO, "Deny access for %s, uid: %d, gid: %d due to missing
-> entry in access control list\n",
-> 
-> libcfs_nid2str(mdt_info_req(info)->rq_peer.nid), body->uid,
-> body->gid); RETURN(-EACCES); } ... }
-> 
-> At a first view it seems to work. A user where nid/uid/gid is not
-> a member of the linked list gets e.g.
-> 
-> user1 at 10.10.1.1:uid:5:gid:5>ls /lustre ls: cannot access /lustre:
-> Permission denied
-> 
-> Another user which has the proper entry in the linked list gets
-> 
-> user2 at 10.10.1.1:uid:105:gid:105>ls /lustre data.raw
-> 
-> However, repeating the same steps with user1 again, he/she can also
-> see the file data.raw.
-> 
-> Can anybody tell me in which Lustre function such a
-> allow_access_nugid() could be properly placed? I also started to
-> study lustre/mdd/mdd_permission.c, however, also with no
-> "integration success".
-> 
-> The long term goal is to setup a Kerberized Lustre and to use the 
-> /etc/idmap.conf functionality , however, currently the Kerberos
-> support for Lustre > 2.3 is broken and I have started to work on
-> some patches for fixing this problem.
-> 
-> Best wishes, Thomas
-> 
-> _______________________________________________ Lustre-devel
-> mailing list Lustre-devel at lists.lustre.org 
-> http://lists.lustre.org/mailman/listinfo/lustre-devel
-> 
------BEGIN PGP SIGNATURE-----
-Version: GnuPG/MacGPG2 v2.0.18 (Darwin)
-Comment: GPGTools - http://gpgtools.org
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iEYEARECAAYFAlFvEqMACgkQcqyJPuRTYp8qbwCeNph9efdKJrl5RuZMJB41MXGg
-P+8An1sVh2HPA7XYB8mWl8n6a4p0R9es
-=51fa
------END PGP SIGNATURE-----
+-- 
+Jim Vanns
+Senior Software Developer
+Framestore
