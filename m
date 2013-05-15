@@ -1,13 +1,30 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 14 May 2013 22:06:08 +0000
+From: James Vanns <james.vanns@framestore.com>
+Date: Wed, 15 May 2013 10:23:17 +0100 (BST)
 Subject: [Lustre-devel] Export over NFS sets rsize to 1MB?
-In-Reply-To: <1182911409.19669249.1368544019962.JavaMail.root@framestore.com>
-Message-ID: <CDB80F65.32491%andreas.dilger@intel.com>
+In-Reply-To: <CDB80F65.32491%andreas.dilger@intel.com>
+Message-ID: <2121037782.19846759.1368609797839.JavaMail.root@framestore.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Thanks for the help Andreas - I too asked the NFS developers (on the list)
+and they came back with /proc/fs/nfsd/max_block_size and nfsd_get_default_max_blksize()
+in fs/nfsd/nfssvc.c.
+
+For what it's worth, this is kernel 2.6.32 and Lustre 1.8.8.
+
+Reckon I've got what I asked for now ;)
+
+Jim
+
+----- Original Message -----
+From: "Andreas Dilger" <andreas.dilger@intel.com>
+To: "james vanns" <james.vanns@framestore.com>
+Cc: lustre-devel at lists.lustre.org, linux-nfs at vger.kernel.org
+Sent: Tuesday, 14 May, 2013 11:06:08 PM
+Subject: Re: [Lustre-devel] Export over NFS sets rsize to 1MB?
 
 On 2013/14/05 9:07 AM, "James Vanns" <james.vanns@framestore.com> wrote:
 >> On 2013/13/05 7:19 AM, "James Vanns" <james.vanns@framestore.com>
@@ -98,3 +115,14 @@ Andreas Dilger
 
 Lustre Software Architect
 Intel High Performance Data Division
+
+
+--
+To unsubscribe from this list: send the line "unsubscribe linux-nfs" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Jim Vanns
+Senior Software Developer
+Framestore
