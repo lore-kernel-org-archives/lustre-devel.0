@@ -1,21 +1,17 @@
-From: White, Cliff <cliff.white@intel.com>
-Date: Thu, 20 Jun 2013 21:15:25 +0000
+From: Jones, Peter A <peter.a.jones@intel.com>
+Date: Thu, 20 Jun 2013 21:19:51 +0000
 Subject: [Lustre-devel] Lustre 2.4 Release
 In-Reply-To: <CALuPYL1WgGcY=8uikyCsa_Tp5GNqqj0+EysJ3r8baMGLsCL9iA@mail.gmail.com>
-Message-ID: <CDE8BE97.5D32%cliff.white@intel.com>
+Message-ID: <CDE8BFF5.2B7B0%peter.a.jones@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Just the usual upgrade process as per the manual.
 
-
-From: Indivar Nair <indivar.nair at techterra.in<mailto:indivar.nair@techterra.in>>
-Date: Thursday, June 20, 2013 10:38 AM
-To: "Dilger, Andreas" <andreas.dilger at intel.com<mailto:andreas.dilger@intel.com>>
-Cc: "lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>" <lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>>
-Subject: Re: [Lustre-devel] Lustre 2.4 Release
+On 6/20/13 10:38 AM, "Indivar Nair" <indivar.nair at techterra.in<mailto:indivar.nair@techterra.in>> wrote:
 
 Ok. The diagram seems to suggest that 2.4.0 would be first maintenance release.
 
@@ -24,12 +20,6 @@ Anyways...
 So I will be able to make an inplace upgrade from 2.4.0 to 2.4.1 when it is released.
 i.e. no re-installation of OS or reformatting OSTs when I move to 2.4.1.
 Just upgrading the Lustre Kernel and Lustre Packages to 2.4.1 should do. right?
-
-Yes, that is the meaning of a maintenance release. Any upgrade from Lustre X.Y.N to X.Y.N+1  will not require re-formatting.
-However, we track vendor kernel bug fixes in our kernels, so a maintenance release will require a kernel change, but should not impact the OS install otherwise.
-Cliffw
-
-
 
 Regards,
 
