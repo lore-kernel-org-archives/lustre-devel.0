@@ -1,44 +1,66 @@
-From: Jones, Peter A <peter.a.jones@intel.com>
-Date: Thu, 20 Jun 2013 12:29:21 +0000
+From: White, Cliff <cliff.white@intel.com>
+Date: Thu, 20 Jun 2013 21:15:25 +0000
 Subject: [Lustre-devel] Lustre 2.4 Release
-In-Reply-To: <CALuPYL0Vf8JOOhOq9RRx_ErP+5qN5_FmgmC6w409DNKqnqSSRw@mail.gmail.com>
-Message-ID: <CDE84282.2B648%peter.a.jones@intel.com>
+In-Reply-To: <CALuPYL1WgGcY=8uikyCsa_Tp5GNqqj0+EysJ3r8baMGLsCL9iA@mail.gmail.com>
+Message-ID: <CDE8BE97.5D32%cliff.white@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Indivar
 
-You are not the first to get confused by the semantics in the terminology.
 
-A maintenance release stream is a series of maintenance releases that follows a given feature release.
+From: Indivar Nair <indivar.nair at techterra.in<mailto:indivar.nair@techterra.in>>
+Date: Thursday, June 20, 2013 10:38 AM
+To: "Dilger, Andreas" <andreas.dilger at intel.com<mailto:andreas.dilger@intel.com>>
+Cc: "lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>" <lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>>
+Subject: Re: [Lustre-devel] Lustre 2.4 Release
 
-So, 2.4.0 is a feature release, 2.4.x is set to become our next maintenance release stream, and 2.4.1 (due out in Q3) will be the first maintenance release in that stream.
+Ok. The diagram seems to suggest that 2.4.0 would be first maintenance release.
 
-The visual on the roadmap showing the link between the feature releases and the maintenance releases aims to illustrate this.
+Anyways...
 
-Does this make sense? Do you have any suggestions how we could clarify this?
+So I will be able to make an inplace upgrade from 2.4.0 to 2.4.1 when it is released.
+i.e. no re-installation of OS or reformatting OSTs when I move to 2.4.1.
+Just upgrading the Lustre Kernel and Lustre Packages to 2.4.1 should do. right?
 
-Peter
+Yes, that is the meaning of a maintenance release. Any upgrade from Lustre X.Y.N to X.Y.N+1  will not require re-formatting.
+However, we track vendor kernel bug fixes in our kernels, so a maintenance release will require a kernel change, but should not impact the OS install otherwise.
+Cliffw
 
-On 6/20/13 5:21 AM, "Indivar Nair" <indivar.nair at techterra.in<mailto:indivar.nair@techterra.in>> wrote:
 
-Hi ...,
-
-Lustre 2.4 was supposed to be released as a "Maintenance Release' -
-
-  https://wiki.hpdd.intel.com/display/PUB/Community+Lustre+Roadmap
-
-so how come it has been released as a 'Feature Release'?
-
-  https://wiki.hpdd.intel.com/display/PUB/Lustre+Releases
-
-Will it be moved to 'Maintenance Release' later?
 
 Regards,
 
 
-
 Indivar Nair
+
+
+
+On Thu, Jun 20, 2013 at 9:54 PM, Dilger, Andreas <andreas.dilger at intel.com<mailto:andreas.dilger@intel.com>> wrote:
+On 2013/20/06 6:21 AM, "Indivar Nair" <indivar.nair at techterra.in<mailto:indivar.nair@techterra.in>> wrote:
+
+>Hi ...,
+>
+>
+>Lustre 2.4 was supposed to be released as a "Maintenance Release' -
+>
+>  https://wiki.hpdd.intel.com/display/PUB/Community+Lustre+Roadmap
+>
+>so how come it has been released as a 'Feature Release'?
+>
+>  https://wiki.hpdd.intel.com/display/PUB/Lustre+Releases
+>
+>
+>Will it be moved to 'Maintenance Release' later?
+
+The 2.4.0 release is one of the 6-month feature releases.
+2.4.1 will be the first maintenance release on that branch.
+
+Cheers, Andreas
+--
+Andreas Dilger
+
+Lustre Software Architect
+Intel High Performance Data Division
