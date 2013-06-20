@@ -1,81 +1,30 @@
-From: Ron Croonenberg <ronc@lanl.gov>
-Date: Tue, 21 May 2013 13:36:40 -0600
-Subject: [Lustre-devel] lustre kernel configuration
-In-Reply-To: <CDC13365.C781%spitzcor@cray.com>
-References: <CDC13365.C781%spitzcor@cray.com>
-Message-ID: <519BCCC8.70506@lanl.gov>
+From: Indivar Nair <indivar.nair@techterra.in>
+Date: Thu, 20 Jun 2013 17:51:35 +0530
+Subject: [Lustre-devel] Lustre 2.4 Release
+Message-ID: <CALuPYL0Vf8JOOhOq9RRx_ErP+5qN5_FmgmC6w409DNKqnqSSRw@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-ok, cool thanks..   that probably will work better. (there were still a 
-bunch of config options that were 'NEW' but a lot less
+Hi ...,
 
-Ron
+Lustre 2.4 was supposed to be released as a "Maintenance Release' -
 
-On 05/21/2013 01:24 PM, Cory Spitz wrote:
-> Kernel configs are kept in the tree.  You can find master's set at
-> http://git.whamcloud.com/?p=fs/lustre-release.git;a=tree;f=lustre/kernel_pa
-> tches/kernel_configs;h=88ca1484fa6597a7d786f3f09f03612f6d039db2;hb=HEAD
->
-> -Cory
->
-> On 5/21/13 2:04 PM, "Ron Croonenberg" <ronc@lanl.gov> wrote:
->
->> Hi Chris,
->>
->> thanks for the link.  What I was looking for was the Linux kernel config
->> but couldn't find any documentation foor (would have been nice to find
->> the ones that are actuallu used in the binaries).
->>
->> Basically what I did is take my RHEL6 config and configured the kernel
->> wit and compiling that seemed to work. (I did compile the rpms, just a
->> regular make. That seemed to work for 1.8.7.
->> I haven't installed anything yet., so we'll see on that part.
->>
->> thanks,
->>
->> Ron
->>
->> On 05/21/2013 12:16 PM, Christopher J. Morrone wrote:
->>> If you use the zfs osd for your servers, there is no need to modify your
->>> Linux kernel.  That is probably a much easier way to get started with
->>> Lustre development.
->>>
->>> If you are set on using the ldiskfs osd, Intel has some instructions on
->>> their wiki here:
->>>
->>>      https://wiki.hpdd.intel.com/display/PUB/Building+Lustre+from+Source
->>>
->>> Chris
->>>
->>> On 05/21/2013 07:11 AM, Ron Croonenberg wrote:
->>>> hello,
->>>>
->>>> I am looking into some Lustre development but want to build everything
->>>> from scratch. I looked around to see how the linux kernel is configured
->>>> but don't seem to find anything.
->>>>
->>>> any ideas?
->>>>
->>>> thanks,
->>>>
->>>> Ron
->>>> _______________________________________________
->>>> Lustre-devel mailing list
->>>> Lustre-devel at lists.lustre.org
->>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>>>
->>>
->>> _______________________________________________
->>> Lustre-devel mailing list
->>> Lustre-devel at lists.lustre.org
->>> http://lists.lustre.org/mailman/listinfo/lustre-devel
->>>
->> _______________________________________________
->> Lustre-devel mailing list
->> Lustre-devel at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-devel
->
+  https://wiki.hpdd.intel.com/display/PUB/Community+Lustre+Roadmap
+
+so how come it has been released as a 'Feature Release'?
+
+  https://wiki.hpdd.intel.com/display/PUB/Lustre+Releases
+
+Will it be moved to 'Maintenance Release' later?
+
+Regards,
+
+
+
+Indivar Nair
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20130620/58093b16/attachment.htm>
