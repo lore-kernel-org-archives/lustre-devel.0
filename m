@@ -1,30 +1,36 @@
-From: Indivar Nair <indivar.nair@techterra.in>
-Date: Thu, 20 Jun 2013 17:51:35 +0530
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Thu, 20 Jun 2013 16:24:00 +0000
 Subject: [Lustre-devel] Lustre 2.4 Release
-Message-ID: <CALuPYL0Vf8JOOhOq9RRx_ErP+5qN5_FmgmC6w409DNKqnqSSRw@mail.gmail.com>
+In-Reply-To: <CALuPYL0Vf8JOOhOq9RRx_ErP+5qN5_FmgmC6w409DNKqnqSSRw@mail.gmail.com>
+Message-ID: <CDE88885.3F140%andreas.dilger@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi ...,
+On 2013/20/06 6:21 AM, "Indivar Nair" <indivar.nair@techterra.in> wrote:
 
-Lustre 2.4 was supposed to be released as a "Maintenance Release' -
+>Hi ...,
+>
+>
+>Lustre 2.4 was supposed to be released as a "Maintenance Release' -
+>  
+>  https://wiki.hpdd.intel.com/display/PUB/Community+Lustre+Roadmap
+>
+>so how come it has been released as a 'Feature Release'?
+>
+>  https://wiki.hpdd.intel.com/display/PUB/Lustre+Releases
+>
+>
+>Will it be moved to 'Maintenance Release' later?
 
-  https://wiki.hpdd.intel.com/display/PUB/Community+Lustre+Roadmap
+The 2.4.0 release is one of the 6-month feature releases.
+2.4.1 will be the first maintenance release on that branch.
 
-so how come it has been released as a 'Feature Release'?
+Cheers, Andreas
+-- 
+Andreas Dilger
 
-  https://wiki.hpdd.intel.com/display/PUB/Lustre+Releases
-
-Will it be moved to 'Maintenance Release' later?
-
-Regards,
-
-
-
-Indivar Nair
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20130620/58093b16/attachment.htm>
+Lustre Software Architect
+Intel High Performance Data Division
