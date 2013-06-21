@@ -1,25 +1,26 @@
-From: Jones, Peter A <peter.a.jones@intel.com>
-Date: Thu, 20 Jun 2013 21:19:51 +0000
+From: Indivar Nair <indivar.nair@techterra.in>
+Date: Fri, 21 Jun 2013 22:40:42 +0530
 Subject: [Lustre-devel] Lustre 2.4 Release
-In-Reply-To: <CALuPYL1WgGcY=8uikyCsa_Tp5GNqqj0+EysJ3r8baMGLsCL9iA@mail.gmail.com>
-Message-ID: <CDE8BFF5.2B7B0%peter.a.jones@intel.com>
+In-Reply-To: <CDE84282.2B648%peter.a.jones@intel.com>
+References: <CALuPYL0Vf8JOOhOq9RRx_ErP+5qN5_FmgmC6w409DNKqnqSSRw@mail.gmail.com>
+	<CDE84282.2B648%peter.a.jones@intel.com>
+Message-ID: <CALuPYL0HmJg1+ymnXhfaa0qf+bEXhf0mVRweptPkXBGNkPpzmw@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Just the usual upgrade process as per the manual.
+Thanks Andreas, Cliff, Peter.
+I guess that clears all confusions.
 
-On 6/20/13 10:38 AM, "Indivar Nair" <indivar.nair at techterra.in<mailto:indivar.nair@techterra.in>> wrote:
+Peter, you could simply remove the number '2.4.0' shown in the 'Maintenance
+Release' branch in the diagram.
+i.e. not have 2.4.0 printed at both places.
+This will clearly indicate that 2.4.0 will be a 'Feature Release' but will
+go on to become a 'Maintenance Release' in its subsequent versions.
 
-Ok. The diagram seems to suggest that 2.4.0 would be first maintenance release.
-
-Anyways...
-
-So I will be able to make an inplace upgrade from 2.4.0 to 2.4.1 when it is released.
-i.e. no re-installation of OS or reformatting OSTs when I move to 2.4.1.
-Just upgrading the Lustre Kernel and Lustre Packages to 2.4.1 should do. right?
+Thanks Guys.
 
 Regards,
 
@@ -28,29 +29,54 @@ Indivar Nair
 
 
 
-On Thu, Jun 20, 2013 at 9:54 PM, Dilger, Andreas <andreas.dilger at intel.com<mailto:andreas.dilger@intel.com>> wrote:
-On 2013/20/06 6:21 AM, "Indivar Nair" <indivar.nair at techterra.in<mailto:indivar.nair@techterra.in>> wrote:
+On Thu, Jun 20, 2013 at 5:59 PM, Jones, Peter A <peter.a.jones@intel.com>wrote:
 
->Hi ...,
+> Hi Indivar
+>
+> You are not the first to get confused by the semantics in the terminology.
+>
+> A maintenance release stream is a series of maintenance releases that
+> follows a given feature release.
+>
+> So, 2.4.0 is a feature release, 2.4.x is set to become our next
+> maintenance release stream, and 2.4.1 (due out in Q3) will be the first
+> maintenance release in that stream.
+>
+> The visual on the roadmap showing the link between the feature releases
+> and the maintenance releases aims to illustrate this.
+>
+> Does this make sense? Do you have any suggestions how we could clarify
+> this?
+>
+> Peter
+>
+> On 6/20/13 5:21 AM, "Indivar Nair" <indivar.nair@techterra.in<mailto:
+> indivar.nair at techterra.in>> wrote:
+>
+> Hi ...,
+>
+> Lustre 2.4 was supposed to be released as a "Maintenance Release' -
+>
+>   https://wiki.hpdd.intel.com/display/PUB/Community+Lustre+Roadmap
+>
+> so how come it has been released as a 'Feature Release'?
+>
+>   https://wiki.hpdd.intel.com/display/PUB/Lustre+Releases
+>
+> Will it be moved to 'Maintenance Release' later?
+>
+> Regards,
 >
 >
->Lustre 2.4 was supposed to be released as a "Maintenance Release' -
 >
->  https://wiki.hpdd.intel.com/display/PUB/Community+Lustre+Roadmap
->
->so how come it has been released as a 'Feature Release'?
->
->  https://wiki.hpdd.intel.com/display/PUB/Lustre+Releases
+> Indivar Nair
 >
 >
->Will it be moved to 'Maintenance Release' later?
-
-The 2.4.0 release is one of the 6-month feature releases.
-2.4.1 will be the first maintenance release on that branch.
-
-Cheers, Andreas
---
-Andreas Dilger
-
-Lustre Software Architect
-Intel High Performance Data Division
+> _______________________________________________
+> Lustre-devel mailing list
+> Lustre-devel at lists.lustre.org
+> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20130621/d42ded29/attachment.htm>
