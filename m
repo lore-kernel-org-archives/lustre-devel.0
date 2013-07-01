@@ -1,28 +1,18 @@
-From: Jones, Peter A <peter.a.jones@intel.com>
-Date: Fri, 21 Jun 2013 20:20:29 +0000
-Subject: [Lustre-devel] Lustre 2.4 Release
-In-Reply-To: <CALuPYL0HmJg1+ymnXhfaa0qf+bEXhf0mVRweptPkXBGNkPpzmw@mail.gmail.com>
-Message-ID: <CDEA036F.2BAA9%peter.a.jones@intel.com>
+From: Ben Evans <Ben.Evans@terascala.com>
+Date: Mon, 1 Jul 2013 18:06:08 +0000
+Subject: [Lustre-devel] tunefs.lustre before mount
+Message-ID: <2b233240c3104f958aeaf54f425bf265@BN1PR06MB215.namprd06.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Thanks for the suggestion Indivar. I'll bring it up the next time we are doing a roadmap refresh on the CDWG
+Assuming I can get access to all the "correct" parameters, would there be a reason that performing a tunefs.lustre before each mount would be harmful?  It's the most straightforward way I can think of to force Lustre to have the correct configuration (ib addresses, etc.) at all times.
 
-On 6/21/13 10:10 AM, "Indivar Nair" <indivar.nair at techterra.in<mailto:indivar.nair@techterra.in>> wrote:
+I don't think it should be an issue, I was just wondering if anyone had run into problems repeatedly running tunefs.lustre (1000s of times against each target)
 
-Thanks Andreas, Cliff, Peter.
-I guess that clears all confusions.
-
-Peter, you could simply remove the number '2.4.0' shown in the 'Maintenance Release' branch in the diagram.
-i.e. not have 2.4.0 printed at both places.
-This will clearly indicate that 2.4.0 will be a 'Feature Release' but will go on to become a 'Maintenance Release' in its subsequent versions.
-
-Thanks Guys.
-
-Regards,
-
-
-Indivar Nair
+-Ben Evans
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20130701/e03a4092/attachment.htm>
