@@ -1,14 +1,25 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sat, 6 Jul 2013 16:17:18 +0000
+From: Ben Evans <Ben.Evans@terascala.com>
+Date: Tue, 9 Jul 2013 21:44:22 +0000
 Subject: [Lustre-devel] tunefs.lustre before mount
-In-Reply-To: <2b233240c3104f958aeaf54f425bf265@BN1PR06MB215.namprd06.prod.outlook.com>
-References: <2b233240c3104f958aeaf54f425bf265@BN1PR06MB215.namprd06.prod.outlook.com>
-Message-ID: <9234F7E5-626A-4C1A-AF02-04B23B907858@intel.com>
+In-Reply-To: <9234F7E5-626A-4C1A-AF02-04B23B907858@intel.com>
+References: <2b233240c3104f958aeaf54f425bf265@BN1PR06MB215.namprd06.prod.outlook.com>,
+	<9234F7E5-626A-4C1A-AF02-04B23B907858@intel.com>
+Message-ID: <7eb8c83a97634a7dbd997ebda88989ed@BN1PR06MB215.namprd06.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Ah, I was thinking more along the lines of setting the filesystem name, mgs information, peer info, etc., not things like timeouts.
+
+-Ben Evans
+________________________________________
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Sent: Saturday, July 06, 2013 12:17 PM
+To: Ben Evans
+Cc: lustre-devel at lists.lustre.org
+Subject: Re: [Lustre-devel] tunefs.lustre before mount
 
 We're actually trying to get rid of tunefs.lustre for setting config parameters, since it complicates the configuration code, and only has a very limited amount of space.
 
