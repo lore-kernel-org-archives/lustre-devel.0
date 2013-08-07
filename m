@@ -1,30 +1,40 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Fri, 02 Aug 2013 13:21:17 -0700
-Subject: [Lustre-devel] ldiskfs build system changes
-Message-ID: <51FC14BD.7060400@llnl.gov>
+From: Tobias Groschup <groschup@stud.uni-heidelberg.de>
+Date: Wed, 07 Aug 2013 12:48:04 +0200
+Subject: [Lustre-devel] LND Development
+Message-ID: <520225E4.1070000@stud.uni-heidelberg.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi folks,
+Hi all,
 
-I want to make people aware of the following ldiskfs patch that I have 
-under review:
+I am a student of applied Computer Science at the University of 
+Heidelberg and I am  currently working on my master thesis about 
+distributed file systems on networks capable of Remote Direct Memory Access.
 
-   http://review.whamcloud.com/6850
+I work at the Computer Architecture Group, which develops a High Speed 
+Interconnect for High Performance Computing called Extoll. I have 
+experience in developing Linux kernel modules, as I work on Extolls 
+driver stack, including a kernel level API to access the Extoll device. 
+Our aim is to implement a LND which supports Extoll.
 
-I don't suspect that anyone other than LLNL has been building ldiskfs 
-externally to lustre.  This patch will remove the ability to do 
-"--with-ldiskfs=/some/other/location".
+So I started to build the current lustre-master and the patched kernel 
+from scratch, which worked very well, thanks to the good documentation 
+online.
 
-My best guess is that no one other than LLNL is effected by this change. 
-  With the rest of the changes to the ldiskfs build system and packaging 
-made by this patch, LLNL will be happy to stop using that option.
+After consulting the Lustre Manual, some guides and papers including 
+"The Lustre Storage Architecture" and "Understanding Lustre Filesystem 
+Internals"  I did not find an comprehensive overview for the API a LND 
+has to implement. Although the function names are easy to find, its not 
+clear what the expected behaviour of the function is, or with which 
+ranges of input data they have to deal.
 
-But folks should be aware of that change.  If that change will impact 
-you negatively, please let me know.  We'll work out a solution that will 
-work for everyone.
+Also, the Doxygen generated from the LNet source files was not very helpful.
 
-Chris
+So my question is: where do I start to implement a LND?
+And: how can I test a LND without recompiling the whole Lustre RPM?
+
+Thanks
+Tobias Groschup
