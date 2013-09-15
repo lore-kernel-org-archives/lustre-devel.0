@@ -1,65 +1,45 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Mon, 19 Aug 2013 18:01:39 -0700
-Subject: [Lustre-devel] Community Roadmap Update, Realignment on 2.5
-In-Reply-To: <520C10E3.7030405@llnl.gov>
-References: <520C10E3.7030405@llnl.gov>
-Message-ID: <5212BFF3.7000002@llnl.gov>
+From: Michael Bloom <michael.bloom@trd2inc.com>
+Date: Sun, 15 Sep 2013 10:51:34 -0400
+Subject: [Lustre-devel] Lustre 2.4 MDT: LustreError: Communicating with
+ 0@lo: operation mds_connect failed with -11
+Message-ID: <CAE8vHZ=q-uSo74vVCR-qOjSgMJsd1sJ2M4EtUk2-5WvDudxrkA@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Background
-----------
+I'm a Lustre newbie who just joined this list.  I'd appreciate any help on
+the following Lustre 2.4 issue I'm running into:
 
-The Lustre community has banded together to work on the development of 
-the Lustre source code.  As part of that effort, we regularly discuss 
-the roadmap for major Lustre releases.  We have developed a schedule of 
-major releases that occur every six months.
+Every time I mount the MDT, the mount appears to succeed but
+/var/log/messages contains the message: "LustreError: 11-0:
+lustre-MDT0000-lwp-MDT0000: Communicating with 0 at lo, operation mds_connect
+failed with -11".  The MDT uses 4 local drives in a RAID10 configuration.
+Each OSS has their own RAID10  of 36 drives each.  The OSS's mount
+correctly without any errors.
 
-We recognize, however, that many organizations need a branch of Lustre 
-that they can run for much longer periods of time than six months.  To 
-that end we collectively decided that we would target the Lustre 2.4.0 
-feature release to begin a side branch of Lustre to receive regularly 
-scheduled maintenance releases for a significant period of time (18 
-months or more).
 
-Unfortunately, one particular feature that some folks feel strongly is 
-an absolute requirement, HSM (Hierarchical Storage Management), did not 
-land on the development branch in time for Lustre 2.4.0.  Happily HSM is 
-now landed on the master branch, and will appear in the next Lustre 
-feature release, version 2.5.0.
+I've seen this error mentioned in countless Google searches.  One obscure
+reply suggested this was a problem fixed in 2.5.  All other references were
+with respect to pre-2.4 releases where the message indicated there was
+probably an error somewhere in the connection's configuration.
 
-Rather than split the community effort between two closely spaced 
-scheduled maintenance release branches, we have decided to realign our 
-efforts from the 2.4 branch to the 2.5 branch.
+Is this a real error?  I see the code that probably generates this
+in client.c.  In abbreviated form, the code is:
+LCONSOLE_ERROR_MSG(0x11, "%s Communicating with %s") in
+ptlrpc_check_status().  There's another in mdt_obd_connect() where -EAGAIN
+[set to -11 in lustre_errno.h) is returned if the stack isn't ready to
+handle requests as indicated by the return code from obd_health_check().
 
-An updated Community Lustre Roadmap has been posted here:
+My environment is this:
+MDT, OSS0, and OSS1 are all on 3 separate nodes running Centos 6.4 and
+connected by Infiniband Mellanox HBAs.  Running this in a VM with the MDT
+and a single OSS on one node in a VM using TCP did not exhibit this problem.
 
-   http://lustre.opensfs.org/community-lustre-roadmap/
+Thanks in advance for any help you can provide.
 
-What this means in a Nutshell
------------------------------
-
-The Lustre 2.5 branch is the one for which we expect to see regularly 
-scheduled maintenance releases for an extended period of time (18+ months).
-
-We no longer expect regularly scheduled maintenance releases on the 
-Lustre 2.4 branch after the Lustre 2.4.2 release.  Our recommended 
-upgrade path after 2.4.2 is an upgrade to the latest 2.5.X release.
-
-What to do if you are already committed to Lustre 2.4
------------------------------------------------------
-
-If you have already committed to using Lustre 2.4 at your organization 
-and an upgrade to Lustre 2.5 is not either desired or possible, we 
-recommend that you contact your Lustre support vendor to find out which 
-branches they intend to support.  Some Lustre vendors offer support for 
-branches beyond the Community's officially recommended releases.
-
-Some Lustre vendors have already announced their intent to continue 
-supporting their users who have committed to the Lustre 2.4 branch.
-
-Chris Morrone
-OpenSFS Community Development Working Group Lead
+Michael
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20130915/ee3c8f86/attachment.htm>
