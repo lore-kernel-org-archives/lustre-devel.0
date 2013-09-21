@@ -1,45 +1,70 @@
-From: Michael Bloom <michael.bloom@trd2inc.com>
-Date: Sun, 15 Sep 2013 10:51:34 -0400
-Subject: [Lustre-devel] Lustre 2.4 MDT: LustreError: Communicating with
- 0@lo: operation mds_connect failed with -11
-Message-ID: <CAE8vHZ=q-uSo74vVCR-qOjSgMJsd1sJ2M4EtUk2-5WvDudxrkA@mail.gmail.com>
+From: Alexey Lyahkov <alexey_lyashkov@xyratex.com>
+Date: Sat, 21 Sep 2013 10:39:28 +0200
+Subject: [Lustre-devel] portability in lustre code.
+Message-ID: <D90080E4-C334-44D0-8879-7381E21C7390@xyratex.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I'm a Lustre newbie who just joined this list.  I'd appreciate any help on
-the following Lustre 2.4 issue I'm running into:
+Hi All,
 
-Every time I mount the MDT, the mount appears to succeed but
-/var/log/messages contains the message: "LustreError: 11-0:
-lustre-MDT0000-lwp-MDT0000: Communicating with 0 at lo, operation mds_connect
-failed with -11".  The MDT uses 4 local drives in a RAID10 configuration.
-Each OSS has their own RAID10  of 36 drives each.  The OSS's mount
-correctly without any errors.
+I "happy" to see moving to lustre kernel generate a first results.
+my MacOS fuse client brooked to build after sources updates.
+
+In file included from /Users/shadow/work/lustre/work/WC-review/mac-os/libcfs/include/libcfs/posix/libcfs.h:108,
+                 from /Users/shadow/work/lustre/work/WC-review/mac-os/libcfs/include/libcfs/libcfs.h:45,
+                 from nidstrings.c:43:
+/Users/shadow/work/lustre/work/WC-review/mac-os/libcfs/include/libcfs/user-bitops.h:80: error: conflicting types for ?fls?
+/usr/include/strings.h:90: error: previous declaration of ?fls? was here
+
+that bug introduced by commit
+>>
+commit d38d331fa6525ffc02665f48fa52f94626360631
+Author: James Simmons <uja.ornl@gmail.com>
+Date:   Tue Aug 27 12:51:06 2013 -0400
+
+    LU-1346 libcfs: cleanup macros in portals_compat25.h
+>> 
+so that commit - isn't correctly inspected for systems other to linux and introduce a new regression for systems other then Linux.
+I was pointed about similar situation in past - but hit that in real world.
+Andreas, did you remember my concerns about lost portability ?
+
+batch changes code in way without ability to replace a cfs specific function to any existent in build env.
+>>>
+diff --git a/libcfs/include/libcfs/user-bitops.h b/libcfs/include/libcfs/user-bitops.h
+index 2e31e88..1b16ca7 100644
+--- a/libcfs/include/libcfs/user-bitops.h
++++ b/libcfs/include/libcfs/user-bitops.h
+@@ -76,7 +76,7 @@ static inline int test_bit(int nr, const unsigned long *addr)
+ }
+ 
+ /* using binary seach */
+-static __inline__ unsigned long __cfs_fls(long data)
++static __inline__ unsigned long fls(long data)
+ {
+        int pos = 32;
+ 
+@@ -147,8 +147,8 @@ static __inline__ unsigned long __cfs_ffs(long data)
+>>
+but fls from BSD userland have a different prototype and we don't able to replace with flsl from build env.
+
+from man page
+FFS(3)                   BSD Library Functions Manual                   FFS(3)
+
+NAME
+     ffs, ffsl, fls, flsl -- find first or last bit set in a bit string
+HISTORY
+     The ffs() function appeared in 4.3BSD.  Its prototype existed previously in <string.h> before it was moved to <strings.h> for IEEE Std 1003.1-2001
+     (``POSIX.1'') compliance.
+
+     The ffsl(), fls(), and flsl() functions appeared in FreeBSD 5.3.
 
 
-I've seen this error mentioned in countless Google searches.  One obscure
-reply suggested this was a problem fixed in 2.5.  All other references were
-with respect to pre-2.4 releases where the message indicated there was
-probably an error somewhere in the connection's configuration.
+and we don't have a way to the replace fls with flsl for MacOS/BSD or use own implementation without reverting a cleanup for fls function.
 
-Is this a real error?  I see the code that probably generates this
-in client.c.  In abbreviated form, the code is:
-LCONSOLE_ERROR_MSG(0x11, "%s Communicating with %s") in
-ptlrpc_check_status().  There's another in mdt_obd_connect() where -EAGAIN
-[set to -11 in lustre_errno.h) is returned if the stack isn't ready to
-handle requests as indicated by the return code from obd_health_check().
 
-My environment is this:
-MDT, OSS0, and OSS1 are all on 3 separate nodes running Centos 6.4 and
-connected by Infiniband Mellanox HBAs.  Running this in a VM with the MDT
-and a single OSS on one node in a VM using TCP did not exhibit this problem.
-
-Thanks in advance for any help you can provide.
-
-Michael
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20130915/ee3c8f86/attachment.htm>
+----------------------------------------------
+Alexey Lyahkov
+alexey_lyashkov at xyratex.com
