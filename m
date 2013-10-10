@@ -1,33 +1,33 @@
-From: Tobias Groschup <groschup@stud.uni-heidelberg.de>
-Date: Mon, 07 Oct 2013 16:42:48 +0200
-Subject: [Lustre-devel] Starting and using  a self written LND
-Message-ID: <5252C868.2050104@stud.uni-heidelberg.de>
+From: Wendy Cheng <s.wendy.cheng@gmail.com>
+Date: Thu, 10 Oct 2013 10:05:56 -0700
+Subject: [Lustre-devel] Lustre on Intel Xeon Phi
+In-Reply-To: <9FC73D3DBECE0941BD2ED069D268634216EBF312@IRSMSX105.ger.corp.intel.com>
+References: <CABgxfbFoC1bh4zmJmgZJuufN1zViO1e7AogvVMkeOzVRuPw0hw@mail.gmail.com>
+	<9FC73D3DBECE0941BD2ED069D268634216EBEEAB@IRSMSX105.ger.corp.intel.com>
+	<CABgxfbGSgeNHx0AT+8WeYigM==TpEL5Ecrn-Qk=YDGFCxwiQyQ@mail.gmail.com>
+	<9FC73D3DBECE0941BD2ED069D268634216EBF312@IRSMSX105.ger.corp.intel.com>
+Message-ID: <CABgxfbFqiqg-w=kCise+x0468UE9YqUrnek7UVTt74nfsLaCvw@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi all,
+On Sat, Oct 5, 2013 at 3:01 AM, Eremin, Dmitry <dmitry.eremin@intel.com> wrote:
+> Sorry, after recent reorganization it was broken. I will fix this. But now you can just remove "--disable-tests" option from configure. The build will be a bit longer but error should gone. Those binaries produced for testing needs.
+>
 
-I am still at the task of writing a new LND. Finally got Lustre to build 
-with our own software stack.
+Thanks for the help ! The Xeon Phi Lustre client is now up and running
+on top of Infiniband RDMA using
 
-Now I want to test the new LND. Of course, it does not implement much 
-functionality yet. In fact, it only has a stump for the send and receive 
-functions, and a startup and shutdown function which sets up the 
-software context for the network card and closes it.
-I can load the module, and LNet does not crash after adding the new 
-entries to the LND types enum in libcfs/include/libcfs/libcfs private.h 
-and to libcfs_netstrfns[] in libcfs/libcfs/nidstrings.c.
+* Intel Xeon Phi MPSS 2.1 (mpss_gold_update_3-2.1.6720-16)
+* Lustre-release from git master branch
+* A private version of OFED
 
-So the question is: how does one invoke the startup function after 
-loading an LND module? I tried lclt and its network up command, which 
-returned without error, but I did not see the debug output which is 
-printed via printks.
+There was a kernel panic at lmv_get_info() during mount time but the
+problem has been fixed. As the issue seems to be generic (not MPSS
+specific), will start another thread to discuss it.
 
-And: are the modifications to the libcfs mentioned above all that are 
-needed to declare an LND to libcfs?
+Again, your responses and help are very appreciated.
 
-Thanks and Greetings
-Tobias
+-- Wendy
