@@ -1,13 +1,26 @@
-From: Wendy Cheng <s.wendy.cheng@gmail.com>
-Date: Fri, 11 Oct 2013 20:28:45 -0700
-Subject: [Lustre-devel] [Patch] Fix Client Kernel Crash with Mis-configured
-	Index Numbering
-Message-ID: <CABgxfbH-js0JZzSAienCMJgXQYzVsKUYHbpfJWbvPfakyFGT6w@mail.gmail.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Sat, 12 Oct 2013 06:59:03 +0000
+Subject: [Lustre-devel] [Patch] Fix Client Kernel Crash with
+ Mis-configured	Index Numbering
+In-Reply-To: <CABgxfbH-js0JZzSAienCMJgXQYzVsKUYHbpfJWbvPfakyFGT6w@mail.gmail.com>
+References: <CABgxfbH-js0JZzSAienCMJgXQYzVsKUYHbpfJWbvPfakyFGT6w@mail.gmail.com>
+Message-ID: <E7E46B0B-79E1-4238-954E-6D6177A9421A@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Hi Wendy,
+Thanks for the patch. Could you please file a ticket at https://jira.hpdd.intel.com/ and submit the patch to our Gerrit repo (with minor tweaks as suggested below) so it is included in the next Lustre release. For more details please see:
+
+https://wiki.hpdd.intel.com/display/PUB/Submitting+Changes
+
+You are totally correct that no user input should crash the kernel. The support for multiple MDTs in the same filesystem is relatively new (previously only MDT index 0 was allowed), and I guess nobody has ever tested what you did.
+
+Cheers, Andreas
+
+On 2013-10-11, at 21:29, "Wendy Cheng" <s.wendy.cheng at gmail.com<mailto:s.wendy.cheng@gmail.com>> wrote:
 
 Ref: http://lists.lustre.org/pipermail/lustre-devel/2013-October/004270.html
 
@@ -45,7 +58,7 @@ lustre_start_mgc+0x227/0x2a90 [obdclass]^M
 <4>[  215.947507]  [<ffffffff810f57cc>] sys_mount+0x84/0xbd^M
 <4>[  215.947527]  [<ffffffff81002aab>] system_call_fastpath+0x16/0x1b^M
 
-Signed-off-by: Wendy Cheng <wendy.cheng@intel.com>
+Signed-off-by: Wendy Cheng <wendy.cheng at intel.com<mailto:wendy.cheng@intel.com>>
 
 diff --git a/lustre/lmv/lmv_obd.c b/lustre/lmv/lmv_obd.c
 index 3091bfb..5f4a18b 100644
@@ -53,19 +66,29 @@ index 3091bfb..5f4a18b 100644
 +++ b/lustre/lmv/lmv_obd.c
 @@ -2443,6 +2443,16 @@ static int lmv_get_info(const struct lu_env
 *env, struct obd_export *exp,
-                         RETURN(rc);
+                        RETURN(rc);
 
-                /*
+               /*
 +                * In the case of mis-configured OSS, instead of crashing
+
+This comment should read "misconfigured MDT" ...
+
 +                * the kernel during client mount, give them a warning and
 +                * gracefully back out mount process w/ -ENXIO error.
 +                */
 +               if (lmv->tgts[0] == NULL) {
 +                       CDEBUG(D_IOCTL, "NULL index\n");
+
+"NULL target for MDT0\n"
+
 +                       RETURN(-ENXIO);
 +               }
 +
 +               /*
-                 * Forwarding this request to first MDS, it should know LOV
-                 * desc.
-                 */
+                * Forwarding this request to first MDS, it should know LOV
+                * desc.
+                */
+_______________________________________________
+Lustre-devel mailing list
+Lustre-devel at lists.lustre.org<mailto:Lustre-devel@lists.lustre.org>
+http://lists.lustre.org/mailman/listinfo/lustre-devel
