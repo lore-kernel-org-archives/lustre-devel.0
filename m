@@ -1,68 +1,88 @@
 From: Indivar Nair <indivar.nair@techterra.in>
-Date: Mon, 21 Oct 2013 18:40:18 +0530
+Date: Tue, 22 Oct 2013 18:44:43 +0530
 Subject: [Lustre-devel] Lustre+ZFS Documentation
-In-Reply-To: <CAB+_9Gqw=bXGKYk5PDCS2O6CNRZEgDnqxuRD3AvfWvK-VBxXUQ@mail.gmail.com>
+In-Reply-To: <CAB+_9GoPa7h80Fu3VZNRAR9Mw=E5DHO4XnCdE26u5W3ozWtoDA@mail.gmail.com>
 References: <CALuPYL1rmx6kBq=ru6GiqsRVTt-T5Awf_O7XNPiza6GqQpTeYg@mail.gmail.com>
 	<CAB+_9Gqw=bXGKYk5PDCS2O6CNRZEgDnqxuRD3AvfWvK-VBxXUQ@mail.gmail.com>
-Message-ID: <CALuPYL1feMjW+0L3BueiY6dSqju==eDm9cou8830mhrwA3gmHg@mail.gmail.com>
+	<CALuPYL1feMjW+0L3BueiY6dSqju==eDm9cou8830mhrwA3gmHg@mail.gmail.com>
+	<CAB+_9GoPa7h80Fu3VZNRAR9Mw=E5DHO4XnCdE26u5W3ozWtoDA@mail.gmail.com>
+Message-ID: <CALuPYL2r78AtXyyWQDhvy7at9kXVmUrfHrhYBmzOb=bmNTts3g@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Thanks Parinay,
+Got it.
 
-The second link is what I was looking for.
-
-However, it states that -
-"The Lustre Orion code still requires some polish and you may encounter a
-few bugs. It is not currently considered ready for real production usage."
-
-I guess this is an old documentation and the line is no more valid with
-Lustre 2.4 and later, right?
-
-Regards,
+Thanks Parinay.
 
 
-Indivar Nair
-
-
-
-On Mon, Oct 21, 2013 at 3:08 PM, Parinay Kondekar <
+On Tue, Oct 22, 2013 at 4:19 PM, Parinay Kondekar <
 parinay_kondekar@xyratex.com> wrote:
 
-> If not seen already ...
->
-> http://zfsonlinux.org/lustre.html
->
-> http://zfsonlinux.org/lustre-configure-single.html
+> 2.4 changelog - https://wiki.hpdd.intel.com/display/PUB/Lustre+2.4 = OSD
+> Server stack ; so Yes.
 >
 > HTH
 >
 >
+> On 21 October 2013 18:40, Indivar Nair <indivar.nair@techterra.in> wrote:
 >
-> On 18 October 2013 09:16, Indivar Nair <indivar.nair@techterra.in> wrote:
->
->> Hi ...,
+>> Thanks Parinay,
 >>
->> Is there a documentation on how to deploy Lustre over ZFS (MDS and OSS)?
+>> The second link is what I was looking for.
 >>
->> I am not able to find anything on it in the Lustre Documentation page -
->> http://build.whamcloud.com/job/lustre-manual/lastSuccessfulBuild/artifact/lustre_manual.xhtml
+>> However, it states that -
+>> "The Lustre Orion code still requires some polish and you may encounter a
+>> few bugs. It is not currently considered ready for real production usage."
+>>
+>> I guess this is an old documentation and the line is no more valid with
+>> Lustre 2.4 and later, right?
 >>
 >> Regards,
 >>
 >>
 >> Indivar Nair
 >>
->> _______________________________________________
->> Lustre-devel mailing list
->> Lustre-devel at lists.lustre.org
->> http://lists.lustre.org/mailman/listinfo/lustre-devel
 >>
+>>
+>> On Mon, Oct 21, 2013 at 3:08 PM, Parinay Kondekar <
+>> parinay_kondekar at xyratex.com> wrote:
+>>
+>>> If not seen already ...
+>>>
+>>> http://zfsonlinux.org/lustre.html
+>>>
+>>> http://zfsonlinux.org/lustre-configure-single.html
+>>>
+>>> HTH
+>>>
+>>>
+>>>
+>>> On 18 October 2013 09:16, Indivar Nair <indivar.nair@techterra.in>wrote:
+>>>
+>>>> Hi ...,
+>>>>
+>>>> Is there a documentation on how to deploy Lustre over ZFS (MDS and OSS)?
+>>>>
+>>>> I am not able to find anything on it in the Lustre Documentation page -
+>>>> http://build.whamcloud.com/job/lustre-manual/lastSuccessfulBuild/artifact/lustre_manual.xhtml
+>>>>
+>>>> Regards,
+>>>>
+>>>>
+>>>> Indivar Nair
+>>>>
+>>>> _______________________________________________
+>>>> Lustre-devel mailing list
+>>>> Lustre-devel at lists.lustre.org
+>>>> http://lists.lustre.org/mailman/listinfo/lustre-devel
+>>>>
+>>>>
+>>>
 >>
 >
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20131021/39f72f2f/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20131022/1e58643c/attachment.htm>
