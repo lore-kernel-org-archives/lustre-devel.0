@@ -1,14 +1,36 @@
-From: Rituparna Chakraborty <xanthornus@gmail.com>
-Date: Fri, 29 Aug 2014 18:54:57 +0530
-Subject: [Lustre-devel] request to work on the project
-Message-ID: <CAL61XNwyaDasnvndq9WPT=znTkuPPCDZROsRYE+SV8+iMzyBbA@mail.gmail.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Sat, 22 Nov 2014 16:43:09 +0000
+Subject: [Lustre-devel] [Lwg] Splitting up Lustre and LNET RPMs
+In-Reply-To: <CAB_j=McP82fqqF=iv+c-5fpKX0TjpMGhcVoRDH8xNuDQobGNug@mail.gmail.com>
+References: <CAB_j=McP82fqqF=iv+c-5fpKX0TjpMGhcVoRDH8xNuDQobGNug@mail.gmail.com>
+Message-ID: <F9FCB7F3-3BC8-4601-9200-213660591BA2@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I would like to work on ioctl() cleanups project
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20140829/b7c7351b/attachment.htm>
+I suspect that LWG is too small a list to ask such questions. I've added hpdd-discuss and lustre-devel to the CC list.
+
+I'm not against it in principle, but I have no idea how much work this will be to implement.
+
+Cheers, Andreas
+
+On Nov 20, 2014, at 11:50, "Nathan Rutman" <nathan.rutman at seagate.com<mailto:nathan.rutman@seagate.com>> wrote:
+
+
+What does the community think about splitting the LNET build out of Lustre as a separate set of (source and binary) RPMs?
+This would make it easier/faster to build, install, and upgrade Lustre in existing installations without changing things we don't need to. It would also make it easier to re-use LNET in other projects, and make it easier for unusual users to maintain a customized LNET.
+I have no idea how this might affect landing in mainstream kernel.
+Thoughts / opinions?
+
+
+--
+--
+Nathan Rutman ? Principal Systems Architect
+Seagate Technology ? +1 503 877-9507 ? PST
+
+_______________________________________________
+lwg mailing list
+lwg at lists.opensfs.org<mailto:lwg@lists.opensfs.org>
+http://lists.opensfs.org/listinfo.cgi/lwg-opensfs.org
