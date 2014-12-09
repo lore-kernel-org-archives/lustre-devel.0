@@ -1,36 +1,31 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sat, 22 Nov 2014 16:43:09 +0000
-Subject: [Lustre-devel] [Lwg] Splitting up Lustre and LNET RPMs
-In-Reply-To: <CAB_j=McP82fqqF=iv+c-5fpKX0TjpMGhcVoRDH8xNuDQobGNug@mail.gmail.com>
-References: <CAB_j=McP82fqqF=iv+c-5fpKX0TjpMGhcVoRDH8xNuDQobGNug@mail.gmail.com>
-Message-ID: <F9FCB7F3-3BC8-4601-9200-213660591BA2@intel.com>
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Mon, 08 Dec 2014 16:12:35 -0800
+Subject: [Lustre-devel] Lustre Developer Project Meeting, January 22-23, 2015
+Message-ID: <54863E73.9020106@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I suspect that LWG is too small a list to ask such questions. I've added hpdd-discuss and lustre-devel to the CC list.
+Hello Lustre Developers,
 
-I'm not against it in principle, but I have no idea how much work this will be to implement.
+The OpenSFS Lustre Working Group (LWG) would like to invite all Lustre 
+software developers to register and attend the two day Lustre Developer 
+Project Meeting in Livermore, CA on January 22-23, 2015.
 
-Cheers, Andreas
+Details about the meeting can be found on the following OpenSFS page:
 
-On Nov 20, 2014, at 11:50, "Nathan Rutman" <nathan.rutman at seagate.com<mailto:nathan.rutman@seagate.com>> wrote:
+   http://opensfs.org/events/
 
+including a link to the registration form:
 
-What does the community think about splitting the LNET build out of Lustre as a separate set of (source and binary) RPMs?
-This would make it easier/faster to build, install, and upgrade Lustre in existing installations without changing things we don't need to. It would also make it easier to re-use LNET in other projects, and make it easier for unusual users to maintain a customized LNET.
-I have no idea how this might affect landing in mainstream kernel.
-Thoughts / opinions?
+    https://opensfs.wufoo.com/forms/z1j9z4sm03mwco4/
 
+We ask that you please register by December 19th, 2014 so that we have 
+sufficient time to work together on the final agenda for the meeting.
 
---
---
-Nathan Rutman ? Principal Systems Architect
-Seagate Technology ? +1 503 877-9507 ? PST
+We hope to see you there!
 
-_______________________________________________
-lwg mailing list
-lwg at lists.opensfs.org<mailto:lwg@lists.opensfs.org>
-http://lists.opensfs.org/listinfo.cgi/lwg-opensfs.org
+Christopher Morrone
+OpenSFS LWG Chair
