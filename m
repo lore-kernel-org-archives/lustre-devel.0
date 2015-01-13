@@ -1,31 +1,29 @@
 From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Mon, 08 Dec 2014 16:12:35 -0800
-Subject: [Lustre-devel] Lustre Developer Project Meeting, January 22-23, 2015
-Message-ID: <54863E73.9020106@llnl.gov>
+Date: Tue, 13 Jan 2015 10:39:36 -0800
+Subject: [Lustre-devel] Lustre Developer Project Meeting registration
+	closing!
+Message-ID: <54B56668.1080102@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello Lustre Developers,
+Hello everyone,
 
-The OpenSFS Lustre Working Group (LWG) would like to invite all Lustre 
-software developers to register and attend the two day Lustre Developer 
-Project Meeting in Livermore, CA on January 22-23, 2015.
+The registration for the Lustre Developer Project Meeting is closing! 
+The dates for the meeting are January 22-23, and it will be held in 
+Livermore, CA.
 
-Details about the meeting can be found on the following OpenSFS page:
+If you have not yet registered to attend, you can find more information 
+and the link for registration here:
 
    http://opensfs.org/events/
 
-including a link to the registration form:
+Please register by Noon Pacific time TOMORROW (January 14).
 
-    https://opensfs.wufoo.com/forms/z1j9z4sm03mwco4/
+We will almost certainly have seating for any super-procrastinators that 
+want to register after that date, but lunches can only be promised for 
+those that register by noon tomorrow.
 
-We ask that you please register by December 19th, 2014 so that we have 
-sufficient time to work together on the final agenda for the meeting.
-
-We hope to see you there!
-
-Christopher Morrone
-OpenSFS LWG Chair
+Chris
