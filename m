@@ -1,25 +1,47 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sun, 8 Feb 2015 01:56:18 +0000
+Date: Tue, 10 Feb 2015 21:47:18 +0000
 Subject: [Lustre-devel] [HPDD-discuss] Removal of SOM code
-In-Reply-To: <CAC_cOcKVa=5XGcA81yimZHJ81H+5YQ24UXtQrdYBC9bsN1ihRw@mail.gmail.com>
+In-Reply-To: <CAB_j=MdDBW8o67ysrrjFL8xTtp4MEQ0gdcQnTwXoe3xgkbJ96Q@mail.gmail.com>
 References: <D0FA9D65.DA3FB%andreas.dilger@intel.com>
 	<CAC_cOcKVa=5XGcA81yimZHJ81H+5YQ24UXtQrdYBC9bsN1ihRw@mail.gmail.com>
-Message-ID: <D0FC0E5D.DA6C4%andreas.dilger@intel.com>
+	<D0FC0E5D.DA6C4%andreas.dilger@intel.com>
+	<CAB_j=MdDBW8o67ysrrjFL8xTtp4MEQ0gdcQnTwXoe3xgkbJ96Q@mail.gmail.com>
+Message-ID: <D0FFC8F1.DAF5B%andreas.dilger@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+I think the "lazy" size is what would be stored directly in the MDS inodes (possibly in struct som_attrs to avoid confusing i_size on the on-disk inode as happened with 1.8).
+
+The lazy size would be available via tools like e2scan, lester (https://github.com/ORNL-TechInt/lester), and other specialized tools (possibly "lfs find"), but not exposed directly as the file size to applications via stat, read, write-append.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Software Architect
+Intel High Performance Data Division
+
+On 2015/02/09, 3:16 PM, "Nathan Rutman" <nathan.rutman at seagate.com<mailto:nathan.rutman@seagate.com>> wrote:
+
+I think "best effort" would be sufficient in 99% of cases, but when not how would you ask for the "real" vs the "lazy" size?
+
+
+--
+Nathan Rutman ? Principal Systems Architect
+Seagate Technology ? +1 503 877-9507 ? PST
+
+On Sat, Feb 7, 2015 at 5:56 PM, Dilger, Andreas <andreas.dilger at intel.com<mailto:andreas.dilger@intel.com>> wrote:
 On 2015/02/06, 5:08 PM, "Meghan McClelland"
-<meghan.mcclelland@seagate.com> wrote:
+<meghan.mcclelland at seagate.com<mailto:meghan.mcclelland@seagate.com>> wrote:
 
 >Oh no! I had just been talking about using this feature :(
 >
 >Even in it's current form which I agree isn't ideal, I think it could
 >be helpful for a project like fssstats. Fsstats was an open effort to
 >gather and collect filesystems data (see
->http://www.pdsi-scidac.org/fsstats/). It has unfortunately somewhat
+>https://urldefense.proofpoint.com/v2/url?u=http-3A__www.pdsi-2Dscidac.org_fsstats_&d=AwIFAw&c=IGDlg0lD0b-nebmJJ0Kp8A&r=DMt7Lenz8pKzikBAXiZHPR9svLyt_fCSHKCEMGO1wuQ&m=3nnnri6gcyf5QXlmXliYSqhfg_bK5oBpOaxzPtEodvc&s=y1ilHERZjqGR6LPW-5or8wiNk0o0zGTIEUMToDuLGHg&e= ). It has unfortunately somewhat
 >died off due to loss of funding, but I think was a good idea that
 >helped the community, especially researchers.
 
@@ -57,7 +79,7 @@ Cheers, Andreas
 
 
 >On Fri, Feb 6, 2015 at 3:33 PM, Dilger, Andreas
-><andreas.dilger@intel.com> wrote:
+><andreas.dilger at intel.com<mailto:andreas.dilger@intel.com>> wrote:
 >> The Size on MDT (SOM) feature has been in a prototype state for several
 >> years, with no signs of moving beyond this prototype stage.
 >>
@@ -70,27 +92,27 @@ Cheers, Andreas
 >>
 >> We're planning to remove the SOM code from the master branch as a
 >>result,
->> tracked under 
+>> tracked under
 >>https://urldefense.proofpoint.com/v2/url?u=https-3A__jira.hpdd.intel.com_
 >>browse_LU-2D6047-3A&d=AwICAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=VKuhI1_CodqTbWyBg
 >>Nk0Z5da-Cpzi6WFMl6RJ0M1EeM&m=J0jMwPGPIPnotoqE8FhyhDf07Rh6V4BAMet6Wfh-bqM&
 >>s=TzuY05kGc01qUMWZZluqhikn49_0zzLDVoT8e7igolQ&e=
->> - 
+>> -
 >>https://urldefense.proofpoint.com/v2/url?u=http-3A__review.whamcloud.com_
 >>13126&d=AwICAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=VKuhI1_CodqTbWyBgNk0Z5da-Cpzi6W
 >>FMl6RJ0M1EeM&m=J0jMwPGPIPnotoqE8FhyhDf07Rh6V4BAMet6Wfh-bqM&s=sc9FrYH8KyW_
 >>9Un3Z-E_HXPRv5DPicF-Mc92PbET6hc&e=
->> - 
+>> -
 >>https://urldefense.proofpoint.com/v2/url?u=http-3A__review.whamcloud.com_
 >>13169&d=AwICAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=VKuhI1_CodqTbWyBgNk0Z5da-Cpzi6W
 >>FMl6RJ0M1EeM&m=J0jMwPGPIPnotoqE8FhyhDf07Rh6V4BAMet6Wfh-bqM&s=Qf7HJzAInFeG
 >>IR7l4VRWc7OEgUX77nhkrptHRFS8Q04&e=
->> - 
+>> -
 >>https://urldefense.proofpoint.com/v2/url?u=http-3A__review.whamcloud.com_
 >>13442&d=AwICAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=VKuhI1_CodqTbWyBgNk0Z5da-Cpzi6W
 >>FMl6RJ0M1EeM&m=J0jMwPGPIPnotoqE8FhyhDf07Rh6V4BAMet6Wfh-bqM&s=v0_uCOoz-ipW
 >>11UJPZlvLk-REnsF_T1P3KPvKMzQ_lE&e=
->> - 
+>> -
 >>https://urldefense.proofpoint.com/v2/url?u=http-3A__review.whamcloud.com_
 >>13443&d=AwICAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=VKuhI1_CodqTbWyBgNk0Z5da-Cpzi6W
 >>FMl6RJ0M1EeM&m=J0jMwPGPIPnotoqE8FhyhDf07Rh6V4BAMet6Wfh-bqM&s=MhKEsBRfdjlw
@@ -135,8 +157,8 @@ Cheers, Andreas
 >>
 >> _______________________________________________
 >> HPDD-discuss mailing list
->> HPDD-discuss at lists.01.org
->> 
+>> HPDD-discuss at lists.01.org<mailto:HPDD-discuss@lists.01.org>
+>>
 >>https://urldefense.proofpoint.com/v2/url?u=https-3A__lists.01.org_mailman
 >>_listinfo_hpdd-2Ddiscuss&d=AwICAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=VKuhI1_CodqT
 >>bWyBgNk0Z5da-Cpzi6WFMl6RJ0M1EeM&m=J0jMwPGPIPnotoqE8FhyhDf07Rh6V4BAMet6Wfh
@@ -144,17 +166,23 @@ Cheers, Andreas
 >
 >
 >
->-- 
+>--
 >Meghan McClelland ? Senior Product Manager
 >Seagate Technology, LLC
 >mobile: +1 (505) 695 0065
->www.seagate.com
+>www.seagate.com<http://www.seagate.com>
 >
 
 
 Cheers, Andreas
--- 
+--
 Andreas Dilger
 
 Lustre Software Architect
 Intel High Performance Data Division
+
+
+_______________________________________________
+Lustre-devel mailing list
+Lustre-devel at lists.lustre.org<mailto:Lustre-devel@lists.lustre.org>
+https://urldefense.proofpoint.com/v2/url?u=http-3A__lists.lustre.org_mailman_listinfo_lustre-2Ddevel&d=AwIFAw&c=IGDlg0lD0b-nebmJJ0Kp8A&r=DMt7Lenz8pKzikBAXiZHPR9svLyt_fCSHKCEMGO1wuQ&m=3nnnri6gcyf5QXlmXliYSqhfg_bK5oBpOaxzPtEodvc&s=nc5Ab1Q46xs_6dHlZh2aWAVW8l7dABA63WfVyO6NXBE&e=
