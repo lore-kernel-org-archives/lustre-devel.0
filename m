@@ -1,28 +1,61 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Mon, 02 Mar 2015 09:54:39 -0800
-Subject: [Lustre-devel] NEEDED: Volunteers to lead Developer Day discussions
-Message-ID: <54F4A3DF.8030900@llnl.gov>
+From: Jeremy Filizetti <jeremy.filizetti@gmail.com>
+Date: Tue, 24 Mar 2015 16:15:25 -0400
+Subject: [lustre-devel] Fwd: proposed version change for PTLRPC GSS
+In-Reply-To: <CAC2+cFgRWEEALvwhOiSdhiapkvE=VeeiZ_KeNihud0bxN8y2ew@mail.gmail.com>
+References: <CAC2+cFgRWEEALvwhOiSdhiapkvE=VeeiZ_KeNihud0bxN8y2ew@mail.gmail.com>
+Message-ID: <CAC2+cFip2cDfT1xAKvo+QKEr2oVnx0iQxTC8D1vDMNXyDtY-pQ@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello everyone,
+I'm sending to lustre-devel for wider distribution/comment.
 
-The Thursday immediately following LUG 2015 will be a Lustre Developer 
-Day.  Developer Day is the perfect place to pitch your proposed changes 
-to the Lustre code.  Surrounded by your Lustre software development 
-peers, you can receive immediate constructive feedback and rally others 
-to join you in your efforts.
+---------- Forwarded message ----------
+From: Jeremy Filizetti <jeremy.filizetti@gmail.com>
+Date: Mon, Mar 23, 2015 at 9:34 PM
+Subject: proposed version change for PTLRPC GSS
+To: "iudev at lists.opensfs.org" <iudev@lists.opensfs.org>
 
-We need volunteers to lead discussions sessions!  Ideally each 
-discussion session will consist of a short pitch followed by feedback 
-and discussion with the audience of Lustre developers.
 
-If you are a Lustre software developer and you would like to lead a 
-discussion session, please contact me with your proposed topic by no 
-later than 5pm Pacific time on March 9th.
+On the phone call last week we discussed an increment of the
+PTLRPC_GSS_VERSION to version 2 to allow some changes
+changes/restructuring.  No one had any objections on the phone call but I
+wanted to send it out for wider distribution and feedback.
+
+Changing the request format would allow us to support larger GSS token
+sizes which today are limited (see ticket LU-3855).   From what I have
+looked through so far the following seems to allow for larger tokens and
+also allow some of these changes without having to worry about backwards
+compatibility since it was never really "working" anyways.
+
+Change PTLRPC_GSS_VERSION to 2
+
+Enlarge GSS_CTX_INIT_MAX_LEN to something larger then 1024.   Ideally we
+would support MaxTokenSize of 64k for the largest active directory ticket:
+(see
+http://blogs.technet.com/b/shanecothran/archive/2010/07/16/maxtokensize-and-kerberos-token-bloat.aspx
+).
+The purpose of enlarging this is to support larger tokens.  The
+sizeof(struct rsi) needs to remain under PAGE_SIZE right now with
+rsi_request calling sunrpc_cache_pipe_upcall.  Since there is only one
+lsvcgssd process supposed to be running maybe it would be acceptable to use
+larger requests and just slightly modify rsi_request to incorporate must of
+the functionality of sunrpc_cache_pipe_upcall.
+
+To keep things simple with the lsvcgssd and continue to use a single
+channel proc file interface I'd like to AND the GSS subflavor onto most
+significant bits of lustre_svc in struct rsi.  Instead of calling the
+inappropriately named handle_nullreq things would be changed to handle the
+multiple subflavors (gssnull, sk, krb5).  gssnull and sk won't have a full
+userspace component so gss_accept_sec_context can't be called.
+
+Thoughts welcome.  I'm sure I missed something along the way here but this
+is just what I have looked at so far.
 
 Thanks,
-Chris
+Jeremy
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150324/6879d571/attachment.htm>
