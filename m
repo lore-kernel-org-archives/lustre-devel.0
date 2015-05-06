@@ -1,12 +1,17 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Wed, 6 May 2015 16:38:42 +0000
+From: Xiong, Jinshan <jinshan.xiong@intel.com>
+Date: Wed, 6 May 2015 18:42:22 +0000
 Subject: [lustre-devel] Lock ahead: ldlm_completion_ast questions
-Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614C42E2E@CFWEX01.americas.cray.com>
+In-Reply-To: <DB0C8A206669AC40B1C4E52A8584A6F614C42E2E@CFWEX01.americas.cray.com>
+References: <DB0C8A206669AC40B1C4E52A8584A6F614C42E2E@CFWEX01.americas.cray.com>
+Message-ID: <D69967CE-C0D2-4624-AD4C-7D63361C3359@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+
+On May 6, 2015, at 9:38 AM, Patrick Farrell <paf at cray.com<mailto:paf@cray.com>> wrote:
 
 Greetings,
 
@@ -50,10 +55,12 @@ work.)
 
 Does that seem reasonable?  Is there another way it would be better to approach that one?
 
+I think this problem can be solved easily by not allowing lock-ahead locks to revoke conflicting locks at enqueue time. Therefore, the result of enqueueing a lock-ahead lock is either granted or aborted due to conflicting when osc_enqueue_interpret() is called, the locks? state is determined so the regular ldlm_completion_ast() in ptlrpcd thread context won?t be blocked.
+
+Jinshan
+
+
 Other question (which is a bit nastier) coming shortly.
 
 Thanks in advance,
 - Patrick Farrell
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150506/0fa9fb3a/attachment-0001.htm>
