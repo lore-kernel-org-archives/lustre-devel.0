@@ -1,15 +1,29 @@
-From: Xiong, Jinshan <jinshan.xiong@intel.com>
-Date: Wed, 6 May 2015 18:42:22 +0000
+From: Patrick Farrell <paf@cray.com>
+Date: Wed, 6 May 2015 18:55:54 +0000
 Subject: [lustre-devel] Lock ahead: ldlm_completion_ast questions
-In-Reply-To: <DB0C8A206669AC40B1C4E52A8584A6F614C42E2E@CFWEX01.americas.cray.com>
-References: <DB0C8A206669AC40B1C4E52A8584A6F614C42E2E@CFWEX01.americas.cray.com>
-Message-ID: <D69967CE-C0D2-4624-AD4C-7D63361C3359@intel.com>
+In-Reply-To: <D69967CE-C0D2-4624-AD4C-7D63361C3359@intel.com>
+References: <DB0C8A206669AC40B1C4E52A8584A6F614C42E2E@CFWEX01.americas.cray.com>,
+	<D69967CE-C0D2-4624-AD4C-7D63361C3359@intel.com>
+Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614C42E90@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Jinshan,
+
+I discussed that aspect with our MPIIO library developers, and they felt it was important to have the option to make the lock requests blocking (IE, have them revoke existing locks on conflict).  They pointed out that the library has no way to guarantee there aren't existing locks on the file, and in fact, a whole file read lock or something similar will be very common since the file may be created (and accessed) in any way number of ways before the library gets to it.
+
+So if lock ahead locks don't have the option of being blocking lock requests, they could only be used on newly created files.  (I'm currently controlling blocking/non-blocking with a flag passed in from userspace.)
+
+- Patrick
+________________________________________
+From: Xiong, Jinshan [jinshan.xiong at intel.com]
+Sent: Wednesday, May 06, 2015 1:42 PM
+To: Patrick Farrell
+Cc: lustre-devel at lists.lustre.org; Dilger, Andreas
+Subject: Re: Lock ahead: ldlm_completion_ast questions
 
 On May 6, 2015, at 9:38 AM, Patrick Farrell <paf at cray.com<mailto:paf@cray.com>> wrote:
 
