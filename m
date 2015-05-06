@@ -1,132 +1,59 @@
-From: Nathan Rutman <nathan.rutman@seagate.com>
-Date: Thu, 16 Apr 2015 18:29:19 -0000
-Subject: [lustre-devel] [Iudev] proposed version change for PTLRPC GSS
-In-Reply-To: <551518C3.70002@bull.net>
-References: <CAC2+cFgRWEEALvwhOiSdhiapkvE=VeeiZ_KeNihud0bxN8y2ew@mail.gmail.com>
-	<55111C81.5010009@bull.net>
-	<D13891F9.E8187%andreas.dilger@intel.com> <551518C3.70002@bull.net>
-Message-ID: <CAB_j=McMQ9c95BgnF3kTFAqSEpr7VRcC9txA8xCstwO4CpnwPg@mail.gmail.com>
+From: Patrick Farrell <paf@cray.com>
+Date: Wed, 6 May 2015 16:38:42 +0000
+Subject: [lustre-devel] Lock ahead: ldlm_completion_ast questions
+Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614C42E2E@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Sebastien, do these patches represent all the merged Kerberos changes?
-Or can these be landed independently of the others?
+Greetings,
 
+Trying the new list here, in the interest of having a bit more conversation and
+design in the open.
 
-*--*
+I've been continuing work on lock ahead, and I've run in to a pair of related
+problems I wanted to ask about.  I'll do them in two separate mails.
 
-*Nathan Rutman ? Principal Systems ArchitectSeagate Technology** ? *+1 503
-877-9507* ? *GMT-8
+Basically, these center around ldlm_completion_ast/ldlm_completion_ast_async
+and the LVB ready flag.
 
-On Fri, Mar 27, 2015 at 1:45 AM, Sebastien Buisson <
-sebastien.buisson@atos.net> wrote:
+Here's the first one.
 
-> Re-emitting because of issues with my email address.
-> --------
->
-> Hi,
->
-> As I understand the need for evolutions in the GSS code, I advocate the
-> review and merge of all patches related to Kerberos revival as soon as
-> possible. It would avoid painful rebase of work done by IU, or Kerberos
-> patches, or both.
-> The Kerberos revival patches waiting for review are:
-> http://review.whamcloud.com/14040
-> http://review.whamcloud.com/14041
-> http://review.whamcloud.com/14042
->
-> Best regards,
-> Sebastien.
->
->
-> Le 25/03/2015 22:25, Dilger, Andreas a ?crit :
->
->> Sebastien,
->> can you please also add lustre-devel at lists.lustre.org to the CC list for
->> this discussion.
->>
->> On 2015/03/24, 3:12 AM, "Sebastien Buisson" <sebastien.buisson@atos.net>
->> wrote:
->>
->>  Hi there,
->>>
->>> I agree we should not bother with backward compatibility. Kerberos
->>> revival patches aim at Lustre 2.8, so we are good if the modifications
->>> you propose also land in 2.8.
->>>
->>> Taking advantage of the opportunity to replace handle_nullreq with
->>> subflavor specific code is really nice, as those bits are really
->>> confusing for someone who tries to understand the code.
->>>
->>> Cheers,
->>> Sebastien.
->>>
->>>
->>> Le 24/03/2015 02:34, Jeremy Filizetti a ?crit :
->>>
->>>> On the phone call last week we discussed an increment of the
->>>> PTLRPC_GSS_VERSION to version 2 to allow some changes
->>>> changes/restructuring.  No one had any objections on the phone call but
->>>> I wanted to send it out for wider distribution and feedback.
->>>>
->>>> Changing the request format would allow us to support larger GSS token
->>>> sizes which today are limited (see ticket LU-3855).   From what I have
->>>> looked through so far the following seems to allow for larger tokens and
->>>> also allow some of these changes without having to worry about backwards
->>>> compatibility since it was never really "working" anyways.
->>>>
->>>> Change PTLRPC_GSS_VERSION to 2
->>>>
->>>> Enlarge GSS_CTX_INIT_MAX_LEN to something larger then 1024.   Ideally we
->>>> would support MaxTokenSize of 64k for the largest active directory
->>>> ticket: (see
->>>>
->>>> http://blogs.technet.com/b/shanecothran/archive/2010/07/
->>>> 16/maxtokensize-a
->>>> nd-kerberos-token-bloat.aspx).
->>>> The purpose of enlarging this is to support larger tokens.  The
->>>> sizeof(struct rsi) needs to remain under PAGE_SIZE right now with
->>>> rsi_request calling sunrpc_cache_pipe_upcall.  Since there is only one
->>>> lsvcgssd process supposed to be running maybe it would be acceptable to
->>>> use larger requests and just slightly modify rsi_request to incorporate
->>>> must of the functionality of sunrpc_cache_pipe_upcall.
->>>>
->>>> To keep things simple with the lsvcgssd and continue to use a single
->>>> channel proc file interface I'd like to AND the GSS subflavor onto most
->>>> significant bits of lustre_svc in struct rsi.  Instead of calling the
->>>> inappropriately named handle_nullreq things would be changed to handle
->>>> the multiple subflavors (gssnull, sk, krb5).  gssnull and sk won't have
->>>> a full userspace component so gss_accept_sec_context can't be called.
->>>>
->>>> Thoughts welcome.  I'm sure I missed something along the way here but
->>>> this is just what I have looked at so far.
->>>>
->>>> Thanks,
->>>> Jeremy
->>>>
->>>>
->>>> _______________________________________________
->>>> Iudev mailing list
->>>> Iudev at lists.opensfs.org
->>>> http://lists.opensfs.org/listinfo.cgi/iudev-opensfs.org
->>>>
->>>>  _______________________________________________
->>> Iudev mailing list
->>> Iudev at lists.opensfs.org
->>> http://lists.opensfs.org/listinfo.cgi/iudev-opensfs.org
->>>
->>>
->>
->> Cheers, Andreas
->>
->>  _______________________________________________
-> Iudev mailing list
-> Iudev at lists.opensfs.org
-> http://lists.opensfs.org/listinfo.cgi/iudev-opensfs.org
->
+Because the reply to an async request is handled by the PTLRPCD thread,
+async lock requests cannot use ldlm_completion_ast, because
+(as Oleg so memorably told us in Denver) we can't sleep in ptlrpcd threads.
+
+So I use ldlm_completion_ast_async for the lock ahead locks.
+The problem is, now, all of the users who attempt to use the lock will use that AST.
+
+That's a problem, because ldlm_completion_ast is where a thread that wants to
+use a lock on the waiting queue sleeps until that lock is granted.
+So if a lock ahead lock is on the waiting queue and another thread finds it in
+ldlm_lock_match, that thread calls ldlm_completion_ast_async, and does not sleep(!)
+waiting for the lock to be granted.
+
+My first thought for how to solve this is having a separate l_completion_ast_async
+pointer.  The only caller that needs (and should get) the async behavior is ptlrpcd
+via osc_enqueue_interpret, so it can call that instead of l_completion_ast.
+
+ptlrpcd uses osc_enqueue_interpret, which calls ldlm_cli_enqueue_fini, which then calls
+l_completion_ast.  I think it would be enough to add an "async" argument to
+ldlm_cli_enqueue_fini, and have osc_enqueue_interpret use that to make ldlm_cli_enqueue_fini
+call l_completion_ast_async instead.
+
+This would allow other users to wait correctly for lock ahead locks to be granted.
+
+Code implementing that will be going up shortly.  (I've tested it briefly and it seems to
+work.)
+
+Does that seem reasonable?  Is there another way it would be better to approach that one?
+
+Other question (which is a bit nastier) coming shortly.
+
+Thanks in advance,
+- Patrick Farrell
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150416/437565ab/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150506/0fa9fb3a/attachment-0001.htm>
