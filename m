@@ -1,135 +1,131 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 May 2015 18:46:18 -0400
-Subject: [lustre-devel] [PATCH 3/3] staging:lustre: cleanup libcfs lock
-	handling
-In-Reply-To: <uja.ornl@gmail.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Fri, 22 May 2015 14:15:36 +0300
+Subject: [lustre-devel] [PATCH 1/3] staging:lustre: remove tcpip
+	abstraction from libcfs
+In-Reply-To: <1432248378-28912-2-git-send-email-jsimmons@infradead.org>
 References: <uja.ornl@gmail.com>
-Message-ID: <1432248378-28912-4-git-send-email-jsimmons@infradead.org>
+	<1432248378-28912-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <20150522111536.GA19434@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Previously with libcfs being built for user land and kernel
-space wrappers were created to transparently handle locking.
-Now that user land support has been removed we delete all
-those locking wrappers with this patch. Many of those changes
-landed upstream but some nice cleanups still remain that are
-pushed in this patch.
+This patch does a lot of stuff all at once and it is hard to review.  It
+could easily be broken into patches which are easy to review.
 
-Signed-off-by: James Simmons <uja.ornl@gmail.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
-Reviewed-on: http://review.whamcloud.com/13793
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
----
- drivers/staging/lustre/lnet/lnet/acceptor.c        |    2 +-
- drivers/staging/lustre/lustre/libcfs/fail.c        |    2 +-
- .../lustre/lustre/libcfs/linux/linux-tracefile.c   |    4 +---
- drivers/staging/lustre/lustre/libcfs/module.c      |   11 ++---------
- drivers/staging/lustre/lustre/libcfs/tracefile.c   |    2 +-
- 5 files changed, 6 insertions(+), 15 deletions(-)
+> @@ -1378,15 +1378,15 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+>  	ksocknal_txlist_done(ni, &zombies, 1);
+>  	ksocknal_peer_decref(peer);
+>  
+> - failed_1:
+> +failed_1:
 
-diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
-index c44d3e0..a7c5785 100644
---- a/drivers/staging/lustre/lnet/lnet/acceptor.c
-+++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
-@@ -35,9 +35,9 @@
-  */
- 
- #define DEBUG_SUBSYSTEM S_LNET
-+#include <linux/completion.h>
- #include "../../include/linux/lnet/lib-lnet.h"
- 
--
- static int   accept_port    = 988;
- static int   accept_backlog = 127;
- static int   accept_timeout = 5;
-diff --git a/drivers/staging/lustre/lustre/libcfs/fail.c b/drivers/staging/lustre/lustre/libcfs/fail.c
-index 92444b0..7b7fc21 100644
---- a/drivers/staging/lustre/lustre/libcfs/fail.c
-+++ b/drivers/staging/lustre/lustre/libcfs/fail.c
-@@ -41,7 +41,7 @@ EXPORT_SYMBOL(cfs_fail_loc);
- unsigned int cfs_fail_val = 0;
- EXPORT_SYMBOL(cfs_fail_val);
- 
--wait_queue_head_t cfs_race_waitq;
-+DECLARE_WAIT_QUEUE_HEAD(cfs_race_waitq);
- EXPORT_SYMBOL(cfs_race_waitq);
- 
- int cfs_race_state;
-diff --git a/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c b/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c
-index 483cbc8..eb10e3b 100644
---- a/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c
-+++ b/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c
-@@ -49,7 +49,7 @@ static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
- 
- char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
- 
--struct rw_semaphore cfs_tracefile_sem;
-+static DECLARE_RWSEM(cfs_tracefile_sem);
- 
- int cfs_tracefile_init_arch(void)
- {
-@@ -57,8 +57,6 @@ int cfs_tracefile_init_arch(void)
- 	int    j;
- 	struct cfs_trace_cpu_data *tcd;
- 
--	init_rwsem(&cfs_tracefile_sem);
--
- 	/* initialize trace_data */
- 	memset(cfs_trace_data, 0, sizeof(cfs_trace_data));
- 	for (i = 0; i < CFS_TCD_TYPE_MAX; i++) {
-diff --git a/drivers/staging/lustre/lustre/libcfs/module.c b/drivers/staging/lustre/lustre/libcfs/module.c
-index f0ee76a..22fe9cf 100644
---- a/drivers/staging/lustre/lustre/libcfs/module.c
-+++ b/drivers/staging/lustre/lustre/libcfs/module.c
-@@ -67,8 +67,6 @@ MODULE_DESCRIPTION("Portals v3.1");
- MODULE_LICENSE("GPL");
- 
- extern struct miscdevice libcfs_dev;
--extern struct rw_semaphore cfs_tracefile_sem;
--extern struct mutex cfs_trace_thread_mutex;
- extern struct cfs_wi_sched *cfs_sched_rehash;
- extern void libcfs_init_nidstrings(void);
- 
-@@ -249,8 +247,8 @@ static int libcfs_psdev_release(unsigned long flags, void *args)
- 	return 0;
- }
- 
--static struct rw_semaphore ioctl_list_sem;
--static struct list_head ioctl_list;
-+static DECLARE_RWSEM(ioctl_list_sem);
-+static LIST_HEAD(ioctl_list);
- 
- int libcfs_register_ioctl(struct libcfs_ioctl_handler *hand)
- {
-@@ -393,11 +391,6 @@ static int init_libcfs_module(void)
- 
- 	libcfs_arch_init();
- 	libcfs_init_nidstrings();
--	init_rwsem(&cfs_tracefile_sem);
--	mutex_init(&cfs_trace_thread_mutex);
--	init_rwsem(&ioctl_list_sem);
--	INIT_LIST_HEAD(&ioctl_list);
--	init_waitqueue_head(&cfs_race_waitq);
- 
- 	rc = libcfs_debug_init(5 * 1024 * 1024);
- 	if (rc < 0) {
-diff --git a/drivers/staging/lustre/lustre/libcfs/tracefile.c b/drivers/staging/lustre/lustre/libcfs/tracefile.c
-index c86394f..6ee2adc 100644
---- a/drivers/staging/lustre/lustre/libcfs/tracefile.c
-+++ b/drivers/staging/lustre/lustre/libcfs/tracefile.c
-@@ -52,7 +52,7 @@ union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline
- char cfs_tracefile[TRACEFILE_NAME_SIZE];
- long long cfs_tracefile_size = CFS_TRACEFILE_SIZE;
- static struct tracefiled_ctl trace_tctl;
--struct mutex cfs_trace_thread_mutex;
-+static DEFINE_MUTEX(cfs_trace_thread_mutex);
- static int thread_running;
- 
- static atomic_t cfs_tage_allocated = ATOMIC_INIT(0);
--- 
-1.7.1
+Do unrelated white space changes in a different patch.  It just makes
+reviewing complicated to mix easy to review white space changes in with
+everything else.
+
+>  	if (hello != NULL)
+>  		LIBCFS_FREE(hello, offsetof(ksock_hello_msg_t,
+>  					    kshm_ips[LNET_MAX_INTERFACES]));
+>  
+>  	LIBCFS_FREE(conn, sizeof(*conn));
+>  
+> - failed_0:
+> -	libcfs_sock_release(sock);
+> +failed_0:
+> +	sock_release(sock);
+
+Do a rename patch by itself.  You can rename a bunch of functions at the
+same time, that's fine.  Personally, you can even move the functions
+between files, that's also fine with me and doesn't complicate my
+review.
+
+Ok in this next section we move functions around and rename them but
+also introduce some bad changes in the new function.
+
+> +static int
+> +lnet_sock_ioctl(int cmd, unsigned long arg)
+> +{
+> +	struct file *sock_filp;
+> +	struct socket *sock;
+> +	int fd = -1;
+> +	int rc;
+> +
+> +	rc = sock_create(PF_INET, SOCK_STREAM, 0, &sock);
+> +	if (rc != 0) {
+> +		CERROR("Can't create socket: %d\n", rc);
+> +		return rc;
+> +	}
+> +
+> +	sock_filp = sock_alloc_file(sock, 0, NULL);
+> +	if (!sock_filp) {
+
+
+sock_alloc_file() never returns NULL, only valid pointers on success or
+ERR_PTRs on failue.
+
+
+> +		rc = -ENOMEM;
+> +		sock_release(sock);
+> +		goto out;
+> +	}
+> +
+> +	rc = kernel_sock_unlocked_ioctl(sock_filp, cmd, arg);
+
+This is an unrelated cleanup.  Do it in a different patch.
+
+> +
+> +	fput(sock_filp);
+> +out:
+> +	if (fd >= 0)
+> +		sys_close(fd);
+
+This is a new change as well.  "fd" is always -1 so this is dead code.
+
+> +	return rc;
+> +}
+> +
+
+Here is the old function:
+
+> -static int
+> -libcfs_sock_ioctl(int cmd, unsigned long arg)
+> -{
+> -	mm_segment_t	oldmm = get_fs();
+> -	struct socket  *sock;
+> -	int		rc;
+> -	struct file    *sock_filp;
+> -
+> -	rc = sock_create (PF_INET, SOCK_STREAM, 0, &sock);
+> -	if (rc != 0) {
+> -		CERROR ("Can't create socket: %d\n", rc);
+> -		return rc;
+> -	}
+> -
+> -	sock_filp = sock_alloc_file(sock, 0, NULL);
+> -	if (IS_ERR(sock_filp)) {
+
+This check was correct in the original.
+
+> -		sock_release(sock);
+> -		rc = PTR_ERR(sock_filp);
+> -		goto out;
+> -	}
+> -
+> -	set_fs(KERNEL_DS);
+> -	if (sock_filp->f_op->unlocked_ioctl)
+> -		rc = sock_filp->f_op->unlocked_ioctl(sock_filp, cmd, arg);
+> -	set_fs(oldmm);
+> -
+> -	fput(sock_filp);
+> -out:
+> -	return rc;
+> -}
+
+This patch has some bug fixes as well.  Those should be sent as one
+patch per bugfix with a proper changelog.
+
+regards,
+dan carpenter
