@@ -1,131 +1,109 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Fri, 22 May 2015 14:15:36 +0300
-Subject: [lustre-devel] [PATCH 1/3] staging:lustre: remove tcpip
-	abstraction from libcfs
-In-Reply-To: <1432248378-28912-2-git-send-email-jsimmons@infradead.org>
+Date: Fri, 22 May 2015 16:00:19 +0300
+Subject: [lustre-devel] [PATCH 2/3] staging:lustre: remove kernel
+ defines in userland headers
+In-Reply-To: <1432248378-28912-3-git-send-email-jsimmons@infradead.org>
 References: <uja.ornl@gmail.com>
-	<1432248378-28912-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <20150522111536.GA19434@mwanda>
+	<1432248378-28912-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <20150522130019.GN4150@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This patch does a lot of stuff all at once and it is hard to review.  It
-could easily be broken into patches which are easy to review.
+This patch seems fine but it would also be better if it were broken up
+into easy to review patches.
 
-> @@ -1378,15 +1378,15 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
->  	ksocknal_txlist_done(ni, &zombies, 1);
->  	ksocknal_peer_decref(peer);
->  
-> - failed_1:
-> +failed_1:
+[patch 1] delete LNET_USE_LIB_FREELIST code
+	This is theortetically what this patch does except it does tons
+	of other things as well.
 
-Do unrelated white space changes in a different patch.  It just makes
-reviewing complicated to mix easy to review white space changes in with
-everything else.
+Patches which delete whole functions, #defines or from #ifdef to #endif
+are normally easy to review.  When there are + lines it is hard.
 
->  	if (hello != NULL)
->  		LIBCFS_FREE(hello, offsetof(ksock_hello_msg_t,
->  					    kshm_ips[LNET_MAX_INTERFACES]));
->  
->  	LIBCFS_FREE(conn, sizeof(*conn));
->  
-> - failed_0:
-> -	libcfs_sock_release(sock);
-> +failed_0:
-> +	sock_release(sock);
+[patch 2] move things around (i guess)?
+[patch 3] white space fixes
+[patch 4] get rid of lnet_eq_free_locked() and macro friends.
+[patch 5] rename CamelCase functions
+[patch 6] clean up lnet_msg_container_setup()
 
-Do a rename patch by itself.  You can rename a bunch of functions at the
-same time, that's fine.  Personally, you can even move the functions
-between files, that's also fine with me and doesn't complicate my
-review.
+>  typedef struct lnet_peer {
+> -	struct list_head	lp_hashlist;	  /* chain on peer hash */
+> -	struct list_head	lp_txq;	       /* messages blocking for tx credits */
+> -	struct list_head	lp_rtrq;	      /* messages blocking for router credits */
+> -	struct list_head	lp_rtr_list;	  /* chain on router list */
+> -	int	       lp_txcredits;	 /* # tx credits available */
+> -	int	       lp_mintxcredits;      /* low water mark */
+> -	int	       lp_rtrcredits;	/* # router credits */
+> -	int	       lp_minrtrcredits;     /* low water mark */
+> -	unsigned int      lp_alive:1;	   /* alive/dead? */
+> -	unsigned int      lp_notify:1;	  /* notification outstanding? */
+> -	unsigned int      lp_notifylnd:1;       /* outstanding notification for LND? */
+> -	unsigned int      lp_notifying:1;       /* some thread is handling notification */
+> -	unsigned int      lp_ping_notsent;      /* SEND event outstanding from ping */
+> -	int	       lp_alive_count;       /* # times router went dead<->alive */
+> -	long	      lp_txqnob;	    /* bytes queued for sending */
+> -	unsigned long	lp_timestamp;	 /* time of last aliveness news */
+> -	unsigned long	lp_ping_timestamp;    /* time of last ping attempt */
+> -	unsigned long	lp_ping_deadline;     /* != 0 if ping reply expected */
+> -	unsigned long	lp_last_alive;	/* when I was last alive */
+> -	unsigned long	lp_last_query;	/* when lp_ni was queried last time */
+> -	lnet_ni_t	*lp_ni;		/* interface peer is on */
+> -	lnet_nid_t	lp_nid;	       /* peer's NID */
+> -	int	       lp_refcount;	  /* # refs */
+> -	int			lp_cpt;		/* CPT this peer attached on */
+> +	/* chain on peer hash */
+> +	struct list_head	lp_hashlist;
+> +	/* messages blocking for tx credits */
+> +	struct list_head	lp_txq;
+> +	/* messages blocking for router credits */
+> +	struct list_head	lp_rtrq;
+> +	/* chain on router list */
+> +	struct list_head	lp_rtr_list;
+> +	/* # tx credits available */
+> +	int			lp_txcredits;
+> +	/* low water mark */
+> +	int			lp_mintxcredits;
+> +	/* # router credits */
+> +	int			lp_rtrcredits;
+> +	/* low water mark */
+> +	int			lp_minrtrcredits;
+> +	/* alive/dead? */
+> +	unsigned int		lp_alive:1;
+> +	/* notification outstanding? */
+> +	unsigned int		lp_notify:1;
+> +	/* outstanding notification for LND? */
+> +	unsigned int		lp_notifylnd:1;
+> +	/* some thread is handling notification */
+> +	unsigned int		lp_notifying:1;
+> +	/* SEND event outstanding from ping */
+> +	unsigned int		lp_ping_notsent;
+> +	/* # times router went dead<->alive */
+> +	int			lp_alive_count;
+> +	/* bytes queued for sending */
+> +	long			lp_txqnob;
+> +	/* time of last aliveness news */
+> +	unsigned long		lp_timestamp;
+> +	/* time of last ping attempt */
+> +	unsigned long		lp_ping_timestamp;
+> +	/* != 0 if ping reply expected */
+> +	unsigned long		lp_ping_deadline;
+> +	/* when I was last alive */
+> +	unsigned long		lp_last_alive;
+> +	/* when lp_ni was queried last time */
+> +	unsigned long		lp_last_query;
+> +	/* interface peer is on */
+> +	lnet_ni_t		*lp_ni;
+> +	/* peer's NID */
+> +	lnet_nid_t		lp_nid;
+> +	/* # refs */
+> +	int			lp_refcount;
+> +	/* CPT this peer attached on */
+> +	int			lp_cpt;
 
-Ok in this next section we move functions around and rename them but
-also introduce some bad changes in the new function.
-
-> +static int
-> +lnet_sock_ioctl(int cmd, unsigned long arg)
-> +{
-> +	struct file *sock_filp;
-> +	struct socket *sock;
-> +	int fd = -1;
-> +	int rc;
-> +
-> +	rc = sock_create(PF_INET, SOCK_STREAM, 0, &sock);
-> +	if (rc != 0) {
-> +		CERROR("Can't create socket: %d\n", rc);
-> +		return rc;
-> +	}
-> +
-> +	sock_filp = sock_alloc_file(sock, 0, NULL);
-> +	if (!sock_filp) {
-
-
-sock_alloc_file() never returns NULL, only valid pointers on success or
-ERR_PTRs on failue.
-
-
-> +		rc = -ENOMEM;
-> +		sock_release(sock);
-> +		goto out;
-> +	}
-> +
-> +	rc = kernel_sock_unlocked_ioctl(sock_filp, cmd, arg);
-
-This is an unrelated cleanup.  Do it in a different patch.
-
-> +
-> +	fput(sock_filp);
-> +out:
-> +	if (fd >= 0)
-> +		sys_close(fd);
-
-This is a new change as well.  "fd" is always -1 so this is dead code.
-
-> +	return rc;
-> +}
-> +
-
-Here is the old function:
-
-> -static int
-> -libcfs_sock_ioctl(int cmd, unsigned long arg)
-> -{
-> -	mm_segment_t	oldmm = get_fs();
-> -	struct socket  *sock;
-> -	int		rc;
-> -	struct file    *sock_filp;
-> -
-> -	rc = sock_create (PF_INET, SOCK_STREAM, 0, &sock);
-> -	if (rc != 0) {
-> -		CERROR ("Can't create socket: %d\n", rc);
-> -		return rc;
-> -	}
-> -
-> -	sock_filp = sock_alloc_file(sock, 0, NULL);
-> -	if (IS_ERR(sock_filp)) {
-
-This check was correct in the original.
-
-> -		sock_release(sock);
-> -		rc = PTR_ERR(sock_filp);
-> -		goto out;
-> -	}
-> -
-> -	set_fs(KERNEL_DS);
-> -	if (sock_filp->f_op->unlocked_ioctl)
-> -		rc = sock_filp->f_op->unlocked_ioctl(sock_filp, cmd, arg);
-> -	set_fs(oldmm);
-> -
-> -	fput(sock_filp);
-> -out:
-> -	return rc;
-> -}
-
-This patch has some bug fixes as well.  Those should be sent as one
-patch per bugfix with a proper changelog.
+This new block of declarations is uglier than the original.  Don't make
+things uglier.
 
 regards,
 dan carpenter
