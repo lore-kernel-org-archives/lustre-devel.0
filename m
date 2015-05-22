@@ -1,79 +1,79 @@
-From: Julia Lawall <julia.lawall@lip6.fr>
-Date: Fri, 22 May 2015 07:06:47 +0200 (CEST)
-Subject: [lustre-devel] [PATCH v4 10/13] staging: lustre: lnet: lnet:
- checkpatch.pl fixes
-In-Reply-To: <CABqvwjuKypiacf3336j-q450FGKaO4wh0Ld7PF8MGz0VPsYBbw@mail.gmail.com>
-References: <1432237849-53947-1-git-send-email-shuey@purdue.edu>
-	<1432237849-53947-11-git-send-email-shuey@purdue.edu>
-	<1432242004.20840.68.camel@perches.com>
-	<alpine.DEB.2.10.1505212328500.5370@hadrien>
-	<CABqvwjuKypiacf3336j-q450FGKaO4wh0Ld7PF8MGz0VPsYBbw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.10.1505220704541.2672@hadrien>
+From: Joe Perches <joe@perches.com>
+Date: Fri, 22 May 2015 08:24:34 -0700
+Subject: [lustre-devel] [PATCH 2/3] staging:lustre: remove kernel
+ defines in userland headers
+In-Reply-To: <b5d34de937b54607b8c8f715bfade82a@EXCHCS32.ornl.gov>
+References: <uja.ornl@gmail.com>
+	<1432248378-28912-3-git-send-email-jsimmons@infradead.org>
+	<20150522130019.GN4150@mwanda>
+	<b5d34de937b54607b8c8f715bfade82a@EXCHCS32.ornl.gov>
+Message-ID: <1432308274.29657.15.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, 21 May 2015, Michael Shuey wrote:
+On Fri, 2015-05-22 at 15:12 +0000, Simmons, James A. wrote:
+> >>  typedef struct lnet_peer {
+> >> -	struct list_head	lp_hashlist;	  /* chain on peer hash */
+> >> -	struct list_head	lp_txq;	       /* messages blocking for tx credits */
+> >> -	struct list_head	lp_rtrq;	      /* messages blocking for router credits */
+> >> -	struct list_head	lp_rtr_list;	  /* chain on router list */
+> >> -	int	       lp_txcredits;	 /* # tx credits available */
+> >> -	int	       lp_mintxcredits;      /* low water mark */
+> >> -	int	       lp_rtrcredits;	/* # router credits */
+> >> -	int	       lp_minrtrcredits;     /* low water mark */
+> >> -	unsigned int      lp_alive:1;	   /* alive/dead? */
+> >> -	unsigned int      lp_notify:1;	  /* notification outstanding? */
+> >> -	unsigned int      lp_notifylnd:1;       /* outstanding notification for LND? */
+> >> -	unsigned int      lp_notifying:1;       /* some thread is handling notification */
+> >> -	unsigned int      lp_ping_notsent;      /* SEND event outstanding from ping */
+> >> -	int	       lp_alive_count;       /* # times router went dead<->alive */
+> >> -	long	      lp_txqnob;	    /* bytes queued for sending */
+> >> -	unsigned long	lp_timestamp;	 /* time of last aliveness news */
+> >> -	unsigned long	lp_ping_timestamp;    /* time of last ping attempt */
+> >> -	unsigned long	lp_ping_deadline;     /* != 0 if ping reply expected */
+> >> -	unsigned long	lp_last_alive;	/* when I was last alive */
+> >> -	unsigned long	lp_last_query;	/* when lp_ni was queried last time */
+> >> -	lnet_ni_t	*lp_ni;		/* interface peer is on */
+> >> -	lnet_nid_t	lp_nid;	       /* peer's NID */
+> >> -	int	       lp_refcount;	  /* # refs */
+> >> -	int			lp_cpt;		/* CPT this peer attached on */
+> >> +	/* chain on peer hash */
+> >> +	struct list_head	lp_hashlist;
+> >> +	/* messages blocking for tx credits */
+> >> +	struct list_head	lp_txq;
+> >> +	/* messages blocking for router credits */
+> >> +	struct list_head	lp_rtrq;
+> >> +	/* chain on router list */
+> >> +	struct list_head	lp_rtr_list;
+> >> +	/* # tx credits available */
+> >> +	int			lp_txcredits;
+> >> +	/* low water mark */
+> >> +	int			lp_mintxcredits;
+> >> +	/* # router credits */
+> >> +	int			lp_rtrcredits;
+> >> +	/* low water mark */
+> >> +	int			lp_minrtrcredits;
+> >> +	/* alive/dead? */
+> >> +	unsigned int		lp_alive:1;
+> >> +	/* notification outstanding? */
+> >> +	unsigned int		lp_notify:1;
+> >> +	/* outstanding notification for LND? */
+> >> +	unsigned int		lp_notifylnd:1;
+> >
+> >This new block of declarations is uglier than the original.  Don't make
+> >things uglier.
+> 
+> Might be ugly but it makes checkpatch.pl happy.  So it is a choice between
+> making checkpatch.pl happy about staying in the 80 character limit or looking
+> nice and chekpatch.pl being unhappy.
 
-> That's a task (of many) I've been putting on the back burner until the code
-> is cleaner.? It's also a HUGE change, since there are debug macros
-> everywhere, and they all check a #define'd mask to see if they should fire,
-> and the behavior is likely governed by parts of the lustre user land tools
-> as well.
->
-> Suggestions are welcome.? Do other parts of the linux kernel define complex
-> debugging macros like these, or is this a lustre-ism?? Any suggestions on
-> how to handle this more in line with existing drivers?
+I would choose looking nice every time.
 
-Once you decide what to do, you can use Coccinelle to make the changes for
-you.  So you shouldn't be put off by the number of code sites to change.
+checkpatch is stupid.  Please don't let it control you.
 
-The normal functions are pr_err, pr_warn, etc.  Perhaps you can follow
-Joe's suggestions if you really need something more complicated.
-
-julia
->
-> --
-> Mike Shuey
->
-> On Thu, May 21, 2015 at 5:29 PM, Julia Lawall <julia.lawall@lip6.fr> wrote:
-> >
-> >
-> >
-> > On Thu, 21 May 2015, Joe Perches wrote:
-> >
-> > > On Thu, 2015-05-21 at 15:50 -0400, Mike Shuey wrote:
-> > > > Fix many checkpatch.pl warnings.
-> > > []
-> > > > diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c
-> b/drivers/staging/lustre/lnet/lnet/acceptor.c
-> > > []
-> > > > @@ -99,38 +99,42 @@ lnet_connect_console_error(int rc, lnet_nid_t
-> peer_nid,
-> > > > ? ? switch (rc) {
-> > > > ? ? /* "normal" errors */
-> > > > ? ? case -ECONNREFUSED:
-> > > > - ? ? ? ? ? CNETERR("Connection to %s at host %pI4h on port %d was
-> refused: check that Lustre is running on that node.\n",
-> > > > - ? ? ? ? ? ? ? ? ? libcfs_nid2str(peer_nid),
-> > > > - ? ? ? ? ? ? ? ? ? &peer_ip, peer_port);
-> > > > + ? ? ? ? ? CNETERR(
-> > > > + ? ? ? ? ? ? ? ? ? "Connection to %s at host %pI4h on port %d was
-> refused: check that Lustre is running on that node.\n",
-> > > > + ? ? ? ? ? ? ? ? ? libcfs_nid2str(peer_nid), &peer_ip, peer_port);
-> > >
-> > > These are not improvements and checkpatch messages aren't dicta.
-> > >
-> > > Please don't convert code unless the conversion makes it better
-> > > for a human reader.
-> > >
-> > > These don't.
-> >
-> > I haven't looked into it, but perhaps there is a standard kernel printing
-> > function that these could be converted to directly?
-> >
-> > julia
->
->
+Maybe it'd be better to add another --ignore type just for
+comments that extend longer than the maximum line length to
+checkpatch.
