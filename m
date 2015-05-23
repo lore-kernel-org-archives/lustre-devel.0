@@ -1,65 +1,37 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Sat, 23 May 2015 03:13:42 +0000
-Subject: [lustre-devel] [HPDD-discuss] [PATCH v4 10/13] staging: lustre:
- lnet: lnet: checkpatch.pl fixes
-In-Reply-To: <1432341390.29657.29.camel@perches.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Sat, 23 May 2015 13:14:28 +0300
+Subject: [lustre-devel] [PATCH v4 00/13] staging: lustre: lnet: code
+	cleanups
+In-Reply-To: <CABqvwjsJXJYciMDHqy9vEdL6dGLhx3+Pi0_ro6192Z5SGR9Q_w@mail.gmail.com>
 References: <1432237849-53947-1-git-send-email-shuey@purdue.edu>
-	<1432237849-53947-11-git-send-email-shuey@purdue.edu>
-	<1432242004.20840.68.camel@perches.com>
-	<alpine.DEB.2.10.1505212328500.5370@hadrien>
-	<CABqvwjuKypiacf3336j-q450FGKaO4wh0Ld7PF8MGz0VPsYBbw@mail.gmail.com>
-	<alpine.DEB.2.10.1505220704541.2672@hadrien>
-	<15C0AFDB-CA69-40E5-B65E-C559A5B5CE47@intel.com>
-	<1432309337.29657.16.camel@perches.com>
-	<05DE4AF3-20A6-40F6-BAC6-79C140E490AF@intel.com>
-	<1432339030.29657.20.camel@perches.com>
-	<863F0D66-99B1-4658-8A99-E3A843E0E8FC@intel.com>
-	<1432340285.29657.26.camel@perches.com>
-	<467D21EA-E5E8-4F16-AABD-31D79062FFF9@intel.com>,
-	<1432341390.29657.29.camel@perches.com>
-Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614C88534@CFWEX01.americas.cray.com>
+	<20150522092142.GJ4150@mwanda>
+	<CABqvwjsJXJYciMDHqy9vEdL6dGLhx3+Pi0_ro6192Z5SGR9Q_w@mail.gmail.com>
+Message-ID: <20150523101428.GX22558@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Since it is not actually doing a printk - at least, not necessarily - I like lustre_logmsg.  lustre_output seems too vague.
+We would have applied the v3 patchset but now I don't know because we're
+up to v5.  We can't apply v5 because there are problems with it.  No
+one responded to v3 so Greg still might apply it or he might find these
+email threads too scrambled and delete everything and ask for a resend.
 
-- Patrick
-________________________________________
-From: HPDD-discuss [hpdd-discuss-bounces at lists.01.org] on behalf of Joe Perches [joe at perches.com]
-Sent: Friday, May 22, 2015 7:36 PM
-To: Drokin, Oleg
-Cc: <devel@driverdev.osuosl.org>; <gregkh@linuxfoundation.org>; <kernel-janitors@vger.kernel.org>; <linux-kernel@vger.kernel.org>; Julia Lawall; <HPDD-discuss@ml01.01.org>; <lustre-devel@lists.lustre.org>
-Subject: Re: [HPDD-discuss] [PATCH v4 10/13] staging: lustre: lnet: lnet: checkpatch.pl fixes
+It's pretty messed up so just wait for Greg to get to it before sending
+more patches?
 
-On Sat, 2015-05-23 at 00:25 +0000, Drokin, Oleg wrote:
-> On May 22, 2015, at 8:18 PM, Joe Perches wrote:
-> >>>> I wonder what is more clear about that in your opinion ve
-> >>>> lustre_error/lustre_debug?
-> >>>
-> >>> The fact that you have to explain this shows that it's
-> >>> at least misleading unless you completely understand the
-> >>> code.
-> >>
-> >> Or you know, you might take the function name at the face value
-> >> and assume that CERROR means it's an error and CDEBUG means it's a debug message?
-> >
-> > Maybe, but I think that it'd be better if the mechanism
-> > it uses was more plainly named something like lustre_log.
->
-> While the idea seems good, the biggest obstacle here is such that
-> there's already a thing called lustre log (llog for short too) -
-> it's kind of a distributed journal of operations.
->
-> Its there a different synonym, I wonder?
+Basically you should only send patches which you assume will be applied.
+If no one responds after 3 days then probably that means everyone from
+the peanut gallery (Me, Sudip, Joe, the lustre devs), we don't have an
+issue.  Then Greg does the last review (2-3 weeks later perhaps).  But
+if it makes it past all the other reviews then generally Greg also will
+be ok with it.
 
-Maybe: lustre_printk, lustre_logmsg, lustre_output
+Greg applies patches in first come, first applied order.  If they don't
+apply then you have to redo it.  He doesn't invest a lot of time into
+figuring out why.  So you have to coordinate with the other devs, it's
+up to you how you do that.
 
-
-
-_______________________________________________
-HPDD-discuss mailing list
-HPDD-discuss at lists.01.org
-https://lists.01.org/mailman/listinfo/hpdd-discuss
+regards,
+dan carpenter
