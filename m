@@ -1,29 +1,25 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Mon, 25 May 2015 12:37:38 +0300
-Subject: [lustre-devel] [PATCH 5/6] staging:lustre: style cleanups for
-	lib-socket.c
-In-Reply-To: <1432319552-10479-6-git-send-email-jsimmons@infradead.org>
-References: <uja.ornl@gmail.com>
-	<1432319552-10479-6-git-send-email-jsimmons@infradead.org>
-Message-ID: <20150525093737.GS4150@mwanda>
+From: Mohr Jr, Richard Frank (Rick Mohr) <rmohr@utk.edu>
+Date: Tue, 26 May 2015 15:08:44 +0000
+Subject: [lustre-devel] lustre design docs
+In-Reply-To: <69BD0579-A188-4012-8926-3F55CF5E1BF9@seagate.com>
+References: <69BD0579-A188-4012-8926-3F55CF5E1BF9@seagate.com>
+Message-ID: <0B18B94D-6B1C-44F8-B98A-0BB0DD095FEA@utk.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, May 22, 2015 at 02:32:31PM -0400, James Simmons wrote:
-> @@ -167,13 +164,14 @@ lnet_ipif_enumerate (char ***namesp)
->  		if (nalloc * sizeof(*ifr) > PAGE_CACHE_SIZE) {
->  			toobig = 1;
->  			nalloc = PAGE_CACHE_SIZE/sizeof(*ifr);
-> -			CWARN("Too many interfaces: only enumerating first %d\n",
-> -			      nalloc);
-> +			CWARN("Too many interfaces: only enumerating "
-> +			      "first %d\n", nalloc);
->  		}
 
-Don't split string literals, it makes them hard to grep for.
+> On May 20, 2015, at 2:06 PM, Vitaly Fertman <vitaly.fertman@seagate.com> wrote:
+> 
+> there was an idea to publish existing design docs on opensfs wiki.
+> is centralised design repository interesting at all?
 
-regards,
-dan carpenter
+I think that is a good idea.  Consolidating the design docs in a single location (or at least links that point to them) would certainly make it easier to track them down.
+
+--
+Rick Mohr
+Senior HPC System Administrator
+National Institute for Computational Sciences
+http://www.nics.tennessee.edu
