@@ -1,30 +1,32 @@
-From: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
-Date: Sat, 23 May 2015 18:09:04 +0530
-Subject: [lustre-devel] [PATCH v4 00/13] staging: lustre: lnet: code
-	cleanups
-In-Reply-To: <CABqvwjvKg1yK2b=2+ASGvJ4xT3Sq4XMhY70makjwccj+duvAEQ@mail.gmail.com>
-References: <1432237849-53947-1-git-send-email-shuey@purdue.edu>
-	<20150522092142.GJ4150@mwanda>
-	<CABqvwjsJXJYciMDHqy9vEdL6dGLhx3+Pi0_ro6192Z5SGR9Q_w@mail.gmail.com>
-	<20150523101428.GX22558@mwanda>
-	<CABqvwjvKg1yK2b=2+ASGvJ4xT3Sq4XMhY70makjwccj+duvAEQ@mail.gmail.com>
-Message-ID: <20150523123904.GA12407@sudip-PC>
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Wed, 27 May 2015 15:01:37 +0000
+Subject: [lustre-devel] [PATCH 5/6] staging:lustre: style cleanups
+	for	lib-socket.c
+In-Reply-To: <20150525093737.GS4150@mwanda>
+References: <uja.ornl@gmail.com>
+	<1432319552-10479-6-git-send-email-jsimmons@infradead.org>
+	<20150525093737.GS4150@mwanda>
+Message-ID: <dd9883629dd64028b5c4e6a33d17a431@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sat, May 23, 2015 at 08:09:54AM -0400, Michael Shuey wrote:
-> BTW, you keep mentioning a v5 that I sent.  Where is that, exactly?
-> The last round of patches I sent I've kept labeled as "PATCH v4", and
-> I only hit git send-email once.  Could you forward me something from
-> this v5 series, so I could see if anything is amiss on my end?
+>>On Fri, May 22, 2015 at 02:32:31PM -0400, James Simmons wrote:
+>> @@ -167,13 +164,14 @@ lnet_ipif_enumerate (char ***namesp)
+>>  		if (nalloc * sizeof(*ifr) > PAGE_CACHE_SIZE) {
+>>  			toobig = 1;
+>>  			nalloc = PAGE_CACHE_SIZE/sizeof(*ifr);
+>> -			CWARN("Too many interfaces: only enumerating first %d\n",
+>> -			      nalloc);
+>> +			CWARN("Too many interfaces: only enumerating "
+>> +			      "first %d\n", nalloc);
+>>  		}
+>
+>Don't split string literals, it makes them hard to grep for.
 
-I think it was not a v5. But what happened is in your series some
-of the patches were marked as v4 and some were not having any version
-so it appeared like a fresh series again. Like 1/13,2/13,3/13 has v4
-but the others donot have a version.
-
-regards
-sudip
+Will fix. The CWARN will go over 80 characters but from the recent emails that is more acceptable.
+If this is the only problem then this patch set it ready.  I have more patch series that are dependent
+on this first one. Should I push the other patch series with a note that it is dependent on the tcpip
+cleanup or wait until it is merged? Also how does one find out when the patch has been merged?
