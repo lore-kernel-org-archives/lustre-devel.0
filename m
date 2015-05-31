@@ -1,50 +1,44 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Wed, 27 May 2015 21:15:36 +0000
-Subject: [lustre-devel] Possible minor bug
-In-Reply-To: <D18B8A8A.F359D%andreas.dilger@intel.com>
-References: <D18B8A8A.F359D%andreas.dilger@intel.com>
-Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614C8947B@CFWEX01.americas.cray.com>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Sun, 31 May 2015 11:24:56 +0900
+Subject: [lustre-devel] [PATCH v4 00/13] staging: lustre: lnet: code
+	cleanups
+In-Reply-To: <CABqvwjtPdX4yfEob+LwurrT=ACdhNkwS8u9Zh9-gjBH6oo56Nw@mail.gmail.com>
+References: <1432237849-53947-1-git-send-email-shuey@purdue.edu>
+	<20150522092142.GJ4150@mwanda>
+	<CABqvwjsJXJYciMDHqy9vEdL6dGLhx3+Pi0_ro6192Z5SGR9Q_w@mail.gmail.com>
+	<20150523101428.GX22558@mwanda>
+	<CABqvwjvKg1yK2b=2+ASGvJ4xT3Sq4XMhY70makjwccj+duvAEQ@mail.gmail.com>
+	<20150523123904.GA12407@sudip-PC>
+	<CABqvwjtPdX4yfEob+LwurrT=ACdhNkwS8u9Zh9-gjBH6oo56Nw@mail.gmail.com>
+Message-ID: <20150531022456.GA30873@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ok, thanks.
+A: No.
+Q: Should I include quotations after my reply?
 
-Here's the LU:
-https://jira.hpdd.intel.com/browse/LU-6656
-________________________________________
-From: Dilger, Andreas [andreas.dilger at intel.com]
-Sent: Wednesday, May 27, 2015 3:55 PM
-To: Patrick Farrell
-Cc: lustre-devel at lists.lustre.org
-Subject: Re: [lustre-devel] Possible minor bug
+http://daringfireball.net/2007/07/on_top
 
-On 2015/05/27, 2:03 PM, "Patrick Farrell" <paf at cray.com<mailto:paf@cray.com>> wrote:
+On Sat, May 23, 2015 at 10:05:27AM -0400, Michael Shuey wrote:
+> Ah - that explains it.  I added additional files to the series, but
+> simply re-applied the original round of patches.  They would've not
+> been tagged as v4, while the patches pertaining to the newly-modified
+> files had v4 in the subject.
 
-While doing some other work, I noticed something I believe is a potential problem in the server side quota code.
+The way you sent these is a mess, I can't sort by subject and apply them
+properly.
 
-Specifically, in qmt_glimpse_lock:
+Either put the v4 at the front, for all patches, like this:
+	[PATCH v4 01/13]
+or at the end of the number:
+	[PATCH 01/13 v4]
+so I can sort them.
 
-While the resource lock (a spin lock) is held, it does
+Please fix up and resend this series, I've dropped it from my queue.
 
-OBD_ALLOC_PTR(work);
+thanks,
 
-Since allocations can sleep, doesn't this allocation need to be atomic?
-
-So, following the current Lustre convention, it should be:
-LIBCFS_ALLOC_ATOMIC(work, sizeof(struct
-ldlm_glimpse_work));
-
-You could also use OBD_ALLOC_GFP(work, sizeof(*work), GFP_ATOMIC), which is equivalent, but at least keeps the same paradigm of other allocations in this code.
-
-I have seen no actual bugs from this, but I hit a hang while modifying the equivalent code in ofd_intent_policy for lock ahead, and I think the same hang is theoretically possible here.  My understanding is that, in general, doing allocations while holding a spin lock is not recommended.
-
-Not only not recommended, but not allowed for GFP_NOFS allocations.  Probably if you had CONFIG_DEBUG_SPINLOCK or similar enabled, you would get a warning here due to __might_sleep() in the allocation path.
-
-I'm hoping for other input before I go further - Am I right that this is something which needs fixing?  If so, I'll open an LU and submit a patch.
-
-Yes, please do.
-
-Cheers, Andreas
+greg k-h
