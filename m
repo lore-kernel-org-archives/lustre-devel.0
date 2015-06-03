@@ -1,59 +1,93 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Wed, 3 Jun 2015 15:27:45 -0500
-Subject: [lustre-devel] Lustre and libreadline
-In-Reply-To: <20150603185716.GA10033@llnl.gov>
-References: <556F4825.1050408@cray.com> <20150603185716.GA10033@llnl.gov>
-Message-ID: <556F6341.3070507@cray.com>
+From: Colin Faber <colin.faber@seagate.com>
+Date: Wed, 3 Jun 2015 14:32:53 -0600
+Subject: [lustre-devel] OpenID 2.0 and Gerrit 2.11
+In-Reply-To: <1637F3AC-75FF-4EEC-8777-4FBF9FCDB60B@intel.com>
+References: <CAPALmn=6cNyRPhCQe_4A+hqJueP0yKh4vP13JE3KiucCk3SE4w@mail.gmail.com>
+	<556F5BA7.1020301@llnl.gov>
+	<CAPALmnmXbE_VLSvrUBA-NgLz1XDsr3Lz2m886KVNU8KYvwgbgg@mail.gmail.com>
+	<1637F3AC-75FF-4EEC-8777-4FBF9FCDB60B@intel.com>
+Message-ID: <CAPALmnkGyQ6Fas6qG-ivSGASCaxhAChT2hnPJx2L39hJnffB=A@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-You say you just install the library and not the utils, but do you 
-specifically build without the utils?  Is there some existing config 
-option for that?  (Hoping to save myself some grepping...) Otherwise, 
-I'll have to add in that option.
+So I guess coming back around to the original question, any ETA or idea
+when / if this will be available?
 
-It also seems that readline-devel isn't available for the Intel Xeon Phi 
-chips (or at least Cray doesn't have it in our build setup).
+=)
 
-- Patrick
+-cf
 
-On 06/03/2015 01:57 PM, Ned Bass wrote:
-> Hi Patrick,
+
+On Wed, Jun 3, 2015 at 2:14 PM, Read, Robert <robert.read@intel.com> wrote:
+
+> Right, we need OAuth2, which is what Google calls Google OpenID Connect.
+> It looks this has been addressed as of Gerrit 2.10.2.
 >
-> LLNL builds a stand-alone liblustreapi library for our BG/Q compute
-> nodes, and readline isn't available there. Now, since we just install
-> the library and not the utils we don't actually need readline. Perhaps
-> rather than making the readline configurue check stricly mandatory, we
-> could add a --disable-utils option which, if specified, would make
-> readline optional.
+> https://code.google.com/p/gerrit/issues/detail?id=2677
 >
-> Thanks,
-> Ned
 >
-> On Wed, Jun 03, 2015 at 01:32:05PM -0500, Patrick Farrell wrote:
->> Good afternoon,
->>
->> Cray has recently discovered that 'lfs getstripe' crashes with a
->> null pointer if it is not built with libreadline (Found in
->> 'readline-devel').
->>
->> When built without libreadline, Lustre uses its own implementation
->> of the readline components it needs.  (Look for "HAVE_LIBREADLINE"
->> in libcfs/libcfs/util/parser.c)  This is the source of the null
->> pointer.
->>
->> I think libreadline should be available on every platform we wish to
->> build Lustre on, so I'd rather not fix the broken internal version
->> of it.  Given that, is there any objection to adding an explicit
->> BuildRequires to the spec, making it mandatory in the config
->> process, and removing all traces of Lustre's internal readline
->> implementation?  If not, I'll open a Jira ticket to do this.
->>
->> - Patrick
->> _______________________________________________
->> lustre-devel mailing list
->> lustre-devel at lists.lustre.org
->> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> robert
+>
+>
+> On Jun 3, 2015, at 13:03 , Colin Faber <colin.faber@seagate.com<mailto:
+> colin.faber at seagate.com>> wrote:
+>
+> Hi Chris,
+>
+> From what I can tell, the OAuth2 and OpenID 2.0 combo does work for google
+> account authentication against gerrit:
+>
+>
+> https://urldefense.proofpoint.com/v2/url?u=http-3A__gerrit.cloudlinux.com-3A8080_login_-2523-252Fq-252Fstatus-253Aopen&d=AwIFAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=x9pM59OqndbWw-lPPdr8w1Vud29EZigcxcNkz0uw5oQ&m=2TZ9J8tYpzP7LWdaW6rjmipw1eWHcfszrDgaL-Ok6dc&s=uIy4ooW8SY3s2WtLNxy4Av8Yu3YE6wUY9sCn7DDnEws&e=
+>
+>
+> -cf
+>
+>
+>
+> On Wed, Jun 3, 2015 at 1:55 PM, Christopher J. Morrone <morrone2@llnl.gov
+> <mailto:morrone2@llnl.gov>> wrote:
+> I think you might have that backwards.  Google has _stopped_ supporting
+> OpenID 2.0.  To the best of my knowledge no version of gerrit yet supports
+> Google's new OpenID Connect system.
+>
+> Chris
+>
+>
+> On 06/03/2015 12:52 PM, Colin Faber wrote:
+> Hi,
+>
+> This is probably more a question for the folks at Intel.. Is there an
+> ETA or plan in place to upgrade to Gerrit 2.11 and OpenID 2.0? Such
+> changes would allow for google logins to function correctly.
+>
+> -cf
+>
+>
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
+>
+> https://urldefense.proofpoint.com/v2/url?u=http-3A__lists.lustre.org_listinfo.cgi_lustre-2Ddevel-2Dlustre.org&d=AwIFAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=x9pM59OqndbWw-lPPdr8w1Vud29EZigcxcNkz0uw5oQ&m=2TZ9J8tYpzP7LWdaW6rjmipw1eWHcfszrDgaL-Ok6dc&s=7ye70YNBCUYjesG3rFEiQo5M7y5yr4F6s_KuY1Ngaco&e=
+>
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
+>
+> https://urldefense.proofpoint.com/v2/url?u=http-3A__lists.lustre.org_listinfo.cgi_lustre-2Ddevel-2Dlustre.org&d=AwIFAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=x9pM59OqndbWw-lPPdr8w1Vud29EZigcxcNkz0uw5oQ&m=2TZ9J8tYpzP7LWdaW6rjmipw1eWHcfszrDgaL-Ok6dc&s=7ye70YNBCUYjesG3rFEiQo5M7y5yr4F6s_KuY1Ngaco&e=
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
+>
+> https://urldefense.proofpoint.com/v2/url?u=http-3A__lists.lustre.org_listinfo.cgi_lustre-2Ddevel-2Dlustre.org&d=AwIFAg&c=IGDlg0lD0b-nebmJJ0Kp8A&r=x9pM59OqndbWw-lPPdr8w1Vud29EZigcxcNkz0uw5oQ&m=2TZ9J8tYpzP7LWdaW6rjmipw1eWHcfszrDgaL-Ok6dc&s=7ye70YNBCUYjesG3rFEiQo5M7y5yr4F6s_KuY1Ngaco&e=
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150603/5408f298/attachment.htm>
