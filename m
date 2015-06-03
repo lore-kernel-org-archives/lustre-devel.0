@@ -1,36 +1,94 @@
-From: Ned Bass <bass6@llnl.gov>
-Date: Wed, 3 Jun 2015 15:49:01 -0700
-Subject: [lustre-devel] Lustre and libreadline
-In-Reply-To: <116ba3cddacd422ca0f9b597c691f5df@EXCHCS32.ornl.gov>
-References: <556F4825.1050408@cray.com> <20150603185716.GA10033@llnl.gov>
-	<556F6341.3070507@cray.com>
-	<116ba3cddacd422ca0f9b597c691f5df@EXCHCS32.ornl.gov>
-Message-ID: <20150603224901.GB10033@llnl.gov>
+From: Jones, Peter A <peter.a.jones@intel.com>
+Date: Wed, 3 Jun 2015 23:44:46 +0000
+Subject: [lustre-devel] OpenID 2.0 and Gerrit 2.11
+In-Reply-To: <CAJcXmBnFhYJe+AP1-T5XizgNiFZnOWjgvAbu4S4bbvbh0XeWcQ@mail.gmail.com>
+References: <CAPALmn=6cNyRPhCQe_4A+hqJueP0yKh4vP13JE3KiucCk3SE4w@mail.gmail.com>
+	<556F5BA7.1020301@llnl.gov>
+	<CAPALmnmXbE_VLSvrUBA-NgLz1XDsr3Lz2m886KVNU8KYvwgbgg@mail.gmail.com>
+	<1637F3AC-75FF-4EEC-8777-4FBF9FCDB60B@intel.com>
+	<556F7078.1020407@llnl.gov>
+	<CAJcXmBnFhYJe+AP1-T5XizgNiFZnOWjgvAbu4S4bbvbh0XeWcQ@mail.gmail.com>
+Message-ID: <D194DAA9.90B9B%peter.a.jones@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Jun 03, 2015 at 09:07:11PM +0000, Simmons, James A. wrote:
-> >You say you just install the library and not the utils, but do you 
-> >specifically build without the utils?  Is there some existing config 
-> >option for that?  (Hoping to save myself some grepping...) Otherwise, 
-> >I'll have to add in that option.
-> >
-> >It also seems that readline-devel isn't available for the Intel Xeon Phi 
-> >chips (or at least Cray doesn't have it in our build setup).
-> 
-> This is just papering over the real problem. The utilites should be using
-> getopt() instead. The only thing Parse does that is non standard is
-> an interactive command line. The only place I have ever used that is
-> for lnet selftest. Does lfs really need an interactive command line?
-> I think not.
+Colin
 
-I concur. There a few lctl commands that can only be run today in the
-interactive mode because they rely on earlier commands. For example,
-"conn_list" requires that you first run "network". Such commands should
-be updated to use sub-arguments rather than relying on previous
-commands.
+In answer to your original question, no, we do not have an ETA yet for upgrading to gerrit 2.11, but we?ll certainly get to it eventually. Due to the aforementioned earlier limitations I think that those actively working on Lustre development have moved away from relying on Google logins. Once we have upgraded we can certainly experiment and see what exactly is possible.
 
-Ned
+Peter
+
+On 6/3/15, 2:25 PM, "Colin Faber" <cfaber at gmail.com<mailto:cfaber@gmail.com>> wrote:
+
+I believe that's the case from what I understand.
+
+On Wed, Jun 3, 2015 at 3:24 PM, Christopher J. Morrone <morrone2 at llnl.gov<mailto:morrone2@llnl.gov>> wrote:
+Is it perhaps that gerrit doesn't entirely support it natively, but there is an external gerrit plugin (gerrit-oauth-provier) that makes it work with gerrit 2.10.3.1 or 2.11?  Their documentation is none too clear.
+
+Chris
+
+
+On 06/03/2015 01:14 PM, Read, Robert wrote:
+Right, we need OAuth2, which is what Google calls Google OpenID Connect. It looks this has been addressed as of Gerrit 2.10.2.
+
+https://code.google.com/p/gerrit/issues/detail?id=2677
+
+
+robert
+
+
+On Jun 3, 2015, at 13:03 , Colin Faber <colin.faber at seagate.com<mailto:colin.faber@seagate.com><mailto:colin.faber at seagate.com<mailto:colin.faber@seagate.com>>> wrote:
+
+Hi Chris,
+
+From what I can tell, the OAuth2 and OpenID 2.0 combo does work for google account authentication against gerrit:
+
+http://gerrit.cloudlinux.com:8080/login/%23%2Fq%2Fstatus%3Aopen
+
+
+-cf
+
+
+
+On Wed, Jun 3, 2015 at 1:55 PM, Christopher J. Morrone <morrone2 at llnl.gov<mailto:morrone2@llnl.gov><mailto:morrone2 at llnl.gov<mailto:morrone2@llnl.gov>>> wrote:
+I think you might have that backwards.  Google has _stopped_ supporting OpenID 2.0.  To the best of my knowledge no version of gerrit yet supports Google's new OpenID Connect system.
+
+Chris
+
+
+On 06/03/2015 12:52 PM, Colin Faber wrote:
+Hi,
+
+This is probably more a question for the folks at Intel.. Is there an
+ETA or plan in place to upgrade to Gerrit 2.11 and OpenID 2.0? Such
+changes would allow for google logins to function correctly.
+
+-cf
+
+
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org><mailto:lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>>
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org><mailto:lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>>
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org><mailto:lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>>
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
