@@ -1,574 +1,587 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  3 Jun 2015 16:43:24 -0400
-Subject: [lustre-devel] [PATCH v3 5/8] staging:lustre: separate kernel and
-	user land defines in the LNet headers
+Date: Wed,  3 Jun 2015 16:43:20 -0400
+Subject: [lustre-devel] [PATCH v3 1/8] staging:lustre: assume a kernel build
 In-Reply-To: <1433364207-14307-1-git-send-email-jsimmons@infradead.org>
 References: <1433364207-14307-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1433364207-14307-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1433364207-14307-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Currently the lnet headers used by user land contain various internal
-LNet structures that are only used by kernel space. Move the user land
-structures to headers used by user land. The kernel structures are
-relocated to headers that are never exposed to user land.
+From: John L. Hammond <john.hammond@intel.com>
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
+In lnet/lnet/ and lnet/selftest/ assume a kernel build (assume that
+__KERNEL__ is defined). Remove some common code only needed for user
+space LNet.
+
+Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
+Reviewed-on: http://review.whamcloud.com/13121
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    3 -
- .../staging/lustre/include/linux/lnet/lib-types.h  |  175 ++-----------------
- .../staging/lustre/include/linux/lnet/lnetctl.h    |    7 +-
- drivers/staging/lustre/include/linux/lnet/lnetst.h |    5 +-
- .../staging/lustre/include/linux/lnet/socklnd.h    |    1 -
- drivers/staging/lustre/include/linux/lnet/types.h  |  169 +++++++++++++++++--
- drivers/staging/lustre/lnet/lnet/acceptor.c        |    2 -
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    3 +-
- 8 files changed, 180 insertions(+), 185 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |  215 +-------------------
+ .../staging/lustre/include/linux/lnet/lib-types.h  |   20 --
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |   69 +------
+ drivers/staging/lustre/lnet/lnet/lib-eq.c          |    2 +-
+ drivers/staging/lustre/lnet/lnet/lib-md.c          |    6 +-
+ drivers/staging/lustre/lnet/lnet/lib-me.c          |    6 +-
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         |    2 +-
+ 7 files changed, 16 insertions(+), 304 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index c224062..2750570 100644
+index ff07703..ac3be94 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -34,8 +34,6 @@
-  * Lustre is a trademark of Sun Microsystems, Inc.
-  *
-  * lnet/include/lnet/lib-lnet.h
-- *
-- * Top level include for library side routines
+@@ -49,24 +49,17 @@
+ 
+ extern lnet_t  the_lnet;			/* THE network */
+ 
+-#if  defined(LNET_USE_LIB_FREELIST)
+-/* 1 CPT, simplify implementation... */
+-# define LNET_CPT_MAX_BITS      0
+-
+-#else /* KERNEL and no freelist */
+-
+-# if (BITS_PER_LONG == 32)
++#if (BITS_PER_LONG == 32)
+ /* 2 CPTs, allowing more CPTs might make us under memory pressure */
+-#  define LNET_CPT_MAX_BITS     1
++# define LNET_CPT_MAX_BITS     1
+ 
+-# else /* 64-bit system */
++#else /* 64-bit system */
+ /*
+  * 256 CPTs for thousands of CPUs, allowing more CPTs might make us
+  * under risk of consuming all lh_cookie.
   */
+-#  define LNET_CPT_MAX_BITS     8
+-# endif /* BITS_PER_LONG == 32 */
+-#endif
++# define LNET_CPT_MAX_BITS     8
++#endif /* BITS_PER_LONG == 32 */
  
- #ifndef __LNET_LIB_LNET_H__
-@@ -43,7 +41,6 @@
+ /* max allowed CPT number */
+ #define LNET_CPT_MAX	    (1 << LNET_CPT_MAX_BITS)
+@@ -175,191 +168,9 @@ lnet_net_lock_current(void)
  
- #include "../libcfs/libcfs.h"
- #include "api.h"
--#include "types.h"
- #include "lnet.h"
- #include "lib-types.h"
+ #define MAX_PORTALS     64
  
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 4177da2..fdf94dd 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -42,129 +42,20 @@
- #ifndef __LNET_LIB_TYPES_H__
- #define __LNET_LIB_TYPES_H__
- 
--#include "../libcfs/libcfs.h"
--#include <linux/list.h>
--#include "types.h"
+-/* these are only used by code with LNET_USE_LIB_FREELIST, but we still
+- * exported them to !LNET_USE_LIB_FREELIST for easy implementation */
+-#define LNET_FL_MAX_MES		2048
+-#define LNET_FL_MAX_MDS		2048
+-#define LNET_FL_MAX_EQS		512
+-#define LNET_FL_MAX_MSGS	2048    /* Outstanding messages */
 -
--#define WIRE_ATTR       __attribute__((packed))
+-#ifdef LNET_USE_LIB_FREELIST
 -
--/* Packed version of lnet_process_id_t to transfer via network */
--typedef struct {
--	lnet_nid_t nid;
--	lnet_pid_t pid;   /* node id / process id */
--} WIRE_ATTR lnet_process_id_packed_t;
+-int lnet_freelist_init(lnet_freelist_t *fl, int n, int size);
+-void lnet_freelist_fini(lnet_freelist_t *fl);
 -
--/* The wire handle's interface cookie only matches one network interface in
-- * one epoch (i.e. new cookie when the interface restarts or the node
-- * reboots).  The object cookie only matches one object on that interface
-- * during that object's lifetime (i.e. no cookie re-use). */
--typedef struct {
--	__u64 wh_interface_cookie;
--	__u64 wh_object_cookie;
--} WIRE_ATTR lnet_handle_wire_t;
+-static inline void *
+-lnet_freelist_alloc(lnet_freelist_t *fl)
+-{
+-	/* ALWAYS called with liblock held */
+-	lnet_freeobj_t *o;
 -
--typedef enum {
--	LNET_MSG_ACK = 0,
--	LNET_MSG_PUT,
--	LNET_MSG_GET,
--	LNET_MSG_REPLY,
--	LNET_MSG_HELLO,
--} lnet_msg_type_t;
+-	if (list_empty(&fl->fl_list))
+-		return NULL;
 -
--/* The variant fields of the portals message header are aligned on an 8
-- * byte boundary in the message header.  Note that all types used in these
-- * wire structs MUST be fixed size and the smaller types are placed at the
-- * end. */
--typedef struct lnet_ack {
--	lnet_handle_wire_t  dst_wmd;
--	__u64	       match_bits;
--	__u32	       mlength;
--} WIRE_ATTR lnet_ack_t;
+-	o = list_entry(fl->fl_list.next, lnet_freeobj_t, fo_list);
+-	list_del(&o->fo_list);
+-	return (void *)&o->fo_contents;
+-}
 -
--typedef struct lnet_put {
--	lnet_handle_wire_t  ack_wmd;
--	__u64	       match_bits;
--	__u64	       hdr_data;
--	__u32	       ptl_index;
--	__u32	       offset;
--} WIRE_ATTR lnet_put_t;
+-static inline void
+-lnet_freelist_free(lnet_freelist_t *fl, void *obj)
+-{
+-	/* ALWAYS called with liblock held */
+-	lnet_freeobj_t *o = list_entry(obj, lnet_freeobj_t, fo_contents);
 -
--typedef struct lnet_get {
--	lnet_handle_wire_t  return_wmd;
--	__u64	       match_bits;
--	__u32	       ptl_index;
--	__u32	       src_offset;
--	__u32	       sink_length;
--} WIRE_ATTR lnet_get_t;
+-	list_add(&o->fo_list, &fl->fl_list);
+-}
 -
--typedef struct lnet_reply {
--	lnet_handle_wire_t  dst_wmd;
--} WIRE_ATTR lnet_reply_t;
+-static inline lnet_eq_t *
+-lnet_eq_alloc(void)
+-{
+-	/* NEVER called with resource lock held */
+-	struct lnet_res_container *rec = &the_lnet.ln_eq_container;
+-	lnet_eq_t		  *eq;
 -
--typedef struct lnet_hello {
--	__u64	      incarnation;
--	__u32	      type;
--} WIRE_ATTR lnet_hello_t;
-+#include <linux/kthread.h>
-+#include <linux/uio.h>
-+#include <linux/types.h>
-+#include <net/sock.h>
- 
--typedef struct {
--	lnet_nid_t	  dest_nid;
--	lnet_nid_t	  src_nid;
--	lnet_pid_t	  dest_pid;
--	lnet_pid_t	  src_pid;
--	__u32	       type;	       /* lnet_msg_type_t */
--	__u32	       payload_length;     /* payload data to follow */
--	/*<------__u64 aligned------->*/
--	union {
--		lnet_ack_t   ack;
--		lnet_put_t   put;
--		lnet_get_t   get;
--		lnet_reply_t reply;
--		lnet_hello_t hello;
--	} msg;
--} WIRE_ATTR lnet_hdr_t;
+-	LASSERT(LNET_CPT_NUMBER == 1);
 -
--/* A HELLO message contains a magic number and protocol version
-- * code in the header's dest_nid, the peer's NID in the src_nid, and
-- * LNET_MSG_HELLO in the type field.  All other common fields are zero
-- * (including payload_size; i.e. no payload).
-- * This is for use by byte-stream LNDs (e.g. TCP/IP) to check the peer is
-- * running the same protocol and to find out its NID. These LNDs should
-- * exchange HELLO messages when a connection is first established.  Individual
-- * LNDs can put whatever else they fancy in lnet_hdr_t::msg.
-- */
--typedef struct {
--	__u32   magic;			  /* LNET_PROTO_TCP_MAGIC */
--	__u16   version_major;		  /* increment on incompatible change */
--	__u16   version_minor;		  /* increment on compatible change */
--} WIRE_ATTR lnet_magicversion_t;
+-	lnet_res_lock(0);
+-	eq = (lnet_eq_t *)lnet_freelist_alloc(&rec->rec_freelist);
+-	lnet_res_unlock(0);
 -
--/* PROTO MAGIC for LNDs */
--#define LNET_PROTO_IB_MAGIC		 0x0be91b91
--#define LNET_PROTO_RA_MAGIC		 0x0be91b92
--#define LNET_PROTO_QSW_MAGIC		0x0be91b93
--#define LNET_PROTO_GNI_MAGIC		0xb00fbabe /* ask Kim */
--#define LNET_PROTO_TCP_MAGIC		0xeebc0ded
--#define LNET_PROTO_PTL_MAGIC		0x50746C4E /* 'PtlN' unique magic */
--#define LNET_PROTO_MX_MAGIC		 0x4d583130 /* 'MX10'! */
--#define LNET_PROTO_ACCEPTOR_MAGIC	   0xacce7100
--#define LNET_PROTO_PING_MAGIC	       0x70696E67 /* 'ping' */
+-	return eq;
+-}
 -
--/* Placeholder for a future "unified" protocol across all LNDs */
--/* Current LNDs that receive a request with this magic will respond with a
-- * "stub" reply using their current protocol */
--#define LNET_PROTO_MAGIC		    0x45726963 /* ! */
+-static inline void
+-lnet_eq_free_locked(lnet_eq_t *eq)
+-{
+-	/* ALWAYS called with resource lock held */
+-	struct lnet_res_container *rec = &the_lnet.ln_eq_container;
 -
--#define LNET_PROTO_TCP_VERSION_MAJOR	1
--#define LNET_PROTO_TCP_VERSION_MINOR	0
+-	LASSERT(LNET_CPT_NUMBER == 1);
+-	lnet_freelist_free(&rec->rec_freelist, eq);
+-}
 -
--/* Acceptor connection request */
--typedef struct {
--	__u32       acr_magic;		  /* PTL_ACCEPTOR_PROTO_MAGIC */
--	__u32       acr_version;		/* protocol version */
--	__u64       acr_nid;		    /* target NID */
--} WIRE_ATTR lnet_acceptor_connreq_t;
-+#include "types.h"
- 
--#define LNET_PROTO_ACCEPTOR_VERSION       1
-+/* Max payload size */
-+#define LNET_MAX_PAYLOAD      CONFIG_LNET_MAX_PAYLOAD
-+#if (LNET_MAX_PAYLOAD < LNET_MTU)
-+# error "LNET_MAX_PAYLOAD too small - error in configure --with-max-payload-mb"
-+#elif (LNET_MAX_PAYLOAD > (PAGE_SIZE * LNET_MAX_IOV))
-+#  error "LNET_MAX_PAYLOAD too large - error in configure --with-max-payload-mb"
-+#endif
- 
- /* forward refs */
- struct lnet_libmd;
-@@ -299,7 +190,7 @@ typedef struct lnet_lnd {
- 	int		   lnd_refcount;	 /* # active instances */
- 
- 	/* fields initialised by the LND */
--	unsigned int	  lnd_type;
-+	__u32			lnd_type;
- 
- 	int  (*lnd_startup)(struct lnet_ni *ni);
- 	void (*lnd_shutdown)(struct lnet_ni *ni);
-@@ -353,15 +244,6 @@ typedef struct lnet_lnd {
- 
- } lnd_t;
- 
--#define LNET_NI_STATUS_UP      0x15aac0de
--#define LNET_NI_STATUS_DOWN    0xdeadface
--#define LNET_NI_STATUS_INVALID 0x00000000
--typedef struct {
--	lnet_nid_t ns_nid;
--	__u32      ns_status;
--	__u32      ns_unused;
--} WIRE_ATTR lnet_ni_status_t;
+-static inline void
+-lnet_eq_free(lnet_eq_t *eq)
+-{
+-	lnet_res_lock(0);
+-	lnet_eq_free_locked(eq);
+-	lnet_res_unlock(0);
+-}
 -
- struct lnet_tx_queue {
- 	int			tq_credits;	/* # tx credits free */
- 	int			tq_credits_min;	/* lowest it's been */
-@@ -369,8 +251,6 @@ struct lnet_tx_queue {
- 	struct list_head		tq_delayed;	/* delayed TXs */
- };
- 
--#define LNET_MAX_INTERFACES   16
+-static inline lnet_libmd_t *
+-lnet_md_alloc(lnet_md_t *umd)
+-{
+-	/* NEVER called with resource lock held */
+-	struct lnet_res_container *rec = the_lnet.ln_md_containers[0];
+-	lnet_libmd_t		  *md;
 -
- typedef struct lnet_ni {
- 	spinlock_t		ni_lock;
- 	struct list_head		ni_list;	/* chain on ln_nis */
-@@ -406,14 +286,6 @@ typedef struct lnet_ni {
- #define LNET_PING_FEAT_MASK		(LNET_PING_FEAT_BASE | \
- 					 LNET_PING_FEAT_NI_STATUS)
- 
--typedef struct {
--	__u32			pi_magic;
--	__u32			pi_features;
--	lnet_pid_t		pi_pid;
--	__u32			pi_nnis;
--	lnet_ni_status_t	pi_ni[0];
--} WIRE_ATTR lnet_ping_info_t;
+-	LASSERT(LNET_CPT_NUMBER == 1);
 -
- /* router checker data, per router */
- #define LNET_MAX_RTR_NIS   16
- #define LNET_PINGINFO_SIZE offsetof(lnet_ping_info_t, pi_ni[LNET_MAX_RTR_NIS])
-@@ -496,6 +368,11 @@ typedef struct {
- 	__u32		   lrn_net;	/* my net number */
- } lnet_remotenet_t;
- 
-+/** lnet message has credit and can be submitted to lnd for send/receive */
-+#define LNET_CREDIT_OK		0
-+/** lnet message is waiting for credit */
-+#define LNET_CREDIT_WAIT	1
-+
- typedef struct {
- 	struct list_head rbp_bufs;	     /* my free buffer pool */
- 	struct list_head rbp_msgs;	     /* messages blocking for a buffer */
-@@ -511,23 +388,9 @@ typedef struct {
- 	lnet_kiov_t	    rb_kiov[0];	  /* the buffer space */
- } lnet_rtrbuf_t;
- 
--typedef struct {
--	__u32	msgs_alloc;
--	__u32	msgs_max;
--	__u32	errors;
--	__u32	send_count;
--	__u32	recv_count;
--	__u32	route_count;
--	__u32	drop_count;
--	__u64	send_length;
--	__u64	recv_length;
--	__u64	route_length;
--	__u64	drop_length;
--} WIRE_ATTR lnet_counters_t;
+-	lnet_res_lock(0);
+-	md = (lnet_libmd_t *)lnet_freelist_alloc(&rec->rec_freelist);
+-	lnet_res_unlock(0);
 -
- #define LNET_PEER_HASHSIZE   503		/* prime! */
- 
--#define LNET_NRBPOOLS	 3		 /* # different router buffer pools */
-+#define LNET_NRBPOOLS		3	/* # different router buffer pools */
- 
- enum {
- 	/* Didn't match anything */
-diff --git a/drivers/staging/lustre/include/linux/lnet/lnetctl.h b/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-index 98181d3..bdd69b2 100644
---- a/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-@@ -14,12 +14,11 @@
-  *   along with Portals; if not, write to the Free Software
-  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-  *
-- * header for libptlctl.a
-+ * header for lnet ioctl
-  */
--#ifndef _PTLCTL_H_
--#define _PTLCTL_H_
-+#ifndef _LNETCTL_H_
-+#define _LNETCTL_H_
- 
--#include "../libcfs/libcfs.h"
- #include "types.h"
- 
- #define LNET_DEV_ID 0
-diff --git a/drivers/staging/lustre/include/linux/lnet/lnetst.h b/drivers/staging/lustre/include/linux/lnet/lnetst.h
-index 885f708..57432fd 100644
---- a/drivers/staging/lustre/include/linux/lnet/lnetst.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lnetst.h
-@@ -41,9 +41,7 @@
- #ifndef __LNET_ST_H__
- #define __LNET_ST_H__
- 
--#include "../libcfs/libcfs.h"
--#include "lnet.h"
--#include "lib-types.h"
-+#include <linux/types.h>
- 
- #define LST_FEAT_NONE		(0)
- #define LST_FEAT_BULK_LEN	(1 << 0)	/* enable variable page size */
-@@ -468,7 +466,6 @@ typedef struct {
- 	int		     png_flags;	      /* reserved flags */
- } lst_test_ping_param_t;
- 
--/* more tests */
- typedef struct {
- 	__u32 errors;
- 	__u32 rpcs_sent;
-diff --git a/drivers/staging/lustre/include/linux/lnet/socklnd.h b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-index 389038b..f7c7b08 100644
---- a/drivers/staging/lustre/include/linux/lnet/socklnd.h
-+++ b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-@@ -39,7 +39,6 @@
- #define __LNET_LNET_SOCKLND_H__
- 
- #include "types.h"
--#include "lib-types.h"
- 
- #define SOCKLND_CONN_NONE     (-1)
- #define SOCKLND_CONN_ANY	0
-diff --git a/drivers/staging/lustre/include/linux/lnet/types.h b/drivers/staging/lustre/include/linux/lnet/types.h
-index 15528a1..32b9431 100644
---- a/drivers/staging/lustre/include/linux/lnet/types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/types.h
-@@ -37,11 +37,11 @@
- #ifndef __LNET_TYPES_H__
- #define __LNET_TYPES_H__
- 
-+#include <linux/types.h>
-+
- /** \addtogroup lnet
-  * @{ */
- 
--#include "../libcfs/libcfs.h"
+-	if (md != NULL)
+-		INIT_LIST_HEAD(&md->md_list);
 -
- /** \addtogroup lnet_addr
-  * @{ */
+-	return md;
+-}
+-
+-static inline void
+-lnet_md_free_locked(lnet_libmd_t *md)
+-{
+-	/* ALWAYS called with resource lock held */
+-	struct lnet_res_container *rec = the_lnet.ln_md_containers[0];
+-
+-	LASSERT(LNET_CPT_NUMBER == 1);
+-	lnet_freelist_free(&rec->rec_freelist, md);
+-}
+-
+-static inline void
+-lnet_md_free(lnet_libmd_t *md)
+-{
+-	lnet_res_lock(0);
+-	lnet_md_free_locked(md);
+-	lnet_res_unlock(0);
+-}
+-
+-static inline lnet_me_t *
+-lnet_me_alloc(void)
+-{
+-	/* NEVER called with resource lock held */
+-	struct lnet_res_container *rec = the_lnet.ln_me_containers[0];
+-	lnet_me_t		  *me;
+-
+-	LASSERT(LNET_CPT_NUMBER == 1);
+-
+-	lnet_res_lock(0);
+-	me = (lnet_me_t *)lnet_freelist_alloc(&rec->rec_freelist);
+-	lnet_res_unlock(0);
+-
+-	return me;
+-}
+-
+-static inline void
+-lnet_me_free_locked(lnet_me_t *me)
+-{
+-	/* ALWAYS called with resource lock held */
+-	struct lnet_res_container *rec = the_lnet.ln_me_containers[0];
+-
+-	LASSERT(LNET_CPT_NUMBER == 1);
+-	lnet_freelist_free(&rec->rec_freelist, me);
+-}
+-
+-static inline void
+-lnet_me_free(lnet_me_t *me)
+-{
+-	lnet_res_lock(0);
+-	lnet_me_free_locked(me);
+-	lnet_res_unlock(0);
+-}
+-
+-static inline lnet_msg_t *
+-lnet_msg_alloc(void)
+-{
+-	/* NEVER called with network lock held */
+-	struct lnet_msg_container *msc = the_lnet.ln_msg_containers[0];
+-	lnet_msg_t		  *msg;
+-
+-	LASSERT(LNET_CPT_NUMBER == 1);
+-
+-	lnet_net_lock(0);
+-	msg = (lnet_msg_t *)lnet_freelist_alloc(&msc->msc_freelist);
+-	lnet_net_unlock(0);
+-
+-	if (msg != NULL) {
+-		/* NULL pointers, clear flags etc */
+-		memset(msg, 0, sizeof(*msg));
+-	}
+-	return msg;
+-}
+-
+-static inline void
+-lnet_msg_free_locked(lnet_msg_t *msg)
+-{
+-	/* ALWAYS called with network lock held */
+-	struct lnet_msg_container *msc = the_lnet.ln_msg_containers[0];
+-
+-	LASSERT(LNET_CPT_NUMBER == 1);
+-	LASSERT(!msg->msg_onactivelist);
+-	lnet_freelist_free(&msc->msc_freelist, msg);
+-}
+-
+-static inline void
+-lnet_msg_free(lnet_msg_t *msg)
+-{
+-	lnet_net_lock(0);
+-	lnet_msg_free_locked(msg);
+-	lnet_net_unlock(0);
+-}
+-
+-#else /* !LNET_USE_LIB_FREELIST */
+-
+ static inline lnet_eq_t *
+ lnet_eq_alloc(void)
+ {
+-	/* NEVER called with liblock held */
+ 	lnet_eq_t *eq;
  
-@@ -74,6 +74,7 @@ typedef __u32 lnet_pid_t;
- 
- #define LNET_PID_RESERVED 0xf0000000 /* reserved bits in PID */
- #define LNET_PID_USERFLAG 0x80000000 /* set in userspace peers */
-+#define LNET_PID_LUSTRE	  12345
- 
- #define LNET_TIME_FOREVER    (-1)
- 
-@@ -110,7 +111,158 @@ static inline __u32 LNET_MKNET(__u32 type, __u32 num)
- 	return (type << 16) | num;
+ 	LIBCFS_ALLOC(eq, sizeof(*eq));
+@@ -369,14 +180,12 @@ lnet_eq_alloc(void)
+ static inline void
+ lnet_eq_free(lnet_eq_t *eq)
+ {
+-	/* ALWAYS called with resource lock held */
+ 	LIBCFS_FREE(eq, sizeof(*eq));
  }
  
--/**
-+#define WIRE_ATTR	__packed
-+
-+/* Packed version of lnet_process_id_t to transfer via network */
-+typedef struct {
-+	/* node id / process id */
-+	lnet_nid_t	nid;
-+	lnet_pid_t	pid;
-+} WIRE_ATTR lnet_process_id_packed_t;
-+
-+/* The wire handle's interface cookie only matches one network interface in
-+ * one epoch (i.e. new cookie when the interface restarts or the node
-+ * reboots).  The object cookie only matches one object on that interface
-+ * during that object's lifetime (i.e. no cookie re-use). */
-+typedef struct {
-+	__u64	wh_interface_cookie;
-+	__u64	wh_object_cookie;
-+} WIRE_ATTR lnet_handle_wire_t;
-+
-+typedef enum {
-+	LNET_MSG_ACK = 0,
-+	LNET_MSG_PUT,
-+	LNET_MSG_GET,
-+	LNET_MSG_REPLY,
-+	LNET_MSG_HELLO,
-+} lnet_msg_type_t;
-+
-+/* The variant fields of the portals message header are aligned on an 8
-+ * byte boundary in the message header.  Note that all types used in these
-+ * wire structs MUST be fixed size and the smaller types are placed@the
-+ * end. */
-+typedef struct lnet_ack {
-+	lnet_handle_wire_t	dst_wmd;
-+	__u64			match_bits;
-+	__u32			mlength;
-+} WIRE_ATTR lnet_ack_t;
-+
-+typedef struct lnet_put {
-+	lnet_handle_wire_t	ack_wmd;
-+	__u64			match_bits;
-+	__u64			hdr_data;
-+	__u32			ptl_index;
-+	__u32			offset;
-+} WIRE_ATTR lnet_put_t;
-+
-+typedef struct lnet_get {
-+	lnet_handle_wire_t	return_wmd;
-+	__u64			match_bits;
-+	__u32			ptl_index;
-+	__u32			src_offset;
-+	__u32			sink_length;
-+} WIRE_ATTR lnet_get_t;
-+
-+typedef struct lnet_reply {
-+	lnet_handle_wire_t	dst_wmd;
-+} WIRE_ATTR lnet_reply_t;
-+
-+typedef struct lnet_hello {
-+	__u64			incarnation;
-+	__u32			type;
-+} WIRE_ATTR lnet_hello_t;
-+
-+typedef struct {
-+	lnet_nid_t	dest_nid;
-+	lnet_nid_t	src_nid;
-+	lnet_pid_t	dest_pid;
-+	lnet_pid_t	src_pid;
-+	__u32		type;		/* lnet_msg_type_t */
-+	__u32		payload_length;	/* payload data to follow */
-+	/*<------__u64 aligned------->*/
-+	union {
-+		lnet_ack_t	ack;
-+		lnet_put_t	put;
-+		lnet_get_t	get;
-+		lnet_reply_t	reply;
-+		lnet_hello_t	hello;
-+	} msg;
-+} WIRE_ATTR lnet_hdr_t;
-+
-+/* A HELLO message contains a magic number and protocol version
-+ * code in the header's dest_nid, the peer's NID in the src_nid, and
-+ * LNET_MSG_HELLO in the type field.  All other common fields are zero
-+ * (including payload_size; i.e. no payload).
-+ * This is for use by byte-stream LNDs (e.g. TCP/IP) to check the peer is
-+ * running the same protocol and to find out its NID. These LNDs should
-+ * exchange HELLO messages when a connection is first established.  Individual
-+ * LNDs can put whatever else they fancy in lnet_hdr_t::msg.
-+ */
-+typedef struct {
-+	__u32	magic;		/* LNET_PROTO_TCP_MAGIC */
-+	__u16	version_major;	/* increment on incompatible change */
-+	__u16	version_minor;	/* increment on compatible change */
-+} WIRE_ATTR lnet_magicversion_t;
-+
-+/* PROTO MAGIC for LNDs */
-+#define LNET_PROTO_IB_MAGIC		0x0be91b91
-+#define LNET_PROTO_GNI_MAGIC		0xb00fbabe /* ask Kim */
-+#define LNET_PROTO_TCP_MAGIC		0xeebc0ded
-+#define LNET_PROTO_ACCEPTOR_MAGIC	0xacce7100
-+#define LNET_PROTO_PING_MAGIC		0x70696E67 /* 'ping' */
-+
-+/* Placeholder for a future "unified" protocol across all LNDs */
-+/* Current LNDs that receive a request with this magic will respond with a
-+ * "stub" reply using their current protocol */
-+#define LNET_PROTO_MAGIC		0x45726963 /* ! */
-+
-+#define LNET_PROTO_TCP_VERSION_MAJOR	1
-+#define LNET_PROTO_TCP_VERSION_MINOR	0
-+
-+/* Acceptor connection request */
-+typedef struct {
-+	__u32	acr_magic;		/* PTL_ACCEPTOR_PROTO_MAGIC */
-+	__u32	acr_version;		/* protocol version */
-+	__u64	acr_nid;		/* target NID */
-+} WIRE_ATTR lnet_acceptor_connreq_t;
-+
-+#define LNET_PROTO_ACCEPTOR_VERSION	1
-+
-+typedef struct {
-+	lnet_nid_t	ns_nid;
-+	__u32		ns_status;
-+	__u32		ns_unused;
-+} WIRE_ATTR lnet_ni_status_t;
-+
-+typedef struct {
-+	__u32			pi_magic;
-+	__u32			pi_features;
-+	lnet_pid_t		pi_pid;
-+	__u32			pi_nnis;
-+	lnet_ni_status_t	pi_ni[0];
-+} WIRE_ATTR lnet_ping_info_t;
-+
-+typedef struct lnet_counters {
-+	__u32	msgs_alloc;
-+	__u32	msgs_max;
-+	__u32	errors;
-+	__u32	send_count;
-+	__u32	recv_count;
-+	__u32	route_count;
-+	__u32	drop_count;
-+	__u64	send_length;
-+	__u64	recv_length;
-+	__u64	route_length;
-+	__u64	drop_length;
-+} WIRE_ATTR lnet_counters_t;
-+
-+#define LNET_NI_STATUS_UP      0x15aac0de
-+#define LNET_NI_STATUS_DOWN    0xdeadface
-+#define LNET_NI_STATUS_INVALID 0x00000000
-+
-+#define LNET_MAX_INTERFACES    16
-+
-+/*
-  * Objects maintained by the LNet are accessed through handles. Handle types
-  * have names of the form lnet_handle_xx_t, where xx is one of the two letter
-  * object type codes ('eq' for event queue, 'md' for memory descriptor, and
-@@ -311,17 +463,6 @@ typedef struct {
- /** limit on the number of fragments in discontiguous MDs */
- #define LNET_MAX_IOV    256
+ static inline lnet_libmd_t *
+ lnet_md_alloc(lnet_md_t *umd)
+ {
+-	/* NEVER called with liblock held */
+ 	lnet_libmd_t *md;
+ 	unsigned int  size;
+ 	unsigned int  niov;
+@@ -405,7 +214,6 @@ lnet_md_alloc(lnet_md_t *umd)
+ static inline void
+ lnet_md_free(lnet_libmd_t *md)
+ {
+-	/* ALWAYS called with resource lock held */
+ 	unsigned int  size;
  
--/* Max payload size */
--# define LNET_MAX_PAYLOAD	CONFIG_LNET_MAX_PAYLOAD
--# if (LNET_MAX_PAYLOAD < LNET_MTU)
--#  error "LNET_MAX_PAYLOAD too small - error in configure --with-max-payload-mb"
--# else
--#  if (LNET_MAX_PAYLOAD > (PAGE_SIZE * LNET_MAX_IOV))
--/*  PAGE_SIZE is a constant: check with cpp! */
--#   error "LNET_MAX_PAYLOAD too large - error in configure --with-max-payload-mb"
--#  endif
--# endif
+ 	if ((md->md_options & LNET_MD_KIOV) != 0)
+@@ -419,7 +227,6 @@ lnet_md_free(lnet_libmd_t *md)
+ static inline lnet_me_t *
+ lnet_me_alloc(void)
+ {
+-	/* NEVER called with liblock held */
+ 	lnet_me_t *me;
+ 
+ 	LIBCFS_ALLOC(me, sizeof(*me));
+@@ -429,14 +236,12 @@ lnet_me_alloc(void)
+ static inline void
+ lnet_me_free(lnet_me_t *me)
+ {
+-	/* ALWAYS called with resource lock held */
+ 	LIBCFS_FREE(me, sizeof(*me));
+ }
+ 
+ static inline lnet_msg_t *
+ lnet_msg_alloc(void)
+ {
+-	/* NEVER called with liblock held */
+ 	lnet_msg_t *msg;
+ 
+ 	LIBCFS_ALLOC(msg, sizeof(*msg));
+@@ -448,18 +253,10 @@ lnet_msg_alloc(void)
+ static inline void
+ lnet_msg_free(lnet_msg_t *msg)
+ {
+-	/* ALWAYS called with network lock held */
+ 	LASSERT(!msg->msg_onactivelist);
+ 	LIBCFS_FREE(msg, sizeof(*msg));
+ }
+ 
+-#define lnet_eq_free_locked(eq)		lnet_eq_free(eq)
+-#define lnet_md_free_locked(md)		lnet_md_free(md)
+-#define lnet_me_free_locked(me)		lnet_me_free(me)
+-#define lnet_msg_free_locked(msg)	lnet_msg_free(msg)
 -
- /**
-  * Options for the MD structure. See lnet_md_t::options.
-  */
-diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
-index 1dc7c8a..4928f5c 100644
---- a/drivers/staging/lustre/lnet/lnet/acceptor.c
-+++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
-@@ -243,8 +243,6 @@ lnet_accept(struct socket *sock, __u32 magic)
+-#endif /* LNET_USE_LIB_FREELIST */
+-
+ lnet_libhandle_t *lnet_res_lh_lookup(struct lnet_res_container *rec,
+ 				     __u64 cookie);
+ void lnet_res_lh_initialize(struct lnet_res_container *rec,
+@@ -467,7 +264,6 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
+ static inline void
+ lnet_res_lh_invalidate(lnet_libhandle_t *lh)
+ {
+-	/* ALWAYS called with resource lock held */
+ 	/* NB: cookie is still useful, don't reset it */
+ 	list_del(&lh->lh_hash_chain);
+ }
+@@ -486,7 +282,6 @@ lnet_eq2handle(lnet_handle_eq_t *handle, lnet_eq_t *eq)
+ static inline lnet_eq_t *
+ lnet_handle2eq(lnet_handle_eq_t *handle)
+ {
+-	/* ALWAYS called with resource lock held */
+ 	lnet_libhandle_t *lh;
  
- 		if (magic == le32_to_cpu(LNET_PROTO_TCP_MAGIC))
- 			str = "'old' socknal/tcpnal";
--		else if (lnet_accept_magic(magic, LNET_PROTO_RA_MAGIC))
--			str = "'old' ranal";
- 		else
- 			str = "unrecognised";
+ 	lh = lnet_res_lh_lookup(&the_lnet.ln_eq_container, handle->cookie);
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+index 5053766..41827a0 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+@@ -280,20 +280,6 @@ typedef struct lnet_libmd {
+ #define LNET_MD_FLAG_AUTO_UNLINK      (1 << 1)
+ #define LNET_MD_FLAG_ABORTED	 (1 << 2)
  
+-#ifdef LNET_USE_LIB_FREELIST
+-typedef struct {
+-	void		  *fl_objs;	  /* single contiguous array of objects */
+-	int		    fl_nobjs;	 /* the number of them */
+-	int		    fl_objsize;       /* the size (including overhead) of each of them */
+-	struct list_head	     fl_list;	  /* where they are enqueued */
+-} lnet_freelist_t;
+-
+-typedef struct {
+-	struct list_head	     fo_list;	     /* enqueue on fl_list */
+-	void		  *fo_contents;	 /* aligned contents */
+-} lnet_freeobj_t;
+-#endif
+-
+ typedef struct {
+ 	/* info about peers we are trying to fail */
+ 	struct list_head	     tp_list;	     /* ln_test_peers */
+@@ -639,9 +625,6 @@ struct lnet_res_container {
+ 	__u64			rec_lh_cookie;	/* cookie generator */
+ 	struct list_head		rec_active;	/* active resource list */
+ 	struct list_head		*rec_lh_hash;	/* handle hash */
+-#ifdef LNET_USE_LIB_FREELIST
+-	lnet_freelist_t		rec_freelist;	/* freelist for resources */
+-#endif
+ };
+ 
+ /* message container */
+@@ -654,9 +637,6 @@ struct lnet_msg_container {
+ 	struct list_head		msc_active;	/* active message list */
+ 	/* threads doing finalization */
+ 	void			**msc_finalizers;
+-#ifdef LNET_USE_LIB_FREELIST
+-	lnet_freelist_t		msc_freelist;	/* freelist for messages */
+-#endif
+ };
+ 
+ /* Router Checker states */
 diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index a2d0d10..57e9752 100644
+index 2230eb0..0740ab9 100644
 --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
 +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -35,10 +35,11 @@
-  */
+@@ -356,56 +356,6 @@ lnet_counters_reset(void)
+ }
+ EXPORT_SYMBOL(lnet_counters_reset);
  
- #define DEBUG_SUBSYSTEM S_LNET
--#include "../../include/linux/lnet/lib-lnet.h"
- #include <linux/log2.h>
- #include <linux/ktime.h>
+-#ifdef LNET_USE_LIB_FREELIST
+-
+-int
+-lnet_freelist_init(lnet_freelist_t *fl, int n, int size)
+-{
+-	char *space;
+-
+-	LASSERT(n > 0);
+-
+-	size += offsetof(lnet_freeobj_t, fo_contents);
+-
+-	LIBCFS_ALLOC(space, n * size);
+-	if (space == NULL)
+-		return -ENOMEM;
+-
+-	INIT_LIST_HEAD(&fl->fl_list);
+-	fl->fl_objs = space;
+-	fl->fl_nobjs = n;
+-	fl->fl_objsize = size;
+-
+-	do {
+-		memset(space, 0, size);
+-		list_add((struct list_head *)space, &fl->fl_list);
+-		space += size;
+-	} while (--n != 0);
+-
+-	return 0;
+-}
+-
+-void
+-lnet_freelist_fini(lnet_freelist_t *fl)
+-{
+-	struct list_head *el;
+-	int count;
+-
+-	if (fl->fl_nobjs == 0)
+-		return;
+-
+-	count = 0;
+-	for (el = fl->fl_list.next; el != &fl->fl_list; el = el->next)
+-		count++;
+-
+-	LASSERT(count == fl->fl_nobjs);
+-
+-	LIBCFS_FREE(fl->fl_objs, fl->fl_nobjs * fl->fl_objsize);
+-	memset(fl, 0, sizeof(*fl));
+-}
+-
+-#endif /* LNET_USE_LIB_FREELIST */
+-
+ static __u64
+ lnet_create_interface_cookie(void)
+ {
+@@ -462,9 +412,6 @@ lnet_res_container_cleanup(struct lnet_res_container *rec)
+ 		       count, lnet_res_type2str(rec->rec_type));
+ 	}
  
-+#include "../../include/linux/lnet/lib-lnet.h"
-+
- #define D_LNI D_CONSOLE
+-#ifdef LNET_USE_LIB_FREELIST
+-	lnet_freelist_fini(&rec->rec_freelist);
+-#endif
+ 	if (rec->rec_lh_hash != NULL) {
+ 		LIBCFS_FREE(rec->rec_lh_hash,
+ 			    LNET_LH_HASH_SIZE * sizeof(rec->rec_lh_hash[0]));
+@@ -485,13 +432,6 @@ lnet_res_container_setup(struct lnet_res_container *rec,
  
- lnet_t the_lnet;			   /* THE state of the network */
+ 	rec->rec_type = type;
+ 	INIT_LIST_HEAD(&rec->rec_active);
+-
+-#ifdef LNET_USE_LIB_FREELIST
+-	memset(&rec->rec_freelist, 0, sizeof(rec->rec_freelist));
+-	rc = lnet_freelist_init(&rec->rec_freelist, objnum, objsz);
+-	if (rc != 0)
+-		goto out;
+-#endif
+ 	rec->rec_lh_cookie = (cpt << LNET_COOKIE_TYPE_BITS) | type;
+ 
+ 	/* Arbitrary choice of hash table size */
+@@ -635,13 +575,11 @@ lnet_prepare(lnet_pid_t requested_pid)
+ 		goto failed;
+ 
+ 	rc = lnet_res_container_setup(&the_lnet.ln_eq_container, 0,
+-				      LNET_COOKIE_TYPE_EQ, LNET_FL_MAX_EQS,
+-				      sizeof(lnet_eq_t));
++				      LNET_COOKIE_TYPE_EQ, 0, 0);
+ 	if (rc != 0)
+ 		goto failed;
+ 
+-	recs = lnet_res_containers_create(LNET_COOKIE_TYPE_ME, LNET_FL_MAX_MES,
+-					  sizeof(lnet_me_t));
++	recs = lnet_res_containers_create(LNET_COOKIE_TYPE_ME, 0, 0);
+ 	if (recs == NULL) {
+ 		rc = -ENOMEM;
+ 		goto failed;
+@@ -649,8 +587,7 @@ lnet_prepare(lnet_pid_t requested_pid)
+ 
+ 	the_lnet.ln_me_containers = recs;
+ 
+-	recs = lnet_res_containers_create(LNET_COOKIE_TYPE_MD, LNET_FL_MAX_MDS,
+-					  sizeof(lnet_libmd_t));
++	recs = lnet_res_containers_create(LNET_COOKIE_TYPE_MD, 0, 0);
+ 	if (recs == NULL) {
+ 		rc = -ENOMEM;
+ 		goto failed;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+index 28858fb..f19ce9a 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+@@ -191,7 +191,7 @@ LNetEQFree(lnet_handle_eq_t eqh)
+ 
+ 	lnet_res_lh_invalidate(&eq->eq_lh);
+ 	list_del(&eq->eq_list);
+-	lnet_eq_free_locked(eq);
++	lnet_eq_free(eq);
+  out:
+ 	lnet_eq_wait_unlock();
+ 	lnet_res_unlock(LNET_LOCK_EX);
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
+index 5856c30..758f5be 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-md.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
+@@ -82,7 +82,7 @@ lnet_md_unlink(lnet_libmd_t *md)
+ 
+ 	LASSERT(!list_empty(&md->md_list));
+ 	list_del_init(&md->md_list);
+-	lnet_md_free_locked(md);
++	lnet_md_free(md);
+ }
+ 
+ static int
+@@ -320,7 +320,7 @@ LNetMDAttach(lnet_handle_me_t meh, lnet_md_t umd,
+ 	return 0;
+ 
+  failed:
+-	lnet_md_free_locked(md);
++	lnet_md_free(md);
+ 
+ 	lnet_res_unlock(cpt);
+ 	return rc;
+@@ -381,7 +381,7 @@ LNetMDBind(lnet_md_t umd, lnet_unlink_t unlink, lnet_handle_md_t *handle)
+ 	return 0;
+ 
+  failed:
+-	lnet_md_free_locked(md);
++	lnet_md_free(md);
+ 
+ 	lnet_res_unlock(cpt);
+ 	return rc;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-me.c b/drivers/staging/lustre/lnet/lnet/lib-me.c
+index 09e9008..42fc99e 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-me.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-me.c
+@@ -172,7 +172,7 @@ LNetMEInsert(lnet_handle_me_t current_meh,
+ 
+ 	current_me = lnet_handle2me(&current_meh);
+ 	if (current_me == NULL) {
+-		lnet_me_free_locked(new_me);
++		lnet_me_free(new_me);
+ 
+ 		lnet_res_unlock(cpt);
+ 		return -ENOENT;
+@@ -183,7 +183,7 @@ LNetMEInsert(lnet_handle_me_t current_meh,
+ 	ptl = the_lnet.ln_portals[current_me->me_portal];
+ 	if (lnet_ptl_is_unique(ptl)) {
+ 		/* nosense to insertion on unique portal */
+-		lnet_me_free_locked(new_me);
++		lnet_me_free(new_me);
+ 		lnet_res_unlock(cpt);
+ 		return -EPERM;
+ 	}
+@@ -276,7 +276,7 @@ lnet_me_unlink(lnet_me_t *me)
+ 	}
+ 
+ 	lnet_res_lh_invalidate(&me->me_lh);
+-	lnet_me_free_locked(me);
++	lnet_me_free(me);
+ }
+ 
+ #if 0
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+index 65d7595..43977e8 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+@@ -427,7 +427,7 @@ lnet_complete_msg_locked(lnet_msg_t *msg, int cpt)
+ 	}
+ 
+ 	lnet_msg_decommit(msg, cpt, status);
+-	lnet_msg_free_locked(msg);
++	lnet_msg_free(msg);
+ 	return 0;
+ }
+ 
 -- 
 1.7.1
