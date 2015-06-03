@@ -1,53 +1,34 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  3 Jun 2015 10:32:34 -0400
-Subject: [lustre-devel] [PATCH v3 7/7] staging:lustre: Update license and
-	copyright for lib-socket.c
-In-Reply-To: <1433341954-654-1-git-send-email-jsimmons@infradead.org>
+From: Joe Perches <joe@perches.com>
+Date: Wed, 03 Jun 2015 07:42:54 -0700
+Subject: [lustre-devel] [PATCH v3 6/7] staging:lustre: style cleanups
+	for lib-socket.c
+In-Reply-To: <1433341954-654-7-git-send-email-jsimmons@infradead.org>
 References: <1433341954-654-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1433341954-654-8-git-send-email-jsimmons@infradead.org>
+	<1433341954-654-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1433342574.4861.126.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Point to the right place for GNU license. Update Intel copyright.
+On Wed, 2015-06-03 at 10:32 -0400, James Simmons wrote:
+> Handle all the style issues reported by checkpatch.pl.
+> Remove general white spaces, spaces in function calls,
+> etc.
+[]
+> @@ -167,13 +164,14 @@ lnet_ipif_enumerate (char ***namesp)
+>  		if (nalloc * sizeof(*ifr) > PAGE_CACHE_SIZE) {
+>  			toobig = 1;
+>  			nalloc = PAGE_CACHE_SIZE/sizeof(*ifr);
+> -			CWARN("Too many interfaces: only enumerating first %d\n",
+> -			      nalloc);
+> +			CWARN("Too many interfaces: only enumerating "
+> +			      "first %d\n", nalloc);
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lnet/lnet/lib-socket.c |   10 +++-------
- 1 files changed, 3 insertions(+), 7 deletions(-)
+Please don't split single strings into multiple parts.
 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-index f0b187d..2f8443c 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-@@ -15,11 +15,7 @@
-  *
-  * You should have received a copy of the GNU General Public License
-  * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-  *
-  * GPL HEADER END
-  */
-@@ -27,11 +23,11 @@
-  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-  *
-- * Copyright (c) 2012, Intel Corporation.
-+ * Copyright (c) 2012, 2015 Intel Corporation.
-  */
- /*
-  * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-+ * Lustre is a trademark of Seagate, Inc.
-  */
- #define DEBUG_SUBSYSTEM S_LNET
- 
--- 
-1.7.1
+For a patch like this it'd be nice to specify that both
+"git diff -w" and scripts/objdiff shows no differences.
+
+Unless it does...
