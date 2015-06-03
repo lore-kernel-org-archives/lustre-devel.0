@@ -1,34 +1,25 @@
-From: Joe Perches <joe@perches.com>
-Date: Wed, 03 Jun 2015 07:42:54 -0700
-Subject: [lustre-devel] [PATCH v3 6/7] staging:lustre: style cleanups
-	for lib-socket.c
-In-Reply-To: <1433341954-654-7-git-send-email-jsimmons@infradead.org>
+From: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
+Date: Wed, 3 Jun 2015 22:03:23 +0530
+Subject: [lustre-devel] [PATCH v3 4/7] staging:lustre: rename tcpip
+ handling functions to lnet_* prefix
+In-Reply-To: <1433341954-654-5-git-send-email-jsimmons@infradead.org>
 References: <1433341954-654-1-git-send-email-jsimmons@infradead.org>
-	<1433341954-654-7-git-send-email-jsimmons@infradead.org>
-Message-ID: <1433342574.4861.126.camel@perches.com>
+	<1433341954-654-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <20150603163323.GA5314@sudip-PC>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, 2015-06-03 at 10:32 -0400, James Simmons wrote:
-> Handle all the style issues reported by checkpatch.pl.
-> Remove general white spaces, spaces in function calls,
-> etc.
-[]
-> @@ -167,13 +164,14 @@ lnet_ipif_enumerate (char ***namesp)
->  		if (nalloc * sizeof(*ifr) > PAGE_CACHE_SIZE) {
->  			toobig = 1;
->  			nalloc = PAGE_CACHE_SIZE/sizeof(*ifr);
-> -			CWARN("Too many interfaces: only enumerating first %d\n",
-> -			      nalloc);
-> +			CWARN("Too many interfaces: only enumerating "
-> +			      "first %d\n", nalloc);
+On Wed, Jun 03, 2015 at 10:32:31AM -0400, James Simmons wrote:
+> With all the TCPIP handling done in the lnet layer we should
+> rename all the functions with the prefix lnet_*. One other
+> change done was changing the remove argument of lnet_sock_getaddr
+> from a int to a bool.
+> 
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+checkpatch is complaining about unrecognized email address.
 
-Please don't split single strings into multiple parts.
-
-For a patch like this it'd be nice to specify that both
-"git diff -w" and scripts/objdiff shows no differences.
-
-Unless it does...
+regards
+sudip
