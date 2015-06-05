@@ -1,49 +1,39 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Fri, 5 Jun 2015 12:04:33 +0300
-Subject: [lustre-devel] [PATCH v3 7/8] staging:lustre: style cleanups
-	for LNet headers
-In-Reply-To: <1433364207-14307-8-git-send-email-jsimmons@infradead.org>
-References: <1433364207-14307-1-git-send-email-jsimmons@infradead.org>
-	<1433364207-14307-8-git-send-email-jsimmons@infradead.org>
-Message-ID: <20150605090433.GO28762@mwanda>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Fri, 5 Jun 2015 17:15:47 +0000
+Subject: [lustre-devel] Lustre and libreadline
+In-Reply-To: <20150604174752.GD10033@llnl.gov>
+References: <556F4825.1050408@cray.com> <20150603185716.GA10033@llnl.gov>
+	<556F6341.3070507@cray.com>
+	<116ba3cddacd422ca0f9b597c691f5df@EXCHCS32.ornl.gov>
+	<20150603224901.GB10033@llnl.gov>
+	<D1959036.F52DC%andreas.dilger@intel.com>
+	<20150604173726.GC10033@llnl.gov> <20150604174752.GD10033@llnl.gov>
+Message-ID: <D1964818.F54C3%andreas.dilger@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I'm fine with merging this patch as is.
+On 2015/06/04, 11:47 AM, "Ned Bass" <bass6@llnl.gov> wrote:
 
-On Wed, Jun 03, 2015 at 04:43:26PM -0400, James Simmons wrote:
-> +	struct lnet_peer	*msg_txpeer;	 /* peer I'm sending to */
-> +	struct lnet_peer	*msg_rxpeer;	 /* peer I received from */
-> +
-> +	void			*msg_private;
-> +	struct lnet_libmd	*msg_md;
-> +
-> +	unsigned int		msg_len;
-> +	unsigned int		msg_wanted;
-> +	unsigned int		msg_offset;
-> +	unsigned int		msg_niov;
-> +	struct kvec		*msg_iov;
-> +	lnet_kiov_t		*msg_kiov;
-> +
-> +	lnet_event_t		msg_ev;
-> +	lnet_hdr_t		msg_hdr;
+>On Thu, Jun 04, 2015 at 10:37:26AM -0700, Ned Bass wrote:
+>>
+>> Cool, thanks. The --net option isn't covered in the lctl man page, but
+>> it is in the online help. We'll need to close all those documentation
+>> gaps when we gut interactive mode.
+>
+>Or better yet (getting off topic here) emulate git and have separate man
+>pages for each subcommand, and have 'lfs help <command>' display the
+>lfs-command man page.
 
-These aren't in "lustre style".  Lustre style is more like:
+See https://jira.hpdd.intel.com/browse/LU-4315 for splitting up the lfs.1
+and lctl.8 man pages.  That is the kind of project any number of users
+could take on easily.
 
-	unsigned int		msg_len;
-	unsigned int		msg_wanted;
-	unsigned int		msg_offset;
-	unsigned int		msg_niov;
-	struct kvec	       *msg_iov;
-	lnet_kiov_t	       *msg_kiov;
+Cheers, Andreas
+-- 
+Andreas Dilger
 
-
-We're going through and re-indenting things.  I think just one space
-between type and name is the right thing for .c files but you guys
-really should figure out what style you're using for your header files.
-
-regards,
-dan carpenter
+Lustre Software Architect
+Intel High Performance Data Division
