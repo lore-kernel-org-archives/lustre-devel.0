@@ -1,25 +1,37 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Thu, 04 Jun 2015 14:21:26 -0700
-Subject: [lustre-devel] Lustre 2.8 feature freeze warning
-Message-ID: <5570C156.8010003@llnl.gov>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Fri, 5 Jun 2015 12:02:00 +0300
+Subject: [lustre-devel] [PATCH v3 1/8] staging:lustre: assume a kernel
+	build
+In-Reply-To: <1433364207-14307-2-git-send-email-jsimmons@infradead.org>
+References: <1433364207-14307-1-git-send-email-jsimmons@infradead.org>
+	<1433364207-14307-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <20150605090200.GL28762@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello everyone,
+This whole patchset looks find to me.
 
-Please be aware that the Lustre 2.8 feature freeze is rapidly 
-approaching.  After June 30, any unlanded major features will be 
-postponed until a future release.
+Some tips for the future.
 
-The current schedule for the 2.8.0 release is always available here:
+On Wed, Jun 03, 2015 at 04:43:20PM -0400, James Simmons wrote:
+> From: John L. Hammond <john.hammond@intel.com>
+> 
+> In lnet/lnet/ and lnet/selftest/ assume a kernel build (assume that
+> __KERNEL__ is defined). Remove some common code only needed for user
+> space LNet.
+> 
 
-http://wiki.lustre.org/Release_2.8.0
+> -	recs = lnet_res_containers_create(LNET_COOKIE_TYPE_ME, LNET_FL_MAX_MES,
+> -					  sizeof(lnet_me_t));
+> +	recs = lnet_res_containers_create(LNET_COOKIE_TYPE_ME, 0, 0);
 
-Smaller code changes (such as support for new kernels) are generally 
-still permitted until the code freeze date.  For 2.8.0, the code freeze 
-date is August 31st.
+When I'm reviewing "delete code" patches, I pretty much focus on the
+plus lines like this one.  Obviously, I can figure out why we changed
+the parameters to zero but it saves me time if it's spelled out in the
+changelog.
 
-Chris
+regards,
+dan carpenter
