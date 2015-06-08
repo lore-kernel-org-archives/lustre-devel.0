@@ -1,44 +1,35 @@
-From: Antonio Murdaca <antoniomurdaca@gmail.com>
-Date: Mon, 8 Jun 2015 21:30:35 +0200
-Subject: [lustre-devel] [PATCH] staging: lustre: cleanup not needed else
-	clauses
-In-Reply-To: <20150608192834.GA15483@kroah.com>
-References: <1433161131-25946-1-git-send-email-antonio.murdaca@gmail.com>
-	<20150608192834.GA15483@kroah.com>
-Message-ID: <CAA7r0fqYj8Q=Omjwh_-5BLVxvO_+K1tsBNro3_bp+Lt=7ifxzg@mail.gmail.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Mon, 8 Jun 2015 12:33:59 -0700
+Subject: [lustre-devel] [PATCH v4 1/7] staging:lustre: move tcpip
+	abstraction
+In-Reply-To: <1433361433-24976-2-git-send-email-jsimmons@infradead.org>
+References: <1433361433-24976-1-git-send-email-jsimmons@infradead.org>
+	<1433361433-24976-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <20150608193359.GA1001@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-I'll send a v2 as soon as possible!
+On Wed, Jun 03, 2015 at 03:57:07PM -0400, James Simmons wrote:
+> Rename libcfs/linux/linux-tcpip.c to lnet/lnet/lib-socket.c
+> 
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  drivers/staging/lustre/lnet/lnet/Makefile          |    7 +-
+>  drivers/staging/lustre/lnet/lnet/lib-socket.c      |  624 ++++++++++++++++++++
+>  drivers/staging/lustre/lustre/libcfs/Makefile      |    1 -
+>  .../lustre/lustre/libcfs/linux/linux-tcpip.c       |  623 -------------------
+>  4 files changed, 628 insertions(+), 627 deletions(-)
+>  create mode 100644 drivers/staging/lustre/lnet/lnet/lib-socket.c
+>  delete mode 100644 drivers/staging/lustre/lustre/libcfs/linux/linux-tcpip.c
 
-2015-06-08 21:28 GMT+02:00 Greg KH <gregkh@linuxfoundation.org>:
-> On Mon, Jun 01, 2015 at 02:18:51PM +0200, Antonio Murdaca wrote:
->> cleanup checkpatch.pl warnings about not needed else
->> clauses after a break or return
->>
->> Signed-off-by: Antonio Murdaca <antonio.murdaca@gmail.com>
->> ---
->>  drivers/staging/lustre/lustre/fid/fid_request.c    |  5 ++-
->>  .../staging/lustre/lustre/include/lprocfs_status.h |  3 +-
->>  drivers/staging/lustre/lustre/lclient/lcommon_cl.c | 36 +++++++++++-----------
->>  drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |  3 +-
->>  drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 11 ++++---
->>  drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     |  3 +-
->>  drivers/staging/lustre/lustre/lov/lov_request.c    |  3 +-
->>  drivers/staging/lustre/lustre/mdc/mdc_request.c    |  8 ++---
->>  drivers/staging/lustre/lustre/obdclass/cl_object.c |  6 ++--
->>  drivers/staging/lustre/lustre/obdclass/llog_cat.c  |  6 ++--
->>  drivers/staging/lustre/lustre/osc/osc_lock.c       |  3 +-
->>  drivers/staging/lustre/lustre/osc/osc_request.c    | 14 +++++----
->>  drivers/staging/lustre/lustre/ptlrpc/pinger.c      |  8 ++---
->>  13 files changed, 50 insertions(+), 59 deletions(-)
->
-> Doesn't apply to my latest tree :(
+Please generate patches in -M format, so I can see the rename properly,
+as it is, this is too messy for me to review.
 
+Please fix up and resend.
 
+thanks,
 
--- 
-Antonio Murdaca
+greg k-h
