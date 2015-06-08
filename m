@@ -1,32 +1,32 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 8 Jun 2015 12:38:26 -0700
-Subject: [lustre-devel] [PATCH v3 3/8] staging:lustre: delete no longer
-	used LNet headers
-In-Reply-To: <1433364207-14307-4-git-send-email-jsimmons@infradead.org>
-References: <1433364207-14307-1-git-send-email-jsimmons@infradead.org>
-	<1433364207-14307-4-git-send-email-jsimmons@infradead.org>
-Message-ID: <20150608193826.GA12667@kroah.com>
+From: Antonio Murdaca <antoniomurdaca@gmail.com>
+Date: Mon,  8 Jun 2015 21:48:40 +0200
+Subject: [lustre-devel] [PATCH v2 0/1] staging: lustre: cleanup not needed
+	else clauses
+Message-ID: <1433792921-10920-1-git-send-email-runcom@linux.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Jun 03, 2015 at 04:43:22PM -0400, James Simmons wrote:
-> Remove the linux specific headers for LNet since they are
-> mostly empty. Also api-support.h and lnet-sysctl.h is not
-> needed by anyone. Lastly we delete ptllnd.h and ptllnd_wire.h
-> which were used by Cray hardware that no longer exist.
-> With the deletion of the headers some conditionals and
-> wrappers that no longer exist are handled directly in the
-> source code. Alongside that some user land router code is
-> also removed.
-> 
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
+This patch applies cleanly to staging-next tree
 
-Doesn't apply to my tree, please refresh and resend this and the rest of
-this series.
+Antonio Murdaca (1):
+  staging: lustre: cleanup not needed else clauses
 
-thanks,
+ drivers/staging/lustre/lustre/fid/fid_request.c        |  5 ++---
+ drivers/staging/lustre/lustre/include/lprocfs_status.h |  3 +--
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c          |  3 +--
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c         | 11 ++++++-----
+ drivers/staging/lustre/lustre/ldlm/ldlm_pool.c         |  3 +--
+ drivers/staging/lustre/lustre/lov/lov_request.c        |  3 +--
+ drivers/staging/lustre/lustre/mdc/mdc_request.c        |  8 ++++----
+ drivers/staging/lustre/lustre/obdclass/cl_object.c     |  6 ++----
+ drivers/staging/lustre/lustre/obdclass/llog_cat.c      |  6 ++----
+ drivers/staging/lustre/lustre/osc/osc_lock.c           |  3 +--
+ drivers/staging/lustre/lustre/osc/osc_request.c        | 14 ++++++++------
+ drivers/staging/lustre/lustre/ptlrpc/pinger.c          |  8 +++-----
+ 12 files changed, 32 insertions(+), 41 deletions(-)
 
-greg k-h
+-- 
+2.4.3
