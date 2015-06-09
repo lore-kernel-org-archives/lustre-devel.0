@@ -1,79 +1,35 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  8 Jun 2015 22:27:09 -0400
-Subject: [lustre-devel] [PATCH v5 3/7] staging:lustre: remove useless
-	libcfs_sock_abort_accept
-In-Reply-To: <1433816833-3244-1-git-send-email-jsimmons@infradead.org>
-References: <1433816833-3244-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1433816833-3244-4-git-send-email-jsimmons@infradead.org>
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Tue, 9 Jun 2015 13:38:53 +0000
+Subject: [lustre-devel] [PATCH v4 1/7] staging:lustre: move
+	tcpip	abstraction
+In-Reply-To: <20150604074535.GA6781@sudip-PC>
+References: <1433361433-24976-1-git-send-email-jsimmons@infradead.org>
+	<1433361433-24976-2-git-send-email-jsimmons@infradead.org>
+	<20150604053554.GB6376@sudip-PC> <20150604073420.GA28762@mwanda>
+	<20150604074535.GA6781@sudip-PC>
+Message-ID: <52dddbd6f58e475981a9e19985008ce7@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Another one of those silly one line wrappers which is not
-needed. Replace libcfs_sock_abort_accept wrapper with a
-direct call to wake_up_all on the lnet_acceptor_state sock.
+>On Thu, Jun 04, 2015 at 10:34:20AM +0300, Dan Carpenter wrote:
+>> On Thu, Jun 04, 2015 at 11:05:54AM +0530, Sudip Mukherjee wrote:
+>> > On Wed, Jun 03, 2015 at 03:57:07PM -0400, James Simmons wrote:
+>> > > Rename libcfs/linux/linux-tcpip.c to lnet/lnet/lib-socket.c
+>> > looks like you have not just renamed the file, but there was also a change
+>> > in the #include which is not mentioned in the commit message.
+>> > 
+>> 
+>> That's obviously going to be part of moving the file.
+>yes. path changed for libcfs.h. so that was updated.
+>but there was also a new line
+>#include "../../include/linux/lnet/lib-lnet.h"
+>
+>should that be part of moving the file also?
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 -
- drivers/staging/lustre/lnet/lnet/acceptor.c        |    4 ++--
- drivers/staging/lustre/lnet/lnet/lib-socket.c      |    8 --------
- 3 files changed, 2 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index f469333..457ce9a 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -71,7 +71,6 @@ int libcfs_ipif_enumerate(char ***names);
- void libcfs_ipif_free_enumeration(char **names, int n);
- int libcfs_sock_listen(struct socket **sockp, __u32 ip, int port, int backlog);
- int libcfs_sock_accept(struct socket **newsockp, struct socket *sock);
--void libcfs_sock_abort_accept(struct socket *sock);
- int libcfs_sock_connect(struct socket **sockp, int *fatal,
- 			__u32 local_ip, int local_port,
- 			__u32 peer_ip, int peer_port);
-diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
-index 1657106..246a583 100644
---- a/drivers/staging/lustre/lnet/lnet/acceptor.c
-+++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
-@@ -377,7 +377,7 @@ lnet_acceptor(void *arg)
- 			continue;
- 		}
- 
--		/* maybe we're waken up with libcfs_sock_abort_accept() */
-+		/* maybe the LNet acceptor thread has been waken */
- 		if (lnet_acceptor_state.pta_shutdown) {
- 			sock_release(newsock);
- 			break;
-@@ -493,7 +493,7 @@ lnet_acceptor_stop(void)
- 		return;
- 
- 	lnet_acceptor_state.pta_shutdown = 1;
--	libcfs_sock_abort_accept(lnet_acceptor_state.pta_sock);
-+	wake_up_all(sk_sleep(lnet_acceptor_state.pta_sock->sk));
- 
- 	/* block until acceptor signals exit */
- 	wait_for_completion(&lnet_acceptor_state.pta_signal);
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-index 259db61..bb8d9c2 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-@@ -568,14 +568,6 @@ libcfs_sock_accept (struct socket **newsockp, struct socket *sock)
- 
- EXPORT_SYMBOL(libcfs_sock_accept);
- 
--void
--libcfs_sock_abort_accept (struct socket *sock)
--{
--	wake_up_all(sk_sleep(sock->sk));
--}
--
--EXPORT_SYMBOL(libcfs_sock_abort_accept);
--
- int
- libcfs_sock_connect (struct socket **sockp, int *fatal,
- 		     __u32 local_ip, int local_port,
--- 
-1.7.1
+That is handle the move of some of the LNet function declarations in libcfs.h
+to lib-lnet.h. That happens in patch number 4 of this series. I was trying to
+minimize the diff between the tip of the Lustre development branch and
+the upstream client.
