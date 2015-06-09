@@ -1,53 +1,50 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 9 Jun 2015 00:33:50 +0000
-Subject: [lustre-devel] [PATCH v3 5/8] staging:lustre: separate kernel
- and user land defines in the LNet headers
-In-Reply-To: <20150605090226.GM28762@mwanda>
-References: <1433364207-14307-1-git-send-email-jsimmons@infradead.org>
-	<1433364207-14307-6-git-send-email-jsimmons@infradead.org>
-	<20150605090226.GM28762@mwanda>
-Message-ID: <D19B6F47.F5921%andreas.dilger@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon,  8 Jun 2015 22:27:06 -0400
+Subject: [lustre-devel] [PATCH v5 0/7] staging:lustre: remove tcpip
+	abstraction from libcfs
+Message-ID: <1433816833-3244-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/06/05, 3:02 AM, "Dan Carpenter" <dan.carpenter@oracle.com> wrote:
+Since libcfs no longer builds for user land we can
+move the TCPIP abstraction that exist to the LNET
+layer which is the only place that uses it. Also
+the migrated code will use native linux kernel
+APIs directly instead of with wrappers.
 
->On Wed, Jun 03, 2015 at 04:43:24PM -0400, James Simmons wrote:
->> Currently the lnet headers used by user land contain various internal
->> LNet structures that are only used by kernel space. Move the user land
->> structures to headers used by user land. The kernel structures are
->> relocated to headers that are never exposed to user land.
->> 
->> Signed-off-by: James Simmons <jsimmons@infradead.org>
->> ---
->> diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c
->>b/drivers/staging/lustre/lnet/lnet/acceptor.c
->> index 1dc7c8a..4928f5c 100644
->> --- a/drivers/staging/lustre/lnet/lnet/acceptor.c
->> +++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
->> @@ -243,8 +243,6 @@ lnet_accept(struct socket *sock, __u32 magic)
->>  
->>  		if (magic == le32_to_cpu(LNET_PROTO_TCP_MAGIC))
->>  			str = "'old' socknal/tcpnal";
->> -		else if (lnet_accept_magic(magic, LNET_PROTO_RA_MAGIC))
->> -			str = "'old' ranal";
->>  		else
->>  			str = "unrecognised";
->>  
->
->Presumably this was done intentionally.  We deleted LNET_PROTO_RA_MAGIC.
->The changelog was not very clear why.
+Signed-off-by: James Simmons <uja.ornl@gmail.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+Reviewed-on: http://review.whamcloud.com/13760
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Isaac Huang <he.huang@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 
-The "Rapid Array" network interface is an obsolete network once used by
-Cray hardware but hasn't been supported for about 10 years and was (mostly)
-deleted from the tree already.  This was just a left-over I guess.
+James Simmons (7):
+  staging:lustre: move tcpip abstraction
+  staging:lustre: remove useless libcfs_sock_release
+  staging:lustre: remove useless libcfs_sock_abort_accept
+  staging:lustre: rename tcpip handling functions to lnet_* prefix
+  staging:lustre: use available kernel wrappers in lib-socket.c
+  staging:lustre: lib-socket.c code cleanup - indentation etc
+  staging:lustre: Update license and copyright for lib-socket.c
 
-Cheers, Andreas
--- 
-Andreas Dilger
-
-Lustre Software Architect
-Intel High Performance Data Division
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |   17 -
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |   16 +
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    2 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   17 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |    2 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |    6 +-
+ .../lustre/lnet/klnds/socklnd/socklnd_lib-linux.c  |   15 +-
+ .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |   43 +-
+ drivers/staging/lustre/lnet/lnet/Makefile          |    7 +-
+ drivers/staging/lustre/lnet/lnet/acceptor.c        |   55 +-
+ drivers/staging/lustre/lnet/lnet/config.c          |   21 +-
+ drivers/staging/lustre/lnet/lnet/lib-socket.c      |  594 +++++++++++++++++++
+ drivers/staging/lustre/lustre/libcfs/Makefile      |    1 -
+ .../lustre/lustre/libcfs/linux/linux-tcpip.c       |  623 --------------------
+ 14 files changed, 687 insertions(+), 732 deletions(-)
+ create mode 100644 drivers/staging/lustre/lnet/lnet/lib-socket.c
+ delete mode 100644 drivers/staging/lustre/lustre/libcfs/linux/linux-tcpip.c
