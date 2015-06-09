@@ -1,35 +1,12 @@
 From: Ben Evans <bevans@cray.com>
-Date: Wed, 10 Jun 2015 14:01:06 +0000
+Date: Tue, 9 Jun 2015 19:48:13 +0000
 Subject: [lustre-devel] wiretest.c
-In-Reply-To: <299328B7-9D13-4854-BA51-2B1F3E1D9358@intel.com>
-References: <6E6D936CCB2E3C428716BD24C5C6CDF264330C@CFWEX01.americas.cray.com>
-	<299328B7-9D13-4854-BA51-2B1F3E1D9358@intel.com>
-Message-ID: <6E6D936CCB2E3C428716BD24C5C6CDF26433AA@CFWEX01.americas.cray.com>
+Message-ID: <6E6D936CCB2E3C428716BD24C5C6CDF264330C@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
-
-That much I assumed from context, it just strikes me as a strange way of going about it, since it just adds a second step to change a constant.  I figured code reviews would pick that stuff up pretty quickly.
-
-Does using it as a method of identifying unused constants make sense to you?
-
--Ben
-
------Original Message-----
-From: Dilger, Andreas [mailto:andreas.dilger at intel.com] 
-Sent: Tuesday, June 09, 2015 9:42 PM
-To: Ben Evans
-Cc: Drokin, Oleg; lustre-devel at lists.lustre.org
-Subject: Re: wiretest.c
-
-Ben,
-The point of wiretest.c is that these values should basically never be changed. At compile time these checks should become no-ops unless they have changed, which would be a bug.
-
-Cheers, Andreas
-
-On Jun 9, 2015, at 13:49, Ben Evans <bevans at cray.com<mailto:bevans@cray.com>> wrote:
 
 I'm trying to help out with the client code merging into the kernel project.  The first thing I dove into was ptlrpc, as it's a space that's been singled out as needing help.
 
@@ -49,3 +26,6 @@ What's the point from a design perspective other than making it mildly more diff
 Thanks for any help, or insight you can give
 
 -Ben Evans
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150609/157737dc/attachment-0001.htm>
