@@ -1,35 +1,50 @@
 From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Tue, 9 Jun 2015 13:38:53 +0000
-Subject: [lustre-devel] [PATCH v4 1/7] staging:lustre: move
-	tcpip	abstraction
-In-Reply-To: <20150604074535.GA6781@sudip-PC>
-References: <1433361433-24976-1-git-send-email-jsimmons@infradead.org>
-	<1433361433-24976-2-git-send-email-jsimmons@infradead.org>
-	<20150604053554.GB6376@sudip-PC> <20150604073420.GA28762@mwanda>
-	<20150604074535.GA6781@sudip-PC>
-Message-ID: <52dddbd6f58e475981a9e19985008ce7@EXCHCS32.ornl.gov>
+Date: Tue, 9 Jun 2015 14:59:26 +0000
+Subject: [lustre-devel] [PATCH v3 5/8] staging:lustre: separate kernel
+ and user land defines in the LNet headers
+In-Reply-To: <D19B6F47.F5921%andreas.dilger@intel.com>
+References: <1433364207-14307-1-git-send-email-jsimmons@infradead.org>
+	<1433364207-14307-6-git-send-email-jsimmons@infradead.org>
+	<20150605090226.GM28762@mwanda>
+	<D19B6F47.F5921%andreas.dilger@intel.com>
+Message-ID: <8fc5cd45fda6439f9cad8c8a7b504db9@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->On Thu, Jun 04, 2015 at 10:34:20AM +0300, Dan Carpenter wrote:
->> On Thu, Jun 04, 2015 at 11:05:54AM +0530, Sudip Mukherjee wrote:
->> > On Wed, Jun 03, 2015 at 03:57:07PM -0400, James Simmons wrote:
->> > > Rename libcfs/linux/linux-tcpip.c to lnet/lnet/lib-socket.c
->> > looks like you have not just renamed the file, but there was also a change
->> > in the #include which is not mentioned in the commit message.
->> > 
->> 
->> That's obviously going to be part of moving the file.
->yes. path changed for libcfs.h. so that was updated.
->but there was also a new line
->#include "../../include/linux/lnet/lib-lnet.h"
+>On 2015/06/05, 3:02 AM, "Dan Carpenter" <dan.carpenter@oracle.com> wrote:
 >
->should that be part of moving the file also?
+>>On Wed, Jun 03, 2015 at 04:43:24PM -0400, James Simmons wrote:
+>>> Currently the lnet headers used by user land contain various internal
+>>> LNet structures that are only used by kernel space. Move the user land
+>>> structures to headers used by user land. The kernel structures are
+>>> relocated to headers that are never exposed to user land.
+>>> 
+>>> Signed-off-by: James Simmons <jsimmons@infradead.org>
+>>> ---
+>>> diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c
+>>>b/drivers/staging/lustre/lnet/lnet/acceptor.c
+>>> index 1dc7c8a..4928f5c 100644
+>>> --- a/drivers/staging/lustre/lnet/lnet/acceptor.c
+>>> +++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
+>>> @@ -243,8 +243,6 @@ lnet_accept(struct socket *sock, __u32 magic)
+>>>  
+>>>  		if (magic == le32_to_cpu(LNET_PROTO_TCP_MAGIC))
+>>>  			str = "'old' socknal/tcpnal";
+>>> -		else if (lnet_accept_magic(magic, LNET_PROTO_RA_MAGIC))
+>>> -			str = "'old' ranal";
+>>>  		else
+>>>  			str = "unrecognised";
+>>>  
+>>
+>>Presumably this was done intentionally.  We deleted LNET_PROTO_RA_MAGIC.
+>>The changelog was not very clear why.
+>
+>The "Rapid Array" network interface is an obsolete network once used by
+>Cray hardware but hasn't been supported for about 10 years and was (mostly)
+>deleted from the tree already.  This was just a left-over I guess.
 
-That is handle the move of some of the LNet function declarations in libcfs.h
-to lib-lnet.h. That happens in patch number 4 of this series. I was trying to
-minimize the diff between the tip of the Lustre development branch and
-the upstream client.
+I need to break this patch up and do a proper backport of the patch from LU-6209.
+Currently it is mixed in with this header cleanup. 
