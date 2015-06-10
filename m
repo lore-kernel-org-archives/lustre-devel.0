@@ -1,37 +1,54 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Wed, 10 Jun 2015 01:41:35 +0000
-Subject: [lustre-devel] wiretest.c
-In-Reply-To: <6E6D936CCB2E3C428716BD24C5C6CDF264330C@CFWEX01.americas.cray.com>
-References: <6E6D936CCB2E3C428716BD24C5C6CDF264330C@CFWEX01.americas.cray.com>
-Message-ID: <299328B7-9D13-4854-BA51-2B1F3E1D9358@intel.com>
+Date: Wed, 10 Jun 2015 06:58:02 +0000
+Subject: [lustre-devel] OBD_CONNECT_* flags
+In-Reply-To: <55774CE2.30107@cray.com>
+References: <55774CE2.30107@cray.com>
+Message-ID: <D19D2F08.F62A2%andreas.dilger@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ben,
-The point of wiretest.c is that these values should basically never be changed. At compile time these checks should become no-ops unless they have changed, which would be a bug.
+On 2015/06/09, 2:30 PM, "Patrick Farrell" <paf@cray.com> wrote:
+>Hopefully a fairly quick question...  I'm adding a new feature (lock
+>ahead) and would like to use an OBD_CONNECT flag to verify it's
+>supported on the server.  I took a quick stab at adding one, but I'm
+>getting lost in the details of how the flags are set and exchanged.
+>
+>Essentially, I would like the client and server (OSS in this case) to
+>both have a particular OBD_CONNECT flag or the client will return
+>-EOPNOTSUPP when the feature (an ioctl) is invoked.
+>So: Is an OBD_CONNECT flag the right way to do this?
+>If so, could anyone give a brief explanation of how that works, or an
+>example to build off of?
+
+The client sets the OBD_CONNECT flags for features it supports before
+connection to the MDS or OSS (or MGS, but we'll leave that out for now).
+The server replies with the subset of those flags that it supports,
+masking the client flags with either the MDS_CONNECT_SUPPORTED or
+OST_CONNECT_SUPPORTED mask, depending on the service type.  The resulting
+set of flags are features that both the client and server understand.
+Definitely using OBD_CONNECT flags is the intended way to do this.
+
+If this feature only needs to be understood by the OSC and OST, then you
+are done - the connect flags are stored for each connection.  If the llite
+layer needs to be aware of the feature then this is a bit more complex
+because the client->OST connections are async and the flags aren't set
+until the connection is completed.  That is fine for checking features as
+needed during runtime on a particular OST, but not possible if you would
+need to refuse the mount because of some missing server feature (which I
+don't think is relevant for your use case).
+
+In theory, the OBD_CONNECT flags could be different on a per-OST basis if
+the OSTs were just being upgraded, but practically this is not the case.
+For lockahead this seems manageable, since this is just an advisory
+feature, so it would be OK if the lockahead requests weren't executed for
+some OSTs.
 
 Cheers, Andreas
+-- 
+Andreas Dilger
 
-On Jun 9, 2015, at 13:49, Ben Evans <bevans at cray.com<mailto:bevans@cray.com>> wrote:
-
-I?m trying to help out with the client code merging into the kernel project.  The first thing I dove into was ptlrpc, as it?s a space that?s been singled out as needing help.
-
-In order to get my head around it, I?m just going through the code, and one of the first things that pops up is wiretest.c, which looks to be checking that things that have been #defined have the values that they are #defined to have, that structures are offset correctly (for a given value of ?correctly?) etc.
-
-So, I?ve started going through wiretest and seeing how much of the things that are defined are actually used in the code, and I find that some just aren?t used at all, or at least not in other places than where they?re defined, and wiretest. HSM_GHOST_COPY is a good example of it.  I can?t find any usage in the mainline lustre-release code, or in the drivers/staging/lustre code.  Is this the sort of thing that should be flagged for deletion?
-
-Secondly, if the code boils down to:
-#define SOME_VAR 10
-
-and
-
-LASSERT(SOME_VAR == 10);
-
-What?s the point from a design perspective other than making it mildly more difficult to change?
-
-Thanks for any help, or insight you can give
-
--Ben Evans
+Lustre Software Architect
+Intel High Performance Data Division
