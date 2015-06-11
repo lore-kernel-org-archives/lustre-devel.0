@@ -1,153 +1,285 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 11 Jun 2015 15:18:13 -0400
-Subject: [lustre-devel] [PATCH v4 7/9] staging:lustre: fix camel case for
-	LNetInit and LNetFini
+Date: Thu, 11 Jun 2015 15:18:15 -0400
+Subject: [lustre-devel] [PATCH v4 9/9] staging:lustre: Update license and
+	copyright for the LNET headers
 In-Reply-To: <1434050295-10986-1-git-send-email-jsimmons@infradead.org>
 References: <1434050295-10986-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1434050295-10986-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1434050295-10986-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-For the functions LNetInit and LNetFini move away from
-camel case to lnet_init and lnet_fini.
+Point to the right place for GNU license. Update Intel copyright.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/linux/lnet/api.h    |    3 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    3 +++
- .../staging/lustre/include/linux/lnet/lib-types.h  |    2 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |   16 ++++++++--------
- drivers/staging/lustre/lnet/lnet/module.c          |    6 +++---
- 5 files changed, 15 insertions(+), 15 deletions(-)
+ drivers/staging/lustre/include/linux/lnet/api.h    |   13 +++++--------
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |   10 +++-------
+ .../staging/lustre/include/linux/lnet/lib-types.h  |   13 +++----------
+ drivers/staging/lustre/include/linux/lnet/lnet.h   |   10 ++++------
+ drivers/staging/lustre/include/linux/lnet/lnetst.h |   12 ++++--------
+ drivers/staging/lustre/include/linux/lnet/nidstr.h |    3 ++-
+ .../staging/lustre/include/linux/lnet/socklnd.h    |   12 ++++--------
+ drivers/staging/lustre/include/linux/lnet/types.h  |   10 +++-------
+ 8 files changed, 28 insertions(+), 55 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/api.h b/drivers/staging/lustre/include/linux/lnet/api.h
-index c4dc1b2..dee7f27 100644
+index 2eb0a05..9493d5e 100644
 --- a/drivers/staging/lustre/include/linux/lnet/api.h
 +++ b/drivers/staging/lustre/include/linux/lnet/api.h
-@@ -52,9 +52,6 @@
- /** \defgroup lnet_init_fini Initialization and cleanup
-  * The LNet must be properly initialized before any LNet calls can be made.
-  * @{ */
--int LNetInit(void);
--void LNetFini(void);
--
- int LNetNIInit(lnet_pid_t requested_pid);
- int LNetNIFini(void);
- /** @} lnet_init_fini */
+@@ -15,21 +15,19 @@
+  *
+  * You should have received a copy of the GNU General Public License
+  * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
++ * http://www.gnu.org/licenses/gpl-2.0.html
+  *
+  * GPL HEADER END
+  */
+ /*
+  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Use is subject to license terms.
++ *
++ * Copyright (c) 2011 - 2015, Intel Corporation.
+  */
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
++ * Lustre is a trademark of Seagate, Inc.
+  */
+ 
+ #ifndef __LNET_API_H__
+@@ -41,9 +39,8 @@
+  *
+  * LNet is an asynchronous message-passing API, which provides an unreliable
+  * connectionless service that can't guarantee any order. It supports OFA IB,
+- * TCP/IP, and Cray Portals, and routes between heterogeneous networks.
++ * TCP/IP, and Cray Interconnects, and routes between heterogeneous networks.
+  *
+- * LNet can run both in OS kernel space and in userspace as a library.
+  * @{
+  */
+ 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 061e171..6246e2e 100644
+index 0dbab6f..a9c9a07 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -434,6 +434,9 @@ lnet_ni_t *lnet_nid2ni_locked(lnet_nid_t nid, int cpt);
- lnet_ni_t *lnet_net2ni_locked(__u32 net, int cpt);
- lnet_ni_t *lnet_net2ni(__u32 net);
- 
-+int lnet_init(void);
-+void lnet_fini(void);
-+
- int lnet_notify(lnet_ni_t *ni, lnet_nid_t peer, int alive, unsigned long when);
- void lnet_notify_locked(lnet_peer_t *lp, int notifylnd, int alive,
- 			unsigned long when);
+@@ -15,11 +15,7 @@
+  *
+  * You should have received a copy of the GNU General Public License
+  * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
++ * http://www.gnu.org/licenses/gpl-2.0.html
+  *
+  * GPL HEADER END
+  */
+@@ -27,11 +23,11 @@
+  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Use is subject to license terms.
+  *
+- * Copyright (c) 2012, Intel Corporation.
++ * Copyright (c) 2012 - 2015, Intel Corporation.
+  */
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
++ * Lustre is a trademark of Seagate, Inc.
+  *
+  * lnet/include/lnet/lib-lnet.h
+  */
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index fdf94dd..8e8e725 100644
+index fa949d8..81a63db 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -575,7 +575,7 @@ typedef struct {
- 
- 	struct mutex			ln_api_mutex;
- 	struct mutex			ln_lnd_mutex;
--	int				ln_init;	/* LNetInit() called? */
-+	int				ln_init;	/* lnet_init() called? */
- 	/* Have I called LNetNIInit myself? */
- 	int				ln_niinit_self;
- 	/* LNetNIInit/LNetNIFini counter */
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 57e9752..d14fe70 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1101,14 +1101,14 @@ lnet_startup_lndnis(void)
-  * Initialize LNet library.
+@@ -15,11 +15,7 @@
   *
-  * Only userspace program needs to call this function - it's automatically
-- * called in the kernel at module loading time. Caller has to call LNetFini()
-- * after a call to LNetInit(), if and only if the latter returned 0. It must
-+ * called in the kernel at module loading time. Caller has to call lnet_fini()
-+ * after a call to lnet_init(), if and only if the latter returned 0. It must
-  * be called exactly once.
+  * You should have received a copy of the GNU General Public License
+  * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
++ * http://www.gnu.org/licenses/gpl-2.0.html
   *
-  * \return 0 on success, and -ve on failures.
+  * GPL HEADER END
   */
- int
--LNetInit(void)
-+lnet_init(void)
- {
- 	int rc;
+@@ -27,16 +23,13 @@
+  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Use is subject to license terms.
+  *
+- * Copyright (c) 2012, Intel Corporation.
++ * Copyright (c) 2012 - 2015, Intel Corporation.
+  */
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
++ * Lustre is a trademark of Seagate, Inc.
+  *
+  * lnet/include/lnet/lib-types.h
+- *
+- * Types used by the library side routines that do not need to be
+- * exposed to the user application
+  */
  
-@@ -1161,7 +1161,7 @@ LNetInit(void)
- 	lnet_register_lnd(&the_lolnd);
- 	return 0;
- }
--EXPORT_SYMBOL(LNetInit);
-+EXPORT_SYMBOL(lnet_init);
+ #ifndef __LNET_LIB_TYPES_H__
+diff --git a/drivers/staging/lustre/include/linux/lnet/lnet.h b/drivers/staging/lustre/include/linux/lnet/lnet.h
+index 8124d8f..5d1559a 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lnet.h
++++ b/drivers/staging/lustre/include/linux/lnet/lnet.h
+@@ -15,21 +15,19 @@
+  *
+  * You should have received a copy of the GNU General Public License
+  * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
++ * http://www.gnu.org/licenses/gpl-2.0.html
+  *
+  * GPL HEADER END
+  */
+ /*
+  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Use is subject to license terms.
++ *
++ * Copyright (c) 2012 - 2015, Intel Corporation.
+  */
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
++ * Lustre is a trademark of Seagate, Inc.
+  */
+ 
+ #ifndef __LNET_H__
+diff --git a/drivers/staging/lustre/include/linux/lnet/lnetst.h b/drivers/staging/lustre/include/linux/lnet/lnetst.h
+index ea1e0c6..fd1e0fd 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lnetst.h
++++ b/drivers/staging/lustre/include/linux/lnet/lnetst.h
+@@ -15,11 +15,7 @@
+  *
+  * You should have received a copy of the GNU General Public License
+  * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
++ * http://www.gnu.org/licenses/gpl-2.0.html
+  *
+  * GPL HEADER END
+  */
+@@ -27,15 +23,15 @@
+  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Use is subject to license terms.
+  *
+- * Copyright (c) 2011, Intel Corporation.
++ * Copyright (c) 2011 - 2015, Intel Corporation.
+  */
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
++ * Lustre is a trademark of Seagate, Inc.
+  *
+  * lnet/include/lnet/lnetst.h
+  *
+- * Author: Liang Zhen <liangzhen@clusterfs.com>
++ * Author: Liang Zhen <liang.zhen@intel.com>
+  */
+ 
+ #ifndef __LNET_ST_H__
+diff --git a/drivers/staging/lustre/include/linux/lnet/nidstr.h b/drivers/staging/lustre/include/linux/lnet/nidstr.h
+index 8eaed1a..a627be9 100644
+--- a/drivers/staging/lustre/include/linux/lnet/nidstr.h
++++ b/drivers/staging/lustre/include/linux/lnet/nidstr.h
+@@ -23,10 +23,11 @@
+  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Use is subject to license terms.
+  *
+- * Copyright (c) 2011, 2014, Intel Corporation.
++ * Copyright (c) 2011 - 2015, Intel Corporation.
+  */
+ #ifndef _LNET_NIDSTRINGS_H
+ #define _LNET_NIDSTRINGS_H
++
+ #include "types.h"
  
  /**
-  * Finalize LNet library.
-@@ -1169,11 +1169,11 @@ EXPORT_SYMBOL(LNetInit);
-  * Only userspace program needs to call this function. It can be called
-  * at most once.
+diff --git a/drivers/staging/lustre/include/linux/lnet/socklnd.h b/drivers/staging/lustre/include/linux/lnet/socklnd.h
+index 4c790bd..599c9f6 100644
+--- a/drivers/staging/lustre/include/linux/lnet/socklnd.h
++++ b/drivers/staging/lustre/include/linux/lnet/socklnd.h
+@@ -15,25 +15,21 @@
   *
-- * \pre LNetInit() called with success.
-+ * \pre lnet_init() called with success.
-  * \pre All LNet users called LNetNIFini() for matching LNetNIInit() calls.
+  * You should have received a copy of the GNU General Public License
+  * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
++ * http://www.gnu.org/licenses/gpl-2.0.html
+  *
+  * GPL HEADER END
   */
- void
--LNetFini(void)
-+lnet_fini(void)
- {
- 	LASSERT(the_lnet.ln_init);
- 	LASSERT(the_lnet.ln_refcount == 0);
-@@ -1185,12 +1185,12 @@ LNetFini(void)
- 
- 	the_lnet.ln_init = 0;
- }
--EXPORT_SYMBOL(LNetFini);
-+EXPORT_SYMBOL(lnet_fini);
- 
- /**
-  * Set LNet PID and start LNet interfaces, routing, and forwarding.
+ /*
+  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Use is subject to license terms.
++ *
++ * Copyright (c) 2012 - 2015, Intel Corporation.
+  */
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
++ * Lustre is a trademark of Seagate, Inc.
   *
-- * Userspace program should call this after a successful call to LNetInit().
-+ * Userspace program should call this after a successful call to lnet_init().
-  * Users must call this function at least once before any other functions.
-  * For each successful call there must be a corresponding call to
-  * LNetNIFini(). For subsequent calls to LNetNIInit(), \a requested_pid is
-diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
-index 6881b9c..576201a 100644
---- a/drivers/staging/lustre/lnet/lnet/module.c
-+++ b/drivers/staging/lustre/lnet/lnet/module.c
-@@ -117,9 +117,9 @@ init_lnet(void)
+  * lnet/include/lnet/socklnd.h
+- *
+- * #defines shared between socknal implementation and utilities
+  */
+ #ifndef __LNET_LNET_SOCKLND_H__
+ #define __LNET_LNET_SOCKLND_H__
+diff --git a/drivers/staging/lustre/include/linux/lnet/types.h b/drivers/staging/lustre/include/linux/lnet/types.h
+index 06d73c0..940f73f 100644
+--- a/drivers/staging/lustre/include/linux/lnet/types.h
++++ b/drivers/staging/lustre/include/linux/lnet/types.h
+@@ -15,11 +15,7 @@
+  *
+  * You should have received a copy of the GNU General Public License
+  * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
++ * http://www.gnu.org/licenses/gpl-2.0.html
+  *
+  * GPL HEADER END
+  */
+@@ -27,11 +23,11 @@
+  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+  * Use is subject to license terms.
+  *
+- * Copyright (c) 2012, Intel Corporation.
++ * Copyright (c) 2012 - 2015, Intel Corporation.
+  */
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
++ * Lustre is a trademark of Seagate, Inc.
+  */
  
- 	mutex_init(&lnet_config_mutex);
- 
--	rc = LNetInit();
-+	rc = lnet_init();
- 	if (rc != 0) {
--		CERROR("LNetInit: error %d\n", rc);
-+		CERROR("lnet_init: error %d\n", rc);
- 		return rc;
- 	}
- 
-@@ -143,7 +143,7 @@ fini_lnet(void)
- 	rc = libcfs_deregister_ioctl(&lnet_ioctl_handler);
- 	LASSERT(rc == 0);
- 
--	LNetFini();
-+	lnet_fini();
- }
- 
- MODULE_AUTHOR("Peter J. Braam <braam@clusterfs.com>");
+ #ifndef __LNET_TYPES_H__
 -- 
 1.7.1
