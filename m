@@ -1,556 +1,296 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 11 Jun 2015 15:18:12 -0400
-Subject: [lustre-devel] [PATCH v4 6/9] staging:lustre: separate kernel and
-	user land defines in the LNet headers
+Date: Thu, 11 Jun 2015 15:18:11 -0400
+Subject: [lustre-devel] [PATCH v4 5/9] staging:lustre: move LNet NID macros
+	to LNet layer
 In-Reply-To: <1434050295-10986-1-git-send-email-jsimmons@infradead.org>
 References: <1434050295-10986-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1434050295-10986-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1434050295-10986-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Currently the lnet headers used by user land contain various internal
-LNet structures that are only used by kernel space. Move the user land
-structures to headers used by user land. The kernel structures are
-relocated to headers that are never exposed to user land.
+Currently several special macros LNet NID macros exist
+in libcfs.h and libcfs_private.h. Move those macros
+out to the lnet header types.h. The new lnet header
+nidstr.h contains LNet NID string data that can be
+used by user land LNet utilities and the LNet kernel
+drivers.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    3 -
- .../staging/lustre/include/linux/lnet/lib-types.h  |  171 +++-----------------
- .../staging/lustre/include/linux/lnet/lnetctl.h    |    7 +-
- drivers/staging/lustre/include/linux/lnet/lnetst.h |    5 +-
- .../staging/lustre/include/linux/lnet/socklnd.h    |    1 -
- drivers/staging/lustre/include/linux/lnet/types.h  |  169 ++++++++++++++++++--
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    3 +-
- 7 files changed, 180 insertions(+), 179 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_private.h   |   55 --------------
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |    1 +
+ drivers/staging/lustre/include/linux/lnet/lnet.h   |    5 +-
+ drivers/staging/lustre/include/linux/lnet/nidstr.h |   76 ++++++++++++++++++++
+ drivers/staging/lustre/include/linux/lnet/types.h  |   33 +++++++++
+ .../lustre/lustre/include/lustre/lustre_idl.h      |    1 +
+ drivers/staging/lustre/lustre/include/lustre_net.h |    4 +-
+ 7 files changed, 114 insertions(+), 61 deletions(-)
+ create mode 100644 drivers/staging/lustre/include/linux/lnet/nidstr.h
 
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+index d8f8543..ed37d26 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+@@ -42,14 +42,10 @@
+ #ifndef __LIBCFS_PRIVATE_H__
+ #define __LIBCFS_PRIVATE_H__
+ 
+-/* XXX this layering violation is for nidstrings */
+-#include "../lnet/types.h"
+-
+ #ifndef DEBUG_SUBSYSTEM
+ # define DEBUG_SUBSYSTEM S_UNDEFINED
+ #endif
+ 
+-
+ /*
+  * When this is on, LASSERT macro includes check for assignment used instead
+  * of equality check, but doesn't have unlikely(). Turn this on from time to
+@@ -410,36 +406,6 @@ int cfs_percpt_atomic_summary(atomic_t **refs);
+  */
+ #define CLASSERT(cond) do {switch (42) {case (cond): case 0: break; } } while (0)
+ 
+-/* support decl needed both by kernel and liblustre */
+-int	 libcfs_isknown_lnd(int type);
+-char       *libcfs_lnd2modname(int type);
+-char       *libcfs_lnd2str(int type);
+-int	 libcfs_str2lnd(const char *str);
+-char       *libcfs_net2str(__u32 net);
+-char       *libcfs_nid2str(lnet_nid_t nid);
+-__u32       libcfs_str2net(const char *str);
+-lnet_nid_t  libcfs_str2nid(const char *str);
+-int	 libcfs_str2anynid(lnet_nid_t *nid, const char *str);
+-char       *libcfs_id2str(lnet_process_id_t id);
+-void	cfs_free_nidlist(struct list_head *list);
+-int	 cfs_parse_nidlist(char *str, int len, struct list_head *list);
+-int	 cfs_match_nid(lnet_nid_t nid, struct list_head *list);
+-
+-/** \addtogroup lnet_addr
+- * @{ */
+-/* how an LNET NID encodes net:address */
+-/** extract the address part of an lnet_nid_t */
+-#define LNET_NIDADDR(nid)      ((__u32)((nid) & 0xffffffff))
+-/** extract the network part of an lnet_nid_t */
+-#define LNET_NIDNET(nid)       ((__u32)(((nid) >> 32)) & 0xffffffff)
+-/** make an lnet_nid_t from a network part and an address part */
+-#define LNET_MKNID(net, addr)   ((((__u64)(net))<<32)|((__u64)(addr)))
+-/* how net encodes type:number */
+-#define LNET_NETNUM(net)       ((net) & 0xffff)
+-#define LNET_NETTYP(net)       (((net) >> 16) & 0xffff)
+-#define LNET_MKNET(typ, num)    ((((__u32)(typ))<<16)|((__u32)(num)))
+-/** @} lnet_addr */
+-
+ /* max value for numeric network address */
+ #define MAX_NUMERIC_VALUE 0xffffffff
+ 
+@@ -519,25 +485,4 @@ do {						    \
+ 	ptr += cfs_size_round(len + 1);		 \
+ } while (0)
+ 
+-/**
+- *  Lustre Network Driver types.
+- */
+-enum {
+-	/* Only add to these values (i.e. don't ever change or redefine them):
+-	 * network addresses depend on them... */
+-	QSWLND    = 1,
+-	SOCKLND   = 2,
+-	GMLND     = 3, /* obsolete, keep it so that libcfs_nid2str works */
+-	PTLLND    = 4,
+-	O2IBLND   = 5,
+-	CIBLND    = 6,
+-	OPENIBLND = 7,
+-	IIBLND    = 8,
+-	LOLND     = 9,
+-	RALND     = 10,
+-	VIBLND    = 11,
+-	MXLND     = 12,
+-	GNILND    = 13,
+-};
+-
+ #endif
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 5b3b103..061e171 100644
+index c46e0e6..5b3b103 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -34,8 +34,6 @@
-  * Lustre is a trademark of Sun Microsystems, Inc.
-  *
-  * lnet/include/lnet/lib-lnet.h
-- *
-- * Top level include for library side routines
-  */
- 
- #ifndef __LNET_LIB_LNET_H__
-@@ -43,7 +41,6 @@
+@@ -42,6 +42,7 @@
+ #define __LNET_LIB_LNET_H__
  
  #include "../libcfs/libcfs.h"
- #include "api.h"
--#include "types.h"
++#include "api.h"
+ #include "types.h"
  #include "lnet.h"
  #include "lib-types.h"
- 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 4b862d3..fdf94dd 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -42,125 +42,20 @@
- #ifndef __LNET_LIB_TYPES_H__
- #define __LNET_LIB_TYPES_H__
- 
--#include "../libcfs/libcfs.h"
--#include <linux/list.h>
--#include "types.h"
--
--#define WIRE_ATTR       __attribute__((packed))
--
--/* Packed version of lnet_process_id_t to transfer via network */
--typedef struct {
--	lnet_nid_t nid;
--	lnet_pid_t pid;   /* node id / process id */
--} WIRE_ATTR lnet_process_id_packed_t;
--
--/* The wire handle's interface cookie only matches one network interface in
-- * one epoch (i.e. new cookie when the interface restarts or the node
-- * reboots).  The object cookie only matches one object on that interface
-- * during that object's lifetime (i.e. no cookie re-use). */
--typedef struct {
--	__u64 wh_interface_cookie;
--	__u64 wh_object_cookie;
--} WIRE_ATTR lnet_handle_wire_t;
--
--typedef enum {
--	LNET_MSG_ACK = 0,
--	LNET_MSG_PUT,
--	LNET_MSG_GET,
--	LNET_MSG_REPLY,
--	LNET_MSG_HELLO,
--} lnet_msg_type_t;
--
--/* The variant fields of the portals message header are aligned on an 8
-- * byte boundary in the message header.  Note that all types used in these
-- * wire structs MUST be fixed size and the smaller types are placed at the
-- * end. */
--typedef struct lnet_ack {
--	lnet_handle_wire_t  dst_wmd;
--	__u64	       match_bits;
--	__u32	       mlength;
--} WIRE_ATTR lnet_ack_t;
--
--typedef struct lnet_put {
--	lnet_handle_wire_t  ack_wmd;
--	__u64	       match_bits;
--	__u64	       hdr_data;
--	__u32	       ptl_index;
--	__u32	       offset;
--} WIRE_ATTR lnet_put_t;
--
--typedef struct lnet_get {
--	lnet_handle_wire_t  return_wmd;
--	__u64	       match_bits;
--	__u32	       ptl_index;
--	__u32	       src_offset;
--	__u32	       sink_length;
--} WIRE_ATTR lnet_get_t;
--
--typedef struct lnet_reply {
--	lnet_handle_wire_t  dst_wmd;
--} WIRE_ATTR lnet_reply_t;
--
--typedef struct lnet_hello {
--	__u64	      incarnation;
--	__u32	      type;
--} WIRE_ATTR lnet_hello_t;
-+#include <linux/kthread.h>
-+#include <linux/uio.h>
-+#include <linux/types.h>
-+#include <net/sock.h>
- 
--typedef struct {
--	lnet_nid_t	  dest_nid;
--	lnet_nid_t	  src_nid;
--	lnet_pid_t	  dest_pid;
--	lnet_pid_t	  src_pid;
--	__u32	       type;	       /* lnet_msg_type_t */
--	__u32	       payload_length;     /* payload data to follow */
--	/*<------__u64 aligned------->*/
--	union {
--		lnet_ack_t   ack;
--		lnet_put_t   put;
--		lnet_get_t   get;
--		lnet_reply_t reply;
--		lnet_hello_t hello;
--	} msg;
--} WIRE_ATTR lnet_hdr_t;
--
--/* A HELLO message contains a magic number and protocol version
-- * code in the header's dest_nid, the peer's NID in the src_nid, and
-- * LNET_MSG_HELLO in the type field.  All other common fields are zero
-- * (including payload_size; i.e. no payload).
-- * This is for use by byte-stream LNDs (e.g. TCP/IP) to check the peer is
-- * running the same protocol and to find out its NID. These LNDs should
-- * exchange HELLO messages when a connection is first established.  Individual
-- * LNDs can put whatever else they fancy in lnet_hdr_t::msg.
-- */
--typedef struct {
--	__u32   magic;			  /* LNET_PROTO_TCP_MAGIC */
--	__u16   version_major;		  /* increment on incompatible change */
--	__u16   version_minor;		  /* increment on compatible change */
--} WIRE_ATTR lnet_magicversion_t;
--
--/* PROTO MAGIC for LNDs */
--#define LNET_PROTO_IB_MAGIC		 0x0be91b91
--#define LNET_PROTO_GNI_MAGIC		0xb00fbabe /* ask Kim */
--#define LNET_PROTO_TCP_MAGIC		0xeebc0ded
--#define LNET_PROTO_ACCEPTOR_MAGIC	   0xacce7100
--#define LNET_PROTO_PING_MAGIC	       0x70696E67 /* 'ping' */
--
--/* Placeholder for a future "unified" protocol across all LNDs */
--/* Current LNDs that receive a request with this magic will respond with a
-- * "stub" reply using their current protocol */
--#define LNET_PROTO_MAGIC		    0x45726963 /* ! */
--
--#define LNET_PROTO_TCP_VERSION_MAJOR	1
--#define LNET_PROTO_TCP_VERSION_MINOR	0
--
--/* Acceptor connection request */
--typedef struct {
--	__u32       acr_magic;		  /* PTL_ACCEPTOR_PROTO_MAGIC */
--	__u32       acr_version;		/* protocol version */
--	__u64       acr_nid;		    /* target NID */
--} WIRE_ATTR lnet_acceptor_connreq_t;
-+#include "types.h"
- 
--#define LNET_PROTO_ACCEPTOR_VERSION       1
-+/* Max payload size */
-+#define LNET_MAX_PAYLOAD      CONFIG_LNET_MAX_PAYLOAD
-+#if (LNET_MAX_PAYLOAD < LNET_MTU)
-+# error "LNET_MAX_PAYLOAD too small - error in configure --with-max-payload-mb"
-+#elif (LNET_MAX_PAYLOAD > (PAGE_SIZE * LNET_MAX_IOV))
-+#  error "LNET_MAX_PAYLOAD too large - error in configure --with-max-payload-mb"
-+#endif
- 
- /* forward refs */
- struct lnet_libmd;
-@@ -295,7 +190,7 @@ typedef struct lnet_lnd {
- 	int		   lnd_refcount;	 /* # active instances */
- 
- 	/* fields initialised by the LND */
--	unsigned int	  lnd_type;
-+	__u32			lnd_type;
- 
- 	int  (*lnd_startup)(struct lnet_ni *ni);
- 	void (*lnd_shutdown)(struct lnet_ni *ni);
-@@ -349,15 +244,6 @@ typedef struct lnet_lnd {
- 
- } lnd_t;
- 
--#define LNET_NI_STATUS_UP      0x15aac0de
--#define LNET_NI_STATUS_DOWN    0xdeadface
--#define LNET_NI_STATUS_INVALID 0x00000000
--typedef struct {
--	lnet_nid_t ns_nid;
--	__u32      ns_status;
--	__u32      ns_unused;
--} WIRE_ATTR lnet_ni_status_t;
--
- struct lnet_tx_queue {
- 	int			tq_credits;	/* # tx credits free */
- 	int			tq_credits_min;	/* lowest it's been */
-@@ -365,8 +251,6 @@ struct lnet_tx_queue {
- 	struct list_head		tq_delayed;	/* delayed TXs */
- };
- 
--#define LNET_MAX_INTERFACES   16
--
- typedef struct lnet_ni {
- 	spinlock_t		ni_lock;
- 	struct list_head		ni_list;	/* chain on ln_nis */
-@@ -402,14 +286,6 @@ typedef struct lnet_ni {
- #define LNET_PING_FEAT_MASK		(LNET_PING_FEAT_BASE | \
- 					 LNET_PING_FEAT_NI_STATUS)
- 
--typedef struct {
--	__u32			pi_magic;
--	__u32			pi_features;
--	lnet_pid_t		pi_pid;
--	__u32			pi_nnis;
--	lnet_ni_status_t	pi_ni[0];
--} WIRE_ATTR lnet_ping_info_t;
--
- /* router checker data, per router */
- #define LNET_MAX_RTR_NIS   16
- #define LNET_PINGINFO_SIZE offsetof(lnet_ping_info_t, pi_ni[LNET_MAX_RTR_NIS])
-@@ -492,6 +368,11 @@ typedef struct {
- 	__u32		   lrn_net;	/* my net number */
- } lnet_remotenet_t;
- 
-+/** lnet message has credit and can be submitted to lnd for send/receive */
-+#define LNET_CREDIT_OK		0
-+/** lnet message is waiting for credit */
-+#define LNET_CREDIT_WAIT	1
-+
- typedef struct {
- 	struct list_head rbp_bufs;	     /* my free buffer pool */
- 	struct list_head rbp_msgs;	     /* messages blocking for a buffer */
-@@ -507,23 +388,9 @@ typedef struct {
- 	lnet_kiov_t	    rb_kiov[0];	  /* the buffer space */
- } lnet_rtrbuf_t;
- 
--typedef struct {
--	__u32	msgs_alloc;
--	__u32	msgs_max;
--	__u32	errors;
--	__u32	send_count;
--	__u32	recv_count;
--	__u32	route_count;
--	__u32	drop_count;
--	__u64	send_length;
--	__u64	recv_length;
--	__u64	route_length;
--	__u64	drop_length;
--} WIRE_ATTR lnet_counters_t;
--
- #define LNET_PEER_HASHSIZE   503		/* prime! */
- 
--#define LNET_NRBPOOLS	 3		 /* # different router buffer pools */
-+#define LNET_NRBPOOLS		3	/* # different router buffer pools */
- 
- enum {
- 	/* Didn't match anything */
-diff --git a/drivers/staging/lustre/include/linux/lnet/lnetctl.h b/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-index 98181d3..bdd69b2 100644
---- a/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-@@ -14,12 +14,11 @@
-  *   along with Portals; if not, write to the Free Software
-  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-  *
-- * header for libptlctl.a
-+ * header for lnet ioctl
+diff --git a/drivers/staging/lustre/include/linux/lnet/lnet.h b/drivers/staging/lustre/include/linux/lnet/lnet.h
+index 8d054a1..8124d8f 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lnet.h
++++ b/drivers/staging/lustre/include/linux/lnet/lnet.h
+@@ -41,9 +41,6 @@
+  * User application interface file
   */
--#ifndef _PTLCTL_H_
--#define _PTLCTL_H_
-+#ifndef _LNETCTL_H_
-+#define _LNETCTL_H_
- 
--#include "../libcfs/libcfs.h"
  #include "types.h"
+-#include "api.h"
+-
+-#define LNET_NIDSTR_COUNT  1024    /* # of nidstrings */
+-#define LNET_NIDSTR_SIZE   32      /* size of each one (see below for usage) */
++#include "nidstr.h"
  
- #define LNET_DEV_ID 0
-diff --git a/drivers/staging/lustre/include/linux/lnet/lnetst.h b/drivers/staging/lustre/include/linux/lnet/lnetst.h
-index 885f708..57432fd 100644
---- a/drivers/staging/lustre/include/linux/lnet/lnetst.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lnetst.h
-@@ -41,9 +41,7 @@
- #ifndef __LNET_ST_H__
- #define __LNET_ST_H__
- 
--#include "../libcfs/libcfs.h"
--#include "lnet.h"
--#include "lib-types.h"
-+#include <linux/types.h>
- 
- #define LST_FEAT_NONE		(0)
- #define LST_FEAT_BULK_LEN	(1 << 0)	/* enable variable page size */
-@@ -468,7 +466,6 @@ typedef struct {
- 	int		     png_flags;	      /* reserved flags */
- } lst_test_ping_param_t;
- 
--/* more tests */
- typedef struct {
- 	__u32 errors;
- 	__u32 rpcs_sent;
-diff --git a/drivers/staging/lustre/include/linux/lnet/socklnd.h b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-index 389038b..f7c7b08 100644
---- a/drivers/staging/lustre/include/linux/lnet/socklnd.h
-+++ b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-@@ -39,7 +39,6 @@
- #define __LNET_LNET_SOCKLND_H__
- 
- #include "types.h"
--#include "lib-types.h"
- 
- #define SOCKLND_CONN_NONE     (-1)
- #define SOCKLND_CONN_ANY	0
+ #endif
+diff --git a/drivers/staging/lustre/include/linux/lnet/nidstr.h b/drivers/staging/lustre/include/linux/lnet/nidstr.h
+new file mode 100644
+index 0000000..8eaed1a
+--- /dev/null
++++ b/drivers/staging/lustre/include/linux/lnet/nidstr.h
+@@ -0,0 +1,76 @@
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
++ * Use is subject to license terms.
++ *
++ * Copyright (c) 2011, 2014, Intel Corporation.
++ */
++#ifndef _LNET_NIDSTRINGS_H
++#define _LNET_NIDSTRINGS_H
++#include "types.h"
++
++/**
++ *  Lustre Network Driver types.
++ */
++enum {
++	/* Only add to these values (i.e. don't ever change or redefine them):
++	 * network addresses depend on them... */
++	QSWLND		= 1,
++	SOCKLND		= 2,
++	GMLND		= 3,
++	PTLLND		= 4,
++	O2IBLND		= 5,
++	CIBLND		= 6,
++	OPENIBLND	= 7,
++	IIBLND		= 8,
++	LOLND		= 9,
++	RALND		= 10,
++	VIBLND		= 11,
++	MXLND		= 12,
++	GNILND		= 13,
++	GNIIPLND	= 14,
++};
++
++struct list_head;
++
++#define LNET_NIDSTR_COUNT  1024    /* # of nidstrings */
++#define LNET_NIDSTR_SIZE   32      /* size of each one (see below for usage) */
++
++int libcfs_isknown_lnd(int type);
++char *libcfs_lnd2modname(int type);
++char *libcfs_lnd2str(int type);
++int libcfs_str2lnd(const char *str);
++char *libcfs_net2str(__u32 net);
++char *libcfs_nid2str(lnet_nid_t nid);
++__u32 libcfs_str2net(const char *str);
++lnet_nid_t libcfs_str2nid(const char *str);
++int libcfs_str2anynid(lnet_nid_t *nid, const char *str);
++char *libcfs_id2str(lnet_process_id_t id);
++void cfs_free_nidlist(struct list_head *list);
++int cfs_parse_nidlist(char *str, int len, struct list_head *list);
++int cfs_match_nid(lnet_nid_t nid, struct list_head *list);
++bool cfs_nidrange_is_contiguous(struct list_head *nidlist);
++void cfs_nidrange_find_min_max(struct list_head *nidlist, char *min_nid,
++			       char *max_nid, size_t nidstr_length);
++
++#endif /* _LNET_NIDSTRINGS_H */
 diff --git a/drivers/staging/lustre/include/linux/lnet/types.h b/drivers/staging/lustre/include/linux/lnet/types.h
-index 15528a1..32b9431 100644
+index 68d8139..15528a1 100644
 --- a/drivers/staging/lustre/include/linux/lnet/types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/types.h
-@@ -37,11 +37,11 @@
- #ifndef __LNET_TYPES_H__
- #define __LNET_TYPES_H__
- 
-+#include <linux/types.h>
-+
- /** \addtogroup lnet
-  * @{ */
- 
--#include "../libcfs/libcfs.h"
--
- /** \addtogroup lnet_addr
-  * @{ */
- 
-@@ -74,6 +74,7 @@ typedef __u32 lnet_pid_t;
- 
- #define LNET_PID_RESERVED 0xf0000000 /* reserved bits in PID */
- #define LNET_PID_USERFLAG 0x80000000 /* set in userspace peers */
-+#define LNET_PID_LUSTRE	  12345
+@@ -77,6 +77,39 @@ typedef __u32 lnet_pid_t;
  
  #define LNET_TIME_FOREVER    (-1)
  
-@@ -110,7 +111,158 @@ static inline __u32 LNET_MKNET(__u32 type, __u32 num)
- 	return (type << 16) | num;
- }
- 
--/**
-+#define WIRE_ATTR	__packed
++/* how an LNET NID encodes net:address */
++/** extract the address part of an lnet_nid_t */
 +
-+/* Packed version of lnet_process_id_t to transfer via network */
-+typedef struct {
-+	/* node id / process id */
-+	lnet_nid_t	nid;
-+	lnet_pid_t	pid;
-+} WIRE_ATTR lnet_process_id_packed_t;
++static inline __u32 LNET_NIDADDR(lnet_nid_t nid)
++{
++	return nid & 0xffffffff;
++}
 +
-+/* The wire handle's interface cookie only matches one network interface in
-+ * one epoch (i.e. new cookie when the interface restarts or the node
-+ * reboots).  The object cookie only matches one object on that interface
-+ * during that object's lifetime (i.e. no cookie re-use). */
-+typedef struct {
-+	__u64	wh_interface_cookie;
-+	__u64	wh_object_cookie;
-+} WIRE_ATTR lnet_handle_wire_t;
++static inline __u32 LNET_NIDNET(lnet_nid_t nid)
++{
++	return (nid >> 32) & 0xffffffff;
++}
 +
-+typedef enum {
-+	LNET_MSG_ACK = 0,
-+	LNET_MSG_PUT,
-+	LNET_MSG_GET,
-+	LNET_MSG_REPLY,
-+	LNET_MSG_HELLO,
-+} lnet_msg_type_t;
++static inline lnet_nid_t LNET_MKNID(__u32 net, __u32 addr)
++{
++	return (((__u64)net) << 32) | addr;
++}
 +
-+/* The variant fields of the portals message header are aligned on an 8
-+ * byte boundary in the message header.  Note that all types used in these
-+ * wire structs MUST be fixed size and the smaller types are placed@the
-+ * end. */
-+typedef struct lnet_ack {
-+	lnet_handle_wire_t	dst_wmd;
-+	__u64			match_bits;
-+	__u32			mlength;
-+} WIRE_ATTR lnet_ack_t;
++static inline __u32 LNET_NETNUM(__u32 net)
++{
++	return net & 0xffff;
++}
 +
-+typedef struct lnet_put {
-+	lnet_handle_wire_t	ack_wmd;
-+	__u64			match_bits;
-+	__u64			hdr_data;
-+	__u32			ptl_index;
-+	__u32			offset;
-+} WIRE_ATTR lnet_put_t;
++static inline __u32 LNET_NETTYP(__u32 net)
++{
++	return (net >> 16) & 0xffff;
++}
 +
-+typedef struct lnet_get {
-+	lnet_handle_wire_t	return_wmd;
-+	__u64			match_bits;
-+	__u32			ptl_index;
-+	__u32			src_offset;
-+	__u32			sink_length;
-+} WIRE_ATTR lnet_get_t;
++static inline __u32 LNET_MKNET(__u32 type, __u32 num)
++{
++	return (type << 16) | num;
++}
 +
-+typedef struct lnet_reply {
-+	lnet_handle_wire_t	dst_wmd;
-+} WIRE_ATTR lnet_reply_t;
-+
-+typedef struct lnet_hello {
-+	__u64			incarnation;
-+	__u32			type;
-+} WIRE_ATTR lnet_hello_t;
-+
-+typedef struct {
-+	lnet_nid_t	dest_nid;
-+	lnet_nid_t	src_nid;
-+	lnet_pid_t	dest_pid;
-+	lnet_pid_t	src_pid;
-+	__u32		type;		/* lnet_msg_type_t */
-+	__u32		payload_length;	/* payload data to follow */
-+	/*<------__u64 aligned------->*/
-+	union {
-+		lnet_ack_t	ack;
-+		lnet_put_t	put;
-+		lnet_get_t	get;
-+		lnet_reply_t	reply;
-+		lnet_hello_t	hello;
-+	} msg;
-+} WIRE_ATTR lnet_hdr_t;
-+
-+/* A HELLO message contains a magic number and protocol version
-+ * code in the header's dest_nid, the peer's NID in the src_nid, and
-+ * LNET_MSG_HELLO in the type field.  All other common fields are zero
-+ * (including payload_size; i.e. no payload).
-+ * This is for use by byte-stream LNDs (e.g. TCP/IP) to check the peer is
-+ * running the same protocol and to find out its NID. These LNDs should
-+ * exchange HELLO messages when a connection is first established.  Individual
-+ * LNDs can put whatever else they fancy in lnet_hdr_t::msg.
-+ */
-+typedef struct {
-+	__u32	magic;		/* LNET_PROTO_TCP_MAGIC */
-+	__u16	version_major;	/* increment on incompatible change */
-+	__u16	version_minor;	/* increment on compatible change */
-+} WIRE_ATTR lnet_magicversion_t;
-+
-+/* PROTO MAGIC for LNDs */
-+#define LNET_PROTO_IB_MAGIC		0x0be91b91
-+#define LNET_PROTO_GNI_MAGIC		0xb00fbabe /* ask Kim */
-+#define LNET_PROTO_TCP_MAGIC		0xeebc0ded
-+#define LNET_PROTO_ACCEPTOR_MAGIC	0xacce7100
-+#define LNET_PROTO_PING_MAGIC		0x70696E67 /* 'ping' */
-+
-+/* Placeholder for a future "unified" protocol across all LNDs */
-+/* Current LNDs that receive a request with this magic will respond with a
-+ * "stub" reply using their current protocol */
-+#define LNET_PROTO_MAGIC		0x45726963 /* ! */
-+
-+#define LNET_PROTO_TCP_VERSION_MAJOR	1
-+#define LNET_PROTO_TCP_VERSION_MINOR	0
-+
-+/* Acceptor connection request */
-+typedef struct {
-+	__u32	acr_magic;		/* PTL_ACCEPTOR_PROTO_MAGIC */
-+	__u32	acr_version;		/* protocol version */
-+	__u64	acr_nid;		/* target NID */
-+} WIRE_ATTR lnet_acceptor_connreq_t;
-+
-+#define LNET_PROTO_ACCEPTOR_VERSION	1
-+
-+typedef struct {
-+	lnet_nid_t	ns_nid;
-+	__u32		ns_status;
-+	__u32		ns_unused;
-+} WIRE_ATTR lnet_ni_status_t;
-+
-+typedef struct {
-+	__u32			pi_magic;
-+	__u32			pi_features;
-+	lnet_pid_t		pi_pid;
-+	__u32			pi_nnis;
-+	lnet_ni_status_t	pi_ni[0];
-+} WIRE_ATTR lnet_ping_info_t;
-+
-+typedef struct lnet_counters {
-+	__u32	msgs_alloc;
-+	__u32	msgs_max;
-+	__u32	errors;
-+	__u32	send_count;
-+	__u32	recv_count;
-+	__u32	route_count;
-+	__u32	drop_count;
-+	__u64	send_length;
-+	__u64	recv_length;
-+	__u64	route_length;
-+	__u64	drop_length;
-+} WIRE_ATTR lnet_counters_t;
-+
-+#define LNET_NI_STATUS_UP      0x15aac0de
-+#define LNET_NI_STATUS_DOWN    0xdeadface
-+#define LNET_NI_STATUS_INVALID 0x00000000
-+
-+#define LNET_MAX_INTERFACES    16
-+
-+/*
+ /**
   * Objects maintained by the LNet are accessed through handles. Handle types
   * have names of the form lnet_handle_xx_t, where xx is one of the two letter
-  * object type codes ('eq' for event queue, 'md' for memory descriptor, and
-@@ -311,17 +463,6 @@ typedef struct {
- /** limit on the number of fragments in discontiguous MDs */
- #define LNET_MAX_IOV    256
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 305ecbe..4d72d6e 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -92,6 +92,7 @@
+ #define _LUSTRE_IDL_H_
  
--/* Max payload size */
--# define LNET_MAX_PAYLOAD	CONFIG_LNET_MAX_PAYLOAD
--# if (LNET_MAX_PAYLOAD < LNET_MTU)
--#  error "LNET_MAX_PAYLOAD too small - error in configure --with-max-payload-mb"
--# else
--#  if (LNET_MAX_PAYLOAD > (PAGE_SIZE * LNET_MAX_IOV))
--/*  PAGE_SIZE is a constant: check with cpp! */
--#   error "LNET_MAX_PAYLOAD too large - error in configure --with-max-payload-mb"
--#  endif
--# endif
--
- /**
-  * Options for the MD structure. See lnet_md_t::options.
-  */
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index a2d0d10..57e9752 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -35,10 +35,11 @@
+ #include "../../../include/linux/libcfs/libcfs.h"
++#include "../../../include/linux/lnet/types.h"
+ 
+ /* Defn's shared with user-space. */
+ #include "lustre_user.h"
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 998dcd9..77a7de9 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -56,8 +56,8 @@
   */
  
- #define DEBUG_SUBSYSTEM S_LNET
--#include "../../include/linux/lnet/lib-lnet.h"
- #include <linux/log2.h>
- #include <linux/ktime.h>
- 
-+#include "../../include/linux/lnet/lib-lnet.h"
-+
- #define D_LNI D_CONSOLE
- 
- lnet_t the_lnet;			   /* THE state of the network */
+ #include "../../include/linux/libcfs/libcfs.h"
+-// #include <obd.h>
+-#include "../../include/linux/lnet/lnet.h"
++#include "../../include/linux/lnet/nidstr.h"
++#include "../../include/linux/lnet/api.h"
+ #include "lustre/lustre_idl.h"
+ #include "lustre_ha.h"
+ #include "lustre_sec.h"
 -- 
 1.7.1
