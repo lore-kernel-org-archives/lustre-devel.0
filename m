@@ -1,15 +1,29 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 12 Jun 2015 21:49:04 +0000
+Date: Fri, 12 Jun 2015 21:53:02 +0000
 Subject: [lustre-devel] lustre design docs
 In-Reply-To: <9EE73FB1-18B8-4ADC-86BE-1C059358F798@cray.com>
 References: <69BD0579-A188-4012-8926-3F55CF5E1BF9@seagate.com>
 	<9EE73FB1-18B8-4ADC-86BE-1C059358F798@cray.com>
-Message-ID: <D1A0AFE3.F7223%andreas.dilger@intel.com>
+Message-ID: <D1A0B005.F7226%andreas.dilger@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+I agree - there are a lot of documents spread across many places (old
+wiki, new wiki, opensfs wiki, HPDD wiki, old CVS "lustre-doc" repo, etc).
+Just getting those into a central location would be a good start.
+
+Obviously many of those documents are outdated, but I think even those
+would be valuable as long as it is clear at the top of the document what
+state it is in (e.g. having the date of origin and a description of the
+status like obsolete, stale, useful, up-to-date, etc).
+
+I think Richard has been uploading some of our more recent design docs to
+the new wiki, so that would be as good a place to start as any.
+
+Cheers, Andreas
 
 On 2015/06/12, 3:04 PM, "Justin Miller" <jmiller@cray.com> wrote:
 
