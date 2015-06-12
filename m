@@ -1,285 +1,51 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 11 Jun 2015 15:18:15 -0400
-Subject: [lustre-devel] [PATCH v4 9/9] staging:lustre: Update license and
-	copyright for the LNET headers
-In-Reply-To: <1434050295-10986-1-git-send-email-jsimmons@infradead.org>
-References: <1434050295-10986-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1434050295-10986-10-git-send-email-jsimmons@infradead.org>
+From: Justin Miller <jmiller@cray.com>
+Date: Fri, 12 Jun 2015 21:04:51 +0000
+Subject: [lustre-devel] lustre design docs
+In-Reply-To: <69BD0579-A188-4012-8926-3F55CF5E1BF9@seagate.com>
+References: <69BD0579-A188-4012-8926-3F55CF5E1BF9@seagate.com>
+Message-ID: <9EE73FB1-18B8-4ADC-86BE-1C059358F798@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Point to the right place for GNU license. Update Intel copyright.
+I think a central document repository is a good idea, and would be a valuable asset. The plan you outline to collect the documents and metadata first and then convert the most useful documents to a maintainable format makes a lot of sense. In addition to the benefits you identify, it may also allow for the collection of some interesting metrics.
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/include/linux/lnet/api.h    |   13 +++++--------
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |   10 +++-------
- .../staging/lustre/include/linux/lnet/lib-types.h  |   13 +++----------
- drivers/staging/lustre/include/linux/lnet/lnet.h   |   10 ++++------
- drivers/staging/lustre/include/linux/lnet/lnetst.h |   12 ++++--------
- drivers/staging/lustre/include/linux/lnet/nidstr.h |    3 ++-
- .../staging/lustre/include/linux/lnet/socklnd.h    |   12 ++++--------
- drivers/staging/lustre/include/linux/lnet/types.h  |   10 +++-------
- 8 files changed, 28 insertions(+), 55 deletions(-)
+I?d be happy to help with this project.
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/api.h b/drivers/staging/lustre/include/linux/lnet/api.h
-index 2eb0a05..9493d5e 100644
---- a/drivers/staging/lustre/include/linux/lnet/api.h
-+++ b/drivers/staging/lustre/include/linux/lnet/api.h
-@@ -15,21 +15,19 @@
-  *
-  * You should have received a copy of the GNU General Public License
-  * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-  *
-  * GPL HEADER END
-  */
- /*
-  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-+ *
-+ * Copyright (c) 2011 - 2015, Intel Corporation.
-  */
- /*
-  * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-+ * Lustre is a trademark of Seagate, Inc.
-  */
- 
- #ifndef __LNET_API_H__
-@@ -41,9 +39,8 @@
-  *
-  * LNet is an asynchronous message-passing API, which provides an unreliable
-  * connectionless service that can't guarantee any order. It supports OFA IB,
-- * TCP/IP, and Cray Portals, and routes between heterogeneous networks.
-+ * TCP/IP, and Cray Interconnects, and routes between heterogeneous networks.
-  *
-- * LNet can run both in OS kernel space and in userspace as a library.
-  * @{
-  */
- 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 0dbab6f..a9c9a07 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -15,11 +15,7 @@
-  *
-  * You should have received a copy of the GNU General Public License
-  * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-  *
-  * GPL HEADER END
-  */
-@@ -27,11 +23,11 @@
-  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-  *
-- * Copyright (c) 2012, Intel Corporation.
-+ * Copyright (c) 2012 - 2015, Intel Corporation.
-  */
- /*
-  * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-+ * Lustre is a trademark of Seagate, Inc.
-  *
-  * lnet/include/lnet/lib-lnet.h
-  */
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index fa949d8..81a63db 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -15,11 +15,7 @@
-  *
-  * You should have received a copy of the GNU General Public License
-  * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-  *
-  * GPL HEADER END
-  */
-@@ -27,16 +23,13 @@
-  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-  *
-- * Copyright (c) 2012, Intel Corporation.
-+ * Copyright (c) 2012 - 2015, Intel Corporation.
-  */
- /*
-  * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-+ * Lustre is a trademark of Seagate, Inc.
-  *
-  * lnet/include/lnet/lib-types.h
-- *
-- * Types used by the library side routines that do not need to be
-- * exposed to the user application
-  */
- 
- #ifndef __LNET_LIB_TYPES_H__
-diff --git a/drivers/staging/lustre/include/linux/lnet/lnet.h b/drivers/staging/lustre/include/linux/lnet/lnet.h
-index 8124d8f..5d1559a 100644
---- a/drivers/staging/lustre/include/linux/lnet/lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lnet.h
-@@ -15,21 +15,19 @@
-  *
-  * You should have received a copy of the GNU General Public License
-  * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-  *
-  * GPL HEADER END
-  */
- /*
-  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-+ *
-+ * Copyright (c) 2012 - 2015, Intel Corporation.
-  */
- /*
-  * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-+ * Lustre is a trademark of Seagate, Inc.
-  */
- 
- #ifndef __LNET_H__
-diff --git a/drivers/staging/lustre/include/linux/lnet/lnetst.h b/drivers/staging/lustre/include/linux/lnet/lnetst.h
-index ea1e0c6..fd1e0fd 100644
---- a/drivers/staging/lustre/include/linux/lnet/lnetst.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lnetst.h
-@@ -15,11 +15,7 @@
-  *
-  * You should have received a copy of the GNU General Public License
-  * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-  *
-  * GPL HEADER END
-  */
-@@ -27,15 +23,15 @@
-  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-  *
-- * Copyright (c) 2011, Intel Corporation.
-+ * Copyright (c) 2011 - 2015, Intel Corporation.
-  */
- /*
-  * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-+ * Lustre is a trademark of Seagate, Inc.
-  *
-  * lnet/include/lnet/lnetst.h
-  *
-- * Author: Liang Zhen <liangzhen@clusterfs.com>
-+ * Author: Liang Zhen <liang.zhen@intel.com>
-  */
- 
- #ifndef __LNET_ST_H__
-diff --git a/drivers/staging/lustre/include/linux/lnet/nidstr.h b/drivers/staging/lustre/include/linux/lnet/nidstr.h
-index 8eaed1a..a627be9 100644
---- a/drivers/staging/lustre/include/linux/lnet/nidstr.h
-+++ b/drivers/staging/lustre/include/linux/lnet/nidstr.h
-@@ -23,10 +23,11 @@
-  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-  *
-- * Copyright (c) 2011, 2014, Intel Corporation.
-+ * Copyright (c) 2011 - 2015, Intel Corporation.
-  */
- #ifndef _LNET_NIDSTRINGS_H
- #define _LNET_NIDSTRINGS_H
-+
- #include "types.h"
- 
- /**
-diff --git a/drivers/staging/lustre/include/linux/lnet/socklnd.h b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-index 4c790bd..599c9f6 100644
---- a/drivers/staging/lustre/include/linux/lnet/socklnd.h
-+++ b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-@@ -15,25 +15,21 @@
-  *
-  * You should have received a copy of the GNU General Public License
-  * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-  *
-  * GPL HEADER END
-  */
- /*
-  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-+ *
-+ * Copyright (c) 2012 - 2015, Intel Corporation.
-  */
- /*
-  * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-+ * Lustre is a trademark of Seagate, Inc.
-  *
-  * lnet/include/lnet/socklnd.h
-- *
-- * #defines shared between socknal implementation and utilities
-  */
- #ifndef __LNET_LNET_SOCKLND_H__
- #define __LNET_LNET_SOCKLND_H__
-diff --git a/drivers/staging/lustre/include/linux/lnet/types.h b/drivers/staging/lustre/include/linux/lnet/types.h
-index 06d73c0..940f73f 100644
---- a/drivers/staging/lustre/include/linux/lnet/types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/types.h
-@@ -15,11 +15,7 @@
-  *
-  * You should have received a copy of the GNU General Public License
-  * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-  *
-  * GPL HEADER END
-  */
-@@ -27,11 +23,11 @@
-  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-  * Use is subject to license terms.
-  *
-- * Copyright (c) 2012, Intel Corporation.
-+ * Copyright (c) 2012 - 2015, Intel Corporation.
-  */
- /*
-  * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-+ * Lustre is a trademark of Seagate, Inc.
-  */
- 
- #ifndef __LNET_TYPES_H__
--- 
-1.7.1
+- Justin Miller
+
+
+On 5/20/15, 1:06 PM, "lustre-devel on behalf of Vitaly Fertman" <lustre-devel-bounces at lists.lustre.org on behalf of vitaly.fertman@seagate.com> wrote:
+
+>Hi All,
+>
+>there was an idea to publish existing design docs on opensfs wiki.
+>is centralised design repository interesting at all?
+>
+>currently the existing designs are not in the wiki format, mostly pdf, so this is
+>not an ideal doc repository we want to have: not changeable, not maintainable,
+>could be outdated, etc, but could be published very quickly.
+>
+>however, this is not the final step but just a beginning. at the same time, we may get
+>some benefits immediately:
+>- all the docs are gathered in one centralised place, faster doc search;
+>- the fully documented product (although maybe not very up-to-date initially) ?
+>attractive for many readers, especially newbies;
+>- a quick jump to unknown code having a design, faster than reading the source code;
+>
+>after that, having these docs already published, next steps could be:
+>- docs to be split on those which are to be maintained and left untouched;
+>- a procedure of converting to be maintained docs to wiki format could be organised; 
+>- a procedure of updating converted docs to be organised; 
+>etc.
+>
+>would be valuable? thoughts?
+>
+>?
+>Vitaly?
+>_______________________________________________
+>lustre-devel mailing list
+>lustre-devel at lists.lustre.org
+>http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
