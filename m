@@ -1,90 +1,71 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Tue, 16 Jun 2015 15:23:15 -0500
-Subject: [lustre-devel] Lock ahead v1
-Message-ID: <558085B3.1040400@cray.com>
+From: LEIBOVICI Thomas <thomas.leibovici@cea.fr>
+Date: Wed, 17 Jun 2015 10:08:28 +0200
+Subject: [lustre-devel] HSM phase 2 HLD / Roadmap?
+In-Reply-To: <D1A5A6E6.F7B31%andreas.dilger@intel.com>
+References: <CAPALmnnUyFxT3zwJUZ5ZGkgeHO9XgdQqPFTQ_chqy5wmLmEkwg@mail.gmail.com>
+	<55803C06.4080003@cea.fr> <D1A5987F.F7ACA%andreas.dilger@intel.com>
+	<558040B5.2050609@cray.com> <D1A5A6E6.F7B31%andreas.dilger@intel.com>
+Message-ID: <55812AFC.1050405@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello,
+On 06/16/15 18:15, Dilger, Andreas wrote:
+> On 2015/06/16, 9:28 AM, "Patrick Farrell" <paf@cray.com> wrote:
+>
+>> Andreas,
+>>
+>> Could you expound on "Better integration with DNE"?  I'm not immediately
+>> clear on what that might mean.
+> I was thinking that the current DNE support is still using a single RBH
+> database fed by multiple ChangeLogs (one from each MDT), which doesn't
+> scale very well.  That said, I guess it would be possible to have a single
+> parallel MySQL database that scales horizontally, so the scaling would be
+> independent of the number of MDTs.
+>
+> Maybe this one should be dropped from the list, or just be considered part
+> of the "optimize RBH database".
+>
+> Cheers, Andreas
+AFAIK, there are other aspects of DNE that HSM wouldn't support:
+HSM does not currently support striped directories (DNE phase 2)
+in particular the volatile file used for "restore" operations wouldn't 
+be properly located on the right MDT.
 
-I?ve been hard at work on lock ahead for some time, and there's been a 
-notable change in the design. (I?m not going to recap lock ahead here ? 
-If you?d like background, please check out the slides and/or video of my 
-LUG talk: 
-http://cdn.opensfs.org/wp-content/uploads/2015/04/Shared-File-Performance-in-Lustre_Farrell.pdf 
-; http://youtu.be/ITfZfV5QzIs )
+Thomas
 
-I'm emailing here primarily to explain the change for those reviewing 
-the patch (http://review.whamcloud.com/#/c/13564/).
-
-It has proved extremely difficult to make blocking asynchronous lock 
-requests, which I originally wanted. If the lock requests could be 
-blocking, then they could clear out existing locks on the file. However, 
-there are a number of problems with asynchronous blocking requests, some 
-of which I detailed in emails to this list. With help from Jinshan, I 
-have an idea what to do to fix them, but the changes are significant 
-and, it turns out, not really necessary for lock ahead.
-
-Here's why:
-
-The main problem with non-blocking lock requests is they will not clear 
-out existing locks, so if there are any on the file, we will not get 
-lock ahead locks granted. To avoid this situation, we will have the 
-library take and release a (blocking) group lock when it first opens the 
-file. This will clear out any existing locks on the file, making it 
-?clean? for the lock ahead requests. This (mostly) means we don't need 
-blocking lock ahead requests.
-
-The lock ahead writing process for writing out a large file, then, looks 
-like this:
-OPEN, GROUP_LOCK, GROUP_UNLOCK, LOCK_AHEAD (n blocks ahead), WRITE, 
-WRITE, WRITE ? [track position of writes (IE, number of lock ahead locks 
-remaining ahead of the IO), when lock ahead count is small?>] LOCK_AHEAD 
-(n blocks ahead), WRITE, WRITE, WRITE? Etc.
-
-This also helps keep the lock count manageable, which avoids some 
-performance issues.
-
-However, we need one more thing:
-
-Imagine if lock ahead locks are not created of the IO (due to raciness) 
-or they are cancelled by a request from a node that is not part of the 
-collective IO (for example, a user tries to read the file during the 
-IO). In either case, the lock which results will be expanded normally. 
-So it's possible for that lock to be extended to cover the rest of the 
-file, and so it will block future lock ahead requests. That lock will be 
-cancelled when a read or write request happens in the range covered by 
-that lock, but that read/write request will be expanded as well - And we 
-return to handing the lock back and forth between clients.
-
-The way to avoid this is to turn off lock expansion for anyone who is 
-supposed to be using lock ahead locks. Their IO requests will normally 
-use the lock ahead locks provided for them, but if the lock ahead locks 
-aren't available (for reasons described above), the locks for these 
-requests will not be expanded.
-
-This means that losing a race between IO and the lock ahead lock on a 
-particular lock ahead request (or entire set of lock ahead requests) 
-will never create a large lock, which would block future lock ahead 
-requests.
-
-Additionally, if lock ahead is interrupted by a request from another 
-client (preventing lock ahead requests by creating a large lock), the 
-'real' IO requests from the lock ahead clients will eventually cancel 
-that large lock. Since the locks for those requests aren't expanded, the 
-next set of lock ahead requests (which are out ahead of the IO) will work.
-
-Effectively, this means that if lock ahead is interrupted by a competing 
-request or if it fails the race to be ready in time, it can avoid 
-returning to the pathological case.
-
-Code implementing lock and this other ioctl to disable expansion is up 
-for review here:
-http://review.whamcloud.com/#/c/13564/
-
-The current version is essentially 'code complete' and ready for review.
-
-- Patrick Farrell
+>> Thanks,
+>> - Patrick
+>> On 06/16/2015 10:21 AM, Dilger, Andreas wrote:
+>>> I think there are a few features that would be of interest for HSM
+>>> improvement.
+>>>
+>>> * optimization of RobinHood database/POSIX copytool
+>>> * better integration with DNE
+>>> * partial file restore using composite files
+>>>
+>>> (http://wiki.opensfs.org/images/e/e4/LayoutEnhancementDesign_HighLevelDes
+>>> ig
+>>> n.pdf)
+>>>      * change HSM to use LOV EA layout instead of dedicated xattr
+>>>      * allowing a larger HSM archive ID (e.g. 128-bit UUID) so it can be
+>>>        used as the primary archive identifier instead of Lustre FID
+>>> * archive/restore of directory trees from the MDT as tarballs
+>>>      * allow release/restore of space from the MDT
+>>>      * would be needed for handling Data-on-MDT files
+>>>
+>>> Note that we don't have any plans to work on this, just listing some
+>>> ideas
+>>> percolating in my brain.
+>>>
+>>>
+>>> Cheers, Andreas
+>> _______________________________________________
+>> lustre-devel mailing list
+>> lustre-devel at lists.lustre.org
+>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>>
+>
+> Cheers, Andreas
