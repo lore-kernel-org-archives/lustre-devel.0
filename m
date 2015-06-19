@@ -1,71 +1,62 @@
-From: LEIBOVICI Thomas <thomas.leibovici@cea.fr>
-Date: Wed, 17 Jun 2015 10:08:28 +0200
-Subject: [lustre-devel] HSM phase 2 HLD / Roadmap?
-In-Reply-To: <D1A5A6E6.F7B31%andreas.dilger@intel.com>
-References: <CAPALmnnUyFxT3zwJUZ5ZGkgeHO9XgdQqPFTQ_chqy5wmLmEkwg@mail.gmail.com>
-	<55803C06.4080003@cea.fr> <D1A5987F.F7ACA%andreas.dilger@intel.com>
-	<558040B5.2050609@cray.com> <D1A5A6E6.F7B31%andreas.dilger@intel.com>
-Message-ID: <55812AFC.1050405@cea.fr>
+From: John Suykerbuyk <john.suykerbuyk@seagate.com>
+Date: Fri, 19 Jun 2015 10:19:19 -0600
+Subject: [lustre-devel] KVM Quick Start Guide
+In-Reply-To: <557B6CB4.1080801@llnl.gov>
+References: <69BD0579-A188-4012-8926-3F55CF5E1BF9@seagate.com>
+	<9EE73FB1-18B8-4ADC-86BE-1C059358F798@cray.com>
+	<D1A0B005.F7226%andreas.dilger@intel.com>
+	<CA+sy+eTsv7UjX3ZLaC-ft=KHfjsdXtH8aew87RBFgvrM0=qskw@mail.gmail.com>
+	<557B6C5D.5000904@llnl.gov> <557B6CB4.1080801@llnl.gov>
+Message-ID: <CA+sy+eT48P4dBbfxaoZs3bbnaj6dETDZB8EwY+Tz=SdFQsTX6w@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 06/16/15 18:15, Dilger, Andreas wrote:
-> On 2015/06/16, 9:28 AM, "Patrick Farrell" <paf@cray.com> wrote:
->
->> Andreas,
->>
->> Could you expound on "Better integration with DNE"?  I'm not immediately
->> clear on what that might mean.
-> I was thinking that the current DNE support is still using a single RBH
-> database fed by multiple ChangeLogs (one from each MDT), which doesn't
-> scale very well.  That said, I guess it would be possible to have a single
-> parallel MySQL database that scales horizontally, so the scaling would be
-> independent of the number of MDTs.
->
-> Maybe this one should be dropped from the list, or just be considered part
-> of the "optimize RBH database".
->
-> Cheers, Andreas
-AFAIK, there are other aspects of DNE that HSM wouldn't support:
-HSM does not currently support striped directories (DNE phase 2)
-in particular the volatile file used for "restore" operations wouldn't 
-be properly located on the right MDT.
+I've got my document ready to publish, but am still waiting on my account
+request to be accepted.
 
-Thomas
+Is there someone I can (politely) nudge?
 
->> Thanks,
->> - Patrick
->> On 06/16/2015 10:21 AM, Dilger, Andreas wrote:
->>> I think there are a few features that would be of interest for HSM
->>> improvement.
->>>
->>> * optimization of RobinHood database/POSIX copytool
->>> * better integration with DNE
->>> * partial file restore using composite files
->>>
->>> (http://wiki.opensfs.org/images/e/e4/LayoutEnhancementDesign_HighLevelDes
->>> ig
->>> n.pdf)
->>>      * change HSM to use LOV EA layout instead of dedicated xattr
->>>      * allowing a larger HSM archive ID (e.g. 128-bit UUID) so it can be
->>>        used as the primary archive identifier instead of Lustre FID
->>> * archive/restore of directory trees from the MDT as tarballs
->>>      * allow release/restore of space from the MDT
->>>      * would be needed for handling Data-on-MDT files
->>>
->>> Note that we don't have any plans to work on this, just listing some
->>> ideas
->>> percolating in my brain.
->>>
->>>
->>> Cheers, Andreas
->> _______________________________________________
->> lustre-devel mailing list
->> lustre-devel at lists.lustre.org
->> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->>
+- John "S"
+
+On Fri, Jun 12, 2015 at 5:35 PM, Christopher J. Morrone <morrone2@llnl.gov>
+wrote:
+
+> Whoops, I put an "s" in there.  I meant:
 >
-> Cheers, Andreas
+> http://wiki.lustre.org/KVM_Quick_Start_Guide
+>
+> On 06/12/2015 04:33 PM, Christopher J. Morrone wrote:
+>
+>> Are you asking us to pick a title for you?  How about:
+>>
+>> https://wiki.lustre.org/KVM_Quick_Start_Guide
+>>
+>> Chris
+>>
+>> On 06/12/2015 03:49 PM, John Suykerbuyk wrote:
+>>
+>>> Can you guys point me to where I should create my Lustre Quick Start
+>>> Guide (on KVM)?
+>>>
+>>> It's my hope that someone will be able to take this and a machine
+>>> capable of hosting KVM virtual machines, and without anything but the
+>>> publicly accessible repositories, assemble and play around with a small
+>>> (3 node) Lustre virtual cluster.
+>>>
+>>> - John "S"
+>>>
+>>
+>> .
+>>
+>>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150619/d77f6fa7/attachment.htm>
