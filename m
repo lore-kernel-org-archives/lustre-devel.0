@@ -1,20 +1,16 @@
 From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Mon, 22 Jun 2015 17:18:53 +0000
-Subject: [lustre-devel] Fwd: [HPDD-discuss] [PATCH 01/12] staging:
- lustre: fid: Use !x to check for kzalloc failure
-In-Reply-To: <55882DC7.6060802@cray.com>
-References: <1434819550-3193-2-git-send-email-Julia.Lawall@lip6.fr>
-	<55882DC7.6060802@cray.com>
-Message-ID: <d0ef1a762dce4049aca76a30eecdebff@EXCHCS32.ornl.gov>
+Date: Mon, 22 Jun 2015 17:27:03 +0000
+Subject: [lustre-devel] [HPDD-discuss] [PATCH 01/12] staging: lustre:
+ fid: Use !x to check for kzalloc failure
+Message-ID: <556d2f2088404e09aac1f0a57767cea5@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->Question for lustre-devel...  Isn't this the opposite of the style that we're currently trying to use in Gerrit submissions?  Is my memory faulty?
 
-You are correct. Is this change really necessary? I will respone shortly.
+Is this change a hard requirement? Currently the lustre code standard in our development tree is the opposite policy.
 
 
 -------- Original Message --------
@@ -135,4 +131,4 @@ https://lists.01.org/mailman/listinfo/hpdd-discuss
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150622/cc615a1b/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150622/e9b7f1db/attachment-0001.htm>
