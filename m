@@ -1,134 +1,18 @@
-From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Mon, 22 Jun 2015 17:27:03 +0000
+From: Greg Kroah-Hartman (gregkh@linuxfoundation.org) <gregkh@linuxfoundation.org>
+Date: Mon, 22 Jun 2015 11:03:06 -0700
 Subject: [lustre-devel] [HPDD-discuss] [PATCH 01/12] staging: lustre:
  fid: Use !x to check for kzalloc failure
-Message-ID: <556d2f2088404e09aac1f0a57767cea5@EXCHCS32.ornl.gov>
+In-Reply-To: <556d2f2088404e09aac1f0a57767cea5@EXCHCS32.ornl.gov>
+References: <556d2f2088404e09aac1f0a57767cea5@EXCHCS32.ornl.gov>
+Message-ID: <20150622180306.GA20087@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-
-Is this change a hard requirement? Currently the lustre code standard in our development tree is the opposite policy.
-
-
--------- Original Message --------
-Subject:
-
-[HPDD-discuss] [PATCH 01/12] staging: lustre: fid: Use !x to check for kzalloc failure
-
-Date:
-
-Sat, 20 Jun 2015 18:58:59 +0200
-
-From:
-
-Julia Lawall <Julia.Lawall@lip6.fr><mailto:Julia.Lawall@lip6.fr>
-
-To:
-
-Oleg Drokin <oleg.drokin@intel.com><mailto:oleg.drokin@intel.com>
-
-CC:
-
-<devel@driverdev.osuosl.org><mailto:devel@driverdev.osuosl.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org><mailto:gregkh@linuxfoundation.org>, <kernel-janitors@vger.kernel.org><mailto:kernel-janitors@vger.kernel.org>, <linux-kernel@vger.kernel.org><mailto:linux-kernel@vger.kernel.org>, <HPDD-discuss@lists.01.org><mailto:HPDD-discuss@lists.01.org>
-
-
-
-!x is more normal for kzalloc failure in the kernel.
-
-
-
-The semantic patch that makes this change is as follows:
-
-(http://coccinelle.lip6.fr/)
-
-
-
-// <smpl>
-
-@@
-
-expression x;
-
-statement S1, S2;
-
-@@
-
-
-
-x = kzalloc(...);
-
-if (
-
-- x == NULL
-
-+ !x
-
- ) S1 else S2
-
-// </smpl>
-
-
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr><mailto:Julia.Lawall@lip6.fr>
-
-
-
----
-
- drivers/staging/lustre/lustre/fid/fid_request.c |    4 ++--
-
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-
-
-diff -u -p a/drivers/staging/lustre/lustre/fid/fid_request.c b/drivers/staging/lustre/lustre/fid/fid_request.c
-
---- a/drivers/staging/lustre/lustre/fid/fid_request.c
-
-+++ b/drivers/staging/lustre/lustre/fid/fid_request.c
-
-@@ -498,11 +498,11 @@ int client_fid_init(struct obd_device *o
-
-        int rc;
-
-
-
-        cli->cl_seq = kzalloc(sizeof(*cli->cl_seq), GFP_NOFS);
-
--       if (cli->cl_seq == NULL)
-
-+       if (!cli->cl_seq)
-
-               return -ENOMEM;
-
-
-
-        prefix = kzalloc(MAX_OBD_NAME + 5, GFP_NOFS);
-
--       if (prefix == NULL) {
-
-+       if (!prefix) {
-
-               rc = -ENOMEM;
-
-               goto out_free_seq;
-
-        }
-
-
-
-_______________________________________________
-
-HPDD-discuss mailing list
-
-HPDD-discuss at lists.01.org<mailto:HPDD-discuss@lists.01.org>
-
-https://lists.01.org/mailman/listinfo/hpdd-discuss
-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150622/e9b7f1db/attachment-0001.htm>
+On Mon, Jun 22, 2015 at 05:27:03PM +0000, Simmons, James A. wrote:
+> 
+> Is this change a hard requirement? Currently the lustre code standard in our development tree is the opposite policy.
+
+Please follow the kernel coding style rules.
