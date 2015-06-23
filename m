@@ -1,63 +1,45 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 23 Jun 2015 08:25:05 +0000
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Tue, 23 Jun 2015 12:23:03 +0300
 Subject: [lustre-devel] [PATCH 01/12] staging: lustre: fid: Use !x to
  check for kzalloc failure
-In-Reply-To: <1434819550-3193-2-git-send-email-Julia.Lawall@lip6.fr>
+In-Reply-To: <D1AECA61.F8DE5%andreas.dilger@intel.com>
 References: <1434819550-3193-1-git-send-email-Julia.Lawall@lip6.fr>
 	<1434819550-3193-2-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <D1AECA61.F8DE5%andreas.dilger@intel.com>
+	<D1AECA61.F8DE5%andreas.dilger@intel.com>
+Message-ID: <20150623092303.GN28762@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/06/20, 10:58 AM, "Julia Lawall" <Julia.Lawall@lip6.fr> wrote:
+On Tue, Jun 23, 2015 at 08:25:05AM +0000, Dilger, Andreas wrote:
+> I've found in the past that developers can introduce bugs when they treat
+> return values as boolean when they really aren't.
 
->!x is more normal for kzalloc failure in the kernel.
+I can imagine a bug like that where a function can return 0-2 and people
+do:
 
-While "!x" might be more normal for kzalloc(), I don't see that as an
-improvement over explicitly checking against NULL, which is what kzalloc()
-and other memory-allocating functions return on error.
+	if (ret)
 
-I've found in the past that developers can introduce bugs when they treat
-return values as boolean when they really aren't.  I'd prefer that the
-code is kept with explicit comparisons against NULL, as it is today.
-Most of the cases that are now using "!x" are from your previous patches.
+instead of:
 
-Cheers, Andreas
+	if (ret == 1)
 
->Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->
->---
-> drivers/staging/lustre/lustre/fid/fid_request.c |    4 ++--
-> 1 file changed, 2 insertions(+), 2 deletions(-)
->
->diff -u -p a/drivers/staging/lustre/lustre/fid/fid_request.c
->b/drivers/staging/lustre/lustre/fid/fid_request.c
->--- a/drivers/staging/lustre/lustre/fid/fid_request.c
->+++ b/drivers/staging/lustre/lustre/fid/fid_request.c
->@@ -498,11 +498,11 @@ int client_fid_init(struct obd_device *o
-> 	int rc;
-> 
-> 	cli->cl_seq = kzalloc(sizeof(*cli->cl_seq), GFP_NOFS);
->-	if (cli->cl_seq == NULL)
->+	if (!cli->cl_seq)
-> 		return -ENOMEM;
-> 
-> 	prefix = kzalloc(MAX_OBD_NAME + 5, GFP_NOFS);
->-	if (prefix == NULL) {
->+	if (!prefix) {
-> 		rc = -ENOMEM;
-> 		goto out_free_seq;
-> 	}
->
->
+but that bug is something else besides pointers so it doesn't apply
+here.
 
+What someone should do is try to measure it scientifically where we
+flash some code on the screen and you have to press J for NULL and K for
+non-NULL and we time it to the hundredth of a second.  I have a feeling
+that (NULL != foo) is the worst way to write it because of the double
+negative Yoda code.
 
-Cheers, Andreas
--- 
-Andreas Dilger
+Yoda code is the most useless thing ever.  I have actually measured this
+and we introduce about 2 = vs == bugs per year.  It's probably less now
+that we have so many static checks against it.  But people decided that
+Yoda code was a good idea based on their gut instead of using statistics
+and measurements and science.
 
-Lustre Software Architect
-Intel High Performance Data Division
+regards,
+dan carpenter
