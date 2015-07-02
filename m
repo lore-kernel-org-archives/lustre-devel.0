@@ -1,61 +1,46 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 30 Jun 2015 21:26:43 +0000
-Subject: [lustre-devel] LIBCFS_ALLOC
-In-Reply-To: <alpine.DEB.2.02.1506280844460.2103@localhost6.localdomain6>
-References: <1434819550-3193-1-git-send-email-Julia.Lawall@lip6.fr>
-	<1434819550-3193-2-git-send-email-Julia.Lawall@lip6.fr>
-	<D1AECA61.F8DE5%andreas.dilger@intel.com>
-	<alpine.DEB.2.02.1506280844460.2103@localhost6.localdomain6>
-Message-ID: <D1B863B8.FA7C0%andreas.dilger@intel.com>
+From: Ben Evans <bevans@cray.com>
+Date: Thu, 2 Jul 2015 10:18:48 -0500
+Subject: [lustre-devel] [PATCH] LU-3677 mdt: Set HSM dirty open-for-write
+	file when	evicted.
+Message-ID: <20150702151848.GA26896@lusbld01.us.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/06/28, 12:52 AM, "Julia Lawall" <julia.lawall@lip6.fr> wrote:
+Fix regression introduced by LU-1303 (5165cdd). Previously,
+MDS_CLOSE_CLEANUP was used to detect file closing, due to eviction.
+This flag is no more since 5165cdd.
 
->It is not clear that all of the uses of LIBCFS_ALLOC really risk needing
->vmalloc.  For example:
->
->lnet/klnds/socklnd/socklnd.c, function ksocknal_accept:
->
->ksock_connreq_t *cr;
->...
->LIBCFS_ALLOC(cr, sizeof(*cr));
->
->The definition of ksock_connreq_t is:
->
->typedef struct ksock_connreq {
->        struct list_head ksncr_list;  /* stash on ksnd_connd_connreqs */
->        lnet_ni_t        *ksncr_ni;   /* chosen NI */
->        struct socket    *ksncr_sock; /* accepted socket */
->} ksock_connreq_t;
->
->This looks like a very small structure.
->
->LIBCFS_ALLOC relies on a test on the size, which should be able to be
->compiled away.  libcfs_kvzalloc on the other hand relies on the failure
->of 
->kmalloc and so the test for that won't be compiled away.
+It completely removed this symbol.
 
-There are probably only a handful of places where trying vmalloc() even
-makes sense.  In most cases, LIBCFS_ALLOC() can be replaced by a straight
-call to kmalloc() because the allocation size is small enough, and only a
-few need to use libcfs_kvzalloc().  Anything at PAGE_SIZE or less will
-either work with kmalloc() or it won't work at all.
+Signed-off-by: Aurelien Degremont <aurelien.degremont@cea.fr>
+Change-Id: I20e18103fe085672f499c956e831564e45bd5200
+Reviewed-on: http://review.whamcloud.com/7195
+Tested-by: Hudson
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Tested-by: Maloo <whamcloud.maloo@gmail.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+---
+ .../lustre/lustre/include/lustre/lustre_idl.h      |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I do agree with James' comments that vmalloc() was needed for both very
-large allocations that can't be satisfied by kmalloc() at all, as well as
-smaller allocations (anything over a couple of pages) due to fragmentation
-of free pages after running for a long time.  I think libcfs_kvzalloc() is
-at least as good as the size-based threshold used previously, since using
-kmalloc() is going to be faster than vmalloc() and would work better on
-32-bit platforms with limited vmalloc() size.
-
-Cheers, Andreas
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 4d72d6e..c039cbc 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -2390,7 +2390,7 @@ enum mds_op_bias {
+ 	MDS_PERM_BYPASS		= 1 << 3,
+ 	MDS_SOM			= 1 << 4,
+ 	MDS_QUOTA_IGNORE	= 1 << 5,
+-	MDS_CLOSE_CLEANUP	= 1 << 6,
++	/* Was MDS_CLOSE_CLEANUP	= (1 << 6), No more used */
+ 	MDS_KEEP_ORPHAN		= 1 << 7,
+ 	MDS_RECOV_OPEN		= 1 << 8,
+ 	MDS_DATA_MODIFIED	= 1 << 9,
 -- 
-Andreas Dilger
-
-Lustre Software Architect
-Intel High Performance Data Division
+1.6.5.6
