@@ -1,104 +1,126 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 3 Jul 2015 11:52:06 +0000
-Subject: [lustre-devel] LIBCFS_ALLOC
-In-Reply-To: <9cb85b423527448db721927a35974317@EXCHCS32.ornl.gov>
-References: <1434819550-3193-1-git-send-email-Julia.Lawall@lip6.fr>
-	<1434819550-3193-2-git-send-email-Julia.Lawall@lip6.fr>
-	<D1AECA61.F8DE5%andreas.dilger@intel.com>
-	<alpine.DEB.2.02.1506280844460.2103@localhost6.localdomain6>
-	<20150628215408.GG28762@mwanda>
-	<d2c4fda0148a4e579b5636b586d32fbe@EXCHCS32.ornl.gov>
-	<alpine.DEB.2.10.1506301657470.2330@hadrien>
-	<9cb85b423527448db721927a35974317@EXCHCS32.ornl.gov>
-Message-ID: <D1BBD1A4.FB638%andreas.dilger@intel.com>
+From: Drokin, Oleg <oleg.drokin@intel.com>
+Date: Sat, 4 Jul 2015 02:00:45 +0000
+Subject: [lustre-devel] [PATCH] LU-3677 mdt: Set HSM dirty
+ open-for-write file when evicted.
+In-Reply-To: <D1BB1222.FB0C3%andreas.dilger@intel.com>
+References: <20150702151848.GA26896@lusbld01.us.cray.com>
+	<D1BB1222.FB0C3%andreas.dilger@intel.com>
+Message-ID: <7010D276-D817-4A22-87FE-4997221EF5A1@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/07/02, 4:25 PM, "Simmons, James A." <simmonsja@ornl.gov> wrote:
+Hello!
 
->
->>> >Yeah.  You're right.  Doing a vmalloc() when kmalloc() doesn't have
->>>even
->>> >a tiny sliver of RAM isn't going to work.  It's easier to use
->>> >libcfs_kvzalloc() everywhere, but it's probably the wrong thing.
->>>
->>> The original  reason we have the vmalloc water mark wasn't so much the
->>> issue of memory exhaustion but to handle the case of memory
->>>fragmentation.
->>> Some sites had after a extended period of time started to see failures
->>>of
->>> allocating even 32K using kmalloc.  In our latest development branch
->>>we moved
->>> away from using a water mark to always try kmalloc first and if it
->>>fails then we
->>> try vmalloc. At ORNL we ran into severe performance issues when we
->>>entered
->>> vmalloc territory. It has been discussed before on what might replace
->>>vmalloc
->>> handling in the case of kmalloc fails but no solution has been worked
->>>out.
->>
->>OK, but if a structure contains only 4 words, would it be better to just
->>use kzalloc?  Or does it not matter?  It would only save trying vmalloc
->>in
->>a case that it is guaranteed to fail, but if a structure with 4 words
->>can't be allocated, the system has other problems.  Another argument is
->>that kzalloc is a well known function that people and bug-finding tools
->>understand, so it is better to use it whenever possible.
->>
->>Some of the other structures contain a lot more fields, as well as small
->>arrays.  They are probably acceptable for kzalloc too, but I wouldn't
->>know
->>the exact dividing line.
->
->The reason I bring this up is to discuss sorting this out. Once long ago
->we had just LIBCFS_ALLOC. For some reason before my time OBD_ALLOC got
-> spawned off of that.  Currently LIBCFS_ALLOC is used just by the
->libcfs/LNet
-> layer.
+On Jul 3, 2015, at 6:59 AM, Dilger, Andreas wrote:
 
-That is because there was (is?) interest from Cray and others to use LNet
-independently from Lustre (Zest and DVS, for example) so LNet should be
-self-contained and not depend on anything from Lustre.
+> Hi Ben,
+> for patches being submitted to the upstream kernel, they also need to be
+> CC'd to the maintainers and lists of the "Linux Staging" project.  Since
+> we're pretty new at taking outside patches for upstream, I'll let Oleg
+> comment on whether he prefers to accumulate the patches himself and pass
+> them upstream, or if you should CC the upstream maintainers/lists directly.
 
-> Now OBD_ALLOC in our development branch has moved to a try kmalloc first
->and
->if it fails try vmalloc for any size memory allocation.  LIBCFS_ALLOC
->still
-> does the original approach.   So we have two possible solutions
->depending on if libcfs/LNet needs to ever do a vmalloc.
->
->One solution if libcfs/LNet never needs a vmalloc is remove LIBCFS_ALLOC
->and replace it with kzalloc everywhere. We can then move libcfs_kzvalloc
->to
-> the lustre layer and port the change we did in the development branch to
-> here of the try kmalloc then vmalloc approach.
->
->The other approach is if libcfs/LNet does in some case need to use vmalloc
-> we could then update LIBCFS_ALLOC to first try kmalloc then vmalloc. Once
-> this is implemented we can nuke the OBD_ALLOC system.
+I think it's ok for people to send patches themselves.
+> On 2015/07/02, 9:18 AM, "Ben Evans" <bevans@cray.com> wrote:
+> 
+>> LU-3677 mdt: Set HSM dirty open-for-write	file when	evicted.
+> 
+> For patches being pushed upstream, the "LU-3677" label should be removed
+> from the subject line to a separate tag at the end after Reviewed-on:
+> 
+>    Intel-bug-ID: http://jira.hpdd.intel.com/browse/LU-3677
 
-I don't agree.  I think there are a few places where vmalloc() makes sense
-to try (if the allocation may be large), but in most places LIBCFS_ALLOC()
-should only use kmalloc().
+Additionally instead of the subsystem (mdt in this instance),
+I typically expand that some more to something like:
+staging/lustre/mdt (or jsut staging/lustre if there's no clear subsystem).
 
-Unfortunately, there wasn't a separate LIBCFS_ALLOC_LARGE() like there was
-for OBD_ALLOC_LARGE() that made it clear which callsites are (potentially)
-large and which are small.  The macro approach allowed the compile-time
-optimization of the small callsites, but that needs to be done by hand now.
+also note taht mdt is not really a subsystem in upstream kernel so typically
+patches to it are skipped from being sent upstream or redone to only retain
+relevant client-side bits.
 
->Either way I like to see it consolidated down to one system.
+>> Fix regression introduced by LU-1303 (5165cdd). Previously,
+>> MDS_CLOSE_CLEANUP was used to detect file closing, due to eviction.
+>> This flag is no more since 5165cdd.
+> 
+> The patch commit hash referenced here (5165cdd) is only relevant for
+> the Lustre "master" branch, but do not make any sense for the kernel
+> tree itself (where this patch is going), and the upstream maintainers
+> don't like that.  Since the referenced patch was landed before the
+> Lustre client code was pushed upstream, it probably doesn't make sense
+> to reference this at all, and just update the commit comment like:
+> 
+>    Previously, MDS_CLOSE_CLEANUP was used to detect file closing
+>    due to eviction.  This flag is not used anymore.
+> 
+>    Completely remove this symbol.
+> 
+>> Change-Id: I20e18103fe085672f499c956e831564e45bd5200
+> 
+> Upstream doesn't like the Change-Id, since it is confusing for other
+> Gerrit instances if the patches are being imported.  This should be
+> flagged if checkpatch.pl is run against the patch, which should be
+> done for every patch going upstream, even if it was landed to master
+> previously.
+> 
+>> Reviewed-on: http://review.whamcloud.com/7195
+> 
+> Reviewed-on: is OK.
+> 
+>> Tested-by: Hudson
+>> Tested-by: Maloo <whamcloud.maloo@gmail.com>
+> 
+> Remove Tested-by: since those don't mean anything to upstream.
+> 
+>> Signed-off-by: Aurelien Degremont <aurelien.degremont@cea.fr>
+>> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+>> Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+>> Reviewed-by: John L. Hammond <john.hammond@intel.com>
+>> Reviewed-by: Fan Yong <fan.yong@intel.com>
+>> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> 
+> The Signed-off-by: and Reviewed-by: lines should stay.
 
-Given the proliferation of foo_kvmalloc() and foo_kvzalloc() helpers
-(ext4_, kvm_, dm_, apparmor, ceph_, __aa_), maybe it it is time to move
-these to common kernel code instead of introducing yet another new one?
+Also your own Signed-off-by: line needs to appear here at the end.
 
-Cheers, Andreas
--- 
-Andreas Dilger
+> As you can see, the commit message and possibly the patch itself
+> may be slightly different between master and upstream, but at least
+> with the Reviewed-on: and Intel-bug-id: tags we can track the patches
+> between the two.
+> 
+> There are similar labels needed when porting patches from upstream
+> kernels into master.
+> 
+> Both of these cases are already described on the wiki page:
+> https://wiki.hpdd.intel.com/display/PUB/Commit+Comments under the
+> "Additional commit tags" section.
+> 
+> Cheers, Andreas
+> 
+>> ---
+>> .../lustre/lustre/include/lustre/lustre_idl.h      |    2 +-
+>> 1 files changed, 1 insertions(+), 1 deletions(-)
+>> 
+>> diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+>> b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+>> index 4d72d6e..c039cbc 100644
+>> --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+>> +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+>> @@ -2390,7 +2390,7 @@ enum mds_op_bias {
+>> 	MDS_PERM_BYPASS		= 1 << 3,
+>> 	MDS_SOM			= 1 << 4,
+>> 	MDS_QUOTA_IGNORE	= 1 << 5,
+>> -	MDS_CLOSE_CLEANUP	= 1 << 6,
+>> +	/* Was MDS_CLOSE_CLEANUP	= (1 << 6), No more used */
 
-Lustre Software Architect
-Intel High Performance Data Division
+I imagine you can also fix spelling/grammar as you go
+(submitting symmetric patches to master).
+This would likely be fixed in upstream by others creating further drift,
+so probably a good idea to take it under control from the get go.
+
+Thanks.
+
+Bye,
+    Oleg
