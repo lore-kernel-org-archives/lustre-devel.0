@@ -1,14 +1,26 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Mon, 6 Jul 2015 18:12:38 +0000
+From: Ben Evans <bevans@cray.com>
+Date: Mon, 6 Jul 2015 18:17:09 +0000
 Subject: [lustre-devel] [PATCH] Remove unused MDS_CLOSE_CLEANUP define
-In-Reply-To: <20150706175930.GA2909@lusbld01.us.cray.com>
+In-Reply-To: <D1C020B4.FBCA5%andreas.dilger@intel.com>
 References: <20150706175930.GA2909@lusbld01.us.cray.com>
-Message-ID: <D1C020B4.FBCA5%andreas.dilger@intel.com>
+	<D1C020B4.FBCA5%andreas.dilger@intel.com>
+Message-ID: <6E6D936CCB2E3C428716BD24C5C6CDF2644A76@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Got it, thanks for the feedback!
+
+-Ben 
+
+-----Original Message-----
+From: Dilger, Andreas [mailto:andreas.dilger at intel.com] 
+Sent: Monday, July 06, 2015 2:13 PM
+To: Ben Evans
+Cc: lustre-devel at lists.lustre.org
+Subject: Re: [lustre-devel] [PATCH] Remove unused MDS_CLOSE_CLEANUP define
 
 For submitting upstream, the component should be listed like:
 
@@ -16,7 +28,7 @@ staging/lustre: remove unused MDS_CLOSE_CLEANUP define
 
 On 2015/07/06, 11:59 AM, "Ben Evans" <bevans@cray.com> wrote:
 
->Previously, MDS_CLOSE_CLEANUP was used to detect file closing, due to
+>Previously, MDS_CLOSE_CLEANUP was used to detect file closing, due to 
 >eviction.  This flag is no longer used.
 >
 >Signed-off-by: Aurelien Degremont <aurelien.degremont@cea.fr>
@@ -46,7 +58,7 @@ On 2015/07/06, 11:59 AM, "Ben Evans" <bevans@cray.com> wrote:
 > 	MDS_KEEP_ORPHAN		= 1 << 7,
 > 	MDS_RECOV_OPEN		= 1 << 8,
 > 	MDS_DATA_MODIFIED	= 1 << 9,
->-- 
+>--
 >1.6.5.6
 >
 >_______________________________________________
@@ -57,7 +69,7 @@ On 2015/07/06, 11:59 AM, "Ben Evans" <bevans@cray.com> wrote:
 
 
 Cheers, Andreas
--- 
+--
 Andreas Dilger
 
 Lustre Software Architect
