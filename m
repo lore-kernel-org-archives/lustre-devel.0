@@ -1,22 +1,33 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Mon, 6 Jul 2015 20:36:55 +0000
+From: Ben Evans <bevans@cray.com>
+Date: Mon, 6 Jul 2015 20:39:49 +0000
 Subject: [lustre-devel] [PATCH] staging/lustre: Remove unused
  MDS_CLOSE_CLEANUP define
-In-Reply-To: <20150706183019.GA6127@lusbld01.us.cray.com>
+In-Reply-To: <D1C040DE.FBD49%andreas.dilger@intel.com>
 References: <20150706183019.GA6127@lusbld01.us.cray.com>
-Message-ID: <D1C040DE.FBD49%andreas.dilger@intel.com>
+	<D1C040DE.FBD49%andreas.dilger@intel.com>
+Message-ID: <6E6D936CCB2E3C428716BD24C5C6CDF2644B9A@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The character between "unused" and "MDS" in the patch summary line appears
-to be a tab instead of a space.
+Ok, I'll clean it up.  Thanks for all the help with the feedback
+
+-Ben
+
+-----Original Message-----
+From: Dilger, Andreas [mailto:andreas.dilger at intel.com] 
+Sent: Monday, July 06, 2015 4:37 PM
+To: Ben Evans
+Cc: lustre-devel at lists.lustre.org
+Subject: Re: [lustre-devel] [PATCH] staging/lustre: Remove unused MDS_CLOSE_CLEANUP define
+
+The character between "unused" and "MDS" in the patch summary line appears to be a tab instead of a space.
 
 On 2015/07/06, 12:30 PM, "Ben Evans" <bevans@cray.com> wrote:
 
->Previously, MDS_CLOSE_CLEANUP was used to detect file closing, due to
+>Previously, MDS_CLOSE_CLEANUP was used to detect file closing, due to 
 >eviction.
 >This flag is no longer used.
 >
@@ -56,11 +67,10 @@ The version is from "git describe 5165cdd" from the original commit.
 > 	MDS_RECOV_OPEN		= 1 << 8,
 > 	MDS_DATA_MODIFIED	= 1 << 9,
 
-I think after these changes you could add the upstream maintainers to the
-"To:" and "CC:" so that the patch can be accepted upstream.
+I think after these changes you could add the upstream maintainers to the "To:" and "CC:" so that the patch can be accepted upstream.
 
 Cheers, Andreas
--- 
+--
 Andreas Dilger
 
 Lustre Software Architect
