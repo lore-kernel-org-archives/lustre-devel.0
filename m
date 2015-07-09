@@ -1,59 +1,211 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Wed, 8 Jul 2015 00:44:24 +0000
-Subject: [lustre-devel] [PATCH] [PATCH] staging/lustre: Remove unused
- MDS_CLOSE_CLEANUP	define
-In-Reply-To: <559C2F32.5040104@llnl.gov>
-References: <20150707153234.GA1872@lusbld01.us.cray.com>,
-	<559C2F32.5040104@llnl.gov>
-Message-ID: <E223F4DE-394E-43EB-8F3A-A6E73D000501@intel.com>
+From: Nunez, James A <james.a.nunez@intel.com>
+Date: Thu, 9 Jul 2015 14:06:40 +0000
+Subject: [lustre-devel] [Iudev] proposed version change for PTLRPC GSS
+In-Reply-To: <CAB_j=MdmsV=Oe9i0sNUGi2k0mmiiPA4C_W0xQUtCh2AuROtf1w@mail.gmail.com>
+References: <CAC2+cFgRWEEALvwhOiSdhiapkvE=VeeiZ_KeNihud0bxN8y2ew@mail.gmail.com>
+	<55111C81.5010009@bull.net>	<D13891F9.E8187%andreas.dilger@intel.com>
+	<551518C3.70002@bull.net>
+	<CAB_j=McMQ9c95BgnF3kTFAqSEpr7VRcC9txA8xCstwO4CpnwPg@mail.gmail.com>
+	<553001AE.2070601@bull.net>
+	<CAB_j=MdmsV=Oe9i0sNUGi2k0mmiiPA4C_W0xQUtCh2AuROtf1w@mail.gmail.com>
+Message-ID: <204419CE11160F44944331EE9BAD7D224610A775@FMSMSX114.amr.corp.intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The flag is no longer used in the code so there is no value to keep it around. It was only ever used for SOM, which was deleted and never supported. 
+Nathan and Sebastien,
 
-Cheers, Andreas
+I?m interested in testing the revived Kerberos support in Lustre. I?d like to understand how you tested this feature and suggested best practices on setting up the Kerberos environment for use with Lustre.
 
-> On Jul 7, 2015, at 13:57, Christopher J. Morrone <morrone2@llnl.gov> wrote:
-> 
-> Unless there is code in this client that explicitly prevents it from connecting with a pre-2.4.0 server, perhaps this flag should not be removed.
-> 
-> Chris
-> 
->> On 07/07/2015 08:32 AM, Ben Evans wrote:
->> Previously, MDS_CLOSE_CLEANUP was used to detect file closing,
->> due to eviction. This flag is no longer used.
->> 
->> Signed-off-by: Aurelien Degremont <aurelien.degremont@cea.fr>
->> Intel-bug-ID: http://jira.hpdd.intel.com/browse/LU-3677
->> Reviewed-on: http://review.whamcloud.com/7195
->> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
->> Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
->> Reviewed-by: John L. Hammond <john.hammond@intel.com>
->> Reviewed-by: Fan Yong <fan.yong@intel.com>
->> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
->> Signed-off-by: Ben Evans <bevans@cray.com>
->> ---
->>  .../lustre/lustre/include/lustre/lustre_idl.h      |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
->> index 4d72d6e..bea70cb 100644
->> --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
->> +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
->> @@ -2390,7 +2390,7 @@ enum mds_op_bias {
->>      MDS_PERM_BYPASS        = 1 << 3,
->>      MDS_SOM            = 1 << 4,
->>      MDS_QUOTA_IGNORE    = 1 << 5,
->> -    MDS_CLOSE_CLEANUP    = 1 << 6,
->> +    /* MDS_CLOSE_CLEANUP = 1 << 6, obsolete since 2.4.0 */
->>      MDS_KEEP_ORPHAN        = 1 << 7,
->>      MDS_RECOV_OPEN        = 1 << 8,
->>      MDS_DATA_MODIFIED    = 1 << 9,
-> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+I?ve looked in Jira and can?t find a test plan for Kerberos. Do you have a test plan and would you  please share it?
+
+I?ve looked over all the patches for the Kerberos Revival ticket and don?t see any new tests added by these patches. Does this mean that the existing Kerberos tests in sanity-krb5 still work and test the feature thoroughly? If not, would you please submit a patch adding new tests?
+
+Thank you,
+James
+
+From: lustre-devel [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Nathan Rutman
+Sent: Tuesday, April 21, 2015 1:47 PM
+To: Sebastien Buisson; Andrew Perepechko
+Cc: iudev at lists.opensfs.org; lustre-devel at lists.lustre.org
+Subject: Re: [lustre-devel] [Iudev] proposed version change for PTLRPC GSS
+
+Hi Sebastien -
+thanks for pushing this forward. At this point, I want to make sure that we have the "union" of all the Kerberos fixes from Bull and Seagate on track for landing. I know you're already working with Andrew but if there's anything else that you need from Seagate please let me know.
+
+--
+Nathan Rutman ? Principal Systems Architect
+Seagate Technology ? +1 503 877-9507 ? GMT-8
+
+On Thu, Apr 16, 2015 at 11:38 AM, Sebastien Buisson <sebastien.buisson at atos.net<mailto:sebastien.buisson@atos.net>> wrote:
+Hi Nathan,
+
+All the Kerberos related patches that are not landed yet are:
+LU-3778:
+http://review.whamcloud.com/14040
+LU-6356:
+http://review.whamcloud.com/14349
+http://review.whamcloud.com/14041
+http://review.whamcloud.com/14042
+http://review.whamcloud.com/14404
+
+They can all possibly impact the work done on Shared Key feature, this is why I was proposing that have them merged as soon as possible.
+
+Best regards,
+Sebastien.
+
+
+Le 16/04/2015 12:22, Nathan Rutman a ?crit :
+Sebastien, do these patches represent all the merged Kerberos changes?
+Or can these be landed independently of the others?
+
+
+*--*
+*Nathan Rutman ? Principal Systems Architect
+Seagate Technology** ? *+1 503 877-9507<tel:%2B1%20503%20877-9507>* ? *GMT-8
+
+On Fri, Mar 27, 2015 at 1:45 AM, Sebastien Buisson
+<sebastien.buisson at atos.net<mailto:sebastien.buisson@atos.net> <mailto:sebastien.buisson at atos.net<mailto:sebastien.buisson@atos.net>>> wrote:
+
+    Re-emitting because of issues with my email address.
+    --------
+
+    Hi,
+
+    As I understand the need for evolutions in the GSS code, I advocate
+    the review and merge of all patches related to Kerberos revival as
+    soon as possible. It would avoid painful rebase of work done by IU,
+    or Kerberos patches, or both.
+    The Kerberos revival patches waiting for review are:
+    http://review.whamcloud.com/__14040 <http://review.whamcloud.com/14040>
+    http://review.whamcloud.com/__14041 <http://review.whamcloud.com/14041>
+    http://review.whamcloud.com/__14042 <http://review.whamcloud.com/14042>
+
+    Best regards,
+    Sebastien.
+
+
+    Le 25/03/2015 22:25, Dilger, Andreas a ?crit :
+
+        Sebastien,
+        can you please also add lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
+        <mailto:lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>> to the CC list for
+        this discussion.
+
+        On 2015/03/24, 3:12 AM, "Sebastien Buisson"
+        <sebastien.buisson at atos.net<mailto:sebastien.buisson@atos.net> <mailto:sebastien.buisson at atos.net<mailto:sebastien.buisson@atos.net>>>
+
+        wrote:
+
+            Hi there,
+
+            I agree we should not bother with backward compatibility.
+            Kerberos
+            revival patches aim at Lustre 2.8, so we are good if the
+            modifications
+            you propose also land in 2.8.
+
+            Taking advantage of the opportunity to replace
+            handle_nullreq with
+            subflavor specific code is really nice, as those bits are really
+            confusing for someone who tries to understand the code.
+
+            Cheers,
+            Sebastien.
+
+
+            Le 24/03/2015 02:34, Jeremy Filizetti a ?crit :
+
+                On the phone call last week we discussed an increment of the
+                PTLRPC_GSS_VERSION to version 2 to allow some changes
+                changes/restructuring.  No one had any objections on the
+                phone call but
+                I wanted to send it out for wider distribution and feedback.
+
+                Changing the request format would allow us to support
+                larger GSS token
+                sizes which today are limited (see ticket LU-3855).
+                  From what I have
+                looked through so far the following seems to allow for
+                larger tokens and
+                also allow some of these changes without having to worry
+                about backwards
+                compatibility since it was never really "working" anyways.
+
+                Change PTLRPC_GSS_VERSION to 2
+
+                Enlarge GSS_CTX_INIT_MAX_LEN to something larger then
+                1024.   Ideally we
+                would support MaxTokenSize of 64k for the largest active
+                directory
+                ticket: (see
+                http://blogs.technet.com/b/__shanecothran/archive/2010/07/__16/maxtokensize-a
+
+                <http://blogs.technet.com/b/shanecothran/archive/2010/07/16/maxtokensize-a>
+                nd-kerberos-token-bloat.aspx).
+                The purpose of enlarging this is to support larger
+                tokens.  The
+                sizeof(struct rsi) needs to remain under PAGE_SIZE right
+                now with
+                rsi_request calling sunrpc_cache_pipe_upcall.  Since
+                there is only one
+                lsvcgssd process supposed to be running maybe it would
+                be acceptable to
+                use larger requests and just slightly modify rsi_request
+                to incorporate
+                must of the functionality of sunrpc_cache_pipe_upcall.
+
+                To keep things simple with the lsvcgssd and continue to
+                use a single
+                channel proc file interface I'd like to AND the GSS
+                subflavor onto most
+                significant bits of lustre_svc in struct rsi.  Instead
+                of calling the
+                inappropriately named handle_nullreq things would be
+                changed to handle
+                the multiple subflavors (gssnull, sk, krb5).  gssnull
+                and sk won't have
+                a full userspace component so gss_accept_sec_context
+                can't be called.
+
+                Thoughts welcome.  I'm sure I missed something along the
+                way here but
+                this is just what I have looked at so far.
+
+                Thanks,
+                Jeremy
+
+                _________________________________________________
+                Iudev mailing list
+                Iudev at lists.opensfs.org<mailto:Iudev@lists.opensfs.org> <mailto:Iudev at lists.opensfs.org<mailto:Iudev@lists.opensfs.org>>
+                http://lists.opensfs.org/__listinfo.cgi/iudev-opensfs.org <http://lists.opensfs.org/listinfo.cgi/iudev-opensfs.org>
+
+            _________________________________________________
+            Iudev mailing list
+            Iudev at lists.opensfs.org<mailto:Iudev@lists.opensfs.org> <mailto:Iudev at lists.opensfs.org<mailto:Iudev@lists.opensfs.org>>
+            http://lists.opensfs.org/__listinfo.cgi/iudev-opensfs.org
+            <http://lists.opensfs.org/listinfo.cgi/iudev-opensfs.org>
+
+
+
+        Cheers, Andreas
+
+    _________________________________________________
+    Iudev mailing list
+    Iudev at lists.opensfs.org<mailto:Iudev@lists.opensfs.org> <mailto:Iudev at lists.opensfs.org<mailto:Iudev@lists.opensfs.org>>
+    http://lists.opensfs.org/__listinfo.cgi/iudev-opensfs.org
+    <http://lists.opensfs.org/listinfo.cgi/iudev-opensfs.org>
+
+
+
+
+_______________________________________________
+Iudev mailing list
+Iudev at lists.opensfs.org<mailto:Iudev@lists.opensfs.org>
+http://lists.opensfs.org/listinfo.cgi/iudev-opensfs.org
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150709/d24cb57b/attachment-0001.htm>
