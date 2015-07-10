@@ -1,59 +1,42 @@
 From: Patrick Farrell <paf@cray.com>
-Date: Fri, 10 Jul 2015 10:11:54 -0500
-Subject: [lustre-devel] [PATCH] lustre/staging: remove unused MAY_
-	constants
-In-Reply-To: <20150710150931.GA29330@lusbld01.us.cray.com>
-References: <20150710150931.GA29330@lusbld01.us.cray.com>
-Message-ID: <559FE0BA.1060206@cray.com>
+Date: Fri, 10 Jul 2015 11:14:45 -0500
+Subject: [lustre-devel] Lock ahead - Possible change
+Message-ID: <559FEF75.4080103@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Typo in the bug-ID URL.  httpd instead of hpdd.
-On 07/10/2015 10:09 AM, Ben Evans wrote:
-> Remove unused MAY_ constants from lustre_idl.h
->
-> Intel-bug-ID: http://jira.httpd.intel.com/browse/LU-6450
-> Reviewed-by: James Simmons <uja.ornl@gmail.com>
-> Signed-off-by: Ben Evans <bevans@cray.com>
-> ---
->   .../lustre/lustre/include/lustre/lustre_idl.h      |   24 ++++++++-----------
->   1 files changed, 10 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> index bea70cb..be1cbae 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> @@ -2366,20 +2366,16 @@ extern void lustre_swab_mdt_rec_setattr (struct mdt_rec_setattr *sa);
->   					      */
->   #define MDS_OPEN_RELEASE   02000000000000ULL /* Open the file for HSM release */
->   
-> -/* permission for create non-directory file */
-> -#define MAY_CREATE      (1 << 7)
-> -/* permission for create directory file */
-> -#define MAY_LINK	(1 << 8)
-> -/* permission for delete from the directory */
-> -#define MAY_UNLINK      (1 << 9)
-> -/* source's permission for rename */
-> -#define MAY_RENAME_SRC  (1 << 10)
-> -/* target's permission for rename */
-> -#define MAY_RENAME_TAR  (1 << 11)
-> -/* part (parent's) VTX permission check */
-> -#define MAY_VTX_PART    (1 << 12)
-> -/* full VTX permission check */
-> -#define MAY_VTX_FULL    (1 << 13)
-> +/*
-> +#define UNUSED_MAY_CREATE	(1 << 7) create non-directory file
-> +#define UNUSED_MAY_LINK		(1 << 8) create directory file
-> +#define UNUSED_MAY_UNLINK	(1 << 9) delete from the directory
-> +#define UNUSED_MAY_RENAME_SRC	(1 << 10) source's rename
-> +#define UNUSED_MAY_RENAME_TAR	(1 << 11) target's rename
-> +#define UNUSED_MAY_VTX_PART	(1 << 12) part (parent's) VTX check
-> +#define UNUSED_MAY_VTX_FULL	(1 << 13) full VTX check
-> +*/
-> +
->   /* lfs rgetfacl permission check */
->   #define MAY_RGETFACL    (1 << 14)
->   
+Good morning,
+
+I am reluctant to make further changes to lock ahead at this point when 
+it is ready and pending review, but I wanted to float an idea to see if 
+it would likely meet acceptance.  (I am primarily asking Jinshan and 
+Andreas, who have been involved from the beginning.)
+
+Currently, lock ahead requests are asynchronous, and, because of that, 
+non-blocking.  What about the possibility of also allowing blocking, 
+*synchronous* requests via the same API?
+
+This is intended as a way for a client to make a blocking lock request 
+on a specific region of a file, rather than the whole file by taking a 
+group lock as is currently the only option.
+
+This would not be used for my immediate goal of enhancing strided 
+writing performance with lock ahead itself, but might be handy in other 
+situations and is a pretty minor change to the API.  (Just allow 
+blocking requests and make them synchronous, rather than not allowing 
+them as is the case now.)
+
+I still think I will push this out to a future enhancement of the 
+feature rather than integrate it into the current patch.
+
+Thoughts?  Objections?
+
+I admit that this expansion of the API is making me question 'lock 
+ahead' as the name for the API itself, rather than a particular usage of 
+it.  Perhaps that's not a direction we want to go, or perhaps we should 
+rename the API.  (Suggestions encouraged)
+
+- Patrick Farrell
