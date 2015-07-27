@@ -1,36 +1,45 @@
-From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Mon, 27 Jul 2015 14:16:40 +0000
-Subject: [lustre-devel] Expanding Build/Test Coverage for community tree
-Message-ID: <8FD97F7B-BF6F-4DB9-8A87-A88BF3683EC4@intel.com>
+From: DEGREMONT Aurelien <aurelien.degremont@cea.fr>
+Date: Mon, 27 Jul 2015 18:34:03 +0200
+Subject: [lustre-devel] LAD'15: Call for papers extended up to August 4th
+Message-ID: <55B65D7B.40506@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+*LAD'15 - Lustre Administrator and Developer Workshop*
+September 22th - 23th, 2015
+Paris Marriott Champs Elysees Hotel, Paris - France
 
-I have been thinking about ways to extend our build/test coverage beyond
-the capacity and composition of the HPDD test cluster.
+*CALL FOR PAPERS*
+We are extending call for papers up to August 4th, 2015. You have one 
+more week to send your abstract!
+We are inviting community members to send proposals for presentations at 
+this event. No proceeding is required, just an abstract of a 30-min 
+(technical) presentation.
+Please send this to lad at eofs.eu
 
-Without participating in continuous build/testing, it is easy for
-regressions affecting options used in the community (architectures, Linux
-distros or lnds, say) to creep in and only be reported after the
-responsible changes have landed (and perhaps even a release has gone out)
+Topics may include (but are not limited to): site updates or future 
+projects, Lustre administration, monitoring and tools, Lustre feature 
+overview, Lustre client performance (benefits of hardware evolution to 
+Lustre (like SSD, many-cores?), comparison between Lustre and other 
+parallel file systems (perf. and/or features), Lustre and Exascale I/O, 
+tunings, etc.
 
-In order to alleviate this somehow, I created a small howto with a
-handful of scripts that would allow all interested parties to insert their
-own builders and test scenarios into process from comfort of their own data
-centers and without full blown additional Jenkins instances and such.
+*REGISTRATION*
+Registration for the workshop is open:
+http://lad.eofs.org/register.php
 
-The scripts are pretty primitive and single threaded (mostly geared for
-build testing now), but they do their intended job. All enhancements to
-make them better handle testing, integrate with web servers to post better
-output and such are also greatly appreciated.
+*WEB SITE*
+Get all details on http://www.eofs.eu/?id=lad15
 
-The howto could be located at http://wiki.lustre.org/Simple_Gerrit_Builder_Howto
+*SPONSORS*
+We are very pleased this event is organized thanks to the following 
+generous sponsors:
+ATOS, CEA, CRAY, DDN, INTEL and SEAGATE
 
-Thanks.
-
-Bye,
-    Oleg
+For any other information, please contact lad at eofs.eu
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150727/a809a8db/attachment.htm>
