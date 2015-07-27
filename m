@@ -1,7 +1,7 @@
 From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Mon, 27 Jul 2015 01:19:25 +0000
-Subject: [lustre-devel] Extended Lustre testing
-Message-ID: <7F0D23EB-DEAF-42C7-A085-F9C778B84C10@intel.com>
+Date: Mon, 27 Jul 2015 14:16:40 +0000
+Subject: [lustre-devel] Expanding Build/Test Coverage for community tree
+Message-ID: <8FD97F7B-BF6F-4DB9-8A87-A88BF3683EC4@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -10,17 +10,27 @@ To: lustre-devel@lists.lustre.org
 
 Hello!
 
-   Last LUG and at other events I have been getting questions about additional testing I perform on Lustre patches before accepting them. While explaining it in general in person when asked, I finally came up with a written Howto
-   that I placed in the wiki at http://wiki.lustre.org/Testing_Setup_To_Induce_Race_Conditions
+I have been thinking about ways to extend our build/test coverage beyond
+the capacity and composition of the HPDD test cluster.
 
-   Now, I've been doing this for a couple of years, so certain details that are obvious for me and I take for granted might be less obvious for people exposed to all of this for the first time. So now might be a good time to
-   ask away your questions so that the document could be improved.
+Without participating in continuous build/testing, it is easy for
+regressions affecting options used in the community (architectures, Linux
+distros or lnds, say) to creep in and only be reported after the
+responsible changes have landed (and perhaps even a release has gone out)
 
-   Also, I wanted some visibility for this addition in the hopes that more people would start doing stuff like this and perhaps even enhance the technique so that the Lustre becomes even more stable and robust.
+In order to alleviate this somehow, I created a small howto with a
+handful of scripts that would allow all interested parties to insert their
+own builders and test scenarios into process from comfort of their own data
+centers and without full blown additional Jenkins instances and such.
 
-   And additionally it would be great if others share their own cool testing techniques that might be deployed by others.
+The scripts are pretty primitive and single threaded (mostly geared for
+build testing now), but they do their intended job. All enhancements to
+make them better handle testing, integrate with web servers to post better
+output and such are also greatly appreciated.
 
-   Thanks.
+The howto could be located at http://wiki.lustre.org/Simple_Gerrit_Builder_Howto
+
+Thanks.
 
 Bye,
     Oleg
