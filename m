@@ -1,57 +1,40 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Wed, 29 Jul 2015 04:53:28 +0000
+From: Drokin, Oleg <oleg.drokin@intel.com>
+Date: Fri, 31 Jul 2015 03:54:02 +0000
 Subject: [lustre-devel] Lock ahead - Possible change
 In-Reply-To: <559FEF75.4080103@cray.com>
 References: <559FEF75.4080103@cray.com>
-Message-ID: <D1C57945.FCC4A%andreas.dilger@intel.com>
+Message-ID: <7A7A49C2-E8AB-4661-8991-0A23D4188D6B@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/07/10, 10:14 AM, "lustre-devel on behalf of Patrick Farrell"
-<lustre-devel-bounces at lists.lustre.org on behalf of paf@cray.com> wrote:
 
->Good morning,
->
->I am reluctant to make further changes to lock ahead at this point when
->it is ready and pending review, but I wanted to float an idea to see if
->it would likely meet acceptance.  (I am primarily asking Jinshan and
->Andreas, who have been involved from the beginning.)
->
->Currently, lock ahead requests are asynchronous, and, because of that,
->non-blocking.  What about the possibility of also allowing blocking,
->*synchronous* requests via the same API?
+On Jul 10, 2015, at 12:14 PM, Patrick Farrell wrote:
 
-This seems like it could be useful in the future, if it doesn't make the
-code significantly more complex.
+> Good morning,
+> 
+> I am reluctant to make further changes to lock ahead at this point when it is ready and pending review, but I wanted to float an idea to see if it would likely meet acceptance.  (I am primarily asking Jinshan and Andreas, who have been involved from the beginning.)
+> 
+> Currently, lock ahead requests are asynchronous, and, because of that, non-blocking.  What about the possibility of also allowing blocking, *synchronous* requests via the same API?
 
->This is intended as a way for a client to make a blocking lock request
->on a specific region of a file, rather than the whole file by taking a
->group lock as is currently the only option.
->
->This would not be used for my immediate goal of enhancing strided
->writing performance with lock ahead itself, but might be handy in other
->situations and is a pretty minor change to the API.  (Just allow
->blocking requests and make them synchronous, rather than not allowing
->them as is the case now.)
->
->I still think I will push this out to a future enhancement of the
->feature rather than integrate it into the current patch.
->
->Thoughts?  Objections?
->
->I admit that this expansion of the API is making me question 'lock
->ahead' as the name for the API itself, rather than a particular usage of
->it.  Perhaps that's not a direction we want to go, or perhaps we should
->rename the API.  (Suggestions encouraged)
+This is potentially deadlockprone, so definitely think it through first.
 
-What about just "lock request" or "lock enqueue"?
+There are plenty of design assumptions about how there could be just one blocking lock request from a thread.
+Otherwise stuff like
+process1: request lock1, request lock2
+process2: request lock3, that conflicts with lock1 and lock2.
 
-Cheers, Andreas
--- 
-Andreas Dilger
+Now if lock1 is granted then lock3 is processed next and process1 is blocked with lock1 actually held until lock2 is granted - this will not end well.
 
-Lustre Software Architect
-Intel High Performance Data Division
+> This is intended as a way for a client to make a blocking lock request on a specific region of a file, rather than the whole file by taking a group lock as is currently the only option.
+> 
+> This would not be used for my immediate goal of enhancing strided writing performance with lock ahead itself, but might be handy in other situations and is a pretty minor change to the API.  (Just allow blocking requests and make them synchronous, rather than not allowing them as is the case now.)
+> 
+> I still think I will push this out to a future enhancement of the feature rather than integrate it into the current patch.
+
+In my view this definitely should be a separate patch.
+
+Bye,
+    Oleg
