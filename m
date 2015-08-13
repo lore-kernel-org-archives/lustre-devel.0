@@ -1,40 +1,33 @@
-From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Fri, 31 Jul 2015 03:54:02 +0000
-Subject: [lustre-devel] Lock ahead - Possible change
-In-Reply-To: <559FEF75.4080103@cray.com>
-References: <559FEF75.4080103@cray.com>
-Message-ID: <7A7A49C2-E8AB-4661-8991-0A23D4188D6B@intel.com>
+From: Di Natale, Giuseppe <dinatale2@llnl.gov>
+Date: Thu, 13 Aug 2015 22:43:14 +0000
+Subject: [lustre-devel] lctl conf_param vs set_param -P
+Message-ID: <974262C966B9F640899A48EB96313E9A2B3C90@PRDEXMBX-08.the-lab.llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Greetings,
 
-On Jul 10, 2015, at 12:14 PM, Patrick Farrell wrote:
+In an effort to change test-framework.sh to not utilize the deprecated conf_param option in lctl, I stumbled upon what appears to be inconsistent behavior between lctl's conf_param and set_param -P options. The permanent option test-framework.sh is attempting to change is jobid_var. When using conf_param, any changes to the property are written to /proc/fs/lustre/jobid_var within a short period of time. This is not the case with set_param -P. The change is never reflected nor is it stored in some other file within /proc. I started digging into the MGS logs and found that the behavior for both are different (the relevant segments of the logs are attached to this email and are named accordingly). In short, it appears that conf_param attempts to apply the changes to all the targets while set_param does not (it does not recognize it as a global property). Can someone offer any insight on why the behavior appears to be different or provide insight on if this is incorrect behavior?
 
-> Good morning,
-> 
-> I am reluctant to make further changes to lock ahead at this point when it is ready and pending review, but I wanted to float an idea to see if it would likely meet acceptance.  (I am primarily asking Jinshan and Andreas, who have been involved from the beginning.)
-> 
-> Currently, lock ahead requests are asynchronous, and, because of that, non-blocking.  What about the possibility of also allowing blocking, *synchronous* requests via the same API?
-
-This is potentially deadlockprone, so definitely think it through first.
-
-There are plenty of design assumptions about how there could be just one blocking lock request from a thread.
-Otherwise stuff like
-process1: request lock1, request lock2
-process2: request lock3, that conflicts with lock1 and lock2.
-
-Now if lock1 is granted then lock3 is processed next and process1 is blocked with lock1 actually held until lock2 is granted - this will not end well.
-
-> This is intended as a way for a client to make a blocking lock request on a specific region of a file, rather than the whole file by taking a group lock as is currently the only option.
-> 
-> This would not be used for my immediate goal of enhancing strided writing performance with lock ahead itself, but might be handy in other situations and is a pretty minor change to the API.  (Just allow blocking requests and make them synchronous, rather than not allowing them as is the case now.)
-> 
-> I still think I will push this out to a future enhancement of the feature rather than integrate it into the current patch.
-
-In my view this definitely should be a separate patch.
-
-Bye,
-    Oleg
+Thanks,
+Giuseppe Di Natale
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150813/7954dcf2/attachment.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: set_param_log
+Type: application/octet-stream
+Size: 3081 bytes
+Desc: set_param_log
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150813/7954dcf2/attachment.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: conf_param_log
+Type: application/octet-stream
+Size: 4383 bytes
+Desc: conf_param_log
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150813/7954dcf2/attachment-0001.obj>
