@@ -1,7 +1,7 @@
 From: Chris Horn <hornc@cray.com>
-Date: Wed, 19 Aug 2015 21:14:47 +0000
+Date: Wed, 19 Aug 2015 21:16:29 +0000
 Subject: [lustre-devel] Why can you set concurrent_sends < peer_credits ?
-In-Reply-To: <CAJ2e-W0h9HfHrrcOkimoHWhpNiAMzdo_C1WNinLLbGeLBF9X5A@mail.gmail.com>
+In-Reply-To: <FA332012-D83C-41BA-969D-2EA17A23C058@cray.com>
 References: <A6550817-BCC0-49D6-A259-067A4CCA87B7@cray.com>
 	<CAJ2e-W1S1FXnLLH30HOp=FzisXPy51eHJM+W+RYwmJVDcNjH1w@mail.gmail.com>
 	<04556C78-49F4-4A78-A477-ADE76C7773BB@cray.com>
@@ -10,12 +10,19 @@ References: <A6550817-BCC0-49D6-A259-067A4CCA87B7@cray.com>
 	<CAJ2e-W3gt6SMjyCCZAkC_HyGmpNezZq4bqBRziwY-r45EeSPnw@mail.gmail.com>
 	<55D4EBB1.3000502@llnl.gov>
 	<CAJ2e-W0h9HfHrrcOkimoHWhpNiAMzdo_C1WNinLLbGeLBF9X5A@mail.gmail.com>
-Message-ID: <FA332012-D83C-41BA-969D-2EA17A23C058@cray.com>
+	<FA332012-D83C-41BA-969D-2EA17A23C058@cray.com>
+Message-ID: <0D0C00EC-C1C6-4360-BA73-730B97F2D85A@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+To clarify, the lnet_compare_routes() does look at peer credits, but only if priority, hops and queued nob are all the same. It would probably be better to weight all of these things together as was suggested at one of the developer conferences recently.
+
+Chris Horn
+
+On Aug 19, 2015, at 4:14 PM, Chris Horn <hornc at cray.com<mailto:hornc@cray.com>> wrote:
 
 We could more easily help that situation by changing the lnet_compare_routes() method to look at the number of credits available when deciding which router peer to use as a next hop.
 
@@ -41,6 +48,7 @@ lustre-devel mailing list
 lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150819/5eb83fba/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20150819/6dae99f7/attachment.htm>
