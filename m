@@ -1,18 +1,22 @@
-From: Jeff Becker <Jeffrey.C.Becker@nasa.gov>
-Date: Thu, 20 Aug 2015 13:01:38 -0700
-Subject: [lustre-devel] [PATCH] staging/lustre: fix block comment formatting
-Message-ID: <1440100898-37695-1-git-send-email-Jeffrey.C.Becker@nasa.gov>
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Thu, 20 Aug 2015 20:07:11 +0000
+Subject: [lustre-devel] [PATCH] staging/lustre: fix block comment
+ formatting
+In-Reply-To: <1440100898-37695-1-git-send-email-Jeffrey.C.Becker@nasa.gov>
+References: <1440100898-37695-1-git-send-email-Jeffrey.C.Becker@nasa.gov>
+Message-ID: <ccba2d9ada13436fb954ff2cb14b8391@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Running checkpatch.pl on lnet/klnds/o2iblnd/o2iblnd.h produces several
-"Block comments use a trailing */ on a separate line" warnings. This patch
-fixes these.
+>Running checkpatch.pl on lnet/klnds/o2iblnd/o2iblnd.h produces several
+>"Block comments use a trailing */ on a separate line" warnings. This patch
+>fixes these.
 
----
+These fixes are just plain ugly. Is this change a requirement?
+
  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    | 90 ++++++++++++++--------
  1 file changed, 60 insertions(+), 30 deletions(-)
 
@@ -262,3 +266,8 @@ index f4b6c33..659d9cc 100644
  #define KIBLND_CONN_PARAM_LEN(e) ((e)->param.conn.private_data_len)
 -- 
 2.4.5
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
