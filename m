@@ -1,14 +1,22 @@
-From: Ben Evans <bevans@cray.com>
-Date: Tue, 15 Sep 2015 20:53:01 +0000
+From: Patrick Farrell <paf@cray.com>
+Date: Tue, 15 Sep 2015 21:12:56 +0000
 Subject: [lustre-devel] adding IOCTL for ping
-In-Reply-To: <55F88186.50803@llnl.gov>
-References: <D21DABBC.C8F%jevans@cray.com> <55F88186.50803@llnl.gov>
-Message-ID: <D21DFBEC.CA4%jevans@cray.com>
+In-Reply-To: <D21DFBEC.CA4%jevans@cray.com>
+References: <D21DABBC.C8F%jevans@cray.com>
+	<55F88186.50803@llnl.gov>,<D21DFBEC.CA4%jevans@cray.com>
+Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614CF1BFA@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Hmmm.  What about a proc interface instead?  This feels - to me - better suited to that, since it's a control that isn't part of the I/O path in any way.
+________________________________________
+From: lustre-devel [lustre-devel-bounces at lists.lustre.org] on behalf of Ben Evans [bevans at cray.com]
+Sent: Tuesday, September 15, 2015 3:53 PM
+To: Christopher J. Morrone; lustre-devel at lists.lustre.org
+Subject: Re: [lustre-devel] adding IOCTL for ping
 
 You?re correct, targets and client Ids would probably be better.  I was
 simply thinking that it would be a relatively straightforward piece of
@@ -60,3 +68,8 @@ wrote:
 >lustre-devel mailing list
 >lustre-devel at lists.lustre.org
 >http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
