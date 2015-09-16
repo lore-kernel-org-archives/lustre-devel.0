@@ -1,18 +1,25 @@
-From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Wed, 16 Sep 2015 15:16:49 +0000
+From: Patrick Farrell <paf@cray.com>
+Date: Wed, 16 Sep 2015 15:24:03 +0000
 Subject: [lustre-devel] adding IOCTL for ping
-In-Reply-To: <D21EE244.CB9%jevans@cray.com>
+In-Reply-To: <e27616ddad104a94a6d8f5d3208aee99@EXCHCS32.ornl.gov>
 References: <D21DABBC.C8F%jevans@cray.com> <55F88186.50803@llnl.gov>
 	<D21DFBEC.CA4%jevans@cray.com>
 	<DB0C8A206669AC40B1C4E52A8584A6F614CF1BFA@CFWEX01.americas.cray.com>
-	<D21EE244.CB9%jevans@cray.com>
-Message-ID: <e27616ddad104a94a6d8f5d3208aee99@EXCHCS32.ornl.gov>
+	<D21EE244.CB9%jevans@cray.com>,
+	<e27616ddad104a94a6d8f5d3208aee99@EXCHCS32.ornl.gov>
+Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614CF1CB4@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+A further thought: wouldn't an ioctl be unusable on servers?
+________________________________________
+From: Simmons, James A. [simmonsja at ornl.gov]
+Sent: Wednesday, September 16, 2015 10:16 AM
+To: Ben Evans; Patrick Farrell; Christopher J. Morrone; lustre-devel at lists.lustre.org
+Subject: RE: [lustre-devel] adding IOCTL for ping
 
 >My understanding is that adding new proc interfaces is discouraged by
 >upstream linux.
