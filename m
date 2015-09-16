@@ -1,21 +1,23 @@
-From: Ben Evans <bevans@cray.com>
-Date: Wed, 16 Sep 2015 13:10:18 +0000
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Wed, 16 Sep 2015 15:16:49 +0000
 Subject: [lustre-devel] adding IOCTL for ping
-In-Reply-To: <DB0C8A206669AC40B1C4E52A8584A6F614CF1BFA@CFWEX01.americas.cray.com>
+In-Reply-To: <D21EE244.CB9%jevans@cray.com>
 References: <D21DABBC.C8F%jevans@cray.com> <55F88186.50803@llnl.gov>
 	<D21DFBEC.CA4%jevans@cray.com>
 	<DB0C8A206669AC40B1C4E52A8584A6F614CF1BFA@CFWEX01.americas.cray.com>
-Message-ID: <D21EE244.CB9%jevans@cray.com>
+	<D21EE244.CB9%jevans@cray.com>
+Message-ID: <e27616ddad104a94a6d8f5d3208aee99@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-My understanding is that adding new proc interfaces is discouraged by
-upstream linux.
 
--Ben
+>My understanding is that adding new proc interfaces is discouraged by
+>upstream linux.
+
+Please no new ioctls.
 
 On 9/15/15, 5:12 PM, "Patrick Farrell" <paf@cray.com> wrote:
 
@@ -85,3 +87,8 @@ On 9/15/15, 5:12 PM, "Patrick Farrell" <paf@cray.com> wrote:
 >lustre-devel mailing list
 >lustre-devel at lists.lustre.org
 >http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
