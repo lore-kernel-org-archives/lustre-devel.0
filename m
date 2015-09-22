@@ -1,30 +1,47 @@
 From: Anton Gerasimov <anton.gerasimov@openmailbox.org>
-Date: Wed, 23 Sep 2015 00:35:13 +0300
-Subject: [lustre-devel] [PATCH 0/3] staging: lustre: fix (non-)static
-	symbols issues
-Message-ID: <1442957713-14727-1-git-send-email-anton.gerasimov@openmailbox.org>
+Date: Wed, 23 Sep 2015 00:40:43 +0300
+Subject: [lustre-devel] [PATCH 1/3] staging: lustre: add shared variables to
+	the header
+In-Reply-To: <1442957713-14727-1-git-send-email-anton.gerasimov@openmailbox.org>
+References: <1442957713-14727-1-git-send-email-anton.gerasimov@openmailbox.org>
+Message-ID: <1442958043-15015-1-git-send-email-anton.gerasimov@openmailbox.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This series of patches eliminates some sparse warnings concerning
-static variables in lustre rtlrpc module where it seemed reasonable.
-Symbols that are really local to a source file are made static and
-declarations added to a header for symbols that are shared between
-source files.
+This patch adds declarations for variables used in several files
+across the ptlrpc module to the local header.
 
-Anton Gerasimov (3):
-  staging: lustre: add shared variables to the header
-  staging: lustre: include header with local ptlrpc declarations
-  staging: lustre: make non-exported functions static
-
- drivers/staging/lustre/lustre/ptlrpc/pack_generic.c    | 8 ++++----
+Signed-off-by: Anton Gerasimov <anton.gerasimov@openmailbox.org>
+---
  drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h | 6 ++++++
- drivers/staging/lustre/lustre/ptlrpc/sec_null.c        | 2 ++
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c        | 2 ++
- 4 files changed, 14 insertions(+), 4 deletions(-)
+ 1 file changed, 6 insertions(+)
 
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+index 34c7e28..4e35b14 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+@@ -47,6 +47,10 @@ struct ldlm_res_id;
+ struct ptlrpc_request_set;
+ extern int test_req_buffer_pressure;
+ extern struct mutex ptlrpc_all_services_mutex;
++extern struct list_head ptlrpc_all_services;
++
++extern struct mutex ptlrpcd_mutex;
++extern struct mutex pinger_mutex;
+ 
+ int ptlrpc_start_thread(struct ptlrpc_service_part *svcpt, int wait);
+ /* ptlrpcd.c */
+@@ -110,6 +114,8 @@ struct nrs_core {
+ 
+ };
+ 
++extern struct nrs_core nrs_core;
++
+ int ptlrpc_service_nrs_setup(struct ptlrpc_service *svc);
+ void ptlrpc_service_nrs_cleanup(struct ptlrpc_service *svc);
+ 
 -- 
 2.5.1
