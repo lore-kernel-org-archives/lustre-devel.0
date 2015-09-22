@@ -1,16 +1,30 @@
-From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Tue, 22 Sep 2015 02:54:35 +0000
-Subject: [lustre-devel] New master tag 2.7.60
-Message-ID: <0118D85E-7CAD-4EBB-86F9-AAF35B15D24B@intel.com>
+From: Anton Gerasimov <anton.gerasimov@openmailbox.org>
+Date: Wed, 23 Sep 2015 00:35:13 +0300
+Subject: [lustre-devel] [PATCH 0/3] staging: lustre: fix (non-)static
+	symbols issues
+Message-ID: <1442957713-14727-1-git-send-email-anton.gerasimov@openmailbox.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+This series of patches eliminates some sparse warnings concerning
+static variables in lustre rtlrpc module where it seemed reasonable.
+Symbols that are really local to a source file are made static and
+declarations added to a header for symbols that are shared between
+source files.
 
-   master branch of the Lustre community tree has just been tagged as 2.7.60
+Anton Gerasimov (3):
+  staging: lustre: add shared variables to the header
+  staging: lustre: include header with local ptlrpc declarations
+  staging: lustre: make non-exported functions static
 
-Bye,
-    Oleg
+ drivers/staging/lustre/lustre/ptlrpc/pack_generic.c    | 8 ++++----
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h | 6 ++++++
+ drivers/staging/lustre/lustre/ptlrpc/sec_null.c        | 2 ++
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c        | 2 ++
+ 4 files changed, 14 insertions(+), 4 deletions(-)
+
+-- 
+2.5.1
