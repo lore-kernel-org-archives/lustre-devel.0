@@ -1,70 +1,35 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Wed, 23 Sep 2015 13:13:45 +0000
-Subject: [lustre-devel] [PATCH 1/3] staging: lustre: add shared
-	variables to the header
-In-Reply-To: <1442958043-15015-1-git-send-email-anton.gerasimov@openmailbox.org>
-References: <1442957713-14727-1-git-send-email-anton.gerasimov@openmailbox.org>
-	<1442958043-15015-1-git-send-email-anton.gerasimov@openmailbox.org>
-Message-ID: <D22870E4.10CD03%andreas.dilger@intel.com>
+From: Anton Gerasimov <anton.gerasimov@openmailbox.org>
+Date: Thu, 24 Sep 2015 00:00:15 +0300
+Subject: [lustre-devel] [PATCHv2 0/3] staging: lustre: fix (non-)static
+	symbols issues
+Message-ID: <20150923205945.GA5335@linux-0hv4.site>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/09/22, 11:40 PM, "Anton Gerasimov"
-<anton.gerasimov@openmailbox.org> wrote:
+This series of patches eliminates some sparse warnings concerning
+static variables in lustre rtlrpc module where it seemed reasonable.
+Symbols that are really local to a source file are made static and
+declarations added to a header for symbols that are shared between
+source files.
 
->This patch adds declarations for variables used in several files
->across the ptlrpc module to the local header.
->
->Signed-off-by: Anton Gerasimov <anton.gerasimov@openmailbox.org>
->---
-> drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h | 6 ++++++
-> 1 file changed, 6 insertions(+)
->
->diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
->b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
->index 34c7e28..4e35b14 100644
->--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
->+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
->@@ -47,6 +47,10 @@ struct ldlm_res_id;
-> struct ptlrpc_request_set;
-> extern int test_req_buffer_pressure;
-> extern struct mutex ptlrpc_all_services_mutex;
->+extern struct list_head ptlrpc_all_services;
->+
->+extern struct mutex ptlrpcd_mutex;
->+extern struct mutex pinger_mutex;
+v2: Thank Andreas Dilger for the review.
 
-Your patch adds these declarations to ptlrpc_internal.h but it doesn't
-remove the corresponding "extern" declaration lines from the .c files.
-Could you please remove these (now redundant) lines and resubmit the
-patch.
+Anton Gerasimov (3):
+  staging: lustre: moved extern declarations to a header
+  staging: lustre: include header with local ptlrpc declarations
+  staging: lustre: make non-exported functions static
 
-Cheers, Andreas
+ drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    | 1 -
+ drivers/staging/lustre/lustre/ptlrpc/nrs.c             | 1 -
+ drivers/staging/lustre/lustre/ptlrpc/pack_generic.c    | 8 ++++----
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h | 6 ++++++
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c   | 2 --
+ drivers/staging/lustre/lustre/ptlrpc/sec_null.c        | 2 ++
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c        | 2 ++
+ 7 files changed, 14 insertions(+), 8 deletions(-)
 
-> 
-> int ptlrpc_start_thread(struct ptlrpc_service_part *svcpt, int wait);
-> /* ptlrpcd.c */
->@@ -110,6 +114,8 @@ struct nrs_core {
-> 
-> };
-> 
->+extern struct nrs_core nrs_core;
->+
-> int ptlrpc_service_nrs_setup(struct ptlrpc_service *svc);
-> void ptlrpc_service_nrs_cleanup(struct ptlrpc_service *svc);
-> 
->-- 
->2.5.1
->
->
-
-
-Cheers, Andreas
 -- 
-Andreas Dilger
-
-Lustre Software Architect
-Intel High Performance Data Division
+2.5.1
