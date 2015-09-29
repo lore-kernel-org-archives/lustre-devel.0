@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:44:01 -0400
-Subject: [lustre-devel] [PATCH 18/29] staging/lustre: Drop unused
-	obdo_from_la() and la_from_obdo()
+Date: Mon, 28 Sep 2015 23:44:06 -0400
+Subject: [lustre-devel] [PATCH 23/29] staging/lustre/fid: Get rid of lcs_srv
+	in lu_client_seq
 In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-19-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-24-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,165 +13,139 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-They are no longer used anywhere.
+Since we know lcs_srv is always NULL, just get rid of it completely
+and fix up all the code to assumee it was never there.
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+Signed-off-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/lustre/obdclass/linux/linux-obdo.c      | 137 ---------------------
- 1 file changed, 137 deletions(-)
+ drivers/staging/lustre/lustre/fid/fid_request.c    | 48 ++++++++--------------
+ drivers/staging/lustre/lustre/fid/lproc_fid.c      |  2 -
+ drivers/staging/lustre/lustre/include/lustre_fid.h |  5 ---
+ 3 files changed, 17 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-obdo.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-obdo.c
-index 62ed706..9496c09 100644
---- a/drivers/staging/lustre/lustre/obdclass/linux/linux-obdo.c
-+++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-obdo.c
-@@ -49,102 +49,6 @@
- #include <linux/fs.h>
- #include <linux/pagemap.h> /* for PAGE_CACHE_SIZE */
+diff --git a/drivers/staging/lustre/lustre/fid/fid_request.c b/drivers/staging/lustre/lustre/fid/fid_request.c
+index ce55340..7c45e74 100644
+--- a/drivers/staging/lustre/lustre/fid/fid_request.c
++++ b/drivers/staging/lustre/lustre/fid/fid_request.c
+@@ -150,19 +150,15 @@ int seq_client_alloc_super(struct lu_client_seq *seq,
  
--/*FIXME: Just copy from obdo_from_inode*/
--void obdo_from_la(struct obdo *dst, struct lu_attr *la, __u64 valid)
--{
--	u32 newvalid = 0;
+ 	mutex_lock(&seq->lcs_mutex);
+ 
+-	if (seq->lcs_srv) {
+-		rc = 0;
+-	} else {
+-		/* Check whether the connection to seq controller has been
+-		 * setup (lcs_exp != NULL) */
+-		if (seq->lcs_exp == NULL) {
+-			mutex_unlock(&seq->lcs_mutex);
+-			return -EINPROGRESS;
+-		}
 -
--	if (valid & LA_ATIME) {
--		dst->o_atime = la->la_atime;
--		newvalid |= OBD_MD_FLATIME;
--	}
--	if (valid & LA_MTIME) {
--		dst->o_mtime = la->la_mtime;
--		newvalid |= OBD_MD_FLMTIME;
--	}
--	if (valid & LA_CTIME) {
--		dst->o_ctime = la->la_ctime;
--		newvalid |= OBD_MD_FLCTIME;
--	}
--	if (valid & LA_SIZE) {
--		dst->o_size = la->la_size;
--		newvalid |= OBD_MD_FLSIZE;
--	}
--	if (valid & LA_BLOCKS) {  /* allocation of space (x512 bytes) */
--		dst->o_blocks = la->la_blocks;
--		newvalid |= OBD_MD_FLBLOCKS;
--	}
--	if (valid & LA_TYPE) {
--		dst->o_mode = (dst->o_mode & S_IALLUGO) |
--			      (la->la_mode & S_IFMT);
--		newvalid |= OBD_MD_FLTYPE;
--	}
--	if (valid & LA_MODE) {
--		dst->o_mode = (dst->o_mode & S_IFMT) |
--			      (la->la_mode & S_IALLUGO);
--		newvalid |= OBD_MD_FLMODE;
--	}
--	if (valid & LA_UID) {
--		dst->o_uid = la->la_uid;
--		newvalid |= OBD_MD_FLUID;
--	}
--	if (valid & LA_GID) {
--		dst->o_gid = la->la_gid;
--		newvalid |= OBD_MD_FLGID;
--	}
--	dst->o_valid |= newvalid;
--}
--EXPORT_SYMBOL(obdo_from_la);
--
--/*FIXME: Just copy from obdo_from_inode*/
--void la_from_obdo(struct lu_attr *dst, struct obdo *obdo, u32 valid)
--{
--	__u64 newvalid = 0;
--
--	valid &= obdo->o_valid;
--
--	if (valid & OBD_MD_FLATIME) {
--		dst->la_atime = obdo->o_atime;
--		newvalid |= LA_ATIME;
--	}
--	if (valid & OBD_MD_FLMTIME) {
--		dst->la_mtime = obdo->o_mtime;
--		newvalid |= LA_MTIME;
--	}
--	if (valid & OBD_MD_FLCTIME) {
--		dst->la_ctime = obdo->o_ctime;
--		newvalid |= LA_CTIME;
--	}
--	if (valid & OBD_MD_FLSIZE) {
--		dst->la_size = obdo->o_size;
--		newvalid |= LA_SIZE;
--	}
--	if (valid & OBD_MD_FLBLOCKS) {
--		dst->la_blocks = obdo->o_blocks;
--		newvalid |= LA_BLOCKS;
--	}
--	if (valid & OBD_MD_FLTYPE) {
--		dst->la_mode = (dst->la_mode & S_IALLUGO) |
--			       (obdo->o_mode & S_IFMT);
--		newvalid |= LA_TYPE;
--	}
--	if (valid & OBD_MD_FLMODE) {
--		dst->la_mode = (dst->la_mode & S_IFMT) |
--			       (obdo->o_mode & S_IALLUGO);
--		newvalid |= LA_MODE;
--	}
--	if (valid & OBD_MD_FLUID) {
--		dst->la_uid = obdo->o_uid;
--		newvalid |= LA_UID;
--	}
--	if (valid & OBD_MD_FLGID) {
--		dst->la_gid = obdo->o_gid;
--		newvalid |= LA_GID;
--	}
--	dst->la_valid = newvalid;
--}
--EXPORT_SYMBOL(la_from_obdo);
--
- void obdo_refresh_inode(struct inode *dst, struct obdo *src, u32 valid)
- {
- 	valid &= src->o_valid;
-@@ -179,44 +83,3 @@ void obdo_refresh_inode(struct inode *dst, struct obdo *src, u32 valid)
- 		dst->i_blocks = src->o_blocks;
+-		rc = seq_client_rpc(seq, &seq->lcs_space,
+-				    SEQ_ALLOC_SUPER, "super");
++	/* Check whether the connection to seq controller has been
++	 * setup (lcs_exp != NULL) */
++	if (!seq->lcs_exp) {
++		mutex_unlock(&seq->lcs_mutex);
++		return -EINPROGRESS;
+ 	}
++
++	rc = seq_client_rpc(seq, &seq->lcs_space,
++			    SEQ_ALLOC_SUPER, "super");
+ 	mutex_unlock(&seq->lcs_mutex);
+ 	return rc;
  }
- EXPORT_SYMBOL(obdo_refresh_inode);
--
--void obdo_to_inode(struct inode *dst, struct obdo *src, u32 valid)
--{
--	valid &= src->o_valid;
--
--	LASSERTF(!(valid & (OBD_MD_FLTYPE | OBD_MD_FLGENER | OBD_MD_FLFID |
--			    OBD_MD_FLID | OBD_MD_FLGROUP)),
--		 "object "DOSTID", valid %x\n", POSTID(&src->o_oi), valid);
--
--	if (valid & (OBD_MD_FLCTIME | OBD_MD_FLMTIME))
--		CDEBUG(D_INODE,
--		       "valid %#llx, cur time %lu/%lu, new %llu/%llu\n",
--		       src->o_valid, LTIME_S(dst->i_mtime),
--		       LTIME_S(dst->i_ctime), src->o_mtime, src->o_ctime);
--
--	if (valid & OBD_MD_FLATIME)
--		LTIME_S(dst->i_atime) = src->o_atime;
--	if (valid & OBD_MD_FLMTIME)
--		LTIME_S(dst->i_mtime) = src->o_mtime;
--	if (valid & OBD_MD_FLCTIME && src->o_ctime > LTIME_S(dst->i_ctime))
--		LTIME_S(dst->i_ctime) = src->o_ctime;
--	if (valid & OBD_MD_FLSIZE)
--		i_size_write(dst, src->o_size);
--	if (valid & OBD_MD_FLBLOCKS) { /* allocation of space */
--		dst->i_blocks = src->o_blocks;
--		if (dst->i_blocks < src->o_blocks) /* overflow */
--			dst->i_blocks = -1;
--
+@@ -173,18 +169,14 @@ static int seq_client_alloc_meta(const struct lu_env *env,
+ {
+ 	int rc;
+ 
+-	if (seq->lcs_srv) {
+-		rc = 0;
+-	} else {
+-		do {
+-			/* If meta server return -EINPROGRESS or EAGAIN,
+-			 * it means meta server might not be ready to
+-			 * allocate super sequence from sequence controller
+-			 * (MDT0)yet */
+-			rc = seq_client_rpc(seq, &seq->lcs_space,
+-					    SEQ_ALLOC_META, "meta");
+-		} while (rc == -EINPROGRESS || rc == -EAGAIN);
 -	}
--	if (valid & OBD_MD_FLBLKSZ)
--		dst->i_blkbits = ffs(src->o_blksize)-1;
--	if (valid & OBD_MD_FLMODE)
--		dst->i_mode = (dst->i_mode & S_IFMT) | (src->o_mode & ~S_IFMT);
--	if (valid & OBD_MD_FLUID)
--		dst->i_uid = make_kuid(&init_user_ns, src->o_uid);
--	if (valid & OBD_MD_FLGID)
--		dst->i_gid = make_kgid(&init_user_ns, src->o_gid);
--	if (valid & OBD_MD_FLFLAGS)
--		dst->i_flags = src->o_flags;
--}
--EXPORT_SYMBOL(obdo_to_inode);
++	do {
++		/* If meta server return -EINPROGRESS or EAGAIN,
++		 * it means meta server might not be ready to
++		 * allocate super sequence from sequence controller
++		 * (MDT0)yet */
++		rc = seq_client_rpc(seq, &seq->lcs_space,
++				    SEQ_ALLOC_META, "meta");
++	} while (rc == -EINPROGRESS || rc == -EAGAIN);
+ 
+ 	return rc;
+ }
+@@ -395,8 +387,6 @@ static void seq_client_fini(struct lu_client_seq *seq)
+ 		class_export_put(seq->lcs_exp);
+ 		seq->lcs_exp = NULL;
+ 	}
+-
+-	seq->lcs_srv = NULL;
+ }
+ 
+ static int seq_client_init(struct lu_client_seq *seq,
+@@ -409,7 +399,6 @@ static int seq_client_init(struct lu_client_seq *seq,
+ 	LASSERT(seq != NULL);
+ 	LASSERT(prefix != NULL);
+ 
+-	seq->lcs_srv = NULL;
+ 	seq->lcs_type = type;
+ 
+ 	mutex_init(&seq->lcs_mutex);
+@@ -422,10 +411,7 @@ static int seq_client_init(struct lu_client_seq *seq,
+ 	/* Make sure that things are clear before work is started. */
+ 	seq_client_flush(seq);
+ 
+-	if (exp != NULL)
+-		seq->lcs_exp = class_export_get(exp);
+-	else if (type == LUSTRE_SEQ_METADATA)
+-		LASSERT(seq->lcs_srv != NULL);
++	seq->lcs_exp = class_export_get(exp);
+ 
+ 	snprintf(seq->lcs_name, sizeof(seq->lcs_name),
+ 		 "cli-%s", prefix);
+diff --git a/drivers/staging/lustre/lustre/fid/lproc_fid.c b/drivers/staging/lustre/lustre/fid/lproc_fid.c
+index bf12723..ce90c1c 100644
+--- a/drivers/staging/lustre/lustre/fid/lproc_fid.c
++++ b/drivers/staging/lustre/lustre/fid/lproc_fid.c
+@@ -204,8 +204,6 @@ ldebugfs_fid_server_seq_show(struct seq_file *m, void *unused)
+ 	if (seq->lcs_exp != NULL) {
+ 		cli = &seq->lcs_exp->exp_obd->u.cli;
+ 		seq_printf(m, "%s\n", cli->cl_target_uuid.uuid);
+-	} else {
+-		seq_printf(m, "%s\n", seq->lcs_srv->lss_name);
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
+index 22fc96e..bbe3ff8 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_fid.h
++++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
+@@ -330,8 +330,6 @@ enum lu_mgr_type {
+ 	LUSTRE_SEQ_CONTROLLER
+ };
+ 
+-struct lu_server_seq;
+-
+ /* Client sequence manager interface. */
+ struct lu_client_seq {
+ 	/* Sequence-controller export. */
+@@ -366,9 +364,6 @@ struct lu_client_seq {
+ 	 */
+ 	__u64		   lcs_width;
+ 
+-	/* Seq-server for direct talking */
+-	struct lu_server_seq   *lcs_srv;
+-
+ 	/* wait queue for fid allocation and update indicator */
+ 	wait_queue_head_t	     lcs_waitq;
+ 	int		     lcs_update;
 -- 
 2.1.0
