@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:43:59 -0400
-Subject: [lustre-devel] [PATCH 16/29] staging/lustre/ptlrpc: Drop unused
-	client code
+Date: Mon, 28 Sep 2015 23:43:52 -0400
+Subject: [lustre-devel] [PATCH 09/29] staging/lustre: Remove unused
+	functions and definitions from cl_object
 In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-17-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-10-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,222 +13,327 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-These client request/import functions are not used anywhere,
-so drop them.
+cl_object_header_fini, cl_object_has_locks, cl_attr2lvb,
+cl_page_list_own, cl_page_list_unmap, cl_2queue_assume,
+cl_io_print, cl_enqueue,
+also cleanup extern declarations in cl_object.h
 
 Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_net.h | 13 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c      | 95 ----------------------
- drivers/staging/lustre/lustre/ptlrpc/import.c      | 11 ---
- 3 files changed, 119 deletions(-)
+ drivers/staging/lustre/lustre/include/cl_object.h  | 26 ---------
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     | 65 ----------------------
+ drivers/staging/lustre/lustre/obdclass/cl_lock.c   | 26 ---------
+ drivers/staging/lustre/lustre/obdclass/cl_object.c | 41 --------------
+ 4 files changed, 158 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index 6df3e70..a486c1d 100644
---- a/drivers/staging/lustre/lustre/include/lustre_net.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -2356,22 +2356,17 @@ void ptlrpc_request_committed(struct ptlrpc_request *req, int force);
+diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+index b2366ca..b073313 100644
+--- a/drivers/staging/lustre/lustre/include/cl_object.h
++++ b/drivers/staging/lustre/lustre/include/cl_object.h
+@@ -2733,7 +2733,6 @@ struct cl_object *cl_object_find(const struct lu_env *env, struct cl_device *cd,
+ 				 const struct cl_object_conf *c);
  
- void ptlrpc_init_client(int req_portal, int rep_portal, char *name,
- 			struct ptlrpc_client *);
--void ptlrpc_cleanup_client(struct obd_import *imp);
- struct ptlrpc_connection *ptlrpc_uuid_to_connection(struct obd_uuid *uuid);
- 
- int ptlrpc_queue_wait(struct ptlrpc_request *req);
- int ptlrpc_replay_req(struct ptlrpc_request *req);
- int ptlrpc_unregister_reply(struct ptlrpc_request *req, int async);
--void ptlrpc_restart_req(struct ptlrpc_request *req);
- void ptlrpc_abort_inflight(struct obd_import *imp);
--void ptlrpc_cleanup_imp(struct obd_import *imp);
- void ptlrpc_abort_set(struct ptlrpc_request_set *set);
- 
- struct ptlrpc_request_set *ptlrpc_prep_set(void);
- struct ptlrpc_request_set *ptlrpc_prep_fcset(int max, set_producer_func func,
- 					     void *arg);
--int ptlrpc_set_add_cb(struct ptlrpc_request_set *set,
--		      set_interpreter_func fn, void *data);
- int ptlrpc_set_next_timeout(struct ptlrpc_request_set *);
- int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set);
- int ptlrpc_set_wait(struct ptlrpc_request_set *);
-@@ -2405,15 +2400,7 @@ struct ptlrpc_request *ptlrpc_request_alloc_pack(struct obd_import *imp,
- int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
- 			     __u32 version, int opcode, char **bufs,
- 			     struct ptlrpc_cli_ctx *ctx);
--struct ptlrpc_request *ptlrpc_prep_req(struct obd_import *imp, __u32 version,
--				       int opcode, int count, __u32 *lengths,
--				       char **bufs);
--struct ptlrpc_request *ptlrpc_prep_req_pool(struct obd_import *imp,
--					     __u32 version, int opcode,
--					    int count, __u32 *lengths, char **bufs,
--					    struct ptlrpc_request_pool *pool);
- void ptlrpc_req_finished(struct ptlrpc_request *request);
--void ptlrpc_req_finished_with_imp_lock(struct ptlrpc_request *request);
- struct ptlrpc_request *ptlrpc_request_addref(struct ptlrpc_request *req);
- struct ptlrpc_bulk_desc *ptlrpc_prep_bulk_imp(struct ptlrpc_request *req,
- 					      unsigned npages, unsigned max_brw,
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index d013d4b..6aaa5dd 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -802,48 +802,6 @@ struct ptlrpc_request *ptlrpc_request_alloc_pack(struct obd_import *imp,
- EXPORT_SYMBOL(ptlrpc_request_alloc_pack);
+ int  cl_object_header_init(struct cl_object_header *h);
+-void cl_object_header_fini(struct cl_object_header *h);
+ void cl_object_put	(const struct lu_env *env, struct cl_object *o);
+ void cl_object_get	(struct cl_object *o);
+ void cl_object_attr_lock  (struct cl_object *o);
+@@ -2748,7 +2747,6 @@ int  cl_conf_set	  (const struct lu_env *env, struct cl_object *obj,
+ 			   const struct cl_object_conf *conf);
+ void cl_object_prune      (const struct lu_env *env, struct cl_object *obj);
+ void cl_object_kill       (const struct lu_env *env, struct cl_object *obj);
+-int  cl_object_has_locks  (struct cl_object *obj);
  
  /**
-- * Prepare request (fetched from pool \a pool if not NULL) on import \a imp
-- * for operation \a opcode. Request would contain \a count buffers.
-- * Sizes of buffers are described in array \a lengths and buffers themselves
-- * are provided by a pointer \a bufs.
-- * Returns prepared request structure pointer or NULL on error.
+  * Returns true, iff \a o0 and \a o1 are slices of the same object.
+@@ -2935,10 +2933,6 @@ void  cl_lock_release   (const struct lu_env *env, struct cl_lock *lock,
+ void  cl_lock_user_add  (const struct lu_env *env, struct cl_lock *lock);
+ void  cl_lock_user_del  (const struct lu_env *env, struct cl_lock *lock);
+ 
+-enum cl_lock_state cl_lock_intransit(const struct lu_env *env,
+-				     struct cl_lock *lock);
+-void cl_lock_extransit(const struct lu_env *env, struct cl_lock *lock,
+-		       enum cl_lock_state state);
+ int cl_lock_is_intransit(struct cl_lock *lock);
+ 
+ int cl_lock_enqueue_wait(const struct lu_env *env, struct cl_lock *lock,
+@@ -2976,8 +2970,6 @@ int cl_lock_enqueue_wait(const struct lu_env *env, struct cl_lock *lock,
+  *
+  * @{ */
+ 
+-int   cl_enqueue    (const struct lu_env *env, struct cl_lock *lock,
+-		     struct cl_io *io, __u32 flags);
+ int   cl_wait       (const struct lu_env *env, struct cl_lock *lock);
+ void  cl_unuse      (const struct lu_env *env, struct cl_lock *lock);
+ int   cl_enqueue_try(const struct lu_env *env, struct cl_lock *lock,
+@@ -2996,7 +2988,6 @@ int  cl_queue_match      (const struct list_head *queue,
+ 			  const struct cl_lock_descr *need);
+ 
+ void cl_lock_mutex_get  (const struct lu_env *env, struct cl_lock *lock);
+-int  cl_lock_mutex_try  (const struct lu_env *env, struct cl_lock *lock);
+ void cl_lock_mutex_put  (const struct lu_env *env, struct cl_lock *lock);
+ int  cl_lock_is_mutexed (struct cl_lock *lock);
+ int  cl_lock_nr_mutexed (const struct lu_env *env);
+@@ -3062,10 +3053,6 @@ int   cl_io_submit_rw    (const struct lu_env *env, struct cl_io *io,
+ int   cl_io_submit_sync  (const struct lu_env *env, struct cl_io *io,
+ 			  enum cl_req_type iot, struct cl_2queue *queue,
+ 			  long timeout);
+-void  cl_io_rw_advance   (const struct lu_env *env, struct cl_io *io,
+-			  size_t nob);
+-int   cl_io_cancel       (const struct lu_env *env, struct cl_io *io,
+-			  struct cl_page_list *queue);
+ int   cl_io_is_going     (const struct lu_env *env);
+ 
+ /**
+@@ -3097,9 +3084,6 @@ static inline int cl_io_is_trunc(const struct cl_io *io)
+ 
+ struct cl_io *cl_io_top(struct cl_io *io);
+ 
+-void cl_io_print(const struct lu_env *env, void *cookie,
+-		 lu_printer_t printer, const struct cl_io *io);
+-
+ #define CL_IO_SLICE_CLEAN(foo_io, base)					\
+ do {									\
+ 	typeof(foo_io) __foo_io = (foo_io);				\
+@@ -3145,22 +3129,14 @@ void cl_page_list_del    (const struct lu_env *env,
+ 			  struct cl_page_list *plist, struct cl_page *page);
+ void cl_page_list_disown (const struct lu_env *env,
+ 			  struct cl_io *io, struct cl_page_list *plist);
+-int  cl_page_list_own    (const struct lu_env *env,
+-			  struct cl_io *io, struct cl_page_list *plist);
+-void cl_page_list_assume (const struct lu_env *env,
+-			  struct cl_io *io, struct cl_page_list *plist);
+ void cl_page_list_discard(const struct lu_env *env,
+ 			  struct cl_io *io, struct cl_page_list *plist);
+-int  cl_page_list_unmap  (const struct lu_env *env,
+-			  struct cl_io *io, struct cl_page_list *plist);
+ void cl_page_list_fini   (const struct lu_env *env, struct cl_page_list *plist);
+ 
+ void cl_2queue_init     (struct cl_2queue *queue);
+ void cl_2queue_add      (struct cl_2queue *queue, struct cl_page *page);
+ void cl_2queue_disown   (const struct lu_env *env,
+ 			 struct cl_io *io, struct cl_2queue *queue);
+-void cl_2queue_assume   (const struct lu_env *env,
+-			 struct cl_io *io, struct cl_2queue *queue);
+ void cl_2queue_discard  (const struct lu_env *env,
+ 			 struct cl_io *io, struct cl_2queue *queue);
+ void cl_2queue_fini     (const struct lu_env *env, struct cl_2queue *queue);
+@@ -3253,7 +3229,6 @@ struct cl_env_nest {
+ 	void *cen_cookie;
+ };
+ 
+-struct lu_env *cl_env_peek       (int *refcheck);
+ struct lu_env *cl_env_get	(int *refcheck);
+ struct lu_env *cl_env_alloc      (int *refcheck, __u32 tags);
+ struct lu_env *cl_env_nested_get (struct cl_env_nest *nest);
+@@ -3269,7 +3244,6 @@ void	   cl_env_unplant    (struct lu_env *env, int *refcheck);
+ /*
+  * Misc
+  */
+-void cl_attr2lvb(struct ost_lvb *lvb, const struct cl_attr *attr);
+ void cl_lvb2attr(struct cl_attr *attr, const struct ost_lvb *lvb);
+ 
+ struct cl_device *cl_type_setup(const struct lu_env *env, struct lu_site *site,
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index da0066a..a822a0b 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -1181,32 +1181,6 @@ void cl_page_list_fini(const struct lu_env *env, struct cl_page_list *plist)
+ EXPORT_SYMBOL(cl_page_list_fini);
+ 
+ /**
+- * Owns all pages in a queue.
 - */
--struct ptlrpc_request *
--ptlrpc_prep_req_pool(struct obd_import *imp,
--		     __u32 version, int opcode,
--		     int count, __u32 *lengths, char **bufs,
--		     struct ptlrpc_request_pool *pool)
+-int cl_page_list_own(const struct lu_env *env,
+-		     struct cl_io *io, struct cl_page_list *plist)
 -{
--	struct ptlrpc_request *request;
--	int rc;
+-	struct cl_page *page;
+-	struct cl_page *temp;
+-	pgoff_t index = 0;
+-	int result;
 -
--	request = __ptlrpc_request_alloc(imp, pool);
--	if (!request)
--		return NULL;
+-	LINVRNT(plist->pl_owner == current);
 -
--	rc = __ptlrpc_request_bufs_pack(request, version, opcode, count,
--					lengths, bufs, NULL);
--	if (rc) {
--		ptlrpc_request_free(request);
--		request = NULL;
+-	result = 0;
+-	cl_page_list_for_each_safe(page, temp, plist) {
+-		LASSERT(index <= page->cp_index);
+-		index = page->cp_index;
+-		if (cl_page_own(env, io, page) == 0)
+-			result = result ?: page->cp_error;
+-		else
+-			cl_page_list_del(env, plist, page);
 -	}
--	return request;
+-	return result;
 -}
--EXPORT_SYMBOL(ptlrpc_prep_req_pool);
+-EXPORT_SYMBOL(cl_page_list_own);
 -
 -/**
-- * Same as ptlrpc_prep_req_pool, but without pool
-- */
--struct ptlrpc_request *
--ptlrpc_prep_req(struct obd_import *imp, __u32 version, int opcode, int count,
--		__u32 *lengths, char **bufs)
--{
--	return ptlrpc_prep_req_pool(imp, version, opcode, count, lengths, bufs,
--				    NULL);
--}
--EXPORT_SYMBOL(ptlrpc_prep_req);
--
--/**
-  * Allocate and initialize new request set structure on the current CPT.
-  * Returns a pointer to the newly allocated set structure or NULL on error.
+  * Assumes all pages in a queue.
   */
-@@ -959,28 +917,6 @@ void ptlrpc_set_destroy(struct ptlrpc_request_set *set)
- EXPORT_SYMBOL(ptlrpc_set_destroy);
+ void cl_page_list_assume(const struct lu_env *env,
+@@ -1236,26 +1210,6 @@ void cl_page_list_discard(const struct lu_env *env, struct cl_io *io,
+ EXPORT_SYMBOL(cl_page_list_discard);
  
  /**
-- * Add a callback function \a fn to the set.
-- * This function would be called when all requests on this set are completed.
-- * The function will be passed \a data argument.
+- * Unmaps all pages in a queue from user virtual memory.
 - */
--int ptlrpc_set_add_cb(struct ptlrpc_request_set *set,
--		      set_interpreter_func fn, void *data)
+-int cl_page_list_unmap(const struct lu_env *env, struct cl_io *io,
+-			struct cl_page_list *plist)
 -{
--	struct ptlrpc_set_cbdata *cbdata;
+-	struct cl_page *page;
+-	int result;
 -
--	cbdata = kzalloc(sizeof(*cbdata), GFP_NOFS);
--	if (!cbdata)
--		return -ENOMEM;
--
--	cbdata->psc_interpret = fn;
--	cbdata->psc_data = data;
--	list_add_tail(&cbdata->psc_item, &set->set_cblist);
--
--	return 0;
+-	LINVRNT(plist->pl_owner == current);
+-	result = 0;
+-	cl_page_list_for_each(page, plist) {
+-		result = cl_page_unmap(env, io, page);
+-		if (result != 0)
+-			break;
+-	}
+-	return result;
 -}
--EXPORT_SYMBOL(ptlrpc_set_add_cb);
+-EXPORT_SYMBOL(cl_page_list_unmap);
 -
 -/**
-  * Add a new request to the general purpose request set.
-  * Assumes request reference from the caller.
+  * Initialize dual page queue.
   */
-@@ -2282,18 +2218,6 @@ static void __ptlrpc_free_req(struct ptlrpc_request *request, int locked)
- 		ptlrpc_request_cache_free(request);
- }
+ void cl_2queue_init(struct cl_2queue *queue)
+@@ -1297,17 +1251,6 @@ void cl_2queue_discard(const struct lu_env *env,
+ EXPORT_SYMBOL(cl_2queue_discard);
  
--static int __ptlrpc_req_finished(struct ptlrpc_request *request, int locked);
--/**
-- * Drop one request reference. Must be called with import imp_lock held.
-- * When reference count drops to zero, request is freed.
+ /**
+- * Assume to own the pages in cl_2queue
 - */
--void ptlrpc_req_finished_with_imp_lock(struct ptlrpc_request *request)
+-void cl_2queue_assume(const struct lu_env *env,
+-		      struct cl_io *io, struct cl_2queue *queue)
 -{
--	assert_spin_locked(&request->rq_import->imp_lock);
--	(void)__ptlrpc_req_finished(request, 1);
+-	cl_page_list_assume(env, io, &queue->c2_qin);
+-	cl_page_list_assume(env, io, &queue->c2_qout);
 -}
--EXPORT_SYMBOL(ptlrpc_req_finished_with_imp_lock);
+-EXPORT_SYMBOL(cl_2queue_assume);
 -
- /**
-  * Helper function
-  * Drops one reference count for request \a request.
-@@ -2535,11 +2459,6 @@ free_req:
- 	}
- }
- 
--void ptlrpc_cleanup_client(struct obd_import *imp)
--{
--}
--EXPORT_SYMBOL(ptlrpc_cleanup_client);
--
- /**
-  * Schedule previously sent request for resend.
-  * For bulk requests we assign new xid (to avoid problems with
-@@ -2578,20 +2497,6 @@ void ptlrpc_resend_req(struct ptlrpc_request *req)
- }
- EXPORT_SYMBOL(ptlrpc_resend_req);
- 
--/* XXX: this function and rq_status are currently unused */
--void ptlrpc_restart_req(struct ptlrpc_request *req)
--{
--	DEBUG_REQ(D_HA, req, "restarting (possibly-)completed request");
--	req->rq_status = -ERESTARTSYS;
--
--	spin_lock(&req->rq_lock);
--	req->rq_restart = 1;
--	req->rq_timedout = 0;
--	ptlrpc_client_wake_req(req);
--	spin_unlock(&req->rq_lock);
--}
--EXPORT_SYMBOL(ptlrpc_restart_req);
--
- /**
-  * Grab additional reference on a request \a req
+-/**
+  * Finalize both page lists of a 2-queue.
   */
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index 9ff1a22..1ac265d 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -142,7 +142,6 @@ void deuuidify(char *uuid, const char *prefix, char **uuid_start, int *uuid_len)
- 		    UUID_STR, strlen(UUID_STR)))
- 		*uuid_len -= strlen(UUID_STR);
- }
--EXPORT_SYMBOL(deuuidify);
+ void cl_2queue_fini(const struct lu_env *env, struct cl_2queue *queue)
+@@ -1341,14 +1284,6 @@ struct cl_io *cl_io_top(struct cl_io *io)
+ EXPORT_SYMBOL(cl_io_top);
  
  /**
-  * Returns true if import was FULL, false if import was already not
-@@ -1503,16 +1502,6 @@ out:
- }
- EXPORT_SYMBOL(ptlrpc_disconnect_import);
- 
--void ptlrpc_cleanup_imp(struct obd_import *imp)
+- * Prints human readable representation of \a io to the \a f.
+- */
+-void cl_io_print(const struct lu_env *env, void *cookie,
+-		 lu_printer_t printer, const struct cl_io *io)
 -{
--	spin_lock(&imp->imp_lock);
--	IMPORT_SET_STATE_NOLOCK(imp, LUSTRE_IMP_CLOSED);
--	imp->imp_generation++;
--	spin_unlock(&imp->imp_lock);
--	ptlrpc_abort_inflight(imp);
 -}
--EXPORT_SYMBOL(ptlrpc_cleanup_imp);
 -
- /* Adaptive Timeout utils */
- extern unsigned int at_min, at_max, at_history;
+-/**
+  * Adds request slice to the compound request.
+  *
+  * This is called by cl_device_operations::cdo_req_init() methods to add a
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+index 7c6583a..4294ca6 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+@@ -1276,32 +1276,6 @@ static int cl_enqueue_locked(const struct lu_env *env, struct cl_lock *lock,
+ }
  
+ /**
+- * Enqueues a lock.
+- *
+- * \pre current thread or io owns a hold on lock.
+- *
+- * \post ergo(result == 0, lock->users increased)
+- * \post ergo(result == 0, lock->cll_state == CLS_ENQUEUED ||
+- *			 lock->cll_state == CLS_HELD)
+- */
+-int cl_enqueue(const struct lu_env *env, struct cl_lock *lock,
+-	       struct cl_io *io, __u32 enqflags)
+-{
+-	int result;
+-
+-	cl_lock_lockdep_acquire(env, lock, enqflags);
+-	cl_lock_mutex_get(env, lock);
+-	result = cl_enqueue_locked(env, lock, io, enqflags);
+-	cl_lock_mutex_put(env, lock);
+-	if (result != 0)
+-		cl_lock_lockdep_release(env, lock);
+-	LASSERT(ergo(result == 0, lock->cll_state == CLS_ENQUEUED ||
+-		     lock->cll_state == CLS_HELD));
+-	return result;
+-}
+-EXPORT_SYMBOL(cl_enqueue);
+-
+-/**
+  * Tries to unlock a lock.
+  *
+  * This function is called to release underlying resource:
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+index 05e29f8..89ff7f1 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+@@ -98,16 +98,6 @@ int cl_object_header_init(struct cl_object_header *h)
+ EXPORT_SYMBOL(cl_object_header_init);
+ 
+ /**
+- * Finalize cl_object_header.
+- */
+-void cl_object_header_fini(struct cl_object_header *h)
+-{
+-	LASSERT(list_empty(&h->coh_locks));
+-	lu_object_header_fini(&h->coh_lu);
+-}
+-EXPORT_SYMBOL(cl_object_header_fini);
+-
+-/**
+  * Returns a cl_object with a given \a fid.
+  *
+  * Returns either cached or newly created object. Additional reference on the
+@@ -363,22 +353,6 @@ void cl_object_prune(const struct lu_env *env, struct cl_object *obj)
+ }
+ EXPORT_SYMBOL(cl_object_prune);
+ 
+-/**
+- * Check if the object has locks.
+- */
+-int cl_object_has_locks(struct cl_object *obj)
+-{
+-	struct cl_object_header *head = cl_object_header(obj);
+-	int has;
+-
+-	spin_lock(&head->coh_lock_guard);
+-	has = list_empty(&head->coh_locks);
+-	spin_unlock(&head->coh_lock_guard);
+-
+-	return (has == 0);
+-}
+-EXPORT_SYMBOL(cl_object_has_locks);
+-
+ void cache_stats_init(struct cache_stats *cs, const char *name)
+ {
+ 	int i;
+@@ -929,21 +903,6 @@ void cl_env_nested_put(struct cl_env_nest *nest, struct lu_env *env)
+ EXPORT_SYMBOL(cl_env_nested_put);
+ 
+ /**
+- * Converts struct cl_attr to struct ost_lvb.
+- *
+- * \see cl_lvb2attr
+- */
+-void cl_attr2lvb(struct ost_lvb *lvb, const struct cl_attr *attr)
+-{
+-	lvb->lvb_size   = attr->cat_size;
+-	lvb->lvb_mtime  = attr->cat_mtime;
+-	lvb->lvb_atime  = attr->cat_atime;
+-	lvb->lvb_ctime  = attr->cat_ctime;
+-	lvb->lvb_blocks = attr->cat_blocks;
+-}
+-EXPORT_SYMBOL(cl_attr2lvb);
+-
+-/**
+  * Converts struct ost_lvb to struct cl_attr.
+  *
+  * \see cl_attr2lvb
 -- 
 2.1.0
