@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:44:07 -0400
-Subject: [lustre-devel] [PATCH 24/29] staging/lustre/fid: Remove unused
-	struct lu_server_seq
+Date: Mon, 28 Sep 2015 23:43:51 -0400
+Subject: [lustre-devel] [PATCH 08/29] staging/lustre: Remove unused
+	ptlrpcd_add_rqset()
 In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-25-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-9-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,72 +13,79 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Signed-off-by: Oleg Drokin <oleg.drokin@intel.com>
----
- drivers/staging/lustre/lustre/include/lustre_fid.h | 51 ----------------------
- 1 file changed, 51 deletions(-)
+No point in retaining it if it's unused.
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
-index bbe3ff8..19d9175 100644
---- a/drivers/staging/lustre/lustre/include/lustre_fid.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
-@@ -369,57 +369,6 @@ struct lu_client_seq {
- 	int		     lcs_update;
- };
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ drivers/staging/lustre/lustre/include/lustre_net.h |  1 -
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     | 42 ----------------------
+ 2 files changed, 43 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 090484b..6df3e70 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -2902,7 +2902,6 @@ void ptlrpcd_stop(struct ptlrpcd_ctl *pc, int force);
+ void ptlrpcd_free(struct ptlrpcd_ctl *pc);
+ void ptlrpcd_wake(struct ptlrpc_request *req);
+ void ptlrpcd_add_req(struct ptlrpc_request *req);
+-void ptlrpcd_add_rqset(struct ptlrpc_request_set *set);
+ int ptlrpcd_addref(void);
+ void ptlrpcd_decref(void);
  
--/* server sequence manager interface */
--struct lu_server_seq {
--	/* Available sequences space */
--	struct lu_seq_range	 lss_space;
--
--	/* keeps highwater in lsr_end for seq allocation algorithm */
--	struct lu_seq_range	 lss_lowater_set;
--	struct lu_seq_range	 lss_hiwater_set;
--
--	/*
--	 * Device for server side seq manager needs (saving sequences to backing
--	 * store).
--	 */
--	struct dt_device       *lss_dev;
--
--	/* LUSTRE_SEQ_SERVER or LUSTRE_SEQ_CONTROLLER */
--	enum lu_mgr_type       lss_type;
--
--	/* Client interface to request controller */
--	struct lu_client_seq   *lss_cli;
--
--	/* Mutex for protecting allocation */
--	struct mutex		lss_mutex;
--
--	/*
--	 * Service uuid, passed from MDT + seq name to form unique seq name to
--	 * use it with procfs.
--	 */
--	char		    lss_name[LUSTRE_MDT_MAXNAMELEN];
--
--	/*
--	 * Allocation chunks for super and meta sequences. Default values are
--	 * LUSTRE_SEQ_SUPER_WIDTH and LUSTRE_SEQ_META_WIDTH.
--	 */
--	__u64		   lss_width;
--
--	/*
--	 * minimum lss_alloc_set size that should be allocated from
--	 * lss_space
--	 */
--	__u64		   lss_set_width;
--
--	/* sync is needed for update operation */
--	__u32		   lss_need_sync;
--
--	/**
--	 * Pointer to site object, required to access site fld.
--	 */
--	struct seq_server_site  *lss_site;
--};
--
- /* Client methods */
- void seq_client_flush(struct lu_client_seq *seq);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index 00efdbf..ce036a1 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -196,48 +196,6 @@ ptlrpcd_select_pc(struct ptlrpc_request *req)
+ }
  
+ /**
+- * Move all request from an existing request set to the ptlrpcd queue.
+- * All requests from the set must be in phase RQ_PHASE_NEW.
+- */
+-void ptlrpcd_add_rqset(struct ptlrpc_request_set *set)
+-{
+-	struct list_head *tmp, *pos;
+-	struct ptlrpcd_ctl *pc;
+-	struct ptlrpc_request_set *new;
+-	int count, i;
+-
+-	pc = ptlrpcd_select_pc(NULL);
+-	new = pc->pc_set;
+-
+-	list_for_each_safe(pos, tmp, &set->set_requests) {
+-		struct ptlrpc_request *req =
+-			list_entry(pos, struct ptlrpc_request,
+-				       rq_set_chain);
+-
+-		LASSERT(req->rq_phase == RQ_PHASE_NEW);
+-		req->rq_set = new;
+-		req->rq_queued_time = cfs_time_current();
+-	}
+-
+-	spin_lock(&new->set_new_req_lock);
+-	list_splice_init(&set->set_requests, &new->set_new_requests);
+-	i = atomic_read(&set->set_remaining);
+-	count = atomic_add_return(i, &new->set_new_count);
+-	atomic_set(&set->set_remaining, 0);
+-	spin_unlock(&new->set_new_req_lock);
+-	if (count == i) {
+-		wake_up(&new->set_waitq);
+-
+-		/* XXX: It maybe unnecessary to wakeup all the partners. But to
+-		 *      guarantee the async RPC can be processed ASAP, we have
+-		 *      no other better choice. It maybe fixed in future. */
+-		for (i = 0; i < pc->pc_npartners; i++)
+-			wake_up(&pc->pc_partners[i]->pc_set->set_waitq);
+-	}
+-}
+-EXPORT_SYMBOL(ptlrpcd_add_rqset);
+-
+-/**
+  * Return transferred RPCs count.
+  */
+ static int ptlrpcd_steal_rqset(struct ptlrpc_request_set *des,
 -- 
 2.1.0
