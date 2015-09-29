@@ -1,109 +1,171 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Mon, 28 Sep 2015 22:09:36 +0000
-Subject: [lustre-devel] [PATCH 30/73] staging/lustre: use 64-bit times
- for request times
-In-Reply-To: <1670598.hVGksRcUem@wuerfel>
-References: <1443386773-305443-1-git-send-email-green@linuxhacker.ru>
-	<1443386773-305443-31-git-send-email-green@linuxhacker.ru>
-	<D22E5B67.10D71A%andreas.dilger@intel.com> <1670598.hVGksRcUem@wuerfel>
-Message-ID: <D22F140B.10D9F7%andreas.dilger@intel.com>
+From: green at linuxhacker.ru <green@linuxhacker.ru>
+Date: Mon, 28 Sep 2015 23:43:45 -0400
+Subject: [lustre-devel] [PATCH 02/29] staging/lustre: Remove unused
+	lustre_acl_xattr_merge2posix()
+In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
+References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-3-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/09/28, 2:19 AM, "lustre-devel on behalf of Arnd Bergmann"
-<lustre-devel-bounces at lists.lustre.org on behalf of arnd@arndb.de> wrote:
+From: Oleg Drokin <green@linuxhacker.ru>
 
->On Monday 28 September 2015 01:09:18 Dilger, Andreas wrote:
->> On 2015/09/27, 10:45 PM, "green at linuxhacker.ru" <green@linuxhacker.ru>
->> wrote:
->> >diff --git a/drivers/staging/lustre/lustre/ptlrpc/events.c
->> >b/drivers/staging/lustre/lustre/ptlrpc/events.c
->> >index 53f6b62..afd869b 100644
->> >--- a/drivers/staging/lustre/lustre/ptlrpc/events.c
->> >+++ b/drivers/staging/lustre/lustre/ptlrpc/events.c
->> >@@ -246,7 +246,7 @@ static void ptlrpc_req_add_history(struct
->> >ptlrpc_service_part *svcpt,
->> > 				   struct ptlrpc_request *req)
->> > {
->> > 	__u64 sec = req->rq_arrival_time.tv_sec;
->> >-	__u32 usec = req->rq_arrival_time.tv_usec >> 4; /* usec / 16 */
->> >+	__u32 usec = req->rq_arrival_time.tv_nsec / NSEC_PER_USEC / 16; /*
->>usec
->> >/ 16 */
->> 
->> This could just be written like:
->> 
->> 	__u32 usec = req->rq_arrival_time.tv_nsec >> 14 /* nsec / 16384 */;
->> 
->> since the main point of this calculation is to get a number that fits
->> into a 16-bit field to provide ordering for items in a trace log.  It
->> doesn't have to be exactly "nsec / 16000", and it avoids the division.
->
->Ok, that wasn't clear from the original code, so I just moved the division
->from the do_gettimeofday() here to keep the data unchanged.
->
->With your change, the
->
->new_seq = (sec << REQS_SEC_SHIFT) |
->                  (usec << REQS_USEC_SHIFT) |
->                  (svcpt->scp_cpt < 0 ? 0 : svcpt->scp_cpt);
->
->calculation will get forward jumps once a second, but I guess that
->doesn't matter if it's only used for sequencing.
->
->The part that I had not noticed here is the y2106 overflow in the
->sequence number. If we change the logic, we should probably give
->a few more bits to the seconds, as well, or use monotonic time.
->
->> >diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c
->> >b/drivers/staging/lustre/lustre/ptlrpc/service.c
->> >index 40de622..28f57d7 100644
->> >--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
->> >+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
->> >@@ -1191,7 +1191,7 @@ static int ptlrpc_at_add_timed(struct
->> >ptlrpc_request *req)
->> > 	spin_lock(&svcpt->scp_at_lock);
->> > 	LASSERT(list_empty(&req->rq_timed_list));
->> > 
->> >-	index = (unsigned long)req->rq_deadline % array->paa_size;
->> >+	div_u64_rem(req->rq_deadline, array->paa_size, &index);
->> 
->> Since this is just a round-robin index that advances once per second,
->> it doesn't matter at all whether the calculation is computed on the
->> 64-bit seconds or on the 32-bit seconds, so there isn't any need for
->> the more expensive div_u64_rem() call here at all.  It is fine to
->> just truncate the seconds and then do the modulus on the 32-bit value.
->> 
->> >@@ -1421,7 +1421,7 @@ static int ptlrpc_at_check_timed(struct
->> >ptlrpc_service_part *svcpt)
->> > 	   server will take. Send early replies to everyone expiring soon. */
->> > 	INIT_LIST_HEAD(&work_list);
->> > 	deadline = -1;
->> >-	index = (unsigned long)array->paa_deadline % array->paa_size;
->> >+	div_u64_rem(array->paa_deadline, array->paa_size, &index);
->> 
->> Same here.
->
->I went back and forth on these. Initially I did just what you suggest
->here and added a (u32) cast on the deadline fields, but I could not
->convince myself that the backwards jump in 2038 is harmless. For all
->I can tell,  array->paa_size is not normally a power-of-two number, so
->(0xffffffff % array->paa_size) and (0 % array->paa_size) are not
->neighboring indices. If you are sure that the index can be allowed to
->jump in 2038, we should do the simpler math and add a comment.
+Apparently this is only used only on the metadata server.
 
-The jump should be largely harmless.  This array is tracking the maximum
-RPC service time over the past paa_size interval to avoid sending spurious
-RPC retries if the server is already heavily loaded.  If these values
-are not expired in 100% accurate order the worst thing that can happen is
-that some clients may resend their RPCs unnecessarily under heavy load.
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ .../staging/lustre/lustre/include/lustre_eacl.h    |   4 -
+ drivers/staging/lustre/lustre/obdclass/acl.c       | 119 ---------------------
+ 2 files changed, 123 deletions(-)
 
-Cheers, Andreas
+diff --git a/drivers/staging/lustre/lustre/include/lustre_eacl.h b/drivers/staging/lustre/lustre/include/lustre_eacl.h
+index 0f8f76c..499f9c8 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_eacl.h
++++ b/drivers/staging/lustre/lustre/include/lustre_eacl.h
+@@ -80,10 +80,6 @@ extern void
+ lustre_posix_acl_xattr_free(posix_acl_xattr_header *header, int size);
+ extern void
+ lustre_ext_acl_xattr_free(ext_acl_xattr_header *header);
+-extern int
+-lustre_acl_xattr_merge2posix(posix_acl_xattr_header *posix_header, int size,
+-			     ext_acl_xattr_header *ext_header,
+-			     posix_acl_xattr_header **out);
+ extern ext_acl_xattr_header *
+ lustre_acl_xattr_merge2ext(posix_acl_xattr_header *posix_header, int size,
+ 			   ext_acl_xattr_header *ext_header);
+diff --git a/drivers/staging/lustre/lustre/obdclass/acl.c b/drivers/staging/lustre/lustre/obdclass/acl.c
+index 933456c..1dace14 100644
+--- a/drivers/staging/lustre/lustre/obdclass/acl.c
++++ b/drivers/staging/lustre/lustre/obdclass/acl.c
+@@ -287,125 +287,6 @@ again:
+ }
+ 
+ /*
+- * Merge the posix ACL and the extended ACL into new posix ACL.
+- */
+-int lustre_acl_xattr_merge2posix(posix_acl_xattr_header *posix_header, int size,
+-				 ext_acl_xattr_header *ext_header,
+-				 posix_acl_xattr_header **out)
+-{
+-	int posix_count, posix_size, i, j;
+-	int ext_count = le32_to_cpu(ext_header->a_count), pos = 0, rc = 0;
+-	posix_acl_xattr_entry pe = {ACL_MASK, 0, ACL_UNDEFINED_ID};
+-	posix_acl_xattr_header *new;
+-	ext_acl_xattr_entry *ee, ae;
+-
+-	lustre_posix_acl_cpu_to_le(&pe, &pe);
+-	ee = lustre_ext_acl_xattr_search(ext_header, &pe, &pos);
+-	if (ee == NULL || le32_to_cpu(ee->e_stat) == ES_DEL) {
+-		/* there are only base ACL entries at most. */
+-		posix_count = 3;
+-		posix_size = CFS_ACL_XATTR_SIZE(posix_count, posix_acl_xattr);
+-		new = kzalloc(posix_size, GFP_NOFS);
+-		if (unlikely(new == NULL))
+-			return -ENOMEM;
+-
+-		new->a_version = cpu_to_le32(CFS_ACL_XATTR_VERSION);
+-		for (i = 0, j = 0; i < ext_count; i++) {
+-			lustre_ext_acl_le_to_cpu(&ae,
+-						 &ext_header->a_entries[i]);
+-			switch (ae.e_tag) {
+-			case ACL_USER_OBJ:
+-			case ACL_GROUP_OBJ:
+-			case ACL_OTHER:
+-				if (ae.e_id != ACL_UNDEFINED_ID) {
+-					rc = -EIO;
+-					goto _out;
+-				}
+-
+-				if (ae.e_stat != ES_DEL) {
+-					new->a_entries[j].e_tag =
+-						ext_header->a_entries[i].e_tag;
+-					new->a_entries[j].e_perm =
+-						ext_header->a_entries[i].e_perm;
+-					new->a_entries[j++].e_id =
+-						ext_header->a_entries[i].e_id;
+-				}
+-				break;
+-			case ACL_MASK:
+-			case ACL_USER:
+-			case ACL_GROUP:
+-				if (ae.e_stat == ES_DEL)
+-					break;
+-			default:
+-				rc = -EIO;
+-				goto _out;
+-			}
+-		}
+-	} else {
+-		/* maybe there are valid ACL_USER or ACL_GROUP entries in the
+-		 * original server-side ACL, they are regarded as ES_UNC stat.*/
+-		int ori_posix_count;
+-
+-		if (unlikely(size < 0))
+-			return -EINVAL;
+-		else if (!size)
+-			ori_posix_count = 0;
+-		else
+-			ori_posix_count =
+-				CFS_ACL_XATTR_COUNT(size, posix_acl_xattr);
+-		posix_count = ori_posix_count + ext_count;
+-		posix_size =
+-			CFS_ACL_XATTR_SIZE(posix_count, posix_acl_xattr);
+-		new = kzalloc(posix_size, GFP_NOFS);
+-		if (unlikely(new == NULL))
+-			return -ENOMEM;
+-
+-		new->a_version = cpu_to_le32(CFS_ACL_XATTR_VERSION);
+-		/* 1. process the unchanged ACL entries
+-		 *    in the original server-side ACL. */
+-		pos = 0;
+-		for (i = 0, j = 0; i < ori_posix_count; i++) {
+-			ee = lustre_ext_acl_xattr_search(ext_header,
+-					&posix_header->a_entries[i], &pos);
+-			if (ee == NULL)
+-				memcpy(&new->a_entries[j++],
+-				       &posix_header->a_entries[i],
+-				       sizeof(posix_acl_xattr_entry));
+-		}
+-
+-		/* 2. process the non-deleted entries
+-		 *    from client-side extended ACL. */
+-		for (i = 0; i < ext_count; i++) {
+-			if (le16_to_cpu(ext_header->a_entries[i].e_stat) !=
+-			    ES_DEL) {
+-				new->a_entries[j].e_tag =
+-						ext_header->a_entries[i].e_tag;
+-				new->a_entries[j].e_perm =
+-						ext_header->a_entries[i].e_perm;
+-				new->a_entries[j++].e_id =
+-						ext_header->a_entries[i].e_id;
+-			}
+-		}
+-	}
+-
+-	/* free unused space. */
+-	rc = lustre_posix_acl_xattr_reduce_space(&new, posix_count, j);
+-	if (rc >= 0) {
+-		posix_size = rc;
+-		*out = new;
+-		rc = 0;
+-	}
+-
+-_out:
+-	if (rc) {
+-		kfree(new);
+-		posix_size = rc;
+-	}
+-	return posix_size;
+-}
+-EXPORT_SYMBOL(lustre_acl_xattr_merge2posix);
+-
+-/*
+  * Merge the posix ACL and the extended ACL into new extended ACL.
+  */
+ ext_acl_xattr_header *
 -- 
-Andreas Dilger
-
-Lustre Software Architect
-Intel High Performance Data Division
+2.1.0
