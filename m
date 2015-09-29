@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:43:53 -0400
-Subject: [lustre-devel] [PATCH 10/29] staging/lustre: Remove unused
-	lu_object functions.
+Date: Mon, 28 Sep 2015 23:43:58 -0400
+Subject: [lustre-devel] [PATCH 15/29] staging/lustre/obdclass: Drop unused
+	code from obdo.c
 In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-11-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-16-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,378 +13,205 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Quite a bunch of them are only used on the server.
-lu_object_put_nocache, lu_object_invariant, lu_dev_del_linkage,
-lu_context_tags_update, lu_context_tags_clear, lu_session_tags_update,
-lu_session_tags_clear, lu_env_refill_by_tags, lu_printk_printer,
-lu_object_assign_fid, lu_object_anon, lu_buf_free, lu_buf_alloc,
-lu_buf_realloc, lu_buf_check_and_alloc, lu_buf_check_and_grow
+These functions are not even referenced in any header files anymore.
 
 Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h  |  27 ---
- drivers/staging/lustre/lustre/obdclass/lu_object.c | 241 ---------------------
- 2 files changed, 268 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/obdo.c | 170 --------------------------
+ 1 file changed, 170 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index 7756008..e2199c2 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -672,7 +672,6 @@ void lu_object_add_top    (struct lu_object_header *h, struct lu_object *o);
- void lu_object_add	(struct lu_object *before, struct lu_object *o);
- 
- void lu_dev_add_linkage(struct lu_site *s, struct lu_device *d);
--void lu_dev_del_linkage(struct lu_site *s, struct lu_device *d);
- 
- /**
-  * Helpers to initialize and finalize device types.
-@@ -710,7 +709,6 @@ static inline int lu_object_is_dying(const struct lu_object_header *h)
+diff --git a/drivers/staging/lustre/lustre/obdclass/obdo.c b/drivers/staging/lustre/lustre/obdclass/obdo.c
+index 307ffe3..1a950fb 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obdo.c
++++ b/drivers/staging/lustre/lustre/obdclass/obdo.c
+@@ -115,90 +115,6 @@ void obdo_from_inode(struct obdo *dst, struct inode *src, u32 valid)
  }
+ EXPORT_SYMBOL(obdo_from_inode);
  
- void lu_object_put(const struct lu_env *env, struct lu_object *o);
--void lu_object_put_nocache(const struct lu_env *env, struct lu_object *o);
- void lu_object_unhash(const struct lu_env *env, struct lu_object *o);
- 
- int lu_site_purge(const struct lu_env *env, struct lu_site *s, int nr);
-@@ -1241,14 +1239,6 @@ void lu_context_key_degister_many(struct lu_context_key *k, ...);
- void lu_context_key_revive_many  (struct lu_context_key *k, ...);
- void lu_context_key_quiesce_many (struct lu_context_key *k, ...);
- 
--/*
-- * update/clear ctx/ses tags.
-- */
--void lu_context_tags_update(__u32 tags);
--void lu_context_tags_clear(__u32 tags);
--void lu_session_tags_update(__u32 tags);
--void lu_session_tags_clear(__u32 tags);
--
- /**
-  * Environment.
-  */
-@@ -1266,7 +1256,6 @@ struct lu_env {
- int  lu_env_init  (struct lu_env *env, __u32 tags);
- void lu_env_fini  (struct lu_env *env);
- int  lu_env_refill(struct lu_env *env);
--int  lu_env_refill_by_tags(struct lu_env *env, __u32 ctags, __u32 stags);
- 
- /** @} lu_context */
- 
-@@ -1319,21 +1308,5 @@ struct lu_kmem_descr {
- int  lu_kmem_init(struct lu_kmem_descr *caches);
- void lu_kmem_fini(struct lu_kmem_descr *caches);
- 
--void lu_object_assign_fid(const struct lu_env *env, struct lu_object *o,
--			  const struct lu_fid *fid);
--struct lu_object *lu_object_anon(const struct lu_env *env,
--				 struct lu_device *dev,
--				 const struct lu_object_conf *conf);
--
--/** null buffer */
--extern struct lu_buf LU_BUF_NULL;
--
--void lu_buf_free(struct lu_buf *buf);
--void lu_buf_alloc(struct lu_buf *buf, int size);
--void lu_buf_realloc(struct lu_buf *buf, int size);
--
--int lu_buf_check_and_grow(struct lu_buf *buf, int len);
--struct lu_buf *lu_buf_check_and_alloc(struct lu_buf *buf, int len);
--
- /** @} lu */
- #endif /* __LUSTRE_LU_OBJECT_H */
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index c892e82..01d70f0 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -157,17 +157,6 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
- EXPORT_SYMBOL(lu_object_put);
- 
- /**
-- * Put object and don't keep in cache. This is temporary solution for
-- * multi-site objects when its layering is not constant.
-- */
--void lu_object_put_nocache(const struct lu_env *env, struct lu_object *o)
+-void obdo_cpy_md(struct obdo *dst, struct obdo *src, u32 valid)
 -{
--	set_bit(LU_OBJECT_HEARD_BANSHEE, &o->lo_header->loh_flags);
--	return lu_object_put(env, o);
--}
--EXPORT_SYMBOL(lu_object_put_nocache);
--
--/**
-  * Kill the object and take it out of LRU cache.
-  * Currently used by client code for layout change.
-  */
-@@ -529,23 +518,6 @@ void lu_object_print(const struct lu_env *env, void *cookie,
- }
- EXPORT_SYMBOL(lu_object_print);
- 
--/**
-- * Check object consistency.
-- */
--int lu_object_invariant(const struct lu_object *o)
--{
--	struct lu_object_header *top;
--
--	top = o->lo_header;
--	list_for_each_entry(o, &top->loh_layers, lo_linkage) {
--		if (o->lo_ops->loo_object_invariant != NULL &&
--		    !o->lo_ops->loo_object_invariant(o))
--			return 0;
+-	CDEBUG(D_INODE, "src obdo "DOSTID" valid %#llx, dst obdo "DOSTID"\n",
+-	       POSTID(&src->o_oi), src->o_valid, POSTID(&dst->o_oi));
+-	if (valid & OBD_MD_FLATIME)
+-		dst->o_atime = src->o_atime;
+-	if (valid & OBD_MD_FLMTIME)
+-		dst->o_mtime = src->o_mtime;
+-	if (valid & OBD_MD_FLCTIME)
+-		dst->o_ctime = src->o_ctime;
+-	if (valid & OBD_MD_FLSIZE)
+-		dst->o_size = src->o_size;
+-	if (valid & OBD_MD_FLBLOCKS) /* allocation of space */
+-		dst->o_blocks = src->o_blocks;
+-	if (valid & OBD_MD_FLBLKSZ)
+-		dst->o_blksize = src->o_blksize;
+-	if (valid & OBD_MD_FLTYPE)
+-		dst->o_mode = (dst->o_mode & ~S_IFMT) | (src->o_mode & S_IFMT);
+-	if (valid & OBD_MD_FLMODE)
+-		dst->o_mode = (dst->o_mode & S_IFMT) | (src->o_mode & ~S_IFMT);
+-	if (valid & OBD_MD_FLUID)
+-		dst->o_uid = src->o_uid;
+-	if (valid & OBD_MD_FLGID)
+-		dst->o_gid = src->o_gid;
+-	if (valid & OBD_MD_FLFLAGS)
+-		dst->o_flags = src->o_flags;
+-	if (valid & OBD_MD_FLFID) {
+-		dst->o_parent_seq = src->o_parent_seq;
+-		dst->o_parent_ver = src->o_parent_ver;
 -	}
--	return 1;
--}
--EXPORT_SYMBOL(lu_object_invariant);
+-	if (valid & OBD_MD_FLGENER)
+-		dst->o_parent_oid = src->o_parent_oid;
+-	if (valid & OBD_MD_FLHANDLE)
+-		dst->o_handle = src->o_handle;
+-	if (valid & OBD_MD_FLCOOKIE)
+-		dst->o_lcookie = src->o_lcookie;
 -
- static struct lu_object *htable_lookup(struct lu_site *s,
- 				       struct cfs_hash_bd *bd,
- 				       const struct lu_fid *f,
-@@ -962,14 +934,6 @@ void lu_dev_add_linkage(struct lu_site *s, struct lu_device *d)
- }
- EXPORT_SYMBOL(lu_dev_add_linkage);
- 
--void lu_dev_del_linkage(struct lu_site *s, struct lu_device *d)
+-	dst->o_valid |= valid;
+-}
+-EXPORT_SYMBOL(obdo_cpy_md);
+-
+-/* returns FALSE if comparison (by flags) is same, TRUE if changed */
+-int obdo_cmp_md(struct obdo *dst, struct obdo *src, u32 compare)
 -{
--	spin_lock(&s->ls_ld_lock);
--	list_del_init(&d->ld_linkage);
--	spin_unlock(&s->ls_ld_lock);
--}
--EXPORT_SYMBOL(lu_dev_del_linkage);
+-	int res = 0;
 -
- /**
-  * Initialize site \a s, with \a d as the top level device.
-  */
-@@ -1701,42 +1665,6 @@ EXPORT_SYMBOL(lu_context_refill);
- __u32 lu_context_tags_default;
- __u32 lu_session_tags_default;
- 
--void lu_context_tags_update(__u32 tags)
--{
--	spin_lock(&lu_keys_guard);
--	lu_context_tags_default |= tags;
--	key_set_version++;
--	spin_unlock(&lu_keys_guard);
+-	if (compare & OBD_MD_FLATIME)
+-		res |= dst->o_atime != src->o_atime;
+-	if (compare & OBD_MD_FLMTIME)
+-		res |= dst->o_mtime != src->o_mtime;
+-	if (compare & OBD_MD_FLCTIME)
+-		res |= dst->o_ctime != src->o_ctime;
+-	if (compare & OBD_MD_FLSIZE)
+-		res |= dst->o_size != src->o_size;
+-	if (compare & OBD_MD_FLBLOCKS) /* allocation of space */
+-		res |= dst->o_blocks != src->o_blocks;
+-	if (compare & OBD_MD_FLBLKSZ)
+-		res |= dst->o_blksize != src->o_blksize;
+-	if (compare & OBD_MD_FLTYPE)
+-		res |= ((dst->o_mode ^ src->o_mode) & S_IFMT) != 0;
+-	if (compare & OBD_MD_FLMODE)
+-		res |= ((dst->o_mode ^ src->o_mode) & ~S_IFMT) != 0;
+-	if (compare & OBD_MD_FLUID)
+-		res |= dst->o_uid != src->o_uid;
+-	if (compare & OBD_MD_FLGID)
+-		res |= dst->o_gid != src->o_gid;
+-	if (compare & OBD_MD_FLFLAGS)
+-		res |= dst->o_flags != src->o_flags;
+-	if (compare & OBD_MD_FLNLINK)
+-		res |= dst->o_nlink != src->o_nlink;
+-	if (compare & OBD_MD_FLFID) {
+-		res |= dst->o_parent_seq != src->o_parent_seq;
+-		res |= dst->o_parent_ver != src->o_parent_ver;
+-	}
+-	if (compare & OBD_MD_FLGENER)
+-		res |= dst->o_parent_oid != src->o_parent_oid;
+-	/* XXX Don't know if these should be included here - wasn't previously
+-	if ( compare & OBD_MD_FLINLINE )
+-		res |= memcmp(dst->o_inline, src->o_inline);
+-	*/
+-	return res;
 -}
--EXPORT_SYMBOL(lu_context_tags_update);
+-EXPORT_SYMBOL(obdo_cmp_md);
 -
--void lu_context_tags_clear(__u32 tags)
--{
--	spin_lock(&lu_keys_guard);
--	lu_context_tags_default &= ~tags;
--	key_set_version++;
--	spin_unlock(&lu_keys_guard);
--}
--EXPORT_SYMBOL(lu_context_tags_clear);
--
--void lu_session_tags_update(__u32 tags)
--{
--	spin_lock(&lu_keys_guard);
--	lu_session_tags_default |= tags;
--	key_set_version++;
--	spin_unlock(&lu_keys_guard);
--}
--EXPORT_SYMBOL(lu_session_tags_update);
--
--void lu_session_tags_clear(__u32 tags)
--{
--	spin_lock(&lu_keys_guard);
--	lu_session_tags_default &= ~tags;
--	key_set_version++;
--	spin_unlock(&lu_keys_guard);
--}
--EXPORT_SYMBOL(lu_session_tags_clear);
--
- int lu_env_init(struct lu_env *env, __u32 tags)
+ void obdo_to_ioobj(struct obdo *oa, struct obd_ioobj *ioobj)
  {
- 	int result;
-@@ -1768,31 +1696,6 @@ int lu_env_refill(struct lu_env *env)
+ 	ioobj->ioo_oid = oa->o_oi;
+@@ -211,42 +127,6 @@ void obdo_to_ioobj(struct obdo *oa, struct obd_ioobj *ioobj)
  }
- EXPORT_SYMBOL(lu_env_refill);
+ EXPORT_SYMBOL(obdo_to_ioobj);
  
--/**
-- * Currently, this API will only be used by echo client.
-- * Because echo client and normal lustre client will share
-- * same cl_env cache. So echo client needs to refresh
-- * the env context after it get one from the cache, especially
-- * when normal client and echo client co-exist in the same client.
-- */
--int lu_env_refill_by_tags(struct lu_env *env, __u32 ctags,
--			  __u32 stags)
+-void obdo_from_iattr(struct obdo *oa, struct iattr *attr, unsigned int ia_valid)
 -{
--	if ((env->le_ctx.lc_tags & ctags) != ctags) {
--		env->le_ctx.lc_version = 0;
--		env->le_ctx.lc_tags |= ctags;
+-	if (ia_valid & ATTR_ATIME) {
+-		oa->o_atime = LTIME_S(attr->ia_atime);
+-		oa->o_valid |= OBD_MD_FLATIME;
 -	}
--
--	if (env->le_ses && (env->le_ses->lc_tags & stags) != stags) {
--		env->le_ses->lc_version = 0;
--		env->le_ses->lc_tags |= stags;
+-	if (ia_valid & ATTR_MTIME) {
+-		oa->o_mtime = LTIME_S(attr->ia_mtime);
+-		oa->o_valid |= OBD_MD_FLMTIME;
 -	}
--
--	return lu_env_refill(env);
+-	if (ia_valid & ATTR_CTIME) {
+-		oa->o_ctime = LTIME_S(attr->ia_ctime);
+-		oa->o_valid |= OBD_MD_FLCTIME;
+-	}
+-	if (ia_valid & ATTR_SIZE) {
+-		oa->o_size = attr->ia_size;
+-		oa->o_valid |= OBD_MD_FLSIZE;
+-	}
+-	if (ia_valid & ATTR_MODE) {
+-		oa->o_mode = attr->ia_mode;
+-		oa->o_valid |= OBD_MD_FLTYPE | OBD_MD_FLMODE;
+-		if (!in_group_p(make_kgid(&init_user_ns, oa->o_gid)) &&
+-		    !capable(CFS_CAP_FSETID))
+-			oa->o_mode &= ~S_ISGID;
+-	}
+-	if (ia_valid & ATTR_UID) {
+-		oa->o_uid = from_kuid(&init_user_ns, attr->ia_uid);
+-		oa->o_valid |= OBD_MD_FLUID;
+-	}
+-	if (ia_valid & ATTR_GID) {
+-		oa->o_gid = from_kgid(&init_user_ns, attr->ia_gid);
+-		oa->o_valid |= OBD_MD_FLGID;
+-	}
 -}
--EXPORT_SYMBOL(lu_env_refill_by_tags);
+-EXPORT_SYMBOL(obdo_from_iattr);
 -
--
- struct lu_site_stats {
- 	unsigned	lss_populated;
- 	unsigned	lss_max_search;
-@@ -1904,29 +1807,9 @@ static unsigned long lu_cache_shrink_scan(struct shrinker *sk,
- 	return sc->nr_to_scan - remain;
- }
- 
--/*
-- * Debugging stuff.
-- */
--
--/**
-- * Environment to be used in debugger, contains all tags.
-- */
--struct lu_env lu_debugging_env;
--
- /**
-  * Debugging printer function using printk().
-  */
--int lu_printk_printer(const struct lu_env *env,
--		      void *unused, const char *format, ...)
--{
--	va_list args;
--
--	va_start(args, format);
--	vprintk(format, args);
--	va_end(args);
--	return 0;
--}
--
- static struct shrinker lu_site_shrinker = {
- 	.count_objects	= lu_cache_shrink_count,
- 	.scan_objects	= lu_cache_shrink_scan,
-@@ -2069,127 +1952,3 @@ void lu_kmem_fini(struct lu_kmem_descr *caches)
+ void iattr_from_obdo(struct iattr *attr, struct obdo *oa, u32 valid)
+ {
+ 	valid &= oa->o_valid;
+@@ -310,53 +190,3 @@ void md_from_obdo(struct md_op_data *op_data, struct obdo *oa, u32 valid)
  	}
  }
- EXPORT_SYMBOL(lu_kmem_fini);
+ EXPORT_SYMBOL(md_from_obdo);
 -
--/**
-- * Temporary solution to be able to assign fid in ->do_create()
-- * till we have fully-functional OST fids
-- */
--void lu_object_assign_fid(const struct lu_env *env, struct lu_object *o,
--			  const struct lu_fid *fid)
+-void obdo_from_md(struct obdo *oa, struct md_op_data *op_data,
+-		  unsigned int valid)
 -{
--	struct lu_site		*s = o->lo_dev->ld_site;
--	struct lu_fid		*old = &o->lo_header->loh_fid;
--	struct lu_object	*shadow;
--	wait_queue_t		 waiter;
--	struct cfs_hash		*hs;
--	struct cfs_hash_bd	 bd;
--	__u64			 version = 0;
--
--	LASSERT(fid_is_zero(old));
--
--	hs = s->ls_obj_hash;
--	cfs_hash_bd_get_and_lock(hs, (void *)fid, &bd, 1);
--	shadow = htable_lookup(s, &bd, fid, &waiter, &version);
--	/* supposed to be unique */
--	LASSERT(IS_ERR(shadow) && PTR_ERR(shadow) == -ENOENT);
--	*old = *fid;
--	cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
--	cfs_hash_bd_unlock(hs, &bd, 1);
--}
--EXPORT_SYMBOL(lu_object_assign_fid);
--
--/**
-- * allocates object with 0 (non-assigned) fid
-- * XXX: temporary solution to be able to assign fid in ->do_create()
-- *      till we have fully-functional OST fids
-- */
--struct lu_object *lu_object_anon(const struct lu_env *env,
--				 struct lu_device *dev,
--				 const struct lu_object_conf *conf)
--{
--	struct lu_fid     fid;
--	struct lu_object *o;
--
--	fid_zero(&fid);
--	o = lu_object_alloc(env, dev, &fid, conf);
--
--	return o;
--}
--EXPORT_SYMBOL(lu_object_anon);
--
--struct lu_buf LU_BUF_NULL = {
--	.lb_buf = NULL,
--	.lb_len = 0
--};
--EXPORT_SYMBOL(LU_BUF_NULL);
--
--void lu_buf_free(struct lu_buf *buf)
--{
--	LASSERT(buf);
--	if (buf->lb_buf) {
--		LASSERT(buf->lb_len > 0);
--		kvfree(buf->lb_buf);
--		buf->lb_buf = NULL;
--		buf->lb_len = 0;
+-	obdo_from_iattr(oa, &op_data->op_attr, valid);
+-	if (valid & ATTR_BLOCKS) {
+-		oa->o_blocks = op_data->op_attr_blocks;
+-		oa->o_valid |= OBD_MD_FLBLOCKS;
+-	}
+-	if (valid & ATTR_ATTR_FLAG) {
+-		oa->o_flags =
+-			((struct ll_iattr *)&op_data->op_attr)->ia_attr_flags;
+-		oa->o_valid |= OBD_MD_FLFLAGS;
 -	}
 -}
--EXPORT_SYMBOL(lu_buf_free);
+-EXPORT_SYMBOL(obdo_from_md);
 -
--void lu_buf_alloc(struct lu_buf *buf, int size)
+-void obdo_cpu_to_le(struct obdo *dobdo, struct obdo *sobdo)
 -{
--	LASSERT(buf);
--	LASSERT(buf->lb_buf == NULL);
--	LASSERT(buf->lb_len == 0);
--	buf->lb_buf = libcfs_kvzalloc(size, GFP_NOFS);
--	if (likely(buf->lb_buf))
--		buf->lb_len = size;
+-	dobdo->o_size = cpu_to_le64(sobdo->o_size);
+-	dobdo->o_mtime = cpu_to_le64(sobdo->o_mtime);
+-	dobdo->o_atime = cpu_to_le64(sobdo->o_atime);
+-	dobdo->o_ctime = cpu_to_le64(sobdo->o_ctime);
+-	dobdo->o_blocks = cpu_to_le64(sobdo->o_blocks);
+-	dobdo->o_mode = cpu_to_le32(sobdo->o_mode);
+-	dobdo->o_uid = cpu_to_le32(sobdo->o_uid);
+-	dobdo->o_gid = cpu_to_le32(sobdo->o_gid);
+-	dobdo->o_flags = cpu_to_le32(sobdo->o_flags);
+-	dobdo->o_nlink = cpu_to_le32(sobdo->o_nlink);
+-	dobdo->o_blksize = cpu_to_le32(sobdo->o_blksize);
+-	dobdo->o_valid = cpu_to_le64(sobdo->o_valid);
 -}
--EXPORT_SYMBOL(lu_buf_alloc);
+-EXPORT_SYMBOL(obdo_cpu_to_le);
 -
--void lu_buf_realloc(struct lu_buf *buf, int size)
+-void obdo_le_to_cpu(struct obdo *dobdo, struct obdo *sobdo)
 -{
--	lu_buf_free(buf);
--	lu_buf_alloc(buf, size);
+-	dobdo->o_size = le64_to_cpu(sobdo->o_size);
+-	dobdo->o_mtime = le64_to_cpu(sobdo->o_mtime);
+-	dobdo->o_atime = le64_to_cpu(sobdo->o_atime);
+-	dobdo->o_ctime = le64_to_cpu(sobdo->o_ctime);
+-	dobdo->o_blocks = le64_to_cpu(sobdo->o_blocks);
+-	dobdo->o_mode = le32_to_cpu(sobdo->o_mode);
+-	dobdo->o_uid = le32_to_cpu(sobdo->o_uid);
+-	dobdo->o_gid = le32_to_cpu(sobdo->o_gid);
+-	dobdo->o_flags = le32_to_cpu(sobdo->o_flags);
+-	dobdo->o_nlink = le32_to_cpu(sobdo->o_nlink);
+-	dobdo->o_blksize = le32_to_cpu(sobdo->o_blksize);
+-	dobdo->o_valid = le64_to_cpu(sobdo->o_valid);
 -}
--EXPORT_SYMBOL(lu_buf_realloc);
--
--struct lu_buf *lu_buf_check_and_alloc(struct lu_buf *buf, int len)
--{
--	if (buf->lb_buf == NULL && buf->lb_len == 0)
--		lu_buf_alloc(buf, len);
--
--	if ((len > buf->lb_len) && (buf->lb_buf != NULL))
--		lu_buf_realloc(buf, len);
--
--	return buf;
--}
--EXPORT_SYMBOL(lu_buf_check_and_alloc);
--
--/**
-- * Increase the size of the \a buf.
-- * preserves old data in buffer
-- * old buffer remains unchanged on error
-- * \retval 0 or -ENOMEM
-- */
--int lu_buf_check_and_grow(struct lu_buf *buf, int len)
--{
--	char *ptr;
--
--	if (len <= buf->lb_len)
--		return 0;
--
--	ptr = libcfs_kvzalloc(len, GFP_NOFS);
--	if (ptr == NULL)
--		return -ENOMEM;
--
--	/* Free the old buf */
--	if (buf->lb_buf != NULL) {
--		memcpy(ptr, buf->lb_buf, buf->lb_len);
--		kvfree(buf->lb_buf);
--	}
--
--	buf->lb_buf = ptr;
--	buf->lb_len = len;
--	return 0;
--}
--EXPORT_SYMBOL(lu_buf_check_and_grow);
+-EXPORT_SYMBOL(obdo_le_to_cpu);
 -- 
 2.1.0
