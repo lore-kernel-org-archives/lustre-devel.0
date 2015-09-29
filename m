@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:43:56 -0400
-Subject: [lustre-devel] [PATCH 13/29] staging/lustre: Remove unused function
-	class_handle_hash_back()
+Date: Mon, 28 Sep 2015 23:44:03 -0400
+Subject: [lustre-devel] [PATCH 20/29] staging/lustre/fid: Remove server fid
+	function declarations
 In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-14-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-21-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,50 +13,47 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-No callers left.
+Those functions are not present anywhere in the client code.
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+Signed-off-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- drivers/staging/lustre/lustre/include/lustre_handles.h  |  1 -
- drivers/staging/lustre/lustre/obdclass/lustre_handles.c | 13 -------------
- 2 files changed, 14 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_fid.h | 24 ----------------------
+ 1 file changed, 24 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_handles.h b/drivers/staging/lustre/lustre/include/lustre_handles.h
-index 726bbd3..4d51c8a 100644
---- a/drivers/staging/lustre/lustre/include/lustre_handles.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_handles.h
-@@ -86,7 +86,6 @@ struct portals_handle {
- void class_handle_hash(struct portals_handle *,
- 		       struct portals_handle_ops *ops);
- void class_handle_unhash(struct portals_handle *);
--void class_handle_hash_back(struct portals_handle *);
- void *class_handle2object(__u64 cookie);
- void class_handle_free_cb(struct rcu_head *rcu);
- int class_handle_init(void);
-diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-index 97d79da..d19ec15 100644
---- a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-@@ -134,19 +134,6 @@ void class_handle_unhash(struct portals_handle *h)
- }
- EXPORT_SYMBOL(class_handle_unhash);
+diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
+index abc9345..1b50e66 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_fid.h
++++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
+@@ -425,30 +425,6 @@ struct lu_server_seq {
+ 	struct seq_server_site  *lss_site;
+ };
  
--void class_handle_hash_back(struct portals_handle *h)
--{
--	struct handle_bucket *bucket;
+-/* Server methods */
 -
--	bucket = handle_hash + (h->h_cookie & HANDLE_HASH_MASK);
+-int seq_server_init(struct lu_server_seq *seq,
+-		    struct dt_device *dev,
+-		    const char *prefix,
+-		    enum lu_mgr_type type,
+-		    struct seq_server_site *ss,
+-		    const struct lu_env *env);
 -
--	spin_lock(&bucket->lock);
--	list_add_rcu(&h->h_link, &bucket->head);
--	h->h_in = 1;
--	spin_unlock(&bucket->lock);
--}
--EXPORT_SYMBOL(class_handle_hash_back);
+-void seq_server_fini(struct lu_server_seq *seq,
+-		     const struct lu_env *env);
 -
- void *class_handle2object(__u64 cookie)
- {
- 	struct handle_bucket *bucket;
+-int seq_server_alloc_super(struct lu_server_seq *seq,
+-			   struct lu_seq_range *out,
+-			   const struct lu_env *env);
+-
+-int seq_server_alloc_meta(struct lu_server_seq *seq,
+-			  struct lu_seq_range *out,
+-			  const struct lu_env *env);
+-
+-int seq_server_set_cli(struct lu_server_seq *seq,
+-		       struct lu_client_seq *cli,
+-		       const struct lu_env *env);
+-
+ /* Client methods */
+ int seq_client_init(struct lu_client_seq *seq,
+ 		    struct obd_export *exp,
 -- 
 2.1.0
