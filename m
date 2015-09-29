@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:43:45 -0400
-Subject: [lustre-devel] [PATCH 02/29] staging/lustre: Remove unused
-	lustre_acl_xattr_merge2posix()
+Date: Mon, 28 Sep 2015 23:43:48 -0400
+Subject: [lustre-devel] [PATCH 05/29] staging/lustre: Remove unused reply
+	state batches code
 In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-6-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,159 +13,219 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Apparently this is only used only on the metadata server.
+rs_batch is used on the server only.
 
 Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../staging/lustre/lustre/include/lustre_eacl.h    |   4 -
- drivers/staging/lustre/lustre/obdclass/acl.c       | 119 ---------------------
- 2 files changed, 123 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_net.h |   6 +-
+ drivers/staging/lustre/lustre/ptlrpc/service.c     | 145 ---------------------
+ 2 files changed, 1 insertion(+), 150 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_eacl.h b/drivers/staging/lustre/lustre/include/lustre_eacl.h
-index 0f8f76c..499f9c8 100644
---- a/drivers/staging/lustre/lustre/include/lustre_eacl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_eacl.h
-@@ -80,10 +80,6 @@ extern void
- lustre_posix_acl_xattr_free(posix_acl_xattr_header *header, int size);
- extern void
- lustre_ext_acl_xattr_free(ext_acl_xattr_header *header);
--extern int
--lustre_acl_xattr_merge2posix(posix_acl_xattr_header *posix_header, int size,
--			     ext_acl_xattr_header *ext_header,
--			     posix_acl_xattr_header **out);
- extern ext_acl_xattr_header *
- lustre_acl_xattr_merge2ext(posix_acl_xattr_header *posix_header, int size,
- 			   ext_acl_xattr_header *ext_header);
-diff --git a/drivers/staging/lustre/lustre/obdclass/acl.c b/drivers/staging/lustre/lustre/obdclass/acl.c
-index 933456c..1dace14 100644
---- a/drivers/staging/lustre/lustre/obdclass/acl.c
-+++ b/drivers/staging/lustre/lustre/obdclass/acl.c
-@@ -287,125 +287,6 @@ again:
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index a928631..e7faf0e 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -429,8 +429,7 @@ struct ptlrpc_reply_state {
+ 	unsigned long	  rs_on_net:1;   /* reply_out_callback pending? */
+ 	unsigned long	  rs_prealloc:1; /* rs from prealloc list */
+ 	unsigned long	  rs_committed:1;/* the transaction was committed
+-						 and the rs was dispatched
+-						 by ptlrpc_commit_replies */
++					  * and the rs was dispatched */
+ 	/** Size of the state */
+ 	int		    rs_size;
+ 	/** opcode */
+@@ -2525,9 +2524,6 @@ struct ptlrpc_service_conf {
+  *
+  * @{
+  */
+-void ptlrpc_save_lock(struct ptlrpc_request *req,
+-		      struct lustre_handle *lock, int mode, int no_ack);
+-void ptlrpc_commit_replies(struct obd_export *exp);
+ void ptlrpc_dispatch_difficult_reply(struct ptlrpc_reply_state *rs);
+ void ptlrpc_schedule_difficult_reply(struct ptlrpc_reply_state *rs);
+ int ptlrpc_hpreq_handler(struct ptlrpc_request *req);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index cdc7e62..506fc36 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -179,33 +179,6 @@ ptlrpc_grow_req_bufs(struct ptlrpc_service_part *svcpt, int post)
+ 	return rc;
  }
  
- /*
-- * Merge the posix ACL and the extended ACL into new posix ACL.
+-/**
+- * Part of Rep-Ack logic.
+- * Puts a lock and its mode into reply state associated to request reply.
 - */
--int lustre_acl_xattr_merge2posix(posix_acl_xattr_header *posix_header, int size,
--				 ext_acl_xattr_header *ext_header,
--				 posix_acl_xattr_header **out)
+-void
+-ptlrpc_save_lock(struct ptlrpc_request *req,
+-		 struct lustre_handle *lock, int mode, int no_ack)
 -{
--	int posix_count, posix_size, i, j;
--	int ext_count = le32_to_cpu(ext_header->a_count), pos = 0, rc = 0;
--	posix_acl_xattr_entry pe = {ACL_MASK, 0, ACL_UNDEFINED_ID};
--	posix_acl_xattr_header *new;
--	ext_acl_xattr_entry *ee, ae;
+-	struct ptlrpc_reply_state *rs = req->rq_reply_state;
+-	int idx;
 -
--	lustre_posix_acl_cpu_to_le(&pe, &pe);
--	ee = lustre_ext_acl_xattr_search(ext_header, &pe, &pos);
--	if (ee == NULL || le32_to_cpu(ee->e_stat) == ES_DEL) {
--		/* there are only base ACL entries at most. */
--		posix_count = 3;
--		posix_size = CFS_ACL_XATTR_SIZE(posix_count, posix_acl_xattr);
--		new = kzalloc(posix_size, GFP_NOFS);
--		if (unlikely(new == NULL))
--			return -ENOMEM;
+-	LASSERT(rs != NULL);
+-	LASSERT(rs->rs_nlocks < RS_MAX_LOCKS);
 -
--		new->a_version = cpu_to_le32(CFS_ACL_XATTR_VERSION);
--		for (i = 0, j = 0; i < ext_count; i++) {
--			lustre_ext_acl_le_to_cpu(&ae,
--						 &ext_header->a_entries[i]);
--			switch (ae.e_tag) {
--			case ACL_USER_OBJ:
--			case ACL_GROUP_OBJ:
--			case ACL_OTHER:
--				if (ae.e_id != ACL_UNDEFINED_ID) {
--					rc = -EIO;
--					goto _out;
--				}
--
--				if (ae.e_stat != ES_DEL) {
--					new->a_entries[j].e_tag =
--						ext_header->a_entries[i].e_tag;
--					new->a_entries[j].e_perm =
--						ext_header->a_entries[i].e_perm;
--					new->a_entries[j++].e_id =
--						ext_header->a_entries[i].e_id;
--				}
--				break;
--			case ACL_MASK:
--			case ACL_USER:
--			case ACL_GROUP:
--				if (ae.e_stat == ES_DEL)
--					break;
--			default:
--				rc = -EIO;
--				goto _out;
--			}
--		}
+-	if (req->rq_export->exp_disconnected) {
+-		ldlm_lock_decref(lock, mode);
 -	} else {
--		/* maybe there are valid ACL_USER or ACL_GROUP entries in the
--		 * original server-side ACL, they are regarded as ES_UNC stat.*/
--		int ori_posix_count;
--
--		if (unlikely(size < 0))
--			return -EINVAL;
--		else if (!size)
--			ori_posix_count = 0;
--		else
--			ori_posix_count =
--				CFS_ACL_XATTR_COUNT(size, posix_acl_xattr);
--		posix_count = ori_posix_count + ext_count;
--		posix_size =
--			CFS_ACL_XATTR_SIZE(posix_count, posix_acl_xattr);
--		new = kzalloc(posix_size, GFP_NOFS);
--		if (unlikely(new == NULL))
--			return -ENOMEM;
--
--		new->a_version = cpu_to_le32(CFS_ACL_XATTR_VERSION);
--		/* 1. process the unchanged ACL entries
--		 *    in the original server-side ACL. */
--		pos = 0;
--		for (i = 0, j = 0; i < ori_posix_count; i++) {
--			ee = lustre_ext_acl_xattr_search(ext_header,
--					&posix_header->a_entries[i], &pos);
--			if (ee == NULL)
--				memcpy(&new->a_entries[j++],
--				       &posix_header->a_entries[i],
--				       sizeof(posix_acl_xattr_entry));
--		}
--
--		/* 2. process the non-deleted entries
--		 *    from client-side extended ACL. */
--		for (i = 0; i < ext_count; i++) {
--			if (le16_to_cpu(ext_header->a_entries[i].e_stat) !=
--			    ES_DEL) {
--				new->a_entries[j].e_tag =
--						ext_header->a_entries[i].e_tag;
--				new->a_entries[j].e_perm =
--						ext_header->a_entries[i].e_perm;
--				new->a_entries[j++].e_id =
--						ext_header->a_entries[i].e_id;
--			}
--		}
+-		idx = rs->rs_nlocks++;
+-		rs->rs_locks[idx] = *lock;
+-		rs->rs_modes[idx] = mode;
+-		rs->rs_difficult = 1;
+-		rs->rs_no_ack = !!no_ack;
 -	}
--
--	/* free unused space. */
--	rc = lustre_posix_acl_xattr_reduce_space(&new, posix_count, j);
--	if (rc >= 0) {
--		posix_size = rc;
--		*out = new;
--		rc = 0;
--	}
--
--_out:
--	if (rc) {
--		kfree(new);
--		posix_size = rc;
--	}
--	return posix_size;
 -}
--EXPORT_SYMBOL(lustre_acl_xattr_merge2posix);
+-EXPORT_SYMBOL(ptlrpc_save_lock);
 -
--/*
-  * Merge the posix ACL and the extended ACL into new extended ACL.
+-
+ struct ptlrpc_hr_partition;
+ 
+ struct ptlrpc_hr_thread {
+@@ -246,32 +219,10 @@ struct ptlrpc_hr_service {
+ 	struct ptlrpc_hr_partition	**hr_partitions;
+ };
+ 
+-struct rs_batch {
+-	struct list_head			rsb_replies;
+-	unsigned int			rsb_n_replies;
+-	struct ptlrpc_service_part	*rsb_svcpt;
+-};
+-
+ /** reply handling service. */
+ static struct ptlrpc_hr_service		ptlrpc_hr;
+ 
+ /**
+- * maximum number of replies scheduled in one batch
+- */
+-#define MAX_SCHEDULED 256
+-
+-/**
+- * Initialize a reply batch.
+- *
+- * \param b batch
+- */
+-static void rs_batch_init(struct rs_batch *b)
+-{
+-	memset(b, 0, sizeof(*b));
+-	INIT_LIST_HEAD(&b->rsb_replies);
+-}
+-
+-/**
+  * Choose an hr thread to dispatch requests to.
   */
- ext_acl_xattr_header *
+ static struct ptlrpc_hr_thread *
+@@ -297,76 +248,6 @@ ptlrpc_hr_select(struct ptlrpc_service_part *svcpt)
+ }
+ 
+ /**
+- * Dispatch all replies accumulated in the batch to one from
+- * dedicated reply handling threads.
+- *
+- * \param b batch
+- */
+-static void rs_batch_dispatch(struct rs_batch *b)
+-{
+-	if (b->rsb_n_replies != 0) {
+-		struct ptlrpc_hr_thread	*hrt;
+-
+-		hrt = ptlrpc_hr_select(b->rsb_svcpt);
+-
+-		spin_lock(&hrt->hrt_lock);
+-		list_splice_init(&b->rsb_replies, &hrt->hrt_queue);
+-		spin_unlock(&hrt->hrt_lock);
+-
+-		wake_up(&hrt->hrt_waitq);
+-		b->rsb_n_replies = 0;
+-	}
+-}
+-
+-/**
+- * Add a reply to a batch.
+- * Add one reply object to a batch, schedule batched replies if overload.
+- *
+- * \param b batch
+- * \param rs reply
+- */
+-static void rs_batch_add(struct rs_batch *b, struct ptlrpc_reply_state *rs)
+-{
+-	struct ptlrpc_service_part *svcpt = rs->rs_svcpt;
+-
+-	if (svcpt != b->rsb_svcpt || b->rsb_n_replies >= MAX_SCHEDULED) {
+-		if (b->rsb_svcpt != NULL) {
+-			rs_batch_dispatch(b);
+-			spin_unlock(&b->rsb_svcpt->scp_rep_lock);
+-		}
+-		spin_lock(&svcpt->scp_rep_lock);
+-		b->rsb_svcpt = svcpt;
+-	}
+-	spin_lock(&rs->rs_lock);
+-	rs->rs_scheduled_ever = 1;
+-	if (rs->rs_scheduled == 0) {
+-		list_move(&rs->rs_list, &b->rsb_replies);
+-		rs->rs_scheduled = 1;
+-		b->rsb_n_replies++;
+-	}
+-	rs->rs_committed = 1;
+-	spin_unlock(&rs->rs_lock);
+-}
+-
+-/**
+- * Reply batch finalization.
+- * Dispatch remaining replies from the batch
+- * and release remaining spinlock.
+- *
+- * \param b batch
+- */
+-static void rs_batch_fini(struct rs_batch *b)
+-{
+-	if (b->rsb_svcpt != NULL) {
+-		rs_batch_dispatch(b);
+-		spin_unlock(&b->rsb_svcpt->scp_rep_lock);
+-	}
+-}
+-
+-#define DECLARE_RS_BATCH(b)     struct rs_batch b
+-
+-
+-/**
+  * Put reply state into a queue for processing because we received
+  * ACK from the client
+  */
+@@ -403,32 +284,6 @@ ptlrpc_schedule_difficult_reply(struct ptlrpc_reply_state *rs)
+ }
+ EXPORT_SYMBOL(ptlrpc_schedule_difficult_reply);
+ 
+-void ptlrpc_commit_replies(struct obd_export *exp)
+-{
+-	struct ptlrpc_reply_state *rs, *nxt;
+-	DECLARE_RS_BATCH(batch);
+-
+-	rs_batch_init(&batch);
+-	/* Find any replies that have been committed and get their service
+-	 * to attend to complete them. */
+-
+-	/* CAVEAT EMPTOR: spinlock ordering!!! */
+-	spin_lock(&exp->exp_uncommitted_replies_lock);
+-	list_for_each_entry_safe(rs, nxt, &exp->exp_uncommitted_replies,
+-				     rs_obd_list) {
+-		LASSERT(rs->rs_difficult);
+-		/* VBR: per-export last_committed */
+-		LASSERT(rs->rs_export);
+-		if (rs->rs_transno <= exp->exp_last_committed) {
+-			list_del_init(&rs->rs_obd_list);
+-			rs_batch_add(&batch, rs);
+-		}
+-	}
+-	spin_unlock(&exp->exp_uncommitted_replies_lock);
+-	rs_batch_fini(&batch);
+-}
+-EXPORT_SYMBOL(ptlrpc_commit_replies);
+-
+ static int
+ ptlrpc_server_post_idle_rqbds(struct ptlrpc_service_part *svcpt)
+ {
 -- 
 2.1.0
