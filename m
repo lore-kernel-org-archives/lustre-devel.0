@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:43:46 -0400
-Subject: [lustre-devel] [PATCH 03/29] staging/lustre/ptlrpc: Remove
-	server-specific health checks
+Date: Mon, 28 Sep 2015 23:43:47 -0400
+Subject: [lustre-devel] [PATCH 04/29] staging/lustre: Remove unused
+	req_capsule_server_grow
 In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-4-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-5-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,113 +13,100 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-ptlrpc_service_health_check is only used on a service, so
-it makes no point to retain it in the client code.
-Also removing it's helpers: ptlrpc_svcpt_health_check and
-ptlrpc_nrs_req_peek_nolock
+It's only used on the server
 
 Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_net.h |  1 -
- .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |  6 ---
- drivers/staging/lustre/lustre/ptlrpc/service.c     | 58 ----------------------
- 3 files changed, 65 deletions(-)
+ .../lustre/lustre/include/lustre_req_layout.h      |  3 --
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      | 62 ----------------------
+ 2 files changed, 65 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index e929c93..a928631 100644
---- a/drivers/staging/lustre/lustre/include/lustre_net.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -2541,7 +2541,6 @@ int ptlrpc_start_threads(struct ptlrpc_service *svc);
- int ptlrpc_unregister_service(struct ptlrpc_service *service);
- int liblustre_check_services(void *arg);
- void ptlrpc_daemonize(char *name);
--int ptlrpc_service_health_check(struct ptlrpc_service *);
- void ptlrpc_server_drop_request(struct ptlrpc_request *req);
- void ptlrpc_request_change_export(struct ptlrpc_request *req,
- 				  struct obd_export *export);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-index 059ad96b..a3608a9 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-@@ -137,12 +137,6 @@ ptlrpc_nrs_req_get_nolock(struct ptlrpc_service_part *svcpt, bool hp,
- 	return ptlrpc_nrs_req_get_nolock0(svcpt, hp, false, force);
- }
+diff --git a/drivers/staging/lustre/lustre/include/lustre_req_layout.h b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+index c6457b2..04c0076 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_req_layout.h
++++ b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+@@ -129,9 +129,6 @@ void req_capsule_shrink(struct req_capsule *pill,
+ 			const struct req_msg_field *field,
+ 			unsigned int newlen,
+ 			enum req_location loc);
+-int req_capsule_server_grow(struct req_capsule *pill,
+-			    const struct req_msg_field *field,
+-			    unsigned int newlen);
+ int  req_layout_init(void);
+ void req_layout_fini(void);
  
--static inline struct ptlrpc_request *
--ptlrpc_nrs_req_peek_nolock(struct ptlrpc_service_part *svcpt, bool hp)
--{
--	return ptlrpc_nrs_req_get_nolock0(svcpt, hp, true, false);
--}
--
- void ptlrpc_nrs_req_del_nolock(struct ptlrpc_request *req);
- bool ptlrpc_nrs_req_pending_nolock(struct ptlrpc_service_part *svcpt, bool hp);
- 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 326f89e..cdc7e62 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -2977,61 +2977,3 @@ int ptlrpc_unregister_service(struct ptlrpc_service *service)
- 	return 0;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+index 5d19cfc..4ddbe0d 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+@@ -2376,67 +2376,5 @@ void req_capsule_shrink(struct req_capsule *pill,
  }
- EXPORT_SYMBOL(ptlrpc_unregister_service);
--
--/**
-- * Returns 0 if the service is healthy.
-- *
-- * Right now, it just checks to make sure that requests aren't languishing
-- * in the queue.  We'll use this health check to govern whether a node needs
-- * to be shot, so it's intentionally non-aggressive. */
--static int ptlrpc_svcpt_health_check(struct ptlrpc_service_part *svcpt)
+ EXPORT_SYMBOL(req_capsule_shrink);
+ 
+-int req_capsule_server_grow(struct req_capsule *pill,
+-			    const struct req_msg_field *field,
+-			    unsigned int newlen)
 -{
--	struct ptlrpc_request *request = NULL;
--	struct timespec64 right_now;
--	struct timespec64 timediff;
+-	struct ptlrpc_reply_state *rs = pill->rc_req->rq_reply_state, *nrs;
+-	char *from, *to;
+-	int offset, len, rc;
 -
--	ktime_get_real_ts64(&right_now);
+-	LASSERT(pill->rc_fmt != NULL);
+-	LASSERT(__req_format_is_sane(pill->rc_fmt));
+-	LASSERT(req_capsule_has_field(pill, field, RCL_SERVER));
+-	LASSERT(req_capsule_field_present(pill, field, RCL_SERVER));
 -
--	spin_lock(&svcpt->scp_req_lock);
--	/* How long has the next entry been waiting? */
--	if (ptlrpc_server_high_pending(svcpt, true))
--		request = ptlrpc_nrs_req_peek_nolock(svcpt, true);
--	else if (ptlrpc_server_normal_pending(svcpt, true))
--		request = ptlrpc_nrs_req_peek_nolock(svcpt, false);
+-	len = req_capsule_get_size(pill, field, RCL_SERVER);
+-	offset = __req_capsule_offset(pill, field, RCL_SERVER);
+-	if (pill->rc_req->rq_repbuf_len >=
+-	    lustre_packed_msg_size(pill->rc_req->rq_repmsg) - len + newlen)
+-		CERROR("Inplace repack might be done\n");
 -
--	if (request == NULL) {
--		spin_unlock(&svcpt->scp_req_lock);
--		return 0;
+-	pill->rc_req->rq_reply_state = NULL;
+-	req_capsule_set_size(pill, field, RCL_SERVER, newlen);
+-	rc = req_capsule_server_pack(pill);
+-	if (rc) {
+-		/* put old rs back, the caller will decide what to do */
+-		pill->rc_req->rq_reply_state = rs;
+-		return rc;
 -	}
--
--	timediff = timespec64_sub(right_now, request->rq_arrival_time);
--	spin_unlock(&svcpt->scp_req_lock);
--
--	if ((timediff.tv_sec) >
--	    (AT_OFF ? obd_timeout * 3 / 2 : at_max)) {
--		CERROR("%s: unhealthy - request has been waiting %llds\n",
--		       svcpt->scp_service->srv_name, (s64)timediff.tv_sec);
--		return -1;
+-	nrs = pill->rc_req->rq_reply_state;
+-	/* Now we need only buffers, copy first chunk */
+-	to = lustre_msg_buf(nrs->rs_msg, 0, 0);
+-	from = lustre_msg_buf(rs->rs_msg, 0, 0);
+-	len = (char *)lustre_msg_buf(rs->rs_msg, offset, 0) - from;
+-	memcpy(to, from, len);
+-	/* check if we have tail and copy it too */
+-	if (rs->rs_msg->lm_bufcount > offset + 1) {
+-		to = lustre_msg_buf(nrs->rs_msg, offset + 1, 0);
+-		from = lustre_msg_buf(rs->rs_msg, offset + 1, 0);
+-		offset = rs->rs_msg->lm_bufcount - 1;
+-		len = (char *)lustre_msg_buf(rs->rs_msg, offset, 0) +
+-		      cfs_size_round(rs->rs_msg->lm_buflens[offset]) - from;
+-		memcpy(to, from, len);
 -	}
+-	/* drop old reply if everything is fine */
+-	if (rs->rs_difficult) {
+-		/* copy rs data */
+-		int i;
 -
+-		nrs->rs_difficult = 1;
+-		nrs->rs_no_ack = rs->rs_no_ack;
+-		for (i = 0; i < rs->rs_nlocks; i++) {
+-			nrs->rs_locks[i] = rs->rs_locks[i];
+-			nrs->rs_modes[i] = rs->rs_modes[i];
+-			nrs->rs_nlocks++;
+-		}
+-		rs->rs_nlocks = 0;
+-		rs->rs_difficult = 0;
+-		rs->rs_no_ack = 0;
+-	}
+-	ptlrpc_rs_decref(rs);
 -	return 0;
 -}
--
--int
--ptlrpc_service_health_check(struct ptlrpc_service *svc)
--{
--	struct ptlrpc_service_part *svcpt;
--	int i;
--
--	if (svc == NULL)
--		return 0;
--
--	ptlrpc_service_for_each_part(svcpt, i, svc) {
--		int rc = ptlrpc_svcpt_health_check(svcpt);
--
--		if (rc != 0)
--			return rc;
--	}
--	return 0;
--}
--EXPORT_SYMBOL(ptlrpc_service_health_check);
+-EXPORT_SYMBOL(req_capsule_server_grow);
+ /* __REQ_LAYOUT_USER__ */
+ #endif
 -- 
 2.1.0
