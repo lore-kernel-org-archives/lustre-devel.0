@@ -1,10 +1,7 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:43:44 -0400
-Subject: [lustre-devel] [PATCH 01/29] staging/lustre: Remove unused
-	target_print_req()
-In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-2-git-send-email-green@linuxhacker.ru>
+Date: Mon, 28 Sep 2015 23:43:43 -0400
+Subject: [lustre-devel] [PATCH 00/29] Removal of unused Lustre code
+Message-ID: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,71 +10,100 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This is a server-side request printing function, so we don't
-really need it on the client.
+This set removes a bunch of lustre code that is no lonver relevant,
+is server specific or is otherwise unused.
 
-Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
----
- .../staging/lustre/lustre/include/lprocfs_status.h |  4 ---
- .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    | 30 ----------------------
- 2 files changed, 34 deletions(-)
+Please consider.
 
-diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-index 5262b4f..22f3777 100644
---- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-+++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-@@ -720,10 +720,6 @@ ssize_t lustre_attr_store(struct kobject *kobj, struct attribute *attr,
- 
- extern const struct sysfs_ops lustre_sysfs_ops;
- 
--/* lproc_ptlrpc.c */
--struct ptlrpc_request;
--void target_print_req(void *seq_file, struct ptlrpc_request *req);
--
- /* all quota proc functions */
- int lprocfs_quota_rd_bunit(char *page, char **start,
- 			   loff_t off, int count,
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-index d66a7b8..3a212b4 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -890,36 +890,6 @@ ptlrpc_lprocfs_svc_req_history_next(struct seq_file *s,
- 	return NULL;
- }
- 
--/* common ost/mdt so_req_printer */
--void target_print_req(void *seq_file, struct ptlrpc_request *req)
--{
--	/* Called holding srv_lock with irqs disabled.
--	 * Print specific req contents and a newline.
--	 * CAVEAT EMPTOR: check request message length before printing!!!
--	 * You might have received any old crap so you must be just as
--	 * careful here as the service's request parser!!! */
--	struct seq_file *sf = seq_file;
--
--	switch (req->rq_phase) {
--	case RQ_PHASE_NEW:
--		/* still awaiting a service thread's attention, or rejected
--		 * because the generic request message didn't unpack */
--		seq_printf(sf, "<not swabbed>\n");
--		break;
--	case RQ_PHASE_INTERPRET:
--		/* being handled, so basic msg swabbed, and opc is valid
--		 * but racing with mds_handle() */
--	case RQ_PHASE_COMPLETE:
--		/* been handled by mds_handle() reply state possibly still
--		 * volatile */
--		seq_printf(sf, "opc %d\n", lustre_msg_get_opc(req->rq_reqmsg));
--		break;
--	default:
--		DEBUG_REQ(D_ERROR, req, "bad phase %d", req->rq_phase);
--	}
--}
--EXPORT_SYMBOL(target_print_req);
--
- static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
- {
- 	struct ptlrpc_service *svc = s->private;
+More to come later.
+
+Arnd Bergmann (1):
+  staging/lustre: remove lots of dead code
+
+Oleg Drokin (28):
+  staging/lustre: Remove unused target_print_req()
+  staging/lustre: Remove unused lustre_acl_xattr_merge2posix()
+  staging/lustre/ptlrpc: Remove server-specific health checks
+  staging/lustre: Remove unused req_capsule_server_grow
+  staging/lustre: Remove unused reply state batches code
+  staging/lustre: Remove high-priority request callbacks
+  staging/lustre: Remove unused statfs_pack()
+  staging/lustre: Remove unused ptlrpcd_add_rqset()
+  staging/lustre: Remove unused functions and definitions from cl_object
+  staging/lustre: Remove unused lu_object functions.
+  staging/lustre/ldlm: Remove unused round_timeout function
+  staging/lustre/obdclass: Remove unused functions from genops.c
+  staging/lustre: Remove unused function class_handle_hash_back()
+  staging/lustre: Remove unused function server_name2svname()
+  staging/lustre/obdclass: Drop unused code from obdo.c
+  staging/lustre/ptlrpc: Drop unused client code
+  staging/lustre/ptlrpc: secure wrapping code cleanup
+  staging/lustre: Drop unused obdo_from_la() and la_from_obdo()
+  staging/lustre/fid: Remove server fid function declarations
+  staging/lustre/fid: seq_client_init/fini don't need to be exported
+  staging/lustre/fid: Remove unused seq_client_get_seq function
+  staging/lustre/fid: Get rid of lcs_srv in lu_client_seq
+  staging/lustre/fid: Remove unused struct lu_server_seq
+  staging/lustre/obdclass: Remove unused nid_hash
+  staging/lustre: Remove server-only recovery-related bits
+  staging/lustre: Remove ccc_attr/conf_set()
+  staging/lustre: Remove unused ccc_io_fini()
+  staging/lustre: Remove ccc_transient_page_* methods
+
+ drivers/staging/lustre/lustre/fid/fid_request.c    | 132 ++------
+ drivers/staging/lustre/lustre/fid/lproc_fid.c      |   2 -
+ drivers/staging/lustre/lustre/include/cl_object.h  |  26 --
+ drivers/staging/lustre/lustre/include/lclient.h    |  24 --
+ .../staging/lustre/lustre/include/lprocfs_status.h |   4 -
+ drivers/staging/lustre/lustre/include/lu_object.h  |  27 --
+ .../lustre/lustre/include/lustre/lustre_idl.h      |   8 -
+ .../lustre/lustre/include/lustre/lustre_user.h     |   2 -
+ .../staging/lustre/lustre/include/lustre_debug.h   |   1 -
+ .../staging/lustre/lustre/include/lustre_disk.h    |   2 -
+ .../staging/lustre/lustre/include/lustre_eacl.h    |   4 -
+ .../staging/lustre/lustre/include/lustre_export.h  |  19 +-
+ drivers/staging/lustre/lustre/include/lustre_fid.h |  91 ------
+ .../staging/lustre/lustre/include/lustre_handles.h |   1 -
+ .../staging/lustre/lustre/include/lustre_import.h  |   1 -
+ drivers/staging/lustre/lustre/include/lustre_lib.h |   1 -
+ drivers/staging/lustre/lustre/include/lustre_net.h |  42 +--
+ .../staging/lustre/lustre/include/lustre_param.h   |   6 -
+ .../lustre/lustre/include/lustre_req_layout.h      |   7 -
+ drivers/staging/lustre/lustre/include/lustre_sec.h |  20 --
+ drivers/staging/lustre/lustre/include/obd.h        |  29 --
+ drivers/staging/lustre/lustre/include/obd_class.h  |  28 --
+ drivers/staging/lustre/lustre/lclient/lcommon_cl.c |  70 ----
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |   5 -
+ drivers/staging/lustre/lustre/obdclass/acl.c       | 119 -------
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     |  65 ----
+ drivers/staging/lustre/lustre/obdclass/cl_lock.c   |  26 --
+ drivers/staging/lustre/lustre/obdclass/cl_object.c |  41 ---
+ drivers/staging/lustre/lustre/obdclass/debug.c     |  10 -
+ drivers/staging/lustre/lustre/obdclass/genops.c    | 249 +-------------
+ .../lustre/lustre/obdclass/linux/linux-obdo.c      | 137 --------
+ .../lustre/lustre/obdclass/linux/linux-sysctl.c    |   4 -
+ drivers/staging/lustre/lustre/obdclass/lu_object.c | 241 --------------
+ .../lustre/lustre/obdclass/lustre_handles.c        |  13 -
+ .../staging/lustre/lustre/obdclass/obd_config.c    | 358 ---------------------
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |  27 --
+ drivers/staging/lustre/lustre/obdclass/obdo.c      | 170 ----------
+ .../staging/lustre/lustre/obdclass/statfs_pack.c   |  14 -
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |  95 ------
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |  11 -
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      | 126 --------
+ .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |  30 --
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |   3 +-
+ drivers/staging/lustre/lustre/ptlrpc/nrs.c         | 123 -------
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    | 197 ------------
+ drivers/staging/lustre/lustre/ptlrpc/pinger.c      |  18 --
+ .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |   8 -
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |  42 ---
+ drivers/staging/lustre/lustre/ptlrpc/sec.c         | 116 -------
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    | 329 -------------------
+ drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |  48 ---
+ drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |  15 -
+ drivers/staging/lustre/lustre/ptlrpc/service.c     | 320 ++----------------
+ 53 files changed, 62 insertions(+), 3445 deletions(-)
+
 -- 
 2.1.0
