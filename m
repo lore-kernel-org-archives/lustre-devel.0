@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 28 Sep 2015 23:43:48 -0400
-Subject: [lustre-devel] [PATCH 05/29] staging/lustre: Remove unused reply
-	state batches code
+Date: Mon, 28 Sep 2015 23:43:49 -0400
+Subject: [lustre-devel] [PATCH 06/29] staging/lustre: Remove high-priority
+	request callbacks
 In-Reply-To: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
 References: <1443498252-1974801-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443498252-1974801-6-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443498252-1974801-7-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,219 +13,108 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-rs_batch is used on the server only.
+This function is only used on the server where real high-priority
+requests actually exist.
+This deletes ptlrpc_hpreq_handler() and ptlrpc_request_change_export()
 
 Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_net.h |   6 +-
- drivers/staging/lustre/lustre/ptlrpc/service.c     | 145 ---------------------
- 2 files changed, 1 insertion(+), 150 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_net.h |  3 --
+ drivers/staging/lustre/lustre/ptlrpc/service.c     | 53 ----------------------
+ 2 files changed, 56 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index a928631..e7faf0e 100644
+index e7faf0e..090484b 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_net.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -429,8 +429,7 @@ struct ptlrpc_reply_state {
- 	unsigned long	  rs_on_net:1;   /* reply_out_callback pending? */
- 	unsigned long	  rs_prealloc:1; /* rs from prealloc list */
- 	unsigned long	  rs_committed:1;/* the transaction was committed
--						 and the rs was dispatched
--						 by ptlrpc_commit_replies */
-+					  * and the rs was dispatched */
- 	/** Size of the state */
- 	int		    rs_size;
- 	/** opcode */
-@@ -2525,9 +2524,6 @@ struct ptlrpc_service_conf {
-  *
-  * @{
+@@ -2526,7 +2526,6 @@ struct ptlrpc_service_conf {
   */
--void ptlrpc_save_lock(struct ptlrpc_request *req,
--		      struct lustre_handle *lock, int mode, int no_ack);
--void ptlrpc_commit_replies(struct obd_export *exp);
  void ptlrpc_dispatch_difficult_reply(struct ptlrpc_reply_state *rs);
  void ptlrpc_schedule_difficult_reply(struct ptlrpc_reply_state *rs);
- int ptlrpc_hpreq_handler(struct ptlrpc_request *req);
+-int ptlrpc_hpreq_handler(struct ptlrpc_request *req);
+ struct ptlrpc_service *ptlrpc_register_service(
+ 				struct ptlrpc_service_conf *conf,
+ 				struct kset *parent,
+@@ -2538,8 +2537,6 @@ int ptlrpc_unregister_service(struct ptlrpc_service *service);
+ int liblustre_check_services(void *arg);
+ void ptlrpc_daemonize(char *name);
+ void ptlrpc_server_drop_request(struct ptlrpc_request *req);
+-void ptlrpc_request_change_export(struct ptlrpc_request *req,
+-				  struct obd_export *export);
+ 
+ int ptlrpc_hr_init(void);
+ void ptlrpc_hr_fini(void);
 diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index cdc7e62..506fc36 100644
+index 506fc36..353ac22 100644
 --- a/drivers/staging/lustre/lustre/ptlrpc/service.c
 +++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -179,33 +179,6 @@ ptlrpc_grow_req_bufs(struct ptlrpc_service_part *svcpt, int post)
- 	return rc;
+@@ -819,35 +819,6 @@ void ptlrpc_server_drop_request(struct ptlrpc_request *req)
+ 	}
  }
  
--/**
-- * Part of Rep-Ack logic.
-- * Puts a lock and its mode into reply state associated to request reply.
-- */
--void
--ptlrpc_save_lock(struct ptlrpc_request *req,
--		 struct lustre_handle *lock, int mode, int no_ack)
+-/** Change request export and move hp request from old export to new */
+-void ptlrpc_request_change_export(struct ptlrpc_request *req,
+-				  struct obd_export *export)
 -{
--	struct ptlrpc_reply_state *rs = req->rq_reply_state;
--	int idx;
+-	if (req->rq_export != NULL) {
+-		if (!list_empty(&req->rq_exp_list)) {
+-			/* remove rq_exp_list from last export */
+-			spin_lock_bh(&req->rq_export->exp_rpc_lock);
+-			list_del_init(&req->rq_exp_list);
+-			spin_unlock_bh(&req->rq_export->exp_rpc_lock);
 -
--	LASSERT(rs != NULL);
--	LASSERT(rs->rs_nlocks < RS_MAX_LOCKS);
--
--	if (req->rq_export->exp_disconnected) {
--		ldlm_lock_decref(lock, mode);
--	} else {
--		idx = rs->rs_nlocks++;
--		rs->rs_locks[idx] = *lock;
--		rs->rs_modes[idx] = mode;
--		rs->rs_difficult = 1;
--		rs->rs_no_ack = !!no_ack;
+-			/* export has one reference already, so it`s safe to
+-			 * add req to export queue here and get another
+-			 * reference for request later */
+-			spin_lock_bh(&export->exp_rpc_lock);
+-			list_add(&req->rq_exp_list, &export->exp_hp_rpcs);
+-			spin_unlock_bh(&export->exp_rpc_lock);
+-		}
+-		class_export_rpc_dec(req->rq_export);
+-		class_export_put(req->rq_export);
 -	}
+-
+-	/* request takes one export refcount */
+-	req->rq_export = class_export_get(export);
+-	class_export_rpc_inc(export);
+-
+-	return;
 -}
--EXPORT_SYMBOL(ptlrpc_save_lock);
 -
+ /**
+  * to finish a request: stop sending more early replies, and release
+  * the request.
+@@ -1329,30 +1300,6 @@ static void ptlrpc_server_hpreq_fini(struct ptlrpc_request *req)
+ 	}
+ }
+ 
+-static int ptlrpc_hpreq_check(struct ptlrpc_request *req)
+-{
+-	return 1;
+-}
 -
- struct ptlrpc_hr_partition;
- 
- struct ptlrpc_hr_thread {
-@@ -246,32 +219,10 @@ struct ptlrpc_hr_service {
- 	struct ptlrpc_hr_partition	**hr_partitions;
- };
- 
--struct rs_batch {
--	struct list_head			rsb_replies;
--	unsigned int			rsb_n_replies;
--	struct ptlrpc_service_part	*rsb_svcpt;
+-static struct ptlrpc_hpreq_ops ptlrpc_hpreq_common = {
+-	.hpreq_check       = ptlrpc_hpreq_check,
 -};
 -
- /** reply handling service. */
- static struct ptlrpc_hr_service		ptlrpc_hr;
- 
- /**
-- * maximum number of replies scheduled in one batch
-- */
--#define MAX_SCHEDULED 256
--
--/**
-- * Initialize a reply batch.
-- *
-- * \param b batch
-- */
--static void rs_batch_init(struct rs_batch *b)
+-/* Hi-Priority RPC check by RPC operation code. */
+-int ptlrpc_hpreq_handler(struct ptlrpc_request *req)
 -{
--	memset(b, 0, sizeof(*b));
--	INIT_LIST_HEAD(&b->rsb_replies);
+-	int opc = lustre_msg_get_opc(req->rq_reqmsg);
+-
+-	/* Check for export to let only reconnects for not yet evicted
+-	 * export to become a HP rpc. */
+-	if ((req->rq_export != NULL) &&
+-	    (opc == OBD_PING || opc == MDS_CONNECT || opc == OST_CONNECT))
+-		req->rq_ops = &ptlrpc_hpreq_common;
+-
+-	return 0;
 -}
+-EXPORT_SYMBOL(ptlrpc_hpreq_handler);
 -
--/**
-  * Choose an hr thread to dispatch requests to.
-  */
- static struct ptlrpc_hr_thread *
-@@ -297,76 +248,6 @@ ptlrpc_hr_select(struct ptlrpc_service_part *svcpt)
- }
- 
- /**
-- * Dispatch all replies accumulated in the batch to one from
-- * dedicated reply handling threads.
-- *
-- * \param b batch
-- */
--static void rs_batch_dispatch(struct rs_batch *b)
--{
--	if (b->rsb_n_replies != 0) {
--		struct ptlrpc_hr_thread	*hrt;
--
--		hrt = ptlrpc_hr_select(b->rsb_svcpt);
--
--		spin_lock(&hrt->hrt_lock);
--		list_splice_init(&b->rsb_replies, &hrt->hrt_queue);
--		spin_unlock(&hrt->hrt_lock);
--
--		wake_up(&hrt->hrt_waitq);
--		b->rsb_n_replies = 0;
--	}
--}
--
--/**
-- * Add a reply to a batch.
-- * Add one reply object to a batch, schedule batched replies if overload.
-- *
-- * \param b batch
-- * \param rs reply
-- */
--static void rs_batch_add(struct rs_batch *b, struct ptlrpc_reply_state *rs)
--{
--	struct ptlrpc_service_part *svcpt = rs->rs_svcpt;
--
--	if (svcpt != b->rsb_svcpt || b->rsb_n_replies >= MAX_SCHEDULED) {
--		if (b->rsb_svcpt != NULL) {
--			rs_batch_dispatch(b);
--			spin_unlock(&b->rsb_svcpt->scp_rep_lock);
--		}
--		spin_lock(&svcpt->scp_rep_lock);
--		b->rsb_svcpt = svcpt;
--	}
--	spin_lock(&rs->rs_lock);
--	rs->rs_scheduled_ever = 1;
--	if (rs->rs_scheduled == 0) {
--		list_move(&rs->rs_list, &b->rsb_replies);
--		rs->rs_scheduled = 1;
--		b->rsb_n_replies++;
--	}
--	rs->rs_committed = 1;
--	spin_unlock(&rs->rs_lock);
--}
--
--/**
-- * Reply batch finalization.
-- * Dispatch remaining replies from the batch
-- * and release remaining spinlock.
-- *
-- * \param b batch
-- */
--static void rs_batch_fini(struct rs_batch *b)
--{
--	if (b->rsb_svcpt != NULL) {
--		rs_batch_dispatch(b);
--		spin_unlock(&b->rsb_svcpt->scp_rep_lock);
--	}
--}
--
--#define DECLARE_RS_BATCH(b)     struct rs_batch b
--
--
--/**
-  * Put reply state into a queue for processing because we received
-  * ACK from the client
-  */
-@@ -403,32 +284,6 @@ ptlrpc_schedule_difficult_reply(struct ptlrpc_reply_state *rs)
- }
- EXPORT_SYMBOL(ptlrpc_schedule_difficult_reply);
- 
--void ptlrpc_commit_replies(struct obd_export *exp)
--{
--	struct ptlrpc_reply_state *rs, *nxt;
--	DECLARE_RS_BATCH(batch);
--
--	rs_batch_init(&batch);
--	/* Find any replies that have been committed and get their service
--	 * to attend to complete them. */
--
--	/* CAVEAT EMPTOR: spinlock ordering!!! */
--	spin_lock(&exp->exp_uncommitted_replies_lock);
--	list_for_each_entry_safe(rs, nxt, &exp->exp_uncommitted_replies,
--				     rs_obd_list) {
--		LASSERT(rs->rs_difficult);
--		/* VBR: per-export last_committed */
--		LASSERT(rs->rs_export);
--		if (rs->rs_transno <= exp->exp_last_committed) {
--			list_del_init(&rs->rs_obd_list);
--			rs_batch_add(&batch, rs);
--		}
--	}
--	spin_unlock(&exp->exp_uncommitted_replies_lock);
--	rs_batch_fini(&batch);
--}
--EXPORT_SYMBOL(ptlrpc_commit_replies);
--
- static int
- ptlrpc_server_post_idle_rqbds(struct ptlrpc_service_part *svcpt)
+ static int ptlrpc_server_request_add(struct ptlrpc_service_part *svcpt,
+ 				     struct ptlrpc_request *req)
  {
 -- 
 2.1.0
