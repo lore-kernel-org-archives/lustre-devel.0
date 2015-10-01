@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:29 -0400
-Subject: [lustre-devel] [PATCH 19/32] staging/lustre/ldlm: Remove unused
-	ldlm_pool_get_clv()
+Date: Thu,  1 Oct 2015 00:12:24 -0400
+Subject: [lustre-devel] [PATCH 14/32] staging/lustre/ldlm: Remove unused
+	ldlm_enqueue_pack()
 In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-20-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443672762-982936-15-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,50 +13,57 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
+Not used anywhere
+
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
  drivers/staging/lustre/lustre/include/lustre_dlm.h |  1 -
- drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     | 16 ----------------
- 2 files changed, 17 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 21 ---------------------
+ 2 files changed, 22 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index 4d81e73..1b5f298 100644
+index ce91ccc..72c52ef 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -1401,7 +1401,6 @@ int ldlm_pool_setup(struct ldlm_pool *pl, int limit);
- int ldlm_pool_recalc(struct ldlm_pool *pl);
- __u32 ldlm_pool_get_lvf(struct ldlm_pool *pl);
- __u64 ldlm_pool_get_slv(struct ldlm_pool *pl);
--__u64 ldlm_pool_get_clv(struct ldlm_pool *pl);
- __u32 ldlm_pool_get_limit(struct ldlm_pool *pl);
- void ldlm_pool_set_slv(struct ldlm_pool *pl, __u64 slv);
- void ldlm_pool_set_clv(struct ldlm_pool *pl, __u64 clv);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-index 1c9d67f..cbe4b7b 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-@@ -1023,22 +1023,6 @@ void ldlm_pool_set_slv(struct ldlm_pool *pl, __u64 slv)
- EXPORT_SYMBOL(ldlm_pool_set_slv);
+@@ -1307,7 +1307,6 @@ int ldlm_prep_elc_req(struct obd_export *exp,
+ 		      int version, int opc, int canceloff,
+ 		      struct list_head *cancels, int count);
  
- /**
-- * Returns current \a pl CLV.
-- *
-- * \pre ->pl_lock is not locked.
-- */
--__u64 ldlm_pool_get_clv(struct ldlm_pool *pl)
+-struct ptlrpc_request *ldlm_enqueue_pack(struct obd_export *exp, int lvb_len);
+ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 			  ldlm_type_t type, __u8 with_policy, ldlm_mode_t mode,
+ 			  __u64 *flags, void *lvb, __u32 lvb_len,
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index 9856133..c73661c 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -742,27 +742,6 @@ int ldlm_prep_enqueue_req(struct obd_export *exp, struct ptlrpc_request *req,
+ }
+ EXPORT_SYMBOL(ldlm_prep_enqueue_req);
+ 
+-struct ptlrpc_request *ldlm_enqueue_pack(struct obd_export *exp, int lvb_len)
 -{
--	__u64 slv;
+-	struct ptlrpc_request *req;
+-	int rc;
 -
--	spin_lock(&pl->pl_lock);
--	slv = pl->pl_client_lock_volume;
--	spin_unlock(&pl->pl_lock);
--	return slv;
+-	req = ptlrpc_request_alloc(class_exp2cliimp(exp), &RQF_LDLM_ENQUEUE);
+-	if (req == NULL)
+-		return ERR_PTR(-ENOMEM);
+-
+-	rc = ldlm_prep_enqueue_req(exp, req, NULL, 0);
+-	if (rc) {
+-		ptlrpc_request_free(req);
+-		return ERR_PTR(rc);
+-	}
+-
+-	req_capsule_set_size(&req->rq_pill, &RMF_DLM_LVB, RCL_SERVER, lvb_len);
+-	ptlrpc_request_set_replen(req);
+-	return req;
 -}
--EXPORT_SYMBOL(ldlm_pool_get_clv);
+-EXPORT_SYMBOL(ldlm_enqueue_pack);
 -
--/**
-  * Sets passed \a clv to \a pl.
+ /**
+  * Client-side lock enqueue.
   *
-  * \pre ->pl_lock is not locked.
 -- 
 2.1.0
