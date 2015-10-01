@@ -1,10 +1,8 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:16 -0400
-Subject: [lustre-devel] [PATCH 06/32] staging/lustre/lov: Remove unused
-	lov_lsm_decref()
-In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-7-git-send-email-green@linuxhacker.ru>
+Date: Thu,  1 Oct 2015 00:12:10 -0400
+Subject: [lustre-devel] [PATCH 00/32] Lustre (mostly locking) unused code
+	removal
+Message-ID: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,59 +11,78 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Also lov_lsm_addref is only used in the file it is defined,
-so make it static
+This continues the quest for killing unused code in the Lustre client.
 
-Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
----
- drivers/staging/lustre/lustre/lov/lov_cl_internal.h |  3 ---
- drivers/staging/lustre/lustre/lov/lov_object.c      | 13 +------------
- 2 files changed, 1 insertion(+), 15 deletions(-)
+Main focus in this set is on Lustre LDLM code - it kills both
+outright unused code and code that looks like it's used, but in fact
+also unused as various conditions that would lead to it would only
+happen on the server. Also LDLM is cleaned up to remove unneeded exported
+symbols and (almost) all locally used functions are now declared as static.
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-index 314ce85..9a9156e 100644
---- a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-@@ -637,9 +637,6 @@ struct lov_io_sub    *lov_page_subio(const struct lu_env *env,
- 					 struct lov_io *lio,
- 					 const struct cl_page_slice *slice);
- 
--void lov_lsm_decref(struct lov_object *lov, struct lov_stripe_md *lsm);
--struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov);
--
- #define lov_foreach_target(lov, var)		    \
- 	for (var = 0; var < lov_targets_nr(lov); ++var)
- 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-index 4d7cd92..e67df64 100644
---- a/drivers/staging/lustre/lustre/lov/lov_object.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-@@ -909,7 +909,7 @@ struct lu_object *lov_object_alloc(const struct lu_env *env,
- 	return obj;
- }
- 
--struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
-+static struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
- {
- 	struct lov_stripe_md *lsm = NULL;
- 
-@@ -924,17 +924,6 @@ struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
- 	return lsm;
- }
- 
--void lov_lsm_decref(struct lov_object *lov, struct lov_stripe_md *lsm)
--{
--	if (lsm == NULL)
--		return;
--
--	CDEBUG(D_INODE, "lsm %p decref %d by %p.\n",
--		lsm, atomic_read(&lsm->lsm_refc), current);
--
--	lov_free_memmd(&lsm);
--}
--
- struct lov_stripe_md *lov_lsm_get(struct cl_object *clobj)
- {
- 	struct lu_object *luobj;
+Also a few patches to llite/lov to remove some unused functions there.
+
+Please consider.
+
+Oleg Drokin (32):
+  staging/lustre/llite: Remove unused ll_get_default/max_cookiesize()
+  staging/lustre: KEY_DEFAULT/MAX_COOKIESIZE key is unused, remove them
+  staging/lustre: Remove ununused ll_ra_read_get()
+  staging/lustre/llite: Remove unused ll_rmdir_entry()
+  staging/lustre/lov: Remove unused lov_dump_lmm/pool()
+  staging/lustre/lov: Remove unused lov_lsm_decref()
+  staging/lustre/ldlm: Remove unused interval tree bits
+  staging/lustre/ldlm: Remove unused ldlm_cancel_locks_for_exports()
+  staging/lustre/ldlm: Remove ldlm_init/destroy_export()
+  staging/lustre/ldlm: Remove unimplemented lock conversion traces.
+  staging/lustre/ldlm: Get rid of lr_converting queue
+  staging/lustre/ldlm: Remove unused ldlm_cli_enqueue_local()
+  staging/lustre/ldlm: Remove unused ldlm_init/fini_flock_export
+  staging/lustre/ldlm: Remove unused ldlm_enqueue_pack()
+  staging/lustre/ldlm: Remove ldlm_errno2error()
+  staging/lustre/ldlm: Remove ldlm_glimpse_ast()
+  staging/lustre/ldlm: Remove ldlm_lock_fail_match()
+  staging/lustre/ldlm: Remove ldlm_namespace_free()
+  staging/lustre/ldlm: Remove unused ldlm_pool_get_clv()
+  staging/lustre/ldlm: Remove unused ldlm_pool_set_slv()
+  staging/lustre/ldlm: Remove ldlm_refresh/del_waiting_lock()
+  staging/lustre/ldlm: Remove intent policies handler.
+  staging/lustre/ldlm: Remove unused ldlm_reprocess_all*()
+  staging/lustre/ldlm: Remove unused ldlm_resource_insert_lock_after()
+  staging/lustre/ldlm: Remove unused ldlm_blocking_ast/_nocheck()
+  staging/lustre: Remove ns_is_client()
+  staging/lustre: Remove ns_is_server()
+  staging/lustre/ldlm: Remove server side code from pool support.
+  staging/lustre/ldlm: Remove unused exported symbols.
+  staging/lustre/ldlm: Remove ldlm_namespace_inactive_list()
+  staging/lustre/ldlm: Remove posix lock (flock) deadlock detection
+  staging/lustre/ldlm: Make ldlm_add_ast_work_item() static
+
+ .../staging/lustre/lustre/include/interval_tree.h  |  36 --
+ drivers/staging/lustre/lustre/include/lustre_dlm.h | 103 +----
+ drivers/staging/lustre/lustre/include/obd.h        |   2 -
+ drivers/staging/lustre/lustre/ldlm/interval_tree.c | 271 --------------
+ drivers/staging/lustre/lustre/ldlm/l_lock.c        |   7 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_extent.c   |  22 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    | 269 +------------
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |  36 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |  36 --
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 380 ++-----------------
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    | 122 +-----
+ drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     | 416 ++-------------------
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 338 +----------------
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 181 +++------
+ .../staging/lustre/lustre/llite/llite_internal.h   |   4 -
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  26 --
+ drivers/staging/lustre/lustre/llite/namei.c        |  28 --
+ drivers/staging/lustre/lustre/llite/rw.c           |  24 --
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   2 -
+ .../staging/lustre/lustre/lov/lov_cl_internal.h    |   3 -
+ drivers/staging/lustre/lustre/lov/lov_internal.h   |   2 -
+ drivers/staging/lustre/lustre/lov/lov_object.c     |  13 +-
+ drivers/staging/lustre/lustre/lov/lov_pack.c       |  20 -
+ drivers/staging/lustre/lustre/lov/lov_pool.c       |  22 --
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |  20 -
+ 25 files changed, 155 insertions(+), 2228 deletions(-)
+
 -- 
 2.1.0
