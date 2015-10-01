@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:34 -0400
-Subject: [lustre-devel] [PATCH 24/32] staging/lustre/ldlm: Remove unused
-	ldlm_resource_insert_lock_after()
+Date: Thu,  1 Oct 2015 00:12:35 -0400
+Subject: [lustre-devel] [PATCH 25/32] staging/lustre/ldlm: Remove unused
+	ldlm_blocking_ast/_nocheck()
 In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-25-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443672762-982936-26-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,63 +13,108 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-It was only used on the server.
+All users are gone, and they were used on the server anyway.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |  2 --
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 26 ----------------------
- 2 files changed, 28 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |  3 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 70 ----------------------
+ 2 files changed, 73 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-index 1293f13..56805d0 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-@@ -116,8 +116,6 @@ int ldlm_get_enq_timeout(struct ldlm_lock *lock);
- 
- /* ldlm_resource.c */
- int ldlm_resource_putref_locked(struct ldlm_resource *res);
--void ldlm_resource_insert_lock_after(struct ldlm_lock *original,
--				     struct ldlm_lock *new);
- void ldlm_namespace_free_prior(struct ldlm_namespace *ns,
- 			       struct obd_import *imp, int force);
- void ldlm_namespace_free_post(struct ldlm_namespace *ns);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index cd65efe..9906372 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -1281,32 +1281,6 @@ void ldlm_resource_add_lock(struct ldlm_resource *res, struct list_head *head,
- 	list_add_tail(&lock->l_res_link, head);
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 9608373..360c7f7 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -1264,9 +1264,6 @@ int ldlm_expired_completion_wait(void *data);
+  * also used by client-side lock handlers to perform minimum level base
+  * processing.
+  * @{ */
+-int ldlm_blocking_ast_nocheck(struct ldlm_lock *lock);
+-int ldlm_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
+-		      void *data, int flag);
+ int ldlm_completion_ast_async(struct ldlm_lock *lock, __u64 flags, void *data);
+ int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data);
+ /** @} ldlm_local_ast */
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index 15e1980..2d28fc2 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -287,76 +287,6 @@ noreproc:
  }
+ EXPORT_SYMBOL(ldlm_completion_ast);
  
 -/**
-- * Insert a lock into resource after specified lock.
+- * A helper to build a blocking AST function
 - *
-- * Obtain resource description from the lock we are inserting after.
+- * Perform a common operation for blocking ASTs:
+- * deferred lock cancellation.
+- *
+- * \param lock the lock blocking or canceling AST was called on
+- * \retval 0
+- * \see mdt_blocking_ast
+- * \see ldlm_blocking_ast
 - */
--void ldlm_resource_insert_lock_after(struct ldlm_lock *original,
--				     struct ldlm_lock *new)
+-int ldlm_blocking_ast_nocheck(struct ldlm_lock *lock)
 -{
--	struct ldlm_resource *res = original->l_resource;
+-	int do_ast;
 -
--	check_res_locked(res);
+-	lock->l_flags |= LDLM_FL_CBPENDING;
+-	do_ast = !lock->l_readers && !lock->l_writers;
+-	unlock_res_and_lock(lock);
 -
--	ldlm_resource_dump(D_INFO, res);
--	LDLM_DEBUG(new, "About to insert this lock after %p:\n", original);
+-	if (do_ast) {
+-		struct lustre_handle lockh;
+-		int rc;
 -
--	if (new->l_flags & LDLM_FL_DESTROYED) {
--		CDEBUG(D_OTHER, "Lock destroyed, not adding to resource\n");
--		goto out;
+-		LDLM_DEBUG(lock, "already unused, calling ldlm_cli_cancel");
+-		ldlm_lock2handle(lock, &lockh);
+-		rc = ldlm_cli_cancel(&lockh, LCF_ASYNC);
+-		if (rc < 0)
+-			CERROR("ldlm_cli_cancel: %d\n", rc);
+-	} else {
+-		LDLM_DEBUG(lock, "Lock still has references, will be cancelled later");
+-	}
+-	return 0;
+-}
+-EXPORT_SYMBOL(ldlm_blocking_ast_nocheck);
+-
+-/**
+- * Server blocking AST
+- *
+- * ->l_blocking_ast() callback for LDLM locks acquired by server-side
+- * OBDs.
+- *
+- * \param lock the lock which blocks a request or cancelling lock
+- * \param desc unused
+- * \param data unused
+- * \param flag indicates whether this cancelling or blocking callback
+- * \retval 0
+- * \see ldlm_blocking_ast_nocheck
+- */
+-int ldlm_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
+-		      void *data, int flag)
+-{
+-	if (flag == LDLM_CB_CANCELING) {
+-		/* Don't need to do anything here. */
+-		return 0;
 -	}
 -
--	LASSERT(list_empty(&new->l_res_link));
--
--	list_add(&new->l_res_link, &original->l_res_link);
-- out:;
+-	lock_res_and_lock(lock);
+-	/* Get this: if ldlm_blocking_ast is racing with intent_policy, such
+-	 * that ldlm_blocking_ast is called just before intent_policy method
+-	 * takes the lr_lock, then by the time we get the lock, we might not
+-	 * be the correct blocking function anymore.  So check, and return
+-	 * early, if so. */
+-	if (lock->l_blocking_ast != ldlm_blocking_ast) {
+-		unlock_res_and_lock(lock);
+-		return 0;
+-	}
+-	return ldlm_blocking_ast_nocheck(lock);
 -}
+-EXPORT_SYMBOL(ldlm_blocking_ast);
 -
- void ldlm_resource_unlink_lock(struct ldlm_lock *lock)
+ static void failed_lock_cleanup(struct ldlm_namespace *ns,
+ 				struct ldlm_lock *lock, int mode)
  {
- 	int type = lock->l_resource->lr_type;
 -- 
 2.1.0
