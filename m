@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:15 -0400
-Subject: [lustre-devel] [PATCH 05/32] staging/lustre/lov: Remove unused
-	lov_dump_lmm/pool()
+Date: Thu,  1 Oct 2015 00:12:18 -0400
+Subject: [lustre-devel] [PATCH 08/32] staging/lustre/ldlm: Remove unused
+	ldlm_cancel_locks_for_exports()
 In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-6-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443672762-982936-9-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,99 +13,87 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-These generic switch functions appear to be unused as all the
-individual ones are called directly.
+This is only used on the server in case a client gets disconnected.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/lov/lov_internal.h |  2 --
- drivers/staging/lustre/lustre/lov/lov_pack.c     | 20 --------------------
- drivers/staging/lustre/lustre/lov/lov_pool.c     | 22 ----------------------
- 3 files changed, 44 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |  2 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 50 ----------------------
+ 2 files changed, 52 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index dde9656..0de39cc 100644
---- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -220,7 +220,6 @@ int lov_free_memmd(struct lov_stripe_md **lsmp);
- void lov_dump_lmm_v1(int level, struct lov_mds_md_v1 *lmm);
- void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm);
- void lov_dump_lmm_common(int level, void *lmmp);
--void lov_dump_lmm(int level, void *lmm);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+index fa4b7c7..e870b3e 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+@@ -164,8 +164,6 @@ void ldlm_lock_add_to_lru(struct ldlm_lock *lock);
+ void ldlm_lock_touch_in_lru(struct ldlm_lock *lock);
+ void ldlm_lock_destroy_nolock(struct ldlm_lock *lock);
  
- /* lov_ea.c */
- struct lov_stripe_md *lsm_alloc_plain(__u16 stripe_count, int *size);
-@@ -248,7 +247,6 @@ int lov_pool_new(struct obd_device *obd, char *poolname);
- int lov_pool_del(struct obd_device *obd, char *poolname);
- int lov_pool_add(struct obd_device *obd, char *poolname, char *ostname);
- int lov_pool_remove(struct obd_device *obd, char *poolname, char *ostname);
--void lov_dump_pool(int level, struct pool_desc *pool);
- struct pool_desc *lov_find_pool(struct lov_obd *lov, char *poolname);
- int lov_check_index_in_pool(__u32 idx, struct pool_desc *pool);
- void lov_pool_putref(struct pool_desc *pool);
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index 6b1c135..05651ac 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -100,26 +100,6 @@ void lov_dump_lmm_v3(int level, struct lov_mds_md_v3 *lmm)
- 			     le16_to_cpu(lmm->lmm_stripe_count));
- }
- 
--void lov_dump_lmm(int level, void *lmm)
--{
--	int magic;
+-void ldlm_cancel_locks_for_export(struct obd_export *export);
 -
--	magic = le32_to_cpu(((struct lov_mds_md *)lmm)->lmm_magic);
--	switch (magic) {
--	case LOV_MAGIC_V1:
--		lov_dump_lmm_v1(level, (struct lov_mds_md_v1 *)lmm);
--		break;
--	case LOV_MAGIC_V3:
--		lov_dump_lmm_v3(level, (struct lov_mds_md_v3 *)lmm);
--		break;
--	default:
--		CDEBUG(level, "unrecognized lmm_magic %x, assuming %x\n",
--		       magic, LOV_MAGIC_V1);
--		lov_dump_lmm_common(level, lmm);
--		break;
--	}
--}
--
- /* Pack LOV object metadata for disk storage.  It is packed in LE byte
-  * order and is opaque to the networking layer.
-  *
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
-index c59b140..f996348 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pool.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
-@@ -294,28 +294,6 @@ static struct file_operations pool_proc_operations = {
- 	.release	= seq_release,
+ /* ldlm_lockd.c */
+ int ldlm_bl_to_thread_lock(struct ldlm_namespace *ns, struct ldlm_lock_desc *ld,
+ 			   struct ldlm_lock *lock);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 12eb5ac..b257b89 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -2012,56 +2012,6 @@ struct export_cl_data {
  };
  
--void lov_dump_pool(int level, struct pool_desc *pool)
+ /**
+- * Iterator function for ldlm_cancel_locks_for_export.
+- * Cancels passed locks.
+- */
+-int ldlm_cancel_locks_for_export_cb(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-				    struct hlist_node *hnode, void *data)
+-
 -{
--	int i;
+-	struct export_cl_data	*ecl = (struct export_cl_data *)data;
+-	struct obd_export	*exp  = ecl->ecl_exp;
+-	struct ldlm_lock     *lock = cfs_hash_object(hs, hnode);
+-	struct ldlm_resource *res;
 -
--	lov_pool_getref(pool);
+-	res = ldlm_resource_getref(lock->l_resource);
+-	LDLM_LOCK_GET(lock);
 -
--	CDEBUG(level, "pool "LOV_POOLNAMEF" has %d members\n",
--	       pool->pool_name, pool->pool_obds.op_count);
--	down_read(&pool_tgt_rw_sem(pool));
+-	LDLM_DEBUG(lock, "export %p", exp);
+-	ldlm_res_lvbo_update(res, NULL, 1);
+-	ldlm_lock_cancel(lock);
+-	ldlm_reprocess_all(res);
+-	ldlm_resource_putref(res);
+-	LDLM_LOCK_RELEASE(lock);
 -
--	for (i = 0; i < pool_tgt_count(pool) ; i++) {
--		if (!pool_tgt(pool, i) || !(pool_tgt(pool, i))->ltd_exp)
--			continue;
--		CDEBUG(level, "pool "LOV_POOLNAMEF"[%d] = %s\n",
--		       pool->pool_name, i,
--		       obd_uuid2str(&((pool_tgt(pool, i))->ltd_uuid)));
+-	ecl->ecl_loop++;
+-	if ((ecl->ecl_loop & -ecl->ecl_loop) == ecl->ecl_loop) {
+-		CDEBUG(D_INFO,
+-		       "Cancel lock %p for export %p (loop %d), still have %d locks left on hash table.\n",
+-		       lock, exp, ecl->ecl_loop,
+-		       atomic_read(&hs->hs_count));
 -	}
 -
--	up_read(&pool_tgt_rw_sem(pool));
--	lov_pool_putref(pool);
+-	return 0;
 -}
 -
- #define LOV_POOL_INIT_COUNT 2
- int lov_ost_pool_init(struct ost_pool *op, unsigned int count)
- {
+-/**
+- * Cancel all locks for given export.
+- *
+- * Typically called on client disconnection/eviction
+- */
+-void ldlm_cancel_locks_for_export(struct obd_export *exp)
+-{
+-	struct export_cl_data	ecl = {
+-		.ecl_exp	= exp,
+-		.ecl_loop	= 0,
+-	};
+-
+-	cfs_hash_for_each_empty(exp->exp_lock_hash,
+-				ldlm_cancel_locks_for_export_cb, &ecl);
+-}
+-
+-/**
+  * Downgrade an exclusive lock.
+  *
+  * A fast variant of ldlm_lock_convert for conversion of exclusive
 -- 
 2.1.0
