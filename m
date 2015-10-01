@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:30 -0400
-Subject: [lustre-devel] [PATCH 20/32] staging/lustre/ldlm: Remove unused
-	ldlm_pool_set_slv()
+Date: Thu,  1 Oct 2015 00:12:21 -0400
+Subject: [lustre-devel] [PATCH 11/32] staging/lustre/ldlm: Get rid of
+	lr_converting queue
 In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-21-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443672762-982936-12-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,47 +13,122 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
+Now that we removed all the lock conversion functions,
+also get rid of the converson queue since nothing could ever
+get there anyway.
+
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_dlm.h |  1 -
- drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     | 13 -------------
- 2 files changed, 14 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |  2 --
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 10 +---------
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |  9 ---------
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 12 ------------
+ 4 files changed, 1 insertion(+), 32 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index 1b5f298..ec717eb 100644
+index bea526b..40377b2 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -1402,7 +1402,6 @@ int ldlm_pool_recalc(struct ldlm_pool *pl);
- __u32 ldlm_pool_get_lvf(struct ldlm_pool *pl);
- __u64 ldlm_pool_get_slv(struct ldlm_pool *pl);
- __u32 ldlm_pool_get_limit(struct ldlm_pool *pl);
--void ldlm_pool_set_slv(struct ldlm_pool *pl, __u64 slv);
- void ldlm_pool_set_clv(struct ldlm_pool *pl, __u64 clv);
- void ldlm_pool_set_limit(struct ldlm_pool *pl, __u32 limit);
- void ldlm_pool_add(struct ldlm_pool *pl, struct ldlm_lock *lock);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-index cbe4b7b..94cdf5f 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-@@ -1010,19 +1010,6 @@ __u64 ldlm_pool_get_slv(struct ldlm_pool *pl)
- EXPORT_SYMBOL(ldlm_pool_get_slv);
+@@ -883,8 +883,6 @@ struct ldlm_resource {
+ 	 * @{ */
+ 	/** List of locks in granted state */
+ 	struct list_head		lr_granted;
+-	/** List of locks waiting to change their granted mode (converted) */
+-	struct list_head		lr_converting;
+ 	/**
+ 	 * List of locks that could not be granted due to conflicts and
+ 	 * that are waiting for conflicts to go away */
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 0597fec..7f9d3c1 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -1260,12 +1260,6 @@ ldlm_mode_t ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
+ 		rc = 0;
+ 		goto out;
+ 	}
+-	lock = search_queue(&res->lr_converting, &mode, policy, old_lock,
+-			    flags, unref);
+-	if (lock != NULL) {
+-		rc = 1;
+-		goto out;
+-	}
+ 	lock = search_queue(&res->lr_waiting, &mode, policy, old_lock,
+ 			    flags, unref);
+ 	if (lock != NULL) {
+@@ -1634,9 +1628,7 @@ ldlm_error_t ldlm_lock_enqueue(struct ldlm_namespace *ns,
+ 	 * FIXME (bug 268): Detect obvious lies by checking compatibility in
+ 	 * granted/converting queues. */
+ 	if (local) {
+-		if (*flags & LDLM_FL_BLOCK_CONV)
+-			ldlm_resource_add_lock(res, &res->lr_converting, lock);
+-		else if (*flags & (LDLM_FL_BLOCK_WAIT | LDLM_FL_BLOCK_GRANTED))
++		if (*flags & (LDLM_FL_BLOCK_WAIT | LDLM_FL_BLOCK_GRANTED))
+ 			ldlm_resource_add_lock(res, &res->lr_waiting, lock);
+ 		else
+ 			ldlm_grant_lock(lock, NULL);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index 5bd66c3..760c745 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -1878,15 +1878,6 @@ int ldlm_resource_foreach(struct ldlm_resource *res, ldlm_iterator_t iter,
+ 		}
+ 	}
  
- /**
-- * Sets passed \a slv to \a pl.
-- *
-- * \pre ->pl_lock is not locked.
-- */
--void ldlm_pool_set_slv(struct ldlm_pool *pl, __u64 slv)
--{
--	spin_lock(&pl->pl_lock);
--	pl->pl_server_lock_volume = slv;
--	spin_unlock(&pl->pl_lock);
--}
--EXPORT_SYMBOL(ldlm_pool_set_slv);
+-	list_for_each_safe(tmp, next, &res->lr_converting) {
+-		lock = list_entry(tmp, struct ldlm_lock, l_res_link);
 -
--/**
-  * Sets passed \a clv to \a pl.
-  *
-  * \pre ->pl_lock is not locked.
+-		if (iter(lock, closure) == LDLM_ITER_STOP) {
+-			rc = LDLM_ITER_STOP;
+-			goto out;
+-		}
+-	}
+-
+ 	list_for_each_safe(tmp, next, &res->lr_waiting) {
+ 		lock = list_entry(tmp, struct ldlm_lock, l_res_link);
+ 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index cc212b9..dac2ec2 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -792,7 +792,6 @@ static int ldlm_resource_clean(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+ 	__u64 flags = *(__u64 *)arg;
+ 
+ 	cleanup_resource(res, &res->lr_granted, flags);
+-	cleanup_resource(res, &res->lr_converting, flags);
+ 	cleanup_resource(res, &res->lr_waiting, flags);
+ 
+ 	return 0;
+@@ -1059,7 +1058,6 @@ static struct ldlm_resource *ldlm_resource_new(void)
+ 		return NULL;
+ 
+ 	INIT_LIST_HEAD(&res->lr_granted);
+-	INIT_LIST_HEAD(&res->lr_converting);
+ 	INIT_LIST_HEAD(&res->lr_waiting);
+ 
+ 	/* Initialize interval trees for each lock mode. */
+@@ -1224,11 +1222,6 @@ static void __ldlm_resource_putref_final(struct cfs_hash_bd *bd,
+ 		LBUG();
+ 	}
+ 
+-	if (!list_empty(&res->lr_converting)) {
+-		ldlm_resource_dump(D_ERROR, res);
+-		LBUG();
+-	}
+-
+ 	if (!list_empty(&res->lr_waiting)) {
+ 		ldlm_resource_dump(D_ERROR, res);
+ 		LBUG();
+@@ -1451,11 +1444,6 @@ void ldlm_resource_dump(int level, struct ldlm_resource *res)
+ 			}
+ 		}
+ 	}
+-	if (!list_empty(&res->lr_converting)) {
+-		CDEBUG(level, "Converting locks:\n");
+-		list_for_each_entry(lock, &res->lr_converting, l_res_link)
+-			LDLM_DEBUG_LIMIT(level, lock, "###");
+-	}
+ 	if (!list_empty(&res->lr_waiting)) {
+ 		CDEBUG(level, "Waiting locks:\n");
+ 		list_for_each_entry(lock, &res->lr_waiting, l_res_link)
 -- 
 2.1.0
