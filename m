@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:13 -0400
-Subject: [lustre-devel] [PATCH 03/32] staging/lustre: Remove ununused
-	ll_ra_read_get()
+Date: Thu,  1 Oct 2015 00:12:14 -0400
+Subject: [lustre-devel] [PATCH 04/32] staging/lustre/llite: Remove unused
+	ll_rmdir_entry()
 In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-4-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443672762-982936-5-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,60 +13,65 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Also ll_ra_read_get_locked that was only used by it.
+The ioctl for this function was removed, but the function was
+forgotten, so kill it now.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
  .../staging/lustre/lustre/llite/llite_internal.h   |  1 -
- drivers/staging/lustre/lustre/llite/rw.c           | 24 ----------------------
- 2 files changed, 25 deletions(-)
+ drivers/staging/lustre/lustre/llite/namei.c        | 28 ----------------------
+ 2 files changed, 29 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 59fdbed..d6bdfed 100644
+index d6bdfed..4c20b1e 100644
 --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
 +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -657,7 +657,6 @@ static inline int ll_need_32bit_api(struct ll_sb_info *sbi)
+@@ -687,7 +687,6 @@ struct inode *ll_iget(struct super_block *sb, ino_t hash,
+ int ll_md_blocking_ast(struct ldlm_lock *, struct ldlm_lock_desc *,
+ 		       void *data, int flag);
+ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de);
+-int ll_rmdir_entry(struct inode *dir, char *name, int namelen);
  
- void ll_ra_read_in(struct file *f, struct ll_ra_read *rar);
- void ll_ra_read_ex(struct file *f, struct ll_ra_read *rar);
--struct ll_ra_read *ll_ra_read_get(struct file *f);
- 
- /* llite/lproc_llite.c */
- int ldebugfs_register_mountpoint(struct dentry *parent,
-diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
-index 8c1bfd2..71be194 100644
---- a/drivers/staging/lustre/lustre/llite/rw.c
-+++ b/drivers/staging/lustre/lustre/llite/rw.c
-@@ -417,30 +417,6 @@ void ll_ra_read_ex(struct file *f, struct ll_ra_read *rar)
- 	spin_unlock(&ras->ras_lock);
+ /* llite/rw.c */
+ int ll_prepare_write(struct file *, struct page *, unsigned from, unsigned to);
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index 2e663ea..a22e252 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -870,34 +870,6 @@ static inline void ll_get_child_fid(struct dentry *child, struct lu_fid *fid)
+ 		*fid = *ll_inode2fid(d_inode(child));
  }
  
--static struct ll_ra_read *ll_ra_read_get_locked(struct ll_readahead_state *ras)
+-/**
+- * Remove dir entry
+- **/
+-int ll_rmdir_entry(struct inode *dir, char *name, int namelen)
 -{
--	struct ll_ra_read *scan;
+-	struct ptlrpc_request *request = NULL;
+-	struct md_op_data *op_data;
+-	int rc;
 -
--	list_for_each_entry(scan, &ras->ras_read_beads, lrr_linkage) {
--		if (scan->lrr_reader == current)
--			return scan;
+-	CDEBUG(D_VFSTRACE, "VFS Op:name=%.*s,dir=%lu/%u(%p)\n",
+-	       namelen, name, dir->i_ino, dir->i_generation, dir);
+-
+-	op_data = ll_prep_md_op_data(NULL, dir, NULL, name, strlen(name),
+-				     S_IFDIR, LUSTRE_OPC_ANY, NULL);
+-	if (IS_ERR(op_data))
+-		return PTR_ERR(op_data);
+-	op_data->op_cli_flags |= CLI_RM_ENTRY;
+-	rc = md_unlink(ll_i2sbi(dir)->ll_md_exp, op_data, &request);
+-	ll_finish_md_op_data(op_data);
+-	if (rc == 0) {
+-		ll_update_times(request, dir);
+-		ll_stats_ops_tally(ll_i2sbi(dir), LPROC_LL_RMDIR, 1);
 -	}
--	return NULL;
+-
+-	ptlrpc_req_finished(request);
+-	return rc;
 -}
 -
--struct ll_ra_read *ll_ra_read_get(struct file *f)
--{
--	struct ll_readahead_state *ras;
--	struct ll_ra_read	 *bead;
--
--	ras = ll_ras_get(f);
--
--	spin_lock(&ras->ras_lock);
--	bead = ll_ra_read_get_locked(ras);
--	spin_unlock(&ras->ras_lock);
--	return bead;
--}
--
- static int cl_read_ahead_page(const struct lu_env *env, struct cl_io *io,
- 			      struct cl_page_list *queue, struct cl_page *page,
- 			      struct page *vmpage)
+ int ll_objects_destroy(struct ptlrpc_request *request, struct inode *dir)
+ {
+ 	struct mdt_body *body;
 -- 
 2.1.0
