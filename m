@@ -1,10 +1,9 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:33 -0400
-Subject: [lustre-devel] [PATCH 23/32] staging/lustre/ldlm: Remove unused
-	ldlm_reprocess_all*()
+Date: Thu,  1 Oct 2015 00:12:37 -0400
+Subject: [lustre-devel] [PATCH 27/32] staging/lustre: Remove ns_is_server()
 In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-24-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443672762-982936-28-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,122 +12,174 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-They are only used on the server.
-Also remove helper functions and cleanup callsites.
+Since the code we have is Lustre-client only, this function
+always returns 0, so drop it and amend all the callsites to
+drop dead code.
+One of the places also sets LDLM_FL_NS_SRV to indicate a lock
+is in a server namespace. This too cannot happen in this code,
+so drop all such checks as well.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_dlm.h |  2 -
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |  1 -
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 48 ----------------------
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |  4 --
- 4 files changed, 55 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h | 13 -------------
+ drivers/staging/lustre/lustre/ldlm/l_lock.c        |  7 ++-----
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 14 --------------
+ drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     | 16 ++--------------
+ 4 files changed, 4 insertions(+), 46 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index c0b2c61..9608373 100644
+index 1e40203..49b5a07 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -1215,8 +1215,6 @@ ldlm_mode_t ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
- ldlm_mode_t ldlm_revalidate_lock_handle(struct lustre_handle *lockh,
- 					__u64 *bits);
- void ldlm_lock_cancel(struct ldlm_lock *lock);
--void ldlm_reprocess_all(struct ldlm_resource *res);
--void ldlm_reprocess_all_ns(struct ldlm_namespace *ns);
- void ldlm_lock_dump_handle(int level, struct lustre_handle *);
- void ldlm_unlink_lock_skiplist(struct ldlm_lock *req);
+@@ -465,19 +465,6 @@ struct ldlm_namespace {
+ };
  
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index bb8ecc8..14e6782 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -523,7 +523,6 @@ reprocess:
- 	/* At this point we're granting the lock request. */
- 	req->l_granted_mode = req->l_req_mode;
+ /**
+- * Returns 1 if namespace \a ns is a server namespace.
+- */
+-static inline int ns_is_server(struct ldlm_namespace *ns)
+-{
+-	LASSERT(ns != NULL);
+-	LASSERT(!(ns->ns_client & ~(LDLM_NAMESPACE_CLIENT |
+-				    LDLM_NAMESPACE_SERVER)));
+-	LASSERT(ns->ns_client == LDLM_NAMESPACE_CLIENT ||
+-		ns->ns_client == LDLM_NAMESPACE_SERVER);
+-	return ns->ns_client == LDLM_NAMESPACE_SERVER;
+-}
+-
+-/**
+  * Returns 1 if namespace \a ns supports early lock cancel (ELC).
+  */
+ static inline int ns_connect_cancelset(struct ldlm_namespace *ns)
+diff --git a/drivers/staging/lustre/lustre/ldlm/l_lock.c b/drivers/staging/lustre/lustre/ldlm/l_lock.c
+index cd8ab40..e5d1344 100644
+--- a/drivers/staging/lustre/lustre/ldlm/l_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/l_lock.c
+@@ -50,9 +50,7 @@
+  */
+ struct ldlm_resource *lock_res_and_lock(struct ldlm_lock *lock)
+ {
+-	/* on server-side resource of lock doesn't change */
+-	if ((lock->l_flags & LDLM_FL_NS_SRV) == 0)
+-		spin_lock(&lock->l_lock);
++	spin_lock(&lock->l_lock);
  
--	/* Add req to the granted queue before calling ldlm_reprocess_all(). */
- 	if (!added) {
- 		list_del_init(&req->l_res_link);
- 		/* insert new lock before ownlocks in list. */
+ 	lock_res(lock->l_resource);
+ 
+@@ -70,7 +68,6 @@ void unlock_res_and_lock(struct ldlm_lock *lock)
+ 	lock->l_flags &= ~LDLM_FL_RES_LOCKED;
+ 
+ 	unlock_res(lock->l_resource);
+-	if ((lock->l_flags & LDLM_FL_NS_SRV) == 0)
+-		spin_unlock(&lock->l_lock);
++	spin_unlock(&lock->l_lock);
+ }
+ EXPORT_SYMBOL(unlock_res_and_lock);
 diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index 5a07669..e586d33 100644
+index 6d5e7af..827e5df 100644
 --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
 +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -1786,54 +1786,6 @@ out:
- 	return rc;
- }
+@@ -237,11 +237,6 @@ int ldlm_lock_remove_from_lru(struct ldlm_lock *lock)
+ 	struct ldlm_namespace *ns = ldlm_lock_to_ns(lock);
+ 	int rc;
  
--static int reprocess_one_queue(struct ldlm_resource *res, void *closure)
--{
--	ldlm_reprocess_all(res);
--	return LDLM_ITER_CONTINUE;
--}
--
--static int ldlm_reprocess_res(struct cfs_hash *hs, struct cfs_hash_bd *bd,
--			      struct hlist_node *hnode, void *arg)
--{
--	struct ldlm_resource *res = cfs_hash_object(hs, hnode);
--	int    rc;
--
--	rc = reprocess_one_queue(res, arg);
--
--	return rc == LDLM_ITER_STOP;
--}
--
--/**
-- * Iterate through all resources on a namespace attempting to grant waiting
-- * locks.
-- */
--void ldlm_reprocess_all_ns(struct ldlm_namespace *ns)
--{
--	if (ns != NULL) {
--		cfs_hash_for_each_nolock(ns->ns_rs_hash,
--					 ldlm_reprocess_res, NULL);
+-	if (lock->l_flags & LDLM_FL_NS_SRV) {
+-		LASSERT(list_empty(&lock->l_lru));
+-		return 0;
 -	}
--}
--EXPORT_SYMBOL(ldlm_reprocess_all_ns);
 -
--/**
-- * Try to grant all waiting locks on a resource.
-- *
-- * Calls ldlm_reprocess_queue on converting and waiting queues.
-- *
-- * Typically called after some resource locks are cancelled to see
-- * if anything could be granted as a result of the cancellation.
-- */
--void ldlm_reprocess_all(struct ldlm_resource *res)
--{
--	LIST_HEAD(rpc_list);
--
--	if (!ns_is_client(ldlm_res_to_ns(res))) {
--		CERROR("This is client-side-only module, cannot handle LDLM_NAMESPACE_SERVER resource type lock.\n");
--		LBUG();
+ 	spin_lock(&ns->ns_lock);
+ 	rc = ldlm_lock_remove_from_lru_nolock(lock);
+ 	spin_unlock(&ns->ns_lock);
+@@ -286,11 +281,6 @@ void ldlm_lock_touch_in_lru(struct ldlm_lock *lock)
+ {
+ 	struct ldlm_namespace *ns = ldlm_lock_to_ns(lock);
+ 
+-	if (lock->l_flags & LDLM_FL_NS_SRV) {
+-		LASSERT(list_empty(&lock->l_lru));
+-		return;
 -	}
--}
 -
- /**
-  * Helper function to call blocking AST for LDLM lock \a lock in a
-  * "cancelling" mode.
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index a9159fd..15e1980 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -188,7 +188,6 @@ int ldlm_completion_ast_async(struct ldlm_lock *lock, __u64 flags, void *data)
- 	}
+ 	spin_lock(&ns->ns_lock);
+ 	if (!list_empty(&lock->l_lru)) {
+ 		ldlm_lock_remove_from_lru_nolock(lock);
+@@ -799,8 +789,6 @@ void ldlm_lock_decref_internal(struct ldlm_lock *lock, __u32 mode)
+ 	    (lock->l_flags & LDLM_FL_CBPENDING)) {
+ 		/* If we received a blocked AST and this was the last reference,
+ 		 * run the callback. */
+-		if ((lock->l_flags & LDLM_FL_NS_SRV) && lock->l_export)
+-			CERROR("FL_CBPENDING set on non-local lock--just a warning\n");
  
- 	LDLM_DEBUG(lock, "client-side enqueue returned a blocked lock, going forward");
--	ldlm_reprocess_all(lock->l_resource);
- 	return 0;
+ 		LDLM_DEBUG(lock, "final decref done on cbpending lock");
+ 
+@@ -1486,8 +1474,6 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
+ 	lock->l_req_mode = mode;
+ 	lock->l_ast_data = data;
+ 	lock->l_pid = current_pid();
+-	if (ns_is_server(ns))
+-		lock->l_flags |= LDLM_FL_NS_SRV;
+ 	if (cbs) {
+ 		lock->l_blocking_ast = cbs->lcs_blocking;
+ 		lock->l_completion_ast = cbs->lcs_completion;
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+index 94cdf5f..dac1b6f 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+@@ -656,8 +656,8 @@ EXPORT_SYMBOL(ldlm_pool_setup);
+ 
+ static int lprocfs_pool_state_seq_show(struct seq_file *m, void *unused)
+ {
+-	int granted, grant_rate, cancel_rate, grant_step;
+-	int grant_speed, grant_plan, lvf;
++	int granted, grant_rate, cancel_rate;
++	int grant_speed, lvf;
+ 	struct ldlm_pool *pl = m->private;
+ 	__u64 slv, clv;
+ 	__u32 limit;
+@@ -666,13 +666,11 @@ static int lprocfs_pool_state_seq_show(struct seq_file *m, void *unused)
+ 	slv = pl->pl_server_lock_volume;
+ 	clv = pl->pl_client_lock_volume;
+ 	limit = ldlm_pool_get_limit(pl);
+-	grant_plan = pl->pl_grant_plan;
+ 	granted = atomic_read(&pl->pl_granted);
+ 	grant_rate = atomic_read(&pl->pl_grant_rate);
+ 	cancel_rate = atomic_read(&pl->pl_cancel_rate);
+ 	grant_speed = grant_rate - cancel_rate;
+ 	lvf = atomic_read(&pl->pl_lock_volume_factor);
+-	grant_step = ldlm_pool_t2gsp(pl->pl_recalc_period);
+ 	spin_unlock(&pl->pl_lock);
+ 
+ 	seq_printf(m, "LDLM pool state (%s):\n"
+@@ -681,11 +679,6 @@ static int lprocfs_pool_state_seq_show(struct seq_file *m, void *unused)
+ 		      "  LVF: %d\n",
+ 		      pl->pl_name, slv, clv, lvf);
+ 
+-	if (ns_is_server(ldlm_pl2ns(pl))) {
+-		seq_printf(m, "  GSP: %d%%\n"
+-			      "  GP:  %d\n",
+-			      grant_step, grant_plan);
+-	}
+ 	seq_printf(m, "  GR:  %d\n  CR:  %d\n  GS:  %d\n"
+ 		      "  G:   %d\n  L:   %d\n",
+ 		      grant_rate, cancel_rate, grant_speed,
+@@ -966,8 +959,6 @@ void ldlm_pool_add(struct ldlm_pool *pl, struct ldlm_lock *lock)
+ 	 * enqueue/cancel rpc. Also we do not want to run out of stack
+ 	 * with too long call paths.
+ 	 */
+-	if (ns_is_server(ldlm_pl2ns(pl)))
+-		ldlm_pool_recalc(pl);
  }
- EXPORT_SYMBOL(ldlm_completion_ast_async);
-@@ -892,9 +891,6 @@ static __u64 ldlm_cli_cancel_local(struct ldlm_lock *lock)
- 			LDLM_ERROR(lock, "Trying to cancel local lock");
- 			LBUG();
- 		}
--		LDLM_DEBUG(lock, "server-side local cancel");
--		ldlm_lock_cancel(lock);
--		ldlm_reprocess_all(lock->l_resource);
- 	}
+ EXPORT_SYMBOL(ldlm_pool_add);
  
- 	return rc;
+@@ -987,9 +978,6 @@ void ldlm_pool_del(struct ldlm_pool *pl, struct ldlm_lock *lock)
+ 	atomic_inc(&pl->pl_cancel_rate);
+ 
+ 	lprocfs_counter_incr(pl->pl_stats, LDLM_POOL_CANCEL_STAT);
+-
+-	if (ns_is_server(ldlm_pl2ns(pl)))
+-		ldlm_pool_recalc(pl);
+ }
+ EXPORT_SYMBOL(ldlm_pool_del);
+ 
 -- 
 2.1.0
