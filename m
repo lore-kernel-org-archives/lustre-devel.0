@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:28 -0400
-Subject: [lustre-devel] [PATCH 18/32] staging/lustre/ldlm: Remove
-	ldlm_namespace_free()
+Date: Thu,  1 Oct 2015 00:12:31 -0400
+Subject: [lustre-devel] [PATCH 21/32] staging/lustre/ldlm: Remove
+	ldlm_refresh/del_waiting_lock()
 In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-19-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443672762-982936-22-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,65 +13,74 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-It was directly used only on the server. Client side part
-was split into smaller chunks to avoid deadlocks.
+Nothing adds locks into waiting list on the client, so no
+point in retaining those.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
  drivers/staging/lustre/lustre/include/lustre_dlm.h |  2 --
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 27 ----------------------
- 2 files changed, 29 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |  8 --------
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    | 13 -------------
+ 3 files changed, 23 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index cc5ad4c1..4d81e73 100644
+index ec717eb..5a72f22 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -1236,8 +1236,6 @@ ldlm_namespace_new(struct obd_device *obd, char *name,
- 		   ldlm_side_t client, ldlm_appetite_t apt,
- 		   ldlm_ns_type_t ns_type);
- int ldlm_namespace_cleanup(struct ldlm_namespace *ns, __u64 flags);
--void ldlm_namespace_free(struct ldlm_namespace *ns,
--			 struct obd_import *imp, int force);
- void ldlm_namespace_register(struct ldlm_namespace *ns, ldlm_side_t client);
- void ldlm_namespace_unregister(struct ldlm_namespace *ns, ldlm_side_t client);
- void ldlm_namespace_get(struct ldlm_namespace *ns);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index dac2ec2..cd65efe 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -948,33 +948,6 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
- 	ldlm_put_ref();
- }
+@@ -1108,8 +1108,6 @@ struct ldlm_callback_suite {
+ };
  
--/**
-- * Cleanup the resource, and free namespace.
-- * bug 12864:
-- * Deadlock issue:
-- * proc1: destroy import
-- *	class_disconnect_export(grab cl_sem) ->
-- *	      -> ldlm_namespace_free ->
-- *	      -> ldebugfs_remove(grab _lprocfs_lock).
-- * proc2: read proc info
-- *	lprocfs_fops_read(grab _lprocfs_lock) ->
-- *	      -> osc_rd_active, etc(grab cl_sem).
-- *
-- * So that I have to split the ldlm_namespace_free into two parts - the first
-- * part ldlm_namespace_free_prior is used to cleanup the resource which is
-- * being used; the 2nd part ldlm_namespace_free_post is used to unregister the
-- * lprocfs entries, and then free memory. It will be called w/o cli->cl_sem
-- * held.
-- */
--void ldlm_namespace_free(struct ldlm_namespace *ns,
--			 struct obd_import *imp,
--			 int force)
--{
--	ldlm_namespace_free_prior(ns, imp, force);
--	ldlm_namespace_free_post(ns);
--}
--EXPORT_SYMBOL(ldlm_namespace_free);
+ /* ldlm_lockd.c */
+-int ldlm_del_waiting_lock(struct ldlm_lock *lock);
+-int ldlm_refresh_waiting_lock(struct ldlm_lock *lock, int timeout);
+ int ldlm_get_ref(void);
+ void ldlm_put_ref(void);
+ struct ldlm_lock *ldlm_request_lock(struct ptlrpc_request *req);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 536f97c..133936e 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -1947,17 +1947,9 @@ void ldlm_lock_cancel(struct ldlm_lock *lock)
+ 		LBUG();
+ 	}
+ 
+-	if (lock->l_flags & LDLM_FL_WAITED)
+-		ldlm_del_waiting_lock(lock);
 -
- void ldlm_namespace_get(struct ldlm_namespace *ns)
- {
- 	atomic_inc(&ns->ns_bref);
+ 	/* Releases cancel callback. */
+ 	ldlm_cancel_callback(lock);
+ 
+-	/* Yes, second time, just in case it was added again while we were
+-	 * running with no res lock in ldlm_cancel_callback */
+-	if (lock->l_flags & LDLM_FL_WAITED)
+-		ldlm_del_waiting_lock(lock);
+-
+ 	ldlm_resource_unlink_lock(lock);
+ 	ldlm_lock_destroy_nolock(lock);
+ 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+index 57f6128..045e3c6 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+@@ -111,19 +111,6 @@ struct ldlm_bl_work_item {
+ 	int		     blwi_mem_pressure;
+ };
+ 
+-
+-int ldlm_del_waiting_lock(struct ldlm_lock *lock)
+-{
+-	return 0;
+-}
+-
+-int ldlm_refresh_waiting_lock(struct ldlm_lock *lock, int timeout)
+-{
+-	return 0;
+-}
+-
+-
+-
+ /**
+  * Callback handler for receiving incoming blocking ASTs.
+  *
 -- 
 2.1.0
