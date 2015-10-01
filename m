@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Thu,  1 Oct 2015 00:12:11 -0400
-Subject: [lustre-devel] [PATCH 01/32] staging/lustre/llite: Remove unused
-	ll_get_default/max_cookiesize()
+Date: Thu,  1 Oct 2015 00:12:16 -0400
+Subject: [lustre-devel] [PATCH 06/32] staging/lustre/lov: Remove unused
+	lov_lsm_decref()
 In-Reply-To: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
 References: <1443672762-982936-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1443672762-982936-2-git-send-email-green@linuxhacker.ru>
+Message-ID: <1443672762-982936-7-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,64 +13,59 @@ To: lustre-devel@lists.lustre.org
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This was used for a function that's no longer important, but
-is no longer used anywhere.
+Also lov_lsm_addref is only used in the file it is defined,
+so make it static
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../staging/lustre/lustre/llite/llite_internal.h   |  2 --
- drivers/staging/lustre/lustre/llite/llite_lib.c    | 26 ----------------------
- 2 files changed, 28 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_cl_internal.h |  3 ---
+ drivers/staging/lustre/lustre/lov/lov_object.c      | 13 +------------
+ 2 files changed, 1 insertion(+), 15 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index dcf7c6b..59fdbed 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -789,8 +789,6 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
- int ll_obd_statfs(struct inode *inode, void *arg);
- int ll_get_max_mdsize(struct ll_sb_info *sbi, int *max_mdsize);
- int ll_get_default_mdsize(struct ll_sb_info *sbi, int *default_mdsize);
--int ll_get_max_cookiesize(struct ll_sb_info *sbi, int *max_cookiesize);
--int ll_get_default_cookiesize(struct ll_sb_info *sbi, int *default_cookiesize);
- int ll_process_config(struct lustre_cfg *lcfg);
- struct md_op_data *ll_prep_md_op_data(struct md_op_data *op_data,
- 				      struct inode *i1, struct inode *i2,
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index b6234b2..e1d8fb0 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -604,32 +604,6 @@ int ll_get_default_mdsize(struct ll_sb_info *sbi, int *lmmsize)
- 	return rc;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
+index 314ce85..9a9156e 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
++++ b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
+@@ -637,9 +637,6 @@ struct lov_io_sub    *lov_page_subio(const struct lu_env *env,
+ 					 struct lov_io *lio,
+ 					 const struct cl_page_slice *slice);
+ 
+-void lov_lsm_decref(struct lov_object *lov, struct lov_stripe_md *lsm);
+-struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov);
+-
+ #define lov_foreach_target(lov, var)		    \
+ 	for (var = 0; var < lov_targets_nr(lov); ++var)
+ 
+diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
+index 4d7cd92..e67df64 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_object.c
++++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+@@ -909,7 +909,7 @@ struct lu_object *lov_object_alloc(const struct lu_env *env,
+ 	return obj;
  }
  
--int ll_get_max_cookiesize(struct ll_sb_info *sbi, int *lmmsize)
--{
--	int size, rc;
--
--	size = sizeof(int);
--	rc = obd_get_info(NULL, sbi->ll_md_exp, sizeof(KEY_MAX_COOKIESIZE),
--			  KEY_MAX_COOKIESIZE, &size, lmmsize, NULL);
--	if (rc)
--		CERROR("Get max cookiesize error rc %d\n", rc);
--
--	return rc;
--}
--
--int ll_get_default_cookiesize(struct ll_sb_info *sbi, int *lmmsize)
--{
--	int size, rc;
--
--	size = sizeof(int);
--	rc = obd_get_info(NULL, sbi->ll_md_exp, sizeof(KEY_DEFAULT_COOKIESIZE),
--			  KEY_DEFAULT_COOKIESIZE, &size, lmmsize, NULL);
--	if (rc)
--		CERROR("Get default cookiesize error rc %d\n", rc);
--
--	return rc;
--}
--
- static void client_common_put_super(struct super_block *sb)
+-struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
++static struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
  {
- 	struct ll_sb_info *sbi = ll_s2sbi(sb);
+ 	struct lov_stripe_md *lsm = NULL;
+ 
+@@ -924,17 +924,6 @@ struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
+ 	return lsm;
+ }
+ 
+-void lov_lsm_decref(struct lov_object *lov, struct lov_stripe_md *lsm)
+-{
+-	if (lsm == NULL)
+-		return;
+-
+-	CDEBUG(D_INODE, "lsm %p decref %d by %p.\n",
+-		lsm, atomic_read(&lsm->lsm_refc), current);
+-
+-	lov_free_memmd(&lsm);
+-}
+-
+ struct lov_stripe_md *lov_lsm_get(struct cl_object *clobj)
+ {
+ 	struct lu_object *luobj;
 -- 
 2.1.0
