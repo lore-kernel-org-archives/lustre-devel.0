@@ -1,29 +1,41 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Mon, 05 Oct 2015 14:52:06 -0700
+From: Di Natale, Giuseppe <dinatale2@llnl.gov>
+Date: Mon, 5 Oct 2015 22:47:36 +0000
 Subject: [lustre-devel] lprocfs Helper Issues
-In-Reply-To: <FF7D8D24-EC8A-4073-AEA7-DDEC419B2999@intel.com>
+In-Reply-To: <5612F106.1070601@llnl.gov>
 References: <974262C966B9F640899A48EB96313E9A2C9DAA@PRDEXMBX-08.the-lab.llnl.gov>,
-	<560B4800.6070103@llnl.gov>	<974262C966B9F640899A48EB96313E9A2CA46B@PRDEXMBX-08.the-lab.llnl.gov>	<560C7F1A.30004@llnl.gov>,
-	<560F2174.2040003@llnl.gov>
-	<FF7D8D24-EC8A-4073-AEA7-DDEC419B2999@intel.com>
-Message-ID: <5612F106.1070601@llnl.gov>
+	<560B4800.6070103@llnl.gov>
+	<974262C966B9F640899A48EB96313E9A2CA46B@PRDEXMBX-08.the-lab.llnl.gov>
+	<560C7F1A.30004@llnl.gov>,	<560F2174.2040003@llnl.gov>
+	<FF7D8D24-EC8A-4073-AEA7-DDEC419B2999@intel.com>,
+	<5612F106.1070601@llnl.gov>
+Message-ID: <974262C966B9F640899A48EB96313E9A2CB546@PRDEXMBX-08.the-lab.llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+The other option is to have two slightly different versions of the function. One will accept units and the other won't. The one that doesn't accept units would error if something other than numbers and a decimal are present. This would create an interface which would clearly represent the caller's intent (units vs no units).
+
+Giuseppe
+________________________________________
+From: lustre-devel [lustre-devel-bounces at lists.lustre.org] on behalf of Christopher J. Morrone [morrone2 at llnl.gov]
+Sent: Monday, October 05, 2015 2:52 PM
+To: Dilger, Andreas
+Cc: lustre-devel at lists.lustre.org
+Subject: Re: [lustre-devel] lprocfs Helper Issues
+
 I don't recall any proc files that accepted pages.
 
-I certainly remember callers sending a multiplier that resulted in the 
-string parsing function doing the conversion to pages.  But those very 
-callers are the ones that break when the string specifies a unit.  The 
-code authors failed to realize that, so this would let us avoid that 
+I certainly remember callers sending a multiplier that resulted in the
+string parsing function doing the conversion to pages.  But those very
+callers are the ones that break when the string specifies a unit.  The
+code authors failed to realize that, so this would let us avoid that
 mistake in the future.
 
-I don't think it is terribly onerous to do the bit shifting in the 
-caller instead of passing the multiplier as parameter to the string 
-conversion function.  I think it might even make the code a little more 
+I don't think it is terribly onerous to do the bit shifting in the
+caller instead of passing the multiplier as parameter to the string
+conversion function.  I think it might even make the code a little more
 readable.
 
 Chris
@@ -290,3 +302,8 @@ On 10/03/2015 02:54 AM, Dilger, Andreas wrote:
 >> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 > .
 >
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
