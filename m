@@ -1,38 +1,40 @@
 From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Wed, 14 Oct 2015 00:19:25 +0200
-Subject: [lustre-devel] [PATCH 0/7] staging: lustre: remove uses and
- definition of container_of0
-Message-ID: <cover.1444774232.git.mahfouz.saif.elyazal@gmail.com>
+Date: Wed, 14 Oct 2015 00:23:14 +0200
+Subject: [lustre-devel] [PATCH 2/7] staging: lustre: llite_nfs.c: replace
+ container_of0 by container_of
+In-Reply-To: <cover.1444774232.git.mahfouz.saif.elyazal@gmail.com>
+References: <cover.1444774232.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <a9b823b1753239156b310ecb9ac109023629bc23.1444774232.git.mahfouz.saif.elyazal@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-container_of0 can be replaced by the Linux kernel macro container_of.
-The only difference is that container_of0 tries to evade type casting
-when the pointer is erroneous or null. All uses of container_of0 have
-been replaced by container_of and then the macro was removed in the last
-patch.
+Replaces container_of0 by container_of. The only difference between
+the two implementations is that container_of0 tries to evade
+type casting if the pointer is erroneous or null. The use of
+container_of is encouraged to bring lustre one step closer to
+community standards.
 
-Aya Mahfouz (7):
-  staging: lustre: lcommon_cl.c: replace container_of0 by container_of
-  staging: lustre: llite_nfs.c: replace container_of0 by container_of
-  staging: lustre: lu_object.c: replace container_of0 by container_of
-  staging: lustre: echo_client.c: replace container_of0 by container_of
-  staging: lustre: osc_io.c: replace container_of0 by container_of
-  staging: lustre: osc_object.c: replace container_of0 by container_of
-  staging: lustre: remove container_of0 and __container_of
+Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+---
+ drivers/staging/lustre/lustre/llite/llite_nfs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/staging/lustre/include/linux/libcfs/libcfs.h | 11 -----------
- drivers/staging/lustre/lustre/lclient/lcommon_cl.c   | 10 +++++-----
- drivers/staging/lustre/lustre/llite/llite_nfs.c      |  2 +-
- drivers/staging/lustre/lustre/obdclass/lu_object.c   |  6 +++---
- drivers/staging/lustre/lustre/obdecho/echo_client.c  |  2 +-
- drivers/staging/lustre/lustre/osc/osc_io.c           |  4 ++--
- drivers/staging/lustre/lustre/osc/osc_object.c       |  2 +-
- 7 files changed, 13 insertions(+), 24 deletions(-)
-
+diff --git a/drivers/staging/lustre/lustre/llite/llite_nfs.c b/drivers/staging/lustre/lustre/llite/llite_nfs.c
+index e578a11..340fb61 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_nfs.c
++++ b/drivers/staging/lustre/lustre/llite/llite_nfs.c
+@@ -210,7 +210,7 @@ static int ll_nfs_get_name_filldir(struct dir_context *ctx, const char *name,
+ {
+ 	/* It is hack to access lde_fid for comparison with lgd_fid.
+ 	 * So the input 'name' must be part of the 'lu_dirent'. */
+-	struct lu_dirent *lde = container_of0(name, struct lu_dirent, lde_name);
++	struct lu_dirent *lde = container_of(name, struct lu_dirent, lde_name);
+ 	struct ll_getname_data *lgd =
+ 		container_of(ctx, struct ll_getname_data, ctx);
+ 	struct lu_fid fid;
 -- 
 2.4.2
 
