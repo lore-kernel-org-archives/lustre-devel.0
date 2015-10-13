@@ -1,9 +1,9 @@
 From: kbuild test robot <lkp@intel.com>
-Date: Wed, 14 Oct 2015 07:28:13 +0800
+Date: Wed, 14 Oct 2015 07:25:06 +0800
 Subject: [lustre-devel] [PATCH 2/7] staging: lustre: llite_nfs.c:
  replace container_of0 by container_of
 In-Reply-To: <a9b823b1753239156b310ecb9ac109023629bc23.1444774232.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <201510140740.tybjxpAz%fengguang.wu@intel.com>
+Message-ID: <201510140754.x1M8HsOi%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,68 +15,46 @@ Hi Aya,
 [auto build test WARNING on staging/staging-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
 url:    https://github.com/0day-ci/linux/commits/Aya-Mahfouz/staging-lustre-remove-uses-and-definition-of-container_of0/20151014-062751
-config: arm64-allmodconfig (attached as .config)
+config: blackfin-allmodconfig (attached as .config)
 reproduce:
         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+        make.cross ARCH=blackfin 
 
 All warnings (new ones prefixed by >>):
 
-   In file included from include/linux/list.h:8:0,
-                    from include/linux/wait.h:6,
-                    from include/linux/fs.h:5,
-                    from drivers/staging/lustre/lustre/llite/../include/linux/lustre_lite.h:44,
-                    from drivers/staging/lustre/lustre/llite/../include/lustre_lite.h:45,
-                    from drivers/staging/lustre/lustre/llite/llite_nfs.c:45:
    drivers/staging/lustre/lustre/llite/llite_nfs.c: In function 'll_nfs_get_name_filldir':
-   include/linux/kernel.h:811:48: warning: initialization from incompatible pointer type
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                   ^
-   drivers/staging/lustre/lustre/llite/llite_nfs.c:213:26: note: in expansion of macro 'container_of'
-     struct lu_dirent *lde = container_of(name, struct lu_dirent, lde_name);
-                             ^
->> include/linux/kernel.h:811:48: warning: (near initialization for 'lde')
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                   ^
-   drivers/staging/lustre/lustre/llite/llite_nfs.c:213:26: note: in expansion of macro 'container_of'
-     struct lu_dirent *lde = container_of(name, struct lu_dirent, lde_name);
-                             ^
+>> drivers/staging/lustre/lustre/llite/llite_nfs.c:213:26: warning: initialization from incompatible pointer type [enabled by default]
+>> drivers/staging/lustre/lustre/llite/llite_nfs.c:213:26: warning: (near initialization for 'lde') [enabled by default]
 
-vim +/lde +811 include/linux/kernel.h
+vim +213 drivers/staging/lustre/lustre/llite/llite_nfs.c
 
-^1da177e Linus Torvalds 2005-04-16  795  
-91f68b73 Wu Fengguang   2009-01-07  796  
-91f68b73 Wu Fengguang   2009-01-07  797  /*
-91f68b73 Wu Fengguang   2009-01-07  798   * swap - swap value of @a and @b
-91f68b73 Wu Fengguang   2009-01-07  799   */
-ac7b9004 Peter Zijlstra 2009-02-04  800  #define swap(a, b) \
-ac7b9004 Peter Zijlstra 2009-02-04  801  	do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
-91f68b73 Wu Fengguang   2009-01-07  802  
-^1da177e Linus Torvalds 2005-04-16  803  /**
-^1da177e Linus Torvalds 2005-04-16  804   * container_of - cast a member of a structure out to the containing structure
-^1da177e Linus Torvalds 2005-04-16  805   * @ptr:	the pointer to the member.
-^1da177e Linus Torvalds 2005-04-16  806   * @type:	the type of the container struct this is embedded in.
-^1da177e Linus Torvalds 2005-04-16  807   * @member:	the name of the member within the struct.
-^1da177e Linus Torvalds 2005-04-16  808   *
-^1da177e Linus Torvalds 2005-04-16  809   */
-^1da177e Linus Torvalds 2005-04-16  810  #define container_of(ptr, type, member) ({			\
-^1da177e Linus Torvalds 2005-04-16 @811  	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-^1da177e Linus Torvalds 2005-04-16  812  	(type *)( (char *)__mptr - offsetof(type,member) );})
-^1da177e Linus Torvalds 2005-04-16  813  
-b9d4f426 Arnaud Lacombe 2011-07-25  814  /* Rebuild everything on CONFIG_FTRACE_MCOUNT_RECORD */
-b9d4f426 Arnaud Lacombe 2011-07-25  815  #ifdef CONFIG_FTRACE_MCOUNT_RECORD
-b9d4f426 Arnaud Lacombe 2011-07-25  816  # define REBUILD_DUE_TO_FTRACE_MCOUNT_RECORD
-b9d4f426 Arnaud Lacombe 2011-07-25  817  #endif
-9d00f92f WANG Cong      2011-07-25  818  
-58f86cc8 Rusty Russell  2014-03-24  819  /* Permissions on a sysfs file: you didn't miss the 0 prefix did you? */
-
-:::::: The code at line 811 was first introduced by commit
-:::::: 1da177e4c3f41524e886b7f1b8a0c1fc7321cac2 Linux-2.6.12-rc2
-
-:::::: TO: Linus Torvalds <torvalds@ppc970.osdl.org>
-:::::: CC: Linus Torvalds <torvalds@ppc970.osdl.org>
+   197		if (*plen < sizeof(struct lustre_nfs_fid) / 4)
+   198			return 255;
+   199	
+   200		nfs_fid->lnf_child = *ll_inode2fid(inode);
+   201		nfs_fid->lnf_parent = *ll_inode2fid(parent);
+   202		*plen = sizeof(struct lustre_nfs_fid) / 4;
+   203	
+   204		return LUSTRE_NFS_FID;
+   205	}
+   206	
+   207	static int ll_nfs_get_name_filldir(struct dir_context *ctx, const char *name,
+   208					   int namelen, loff_t hash, u64 ino,
+   209					   unsigned type)
+   210	{
+   211		/* It is hack to access lde_fid for comparison with lgd_fid.
+   212		 * So the input 'name' must be part of the 'lu_dirent'. */
+ > 213		struct lu_dirent *lde = container_of(name, struct lu_dirent, lde_name);
+   214		struct ll_getname_data *lgd =
+   215			container_of(ctx, struct ll_getname_data, ctx);
+   216		struct lu_fid fid;
+   217	
+   218		fid_le_to_cpu(&fid, &lde->lde_fid);
+   219		if (lu_fid_eq(&fid, &lgd->lgd_fid)) {
+   220			memcpy(lgd->lgd_name, name, namelen);
+   221			lgd->lgd_name[namelen] = 0;
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -85,6 +63,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/octet-stream
-Size: 45658 bytes
+Size: 38047 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20151014/0585f166/attachment-0001.obj>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20151014/b9f371b1/attachment-0001.obj>
