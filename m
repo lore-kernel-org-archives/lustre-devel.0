@@ -1,52 +1,69 @@
-From: Ryan Van Quinlan <ryan.van.quinlan@gmail.com>
-Date: Sat, 10 Oct 2015 21:53:50 -0700
-Subject: [lustre-devel] [PATCH] staging: lustre: lclient: NULL comparison
-	style
-Message-ID: <20151011045349.GA21387@ryan-ThinkPad-T430s>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Tue, 13 Oct 2015 22:42:22 +0000
+Subject: [lustre-devel] [PATCH 0/7] staging: lustre: remove uses and
+ definition of container_of0
+In-Reply-To: <cover.1444774232.git.mahfouz.saif.elyazal@gmail.com>
+References: <cover.1444774232.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <D242E3F1.110E68%andreas.dilger@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Fixes checkpatch.pl checks:
-CHECK: Comparison to NULL could be written ...
+On 2015/10/13, 16:19, "Aya Mahfouz" <mahfouz.saif.elyazal@gmail.com> wrote:
 
-Signed-off-by: Ryan Van Quinlan <ryan.van.quinlan@gmail.com>
----
- drivers/staging/lustre/lustre/lclient/glimpse.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+>container_of0 can be replaced by the Linux kernel macro container_of.
+>The only difference is that container_of0 tries to evade type casting
+>when the pointer is erroneous or null. All uses of container_of0 have
+>been replaced by container_of and then the macro was removed in the last
+>patch.
 
-diff --git a/drivers/staging/lustre/lustre/lclient/glimpse.c b/drivers/staging/lustre/lustre/lclient/glimpse.c
-index b9f2bb6..8533a1e 100644
---- a/drivers/staging/lustre/lustre/lclient/glimpse.c
-+++ b/drivers/staging/lustre/lustre/lclient/glimpse.c
-@@ -73,7 +73,7 @@ blkcnt_t dirty_cnt(struct inode *inode)
- 	struct ccc_object *vob = cl_inode2ccc(inode);
- 	void	      *results[1];
- 
--	if (inode->i_mapping != NULL)
-+	if (inode->i_mapping)
- 		cnt += radix_tree_gang_lookup_tag(&inode->i_mapping->page_tree,
- 						  results, 0, 1,
- 						  PAGECACHE_TAG_DIRTY);
-@@ -129,7 +129,7 @@ int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
- 					       current);
- 			cio->cui_glimpse = 0;
- 
--			if (lock == NULL)
-+			if (!lock)
- 				return 0;
- 
- 			if (IS_ERR(lock))
-@@ -255,7 +255,7 @@ int cl_local_size(struct inode *inode)
- 		*descr = whole_file;
- 		descr->cld_obj = clob;
- 		lock = cl_lock_peek(env, io, descr, "localsize", current);
--		if (lock != NULL) {
-+		if (lock) {
- 			cl_merge_lvb(env, inode);
- 			cl_unuse(env, lock);
- 			cl_lock_release(env, lock, "localsize", current);
+Thank you for your patch.  However, it should be noted that this blanket
+replacement of container_of0() isn't necessarily safe.  If the caller isn't
+explicitly checking for IS_ERR(ptr) or ptr == NULL then the container_of()
+macro can transform the err/NULL pointer into another pointer that is
+NOT err/NULL and cause the kernel to oops when the bad pointer is used,
+even if there are later IS_ERR() or NULL checks.
+
+I'm not against removing container_of0() completely, but not without a
+clear review of the callers to determine whether err/NULL pointers are
+not actually possible in this callpath, or explicit checks in the callers
+for err/NULL pointers before container_of() is used.  Did you do that?
+
+Cheers, Andreas
+
+>Aya Mahfouz (7):
+>  staging: lustre: lcommon_cl.c: replace container_of0 by container_of
+>  staging: lustre: llite_nfs.c: replace container_of0 by container_of
+>  staging: lustre: lu_object.c: replace container_of0 by container_of
+>  staging: lustre: echo_client.c: replace container_of0 by container_of
+>  staging: lustre: osc_io.c: replace container_of0 by container_of
+>  staging: lustre: osc_object.c: replace container_of0 by container_of
+>  staging: lustre: remove container_of0 and __container_of
+>
+> drivers/staging/lustre/include/linux/libcfs/libcfs.h | 11 -----------
+> drivers/staging/lustre/lustre/lclient/lcommon_cl.c   | 10 +++++-----
+> drivers/staging/lustre/lustre/llite/llite_nfs.c      |  2 +-
+> drivers/staging/lustre/lustre/obdclass/lu_object.c   |  6 +++---
+> drivers/staging/lustre/lustre/obdecho/echo_client.c  |  2 +-
+> drivers/staging/lustre/lustre/osc/osc_io.c           |  4 ++--
+> drivers/staging/lustre/lustre/osc/osc_object.c       |  2 +-
+> 7 files changed, 13 insertions(+), 24 deletions(-)
+>
+>-- 
+>2.4.2
+>
+>
+>-- 
+>Kind Regards,
+>Aya Saif El-yazal Mahfouz
+>
+
+
+Cheers, Andreas
 -- 
-1.9.1
+Andreas Dilger
+
+Lustre Software Architect
+Intel High Performance Data Division
