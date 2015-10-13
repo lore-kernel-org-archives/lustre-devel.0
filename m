@@ -1,10 +1,10 @@
 From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Wed, 14 Oct 2015 00:23:54 +0200
-Subject: [lustre-devel] [PATCH 4/7] staging: lustre: echo_client.c: replace
+Date: Wed, 14 Oct 2015 00:24:19 +0200
+Subject: [lustre-devel] [PATCH 5/7] staging: lustre: osc_io.c: replace
  container_of0 by container_of
 In-Reply-To: <cover.1444774232.git.mahfouz.saif.elyazal@gmail.com>
 References: <cover.1444774232.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <fdfe519b4b8143173b30e6d6071a2f6a212931ea.1444774232.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <f744c888f2d0c2820e1f08d74b725f17573c7bc8.1444774232.git.mahfouz.saif.elyazal@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -19,22 +19,29 @@ community standards.
 
 Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
 ---
- drivers/staging/lustre/lustre/obdecho/echo_client.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/osc/osc_io.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index ef9cb31..1e9a57f 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -103,7 +103,7 @@ static int echo_client_cleanup(struct obd_device *obddev);
-  */
- static inline struct echo_device *cl2echo_dev(const struct cl_device *dev)
+diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
+index 3a4200f..fb3b415 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_io.c
++++ b/drivers/staging/lustre/lustre/osc/osc_io.c
+@@ -56,13 +56,13 @@
+ static struct osc_req *cl2osc_req(const struct cl_req_slice *slice)
  {
--	return container_of0(dev, struct echo_device, ed_cl);
-+	return container_of(dev, struct echo_device, ed_cl);
+ 	LINVRNT(slice->crs_dev->cd_lu_dev.ld_type == &osc_device_type);
+-	return container_of0(slice, struct osc_req, or_cl);
++	return container_of(slice, struct osc_req, or_cl);
  }
  
- static inline struct cl_device *echo_dev2cl(struct echo_device *d)
+ static struct osc_io *cl2osc_io(const struct lu_env *env,
+ 				const struct cl_io_slice *slice)
+ {
+-	struct osc_io *oio = container_of0(slice, struct osc_io, oi_cl);
++	struct osc_io *oio = container_of(slice, struct osc_io, oi_cl);
+ 
+ 	LINVRNT(oio == osc_env_io(env));
+ 	return oio;
 -- 
 2.4.2
 
