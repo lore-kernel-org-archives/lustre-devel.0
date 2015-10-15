@@ -1,7 +1,7 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Thu, 15 Oct 2015 13:59:43 +0300
+Date: Thu, 15 Oct 2015 14:14:19 +0300
 Subject: [lustre-devel] staging: add Lustre file system client support
-Message-ID: <20151015105943.GA22833@mwanda>
+Message-ID: <20151015111419.GA24704@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,53 +14,81 @@ The patch d7e09d0397e8: "staging: add Lustre file system client
 support" from May 2, 2013, leads to the following static checker
 warning:
 
-	drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c:150 libcfs_kkuc_group_rem()
-	error: buffer overflow 'kkuc_groups' 3 <= s32max
+	drivers/staging/lustre/lnet/selftest/console.c:1330 lstcon_test_add()
+	error: 'paramlen' from user is not capped properly
 
-drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-   146  int libcfs_kkuc_group_rem(int uid, int group)
-   147  {
-   148          struct kkuc_reg *reg, *next;
-   149  
-   150          if (kkuc_groups[group].next == NULL)
+drivers/staging/lustre/lnet/selftest/console.c
+  1273  int
+  1274  lstcon_test_add(char *batch_name, int type, int loop,
+  1275                  int concur, int dist, int span,
+  1276                  char *src_name, char *dst_name,
+  1277                  void *param, int paramlen, int *retp,
+  1278                  struct list_head *result_up)
+  1279  {
+  1280          lstcon_test_t    *test   = NULL;
+  1281          int              rc;
+  1282          lstcon_group_t   *src_grp = NULL;
+  1283          lstcon_group_t   *dst_grp = NULL;
+  1284          lstcon_batch_t   *batch = NULL;
+  1285  
+  1286          /*
+  1287           * verify that a batch of the given name exists, and the groups
+  1288           * that will be part of the batch exist and have at least one
+  1289           * active node
+  1290           */
+  1291          rc = lstcon_verify_batch(batch_name, &batch);
+  1292          if (rc != 0)
+  1293                  goto out;
+  1294  
+  1295          rc = lstcon_verify_group(src_name, &src_grp);
+  1296          if (rc != 0)
+  1297                  goto out;
+  1298  
+  1299          rc = lstcon_verify_group(dst_name, &dst_grp);
+  1300          if (rc != 0)
+  1301                  goto out;
+  1302  
+  1303          if (dst_grp->grp_userland)
+  1304                  *retp = 1;
+  1305  
+  1306          LIBCFS_ALLOC(test, offsetof(lstcon_test_t, tes_param[paramlen]));
 
-group doesn't appear to have been validated@all.  It comes from the
-user.  The call tree is:
+There is an underflow and integer overflow bug here.
 
--> lmv_iocontrol()
-   -> lmv_hsm_ct_unregister()
-      -> libcfs_kkuc_group_rem()
+  1307          if (!test) {
+  1308                  CERROR("Can't allocate test descriptor\n");
+  1309                  rc = -ENOMEM;
+  1310  
+  1311                  goto out;
+  1312          }
+  1313  
+  1314          test->tes_hdr.tsb_id    = batch->bat_hdr.tsb_id;
+  1315          test->tes_batch         = batch;
+  1316          test->tes_type          = type;
+  1317          test->tes_oneside       = 0; /* TODO */
+  1318          test->tes_loop          = loop;
+  1319          test->tes_concur        = concur;
+  1320          test->tes_stop_onerr    = 1; /* TODO */
+  1321          test->tes_span          = span;
+  1322          test->tes_dist          = dist;
+  1323          test->tes_cliidx        = 0; /* just used for creating RPC */
+  1324          test->tes_src_grp       = src_grp;
+  1325          test->tes_dst_grp       = dst_grp;
+  1326          INIT_LIST_HEAD(&test->tes_trans_list);
+  1327  
+  1328          if (param != NULL) {
+  1329                  test->tes_paramlen = paramlen;
+  1330                  memcpy(&test->tes_param[0], param, paramlen);
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-It looks like this code could oops.
+This is the warning.
 
-   151                  return 0;
-   152  
-   153          if (uid == 0) {
-   154                  /* Broadcast a shutdown message */
-   155                  struct kuc_hdr lh;
-   156  
-   157                  lh.kuc_magic = KUC_MAGIC;
-   158                  lh.kuc_transport = KUC_TRANSPORT_GENERIC;
-   159                  lh.kuc_msgtype = KUC_MSG_SHUTDOWN;
-   160                  lh.kuc_msglen = sizeof(lh);
-   161                  libcfs_kkuc_group_put(group, &lh);
-   162          }
-   163  
-   164          down_write(&kg_sem);
-   165          list_for_each_entry_safe(reg, next, &kkuc_groups[group], kr_chain) {
-   166                  if ((uid == 0) || (uid == reg->kr_uid)) {
-   167                          list_del(&reg->kr_chain);
-   168                          CDEBUG(D_KUC, "Removed uid=%d fp=%p from group %d\n",
-   169                                 reg->kr_uid, reg->kr_fp, group);
-   170                          if (reg->kr_fp != NULL)
-   171                                  fput(reg->kr_fp);
-   172                          kfree(reg);
-   173                  }
-   174          }
-   175          up_write(&kg_sem);
-   176  
-   177          return 0;
-   178  }
+  1331          }
+
+The warning here is a false positive because the caller validates
+"paramlen" when "param" is non-NULL.  Unfortunately, on line 1306, we
+use "paramlen" even when param is NULL.  "paramlen" is signed so this
+can mean "test" is smaller than expected leading to memory corruption.
 
 regards,
 dan carpenter
