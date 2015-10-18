@@ -1,10 +1,10 @@
 From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Sun, 18 Oct 2015 13:16:21 +0200
-Subject: [lustre-devel] [PATCH v2 3/5] staging: lustre: workitem.c: replace
+Date: Sun, 18 Oct 2015 13:17:30 +0200
+Subject: [lustre-devel] [PATCH v2 4/5] staging: lustre: selftest.h: replace
  IS_PO2 by is_power_of_2
 In-Reply-To: <cover.1445166429.git.mahfouz.saif.elyazal@gmail.com>
 References: <cover.1445166429.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <83b9e52c85e13c63d42b434fbd36307e869e244b.1445166429.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <80d953d3bda682675fed808e6ae2a6c6855a5ae5.1445166429.git.mahfouz.saif.elyazal@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,38 +16,36 @@ is_power_of_2 since it returns 1 for numbers that are powers
 of 2 only whereas IS_PO2 returns 1 for 0 and numbers that are
 powers of 2.
 
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
 ---
 v2:
-	-changed commit message
-	-added Andreas Reviewed by tag
+	-added new patch in patch set for selftest.h
 
- drivers/staging/lustre/lustre/libcfs/workitem.c | 4 +++-
+ drivers/staging/lustre/lnet/selftest/selftest.h | 4 +++-
  1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/libcfs/workitem.c b/drivers/staging/lustre/lustre/libcfs/workitem.c
-index e1143a5..377e1ea 100644
---- a/drivers/staging/lustre/lustre/libcfs/workitem.c
-+++ b/drivers/staging/lustre/lustre/libcfs/workitem.c
-@@ -41,6 +41,8 @@
+diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
+index 8a77d3f..2846f26 100644
+--- a/drivers/staging/lustre/lnet/selftest/selftest.h
++++ b/drivers/staging/lustre/lnet/selftest/selftest.h
+@@ -43,6 +43,8 @@
  
- #define DEBUG_SUBSYSTEM S_LNET
+ #define LNET_ONLY
  
 +#include <linux/log2.h>
 +
  #include "../../include/linux/libcfs/libcfs.h"
- 
- #define CFS_WS_NAME_LEN	 16
-@@ -325,7 +327,7 @@ cfs_wi_sched_destroy(struct cfs_wi_sched *sched)
- 
- 	spin_lock(&cfs_wi_data.wi_glock);
- 	while (sched->ws_nthreads > 0) {
--		CDEBUG(IS_PO2(++i) ? D_WARNING : D_NET,
-+		CDEBUG(is_power_of_2(++i) ? D_WARNING : D_NET,
- 		       "waiting for %d threads of WI sched[%s] to terminate\n",
- 		       sched->ws_nthreads, sched->ws_name);
- 
+ #include "../../include/linux/lnet/lnet.h"
+ #include "../../include/linux/lnet/lib-lnet.h"
+@@ -585,7 +587,7 @@ swi_state2str (int state)
+ do {									\
+ 	int __I = 2;							\
+ 	while (!(cond)) {						\
+-		CDEBUG(IS_PO2(++__I) ? D_WARNING : D_NET,		\
++		CDEBUG(is_power_of_2(++__I) ? D_WARNING : D_NET,		\
+ 		       fmt, ## __VA_ARGS__);				\
+ 		spin_unlock(&(lock));					\
+ 									\
 -- 
 2.4.2
 
