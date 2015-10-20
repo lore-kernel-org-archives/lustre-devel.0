@@ -1,49 +1,106 @@
-From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Sun, 18 Oct 2015 13:18:46 +0200
-Subject: [lustre-devel] [PATCH v2 5/5] staging: lustre: libcfs.h: remove
-	IS_PO2 and __is_po2
-In-Reply-To: <cover.1445166429.git.mahfouz.saif.elyazal@gmail.com>
-References: <cover.1445166429.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <0e9d3eee355071a1a5c1cb85eb60da11584fb912.1445166429.git.mahfouz.saif.elyazal@gmail.com>
+From: Ben Evans <bevans@cray.com>
+Date: Tue, 20 Oct 2015 17:02:01 -0500
+Subject: [lustre-devel] [PATCH] staging/lustre: move IT_* definitions to
+	lustre_idl.h
+Message-ID: <20151020220201.GA6065@lusbld01.us.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Removes IS_PO2 and __is_po2 since the uses of IS_PO2 have
-been replaced by is_power_of_2
+Put IT_* definitions into an enum, as they're sent over the wire,
+adjust calls, print statements, etc. to use the new enum.
 
-Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+Signed-off-by: Ben Evans <bevans@cray.com>
 ---
-v2:
-	-became patch number 5 in the series
+ .../lustre/lustre/include/lustre/lustre_idl.h      |   18 ++++++++++++++++++
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |    2 +-
+ drivers/staging/lustre/lustre/include/obd.h        |   16 ----------------
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |    2 +-
+ 4 files changed, 20 insertions(+), 18 deletions(-)
 
- drivers/staging/lustre/include/linux/libcfs/libcfs.h | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index 385ced1..c78a147 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -42,13 +42,6 @@
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index ac78dbc..646c095 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -2782,6 +2782,24 @@ union ldlm_gl_desc {
  
- #include "curproc.h"
+ void lustre_swab_gl_desc(union ldlm_gl_desc *);
  
--static inline int __is_po2(unsigned long long val)
--{
--	return !(val & (val - 1));
--}
++enum ldlm_intent_flags {
++	IT_OPEN        = 0x00000001,
++	IT_CREAT       = 0x00000002,
++	IT_OPEN_CREAT  = 0x00000003,
++	IT_READDIR     = 0x00000004,
++	IT_GETATTR     = 0x00000008,
++	IT_LOOKUP      = 0x00000010,
++	IT_UNLINK      = 0x00000020,
++	IT_TRUNC       = 0x00000040,
++	IT_GETXATTR    = 0x00000080,
++	IT_EXEC        = 0x00000100,
++	IT_PIN         = 0x00000200,
++	IT_LAYOUT      = 0x00000400,
++	IT_QUOTA_DQACQ = 0x00000800,
++	IT_QUOTA_CONN  = 0x00001000,
++	IT_SETXATTR    = 0x00002000,
++};
++
+ struct ldlm_intent {
+ 	__u64 opc;
+ };
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 3552546..af46f36 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -1017,7 +1017,7 @@ extern struct obd_ops ldlm_obd_ops;
+ 
+ extern char *ldlm_lockname[];
+ extern char *ldlm_typename[];
+-char *ldlm_it2str(int it);
++const char *ldlm_it2str(enum ldlm_intent_flags it);
+ 
+ /**
+  * Just a fancy CDEBUG call with log level preset to LDLM_DEBUG.
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 9ad8c26..f731f51 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -995,22 +995,6 @@ enum obd_cleanup_stage {
+ 
+ struct lu_context;
+ 
+-/* /!\ must be coherent with include/linux/namei.h on patched kernel */
+-#define IT_OPEN     (1 << 0)
+-#define IT_CREAT    (1 << 1)
+-#define IT_READDIR  (1 << 2)
+-#define IT_GETATTR  (1 << 3)
+-#define IT_LOOKUP   (1 << 4)
+-#define IT_UNLINK   (1 << 5)
+-#define IT_TRUNC    (1 << 6)
+-#define IT_GETXATTR (1 << 7)
+-#define IT_EXEC     (1 << 8)
+-#define IT_PIN      (1 << 9)
+-#define IT_LAYOUT   (1 << 10)
+-#define IT_QUOTA_DQACQ (1 << 11)
+-#define IT_QUOTA_CONN  (1 << 12)
+-#define IT_SETXATTR (1 << 13)
 -
--#define IS_PO2(val) __is_po2((unsigned long long)(val))
--
- #define LOWEST_BIT_SET(x)       ((x) & ~((x) - 1))
+ static inline int it_to_lock_mode(struct lookup_intent *it)
+ {
+ 	/* CREAT needs to be tested before open (both could be set) */
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index cd340fc..f3b197a 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -123,7 +123,7 @@ void ldlm_convert_policy_to_local(struct obd_export *exp, ldlm_type_t type,
+ 	convert(wpolicy, lpolicy);
+ }
  
- /*
+-char *ldlm_it2str(int it)
++const char *ldlm_it2str(enum ldlm_intent_flags it)
+ {
+ 	switch (it) {
+ 	case IT_OPEN:
 -- 
-2.4.2
-
-
--- 
-Kind Regards,
-Aya Saif El-yazal Mahfouz
+1.6.5.6
