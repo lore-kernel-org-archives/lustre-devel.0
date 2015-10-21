@@ -1,49 +1,42 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Wed, 21 Oct 2015 13:42:18 +0000
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Wed, 21 Oct 2015 15:26:50 +0000
 Subject: [lustre-devel] [PATCH] staging/lustre: move IT_* definitions to
  lustre_idl.h
-In-Reply-To: <D24D0D4E.26FC%jevans@cray.com>
-References: <20151020220201.GA6065@lusbld01.us.cray.com>
-	<DB0C8A206669AC40B1C4E52A8584A6F614D17E39@CFWEX01.americas.cray.com>,
-	<D24D0D4E.26FC%jevans@cray.com>
-Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614D17EA6@CFWEX01.americas.cray.com>
+Message-ID: <D24D09E2.112FD8%andreas.dilger@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ah, OK.
+On 2015/10/20, 16:02, "lustre-devel on behalf of Ben Evans"
+<lustre-devel-bounces at lists.lustre.org on behalf of bevans@cray.com> wrote:
 
-Thank you, Ben, Oleg.
-________________________________________
-From: Ben Evans
-Sent: Wednesday, October 21, 2015 8:37 AM
-To: Patrick Farrell; Ben Evans; lustre-devel at lists.lustre.org
-Subject: Re: [lustre-devel] [PATCH] staging/lustre: move IT_* definitions to lustre_idl.h
-
-Yep, see the discussion here:  http://review.whamcloud.com/#/c/16228/
-
-On 10/20/15, 8:41 PM, "Patrick Farrell" <paf@cray.com> wrote:
-
->Do you know what the removed comment about being coherent with namei.h
->means or once meant?  I took a look and can't see anything that
->corresponds now, but I'd feel more comfortable if I knew for sure what
->that comment meant...
->
->- Patrick
->________________________________________
->From: lustre-devel [lustre-devel-bounces at lists.lustre.org] on behalf of
->Ben Evans [bevans at cray.com]
->Sent: Tuesday, October 20, 2015 5:02 PM
->To: lustre-devel at lists.lustre.org
->Subject: [lustre-devel] [PATCH] staging/lustre: move IT_* definitions to
->      lustre_idl.h
->
 >Put IT_* definitions into an enum, as they're sent over the wire,
 >adjust calls, print statements, etc. to use the new enum.
 >
 >Signed-off-by: Ben Evans <bevans@cray.com>
+
+When you push patches upstream, please include the review tags from the
+original patch:
+
+Reviewed-on: http://review.whamcloud.com/16228
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+
+
+The "Tested-by:" and "Change-Id:" tags should be dropped.
+
+The Reviewed-on: tag allows readers to get more information about this
+patch and helps us track which patches have been upstreamed and which have
+not.
+
+The Reviewed-by: tag allows the upstream reviewer to see who has already
+approved the patch.
+
+Cheers, Andreas
+
 >---
 > .../lustre/lustre/include/lustre/lustre_idl.h      |   18
 >++++++++++++++++++
@@ -59,29 +52,29 @@ On 10/20/15, 8:41 PM, "Patrick Farrell" <paf@cray.com> wrote:
 >--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 >+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 >@@ -2782,6 +2782,24 @@ union ldlm_gl_desc {
->
+> 
 > void lustre_swab_gl_desc(union ldlm_gl_desc *);
->
+> 
 >+enum ldlm_intent_flags {
->+       IT_OPEN        = 0x00000001,
->+       IT_CREAT       = 0x00000002,
->+       IT_OPEN_CREAT  = 0x00000003,
->+       IT_READDIR     = 0x00000004,
->+       IT_GETATTR     = 0x00000008,
->+       IT_LOOKUP      = 0x00000010,
->+       IT_UNLINK      = 0x00000020,
->+       IT_TRUNC       = 0x00000040,
->+       IT_GETXATTR    = 0x00000080,
->+       IT_EXEC        = 0x00000100,
->+       IT_PIN         = 0x00000200,
->+       IT_LAYOUT      = 0x00000400,
->+       IT_QUOTA_DQACQ = 0x00000800,
->+       IT_QUOTA_CONN  = 0x00001000,
->+       IT_SETXATTR    = 0x00002000,
+>+	IT_OPEN        = 0x00000001,
+>+	IT_CREAT       = 0x00000002,
+>+	IT_OPEN_CREAT  = 0x00000003,
+>+	IT_READDIR     = 0x00000004,
+>+	IT_GETATTR     = 0x00000008,
+>+	IT_LOOKUP      = 0x00000010,
+>+	IT_UNLINK      = 0x00000020,
+>+	IT_TRUNC       = 0x00000040,
+>+	IT_GETXATTR    = 0x00000080,
+>+	IT_EXEC        = 0x00000100,
+>+	IT_PIN         = 0x00000200,
+>+	IT_LAYOUT      = 0x00000400,
+>+	IT_QUOTA_DQACQ = 0x00000800,
+>+	IT_QUOTA_CONN  = 0x00001000,
+>+	IT_SETXATTR    = 0x00002000,
 >+};
 >+
 > struct ldlm_intent {
->        __u64 opc;
+> 	__u64 opc;
 > };
 >diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h
 >b/drivers/staging/lustre/lustre/include/lustre_dlm.h
@@ -89,12 +82,12 @@ On 10/20/15, 8:41 PM, "Patrick Farrell" <paf@cray.com> wrote:
 >--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
 >+++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
 >@@ -1017,7 +1017,7 @@ extern struct obd_ops ldlm_obd_ops;
->
+> 
 > extern char *ldlm_lockname[];
 > extern char *ldlm_typename[];
 >-char *ldlm_it2str(int it);
 >+const char *ldlm_it2str(enum ldlm_intent_flags it);
->
+> 
 > /**
 >  * Just a fancy CDEBUG call with log level preset to LDLM_DEBUG.
 >diff --git a/drivers/staging/lustre/lustre/include/obd.h
@@ -103,9 +96,9 @@ On 10/20/15, 8:41 PM, "Patrick Farrell" <paf@cray.com> wrote:
 >--- a/drivers/staging/lustre/lustre/include/obd.h
 >+++ b/drivers/staging/lustre/lustre/include/obd.h
 >@@ -995,22 +995,6 @@ enum obd_cleanup_stage {
->
+> 
 > struct lu_context;
->
+> 
 >-/* /!\ must be coherent with include/linux/namei.h on patched kernel */
 >-#define IT_OPEN     (1 << 0)
 >-#define IT_CREAT    (1 << 1)
@@ -124,7 +117,7 @@ On 10/20/15, 8:41 PM, "Patrick Farrell" <paf@cray.com> wrote:
 >-
 > static inline int it_to_lock_mode(struct lookup_intent *it)
 > {
->        /* CREAT needs to be tested before open (both could be set) */
+> 	/* CREAT needs to be tested before open (both could be set) */
 >diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
 >b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
 >index cd340fc..f3b197a 100644
@@ -132,18 +125,27 @@ On 10/20/15, 8:41 PM, "Patrick Farrell" <paf@cray.com> wrote:
 >+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
 >@@ -123,7 +123,7 @@ void ldlm_convert_policy_to_local(struct obd_export
 >*exp, ldlm_type_t type,
->        convert(wpolicy, lpolicy);
+> 	convert(wpolicy, lpolicy);
 > }
->
+> 
 >-char *ldlm_it2str(int it)
 >+const char *ldlm_it2str(enum ldlm_intent_flags it)
 > {
->        switch (it) {
->        case IT_OPEN:
->--
+> 	switch (it) {
+> 	case IT_OPEN:
+>-- 
 >1.6.5.6
 >
 >_______________________________________________
 >lustre-devel mailing list
 >lustre-devel at lists.lustre.org
 >http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>
+
+
+Cheers, Andreas
+-- 
+Andreas Dilger
+
+Lustre Software Architect
+Intel High Performance Data Division
