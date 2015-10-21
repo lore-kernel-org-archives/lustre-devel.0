@@ -1,16 +1,26 @@
-From: Ben Evans <bevans@cray.com>
-Date: Wed, 21 Oct 2015 13:37:52 +0000
+From: Patrick Farrell <paf@cray.com>
+Date: Wed, 21 Oct 2015 13:42:18 +0000
 Subject: [lustre-devel] [PATCH] staging/lustre: move IT_* definitions to
  lustre_idl.h
-In-Reply-To: <DB0C8A206669AC40B1C4E52A8584A6F614D17E39@CFWEX01.americas.cray.com>
+In-Reply-To: <D24D0D4E.26FC%jevans@cray.com>
 References: <20151020220201.GA6065@lusbld01.us.cray.com>
-	<DB0C8A206669AC40B1C4E52A8584A6F614D17E39@CFWEX01.americas.cray.com>
-Message-ID: <D24D0D4E.26FC%jevans@cray.com>
+	<DB0C8A206669AC40B1C4E52A8584A6F614D17E39@CFWEX01.americas.cray.com>,
+	<D24D0D4E.26FC%jevans@cray.com>
+Message-ID: <DB0C8A206669AC40B1C4E52A8584A6F614D17EA6@CFWEX01.americas.cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Ah, OK.
+
+Thank you, Ben, Oleg.
+________________________________________
+From: Ben Evans
+Sent: Wednesday, October 21, 2015 8:37 AM
+To: Patrick Farrell; Ben Evans; lustre-devel at lists.lustre.org
+Subject: Re: [lustre-devel] [PATCH] staging/lustre: move IT_* definitions to lustre_idl.h
 
 Yep, see the discussion here:  http://review.whamcloud.com/#/c/16228/
 
