@@ -1,33 +1,38 @@
-From: kbuild test robot <lkp@intel.com>
-Date: Fri, 23 Oct 2015 00:36:55 +0800
-Subject: [lustre-devel] [PATCH 3/3] locks: cleanup posix_lock_inode_wait
- and flock_lock_inode_wait
-In-Reply-To: <ded792d8fdcba562a1c74fd14fefcb387debc4b1.1445524157.git.bcodding@redhat.com>
-Message-ID: <201510230020.vZvDxsE7%fengguang.wu@intel.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Thu, 22 Oct 2015 22:48:19 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: fix misleading
+	indentation
+In-Reply-To: <1445449240-30305-1-git-send-email-luisbg@osg.samsung.com>
+References: <1445449240-30305-1-git-send-email-luisbg@osg.samsung.com>
+Message-ID: <20151022194819.GR7340@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Benjamin,
+On Wed, Oct 21, 2015 at 06:40:40PM +0100, Luis de Bethencourt wrote:
+> The code is correct, the indentation is misleading. Only the the return rc
+> is part of the conditional statement if rc != 0.
+> 
+> Fix a smatch warning:
+> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c:2157
+> kiblnd_hdev_setup_mrs() warn: curly braces intended?
+> 
+> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+> ---
+> 
+> Hi,
+> 
+> This patch gives a warning in checkpatch.pl for the line:
+> if (hdev->ibh_mrs == NULL)
+> 
+> It would be cleaner if this was 'if (!hdev->ibh_mrs)' instead. I didn't fix
+> this as well because the file has 41 instances of comparisons with NULL. I
+> would be happy to do so in a patch in reply to this one if it would be good.
+> 
 
-[auto build test WARNING on jlayton/linux-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+You did the right thing.  One thing per patch.
 
-url:    https://github.com/0day-ci/linux/commits/Benjamin-Coddington/locks-introduce-locks_lock_inode_wait/20151022-233848
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
-
-
-sparse warnings: (new ones prefixed by >>)
-
->> fs/locks.c:1176:5: sparse: symbol 'posix_lock_inode_wait' was not declared. Should it be static?
->> fs/locks.c:1863:5: sparse: symbol 'flock_lock_inode_wait' was not declared. Should it be static?
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+regards,
+dan carpenter
