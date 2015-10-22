@@ -1,41 +1,33 @@
 From: kbuild test robot <lkp@intel.com>
 Date: Fri, 23 Oct 2015 00:36:55 +0800
-Subject: [lustre-devel] [RFC PATCH] locks: posix_lock_inode_wait() can be
-	static
+Subject: [lustre-devel] [PATCH 3/3] locks: cleanup posix_lock_inode_wait
+ and flock_lock_inode_wait
 In-Reply-To: <ded792d8fdcba562a1c74fd14fefcb387debc4b1.1445524157.git.bcodding@redhat.com>
-References: <201510230020.vZvDxsE7%fengguang.wu@intel.com>
-Message-ID: <20151022163655.GA111096@roam>
+Message-ID: <201510230020.vZvDxsE7%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Hi Benjamin,
 
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+[auto build test WARNING on jlayton/linux-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+
+url:    https://github.com/0day-ci/linux/commits/Benjamin-Coddington/locks-introduce-locks_lock_inode_wait/20151022-233848
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
+
+
+sparse warnings: (new ones prefixed by >>)
+
+>> fs/locks.c:1176:5: sparse: symbol 'posix_lock_inode_wait' was not declared. Should it be static?
+>> fs/locks.c:1863:5: sparse: symbol 'flock_lock_inode_wait' was not declared. Should it be static?
+
+Please review and possibly fold the followup patch.
+
 ---
- locks.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/fs/locks.c b/fs/locks.c
-index daf4664..0d2b326 100644
---- a/fs/locks.c
-+++ b/fs/locks.c
-@@ -1173,7 +1173,7 @@ EXPORT_SYMBOL(posix_lock_file);
-  *
-  * Apply a POSIX style lock request to an inode.
-  */
--int posix_lock_inode_wait(struct inode *inode, struct file_lock *fl)
-+static int posix_lock_inode_wait(struct inode *inode, struct file_lock *fl)
- {
- 	int error;
- 	might_sleep ();
-@@ -1860,7 +1860,7 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
-  *
-  * Apply a FLOCK style lock request to an inode.
-  */
--int flock_lock_inode_wait(struct inode *inode, struct file_lock *fl)
-+static int flock_lock_inode_wait(struct inode *inode, struct file_lock *fl)
- {
- 	int error;
- 	might_sleep();
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
