@@ -1,64 +1,96 @@
-From: Julia Lawall <julia.lawall@lip6.fr>
-Date: Fri, 23 Oct 2015 11:59:41 +0200 (CEST)
-Subject: [lustre-devel] [Outreachy kernel] [PATCH] Staging: lustre:
- obdclass: Remove unused header files
-In-Reply-To: <1445594277-14421-1-git-send-email-shraddha.6596@gmail.com>
-References: <1445594277-14421-1-git-send-email-shraddha.6596@gmail.com>
-Message-ID: <alpine.DEB.2.10.1510231158450.2437@hadrien>
+From: Benjamin Coddington <bcodding@redhat.com>
+Date: Thu, 22 Oct 2015 11:35:54 -0400
+Subject: [lustre-devel] [PATCH 1/3] locks: introduce locks_lock_inode_wait()
+In-Reply-To: <cover.1445524157.git.bcodding@redhat.com>
+References: <cover.1445524157.git.bcodding@redhat.com>
+Message-ID: <daf0d3941f34438c1fbdc94a5f3a47c2b22f3ee8.1445524157.git.bcodding@redhat.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Users of the locks API commonly call either posix_lock_file_wait() or
+flock_lock_file_wait() depending upon the lock type.  Add a new function
+locks_lock_inode_wait() which will check and call the correct function for
+the type of lock passed in.
 
+Signed-off-by: Benjamin Coddington <bcodding@redhat.com>
+---
+ fs/locks.c         |   24 ++++++++++++++++++++++++
+ include/linux/fs.h |   11 +++++++++++
+ 2 files changed, 35 insertions(+), 0 deletions(-)
 
-On Fri, 23 Oct 2015, Shraddha Barke wrote:
-
-> Remove unused header files that are already included in 'lu_object.h'
-> and 'obd.h'
->
-> Signed-off-by: Shraddha Barke <shraddha.6596@gmail.com>
-> ---
->  drivers/staging/lustre/lustre/obdclass/lu_object.c | 1 -
->  drivers/staging/lustre/lustre/obdclass/lu_ref.c    | 1 -
->  2 files changed, 2 deletions(-)
->
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> index 0d15bd5..549df95 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> @@ -55,7 +55,6 @@
->  #include "../include/lustre_disk.h"
->  #include "../include/lustre_fid.h"
->  #include "../include/lu_object.h"
-> -#include "../include/lu_ref.h"
-
-If things from lu_ref.h are directly referred to in the .c file, it may be
-better to keep the include, rather than relying on some other include file
-(that could change in the future) to include it.
-
-julia
-
->  #include <linux/list.h>
->
->  static void lu_object_free(const struct lu_env *env, struct lu_object *o);
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_ref.c b/drivers/staging/lustre/lustre/obdclass/lu_ref.c
-> index 993697b..df2d8b9 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lu_ref.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lu_ref.c
-> @@ -47,4 +47,3 @@
->  #include "../include/obd.h"
->  #include "../include/obd_class.h"
->  #include "../include/obd_support.h"
-> -#include "../include/lu_ref.h"
-> --
-> 2.1.4
->
-> --
-> You received this message because you are subscribed to the Google Groups "outreachy-kernel" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to outreachy-kernel+unsubscribe at googlegroups.com.
-> To post to this group, send email to outreachy-kernel at googlegroups.com.
-> To view this discussion on the web visit https://groups.google.com/d/msgid/outreachy-kernel/1445594277-14421-1-git-send-email-shraddha.6596%40gmail.com.
-> For more options, visit https://groups.google.com/d/optout.
->
+diff --git a/fs/locks.c b/fs/locks.c
+index 2a54c80..68b1784 100644
+--- a/fs/locks.c
++++ b/fs/locks.c
+@@ -1876,6 +1876,30 @@ int flock_lock_inode_wait(struct inode *inode, struct file_lock *fl)
+ EXPORT_SYMBOL(flock_lock_inode_wait);
+ 
+ /**
++ * locks_lock_inode_wait - Apply a lock to an inode
++ * @inode: inode of the file to apply to
++ * @fl: The lock to be applied
++ *
++ * Apply a POSIX or FLOCK style lock request to an inode.
++ */
++int locks_lock_inode_wait(struct inode *inode, struct file_lock *fl)
++{
++	int res = 0;
++	switch (fl->fl_flags & (FL_POSIX|FL_FLOCK)) {
++		case FL_POSIX:
++			res = posix_lock_inode_wait(inode, fl);
++			break;
++		case FL_FLOCK:
++			res = flock_lock_inode_wait(inode, fl);
++			break;
++		default:
++			BUG();
++	}
++	return res;
++}
++EXPORT_SYMBOL(locks_lock_inode_wait);
++
++/**
+  *	sys_flock: - flock() system call.
+  *	@fd: the file descriptor to lock.
+  *	@cmd: the type of lock to apply.
+diff --git a/include/linux/fs.h b/include/linux/fs.h
+index 72d8a84..2e283b7 100644
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -1059,6 +1059,7 @@ extern int vfs_test_lock(struct file *, struct file_lock *);
+ extern int vfs_lock_file(struct file *, unsigned int, struct file_lock *, struct file_lock *);
+ extern int vfs_cancel_lock(struct file *filp, struct file_lock *fl);
+ extern int flock_lock_inode_wait(struct inode *inode, struct file_lock *fl);
++extern int locks_lock_inode_wait(struct inode *inode, struct file_lock *fl);
+ extern int __break_lease(struct inode *inode, unsigned int flags, unsigned int type);
+ extern void lease_get_mtime(struct inode *, struct timespec *time);
+ extern int generic_setlease(struct file *, long, struct file_lock **, void **priv);
+@@ -1177,6 +1178,11 @@ static inline int flock_lock_inode_wait(struct inode *inode,
+ 	return -ENOLCK;
+ }
+ 
++static inline int locks_lock_file_wait(struct file *filp, struct file_lock *fl)
++{
++	return -ENOLCK;
++}
++
+ static inline int __break_lease(struct inode *inode, unsigned int mode, unsigned int type)
+ {
+ 	return 0;
+@@ -1225,6 +1231,11 @@ static inline int flock_lock_file_wait(struct file *filp, struct file_lock *fl)
+ 	return flock_lock_inode_wait(file_inode(filp), fl);
+ }
+ 
++static inline int locks_lock_file_wait(struct file *filp, struct file_lock *fl)
++{
++	return locks_lock_inode_wait(file_inode(filp), fl);
++}
++
+ struct fasync_struct {
+ 	spinlock_t		fa_lock;
+ 	int			magic;
+-- 
+1.7.1
