@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 23 Oct 2015 15:59:16 -0400
-Subject: [lustre-devel] [PATCH 4/5] staging:lustre: split kernel comm
-	between user and kernel
+Date: Fri, 23 Oct 2015 15:59:17 -0400
+Subject: [lustre-devel] [PATCH 5/5] staging:lustre: Update license and
+	copyright for kernel comm
 In-Reply-To: <1445630357-27149-1-git-send-email-jsimmons@infradead.org>
 References: <1445630357-27149-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1445630357-27149-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1445630357-27149-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,20 +13,9 @@ To: lustre-devel@lists.lustre.org
 
 From: frank zago <fzago@cray.com>
 
-Split the kernel comm header in libcfs into two new headers
-to handle both kernel space and user space for the lustre layer.
-This is broken out of the original patch 14270. The part covered
-by this change is as follows:
-
-The original libcfs_kernelcomm.h header is split into three parts:
-  * lustre_kernelcomm.h, a new header for the kernel parts;
-  * uapi_kernelcomm.h, a new header for the data structures shared
-    between userspace and kernelspace;
-  * lustreapi_internal.h receives the private liblustreapi prototypes.
-
-Various names and filenames have been harmonized to *kernelcomm*.
-
-The unused symbol KUC_FL_BLOCK has been removed.
+Point to the right place for GNU license. Update Intel copyright.
+Update Nathan Rutmans email address. This was broken out of the
+original patch 14270.
 
 Signed-off-by: frank zago <fzago@cray.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
@@ -38,101 +27,42 @@ Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 -
- .../lustre/lustre/include/lustre_kernelcomm.h      |   56 ++++++++++++++++++++
- .../include/uapi_kernelcomm.h}                     |   50 ++++-------------
- drivers/staging/lustre/lustre/llite/dir.c          |    1 +
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    1 +
- drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |    2 +
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    1 +
- drivers/staging/lustre/lustre/obdclass/genops.c    |    1 +
- .../staging/lustre/lustre/obdclass/kernelcomm.c    |    5 +-
- 9 files changed, 76 insertions(+), 42 deletions(-)
- create mode 100644 drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
- rename drivers/staging/lustre/{include/linux/libcfs/libcfs_kernelcomm.h => lustre/include/uapi_kernelcomm.h} (62%)
+ .../lustre/lustre/include/lustre_kernelcomm.h      |    2 +-
+ .../lustre/lustre/include/uapi_kernelcomm.h        |    2 +-
+ .../staging/lustre/lustre/obdclass/kernelcomm.c    |   11 +++--------
+ 3 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index 5dd9cdf..1117310 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -125,7 +125,6 @@ void cfs_get_random_bytes(void *buf, int size);
- #include "libcfs_prim.h"
- #include "libcfs_time.h"
- #include "libcfs_string.h"
--#include "libcfs_kernelcomm.h"
- #include "libcfs_workitem.h"
- #include "libcfs_hash.h"
- #include "libcfs_fail.h"
 diff --git a/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h b/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
-new file mode 100644
-index 0000000..a5baa80
---- /dev/null
+index a5baa80..a61263f 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
-@@ -0,0 +1,56 @@
-+/*
-+ * GPL HEADER START
-+ *
-+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 only,
-+ * as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 for more details (a copy is included
-+ * in the LICENSE file that accompanied this code).
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 along with this program; If not, see
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-+ *
-+ * GPL HEADER END
-+ */
-+/*
-+ * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-+ * Use is subject to license terms.
-+ *
-+ * Copyright (c) 2013, Intel Corporation.
-+ */
-+/*
-+ * This file is part of Lustre, http://www.lustre.org/
-+ *
-+ * Author: Nathan Rutman <nathan.rutman@sun.com>
-+ *
-+ * Kernel <-> userspace communication routines.
-+ * The definitions below are used in the kernel and userspace.
-+ */
-+
-+#ifndef __LUSTRE_KERNELCOMM_H__
-+#define __LUSTRE_KERNELCOMM_H__
-+
-+/* For declarations shared with userspace */
-+#include "uapi_kernelcomm.h"
-+
-+/* prototype for callback function on kuc groups */
-+typedef int (*libcfs_kkuc_cb_t)(void *data, void *cb_arg);
-+
-+/* Kernel methods */
-+int libcfs_kkuc_msg_put(struct file *fp, void *payload);
-+int libcfs_kkuc_group_put(int group, void *payload);
-+int libcfs_kkuc_group_add(struct file *fp, int uid, int group,
-+			  void *data);
-+int libcfs_kkuc_group_rem(int uid, int group, void **pdata);
-+int libcfs_kkuc_group_foreach(int group, libcfs_kkuc_cb_t cb_func,
-+			      void *cb_arg);
-+
-+#endif /* __LUSTRE_KERNELCOMM_H__ */
-+
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h b/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
-similarity index 62%
-rename from drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-rename to drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
-index 7323ca6..5e0b8de 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
+@@ -28,7 +28,7 @@
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+  *
+- * Author: Nathan Rutman <nathan.rutman@sun.com>
++ * Author: Nathan Rutman <nathan.rutman@seagate.com>
+  *
+  * Kernel <-> userspace communication routines.
+  * The definitions below are used in the kernel and userspace.
+diff --git a/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h b/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
+index 5e0b8de..ad608b7 100644
+--- a/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
 +++ b/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
-@@ -15,37 +15,29 @@
+@@ -28,7 +28,7 @@
+ /*
+  * This file is part of Lustre, http://www.lustre.org/
+  *
+- * Author: Nathan Rutman <nathan.rutman@sun.com>
++ * Author: Nathan Rutman <nathan.rutman@seagate.com>
+  *
+  * Kernel <-> userspace communication routines.
+  * The definitions below are used in the kernel and userspace.
+diff --git a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
+index 70bd729..978191a 100644
+--- a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
++++ b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
+@@ -15,11 +15,7 @@
   *
   * You should have received a copy of the GNU General Public License
   * version 2 along with this program; If not, see
@@ -145,171 +75,21 @@ index 7323ca6..5e0b8de 100644
   *
   * GPL HEADER END
   */
- /*
-  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+@@ -27,13 +23,12 @@
+  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
   * Use is subject to license terms.
-+ *
-+ * Copyright (c) 2013, Intel Corporation.
+  *
+- * Copyright (c) 2012, Intel Corporation.
++ * Copyright (c) 2012, 2015, Intel Corporation.
   */
  /*
   * This file is part of Lustre, http://www.lustre.org/
 - * Lustre is a trademark of Sun Microsystems, Inc.
   *
-  * Author: Nathan Rutman <nathan.rutman@sun.com>
+- * Author: Nathan Rutman <nathan.rutman@sun.com>
++ * Author: Nathan Rutman <nathan.rutman@seagate.com>
   *
-- * libcfs/include/libcfs/libcfs_kernelcomm.h
-- *
   * Kernel <-> userspace communication routines.
-  * The definitions below are used in the kernel and userspace.
-- *
-  */
- 
--#ifndef __LIBCFS_KERNELCOMM_H__
--#define __LIBCFS_KERNELCOMM_H__
-+#ifndef __UAPI_KERNELCOMM_H__
-+#define __UAPI_KERNELCOMM_H__
- 
--#ifndef __LIBCFS_LIBCFS_H__
--#error Do not #include this file directly. #include <linux/libcfs/libcfs.h> instead
--#endif
-+#include <linux/types.h>
- 
- /* KUC message header.
-  * All current and future KUC messages should use this header.
-@@ -63,7 +55,6 @@ struct kuc_hdr {
- #define KUC_CHANGELOG_MSG_MAXSIZE (sizeof(struct kuc_hdr)+CR_MAXSIZE)
- 
- #define KUC_MAGIC  0x191C /*Lustre9etLinC */
--#define KUC_FL_BLOCK 0x01   /* Wait for send */
- 
- /* kuc_msgtype values are defined in each transport */
- enum kuc_transport_type {
-@@ -76,43 +67,26 @@ enum kuc_generic_message_type {
- 	KUC_MSG_SHUTDOWN = 1,
- };
- 
--/* prototype for callback function on kuc groups */
--typedef int (*libcfs_kkuc_cb_t)(void *data, void *cb_arg);
--
- /* KUC Broadcast Groups. This determines which userspace process hears which
-  * messages.  Mutliple transports may be used within a group, or multiple
-  * groups may use the same transport.  Broadcast
-  * groups need not be used if e.g. a UID is specified instead;
-  * use group 0 to signify unicast.
-  */
--#define KUC_GRP_HSM	   0x02
--#define KUC_GRP_MAX	   KUC_GRP_HSM
--
--/* Kernel methods */
--int libcfs_kkuc_msg_put(struct file *fp, void *payload);
--int libcfs_kkuc_group_put(int group, void *payload);
--int libcfs_kkuc_group_add(struct file *fp, int uid, int group,
--			  void *data);
--int libcfs_kkuc_group_rem(int uid, int group, void **pdata);
--int libcfs_kkuc_group_foreach(int group, libcfs_kkuc_cb_t cb_func,
--				     void *cb_arg);
-+#define KUC_GRP_HSM	0x02
-+#define KUC_GRP_MAX	KUC_GRP_HSM
- 
- #define LK_FLG_STOP 0x01
-+#define LK_NOFD -1U
- 
- /* kernelcomm control structure, passed from userspace to kernel */
--typedef struct lustre_kernelcomm {
-+struct lustre_kernelcomm {
- 	__u32 lk_wfd;
- 	__u32 lk_rfd;
- 	__u32 lk_uid;
- 	__u32 lk_group;
- 	__u32 lk_data;
- 	__u32 lk_flags;
--} __packed lustre_kernelcomm;
--
--/* Userspace methods */
--int libcfs_ukuc_start(lustre_kernelcomm *l, int groups);
--int libcfs_ukuc_stop(lustre_kernelcomm *l);
--int libcfs_ukuc_msg_get(lustre_kernelcomm *l, char *buf, int maxsize,
--			       int transport);
-+} __packed;
- 
--#endif /* __LIBCFS_KERNELCOMM_H__ */
-+#endif	/* __UAPI_KERNELCOMM_H__ */
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 3d746a9..6b2834d 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -55,6 +55,7 @@
- #include "../include/lustre_lite.h"
- #include "../include/lustre_dlm.h"
- #include "../include/lustre_fid.h"
-+#include "../include/lustre_kernelcomm.h"
- #include "llite_internal.h"
- 
- /*
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 50eccb1..ee16236 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -53,6 +53,7 @@
- #include "../include/lprocfs_status.h"
- #include "../include/lustre_lite.h"
- #include "../include/lustre_fid.h"
-+#include "../include/lustre_kernelcomm.h"
- #include "lmv_internal.h"
- 
- static void lmv_activate_target(struct lmv_obd *lmv,
-diff --git a/drivers/staging/lustre/lustre/mdc/lproc_mdc.c b/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-index 1c95f87..7d7b671 100644
---- a/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-+++ b/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-@@ -38,6 +38,8 @@
- #include <linux/vfs.h>
- #include "../include/obd_class.h"
- #include "../include/lprocfs_status.h"
-+/* temporary for testing */
-+#include "../include/lustre_kernelcomm.h"
- #include "mdc_internal.h"
- 
- static ssize_t max_rpcs_in_flight_show(struct kobject *kobj,
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index dc98239..4aa48e4 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -48,6 +48,7 @@
- #include "../include/lprocfs_status.h"
- #include "../include/lustre_param.h"
- #include "../include/lustre_log.h"
-+#include "../include/lustre_kernelcomm.h"
- 
- #include "mdc_internal.h"
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 978c3c5..6181826 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -42,6 +42,7 @@
- #define DEBUG_SUBSYSTEM S_CLASS
- #include "../include/obd_class.h"
- #include "../include/lprocfs_status.h"
-+#include "../include/lustre_kernelcomm.h"
- 
- spinlock_t obd_types_lock;
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-index 04c6d2d..70bd729 100644
---- a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-+++ b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-@@ -42,9 +42,8 @@
- #define DEBUG_SUBSYSTEM S_CLASS
- #define D_KUC D_OTHER
- 
--#include "../../include/linux/libcfs/libcfs.h"
--
--/* This is the kernel side (liblustre as well). */
-+#include "../include/obd_support.h"
-+#include "../include/lustre_kernelcomm.h"
- 
- /**
-  * libcfs_kkuc_msg_put - send an message from kernel to userspace
+  * Using pipes for all arches.
 -- 
 1.7.1
