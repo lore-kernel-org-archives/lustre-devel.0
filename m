@@ -1,31 +1,57 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sun, 25 Oct 2015 07:44:43 +0000
-Subject: [lustre-devel] syncronous liblustreapi calls
-Message-ID: <D251E3C0.113DBD%andreas.dilger@intel.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Sat, 24 Oct 2015 18:56:23 -0700
+Subject: [lustre-devel] [PATCH 0/5] staging:lustre: split kernel comm
+ between user and kernel
+In-Reply-To: <1445630357-27149-1-git-send-email-jsimmons@infradead.org>
+References: <1445630357-27149-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <20151025015623.GB14640@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-For lctl conf_param commands, this was tricky to implement with synchronous calls, since the configuration needs to be set on the MGS (where the log is stored), but only the client (or server, depending on the parameter) knows whether that parameter is valid since the MGS won't have a mounted client for e.g. "llite" tunables, nor a mounted server for e.g. "obdfilter" tunables.  Also, there is an added complexity in whether "wait until completion" means "written to disk on the MGS" or "applied to one, some, or all clients or servers"?
+On Fri, Oct 23, 2015 at 03:59:12PM -0400, James Simmons wrote:
+> The kernel communication code used for HSM and changelog is
+> entangled. Move the user space bits into the liblustreapi. This will
+> also help for a possible relicensing. The kernel portion is also moved
+> from libcfs to obdclass.
+> 
+> The original libcfs_kernelcomm.h header is split into three parts:
+> 
+>   * lustre_kernelcomm.h, a new header for the kernel parts;
+>   * uapi_kernelcomm.h, a new header for the data structures shared
+>     between userspace and kernelspace;
+>   * lustreapi_internal.h receives the private liblustreapi prototypes.
+> 
+> The original code in kernel_user_comm.c is split into two parts:
+> 
+>   * obdclass/kernelcomm.c for the kernel part. filp_user_write() was
+>     moved there, and linux-fs.c deleted;
+>   * liblustreapi_kernelconn.c for the user part. The calls to CDEBUG
+>     have been removed, and calls to CERROR have been transformed to
+>     llapi_err_noerrno. The type lustre_kernelcomm has been removed and
+>     replace by struct lustre_kernelcomm.
+> 
+> Various names and filenames have been harmonized to *kernelcomm*.
+> 
+> The unused symbol KUC_FL_BLOCK has been removed.
+> 
+> Signed-off-by: frank zago <fzago@cray.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+> Reviewed-on: http://review.whamcloud.com/14270
+> Reviewed-by: Nathan Rutman <nathan.rutman@seagate.com>
+> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+> Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> Reviewed-by: John L. Hammond <john.hammond@intel.com>
+> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 
-I'm not saying that the current interface is good - some tests needs polling of /proc to check that conf_param parameter updates have completed.  I'm open to suggestions that solve this in a manner that doesn't allow arbitrary clients to modify global filesystem tunables...
+The series didn't all have numbers on them, so I don't know what order
+to apply them in :(
 
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Software Architect
-Intel High Performance Data Division
+Please resend them with the proper numbering on them so I know what to
+do here.
 
-On 2015/10/22, 08:50, "lustre-devel on behalf of Ben Evans" <lustre-devel-bounces at lists.lustre.org<mailto:lustre-devel-bounces@lists.lustre.org> on behalf of bevans at cray.com<mailto:bevans@cray.com>> wrote:
+thanks,
 
-Is there some architectural reason behind a lack of synchronous calls to set values?
-
-As an example, the changelog_clear operation does some preliminary checking in liblustreapi for things like non-negative ranges, and that the changelog user is formatted correctly (not that the user actually exists).
-
-If everything checks out, it sends off an async request and tells the user everything is fine.  On the MDS, many things may go wrong (such as the range being invalid, or the user not existing), and that gets written to the logs on the MDS, but there doesn?t seem to be a way of telling the user that something went wrong.
-
-Is there some backstory on this, or is it just an architectural consequence of the way Lustre works?
-
--Ben Evans
+greg k-h
