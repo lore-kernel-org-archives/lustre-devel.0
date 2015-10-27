@@ -1,10 +1,10 @@
 From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Tue, 27 Oct 2015 19:42:08 +0200
-Subject: [lustre-devel] [RESEND PATCH v2 1/5] staging: lustre:
- ldlm_extent.c: replace IS_PO2 by is_power_of_2
+Date: Tue, 27 Oct 2015 19:43:34 +0200
+Subject: [lustre-devel] [RESEND PATCH v2 2/5] staging: lustre: hash.c:
+ Replace IS_PO2 by is_power_of_2
 In-Reply-To: <cover.1445967419.git.mahfouz.saif.elyazal@gmail.com>
 References: <cover.1445967419.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <8231e028c575cc4ab2e34601b92d3a66f11559ff.1445967419.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <36db1862a6b63ac07f3b1ed3a1f7f39a772399c6.1445967419.git.mahfouz.saif.elyazal@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,37 +16,38 @@ is_power_of_2 since it returns 1 for numbers that are powers
 of 2 only whereas IS_PO2 returns 1 for 0 and numbers that are
 powers of 2.
 
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
 ---
 v2:
         -changed commit message
+        -added Andreas Reviewed by tag
 
- drivers/staging/lustre/lustre/ldlm/ldlm_extent.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/libcfs/hash.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-index c787888..d994ce0 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-@@ -50,6 +50,9 @@
-  */
+diff --git a/drivers/staging/lustre/lustre/libcfs/hash.c b/drivers/staging/lustre/lustre/libcfs/hash.c
+index 6f4c7d4..4b5e79a 100644
+--- a/drivers/staging/lustre/lustre/libcfs/hash.c
++++ b/drivers/staging/lustre/lustre/libcfs/hash.c
+@@ -109,6 +109,8 @@
  
- #define DEBUG_SUBSYSTEM S_LDLM
-+
+ #include "../../include/linux/libcfs/libcfs.h"
+ #include <linux/seq_file.h>
 +#include <linux/log2.h>
 +
- #include "../../include/linux/libcfs/libcfs.h"
- #include "../include/lustre_dlm.h"
- #include "../include/obd_support.h"
-@@ -149,7 +152,7 @@ static inline int lock_mode_to_index(ldlm_mode_t mode)
- 	int index;
  
- 	LASSERT(mode != 0);
--	LASSERT(IS_PO2(mode));
-+	LASSERT(is_power_of_2(mode));
- 	for (index = -1; mode; index++)
- 		mode >>= 1;
- 	LASSERT(index < LCK_MODE_NUM);
+ #if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
+ static unsigned int warn_on_depth = 8;
+@@ -1785,7 +1787,7 @@ cfs_hash_rehash_cancel_locked(struct cfs_hash *hs)
+ 	for (i = 2; cfs_hash_is_rehashing(hs); i++) {
+ 		cfs_hash_unlock(hs, 1);
+ 		/* raise console warning while waiting too long */
+-		CDEBUG(IS_PO2(i >> 3) ? D_WARNING : D_INFO,
++		CDEBUG(is_power_of_2(i >> 3) ? D_WARNING : D_INFO,
+ 		       "hash %s is still rehashing, rescheded %d\n",
+ 		       hs->hs_name, i - 1);
+ 		cond_resched();
 -- 
 2.4.2
 
