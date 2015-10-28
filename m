@@ -1,46 +1,52 @@
 From: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
-Date: Wed, 28 Oct 2015 12:11:59 +0530
-Subject: [lustre-devel] [RESEND PATCH v2 2/5] staging: lustre: hash.c:
- Replace IS_PO2 by is_power_of_2
-In-Reply-To: <36db1862a6b63ac07f3b1ed3a1f7f39a772399c6.1445967419.git.mahfouz.saif.elyazal@gmail.com>
+Date: Wed, 28 Oct 2015 12:14:57 +0530
+Subject: [lustre-devel] [RESEND PATCH v2 4/5] staging: lustre:
+ selftest.h: replace IS_PO2 by is_power_of_2
+In-Reply-To: <6424e67b55e713cc71a479e1dc19325ca7f5934f.1445967419.git.mahfouz.saif.elyazal@gmail.com>
 References: <cover.1445967419.git.mahfouz.saif.elyazal@gmail.com>
-	<36db1862a6b63ac07f3b1ed3a1f7f39a772399c6.1445967419.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <20151028064159.GB3649@sudip-pc>
+	<6424e67b55e713cc71a479e1dc19325ca7f5934f.1445967419.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <20151028064457.GC3649@sudip-pc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Oct 27, 2015 at 07:43:34PM +0200, Aya Mahfouz wrote:
+On Tue, Oct 27, 2015 at 07:45:22PM +0200, Aya Mahfouz wrote:
 > Replaces IS_PO2 by is_power_of_2. It is more accurate to use
 > is_power_of_2 since it returns 1 for numbers that are powers
 > of 2 only whereas IS_PO2 returns 1 for 0 and numbers that are
 > powers of 2.
 > 
-> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 > Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
 > ---
 > v2:
->         -changed commit message
->         -added Andreas Reviewed by tag
+>         -added new patch in patch set for selftest.h
 > 
->  drivers/staging/lustre/lustre/libcfs/hash.c | 4 +++-
+>  drivers/staging/lustre/lnet/selftest/selftest.h | 4 +++-
 >  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/libcfs/hash.c b/drivers/staging/lustre/lustre/libcfs/hash.c
-> index 6f4c7d4..4b5e79a 100644
-> --- a/drivers/staging/lustre/lustre/libcfs/hash.c
-> +++ b/drivers/staging/lustre/lustre/libcfs/hash.c
-> @@ -109,6 +109,8 @@
+> diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
+> index 8a77d3f..2846f26 100644
+> --- a/drivers/staging/lustre/lnet/selftest/selftest.h
+> +++ b/drivers/staging/lustre/lnet/selftest/selftest.h
+> @@ -43,6 +43,8 @@
 >  
->  #include "../../include/linux/libcfs/libcfs.h"
->  #include <linux/seq_file.h>
+>  #define LNET_ONLY
+>  
 > +#include <linux/log2.h>
 > +
+>  #include "../../include/linux/libcfs/libcfs.h"
+>  #include "../../include/linux/lnet/lnet.h"
+>  #include "../../include/linux/lnet/lib-lnet.h"
+> @@ -585,7 +587,7 @@ swi_state2str (int state)
+>  do {									\
+>  	int __I = 2;							\
+>  	while (!(cond)) {						\
+> -		CDEBUG(IS_PO2(++__I) ? D_WARNING : D_NET,		\
+> +		CDEBUG(is_power_of_2(++__I) ? D_WARNING : D_NET,		\
 
-This extra blank line will introduce new checkpatch error of "multiple
-blank lines"
+An extra tab here broke the alignent of those '\'.
 
 regards
 sudip
