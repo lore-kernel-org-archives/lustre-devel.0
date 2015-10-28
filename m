@@ -1,52 +1,47 @@
-From: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
-Date: Wed, 28 Oct 2015 12:14:57 +0530
-Subject: [lustre-devel] [RESEND PATCH v2 4/5] staging: lustre:
- selftest.h: replace IS_PO2 by is_power_of_2
-In-Reply-To: <6424e67b55e713cc71a479e1dc19325ca7f5934f.1445967419.git.mahfouz.saif.elyazal@gmail.com>
-References: <cover.1445967419.git.mahfouz.saif.elyazal@gmail.com>
-	<6424e67b55e713cc71a479e1dc19325ca7f5934f.1445967419.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <20151028064457.GC3649@sudip-pc>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 28 Oct 2015 12:54:21 -0400
+Subject: [lustre-devel] [PATCH 00/10] staging: lustre: cleanup up libcfs
+	hash code for upstream
+Message-ID: <1446051271-25189-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Oct 27, 2015 at 07:45:22PM +0200, Aya Mahfouz wrote:
-> Replaces IS_PO2 by is_power_of_2. It is more accurate to use
-> is_power_of_2 since it returns 1 for numbers that are powers
-> of 2 only whereas IS_PO2 returns 1 for 0 and numbers that are
-> powers of 2.
-> 
-> Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-> ---
-> v2:
->         -added new patch in patch set for selftest.h
-> 
->  drivers/staging/lustre/lnet/selftest/selftest.h | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
-> index 8a77d3f..2846f26 100644
-> --- a/drivers/staging/lustre/lnet/selftest/selftest.h
-> +++ b/drivers/staging/lustre/lnet/selftest/selftest.h
-> @@ -43,6 +43,8 @@
->  
->  #define LNET_ONLY
->  
-> +#include <linux/log2.h>
-> +
->  #include "../../include/linux/libcfs/libcfs.h"
->  #include "../../include/linux/lnet/lnet.h"
->  #include "../../include/linux/lnet/lib-lnet.h"
-> @@ -585,7 +587,7 @@ swi_state2str (int state)
->  do {									\
->  	int __I = 2;							\
->  	while (!(cond)) {						\
-> -		CDEBUG(IS_PO2(++__I) ? D_WARNING : D_NET,		\
-> +		CDEBUG(is_power_of_2(++__I) ? D_WARNING : D_NET,		\
+From: James Simmons <uja.ornl@yahoo.com>
 
-An extra tab here broke the alignent of those '\'.
+This patch brings the libcfs hash handling up to linux
+kernel coding style. Various typedefs and macros have
+been removed.
 
-regards
-sudip
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+Reviewed-on: http://review.whamcloud.com/14624
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: frank zago <fzago@cray.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+
+James Simmons (10):
+  staging: lustre: change cfs_hash_lock_ops_t to struct
+  staging: lustre: change cfs_hash_hlist_ops_t to struct
+  staging: lustre: change cfs_hash_ops_t to struct
+  staging: lustre: change cfs_hash_dhead*_t to struct
+  staging: lustre: change cfs_hash_head*_t to struct
+  staging: lustre: convert last typedef data types in hash.c
+  staging: lustre: cleanup over 80 characters in libcfs_hash.h
+  staging: lustre: remove white space in libcfs_hash.h
+  staging: lustre: fix remaining checkpatch issues for libcfs_hash.h
+  staging: lustre: remove white space in hash.c
+
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |  350 +++++++++-------
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   18 +-
+ drivers/staging/lustre/lustre/libcfs/hash.c        |  447 ++++++++++----------
+ drivers/staging/lustre/lustre/lov/lov_internal.h   |    2 +-
+ drivers/staging/lustre/lustre/lov/lov_pool.c       |    6 +-
+ drivers/staging/lustre/lustre/obdclass/cl_object.c |    6 +-
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |    6 +-
+ .../staging/lustre/lustre/obdclass/obd_config.c    |    8 +-
+ drivers/staging/lustre/lustre/osc/osc_quota.c      |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/connection.c  |    8 +-
+ 10 files changed, 451 insertions(+), 402 deletions(-)
