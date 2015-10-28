@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 28 Oct 2015 12:54:30 -0400
-Subject: [lustre-devel] [PATCH 09/10] staging: lustre: fix remaining
-	checkpatch issues for libcfs_hash.h
+Date: Wed, 28 Oct 2015 12:54:22 -0400
+Subject: [lustre-devel] [PATCH 01/10] staging: lustre: change
+	cfs_hash_lock_ops_t to struct
 In-Reply-To: <1446051271-25189-1-git-send-email-jsimmons@infradead.org>
 References: <1446051271-25189-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1446051271-25189-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1446051271-25189-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,75 +13,93 @@ To: lustre-devel@lists.lustre.org
 
 From: James Simmons <uja.ornl@yahoo.com>
 
-Final cleanup to make libcfs_hash.h completely kernel standard
-compliant.
+Change cfs_hash_lock_ops_t to struct cfs_hash_lock_ops.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/linux/libcfs/libcfs_hash.h      |   16 ++++++++++------
- 1 files changed, 10 insertions(+), 6 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |    4 ++--
+ drivers/staging/lustre/lustre/libcfs/hash.c        |   12 ++++++------
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-index 5df8ba2..563b2b4 100644
+index c408145..778feb6 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
 +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-@@ -62,7 +62,8 @@
- /** disable debug */
- #define CFS_HASH_DEBUG_NONE	0
- /** record hash depth and output to console when it's too deep,
-- *  computing overhead is low but consume more memory */
-+ *  computing overhead is low but consume more memory
-+ */
- #define CFS_HASH_DEBUG_1	1
- /** expensive, check key validation */
- #define CFS_HASH_DEBUG_2	2
-@@ -158,7 +159,8 @@ enum cfs_hash_tag {
- 	 */
- 	CFS_HASH_NBLK_CHANGE	= 1 << 13,
- 	/** NB, we typed hs_flags as  __u16, please change it
--	 * if you need to extend >=16 flags */
-+	 * if you need to extend >=16 flags
-+	 */
+@@ -272,7 +272,7 @@ struct cfs_hash {
+ 	char			hs_name[0];
  };
  
- /** most used attributes */
-@@ -206,7 +208,8 @@ enum cfs_hash_tag {
+-typedef struct cfs_hash_lock_ops {
++struct cfs_hash_lock_ops {
+ 	/** lock the hash table */
+ 	void    (*hs_lock)(union cfs_hash_lock *lock, int exclusive);
+ 	/** unlock the hash table */
+@@ -281,7 +281,7 @@ typedef struct cfs_hash_lock_ops {
+ 	void    (*hs_bkt_lock)(union cfs_hash_lock *lock, int exclusive);
+ 	/** unlock the hash bucket */
+ 	void    (*hs_bkt_unlock)(union cfs_hash_lock *lock, int exclusive);
+-} cfs_hash_lock_ops_t;
++};
  
- struct cfs_hash {
- 	/** serialize with rehash, or serialize all operations if
--	 * the hash-table has CFS_HASH_NO_BKTLOCK */
-+	 * the hash-table has CFS_HASH_NO_BKTLOCK
-+	 */
- 	union cfs_hash_lock		hs_lock;
- 	/** hash operations */
- 	struct cfs_hash_ops		*hs_ops;
-@@ -375,7 +378,8 @@ cfs_hash_with_no_itemref(struct cfs_hash *hs)
- {
- 	/* hash-table doesn't keep refcount on item,
- 	 * item can't be removed from hash unless it's
--	 * ZERO refcount */
-+	 * ZERO refcount.
-+	 */
- 	return (hs->hs_flags & CFS_HASH_NO_ITEMREF) != 0;
+ typedef struct cfs_hash_hlist_ops {
+ 	/** return hlist_head of hash-head of @bd */
+diff --git a/drivers/staging/lustre/lustre/libcfs/hash.c b/drivers/staging/lustre/lustre/libcfs/hash.c
+index 6f4c7d4..b78feb0 100644
+--- a/drivers/staging/lustre/lustre/libcfs/hash.c
++++ b/drivers/staging/lustre/lustre/libcfs/hash.c
+@@ -159,7 +159,7 @@ cfs_hash_rw_unlock(union cfs_hash_lock *lock, int exclusive)
  }
  
-@@ -820,7 +824,7 @@ cfs_hash_djb2_hash(const void *key, size_t size, unsigned mask)
- {
- 	unsigned i, hash = 5381;
+ /** No lock hash */
+-static cfs_hash_lock_ops_t cfs_hash_nl_lops = {
++static struct cfs_hash_lock_ops cfs_hash_nl_lops = {
+ 	.hs_lock	= cfs_hash_nl_lock,
+ 	.hs_unlock      = cfs_hash_nl_unlock,
+ 	.hs_bkt_lock    = cfs_hash_nl_lock,
+@@ -167,7 +167,7 @@ static cfs_hash_lock_ops_t cfs_hash_nl_lops = {
+ };
  
--	LASSERT(key != NULL);
-+	LASSERT(key);
+ /** no bucket lock, one spinlock to protect everything */
+-static cfs_hash_lock_ops_t cfs_hash_nbl_lops = {
++static struct cfs_hash_lock_ops cfs_hash_nbl_lops = {
+ 	.hs_lock	= cfs_hash_spin_lock,
+ 	.hs_unlock      = cfs_hash_spin_unlock,
+ 	.hs_bkt_lock    = cfs_hash_nl_lock,
+@@ -175,7 +175,7 @@ static cfs_hash_lock_ops_t cfs_hash_nbl_lops = {
+ };
  
- 	for (i = 0; i < size; i++)
- 		hash = hash * 33 + ((char *)key)[i];
-@@ -848,7 +852,7 @@ cfs_hash_u64_hash(const __u64 key, unsigned mask)
+ /** spin bucket lock, rehash is enabled */
+-static cfs_hash_lock_ops_t cfs_hash_bkt_spin_lops = {
++static struct cfs_hash_lock_ops cfs_hash_bkt_spin_lops = {
+ 	.hs_lock	= cfs_hash_rw_lock,
+ 	.hs_unlock      = cfs_hash_rw_unlock,
+ 	.hs_bkt_lock    = cfs_hash_spin_lock,
+@@ -183,7 +183,7 @@ static cfs_hash_lock_ops_t cfs_hash_bkt_spin_lops = {
+ };
  
- /** iterate over all buckets in @bds (array of struct cfs_hash_bd) */
- #define cfs_hash_for_each_bd(bds, n, i)	\
--	for (i = 0; i < n && (bds)[i].bd_bucket != NULL; i++)
-+	for (i = 0; i < n && (bds)[i].bd_bucket; i++)
+ /** rw bucket lock, rehash is enabled */
+-static cfs_hash_lock_ops_t cfs_hash_bkt_rw_lops = {
++static struct cfs_hash_lock_ops cfs_hash_bkt_rw_lops = {
+ 	.hs_lock	= cfs_hash_rw_lock,
+ 	.hs_unlock      = cfs_hash_rw_unlock,
+ 	.hs_bkt_lock    = cfs_hash_rw_lock,
+@@ -191,7 +191,7 @@ static cfs_hash_lock_ops_t cfs_hash_bkt_rw_lops = {
+ };
  
- /** iterate over all buckets of @hs */
- #define cfs_hash_for_each_bucket(hs, bd, pos)			\
+ /** spin bucket lock, rehash is disabled */
+-static cfs_hash_lock_ops_t cfs_hash_nr_bkt_spin_lops = {
++static struct cfs_hash_lock_ops cfs_hash_nr_bkt_spin_lops = {
+ 	.hs_lock	= cfs_hash_nl_lock,
+ 	.hs_unlock      = cfs_hash_nl_unlock,
+ 	.hs_bkt_lock    = cfs_hash_spin_lock,
+@@ -199,7 +199,7 @@ static cfs_hash_lock_ops_t cfs_hash_nr_bkt_spin_lops = {
+ };
+ 
+ /** rw bucket lock, rehash is disabled */
+-static cfs_hash_lock_ops_t cfs_hash_nr_bkt_rw_lops = {
++static struct cfs_hash_lock_ops cfs_hash_nr_bkt_rw_lops = {
+ 	.hs_lock	= cfs_hash_nl_lock,
+ 	.hs_unlock      = cfs_hash_nl_unlock,
+ 	.hs_bkt_lock    = cfs_hash_rw_lock,
 -- 
 1.7.1
