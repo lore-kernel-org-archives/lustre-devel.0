@@ -1,44 +1,47 @@
 From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Thu, 29 Oct 2015 02:59:27 +0200
-Subject: [lustre-devel] [PATCH v3 4/5] staging: lustre: selftest.h: replace
- IS_PO2 by is_power_of_2
+Date: Thu, 29 Oct 2015 03:00:24 +0200
+Subject: [lustre-devel] [PATCH v3 5/5] staging: lustre: libcfs.h: remove
+	IS_PO2 and __is_po2
 In-Reply-To: <cover.1446079745.git.mahfouz.saif.elyazal@gmail.com>
 References: <cover.1446079745.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <d04727753184782bbd69cea63d83f2c7f7b8be20.1446079745.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <6257d068b94ff8b07a6c756df16325fea0e7536f.1446079745.git.mahfouz.saif.elyazal@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Replaces IS_PO2 by is_power_of_2. It is more accurate to use
-is_power_of_2 since it returns 1 for numbers that are powers
-of 2 only whereas IS_PO2 returns 1 for 0 and numbers that are
-powers of 2.
+Removes IS_PO2 and __is_po2 since the uses of IS_PO2 have
+been replaced by is_power_of_2
 
 Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
 ---
 v2:
-        -added new patch in patch set for selftest.h
+        -became patch number 5 in the series
 v3:
-	-fixed checkpatch.pl warning
+	-no change
 
- drivers/staging/lustre/lnet/selftest/selftest.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/include/linux/libcfs/libcfs.h | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
-index 8a77d3f..15b3b34 100644
---- a/drivers/staging/lustre/lnet/selftest/selftest.h
-+++ b/drivers/staging/lustre/lnet/selftest/selftest.h
-@@ -585,7 +585,7 @@ swi_state2str (int state)
- do {									\
- 	int __I = 2;							\
- 	while (!(cond)) {						\
--		CDEBUG(IS_PO2(++__I) ? D_WARNING : D_NET,		\
-+		CDEBUG(is_power_of_2(++__I) ? D_WARNING : D_NET,	\
- 		       fmt, ## __VA_ARGS__);				\
- 		spin_unlock(&(lock));					\
- 									\
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+index 4d74e8a..7f76b20 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+@@ -42,13 +42,6 @@
+ 
+ #include "curproc.h"
+ 
+-static inline int __is_po2(unsigned long long val)
+-{
+-	return !(val & (val - 1));
+-}
+-
+-#define IS_PO2(val) __is_po2((unsigned long long)(val))
+-
+ #define LOWEST_BIT_SET(x)       ((x) & ~((x) - 1))
+ 
+ /*
 -- 
 2.4.2
 
