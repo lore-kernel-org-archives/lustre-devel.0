@@ -1,33 +1,28 @@
-From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Thu, 29 Oct 2015 15:44:59 +0000
-Subject: [lustre-devel] [PATCH 09/10] staging: lustre: fix remaining
- checkpatch issues for libcfs_hash.h
-In-Reply-To: <D256AA29.116816%andreas.dilger@intel.com>
-References: <1446051271-25189-1-git-send-email-jsimmons@infradead.org>
-	<1446051271-25189-10-git-send-email-jsimmons@infradead.org>
-	<D256AA29.116816%andreas.dilger@intel.com>
-Message-ID: <34f03ffe2c734f2d80bc6d5b1478b82d@EXCHCS32.ornl.gov>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 29 Oct 2015 17:35:16 -0400
+Subject: [lustre-devel] [PATCH 0/6] staging: lustre: second series for
+	libcfs hash code cleanup
+Message-ID: <1446154522-12929-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->>diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
->>b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
->>index 5df8ba2..563b2b4 100644
->>--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
->>+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
->>@@ -62,7 +62,8 @@
->> /** disable debug */
->> #define CFS_HASH_DEBUG_NONE	0
->> /** record hash depth and output to console when it's too deep,
->>- *  computing overhead is low but consume more memory */
->>+ *  computing overhead is low but consume more memory
->>+ */
->
->Typically, multi-line comments have the leading /* on a separate line
->from the first line of text.  If you are changing all these comments
->you may as well make it consistent with the kernel style.
+From: James Simmons <uja.ornl@yahoo.com>
 
-Fixed for next patch series.
+This patch covers more style cleanup series for the libcfs
+hash code. Mostly removal of white spaces and resolving the
+checkpath issues in libcfs_hash.h.
+
+James Simmons (6):
+  staging: lustre: remove white space in libcfs_hash.h
+  staging: lustre: remove obsolete comment in libcfs_hash.h
+  staging: lustre: move linux hash.h header to start of libcfs_hash.h
+  staging: lustre: fix remaining checkpatch issues for libcfs_hash.h
+  staging: lustre: remove white space in hash.c
+  staging: lustre: place linux header first in hash.c
+
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |  170 +++++-----
+ drivers/staging/lustre/lustre/libcfs/hash.c        |  344 ++++++++++----------
+ 2 files changed, 266 insertions(+), 248 deletions(-)
