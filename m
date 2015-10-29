@@ -1,46 +1,28 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Thu, 29 Oct 2015 16:51:23 +0300
-Subject: [lustre-devel] [patch] staging: lustre: potential underflow in
- libcfs_kkuc_group_add()
-Message-ID: <20151029135122.GA7709@mwanda>
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Thu, 29 Oct 2015 15:22:13 +0000
+Subject: [lustre-devel] [PATCH 08/10] staging: lustre: remove white
+ space in libcfs_hash.h
+In-Reply-To: <D256A968.116805%andreas.dilger@intel.com>
+References: <1446051271-25189-1-git-send-email-jsimmons@infradead.org>
+	<1446051271-25189-9-git-send-email-jsimmons@infradead.org>
+	<D256A968.116805%andreas.dilger@intel.com>
+Message-ID: <2b25c8958e1944bbbd48b638ab7eed6f@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-My static checker says that "group" is a user controlled number that can
-be negative leading to an array underflow.  I have looked at it, and I'm
-not an expert enough in lustre to say for sure if it is really a bug.
-Anyway, it's simple enough to make the variable unsigned which pleases
-the static checker and makes it easier to audit.
+>>struct cfs_hash_bd {
+>>-	struct cfs_hash_bucket	*bd_bucket;      /**< address of bucket */
+>>-	unsigned int		bd_offset;      /**< offset in bucket */
+>>+	/**< address of bucket */
+>>+	struct cfs_hash_bucket	*bd_bucket;
+>>+	/**< offset in bucket */
+>>+	unsigned int		 bd_offset;
+>> };
+>
+>The "/**< ... */" marker means "the field to the left", but if you are
+>moving these to the line before the field you should just use "/* ... */".
 
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-index a989d26..41f3d81 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-@@ -91,7 +91,7 @@ typedef int (*libcfs_kkuc_cb_t)(__u32 data, void *cb_arg);
- /* Kernel methods */
- int libcfs_kkuc_msg_put(struct file *fp, void *payload);
- int libcfs_kkuc_group_put(int group, void *payload);
--int libcfs_kkuc_group_add(struct file *fp, int uid, int group,
-+int libcfs_kkuc_group_add(struct file *fp, int uid, unsigned int group,
- 				 __u32 data);
- int libcfs_kkuc_group_rem(int uid, int group);
- int libcfs_kkuc_group_foreach(int group, libcfs_kkuc_cb_t cb_func,
-diff --git a/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c b/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-index ad661a3..d8230ae 100644
---- a/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-+++ b/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-@@ -110,7 +110,8 @@ static DECLARE_RWSEM(kg_sem);
-  * @param uid identifier for this receiver
-  * @param group group number
-  */
--int libcfs_kkuc_group_add(struct file *filp, int uid, int group, __u32 data)
-+int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
-+			  __u32 data)
- {
- 	struct kkuc_reg *reg;
- 
+Fixed.
