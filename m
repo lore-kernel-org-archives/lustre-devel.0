@@ -1,10 +1,10 @@
 From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Thu, 29 Oct 2015 02:54:09 +0200
-Subject: [lustre-devel] [PATCH v3 1/5] staging: lustre: ldlm_extent.c:
- replace IS_PO2 by is_power_of_2
+Date: Thu, 29 Oct 2015 02:55:50 +0200
+Subject: [lustre-devel] [PATCH v3 2/5] staging: lustre: hash.c: Replace
+ IS_PO2 by is_power_of_2
 In-Reply-To: <cover.1446079745.git.mahfouz.saif.elyazal@gmail.com>
 References: <cover.1446079745.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <f64d28ead855c4ecebdebaa0232e255d4317d7eb.1446079745.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <f31d304bb4f29a751f20323731b5a454f3e10460.1446079745.git.mahfouz.saif.elyazal@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,29 +16,39 @@ is_power_of_2 since it returns 1 for numbers that are powers
 of 2 only whereas IS_PO2 returns 1 for 0 and numbers that are
 powers of 2.
 
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
 ---
 v2:
         -changed commit message
+	-added Andreas Reviewed by tag
 v3:
-	-no change
+	-fixed checkpatch.pl warning
 
- drivers/staging/lustre/lustre/ldlm/ldlm_extent.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/libcfs/hash.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-index c787888..9c70f31 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-@@ -149,7 +149,7 @@ static inline int lock_mode_to_index(ldlm_mode_t mode)
- 	int index;
+diff --git a/drivers/staging/lustre/lustre/libcfs/hash.c b/drivers/staging/lustre/lustre/libcfs/hash.c
+index 0308744..ec26916 100644
+--- a/drivers/staging/lustre/lustre/libcfs/hash.c
++++ b/drivers/staging/lustre/lustre/libcfs/hash.c
+@@ -109,6 +109,7 @@
  
- 	LASSERT(mode != 0);
--	LASSERT(IS_PO2(mode));
-+	LASSERT(is_power_of_2(mode));
- 	for (index = -1; mode; index++)
- 		mode >>= 1;
- 	LASSERT(index < LCK_MODE_NUM);
+ #include "../../include/linux/libcfs/libcfs.h"
+ #include <linux/seq_file.h>
++#include <linux/log2.h>
+ 
+ #if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
+ static unsigned int warn_on_depth = 8;
+@@ -1794,7 +1795,7 @@ cfs_hash_rehash_cancel_locked(struct cfs_hash *hs)
+ 	for (i = 2; cfs_hash_is_rehashing(hs); i++) {
+ 		cfs_hash_unlock(hs, 1);
+ 		/* raise console warning while waiting too long */
+-		CDEBUG(IS_PO2(i >> 3) ? D_WARNING : D_INFO,
++		CDEBUG(is_power_of_2(i >> 3) ? D_WARNING : D_INFO,
+ 		       "hash %s is still rehashing, rescheded %d\n",
+ 		       hs->hs_name, i - 1);
+ 		cond_resched();
 -- 
 2.4.2
 
