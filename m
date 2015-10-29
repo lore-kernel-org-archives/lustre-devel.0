@@ -1,10 +1,10 @@
 From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Thu, 29 Oct 2015 02:55:50 +0200
-Subject: [lustre-devel] [PATCH v3 2/5] staging: lustre: hash.c: Replace
+Date: Thu, 29 Oct 2015 02:57:33 +0200
+Subject: [lustre-devel] [PATCH v3 3/5] staging: lustre: workitem.c: replace
  IS_PO2 by is_power_of_2
 In-Reply-To: <cover.1446079745.git.mahfouz.saif.elyazal@gmail.com>
 References: <cover.1446079745.git.mahfouz.saif.elyazal@gmail.com>
-Message-ID: <f31d304bb4f29a751f20323731b5a454f3e10460.1446079745.git.mahfouz.saif.elyazal@gmail.com>
+Message-ID: <5f3bb74fa1c407ecc97e27d2adde7cec8a3d8afa.1446079745.git.mahfouz.saif.elyazal@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -23,32 +23,24 @@ v2:
         -changed commit message
 	-added Andreas Reviewed by tag
 v3:
-	-fixed checkpatch.pl warning
+	-no change
 
- drivers/staging/lustre/lustre/libcfs/hash.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/libcfs/workitem.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/libcfs/hash.c b/drivers/staging/lustre/lustre/libcfs/hash.c
-index 0308744..ec26916 100644
---- a/drivers/staging/lustre/lustre/libcfs/hash.c
-+++ b/drivers/staging/lustre/lustre/libcfs/hash.c
-@@ -109,6 +109,7 @@
+diff --git a/drivers/staging/lustre/lustre/libcfs/workitem.c b/drivers/staging/lustre/lustre/libcfs/workitem.c
+index e1143a5..268dd68 100644
+--- a/drivers/staging/lustre/lustre/libcfs/workitem.c
++++ b/drivers/staging/lustre/lustre/libcfs/workitem.c
+@@ -325,7 +325,7 @@ cfs_wi_sched_destroy(struct cfs_wi_sched *sched)
  
- #include "../../include/linux/libcfs/libcfs.h"
- #include <linux/seq_file.h>
-+#include <linux/log2.h>
+ 	spin_lock(&cfs_wi_data.wi_glock);
+ 	while (sched->ws_nthreads > 0) {
+-		CDEBUG(IS_PO2(++i) ? D_WARNING : D_NET,
++		CDEBUG(is_power_of_2(++i) ? D_WARNING : D_NET,
+ 		       "waiting for %d threads of WI sched[%s] to terminate\n",
+ 		       sched->ws_nthreads, sched->ws_name);
  
- #if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
- static unsigned int warn_on_depth = 8;
-@@ -1794,7 +1795,7 @@ cfs_hash_rehash_cancel_locked(struct cfs_hash *hs)
- 	for (i = 2; cfs_hash_is_rehashing(hs); i++) {
- 		cfs_hash_unlock(hs, 1);
- 		/* raise console warning while waiting too long */
--		CDEBUG(IS_PO2(i >> 3) ? D_WARNING : D_INFO,
-+		CDEBUG(is_power_of_2(i >> 3) ? D_WARNING : D_INFO,
- 		       "hash %s is still rehashing, rescheded %d\n",
- 		       hs->hs_name, i - 1);
- 		cond_resched();
 -- 
 2.4.2
 
