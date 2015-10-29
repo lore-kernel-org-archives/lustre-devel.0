@@ -1,579 +1,347 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Thu, 29 Oct 2015 12:24:40 +0300
-Subject: [lustre-devel] [patch 1/2] staging: lustre: remove o_ prefix from
+Date: Thu, 29 Oct 2015 12:26:36 +0300
+Subject: [lustre-devel] [patch 2/2] staging: lustre: remove m_ prefix from
 	function pointers
-Message-ID: <20151029092440.GA8629@mwanda>
+In-Reply-To: <20151029092440.GA8629@mwanda>
+Message-ID: <20151029092636.GB8629@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-We mostly refer to these function pointers using macros that use macro
-magic to add the "o_" prefix to the front.  It means that you can't use
-cscope to find the caller.  Heck, you can't even grep for it.
-
-I looked at preserving the "o_" prefix by removing the macro magic and
-adding "o_" to all the call sites but then I realized that, really, the
-prefix doesn't add any value.  Let's just remove it.
+All the callers call these function pointers without the "m_" prefix and
+use macro magic to add it later behind the scenes.  It means that you
+can't grep for the call sites.  I considered modifying the call sites
+but in the end I decided that the "m_" prefix doesn't add anything so we
+can just get rid of it.
 
 Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
 diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 5e93afc..5aca9bb 100644
+index 5aca9bb..5c90b59 100644
 --- a/drivers/staging/lustre/lustre/include/obd.h
 +++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -963,123 +963,123 @@ struct md_enqueue_info {
- };
+@@ -1124,89 +1124,89 @@ struct md_open_data {
+ struct lookup_intent;
  
- struct obd_ops {
--	struct module *o_owner;
--	int (*o_iocontrol)(unsigned int cmd, struct obd_export *exp, int len,
--			   void *karg, void *uarg);
--	int (*o_get_info)(const struct lu_env *env, struct obd_export *,
--			  __u32 keylen, void *key, __u32 *vallen, void *val,
--			  struct lov_stripe_md *lsm);
--	int (*o_set_info_async)(const struct lu_env *, struct obd_export *,
--				__u32 keylen, void *key,
--				__u32 vallen, void *val,
--				struct ptlrpc_request_set *set);
--	int (*o_attach)(struct obd_device *dev, u32 len, void *data);
--	int (*o_detach)(struct obd_device *dev);
--	int (*o_setup)(struct obd_device *dev, struct lustre_cfg *cfg);
--	int (*o_precleanup)(struct obd_device *dev,
--			    enum obd_cleanup_stage cleanup_stage);
--	int (*o_cleanup)(struct obd_device *dev);
--	int (*o_process_config)(struct obd_device *dev, u32 len, void *data);
--	int (*o_postrecov)(struct obd_device *dev);
--	int (*o_add_conn)(struct obd_import *imp, struct obd_uuid *uuid,
--			  int priority);
--	int (*o_del_conn)(struct obd_import *imp, struct obd_uuid *uuid);
-+	struct module *owner;
-+	int (*iocontrol)(unsigned int cmd, struct obd_export *exp, int len,
-+			 void *karg, void *uarg);
-+	int (*get_info)(const struct lu_env *env, struct obd_export *,
-+			__u32 keylen, void *key, __u32 *vallen, void *val,
-+			struct lov_stripe_md *lsm);
-+	int (*set_info_async)(const struct lu_env *, struct obd_export *,
-+			      __u32 keylen, void *key,
-+			      __u32 vallen, void *val,
-+			      struct ptlrpc_request_set *set);
-+	int (*attach)(struct obd_device *dev, u32 len, void *data);
-+	int (*detach)(struct obd_device *dev);
-+	int (*setup)(struct obd_device *dev, struct lustre_cfg *cfg);
-+	int (*precleanup)(struct obd_device *dev,
-+			  enum obd_cleanup_stage cleanup_stage);
-+	int (*cleanup)(struct obd_device *dev);
-+	int (*process_config)(struct obd_device *dev, u32 len, void *data);
-+	int (*postrecov)(struct obd_device *dev);
-+	int (*add_conn)(struct obd_import *imp, struct obd_uuid *uuid,
-+			int priority);
-+	int (*del_conn)(struct obd_import *imp, struct obd_uuid *uuid);
- 	/* connect to the target device with given connection
- 	 * data. @ocd->ocd_connect_flags is modified to reflect flags actually
- 	 * granted by the target, which are guaranteed to be a subset of flags
- 	 * asked for. If @ocd == NULL, use default parameters. */
--	int (*o_connect)(const struct lu_env *env,
--			 struct obd_export **exp, struct obd_device *src,
--			 struct obd_uuid *cluuid, struct obd_connect_data *ocd,
-+	int (*connect)(const struct lu_env *env,
-+		       struct obd_export **exp, struct obd_device *src,
-+		       struct obd_uuid *cluuid, struct obd_connect_data *ocd,
-+		       void *localdata);
-+	int (*reconnect)(const struct lu_env *env,
-+			 struct obd_export *exp, struct obd_device *src,
-+			 struct obd_uuid *cluuid,
-+			 struct obd_connect_data *ocd,
- 			 void *localdata);
--	int (*o_reconnect)(const struct lu_env *env,
--			   struct obd_export *exp, struct obd_device *src,
--			   struct obd_uuid *cluuid,
--			   struct obd_connect_data *ocd,
--			   void *localdata);
--	int (*o_disconnect)(struct obd_export *exp);
-+	int (*disconnect)(struct obd_export *exp);
+ struct md_ops {
+-	int (*m_getstatus)(struct obd_export *, struct lu_fid *);
+-	int (*m_null_inode)(struct obd_export *, const struct lu_fid *);
+-	int (*m_find_cbdata)(struct obd_export *, const struct lu_fid *,
+-			     ldlm_iterator_t, void *);
+-	int (*m_close)(struct obd_export *, struct md_op_data *,
+-		       struct md_open_data *, struct ptlrpc_request **);
+-	int (*m_create)(struct obd_export *, struct md_op_data *,
+-			const void *, int, int, __u32, __u32, cfs_cap_t,
+-			__u64, struct ptlrpc_request **);
+-	int (*m_done_writing)(struct obd_export *, struct md_op_data  *,
+-			      struct md_open_data *);
+-	int (*m_enqueue)(struct obd_export *, struct ldlm_enqueue_info *,
+-			 struct lookup_intent *, struct md_op_data *,
+-			 struct lustre_handle *, void *, int,
+-			 struct ptlrpc_request **, __u64);
+-	int (*m_getattr)(struct obd_export *, struct md_op_data *,
+-			 struct ptlrpc_request **);
+-	int (*m_getattr_name)(struct obd_export *, struct md_op_data *,
+-			      struct ptlrpc_request **);
+-	int (*m_intent_lock)(struct obd_export *, struct md_op_data *,
+-			     void *, int, struct lookup_intent *, int,
+-			     struct ptlrpc_request **,
+-			     ldlm_blocking_callback, __u64);
+-	int (*m_link)(struct obd_export *, struct md_op_data *,
++	int (*getstatus)(struct obd_export *, struct lu_fid *);
++	int (*null_inode)(struct obd_export *, const struct lu_fid *);
++	int (*find_cbdata)(struct obd_export *, const struct lu_fid *,
++			   ldlm_iterator_t, void *);
++	int (*close)(struct obd_export *, struct md_op_data *,
++		     struct md_open_data *, struct ptlrpc_request **);
++	int (*create)(struct obd_export *, struct md_op_data *,
++		      const void *, int, int, __u32, __u32, cfs_cap_t,
++		      __u64, struct ptlrpc_request **);
++	int (*done_writing)(struct obd_export *, struct md_op_data  *,
++			    struct md_open_data *);
++	int (*enqueue)(struct obd_export *, struct ldlm_enqueue_info *,
++		       struct lookup_intent *, struct md_op_data *,
++		       struct lustre_handle *, void *, int,
++		       struct ptlrpc_request **, __u64);
++	int (*getattr)(struct obd_export *, struct md_op_data *,
++		       struct ptlrpc_request **);
++	int (*getattr_name)(struct obd_export *, struct md_op_data *,
++			    struct ptlrpc_request **);
++	int (*intent_lock)(struct obd_export *, struct md_op_data *,
++			   void *, int, struct lookup_intent *, int,
++			   struct ptlrpc_request **,
++			   ldlm_blocking_callback, __u64);
++	int (*link)(struct obd_export *, struct md_op_data *,
++		    struct ptlrpc_request **);
++	int (*rename)(struct obd_export *, struct md_op_data *,
++		      const char *, int, const char *, int,
+ 		      struct ptlrpc_request **);
+-	int (*m_rename)(struct obd_export *, struct md_op_data *,
+-			const char *, int, const char *, int,
+-			struct ptlrpc_request **);
+-	int (*m_is_subdir)(struct obd_export *, const struct lu_fid *,
+-			   const struct lu_fid *,
++	int (*is_subdir)(struct obd_export *, const struct lu_fid *,
++			 const struct lu_fid *,
+ 			   struct ptlrpc_request **);
+-	int (*m_setattr)(struct obd_export *, struct md_op_data *, void *,
+-			 int, void *, int, struct ptlrpc_request **,
++	int (*setattr)(struct obd_export *, struct md_op_data *, void *,
++		       int, void *, int, struct ptlrpc_request **,
+ 			 struct md_open_data **mod);
+-	int (*m_sync)(struct obd_export *, const struct lu_fid *,
++	int (*sync)(struct obd_export *, const struct lu_fid *,
++		    struct ptlrpc_request **);
++	int (*readpage)(struct obd_export *, struct md_op_data *,
++			struct page **, struct ptlrpc_request **);
++
++	int (*unlink)(struct obd_export *, struct md_op_data *,
+ 		      struct ptlrpc_request **);
+-	int (*m_readpage)(struct obd_export *, struct md_op_data *,
+-			  struct page **, struct ptlrpc_request **);
  
- 	/* Initialize/finalize fids infrastructure. */
--	int (*o_fid_init)(struct obd_device *obd,
--			  struct obd_export *exp, enum lu_cli_type type);
--	int (*o_fid_fini)(struct obd_device *obd);
-+	int (*fid_init)(struct obd_device *obd,
-+			struct obd_export *exp, enum lu_cli_type type);
-+	int (*fid_fini)(struct obd_device *obd);
+-	int (*m_unlink)(struct obd_export *, struct md_op_data *,
++	int (*setxattr)(struct obd_export *, const struct lu_fid *,
++			u64, const char *, const char *, int, int, int, __u32,
+ 			struct ptlrpc_request **);
  
- 	/* Allocate new fid according to passed @hint. */
--	int (*o_fid_alloc)(struct obd_export *exp, struct lu_fid *fid,
--			   struct md_op_data *op_data);
-+	int (*fid_alloc)(struct obd_export *exp, struct lu_fid *fid,
-+			 struct md_op_data *op_data);
+-	int (*m_setxattr)(struct obd_export *, const struct lu_fid *,
+-			  u64, const char *, const char *, int, int, int, __u32,
+-			  struct ptlrpc_request **);
+-
+-	int (*m_getxattr)(struct obd_export *, const struct lu_fid *,
+-			  u64, const char *, const char *, int, int, int,
+-			  struct ptlrpc_request **);
++	int (*getxattr)(struct obd_export *, const struct lu_fid *,
++			u64, const char *, const char *, int, int, int,
++			struct ptlrpc_request **);
+ 
+-	int (*m_init_ea_size)(struct obd_export *, int, int, int, int);
++	int (*init_ea_size)(struct obd_export *, int, int, int, int);
+ 
+-	int (*m_get_lustre_md)(struct obd_export *, struct ptlrpc_request *,
+-			       struct obd_export *, struct obd_export *,
+-			       struct lustre_md *);
++	int (*get_lustre_md)(struct obd_export *, struct ptlrpc_request *,
++			     struct obd_export *, struct obd_export *,
++			     struct lustre_md *);
+ 
+-	int (*m_free_lustre_md)(struct obd_export *, struct lustre_md *);
++	int (*free_lustre_md)(struct obd_export *, struct lustre_md *);
+ 
+-	int (*m_set_open_replay_data)(struct obd_export *,
+-				      struct obd_client_handle *,
+-				      struct lookup_intent *);
+-	int (*m_clear_open_replay_data)(struct obd_export *,
+-					struct obd_client_handle *);
+-	int (*m_set_lock_data)(struct obd_export *, __u64 *, void *, __u64 *);
++	int (*set_open_replay_data)(struct obd_export *,
++				    struct obd_client_handle *,
++				    struct lookup_intent *);
++	int (*clear_open_replay_data)(struct obd_export *,
++				      struct obd_client_handle *);
++	int (*set_lock_data)(struct obd_export *, __u64 *, void *, __u64 *);
+ 
+-	ldlm_mode_t (*m_lock_match)(struct obd_export *, __u64,
+-				    const struct lu_fid *, ldlm_type_t,
+-				    ldlm_policy_data_t *, ldlm_mode_t,
+-				    struct lustre_handle *);
++	ldlm_mode_t (*lock_match)(struct obd_export *, __u64,
++				  const struct lu_fid *, ldlm_type_t,
++				  ldlm_policy_data_t *, ldlm_mode_t,
++				  struct lustre_handle *);
+ 
+-	int (*m_cancel_unused)(struct obd_export *, const struct lu_fid *,
+-			       ldlm_policy_data_t *, ldlm_mode_t,
+-			       ldlm_cancel_flags_t flags, void *opaque);
++	int (*cancel_unused)(struct obd_export *, const struct lu_fid *,
++			     ldlm_policy_data_t *, ldlm_mode_t,
++			     ldlm_cancel_flags_t flags, void *opaque);
+ 
+-	int (*m_get_remote_perm)(struct obd_export *, const struct lu_fid *,
+-				 __u32, struct ptlrpc_request **);
++	int (*get_remote_perm)(struct obd_export *, const struct lu_fid *,
++			       __u32, struct ptlrpc_request **);
+ 
+-	int (*m_intent_getattr_async)(struct obd_export *,
+-				      struct md_enqueue_info *,
+-				      struct ldlm_enqueue_info *);
++	int (*intent_getattr_async)(struct obd_export *,
++				    struct md_enqueue_info *,
++				    struct ldlm_enqueue_info *);
+ 
+-	int (*m_revalidate_lock)(struct obd_export *, struct lookup_intent *,
+-				 struct lu_fid *, __u64 *bits);
++	int (*revalidate_lock)(struct obd_export *, struct lookup_intent *,
++			       struct lu_fid *, __u64 *bits);
  
  	/*
- 	 * Object with @fid is getting deleted, we may want to do something
- 	 * about this.
- 	 */
--	int (*o_statfs)(const struct lu_env *, struct obd_export *exp,
--			struct obd_statfs *osfs, __u64 max_age, __u32 flags);
--	int (*o_statfs_async)(struct obd_export *exp, struct obd_info *oinfo,
--			      __u64 max_age, struct ptlrpc_request_set *set);
--	int (*o_packmd)(struct obd_export *exp, struct lov_mds_md **disk_tgt,
--			struct lov_stripe_md *mem_src);
--	int (*o_unpackmd)(struct obd_export *exp,
--			  struct lov_stripe_md **mem_tgt,
--			  struct lov_mds_md *disk_src, int disk_len);
--	int (*o_preallocate)(struct lustre_handle *, u32 *req, u64 *ids);
--	int (*o_create)(const struct lu_env *env, struct obd_export *exp,
--			struct obdo *oa, struct lov_stripe_md **ea,
--			struct obd_trans_info *oti);
--	int (*o_destroy)(const struct lu_env *env, struct obd_export *exp,
--			 struct obdo *oa, struct lov_stripe_md *ea,
--			 struct obd_trans_info *oti, struct obd_export *md_exp);
--	int (*o_setattr)(const struct lu_env *, struct obd_export *exp,
--			 struct obd_info *oinfo, struct obd_trans_info *oti);
--	int (*o_setattr_async)(struct obd_export *exp, struct obd_info *oinfo,
--			       struct obd_trans_info *oti,
--			       struct ptlrpc_request_set *rqset);
--	int (*o_getattr)(const struct lu_env *env, struct obd_export *exp,
--			 struct obd_info *oinfo);
--	int (*o_getattr_async)(struct obd_export *exp, struct obd_info *oinfo,
--			       struct ptlrpc_request_set *set);
--	int (*o_adjust_kms)(struct obd_export *exp, struct lov_stripe_md *lsm,
--			    u64 size, int shrink);
--	int (*o_preprw)(const struct lu_env *env, int cmd,
--			struct obd_export *exp, struct obdo *oa, int objcount,
--			struct obd_ioobj *obj, struct niobuf_remote *remote,
--			int *nr_pages, struct niobuf_local *local,
--			struct obd_trans_info *oti);
--	int (*o_commitrw)(const struct lu_env *env, int cmd,
--			  struct obd_export *exp, struct obdo *oa,
--			  int objcount, struct obd_ioobj *obj,
--			  struct niobuf_remote *remote, int pages,
--			  struct niobuf_local *local,
--			  struct obd_trans_info *oti, int rc);
--	int (*o_find_cbdata)(struct obd_export *, struct lov_stripe_md *,
--			     ldlm_iterator_t it, void *data);
--	int (*o_init_export)(struct obd_export *exp);
--	int (*o_destroy_export)(struct obd_export *exp);
-+	int (*statfs)(const struct lu_env *, struct obd_export *exp,
-+		      struct obd_statfs *osfs, __u64 max_age, __u32 flags);
-+	int (*statfs_async)(struct obd_export *exp, struct obd_info *oinfo,
-+			    __u64 max_age, struct ptlrpc_request_set *set);
-+	int (*packmd)(struct obd_export *exp, struct lov_mds_md **disk_tgt,
-+		      struct lov_stripe_md *mem_src);
-+	int (*unpackmd)(struct obd_export *exp,
-+			struct lov_stripe_md **mem_tgt,
-+			struct lov_mds_md *disk_src, int disk_len);
-+	int (*preallocate)(struct lustre_handle *, u32 *req, u64 *ids);
-+	int (*create)(const struct lu_env *env, struct obd_export *exp,
-+		      struct obdo *oa, struct lov_stripe_md **ea,
-+		      struct obd_trans_info *oti);
-+	int (*destroy)(const struct lu_env *env, struct obd_export *exp,
-+		       struct obdo *oa, struct lov_stripe_md *ea,
-+		       struct obd_trans_info *oti, struct obd_export *md_exp);
-+	int (*setattr)(const struct lu_env *, struct obd_export *exp,
-+		       struct obd_info *oinfo, struct obd_trans_info *oti);
-+	int (*setattr_async)(struct obd_export *exp, struct obd_info *oinfo,
-+			     struct obd_trans_info *oti,
-+			     struct ptlrpc_request_set *rqset);
-+	int (*getattr)(const struct lu_env *env, struct obd_export *exp,
-+		       struct obd_info *oinfo);
-+	int (*getattr_async)(struct obd_export *exp, struct obd_info *oinfo,
-+			     struct ptlrpc_request_set *set);
-+	int (*adjust_kms)(struct obd_export *exp, struct lov_stripe_md *lsm,
-+			  u64 size, int shrink);
-+	int (*preprw)(const struct lu_env *env, int cmd,
-+		      struct obd_export *exp, struct obdo *oa, int objcount,
-+		      struct obd_ioobj *obj, struct niobuf_remote *remote,
-+		      int *nr_pages, struct niobuf_local *local,
-+		      struct obd_trans_info *oti);
-+	int (*commitrw)(const struct lu_env *env, int cmd,
-+			struct obd_export *exp, struct obdo *oa,
-+			int objcount, struct obd_ioobj *obj,
-+			struct niobuf_remote *remote, int pages,
-+			struct niobuf_local *local,
-+			struct obd_trans_info *oti, int rc);
-+	int (*find_cbdata)(struct obd_export *, struct lov_stripe_md *,
-+			   ldlm_iterator_t it, void *data);
-+	int (*init_export)(struct obd_export *exp);
-+	int (*destroy_export)(struct obd_export *exp);
- 
- 	/* metadata-only methods */
--	int (*o_import_event)(struct obd_device *, struct obd_import *,
--			      enum obd_import_event);
-+	int (*import_event)(struct obd_device *, struct obd_import *,
-+			    enum obd_import_event);
- 
--	int (*o_notify)(struct obd_device *obd, struct obd_device *watched,
--			enum obd_notify_event ev, void *data);
-+	int (*notify)(struct obd_device *obd, struct obd_device *watched,
-+		      enum obd_notify_event ev, void *data);
- 
--	int (*o_health_check)(const struct lu_env *env, struct obd_device *);
--	struct obd_uuid *(*o_get_uuid)(struct obd_export *exp);
-+	int (*health_check)(const struct lu_env *env, struct obd_device *);
-+	struct obd_uuid *(*get_uuid)(struct obd_export *exp);
- 
- 	/* quota methods */
--	int (*o_quotacheck)(struct obd_device *, struct obd_export *,
--			    struct obd_quotactl *);
--	int (*o_quotactl)(struct obd_device *, struct obd_export *,
-+	int (*quotacheck)(struct obd_device *, struct obd_export *,
- 			  struct obd_quotactl *);
-+	int (*quotactl)(struct obd_device *, struct obd_export *,
-+			struct obd_quotactl *);
- 
- 	/* pools methods */
--	int (*o_pool_new)(struct obd_device *obd, char *poolname);
--	int (*o_pool_del)(struct obd_device *obd, char *poolname);
--	int (*o_pool_add)(struct obd_device *obd, char *poolname,
--			  char *ostname);
--	int (*o_pool_rem)(struct obd_device *obd, char *poolname,
--			  char *ostname);
--	void (*o_getref)(struct obd_device *obd);
--	void (*o_putref)(struct obd_device *obd);
-+	int (*pool_new)(struct obd_device *obd, char *poolname);
-+	int (*pool_del)(struct obd_device *obd, char *poolname);
-+	int (*pool_add)(struct obd_device *obd, char *poolname,
-+			char *ostname);
-+	int (*pool_rem)(struct obd_device *obd, char *poolname,
-+			char *ostname);
-+	void (*getref)(struct obd_device *obd);
-+	void (*putref)(struct obd_device *obd);
- 	/*
- 	 * NOTE: If adding ops, add another LPROCFS_OBD_OP_INIT() line
- 	 * to lprocfs_alloc_obd_stats() in obdclass/lprocfs_status.c.
+ 	 * NOTE: If adding ops, add another LPROCFS_MD_OP_INIT() line to
 diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index bf2bde5..674be77 100644
+index 674be77..c323c84 100644
 --- a/drivers/staging/lustre/lustre/include/obd_class.h
 +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -260,7 +260,7 @@ void obdo_to_ioobj(struct obdo *oa, struct obd_ioobj *ioobj);
- void md_from_obdo(struct md_op_data *op_data, struct obdo *oa, u32 valid);
+@@ -261,7 +261,7 @@ void md_from_obdo(struct md_op_data *op_data, struct obdo *oa, u32 valid);
  
  #define OBT(dev)	(dev)->obd_type
--#define OBP(dev, op)    (dev)->obd_type->typ_dt_ops->o_ ## op
-+#define OBP(dev, op)    (dev)->obd_type->typ_dt_ops->op
- #define MDP(dev, op)    (dev)->obd_type->typ_md_ops->m_ ## op
+ #define OBP(dev, op)    (dev)->obd_type->typ_dt_ops->op
+-#define MDP(dev, op)    (dev)->obd_type->typ_md_ops->m_ ## op
++#define MDP(dev, op)    (dev)->obd_type->typ_md_ops->op
  #define CTXTP(ctxt, op) (ctxt)->loc_logops->lop_##op
  
-@@ -291,9 +291,9 @@ static inline int obd_check_dev_active(struct obd_device *obd)
- }
+ /* Ensure obd_setup: used for cleanup which must be called
+@@ -314,9 +314,9 @@ static inline int obd_check_dev_active(struct obd_device *obd)
+ 	}
  
- #define OBD_COUNTER_OFFSET(op)				  \
--	((offsetof(struct obd_ops, o_ ## op) -		  \
--	  offsetof(struct obd_ops, o_iocontrol))		\
--	 / sizeof(((struct obd_ops *)(0))->o_iocontrol))
-+	((offsetof(struct obd_ops, op) -		  \
-+	  offsetof(struct obd_ops, iocontrol))		\
-+	 / sizeof(((struct obd_ops *)(0))->iocontrol))
+ #define MD_COUNTER_OFFSET(op)				   \
+-	((offsetof(struct md_ops, m_ ## op) -		   \
+-	  offsetof(struct md_ops, m_getstatus))		 \
+-	 / sizeof(((struct md_ops *)(0))->m_getstatus))
++	((offsetof(struct md_ops, op) -		   \
++	  offsetof(struct md_ops, getstatus))		 \
++	 / sizeof(((struct md_ops *)(0))->getstatus))
  
- #define OBD_COUNTER_INCREMENT(obdx, op)			   \
- 	if ((obdx)->obd_stats != NULL) {			  \
+ #define MD_COUNTER_INCREMENT(obdx, op)			   \
+ 	if ((obd)->md_stats != NULL) {			   \
 diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 635a93c..947a127 100644
+index 947a127..55f801b 100644
 --- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
 +++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -2744,23 +2744,23 @@ static int lmv_quotacheck(struct obd_device *unused, struct obd_export *exp,
- }
- 
- static struct obd_ops lmv_obd_ops = {
--	.o_owner		= THIS_MODULE,
--	.o_setup		= lmv_setup,
--	.o_cleanup	      = lmv_cleanup,
--	.o_precleanup	   = lmv_precleanup,
--	.o_process_config       = lmv_process_config,
--	.o_connect	      = lmv_connect,
--	.o_disconnect	   = lmv_disconnect,
--	.o_statfs	       = lmv_statfs,
--	.o_get_info	     = lmv_get_info,
--	.o_set_info_async       = lmv_set_info_async,
--	.o_packmd	       = lmv_packmd,
--	.o_unpackmd	     = lmv_unpackmd,
--	.o_notify	       = lmv_notify,
--	.o_get_uuid	     = lmv_get_uuid,
--	.o_iocontrol	    = lmv_iocontrol,
--	.o_quotacheck	   = lmv_quotacheck,
--	.o_quotactl	     = lmv_quotactl
-+	.owner		= THIS_MODULE,
-+	.setup		= lmv_setup,
-+	.cleanup	= lmv_cleanup,
-+	.precleanup	= lmv_precleanup,
-+	.process_config	= lmv_process_config,
-+	.connect	= lmv_connect,
-+	.disconnect	= lmv_disconnect,
-+	.statfs		= lmv_statfs,
-+	.get_info	= lmv_get_info,
-+	.set_info_async	= lmv_set_info_async,
-+	.packmd		= lmv_packmd,
-+	.unpackmd	= lmv_unpackmd,
-+	.notify		= lmv_notify,
-+	.get_uuid	= lmv_get_uuid,
-+	.iocontrol	= lmv_iocontrol,
-+	.quotacheck	= lmv_quotacheck,
-+	.quotactl	= lmv_quotactl
+@@ -2764,35 +2764,35 @@ static struct obd_ops lmv_obd_ops = {
  };
  
  static struct md_ops lmv_md_ops = {
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index c3be0b5..ad678d4 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -2280,35 +2280,35 @@ out:
- }
- 
- static struct obd_ops lov_obd_ops = {
--	.o_owner	       = THIS_MODULE,
--	.o_setup	       = lov_setup,
--	.o_precleanup	  = lov_precleanup,
--	.o_cleanup	     = lov_cleanup,
--	/*.o_process_config      = lov_process_config,*/
--	.o_connect	     = lov_connect,
--	.o_disconnect	  = lov_disconnect,
--	.o_statfs	      = lov_statfs,
--	.o_statfs_async	= lov_statfs_async,
--	.o_packmd	      = lov_packmd,
--	.o_unpackmd	    = lov_unpackmd,
--	.o_create	      = lov_create,
--	.o_destroy	     = lov_destroy,
--	.o_getattr_async       = lov_getattr_async,
--	.o_setattr_async       = lov_setattr_async,
--	.o_adjust_kms	  = lov_adjust_kms,
--	.o_find_cbdata	 = lov_find_cbdata,
--	.o_iocontrol	   = lov_iocontrol,
--	.o_get_info	    = lov_get_info,
--	.o_set_info_async      = lov_set_info_async,
--	.o_notify	      = lov_notify,
--	.o_pool_new	    = lov_pool_new,
--	.o_pool_rem	    = lov_pool_remove,
--	.o_pool_add	    = lov_pool_add,
--	.o_pool_del	    = lov_pool_del,
--	.o_getref	      = lov_getref,
--	.o_putref	      = lov_putref,
--	.o_quotactl	    = lov_quotactl,
--	.o_quotacheck	  = lov_quotacheck,
-+	.owner          = THIS_MODULE,
-+	.setup          = lov_setup,
-+	.precleanup     = lov_precleanup,
-+	.cleanup        = lov_cleanup,
-+	/*.process_config       = lov_process_config,*/
-+	.connect        = lov_connect,
-+	.disconnect     = lov_disconnect,
-+	.statfs         = lov_statfs,
-+	.statfs_async   = lov_statfs_async,
-+	.packmd         = lov_packmd,
-+	.unpackmd       = lov_unpackmd,
-+	.create         = lov_create,
-+	.destroy        = lov_destroy,
-+	.getattr_async  = lov_getattr_async,
-+	.setattr_async  = lov_setattr_async,
-+	.adjust_kms     = lov_adjust_kms,
-+	.find_cbdata    = lov_find_cbdata,
-+	.iocontrol      = lov_iocontrol,
-+	.get_info       = lov_get_info,
-+	.set_info_async = lov_set_info_async,
-+	.notify         = lov_notify,
-+	.pool_new       = lov_pool_new,
-+	.pool_rem       = lov_pool_remove,
-+	.pool_add       = lov_pool_add,
-+	.pool_del       = lov_pool_del,
-+	.getref         = lov_getref,
-+	.putref         = lov_putref,
-+	.quotactl       = lov_quotactl,
-+	.quotacheck     = lov_quotacheck,
+-	.m_getstatus	    = lmv_getstatus,
+-	.m_null_inode		= lmv_null_inode,
+-	.m_find_cbdata	  = lmv_find_cbdata,
+-	.m_close		= lmv_close,
+-	.m_create	       = lmv_create,
+-	.m_done_writing	 = lmv_done_writing,
+-	.m_enqueue	      = lmv_enqueue,
+-	.m_getattr	      = lmv_getattr,
+-	.m_getxattr	     = lmv_getxattr,
+-	.m_getattr_name	 = lmv_getattr_name,
+-	.m_intent_lock	  = lmv_intent_lock,
+-	.m_link		 = lmv_link,
+-	.m_rename	       = lmv_rename,
+-	.m_setattr	      = lmv_setattr,
+-	.m_setxattr	     = lmv_setxattr,
+-	.m_sync		 = lmv_sync,
+-	.m_readpage	     = lmv_readpage,
+-	.m_unlink	       = lmv_unlink,
+-	.m_init_ea_size	 = lmv_init_ea_size,
+-	.m_cancel_unused	= lmv_cancel_unused,
+-	.m_set_lock_data	= lmv_set_lock_data,
+-	.m_lock_match	   = lmv_lock_match,
+-	.m_get_lustre_md	= lmv_get_lustre_md,
+-	.m_free_lustre_md       = lmv_free_lustre_md,
+-	.m_set_open_replay_data = lmv_set_open_replay_data,
+-	.m_clear_open_replay_data = lmv_clear_open_replay_data,
+-	.m_get_remote_perm      = lmv_get_remote_perm,
+-	.m_intent_getattr_async = lmv_intent_getattr_async,
+-	.m_revalidate_lock      = lmv_revalidate_lock
++	.getstatus		= lmv_getstatus,
++	.null_inode		= lmv_null_inode,
++	.find_cbdata		= lmv_find_cbdata,
++	.close			= lmv_close,
++	.create			= lmv_create,
++	.done_writing		= lmv_done_writing,
++	.enqueue		= lmv_enqueue,
++	.getattr		= lmv_getattr,
++	.getxattr		= lmv_getxattr,
++	.getattr_name		= lmv_getattr_name,
++	.intent_lock		= lmv_intent_lock,
++	.link			= lmv_link,
++	.rename			= lmv_rename,
++	.setattr		= lmv_setattr,
++	.setxattr		= lmv_setxattr,
++	.sync			= lmv_sync,
++	.readpage		= lmv_readpage,
++	.unlink			= lmv_unlink,
++	.init_ea_size		= lmv_init_ea_size,
++	.cancel_unused		= lmv_cancel_unused,
++	.set_lock_data		= lmv_set_lock_data,
++	.lock_match		= lmv_lock_match,
++	.get_lustre_md		= lmv_get_lustre_md,
++	.free_lustre_md		= lmv_free_lustre_md,
++	.set_open_replay_data	= lmv_set_open_replay_data,
++	.clear_open_replay_data	= lmv_clear_open_replay_data,
++	.get_remote_perm	= lmv_get_remote_perm,
++	.intent_getattr_async	= lmv_intent_getattr_async,
++	.revalidate_lock	= lmv_revalidate_lock
  };
  
- struct kmem_cache *lov_oinfo_slab;
+ static int __init lmv_init(void)
 diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 16a5a10..34a8867 100644
+index 34a8867..5b78e7a 100644
 --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
 +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -2460,26 +2460,26 @@ static int mdc_get_remote_perm(struct obd_export *exp, const struct lu_fid *fid,
- }
- 
- static struct obd_ops mdc_obd_ops = {
--	.o_owner	    = THIS_MODULE,
--	.o_setup	    = mdc_setup,
--	.o_precleanup       = mdc_precleanup,
--	.o_cleanup	  = mdc_cleanup,
--	.o_add_conn	 = client_import_add_conn,
--	.o_del_conn	 = client_import_del_conn,
--	.o_connect          = client_connect_import,
--	.o_disconnect       = client_disconnect_export,
--	.o_iocontrol	= mdc_iocontrol,
--	.o_set_info_async   = mdc_set_info_async,
--	.o_statfs	   = mdc_statfs,
--	.o_fid_init	    = client_fid_init,
--	.o_fid_fini	    = client_fid_fini,
--	.o_fid_alloc	= mdc_fid_alloc,
--	.o_import_event     = mdc_import_event,
--	.o_get_info	 = mdc_get_info,
--	.o_process_config   = mdc_process_config,
--	.o_get_uuid	 = mdc_get_uuid,
--	.o_quotactl	 = mdc_quotactl,
--	.o_quotacheck       = mdc_quotacheck
-+	.owner          = THIS_MODULE,
-+	.setup          = mdc_setup,
-+	.precleanup     = mdc_precleanup,
-+	.cleanup        = mdc_cleanup,
-+	.add_conn       = client_import_add_conn,
-+	.del_conn       = client_import_del_conn,
-+	.connect        = client_connect_import,
-+	.disconnect     = client_disconnect_export,
-+	.iocontrol      = mdc_iocontrol,
-+	.set_info_async = mdc_set_info_async,
-+	.statfs         = mdc_statfs,
-+	.fid_init       = client_fid_init,
-+	.fid_fini       = client_fid_fini,
-+	.fid_alloc      = mdc_fid_alloc,
-+	.import_event   = mdc_import_event,
-+	.get_info       = mdc_get_info,
-+	.process_config = mdc_process_config,
-+	.get_uuid       = mdc_get_uuid,
-+	.quotactl       = mdc_quotactl,
-+	.quotacheck     = mdc_quotacheck
+@@ -2483,36 +2483,36 @@ static struct obd_ops mdc_obd_ops = {
  };
  
  static struct md_ops mdc_md_ops = {
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 7315733..8c56cc3 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -1694,20 +1694,20 @@ out:
- }
- 
- static struct obd_ops mgc_obd_ops = {
--	.o_owner	= THIS_MODULE,
--	.o_setup	= mgc_setup,
--	.o_precleanup   = mgc_precleanup,
--	.o_cleanup      = mgc_cleanup,
--	.o_add_conn     = client_import_add_conn,
--	.o_del_conn     = client_import_del_conn,
--	.o_connect      = client_connect_import,
--	.o_disconnect   = client_disconnect_export,
--	/* .o_enqueue      = mgc_enqueue, */
--	/* .o_iocontrol    = mgc_iocontrol, */
--	.o_set_info_async = mgc_set_info_async,
--	.o_get_info       = mgc_get_info,
--	.o_import_event = mgc_import_event,
--	.o_process_config = mgc_process_config,
-+	.owner          = THIS_MODULE,
-+	.setup          = mgc_setup,
-+	.precleanup     = mgc_precleanup,
-+	.cleanup        = mgc_cleanup,
-+	.add_conn       = client_import_add_conn,
-+	.del_conn       = client_import_del_conn,
-+	.connect        = client_connect_import,
-+	.disconnect     = client_disconnect_export,
-+	/* .enqueue     = mgc_enqueue, */
-+	/* .iocontrol   = mgc_iocontrol, */
-+	.set_info_async = mgc_set_info_async,
-+	.get_info       = mgc_get_info,
-+	.import_event   = mgc_import_event,
-+	.process_config = mgc_process_config,
+-	.m_getstatus	= mdc_getstatus,
+-	.m_null_inode	    = mdc_null_inode,
+-	.m_find_cbdata      = mdc_find_cbdata,
+-	.m_close	    = mdc_close,
+-	.m_create	   = mdc_create,
+-	.m_done_writing     = mdc_done_writing,
+-	.m_enqueue	  = mdc_enqueue,
+-	.m_getattr	  = mdc_getattr,
+-	.m_getattr_name     = mdc_getattr_name,
+-	.m_intent_lock      = mdc_intent_lock,
+-	.m_link	     = mdc_link,
+-	.m_is_subdir	= mdc_is_subdir,
+-	.m_rename	   = mdc_rename,
+-	.m_setattr	  = mdc_setattr,
+-	.m_setxattr	 = mdc_setxattr,
+-	.m_getxattr	 = mdc_getxattr,
+-	.m_sync	     = mdc_sync,
+-	.m_readpage	 = mdc_readpage,
+-	.m_unlink	   = mdc_unlink,
+-	.m_cancel_unused    = mdc_cancel_unused,
+-	.m_init_ea_size     = mdc_init_ea_size,
+-	.m_set_lock_data    = mdc_set_lock_data,
+-	.m_lock_match       = mdc_lock_match,
+-	.m_get_lustre_md    = mdc_get_lustre_md,
+-	.m_free_lustre_md   = mdc_free_lustre_md,
+-	.m_set_open_replay_data = mdc_set_open_replay_data,
+-	.m_clear_open_replay_data = mdc_clear_open_replay_data,
+-	.m_get_remote_perm  = mdc_get_remote_perm,
+-	.m_intent_getattr_async = mdc_intent_getattr_async,
+-	.m_revalidate_lock      = mdc_revalidate_lock
++	.getstatus		= mdc_getstatus,
++	.null_inode		= mdc_null_inode,
++	.find_cbdata		= mdc_find_cbdata,
++	.close			= mdc_close,
++	.create			= mdc_create,
++	.done_writing		= mdc_done_writing,
++	.enqueue		= mdc_enqueue,
++	.getattr		= mdc_getattr,
++	.getattr_name		= mdc_getattr_name,
++	.intent_lock		= mdc_intent_lock,
++	.link			= mdc_link,
++	.is_subdir		= mdc_is_subdir,
++	.rename			= mdc_rename,
++	.setattr		= mdc_setattr,
++	.setxattr		= mdc_setxattr,
++	.getxattr		= mdc_getxattr,
++	.sync			= mdc_sync,
++	.readpage		= mdc_readpage,
++	.unlink			= mdc_unlink,
++	.cancel_unused		= mdc_cancel_unused,
++	.init_ea_size		= mdc_init_ea_size,
++	.set_lock_data		= mdc_set_lock_data,
++	.lock_match		= mdc_lock_match,
++	.get_lustre_md		= mdc_get_lustre_md,
++	.free_lustre_md		= mdc_free_lustre_md,
++	.set_open_replay_data	= mdc_set_open_replay_data,
++	.clear_open_replay_data	= mdc_clear_open_replay_data,
++	.get_remote_perm	= mdc_get_remote_perm,
++	.intent_getattr_async	= mdc_intent_getattr_async,
++	.revalidate_lock	= mdc_revalidate_lock
  };
  
- static int __init mgc_init(void)
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index ab0748b..fbbd4b5 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -132,7 +132,7 @@ static struct obd_type *class_get_type(const char *name)
- 	if (type) {
- 		spin_lock(&type->obd_type_lock);
- 		type->typ_refcnt++;
--		try_module_get(type->typ_dt_ops->o_owner);
-+		try_module_get(type->typ_dt_ops->owner);
- 		spin_unlock(&type->obd_type_lock);
- 	}
- 	return type;
-@@ -143,7 +143,7 @@ void class_put_type(struct obd_type *type)
- 	LASSERT(type);
- 	spin_lock(&type->obd_type_lock);
- 	type->typ_refcnt--;
--	module_put(type->typ_dt_ops->o_owner);
-+	module_put(type->typ_dt_ops->owner);
- 	spin_unlock(&type->obd_type_lock);
- }
- EXPORT_SYMBOL(class_put_type);
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index ef9cb31..5b26265 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -2128,10 +2128,10 @@ static int echo_client_disconnect(struct obd_export *exp)
- }
- 
- static struct obd_ops echo_client_obd_ops = {
--	.o_owner       = THIS_MODULE,
--	.o_iocontrol   = echo_client_iocontrol,
--	.o_connect     = echo_client_connect,
--	.o_disconnect  = echo_client_disconnect
-+	.owner          = THIS_MODULE,
-+	.iocontrol      = echo_client_iocontrol,
-+	.connect        = echo_client_connect,
-+	.disconnect     = echo_client_disconnect
- };
- 
- static int echo_client_init(void)
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 32c9713..d2fc4fe 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -3257,33 +3257,33 @@ static int osc_process_config(struct obd_device *obd, u32 len, void *buf)
- }
- 
- struct obd_ops osc_obd_ops = {
--	.o_owner		= THIS_MODULE,
--	.o_setup		= osc_setup,
--	.o_precleanup	   = osc_precleanup,
--	.o_cleanup	      = osc_cleanup,
--	.o_add_conn	     = client_import_add_conn,
--	.o_del_conn	     = client_import_del_conn,
--	.o_connect	      = client_connect_import,
--	.o_reconnect	    = osc_reconnect,
--	.o_disconnect	   = osc_disconnect,
--	.o_statfs	       = osc_statfs,
--	.o_statfs_async	 = osc_statfs_async,
--	.o_packmd	       = osc_packmd,
--	.o_unpackmd	     = osc_unpackmd,
--	.o_create	       = osc_create,
--	.o_destroy	      = osc_destroy,
--	.o_getattr	      = osc_getattr,
--	.o_getattr_async	= osc_getattr_async,
--	.o_setattr	      = osc_setattr,
--	.o_setattr_async	= osc_setattr_async,
--	.o_find_cbdata	  = osc_find_cbdata,
--	.o_iocontrol	    = osc_iocontrol,
--	.o_get_info	     = osc_get_info,
--	.o_set_info_async       = osc_set_info_async,
--	.o_import_event	 = osc_import_event,
--	.o_process_config       = osc_process_config,
--	.o_quotactl	     = osc_quotactl,
--	.o_quotacheck	   = osc_quotacheck,
-+	.owner          = THIS_MODULE,
-+	.setup          = osc_setup,
-+	.precleanup     = osc_precleanup,
-+	.cleanup        = osc_cleanup,
-+	.add_conn       = client_import_add_conn,
-+	.del_conn       = client_import_del_conn,
-+	.connect        = client_connect_import,
-+	.reconnect      = osc_reconnect,
-+	.disconnect     = osc_disconnect,
-+	.statfs         = osc_statfs,
-+	.statfs_async   = osc_statfs_async,
-+	.packmd         = osc_packmd,
-+	.unpackmd       = osc_unpackmd,
-+	.create         = osc_create,
-+	.destroy        = osc_destroy,
-+	.getattr        = osc_getattr,
-+	.getattr_async  = osc_getattr_async,
-+	.setattr        = osc_setattr,
-+	.setattr_async  = osc_setattr_async,
-+	.find_cbdata    = osc_find_cbdata,
-+	.iocontrol      = osc_iocontrol,
-+	.get_info       = osc_get_info,
-+	.set_info_async = osc_set_info_async,
-+	.import_event   = osc_import_event,
-+	.process_config = osc_process_config,
-+	.quotactl       = osc_quotactl,
-+	.quotacheck     = osc_quotacheck,
- };
- 
- extern struct lu_kmem_descr osc_caches[];
+ static int __init mdc_init(void)
