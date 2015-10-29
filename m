@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 29 Oct 2015 17:35:19 -0400
-Subject: [lustre-devel] [PATCH 3/6] staging: lustre: move linux hash.h
-	header to start of libcfs_hash.h
+Date: Thu, 29 Oct 2015 17:35:18 -0400
+Subject: [lustre-devel] [PATCH 2/6] staging: lustre: remove obsolete comment
+	in libcfs_hash.h
 In-Reply-To: <1446154522-12929-1-git-send-email-jsimmons@infradead.org>
 References: <1446154522-12929-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1446154522-12929-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1446154522-12929-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,36 +13,30 @@ To: lustre-devel@lists.lustre.org
 
 From: James Simmons <uja.ornl@yahoo.com>
 
-Minor style cleanup to put hash.h header to the top of the
-libcfs_hash.h file.
+Remove comment hash_long which was removed long ago.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/linux/libcfs/libcfs_hash.h      |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-index 4a78e6d..2e0c892 100644
+index 4d73f8a..4a78e6d 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
 +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-@@ -41,6 +41,9 @@
- 
- #ifndef __LIBCFS_HASH_H__
- #define __LIBCFS_HASH_H__
-+
-+#include <linux/hash.h>
-+
- /*
-  * Knuth recommends primes in approximately golden ratio to the maximum
-  * integer representable by a machine word for multiplicative hashing.
-@@ -56,8 +59,6 @@
+@@ -56,13 +56,6 @@
  /*  2^63 + 2^61 - 2^57 + 2^54 - 2^51 - 2^18 + 1 */
  #define CFS_GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001ULL
  
--#include <linux/hash.h>
+-/*
+- * Ideally we would use HAVE_HASH_LONG for this, but on linux we configure
+- * the linux kernel and user space at the same time, so we need to differentiate
+- * between them explicitly. If this is not needed on other architectures, then
+- * we'll need to move the functions to architecture specific headers.
+- */
 -
+ #include <linux/hash.h>
+ 
  /** disable debug */
- #define CFS_HASH_DEBUG_NONE	0
- /** record hash depth and output to console when it's too deep,
 -- 
 1.7.1
