@@ -1,27 +1,39 @@
-From: Smith, Stan <stan.smith@intel.com>
-Date: Mon, 2 Nov 2015 20:46:10 +0000
+From: Ben Evans <bevans@cray.com>
+Date: Mon, 2 Nov 2015 20:49:24 +0000
 Subject: [lustre-devel] porting Lustre server to RHEL6.7 distro running
  a kernel.org linux-3.12.39
-In-Reply-To: <D25D229F.28B1%jevans@cray.com>
+In-Reply-To: <2DDE0F15AAFF91448E6F813C42EF4CBEA195FEB0@ORSMSX105.amr.corp.intel.com>
 References: <2DDE0F15AAFF91448E6F813C42EF4CBEA195FDB8@ORSMSX105.amr.corp.intel.com>
 	<5637B5CB.9090106@cray.com> <D25D229F.28B1%jevans@cray.com>
-Message-ID: <2DDE0F15AAFF91448E6F813C42EF4CBEA195FEB0@ORSMSX105.amr.corp.intel.com>
+	<2DDE0F15AAFF91448E6F813C42EF4CBEA195FEB0@ORSMSX105.amr.corp.intel.com>
+Message-ID: <D25D3620.28BE%jevans@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+By patchless, I mean that neither Lustre nor ZFS need to patch the Linux kernel in order to work.  With ldiskfs, some patching of the kernel needs to happen, which is where you?re running into trouble.
+
+I?m not going to say that it will be pain-free, just that you?ll remove a potentially large pain point in your dev process.
+
+-Ben Evans
+
+From: "Smith, Stan" <stan.smith at intel.com<mailto:stan.smith@intel.com>>
+Date: Monday, November 2, 2015 at 3:46 PM
+To: Ben Evans <bevans at cray.com<mailto:bevans@cray.com>>, Patrick Farrell <paf at cray.com<mailto:paf@cray.com>>, "lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>" <lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>>
+Subject: RE: [lustre-devel] porting Lustre server to RHEL6.7 distro running a kernel.org linux-3.12.39
+
 From: lustre-devel [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Ben Evans
 Sent: Monday, November 2, 2015 11:26 AM
-To: Patrick Farrell <paf@cray.com>; lustre-devel at lists.lustre.org
+To: Patrick Farrell <paf at cray.com<mailto:paf@cray.com>>; lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
 Subject: Re: [lustre-devel] porting Lustre server to RHEL6.7 distro running a kernel.org linux-3.12.39
 
-Using ZFS as a backing filesystem may be a simpler way to go here if you want to stay with kernel.org.  The lustre server + ZFS is patchless, and if you're writing a new LND, you probably don't care about the backing filesystem anyway.
+Using ZFS as a backing filesystem may be a simpler way to go here if you want to stay with kernel.org.  The lustre server + ZFS is patchless, and if you?re writing a new LND, you probably don?t care about the backing filesystem anyway.
 
-You are 100% spot-on, at this juncture in the LND development, I don't really care so much about the backing filesystem; whatever builds/works such that I can continue LND testing in the client/server environment. I suspect a large step between LNet selftests and full-on LFS.
+You are 100% spot-on, at this juncture in the LND development, I don?t really care so much about the backing filesystem; whatever builds/works such that I can continue LND testing in the client/server environment. I suspect a large step between LNet selftests and full-on LFS.
 
-It's Monday after a time zone change, hence a small clarification on your statement 'The lustre server + ZFS is patchless'.
+It?s Monday after a time zone change, hence a small clarification on your statement ?The lustre server + ZFS is patchless?.
 By patchless you saying the lustre source kernel patches are not required when using ZFS? Just to be crystal-clear.
 
 Stan.
@@ -44,11 +56,11 @@ Regards,
 - Patrick Farrell
 On 11/02/2015 01:05 PM, Smith, Stan wrote:
 Hello,
-  I'm currently unable to search the lustre-devel archives + 1st post to this list.
+  I?m currently unable to search the lustre-devel archives + 1st post to this list.
 
-Having read lustre documentation I find only references to building lustre server for stock 'distro' kernels.
+Having read lustre documentation I find only references to building lustre server for stock ?distro? kernels.
 
-Does someone have suggestions on how to patch ldiskfs for a kernel.org kernel.....specifically weeding out RHEL/SLES/* distro FS enhancements from a kernel.org base?
+Does someone have suggestions on how to patch ldiskfs for a kernel.org kernel?..specifically weeding out RHEL/SLES/* distro FS enhancements from a kernel.org base?
 
 I have written a Reliable Datagram LND which passes the LNet selftests (client lustre build) now entering the world of lustre server building.
 Patching the kernel.org kernel for lustre server was fairly straightforward, creating the patch series for ldiskfs is another story.
@@ -68,4 +80,4 @@ lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>http://lis
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20151102/745814fa/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20151102/3be92309/attachment-0001.htm>
