@@ -1,77 +1,46 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  2 Nov 2015 12:22:10 -0500
-Subject: [lustre-devel] [PATCH v2 4/7] staging: lustre: use proper comment
-	blocks for libcfs_hash.h
+Date: Mon,  2 Nov 2015 12:22:09 -0500
+Subject: [lustre-devel] [PATCH v2 3/7] staging: lustre: move linux hash.h
+	header to start of libcfs_hash.h
 In-Reply-To: <1446484933-23571-1-git-send-email-jsimmons@infradead.org>
 References: <1446484933-23571-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1446484933-23571-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1446484933-23571-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The script checkpatch.pl reported problems with the style of
-the comment blocks. This patch resolves those problems.
+Minor style cleanup to put hash.h header to the top of the
+libcfs_hash.h file.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/linux/libcfs/libcfs_hash.h      |   21 +++++++++++++------
- 1 files changed, 14 insertions(+), 7 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-index 2e0c892..87dee16 100644
+index 4a78e6d..2e0c892 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
 +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-@@ -61,8 +61,10 @@
+@@ -41,6 +41,9 @@
  
+ #ifndef __LIBCFS_HASH_H__
+ #define __LIBCFS_HASH_H__
++
++#include <linux/hash.h>
++
+ /*
+  * Knuth recommends primes in approximately golden ratio to the maximum
+  * integer representable by a machine word for multiplicative hashing.
+@@ -56,8 +59,6 @@
+ /*  2^63 + 2^61 - 2^57 + 2^54 - 2^51 - 2^18 + 1 */
+ #define CFS_GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001ULL
+ 
+-#include <linux/hash.h>
+-
  /** disable debug */
  #define CFS_HASH_DEBUG_NONE	0
--/** record hash depth and output to console when it's too deep,
-- *  computing overhead is low but consume more memory */
-+/*
-+ * record hash depth and output to console when it's too deep,
-+ * computing overhead is low but consume more memory
-+ */
- #define CFS_HASH_DEBUG_1	1
- /** expensive, check key validation */
- #define CFS_HASH_DEBUG_2	2
-@@ -158,7 +160,8 @@ enum cfs_hash_tag {
- 	 */
- 	CFS_HASH_NBLK_CHANGE	= 1 << 13,
- 	/** NB, we typed hs_flags as  __u16, please change it
--	 * if you need to extend >=16 flags */
-+	 * if you need to extend >=16 flags
-+	 */
- };
- 
- /** most used attributes */
-@@ -205,8 +208,10 @@ enum cfs_hash_tag {
-  */
- 
- struct cfs_hash {
--	/** serialize with rehash, or serialize all operations if
--	 * the hash-table has CFS_HASH_NO_BKTLOCK */
-+	/*
-+	 * serialize with rehash, or serialize all operations if
-+	 * the hash-table has CFS_HASH_NO_BKTLOCK
-+	 */
- 	union cfs_hash_lock		hs_lock;
- 	/** hash operations */
- 	struct cfs_hash_ops		*hs_ops;
-@@ -373,9 +378,11 @@ cfs_hash_with_add_tail(struct cfs_hash *hs)
- static inline int
- cfs_hash_with_no_itemref(struct cfs_hash *hs)
- {
--	/* hash-table doesn't keep refcount on item,
-+	/*
-+	 * hash-table doesn't keep refcount on item,
- 	 * item can't be removed from hash unless it's
--	 * ZERO refcount */
-+	 * ZERO refcount.
-+	 */
- 	return (hs->hs_flags & CFS_HASH_NO_ITEMREF) != 0;
- }
- 
+ /** record hash depth and output to console when it's too deep,
 -- 
 1.7.1
