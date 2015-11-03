@@ -1,56 +1,34 @@
 From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Tue, 3 Nov 2015 23:28:17 +0000
-Subject: [lustre-devel] [patch] staging: lustre: potential underflow in
- libcfs_kkuc_group_add()
-In-Reply-To: <20151029135122.GA7709@mwanda>
-References: <20151029135122.GA7709@mwanda>
-Message-ID: <b7e8511d07d84cfaa9e437729795f179@EXCHCS32.ornl.gov>
+Date: Tue, 3 Nov 2015 23:56:22 +0000
+Subject: [lustre-devel] [PATCH 1/3] staging: lustre: checkpatch cleanups
+ for nidstring.c
+In-Reply-To: <20151102144837.GG18797@mwanda>
+References: <1446161303-798-1-git-send-email-jsimmons@infradead.org>
+	<1446161303-798-2-git-send-email-jsimmons@infradead.org>
+	<20151030230148.GB2920@kroah.com>
+	<229dae23c2f34950a21db4bd6dbdcfba@EXCHCS32.ornl.gov>
+	<20151102144837.GG18797@mwanda>
+Message-ID: <fc4cb8a899234adabb499f57b76a20b2@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-
->My static checker says that "group" is a user controlled number that can
->be negative leading to an array underflow.  I have looked at it, and I'm
->not an expert enough in lustre to say for sure if it is really a bug.
->Anyway, it's simple enough to make the variable unsigned which pleases
->the static checker and makes it easier to audit.
+>Yeah.  That is often the fastest way to fix all the checkpatch warnings.
 >
->Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+>Checkpatch warnings are pretty mechanical.  Just send like 100 patches
+>at a time until everything is fixed.  Don't overthink.  Say your patch
+>breaks the alignment then you have to fix that, but otherwise only fix
+>one thing at a time.  Sometimes people will ask you to fix something
+>else on the same line, but just say "I didn't introduce that, but yes I
+>am planning to fix that in a later patchset since I am following the
+>one thing per patch rule."
+>
+>Don't feel shame about sending many small patches.  We pretty much merge
+>everything.
 
-Dmitry do you this this could be placed under place under LU-6303 or does a new ticket need to be open.
-I also CC Frank Zago who is very familiar with this code. To me it looks okay.
-
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-index a989d26..41f3d81 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-@@ -91,7 +91,7 @@ typedef int (*libcfs_kkuc_cb_t)(__u32 data, void *cb_arg);
- /* Kernel methods */
- int libcfs_kkuc_msg_put(struct file *fp, void *payload);
- int libcfs_kkuc_group_put(int group, void *payload);
--int libcfs_kkuc_group_add(struct file *fp, int uid, int group,
-+int libcfs_kkuc_group_add(struct file *fp, int uid, unsigned int group,
- 				 __u32 data);
- int libcfs_kkuc_group_rem(int uid, int group);
- int libcfs_kkuc_group_foreach(int group, libcfs_kkuc_cb_t cb_func,
-diff --git a/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c b/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-index ad661a3..d8230ae 100644
---- a/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-+++ b/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-@@ -110,7 +110,8 @@ static DECLARE_RWSEM(kg_sem);
-  * @param uid identifier for this receiver
-  * @param group group number
-  */
--int libcfs_kkuc_group_add(struct file *filp, int uid, int group, __u32 data)
-+int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
-+			  __u32 data)
- {
- 	struct kkuc_reg *reg;
- 
-_______________________________________________
-devel mailing list
-devel at linuxdriverproject.org
-http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
+It was the sense of it taking forever with that amount of patches needed with
+the one file approach. Looking at the back log of fixes its not as bad as I thought
+for libcfs/LNet. Once those fixes are merged the style cleanups can happen
+pretty quickly.
