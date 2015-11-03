@@ -1,34 +1,43 @@
-From: Paul Davies C <pauldaviesc@gmail.com>
-Date: Sun, 1 Nov 2015 14:12:29 +0530
-Subject: [lustre-devel] [PATCH] lustre: obdclass: fix sparse warning
-Message-ID: <5635d078.a1ee440a.16126.ffffcaf6@mx.google.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Wed, 4 Nov 2015 01:16:16 +0300
+Subject: [lustre-devel] [patch] staging: lustre: remove unused variable
+Message-ID: <20151103221616.GD19280@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Fix the following warning given by sparse:
+The "->lr_lvb_data" struct member is never used.  Delete it.
 
-drivers/staging/lustre/lustre/obdclass/cl_lock.c:690:5: warning: symbol 'cl_lock_mutex_try' was not declared. Should it be static?
-
-Signed-off-by: Paul Davies C <pauldaviesc@gmail.com>
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
- drivers/staging/lustre/lustre/obdclass/cl_lock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I have compile tested this.  I looked through the history and it seems
+to never have been used.  I wonder if we can remove the locking as well.
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-index 5621beb..6f83452 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-@@ -687,7 +687,7 @@ EXPORT_SYMBOL(cl_lock_mutex_get);
-  *
-  * \see cl_lock_mutex_get()
-  */
--int cl_lock_mutex_try(const struct lu_env *env, struct cl_lock *lock)
-+static int cl_lock_mutex_try(const struct lu_env *env, struct cl_lock *lock)
- {
- 	int result;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 0e75a15..138479a 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -872,8 +872,6 @@ struct ldlm_resource {
+ 	 */
+ 	struct mutex		lr_lvb_mutex;
+ 	int			lr_lvb_len;
+-	/** protected by lr_lock */
+-	void			*lr_lvb_data;
  
--- 
-1.9.1
+ 	/** When the resource was considered as contended. */
+ 	unsigned long		lr_contention_time;
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index c0a54bf..b55a4f0 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -1154,8 +1154,6 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 			CERROR("%s: lvbo_init failed for resource %#llx:%#llx: rc = %d\n",
+ 			       ns->ns_obd->obd_name, name->name[0],
+ 			       name->name[1], rc);
+-			kfree(res->lr_lvb_data);
+-			res->lr_lvb_data = NULL;
+ 			res->lr_lvb_len = rc;
+ 			mutex_unlock(&res->lr_lvb_mutex);
+ 			ldlm_resource_putref(res);
