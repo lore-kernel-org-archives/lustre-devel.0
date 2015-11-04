@@ -1,39 +1,56 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  4 Nov 2015 13:39:59 -0500
-Subject: [lustre-devel] [PATCH 03/10] staging: lustre: remove
-	libcfs_debug_set_level prototype from libcfs_private.h
+Date: Wed,  4 Nov 2015 13:40:01 -0500
+Subject: [lustre-devel] [PATCH 05/10] staging: lustre: Fix possible NULL
+	pointer dereference in lprocfs_status.c
 In-Reply-To: <1446662406-4590-1-git-send-email-jsimmons@infradead.org>
 References: <1446662406-4590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1446662406-4590-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1446662406-4590-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: frank zago <fzago@cray.com>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-The function libcfs_debug_set_level is used only internally so no reason
-to expose it in libcfs_private.h. This is broken out from LU-5829 patch
-http://review.whamcloud.com/13319.
+The imp->imp_connection really could be NULL, we better check for it
+before dereferencing it in taht call to libcfs_nid2str_r.
 
-Signed-off-by: frank zago <fzago@cray.com>
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6507
+Reviewed-on: http://review.whamcloud.com/14808
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_private.h   |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ .../lustre/lustre/obdclass/lprocfs_status.c        |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-index 6af733d..dc2fe1f 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-@@ -185,8 +185,6 @@ int libcfs_debug_cleanup(void);
- int libcfs_debug_clear_buffer(void);
- int libcfs_debug_mark_buffer(const char *text);
- 
--void libcfs_debug_set_level(unsigned int debug_level);
--
- /*
-  * allocate per-cpu-partition data, returned value is an array of pointers,
-  * variable can be indexed by CPU ID.
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index 2de3c1b..dda5ad1 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -665,15 +665,18 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 		seq_printf(m, "%s%s", j ? ", " : "", nidstr);
+ 		j++;
+ 	}
+-	libcfs_nid2str_r(imp->imp_connection->c_peer.nid,
+-			 nidstr, sizeof(nidstr));
++	if (imp->imp_connection != NULL)
++		libcfs_nid2str_r(imp->imp_connection->c_peer.nid,
++				 nidstr, sizeof(nidstr));
++	else
++		strncpy(nidstr, "<none>", sizeof(nidstr));
+ 	seq_printf(m,
+ 		      "]\n"
+ 		      "       current_connection: %s\n"
+ 		      "       connection_attempts: %u\n"
+ 		      "       generation: %u\n"
+ 		      "       in-progress_invalidations: %u\n",
+-		      imp->imp_connection == NULL ? "<none>" : nidstr,
++		      nidstr,
+ 		      imp->imp_conn_cnt,
+ 		      imp->imp_generation,
+ 		      atomic_read(&imp->imp_inval_count));
 -- 
 1.7.1
