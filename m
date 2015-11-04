@@ -1,58 +1,27 @@
-From: Frank Zago <fzago@cray.com>
-Date: Tue, 3 Nov 2015 17:49:00 -0600
-Subject: [lustre-devel] [patch] staging: lustre: potential underflow in
- libcfs_kkuc_group_add()
-In-Reply-To: <b7e8511d07d84cfaa9e437729795f179@EXCHCS32.ornl.gov>
-References: <20151029135122.GA7709@mwanda>
-	<b7e8511d07d84cfaa9e437729795f179@EXCHCS32.ornl.gov>
-Message-ID: <563947EC.9020502@cray.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Tue, 3 Nov 2015 19:46:07 -0800
+Subject: [lustre-devel] [PATCH v2 1/7] staging: lustre: remove white
+ space in libcfs_hash.h
+In-Reply-To: <1446484933-23571-2-git-send-email-jsimmons@infradead.org>
+References: <1446484933-23571-1-git-send-email-jsimmons@infradead.org>
+	<1446484933-23571-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <20151104034607.GA12870@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 11/03/2015 05:28 PM, Simmons, James A. wrote:
->
->> My static checker says that "group" is a user controlled number that can
->> be negative leading to an array underflow.  I have looked at it, and I'm
->> not an expert enough in lustre to say for sure if it is really a bug.
->> Anyway, it's simple enough to make the variable unsigned which pleases
->> the static checker and makes it easier to audit.
->>
->> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
->
-> Dmitry do you this this could be placed under place under LU-6303 or does a new ticket need to be open.
-> I also CC Frank Zago who is very familiar with this code. To me it looks okay.
->
-> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-> index a989d26..41f3d81 100644
-> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_kernelcomm.h
-> @@ -91,7 +91,7 @@ typedef int (*libcfs_kkuc_cb_t)(__u32 data, void *cb_arg);
->   /* Kernel methods */
->   int libcfs_kkuc_msg_put(struct file *fp, void *payload);
->   int libcfs_kkuc_group_put(int group, void *payload);
-> -int libcfs_kkuc_group_add(struct file *fp, int uid, int group,
-> +int libcfs_kkuc_group_add(struct file *fp, int uid, unsigned int group,
->   				 __u32 data);
->   int libcfs_kkuc_group_rem(int uid, int group);
->   int libcfs_kkuc_group_foreach(int group, libcfs_kkuc_cb_t cb_func,
-> diff --git a/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c b/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-> index ad661a3..d8230ae 100644
-> --- a/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-> +++ b/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
-> @@ -110,7 +110,8 @@ static DECLARE_RWSEM(kg_sem);
->    * @param uid identifier for this receiver
->    * @param group group number
->    */
-> -int libcfs_kkuc_group_add(struct file *filp, int uid, int group, __u32 data)
-> +int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
-> +			  __u32 data)
->   {
->   	struct kkuc_reg *reg;
+On Mon, Nov 02, 2015 at 12:22:07PM -0500, James Simmons wrote:
+> Cleanup all the unneeded white space in libcfs_hash.h.
+> 
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  .../lustre/include/linux/libcfs/libcfs_hash.h      |  135 ++++++++++----------
+>  1 files changed, 70 insertions(+), 65 deletions(-)
 
-Yes, but for consistency, all 4 functions should be changed.
+Doesn't apply, did I already queue up this series?
 
-Regards,
-   Frank.
+confused,
+
+greg k-h
