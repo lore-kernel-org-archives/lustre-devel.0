@@ -1,66 +1,39 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  4 Nov 2015 13:40:04 -0500
-Subject: [lustre-devel] [PATCH 08/10] staging: lustre: race condition for
-	check/use cfs_fail_val
+Date: Wed,  4 Nov 2015 13:39:59 -0500
+Subject: [lustre-devel] [PATCH 03/10] staging: lustre: remove
+	libcfs_debug_set_level prototype from libcfs_private.h
 In-Reply-To: <1446662406-4590-1-git-send-email-jsimmons@infradead.org>
 References: <1446662406-4590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1446662406-4590-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1446662406-4590-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Fan Yong <fan.yong@intel.com>
+From: frank zago <fzago@cray.com>
 
-There are some race conditions when check/use cfs_fail_val.
-For example: when inject failure stub for LFSCK test as following:
+The function libcfs_debug_set_level is used only internally so no reason
+to expose it in libcfs_private.h. This is broken out from LU-5829 patch
+http://review.whamcloud.com/13319.
 
-764   if (OBD_FAIL_CHECK(OBD_FAIL_LFSCK_DELAY2) &&
-765       cfs_fail_val > 0) {
-766           struct l_wait_info lwi;
-767
-768           lwi = LWI_TIMEOUT(cfs_time_seconds(cfs_fail_val),
-769                             NULL, NULL);
-770           l_wait_event(thread->t_ctl_waitq,
-771                        !thread_is_running(thread),
-772                        &lwi);
-773
-774           if (unlikely(!thread_is_running(thread))) {
-775                   CDEBUG(D_LFSCK, "%s: scan dir exit for engine "
-776                          "stop, parent "DFID", cookie "LPX64"n",
-777                          lfsck_lfsck2name(lfsck),
-778                          PFID(lfsck_dto2fid(dir)),
-779                          lfsck->li_cookie_dir);
-780                   RETURN(0);
-781           }
-782   }
-
-The "cfs_fail_val" may be changed as zero by others after the check
-at the line 765 but before using it at the line 768. Then the LFSCK
-engine will fall into "wait" until someone run "lfsck_stop".
-
-Signed-off-by: Fan Yong <fan.yong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6146
-Reviewed-on: http://review.whamcloud.com/13481
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Signed-off-by: frank zago <fzago@cray.com>
 ---
- drivers/staging/lustre/lustre/libcfs/fail.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_private.h   |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/libcfs/fail.c b/drivers/staging/lustre/lustre/libcfs/fail.c
-index d39fece..ea059b0 100644
---- a/drivers/staging/lustre/lustre/libcfs/fail.c
-+++ b/drivers/staging/lustre/lustre/libcfs/fail.c
-@@ -126,7 +126,7 @@ int __cfs_fail_timeout_set(__u32 id, __u32 value, int ms, int set)
- 	int ret;
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+index 6af733d..dc2fe1f 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+@@ -185,8 +185,6 @@ int libcfs_debug_cleanup(void);
+ int libcfs_debug_clear_buffer(void);
+ int libcfs_debug_mark_buffer(const char *text);
  
- 	ret = __cfs_fail_check_set(id, value, set);
--	if (ret) {
-+	if (ret && likely(ms > 0)) {
- 		CERROR("cfs_fail_timeout id %x sleeping for %dms\n",
- 		       id, ms);
- 		set_current_state(TASK_UNINTERRUPTIBLE);
+-void libcfs_debug_set_level(unsigned int debug_level);
+-
+ /*
+  * allocate per-cpu-partition data, returned value is an array of pointers,
+  * variable can be indexed by CPU ID.
 -- 
 1.7.1
