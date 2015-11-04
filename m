@@ -1,34 +1,49 @@
 From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Tue, 3 Nov 2015 23:56:22 +0000
-Subject: [lustre-devel] [PATCH 1/3] staging: lustre: checkpatch cleanups
- for nidstring.c
-In-Reply-To: <20151102144837.GG18797@mwanda>
-References: <1446161303-798-1-git-send-email-jsimmons@infradead.org>
-	<1446161303-798-2-git-send-email-jsimmons@infradead.org>
-	<20151030230148.GB2920@kroah.com>
-	<229dae23c2f34950a21db4bd6dbdcfba@EXCHCS32.ornl.gov>
-	<20151102144837.GG18797@mwanda>
-Message-ID: <fc4cb8a899234adabb499f57b76a20b2@EXCHCS32.ornl.gov>
+Date: Wed, 4 Nov 2015 00:20:49 +0000
+Subject: [lustre-devel] [PATCH] staging:lustre: Prevent duplicate CT
+	registrations
+In-Reply-To: <20151026085249.GW7340@mwanda>
+References: <1445630357-27149-1-git-send-email-jsimmons@infradead.org>
+	<1445630357-27149-3-git-send-email-jsimmons@infradead.org>
+	<20151026085249.GW7340@mwanda>
+Message-ID: <a1d0c77c4ddf4ce2960a39af3741edb3@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->Yeah.  That is often the fastest way to fix all the checkpatch warnings.
+>On Fri, Oct 23, 2015 at 03:59:14PM -0400, James Simmons wrote:
+>> diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+>> index 635a93c..d6d70d8 100644
+>> --- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+>> +++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+>> @@ -794,7 +794,9 @@ static void lmv_hsm_req_build(struct lmv_obd *lmv,
+>>  static int lmv_hsm_ct_unregister(struct lmv_obd *lmv, unsigned int cmd, int len,
+>>  				 struct lustre_kernelcomm *lk, void *uarg)
+>>  {
+>> -	int	i, rc = 0;
+>> +	struct kkuc_ct_data *kcd = NULL;
+>> +	int rc = 0;
+>> +	__u32 i;
 >
->Checkpatch warnings are pretty mechanical.  Just send like 100 patches
->at a time until everything is fixed.  Don't overthink.  Say your patch
->breaks the alignment then you have to fix that, but otherwise only fix
->one thing at a time.  Sometimes people will ask you to fix something
->else on the same line, but just say "I didn't introduce that, but yes I
->am planning to fix that in a later patchset since I am following the
->one thing per patch rule."
->
->Don't feel shame about sending many small patches.  We pretty much merge
->everything.
+>We have been introducing a lot of new __u32 types here and I just
+>assumed there was a reason for it but this one is clearly wrong.  The
+>new code implies that ->ld_tgt_count can overflow INT_MAX which is not
+>true and that this is code shared with userspace which might be true but
+>it's not described in the changelog.  Is this a static checker fix?
+>Stop using that broken static checker, because the correct type here is
+>int.
 
-It was the sense of it taking forever with that amount of patches needed with
-the one file approach. Looking at the back log of fixes its not as bad as I thought
-for libcfs/LNet. Once those fixes are merged the style cleanups can happen
-pretty quickly.
+No this patch is from a real fix. You can read the details at
+https://jira.hpdd.intel.com/browse/LU-3882. I bet he did this to avoid
+the pickiness of gcc. We have build failure due to gcc stupidity. I could
+be wrong which if that is the case the original Author is CC.
+
+>Anyway, stop making gratuitous unrelated changes (like the white space
+>changes to local declarations).  I feel like I have held off commenting
+>on this for a while and shown great restraint.  :P
+
+This is a direct drop of the original patch. I see lots of corrections to the
+code below. Would a new follow on patch to correct these issues be okay
+with you. This way we can perverse our bug fix history.
