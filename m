@@ -1,122 +1,173 @@
-From: Amitoj Kaur Chawla <amitoj1606@gmail.com>
-Date: Fri, 6 Nov 2015 02:04:21 +0530
-Subject: [lustre-devel] [PATCH] staging: lustre: lnet: selftest: Move extern
- declarations to headers
-Message-ID: <20151105203421.GA12506@amitoj-Inspiron-3542>
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Thu, 5 Nov 2015 13:45:02 -0800
+Subject: [lustre-devel] Should we have fewer releases?
+In-Reply-To: <D25FC1DB.89C48%spitzcor@cray.com>
+References: <D25FA9D2.89BFF%spitzcor@cray.com> <563A6351.4080407@llnl.gov>
+	<D25FC1DB.89C48%spitzcor@cray.com>
+Message-ID: <563BCDDE.9060103@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This patch moves extern declarations to respective header files.
+Hi,
 
-This patch also removes extern keyword from function declarations
-since functions have the extern specifier by default.
+I think that Cory meant to send his message to this list.  Please read 
+his comment at the end before reading my reply here.
 
-Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
----
- drivers/staging/lustre/lnet/selftest/console.c   |  4 ----
- drivers/staging/lustre/lnet/selftest/console.h   |  2 ++
- drivers/staging/lustre/lnet/selftest/framework.c | 11 -----------
- drivers/staging/lustre/lnet/selftest/module.c    |  3 ---
- drivers/staging/lustre/lnet/selftest/selftest.h  | 13 +++++++++++++
- 5 files changed, 15 insertions(+), 18 deletions(-)
+Peter Jones is summarized in those notes as saying that how long 
+releases take seems to depend on how much change was introduce into the 
+tree.  I agree; this is a causal relationship.
 
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index 024aaee..ab9906f 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -1698,8 +1698,6 @@ lstcon_new_session_id(lst_sid_t *sid)
- 	sid->ses_stamp = cfs_time_current();
- }
- 
--extern srpc_service_t lstcon_acceptor_service;
--
- int
- lstcon_session_new(char *name, int key, unsigned feats,
- 		   int timeout, int force, lst_sid_t *sid_up)
-@@ -1984,8 +1982,6 @@ static void lstcon_init_acceptor_service(void)
- 	lstcon_acceptor_service.sv_wi_total = SFW_FRWK_WI_MAX;
- }
- 
--extern int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_data *data);
--
- static DECLARE_IOCTL_HANDLER(lstcon_ioctl_handler, lstcon_ioctl_entry);
- 
- /* initialize console */
-diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
-index acd1312..fe1974a 100644
---- a/drivers/staging/lustre/lnet/selftest/console.h
-+++ b/drivers/staging/lustre/lnet/selftest/console.h
-@@ -169,6 +169,8 @@ typedef struct {
- } lstcon_session_t; /* session descriptor */
- 
- extern lstcon_session_t	 console_session;
-+extern srpc_service_t lstcon_acceptor_service;
-+int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_data *data);
- 
- static inline lstcon_trans_stat_t *
- lstcon_trans_stat(void)
-diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
-index 177beaf..34072d0 100644
---- a/drivers/staging/lustre/lnet/selftest/framework.c
-+++ b/drivers/staging/lustre/lnet/selftest/framework.c
-@@ -1623,17 +1623,6 @@ static srpc_service_t sfw_services[] = {
- 	}
- };
- 
--extern sfw_test_client_ops_t ping_test_client;
--extern srpc_service_t	ping_test_service;
--extern void ping_init_test_client(void);
--extern void ping_init_test_service(void);
--
--extern sfw_test_client_ops_t brw_test_client;
--extern srpc_service_t	brw_test_service;
--extern void brw_init_test_client(void);
--extern void brw_init_test_service(void);
--
--
- int
- sfw_startup(void)
- {
-diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
-index 09b8f46..c2a8ee5 100644
---- a/drivers/staging/lustre/lnet/selftest/module.c
-+++ b/drivers/staging/lustre/lnet/selftest/module.c
-@@ -47,9 +47,6 @@ enum {
- 	LST_INIT_CONSOLE
- };
- 
--extern int lstcon_console_init(void);
--extern int lstcon_console_fini(void);
--
- static int lst_init_step = LST_INIT_NONE;
- 
- struct cfs_wi_sched *lst_sched_serial;
-diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
-index 4832253..7e6a234 100644
---- a/drivers/staging/lustre/lnet/selftest/selftest.h
-+++ b/drivers/staging/lustre/lnet/selftest/selftest.h
-@@ -452,6 +452,19 @@ void srpc_service_remove_buffers(srpc_service_t *sv, int nbuffer);
- void srpc_get_counters(srpc_counters_t *cnt);
- void srpc_set_counters(const srpc_counters_t *cnt);
- 
-+int lstcon_console_init(void);
-+int lstcon_console_fini(void);
-+
-+extern sfw_test_client_ops_t ping_test_client;
-+extern srpc_service_t	ping_test_service;
-+void ping_init_test_client(void);
-+void ping_init_test_service(void);
-+
-+extern sfw_test_client_ops_t brw_test_client;
-+extern srpc_service_t	brw_test_service;
-+void brw_init_test_client(void);
-+void brw_init_test_service(void);
-+
- extern struct cfs_wi_sched *lst_sched_serial;
- extern struct cfs_wi_sched **lst_sched_test;
- 
--- 
-1.9.1
+I believe that if our six months releases are often late and take in the 
+7-9 month range, then I think that planned nine month releases will in 
+actuality take 12+ months.
+
+It may not be the current advocate's reason for suggesting the longer 
+release cycle, but one argument I have heard many times is that a longer 
+cycle will reduce the amount of manpower needed to create releases.  I 
+don't think that is substantially true.  While there are some fixed 
+costs in creating a release, there is no real reason that those fixed 
+costs need be a dominant factor for manpower demands.  On the other 
+hand, required manpower is almost always going to be strongly 
+proportional to, and dominated by, the amount of change we introduce.
+
+If we perform excellent, in-depth reviews on all code changes and we 
+also perform strong testing throughout the development cycle, then the 
+manpower centered around "release time" need not be very high.  But 
+right now our peer reviews aren't quite as in depth as they could be, 
+and community testing, while improving of late, is unpredictably applied 
+and concentrated near the end of the cycle.  This guarantees a large and 
+unpredictable amount of development effort shortly before the release 
+date, often resulting in a missed release target.
+
+So lets think about what happens if we extend the development cycle, 
+including extending freeze dates.  Assuming only minor, gradual 
+improvements in code reviews and continuous testing (a very safe 
+assumption, I think), the amount of change introduced into the release 
+will be proportionally higher the longer we leave the landing window 
+open.  The greater the change, the larger the amount of effort needed to 
+stabilize the code after the fact.
+
+Furthermore, I would speculate that extending the release cycle and 
+putting off the testing and stabilization effort will actually require a 
+super linear increase in the time for that effort.
+
+Consider for instance that the longer we make the release cycle, the 
+more likely that bug authors have moved on to another task or project. 
+Since this is an open source project we don't have any way to order the 
+bug author back to work on her code.  Even if the original author is 
+available to work on the bug, she may need significant time to shift 
+gears and remember how the code she touched works before she can make 
+significant progress.  If the original author is not available, then 
+someone else needs to learn that portion of code and that has even more 
+obvious impact on time to solution and release.
+
+I think there are also other effects that will conspire (e.g. unexpected 
+change interactions) to make the testing and stabilization period grow 
+super-linearly with the increase in the landing window.
+
+Therefore, I would argue that lengthening the release cycle will neither 
+reduce our manpower needs nor result in more predictable release dates.
+
+On the contrary, we need to go in the opposite direction to achieve 
+those goals.  We need to shorten the release cycle and have more 
+frequent releases.  I would recommend that we move to to a roughly three 
+month release cycle.  Some of the benefits might be:
+
+* Less change and accumulate before the release
+* The penalty for missing a release landing window is reduced when 
+releases are more often
+* Code reviewers have less pressure to land unfinished and/or 
+insufficiently reviewed and tested code when the penalty is reduced
+* Less change means less to test and fix at release time
+* Bug authors are more likely to still remember what they did and 
+participate in cleanup.
+* Less time before bugs that slip through the cracks appear in a major 
+release
+* Reduces developer frustration with long freeze windows
+* Encourages developers to rally more frequently around the landing 
+windows instead of falling into a long period of silence and then trying 
+to shove a bunch of code in just before freeze.  (They'll still try to 
+ram things in just before freeze, but with more frequent landing windows 
+the amount will be smaller and more manageable.)
+
+It was also mentioned in the LWG email that vendors believe that the 
+open source releases need to adhere to an advertised schedule.  Having 
+shorter release cycles with smaller and more manageable change will 
+directly contribute to Lustre releases happening on a more regular schedule.
+
+Those same vendors tend to be concerned that they will not be able to 
+productise every single release if they happen on a three month 
+schedule.  It is important to recognize that a vendor's product schedule 
+need not be directly in sync with every community release.  It is 
+actually quite common in the open source world for vendors to select a 
+version to productise, and skip over some community releases to find the 
+next version which they will productise.  Consider, for instance, the 
+Linux kernel.  RedHat selects a version of the kernel to include in RHEL 
+and then sticks with the base of code fore many years.  They will 
+backport changes as they see fit, but their base on that release remains 
+the same.  The next kernel that they decide to package in their product 
+will skip over many of the upstream Linux releases.
+
+Some Lustre vendors already operate this way, and the ones that do not 
+need to adapt to this common, successful open source model.
+
+Shortening the release cycle will help encourage and sustain an active 
+open source community of Lustre developers from a diverse set of 
+organizations.
+
+Conversely, lengthening the release cycle will result in less Lustre 
+stability and encourage stagnation.  It will make us less nimble, less 
+likely to meet the needs of our current user base, and slower to expand 
+into new markets.
+
+Lets start working through what process changes we will need to make to 
+shorten the development cycles and make lustre releases more often.
+
+Thanks,
+Chris
+
+On 11/04/2015 01:16 PM, Cory Spitz wrote:
+> Hello, Lustre developers.
+>
+> On today?s OpenSFS LWG teleconference call (notes at
+> http://wiki.opensfs.org/LWG_Minutes_2015-11-04) I proposed that we change
+> the Lustre release cadence from six months to nine months.  Chris M.
+> responded (below) that any discussion about development changes should
+> happen here on lustre-devel.  I agree, developers need to be on-board.
+>
+> So what do you think about release changes?  What requirements do you
+> have?  What issues would you have if OpenSFS changed the major release
+> cadence to nine months?
+>
+> Thanks,
+>
+> -Cory
+>
+> On 11/4/15, 1:58 PM, "lwg on behalf of Christopher J. Morrone"
+> <lwg-bounces at lists.opensfs.org on behalf of morrone2@llnl.gov> wrote:
+>
+>> On 11/04/2015 10:28 AM, Cory Spitz wrote:
+>>
+>>> Lustre release cadence
+>>> We haven?t been good about hitting our 6 month schedules
+>>> Cory proposed a 9 month cadence just to recognize reality.  Certainly
+>>> pros/cons to any scheme.  Should be up for discussion.  How/when to
+>>> decide?
+>>
+>> Any development change like that needs to be discussed on lustre-devel.
+>>
+>> Chris
+>>
+>> _______________________________________________
+>> lwg mailing list
+>> lwg at lists.opensfs.org
+>> http://lists.opensfs.org/listinfo.cgi/lwg-opensfs.org
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.opensfs.org
+> http://lists.opensfs.org/listinfo.cgi/lustre-devel-opensfs.org
+>
