@@ -1,46 +1,208 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Thu, 5 Nov 2015 22:10:01 +0000
-Subject: [lustre-devel] Build Dependency Issue in Lustre Mainline Linux
-In-Reply-To: <563BB5D7.2040506@canonical.com>
-References: <563BB5D7.2040506@canonical.com>
-Message-ID: <D261223F.118B92%andreas.dilger@intel.com>
+From: DEGREMONT Aurelien <aurelien.degremont@cea.fr>
+Date: Fri, 6 Nov 2015 14:53:51 +0100
+Subject: [lustre-devel] Should we have fewer releases?
+In-Reply-To: <563BCDDE.9060103@llnl.gov>
+References: <D25FA9D2.89BFF%spitzcor@cray.com> <563A6351.4080407@llnl.gov>
+	<D25FC1DB.89C48%spitzcor@cray.com> <563BCDDE.9060103@llnl.gov>
+Message-ID: <563CB0EF.5050005@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/11/05, 13:02, "lustre-devel on behalf of Chris J Arges"
-<lustre-devel-bounces at lists.lustre.org on behalf of
-chris.j.arges@canonical.com> wrote:
+Hi
 
->Just did a fresh git pull --rebase and tried to do 'make deb-pkg' with
->an Ubuntu config (which enables lustre). I got the following:
+You're right for most of your comments.
+
+However, you forgot one important thing: there is no more public 
+maintenance releases.
+Your theory is correct if Lustre releases get bugfix only minor releases 
+(i.e: 2.7.1, 2.7.2, ...) like it uses to have.
+
+HPC centers cannot upgrade Lustre release very often. Usually they pick 
+one and stick to it for a while, doing at most one or two major upgrades 
+during the computer life cycle (lets say 5 years).
+The more Lustre releases they will be, the more scattering of Lustre 
+versions in production they will be. As there is no more bugfix release 
+made, admins need to regroup their efforts on fewer releases to benefit 
+from debugging and patches produced by others, on the same Lustre release.
+
+Regarding lengthening the release cycle, I clearly agree that having 
+longer landing window won't help at all. That means that lengthening 
+release cycle only mean lengthening the code freeze window.
+
+
+Aur?lien
+
+Le 05/11/2015 22:45, Christopher J. Morrone a ?crit :
+> Hi,
 >
->depmod: WARNING: found 2 modules in dependency cycles!
->depmod: WARNING:
->/home/arges/src/kernel/linux/./debian/tmp/lib/modules/4.3.0+/kernel/driver
->s/staging/lustre/lnet/lnet/lnet.ko
->in dependency cycle!
->depmod: WARNING:
->/home/arges/src/kernel/linux/./debian/tmp/lib/modules/4.3.0+/kernel/driver
->s/staging/lustre/lustre/libcfs/libcfs.ko
->in dependency cycle!
->./scripts/depmod.sh: line 57: 16836 Killed                  "$DEPMOD"
->"$@" "$KERNELRELEASE" $SYMBOL_PREFIX
->make[2]: *** [_modinst_post] Error 137
->make[1]: *** [deb-pkg] Error 2
->make: *** [deb-pkg] Error 2
+> I think that Cory meant to send his message to this list.  Please read 
+> his comment at the end before reading my reply here.
 >
->This was building fine in v4.3, so I suspect something after this tag is
->causing issue. (My HEAD is at 8e483ed13).
-
-Could you run git bisect to find the offending patch?  The error messages
-don't really give very much to go on.
-
-Cheers, Andreas
--- 
-Andreas Dilger
-
-Lustre Software Architect
-Intel High Performance Data Division
+> Peter Jones is summarized in those notes as saying that how long 
+> releases take seems to depend on how much change was introduce into 
+> the tree.  I agree; this is a causal relationship.
+>
+> I believe that if our six months releases are often late and take in 
+> the 7-9 month range, then I think that planned nine month releases 
+> will in actuality take 12+ months.
+>
+> It may not be the current advocate's reason for suggesting the longer 
+> release cycle, but one argument I have heard many times is that a 
+> longer cycle will reduce the amount of manpower needed to create 
+> releases.  I don't think that is substantially true.  While there are 
+> some fixed costs in creating a release, there is no real reason that 
+> those fixed costs need be a dominant factor for manpower demands.  On 
+> the other hand, required manpower is almost always going to be 
+> strongly proportional to, and dominated by, the amount of change we 
+> introduce.
+>
+> If we perform excellent, in-depth reviews on all code changes and we 
+> also perform strong testing throughout the development cycle, then the 
+> manpower centered around "release time" need not be very high.  But 
+> right now our peer reviews aren't quite as in depth as they could be, 
+> and community testing, while improving of late, is unpredictably 
+> applied and concentrated near the end of the cycle. This guarantees a 
+> large and unpredictable amount of development effort shortly before 
+> the release date, often resulting in a missed release target.
+>
+> So lets think about what happens if we extend the development cycle, 
+> including extending freeze dates.  Assuming only minor, gradual 
+> improvements in code reviews and continuous testing (a very safe 
+> assumption, I think), the amount of change introduced into the release 
+> will be proportionally higher the longer we leave the landing window 
+> open.  The greater the change, the larger the amount of effort needed 
+> to stabilize the code after the fact.
+>
+> Furthermore, I would speculate that extending the release cycle and 
+> putting off the testing and stabilization effort will actually require 
+> a super linear increase in the time for that effort.
+>
+> Consider for instance that the longer we make the release cycle, the 
+> more likely that bug authors have moved on to another task or project. 
+> Since this is an open source project we don't have any way to order 
+> the bug author back to work on her code.  Even if the original author 
+> is available to work on the bug, she may need significant time to 
+> shift gears and remember how the code she touched works before she can 
+> make significant progress.  If the original author is not available, 
+> then someone else needs to learn that portion of code and that has 
+> even more obvious impact on time to solution and release.
+>
+> I think there are also other effects that will conspire (e.g. 
+> unexpected change interactions) to make the testing and stabilization 
+> period grow super-linearly with the increase in the landing window.
+>
+> Therefore, I would argue that lengthening the release cycle will 
+> neither reduce our manpower needs nor result in more predictable 
+> release dates.
+>
+> On the contrary, we need to go in the opposite direction to achieve 
+> those goals.  We need to shorten the release cycle and have more 
+> frequent releases.  I would recommend that we move to to a roughly 
+> three month release cycle.  Some of the benefits might be:
+>
+> * Less change and accumulate before the release
+> * The penalty for missing a release landing window is reduced when 
+> releases are more often
+> * Code reviewers have less pressure to land unfinished and/or 
+> insufficiently reviewed and tested code when the penalty is reduced
+> * Less change means less to test and fix at release time
+> * Bug authors are more likely to still remember what they did and 
+> participate in cleanup.
+> * Less time before bugs that slip through the cracks appear in a major 
+> release
+> * Reduces developer frustration with long freeze windows
+> * Encourages developers to rally more frequently around the landing 
+> windows instead of falling into a long period of silence and then 
+> trying to shove a bunch of code in just before freeze. (They'll still 
+> try to ram things in just before freeze, but with more frequent 
+> landing windows the amount will be smaller and more manageable.)
+>
+> It was also mentioned in the LWG email that vendors believe that the 
+> open source releases need to adhere to an advertised schedule.  Having 
+> shorter release cycles with smaller and more manageable change will 
+> directly contribute to Lustre releases happening on a more regular 
+> schedule.
+>
+> Those same vendors tend to be concerned that they will not be able to 
+> productise every single release if they happen on a three month 
+> schedule.  It is important to recognize that a vendor's product 
+> schedule need not be directly in sync with every community release.  
+> It is actually quite common in the open source world for vendors to 
+> select a version to productise, and skip over some community releases 
+> to find the next version which they will productise.  Consider, for 
+> instance, the Linux kernel.  RedHat selects a version of the kernel to 
+> include in RHEL and then sticks with the base of code fore many 
+> years.  They will backport changes as they see fit, but their base on 
+> that release remains the same. The next kernel that they decide to 
+> package in their product will skip over many of the upstream Linux 
+> releases.
+>
+> Some Lustre vendors already operate this way, and the ones that do not 
+> need to adapt to this common, successful open source model.
+>
+> Shortening the release cycle will help encourage and sustain an active 
+> open source community of Lustre developers from a diverse set of 
+> organizations.
+>
+> Conversely, lengthening the release cycle will result in less Lustre 
+> stability and encourage stagnation.  It will make us less nimble, less 
+> likely to meet the needs of our current user base, and slower to 
+> expand into new markets.
+>
+> Lets start working through what process changes we will need to make 
+> to shorten the development cycles and make lustre releases more often.
+>
+> Thanks,
+> Chris
+>
+> On 11/04/2015 01:16 PM, Cory Spitz wrote:
+>> Hello, Lustre developers.
+>>
+>> On today?s OpenSFS LWG teleconference call (notes at
+>> http://wiki.opensfs.org/LWG_Minutes_2015-11-04) I proposed that we 
+>> change
+>> the Lustre release cadence from six months to nine months. Chris M.
+>> responded (below) that any discussion about development changes should
+>> happen here on lustre-devel.  I agree, developers need to be on-board.
+>>
+>> So what do you think about release changes?  What requirements do you
+>> have?  What issues would you have if OpenSFS changed the major release
+>> cadence to nine months?
+>>
+>> Thanks,
+>>
+>> -Cory
+>>
+>> On 11/4/15, 1:58 PM, "lwg on behalf of Christopher J. Morrone"
+>> <lwg-bounces at lists.opensfs.org on behalf of morrone2@llnl.gov> wrote:
+>>
+>>> On 11/04/2015 10:28 AM, Cory Spitz wrote:
+>>>
+>>>> Lustre release cadence
+>>>> We haven?t been good about hitting our 6 month schedules
+>>>> Cory proposed a 9 month cadence just to recognize reality. Certainly
+>>>> pros/cons to any scheme.  Should be up for discussion. How/when to
+>>>> decide?
+>>>
+>>> Any development change like that needs to be discussed on lustre-devel.
+>>>
+>>> Chris
+>>>
+>>> _______________________________________________
+>>> lwg mailing list
+>>> lwg at lists.opensfs.org
+>>> http://lists.opensfs.org/listinfo.cgi/lwg-opensfs.org
+>>
+>> _______________________________________________
+>> lustre-devel mailing list
+>> lustre-devel at lists.opensfs.org
+>> http://lists.opensfs.org/listinfo.cgi/lustre-devel-opensfs.org
+>>
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
