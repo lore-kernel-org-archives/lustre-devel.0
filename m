@@ -1,37 +1,29 @@
 From: Greg KH <gregkh@linuxfoundation.org>
-Date: Fri, 6 Nov 2015 17:13:32 -0800
-Subject: [lustre-devel] [PATCH] lustre: obdclass: fix sparse warning
-In-Reply-To: <5635d078.a1ee440a.16126.ffffcaf6@mx.google.com>
-References: <5635d078.a1ee440a.16126.ffffcaf6@mx.google.com>
-Message-ID: <20151107011332.GA14291@kroah.com>
+Date: Fri, 6 Nov 2015 17:16:56 -0800
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: selftest: Move
+ extern declarations to headers
+In-Reply-To: <20151105203421.GA12506@amitoj-Inspiron-3542>
+References: <20151105203421.GA12506@amitoj-Inspiron-3542>
+Message-ID: <20151107011656.GA4165@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sun, Nov 01, 2015 at 02:12:29PM +0530, Paul Davies C wrote:
-> Fix the following warning given by sparse:
+On Fri, Nov 06, 2015 at 02:04:21AM +0530, Amitoj Kaur Chawla wrote:
+> This patch moves extern declarations to respective header files.
 > 
-> drivers/staging/lustre/lustre/obdclass/cl_lock.c:690:5: warning: symbol 'cl_lock_mutex_try' was not declared. Should it be static?
+> This patch also removes extern keyword from function declarations
+> since functions have the extern specifier by default.
 > 
-> Signed-off-by: Paul Davies C <pauldaviesc@gmail.com>
-> ---
->  drivers/staging/lustre/lustre/obdclass/cl_lock.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-> index 5621beb..6f83452 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-> @@ -687,7 +687,7 @@ EXPORT_SYMBOL(cl_lock_mutex_get);
->   *
->   * \see cl_lock_mutex_get()
->   */
-> -int cl_lock_mutex_try(const struct lu_env *env, struct cl_lock *lock)
-> +static int cl_lock_mutex_try(const struct lu_env *env, struct cl_lock *lock)
->  {
->  	int result;
->  
+> Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
 
-Someone did this before you did, sorry :(
+Doesn't apply to my staging-testing branch anymore due to patches send
+before yours :(
+
+Please refresh it and resend.
+
+thanks,
+
+greg k-h
