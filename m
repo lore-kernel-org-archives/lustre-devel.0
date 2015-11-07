@@ -1,39 +1,36 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Mon, 9 Nov 2015 12:44:20 -0800
-Subject: [lustre-devel] AnonHugePages Virtual Memory Commit bug
-In-Reply-To: <CAD-PXqLoZ1Lsn07N6Q548s8hVQX5f7o=EnBa=LcB1Seb7Km_Zg@mail.gmail.com>
-References: <CAD-PXqLoZ1Lsn07N6Q548s8hVQX5f7o=EnBa=LcB1Seb7Km_Zg@mail.gmail.com>
-Message-ID: <20151109204420.GA14121@kroah.com>
+From: Dmitry Safonov <0x7f454c46@gmail.com>
+Date: Sat, 7 Nov 2015 23:37:40 +0300
+Subject: [lustre-devel] next-20151101 - depmod issues with Lustre modules
+In-Reply-To: <8398.1446478793@turing-police.cc.vt.edu>
+References: <8398.1446478793@turing-police.cc.vt.edu>
+Message-ID: <CAJwJo6YTNB38rYAYwExom4WW5yRJ9eUSXNV4a+xW026VY2iwTg@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Nov 09, 2015 at 02:08:01PM -0600, Prem Kumar wrote:
-> Dear All,
-> 
-> Sorry to intervene and being rude and send this message directly to you folks.
-> I have made several attempts to reach to?linux-kernel at vger.kernel.org and my
-> attempts have failed?miserably and I have not be able make any progress on this
-> issue I have had for months now.?
+Reproduced on mainline v4.3-9038-g27eb427bdc0960 with
+Arch Linux default config (attached):
 
-<snip>
+depmod: ERROR: Found 2 modules in dependency cycles!
+depmod: ERROR: Cycle detected: lnet -> libcfs -> lnet
+make: *** [_modinst_post] Error 1
 
-Please don't post html email, and then your message will go through to
-linux-kernel with no problems.  Fix that and you should be fine.
-
-But:
-
-<snip>
-
-> I feel this is a bug. I am at kernel:?2.6.32-431.17.1.el6.x86_64
-
-Please ask for support from Red Hat who provides you with this kernel,
-you are the one paying for that support, so please use it.  There's
-nothing that the kernel community can do with a vendor-specific kernel,
-especially one as old as this one.
-
-good luck!
-
-greg k-h
+2015-11-02 18:39 GMT+03:00 Valdis Kletnieks <Valdis.Kletnieks@vt.edu>:
+> next-20151101 compiles fine, but depmod has a cow:
+>
+> depmod: ERROR: Found 2 modules in dependency cycles!
+> depmod: ERROR: Cycle detected: lnet -> libcfs -> lnet
+>
+> Sorry, not sure which commit(s) introduced the issue.  next-20151022
+> was OK.
+>
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config
+Type: application/octet-stream
+Size: 175569 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20151107/6738d1cc/attachment-0001.obj>
