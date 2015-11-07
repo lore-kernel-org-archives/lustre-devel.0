@@ -1,38 +1,41 @@
-From: Shraddha Barke <shraddha.6596@gmail.com>
-Date: Sat,  7 Nov 2015 15:14:24 +0530
-Subject: [lustre-devel] [PATCH] Staging: lustre: lustre_mds: Remove unused
-	md_should_create
-Message-ID: <1446889464-21260-1-git-send-email-shraddha.6596@gmail.com>
+From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+Date: Sat, 7 Nov 2015 12:03:41 +0200
+Subject: [lustre-devel] [PATCH v3 5/5] staging: lustre: libcfs.h: remove
+ IS_PO2 and __is_po2
+In-Reply-To: <20151107011109.GB7495@kroah.com>
+References: <cover.1446079745.git.mahfouz.saif.elyazal@gmail.com>
+	<6257d068b94ff8b07a6c756df16325fea0e7536f.1446079745.git.mahfouz.saif.elyazal@gmail.com>
+	<20151107011109.GB7495@kroah.com>
+Message-ID: <20151107100341.GA2852@waves>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-md_should_create has been defined in header file but not used.
-Thus remove it.
+On Fri, Nov 06, 2015 at 05:11:09PM -0800, Greg KH wrote:
+> On Thu, Oct 29, 2015 at 03:00:24AM +0200, Aya Mahfouz wrote:
+> > Removes IS_PO2 and __is_po2 since the uses of IS_PO2 have
+> > been replaced by is_power_of_2
+> > 
+> > Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+> > ---
+> > v2:
+> >         -became patch number 5 in the series
+> > v3:
+> > 	-no change
+> > 
+> >  drivers/staging/lustre/include/linux/libcfs/libcfs.h | 7 -------
+> >  1 file changed, 7 deletions(-)
+> 
+> I can't take this yet, as your patch 2/5 didn't apply :(
 
-Signed-off-by: Shraddha Barke <shraddha.6596@gmail.com>
----
- drivers/staging/lustre/lustre/include/lustre_mds.h | 6 ------
- 1 file changed, 6 deletions(-)
+No, problems. I understand that it is hard for these patches to apply as
+is given that they are quite old. I will recheck if there are new uses
+of them and resend this patch alone or in another patchset.
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_mds.h b/drivers/staging/lustre/lustre/include/lustre_mds.h
-index a16eb8b..95d27dd 100644
---- a/drivers/staging/lustre/lustre/include/lustre_mds.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_mds.h
-@@ -62,12 +62,6 @@ struct mds_group_info {
- #define MDD_OBD_NAME     "mdd_obd"
- #define MDD_OBD_UUID     "mdd_obd_uuid"
- 
--static inline int md_should_create(__u64 flags)
--{
--       return !(flags & MDS_OPEN_DELAY_CREATE ||
--	       !(flags & FMODE_WRITE));
--}
--
- /* these are local flags, used only on the client, private */
- #define M_CHECK_STALE	   0200000000
- 
+Thanks,
+
 -- 
-2.1.4
+Kind Regards,
+Aya Saif El-yazal Mahfouz
