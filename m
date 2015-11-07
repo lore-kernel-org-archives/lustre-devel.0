@@ -1,28 +1,34 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Fri, 6 Nov 2015 17:16:56 -0800
-Subject: [lustre-devel] [PATCH] staging: lustre: lnet: selftest: Move
- extern declarations to headers
-In-Reply-To: <20151105203421.GA12506@amitoj-Inspiron-3542>
-References: <20151105203421.GA12506@amitoj-Inspiron-3542>
-Message-ID: <20151107011656.GA4165@kroah.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Fri, 6 Nov 2015 19:27:47 -0800
+Subject: [lustre-devel] [PATCH] staging: lustre: remove
+	IOC_LIBCFS_PING_TEST ioctl
+In-Reply-To: <563d5d08.0347370a.f9d83.2af9SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <563d5d08.0347370a.f9d83.2af9SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20151107032747.GA14108@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Nov 06, 2015 at 02:04:21AM +0530, Amitoj Kaur Chawla wrote:
-> This patch moves extern declarations to respective header files.
+On Fri, Nov 06, 2015 at 09:08:03PM -0500, y at ccs.ornl.gov wrote:
+> From: James Simmons <uja.ornl@yahoo.com>
 > 
-> This patch also removes extern keyword from function declarations
-> since functions have the extern specifier by default.
+> The ioctl IOC_LIBCFS_PING_TEST has not been used in
+> ages. The recent nidstring changes which moved all
+> the nidstring operations from libcfs to the LNet
+> layer but this ioctl code was still using an
+> nidstring operation that was causing an circular
+> dependency loop between libcfs and LNet.
 > 
-> Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  .../lustre/include/linux/libcfs/libcfs_ioctl.h     |    1 -
+>  drivers/staging/lustre/lustre/libcfs/module.c      |   17 -----------------
+>  2 files changed, 0 insertions(+), 18 deletions(-)
 
-Doesn't apply to my staging-testing branch anymore due to patches send
-before yours :(
-
-Please refresh it and resend.
+You sent me 2 copies of this, which am I supposed to apply?  I've
+dropped both, please resend the correct one.
 
 thanks,
 
