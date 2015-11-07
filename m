@@ -1,35 +1,55 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Fri, 6 Nov 2015 19:27:47 -0800
-Subject: [lustre-devel] [PATCH] staging: lustre: remove
-	IOC_LIBCFS_PING_TEST ioctl
-In-Reply-To: <563d5d08.0347370a.f9d83.2af9SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <563d5d08.0347370a.f9d83.2af9SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20151107032747.GA14108@kroah.com>
+From: Shraddha Barke <shraddha.6596@gmail.com>
+Date: Sat,  7 Nov 2015 11:16:39 +0530
+Subject: [lustre-devel] [PATCH] Staging: lustre: obd_cksum.h: Remove unused
+	cksum_types_supported_server
+Message-ID: <1446875199-15537-1-git-send-email-shraddha.6596@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Nov 06, 2015 at 09:08:03PM -0500, y at ccs.ornl.gov wrote:
-> From: James Simmons <uja.ornl@yahoo.com>
-> 
-> The ioctl IOC_LIBCFS_PING_TEST has not been used in
-> ages. The recent nidstring changes which moved all
-> the nidstring operations from libcfs to the LNet
-> layer but this ioctl code was still using an
-> nidstring operation that was causing an circular
-> dependency loop between libcfs and LNet.
-> 
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> ---
->  .../lustre/include/linux/libcfs/libcfs_ioctl.h     |    1 -
->  drivers/staging/lustre/lustre/libcfs/module.c      |   17 -----------------
->  2 files changed, 0 insertions(+), 18 deletions(-)
+cksum_types_supported_server is defined in header file but not used
+anywhere. Hence remove it.
 
-You sent me 2 copies of this, which am I supposed to apply?  I've
-dropped both, please resend the correct one.
+Signed-off-by: Shraddha Barke <shraddha.6596@gmail.com>
+---
+ drivers/staging/lustre/lustre/include/obd_cksum.h | 23 -----------------------
+ 1 file changed, 23 deletions(-)
 
-thanks,
-
-greg k-h
+diff --git a/drivers/staging/lustre/lustre/include/obd_cksum.h b/drivers/staging/lustre/lustre/include/obd_cksum.h
+index a0099d7..01db604 100644
+--- a/drivers/staging/lustre/lustre/include/obd_cksum.h
++++ b/drivers/staging/lustre/lustre/include/obd_cksum.h
+@@ -133,29 +133,6 @@ static inline cksum_type_t cksum_types_supported_client(void)
+ 	return ret;
+ }
+ 
+-/* Server uses algos that perform at 50% or better of the Adler */
+-static inline cksum_type_t cksum_types_supported_server(void)
+-{
+-	int	     base_speed;
+-	cksum_type_t    ret = OBD_CKSUM_ADLER;
+-
+-	CDEBUG(D_INFO, "Crypto hash speed: crc %d, crc32c %d, adler %d\n",
+-	       cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_CRC32)),
+-	       cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_CRC32C)),
+-	       cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_ADLER)));
+-
+-	base_speed = cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_ADLER)) / 2;
+-
+-	if (cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_CRC32C)) >=
+-	    base_speed)
+-		ret |= OBD_CKSUM_CRC32C;
+-	if (cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_CRC32)) >=
+-	    base_speed)
+-		ret |= OBD_CKSUM_CRC32;
+-
+-	return ret;
+-}
+-
+ /* Select the best checksum algorithm among those supplied in the cksum_types
+  * input.
+  *
+-- 
+2.1.4
