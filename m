@@ -1,54 +1,101 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  8 Nov 2015 14:17:05 -0500
-Subject: [lustre-devel] [PATCH 00/13] bring lustre's kernel_comm code up to
-	date
-Message-ID: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
+Date: Sun,  8 Nov 2015 14:17:13 -0500
+Subject: [lustre-devel] [PATCH 08/13] staging: lustre: remove unnecessary
+	NULL checks in kernel_comm.c
+In-Reply-To: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
+References: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1447010238-25775-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This patch series brings the kernel_comm code used by Lustre up
-to the latest verison with various fixes and style improvements
-which makes the code compliant with the linux kernel standard.
+Fix checkpatch.pl reports of NULL comparison in kernel_comm.c.
 
-Henri Doreau (1):
-  staging: lustre: Prevent duplicate CT registrations
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ .../staging/lustre/lustre/obdclass/kernelcomm.c    |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
 
-Hongchao Zhang (1):
-  staging: lustre: embed kr_data into kkuc_reg
-
-James Simmons (8):
-  staging: lustre: kg_sem semaphore handling is incorrectly
-  staging: lustre: convert kernelcomm group to unsigned int
-  staging: lustre: remove unnecessary NULL checks in kernel_comm.c
-  staging: lustre: cleanup block comment style in kernel_comm code
-  staging: lustre: add space around '+' in kernel_comm code
-  staging: lustre: use proper braces in libcfs_kkuc_group_put
-  staging: lustre: return proper error code for libcfs_kkuc_msg_put
-  staging: lustre: cleanup white space in kernel comm code
-
-John L. Hammond (1):
-  staging: lustre: remove hsm_nl proc file
-
-frank zago (2):
-  staging: lustre: move kernel_user_comm.c from libcfs to lustre
-  staging: lustre: split kernel comm between user and kernel
-
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 -
- .../staging/lustre/lustre/include/lustre_export.h  |    7 ++
- .../lustre/lustre/include/lustre_kernelcomm.h      |   56 ++++++++++++++
- .../include/uapi_kernelcomm.h}                     |   72 ++++++------------
- drivers/staging/lustre/lustre/libcfs/Makefile      |    5 +-
- drivers/staging/lustre/lustre/llite/dir.c          |    1 +
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   30 ++++++---
- drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   77 --------------------
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |   21 ++++--
- drivers/staging/lustre/lustre/obdclass/Makefile    |   10 ++--
- drivers/staging/lustre/lustre/obdclass/genops.c    |    1 +
- .../kernel_user_comm.c => obdclass/kernelcomm.c}   |   76 ++++++++++---------
- 12 files changed, 171 insertions(+), 186 deletions(-)
- create mode 100644 drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
- rename drivers/staging/lustre/{include/linux/libcfs/libcfs_kernelcomm.h => lustre/include/uapi_kernelcomm.h} (51%)
- rename drivers/staging/lustre/lustre/{libcfs/kernel_user_comm.c => obdclass/kernelcomm.c} (82%)
+diff --git a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
+index 1081253..c9405e6 100644
+--- a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
++++ b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
+@@ -59,7 +59,7 @@ int libcfs_kkuc_msg_put(struct file *filp, void *payload)
+ 	mm_segment_t fs;
+ 	int rc = -ENOSYS;
+ 
+-	if (filp == NULL || IS_ERR(filp))
++	if (!filp || IS_ERR(filp))
+ 		return -EBADF;
+ 
+ 	if (kuch->kuc_magic != KUC_MAGIC) {
+@@ -121,12 +121,12 @@ int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
+ 	}
+ 
+ 	/* fput in group_rem */
+-	if (filp == NULL)
++	if (!filp)
+ 		return -EBADF;
+ 
+ 	/* freed in group_rem */
+ 	reg = kmalloc(sizeof(*reg) + data_len, 0);
+-	if (reg == NULL)
++	if (!reg)
+ 		return -ENOMEM;
+ 
+ 	reg->kr_fp = filp;
+@@ -134,7 +134,7 @@ int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
+ 	memcpy(reg->kr_data, data, data_len);
+ 
+ 	down_write(&kg_sem);
+-	if (kkuc_groups[group].next == NULL)
++	if (!kkuc_groups[group].next)
+ 		INIT_LIST_HEAD(&kkuc_groups[group]);
+ 	list_add(&reg->kr_chain, &kkuc_groups[group]);
+ 	up_write(&kg_sem);
+@@ -149,7 +149,7 @@ int libcfs_kkuc_group_rem(int uid, unsigned int group)
+ {
+ 	struct kkuc_reg *reg, *next;
+ 
+-	if (kkuc_groups[group].next == NULL)
++	if (!kkuc_groups[group].next)
+ 		return 0;
+ 
+ 	if (uid == 0) {
+@@ -169,7 +169,7 @@ int libcfs_kkuc_group_rem(int uid, unsigned int group)
+ 			list_del(&reg->kr_chain);
+ 			CDEBUG(D_KUC, "Removed uid=%d fp=%p from group %d\n",
+ 			       reg->kr_uid, reg->kr_fp, group);
+-			if (reg->kr_fp != NULL)
++			if (reg->kr_fp)
+ 				fput(reg->kr_fp);
+ 			kfree(reg);
+ 		}
+@@ -188,7 +188,7 @@ int libcfs_kkuc_group_put(unsigned int group, void *payload)
+ 
+ 	down_write(&kg_sem);
+ 	list_for_each_entry(reg, &kkuc_groups[group], kr_chain) {
+-		if (reg->kr_fp != NULL) {
++		if (reg->kr_fp) {
+ 			rc = libcfs_kkuc_msg_put(reg->kr_fp, payload);
+ 			if (rc == 0)
+ 				one_success = 1;
+@@ -227,12 +227,12 @@ int libcfs_kkuc_group_foreach(unsigned int group, libcfs_kkuc_cb_t cb_func,
+ 	}
+ 
+ 	/* no link for this group */
+-	if (kkuc_groups[group].next == NULL)
++	if (!kkuc_groups[group].next)
+ 		return 0;
+ 
+ 	down_read(&kg_sem);
+ 	list_for_each_entry(reg, &kkuc_groups[group], kr_chain) {
+-		if (reg->kr_fp != NULL)
++		if (reg->kr_fp)
+ 			rc = cb_func(reg->kr_data, cb_arg);
+ 	}
+ 	up_read(&kg_sem);
+-- 
+1.7.1
