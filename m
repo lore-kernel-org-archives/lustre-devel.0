@@ -1,179 +1,85 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  8 Nov 2015 14:17:11 -0500
-Subject: [lustre-devel] [PATCH 06/13] staging: lustre: embed kr_data into
-	kkuc_reg
+Date: Sun,  8 Nov 2015 14:17:09 -0500
+Subject: [lustre-devel] [PATCH 04/13] staging: lustre: move
+	kernel_user_comm.c from libcfs to lustre
 In-Reply-To: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
 References: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1447010238-25775-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1447010238-25775-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Hongchao Zhang <hongchao.zhang@intel.com>
+From: frank zago <fzago@cray.com>
 
-In struct kkuc_reg, the "kr_data" is difficult to be freed
-outside of libcfs, then it's better to change it to be
-inline data instead of the data pointer.
+Move the kernel portion from libcfs to obdclass. This code is
+only used by lustre. This is broken out of the original patch
+14270. The part covered by this change is as follows:
 
-Signed-off-by: Hongchao Zhang <hongchao.zhang@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6485
-Reviewed-on: http://review.whamcloud.com/14638
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+The original code in kernel_user_comm.c is split into two parts:
+
+  * obdclass/kernelcomm.c for the kernel part. filp_user_write() was
+    moved there, and linux-fs.c deleted;
+  * liblustreapi_kernelconn.c for the user part. The calls to CDEBUG
+    have been removed, and calls to CERROR have been transformed to
+    llapi_err_noerrno. The type lustre_kernelcomm has been removed and
+    replace by struct lustre_kernelcomm.
+
+Various names and filenames have been harmonized to *kernelcomm*.
+
+Signed-off-by: frank zago <fzago@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+Reviewed-on: http://review.whamcloud.com/14270
+Reviewed-by: Nathan Rutman <nathan.rutman@seagate.com>
 Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: frank zago <fzago@cray.com>
-Reviewed-by: Robert Read <robert.read@intel.com>
-Reviewed-by: Henri Doreau <henri.doreau@cea.fr>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre_kernelcomm.h      |    4 +-
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   22 ++++++-------------
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    2 +-
- .../staging/lustre/lustre/obdclass/kernelcomm.c    |   12 ++++------
- 4 files changed, 15 insertions(+), 25 deletions(-)
+ drivers/staging/lustre/lustre/libcfs/Makefile      |    5 ++---
+ drivers/staging/lustre/lustre/obdclass/Makefile    |   10 +++++-----
+ .../kernel_user_comm.c => obdclass/kernelcomm.c}   |    0
+ 3 files changed, 7 insertions(+), 8 deletions(-)
+ rename drivers/staging/lustre/lustre/{libcfs/kernel_user_comm.c => obdclass/kernelcomm.c} (100%)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h b/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
-index bb305f4..235b980 100644
---- a/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
-@@ -47,8 +47,8 @@ typedef int (*libcfs_kkuc_cb_t)(void *data, void *cb_arg);
- int libcfs_kkuc_msg_put(struct file *fp, void *payload);
- int libcfs_kkuc_group_put(int group, void *payload);
- int libcfs_kkuc_group_add(struct file *fp, int uid, unsigned int group,
--			  void *data);
--int libcfs_kkuc_group_rem(int uid, int group, void **pdata);
-+			  void *data, size_t data_len);
-+int libcfs_kkuc_group_rem(int uid, int group);
- int libcfs_kkuc_group_foreach(int group, libcfs_kkuc_cb_t cb_func,
- 			      void *cb_arg);
+diff --git a/drivers/staging/lustre/lustre/libcfs/Makefile b/drivers/staging/lustre/lustre/libcfs/Makefile
+index 03d3f3d..277c123 100644
+--- a/drivers/staging/lustre/lustre/libcfs/Makefile
++++ b/drivers/staging/lustre/lustre/libcfs/Makefile
+@@ -11,8 +11,7 @@ libcfs-linux-objs += linux-mem.o
+ libcfs-linux-objs := $(addprefix linux/,$(libcfs-linux-objs))
  
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 2ad2904..c2c8b72 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -795,7 +795,6 @@ static void lmv_hsm_req_build(struct lmv_obd *lmv,
- static int lmv_hsm_ct_unregister(struct lmv_obd *lmv, unsigned int cmd, int len,
- 				 struct lustre_kernelcomm *lk, void *uarg)
- {
--	struct kkuc_ct_data *kcd = NULL;
- 	int rc = 0;
- 	__u32 i;
+ libcfs-all-objs := debug.o fail.o module.o tracefile.o \
+-		   libcfs_string.o hash.o kernel_user_comm.o \
+-		   prng.o workitem.o libcfs_cpu.o \
+-		   libcfs_mem.o libcfs_lock.o
++		   libcfs_string.o hash.o prng.o workitem.o \
++		   libcfs_cpu.o libcfs_mem.o libcfs_lock.o
  
-@@ -810,9 +809,7 @@ static int lmv_hsm_ct_unregister(struct lmv_obd *lmv, unsigned int cmd, int len,
- 	 * Unreached coordinators will get EPIPE on next requests
- 	 * and will unregister automatically.
- 	 */
--	rc = libcfs_kkuc_group_rem(lk->lk_uid, lk->lk_group, (void **)&kcd);
--	if (kcd)
--		kfree(kcd);
-+	rc = libcfs_kkuc_group_rem(lk->lk_uid, lk->lk_group);
+ libcfs-objs := $(libcfs-linux-objs) $(libcfs-all-objs)
+diff --git a/drivers/staging/lustre/lustre/obdclass/Makefile b/drivers/staging/lustre/lustre/obdclass/Makefile
+index acc6857..c404eb3 100644
+--- a/drivers/staging/lustre/lustre/obdclass/Makefile
++++ b/drivers/staging/lustre/lustre/obdclass/Makefile
+@@ -2,8 +2,8 @@ obj-$(CONFIG_LUSTRE_FS) += obdclass.o
  
- 	return rc;
- }
-@@ -824,7 +821,7 @@ static int lmv_hsm_ct_register(struct lmv_obd *lmv, unsigned int cmd, int len,
- 	__u32 i, j;
- 	int err, rc = 0;
- 	bool any_set = false;
--	struct kkuc_ct_data *kcd;
-+	struct kkuc_ct_data kcd = { 0 };
- 
- 	/* All or nothing: try to register to all MDS.
- 	 * In case of failure, unregister from previous MDS,
-@@ -864,20 +861,15 @@ static int lmv_hsm_ct_register(struct lmv_obd *lmv, unsigned int cmd, int len,
- 	if (!filp)
- 		return -EBADF;
- 
--	kcd = kzalloc(sizeof(*kcd), GFP_NOFS);
--	if (!kcd) {
--		fput(filp);
--		return -ENOMEM;
--	}
--	kcd->kcd_magic = KKUC_CT_DATA_MAGIC;
--	kcd->kcd_uuid = lmv->cluuid;
--	kcd->kcd_archive = lk->lk_data;
-+	kcd.kcd_magic = KKUC_CT_DATA_MAGIC;
-+	kcd.kcd_uuid = lmv->cluuid;
-+	kcd.kcd_archive = lk->lk_data;
- 
--	rc = libcfs_kkuc_group_add(filp, lk->lk_uid, lk->lk_group, kcd);
-+	rc = libcfs_kkuc_group_add(filp, lk->lk_uid, lk->lk_group,
-+				   &kcd, sizeof(kcd));
- 	if (rc) {
- 		if (filp)
- 			fput(filp);
--		kfree(kcd);
- 	}
- 
- 	return rc;
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index a4c543a..ee1c040 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -2391,7 +2391,7 @@ static int mdc_precleanup(struct obd_device *obd, enum obd_cleanup_stage stage)
- 	case OBD_CLEANUP_EXPORTS:
- 		/* Failsafe, ok if racy */
- 		if (obd->obd_type->typ_refcnt <= 1)
--			libcfs_kkuc_group_rem(0, KUC_GRP_HSM, NULL);
-+			libcfs_kkuc_group_rem(0, KUC_GRP_HSM);
- 
- 		obd_cleanup_client_import(obd);
- 		ptlrpc_lprocfs_unregister_obd(obd);
-diff --git a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-index e3f5a3c..e290246 100644
---- a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-+++ b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-@@ -97,7 +97,7 @@ struct kkuc_reg {
- 	struct list_head kr_chain;
- 	int		 kr_uid;
- 	struct file	*kr_fp;
--	void		*kr_data;
-+	char		 kr_data[0];
- };
- 
- static struct list_head kkuc_groups[KUC_GRP_MAX+1] = {};
-@@ -111,7 +111,7 @@ static DECLARE_RWSEM(kg_sem);
-  * @param data user data
-  */
- int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
--			  void *data)
-+			  void *data, size_t data_len)
- {
- 	struct kkuc_reg *reg;
- 
-@@ -125,13 +125,13 @@ int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
- 		return -EBADF;
- 
- 	/* freed in group_rem */
--	reg = kmalloc(sizeof(*reg), 0);
-+	reg = kmalloc(sizeof(*reg) + data_len, 0);
- 	if (reg == NULL)
- 		return -ENOMEM;
- 
- 	reg->kr_fp = filp;
- 	reg->kr_uid = uid;
--	reg->kr_data = data;
-+	memcpy(reg->kr_data, data, data_len);
- 
- 	down_write(&kg_sem);
- 	if (kkuc_groups[group].next == NULL)
-@@ -145,7 +145,7 @@ int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
- }
- EXPORT_SYMBOL(libcfs_kkuc_group_add);
- 
--int libcfs_kkuc_group_rem(int uid, int group, void **pdata)
-+int libcfs_kkuc_group_rem(int uid, int group)
- {
- 	struct kkuc_reg *reg, *next;
- 
-@@ -171,8 +171,6 @@ int libcfs_kkuc_group_rem(int uid, int group, void **pdata)
- 			       reg->kr_uid, reg->kr_fp, group);
- 			if (reg->kr_fp != NULL)
- 				fput(reg->kr_fp);
--			if (pdata)
--				*pdata = reg->kr_data;
- 			kfree(reg);
- 		}
- 	}
+ obdclass-y := linux/linux-module.o linux/linux-obdo.o linux/linux-sysctl.o \
+ 	      llog.o llog_cat.o llog_obd.o llog_swab.o class_obd.o debug.o \
+-	      genops.o uuid.o lprocfs_status.o \
+-	      lustre_handles.o lustre_peer.o \
+-	      statfs_pack.o obdo.o obd_config.o obd_mount.o \
+-	      lu_object.o cl_object.o   \
+-	      cl_page.o cl_lock.o cl_io.o lu_ref.o acl.o lprocfs_counters.o
++	      genops.o uuid.o lprocfs_status.o lprocfs_counters.o \
++	      lustre_handles.o lustre_peer.o statfs_pack.o \
++	      obdo.o obd_config.o obd_mount.o lu_object.o lu_ref.o \
++	      cl_object.o cl_page.o cl_lock.o cl_io.o \
++	      acl.o kernelcomm.o
+diff --git a/drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
+similarity index 100%
+rename from drivers/staging/lustre/lustre/libcfs/kernel_user_comm.c
+rename to drivers/staging/lustre/lustre/obdclass/kernelcomm.c
 -- 
 1.7.1
