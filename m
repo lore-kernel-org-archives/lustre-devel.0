@@ -1,55 +1,37 @@
 From: Shivani Bhardwaj <shivanib134@gmail.com>
-Date: Sun,  8 Nov 2015 22:22:58 +0530
-Subject: [lustre-devel] [PATCH] staging: lustre: mdc_request: Remove
-	mdc_kuc_reregister wrapper
-Message-ID: <1447001578-4161-1-git-send-email-shivanib134@gmail.com>
+Date: Sun,  8 Nov 2015 22:33:46 +0530
+Subject: [lustre-devel] [PATCH] staging: lustre: lproc_mgc: Remove unused
+	function mgc_ir_state_seq_show
+Message-ID: <1447002226-4462-1-git-send-email-shivanib134@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Remove the wrapper function mdc_kuc_reregister() and replace its call
-with the function it wrapped. Also, comment has been added for clarity.
+Remove the function mgc_ir_state_seq_show() as it is not
+referenced/called anywhere.
 
 Signed-off-by: Shivani Bhardwaj <shivanib134@gmail.com>
 ---
- drivers/staging/lustre/lustre/mdc/mdc_request.c | 16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
+ drivers/staging/lustre/lustre/mgc/lproc_mgc.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 294c050..e172be1 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -2037,17 +2037,6 @@ static int mdc_hsm_ct_reregister(__u32 data, void *cb_arg)
- 	return ((rc != 0) && (rc != -EEXIST)) ? rc : 0;
- }
+diff --git a/drivers/staging/lustre/lustre/mgc/lproc_mgc.c b/drivers/staging/lustre/lustre/mgc/lproc_mgc.c
+index 8d5bc5a..ad6a7d9 100644
+--- a/drivers/staging/lustre/lustre/mgc/lproc_mgc.c
++++ b/drivers/staging/lustre/lustre/mgc/lproc_mgc.c
+@@ -48,11 +48,6 @@ LPROC_SEQ_FOPS_RO_TYPE(mgc, state);
  
--/**
-- * Re-establish all kuc contexts with MDT
-- * after MDT shutdown/recovery.
-- */
--static int mdc_kuc_reregister(struct obd_import *imp)
+ LPROC_SEQ_FOPS_WR_ONLY(mgc, ping);
+ 
+-static int mgc_ir_state_seq_show(struct seq_file *m, void *v)
 -{
--	/* re-register HSM agents */
--	return libcfs_kkuc_group_foreach(KUC_GRP_HSM, mdc_hsm_ct_reregister,
--					 (void *)imp);
+-	return lprocfs_mgc_rd_ir_state(m, m->private);
 -}
 -
- static int mdc_set_info_async(const struct lu_env *env,
- 			      struct obd_export *exp,
- 			      u32 keylen, void *key,
-@@ -2210,7 +2199,10 @@ static int mdc_import_event(struct obd_device *obd, struct obd_import *imp,
- 		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_ACTIVE, NULL);
- 		/* redo the kuc registration after reconnecting */
- 		if (rc == 0)
--			rc = mdc_kuc_reregister(imp);
-+			/* re-register HSM agents */
-+			rc = libcfs_kkuc_group_foreach(KUC_GRP_HSM,
-+						       mdc_hsm_ct_reregister,
-+						       (void *)imp);
- 		break;
- 	case IMP_EVENT_OCD:
- 		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_OCD, NULL);
+ LPROC_SEQ_FOPS_RO(mgc_ir_state);
+ 
+ static struct lprocfs_vars lprocfs_mgc_obd_vars[] = {
 -- 
 2.1.0
