@@ -1,77 +1,77 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  8 Nov 2015 14:17:12 -0500
-Subject: [lustre-devel] [PATCH 07/13] staging: lustre: convert kernelcomm
-	group to unsigned int
+Date: Sun,  8 Nov 2015 14:17:14 -0500
+Subject: [lustre-devel] [PATCH 09/13] staging: lustre: cleanup block comment
+	style in kernel_comm code
 In-Reply-To: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
 References: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1447010238-25775-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1447010238-25775-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The group variable was converted to an unsigned int in
-libcfs_kkuc_group_add() to avoid a potential overflow.
-The variable group is used in other kernelcomm functions
-so it makes sense to convert the rest of the group
-variables to unsigned int.
+Fixup the comments to the linux kernel style for the source and
+headers related to the kernel_comm work.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre_kernelcomm.h      |    6 +++---
- .../staging/lustre/lustre/obdclass/kernelcomm.c    |    6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ .../lustre/lustre/include/uapi_kernelcomm.h        |   10 ++++++----
+ .../staging/lustre/lustre/obdclass/kernelcomm.c    |   12 ++++++++----
+ 2 files changed, 14 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h b/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
-index 235b980..14bad00 100644
---- a/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_kernelcomm.h
-@@ -45,11 +45,11 @@ typedef int (*libcfs_kkuc_cb_t)(void *data, void *cb_arg);
+diff --git a/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h b/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
+index 5e0b8de..a8feab6 100644
+--- a/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
++++ b/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
+@@ -45,11 +45,13 @@
+  */
+ struct kuc_hdr {
+ 	__u16 kuc_magic;
+-	__u8  kuc_transport;  /* Each new Lustre feature should use a different
+-				 transport */
++	/* Each new Lustre feature should use a different transport */
++	__u8  kuc_transport;
+ 	__u8  kuc_flags;
+-	__u16 kuc_msgtype;    /* Message type or opcode, transport-specific */
+-	__u16 kuc_msglen;     /* Including header */
++	/* Message type or opcode, transport-specific */
++	__u16 kuc_msgtype;
++	/* Including header */
++	__u16 kuc_msglen;
+ } __aligned(sizeof(__u64));
  
- /* Kernel methods */
- int libcfs_kkuc_msg_put(struct file *fp, void *payload);
--int libcfs_kkuc_group_put(int group, void *payload);
-+int libcfs_kkuc_group_put(unsigned int group, void *payload);
- int libcfs_kkuc_group_add(struct file *fp, int uid, unsigned int group,
- 			  void *data, size_t data_len);
--int libcfs_kkuc_group_rem(int uid, int group);
--int libcfs_kkuc_group_foreach(int group, libcfs_kkuc_cb_t cb_func,
-+int libcfs_kkuc_group_rem(int uid, unsigned int group);
-+int libcfs_kkuc_group_foreach(unsigned int group, libcfs_kkuc_cb_t cb_func,
- 			      void *cb_arg);
- 
- #endif /* __LUSTRE_KERNELCOMM_H__ */
+ #define KUC_CHANGELOG_MSG_MAXSIZE (sizeof(struct kuc_hdr)+CR_MAXSIZE)
 diff --git a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-index e290246..1081253 100644
+index c9405e6..eb5b0be 100644
 --- a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
 +++ b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-@@ -145,7 +145,7 @@ int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
+@@ -89,9 +89,11 @@ int libcfs_kkuc_msg_put(struct file *filp, void *payload)
  }
- EXPORT_SYMBOL(libcfs_kkuc_group_add);
+ EXPORT_SYMBOL(libcfs_kkuc_msg_put);
  
--int libcfs_kkuc_group_rem(int uid, int group)
-+int libcfs_kkuc_group_rem(int uid, unsigned int group)
- {
- 	struct kkuc_reg *reg, *next;
+-/* Broadcast groups are global across all mounted filesystems;
++/*
++ * Broadcast groups are global across all mounted filesystems;
+  * i.e. registering for a group on 1 fs will get messages for that
+- * group from any fs */
++ * group from any fs
++ */
+ /** A single group registration has a uid and a file pointer */
+ struct kkuc_reg {
+ 	struct list_head kr_chain;
+@@ -200,8 +202,10 @@ int libcfs_kkuc_group_put(unsigned int group, void *payload)
+ 	}
+ 	up_write(&kg_sem);
  
-@@ -180,7 +180,7 @@ int libcfs_kkuc_group_rem(int uid, int group)
- }
- EXPORT_SYMBOL(libcfs_kkuc_group_rem);
+-	/* don't return an error if the message has been delivered
+-	 * at least to one agent */
++	/*
++	 * don't return an error if the message has been delivered
++	 * at least to one agent
++	 */
+ 	if (one_success)
+ 		rc = 0;
  
--int libcfs_kkuc_group_put(int group, void *payload)
-+int libcfs_kkuc_group_put(unsigned int group, void *payload)
- {
- 	struct kkuc_reg	*reg;
- 	int		 rc = 0;
-@@ -215,7 +215,7 @@ EXPORT_SYMBOL(libcfs_kkuc_group_put);
-  * @param cb_func the function to be called.
-  * @param cb_arg extra argument to be passed to the callback function.
-  */
--int libcfs_kkuc_group_foreach(int group, libcfs_kkuc_cb_t cb_func,
-+int libcfs_kkuc_group_foreach(unsigned int group, libcfs_kkuc_cb_t cb_func,
- 			      void *cb_arg)
- {
- 	struct kkuc_reg *reg;
 -- 
 1.7.1
