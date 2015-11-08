@@ -1,77 +1,81 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  8 Nov 2015 14:17:14 -0500
-Subject: [lustre-devel] [PATCH 09/13] staging: lustre: cleanup block comment
-	style in kernel_comm code
-In-Reply-To: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
-References: <1447010238-25775-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1447010238-25775-10-git-send-email-jsimmons@infradead.org>
+Date: Sun,  8 Nov 2015 18:09:36 -0500
+Subject: [lustre-devel] [PATCH] staging: lustre: remove unnecessary
+	EXPORT_SYMBOL for lnet layer
+Message-ID: <1447024177-2219-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Fixup the comments to the linux kernel style for the source and
-headers related to the kernel_comm work.
+From: frank zago <fzago@cray.com>
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
+A lot of symbols don't need to be exported at all because they are
+only used in the module they belong to.
+
+Signed-off-by: frank zago <fzago@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5829
+Reviewed-on: http://review.whamcloud.com/13320
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: Isaac Huang <he.huang@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/lustre/include/uapi_kernelcomm.h        |   10 ++++++----
- .../staging/lustre/lustre/obdclass/kernelcomm.c    |   12 ++++++++----
- 2 files changed, 14 insertions(+), 8 deletions(-)
+ drivers/staging/lustre/lnet/lnet/api-ni.c     |    3 ---
+ drivers/staging/lustre/lnet/lnet/lib-move.c   |    1 -
+ drivers/staging/lustre/lnet/selftest/conctl.c |    2 --
+ 3 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h b/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
-index 5e0b8de..a8feab6 100644
---- a/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
-+++ b/drivers/staging/lustre/lustre/include/uapi_kernelcomm.h
-@@ -45,11 +45,13 @@
-  */
- struct kuc_hdr {
- 	__u16 kuc_magic;
--	__u8  kuc_transport;  /* Each new Lustre feature should use a different
--				 transport */
-+	/* Each new Lustre feature should use a different transport */
-+	__u8  kuc_transport;
- 	__u8  kuc_flags;
--	__u16 kuc_msgtype;    /* Message type or opcode, transport-specific */
--	__u16 kuc_msglen;     /* Including header */
-+	/* Message type or opcode, transport-specific */
-+	__u16 kuc_msgtype;
-+	/* Including header */
-+	__u16 kuc_msglen;
- } __aligned(sizeof(__u64));
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index 284150f..9f78dc8 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -354,7 +354,6 @@ lnet_counters_reset(void)
  
- #define KUC_CHANGELOG_MSG_MAXSIZE (sizeof(struct kuc_hdr)+CR_MAXSIZE)
-diff --git a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-index c9405e6..eb5b0be 100644
---- a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-+++ b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-@@ -89,9 +89,11 @@ int libcfs_kkuc_msg_put(struct file *filp, void *payload)
+ 	lnet_net_unlock(LNET_LOCK_EX);
  }
- EXPORT_SYMBOL(libcfs_kkuc_msg_put);
+-EXPORT_SYMBOL(lnet_counters_reset);
  
--/* Broadcast groups are global across all mounted filesystems;
-+/*
-+ * Broadcast groups are global across all mounted filesystems;
-  * i.e. registering for a group on 1 fs will get messages for that
-- * group from any fs */
-+ * group from any fs
-+ */
- /** A single group registration has a uid and a file pointer */
- struct kkuc_reg {
- 	struct list_head kr_chain;
-@@ -200,8 +202,10 @@ int libcfs_kkuc_group_put(unsigned int group, void *payload)
+ static char *
+ lnet_res_type2str(int type)
+@@ -1153,7 +1152,6 @@ lnet_init(void)
+ 	lnet_register_lnd(&the_lolnd);
+ 	return 0;
+ }
+-EXPORT_SYMBOL(lnet_init);
+ 
+ /**
+  * Finalize LNet library.
+@@ -1177,7 +1175,6 @@ lnet_fini(void)
+ 
+ 	the_lnet.ln_init = 0;
+ }
+-EXPORT_SYMBOL(lnet_fini);
+ 
+ /**
+  * Set LNet PID and start LNet interfaces, routing, and forwarding.
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index 5631f60..03a721e 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -1645,7 +1645,6 @@ lnet_msgtyp2str(int type)
+ 		return "<UNKNOWN>";
  	}
- 	up_write(&kg_sem);
+ }
+-EXPORT_SYMBOL(lnet_msgtyp2str);
  
--	/* don't return an error if the message has been delivered
--	 * at least to one agent */
-+	/*
-+	 * don't return an error if the message has been delivered
-+	 * at least to one agent
-+	 */
- 	if (one_success)
- 		rc = 0;
+ void
+ lnet_print_hdr(lnet_hdr_t *hdr)
+diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
+index 556c837..a534665 100644
+--- a/drivers/staging/lustre/lnet/selftest/conctl.c
++++ b/drivers/staging/lustre/lnet/selftest/conctl.c
+@@ -925,5 +925,3 @@ out:
  
+ 	return rc;
+ }
+-
+-EXPORT_SYMBOL(lstcon_ioctl_entry);
 -- 
 1.7.1
