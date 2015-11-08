@@ -1,118 +1,66 @@
-From: Shivani Bhardwaj <shivanib134@gmail.com>
-Date: Sun,  8 Nov 2015 14:47:34 +0530
-Subject: [lustre-devel] [PATCH 2/2] staging: lustre: workitem: Remove
-	cfs_wi_sched_unlock wrapper
-In-Reply-To: <cover.1446974107.git.shivanib134@gmail.com>
-References: <cover.1446974107.git.shivanib134@gmail.com>
-Message-ID: <7039ec871e3d3b34c6f6a958d38e14cb87b87761.1446974107.git.shivanib134@gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sun,  8 Nov 2015 11:34:54 -0500
+Subject: [lustre-devel] [PATCH v2] staging: lustre: remove
+	IOC_LIBCFS_PING_TEST ioctl
+Message-ID: <1447000500-29427-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Remove the wrapper function cfs_wi_sched_unlock() and replace all its
-calls with the function it wrapped.
+The ioctl IOC_LIBCFS_PING_TEST has not been used in
+ages. The recent nidstring changes which moved all
+the nidstring operations from libcfs to the LNet
+layer but this ioctl code was still using an
+nidstring operation that was causing an circular
+dependency loop between libcfs and LNet.
 
-Signed-off-by: Shivani Bhardwaj <shivanib134@gmail.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/libcfs/workitem.c | 26 ++++++++++---------------
- 1 file changed, 10 insertions(+), 16 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_ioctl.h     |    1 -
+ drivers/staging/lustre/lustre/libcfs/module.c      |   17 -----------------
+ 2 files changed, 0 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/libcfs/workitem.c b/drivers/staging/lustre/lustre/libcfs/workitem.c
-index e8bac9b..60bb88a 100644
---- a/drivers/staging/lustre/lustre/libcfs/workitem.c
-+++ b/drivers/staging/lustre/lustre/libcfs/workitem.c
-@@ -86,26 +86,20 @@ static struct cfs_workitem_data {
- 	int			wi_stopping;
- } cfs_wi_data;
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
+index f5d741f..485ab26 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
+@@ -110,7 +110,6 @@ struct libcfs_ioctl_handler {
+ #define IOC_LIBCFS_CLEAR_DEBUG	     _IOWR('e', 31, long)
+ #define IOC_LIBCFS_MARK_DEBUG	      _IOWR('e', 32, long)
+ #define IOC_LIBCFS_MEMHOG		  _IOWR('e', 36, long)
+-#define IOC_LIBCFS_PING_TEST	       _IOWR('e', 37, long)
+ /* lnet ioctls */
+ #define IOC_LIBCFS_GET_NI		  _IOWR('e', 50, long)
+ #define IOC_LIBCFS_FAIL_NID		_IOWR('e', 51, long)
+diff --git a/drivers/staging/lustre/lustre/libcfs/module.c b/drivers/staging/lustre/lustre/libcfs/module.c
+index 570f05c..89038ed 100644
+--- a/drivers/staging/lustre/lustre/libcfs/module.c
++++ b/drivers/staging/lustre/lustre/libcfs/module.c
+@@ -274,23 +274,6 @@ static int libcfs_ioctl_int(struct cfs_psdev_file *pfile, unsigned long cmd,
+ 		}
+ 		break;
  
--static inline void
--cfs_wi_sched_unlock(struct cfs_wi_sched *sched)
--{
--	spin_unlock(&sched->ws_lock);
--}
+-	case IOC_LIBCFS_PING_TEST: {
+-		extern void (kping_client)(struct libcfs_ioctl_data *);
+-		void (*ping)(struct libcfs_ioctl_data *);
 -
- static inline int
- cfs_wi_sched_cansleep(struct cfs_wi_sched *sched)
- {
- 	spin_lock(&sched->ws_lock);
- 	if (sched->ws_stopping) {
--		cfs_wi_sched_unlock(sched);
-+		spin_unlock(&sched->ws_lock);
- 		return 0;
- 	}
+-		CDEBUG(D_IOCTL, "doing %d pings to nid %s (%s)\n",
+-		       data->ioc_count, libcfs_nid2str(data->ioc_nid),
+-		       libcfs_nid2str(data->ioc_nid));
+-		ping = symbol_get(kping_client);
+-		if (!ping)
+-			CERROR("symbol_get failed\n");
+-		else {
+-			ping(data);
+-			symbol_put(kping_client);
+-		}
+-		return 0;
+-	}
+-
+ 	default: {
+ 		struct libcfs_ioctl_handler *hand;
  
- 	if (!list_empty(&sched->ws_runq)) {
--		cfs_wi_sched_unlock(sched);
-+		spin_unlock(&sched->ws_lock);
- 		return 0;
- 	}
--	cfs_wi_sched_unlock(sched);
-+	spin_unlock(&sched->ws_lock);
- 	return 1;
- }
- 
-@@ -133,7 +127,7 @@ cfs_wi_exit(struct cfs_wi_sched *sched, cfs_workitem_t *wi)
- 	LASSERT(list_empty(&wi->wi_list));
- 
- 	wi->wi_scheduled = 1; /* LBUG future schedule attempts */
--	cfs_wi_sched_unlock(sched);
-+	spin_unlock(&sched->ws_lock);
- 
- 	return;
- }
-@@ -171,7 +165,7 @@ cfs_wi_deschedule(struct cfs_wi_sched *sched, cfs_workitem_t *wi)
- 
- 	LASSERT (list_empty(&wi->wi_list));
- 
--	cfs_wi_sched_unlock(sched);
-+	spin_unlock(&sched->ws_lock);
- 	return rc;
- }
- EXPORT_SYMBOL(cfs_wi_deschedule);
-@@ -205,7 +199,7 @@ cfs_wi_schedule(struct cfs_wi_sched *sched, cfs_workitem_t *wi)
- 	}
- 
- 	LASSERT (!list_empty(&wi->wi_list));
--	cfs_wi_sched_unlock(sched);
-+	spin_unlock(&sched->ws_lock);
- 	return;
- }
- EXPORT_SYMBOL(cfs_wi_schedule);
-@@ -252,7 +246,7 @@ cfs_wi_scheduler (void *arg)
- 			wi->wi_running   = 1;
- 			wi->wi_scheduled = 0;
- 
--			cfs_wi_sched_unlock(sched);
-+			spin_unlock(&sched->ws_lock);
- 			nloops++;
- 
- 			rc = (*wi->wi_action) (wi);
-@@ -272,7 +266,7 @@ cfs_wi_scheduler (void *arg)
- 		}
- 
- 		if (!list_empty(&sched->ws_runq)) {
--			cfs_wi_sched_unlock(sched);
-+			spin_unlock(&sched->ws_lock);
- 			/* don't sleep because some workitems still
- 			 * expect me to come back soon */
- 			cond_resched();
-@@ -280,13 +274,13 @@ cfs_wi_scheduler (void *arg)
- 			continue;
- 		}
- 
--		cfs_wi_sched_unlock(sched);
-+		spin_unlock(&sched->ws_lock);
- 		rc = wait_event_interruptible_exclusive(sched->ws_waitq,
- 						!cfs_wi_sched_cansleep(sched));
- 		spin_lock(&sched->ws_lock);
- 	}
- 
--	cfs_wi_sched_unlock(sched);
-+	spin_unlock(&sched->ws_lock);
- 
- 	spin_lock(&cfs_wi_data.wi_glock);
- 	sched->ws_nthreads--;
 -- 
-2.1.0
+1.7.1
