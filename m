@@ -1,52 +1,74 @@
-From: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
-Date: Mon, 9 Nov 2015 16:49:39 +0530
-Subject: [lustre-devel] [PATCH] staging: lustre: Handle nodemask on UMP
-	machines
-In-Reply-To: <1447000500-29427-2-git-send-email-jsimmons@infradead.org>
-References: <1447000500-29427-1-git-send-email-jsimmons@infradead.org>
-	<1447000500-29427-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <20151109111939.GB3868@sudip-pc>
+From: Shivani Bhardwaj <shivanib134@gmail.com>
+Date: Tue, 10 Nov 2015 00:24:17 +0530
+Subject: [lustre-devel] [PATCH] staging: lustre: acl: Remove
+	lustre_posix_acl_xattr_free wrapper
+Message-ID: <1447095257-21165-1-git-send-email-shivanib134@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sun, Nov 08, 2015 at 11:34:55AM -0500, James Simmons wrote:
-> For UMP and SMP machines the struct cfs_cpt_table are
-> defined differently. In the case handled by this patch
-> nodemask is defined as a integer for the UMP case and
-> as a pointer for the SMP case. This will cause a problem
-> for ost_setup which reads the nodemask directly. Instead
-> we create a UMP version of cfs_cpt_nodemask and use that
-> in ost_setup.
-> 
-> Signed-off-by: James Simmons <uja.ornl@gmail.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4199
-> Reviewed-on: http://review.whamcloud.com/9219
-> Reviewed-by: Liang Zhen <liang.zhen@intel.com>
-> Reviewed-by: Li Xi <pkuelelixi@gmail.com>
-> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Remove the wrapper function lustre_posix_acl_xattr_free() and replace its
+call in the file xattr with the function kfree() that it wrapped. Also,
+its prototype from the header lustre_eacl is removed as it is no longer
+of any use.
 
-Signed-off-by: and Reviewed-by: tags entered two times. Once here.
-> 
-> Starting in 3.14 kernels nodemask_t was changed from a
-> a unsigned long to a linux bitmap so more than 32 cores
-> could be supported. Using set_bit in cfs_cpt_table_alloc
-> no longer compiles so this patch backports bits of the
-> node management function that use a linux bitmap back
-> end. Cleaned up libcfs bitmap.h to use the libcfs layers
-> memory allocation function. This was pulling in lustre
-> related code that was not defined.
-> 
-> Signed-off-by: James Simmons <uja.ornl@gmail.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4993
-> Reviewed-on: http://review.whamcloud.com/10332
-> Reviewed-by: Liang Zhen <liang.zhen@intel.com>
-> Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: Shivani Bhardwaj <shivanib134@gmail.com>
+---
+ drivers/staging/lustre/lustre/include/lustre_eacl.h | 2 --
+ drivers/staging/lustre/lustre/llite/xattr.c         | 5 ++++-
+ drivers/staging/lustre/lustre/obdclass/acl.c        | 9 ---------
+ 3 files changed, 4 insertions(+), 12 deletions(-)
 
-And then again here.
-
-regards
-sudip
+diff --git a/drivers/staging/lustre/lustre/include/lustre_eacl.h b/drivers/staging/lustre/lustre/include/lustre_eacl.h
+index fee4d2c..0b66593 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_eacl.h
++++ b/drivers/staging/lustre/lustre/include/lustre_eacl.h
+@@ -76,8 +76,6 @@ extern int
+ lustre_posix_acl_xattr_filter(posix_acl_xattr_header *header, size_t size,
+ 			      posix_acl_xattr_header **out);
+ extern void
+-lustre_posix_acl_xattr_free(posix_acl_xattr_header *header, int size);
+-extern void
+ lustre_ext_acl_xattr_free(ext_acl_xattr_header *header);
+ extern ext_acl_xattr_header *
+ lustre_acl_xattr_merge2ext(posix_acl_xattr_header *posix_header, int size,
+diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
+index 4b7eb33..f9b1dee 100644
+--- a/drivers/staging/lustre/lustre/llite/xattr.c
++++ b/drivers/staging/lustre/lustre/llite/xattr.c
+@@ -193,7 +193,10 @@ int ll_setxattr_common(struct inode *inode, const char *name,
+ 			 ll_i2suppgid(inode), &req);
+ #ifdef CONFIG_FS_POSIX_ACL
+ 	if (new_value != NULL)
+-		lustre_posix_acl_xattr_free(new_value, size);
++		/*
++		 * Release the posix ACL space.
++		 */
++		kfree(new_value);
+ 	if (acl != NULL)
+ 		lustre_ext_acl_xattr_free(acl);
+ #endif
+diff --git a/drivers/staging/lustre/lustre/obdclass/acl.c b/drivers/staging/lustre/lustre/obdclass/acl.c
+index 2e20cf6..49ba885 100644
+--- a/drivers/staging/lustre/lustre/obdclass/acl.c
++++ b/drivers/staging/lustre/lustre/obdclass/acl.c
+@@ -236,15 +236,6 @@ _out:
+ EXPORT_SYMBOL(lustre_posix_acl_xattr_filter);
+ 
+ /*
+- * Release the posix ACL space.
+- */
+-void lustre_posix_acl_xattr_free(posix_acl_xattr_header *header, int size)
+-{
+-	kfree(header);
+-}
+-EXPORT_SYMBOL(lustre_posix_acl_xattr_free);
+-
+-/*
+  * Release the extended ACL space.
+  */
+ void lustre_ext_acl_xattr_free(ext_acl_xattr_header *header)
+-- 
+2.1.0
