@@ -1,74 +1,71 @@
-From: Shivani Bhardwaj <shivanib134@gmail.com>
-Date: Tue, 10 Nov 2015 00:24:17 +0530
-Subject: [lustre-devel] [PATCH] staging: lustre: acl: Remove
-	lustre_posix_acl_xattr_free wrapper
-Message-ID: <1447095257-21165-1-git-send-email-shivanib134@gmail.com>
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Mon, 9 Nov 2015 19:11:15 +0000
+Subject: [lustre-devel] [PATCH] Staging: lustre: obd_cksum.h: Remove
+ unused	cksum_types_supported_server
+In-Reply-To: <1446875199-15537-1-git-send-email-shraddha.6596@gmail.com>
+References: <1446875199-15537-1-git-send-email-shraddha.6596@gmail.com>
+Message-ID: <8f8563f394e44c77bc531839d801ff16@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Remove the wrapper function lustre_posix_acl_xattr_free() and replace its
-call in the file xattr with the function kfree() that it wrapped. Also,
-its prototype from the header lustre_eacl is removed as it is no longer
-of any use.
+>From: lustre-devel [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Shraddha Barke
+>Sent: Saturday, November 07, 2015 12:47 AM
+>To: Greg Kroah-Hartman; lustre-devel at lists.lustre.org
+>Subject: [lustre-devel] [PATCH] Staging: lustre: obd_cksum.h: Remove unused cksum_types_supported_server
+>
+>cksum_types_supported_server is defined in header file but not used
+>anywhere. Hence remove it.
+>
+>Signed-off-by: Shraddha Barke <shraddha.6596@gmail.com>
+>---
+> drivers/staging/lustre/lustre/include/obd_cksum.h | 23 -----------------------
+> 1 file changed, 23 deletions(-)
 
-Signed-off-by: Shivani Bhardwaj <shivanib134@gmail.com>
----
- drivers/staging/lustre/lustre/include/lustre_eacl.h | 2 --
- drivers/staging/lustre/lustre/llite/xattr.c         | 5 ++++-
- drivers/staging/lustre/lustre/obdclass/acl.c        | 9 ---------
- 3 files changed, 4 insertions(+), 12 deletions(-)
+Server side left that is safe to remove.
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_eacl.h b/drivers/staging/lustre/lustre/include/lustre_eacl.h
-index fee4d2c..0b66593 100644
---- a/drivers/staging/lustre/lustre/include/lustre_eacl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_eacl.h
-@@ -76,8 +76,6 @@ extern int
- lustre_posix_acl_xattr_filter(posix_acl_xattr_header *header, size_t size,
- 			      posix_acl_xattr_header **out);
- extern void
--lustre_posix_acl_xattr_free(posix_acl_xattr_header *header, int size);
--extern void
- lustre_ext_acl_xattr_free(ext_acl_xattr_header *header);
- extern ext_acl_xattr_header *
- lustre_acl_xattr_merge2ext(posix_acl_xattr_header *posix_header, int size,
-diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 4b7eb33..f9b1dee 100644
---- a/drivers/staging/lustre/lustre/llite/xattr.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -193,7 +193,10 @@ int ll_setxattr_common(struct inode *inode, const char *name,
- 			 ll_i2suppgid(inode), &req);
- #ifdef CONFIG_FS_POSIX_ACL
- 	if (new_value != NULL)
--		lustre_posix_acl_xattr_free(new_value, size);
-+		/*
-+		 * Release the posix ACL space.
-+		 */
-+		kfree(new_value);
- 	if (acl != NULL)
- 		lustre_ext_acl_xattr_free(acl);
- #endif
-diff --git a/drivers/staging/lustre/lustre/obdclass/acl.c b/drivers/staging/lustre/lustre/obdclass/acl.c
-index 2e20cf6..49ba885 100644
---- a/drivers/staging/lustre/lustre/obdclass/acl.c
-+++ b/drivers/staging/lustre/lustre/obdclass/acl.c
-@@ -236,15 +236,6 @@ _out:
- EXPORT_SYMBOL(lustre_posix_acl_xattr_filter);
+Acked-by: James Simmons <jsimmons@infradead.org>
+
+diff --git a/drivers/staging/lustre/lustre/include/obd_cksum.h b/drivers/staging/lustre/lustre/include/obd_cksum.h
+index a0099d7..01db604 100644
+--- a/drivers/staging/lustre/lustre/include/obd_cksum.h
++++ b/drivers/staging/lustre/lustre/include/obd_cksum.h
+@@ -133,29 +133,6 @@ static inline cksum_type_t cksum_types_supported_client(void)
+ 	return ret;
+ }
  
- /*
-- * Release the posix ACL space.
-- */
--void lustre_posix_acl_xattr_free(posix_acl_xattr_header *header, int size)
+-/* Server uses algos that perform at 50% or better of the Adler */
+-static inline cksum_type_t cksum_types_supported_server(void)
 -{
--	kfree(header);
--}
--EXPORT_SYMBOL(lustre_posix_acl_xattr_free);
+-	int	     base_speed;
+-	cksum_type_t    ret = OBD_CKSUM_ADLER;
 -
--/*
-  * Release the extended ACL space.
-  */
- void lustre_ext_acl_xattr_free(ext_acl_xattr_header *header)
+-	CDEBUG(D_INFO, "Crypto hash speed: crc %d, crc32c %d, adler %d\n",
+-	       cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_CRC32)),
+-	       cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_CRC32C)),
+-	       cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_ADLER)));
+-
+-	base_speed = cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_ADLER)) / 2;
+-
+-	if (cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_CRC32C)) >=
+-	    base_speed)
+-		ret |= OBD_CKSUM_CRC32C;
+-	if (cfs_crypto_hash_speed(cksum_obd2cfs(OBD_CKSUM_CRC32)) >=
+-	    base_speed)
+-		ret |= OBD_CKSUM_CRC32;
+-
+-	return ret;
+-}
+-
+ /* Select the best checksum algorithm among those supplied in the cksum_types
+  * input.
+  *
 -- 
-2.1.0
+2.1.4
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
