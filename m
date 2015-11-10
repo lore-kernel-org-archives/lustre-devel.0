@@ -1,10 +1,10 @@
 From: Shivani Bhardwaj <shivanib134@gmail.com>
-Date: Tue, 10 Nov 2015 10:22:19 +0530
-Subject: [lustre-devel] [PATCH v2 2/8] Staging: lustre: file: Replace
-	function calls with standard function
+Date: Tue, 10 Nov 2015 10:25:40 +0530
+Subject: [lustre-devel] [PATCH v2 3/8] Staging: lustre: namei: Replace calls
+	with kfree
 In-Reply-To: <cover.1447129813.git.shivanib134@gmail.com>
 References: <cover.1447129813.git.shivanib134@gmail.com>
-Message-ID: <ae41e6d049a9e5af7aafad3a3ac275064858f965.1447129813.git.shivanib134@gmail.com>
+Message-ID: <21f6b3b5ee44344e4405c5d3b26d13180e545dd4.1447129813.git.shivanib134@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -19,120 +19,66 @@ Signed-off-by: Shivani Bhardwaj <shivanib134@gmail.com>
 Changes in v2:
         Fix commit message and merge a patch
 
- drivers/staging/lustre/lustre/llite/file.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ drivers/staging/lustre/lustre/llite/namei.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 02f2759..186b5af 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -202,7 +202,7 @@ static int ll_close_inode_openhandle(struct obd_export *md_exp,
- 			rc = -EBUSY;
- 	}
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index 2ca2200..f058ebe2 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -531,7 +531,7 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
  
--	ll_finish_md_op_data(op_data);
-+	kfree(op_data);
- 
- out:
- 	if (exp_connect_som(exp) && !epoch_close &&
-@@ -420,7 +420,7 @@ static int ll_intent_file_open(struct dentry *dentry, void *lmm,
- 	itp->it_flags |= MDS_OPEN_BY_FID;
- 	rc = md_intent_lock(sbi->ll_md_exp, op_data, lmm, lmmsize, itp,
- 			    0 /*unused */, &req, ll_md_blocking_ast, 0);
--	ll_finish_md_op_data(op_data);
-+	kfree(op_data);
- 	if (rc == -ESTALE) {
- 		/* reason for keep own exit path - don`t flood log
- 		* with messages with -ESTALE errors.
-@@ -819,7 +819,7 @@ ll_lease_open(struct inode *inode, struct file *file, fmode_t fmode,
- 	 * open in ll_md_blocking_ast(). Otherwise as ll_md_blocking_lease_ast
- 	 * doesn't deal with openhandle, so normal openhandle will be leaked. */
- 				LDLM_FL_NO_LRU | LDLM_FL_EXCL);
--	ll_finish_md_op_data(op_data);
-+	kfree(op_data);
- 	ptlrpc_req_finished(req);
- 	if (rc < 0)
- 		goto out_release_it;
-@@ -1393,7 +1393,7 @@ int ll_lov_getstripe_ea_info(struct inode *inode, const char *filename,
- 
- 	op_data->op_valid = OBD_MD_FLEASIZE | OBD_MD_FLDIREA;
- 	rc = md_getattr_name(sbi->ll_md_exp, op_data, &req);
+ 	rc = md_intent_lock(ll_i2mdexp(parent), op_data, NULL, 0, it,
+ 			    lookup_flags, &req, ll_md_blocking_ast, 0);
 -	ll_finish_md_op_data(op_data);
 +	kfree(op_data);
  	if (rc < 0) {
- 		CDEBUG(D_INFO, "md_getattr_name failed on %s: rc %d\n",
- 		       filename, rc);
-@@ -2056,7 +2056,7 @@ static int ll_swap_layouts(struct file *file1, struct file *file2,
- 
- 	rc = obd_iocontrol(LL_IOC_LOV_SWAP_LAYOUTS, ll_i2mdexp(llss->inode1),
- 			   sizeof(*op_data), op_data, NULL);
+ 		retval = ERR_PTR(rc);
+ 		goto out;
+@@ -786,7 +786,7 @@ static int ll_new_node(struct inode *dir, struct dentry *dentry,
+ 			from_kuid(&init_user_ns, current_fsuid()),
+ 			from_kgid(&init_user_ns, current_fsgid()),
+ 			cfs_curproc_cap_pack(), rdev, &request);
 -	ll_finish_md_op_data(op_data);
 +	kfree(op_data);
+ 	if (err)
+ 		goto err_exit;
  
- putgl:
- 	if (gid != 0) {
-@@ -2131,7 +2131,7 @@ static int ll_hsm_state_set(struct inode *inode, struct hsm_state_set *hss)
- 	rc = obd_iocontrol(LL_IOC_HSM_STATE_SET, ll_i2mdexp(inode),
- 			   sizeof(*op_data), op_data, NULL);
- 
+@@ -961,7 +961,7 @@ static int ll_unlink(struct inode *dir, struct dentry *dentry)
+ 	ll_get_child_fid(dentry, &op_data->op_fid3);
+ 	op_data->op_fid2 = op_data->op_fid3;
+ 	rc = md_unlink(ll_i2sbi(dir)->ll_md_exp, op_data, &request);
 -	ll_finish_md_op_data(op_data);
 +	kfree(op_data);
+ 	if (rc)
+ 		goto out;
  
- 	return rc;
- }
-@@ -2350,7 +2350,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 		if (copy_to_user((void *)arg, hus, sizeof(*hus)))
- 			rc = -EFAULT;
- 
--		ll_finish_md_op_data(op_data);
-+		kfree(op_data);
- 		kfree(hus);
- 		return rc;
- 	}
-@@ -2389,7 +2389,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 		if (copy_to_user((char *)arg, hca, sizeof(*hca)))
- 			rc = -EFAULT;
- 
--		ll_finish_md_op_data(op_data);
-+		kfree(op_data);
- 		kfree(hca);
- 		return rc;
- 	}
-@@ -2761,7 +2761,7 @@ ll_file_flock(struct file *file, int cmd, struct file_lock *file_lock)
- 		rc = rc2;
- 	}
- 
+@@ -1011,7 +1011,7 @@ static int ll_rmdir(struct inode *dir, struct dentry *dentry)
+ 	ll_get_child_fid(dentry, &op_data->op_fid3);
+ 	op_data->op_fid2 = op_data->op_fid3;
+ 	rc = md_unlink(ll_i2sbi(dir)->ll_md_exp, op_data, &request);
 -	ll_finish_md_op_data(op_data);
 +	kfree(op_data);
+ 	if (rc == 0) {
+ 		ll_update_times(request, dir);
+ 		ll_stats_ops_tally(ll_i2sbi(dir), LPROC_LL_RMDIR, 1);
+@@ -1060,7 +1060,7 @@ static int ll_link(struct dentry *old_dentry, struct inode *dir,
+ 		return PTR_ERR(op_data);
  
- 	return rc;
- }
-@@ -2896,7 +2896,7 @@ static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
- 				       based lookup */
- 				    &oit, 0, &req,
- 				    ll_md_blocking_ast, 0);
--		ll_finish_md_op_data(op_data);
-+		kfree(op_data);
- 		oit.it_create_mode &= ~M_CHECK_STALE;
- 		if (rc < 0) {
- 			rc = ll_inode_revalidate_fini(inode, rc);
-@@ -2938,7 +2938,7 @@ static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
- 
- 		op_data->op_valid = valid;
- 		rc = md_getattr(sbi->ll_md_exp, op_data, &req);
--		ll_finish_md_op_data(op_data);
-+		kfree(op_data);
- 		if (rc) {
- 			rc = ll_inode_revalidate_fini(inode, rc);
- 			return rc;
-@@ -3533,7 +3533,7 @@ again:
- 		ptlrpc_req_finished(it.d.lustre.it_data);
- 	it.d.lustre.it_data = NULL;
- 
+ 	err = md_link(sbi->ll_md_exp, op_data, &request);
 -	ll_finish_md_op_data(op_data);
 +	kfree(op_data);
+ 	if (err)
+ 		goto out;
  
- 	mode = it.d.lustre.it_lock_mode;
- 	it.d.lustre.it_lock_mode = 0;
+@@ -1096,7 +1096,7 @@ static int ll_rename(struct inode *old_dir, struct dentry *old_dentry,
+ 			old_dentry->d_name.len,
+ 			new_dentry->d_name.name,
+ 			new_dentry->d_name.len, &request);
+-	ll_finish_md_op_data(op_data);
++	kfree(op_data);
+ 	if (!err) {
+ 		ll_update_times(request, old_dir);
+ 		ll_update_times(request, new_dir);
 -- 
 2.1.0
