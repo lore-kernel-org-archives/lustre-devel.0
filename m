@@ -1,35 +1,33 @@
 From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Tue, 10 Nov 2015 00:46:56 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: Handle nodemask on
-	UMP	machines
-In-Reply-To: <20151109111939.GB3868@sudip-pc>
-References: <1447000500-29427-1-git-send-email-jsimmons@infradead.org>
-	<1447000500-29427-2-git-send-email-jsimmons@infradead.org>
-	<20151109111939.GB3868@sudip-pc>
-Message-ID: <9bac5dac537b42d89c5bd7e88ed31f80@EXCHCS32.ornl.gov>
+Date: Tue, 10 Nov 2015 00:50:04 +0000
+Subject: [lustre-devel] AnonHugePages Virtual Memory Commit bug
+In-Reply-To: <CAD-PXqLoZ1Lsn07N6Q548s8hVQX5f7o=EnBa=LcB1Seb7Km_Zg@mail.gmail.com>
+References: <CAD-PXqLoZ1Lsn07N6Q548s8hVQX5f7o=EnBa=LcB1Seb7Km_Zg@mail.gmail.com>
+Message-ID: <f07110b6881d4c7a8d3e861b6b41fbcb@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->On Sun, Nov 08, 2015 at 11:34:55AM -0500, James Simmons wrote:
->> For UMP and SMP machines the struct cfs_cpt_table are
->> defined differently. In the case handled by this patch
->> nodemask is defined as a integer for the UMP case and
->> as a pointer for the SMP case. This will cause a problem
->> for ost_setup which reads the nodemask directly. Instead
->> we create a UMP version of cfs_cpt_nodemask and use that
->> in ost_setup.
->> 
->> Signed-off-by: James Simmons <uja.ornl@gmail.com>
->> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4199
->> Reviewed-on: http://review.whamcloud.com/9219
->> Reviewed-by: Liang Zhen <liang.zhen@intel.com>
->> Reviewed-by: Li Xi <pkuelelixi@gmail.com>
->> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+>Dear All,
 >
->Signed-off-by: and Reviewed-by: tags entered two times. Once here.
- 
-It is one of those rare situations where two patches are need together.
-It would be nice to be able to preserve the reviewers for each one.
+>Sorry to intervene and being rude and send this message directly to you folks. I have made several attempts to reach to linux-kernel at vger.kernel.org<mailto:linux-kernel@vger.kernel.org> and my attempts have failed miserably and I have not be able make any >progress on this issue I have had for months now.
+>
+>With all humbleness I request your help so that I can get assistance with this issue of mine. Please guide me. I get hundreds-thousands of emails from vger.kernel.org<http://vger.kernel.org>, not a problem, but I cannot post my >question to the email above. Any help will be like God's grace for me now.
+>
+>My ISSUE:
+>
+>
+>I feel this is a bug. I am at kernel: 2.6.32-431.17.1.el6.x86_64
+>
+>I have run into this many a times and only reboot has been the fix.
+>
+>Issue is on every idle(not running any user processes) machine(diskless node, & no swap) I see AnonHugePages limits the amount of memory that can be allocated to any new process/program on that that system.
+>
+>When ever I see this happen, atop always show vmcom > vmlim, i a situation where there is no swap disk I am thinking this is causing the system to lock up that memory from use by any other process on that system.
+
+Since you are new from my reading it looks like you are using the OpenSFS branch of Lustre. In that case please don?t  post to the staging driver mailing list or the kernel mailing list. Which version are you using for your clients and servers and what distro?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20151110/bacce5ae/attachment.htm>
