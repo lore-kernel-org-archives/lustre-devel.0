@@ -1,45 +1,54 @@
-From: Shraddha Barke <shraddha.6596@gmail.com>
-Date: Tue, 10 Nov 2015 19:03:41 +0530 (IST)
-Subject: [lustre-devel] [PATCH] Staging: lustre: lustre_mds: Remove
- unused md_should_create
-In-Reply-To: <3ded8eac5c2d43cba0306ac4b052c9e3@EXCHCS32.ornl.gov>
-References: <1446889464-21260-1-git-send-email-shraddha.6596@gmail.com>
-	<3ded8eac5c2d43cba0306ac4b052c9e3@EXCHCS32.ornl.gov>
-Message-ID: <alpine.DEB.2.11.1511101902460.4953@shraddha-370R4E-370R4V-370R5E-3570RE-370R5V>
+From: Shivani Bhardwaj <shivanib134@gmail.com>
+Date: Wed, 11 Nov 2015 14:29:07 +0530
+Subject: [lustre-devel] [PATCH] staging: lustre: cl_io: Remove
+	cl_lock_descr_fid wrapper
+Message-ID: <1447232347-35621-1-git-send-email-shivanib134@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Remove unnecessary wrapper function cl_lock_descr_fid() and replace all
+its calls with the function it wrapped.
 
+Signed-off-by: Shivani Bhardwaj <shivanib134@gmail.com>
+---
+ drivers/staging/lustre/lustre/obdclass/cl_io.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-On Tue, 10 Nov 2015, Simmons, James A. wrote:
-
->> From: lustre-devel [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Shraddha Barke
->> Sent: Saturday, November 07, 2015 4:44 AM
->> To: Greg Kroah-Hartman; lustre-devel at lists.lustre.org
->> Subject: [lustre-devel] [PATCH] Staging: lustre: lustre_mds: Remove unused md_should_create
->>
->> md_should_create has been defined in header file but not used.
->> Thus remove it.
->>
->> Signed-off-by: Shraddha Barke <shraddha.6596@gmail.com>
->> ---
->> drivers/staging/lustre/lustre/include/lustre_mds.h | 6 ------>
-> >1 file changed, 6 deletions(-)
->
-> Lustre_mds.h is one of those dysfunctional headers used by client and server code. With the porting
-> of some patches and a little rearranging this file could go away.  I'm working out a plan for the pushing
-> of the patches and should have it ready in a few days. Basically a lot of work went into cleaning up
-> the CLIO client code since the performance was really bad from all the abstraction. You can read
-> about it at https://jira.hpdd.intel.com/browse/LU-5880. That work needs very badly merged to  the
-> upstream client.
-
-Yes, I'll work on this and send patches.
-
-Kind Regards,
-
-Shraddha
->
->
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index e67cea7..37c449b 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -236,16 +236,11 @@ int cl_io_rw_init(const struct lu_env *env, struct cl_io *io,
+ }
+ EXPORT_SYMBOL(cl_io_rw_init);
+ 
+-static inline const struct lu_fid *
+-cl_lock_descr_fid(const struct cl_lock_descr *descr)
+-{
+-	return lu_object_fid(&descr->cld_obj->co_lu);
+-}
+-
+ static int cl_lock_descr_sort(const struct cl_lock_descr *d0,
+ 			      const struct cl_lock_descr *d1)
+ {
+-	return lu_fid_cmp(cl_lock_descr_fid(d0), cl_lock_descr_fid(d1)) ?:
++	return lu_fid_cmp(lu_object_fid(&d0->cld_obj->co_lu),
++			  lu_object_fid(&d1->cld_obj->co_lu)) ?:
+ 		__diff_normalize(d0->cld_start, d1->cld_start);
+ }
+ 
+@@ -254,7 +249,8 @@ static int cl_lock_descr_cmp(const struct cl_lock_descr *d0,
+ {
+ 	int ret;
+ 
+-	ret = lu_fid_cmp(cl_lock_descr_fid(d0), cl_lock_descr_fid(d1));
++	ret = lu_fid_cmp(lu_object_fid(&d0->cld_obj->co_lu),
++			 lu_object_fid(&d1->cld_obj->co_lu));
+ 	if (ret)
+ 		return ret;
+ 	if (d0->cld_end < d1->cld_start)
+-- 
+2.1.0
