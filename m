@@ -1,57 +1,71 @@
-From: Shivani Bhardwaj <shivanib134@gmail.com>
-Date: Fri, 13 Nov 2015 18:36:22 +0530
-Subject: [lustre-devel] [PATCH] staging: lustre: cl_lock: Remove
-	cl_lock_lockdep_init wrapper
-In-Reply-To: <20151113130331.GB18741@sudip-pc>
-References: <1447237306-46901-1-git-send-email-shivanib134@gmail.com>
-	<201511111859.mIw4mICa%fengguang.wu@intel.com>
-	<CAKHNQQHLwsfv6OKOci4g4405_vcFgy7GNcUAWX0aDAS+GFU6gw@mail.gmail.com>
-	<20151111173100.GA20846@kroah.com>
-	<CAKHNQQEW9ZcYrdowy5cFkJXqzEyoy+CseJg_3ge0QCC7=5oA3A@mail.gmail.com>
-	<20151113130331.GB18741@sudip-pc>
-Message-ID: <CAKHNQQHdTHff9J+dQkAZMhTTFHcoZ1QV-moDx4AdXSdO0CWe_A@mail.gmail.com>
+From: Julia Lawall <Julia.Lawall@lip6.fr>
+Date: Sat, 14 Nov 2015 13:30:34 +0100
+Subject: [lustre-devel] [PATCH] lustre: constify inode_operations structures
+Message-ID: <1447504234-25165-1-git-send-email-Julia.Lawall@lip6.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Nov 13, 2015 at 6:33 PM, Sudip Mukherjee
-<sudipm.mukherjee@gmail.com> wrote:
->
-> On Wed, Nov 11, 2015 at 11:03:34PM +0530, Shivani Bhardwaj wrote:
-> > On Wed, Nov 11, 2015 at 11:01 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > > On Wed, Nov 11, 2015 at 10:51:36PM +0530, Shivani Bhardwaj wrote:
-> > >> On Wed, Nov 11, 2015 at 4:24 PM, kbuild test robot <lkp@intel.com> wrote:
-> <snip>
-> > >>
-> > >> I'm not getting any of these errors at compilation. I've checked
-> > >> thrice. Could you please tell what am I doing wrong so that I can
-> > >> avoid introducing errors in future patches?
-> > >
-> > > Use the .config provided, odds are you have lockdep enabled.
-> >
-> > Thanks Greg.
-> > I tried that. Still no errors. Any other suggestion?
->
-> while removing the wrapper you missed that cl_lock_lockdep_init() is:
->
-> static void cl_lock_lockdep_init(struct cl_lock *lock)
-> {
->                 lockdep_set_class_and_name(lock, &cl_lock_key, "EXT");
-> }
->
-> if CONFIG_LOCKDEP is defined.
-> and if CONFIG_LOCKDEP is not defined then:
->
-> static void cl_lock_lockdep_init(struct cl_lock *lock)
-> {}
->
-> your patch is using lockdep_set_class_and_name() in both cases.
->
+The inode_operations structures are never modified, so declare them
+as const, like all the other inode_operations structures.
 
-Yes! This is the problem.
-Thank you Sudip.
+Done with the help of Coccinelle.
 
-> regards
-> sudip
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/staging/lustre/lustre/llite/file.c           |    2 +-
+ drivers/staging/lustre/lustre/llite/llite_internal.h |    4 ++--
+ drivers/staging/lustre/lustre/llite/symlink.c        |    2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 02f2759..31cd6b3 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -3139,7 +3139,7 @@ struct file_operations ll_file_operations_noflock = {
+ 	.lock	   = ll_file_noflock
+ };
+ 
+-struct inode_operations ll_file_inode_operations = {
++const struct inode_operations ll_file_inode_operations = {
+ 	.setattr	= ll_setattr,
+ 	.getattr	= ll_getattr,
+ 	.permission	= ll_inode_permission,
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 9096d31..6102b29 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -705,7 +705,7 @@ extern const struct address_space_operations ll_aops;
+ extern struct file_operations ll_file_operations;
+ extern struct file_operations ll_file_operations_flock;
+ extern struct file_operations ll_file_operations_noflock;
+-extern struct inode_operations ll_file_inode_operations;
++extern const struct inode_operations ll_file_inode_operations;
+ int ll_have_md_lock(struct inode *inode, __u64 *bits,
+ 		    ldlm_mode_t l_req_mode);
+ ldlm_mode_t ll_take_md_lock(struct inode *inode, __u64 bits,
+@@ -805,7 +805,7 @@ struct inode *search_inode_for_lustre(struct super_block *sb,
+ 				      const struct lu_fid *fid);
+ 
+ /* llite/symlink.c */
+-extern struct inode_operations ll_fast_symlink_inode_operations;
++extern const struct inode_operations ll_fast_symlink_inode_operations;
+ 
+ /* llite/llite_close.c */
+ struct ll_close_queue {
+diff --git a/drivers/staging/lustre/lustre/llite/symlink.c b/drivers/staging/lustre/lustre/llite/symlink.c
+index 69b2036..32c4cf4 100644
+--- a/drivers/staging/lustre/lustre/llite/symlink.c
++++ b/drivers/staging/lustre/lustre/llite/symlink.c
+@@ -146,7 +146,7 @@ static void ll_put_link(struct inode *unused, void *cookie)
+ 	ptlrpc_req_finished(cookie);
+ }
+ 
+-struct inode_operations ll_fast_symlink_inode_operations = {
++const struct inode_operations ll_fast_symlink_inode_operations = {
+ 	.readlink	= generic_readlink,
+ 	.setattr	= ll_setattr,
+ 	.follow_link	= ll_follow_link,
