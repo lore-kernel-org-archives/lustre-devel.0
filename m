@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 20 Nov 2015 18:36:05 -0500
-Subject: [lustre-devel] [PATCH 29/40] staging: lustre: handle
-	lnet_check_routes() errors
+Date: Fri, 20 Nov 2015 18:36:06 -0500
+Subject: [lustre-devel] [PATCH 30/40] staging: lustre: improvement to router
+	checker
 In-Reply-To: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1448062576-23757-30-git-send-email-jsimmons@infradead.org>
+Message-ID: <1448062576-23757-31-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,41 +13,152 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-After adding a route, lnet_check_routes() is called to ensure that
-the route added doesn't invalidate the routing configuration.  If
-lnet_check_routes() fails then the route just added, which caused the
-current configuration to be invalidated is deleted, and an error
-is returned to the user.
+This patch starts router checker thread all the time.
+
+The router checker only checks routes by ping if
+live_router_check_interval or dead_router_check_interval are set
+to something other than 0, and there are routes configured.
+
+If these conditions are not met the router checker sleeps until woken
+up when a route is added.  It is also woken up whenever the RC is
+being stopped to ensure the thread doesn't hang.
+
+In the future when DLC starts configuring the live and dead
+router_check_interval parameters, then by manipulating them
+the router checker can be turned on and off by the user.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6218
-Reviewed-on: http://review.whamcloud.com/13445
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6003
+Reviewed-on: http://review.whamcloud.com/13035
 Reviewed-by: Liang Zhen <liang.zhen@intel.com>
 Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- drivers/staging/lustre/lnet/lnet/api-ni.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-types.h  |    7 +++
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |    1 +
+ drivers/staging/lustre/lnet/lnet/router.c          |   51 +++++++++++++++++---
+ 3 files changed, 52 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+index 3282782..574de55 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+@@ -619,6 +619,13 @@ typedef struct {
+ 	 */
+ 	bool				  ln_nis_from_mod_params;
+ 
++	/*
++	 * waitq for router checker.  As long as there are no routes in
++	 * the list, the router checker will sleep on this queue.  when
++	 * routes are added the thread will wake up
++	 */
++	wait_queue_head_t		  ln_rc_waitq;
++
+ } lnet_t;
+ 
+ #endif
 diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index ed167c8..b119c6c 100644
+index b119c6c..09656a1 100644
 --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
 +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1910,8 +1910,14 @@ LNetCtl(unsigned int cmd, void *arg)
- 				    config->cfg_nid,
- 				    config->cfg_config_u.cfg_route.
- 					rtr_priority);
-+		if (rc == 0) {
-+			rc = lnet_check_routes();
-+			if (rc != 0)
-+				lnet_del_route(config->cfg_net,
-+					       config->cfg_nid);
-+		}
- 		mutex_unlock(&the_lnet.ln_api_mutex);
--		return (rc != 0) ? rc : lnet_check_routes();
-+		return rc;
+@@ -99,6 +99,7 @@ lnet_init_locks(void)
+ {
+ 	spin_lock_init(&the_lnet.ln_eq_wait_lock);
+ 	init_waitqueue_head(&the_lnet.ln_eq_waitq);
++	init_waitqueue_head(&the_lnet.ln_rc_waitq);
+ 	mutex_init(&the_lnet.ln_lnd_mutex);
+ 	mutex_init(&the_lnet.ln_api_mutex);
+ }
+diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+index 9271be6..b4ac670 100644
+--- a/drivers/staging/lustre/lnet/lnet/router.c
++++ b/drivers/staging/lustre/lnet/lnet/router.c
+@@ -404,6 +404,9 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
+ 	if (rnet != rnet2)
+ 		LIBCFS_FREE(rnet, sizeof(*rnet));
  
- 	case IOC_LIBCFS_DEL_ROUTE:
- 		config = arg;
++	/* indicate to startup the router checker if configured */
++	wake_up(&the_lnet.ln_rc_waitq);
++
+ 	return rc;
+ }
+ 
+@@ -1053,11 +1056,6 @@ lnet_router_checker_start(void)
+ 		return -EINVAL;
+ 	}
+ 
+-	if (!the_lnet.ln_routing &&
+-	    live_router_check_interval <= 0 &&
+-	    dead_router_check_interval <= 0)
+-		return 0;
+-
+ 	sema_init(&the_lnet.ln_rc_signal, 0);
+ 	/* EQ size doesn't matter; the callback is guaranteed to get every
+ 	 * event */
+@@ -1102,6 +1100,8 @@ lnet_router_checker_stop(void)
+ 
+ 	LASSERT(the_lnet.ln_rc_state == LNET_RC_STATE_RUNNING);
+ 	the_lnet.ln_rc_state = LNET_RC_STATE_STOPPING;
++	/* wakeup the RC thread if it's sleeping */
++	wake_up(&the_lnet.ln_rc_waitq);
+ 
+ 	/* block until event callback signals exit */
+ 	down(&the_lnet.ln_rc_signal);
+@@ -1192,6 +1192,33 @@ lnet_prune_rc_data(int wait_unlink)
+ 	lnet_net_unlock(LNET_LOCK_EX);
+ }
+ 
++/*
++ * This function is called to check if the RC should block indefinitely.
++ * It's called from lnet_router_checker() as well as being passed to
++ * wait_event_interruptible() to avoid the lost wake_up problem.
++ *
++ * When it's called from wait_event_interruptible() it is necessary to
++ * also not sleep if the rc state is not running to avoid a deadlock
++ * when the system is shutting down
++ */
++static inline bool
++lnet_router_checker_active(void)
++{
++	if (the_lnet.ln_rc_state != LNET_RC_STATE_RUNNING)
++		return true;
++
++	/*
++	 * Router Checker thread needs to run when routing is enabled in
++	 * order to call lnet_update_ni_status_locked()
++	 */
++	if (the_lnet.ln_routing)
++		return true;
++
++	return !list_empty(&the_lnet.ln_routers) &&
++		(live_router_check_interval > 0 ||
++		 dead_router_check_interval > 0);
++}
++
+ static int
+ lnet_router_checker(void *arg)
+ {
+@@ -1243,8 +1270,18 @@ rescan:
+ 		/* Call schedule_timeout() here always adds 1 to load average
+ 		 * because kernel counts # active tasks as nr_running
+ 		 * + nr_uninterruptible. */
+-		set_current_state(TASK_INTERRUPTIBLE);
+-		schedule_timeout(cfs_time_seconds(1));
++		/*
++		 * if there are any routes then wakeup every second.  If
++		 * there are no routes then sleep indefinitely until woken
++		 * up by a user adding a route
++		 */
++		if (!lnet_router_checker_active())
++			wait_event_interruptible(the_lnet.ln_rc_waitq,
++						 lnet_router_checker_active());
++		else
++			wait_event_interruptible_timeout(the_lnet.ln_rc_waitq,
++							 false,
++							 cfs_time_seconds(1));
+ 	}
+ 
+ 	LASSERT(the_lnet.ln_rc_state == LNET_RC_STATE_STOPPING);
 -- 
 1.7.1
