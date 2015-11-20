@@ -1,167 +1,148 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 20 Nov 2015 18:35:58 -0500
-Subject: [lustre-devel] [PATCH 22/40] staging: lustre: Fixes to make lnetctl
-	function as expected.
+Date: Fri, 20 Nov 2015 18:36:00 -0500
+Subject: [lustre-devel] [PATCH 24/40] staging: lustre: make some lnet
+	functions static
 In-Reply-To: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1448062576-23757-23-git-send-email-jsimmons@infradead.org>
+Message-ID: <1448062576-23757-25-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-During testing of the lnetctl utility I ran into some
-issues. One of the problems is when you print out help
-for peer_credits you get help for stats. With this patch
-the help option for peer_credits is set to return the
-proper help message.
+From: frank zago <fzago@cray.com>
 
-The second problem was for grabbing stats data. No data
-was returned but instead it reported a error. The reason
-for this is that libcfs_ioctl_getdata() test to see if the
-size of the data passed in is less than the struct
-libcfs_ioctl_data in size. For the stats function its
-data structure struct lnet_ioctl_lnet_stats is smaller
-than what is allowed. Instead of checking if the data
-is less than libcfs_ioctl_data in size we check to ensure
-that the data is not smaller than the ioctl hdr data which
-is universal.
+Some functions and variables are only used in their C file, so reduce
+their scope. This reduces the code size, and fixes sparse warnings
+such as:
 
-The bug in libcfs_ioctl_getdata() exposed a bunch of cases
-with new ioctls that don't check to see if the data imported
-from userland equals the size reported in the ioctl hdr
-data. We address those cases in this patch as well.
+warning: symbol 'proc_lnet_routes' was not declared.
+        Should it be static?
+warning: symbol 'proc_lnet_routers' was not declared.
+        Should it be static?
 
-Signed-off-by: James Simmons <uja.ornl@gmail.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5935
-Reviewed-on: http://review.whamcloud.com/12782
-Reviewed-by: Liang Zhen <liang.zhen@intel.com>
-Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Some prototypes were removed from C files and added to the proper
+header.
+
+Signed-off-by: Frank Zago <fzago@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5396
+Reviewed-on: http://review.whamcloud.com/12206
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 ---
- drivers/staging/lustre/lnet/lnet/api-ni.c          |   36 ++++++++++++++++++++
- .../lustre/lustre/libcfs/linux/linux-module.c      |    2 +-
- 2 files changed, 37 insertions(+), 1 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |    2 ++
+ drivers/staging/lustre/lnet/lnet/router_proc.c     |    2 --
+ drivers/staging/lustre/lnet/selftest/console.c     |    4 +---
+ drivers/staging/lustre/lnet/selftest/framework.c   |   10 ----------
+ drivers/staging/lustre/lnet/selftest/module.c      |    4 +---
+ drivers/staging/lustre/lnet/selftest/rpc.c         |    2 +-
+ 6 files changed, 5 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index e40c657..7657f88 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1872,6 +1872,10 @@ LNetCtl(unsigned int cmd, void *arg)
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+index 4c2d824..00ef4d0 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+@@ -446,6 +446,8 @@ lnet_ni_t *lnet_nid2ni_locked(lnet_nid_t nid, int cpt);
+ lnet_ni_t *lnet_net2ni_locked(__u32 net, int cpt);
+ lnet_ni_t *lnet_net2ni(__u32 net);
  
- 	case IOC_LIBCFS_ADD_ROUTE:
- 		config = arg;
++extern int portal_rotor;
 +
-+		if (config->cfg_hdr.ioc_len < sizeof(*config))
-+			return -EINVAL;
-+
- 		mutex_lock(&the_lnet.ln_api_mutex);
- 		rc = lnet_add_route(config->cfg_net,
- 				    config->cfg_config_u.cfg_route.rtr_hop,
-@@ -1883,6 +1887,10 @@ LNetCtl(unsigned int cmd, void *arg)
+ int lnet_init(void);
+ void lnet_fini(void);
  
- 	case IOC_LIBCFS_DEL_ROUTE:
- 		config = arg;
-+
-+		if (config->cfg_hdr.ioc_len < sizeof(*config))
-+			return -EINVAL;
-+
- 		mutex_lock(&the_lnet.ln_api_mutex);
- 		rc = lnet_del_route(config->cfg_net, config->cfg_nid);
- 		mutex_unlock(&the_lnet.ln_api_mutex);
-@@ -1890,6 +1898,10 @@ LNetCtl(unsigned int cmd, void *arg)
+diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
+index af7423f..73183f1 100644
+--- a/drivers/staging/lustre/lnet/lnet/router_proc.c
++++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
+@@ -795,8 +795,6 @@ static struct lnet_portal_rotors	portal_rotors[] = {
+ 	},
+ };
  
- 	case IOC_LIBCFS_GET_ROUTE:
- 		config = arg;
-+
-+		if (config->cfg_hdr.ioc_len < sizeof(*config))
-+			return -EINVAL;
-+
- 		return lnet_get_route(config->cfg_count,
- 				      &config->cfg_net,
- 				      &config->cfg_config_u.cfg_route.rtr_hop,
-@@ -1900,8 +1912,13 @@ LNetCtl(unsigned int cmd, void *arg)
+-extern int portal_rotor;
+-
+ static int __proc_lnet_portal_rotor(void *data, int write,
+ 				    loff_t pos, void __user *buffer, int nob)
+ {
+diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
+index f8d6dfe..551d664 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.c
++++ b/drivers/staging/lustre/lnet/selftest/console.c
+@@ -1694,8 +1694,6 @@ lstcon_new_session_id(lst_sid_t *sid)
+ 	sid->ses_stamp = cfs_time_current();
+ }
  
- 	case IOC_LIBCFS_GET_NET: {
- 		struct lnet_ioctl_net_config *net_config;
-+		size_t total = sizeof(*config) + sizeof(*net_config);
+-extern srpc_service_t lstcon_acceptor_service;
+-
+ int
+ lstcon_session_new(char *name, int key, unsigned feats,
+ 		   int timeout, int force, lst_sid_t __user *sid_up)
+@@ -1974,7 +1972,7 @@ out:
+ 	return rc;
+ }
  
- 		config = arg;
-+
-+		if (config->cfg_hdr.ioc_len < total)
-+			return -EINVAL;
-+
- 		net_config = (struct lnet_ioctl_net_config *)
- 				config->cfg_bulk;
- 		if (!config || !net_config)
-@@ -1925,12 +1942,19 @@ LNetCtl(unsigned int cmd, void *arg)
- 	{
- 		struct lnet_ioctl_lnet_stats *lnet_stats = arg;
- 
-+		if (lnet_stats->st_hdr.ioc_len < sizeof(*lnet_stats))
-+			return -EINVAL;
-+
- 		lnet_counters_get(&lnet_stats->st_cntrs);
- 		return 0;
+-srpc_service_t lstcon_acceptor_service;
++static srpc_service_t lstcon_acceptor_service;
+ static void lstcon_init_acceptor_service(void)
+ {
+ 	/* initialize selftest console acceptor service table */
+diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+index 1a2da74..b04c147 100644
+--- a/drivers/staging/lustre/lnet/selftest/framework.c
++++ b/drivers/staging/lustre/lnet/selftest/framework.c
+@@ -1622,16 +1622,6 @@ static srpc_service_t sfw_services[] = {
  	}
+ };
  
- 	case IOC_LIBCFS_CONFIG_RTR:
- 		config = arg;
-+
-+		if (config->cfg_hdr.ioc_len < sizeof(*config))
-+			return -EINVAL;
-+
- 		mutex_lock(&the_lnet.ln_api_mutex);
- 		if (config->cfg_config_u.cfg_buffers.buf_enable) {
- 			rc = lnet_rtrpools_enable();
-@@ -1943,6 +1967,10 @@ LNetCtl(unsigned int cmd, void *arg)
+-extern sfw_test_client_ops_t ping_test_client;
+-extern srpc_service_t	ping_test_service;
+-extern void ping_init_test_client(void);
+-extern void ping_init_test_service(void);
+-
+-extern sfw_test_client_ops_t brw_test_client;
+-extern srpc_service_t	brw_test_service;
+-extern void brw_init_test_client(void);
+-extern void brw_init_test_service(void);
+-
+ int
+ sfw_startup(void)
+ {
+diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
+index 46cbdf0..91564e5 100644
+--- a/drivers/staging/lustre/lnet/selftest/module.c
++++ b/drivers/staging/lustre/lnet/selftest/module.c
+@@ -37,6 +37,7 @@
+ #define DEBUG_SUBSYSTEM S_LNET
  
- 	case IOC_LIBCFS_ADD_BUF:
- 		config = arg;
-+
-+		if (config->cfg_hdr.ioc_len < sizeof(*config))
-+			return -EINVAL;
-+
- 		mutex_lock(&the_lnet.ln_api_mutex);
- 		rc = lnet_rtrpools_adjust(config->cfg_config_u.cfg_buffers.
- 						buf_tiny,
-@@ -1955,8 +1983,13 @@ LNetCtl(unsigned int cmd, void *arg)
+ #include "selftest.h"
++#include "console.h"
  
- 	case IOC_LIBCFS_GET_BUF: {
- 		struct lnet_ioctl_pool_cfg *pool_cfg;
-+		size_t total = sizeof(*config) + sizeof(*pool_cfg);
+ enum {
+ 	LST_INIT_NONE = 0,
+@@ -47,9 +48,6 @@ enum {
+ 	LST_INIT_CONSOLE
+ };
  
- 		config = arg;
-+
-+		if (config->cfg_hdr.ioc_len < total)
-+			return -EINVAL;
-+
- 		pool_cfg = (struct lnet_ioctl_pool_cfg *)config->cfg_bulk;
- 		return lnet_get_rtr_pool_cfg(config->cfg_count, pool_cfg);
- 	}
-@@ -1964,6 +1997,9 @@ LNetCtl(unsigned int cmd, void *arg)
- 	case IOC_LIBCFS_GET_PEER_INFO: {
- 		struct lnet_ioctl_peer *peer_info = arg;
+-extern int lstcon_console_init(void);
+-extern int lstcon_console_fini(void);
+-
+ static int lst_init_step = LST_INIT_NONE;
  
-+		if (peer_info->pr_hdr.ioc_len < sizeof(*peer_info))
-+			return -EINVAL;
-+
- 		return lnet_get_peer_info(peer_info->pr_count,
- 			&peer_info->pr_nid,
- 			peer_info->pr_lnd_u.pr_peer_credits.cr_aliveness,
-diff --git a/drivers/staging/lustre/lustre/libcfs/linux/linux-module.c b/drivers/staging/lustre/lustre/libcfs/linux/linux-module.c
-index 50a5464..9414746 100644
---- a/drivers/staging/lustre/lustre/libcfs/linux/linux-module.c
-+++ b/drivers/staging/lustre/lustre/libcfs/linux/linux-module.c
-@@ -73,7 +73,7 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
- 		return -EINVAL;
- 	}
+ struct cfs_wi_sched *lst_sched_serial;
+diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
+index 2212199..9b823be 100644
+--- a/drivers/staging/lustre/lnet/selftest/rpc.c
++++ b/drivers/staging/lustre/lnet/selftest/rpc.c
+@@ -1082,7 +1082,7 @@ srpc_client_rpc_expired(void *data)
+ 	spin_unlock(&srpc_data.rpc_glock);
+ }
  
--	if (hdr.ioc_len < sizeof(struct libcfs_ioctl_data)) {
-+	if (hdr.ioc_len < sizeof(struct libcfs_ioctl_hdr)) {
- 		CERROR("libcfs ioctl: user buffer too small for ioctl\n");
- 		return -EINVAL;
- 	}
+-inline void
++static void
+ srpc_add_client_rpc_timer(srpc_client_rpc_t *rpc)
+ {
+ 	stt_timer_t *timer = &rpc->crpc_timer;
 -- 
 1.7.1
