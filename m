@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 20 Nov 2015 18:35:50 -0500
-Subject: [lustre-devel] [PATCH 14/40] staging: lustre: fix crash due to NULL
-	networks string
+Date: Fri, 20 Nov 2015 18:35:59 -0500
+Subject: [lustre-devel] [PATCH 23/40] staging: lustre: return appropriate
+	errno when adding route
 In-Reply-To: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1448062576-23757-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <1448062576-23757-24-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,85 +13,90 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-If there is an invalid networks or ip2nets lnet_parse_networks()
-gets called with a NULL 'network' string parameter
+When adding route it ignored specific scenarios, namely:
+1. route already exists
+2. route is on a local net
+3. route is unreacheable
 
-lnet_parse_networks() needs to sanitize its input string now that
-it's being called from multiple places.  Instead, check for
-a NULL string everytime the function is called, which reduces the
-probability of errors with other code modifications.
+This patch returns the appropriate return codes from the lower level
+function lnet_add_route(), and then ignores the above case from the
+calling function, lnet_parse_route().  This is needed so we don't
+halt processing routes in the module parameters.
+
+However, we can now add routes dynamically, and it should be returned
+to the user whether adding the requested route succeeded or failed.
+
+In userspace it is determined whether to continue adding routes or to
+halt processing.  Currently "lnetctl import < config" continues
+adding the rest of the configuration and reports at the end which
+operations passed and which ones failed.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5540
-Reviewed-on: http://review.whamcloud.com/11626
-Reviewed-by: Isaac Huang <he.huang@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6045
+Reviewed-on: http://review.whamcloud.com/13116
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: Isaac Huang <he.huang@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- drivers/staging/lustre/lnet/lnet/api-ni.c |    5 +----
- drivers/staging/lustre/lnet/lnet/config.c |    9 ++++++++-
- 2 files changed, 9 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lnet/lnet/config.c |    2 +-
+ drivers/staging/lustre/lnet/lnet/router.c |   11 +++++++----
+ 2 files changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 165345c..cc87900 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1524,7 +1524,6 @@ LNetNIInit(lnet_pid_t requested_pid)
- 	lnet_ping_info_t *pinfo;
- 	lnet_handle_md_t md_handle;
- 	struct list_head net_head;
--	char *nets;
- 
- 	INIT_LIST_HEAD(&net_head);
- 
-@@ -1539,13 +1538,11 @@ LNetNIInit(lnet_pid_t requested_pid)
- 		return rc;
- 	}
- 
--	nets = lnet_get_networks();
--
- 	rc = lnet_prepare(requested_pid);
- 	if (rc != 0)
- 		goto failed0;
- 
--	rc = lnet_parse_networks(&net_head, nets);
-+	rc = lnet_parse_networks(&net_head, lnet_get_networks());
- 	if (rc < 0)
- 		goto failed1;
- 
 diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index 1c7ad7c..d1e0217 100644
+index 7b7412b..1028195 100644
 --- a/drivers/staging/lustre/lnet/lnet/config.c
 +++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -184,7 +184,7 @@ int
- lnet_parse_networks(struct list_head *nilist, char *networks)
- {
- 	struct cfs_expr_list *el = NULL;
--	int tokensize = strlen(networks) + 1;
-+	int tokensize;
- 	char *tokens;
- 	char *str;
- 	char *tmp;
-@@ -192,6 +192,11 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 	__u32 net;
- 	int nnets = 0;
+@@ -771,7 +771,7 @@ lnet_parse_route(char *str, int *im_a_router)
+ 			}
  
-+	if (!networks) {
-+		CERROR("networks string is undefined\n");
-+		return -EINVAL;
-+	}
-+
- 	if (strlen(networks) > LNET_SINGLE_TEXTBUF_NOB) {
- 		/* _WAY_ conservative */
- 		LCONSOLE_ERROR_MSG(0x112,
-@@ -199,6 +204,8 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 			rc = lnet_add_route(net, hops, nid, priority);
+-			if (rc != 0) {
++			if (rc != 0 && rc != -EEXIST && rc != -EHOSTUNREACH) {
+ 				CERROR("Can't create route to %s via %s\n",
+ 				       libcfs_net2str(net),
+ 				       libcfs_nid2str(nid));
+diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+index 1f5a4b1..9271be6 100644
+--- a/drivers/staging/lustre/lnet/lnet/router.c
++++ b/drivers/staging/lustre/lnet/lnet/router.c
+@@ -315,7 +315,7 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
  		return -EINVAL;
- 	}
  
-+	tokensize = strlen(networks) + 1;
-+
- 	LIBCFS_ALLOC(tokens, tokensize);
- 	if (tokens == NULL) {
- 		CERROR("Can't allocate net tokens\n");
+ 	if (lnet_islocalnet(net))	       /* it's a local network */
+-		return 0;		       /* ignore the route entry */
++		return -EEXIST;
+ 
+ 	/* Assume net, route, all new */
+ 	LIBCFS_ALLOC(route, sizeof(*route));
+@@ -346,7 +346,7 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
+ 		LIBCFS_FREE(rnet, sizeof(*rnet));
+ 
+ 		if (rc == -EHOSTUNREACH) /* gateway is not on a local net */
+-			return 0;	/* ignore the route entry */
++			return rc;	/* ignore the route entry */
+ 		CERROR("Error %d creating route %s %d %s\n", rc,
+ 		       libcfs_net2str(net), hops,
+ 		       libcfs_nid2str(gateway));
+@@ -394,14 +394,17 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
+ 	/* -1 for notify or !add_route */
+ 	lnet_peer_decref_locked(route->lr_gateway);
+ 	lnet_net_unlock(LNET_LOCK_EX);
++	rc = 0;
+ 
+-	if (!add_route)
++	if (!add_route) {
++		rc = -EEXIST;
+ 		LIBCFS_FREE(route, sizeof(*route));
++	}
+ 
+ 	if (rnet != rnet2)
+ 		LIBCFS_FREE(rnet, sizeof(*rnet));
+ 
+-	return 0;
++	return rc;
+ }
+ 
+ int
 -- 
 1.7.1
