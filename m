@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 20 Nov 2015 18:36:06 -0500
-Subject: [lustre-devel] [PATCH 30/40] staging: lustre: improvement to router
-	checker
+Date: Fri, 20 Nov 2015 18:36:14 -0500
+Subject: [lustre-devel] [PATCH 38/40] staging: lustre: Allocate the correct
+	number of rtr buffers
 In-Reply-To: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1448062576-23757-31-git-send-email-jsimmons@infradead.org>
+Message-ID: <1448062576-23757-39-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,152 +13,144 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-This patch starts router checker thread all the time.
+This patch ensures that the correct number of router buffers are
+allocated.  It keeps a count that keeps track of the number of
+buffers allocated.  Another count keeps the number of buffers
+requested. The number of buffers allocated is set when creating
+new buffers and reduced when buffers are freed.
 
-The router checker only checks routes by ping if
-live_router_check_interval or dead_router_check_interval are set
-to something other than 0, and there are routes configured.
+The number of requested buffer is set when the buffers are
+allocated and is checked when credits are returned to determine
+whether the buffer should be freed or kept.
 
-If these conditions are not met the router checker sleeps until woken
-up when a route is added.  It is also woken up whenever the RC is
-being stopped to ensure the thread doesn't hang.
+In lnet_rtrpool_adjust_bufs() grab lnet_net_lock() before using
+rbp_nbuffers to ensure that it doesn't change by
+lnet_return_rx_credits_locked() during the process of allocating
+new buffers.  All other access to rbp_nbuffers is already being
+protected by lnet_net_lock().
 
-In the future when DLC starts configuring the live and dead
-router_check_interval parameters, then by manipulating them
-the router checker can be turned on and off by the user.
+This avoids the case where we allocate less than the desired
+number of buffers.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6003
-Reviewed-on: http://review.whamcloud.com/13035
-Reviewed-by: Liang Zhen <liang.zhen@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6122
+Reviewed-on: http://review.whamcloud.com/13519
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-types.h  |    7 +++
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    1 +
- drivers/staging/lustre/lnet/lnet/router.c          |   51 +++++++++++++++++---
- 3 files changed, 52 insertions(+), 7 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-types.h  |    5 ++-
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |    3 +-
+ drivers/staging/lustre/lnet/lnet/router.c          |   32 +++++++++++++++-----
+ 3 files changed, 30 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 3282782..574de55 100644
+index 695b5be..24b3c1a 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -619,6 +619,13 @@ typedef struct {
- 	 */
- 	bool				  ln_nis_from_mod_params;
- 
-+	/*
-+	 * waitq for router checker.  As long as there are no routes in
-+	 * the list, the router checker will sleep on this queue.  when
-+	 * routes are added the thread will wake up
-+	 */
-+	wait_queue_head_t		  ln_rc_waitq;
-+
- } lnet_t;
- 
- #endif
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index b119c6c..09656a1 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -99,6 +99,7 @@ lnet_init_locks(void)
- {
- 	spin_lock_init(&the_lnet.ln_eq_wait_lock);
- 	init_waitqueue_head(&the_lnet.ln_eq_waitq);
-+	init_waitqueue_head(&the_lnet.ln_rc_waitq);
- 	mutex_init(&the_lnet.ln_lnd_mutex);
- 	mutex_init(&the_lnet.ln_api_mutex);
- }
+@@ -386,7 +386,10 @@ typedef struct {
+ 	struct list_head	rbp_msgs;	/* messages blocking
+ 						   for a buffer */
+ 	int			rbp_npages;	/* # pages in each buffer */
+-	int			rbp_nbuffers;	/* # buffers */
++	/* requested number of buffers */
++	int			rbp_req_nbuffers;
++	/* # buffers actually allocated */
++	int			rbp_nbuffers;
+ 	int			rbp_credits;	/* # free buffers /
+ 						     blocked messages */
+ 	int			rbp_mincredits;	/* low water mark */
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index 430cb9a..21a7c6f 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -1101,9 +1101,10 @@ lnet_return_rx_credits_locked(lnet_msg_t *msg)
+ 		 * buffers in this pool.  Make sure we never put back
+ 		 * more buffers than the stated number.
+ 		 */
+-		if (rbp->rbp_credits >= rbp->rbp_nbuffers) {
++		if (unlikely(rbp->rbp_credits >= rbp->rbp_req_nbuffers)) {
+ 			/* Discard this buffer so we don't have too many. */
+ 			lnet_destroy_rtrbuf(rb, rbp->rbp_npages);
++			rbp->rbp_nbuffers--;
+ 		} else {
+ 			list_add(&rb->rb_list, &rbp->rbp_bufs);
+ 			rbp->rbp_credits++;
 diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index 9271be6..b4ac670 100644
+index 91f3f09..35cfced 100644
 --- a/drivers/staging/lustre/lnet/lnet/router.c
 +++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -404,6 +404,9 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
- 	if (rnet != rnet2)
- 		LIBCFS_FREE(rnet, sizeof(*rnet));
+@@ -1352,6 +1352,7 @@ lnet_rtrpool_free_bufs(lnet_rtrbufpool_t *rbp, int cpt)
+ 	lnet_net_lock(cpt);
+ 	lnet_drop_routed_msgs_locked(&rbp->rbp_msgs, cpt);
+ 	list_splice_init(&rbp->rbp_bufs, &tmp);
++	rbp->rbp_req_nbuffers = 0;
+ 	rbp->rbp_nbuffers = 0;
+ 	rbp->rbp_credits = 0;
+ 	rbp->rbp_mincredits = 0;
+@@ -1372,20 +1373,33 @@ lnet_rtrpool_adjust_bufs(lnet_rtrbufpool_t *rbp, int nbufs, int cpt)
+ 	lnet_rtrbuf_t *rb;
+ 	int num_rb;
+ 	int num_buffers = 0;
++	int old_req_nbufs;
+ 	int npages = rbp->rbp_npages;
  
-+	/* indicate to startup the router checker if configured */
-+	wake_up(&the_lnet.ln_rc_waitq);
-+
- 	return rc;
- }
- 
-@@ -1053,11 +1056,6 @@ lnet_router_checker_start(void)
- 		return -EINVAL;
++	lnet_net_lock(cpt);
+ 	/*
+ 	 * If we are called for less buffers than already in the pool, we
+-	 * just lower the nbuffers number and excess buffers will be
++	 * just lower the req_nbuffers number and excess buffers will be
+ 	 * thrown away as they are returned to the free list.  Credits
+ 	 * then get adjusted as well.
++	 * If we already have enough buffers allocated to serve the
++	 * increase requested, then we can treat that the same way as we
++	 * do the decrease.
+ 	 */
+-	if (nbufs <= rbp->rbp_nbuffers) {
+-		lnet_net_lock(cpt);
+-		rbp->rbp_nbuffers = nbufs;
++	num_rb = nbufs - rbp->rbp_nbuffers;
++	if (nbufs <= rbp->rbp_req_nbuffers || num_rb <= 0) {
++		rbp->rbp_req_nbuffers = nbufs;
+ 		lnet_net_unlock(cpt);
+ 		return 0;
  	}
- 
--	if (!the_lnet.ln_routing &&
--	    live_router_check_interval <= 0 &&
--	    dead_router_check_interval <= 0)
--		return 0;
--
- 	sema_init(&the_lnet.ln_rc_signal, 0);
- 	/* EQ size doesn't matter; the callback is guaranteed to get every
- 	 * event */
-@@ -1102,6 +1100,8 @@ lnet_router_checker_stop(void)
- 
- 	LASSERT(the_lnet.ln_rc_state == LNET_RC_STATE_RUNNING);
- 	the_lnet.ln_rc_state = LNET_RC_STATE_STOPPING;
-+	/* wakeup the RC thread if it's sleeping */
-+	wake_up(&the_lnet.ln_rc_waitq);
- 
- 	/* block until event callback signals exit */
- 	down(&the_lnet.ln_rc_signal);
-@@ -1192,6 +1192,33 @@ lnet_prune_rc_data(int wait_unlink)
- 	lnet_net_unlock(LNET_LOCK_EX);
- }
- 
-+/*
-+ * This function is called to check if the RC should block indefinitely.
-+ * It's called from lnet_router_checker() as well as being passed to
-+ * wait_event_interruptible() to avoid the lost wake_up problem.
-+ *
-+ * When it's called from wait_event_interruptible() it is necessary to
-+ * also not sleep if the rc state is not running to avoid a deadlock
-+ * when the system is shutting down
-+ */
-+static inline bool
-+lnet_router_checker_active(void)
-+{
-+	if (the_lnet.ln_rc_state != LNET_RC_STATE_RUNNING)
-+		return true;
-+
 +	/*
-+	 * Router Checker thread needs to run when routing is enabled in
-+	 * order to call lnet_update_ni_status_locked()
++	 * store the older value of rbp_req_nbuffers and then set it to
++	 * the new request to prevent lnet_return_rx_credits_locked() from
++	 * freeing buffers that we need to keep around
 +	 */
-+	if (the_lnet.ln_routing)
-+		return true;
++	old_req_nbufs = rbp->rbp_req_nbuffers;
++	rbp->rbp_req_nbuffers = nbufs;
++	lnet_net_unlock(cpt);
+ 
+ 	INIT_LIST_HEAD(&rb_list);
+ 
+@@ -1394,19 +1408,21 @@ lnet_rtrpool_adjust_bufs(lnet_rtrbufpool_t *rbp, int nbufs, int cpt)
+ 	 * allocated successfully then join this list to the rbp buffer
+ 	 * list. If not then free all allocated buffers.
+ 	 */
+-	num_rb = rbp->rbp_nbuffers;
+-
+-	while (num_rb < nbufs) {
++	while (num_rb-- > 0) {
+ 		rb = lnet_new_rtrbuf(rbp, cpt);
+ 		if (rb == NULL) {
+ 			CERROR("Failed to allocate %d route bufs of %d pages\n",
+ 			       nbufs, npages);
 +
-+	return !list_empty(&the_lnet.ln_routers) &&
-+		(live_router_check_interval > 0 ||
-+		 dead_router_check_interval > 0);
-+}
++			lnet_net_lock(cpt);
++			rbp->rbp_req_nbuffers = old_req_nbufs;
++			lnet_net_unlock(cpt);
 +
- static int
- lnet_router_checker(void *arg)
- {
-@@ -1243,8 +1270,18 @@ rescan:
- 		/* Call schedule_timeout() here always adds 1 to load average
- 		 * because kernel counts # active tasks as nr_running
- 		 * + nr_uninterruptible. */
--		set_current_state(TASK_INTERRUPTIBLE);
--		schedule_timeout(cfs_time_seconds(1));
-+		/*
-+		 * if there are any routes then wakeup every second.  If
-+		 * there are no routes then sleep indefinitely until woken
-+		 * up by a user adding a route
-+		 */
-+		if (!lnet_router_checker_active())
-+			wait_event_interruptible(the_lnet.ln_rc_waitq,
-+						 lnet_router_checker_active());
-+		else
-+			wait_event_interruptible_timeout(the_lnet.ln_rc_waitq,
-+							 false,
-+							 cfs_time_seconds(1));
+ 			goto failed;
+ 		}
+ 
+ 		list_add(&rb->rb_list, &rb_list);
+ 		num_buffers++;
+-		num_rb++;
  	}
  
- 	LASSERT(the_lnet.ln_rc_state == LNET_RC_STATE_STOPPING);
+ 	lnet_net_lock(cpt);
 -- 
 1.7.1
