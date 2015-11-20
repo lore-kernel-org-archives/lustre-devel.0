@@ -1,143 +1,45 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 20 Nov 2015 18:35:39 -0500
-Subject: [lustre-devel] [PATCH 03/40] staging: lustre: reflect down routes
-	in /proc/sys/lnet/routes
+Date: Fri, 20 Nov 2015 18:35:44 -0500
+Subject: [lustre-devel] [PATCH 08/40] staging: lustre: do not memset after
+	LIBCFS_ALLOC
 In-Reply-To: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1448062576-23757-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1448062576-23757-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Chris Horn <hornc@cray.com>
+From: Frank Zago <fzago@cray.com>
 
-We consider routes "down" if the router is down or the router
-NI for the target network is down. This should be reflected
-in the output of /proc/sys/lnet/routes
+LIBCFS_ALLOC already zero out the memory allocated, so there is no
+need to zero out the memory again.
 
-Signed-off-by: Chris Horn <hornc@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3679
-Reviewed-on: http://review.whamcloud.com/7857
-Reviewed-by: Cory Spitz <spitzcor@cray.com>
-Reviewed-by: Isaac Huang <he.huang@intel.com>
+Signed-off-by: Frank Zago <fzago@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5304
+Reviewed-on: http://review.whamcloud.com/11012
+Reviewed-by: Patrick Farrell <paf@cray.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |   13 ++++++++
- drivers/staging/lustre/lnet/lnet/lib-move.c        |   32 ++++++++++----------
- drivers/staging/lustre/lnet/lnet/router_proc.c     |    2 +-
- 3 files changed, 30 insertions(+), 17 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index b61d504..09c6bfe 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -64,6 +64,19 @@ extern lnet_t	the_lnet;	/* THE network */
- /** exclusive lock */
- #define LNET_LOCK_EX		CFS_PERCPT_LOCK_EX
- 
-+static inline int lnet_is_route_alive(lnet_route_t *route)
-+{
-+	/* gateway is down */
-+	if (!route->lr_gateway->lp_alive)
-+		return 0;
-+	/* no NI status, assume it's alive */
-+	if ((route->lr_gateway->lp_ping_feats &
-+	     LNET_PING_FEAT_NI_STATUS) == 0)
-+		return 1;
-+	/* has NI status, check # down NIs */
-+	return route->lr_downis == 0;
-+}
-+
- static inline int lnet_is_wire_handle_none(lnet_handle_wire_t *wh)
- {
- 	return (wh->wh_interface_cookie == LNET_WIRE_HANDLE_COOKIE_NONE &&
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 7a68382..c56de44 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -1122,9 +1122,9 @@ static lnet_peer_t *
- lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
- {
- 	lnet_remotenet_t *rnet;
--	lnet_route_t *rtr;
--	lnet_route_t *rtr_best;
--	lnet_route_t *rtr_last;
-+	lnet_route_t *route;
-+	lnet_route_t *best_route;
-+	lnet_route_t *last_route;
- 	struct lnet_peer *lp_best;
- 	struct lnet_peer *lp;
- 	int rc;
-@@ -1137,13 +1137,12 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
- 		return NULL;
- 
- 	lp_best = NULL;
--	rtr_best = rtr_last = NULL;
--	list_for_each_entry(rtr, &rnet->lrn_routes, lr_list) {
--		lp = rtr->lr_gateway;
-+	best_route = NULL;
-+	last_route = NULL;
-+	list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
-+		lp = route->lr_gateway;
- 
--		if (!lp->lp_alive || /* gateway is down */
--		    ((lp->lp_ping_feats & LNET_PING_FEAT_NI_STATUS) != 0 &&
--		     rtr->lr_downis != 0)) /* NI to target is down */
-+		if (!lnet_is_route_alive(route))
- 			continue;
- 
- 		if (ni != NULL && lp->lp_ni != ni)
-@@ -1153,28 +1152,29 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
- 			return lp;
- 
- 		if (lp_best == NULL) {
--			rtr_best = rtr_last = rtr;
-+			best_route = route;
-+			last_route = route;
- 			lp_best = lp;
- 			continue;
- 		}
- 
- 		/* no protection on below fields, but it's harmless */
--		if (rtr_last->lr_seq - rtr->lr_seq < 0)
--			rtr_last = rtr;
-+		if (last_route->lr_seq - route->lr_seq < 0)
-+			last_route = route;
- 
--		rc = lnet_compare_routes(rtr, rtr_best);
-+		rc = lnet_compare_routes(route, best_route);
- 		if (rc < 0)
- 			continue;
- 
--		rtr_best = rtr;
-+		best_route = route;
- 		lp_best = lp;
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 0f4154c..f3cbc3b 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -335,8 +335,6 @@ int kiblnd_create_peer(lnet_ni_t *ni, kib_peer_t **peerp, lnet_nid_t nid)
+ 		return -ENOMEM;
  	}
  
- 	/* set sequence number on the best router to the latest sequence + 1
- 	 * so we can round-robin all routers, it's race and inaccurate but
- 	 * harmless and functional  */
--	if (rtr_best != NULL)
--		rtr_best->lr_seq = rtr_last->lr_seq + 1;
-+	if (best_route)
-+		best_route->lr_seq = last_route->lr_seq + 1;
- 	return lp_best;
- }
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-index 396c7c4..af7423f 100644
---- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-+++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-@@ -240,7 +240,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
- 			unsigned int hops = route->lr_hops;
- 			unsigned int priority = route->lr_priority;
- 			lnet_nid_t nid = route->lr_gateway->lp_nid;
--			int alive = route->lr_gateway->lp_alive;
-+			int alive = lnet_is_route_alive(route);
- 
- 			s += snprintf(s, tmpstr + tmpsiz - s,
- 				      "%-8s %4u %8u %7s %s\n",
+-	memset(peer, 0, sizeof(*peer));	 /* zero flags etc */
+-
+ 	peer->ibp_ni = ni;
+ 	peer->ibp_nid = nid;
+ 	peer->ibp_error = 0;
 -- 
 1.7.1
