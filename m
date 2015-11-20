@@ -1,88 +1,73 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 20 Nov 2015 18:36:01 -0500
-Subject: [lustre-devel] [PATCH 25/40] staging: lustre: missed a few cases of
-	using NULL instead of 0
+Date: Fri, 20 Nov 2015 18:36:08 -0500
+Subject: [lustre-devel] [PATCH 32/40] staging: lustre: prevent assert on
+	LNet module unload
 In-Reply-To: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1448062576-23757-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1448062576-23757-33-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: frank zago <fzago@cray.com>
+From: Amir Shehata <amir.shehata@intel.com>
 
-It is preferable to use NULL instead of 0 for pointers. This fixes sparse
-warnings such as:
+There is a use case where lnet can be unloaded while there are
+no NIs configured.  Removing lnet in this case will cause
+LNetFini() to be called without a prior call to LNetNIFini().
+This will cause the LASSERT(the_lnet.ln_refcount == 0) to be
+triggered.
 
-lustre/fld/fld_request.c:126:17: warning: Using plain integer as NULL pointer
+To deal with this use case when LNet is configured a reference
+count on the module is taken using try_module_get().  This way
+LNet must be unconfigured before it could be removed; therefore
+avoiding the above case.  When LNet is unconfigured module_put()
+is called to return the reference count.
 
-The second parameter of class_match_param() was changed to a const, to
-be able to remove a cast in one user, to prevent splitting a long
-line. No other code change.
-
-Signed-off-by: frank zago <fzago@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5396
-Reviewed-on: http://review.whamcloud.com/12567
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6010
+Reviewed-on: http://review.whamcloud.com/13110
 Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    2 +-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |    2 +-
- .../staging/lustre/lustre/obdclass/obd_config.c    |    4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lnet/lnet/module.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 7657f88..89b390a 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -902,7 +902,7 @@ lnet_ping_info_setup(lnet_ping_info_t **ppinfo, lnet_handle_md_t *md_handle,
- {
- 	lnet_process_id_t id = {LNET_NID_ANY, LNET_PID_ANY};
- 	lnet_handle_me_t me_handle;
--	lnet_md_t md = {0};
-+	lnet_md_t md = { NULL };
- 	int rc, rc2;
+diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
+index 48eb085..b1f32a6 100644
+--- a/drivers/staging/lustre/lnet/lnet/module.c
++++ b/drivers/staging/lustre/lnet/lnet/module.c
+@@ -53,13 +53,21 @@ lnet_configure(void *arg)
+ 	mutex_lock(&lnet_config_mutex);
  
- 	if (set_eq) {
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 4a8c759..2109297 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -1941,7 +1941,7 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
- 		  struct super_block *sb, struct lookup_intent *it)
- {
- 	struct ll_sb_info *sbi = NULL;
--	struct lustre_md md;
-+	struct lustre_md md = { NULL };
- 	int rc;
+ 	if (!the_lnet.ln_niinit_self) {
++		rc = try_module_get(THIS_MODULE);
++
++		if (rc != 1)
++			goto out;
++
+ 		rc = LNetNIInit(LNET_PID_LUSTRE);
+ 		if (rc >= 0) {
+ 			the_lnet.ln_niinit_self = 1;
+ 			rc = 0;
++		} else {
++			module_put(THIS_MODULE);
+ 		}
+ 	}
  
- 	LASSERT(*inode || sb);
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index c231e0d..db8e12d 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -72,7 +72,7 @@ EXPORT_SYMBOL(class_find_param);
++out:
+ 	mutex_unlock(&lnet_config_mutex);
+ 	return rc;
+ }
+@@ -74,6 +82,7 @@ lnet_unconfigure(void)
+ 	if (the_lnet.ln_niinit_self) {
+ 		the_lnet.ln_niinit_self = 0;
+ 		LNetNIFini();
++		module_put(THIS_MODULE);
+ 	}
  
- /* returns 0 if this is the first key in the buffer, else 1.
-    valp points to first char after key. */
--static int class_match_param(char *buf, char *key, char **valp)
-+static int class_match_param(char *buf, const char *key, char **valp)
- {
- 	if (!buf)
- 		return 1;
-@@ -1008,7 +1008,7 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
- 		/* Search proc entries */
- 		while (lvars[j].name) {
- 			var = &lvars[j];
--			if (class_match_param(key, (char *)var->name, NULL) == 0
-+			if (class_match_param(key, var->name, NULL) == 0
- 			    && keylen == strlen(var->name)) {
- 				matched++;
- 				rc = -EROFS;
+ 	mutex_lock(&the_lnet.ln_api_mutex);
 -- 
 1.7.1
