@@ -1,344 +1,150 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 20 Nov 2015 18:35:45 -0500
-Subject: [lustre-devel] [PATCH 09/40] staging: lustre: Dynamic LNet
-	Configuration (DLC)
+Date: Fri, 20 Nov 2015 18:35:38 -0500
+Subject: [lustre-devel] [PATCH 02/40] staging: lustre: fix 'NULL pointer
+	dereference' errors for LNet
 In-Reply-To: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1448062576-23757-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1448062576-23757-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <amir.shehata@intel.com>
+From: Sebastien Buisson <sebastien.buisson@bull.net>
 
-This is the first patch of a set of patches that enables DLC.
+Fix 'NULL pointer dereference' defects found by Coverity version
+6.5.3:
+Dereference after null check (FORWARD_NULL)
+For instance, Passing null pointer to a function which dereferences
+it.
+Dereference before null check (REVERSE_INULL)
+Null-checking variable suggests that it may be null, but it has
+already been dereferenced on all paths leading to the check.
+Dereference null return value (NULL_RETURNS)
 
-This patch adds some cleanup in the config.c as well as some
-preparatory changes in peer.c to enable dynamic network
-configuration
+The following fixes for the LNet layer are broken out of patch
+http://review.whamcloud.com/4720.
 
-Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2456
-Change-Id: I8c8bbf3b55acf4d76f22a8be587b553a70d31889
-Reviewed-on: http://review.whamcloud.com/9830
-Reviewed-by: Liang Zhen <liang.zhen@intel.com>
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Signed-off-by: Sebastien Buisson <sebastien.buisson@bull.net>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2217
+Reviewed-on: http://review.whamcloud.com/4720
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    2 +-
- .../staging/lustre/include/linux/lnet/lib-types.h  |    5 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    8 +-
- drivers/staging/lustre/lnet/lnet/config.c          |   29 ++++-
- drivers/staging/lustre/lnet/lnet/peer.c            |  134 ++++++++++++++------
- 5 files changed, 124 insertions(+), 54 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    2 +-
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |    2 +
+ drivers/staging/lustre/lnet/selftest/conctl.c      |   51 ++++++++++----------
+ 3 files changed, 29 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 09c6bfe..1e0b236 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -685,7 +685,7 @@ int lnet_parse_networks(struct list_head *nilist, char *networks);
- int lnet_nid2peer_locked(lnet_peer_t **lpp, lnet_nid_t nid, int cpt);
- lnet_peer_t *lnet_find_peer_locked(struct lnet_peer_table *ptable,
- 				   lnet_nid_t nid);
--void lnet_peer_tables_cleanup(void);
-+void lnet_peer_tables_cleanup(lnet_ni_t *ni);
- void lnet_peer_tables_destroy(void);
- int lnet_peer_tables_create(void);
- void lnet_debug_peer(lnet_nid_t nid);
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index d792c4a..39381d9 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -343,6 +343,8 @@ typedef struct lnet_peer {
- struct lnet_peer_table {
- 	int			 pt_version;	/* /proc validity stamp */
- 	int			 pt_number;	/* # peers extant */
-+	/* # zombies to go to deathrow (and not there yet) */
-+	int			 pt_zombies;
- 	struct list_head	 pt_deathrow;	/* zombie peers */
- 	struct list_head	*pt_hash;	/* NID->peer hash */
- };
-@@ -600,9 +602,6 @@ typedef struct {
- 	/* registered LNDs */
- 	struct list_head		  ln_lnds;
- 
--	/* space for network names */
--	char				 *ln_network_tokens;
--	int				  ln_network_tokens_nob;
- 	/* test protocol compatibility flags */
- 	int				  ln_testprotocompat;
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 284150f..f3c9937 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -882,7 +882,7 @@ lnet_shutdown_lndnis(void)
- 
- 	/* Clear the peer table and wait for all peers to go (they hold refs on
- 	 * their NIs) */
--	lnet_peer_tables_cleanup();
-+	lnet_peer_tables_cleanup(NULL);
- 
- 	lnet_net_lock(LNET_LOCK_EX);
- 	/* Now wait for the NI's I just nuked to show up on ln_zombie_nis
-@@ -939,12 +939,6 @@ lnet_shutdown_lndnis(void)
- 
- 	the_lnet.ln_shutdown = 0;
- 	lnet_net_unlock(LNET_LOCK_EX);
--
--	if (the_lnet.ln_network_tokens != NULL) {
--		LIBCFS_FREE(the_lnet.ln_network_tokens,
--			    the_lnet.ln_network_tokens_nob);
--		the_lnet.ln_network_tokens = NULL;
--	}
- }
- 
- static int
-diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index 867c96e..7bb140b 100644
---- a/drivers/staging/lustre/lnet/lnet/config.c
-+++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -96,6 +96,8 @@ lnet_net_unique(__u32 net, struct list_head *nilist)
- void
- lnet_ni_free(struct lnet_ni *ni)
- {
-+	int i;
-+
- 	if (ni->ni_refs != NULL)
- 		cfs_percpt_free(ni->ni_refs);
- 
-@@ -105,6 +107,10 @@ lnet_ni_free(struct lnet_ni *ni)
- 	if (ni->ni_cpts != NULL)
- 		cfs_expr_list_values_free(ni->ni_cpts, ni->ni_ncpts);
- 
-+	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++) {
-+		LIBCFS_FREE(ni->ni_interfaces[i],
-+			    strlen(ni->ni_interfaces[i]) + 1);
-+	}
- 	LIBCFS_FREE(ni, sizeof(*ni));
- }
- 
-@@ -199,8 +205,6 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 		return -ENOMEM;
- 	}
- 
--	the_lnet.ln_network_tokens = tokens;
--	the_lnet.ln_network_tokens_nob = tokensize;
- 	memcpy(tokens, networks, tokensize);
- 	str = tmp = tokens;
- 
-@@ -319,7 +323,23 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 				goto failed;
- 			}
- 
--			ni->ni_interfaces[niface++] = iface;
-+			/*
-+			 * Allocate a separate piece of memory and copy
-+			 * into it the string, so we don't have
-+			 * a depencency on the tokens string.  This way we
-+			 * can free the tokens at the end of the function.
-+			 * The newly allocated ni_interfaces[] can be
-+			 * freed when freeing the NI
-+			 */
-+			LIBCFS_ALLOC(ni->ni_interfaces[niface],
-+				     strlen(iface) + 1);
-+			if (!ni->ni_interfaces[niface]) {
-+				CERROR("Can't allocate net interface name\n");
-+				goto failed;
-+			}
-+			strncpy(ni->ni_interfaces[niface], iface,
-+				strlen(iface));
-+			niface++;
- 			iface = comma;
- 		} while (iface != NULL);
- 
-@@ -344,6 +364,8 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 	}
- 
- 	LASSERT(!list_empty(nilist));
-+
-+	LIBCFS_FREE(tokens, tokensize);
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index de0f85f..0f4154c 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2829,7 +2829,7 @@ int kiblnd_startup(lnet_ni_t *ni)
  	return 0;
  
-  failed_syntax:
-@@ -360,7 +382,6 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 		cfs_expr_list_free(el);
+ failed:
+-	if (net->ibn_dev == NULL && ibdev != NULL)
++	if (net && net->ibn_dev == NULL && ibdev != NULL)
+ 		kiblnd_destroy_dev(ibdev);
  
- 	LIBCFS_FREE(tokens, tokensize);
--	the_lnet.ln_network_tokens = NULL;
- 
- 	return -EINVAL;
- }
-diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-index 1fceed3..bb5a0bb 100644
---- a/drivers/staging/lustre/lnet/lnet/peer.c
-+++ b/drivers/staging/lustre/lnet/lnet/peer.c
-@@ -103,62 +103,116 @@ lnet_peer_tables_destroy(void)
- 	the_lnet.ln_peer_tables = NULL;
- }
- 
-+static void
-+lnet_peer_table_cleanup_locked(lnet_ni_t *ni, struct lnet_peer_table *ptable)
-+{
-+	int i;
-+	lnet_peer_t *lp;
-+	lnet_peer_t *tmp;
-+
-+	for (i = 0; i < LNET_PEER_HASH_SIZE; i++) {
-+		list_for_each_entry_safe(lp, tmp, &ptable->pt_hash[i],
-+					 lp_hashlist) {
-+			if (ni && ni != lp->lp_ni)
-+				continue;
-+			list_del_init(&lp->lp_hashlist);
-+			/* Lose hash table's ref */
-+			ptable->pt_zombies++;
-+			lnet_peer_decref_locked(lp);
-+		}
-+	}
-+}
-+
-+static void
-+lnet_peer_table_deathrow_wait_locked(struct lnet_peer_table *ptable,
-+				     int cpt_locked)
-+{
-+	int i;
-+
-+	for (i = 3; ptable->pt_zombies != 0; i++) {
-+		lnet_net_unlock(cpt_locked);
-+
-+		if (IS_PO2(i)) {
-+			CDEBUG(D_WARNING,
-+			       "Waiting for %d zombies on peer table\n",
-+			       ptable->pt_zombies);
-+		}
-+		set_current_state(TASK_UNINTERRUPTIBLE);
-+		schedule_timeout(cfs_time_seconds(1) >> 1);
-+		lnet_net_lock(cpt_locked);
-+	}
-+}
-+
-+static void
-+lnet_peer_table_del_rtrs_locked(lnet_ni_t *ni, struct lnet_peer_table *ptable,
-+				int cpt_locked)
-+{
-+	lnet_peer_t *lp;
-+	lnet_peer_t *tmp;
-+	lnet_nid_t lp_nid;
-+	int i;
-+
-+	for (i = 0; i < LNET_PEER_HASH_SIZE; i++) {
-+		list_for_each_entry_safe(lp, tmp, &ptable->pt_hash[i],
-+					 lp_hashlist) {
-+			if (ni != lp->lp_ni)
-+				continue;
-+
-+			if (lp->lp_rtr_refcount == 0)
-+				continue;
-+
-+			lp_nid = lp->lp_nid;
-+
-+			lnet_net_unlock(cpt_locked);
-+			lnet_del_route(LNET_NIDNET(LNET_NID_ANY), lp_nid);
-+			lnet_net_lock(cpt_locked);
-+		}
-+	}
-+}
-+
- void
--lnet_peer_tables_cleanup(void)
-+lnet_peer_tables_cleanup(lnet_ni_t *ni)
+ net_failed:
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index 5631f60..7a68382 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -162,6 +162,7 @@ lnet_iov_nob(unsigned int niov, struct kvec *iov)
  {
- 	struct lnet_peer_table *ptable;
-+	struct list_head deathrow;
-+	lnet_peer_t *lp;
- 	int i;
--	int j;
+ 	unsigned int nob = 0;
  
--	LASSERT(the_lnet.ln_shutdown);	/* i.e. no new peers */
-+	INIT_LIST_HEAD(&deathrow);
++	LASSERT(niov == 0 || iov);
+ 	while (niov-- > 0)
+ 		nob += (iov++)->iov_len;
  
-+	LASSERT(the_lnet.ln_shutdown || ni);
-+	/*
-+	 * If just deleting the peers for a NI, get rid of any routes these
-+	 * peers are gateways for.
-+	 */
- 	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
- 		lnet_net_lock(i);
--
--		for (j = 0; j < LNET_PEER_HASH_SIZE; j++) {
--			struct list_head *peers = &ptable->pt_hash[j];
--
--			while (!list_empty(peers)) {
--				lnet_peer_t *lp = list_entry(peers->next,
--								 lnet_peer_t,
--								 lp_hashlist);
--				list_del_init(&lp->lp_hashlist);
--				/* lose hash table's ref */
--				lnet_peer_decref_locked(lp);
--			}
--		}
--
-+		lnet_peer_table_del_rtrs_locked(ni, ptable, i);
- 		lnet_net_unlock(i);
- 	}
+@@ -280,6 +281,7 @@ lnet_kiov_nob(unsigned int niov, lnet_kiov_t *kiov)
+ {
+ 	unsigned int nob = 0;
  
-+	/*
-+	 * Start the process of moving the applicable peers to
-+	 * deathrow.
-+	 */
- 	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
--		LIST_HEAD(deathrow);
--		lnet_peer_t *lp;
++	LASSERT(niov == 0 || kiov);
+ 	while (niov-- > 0)
+ 		nob += (kiov++)->kiov_len;
+ 
+diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
+index 556c837..2ca7d0e 100644
+--- a/drivers/staging/lustre/lnet/selftest/conctl.c
++++ b/drivers/staging/lustre/lnet/selftest/conctl.c
+@@ -679,45 +679,46 @@ static int
+ lst_stat_query_ioctl(lstio_stat_args_t *args)
+ {
+ 	int rc;
+-	char *name;
++	char *name = NULL;
+ 
+ 	/* TODO: not finished */
+ 	if (args->lstio_sta_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_sta_resultp == NULL ||
+-	    (args->lstio_sta_namep  == NULL &&
+-	     args->lstio_sta_idsp   == NULL) ||
+-	    args->lstio_sta_nmlen <= 0 ||
+-	    args->lstio_sta_nmlen > LST_NAME_SIZE)
+-		return -EINVAL;
 -
- 		lnet_net_lock(i);
-+		lnet_peer_table_cleanup_locked(ni, ptable);
-+		lnet_net_unlock(i);
+-	if (args->lstio_sta_idsp != NULL &&
+-	    args->lstio_sta_count <= 0)
++	if (!args->lstio_sta_resultp)
+ 		return -EINVAL;
+ 
+-	LIBCFS_ALLOC(name, args->lstio_sta_nmlen + 1);
+-	if (name == NULL)
+-		return -ENOMEM;
+-
+-	if (copy_from_user(name, args->lstio_sta_namep,
+-			       args->lstio_sta_nmlen)) {
+-		LIBCFS_FREE(name, args->lstio_sta_nmlen + 1);
+-		return -EFAULT;
+-	}
++	if (args->lstio_sta_idsp) {
++		if (args->lstio_sta_count <= 0)
++			return -EINVAL;
+ 
+-	if (args->lstio_sta_idsp == NULL) {
+-		rc = lstcon_group_stat(name, args->lstio_sta_timeout,
+-				       args->lstio_sta_resultp);
+-	} else {
+ 		rc = lstcon_nodes_stat(args->lstio_sta_count,
+ 				       args->lstio_sta_idsp,
+ 				       args->lstio_sta_timeout,
+ 				       args->lstio_sta_resultp);
+-	}
++	} else if (args->lstio_sta_namep) {
++		if (args->lstio_sta_nmlen <= 0 ||
++		    args->lstio_sta_nmlen > LST_NAME_SIZE)
++			return -EINVAL;
++
++		LIBCFS_ALLOC(name, args->lstio_sta_nmlen + 1);
++		if (!name)
++			return -ENOMEM;
+ 
+-	LIBCFS_FREE(name, args->lstio_sta_nmlen + 1);
++		rc = copy_from_user(name, args->lstio_sta_namep,
++				    args->lstio_sta_nmlen);
++		if (!rc)
++			rc = lstcon_group_stat(name, args->lstio_sta_timeout,
++					       args->lstio_sta_resultp);
++		else
++			rc = -EFAULT;
+ 
++	} else {
++		rc = -EINVAL;
 +	}
- 
--		for (j = 3; ptable->pt_number != 0; j++) {
--			lnet_net_unlock(i);
--
--			if ((j & (j - 1)) == 0) {
--				CDEBUG(D_WARNING,
--				       "Waiting for %d peers on peer table\n",
--				       ptable->pt_number);
--			}
--			set_current_state(TASK_UNINTERRUPTIBLE);
--			schedule_timeout(cfs_time_seconds(1) / 2);
--			lnet_net_lock(i);
--		}
-+	/* Cleanup all entries on deathrow. */
-+	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
-+		lnet_net_lock(i);
-+		lnet_peer_table_deathrow_wait_locked(ptable, i);
- 		list_splice_init(&ptable->pt_deathrow, &deathrow);
--
- 		lnet_net_unlock(i);
-+	}
- 
--		while (!list_empty(&deathrow)) {
--			lp = list_entry(deathrow.next,
--					    lnet_peer_t, lp_hashlist);
--			list_del(&lp->lp_hashlist);
--			LIBCFS_FREE(lp, sizeof(*lp));
--		}
-+	while (!list_empty(&deathrow)) {
-+		lp = list_entry(deathrow.next, lnet_peer_t, lp_hashlist);
-+		list_del(&lp->lp_hashlist);
-+		LIBCFS_FREE(lp, sizeof(*lp));
- 	}
++
++	if (name)
++		LIBCFS_FREE(name, args->lstio_sta_nmlen + 1);
+ 	return rc;
  }
  
-@@ -181,6 +235,8 @@ lnet_destroy_peer_locked(lnet_peer_t *lp)
- 	lp->lp_ni = NULL;
- 
- 	list_add(&lp->lp_hashlist, &ptable->pt_deathrow);
-+	LASSERT(ptable->pt_zombies > 0);
-+	ptable->pt_zombies--;
- }
- 
- lnet_peer_t *
 -- 
 1.7.1
