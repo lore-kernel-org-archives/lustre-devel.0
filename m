@@ -1,148 +1,107 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 20 Nov 2015 18:36:00 -0500
-Subject: [lustre-devel] [PATCH 24/40] staging: lustre: make some lnet
-	functions static
+Date: Fri, 20 Nov 2015 18:36:04 -0500
+Subject: [lustre-devel] [PATCH 28/40] staging: lustre: return -EEXIST if NI
+	is not unique
 In-Reply-To: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1448062576-23757-25-git-send-email-jsimmons@infradead.org>
+Message-ID: <1448062576-23757-29-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: frank zago <fzago@cray.com>
+From: Amir Shehata <amir.shehata@intel.com>
 
-Some functions and variables are only used in their C file, so reduce
-their scope. This reduces the code size, and fixes sparse warnings
-such as:
+Return -EEXIST and not -EINVAL when trying to add a
+network interface which is not unique.
 
-warning: symbol 'proc_lnet_routes' was not declared.
-        Should it be static?
-warning: symbol 'proc_lnet_routers' was not declared.
-        Should it be static?
+Some minor cleanup in api-ni.c
 
-Some prototypes were removed from C files and added to the proper
-header.
-
-Signed-off-by: Frank Zago <fzago@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5396
-Reviewed-on: http://review.whamcloud.com/12206
+Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5875
+Reviewed-on: http://review.whamcloud.com/13056
+Reviewed-by: Isaac Huang <he.huang@intel.com>
 Reviewed-by: James Simmons <uja.ornl@gmail.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    2 ++
- drivers/staging/lustre/lnet/lnet/router_proc.c     |    2 --
- drivers/staging/lustre/lnet/selftest/console.c     |    4 +---
- drivers/staging/lustre/lnet/selftest/framework.c   |   10 ----------
- drivers/staging/lustre/lnet/selftest/module.c      |    4 +---
- drivers/staging/lustre/lnet/selftest/rpc.c         |    2 +-
- 6 files changed, 5 insertions(+), 19 deletions(-)
+ drivers/staging/lustre/lnet/lnet/api-ni.c |   20 +++++++++-----------
+ 1 files changed, 9 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 4c2d824..00ef4d0 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -446,6 +446,8 @@ lnet_ni_t *lnet_nid2ni_locked(lnet_nid_t nid, int cpt);
- lnet_ni_t *lnet_net2ni_locked(__u32 net, int cpt);
- lnet_ni_t *lnet_net2ni(__u32 net);
- 
-+extern int portal_rotor;
-+
- int lnet_init(void);
- void lnet_fini(void);
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-index af7423f..73183f1 100644
---- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-+++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-@@ -795,8 +795,6 @@ static struct lnet_portal_rotors	portal_rotors[] = {
- 	},
- };
- 
--extern int portal_rotor;
--
- static int __proc_lnet_portal_rotor(void *data, int write,
- 				    loff_t pos, void __user *buffer, int nob)
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index 9b00bc1..ed167c8 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -1213,7 +1213,7 @@ static int
+ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
+ 		   __s32 peer_cr, __s32 peer_buf_cr, __s32 credits)
  {
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index f8d6dfe..551d664 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -1694,8 +1694,6 @@ lstcon_new_session_id(lst_sid_t *sid)
- 	sid->ses_stamp = cfs_time_current();
- }
+-	int rc = 0;
++	int rc = -EINVAL;
+ 	__u32 lnd_type;
+ 	lnd_t *lnd;
+ 	struct lnet_tx_queue *tq;
+@@ -1231,19 +1231,19 @@ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
  
--extern srpc_service_t lstcon_acceptor_service;
--
- int
- lstcon_session_new(char *name, int key, unsigned feats,
- 		   int timeout, int force, lst_sid_t __user *sid_up)
-@@ -1974,7 +1972,7 @@ out:
- 	return rc;
- }
+ 	/* Make sure this new NI is unique. */
+ 	lnet_net_lock(LNET_LOCK_EX);
+-	if (!lnet_net_unique(LNET_NIDNET(ni->ni_nid), &the_lnet.ln_nis)) {
++	rc = lnet_net_unique(LNET_NIDNET(ni->ni_nid), &the_lnet.ln_nis);
++	lnet_net_unlock(LNET_LOCK_EX);
++	if (!rc) {
+ 		if (lnd_type == LOLND) {
+-			lnet_net_unlock(LNET_LOCK_EX);
+ 			lnet_ni_free(ni);
+ 			return 0;
+ 		}
+-		lnet_net_unlock(LNET_LOCK_EX);
  
--srpc_service_t lstcon_acceptor_service;
-+static srpc_service_t lstcon_acceptor_service;
- static void lstcon_init_acceptor_service(void)
- {
- 	/* initialize selftest console acceptor service table */
-diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
-index 1a2da74..b04c147 100644
---- a/drivers/staging/lustre/lnet/selftest/framework.c
-+++ b/drivers/staging/lustre/lnet/selftest/framework.c
-@@ -1622,16 +1622,6 @@ static srpc_service_t sfw_services[] = {
+ 		CERROR("Net %s is not unique\n",
+ 		       libcfs_net2str(LNET_NIDNET(ni->ni_nid)));
++		rc = -EEXIST;
+ 		goto failed0;
  	}
- };
+-	lnet_net_unlock(LNET_LOCK_EX);
  
--extern sfw_test_client_ops_t ping_test_client;
--extern srpc_service_t	ping_test_service;
--extern void ping_init_test_client(void);
--extern void ping_init_test_service(void);
--
--extern sfw_test_client_ops_t brw_test_client;
--extern srpc_service_t	brw_test_service;
--extern void brw_init_test_client(void);
--extern void brw_init_test_service(void);
--
- int
- sfw_startup(void)
- {
-diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
-index 46cbdf0..91564e5 100644
---- a/drivers/staging/lustre/lnet/selftest/module.c
-+++ b/drivers/staging/lustre/lnet/selftest/module.c
-@@ -37,6 +37,7 @@
- #define DEBUG_SUBSYSTEM S_LNET
- 
- #include "selftest.h"
-+#include "console.h"
- 
- enum {
- 	LST_INIT_NONE = 0,
-@@ -47,9 +48,6 @@ enum {
- 	LST_INIT_CONSOLE
- };
- 
--extern int lstcon_console_init(void);
--extern int lstcon_console_fini(void);
--
- static int lst_init_step = LST_INIT_NONE;
- 
- struct cfs_wi_sched *lst_sched_serial;
-diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
-index 2212199..9b823be 100644
---- a/drivers/staging/lustre/lnet/selftest/rpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/rpc.c
-@@ -1082,7 +1082,7 @@ srpc_client_rpc_expired(void *data)
- 	spin_unlock(&srpc_data.rpc_glock);
+ 	mutex_lock(&the_lnet.ln_lnd_mutex);
+ 	lnd = lnet_find_lnd_by_type(lnd_type);
+@@ -1259,6 +1259,7 @@ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
+ 			CERROR("Can't load LND %s, module %s, rc=%d\n",
+ 			       libcfs_lnd2str(lnd_type),
+ 			       libcfs_lnd2modname(lnd_type), rc);
++			rc = -EINVAL;
+ 			goto failed0;
+ 		}
+ 	}
+@@ -1348,7 +1349,7 @@ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
+ 	return 0;
+ failed0:
+ 	lnet_ni_free(ni);
+-	return -EINVAL;
++	return rc;
  }
  
--inline void
-+static void
- srpc_add_client_rpc_timer(srpc_client_rpc_t *rpc)
+ static int
+@@ -1495,7 +1496,7 @@ int
+ LNetNIInit(lnet_pid_t requested_pid)
  {
- 	stt_timer_t *timer = &rpc->crpc_timer;
+ 	int im_a_router = 0;
+-	int rc, rc2;
++	int rc;
+ 	int ni_count;
+ 	lnet_ping_info_t *pinfo;
+ 	lnet_handle_md_t md_handle;
+@@ -1584,10 +1585,7 @@ LNetNIInit(lnet_pid_t requested_pid)
+ 	return 0;
+ 
+  failed4:
+-	lnet_ping_md_unlink(pinfo, &md_handle);
+-	lnet_ping_info_free(pinfo);
+-	rc2 = LNetEQFree(the_lnet.ln_ping_target_eq);
+-	LASSERT(rc2 == 0);
++	lnet_ping_target_fini();
+  failed3:
+ 	the_lnet.ln_refcount = 0;
+ 	lnet_acceptor_stop();
 -- 
 1.7.1
