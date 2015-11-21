@@ -1,56 +1,86 @@
-From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Sat, 21 Nov 2015 15:09:22 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: lov: Fix sparse warning
-In-Reply-To: <56502ab9.8e4b620a.55593.5357@mx.google.com>
-References: <56502ab9.8e4b620a.55593.5357@mx.google.com>
-Message-ID: <6F4A320D-0C7C-4F7F-B3AD-D241A22F6F51@intel.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Sat, 21 Nov 2015 21:45:36 +0300
+Subject: [lustre-devel] [PATCH 06/40] staging: lustre: remove uses of
+	IS_ERR_VALUE()
+In-Reply-To: <1448062576-23757-7-git-send-email-jsimmons@infradead.org>
+References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
+	<1448062576-23757-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <20151121184536.GY18797@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+On Fri, Nov 20, 2015 at 06:35:42PM -0500, James Simmons wrote:
+> @@ -1577,15 +1578,20 @@ static int mdc_ioc_changelog_send(struct obd_device *obd,
+>  	 * New thread because we should return to user app before
+>  	 * writing into our pipe
+>  	 */
+> -	rc = PTR_ERR(kthread_run(mdc_changelog_send_thread, cs,
+> -				 "mdc_clg_send_thread"));
+> -	if (!IS_ERR_VALUE(rc)) {
+> -		CDEBUG(D_CHANGELOG, "start changelog thread\n");
+> -		return 0;
+> +	task = kthread_run(mdc_changelog_send_thread, cs,
+> +			   "mdc_clg_send_thread");
+> +	if (IS_ERR(task)) {
+> +		rc = PTR_ERR(task);
+> +		CERROR("%s: can't start changelog thread: rc = %d\n",
+> +		       obd->obd_name, rc);
+> +		kfree(cs);
+> +	} else {
+> +		rc = 0;
+> +		CDEBUG(D_CHANGELOG, "%s: started changelog thread\n",
+> +		       obd->obd_name);
+>  	}
+>  
+>  	CERROR("Failed to start changelog thread: %d\n", rc);
+> -	kfree(cs);
+>  	return rc;
+>  }
+>  
 
-On Nov 21, 2015, at 3:26 AM, Paul Davies C wrote:
+This will print an error when it succeeds.
 
-> This patch fixes the following warnings:-
-> 
-> drivers/staging/lustre/lustre/lov/lov_object.c:926:22: warning: symbol 'lov_lsm_get' was not declared. Should it be static?
-> drivers/staging/lustre/lustre/lov/lov_object.c:942:6: warning: symbol 'lov_lsm_put' was not declared. Should it be static?
-> 
-> Signed-off-by: Paul Davies C <pauldaviesc@gmail.com>
-> ---
-> drivers/staging/lustre/lustre/lov/lov_object.c | 4 ++--
-> 1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-> index c7ff817..a667336 100644
-> --- a/drivers/staging/lustre/lustre/lov/lov_object.c
-> +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-> @@ -923,7 +923,7 @@ static struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
-> 	return lsm;
-> }
-> 
-> -struct lov_stripe_md *lov_lsm_get(struct cl_object *clobj)
-> +static struct lov_stripe_md *lov_lsm_get(struct cl_object *clobj)
-> {
-> 	struct lu_object *luobj;
-> 	struct lov_stripe_md *lsm = NULL;
-> @@ -939,7 +939,7 @@ struct lov_stripe_md *lov_lsm_get(struct cl_object *clobj)
-> }
-> EXPORT_SYMBOL(lov_lsm_get);
+It better to keep the error path and the success path as separate as
+possible.  For the normal case, the success path is at indent level 1
+and the fail path is at indent level 2.  Like this:
 
-You did not compile-tested this, did you?
-This symbol is still used in lustre/lclient/lcommon_cl.c but also
-leaving EXPORT_SYMBOL intact for a static symbol?
+	ret = one();
+	if (ret)
+		return ret;
+	ret = two();
+	if (ret)
+		return ret;
 
-> 
-> -void lov_lsm_put(struct cl_object *unused, struct lov_stripe_md *lsm)
-> +static void lov_lsm_put(struct cl_object *unused, struct lov_stripe_md *lsm)
-> {
-> 	if (lsm != NULL)
-> 		lov_free_memmd(&lsm);
-> -- 
-> 1.9.1
-> 
+	return 0;
+
+When it's written that way it is:
+
+	success;
+	if (ret)
+		fail_path;
+
+	success;
+	if (ret)
+		fail_path;
+	success;
+
+
+The current code looks like:
+
+	success;
+	if (ret) {
+		fail;
+	} else {
+		success;
+	}
+	mixed;
+
+You see what I mean?  Ideally the function should look like a list of
+directives in a row at indent level 1 with only minimal indenting for
+errors.
+
+regards,
+dan carpenter
