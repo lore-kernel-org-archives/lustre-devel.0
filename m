@@ -1,70 +1,73 @@
-From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Mon, 23 Nov 2015 23:42:34 +0200
+From: kbuild test robot <lkp@intel.com>
+Date: Tue, 24 Nov 2015 06:10:08 +0800
 Subject: [lustre-devel] [PATCH] staging: lustre: ptlrpc: constify
 	ptlrpc_sec_cops structs
-Message-ID: <20151123214234.GA9568@waves>
+In-Reply-To: <20151123214234.GA9568@waves>
+Message-ID: <201511240637.yUtwbW4T%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Constifies ptlrpc_sec_cops structures in the lustre driver
-since they are not modified after their initialization.
+Hi Aya,
 
-Detected and found using Coccinelle.
+[auto build test WARNING on staging/staging-testing]
+[also build test WARNING on v4.4-rc2 next-20151123]
 
-Suggested-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+url:    https://github.com/0day-ci/linux/commits/Aya-Mahfouz/staging-lustre-ptlrpc-constify-ptlrpc_sec_cops-structs/20151124-054437
+config: tile-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=tile 
+
+All warnings (new ones prefixed by >>):
+
+>> drivers/staging/lustre/lustre/ptlrpc/sec_null.c:404:2: warning: initialization discards 'const' qualifier from pointer target type [enabled by default]
+
+vim +/const +404 drivers/staging/lustre/lustre/ptlrpc/sec_null.c
+
+d7e09d039 Peng Tao 2013-05-02  388  	.free_reqbuf	    = null_free_reqbuf,
+d7e09d039 Peng Tao 2013-05-02  389  	.free_repbuf	    = null_free_repbuf,
+d7e09d039 Peng Tao 2013-05-02  390  	.enlarge_reqbuf	 = null_enlarge_reqbuf,
+d7e09d039 Peng Tao 2013-05-02  391  };
+d7e09d039 Peng Tao 2013-05-02  392  
+d7e09d039 Peng Tao 2013-05-02  393  static struct ptlrpc_sec_sops null_sec_sops = {
+d7e09d039 Peng Tao 2013-05-02  394  	.accept		 = null_accept,
+d7e09d039 Peng Tao 2013-05-02  395  	.alloc_rs	       = null_alloc_rs,
+d7e09d039 Peng Tao 2013-05-02  396  	.authorize	      = null_authorize,
+d7e09d039 Peng Tao 2013-05-02  397  	.free_rs		= null_free_rs,
+d7e09d039 Peng Tao 2013-05-02  398  };
+d7e09d039 Peng Tao 2013-05-02  399  
+d7e09d039 Peng Tao 2013-05-02  400  static struct ptlrpc_sec_policy null_policy = {
+d7e09d039 Peng Tao 2013-05-02  401  	.sp_owner	       = THIS_MODULE,
+d7e09d039 Peng Tao 2013-05-02  402  	.sp_name		= "sec.null",
+d7e09d039 Peng Tao 2013-05-02  403  	.sp_policy	      = SPTLRPC_POLICY_NULL,
+d7e09d039 Peng Tao 2013-05-02 @404  	.sp_cops		= &null_sec_cops,
+d7e09d039 Peng Tao 2013-05-02  405  	.sp_sops		= &null_sec_sops,
+d7e09d039 Peng Tao 2013-05-02  406  };
+d7e09d039 Peng Tao 2013-05-02  407  
+d7e09d039 Peng Tao 2013-05-02  408  static void null_init_internal(void)
+d7e09d039 Peng Tao 2013-05-02  409  {
+d7e09d039 Peng Tao 2013-05-02  410  	static HLIST_HEAD(__list);
+d7e09d039 Peng Tao 2013-05-02  411  
+d7e09d039 Peng Tao 2013-05-02  412  	null_sec.ps_policy = &null_policy;
+
+:::::: The code at line 404 was first introduced by commit
+:::::: d7e09d0397e84eefbabfd9cb353221f3c6448d83 staging: add Lustre file system client support
+
+:::::: TO: Peng Tao <bergwolf@gmail.com>
+:::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
 ---
- drivers/staging/lustre/lustre/ptlrpc/sec.c       | 2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_null.c  | 2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_plain.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-index 39f5261..f959897 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-@@ -1580,7 +1580,7 @@ int sptlrpc_cli_enlarge_reqbuf(struct ptlrpc_request *req,
- 			       int segment, int newsize)
- {
- 	struct ptlrpc_cli_ctx *ctx = req->rq_cli_ctx;
--	struct ptlrpc_sec_cops *cops;
-+	const struct ptlrpc_sec_cops *cops;
- 	struct lustre_msg *msg = req->rq_reqmsg;
- 
- 	LASSERT(ctx);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
-index ebfa609..ffdad15 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
-@@ -378,7 +378,7 @@ static struct ptlrpc_ctx_ops null_ctx_ops = {
- 	.verify		 = null_ctx_verify,
- };
- 
--static struct ptlrpc_sec_cops null_sec_cops = {
-+static const struct ptlrpc_sec_cops null_sec_cops = {
- 	.create_sec	     = null_create_sec,
- 	.destroy_sec	    = null_destroy_sec,
- 	.lookup_ctx	     = null_lookup_ctx,
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-index f448b45..71351de 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-@@ -956,7 +956,7 @@ static struct ptlrpc_ctx_ops plain_ctx_ops = {
- 	.unwrap_bulk	    = plain_cli_unwrap_bulk,
- };
- 
--static struct ptlrpc_sec_cops plain_sec_cops = {
-+static const struct ptlrpc_sec_cops plain_sec_cops = {
- 	.create_sec	     = plain_create_sec,
- 	.destroy_sec	    = plain_destroy_sec,
- 	.kill_sec	       = plain_kill_sec,
--- 
-2.4.3
-
-
--- 
-Kind Regards,
-Aya Saif El-yazal Mahfouz
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 42380 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20151124/ef8ffe65/attachment-0001.obj>
