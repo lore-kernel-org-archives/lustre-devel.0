@@ -1,86 +1,70 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Sat, 21 Nov 2015 21:45:36 +0300
-Subject: [lustre-devel] [PATCH 06/40] staging: lustre: remove uses of
-	IS_ERR_VALUE()
-In-Reply-To: <1448062576-23757-7-git-send-email-jsimmons@infradead.org>
-References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-	<1448062576-23757-7-git-send-email-jsimmons@infradead.org>
-Message-ID: <20151121184536.GY18797@mwanda>
+From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+Date: Mon, 23 Nov 2015 23:42:34 +0200
+Subject: [lustre-devel] [PATCH] staging: lustre: ptlrpc: constify
+	ptlrpc_sec_cops structs
+Message-ID: <20151123214234.GA9568@waves>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Nov 20, 2015 at 06:35:42PM -0500, James Simmons wrote:
-> @@ -1577,15 +1578,20 @@ static int mdc_ioc_changelog_send(struct obd_device *obd,
->  	 * New thread because we should return to user app before
->  	 * writing into our pipe
->  	 */
-> -	rc = PTR_ERR(kthread_run(mdc_changelog_send_thread, cs,
-> -				 "mdc_clg_send_thread"));
-> -	if (!IS_ERR_VALUE(rc)) {
-> -		CDEBUG(D_CHANGELOG, "start changelog thread\n");
-> -		return 0;
-> +	task = kthread_run(mdc_changelog_send_thread, cs,
-> +			   "mdc_clg_send_thread");
-> +	if (IS_ERR(task)) {
-> +		rc = PTR_ERR(task);
-> +		CERROR("%s: can't start changelog thread: rc = %d\n",
-> +		       obd->obd_name, rc);
-> +		kfree(cs);
-> +	} else {
-> +		rc = 0;
-> +		CDEBUG(D_CHANGELOG, "%s: started changelog thread\n",
-> +		       obd->obd_name);
->  	}
->  
->  	CERROR("Failed to start changelog thread: %d\n", rc);
-> -	kfree(cs);
->  	return rc;
->  }
->  
+Constifies ptlrpc_sec_cops structures in the lustre driver
+since they are not modified after their initialization.
 
-This will print an error when it succeeds.
+Detected and found using Coccinelle.
 
-It better to keep the error path and the success path as separate as
-possible.  For the normal case, the success path is at indent level 1
-and the fail path is at indent level 2.  Like this:
+Suggested-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+---
+ drivers/staging/lustre/lustre/ptlrpc/sec.c       | 2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_null.c  | 2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_plain.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-	ret = one();
-	if (ret)
-		return ret;
-	ret = two();
-	if (ret)
-		return ret;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+index 39f5261..f959897 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+@@ -1580,7 +1580,7 @@ int sptlrpc_cli_enlarge_reqbuf(struct ptlrpc_request *req,
+ 			       int segment, int newsize)
+ {
+ 	struct ptlrpc_cli_ctx *ctx = req->rq_cli_ctx;
+-	struct ptlrpc_sec_cops *cops;
++	const struct ptlrpc_sec_cops *cops;
+ 	struct lustre_msg *msg = req->rq_reqmsg;
+ 
+ 	LASSERT(ctx);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
+index ebfa609..ffdad15 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
+@@ -378,7 +378,7 @@ static struct ptlrpc_ctx_ops null_ctx_ops = {
+ 	.verify		 = null_ctx_verify,
+ };
+ 
+-static struct ptlrpc_sec_cops null_sec_cops = {
++static const struct ptlrpc_sec_cops null_sec_cops = {
+ 	.create_sec	     = null_create_sec,
+ 	.destroy_sec	    = null_destroy_sec,
+ 	.lookup_ctx	     = null_lookup_ctx,
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+index f448b45..71351de 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+@@ -956,7 +956,7 @@ static struct ptlrpc_ctx_ops plain_ctx_ops = {
+ 	.unwrap_bulk	    = plain_cli_unwrap_bulk,
+ };
+ 
+-static struct ptlrpc_sec_cops plain_sec_cops = {
++static const struct ptlrpc_sec_cops plain_sec_cops = {
+ 	.create_sec	     = plain_create_sec,
+ 	.destroy_sec	    = plain_destroy_sec,
+ 	.kill_sec	       = plain_kill_sec,
+-- 
+2.4.3
 
-	return 0;
 
-When it's written that way it is:
-
-	success;
-	if (ret)
-		fail_path;
-
-	success;
-	if (ret)
-		fail_path;
-	success;
-
-
-The current code looks like:
-
-	success;
-	if (ret) {
-		fail;
-	} else {
-		success;
-	}
-	mixed;
-
-You see what I mean?  Ideally the function should look like a list of
-directives in a row at indent level 1 with only minimal indenting for
-errors.
-
-regards,
-dan carpenter
+-- 
+Kind Regards,
+Aya Saif El-yazal Mahfouz
