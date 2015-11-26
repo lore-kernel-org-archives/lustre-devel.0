@@ -1,8 +1,8 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Thu, 26 Nov 2015 08:53:31 -0800
+From: SF Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 26 Nov 2015 20:02:21 +0100
 Subject: [lustre-devel] [PATCH 3/3] staging: lustre: Less function calls
  in class_register_type() after error detection
-In-Reply-To: <5656AFEC.8030709@users.sourceforge.net>
+In-Reply-To: <20151126165331.GA7882@kroah.com>
 References: <alpine.DEB.2.10.1402251840450.7035@hadrien>
 	<530CF8FF.8080600@users.sourceforge.net>
 	<alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
@@ -13,54 +13,53 @@ References: <alpine.DEB.2.10.1402251840450.7035@hadrien>
 	<563B4991.90005@users.sourceforge.net>
 	<20151125163901.GA7368@kroah.com>
 	<5656AFEC.8030709@users.sourceforge.net>
-Message-ID: <20151126165331.GA7882@kroah.com>
+	<20151126165331.GA7882@kroah.com>
+Message-ID: <5657573D.4080905@users.sourceforge.net>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, Nov 26, 2015 at 08:08:28AM +0100, SF Markus Elfring wrote:
-> Am 25.11.2015 um 17:39 schrieb Greg Kroah-Hartman:
-> > On Thu, Nov 05, 2015 at 01:20:33PM +0100, SF Markus Elfring wrote:
-> >> From: Markus Elfring <elfring@users.sourceforge.net>
-> >> Date: Thu, 5 Nov 2015 12:48:58 +0100
-> >>
-> >> The functions "kfree" and "kobject_put" were called in a few cases by the
-> >> function "class_register_type" during error handling even if the passed
-> >> variable contained a null pointer.
-> >>
-> >> This implementation detail could be improved by the adjustment of
-> >> jump targets.
-> >>
-> >> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> >> ---
-> >>  drivers/staging/lustre/lustre/obdclass/genops.c | 26 +++++++++++++++----------
-> >>  1 file changed, 16 insertions(+), 10 deletions(-)
-> > 
-> > Does not apply to my staging-next branch :(
+>> Do you try this update suggestion out without integrating the corresponding previous
+>> update suggestion "Delete unnecessary checks before two function calls"
+>> where I proposed to remove extra checks before a few calls of the function "kobject_put"
+>> (which seems to matter for the patch hunk in the shown error message)?
+>> https://lkml.org/lkml/2015/11/5/276
+>> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1013635.html
 > 
-> I get also a result like the following together with the software "Linux next-20151126".   ;-)
+> I guess so, I don't remember, I don't see any patches from you earlier
+> in my "todo" mbox.
+
+I am still waiting for further constructive feedback on a bunch
+of my update suggestions which are derived from static source code analysis.
+
+It can be the usual challenge to get a bit more attention for them.
+Other software improvements will result in bigger effects than the source code
+fine-tuning I propose, won't it?
+
+I would like to acknowledge that changes like the following from this patch series
+can still be applied together for the software "Linux next-20151126".
+* 0001-staging-lustre-Delete-unnecessary-checks-before-two.patch
+* 0003-staging-lustre-Less-function-calls-in-class_register.patch
+
+
+>> Would you like to reject the first update step from this patch series
+>> so that I need to adapt my approach to your software design decision?
 > 
-> elfring at Sonne:~/Projekte/Linux/next-patched> LANG=C git apply ~/Projekte/Bau/Linux/scripts/Coccinelle/deletions1/next/20151102/Flicken/0003-staging-lustre-Less-function-calls-in-class_register.patch
-> error: patch failed: drivers/staging/lustre/lustre/obdclass/genops.c:214
-> error: drivers/staging/lustre/lustre/obdclass/genops.c: patch does not apply
-> 
-> 
-> Do you try this update suggestion out without integrating the corresponding previous
-> update suggestion "Delete unnecessary checks before two function calls"
-> where I proposed to remove extra checks before a few calls of the function "kobject_put"
-> (which seems to matter for the patch hunk in the shown error message)?
-> https://lkml.org/lkml/2015/11/5/276
-> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1013635.html
+> I have no idea what you are talking about.  I have no recolection of
+> previous patches or conversations about your patches.
 
-I guess so, I don't remember, I don't see any patches from you earlier
-in my "todo" mbox.
+* Dan Carpenter expressed his software design concerns around hidden sanity checks
+  a few times.
+  How do you think about to give the proposed changes another chance?
 
-> Would you like to reject the first update step from this patch series
-> so that I need to adapt my approach to your software design decision?
+* Positive feedback is occasionally increasing by specific subsystem supporters
+  and maintainers.
+  How will our collaboration evolve further?
 
-I have no idea what you are talking about.  I have no recolection of
-previous patches or conversations about your patches.
 
-greg k-h
+Do you want that I resend any mails/patches from my "waiting queue"?
+
+Regards,
+Markus
