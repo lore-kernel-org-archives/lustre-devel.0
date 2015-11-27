@@ -1,52 +1,82 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Thu, 26 Nov 2015 23:01:30 +0300
-Subject: [lustre-devel] [PATCH 3/3] staging: lustre: Less function calls
- in class_register_type() after error detection
-In-Reply-To: <5657573D.4080905@users.sourceforge.net>
-References: <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
-	<530DD06F.4090703@users.sourceforge.net>
-	<alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
-	<5317A59D.4@users.sourceforge.net>
-	<563B473C.5090508@users.sourceforge.net>
-	<563B4991.90005@users.sourceforge.net>
-	<20151125163901.GA7368@kroah.com>
-	<5656AFEC.8030709@users.sourceforge.net>
-	<20151126165331.GA7882@kroah.com>
-	<5657573D.4080905@users.sourceforge.net>
-Message-ID: <20151126200130.GI7289@mwanda>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Fri, 27 Nov 2015 04:31:39 +0000
+Subject: [lustre-devel] [PATCH v2] staging: lustre: remove
+	IOC_LIBCFS_PING_TEST ioctl
+Message-ID: <D27D2340.11CC89%andreas.dilger@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-These patches are often correct in the same way a stopped clock is
-correct twice a day, but I reject the motivation/approach/patch
-description.  Just because there is a sanity check does not mean we
-should use it (ie, do an insane thing).  It hurts readability to hide
-the NULL check.
+On 2015/11/08, 09:34, "James Simmons" <jsimmons@infradead.org> wrote:
 
-On the other hand, half the time the NULL checks are superflous because
-the pointer is never NULL.  The other half of the time the NULL checks
-are there because the code uses one err style error handling.  Also the
-error handling code should mirror the allocation code so I feel like it
-should be:
+>The ioctl IOC_LIBCFS_PING_TEST has not been used in
+>ages. The recent nidstring changes which moved all
+>the nidstring operations from libcfs to the LNet
+>layer but this ioctl code was still using an
+>nidstring operation that was causing an circular
+>dependency loop between libcfs and LNet:
 
-	if (some_feature)
-		foo = allocate();
-	ret = frob();
-	if (ret)
-		goto free_foo;
+Hi Greg,
+are you planning on pushing this patch to Linus for 4.4?  It was resent
+on 11/08 per your request on 11/07 but I don't see it in staging or
+staging-next yet.  Since it fixes the depmod dependency cycle for
+allmodconfig builds on mainline it seems worthwhile to include into
+4.4-rc3 rather than waiting for 4.5.
 
-free_foo:
-	if (some_feature)  // <--- as opposed to if (foo) {
-		free(foo);
+Cheers, Andreas
 
-So anyway I often don't like the original code, but the new code is
-even worse and I have never heard a good motivation for these patches
-besides that they were generated using a cool tool.  It's not a good
-reason.  Other maintainers are accepting these patches so you are free
-to send them there.
 
-regards,
-dan carpenter
+>Signed-off-by: James Simmons <jsimmons@infradead.org>
+>---
+> .../lustre/include/linux/libcfs/libcfs_ioctl.h     |    1 -
+> drivers/staging/lustre/lustre/libcfs/module.c      |   17
+>-----------------
+> 2 files changed, 0 insertions(+), 18 deletions(-)
+>
+>diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
+>b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
+>index f5d741f..485ab26 100644
+>--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
+>+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
+>@@ -110,7 +110,6 @@ struct libcfs_ioctl_handler {
+> #define IOC_LIBCFS_CLEAR_DEBUG	     _IOWR('e', 31, long)
+> #define IOC_LIBCFS_MARK_DEBUG	      _IOWR('e', 32, long)
+> #define IOC_LIBCFS_MEMHOG		  _IOWR('e', 36, long)
+>-#define IOC_LIBCFS_PING_TEST	       _IOWR('e', 37, long)
+> /* lnet ioctls */
+> #define IOC_LIBCFS_GET_NI		  _IOWR('e', 50, long)
+> #define IOC_LIBCFS_FAIL_NID		_IOWR('e', 51, long)
+>diff --git a/drivers/staging/lustre/lustre/libcfs/module.c
+>b/drivers/staging/lustre/lustre/libcfs/module.c
+>index 570f05c..89038ed 100644
+>--- a/drivers/staging/lustre/lustre/libcfs/module.c
+>+++ b/drivers/staging/lustre/lustre/libcfs/module.c
+>@@ -274,23 +274,6 @@ static int libcfs_ioctl_int(struct cfs_psdev_file
+>  		}
+>  		break;
+> 
+>-	case IOC_LIBCFS_PING_TEST: {
+>-		extern void (kping_client)(struct libcfs_ioctl_data *);
+>-		void (*ping)(struct libcfs_ioctl_data *);
+>-
+>-		CDEBUG(D_IOCTL, "doing %d pings to nid %s (%s)\n",
+>-		       data->ioc_count, libcfs_nid2str(data->ioc_nid),
+>-		       libcfs_nid2str(data->ioc_nid));
+>-		ping = symbol_get(kping_client);
+>-		if (!ping)
+>-			CERROR("symbol_get failed\n");
+>-		else {
+>-			ping(data);
+>-			symbol_put(kping_client);
+>-		}
+>-		return 0;
+>-	}
+>-
+>  	default: {
+>  		struct libcfs_ioctl_handler *hand;
+> 
+> 
+>-- 
+>1.7.1
