@@ -1,82 +1,88 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 27 Nov 2015 04:31:39 +0000
-Subject: [lustre-devel] [PATCH v2] staging: lustre: remove
-	IOC_LIBCFS_PING_TEST ioctl
-Message-ID: <D27D2340.11CC89%andreas.dilger@intel.com>
+From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+Date: Fri, 27 Nov 2015 22:41:23 +0200
+Subject: [lustre-devel] [PATCH v2] staging: lustre: ptlrpc: constify
+	ptlrpc_sec_cops structs
+Message-ID: <20151127204123.GA8719@waves>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On 2015/11/08, 09:34, "James Simmons" <jsimmons@infradead.org> wrote:
+Constifies ptlrpc_sec_cops structures in the lustre driver
+since they are not modified after their initialization.
 
->The ioctl IOC_LIBCFS_PING_TEST has not been used in
->ages. The recent nidstring changes which moved all
->the nidstring operations from libcfs to the LNet
->layer but this ioctl code was still using an
->nidstring operation that was causing an circular
->dependency loop between libcfs and LNet:
+Detected and found using Coccinelle.
 
-Hi Greg,
-are you planning on pushing this patch to Linus for 4.4?  It was resent
-on 11/08 per your request on 11/07 but I don't see it in staging or
-staging-next yet.  Since it fixes the depmod dependency cycle for
-allmodconfig builds on mainline it seems worthwhile to include into
-4.4-rc3 rather than waiting for 4.5.
+Suggested-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+---
+Changelog:
+	v2: added const to a ptlrpc_sec_cops structure
+	in the definition of ptlrpc_sec_policy
+	
+ drivers/staging/lustre/lustre/include/lustre_sec.h | 2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec.c         | 2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_null.c    | 2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-Cheers, Andreas
+diff --git a/drivers/staging/lustre/lustre/include/lustre_sec.h b/drivers/staging/lustre/lustre/include/lustre_sec.h
+index dd1033b..de35e2f 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_sec.h
++++ b/drivers/staging/lustre/lustre/include/lustre_sec.h
+@@ -779,7 +779,7 @@ struct ptlrpc_sec_policy {
+ 	struct module		   *sp_owner;
+ 	char			   *sp_name;
+ 	__u16			   sp_policy; /* policy number */
+-	struct ptlrpc_sec_cops	 *sp_cops;   /* client ops */
++	const struct ptlrpc_sec_cops	 *sp_cops;   /* client ops */
+ 	struct ptlrpc_sec_sops	 *sp_sops;   /* server ops */
+ };
+ 
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+index 39f5261..f959897 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+@@ -1580,7 +1580,7 @@ int sptlrpc_cli_enlarge_reqbuf(struct ptlrpc_request *req,
+ 			       int segment, int newsize)
+ {
+ 	struct ptlrpc_cli_ctx *ctx = req->rq_cli_ctx;
+-	struct ptlrpc_sec_cops *cops;
++	const struct ptlrpc_sec_cops *cops;
+ 	struct lustre_msg *msg = req->rq_reqmsg;
+ 
+ 	LASSERT(ctx);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
+index ebfa609..ffdad15 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
+@@ -378,7 +378,7 @@ static struct ptlrpc_ctx_ops null_ctx_ops = {
+ 	.verify		 = null_ctx_verify,
+ };
+ 
+-static struct ptlrpc_sec_cops null_sec_cops = {
++static const struct ptlrpc_sec_cops null_sec_cops = {
+ 	.create_sec	     = null_create_sec,
+ 	.destroy_sec	    = null_destroy_sec,
+ 	.lookup_ctx	     = null_lookup_ctx,
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+index f448b45..71351de 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+@@ -956,7 +956,7 @@ static struct ptlrpc_ctx_ops plain_ctx_ops = {
+ 	.unwrap_bulk	    = plain_cli_unwrap_bulk,
+ };
+ 
+-static struct ptlrpc_sec_cops plain_sec_cops = {
++static const struct ptlrpc_sec_cops plain_sec_cops = {
+ 	.create_sec	     = plain_create_sec,
+ 	.destroy_sec	    = plain_destroy_sec,
+ 	.kill_sec	       = plain_kill_sec,
+-- 
+2.4.3
 
 
->Signed-off-by: James Simmons <jsimmons@infradead.org>
->---
-> .../lustre/include/linux/libcfs/libcfs_ioctl.h     |    1 -
-> drivers/staging/lustre/lustre/libcfs/module.c      |   17
->-----------------
-> 2 files changed, 0 insertions(+), 18 deletions(-)
->
->diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
->b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
->index f5d741f..485ab26 100644
->--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
->+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
->@@ -110,7 +110,6 @@ struct libcfs_ioctl_handler {
-> #define IOC_LIBCFS_CLEAR_DEBUG	     _IOWR('e', 31, long)
-> #define IOC_LIBCFS_MARK_DEBUG	      _IOWR('e', 32, long)
-> #define IOC_LIBCFS_MEMHOG		  _IOWR('e', 36, long)
->-#define IOC_LIBCFS_PING_TEST	       _IOWR('e', 37, long)
-> /* lnet ioctls */
-> #define IOC_LIBCFS_GET_NI		  _IOWR('e', 50, long)
-> #define IOC_LIBCFS_FAIL_NID		_IOWR('e', 51, long)
->diff --git a/drivers/staging/lustre/lustre/libcfs/module.c
->b/drivers/staging/lustre/lustre/libcfs/module.c
->index 570f05c..89038ed 100644
->--- a/drivers/staging/lustre/lustre/libcfs/module.c
->+++ b/drivers/staging/lustre/lustre/libcfs/module.c
->@@ -274,23 +274,6 @@ static int libcfs_ioctl_int(struct cfs_psdev_file
->  		}
->  		break;
-> 
->-	case IOC_LIBCFS_PING_TEST: {
->-		extern void (kping_client)(struct libcfs_ioctl_data *);
->-		void (*ping)(struct libcfs_ioctl_data *);
->-
->-		CDEBUG(D_IOCTL, "doing %d pings to nid %s (%s)\n",
->-		       data->ioc_count, libcfs_nid2str(data->ioc_nid),
->-		       libcfs_nid2str(data->ioc_nid));
->-		ping = symbol_get(kping_client);
->-		if (!ping)
->-			CERROR("symbol_get failed\n");
->-		else {
->-			ping(data);
->-			symbol_put(kping_client);
->-		}
->-		return 0;
->-	}
->-
->  	default: {
->  		struct libcfs_ioctl_handler *hand;
-> 
-> 
->-- 
->1.7.1
+-- 
+Kind Regards,
+Aya Saif El-yazal Mahfouz
