@@ -1,37 +1,34 @@
 From: Valdis Kletnieks <Valdis.Kletnieks@vt.edu>
-Date: Tue,  1 Dec 2015 17:05:15 -0500
-Subject: [lustre-devel] [lustre cleanups 2/6] Fix set-but-unused whinge.
-In-Reply-To: <1449007519-73974-1-git-send-email-Valdis.Kletnieks@vt.edu>
-References: <1449007519-73974-1-git-send-email-Valdis.Kletnieks@vt.edu>
-Message-ID: <1449007519-73974-3-git-send-email-Valdis.Kletnieks@vt.edu>
+Date: Tue,  1 Dec 2015 17:05:13 -0500
+Subject: [lustre-devel] [lustre cleanups 0/6] Patch series to make lustre
+	safe(r) for W=1 compiles
+Message-ID: <1449007519-73974-1-git-send-email-Valdis.Kletnieks@vt.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>
-Cc: lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org, Valdis Kletnieks <Valdis.Kletnieks@vt.edu>
+To: lustre-devel@lists.lustre.org
 
-drivers/staging/lustre/lustre/fid/lproc_fid.c: In function 'ldebugfs_fid_write_common':
-drivers/staging/lustre/lustre/fid/lproc_fid.c:67:6: warning: variable 'rc' set but not used [-Wunused-but-set-variable]
-  int rc;
+Start of a batch series to clean up the Lustre tree. Other people have
+done  some sparse and checkpatch cleanups, but I found a bunch of
+stuff building with W=1.
 
-We fix it by *using* the return code to help bulletproof it.  It says it's
-test code - it should be *more* bulletproof than production, not less.
+Valdis Kletnieks (6):
 
-Signed-off-by: Valdis Kletnieks <Valdis.Kletnieks@vt.edu>
----
-diff --git a/drivers/staging/lustre/lustre/fid/lproc_fid.c b/drivers/staging/lustre/lustre/fid/lproc_fid.c
-index ce90c1c54a63..eff011f30fa5 100644
---- a/drivers/staging/lustre/lustre/fid/lproc_fid.c
-+++ b/drivers/staging/lustre/lustre/fid/lproc_fid.c
-@@ -85,6 +85,8 @@ ldebugfs_fid_write_common(const char __user *buffer, size_t count,
- 	rc = sscanf(kernbuf, "[%llx - %llx]\n",
- 		    (unsigned long long *)&tmp.lsr_start,
- 		    (unsigned long long *)&tmp.lsr_end);
-+	if (rc != 2)
-+		return -EINVAL;
- 	if (!range_is_sane(&tmp) || range_is_zero(&tmp) ||
- 	    tmp.lsr_start < range->lsr_start || tmp.lsr_end > range->lsr_end)
- 		return -EINVAL;
+  Swap inline/const to kill 272 warnings
+  Fix set-but-unused whinge.
+  Clean up another C warnining:
+  Fix another C compiler whine:
+  Nuke an unsigned >= 0 assert
+  Nuke another unsigned >= 0 assert
+
+ drivers/staging/lustre/lustre/fid/lproc_fid.c      |  1 +
+ drivers/staging/lustre/lustre/include/lu_object.h  |  2 +-
+ drivers/staging/lustre/lustre/include/lustre_cfg.h |  4 --
+ drivers/staging/lustre/lustre/libcfs/module.c      | 15 ++++----
+ drivers/staging/lustre/lustre/llite/rw.c           |  1 -
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |  1 -
+ 7 files changed, 26 insertions(+), 41 deletions(-)
+
 -- 
 2.6.3
