@@ -1,170 +1,168 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Wed, 2 Dec 2015 10:46:17 +0300
-Subject: [lustre-devel] [PATCH 02/40] staging: lustre: fix 'NULL pointer
- dereference' errors for LNet
-In-Reply-To: <1448062576-23757-3-git-send-email-jsimmons@infradead.org>
+Date: Wed, 2 Dec 2015 10:54:10 +0300
+Subject: [lustre-devel] [PATCH 03/40] staging: lustre: reflect down
+ routes in /proc/sys/lnet/routes
+In-Reply-To: <1448062576-23757-4-git-send-email-jsimmons@infradead.org>
 References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-	<1448062576-23757-3-git-send-email-jsimmons@infradead.org>
-Message-ID: <20151202074617.GI18797@mwanda>
+	<1448062576-23757-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <20151202075410.GJ18797@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Nov 20, 2015 at 06:35:38PM -0500, James Simmons wrote:
-> From: Sebastien Buisson <sebastien.buisson@bull.net>
+On Fri, Nov 20, 2015 at 06:35:39PM -0500, James Simmons wrote:
+> From: Chris Horn <hornc@cray.com>
 > 
-> Fix 'NULL pointer dereference' defects found by Coverity version
-> 6.5.3:
-> Dereference after null check (FORWARD_NULL)
-> For instance, Passing null pointer to a function which dereferences
-> it.
-> Dereference before null check (REVERSE_INULL)
-> Null-checking variable suggests that it may be null, but it has
-> already been dereferenced on all paths leading to the check.
-> Dereference null return value (NULL_RETURNS)
+> We consider routes "down" if the router is down or the router
+> NI for the target network is down. This should be reflected
+> in the output of /proc/sys/lnet/routes
 > 
-> The following fixes for the LNet layer are broken out of patch
-> http://review.whamcloud.com/4720.
-> 
-> Signed-off-by: Sebastien Buisson <sebastien.buisson@bull.net>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2217
-> Reviewed-on: http://review.whamcloud.com/4720
-> Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> Signed-off-by: Chris Horn <hornc@cray.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3679
+> Reviewed-on: http://review.whamcloud.com/7857
+> Reviewed-by: Cory Spitz <spitzcor@cray.com>
+> Reviewed-by: Isaac Huang <he.huang@intel.com>
 > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 > ---
->  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    2 +-
->  drivers/staging/lustre/lnet/lnet/lib-move.c        |    2 +
->  drivers/staging/lustre/lnet/selftest/conctl.c      |   51 ++++++++++----------
->  3 files changed, 29 insertions(+), 26 deletions(-)
+>  .../staging/lustre/include/linux/lnet/lib-lnet.h   |   13 ++++++++
+>  drivers/staging/lustre/lnet/lnet/lib-move.c        |   32 ++++++++++----------
+>  drivers/staging/lustre/lnet/lnet/router_proc.c     |    2 +-
+>  3 files changed, 30 insertions(+), 17 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> index de0f85f..0f4154c 100644
-> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> @@ -2829,7 +2829,7 @@ int kiblnd_startup(lnet_ni_t *ni)
->  	return 0;
+> diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> index b61d504..09c6bfe 100644
+> --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> @@ -64,6 +64,19 @@ extern lnet_t	the_lnet;	/* THE network */
+>  /** exclusive lock */
+>  #define LNET_LOCK_EX		CFS_PERCPT_LOCK_EX
 >  
->  failed:
-> -	if (net->ibn_dev == NULL && ibdev != NULL)
-> +	if (net && net->ibn_dev == NULL && ibdev != NULL)
->  		kiblnd_destroy_dev(ibdev);
->  
->  net_failed:
-
-I think the warning must be for a really really old version.  This was
-fixed in: 3247c4e5ef5d ('staging: lustre: lnet: klnds: o2iblnd: fix null
-dereference on failed path in o2iblnd.c').
-
-The new NULL check is superflous.
-
+> +static inline int lnet_is_route_alive(lnet_route_t *route)
+> +{
+> +	/* gateway is down */
+> +	if (!route->lr_gateway->lp_alive)
+> +		return 0;
+> +	/* no NI status, assume it's alive */
+> +	if ((route->lr_gateway->lp_ping_feats &
+> +	     LNET_PING_FEAT_NI_STATUS) == 0)
+> +		return 1;
+> +	/* has NI status, check # down NIs */
+> +	return route->lr_downis == 0;
+> +}
+> +
+>  static inline int lnet_is_wire_handle_none(lnet_handle_wire_t *wh)
+>  {
+>  	return (wh->wh_interface_cookie == LNET_WIRE_HANDLE_COOKIE_NONE &&
 > diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> index 5631f60..7a68382 100644
+> index 7a68382..c56de44 100644
 > --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
 > +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> @@ -162,6 +162,7 @@ lnet_iov_nob(unsigned int niov, struct kvec *iov)
+> @@ -1122,9 +1122,9 @@ static lnet_peer_t *
+>  lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
 >  {
->  	unsigned int nob = 0;
->  
-> +	LASSERT(niov == 0 || iov);
->  	while (niov-- > 0)
->  		nob += (iov++)->iov_len;
->  
-> @@ -280,6 +281,7 @@ lnet_kiov_nob(unsigned int niov, lnet_kiov_t *kiov)
->  {
->  	unsigned int nob = 0;
->  
-> +	LASSERT(niov == 0 || kiov);
->  	while (niov-- > 0)
->  		nob += (kiov++)->kiov_len;
->  
+>  	lnet_remotenet_t *rnet;
+> -	lnet_route_t *rtr;
+> -	lnet_route_t *rtr_best;
+> -	lnet_route_t *rtr_last;
+> +	lnet_route_t *route;
+> +	lnet_route_t *best_route;
+> +	lnet_route_t *last_route;
 
-Fine, I suppose.
+Unrelated variable renaming.
 
-> diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-> index 556c837..2ca7d0e 100644
-> --- a/drivers/staging/lustre/lnet/selftest/conctl.c
-> +++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-> @@ -679,45 +679,46 @@ static int
->  lst_stat_query_ioctl(lstio_stat_args_t *args)
->  {
+>  	struct lnet_peer *lp_best;
+>  	struct lnet_peer *lp;
 >  	int rc;
-> -	char *name;
-> +	char *name = NULL;
+> @@ -1137,13 +1137,12 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
+>  		return NULL;
 >  
->  	/* TODO: not finished */
->  	if (args->lstio_sta_key != console_session.ses_key)
->  		return -EACCES;
->  
-> -	if (args->lstio_sta_resultp == NULL ||
-> -	    (args->lstio_sta_namep  == NULL &&
-> -	     args->lstio_sta_idsp   == NULL) ||
-> -	    args->lstio_sta_nmlen <= 0 ||
-> -	    args->lstio_sta_nmlen > LST_NAME_SIZE)
-> -		return -EINVAL;
-> -
-> -	if (args->lstio_sta_idsp != NULL &&
-> -	    args->lstio_sta_count <= 0)
-> +	if (!args->lstio_sta_resultp)
->  		return -EINVAL;
->  
-> -	LIBCFS_ALLOC(name, args->lstio_sta_nmlen + 1);
-> -	if (name == NULL)
-> -		return -ENOMEM;
-> -
-> -	if (copy_from_user(name, args->lstio_sta_namep,
-> -			       args->lstio_sta_nmlen)) {
-> -		LIBCFS_FREE(name, args->lstio_sta_nmlen + 1);
-> -		return -EFAULT;
-> -	}
-> +	if (args->lstio_sta_idsp) {
-> +		if (args->lstio_sta_count <= 0)
-> +			return -EINVAL;
->  
-> -	if (args->lstio_sta_idsp == NULL) {
-> -		rc = lstcon_group_stat(name, args->lstio_sta_timeout,
-> -				       args->lstio_sta_resultp);
-> -	} else {
->  		rc = lstcon_nodes_stat(args->lstio_sta_count,
->  				       args->lstio_sta_idsp,
->  				       args->lstio_sta_timeout,
->  				       args->lstio_sta_resultp);
-> -	}
-> +	} else if (args->lstio_sta_namep) {
-> +		if (args->lstio_sta_nmlen <= 0 ||
-> +		    args->lstio_sta_nmlen > LST_NAME_SIZE)
-> +			return -EINVAL;
-> +
-> +		LIBCFS_ALLOC(name, args->lstio_sta_nmlen + 1);
-> +		if (!name)
-> +			return -ENOMEM;
->  
-> -	LIBCFS_FREE(name, args->lstio_sta_nmlen + 1);
-> +		rc = copy_from_user(name, args->lstio_sta_namep,
-> +				    args->lstio_sta_nmlen);
-> +		if (!rc)
-> +			rc = lstcon_group_stat(name, args->lstio_sta_timeout,
-> +					       args->lstio_sta_resultp);
-> +		else
-> +			rc = -EFAULT;
->  
-> +	} else {
-> +		rc = -EINVAL;
-> +	}
-> +
-> +	if (name)
-> +		LIBCFS_FREE(name, args->lstio_sta_nmlen + 1);
+>  	lp_best = NULL;
+> -	rtr_best = rtr_last = NULL;
+> -	list_for_each_entry(rtr, &rnet->lrn_routes, lr_list) {
+> -		lp = rtr->lr_gateway;
+> +	best_route = NULL;
+> +	last_route = NULL;
 
+Unrelated checkpatch fixes.
 
-There is no bug fix here.  This code was fine when it was merged into
-the kernel in 2013 so I have no idea how out of date the static checker
-warning is...  The new code doesn't do unnecessary allocations so that's
-good but "name" should be declared in the block where it is used instead
-of at the start of the function.  Btw, we assume that the user gives us
-a NUL terminated string for "name" so we should fix that bug as well.
+> +	list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
+> +		lp = route->lr_gateway;
+>  
+> -		if (!lp->lp_alive || /* gateway is down */
+> -		    ((lp->lp_ping_feats & LNET_PING_FEAT_NI_STATUS) != 0 &&
+> -		     rtr->lr_downis != 0)) /* NI to target is down */
+> +		if (!lnet_is_route_alive(route))
 
-TODO: lustre: don't assume "name" is NUL terminated
+This section is related to the patch, we moved the check out into its
+own function.
+
+>  			continue;
+>  
+>  		if (ni != NULL && lp->lp_ni != ni)
+> @@ -1153,28 +1152,29 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
+>  			return lp;
+>  
+>  		if (lp_best == NULL) {
+> -			rtr_best = rtr_last = rtr;
+> +			best_route = route;
+> +			last_route = route;
+
+More unrelated checkpatch fixes.
+
+>  			lp_best = lp;
+>  			continue;
+>  		}
+>  
+>  		/* no protection on below fields, but it's harmless */
+> -		if (rtr_last->lr_seq - rtr->lr_seq < 0)
+> -			rtr_last = rtr;
+> +		if (last_route->lr_seq - route->lr_seq < 0)
+> +			last_route = route;
+>  
+> -		rc = lnet_compare_routes(rtr, rtr_best);
+> +		rc = lnet_compare_routes(route, best_route);
+>  		if (rc < 0)
+>  			continue;
+>  
+> -		rtr_best = rtr;
+> +		best_route = route;
+>  		lp_best = lp;
+>  	}
+>  
+>  	/* set sequence number on the best router to the latest sequence + 1
+>  	 * so we can round-robin all routers, it's race and inaccurate but
+>  	 * harmless and functional  */
+> -	if (rtr_best != NULL)
+> -		rtr_best->lr_seq = rtr_last->lr_seq + 1;
+> +	if (best_route)
+
+More checkpatch fixes.
+
+> +		best_route->lr_seq = last_route->lr_seq + 1;
+>  	return lp_best;
+>  }
+>  
+> diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
+> index 396c7c4..af7423f 100644
+> --- a/drivers/staging/lustre/lnet/lnet/router_proc.c
+> +++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
+> @@ -240,7 +240,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
+>  			unsigned int hops = route->lr_hops;
+>  			unsigned int priority = route->lr_priority;
+>  			lnet_nid_t nid = route->lr_gateway->lp_nid;
+> -			int alive = route->lr_gateway->lp_alive;
+> +			int alive = lnet_is_route_alive(route);
+
+This line is the bugfix.
+
+I know that people hate breaking patches up into reviewable patches but
+this is a one line fix which is hidden behind 30 lines of unrelated
+changes.  It makes it very hard to follow what is going on.
+
+I have scripts to review checkpatch fixes basically automatically so it
+really really helps me when people do one thing per patch.
 
 regards,
 dan carpenter
