@@ -1,73 +1,58 @@
-From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Fri,  4 Dec 2015 18:23:08 -0500
-Subject: [lustre-devel] [PATCH] staging/lustre: remove IOC_LIBCFS_PING_TEST
-	ioctl
-Message-ID: <1449271388-3546416-1-git-send-email-green@linuxhacker.ru>
+From: Rasmus Villemoes <linux@rasmusvillemoes.dk>
+Date: Sun,  6 Dec 2015 01:41:31 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: fix %.2X versus signed char
+	issue
+Message-ID: <1449362492-20779-1-git-send-email-linux@rasmusvillemoes.dk>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: James Simmons <jsimmons@infradead.org>
+When char is signed and one of the bytes in lmm happens to have a byte
+value above 127, the result of printing that with %.2X will be 8 hex
+chars, the first 6 of which are 'F'. Worst case, we'll overrun our
+'carefully' allocated buffer.
 
-The ioctl IOC_LIBCFS_PING_TEST has not been used in
-ages. The recent nidstring changes which moved all
-the nidstring operations from libcfs to the LNet
-layer but this ioctl code was still using an
-nidstring operation that was causing a circular
-dependency loop between libcfs and LNet.
+I didn't have the tenacity to work through the gazillion and seven
+layers of macros behind CERROR, but I assume it'll all end at some
+function implemented in terms of the kernel's vsnprintf. Use %*phN for
+a hexdump. That'll cap the number of dumped bytes at 64. If that's a
+problem, the loop could be replaced by "bin2hex(buffer, lmm,
+lmm_bytes);".
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+Signed-off-by: Rasmus Villemoes <linux@rasmusvillemoes.dk>
 ---
-Would be great to have this accepted to fix the ugly
-circular dependency error Lustre is still causing in the Linus'
-tree when enabled.
+ drivers/staging/lustre/lustre/lov/lov_pack.c | 15 +--------------
+ 1 file changed, 1 insertion(+), 14 deletions(-)
 
- .../staging/lustre/include/linux/libcfs/libcfs_ioctl.h  |  1 -
- drivers/staging/lustre/lustre/libcfs/module.c           | 17 -----------------
- 2 files changed, 18 deletions(-)
-
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-index f5d741f..485ab26 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-@@ -110,7 +110,6 @@ struct libcfs_ioctl_handler {
- #define IOC_LIBCFS_CLEAR_DEBUG	     _IOWR('e', 31, long)
- #define IOC_LIBCFS_MARK_DEBUG	      _IOWR('e', 32, long)
- #define IOC_LIBCFS_MEMHOG		  _IOWR('e', 36, long)
--#define IOC_LIBCFS_PING_TEST	       _IOWR('e', 37, long)
- /* lnet ioctls */
- #define IOC_LIBCFS_GET_NI		  _IOWR('e', 50, long)
- #define IOC_LIBCFS_FAIL_NID		_IOWR('e', 51, long)
-diff --git a/drivers/staging/lustre/lustre/libcfs/module.c b/drivers/staging/lustre/lustre/libcfs/module.c
-index 07a6859..e7c2b26 100644
---- a/drivers/staging/lustre/lustre/libcfs/module.c
-+++ b/drivers/staging/lustre/lustre/libcfs/module.c
-@@ -274,23 +274,6 @@ static int libcfs_ioctl_int(struct cfs_psdev_file *pfile, unsigned long cmd,
- 		}
- 		break;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index 2fb1e974cc70..7f18d08929a5 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -258,22 +258,9 @@ static int lov_verify_lmm(void *lmm, int lmm_bytes, __u16 *stripe_count)
+ 	int rc;
  
--	case IOC_LIBCFS_PING_TEST: {
--		extern void (kping_client)(struct libcfs_ioctl_data *);
--		void (*ping)(struct libcfs_ioctl_data *);
+ 	if (lsm_op_find(le32_to_cpu(*(__u32 *)lmm)) == NULL) {
+-		char *buffer;
+-		int sz;
 -
--		CDEBUG(D_IOCTL, "doing %d pings to nid %s (%s)\n",
--		       data->ioc_count, libcfs_nid2str(data->ioc_nid),
--		       libcfs_nid2str(data->ioc_nid));
--		ping = symbol_get(kping_client);
--		if (!ping)
--			CERROR("symbol_get failed\n");
--		else {
--			ping(data);
--			symbol_put(kping_client);
+ 		CERROR("bad disk LOV MAGIC: 0x%08X; dumping LMM (size=%d):\n",
+ 		       le32_to_cpu(*(__u32 *)lmm), lmm_bytes);
+-		sz = lmm_bytes * 2 + 1;
+-		buffer = libcfs_kvzalloc(sz, GFP_NOFS);
+-		if (buffer != NULL) {
+-			int i;
+-
+-			for (i = 0; i < lmm_bytes; i++)
+-				sprintf(buffer+2*i, "%.2X", ((char *)lmm)[i]);
+-			buffer[sz - 1] = '\0';
+-			CERROR("%s\n", buffer);
+-			kvfree(buffer);
 -		}
--		return 0;
--	}
--
- 	default: {
- 		struct libcfs_ioctl_handler *hand;
- 
++		CERROR("%*phN\n", lmm_bytes, lmm);
+ 		return -EINVAL;
+ 	}
+ 	rc = lsm_op_find(le32_to_cpu(*(__u32 *)lmm))->lsm_lmm_verify(lmm,
 -- 
-2.1.0
+2.6.1
