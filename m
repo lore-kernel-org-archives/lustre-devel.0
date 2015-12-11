@@ -1,46 +1,67 @@
 From: Valdis Kletnieks <Valdis.Kletnieks@vt.edu>
-Date: Fri, 11 Dec 2015 18:04:20 -0500
-Subject: [lustre-devel] [PATCH v2 1/6] staging/lustre: Silence warning about
-	'inline'
+Date: Fri, 11 Dec 2015 18:04:23 -0500
+Subject: [lustre-devel] [PATCH v2 4/6] Fix another C compiler whine: set but
+	not used
 In-Reply-To: <1449875065-35182-1-git-send-email-Valdis.Kletnieks@vt.edu>
 References: <1449875065-35182-1-git-send-email-Valdis.Kletnieks@vt.edu>
-Message-ID: <1449875065-35182-2-git-send-email-Valdis.Kletnieks@vt.edu>
+Message-ID: <1449875065-35182-5-git-send-email-Valdis.Kletnieks@vt.edu>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Low-hanging fruit first:
+  CC [M]  drivers/staging/lustre/lustre/libcfs/module.o
+drivers/staging/lustre/lustre/libcfs/module.c: In function 'lustre_insert_debugfs':
+drivers/staging/lustre/lustre/libcfs/module.c:670:17: warning: variable 'entry' set but not used [-Wunused-but-set-variable]
+  struct dentry *entry;
+                     ^
 
-  CC [M]  drivers/staging/lustre/lustre/fid/fid_request.o
-In file included from drivers/staging/lustre/lustre/fid/../include/lustre_net.h:66:0,
-                 from drivers/staging/lustre/lustre/fid/../include/lustre_lib.h:64,
-                 from drivers/staging/lustre/lustre/fid/../include/obd.h:52,
-                 from drivers/staging/lustre/lustre/fid/fid_request.c:48:
-drivers/staging/lustre/lustre/fid/../include/lu_object.h:765:1: warning: 'inline' is not at beginning of declaration [-Wold-style-declaration]
- static const inline struct lu_device_operations *
- ^
-
-So we just swap inline and const.  272 warnings gone. :)
+Just ignore the dentry returned, and add a comment that we *know*
+we're not really leaking the dentry because something else will be able
+to reap it via recursion.
 
 Signed-off-by: Valdis Kletnieks <Valdis.Kletnieks@vt.edu>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/libcfs/module.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index fa78689748a9..176724f60c1b 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -756,7 +756,7 @@ static inline const struct lu_fid *lu_object_fid(const struct lu_object *o)
- /**
-  * return device operations vector for this object
-  */
--static const inline struct lu_device_operations *
-+static inline const struct lu_device_operations *
- lu_object_ops(const struct lu_object *o)
+diff --git a/drivers/staging/lustre/lustre/libcfs/module.c b/drivers/staging/lustre/lustre/libcfs/module.c
+index 96d9d4651a51..4438dc426b54 100644
+--- a/drivers/staging/lustre/lustre/libcfs/module.c
++++ b/drivers/staging/lustre/lustre/libcfs/module.c
+@@ -667,8 +667,6 @@ static const struct file_operations lnet_debugfs_file_operations = {
+ void lustre_insert_debugfs(struct ctl_table *table,
+ 			   const struct lnet_debugfs_symlink_def *symlinks)
  {
- 	return o->lo_dev->ld_ops;
+-	struct dentry *entry;
+-
+ 	if (lnet_debugfs_root == NULL)
+ 		lnet_debugfs_root = debugfs_create_dir("lnet", NULL);
+ 
+@@ -676,15 +674,17 @@ void lustre_insert_debugfs(struct ctl_table *table,
+ 	if (IS_ERR_OR_NULL(lnet_debugfs_root))
+ 		return;
+ 
++	/* We don't save the dentry returned in next two calls, because
++	 * we don't call debugfs_remove() but rather remove_recursive()
++	 */
+ 	for (; table->procname; table++)
+-		entry = debugfs_create_file(table->procname, table->mode,
+-					    lnet_debugfs_root, table,
+-					    &lnet_debugfs_file_operations);
++		debugfs_create_file(table->procname, table->mode,
++				    lnet_debugfs_root, table,
++				    &lnet_debugfs_file_operations);
+ 
+ 	for (; symlinks && symlinks->name; symlinks++)
+-		entry = debugfs_create_symlink(symlinks->name,
+-					       lnet_debugfs_root,
+-					       symlinks->target);
++		debugfs_create_symlink(symlinks->name, lnet_debugfs_root,
++				       symlinks->target);
+ 
+ }
+ EXPORT_SYMBOL_GPL(lustre_insert_debugfs);
 -- 
 2.6.3
