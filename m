@@ -1,10 +1,11 @@
 From: SF Markus Elfring <elfring@users.sourceforge.net>
-Date: Sun, 13 Dec 2015 14:48:35 +0100
-Subject: [lustre-devel] [PATCH 0/7] staging-Lustre: Fine-tuning for some
- function implementations
-In-Reply-To: <566ABCD9.1060404@users.sourceforge.net>
+Date: Sun, 13 Dec 2015 14:52:48 +0100
+Subject: [lustre-devel] [PATCH 1/7] staging: lustre: Delete unnecessary goto
+ statements in six functions
+In-Reply-To: <566D7733.1030102@users.sourceforge.net>
 References: <566ABCD9.1060404@users.sourceforge.net>
-Message-ID: <566D7733.1030102@users.sourceforge.net>
+	<566D7733.1030102@users.sourceforge.net>
+Message-ID: <566D7830.9060000@users.sourceforge.net>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,29 +13,76 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sun, 13 Dec 2015 14:40:14 +0100
+Date: Sun, 13 Dec 2015 09:30:47 +0100
 
-Several update suggestions were taken into account
-from static source code analysis.
+Six goto statements referred to a source code position directly behind them.
+Thus omit such unnecessary jumps.
 
-Markus Elfring (7):
-  Delete unnecessary goto statements in six functions
-  Rename a jump label for ptlrpc_req_finished() calls
-  Rename a jump label for a kfree(key) call
-  Delete an unnecessary variable initialisation in mgc_process_recover_log()
-  Less checks in mgc_process_recover_log() after error detection
-  A few checks less in mgc_process_recover_log() after error detection
-  Rename a jump label for module_put() calls
+This issue was detected by using the Coccinelle software.
 
- drivers/staging/lustre/lustre/llite/file.c         |  26 ++---
- drivers/staging/lustre/lustre/llite/lloop.c        |   8 +-
- drivers/staging/lustre/lustre/llite/namei.c        |  13 +--
- drivers/staging/lustre/lustre/llite/xattr.c        |  20 ++--
- drivers/staging/lustre/lustre/mdc/mdc_request.c    | 124 ++++++++++-----------
- drivers/staging/lustre/lustre/mgc/mgc_request.c    |  53 ++++-----
- drivers/staging/lustre/lustre/osc/osc_request.c    |  52 ++++-----
- drivers/staging/lustre/lustre/ptlrpc/llog_client.c |  22 ++--
- 8 files changed, 152 insertions(+), 166 deletions(-)
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/staging/lustre/lustre/llite/namei.c     | 1 -
+ drivers/staging/lustre/lustre/mdc/mdc_request.c | 7 -------
+ 2 files changed, 8 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index 64db5e8..2113dd4 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -554,7 +554,6 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
+ 		retval = NULL;
+ 	else
+ 		retval = dentry;
+-	goto out;
+  out:
+ 	if (req)
+ 		ptlrpc_req_finished(req);
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index 294c050..920b1e9 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -1181,7 +1181,6 @@ static int mdc_ioc_hsm_progress(struct obd_export *exp,
+ 	ptlrpc_request_set_replen(req);
+ 
+ 	rc = mdc_queue_wait(req);
+-	goto out;
+ out:
+ 	ptlrpc_req_finished(req);
+ 	return rc;
+@@ -1216,7 +1215,6 @@ static int mdc_ioc_hsm_ct_register(struct obd_import *imp, __u32 archives)
+ 	ptlrpc_request_set_replen(req);
+ 
+ 	rc = mdc_queue_wait(req);
+-	goto out;
+ out:
+ 	ptlrpc_req_finished(req);
+ 	return rc;
+@@ -1282,7 +1280,6 @@ static int mdc_ioc_hsm_ct_unregister(struct obd_import *imp)
+ 	ptlrpc_request_set_replen(req);
+ 
+ 	rc = mdc_queue_wait(req);
+-	goto out;
+ out:
+ 	ptlrpc_req_finished(req);
+ 	return rc;
+@@ -1362,8 +1359,6 @@ static int mdc_ioc_hsm_state_set(struct obd_export *exp,
+ 	ptlrpc_request_set_replen(req);
+ 
+ 	rc = mdc_queue_wait(req);
+-	goto out;
+-
+ out:
+ 	ptlrpc_req_finished(req);
+ 	return rc;
+@@ -1427,8 +1422,6 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
+ 	ptlrpc_request_set_replen(req);
+ 
+ 	rc = mdc_queue_wait(req);
+-	goto out;
+-
+ out:
+ 	ptlrpc_req_finished(req);
+ 	return rc;
 -- 
 2.6.3
