@@ -1,88 +1,48 @@
-From: Joe Perches <joe@perches.com>
-Date: Tue, 15 Dec 2015 07:02:31 -0800
-Subject: [lustre-devel] [PATCH 1/7] staging: lustre: Delete unnecessary
- goto statements in six functions
-In-Reply-To: <20151215144133.GC5284@mwanda>
-References: <566ABCD9.1060404@users.sourceforge.net>
-	<566D7733.1030102@users.sourceforge.net>
-	<566D7830.9060000@users.sourceforge.net>
-	<1450189676.3551.1.camel@perches.com> <20151215144133.GC5284@mwanda>
-Message-ID: <1450191751.3551.14.camel@perches.com>
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Tue, 15 Dec 2015 17:10:39 +0000
+Subject: [lustre-devel] [PATCH 21/40] staging: lustre: improve LNet
+	clean up code and API
+In-Reply-To: <20151202125440.GS18797@mwanda>
+References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
+	<1448062576-23757-22-git-send-email-jsimmons@infradead.org>
+	<20151202125440.GS18797@mwanda>
+Message-ID: <05bc05cb164b4d249f74683aef9c9d72@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 2015-12-15 at 17:41 +0300, Dan Carpenter wrote:
-> On Tue, Dec 15, 2015 at 06:27:56AM -0800, Joe Perches wrote:
-> > On Sun, 2015-12-13 at 14:52 +0100, SF Markus Elfring wrote:
-> > > From: Markus Elfring <elfring@users.sourceforge.net>
-> > > Date: Sun, 13 Dec 2015 09:30:47 +0100
-> > > 
-> > > Six goto statements referred to a source code position directly behind them.
-> > > Thus omit such unnecessary jumps.
-> > 
-> > I suggest you leave a blank line instead
-> > of deleting the goto.
-> > 
-> 
-> What is the point of the little bunny hop?
-> 
-> regards,
-> dan carpenter
-> 
+>Actually we're going to have to redo so much code that it's not worth it
+>for me to review the rest of these patches.  
 
--ENOPARSE little bunny hop
-(though I could have said "just leave a blank line)
+Sorry I didn't get back to you sooner but I was on vacation.  Thanks for 
+reviewing this work. Especially since this is the first major bug fixing merge
+for the lustre client which means a lot of pain involved to iron out how to
+do this. I have been pondering if pushing bug fixes before style cleanups
+is the right thing to do. I pushed a bunch of bug fixes earlier and none got
+merged which either means Greg is just backed up and hasn't the time to
+merge them or  style issues are higher priority. Assuming these bug fixes are
+in scope of the staging tree. Should I continue to push this work first?
+Well either way I should update this patch series so it ready to merge at some
+point.
 
-I think that code blocks are more obvious to read.
+>Please just look over everything again:
+>
+> BAD:	return -1;
+>GOOD:	return -EINVAL;
+>
+> BAD:  failed0:
+>GOOD:  free_something:
+>
+> BAD:	if (rc != 0)
+>GOOD:	if (rc)
+>
+>Do one thing per patch.
+>Do not introduce a bug and then fix it in a later patch.
+>Check ioc_len more carefully.
+>Don't make the code look ugly just to please checkpatch.pl.
+>Do error handling not success handling.
+>Try to avoid indenting a far to the right.
 
-This is the original code:
-
-	result = foo();
-	if (result)
-		goto label;
-
-	result = bar();
-	if (result)
-		goto label;
-
-	result = baz();
-	if (result)
-		goto label;
-
-label:
-	go on...
-
-He proposes:
-
-	result = foo();
-	if (result)
-		goto label;
-
-	result = bar();
-	if (result)
-		goto label;
-
-	result = baz();
-label:
-	go on...
-
-
-I don't find the test->goto label; label: use offensive,
-but if he does, I think keeping a blank line in place of
-the test->goto might be better.
-
-	result = foo();
-	if (result)
-		goto label;
-
-	result = bar();
-	if (result)
-		goto label;
-
-	result = baz();
-
-label:
-	go on...
+Okay. Will start to do the patch cleanup.
