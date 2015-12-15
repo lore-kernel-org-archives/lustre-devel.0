@@ -1,48 +1,64 @@
-From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Tue, 15 Dec 2015 18:39:07 +0000
-Subject: [lustre-devel] [PATCH 13/40] staging: lustre: Dynamic LNet
- Configuration (DLC) show command
-In-Reply-To: <20151215181932.GH5177@mwanda>
-References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-	<1448062576-23757-14-git-send-email-jsimmons@infradead.org>
-	<20151202112055.GM18797@mwanda>
-	<944b6e806bc44a3fa4d6d5e1904a894a@EXCHCS32.ornl.gov>
-	<20151215181932.GH5177@mwanda>
-Message-ID: <5a754fcb1c2f42cba72b558e41d03828@EXCHCS32.ornl.gov>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Tue, 15 Dec 2015 10:48:03 -0800
+Subject: [lustre-devel] [PATCH] staging: lustre: fix address space
+	mismatches
+In-Reply-To: <20151215165045.GA5213@bytefire-computer>
+References: <20151215165045.GA5213@bytefire-computer>
+Message-ID: <20151215184803.GB16129@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
->On Tue, Dec 15, 2015 at 06:14:19PM +0000, Simmons, James A. wrote:
->>   
->> >>  struct libcfs_ioctl_hdr {
->> >>  	__u32 ioc_len;
->> >> @@ -87,6 +88,13 @@ do {						    \
->> >>  	data.ioc_hdr.ioc_len = sizeof(data);			\
->> >>  } while (0)
->> >>  
->> >> +#define LIBCFS_IOC_INIT_V2(data, hdr)			\
->> >> +do {							\
->> >> +	memset(&(data), 0, sizeof(data));		\
->> >> +	(data).hdr.ioc_version = LIBCFS_IOCTL_VERSION2;	\
->> >> +	(data).hdr.ioc_len = sizeof(data);		\
->> >> +} while (0)
->> >> +
->> >
->> >Do we really need this?
->> 
->> Would you be okay if this was a inline function? This is used by user land and kernel space code.
->> 
->
->I try (not very hard) to sound like a broken record but this business of
->sharing code with userland is a pain in the butt.  It's not used in the
->kernel or in any patches you have sent.
->
->It would look better as an inline function though so I wouldn't have
->even noticed it.
+On Tue, Dec 15, 2015 at 04:50:45PM +0000, Okash Khawaja wrote:
+> This patch fixes address space warnings from sparse. Function
+> lprocfs_write_helper() accepts user space buffer but was being 
+> passed kernel space buffer by these functions:
+> 
+> contention_seconds_store()
+> lockless_truncate_store()
+> 
+> Since these functions are used to implement show and store functions of
+> lustre_attr object and since lustre_attr object is used to implement object
+> inheritance through use of `container_of`, the address space warnings
+> show up at multiple places inside driver's code base.
+> 
+> This patch creates a user space version of lustre_attr object lustre_attr_u.
+> Keeping function names and signatures same - other than the __user attribute -
+> ensures that object inheritance continues to work as it was, but address
+> space discrepency is removed. That removes a whole bunch of address
+> space warnings.
+> 
+> Signed-off-by: Okash Khawaja <okash.khawaja@gmail.com>
+> ---
+>  drivers/staging/lustre/lustre/include/lprocfs_status.h | 16 ++++++++++++++++
+>  drivers/staging/lustre/lustre/osc/lproc_osc.c          | 12 ++++++------
+>  2 files changed, 22 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+> index f18c0c7..df6d9d5 100644
+> --- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
+> +++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+> @@ -698,6 +698,22 @@ static struct lustre_attr lustre_attr_##name = __ATTR(name, mode, show, store)
+>  #define LUSTRE_RO_ATTR(name) LUSTRE_ATTR(name, 0444, name##_show, NULL)
+>  #define LUSTRE_RW_ATTR(name) LUSTRE_ATTR(name, 0644, name##_show, name##_store)
+>  
+> +struct lustre_attr_u {
+> +	struct attribute attr;
+> +	ssize_t (*show)(struct kobject *kobj, struct attribute *attr,
+> +			char *buf);
+> +	ssize_t (*store)(struct kobject *kobj, struct attribute *attr,
+> +			 const char __user *buf, size_t len);
 
-I'm glad you noticed.  I just looked at the production source code and yep it is only used
-in the userland tools code. I need to update our tools so they don't break. Then we can
-remove these macros.
+sysfs files do not have __user pointers, something is really wrong here
+if that's the solution :(
+
+See the other comments in the mailing list archives for how messed up
+the __user and kernel pointers are in lustre, and how I'd not recommend
+anyone trying to fix them, unless you are a lustre developer and can
+test all of your changes...
+
+sorry,
+
+greg k-h
