@@ -1,39 +1,119 @@
-From: Joe Perches <joe@perches.com>
-Date: Tue, 15 Dec 2015 10:55:11 -0800
-Subject: [lustre-devel] staging: lustre: Delete unnecessary goto
- statements in six functions
-In-Reply-To: <567060C3.5070608@users.sourceforge.net>
-References: <566ABCD9.1060404@users.sourceforge.net>
-	<566D7733.1030102@users.sourceforge.net>
-	<566D7830.9060000@users.sourceforge.net>
-	<1450189676.3551.1.camel@perches.com> <20151215144133.GC5284@mwanda>
-	<1450191751.3551.14.camel@perches.com> <20151215174844.GE5284@mwanda>
-	<1450203011.4142.4.camel@perches.com>
-	<56705B71.6090307@users.sourceforge.net>
-	<1450204451.4142.19.camel@perches.com>
-	<567060C3.5070608@users.sourceforge.net>
-Message-ID: <1450205711.4142.23.camel@perches.com>
+From: Okash Khawaja <okash.khawaja@gmail.com>
+Date: Tue, 15 Dec 2015 16:50:45 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: fix address space mismatches
+Message-ID: <20151215165045.GA5213@bytefire-computer>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 2015-12-15 at 19:49 +0100, SF Markus Elfring wrote:
-> > I think there should _not_ be a hardened rule.
-> I guess that it can become hard to achieve consensus on a precise rule.
+This patch fixes address space warnings from sparse. Function
+lprocfs_write_helper() accepts user space buffer but was being 
+passed kernel space buffer by these functions:
 
-Consensus isn't unanimity.
+contention_seconds_store()
+lockless_truncate_store()
 
-> I imagine that your feedback
-> can cause further software development troubles if the acceptance for
-> this update suggestion will really depend on the number of blank lines
-> before a jump label.
+Since these functions are used to implement show and store functions of
+lustre_attr object and since lustre_attr object is used to implement object
+inheritance through use of `container_of`, the address space warnings
+show up at multiple places inside driver's code base.
 
-<shrug>
+This patch creates a user space version of lustre_attr object lustre_attr_u.
+Keeping function names and signatures same - other than the __user attribute -
+ensures that object inheritance continues to work as it was, but address
+space discrepency is removed. That removes a whole bunch of address
+space warnings.
 
-The author of any particular bit of code can do
-whatever they want.
+Signed-off-by: Okash Khawaja <okash.khawaja@gmail.com>
+---
+ drivers/staging/lustre/lustre/include/lprocfs_status.h | 16 ++++++++++++++++
+ drivers/staging/lustre/lustre/osc/lproc_osc.c          | 12 ++++++------
+ 2 files changed, 22 insertions(+), 6 deletions(-)
 
-Localized consistency is probably more valuable than
-global consistency.
+diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+index f18c0c7..df6d9d5 100644
+--- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
++++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+@@ -698,6 +698,22 @@ static struct lustre_attr lustre_attr_##name = __ATTR(name, mode, show, store)
+ #define LUSTRE_RO_ATTR(name) LUSTRE_ATTR(name, 0444, name##_show, NULL)
+ #define LUSTRE_RW_ATTR(name) LUSTRE_ATTR(name, 0644, name##_show, name##_store)
+ 
++struct lustre_attr_u {
++	struct attribute attr;
++	ssize_t (*show)(struct kobject *kobj, struct attribute *attr,
++			char *buf);
++	ssize_t (*store)(struct kobject *kobj, struct attribute *attr,
++			 const char __user *buf, size_t len);
++};
++
++#define LUSTRE_ATTR_U(name, mode, show, store) \
++static struct lustre_attr_u lustre_attr_u_##name = __ATTR(name, mode, show, \
++		store)
++
++#define LUSTRE_RO_ATTR_U(name) LUSTRE_ATTR_U(name, 0444, name##_show, NULL)
++#define LUSTRE_RW_ATTR_U(name) LUSTRE_ATTR_U(name, 0644, name##_show, \
++		name##_store)
++
+ extern const struct sysfs_ops lustre_sysfs_ops;
+ 
+ /* all quota proc functions */
+diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
+index c4d44e7..dd80780 100644
+--- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
++++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
+@@ -474,7 +474,7 @@ static ssize_t contention_seconds_show(struct kobject *kobj,
+ 
+ static ssize_t contention_seconds_store(struct kobject *kobj,
+ 					struct attribute *attr,
+-					const char *buffer,
++					const char __user *buffer,
+ 					size_t count)
+ {
+ 	struct obd_device *obd = container_of(kobj, struct obd_device,
+@@ -484,7 +484,7 @@ static ssize_t contention_seconds_store(struct kobject *kobj,
+ 	return lprocfs_write_helper(buffer, count, &od->od_contention_time) ?:
+ 		count;
+ }
+-LUSTRE_RW_ATTR(contention_seconds);
++LUSTRE_RW_ATTR_U(contention_seconds);
+ 
+ static ssize_t lockless_truncate_show(struct kobject *kobj,
+ 				      struct attribute *attr,
+@@ -499,7 +499,7 @@ static ssize_t lockless_truncate_show(struct kobject *kobj,
+ 
+ static ssize_t lockless_truncate_store(struct kobject *kobj,
+ 				       struct attribute *attr,
+-				       const char *buffer,
++				       const char __user *buffer,
+ 				       size_t count)
+ {
+ 	struct obd_device *obd = container_of(kobj, struct obd_device,
+@@ -509,7 +509,7 @@ static ssize_t lockless_truncate_store(struct kobject *kobj,
+ 	return lprocfs_write_helper(buffer, count, &od->od_lockless_truncate) ?:
+ 		count;
+ }
+-LUSTRE_RW_ATTR(lockless_truncate);
++LUSTRE_RW_ATTR_U(lockless_truncate);
+ 
+ static ssize_t destroys_in_flight_show(struct kobject *kobj,
+ 				       struct attribute *attr,
+@@ -766,13 +766,13 @@ int lproc_osc_attach_seqstat(struct obd_device *dev)
+ static struct attribute *osc_attrs[] = {
+ 	&lustre_attr_active.attr,
+ 	&lustre_attr_checksums.attr,
+-	&lustre_attr_contention_seconds.attr,
++	&lustre_attr_u_contention_seconds.attr,
+ 	&lustre_attr_cur_dirty_bytes.attr,
+ 	&lustre_attr_cur_grant_bytes.attr,
+ 	&lustre_attr_cur_lost_grant_bytes.attr,
+ 	&lustre_attr_destroys_in_flight.attr,
+ 	&lustre_attr_grant_shrink_interval.attr,
+-	&lustre_attr_lockless_truncate.attr,
++	&lustre_attr_u_lockless_truncate.attr,
+ 	&lustre_attr_max_dirty_mb.attr,
+ 	&lustre_attr_max_pages_per_rpc.attr,
+ 	&lustre_attr_max_rpcs_in_flight.attr,
+-- 
+2.5.2
