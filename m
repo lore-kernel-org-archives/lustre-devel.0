@@ -1,38 +1,39 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Tue, 15 Dec 2015 10:48:42 -0800
-Subject: [lustre-devel] [PATCH 13/40] staging: lustre: Dynamic LNet
- Configuration (DLC) show command
-In-Reply-To: <944b6e806bc44a3fa4d6d5e1904a894a@EXCHCS32.ornl.gov>
-References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-	<1448062576-23757-14-git-send-email-jsimmons@infradead.org>
-	<20151202112055.GM18797@mwanda>
-	<944b6e806bc44a3fa4d6d5e1904a894a@EXCHCS32.ornl.gov>
-Message-ID: <20151215184842.GC16129@kroah.com>
+From: SF Markus Elfring <elfring@users.sourceforge.net>
+Date: Tue, 15 Dec 2015 19:49:39 +0100
+Subject: [lustre-devel] staging: lustre: Delete unnecessary goto
+ statements in six functions
+In-Reply-To: <1450204451.4142.19.camel@perches.com>
+References: <566ABCD9.1060404@users.sourceforge.net>
+	<566D7733.1030102@users.sourceforge.net>
+	<566D7830.9060000@users.sourceforge.net>
+	<1450189676.3551.1.camel@perches.com> <20151215144133.GC5284@mwanda>
+	<1450191751.3551.14.camel@perches.com> <20151215174844.GE5284@mwanda>
+	<1450203011.4142.4.camel@perches.com>
+	<56705B71.6090307@users.sourceforge.net>
+	<1450204451.4142.19.camel@perches.com>
+Message-ID: <567060C3.5070608@users.sourceforge.net>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Dec 15, 2015 at 06:14:19PM +0000, Simmons, James A. wrote:
->   
-> >>  struct libcfs_ioctl_hdr {
-> >>  	__u32 ioc_len;
-> >> @@ -87,6 +88,13 @@ do {						    \
-> >>  	data.ioc_hdr.ioc_len = sizeof(data);			\
-> >>  } while (0)
-> >>  
-> >> +#define LIBCFS_IOC_INIT_V2(data, hdr)			\
-> >> +do {							\
-> >> +	memset(&(data), 0, sizeof(data));		\
-> >> +	(data).hdr.ioc_version = LIBCFS_IOCTL_VERSION2;	\
-> >> +	(data).hdr.ioc_len = sizeof(data);		\
-> >> +} while (0)
-> >> +
-> >
-> >Do we really need this?
-> 
-> Would you be okay if this was a inline function? This is used by user
-> land and kernel space code.
+> I think there should _not_ be a hardened rule.
 
-Then your code is broken, please never do that.
+I guess that it can become hard to achieve consensus on a precise rule.
+
+
+> Style is just a guide.
+
+Generally nice ?
+
+
+>   Do what you think appropriate.
+
+I'm sorry for my evolving understanding. - But I imagine that your feedback
+can cause further software development troubles if the acceptance for
+this update suggestion will really depend on the number of blank lines
+before a jump label.
+
+Regards,
+Markus
