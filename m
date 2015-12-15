@@ -1,46 +1,77 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Tue, 15 Dec 2015 21:19:32 +0300
-Subject: [lustre-devel] [PATCH 13/40] staging: lustre: Dynamic LNet
- Configuration (DLC) show command
-In-Reply-To: <944b6e806bc44a3fa4d6d5e1904a894a@EXCHCS32.ornl.gov>
-References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
-	<1448062576-23757-14-git-send-email-jsimmons@infradead.org>
-	<20151202112055.GM18797@mwanda>
-	<944b6e806bc44a3fa4d6d5e1904a894a@EXCHCS32.ornl.gov>
-Message-ID: <20151215181932.GH5177@mwanda>
+From: Joe Perches <joe@perches.com>
+Date: Tue, 15 Dec 2015 10:22:07 -0800
+Subject: [lustre-devel] staging: lustre: Delete unnecessary goto
+ statements in six functions
+In-Reply-To: <567055C4.8000806@users.sourceforge.net>
+References: <566ABCD9.1060404@users.sourceforge.net>
+	<566D7733.1030102@users.sourceforge.net>
+	<566D7830.9060000@users.sourceforge.net>
+	<1450189676.3551.1.camel@perches.com> <20151215144133.GC5284@mwanda>
+	<1450191751.3551.14.camel@perches.com>
+	<567055C4.8000806@users.sourceforge.net>
+Message-ID: <1450203727.4142.13.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Dec 15, 2015 at 06:14:19PM +0000, Simmons, James A. wrote:
->   
-> >>  struct libcfs_ioctl_hdr {
-> >>  	__u32 ioc_len;
-> >> @@ -87,6 +88,13 @@ do {						    \
-> >>  	data.ioc_hdr.ioc_len = sizeof(data);			\
-> >>  } while (0)
-> >>  
-> >> +#define LIBCFS_IOC_INIT_V2(data, hdr)			\
-> >> +do {							\
-> >> +	memset(&(data), 0, sizeof(data));		\
-> >> +	(data).hdr.ioc_version = LIBCFS_IOCTL_VERSION2;	\
-> >> +	(data).hdr.ioc_len = sizeof(data);		\
-> >> +} while (0)
-> >> +
-> >
-> >Do we really need this?
+On Tue, 2015-12-15 at 19:02 +0100, SF Markus Elfring wrote:
+> > This is the original code:
+> Really ??
+> > 	result = baz();
+> > 	if (result)
+> > 		goto label;
+> > 
+> > label:
+> > 	go on...
 > 
-> Would you be okay if this was a inline function? This is used by user land and kernel space code.
+> I do not see such a source code structure
+> at the six places I propose to clean-up.
 > 
+> 
+> > I don't find the test->goto label; label: use offensive,
+> > but if he does, I think keeping a blank line in place of
+> > the test->goto might be better.
+> 
+> I find this an interesting view on source code layout.
+> Are there any more opinions around such implementation details?
 
-I try (not very hard) to sound like a broken record but this business of
-sharing code with userland is a pain in the butt.  It's not used in the
-kernel or in any patches you have sent.
+Or to put it another way, use a blank line before the
+first or only label in an error/out block.
 
-It would look better as an inline function though so I wouldn't have
-even noticed it.
+I don't find it different then commonly written blocks like:
 
-regards,
-dan carpenter
+void foo(void)
+{
+	...;
+
+	wind1();
+
+	val = func1(...);
+	if (val) {
+		printk(...);
+		goto err_type;
+	}
+
+	wind2();
+
+	val = func2(...);
+	if (val) {
+		printk(...);
+		goto err_type2;
+	}
+
+	...
+
+	return 0;
+
+err_type2:
+	unwind2();
+err_type:
+	unwind1();
+	return -ERR;
+}
+
+Yes, you can elide all the blank lines, but using them can
+help readability.
