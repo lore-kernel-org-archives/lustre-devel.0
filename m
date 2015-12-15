@@ -1,47 +1,48 @@
-From: Joe Perches <joe@perches.com>
-Date: Tue, 15 Dec 2015 10:34:11 -0800
-Subject: [lustre-devel] staging: lustre: Delete unnecessary goto
- statements in six functions
-In-Reply-To: <56705B71.6090307@users.sourceforge.net>
-References: <566ABCD9.1060404@users.sourceforge.net>
-	<566D7733.1030102@users.sourceforge.net>
-	<566D7830.9060000@users.sourceforge.net>
-	<1450189676.3551.1.camel@perches.com> <20151215144133.GC5284@mwanda>
-	<1450191751.3551.14.camel@perches.com> <20151215174844.GE5284@mwanda>
-	<1450203011.4142.4.camel@perches.com>
-	<56705B71.6090307@users.sourceforge.net>
-Message-ID: <1450204451.4142.19.camel@perches.com>
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Tue, 15 Dec 2015 18:39:07 +0000
+Subject: [lustre-devel] [PATCH 13/40] staging: lustre: Dynamic LNet
+ Configuration (DLC) show command
+In-Reply-To: <20151215181932.GH5177@mwanda>
+References: <1448062576-23757-1-git-send-email-jsimmons@infradead.org>
+	<1448062576-23757-14-git-send-email-jsimmons@infradead.org>
+	<20151202112055.GM18797@mwanda>
+	<944b6e806bc44a3fa4d6d5e1904a894a@EXCHCS32.ornl.gov>
+	<20151215181932.GH5177@mwanda>
+Message-ID: <5a754fcb1c2f42cba72b558e41d03828@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 2015-12-15 at 19:26 +0100, SF Markus Elfring wrote:
-> > 	rc = mdc_queue_wait(req);
-> > 	goto out;
-> > out:
-> > 	ptlrpc_req_finished(req);
-> > 	return rc;
-> > }
-> > ---------------------
-> > 
-> > I think if the last goto out; is to be removed,
-> > then it should be replaced by a blank line.
-> > 
-> > It separates the last operation block from the return.
-> 
-> Would you like to point a very specific coding style issue out?
+>On Tue, Dec 15, 2015 at 06:14:19PM +0000, Simmons, James A. wrote:
+>>   
+>> >>  struct libcfs_ioctl_hdr {
+>> >>  	__u32 ioc_len;
+>> >> @@ -87,6 +88,13 @@ do {						    \
+>> >>  	data.ioc_hdr.ioc_len = sizeof(data);			\
+>> >>  } while (0)
+>> >>  
+>> >> +#define LIBCFS_IOC_INIT_V2(data, hdr)			\
+>> >> +do {							\
+>> >> +	memset(&(data), 0, sizeof(data));		\
+>> >> +	(data).hdr.ioc_version = LIBCFS_IOCTL_VERSION2;	\
+>> >> +	(data).hdr.ioc_len = sizeof(data);		\
+>> >> +} while (0)
+>> >> +
+>> >
+>> >Do we really need this?
+>> 
+>> Would you be okay if this was a inline function? This is used by user land and kernel space code.
+>> 
+>
+>I try (not very hard) to sound like a broken record but this business of
+>sharing code with userland is a pain in the butt.  It's not used in the
+>kernel or in any patches you have sent.
+>
+>It would look better as an inline function though so I wouldn't have
+>even noticed it.
 
-Other than using vertical separation can help readability?
-
-I think there should _not_ be a hardened rule.
-Style is just a guide. ?Do what you think appropriate.
-
-> How often should jump labels preceded with blank lines?
-
-When other nearby blocks are also separated by blank lines.
-
-Localized consistency can be useful.
-
-Inconsistency can make code harder to follow/predict.
+I'm glad you noticed.  I just looked at the production source code and yep it is only used
+in the userland tools code. I need to update our tools so they don't break. Then we can
+remove these macros.
