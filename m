@@ -1,10 +1,7 @@
 From: Shraddha <shraddha.6596@gmail.com>
-Date: Wed, 16 Dec 2015 23:10:17 +0530
-Subject: [lustre-devel] [PATCH 3/3] Staging: lustre: lnet: Remove functions
-	LNetEQWait and LNetEQGet
-In-Reply-To: <1450287617-7682-1-git-send-email-shraddha.6596@gmail.com>
-References: <1450287617-7682-1-git-send-email-shraddha.6596@gmail.com>
-Message-ID: <1450287617-7682-4-git-send-email-shraddha.6596@gmail.com>
+Date: Fri, 18 Dec 2015 02:40:25 +0530
+Subject: [lustre-devel] [PATCH 0/5] Staging: lustre: Code cleanups
+Message-ID: <1450386630-5662-1-git-send-email-shraddha.6596@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,67 +10,21 @@ To: lustre-devel@lists.lustre.org
 
 From: Shraddha Barke <shraddha.6596@gmail.com>
 
-Functions LNetEQWait and LNetEQGet are defined but not used. Thus
-remove it. Also remove corresponding declarations from header file.
+These patches remove unused code and declare functions as static
 
-Signed-off-by: Shraddha Barke <shraddha.6596@gmail.com>
----
- drivers/staging/lustre/include/linux/lnet/api.h |  6 ------
- drivers/staging/lustre/lnet/lnet/lib-eq.c       | 18 ------------------
- 2 files changed, 24 deletions(-)
+Shraddha Barke (5):
+  Staging: lustre: obdclass: Declare cl_env_peek as static
+  Staging: lustre: libcfs: Remove unused libcfs_debug_set_level
+  Staging: lustre: osc: Declare as static
+  Staging: lustre: osc: Declare osc_attr_set as static
+  Staging: lustre: obdclass: Declare lu_site_hash_ops as static
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/api.h b/drivers/staging/lustre/include/linux/lnet/api.h
-index 9493d5e..75285fd 100644
---- a/drivers/staging/lustre/include/linux/lnet/api.h
-+++ b/drivers/staging/lustre/include/linux/lnet/api.h
-@@ -161,12 +161,6 @@ int LNetEQAlloc(unsigned int       count_in,
- 
- int LNetEQFree(lnet_handle_eq_t eventq_in);
- 
--int LNetEQGet(lnet_handle_eq_t  eventq_in,
--	      lnet_event_t     *event_out);
--
--int LNetEQWait(lnet_handle_eq_t  eventq_in,
--	       lnet_event_t     *event_out);
--
- int LNetEQPoll(lnet_handle_eq_t *eventqs_in,
- 	       int		 neq_in,
- 	       int		 timeout_ms,
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-index 60889eb..64f94a6 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-@@ -282,15 +282,6 @@ lnet_eq_dequeue_event(lnet_eq_t *eq, lnet_event_t *ev)
-  * at least one event between this event and the last event obtained from the
-  * EQ has been dropped due to limited space in the EQ.
-  */
--int
--LNetEQGet(lnet_handle_eq_t eventq, lnet_event_t *event)
--{
--	int which;
--
--	return LNetEQPoll(&eventq, 1, 0,
--			 event, &which);
--}
--EXPORT_SYMBOL(LNetEQGet);
- 
- /**
-  * Block the calling process until there is an event in the EQ.
-@@ -308,15 +299,6 @@ EXPORT_SYMBOL(LNetEQGet);
-  * at least one event between this event and the last event obtained from the
-  * EQ has been dropped due to limited space in the EQ.
-  */
--int
--LNetEQWait(lnet_handle_eq_t eventq, lnet_event_t *event)
--{
--	int which;
--
--	return LNetEQPoll(&eventq, 1, LNET_TIME_FOREVER,
--			 event, &which);
--}
--EXPORT_SYMBOL(LNetEQWait);
- 
- static int
- lnet_eq_wait_locked(int *timeout_ms)
+ drivers/staging/lustre/lustre/libcfs/debug.c       |  7 -------
+ drivers/staging/lustre/lustre/obdclass/cl_object.c |  3 +--
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |  2 +-
+ drivers/staging/lustre/lustre/osc/osc_cache.c      | 10 +++++-----
+ drivers/staging/lustre/lustre/osc/osc_object.c     |  4 ++--
+ 5 files changed, 9 insertions(+), 17 deletions(-)
+
 -- 
 2.1.4
