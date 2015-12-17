@@ -1,9 +1,10 @@
 From: Shraddha <shraddha.6596@gmail.com>
-Date: Fri, 18 Dec 2015 02:40:28 +0530
-Subject: [lustre-devel] [PATCH 3/5] Staging: lustre: osc: Declare as static
+Date: Fri, 18 Dec 2015 02:40:29 +0530
+Subject: [lustre-devel] [PATCH 4/5] Staging: lustre: osc: Declare
+	osc_attr_set as static
 In-Reply-To: <1450386630-5662-1-git-send-email-shraddha.6596@gmail.com>
 References: <1450386630-5662-1-git-send-email-shraddha.6596@gmail.com>
-Message-ID: <1450386630-5662-4-git-send-email-shraddha.6596@gmail.com>
+Message-ID: <1450386630-5662-5-git-send-email-shraddha.6596@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,41 +13,28 @@ To: lustre-devel@lists.lustre.org
 
 From: Shraddha Barke <shraddha.6596@gmail.com>
 
-Declare osc_extent_find and osc_unreserve_grant as static since they
-are used only in this particular file.
+osc_attr_set is used only in this particular file. Thus declare it
+as static.
 
 Signed-off-by: Shraddha Barke <shraddha.6596@gmail.com>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_object.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index b1d1a87f..3f5a2a7d 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -619,9 +619,9 @@ static inline int overlapped(struct osc_extent *ex1, struct osc_extent *ex2)
-  * Find or create an extent which includes @index, core function to manage
-  * extent tree.
-  */
--struct osc_extent *osc_extent_find(const struct lu_env *env,
--				   struct osc_object *obj, pgoff_t index,
--				   int *grants)
-+static struct osc_extent *osc_extent_find(const struct lu_env *env,
-+					  struct osc_object *obj, pgoff_t index,
-+					  int *grants)
- 
- {
- 	struct client_obd *cli = osc_cli(obj);
-@@ -1420,8 +1420,8 @@ static void __osc_unreserve_grant(struct client_obd *cli,
- 	}
+diff --git a/drivers/staging/lustre/lustre/osc/osc_object.c b/drivers/staging/lustre/lustre/osc/osc_object.c
+index ba57f8d..2a171eb 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_object.c
++++ b/drivers/staging/lustre/lustre/osc/osc_object.c
+@@ -158,8 +158,8 @@ static int osc_attr_get(const struct lu_env *env, struct cl_object *obj,
+ 	return 0;
  }
  
--void osc_unreserve_grant(struct client_obd *cli,
--			 unsigned int reserved, unsigned int unused)
-+static void osc_unreserve_grant(struct client_obd *cli,
-+				unsigned int reserved, unsigned int unused)
+-int osc_attr_set(const struct lu_env *env, struct cl_object *obj,
+-		 const struct cl_attr *attr, unsigned valid)
++static int osc_attr_set(const struct lu_env *env, struct cl_object *obj,
++			const struct cl_attr *attr, unsigned valid)
  {
- 	client_obd_list_lock(&cli->cl_loi_list_lock);
- 	__osc_unreserve_grant(cli, reserved, unused);
+ 	struct lov_oinfo *oinfo = cl2osc(obj)->oo_oinfo;
+ 	struct ost_lvb *lvb = &oinfo->loi_lvb;
 -- 
 2.1.4
