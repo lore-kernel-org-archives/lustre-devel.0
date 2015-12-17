@@ -1,7 +1,10 @@
 From: Shraddha <shraddha.6596@gmail.com>
-Date: Fri, 18 Dec 2015 02:40:25 +0530
-Subject: [lustre-devel] [PATCH 0/5] Staging: lustre: Code cleanups
-Message-ID: <1450386630-5662-1-git-send-email-shraddha.6596@gmail.com>
+Date: Fri, 18 Dec 2015 02:40:26 +0530
+Subject: [lustre-devel] [PATCH 1/5] Staging: lustre: obdclass: Declare
+	cl_env_peek as static
+In-Reply-To: <1450386630-5662-1-git-send-email-shraddha.6596@gmail.com>
+References: <1450386630-5662-1-git-send-email-shraddha.6596@gmail.com>
+Message-ID: <1450386630-5662-2-git-send-email-shraddha.6596@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -10,21 +13,34 @@ To: lustre-devel@lists.lustre.org
 
 From: Shraddha Barke <shraddha.6596@gmail.com>
 
-These patches remove unused code and declare functions as static
+Declare cl_env_peek as static since it is used only in this file.
+Also remove the EXPORT SYMBOL.
 
-Shraddha Barke (5):
-  Staging: lustre: obdclass: Declare cl_env_peek as static
-  Staging: lustre: libcfs: Remove unused libcfs_debug_set_level
-  Staging: lustre: osc: Declare as static
-  Staging: lustre: osc: Declare osc_attr_set as static
-  Staging: lustre: obdclass: Declare lu_site_hash_ops as static
+Signed-off-by: Shraddha Barke <shraddha.6596@gmail.com>
+---
+ drivers/staging/lustre/lustre/obdclass/cl_object.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
- drivers/staging/lustre/lustre/libcfs/debug.c       |  7 -------
- drivers/staging/lustre/lustre/obdclass/cl_object.c |  3 +--
- drivers/staging/lustre/lustre/obdclass/lu_object.c |  2 +-
- drivers/staging/lustre/lustre/osc/osc_cache.c      | 10 +++++-----
- drivers/staging/lustre/lustre/osc/osc_object.c     |  4 ++--
- 5 files changed, 9 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+index a1a6024..ed656a8 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+@@ -704,7 +704,7 @@ static inline struct cl_env *cl_env_container(struct lu_env *env)
+ 	return container_of(env, struct cl_env, ce_lu);
+ }
+ 
+-struct lu_env *cl_env_peek(int *refcheck)
++static struct lu_env *cl_env_peek(int *refcheck)
+ {
+ 	struct lu_env *env;
+ 	struct cl_env *cle;
+@@ -724,7 +724,6 @@ struct lu_env *cl_env_peek(int *refcheck)
+ 	CDEBUG(D_OTHER, "%d@%p\n", cle ? cle->ce_ref : 0, cle);
+ 	return env;
+ }
+-EXPORT_SYMBOL(cl_env_peek);
+ 
+ /**
+  * Returns lu_env: if there already is an environment associated with the
 -- 
 2.1.4
