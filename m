@@ -1,76 +1,45 @@
 From: Bhumika Goyal <bhumirks@gmail.com>
-Date: Sat, 23 Jan 2016 18:41:53 +0530
-Subject: [lustre-devel] [PATCH] Staging:lustre:lustre:llite:Remove explicit
-	NULL comparision
-Message-ID: <1453554713-6895-1-git-send-email-bhumirks@gmail.com>
+Date: Fri, 29 Jan 2016 14:14:26 +0530
+Subject: [lustre-devel] [PATCH] Staging:lustre:lclient:Remove unused function
+Message-ID: <1454057066-16834-1-git-send-email-bhumirks@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: gregkh@linuxfoundation.org, oleg.drokin@intel.com, andreas.dilger@intel.com
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, gregkh@linuxfoundation.org
 Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Bhumika Goyal <bhumirks@gmail.com>
 
-Replaced explicit NULL comparision with its simplier form.
-Found using coccinelle:
-
-@replace_rule@
-expression e;
-@@
-
--e == NULL
-+ !e
+Discard the function ccc_vmpage_page_transient as it is not used
+anywhere in the kernel.
+Used grep to find occurences.
+Problem found using sparse.
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 ---
- drivers/staging/lustre/lustre/llite/dcache.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/lclient/lcommon_cl.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dcache.c b/drivers/staging/lustre/lustre/llite/dcache.c
-index 3d6745e..bc179e5 100644
---- a/drivers/staging/lustre/lustre/llite/dcache.c
-+++ b/drivers/staging/lustre/lustre/llite/dcache.c
-@@ -62,7 +62,7 @@ static void ll_release(struct dentry *de)
- 
- 	LASSERT(de != NULL);
- 	lld = ll_d2d(de);
--	if (lld == NULL) /* NFS copies the de->d_op methods (bug 4655) */
-+	if (!lld) /* NFS copies the de->d_op methods (bug 4655) */
- 		return;
- 
- 	if (lld->lld_it) {
-@@ -131,7 +131,7 @@ static int find_cbdata(struct inode *inode)
- 		return rc;
- 
- 	lsm = ccc_inode_lsm_get(inode);
--	if (lsm == NULL)
-+	if (!lsm)
- 		return rc;
- 
- 	rc = obd_find_cbdata(sbi->ll_dt_exp, lsm, return_if_equal, NULL);
-@@ -184,13 +184,13 @@ int ll_d_init(struct dentry *de)
- 		de, de, de->d_parent, d_inode(de),
- 		d_count(de));
- 
--	if (de->d_fsdata == NULL) {
-+	if (!de->d_fsdata) {
- 		struct ll_dentry_data *lld;
- 
- 		lld = kzalloc(sizeof(*lld), GFP_NOFS);
- 		if (likely(lld)) {
- 			spin_lock(&de->d_lock);
--			if (likely(de->d_fsdata == NULL)) {
-+			if (likely(!de->d_fsdata)) {
- 				de->d_fsdata = lld;
- 				__d_lustre_invalidate(de);
- 			} else {
-@@ -328,7 +328,7 @@ static int ll_revalidate_dentry(struct dentry *dentry,
- 	if (lookup_flags & LOOKUP_RCU)
- 		return -ECHILD;
- 
--	do_statahead_enter(dir, &dentry, d_inode(dentry) == NULL);
-+	do_statahead_enter(dir, &dentry, !d_inode(dentry));
- 	ll_statahead_mark(dir, dentry);
- 	return 1;
+diff --git a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
+index 34dde7d..4dfeb4e 100644
+--- a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
++++ b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
+@@ -986,17 +986,6 @@ struct inode *ccc_object_inode(const struct cl_object *obj)
  }
+ 
+ /**
+- * Returns a pointer to cl_page associated with \a vmpage, without acquiring
+- * additional reference to the resulting page. This is an unsafe version of
+- * cl_vmpage_page() that can only be used under vmpage lock.
+- */
+-struct cl_page *ccc_vmpage_page_transient(struct page *vmpage)
+-{
+-	KLASSERT(PageLocked(vmpage));
+-	return (struct cl_page *)vmpage->private;
+-}
+-
+-/**
+  * Initialize or update CLIO structures for regular files when new
+  * meta-data arrives from the server.
+  *
 -- 
 1.9.1
