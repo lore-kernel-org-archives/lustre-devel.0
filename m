@@ -1,81 +1,45 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Sat,  6 Feb 2016 02:01:50 -0500
-Subject: [lustre-devel] [PATCH 1/2] staging/lustre/libcfs: Properly handle
-	debugfs read- and write-only files
-In-Reply-To: <1454742111-2231460-1-git-send-email-green@linuxhacker.ru>
-References: <1454742111-2231460-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1454742111-2231460-2-git-send-email-green@linuxhacker.ru>
+Date: Sat,  6 Feb 2016 02:12:12 -0500
+Subject: [lustre-devel] [PATCH] staging/lustre/lnet: Don't call
+	roundup_pow_of_two on zero in LNetEQAlloc
+Message-ID: <1454742732-2232567-1-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>, Pekka Enberg <penberg@kernel.org>
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-It turns out that unlike procfs, debugfs does not really enforce
-permissions for root (similar to regular filesystems), so we need
-to ensure we are not providing ->write() method to read-only files
-and ->read() method for write-only files at registration.
+roundup_pow_of_two return when called on a zero argument is
+undefined, so don't call it like that.
 
-This fixes a couple of crashes on unexpected access.
+This fixes a problem introduced by commit 322489d9d551
+("staging/lustre: Use roundup_pow_of_two() in LNetEQAlloc()")
+since 0 is a valid count parameter for LNetEQAlloc. Also manifesting
+itself as an annoying kernel warning:
+LNet: 3486:0:(lib-eq.c:85:LNetEQAlloc()) EQ callback is guaranteed to get every event, do you still want to set eqcount 1 for polling event which will have locking overhead? Please contact with developer to confirm
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+CC: Pekka Enberg <penberg@kernel.org>
 ---
- drivers/staging/lustre/lustre/libcfs/module.c | 27 +++++++++++++++++++++++++--
- 1 file changed, 25 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lnet/lnet/lib-eq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/libcfs/module.c b/drivers/staging/lustre/lustre/libcfs/module.c
-index d5a047b..611607a 100644
---- a/drivers/staging/lustre/lustre/libcfs/module.c
-+++ b/drivers/staging/lustre/lustre/libcfs/module.c
-@@ -502,13 +502,36 @@ static ssize_t lnet_debugfs_write(struct file *filp, const char __user *buf,
- 	return error;
- }
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+index 64f94a6..bfbc313 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+@@ -79,7 +79,8 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
+ 	 * overflow, they don't skip entries, so the queue has the same
+ 	 * apparent capacity at all times */
  
--static const struct file_operations lnet_debugfs_file_operations = {
-+static const struct file_operations lnet_debugfs_file_operations_rw = {
- 	.open		= simple_open,
- 	.read		= lnet_debugfs_read,
- 	.write		= lnet_debugfs_write,
- 	.llseek		= default_llseek,
- };
+-	count = roundup_pow_of_two(count);
++	if (count)
++		count = roundup_pow_of_two(count);
  
-+static const struct file_operations lnet_debugfs_file_operations_ro = {
-+	.open		= simple_open,
-+	.read		= lnet_debugfs_read,
-+	.llseek		= default_llseek,
-+};
-+
-+static const struct file_operations lnet_debugfs_file_operations_wo = {
-+	.open		= simple_open,
-+	.write		= lnet_debugfs_write,
-+	.llseek		= default_llseek,
-+};
-+
-+static const struct file_operations *lnet_debugfs_fops_select(umode_t mode)
-+{
-+	if (!(mode & S_IWUGO))
-+		return &lnet_debugfs_file_operations_ro;
-+
-+	if (!(mode & S_IRUGO))
-+		return &lnet_debugfs_file_operations_wo;
-+
-+	return &lnet_debugfs_file_operations_rw;
-+}
-+
- void lustre_insert_debugfs(struct ctl_table *table,
- 			   const struct lnet_debugfs_symlink_def *symlinks)
- {
-@@ -525,7 +548,7 @@ void lustre_insert_debugfs(struct ctl_table *table,
- 	for (; table->procname; table++)
- 		debugfs_create_file(table->procname, table->mode,
- 				    lnet_debugfs_root, table,
--				    &lnet_debugfs_file_operations);
-+				    lnet_debugfs_fops_select(table->mode));
- 
- 	for (; symlinks && symlinks->name; symlinks++)
- 		debugfs_create_symlink(symlinks->name, lnet_debugfs_root,
+ 	if (callback != LNET_EQ_HANDLER_NONE && count != 0)
+ 		CWARN("EQ callback is guaranteed to get every event, do you still want to set eqcount %d for polling event which will have locking overhead? Please contact with developer to confirm\n", count);
 -- 
 2.1.0
