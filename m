@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 10 Feb 2016 13:00:20 -0500
-Subject: [lustre-devel] [PATCH 3/5] staging/lustre: Adjust import state
-	history output format
+Date: Wed, 10 Feb 2016 13:00:22 -0500
+Subject: [lustre-devel] [PATCH 5/5] staging/lustre: Remove unused
+	LUSTRE_VERSION_ALLOWED_OFFSET define
 In-Reply-To: <1455127222-2557752-1-git-send-email-green@linuxhacker.ru>
 References: <1455127222-2557752-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455127222-2557752-4-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455127222-2557752-6-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,62 +14,34 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-New test scripts expect spaces around state names and square brackets
-when parsing debugfs output, so add them to avoid false failures.
+LUSTRE_VERSION_ALLOWED_OFFSET is only used on the server to disallow
+connection of old userspace clients.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/obdclass/lprocfs_status.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_ver.h | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index 9a1434d..eda44d8 100644
---- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -642,21 +642,21 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
- 		     "    target: %s\n"
- 		     "    state: %s\n"
- 		     "    instance: %u\n"
--		     "    connect_flags: [",
-+		     "    connect_flags: [ ",
- 		     obd->obd_name,
- 		     obd2cli_tgt(obd),
- 		     ptlrpc_import_state_name(imp->imp_state),
- 		     imp->imp_connect_data.ocd_instance);
- 	obd_connect_seq_flags2str(m, imp->imp_connect_data.ocd_connect_flags, ", ");
- 	seq_printf(m,
--		      "]\n"
--		      "    import_flags: [");
-+		      " ]\n"
-+		      "    import_flags: [ ");
- 	obd_import_flags2str(imp, m);
+diff --git a/drivers/staging/lustre/lustre/include/lustre_ver.h b/drivers/staging/lustre/lustre/include/lustre_ver.h
+index 01205b8..64559a1 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_ver.h
++++ b/drivers/staging/lustre/lustre/include/lustre_ver.h
+@@ -11,13 +11,10 @@
+ 					    LUSTRE_MINOR, LUSTRE_PATCH, \
+ 					    LUSTRE_FIX)
  
- 	seq_printf(m,
--		      "]\n"
-+		      " ]\n"
- 		      "    connection:\n"
--		      "       failover_nids: [");
-+		      "       failover_nids: [ ");
- 	spin_lock(&imp->imp_lock);
- 	j = 0;
- 	list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
-@@ -671,7 +671,7 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
- 	else
- 		strncpy(nidstr, "<none>", sizeof(nidstr));
- 	seq_printf(m,
--		      "]\n"
-+		      " ]\n"
- 		      "       current_connection: %s\n"
- 		      "       connection_attempts: %u\n"
- 		      "       generation: %u\n"
-@@ -795,7 +795,7 @@ int lprocfs_rd_state(struct seq_file *m, void *data)
- 			&imp->imp_state_hist[(k + j) % IMP_STATE_HIST_LEN];
- 		if (ish->ish_state == 0)
- 			continue;
--		seq_printf(m, " - [%lld, %s]\n", (s64)ish->ish_time,
-+		seq_printf(m, " - [ %lld, %s ]\n", (s64)ish->ish_time,
- 			   ptlrpc_import_state_name(ish->ish_state));
- 	}
+-/* liblustre clients are only allowed to connect if their LUSTRE_FIX mismatches
+- * by this amount (set in lustre/autoconf/lustre-version.ac). */
+-#define LUSTRE_VERSION_ALLOWED_OFFSET OBD_OCD_VERSION(0, 0, 1, 32)
+-
+-/* If lustre version of client and servers it connects to differs by more
++/*
++ * If lustre version of client and servers it connects to differs by more
+  * than this amount, client would issue a warning.
+- * (set in lustre/autoconf/lustre-version.ac) */
++ */
+ #define LUSTRE_VERSION_OFFSET_WARN OBD_OCD_VERSION(0, 4, 0, 0)
  
+ #endif
 -- 
 2.1.0
