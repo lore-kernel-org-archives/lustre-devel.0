@@ -1,96 +1,25 @@
-From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Tue, 9 Feb 2016 19:37:37 +0000
-Subject: [lustre-devel] New tags, 2.8 codebase codefreeze,
-	2.9 development branch start
-Message-ID: <6973BB5C-98F6-4EEC-ADCA-9128A0E5F9C1@intel.com>
+From: Jones, Peter A <peter.a.jones@intel.com>
+Date: Wed, 10 Feb 2016 14:18:26 +0000
+Subject: [lustre-devel] Community Release Update
+Message-ID: <D2DF7987.BC02C%peter.a.jones@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+Hi there
 
-   I just tagged 2.7.90 tag and that marks codefreeze in the 2.8 development branch that is also now split into b2_8 (changelog below).
+As Oleg shared yesterday, Lustre 2.8 Is in now in code freeze and so only blocking bugs and test script corrections are eligible to land between now and the release going GA. Getting to this point has taken much longer than targeted, largely due to the complexity in working through all the recovery edge cases when DNE is operating under load, but there are candidate fixes for the last remaining blocking bugs that are holding up well in testing and so things are looking encouraging that we are converging towards a GA release in the coming weeks.
 
-   Master branch is now tagged as 2.8.50 and would start accepting 2.9-destined patches real soon now.
+We have been looking ahead to Lustre 2.9 for some time and expect to be able to hit the ground running with feature landings for that release as soon as next week. You can get a sense of the kind of content that might be in this release at the 2.9 wiki page - http://wiki.lustre.org/Release_2.9.0 .
 
-catAlex Zhuravlev (2):
-      LU-7705 ldlm: make round_timeout() static
-      LU-7703 mdd: linkea should be updated properly at migration
+You may notice that those hoping to contribute features have been required to identify who will be responsible for supporting roles like reviewing patches, writing documentation and testing. This is expected to mean more predictable delivery of complete features during the release cycle.
 
-Alexander Boyko (1):
-      LU-7443 llog: remove unused and empty llog
+What is less evident due to the nature of the features likely to be ready during the appropriate time for landing for the 2.9 release is that we have now introduced a practice whereby large, potentially  disruptive, changes are segregated into a separate branch so that the whole feature can be thoroughly tested in its entirety ? and then landed in its entirety only when it is ready. There is an example of this practice in flight with the Multi-rail efforts, which may be a candidate for the 2.10 release later this year - http://review.whamcloud.com/#/q/status:open+project:fs/lustre-release+branch:multi-rail . The goal of this approach is to prevent scenarios as we have seen with DNE in this release when the inclusion of one large feature delays the whole release schedule.
 
-Andreas Dilger (1):
-      LU-6587 obdclass: use OBD_FREE_LARGE with OBD_ALLOC_LARGE
+I would also like to make clear that, while the release planning to date has been focused during the regular LWG meetings (http://wiki.opensfs.org/Lustre_Working_Group) that we still welcome input on the community releases from those unable to participate in those meetings.
 
-Andrew Perepechko (1):
-      LU-6020 gss: add lsvcgssd init.d wrapper
+Regards
 
-Bruno Faccini (1):
-      LU-7679 build: strengthen lustre-dkms during on-target build
-
-Christopher J. Morrone (1):
-      LU-3953 build: Fix duplicate snmp directory packaging
-
-Chuck Fossen (3):
-      LU-7578 gnilnd: Add module parameter reg_fail_timeout
-      LU-7578 gnilnd: Handle new return code in gni_mem_register()
-      LU-7578 gnilnd: Return correct error on GNI_RC_ERROR_NOMEM
-
-Di Wang (5):
-      LU-7716 mdt: No is_subdir check for same dir rename
-      LU-7715 out: fix err_serious in out_handle
-      LU-7564 osp: Do not match the lock for OSP
-      LU-7737 lod: not return -EIO during process updates log
-      LU-7725 osp: get update reply from replied req
-
-Fan Yong (1):
-      LU-6684 lfsck: set the lfsck notify as interruptable
-
-James Shimek (2):
-      LU-7578 gnilnd: Revert max_immediate setting
-      LU-7578 gnilnd: Modify allocator flags to prevent waiting
-
-James Simmons (3):
-      LU-6245 libcfs: make libcfs_ioctl.h and lnetctl.h uapi compliant
-      LU-6245 libcfs: remove userland headers from libcfs.h
-      LU-5030 util: migrate lctl params functions to use cfs_get_paths()
-
-Jian Yu (2):
-      LU-6824 ldiskfs: add dir htree growing warning patch
-      LU-7584 tests: create file on single MDS in sanity test 129
-
-John L. Hammond (1):
-      LU-7576 llapi: use dirname() in opendir_parent()
-
-Leonel Ochoa (1):
-      LU-7468 tests: update maloo_upload.sh to create upload.tar.gz
-
-Li Xi (1):
-      LU-7229 hsm: relax time check of sanity-hsm test_60
-
-Liang Zhen (1):
-      LU-7646 o2iblnd: connrace protocol improvement
-
-Nathaniel Clark (1):
-      LU-6719 osd-zfs: Ignore EEXIST during object init
-
-Niu Yawei (1):
-      LU-7729 target: fix process_req_last_xid() return value
-
-Oleg Drokin (7):
-      LU-7623 Update obd iocontrol methods with __user attribute
-      LU-7623 lmv: Properly mark lmv_fid2path uarg argment as __user
-      LU-7623 lmv: Mark lmv_hsm_ct_register/unregister uarg as __user
-      LU-7623 lnet: Properly declare lnet_ping() forward declaration
-      LU-4423 socklnd: use kernel socket sockopt apis
-      LU-7623 mdt: Match up prototype and definition of mdt_hsm_cdt_control_seq_write
-      New tag 2.7.90
-
-Richard Henwood (1):
-      LU-3531 doc: update lfs migrate and mkdir documentation.
-
-gaurav mahajan (1):
-      LU-6225 test: test-framework does not cleanup for failed tests
+Peter
