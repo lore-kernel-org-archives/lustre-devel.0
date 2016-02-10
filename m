@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 10 Feb 2016 13:00:19 -0500
-Subject: [lustre-devel] [PATCH 2/5] staging/lustre/obdecho: Better handle
-	invalid create requests
+Date: Wed, 10 Feb 2016 13:00:18 -0500
+Subject: [lustre-devel] [PATCH 1/5] staging/lustre/obdecho: Remove always
+	true condition
 In-Reply-To: <1455127222-2557752-1-git-send-email-green@linuxhacker.ru>
 References: <1455127222-2557752-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455127222-2557752-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455127222-2557752-2-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,47 +14,33 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-When gettng an invalid create request in echo code (wrong group,
-or no group at all), just return an error instead of crashing.
+Dan Carpenter noticed that since we already checked for
+(oa->o_valid & OBD_MD_FLID) == 0, that means
+(oa->o_valid & OBD_MD_FLID) is always true after that so
+no point in checking for it.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
- drivers/staging/lustre/lustre/obdecho/echo_client.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/obdecho/echo_client.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index e1c9d11..4ca82af 100644
+index d3e398f..e1c9d11 100644
 --- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
 +++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -1210,8 +1210,10 @@ static int echo_create_object(const struct lu_env *env, struct echo_device *ed,
- 	int		     rc;
- 	int		     created = 0;
- 
--	if ((oa->o_valid & OBD_MD_FLID) == 0) { /* no obj id */
--		CERROR("No valid oid\n");
-+	if (!(oa->o_valid & OBD_MD_FLID) ||
-+	    !(oa->o_valid & OBD_MD_FLGROUP) ||
-+	    !fid_seq_is_echo(ostid_seq(&oa->o_oi))) {
-+		CERROR("invalid oid " DOSTID "\n", POSTID(&oa->o_oi));
- 		return -EINVAL;
- 	}
- 
-@@ -1222,16 +1224,11 @@ static int echo_create_object(const struct lu_env *env, struct echo_device *ed,
+@@ -1222,10 +1222,8 @@ static int echo_create_object(const struct lu_env *env, struct echo_device *ed,
  	}
  
  	/* setup object ID here */
--	LASSERT(oa->o_valid & OBD_MD_FLGROUP);
- 	lsm->lsm_oi = oa->o_oi;
+-	if (oa->o_valid & OBD_MD_FLID) {
+-		LASSERT(oa->o_valid & OBD_MD_FLGROUP);
+-		lsm->lsm_oi = oa->o_oi;
+-	}
++	LASSERT(oa->o_valid & OBD_MD_FLGROUP);
++	lsm->lsm_oi = oa->o_oi;
  
  	if (ostid_id(&lsm->lsm_oi) == 0)
  		ostid_set_id(&lsm->lsm_oi, ++last_object_id);
- 
--	/* Only echo objects are allowed to be created */
--	LASSERT((oa->o_valid & OBD_MD_FLGROUP) &&
--		(ostid_seq(&oa->o_oi) == FID_SEQ_ECHO));
--
- 	rc = obd_create(env, ec->ec_exp, oa, &lsm, oti);
- 	if (rc != 0) {
- 		CERROR("Cannot create objects: rc = %d\n", rc);
 -- 
 2.1.0
