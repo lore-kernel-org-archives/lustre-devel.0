@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 12 Feb 2016 12:06:09 -0500
-Subject: [lustre-devel] [PATCH 11/11] staging: lustre: fix all conditional
-	comparison to zero in LNet layer
+Date: Fri, 12 Feb 2016 12:06:08 -0500
+Subject: [lustre-devel] [PATCH 10/11] staging: lustre: fix all NULL
+	comparisons in LNet layer
 In-Reply-To: <1455296769-5481-1-git-send-email-jsimmons@infradead.org>
 References: <1455296769-5481-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1455296769-5481-12-git-send-email-jsimmons@infradead.org>
+Message-ID: <1455296769-5481-11-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,8108 +12,6640 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Dorkin <oleg.dorkin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Doing if (rc != 0) or if (rc == 0) is bad form. This patch corrects
-the LNet code to behavior according to kernel coding standards.
+This removes every instance of checking a variable against
+NULL in the LNet source code.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |   21 +--
- .../staging/lustre/include/linux/lnet/lib-types.h  |    2 +-
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  137 +++++++-------
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |   14 +-
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |  186 ++++++++++----------
- .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  |    2 +-
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |  139 +++++++--------
- .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |  148 ++++++++--------
- .../lustre/lnet/klnds/socklnd/socklnd_lib.c        |   42 +++---
- .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |   54 +++---
- drivers/staging/lustre/lnet/lnet/acceptor.c        |   36 ++--
- drivers/staging/lustre/lnet/lnet/api-ni.c          |  113 ++++++------
- drivers/staging/lustre/lnet/lnet/config.c          |   63 ++++----
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |   12 +-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  208 ++++++++++----------
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |  142 +++++++-------
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |  122 ++++++------
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |   82 ++++----
+ .../lustre/lnet/klnds/socklnd/socklnd_lib.c        |   28 ++--
+ .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |   46 +++---
+ drivers/staging/lustre/lnet/lnet/acceptor.c        |   16 +-
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |   78 ++++----
+ drivers/staging/lustre/lnet/lnet/config.c          |   83 ++++----
  drivers/staging/lustre/lnet/lnet/lib-eq.c          |   18 +-
- drivers/staging/lustre/lnet/lnet/lib-md.c          |   42 +++---
- drivers/staging/lustre/lnet/lnet/lib-me.c          |    4 +-
- drivers/staging/lustre/lnet/lnet/lib-move.c        |   92 +++++-----
- drivers/staging/lustre/lnet/lnet/lib-msg.c         |   22 ++--
- drivers/staging/lustre/lnet/lnet/lib-ptl.c         |   52 +++---
- drivers/staging/lustre/lnet/lnet/lib-socket.c      |   58 +++---
- drivers/staging/lustre/lnet/lnet/module.c          |    8 +-
- drivers/staging/lustre/lnet/lnet/nidstrings.c      |   52 +++---
- drivers/staging/lustre/lnet/lnet/peer.c            |   12 +-
- drivers/staging/lustre/lnet/lnet/router.c          |   52 +++---
- drivers/staging/lustre/lnet/lnet/router_proc.c     |   46 +++---
- drivers/staging/lustre/lnet/selftest/brw_test.c    |   36 ++--
- drivers/staging/lustre/lnet/selftest/conctl.c      |   12 +-
- drivers/staging/lustre/lnet/selftest/conrpc.c      |  102 ++++++------
- drivers/staging/lustre/lnet/selftest/console.c     |  168 +++++++++---------
- drivers/staging/lustre/lnet/selftest/framework.c   |   79 ++++-----
- drivers/staging/lustre/lnet/selftest/module.c      |   10 +-
- drivers/staging/lustre/lnet/selftest/ping_test.c   |   10 +-
- drivers/staging/lustre/lnet/selftest/rpc.c         |  130 +++++++-------
- drivers/staging/lustre/lnet/selftest/selftest.h    |   10 +-
- drivers/staging/lustre/lnet/selftest/timer.c       |    4 +-
- 35 files changed, 985 insertions(+), 991 deletions(-)
+ drivers/staging/lustre/lnet/lnet/lib-md.c          |   10 +-
+ drivers/staging/lustre/lnet/lnet/lib-me.c          |   16 +-
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |  142 +++++++-------
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         |   20 +-
+ drivers/staging/lustre/lnet/lnet/lib-ptl.c         |   20 +-
+ drivers/staging/lustre/lnet/lnet/lib-socket.c      |   16 +-
+ drivers/staging/lustre/lnet/lnet/lo.c              |    8 +-
+ drivers/staging/lustre/lnet/lnet/nidstrings.c      |   48 +++---
+ drivers/staging/lustre/lnet/lnet/peer.c            |   20 +-
+ drivers/staging/lustre/lnet/lnet/router.c          |   68 ++++----
+ drivers/staging/lustre/lnet/lnet/router_proc.c     |   43 ++--
+ drivers/staging/lustre/lnet/selftest/brw_test.c    |   22 +-
+ drivers/staging/lustre/lnet/selftest/conctl.c      |  157 ++++++++--------
+ drivers/staging/lustre/lnet/selftest/conrpc.c      |   36 ++--
+ drivers/staging/lustre/lnet/selftest/console.c     |   64 +++---
+ drivers/staging/lustre/lnet/selftest/framework.c   |  108 +++++-----
+ drivers/staging/lustre/lnet/selftest/module.c      |    4 +-
+ drivers/staging/lustre/lnet/selftest/ping_test.c   |    8 +-
+ drivers/staging/lustre/lnet/selftest/rpc.c         |   47 +++---
+ drivers/staging/lustre/lnet/selftest/selftest.h    |    4 +-
+ drivers/staging/lustre/lnet/selftest/timer.c       |    2 +-
+ 32 files changed, 846 insertions(+), 852 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 618126b..b0f80b4 100644
+index b8be9b6..618126b 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -72,8 +72,8 @@ static inline int lnet_is_wire_handle_none(lnet_handle_wire_t *wh)
+@@ -197,7 +197,7 @@ lnet_md_alloc(lnet_md_t *umd)
  
- static inline int lnet_md_exhausted(lnet_libmd_t *md)
- {
--	return (md->md_threshold == 0 ||
--		((md->md_options & LNET_MD_MAX_SIZE) != 0 &&
-+	return (!md->md_threshold ||
-+		((md->md_options & LNET_MD_MAX_SIZE) &&
- 		 md->md_offset + md->md_max_size > md->md_length));
- }
+ 	LIBCFS_ALLOC(md, size);
  
-@@ -85,13 +85,13 @@ static inline int lnet_md_unlinkable(lnet_libmd_t *md)
- 	 *    LNetM[DE]Unlink, in the latter case md may not be exhausted).
- 	 *  - auto unlink is on and md is exhausted.
- 	 */
--	if (md->md_refcount != 0)
-+	if (md->md_refcount)
- 		return 0;
- 
--	if ((md->md_flags & LNET_MD_FLAG_ZOMBIE) != 0)
-+	if (md->md_flags & LNET_MD_FLAG_ZOMBIE)
- 		return 1;
- 
--	return ((md->md_flags & LNET_MD_FLAG_AUTO_UNLINK) != 0 &&
-+	return ((md->md_flags & LNET_MD_FLAG_AUTO_UNLINK) &&
- 		lnet_md_exhausted(md));
- }
- 
-@@ -186,12 +186,11 @@ lnet_md_alloc(lnet_md_t *umd)
- 	unsigned int size;
- 	unsigned int niov;
- 
--	if ((umd->options & LNET_MD_KIOV) != 0) {
-+	if (umd->options & LNET_MD_KIOV) {
- 		niov = umd->length;
- 		size = offsetof(lnet_libmd_t, md_iov.kiov[niov]);
- 	} else {
--		niov = ((umd->options & LNET_MD_IOVEC) != 0) ?
--		       umd->length : 1;
-+		niov = umd->options & LNET_MD_IOVEC ? umd->length : 1;
- 		size = offsetof(lnet_libmd_t, md_iov.iov[niov]);
- 	}
- 
-@@ -212,7 +211,7 @@ lnet_md_free(lnet_libmd_t *md)
- {
- 	unsigned int size;
- 
--	if ((md->md_options & LNET_MD_KIOV) != 0)
-+	if (md->md_options & LNET_MD_KIOV)
- 		size = offsetof(lnet_libmd_t, md_iov.kiov[md->md_niov]);
- 	else
- 		size = offsetof(lnet_libmd_t, md_iov.iov[md->md_niov]);
-@@ -364,14 +363,14 @@ lnet_peer_decref_locked(lnet_peer_t *lp)
- {
- 	LASSERT(lp->lp_refcount > 0);
- 	lp->lp_refcount--;
--	if (lp->lp_refcount == 0)
-+	if (!lp->lp_refcount)
- 		lnet_destroy_peer_locked(lp);
- }
- 
- static inline int
- lnet_isrouter(lnet_peer_t *lp)
- {
--	return lp->lp_rtr_refcount != 0;
-+	return lp->lp_rtr_refcount ? 1 : 0;
- }
- 
+-	if (md != NULL) {
++	if (md) {
+ 		/* Set here in case of early free */
+ 		md->md_options = umd->options;
+ 		md->md_niov = niov;
+@@ -267,7 +267,7 @@ lnet_res_lh_invalidate(lnet_libhandle_t *lh)
  static inline void
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 42f08c8..d769c35 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -359,7 +359,7 @@ struct lnet_peer_table {
-  * peer aliveness is enabled only on routers for peers in a network where the
-  * lnet_ni_t::ni_peertimeout has been set to a positive value
-  */
--#define lnet_peer_aliveness_enabled(lp) (the_lnet.ln_routing != 0 && \
-+#define lnet_peer_aliveness_enabled(lp) (the_lnet.ln_routing && \
- 					 (lp)->lp_ni->ni_peertimeout > 0)
+ lnet_eq2handle(lnet_handle_eq_t *handle, lnet_eq_t *eq)
+ {
+-	if (eq == NULL) {
++	if (!eq) {
+ 		LNetInvalidateHandle(handle);
+ 		return;
+ 	}
+@@ -281,7 +281,7 @@ lnet_handle2eq(lnet_handle_eq_t *handle)
+ 	lnet_libhandle_t *lh;
  
- typedef struct {
+ 	lh = lnet_res_lh_lookup(&the_lnet.ln_eq_container, handle->cookie);
+-	if (lh == NULL)
++	if (!lh)
+ 		return NULL;
+ 
+ 	return lh_entry(lh, lnet_eq_t, eq_lh);
+@@ -303,7 +303,7 @@ lnet_handle2md(lnet_handle_md_t *handle)
+ 	cpt = lnet_cpt_of_cookie(handle->cookie);
+ 	lh = lnet_res_lh_lookup(the_lnet.ln_md_containers[cpt],
+ 				handle->cookie);
+-	if (lh == NULL)
++	if (!lh)
+ 		return NULL;
+ 
+ 	return lh_entry(lh, lnet_libmd_t, md_lh);
+@@ -322,7 +322,7 @@ lnet_wire_handle2md(lnet_handle_wire_t *wh)
+ 	cpt = lnet_cpt_of_cookie(wh->wh_object_cookie);
+ 	lh = lnet_res_lh_lookup(the_lnet.ln_md_containers[cpt],
+ 				wh->wh_object_cookie);
+-	if (lh == NULL)
++	if (!lh)
+ 		return NULL;
+ 
+ 	return lh_entry(lh, lnet_libmd_t, md_lh);
+@@ -344,7 +344,7 @@ lnet_handle2me(lnet_handle_me_t *handle)
+ 	cpt = lnet_cpt_of_cookie(handle->cookie);
+ 	lh = lnet_res_lh_lookup(the_lnet.ln_me_containers[cpt],
+ 				handle->cookie);
+-	if (lh == NULL)
++	if (!lh)
+ 		return NULL;
+ 
+ 	return lh_entry(lh, lnet_me_t, me_lh);
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index a3d654a..2e7b5ca 100644
+index db551e4..a3d654a 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -63,7 +63,7 @@ static __u32 kiblnd_cksum(void *ptr, int nob)
- 		sum = ((sum << 1) | (sum >> 31)) + *c++;
+@@ -330,11 +330,11 @@ int kiblnd_create_peer(lnet_ni_t *ni, kib_peer_t **peerp, lnet_nid_t nid)
+ 	int cpt = lnet_cpt_of_nid(nid);
+ 	unsigned long flags;
  
- 	/* ensure I don't return 0 (== no checksum) */
--	return (sum == 0) ? 1 : sum;
-+	return !sum ? 1 : sum;
- }
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 	LASSERT(nid != LNET_NID_ANY);
  
- static char *kiblnd_msgtype2str(int type)
-@@ -257,7 +257,7 @@ int kiblnd_unpack_msg(kib_msg_t *msg, int nob)
- 	 */
- 	msg_cksum = flip ? __swab32(msg->ibm_cksum) : msg->ibm_cksum;
- 	msg->ibm_cksum = 0;
--	if (msg_cksum != 0 &&
-+	if (msg_cksum &&
- 	    msg_cksum != kiblnd_cksum(msg, msg_nob)) {
- 		CERROR("Bad checksum\n");
- 		return -EPROTO;
-@@ -354,7 +354,7 @@ int kiblnd_create_peer(lnet_ni_t *ni, kib_peer_t **peerp, lnet_nid_t nid)
- 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
- 
- 	/* always called with a ref on ni, which prevents ni being shutdown */
--	LASSERT(net->ibn_shutdown == 0);
-+	LASSERT(!net->ibn_shutdown);
- 
- 	/* npeers only grows with the global lock held */
- 	atomic_inc(&net->ibn_npeers);
-@@ -370,10 +370,10 @@ void kiblnd_destroy_peer(kib_peer_t *peer)
+ 	LIBCFS_CPT_ALLOC(peer, lnet_cpt_table(), cpt, sizeof(*peer));
+-	if (peer == NULL) {
++	if (!peer) {
+ 		CERROR("Cannot allocate peer\n");
+ 		return -ENOMEM;
+ 	}
+@@ -369,7 +369,7 @@ void kiblnd_destroy_peer(kib_peer_t *peer)
+ {
  	kib_net_t *net = peer->ibp_ni->ni_data;
  
- 	LASSERT(net);
--	LASSERT(atomic_read(&peer->ibp_refcount) == 0);
-+	LASSERT(!atomic_read(&peer->ibp_refcount));
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 	LASSERT(atomic_read(&peer->ibp_refcount) == 0);
  	LASSERT(!kiblnd_peer_active(peer));
--	LASSERT(peer->ibp_connecting == 0);
--	LASSERT(peer->ibp_accepting == 0);
-+	LASSERT(!peer->ibp_connecting);
-+	LASSERT(!peer->ibp_accepting);
- 	LASSERT(list_empty(&peer->ibp_conns));
- 	LASSERT(list_empty(&peer->ibp_tx_queue));
+ 	LASSERT(peer->ibp_connecting == 0);
+@@ -604,7 +604,7 @@ static void kiblnd_setup_mtu_locked(struct rdma_cm_id *cmid)
+ 	int mtu;
  
-@@ -609,7 +609,7 @@ static void kiblnd_setup_mtu_locked(struct rdma_cm_id *cmid)
+ 	/* XXX There is no path record for iWARP, set by netdev->change_mtu? */
+-	if (cmid->route.path_rec == NULL)
++	if (!cmid->route.path_rec)
+ 		return;
  
  	mtu = kiblnd_translate_mtu(*kiblnd_tunables.kib_ib_mtu);
- 	LASSERT(mtu >= 0);
--	if (mtu != 0)
-+	if (mtu)
- 		cmid->route.path_rec->mtu = mtu;
- }
+@@ -626,7 +626,7 @@ static int kiblnd_get_completion_vector(kib_conn_t *conn, int cpt)
+ 		return 0;
  
-@@ -632,7 +632,7 @@ static int kiblnd_get_completion_vector(kib_conn_t *conn, int cpt)
+ 	mask = cfs_cpt_cpumask(lnet_cpt_table(), cpt);
+-	if (mask == NULL)
++	if (!mask)
+ 		return 0;
+ 
  	/* hash NID to CPU id in this partition... */
- 	off = do_div(nid, cpumask_weight(mask));
- 	for_each_cpu(i, mask) {
--		if (off-- == 0)
-+		if (!off--)
- 			return i % vectors;
- 	}
- 
-@@ -748,7 +748,7 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
- 
- 	rc = kiblnd_alloc_pages(&conn->ibc_rx_pages, cpt,
- 				IBLND_RX_MSG_PAGES(version));
--	if (rc != 0)
-+	if (rc)
- 		goto failed_2;
- 
- 	kiblnd_map_rx_descs(conn);
-@@ -767,7 +767,7 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
- 	conn->ibc_cq = cq;
- 
- 	rc = ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't request completion notificiation: %d\n", rc);
- 		goto failed_2;
- 	}
-@@ -786,7 +786,7 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
- 	conn->ibc_sched = sched;
- 
- 	rc = rdma_create_qp(cmid, conn->ibc_hdev->ibh_pd, init_qp_attr);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create QP: %d, send_wr: %d, recv_wr: %d\n",
- 		       rc, init_qp_attr->cap.max_send_wr,
- 		       init_qp_attr->cap.max_recv_wr);
-@@ -803,7 +803,7 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
- 	for (i = 0; i < IBLND_RX_MSGS(version); i++) {
- 		rc = kiblnd_post_rx(&conn->ibc_rxs[i],
- 				    IBLND_POSTRX_NO_CREDIT);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't post rxmsg: %d\n", rc);
- 
- 			/* Make posted receives complete */
-@@ -857,15 +857,15 @@ void kiblnd_destroy_conn(kib_conn_t *conn)
+@@ -665,7 +665,7 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
  	int rc;
+ 	int i;
  
+-	LASSERT(net != NULL);
++	LASSERT(net);
  	LASSERT(!in_interrupt());
--	LASSERT(atomic_read(&conn->ibc_refcount) == 0);
-+	LASSERT(!atomic_read(&conn->ibc_refcount));
- 	LASSERT(list_empty(&conn->ibc_early_rxs));
- 	LASSERT(list_empty(&conn->ibc_tx_noops));
- 	LASSERT(list_empty(&conn->ibc_tx_queue));
- 	LASSERT(list_empty(&conn->ibc_tx_queue_rsrvd));
- 	LASSERT(list_empty(&conn->ibc_tx_queue_nocred));
- 	LASSERT(list_empty(&conn->ibc_active_txs));
--	LASSERT(conn->ibc_noops_posted == 0);
--	LASSERT(conn->ibc_nsends_posted == 0);
-+	LASSERT(!conn->ibc_noops_posted);
-+	LASSERT(!conn->ibc_nsends_posted);
  
- 	switch (conn->ibc_state) {
- 	default:
-@@ -887,7 +887,7 @@ void kiblnd_destroy_conn(kib_conn_t *conn)
+ 	dev = net->ibn_dev;
+@@ -677,14 +677,14 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
  
- 	if (conn->ibc_cq) {
+ 	LIBCFS_CPT_ALLOC(init_qp_attr, lnet_cpt_table(), cpt,
+ 			 sizeof(*init_qp_attr));
+-	if (init_qp_attr == NULL) {
++	if (!init_qp_attr) {
+ 		CERROR("Can't allocate qp_attr for %s\n",
+ 		       libcfs_nid2str(peer->ibp_nid));
+ 		goto failed_0;
+ 	}
+ 
+ 	LIBCFS_CPT_ALLOC(conn, lnet_cpt_table(), cpt, sizeof(*conn));
+-	if (conn == NULL) {
++	if (!conn) {
+ 		CERROR("Can't allocate connection for %s\n",
+ 		       libcfs_nid2str(peer->ibp_nid));
+ 		goto failed_1;
+@@ -706,7 +706,7 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
+ 
+ 	LIBCFS_CPT_ALLOC(conn->ibc_connvars, lnet_cpt_table(), cpt,
+ 			 sizeof(*conn->ibc_connvars));
+-	if (conn->ibc_connvars == NULL) {
++	if (!conn->ibc_connvars) {
+ 		CERROR("Can't allocate in-progress connection state\n");
+ 		goto failed_2;
+ 	}
+@@ -741,7 +741,7 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
+ 
+ 	LIBCFS_CPT_ALLOC(conn->ibc_rxs, lnet_cpt_table(), cpt,
+ 			 IBLND_RX_MSGS(version) * sizeof(kib_rx_t));
+-	if (conn->ibc_rxs == NULL) {
++	if (!conn->ibc_rxs) {
+ 		CERROR("Cannot allocate RX buffers\n");
+ 		goto failed_2;
+ 	}
+@@ -874,7 +874,7 @@ void kiblnd_destroy_conn(kib_conn_t *conn)
+ 
+ 	case IBLND_CONN_DISCONNECTED:
+ 		/* connvars should have been freed already */
+-		LASSERT(conn->ibc_connvars == NULL);
++		LASSERT(!conn->ibc_connvars);
+ 		break;
+ 
+ 	case IBLND_CONN_INIT:
+@@ -882,28 +882,28 @@ void kiblnd_destroy_conn(kib_conn_t *conn)
+ 	}
+ 
+ 	/* conn->ibc_cmid might be destroyed by CM already */
+-	if (cmid != NULL && cmid->qp != NULL)
++	if (cmid && cmid->qp)
+ 		rdma_destroy_qp(cmid);
+ 
+-	if (conn->ibc_cq != NULL) {
++	if (conn->ibc_cq) {
  		rc = ib_destroy_cq(conn->ibc_cq);
--		if (rc != 0)
-+		if (rc)
+ 		if (rc != 0)
  			CWARN("Error destroying CQ: %d\n", rc);
  	}
  
-@@ -1011,7 +1011,7 @@ static int kiblnd_close_matching_conns(lnet_ni_t *ni, lnet_nid_t nid)
- 	if (nid == LNET_NID_ANY)
- 		return 0;
+-	if (conn->ibc_rx_pages != NULL)
++	if (conn->ibc_rx_pages)
+ 		kiblnd_unmap_rx_descs(conn);
  
--	return (count == 0) ? -ENOENT : 0;
-+	return !count ? -ENOENT : 0;
- }
- 
- int kiblnd_ctl(lnet_ni_t *ni, unsigned int cmd, void *arg)
-@@ -1087,7 +1087,7 @@ void kiblnd_query(lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
- 
- 	read_unlock_irqrestore(glock, flags);
- 
--	if (last_alive != 0)
-+	if (last_alive)
- 		*when = last_alive;
- 
- 	/*
-@@ -1213,7 +1213,7 @@ static void kiblnd_unmap_tx_pool(kib_tx_pool_t *tpo)
- 	kib_tx_t *tx;
- 	int i;
- 
--	LASSERT(tpo->tpo_pool.po_allocated == 0);
-+	LASSERT(!tpo->tpo_pool.po_allocated);
- 
- 	if (!hdev)
- 		return;
-@@ -1239,7 +1239,7 @@ static kib_hca_dev_t *kiblnd_current_hdev(kib_dev_t *dev)
- 	read_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
- 	while (dev->ibd_failover) {
- 		read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
--		if (i++ % 50 == 0)
-+		if (!(i++ % 50))
- 			CDEBUG(D_NET, "%s: Wait for failover\n",
- 			       dev->ibd_ifname);
- 		schedule_timeout(cfs_time_seconds(1) / 100);
-@@ -1275,7 +1275,7 @@ static void kiblnd_map_tx_pool(kib_tx_pool_t *tpo)
- 	CLASSERT(IBLND_MSG_SIZE <= PAGE_SIZE);
- 
- 	/* No fancy arithmetic when we do the buffer calculations */
--	CLASSERT(PAGE_SIZE % IBLND_MSG_SIZE == 0);
-+	CLASSERT(!(PAGE_SIZE % IBLND_MSG_SIZE));
- 
- 	tpo->tpo_hdev = kiblnd_current_hdev(dev);
- 
-@@ -1359,7 +1359,7 @@ struct ib_mr *kiblnd_find_rd_dma_mr(kib_hca_dev_t *hdev, kib_rdma_desc_t *rd)
- 
- static void kiblnd_destroy_fmr_pool(kib_fmr_pool_t *pool)
- {
--	LASSERT(pool->fpo_map_count == 0);
-+	LASSERT(!pool->fpo_map_count);
- 
- 	if (pool->fpo_fmr_pool)
- 		ib_destroy_fmr_pool(pool->fpo_fmr_pool);
-@@ -1449,7 +1449,7 @@ static void kiblnd_fail_fmr_poolset(kib_fmr_poolset_t *fps,
- 						 kib_fmr_pool_t, fpo_list);
- 		fpo->fpo_failed = 1;
- 		list_del(&fpo->fpo_list);
--		if (fpo->fpo_map_count == 0)
-+		if (!fpo->fpo_map_count)
- 			list_add(&fpo->fpo_list, zombies);
- 		else
- 			list_add(&fpo->fpo_list, &fps->fps_failed_pool_list);
-@@ -1484,7 +1484,7 @@ static int kiblnd_init_fmr_poolset(kib_fmr_poolset_t *fps, int cpt,
- 	INIT_LIST_HEAD(&fps->fps_failed_pool_list);
- 
- 	rc = kiblnd_create_fmr_pool(fps, &fpo);
--	if (rc == 0)
-+	if (!rc)
- 		list_add_tail(&fpo->fpo_list, &fps->fps_pool_list);
- 
- 	return rc;
-@@ -1492,7 +1492,7 @@ static int kiblnd_init_fmr_poolset(kib_fmr_poolset_t *fps, int cpt,
- 
- static int kiblnd_fmr_pool_is_idle(kib_fmr_pool_t *fpo, unsigned long now)
- {
--	if (fpo->fpo_map_count != 0) /* still in use */
-+	if (fpo->fpo_map_count) /* still in use */
- 		return 0;
- 	if (fpo->fpo_failed)
- 		return 1;
-@@ -1509,11 +1509,11 @@ void kiblnd_fmr_pool_unmap(kib_fmr_t *fmr, int status)
- 	int rc;
- 
- 	rc = ib_fmr_pool_unmap(fmr->fmr_pfmr);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
- 
--	if (status != 0) {
-+	if (status) {
- 		rc = ib_flush_fmr_pool(fpo->fpo_fmr_pool);
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
+-	if (conn->ibc_rxs != NULL) {
++	if (conn->ibc_rxs) {
+ 		LIBCFS_FREE(conn->ibc_rxs,
+ 			    IBLND_RX_MSGS(conn->ibc_version)
+ 			      * sizeof(kib_rx_t));
  	}
  
- 	fmr->fmr_pool = NULL;
-@@ -1596,7 +1596,7 @@ int kiblnd_fmr_pool_map(kib_fmr_poolset_t *fps, __u64 *pages, int npages,
- 	rc = kiblnd_create_fmr_pool(fps, &fpo);
- 	spin_lock(&fps->fps_lock);
- 	fps->fps_increasing = 0;
--	if (rc == 0) {
-+	if (!rc) {
- 		fps->fps_version++;
- 		list_add_tail(&fpo->fpo_list, &fps->fps_pool_list);
- 	} else {
-@@ -1610,7 +1610,7 @@ int kiblnd_fmr_pool_map(kib_fmr_poolset_t *fps, __u64 *pages, int npages,
- static void kiblnd_fini_pool(kib_pool_t *pool)
- {
- 	LASSERT(list_empty(&pool->po_free_list));
--	LASSERT(pool->po_allocated == 0);
-+	LASSERT(!pool->po_allocated);
+-	if (conn->ibc_connvars != NULL)
++	if (conn->ibc_connvars)
+ 		LIBCFS_FREE(conn->ibc_connvars, sizeof(*conn->ibc_connvars));
  
- 	CDEBUG(D_NET, "Finalize %s pool\n", pool->po_owner->ps_name);
- }
-@@ -1650,7 +1650,7 @@ static void kiblnd_fail_poolset(kib_poolset_t *ps, struct list_head *zombies)
- 					    kib_pool_t, po_list);
- 		po->po_failed = 1;
- 		list_del(&po->po_list);
--		if (po->po_allocated == 0)
-+		if (!po->po_allocated)
- 			list_add(&po->po_list, zombies);
+-	if (conn->ibc_hdev != NULL)
++	if (conn->ibc_hdev)
+ 		kiblnd_hdev_decref(conn->ibc_hdev);
+ 
+ 	/* See CAVEAT EMPTOR above in kiblnd_create_conn */
+@@ -1040,14 +1040,14 @@ int kiblnd_ctl(lnet_ni_t *ni, unsigned int cmd, void *arg)
+ 
+ 		rc = 0;
+ 		conn = kiblnd_get_conn_by_idx(ni, data->ioc_count);
+-		if (conn == NULL) {
++		if (!conn) {
+ 			rc = -ENOENT;
+ 			break;
+ 		}
+ 
+-		LASSERT(conn->ibc_cmid != NULL);
++		LASSERT(conn->ibc_cmid);
+ 		data->ioc_nid = conn->ibc_peer->ibp_nid;
+-		if (conn->ibc_cmid->route.path_rec == NULL)
++		if (!conn->ibc_cmid->route.path_rec)
+ 			data->ioc_u32[0] = 0; /* iWarp has no path MTU */
  		else
- 			list_add(&po->po_list, &ps->ps_failed_pool_list);
-@@ -1693,7 +1693,7 @@ static int kiblnd_init_poolset(kib_poolset_t *ps, int cpt,
- 	INIT_LIST_HEAD(&ps->ps_failed_pool_list);
+ 			data->ioc_u32[0] =
+@@ -1078,7 +1078,7 @@ void kiblnd_query(lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
+ 	read_lock_irqsave(glock, flags);
  
- 	rc = ps->ps_pool_create(ps, size, &pool);
--	if (rc == 0)
-+	if (!rc)
- 		list_add(&pool->po_list, &ps->ps_pool_list);
- 	else
- 		CERROR("Failed to create the first pool for %s\n", ps->ps_name);
-@@ -1703,7 +1703,7 @@ static int kiblnd_init_poolset(kib_poolset_t *ps, int cpt,
+ 	peer = kiblnd_find_peer_locked(nid);
+-	if (peer != NULL) {
++	if (peer) {
+ 		LASSERT(peer->ibp_connecting > 0 || /* creating conns */
+ 			 peer->ibp_accepting > 0 ||
+ 			 !list_empty(&peer->ibp_conns));  /* active conn */
+@@ -1094,7 +1094,7 @@ void kiblnd_query(lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
+ 	 * peer is not persistent in hash, trigger peer creation
+ 	 * and connection establishment with a NULL tx
+ 	 */
+-	if (peer == NULL)
++	if (!peer)
+ 		kiblnd_launch_tx(ni, NULL, nid);
  
- static int kiblnd_pool_is_idle(kib_pool_t *pool, unsigned long now)
+ 	CDEBUG(D_NET, "Peer %s %p, alive %ld secs ago\n",
+@@ -1108,7 +1108,7 @@ void kiblnd_free_pages(kib_pages_t *p)
+ 	int i;
+ 
+ 	for (i = 0; i < npages; i++) {
+-		if (p->ibp_pages[i] != NULL)
++		if (p->ibp_pages[i])
+ 			__free_page(p->ibp_pages[i]);
+ 	}
+ 
+@@ -1122,7 +1122,7 @@ int kiblnd_alloc_pages(kib_pages_t **pp, int cpt, int npages)
+ 
+ 	LIBCFS_CPT_ALLOC(p, lnet_cpt_table(), cpt,
+ 			 offsetof(kib_pages_t, ibp_pages[npages]));
+-	if (p == NULL) {
++	if (!p) {
+ 		CERROR("Can't allocate descriptor for %d pages\n", npages);
+ 		return -ENOMEM;
+ 	}
+@@ -1134,7 +1134,7 @@ int kiblnd_alloc_pages(kib_pages_t **pp, int cpt, int npages)
+ 		p->ibp_pages[i] = alloc_pages_node(
+ 				    cfs_cpt_spread_node(lnet_cpt_table(), cpt),
+ 				    GFP_NOFS, 0);
+-		if (p->ibp_pages[i] == NULL) {
++		if (!p->ibp_pages[i]) {
+ 			CERROR("Can't allocate page %d of %d\n", i, npages);
+ 			kiblnd_free_pages(p);
+ 			return -ENOMEM;
+@@ -1150,8 +1150,8 @@ void kiblnd_unmap_rx_descs(kib_conn_t *conn)
+ 	kib_rx_t *rx;
+ 	int i;
+ 
+-	LASSERT(conn->ibc_rxs != NULL);
+-	LASSERT(conn->ibc_hdev != NULL);
++	LASSERT(conn->ibc_rxs);
++	LASSERT(conn->ibc_hdev);
+ 
+ 	for (i = 0; i < IBLND_RX_MSGS(conn->ibc_version); i++) {
+ 		rx = &conn->ibc_rxs[i];
+@@ -1215,7 +1215,7 @@ static void kiblnd_unmap_tx_pool(kib_tx_pool_t *tpo)
+ 
+ 	LASSERT(tpo->tpo_pool.po_allocated == 0);
+ 
+-	if (hdev == NULL)
++	if (!hdev)
+ 		return;
+ 
+ 	for (i = 0; i < tpo->tpo_pool.po_size; i++) {
+@@ -1267,7 +1267,7 @@ static void kiblnd_map_tx_pool(kib_tx_pool_t *tpo)
+ 	int ipage;
+ 	int i;
+ 
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 
+ 	dev = net->ibn_dev;
+ 
+@@ -1310,7 +1310,7 @@ struct ib_mr *kiblnd_find_dma_mr(kib_hca_dev_t *hdev, __u64 addr, __u64 size)
  {
--	if (pool->po_allocated != 0) /* still in use */
-+	if (pool->po_allocated) /* still in use */
- 		return 0;
- 	if (pool->po_failed)
- 		return 1;
-@@ -1790,7 +1790,7 @@ struct list_head *kiblnd_pool_alloc_node(kib_poolset_t *ps)
+ 	__u64 index;
+ 
+-	LASSERT(hdev->ibh_mrs[0] != NULL);
++	LASSERT(hdev->ibh_mrs[0]);
+ 
+ 	if (hdev->ibh_nmrs == 1)
+ 		return hdev->ibh_mrs[0];
+@@ -1330,7 +1330,7 @@ struct ib_mr *kiblnd_find_rd_dma_mr(kib_hca_dev_t *hdev, kib_rdma_desc_t *rd)
+ 	struct ib_mr *mr;
+ 	int i;
+ 
+-	LASSERT(hdev->ibh_mrs[0] != NULL);
++	LASSERT(hdev->ibh_mrs[0]);
+ 
+ 	if (*kiblnd_tunables.kib_map_on_demand > 0 &&
+ 	    *kiblnd_tunables.kib_map_on_demand <= rd->rd_nfrags)
+@@ -1344,10 +1344,10 @@ struct ib_mr *kiblnd_find_rd_dma_mr(kib_hca_dev_t *hdev, kib_rdma_desc_t *rd)
+ 		mr = kiblnd_find_dma_mr(hdev,
+ 					rd->rd_frags[i].rf_addr,
+ 					rd->rd_frags[i].rf_nob);
+-		if (prev_mr == NULL)
++		if (!prev_mr)
+ 			prev_mr = mr;
+ 
+-		if (mr == NULL || prev_mr != mr) {
++		if (!mr || prev_mr != mr) {
+ 			/* Can't covered by one single MR */
+ 			mr = NULL;
+ 			break;
+@@ -1361,10 +1361,10 @@ static void kiblnd_destroy_fmr_pool(kib_fmr_pool_t *pool)
+ {
+ 	LASSERT(pool->fpo_map_count == 0);
+ 
+-	if (pool->fpo_fmr_pool != NULL)
++	if (pool->fpo_fmr_pool)
+ 		ib_destroy_fmr_pool(pool->fpo_fmr_pool);
+ 
+-	if (pool->fpo_hdev != NULL)
++	if (pool->fpo_hdev)
+ 		kiblnd_hdev_decref(pool->fpo_hdev);
+ 
+ 	LIBCFS_FREE(pool, sizeof(*pool));
+@@ -1414,7 +1414,7 @@ static int kiblnd_create_fmr_pool(kib_fmr_poolset_t *fps,
+ 	int rc;
+ 
+ 	LIBCFS_CPT_ALLOC(fpo, lnet_cpt_table(), fps->fps_cpt, sizeof(*fpo));
+-	if (fpo == NULL)
++	if (!fpo)
+ 		return -ENOMEM;
+ 
+ 	fpo->fpo_hdev = kiblnd_current_hdev(dev);
+@@ -1439,7 +1439,7 @@ static int kiblnd_create_fmr_pool(kib_fmr_poolset_t *fps,
+ static void kiblnd_fail_fmr_poolset(kib_fmr_poolset_t *fps,
+ 				    struct list_head *zombies)
+ {
+-	if (fps->fps_net == NULL) /* intialized? */
++	if (!fps->fps_net) /* intialized? */
+ 		return;
+ 
+ 	spin_lock(&fps->fps_lock);
+@@ -1460,7 +1460,7 @@ static void kiblnd_fail_fmr_poolset(kib_fmr_poolset_t *fps,
+ 
+ static void kiblnd_fini_fmr_poolset(kib_fmr_poolset_t *fps)
+ {
+-	if (fps->fps_net != NULL) { /* initialized? */
++	if (fps->fps_net) { /* initialized? */
+ 		kiblnd_destroy_fmr_pool_list(&fps->fps_failed_pool_list);
+ 		kiblnd_destroy_fmr_pool_list(&fps->fps_pool_list);
+ 	}
+@@ -1634,14 +1634,14 @@ static void kiblnd_destroy_pool_list(struct list_head *head)
+ 		pool = list_entry(head->next, kib_pool_t, po_list);
+ 		list_del(&pool->po_list);
+ 
+-		LASSERT(pool->po_owner != NULL);
++		LASSERT(pool->po_owner);
+ 		pool->po_owner->ps_pool_destroy(pool);
+ 	}
+ }
+ 
+ static void kiblnd_fail_poolset(kib_poolset_t *ps, struct list_head *zombies)
+ {
+-	if (ps->ps_net == NULL) /* intialized? */
++	if (!ps->ps_net) /* intialized? */
+ 		return;
  
  	spin_lock(&ps->ps_lock);
- 	ps->ps_increasing = 0;
--	if (rc == 0) {
-+	if (!rc) {
- 		list_add_tail(&pool->po_list, &ps->ps_pool_list);
- 	} else {
- 		ps->ps_next_retry = cfs_time_shift(IBLND_POOL_RETRY);
-@@ -1807,7 +1807,7 @@ static void kiblnd_destroy_tx_pool(kib_pool_t *pool)
- 	kib_tx_pool_t *tpo = container_of(pool, kib_tx_pool_t, tpo_pool);
- 	int i;
+@@ -1660,7 +1660,7 @@ static void kiblnd_fail_poolset(kib_poolset_t *ps, struct list_head *zombies)
  
--	LASSERT(pool->po_allocated == 0);
-+	LASSERT(!pool->po_allocated);
+ static void kiblnd_fini_poolset(kib_poolset_t *ps)
+ {
+-	if (ps->ps_net != NULL) { /* initialized? */
++	if (ps->ps_net) { /* initialized? */
+ 		kiblnd_destroy_pool_list(&ps->ps_failed_pool_list);
+ 		kiblnd_destroy_pool_list(&ps->ps_pool_list);
+ 	}
+@@ -1719,7 +1719,7 @@ void kiblnd_pool_free_node(kib_pool_t *pool, struct list_head *node)
  
- 	if (tpo->tpo_tx_pages) {
+ 	spin_lock(&ps->ps_lock);
+ 
+-	if (ps->ps_node_fini != NULL)
++	if (ps->ps_node_fini)
+ 		ps->ps_node_fini(pool, node);
+ 
+ 	LASSERT(pool->po_allocated > 0);
+@@ -1757,7 +1757,7 @@ struct list_head *kiblnd_pool_alloc_node(kib_poolset_t *ps)
+ 		node = pool->po_free_list.next;
+ 		list_del(node);
+ 
+-		if (ps->ps_node_init != NULL) {
++		if (ps->ps_node_init) {
+ 			/* still hold the lock */
+ 			ps->ps_node_init(pool, node);
+ 		}
+@@ -1809,35 +1809,35 @@ static void kiblnd_destroy_tx_pool(kib_pool_t *pool)
+ 
+ 	LASSERT(pool->po_allocated == 0);
+ 
+-	if (tpo->tpo_tx_pages != NULL) {
++	if (tpo->tpo_tx_pages) {
  		kiblnd_unmap_tx_pool(tpo);
-@@ -1877,7 +1877,7 @@ static int kiblnd_create_tx_pool(kib_poolset_t *ps, int size,
- 	tpo->tpo_tx_pages = NULL;
+ 		kiblnd_free_pages(tpo->tpo_tx_pages);
+ 	}
  
- 	npg = (size * IBLND_MSG_SIZE + PAGE_SIZE - 1) / PAGE_SIZE;
--	if (kiblnd_alloc_pages(&tpo->tpo_tx_pages, ps->ps_cpt, npg) != 0) {
-+	if (kiblnd_alloc_pages(&tpo->tpo_tx_pages, ps->ps_cpt, npg)) {
- 		CERROR("Can't allocate tx pages: %d\n", npg);
- 		LIBCFS_FREE(tpo, sizeof(*tpo));
+-	if (tpo->tpo_tx_descs == NULL)
++	if (!tpo->tpo_tx_descs)
+ 		goto out;
+ 
+ 	for (i = 0; i < pool->po_size; i++) {
+ 		kib_tx_t *tx = &tpo->tpo_tx_descs[i];
+ 
+ 		list_del(&tx->tx_list);
+-		if (tx->tx_pages != NULL)
++		if (tx->tx_pages)
+ 			LIBCFS_FREE(tx->tx_pages,
+ 				    LNET_MAX_IOV *
+ 				    sizeof(*tx->tx_pages));
+-		if (tx->tx_frags != NULL)
++		if (tx->tx_frags)
+ 			LIBCFS_FREE(tx->tx_frags,
+ 				    IBLND_MAX_RDMA_FRAGS *
+ 					    sizeof(*tx->tx_frags));
+-		if (tx->tx_wrq != NULL)
++		if (tx->tx_wrq)
+ 			LIBCFS_FREE(tx->tx_wrq,
+ 				    (1 + IBLND_MAX_RDMA_FRAGS) *
+ 				    sizeof(*tx->tx_wrq));
+-		if (tx->tx_sge != NULL)
++		if (tx->tx_sge)
+ 			LIBCFS_FREE(tx->tx_sge,
+ 				    (1 + IBLND_MAX_RDMA_FRAGS) *
+ 				    sizeof(*tx->tx_sge));
+-		if (tx->tx_rd != NULL)
++		if (tx->tx_rd)
+ 			LIBCFS_FREE(tx->tx_rd,
+ 				    offsetof(kib_rdma_desc_t,
+ 					     rd_frags[IBLND_MAX_RDMA_FRAGS]));
+@@ -1866,7 +1866,7 @@ static int kiblnd_create_tx_pool(kib_poolset_t *ps, int size,
+ 	kib_tx_pool_t *tpo;
+ 
+ 	LIBCFS_CPT_ALLOC(tpo, lnet_cpt_table(), ps->ps_cpt, sizeof(*tpo));
+-	if (tpo == NULL) {
++	if (!tpo) {
+ 		CERROR("Failed to allocate TX pool\n");
  		return -ENOMEM;
-@@ -1988,7 +1988,7 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
- 	int i;
+ 	}
+@@ -1885,7 +1885,7 @@ static int kiblnd_create_tx_pool(kib_poolset_t *ps, int size,
  
- 	read_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
--	if (*kiblnd_tunables.kib_map_on_demand == 0 &&
-+	if (!*kiblnd_tunables.kib_map_on_demand &&
- 	    net->ibn_dev->ibd_hdev->ibh_nmrs == 1) {
- 		read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
- 		goto create_tx_pool;
-@@ -2029,10 +2029,10 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
+ 	LIBCFS_CPT_ALLOC(tpo->tpo_tx_descs, lnet_cpt_table(), ps->ps_cpt,
+ 			 size * sizeof(kib_tx_t));
+-	if (tpo->tpo_tx_descs == NULL) {
++	if (!tpo->tpo_tx_descs) {
+ 		CERROR("Can't allocate %d tx descriptors\n", size);
+ 		ps->ps_pool_destroy(pool);
+ 		return -ENOMEM;
+@@ -1897,17 +1897,17 @@ static int kiblnd_create_tx_pool(kib_poolset_t *ps, int size,
+ 		kib_tx_t *tx = &tpo->tpo_tx_descs[i];
+ 
+ 		tx->tx_pool = tpo;
+-		if (ps->ps_net->ibn_fmr_ps != NULL) {
++		if (ps->ps_net->ibn_fmr_ps) {
+ 			LIBCFS_CPT_ALLOC(tx->tx_pages,
+ 					 lnet_cpt_table(), ps->ps_cpt,
+ 					 LNET_MAX_IOV * sizeof(*tx->tx_pages));
+-			if (tx->tx_pages == NULL)
++			if (!tx->tx_pages)
+ 				break;
+ 		}
+ 
+ 		LIBCFS_CPT_ALLOC(tx->tx_frags, lnet_cpt_table(), ps->ps_cpt,
+ 				 IBLND_MAX_RDMA_FRAGS * sizeof(*tx->tx_frags));
+-		if (tx->tx_frags == NULL)
++		if (!tx->tx_frags)
+ 			break;
+ 
+ 		sg_init_table(tx->tx_frags, IBLND_MAX_RDMA_FRAGS);
+@@ -1915,19 +1915,19 @@ static int kiblnd_create_tx_pool(kib_poolset_t *ps, int size,
+ 		LIBCFS_CPT_ALLOC(tx->tx_wrq, lnet_cpt_table(), ps->ps_cpt,
+ 				 (1 + IBLND_MAX_RDMA_FRAGS) *
+ 				 sizeof(*tx->tx_wrq));
+-		if (tx->tx_wrq == NULL)
++		if (!tx->tx_wrq)
+ 			break;
+ 
+ 		LIBCFS_CPT_ALLOC(tx->tx_sge, lnet_cpt_table(), ps->ps_cpt,
+ 				 (1 + IBLND_MAX_RDMA_FRAGS) *
+ 				 sizeof(*tx->tx_sge));
+-		if (tx->tx_sge == NULL)
++		if (!tx->tx_sge)
+ 			break;
+ 
+ 		LIBCFS_CPT_ALLOC(tx->tx_rd, lnet_cpt_table(), ps->ps_cpt,
+ 				 offsetof(kib_rdma_desc_t,
+ 					  rd_frags[IBLND_MAX_RDMA_FRAGS]));
+-		if (tx->tx_rd == NULL)
++		if (!tx->tx_rd)
+ 			break;
+ 	}
+ 
+@@ -1958,23 +1958,23 @@ static void kiblnd_net_fini_pools(kib_net_t *net)
+ 		kib_tx_poolset_t *tps;
+ 		kib_fmr_poolset_t *fps;
+ 
+-		if (net->ibn_tx_ps != NULL) {
++		if (net->ibn_tx_ps) {
+ 			tps = net->ibn_tx_ps[i];
+ 			kiblnd_fini_poolset(&tps->tps_poolset);
+ 		}
+ 
+-		if (net->ibn_fmr_ps != NULL) {
++		if (net->ibn_fmr_ps) {
+ 			fps = net->ibn_fmr_ps[i];
+ 			kiblnd_fini_fmr_poolset(fps);
+ 		}
+ 	}
+ 
+-	if (net->ibn_tx_ps != NULL) {
++	if (net->ibn_tx_ps) {
+ 		cfs_percpt_free(net->ibn_tx_ps);
+ 		net->ibn_tx_ps = NULL;
+ 	}
+ 
+-	if (net->ibn_fmr_ps != NULL) {
++	if (net->ibn_fmr_ps) {
+ 		cfs_percpt_free(net->ibn_fmr_ps);
+ 		net->ibn_fmr_ps = NULL;
+ 	}
+@@ -2009,7 +2009,7 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
+ 	 * TX pool must be created later than FMR, see LU-2268
+ 	 * for details
+ 	 */
+-	LASSERT(net->ibn_tx_ps == NULL);
++	LASSERT(!net->ibn_tx_ps);
+ 
+ 	/*
+ 	 * premapping can fail if ibd_nmr > 1, so we always create
+@@ -2018,14 +2018,14 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
+ 
+ 	net->ibn_fmr_ps = cfs_percpt_alloc(lnet_cpt_table(),
+ 					   sizeof(kib_fmr_poolset_t));
+-	if (net->ibn_fmr_ps == NULL) {
++	if (!net->ibn_fmr_ps) {
+ 		CERROR("Failed to allocate FMR pool array\n");
+ 		rc = -ENOMEM;
+ 		goto failed;
+ 	}
+ 
+ 	for (i = 0; i < ncpts; i++) {
+-		cpt = (cpts == NULL) ? i : cpts[i];
++		cpt = !cpts ? i : cpts[i];
  		rc = kiblnd_init_fmr_poolset(net->ibn_fmr_ps[cpt], cpt, net,
  					     kiblnd_fmr_pool_size(ncpts),
  					     kiblnd_fmr_flush_trigger(ncpts));
--		if (rc == -ENOSYS && i == 0) /* no FMR */
-+		if (rc == -ENOSYS && !i) /* no FMR */
- 			break;
+@@ -2053,14 +2053,14 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
+  create_tx_pool:
+ 	net->ibn_tx_ps = cfs_percpt_alloc(lnet_cpt_table(),
+ 					  sizeof(kib_tx_poolset_t));
+-	if (net->ibn_tx_ps == NULL) {
++	if (!net->ibn_tx_ps) {
+ 		CERROR("Failed to allocate tx pool array\n");
+ 		rc = -ENOMEM;
+ 		goto failed;
+ 	}
  
--		if (rc != 0) { /* a real error */
-+		if (rc) { /* a real error */
- 			CERROR("Can't initialize FMR pool for CPT %d: %d\n",
- 			       cpt, rc);
- 			goto failed;
-@@ -2067,7 +2067,7 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
- 					 kiblnd_create_tx_pool,
- 					 kiblnd_destroy_tx_pool,
- 					 kiblnd_tx_init, NULL);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't initialize TX pool for CPT %d: %d\n",
- 			       cpt, rc);
- 			goto failed;
-@@ -2077,7 +2077,7 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
- 	return 0;
-  failed:
- 	kiblnd_net_fini_pools(net);
--	LASSERT(rc != 0);
-+	LASSERT(rc);
- 	return rc;
- }
- 
-@@ -2112,7 +2112,7 @@ static void kiblnd_hdev_cleanup_mrs(kib_hca_dev_t *hdev)
+ 	for (i = 0; i < ncpts; i++) {
+-		cpt = (cpts == NULL) ? i : cpts[i];
++		cpt = !cpts ? i : cpts[i];
+ 		rc = kiblnd_init_poolset(&net->ibn_tx_ps[cpt]->tps_poolset,
+ 					 cpt, net, "TX",
+ 					 kiblnd_tx_pool_size(ncpts),
+@@ -2112,11 +2112,11 @@ static void kiblnd_hdev_cleanup_mrs(kib_hca_dev_t *hdev)
  {
  	int i;
  
--	if (hdev->ibh_nmrs == 0 || !hdev->ibh_mrs)
-+	if (!hdev->ibh_nmrs || !hdev->ibh_mrs)
+-	if (hdev->ibh_nmrs == 0 || hdev->ibh_mrs == NULL)
++	if (hdev->ibh_nmrs == 0 || !hdev->ibh_mrs)
  		return;
  
  	for (i = 0; i < hdev->ibh_nmrs; i++) {
-@@ -2147,7 +2147,7 @@ static int kiblnd_hdev_setup_mrs(kib_hca_dev_t *hdev)
- 	int acflags = IB_ACCESS_LOCAL_WRITE | IB_ACCESS_REMOTE_WRITE;
+-		if (hdev->ibh_mrs[i] == NULL)
++		if (!hdev->ibh_mrs[i])
+ 			break;
  
- 	rc = kiblnd_hdev_get_attr(hdev);
--	if (rc != 0)
-+	if (rc)
+ 		ib_dereg_mr(hdev->ibh_mrs[i]);
+@@ -2131,10 +2131,10 @@ void kiblnd_hdev_destroy(kib_hca_dev_t *hdev)
+ {
+ 	kiblnd_hdev_cleanup_mrs(hdev);
+ 
+-	if (hdev->ibh_pd != NULL)
++	if (hdev->ibh_pd)
+ 		ib_dealloc_pd(hdev->ibh_pd);
+ 
+-	if (hdev->ibh_cmid != NULL)
++	if (hdev->ibh_cmid)
+ 		rdma_destroy_id(hdev->ibh_cmid);
+ 
+ 	LIBCFS_FREE(hdev, sizeof(*hdev));
+@@ -2151,7 +2151,7 @@ static int kiblnd_hdev_setup_mrs(kib_hca_dev_t *hdev)
  		return rc;
  
  	LIBCFS_ALLOC(hdev->ibh_mrs, 1 * sizeof(*hdev->ibh_mrs));
+-	if (hdev->ibh_mrs == NULL) {
++	if (!hdev->ibh_mrs) {
+ 		CERROR("Failed to allocate MRs table\n");
+ 		return -ENOMEM;
+ 	}
+@@ -2185,8 +2185,8 @@ static int kiblnd_dev_need_failover(kib_dev_t *dev)
+ 	struct sockaddr_in dstaddr;
+ 	int rc;
+ 
+-	if (dev->ibd_hdev == NULL || /* initializing */
+-	    dev->ibd_hdev->ibh_cmid == NULL || /* listener is dead */
++	if (!dev->ibd_hdev || /* initializing */
++	    !dev->ibd_hdev->ibh_cmid || /* listener is dead */
+ 	    *kiblnd_tunables.kib_dev_failover > 1) /* debugging */
+ 		return 1;
+ 
 @@ -2218,7 +2218,7 @@ static int kiblnd_dev_need_failover(kib_dev_t *dev)
  	dstaddr.sin_family = AF_INET;
  	rc = rdma_resolve_addr(cmid, (struct sockaddr *)&srcaddr,
  			       (struct sockaddr *)&dstaddr, 1);
--	if (rc != 0 || !cmid->device) {
-+	if (rc || !cmid->device) {
+-	if (rc != 0 || cmid->device == NULL) {
++	if (rc != 0 || !cmid->device) {
  		CERROR("Failed to bind %s:%pI4h to device(%p): %d\n",
  		       dev->ibd_ifname, &dev->ibd_ifip,
  		       cmid->device, rc);
+@@ -2247,14 +2247,14 @@ int kiblnd_dev_failover(kib_dev_t *dev)
+ 	int i;
+ 
+ 	LASSERT(*kiblnd_tunables.kib_dev_failover > 1 ||
+-		dev->ibd_can_failover || dev->ibd_hdev == NULL);
++		dev->ibd_can_failover || !dev->ibd_hdev);
+ 
+ 	rc = kiblnd_dev_need_failover(dev);
+ 	if (rc <= 0)
+ 		goto out;
+ 
+-	if (dev->ibd_hdev != NULL &&
+-	    dev->ibd_hdev->ibh_cmid != NULL) {
++	if (dev->ibd_hdev &&
++	    dev->ibd_hdev->ibh_cmid) {
+ 		/*
+ 		 * XXX it's not good to close old listener at here,
+ 		 * because we can fail to create new listener.
 @@ -2289,7 +2289,7 @@ int kiblnd_dev_failover(kib_dev_t *dev)
  
  	/* Bind to failover device or port */
  	rc = rdma_bind_addr(cmid, (struct sockaddr *)&addr);
--	if (rc != 0 || !cmid->device) {
-+	if (rc || !cmid->device) {
+-	if (rc != 0 || cmid->device == NULL) {
++	if (rc != 0 || !cmid->device) {
  		CERROR("Failed to bind %s:%pI4h to device(%p): %d\n",
  		       dev->ibd_ifname, &dev->ibd_ifip,
  		       cmid->device, rc);
-@@ -2320,13 +2320,13 @@ int kiblnd_dev_failover(kib_dev_t *dev)
- 	hdev->ibh_pd = pd;
- 
- 	rc = rdma_listen(cmid, 0);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't start new listener: %d\n", rc);
- 		goto out;
+@@ -2298,7 +2298,7 @@ int kiblnd_dev_failover(kib_dev_t *dev)
  	}
  
- 	rc = kiblnd_hdev_setup_mrs(hdev);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't setup device: %d\n", rc);
- 		goto out;
- 	}
-@@ -2357,7 +2357,7 @@ int kiblnd_dev_failover(kib_dev_t *dev)
- 	if (hdev)
+ 	LIBCFS_ALLOC(hdev, sizeof(*hdev));
+-	if (hdev == NULL) {
++	if (!hdev) {
+ 		CERROR("Failed to allocate kib_hca_dev\n");
+ 		rdma_destroy_id(cmid);
+ 		rc = -ENOMEM;
+@@ -2354,7 +2354,7 @@ int kiblnd_dev_failover(kib_dev_t *dev)
+ 		kiblnd_destroy_pool_list(&zombie_ppo);
+ 	if (!list_empty(&zombie_fpo))
+ 		kiblnd_destroy_fmr_pool_list(&zombie_fpo);
+-	if (hdev != NULL)
++	if (hdev)
  		kiblnd_hdev_decref(hdev);
  
--	if (rc != 0)
-+	if (rc)
- 		dev->ibd_failed_failover++;
- 	else
- 		dev->ibd_failed_failover = 0;
-@@ -2367,7 +2367,7 @@ int kiblnd_dev_failover(kib_dev_t *dev)
- 
- void kiblnd_destroy_dev(kib_dev_t *dev)
- {
--	LASSERT(dev->ibd_nnets == 0);
-+	LASSERT(!dev->ibd_nnets);
- 	LASSERT(list_empty(&dev->ibd_nets));
- 
+ 	if (rc != 0)
+@@ -2373,7 +2373,7 @@ void kiblnd_destroy_dev(kib_dev_t *dev)
  	list_del(&dev->ibd_fail_list);
-@@ -2389,7 +2389,7 @@ static kib_dev_t *kiblnd_create_dev(char *ifname)
- 	int rc;
+ 	list_del(&dev->ibd_list);
  
- 	rc = lnet_ipif_query(ifname, &up, &ip, &netmask);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't query IPoIB interface %s: %d\n",
- 		       ifname, rc);
+-	if (dev->ibd_hdev != NULL)
++	if (dev->ibd_hdev)
+ 		kiblnd_hdev_decref(dev->ibd_hdev);
+ 
+ 	LIBCFS_FREE(dev, sizeof(*dev));
+@@ -2401,11 +2401,11 @@ static kib_dev_t *kiblnd_create_dev(char *ifname)
+ 	}
+ 
+ 	LIBCFS_ALLOC(dev, sizeof(*dev));
+-	if (dev == NULL)
++	if (!dev)
  		return NULL;
-@@ -2420,7 +2420,7 @@ static kib_dev_t *kiblnd_create_dev(char *ifname)
  
- 	/* initialize the device */
- 	rc = kiblnd_dev_failover(dev);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't initialize device: %d\n", rc);
- 		LIBCFS_FREE(dev, sizeof(*dev));
- 		return NULL;
-@@ -2464,7 +2464,7 @@ static void kiblnd_base_shutdown(void)
- 		wake_up_all(&kiblnd_data.kib_failover_waitq);
+ 	netdev = dev_get_by_name(&init_net, ifname);
+-	if (netdev == NULL) {
++	if (!netdev) {
+ 		dev->ibd_can_failover = 0;
+ 	} else {
+ 		dev->ibd_can_failover = !!(netdev->flags & IFF_MASTER);
+@@ -2443,7 +2443,7 @@ static void kiblnd_base_shutdown(void)
  
- 		i = 2;
--		while (atomic_read(&kiblnd_data.kib_nthreads) != 0) {
-+		while (atomic_read(&kiblnd_data.kib_nthreads)) {
- 			i++;
- 			/* power of 2 ? */
- 			CDEBUG(((i & (-i)) == i) ? D_WARNING : D_NET,
-@@ -2519,7 +2519,7 @@ void kiblnd_shutdown(lnet_ni_t *ni)
+ 	case IBLND_INIT_ALL:
+ 	case IBLND_INIT_DATA:
+-		LASSERT(kiblnd_data.kib_peers != NULL);
++		LASSERT(kiblnd_data.kib_peers);
+ 		for (i = 0; i < kiblnd_data.kib_peer_hash_size; i++)
+ 			LASSERT(list_empty(&kiblnd_data.kib_peers[i]));
+ 		LASSERT(list_empty(&kiblnd_data.kib_connd_zombies));
+@@ -2480,13 +2480,13 @@ static void kiblnd_base_shutdown(void)
+ 		break;
+ 	}
  
- 		/* Wait for all peer state to clean up */
- 		i = 2;
--		while (atomic_read(&net->ibn_npeers) != 0) {
-+		while (atomic_read(&net->ibn_npeers)) {
- 			i++;
- 			CDEBUG(((i & (-i)) == i) ? D_WARNING : D_NET, /* 2**n? */
- 			       "%s: waiting for %d peers to disconnect\n",
-@@ -2540,10 +2540,9 @@ void kiblnd_shutdown(lnet_ni_t *ni)
- 		/* fall through */
+-	if (kiblnd_data.kib_peers != NULL) {
++	if (kiblnd_data.kib_peers) {
+ 		LIBCFS_FREE(kiblnd_data.kib_peers,
+ 			    sizeof(struct list_head) *
+ 			    kiblnd_data.kib_peer_hash_size);
+ 	}
  
+-	if (kiblnd_data.kib_scheds != NULL)
++	if (kiblnd_data.kib_scheds)
+ 		cfs_percpt_free(kiblnd_data.kib_scheds);
+ 
+ 	kiblnd_data.kib_init = IBLND_INIT_NOTHING;
+@@ -2502,7 +2502,7 @@ void kiblnd_shutdown(lnet_ni_t *ni)
+ 
+ 	LASSERT(kiblnd_data.kib_init == IBLND_INIT_ALL);
+ 
+-	if (net == NULL)
++	if (!net)
+ 		goto out;
+ 
+ 	write_lock_irqsave(g_lock, flags);
+@@ -2542,7 +2542,7 @@ void kiblnd_shutdown(lnet_ni_t *ni)
  	case IBLND_INIT_NOTHING:
--		LASSERT(atomic_read(&net->ibn_nconns) == 0);
-+		LASSERT(!atomic_read(&net->ibn_nconns));
+ 		LASSERT(atomic_read(&net->ibn_nconns) == 0);
  
--		if (net->ibn_dev &&
--		    net->ibn_dev->ibd_nnets == 0)
-+		if (net->ibn_dev && !net->ibn_dev->ibd_nnets)
+-		if (net->ibn_dev != NULL &&
++		if (net->ibn_dev &&
+ 		    net->ibn_dev->ibd_nnets == 0)
  			kiblnd_destroy_dev(net->ibn_dev);
  
- 		break;
-@@ -2624,16 +2623,16 @@ static int kiblnd_base_startup(void)
- 	/*****************************************************/
- 
- 	rc = kiblnd_thread_start(kiblnd_connd, NULL, "kiblnd_connd");
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't spawn o2iblnd connd: %d\n", rc);
+@@ -2579,7 +2579,7 @@ static int kiblnd_base_startup(void)
+ 	kiblnd_data.kib_peer_hash_size = IBLND_PEER_HASH_SIZE;
+ 	LIBCFS_ALLOC(kiblnd_data.kib_peers,
+ 		     sizeof(struct list_head) * kiblnd_data.kib_peer_hash_size);
+-	if (kiblnd_data.kib_peers == NULL)
++	if (!kiblnd_data.kib_peers)
  		goto failed;
- 	}
+ 	for (i = 0; i < kiblnd_data.kib_peer_hash_size; i++)
+ 		INIT_LIST_HEAD(&kiblnd_data.kib_peers[i]);
+@@ -2592,7 +2592,7 @@ static int kiblnd_base_startup(void)
  
--	if (*kiblnd_tunables.kib_dev_failover != 0)
-+	if (*kiblnd_tunables.kib_dev_failover)
- 		rc = kiblnd_thread_start(kiblnd_failover_thread, NULL,
- 					 "kiblnd_failover");
- 
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't spawn o2iblnd failover thread: %d\n", rc);
+ 	kiblnd_data.kib_scheds = cfs_percpt_alloc(lnet_cpt_table(),
+ 						  sizeof(*sched));
+-	if (kiblnd_data.kib_scheds == NULL)
++	if (!kiblnd_data.kib_scheds)
  		goto failed;
- 	}
-@@ -2655,7 +2654,7 @@ static int kiblnd_start_schedulers(struct kib_sched_info *sched)
- 	int nthrs;
- 	int i;
  
--	if (sched->ibs_nthreads == 0) {
-+	if (!sched->ibs_nthreads) {
- 		if (*kiblnd_tunables.kib_nscheds > 0) {
- 			nthrs = sched->ibs_nthreads_max;
- 		} else {
-@@ -2678,7 +2677,7 @@ static int kiblnd_start_schedulers(struct kib_sched_info *sched)
- 		snprintf(name, sizeof(name), "kiblnd_sd_%02ld_%02ld",
- 			 KIB_THREAD_CPT(id), KIB_THREAD_TID(id));
- 		rc = kiblnd_thread_start(kiblnd_scheduler, (void *)id, name);
--		if (rc == 0)
-+		if (!rc)
- 			continue;
+ 	cfs_percpt_for_each(sched, i, kiblnd_data.kib_scheds) {
+@@ -2700,7 +2700,7 @@ static int kiblnd_dev_start_threads(kib_dev_t *dev, int newdev, __u32 *cpts,
+ 	for (i = 0; i < ncpts; i++) {
+ 		struct kib_sched_info *sched;
  
- 		CERROR("Can't spawn thread %d for scheduler[%d]: %d\n",
-@@ -2707,7 +2706,7 @@ static int kiblnd_dev_start_threads(kib_dev_t *dev, int newdev, __u32 *cpts,
- 			continue;
+-		cpt = (cpts == NULL) ? i : cpts[i];
++		cpt = !cpts ? i : cpts[i];
+ 		sched = kiblnd_data.kib_scheds[cpt];
  
- 		rc = kiblnd_start_schedulers(kiblnd_data.kib_scheds[cpt]);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Failed to start scheduler threads for %s\n",
- 			       dev->ibd_ifname);
- 			return rc;
-@@ -2725,7 +2724,7 @@ static kib_dev_t *kiblnd_dev_search(char *ifname)
- 
- 	colon = strchr(ifname, ':');
- 	list_for_each_entry(dev, &kiblnd_data.kib_devs, ibd_list) {
--		if (strcmp(&dev->ibd_ifname[0], ifname) == 0)
-+		if (!strcmp(&dev->ibd_ifname[0], ifname))
+ 		if (!newdev && sched->ibs_nthreads > 0)
+@@ -2728,21 +2728,21 @@ static kib_dev_t *kiblnd_dev_search(char *ifname)
+ 		if (strcmp(&dev->ibd_ifname[0], ifname) == 0)
  			return dev;
  
- 		if (alias)
-@@ -2737,7 +2736,7 @@ static kib_dev_t *kiblnd_dev_search(char *ifname)
- 		if (colon2)
+-		if (alias != NULL)
++		if (alias)
+ 			continue;
+ 
+ 		colon2 = strchr(dev->ibd_ifname, ':');
+-		if (colon != NULL)
++		if (colon)
+ 			*colon = 0;
+-		if (colon2 != NULL)
++		if (colon2)
  			*colon2 = 0;
  
--		if (strcmp(&dev->ibd_ifname[0], ifname) == 0)
-+		if (!strcmp(&dev->ibd_ifname[0], ifname))
+ 		if (strcmp(&dev->ibd_ifname[0], ifname) == 0)
  			alias = dev;
  
- 		if (colon)
-@@ -2762,7 +2761,7 @@ int kiblnd_startup(lnet_ni_t *ni)
- 
- 	if (kiblnd_data.kib_init == IBLND_INIT_NOTHING) {
- 		rc = kiblnd_base_startup();
--		if (rc != 0)
-+		if (rc)
- 			return rc;
+-		if (colon != NULL)
++		if (colon)
+ 			*colon = ':';
+-		if (colon2 != NULL)
++		if (colon2)
+ 			*colon2 = ':';
  	}
+ 	return alias;
+@@ -2768,7 +2768,7 @@ int kiblnd_startup(lnet_ni_t *ni)
  
-@@ -2803,7 +2802,7 @@ int kiblnd_startup(lnet_ni_t *ni)
+ 	LIBCFS_ALLOC(net, sizeof(*net));
+ 	ni->ni_data = net;
+-	if (net == NULL)
++	if (!net)
+ 		goto net_failed;
  
- 	newdev = !ibdev;
+ 	ktime_get_real_ts64(&tv);
+@@ -2780,11 +2780,11 @@ int kiblnd_startup(lnet_ni_t *ni)
+ 	ni->ni_peertxcredits  = *kiblnd_tunables.kib_peertxcredits;
+ 	ni->ni_peerrtrcredits = *kiblnd_tunables.kib_peerrtrcredits;
+ 
+-	if (ni->ni_interfaces[0] != NULL) {
++	if (ni->ni_interfaces[0]) {
+ 		/* Use the IPoIB interface specified in 'networks=' */
+ 
+ 		CLASSERT(LNET_MAX_INTERFACES > 1);
+-		if (ni->ni_interfaces[1] != NULL) {
++		if (ni->ni_interfaces[1]) {
+ 			CERROR("Multiple interfaces not supported\n");
+ 			goto failed;
+ 		}
+@@ -2801,12 +2801,12 @@ int kiblnd_startup(lnet_ni_t *ni)
+ 
+ 	ibdev = kiblnd_dev_search(ifname);
+ 
+-	newdev = ibdev == NULL;
++	newdev = !ibdev;
  	/* hmm...create kib_dev even for alias */
--	if (!ibdev || strcmp(&ibdev->ibd_ifname[0], ifname) != 0)
-+	if (!ibdev || strcmp(&ibdev->ibd_ifname[0], ifname))
+-	if (ibdev == NULL || strcmp(&ibdev->ibd_ifname[0], ifname) != 0)
++	if (!ibdev || strcmp(&ibdev->ibd_ifname[0], ifname) != 0)
  		ibdev = kiblnd_create_dev(ifname);
  
- 	if (!ibdev)
-@@ -2814,11 +2813,11 @@ int kiblnd_startup(lnet_ni_t *ni)
- 
- 	rc = kiblnd_dev_start_threads(ibdev, newdev,
- 				      ni->ni_cpts, ni->ni_ncpts);
--	if (rc != 0)
-+	if (rc)
+-	if (ibdev == NULL)
++	if (!ibdev)
  		goto failed;
  
- 	rc = kiblnd_net_init_pools(net, ni->ni_cpts, ni->ni_ncpts);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Failed to initialize NI pools: %d\n", rc);
- 		goto failed;
- 	}
-@@ -2861,7 +2860,7 @@ static int __init kiblnd_module_init(void)
- 			  <= IBLND_MSG_SIZE);
+ 	net->ibn_dev = ibdev;
+@@ -2833,7 +2833,7 @@ int kiblnd_startup(lnet_ni_t *ni)
+ 	return 0;
  
- 	rc = kiblnd_tunables_init();
--	if (rc != 0)
-+	if (rc)
- 		return rc;
+ failed:
+-	if (net->ibn_dev == NULL && ibdev != NULL)
++	if (!net->ibn_dev && ibdev)
+ 		kiblnd_destroy_dev(ibdev);
  
- 	lnet_register_lnd(&the_o2iblnd);
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index 16c90ed..2abb574 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -148,7 +148,7 @@ kiblnd_concurrent_sends_v1(void)
- 
- #define IBLND_MSG_SIZE		(4 << 10)	 /* max size of queued messages (inc hdr) */
- #define IBLND_MAX_RDMA_FRAGS	 LNET_MAX_IOV	   /* max # of fragments supported */
--#define IBLND_CFG_RDMA_FRAGS       (*kiblnd_tunables.kib_map_on_demand != 0 ? \
-+#define IBLND_CFG_RDMA_FRAGS       (*kiblnd_tunables.kib_map_on_demand ? \
- 				    *kiblnd_tunables.kib_map_on_demand :      \
- 				     IBLND_MAX_RDMA_FRAGS)  /* max # of fragments configured by user */
- #define IBLND_RDMA_FRAGS(v)	((v) == IBLND_MSG_VERSION_1 ? \
-@@ -611,7 +611,7 @@ kiblnd_dev_can_failover(kib_dev_t *dev)
- 	if (!list_empty(&dev->ibd_fail_list)) /* already scheduled */
- 		return 0;
- 
--	if (*kiblnd_tunables.kib_dev_failover == 0) /* disabled */
-+	if (!*kiblnd_tunables.kib_dev_failover) /* disabled */
- 		return 0;
- 
- 	if (*kiblnd_tunables.kib_dev_failover > 1) /* force failover */
-@@ -710,16 +710,16 @@ kiblnd_need_noop(kib_conn_t *conn)
- 
- 		/* No tx to piggyback NOOP onto or no credit to send a tx */
- 		return (list_empty(&conn->ibc_tx_queue) ||
--			conn->ibc_credits == 0);
-+			!conn->ibc_credits);
- 	}
- 
- 	if (!list_empty(&conn->ibc_tx_noops) || /* NOOP already queued */
- 	    !list_empty(&conn->ibc_tx_queue_nocred) || /* piggyback NOOP */
--	    conn->ibc_credits == 0)		    /* no credit */
-+	    !conn->ibc_credits)		    /* no credit */
- 		return 0;
- 
- 	if (conn->ibc_credits == 1 &&      /* last credit reserved for */
--	    conn->ibc_outstanding_credits == 0) /* giving back credits */
-+	    !conn->ibc_outstanding_credits) /* giving back credits */
- 		return 0;
- 
- 	/* No tx to piggyback NOOP onto or no credit to send a tx */
-@@ -765,8 +765,8 @@ kiblnd_ptr2wreqid(void *ptr, int type)
- {
- 	unsigned long lptr = (unsigned long)ptr;
- 
--	LASSERT((lptr & IBLND_WID_MASK) == 0);
--	LASSERT((type & ~IBLND_WID_MASK) == 0);
-+	LASSERT(!(lptr & IBLND_WID_MASK));
-+	LASSERT(!(type & ~IBLND_WID_MASK));
- 	return (__u64)(lptr | type);
- }
- 
+ net_failed:
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 674a4ee..0608431 100644
+index d9c7089..674a4ee 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -53,7 +53,7 @@ kiblnd_tx_done(lnet_ni_t *ni, kib_tx_t *tx)
- 	LASSERT(net);
+@@ -50,12 +50,12 @@ kiblnd_tx_done(lnet_ni_t *ni, kib_tx_t *tx)
+ 	int rc;
+ 	int i;
+ 
+-	LASSERT(net != NULL);
++	LASSERT(net);
  	LASSERT(!in_interrupt());
  	LASSERT(!tx->tx_queued);	       /* mustn't be queued for sending */
--	LASSERT(tx->tx_sending == 0);	  /* mustn't be awaiting sent callback */
-+	LASSERT(!tx->tx_sending);	  /* mustn't be awaiting sent callback */
+ 	LASSERT(tx->tx_sending == 0);	  /* mustn't be awaiting sent callback */
  	LASSERT(!tx->tx_waiting);	      /* mustn't be awaiting peer response */
- 	LASSERT(tx->tx_pool);
+-	LASSERT(tx->tx_pool != NULL);
++	LASSERT(tx->tx_pool);
  
-@@ -115,15 +115,15 @@ kiblnd_get_idle_tx(lnet_ni_t *ni, lnet_nid_t target)
+ 	kiblnd_unmap_tx(ni, tx);
+ 
+@@ -64,7 +64,7 @@ kiblnd_tx_done(lnet_ni_t *ni, kib_tx_t *tx)
+ 	lntmsg[1] = tx->tx_lntmsg[1]; tx->tx_lntmsg[1] = NULL;
+ 	rc = tx->tx_status;
+ 
+-	if (tx->tx_conn != NULL) {
++	if (tx->tx_conn) {
+ 		LASSERT(ni == tx->tx_conn->ibc_peer->ibp_ni);
+ 
+ 		kiblnd_conn_decref(tx->tx_conn);
+@@ -78,7 +78,7 @@ kiblnd_tx_done(lnet_ni_t *ni, kib_tx_t *tx)
+ 
+ 	/* delay finalize until my descs have been freed */
+ 	for (i = 0; i < 2; i++) {
+-		if (lntmsg[i] == NULL)
++		if (!lntmsg[i])
+ 			continue;
+ 
+ 		lnet_finalize(ni, lntmsg[i], rc);
+@@ -111,7 +111,7 @@ kiblnd_get_idle_tx(lnet_ni_t *ni, lnet_nid_t target)
+ 
+ 	tps = net->ibn_tx_ps[lnet_cpt_of_nid(target)];
+ 	node = kiblnd_pool_alloc_node(&tps->tps_poolset);
+-	if (node == NULL)
++	if (!node)
  		return NULL;
  	tx = container_of(node, kib_tx_t, tx_list);
  
--	LASSERT(tx->tx_nwrq == 0);
-+	LASSERT(!tx->tx_nwrq);
- 	LASSERT(!tx->tx_queued);
--	LASSERT(tx->tx_sending == 0);
-+	LASSERT(!tx->tx_sending);
+@@ -120,9 +120,9 @@ kiblnd_get_idle_tx(lnet_ni_t *ni, lnet_nid_t target)
+ 	LASSERT(tx->tx_sending == 0);
  	LASSERT(!tx->tx_waiting);
--	LASSERT(tx->tx_status == 0);
-+	LASSERT(!tx->tx_status);
- 	LASSERT(!tx->tx_conn);
- 	LASSERT(!tx->tx_lntmsg[0]);
- 	LASSERT(!tx->tx_lntmsg[1]);
--	LASSERT(tx->tx_nfrags == 0);
-+	LASSERT(!tx->tx_nfrags);
+ 	LASSERT(tx->tx_status == 0);
+-	LASSERT(tx->tx_conn == NULL);
+-	LASSERT(tx->tx_lntmsg[0] == NULL);
+-	LASSERT(tx->tx_lntmsg[1] == NULL);
++	LASSERT(!tx->tx_conn);
++	LASSERT(!tx->tx_lntmsg[0]);
++	LASSERT(!tx->tx_lntmsg[1]);
+ 	LASSERT(tx->tx_nfrags == 0);
  
  	return tx;
- }
-@@ -185,7 +185,7 @@ kiblnd_post_rx(kib_rx_t *rx, int credit)
- 	 */
- 	kiblnd_conn_addref(conn);
- 	rc = ib_post_recv(conn->ibc_cmid->qp, &rx->rx_wrq, &bad_wrq);
--	if (unlikely(rc != 0)) {
-+	if (unlikely(rc)) {
- 		CERROR("Can't post rx for %s: %d, bad_wrq: %p\n",
- 		       libcfs_nid2str(conn->ibc_peer->ibp_nid), rc, bad_wrq);
- 		rx->rx_nob = 0;
-@@ -194,7 +194,7 @@ kiblnd_post_rx(kib_rx_t *rx, int credit)
- 	if (conn->ibc_state < IBLND_CONN_ESTABLISHED) /* Initial post */
- 		goto out;
- 
--	if (unlikely(rc != 0)) {
-+	if (unlikely(rc)) {
- 		kiblnd_close_conn(conn, rc);
- 		kiblnd_drop_rx(rx);	     /* No more posts for this rx */
- 		goto out;
-@@ -225,7 +225,7 @@ kiblnd_find_waiting_tx_locked(kib_conn_t *conn, int txtype, __u64 cookie)
- 		kib_tx_t *tx = list_entry(tmp, kib_tx_t, tx_list);
- 
- 		LASSERT(!tx->tx_queued);
--		LASSERT(tx->tx_sending != 0 || tx->tx_waiting);
-+		LASSERT(tx->tx_sending || tx->tx_waiting);
- 
- 		if (tx->tx_cookie != cookie)
- 			continue;
-@@ -260,7 +260,7 @@ kiblnd_handle_completion(kib_conn_t *conn, int txtype, int status, __u64 cookie)
- 		return;
- 	}
- 
--	if (tx->tx_status == 0) {	       /* success so far */
-+	if (!tx->tx_status) {	       /* success so far */
- 		if (status < 0) /* failed? */
- 			tx->tx_status = status;
- 		else if (txtype == IBLND_MSG_GET_REQ)
-@@ -269,7 +269,7 @@ kiblnd_handle_completion(kib_conn_t *conn, int txtype, int status, __u64 cookie)
- 
- 	tx->tx_waiting = 0;
- 
--	idle = !tx->tx_queued && (tx->tx_sending == 0);
-+	idle = !tx->tx_queued && !tx->tx_sending;
- 	if (idle)
- 		list_del(&tx->tx_list);
- 
-@@ -316,7 +316,7 @@ kiblnd_handle_rx(kib_rx_t *rx)
- 	       msg->ibm_type, credits,
- 	       libcfs_nid2str(conn->ibc_peer->ibp_nid));
- 
--	if (credits != 0) {
-+	if (credits) {
- 		/* Have I received credits that will let me send? */
- 		spin_lock(&conn->ibc_lock);
- 
-@@ -360,7 +360,7 @@ kiblnd_handle_rx(kib_rx_t *rx)
- 			break;
- 		}
- 
--		if (credits != 0) /* credit already posted */
-+		if (credits) /* credit already posted */
- 			post_credit = IBLND_POSTRX_NO_CREDIT;
- 		else	      /* a keepalive NOOP */
- 			post_credit = IBLND_POSTRX_PEER_CREDIT;
-@@ -487,7 +487,7 @@ kiblnd_rx_complete(kib_rx_t *rx, int status, int nob)
- 	rx->rx_nob = nob;
- 
- 	rc = kiblnd_unpack_msg(msg, rx->rx_nob);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d unpacking rx from %s\n",
- 		       rc, libcfs_nid2str(conn->ibc_peer->ibp_nid));
- 		goto failed;
-@@ -583,7 +583,7 @@ kiblnd_fmr_map_tx(kib_net_t *net, kib_tx_t *tx, kib_rdma_desc_t *rd, int nob)
- 
- 	fps = net->ibn_fmr_ps[cpt];
- 	rc = kiblnd_fmr_pool_map(fps, pages, npages, 0, &tx->fmr);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't map %d pages: %d\n", npages, rc);
- 		return rc;
- 	}
-@@ -612,7 +612,7 @@ static void kiblnd_unmap_tx(lnet_ni_t *ni, kib_tx_t *tx)
- 		tx->fmr.fmr_pfmr = NULL;
- 	}
- 
--	if (tx->tx_nfrags != 0) {
-+	if (tx->tx_nfrags) {
- 		kiblnd_dma_unmap_sg(tx->tx_pool->tpo_hdev->ibh_ibdev,
- 				    tx->tx_frags, tx->tx_nfrags, tx->tx_dmadir);
- 		tx->tx_nfrags = 0;
-@@ -769,7 +769,7 @@ kiblnd_post_tx_locked(kib_conn_t *conn, kib_tx_t *tx, int credit)
- 	LASSERT(tx->tx_nwrq > 0);
- 	LASSERT(tx->tx_nwrq <= 1 + IBLND_RDMA_FRAGS(ver));
- 
--	LASSERT(credit == 0 || credit == 1);
-+	LASSERT(!credit || credit == 1);
- 	LASSERT(conn->ibc_outstanding_credits >= 0);
- 	LASSERT(conn->ibc_outstanding_credits <= IBLND_MSG_QUEUE_SIZE(ver));
- 	LASSERT(conn->ibc_credits >= 0);
-@@ -782,13 +782,13 @@ kiblnd_post_tx_locked(kib_conn_t *conn, kib_tx_t *tx, int credit)
- 		return -EAGAIN;
- 	}
- 
--	if (credit != 0 && conn->ibc_credits == 0) {   /* no credits */
-+	if (credit && !conn->ibc_credits) {   /* no credits */
- 		CDEBUG(D_NET, "%s: no credits\n",
- 		       libcfs_nid2str(peer->ibp_nid));
- 		return -EAGAIN;
- 	}
- 
--	if (credit != 0 && !IBLND_OOB_CAPABLE(ver) &&
-+	if (credit && !IBLND_OOB_CAPABLE(ver) &&
- 	    conn->ibc_credits == 1 &&   /* last credit reserved */
- 	    msg->ibm_type != IBLND_MSG_NOOP) {      /* for NOOP */
- 		CDEBUG(D_NET, "%s: not using last credit\n",
-@@ -851,7 +851,7 @@ kiblnd_post_tx_locked(kib_conn_t *conn, kib_tx_t *tx, int credit)
- 
- 	conn->ibc_last_send = jiffies;
- 
--	if (rc == 0)
-+	if (!rc)
- 		return 0;
- 
- 	/*
-@@ -868,7 +868,7 @@ kiblnd_post_tx_locked(kib_conn_t *conn, kib_tx_t *tx, int credit)
- 	tx->tx_waiting = 0;
- 	tx->tx_sending--;
- 
--	done = (tx->tx_sending == 0);
-+	done = !tx->tx_sending;
- 	if (done)
- 		list_del(&tx->tx_list);
- 
-@@ -955,7 +955,7 @@ kiblnd_check_sends(kib_conn_t *conn)
- 			break;
- 		}
- 
--		if (kiblnd_post_tx_locked(conn, tx, credit) != 0)
-+		if (kiblnd_post_tx_locked(conn, tx, credit))
- 			break;
- 	}
- 
-@@ -1001,7 +1001,7 @@ kiblnd_tx_complete(kib_tx_t *tx, int status)
- 		tx->tx_status = -EIO;
- 	}
- 
--	idle = (tx->tx_sending == 0) &&	 /* This is the final callback */
-+	idle = !tx->tx_sending &&	 /* This is the final callback */
- 	       !tx->tx_waiting &&	       /* Not waiting for peer */
- 	       !tx->tx_queued;		  /* Not re-queued (PUT_DONE) */
- 	if (idle)
-@@ -1067,7 +1067,7 @@ kiblnd_init_rdma(kib_conn_t *conn, kib_tx_t *tx, int type,
- 	int wrknob;
- 
- 	LASSERT(!in_interrupt());
--	LASSERT(tx->tx_nwrq == 0);
-+	LASSERT(!tx->tx_nwrq);
- 	LASSERT(type == IBLND_MSG_GET_DONE ||
- 		type == IBLND_MSG_PUT_DONE);
- 
-@@ -1210,7 +1210,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 
- 	/* allow the port to be reused */
- 	rc = rdma_set_reuseaddr(cmid, 1);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Unable to set reuse on cmid: %d\n", rc);
- 		return rc;
- 	}
-@@ -1222,7 +1222,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 				       (struct sockaddr *)srcaddr,
- 				       (struct sockaddr *)dstaddr,
- 				       timeout_ms);
--		if (rc == 0) {
-+		if (!rc) {
- 			CDEBUG(D_NET, "bound to port %hu\n", port);
- 			return 0;
- 		} else if (rc == -EADDRINUSE || rc == -EADDRNOTAVAIL) {
-@@ -1281,7 +1281,7 @@ kiblnd_connect_peer(kib_peer_t *peer)
- 				       (struct sockaddr *)&dstaddr,
- 				       *kiblnd_tunables.kib_timeout * 1000);
- 	}
--	if (rc != 0) {
-+	if (rc) {
- 		/* Can't initiate address resolution:  */
- 		CERROR("Can't resolve addr for %s: %d\n",
- 		       libcfs_nid2str(peer->ibp_nid), rc);
-@@ -1347,8 +1347,8 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
- 	if (peer) {
- 		if (list_empty(&peer->ibp_conns)) {
- 			/* found a peer, but it's still connecting... */
--			LASSERT(peer->ibp_connecting != 0 ||
--				peer->ibp_accepting != 0);
-+			LASSERT(peer->ibp_connecting ||
-+				peer->ibp_accepting);
- 			if (tx)
- 				list_add_tail(&tx->tx_list,
- 					      &peer->ibp_tx_queue);
-@@ -1370,7 +1370,7 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
- 
- 	/* Allocate a peer ready to add to the peer table and retry */
- 	rc = kiblnd_create_peer(ni, &peer, nid);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create peer %s\n", libcfs_nid2str(nid));
- 		if (tx) {
- 			tx->tx_status = -EHOSTUNREACH;
-@@ -1386,8 +1386,8 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
- 	if (peer2) {
- 		if (list_empty(&peer2->ibp_conns)) {
- 			/* found a peer, but it's still connecting... */
--			LASSERT(peer2->ibp_connecting != 0 ||
--				peer2->ibp_accepting != 0);
-+			LASSERT(peer2->ibp_connecting ||
-+				peer2->ibp_accepting);
- 			if (tx)
- 				list_add_tail(&tx->tx_list,
- 					      &peer2->ibp_tx_queue);
-@@ -1408,11 +1408,11 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
- 	}
- 
- 	/* Brand new peer */
--	LASSERT(peer->ibp_connecting == 0);
-+	LASSERT(!peer->ibp_connecting);
- 	peer->ibp_connecting = 1;
- 
- 	/* always called with a ref on ni, which prevents ni being shutdown */
--	LASSERT(((kib_net_t *)ni->ni_data)->ibn_shutdown == 0);
-+	LASSERT(!((kib_net_t *)ni->ni_data)->ibn_shutdown);
- 
- 	if (tx)
- 		list_add_tail(&tx->tx_list, &peer->ibp_tx_queue);
-@@ -1450,7 +1450,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
- 	CDEBUG(D_NET, "sending %d bytes in %d frags to %s\n",
- 	       payload_nob, payload_niov, libcfs_id2str(target));
- 
--	LASSERT(payload_nob == 0 || payload_niov > 0);
-+	LASSERT(!payload_nob || payload_niov > 0);
- 	LASSERT(payload_niov <= LNET_MAX_IOV);
- 
- 	/* Thread context */
-@@ -1464,7 +1464,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
- 		return -EIO;
- 
- 	case LNET_MSG_ACK:
--		LASSERT(payload_nob == 0);
-+		LASSERT(!payload_nob);
- 		break;
- 
- 	case LNET_MSG_GET:
-@@ -1485,7 +1485,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
- 
- 		ibmsg = tx->tx_msg;
- 		rd = &ibmsg->ibm_u.get.ibgm_rd;
--		if ((lntmsg->msg_md->md_options & LNET_MD_KIOV) == 0)
-+		if (!(lntmsg->msg_md->md_options & LNET_MD_KIOV))
- 			rc = kiblnd_setup_rd_iov(ni, tx, rd,
- 						 lntmsg->msg_md->md_niov,
- 						 lntmsg->msg_md->md_iov.iov,
-@@ -1495,7 +1495,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
- 						  lntmsg->msg_md->md_niov,
- 						  lntmsg->msg_md->md_iov.kiov,
- 						  0, lntmsg->msg_md->md_length);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't setup GET sink for %s: %d\n",
- 			       libcfs_nid2str(target.nid), rc);
- 			kiblnd_tx_done(ni, tx);
-@@ -1544,7 +1544,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
- 			rc = kiblnd_setup_rd_kiov(ni, tx, tx->tx_rd,
- 						  payload_niov, payload_kiov,
- 						  payload_offset, payload_nob);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't setup PUT src for %s: %d\n",
- 			       libcfs_nid2str(target.nid), rc);
- 			kiblnd_tx_done(ni, tx);
-@@ -1615,7 +1615,7 @@ kiblnd_reply(lnet_ni_t *ni, kib_rx_t *rx, lnet_msg_t *lntmsg)
- 		goto failed_0;
- 	}
- 
--	if (nob == 0)
-+	if (!nob)
- 		rc = 0;
- 	else if (!kiov)
- 		rc = kiblnd_setup_rd_iov(ni, tx, tx->tx_rd,
-@@ -1624,7 +1624,7 @@ kiblnd_reply(lnet_ni_t *ni, kib_rx_t *rx, lnet_msg_t *lntmsg)
- 		rc = kiblnd_setup_rd_kiov(ni, tx, tx->tx_rd,
- 					  niov, kiov, offset, nob);
- 
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't setup GET src for %s: %d\n",
- 		       libcfs_nid2str(target.nid), rc);
- 		goto failed_1;
-@@ -1640,7 +1640,7 @@ kiblnd_reply(lnet_ni_t *ni, kib_rx_t *rx, lnet_msg_t *lntmsg)
- 		goto failed_1;
- 	}
- 
--	if (nob == 0) {
-+	if (!nob) {
- 		/* No RDMA: local completion may happen now! */
- 		lnet_finalize(ni, lntmsg, 0);
- 	} else {
-@@ -1706,7 +1706,7 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
- 		kib_msg_t	*txmsg;
- 		kib_rdma_desc_t *rd;
- 
--		if (mlen == 0) {
-+		if (!mlen) {
- 			lnet_finalize(ni, lntmsg, 0);
- 			kiblnd_send_completion(rx->rx_conn, IBLND_MSG_PUT_NAK, 0,
- 					       rxmsg->ibm_u.putreq.ibprm_cookie);
-@@ -1730,7 +1730,7 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
- 		else
- 			rc = kiblnd_setup_rd_kiov(ni, tx, rd,
- 						  niov, kiov, offset, mlen);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't setup PUT sink for %s: %d\n",
- 			       libcfs_nid2str(conn->ibc_peer->ibp_nid), rc);
- 			kiblnd_tx_done(ni, tx);
-@@ -1808,9 +1808,9 @@ kiblnd_peer_notify(kib_peer_t *peer)
- 	read_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
- 
- 	if (list_empty(&peer->ibp_conns) &&
--	    peer->ibp_accepting == 0 &&
--	    peer->ibp_connecting == 0 &&
--	    peer->ibp_error != 0) {
-+	    !peer->ibp_accepting &&
-+	    !peer->ibp_connecting &&
-+	    peer->ibp_error) {
- 		error = peer->ibp_error;
- 		peer->ibp_error = 0;
- 
-@@ -1819,7 +1819,7 @@ kiblnd_peer_notify(kib_peer_t *peer)
- 
- 	read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
- 
--	if (error != 0)
-+	if (error)
- 		lnet_notify(peer->ibp_ni,
- 			    peer->ibp_nid, 0, last_alive);
- }
-@@ -1839,15 +1839,15 @@ kiblnd_close_conn_locked(kib_conn_t *conn, int error)
- 	kib_dev_t *dev;
- 	unsigned long flags;
- 
--	LASSERT(error != 0 || conn->ibc_state >= IBLND_CONN_ESTABLISHED);
-+	LASSERT(error || conn->ibc_state >= IBLND_CONN_ESTABLISHED);
- 
--	if (error != 0 && conn->ibc_comms_error == 0)
-+	if (error && !conn->ibc_comms_error)
- 		conn->ibc_comms_error = error;
- 
- 	if (conn->ibc_state != IBLND_CONN_ESTABLISHED)
- 		return; /* already being handled  */
- 
--	if (error == 0 &&
-+	if (!error &&
- 	    list_empty(&conn->ibc_tx_noops) &&
- 	    list_empty(&conn->ibc_tx_queue) &&
- 	    list_empty(&conn->ibc_tx_queue_rsrvd) &&
-@@ -1879,7 +1879,7 @@ kiblnd_close_conn_locked(kib_conn_t *conn, int error)
- 
- 	kiblnd_set_conn_state(conn, IBLND_CONN_CLOSING);
- 
--	if (error != 0 &&
-+	if (error &&
- 	    kiblnd_dev_can_failover(dev)) {
- 		list_add_tail(&dev->ibd_fail_list,
- 			      &kiblnd_data.kib_failed_devs);
-@@ -1943,7 +1943,7 @@ kiblnd_abort_txs(kib_conn_t *conn, struct list_head *txs)
- 
- 		if (txs == &conn->ibc_active_txs) {
- 			LASSERT(!tx->tx_queued);
--			LASSERT(tx->tx_waiting || tx->tx_sending != 0);
-+			LASSERT(tx->tx_waiting || tx->tx_sending);
- 		} else {
- 			LASSERT(tx->tx_queued);
- 		}
-@@ -1951,7 +1951,7 @@ kiblnd_abort_txs(kib_conn_t *conn, struct list_head *txs)
- 		tx->tx_status = -ECONNABORTED;
- 		tx->tx_waiting = 0;
- 
--		if (tx->tx_sending == 0) {
-+		if (!tx->tx_sending) {
- 			tx->tx_queued = 0;
- 			list_del(&tx->tx_list);
- 			list_add(&tx->tx_list, &zombies);
-@@ -1997,7 +1997,7 @@ kiblnd_peer_connect_failed(kib_peer_t *peer, int active, int error)
- 	LIST_HEAD(zombies);
- 	unsigned long flags;
- 
--	LASSERT(error != 0);
-+	LASSERT(error);
- 	LASSERT(!in_interrupt());
- 
- 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
-@@ -2010,8 +2010,8 @@ kiblnd_peer_connect_failed(kib_peer_t *peer, int active, int error)
- 		peer->ibp_accepting--;
- 	}
- 
--	if (peer->ibp_connecting != 0 ||
--	    peer->ibp_accepting != 0) {
-+	if (peer->ibp_connecting ||
-+	    peer->ibp_accepting) {
- 		/* another connection attempt under way... */
- 		write_unlock_irqrestore(&kiblnd_data.kib_global_lock,
- 					flags);
-@@ -2070,7 +2070,7 @@ kiblnd_connreq_done(kib_conn_t *conn, int status)
- 	LIBCFS_FREE(conn->ibc_connvars, sizeof(*conn->ibc_connvars));
- 	conn->ibc_connvars = NULL;
- 
--	if (status != 0) {
-+	if (status) {
- 		/* failed to establish connection */
- 		kiblnd_peer_connect_failed(peer, active, status);
- 		kiblnd_finalise_conn(conn);
-@@ -2095,7 +2095,7 @@ kiblnd_connreq_done(kib_conn_t *conn, int status)
- 	else
- 		peer->ibp_accepting--;
- 
--	if (peer->ibp_version == 0) {
-+	if (!peer->ibp_version) {
- 		peer->ibp_version     = conn->ibc_version;
- 		peer->ibp_incarnation = conn->ibc_incarnation;
- 	}
-@@ -2113,7 +2113,7 @@ kiblnd_connreq_done(kib_conn_t *conn, int status)
- 	list_del_init(&peer->ibp_tx_queue);
- 
- 	if (!kiblnd_peer_active(peer) ||	/* peer has been deleted */
--	    conn->ibc_comms_error != 0) {       /* error has happened already */
-+	    conn->ibc_comms_error) {       /* error has happened already */
- 		lnet_ni_t *ni = peer->ibp_ni;
- 
- 		/* start to shut down connection */
-@@ -2149,7 +2149,7 @@ kiblnd_reject(struct rdma_cm_id *cmid, kib_rej_t *rej)
- 
- 	rc = rdma_reject(cmid, rej, sizeof(*rej));
- 
--	if (rc != 0)
-+	if (rc)
- 		CWARN("Error %d sending reject\n", rc);
- }
- 
-@@ -2220,7 +2220,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 		goto failed;
- 
- 	rc = kiblnd_unpack_msg(reqmsg, priv_nob);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't parse connection request: %d\n", rc);
- 		goto failed;
- 	}
-@@ -2247,7 +2247,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 	}
- 
-        /* check time stamp as soon as possible */
--	if (reqmsg->ibm_dststamp != 0 &&
-+	if (reqmsg->ibm_dststamp &&
- 	    reqmsg->ibm_dststamp != net->ibn_incarnation) {
- 		CWARN("Stale connection request\n");
- 		rej.ibr_why = IBLND_REJECT_CONN_STALE;
-@@ -2298,7 +2298,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 
- 	/* assume 'nid' is a new peer; create  */
- 	rc = kiblnd_create_peer(ni, &peer, nid);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create peer for %s\n", libcfs_nid2str(nid));
- 		rej.ibr_why = IBLND_REJECT_NO_RESOURCES;
- 		goto failed;
-@@ -2308,7 +2308,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 
- 	peer2 = kiblnd_find_peer_locked(nid);
- 	if (peer2) {
--		if (peer2->ibp_version == 0) {
-+		if (!peer2->ibp_version) {
- 			peer2->ibp_version     = version;
- 			peer2->ibp_incarnation = reqmsg->ibm_srcstamp;
- 		}
-@@ -2328,7 +2328,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 		}
- 
- 		/* tie-break connection race in favour of the higher NID */
--		if (peer2->ibp_connecting != 0 &&
-+		if (peer2->ibp_connecting &&
- 		    nid < ni->ni_nid) {
- 			write_unlock_irqrestore(g_lock, flags);
- 
-@@ -2347,16 +2347,16 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 		peer = peer2;
- 	} else {
- 		/* Brand new peer */
--		LASSERT(peer->ibp_accepting == 0);
--		LASSERT(peer->ibp_version == 0 &&
--			peer->ibp_incarnation == 0);
-+		LASSERT(!peer->ibp_accepting);
-+		LASSERT(!peer->ibp_version &&
-+			!peer->ibp_incarnation);
- 
- 		peer->ibp_accepting   = 1;
- 		peer->ibp_version     = version;
- 		peer->ibp_incarnation = reqmsg->ibm_srcstamp;
- 
- 		/* I have a ref on ni that prevents it being shutdown */
--		LASSERT(net->ibn_shutdown == 0);
-+		LASSERT(!net->ibn_shutdown);
- 
- 		kiblnd_peer_addref(peer);
- 		list_add_tail(&peer->ibp_list, kiblnd_nid2peerlist(nid));
-@@ -2405,7 +2405,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 	CDEBUG(D_NET, "Accept %s\n", libcfs_nid2str(nid));
- 
- 	rc = rdma_accept(cmid, &cp);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't accept %s: %d\n", libcfs_nid2str(nid), rc);
- 		rej.ibr_version = version;
- 		rej.ibr_why     = IBLND_REJECT_FATAL;
-@@ -2454,7 +2454,7 @@ kiblnd_reconnect(kib_conn_t *conn, int version,
- 	if ((!list_empty(&peer->ibp_tx_queue) ||
- 	     peer->ibp_version != version) &&
- 	    peer->ibp_connecting == 1 &&
--	    peer->ibp_accepting == 0) {
-+	    !peer->ibp_accepting) {
- 		retry = 1;
- 		peer->ibp_connecting++;
- 
-@@ -2649,7 +2649,7 @@ kiblnd_check_connreply(kib_conn_t *conn, void *priv, int priv_nob)
- 
- 	LASSERT(net);
- 
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't unpack connack from %s: %d\n",
- 		       libcfs_nid2str(peer->ibp_nid), rc);
- 		goto failed;
-@@ -2706,7 +2706,7 @@ kiblnd_check_connreply(kib_conn_t *conn, void *priv, int priv_nob)
- 		rc = -ESTALE;
- 	read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
- 
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Bad connection reply from %s, rc = %d, version: %x max_frags: %d\n",
- 		       libcfs_nid2str(peer->ibp_nid), rc,
- 		       msg->ibm_version, msg->ibm_u.connparams.ibcp_max_frags);
-@@ -2729,7 +2729,7 @@ kiblnd_check_connreply(kib_conn_t *conn, void *priv, int priv_nob)
- 	 * kiblnd_connreq_done(0) moves the conn state to ESTABLISHED, but then
- 	 * immediately tears it down.
- 	 */
--	LASSERT(rc != 0);
-+	LASSERT(rc);
- 	conn->ibc_comms_error = rc;
- 	kiblnd_connreq_done(conn, 0);
- }
-@@ -2749,8 +2749,8 @@ kiblnd_active_connect(struct rdma_cm_id *cmid)
- 	read_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
- 
- 	incarnation = peer->ibp_incarnation;
--	version = (peer->ibp_version == 0) ? IBLND_MSG_VERSION :
--					     peer->ibp_version;
-+	version = !peer->ibp_version ? IBLND_MSG_VERSION :
-+				       peer->ibp_version;
- 
- 	read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
- 
-@@ -2790,7 +2790,7 @@ kiblnd_active_connect(struct rdma_cm_id *cmid)
- 	LASSERT(conn->ibc_cmid == cmid);
- 
- 	rc = rdma_connect(cmid, &cp);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't connect to %s: %d\n",
- 		       libcfs_nid2str(peer->ibp_nid), rc);
- 		kiblnd_connreq_done(conn, rc);
-@@ -2827,7 +2827,7 @@ kiblnd_cm_callback(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
- 		        libcfs_nid2str(peer->ibp_nid), event->status);
- 		kiblnd_peer_connect_failed(peer, 1, -EHOSTUNREACH);
- 		kiblnd_peer_decref(peer);
--		return -EHOSTUNREACH;      /* rc != 0 destroys cmid */
-+		return -EHOSTUNREACH;      /* rc destroys cmid */
- 
- 	case RDMA_CM_EVENT_ADDR_RESOLVED:
- 		peer = (kib_peer_t *)cmid->context;
-@@ -2835,14 +2835,14 @@ kiblnd_cm_callback(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
- 		CDEBUG(D_NET, "%s Addr resolved: %d\n",
- 		       libcfs_nid2str(peer->ibp_nid), event->status);
- 
--		if (event->status != 0) {
-+		if (event->status) {
- 			CNETERR("Can't resolve address for %s: %d\n",
- 				libcfs_nid2str(peer->ibp_nid), event->status);
- 			rc = event->status;
- 		} else {
- 			rc = rdma_resolve_route(
- 				cmid, *kiblnd_tunables.kib_timeout * 1000);
--			if (rc == 0)
-+			if (!rc)
- 				return 0;
- 			/* Can't initiate route resolution */
- 			CERROR("Can't resolve route for %s: %d\n",
-@@ -2850,7 +2850,7 @@ kiblnd_cm_callback(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
- 		}
- 		kiblnd_peer_connect_failed(peer, 1, rc);
- 		kiblnd_peer_decref(peer);
--		return rc;		      /* rc != 0 destroys cmid */
-+		return rc;		      /* rc destroys cmid */
- 
- 	case RDMA_CM_EVENT_ROUTE_ERROR:
- 		peer = (kib_peer_t *)cmid->context;
-@@ -2858,21 +2858,21 @@ kiblnd_cm_callback(struct rdma_cm_id *cmid, struct rdma_cm_event *event)
- 			libcfs_nid2str(peer->ibp_nid), event->status);
- 		kiblnd_peer_connect_failed(peer, 1, -EHOSTUNREACH);
- 		kiblnd_peer_decref(peer);
--		return -EHOSTUNREACH;	   /* rc != 0 destroys cmid */
-+		return -EHOSTUNREACH;	   /* rc destroys cmid */
- 
- 	case RDMA_CM_EVENT_ROUTE_RESOLVED:
- 		peer = (kib_peer_t *)cmid->context;
- 		CDEBUG(D_NET, "%s Route resolved: %d\n",
- 		       libcfs_nid2str(peer->ibp_nid), event->status);
- 
--		if (event->status == 0)
-+		if (!event->status)
- 			return kiblnd_active_connect(cmid);
- 
- 		CNETERR("Can't resolve route for %s: %d\n",
- 		        libcfs_nid2str(peer->ibp_nid), event->status);
- 		kiblnd_peer_connect_failed(peer, 1, event->status);
- 		kiblnd_peer_decref(peer);
--		return event->status;	   /* rc != 0 destroys cmid */
-+		return event->status;	   /* rc destroys cmid */
- 
- 	case RDMA_CM_EVENT_UNREACHABLE:
- 		conn = (kib_conn_t *)cmid->context;
-@@ -2984,7 +2984,7 @@ kiblnd_check_txs_locked(kib_conn_t *conn, struct list_head *txs)
- 			LASSERT(tx->tx_queued);
- 		} else {
- 			LASSERT(!tx->tx_queued);
--			LASSERT(tx->tx_waiting || tx->tx_sending != 0);
-+			LASSERT(tx->tx_waiting || tx->tx_sending);
- 		}
- 
- 		if (cfs_time_aftereq(jiffies, tx->tx_deadline)) {
-@@ -3179,7 +3179,7 @@ kiblnd_connd(void *arg)
- 			if (*kiblnd_tunables.kib_timeout > n * p)
- 				chunk = (chunk * n * p) /
- 					*kiblnd_tunables.kib_timeout;
--			if (chunk == 0)
-+			if (!chunk)
- 				chunk = 1;
- 
- 			for (i = 0; i < chunk; i++) {
-@@ -3268,7 +3268,7 @@ kiblnd_cq_completion(struct ib_cq *cq, void *arg)
- 	 * NB I'm not allowed to schedule this conn once its refcount has
- 	 * reached 0.  Since fundamentally I'm racing with scheduler threads
- 	 * consuming my CQ I could be called after all completions have
--	 * occurred.  But in this case, ibc_nrx == 0 && ibc_nsends_posted == 0
-+	 * occurred.  But in this case, !ibc_nrx && !ibc_nsends_posted
- 	 * and this CQ is about to be destroyed so I NOOP.
- 	 */
- 	kib_conn_t *conn = arg;
-@@ -3324,7 +3324,7 @@ kiblnd_scheduler(void *arg)
- 	sched = kiblnd_data.kib_scheds[KIB_THREAD_CPT(id)];
- 
- 	rc = cfs_cpt_bind(lnet_cpt_table(), sched->ibs_cpt);
--	if (rc != 0) {
-+	if (rc) {
- 		CWARN("Failed to bind on CPT %d, please verify whether all CPUs are healthy and reload modules if necessary, otherwise your system might under risk of low performance\n",
- 		      sched->ibs_cpt);
- 	}
-@@ -3354,7 +3354,7 @@ kiblnd_scheduler(void *arg)
- 			spin_unlock_irqrestore(&sched->ibs_lock, flags);
- 
- 			rc = ib_poll_cq(conn->ibc_cq, 1, &wc);
--			if (rc == 0) {
-+			if (!rc) {
- 				rc = ib_req_notify_cq(conn->ibc_cq,
- 						      IB_CQ_NEXT_COMP);
- 				if (rc < 0) {
-@@ -3382,7 +3382,7 @@ kiblnd_scheduler(void *arg)
- 
- 			spin_lock_irqsave(&sched->ibs_lock, flags);
- 
--			if (rc != 0 || conn->ibc_ready) {
-+			if (rc || conn->ibc_ready) {
- 				/*
- 				 * There may be another completion waiting; get
- 				 * another scheduler to check while I handle
-@@ -3398,7 +3398,7 @@ kiblnd_scheduler(void *arg)
- 				conn->ibc_scheduled = 0;
- 			}
- 
--			if (rc != 0) {
-+			if (rc) {
- 				spin_unlock_irqrestore(&sched->ibs_lock, flags);
- 				kiblnd_complete(&wc);
- 
-@@ -3438,7 +3438,7 @@ kiblnd_failover_thread(void *arg)
- 	unsigned long flags;
+@@ -152,14 +152,14 @@ kiblnd_post_rx(kib_rx_t *rx, int credit)
+ 	struct ib_mr *mr;
  	int rc;
  
--	LASSERT(*kiblnd_tunables.kib_dev_failover != 0);
-+	LASSERT(*kiblnd_tunables.kib_dev_failover);
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 	LASSERT(!in_interrupt());
+ 	LASSERT(credit == IBLND_POSTRX_NO_CREDIT ||
+ 		credit == IBLND_POSTRX_PEER_CREDIT ||
+ 		credit == IBLND_POSTRX_RSRVD_CREDIT);
  
- 	cfs_block_allsigs();
+ 	mr = kiblnd_find_dma_mr(conn->ibc_hdev, rx->rx_msgaddr, IBLND_MSG_SIZE);
+-	LASSERT(mr != NULL);
++	LASSERT(mr);
  
-@@ -3497,7 +3497,7 @@ kiblnd_failover_thread(void *arg)
- 		remove_wait_queue(&kiblnd_data.kib_failover_waitq, &wait);
- 		write_lock_irqsave(glock, flags);
+ 	rx->rx_sge.lkey   = mr->lkey;
+ 	rx->rx_sge.addr   = rx->rx_msgaddr;
+@@ -251,7 +251,7 @@ kiblnd_handle_completion(kib_conn_t *conn, int txtype, int status, __u64 cookie)
+ 	spin_lock(&conn->ibc_lock);
  
--		if (!long_sleep || rc != 0)
-+		if (!long_sleep || rc)
- 			continue;
+ 	tx = kiblnd_find_waiting_tx_locked(conn, txtype, cookie);
+-	if (tx == NULL) {
++	if (!tx) {
+ 		spin_unlock(&conn->ibc_lock);
  
- 		/*
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-index afbd6d1..b4607da 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-@@ -202,7 +202,7 @@ kiblnd_tunables_init(void)
- 	if (*kiblnd_tunables.kib_map_on_demand == 1)
- 		*kiblnd_tunables.kib_map_on_demand = 2; /* don't make sense to create map if only one fragment */
+ 		CWARN("Unmatched completion type %x cookie %#llx from %s\n",
+@@ -285,7 +285,7 @@ kiblnd_send_completion(kib_conn_t *conn, int type, int status, __u64 cookie)
+ 	lnet_ni_t *ni = conn->ibc_peer->ibp_ni;
+ 	kib_tx_t *tx = kiblnd_get_idle_tx(ni, conn->ibc_peer->ibp_nid);
  
--	if (*kiblnd_tunables.kib_concurrent_sends == 0) {
-+	if (!*kiblnd_tunables.kib_concurrent_sends) {
- 		if (*kiblnd_tunables.kib_map_on_demand > 0 &&
- 		    *kiblnd_tunables.kib_map_on_demand <= IBLND_MAX_RDMA_FRAGS / 8)
- 			*kiblnd_tunables.kib_concurrent_sends = (*kiblnd_tunables.kib_peertxcredits) * 2;
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 2c2d1c9..49d716d 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -91,7 +91,7 @@ ksocknal_create_route(__u32 ipaddr, int port)
- void
- ksocknal_destroy_route(ksock_route_t *route)
+-	if (tx == NULL) {
++	if (!tx) {
+ 		CERROR("Can't get tx for completion %x for %s\n",
+ 		       type, libcfs_nid2str(conn->ibc_peer->ibp_nid));
+ 		return;
+@@ -397,11 +397,11 @@ kiblnd_handle_rx(kib_rx_t *rx)
+ 		spin_lock(&conn->ibc_lock);
+ 		tx = kiblnd_find_waiting_tx_locked(conn, IBLND_MSG_PUT_REQ,
+ 						   msg->ibm_u.putack.ibpam_src_cookie);
+-		if (tx != NULL)
++		if (tx)
+ 			list_del(&tx->tx_list);
+ 		spin_unlock(&conn->ibc_lock);
+ 
+-		if (tx == NULL) {
++		if (!tx) {
+ 			CERROR("Unmatched PUT_ACK from %s\n",
+ 			       libcfs_nid2str(conn->ibc_peer->ibp_nid));
+ 			rc = -EPROTO;
+@@ -470,7 +470,7 @@ kiblnd_rx_complete(kib_rx_t *rx, int status, int nob)
+ 	int rc;
+ 	int err = -EIO;
+ 
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 	LASSERT(rx->rx_nob < 0);	       /* was posted */
+ 	rx->rx_nob = 0;			 /* isn't now */
+ 
+@@ -538,7 +538,7 @@ kiblnd_kvaddr_to_page(unsigned long vaddr)
+ 
+ 	if (is_vmalloc_addr((void *)vaddr)) {
+ 		page = vmalloc_to_page((void *)vaddr);
+-		LASSERT(page != NULL);
++		LASSERT(page);
+ 		return page;
+ 	}
+ #ifdef CONFIG_HIGHMEM
+@@ -550,7 +550,7 @@ kiblnd_kvaddr_to_page(unsigned long vaddr)
+ 	}
+ #endif
+ 	page = virt_to_page(vaddr);
+-	LASSERT(page != NULL);
++	LASSERT(page);
+ 	return page;
+ }
+ 
+@@ -566,8 +566,8 @@ kiblnd_fmr_map_tx(kib_net_t *net, kib_tx_t *tx, kib_rdma_desc_t *rd, int nob)
+ 	int rc;
+ 	int i;
+ 
+-	LASSERT(tx->tx_pool != NULL);
+-	LASSERT(tx->tx_pool->tpo_pool.po_owner != NULL);
++	LASSERT(tx->tx_pool);
++	LASSERT(tx->tx_pool->tpo_pool.po_owner);
+ 
+ 	hdev = tx->tx_pool->tpo_hdev;
+ 
+@@ -605,7 +605,7 @@ static void kiblnd_unmap_tx(lnet_ni_t *ni, kib_tx_t *tx)
  {
--	LASSERT(atomic_read(&route->ksnr_refcount) == 0);
-+	LASSERT(!atomic_read(&route->ksnr_refcount));
+ 	kib_net_t *net = ni->ni_data;
  
- 	if (route->ksnr_peer)
- 		ksocknal_peer_decref(route->ksnr_peer);
-@@ -154,8 +154,8 @@ ksocknal_destroy_peer(ksock_peer_t *peer)
- 	CDEBUG(D_NET, "peer %s %p deleted\n",
- 	       libcfs_id2str(peer->ksnp_id), peer);
+-	LASSERT(net != NULL);
++	LASSERT(net);
  
--	LASSERT(atomic_read(&peer->ksnp_refcount) == 0);
--	LASSERT(peer->ksnp_accepting == 0);
-+	LASSERT(!atomic_read(&peer->ksnp_refcount));
-+	LASSERT(!peer->ksnp_accepting);
- 	LASSERT(list_empty(&peer->ksnp_conns));
- 	LASSERT(list_empty(&peer->ksnp_routes));
- 	LASSERT(list_empty(&peer->ksnp_tx_queue));
-@@ -269,7 +269,7 @@ ksocknal_get_peer_info(lnet_ni_t *ni, int index,
- 			if (peer->ksnp_ni != ni)
- 				continue;
+ 	if (net->ibn_fmr_ps && tx->fmr.fmr_pfmr) {
+ 		kiblnd_fmr_pool_unmap(&tx->fmr, tx->tx_status);
+@@ -648,13 +648,13 @@ static int kiblnd_map_tx(lnet_ni_t *ni, kib_tx_t *tx, kib_rdma_desc_t *rd,
  
--			if (peer->ksnp_n_passive_ips == 0 &&
-+			if (!peer->ksnp_n_passive_ips &&
- 			    list_empty(&peer->ksnp_routes)) {
- 				if (index-- > 0)
- 					continue;
-@@ -332,7 +332,7 @@ ksocknal_associate_route_conn_locked(ksock_route_t *route, ksock_conn_t *conn)
- 	ksocknal_route_addref(route);
- 
- 	if (route->ksnr_myipaddr != conn->ksnc_myipaddr) {
--		if (route->ksnr_myipaddr == 0) {
-+		if (!route->ksnr_myipaddr) {
- 			/* route wasn't bound locally yet (the initial route) */
- 			CDEBUG(D_NET, "Binding %s %pI4h to %pI4h\n",
- 			       libcfs_id2str(peer->ksnp_id),
-@@ -378,7 +378,7 @@ ksocknal_add_route_locked(ksock_peer_t *peer, ksock_route_t *route)
- 	LASSERT(!route->ksnr_peer);
- 	LASSERT(!route->ksnr_scheduled);
- 	LASSERT(!route->ksnr_connecting);
--	LASSERT(route->ksnr_connected == 0);
-+	LASSERT(!route->ksnr_connected);
- 
- 	/* LASSERT(unique) */
- 	list_for_each(tmp, &peer->ksnp_routes) {
-@@ -429,7 +429,7 @@ ksocknal_del_route_locked(ksock_route_t *route)
- 		ksocknal_close_conn_locked(conn, 0);
+ 	/* looking for pre-mapping MR */
+ 	mr = kiblnd_find_rd_dma_mr(hdev, rd);
+-	if (mr != NULL) {
++	if (mr) {
+ 		/* found pre-mapping MR */
+ 		rd->rd_key = (rd != tx->tx_rd) ? mr->rkey : mr->lkey;
+ 		return 0;
  	}
  
--	if (route->ksnr_myipaddr != 0) {
-+	if (route->ksnr_myipaddr) {
+-	if (net->ibn_fmr_ps != NULL)
++	if (net->ibn_fmr_ps)
+ 		return kiblnd_fmr_map_tx(net, tx, rd, nob);
+ 
+ 	return -EINVAL;
+@@ -673,7 +673,7 @@ kiblnd_setup_rd_iov(lnet_ni_t *ni, kib_tx_t *tx, kib_rdma_desc_t *rd,
+ 
+ 	LASSERT(nob > 0);
+ 	LASSERT(niov > 0);
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 
+ 	while (offset >= iov->iov_len) {
+ 		offset -= iov->iov_len;
+@@ -689,7 +689,7 @@ kiblnd_setup_rd_iov(lnet_ni_t *ni, kib_tx_t *tx, kib_rdma_desc_t *rd,
+ 		vaddr = ((unsigned long)iov->iov_base) + offset;
+ 		page_offset = vaddr & (PAGE_SIZE - 1);
+ 		page = kiblnd_kvaddr_to_page(vaddr);
+-		if (page == NULL) {
++		if (!page) {
+ 			CERROR("Can't find page\n");
+ 			return -EFAULT;
+ 		}
+@@ -725,7 +725,7 @@ kiblnd_setup_rd_kiov(lnet_ni_t *ni, kib_tx_t *tx, kib_rdma_desc_t *rd,
+ 
+ 	LASSERT(nob > 0);
+ 	LASSERT(nkiov > 0);
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 
+ 	while (offset >= kiov->kiov_len) {
+ 		offset -= kiov->kiov_len;
+@@ -925,11 +925,11 @@ kiblnd_check_sends(kib_conn_t *conn)
+ 		spin_unlock(&conn->ibc_lock);
+ 
+ 		tx = kiblnd_get_idle_tx(ni, conn->ibc_peer->ibp_nid);
+-		if (tx != NULL)
++		if (tx)
+ 			kiblnd_init_tx_msg(ni, tx, IBLND_MSG_NOOP, 0);
+ 
+ 		spin_lock(&conn->ibc_lock);
+-		if (tx != NULL)
++		if (tx)
+ 			kiblnd_queue_tx_locked(tx, conn);
+ 	}
+ 
+@@ -1035,7 +1035,7 @@ kiblnd_init_tx_msg(lnet_ni_t *ni, kib_tx_t *tx, int type, int body_nob)
+ 	kiblnd_init_msg(tx->tx_msg, type, body_nob);
+ 
+ 	mr = kiblnd_find_dma_mr(hdev, tx->tx_msgaddr, nob);
+-	LASSERT(mr != NULL);
++	LASSERT(mr);
+ 
+ 	sge->lkey   = mr->lkey;
+ 	sge->addr   = tx->tx_msgaddr;
+@@ -1149,7 +1149,7 @@ kiblnd_queue_tx_locked(kib_tx_t *tx, kib_conn_t *conn)
+ 	tx->tx_queued = 1;
+ 	tx->tx_deadline = jiffies + (*kiblnd_tunables.kib_timeout * HZ);
+ 
+-	if (tx->tx_conn == NULL) {
++	if (!tx->tx_conn) {
+ 		kiblnd_conn_addref(conn);
+ 		tx->tx_conn = conn;
+ 		LASSERT(tx->tx_msg->ibm_type != IBLND_MSG_PUT_DONE);
+@@ -1247,7 +1247,7 @@ kiblnd_connect_peer(kib_peer_t *peer)
+ 	struct sockaddr_in dstaddr;
+ 	int rc;
+ 
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 	LASSERT(peer->ibp_connecting > 0);
+ 
+ 	cmid = kiblnd_rdma_create_id(kiblnd_cm_callback, peer, RDMA_PS_TCP,
+@@ -1288,7 +1288,7 @@ kiblnd_connect_peer(kib_peer_t *peer)
+ 		goto failed2;
+ 	}
+ 
+-	LASSERT(cmid->device != NULL);
++	LASSERT(cmid->device);
+ 	CDEBUG(D_NET, "%s: connection bound to %s:%pI4h:%s\n",
+ 	       libcfs_nid2str(peer->ibp_nid), dev->ibd_ifname,
+ 	       &dev->ibd_ifip, cmid->device->name);
+@@ -1316,8 +1316,8 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
+ 	 * If I get here, I've committed to send, so I complete the tx with
+ 	 * failure on any problems
+ 	 */
+-	LASSERT(tx == NULL || tx->tx_conn == NULL); /* only set when assigned a conn */
+-	LASSERT(tx == NULL || tx->tx_nwrq > 0);     /* work items have been set up */
++	LASSERT(!tx || !tx->tx_conn); /* only set when assigned a conn */
++	LASSERT(!tx || tx->tx_nwrq > 0);     /* work items have been set up */
+ 
+ 	/*
+ 	 * First time, just use a read lock since I expect to find my peer
+@@ -1326,14 +1326,14 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
+ 	read_lock_irqsave(g_lock, flags);
+ 
+ 	peer = kiblnd_find_peer_locked(nid);
+-	if (peer != NULL && !list_empty(&peer->ibp_conns)) {
++	if (peer && !list_empty(&peer->ibp_conns)) {
+ 		/* Found a peer with an established connection */
+ 		conn = kiblnd_get_conn_locked(peer);
+ 		kiblnd_conn_addref(conn); /* 1 ref for me... */
+ 
+ 		read_unlock_irqrestore(g_lock, flags);
+ 
+-		if (tx != NULL)
++		if (tx)
+ 			kiblnd_queue_tx(tx, conn);
+ 		kiblnd_conn_decref(conn); /* ...to here */
+ 		return;
+@@ -1344,12 +1344,12 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
+ 	write_lock(g_lock);
+ 
+ 	peer = kiblnd_find_peer_locked(nid);
+-	if (peer != NULL) {
++	if (peer) {
+ 		if (list_empty(&peer->ibp_conns)) {
+ 			/* found a peer, but it's still connecting... */
+ 			LASSERT(peer->ibp_connecting != 0 ||
+ 				peer->ibp_accepting != 0);
+-			if (tx != NULL)
++			if (tx)
+ 				list_add_tail(&tx->tx_list,
+ 					      &peer->ibp_tx_queue);
+ 			write_unlock_irqrestore(g_lock, flags);
+@@ -1359,7 +1359,7 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
+ 
+ 			write_unlock_irqrestore(g_lock, flags);
+ 
+-			if (tx != NULL)
++			if (tx)
+ 				kiblnd_queue_tx(tx, conn);
+ 			kiblnd_conn_decref(conn); /* ...to here */
+ 		}
+@@ -1372,7 +1372,7 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
+ 	rc = kiblnd_create_peer(ni, &peer, nid);
+ 	if (rc != 0) {
+ 		CERROR("Can't create peer %s\n", libcfs_nid2str(nid));
+-		if (tx != NULL) {
++		if (tx) {
+ 			tx->tx_status = -EHOSTUNREACH;
+ 			tx->tx_waiting = 0;
+ 			kiblnd_tx_done(ni, tx);
+@@ -1383,12 +1383,12 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
+ 	write_lock_irqsave(g_lock, flags);
+ 
+ 	peer2 = kiblnd_find_peer_locked(nid);
+-	if (peer2 != NULL) {
++	if (peer2) {
+ 		if (list_empty(&peer2->ibp_conns)) {
+ 			/* found a peer, but it's still connecting... */
+ 			LASSERT(peer2->ibp_connecting != 0 ||
+ 				peer2->ibp_accepting != 0);
+-			if (tx != NULL)
++			if (tx)
+ 				list_add_tail(&tx->tx_list,
+ 					      &peer2->ibp_tx_queue);
+ 			write_unlock_irqrestore(g_lock, flags);
+@@ -1398,7 +1398,7 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
+ 
+ 			write_unlock_irqrestore(g_lock, flags);
+ 
+-			if (tx != NULL)
++			if (tx)
+ 				kiblnd_queue_tx(tx, conn);
+ 			kiblnd_conn_decref(conn); /* ...to here */
+ 		}
+@@ -1414,7 +1414,7 @@ kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid)
+ 	/* always called with a ref on ni, which prevents ni being shutdown */
+ 	LASSERT(((kib_net_t *)ni->ni_data)->ibn_shutdown == 0);
+ 
+-	if (tx != NULL)
++	if (tx)
+ 		list_add_tail(&tx->tx_list, &peer->ibp_tx_queue);
+ 
+ 	kiblnd_peer_addref(peer);
+@@ -1456,7 +1456,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 	/* Thread context */
+ 	LASSERT(!in_interrupt());
+ 	/* payload is either all vaddrs or all pages */
+-	LASSERT(!(payload_kiov != NULL && payload_iov != NULL));
++	LASSERT(!(payload_kiov && payload_iov));
+ 
+ 	switch (type) {
+ 	default:
+@@ -1477,7 +1477,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 			break;		  /* send IMMEDIATE */
+ 
+ 		tx = kiblnd_get_idle_tx(ni, target.nid);
+-		if (tx == NULL) {
++		if (!tx) {
+ 			CERROR("Can't allocate txd for GET to %s\n",
+ 			       libcfs_nid2str(target.nid));
+ 			return -ENOMEM;
+@@ -1509,7 +1509,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 		kiblnd_init_tx_msg(ni, tx, IBLND_MSG_GET_REQ, nob);
+ 
+ 		tx->tx_lntmsg[1] = lnet_create_reply_msg(ni, lntmsg);
+-		if (tx->tx_lntmsg[1] == NULL) {
++		if (!tx->tx_lntmsg[1]) {
+ 			CERROR("Can't create reply for GET -> %s\n",
+ 			       libcfs_nid2str(target.nid));
+ 			kiblnd_tx_done(ni, tx);
+@@ -1529,14 +1529,14 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 			break;		  /* send IMMEDIATE */
+ 
+ 		tx = kiblnd_get_idle_tx(ni, target.nid);
+-		if (tx == NULL) {
++		if (!tx) {
+ 			CERROR("Can't allocate %s txd for %s\n",
+ 			       type == LNET_MSG_PUT ? "PUT" : "REPLY",
+ 			       libcfs_nid2str(target.nid));
+ 			return -ENOMEM;
+ 		}
+ 
+-		if (payload_kiov == NULL)
++		if (!payload_kiov)
+ 			rc = kiblnd_setup_rd_iov(ni, tx, tx->tx_rd,
+ 						 payload_niov, payload_iov,
+ 						 payload_offset, payload_nob);
+@@ -1568,7 +1568,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 		 <= IBLND_MSG_SIZE);
+ 
+ 	tx = kiblnd_get_idle_tx(ni, target.nid);
+-	if (tx == NULL) {
++	if (!tx) {
+ 		CERROR("Can't send %d to %s: tx descs exhausted\n",
+ 		       type, libcfs_nid2str(target.nid));
+ 		return -ENOMEM;
+@@ -1577,7 +1577,7 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 	ibmsg = tx->tx_msg;
+ 	ibmsg->ibm_u.immediate.ibim_hdr = *hdr;
+ 
+-	if (payload_kiov != NULL)
++	if (payload_kiov)
+ 		lnet_copy_kiov2flat(IBLND_MSG_SIZE, ibmsg,
+ 				    offsetof(kib_msg_t, ibm_u.immediate.ibim_payload),
+ 				    payload_niov, payload_kiov,
+@@ -1609,7 +1609,7 @@ kiblnd_reply(lnet_ni_t *ni, kib_rx_t *rx, lnet_msg_t *lntmsg)
+ 	int rc;
+ 
+ 	tx = kiblnd_get_idle_tx(ni, rx->rx_conn->ibc_peer->ibp_nid);
+-	if (tx == NULL) {
++	if (!tx) {
+ 		CERROR("Can't get tx for REPLY to %s\n",
+ 		       libcfs_nid2str(target.nid));
+ 		goto failed_0;
+@@ -1617,7 +1617,7 @@ kiblnd_reply(lnet_ni_t *ni, kib_rx_t *rx, lnet_msg_t *lntmsg)
+ 
+ 	if (nob == 0)
+ 		rc = 0;
+-	else if (kiov == NULL)
++	else if (!kiov)
+ 		rc = kiblnd_setup_rd_iov(ni, tx, tx->tx_rd,
+ 					 niov, iov, offset, nob);
+ 	else
+@@ -1673,7 +1673,7 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
+ 	LASSERT(mlen <= rlen);
+ 	LASSERT(!in_interrupt());
+ 	/* Either all pages or all vaddrs */
+-	LASSERT(!(kiov != NULL && iov != NULL));
++	LASSERT(!(kiov && iov));
+ 
+ 	switch (rxmsg->ibm_type) {
+ 	default:
+@@ -1689,7 +1689,7 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
+ 			break;
+ 		}
+ 
+-		if (kiov != NULL)
++		if (kiov)
+ 			lnet_copy_flat2kiov(niov, kiov, offset,
+ 					    IBLND_MSG_SIZE, rxmsg,
+ 					    offsetof(kib_msg_t, ibm_u.immediate.ibim_payload),
+@@ -1714,7 +1714,7 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
+ 		}
+ 
+ 		tx = kiblnd_get_idle_tx(ni, conn->ibc_peer->ibp_nid);
+-		if (tx == NULL) {
++		if (!tx) {
+ 			CERROR("Can't allocate tx for %s\n",
+ 			       libcfs_nid2str(conn->ibc_peer->ibp_nid));
+ 			/* Not replying will break the connection */
+@@ -1724,7 +1724,7 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
+ 
+ 		txmsg = tx->tx_msg;
+ 		rd = &txmsg->ibm_u.putack.ibpam_rd;
+-		if (kiov == NULL)
++		if (!kiov)
+ 			rc = kiblnd_setup_rd_iov(ni, tx, rd,
+ 						 niov, iov, offset, mlen);
+ 		else
+@@ -1756,7 +1756,7 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
+ 		}
+ 
+ 	case IBLND_MSG_GET_REQ:
+-		if (lntmsg != NULL) {
++		if (lntmsg) {
+ 			/* Optimized GET; RDMA lntmsg's payload */
+ 			kiblnd_reply(ni, rx, lntmsg);
+ 		} else {
+@@ -2177,7 +2177,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 
+ 	/* cmid inherits 'context' from the corresponding listener id */
+ 	ibdev = (kib_dev_t *)cmid->context;
+-	LASSERT(ibdev != NULL);
++	LASSERT(ibdev);
+ 
+ 	memset(&rej, 0, sizeof(rej));
+ 	rej.ibr_magic = IBLND_MSG_MAGIC;
+@@ -2228,17 +2228,17 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 	nid = reqmsg->ibm_srcnid;
+ 	ni = lnet_net2ni(LNET_NIDNET(reqmsg->ibm_dstnid));
+ 
+-	if (ni != NULL) {
++	if (ni) {
+ 		net = (kib_net_t *)ni->ni_data;
+ 		rej.ibr_incarnation = net->ibn_incarnation;
+ 	}
+ 
+-	if (ni == NULL ||			 /* no matching net */
++	if (!ni ||			 /* no matching net */
+ 	    ni->ni_nid != reqmsg->ibm_dstnid ||   /* right NET, wrong NID! */
+ 	    net->ibn_dev != ibdev) {	      /* wrong device */
+ 		CERROR("Can't accept %s on %s (%s:%d:%pI4h): bad dst nid %s\n",
+ 		       libcfs_nid2str(nid),
+-		       ni == NULL ? "NA" : libcfs_nid2str(ni->ni_nid),
++		       !ni ? "NA" : libcfs_nid2str(ni->ni_nid),
+ 		       ibdev->ibd_ifname, ibdev->ibd_nnets,
+ 		       &ibdev->ibd_ifip,
+ 		       libcfs_nid2str(reqmsg->ibm_dstnid));
+@@ -2307,7 +2307,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 	write_lock_irqsave(g_lock, flags);
+ 
+ 	peer2 = kiblnd_find_peer_locked(nid);
+-	if (peer2 != NULL) {
++	if (peer2) {
+ 		if (peer2->ibp_version == 0) {
+ 			peer2->ibp_version     = version;
+ 			peer2->ibp_incarnation = reqmsg->ibm_srcstamp;
+@@ -2365,7 +2365,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 	}
+ 
+ 	conn = kiblnd_create_conn(peer, cmid, IBLND_CONN_PASSIVE_WAIT, version);
+-	if (conn == NULL) {
++	if (!conn) {
+ 		kiblnd_peer_connect_failed(peer, 0, -ENOMEM);
+ 		kiblnd_peer_decref(peer);
+ 		rej.ibr_why = IBLND_REJECT_NO_RESOURCES;
+@@ -2419,7 +2419,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 	return 0;
+ 
+  failed:
+-	if (ni != NULL)
++	if (ni)
+ 		lnet_ni_decref(ni);
+ 
+ 	rej.ibr_version             = version;
+@@ -2488,9 +2488,9 @@ kiblnd_reconnect(kib_conn_t *conn, int version,
+ 	CNETERR("%s: retrying (%s), %x, %x, queue_dep: %d, max_frag: %d, msg_size: %d\n",
+ 		libcfs_nid2str(peer->ibp_nid),
+ 		reason, IBLND_MSG_VERSION, version,
+-		cp != NULL ? cp->ibcp_queue_depth  : IBLND_MSG_QUEUE_SIZE(version),
+-		cp != NULL ? cp->ibcp_max_frags    : IBLND_RDMA_FRAGS(version),
+-		cp != NULL ? cp->ibcp_max_msg_size : IBLND_MSG_SIZE);
++		cp ? cp->ibcp_queue_depth  : IBLND_MSG_QUEUE_SIZE(version),
++		cp ? cp->ibcp_max_frags    : IBLND_RDMA_FRAGS(version),
++		cp ? cp->ibcp_max_msg_size : IBLND_MSG_SIZE);
+ 
+ 	kiblnd_connect_peer(peer);
+ }
+@@ -2595,7 +2595,7 @@ kiblnd_rejected(kib_conn_t *conn, int reason, void *priv, int priv_nob)
+ 			case IBLND_REJECT_MSG_QUEUE_SIZE:
+ 				CERROR("%s rejected: incompatible message queue depth %d, %d\n",
+ 				       libcfs_nid2str(peer->ibp_nid),
+-				       cp != NULL ? cp->ibcp_queue_depth :
++				       cp ? cp->ibcp_queue_depth :
+ 				       IBLND_MSG_QUEUE_SIZE(rej->ibr_version),
+ 				       IBLND_MSG_QUEUE_SIZE(conn->ibc_version));
+ 				break;
+@@ -2603,7 +2603,7 @@ kiblnd_rejected(kib_conn_t *conn, int reason, void *priv, int priv_nob)
+ 			case IBLND_REJECT_RDMA_FRAGS:
+ 				CERROR("%s rejected: incompatible # of RDMA fragments %d, %d\n",
+ 				       libcfs_nid2str(peer->ibp_nid),
+-				       cp != NULL ? cp->ibcp_max_frags :
++				       cp ? cp->ibcp_max_frags :
+ 				       IBLND_RDMA_FRAGS(rej->ibr_version),
+ 				       IBLND_RDMA_FRAGS(conn->ibc_version));
+ 				break;
+@@ -2647,7 +2647,7 @@ kiblnd_check_connreply(kib_conn_t *conn, void *priv, int priv_nob)
+ 	int rc = kiblnd_unpack_msg(msg, priv_nob);
+ 	unsigned long flags;
+ 
+-	LASSERT(net != NULL);
++	LASSERT(net);
+ 
+ 	if (rc != 0) {
+ 		CERROR("Can't unpack connack from %s: %d\n",
+@@ -2755,7 +2755,7 @@ kiblnd_active_connect(struct rdma_cm_id *cmid)
+ 	read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
+ 
+ 	conn = kiblnd_create_conn(peer, cmid, IBLND_CONN_ACTIVE_CONNECT, version);
+-	if (conn == NULL) {
++	if (!conn) {
+ 		kiblnd_peer_connect_failed(peer, 1, -ENOMEM);
+ 		kiblnd_peer_decref(peer); /* lose cmid's ref */
+ 		return -ENOMEM;
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+index 7c9525d..2c2d1c9 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+@@ -70,7 +70,7 @@ ksocknal_create_route(__u32 ipaddr, int port)
+ 	ksock_route_t *route;
+ 
+ 	LIBCFS_ALLOC(route, sizeof(*route));
+-	if (route == NULL)
++	if (!route)
+ 		return NULL;
+ 
+ 	atomic_set(&route->ksnr_refcount, 1);
+@@ -93,7 +93,7 @@ ksocknal_destroy_route(ksock_route_t *route)
+ {
+ 	LASSERT(atomic_read(&route->ksnr_refcount) == 0);
+ 
+-	if (route->ksnr_peer != NULL)
++	if (route->ksnr_peer)
+ 		ksocknal_peer_decref(route->ksnr_peer);
+ 
+ 	LIBCFS_FREE(route, sizeof(*route));
+@@ -110,7 +110,7 @@ ksocknal_create_peer(ksock_peer_t **peerp, lnet_ni_t *ni, lnet_process_id_t id)
+ 	LASSERT(!in_interrupt());
+ 
+ 	LIBCFS_ALLOC(peer, sizeof(*peer));
+-	if (peer == NULL)
++	if (!peer)
+ 		return -ENOMEM;
+ 
+ 	peer->ksnp_ni = ni;
+@@ -208,7 +208,7 @@ ksocknal_find_peer(lnet_ni_t *ni, lnet_process_id_t id)
+ 
+ 	read_lock(&ksocknal_data.ksnd_global_lock);
+ 	peer = ksocknal_find_peer_locked(ni, id);
+-	if (peer != NULL)			/* +1 ref for caller? */
++	if (peer)			/* +1 ref for caller? */
+ 		ksocknal_peer_addref(peer);
+ 	read_unlock(&ksocknal_data.ksnd_global_lock);
+ 
+@@ -231,7 +231,7 @@ ksocknal_unlink_peer_locked(ksock_peer_t *peer)
+ 		 * All IPs in peer->ksnp_passive_ips[] come from the
+ 		 * interface list, therefore the call must succeed.
+ 		 */
+-		LASSERT(iface != NULL);
++		LASSERT(iface);
+ 
+ 		CDEBUG(D_NET, "peer=%p iface=%p ksni_nroutes=%d\n",
+ 		       peer, iface, iface->ksni_nroutes);
+@@ -347,13 +347,13 @@ ksocknal_associate_route_conn_locked(ksock_route_t *route, ksock_conn_t *conn)
+ 
+ 			iface = ksocknal_ip2iface(route->ksnr_peer->ksnp_ni,
+ 						  route->ksnr_myipaddr);
+-			if (iface != NULL)
++			if (iface)
+ 				iface->ksni_nroutes--;
+ 		}
+ 		route->ksnr_myipaddr = conn->ksnc_myipaddr;
  		iface = ksocknal_ip2iface(route->ksnr_peer->ksnp_ni,
  					  route->ksnr_myipaddr);
- 		if (iface)
-@@ -466,7 +466,7 @@ ksocknal_add_peer(lnet_ni_t *ni, lnet_process_id_t id, __u32 ipaddr, int port)
+-		if (iface != NULL)
++		if (iface)
+ 			iface->ksni_nroutes++;
+ 	}
  
- 	/* Have a brand new peer ready... */
- 	rc = ksocknal_create_peer(&peer, ni, id);
--	if (rc != 0)
-+	if (rc)
+@@ -375,7 +375,7 @@ ksocknal_add_route_locked(ksock_peer_t *peer, ksock_route_t *route)
+ 	ksock_route_t *route2;
+ 
+ 	LASSERT(!peer->ksnp_closing);
+-	LASSERT(route->ksnr_peer == NULL);
++	LASSERT(!route->ksnr_peer);
+ 	LASSERT(!route->ksnr_scheduled);
+ 	LASSERT(!route->ksnr_connecting);
+ 	LASSERT(route->ksnr_connected == 0);
+@@ -432,7 +432,7 @@ ksocknal_del_route_locked(ksock_route_t *route)
+ 	if (route->ksnr_myipaddr != 0) {
+ 		iface = ksocknal_ip2iface(route->ksnr_peer->ksnp_ni,
+ 					  route->ksnr_myipaddr);
+-		if (iface != NULL)
++		if (iface)
+ 			iface->ksni_nroutes--;
+ 	}
+ 
+@@ -470,7 +470,7 @@ ksocknal_add_peer(lnet_ni_t *ni, lnet_process_id_t id, __u32 ipaddr, int port)
  		return rc;
  
  	route = ksocknal_create_route(ipaddr, port);
-@@ -478,7 +478,7 @@ ksocknal_add_peer(lnet_ni_t *ni, lnet_process_id_t id, __u32 ipaddr, int port)
- 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
- 
- 	/* always called with a ref on ni, so shutdown can't have started */
--	LASSERT(((ksock_net_t *) ni->ni_data)->ksnn_shutdown == 0);
-+	LASSERT(!((ksock_net_t *) ni->ni_data)->ksnn_shutdown);
+-	if (route == NULL) {
++	if (!route) {
+ 		ksocknal_peer_decref(peer);
+ 		return -ENOMEM;
+ 	}
+@@ -481,7 +481,7 @@ ksocknal_add_peer(lnet_ni_t *ni, lnet_process_id_t id, __u32 ipaddr, int port)
+ 	LASSERT(((ksock_net_t *) ni->ni_data)->ksnn_shutdown == 0);
  
  	peer2 = ksocknal_find_peer_locked(ni, id);
- 	if (peer2) {
-@@ -530,7 +530,7 @@ ksocknal_del_peer_locked(ksock_peer_t *peer, __u32 ip)
- 		route = list_entry(tmp, ksock_route_t, ksnr_list);
+-	if (peer2 != NULL) {
++	if (peer2) {
+ 		ksocknal_peer_decref(peer);
+ 		peer = peer2;
+ 	} else {
+@@ -499,7 +499,7 @@ ksocknal_add_peer(lnet_ni_t *ni, lnet_process_id_t id, __u32 ipaddr, int port)
  
- 		/* no match */
--		if (!(ip == 0 || route->ksnr_ipaddr == ip))
-+		if (!(!ip || route->ksnr_ipaddr == ip))
- 			continue;
- 
- 		route->ksnr_share_count = 0;
-@@ -544,7 +544,7 @@ ksocknal_del_peer_locked(ksock_peer_t *peer, __u32 ip)
- 		nshared += route->ksnr_share_count;
+ 		route2 = NULL;
  	}
- 
--	if (nshared == 0) {
-+	if (!nshared) {
- 		/*
- 		 * remove everything else if there are no explicit entries
- 		 * left
-@@ -553,7 +553,7 @@ ksocknal_del_peer_locked(ksock_peer_t *peer, __u32 ip)
- 			route = list_entry(tmp, ksock_route_t, ksnr_list);
- 
- 			/* we should only be removing auto-entries */
--			LASSERT(route->ksnr_share_count == 0);
-+			LASSERT(!route->ksnr_share_count);
- 			ksocknal_del_route_locked(route);
- 		}
- 
-@@ -710,7 +710,7 @@ ksocknal_local_ipvec(lnet_ni_t *ni, __u32 *ipaddrs)
- 
- 	for (i = 0; i < nip; i++) {
- 		ipaddrs[i] = net->ksnn_interfaces[i].ksni_ipaddr;
--		LASSERT(ipaddrs[i] != 0);
-+		LASSERT(ipaddrs[i]);
- 	}
- 
- 	read_unlock(&ksocknal_data.ksnd_global_lock);
-@@ -728,11 +728,11 @@ ksocknal_match_peerip(ksock_interface_t *iface, __u32 *ips, int nips)
- 	int i;
- 
- 	for (i = 0; i < nips; i++) {
--		if (ips[i] == 0)
-+		if (!ips[i])
- 			continue;
- 
- 		this_xor = ips[i] ^ iface->ksni_ipaddr;
--		this_netmatch = ((this_xor & iface->ksni_netmask) == 0) ? 1 : 0;
-+		this_netmatch = !(this_xor & iface->ksni_netmask) ? 1 : 0;
- 
- 		if (!(best < 0 ||
- 		      best_netmatch < this_netmatch ||
-@@ -824,7 +824,7 @@ ksocknal_select_ips(ksock_peer_t *peer, __u32 *peerips, int n_peerips)
- 
- 				k = ksocknal_match_peerip(iface, peerips, n_peerips);
+-	if (route2 == NULL) {
++	if (!route2) {
+ 		ksocknal_add_route_locked(peer, route);
+ 		route->ksnr_share_count++;
+ 	} else {
+@@ -826,7 +826,7 @@ ksocknal_select_ips(ksock_peer_t *peer, __u32 *peerips, int n_peerips)
  				xor = ip ^ peerips[k];
--				this_netmatch = ((xor & iface->ksni_netmask) == 0) ? 1 : 0;
-+				this_netmatch = !(xor & iface->ksni_netmask) ? 1 : 0;
+ 				this_netmatch = ((xor & iface->ksni_netmask) == 0) ? 1 : 0;
  
- 				if (!(!best_iface ||
+-				if (!(best_iface == NULL ||
++				if (!(!best_iface ||
  				      best_netmatch < this_netmatch ||
-@@ -947,9 +947,9 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
- 			if (route)
+ 				      (best_netmatch == this_netmatch &&
+ 				       best_npeers > iface->ksni_npeers)))
+@@ -894,13 +894,13 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
+ 	LASSERT(npeer_ipaddrs <= LNET_MAX_INTERFACES);
+ 
+ 	for (i = 0; i < npeer_ipaddrs; i++) {
+-		if (newroute != NULL) {
++		if (newroute) {
+ 			newroute->ksnr_ipaddr = peer_ipaddrs[i];
+ 		} else {
+ 			write_unlock_bh(global_lock);
+ 
+ 			newroute = ksocknal_create_route(peer_ipaddrs[i], port);
+-			if (newroute == NULL)
++			if (!newroute)
+ 				return;
+ 
+ 			write_lock_bh(global_lock);
+@@ -921,7 +921,7 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
+ 
+ 			route = NULL;
+ 		}
+-		if (route != NULL)
++		if (route)
+ 			continue;
+ 
+ 		best_iface = NULL;
+@@ -944,14 +944,14 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
+ 
+ 				route = NULL;
+ 			}
+-			if (route != NULL)
++			if (route)
  				continue;
  
--			this_netmatch = (((iface->ksni_ipaddr ^
-+			this_netmatch = (!((iface->ksni_ipaddr ^
+ 			this_netmatch = (((iface->ksni_ipaddr ^
  					   newroute->ksnr_ipaddr) &
--					   iface->ksni_netmask) == 0) ? 1 : 0;
-+					   iface->ksni_netmask)) ? 1 : 0;
+ 					   iface->ksni_netmask) == 0) ? 1 : 0;
  
- 			if (!(!best_iface ||
+-			if (!(best_iface == NULL ||
++			if (!(!best_iface ||
  			      best_netmatch < this_netmatch ||
-@@ -986,7 +986,7 @@ ksocknal_accept(lnet_ni_t *ni, struct socket *sock)
- 	int peer_port;
- 
- 	rc = lnet_sock_getaddr(sock, 1, &peer_ip, &peer_port);
--	LASSERT(rc == 0);		      /* we succeeded before */
-+	LASSERT(!rc);		      /* we succeeded before */
- 
- 	LIBCFS_ALLOC(cr, sizeof(*cr));
- 	if (!cr) {
-@@ -1082,7 +1082,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
- 
- 	/* stash conn's local and remote addrs */
- 	rc = ksocknal_lib_get_conn_addrs(conn);
--	if (rc != 0)
-+	if (rc)
- 		goto failed_1;
- 
- 	/*
-@@ -1114,7 +1114,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+ 			      (best_netmatch == this_netmatch &&
+ 			       best_nroutes > iface->ksni_nroutes)))
+@@ -962,7 +962,7 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
+ 			best_nroutes = iface->ksni_nroutes;
  		}
  
- 		rc = ksocknal_send_hello(ni, conn, peerid.nid, hello);
--		if (rc != 0)
-+		if (rc)
- 			goto failed_1;
- 	} else {
- 		peerid.nid = LNET_NID_ANY;
-@@ -1128,7 +1128,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
- 	if (rc < 0)
+-		if (best_iface == NULL)
++		if (!best_iface)
+ 			continue;
+ 
+ 		newroute->ksnr_myipaddr = best_iface->ksni_ipaddr;
+@@ -973,7 +973,7 @@ ksocknal_create_routes(ksock_peer_t *peer, int port,
+ 	}
+ 
+ 	write_unlock_bh(global_lock);
+-	if (newroute != NULL)
++	if (newroute)
+ 		ksocknal_route_decref(newroute);
+ }
+ 
+@@ -989,7 +989,7 @@ ksocknal_accept(lnet_ni_t *ni, struct socket *sock)
+ 	LASSERT(rc == 0);		      /* we succeeded before */
+ 
+ 	LIBCFS_ALLOC(cr, sizeof(*cr));
+-	if (cr == NULL) {
++	if (!cr) {
+ 		LCONSOLE_ERROR_MSG(0x12f, "Dropping connection request from %pI4h: memory exhausted\n",
+ 				   &peer_ip);
+ 		return -ENOMEM;
+@@ -1042,12 +1042,12 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+ 	int active;
+ 	char *warn = NULL;
+ 
+-	active = (route != NULL);
++	active = !!route;
+ 
+ 	LASSERT(active == (type != SOCKLND_CONN_NONE));
+ 
+ 	LIBCFS_ALLOC(conn, sizeof(*conn));
+-	if (conn == NULL) {
++	if (!conn) {
+ 		rc = -ENOMEM;
+ 		goto failed_0;
+ 	}
+@@ -1075,7 +1075,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+ 
+ 	LIBCFS_ALLOC(hello, offsetof(ksock_hello_msg_t,
+ 				     kshm_ips[LNET_MAX_INTERFACES]));
+-	if (hello == NULL) {
++	if (!hello) {
+ 		rc = -ENOMEM;
+ 		goto failed_1;
+ 	}
+@@ -1103,7 +1103,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+ 		conn->ksnc_proto = peer->ksnp_proto;
+ 		write_unlock_bh(global_lock);
+ 
+-		if (conn->ksnc_proto == NULL) {
++		if (!conn->ksnc_proto) {
+ 			 conn->ksnc_proto = &ksocknal_protocol_v3x;
+ #if SOCKNAL_VERSION_DEBUG
+ 			 if (*ksocknal_tunables.ksnd_protocol == 2)
+@@ -1129,7 +1129,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
  		goto failed_1;
  
--	LASSERT(rc == 0 || active);
-+	LASSERT(!rc || active);
- 	LASSERT(conn->ksnc_proto);
+ 	LASSERT(rc == 0 || active);
+-	LASSERT(conn->ksnc_proto != NULL);
++	LASSERT(conn->ksnc_proto);
  	LASSERT(peerid.nid != LNET_NID_ANY);
  
-@@ -1139,13 +1139,13 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
- 		write_lock_bh(global_lock);
- 	} else {
- 		rc = ksocknal_create_peer(&peer, ni, peerid);
--		if (rc != 0)
-+		if (rc)
- 			goto failed_1;
- 
- 		write_lock_bh(global_lock);
- 
- 		/* called with a ref on ni, so shutdown can't have started */
--		LASSERT(((ksock_net_t *) ni->ni_data)->ksnn_shutdown == 0);
-+		LASSERT(!((ksock_net_t *) ni->ni_data)->ksnn_shutdown);
+ 	cpt = lnet_cpt_of_nid(peerid.nid);
+@@ -1148,7 +1148,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+ 		LASSERT(((ksock_net_t *) ni->ni_data)->ksnn_shutdown == 0);
  
  		peer2 = ksocknal_find_peer_locked(ni, peerid);
- 		if (!peer2) {
-@@ -1239,7 +1239,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
- 			 * Reply on a passive connection attempt so the peer
- 			 * realises we're connected.
- 			 */
--			LASSERT(rc == 0);
-+			LASSERT(!rc);
- 			if (!active)
- 				rc = EALREADY;
+-		if (peer2 == NULL) {
++		if (!peer2) {
+ 			/*
+ 			 * NB this puts an "empty" peer in the peer
+ 			 * table (which takes my ref)
+@@ -1184,7 +1184,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+ 		goto failed_2;
+ 	}
  
-@@ -1344,7 +1344,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
- 	 * socket; this ensures the socket only tears down after the
- 	 * response has been sent.
- 	 */
--	if (rc == 0)
-+	if (!rc)
- 		rc = ksocknal_lib_setup_sock(sock);
- 
- 	write_lock_bh(global_lock);
-@@ -1357,14 +1357,14 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+-	if (peer->ksnp_proto == NULL) {
++	if (!peer->ksnp_proto) {
+ 		/*
+ 		 * Never connected before.
+ 		 * NB recv_hello may have returned EPROTO to signal my peer
+@@ -1386,7 +1386,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
  
  	write_unlock_bh(global_lock);
  
--	if (rc != 0) {
-+	if (rc) {
- 		write_lock_bh(global_lock);
- 		if (!conn->ksnc_closing) {
- 			/* could be closed by another thread */
- 			ksocknal_close_conn_locked(conn, rc);
- 		}
- 		write_unlock_bh(global_lock);
--	} else if (ksocknal_connsock_addref(conn) == 0) {
-+	} else if (!ksocknal_connsock_addref(conn)) {
- 		/* Allow I/O to proceed. */
- 		ksocknal_read_callback(conn);
- 		ksocknal_write_callback(conn);
-@@ -1439,7 +1439,7 @@ ksocknal_close_conn_locked(ksock_conn_t *conn, int error)
- 	ksock_conn_t *conn2;
- 	struct list_head *tmp;
+-	if (warn != NULL) {
++	if (warn) {
+ 		if (rc < 0)
+ 			CERROR("Not creating conn %s type %d: %s\n",
+ 			       libcfs_id2str(peerid), conn->ksnc_type, warn);
+@@ -1415,7 +1415,7 @@ ksocknal_create_conn(lnet_ni_t *ni, ksock_route_t *route,
+ 	ksocknal_peer_decref(peer);
  
--	LASSERT(peer->ksnp_error == 0);
-+	LASSERT(!peer->ksnp_error);
- 	LASSERT(!conn->ksnc_closing);
- 	conn->ksnc_closing = 1;
+ failed_1:
+-	if (hello != NULL)
++	if (hello)
+ 		LIBCFS_FREE(hello, offsetof(ksock_hello_msg_t,
+ 					    kshm_ips[LNET_MAX_INTERFACES]));
  
-@@ -1450,7 +1450,7 @@ ksocknal_close_conn_locked(ksock_conn_t *conn, int error)
- 	if (route) {
+@@ -1447,7 +1447,7 @@ ksocknal_close_conn_locked(ksock_conn_t *conn, int error)
+ 	list_del(&conn->ksnc_list);
+ 
+ 	route = conn->ksnc_route;
+-	if (route != NULL) {
++	if (route) {
  		/* dissociate conn from route... */
  		LASSERT(!route->ksnr_deleted);
--		LASSERT((route->ksnr_connected & (1 << conn->ksnc_type)) != 0);
-+		LASSERT(route->ksnr_connected & (1 << conn->ksnc_type));
+ 		LASSERT((route->ksnr_connected & (1 << conn->ksnc_type)) != 0);
+@@ -1462,7 +1462,7 @@ ksocknal_close_conn_locked(ksock_conn_t *conn, int error)
  
- 		conn2 = NULL;
- 		list_for_each(tmp, &peer->ksnp_conns) {
-@@ -1531,9 +1531,9 @@ ksocknal_peer_failed(ksock_peer_t *peer)
- 	 */
- 	read_lock(&ksocknal_data.ksnd_global_lock);
+ 			conn2 = NULL;
+ 		}
+-		if (conn2 == NULL)
++		if (!conn2)
+ 			route->ksnr_connected &= ~(1 << conn->ksnc_type);
  
--	if ((peer->ksnp_id.pid & LNET_PID_USERFLAG) == 0 &&
-+	if (!(peer->ksnp_id.pid & LNET_PID_USERFLAG) &&
+ 		conn->ksnc_route = NULL;
+@@ -1534,7 +1534,7 @@ ksocknal_peer_failed(ksock_peer_t *peer)
+ 	if ((peer->ksnp_id.pid & LNET_PID_USERFLAG) == 0 &&
  	    list_empty(&peer->ksnp_conns) &&
--	    peer->ksnp_accepting == 0 &&
-+	    !peer->ksnp_accepting &&
- 	    !ksocknal_find_connecting_route_locked(peer)) {
+ 	    peer->ksnp_accepting == 0 &&
+-	    ksocknal_find_connecting_route_locked(peer) == NULL) {
++	    !ksocknal_find_connecting_route_locked(peer)) {
  		notify = 1;
  		last_alive = peer->ksnp_last_alive;
-@@ -1566,7 +1566,7 @@ ksocknal_finalize_zcreq(ksock_conn_t *conn)
- 		if (tx->tx_conn != conn)
- 			continue;
- 
--		LASSERT(tx->tx_msg.ksm_zc_cookies[0] != 0);
-+		LASSERT(tx->tx_msg.ksm_zc_cookies[0]);
- 
- 		tx->tx_msg.ksm_zc_cookies[0] = 0;
- 		tx->tx_zc_aborted = 1; /* mark it as not-acked */
-@@ -1629,7 +1629,7 @@ ksocknal_terminate_conn(ksock_conn_t *conn)
+ 	}
+@@ -1558,7 +1558,7 @@ ksocknal_finalize_zcreq(ksock_conn_t *conn)
+ 	 * NB safe to finalize TXs because closing of socket will
+ 	 * abort all buffered data
  	 */
- 	conn->ksnc_scheduler->kss_nconns--;
- 
--	if (peer->ksnp_error != 0) {
-+	if (peer->ksnp_error) {
- 		/* peer's last conn closed in error */
- 		LASSERT(list_empty(&peer->ksnp_conns));
- 		failed = 1;
-@@ -1656,7 +1656,7 @@ ksocknal_queue_zombie_conn(ksock_conn_t *conn)
- {
- 	/* Queue the conn for the reaper to destroy */
- 
--	LASSERT(atomic_read(&conn->ksnc_conn_refcount) == 0);
-+	LASSERT(!atomic_read(&conn->ksnc_conn_refcount));
- 	spin_lock_bh(&ksocknal_data.ksnd_reaper_lock);
- 
- 	list_add_tail(&conn->ksnc_list, &ksocknal_data.ksnd_zombie_conns);
-@@ -1673,8 +1673,8 @@ ksocknal_destroy_conn(ksock_conn_t *conn)
- 	/* Final coup-de-grace of the reaper */
- 	CDEBUG(D_NET, "connection %p\n", conn);
- 
--	LASSERT(atomic_read(&conn->ksnc_conn_refcount) == 0);
--	LASSERT(atomic_read(&conn->ksnc_sock_refcount) == 0);
-+	LASSERT(!atomic_read(&conn->ksnc_conn_refcount));
-+	LASSERT(!atomic_read(&conn->ksnc_sock_refcount));
- 	LASSERT(!conn->ksnc_sock);
- 	LASSERT(!conn->ksnc_route);
- 	LASSERT(!conn->ksnc_tx_scheduled);
-@@ -1736,8 +1736,7 @@ ksocknal_close_peer_conns_locked(ksock_peer_t *peer, __u32 ipaddr, int why)
- 	list_for_each_safe(ctmp, cnxt, &peer->ksnp_conns) {
- 		conn = list_entry(ctmp, ksock_conn_t, ksnc_list);
- 
--		if (ipaddr == 0 ||
--		    conn->ksnc_ipaddr == ipaddr) {
-+		if (!ipaddr || conn->ksnc_ipaddr == ipaddr) {
- 			count++;
- 			ksocknal_close_conn_locked(conn, why);
- 		}
-@@ -1799,10 +1798,10 @@ ksocknal_close_matching_conns(lnet_process_id_t id, __u32 ipaddr)
- 	write_unlock_bh(&ksocknal_data.ksnd_global_lock);
- 
- 	/* wildcards always succeed */
--	if (id.nid == LNET_NID_ANY || id.pid == LNET_PID_ANY || ipaddr == 0)
-+	if (id.nid == LNET_NID_ANY || id.pid == LNET_PID_ANY || !ipaddr)
- 		return 0;
- 
--	if (count == 0)
-+	if (!count)
- 		return -ENOENT;
- 	else
- 		return 0;
-@@ -1873,7 +1872,7 @@ ksocknal_query(lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
- 
- 	read_unlock(glock);
- 
--	if (last_alive != 0)
-+	if (last_alive)
- 		*when = last_alive;
- 
- 	CDEBUG(D_NET, "Peer %s %p, alive %ld secs ago, connect %d\n",
-@@ -1966,7 +1965,7 @@ static int ksocknal_push(lnet_ni_t *ni, lnet_process_id_t id)
- 			}
- 			read_unlock(&ksocknal_data.ksnd_global_lock);
- 
--			if (i == 0) /* no match */
-+			if (!i) /* no match */
- 				break;
- 
- 			rc = 0;
-@@ -1990,8 +1989,7 @@ ksocknal_add_interface(lnet_ni_t *ni, __u32 ipaddress, __u32 netmask)
- 	struct list_head *rtmp;
- 	ksock_route_t *route;
- 
--	if (ipaddress == 0 ||
--	    netmask == 0)
-+	if (!ipaddress || !netmask)
- 		return -EINVAL;
- 
- 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
-@@ -2063,7 +2061,7 @@ ksocknal_peer_del_interface_locked(ksock_peer_t *peer, __u32 ipaddr)
- 		if (route->ksnr_myipaddr != ipaddr)
- 			continue;
- 
--		if (route->ksnr_share_count != 0) {
-+		if (route->ksnr_share_count) {
- 			/* Manually created; keep, but unbind */
- 			route->ksnr_myipaddr = 0;
- 		} else {
-@@ -2096,8 +2094,7 @@ ksocknal_del_interface(lnet_ni_t *ni, __u32 ipaddress)
- 	for (i = 0; i < net->ksnn_ninterfaces; i++) {
- 		this_ip = net->ksnn_interfaces[i].ksni_ipaddr;
- 
--		if (!(ipaddress == 0 ||
--		      ipaddress == this_ip))
-+		if (!(!ipaddress || ipaddress == this_ip))
- 			continue;
- 
- 		rc = 0;
-@@ -2175,7 +2172,7 @@ ksocknal_ctl(lnet_ni_t *ni, unsigned int cmd, void *arg)
- 		rc = ksocknal_get_peer_info(ni, data->ioc_count,
- 					    &id, &myip, &ip, &port,
- 					    &conn_count,  &share_count);
--		if (rc != 0)
-+		if (rc)
- 			return rc;
- 
- 		data->ioc_nid    = id.nid;
-@@ -2256,7 +2253,7 @@ ksocknal_ctl(lnet_ni_t *ni, unsigned int cmd, void *arg)
- static void
- ksocknal_free_buffers(void)
- {
--	LASSERT(atomic_read(&ksocknal_data.ksnd_nactive_txs) == 0);
-+	LASSERT(!atomic_read(&ksocknal_data.ksnd_nactive_txs));
- 
- 	if (ksocknal_data.ksnd_sched_info) {
- 		struct ksock_sched_info *info;
-@@ -2304,7 +2301,7 @@ ksocknal_base_shutdown(void)
- 	int i;
- 	int j;
- 
--	LASSERT(ksocknal_data.ksnd_nnets == 0);
-+	LASSERT(!ksocknal_data.ksnd_nnets);
- 
- 	switch (ksocknal_data.ksnd_init) {
- 	default:
-@@ -2336,7 +2333,7 @@ ksocknal_base_shutdown(void)
- 						&sched->kss_rx_conns));
- 					LASSERT(list_empty(
- 						&sched->kss_zombie_noop_txs));
--					LASSERT(sched->kss_nconns == 0);
-+					LASSERT(!sched->kss_nconns);
- 				}
- 			}
- 		}
-@@ -2361,7 +2358,7 @@ ksocknal_base_shutdown(void)
- 
- 		i = 4;
- 		read_lock(&ksocknal_data.ksnd_global_lock);
--		while (ksocknal_data.ksnd_nthreads != 0) {
-+		while (ksocknal_data.ksnd_nthreads) {
- 			i++;
- 			CDEBUG(((i & (-i)) == i) ? D_WARNING : D_NET, /* power of 2? */
- 			       "waiting for %d threads to terminate\n",
-@@ -2399,7 +2396,7 @@ ksocknal_base_startup(void)
- 	int i;
- 
- 	LASSERT(ksocknal_data.ksnd_init == SOCKNAL_INIT_NOTHING);
--	LASSERT(ksocknal_data.ksnd_nnets == 0);
-+	LASSERT(!ksocknal_data.ksnd_nnets);
- 
- 	memset(&ksocknal_data, 0, sizeof(ksocknal_data)); /* zero pointers */
- 
-@@ -2502,7 +2499,7 @@ ksocknal_base_startup(void)
- 		snprintf(name, sizeof(name), "socknal_cd%02d", i);
- 		rc = ksocknal_thread_start(ksocknal_connd,
- 					   (void *)((ulong_ptr_t)i), name);
--		if (rc != 0) {
-+		if (rc) {
- 			spin_lock_bh(&ksocknal_data.ksnd_connd_lock);
- 			ksocknal_data.ksnd_connd_starting--;
- 			spin_unlock_bh(&ksocknal_data.ksnd_connd_lock);
-@@ -2512,7 +2509,7 @@ ksocknal_base_startup(void)
- 	}
- 
- 	rc = ksocknal_thread_start(ksocknal_reaper, NULL, "socknal_reaper");
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't spawn socknal reaper: %d\n", rc);
- 		goto failed;
- 	}
-@@ -2604,7 +2601,7 @@ ksocknal_shutdown(lnet_ni_t *ni)
- 	/* Wait for all peer state to clean up */
- 	i = 2;
- 	spin_lock_bh(&net->ksnn_lock);
--	while (net->ksnn_npeers != 0) {
-+	while (net->ksnn_npeers) {
- 		spin_unlock_bh(&net->ksnn_lock);
- 
- 		i++;
-@@ -2621,15 +2618,15 @@ ksocknal_shutdown(lnet_ni_t *ni)
- 	spin_unlock_bh(&net->ksnn_lock);
- 
- 	for (i = 0; i < net->ksnn_ninterfaces; i++) {
--		LASSERT(net->ksnn_interfaces[i].ksni_npeers == 0);
--		LASSERT(net->ksnn_interfaces[i].ksni_nroutes == 0);
-+		LASSERT(!net->ksnn_interfaces[i].ksni_npeers);
-+		LASSERT(!net->ksnn_interfaces[i].ksni_nroutes);
- 	}
- 
- 	list_del(&net->ksnn_list);
- 	LIBCFS_FREE(net, sizeof(*net));
- 
- 	ksocknal_data.ksnd_nnets--;
--	if (ksocknal_data.ksnd_nnets == 0)
-+	if (!ksocknal_data.ksnd_nnets)
- 		ksocknal_base_shutdown();
- }
- 
-@@ -2657,7 +2654,7 @@ ksocknal_enumerate_interfaces(ksock_net_t *net)
- 			continue;
- 
- 		rc = lnet_ipif_query(names[i], &up, &ip, &mask);
--		if (rc != 0) {
-+		if (rc) {
- 			CWARN("Can't get interface %s info: %d\n",
- 			      names[i], rc);
- 			continue;
-@@ -2684,7 +2681,7 @@ ksocknal_enumerate_interfaces(ksock_net_t *net)
- 
- 	lnet_ipif_free_enumeration(names, n);
- 
--	if (j == 0)
-+	if (!j)
- 		CERROR("Can't find any usable interfaces\n");
- 
- 	return j;
-@@ -2715,7 +2712,7 @@ ksocknal_search_new_ipif(ksock_net_t *net)
- 				if (colon2)
- 					*colon2 = 0;
- 
--				found = strcmp(ifnam, ifnam2) == 0;
-+				found = !strcmp(ifnam, ifnam2);
- 				if (colon2)
- 					*colon2 = ':';
- 			}
-@@ -2738,7 +2735,7 @@ ksocknal_start_schedulers(struct ksock_sched_info *info)
- 	int rc = 0;
- 	int i;
- 
--	if (info->ksi_nthreads == 0) {
-+	if (!info->ksi_nthreads) {
- 		if (*ksocknal_tunables.ksnd_nscheds > 0) {
- 			nthrs = info->ksi_nthreads_max;
- 		} else {
-@@ -2766,7 +2763,7 @@ ksocknal_start_schedulers(struct ksock_sched_info *info)
- 
- 		rc = ksocknal_thread_start(ksocknal_scheduler,
- 					   (void *)id, name);
--		if (rc == 0)
-+		if (!rc)
- 			continue;
- 
- 		CERROR("Can't spawn thread %d for scheduler[%d]: %d\n",
-@@ -2798,7 +2795,7 @@ ksocknal_net_start_threads(ksock_net_t *net, __u32 *cpts, int ncpts)
- 			continue;
- 
- 		rc = ksocknal_start_schedulers(info);
--		if (rc != 0)
-+		if (rc)
- 			return rc;
- 	}
- 	return 0;
-@@ -2815,7 +2812,7 @@ ksocknal_startup(lnet_ni_t *ni)
- 
- 	if (ksocknal_data.ksnd_init == SOCKNAL_INIT_NOTHING) {
- 		rc = ksocknal_base_startup();
--		if (rc != 0)
-+		if (rc)
- 			return rc;
- 	}
- 
-@@ -2848,7 +2845,7 @@ ksocknal_startup(lnet_ni_t *ni)
- 					     &net->ksnn_interfaces[i].ksni_ipaddr,
- 					     &net->ksnn_interfaces[i].ksni_netmask);
- 
--			if (rc != 0) {
-+			if (rc) {
- 				CERROR("Can't get interface %s info: %d\n",
- 				       ni->ni_interfaces[i], rc);
- 				goto fail_1;
-@@ -2869,7 +2866,7 @@ ksocknal_startup(lnet_ni_t *ni)
- 
- 	/* call it before add it to ksocknal_data.ksnd_nets */
- 	rc = ksocknal_net_start_threads(net, ni->ni_cpts, ni->ni_ncpts);
--	if (rc != 0)
-+	if (rc)
- 		goto fail_1;
- 
- 	ni->ni_nid = LNET_MKNID(LNET_NIDNET(ni->ni_nid),
-@@ -2883,7 +2880,7 @@ ksocknal_startup(lnet_ni_t *ni)
-  fail_1:
- 	LIBCFS_FREE(net, sizeof(*net));
-  fail_0:
--	if (ksocknal_data.ksnd_nnets == 0)
-+	if (!ksocknal_data.ksnd_nnets)
- 		ksocknal_base_shutdown();
- 
- 	return -ENETDOWN;
-@@ -2916,7 +2913,7 @@ ksocknal_module_init(void)
- 	the_ksocklnd.lnd_accept   = ksocknal_accept;
- 
- 	rc = ksocknal_tunables_init();
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	lnet_register_lnd(&the_ksocklnd);
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-index f9ec607..02da02d 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-@@ -138,7 +138,7 @@ ksocknal_send_iov(ksock_conn_t *conn, ksock_tx_t *tx)
- 		nob -= iov->iov_len;
- 		tx->tx_iov = ++iov;
- 		tx->tx_niov--;
--	} while (nob != 0);
-+	} while (nob);
- 
- 	return rc;
- }
-@@ -150,7 +150,7 @@ ksocknal_send_kiov(ksock_conn_t *conn, ksock_tx_t *tx)
- 	int nob;
- 	int rc;
- 
--	LASSERT(tx->tx_niov == 0);
-+	LASSERT(!tx->tx_niov);
- 	LASSERT(tx->tx_nkiov > 0);
- 
- 	/* Never touch tx->tx_kiov inside ksocknal_lib_send_kiov() */
-@@ -176,7 +176,7 @@ ksocknal_send_kiov(ksock_conn_t *conn, ksock_tx_t *tx)
- 		nob -= (int)kiov->kiov_len;
- 		tx->tx_kiov = ++kiov;
- 		tx->tx_nkiov--;
--	} while (nob != 0);
-+	} while (nob);
- 
- 	return rc;
- }
-@@ -187,15 +187,15 @@ ksocknal_transmit(ksock_conn_t *conn, ksock_tx_t *tx)
- 	int rc;
- 	int bufnob;
- 
--	if (ksocknal_data.ksnd_stall_tx != 0) {
-+	if (ksocknal_data.ksnd_stall_tx) {
- 		set_current_state(TASK_UNINTERRUPTIBLE);
- 		schedule_timeout(cfs_time_seconds(ksocknal_data.ksnd_stall_tx));
- 	}
- 
--	LASSERT(tx->tx_resid != 0);
-+	LASSERT(tx->tx_resid);
- 
- 	rc = ksocknal_connsock_addref(conn);
--	if (rc != 0) {
-+	if (rc) {
- 		LASSERT(conn->ksnc_closing);
- 		return -ESHUTDOWN;
- 	}
-@@ -205,7 +205,7 @@ ksocknal_transmit(ksock_conn_t *conn, ksock_tx_t *tx)
- 			/* testing... */
- 			ksocknal_data.ksnd_enomem_tx--;
- 			rc = -EAGAIN;
--		} else if (tx->tx_niov != 0) {
-+		} else if (tx->tx_niov) {
- 			rc = ksocknal_send_iov(conn, tx);
- 		} else {
- 			rc = ksocknal_send_kiov(conn, tx);
-@@ -229,7 +229,7 @@ ksocknal_transmit(ksock_conn_t *conn, ksock_tx_t *tx)
- 
- 		if (rc <= 0) { /* Didn't write anything? */
- 
--			if (rc == 0) /* some stacks return 0 instead of -EAGAIN */
-+			if (!rc) /* some stacks return 0 instead of -EAGAIN */
- 				rc = -EAGAIN;
- 
- 			/* Check if EAGAIN is due to memory pressure */
-@@ -243,7 +243,7 @@ ksocknal_transmit(ksock_conn_t *conn, ksock_tx_t *tx)
- 		atomic_sub(rc, &conn->ksnc_tx_nob);
- 		rc = 0;
- 
--	} while (tx->tx_resid != 0);
-+	} while (tx->tx_resid);
- 
- 	ksocknal_connsock_decref(conn);
- 	return rc;
-@@ -291,7 +291,7 @@ ksocknal_recv_iov(ksock_conn_t *conn)
- 		nob -= iov->iov_len;
- 		conn->ksnc_rx_iov = ++iov;
- 		conn->ksnc_rx_niov--;
--	} while (nob != 0);
-+	} while (nob);
- 
- 	return rc;
- }
-@@ -338,7 +338,7 @@ ksocknal_recv_kiov(ksock_conn_t *conn)
- 		nob -= kiov->kiov_len;
- 		conn->ksnc_rx_kiov = ++kiov;
- 		conn->ksnc_rx_nkiov--;
--	} while (nob != 0);
-+	} while (nob);
- 
- 	return 1;
- }
-@@ -353,19 +353,19 @@ ksocknal_receive(ksock_conn_t *conn)
- 	 */
- 	int rc;
- 
--	if (ksocknal_data.ksnd_stall_rx != 0) {
-+	if (ksocknal_data.ksnd_stall_rx) {
- 		set_current_state(TASK_UNINTERRUPTIBLE);
- 		schedule_timeout(cfs_time_seconds(ksocknal_data.ksnd_stall_rx));
- 	}
- 
- 	rc = ksocknal_connsock_addref(conn);
--	if (rc != 0) {
-+	if (rc) {
- 		LASSERT(conn->ksnc_closing);
- 		return -ESHUTDOWN;
- 	}
- 
- 	for (;;) {
--		if (conn->ksnc_rx_niov != 0)
-+		if (conn->ksnc_rx_niov)
- 			rc = ksocknal_recv_iov(conn);
- 		else
- 			rc = ksocknal_recv_kiov(conn);
-@@ -374,7 +374,7 @@ ksocknal_receive(ksock_conn_t *conn)
- 			/* error/EOF or partial receive */
- 			if (rc == -EAGAIN) {
- 				rc = 1;
--			} else if (rc == 0 && conn->ksnc_rx_started) {
-+			} else if (!rc && conn->ksnc_rx_started) {
- 				/* EOF in the middle of a message */
- 				rc = -EPROTO;
- 			}
-@@ -383,7 +383,7 @@ ksocknal_receive(ksock_conn_t *conn)
- 
- 		/* Completed a fragment */
- 
--		if (conn->ksnc_rx_nob_wanted == 0) {
-+		if (!conn->ksnc_rx_nob_wanted) {
- 			rc = 1;
- 			break;
- 		}
-@@ -397,7 +397,7 @@ void
- ksocknal_tx_done(lnet_ni_t *ni, ksock_tx_t *tx)
- {
- 	lnet_msg_t *lnetmsg = tx->tx_lnetmsg;
--	int rc = (tx->tx_resid == 0 && !tx->tx_zc_aborted) ? 0 : -EIO;
-+	int rc = (!tx->tx_resid && !tx->tx_zc_aborted) ? 0 : -EIO;
- 
- 	LASSERT(ni || tx->tx_conn);
- 
-@@ -472,11 +472,11 @@ ksocknal_check_zc_req(ksock_tx_t *tx)
- 	tx->tx_deadline =
- 		cfs_time_shift(*ksocknal_tunables.ksnd_timeout);
- 
--	LASSERT(tx->tx_msg.ksm_zc_cookies[0] == 0);
-+	LASSERT(!tx->tx_msg.ksm_zc_cookies[0]);
- 
- 	tx->tx_msg.ksm_zc_cookies[0] = peer->ksnp_zc_next_cookie++;
- 
--	if (peer->ksnp_zc_next_cookie == 0)
-+	if (!peer->ksnp_zc_next_cookie)
- 		peer->ksnp_zc_next_cookie = SOCKNAL_KEEPALIVE_PING + 1;
- 
- 	list_add_tail(&tx->tx_zc_list, &peer->ksnp_zc_req_list);
-@@ -496,7 +496,7 @@ ksocknal_uncheck_zc_req(ksock_tx_t *tx)
+-	LASSERT(conn->ksnc_sock == NULL);
++	LASSERT(!conn->ksnc_sock);
  
  	spin_lock(&peer->ksnp_lock);
  
--	if (tx->tx_msg.ksm_zc_cookies[0] == 0) {
-+	if (!tx->tx_msg.ksm_zc_cookies[0]) {
- 		/* Not waiting for an ACK */
- 		spin_unlock(&peer->ksnp_lock);
- 		return;
-@@ -522,9 +522,9 @@ ksocknal_process_transmit(ksock_conn_t *conn, ksock_tx_t *tx)
+@@ -1675,8 +1675,8 @@ ksocknal_destroy_conn(ksock_conn_t *conn)
  
- 	CDEBUG(D_NET, "send(%d) %d\n", tx->tx_resid, rc);
+ 	LASSERT(atomic_read(&conn->ksnc_conn_refcount) == 0);
+ 	LASSERT(atomic_read(&conn->ksnc_sock_refcount) == 0);
+-	LASSERT(conn->ksnc_sock == NULL);
+-	LASSERT(conn->ksnc_route == NULL);
++	LASSERT(!conn->ksnc_sock);
++	LASSERT(!conn->ksnc_route);
+ 	LASSERT(!conn->ksnc_tx_scheduled);
+ 	LASSERT(!conn->ksnc_rx_scheduled);
+ 	LASSERT(list_empty(&conn->ksnc_tx_queue));
+@@ -1848,7 +1848,7 @@ ksocknal_query(lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
+ 	read_lock(glock);
  
--	if (tx->tx_resid == 0) {
-+	if (!tx->tx_resid) {
- 		/* Sent everything OK */
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
+ 	peer = ksocknal_find_peer_locked(ni, id);
+-	if (peer != NULL) {
++	if (peer) {
+ 		struct list_head *tmp;
+ 		ksock_conn_t *conn;
+ 		int bufnob;
+@@ -1867,7 +1867,7 @@ ksocknal_query(lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
+ 		}
  
- 		return 0;
+ 		last_alive = peer->ksnp_last_alive;
+-		if (ksocknal_find_connectable_route_locked(peer) == NULL)
++		if (!ksocknal_find_connectable_route_locked(peer))
+ 			connect = 0;
  	}
-@@ -592,7 +592,7 @@ ksocknal_launch_connection_locked(ksock_route_t *route)
  
- 	LASSERT(!route->ksnr_scheduled);
- 	LASSERT(!route->ksnr_connecting);
--	LASSERT((ksocknal_route_mask() & ~route->ksnr_connected) != 0);
-+	LASSERT(ksocknal_route_mask() & ~route->ksnr_connected);
+@@ -1889,7 +1889,7 @@ ksocknal_query(lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
+ 	write_lock_bh(glock);
  
- 	route->ksnr_scheduled = 1;	      /* scheduling conn for connd */
- 	ksocknal_route_addref(route);	   /* extra ref for connd */
-@@ -737,7 +737,7 @@ ksocknal_queue_tx_locked(ksock_tx_t *tx, ksock_conn_t *conn)
- 	bufnob = conn->ksnc_sock->sk->sk_wmem_queued;
- 	spin_lock_bh(&sched->kss_lock);
+ 	peer = ksocknal_find_peer_locked(ni, id);
+-	if (peer != NULL)
++	if (peer)
+ 		ksocknal_launch_all_connections_locked(peer);
  
--	if (list_empty(&conn->ksnc_tx_queue) && bufnob == 0) {
-+	if (list_empty(&conn->ksnc_tx_queue) && !bufnob) {
- 		/* First packet starts the timeout */
- 		conn->ksnc_tx_deadline =
- 			cfs_time_shift(*ksocknal_tunables.ksnd_timeout);
-@@ -752,7 +752,7 @@ ksocknal_queue_tx_locked(ksock_tx_t *tx, ksock_conn_t *conn)
- 		 * The packet is noop ZC ACK, try to piggyback the ack_cookie
- 		 * on a normal packet so I don't need to send it
- 		 */
--		LASSERT(msg->ksm_zc_cookies[1] != 0);
-+		LASSERT(msg->ksm_zc_cookies[1]);
- 		LASSERT(conn->ksnc_proto->pro_queue_tx_zcack);
+ 	write_unlock_bh(glock);
+@@ -1920,7 +1920,7 @@ ksocknal_push_peer(ksock_peer_t *peer)
  
- 		if (conn->ksnc_proto->pro_queue_tx_zcack(conn, tx, 0))
-@@ -763,7 +763,7 @@ ksocknal_queue_tx_locked(ksock_tx_t *tx, ksock_conn_t *conn)
- 		 * It's a normal packet - can it piggback a noop zc-ack that
- 		 * has been queued already?
- 		 */
--		LASSERT(msg->ksm_zc_cookies[1] == 0);
-+		LASSERT(!msg->ksm_zc_cookies[1]);
- 		LASSERT(conn->ksnc_proto->pro_queue_tx_msg);
+ 		read_unlock(&ksocknal_data.ksnd_global_lock);
  
- 		ztx = conn->ksnc_proto->pro_queue_tx_msg(conn, tx);
-@@ -803,10 +803,10 @@ ksocknal_find_connectable_route_locked(ksock_peer_t *peer)
- 			continue;
+-		if (conn == NULL)
++		if (!conn)
+ 			break;
  
- 		/* all route types connected ? */
--		if ((ksocknal_route_mask() & ~route->ksnr_connected) == 0)
-+		if (!(ksocknal_route_mask() & ~route->ksnr_connected))
- 			continue;
+ 		ksocknal_lib_push_conn(conn);
+@@ -1997,7 +1997,7 @@ ksocknal_add_interface(lnet_ni_t *ni, __u32 ipaddress, __u32 netmask)
+ 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
  
--		if (!(route->ksnr_retry_interval == 0 || /* first attempt */
-+		if (!(!route->ksnr_retry_interval || /* first attempt */
- 		      cfs_time_aftereq(now, route->ksnr_timeout))) {
- 			CDEBUG(D_NET,
- 			       "Too soon to retry route %pI4h (cnted %d, interval %ld, %ld secs later)\n",
-@@ -884,7 +884,7 @@ ksocknal_launch_packet(lnet_ni_t *ni, ksock_tx_t *tx, lnet_process_id_t id)
+ 	iface = ksocknal_ip2iface(ni, ipaddress);
+-	if (iface != NULL) {
++	if (iface) {
+ 		/* silently ignore dups */
+ 		rc = 0;
+ 	} else if (net->ksnn_ninterfaces == LNET_MAX_INTERFACES) {
+@@ -2207,7 +2207,7 @@ ksocknal_ctl(lnet_ni_t *ni, unsigned int cmd, void *arg)
+ 		int nagle;
+ 		ksock_conn_t *conn = ksocknal_get_conn_by_idx(ni, data->ioc_count);
  
- 		write_unlock_bh(g_lock);
+-		if (conn == NULL)
++		if (!conn)
+ 			return -ENOENT;
  
--		if ((id.pid & LNET_PID_USERFLAG) != 0) {
-+		if (id.pid & LNET_PID_USERFLAG) {
- 			CERROR("Refusing to create a connection to userspace process %s\n",
- 			       libcfs_id2str(id));
- 			return -EHOSTUNREACH;
-@@ -898,7 +898,7 @@ ksocknal_launch_packet(lnet_ni_t *ni, ksock_tx_t *tx, lnet_process_id_t id)
- 		rc = ksocknal_add_peer(ni, id,
- 				       LNET_NIDADDR(id.nid),
- 				       lnet_acceptor_port());
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't add peer %s: %d\n",
- 			       libcfs_id2str(id), rc);
- 			return rc;
-@@ -956,7 +956,7 @@ ksocknal_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
- 	CDEBUG(D_NET, "sending %u bytes in %d frags to %s\n",
- 	       payload_nob, payload_niov, libcfs_id2str(target));
+ 		ksocknal_lib_get_conn_tunables(conn, &txmem, &rxmem, &nagle);
+@@ -2258,12 +2258,12 @@ ksocknal_free_buffers(void)
+ {
+ 	LASSERT(atomic_read(&ksocknal_data.ksnd_nactive_txs) == 0);
  
--	LASSERT(payload_nob == 0 || payload_niov > 0);
-+	LASSERT(!payload_nob || payload_niov > 0);
- 	LASSERT(payload_niov <= LNET_MAX_IOV);
- 	/* payload is either all vaddrs or all pages */
- 	LASSERT(!(payload_kiov && payload_iov));
-@@ -1010,7 +1010,7 @@ ksocknal_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
- 	if (!mpflag)
- 		cfs_memory_pressure_restore(mpflag);
+-	if (ksocknal_data.ksnd_sched_info != NULL) {
++	if (ksocknal_data.ksnd_sched_info) {
+ 		struct ksock_sched_info *info;
+ 		int i;
  
--	if (rc == 0)
-+	if (!rc)
- 		return 0;
+ 		cfs_percpt_for_each(info, i, ksocknal_data.ksnd_sched_info) {
+-			if (info->ksi_scheds != NULL) {
++			if (info->ksi_scheds) {
+ 				LIBCFS_FREE(info->ksi_scheds,
+ 					    info->ksi_nthreads_max *
+ 					    sizeof(info->ksi_scheds[0]));
+@@ -2312,7 +2312,7 @@ ksocknal_base_shutdown(void)
+ 
+ 	case SOCKNAL_INIT_ALL:
+ 	case SOCKNAL_INIT_DATA:
+-		LASSERT(ksocknal_data.ksnd_peers != NULL);
++		LASSERT(ksocknal_data.ksnd_peers);
+ 		for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++)
+ 			LASSERT(list_empty(&ksocknal_data.ksnd_peers[i]));
+ 
+@@ -2322,10 +2322,10 @@ ksocknal_base_shutdown(void)
+ 		LASSERT(list_empty(&ksocknal_data.ksnd_connd_connreqs));
+ 		LASSERT(list_empty(&ksocknal_data.ksnd_connd_routes));
+ 
+-		if (ksocknal_data.ksnd_sched_info != NULL) {
++		if (ksocknal_data.ksnd_sched_info) {
+ 			cfs_percpt_for_each(info, i,
+ 					    ksocknal_data.ksnd_sched_info) {
+-				if (info->ksi_scheds == NULL)
++				if (!info->ksi_scheds)
+ 					continue;
+ 
+ 				for (j = 0; j < info->ksi_nthreads_max; j++) {
+@@ -2346,10 +2346,10 @@ ksocknal_base_shutdown(void)
+ 		wake_up_all(&ksocknal_data.ksnd_connd_waitq);
+ 		wake_up_all(&ksocknal_data.ksnd_reaper_waitq);
+ 
+-		if (ksocknal_data.ksnd_sched_info != NULL) {
++		if (ksocknal_data.ksnd_sched_info) {
+ 			cfs_percpt_for_each(info, i,
+ 					    ksocknal_data.ksnd_sched_info) {
+-				if (info->ksi_scheds == NULL)
++				if (!info->ksi_scheds)
+ 					continue;
+ 
+ 				for (j = 0; j < info->ksi_nthreads_max; j++) {
+@@ -2407,7 +2407,7 @@ ksocknal_base_startup(void)
+ 	LIBCFS_ALLOC(ksocknal_data.ksnd_peers,
+ 		     sizeof(struct list_head) *
+ 		     ksocknal_data.ksnd_peer_hash_size);
+-	if (ksocknal_data.ksnd_peers == NULL)
++	if (!ksocknal_data.ksnd_peers)
+ 		return -ENOMEM;
+ 
+ 	for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++)
+@@ -2438,7 +2438,7 @@ ksocknal_base_startup(void)
+ 
+ 	ksocknal_data.ksnd_sched_info = cfs_percpt_alloc(lnet_cpt_table(),
+ 							 sizeof(*info));
+-	if (ksocknal_data.ksnd_sched_info == NULL)
++	if (!ksocknal_data.ksnd_sched_info)
+ 		goto failed;
+ 
+ 	cfs_percpt_for_each(info, i, ksocknal_data.ksnd_sched_info) {
+@@ -2461,7 +2461,7 @@ ksocknal_base_startup(void)
+ 
+ 		LIBCFS_CPT_ALLOC(info->ksi_scheds, lnet_cpt_table(), i,
+ 				 info->ksi_nthreads_max * sizeof(*sched));
+-		if (info->ksi_scheds == NULL)
++		if (!info->ksi_scheds)
+ 			goto failed;
+ 
+ 		for (; nthrs > 0; nthrs--) {
+@@ -2547,7 +2547,7 @@ ksocknal_debug_peerhash(lnet_ni_t *ni)
+ 		}
+ 	}
+ 
+-	if (peer != NULL) {
++	if (peer) {
+ 		ksock_route_t *route;
+ 		ksock_conn_t  *conn;
+ 
+@@ -2703,7 +2703,7 @@ ksocknal_search_new_ipif(ksock_net_t *net)
+ 		ksock_net_t *tmp;
+ 		int j;
+ 
+-		if (colon != NULL) /* ignore alias device */
++		if (colon) /* ignore alias device */
+ 			*colon = 0;
+ 
+ 		list_for_each_entry(tmp, &ksocknal_data.ksnd_nets, ksnn_list) {
+@@ -2712,11 +2712,11 @@ ksocknal_search_new_ipif(ksock_net_t *net)
+ 					&tmp->ksnn_interfaces[j].ksni_name[0];
+ 				char *colon2 = strchr(ifnam2, ':');
+ 
+-				if (colon2 != NULL)
++				if (colon2)
+ 					*colon2 = 0;
+ 
+ 				found = strcmp(ifnam, ifnam2) == 0;
+-				if (colon2 != NULL)
++				if (colon2)
+ 					*colon2 = ':';
+ 			}
+ 			if (found)
+@@ -2724,7 +2724,7 @@ ksocknal_search_new_ipif(ksock_net_t *net)
+ 		}
+ 
+ 		new_ipif += !found;
+-		if (colon != NULL)
++		if (colon)
+ 			*colon = ':';
+ 	}
+ 
+@@ -2789,7 +2789,7 @@ ksocknal_net_start_threads(ksock_net_t *net, __u32 *cpts, int ncpts)
+ 
+ 	for (i = 0; i < ncpts; i++) {
+ 		struct ksock_sched_info *info;
+-		int cpt = (cpts == NULL) ? i : cpts[i];
++		int cpt = !cpts ? i : cpts[i];
+ 
+ 		LASSERT(cpt < cfs_cpt_number(lnet_cpt_table()));
+ 		info = ksocknal_data.ksnd_sched_info[cpt];
+@@ -2820,7 +2820,7 @@ ksocknal_startup(lnet_ni_t *ni)
+ 	}
+ 
+ 	LIBCFS_ALLOC(net, sizeof(*net));
+-	if (net == NULL)
++	if (!net)
+ 		goto fail_0;
+ 
+ 	spin_lock_init(&net->ksnn_lock);
+@@ -2831,7 +2831,7 @@ ksocknal_startup(lnet_ni_t *ni)
+ 	ni->ni_peertxcredits  = *ksocknal_tunables.ksnd_peertxcredits;
+ 	ni->ni_peerrtrcredits = *ksocknal_tunables.ksnd_peerrtrcredits;
+ 
+-	if (ni->ni_interfaces[0] == NULL) {
++	if (!ni->ni_interfaces[0]) {
+ 		rc = ksocknal_enumerate_interfaces(net);
+ 		if (rc <= 0)
+ 			goto fail_1;
+@@ -2841,7 +2841,7 @@ ksocknal_startup(lnet_ni_t *ni)
+ 		for (i = 0; i < LNET_MAX_INTERFACES; i++) {
+ 			int up;
+ 
+-			if (ni->ni_interfaces[i] == NULL)
++			if (!ni->ni_interfaces[i])
+ 				break;
+ 
+ 			rc = lnet_ipif_query(ni->ni_interfaces[i], &up,
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+index 16c9bac..f9ec607 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+@@ -47,10 +47,10 @@ ksocknal_alloc_tx(int type, int size)
+ 		spin_unlock(&ksocknal_data.ksnd_tx_lock);
+ 	}
+ 
+-	if (tx == NULL)
++	if (!tx)
+ 		LIBCFS_ALLOC(tx, size);
+ 
+-	if (tx == NULL)
++	if (!tx)
+ 		return NULL;
+ 
+ 	atomic_set(&tx->tx_refcount, 1);
+@@ -70,7 +70,7 @@ ksocknal_alloc_tx_noop(__u64 cookie, int nonblk)
+ 	ksock_tx_t *tx;
+ 
+ 	tx = ksocknal_alloc_tx(KSOCK_MSG_NOOP, KSOCK_NOOP_TX_SIZE);
+-	if (tx == NULL) {
++	if (!tx) {
+ 		CERROR("Can't allocate noop tx desc\n");
+ 		return NULL;
+ 	}
+@@ -94,7 +94,7 @@ ksocknal_free_tx(ksock_tx_t *tx)
+ {
+ 	atomic_dec(&ksocknal_data.ksnd_nactive_txs);
+ 
+-	if (tx->tx_lnetmsg == NULL && tx->tx_desc_size == KSOCK_NOOP_TX_SIZE) {
++	if (!tx->tx_lnetmsg && tx->tx_desc_size == KSOCK_NOOP_TX_SIZE) {
+ 		/* it's a noop tx */
+ 		spin_lock(&ksocknal_data.ksnd_tx_lock);
+ 
+@@ -399,16 +399,16 @@ ksocknal_tx_done(lnet_ni_t *ni, ksock_tx_t *tx)
+ 	lnet_msg_t *lnetmsg = tx->tx_lnetmsg;
+ 	int rc = (tx->tx_resid == 0 && !tx->tx_zc_aborted) ? 0 : -EIO;
+ 
+-	LASSERT(ni != NULL || tx->tx_conn != NULL);
++	LASSERT(ni || tx->tx_conn);
+ 
+-	if (tx->tx_conn != NULL)
++	if (tx->tx_conn)
+ 		ksocknal_conn_decref(tx->tx_conn);
+ 
+-	if (ni == NULL && tx->tx_conn != NULL)
++	if (!ni && tx->tx_conn)
+ 		ni = tx->tx_conn->ksnc_peer->ksnp_ni;
  
  	ksocknal_free_tx(tx);
-@@ -1050,12 +1050,12 @@ ksocknal_new_packet(ksock_conn_t *conn, int nob_to_skip)
+-	if (lnetmsg != NULL) /* KSOCK_MSG_NOOP go without lnetmsg */
++	if (lnetmsg) /* KSOCK_MSG_NOOP go without lnetmsg */
+ 		lnet_finalize(ni, lnetmsg, rc);
+ }
  
- 	LASSERT(conn->ksnc_proto);
+@@ -420,7 +420,7 @@ ksocknal_txlist_done(lnet_ni_t *ni, struct list_head *txlist, int error)
+ 	while (!list_empty(txlist)) {
+ 		tx = list_entry(txlist->next, ksock_tx_t, tx_list);
  
--	if ((*ksocknal_tunables.ksnd_eager_ack & conn->ksnc_type) != 0) {
-+	if (*ksocknal_tunables.ksnd_eager_ack & conn->ksnc_type) {
- 		/* Remind the socket to ack eagerly... */
- 		ksocknal_lib_eager_ack(conn);
+-		if (error && tx->tx_lnetmsg != NULL) {
++		if (error && tx->tx_lnetmsg) {
+ 			CNETERR("Deleting packet type %d len %d %s->%s\n",
+ 				le32_to_cpu(tx->tx_lnetmsg->msg_hdr.type),
+ 				le32_to_cpu(tx->tx_lnetmsg->msg_hdr.payload_length),
+@@ -615,7 +615,7 @@ ksocknal_launch_all_connections_locked(ksock_peer_t *peer)
+ 	for (;;) {
+ 		/* launch any/all connections that need it */
+ 		route = ksocknal_find_connectable_route_locked(peer);
+-		if (route == NULL)
++		if (!route)
+ 			return;
+ 
+ 		ksocknal_launch_connection_locked(route);
+@@ -639,8 +639,8 @@ ksocknal_find_conn_locked(ksock_peer_t *peer, ksock_tx_t *tx, int nonblk)
+ 		int rc;
+ 
+ 		LASSERT(!c->ksnc_closing);
+-		LASSERT(c->ksnc_proto != NULL &&
+-			c->ksnc_proto->pro_match_tx != NULL);
++		LASSERT(c->ksnc_proto &&
++			c->ksnc_proto->pro_match_tx);
+ 
+ 		rc = c->ksnc_proto->pro_match_tx(c, tx, nonblk);
+ 
+@@ -651,7 +651,7 @@ ksocknal_find_conn_locked(ksock_peer_t *peer, ksock_tx_t *tx, int nonblk)
+ 			continue;
+ 
+ 		case SOCKNAL_MATCH_YES: /* typed connection */
+-			if (typed == NULL || tnob > nob ||
++			if (!typed || tnob > nob ||
+ 			    (tnob == nob && *ksocknal_tunables.ksnd_round_robin &&
+ 			     cfs_time_after(typed->ksnc_tx_last_post, c->ksnc_tx_last_post))) {
+ 				typed = c;
+@@ -660,7 +660,7 @@ ksocknal_find_conn_locked(ksock_peer_t *peer, ksock_tx_t *tx, int nonblk)
+ 			break;
+ 
+ 		case SOCKNAL_MATCH_MAY: /* fallback connection */
+-			if (fallback == NULL || fnob > nob ||
++			if (!fallback || fnob > nob ||
+ 			    (fnob == nob && *ksocknal_tunables.ksnd_round_robin &&
+ 			     cfs_time_after(fallback->ksnc_tx_last_post, c->ksnc_tx_last_post))) {
+ 				fallback = c;
+@@ -671,9 +671,9 @@ ksocknal_find_conn_locked(ksock_peer_t *peer, ksock_tx_t *tx, int nonblk)
  	}
  
--	if (nob_to_skip == 0) {	 /* right at next packet boundary now */
-+	if (!nob_to_skip) {	 /* right at next packet boundary now */
- 		conn->ksnc_rx_started = 0;
- 		mb();		       /* racing with timeout thread */
+ 	/* prefer the typed selection */
+-	conn = (typed != NULL) ? typed : fallback;
++	conn = (typed) ? typed : fallback;
  
-@@ -1112,7 +1112,7 @@ ksocknal_new_packet(ksock_conn_t *conn, int nob_to_skip)
- 		skipped += nob;
- 		nob_to_skip -= nob;
+-	if (conn != NULL)
++	if (conn)
+ 		conn->ksnc_tx_last_post = cfs_time_current();
  
--	} while (nob_to_skip != 0 &&    /* mustn't overflow conn's rx iov */
-+	} while (nob_to_skip &&    /* mustn't overflow conn's rx iov */
- 		 niov < sizeof(conn->ksnc_rx_iov_space) / sizeof(struct iovec));
+ 	return conn;
+@@ -726,7 +726,7 @@ ksocknal_queue_tx_locked(ksock_tx_t *tx, ksock_conn_t *conn)
+ 	LASSERT(tx->tx_resid == tx->tx_nob);
  
- 	conn->ksnc_rx_niov = niov;
-@@ -1138,13 +1138,13 @@ ksocknal_process_receive(ksock_conn_t *conn)
- 		conn->ksnc_rx_state == SOCKNAL_RX_LNET_HEADER ||
- 		conn->ksnc_rx_state == SOCKNAL_RX_SLOP);
-  again:
--	if (conn->ksnc_rx_nob_wanted != 0) {
-+	if (conn->ksnc_rx_nob_wanted) {
- 		rc = ksocknal_receive(conn);
+ 	CDEBUG(D_NET, "Packet %p type %d, nob %d niov %d nkiov %d\n",
+-	       tx, (tx->tx_lnetmsg != NULL) ? tx->tx_lnetmsg->msg_hdr.type :
++	       tx, (tx->tx_lnetmsg) ? tx->tx_lnetmsg->msg_hdr.type :
+ 					      KSOCK_MSG_NOOP,
+ 	       tx->tx_nob, tx->tx_niov, tx->tx_nkiov);
  
- 		if (rc <= 0) {
- 			LASSERT(rc != -EAGAIN);
+@@ -753,7 +753,7 @@ ksocknal_queue_tx_locked(ksock_tx_t *tx, ksock_conn_t *conn)
+ 		 * on a normal packet so I don't need to send it
+ 		 */
+ 		LASSERT(msg->ksm_zc_cookies[1] != 0);
+-		LASSERT(conn->ksnc_proto->pro_queue_tx_zcack != NULL);
++		LASSERT(conn->ksnc_proto->pro_queue_tx_zcack);
  
--			if (rc == 0)
-+			if (!rc)
- 				CDEBUG(D_NET, "[%p] EOF from %s ip %pI4h:%d\n",
- 				       conn,
- 				       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-@@ -1160,10 +1160,10 @@ ksocknal_process_receive(ksock_conn_t *conn)
- 			/* it's not an error if conn is being closed */
- 			ksocknal_close_conn_and_siblings(conn,
- 							 (conn->ksnc_closing) ? 0 : rc);
--			return (rc == 0 ? -ESHUTDOWN : rc);
-+			return (!rc ? -ESHUTDOWN : rc);
- 		}
+ 		if (conn->ksnc_proto->pro_queue_tx_zcack(conn, tx, 0))
+ 			ztx = tx; /* ZC ACK piggybacked on ztx release tx later */
+@@ -764,13 +764,13 @@ ksocknal_queue_tx_locked(ksock_tx_t *tx, ksock_conn_t *conn)
+ 		 * has been queued already?
+ 		 */
+ 		LASSERT(msg->ksm_zc_cookies[1] == 0);
+-		LASSERT(conn->ksnc_proto->pro_queue_tx_msg != NULL);
++		LASSERT(conn->ksnc_proto->pro_queue_tx_msg);
  
--		if (conn->ksnc_rx_nob_wanted != 0) {
-+		if (conn->ksnc_rx_nob_wanted) {
- 			/* short read */
- 			return -EAGAIN;
- 		}
-@@ -1188,7 +1188,7 @@ ksocknal_process_receive(ksock_conn_t *conn)
- 		}
+ 		ztx = conn->ksnc_proto->pro_queue_tx_msg(conn, tx);
+ 		/* ztx will be released later */
+ 	}
  
- 		if (conn->ksnc_msg.ksm_type == KSOCK_MSG_NOOP &&
--		    conn->ksnc_msg.ksm_csum != 0 &&     /* has checksum */
-+		    conn->ksnc_msg.ksm_csum &&     /* has checksum */
- 		    conn->ksnc_msg.ksm_csum != conn->ksnc_rx_csum) {
- 			/* NOOP Checksum error */
- 			CERROR("%s: Checksum error, wire:0x%08X data:0x%08X\n",
-@@ -1199,7 +1199,7 @@ ksocknal_process_receive(ksock_conn_t *conn)
- 			return -EIO;
- 		}
+-	if (ztx != NULL) {
++	if (ztx) {
+ 		atomic_sub(ztx->tx_nob, &conn->ksnc_tx_nob);
+ 		list_add_tail(&ztx->tx_list, &sched->kss_zombie_noop_txs);
+ 	}
+@@ -850,17 +850,17 @@ ksocknal_launch_packet(lnet_ni_t *ni, ksock_tx_t *tx, lnet_process_id_t id)
+ 	int retry;
+ 	int rc;
  
--		if (conn->ksnc_msg.ksm_zc_cookies[1] != 0) {
-+		if (conn->ksnc_msg.ksm_zc_cookies[1]) {
- 			__u64 cookie = 0;
+-	LASSERT(tx->tx_conn == NULL);
++	LASSERT(!tx->tx_conn);
  
- 			LASSERT(conn->ksnc_proto != &ksocknal_protocol_v1x);
-@@ -1210,7 +1210,7 @@ ksocknal_process_receive(ksock_conn_t *conn)
- 			rc = conn->ksnc_proto->pro_handle_zcack(conn, cookie,
- 					       conn->ksnc_msg.ksm_zc_cookies[1]);
+ 	g_lock = &ksocknal_data.ksnd_global_lock;
  
--			if (rc != 0) {
-+			if (rc) {
- 				CERROR("%s: Unknown ZC-ACK cookie: %llu, %llu\n",
- 				       libcfs_id2str(conn->ksnc_peer->ksnp_id),
- 				       cookie, conn->ksnc_msg.ksm_zc_cookies[1]);
-@@ -1243,7 +1243,7 @@ ksocknal_process_receive(ksock_conn_t *conn)
- 		/* unpack message header */
- 		conn->ksnc_proto->pro_unpack(&conn->ksnc_msg);
+ 	for (retry = 0;; retry = 1) {
+ 		read_lock(g_lock);
+ 		peer = ksocknal_find_peer_locked(ni, id);
+-		if (peer != NULL) {
+-			if (ksocknal_find_connectable_route_locked(peer) == NULL) {
++		if (peer) {
++			if (!ksocknal_find_connectable_route_locked(peer)) {
+ 				conn = ksocknal_find_conn_locked(peer, tx, tx->tx_nonblk);
+-				if (conn != NULL) {
++				if (conn) {
+ 					/*
+ 					 * I've got no routes that need to be
+ 					 * connecting and I do have an actual
+@@ -879,7 +879,7 @@ ksocknal_launch_packet(lnet_ni_t *ni, ksock_tx_t *tx, lnet_process_id_t id)
+ 		write_lock_bh(g_lock);
  
--		if ((conn->ksnc_peer->ksnp_id.pid & LNET_PID_USERFLAG) != 0) {
-+		if (conn->ksnc_peer->ksnp_id.pid & LNET_PID_USERFLAG) {
- 			/* Userspace peer */
- 			lhdr = &conn->ksnc_msg.ksm_u.lnetmsg.ksnm_hdr;
- 			id = &conn->ksnc_peer->ksnp_id;
-@@ -1281,8 +1281,8 @@ ksocknal_process_receive(ksock_conn_t *conn)
- 		/* payload all received */
- 		rc = 0;
+ 		peer = ksocknal_find_peer_locked(ni, id);
+-		if (peer != NULL)
++		if (peer)
+ 			break;
  
--		if (conn->ksnc_rx_nob_left == 0 &&   /* not truncating */
--		    conn->ksnc_msg.ksm_csum != 0 &&  /* has checksum */
-+		if (!conn->ksnc_rx_nob_left &&   /* not truncating */
-+		    conn->ksnc_msg.ksm_csum &&  /* has checksum */
- 		    conn->ksnc_msg.ksm_csum != conn->ksnc_rx_csum) {
- 			CERROR("%s: Checksum error, wire:0x%08X data:0x%08X\n",
- 			       libcfs_id2str(conn->ksnc_peer->ksnp_id),
-@@ -1290,7 +1290,7 @@ ksocknal_process_receive(ksock_conn_t *conn)
- 			rc = -EIO;
- 		}
+ 		write_unlock_bh(g_lock);
+@@ -908,7 +908,7 @@ ksocknal_launch_packet(lnet_ni_t *ni, ksock_tx_t *tx, lnet_process_id_t id)
+ 	ksocknal_launch_all_connections_locked(peer);
  
--		if (rc == 0 && conn->ksnc_msg.ksm_zc_cookies[0] != 0) {
-+		if (!rc && conn->ksnc_msg.ksm_zc_cookies[0]) {
- 			LASSERT(conn->ksnc_proto != &ksocknal_protocol_v1x);
+ 	conn = ksocknal_find_conn_locked(peer, tx, tx->tx_nonblk);
+-	if (conn != NULL) {
++	if (conn) {
+ 		/* Connection exists; queue message on it */
+ 		ksocknal_queue_tx_locked(tx, conn);
+ 		write_unlock_bh(g_lock);
+@@ -916,7 +916,7 @@ ksocknal_launch_packet(lnet_ni_t *ni, ksock_tx_t *tx, lnet_process_id_t id)
+ 	}
  
- 			lhdr = &conn->ksnc_msg.ksm_u.lnetmsg.ksnm_hdr;
-@@ -1304,7 +1304,7 @@ ksocknal_process_receive(ksock_conn_t *conn)
+ 	if (peer->ksnp_accepting > 0 ||
+-	    ksocknal_find_connecting_route_locked(peer) != NULL) {
++	    ksocknal_find_connecting_route_locked(peer)) {
+ 		/* the message is going to be pinned to the peer */
+ 		tx->tx_deadline =
+ 			cfs_time_shift(*ksocknal_tunables.ksnd_timeout);
+@@ -959,10 +959,10 @@ ksocknal_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 	LASSERT(payload_nob == 0 || payload_niov > 0);
+ 	LASSERT(payload_niov <= LNET_MAX_IOV);
+ 	/* payload is either all vaddrs or all pages */
+-	LASSERT(!(payload_kiov != NULL && payload_iov != NULL));
++	LASSERT(!(payload_kiov && payload_iov));
+ 	LASSERT(!in_interrupt());
  
- 		lnet_finalize(conn->ksnc_peer->ksnp_ni, conn->ksnc_cookie, rc);
+-	if (payload_iov != NULL)
++	if (payload_iov)
+ 		desc_size = offsetof(ksock_tx_t,
+ 				     tx_frags.virt.iov[1 + payload_niov]);
+ 	else
+@@ -972,7 +972,7 @@ ksocknal_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 	if (lntmsg->msg_vmflush)
+ 		mpflag = cfs_memory_pressure_get_and_set();
+ 	tx = ksocknal_alloc_tx(KSOCK_MSG_LNET, desc_size);
+-	if (tx == NULL) {
++	if (!tx) {
+ 		CERROR("Can't allocate tx desc type %d size %d\n",
+ 		       type, desc_size);
+ 		if (lntmsg->msg_vmflush)
+@@ -983,7 +983,7 @@ ksocknal_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
+ 	tx->tx_conn = NULL;		     /* set when assigned a conn */
+ 	tx->tx_lnetmsg = lntmsg;
  
--		if (rc != 0) {
-+		if (rc) {
- 			ksocknal_new_packet(conn, 0);
- 			ksocknal_close_conn_and_siblings(conn, rc);
- 			return -EPROTO;
+-	if (payload_iov != NULL) {
++	if (payload_iov) {
+ 		tx->tx_kiov = NULL;
+ 		tx->tx_nkiov = 0;
+ 		tx->tx_iov = tx->tx_frags.virt.iov;
+@@ -1048,7 +1048,7 @@ ksocknal_new_packet(ksock_conn_t *conn, int nob_to_skip)
+ 	unsigned int niov;
+ 	int skipped;
+ 
+-	LASSERT(conn->ksnc_proto != NULL);
++	LASSERT(conn->ksnc_proto);
+ 
+ 	if ((*ksocknal_tunables.ksnd_eager_ack & conn->ksnc_type) != 0) {
+ 		/* Remind the socket to ack eagerly... */
 @@ -1341,7 +1341,7 @@ ksocknal_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
  	conn->ksnc_rx_nob_wanted = mlen;
  	conn->ksnc_rx_nob_left = rlen;
  
--	if (mlen == 0 || iov) {
-+	if (!mlen || iov) {
+-	if (mlen == 0 || iov != NULL) {
++	if (mlen == 0 || iov) {
  		conn->ksnc_rx_nkiov = 0;
  		conn->ksnc_rx_kiov = NULL;
  		conn->ksnc_rx_iov = conn->ksnc_rx_iov_space.iov;
-@@ -1415,7 +1415,7 @@ int ksocknal_scheduler(void *arg)
- 	cfs_block_allsigs();
+@@ -1678,7 +1678,7 @@ ksocknal_send_hello(lnet_ni_t *ni, ksock_conn_t *conn,
+ 	LASSERT(hello->kshm_nips <= LNET_MAX_INTERFACES);
  
- 	rc = cfs_cpt_bind(lnet_cpt_table(), info->ksi_cpt);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set CPT affinity to %d: %d\n",
- 		       info->ksi_cpt, rc);
+ 	/* rely on caller to hold a ref on socket so it wouldn't disappear */
+-	LASSERT(conn->ksnc_proto != NULL);
++	LASSERT(conn->ksnc_proto);
+ 
+ 	hello->kshm_src_nid = ni->ni_nid;
+ 	hello->kshm_dst_nid = peer_nid;
+@@ -1717,7 +1717,7 @@ ksocknal_recv_hello(lnet_ni_t *ni, ksock_conn_t *conn,
+ 	 *	EPROTO     protocol version mismatch
+ 	 */
+ 	struct socket *sock = conn->ksnc_sock;
+-	int active = (conn->ksnc_proto != NULL);
++	int active = !!conn->ksnc_proto;
+ 	int timeout;
+ 	int proto_match;
+ 	int rc;
+@@ -1759,7 +1759,7 @@ ksocknal_recv_hello(lnet_ni_t *ni, ksock_conn_t *conn,
  	}
-@@ -1452,7 +1452,7 @@ int ksocknal_scheduler(void *arg)
- 			LASSERT(conn->ksnc_rx_scheduled);
  
- 			/* Did process_receive get everything it wanted? */
--			if (rc == 0)
-+			if (!rc)
- 				conn->ksnc_rx_ready = 1;
- 
- 			if (conn->ksnc_rx_state == SOCKNAL_RX_PARSE) {
-@@ -1560,7 +1560,7 @@ int ksocknal_scheduler(void *arg)
- 				rc = wait_event_interruptible_exclusive(
- 					sched->kss_waitq,
- 					!ksocknal_sched_cansleep(sched));
--				LASSERT(rc == 0);
-+				LASSERT(!rc);
- 			} else {
- 				cond_resched();
- 			}
-@@ -1636,7 +1636,7 @@ ksocknal_parse_proto_version(ksock_hello_msg_t *hello)
- 	else if (hello->kshm_magic == __swab32(LNET_PROTO_MAGIC))
- 		version = __swab32(hello->kshm_version);
- 
--	if (version != 0) {
-+	if (version) {
- #if SOCKNAL_VERSION_DEBUG
- 		if (*ksocknal_tunables.ksnd_protocol == 1)
- 			return NULL;
-@@ -1731,7 +1731,7 @@ ksocknal_recv_hello(lnet_ni_t *ni, ksock_conn_t *conn,
- 			    lnet_acceptor_timeout();
- 
- 	rc = lnet_sock_read(sock, &hello->kshm_magic, sizeof(hello->kshm_magic), timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading HELLO from %pI4h\n",
- 		       rc, &conn->ksnc_ipaddr);
- 		LASSERT(rc < 0);
-@@ -1751,7 +1751,7 @@ ksocknal_recv_hello(lnet_ni_t *ni, ksock_conn_t *conn,
- 
- 	rc = lnet_sock_read(sock, &hello->kshm_version,
- 			    sizeof(hello->kshm_version), timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading HELLO from %pI4h\n",
- 		       rc, &conn->ksnc_ipaddr);
- 		LASSERT(rc < 0);
-@@ -1785,7 +1785,7 @@ ksocknal_recv_hello(lnet_ni_t *ni, ksock_conn_t *conn,
- 
- 	/* receive the rest of hello message anyway */
- 	rc = conn->ksnc_proto->pro_recv_hello(conn, hello, timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading or checking hello from from %pI4h\n",
- 		       rc, &conn->ksnc_ipaddr);
- 		LASSERT(rc < 0);
-@@ -1879,7 +1879,7 @@ ksocknal_connect(ksock_route_t *route)
- 		 * route got connected while queued
- 		 */
- 		if (peer->ksnp_closing || route->ksnr_deleted ||
--		    wanted == 0) {
-+		    !wanted) {
- 			retry_later = 0;
- 			break;
- 		}
-@@ -1895,14 +1895,14 @@ ksocknal_connect(ksock_route_t *route)
- 		if (retry_later) /* needs reschedule */
- 			break;
- 
--		if ((wanted & (1 << SOCKLND_CONN_ANY)) != 0) {
-+		if (wanted & (1 << SOCKLND_CONN_ANY)) {
- 			type = SOCKLND_CONN_ANY;
--		} else if ((wanted & (1 << SOCKLND_CONN_CONTROL)) != 0) {
-+		} else if (wanted & (1 << SOCKLND_CONN_CONTROL)) {
- 			type = SOCKLND_CONN_CONTROL;
--		} else if ((wanted & (1 << SOCKLND_CONN_BULK_IN)) != 0) {
-+		} else if (wanted & (1 << SOCKLND_CONN_BULK_IN)) {
- 			type = SOCKLND_CONN_BULK_IN;
- 		} else {
--			LASSERT((wanted & (1 << SOCKLND_CONN_BULK_OUT)) != 0);
-+			LASSERT(wanted & (1 << SOCKLND_CONN_BULK_OUT));
- 			type = SOCKLND_CONN_BULK_OUT;
- 		}
- 
-@@ -1919,7 +1919,7 @@ ksocknal_connect(ksock_route_t *route)
- 		rc = lnet_connect(&sock, peer->ksnp_id.nid,
- 				  route->ksnr_myipaddr,
- 				  route->ksnr_ipaddr, route->ksnr_port);
--		if (rc != 0)
-+		if (rc)
- 			goto failed;
- 
- 		rc = ksocknal_create_conn(peer->ksnp_ni, route, sock, type);
-@@ -1934,7 +1934,7 @@ ksocknal_connect(ksock_route_t *route)
- 		 * A +ve RC means I have to retry because I lost the connection
- 		 * race or I have to renegotiate protocol version
- 		 */
--		retry_later = (rc != 0);
-+		retry_later = (rc);
- 		if (retry_later)
- 			CDEBUG(D_NET, "peer %s: conn race, retry later.\n",
- 			       libcfs_nid2str(peer->ksnp_id.nid));
-@@ -1951,7 +1951,7 @@ ksocknal_connect(ksock_route_t *route)
- 		 * the peer's incoming connection request
- 		 */
- 		if (rc == EALREADY ||
--		    (rc == 0 && peer->ksnp_accepting > 0)) {
-+		    (!rc && peer->ksnp_accepting > 0)) {
- 			/*
- 			 * We want to introduce a delay before next
- 			 * attempt to connect if we lost conn race,
-@@ -1985,12 +1985,12 @@ ksocknal_connect(ksock_route_t *route)
- 		min(route->ksnr_retry_interval,
- 		    cfs_time_seconds(*ksocknal_tunables.ksnd_max_reconnectms) / 1000);
- 
--	LASSERT(route->ksnr_retry_interval != 0);
-+	LASSERT(route->ksnr_retry_interval);
- 	route->ksnr_timeout = cfs_time_add(cfs_time_current(),
- 					   route->ksnr_retry_interval);
+ 	proto = ksocknal_parse_proto_version(hello);
+-	if (proto == NULL) {
++	if (!proto) {
+ 		if (!active) {
+ 			/* unknown protocol from peer, tell peer my protocol */
+ 			conn->ksnc_proto = &ksocknal_protocol_v3x;
+@@ -1991,7 +1991,7 @@ ksocknal_connect(ksock_route_t *route)
  
  	if (!list_empty(&peer->ksnp_tx_queue) &&
--	    peer->ksnp_accepting == 0 &&
-+	    !peer->ksnp_accepting &&
- 	    !ksocknal_find_connecting_route_locked(peer)) {
+ 	    peer->ksnp_accepting == 0 &&
+-	    ksocknal_find_connecting_route_locked(peer) == NULL) {
++	    !ksocknal_find_connecting_route_locked(peer)) {
  		ksock_conn_t *conn;
  
-@@ -2078,7 +2078,7 @@ ksocknal_connd_check_start(time64_t sec, long *timeout)
- 	rc = ksocknal_thread_start(ksocknal_connd, NULL, name);
- 
- 	spin_lock_bh(&ksocknal_data.ksnd_connd_lock);
--	if (rc == 0)
-+	if (!rc)
- 		return 1;
- 
- 	/* we tried ... */
-@@ -2145,7 +2145,7 @@ ksocknal_connd_get_route_locked(signed long *timeout_p)
- 	/* connd_routes can contain both pending and ordinary routes */
- 	list_for_each_entry(route, &ksocknal_data.ksnd_connd_routes,
- 			    ksnr_connd_list) {
--		if (route->ksnr_retry_interval == 0 ||
-+		if (!route->ksnr_retry_interval ||
- 		    cfs_time_aftereq(now, route->ksnr_timeout))
- 			return route;
- 
-@@ -2290,7 +2290,7 @@ ksocknal_find_timed_out_conn(ksock_peer_t *peer)
- 		 * some platform (like Darwin8.x)
- 		 */
- 		error = conn->ksnc_sock->sk->sk_err;
--		if (error != 0) {
-+		if (error) {
- 			ksocknal_conn_addref(conn);
- 
- 			switch (error) {
-@@ -2334,7 +2334,7 @@ ksocknal_find_timed_out_conn(ksock_peer_t *peer)
+ 		/*
+@@ -2219,7 +2219,7 @@ ksocknal_connd(void *arg)
+ 		    ksocknal_data.ksnd_connd_running) {
+ 			route = ksocknal_connd_get_route_locked(&timeout);
  		}
+-		if (route != NULL) {
++		if (route) {
+ 			list_del(&route->ksnr_connd_list);
+ 			ksocknal_data.ksnd_connd_connecting++;
+ 			spin_unlock_bh(connd_lock);
+@@ -2407,7 +2407,7 @@ ksocknal_send_keepalive_locked(ksock_peer_t *peer)
+ 	peer->ksnp_send_keepalive = cfs_time_shift(10);
  
- 		if ((!list_empty(&conn->ksnc_tx_queue) ||
--		     conn->ksnc_sock->sk->sk_wmem_queued != 0) &&
-+		     conn->ksnc_sock->sk->sk_wmem_queued) &&
- 		    cfs_time_aftereq(cfs_time_current(),
- 				     conn->ksnc_tx_deadline)) {
- 			/*
-@@ -2429,7 +2429,7 @@ ksocknal_send_keepalive_locked(ksock_peer_t *peer)
+ 	conn = ksocknal_find_conn_locked(peer, NULL, 1);
+-	if (conn != NULL) {
++	if (conn) {
+ 		sched = conn->ksnc_scheduler;
+ 
+ 		spin_lock_bh(&sched->kss_lock);
+@@ -2424,7 +2424,7 @@ ksocknal_send_keepalive_locked(ksock_peer_t *peer)
+ 
+ 	/* cookie = 1 is reserved for keepalive PING */
+ 	tx = ksocknal_alloc_tx_noop(1, 1);
+-	if (tx == NULL) {
++	if (!tx) {
+ 		read_lock(&ksocknal_data.ksnd_global_lock);
  		return -ENOMEM;
  	}
+@@ -2468,7 +2468,7 @@ ksocknal_check_peer_timeouts(int idx)
  
--	if (ksocknal_launch_packet(peer->ksnp_ni, tx, peer->ksnp_id) == 0) {
-+	if (!ksocknal_launch_packet(peer->ksnp_ni, tx, peer->ksnp_id)) {
- 		read_lock(&ksocknal_data.ksnd_global_lock);
- 		return 1;
- 	}
-@@ -2461,7 +2461,7 @@ ksocknal_check_peer_timeouts(int idx)
- 		int resid = 0;
- 		int n = 0;
+ 		conn = ksocknal_find_timed_out_conn(peer);
  
--		if (ksocknal_send_keepalive_locked(peer) != 0) {
-+		if (ksocknal_send_keepalive_locked(peer)) {
+-		if (conn != NULL) {
++		if (conn) {
  			read_unlock(&ksocknal_data.ksnd_global_lock);
- 			goto again;
- 		}
-@@ -2516,7 +2516,7 @@ ksocknal_check_peer_timeouts(int idx)
- 			n++;
- 		}
  
--		if (n == 0) {
-+		if (!n) {
- 			spin_unlock(&peer->ksnp_lock);
- 			continue;
- 		}
-@@ -2639,7 +2639,7 @@ ksocknal_reaper(void *arg)
- 			if (*ksocknal_tunables.ksnd_timeout > n * p)
- 				chunk = (chunk * n * p) /
- 					*ksocknal_tunables.ksnd_timeout;
--			if (chunk == 0)
-+			if (!chunk)
- 				chunk = 1;
- 
- 			for (i = 0; i < chunk; i++) {
-@@ -2651,7 +2651,7 @@ ksocknal_reaper(void *arg)
- 			deadline = cfs_time_add(deadline, cfs_time_seconds(p));
- 		}
- 
--		if (nenomem_conns != 0) {
-+		if (nenomem_conns) {
- 			/*
- 			 * Reduce my timeout if I rescheduled ENOMEM conns.
- 			 * This also prevents me getting woken immediately
+ 			ksocknal_close_conn_and_siblings(conn, -ETIMEDOUT);
 diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
-index 40ce45d..3e1f24e 100644
+index db5662b..40ce45d 100644
 --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
 +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
-@@ -45,13 +45,13 @@ ksocknal_lib_get_conn_addrs(ksock_conn_t *conn)
- 	/* Didn't need the {get,put}connsock dance to deref ksnc_sock... */
- 	LASSERT(!conn->ksnc_closing);
+@@ -126,7 +126,7 @@ ksocknal_lib_send_kiov(ksock_conn_t *conn, ksock_tx_t *tx)
+ 	int nob;
  
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d getting sock peer IP\n", rc);
- 		return rc;
- 	}
- 
- 	rc = lnet_sock_getaddr(conn->ksnc_sock, 0, &conn->ksnc_myipaddr, NULL);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d getting sock local IP\n", rc);
- 		return rc;
- 	}
-@@ -71,7 +71,7 @@ ksocknal_lib_zc_capable(ksock_conn_t *conn)
- 	 * ZC if the socket supports scatter/gather and doesn't need software
- 	 * checksums
- 	 */
--	return ((caps & NETIF_F_SG) != 0 && (caps & NETIF_F_CSUM_MASK) != 0);
-+	return ((caps & NETIF_F_SG) && (caps & NETIF_F_CSUM_MASK));
- }
- 
- int
-@@ -84,7 +84,7 @@ ksocknal_lib_send_iov(ksock_conn_t *conn, ksock_tx_t *tx)
- 	if (*ksocknal_tunables.ksnd_enable_csum	&& /* checksum enabled */
- 	    conn->ksnc_proto == &ksocknal_protocol_v2x && /* V2.x connection  */
- 	    tx->tx_nob == tx->tx_resid		 && /* frist sending    */
--	    tx->tx_msg.ksm_csum == 0)		     /* not checksummed  */
-+	    !tx->tx_msg.ksm_csum)		     /* not checksummed  */
- 		ksocknal_lib_csum_tx(tx);
+ 	/* Not NOOP message */
+-	LASSERT(tx->tx_lnetmsg != NULL);
++	LASSERT(tx->tx_lnetmsg);
  
  	/*
-@@ -132,7 +132,7 @@ ksocknal_lib_send_kiov(ksock_conn_t *conn, ksock_tx_t *tx)
  	 * NB we can't trust socket ops to either consume our iovs
- 	 * or leave them alone.
- 	 */
--	if (tx->tx_msg.ksm_zc_cookies[0] != 0) {
-+	if (tx->tx_msg.ksm_zc_cookies[0]) {
- 		/* Zero copy is enabled */
- 		struct sock *sk = sock->sk;
- 		struct page *page = kiov->kiov_page;
-@@ -245,7 +245,7 @@ ksocknal_lib_recv_iov(ksock_conn_t *conn)
- 		conn->ksnc_msg.ksm_csum = 0;
- 	}
+@@ -147,7 +147,7 @@ ksocknal_lib_send_kiov(ksock_conn_t *conn, ksock_tx_t *tx)
+ 		    fragsize < tx->tx_resid)
+ 			msgflg |= MSG_MORE;
  
--	if (saved_csum != 0) {
-+	if (saved_csum) {
- 		/* accumulate checksum */
- 		for (i = 0, sum = rc; sum > 0; i++, sum -= fragnob) {
- 			LASSERT(i < niov);
-@@ -290,7 +290,7 @@ ksocknal_lib_kiov_vmap(lnet_kiov_t *kiov, int niov,
- 		return NULL;
- 
- 	for (nob = i = 0; i < niov; i++) {
--		if ((kiov[i].kiov_offset != 0 && i > 0) ||
-+		if ((kiov[i].kiov_offset && i > 0) ||
- 		    (kiov[i].kiov_offset + kiov[i].kiov_len != PAGE_CACHE_SIZE && i < niov - 1))
- 			return NULL;
- 
-@@ -360,7 +360,7 @@ ksocknal_lib_recv_kiov(ksock_conn_t *conn)
- 	rc = kernel_recvmsg(conn->ksnc_sock, &msg, (struct kvec *)scratchiov,
- 			    n, nob, MSG_DONTWAIT);
- 
--	if (conn->ksnc_msg.ksm_csum != 0) {
-+	if (conn->ksnc_msg.ksm_csum) {
- 		for (i = 0, sum = rc; sum > 0; i++, sum -= fragnob) {
- 			LASSERT(i < niov);
- 
-@@ -439,14 +439,14 @@ ksocknal_lib_get_conn_tunables(ksock_conn_t *conn, int *txmem, int *rxmem, int *
- 	int rc;
- 
- 	rc = ksocknal_connsock_addref(conn);
--	if (rc != 0) {
-+	if (rc) {
- 		LASSERT(conn->ksnc_closing);
- 		*txmem = *rxmem = *nagle = 0;
- 		return -ESHUTDOWN;
- 	}
- 
- 	rc = lnet_sock_getbuf(sock, txmem, rxmem);
--	if (rc == 0) {
-+	if (!rc) {
- 		len = sizeof(*nagle);
- 		rc = kernel_getsockopt(sock, SOL_TCP, TCP_NODELAY,
- 				       (char *)nagle, &len);
-@@ -454,7 +454,7 @@ ksocknal_lib_get_conn_tunables(ksock_conn_t *conn, int *txmem, int *rxmem, int *
- 
- 	ksocknal_connsock_decref(conn);
- 
--	if (rc == 0)
-+	if (!rc)
- 		*nagle = !*nagle;
- 	else
- 		*txmem = *rxmem = *nagle = 0;
-@@ -484,7 +484,7 @@ ksocknal_lib_setup_sock(struct socket *sock)
- 
- 	rc = kernel_setsockopt(sock, SOL_SOCKET, SO_LINGER, (char *)&linger,
- 			       sizeof(linger));
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set SO_LINGER: %d\n", rc);
- 		return rc;
- 	}
-@@ -492,7 +492,7 @@ ksocknal_lib_setup_sock(struct socket *sock)
- 	option = -1;
- 	rc = kernel_setsockopt(sock, SOL_TCP, TCP_LINGER2, (char *)&option,
- 			       sizeof(option));
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set SO_LINGER2: %d\n", rc);
- 		return rc;
- 	}
-@@ -502,7 +502,7 @@ ksocknal_lib_setup_sock(struct socket *sock)
- 
- 		rc = kernel_setsockopt(sock, SOL_TCP, TCP_NODELAY,
- 				       (char *)&option, sizeof(option));
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't disable nagle: %d\n", rc);
- 			return rc;
- 		}
-@@ -510,7 +510,7 @@ ksocknal_lib_setup_sock(struct socket *sock)
- 
- 	rc = lnet_sock_setbuf(sock, *ksocknal_tunables.ksnd_tx_buffer_size,
- 			      *ksocknal_tunables.ksnd_rx_buffer_size);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set buffer tx %d, rx %d buffers: %d\n",
- 		       *ksocknal_tunables.ksnd_tx_buffer_size,
- 		       *ksocknal_tunables.ksnd_rx_buffer_size, rc);
-@@ -529,7 +529,7 @@ ksocknal_lib_setup_sock(struct socket *sock)
- 	option = (do_keepalive ? 1 : 0);
- 	rc = kernel_setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *)&option,
- 			       sizeof(option));
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set SO_KEEPALIVE: %d\n", rc);
- 		return rc;
- 	}
-@@ -539,21 +539,21 @@ ksocknal_lib_setup_sock(struct socket *sock)
- 
- 	rc = kernel_setsockopt(sock, SOL_TCP, TCP_KEEPIDLE, (char *)&keep_idle,
- 			       sizeof(keep_idle));
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set TCP_KEEPIDLE: %d\n", rc);
- 		return rc;
- 	}
- 
- 	rc = kernel_setsockopt(sock, SOL_TCP, TCP_KEEPINTVL,
- 			       (char *)&keep_intvl, sizeof(keep_intvl));
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set TCP_KEEPINTVL: %d\n", rc);
- 		return rc;
- 	}
- 
- 	rc = kernel_setsockopt(sock, SOL_TCP, TCP_KEEPCNT, (char *)&keep_count,
- 			       sizeof(keep_count));
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set TCP_KEEPCNT: %d\n", rc);
- 		return rc;
- 	}
-@@ -571,7 +571,7 @@ ksocknal_lib_push_conn(ksock_conn_t *conn)
- 	int rc;
- 
- 	rc = ksocknal_connsock_addref(conn);
--	if (rc != 0)			    /* being shut down */
-+	if (rc)			    /* being shut down */
+-		if (sk->sk_prot->sendpage != NULL) {
++		if (sk->sk_prot->sendpage) {
+ 			rc = sk->sk_prot->sendpage(sk, page,
+ 						   offset, fragsize, msgflg);
+ 		} else {
+@@ -266,7 +266,7 @@ ksocknal_lib_recv_iov(ksock_conn_t *conn)
+ static void
+ ksocknal_lib_kiov_vunmap(void *addr)
+ {
+-	if (addr == NULL)
++	if (!addr)
  		return;
  
- 	sk = conn->ksnc_sock->sk;
-@@ -584,7 +584,7 @@ ksocknal_lib_push_conn(ksock_conn_t *conn)
+ 	vunmap(addr);
+@@ -280,7 +280,7 @@ ksocknal_lib_kiov_vmap(lnet_kiov_t *kiov, int niov,
+ 	int nob;
+ 	int i;
  
- 	rc = kernel_setsockopt(conn->ksnc_sock, SOL_TCP, TCP_NODELAY,
- 			       (char *)&val, sizeof(val));
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
+-	if (!*ksocknal_tunables.ksnd_zc_recv || pages == NULL)
++	if (!*ksocknal_tunables.ksnd_zc_recv || !pages)
+ 		return NULL;
  
- 	lock_sock(sk);
- 	tp->nonagle = nonagle;
+ 	LASSERT(niov <= LNET_MAX_IOV);
+@@ -299,7 +299,7 @@ ksocknal_lib_kiov_vmap(lnet_kiov_t *kiov, int niov,
+ 	}
+ 
+ 	addr = vmap(pages, niov, VM_MAP, PAGE_KERNEL);
+-	if (addr == NULL)
++	if (!addr)
+ 		return NULL;
+ 
+ 	iov->iov_base = addr + kiov[0].kiov_offset;
+@@ -342,7 +342,7 @@ ksocknal_lib_recv_kiov(ksock_conn_t *conn)
+ 	 * or leave them alone.
+ 	 */
+ 	addr = ksocknal_lib_kiov_vmap(kiov, niov, scratchiov, pages);
+-	if (addr != NULL) {
++	if (addr) {
+ 		nob = scratchiov[0].iov_len;
+ 		n = 1;
+ 
+@@ -382,7 +382,7 @@ ksocknal_lib_recv_kiov(ksock_conn_t *conn)
+ 		}
+ 	}
+ 
+-	if (addr != NULL) {
++	if (addr) {
+ 		ksocknal_lib_kiov_vunmap(addr);
+ 	} else {
+ 		for (i = 0; i < niov; i++)
+@@ -400,7 +400,7 @@ ksocknal_lib_csum_tx(ksock_tx_t *tx)
+ 	void *base;
+ 
+ 	LASSERT(tx->tx_iov[0].iov_base == &tx->tx_msg);
+-	LASSERT(tx->tx_conn != NULL);
++	LASSERT(tx->tx_conn);
+ 	LASSERT(tx->tx_conn->ksnc_proto == &ksocknal_protocol_v2x);
+ 
+ 	tx->tx_msg.ksm_csum = 0;
+@@ -408,7 +408,7 @@ ksocknal_lib_csum_tx(ksock_tx_t *tx)
+ 	csum = ksocknal_csum(~0, tx->tx_iov[0].iov_base,
+ 			     tx->tx_iov[0].iov_len);
+ 
+-	if (tx->tx_kiov != NULL) {
++	if (tx->tx_kiov) {
+ 		for (i = 0; i < tx->tx_nkiov; i++) {
+ 			base = kmap(tx->tx_kiov[i].kiov_page) +
+ 			       tx->tx_kiov[i].kiov_offset;
+@@ -606,7 +606,7 @@ ksocknal_data_ready(struct sock *sk)
+ 	read_lock(&ksocknal_data.ksnd_global_lock);
+ 
+ 	conn = sk->sk_user_data;
+-	if (conn == NULL) {	     /* raced with ksocknal_terminate_conn */
++	if (!conn) {	     /* raced with ksocknal_terminate_conn */
+ 		LASSERT(sk->sk_data_ready != &ksocknal_data_ready);
+ 		sk->sk_data_ready(sk);
+ 	} else {
+@@ -633,14 +633,14 @@ ksocknal_write_space(struct sock *sk)
+ 
+ 	CDEBUG(D_NET, "sk %p wspace %d low water %d conn %p%s%s%s\n",
+ 	       sk, wspace, min_wpace, conn,
+-	       (conn == NULL) ? "" : (conn->ksnc_tx_ready ?
++	       !conn ? "" : (conn->ksnc_tx_ready ?
+ 				      " ready" : " blocked"),
+-	       (conn == NULL) ? "" : (conn->ksnc_tx_scheduled ?
++	       !conn ? "" : (conn->ksnc_tx_scheduled ?
+ 				      " scheduled" : " idle"),
+-	       (conn == NULL) ? "" : (list_empty(&conn->ksnc_tx_queue) ?
++	       !conn ? "" : (list_empty(&conn->ksnc_tx_queue) ?
+ 				      " empty" : " queued"));
+ 
+-	if (conn == NULL) {	     /* raced with ksocknal_terminate_conn */
++	if (!conn) {	     /* raced with ksocknal_terminate_conn */
+ 		LASSERT(sk->sk_write_space != &ksocknal_write_space);
+ 		sk->sk_write_space(sk);
+ 
 diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-index d504685..70910ed 100644
+index 041f972..d504685 100644
 --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
 +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-@@ -103,7 +103,7 @@ ksocknal_queue_tx_zcack_v2(ksock_conn_t *conn,
- 	}
+@@ -56,7 +56,7 @@ ksocknal_next_tx_carrier(ksock_conn_t *conn)
  
+ 	/* Called holding BH lock: conn->ksnc_scheduler->kss_lock */
+ 	LASSERT(!list_empty(&conn->ksnc_tx_queue));
+-	LASSERT(tx != NULL);
++	LASSERT(tx);
+ 
+ 	/* Next TX that can carry ZC-ACK or LNet message */
+ 	if (tx->tx_list.next == &conn->ksnc_tx_queue) {
+@@ -75,7 +75,7 @@ ksocknal_queue_tx_zcack_v2(ksock_conn_t *conn,
+ {
+ 	ksock_tx_t *tx = conn->ksnc_tx_carrier;
+ 
+-	LASSERT(tx_ack == NULL ||
++	LASSERT(!tx_ack ||
+ 		tx_ack->tx_msg.ksm_type == KSOCK_MSG_NOOP);
+ 
+ 	/*
+@@ -85,8 +85,8 @@ ksocknal_queue_tx_zcack_v2(ksock_conn_t *conn,
+ 	 * . There is tx can piggyback cookie of tx_ack (or cookie),
+ 	 *   piggyback the cookie and return the tx.
+ 	 */
+-	if (tx == NULL) {
+-		if (tx_ack != NULL) {
++	if (!tx) {
++		if (tx_ack) {
+ 			list_add_tail(&tx_ack->tx_list,
+ 				      &conn->ksnc_tx_queue);
+ 			conn->ksnc_tx_carrier = tx_ack;
+@@ -96,7 +96,7 @@ ksocknal_queue_tx_zcack_v2(ksock_conn_t *conn,
+ 
+ 	if (tx->tx_msg.ksm_type == KSOCK_MSG_NOOP) {
+ 		/* tx is noop zc-ack, can't piggyback zc-ack cookie */
+-		if (tx_ack != NULL)
++		if (tx_ack)
+ 			list_add_tail(&tx_ack->tx_list,
+ 				      &conn->ksnc_tx_queue);
+ 		return 0;
+@@ -105,7 +105,7 @@ ksocknal_queue_tx_zcack_v2(ksock_conn_t *conn,
  	LASSERT(tx->tx_msg.ksm_type == KSOCK_MSG_LNET);
--	LASSERT(tx->tx_msg.ksm_zc_cookies[1] == 0);
-+	LASSERT(!tx->tx_msg.ksm_zc_cookies[1]);
+ 	LASSERT(tx->tx_msg.ksm_zc_cookies[1] == 0);
  
- 	if (tx_ack)
+-	if (tx_ack != NULL)
++	if (tx_ack)
  		cookie = tx_ack->tx_msg.ksm_zc_cookies[1];
-@@ -185,7 +185,7 @@ ksocknal_queue_tx_zcack_v3(ksock_conn_t *conn,
  
- 	if (tx->tx_msg.ksm_zc_cookies[1] == SOCKNAL_KEEPALIVE_PING) {
- 		/* replace the keepalive PING with a real ACK */
--		LASSERT(tx->tx_msg.ksm_zc_cookies[0] == 0);
-+		LASSERT(!tx->tx_msg.ksm_zc_cookies[0]);
- 		tx->tx_msg.ksm_zc_cookies[1] = cookie;
- 		return 1;
+ 	/* piggyback the zc-ack cookie */
+@@ -128,7 +128,7 @@ ksocknal_queue_tx_msg_v2(ksock_conn_t *conn, ksock_tx_t *tx_msg)
+ 	 * . If there is NOOP on the connection, piggyback the cookie
+ 	 *   and replace the NOOP tx, and return the NOOP tx.
+ 	 */
+-	if (tx == NULL) { /* nothing on queue */
++	if (!tx) { /* nothing on queue */
+ 		list_add_tail(&tx_msg->tx_list, &conn->ksnc_tx_queue);
+ 		conn->ksnc_tx_carrier = tx_msg;
+ 		return NULL;
+@@ -162,12 +162,12 @@ ksocknal_queue_tx_zcack_v3(ksock_conn_t *conn,
+ 		return ksocknal_queue_tx_zcack_v2(conn, tx_ack, cookie);
+ 
+ 	/* non-blocking ZC-ACK (to router) */
+-	LASSERT(tx_ack == NULL ||
++	LASSERT(!tx_ack ||
+ 		tx_ack->tx_msg.ksm_type == KSOCK_MSG_NOOP);
+ 
+ 	tx = conn->ksnc_tx_carrier;
+-	if (tx == NULL) {
+-		if (tx_ack != NULL) {
++	if (!tx) {
++		if (tx_ack) {
+ 			list_add_tail(&tx_ack->tx_list,
+ 				      &conn->ksnc_tx_queue);
+ 			conn->ksnc_tx_carrier = tx_ack;
+@@ -175,9 +175,9 @@ ksocknal_queue_tx_zcack_v3(ksock_conn_t *conn,
+ 		return 0;
  	}
-@@ -197,7 +197,7 @@ ksocknal_queue_tx_zcack_v3(ksock_conn_t *conn,
- 		return 1; /* XXX return error in the future */
+ 
+-	/* conn->ksnc_tx_carrier != NULL */
++	/* conn->ksnc_tx_carrier */
+ 
+-	if (tx_ack != NULL)
++	if (tx_ack)
+ 		cookie = tx_ack->tx_msg.ksm_zc_cookies[1];
+ 
+ 	if (cookie == SOCKNAL_KEEPALIVE_PING) /* ignore keepalive PING */
+@@ -261,7 +261,7 @@ ksocknal_queue_tx_zcack_v3(ksock_conn_t *conn,
  	}
  
--	if (tx->tx_msg.ksm_zc_cookies[0] == 0) {
-+	if (!tx->tx_msg.ksm_zc_cookies[0]) {
- 		/* NOOP tx has only one ZC-ACK cookie, can carry at least one more */
- 		if (tx->tx_msg.ksm_zc_cookies[1] > cookie) {
- 			tx->tx_msg.ksm_zc_cookies[0] = tx->tx_msg.ksm_zc_cookies[1];
-@@ -233,7 +233,7 @@ ksocknal_queue_tx_zcack_v3(ksock_conn_t *conn,
- 			tmp = tx->tx_msg.ksm_zc_cookies[0];
- 		}
+ 	/* failed to piggyback ZC-ACK */
+-	if (tx_ack != NULL) {
++	if (tx_ack) {
+ 		list_add_tail(&tx_ack->tx_list, &conn->ksnc_tx_queue);
+ 		/* the next tx can piggyback at least 1 ACK */
+ 		ksocknal_next_tx_carrier(conn);
+@@ -280,7 +280,7 @@ ksocknal_match_tx(ksock_conn_t *conn, ksock_tx_t *tx, int nonblk)
+ 		return SOCKNAL_MATCH_YES;
+ #endif
  
--		if (tmp != 0) {
-+		if (tmp) {
- 			/* range of cookies */
- 			tx->tx_msg.ksm_zc_cookies[0] = tmp - 1;
- 			tx->tx_msg.ksm_zc_cookies[1] = tmp + 1;
-@@ -394,7 +394,7 @@ ksocknal_handle_zcreq(ksock_conn_t *c, __u64 cookie, int remote)
+-	if (tx == NULL || tx->tx_lnetmsg == NULL) {
++	if (!tx || !tx->tx_lnetmsg) {
+ 		/* noop packet */
+ 		nob = offsetof(ksock_msg_t, ksm_u);
+ 	} else {
+@@ -319,7 +319,7 @@ ksocknal_match_tx_v3(ksock_conn_t *conn, ksock_tx_t *tx, int nonblk)
+ {
+ 	int nob;
+ 
+-	if (tx == NULL || tx->tx_lnetmsg == NULL)
++	if (!tx || !tx->tx_lnetmsg)
+ 		nob = offsetof(ksock_msg_t, ksm_u);
+ 	else
+ 		nob = tx->tx_lnetmsg->msg_len + sizeof(ksock_msg_t);
+@@ -334,7 +334,7 @@ ksocknal_match_tx_v3(ksock_conn_t *conn, ksock_tx_t *tx, int nonblk)
+ 	case SOCKLND_CONN_ACK:
+ 		if (nonblk)
+ 			return SOCKNAL_MATCH_YES;
+-		else if (tx == NULL || tx->tx_lnetmsg == NULL)
++		else if (!tx || !tx->tx_lnetmsg)
+ 			return SOCKNAL_MATCH_MAY;
+ 		else
+ 			return SOCKNAL_MATCH_NO;
+@@ -369,10 +369,10 @@ ksocknal_handle_zcreq(ksock_conn_t *c, __u64 cookie, int remote)
+ 	read_lock(&ksocknal_data.ksnd_global_lock);
+ 
+ 	conn = ksocknal_find_conn_locked(peer, NULL, !!remote);
+-	if (conn != NULL) {
++	if (conn) {
+ 		ksock_sched_t *sched = conn->ksnc_scheduler;
+ 
+-		LASSERT(conn->ksnc_proto->pro_queue_tx_zcack != NULL);
++		LASSERT(conn->ksnc_proto->pro_queue_tx_zcack);
+ 
+ 		spin_lock_bh(&sched->kss_lock);
+ 
+@@ -390,7 +390,7 @@ ksocknal_handle_zcreq(ksock_conn_t *c, __u64 cookie, int remote)
+ 
+ 	/* ACK connection is not ready, or can't piggyback the ACK */
+ 	tx = ksocknal_alloc_tx_noop(cookie, !!remote);
+-	if (tx == NULL)
++	if (!tx)
  		return -ENOMEM;
  
  	rc = ksocknal_launch_packet(peer->ksnp_ni, tx, peer->ksnp_id);
--	if (rc == 0)
-+	if (!rc)
- 		return 0;
+@@ -461,7 +461,7 @@ ksocknal_send_hello_v1(ksock_conn_t *conn, ksock_hello_msg_t *hello)
+ 	CLASSERT(sizeof(lnet_magicversion_t) == offsetof(lnet_hdr_t, src_nid));
  
- 	ksocknal_free_tx(tx);
-@@ -411,7 +411,7 @@ ksocknal_handle_zcack(ksock_conn_t *conn, __u64 cookie1, __u64 cookie2)
- 	LIST_HEAD(zlist);
- 	int count;
- 
--	if (cookie1 == 0)
-+	if (!cookie1)
- 		cookie1 = cookie2;
- 
- 	count = (cookie1 > cookie2) ? 2 : (cookie2 - cookie1 + 1);
-@@ -433,7 +433,7 @@ ksocknal_handle_zcack(ksock_conn_t *conn, __u64 cookie1, __u64 cookie2)
- 			list_del(&tx->tx_zc_list);
- 			list_add(&tx->tx_zc_list, &zlist);
- 
--			if (--count == 0)
-+			if (!--count)
- 				break;
- 		}
+ 	LIBCFS_ALLOC(hdr, sizeof(*hdr));
+-	if (hdr == NULL) {
++	if (!hdr) {
+ 		CERROR("Can't allocate lnet_hdr_t\n");
+ 		return -ENOMEM;
  	}
-@@ -446,7 +446,7 @@ ksocknal_handle_zcack(ksock_conn_t *conn, __u64 cookie1, __u64 cookie2)
- 		ksocknal_tx_decref(tx);
- 	}
- 
--	return count == 0 ? 0 : -EPROTO;
-+	return !count ? 0 : -EPROTO;
- }
- 
- static int
-@@ -476,14 +476,14 @@ ksocknal_send_hello_v1(ksock_conn_t *conn, ksock_hello_msg_t *hello)
- 	hmv->version_major = cpu_to_le16(KSOCK_PROTO_V1_MAJOR);
- 	hmv->version_minor = cpu_to_le16(KSOCK_PROTO_V1_MINOR);
- 
--	if (the_lnet.ln_testprotocompat != 0) {
-+	if (the_lnet.ln_testprotocompat) {
- 		/* single-shot proto check */
- 		LNET_LOCK();
--		if ((the_lnet.ln_testprotocompat & 1) != 0) {
-+		if (the_lnet.ln_testprotocompat & 1) {
- 			hmv->version_major++;   /* just different! */
- 			the_lnet.ln_testprotocompat &= ~1;
- 		}
--		if ((the_lnet.ln_testprotocompat & 2) != 0) {
-+		if (the_lnet.ln_testprotocompat & 2) {
- 			hmv->magic = LNET_PROTO_MAGIC;
- 			the_lnet.ln_testprotocompat &= ~2;
- 		}
-@@ -498,13 +498,13 @@ ksocknal_send_hello_v1(ksock_conn_t *conn, ksock_hello_msg_t *hello)
- 	hdr->msg.hello.incarnation = cpu_to_le64(hello->kshm_src_incarnation);
- 
- 	rc = lnet_sock_write(sock, hdr, sizeof(*hdr), lnet_acceptor_timeout());
--	if (rc != 0) {
-+	if (rc) {
- 		CNETERR("Error %d sending HELLO hdr to %pI4h/%d\n",
- 			rc, &conn->ksnc_ipaddr, conn->ksnc_port);
- 		goto out;
- 	}
- 
--	if (hello->kshm_nips == 0)
-+	if (!hello->kshm_nips)
- 		goto out;
- 
- 	for (i = 0; i < (int) hello->kshm_nips; i++)
-@@ -513,7 +513,7 @@ ksocknal_send_hello_v1(ksock_conn_t *conn, ksock_hello_msg_t *hello)
- 	rc = lnet_sock_write(sock, hello->kshm_ips,
- 			     hello->kshm_nips * sizeof(__u32),
- 			     lnet_acceptor_timeout());
--	if (rc != 0) {
-+	if (rc) {
- 		CNETERR("Error %d sending HELLO payload (%d) to %pI4h/%d\n",
- 			rc, hello->kshm_nips,
- 			&conn->ksnc_ipaddr, conn->ksnc_port);
-@@ -533,10 +533,10 @@ ksocknal_send_hello_v2(ksock_conn_t *conn, ksock_hello_msg_t *hello)
- 	hello->kshm_magic   = LNET_PROTO_MAGIC;
- 	hello->kshm_version = conn->ksnc_proto->pro_version;
- 
--	if (the_lnet.ln_testprotocompat != 0) {
-+	if (the_lnet.ln_testprotocompat) {
- 		/* single-shot proto check */
- 		LNET_LOCK();
--		if ((the_lnet.ln_testprotocompat & 1) != 0) {
-+		if (the_lnet.ln_testprotocompat & 1) {
- 			hello->kshm_version++;   /* just different! */
- 			the_lnet.ln_testprotocompat &= ~1;
- 		}
-@@ -545,19 +545,19 @@ ksocknal_send_hello_v2(ksock_conn_t *conn, ksock_hello_msg_t *hello)
- 
- 	rc = lnet_sock_write(sock, hello, offsetof(ksock_hello_msg_t, kshm_ips),
- 			     lnet_acceptor_timeout());
--	if (rc != 0) {
-+	if (rc) {
- 		CNETERR("Error %d sending HELLO hdr to %pI4h/%d\n",
- 			rc, &conn->ksnc_ipaddr, conn->ksnc_port);
- 		return rc;
- 	}
- 
--	if (hello->kshm_nips == 0)
-+	if (!hello->kshm_nips)
- 		return 0;
- 
- 	rc = lnet_sock_write(sock, hello->kshm_ips,
- 			     hello->kshm_nips * sizeof(__u32),
- 			     lnet_acceptor_timeout());
--	if (rc != 0) {
-+	if (rc) {
- 		CNETERR("Error %d sending HELLO payload (%d) to %pI4h/%d\n",
- 			rc, hello->kshm_nips,
- 			&conn->ksnc_ipaddr, conn->ksnc_port);
-@@ -584,7 +584,7 @@ ksocknal_recv_hello_v1(ksock_conn_t *conn, ksock_hello_msg_t *hello,
- 	rc = lnet_sock_read(sock, &hdr->src_nid,
- 			    sizeof(*hdr) - offsetof(lnet_hdr_t, src_nid),
- 			    timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading rest of HELLO hdr from %pI4h\n",
- 		       rc, &conn->ksnc_ipaddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
-@@ -614,12 +614,12 @@ ksocknal_recv_hello_v1(ksock_conn_t *conn, ksock_hello_msg_t *hello,
- 		goto out;
- 	}
- 
--	if (hello->kshm_nips == 0)
-+	if (!hello->kshm_nips)
- 		goto out;
- 
- 	rc = lnet_sock_read(sock, hello->kshm_ips,
- 			    hello->kshm_nips * sizeof(__u32), timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading IPs from ip %pI4h\n",
- 		       rc, &conn->ksnc_ipaddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
-@@ -629,7 +629,7 @@ ksocknal_recv_hello_v1(ksock_conn_t *conn, ksock_hello_msg_t *hello,
- 	for (i = 0; i < (int) hello->kshm_nips; i++) {
- 		hello->kshm_ips[i] = __le32_to_cpu(hello->kshm_ips[i]);
- 
--		if (hello->kshm_ips[i] == 0) {
-+		if (!hello->kshm_ips[i]) {
- 			CERROR("Zero IP[%d] from ip %pI4h\n",
- 			       i, &conn->ksnc_ipaddr);
- 			rc = -EPROTO;
-@@ -658,7 +658,7 @@ ksocknal_recv_hello_v2(ksock_conn_t *conn, ksock_hello_msg_t *hello, int timeout
- 			    offsetof(ksock_hello_msg_t, kshm_ips) -
- 				     offsetof(ksock_hello_msg_t, kshm_src_nid),
- 			    timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading HELLO from %pI4h\n",
- 		       rc, &conn->ksnc_ipaddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
-@@ -682,12 +682,12 @@ ksocknal_recv_hello_v2(ksock_conn_t *conn, ksock_hello_msg_t *hello, int timeout
- 		return -EPROTO;
- 	}
- 
--	if (hello->kshm_nips == 0)
-+	if (!hello->kshm_nips)
- 		return 0;
- 
- 	rc = lnet_sock_read(sock, hello->kshm_ips,
- 			    hello->kshm_nips * sizeof(__u32), timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading IPs from ip %pI4h\n",
- 		       rc, &conn->ksnc_ipaddr);
- 		LASSERT(rc < 0 && rc != -EALREADY);
-@@ -698,7 +698,7 @@ ksocknal_recv_hello_v2(ksock_conn_t *conn, ksock_hello_msg_t *hello, int timeout
- 		if (conn->ksnc_flip)
- 			__swab32s(&hello->kshm_ips[i]);
- 
--		if (hello->kshm_ips[i] == 0) {
-+		if (!hello->kshm_ips[i]) {
- 			CERROR("Zero IP[%d] from ip %pI4h\n",
- 			       i, &conn->ksnc_ipaddr);
- 			return -EPROTO;
-diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
-index ef61eaf..e5f24ff 100644
---- a/drivers/staging/lustre/lnet/lnet/acceptor.c
-+++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
-@@ -159,7 +159,7 @@ lnet_connect(struct socket **sockp, lnet_nid_t peer_nid,
- 
- 		rc = lnet_sock_connect(&sock, &fatal, local_ip, port, peer_ip,
- 				       peer_port);
--		if (rc != 0) {
-+		if (rc) {
- 			if (fatal)
- 				goto failed;
- 			continue;
-@@ -171,14 +171,14 @@ lnet_connect(struct socket **sockp, lnet_nid_t peer_nid,
- 		cr.acr_version = LNET_PROTO_ACCEPTOR_VERSION;
- 		cr.acr_nid     = peer_nid;
- 
--		if (the_lnet.ln_testprotocompat != 0) {
-+		if (the_lnet.ln_testprotocompat) {
- 			/* single-shot proto check */
- 			lnet_net_lock(LNET_LOCK_EX);
--			if ((the_lnet.ln_testprotocompat & 4) != 0) {
-+			if (the_lnet.ln_testprotocompat & 4) {
- 				cr.acr_version++;
- 				the_lnet.ln_testprotocompat &= ~4;
- 			}
--			if ((the_lnet.ln_testprotocompat & 8) != 0) {
-+			if (the_lnet.ln_testprotocompat & 8) {
- 				cr.acr_magic = LNET_PROTO_MAGIC;
- 				the_lnet.ln_testprotocompat &= ~8;
- 			}
-@@ -186,7 +186,7 @@ lnet_connect(struct socket **sockp, lnet_nid_t peer_nid,
- 		}
- 
- 		rc = lnet_sock_write(sock, &cr, sizeof(cr), accept_timeout);
--		if (rc != 0)
-+		if (rc)
- 			goto failed_sock;
- 
- 		*sockp = sock;
-@@ -220,7 +220,7 @@ lnet_accept(struct socket *sock, __u32 magic)
- 	LASSERT(sizeof(cr) <= 16);	     /* not too big for the stack */
- 
- 	rc = lnet_sock_getaddr(sock, 1, &peer_ip, &peer_port);
--	LASSERT(rc == 0);		      /* we succeeded before */
-+	LASSERT(!rc);		      /* we succeeded before */
- 
- 	if (!lnet_accept_magic(magic, LNET_PROTO_ACCEPTOR_MAGIC)) {
- 		if (lnet_accept_magic(magic, LNET_PROTO_MAGIC)) {
-@@ -236,7 +236,7 @@ lnet_accept(struct socket *sock, __u32 magic)
- 			rc = lnet_sock_write(sock, &cr, sizeof(cr),
- 					     accept_timeout);
- 
--			if (rc != 0)
-+			if (rc)
- 				CERROR("Error sending magic+version in response to LNET magic from %pI4h: %d\n",
- 				       &peer_ip, rc);
- 			return -EPROTO;
-@@ -256,7 +256,7 @@ lnet_accept(struct socket *sock, __u32 magic)
- 
- 	rc = lnet_sock_read(sock, &cr.acr_version, sizeof(cr.acr_version),
- 			    accept_timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading connection request version from %pI4h\n",
- 		       rc, &peer_ip);
- 		return -EIO;
-@@ -279,7 +279,7 @@ lnet_accept(struct socket *sock, __u32 magic)
- 		cr.acr_version = LNET_PROTO_ACCEPTOR_VERSION;
- 
- 		rc = lnet_sock_write(sock, &cr, sizeof(cr), accept_timeout);
--		if (rc != 0)
-+		if (rc)
- 			CERROR("Error sending magic+version in response to version %d from %pI4h: %d\n",
- 			       peer_version, &peer_ip, rc);
- 		return -EPROTO;
-@@ -289,7 +289,7 @@ lnet_accept(struct socket *sock, __u32 magic)
- 			    sizeof(cr) -
- 			    offsetof(lnet_acceptor_connreq_t, acr_nid),
- 			    accept_timeout);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d reading connection request from %pI4h\n",
- 		       rc, &peer_ip);
- 		return -EIO;
-@@ -341,7 +341,7 @@ lnet_acceptor(void *arg)
- 
- 	rc = lnet_sock_listen(&lnet_acceptor_state.pta_sock, 0, accept_port,
- 			      accept_backlog);
--	if (rc != 0) {
-+	if (rc) {
- 		if (rc == -EADDRINUSE)
- 			LCONSOLE_ERROR_MSG(0x122, "Can't start acceptor on port %d: port already in use\n",
- 					   accept_port);
-@@ -358,12 +358,12 @@ lnet_acceptor(void *arg)
- 	lnet_acceptor_state.pta_shutdown = rc;
- 	complete(&lnet_acceptor_state.pta_signal);
- 
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	while (!lnet_acceptor_state.pta_shutdown) {
- 		rc = lnet_sock_accept(&newsock, lnet_acceptor_state.pta_sock);
--		if (rc != 0) {
-+		if (rc) {
- 			if (rc != -EAGAIN) {
- 				CWARN("Accept error %d: pausing...\n", rc);
- 				set_current_state(TASK_UNINTERRUPTIBLE);
-@@ -379,7 +379,7 @@ lnet_acceptor(void *arg)
- 		}
- 
- 		rc = lnet_sock_getaddr(newsock, 1, &peer_ip, &peer_port);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't determine new connection's address\n");
- 			goto failed;
- 		}
-@@ -392,14 +392,14 @@ lnet_acceptor(void *arg)
- 
- 		rc = lnet_sock_read(newsock, &magic, sizeof(magic),
- 				    accept_timeout);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Error %d reading connection request from %pI4h\n",
- 			       rc, &peer_ip);
- 			goto failed;
- 		}
- 
- 		rc = lnet_accept(newsock, magic);
--		if (rc != 0)
-+		if (rc)
- 			goto failed;
- 
- 		continue;
-@@ -446,7 +446,7 @@ lnet_acceptor_start(void)
- 	LASSERT(!lnet_acceptor_state.pta_sock);
- 
- 	rc = lnet_acceptor_get_tunables();
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	init_completion(&lnet_acceptor_state.pta_signal);
-@@ -454,7 +454,7 @@ lnet_acceptor_start(void)
- 	if (rc <= 0)
- 		return rc;
- 
--	if (lnet_count_acceptor_nis() == 0)  /* not required */
-+	if (!lnet_count_acceptor_nis())  /* not required */
- 		return 0;
- 
- 	rc2 = PTR_ERR(kthread_run(lnet_acceptor,
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index eb04958..58b30f1 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -76,17 +76,17 @@ lnet_get_networks(void)
- 	char *nets;
- 	int rc;
- 
--	if (*networks != 0 && *ip2nets != 0) {
-+	if (*networks && *ip2nets) {
- 		LCONSOLE_ERROR_MSG(0x101, "Please specify EITHER 'networks' or 'ip2nets' but not both@once\n");
- 		return NULL;
- 	}
- 
--	if (*ip2nets != 0) {
-+	if (*ip2nets) {
- 		rc = lnet_parse_ip2nets(&nets, ip2nets);
--		return (rc == 0) ? nets : NULL;
-+		return !rc ? nets : NULL;
- 	}
- 
--	if (*networks != 0)
-+	if (*networks)
- 		return networks;
- 
- 	return "tcp";
-@@ -309,7 +309,7 @@ lnet_unregister_lnd(lnd_t *lnd)
- 
- 	LASSERT(the_lnet.ln_init);
- 	LASSERT(lnet_find_lnd_by_type(lnd->lnd_type) == lnd);
--	LASSERT(lnd->lnd_refcount == 0);
-+	LASSERT(!lnd->lnd_refcount);
- 
- 	list_del(&lnd->lnd_list);
- 	CDEBUG(D_NET, "%s LND unregistered\n", libcfs_lnd2str(lnd->lnd_type));
-@@ -379,7 +379,7 @@ lnet_res_container_cleanup(struct lnet_res_container *rec)
- {
- 	int count = 0;
- 
--	if (rec->rec_type == 0) /* not set yet, it's uninitialized */
-+	if (!rec->rec_type) /* not set yet, it's uninitialized */
- 		return;
- 
- 	while (!list_empty(&rec->rec_active)) {
-@@ -423,7 +423,7 @@ lnet_res_container_setup(struct lnet_res_container *rec, int cpt, int type)
- 	int rc = 0;
+@@ -576,7 +576,7 @@ ksocknal_recv_hello_v1(ksock_conn_t *conn, ksock_hello_msg_t *hello,
  	int i;
  
--	LASSERT(rec->rec_type == 0);
-+	LASSERT(!rec->rec_type);
+ 	LIBCFS_ALLOC(hdr, sizeof(*hdr));
+-	if (hdr == NULL) {
++	if (!hdr) {
+ 		CERROR("Can't allocate lnet_hdr_t\n");
+ 		return -ENOMEM;
+ 	}
+@@ -713,7 +713,7 @@ ksocknal_pack_msg_v1(ksock_tx_t *tx)
+ {
+ 	/* V1.x has no KSOCK_MSG_NOOP */
+ 	LASSERT(tx->tx_msg.ksm_type != KSOCK_MSG_NOOP);
+-	LASSERT(tx->tx_lnetmsg != NULL);
++	LASSERT(tx->tx_lnetmsg);
  
- 	rec->rec_type = type;
- 	INIT_LIST_HEAD(&rec->rec_active);
-@@ -478,7 +478,7 @@ lnet_res_containers_create(int type)
+ 	tx->tx_iov[0].iov_base = &tx->tx_lnetmsg->msg_hdr;
+ 	tx->tx_iov[0].iov_len  = sizeof(lnet_hdr_t);
+@@ -727,7 +727,7 @@ ksocknal_pack_msg_v2(ksock_tx_t *tx)
+ {
+ 	tx->tx_iov[0].iov_base = &tx->tx_msg;
  
- 	cfs_percpt_for_each(rec, i, recs) {
- 		rc = lnet_res_container_setup(rec, i, type);
--		if (rc != 0) {
-+		if (rc) {
- 			lnet_res_containers_destroy(recs);
- 			return NULL;
- 		}
-@@ -533,11 +533,11 @@ lnet_prepare(lnet_pid_t requested_pid)
- 	struct lnet_res_container **recs;
- 	int rc = 0;
+-	if (tx->tx_lnetmsg != NULL) {
++	if (tx->tx_lnetmsg) {
+ 		LASSERT(tx->tx_msg.ksm_type != KSOCK_MSG_NOOP);
  
--	LASSERT(the_lnet.ln_refcount == 0);
-+	LASSERT(!the_lnet.ln_refcount);
+ 		tx->tx_msg.ksm_u.lnetmsg.ksnm_hdr = tx->tx_lnetmsg->msg_hdr;
+diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
+index 8c95cc5..ef61eaf 100644
+--- a/drivers/staging/lustre/lnet/lnet/acceptor.c
++++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
+@@ -299,16 +299,16 @@ lnet_accept(struct socket *sock, __u32 magic)
+ 		__swab64s(&cr.acr_nid);
  
- 	the_lnet.ln_routing = 0;
- 
--	LASSERT((requested_pid & LNET_PID_USERFLAG) == 0);
-+	LASSERT(!(requested_pid & LNET_PID_USERFLAG));
- 	the_lnet.ln_pid = requested_pid;
- 
- 	INIT_LIST_HEAD(&the_lnet.ln_test_peers);
-@@ -547,7 +547,7 @@ lnet_prepare(lnet_pid_t requested_pid)
- 	INIT_LIST_HEAD(&the_lnet.ln_routers);
- 
- 	rc = lnet_create_remote_nets_table();
--	if (rc != 0)
-+	if (rc)
- 		goto failed;
- 	/*
- 	 * NB the interface cookie in wire handles guards against delayed
-@@ -564,16 +564,16 @@ lnet_prepare(lnet_pid_t requested_pid)
+ 	ni = lnet_net2ni(LNET_NIDNET(cr.acr_nid));
+-	if (ni == NULL ||	       /* no matching net */
++	if (!ni ||	       /* no matching net */
+ 	    ni->ni_nid != cr.acr_nid) { /* right NET, wrong NID! */
+-		if (ni != NULL)
++		if (ni)
+ 			lnet_ni_decref(ni);
+ 		LCONSOLE_ERROR_MSG(0x120, "Refusing connection from %pI4h for %s: No matching NI\n",
+ 				   &peer_ip, libcfs_nid2str(cr.acr_nid));
+ 		return -EPERM;
  	}
  
- 	rc = lnet_peer_tables_create();
--	if (rc != 0)
-+	if (rc)
+-	if (ni->ni_lnd->lnd_accept == NULL) {
++	if (!ni->ni_lnd->lnd_accept) {
+ 		/* This catches a request for the loopback LND */
+ 		lnet_ni_decref(ni);
+ 		LCONSOLE_ERROR_MSG(0x121, "Refusing connection from %pI4h for %s: NI doesn not accept IP connections\n",
+@@ -335,7 +335,7 @@ lnet_acceptor(void *arg)
+ 	int peer_port;
+ 	int secure = (int)((long_ptr_t)arg);
+ 
+-	LASSERT(lnet_acceptor_state.pta_sock == NULL);
++	LASSERT(!lnet_acceptor_state.pta_sock);
+ 
+ 	cfs_block_allsigs();
+ 
+@@ -443,7 +443,7 @@ lnet_acceptor_start(void)
+ 	long rc2;
+ 	long secure;
+ 
+-	LASSERT(lnet_acceptor_state.pta_sock == NULL);
++	LASSERT(!lnet_acceptor_state.pta_sock);
+ 
+ 	rc = lnet_acceptor_get_tunables();
+ 	if (rc != 0)
+@@ -471,11 +471,11 @@ lnet_acceptor_start(void)
+ 
+ 	if (!lnet_acceptor_state.pta_shutdown) {
+ 		/* started OK */
+-		LASSERT(lnet_acceptor_state.pta_sock != NULL);
++		LASSERT(lnet_acceptor_state.pta_sock);
+ 		return 0;
+ 	}
+ 
+-	LASSERT(lnet_acceptor_state.pta_sock == NULL);
++	LASSERT(!lnet_acceptor_state.pta_sock);
+ 
+ 	return -ENETDOWN;
+ }
+@@ -483,7 +483,7 @@ lnet_acceptor_start(void)
+ void
+ lnet_acceptor_stop(void)
+ {
+-	if (lnet_acceptor_state.pta_sock == NULL) /* not running */
++	if (!lnet_acceptor_state.pta_sock) /* not running */
+ 		return;
+ 
+ 	lnet_acceptor_state.pta_shutdown = 1;
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index f7d53cd..eb04958 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -107,10 +107,10 @@ lnet_create_remote_nets_table(void)
+ 	int i;
+ 	struct list_head *hash;
+ 
+-	LASSERT(the_lnet.ln_remote_nets_hash == NULL);
++	LASSERT(!the_lnet.ln_remote_nets_hash);
+ 	LASSERT(the_lnet.ln_remote_nets_hbits > 0);
+ 	LIBCFS_ALLOC(hash, LNET_REMOTE_NETS_HASH_SIZE * sizeof(*hash));
+-	if (hash == NULL) {
++	if (!hash) {
+ 		CERROR("Failed to create remote nets hash table\n");
+ 		return -ENOMEM;
+ 	}
+@@ -126,7 +126,7 @@ lnet_destroy_remote_nets_table(void)
+ {
+ 	int i;
+ 
+-	if (the_lnet.ln_remote_nets_hash == NULL)
++	if (!the_lnet.ln_remote_nets_hash)
+ 		return;
+ 
+ 	for (i = 0; i < LNET_REMOTE_NETS_HASH_SIZE; i++)
+@@ -141,12 +141,12 @@ lnet_destroy_remote_nets_table(void)
+ static void
+ lnet_destroy_locks(void)
+ {
+-	if (the_lnet.ln_res_lock != NULL) {
++	if (the_lnet.ln_res_lock) {
+ 		cfs_percpt_lock_free(the_lnet.ln_res_lock);
+ 		the_lnet.ln_res_lock = NULL;
+ 	}
+ 
+-	if (the_lnet.ln_net_lock != NULL) {
++	if (the_lnet.ln_net_lock) {
+ 		cfs_percpt_lock_free(the_lnet.ln_net_lock);
+ 		the_lnet.ln_net_lock = NULL;
+ 	}
+@@ -158,11 +158,11 @@ lnet_create_locks(void)
+ 	lnet_init_locks();
+ 
+ 	the_lnet.ln_res_lock = cfs_percpt_lock_alloc(lnet_cpt_table());
+-	if (the_lnet.ln_res_lock == NULL)
++	if (!the_lnet.ln_res_lock)
  		goto failed;
  
- 	rc = lnet_msg_containers_create();
--	if (rc != 0)
-+	if (rc)
+ 	the_lnet.ln_net_lock = cfs_percpt_lock_alloc(lnet_cpt_table());
+-	if (the_lnet.ln_net_lock == NULL)
++	if (!the_lnet.ln_net_lock)
  		goto failed;
  
- 	rc = lnet_res_container_setup(&the_lnet.ln_eq_container, 0,
- 				      LNET_COOKIE_TYPE_EQ);
--	if (rc != 0)
-+	if (rc)
+ 	return 0;
+@@ -291,7 +291,7 @@ lnet_register_lnd(lnd_t *lnd)
+ 
+ 	LASSERT(the_lnet.ln_init);
+ 	LASSERT(libcfs_isknown_lnd(lnd->lnd_type));
+-	LASSERT(lnet_find_lnd_by_type(lnd->lnd_type) == NULL);
++	LASSERT(!lnet_find_lnd_by_type(lnd->lnd_type));
+ 
+ 	list_add_tail(&lnd->lnd_list, &the_lnet.ln_lnds);
+ 	lnd->lnd_refcount = 0;
+@@ -408,7 +408,7 @@ lnet_res_container_cleanup(struct lnet_res_container *rec)
+ 		       count, lnet_res_type2str(rec->rec_type));
+ 	}
+ 
+-	if (rec->rec_lh_hash != NULL) {
++	if (rec->rec_lh_hash) {
+ 		LIBCFS_FREE(rec->rec_lh_hash,
+ 			    LNET_LH_HASH_SIZE * sizeof(rec->rec_lh_hash[0]));
+ 		rec->rec_lh_hash = NULL;
+@@ -432,7 +432,7 @@ lnet_res_container_setup(struct lnet_res_container *rec, int cpt, int type)
+ 	/* Arbitrary choice of hash table size */
+ 	LIBCFS_CPT_ALLOC(rec->rec_lh_hash, lnet_cpt_table(), cpt,
+ 			 LNET_LH_HASH_SIZE * sizeof(rec->rec_lh_hash[0]));
+-	if (rec->rec_lh_hash == NULL) {
++	if (!rec->rec_lh_hash) {
+ 		rc = -ENOMEM;
+ 		goto out;
+ 	}
+@@ -470,7 +470,7 @@ lnet_res_containers_create(int type)
+ 	int i;
+ 
+ 	recs = cfs_percpt_alloc(lnet_cpt_table(), sizeof(*rec));
+-	if (recs == NULL) {
++	if (!recs) {
+ 		CERROR("Failed to allocate %s resource containers\n",
+ 		       lnet_res_type2str(type));
+ 		return NULL;
+@@ -557,7 +557,7 @@ lnet_prepare(lnet_pid_t requested_pid)
+ 
+ 	the_lnet.ln_counters = cfs_percpt_alloc(lnet_cpt_table(),
+ 						sizeof(lnet_counters_t));
+-	if (the_lnet.ln_counters == NULL) {
++	if (!the_lnet.ln_counters) {
+ 		CERROR("Failed to allocate counters for LNet\n");
+ 		rc = -ENOMEM;
+ 		goto failed;
+@@ -577,7 +577,7 @@ lnet_prepare(lnet_pid_t requested_pid)
  		goto failed;
  
  	recs = lnet_res_containers_create(LNET_COOKIE_TYPE_ME);
-@@ -593,7 +593,7 @@ lnet_prepare(lnet_pid_t requested_pid)
- 	the_lnet.ln_md_containers = recs;
- 
- 	rc = lnet_portals_create();
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Failed to create portals for LNet: %d\n", rc);
+-	if (recs == NULL) {
++	if (!recs) {
+ 		rc = -ENOMEM;
  		goto failed;
  	}
-@@ -616,7 +616,7 @@ lnet_unprepare(void)
- 	 */
- 	lnet_fail_nid(LNET_NID_ANY, 0);
+@@ -585,7 +585,7 @@ lnet_prepare(lnet_pid_t requested_pid)
+ 	the_lnet.ln_me_containers = recs;
  
--	LASSERT(the_lnet.ln_refcount == 0);
-+	LASSERT(!the_lnet.ln_refcount);
- 	LASSERT(list_empty(&the_lnet.ln_test_peers));
- 	LASSERT(list_empty(&the_lnet.ln_nis));
- 	LASSERT(list_empty(&the_lnet.ln_nis_cpt));
-@@ -847,7 +847,7 @@ lnet_shutdown_lndnis(void)
+ 	recs = lnet_res_containers_create(LNET_COOKIE_TYPE_MD);
+-	if (recs == NULL) {
++	if (!recs) {
+ 		rc = -ENOMEM;
+ 		goto failed;
+ 	}
+@@ -624,12 +624,12 @@ lnet_unprepare(void)
  
- 	/* All quiet on the API front */
- 	LASSERT(!the_lnet.ln_shutdown);
--	LASSERT(the_lnet.ln_refcount == 0);
-+	LASSERT(!the_lnet.ln_refcount);
- 	LASSERT(list_empty(&the_lnet.ln_nis_zombie));
+ 	lnet_portals_destroy();
  
- 	lnet_net_lock(LNET_LOCK_EX);
-@@ -908,7 +908,7 @@ lnet_shutdown_lndnis(void)
- 				lnet_ni_t, ni_list);
- 		list_del_init(&ni->ni_list);
- 		cfs_percpt_for_each(ref, j, ni->ni_refs) {
--			if (*ref == 0)
-+			if (!*ref)
+-	if (the_lnet.ln_md_containers != NULL) {
++	if (the_lnet.ln_md_containers) {
+ 		lnet_res_containers_destroy(the_lnet.ln_md_containers);
+ 		the_lnet.ln_md_containers = NULL;
+ 	}
+ 
+-	if (the_lnet.ln_me_containers != NULL) {
++	if (the_lnet.ln_me_containers) {
+ 		lnet_res_containers_destroy(the_lnet.ln_me_containers);
+ 		the_lnet.ln_me_containers = NULL;
+ 	}
+@@ -640,7 +640,7 @@ lnet_unprepare(void)
+ 	lnet_peer_tables_destroy();
+ 	lnet_rtrpools_free();
+ 
+-	if (the_lnet.ln_counters != NULL) {
++	if (the_lnet.ln_counters) {
+ 		cfs_percpt_free(the_lnet.ln_counters);
+ 		the_lnet.ln_counters = NULL;
+ 	}
+@@ -716,7 +716,7 @@ lnet_cpt_of_nid_locked(lnet_nid_t nid)
+ 			if (LNET_NIDNET(ni->ni_nid) != LNET_NIDNET(nid))
  				continue;
- 			/* still busy, add it back to zombie list */
- 			list_add(&ni->ni_list, &the_lnet.ln_nis_zombie);
-@@ -979,7 +979,7 @@ lnet_startup_lndnis(void)
+ 
+-			LASSERT(ni->ni_cpts != NULL);
++			LASSERT(ni->ni_cpts);
+ 			return ni->ni_cpts[lnet_nid_cpt_hash
+ 					   (nid, ni->ni_ncpts)];
+ 		}
+@@ -754,12 +754,12 @@ lnet_islocalnet(__u32 net)
+ 	cpt = lnet_net_lock_current();
+ 
+ 	ni = lnet_net2ni_locked(net, cpt);
+-	if (ni != NULL)
++	if (ni)
+ 		lnet_ni_decref_locked(ni, cpt);
+ 
+ 	lnet_net_unlock(cpt);
+ 
+-	return ni != NULL;
++	return !!ni;
+ }
+ 
+ lnet_ni_t  *
+@@ -790,11 +790,11 @@ lnet_islocalnid(lnet_nid_t nid)
+ 
+ 	cpt = lnet_net_lock_current();
+ 	ni = lnet_nid2ni_locked(nid, cpt);
+-	if (ni != NULL)
++	if (ni)
+ 		lnet_ni_decref_locked(ni, cpt);
+ 	lnet_net_unlock(cpt);
+ 
+-	return ni != NULL;
++	return !!ni;
+ }
+ 
+ int
+@@ -810,7 +810,7 @@ lnet_count_acceptor_nis(void)
+ 	list_for_each(tmp, &the_lnet.ln_nis) {
+ 		ni = list_entry(tmp, lnet_ni_t, ni_list);
+ 
+-		if (ni->ni_lnd->lnd_accept != NULL)
++		if (ni->ni_lnd->lnd_accept)
+ 			count++;
+ 	}
+ 
+@@ -868,13 +868,13 @@ lnet_shutdown_lndnis(void)
+ 	}
+ 
+ 	/* Drop the cached eqwait NI. */
+-	if (the_lnet.ln_eq_waitni != NULL) {
++	if (the_lnet.ln_eq_waitni) {
+ 		lnet_ni_decref_locked(the_lnet.ln_eq_waitni, 0);
+ 		the_lnet.ln_eq_waitni = NULL;
+ 	}
+ 
+ 	/* Drop the cached loopback NI. */
+-	if (the_lnet.ln_loni != NULL) {
++	if (the_lnet.ln_loni) {
+ 		lnet_ni_decref_locked(the_lnet.ln_loni, 0);
+ 		the_lnet.ln_loni = NULL;
+ 	}
+@@ -953,7 +953,7 @@ lnet_shutdown_lndnis(void)
+ 	the_lnet.ln_shutdown = 0;
+ 	lnet_net_unlock(LNET_LOCK_EX);
+ 
+-	if (the_lnet.ln_network_tokens != NULL) {
++	if (the_lnet.ln_network_tokens) {
+ 		LIBCFS_FREE(the_lnet.ln_network_tokens,
+ 			    the_lnet.ln_network_tokens_nob);
+ 		the_lnet.ln_network_tokens = NULL;
+@@ -975,7 +975,7 @@ lnet_startup_lndnis(void)
+ 
+ 	INIT_LIST_HEAD(&nilist);
+ 
+-	if (nets == NULL)
++	if (!nets)
  		goto failed;
  
  	rc = lnet_parse_networks(&nilist, nets);
--	if (rc != 0)
-+	if (rc)
- 		goto failed;
+@@ -1000,14 +1000,14 @@ lnet_startup_lndnis(void)
+ 		mutex_lock(&the_lnet.ln_lnd_mutex);
+ 		lnd = lnet_find_lnd_by_type(lnd_type);
  
- 	while (!list_empty(&nilist)) {
-@@ -1026,7 +1026,7 @@ lnet_startup_lndnis(void)
+-		if (lnd == NULL) {
++		if (!lnd) {
+ 			mutex_unlock(&the_lnet.ln_lnd_mutex);
+ 			rc = request_module("%s",
+ 					    libcfs_lnd2modname(lnd_type));
+ 			mutex_lock(&the_lnet.ln_lnd_mutex);
  
- 		mutex_unlock(&the_lnet.ln_lnd_mutex);
- 
--		if (rc != 0) {
-+		if (rc) {
- 			LCONSOLE_ERROR_MSG(0x105, "Error %d starting up LNI %s\n",
- 					   rc, libcfs_lnd2str(lnd->lnd_type));
- 			lnet_net_lock(LNET_LOCK_EX);
-@@ -1058,11 +1058,10 @@ lnet_startup_lndnis(void)
- 			continue;
- 		}
- 
--		if (ni->ni_peertxcredits == 0 ||
--		    ni->ni_maxtxcredits == 0) {
-+		if (!ni->ni_peertxcredits || !ni->ni_maxtxcredits) {
- 			LCONSOLE_ERROR_MSG(0x107, "LNI %s has no %scredits\n",
- 					   libcfs_lnd2str(lnd->lnd_type),
--					   ni->ni_peertxcredits == 0 ?
-+					   !ni->ni_peertxcredits ?
- 					   "" : "per-peer ");
+ 			lnd = lnet_find_lnd_by_type(lnd_type);
+-			if (lnd == NULL) {
++			if (!lnd) {
+ 				mutex_unlock(&the_lnet.ln_lnd_mutex);
+ 				CERROR("Can't load LND %s, module %s, rc=%d\n",
+ 				       libcfs_lnd2str(lnd_type),
+@@ -1035,7 +1035,7 @@ lnet_startup_lndnis(void)
  			goto failed;
  		}
-@@ -1138,7 +1137,7 @@ lnet_init(void)
- 		the_lnet.ln_cpt_bits++;
  
- 	rc = lnet_create_locks();
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create LNet global locks: %d\n", rc);
- 		return -1;
- 	}
-@@ -1184,7 +1183,7 @@ void
- lnet_fini(void)
- {
- 	LASSERT(the_lnet.ln_init);
--	LASSERT(the_lnet.ln_refcount == 0);
-+	LASSERT(!the_lnet.ln_refcount);
+-		LASSERT(ni->ni_peertimeout <= 0 || lnd->lnd_query != NULL);
++		LASSERT(ni->ni_peertimeout <= 0 || lnd->lnd_query);
  
- 	while (!list_empty(&the_lnet.ln_lnds))
- 		lnet_unregister_lnd(list_entry(the_lnet.ln_lnds.next,
-@@ -1233,27 +1232,27 @@ LNetNIInit(lnet_pid_t requested_pid)
- 	}
+ 		list_del(&ni->ni_list);
  
- 	rc = lnet_prepare(requested_pid);
--	if (rc != 0)
-+	if (rc)
- 		goto failed0;
+@@ -1043,7 +1043,7 @@ lnet_startup_lndnis(void)
+ 		/* refcount for ln_nis */
+ 		lnet_ni_addref_locked(ni, 0);
+ 		list_add_tail(&ni->ni_list, &the_lnet.ln_nis);
+-		if (ni->ni_cpts != NULL) {
++		if (ni->ni_cpts) {
+ 			list_add_tail(&ni->ni_cptlist,
+ 				      &the_lnet.ln_nis_cpt);
+ 			lnet_ni_addref_locked(ni, 0);
+@@ -1053,7 +1053,7 @@ lnet_startup_lndnis(void)
  
- 	rc = lnet_startup_lndnis();
--	if (rc != 0)
-+	if (rc)
- 		goto failed1;
- 
- 	rc = lnet_parse_routes(lnet_get_routes(), &im_a_router);
--	if (rc != 0)
-+	if (rc)
- 		goto failed2;
- 
- 	rc = lnet_check_routes();
--	if (rc != 0)
-+	if (rc)
- 		goto failed2;
- 
- 	rc = lnet_rtrpools_alloc(im_a_router);
--	if (rc != 0)
-+	if (rc)
- 		goto failed2;
- 
- 	rc = lnet_acceptor_start();
--	if (rc != 0)
-+	if (rc)
- 		goto failed2;
- 
- 	the_lnet.ln_refcount = 1;
-@@ -1264,11 +1263,11 @@ LNetNIInit(lnet_pid_t requested_pid)
- 	 * lnet_router_checker -> lnet_update_ni_status_locked
- 	  */
- 	rc = lnet_ping_target_init();
--	if (rc != 0)
-+	if (rc)
- 		goto failed3;
- 
- 	rc = lnet_router_checker_start();
--	if (rc != 0)
-+	if (rc)
- 		goto failed4;
- 
- 	lnet_router_debugfs_init();
-@@ -1360,7 +1359,7 @@ LNetCtl(unsigned int cmd, void *arg)
- 	case IOC_LIBCFS_ADD_ROUTE:
- 		rc = lnet_add_route(data->ioc_net, data->ioc_count,
- 				    data->ioc_nid, data->ioc_priority);
--		return (rc != 0) ? rc : lnet_check_routes();
-+		return (rc) ? rc : lnet_check_routes();
- 
- 	case IOC_LIBCFS_DEL_ROUTE:
- 		return lnet_del_route(data->ioc_net, data->ioc_nid);
-@@ -1445,13 +1444,13 @@ LNetGetId(unsigned int index, lnet_process_id_t *id)
- 	LASSERT(the_lnet.ln_init);
- 
- 	/* LNetNI initilization failed? */
--	if (the_lnet.ln_refcount == 0)
-+	if (!the_lnet.ln_refcount)
- 		return rc;
- 
- 	cpt = lnet_net_lock_current();
- 
- 	list_for_each(tmp, &the_lnet.ln_nis) {
--		if (index-- != 0)
-+		if (index--)
+ 		if (lnd->lnd_type == LOLND) {
+ 			lnet_ni_addref(ni);
+-			LASSERT(the_lnet.ln_loni == NULL);
++			LASSERT(!the_lnet.ln_loni);
+ 			the_lnet.ln_loni = ni;
  			continue;
- 
- 		ni = list_entry(tmp, lnet_ni_t, ni_list);
-@@ -1494,7 +1493,7 @@ lnet_create_ping_info(void)
- 		if (rc == -ENOENT)
- 			break;
- 
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
+ 		}
+@@ -1081,7 +1081,7 @@ lnet_startup_lndnis(void)
+ 		nicount++;
  	}
+ 
+-	if (the_lnet.ln_eq_waitni != NULL && nicount > 1) {
++	if (the_lnet.ln_eq_waitni && nicount > 1) {
+ 		lnd_type = the_lnet.ln_eq_waitni->ni_lnd->lnd_type;
+ 		LCONSOLE_ERROR_MSG(0x109, "LND %s can only run single-network\n",
+ 				   libcfs_lnd2str(lnd_type));
+@@ -1402,10 +1402,10 @@ LNetCtl(unsigned int cmd, void *arg)
+ 
+ 	default:
+ 		ni = lnet_net2ni(data->ioc_net);
+-		if (ni == NULL)
++		if (!ni)
+ 			return -EINVAL;
+ 
+-		if (ni->ni_lnd->lnd_ctl == NULL)
++		if (!ni->ni_lnd->lnd_ctl)
+ 			rc = -EINVAL;
+ 		else
+ 			rc = ni->ni_lnd->lnd_ctl(ni, cmd, arg);
+@@ -1499,7 +1499,7 @@ lnet_create_ping_info(void)
  
  	infosz = offsetof(lnet_ping_info_t, pi_ni[n]);
-@@ -1513,7 +1512,7 @@ lnet_create_ping_info(void)
- 		lnet_ni_status_t *ns = &pinfo->pi_ni[i];
- 
- 		rc = LNetGetId(i, &id);
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
- 
- 		ns->ns_nid    = id.nid;
- 		ns->ns_status = LNET_NI_STATUS_UP;
-@@ -1568,7 +1567,7 @@ lnet_ping_target_init(void)
- 	int infosz;
- 
- 	rc = lnet_create_ping_info();
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	/*
-@@ -1576,7 +1575,7 @@ lnet_ping_target_init(void)
- 	 * teardown, which by definition is the last one!
- 	 */
- 	rc = LNetEQAlloc(2, LNET_EQ_HANDLER_NONE, &the_lnet.ln_ping_target_eq);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't allocate ping EQ: %d\n", rc);
- 		goto failed_0;
+ 	LIBCFS_ALLOC(pinfo, infosz);
+-	if (pinfo == NULL) {
++	if (!pinfo) {
+ 		CERROR("Can't allocate ping info[%d]\n", n);
+ 		return -ENOMEM;
  	}
-@@ -1589,7 +1588,7 @@ lnet_ping_target_init(void)
- 			  LNET_PROTO_PING_MATCHBITS, 0,
- 			  LNET_UNLINK, LNET_INS_AFTER,
- 			  &meh);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create ping ME: %d\n", rc);
- 		goto failed_1;
- 	}
-@@ -1609,7 +1608,7 @@ lnet_ping_target_init(void)
- 	rc = LNetMDAttach(meh, md,
- 			  LNET_RETAIN,
- 			  &the_lnet.ln_ping_target_md);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't attach ping MD: %d\n", rc);
- 		goto failed_2;
- 	}
-@@ -1618,10 +1617,10 @@ lnet_ping_target_init(void)
+@@ -1521,10 +1521,10 @@ lnet_create_ping_info(void)
+ 		lnet_net_lock(0);
  
-  failed_2:
- 	rc2 = LNetMEUnlink(meh);
--	LASSERT(rc2 == 0);
-+	LASSERT(!rc2);
-  failed_1:
- 	rc2 = LNetEQFree(the_lnet.ln_ping_target_eq);
--	LASSERT(rc2 == 0);
-+	LASSERT(!rc2);
-  failed_0:
- 	lnet_destroy_ping_info();
- 	return rc;
-@@ -1646,7 +1645,7 @@ lnet_ping_target_fini(void)
- 		/* I expect overflow... */
- 		LASSERT(rc >= 0 || rc == -EOVERFLOW);
+ 		ni = lnet_nid2ni_locked(id.nid, 0);
+-		LASSERT(ni != NULL);
++		LASSERT(ni);
  
--		if (rc == 0) {
-+		if (!rc) {
- 			/* timed out: provide a diagnostic */
- 			CWARN("Still waiting for ping MD to unlink\n");
- 			timeout_ms *= 2;
-@@ -1659,7 +1658,7 @@ lnet_ping_target_fini(void)
- 	}
+ 		lnet_ni_lock(ni);
+-		LASSERT(ni->ni_status == NULL);
++		LASSERT(!ni->ni_status);
+ 		ni->ni_status = ns;
+ 		lnet_ni_unlock(ni);
  
- 	rc = LNetEQFree(the_lnet.ln_ping_target_eq);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
- 	lnet_destroy_ping_info();
- 	cfs_restore_sigs(blocked);
- }
-@@ -1699,7 +1698,7 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
+@@ -1694,7 +1694,7 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
+ 		id.pid = LUSTRE_SRV_LNET_PID;
+ 
+ 	LIBCFS_ALLOC(info, infosz);
+-	if (info == NULL)
++	if (!info)
+ 		return -ENOMEM;
  
  	/* NB 2 events max (including any unlink event) */
- 	rc = LNetEQAlloc(2, LNET_EQ_HANDLER_NONE, &eqh);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't allocate EQ: %d\n", rc);
- 		goto out_0;
- 	}
-@@ -1714,7 +1713,7 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 	md.eq_handle = eqh;
- 
- 	rc = LNetMDBind(md, LNET_UNLINK, &mdh);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't bind MD: %d\n", rc);
- 		goto out_1;
- 	}
-@@ -1723,11 +1722,11 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 		     LNET_RESERVED_PORTAL,
- 		     LNET_PROTO_PING_MATCHBITS, 0);
- 
--	if (rc != 0) {
-+	if (rc) {
- 		/* Don't CERROR; this could be deliberate! */
- 
- 		rc2 = LNetMDUnlink(mdh);
--		LASSERT(rc2 == 0);
-+		LASSERT(!rc2);
- 
- 		/* NB must wait for the UNLINK event below... */
- 		unlinked = 1;
-@@ -1751,11 +1750,11 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 
- 		LASSERT(rc2 != -EOVERFLOW);     /* can't miss anything */
- 
--		if (rc2 <= 0 || event.status != 0) {
-+		if (rc2 <= 0 || event.status) {
- 			/* timeout or error */
--			if (!replied && rc == 0)
-+			if (!replied && !rc)
- 				rc = (rc2 < 0) ? rc2 :
--				     (rc2 == 0) ? -ETIMEDOUT :
-+				     !rc2 ? -ETIMEDOUT :
- 				     event.status;
- 
- 			if (!unlinked) {
-@@ -1764,7 +1763,7 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 				/* No assertion (racing with network) */
- 				unlinked = 1;
- 				timeout_ms = a_long_time;
--			} else if (rc2 == 0) {
-+			} else if (!rc2) {
- 				/* timed out waiting for unlink */
- 				CWARN("ping %s: late network completion\n",
- 				      libcfs_id2str(id));
-@@ -1804,7 +1803,7 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 		goto out_1;
- 	}
- 
--	if ((info->pi_features & LNET_PING_FEAT_NI_STATUS) == 0) {
-+	if (!(info->pi_features & LNET_PING_FEAT_NI_STATUS)) {
- 		CERROR("%s: ping w/o NI status: 0x%x\n",
- 		       libcfs_id2str(id), info->pi_features);
- 		goto out_1;
-@@ -1838,9 +1837,9 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 
-  out_1:
- 	rc2 = LNetEQFree(eqh);
--	if (rc2 != 0)
-+	if (rc2)
- 		CERROR("rc2 %d\n", rc2);
--	LASSERT(rc2 == 0);
-+	LASSERT(!rc2);
- 
-  out_0:
- 	LIBCFS_FREE(info, infosz);
 diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index fcd2cfb..e817eb3 100644
+index d02353d..fcd2cfb 100644
 --- a/drivers/staging/lustre/lnet/lnet/config.c
 +++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -210,7 +210,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 	if (!ni)
+@@ -96,13 +96,13 @@ lnet_net_unique(__u32 net, struct list_head *nilist)
+ void
+ lnet_ni_free(struct lnet_ni *ni)
+ {
+-	if (ni->ni_refs != NULL)
++	if (ni->ni_refs)
+ 		cfs_percpt_free(ni->ni_refs);
+ 
+-	if (ni->ni_tx_queues != NULL)
++	if (ni->ni_tx_queues)
+ 		cfs_percpt_free(ni->ni_tx_queues);
+ 
+-	if (ni->ni_cpts != NULL)
++	if (ni->ni_cpts)
+ 		cfs_expr_list_values_free(ni->ni_cpts, ni->ni_ncpts);
+ 
+ 	LIBCFS_FREE(ni, sizeof(*ni));
+@@ -123,7 +123,7 @@ lnet_ni_alloc(__u32 net, struct cfs_expr_list *el, struct list_head *nilist)
+ 	}
+ 
+ 	LIBCFS_ALLOC(ni, sizeof(*ni));
+-	if (ni == NULL) {
++	if (!ni) {
+ 		CERROR("Out of memory creating network %s\n",
+ 		       libcfs_net2str(net));
+ 		return NULL;
+@@ -133,18 +133,18 @@ lnet_ni_alloc(__u32 net, struct cfs_expr_list *el, struct list_head *nilist)
+ 	INIT_LIST_HEAD(&ni->ni_cptlist);
+ 	ni->ni_refs = cfs_percpt_alloc(lnet_cpt_table(),
+ 				       sizeof(*ni->ni_refs[0]));
+-	if (ni->ni_refs == NULL)
++	if (!ni->ni_refs)
  		goto failed;
  
--	while (str && *str != 0) {
-+	while (str && *str) {
+ 	ni->ni_tx_queues = cfs_percpt_alloc(lnet_cpt_table(),
+ 					    sizeof(*ni->ni_tx_queues[0]));
+-	if (ni->ni_tx_queues == NULL)
++	if (!ni->ni_tx_queues)
+ 		goto failed;
+ 
+ 	cfs_percpt_for_each(tq, i, ni->ni_tx_queues)
+ 		INIT_LIST_HEAD(&tq->tq_delayed);
+ 
+-	if (el == NULL) {
++	if (!el) {
+ 		ni->ni_cpts  = NULL;
+ 		ni->ni_ncpts = LNET_CPT_NUMBER;
+ 	} else {
+@@ -194,7 +194,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 	}
+ 
+ 	LIBCFS_ALLOC(tokens, tokensize);
+-	if (tokens == NULL) {
++	if (!tokens) {
+ 		CERROR("Can't allocate net tokens\n");
+ 		return -ENOMEM;
+ 	}
+@@ -207,10 +207,10 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 
+ 	/* Add in the loopback network */
+ 	ni = lnet_ni_alloc(LNET_MKNET(LOLND, 0), NULL, nilist);
+-	if (ni == NULL)
++	if (!ni)
+ 		goto failed;
+ 
+-	while (str != NULL && *str != 0) {
++	while (str && *str != 0) {
  		char *comma = strchr(str, ',');
  		char *bracket = strchr(str, '(');
  		char *square = strchr(str, '[');
-@@ -240,7 +240,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 
- 			rc = cfs_expr_list_parse(square, tmp - square + 1,
- 						 0, LNET_CPT_NUMBER - 1, &el);
--			if (rc != 0) {
-+			if (rc) {
+@@ -222,18 +222,18 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 		 * NB we don't check interface conflicts here; it's the LNDs
+ 		 * responsibility (if it cares at all)
+ 		 */
+-		if (square != NULL && (comma == NULL || square < comma)) {
++		if (square && (!comma || square < comma)) {
+ 			/*
+ 			 * i.e: o2ib0(ib0)[1,2], number between square
+ 			 * brackets are CPTs this NI needs to be bond
+ 			 */
+-			if (bracket != NULL && bracket > square) {
++			if (bracket && bracket > square) {
  				tmp = square;
  				goto failed_syntax;
  			}
-@@ -309,7 +309,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 
+ 			tmp = strchr(square, ']');
+-			if (tmp == NULL) {
++			if (!tmp) {
+ 				tmp = square;
+ 				goto failed_syntax;
+ 			}
+@@ -249,11 +249,10 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 				*square++ = ' ';
+ 		}
+ 
+-		if (bracket == NULL ||
+-		    (comma != NULL && comma < bracket)) {
++		if (!bracket || (comma && comma < bracket)) {
+ 			/* no interface list specified */
+ 
+-			if (comma != NULL)
++			if (comma)
+ 				*comma++ = 0;
+ 			net = libcfs_str2net(cfs_trimwhite(str));
+ 
+@@ -265,10 +264,10 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 			}
+ 
+ 			if (LNET_NETTYP(net) != LOLND && /* LO is implicit */
+-			    lnet_ni_alloc(net, el, nilist) == NULL)
++			    !lnet_ni_alloc(net, el, nilist))
+ 				goto failed;
+ 
+-			if (el != NULL) {
++			if (el) {
+ 				cfs_expr_list_free(el);
+ 				el = NULL;
+ 			}
+@@ -286,10 +285,10 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 
+ 		nnets++;
+ 		ni = lnet_ni_alloc(net, el, nilist);
+-		if (ni == NULL)
++		if (!ni)
+ 			goto failed;
+ 
+-		if (el != NULL) {
++		if (el) {
+ 			cfs_expr_list_free(el);
+ 			el = NULL;
+ 		}
+@@ -298,7 +297,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 		iface = bracket + 1;
+ 
+ 		bracket = strchr(iface, ')');
+-		if (bracket == NULL) {
++		if (!bracket) {
+ 			tmp = iface;
+ 			goto failed_syntax;
+ 		}
+@@ -306,7 +305,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 		*bracket = 0;
+ 		do {
+ 			comma = strchr(iface, ',');
+-			if (comma != NULL)
++			if (comma)
  				*comma++ = 0;
  
  			iface = cfs_trimwhite(iface);
--			if (*iface == 0) {
-+			if (!*iface) {
- 				tmp = iface;
- 				goto failed_syntax;
- 			}
-@@ -330,7 +330,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 		if (comma) {
+@@ -324,11 +323,11 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 
+ 			ni->ni_interfaces[niface++] = iface;
+ 			iface = comma;
+-		} while (iface != NULL);
++		} while (iface);
+ 
+ 		str = bracket + 1;
+ 		comma = strchr(bracket + 1, ',');
+-		if (comma != NULL) {
++		if (comma) {
  			*comma = 0;
  			str = cfs_trimwhite(str);
--			if (*str != 0) {
-+			if (*str) {
- 				tmp = str;
- 				goto failed_syntax;
+ 			if (*str != 0) {
+@@ -359,7 +358,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 		lnet_ni_free(ni);
+ 	}
+ 
+-	if (el != NULL)
++	if (el)
+ 		cfs_expr_list_free(el);
+ 
+ 	LIBCFS_FREE(tokens, tokensize);
+@@ -388,7 +387,7 @@ lnet_new_text_buf(int str_len)
+ 	}
+ 
+ 	LIBCFS_ALLOC(ltb, nob);
+-	if (ltb == NULL)
++	if (!ltb)
+ 		return NULL;
+ 
+ 	ltb->ltb_size = nob;
+@@ -442,7 +441,7 @@ lnet_str2tbs_sep(struct list_head *tbs, char *str)
+ 		nob = (int)(sep - str);
+ 		if (nob > 0) {
+ 			ltb = lnet_new_text_buf(nob);
+-			if (ltb == NULL) {
++			if (!ltb) {
+ 				lnet_free_text_bufs(&pending);
+ 				return -1;
  			}
-@@ -339,7 +339,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 		}
+@@ -488,7 +487,7 @@ lnet_expand1tb(struct list_head *list,
+ 	LASSERT(*sep2 == ']');
  
- 		str = cfs_trimwhite(str);
--		if (*str != 0) {
-+		if (*str) {
- 			tmp = str;
- 			goto failed_syntax;
- 		}
-@@ -434,7 +434,7 @@ lnet_str2tbs_sep(struct list_head *tbs, char *str)
- 			str++;
+ 	ltb = lnet_new_text_buf(len1 + itemlen + len2);
+-	if (ltb == NULL)
++	if (!ltb)
+ 		return -ENOMEM;
  
- 		/* scan for separator or comment */
--		for (sep = str; *sep != 0; sep++)
-+		for (sep = str; *sep; sep++)
- 			if (lnet_issep(*sep) || *sep == '#')
- 				break;
+ 	memcpy(ltb->ltb_text, str, len1);
+@@ -519,11 +518,11 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
+ 	INIT_LIST_HEAD(&pending);
  
-@@ -461,10 +461,10 @@ lnet_str2tbs_sep(struct list_head *tbs, char *str)
- 			/* scan for separator */
- 			do {
- 				sep++;
--			} while (*sep != 0 && !lnet_issep(*sep));
-+			} while (*sep && !lnet_issep(*sep));
- 		}
+ 	sep = strchr(str, '[');
+-	if (sep == NULL)			/* nothing to expand */
++	if (!sep)			/* nothing to expand */
+ 		return 0;
  
--		if (*sep == 0)
-+		if (!*sep)
- 			break;
+ 	sep2 = strchr(sep, ']');
+-	if (sep2 == NULL)
++	if (!sep2)
+ 		goto failed;
  
- 		str = sep + 1;
-@@ -539,7 +539,7 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
- 				/* simple string enumeration */
- 				if (lnet_expand1tb(&pending, str, sep, sep2,
- 						   parsed,
--						   (int)(enditem - parsed)) != 0) {
-+						   (int)(enditem - parsed))) {
- 					goto failed;
- 				}
- 				continue;
-@@ -554,7 +554,7 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
- 			goto failed;
+ 	for (parsed = sep; parsed < sep2; parsed = enditem) {
+@@ -599,7 +598,7 @@ lnet_parse_priority(char *str, unsigned int *priority, char **token)
+ 	int len;
  
- 		if (hi < 0 || lo < 0 || stride < 0 || hi < lo ||
--		    (hi - lo) % stride != 0)
-+		    (hi - lo) % stride)
- 			goto failed;
- 
- 		for (i = lo; i <= hi; i += stride) {
-@@ -564,7 +564,7 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
- 				goto failed;
- 
- 			if (lnet_expand1tb(&pending, str, sep, sep2,
--					   num, nob) != 0)
-+					   num, nob))
- 				goto failed;
- 		}
+ 	sep = strchr(str, LNET_PRIORITY_SEPARATOR);
+-	if (sep == NULL) {
++	if (!sep) {
+ 		*priority = 0;
+ 		return 0;
  	}
-@@ -656,7 +656,7 @@ lnet_parse_route(char *str, int *im_a_router)
- 		/* scan for token start */
- 		while (isspace(*sep))
- 			sep++;
--		if (*sep == 0) {
-+		if (!*sep) {
- 			if (ntokens < (got_hops ? 3 : 2))
- 				goto token_error;
- 			break;
-@@ -666,9 +666,9 @@ lnet_parse_route(char *str, int *im_a_router)
- 		token = sep++;
- 
- 		/* scan for token end */
--		while (*sep != 0 && !isspace(*sep))
-+		while (*sep && !isspace(*sep))
- 			sep++;
--		if (*sep != 0)
-+		if (*sep)
- 			*sep++ = 0;
- 
- 		if (ntokens == 1) {
-@@ -745,7 +745,7 @@ lnet_parse_route(char *str, int *im_a_router)
- 			}
- 
- 			rc = lnet_add_route(net, hops, nid, priority);
--			if (rc != 0) {
-+			if (rc) {
- 				CERROR("Can't create route to %s via %s\n",
- 				       libcfs_net2str(net),
- 				       libcfs_nid2str(nid));
-@@ -802,7 +802,7 @@ lnet_parse_routes(char *routes, int *im_a_router)
- 		rc = lnet_parse_route_tbs(&tbs, im_a_router);
- 	}
- 
--	LASSERT(lnet_tbnob == 0);
-+	LASSERT(!lnet_tbnob);
- 	return rc;
- }
- 
-@@ -814,7 +814,7 @@ lnet_match_network_token(char *token, int len, __u32 *ipaddrs, int nip)
- 	int i;
- 
- 	rc = cfs_ip_addr_parse(token, len, &list);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	for (rc = i = 0; !rc && i < nip; i++)
-@@ -847,18 +847,18 @@ lnet_match_network_tokens(char *net_entry, __u32 *ipaddrs, int nip)
- 		/* scan for token start */
- 		while (isspace(*sep))
- 			sep++;
--		if (*sep == 0)
-+		if (!*sep)
- 			break;
- 
- 		token = sep++;
- 
- 		/* scan for token end */
--		while (*sep != 0 && !isspace(*sep))
-+		while (*sep && !isspace(*sep))
- 			sep++;
--		if (*sep != 0)
-+		if (*sep)
- 			*sep++ = 0;
- 
--		if (ntokens++ == 0) {
-+		if (!ntokens++) {
- 			net = token;
- 			continue;
- 		}
-@@ -872,7 +872,8 @@ lnet_match_network_tokens(char *net_entry, __u32 *ipaddrs, int nip)
- 			return rc;
+@@ -683,7 +682,7 @@ lnet_parse_route(char *str, int *im_a_router)
  		}
  
--		matched |= (rc != 0);
-+		if (rc)
-+			matched |= 1;
- 	}
+ 		ltb = lnet_new_text_buf(strlen(token));
+-		if (ltb == NULL)
++		if (!ltb)
+ 			goto out;
  
- 	if (!matched)
-@@ -930,12 +931,12 @@ lnet_splitnets(char *source, struct list_head *nets)
+ 		strcpy(ltb->ltb_text, token);
+@@ -889,12 +888,12 @@ lnet_netspec2net(char *netspec)
+ 	char *bracket = strchr(netspec, '(');
+ 	__u32 net;
+ 
+-	if (bracket != NULL)
++	if (bracket)
+ 		*bracket = 0;
+ 
+ 	net = libcfs_str2net(netspec);
+ 
+-	if (bracket != NULL)
++	if (bracket)
+ 		*bracket = '(';
+ 
+ 	return net;
+@@ -922,9 +921,7 @@ lnet_splitnets(char *source, struct list_head *nets)
+ 		sep = strchr(tb->ltb_text, ',');
+ 		bracket = strchr(tb->ltb_text, '(');
+ 
+-		if (sep != NULL &&
+-		    bracket != NULL &&
+-		    bracket < sep) {
++		if (sep && bracket && bracket < sep) {
+ 			/* netspec lists interfaces... */
+ 
+ 			offset2 = offset + (int)(bracket - tb->ltb_text);
+@@ -932,7 +929,7 @@ lnet_splitnets(char *source, struct list_head *nets)
+ 
  			bracket = strchr(bracket + 1, ')');
  
- 			if (!bracket ||
--			    !(bracket[1] == ',' || bracket[1] == 0)) {
-+			    !(bracket[1] == ',' || !bracket[1])) {
+-			if (bracket == NULL ||
++			if (!bracket ||
+ 			    !(bracket[1] == ',' || bracket[1] == 0)) {
  				lnet_syntax("ip2nets", source, offset2, len);
  				return -EINVAL;
+@@ -941,7 +938,7 @@ lnet_splitnets(char *source, struct list_head *nets)
+ 			sep = (bracket[1] == 0) ? NULL : bracket + 1;
+ 		}
+ 
+-		if (sep != NULL)
++		if (sep)
+ 			*sep++ = 0;
+ 
+ 		net = lnet_netspec2net(tb->ltb_text);
+@@ -965,13 +962,13 @@ lnet_splitnets(char *source, struct list_head *nets)
  			}
- 
--			sep = (bracket[1] == 0) ? NULL : bracket + 1;
-+			sep = !bracket[1] ? NULL : bracket + 1;
  		}
  
- 		if (sep)
-@@ -1002,7 +1003,7 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
- 	INIT_LIST_HEAD(&raw_entries);
- 	if (lnet_str2tbs_sep(&raw_entries, ip2nets) < 0) {
- 		CERROR("Error parsing ip2nets\n");
--		LASSERT(lnet_tbnob == 0);
-+		LASSERT(!lnet_tbnob);
- 		return -EINVAL;
- 	}
+-		if (sep == NULL)
++		if (!sep)
+ 			return 0;
  
-@@ -1026,7 +1027,7 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
+ 		offset += (int)(sep - tb->ltb_text);
+ 		len = strlen(sep);
+ 		tb2 = lnet_new_text_buf(len);
+-		if (tb2 == NULL)
++		if (!tb2)
+ 			return -ENOMEM;
  
- 		list_del(&tb->ltb_list);
+ 		strncpy(tb2->ltb_text, sep, len);
+@@ -1118,7 +1115,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
+ 		return nif;
  
--		if (rc == 0) {		  /* no match */
-+		if (!rc) {		  /* no match */
- 			lnet_free_text_buf(tb);
- 			continue;
- 		}
-@@ -1072,7 +1073,7 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
- 			list_add_tail(&tb->ltb_list, &matched_nets);
- 
- 			len += snprintf(networks + len, sizeof(networks) - len,
--					"%s%s", (len == 0) ? "" : ",",
-+					"%s%s", !len ? "" : ",",
- 					tb->ltb_text);
- 
- 			if (len >= sizeof(networks)) {
-@@ -1089,7 +1090,7 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
- 	lnet_free_text_bufs(&raw_entries);
- 	lnet_free_text_bufs(&matched_nets);
- 	lnet_free_text_bufs(&current_nets);
--	LASSERT(lnet_tbnob == 0);
-+	LASSERT(!lnet_tbnob);
- 
- 	if (rc < 0)
- 		return rc;
-@@ -1126,7 +1127,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
- 			continue;
- 
- 		rc = lnet_ipif_query(ifnames[i], &up, &ipaddrs[nip], &netmask);
--		if (rc != 0) {
-+		if (rc) {
- 			CWARN("Can't query interface %s: %d\n",
- 			      ifnames[i], rc);
- 			continue;
-@@ -1177,7 +1178,7 @@ lnet_parse_ip2nets(char **networksp, char *ip2nets)
- 		return nip;
- 	}
- 
--	if (nip == 0) {
-+	if (!nip) {
- 		LCONSOLE_ERROR_MSG(0x118,
- 				   "No local IP interfaces for ip2nets to match\n");
- 		return -ENOENT;
-@@ -1191,7 +1192,7 @@ lnet_parse_ip2nets(char **networksp, char *ip2nets)
- 		return rc;
- 	}
- 
--	if (rc == 0) {
-+	if (!rc) {
- 		LCONSOLE_ERROR_MSG(0x11a,
- 				   "ip2nets does not match any local IP interfaces\n");
- 		return -ENOENT;
+ 	LIBCFS_ALLOC(ipaddrs, nif * sizeof(*ipaddrs));
+-	if (ipaddrs == NULL) {
++	if (!ipaddrs) {
+ 		CERROR("Can't allocate ipaddrs[%d]\n", nif);
+ 		lnet_ipif_free_enumeration(ifnames, nif);
+ 		return -ENOMEM;
+@@ -1151,7 +1148,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
+ 	} else {
+ 		if (nip > 0) {
+ 			LIBCFS_ALLOC(ipaddrs2, nip * sizeof(*ipaddrs2));
+-			if (ipaddrs2 == NULL) {
++			if (!ipaddrs2) {
+ 				CERROR("Can't allocate ipaddrs[%d]\n", nip);
+ 				nip = -ENOMEM;
+ 			} else {
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-index 34012e9..b8f248e 100644
+index 683eb45..34012e9 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-@@ -83,21 +83,21 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
- 	if (count)
- 		count = roundup_pow_of_two(count);
- 
--	if (callback != LNET_EQ_HANDLER_NONE && count != 0)
-+	if (callback != LNET_EQ_HANDLER_NONE && count)
- 		CWARN("EQ callback is guaranteed to get every event, do you still want to set eqcount %d for polling event which will have locking overhead? Please contact with developer to confirm\n", count);
- 
- 	/*
- 	 * count can be 0 if only need callback, we can eliminate
- 	 * overhead of enqueue event
- 	 */
--	if (count == 0 && callback == LNET_EQ_HANDLER_NONE)
-+	if (!count && callback == LNET_EQ_HANDLER_NONE)
+@@ -94,12 +94,12 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
  		return -EINVAL;
  
  	eq = lnet_eq_alloc();
- 	if (!eq)
+-	if (eq == NULL)
++	if (!eq)
  		return -ENOMEM;
  
--	if (count != 0) {
-+	if (count) {
+ 	if (count != 0) {
  		LIBCFS_ALLOC(eq->eq_events, count * sizeof(lnet_event_t));
- 		if (!eq->eq_events)
+-		if (eq->eq_events == NULL)
++		if (!eq->eq_events)
  			goto failed;
-@@ -185,7 +185,7 @@ LNetEQFree(lnet_handle_eq_t eqh)
- 
- 	cfs_percpt_for_each(ref, i, eq->eq_refs) {
- 		LASSERT(*ref >= 0);
--		if (*ref == 0)
-+		if (!*ref)
- 			continue;
- 
- 		CDEBUG(D_NET, "Event equeue (%d: %d) busy on destroy.\n",
-@@ -221,7 +221,7 @@ lnet_eq_enqueue_event(lnet_eq_t *eq, lnet_event_t *ev)
- 	/* MUST called with resource lock hold but w/o lnet_eq_wait_lock */
- 	int index;
- 
--	if (eq->eq_size == 0) {
-+	if (!eq->eq_size) {
- 		LASSERT(eq->eq_callback != LNET_EQ_HANDLER_NONE);
- 		eq->eq_callback(ev);
- 		return;
-@@ -321,7 +321,7 @@ __must_hold(&the_lnet.ln_eq_wait_lock)
- 	wait_queue_t wl;
- 	unsigned long now;
- 
--	if (tms == 0)
-+	if (!tms)
- 		return -1; /* don't want to wait and no new event */
- 
- 	init_waitqueue_entry(&wl, current);
-@@ -340,7 +340,7 @@ __must_hold(&the_lnet.ln_eq_wait_lock)
- 			tms = 0;
- 	}
- 
--	wait = tms != 0; /* might need to call here again */
-+	wait = tms; /* might need to call here again */
- 	*timeout_ms = tms;
- 
- 	lnet_eq_wait_lock();
-@@ -401,14 +401,14 @@ LNetEQPoll(lnet_handle_eq_t *eventqs, int neq, int timeout_ms,
- 			}
- 
- 			rc = lnet_eq_dequeue_event(eq, event);
--			if (rc != 0) {
-+			if (rc) {
- 				lnet_eq_wait_unlock();
- 				*which = i;
- 				return rc;
- 			}
- 		}
- 
--		if (wait == 0)
-+		if (!wait)
- 			break;
- 
  		/*
+ 		 * NB allocator has set all event sequence numbers to 0,
+@@ -114,7 +114,7 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
+ 
+ 	eq->eq_refs = cfs_percpt_alloc(lnet_cpt_table(),
+ 				       sizeof(*eq->eq_refs[0]));
+-	if (eq->eq_refs == NULL)
++	if (!eq->eq_refs)
+ 		goto failed;
+ 
+ 	/* MUST hold both exclusive lnet_res_lock */
+@@ -135,10 +135,10 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
+ 	return 0;
+ 
+ failed:
+-	if (eq->eq_events != NULL)
++	if (eq->eq_events)
+ 		LIBCFS_FREE(eq->eq_events, count * sizeof(lnet_event_t));
+ 
+-	if (eq->eq_refs != NULL)
++	if (eq->eq_refs)
+ 		cfs_percpt_free(eq->eq_refs);
+ 
+ 	lnet_eq_free(eq);
+@@ -178,7 +178,7 @@ LNetEQFree(lnet_handle_eq_t eqh)
+ 	lnet_eq_wait_lock();
+ 
+ 	eq = lnet_handle2eq(&eqh);
+-	if (eq == NULL) {
++	if (!eq) {
+ 		rc = -ENOENT;
+ 		goto out;
+ 	}
+@@ -206,9 +206,9 @@ LNetEQFree(lnet_handle_eq_t eqh)
+ 	lnet_eq_wait_unlock();
+ 	lnet_res_unlock(LNET_LOCK_EX);
+ 
+-	if (events != NULL)
++	if (events)
+ 		LIBCFS_FREE(events, size * sizeof(lnet_event_t));
+-	if (refs != NULL)
++	if (refs)
+ 		cfs_percpt_free(refs);
+ 
+ 	return rc;
+@@ -395,7 +395,7 @@ LNetEQPoll(lnet_handle_eq_t *eventqs, int neq, int timeout_ms,
+ 		for (i = 0; i < neq; i++) {
+ 			lnet_eq_t *eq = lnet_handle2eq(&eventqs[i]);
+ 
+-			if (eq == NULL) {
++			if (!eq) {
+ 				lnet_eq_wait_unlock();
+ 				return -ENOENT;
+ 			}
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
-index 490edfb..f26bb03 100644
+index 55bd7a1..490edfb 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-md.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
-@@ -46,7 +46,7 @@
- void
- lnet_md_unlink(lnet_libmd_t *md)
- {
--	if ((md->md_flags & LNET_MD_FLAG_ZOMBIE) == 0) {
-+	if (!(md->md_flags & LNET_MD_FLAG_ZOMBIE)) {
- 		/* first unlink attempt... */
- 		lnet_me_t *me = md->md_me;
+@@ -57,7 +57,7 @@ lnet_md_unlink(lnet_libmd_t *md)
+ 		 * and unlink it if it was created
+ 		 * with LNET_UNLINK
+ 		 */
+-		if (me != NULL) {
++		if (me) {
+ 			/* detach MD from portal */
+ 			lnet_ptl_detach_md(me, md);
+ 			if (me->me_unlink == LNET_UNLINK)
+@@ -75,7 +75,7 @@ lnet_md_unlink(lnet_libmd_t *md)
  
-@@ -68,7 +68,7 @@ lnet_md_unlink(lnet_libmd_t *md)
- 		lnet_res_lh_invalidate(&md->md_lh);
- 	}
+ 	CDEBUG(D_NET, "Unlinking md %p\n", md);
  
--	if (md->md_refcount != 0) {
-+	if (md->md_refcount) {
- 		CDEBUG(D_NET, "Queueing unlink of md %p\n", md);
- 		return;
- 	}
-@@ -105,8 +105,8 @@ lnet_md_build(lnet_libmd_t *lmd, lnet_md_t *umd, int unlink)
- 	lmd->md_refcount = 0;
- 	lmd->md_flags = (unlink == LNET_UNLINK) ? LNET_MD_FLAG_AUTO_UNLINK : 0;
+-	if (md->md_eq != NULL) {
++	if (md->md_eq) {
+ 		int cpt = lnet_cpt_of_cookie(md->md_lh.lh_cookie);
  
--	if ((umd->options & LNET_MD_IOVEC) != 0) {
--		if ((umd->options & LNET_MD_KIOV) != 0) /* Can't specify both */
-+	if (umd->options & LNET_MD_IOVEC) {
-+		if (umd->options & LNET_MD_KIOV) /* Can't specify both */
- 			return -EINVAL;
- 
- 		niov = umd->length;
-@@ -125,12 +125,12 @@ lnet_md_build(lnet_libmd_t *lmd, lnet_md_t *umd, int unlink)
- 
- 		lmd->md_length = total_length;
- 
--		if ((umd->options & LNET_MD_MAX_SIZE) != 0 && /* use max size */
-+		if ((umd->options & LNET_MD_MAX_SIZE) && /* use max size */
- 		    (umd->max_size < 0 ||
- 		     umd->max_size > total_length)) /* illegal max_size */
- 			return -EINVAL;
- 
--	} else if ((umd->options & LNET_MD_KIOV) != 0) {
-+	} else if (umd->options & LNET_MD_KIOV) {
- 		niov = umd->length;
- 		lmd->md_niov = umd->length;
- 		memcpy(lmd->md_iov.kiov, umd->start,
-@@ -147,7 +147,7 @@ lnet_md_build(lnet_libmd_t *lmd, lnet_md_t *umd, int unlink)
- 
- 		lmd->md_length = total_length;
- 
--		if ((umd->options & LNET_MD_MAX_SIZE) != 0 && /* max size used */
-+		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
- 		    (umd->max_size < 0 ||
- 		     umd->max_size > total_length)) /* illegal max_size */
- 			return -EINVAL;
-@@ -158,7 +158,7 @@ lnet_md_build(lnet_libmd_t *lmd, lnet_md_t *umd, int unlink)
- 		lmd->md_iov.iov[0].iov_base = umd->start;
- 		lmd->md_iov.iov[0].iov_len = umd->length;
- 
--		if ((umd->options & LNET_MD_MAX_SIZE) != 0 && /* max size used */
-+		if ((umd->options & LNET_MD_MAX_SIZE) && /* max size used */
- 		    (umd->max_size < 0 ||
- 		     umd->max_size > (int)umd->length)) /* illegal max_size */
- 			return -EINVAL;
-@@ -216,8 +216,8 @@ lnet_md_deconstruct(lnet_libmd_t *lmd, lnet_md_t *umd)
- 	 * and that's all.
+ 		LASSERT(*md->md_eq->eq_refs[cpt] > 0);
+@@ -187,7 +187,7 @@ lnet_md_link(lnet_libmd_t *md, lnet_handle_eq_t eq_handle, int cpt)
+ 	 * TODO - reevaluate what should be here in light of
+ 	 * the removal of the start and end events
+ 	 * maybe there we shouldn't even allow LNET_EQ_NONE!)
+-	 * LASSERT (eq == NULL);
++	 * LASSERT(!eq);
  	 */
- 	umd->start = lmd->md_start;
--	umd->length = ((lmd->md_options &
--			(LNET_MD_IOVEC | LNET_MD_KIOV)) == 0) ?
-+	umd->length = !(lmd->md_options &
-+		      (LNET_MD_IOVEC | LNET_MD_KIOV)) ?
- 		      lmd->md_length : lmd->md_niov;
- 	umd->threshold = lmd->md_threshold;
- 	umd->max_size = lmd->md_max_size;
-@@ -229,13 +229,13 @@ lnet_md_deconstruct(lnet_libmd_t *lmd, lnet_md_t *umd)
- static int
- lnet_md_validate(lnet_md_t *umd)
- {
--	if (!umd->start && umd->length != 0) {
-+	if (!umd->start && umd->length) {
- 		CERROR("MD start pointer can not be NULL with length %u\n",
- 		       umd->length);
- 		return -EINVAL;
- 	}
- 
--	if ((umd->options & (LNET_MD_KIOV | LNET_MD_IOVEC)) != 0 &&
-+	if ((umd->options & (LNET_MD_KIOV | LNET_MD_IOVEC)) &&
- 	    umd->length > LNET_MAX_IOV) {
- 		CERROR("Invalid option: too many fragments %u, %d max\n",
- 		       umd->length, LNET_MAX_IOV);
-@@ -284,10 +284,10 @@ LNetMDAttach(lnet_handle_me_t meh, lnet_md_t umd,
- 	LASSERT(the_lnet.ln_init);
- 	LASSERT(the_lnet.ln_refcount > 0);
- 
--	if (lnet_md_validate(&umd) != 0)
-+	if (lnet_md_validate(&umd))
- 		return -EINVAL;
- 
--	if ((umd.options & (LNET_MD_OP_GET | LNET_MD_OP_PUT)) == 0) {
-+	if (!(umd.options & (LNET_MD_OP_GET | LNET_MD_OP_PUT))) {
- 		CERROR("Invalid option: no MD_OP set\n");
- 		return -EINVAL;
- 	}
-@@ -300,7 +300,7 @@ LNetMDAttach(lnet_handle_me_t meh, lnet_md_t umd,
- 	cpt = lnet_cpt_of_cookie(meh.cookie);
- 
- 	lnet_res_lock(cpt);
--	if (rc != 0)
-+	if (rc)
- 		goto failed;
- 
+ 	if (!LNetHandleIsInvalid(eq_handle)) {
+ 		md->md_eq = lnet_handle2eq(&eq_handle);
+@@ -306,7 +306,7 @@ LNetMDAttach(lnet_handle_me_t meh, lnet_md_t umd,
  	me = lnet_handle2me(&meh);
-@@ -311,7 +311,7 @@ LNetMDAttach(lnet_handle_me_t meh, lnet_md_t umd,
+ 	if (!me)
+ 		rc = -ENOENT;
+-	else if (me->me_md != NULL)
++	else if (me->me_md)
+ 		rc = -EBUSY;
  	else
  		rc = lnet_md_link(md, umd.eq_handle, cpt);
- 
--	if (rc != 0)
-+	if (rc)
- 		goto failed;
- 
- 	/*
-@@ -363,10 +363,10 @@ LNetMDBind(lnet_md_t umd, lnet_unlink_t unlink, lnet_handle_md_t *handle)
- 	LASSERT(the_lnet.ln_init);
- 	LASSERT(the_lnet.ln_refcount > 0);
- 
--	if (lnet_md_validate(&umd) != 0)
-+	if (lnet_md_validate(&umd))
- 		return -EINVAL;
- 
--	if ((umd.options & (LNET_MD_OP_GET | LNET_MD_OP_PUT)) != 0) {
-+	if ((umd.options & (LNET_MD_OP_GET | LNET_MD_OP_PUT))) {
- 		CERROR("Invalid option: GET|PUT illegal on active MDs\n");
- 		return -EINVAL;
- 	}
-@@ -378,11 +378,11 @@ LNetMDBind(lnet_md_t umd, lnet_unlink_t unlink, lnet_handle_md_t *handle)
- 	rc = lnet_md_build(md, &umd, unlink);
- 
- 	cpt = lnet_res_lock_current();
--	if (rc != 0)
-+	if (rc)
- 		goto failed;
- 
- 	rc = lnet_md_link(md, umd.eq_handle, cpt);
--	if (rc != 0)
-+	if (rc)
- 		goto failed;
- 
- 	lnet_md2handle(handle, md);
 @@ -453,7 +453,7 @@ LNetMDUnlink(lnet_handle_md_t mdh)
  	 * when the LND is done, the completion event flags that the MD was
  	 * unlinked.  Otherwise, we enqueue an event now...
  	 */
--	if (md->md_eq && md->md_refcount == 0) {
-+	if (md->md_eq && !md->md_refcount) {
+-	if (md->md_eq != NULL && md->md_refcount == 0) {
++	if (md->md_eq && md->md_refcount == 0) {
  		lnet_build_unlink_event(md, &ev);
  		lnet_eq_enqueue_event(md->md_eq, &ev);
  	}
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-me.c b/drivers/staging/lustre/lnet/lnet/lib-me.c
-index ab17bdb..3c59c88 100644
+index 42fc99e..ab17bdb 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-me.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-me.c
-@@ -109,7 +109,7 @@ LNetMEAttach(unsigned int portal,
+@@ -91,11 +91,11 @@ LNetMEAttach(unsigned int portal,
  
- 	lnet_res_lh_initialize(the_lnet.ln_me_containers[mtable->mt_cpt],
- 			       &me->me_lh);
--	if (ignore_bits != 0)
-+	if (ignore_bits)
- 		head = &mtable->mt_mhash[LNET_MT_HASH_IGNORE];
- 	else
- 		head = lnet_mt_match_head(mtable, match_id, match_bits);
-@@ -248,7 +248,7 @@ LNetMEUnlink(lnet_handle_me_t meh)
+ 	mtable = lnet_mt_of_attach(portal, match_id,
+ 				   match_bits, ignore_bits, pos);
+-	if (mtable == NULL) /* can't match portal type */
++	if (!mtable) /* can't match portal type */
+ 		return -EPERM;
+ 
+ 	me = lnet_me_alloc();
+-	if (me == NULL)
++	if (!me)
+ 		return -ENOMEM;
+ 
+ 	lnet_res_lock(mtable->mt_cpt);
+@@ -163,7 +163,7 @@ LNetMEInsert(lnet_handle_me_t current_meh,
+ 		return -EPERM;
+ 
+ 	new_me = lnet_me_alloc();
+-	if (new_me == NULL)
++	if (!new_me)
+ 		return -ENOMEM;
+ 
+ 	cpt = lnet_cpt_of_cookie(current_meh.cookie);
+@@ -171,7 +171,7 @@ LNetMEInsert(lnet_handle_me_t current_meh,
+ 	lnet_res_lock(cpt);
+ 
+ 	current_me = lnet_handle2me(&current_meh);
+-	if (current_me == NULL) {
++	if (!current_me) {
+ 		lnet_me_free(new_me);
+ 
+ 		lnet_res_unlock(cpt);
+@@ -240,15 +240,15 @@ LNetMEUnlink(lnet_handle_me_t meh)
+ 	lnet_res_lock(cpt);
+ 
+ 	me = lnet_handle2me(&meh);
+-	if (me == NULL) {
++	if (!me) {
+ 		lnet_res_unlock(cpt);
+ 		return -ENOENT;
+ 	}
+ 
  	md = me->me_md;
- 	if (md) {
+-	if (md != NULL) {
++	if (md) {
  		md->md_flags |= LNET_MD_FLAG_ABORTED;
--		if (md->md_eq && md->md_refcount == 0) {
-+		if (md->md_eq && !md->md_refcount) {
+-		if (md->md_eq != NULL && md->md_refcount == 0) {
++		if (md->md_eq && md->md_refcount == 0) {
  			lnet_build_unlink_event(md, &ev);
  			lnet_eq_enqueue_event(md->md_eq, &ev);
  		}
+@@ -267,7 +267,7 @@ lnet_me_unlink(lnet_me_t *me)
+ {
+ 	list_del(&me->me_list);
+ 
+-	if (me->me_md != NULL) {
++	if (me->me_md) {
+ 		lnet_libmd_t *md = me->me_md;
+ 
+ 		/* detach MD from portal of this ME */
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 5e8a6ab..8f16913 100644
+index b40220a..5e8a6ab 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -57,7 +57,7 @@ lnet_fail_nid(lnet_nid_t nid, unsigned int threshold)
- 	LASSERT(the_lnet.ln_init);
- 
- 	/* NB: use lnet_net_lock(0) to serialize operations on test peers */
--	if (threshold != 0) {
-+	if (threshold) {
+@@ -60,7 +60,7 @@ lnet_fail_nid(lnet_nid_t nid, unsigned int threshold)
+ 	if (threshold != 0) {
  		/* Adding a new entry */
  		LIBCFS_ALLOC(tp, sizeof(*tp));
- 		if (!tp)
-@@ -80,7 +80,7 @@ lnet_fail_nid(lnet_nid_t nid, unsigned int threshold)
- 	list_for_each_safe(el, next, &the_lnet.ln_test_peers) {
- 		tp = list_entry(el, lnet_test_peer_t, tp_list);
+-		if (tp == NULL)
++		if (!tp)
+ 			return -ENOMEM;
  
--		if (tp->tp_threshold == 0 ||    /* needs culling anyway */
-+		if (!tp->tp_threshold ||    /* needs culling anyway */
- 		    nid == LNET_NID_ANY ||       /* removing all entries */
- 		    tp->tp_nid == nid) {	  /* matched this one */
- 			list_del(&tp->tp_list);
-@@ -116,7 +116,7 @@ fail_peer(lnet_nid_t nid, int outgoing)
- 	list_for_each_safe(el, next, &the_lnet.ln_test_peers) {
- 		tp = list_entry(el, lnet_test_peer_t, tp_list);
+ 		tp->tp_nid = nid;
+@@ -329,10 +329,10 @@ lnet_copy_kiov2kiov(unsigned int ndiov, lnet_kiov_t *diov, unsigned int doffset,
+ 			       siov->kiov_len - soffset);
+ 		this_nob = min(this_nob, nob);
  
--		if (tp->tp_threshold == 0) {
-+		if (!tp->tp_threshold) {
- 			/* zombie entry */
- 			if (outgoing) {
- 				/*
-@@ -137,7 +137,7 @@ fail_peer(lnet_nid_t nid, int outgoing)
- 			if (tp->tp_threshold != LNET_MD_THRESH_INF) {
- 				tp->tp_threshold--;
- 				if (outgoing &&
--				    tp->tp_threshold == 0) {
-+				    !tp->tp_threshold) {
- 					/* see above */
- 					list_del(&tp->tp_list);
- 					list_add(&tp->tp_list, &cull);
-@@ -179,7 +179,7 @@ lnet_copy_iov2iov(unsigned int ndiov, struct kvec *diov, unsigned int doffset,
- 	/* NB diov, siov are READ-ONLY */
- 	unsigned int this_nob;
+-		if (daddr == NULL)
++		if (!daddr)
+ 			daddr = ((char *)kmap(diov->kiov_page)) +
+ 				diov->kiov_offset + doffset;
+-		if (saddr == NULL)
++		if (!saddr)
+ 			saddr = ((char *)kmap(siov->kiov_page)) +
+ 				siov->kiov_offset + soffset;
  
--	if (nob == 0)
-+	if (!nob)
- 		return;
+@@ -367,9 +367,9 @@ lnet_copy_kiov2kiov(unsigned int ndiov, lnet_kiov_t *diov, unsigned int doffset,
+ 		}
+ 	} while (nob > 0);
  
- 	/* skip complete frags before 'doffset' */
-@@ -243,7 +243,7 @@ lnet_extract_iov(int dst_niov, struct kvec *dst,
- 	unsigned int frag_len;
- 	unsigned int niov;
+-	if (daddr != NULL)
++	if (daddr)
+ 		kunmap(diov->kiov_page);
+-	if (saddr != NULL)
++	if (saddr)
+ 		kunmap(siov->kiov_page);
+ }
+ EXPORT_SYMBOL(lnet_copy_kiov2kiov);
+@@ -411,7 +411,7 @@ lnet_copy_kiov2iov(unsigned int niov, struct kvec *iov, unsigned int iovoffset,
+ 			       (__kernel_size_t) kiov->kiov_len - kiovoffset);
+ 		this_nob = min(this_nob, nob);
  
--	if (len == 0)			   /* no data => */
-+	if (!len)			   /* no data => */
- 		return 0;		     /* no frags */
+-		if (addr == NULL)
++		if (!addr)
+ 			addr = ((char *)kmap(kiov->kiov_page)) +
+ 				kiov->kiov_offset + kiovoffset;
  
- 	LASSERT(src_niov > 0);
-@@ -301,7 +301,7 @@ lnet_copy_kiov2kiov(unsigned int ndiov, lnet_kiov_t *diov, unsigned int doffset,
- 	char *daddr = NULL;
- 	char *saddr = NULL;
+@@ -439,7 +439,7 @@ lnet_copy_kiov2iov(unsigned int niov, struct kvec *iov, unsigned int iovoffset,
  
--	if (nob == 0)
-+	if (!nob)
- 		return;
+ 	} while (nob > 0);
  
- 	LASSERT(!in_interrupt());
-@@ -383,7 +383,7 @@ lnet_copy_kiov2iov(unsigned int niov, struct kvec *iov, unsigned int iovoffset,
- 	unsigned int this_nob;
- 	char *addr = NULL;
+-	if (addr != NULL)
++	if (addr)
+ 		kunmap(kiov->kiov_page);
+ }
+ EXPORT_SYMBOL(lnet_copy_kiov2iov);
+@@ -482,7 +482,7 @@ lnet_copy_iov2kiov(unsigned int nkiov, lnet_kiov_t *kiov,
+ 			       iov->iov_len - iovoffset);
+ 		this_nob = min(this_nob, nob);
  
--	if (nob == 0)
-+	if (!nob)
- 		return;
+-		if (addr == NULL)
++		if (!addr)
+ 			addr = ((char *)kmap(kiov->kiov_page)) +
+ 				kiov->kiov_offset + kiovoffset;
  
- 	LASSERT(!in_interrupt());
-@@ -454,7 +454,7 @@ lnet_copy_iov2kiov(unsigned int nkiov, lnet_kiov_t *kiov,
- 	unsigned int this_nob;
- 	char *addr = NULL;
+@@ -509,7 +509,7 @@ lnet_copy_iov2kiov(unsigned int nkiov, lnet_kiov_t *kiov,
+ 		}
+ 	} while (nob > 0);
  
--	if (nob == 0)
-+	if (!nob)
- 		return;
- 
- 	LASSERT(!in_interrupt());
-@@ -527,7 +527,7 @@ lnet_extract_kiov(int dst_niov, lnet_kiov_t *dst,
- 	unsigned int frag_len;
- 	unsigned int niov;
- 
--	if (len == 0)			   /* no data => */
-+	if (!len)			   /* no data => */
- 		return 0;		     /* no frags */
- 
- 	LASSERT(src_niov > 0);
-@@ -577,7 +577,7 @@ lnet_ni_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
+-	if (addr != NULL)
++	if (addr)
+ 		kunmap(kiov->kiov_page);
+ }
+ EXPORT_SYMBOL(lnet_copy_iov2kiov);
+@@ -577,9 +577,9 @@ lnet_ni_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
  	int rc;
  
  	LASSERT(!in_interrupt());
--	LASSERT(mlen == 0 || msg);
-+	LASSERT(!mlen || msg);
+-	LASSERT(mlen == 0 || msg != NULL);
++	LASSERT(mlen == 0 || msg);
  
- 	if (msg) {
+-	if (msg != NULL) {
++	if (msg) {
  		LASSERT(msg->msg_receiving);
-@@ -589,7 +589,7 @@ lnet_ni_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
- 
- 		msg->msg_receiving = 0;
- 
--		if (mlen != 0) {
-+		if (mlen) {
- 			niov = msg->msg_niov;
- 			iov  = msg->msg_iov;
+ 		LASSERT(!msg->msg_sending);
+ 		LASSERT(rlen == msg->msg_len);
+@@ -595,7 +595,7 @@ lnet_ni_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
  			kiov = msg->msg_kiov;
-@@ -613,12 +613,12 @@ lnet_setpayloadbuffer(lnet_msg_t *msg)
- 	LASSERT(msg->msg_len > 0);
- 	LASSERT(!msg->msg_routing);
- 	LASSERT(md);
--	LASSERT(msg->msg_niov == 0);
-+	LASSERT(!msg->msg_niov);
- 	LASSERT(!msg->msg_iov);
- 	LASSERT(!msg->msg_kiov);
  
- 	msg->msg_niov = md->md_niov;
--	if ((md->md_options & LNET_MD_KIOV) != 0)
-+	if (md->md_options & LNET_MD_KIOV)
- 		msg->msg_kiov = md->md_iov.kiov;
- 	else
- 		msg->msg_iov = md->md_iov.iov;
-@@ -633,7 +633,7 @@ lnet_prep_send(lnet_msg_t *msg, int type, lnet_process_id_t target,
- 	msg->msg_len = len;
- 	msg->msg_offset = offset;
- 
--	if (len != 0)
-+	if (len)
- 		lnet_setpayloadbuffer(msg);
- 
- 	memset(&msg->msg_hdr, 0, sizeof(msg->msg_hdr));
-@@ -673,7 +673,7 @@ lnet_ni_eager_recv(lnet_ni_t *ni, lnet_msg_t *msg)
- 	msg->msg_rx_ready_delay = 1;
- 	rc = ni->ni_lnd->lnd_eager_recv(ni, msg->msg_private, msg,
- 					&msg->msg_private);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("recv from %s / send to %s aborted: eager_recv failed %d\n",
- 		       libcfs_nid2str(msg->msg_rxpeer->lp_nid),
- 		       libcfs_id2str(msg->msg_target), rc);
-@@ -698,7 +698,7 @@ lnet_ni_query_locked(lnet_ni_t *ni, lnet_peer_t *lp)
- 
- 	lp->lp_last_query = cfs_time_current();
- 
--	if (last_alive != 0) /* NI has updated timestamp */
-+	if (last_alive) /* NI has updated timestamp */
- 		lp->lp_last_alive = last_alive;
- }
- 
-@@ -727,7 +727,7 @@ lnet_peer_is_alive(lnet_peer_t *lp, unsigned long now)
- 	 * case, and moreover lp_last_alive at peer creation is assumed.
- 	 */
- 	if (alive && !lp->lp_alive &&
--	    !(lnet_isrouter(lp) && lp->lp_alive_count == 0))
-+	    !(lnet_isrouter(lp) && !lp->lp_alive_count))
- 		lnet_notify_locked(lp, 0, 1, lp->lp_last_alive);
- 
- 	return alive;
-@@ -752,7 +752,7 @@ lnet_peer_alive_locked(lnet_peer_t *lp)
- 	 * Peer appears dead, but we should avoid frequent NI queries (at
- 	 * most once per lnet_queryinterval seconds).
- 	 */
--	if (lp->lp_last_query != 0) {
-+	if (lp->lp_last_query) {
- 		static const int lnet_queryinterval = 1;
- 
- 		unsigned long next_query =
-@@ -805,8 +805,8 @@ lnet_post_send_locked(lnet_msg_t *msg, int do_send)
- 	LASSERT(msg->msg_tx_committed);
- 
- 	/* NB 'lp' is always the next hop */
--	if ((msg->msg_target.pid & LNET_PID_USERFLAG) == 0 &&
--	    lnet_peer_alive_locked(lp) == 0) {
-+	if (!(msg->msg_target.pid & LNET_PID_USERFLAG) &&
-+	    !lnet_peer_alive_locked(lp)) {
- 		the_lnet.ln_counters[cpt]->drop_count++;
- 		the_lnet.ln_counters[cpt]->drop_length += msg->msg_len;
- 		lnet_net_unlock(cpt);
-@@ -821,7 +821,7 @@ lnet_post_send_locked(lnet_msg_t *msg, int do_send)
+ 			LASSERT(niov > 0);
+-			LASSERT((iov == NULL) != (kiov == NULL));
++			LASSERT(!iov != !kiov);
+ 		}
  	}
  
- 	if (msg->msg_md &&
--	    (msg->msg_md->md_flags & LNET_MD_FLAG_ABORTED) != 0) {
-+	    (msg->msg_md->md_flags & LNET_MD_FLAG_ABORTED)) {
+@@ -612,10 +612,10 @@ lnet_setpayloadbuffer(lnet_msg_t *msg)
+ 
+ 	LASSERT(msg->msg_len > 0);
+ 	LASSERT(!msg->msg_routing);
+-	LASSERT(md != NULL);
++	LASSERT(md);
+ 	LASSERT(msg->msg_niov == 0);
+-	LASSERT(msg->msg_iov == NULL);
+-	LASSERT(msg->msg_kiov == NULL);
++	LASSERT(!msg->msg_iov);
++	LASSERT(!msg->msg_kiov);
+ 
+ 	msg->msg_niov = md->md_niov;
+ 	if ((md->md_options & LNET_MD_KIOV) != 0)
+@@ -668,7 +668,7 @@ lnet_ni_eager_recv(lnet_ni_t *ni, lnet_msg_t *msg)
+ 	LASSERT(!msg->msg_sending);
+ 	LASSERT(msg->msg_receiving);
+ 	LASSERT(!msg->msg_rx_ready_delay);
+-	LASSERT(ni->ni_lnd->lnd_eager_recv != NULL);
++	LASSERT(ni->ni_lnd->lnd_eager_recv);
+ 
+ 	msg->msg_rx_ready_delay = 1;
+ 	rc = ni->ni_lnd->lnd_eager_recv(ni, msg->msg_private, msg,
+@@ -690,7 +690,7 @@ lnet_ni_query_locked(lnet_ni_t *ni, lnet_peer_t *lp)
+ 	unsigned long last_alive = 0;
+ 
+ 	LASSERT(lnet_peer_aliveness_enabled(lp));
+-	LASSERT(ni->ni_lnd->lnd_query != NULL);
++	LASSERT(ni->ni_lnd->lnd_query);
+ 
+ 	lnet_net_unlock(lp->lp_cpt);
+ 	ni->ni_lnd->lnd_query(ni, lp->lp_nid, &last_alive);
+@@ -820,7 +820,7 @@ lnet_post_send_locked(lnet_msg_t *msg, int do_send)
+ 		return EHOSTUNREACH;
+ 	}
+ 
+-	if (msg->msg_md != NULL &&
++	if (msg->msg_md &&
+ 	    (msg->msg_md->md_flags & LNET_MD_FLAG_ABORTED) != 0) {
  		lnet_net_unlock(cpt);
  
- 		CNETERR("Aborting message for %s: LNetM[DE]Unlink() already called on the MD/ME.\n",
-@@ -910,7 +910,7 @@ lnet_post_routed_recv_locked(lnet_msg_t *msg, int do_recv)
+@@ -908,8 +908,8 @@ lnet_post_routed_recv_locked(lnet_msg_t *msg, int do_recv)
+ 	lnet_rtrbufpool_t *rbp;
+ 	lnet_rtrbuf_t *rb;
  
- 	LASSERT(!msg->msg_iov);
- 	LASSERT(!msg->msg_kiov);
--	LASSERT(msg->msg_niov == 0);
-+	LASSERT(!msg->msg_niov);
+-	LASSERT(msg->msg_iov == NULL);
+-	LASSERT(msg->msg_kiov == NULL);
++	LASSERT(!msg->msg_iov);
++	LASSERT(!msg->msg_kiov);
+ 	LASSERT(msg->msg_niov == 0);
  	LASSERT(msg->msg_routing);
  	LASSERT(msg->msg_receiving);
- 	LASSERT(!msg->msg_sending);
-@@ -1157,8 +1157,8 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
- 		lp = rtr->lr_gateway;
+@@ -1026,7 +1026,7 @@ lnet_return_tx_credits_locked(lnet_msg_t *msg)
+ 		}
+ 	}
  
- 		if (!lp->lp_alive || /* gateway is down */
--		    ((lp->lp_ping_feats & LNET_PING_FEAT_NI_STATUS) != 0 &&
--		     rtr->lr_downis != 0)) /* NI to target is down */
-+		    ((lp->lp_ping_feats & LNET_PING_FEAT_NI_STATUS) &&
-+		     rtr->lr_downis)) /* NI to target is down */
+-	if (txpeer != NULL) {
++	if (txpeer) {
+ 		msg->msg_txpeer = NULL;
+ 		lnet_peer_decref_locked(txpeer);
+ 	}
+@@ -1048,7 +1048,7 @@ lnet_return_rx_credits_locked(lnet_msg_t *msg)
+ 		 * there until it gets one allocated, or aborts the wait
+ 		 * itself
+ 		 */
+-		LASSERT(msg->msg_kiov != NULL);
++		LASSERT(msg->msg_kiov);
+ 
+ 		rb = list_entry(msg->msg_kiov, lnet_rtrbuf_t, rb_kiov[0]);
+ 		rbp = rb->rb_pool;
+@@ -1089,7 +1089,7 @@ lnet_return_rx_credits_locked(lnet_msg_t *msg)
+ 			(void) lnet_post_routed_recv_locked(msg2, 1);
+ 		}
+ 	}
+-	if (rxpeer != NULL) {
++	if (rxpeer) {
+ 		msg->msg_rxpeer = NULL;
+ 		lnet_peer_decref_locked(rxpeer);
+ 	}
+@@ -1147,7 +1147,7 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
+ 	 * rtr_nid nid, otherwise find the best gateway I can use
+ 	 */
+ 	rnet = lnet_find_net_locked(LNET_NIDNET(target));
+-	if (rnet == NULL)
++	if (!rnet)
+ 		return NULL;
+ 
+ 	lp_best = NULL;
+@@ -1161,13 +1161,13 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
+ 		     rtr->lr_downis != 0)) /* NI to target is down */
  			continue;
  
- 		if (ni && lp->lp_ni != ni)
-@@ -1283,7 +1283,7 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
- 		rc = lnet_nid2peer_locked(&lp, dst_nid, cpt);
- 		/* lp has ref on src_ni; lose mine */
- 		lnet_ni_decref_locked(src_ni, cpt);
--		if (rc != 0) {
-+		if (rc) {
- 			lnet_net_unlock(cpt);
- 			LCONSOLE_WARN("Error %d finding peer %s\n", rc,
- 				      libcfs_nid2str(dst_nid));
-@@ -1365,10 +1365,10 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
- 	if (rc == EHOSTUNREACH || rc == ECANCELED)
- 		return -rc;
+-		if (ni != NULL && lp->lp_ni != ni)
++		if (ni && lp->lp_ni != ni)
+ 			continue;
  
--	if (rc == 0)
-+	if (!rc)
- 		lnet_ni_send(src_ni, msg);
+ 		if (lp->lp_nid == rtr_nid) /* it's pre-determined router */
+ 			return lp;
  
--	return 0; /* rc == 0 or EAGAIN */
-+	return 0; /* !rc or EAGAIN */
- }
- 
- static void
-@@ -1387,7 +1387,7 @@ lnet_recv_put(lnet_ni_t *ni, lnet_msg_t *msg)
- {
- 	lnet_hdr_t *hdr = &msg->msg_hdr;
- 
--	if (msg->msg_wanted != 0)
-+	if (msg->msg_wanted)
- 		lnet_setpayloadbuffer(msg);
- 
- 	lnet_build_msg_event(msg, LNET_EVENT_PUT);
-@@ -1396,8 +1396,8 @@ lnet_recv_put(lnet_ni_t *ni, lnet_msg_t *msg)
- 	 * Must I ACK?  If so I'll grab the ack_wmd out of the header and put
- 	 * it back into the ACK during lnet_finalize()
+-		if (lp_best == NULL) {
++		if (!lp_best) {
+ 			rtr_best = rtr;
+ 			rtr_last = rtr;
+ 			lp_best = lp;
+@@ -1191,7 +1191,7 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
+ 	 * so we can round-robin all routers, it's race and inaccurate but
+ 	 * harmless and functional
  	 */
--	msg->msg_ack = (!lnet_is_wire_handle_none(&hdr->msg.put.ack_wmd) &&
--			(msg->msg_md->md_options & LNET_MD_ACK_DISABLE) == 0);
-+	msg->msg_ack = !lnet_is_wire_handle_none(&hdr->msg.put.ack_wmd) &&
-+		       !(msg->msg_md->md_options & LNET_MD_ACK_DISABLE);
+-	if (rtr_best != NULL)
++	if (rtr_best)
+ 		rtr_best->lr_seq = rtr_last->lr_seq + 1;
+ 	return lp_best;
+ }
+@@ -1212,8 +1212,8 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
+ 	 * but we might want to use pre-determined router for ACK/REPLY
+ 	 * in the future
+ 	 */
+-	/* NB: ni != NULL == interface pre-determined (ACK/REPLY) */
+-	LASSERT(msg->msg_txpeer == NULL);
++	/* NB: ni == interface pre-determined (ACK/REPLY) */
++	LASSERT(!msg->msg_txpeer);
+ 	LASSERT(!msg->msg_sending);
+ 	LASSERT(!msg->msg_target_is_router);
+ 	LASSERT(!msg->msg_receiving);
+@@ -1234,7 +1234,7 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
+ 		src_ni = NULL;
+ 	} else {
+ 		src_ni = lnet_nid2ni_locked(src_nid, cpt);
+-		if (src_ni == NULL) {
++		if (!src_ni) {
+ 			lnet_net_unlock(cpt);
+ 			LCONSOLE_WARN("Can't send to %s: src %s is not a local nid\n",
+ 				      libcfs_nid2str(dst_nid),
+@@ -1247,8 +1247,8 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
+ 	/* Is this for someone on a local network? */
+ 	local_ni = lnet_net2ni_locked(LNET_NIDNET(dst_nid), cpt);
  
- 	lnet_ni_recv(ni, msg->msg_private, msg, msg->msg_rx_delayed,
- 		     msg->msg_offset, msg->msg_wanted, hdr->payload_length);
-@@ -1440,7 +1440,7 @@ lnet_parse_put(lnet_ni_t *ni, lnet_msg_t *msg)
- 			return 0;
+-	if (local_ni != NULL) {
+-		if (src_ni == NULL) {
++	if (local_ni) {
++		if (!src_ni) {
+ 			src_ni = local_ni;
+ 			src_nid = src_ni->ni_nid;
+ 		} else if (src_ni == local_ni) {
+@@ -1294,8 +1294,8 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
+ 	} else {
+ 		/* sending to a remote network */
+ 		lp = lnet_find_route_locked(src_ni, dst_nid, rtr_nid);
+-		if (lp == NULL) {
+-			if (src_ni != NULL)
++		if (!lp) {
++			if (src_ni)
+ 				lnet_ni_decref_locked(src_ni, cpt);
+ 			lnet_net_unlock(cpt);
  
- 		rc = lnet_ni_eager_recv(ni, msg);
--		if (rc == 0)
-+		if (!rc)
- 			goto again;
- 		/* fall through */
+@@ -1314,7 +1314,7 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
+ 		if (rtr_nid != lp->lp_nid) {
+ 			cpt2 = lnet_cpt_of_nid_locked(lp->lp_nid);
+ 			if (cpt2 != cpt) {
+-				if (src_ni != NULL)
++				if (src_ni)
+ 					lnet_ni_decref_locked(src_ni, cpt);
+ 				lnet_net_unlock(cpt);
  
-@@ -1536,7 +1536,7 @@ lnet_parse_reply(lnet_ni_t *ni, lnet_msg_t *msg)
+@@ -1328,7 +1328,7 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
+ 		       libcfs_nid2str(dst_nid), libcfs_nid2str(lp->lp_nid),
+ 		       lnet_msgtyp2str(msg->msg_type), msg->msg_len);
+ 
+-		if (src_ni == NULL) {
++		if (!src_ni) {
+ 			src_ni = lp->lp_ni;
+ 			src_nid = src_ni->ni_nid;
+ 		} else {
+@@ -1355,7 +1355,7 @@ lnet_send(lnet_nid_t src_nid, lnet_msg_t *msg, lnet_nid_t rtr_nid)
+ 
+ 	LASSERT(!msg->msg_peertxcredit);
+ 	LASSERT(!msg->msg_txcredit);
+-	LASSERT(msg->msg_txpeer == NULL);
++	LASSERT(!msg->msg_txpeer);
+ 
+ 	msg->msg_txpeer = lp;		   /* msg takes my ref on lp */
+ 
+@@ -1423,7 +1423,7 @@ lnet_parse_put(lnet_ni_t *ni, lnet_msg_t *msg)
+ 	info.mi_roffset	= hdr->msg.put.offset;
+ 	info.mi_mbits	= hdr->msg.put.match_bits;
+ 
+-	msg->msg_rx_ready_delay = ni->ni_lnd->lnd_eager_recv == NULL;
++	msg->msg_rx_ready_delay = !ni->ni_lnd->lnd_eager_recv;
+ 
+  again:
+ 	rc = lnet_ptl_match_md(&info, msg);
+@@ -1536,13 +1536,13 @@ lnet_parse_reply(lnet_ni_t *ni, lnet_msg_t *msg)
  
  	/* NB handles only looked up by creator (no flips) */
  	md = lnet_wire_handle2md(&hdr->msg.reply.dst_wmd);
--	if (!md || md->md_threshold == 0 || md->md_me) {
-+	if (!md || !md->md_threshold || md->md_me) {
+-	if (md == NULL || md->md_threshold == 0 || md->md_me != NULL) {
++	if (!md || md->md_threshold == 0 || md->md_me) {
  		CNETERR("%s: Dropping REPLY from %s for %s MD %#llx.%#llx\n",
  			libcfs_nid2str(ni->ni_nid), libcfs_id2str(src),
- 			!md ? "invalid" : "inactive",
-@@ -1550,13 +1550,13 @@ lnet_parse_reply(lnet_ni_t *ni, lnet_msg_t *msg)
- 		return ENOENT;		  /* +ve: OK but no match */
- 	}
+-			(md == NULL) ? "invalid" : "inactive",
++			!md ? "invalid" : "inactive",
+ 			hdr->msg.reply.dst_wmd.wh_interface_cookie,
+ 			hdr->msg.reply.dst_wmd.wh_object_cookie);
+-		if (md != NULL && md->md_me != NULL)
++		if (md && md->md_me)
+ 			CERROR("REPLY MD also attached to portal %d\n",
+ 			       md->md_me->me_portal);
  
--	LASSERT(md->md_offset == 0);
-+	LASSERT(!md->md_offset);
- 
- 	rlength = hdr->payload_length;
- 	mlength = min_t(uint, rlength, md->md_length);
- 
- 	if (mlength < rlength &&
--	    (md->md_options & LNET_MD_TRUNCATE) == 0) {
-+	    !(md->md_options & LNET_MD_TRUNCATE)) {
- 		CNETERR("%s: Dropping REPLY from %s length %d for MD %#llx would overflow (%d)\n",
- 			libcfs_nid2str(ni->ni_nid), libcfs_id2str(src),
- 			rlength, hdr->msg.reply.dst_wmd.wh_object_cookie,
-@@ -1571,7 +1571,7 @@ lnet_parse_reply(lnet_ni_t *ni, lnet_msg_t *msg)
- 
- 	lnet_msg_attach_md(msg, md, 0, mlength);
- 
--	if (mlength != 0)
-+	if (mlength)
- 		lnet_setpayloadbuffer(msg);
- 
- 	lnet_res_unlock(cpt);
-@@ -1602,7 +1602,7 @@ lnet_parse_ack(lnet_ni_t *ni, lnet_msg_t *msg)
+@@ -1602,15 +1602,15 @@ lnet_parse_ack(lnet_ni_t *ni, lnet_msg_t *msg)
  
  	/* NB handles only looked up by creator (no flips) */
  	md = lnet_wire_handle2md(&hdr->msg.ack.dst_wmd);
--	if (!md || md->md_threshold == 0 || md->md_me) {
-+	if (!md || !md->md_threshold || md->md_me) {
+-	if (md == NULL || md->md_threshold == 0 || md->md_me != NULL) {
++	if (!md || md->md_threshold == 0 || md->md_me) {
  		/* Don't moan; this is expected */
  		CDEBUG(D_NET,
  		       "%s: Dropping ACK from %s to %s MD %#llx.%#llx\n",
-@@ -1648,7 +1648,7 @@ lnet_parse_forward_locked(lnet_ni_t *ni, lnet_msg_t *msg)
- 		}
+ 		       libcfs_nid2str(ni->ni_nid), libcfs_id2str(src),
+-		       (md == NULL) ? "invalid" : "inactive",
++		       !md ? "invalid" : "inactive",
+ 		       hdr->msg.ack.dst_wmd.wh_interface_cookie,
+ 		       hdr->msg.ack.dst_wmd.wh_object_cookie);
+-		if (md != NULL && md->md_me != NULL)
++		if (md && md->md_me)
+ 			CERROR("Source MD also attached to portal %d\n",
+ 			       md->md_me->me_portal);
+ 
+@@ -1639,7 +1639,7 @@ lnet_parse_forward_locked(lnet_ni_t *ni, lnet_msg_t *msg)
+ 
+ 	if (msg->msg_rxpeer->lp_rtrcredits <= 0 ||
+ 	    lnet_msg2bufpool(msg)->rbp_credits <= 0) {
+-		if (ni->ni_lnd->lnd_eager_recv == NULL) {
++		if (!ni->ni_lnd->lnd_eager_recv) {
+ 			msg->msg_rx_ready_delay = 1;
+ 		} else {
+ 			lnet_net_unlock(msg->msg_rx_cpt);
+@@ -1794,7 +1794,7 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
+ 
+ 		/* NB: so far here is the only place to set NI status to "up */
+ 		ni->ni_last_alive = ktime_get_real_seconds();
+-		if (ni->ni_status != NULL &&
++		if (ni->ni_status &&
+ 		    ni->ni_status->ns_status == LNET_NI_STATUS_DOWN)
+ 			ni->ni_status->ns_status = LNET_NI_STATUS_UP;
+ 		lnet_ni_unlock(ni);
+@@ -1857,7 +1857,7 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
  	}
  
--	if (rc == 0)
-+	if (!rc)
- 		rc = lnet_post_routed_recv_locked(msg, 0);
- 	return rc;
- }
-@@ -1893,7 +1893,7 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
- 
- 	lnet_net_lock(cpt);
- 	rc = lnet_nid2peer_locked(&msg->msg_rxpeer, from_nid, cpt);
--	if (rc != 0) {
-+	if (rc) {
- 		lnet_net_unlock(cpt);
- 		CERROR("%s, src %s: Dropping %s (error %d looking up sender)\n",
+ 	msg = lnet_msg_alloc();
+-	if (msg == NULL) {
++	if (!msg) {
+ 		CERROR("%s, src %s: Dropping %s (out of memory)\n",
  		       libcfs_nid2str(from_nid), libcfs_nid2str(src_nid),
-@@ -1923,7 +1923,7 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
+ 		       lnet_msgtyp2str(type));
+@@ -1957,7 +1957,7 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
+ 	LASSERT(rc == ENOENT);
  
- 		if (rc < 0)
- 			goto free_drop;
--		if (rc == 0) {
-+		if (!rc) {
- 			lnet_ni_recv(ni, msg->msg_private, msg, 0,
- 				     0, payload_length, payload_length);
- 		}
-@@ -1951,7 +1951,7 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
- 		goto free_drop;  /* prevent an unused label if !kernel */
+  free_drop:
+-	LASSERT(msg->msg_md == NULL);
++	LASSERT(!msg->msg_md);
+ 	lnet_finalize(ni, msg, rc);
+ 
+  drop:
+@@ -1979,9 +1979,9 @@ lnet_drop_delayed_msg_list(struct list_head *head, char *reason)
+ 		id.nid = msg->msg_hdr.src_nid;
+ 		id.pid = msg->msg_hdr.src_pid;
+ 
+-		LASSERT(msg->msg_md == NULL);
++		LASSERT(!msg->msg_md);
+ 		LASSERT(msg->msg_rx_delayed);
+-		LASSERT(msg->msg_rxpeer != NULL);
++		LASSERT(msg->msg_rxpeer);
+ 		LASSERT(msg->msg_hdr.type == LNET_MSG_PUT);
+ 
+ 		CWARN("Dropping delayed PUT from %s portal %d match %llu offset %d length %d: %s\n",
+@@ -2026,8 +2026,8 @@ lnet_recv_delayed_msg_list(struct list_head *head)
+ 		id.pid = msg->msg_hdr.src_pid;
+ 
+ 		LASSERT(msg->msg_rx_delayed);
+-		LASSERT(msg->msg_md != NULL);
+-		LASSERT(msg->msg_rxpeer != NULL);
++		LASSERT(msg->msg_md);
++		LASSERT(msg->msg_rxpeer);
+ 		LASSERT(msg->msg_hdr.type == LNET_MSG_PUT);
+ 
+ 		CDEBUG(D_NET, "Resuming delayed PUT from %s portal %d match %llu offset %d length %d.\n",
+@@ -2106,7 +2106,7 @@ LNetPut(lnet_nid_t self, lnet_handle_md_t mdh, lnet_ack_req_t ack,
  	}
  
--	if (rc == 0)
-+	if (!rc)
- 		return 0;
- 
- 	LASSERT(rc == ENOENT);
-@@ -2117,7 +2117,7 @@ LNetPut(lnet_nid_t self, lnet_handle_md_t mdh, lnet_ack_req_t ack,
+ 	msg = lnet_msg_alloc();
+-	if (msg == NULL) {
++	if (!msg) {
+ 		CERROR("Dropping PUT to %s: ENOMEM on lnet_msg_t\n",
+ 		       libcfs_id2str(target));
+ 		return -ENOMEM;
+@@ -2117,11 +2117,11 @@ LNetPut(lnet_nid_t self, lnet_handle_md_t mdh, lnet_ack_req_t ack,
  	lnet_res_lock(cpt);
  
  	md = lnet_handle2md(&mdh);
--	if (!md || md->md_threshold == 0 || md->md_me) {
-+	if (!md || !md->md_threshold || md->md_me) {
+-	if (md == NULL || md->md_threshold == 0 || md->md_me != NULL) {
++	if (!md || md->md_threshold == 0 || md->md_me) {
  		CERROR("Dropping PUT (%llu:%d:%s): MD (%d) invalid\n",
  		       match_bits, portal, libcfs_id2str(target),
- 		       !md ? -1 : md->md_threshold);
-@@ -2159,7 +2159,7 @@ LNetPut(lnet_nid_t self, lnet_handle_md_t mdh, lnet_ack_req_t ack,
- 	lnet_build_msg_event(msg, LNET_EVENT_SEND);
+-		       md == NULL ? -1 : md->md_threshold);
+-		if (md != NULL && md->md_me != NULL)
++		       !md ? -1 : md->md_threshold);
++		if (md && md->md_me)
+ 			CERROR("Source MD also attached to portal %d\n",
+ 			       md->md_me->me_portal);
+ 		lnet_res_unlock(cpt);
+@@ -2194,7 +2194,7 @@ lnet_create_reply_msg(lnet_ni_t *ni, lnet_msg_t *getmsg)
  
- 	rc = lnet_send(self, msg, LNET_NID_ANY);
--	if (rc != 0) {
-+	if (rc) {
- 		CNETERR("Error sending PUT to %s: %d\n",
- 			libcfs_id2str(target), rc);
- 		lnet_finalize(NULL, msg, rc);
-@@ -2200,7 +2200,7 @@ lnet_create_reply_msg(lnet_ni_t *ni, lnet_msg_t *getmsg)
+ 	LASSERT(getmd->md_refcount > 0);
+ 
+-	if (msg == NULL) {
++	if (!msg) {
+ 		CERROR("%s: Dropping REPLY from %s: can't allocate msg\n",
+ 		       libcfs_nid2str(ni->ni_nid), libcfs_id2str(peer_id));
  		goto drop;
+@@ -2241,7 +2241,7 @@ lnet_create_reply_msg(lnet_ni_t *ni, lnet_msg_t *getmsg)
+ 	the_lnet.ln_counters[cpt]->drop_length += getmd->md_length;
+ 	lnet_net_unlock(cpt);
+ 
+-	if (msg != NULL)
++	if (msg)
+ 		lnet_msg_free(msg);
+ 
+ 	return NULL;
+@@ -2255,7 +2255,7 @@ lnet_set_reply_msg_len(lnet_ni_t *ni, lnet_msg_t *reply, unsigned int len)
+ 	 * Set the REPLY length, now the RDMA that elides the REPLY message has
+ 	 * completed and I know it.
+ 	 */
+-	LASSERT(reply != NULL);
++	LASSERT(reply);
+ 	LASSERT(reply->msg_type == LNET_MSG_GET);
+ 	LASSERT(reply->msg_ev.type == LNET_EVENT_REPLY);
+ 
+@@ -2311,7 +2311,7 @@ LNetGet(lnet_nid_t self, lnet_handle_md_t mdh,
  	}
  
--	if (getmd->md_threshold == 0) {
-+	if (!getmd->md_threshold) {
- 		CERROR("%s: Dropping REPLY from %s for inactive MD %p\n",
- 		       libcfs_nid2str(ni->ni_nid), libcfs_id2str(peer_id),
- 		       getmd);
-@@ -2208,7 +2208,7 @@ lnet_create_reply_msg(lnet_ni_t *ni, lnet_msg_t *getmsg)
- 		goto drop;
- 	}
- 
--	LASSERT(getmd->md_offset == 0);
-+	LASSERT(!getmd->md_offset);
- 
- 	CDEBUG(D_NET, "%s: Reply from %s md %p\n",
- 	       libcfs_nid2str(ni->ni_nid), libcfs_id2str(peer_id), getmd);
-@@ -2321,7 +2321,7 @@ LNetGet(lnet_nid_t self, lnet_handle_md_t mdh,
+ 	msg = lnet_msg_alloc();
+-	if (msg == NULL) {
++	if (!msg) {
+ 		CERROR("Dropping GET to %s: ENOMEM on lnet_msg_t\n",
+ 		       libcfs_id2str(target));
+ 		return -ENOMEM;
+@@ -2321,11 +2321,11 @@ LNetGet(lnet_nid_t self, lnet_handle_md_t mdh,
  	lnet_res_lock(cpt);
  
  	md = lnet_handle2md(&mdh);
--	if (!md || md->md_threshold == 0 || md->md_me) {
-+	if (!md || !md->md_threshold || md->md_me) {
+-	if (md == NULL || md->md_threshold == 0 || md->md_me != NULL) {
++	if (!md || md->md_threshold == 0 || md->md_me) {
  		CERROR("Dropping GET (%llu:%d:%s): MD (%d) invalid\n",
  		       match_bits, portal, libcfs_id2str(target),
- 		       !md ? -1 : md->md_threshold);
+-		       md == NULL ? -1 : md->md_threshold);
+-		if (md != NULL && md->md_me != NULL)
++		       !md ? -1 : md->md_threshold);
++		if (md && md->md_me)
+ 			CERROR("REPLY MD also attached to portal %d\n",
+ 			       md->md_me->me_portal);
+ 
+@@ -2409,9 +2409,9 @@ LNetDist(lnet_nid_t dstnid, lnet_nid_t *srcnidp, __u32 *orderp)
+ 		ni = list_entry(e, lnet_ni_t, ni_list);
+ 
+ 		if (ni->ni_nid == dstnid) {
+-			if (srcnidp != NULL)
++			if (srcnidp)
+ 				*srcnidp = dstnid;
+-			if (orderp != NULL) {
++			if (orderp) {
+ 				if (LNET_NETTYP(LNET_NIDNET(dstnid)) == LOLND)
+ 					*orderp = 0;
+ 				else
+@@ -2423,9 +2423,9 @@ LNetDist(lnet_nid_t dstnid, lnet_nid_t *srcnidp, __u32 *orderp)
+ 		}
+ 
+ 		if (LNET_NIDNET(ni->ni_nid) == dstnet) {
+-			if (srcnidp != NULL)
++			if (srcnidp)
+ 				*srcnidp = ni->ni_nid;
+-			if (orderp != NULL)
++			if (orderp)
+ 				*orderp = order;
+ 			lnet_net_unlock(cpt);
+ 			return 1;
+@@ -2446,16 +2446,16 @@ LNetDist(lnet_nid_t dstnid, lnet_nid_t *srcnidp, __u32 *orderp)
+ 
+ 			list_for_each_entry(route, &rnet->lrn_routes,
+ 					    lr_list) {
+-				if (shortest == NULL ||
++				if (!shortest ||
+ 				    route->lr_hops < shortest->lr_hops)
+ 					shortest = route;
+ 			}
+ 
+-			LASSERT(shortest != NULL);
++			LASSERT(shortest);
+ 			hops = shortest->lr_hops;
+-			if (srcnidp != NULL)
++			if (srcnidp)
+ 				*srcnidp = shortest->lr_gateway->lp_ni->ni_nid;
+-			if (orderp != NULL)
++			if (orderp)
+ 				*orderp = order;
+ 			lnet_net_unlock(cpt);
+ 			return hops + 1;
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
-index 5ee390c..749e76a 100644
+index eb4aa34..5ee390c 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
-@@ -172,7 +172,7 @@ lnet_msg_decommit_tx(lnet_msg_t *msg, int status)
- 	lnet_event_t *ev = &msg->msg_ev;
+@@ -350,7 +350,7 @@ lnet_msg_detach_md(lnet_msg_t *msg, int status)
+ 	LASSERT(md->md_refcount >= 0);
  
- 	LASSERT(msg->msg_tx_committed);
--	if (status != 0)
-+	if (status)
- 		goto out;
+ 	unlink = lnet_md_unlinkable(md);
+-	if (md->md_eq != NULL) {
++	if (md->md_eq) {
+ 		msg->msg_ev.status   = status;
+ 		msg->msg_ev.unlinked = unlink;
+ 		lnet_eq_enqueue_event(md->md_eq, &msg->msg_ev);
+@@ -451,7 +451,7 @@ lnet_finalize(lnet_ni_t *ni, lnet_msg_t *msg, int status)
  
- 	counters = the_lnet.ln_counters[msg->msg_tx_cpt];
-@@ -180,7 +180,7 @@ lnet_msg_decommit_tx(lnet_msg_t *msg, int status)
- 	default: /* routed message */
- 		LASSERT(msg->msg_routing);
- 		LASSERT(msg->msg_rx_committed);
--		LASSERT(ev->type == 0);
-+		LASSERT(!ev->type);
+ 	LASSERT(!in_interrupt());
  
- 		counters->route_length += msg->msg_len;
- 		counters->route_count++;
-@@ -226,13 +226,13 @@ lnet_msg_decommit_rx(lnet_msg_t *msg, int status)
- 	LASSERT(!msg->msg_tx_committed); /* decommitted or never committed */
- 	LASSERT(msg->msg_rx_committed);
- 
--	if (status != 0)
-+	if (status)
- 		goto out;
- 
- 	counters = the_lnet.ln_counters[msg->msg_rx_cpt];
- 	switch (ev->type) {
- 	default:
--		LASSERT(ev->type == 0);
-+		LASSERT(!ev->type);
- 		LASSERT(msg->msg_routing);
- 		goto out;
- 
-@@ -371,7 +371,7 @@ lnet_complete_msg_locked(lnet_msg_t *msg, int cpt)
- 
- 	LASSERT(msg->msg_onactivelist);
- 
--	if (status == 0 && msg->msg_ack) {
-+	if (!status && msg->msg_ack) {
- 		/* Only send an ACK if the PUT completed successfully */
- 
- 		lnet_msg_decommit(msg, cpt, 0);
-@@ -410,7 +410,7 @@ lnet_complete_msg_locked(lnet_msg_t *msg, int cpt)
- 		 */
- 		return rc;
- 
--	} else if (status == 0 &&	/* OK so far */
-+	} else if (!status &&	/* OK so far */
- 		   (msg->msg_routing && !msg->msg_sending)) {
- 		/* not forwarded */
- 		LASSERT(!msg->msg_receiving);	/* called back recv already */
-@@ -531,14 +531,14 @@ lnet_finalize(lnet_ni_t *ni, lnet_msg_t *msg, int status)
- 		 * anything, so my finalizing friends can chomp along too
- 		 */
- 		rc = lnet_complete_msg_locked(msg, cpt);
--		if (rc != 0)
-+		if (rc)
- 			break;
- 	}
- 
- 	container->msc_finalizers[my_slot] = NULL;
- 	lnet_net_unlock(cpt);
- 
--	if (rc != 0)
-+	if (rc)
- 		goto again;
- }
- EXPORT_SYMBOL(lnet_finalize);
-@@ -548,7 +548,7 @@ lnet_msg_container_cleanup(struct lnet_msg_container *container)
- {
- 	int count = 0;
- 
--	if (container->msc_init == 0)
-+	if (!container->msc_init)
+-	if (msg == NULL)
++	if (!msg)
  		return;
+ #if 0
+ 	CDEBUG(D_WARNING, "%s msg->%s Flags:%s%s%s%s%s%s%s%s%s%s%s txp %s rxp %s\n",
+@@ -467,12 +467,12 @@ lnet_finalize(lnet_ni_t *ni, lnet_msg_t *msg, int status)
+ 	       msg->msg_rtrcredit ? "F" : "",
+ 	       msg->msg_peerrtrcredit ? "f" : "",
+ 	       msg->msg_onactivelist ? "!" : "",
+-	       msg->msg_txpeer == NULL ? "<none>" : libcfs_nid2str(msg->msg_txpeer->lp_nid),
+-	       msg->msg_rxpeer == NULL ? "<none>" : libcfs_nid2str(msg->msg_rxpeer->lp_nid));
++	       !msg->msg_txpeer ? "<none>" : libcfs_nid2str(msg->msg_txpeer->lp_nid),
++	       !msg->msg_rxpeer ? "<none>" : libcfs_nid2str(msg->msg_rxpeer->lp_nid));
+ #endif
+ 	msg->msg_ev.status = status;
  
- 	while (!list_empty(&container->msc_active)) {
-@@ -592,7 +592,7 @@ lnet_msg_container_setup(struct lnet_msg_container *container, int cpt)
- 
- 	rc = lnet_freelist_init(&container->msc_freelist,
- 				LNET_FL_MAX_MSGS, sizeof(lnet_msg_t));
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Failed to init freelist for message container\n");
- 		lnet_msg_container_cleanup(container);
- 		return rc;
-@@ -649,7 +649,7 @@ lnet_msg_containers_create(void)
- 
- 	cfs_percpt_for_each(container, i, the_lnet.ln_msg_containers) {
- 		rc = lnet_msg_container_setup(container, i);
--		if (rc != 0) {
-+		if (rc) {
- 			lnet_msg_containers_destroy();
- 			return rc;
- 		}
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-index aca47de..0cdeea9 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-@@ -50,7 +50,7 @@ lnet_ptl_match_type(unsigned int index, lnet_process_id_t match_id,
- 	struct lnet_portal *ptl = the_lnet.ln_portals[index];
- 	int unique;
- 
--	unique = ignore_bits == 0 &&
-+	unique = !ignore_bits &&
- 		 match_id.nid != LNET_NID_ANY &&
- 		 match_id.pid != LNET_PID_ANY;
- 
-@@ -152,7 +152,7 @@ lnet_try_match_md(lnet_libmd_t *md,
- 		return LNET_MATCHMD_NONE | LNET_MATCHMD_EXHAUSTED;
- 
- 	/* mismatched MD op */
--	if ((md->md_options & info->mi_opc) == 0)
-+	if (!(md->md_options & info->mi_opc))
- 		return LNET_MATCHMD_NONE;
- 
- 	/* mismatched ME nid/pid? */
-@@ -165,17 +165,17 @@ lnet_try_match_md(lnet_libmd_t *md,
- 		return LNET_MATCHMD_NONE;
- 
- 	/* mismatched ME matchbits? */
--	if (((me->me_match_bits ^ info->mi_mbits) & ~me->me_ignore_bits) != 0)
-+	if ((me->me_match_bits ^ info->mi_mbits) & ~me->me_ignore_bits)
- 		return LNET_MATCHMD_NONE;
- 
- 	/* Hurrah! This _is_ a match; check it out... */
- 
--	if ((md->md_options & LNET_MD_MANAGE_REMOTE) == 0)
-+	if (!(md->md_options & LNET_MD_MANAGE_REMOTE))
- 		offset = md->md_offset;
- 	else
- 		offset = info->mi_roffset;
- 
--	if ((md->md_options & LNET_MD_MAX_SIZE) != 0) {
-+	if (md->md_options & LNET_MD_MAX_SIZE) {
- 		mlength = md->md_max_size;
- 		LASSERT(md->md_offset + mlength <= md->md_length);
- 	} else {
-@@ -184,7 +184,7 @@ lnet_try_match_md(lnet_libmd_t *md,
- 
- 	if (info->mi_rlength <= mlength) {	/* fits in allowed space */
- 		mlength = info->mi_rlength;
--	} else if ((md->md_options & LNET_MD_TRUNCATE) == 0) {
-+	} else if (!(md->md_options & LNET_MD_TRUNCATE)) {
- 		/* this packet _really_ is too big */
- 		CERROR("Matching packet from %s, match %llu length %d too big: %d left, %d allowed\n",
- 		       libcfs_id2str(info->mi_id), info->mi_mbits,
-@@ -210,7 +210,7 @@ lnet_try_match_md(lnet_libmd_t *md,
- 	 * We bumped md->md_refcount above so the MD just gets flagged
- 	 * for unlink when it is finalized.
- 	 */
--	if ((md->md_flags & LNET_MD_FLAG_AUTO_UNLINK) != 0)
-+	if (md->md_flags & LNET_MD_FLAG_AUTO_UNLINK)
- 		lnet_md_unlink(md);
- 
- 	return LNET_MATCHMD_OK | LNET_MATCHMD_EXHAUSTED;
-@@ -304,7 +304,7 @@ lnet_mt_of_match(struct lnet_match_info *info, struct lnet_msg *msg)
- 		/* is there any active entry for this portal? */
- 		nmaps = ptl->ptl_mt_nmaps;
- 		/* map to an active mtable to avoid heavy "stealing" */
--		if (nmaps != 0) {
-+		if (nmaps) {
- 			/*
- 			 * NB: there is possibility that ptl_mt_maps is being
- 			 * changed because we are not under protection of
-@@ -339,7 +339,7 @@ lnet_mt_test_exhausted(struct lnet_match_table *mtable, int pos)
- 	bmap = &mtable->mt_exhausted[pos >> LNET_MT_BITS_U64];
- 	pos &= (1 << LNET_MT_BITS_U64) - 1;
- 
--	return ((*bmap) & (1ULL << pos)) != 0;
-+	return (*bmap & (1ULL << pos));
- }
- 
- static void
-@@ -405,10 +405,10 @@ lnet_mt_match_md(struct lnet_match_table *mtable,
- 		LASSERT(me == me->me_md->md_me);
- 
- 		rc = lnet_try_match_md(me->me_md, info, msg);
--		if ((rc & LNET_MATCHMD_EXHAUSTED) == 0)
-+		if (!(rc & LNET_MATCHMD_EXHAUSTED))
- 			exhausted = 0; /* mlist is not empty */
- 
--		if ((rc & LNET_MATCHMD_FINISH) != 0) {
-+		if (rc & LNET_MATCHMD_FINISH) {
- 			/*
- 			 * don't return EXHAUSTED bit because we don't know
- 			 * whether the mlist is empty or not
-@@ -423,7 +423,7 @@ lnet_mt_match_md(struct lnet_match_table *mtable,
- 			exhausted = 0;
- 	}
- 
--	if (exhausted == 0 && head == &mtable->mt_mhash[LNET_MT_HASH_IGNORE]) {
-+	if (!exhausted && head == &mtable->mt_mhash[LNET_MT_HASH_IGNORE]) {
- 		head = lnet_mt_match_head(mtable, info->mi_id, info->mi_mbits);
- 		goto again; /* re-check MEs w/o ignore-bits */
- 	}
-@@ -490,13 +490,13 @@ lnet_ptl_match_delay(struct lnet_portal *ptl,
- 
- 		cpt = (first + i) % LNET_CPT_NUMBER;
- 		mtable = ptl->ptl_mtables[cpt];
--		if (i != 0 && i != LNET_CPT_NUMBER - 1 && !mtable->mt_enabled)
-+		if (i && i != LNET_CPT_NUMBER - 1 && !mtable->mt_enabled)
- 			continue;
+-	if (msg->msg_md != NULL) {
++	if (msg->msg_md) {
+ 		cpt = lnet_cpt_of_cookie(msg->msg_md->md_lh.lh_cookie);
  
  		lnet_res_lock(cpt);
- 		lnet_ptl_lock(ptl);
- 
--		if (i == 0) { /* the first try, attach on stealing list */
-+		if (!i) { /* the first try, attach on stealing list */
- 			list_add_tail(&msg->msg_list,
- 				      &ptl->ptl_msg_stealing);
- 		}
-@@ -504,11 +504,11 @@ lnet_ptl_match_delay(struct lnet_portal *ptl,
- 		if (!list_empty(&msg->msg_list)) { /* on stealing list */
- 			rc = lnet_mt_match_md(mtable, info, msg);
- 
--			if ((rc & LNET_MATCHMD_EXHAUSTED) != 0 &&
-+			if ((rc & LNET_MATCHMD_EXHAUSTED) &&
- 			    mtable->mt_enabled)
- 				lnet_ptl_disable_mt(ptl, cpt);
- 
--			if ((rc & LNET_MATCHMD_FINISH) != 0)
-+			if (rc & LNET_MATCHMD_FINISH)
- 				list_del_init(&msg->msg_list);
- 
- 		} else {
-@@ -522,7 +522,7 @@ lnet_ptl_match_delay(struct lnet_portal *ptl,
- 
- 		if (!list_empty(&msg->msg_list) && /* not matched yet */
- 		    (i == LNET_CPT_NUMBER - 1 || /* the last CPT */
--		     ptl->ptl_mt_nmaps == 0 ||   /* no active CPT */
-+		     !ptl->ptl_mt_nmaps ||   /* no active CPT */
- 		     (ptl->ptl_mt_nmaps == 1 &&  /* the only active CPT */
- 		      ptl->ptl_mt_maps[0] == cpt))) {
- 			/* nothing to steal, delay or drop */
-@@ -541,7 +541,7 @@ lnet_ptl_match_delay(struct lnet_portal *ptl,
- 		lnet_ptl_unlock(ptl);
- 		lnet_res_unlock(cpt);
- 
--		if ((rc & LNET_MATCHMD_FINISH) != 0 || msg->msg_rx_delayed)
-+		if ((rc & LNET_MATCHMD_FINISH) || msg->msg_rx_delayed)
+@@ -509,7 +509,7 @@ lnet_finalize(lnet_ni_t *ni, lnet_msg_t *msg, int status)
+ 		if (container->msc_finalizers[i] == current)
  			break;
+ 
+-		if (my_slot < 0 && container->msc_finalizers[i] == NULL)
++		if (my_slot < 0 && !container->msc_finalizers[i])
+ 			my_slot = i;
  	}
  
-@@ -567,7 +567,7 @@ lnet_ptl_match_md(struct lnet_match_info *info, struct lnet_msg *msg)
+@@ -565,7 +565,7 @@ lnet_msg_container_cleanup(struct lnet_msg_container *container)
+ 	if (count > 0)
+ 		CERROR("%d active msg on exit\n", count);
  
- 	ptl = the_lnet.ln_portals[info->mi_portal];
- 	rc = lnet_ptl_match_early(ptl, msg);
--	if (rc != 0) /* matched or delayed early message */
-+	if (rc) /* matched or delayed early message */
- 		return rc;
+-	if (container->msc_finalizers != NULL) {
++	if (container->msc_finalizers) {
+ 		LIBCFS_FREE(container->msc_finalizers,
+ 			    container->msc_nfinalizers *
+ 			    sizeof(*container->msc_finalizers));
+@@ -607,7 +607,7 @@ lnet_msg_container_setup(struct lnet_msg_container *container, int cpt)
+ 			 container->msc_nfinalizers *
+ 			 sizeof(*container->msc_finalizers));
  
- 	mtable = lnet_mt_of_match(info, msg);
-@@ -579,13 +579,13 @@ lnet_ptl_match_md(struct lnet_match_info *info, struct lnet_msg *msg)
+-	if (container->msc_finalizers == NULL) {
++	if (!container->msc_finalizers) {
+ 		CERROR("Failed to allocate message finalizers\n");
+ 		lnet_msg_container_cleanup(container);
+ 		return -ENOMEM;
+@@ -622,7 +622,7 @@ lnet_msg_containers_destroy(void)
+ 	struct lnet_msg_container *container;
+ 	int i;
+ 
+-	if (the_lnet.ln_msg_containers == NULL)
++	if (!the_lnet.ln_msg_containers)
+ 		return;
+ 
+ 	cfs_percpt_for_each(container, i, the_lnet.ln_msg_containers)
+@@ -642,7 +642,7 @@ lnet_msg_containers_create(void)
+ 	the_lnet.ln_msg_containers = cfs_percpt_alloc(lnet_cpt_table(),
+ 						      sizeof(*container));
+ 
+-	if (the_lnet.ln_msg_containers == NULL) {
++	if (!the_lnet.ln_msg_containers) {
+ 		CERROR("Failed to allocate cpu-partition data for network\n");
+ 		return -ENOMEM;
  	}
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+index d99364f..aca47de 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+@@ -243,7 +243,7 @@ lnet_mt_of_attach(unsigned int index, lnet_process_id_t id,
+ 	ptl = the_lnet.ln_portals[index];
  
- 	rc = lnet_mt_match_md(mtable, info, msg);
--	if ((rc & LNET_MATCHMD_EXHAUSTED) != 0 && mtable->mt_enabled) {
-+	if ((rc & LNET_MATCHMD_EXHAUSTED) && mtable->mt_enabled) {
- 		lnet_ptl_lock(ptl);
- 		lnet_ptl_disable_mt(ptl, mtable->mt_cpt);
- 		lnet_ptl_unlock(ptl);
- 	}
+ 	mtable = lnet_match2mt(ptl, id, mbits);
+-	if (mtable != NULL) /* unique portal or only one match-table */
++	if (mtable) /* unique portal or only one match-table */
+ 		return mtable;
  
--	if ((rc & LNET_MATCHMD_FINISH) != 0)	/* matched or dropping */
-+	if (rc & LNET_MATCHMD_FINISH)	/* matched or dropping */
- 		goto out1;
+ 	/* it's a wildcard portal */
+@@ -280,7 +280,7 @@ lnet_mt_of_match(struct lnet_match_info *info, struct lnet_msg *msg)
+ 	LASSERT(lnet_ptl_is_wildcard(ptl) || lnet_ptl_is_unique(ptl));
  
- 	if (!msg->msg_rx_ready_delay)
-@@ -646,7 +646,7 @@ lnet_ptl_attach_md(lnet_me_t *me, lnet_libmd_t *md,
- 	int exhausted = 0;
- 	int cpt;
+ 	mtable = lnet_match2mt(ptl, info->mi_id, info->mi_mbits);
+-	if (mtable != NULL)
++	if (mtable)
+ 		return mtable;
  
--	LASSERT(md->md_refcount == 0); /* a brand new MD */
-+	LASSERT(!md->md_refcount); /* a brand new MD */
+ 	/* it's a wildcard portal */
+@@ -399,7 +399,7 @@ lnet_mt_match_md(struct lnet_match_table *mtable,
  
- 	me->me_md = md;
- 	md->md_me = me;
-@@ -680,15 +680,15 @@ lnet_ptl_attach_md(lnet_me_t *me, lnet_libmd_t *md,
- 
- 		rc = lnet_try_match_md(md, &info, msg);
- 
--		exhausted = (rc & LNET_MATCHMD_EXHAUSTED) != 0;
--		if ((rc & LNET_MATCHMD_NONE) != 0) {
-+		exhausted = (rc & LNET_MATCHMD_EXHAUSTED);
-+		if (rc & LNET_MATCHMD_NONE) {
- 			if (exhausted)
- 				break;
+ 	list_for_each_entry_safe(me, tmp, head, me_list) {
+ 		/* ME attached but MD not attached yet */
+-		if (me->me_md == NULL)
++		if (!me->me_md)
  			continue;
+ 
+ 		LASSERT(me == me->me_md->md_me);
+@@ -516,7 +516,7 @@ lnet_ptl_match_delay(struct lnet_portal *ptl,
+ 			 * could be matched by lnet_ptl_attach_md()
+ 			 * which is called by another thread
+ 			 */
+-			rc = msg->msg_md == NULL ?
++			rc = !msg->msg_md ?
+ 			     LNET_MATCHMD_DROP : LNET_MATCHMD_OK;
  		}
  
- 		/* Hurrah! This _is_ a match */
--		LASSERT((rc & LNET_MATCHMD_FINISH) != 0);
-+		LASSERT(rc & LNET_MATCHMD_FINISH);
- 		list_del_init(&msg->msg_list);
+@@ -733,7 +733,7 @@ lnet_ptl_cleanup(struct lnet_portal *ptl)
+ 	struct lnet_match_table	*mtable;
+ 	int i;
  
- 		if (head == &ptl->ptl_msg_stealing) {
-@@ -698,7 +698,7 @@ lnet_ptl_attach_md(lnet_me_t *me, lnet_libmd_t *md,
+-	if (ptl->ptl_mtables == NULL) /* uninitialized portal */
++	if (!ptl->ptl_mtables) /* uninitialized portal */
+ 		return;
+ 
+ 	LASSERT(list_empty(&ptl->ptl_msg_delayed));
+@@ -743,7 +743,7 @@ lnet_ptl_cleanup(struct lnet_portal *ptl)
+ 		lnet_me_t *me;
+ 		int j;
+ 
+-		if (mtable->mt_mhash == NULL) /* uninitialized match-table */
++		if (!mtable->mt_mhash) /* uninitialized match-table */
  			continue;
- 		}
  
--		if ((rc & LNET_MATCHMD_OK) != 0) {
-+		if (rc & LNET_MATCHMD_OK) {
- 			list_add_tail(&msg->msg_list, matches);
+ 		mhash = mtable->mt_mhash;
+@@ -775,7 +775,7 @@ lnet_ptl_setup(struct lnet_portal *ptl, int index)
  
- 			CDEBUG(D_NET, "Resuming delayed PUT from %s portal %d match %llu offset %d length %d.\n",
+ 	ptl->ptl_mtables = cfs_percpt_alloc(lnet_cpt_table(),
+ 					    sizeof(struct lnet_match_table));
+-	if (ptl->ptl_mtables == NULL) {
++	if (!ptl->ptl_mtables) {
+ 		CERROR("Failed to create match table for portal %d\n", index);
+ 		return -ENOMEM;
+ 	}
+@@ -788,7 +788,7 @@ lnet_ptl_setup(struct lnet_portal *ptl, int index)
+ 		/* the extra entry is for MEs with ignore bits */
+ 		LIBCFS_CPT_ALLOC(mhash, lnet_cpt_table(), i,
+ 				 sizeof(*mhash) * (LNET_MT_HASH_SIZE + 1));
+-		if (mhash == NULL) {
++		if (!mhash) {
+ 			CERROR("Failed to create match hash for portal %d\n",
+ 			       index);
+ 			goto failed;
+@@ -816,7 +816,7 @@ lnet_portals_destroy(void)
+ {
+ 	int i;
+ 
+-	if (the_lnet.ln_portals == NULL)
++	if (!the_lnet.ln_portals)
+ 		return;
+ 
+ 	for (i = 0; i < the_lnet.ln_nportals; i++)
+@@ -836,7 +836,7 @@ lnet_portals_create(void)
+ 
+ 	the_lnet.ln_nportals = MAX_PORTALS;
+ 	the_lnet.ln_portals = cfs_array_alloc(the_lnet.ln_nportals, size);
+-	if (the_lnet.ln_portals == NULL) {
++	if (!the_lnet.ln_portals) {
+ 		CERROR("Failed to allocate portals table\n");
+ 		return -ENOMEM;
+ 	}
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-index 0cf0645..53dd0bd 100644
+index f775879..0cf0645 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-@@ -64,7 +64,7 @@ lnet_sock_ioctl(int cmd, unsigned long arg)
- 	int rc;
- 
- 	rc = sock_create(PF_INET, SOCK_STREAM, 0, &sock);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create socket: %d\n", rc);
- 		return rc;
- 	}
-@@ -101,12 +101,12 @@ lnet_ipif_query(char *name, int *up, __u32 *ip, __u32 *mask)
- 
- 	strcpy(ifr.ifr_name, name);
- 	rc = lnet_sock_ioctl(SIOCGIFFLAGS, (unsigned long)&ifr);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't get flags for interface %s\n", name);
- 		return rc;
- 	}
- 
--	if ((ifr.ifr_flags & IFF_UP) == 0) {
-+	if (!(ifr.ifr_flags & IFF_UP)) {
- 		CDEBUG(D_NET, "Interface %s down\n", name);
- 		*up = 0;
- 		*ip = *mask = 0;
-@@ -117,7 +117,7 @@ lnet_ipif_query(char *name, int *up, __u32 *ip, __u32 *mask)
- 	strcpy(ifr.ifr_name, name);
- 	ifr.ifr_addr.sa_family = AF_INET;
- 	rc = lnet_sock_ioctl(SIOCGIFADDR, (unsigned long)&ifr);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't get IP address for interface %s\n", name);
- 		return rc;
- 	}
-@@ -128,7 +128,7 @@ lnet_ipif_query(char *name, int *up, __u32 *ip, __u32 *mask)
- 	strcpy(ifr.ifr_name, name);
- 	ifr.ifr_addr.sa_family = AF_INET;
- 	rc = lnet_sock_ioctl(SIOCGIFNETMASK, (unsigned long)&ifr);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't get netmask for interface %s\n", name);
- 		return rc;
- 	}
-@@ -181,7 +181,7 @@ lnet_ipif_enumerate(char ***namesp)
- 			goto out1;
+@@ -165,7 +165,7 @@ lnet_ipif_enumerate(char ***namesp)
  		}
  
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
- 
- 		nfound = ifc.ifc_len / sizeof(*ifr);
- 		LASSERT(nfound <= nalloc);
-@@ -193,7 +193,7 @@ lnet_ipif_enumerate(char ***namesp)
- 		nalloc *= 2;
- 	}
- 
--	if (nfound == 0)
-+	if (!nfound)
+ 		LIBCFS_ALLOC(ifr, nalloc * sizeof(*ifr));
+-		if (ifr == NULL) {
++		if (!ifr) {
+ 			CERROR("ENOMEM enumerating up to %d interfaces\n",
+ 			       nalloc);
+ 			rc = -ENOMEM;
+@@ -197,7 +197,7 @@ lnet_ipif_enumerate(char ***namesp)
  		goto out1;
  
  	LIBCFS_ALLOC(names, nfound * sizeof(*names));
-@@ -268,10 +268,10 @@ lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout)
- 			.iov_len  = nob
- 		};
- 		struct msghdr msg = {
--			.msg_flags      = (timeout == 0) ? MSG_DONTWAIT : 0
-+			.msg_flags      = !timeout ? MSG_DONTWAIT : 0
- 		};
- 
--		if (timeout != 0) {
-+		if (timeout) {
- 			/* Set send timeout to remaining time */
- 			tv = (struct timeval) {
- 				.tv_sec = ticks / HZ,
-@@ -279,7 +279,7 @@ lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout)
- 			};
- 			rc = kernel_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO,
- 					       (char *)&tv, sizeof(tv));
--			if (rc != 0) {
-+			if (rc) {
- 				CERROR("Can't set socket send timeout %ld.%06d: %d\n",
- 				       (long)tv.tv_sec, (int)tv.tv_usec, rc);
- 				return rc;
-@@ -296,7 +296,7 @@ lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout)
- 		if (rc < 0)
- 			return rc;
- 
--		if (rc == 0) {
-+		if (!rc) {
- 			CERROR("Unexpected zero rc\n");
- 			return -ECONNABORTED;
+-	if (names == NULL) {
++	if (!names) {
+ 		rc = -ENOMEM;
+ 		goto out1;
+ 	}
+@@ -213,7 +213,7 @@ lnet_ipif_enumerate(char ***namesp)
  		}
-@@ -338,7 +338,7 @@ lnet_sock_read(struct socket *sock, void *buffer, int nob, int timeout)
- 		};
- 		rc = kernel_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
- 				       (char *)&tv, sizeof(tv));
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't set socket recv timeout %ld.%06d: %d\n",
- 			       (long)tv.tv_sec, (int)tv.tv_usec, rc);
- 			return rc;
-@@ -351,13 +351,13 @@ lnet_sock_read(struct socket *sock, void *buffer, int nob, int timeout)
- 		if (rc < 0)
- 			return rc;
  
--		if (rc == 0)
-+		if (!rc)
- 			return -ECONNRESET;
- 
- 		buffer = ((char *)buffer) + rc;
- 		nob -= rc;
- 
--		if (nob == 0)
-+		if (!nob)
- 			return 0;
- 
- 		if (ticks <= 0)
-@@ -380,7 +380,7 @@ lnet_sock_create(struct socket **sockp, int *fatal, __u32 local_ip,
- 
- 	rc = sock_create(PF_INET, SOCK_STREAM, 0, &sock);
- 	*sockp = sock;
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create socket: %d\n", rc);
- 		return rc;
- 	}
-@@ -388,16 +388,16 @@ lnet_sock_create(struct socket **sockp, int *fatal, __u32 local_ip,
- 	option = 1;
- 	rc = kernel_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
- 			       (char *)&option, sizeof(option));
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't set SO_REUSEADDR for socket: %d\n", rc);
- 		goto failed;
- 	}
- 
--	if (local_ip != 0 || local_port != 0) {
-+	if (local_ip || local_port) {
- 		memset(&locaddr, 0, sizeof(locaddr));
- 		locaddr.sin_family = AF_INET;
- 		locaddr.sin_port = htons(local_port);
--		locaddr.sin_addr.s_addr = (local_ip == 0) ?
-+		locaddr.sin_addr.s_addr = !local_ip ?
- 					  INADDR_ANY : htonl(local_ip);
- 
- 		rc = kernel_bind(sock, (struct sockaddr *)&locaddr,
-@@ -407,7 +407,7 @@ lnet_sock_create(struct socket **sockp, int *fatal, __u32 local_ip,
- 			*fatal = 0;
- 			goto failed;
+ 		LIBCFS_ALLOC(names[i], IFNAMSIZ);
+-		if (names[i] == NULL) {
++		if (!names[i]) {
+ 			rc = -ENOMEM;
+ 			goto out2;
  		}
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Error trying to bind to port %d: %d\n",
- 			       local_port, rc);
- 			goto failed;
-@@ -426,22 +426,22 @@ lnet_sock_setbuf(struct socket *sock, int txbufsize, int rxbufsize)
- 	int option;
- 	int rc;
+@@ -242,7 +242,7 @@ lnet_ipif_free_enumeration(char **names, int n)
  
--	if (txbufsize != 0) {
-+	if (txbufsize) {
- 		option = txbufsize;
- 		rc = kernel_setsockopt(sock, SOL_SOCKET, SO_SNDBUF,
- 				       (char *)&option, sizeof(option));
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't set send buffer %d: %d\n",
- 			       option, rc);
- 			return rc;
- 		}
- 	}
+ 	LASSERT(n > 0);
  
--	if (rxbufsize != 0) {
-+	if (rxbufsize) {
- 		option = rxbufsize;
- 		rc = kernel_setsockopt(sock, SOL_SOCKET, SO_RCVBUF,
- 				       (char *)&option, sizeof(option));
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't set receive buffer %d: %d\n",
- 			       option, rc);
- 			return rc;
-@@ -462,7 +462,7 @@ lnet_sock_getaddr(struct socket *sock, bool remote, __u32 *ip, int *port)
- 		rc = kernel_getpeername(sock, (struct sockaddr *)&sin, &len);
- 	else
- 		rc = kernel_getsockname(sock, (struct sockaddr *)&sin, &len);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Error %d getting sock %s IP/port\n",
- 		       rc, remote ? "peer" : "local");
- 		return rc;
-@@ -499,7 +499,7 @@ lnet_sock_listen(struct socket **sockp, __u32 local_ip, int local_port,
- 	int rc;
+-	for (i = 0; i < n && names[i] != NULL; i++)
++	for (i = 0; i < n && names[i]; i++)
+ 		LIBCFS_FREE(names[i], IFNAMSIZ);
  
- 	rc = lnet_sock_create(sockp, &fatal, local_ip, local_port);
--	if (rc != 0) {
-+	if (rc) {
- 		if (!fatal)
- 			CERROR("Can't create socket: port %d already in use\n",
- 			       local_port);
-@@ -507,7 +507,7 @@ lnet_sock_listen(struct socket **sockp, __u32 local_ip, int local_port,
- 	}
- 
- 	rc = kernel_listen(*sockp, backlog);
--	if (rc == 0)
-+	if (!rc)
- 		return 0;
- 
- 	CERROR("Can't set listen backlog %d: %d\n", backlog, rc);
-@@ -548,7 +548,7 @@ lnet_sock_accept(struct socket **newsockp, struct socket *sock)
- 		rc = sock->ops->accept(sock, newsock, O_NONBLOCK);
- 	}
- 
--	if (rc != 0)
-+	if (rc)
- 		goto failed;
- 
- 	*newsockp = newsock;
-@@ -568,7 +568,7 @@ lnet_sock_connect(struct socket **sockp, int *fatal, __u32 local_ip,
- 	int rc;
- 
- 	rc = lnet_sock_create(sockp, fatal, local_ip, local_port);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	memset(&srvaddr, 0, sizeof(srvaddr));
-@@ -578,7 +578,7 @@ lnet_sock_connect(struct socket **sockp, int *fatal, __u32 local_ip,
- 
- 	rc = kernel_connect(*sockp, (struct sockaddr *)&srvaddr,
- 			    sizeof(srvaddr), 0);
--	if (rc == 0)
-+	if (!rc)
- 		return 0;
- 
- 	/*
-diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
-index 1e88033..cd37303 100644
---- a/drivers/staging/lustre/lnet/lnet/module.c
-+++ b/drivers/staging/lustre/lnet/lnet/module.c
-@@ -80,7 +80,7 @@ lnet_unconfigure(void)
- 	mutex_unlock(&the_lnet.ln_api_mutex);
- 
- 	mutex_unlock(&lnet_config_mutex);
--	return (refcount == 0) ? 0 : -EBUSY;
-+	return !refcount ? 0 : -EBUSY;
- }
- 
- static int
-@@ -120,13 +120,13 @@ init_lnet(void)
- 	mutex_init(&lnet_config_mutex);
- 
- 	rc = lnet_init();
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("lnet_init: error %d\n", rc);
+ 	LIBCFS_FREE(names, n * sizeof(*names));
+@@ -468,10 +468,10 @@ lnet_sock_getaddr(struct socket *sock, bool remote, __u32 *ip, int *port)
  		return rc;
  	}
  
- 	rc = libcfs_register_ioctl(&lnet_ioctl_handler);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
+-	if (ip != NULL)
++	if (ip)
+ 		*ip = ntohl(sin.sin_addr.s_addr);
  
- 	if (config_on_load) {
- 		/*
-@@ -145,7 +145,7 @@ fini_lnet(void)
- 	int rc;
+-	if (port != NULL)
++	if (port)
+ 		*port = ntohs(sin.sin_port);
  
- 	rc = libcfs_deregister_ioctl(&lnet_ioctl_handler);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
+ 	return 0;
+@@ -481,10 +481,10 @@ EXPORT_SYMBOL(lnet_sock_getaddr);
+ int
+ lnet_sock_getbuf(struct socket *sock, int *txbufsize, int *rxbufsize)
+ {
+-	if (txbufsize != NULL)
++	if (txbufsize)
+ 		*txbufsize = sock->sk->sk_sndbuf;
  
- 	lnet_fini();
- }
+-	if (rxbufsize != NULL)
++	if (rxbufsize)
+ 		*rxbufsize = sock->sk->sk_rcvbuf;
+ 
+ 	return 0;
+diff --git a/drivers/staging/lustre/lnet/lnet/lo.c b/drivers/staging/lustre/lnet/lnet/lo.c
+index 314e164..468eda6 100644
+--- a/drivers/staging/lustre/lnet/lnet/lo.c
++++ b/drivers/staging/lustre/lnet/lnet/lo.c
+@@ -52,9 +52,9 @@ lolnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg,
+ {
+ 	lnet_msg_t *sendmsg = private;
+ 
+-	if (lntmsg != NULL) {		   /* not discarding */
+-		if (sendmsg->msg_iov != NULL) {
+-			if (iov != NULL)
++	if (lntmsg) {		   /* not discarding */
++		if (sendmsg->msg_iov) {
++			if (iov)
+ 				lnet_copy_iov2iov(niov, iov, offset,
+ 						  sendmsg->msg_niov,
+ 						  sendmsg->msg_iov,
+@@ -65,7 +65,7 @@ lolnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg,
+ 						   sendmsg->msg_iov,
+ 						   sendmsg->msg_offset, mlen);
+ 		} else {
+-			if (iov != NULL)
++			if (iov)
+ 				lnet_copy_kiov2iov(niov, iov, offset,
+ 						   sendmsg->msg_niov,
+ 						   sendmsg->msg_kiov,
 diff --git a/drivers/staging/lustre/lnet/lnet/nidstrings.c b/drivers/staging/lustre/lnet/lnet/nidstrings.c
-index c9c85e5..00010f3 100644
+index d7c9836..c9c85e5 100644
 --- a/drivers/staging/lustre/lnet/lnet/nidstrings.c
 +++ b/drivers/staging/lustre/lnet/lnet/nidstrings.c
-@@ -206,7 +206,7 @@ add_nidrange(const struct cfs_lstr *src,
- 	if (!nf)
+@@ -170,7 +170,7 @@ parse_addrange(const struct cfs_lstr *src, struct nidrange *nidrange)
+ 	}
+ 
+ 	LIBCFS_ALLOC(addrrange, sizeof(struct addrrange));
+-	if (addrrange == NULL)
++	if (!addrrange)
+ 		return -ENOMEM;
+ 	list_add_tail(&addrrange->ar_link, &nidrange->nr_addrranges);
+ 	INIT_LIST_HEAD(&addrrange->ar_numaddr_ranges);
+@@ -203,7 +203,7 @@ add_nidrange(const struct cfs_lstr *src,
+ 		return NULL;
+ 
+ 	nf = libcfs_namenum2netstrfns(src->ls_str);
+-	if (nf == NULL)
++	if (!nf)
  		return NULL;
  	endlen = src->ls_len - strlen(nf->nf_name);
--	if (endlen == 0)
-+	if (!endlen)
- 		/* network name only, e.g. "elan" or "tcp" */
- 		netnum = 0;
- 	else {
-@@ -255,17 +255,17 @@ parse_nidrange(struct cfs_lstr *src, struct list_head *nidlist)
- 	struct nidrange *nr;
+ 	if (endlen == 0)
+@@ -229,7 +229,7 @@ add_nidrange(const struct cfs_lstr *src,
+ 	}
  
- 	tmp = *src;
--	if (cfs_gettok(src, '@', &addrrange) == 0)
-+	if (!cfs_gettok(src, '@', &addrrange))
+ 	LIBCFS_ALLOC(nr, sizeof(struct nidrange));
+-	if (nr == NULL)
++	if (!nr)
+ 		return NULL;
+ 	list_add_tail(&nr->nr_link, nidlist);
+ 	INIT_LIST_HEAD(&nr->nr_addrranges);
+@@ -258,11 +258,11 @@ parse_nidrange(struct cfs_lstr *src, struct list_head *nidlist)
+ 	if (cfs_gettok(src, '@', &addrrange) == 0)
  		goto failed;
  
--	if (cfs_gettok(src, '@', &net) == 0 || src->ls_str)
-+	if (!cfs_gettok(src, '@', &net) || src->ls_str)
+-	if (cfs_gettok(src, '@', &net) == 0 || src->ls_str != NULL)
++	if (cfs_gettok(src, '@', &net) == 0 || src->ls_str)
  		goto failed;
  
  	nr = add_nidrange(&net, nidlist);
- 	if (!nr)
+-	if (nr == NULL)
++	if (!nr)
  		goto failed;
  
--	if (parse_addrange(&addrrange, nr) != 0)
-+	if (parse_addrange(&addrrange, nr))
- 		goto failed;
+ 	if (parse_addrange(&addrrange, nr) != 0)
+@@ -489,13 +489,13 @@ static void cfs_ip_ar_min_max(struct addrrange *ar, __u32 *min_nid,
+ 	tmp_ip_addr = ((min_ip[0] << 24) | (min_ip[1] << 16) |
+ 		       (min_ip[2] << 8) | min_ip[3]);
  
- 	return 1;
-@@ -344,12 +344,12 @@ cfs_parse_nidlist(char *str, int len, struct list_head *nidlist)
- 	INIT_LIST_HEAD(nidlist);
- 	while (src.ls_str) {
- 		rc = cfs_gettok(&src, ' ', &res);
--		if (rc == 0) {
-+		if (!rc) {
- 			cfs_free_nidlist(nidlist);
- 			return 0;
+-	if (min_nid != NULL)
++	if (min_nid)
+ 		*min_nid = tmp_ip_addr;
+ 
+ 	tmp_ip_addr = ((max_ip[0] << 24) | (max_ip[1] << 16) |
+ 		       (max_ip[2] << 8) | max_ip[3]);
+ 
+-	if (max_nid != NULL)
++	if (max_nid)
+ 		*max_nid = tmp_ip_addr;
+ }
+ 
+@@ -524,9 +524,9 @@ static void cfs_num_ar_min_max(struct addrrange *ar, __u32 *min_nid,
  		}
- 		rc = parse_nidrange(&res, nidlist);
--		if (rc == 0) {
-+		if (!rc) {
- 			cfs_free_nidlist(nidlist);
- 			return 0;
- 		}
-@@ -397,7 +397,7 @@ cfs_print_network(char *buffer, int count, struct nidrange *nr)
- {
- 	struct netstrfns *nf = nr->nr_netstrfns;
+ 	}
  
--	if (nr->nr_netnum == 0)
-+	if (!nr->nr_netnum)
- 		return scnprintf(buffer, count, "@%s", nf->nf_name);
- 	else
- 		return scnprintf(buffer, count, "@%s%u",
-@@ -419,7 +419,7 @@ cfs_print_addrranges(char *buffer, int count, struct list_head *addrranges,
- 	struct netstrfns *nf = nr->nr_netstrfns;
+-	if (min_nid != NULL)
++	if (min_nid)
+ 		*min_nid = min_addr;
+-	if (max_nid != NULL)
++	if (max_nid)
+ 		*max_nid = max_addr;
+ }
  
- 	list_for_each_entry(ar, addrranges, ar_link) {
--		if (i != 0)
-+		if (i)
- 			i += scnprintf(buffer + i, count - i, " ");
- 		i += nf->nf_print_addrlist(buffer + i, count - i,
- 					   &ar->ar_numaddr_ranges);
-@@ -444,10 +444,10 @@ int cfs_print_nidlist(char *buffer, int count, struct list_head *nidlist)
- 		return 0;
+@@ -548,7 +548,7 @@ bool cfs_nidrange_is_contiguous(struct list_head *nidlist)
  
  	list_for_each_entry(nr, nidlist, nr_link) {
--		if (i != 0)
-+		if (i)
- 			i += scnprintf(buffer + i, count - i, " ");
- 
--		if (nr->nr_all != 0) {
-+		if (nr->nr_all) {
- 			LASSERT(list_empty(&nr->nr_addrranges));
- 			i += scnprintf(buffer + i, count - i, "*");
- 			i += cfs_print_network(buffer + i, count - i, nr);
-@@ -517,7 +517,7 @@ static void cfs_num_ar_min_max(struct addrrange *ar, __u32 *min_nid,
- 
- 	list_for_each_entry(el, &ar->ar_numaddr_ranges, el_link) {
- 		list_for_each_entry(re, &el->el_exprs, re_link) {
--			if (re->re_lo < min_addr || min_addr == 0)
-+			if (re->re_lo < min_addr || !min_addr)
- 				min_addr = re->re_lo;
- 			if (re->re_hi > max_addr)
- 				max_addr = re->re_hi;
-@@ -553,7 +553,7 @@ bool cfs_nidrange_is_contiguous(struct list_head *nidlist)
+ 		nf = nr->nr_netstrfns;
+-		if (lndname == NULL)
++		if (!lndname)
+ 			lndname = nf->nf_name;
  		if (netnum == -1)
  			netnum = nr->nr_netnum;
- 
--		if (strcmp(lndname, nf->nf_name) != 0 ||
-+		if (strcmp(lndname, nf->nf_name) ||
- 		    netnum != nr->nr_netnum)
+@@ -558,7 +558,7 @@ bool cfs_nidrange_is_contiguous(struct list_head *nidlist)
  			return false;
  	}
-@@ -592,7 +592,7 @@ static bool cfs_num_is_contiguous(struct list_head *nidlist)
- 		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
- 			cfs_num_ar_min_max(ar, &current_start_nid,
- 					   &current_end_nid);
--			if (last_end_nid != 0 &&
-+			if (last_end_nid &&
- 			    (current_start_nid - last_end_nid != 1))
- 				return false;
- 			last_end_nid = current_end_nid;
-@@ -602,7 +602,7 @@ static bool cfs_num_is_contiguous(struct list_head *nidlist)
- 						    re_link) {
- 					if (re->re_stride > 1)
- 						return false;
--					else if (last_hi != 0 &&
-+					else if (last_hi &&
- 						 re->re_hi - last_hi != 1)
- 						return false;
- 					last_hi = re->re_hi;
-@@ -642,7 +642,7 @@ static bool cfs_ip_is_contiguous(struct list_head *nidlist)
- 			last_diff = 0;
- 			cfs_ip_ar_min_max(ar, &current_start_nid,
- 					  &current_end_nid);
--			if (last_end_nid != 0 &&
-+			if (last_end_nid &&
- 			    (current_start_nid - last_end_nid != 1))
- 				return false;
- 			last_end_nid = current_end_nid;
-@@ -726,7 +726,7 @@ static void cfs_num_min_max(struct list_head *nidlist, __u32 *min_nid,
- 		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
- 			cfs_num_ar_min_max(ar, &tmp_min_addr,
- 					   &tmp_max_addr);
--			if (tmp_min_addr < min_addr || min_addr == 0)
-+			if (tmp_min_addr < min_addr || !min_addr)
- 				min_addr = tmp_min_addr;
- 			if (tmp_max_addr > max_addr)
- 				max_addr = tmp_min_addr;
-@@ -758,7 +758,7 @@ static void cfs_ip_min_max(struct list_head *nidlist, __u32 *min_nid,
- 		list_for_each_entry(ar, &nr->nr_addrranges, ar_link) {
- 			cfs_ip_ar_min_max(ar, &tmp_min_ip_addr,
- 					  &tmp_max_ip_addr);
--			if (tmp_min_ip_addr < min_ip_addr || min_ip_addr == 0)
-+			if (tmp_min_ip_addr < min_ip_addr || !min_ip_addr)
- 				min_ip_addr = tmp_min_ip_addr;
- 			if (tmp_max_ip_addr > max_ip_addr)
- 				max_ip_addr = tmp_max_ip_addr;
-@@ -806,8 +806,8 @@ libcfs_ip_str2addr(const char *str, int nob, __u32 *addr)
- 	/* numeric IP? */
- 	if (sscanf(str, "%u.%u.%u.%u%n", &a, &b, &c, &d, &n) >= 4 &&
- 	    n == nob &&
--	    (a & ~0xff) == 0 && (b & ~0xff) == 0 &&
--	    (c & ~0xff) == 0 && (d & ~0xff) == 0) {
-+	    !(a & ~0xff) && !(b & ~0xff) &&
-+	    !(c & ~0xff) && !(d & ~0xff)) {
- 		*addr = ((a << 24) | (b << 16) | (c << 8) | d);
- 		return 1;
- 	}
-@@ -837,7 +837,7 @@ cfs_ip_addr_parse(char *str, int len, struct list_head *list)
+ 
+-	if (nf == NULL)
++	if (!nf)
+ 		return false;
+ 
+ 	if (!nf->nf_is_contiguous(nidlist))
+@@ -765,9 +765,9 @@ static void cfs_ip_min_max(struct list_head *nidlist, __u32 *min_nid,
  		}
- 
- 		rc = cfs_expr_list_parse(res.ls_str, res.ls_len, 0, 255, &el);
--		if (rc != 0)
-+		if (rc)
- 			goto out;
- 
- 		list_add_tail(&el->el_link, list);
-@@ -862,7 +862,7 @@ libcfs_ip_addr_range_print(char *buffer, int count, struct list_head *list)
- 
- 	list_for_each_entry(el, list, el_link) {
- 		LASSERT(j++ < 4);
--		if (i != 0)
-+		if (i)
- 			i += scnprintf(buffer + i, count - i, ".");
- 		i += cfs_expr_list_print(buffer + i, count - i, el);
- 	}
-@@ -932,7 +932,7 @@ libcfs_num_parse(char *str, int len, struct list_head *list)
- 	int	rc;
- 
- 	rc = cfs_expr_list_parse(str, len, 0, MAX_NUMERIC_VALUE, &el);
--	if (rc == 0)
-+	if (!rc)
- 		list_add_tail(&el->el_link, list);
- 
- 	return rc;
-@@ -1114,7 +1114,7 @@ libcfs_net2str_r(__u32 net, char *buf, size_t buf_size)
- 	nf = libcfs_lnd2netstrfns(lnd);
- 	if (!nf)
- 		snprintf(buf, buf_size, "<%u:%u>", lnd, nnum);
--	else if (nnum == 0)
-+	else if (!nnum)
- 		snprintf(buf, buf_size, "%s", nf->nf_name);
- 	else
- 		snprintf(buf, buf_size, "%s%u", nf->nf_name, nnum);
-@@ -1146,7 +1146,7 @@ libcfs_nid2str_r(lnet_nid_t nid, char *buf, size_t buf_size)
- 
- 		nf->nf_addr2str(addr, buf, buf_size);
- 		addr_len = strlen(buf);
--		if (nnum == 0)
-+		if (!nnum)
- 			snprintf(buf + addr_len, buf_size - addr_len, "@%s",
- 				 nf->nf_name);
- 		else
-@@ -1244,8 +1244,8 @@ libcfs_id2str(lnet_process_id_t id)
  	}
  
- 	snprintf(str, LNET_NIDSTR_SIZE, "%s%u-%s",
--		 ((id.pid & LNET_PID_USERFLAG) != 0) ? "U" : "",
--		 (id.pid & ~LNET_PID_USERFLAG), libcfs_nid2str(id.nid));
-+		 id.pid & LNET_PID_USERFLAG ? "U" : "",
-+		 id.pid & ~LNET_PID_USERFLAG, libcfs_nid2str(id.nid));
- 	return str;
+-	if (min_nid != NULL)
++	if (min_nid)
+ 		*min_nid = min_ip_addr;
+-	if (max_nid != NULL)
++	if (max_nid)
+ 		*max_nid = max_ip_addr;
  }
- EXPORT_SYMBOL(libcfs_id2str);
+ 
+@@ -828,7 +828,7 @@ cfs_ip_addr_parse(char *str, int len, struct list_head *list)
+ 	src.ls_len = len;
+ 	i = 0;
+ 
+-	while (src.ls_str != NULL) {
++	while (src.ls_str) {
+ 		struct cfs_lstr res;
+ 
+ 		if (!cfs_gettok(&src, '.', &res)) {
+@@ -1064,7 +1064,7 @@ libcfs_name2netstrfns(const char *name)
+ int
+ libcfs_isknown_lnd(__u32 lnd)
+ {
+-	return libcfs_lnd2netstrfns(lnd) != NULL;
++	return !!libcfs_lnd2netstrfns(lnd);
+ }
+ EXPORT_SYMBOL(libcfs_isknown_lnd);
+ 
+@@ -1073,7 +1073,7 @@ libcfs_lnd2modname(__u32 lnd)
+ {
+ 	struct netstrfns *nf = libcfs_lnd2netstrfns(lnd);
+ 
+-	return (nf == NULL) ? NULL : nf->nf_modname;
++	return nf ? nf->nf_modname : NULL;
+ }
+ EXPORT_SYMBOL(libcfs_lnd2modname);
+ 
+@@ -1082,7 +1082,7 @@ libcfs_str2lnd(const char *str)
+ {
+ 	struct netstrfns *nf = libcfs_name2netstrfns(str);
+ 
+-	if (nf != NULL)
++	if (nf)
+ 		return nf->nf_type;
+ 
+ 	return -1;
+@@ -1095,7 +1095,7 @@ libcfs_lnd2str_r(__u32 lnd, char *buf, size_t buf_size)
+ 	struct netstrfns *nf;
+ 
+ 	nf = libcfs_lnd2netstrfns(lnd);
+-	if (nf == NULL)
++	if (!nf)
+ 		snprintf(buf, buf_size, "?%u?", lnd);
+ 	else
+ 		snprintf(buf, buf_size, "%s", nf->nf_name);
+@@ -1112,7 +1112,7 @@ libcfs_net2str_r(__u32 net, char *buf, size_t buf_size)
+ 	struct netstrfns *nf;
+ 
+ 	nf = libcfs_lnd2netstrfns(lnd);
+-	if (nf == NULL)
++	if (!nf)
+ 		snprintf(buf, buf_size, "<%u:%u>", lnd, nnum);
+ 	else if (nnum == 0)
+ 		snprintf(buf, buf_size, "%s", nf->nf_name);
+@@ -1139,7 +1139,7 @@ libcfs_nid2str_r(lnet_nid_t nid, char *buf, size_t buf_size)
+ 	}
+ 
+ 	nf = libcfs_lnd2netstrfns(lnd);
+-	if (nf == NULL) {
++	if (!nf) {
+ 		snprintf(buf, buf_size, "%x@<%u:%u>", addr, lnd, nnum);
+ 	} else {
+ 		size_t addr_len;
+@@ -1199,7 +1199,7 @@ libcfs_str2net(const char *str)
+ {
+ 	__u32  net;
+ 
+-	if (libcfs_str2net_internal(str, &net) != NULL)
++	if (libcfs_str2net_internal(str, &net))
+ 		return net;
+ 
+ 	return LNET_NIDNET(LNET_NID_ANY);
+@@ -1214,15 +1214,15 @@ libcfs_str2nid(const char *str)
+ 	__u32 net;
+ 	__u32 addr;
+ 
+-	if (sep != NULL) {
++	if (sep) {
+ 		nf = libcfs_str2net_internal(sep + 1, &net);
+-		if (nf == NULL)
++		if (!nf)
+ 			return LNET_NID_ANY;
+ 	} else {
+ 		sep = str + strlen(str);
+ 		net = LNET_MKNET(SOCKLND, 0);
+ 		nf = libcfs_lnd2netstrfns(SOCKLND);
+-		LASSERT(nf != NULL);
++		LASSERT(nf);
+ 	}
+ 
+ 	if (!nf->nf_str2addr(str, (int)(sep - str), &addr))
 diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-index 43b459e..00086ee 100644
+index a8e25b0..43b459e 100644
 --- a/drivers/staging/lustre/lnet/lnet/peer.c
 +++ b/drivers/staging/lustre/lnet/lnet/peer.c
-@@ -137,10 +137,10 @@ lnet_peer_tables_cleanup(void)
+@@ -50,7 +50,7 @@ lnet_peer_tables_create(void)
  
- 		lnet_net_lock(i);
+ 	the_lnet.ln_peer_tables = cfs_percpt_alloc(lnet_cpt_table(),
+ 						   sizeof(*ptable));
+-	if (the_lnet.ln_peer_tables == NULL) {
++	if (!the_lnet.ln_peer_tables) {
+ 		CERROR("Failed to allocate cpu-partition peer tables\n");
+ 		return -ENOMEM;
+ 	}
+@@ -60,7 +60,7 @@ lnet_peer_tables_create(void)
  
--		for (j = 3; ptable->pt_number != 0; j++) {
-+		for (j = 3; ptable->pt_number; j++) {
- 			lnet_net_unlock(i);
+ 		LIBCFS_CPT_ALLOC(hash, lnet_cpt_table(), i,
+ 				 LNET_PEER_HASH_SIZE * sizeof(*hash));
+-		if (hash == NULL) {
++		if (!hash) {
+ 			CERROR("Failed to create peer hash table\n");
+ 			lnet_peer_tables_destroy();
+ 			return -ENOMEM;
+@@ -82,12 +82,12 @@ lnet_peer_tables_destroy(void)
+ 	int i;
+ 	int j;
  
--			if ((j & (j - 1)) == 0) {
-+			if (!(j & (j - 1))) {
- 				CDEBUG(D_WARNING,
- 				       "Waiting for %d peers on peer table\n",
- 				       ptable->pt_number);
-@@ -167,11 +167,11 @@ lnet_destroy_peer_locked(lnet_peer_t *lp)
- {
- 	struct lnet_peer_table *ptable;
- 
--	LASSERT(lp->lp_refcount == 0);
--	LASSERT(lp->lp_rtr_refcount == 0);
-+	LASSERT(!lp->lp_refcount);
-+	LASSERT(!lp->lp_rtr_refcount);
- 	LASSERT(list_empty(&lp->lp_txq));
- 	LASSERT(list_empty(&lp->lp_hashlist));
--	LASSERT(lp->lp_txqnob == 0);
-+	LASSERT(!lp->lp_txqnob);
- 
- 	ptable = the_lnet.ln_peer_tables[lp->lp_cpt];
- 	LASSERT(ptable->pt_number > 0);
-@@ -317,7 +317,7 @@ lnet_debug_peer(lnet_nid_t nid)
- 	lnet_net_lock(cpt);
- 
- 	rc = lnet_nid2peer_locked(&lp, nid, cpt);
--	if (rc != 0) {
-+	if (rc) {
- 		lnet_net_unlock(cpt);
- 		CDEBUG(D_WARNING, "No peer %s\n", libcfs_nid2str(nid));
+-	if (the_lnet.ln_peer_tables == NULL)
++	if (!the_lnet.ln_peer_tables)
  		return;
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index c6b747d..735a8f2 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -109,7 +109,7 @@ lnet_notify_locked(lnet_peer_t *lp, int notifylnd, int alive,
- 	lp->lp_timestamp = when;		/* update timestamp */
- 	lp->lp_ping_deadline = 0;	       /* disable ping timeout */
  
--	if (lp->lp_alive_count != 0 &&	  /* got old news */
-+	if (lp->lp_alive_count &&	  /* got old news */
- 	    (!lp->lp_alive) == (!alive)) {      /* new date for old news */
- 		CDEBUG(D_NET, "Old news\n");
- 		return;
-@@ -201,7 +201,7 @@ lnet_rtr_decref_locked(lnet_peer_t *lp)
- 
- 	/* lnet_net_lock must be exclusively locked */
- 	lp->lp_rtr_refcount--;
--	if (lp->lp_rtr_refcount == 0) {
-+	if (!lp->lp_rtr_refcount) {
- 		LASSERT(list_empty(&lp->lp_routes));
- 
- 		if (lp->lp_rcd) {
-@@ -283,7 +283,7 @@ lnet_add_route_to_rnet(lnet_remotenet_t *rnet, lnet_route_t *route)
- 	/* len+1 positions to add a new entry, also prevents division by 0 */
- 	offset = cfs_rand() % (len + 1);
- 	list_for_each(e, &rnet->lrn_routes) {
--		if (offset == 0)
-+		if (!offset)
+ 	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
+ 		hash = ptable->pt_hash;
+-		if (hash == NULL) /* not initialized */
++		if (!hash) /* not initialized */
  			break;
- 		offset--;
+ 
+ 		LASSERT(list_empty(&ptable->pt_deathrow));
+@@ -220,7 +220,7 @@ lnet_nid2peer_locked(lnet_peer_t **lpp, lnet_nid_t nid, int cpt)
+ 
+ 	ptable = the_lnet.ln_peer_tables[cpt2];
+ 	lp = lnet_find_peer_locked(ptable, nid);
+-	if (lp != NULL) {
++	if (lp) {
+ 		*lpp = lp;
+ 		return 0;
  	}
-@@ -342,7 +342,7 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
- 	lnet_net_lock(LNET_LOCK_EX);
+@@ -238,12 +238,12 @@ lnet_nid2peer_locked(lnet_peer_t **lpp, lnet_nid_t nid, int cpt)
+ 	ptable->pt_number++;
+ 	lnet_net_unlock(cpt);
  
- 	rc = lnet_nid2peer_locked(&route->lr_gateway, gateway, LNET_LOCK_EX);
--	if (rc != 0) {
-+	if (rc) {
- 		lnet_net_unlock(LNET_LOCK_EX);
+-	if (lp != NULL)
++	if (lp)
+ 		memset(lp, 0, sizeof(*lp));
+ 	else
+ 		LIBCFS_CPT_ALLOC(lp, lnet_cpt_table(), cpt2, sizeof(*lp));
  
- 		LIBCFS_FREE(route, sizeof(*route));
-@@ -565,7 +565,7 @@ lnet_get_route(int idx, __u32 *net, __u32 *hops,
- 			list_for_each(e2, &rnet->lrn_routes) {
- 				route = list_entry(e2, lnet_route_t, lr_list);
- 
--				if (idx-- == 0) {
-+				if (!idx--) {
- 					*net      = rnet->lrn_net;
- 					*hops     = route->lr_hops;
- 					*priority = route->lr_priority;
-@@ -625,13 +625,13 @@ lnet_parse_rc_info(lnet_rc_data_t *rcd)
- 	}
- 
- 	gw->lp_ping_feats = info->pi_features;
--	if ((gw->lp_ping_feats & LNET_PING_FEAT_MASK) == 0) {
-+	if (!(gw->lp_ping_feats & LNET_PING_FEAT_MASK)) {
- 		CDEBUG(D_NET, "%s: Unexpected features 0x%x\n",
- 		       libcfs_nid2str(gw->lp_nid), gw->lp_ping_feats);
- 		return; /* nothing I can understand */
+-	if (lp == NULL) {
++	if (!lp) {
+ 		rc = -ENOMEM;
+ 		lnet_net_lock(cpt);
+ 		goto out;
+@@ -276,13 +276,13 @@ lnet_nid2peer_locked(lnet_peer_t **lpp, lnet_nid_t nid, int cpt)
  	}
  
--	if ((gw->lp_ping_feats & LNET_PING_FEAT_NI_STATUS) == 0)
-+	if (!(gw->lp_ping_feats & LNET_PING_FEAT_NI_STATUS))
- 		return; /* can't carry NI status info */
- 
- 	list_for_each_entry(rtr, &gw->lp_routes, lr_gwlist) {
-@@ -722,7 +722,7 @@ lnet_router_checker_event(lnet_event_t *event)
- 
- 	if (event->type == LNET_EVENT_SEND) {
- 		lp->lp_ping_notsent = 0;
--		if (event->status == 0)
-+		if (!event->status)
- 			goto out;
- 	}
- 
-@@ -733,7 +733,7 @@ lnet_router_checker_event(lnet_event_t *event)
- 	 * we ping alive routers to try to detect router death before
- 	 * apps get burned).
- 	 */
--	lnet_notify_locked(lp, 1, (event->status == 0), cfs_time_current());
-+	lnet_notify_locked(lp, 1, !event->status, cfs_time_current());
- 
- 	/*
- 	 * The router checker will wake up very shortly and do the
-@@ -741,7 +741,7 @@ lnet_router_checker_event(lnet_event_t *event)
- 	 * XXX If 'lp' stops being a router before then, it will still
- 	 * have the notification pending!!!
- 	 */
--	if (avoid_asym_router_failure && event->status == 0)
-+	if (avoid_asym_router_failure && !event->status)
- 		lnet_parse_rc_info(rcd);
- 
-  out:
-@@ -764,7 +764,7 @@ lnet_wait_known_routerstate(void)
- 		list_for_each(entry, &the_lnet.ln_routers) {
- 			rtr = list_entry(entry, lnet_peer_t, lp_rtr_list);
- 
--			if (rtr->lp_alive_count == 0) {
-+			if (!rtr->lp_alive_count) {
- 				all_known = 0;
- 				break;
- 			}
-@@ -785,7 +785,7 @@ lnet_router_ni_update_locked(lnet_peer_t *gw, __u32 net)
- {
- 	lnet_route_t *rte;
- 
--	if ((gw->lp_ping_feats & LNET_PING_FEAT_NI_STATUS) != 0) {
-+	if ((gw->lp_ping_feats & LNET_PING_FEAT_NI_STATUS)) {
- 		list_for_each_entry(rte, &gw->lp_routes, lr_gwlist) {
- 			if (rte->lr_net == net) {
- 				rte->lr_downis = 0;
-@@ -898,7 +898,7 @@ lnet_create_rc_data_locked(lnet_peer_t *gateway)
- 		CERROR("Can't bind MD: %d\n", rc);
+ 	lp2 = lnet_find_peer_locked(ptable, nid);
+-	if (lp2 != NULL) {
++	if (lp2) {
+ 		*lpp = lp2;
  		goto out;
  	}
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
+ 
+ 	lp->lp_ni = lnet_net2ni_locked(LNET_NIDNET(nid), cpt2);
+-	if (lp->lp_ni == NULL) {
++	if (!lp->lp_ni) {
+ 		rc = -EHOSTUNREACH;
+ 		goto out;
+ 	}
+@@ -299,7 +299,7 @@ lnet_nid2peer_locked(lnet_peer_t **lpp, lnet_nid_t nid, int cpt)
+ 
+ 	return 0;
+ out:
+-	if (lp != NULL)
++	if (lp)
+ 		list_add(&lp->lp_hashlist, &ptable->pt_deathrow);
+ 	ptable->pt_number--;
+ 	return rc;
+diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+index 36f3caa..c6b747d 100644
+--- a/drivers/staging/lustre/lnet/lnet/router.c
++++ b/drivers/staging/lustre/lnet/lnet/router.c
+@@ -138,7 +138,7 @@ lnet_ni_notify_locked(lnet_ni_t *ni, lnet_peer_t *lp)
+ 	 * NB individual events can be missed; the only guarantee is that you
+ 	 * always get the most recent news
+ 	 */
+-	if (lp->lp_notifying || ni == NULL)
++	if (lp->lp_notifying || !ni)
+ 		return;
+ 
+ 	lp->lp_notifying = 1;
+@@ -150,7 +150,7 @@ lnet_ni_notify_locked(lnet_ni_t *ni, lnet_peer_t *lp)
+ 		lp->lp_notifylnd = 0;
+ 		lp->lp_notify    = 0;
+ 
+-		if (notifylnd && ni->ni_lnd->lnd_notify != NULL) {
++		if (notifylnd && ni->ni_lnd->lnd_notify) {
+ 			lnet_net_unlock(lp->lp_cpt);
+ 
+ 			/*
+@@ -204,7 +204,7 @@ lnet_rtr_decref_locked(lnet_peer_t *lp)
+ 	if (lp->lp_rtr_refcount == 0) {
+ 		LASSERT(list_empty(&lp->lp_routes));
+ 
+-		if (lp->lp_rcd != NULL) {
++		if (lp->lp_rcd) {
+ 			list_add(&lp->lp_rcd->rcd_list,
+ 				 &the_lnet.ln_rcd_deathrow);
+ 			lp->lp_rcd = NULL;
+@@ -323,12 +323,12 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
+ 	/* Assume net, route, all new */
+ 	LIBCFS_ALLOC(route, sizeof(*route));
+ 	LIBCFS_ALLOC(rnet, sizeof(*rnet));
+-	if (route == NULL || rnet == NULL) {
++	if (!route || !rnet) {
+ 		CERROR("Out of memory creating route %s %d %s\n",
+ 		       libcfs_net2str(net), hops, libcfs_nid2str(gateway));
+-		if (route != NULL)
++		if (route)
+ 			LIBCFS_FREE(route, sizeof(*route));
+-		if (rnet != NULL)
++		if (rnet)
+ 			LIBCFS_FREE(rnet, sizeof(*rnet));
+ 		return -ENOMEM;
+ 	}
+@@ -359,7 +359,7 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
+ 	LASSERT(!the_lnet.ln_shutdown);
+ 
+ 	rnet2 = lnet_find_net_locked(net);
+-	if (rnet2 == NULL) {
++	if (!rnet2) {
+ 		/* new network */
+ 		list_add_tail(&rnet->lrn_list, lnet_net2rnethash(net));
+ 		rnet2 = rnet;
+@@ -387,7 +387,7 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
+ 		lnet_net_unlock(LNET_LOCK_EX);
+ 
+ 		/* XXX Assume alive */
+-		if (ni->ni_lnd->lnd_notify != NULL)
++		if (ni->ni_lnd->lnd_notify)
+ 			ni->ni_lnd->lnd_notify(ni, gateway, 1);
+ 
+ 		lnet_net_lock(LNET_LOCK_EX);
+@@ -433,7 +433,7 @@ lnet_check_routes(void)
+ 
+ 				route = list_entry(e2, lnet_route_t, lr_list);
+ 
+-				if (route2 == NULL) {
++				if (!route2) {
+ 					route2 = route;
+ 					continue;
+ 				}
+@@ -518,7 +518,7 @@ lnet_del_route(__u32 net, lnet_nid_t gw_nid)
+ 
+ 			LIBCFS_FREE(route, sizeof(*route));
+ 
+-			if (rnet != NULL)
++			if (rnet)
+ 				LIBCFS_FREE(rnet, sizeof(*rnet));
+ 
+ 			rc = 0;
+@@ -696,7 +696,7 @@ lnet_router_checker_event(lnet_event_t *event)
+ 	lnet_rc_data_t *rcd = event->md.user_ptr;
+ 	struct lnet_peer *lp;
+ 
+-	LASSERT(rcd != NULL);
++	LASSERT(rcd);
+ 
+ 	if (event->unlinked) {
+ 		LNetInvalidateHandle(&rcd->rcd_mdh);
+@@ -707,7 +707,7 @@ lnet_router_checker_event(lnet_event_t *event)
+ 		event->type == LNET_EVENT_REPLY);
+ 
+ 	lp = rcd->rcd_gateway;
+-	LASSERT(lp != NULL);
++	LASSERT(lp);
+ 
+ 	/*
+ 	 * NB: it's called with holding lnet_res_lock, we have a few
+@@ -822,7 +822,7 @@ lnet_update_ni_status_locked(void)
+ 			continue;
+ 		}
+ 
+-		LASSERT(ni->ni_status != NULL);
++		LASSERT(ni->ni_status);
+ 
+ 		if (ni->ni_status->ns_status != LNET_NI_STATUS_DOWN) {
+ 			CDEBUG(D_NET, "NI(%s:%d) status changed to down\n",
+@@ -844,7 +844,7 @@ lnet_destroy_rc_data(lnet_rc_data_t *rcd)
+ 	/* detached from network */
+ 	LASSERT(LNetHandleIsInvalid(rcd->rcd_mdh));
+ 
+-	if (rcd->rcd_gateway != NULL) {
++	if (rcd->rcd_gateway) {
+ 		int cpt = rcd->rcd_gateway->lp_cpt;
+ 
+ 		lnet_net_lock(cpt);
+@@ -852,7 +852,7 @@ lnet_destroy_rc_data(lnet_rc_data_t *rcd)
+ 		lnet_net_unlock(cpt);
+ 	}
+ 
+-	if (rcd->rcd_pinginfo != NULL)
++	if (rcd->rcd_pinginfo)
+ 		LIBCFS_FREE(rcd->rcd_pinginfo, LNET_PINGINFO_SIZE);
+ 
+ 	LIBCFS_FREE(rcd, sizeof(*rcd));
+@@ -869,14 +869,14 @@ lnet_create_rc_data_locked(lnet_peer_t *gateway)
+ 	lnet_net_unlock(gateway->lp_cpt);
+ 
+ 	LIBCFS_ALLOC(rcd, sizeof(*rcd));
+-	if (rcd == NULL)
++	if (!rcd)
+ 		goto out;
+ 
+ 	LNetInvalidateHandle(&rcd->rcd_mdh);
+ 	INIT_LIST_HEAD(&rcd->rcd_list);
+ 
+ 	LIBCFS_ALLOC(pi, LNET_PINGINFO_SIZE);
+-	if (pi == NULL)
++	if (!pi)
+ 		goto out;
+ 
+ 	for (i = 0; i < LNET_MAX_RTR_NIS; i++) {
+@@ -902,7 +902,7 @@ lnet_create_rc_data_locked(lnet_peer_t *gateway)
  
  	lnet_net_lock(gateway->lp_cpt);
  	/* router table changed or someone has created rcd for this gateway */
-@@ -918,7 +918,7 @@ lnet_create_rc_data_locked(lnet_peer_t *gateway)
- 	if (rcd) {
+-	if (!lnet_isrouter(gateway) || gateway->lp_rcd != NULL) {
++	if (!lnet_isrouter(gateway) || gateway->lp_rcd) {
+ 		lnet_net_unlock(gateway->lp_cpt);
+ 		goto out;
+ 	}
+@@ -915,7 +915,7 @@ lnet_create_rc_data_locked(lnet_peer_t *gateway)
+ 	return rcd;
+ 
+  out:
+-	if (rcd != NULL) {
++	if (rcd) {
  		if (!LNetHandleIsInvalid(rcd->rcd_mdh)) {
  			rc = LNetMDUnlink(rcd->rcd_mdh);
--			LASSERT(rc == 0);
-+			LASSERT(!rc);
- 		}
- 		lnet_destroy_rc_data(rcd);
- 	}
-@@ -949,7 +949,7 @@ lnet_ping_router_locked(lnet_peer_t *rtr)
- 
- 	lnet_peer_addref_locked(rtr);
- 
--	if (rtr->lp_ping_deadline != 0 && /* ping timed out? */
-+	if (rtr->lp_ping_deadline && /* ping timed out? */
- 	    cfs_time_after(now, rtr->lp_ping_deadline))
- 		lnet_notify_locked(rtr, 1, 0, now);
- 
-@@ -977,7 +977,7 @@ lnet_ping_router_locked(lnet_peer_t *rtr)
- 	       rtr->lp_ping_deadline, rtr->lp_ping_notsent,
- 	       rtr->lp_alive, rtr->lp_alive_count, rtr->lp_ping_timestamp);
- 
--	if (secs != 0 && !rtr->lp_ping_notsent &&
-+	if (secs && !rtr->lp_ping_notsent &&
- 	    cfs_time_after(now, cfs_time_add(rtr->lp_ping_timestamp,
- 					     cfs_time_seconds(secs)))) {
- 		int rc;
-@@ -993,7 +993,7 @@ lnet_ping_router_locked(lnet_peer_t *rtr)
- 
- 		mdh = rcd->rcd_mdh;
- 
--		if (rtr->lp_ping_deadline == 0) {
-+		if (!rtr->lp_ping_deadline) {
- 			rtr->lp_ping_deadline =
- 				cfs_time_shift(router_ping_timeout);
- 		}
-@@ -1004,7 +1004,7 @@ lnet_ping_router_locked(lnet_peer_t *rtr)
- 			     LNET_PROTO_PING_MATCHBITS, 0);
- 
- 		lnet_net_lock(rtr->lp_cpt);
--		if (rc != 0)
-+		if (rc)
- 			rtr->lp_ping_notsent = 0; /* no event pending */
+ 			LASSERT(rc == 0);
+@@ -963,10 +963,10 @@ lnet_ping_router_locked(lnet_peer_t *rtr)
+ 		return;
  	}
  
-@@ -1038,7 +1038,7 @@ lnet_router_checker_start(void)
- 	eqsz = 0;
- 	rc = LNetEQAlloc(eqsz, lnet_router_checker_event,
- 			 &the_lnet.ln_rc_eqh);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't allocate EQ(%d): %d\n", eqsz, rc);
- 		return -ENOMEM;
- 	}
-@@ -1051,7 +1051,7 @@ lnet_router_checker_start(void)
- 		/* block until event callback signals exit */
- 		down(&the_lnet.ln_rc_signal);
- 		rc = LNetEQFree(the_lnet.ln_rc_eqh);
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
- 		the_lnet.ln_rc_state = LNET_RC_STATE_SHUTDOWN;
- 		return -ENOMEM;
- 	}
-@@ -1084,7 +1084,7 @@ lnet_router_checker_stop(void)
- 	LASSERT(the_lnet.ln_rc_state == LNET_RC_STATE_SHUTDOWN);
+-	rcd = rtr->lp_rcd != NULL ?
++	rcd = rtr->lp_rcd ?
+ 	      rtr->lp_rcd : lnet_create_rc_data_locked(rtr);
  
- 	rc = LNetEQFree(the_lnet.ln_rc_eqh);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
- }
- 
- static void
-@@ -1288,7 +1288,7 @@ lnet_rtrpool_free_bufs(lnet_rtrbufpool_t *rbp)
- 	int nbuffers = 0;
- 	lnet_rtrbuf_t *rb;
- 
--	if (rbp->rbp_nbuffers == 0) /* not initialized or already freed */
-+	if (!rbp->rbp_nbuffers) /* not initialized or already freed */
+-	if (rcd == NULL)
++	if (!rcd)
  		return;
  
- 	LASSERT(list_empty(&rbp->rbp_msgs));
-@@ -1317,7 +1317,7 @@ lnet_rtrpool_alloc_bufs(lnet_rtrbufpool_t *rbp, int nbufs, int cpt)
- 	lnet_rtrbuf_t *rb;
+ 	secs = lnet_router_check_interval(rtr);
+@@ -1109,7 +1109,7 @@ lnet_prune_rc_data(int wait_unlink)
+ 		/* router checker is stopping, prune all */
+ 		list_for_each_entry(lp, &the_lnet.ln_routers,
+ 				    lp_rtr_list) {
+-			if (lp->lp_rcd == NULL)
++			if (!lp->lp_rcd)
+ 				continue;
+ 
+ 			LASSERT(list_empty(&lp->lp_rcd->rcd_list));
+@@ -1256,7 +1256,7 @@ lnet_new_rtrbuf(lnet_rtrbufpool_t *rbp, int cpt)
  	int i;
  
--	if (rbp->rbp_nbuffers != 0) {
-+	if (rbp->rbp_nbuffers) {
- 		LASSERT(rbp->rbp_nbuffers == nbufs);
- 		return 0;
- 	}
-@@ -1484,17 +1484,17 @@ lnet_rtrpools_alloc(int im_a_router)
- 	cfs_percpt_for_each(rtrp, i, the_lnet.ln_rtrpools) {
- 		lnet_rtrpool_init(&rtrp[0], 0);
- 		rc = lnet_rtrpool_alloc_bufs(&rtrp[0], nrb_tiny, i);
--		if (rc != 0)
-+		if (rc)
- 			goto failed;
+ 	LIBCFS_CPT_ALLOC(rb, lnet_cpt_table(), cpt, sz);
+-	if (rb == NULL)
++	if (!rb)
+ 		return NULL;
  
- 		lnet_rtrpool_init(&rtrp[1], small_pages);
- 		rc = lnet_rtrpool_alloc_bufs(&rtrp[1], nrb_small, i);
--		if (rc != 0)
-+		if (rc)
- 			goto failed;
+ 	rb->rb_pool = rbp;
+@@ -1265,7 +1265,7 @@ lnet_new_rtrbuf(lnet_rtrbufpool_t *rbp, int cpt)
+ 		page = alloc_pages_node(
+ 				cfs_cpt_spread_node(lnet_cpt_table(), cpt),
+ 				GFP_KERNEL | __GFP_ZERO, 0);
+-		if (page == NULL) {
++		if (!page) {
+ 			while (--i >= 0)
+ 				__free_page(rb->rb_kiov[i].kiov_page);
  
- 		lnet_rtrpool_init(&rtrp[2], large_pages);
- 		rc = lnet_rtrpool_alloc_bufs(&rtrp[2], nrb_large, i);
--		if (rc != 0)
-+		if (rc)
- 			goto failed;
- 	}
+@@ -1325,7 +1325,7 @@ lnet_rtrpool_alloc_bufs(lnet_rtrbufpool_t *rbp, int nbufs, int cpt)
+ 	for (i = 0; i < nbufs; i++) {
+ 		rb = lnet_new_rtrbuf(rbp, cpt);
  
-diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-index 230fc15..a7aaf0c 100644
---- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-+++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-@@ -170,7 +170,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
+-		if (rb == NULL) {
++		if (!rb) {
+ 			CERROR("Failed to allocate %d router bufs of %d pages\n",
+ 			       nbufs, rbp->rbp_npages);
+ 			return -ENOMEM;
+@@ -1362,7 +1362,7 @@ lnet_rtrpools_free(void)
+ 	lnet_rtrbufpool_t *rtrp;
+ 	int i;
  
- 	LASSERT(!write);
- 
--	if (*lenp == 0)
-+	if (!*lenp)
- 		return 0;
- 
- 	LIBCFS_ALLOC(tmpstr, tmpsiz);
-@@ -179,7 +179,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
- 
- 	s = tmpstr; /* points to current position in tmpstr[] */
- 
--	if (*ppos == 0) {
-+	if (!*ppos) {
- 		s += snprintf(s, tmpstr + tmpsiz - s, "Routing %s\n",
- 			      the_lnet.ln_routing ? "enabled" : "disabled");
- 		LASSERT(tmpstr + tmpsiz - s > 0);
-@@ -224,7 +224,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
- 					lnet_route_t *re =
- 						list_entry(r, lnet_route_t,
- 							   lr_list);
--					if (skip == 0) {
-+					if (!skip) {
- 						route = re;
- 						break;
- 					}
-@@ -271,7 +271,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
- 
- 	LIBCFS_FREE(tmpstr, tmpsiz);
- 
--	if (rc == 0)
-+	if (!rc)
- 		*lenp = len;
- 
- 	return rc;
-@@ -293,7 +293,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
- 
- 	LASSERT(!write);
- 
--	if (*lenp == 0)
-+	if (!*lenp)
- 		return 0;
- 
- 	LIBCFS_ALLOC(tmpstr, tmpsiz);
-@@ -302,7 +302,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
- 
- 	s = tmpstr; /* points to current position in tmpstr[] */
- 
--	if (*ppos == 0) {
-+	if (!*ppos) {
- 		s += snprintf(s, tmpstr + tmpsiz - s,
- 			      "%-4s %7s %9s %6s %12s %9s %8s %7s %s\n",
- 			      "ref", "rtr_ref", "alive_cnt", "state",
-@@ -334,7 +334,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
- 			lnet_peer_t *lp = list_entry(r, lnet_peer_t,
- 						     lp_rtr_list);
- 
--			if (skip == 0) {
-+			if (!skip) {
- 				peer = lp;
- 				break;
- 			}
-@@ -358,21 +358,21 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
- 			lnet_route_t *rtr;
- 
- 			if ((peer->lp_ping_feats &
--			     LNET_PING_FEAT_NI_STATUS) != 0) {
-+			     LNET_PING_FEAT_NI_STATUS)) {
- 				list_for_each_entry(rtr, &peer->lp_routes,
- 						    lr_gwlist) {
- 					/*
- 					 * downis on any route should be the
- 					 * number of downis on the gateway
- 					 */
--					if (rtr->lr_downis != 0) {
-+					if (rtr->lr_downis) {
- 						down_ni = rtr->lr_downis;
- 						break;
- 					}
- 				}
- 			}
- 
--			if (deadline == 0)
-+			if (!deadline)
- 				s += snprintf(s, tmpstr + tmpsiz - s,
- 					      "%-4d %7d %9d %6s %12d %9d %8s %7d %s\n",
- 					      nrefs, nrtrrefs, alive_cnt,
-@@ -408,7 +408,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
- 
- 	LIBCFS_FREE(tmpstr, tmpsiz);
- 
--	if (rc == 0)
-+	if (!rc)
- 		*lenp = len;
- 
- 	return rc;
-@@ -431,7 +431,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
- 	CLASSERT(LNET_PROC_HASH_BITS >= LNET_PEER_HASH_BITS);
- 	LASSERT(!write);
- 
--	if (*lenp == 0)
-+	if (!*lenp)
- 		return 0;
- 
- 	if (cpt >= LNET_CPT_NUMBER) {
-@@ -445,7 +445,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
- 
- 	s = tmpstr; /* points to current position in tmpstr[] */
- 
--	if (*ppos == 0) {
-+	if (!*ppos) {
- 		s += snprintf(s, tmpstr + tmpsiz - s,
- 			      "%-24s %4s %5s %5s %5s %5s %5s %5s %5s %s\n",
- 			      "nid", "refs", "state", "last", "max",
-@@ -480,7 +480,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
- 			while (p != &ptable->pt_hash[hash]) {
- 				lnet_peer_t *lp = list_entry(p, lnet_peer_t,
- 							     lp_hashlist);
--				if (skip == 0) {
-+				if (!skip) {
- 					peer = lp;
- 
- 					/*
-@@ -577,7 +577,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
- 
- 	LIBCFS_FREE(tmpstr, tmpsiz);
- 
--	if (rc == 0)
-+	if (!rc)
- 		*lenp = len;
- 
- 	return rc;
-@@ -659,7 +659,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
- 
- 	LASSERT(!write);
- 
--	if (*lenp == 0)
-+	if (!*lenp)
- 		return 0;
- 
- 	LIBCFS_ALLOC(tmpstr, tmpsiz);
-@@ -668,7 +668,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
- 
- 	s = tmpstr; /* points to current position in tmpstr[] */
- 
--	if (*ppos == 0) {
-+	if (!*ppos) {
- 		s += snprintf(s, tmpstr + tmpsiz - s,
- 			      "%-24s %6s %5s %4s %4s %4s %5s %5s %5s\n",
- 			      "nid", "status", "alive", "refs", "peer",
-@@ -686,7 +686,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
- 		while (n != &the_lnet.ln_nis) {
- 			lnet_ni_t *a_ni = list_entry(n, lnet_ni_t, ni_list);
- 
--			if (skip == 0) {
-+			if (!skip) {
- 				ni = a_ni;
- 				break;
- 			}
-@@ -730,7 +730,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
- 				if (j == ni->ni_ncpts)
- 					continue;
- 
--				if (i != 0)
-+				if (i)
- 					lnet_net_lock(i);
- 
- 				s += snprintf(s, tmpstr + tmpsiz - s,
-@@ -742,7 +742,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
- 					      tq->tq_credits_max,
- 					      tq->tq_credits,
- 					      tq->tq_credits_min);
--				if (i != 0)
-+				if (i)
- 					lnet_net_unlock(i);
- 			}
- 			LASSERT(tmpstr + tmpsiz - s > 0);
-@@ -764,7 +764,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
- 
- 	LIBCFS_FREE(tmpstr, tmpsiz);
- 
--	if (rc == 0)
-+	if (!rc)
- 		*lenp = len;
- 
- 	return rc;
-@@ -854,8 +854,8 @@ static int __proc_lnet_portal_rotor(void *data, int write,
- 	rc = -EINVAL;
- 	lnet_res_lock(0);
- 	for (i = 0; portal_rotors[i].pr_name; i++) {
--		if (strncasecmp(portal_rotors[i].pr_name, tmp,
--				strlen(portal_rotors[i].pr_name)) == 0) {
-+		if (!strncasecmp(portal_rotors[i].pr_name, tmp,
-+				 strlen(portal_rotors[i].pr_name))) {
- 			portal_rotor = portal_rotors[i].pr_value;
- 			rc = 0;
- 			break;
-diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
-index 38aed80..b71f4b4 100644
---- a/drivers/staging/lustre/lnet/selftest/brw_test.c
-+++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
-@@ -80,7 +80,7 @@ brw_client_init(sfw_test_instance_t *tsi)
- 	LASSERT(sn);
- 	LASSERT(tsi->tsi_is_client);
- 
--	if ((sn->sn_features & LST_FEAT_BULK_LEN) == 0) {
-+	if (!(sn->sn_features & LST_FEAT_BULK_LEN)) {
- 		test_bulk_req_t  *breq = &tsi->tsi_u.bulk_v0;
- 
- 		opc   = breq->blk_opc;
-@@ -99,7 +99,7 @@ brw_client_init(sfw_test_instance_t *tsi)
- 		 * I should never get this step if it's unknown feature
- 		 * because make_session will reject unknown feature
- 		 */
--		LASSERT((sn->sn_features & ~LST_FEATS_MASK) == 0);
-+		LASSERT(!(sn->sn_features & ~LST_FEATS_MASK));
- 
- 		opc   = breq->blk_opc;
- 		flags = breq->blk_flags;
-@@ -145,7 +145,7 @@ brw_inject_one_error(void)
- 
- 	ktime_get_ts64(&ts);
- 
--	if (((ts.tv_nsec / NSEC_PER_USEC) & 1) == 0)
-+	if (!((ts.tv_nsec / NSEC_PER_USEC) & 1))
- 		return 0;
- 
- 	return brw_inject_errors--;
-@@ -244,7 +244,7 @@ brw_check_bulk(srpc_bulk_t *bk, int pattern, __u64 magic)
- 
- 	for (i = 0; i < bk->bk_niov; i++) {
- 		pg = bk->bk_iovs[i].kiov_page;
--		if (brw_check_page(pg, pattern, magic) != 0) {
-+		if (brw_check_page(pg, pattern, magic)) {
- 			CERROR("Bulk page %p (%d/%d) is corrupted!\n",
- 			       pg, i, bk->bk_niov);
- 			return 1;
-@@ -272,7 +272,7 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
- 	LASSERT(sn);
- 	LASSERT(bulk);
- 
--	if ((sn->sn_features & LST_FEAT_BULK_LEN) == 0) {
-+	if (!(sn->sn_features & LST_FEAT_BULK_LEN)) {
- 		test_bulk_req_t *breq = &tsi->tsi_u.bulk_v0;
- 
- 		opc   = breq->blk_opc;
-@@ -287,7 +287,7 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
- 		 * I should never get this step if it's unknown feature
- 		 * because make_session will reject unknown feature
- 		 */
--		LASSERT((sn->sn_features & ~LST_FEATS_MASK) == 0);
-+		LASSERT(!(sn->sn_features & ~LST_FEATS_MASK));
- 
- 		opc   = breq->blk_opc;
- 		flags = breq->blk_flags;
-@@ -296,7 +296,7 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
- 	}
- 
- 	rc = sfw_create_test_rpc(tsu, dest, sn->sn_features, npg, len, &rpc);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	memcpy(&rpc->crpc_bulk, bulk, offsetof(srpc_bulk_t, bk_iovs[npg]));
-@@ -326,7 +326,7 @@ brw_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
- 
- 	LASSERT(sn);
- 
--	if (rpc->crpc_status != 0) {
-+	if (rpc->crpc_status) {
- 		CERROR("BRW RPC to %s failed with %d\n",
- 		       libcfs_id2str(rpc->crpc_dest), rpc->crpc_status);
- 		if (!tsi->tsi_stopping) /* rpc could have been aborted */
-@@ -343,7 +343,7 @@ brw_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
- 	       "BRW RPC to %s finished with brw_status: %d\n",
- 	       libcfs_id2str(rpc->crpc_dest), reply->brw_status);
- 
--	if (reply->brw_status != 0) {
-+	if (reply->brw_status) {
- 		atomic_inc(&sn->sn_brw_errors);
- 		rpc->crpc_status = -(int)reply->brw_status;
- 		goto out;
-@@ -352,7 +352,7 @@ brw_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
- 	if (reqst->brw_rw == LST_BRW_WRITE)
- 		goto out;
- 
--	if (brw_check_bulk(&rpc->crpc_bulk, reqst->brw_flags, magic) != 0) {
-+	if (brw_check_bulk(&rpc->crpc_bulk, reqst->brw_flags, magic)) {
- 		CERROR("Bulk data from %s is corrupted!\n",
- 		       libcfs_id2str(rpc->crpc_dest));
- 		atomic_inc(&sn->sn_brw_errors);
-@@ -371,7 +371,7 @@ brw_server_rpc_done(struct srpc_server_rpc *rpc)
- 	if (!blk)
+-	if (the_lnet.ln_rtrpools == NULL) /* uninitialized or freed */
++	if (!the_lnet.ln_rtrpools) /* uninitialized or freed */
  		return;
  
--	if (rpc->srpc_status != 0)
-+	if (rpc->srpc_status)
- 		CERROR("Bulk transfer %s %s has failed: %d\n",
- 		       blk->bk_sink ? "from" : "to",
- 		       libcfs_id2str(rpc->srpc_peer), rpc->srpc_status);
-@@ -397,7 +397,7 @@ brw_bulk_ready(struct srpc_server_rpc *rpc, int status)
- 	reqstmsg = &rpc->srpc_reqstbuf->buf_msg;
- 	reqst = &reqstmsg->msg_body.brw_reqst;
+ 	cfs_percpt_for_each(rtrp, i, the_lnet.ln_rtrpools) {
+@@ -1475,7 +1475,7 @@ lnet_rtrpools_alloc(int im_a_router)
+ 	the_lnet.ln_rtrpools = cfs_percpt_alloc(lnet_cpt_table(),
+ 						LNET_NRBPOOLS *
+ 						sizeof(lnet_rtrbufpool_t));
+-	if (the_lnet.ln_rtrpools == NULL) {
++	if (!the_lnet.ln_rtrpools) {
+ 		LCONSOLE_ERROR_MSG(0x10c,
+ 				   "Failed to initialize router buffe pool\n");
+ 		return -ENOMEM;
+@@ -1519,11 +1519,11 @@ lnet_notify(lnet_ni_t *ni, lnet_nid_t nid, int alive, unsigned long when)
+ 	LASSERT(!in_interrupt());
  
--	if (status != 0) {
-+	if (status) {
- 		CERROR("BRW bulk %s failed for RPC from %s: %d\n",
- 		       reqst->brw_rw == LST_BRW_READ ? "READ" : "WRITE",
- 		       libcfs_id2str(rpc->srpc_peer), status);
-@@ -410,7 +410,7 @@ brw_bulk_ready(struct srpc_server_rpc *rpc, int status)
- 	if (reqstmsg->msg_magic != SRPC_MSG_MAGIC)
- 		__swab64s(&magic);
+ 	CDEBUG(D_NET, "%s notifying %s: %s\n",
+-	       (ni == NULL) ? "userspace" : libcfs_nid2str(ni->ni_nid),
++	       !ni ? "userspace" : libcfs_nid2str(ni->ni_nid),
+ 	       libcfs_nid2str(nid),
+ 	       alive ? "up" : "down");
  
--	if (brw_check_bulk(rpc->srpc_bulk, reqst->brw_flags, magic) != 0) {
-+	if (brw_check_bulk(rpc->srpc_bulk, reqst->brw_flags, magic)) {
- 		CERROR("Bulk data from %s is corrupted!\n",
- 		       libcfs_id2str(rpc->srpc_peer));
- 		reply->brw_status = EBADMSG;
-@@ -454,15 +454,15 @@ brw_server_handle(struct srpc_server_rpc *rpc)
- 		return 0;
+-	if (ni != NULL &&
++	if (ni &&
+ 	    LNET_NIDNET(ni->ni_nid) != LNET_NIDNET(nid)) {
+ 		CWARN("Ignoring notification of %s %s by %s (different net)\n",
+ 		      libcfs_nid2str(nid), alive ? "birth" : "death",
+@@ -1534,13 +1534,13 @@ lnet_notify(lnet_ni_t *ni, lnet_nid_t nid, int alive, unsigned long when)
+ 	/* can't do predictions... */
+ 	if (cfs_time_after(when, now)) {
+ 		CWARN("Ignoring prediction from %s of %s %s %ld seconds in the future\n",
+-		      (ni == NULL) ? "userspace" : libcfs_nid2str(ni->ni_nid),
++		      !ni ? "userspace" : libcfs_nid2str(ni->ni_nid),
+ 		      libcfs_nid2str(nid), alive ? "up" : "down",
+ 		      cfs_duration_sec(cfs_time_sub(when, now)));
+ 		return -EINVAL;
  	}
  
--	if ((reqstmsg->msg_ses_feats & ~LST_FEATS_MASK) != 0) {
-+	if (reqstmsg->msg_ses_feats & ~LST_FEATS_MASK) {
- 		replymsg->msg_ses_feats = LST_FEATS_MASK;
- 		reply->brw_status = EPROTO;
+-	if (ni != NULL && !alive &&	     /* LND telling me she's down */
++	if (ni && !alive &&	     /* LND telling me she's down */
+ 	    !auto_down) {		       /* auto-down disabled */
+ 		CDEBUG(D_NET, "Auto-down disabled\n");
  		return 0;
+@@ -1554,7 +1554,7 @@ lnet_notify(lnet_ni_t *ni, lnet_nid_t nid, int alive, unsigned long when)
  	}
  
--	if ((reqstmsg->msg_ses_feats & LST_FEAT_BULK_LEN) == 0) {
-+	if (!(reqstmsg->msg_ses_feats & LST_FEAT_BULK_LEN)) {
- 		/* compat with old version */
--		if ((reqst->brw_len & ~CFS_PAGE_MASK) != 0) {
-+		if (reqst->brw_len & ~CFS_PAGE_MASK) {
- 			reply->brw_status = EINVAL;
- 			return 0;
+ 	lp = lnet_find_peer_locked(the_lnet.ln_peer_tables[cpt], nid);
+-	if (lp == NULL) {
++	if (!lp) {
+ 		/* nid not found */
+ 		lnet_net_unlock(cpt);
+ 		CDEBUG(D_NET, "%s not found\n", libcfs_nid2str(nid));
+@@ -1567,10 +1567,10 @@ lnet_notify(lnet_ni_t *ni, lnet_nid_t nid, int alive, unsigned long when)
+ 	 * call us with when == _time_when_the_node_was_booted_ if
+ 	 * no connections were successfully established
+ 	 */
+-	if (ni != NULL && !alive && when < lp->lp_last_alive)
++	if (ni && !alive && when < lp->lp_last_alive)
+ 		when = lp->lp_last_alive;
+ 
+-	lnet_notify_locked(lp, ni == NULL, alive, when);
++	lnet_notify_locked(lp, !ni, alive, when);
+ 
+ 	lnet_ni_notify_locked(ni, lp);
+ 
+diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
+index 124737e..230fc15 100644
+--- a/drivers/staging/lustre/lnet/lnet/router_proc.c
++++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
+@@ -114,11 +114,11 @@ static int __proc_lnet_stats(void *data, int write,
+ 	/* read */
+ 
+ 	LIBCFS_ALLOC(ctrs, sizeof(*ctrs));
+-	if (ctrs == NULL)
++	if (!ctrs)
+ 		return -ENOMEM;
+ 
+ 	LIBCFS_ALLOC(tmpstr, tmpsiz);
+-	if (tmpstr == NULL) {
++	if (!tmpstr) {
+ 		LIBCFS_FREE(ctrs, sizeof(*ctrs));
+ 		return -ENOMEM;
+ 	}
+@@ -174,7 +174,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
+ 		return 0;
+ 
+ 	LIBCFS_ALLOC(tmpstr, tmpsiz);
+-	if (tmpstr == NULL)
++	if (!tmpstr)
+ 		return -ENOMEM;
+ 
+ 	s = tmpstr; /* points to current position in tmpstr[] */
+@@ -209,13 +209,12 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
+ 			return -ESTALE;
  		}
-@@ -474,7 +474,7 @@ brw_server_handle(struct srpc_server_rpc *rpc)
  
- 	replymsg->msg_ses_feats = reqstmsg->msg_ses_feats;
+-		for (i = 0; i < LNET_REMOTE_NETS_HASH_SIZE && route == NULL;
+-		     i++) {
++		for (i = 0; i < LNET_REMOTE_NETS_HASH_SIZE && !route; i++) {
+ 			rn_list = &the_lnet.ln_remote_nets_hash[i];
  
--	if (reqst->brw_len == 0 || npg > LNET_MAX_IOV) {
-+	if (!reqst->brw_len || npg > LNET_MAX_IOV) {
- 		reply->brw_status = EINVAL;
+ 			n = rn_list->next;
+ 
+-			while (n != rn_list && route == NULL) {
++			while (n != rn_list && !route) {
+ 				rnet = list_entry(n, lnet_remotenet_t,
+ 						  lrn_list);
+ 
+@@ -238,7 +237,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
+ 			}
+ 		}
+ 
+-		if (route != NULL) {
++		if (route) {
+ 			__u32 net = rnet->lrn_net;
+ 			unsigned int hops = route->lr_hops;
+ 			unsigned int priority = route->lr_priority;
+@@ -298,7 +297,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
  		return 0;
- 	}
-@@ -482,7 +482,7 @@ brw_server_handle(struct srpc_server_rpc *rpc)
- 	rc = sfw_alloc_pages(rpc, rpc->srpc_scd->scd_cpt, npg,
- 			     reqst->brw_len,
- 			     reqst->brw_rw == LST_BRW_WRITE);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
  
- 	if (reqst->brw_rw == LST_BRW_READ)
-diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-index 8b9717c..210e24e 100644
---- a/drivers/staging/lustre/lnet/selftest/conctl.c
-+++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-@@ -52,7 +52,7 @@ lst_session_new_ioctl(lstio_session_new_args_t *args)
+ 	LIBCFS_ALLOC(tmpstr, tmpsiz);
+-	if (tmpstr == NULL)
++	if (!tmpstr)
+ 		return -ENOMEM;
+ 
+ 	s = tmpstr; /* points to current position in tmpstr[] */
+@@ -344,7 +343,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
+ 			r = r->next;
+ 		}
+ 
+-		if (peer != NULL) {
++		if (peer) {
+ 			lnet_nid_t nid = peer->lp_nid;
+ 			unsigned long now = cfs_time_current();
+ 			unsigned long deadline = peer->lp_ping_deadline;
+@@ -441,7 +440,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+ 	}
+ 
+ 	LIBCFS_ALLOC(tmpstr, tmpsiz);
+-	if (tmpstr == NULL)
++	if (!tmpstr)
+ 		return -ENOMEM;
+ 
+ 	s = tmpstr; /* points to current position in tmpstr[] */
+@@ -475,7 +474,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+ 		}
+ 
+ 		while (hash < LNET_PEER_HASH_SIZE) {
+-			if (p == NULL)
++			if (!p)
+ 				p = ptable->pt_hash[hash].next;
+ 
+ 			while (p != &ptable->pt_hash[hash]) {
+@@ -504,7 +503,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+ 				p = lp->lp_hashlist.next;
+ 			}
+ 
+-			if (peer != NULL)
++			if (peer)
+ 				break;
+ 
+ 			p = NULL;
+@@ -512,7 +511,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+ 			hash++;
+ 		}
+ 
+-		if (peer != NULL) {
++		if (peer) {
+ 			lnet_nid_t nid = peer->lp_nid;
+ 			int nrefs = peer->lp_refcount;
+ 			int lastalive = -1;
+@@ -560,7 +559,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+ 			cpt++;
+ 			hash = 0;
+ 			hoff = 1;
+-			if (peer == NULL && cpt < LNET_CPT_NUMBER)
++			if (!peer && cpt < LNET_CPT_NUMBER)
+ 				goto again;
+ 		}
+ 	}
+@@ -600,7 +599,7 @@ static int __proc_lnet_buffers(void *data, int write,
+ 	/* (4 %d) * 4 * LNET_CPT_NUMBER */
+ 	tmpsiz = 64 * (LNET_NRBPOOLS + 1) * LNET_CPT_NUMBER;
+ 	LIBCFS_ALLOC(tmpstr, tmpsiz);
+-	if (tmpstr == NULL)
++	if (!tmpstr)
+ 		return -ENOMEM;
+ 
+ 	s = tmpstr; /* points to current position in tmpstr[] */
+@@ -610,7 +609,7 @@ static int __proc_lnet_buffers(void *data, int write,
+ 		      "pages", "count", "credits", "min");
+ 	LASSERT(tmpstr + tmpsiz - s > 0);
+ 
+-	if (the_lnet.ln_rtrpools == NULL)
++	if (!the_lnet.ln_rtrpools)
+ 		goto out; /* I'm not a router */
+ 
+ 	for (idx = 0; idx < LNET_NRBPOOLS; idx++) {
+@@ -664,7 +663,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
+ 		return 0;
+ 
+ 	LIBCFS_ALLOC(tmpstr, tmpsiz);
+-	if (tmpstr == NULL)
++	if (!tmpstr)
+ 		return -ENOMEM;
+ 
+ 	s = tmpstr; /* points to current position in tmpstr[] */
+@@ -696,7 +695,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
+ 			n = n->next;
+ 		}
+ 
+-		if (ni != NULL) {
++		if (ni) {
+ 			struct lnet_tx_queue *tq;
+ 			char *stat;
+ 			time64_t now = ktime_get_real_seconds();
+@@ -712,7 +711,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
+ 				last_alive = 0;
+ 
+ 			lnet_ni_lock(ni);
+-			LASSERT(ni->ni_status != NULL);
++			LASSERT(ni->ni_status);
+ 			stat = (ni->ni_status->ns_status ==
+ 				LNET_NI_STATUS_UP) ? "up" : "down";
+ 			lnet_ni_unlock(ni);
+@@ -722,7 +721,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
+ 			 * TX queue of each partition
+ 			 */
+ 			cfs_percpt_for_each(tq, i, ni->ni_tx_queues) {
+-				for (j = 0; ni->ni_cpts != NULL &&
++				for (j = 0; ni->ni_cpts &&
+ 				     j < ni->ni_ncpts; j++) {
+ 					if (i == ni->ni_cpts[j])
+ 						break;
+@@ -817,7 +816,7 @@ static int __proc_lnet_portal_rotor(void *data, int write,
+ 	int i;
+ 
+ 	LIBCFS_ALLOC(buf, buf_len);
+-	if (buf == NULL)
++	if (!buf)
+ 		return -ENOMEM;
+ 
+ 	if (!write) {
+@@ -854,7 +853,7 @@ static int __proc_lnet_portal_rotor(void *data, int write,
+ 
+ 	rc = -EINVAL;
+ 	lnet_res_lock(0);
+-	for (i = 0; portal_rotors[i].pr_name != NULL; i++) {
++	for (i = 0; portal_rotors[i].pr_name; i++) {
+ 		if (strncasecmp(portal_rotors[i].pr_name, tmp,
+ 				strlen(portal_rotors[i].pr_name)) == 0) {
+ 			portal_rotor = portal_rotors[i].pr_value;
+diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
+index 4af91cb..38aed80 100644
+--- a/drivers/staging/lustre/lnet/selftest/brw_test.c
++++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
+@@ -58,7 +58,7 @@ brw_client_fini(sfw_test_instance_t *tsi)
+ 
+ 	list_for_each_entry(tsu, &tsi->tsi_units, tsu_list) {
+ 		bulk = tsu->tsu_private;
+-		if (bulk == NULL)
++		if (!bulk)
+ 			continue;
+ 
+ 		srpc_free_bulk(bulk);
+@@ -77,7 +77,7 @@ brw_client_init(sfw_test_instance_t *tsi)
+ 	srpc_bulk_t	 *bulk;
+ 	sfw_test_unit_t	 *tsu;
+ 
+-	LASSERT(sn != NULL);
++	LASSERT(sn);
+ 	LASSERT(tsi->tsi_is_client);
+ 
+ 	if ((sn->sn_features & LST_FEAT_BULK_LEN) == 0) {
+@@ -120,7 +120,7 @@ brw_client_init(sfw_test_instance_t *tsi)
+ 	list_for_each_entry(tsu, &tsi->tsi_units, tsu_list) {
+ 		bulk = srpc_alloc_bulk(lnet_cpt_of_nid(tsu->tsu_dest.nid),
+ 				       npg, len, opc == LST_BRW_READ);
+-		if (bulk == NULL) {
++		if (!bulk) {
+ 			brw_client_fini(tsi);
+ 			return -ENOMEM;
+ 		}
+@@ -157,7 +157,7 @@ brw_fill_page(struct page *pg, int pattern, __u64 magic)
+ 	char *addr = page_address(pg);
+ 	int   i;
+ 
+-	LASSERT(addr != NULL);
++	LASSERT(addr);
+ 
+ 	if (pattern == LST_BRW_CHECK_NONE)
+ 		return;
+@@ -188,7 +188,7 @@ brw_check_page(struct page *pg, int pattern, __u64 magic)
+ 	__u64  data = 0; /* make compiler happy */
+ 	int    i;
+ 
+-	LASSERT(addr != NULL);
++	LASSERT(addr);
+ 
+ 	if (pattern == LST_BRW_CHECK_NONE)
+ 		return 0;
+@@ -269,8 +269,8 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
+ 	int opc;
  	int rc;
  
- 	if (!args->lstio_ses_idp || /* address for output sid */
--	    args->lstio_ses_key   == 0 ||    /* no key is specified */
-+	    !args->lstio_ses_key ||    /* no key is specified */
- 	    !args->lstio_ses_namep || /* session name */
+-	LASSERT(sn != NULL);
+-	LASSERT(bulk != NULL);
++	LASSERT(sn);
++	LASSERT(bulk);
+ 
+ 	if ((sn->sn_features & LST_FEAT_BULK_LEN) == 0) {
+ 		test_bulk_req_t *breq = &tsi->tsi_u.bulk_v0;
+@@ -324,7 +324,7 @@ brw_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
+ 	srpc_brw_reply_t *reply = &msg->msg_body.brw_reply;
+ 	srpc_brw_reqst_t *reqst = &rpc->crpc_reqstmsg.msg_body.brw_reqst;
+ 
+-	LASSERT(sn != NULL);
++	LASSERT(sn);
+ 
+ 	if (rpc->crpc_status != 0) {
+ 		CERROR("BRW RPC to %s failed with %d\n",
+@@ -368,7 +368,7 @@ brw_server_rpc_done(struct srpc_server_rpc *rpc)
+ {
+ 	srpc_bulk_t *blk = rpc->srpc_bulk;
+ 
+-	if (blk == NULL)
++	if (!blk)
+ 		return;
+ 
+ 	if (rpc->srpc_status != 0)
+@@ -391,8 +391,8 @@ brw_bulk_ready(struct srpc_server_rpc *rpc, int status)
+ 	srpc_brw_reqst_t *reqst;
+ 	srpc_msg_t *reqstmsg;
+ 
+-	LASSERT(rpc->srpc_bulk != NULL);
+-	LASSERT(rpc->srpc_reqstbuf != NULL);
++	LASSERT(rpc->srpc_bulk);
++	LASSERT(rpc->srpc_reqstbuf);
+ 
+ 	reqstmsg = &rpc->srpc_reqstbuf->buf_msg;
+ 	reqst = &reqstmsg->msg_body.brw_reqst;
+diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
+index cb5c125..8b9717c 100644
+--- a/drivers/staging/lustre/lnet/selftest/conctl.c
++++ b/drivers/staging/lustre/lnet/selftest/conctl.c
+@@ -51,15 +51,15 @@ lst_session_new_ioctl(lstio_session_new_args_t *args)
+ 	char *name;
+ 	int rc;
+ 
+-	if (args->lstio_ses_idp   == NULL || /* address for output sid */
++	if (!args->lstio_ses_idp || /* address for output sid */
+ 	    args->lstio_ses_key   == 0 ||    /* no key is specified */
+-	    args->lstio_ses_namep == NULL || /* session name */
++	    !args->lstio_ses_namep || /* session name */
  	    args->lstio_ses_nmlen <= 0 ||
  	    args->lstio_ses_nmlen > LST_NAME_SIZE)
-@@ -354,7 +354,7 @@ lst_nodes_add_ioctl(lstio_group_nodes_args_t *args)
- 			      args->lstio_grp_resultp);
- 
- 	LIBCFS_FREE(name, args->lstio_grp_nmlen + 1);
--	if (rc == 0 &&
-+	if (!rc &&
- 	    copy_to_user(args->lstio_grp_featp, &feats, sizeof(feats))) {
  		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_ses_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_ses_namep,
+@@ -95,11 +95,11 @@ lst_session_info_ioctl(lstio_session_info_args_t *args)
+ {
+ 	/* no checking of key */
+ 
+-	if (args->lstio_ses_idp    == NULL || /* address for output sid */
+-	    args->lstio_ses_keyp   == NULL || /* address for output key */
+-	    args->lstio_ses_featp  == NULL || /* address for output features */
+-	    args->lstio_ses_ndinfo == NULL || /* address for output ndinfo */
+-	    args->lstio_ses_namep  == NULL || /* address for output name */
++	if (!args->lstio_ses_idp || /* address for output sid */
++	    !args->lstio_ses_keyp || /* address for output key */
++	    !args->lstio_ses_featp || /* address for output features */
++	    !args->lstio_ses_ndinfo || /* address for output ndinfo */
++	    !args->lstio_ses_namep || /* address for output name */
+ 	    args->lstio_ses_nmlen  <= 0 ||
+ 	    args->lstio_ses_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+@@ -122,17 +122,17 @@ lst_debug_ioctl(lstio_debug_args_t *args)
+ 	if (args->lstio_dbg_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_dbg_resultp == NULL)
++	if (!args->lstio_dbg_resultp)
+ 		return -EINVAL;
+ 
+-	if (args->lstio_dbg_namep != NULL && /* name of batch/group */
++	if (args->lstio_dbg_namep && /* name of batch/group */
+ 	    (args->lstio_dbg_nmlen <= 0 ||
+ 	     args->lstio_dbg_nmlen > LST_NAME_SIZE))
+ 		return -EINVAL;
+ 
+-	if (args->lstio_dbg_namep != NULL) {
++	if (args->lstio_dbg_namep) {
+ 		LIBCFS_ALLOC(name, args->lstio_dbg_nmlen + 1);
+-		if (name == NULL)
++		if (!name)
+ 			return -ENOMEM;
+ 
+ 		if (copy_from_user(name, args->lstio_dbg_namep,
+@@ -156,7 +156,7 @@ lst_debug_ioctl(lstio_debug_args_t *args)
+ 	case LST_OPC_BATCHSRV:
+ 		client = 0;
+ 	case LST_OPC_BATCHCLI:
+-		if (name == NULL)
++		if (!name)
+ 			goto out;
+ 
+ 		rc = lstcon_batch_debug(args->lstio_dbg_timeout,
+@@ -164,7 +164,7 @@ lst_debug_ioctl(lstio_debug_args_t *args)
+ 		break;
+ 
+ 	case LST_OPC_GROUP:
+-		if (name == NULL)
++		if (!name)
+ 			goto out;
+ 
+ 		rc = lstcon_group_debug(args->lstio_dbg_timeout,
+@@ -173,7 +173,7 @@ lst_debug_ioctl(lstio_debug_args_t *args)
+ 
+ 	case LST_OPC_NODES:
+ 		if (args->lstio_dbg_count <= 0 ||
+-		    args->lstio_dbg_idsp == NULL)
++		    !args->lstio_dbg_idsp)
+ 			goto out;
+ 
+ 		rc = lstcon_nodes_debug(args->lstio_dbg_timeout,
+@@ -187,7 +187,7 @@ lst_debug_ioctl(lstio_debug_args_t *args)
  	}
-@@ -431,7 +431,7 @@ lst_group_info_ioctl(lstio_group_info_args_t *args)
  
- 	LIBCFS_FREE(name, args->lstio_grp_nmlen + 1);
+ out:
+-	if (name != NULL)
++	if (name)
+ 		LIBCFS_FREE(name, args->lstio_dbg_nmlen + 1);
  
--	if (rc != 0)
-+	if (rc)
+ 	return rc;
+@@ -202,13 +202,13 @@ lst_group_add_ioctl(lstio_group_add_args_t *args)
+ 	if (args->lstio_grp_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_grp_namep == NULL ||
++	if (!args->lstio_grp_namep ||
+ 	    args->lstio_grp_nmlen <= 0 ||
+ 	    args->lstio_grp_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_grp_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_grp_namep,
+@@ -235,13 +235,13 @@ lst_group_del_ioctl(lstio_group_del_args_t *args)
+ 	if (args->lstio_grp_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_grp_namep == NULL ||
++	if (!args->lstio_grp_namep ||
+ 	    args->lstio_grp_nmlen <= 0 ||
+ 	    args->lstio_grp_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_grp_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_grp_namep,
+@@ -268,14 +268,14 @@ lst_group_update_ioctl(lstio_group_update_args_t *args)
+ 	if (args->lstio_grp_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_grp_resultp == NULL ||
+-	    args->lstio_grp_namep == NULL ||
++	if (!args->lstio_grp_resultp ||
++	    !args->lstio_grp_namep ||
+ 	    args->lstio_grp_nmlen <= 0 ||
+ 	    args->lstio_grp_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_grp_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name,
+@@ -298,7 +298,7 @@ lst_group_update_ioctl(lstio_group_update_args_t *args)
+ 
+ 	case LST_GROUP_RMND:
+ 		if (args->lstio_grp_count  <= 0 ||
+-		    args->lstio_grp_idsp == NULL) {
++		    !args->lstio_grp_idsp) {
+ 			rc = -EINVAL;
+ 			break;
+ 		}
+@@ -327,17 +327,17 @@ lst_nodes_add_ioctl(lstio_group_nodes_args_t *args)
+ 	if (args->lstio_grp_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_grp_idsp == NULL || /* array of ids */
++	if (!args->lstio_grp_idsp || /* array of ids */
+ 	    args->lstio_grp_count <= 0 ||
+-	    args->lstio_grp_resultp == NULL ||
+-	    args->lstio_grp_featp == NULL ||
+-	    args->lstio_grp_namep == NULL ||
++	    !args->lstio_grp_resultp ||
++	    !args->lstio_grp_featp ||
++	    !args->lstio_grp_namep ||
+ 	    args->lstio_grp_nmlen <= 0 ||
+ 	    args->lstio_grp_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_grp_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_grp_namep,
+@@ -369,7 +369,7 @@ lst_group_list_ioctl(lstio_group_list_args_t *args)
+ 		return -EACCES;
+ 
+ 	if (args->lstio_grp_idx   < 0 ||
+-	    args->lstio_grp_namep == NULL ||
++	    !args->lstio_grp_namep ||
+ 	    args->lstio_grp_nmlen <= 0 ||
+ 	    args->lstio_grp_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+@@ -390,18 +390,18 @@ lst_group_info_ioctl(lstio_group_info_args_t *args)
+ 	if (args->lstio_grp_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_grp_namep == NULL ||
++	if (!args->lstio_grp_namep ||
+ 	    args->lstio_grp_nmlen <= 0 ||
+ 	    args->lstio_grp_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+-	if (args->lstio_grp_entp  == NULL && /* output: group entry */
+-	    args->lstio_grp_dentsp == NULL)  /* output: node entry */
++	if (!args->lstio_grp_entp &&  /* output: group entry */
++	    !args->lstio_grp_dentsp)  /* output: node entry */
+ 		return -EINVAL;
+ 
+-	if (args->lstio_grp_dentsp != NULL) { /* have node entry */
+-		if (args->lstio_grp_idxp == NULL || /* node index */
+-		    args->lstio_grp_ndentp == NULL) /* # of node entry */
++	if (args->lstio_grp_dentsp) { /* have node entry */
++		if (!args->lstio_grp_idxp || /* node index */
++		    !args->lstio_grp_ndentp) /* # of node entry */
+ 			return -EINVAL;
+ 
+ 		if (copy_from_user(&ndent, args->lstio_grp_ndentp,
+@@ -415,7 +415,7 @@ lst_group_info_ioctl(lstio_group_info_args_t *args)
+ 	}
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_grp_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_grp_namep,
+@@ -434,7 +434,7 @@ lst_group_info_ioctl(lstio_group_info_args_t *args)
+ 	if (rc != 0)
  		return rc;
  
- 	if (args->lstio_grp_dentsp &&
-@@ -655,7 +655,7 @@ lst_batch_info_ioctl(lstio_batch_info_args_t *args)
+-	if (args->lstio_grp_dentsp != NULL &&
++	if (args->lstio_grp_dentsp &&
+ 	    (copy_to_user(args->lstio_grp_idxp, &index, sizeof(index)) ||
+ 	     copy_to_user(args->lstio_grp_ndentp, &ndent, sizeof(ndent))))
+ 		return -EFAULT;
+@@ -451,13 +451,13 @@ lst_batch_add_ioctl(lstio_batch_add_args_t *args)
+ 	if (args->lstio_bat_key != console_session.ses_key)
+ 		return -EACCES;
  
- 	LIBCFS_FREE(name, args->lstio_bat_nmlen + 1);
+-	if (args->lstio_bat_namep == NULL ||
++	if (!args->lstio_bat_namep ||
+ 	    args->lstio_bat_nmlen <= 0 ||
+ 	    args->lstio_bat_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
  
--	if (rc != 0)
-+	if (rc)
+ 	LIBCFS_ALLOC(name, args->lstio_bat_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_bat_namep,
+@@ -484,13 +484,13 @@ lst_batch_run_ioctl(lstio_batch_run_args_t *args)
+ 	if (args->lstio_bat_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_bat_namep == NULL ||
++	if (!args->lstio_bat_namep ||
+ 	    args->lstio_bat_nmlen <= 0 ||
+ 	    args->lstio_bat_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_bat_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_bat_namep,
+@@ -518,14 +518,14 @@ lst_batch_stop_ioctl(lstio_batch_stop_args_t *args)
+ 	if (args->lstio_bat_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_bat_resultp == NULL ||
+-	    args->lstio_bat_namep == NULL ||
++	if (!args->lstio_bat_resultp ||
++	    !args->lstio_bat_namep ||
+ 	    args->lstio_bat_nmlen <= 0 ||
+ 	    args->lstio_bat_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_bat_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_bat_namep,
+@@ -553,8 +553,8 @@ lst_batch_query_ioctl(lstio_batch_query_args_t *args)
+ 	if (args->lstio_bat_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_bat_resultp == NULL ||
+-	    args->lstio_bat_namep == NULL ||
++	if (!args->lstio_bat_resultp ||
++	    !args->lstio_bat_namep ||
+ 	    args->lstio_bat_nmlen <= 0 ||
+ 	    args->lstio_bat_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+@@ -563,7 +563,7 @@ lst_batch_query_ioctl(lstio_batch_query_args_t *args)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_bat_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_bat_namep,
+@@ -592,7 +592,7 @@ lst_batch_list_ioctl(lstio_batch_list_args_t *args)
+ 		return -EACCES;
+ 
+ 	if (args->lstio_bat_idx   < 0 ||
+-	    args->lstio_bat_namep == NULL ||
++	    !args->lstio_bat_namep ||
+ 	    args->lstio_bat_nmlen <= 0 ||
+ 	    args->lstio_bat_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+@@ -613,18 +613,18 @@ lst_batch_info_ioctl(lstio_batch_info_args_t *args)
+ 	if (args->lstio_bat_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_bat_namep == NULL || /* batch name */
++	if (!args->lstio_bat_namep || /* batch name */
+ 	    args->lstio_bat_nmlen <= 0 ||
+ 	    args->lstio_bat_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+-	if (args->lstio_bat_entp == NULL && /* output: batch entry */
+-	    args->lstio_bat_dentsp == NULL) /* output: node entry */
++	if (!args->lstio_bat_entp && /* output: batch entry */
++	    !args->lstio_bat_dentsp) /* output: node entry */
+ 		return -EINVAL;
+ 
+-	if (args->lstio_bat_dentsp != NULL) { /* have node entry */
+-		if (args->lstio_bat_idxp == NULL || /* node index */
+-		    args->lstio_bat_ndentp == NULL) /* # of node entry */
++	if (args->lstio_bat_dentsp) { /* have node entry */
++		if (!args->lstio_bat_idxp || /* node index */
++		    !args->lstio_bat_ndentp) /* # of node entry */
+ 			return -EINVAL;
+ 
+ 		if (copy_from_user(&index, args->lstio_bat_idxp,
+@@ -638,7 +638,7 @@ lst_batch_info_ioctl(lstio_batch_info_args_t *args)
+ 	}
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_bat_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_bat_namep,
+@@ -658,7 +658,7 @@ lst_batch_info_ioctl(lstio_batch_info_args_t *args)
+ 	if (rc != 0)
  		return rc;
  
- 	if (args->lstio_bat_dentsp &&
-@@ -733,7 +733,7 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
+-	if (args->lstio_bat_dentsp != NULL &&
++	if (args->lstio_bat_dentsp &&
+ 	    (copy_to_user(args->lstio_bat_idxp, &index, sizeof(index)) ||
+ 	     copy_to_user(args->lstio_bat_ndentp, &ndent, sizeof(ndent))))
+ 		rc = -EFAULT;
+@@ -676,19 +676,18 @@ lst_stat_query_ioctl(lstio_stat_args_t *args)
+ 	if (args->lstio_sta_key != console_session.ses_key)
+ 		return -EACCES;
+ 
+-	if (args->lstio_sta_resultp == NULL ||
+-	    (args->lstio_sta_namep  == NULL &&
+-	     args->lstio_sta_idsp   == NULL) ||
++	if (!args->lstio_sta_resultp ||
++	    (!args->lstio_sta_namep && !args->lstio_sta_idsp) ||
+ 	    args->lstio_sta_nmlen <= 0 ||
+ 	    args->lstio_sta_nmlen > LST_NAME_SIZE)
+ 		return -EINVAL;
+ 
+-	if (args->lstio_sta_idsp != NULL &&
++	if (args->lstio_sta_idsp &&
+ 	    args->lstio_sta_count <= 0)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(name, args->lstio_sta_nmlen + 1);
+-	if (name == NULL)
++	if (!name)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(name, args->lstio_sta_namep,
+@@ -697,7 +696,7 @@ lst_stat_query_ioctl(lstio_stat_args_t *args)
+ 		return -EFAULT;
+ 	}
+ 
+-	if (args->lstio_sta_idsp == NULL) {
++	if (!args->lstio_sta_idsp) {
+ 		rc = lstcon_group_stat(name, args->lstio_sta_timeout,
+ 				       args->lstio_sta_resultp);
+ 	} else {
+@@ -721,15 +720,15 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
+ 	int		ret = 0;
+ 	int		rc = -ENOMEM;
+ 
+-	if (args->lstio_tes_resultp == NULL ||
+-	    args->lstio_tes_retp == NULL ||
+-	    args->lstio_tes_bat_name == NULL || /* no specified batch */
++	if (!args->lstio_tes_resultp ||
++	    !args->lstio_tes_retp ||
++	    !args->lstio_tes_bat_name || /* no specified batch */
+ 	    args->lstio_tes_bat_nmlen <= 0 ||
+ 	    args->lstio_tes_bat_nmlen > LST_NAME_SIZE ||
+-	    args->lstio_tes_sgrp_name == NULL || /* no source group */
++	    !args->lstio_tes_sgrp_name || /* no source group */
+ 	    args->lstio_tes_sgrp_nmlen <= 0 ||
+ 	    args->lstio_tes_sgrp_nmlen > LST_NAME_SIZE ||
+-	    args->lstio_tes_dgrp_name == NULL || /* no target group */
++	    !args->lstio_tes_dgrp_name || /* no target group */
+ 	    args->lstio_tes_dgrp_nmlen <= 0 ||
  	    args->lstio_tes_dgrp_nmlen > LST_NAME_SIZE)
  		return -EINVAL;
+@@ -741,26 +740,26 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
+ 		return -EINVAL;
  
--	if (args->lstio_tes_loop == 0 || /* negative is infinite */
-+	if (!args->lstio_tes_loop || /* negative is infinite */
- 	    args->lstio_tes_concur <= 0 ||
- 	    args->lstio_tes_dist <= 0 ||
- 	    args->lstio_tes_span <= 0)
-@@ -781,7 +781,7 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
- 			     args->lstio_tes_param_len,
- 			     &ret, args->lstio_tes_resultp);
+ 	/* have parameter, check if parameter length is valid */
+-	if (args->lstio_tes_param != NULL &&
++	if (args->lstio_tes_param &&
+ 	    (args->lstio_tes_param_len <= 0 ||
+ 	     args->lstio_tes_param_len > PAGE_CACHE_SIZE - sizeof(lstcon_test_t)))
+ 		return -EINVAL;
  
--	if (ret != 0)
-+	if (ret)
+ 	LIBCFS_ALLOC(batch_name, args->lstio_tes_bat_nmlen + 1);
+-	if (batch_name == NULL)
++	if (!batch_name)
+ 		return rc;
+ 
+ 	LIBCFS_ALLOC(src_name, args->lstio_tes_sgrp_nmlen + 1);
+-	if (src_name == NULL)
++	if (!src_name)
+ 		goto out;
+ 
+ 	LIBCFS_ALLOC(dst_name, args->lstio_tes_dgrp_nmlen + 1);
+-	 if (dst_name == NULL)
++	 if (!dst_name)
+ 		goto out;
+ 
+-	if (args->lstio_tes_param != NULL) {
++	if (args->lstio_tes_param) {
+ 		LIBCFS_ALLOC(param, args->lstio_tes_param_len);
+-		if (param == NULL)
++		if (!param)
+ 			goto out;
+ 	}
+ 
+@@ -786,16 +785,16 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
  		rc = (copy_to_user(args->lstio_tes_retp, &ret,
  				   sizeof(ret))) ? -EFAULT : 0;
  out:
+-	if (batch_name != NULL)
++	if (batch_name)
+ 		LIBCFS_FREE(batch_name, args->lstio_tes_bat_nmlen + 1);
+ 
+-	if (src_name != NULL)
++	if (src_name)
+ 		LIBCFS_FREE(src_name, args->lstio_tes_sgrp_nmlen + 1);
+ 
+-	if (dst_name != NULL)
++	if (dst_name)
+ 		LIBCFS_FREE(dst_name, args->lstio_tes_dgrp_nmlen + 1);
+ 
+-	if (param != NULL)
++	if (param)
+ 		LIBCFS_FREE(param, args->lstio_tes_param_len);
+ 
+ 	return rc;
+@@ -815,7 +814,7 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_data *data)
+ 		return -EINVAL;
+ 
+ 	LIBCFS_ALLOC(buf, data->ioc_plen1);
+-	if (buf == NULL)
++	if (!buf)
+ 		return -ENOMEM;
+ 
+ 	/* copy in parameter */
 diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-index 5315a37..b02a140 100644
+index 817be93..5315a37 100644
 --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
 +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-@@ -74,9 +74,9 @@ lstcon_rpc_done(srpc_client_rpc_t *rpc)
- 	/* not an orphan RPC */
- 	crpc->crp_finished = 1;
- 
--	if (crpc->crp_stamp == 0) {
-+	if (!crpc->crp_stamp) {
- 		/* not aborted */
--		LASSERT(crpc->crp_status == 0);
-+		LASSERT(!crpc->crp_status);
- 
- 		crpc->crp_stamp  = cfs_time_current();
- 		crpc->crp_status = rpc->crpc_status;
-@@ -138,7 +138,7 @@ lstcon_rpc_prep(lstcon_node_t *nd, int service, unsigned feats,
- 	}
- 
- 	rc = lstcon_rpc_init(nd, service, feats, bulk_npg, bulk_len, 0, crpc);
--	if (rc == 0) {
-+	if (!rc) {
- 		*crpcpp = crpc;
- 		return 0;
- 	}
-@@ -298,8 +298,8 @@ lstcon_rpc_trans_abort(lstcon_rpc_trans_t *trans, int error)
- 		spin_lock(&rpc->crpc_lock);
- 
- 		if (!crpc->crp_posted || /* not posted */
--		    crpc->crp_stamp != 0) { /* rpc done or aborted already */
--			if (crpc->crp_stamp == 0) {
-+		    crpc->crp_stamp) { /* rpc done or aborted already */
-+			if (!crpc->crp_stamp) {
- 				crpc->crp_stamp = cfs_time_current();
- 				crpc->crp_status = -EINTR;
- 			}
-@@ -333,7 +333,7 @@ lstcon_rpc_trans_check(lstcon_rpc_trans_t *trans)
- 	    !list_empty(&trans->tas_olink)) /* Not an end session RPC */
- 		return 1;
- 
--	return (atomic_read(&trans->tas_remaining) == 0) ? 1 : 0;
-+	return !atomic_read(&trans->tas_remaining) ? 1 : 0;
- }
- 
- int
-@@ -370,7 +370,7 @@ lstcon_rpc_trans_postwait(lstcon_rpc_trans_t *trans, int timeout)
- 	if (console_session.ses_shutdown)
- 		rc = -ESHUTDOWN;
- 
--	if (rc != 0 || atomic_read(&trans->tas_remaining) != 0) {
-+	if (rc || atomic_read(&trans->tas_remaining)) {
- 		/* treat short timeout as canceled */
- 		if (rc == -ETIMEDOUT && timeout < LST_TRANS_MIN_TIMEOUT * 2)
- 			rc = -EINTR;
-@@ -394,9 +394,9 @@ lstcon_rpc_get_reply(lstcon_rpc_t *crpc, srpc_msg_t **msgpp)
- 	srpc_generic_reply_t *rep;
- 
- 	LASSERT(nd && rpc);
--	LASSERT(crpc->crp_stamp != 0);
-+	LASSERT(crpc->crp_stamp);
- 
--	if (crpc->crp_status != 0) {
-+	if (crpc->crp_status) {
- 		*msgpp = NULL;
- 		return crpc->crp_status;
- 	}
-@@ -437,12 +437,12 @@ lstcon_rpc_trans_stat(lstcon_rpc_trans_t *trans, lstcon_trans_stat_t *stat)
- 	list_for_each_entry(crpc, &trans->tas_rpcs_list, crp_link) {
- 		lstcon_rpc_stat_total(stat, 1);
- 
--		LASSERT(crpc->crp_stamp != 0);
-+		LASSERT(crpc->crp_stamp);
- 
- 		error = lstcon_rpc_get_reply(crpc, &rep);
--		if (error != 0) {
-+		if (error) {
- 			lstcon_rpc_stat_failure(stat, 1);
--			if (stat->trs_rpc_errno == 0)
-+			if (!stat->trs_rpc_errno)
- 				stat->trs_rpc_errno = -error;
- 
- 			continue;
-@@ -453,7 +453,7 @@ lstcon_rpc_trans_stat(lstcon_rpc_trans_t *trans, lstcon_trans_stat_t *stat)
- 		lstcon_rpc_stat_reply(trans, rep, crpc->crp_node, stat);
- 	}
- 
--	if (trans->tas_opc == LST_TRANS_SESNEW && stat->trs_fwk_errno == 0) {
-+	if (trans->tas_opc == LST_TRANS_SESNEW && !stat->trs_fwk_errno) {
- 		stat->trs_fwk_errno =
- 		      lstcon_session_feats_check(trans->tas_features);
- 	}
-@@ -500,7 +500,7 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
- 
- 		ent = list_entry(next, lstcon_rpc_ent_t, rpe_link);
- 
--		LASSERT(crpc->crp_stamp != 0);
-+		LASSERT(crpc->crp_stamp);
- 
- 		error = lstcon_rpc_get_reply(crpc, &msg);
- 
-@@ -519,7 +519,7 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
- 				 sizeof(error)))
- 			return -EFAULT;
- 
--		if (error != 0)
-+		if (error)
- 			continue;
- 
- 		/* RPC is done */
-@@ -535,7 +535,7 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
- 
- 		error = readent(trans->tas_opc, msg, ent);
- 
--		if (error != 0)
-+		if (error)
- 			return error;
- 	}
- 
-@@ -572,7 +572,7 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
- 		 * user wait for them, just abandon them, they will be recycled
- 		 * in callback
- 		 */
--		LASSERT(crpc->crp_status != 0);
-+		LASSERT(crpc->crp_status);
- 
- 		crpc->crp_node  = NULL;
- 		crpc->crp_trans = NULL;
-@@ -584,7 +584,7 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
- 		atomic_dec(&trans->tas_remaining);
- 	}
- 
--	LASSERT(atomic_read(&trans->tas_remaining) == 0);
-+	LASSERT(!atomic_read(&trans->tas_remaining));
- 
- 	list_del(&trans->tas_link);
- 	if (!list_empty(&trans->tas_olink))
-@@ -610,7 +610,7 @@ lstcon_sesrpc_prep(lstcon_node_t *nd, int transop,
- 	case LST_TRANS_SESNEW:
- 		rc = lstcon_rpc_prep(nd, SRPC_SERVICE_MAKE_SESSION,
- 				     feats, 0, 0, crpc);
--		if (rc != 0)
-+		if (rc)
- 			return rc;
- 
- 		msrq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.mksn_reqst;
-@@ -623,7 +623,7 @@ lstcon_sesrpc_prep(lstcon_node_t *nd, int transop,
- 	case LST_TRANS_SESEND:
- 		rc = lstcon_rpc_prep(nd, SRPC_SERVICE_REMOVE_SESSION,
- 				     feats, 0, 0, crpc);
--		if (rc != 0)
-+		if (rc)
- 			return rc;
- 
- 		rsrq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.rmsn_reqst;
-@@ -644,7 +644,7 @@ lstcon_dbgrpc_prep(lstcon_node_t *nd, unsigned feats, lstcon_rpc_t **crpc)
- 	int rc;
- 
- 	rc = lstcon_rpc_prep(nd, SRPC_SERVICE_DEBUG, feats, 0, 0, crpc);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	drq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.dbg_reqst;
-@@ -664,7 +664,7 @@ lstcon_batrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
- 	int		    rc;
- 
- 	rc = lstcon_rpc_prep(nd, SRPC_SERVICE_BATCH, feats, 0, 0, crpc);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	brq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.bat_reqst;
-@@ -680,7 +680,7 @@ lstcon_batrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
- 	    transop != LST_TRANS_TSBSTOP)
- 		return 0;
- 
--	LASSERT(tsb->tsb_index == 0);
-+	LASSERT(!tsb->tsb_index);
- 
- 	batch = (lstcon_batch_t *)tsb;
- 	brq->bar_arg = batch->bat_arg;
-@@ -695,7 +695,7 @@ lstcon_statrpc_prep(lstcon_node_t *nd, unsigned feats, lstcon_rpc_t **crpc)
- 	int		   rc;
- 
- 	rc = lstcon_rpc_prep(nd, SRPC_SERVICE_QUERY_STAT, feats, 0, 0, crpc);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	srq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.stat_reqst;
-@@ -827,13 +827,13 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
- 
- 	if (transop == LST_TRANS_TSBCLIADD) {
- 		npg = sfw_id_pages(test->tes_span);
--		nob = (feats & LST_FEAT_BULK_LEN) == 0 ?
-+		nob = !(feats & LST_FEAT_BULK_LEN) ?
- 		      npg * PAGE_CACHE_SIZE :
- 		      sizeof(lnet_process_id_packed_t) * test->tes_span;
- 	}
- 
- 	rc = lstcon_rpc_prep(nd, SRPC_SERVICE_TEST, feats, npg, nob, crpc);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	trq  = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.tes_reqst;
-@@ -856,7 +856,7 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
- 
- 			LASSERT(nob > 0);
- 
--			len = (feats & LST_FEAT_BULK_LEN) == 0 ?
-+			len = !(feats & LST_FEAT_BULK_LEN) ?
- 			      PAGE_CACHE_SIZE :
- 			      min_t(int, nob, PAGE_CACHE_SIZE);
- 			nob -= len;
-@@ -881,7 +881,7 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
- 					  test->tes_dist,
- 					  test->tes_span,
- 					  npg, &bulk->bk_iovs[0]);
--		if (rc != 0) {
-+		if (rc) {
- 			lstcon_rpc_put(*crpc);
- 			return rc;
- 		}
-@@ -905,7 +905,7 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
- 
- 	case LST_TEST_BULK:
- 		trq->tsr_service = SRPC_SERVICE_BRW;
--		if ((feats & LST_FEAT_BULK_LEN) == 0) {
-+		if (!(feats & LST_FEAT_BULK_LEN)) {
- 			rc = lstcon_bulkrpc_v0_prep((lst_test_bulk_param_t *)
- 						    &test->tes_param[0], trq);
- 		} else {
-@@ -929,8 +929,8 @@ lstcon_sesnew_stat_reply(lstcon_rpc_trans_t *trans,
- 	srpc_mksn_reply_t *mksn_rep = &reply->msg_body.mksn_reply;
- 	int		   status   = mksn_rep->mksn_status;
- 
--	if (status == 0 &&
--	    (reply->msg_ses_feats & ~LST_FEATS_MASK) != 0) {
-+	if (!status &&
-+	    (reply->msg_ses_feats & ~LST_FEATS_MASK)) {
- 		mksn_rep->mksn_status = EPROTO;
- 		status = EPROTO;
- 	}
-@@ -941,7 +941,7 @@ lstcon_sesnew_stat_reply(lstcon_rpc_trans_t *trans,
- 			reply->msg_ses_feats);
- 	}
- 
--	if (status != 0)
-+	if (status)
- 		return status;
- 
- 	if (!trans->tas_feats_updated) {
-@@ -957,7 +957,7 @@ lstcon_sesnew_stat_reply(lstcon_rpc_trans_t *trans,
- 		status = EPROTO;
- 	}
- 
--	if (status == 0) {
-+	if (!status) {
- 		/* session timeout on remote node */
- 		nd->nd_timeout = mksn_rep->mksn_timeout;
- 	}
-@@ -979,7 +979,7 @@ lstcon_rpc_stat_reply(lstcon_rpc_trans_t *trans, srpc_msg_t *msg,
- 	switch (trans->tas_opc) {
- 	case LST_TRANS_SESNEW:
- 		rc = lstcon_sesnew_stat_reply(trans, nd, msg);
--		if (rc == 0) {
-+		if (!rc) {
- 			lstcon_sesop_stat_success(stat, 1);
- 			return;
- 		}
-@@ -990,7 +990,7 @@ lstcon_rpc_stat_reply(lstcon_rpc_trans_t *trans, srpc_msg_t *msg,
- 	case LST_TRANS_SESEND:
- 		rmsn_rep = &msg->msg_body.rmsn_reply;
- 		/* ESRCH is not an error for end session */
--		if (rmsn_rep->rmsn_status == 0 ||
-+		if (!rmsn_rep->rmsn_status ||
- 		    rmsn_rep->rmsn_status == ESRCH) {
- 			lstcon_sesop_stat_success(stat, 1);
- 			return;
-@@ -1019,7 +1019,7 @@ lstcon_rpc_stat_reply(lstcon_rpc_trans_t *trans, srpc_msg_t *msg,
- 	case LST_TRANS_TSBSTOP:
- 		bat_rep = &msg->msg_body.bat_reply;
- 
--		if (bat_rep->bar_status == 0) {
-+		if (!bat_rep->bar_status) {
- 			lstcon_tsbop_stat_success(stat, 1);
- 			return;
- 		}
-@@ -1038,12 +1038,12 @@ lstcon_rpc_stat_reply(lstcon_rpc_trans_t *trans, srpc_msg_t *msg,
- 	case LST_TRANS_TSBSRVQRY:
- 		bat_rep = &msg->msg_body.bat_reply;
- 
--		if (bat_rep->bar_active != 0)
-+		if (bat_rep->bar_active)
- 			lstcon_tsbqry_stat_run(stat, 1);
- 		else
- 			lstcon_tsbqry_stat_idle(stat, 1);
- 
--		if (bat_rep->bar_status == 0)
-+		if (!bat_rep->bar_status)
- 			return;
- 
- 		lstcon_tsbqry_stat_failure(stat, 1);
-@@ -1054,7 +1054,7 @@ lstcon_rpc_stat_reply(lstcon_rpc_trans_t *trans, srpc_msg_t *msg,
- 	case LST_TRANS_TSBSRVADD:
- 		test_rep = &msg->msg_body.tes_reply;
- 
--		if (test_rep->tsr_status == 0) {
-+		if (!test_rep->tsr_status) {
- 			lstcon_tsbop_stat_success(stat, 1);
- 			return;
- 		}
-@@ -1066,7 +1066,7 @@ lstcon_rpc_stat_reply(lstcon_rpc_trans_t *trans, srpc_msg_t *msg,
- 	case LST_TRANS_STATQRY:
- 		stat_rep = &msg->msg_body.stat_reply;
- 
--		if (stat_rep->str_status == 0) {
-+		if (!stat_rep->str_status) {
- 			lstcon_statqry_stat_success(stat, 1);
- 			return;
- 		}
-@@ -1079,7 +1079,7 @@ lstcon_rpc_stat_reply(lstcon_rpc_trans_t *trans, srpc_msg_t *msg,
- 		LBUG();
- 	}
- 
--	if (stat->trs_fwk_errno == 0)
-+	if (!stat->trs_fwk_errno)
- 		stat->trs_fwk_errno = rc;
- 
- 	return;
-@@ -1101,7 +1101,7 @@ lstcon_rpc_trans_ndlist(struct list_head *ndlist,
- 	/* Creating session RPG for list of nodes */
- 
- 	rc = lstcon_rpc_trans_prep(translist, transop, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction %d: %d\n", transop, rc);
- 		return rc;
- 	}
-@@ -1111,7 +1111,7 @@ lstcon_rpc_trans_ndlist(struct list_head *ndlist,
- 		rc = !condition ? 1 :
- 		     condition(transop, ndl->ndl_node, arg);
- 
--		if (rc == 0)
-+		if (!rc)
- 			continue;
- 
- 		if (rc < 0) {
-@@ -1151,7 +1151,7 @@ lstcon_rpc_trans_ndlist(struct list_head *ndlist,
- 			break;
- 		}
- 
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Failed to create RPC for transaction %s: %d\n",
- 			       lstcon_rpc_trans_name(transop), rc);
- 			break;
-@@ -1160,7 +1160,7 @@ lstcon_rpc_trans_ndlist(struct list_head *ndlist,
- 		lstcon_rpc_trans_addreq(trans, rpc);
- 	}
- 
--	if (rc == 0) {
-+	if (!rc) {
- 		*transpp = trans;
- 		return 0;
- 	}
-@@ -1213,7 +1213,7 @@ lstcon_rpc_pinger(void *arg)
- 
- 			rc = lstcon_sesrpc_prep(nd, LST_TRANS_SESEND,
- 						trans->tas_features, &crpc);
--			if (rc != 0) {
-+			if (rc) {
- 				CERROR("Out of memory\n");
- 				break;
- 			}
-@@ -1258,7 +1258,7 @@ lstcon_rpc_pinger(void *arg)
- 
- 		rc = lstcon_rpc_init(nd, SRPC_SERVICE_DEBUG,
- 				     trans->tas_features, 0, 0, 1, crpc);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Out of memory\n");
- 			break;
- 		}
-@@ -1294,11 +1294,11 @@ lstcon_rpc_pinger_start(void)
- 	int rc;
- 
- 	LASSERT(list_empty(&console_session.ses_rpc_freelist));
--	LASSERT(atomic_read(&console_session.ses_rpc_counter) == 0);
-+	LASSERT(!atomic_read(&console_session.ses_rpc_counter));
- 
- 	rc = lstcon_rpc_trans_prep(NULL, LST_TRANS_SESPING,
- 				   &console_session.ses_ping);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Failed to create console pinger\n");
- 		return rc;
- 	}
-@@ -1361,7 +1361,7 @@ lstcon_rpc_cleanup_wait(void)
- 
- 	spin_lock(&console_session.ses_rpc_lock);
- 
--	lst_wait_until((atomic_read(&console_session.ses_rpc_counter) == 0),
-+	lst_wait_until(!atomic_read(&console_session.ses_rpc_counter),
- 		       console_session.ses_rpc_lock,
- 		       "Network is not accessible or target is down, waiting for %d console RPCs to being recycled\n",
- 		       atomic_read(&console_session.ses_rpc_counter));
-@@ -1399,5 +1399,5 @@ void
- lstcon_rpc_module_fini(void)
+@@ -54,12 +54,12 @@ lstcon_rpc_done(srpc_client_rpc_t *rpc)
  {
- 	LASSERT(list_empty(&console_session.ses_rpc_freelist));
--	LASSERT(atomic_read(&console_session.ses_rpc_counter) == 0);
-+	LASSERT(!atomic_read(&console_session.ses_rpc_counter));
- }
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index 8995417..59cd554 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -159,12 +159,12 @@ lstcon_ndlink_find(struct list_head *hash,
- 		return 0;
- 	}
+ 	lstcon_rpc_t *crpc = (lstcon_rpc_t *)rpc->crpc_priv;
  
--	if (create == 0)
-+	if (!create)
- 		return -ENOENT;
+-	LASSERT(crpc != NULL && rpc == crpc->crp_rpc);
++	LASSERT(crpc && rpc == crpc->crp_rpc);
+ 	LASSERT(crpc->crp_posted && !crpc->crp_finished);
  
- 	/* find or create in session hash */
- 	rc = lstcon_node_find(id, &nd, (create == 1) ? 1 : 0);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
+ 	spin_lock(&rpc->crpc_lock);
  
- 	LIBCFS_ALLOC(ndl, sizeof(lstcon_ndlink_t));
-@@ -236,7 +236,7 @@ lstcon_group_drain(lstcon_group_t *grp, int keep)
- 	lstcon_ndlink_t *tmp;
- 
- 	list_for_each_entry_safe(ndl, tmp, &grp->grp_ndl_list, ndl_link) {
--		if ((ndl->ndl_node->nd_state & keep) == 0)
-+		if (!(ndl->ndl_node->nd_state & keep))
- 			lstcon_group_ndlink_release(grp, ndl);
- 	}
- }
-@@ -267,7 +267,7 @@ lstcon_group_find(const char *name, lstcon_group_t **grpp)
- 	lstcon_group_t *grp;
- 
- 	list_for_each_entry(grp, &console_session.ses_grp_list, grp_link) {
--		if (strncmp(grp->grp_name, name, LST_NAME_SIZE) != 0)
-+		if (strncmp(grp->grp_name, name, LST_NAME_SIZE))
- 			continue;
- 
- 		lstcon_group_addref(grp);  /* +1 ref for caller */
-@@ -285,7 +285,7 @@ lstcon_group_ndlink_find(lstcon_group_t *grp, lnet_process_id_t id,
- 	int rc;
- 
- 	rc = lstcon_ndlink_find(&grp->grp_ndl_hash[0], id, ndlpp, create);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	if (!list_empty(&(*ndlpp)->ndl_link))
-@@ -404,7 +404,7 @@ lstcon_group_nodes_add(lstcon_group_t *grp,
- 	int rc;
- 
- 	rc = lstcon_group_alloc(NULL, &tmp);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Out of memory\n");
- 		return -ENOMEM;
- 	}
-@@ -417,18 +417,18 @@ lstcon_group_nodes_add(lstcon_group_t *grp,
- 
- 		/* skip if it's in this group already */
- 		rc = lstcon_group_ndlink_find(grp, id, &ndl, 0);
--		if (rc == 0)
-+		if (!rc)
- 			continue;
- 
- 		/* add to tmp group */
- 		rc = lstcon_group_ndlink_find(tmp, id, &ndl, 1);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't create ndlink, out of memory\n");
- 			break;
- 		}
- 	}
- 
--	if (rc != 0) {
-+	if (rc) {
- 		lstcon_group_decref(tmp);
- 		return rc;
- 	}
-@@ -436,7 +436,7 @@ lstcon_group_nodes_add(lstcon_group_t *grp,
- 	rc = lstcon_rpc_trans_ndlist(&tmp->grp_ndl_list,
- 				     &tmp->grp_trans_list, LST_TRANS_SESNEW,
- 				     tmp, lstcon_sesrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		lstcon_group_decref(tmp);
- 		return rc;
-@@ -473,7 +473,7 @@ lstcon_group_nodes_remove(lstcon_group_t *grp,
- 	/* End session and remove node from the group */
- 
- 	rc = lstcon_group_alloc(NULL, &tmp);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Out of memory\n");
- 		return -ENOMEM;
- 	}
-@@ -485,14 +485,14 @@ lstcon_group_nodes_remove(lstcon_group_t *grp,
- 		}
- 
- 		/* move node to tmp group */
--		if (lstcon_group_ndlink_find(grp, id, &ndl, 0) == 0)
-+		if (!lstcon_group_ndlink_find(grp, id, &ndl, 0))
- 			lstcon_group_ndlink_move(grp, tmp, ndl);
- 	}
- 
- 	rc = lstcon_rpc_trans_ndlist(&tmp->grp_ndl_list,
- 				     &tmp->grp_trans_list, LST_TRANS_SESEND,
- 				     tmp, lstcon_sesrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		goto error;
- 	}
-@@ -519,15 +519,15 @@ lstcon_group_add(char *name)
- 	lstcon_group_t *grp;
- 	int rc;
- 
--	rc = (lstcon_group_find(name, &grp) == 0) ? -EEXIST : 0;
--	if (rc != 0) {
-+	rc = lstcon_group_find(name, &grp) ? 0: -EEXIST;
-+	if (rc) {
- 		/* find a group with same name */
- 		lstcon_group_decref(grp);
- 		return rc;
- 	}
- 
- 	rc = lstcon_group_alloc(name, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't allocate descriptor for group %s\n", name);
- 		return -ENOMEM;
- 	}
-@@ -548,7 +548,7 @@ lstcon_nodes_add(char *name, int count, lnet_process_id_t __user *ids_up,
- 	LASSERT(ids_up);
- 
- 	rc = lstcon_group_find(name, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find group %s\n", name);
- 		return rc;
- 	}
-@@ -576,7 +576,7 @@ lstcon_group_del(char *name)
- 	int rc;
- 
- 	rc = lstcon_group_find(name, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find group: %s\n", name);
- 		return rc;
- 	}
-@@ -591,7 +591,7 @@ lstcon_group_del(char *name)
- 	rc = lstcon_rpc_trans_ndlist(&grp->grp_ndl_list,
- 				     &grp->grp_trans_list, LST_TRANS_SESEND,
- 				     grp, lstcon_sesrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		lstcon_group_decref(grp);
- 		return rc;
-@@ -618,7 +618,7 @@ lstcon_group_clean(char *name, int args)
- 	int rc;
- 
- 	rc = lstcon_group_find(name, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find group %s\n", name);
- 		return rc;
- 	}
-@@ -651,7 +651,7 @@ lstcon_nodes_remove(char *name, int count, lnet_process_id_t __user *ids_up,
- 	int rc;
- 
- 	rc = lstcon_group_find(name, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find group: %s\n", name);
- 		return rc;
- 	}
-@@ -681,7 +681,7 @@ lstcon_group_refresh(char *name, struct list_head __user *result_up)
- 	int rc;
- 
- 	rc = lstcon_group_find(name, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find group: %s\n", name);
- 		return rc;
- 	}
-@@ -697,7 +697,7 @@ lstcon_group_refresh(char *name, struct list_head __user *result_up)
- 	rc = lstcon_rpc_trans_ndlist(&grp->grp_ndl_list,
- 				     &grp->grp_trans_list, LST_TRANS_SESNEW,
- 				     grp, lstcon_sesrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		/* local error, return */
- 		CDEBUG(D_NET, "Can't create transaction: %d\n", rc);
- 		lstcon_group_decref(grp);
-@@ -724,7 +724,7 @@ lstcon_group_list(int index, int len, char __user *name_up)
- 	LASSERT(name_up);
- 
- 	list_for_each_entry(grp, &console_session.ses_grp_list, grp_link) {
--		if (index-- == 0) {
-+		if (!index--) {
- 			return copy_to_user(name_up, grp->grp_name, len) ?
- 			       -EFAULT : 0;
- 		}
-@@ -784,7 +784,7 @@ lstcon_group_info(char *name, lstcon_ndlist_ent_t __user *gents_p,
- 	int rc;
- 
- 	rc = lstcon_group_find(name, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find group %s\n", name);
- 		return rc;
- 	}
-@@ -826,7 +826,7 @@ lstcon_batch_find(const char *name, lstcon_batch_t **batpp)
- 	lstcon_batch_t *bat;
- 
- 	list_for_each_entry(bat, &console_session.ses_bat_list, bat_link) {
--		if (strncmp(bat->bat_name, name, LST_NAME_SIZE) == 0) {
-+		if (!strncmp(bat->bat_name, name, LST_NAME_SIZE)) {
- 			*batpp = bat;
- 			return 0;
- 		}
-@@ -842,8 +842,8 @@ lstcon_batch_add(char *name)
- 	int i;
- 	int rc;
- 
--	rc = (lstcon_batch_find(name, &bat) == 0) ? -EEXIST : 0;
--	if (rc != 0) {
-+	rc = !lstcon_batch_find(name, &bat) ? -EEXIST : 0;
-+	if (rc) {
- 		CDEBUG(D_NET, "Batch %s already exists\n", name);
- 		return rc;
- 	}
-@@ -904,7 +904,7 @@ lstcon_batch_list(int index, int len, char __user *name_up)
- 	LASSERT(index >= 0);
- 
- 	list_for_each_entry(bat, &console_session.ses_bat_list, bat_link) {
--		if (index-- == 0) {
-+		if (!index--) {
- 			return copy_to_user(name_up, bat->bat_name, len) ?
- 			       -EFAULT : 0;
- 		}
-@@ -927,7 +927,7 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
- 	int rc;
- 
- 	rc = lstcon_batch_find(name, &bat);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find batch %s\n", name);
- 		return -ENOENT;
- 	}
-@@ -1017,7 +1017,7 @@ lstcon_batch_op(lstcon_batch_t *bat, int transop,
- 	rc = lstcon_rpc_trans_ndlist(&bat->bat_cli_list,
- 				     &bat->bat_trans_list, transop,
- 				     bat, lstcon_batrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		return rc;
- 	}
-@@ -1037,7 +1037,7 @@ lstcon_batch_run(char *name, int timeout, struct list_head __user *result_up)
- 	lstcon_batch_t *bat;
- 	int rc;
- 
--	if (lstcon_batch_find(name, &bat) != 0) {
-+	if (lstcon_batch_find(name, &bat)) {
- 		CDEBUG(D_NET, "Can't find batch %s\n", name);
- 		return -ENOENT;
- 	}
-@@ -1047,7 +1047,7 @@ lstcon_batch_run(char *name, int timeout, struct list_head __user *result_up)
- 	rc = lstcon_batch_op(bat, LST_TRANS_TSBRUN, result_up);
- 
- 	/* mark batch as running if it's started in any node */
--	if (lstcon_tsbop_stat_success(lstcon_trans_stat(), 0) != 0)
-+	if (lstcon_tsbop_stat_success(lstcon_trans_stat(), 0))
- 		bat->bat_state = LST_BATCH_RUNNING;
- 
- 	return rc;
-@@ -1059,7 +1059,7 @@ lstcon_batch_stop(char *name, int force, struct list_head __user *result_up)
- 	lstcon_batch_t *bat;
- 	int rc;
- 
--	if (lstcon_batch_find(name, &bat) != 0) {
-+	if (lstcon_batch_find(name, &bat)) {
- 		CDEBUG(D_NET, "Can't find batch %s\n", name);
- 		return -ENOENT;
- 	}
-@@ -1069,7 +1069,7 @@ lstcon_batch_stop(char *name, int force, struct list_head __user *result_up)
- 	rc = lstcon_batch_op(bat, LST_TRANS_TSBSTOP, result_up);
- 
- 	/* mark batch as stopped if all RPCs finished */
--	if (lstcon_tsbop_stat_failure(lstcon_trans_stat(), 0) == 0)
-+	if (!lstcon_tsbop_stat_failure(lstcon_trans_stat(), 0))
- 		bat->bat_state = LST_BATCH_IDLE;
- 
- 	return rc;
-@@ -1163,7 +1163,7 @@ lstcon_testrpc_condition(int transop, lstcon_node_t *nd, void *arg)
- 
- 	LASSERT(nd->nd_id.nid != LNET_NID_ANY);
- 
--	if (lstcon_ndlink_find(hash, nd->nd_id, &ndl, 1) != 0)
-+	if (lstcon_ndlink_find(hash, nd->nd_id, &ndl, 1))
+-	if (crpc->crp_trans == NULL) {
++	if (!crpc->crp_trans) {
+ 		/*
+ 		 * Orphan RPC is not in any transaction,
+ 		 * I'm just a poor body and nobody loves me
+@@ -96,7 +96,7 @@ lstcon_rpc_init(lstcon_node_t *nd, int service, unsigned feats,
+ 	crpc->crp_rpc = sfw_create_rpc(nd->nd_id, service,
+ 				       feats, bulk_npg, bulk_len,
+ 				       lstcon_rpc_done, (void *)crpc);
+-	if (crpc->crp_rpc == NULL)
++	if (!crpc->crp_rpc)
  		return -ENOMEM;
  
- 	if (list_empty(&ndl->ndl_link))
-@@ -1189,15 +1189,15 @@ again:
- 	rc = lstcon_rpc_trans_ndlist(&grp->grp_ndl_list,
- 				     &test->tes_trans_list, transop,
- 				     test, lstcon_testrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		return rc;
- 	}
- 
- 	lstcon_rpc_trans_postwait(trans, LST_TRANS_TIMEOUT);
- 
--	if (lstcon_trans_stat()->trs_rpc_errno != 0 ||
--	    lstcon_trans_stat()->trs_fwk_errno != 0) {
-+	if (lstcon_trans_stat()->trs_rpc_errno ||
-+	    lstcon_trans_stat()->trs_fwk_errno) {
- 		lstcon_rpc_trans_interpreter(trans, result_up, NULL);
- 
- 		lstcon_rpc_trans_destroy(trans);
-@@ -1229,7 +1229,7 @@ lstcon_verify_batch(const char *name, lstcon_batch_t **batch)
- 	int rc;
- 
- 	rc = lstcon_batch_find(name, batch);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find batch %s\n", name);
- 		return rc;
- 	}
-@@ -1249,7 +1249,7 @@ lstcon_verify_group(const char *name, lstcon_group_t **grp)
- 	lstcon_ndlink_t *ndl;
- 
- 	rc = lstcon_group_find(name, grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "can't find group %s\n", name);
- 		return rc;
- 	}
-@@ -1283,15 +1283,15 @@ lstcon_test_add(char *batch_name, int type, int loop,
- 	 * active node
- 	 */
- 	rc = lstcon_verify_batch(batch_name, &batch);
--	if (rc != 0)
-+	if (rc)
- 		goto out;
- 
- 	rc = lstcon_verify_group(src_name, &src_grp);
--	if (rc != 0)
-+	if (rc)
- 		goto out;
- 
- 	rc = lstcon_verify_group(dst_name, &dst_grp);
--	if (rc != 0)
-+	if (rc)
- 		goto out;
- 
- 	if (dst_grp->grp_userland)
-@@ -1326,11 +1326,11 @@ lstcon_test_add(char *batch_name, int type, int loop,
- 
- 	rc = lstcon_test_nodes_add(test, result_up);
- 
--	if (rc != 0)
-+	if (rc)
- 		goto out;
- 
--	if (lstcon_trans_stat()->trs_rpc_errno != 0 ||
--	    lstcon_trans_stat()->trs_fwk_errno != 0)
-+	if (lstcon_trans_stat()->trs_rpc_errno ||
-+	    lstcon_trans_stat()->trs_fwk_errno)
- 		CDEBUG(D_NET, "Failed to add test %d to batch %s\n", type,
- 		       batch_name);
- 
-@@ -1401,12 +1401,12 @@ lstcon_test_batch_query(char *name, int testidx, int client,
- 	int rc;
- 
- 	rc = lstcon_batch_find(name, &batch);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find batch: %s\n", name);
- 		return rc;
- 	}
- 
--	if (testidx == 0) {
-+	if (!testidx) {
- 		translist = &batch->bat_trans_list;
- 		ndlist    = &batch->bat_cli_list;
- 		hdr       = &batch->bat_hdr;
-@@ -1414,7 +1414,7 @@ lstcon_test_batch_query(char *name, int testidx, int client,
- 	} else {
- 		/* query specified test only */
- 		rc = lstcon_test_find(batch, testidx, &test);
--		if (rc != 0) {
-+		if (rc) {
- 			CDEBUG(D_NET, "Can't find test: %d\n", testidx);
- 			return rc;
- 		}
-@@ -1428,16 +1428,16 @@ lstcon_test_batch_query(char *name, int testidx, int client,
- 
- 	rc = lstcon_rpc_trans_ndlist(ndlist, translist, transop, hdr,
- 				     lstcon_batrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		return rc;
- 	}
- 
- 	lstcon_rpc_trans_postwait(trans, timeout);
- 
--	if (testidx == 0 && /* query a batch, not a test */
--	    lstcon_rpc_stat_failure(lstcon_trans_stat(), 0) == 0 &&
--	    lstcon_tsbqry_stat_run(lstcon_trans_stat(), 0) == 0) {
-+	if (!testidx && /* query a batch, not a test */
-+	    !lstcon_rpc_stat_failure(lstcon_trans_stat(), 0) &&
-+	    !lstcon_tsbqry_stat_run(lstcon_trans_stat(), 0)) {
- 		/* all RPCs finished, and no active test */
- 		batch->bat_state = LST_BATCH_IDLE;
- 	}
-@@ -1458,7 +1458,7 @@ lstcon_statrpc_readent(int transop, srpc_msg_t *msg,
- 	srpc_counters_t __user *srpc_stat;
- 	lnet_counters_t __user *lnet_stat;
- 
--	if (rep->str_status != 0)
-+	if (rep->str_status)
- 		return 0;
- 
- 	sfwk_stat = (sfw_counters_t __user *)&ent_up->rpe_payload[0];
-@@ -1487,7 +1487,7 @@ lstcon_ndlist_stat(struct list_head *ndlist,
- 
- 	rc = lstcon_rpc_trans_ndlist(ndlist, &head,
- 				     LST_TRANS_STATQRY, NULL, NULL, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		return rc;
- 	}
-@@ -1509,7 +1509,7 @@ lstcon_group_stat(char *grp_name, int timeout,
- 	int rc;
- 
- 	rc = lstcon_group_find(grp_name, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Can't find group %s\n", grp_name);
- 		return rc;
- 	}
-@@ -1532,7 +1532,7 @@ lstcon_nodes_stat(int count, lnet_process_id_t __user *ids_up,
- 	int rc;
- 
- 	rc = lstcon_group_alloc(NULL, &tmp);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Out of memory\n");
- 		return -ENOMEM;
- 	}
-@@ -1545,7 +1545,7 @@ lstcon_nodes_stat(int count, lnet_process_id_t __user *ids_up,
- 
- 		/* add to tmp group */
- 		rc = lstcon_group_ndlink_find(tmp, id, &ndl, 2);
--		if (rc != 0) {
-+		if (rc) {
- 			CDEBUG((rc == -ENOMEM) ? D_ERROR : D_NET,
- 			       "Failed to find or create %s: %d\n",
- 			       libcfs_id2str(id), rc);
-@@ -1553,7 +1553,7 @@ lstcon_nodes_stat(int count, lnet_process_id_t __user *ids_up,
- 		}
- 	}
- 
--	if (rc != 0) {
-+	if (rc) {
- 		lstcon_group_decref(tmp);
- 		return rc;
- 	}
-@@ -1575,7 +1575,7 @@ lstcon_debug_ndlist(struct list_head *ndlist,
- 
- 	rc = lstcon_rpc_trans_ndlist(ndlist, translist, LST_TRANS_SESQRY,
- 				     NULL, lstcon_sesrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		return rc;
- 	}
-@@ -1604,7 +1604,7 @@ lstcon_batch_debug(int timeout, char *name,
- 	int rc;
- 
- 	rc = lstcon_batch_find(name, &bat);
--	if (rc != 0)
-+	if (rc)
- 		return -ENOENT;
- 
- 	rc = lstcon_debug_ndlist(client ? &bat->bat_cli_list :
-@@ -1622,7 +1622,7 @@ lstcon_group_debug(int timeout, char *name,
- 	int rc;
- 
- 	rc = lstcon_group_find(name, &grp);
--	if (rc != 0)
-+	if (rc)
- 		return -ENOENT;
- 
- 	rc = lstcon_debug_ndlist(&grp->grp_ndl_list, NULL,
-@@ -1644,7 +1644,7 @@ lstcon_nodes_debug(int timeout,
- 	int rc;
- 
- 	rc = lstcon_group_alloc(NULL, &grp);
--	if (rc != 0) {
-+	if (rc) {
- 		CDEBUG(D_NET, "Out of memory\n");
- 		return rc;
- 	}
-@@ -1657,13 +1657,13 @@ lstcon_nodes_debug(int timeout,
- 
- 		/* node is added to tmp group */
- 		rc = lstcon_group_ndlink_find(grp, id, &ndl, 1);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Can't create node link\n");
- 			break;
- 		}
- 	}
- 
--	if (rc != 0) {
-+	if (rc) {
- 		lstcon_group_decref(grp);
- 		return rc;
- 	}
-@@ -1715,11 +1715,11 @@ lstcon_session_new(char *name, int key, unsigned feats,
- 		rc = lstcon_session_end();
- 
- 		/* lstcon_session_end() only return local error */
--		if  (rc != 0)
-+		if  (rc)
- 			return rc;
- 	}
- 
--	if ((feats & ~LST_FEATS_MASK) != 0) {
-+	if (feats & ~LST_FEATS_MASK) {
- 		CNETERR("Unknown session features %x\n",
- 			(feats & ~LST_FEATS_MASK));
- 		return -EINVAL;
-@@ -1741,11 +1741,11 @@ lstcon_session_new(char *name, int key, unsigned feats,
- 		sizeof(console_session.ses_name));
- 
- 	rc = lstcon_batch_add(LST_DEFAULT_BATCH);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
- 
- 	rc = lstcon_rpc_pinger_start();
--	if (rc != 0) {
-+	if (rc) {
- 		lstcon_batch_t *bat = NULL;
- 
- 		lstcon_batch_find(LST_DEFAULT_BATCH, &bat);
-@@ -1754,8 +1754,8 @@ lstcon_session_new(char *name, int key, unsigned feats,
- 		return rc;
- 	}
- 
--	if (copy_to_user(sid_up, &console_session.ses_id,
--			 sizeof(lst_sid_t)) == 0)
-+	if (!copy_to_user(sid_up, &console_session.ses_id,
-+			  sizeof(lst_sid_t)))
- 		return rc;
- 
- 	lstcon_session_end();
-@@ -1811,7 +1811,7 @@ lstcon_session_end(void)
- 	rc = lstcon_rpc_trans_ndlist(&console_session.ses_ndl_list,
- 				     NULL, LST_TRANS_SESEND, NULL,
- 				     lstcon_sesrpc_condition, &trans);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Can't create transaction: %d\n", rc);
- 		return rc;
- 	}
-@@ -1865,7 +1865,7 @@ lstcon_session_feats_check(unsigned feats)
- {
- 	int rc = 0;
- 
--	if ((feats & ~LST_FEATS_MASK) != 0) {
-+	if (feats & ~LST_FEATS_MASK) {
- 		CERROR("Can't support these features: %x\n",
- 		       (feats & ~LST_FEATS_MASK));
- 		return -EPROTO;
-@@ -1883,7 +1883,7 @@ lstcon_session_feats_check(unsigned feats)
+ 	crpc->crp_trans    = NULL;
+@@ -131,9 +131,9 @@ lstcon_rpc_prep(lstcon_node_t *nd, int service, unsigned feats,
  
  	spin_unlock(&console_session.ses_rpc_lock);
  
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("remote features %x do not match with session features %x of console\n",
- 		       feats, console_session.ses_features);
- 	}
-@@ -1913,7 +1913,7 @@ lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
- 		goto out;
- 	}
- 
--	if (lstcon_session_feats_check(req->msg_ses_feats) != 0) {
-+	if (lstcon_session_feats_check(req->msg_ses_feats)) {
- 		jrep->join_status = EPROTO;
- 		goto out;
- 	}
-@@ -1924,9 +1924,9 @@ lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
- 		goto out;
+-	if (crpc == NULL) {
++	if (!crpc) {
+ 		LIBCFS_ALLOC(crpc, sizeof(*crpc));
+-		if (crpc == NULL)
++		if (!crpc)
+ 			return -ENOMEM;
  	}
  
--	if (lstcon_group_find(jreq->join_group, &grp) != 0) {
-+	if (lstcon_group_find(jreq->join_group, &grp)) {
- 		rc = lstcon_group_alloc(jreq->join_group, &grp);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Out of memory\n");
- 			goto out;
- 		}
-@@ -1943,13 +1943,13 @@ lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
- 	}
+@@ -157,7 +157,7 @@ lstcon_rpc_put(lstcon_rpc_t *crpc)
+ 	LASSERT(list_empty(&crpc->crp_link));
  
- 	rc = lstcon_group_ndlink_find(grp, rpc->srpc_peer, &ndl, 0);
--	if (rc == 0) {
-+	if (!rc) {
- 		jrep->join_status = EEXIST;
- 		goto out;
- 	}
+ 	for (i = 0; i < bulk->bk_niov; i++) {
+-		if (bulk->bk_iovs[i].kiov_page == NULL)
++		if (!bulk->bk_iovs[i].kiov_page)
+ 			continue;
  
- 	rc = lstcon_group_ndlink_find(grp, rpc->srpc_peer, &ndl, 1);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Out of memory\n");
- 		goto out;
- 	}
-@@ -1957,7 +1957,7 @@ lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
- 	ndl->ndl_node->nd_state   = LST_NODE_ACTIVE;
- 	ndl->ndl_node->nd_timeout = console_session.ses_timeout;
+ 		__free_page(bulk->bk_iovs[i].kiov_page);
+@@ -188,7 +188,7 @@ lstcon_rpc_post(lstcon_rpc_t *crpc)
+ {
+ 	lstcon_rpc_trans_t *trans = crpc->crp_trans;
  
--	if (grp->grp_userland == 0)
-+	if (!grp->grp_userland)
- 		grp->grp_userland = 1;
+-	LASSERT(trans != NULL);
++	LASSERT(trans);
  
- 	strlcpy(jrep->join_session, console_session.ses_name,
-@@ -2027,7 +2027,7 @@ lstcon_console_init(void)
+ 	atomic_inc(&trans->tas_remaining);
+ 	crpc->crp_posted = 1;
+@@ -241,7 +241,7 @@ lstcon_rpc_trans_prep(struct list_head *translist,
+ {
+ 	lstcon_rpc_trans_t *trans;
  
- 	rc = srpc_add_service(&lstcon_acceptor_service);
- 	LASSERT(rc != -EBUSY);
--	if (rc != 0) {
-+	if (rc) {
- 		LIBCFS_FREE(console_session.ses_ndl_hash,
- 			    sizeof(struct list_head) * LST_GLOBAL_HASHSIZE);
+-	if (translist != NULL) {
++	if (translist) {
+ 		list_for_each_entry(trans, translist, tas_link) {
+ 			/*
+ 			 * Can't enqueue two private transaction on
+@@ -254,12 +254,12 @@ lstcon_rpc_trans_prep(struct list_head *translist,
+ 
+ 	/* create a trans group */
+ 	LIBCFS_ALLOC(trans, sizeof(*trans));
+-	if (trans == NULL)
++	if (!trans)
+ 		return -ENOMEM;
+ 
+ 	trans->tas_opc = transop;
+ 
+-	if (translist == NULL)
++	if (!translist)
+ 		INIT_LIST_HEAD(&trans->tas_olink);
+ 	else
+ 		list_add_tail(&trans->tas_olink, translist);
+@@ -393,7 +393,7 @@ lstcon_rpc_get_reply(lstcon_rpc_t *crpc, srpc_msg_t **msgpp)
+ 	srpc_client_rpc_t *rpc = crpc->crp_rpc;
+ 	srpc_generic_reply_t *rep;
+ 
+-	LASSERT(nd != NULL && rpc != NULL);
++	LASSERT(nd && rpc);
+ 	LASSERT(crpc->crp_stamp != 0);
+ 
+ 	if (crpc->crp_status != 0) {
+@@ -430,7 +430,7 @@ lstcon_rpc_trans_stat(lstcon_rpc_trans_t *trans, lstcon_trans_stat_t *stat)
+ 	srpc_msg_t *rep;
+ 	int error;
+ 
+-	LASSERT(stat != NULL);
++	LASSERT(stat);
+ 
+ 	memset(stat, 0, sizeof(*stat));
+ 
+@@ -484,7 +484,7 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
+ 	struct timeval tv;
+ 	int error;
+ 
+-	LASSERT(head_up != NULL);
++	LASSERT(head_up);
+ 
+ 	next = head_up;
+ 
+@@ -530,7 +530,7 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
+ 				 sizeof(rep->status)))
+ 			return -EFAULT;
+ 
+-		if (readent == NULL)
++		if (!readent)
+ 			continue;
+ 
+ 		error = readent(trans->tas_opc, msg, ent);
+@@ -866,7 +866,7 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
+ 			bulk->bk_iovs[i].kiov_page   =
+ 				alloc_page(GFP_KERNEL);
+ 
+-			if (bulk->bk_iovs[i].kiov_page == NULL) {
++			if (!bulk->bk_iovs[i].kiov_page) {
+ 				lstcon_rpc_put(*crpc);
+ 				return -ENOMEM;
+ 			}
+@@ -1108,7 +1108,7 @@ lstcon_rpc_trans_ndlist(struct list_head *ndlist,
+ 
+ 	feats = trans->tas_features;
+ 	list_for_each_entry(ndl, ndlist, ndl_link) {
+-		rc = condition == NULL ? 1 :
++		rc = !condition ? 1 :
+ 		     condition(transop, ndl->ndl_node, arg);
+ 
+ 		if (rc == 0)
+@@ -1201,7 +1201,7 @@ lstcon_rpc_pinger(void *arg)
+ 
+ 	trans = console_session.ses_ping;
+ 
+-	LASSERT(trans != NULL);
++	LASSERT(trans);
+ 
+ 	list_for_each_entry(ndl, &console_session.ses_ndl_list, ndl_link) {
+ 		nd = ndl->ndl_node;
+@@ -1226,7 +1226,7 @@ lstcon_rpc_pinger(void *arg)
+ 
+ 		crpc = &nd->nd_ping;
+ 
+-		if (crpc->crp_rpc != NULL) {
++		if (crpc->crp_rpc) {
+ 			LASSERT(crpc->crp_trans == trans);
+ 			LASSERT(!list_empty(&crpc->crp_link));
+ 
+diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
+index 914d842..8995417 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.c
++++ b/drivers/staging/lustre/lnet/selftest/console.c
+@@ -90,7 +90,7 @@ lstcon_node_find(lnet_process_id_t id, lstcon_node_t **ndpp, int create)
+ 		return -ENOENT;
+ 
+ 	LIBCFS_ALLOC(*ndpp, sizeof(lstcon_node_t) + sizeof(lstcon_ndlink_t));
+-	if (*ndpp == NULL)
++	if (!*ndpp)
+ 		return -ENOMEM;
+ 
+ 	ndl = (lstcon_ndlink_t *)(*ndpp + 1);
+@@ -168,7 +168,7 @@ lstcon_ndlink_find(struct list_head *hash,
  		return rc;
-@@ -2035,14 +2035,14 @@ lstcon_console_init(void)
  
- 	rc = srpc_service_add_buffers(&lstcon_acceptor_service,
- 				      lstcon_acceptor_service.sv_wi_total);
--	if (rc != 0) {
-+	if (rc) {
- 		rc = -ENOMEM;
- 		goto out;
+ 	LIBCFS_ALLOC(ndl, sizeof(lstcon_ndlink_t));
+-	if (ndl == NULL) {
++	if (!ndl) {
+ 		lstcon_node_put(nd);
+ 		return -ENOMEM;
+ 	}
+@@ -202,11 +202,11 @@ lstcon_group_alloc(char *name, lstcon_group_t **grpp)
+ 
+ 	LIBCFS_ALLOC(grp, offsetof(lstcon_group_t,
+ 				   grp_ndl_hash[LST_NODE_HASHSIZE]));
+-	if (grp == NULL)
++	if (!grp)
+ 		return -ENOMEM;
+ 
+ 	grp->grp_ref = 1;
+-	if (name != NULL)
++	if (name)
+ 		strcpy(grp->grp_name, name);
+ 
+ 	INIT_LIST_HEAD(&grp->grp_link);
+@@ -348,7 +348,7 @@ lstcon_sesrpc_condition(int transop, lstcon_node_t *nd, void *arg)
+ 		if (nd->nd_state != LST_NODE_ACTIVE)
+ 			return 0;
+ 
+-		if (grp != NULL && nd->nd_ref > 1)
++		if (grp && nd->nd_ref > 1)
+ 			return 0;
+ 		break;
+ 
+@@ -545,7 +545,7 @@ lstcon_nodes_add(char *name, int count, lnet_process_id_t __user *ids_up,
+ 	int rc;
+ 
+ 	LASSERT(count > 0);
+-	LASSERT(ids_up != NULL);
++	LASSERT(ids_up);
+ 
+ 	rc = lstcon_group_find(name, &grp);
+ 	if (rc != 0) {
+@@ -721,7 +721,7 @@ lstcon_group_list(int index, int len, char __user *name_up)
+ 	lstcon_group_t *grp;
+ 
+ 	LASSERT(index >= 0);
+-	LASSERT(name_up != NULL);
++	LASSERT(name_up);
+ 
+ 	list_for_each_entry(grp, &console_session.ses_grp_list, grp_link) {
+ 		if (index-- == 0) {
+@@ -742,8 +742,8 @@ lstcon_nodes_getent(struct list_head *head, int *index_p,
+ 	int count = 0;
+ 	int index = 0;
+ 
+-	LASSERT(index_p != NULL && count_p != NULL);
+-	LASSERT(dents_up != NULL);
++	LASSERT(index_p && count_p);
++	LASSERT(dents_up);
+ 	LASSERT(*index_p >= 0);
+ 	LASSERT(*count_p > 0);
+ 
+@@ -800,7 +800,7 @@ lstcon_group_info(char *name, lstcon_ndlist_ent_t __user *gents_p,
+ 
+ 	/* non-verbose query */
+ 	LIBCFS_ALLOC(gentp, sizeof(lstcon_ndlist_ent_t));
+-	if (gentp == NULL) {
++	if (!gentp) {
+ 		CERROR("Can't allocate ndlist_ent\n");
+ 		lstcon_group_decref(grp);
+ 
+@@ -849,14 +849,14 @@ lstcon_batch_add(char *name)
  	}
  
- 	rc = libcfs_register_ioctl(&lstcon_ioctl_handler);
- 
--	if (rc == 0) {
-+	if (!rc) {
- 		lstcon_rpc_module_init();
- 		return 0;
+ 	LIBCFS_ALLOC(bat, sizeof(lstcon_batch_t));
+-	if (bat == NULL) {
++	if (!bat) {
+ 		CERROR("Can't allocate descriptor for batch %s\n", name);
+ 		return -ENOMEM;
  	}
+ 
+ 	LIBCFS_ALLOC(bat->bat_cli_hash,
+ 		     sizeof(struct list_head) * LST_NODE_HASHSIZE);
+-	if (bat->bat_cli_hash == NULL) {
++	if (!bat->bat_cli_hash) {
+ 		CERROR("Can't allocate hash for batch %s\n", name);
+ 		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
+ 
+@@ -865,7 +865,7 @@ lstcon_batch_add(char *name)
+ 
+ 	LIBCFS_ALLOC(bat->bat_srv_hash,
+ 		     sizeof(struct list_head) * LST_NODE_HASHSIZE);
+-	if (bat->bat_srv_hash == NULL) {
++	if (!bat->bat_srv_hash) {
+ 		CERROR("Can't allocate hash for batch %s\n", name);
+ 		LIBCFS_FREE(bat->bat_cli_hash, LST_NODE_HASHSIZE);
+ 		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
+@@ -900,7 +900,7 @@ lstcon_batch_list(int index, int len, char __user *name_up)
+ {
+ 	lstcon_batch_t *bat;
+ 
+-	LASSERT(name_up != NULL);
++	LASSERT(name_up);
+ 	LASSERT(index >= 0);
+ 
+ 	list_for_each_entry(bat, &console_session.ses_bat_list, bat_link) {
+@@ -945,12 +945,12 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
+ 		}
+ 	}
+ 
+-	clilst = (test == NULL) ? &bat->bat_cli_list :
+-				  &test->tes_src_grp->grp_ndl_list;
+-	srvlst = (test == NULL) ? &bat->bat_srv_list :
+-				  &test->tes_dst_grp->grp_ndl_list;
++	clilst = !test ? &bat->bat_cli_list :
++			 &test->tes_src_grp->grp_ndl_list;
++	srvlst = !test ? &bat->bat_srv_list :
++			 &test->tes_dst_grp->grp_ndl_list;
+ 
+-	if (dents_up != NULL) {
++	if (dents_up) {
+ 		rc = lstcon_nodes_getent((server ? srvlst : clilst),
+ 					 index_p, ndent_p, dents_up);
+ 		return rc;
+@@ -958,10 +958,10 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
+ 
+ 	/* non-verbose query */
+ 	LIBCFS_ALLOC(entp, sizeof(lstcon_test_batch_ent_t));
+-	if (entp == NULL)
++	if (!entp)
+ 		return -ENOMEM;
+ 
+-	if (test == NULL) {
++	if (!test) {
+ 		entp->u.tbe_batch.bae_ntest = bat->bat_ntest;
+ 		entp->u.tbe_batch.bae_state = bat->bat_state;
+ 
+@@ -1138,10 +1138,10 @@ lstcon_testrpc_condition(int transop, lstcon_node_t *nd, void *arg)
+ 	struct list_head *head;
+ 
+ 	test = (lstcon_test_t *)arg;
+-	LASSERT(test != NULL);
++	LASSERT(test);
+ 
+ 	batch = test->tes_batch;
+-	LASSERT(batch != NULL);
++	LASSERT(batch);
+ 
+ 	if (test->tes_oneside &&
+ 	    transop == LST_TRANS_TSBSRVADD)
+@@ -1180,8 +1180,8 @@ lstcon_test_nodes_add(lstcon_test_t *test, struct list_head __user *result_up)
+ 	int transop;
+ 	int rc;
+ 
+-	LASSERT(test->tes_src_grp != NULL);
+-	LASSERT(test->tes_dst_grp != NULL);
++	LASSERT(test->tes_src_grp);
++	LASSERT(test->tes_dst_grp);
+ 
+ 	transop = LST_TRANS_TSBSRVADD;
+ 	grp  = test->tes_dst_grp;
+@@ -1319,7 +1319,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
+ 	test->tes_dst_grp	= dst_grp;
+ 	INIT_LIST_HEAD(&test->tes_trans_list);
+ 
+-	if (param != NULL) {
++	if (param) {
+ 		test->tes_paramlen = paramlen;
+ 		memcpy(&test->tes_param[0], param, paramlen);
+ 	}
+@@ -1343,13 +1343,13 @@ lstcon_test_add(char *batch_name, int type, int loop,
+ 	/*  hold groups so nobody can change them */
+ 	return rc;
+ out:
+-	if (test != NULL)
++	if (test)
+ 		LIBCFS_FREE(test, offsetof(lstcon_test_t, tes_param[paramlen]));
+ 
+-	if (dst_grp != NULL)
++	if (dst_grp)
+ 		lstcon_group_decref(dst_grp);
+ 
+-	if (src_grp != NULL)
++	if (src_grp)
+ 		lstcon_group_decref(src_grp);
+ 
+ 	return rc;
+@@ -1777,7 +1777,7 @@ lstcon_session_info(lst_sid_t __user *sid_up, int __user *key_up,
+ 		return -ESRCH;
+ 
+ 	LIBCFS_ALLOC(entp, sizeof(*entp));
+-	if (entp == NULL)
++	if (!entp)
+ 		return -ENOMEM;
+ 
+ 	list_for_each_entry(ndl, &console_session.ses_ndl_list, ndl_link)
+@@ -1967,7 +1967,7 @@ lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
+ 
+ out:
+ 	rep->msg_ses_feats = console_session.ses_features;
+-	if (grp != NULL)
++	if (grp)
+ 		lstcon_group_decref(grp);
+ 
+ 	mutex_unlock(&console_session.ses_mutex);
+@@ -2016,7 +2016,7 @@ lstcon_console_init(void)
+ 
+ 	LIBCFS_ALLOC(console_session.ses_ndl_hash,
+ 		     sizeof(struct list_head) * LST_GLOBAL_HASHSIZE);
+-	if (console_session.ses_ndl_hash == NULL)
++	if (!console_session.ses_ndl_hash)
+ 		return -ENOMEM;
+ 
+ 	for (i = 0; i < LST_GLOBAL_HASHSIZE; i++)
 diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
-index e8221a7..7eca046 100644
+index c61d3e7..e8221a7 100644
 --- a/drivers/staging/lustre/lnet/selftest/framework.c
 +++ b/drivers/staging/lustre/lnet/selftest/framework.c
-@@ -100,8 +100,8 @@ do {                                    \
- 	__swab64s(&(lc).route_length);  \
- } while (0)
+@@ -139,14 +139,14 @@ sfw_register_test(srpc_service_t *service, sfw_test_client_ops_t *cliops)
+ {
+ 	sfw_test_case_t *tsc;
  
--#define sfw_test_active(t)      (atomic_read(&(t)->tsi_nactive) != 0)
--#define sfw_batch_active(b)     (atomic_read(&(b)->bat_nactive) != 0)
-+#define sfw_test_active(t)      (atomic_read(&(t)->tsi_nactive))
-+#define sfw_batch_active(b)     (atomic_read(&(b)->bat_nactive))
+-	if (sfw_find_test_case(service->sv_id) != NULL) {
++	if (sfw_find_test_case(service->sv_id)) {
+ 		CERROR("Failed to register test %s (%d)\n",
+ 		       service->sv_name, service->sv_id);
+ 		return -EEXIST;
+ 	}
  
- static struct smoketest_framework {
- 	struct list_head  fw_zombie_rpcs;     /* RPCs to be recycled */
+ 	LIBCFS_ALLOC(tsc, sizeof(sfw_test_case_t));
+-	if (tsc == NULL)
++	if (!tsc)
+ 		return -ENOMEM;
+ 
+ 	tsc->tsc_cli_ops     = cliops;
 @@ -164,7 +164,7 @@ sfw_add_session_timer(void)
  
  	LASSERT(!sfw_data.fw_shuttingdown);
  
--	if (!sn || sn->sn_timeout == 0)
-+	if (!sn || !sn->sn_timeout)
+-	if (sn == NULL || sn->sn_timeout == 0)
++	if (!sn || sn->sn_timeout == 0)
  		return;
  
  	LASSERT(!sn->sn_timer_active);
-@@ -183,7 +183,7 @@ sfw_del_session_timer(void)
- 	if (!sn || !sn->sn_timer_active)
- 		return 0;
- 
--	LASSERT(sn->sn_timeout != 0);
-+	LASSERT(sn->sn_timeout);
- 
- 	if (stt_del_timer(&sn->sn_timer)) { /* timer defused */
- 		sn->sn_timer_active = 0;
-@@ -226,7 +226,7 @@ sfw_deactivate_session(void)
- 		}
- 	}
- 
--	if (nactive != 0)
-+	if (nactive)
- 		return;   /* wait for active batches to stop */
- 
- 	list_del_init(&sn->sn_list);
-@@ -302,9 +302,9 @@ sfw_server_rpc_done(struct srpc_server_rpc *rpc)
- static void
- sfw_client_rpc_fini(srpc_client_rpc_t *rpc)
+@@ -180,7 +180,7 @@ sfw_del_session_timer(void)
  {
--	LASSERT(rpc->crpc_bulk.bk_niov == 0);
-+	LASSERT(!rpc->crpc_bulk.bk_niov);
- 	LASSERT(list_empty(&rpc->crpc_list));
--	LASSERT(atomic_read(&rpc->crpc_refcount) == 0);
-+	LASSERT(!atomic_read(&rpc->crpc_refcount));
+ 	sfw_session_t *sn = sfw_data.fw_session;
  
- 	CDEBUG(D_NET, "Outgoing framework RPC done: service %d, peer %s, status %s:%d:%d\n",
- 	       rpc->crpc_service, libcfs_id2str(rpc->crpc_dest),
-@@ -445,7 +445,7 @@ sfw_make_session(srpc_mksn_reqst_t *request, srpc_mksn_reply_t *reply)
- 	 * console's responsibility to make sure all nodes in a session have
- 	 * same feature mask.
- 	 */
--	if ((msg->msg_ses_feats & ~LST_FEATS_MASK) != 0) {
-+	if (msg->msg_ses_feats & ~LST_FEATS_MASK) {
- 		reply->mksn_status = EPROTO;
+-	if (sn == NULL || !sn->sn_timer_active)
++	if (!sn || !sn->sn_timer_active)
  		return 0;
- 	}
-@@ -569,7 +569,7 @@ sfw_load_test(struct sfw_test_instance *tsi)
- 	}
  
- 	rc = srpc_service_add_buffers(svc, nbuf);
--	if (rc != 0) {
-+	if (rc) {
- 		CWARN("Failed to reserve enough buffers: service %s, %d needed: %d\n",
- 		      svc->sv_name, nbuf, rc);
- 		/*
-@@ -696,7 +696,7 @@ sfw_unpack_addtest_req(srpc_msg_t *msg)
- 	LASSERT(msg->msg_magic == __swab32(SRPC_MSG_MAGIC));
+ 	LASSERT(sn->sn_timeout != 0);
+@@ -202,7 +202,7 @@ sfw_deactivate_session(void)
+ 	sfw_batch_t *tsb;
+ 	sfw_test_case_t *tsc;
  
- 	if (req->tsr_service == SRPC_SERVICE_BRW) {
--		if ((msg->msg_ses_feats & LST_FEAT_BULK_LEN) == 0) {
-+		if (!(msg->msg_ses_feats & LST_FEAT_BULK_LEN)) {
- 			test_bulk_req_t *bulk = &req->tsr_u.bulk_v0;
+-	if (sn == NULL)
++	if (!sn)
+ 		return;
  
- 			__swab32s(&bulk->blk_opc);
-@@ -761,7 +761,7 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
- 	tsi->tsi_stoptsu_onerr = !!(req->tsr_stop_onerr);
+ 	LASSERT(!sn->sn_timer_active);
+@@ -294,7 +294,7 @@ sfw_server_rpc_done(struct srpc_server_rpc *rpc)
+ 	       swi_state2str(rpc->srpc_wi.swi_state),
+ 	       status);
  
- 	rc = sfw_load_test(tsi);
--	if (rc != 0) {
-+	if (rc) {
- 		LIBCFS_FREE(tsi, sizeof(*tsi));
- 		return rc;
- 	}
-@@ -811,13 +811,13 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
- 	}
- 
- 	rc = tsi->tsi_ops->tso_init(tsi);
--	if (rc == 0) {
-+	if (!rc) {
- 		list_add_tail(&tsi->tsi_list, &tsb->bat_tests);
- 		return 0;
- 	}
- 
- error:
--	LASSERT(rc != 0);
-+	LASSERT(rc);
- 	sfw_destroy_test_instance(tsi);
- 	return rc;
+-	if (rpc->srpc_bulk != NULL)
++	if (rpc->srpc_bulk)
+ 		sfw_free_pages(rpc);
+ 	return;
  }
-@@ -882,9 +882,8 @@ sfw_test_rpc_done(srpc_client_rpc_t *rpc)
- 	list_del_init(&rpc->crpc_list);
+@@ -326,7 +326,7 @@ sfw_find_batch(lst_bid_t bid)
+ 	sfw_session_t *sn = sfw_data.fw_session;
+ 	sfw_batch_t *bat;
  
- 	/* batch is stopping or loop is done or get error */
--	if (tsi->tsi_stopping ||
--	    tsu->tsu_loop == 0 ||
--	    (rpc->crpc_status != 0 && tsi->tsi_stoptsu_onerr))
-+	if (tsi->tsi_stopping || !tsu->tsu_loop ||
-+	    (rpc->crpc_status && tsi->tsi_stoptsu_onerr))
- 		done = 1;
+-	LASSERT(sn != NULL);
++	LASSERT(sn);
  
- 	/* dec ref for poster */
-@@ -953,7 +952,7 @@ sfw_run_test(swi_workitem_t *wi)
+ 	list_for_each_entry(bat, &sn->sn_batches, bat_list) {
+ 		if (bat->bat_id.bat_id == bid.bat_id)
+@@ -342,14 +342,14 @@ sfw_bid2batch(lst_bid_t bid)
+ 	sfw_session_t *sn = sfw_data.fw_session;
+ 	sfw_batch_t *bat;
  
- 	LASSERT(wi == &tsu->tsu_worker);
+-	LASSERT(sn != NULL);
++	LASSERT(sn);
  
--	if (tsi->tsi_ops->tso_prep_rpc(tsu, tsu->tsu_dest, &rpc) != 0) {
-+	if (tsi->tsi_ops->tso_prep_rpc(tsu, tsu->tsu_dest, &rpc)) {
- 		LASSERT(!rpc);
- 		goto test_done;
- 	}
-@@ -1080,7 +1079,7 @@ sfw_query_batch(sfw_batch_t *tsb, int testidx, srpc_batch_reply_t *reply)
- 	if (testidx < 0)
- 		return -EINVAL;
+ 	bat = sfw_find_batch(bid);
+-	if (bat != NULL)
++	if (bat)
+ 		return bat;
  
--	if (testidx == 0) {
-+	if (!testidx) {
- 		reply->bar_active = atomic_read(&tsb->bat_nactive);
+ 	LIBCFS_ALLOC(bat, sizeof(sfw_batch_t));
+-	if (bat == NULL)
++	if (!bat)
+ 		return NULL;
+ 
+ 	bat->bat_error    = 0;
+@@ -369,14 +369,14 @@ sfw_get_stats(srpc_stat_reqst_t *request, srpc_stat_reply_t *reply)
+ 	sfw_counters_t *cnt = &reply->str_fw;
+ 	sfw_batch_t *bat;
+ 
+-	reply->str_sid = (sn == NULL) ? LST_INVALID_SID : sn->sn_id;
++	reply->str_sid = !sn ? LST_INVALID_SID : sn->sn_id;
+ 
+ 	if (request->str_sid.ses_nid == LNET_NID_ANY) {
+ 		reply->str_status = EINVAL;
  		return 0;
  	}
-@@ -1129,11 +1128,11 @@ sfw_add_test(struct srpc_server_rpc *rpc)
- 	request = &rpc->srpc_reqstbuf->buf_msg.msg_body.tes_reqst;
- 	reply->tsr_sid = !sn ? LST_INVALID_SID : sn->sn_id;
  
--	if (request->tsr_loop == 0 ||
--	    request->tsr_concur == 0 ||
-+	if (!request->tsr_loop ||
-+	    !request->tsr_concur ||
- 	    request->tsr_sid.ses_nid == LNET_NID_ANY ||
- 	    request->tsr_ndest > SFW_MAX_NDESTS ||
--	    (request->tsr_is_client && request->tsr_ndest == 0) ||
-+	    (request->tsr_is_client && !request->tsr_ndest) ||
- 	    request->tsr_concur > SFW_MAX_CONCUR ||
- 	    request->tsr_service > SRPC_SERVICE_MAX_ID ||
- 	    request->tsr_service <= SRPC_FRAMEWORK_SERVICE_MAX_ID) {
-@@ -1165,7 +1164,7 @@ sfw_add_test(struct srpc_server_rpc *rpc)
- 		int npg = sfw_id_pages(request->tsr_ndest);
- 		int len;
+-	if (sn == NULL || !sfw_sid_equal(request->str_sid, sn->sn_id)) {
++	if (!sn || !sfw_sid_equal(request->str_sid, sn->sn_id)) {
+ 		reply->str_status = ESRCH;
+ 		return 0;
+ 	}
+@@ -412,12 +412,12 @@ sfw_make_session(srpc_mksn_reqst_t *request, srpc_mksn_reply_t *reply)
+ 	int cplen = 0;
  
--		if ((sn->sn_features & LST_FEAT_BULK_LEN) == 0) {
-+		if (!(sn->sn_features & LST_FEAT_BULK_LEN)) {
- 			len = npg * PAGE_CACHE_SIZE;
- 
- 		} else  {
-@@ -1177,9 +1176,9 @@ sfw_add_test(struct srpc_server_rpc *rpc)
+ 	if (request->mksn_sid.ses_nid == LNET_NID_ANY) {
+-		reply->mksn_sid = (sn == NULL) ? LST_INVALID_SID : sn->sn_id;
++		reply->mksn_sid = !sn ? LST_INVALID_SID : sn->sn_id;
+ 		reply->mksn_status = EINVAL;
+ 		return 0;
  	}
  
- 	rc = sfw_add_test_instance(bat, rpc);
--	CDEBUG(rc == 0 ? D_NET : D_WARNING,
-+	CDEBUG(!rc ? D_NET : D_WARNING,
- 	       "%s test: sv %d %s, loop %d, concur %d, ndest %d\n",
--	       rc == 0 ? "Added" : "Failed to add", request->tsr_service,
-+	       !rc ? "Added" : "Failed to add", request->tsr_service,
- 	       request->tsr_is_client ? "client" : "server",
- 	       request->tsr_loop, request->tsr_concur, request->tsr_ndest);
+-	if (sn != NULL) {
++	if (sn) {
+ 		reply->mksn_status  = 0;
+ 		reply->mksn_sid     = sn->sn_id;
+ 		reply->mksn_timeout = sn->sn_timeout;
+@@ -452,7 +452,7 @@ sfw_make_session(srpc_mksn_reqst_t *request, srpc_mksn_reply_t *reply)
  
-@@ -1248,7 +1247,7 @@ sfw_handle_server_rpc(struct srpc_server_rpc *rpc)
+ 	/* brand new or create by force */
+ 	LIBCFS_ALLOC(sn, sizeof(sfw_session_t));
+-	if (sn == NULL) {
++	if (!sn) {
+ 		CERROR("Dropping RPC (mksn) under memory pressure.\n");
+ 		return -ENOMEM;
  	}
- 
- 	/* Remove timer to avoid racing with it or expiring active session */
--	if (sfw_del_session_timer() != 0) {
-+	if (sfw_del_session_timer()) {
- 		CERROR("Dropping RPC (%s) from %s: racing with expiry timer.",
- 		       sv->sv_name, libcfs_id2str(rpc->srpc_peer));
- 		spin_unlock(&sfw_data.fw_lock);
-@@ -1277,7 +1276,7 @@ sfw_handle_server_rpc(struct srpc_server_rpc *rpc)
- 			goto out;
- 		}
- 
--	} else if ((request->msg_ses_feats & ~LST_FEATS_MASK) != 0) {
-+	} else if (request->msg_ses_feats & ~LST_FEATS_MASK) {
- 		/*
- 		 * NB: at this point, old version will ignore features and
- 		 * create new session anyway, so console should be able
-@@ -1348,7 +1347,7 @@ sfw_bulk_ready(struct srpc_server_rpc *rpc, int status)
- 
+@@ -463,7 +463,7 @@ sfw_make_session(srpc_mksn_reqst_t *request, srpc_mksn_reply_t *reply)
  	spin_lock(&sfw_data.fw_lock);
  
--	if (status != 0) {
-+	if (status) {
- 		CERROR("Bulk transfer failed for RPC: service %s, peer %s, status %d\n",
- 		       sv->sv_name, libcfs_id2str(rpc->srpc_peer), status);
- 		spin_unlock(&sfw_data.fw_lock);
-@@ -1360,7 +1359,7 @@ sfw_bulk_ready(struct srpc_server_rpc *rpc, int status)
- 		return -ESHUTDOWN;
+ 	sfw_deactivate_session();
+-	LASSERT(sfw_data.fw_session == NULL);
++	LASSERT(!sfw_data.fw_session);
+ 	sfw_data.fw_session = sn;
+ 
+ 	spin_unlock(&sfw_data.fw_lock);
+@@ -479,15 +479,15 @@ sfw_remove_session(srpc_rmsn_reqst_t *request, srpc_rmsn_reply_t *reply)
+ {
+ 	sfw_session_t *sn = sfw_data.fw_session;
+ 
+-	reply->rmsn_sid = (sn == NULL) ? LST_INVALID_SID : sn->sn_id;
++	reply->rmsn_sid = !sn ? LST_INVALID_SID : sn->sn_id;
+ 
+ 	if (request->rmsn_sid.ses_nid == LNET_NID_ANY) {
+ 		reply->rmsn_status = EINVAL;
+ 		return 0;
  	}
  
--	if (sfw_del_session_timer() != 0) {
-+	if (sfw_del_session_timer()) {
- 		CERROR("Dropping RPC (%s) from %s: racing with expiry timer",
- 		       sv->sv_name, libcfs_id2str(rpc->srpc_peer));
- 		spin_unlock(&sfw_data.fw_lock);
-@@ -1394,7 +1393,7 @@ sfw_create_rpc(lnet_process_id_t peer, int service,
- 	LASSERT(!sfw_data.fw_shuttingdown);
- 	LASSERT(service <= SRPC_FRAMEWORK_SERVICE_MAX_ID);
+-	if (sn == NULL || !sfw_sid_equal(request->rmsn_sid, sn->sn_id)) {
+-		reply->rmsn_status = (sn == NULL) ? ESRCH : EBUSY;
++	if (!sn || !sfw_sid_equal(request->rmsn_sid, sn->sn_id)) {
++		reply->rmsn_status = !sn ? ESRCH : EBUSY;
+ 		return 0;
+ 	}
  
--	if (nbulkiov == 0 && !list_empty(&sfw_data.fw_zombie_rpcs)) {
-+	if (!nbulkiov && !list_empty(&sfw_data.fw_zombie_rpcs)) {
- 		rpc = list_entry(sfw_data.fw_zombie_rpcs.next,
- 				 srpc_client_rpc_t, crpc_list);
- 		list_del(&rpc->crpc_list);
-@@ -1408,7 +1407,7 @@ sfw_create_rpc(lnet_process_id_t peer, int service,
- 	if (!rpc) {
+@@ -502,7 +502,7 @@ sfw_remove_session(srpc_rmsn_reqst_t *request, srpc_rmsn_reply_t *reply)
+ 
+ 	reply->rmsn_status = 0;
+ 	reply->rmsn_sid    = LST_INVALID_SID;
+-	LASSERT(sfw_data.fw_session == NULL);
++	LASSERT(!sfw_data.fw_session);
+ 	return 0;
+ }
+ 
+@@ -511,7 +511,7 @@ sfw_debug_session(srpc_debug_reqst_t *request, srpc_debug_reply_t *reply)
+ {
+ 	sfw_session_t *sn = sfw_data.fw_session;
+ 
+-	if (sn == NULL) {
++	if (!sn) {
+ 		reply->dbg_status = ESRCH;
+ 		reply->dbg_sid    = LST_INVALID_SID;
+ 		return 0;
+@@ -557,10 +557,10 @@ sfw_load_test(struct sfw_test_instance *tsi)
+ 	int nbuf;
+ 	int rc;
+ 
+-	LASSERT(tsi != NULL);
++	LASSERT(tsi);
+ 	tsc = sfw_find_test_case(tsi->tsi_service);
+ 	nbuf = sfw_test_buffers(tsi);
+-	LASSERT(tsc != NULL);
++	LASSERT(tsc);
+ 	svc = tsc->tsc_srv_service;
+ 
+ 	if (tsi->tsi_is_client) {
+@@ -593,7 +593,7 @@ sfw_unload_test(struct sfw_test_instance *tsi)
+ {
+ 	struct sfw_test_case *tsc = sfw_find_test_case(tsi->tsi_service);
+ 
+-	LASSERT(tsc != NULL);
++	LASSERT(tsc);
+ 
+ 	if (tsi->tsi_is_client)
+ 		return;
+@@ -740,7 +740,7 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
+ 	int rc;
+ 
+ 	LIBCFS_ALLOC(tsi, sizeof(*tsi));
+-	if (tsi == NULL) {
++	if (!tsi) {
+ 		CERROR("Can't allocate test instance for batch: %llu\n",
+ 		       tsb->bat_id.bat_id);
+ 		return -ENOMEM;
+@@ -774,7 +774,7 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
+ 		return 0;
+ 	}
+ 
+-	LASSERT(bk != NULL);
++	LASSERT(bk);
+ 	LASSERT(bk->bk_niov * SFW_ID_PER_PAGE >= (unsigned int)ndest);
+ 	LASSERT((unsigned int)bk->bk_len >=
+ 		sizeof(lnet_process_id_packed_t) * ndest);
+@@ -788,14 +788,14 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
+ 		int j;
+ 
+ 		dests = page_address(bk->bk_iovs[i / SFW_ID_PER_PAGE].kiov_page);
+-		LASSERT(dests != NULL);  /* my pages are within KVM always */
++		LASSERT(dests);  /* my pages are within KVM always */
+ 		id = dests[i % SFW_ID_PER_PAGE];
+ 		if (msg->msg_magic != SRPC_MSG_MAGIC)
+ 			sfw_unpack_id(id);
+ 
+ 		for (j = 0; j < tsi->tsi_concur; j++) {
+ 			LIBCFS_ALLOC(tsu, sizeof(sfw_test_unit_t));
+-			if (tsu == NULL) {
++			if (!tsu) {
+ 				rc = -ENOMEM;
+ 				CERROR("Can't allocate tsu for %d\n",
+ 				       tsi->tsi_service);
+@@ -923,7 +923,7 @@ sfw_create_test_rpc(sfw_test_unit_t *tsu, lnet_process_id_t peer,
+ 
+ 	spin_unlock(&tsi->tsi_lock);
+ 
+-	if (rpc == NULL) {
++	if (!rpc) {
+ 		rpc = srpc_create_client_rpc(peer, tsi->tsi_service, nblk,
+ 					     blklen, sfw_test_rpc_done,
+ 					     sfw_test_rpc_fini, tsu);
+@@ -933,7 +933,7 @@ sfw_create_test_rpc(sfw_test_unit_t *tsu, lnet_process_id_t peer,
+ 				     sfw_test_rpc_fini, tsu);
+ 	}
+ 
+-	if (rpc == NULL) {
++	if (!rpc) {
+ 		CERROR("Can't create rpc for test %d\n", tsi->tsi_service);
+ 		return -ENOMEM;
+ 	}
+@@ -954,11 +954,11 @@ sfw_run_test(swi_workitem_t *wi)
+ 	LASSERT(wi == &tsu->tsu_worker);
+ 
+ 	if (tsi->tsi_ops->tso_prep_rpc(tsu, tsu->tsu_dest, &rpc) != 0) {
+-		LASSERT(rpc == NULL);
++		LASSERT(!rpc);
+ 		goto test_done;
+ 	}
+ 
+-	LASSERT(rpc != NULL);
++	LASSERT(rpc);
+ 
+ 	spin_lock(&tsi->tsi_lock);
+ 
+@@ -1107,11 +1107,11 @@ int
+ sfw_alloc_pages(struct srpc_server_rpc *rpc, int cpt, int npages, int len,
+ 		int sink)
+ {
+-	LASSERT(rpc->srpc_bulk == NULL);
++	LASSERT(!rpc->srpc_bulk);
+ 	LASSERT(npages > 0 && npages <= LNET_MAX_IOV);
+ 
+ 	rpc->srpc_bulk = srpc_alloc_bulk(cpt, npages, len, sink);
+-	if (rpc->srpc_bulk == NULL)
++	if (!rpc->srpc_bulk)
+ 		return -ENOMEM;
+ 
+ 	return 0;
+@@ -1127,7 +1127,7 @@ sfw_add_test(struct srpc_server_rpc *rpc)
+ 	sfw_batch_t *bat;
+ 
+ 	request = &rpc->srpc_reqstbuf->buf_msg.msg_body.tes_reqst;
+-	reply->tsr_sid = (sn == NULL) ? LST_INVALID_SID : sn->sn_id;
++	reply->tsr_sid = !sn ? LST_INVALID_SID : sn->sn_id;
+ 
+ 	if (request->tsr_loop == 0 ||
+ 	    request->tsr_concur == 0 ||
+@@ -1141,14 +1141,14 @@ sfw_add_test(struct srpc_server_rpc *rpc)
+ 		return 0;
+ 	}
+ 
+-	if (sn == NULL || !sfw_sid_equal(request->tsr_sid, sn->sn_id) ||
+-	    sfw_find_test_case(request->tsr_service) == NULL) {
++	if (!sn || !sfw_sid_equal(request->tsr_sid, sn->sn_id) ||
++	    !sfw_find_test_case(request->tsr_service)) {
+ 		reply->tsr_status = ENOENT;
+ 		return 0;
+ 	}
+ 
+ 	bat = sfw_bid2batch(request->tsr_bid);
+-	if (bat == NULL) {
++	if (!bat) {
+ 		CERROR("Dropping RPC (%s) from %s under memory pressure.\n",
+ 		       rpc->srpc_scd->scd_svc->sv_name,
+ 		       libcfs_id2str(rpc->srpc_peer));
+@@ -1160,7 +1160,7 @@ sfw_add_test(struct srpc_server_rpc *rpc)
+ 		return 0;
+ 	}
+ 
+-	if (request->tsr_is_client && rpc->srpc_bulk == NULL) {
++	if (request->tsr_is_client && !rpc->srpc_bulk) {
+ 		/* rpc will be resumed later in sfw_bulk_ready */
+ 		int npg = sfw_id_pages(request->tsr_ndest);
+ 		int len;
+@@ -1194,15 +1194,15 @@ sfw_control_batch(srpc_batch_reqst_t *request, srpc_batch_reply_t *reply)
+ 	int rc = 0;
+ 	sfw_batch_t *bat;
+ 
+-	reply->bar_sid = (sn == NULL) ? LST_INVALID_SID : sn->sn_id;
++	reply->bar_sid = !sn ? LST_INVALID_SID : sn->sn_id;
+ 
+-	if (sn == NULL || !sfw_sid_equal(request->bar_sid, sn->sn_id)) {
++	if (!sn || !sfw_sid_equal(request->bar_sid, sn->sn_id)) {
+ 		reply->bar_status = ESRCH;
+ 		return 0;
+ 	}
+ 
+ 	bat = sfw_find_batch(request->bar_bid);
+-	if (bat == NULL) {
++	if (!bat) {
+ 		reply->bar_status = ENOENT;
+ 		return 0;
+ 	}
+@@ -1237,7 +1237,7 @@ sfw_handle_server_rpc(struct srpc_server_rpc *rpc)
+ 	unsigned features = LST_FEATS_MASK;
+ 	int rc = 0;
+ 
+-	LASSERT(sfw_data.fw_active_srpc == NULL);
++	LASSERT(!sfw_data.fw_active_srpc);
+ 	LASSERT(sv->sv_id <= SRPC_FRAMEWORK_SERVICE_MAX_ID);
+ 
+ 	spin_lock(&sfw_data.fw_lock);
+@@ -1268,7 +1268,7 @@ sfw_handle_server_rpc(struct srpc_server_rpc *rpc)
+ 	    sv->sv_id != SRPC_SERVICE_DEBUG) {
+ 		sfw_session_t *sn = sfw_data.fw_session;
+ 
+-		if (sn != NULL &&
++		if (sn &&
+ 		    sn->sn_features != request->msg_ses_feats) {
+ 			CNETERR("Features of framework RPC don't match features of current session: %x/%x\n",
+ 				request->msg_ses_feats, sn->sn_features);
+@@ -1320,7 +1320,7 @@ sfw_handle_server_rpc(struct srpc_server_rpc *rpc)
+ 		break;
+ 	}
+ 
+-	if (sfw_data.fw_session != NULL)
++	if (sfw_data.fw_session)
+ 		features = sfw_data.fw_session->sn_features;
+  out:
+ 	reply->msg_ses_feats = features;
+@@ -1341,9 +1341,9 @@ sfw_bulk_ready(struct srpc_server_rpc *rpc, int status)
+ 	struct srpc_service *sv = rpc->srpc_scd->scd_svc;
+ 	int rc;
+ 
+-	LASSERT(rpc->srpc_bulk != NULL);
++	LASSERT(rpc->srpc_bulk);
+ 	LASSERT(sv->sv_id == SRPC_SERVICE_TEST);
+-	LASSERT(sfw_data.fw_active_srpc == NULL);
++	LASSERT(!sfw_data.fw_active_srpc);
+ 	LASSERT(rpc->srpc_reqstbuf->buf_msg.msg_body.tes_reqst.tsr_is_client);
+ 
+ 	spin_lock(&sfw_data.fw_lock);
+@@ -1405,7 +1405,7 @@ sfw_create_rpc(lnet_process_id_t peer, int service,
+ 
+ 	spin_unlock(&sfw_data.fw_lock);
+ 
+-	if (rpc == NULL) {
++	if (!rpc) {
  		rpc = srpc_create_client_rpc(peer, service,
  					     nbulkiov, bulklen, done,
--					     nbulkiov != 0 ?  NULL :
-+					     nbulkiov ?  NULL :
- 					     sfw_client_rpc_fini,
+ 					     nbulkiov != 0 ?  NULL :
+@@ -1413,7 +1413,7 @@ sfw_create_rpc(lnet_process_id_t peer, int service,
  					     priv);
  	}
-@@ -1661,10 +1660,10 @@ sfw_startup(void)
- 		return -EINVAL;
- 	}
  
--	if (session_timeout == 0)
-+	if (!session_timeout)
- 		CWARN("Zero session_timeout specified - test sessions never expire.\n");
+-	if (rpc != NULL) /* "session" is concept in framework */
++	if (rpc) /* "session" is concept in framework */
+ 		rpc->crpc_reqstmsg.msg_ses_feats = features;
  
--	if (rpc_timeout == 0)
-+	if (!rpc_timeout)
- 		CWARN("Zero rpc_timeout specified - test RPC never expire.\n");
+ 	return rpc;
+@@ -1702,7 +1702,7 @@ sfw_startup(void)
  
- 	memset(&sfw_data, 0, sizeof(struct smoketest_framework));
-@@ -1680,12 +1679,12 @@ sfw_startup(void)
- 	brw_init_test_client();
- 	brw_init_test_service();
- 	rc = sfw_register_test(&brw_test_service, &brw_test_client);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
+ 	for (i = 0; ; i++) {
+ 		sv = &sfw_services[i];
+-		if (sv->sv_name == NULL)
++		if (!sv->sv_name)
+ 			break;
  
- 	ping_init_test_client();
- 	ping_init_test_service();
- 	rc = sfw_register_test(&ping_test_service, &ping_test_client);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
+ 		sv->sv_bulk_ready = NULL;
+@@ -1746,11 +1746,11 @@ sfw_shutdown(void)
+ 	spin_lock(&sfw_data.fw_lock);
  
- 	error = 0;
- 	list_for_each_entry(tsc, &sfw_data.fw_tests, tsc_list) {
-@@ -1693,7 +1692,7 @@ sfw_startup(void)
- 
- 		rc = srpc_add_service(sv);
- 		LASSERT(rc != -EBUSY);
--		if (rc != 0) {
-+		if (rc) {
- 			CWARN("Failed to add %s service: %d\n",
- 			      sv->sv_name, rc);
- 			error = rc;
-@@ -1713,7 +1712,7 @@ sfw_startup(void)
- 
- 		rc = srpc_add_service(sv);
- 		LASSERT(rc != -EBUSY);
--		if (rc != 0) {
-+		if (rc) {
- 			CWARN("Failed to add %s service: %d\n",
- 			      sv->sv_name, rc);
- 			error = rc;
-@@ -1724,14 +1723,14 @@ sfw_startup(void)
- 			continue;
- 
- 		rc = srpc_service_add_buffers(sv, sv->sv_wi_total);
--		if (rc != 0) {
-+		if (rc) {
- 			CWARN("Failed to reserve enough buffers: service %s, %d needed: %d\n",
- 			      sv->sv_name, sv->sv_wi_total, rc);
- 			error = -ENOMEM;
- 		}
- 	}
- 
--	if (error != 0)
-+	if (error)
- 		sfw_shutdown();
- 	return error;
- }
-@@ -1749,12 +1748,12 @@ sfw_shutdown(void)
- 	lst_wait_until(!sfw_data.fw_active_srpc, sfw_data.fw_lock,
+ 	sfw_data.fw_shuttingdown = 1;
+-	lst_wait_until(sfw_data.fw_active_srpc == NULL, sfw_data.fw_lock,
++	lst_wait_until(!sfw_data.fw_active_srpc, sfw_data.fw_lock,
  		       "waiting for active RPC to finish.\n");
  
--	if (sfw_del_session_timer() != 0)
-+	if (sfw_del_session_timer())
- 		lst_wait_until(!sfw_data.fw_session, sfw_data.fw_lock,
+ 	if (sfw_del_session_timer() != 0)
+-		lst_wait_until(sfw_data.fw_session == NULL, sfw_data.fw_lock,
++		lst_wait_until(!sfw_data.fw_session, sfw_data.fw_lock,
  			       "waiting for session timer to explode.\n");
  
  	sfw_deactivate_session();
--	lst_wait_until(atomic_read(&sfw_data.fw_nzombies) == 0,
-+	lst_wait_until(!atomic_read(&sfw_data.fw_nzombies),
- 		       sfw_data.fw_lock,
- 		       "waiting for %d zombie sessions to die.\n",
- 		       atomic_read(&sfw_data.fw_nzombies));
+@@ -1763,7 +1763,7 @@ sfw_shutdown(void)
+ 
+ 	for (i = 0; ; i++) {
+ 		sv = &sfw_services[i];
+-		if (sv->sv_name == NULL)
++		if (!sv->sv_name)
+ 			break;
+ 
+ 		srpc_shutdown_service(sv);
+@@ -1788,7 +1788,7 @@ sfw_shutdown(void)
+ 
+ 	for (i = 0; ; i++) {
+ 		sv = &sfw_services[i];
+-		if (sv->sv_name == NULL)
++		if (!sv->sv_name)
+ 			break;
+ 
+ 		srpc_wait_service_shutdown(sv);
 diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
-index 741509a..c4bf442 100644
+index 46cbdf0..741509a 100644
 --- a/drivers/staging/lustre/lnet/selftest/module.c
 +++ b/drivers/staging/lustre/lnet/selftest/module.c
-@@ -98,7 +98,7 @@ lnet_selftest_init(void)
+@@ -70,7 +70,7 @@ lnet_selftest_fini(void)
+ 	case LST_INIT_WI_TEST:
+ 		for (i = 0;
+ 		     i < cfs_cpt_number(lnet_cpt_table()); i++) {
+-			if (lst_sched_test[i] == NULL)
++			if (!lst_sched_test[i])
+ 				continue;
+ 			cfs_wi_sched_destroy(lst_sched_test[i]);
+ 		}
+@@ -106,7 +106,7 @@ lnet_selftest_init(void)
  
- 	rc = cfs_wi_sched_create("lst_s", lnet_cpt_table(), CFS_CPT_ANY,
- 				 1, &lst_sched_serial);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("Failed to create serial WI scheduler for LST\n");
- 		return rc;
- 	}
-@@ -117,7 +117,7 @@ lnet_selftest_init(void)
- 		nthrs = max(nthrs - 1, 1);
- 		rc = cfs_wi_sched_create("lst_t", lnet_cpt_table(), i,
- 					 nthrs, &lst_sched_test[i]);
--		if (rc != 0) {
-+		if (rc) {
- 			CERROR("Failed to create CPT affinity WI scheduler %d for LST\n",
- 			       i);
- 			goto error;
-@@ -125,21 +125,21 @@ lnet_selftest_init(void)
- 	}
- 
- 	rc = srpc_startup();
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("LST can't startup rpc\n");
+ 	nscheds = cfs_cpt_number(lnet_cpt_table());
+ 	LIBCFS_ALLOC(lst_sched_test, sizeof(lst_sched_test[0]) * nscheds);
+-	if (lst_sched_test == NULL)
++	if (!lst_sched_test)
  		goto error;
- 	}
- 	lst_init_step = LST_INIT_RPC;
  
- 	rc = sfw_startup();
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("LST can't startup framework\n");
- 		goto error;
- 	}
- 	lst_init_step = LST_INIT_FW;
- 
- 	rc = lstcon_console_init();
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("LST can't startup console\n");
- 		goto error;
- 	}
+ 	lst_init_step = LST_INIT_WI_TEST;
 diff --git a/drivers/staging/lustre/lnet/selftest/ping_test.c b/drivers/staging/lustre/lnet/selftest/ping_test.c
-index 01ceee5..9d27e39 100644
+index 1d23a30..01ceee5 100644
 --- a/drivers/staging/lustre/lnet/selftest/ping_test.c
 +++ b/drivers/staging/lustre/lnet/selftest/ping_test.c
 @@ -61,7 +61,7 @@ ping_client_init(sfw_test_instance_t *tsi)
  	sfw_session_t *sn = tsi->tsi_batch->bat_session;
  
  	LASSERT(tsi->tsi_is_client);
--	LASSERT(sn && (sn->sn_features & ~LST_FEATS_MASK) == 0);
-+	LASSERT(sn && !(sn->sn_features & ~LST_FEATS_MASK));
+-	LASSERT(sn != NULL && (sn->sn_features & ~LST_FEATS_MASK) == 0);
++	LASSERT(sn && (sn->sn_features & ~LST_FEATS_MASK) == 0);
  
  	spin_lock_init(&lst_ping_data.pnd_lock);
  	lst_ping_data.pnd_counter = 0;
-@@ -96,10 +96,10 @@ ping_client_prep_rpc(sfw_test_unit_t *tsu,
+@@ -75,7 +75,7 @@ ping_client_fini(sfw_test_instance_t *tsi)
+ 	sfw_session_t *sn = tsi->tsi_batch->bat_session;
+ 	int errors;
+ 
+-	LASSERT(sn != NULL);
++	LASSERT(sn);
+ 	LASSERT(tsi->tsi_is_client);
+ 
+ 	errors = atomic_read(&sn->sn_ping_errors);
+@@ -95,7 +95,7 @@ ping_client_prep_rpc(sfw_test_unit_t *tsu,
+ 	struct timespec64 ts;
  	int rc;
  
- 	LASSERT(sn);
--	LASSERT((sn->sn_features & ~LST_FEATS_MASK) == 0);
-+	LASSERT(!(sn->sn_features & ~LST_FEATS_MASK));
+-	LASSERT(sn != NULL);
++	LASSERT(sn);
+ 	LASSERT((sn->sn_features & ~LST_FEATS_MASK) == 0);
  
  	rc = sfw_create_test_rpc(tsu, dest, sn->sn_features, 0, 0, rpc);
--	if (rc != 0)
-+	if (rc)
- 		return rc;
+@@ -126,7 +126,7 @@ ping_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
+ 	srpc_ping_reply_t *reply = &rpc->crpc_replymsg.msg_body.ping_reply;
+ 	struct timespec64 ts;
  
- 	req = &(*rpc)->crpc_reqstmsg.msg_body.ping_reqst;
-@@ -128,7 +128,7 @@ ping_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
+-	LASSERT(sn != NULL);
++	LASSERT(sn);
  
- 	LASSERT(sn);
- 
--	if (rpc->crpc_status != 0) {
-+	if (rpc->crpc_status) {
+ 	if (rpc->crpc_status != 0) {
  		if (!tsi->tsi_stopping) /* rpc could have been aborted */
- 			atomic_inc(&sn->sn_ping_errors);
- 		CERROR("Unable to ping %s (%d): %d\n",
-@@ -198,7 +198,7 @@ ping_server_handle(struct srpc_server_rpc *rpc)
- 	rep->pnr_seq   = req->pnr_seq;
- 	rep->pnr_magic = LST_PING_TEST_MAGIC;
- 
--	if ((reqstmsg->msg_ses_feats & ~LST_FEATS_MASK) != 0) {
-+	if (reqstmsg->msg_ses_feats & ~LST_FEATS_MASK) {
- 		replymsg->msg_ses_feats = LST_FEATS_MASK;
- 		rep->pnr_status = EPROTO;
- 		return 0;
 diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
-index 1e78711..f95fd9b 100644
+index 6b10216..1e78711 100644
 --- a/drivers/staging/lustre/lnet/selftest/rpc.c
 +++ b/drivers/staging/lustre/lnet/selftest/rpc.c
-@@ -284,7 +284,7 @@ srpc_service_init(struct srpc_service *svc)
- 		swi_init_workitem(&scd->scd_buf_wi, scd,
- 				  srpc_add_buffer, lst_sched_test[i]);
+@@ -107,11 +107,11 @@ srpc_free_bulk(srpc_bulk_t *bk)
+ 	int i;
+ 	struct page *pg;
  
--		if (i != 0 && srpc_serv_is_framework(svc)) {
-+		if (i && srpc_serv_is_framework(svc)) {
- 			/*
- 			 * NB: framework service only needs srpc_service_cd for
- 			 * one partition, but we allocate for all to make
-@@ -315,7 +315,7 @@ srpc_add_service(struct srpc_service *sv)
+-	LASSERT(bk != NULL);
++	LASSERT(bk);
  
- 	LASSERT(0 <= id && id <= SRPC_SERVICE_MAX_ID);
+ 	for (i = 0; i < bk->bk_niov; i++) {
+ 		pg = bk->bk_iovs[i].kiov_page;
+-		if (pg == NULL)
++		if (!pg)
+ 			break;
  
--	if (srpc_service_init(sv) != 0)
-+	if (srpc_service_init(sv))
+ 		__free_page(pg);
+@@ -131,7 +131,7 @@ srpc_alloc_bulk(int cpt, unsigned bulk_npg, unsigned bulk_len, int sink)
+ 
+ 	LIBCFS_CPT_ALLOC(bk, lnet_cpt_table(), cpt,
+ 			 offsetof(srpc_bulk_t, bk_iovs[bulk_npg]));
+-	if (bk == NULL) {
++	if (!bk) {
+ 		CERROR("Can't allocate descriptor for %d pages\n", bulk_npg);
+ 		return NULL;
+ 	}
+@@ -147,7 +147,7 @@ srpc_alloc_bulk(int cpt, unsigned bulk_npg, unsigned bulk_len, int sink)
+ 
+ 		pg = alloc_pages_node(cfs_cpt_spread_node(lnet_cpt_table(), cpt),
+ 				      GFP_KERNEL, 0);
+-		if (pg == NULL) {
++		if (!pg) {
+ 			CERROR("Can't allocate page %d of %d\n", i, bulk_npg);
+ 			srpc_free_bulk(bk);
+ 			return NULL;
+@@ -199,7 +199,7 @@ srpc_service_fini(struct srpc_service *svc)
+ 	struct list_head *q;
+ 	int i;
+ 
+-	if (svc->sv_cpt_data == NULL)
++	if (!svc->sv_cpt_data)
+ 		return;
+ 
+ 	cfs_percpt_for_each(scd, i, svc->sv_cpt_data) {
+@@ -258,7 +258,7 @@ srpc_service_init(struct srpc_service *svc)
+ 
+ 	svc->sv_cpt_data = cfs_percpt_alloc(lnet_cpt_table(),
+ 					    sizeof(struct srpc_service_cd));
+-	if (svc->sv_cpt_data == NULL)
++	if (!svc->sv_cpt_data)
  		return -ENOMEM;
  
- 	spin_lock(&srpc_data.rpc_glock);
-@@ -366,7 +366,7 @@ srpc_post_passive_rdma(int portal, int local, __u64 matchbits, void *buf,
+ 	svc->sv_ncpts = srpc_serv_is_framework(svc) ?
+@@ -297,7 +297,7 @@ srpc_service_init(struct srpc_service *svc)
+ 		for (j = 0; j < nrpcs; j++) {
+ 			LIBCFS_CPT_ALLOC(rpc, lnet_cpt_table(),
+ 					 i, sizeof(*rpc));
+-			if (rpc == NULL) {
++			if (!rpc) {
+ 				srpc_service_fini(svc);
+ 				return -ENOMEM;
+ 			}
+@@ -322,7 +322,7 @@ srpc_add_service(struct srpc_service *sv)
  
- 	rc = LNetMEAttach(portal, peer, matchbits, 0, LNET_UNLINK,
- 			  local ? LNET_INS_LOCAL : LNET_INS_AFTER, &meh);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("LNetMEAttach failed: %d\n", rc);
- 		LASSERT(rc == -ENOMEM);
- 		return -ENOMEM;
-@@ -380,12 +380,12 @@ srpc_post_passive_rdma(int portal, int local, __u64 matchbits, void *buf,
- 	md.eq_handle = srpc_data.rpc_lnet_eq;
+ 	LASSERT(srpc_data.rpc_state == SRPC_STATE_RUNNING);
  
- 	rc = LNetMDAttach(meh, md, LNET_UNLINK, mdh);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("LNetMDAttach failed: %d\n", rc);
- 		LASSERT(rc == -ENOMEM);
+-	if (srpc_data.rpc_services[id] != NULL) {
++	if (srpc_data.rpc_services[id]) {
+ 		spin_unlock(&srpc_data.rpc_glock);
+ 		goto failed;
+ 	}
+@@ -536,7 +536,7 @@ srpc_add_buffer(struct swi_workitem *wi)
+ 		spin_unlock(&scd->scd_lock);
  
- 		rc = LNetMEUnlink(meh);
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
- 		return -ENOMEM;
+ 		LIBCFS_ALLOC(buf, sizeof(*buf));
+-		if (buf == NULL) {
++		if (!buf) {
+ 			CERROR("Failed to add new buf to service: %s\n",
+ 			       scd->scd_svc->sv_name);
+ 			spin_lock(&scd->scd_lock);
+@@ -880,7 +880,7 @@ srpc_do_bulk(struct srpc_server_rpc *rpc)
+ 	int rc;
+ 	int opt;
+ 
+-	LASSERT(bk != NULL);
++	LASSERT(bk);
+ 
+ 	opt = bk->bk_sink ? LNET_MD_OP_GET : LNET_MD_OP_PUT;
+ 	opt |= LNET_MD_KIOV;
+@@ -921,13 +921,13 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
+ 		spin_unlock(&srpc_data.rpc_glock);
  	}
  
-@@ -406,11 +406,11 @@ srpc_post_active_rdma(int portal, __u64 matchbits, void *buf, int len,
- 	md.start     = buf;
- 	md.length    = len;
- 	md.eq_handle = srpc_data.rpc_lnet_eq;
--	md.threshold = ((options & LNET_MD_OP_GET) != 0) ? 2 : 1;
-+	md.threshold = options & LNET_MD_OP_GET ? 2 : 1;
- 	md.options   = options & ~(LNET_MD_OP_PUT | LNET_MD_OP_GET);
+-	if (rpc->srpc_done != NULL)
++	if (rpc->srpc_done)
+ 		(*rpc->srpc_done) (rpc);
+-	LASSERT(rpc->srpc_bulk == NULL);
++	LASSERT(!rpc->srpc_bulk);
  
- 	rc = LNetMDBind(md, LNET_UNLINK, mdh);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("LNetMDBind failed: %d\n", rc);
- 		LASSERT(rc == -ENOMEM);
- 		return -ENOMEM;
-@@ -421,18 +421,18 @@ srpc_post_active_rdma(int portal, __u64 matchbits, void *buf, int len,
- 	 * they're only meaningful for MDs attached to an ME (i.e. passive
- 	 * buffers...
- 	 */
--	if ((options & LNET_MD_OP_PUT) != 0) {
-+	if (options & LNET_MD_OP_PUT) {
- 		rc = LNetPut(self, *mdh, LNET_NOACK_REQ, peer,
- 			     portal, matchbits, 0, 0);
- 	} else {
--		LASSERT((options & LNET_MD_OP_GET) != 0);
-+		LASSERT(options & LNET_MD_OP_GET);
- 
- 		rc = LNetGet(self, *mdh, peer, portal, matchbits, 0);
- 	}
- 
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("LNet%s(%s, %d, %lld) failed: %d\n",
--		       ((options & LNET_MD_OP_PUT) != 0) ? "Put" : "Get",
-+		       options & LNET_MD_OP_PUT ? "Put" : "Get",
- 		       libcfs_id2str(peer), portal, matchbits, rc);
- 
- 		/*
-@@ -440,7 +440,7 @@ srpc_post_active_rdma(int portal, __u64 matchbits, void *buf, int len,
- 		 * with failure, so fall through and return success here.
- 		 */
- 		rc = LNetMDUnlink(*mdh);
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
- 	} else {
- 		CDEBUG(D_NET, "Posted active RDMA: peer %s, portal %u, matchbits %#llx\n",
- 		       libcfs_id2str(peer), portal, matchbits);
-@@ -487,7 +487,7 @@ srpc_service_post_buffer(struct srpc_service_cd *scd, struct srpc_buffer *buf)
- 	 */
  	spin_lock(&scd->scd_lock);
  
--	if (rc == 0) {
-+	if (!rc) {
- 		if (!sv->sv_shuttingdown)
- 			return 0;
- 
-@@ -555,7 +555,7 @@ srpc_add_buffer(struct swi_workitem *wi)
- 		}
- 
- 		rc = srpc_service_post_buffer(scd, buf);
--		if (rc != 0)
-+		if (rc)
- 			break; /* buf has been freed inside */
- 
- 		LASSERT(scd->scd_buf_posting > 0);
-@@ -564,7 +564,7 @@ srpc_add_buffer(struct swi_workitem *wi)
- 		scd->scd_buf_low = max(2, scd->scd_buf_total / 4);
- 	}
- 
--	if (rc != 0) {
-+	if (rc) {
- 		scd->scd_buf_err_stamp = ktime_get_real_seconds();
- 		scd->scd_buf_err = rc;
- 
-@@ -616,12 +616,12 @@ srpc_service_add_buffers(struct srpc_service *sv, int nbuffer)
- 		 * block all WIs pending on lst_sched_serial for a moment
- 		 * which is not good but not fatal.
- 		 */
--		lst_wait_until(scd->scd_buf_err != 0 ||
--			       (scd->scd_buf_adjust == 0 &&
--				scd->scd_buf_posting == 0),
-+		lst_wait_until(scd->scd_buf_err ||
-+			       (!scd->scd_buf_adjust &&
-+				!scd->scd_buf_posting),
- 			       scd->scd_lock, "waiting for adding buffer\n");
- 
--		if (scd->scd_buf_err != 0 && rc == 0)
-+		if (scd->scd_buf_err && !rc)
- 			rc = scd->scd_buf_err;
- 
+-	if (rpc->srpc_reqstbuf != NULL) {
++	if (rpc->srpc_reqstbuf) {
+ 		/*
+ 		 * NB might drop sv_lock in srpc_service_recycle_buffer, but
+ 		 * sv won't go away for scd_rpc_active must not be empty
+@@ -980,7 +980,7 @@ srpc_handle_rpc(swi_workitem_t *wi)
+ 	if (sv->sv_shuttingdown || rpc->srpc_aborted) {
  		spin_unlock(&scd->scd_lock);
-@@ -702,7 +702,7 @@ srpc_service_recycle_buffer(struct srpc_service_cd *scd, srpc_buffer_t *buf)
- 	__must_hold(&scd->scd_lock)
- {
- 	if (!scd->scd_svc->sv_shuttingdown && scd->scd_buf_adjust >= 0) {
--		if (srpc_service_post_buffer(scd, buf) != 0) {
-+		if (srpc_service_post_buffer(scd, buf)) {
- 			CWARN("Failed to post %s buffer\n",
- 			      scd->scd_svc->sv_name);
- 		}
-@@ -715,7 +715,7 @@ srpc_service_recycle_buffer(struct srpc_service_cd *scd, srpc_buffer_t *buf)
- 	if (scd->scd_buf_adjust < 0) {
- 		scd->scd_buf_adjust++;
- 		if (scd->scd_buf_adjust < 0 &&
--		    scd->scd_buf_total == 0 && scd->scd_buf_posting == 0) {
-+		    !scd->scd_buf_total && !scd->scd_buf_posting) {
- 			CDEBUG(D_INFO,
- 			       "Try to recycle %d buffers but nothing left\n",
- 			       scd->scd_buf_adjust);
-@@ -807,7 +807,7 @@ srpc_send_request(srpc_client_rpc_t *rpc)
- 				    sizeof(srpc_msg_t), LNET_MD_OP_PUT,
- 				    rpc->crpc_dest, LNET_NID_ANY,
- 				    &rpc->crpc_reqstmdh, ev);
--	if (rc != 0) {
-+	if (rc) {
- 		LASSERT(rc == -ENOMEM);
- 		ev->ev_fired = 1;  /* no more event expected */
- 	}
-@@ -831,7 +831,7 @@ srpc_prepare_reply(srpc_client_rpc_t *rpc)
- 				    &rpc->crpc_replymsg, sizeof(srpc_msg_t),
- 				    LNET_MD_OP_PUT, rpc->crpc_dest,
- 				    &rpc->crpc_replymdh, ev);
--	if (rc != 0) {
-+	if (rc) {
- 		LASSERT(rc == -ENOMEM);
- 		ev->ev_fired = 1;  /* no more event expected */
- 	}
-@@ -849,7 +849,7 @@ srpc_prepare_bulk(srpc_client_rpc_t *rpc)
  
- 	LASSERT(bk->bk_niov <= LNET_MAX_IOV);
+-		if (rpc->srpc_bulk != NULL)
++		if (rpc->srpc_bulk)
+ 			LNetMDUnlink(rpc->srpc_bulk->bk_mdh);
+ 		LNetMDUnlink(rpc->srpc_replymdh);
  
--	if (bk->bk_niov == 0)
-+	if (!bk->bk_niov)
- 		return 0; /* nothing to do */
+@@ -1028,7 +1028,7 @@ srpc_handle_rpc(swi_workitem_t *wi)
  
- 	opt = bk->bk_sink ? LNET_MD_OP_PUT : LNET_MD_OP_GET;
-@@ -864,7 +864,7 @@ srpc_prepare_bulk(srpc_client_rpc_t *rpc)
- 	rc = srpc_post_passive_rdma(SRPC_RDMA_PORTAL, 0, *id,
- 				    &bk->bk_iovs[0], bk->bk_niov, opt,
- 				    rpc->crpc_dest, &bk->bk_mdh, ev);
--	if (rc != 0) {
-+	if (rc) {
- 		LASSERT(rc == -ENOMEM);
- 		ev->ev_fired = 1;  /* no more event expected */
- 	}
-@@ -893,7 +893,7 @@ srpc_do_bulk(struct srpc_server_rpc *rpc)
- 				   &bk->bk_iovs[0], bk->bk_niov, opt,
- 				   rpc->srpc_peer, rpc->srpc_self,
- 				   &bk->bk_mdh, ev);
--	if (rc != 0)
-+	if (rc)
- 		ev->ev_fired = 1;  /* no more event expected */
- 	return rc;
- }
-@@ -906,16 +906,16 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
- 	struct srpc_service *sv  = scd->scd_svc;
- 	srpc_buffer_t *buffer;
+ 		wi->swi_state = SWI_STATE_BULK_STARTED;
  
--	LASSERT(status != 0 || rpc->srpc_wi.swi_state == SWI_STATE_DONE);
-+	LASSERT(status || rpc->srpc_wi.swi_state == SWI_STATE_DONE);
- 
- 	rpc->srpc_status = status;
- 
--	CDEBUG_LIMIT(status == 0 ? D_NET : D_NETERROR,
-+	CDEBUG_LIMIT(!status ? D_NET : D_NETERROR,
- 		     "Server RPC %p done: service %s, peer %s, status %s:%d\n",
- 		     rpc, sv->sv_name, libcfs_id2str(rpc->srpc_peer),
- 		     swi_state2str(rpc->srpc_wi.swi_state), status);
- 
--	if (status != 0) {
-+	if (status) {
- 		spin_lock(&srpc_data.rpc_glock);
- 		srpc_data.rpc_counters.rpcs_dropped++;
- 		spin_unlock(&srpc_data.rpc_glock);
-@@ -1003,7 +1003,7 @@ srpc_handle_rpc(swi_workitem_t *wi)
- 		msg = &rpc->srpc_reqstbuf->buf_msg;
- 		reply = &rpc->srpc_replymsg.msg_body.reply;
- 
--		if (msg->msg_magic == 0) {
-+		if (!msg->msg_magic) {
- 			/* moaned already in srpc_lnet_ev_handler */
- 			srpc_server_rpc_done(rpc, EBADMSG);
- 			return 1;
-@@ -1019,8 +1019,8 @@ srpc_handle_rpc(swi_workitem_t *wi)
- 		} else {
- 			reply->status = 0;
- 			rc = (*sv->sv_handler)(rpc);
--			LASSERT(reply->status == 0 || !rpc->srpc_bulk);
--			if (rc != 0) {
-+			LASSERT(!reply->status || !rpc->srpc_bulk);
-+			if (rc) {
- 				srpc_server_rpc_done(rpc, rc);
- 				return 1;
- 			}
-@@ -1030,7 +1030,7 @@ srpc_handle_rpc(swi_workitem_t *wi)
- 
- 		if (rpc->srpc_bulk) {
+-		if (rpc->srpc_bulk != NULL) {
++		if (rpc->srpc_bulk) {
  			rc = srpc_do_bulk(rpc);
--			if (rc == 0)
-+			if (!rc)
+ 			if (rc == 0)
  				return 0; /* wait for bulk */
+@@ -1038,12 +1038,12 @@ srpc_handle_rpc(swi_workitem_t *wi)
+ 		}
+ 	}
+ 	case SWI_STATE_BULK_STARTED:
+-		LASSERT(rpc->srpc_bulk == NULL || ev->ev_fired);
++		LASSERT(!rpc->srpc_bulk || ev->ev_fired);
  
- 			LASSERT(ev->ev_fired);
-@@ -1046,7 +1046,7 @@ srpc_handle_rpc(swi_workitem_t *wi)
- 			if (sv->sv_bulk_ready)
+-		if (rpc->srpc_bulk != NULL) {
++		if (rpc->srpc_bulk) {
+ 			rc = ev->ev_status;
+ 
+-			if (sv->sv_bulk_ready != NULL)
++			if (sv->sv_bulk_ready)
  				rc = (*sv->sv_bulk_ready) (rpc, rc);
  
--			if (rc != 0) {
-+			if (rc) {
- 				srpc_server_rpc_done(rpc, rc);
- 				return 1;
- 			}
-@@ -1054,7 +1054,7 @@ srpc_handle_rpc(swi_workitem_t *wi)
+ 			if (rc != 0) {
+@@ -1186,11 +1186,11 @@ srpc_send_rpc(swi_workitem_t *wi)
+ 	srpc_msg_t *reply;
+ 	int do_bulk;
  
- 		wi->swi_state = SWI_STATE_REPLY_SUBMITTED;
- 		rc = srpc_send_reply(rpc);
--		if (rc == 0)
-+		if (!rc)
- 			return 0; /* wait for reply */
- 		srpc_server_rpc_done(rpc, rc);
- 		return 1;
-@@ -1102,7 +1102,7 @@ srpc_add_client_rpc_timer(srpc_client_rpc_t *rpc)
- {
- 	stt_timer_t *timer = &rpc->crpc_timer;
+-	LASSERT(wi != NULL);
++	LASSERT(wi);
  
--	if (rpc->crpc_timeout == 0)
-+	if (!rpc->crpc_timeout)
- 		return;
+ 	rpc = wi->swi_workitem.wi_data;
  
- 	INIT_LIST_HEAD(&timer->stt_list);
-@@ -1123,7 +1123,7 @@ static void
- srpc_del_client_rpc_timer(srpc_client_rpc_t *rpc)
- {
- 	/* timer not planted or already exploded */
--	if (rpc->crpc_timeout == 0)
-+	if (!rpc->crpc_timeout)
- 		return;
+-	LASSERT(rpc != NULL);
++	LASSERT(rpc);
+ 	LASSERT(wi == &rpc->crpc_wi);
  
- 	/* timer successfully defused */
-@@ -1131,7 +1131,7 @@ srpc_del_client_rpc_timer(srpc_client_rpc_t *rpc)
- 		return;
+ 	reply = &rpc->crpc_replymsg;
+@@ -1322,7 +1322,7 @@ srpc_create_client_rpc(lnet_process_id_t peer, int service,
  
- 	/* timer detonated, wait for it to explode */
--	while (rpc->crpc_timeout != 0) {
-+	while (rpc->crpc_timeout) {
- 		spin_unlock(&rpc->crpc_lock);
+ 	LIBCFS_ALLOC(rpc, offsetof(srpc_client_rpc_t,
+ 				   crpc_bulk.bk_iovs[nbulkiov]));
+-	if (rpc == NULL)
++	if (!rpc)
+ 		return NULL;
  
- 		schedule();
-@@ -1145,17 +1145,17 @@ srpc_client_rpc_done(srpc_client_rpc_t *rpc, int status)
- {
- 	swi_workitem_t *wi = &rpc->crpc_wi;
+ 	srpc_init_client_rpc(rpc, peer, service, nbulkiov,
+@@ -1377,7 +1377,7 @@ srpc_send_reply(struct srpc_server_rpc *rpc)
+ 	__u64 rpyid;
+ 	int rc;
  
--	LASSERT(status != 0 || wi->swi_state == SWI_STATE_DONE);
-+	LASSERT(status || wi->swi_state == SWI_STATE_DONE);
+-	LASSERT(buffer != NULL);
++	LASSERT(buffer);
+ 	rpyid = buffer->buf_msg.msg_body.reqst.rpyid;
  
- 	spin_lock(&rpc->crpc_lock);
+ 	spin_lock(&scd->scd_lock);
+@@ -1664,8 +1664,7 @@ srpc_shutdown(void)
+ 		for (i = 0; i <= SRPC_SERVICE_MAX_ID; i++) {
+ 			srpc_service_t *sv = srpc_data.rpc_services[i];
  
- 	rpc->crpc_closed = 1;
--	if (rpc->crpc_status == 0)
-+	if (!rpc->crpc_status)
- 		rpc->crpc_status = status;
- 
- 	srpc_del_client_rpc_timer(rpc);
- 
--	CDEBUG_LIMIT((status == 0) ? D_NET : D_NETERROR,
-+	CDEBUG_LIMIT(!status ? D_NET : D_NETERROR,
- 		     "Client RPC done: service %d, peer %s, status %s:%d:%d\n",
- 		     rpc->crpc_service, libcfs_id2str(rpc->crpc_dest),
- 		     swi_state2str(wi->swi_state), rpc->crpc_aborted, status);
-@@ -1212,13 +1212,13 @@ srpc_send_rpc(swi_workitem_t *wi)
- 		LASSERT(!srpc_event_pending(rpc));
- 
- 		rc = srpc_prepare_reply(rpc);
--		if (rc != 0) {
-+		if (rc) {
- 			srpc_client_rpc_done(rpc, rc);
- 			return 1;
+-			LASSERTF(sv == NULL,
+-				 "service not empty: id %d, name %s\n",
++			LASSERTF(!sv, "service not empty: id %d, name %s\n",
+ 				 i, sv->sv_name);
  		}
  
- 		rc = srpc_prepare_bulk(rpc);
--		if (rc != 0)
-+		if (rc)
- 			break;
- 
- 		wi->swi_state = SWI_STATE_REQUEST_SUBMITTED;
-@@ -1235,7 +1235,7 @@ srpc_send_rpc(swi_workitem_t *wi)
- 			break;
- 
- 		rc = rpc->crpc_reqstev.ev_status;
--		if (rc != 0)
-+		if (rc)
- 			break;
- 
- 		wi->swi_state = SWI_STATE_REQUEST_SENT;
-@@ -1247,7 +1247,7 @@ srpc_send_rpc(swi_workitem_t *wi)
- 			break;
- 
- 		rc = rpc->crpc_replyev.ev_status;
--		if (rc != 0)
-+		if (rc)
- 			break;
- 
- 		srpc_unpack_msg_hdr(reply);
-@@ -1262,7 +1262,7 @@ srpc_send_rpc(swi_workitem_t *wi)
- 			break;
- 		}
- 
--		if (do_bulk && reply->msg_body.reply.status != 0) {
-+		if (do_bulk && reply->msg_body.reply.status) {
- 			CWARN("Remote error %d at %s, unlink bulk buffer in case peer didn't initiate bulk transfer\n",
- 			      reply->msg_body.reply.status,
- 			      libcfs_id2str(rpc->crpc_dest));
-@@ -1284,7 +1284,7 @@ srpc_send_rpc(swi_workitem_t *wi)
- 		 * remote error.
- 		 */
- 		if (do_bulk && rpc->crpc_bulkev.ev_lnet == LNET_EVENT_UNLINK &&
--		    rpc->crpc_status == 0 && reply->msg_body.reply.status != 0)
-+		    !rpc->crpc_status && reply->msg_body.reply.status)
- 			rc = 0;
- 
- 		wi->swi_state = SWI_STATE_DONE;
-@@ -1292,7 +1292,7 @@ srpc_send_rpc(swi_workitem_t *wi)
- 		return 1;
- 	}
- 
--	if (rc != 0) {
-+	if (rc) {
- 		spin_lock(&rpc->crpc_lock);
- 		srpc_abort_rpc(rpc, rc);
- 		spin_unlock(&rpc->crpc_lock);
-@@ -1334,7 +1334,7 @@ srpc_create_client_rpc(lnet_process_id_t peer, int service,
- void
- srpc_abort_rpc(srpc_client_rpc_t *rpc, int why)
- {
--	LASSERT(why != 0);
-+	LASSERT(why);
- 
- 	if (rpc->crpc_aborted || /* already aborted */
- 	    rpc->crpc_closed)    /* callback imminent */
-@@ -1387,7 +1387,7 @@ srpc_send_reply(struct srpc_server_rpc *rpc)
- 		 * Repost buffer before replying since test client
- 		 * might send me another RPC once it gets the reply
- 		 */
--		if (srpc_service_post_buffer(scd, buffer) != 0)
-+		if (srpc_service_post_buffer(scd, buffer))
- 			CWARN("Failed to repost %s buffer\n", sv->sv_name);
- 		rpc->srpc_reqstbuf = NULL;
- 	}
-@@ -1406,7 +1406,7 @@ srpc_send_reply(struct srpc_server_rpc *rpc)
- 				   sizeof(*msg), LNET_MD_OP_PUT,
- 				   rpc->srpc_peer, rpc->srpc_self,
- 				   &rpc->srpc_replymdh, ev);
--	if (rc != 0)
-+	if (rc)
- 		ev->ev_fired = 1;  /* no more event expected */
- 	return rc;
- }
-@@ -1426,7 +1426,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 
- 	LASSERT(!in_interrupt());
- 
--	if (ev->status != 0) {
-+	if (ev->status) {
- 		spin_lock(&srpc_data.rpc_glock);
- 		srpc_data.rpc_counters.errors++;
- 		spin_unlock(&srpc_data.rpc_glock);
-@@ -1440,7 +1440,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 		       rpcev->ev_status, rpcev->ev_type, rpcev->ev_lnet);
- 		LBUG();
- 	case SRPC_REQUEST_SENT:
--		if (ev->status == 0 && ev->type != LNET_EVENT_UNLINK) {
-+		if (!ev->status && ev->type != LNET_EVENT_UNLINK) {
- 			spin_lock(&srpc_data.rpc_glock);
- 			srpc_data.rpc_counters.rpcs_sent++;
- 			spin_unlock(&srpc_data.rpc_glock);
-@@ -1462,7 +1462,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 
- 		spin_lock(&crpc->crpc_lock);
- 
--		LASSERT(rpcev->ev_fired == 0);
-+		LASSERT(!rpcev->ev_fired);
- 		rpcev->ev_fired  = 1;
- 		rpcev->ev_status = (ev->type == LNET_EVENT_UNLINK) ?
- 						-EINTR : ev->status;
-@@ -1501,15 +1501,15 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 			break;
- 		}
- 
--		if (scd->scd_buf_err_stamp != 0 &&
-+		if (scd->scd_buf_err_stamp &&
- 		    scd->scd_buf_err_stamp < ktime_get_real_seconds()) {
- 			/* re-enable adding buffer */
- 			scd->scd_buf_err_stamp = 0;
- 			scd->scd_buf_err = 0;
- 		}
- 
--		if (scd->scd_buf_err == 0 && /* adding buffer is enabled */
--		    scd->scd_buf_adjust == 0 &&
-+		if (!scd->scd_buf_err && /* adding buffer is enabled */
-+		    !scd->scd_buf_adjust &&
- 		    scd->scd_buf_nposted < scd->scd_buf_low) {
- 			scd->scd_buf_adjust = max(scd->scd_buf_total / 2,
- 						  SFW_TEST_WI_MIN);
-@@ -1520,7 +1520,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 		msg = &buffer->buf_msg;
- 		type = srpc_service2request(sv->sv_id);
- 
--		if (ev->status != 0 || ev->mlength != sizeof(*msg) ||
-+		if (ev->status || ev->mlength != sizeof(*msg) ||
- 		    (msg->msg_type != type &&
- 		     msg->msg_type != __swab32(type)) ||
- 		    (msg->msg_magic != SRPC_MSG_MAGIC &&
-@@ -1569,7 +1569,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 			break; /* wait for final event */
- 
- 	case SRPC_BULK_PUT_SENT:
--		if (ev->status == 0 && ev->type != LNET_EVENT_UNLINK) {
-+		if (!ev->status && ev->type != LNET_EVENT_UNLINK) {
- 			spin_lock(&srpc_data.rpc_glock);
- 
- 			if (rpcev->ev_type == SRPC_BULK_GET_RPLD)
-@@ -1622,22 +1622,22 @@ srpc_startup(void)
- 
- 	LNetInvalidateHandle(&srpc_data.rpc_lnet_eq);
- 	rc = LNetEQAlloc(0, srpc_lnet_ev_handler, &srpc_data.rpc_lnet_eq);
--	if (rc != 0) {
-+	if (rc) {
- 		CERROR("LNetEQAlloc() has failed: %d\n", rc);
- 		goto bail;
- 	}
- 
- 	rc = LNetSetLazyPortal(SRPC_FRAMEWORK_REQUEST_PORTAL);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
- 	rc = LNetSetLazyPortal(SRPC_REQUEST_PORTAL);
--	LASSERT(rc == 0);
-+	LASSERT(!rc);
- 
- 	srpc_data.rpc_state = SRPC_STATE_EQ_INIT;
- 
- 	rc = stt_startup();
- 
- bail:
--	if (rc != 0)
-+	if (rc)
- 		srpc_shutdown();
- 	else
- 		srpc_data.rpc_state = SRPC_STATE_RUNNING;
-@@ -1675,9 +1675,9 @@ srpc_shutdown(void)
- 	case SRPC_STATE_EQ_INIT:
- 		rc = LNetClearLazyPortal(SRPC_FRAMEWORK_REQUEST_PORTAL);
- 		rc = LNetClearLazyPortal(SRPC_REQUEST_PORTAL);
--		LASSERT(rc == 0);
-+		LASSERT(!rc);
- 		rc = LNetEQFree(srpc_data.rpc_lnet_eq);
--		LASSERT(rc == 0); /* the EQ should have no user by now */
-+		LASSERT(!rc); /* the EQ should have no user by now */
- 
- 	case SRPC_STATE_NI_INIT:
- 		LNetNIFini();
 diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
-index e6367ec..f6c8244 100644
+index 906e26a..e6367ec 100644
 --- a/drivers/staging/lustre/lnet/selftest/selftest.h
 +++ b/drivers/staging/lustre/lnet/selftest/selftest.h
-@@ -255,9 +255,9 @@ do {                                                                     \
- 		srpc_destroy_client_rpc(rpc);                            \
- } while (0)
- 
--#define srpc_event_pending(rpc)   ((rpc)->crpc_bulkev.ev_fired == 0 ||   \
--				   (rpc)->crpc_reqstev.ev_fired == 0 ||  \
--				   (rpc)->crpc_replyev.ev_fired == 0)
-+#define srpc_event_pending(rpc)   (!(rpc)->crpc_bulkev.ev_fired ||	\
-+				   !(rpc)->crpc_reqstev.ev_fired ||	\
-+				   !(rpc)->crpc_replyev.ev_fired)
- 
- /* CPU partition data of srpc service */
- struct srpc_service_cd {
-@@ -506,7 +506,7 @@ srpc_destroy_client_rpc(srpc_client_rpc_t *rpc)
+@@ -504,11 +504,11 @@ void srpc_shutdown(void);
+ static inline void
+ srpc_destroy_client_rpc(srpc_client_rpc_t *rpc)
  {
- 	LASSERT(rpc);
+-	LASSERT(rpc != NULL);
++	LASSERT(rpc);
  	LASSERT(!srpc_event_pending(rpc));
--	LASSERT(atomic_read(&rpc->crpc_refcount) == 0);
-+	LASSERT(!atomic_read(&rpc->crpc_refcount));
+ 	LASSERT(atomic_read(&rpc->crpc_refcount) == 0);
  
- 	if (!rpc->crpc_fini)
+-	if (rpc->crpc_fini == NULL)
++	if (!rpc->crpc_fini)
  		LIBCFS_FREE(rpc, srpc_client_rpc_size(rpc));
-@@ -601,7 +601,7 @@ srpc_wait_service_shutdown(srpc_service_t *sv)
- 
- 	LASSERT(sv->sv_shuttingdown);
- 
--	while (srpc_finish_service(sv) == 0) {
-+	while (!srpc_finish_service(sv)) {
- 		i++;
- 		CDEBUG(((i & -i) == i) ? D_WARNING : D_NET,
- 		       "Waiting for %s service to shutdown...\n",
+ 	else
+ 		(*rpc->crpc_fini) (rpc);
 diff --git a/drivers/staging/lustre/lnet/selftest/timer.c b/drivers/staging/lustre/lnet/selftest/timer.c
-index dce5137..c891371 100644
+index b98c08a..dce5137 100644
 --- a/drivers/staging/lustre/lnet/selftest/timer.c
 +++ b/drivers/staging/lustre/lnet/selftest/timer.c
-@@ -218,7 +218,7 @@ stt_startup(void)
- 	stt_data.stt_nthreads = 0;
- 	init_waitqueue_head(&stt_data.stt_waitq);
- 	rc = stt_start_timer_thread();
--	if (rc != 0)
-+	if (rc)
- 		CERROR("Can't spawn timer thread: %d\n", rc);
+@@ -75,7 +75,7 @@ stt_add_timer(stt_timer_t *timer)
  
- 	return rc;
-@@ -237,7 +237,7 @@ stt_shutdown(void)
- 	stt_data.stt_shuttingdown = 1;
- 
- 	wake_up(&stt_data.stt_waitq);
--	lst_wait_until(stt_data.stt_nthreads == 0, stt_data.stt_lock,
-+	lst_wait_until(!stt_data.stt_nthreads, stt_data.stt_lock,
- 		       "waiting for %d threads to terminate\n",
- 		       stt_data.stt_nthreads);
+ 	LASSERT(stt_data.stt_nthreads > 0);
+ 	LASSERT(!stt_data.stt_shuttingdown);
+-	LASSERT(timer->stt_func != NULL);
++	LASSERT(timer->stt_func);
+ 	LASSERT(list_empty(&timer->stt_list));
+ 	LASSERT(timer->stt_expires > ktime_get_real_seconds());
  
 -- 
 1.7.1
