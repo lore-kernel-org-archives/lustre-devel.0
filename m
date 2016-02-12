@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 12 Feb 2016 12:06:02 -0500
-Subject: [lustre-devel] [PATCH 04/11] staging: lustre: remove unnecessary
-	parentheses around LNet function pointer
+Date: Fri, 12 Feb 2016 12:05:59 -0500
+Subject: [lustre-devel] [PATCH 01/11] staging: lustre: drop *_t from end of
+	struct lnet_text_buf
 In-Reply-To: <1455296769-5481-1-git-send-email-jsimmons@infradead.org>
 References: <1455296769-5481-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1455296769-5481-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1455296769-5481-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,116 +12,211 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Dorkin <oleg.dorkin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-No need for the parentheses around any function pointer.
+When lnet_text_buf data structure was transform from typedef
+to struct the *_t which is typical of typedef was not drop.
+This patch removes the *_t to be consistent.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    2 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    4 ++--
- drivers/staging/lustre/lnet/lnet/lib-move.c        |   12 ++++++------
- drivers/staging/lustre/lnet/lnet/router.c          |    4 ++--
- 4 files changed, 11 insertions(+), 11 deletions(-)
+ drivers/staging/lustre/lnet/lnet/config.c |   57 ++++++++++++++---------------
+ 1 files changed, 27 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index fbcbb97..cbf5d0a 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -2185,7 +2185,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 	rej.ibr_why = IBLND_REJECT_FATAL;
- 	rej.ibr_cp.ibcp_max_msg_size = IBLND_MSG_SIZE;
+diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
+index 74d644d..01efe61 100644
+--- a/drivers/staging/lustre/lnet/lnet/config.c
++++ b/drivers/staging/lustre/lnet/lnet/config.c
+@@ -37,7 +37,7 @@
+ #define DEBUG_SUBSYSTEM S_LNET
+ #include "../../include/linux/lnet/lib-lnet.h"
  
--	peer_addr = (struct sockaddr_in *)&(cmid->route.addr.dst_addr);
-+	peer_addr = (struct sockaddr_in *)&cmid->route.addr.dst_addr;
- 	if (*kiblnd_tunables.kib_require_priv_port &&
- 	    ntohs(peer_addr->sin_port) >= PROT_SOCK) {
- 		__u32 ip = ntohl(peer_addr->sin_addr.s_addr);
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index aeef480..e59fbfb 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -935,7 +935,7 @@ lnet_shutdown_lndnis(void)
- 		islo = ni->ni_lnd->lnd_type == LOLND;
- 
- 		LASSERT(!in_interrupt());
--		(ni->ni_lnd->lnd_shutdown)(ni);
-+		ni->ni_lnd->lnd_shutdown(ni);
- 
- 		/*
- 		 * can't deref lnd anymore now; it might have unregistered
-@@ -1023,7 +1023,7 @@ lnet_startup_lndnis(void)
- 
- 		ni->ni_lnd = lnd;
- 
--		rc = (lnd->lnd_startup)(ni);
-+		rc = lnd->lnd_startup(ni);
- 
- 		mutex_unlock(&the_lnet.ln_lnd_mutex);
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 7e1ef18..afc4522 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -599,8 +599,8 @@ lnet_ni_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
- 		}
- 	}
- 
--	rc = (ni->ni_lnd->lnd_recv)(ni, private, msg, delayed,
--				    niov, iov, kiov, offset, mlen, rlen);
-+	rc = ni->ni_lnd->lnd_recv(ni, private, msg, delayed,
-+				  niov, iov, kiov, offset, mlen, rlen);
- 	if (rc < 0)
- 		lnet_finalize(ni, msg, rc);
+-struct lnet_text_buf_t {	    /* tmp struct for parsing routes */
++struct lnet_text_buf {	    /* tmp struct for parsing routes */
+ 	struct list_head ltb_list;	/* stash on lists */
+ 	int ltb_size;	/* allocated size */
+ 	char ltb_text[0];     /* text buffer */
+@@ -369,14 +369,14 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 	return -EINVAL;
  }
-@@ -655,7 +655,7 @@ lnet_ni_send(lnet_ni_t *ni, lnet_msg_t *msg)
- 	LASSERT(LNET_NETTYP(LNET_NIDNET(ni->ni_nid)) == LOLND ||
- 		(msg->msg_txcredit && msg->msg_peertxcredit));
  
--	rc = (ni->ni_lnd->lnd_send)(ni, priv, msg);
-+	rc = ni->ni_lnd->lnd_send(ni, priv, msg);
- 	if (rc < 0)
- 		lnet_finalize(ni, msg, rc);
+-static struct lnet_text_buf_t *
++static struct lnet_text_buf *
+ lnet_new_text_buf(int str_len)
+ {
+-	struct lnet_text_buf_t *ltb;
++	struct lnet_text_buf *ltb;
+ 	int nob;
+ 
+ 	/* NB allocate space for the terminating 0 */
+-	nob = offsetof(struct lnet_text_buf_t, ltb_text[str_len + 1]);
++	nob = offsetof(struct lnet_text_buf, ltb_text[str_len + 1]);
+ 	if (nob > LNET_SINGLE_TEXTBUF_NOB) {
+ 		/* _way_ conservative for "route net gateway..." */
+ 		CERROR("text buffer too big\n");
+@@ -399,7 +399,7 @@ lnet_new_text_buf(int str_len)
  }
-@@ -671,8 +671,8 @@ lnet_ni_eager_recv(lnet_ni_t *ni, lnet_msg_t *msg)
- 	LASSERT(ni->ni_lnd->lnd_eager_recv != NULL);
  
- 	msg->msg_rx_ready_delay = 1;
--	rc = (ni->ni_lnd->lnd_eager_recv)(ni, msg->msg_private, msg,
--					  &msg->msg_private);
-+	rc = ni->ni_lnd->lnd_eager_recv(ni, msg->msg_private, msg,
-+					&msg->msg_private);
- 	if (rc != 0) {
- 		CERROR("recv from %s / send to %s aborted: eager_recv failed %d\n",
- 		       libcfs_nid2str(msg->msg_rxpeer->lp_nid),
-@@ -693,7 +693,7 @@ lnet_ni_query_locked(lnet_ni_t *ni, lnet_peer_t *lp)
- 	LASSERT(ni->ni_lnd->lnd_query != NULL);
+ static void
+-lnet_free_text_buf(struct lnet_text_buf_t *ltb)
++lnet_free_text_buf(struct lnet_text_buf *ltb)
+ {
+ 	lnet_tbnob -= ltb->ltb_size;
+ 	LIBCFS_FREE(ltb, ltb->ltb_size);
+@@ -408,10 +408,10 @@ lnet_free_text_buf(struct lnet_text_buf_t *ltb)
+ static void
+ lnet_free_text_bufs(struct list_head *tbs)
+ {
+-	struct lnet_text_buf_t *ltb;
++	struct lnet_text_buf *ltb;
  
- 	lnet_net_unlock(lp->lp_cpt);
--	(ni->ni_lnd->lnd_query)(ni, lp->lp_nid, &last_alive);
-+	ni->ni_lnd->lnd_query(ni, lp->lp_nid, &last_alive);
- 	lnet_net_lock(lp->lp_cpt);
+ 	while (!list_empty(tbs)) {
+-		ltb = list_entry(tbs->next, struct lnet_text_buf_t, ltb_list);
++		ltb = list_entry(tbs->next, struct lnet_text_buf, ltb_list);
  
- 	lp->lp_last_query = cfs_time_current();
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index 754f7f0..e447b1a 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -157,7 +157,7 @@ lnet_ni_notify_locked(lnet_ni_t *ni, lnet_peer_t *lp)
- 			 * A new notification could happen now; I'll handle it
- 			 * when control returns to me
- 			 */
--			(ni->ni_lnd->lnd_notify)(ni, lp->lp_nid, alive);
-+			ni->ni_lnd->lnd_notify(ni, lp->lp_nid, alive);
+ 		list_del(&ltb->ltb_list);
+ 		lnet_free_text_buf(ltb);
+@@ -425,7 +425,7 @@ lnet_str2tbs_sep(struct list_head *tbs, char *str)
+ 	char *sep;
+ 	int nob;
+ 	int i;
+-	struct lnet_text_buf_t *ltb;
++	struct lnet_text_buf *ltb;
  
- 			lnet_net_lock(lp->lp_cpt);
+ 	INIT_LIST_HEAD(&pending);
+ 
+@@ -483,7 +483,7 @@ lnet_expand1tb(struct list_head *list,
+ {
+ 	int len1 = (int)(sep1 - str);
+ 	int len2 = strlen(sep2 + 1);
+-	struct lnet_text_buf_t *ltb;
++	struct lnet_text_buf *ltb;
+ 
+ 	LASSERT(*sep1 == '[');
+ 	LASSERT(*sep2 == ']');
+@@ -642,7 +642,7 @@ lnet_parse_route(char *str, int *im_a_router)
+ 	struct list_head *tmp2;
+ 	__u32 net;
+ 	lnet_nid_t nid;
+-	struct lnet_text_buf_t *ltb;
++	struct lnet_text_buf *ltb;
+ 	int rc;
+ 	char *sep;
+ 	char *token = str;
+@@ -698,8 +698,7 @@ lnet_parse_route(char *str, int *im_a_router)
+ 		list_add_tail(tmp1, tmp2);
+ 
+ 		while (tmp1 != tmp2) {
+-			ltb = list_entry(tmp1, struct lnet_text_buf_t,
+-					 ltb_list);
++			ltb = list_entry(tmp1, struct lnet_text_buf, ltb_list);
+ 
+ 			rc = lnet_str2tbs_expand(tmp1->next, ltb->ltb_text);
+ 			if (rc < 0)
+@@ -739,13 +738,12 @@ lnet_parse_route(char *str, int *im_a_router)
+ 	LASSERT(!list_empty(&gateways));
+ 
+ 	list_for_each(tmp1, &nets) {
+-		ltb = list_entry(tmp1, struct lnet_text_buf_t, ltb_list);
++		ltb = list_entry(tmp1, struct lnet_text_buf, ltb_list);
+ 		net = libcfs_str2net(ltb->ltb_text);
+ 		LASSERT(net != LNET_NIDNET(LNET_NID_ANY));
+ 
+ 		list_for_each(tmp2, &gateways) {
+-			ltb = list_entry(tmp2, struct lnet_text_buf_t,
+-					 ltb_list);
++			ltb = list_entry(tmp2, struct lnet_text_buf, ltb_list);
+ 			nid = libcfs_str2nid(ltb->ltb_text);
+ 			LASSERT(nid != LNET_NID_ANY);
+ 
+@@ -778,10 +776,10 @@ lnet_parse_route(char *str, int *im_a_router)
+ static int
+ lnet_parse_route_tbs(struct list_head *tbs, int *im_a_router)
+ {
+-	struct lnet_text_buf_t *ltb;
++	struct lnet_text_buf *ltb;
+ 
+ 	while (!list_empty(tbs)) {
+-		ltb = list_entry(tbs->next, struct lnet_text_buf_t, ltb_list);
++		ltb = list_entry(tbs->next, struct lnet_text_buf, ltb_list);
+ 
+ 		if (lnet_parse_route(ltb->ltb_text, im_a_router) < 0) {
+ 			lnet_free_text_bufs(tbs);
+@@ -915,8 +913,8 @@ lnet_splitnets(char *source, struct list_head *nets)
+ 	int offset = 0;
+ 	int offset2;
+ 	int len;
+-	struct lnet_text_buf_t *tb;
+-	struct lnet_text_buf_t *tb2;
++	struct lnet_text_buf *tb;
++	struct lnet_text_buf *tb2;
+ 	struct list_head *t;
+ 	char *sep;
+ 	char *bracket;
+@@ -925,7 +923,7 @@ lnet_splitnets(char *source, struct list_head *nets)
+ 	LASSERT(!list_empty(nets));
+ 	LASSERT(nets->next == nets->prev);     /* single entry */
+ 
+-	tb = list_entry(nets->next, struct lnet_text_buf_t, ltb_list);
++	tb = list_entry(nets->next, struct lnet_text_buf, ltb_list);
+ 
+ 	for (;;) {
+ 		sep = strchr(tb->ltb_text, ',');
+@@ -961,7 +959,7 @@ lnet_splitnets(char *source, struct list_head *nets)
  		}
-@@ -389,7 +389,7 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
  
- 		/* XXX Assume alive */
- 		if (ni->ni_lnd->lnd_notify != NULL)
--			(ni->ni_lnd->lnd_notify)(ni, gateway, 1);
-+			ni->ni_lnd->lnd_notify(ni, gateway, 1);
+ 		list_for_each(t, nets) {
+-			tb2 = list_entry(t, struct lnet_text_buf_t, ltb_list);
++			tb2 = list_entry(t, struct lnet_text_buf, ltb_list);
  
- 		lnet_net_lock(LNET_LOCK_EX);
- 	}
+ 			if (tb2 == tb)
+ 				continue;
+@@ -1002,8 +1000,8 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
+ 	struct list_head current_nets;
+ 	struct list_head *t;
+ 	struct list_head *t2;
+-	struct lnet_text_buf_t *tb;
+-	struct lnet_text_buf_t *tb2;
++	struct lnet_text_buf *tb;
++	struct lnet_text_buf *tb2;
+ 	__u32 net1;
+ 	__u32 net2;
+ 	int len;
+@@ -1026,9 +1024,8 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
+ 	rc = 0;
+ 
+ 	while (!list_empty(&raw_entries)) {
+-		tb = list_entry(raw_entries.next, struct lnet_text_buf_t,
+-				    ltb_list);
+-
++		tb = list_entry(raw_entries.next, struct lnet_text_buf,
++				ltb_list);
+ 		strncpy(source, tb->ltb_text, sizeof(source));
+ 		source[sizeof(source)-1] = '\0';
+ 
+@@ -1053,13 +1050,13 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
+ 
+ 		dup = 0;
+ 		list_for_each(t, &current_nets) {
+-			tb = list_entry(t, struct lnet_text_buf_t, ltb_list);
++			tb = list_entry(t, struct lnet_text_buf, ltb_list);
+ 			net1 = lnet_netspec2net(tb->ltb_text);
+ 			LASSERT(net1 != LNET_NIDNET(LNET_NID_ANY));
+ 
+ 			list_for_each(t2, &matched_nets) {
+-				tb2 = list_entry(t2, struct lnet_text_buf_t,
+-						     ltb_list);
++				tb2 = list_entry(t2, struct lnet_text_buf,
++						 ltb_list);
+ 				net2 = lnet_netspec2net(tb2->ltb_text);
+ 				LASSERT(net2 != LNET_NIDNET(LNET_NID_ANY));
+ 
+@@ -1079,7 +1076,7 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
+ 		}
+ 
+ 		list_for_each_safe(t, t2, &current_nets) {
+-			tb = list_entry(t, struct lnet_text_buf_t, ltb_list);
++			tb = list_entry(t, struct lnet_text_buf, ltb_list);
+ 
+ 			list_del(&tb->ltb_list);
+ 			list_add_tail(&tb->ltb_list, &matched_nets);
 -- 
 1.7.1
