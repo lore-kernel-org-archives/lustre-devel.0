@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 12 Feb 2016 12:06:05 -0500
-Subject: [lustre-devel] [PATCH 07/11] staging: lustre: don't set more than
-	one variable per line in LNet layer
+Date: Fri, 12 Feb 2016 12:06:03 -0500
+Subject: [lustre-devel] [PATCH 05/11] staging: lustre: remove unnecessary
+	blank lines reported by checkpatch.pl
 In-Reply-To: <1455296769-5481-1-git-send-email-jsimmons@infradead.org>
 References: <1455296769-5481-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1455296769-5481-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1455296769-5481-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,330 +12,365 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Dorkin <oleg.dorkin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Cleanup all occurances of more than one variable being set per line as
-reported by checkpatch.pl.
+Remove any useless blank lines reported by checkpatch.pl
+for LNet layer.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    3 ++-
- .../staging/lustre/include/linux/lnet/socklnd.h    |    3 ++-
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   10 ++++++----
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    6 ++----
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   17 ++++++++++-------
- .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |   12 ++++++++----
- drivers/staging/lustre/lnet/lnet/config.c          |    3 ++-
- drivers/staging/lustre/lnet/lnet/lib-md.c          |    9 ++++++---
- drivers/staging/lustre/lnet/lnet/lib-move.c        |    9 ++++++---
- drivers/staging/lustre/lnet/lnet/peer.c            |    6 +++---
- drivers/staging/lustre/lnet/lnet/router.c          |    3 ++-
- drivers/staging/lustre/lnet/selftest/conrpc.c      |    3 ++-
- drivers/staging/lustre/lnet/selftest/selftest.h    |    4 ++--
- 13 files changed, 53 insertions(+), 35 deletions(-)
+ drivers/staging/lustre/include/linux/lnet/nidstr.h |    3 +++
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    6 ------
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    2 --
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    6 ------
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |    4 ----
+ drivers/staging/lustre/lnet/lnet/acceptor.c        |    2 --
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |    1 -
+ drivers/staging/lustre/lnet/lnet/config.c          |    6 ------
+ drivers/staging/lustre/lnet/lnet/lib-md.c          |    1 -
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |    2 --
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         |    1 -
+ drivers/staging/lustre/lnet/lnet/router.c          |    1 -
+ drivers/staging/lustre/lnet/selftest/brw_test.c    |    1 -
+ drivers/staging/lustre/lnet/selftest/console.c     |    1 -
+ 14 files changed, 3 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index c3bf5e8..b8be9b6 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -681,7 +681,8 @@ void lnet_debug_peer(lnet_nid_t nid);
- static inline void
- lnet_peer_set_alive(lnet_peer_t *lp)
- {
--	lp->lp_last_alive = lp->lp_last_query = jiffies;
-+	lp->lp_last_query = jiffies;
-+	lp->lp_last_alive = jiffies;
- 	if (!lp->lp_alive)
- 		lnet_notify_locked(lp, 0, 1, lp->lp_last_alive);
+diff --git a/drivers/staging/lustre/include/linux/lnet/nidstr.h b/drivers/staging/lustre/include/linux/lnet/nidstr.h
+index 9a705e1..937fcc9 100644
+--- a/drivers/staging/lustre/include/linux/lnet/nidstr.h
++++ b/drivers/staging/lustre/include/linux/lnet/nidstr.h
+@@ -69,6 +69,7 @@ static inline char *libcfs_lnd2str(__u32 lnd)
+ 	return libcfs_lnd2str_r(lnd, libcfs_next_nidstring(),
+ 				LNET_NIDSTR_SIZE);
  }
-diff --git a/drivers/staging/lustre/include/linux/lnet/socklnd.h b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-index 3df5065..bc32403 100644
---- a/drivers/staging/lustre/include/linux/lnet/socklnd.h
-+++ b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-@@ -85,7 +85,8 @@ socklnd_init_msg(ksock_msg_t *msg, int type)
- {
- 	msg->ksm_csum = 0;
- 	msg->ksm_type = type;
--	msg->ksm_zc_cookies[0] = msg->ksm_zc_cookies[1]  = 0;
-+	msg->ksm_zc_cookies[0] = 0;
-+	msg->ksm_zc_cookies[1] = 0;
++
+ int libcfs_str2lnd(const char *str);
+ char *libcfs_net2str_r(__u32 net, char *buf, size_t buf_size);
+ static inline char *libcfs_net2str(__u32 net)
+@@ -76,12 +77,14 @@ static inline char *libcfs_net2str(__u32 net)
+ 	return libcfs_net2str_r(net, libcfs_next_nidstring(),
+ 				LNET_NIDSTR_SIZE);
  }
- 
- #define KSOCK_MSG_NOOP	0xC0	/* ksm_u empty */
++
+ char *libcfs_nid2str_r(lnet_nid_t nid, char *buf, size_t buf_size);
+ static inline char *libcfs_nid2str(lnet_nid_t nid)
+ {
+ 	return libcfs_nid2str_r(nid, libcfs_next_nidstring(),
+ 				LNET_NIDSTR_SIZE);
+ }
++
+ __u32 libcfs_str2net(const char *str);
+ lnet_nid_t libcfs_str2nid(const char *str);
+ int libcfs_str2anynid(lnet_nid_t *nid, const char *str);
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index 812d9b5..db551e4 100644
+index 8ad128c..09eaecd 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -500,7 +500,8 @@ static int kiblnd_del_peer(lnet_ni_t *ni, lnet_nid_t nid)
- 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
+@@ -399,7 +399,6 @@ kib_peer_t *kiblnd_find_peer_locked(lnet_nid_t nid)
+ 	kib_peer_t *peer;
  
- 	if (nid != LNET_NID_ANY) {
--		lo = hi = kiblnd_nid2peerlist(nid) - kiblnd_data.kib_peers;
-+		lo = kiblnd_nid2peerlist(nid) - kiblnd_data.kib_peers;
-+		hi = kiblnd_nid2peerlist(nid) - kiblnd_data.kib_peers;
- 	} else {
- 		lo = 0;
- 		hi = kiblnd_data.kib_peer_hash_size - 1;
-@@ -979,9 +980,10 @@ static int kiblnd_close_matching_conns(lnet_ni_t *ni, lnet_nid_t nid)
+ 	list_for_each(tmp, peer_list) {
+-
+ 		peer = list_entry(tmp, kib_peer_t, ibp_list);
  
- 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
+ 		LASSERT(peer->ibp_connecting > 0 || /* creating conns */
+@@ -439,9 +438,7 @@ static int kiblnd_get_peer_info(lnet_ni_t *ni, int index,
+ 	read_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
  
--	if (nid != LNET_NID_ANY)
--		lo = hi = kiblnd_nid2peerlist(nid) - kiblnd_data.kib_peers;
--	else {
-+	if (nid != LNET_NID_ANY) {
-+		lo = kiblnd_nid2peerlist(nid) - kiblnd_data.kib_peers;
-+		hi = kiblnd_nid2peerlist(nid) - kiblnd_data.kib_peers;
-+	} else {
- 		lo = 0;
- 		hi = kiblnd_data.kib_peer_hash_size - 1;
+ 	for (i = 0; i < kiblnd_data.kib_peer_hash_size; i++) {
+-
+ 		list_for_each(ptmp, &kiblnd_data.kib_peers[i]) {
+-
+ 			peer = list_entry(ptmp, kib_peer_t, ibp_list);
+ 			LASSERT(peer->ibp_connecting > 0 ||
+ 				peer->ibp_accepting > 0 ||
+@@ -554,7 +551,6 @@ static kib_conn_t *kiblnd_get_conn_by_idx(lnet_ni_t *ni, int index)
+ 
+ 	for (i = 0; i < kiblnd_data.kib_peer_hash_size; i++) {
+ 		list_for_each(ptmp, &kiblnd_data.kib_peers[i]) {
+-
+ 			peer = list_entry(ptmp, kib_peer_t, ibp_list);
+ 			LASSERT(peer->ibp_connecting > 0 ||
+ 				peer->ibp_accepting > 0 ||
+@@ -992,7 +988,6 @@ static int kiblnd_close_matching_conns(lnet_ni_t *ni, lnet_nid_t nid)
+ 
+ 	for (i = lo; i <= hi; i++) {
+ 		list_for_each_safe(ptmp, pnxt, &kiblnd_data.kib_peers[i]) {
+-
+ 			peer = list_entry(ptmp, kib_peer_t, ibp_list);
+ 			LASSERT(peer->ibp_connecting > 0 ||
+ 				peer->ibp_accepting > 0 ||
+@@ -1584,7 +1579,6 @@ int kiblnd_fmr_pool_map(kib_fmr_poolset_t *fps, __u64 *pages, int npages,
+ 		CDEBUG(D_NET, "Another thread is allocating new FMR pool, waiting for her to complete\n");
+ 		schedule();
+ 		goto again;
+-
  	}
+ 
+ 	if (time_before(cfs_time_current(), fps->fps_next_retry)) {
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 46d1810..14938c3 100644
+index cbf5d0a..6b5a0b3 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -1061,8 +1061,8 @@ kiblnd_init_rdma(kib_conn_t *conn, kib_tx_t *tx, int type,
- 	struct ib_sge *sge = &tx->tx_sge[0];
- 	struct ib_rdma_wr *wrq = &tx->tx_wrq[0], *next;
- 	int rc  = resid;
--	int srcidx;
--	int dstidx;
-+	int srcidx = 0;
-+	int dstidx = 0;
- 	int wrknob;
+@@ -2287,7 +2287,6 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 			rej.ibr_why = IBLND_REJECT_RDMA_FRAGS;
  
- 	LASSERT(!in_interrupt());
-@@ -1070,8 +1070,6 @@ kiblnd_init_rdma(kib_conn_t *conn, kib_tx_t *tx, int type,
- 	LASSERT(type == IBLND_MSG_GET_DONE ||
- 		type == IBLND_MSG_PUT_DONE);
- 
--	srcidx = dstidx = 0;
+ 		goto failed;
 -
- 	while (resid > 0) {
- 		if (srcidx >= srcrd->rd_nfrags) {
- 			CERROR("Src buffer exhausted: %d frags\n", srcidx);
+ 	}
+ 
+ 	if (reqmsg->ibm_u.connparams.ibcp_max_msg_size > IBLND_MSG_SIZE) {
+@@ -3128,7 +3127,6 @@ kiblnd_connd(void *arg)
+ 	spin_lock_irqsave(&kiblnd_data.kib_connd_lock, flags);
+ 
+ 	while (!kiblnd_data.kib_shutdown) {
+-
+ 		dropped_lock = 0;
+ 
+ 		if (!list_empty(&kiblnd_data.kib_connd_zombies)) {
 diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 4ab7f29..7c9525d 100644
+index 6bf92fd..c428684 100644
 --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
 +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -582,9 +582,10 @@ ksocknal_del_peer(lnet_ni_t *ni, lnet_process_id_t id, __u32 ip)
+@@ -182,7 +182,6 @@ ksocknal_find_peer_locked(lnet_ni_t *ni, lnet_process_id_t id)
+ 	ksock_peer_t *peer;
  
- 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
+ 	list_for_each(tmp, peer_list) {
+-
+ 		peer = list_entry(tmp, ksock_peer_t, ksnp_list);
  
--	if (id.nid != LNET_NID_ANY)
--		lo = hi = (int)(ksocknal_nid2peerlist(id.nid) - ksocknal_data.ksnd_peers);
--	else {
-+	if (id.nid != LNET_NID_ANY) {
-+		lo = (int)(ksocknal_nid2peerlist(id.nid) - ksocknal_data.ksnd_peers);
-+		hi = (int)(ksocknal_nid2peerlist(id.nid) - ksocknal_data.ksnd_peers);
-+	} else {
- 		lo = 0;
- 		hi = ksocknal_data.ksnd_peer_hash_size - 1;
+ 		LASSERT(!peer->ksnp_closing);
+@@ -264,7 +263,6 @@ ksocknal_get_peer_info(lnet_ni_t *ni, int index,
+ 	read_lock(&ksocknal_data.ksnd_global_lock);
+ 
+ 	for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++) {
+-
+ 		list_for_each(ptmp, &ksocknal_data.ksnd_peers[i]) {
+ 			peer = list_entry(ptmp, ksock_peer_t, ksnp_list);
+ 
+@@ -1015,7 +1013,6 @@ ksocknal_connecting(ksock_peer_t *peer, __u32 ipaddr)
+ 	ksock_route_t *route;
+ 
+ 	list_for_each_entry(route, &peer->ksnp_routes, ksnr_list) {
+-
+ 		if (route->ksnr_ipaddr == ipaddr)
+ 			return route->ksnr_connecting;
  	}
-@@ -1774,9 +1775,10 @@ ksocknal_close_matching_conns(lnet_process_id_t id, __u32 ipaddr)
+@@ -1787,7 +1784,6 @@ ksocknal_close_matching_conns(lnet_process_id_t id, __u32 ipaddr)
+ 	for (i = lo; i <= hi; i++) {
+ 		list_for_each_safe(ptmp, pnxt,
+ 				   &ksocknal_data.ksnd_peers[i]) {
+-
+ 			peer = list_entry(ptmp, ksock_peer_t, ksnp_list);
  
- 	write_lock_bh(&ksocknal_data.ksnd_global_lock);
+ 			if (!((id.nid == LNET_NID_ANY || id.nid == peer->ksnp_id.nid) &&
+@@ -2330,7 +2326,6 @@ ksocknal_base_shutdown(void)
+ 					continue;
  
--	if (id.nid != LNET_NID_ANY)
--		lo = hi = (int)(ksocknal_nid2peerlist(id.nid) - ksocknal_data.ksnd_peers);
--	else {
-+	if (id.nid != LNET_NID_ANY) {
-+		lo = (int)(ksocknal_nid2peerlist(id.nid) - ksocknal_data.ksnd_peers);
-+		hi = (int)(ksocknal_nid2peerlist(id.nid) - ksocknal_data.ksnd_peers);
-+	} else {
- 		lo = 0;
- 		hi = ksocknal_data.ksnd_peer_hash_size - 1;
- 	}
-@@ -1938,7 +1940,8 @@ static int ksocknal_push(lnet_ni_t *ni, lnet_process_id_t id)
- 		start = &ksocknal_data.ksnd_peers[0];
- 		end = &ksocknal_data.ksnd_peers[hsize - 1];
- 	} else {
--		start = end = ksocknal_nid2peerlist(id.nid);
-+		start = ksocknal_nid2peerlist(id.nid);
-+		end = ksocknal_nid2peerlist(id.nid);
- 	}
- 
- 	for (tmp = start; tmp <= end; tmp++) {
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-index 2fe23d4..c59ddc2 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-@@ -719,7 +719,8 @@ ksocknal_pack_msg_v1(ksock_tx_t *tx)
- 	tx->tx_iov[0].iov_base = &tx->tx_lnetmsg->msg_hdr;
- 	tx->tx_iov[0].iov_len  = sizeof(lnet_hdr_t);
- 
--	tx->tx_resid = tx->tx_nob = tx->tx_lnetmsg->msg_len + sizeof(lnet_hdr_t);
-+	tx->tx_nob = tx->tx_lnetmsg->msg_len + sizeof(lnet_hdr_t);
-+	tx->tx_resid = tx->tx_lnetmsg->msg_len + sizeof(lnet_hdr_t);
- }
- 
- static void
-@@ -732,12 +733,14 @@ ksocknal_pack_msg_v2(ksock_tx_t *tx)
- 
- 		tx->tx_msg.ksm_u.lnetmsg.ksnm_hdr = tx->tx_lnetmsg->msg_hdr;
- 		tx->tx_iov[0].iov_len = sizeof(ksock_msg_t);
--		tx->tx_resid = tx->tx_nob = sizeof(ksock_msg_t) + tx->tx_lnetmsg->msg_len;
-+		tx->tx_nob = sizeof(ksock_msg_t) + tx->tx_lnetmsg->msg_len;
-+		tx->tx_resid = sizeof(ksock_msg_t) + tx->tx_lnetmsg->msg_len;
- 	} else {
- 		LASSERT(tx->tx_msg.ksm_type == KSOCK_MSG_NOOP);
- 
- 		tx->tx_iov[0].iov_len = offsetof(ksock_msg_t, ksm_u.lnetmsg.ksnm_hdr);
--		tx->tx_resid = tx->tx_nob = offsetof(ksock_msg_t,  ksm_u.lnetmsg.ksnm_hdr);
-+		tx->tx_nob = offsetof(ksock_msg_t,  ksm_u.lnetmsg.ksnm_hdr);
-+		tx->tx_resid = offsetof(ksock_msg_t,  ksm_u.lnetmsg.ksnm_hdr);
- 	}
- 	/* Don't checksum before start sending, because packet can be piggybacked with ACK */
- }
-@@ -747,7 +750,8 @@ ksocknal_unpack_msg_v1(ksock_msg_t *msg)
+ 				for (j = 0; j < info->ksi_nthreads_max; j++) {
+-
+ 					sched = &info->ksi_scheds[j];
+ 					LASSERT(list_empty(
+ 						&sched->kss_tx_conns));
+@@ -2387,7 +2382,6 @@ ksocknal_base_shutdown(void)
+ static __u64
+ ksocknal_new_incarnation(void)
  {
- 	msg->ksm_csum = 0;
- 	msg->ksm_type = KSOCK_MSG_LNET;
--	msg->ksm_zc_cookies[0] = msg->ksm_zc_cookies[1]  = 0;
-+	msg->ksm_zc_cookies[0] = 0;
-+	msg->ksm_zc_cookies[1] = 0;
- }
- 
+-
+ 	/* The incarnation number is the time this module loaded and it
+ 	 * identifies this particular instance of the socknal.
+ 	 */
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+index 1243f92..c82ed27 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+@@ -589,7 +589,6 @@ ksocknal_process_transmit (ksock_conn_t *conn, ksock_tx_t *tx)
  static void
+ ksocknal_launch_connection_locked (ksock_route_t *route)
+ {
+-
+ 	/* called holding write lock on ksnd_global_lock */
+ 
+ 	LASSERT(!route->ksnr_scheduled);
+@@ -2147,7 +2146,6 @@ ksocknal_connd_get_route_locked(signed long *timeout_p)
+ 	/* connd_routes can contain both pending and ordinary routes */
+ 	list_for_each_entry(route, &ksocknal_data.ksnd_connd_routes,
+ 			    ksnr_connd_list) {
+-
+ 		if (route->ksnr_retry_interval == 0 ||
+ 		    cfs_time_aftereq(now, route->ksnr_timeout))
+ 			return route;
+@@ -2495,7 +2493,6 @@ ksocknal_check_peer_timeouts (int idx)
+ 
+ 			if (cfs_time_aftereq(cfs_time_current(),
+ 					     tx->tx_deadline)) {
+-
+ 				ksocknal_peer_addref(peer);
+ 				read_unlock(&ksocknal_data.ksnd_global_lock);
+ 
+@@ -2569,7 +2566,6 @@ ksocknal_reaper (void *arg)
+ 	spin_lock_bh(&ksocknal_data.ksnd_reaper_lock);
+ 
+ 	while (!ksocknal_data.ksnd_shuttingdown) {
+-
+ 		if (!list_empty (&ksocknal_data.ksnd_deathrow_conns)) {
+ 			conn = list_entry (ksocknal_data. \
+ 					       ksnd_deathrow_conns.next,
+diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
+index b330f64..8c95cc5 100644
+--- a/drivers/staging/lustre/lnet/lnet/acceptor.c
++++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
+@@ -223,7 +223,6 @@ lnet_accept(struct socket *sock, __u32 magic)
+ 	LASSERT(rc == 0);		      /* we succeeded before */
+ 
+ 	if (!lnet_accept_magic(magic, LNET_PROTO_ACCEPTOR_MAGIC)) {
+-
+ 		if (lnet_accept_magic(magic, LNET_PROTO_MAGIC)) {
+ 			/*
+ 			 * future version compatibility!
+@@ -363,7 +362,6 @@ lnet_acceptor(void *arg)
+ 		return rc;
+ 
+ 	while (!lnet_acceptor_state.pta_shutdown) {
+-
+ 		rc = lnet_sock_accept(&newsock, lnet_acceptor_state.pta_sock);
+ 		if (rc != 0) {
+ 			if (rc != -EAGAIN) {
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index e59fbfb..78188a9 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -340,7 +340,6 @@ lnet_counters_get(lnet_counters_t *counters)
+ 		counters->recv_length  += ctr->recv_length;
+ 		counters->route_length += ctr->route_length;
+ 		counters->drop_length  += ctr->drop_length;
+-
+ 	}
+ 	lnet_net_unlock(LNET_LOCK_EX);
+ }
 diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index e30a959..d02353d 100644
+index 5339dee..695db24 100644
 --- a/drivers/staging/lustre/lnet/lnet/config.c
 +++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -202,7 +202,8 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 	the_lnet.ln_network_tokens = tokens;
- 	the_lnet.ln_network_tokens_nob = tokensize;
- 	memcpy(tokens, networks, tokensize);
--	str = tmp = tokens;
-+	tmp = tokens;
-+	str = tokens;
+@@ -221,7 +221,6 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 		 * NB we don't check interface conflicts here; it's the LNDs
+ 		 * responsibility (if it cares at all)
+ 		 */
+-
+ 		if (square != NULL && (comma == NULL || square < comma)) {
+ 			/*
+ 			 * i.e: o2ib0(ib0)[1,2], number between square
+@@ -251,7 +250,6 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
  
- 	/* Add in the loopback network */
- 	ni = lnet_ni_alloc(LNET_MKNET(LOLND, 0), NULL, nilist);
+ 		if (bracket == NULL ||
+ 		    (comma != NULL && comma < bracket)) {
+-
+ 			/* no interface list specified */
+ 
+ 			if (comma != NULL)
+@@ -528,7 +526,6 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
+ 		goto failed;
+ 
+ 	for (parsed = sep; parsed < sep2; parsed = enditem) {
+-
+ 		enditem = ++parsed;
+ 		while (enditem < sep2 && *enditem != ',')
+ 			enditem++;
+@@ -538,9 +535,7 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
+ 
+ 		if (sscanf(parsed, "%d-%d/%d%n", &lo, &hi,
+ 			   &stride, &scanned) < 3) {
+-
+ 			if (sscanf(parsed, "%d-%d%n", &lo, &hi, &scanned) < 2) {
+-
+ 				/* simple string enumeration */
+ 				if (lnet_expand1tb(&pending, str, sep, sep2,
+ 						   parsed,
+@@ -564,7 +559,6 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
+ 			goto failed;
+ 
+ 		for (i = lo; i <= hi; i += stride) {
+-
+ 			snprintf(num, sizeof(num), "%d", i);
+ 			nob = strlen(num);
+ 			if (nob + 1 == sizeof(num))
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
-index 4d59bac..55bd7a1 100644
+index fef517d..4d59bac 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-md.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
-@@ -109,7 +109,8 @@ lnet_md_build(lnet_libmd_t *lmd, lnet_md_t *umd, int unlink)
+@@ -106,7 +106,6 @@ lnet_md_build(lnet_libmd_t *lmd, lnet_md_t *umd, int unlink)
+ 	lmd->md_flags = (unlink == LNET_UNLINK) ? LNET_MD_FLAG_AUTO_UNLINK : 0;
+ 
+ 	if ((umd->options & LNET_MD_IOVEC) != 0) {
+-
  		if ((umd->options & LNET_MD_KIOV) != 0) /* Can't specify both */
  			return -EINVAL;
  
--		lmd->md_niov = niov = umd->length;
-+		niov = umd->length;
-+		lmd->md_niov = umd->length;
- 		memcpy(lmd->md_iov.iov, umd->start,
- 		       niov * sizeof(lmd->md_iov.iov[0]));
- 
-@@ -130,7 +131,8 @@ lnet_md_build(lnet_libmd_t *lmd, lnet_md_t *umd, int unlink)
- 			return -EINVAL;
- 
- 	} else if ((umd->options & LNET_MD_KIOV) != 0) {
--		lmd->md_niov = niov = umd->length;
-+		niov = umd->length;
-+		lmd->md_niov = umd->length;
- 		memcpy(lmd->md_iov.kiov, umd->start,
- 		       niov * sizeof(lmd->md_iov.kiov[0]));
- 
-@@ -151,7 +153,8 @@ lnet_md_build(lnet_libmd_t *lmd, lnet_md_t *umd, int unlink)
- 			return -EINVAL;
- 	} else {   /* contiguous */
- 		lmd->md_length = umd->length;
--		lmd->md_niov = niov = 1;
-+		niov = 1;
-+		lmd->md_niov = 1;
- 		lmd->md_iov.iov[0].iov_base = umd->start;
- 		lmd->md_iov.iov[0].iov_len = umd->length;
- 
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 12bb983..b40220a 100644
+index afc4522..12bb983 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -1151,7 +1151,8 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
- 		return NULL;
+@@ -1726,7 +1726,6 @@ lnet_print_hdr(lnet_hdr_t *hdr)
+ 		      hdr->msg.reply.dst_wmd.wh_object_cookie,
+ 		      hdr->payload_length);
+ 	}
+-
+ }
  
- 	lp_best = NULL;
--	rtr_best = rtr_last = NULL;
-+	rtr_best = NULL;
-+	rtr_last = NULL;
- 	list_for_each_entry(rtr, &rnet->lrn_routes, lr_list) {
- 		lp = rtr->lr_gateway;
- 
-@@ -1167,7 +1168,8 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
- 			return lp;
- 
- 		if (lp_best == NULL) {
--			rtr_best = rtr_last = rtr;
-+			rtr_best = rtr;
-+			rtr_last = rtr;
- 			lp_best = lp;
- 			continue;
- 		}
-@@ -1868,7 +1870,8 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
+ int
+@@ -1866,7 +1865,6 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
+ 	/* msg zeroed in lnet_msg_alloc;
+ 	 * i.e. flags all clear, pointers NULL etc
+ 	 */
+-
  	msg->msg_type = type;
  	msg->msg_private = private;
  	msg->msg_receiving = 1;
--	msg->msg_len = msg->msg_wanted = payload_length;
-+	msg->msg_wanted = payload_length;
-+	msg->msg_len = payload_length;
- 	msg->msg_offset = 0;
- 	msg->msg_hdr = *hdr;
- 	/* for building message event */
-diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-index 9c0f264..a8e25b0 100644
---- a/drivers/staging/lustre/lnet/lnet/peer.c
-+++ b/drivers/staging/lustre/lnet/lnet/peer.c
-@@ -287,9 +287,9 @@ lnet_nid2peer_locked(lnet_peer_t **lpp, lnet_nid_t nid, int cpt)
- 		goto out;
- 	}
- 
--	lp->lp_txcredits     =
--	lp->lp_mintxcredits  = lp->lp_ni->ni_peertxcredits;
--	lp->lp_rtrcredits    =
-+	lp->lp_txcredits = lp->lp_ni->ni_peertxcredits;
-+	lp->lp_mintxcredits = lp->lp_ni->ni_peertxcredits;
-+	lp->lp_rtrcredits = lnet_peer_buffer_credits(lp->lp_ni);
- 	lp->lp_minrtrcredits = lnet_peer_buffer_credits(lp->lp_ni);
- 
- 	list_add_tail(&lp->lp_hashlist,
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+index a680e68..eb4aa34 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+@@ -74,7 +74,6 @@ lnet_build_msg_event(lnet_msg_t *msg, lnet_event_kind_t ev_type)
+ 		ev->initiator.nid = LNET_NID_ANY;
+ 		ev->initiator.pid = the_lnet.ln_pid;
+ 		ev->sender        = LNET_NID_ANY;
+-
+ 	} else {
+ 		/* event for passive message */
+ 		ev->target.pid    = hdr->dest_pid;
 diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index 65f951c..36f3caa 100644
+index e447b1a..65f951c 100644
 --- a/drivers/staging/lustre/lnet/lnet/router.c
 +++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -1307,7 +1307,8 @@ lnet_rtrpool_free_bufs(lnet_rtrbufpool_t *rbp)
- 	LASSERT(rbp->rbp_nbuffers == nbuffers);
- 	LASSERT(rbp->rbp_credits == nbuffers);
- 
--	rbp->rbp_nbuffers = rbp->rbp_credits = 0;
-+	rbp->rbp_nbuffers = 0;
-+	rbp->rbp_credits = 0;
- }
- 
- static int
-diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-index 3e702e2..817be93 100644
---- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-@@ -953,7 +953,8 @@ lstcon_sesnew_stat_reply(lstcon_rpc_trans_t *trans,
- 		CNETERR("Framework features %x from %s is different with features on this transaction: %x\n",
- 			reply->msg_ses_feats, libcfs_nid2str(nd->nd_id.nid),
- 			trans->tas_features);
--		status = mksn_rep->mksn_status = EPROTO;
-+		mksn_rep->mksn_status = EPROTO;
-+		status = EPROTO;
+@@ -353,7 +353,6 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
+ 		CERROR("Error %d creating route %s %d %s\n", rc,
+ 		       libcfs_net2str(net), hops,
+ 		       libcfs_nid2str(gateway));
+-
+ 		return rc;
  	}
  
- 	if (status == 0) {
-diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
-index 8704983..5781f77 100644
---- a/drivers/staging/lustre/lnet/selftest/selftest.h
-+++ b/drivers/staging/lustre/lnet/selftest/selftest.h
-@@ -546,8 +546,8 @@ srpc_init_client_rpc (srpc_client_rpc_t *rpc, lnet_process_id_t peer,
- 	LNetInvalidateHandle(&rpc->crpc_bulk.bk_mdh);
+diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
+index 88fb54d..4af91cb 100644
+--- a/drivers/staging/lustre/lnet/selftest/brw_test.c
++++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
+@@ -505,7 +505,6 @@ void brw_init_test_client(void)
+ srpc_service_t brw_test_service;
+ void brw_init_test_service(void)
+ {
+-
+ 	brw_test_service.sv_id         = SRPC_SERVICE_BRW;
+ 	brw_test_service.sv_name       = "brw_test";
+ 	brw_test_service.sv_handler    = brw_server_handle;
+diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
+index 64d58d1..ab0a3f7 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.c
++++ b/drivers/staging/lustre/lnet/selftest/console.c
+@@ -967,7 +967,6 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
+ 		entp->u.tbe_batch.bae_state = bat->bat_state;
  
- 	/* no event is expected at this point */
--	rpc->crpc_bulkev.ev_fired  =
--	rpc->crpc_reqstev.ev_fired =
-+	rpc->crpc_bulkev.ev_fired = 1;
-+	rpc->crpc_reqstev.ev_fired = 1;
- 	rpc->crpc_replyev.ev_fired = 1;
- 
- 	rpc->crpc_reqstmsg.msg_magic   = SRPC_MSG_MAGIC;
+ 	} else {
+-
+ 		entp->u.tbe_test.tse_type   = test->tes_type;
+ 		entp->u.tbe_test.tse_loop   = test->tes_loop;
+ 		entp->u.tbe_test.tse_concur = test->tes_concur;
 -- 
 1.7.1
