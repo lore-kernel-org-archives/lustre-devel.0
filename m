@@ -1,341 +1,86 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 15 Feb 2016 10:25:49 -0500
-Subject: [lustre-devel] [PATCH 05/10] staging: lustre: remove uses of
-	IS_ERR_VALUE()
+Date: Mon, 15 Feb 2016 10:25:46 -0500
+Subject: [lustre-devel] [PATCH 02/10] staging: lustre: reflect down routes
+	in /proc/sys/lnet/routes
 In-Reply-To: <1455549954-29532-1-git-send-email-jsimmons@infradead.org>
 References: <1455549954-29532-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1455549954-29532-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1455549954-29532-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Chris Horn <hornc@cray.com>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: Chris Horn <hornc@cray.com>
 
-Remove most uses of IS_ERR_VALUE(). This macro was often given an int
-argument coming from PTR_ERR(). This invokes implementation defined
-behavior since the long value gotten by applying PTR_ERR() to a kernel
-pointer will usually not be representable as an int. Moreover it may
-be just plain wrong to do this since the expressions IS_ERR(p) and
-IS_ERR_VALUE((int) PTR_ERR(p)) are not equivalent for a general
-pointer p.
+We consider routes "down" if the router is down or the router
+NI for the target network is down. This should be reflected
+in the output of /proc/sys/lnet/routes
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3498
-Reviewed-on: http://review.whamcloud.com/6759
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Signed-off-by: Chris Horn <hornc@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3679
+Reviewed-on: http://review.whamcloud.com/7857
+Reviewed-by: Cory Spitz <spitzcor@cray.com>
+Reviewed-by: Isaac Huang <he.huang@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- drivers/staging/lustre/lnet/lnet/acceptor.c      |    9 ++++---
- drivers/staging/lustre/lnet/lnet/router.c        |    7 +++--
- drivers/staging/lustre/lustre/libcfs/tracefile.c |    6 +++-
- drivers/staging/lustre/lustre/llite/statahead.c  |    8 ++++--
- drivers/staging/lustre/lustre/mdc/mdc_request.c  |   18 +++++++++----
- drivers/staging/lustre/lustre/mgc/mgc_request.c  |    9 ++++---
- drivers/staging/lustre/lustre/obdclass/llog.c    |   13 ++++++----
- drivers/staging/lustre/lustre/ptlrpc/pinger.c    |   10 ++++---
- drivers/staging/lustre/lustre/ptlrpc/service.c   |   29 +++++++++++++---------
- 9 files changed, 66 insertions(+), 43 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |   13 +++++++++++++
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |    4 +---
+ drivers/staging/lustre/lnet/lnet/router_proc.c     |    2 +-
+ 3 files changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
-index e5f24ff..07df727 100644
---- a/drivers/staging/lustre/lnet/lnet/acceptor.c
-+++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
-@@ -439,6 +439,7 @@ accept2secure(const char *acc, long *sec)
- int
- lnet_acceptor_start(void)
- {
-+	struct task_struct *task;
- 	int rc;
- 	long rc2;
- 	long secure;
-@@ -457,10 +458,10 @@ lnet_acceptor_start(void)
- 	if (!lnet_count_acceptor_nis())  /* not required */
- 		return 0;
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+index b0f80b4..b2e5017 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+@@ -64,6 +64,19 @@ extern lnet_t	the_lnet;	/* THE network */
+ /** exclusive lock */
+ #define LNET_LOCK_EX		CFS_PERCPT_LOCK_EX
  
--	rc2 = PTR_ERR(kthread_run(lnet_acceptor,
--				  (void *)(ulong_ptr_t)secure,
--				  "acceptor_%03ld", secure));
--	if (IS_ERR_VALUE(rc2)) {
-+	task = kthread_run(lnet_acceptor, (void *)(ulong_ptr_t)secure,
-+			   "acceptor_%03ld", secure);
-+	if (IS_ERR(task)) {
-+		rc2 = PTR_ERR(task);
- 		CERROR("Can't start acceptor thread: %ld\n", rc2);
- 
- 		return -ESRCH;
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index 9c32a01..67566ca 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -1004,6 +1004,7 @@ lnet_ping_router_locked(lnet_peer_t *rtr)
- int
- lnet_router_checker_start(void)
- {
-+	struct task_struct *task;
- 	int rc;
- 	int eqsz;
- 
-@@ -1034,9 +1035,9 @@ lnet_router_checker_start(void)
- 	}
- 
- 	the_lnet.ln_rc_state = LNET_RC_STATE_RUNNING;
--	rc = PTR_ERR(kthread_run(lnet_router_checker,
--				 NULL, "router_checker"));
--	if (IS_ERR_VALUE(rc)) {
-+	task = kthread_run(lnet_router_checker, NULL, "router_checker");
-+	if (IS_ERR(task)) {
-+		rc = PTR_ERR(task);
- 		CERROR("Can't start router checker thread: %d\n", rc);
- 		/* block until event callback signals exit */
- 		down(&the_lnet.ln_rc_signal);
-diff --git a/drivers/staging/lustre/lustre/libcfs/tracefile.c b/drivers/staging/lustre/lustre/libcfs/tracefile.c
-index 65c4f1a..bc5d0ee 100644
---- a/drivers/staging/lustre/lustre/libcfs/tracefile.c
-+++ b/drivers/staging/lustre/lustre/libcfs/tracefile.c
-@@ -1056,6 +1056,7 @@ end_loop:
- int cfs_trace_start_thread(void)
- {
- 	struct tracefiled_ctl *tctl = &trace_tctl;
-+	struct task_struct *task;
- 	int rc = 0;
- 
- 	mutex_lock(&cfs_trace_thread_mutex);
-@@ -1067,8 +1068,9 @@ int cfs_trace_start_thread(void)
- 	init_waitqueue_head(&tctl->tctl_waitq);
- 	atomic_set(&tctl->tctl_shutdown, 0);
- 
--	if (IS_ERR(kthread_run(tracefiled, tctl, "ktracefiled"))) {
--		rc = -ECHILD;
-+	task = kthread_run(tracefiled, tctl, "ktracefiled");
-+	if (IS_ERR(task)) {
-+		rc = PTR_ERR(task);
- 		goto out;
- 	}
- 
-diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-index 88ffd8e..064794e 100644
---- a/drivers/staging/lustre/lustre/llite/statahead.c
-+++ b/drivers/staging/lustre/lustre/llite/statahead.c
-@@ -1498,6 +1498,7 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
- 	struct ll_sa_entry       *entry;
- 	struct ptlrpc_thread     *thread;
- 	struct l_wait_info	lwi   = { 0 };
-+	struct task_struct *task;
- 	int		       rc    = 0;
- 	struct ll_inode_info     *plli;
- 
-@@ -1656,10 +1657,11 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
- 	lli->lli_sai = sai;
- 
- 	plli = ll_i2info(d_inode(parent));
--	rc = PTR_ERR(kthread_run(ll_statahead_thread, parent,
--				 "ll_sa_%u", plli->lli_opendir_pid));
-+	task = kthread_run(ll_statahead_thread, parent, "ll_sa_%u",
-+			   plli->lli_opendir_pid);
- 	thread = &sai->sai_thread;
--	if (IS_ERR_VALUE(rc)) {
-+	if (IS_ERR(task)) {
-+		rc = PTR_ERR(task);
- 		CERROR("can't start ll_sa thread, rc: %d\n", rc);
- 		dput(parent);
- 		lli->lli_opendir_key = NULL;
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 4348127..c0d961a 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -1554,6 +1554,7 @@ static int mdc_ioc_changelog_send(struct obd_device *obd,
- 				  struct ioc_changelog *icc)
- {
- 	struct changelog_show *cs;
-+	struct task_struct *task;
- 	int rc;
- 
- 	/* Freed in mdc_changelog_send_thread */
-@@ -1571,15 +1572,20 @@ static int mdc_ioc_changelog_send(struct obd_device *obd,
- 	 * New thread because we should return to user app before
- 	 * writing into our pipe
- 	 */
--	rc = PTR_ERR(kthread_run(mdc_changelog_send_thread, cs,
--				 "mdc_clg_send_thread"));
--	if (!IS_ERR_VALUE(rc)) {
--		CDEBUG(D_CHANGELOG, "start changelog thread\n");
--		return 0;
-+	task = kthread_run(mdc_changelog_send_thread, cs,
-+			   "mdc_clg_send_thread");
-+	if (IS_ERR(task)) {
-+		rc = PTR_ERR(task);
-+		CERROR("%s: can't start changelog thread: rc = %d\n",
-+		       obd->obd_name, rc);
-+		kfree(cs);
-+	} else {
-+		rc = 0;
-+		CDEBUG(D_CHANGELOG, "%s: started changelog thread\n",
-+		       obd->obd_name);
- 	}
- 
- 	CERROR("Failed to start changelog thread: %d\n", rc);
--	kfree(cs);
- 	return rc;
- }
- 
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index ab4800c..5aeb426 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -711,6 +711,7 @@ static int mgc_cleanup(struct obd_device *obd)
- static int mgc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
- {
- 	struct lprocfs_static_vars lvars = { NULL };
-+	struct task_struct *task;
- 	int rc;
- 
- 	ptlrpcd_addref();
-@@ -734,10 +735,10 @@ static int mgc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
- 		init_waitqueue_head(&rq_waitq);
- 
- 		/* start requeue thread */
--		rc = PTR_ERR(kthread_run(mgc_requeue_thread, NULL,
--					     "ll_cfg_requeue"));
--		if (IS_ERR_VALUE(rc)) {
--			CERROR("%s: Cannot start requeue thread (%d),no more log updates!\n",
-+		task = kthread_run(mgc_requeue_thread, NULL, "ll_cfg_requeue");
-+		if (IS_ERR(task)) {
-+			rc = PTR_ERR(task);
-+			CERROR("%s: cannot start requeue thread: rc = %d; no more log updates\n",
- 			       obd->obd_name, rc);
- 			goto err_cleanup;
- 		}
-diff --git a/drivers/staging/lustre/lustre/obdclass/llog.c b/drivers/staging/lustre/lustre/obdclass/llog.c
-index f956d7e..85b74ed 100644
---- a/drivers/staging/lustre/lustre/obdclass/llog.c
-+++ b/drivers/staging/lustre/lustre/obdclass/llog.c
-@@ -376,17 +376,19 @@ int llog_process_or_fork(const struct lu_env *env,
- 	lpi->lpi_catdata   = catdata;
- 
- 	if (fork) {
-+		struct task_struct *task;
++static inline int lnet_is_route_alive(lnet_route_t *route)
++{
++	/* gateway is down */
++	if (!route->lr_gateway->lp_alive)
++		return 0;
++	/* no NI status, assume it's alive */
++	if ((route->lr_gateway->lp_ping_feats &
++	     LNET_PING_FEAT_NI_STATUS) == 0)
++		return 1;
++	/* has NI status, check # down NIs */
++	return route->lr_downis == 0;
++}
 +
- 		/* The new thread can't use parent env,
- 		 * init the new one in llog_process_thread_daemonize. */
- 		lpi->lpi_env = NULL;
- 		init_completion(&lpi->lpi_completion);
--		rc = PTR_ERR(kthread_run(llog_process_thread_daemonize, lpi,
--					     "llog_process_thread"));
--		if (IS_ERR_VALUE(rc)) {
-+		task = kthread_run(llog_process_thread_daemonize, lpi,
-+				   "llog_process_thread");
-+		if (IS_ERR(task)) {
-+			rc = PTR_ERR(task);
- 			CERROR("%s: cannot start thread: rc = %d\n",
- 			       loghandle->lgh_ctxt->loc_obd->obd_name, rc);
--			kfree(lpi);
--			return rc;
-+			goto out_lpi;
- 		}
- 		wait_for_completion(&lpi->lpi_completion);
- 	} else {
-@@ -394,6 +396,7 @@ int llog_process_or_fork(const struct lu_env *env,
- 		llog_process_thread(lpi);
- 	}
- 	rc = lpi->lpi_rc;
-+out_lpi:
- 	kfree(lpi);
- 	return rc;
- }
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-index fb2d523..912ab59 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-@@ -293,6 +293,7 @@ static struct ptlrpc_thread pinger_thread;
- int ptlrpc_start_pinger(void)
+ static inline int lnet_is_wire_handle_none(lnet_handle_wire_t *wh)
  {
- 	struct l_wait_info lwi = { 0 };
-+	struct task_struct *task;
- 	int rc;
+ 	return (wh->wh_interface_cookie == LNET_WIRE_HANDLE_COOKIE_NONE &&
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index f023b0c..ab56e7f 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -1156,9 +1156,7 @@ lnet_find_route_locked(lnet_ni_t *ni, lnet_nid_t target, lnet_nid_t rtr_nid)
+ 	list_for_each_entry(route, &rnet->lrn_routes, lr_list) {
+ 		lp = route->lr_gateway;
  
- 	if (!thread_is_init(&pinger_thread) &&
-@@ -303,10 +304,11 @@ int ptlrpc_start_pinger(void)
+-		if (!lp->lp_alive || /* gateway is down */
+-		    ((lp->lp_ping_feats & LNET_PING_FEAT_NI_STATUS) &&
+-		     route->lr_downis)) /* NI to target is down */
++		if (!lnet_is_route_alive(route))
+ 			continue;
  
- 	strcpy(pinger_thread.t_name, "ll_ping");
+ 		if (ni && lp->lp_ni != ni)
+diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
+index a7aaf0c..4148caf 100644
+--- a/drivers/staging/lustre/lnet/lnet/router_proc.c
++++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
+@@ -242,7 +242,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
+ 			unsigned int hops = route->lr_hops;
+ 			unsigned int priority = route->lr_priority;
+ 			lnet_nid_t nid = route->lr_gateway->lp_nid;
+-			int alive = route->lr_gateway->lp_alive;
++			int alive = lnet_is_route_alive(route);
  
--	rc = PTR_ERR(kthread_run(ptlrpc_pinger_main, &pinger_thread,
--				 "%s", pinger_thread.t_name));
--	if (IS_ERR_VALUE(rc)) {
--		CERROR("cannot start thread: %d\n", rc);
-+	task = kthread_run(ptlrpc_pinger_main, &pinger_thread,
-+			   pinger_thread.t_name);
-+	if (IS_ERR(task)) {
-+		rc = PTR_ERR(task);
-+		CERROR("cannot start pinger thread: rc = %d\n", rc);
- 		return rc;
- 	}
- 	l_wait_event(pinger_thread.t_ctl_waitq,
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 8598300..830468a 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -2255,24 +2255,27 @@ static int ptlrpc_start_hr_threads(void)
- 
- 		for (j = 0; j < hrp->hrp_nthrs; j++) {
- 			struct	ptlrpc_hr_thread *hrt = &hrp->hrp_thrs[j];
-+			struct task_struct *task;
- 
--			rc = PTR_ERR(kthread_run(ptlrpc_hr_main,
-+			task = kthread_run(ptlrpc_hr_main,
- 						 &hrp->hrp_thrs[j],
- 						 "ptlrpc_hr%02d_%03d",
- 						 hrp->hrp_cpt,
--						 hrt->hrt_id));
--			if (IS_ERR_VALUE(rc))
-+						 hrt->hrt_id);
-+			if (IS_ERR(task)) {
-+				rc = PTR_ERR(task);
- 				break;
-+			}
- 		}
- 		wait_event(ptlrpc_hr.hr_waitq,
- 			       atomic_read(&hrp->hrp_nstarted) == j);
--		if (!IS_ERR_VALUE(rc))
--			continue;
- 
--		CERROR("Reply handling thread %d:%d Failed on starting: rc = %d\n",
--		       i, j, rc);
--		ptlrpc_stop_hr_threads();
--		return rc;
-+		if (rc < 0) {
-+			CERROR("cannot start reply handler thread %d:%d: rc = %d\n",
-+			       i, j, rc);
-+			ptlrpc_stop_hr_threads();
-+			return rc;
-+		}
- 	}
- 	return 0;
- }
-@@ -2374,6 +2377,7 @@ int ptlrpc_start_thread(struct ptlrpc_service_part *svcpt, int wait)
- 	struct l_wait_info lwi = { 0 };
- 	struct ptlrpc_thread *thread;
- 	struct ptlrpc_service *svc;
-+	struct task_struct *task;
- 	int rc;
- 
- 	LASSERT(svcpt != NULL);
-@@ -2442,9 +2446,10 @@ int ptlrpc_start_thread(struct ptlrpc_service_part *svcpt, int wait)
- 	}
- 
- 	CDEBUG(D_RPCTRACE, "starting thread '%s'\n", thread->t_name);
--	rc = PTR_ERR(kthread_run(ptlrpc_main, thread, "%s", thread->t_name));
--	if (IS_ERR_VALUE(rc)) {
--		CERROR("cannot start thread '%s': rc %d\n",
-+	task = kthread_run(ptlrpc_main, thread, "%s", thread->t_name);
-+	if (IS_ERR(task)) {
-+		rc = PTR_ERR(task);
-+		CERROR("cannot start thread '%s': rc = %d\n",
- 		       thread->t_name, rc);
- 		spin_lock(&svcpt->scp_lock);
- 		--svcpt->scp_nthrs_starting;
+ 			s += snprintf(s, tmpstr + tmpsiz - s,
+ 				      "%-8s %4u %8u %7s %s\n",
 -- 
 1.7.1
