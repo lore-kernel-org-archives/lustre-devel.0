@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 15 Feb 2016 10:25:54 -0500
-Subject: [lustre-devel] [PATCH 10/10] staging: lustre: DLC Feature dynamic
-	net config
+Date: Mon, 15 Feb 2016 10:25:53 -0500
+Subject: [lustre-devel] [PATCH 09/10] staging: lustre: Dynamic LNet
+	Configuration (DLC) dynamic routing
 In-Reply-To: <1455549954-29532-1-git-send-email-jsimmons@infradead.org>
 References: <1455549954-29532-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1455549954-29532-11-git-send-email-jsimmons@infradead.org>
+Message-ID: <1455549954-29532-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,1059 +14,716 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-This is the third patch of a set of patches that enables DLC.
+This is the second patch of a set of patches that enables DLC.
 
 This patch adds the following features to LNET.  Currently these
 features are not driven by user space.
-- Adding/Deleting Networks dynamically
-Two new functions were added:
- - lnet_dyn_add_ni()
-    add an NI. if the NI is already added then fail with
-    appropriate error code
- - lnet_dyn_del_ni()
-    delete an existing NI.  If NI doesn't exist fail with
-    appropriate failure code.
-These functions shall be called from IOCTL.
+- Enabling Routing on Demand.  The default number of router
+  buffers are allocated.
+- Disable Routing on demand. Unused router buffers are freed and
+  used router buffers are freed when they are no longer in use.
+  The following time routing is enabled the default router buffer
+  values are used.  It has been decided that remembering the
+  user set router buffer values should be remembered and re-set
+  by user space scripts.
+- Increase the number of router buffers on demand, by allocating
+  new ones.
+- Decrease the number of router buffers.  Exccess buffers are freed
+  if they are not in use.  Otherwise they are freed once they are
+  no longer in use.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2456
-Reviewed-on: http://review.whamcloud.com/9832
+Change-Id: Id07d4ad424d8f5ba72475d4149380afe2ac54e77
+Reviewed-on: http://review.whamcloud.com/9831
 Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
 Reviewed-by: Liang Zhen <liang.zhen@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    4 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |  804 +++++++++++++-------
- drivers/staging/lustre/lnet/lnet/config.c          |    2 +-
- 3 files changed, 518 insertions(+), 292 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |    8 +-
+ .../staging/lustre/include/linux/lnet/lib-types.h  |    8 +-
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |    4 +-
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |   89 +++++--
+ drivers/staging/lustre/lnet/lnet/router.c          |  277 +++++++++++++++-----
+ 5 files changed, 304 insertions(+), 82 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 3a1cf61..0592e30 100644
+index 77d8e37..3a1cf61 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -681,12 +681,10 @@ void lnet_router_checker_stop(void);
- void lnet_router_ni_update_locked(lnet_peer_t *gw, __u32 net);
- void lnet_swap_pinginfo(lnet_ping_info_t *info);
+@@ -461,7 +461,11 @@ int lnet_get_route(int idx, __u32 *net, __u32 *hops,
+ void lnet_router_debugfs_init(void);
+ void lnet_router_debugfs_fini(void);
+ int  lnet_rtrpools_alloc(int im_a_router);
+-void lnet_rtrpools_free(void);
++void lnet_destroy_rtrbuf(lnet_rtrbuf_t *rb, int npages);
++int lnet_rtrpools_adjust(int tiny, int small, int large);
++int lnet_rtrpools_enable(void);
++void lnet_rtrpools_disable(void);
++void lnet_rtrpools_free(int keep_pools);
+ lnet_remotenet_t *lnet_find_net_locked(__u32 net);
  
--int lnet_ping_target_init(void);
--void lnet_ping_target_fini(void);
--
- int lnet_parse_ip2nets(char **networksp, char *ip2nets);
- int lnet_parse_routes(char *route_str, int *im_a_router);
- int lnet_parse_networks(struct list_head *nilist, char *networks);
-+int lnet_net_unique(__u32 net, struct list_head *nilist);
+ int lnet_islocalnid(lnet_nid_t nid);
+@@ -481,6 +485,8 @@ void lnet_prep_send(lnet_msg_t *msg, int type, lnet_process_id_t target,
+ int lnet_send(lnet_nid_t nid, lnet_msg_t *msg, lnet_nid_t rtr_nid);
+ void lnet_return_tx_credits_locked(lnet_msg_t *msg);
+ void lnet_return_rx_credits_locked(lnet_msg_t *msg);
++void lnet_schedule_blocked_locked(lnet_rtrbufpool_t *rbp);
++void lnet_drop_routed_msgs_locked(struct list_head *list, int cpt);
  
- int lnet_nid2peer_locked(lnet_peer_t **lpp, lnet_nid_t nid, int cpt);
- lnet_peer_t *lnet_find_peer_locked(struct lnet_peer_table *ptable,
+ /* portals functions */
+ /* portals attributes */
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+index be650d4..b0ba9d8 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+@@ -285,6 +285,7 @@ typedef struct lnet_ni {
+ #define LNET_PING_FEAT_INVAL		(0)		/* no feature */
+ #define LNET_PING_FEAT_BASE		(1 << 0)	/* just a ping */
+ #define LNET_PING_FEAT_NI_STATUS	(1 << 1)	/* return NI status */
++#define LNET_PING_FEAT_RTE_DISABLED	(1 << 2)	/* Routing enabled */
+ 
+ #define LNET_PING_FEAT_MASK		(LNET_PING_FEAT_BASE | \
+ 					 LNET_PING_FEAT_NI_STATUS)
+@@ -410,7 +411,12 @@ typedef struct {
+ 
+ #define LNET_PEER_HASHSIZE	503	/* prime! */
+ 
+-#define LNET_NRBPOOLS		3	/* # different router buffer pools */
++#define LNET_TINY_BUF_IDX	0
++#define LNET_SMALL_BUF_IDX	1
++#define LNET_LARGE_BUF_IDX	2
++
++/* # different router buffer pools */
++#define LNET_NRBPOOLS		(LNET_LARGE_BUF_IDX + 1)
+ 
+ enum {
+ 	/* Didn't match anything */
 diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 06046b2..933f345 100644
+index cd68ca7..06046b2 100644
 --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
 +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -533,6 +533,11 @@ lnet_prepare(lnet_pid_t requested_pid)
- 	struct lnet_res_container **recs;
- 	int rc = 0;
+@@ -638,7 +638,7 @@ lnet_unprepare(void)
  
-+	if (requested_pid == LNET_PID_ANY) {
-+		/* Don't instantiate LNET just for me */
-+		return -ENETDOWN;
-+	}
-+
- 	LASSERT(!the_lnet.ln_refcount);
+ 	lnet_msg_containers_destroy();
+ 	lnet_peer_tables_destroy();
+-	lnet_rtrpools_free();
++	lnet_rtrpools_free(0);
  
- 	the_lnet.ln_routing = 0;
-@@ -819,6 +824,229 @@ lnet_count_acceptor_nis(void)
- 	return count;
- }
- 
-+static lnet_ping_info_t *
-+lnet_ping_info_create(int num_ni)
-+{
-+	lnet_ping_info_t *ping_info;
-+	unsigned int infosz;
-+
-+	infosz = offsetof(lnet_ping_info_t, pi_ni[num_ni]);
-+	LIBCFS_ALLOC(ping_info, infosz);
-+	if (!ping_info) {
-+		CERROR("Can't allocate ping info[%d]\n", num_ni);
-+		return NULL;
-+	}
-+
-+	ping_info->pi_nnis = num_ni;
-+	ping_info->pi_pid = the_lnet.ln_pid;
-+	ping_info->pi_magic = LNET_PROTO_PING_MAGIC;
-+	ping_info->pi_features = LNET_PING_FEAT_NI_STATUS;
-+
-+	return ping_info;
-+}
-+
-+static inline int
-+lnet_get_ni_count(void)
-+{
-+	struct lnet_ni *ni;
-+	int count = 0;
-+
-+	lnet_net_lock(0);
-+
-+	list_for_each_entry(ni, &the_lnet.ln_nis, ni_list)
-+		count++;
-+
-+	lnet_net_unlock(0);
-+
-+	return count;
-+}
-+
-+static inline void
-+lnet_ping_info_free(lnet_ping_info_t *pinfo)
-+{
-+	LIBCFS_FREE(pinfo,
-+		    offsetof(lnet_ping_info_t,
-+			     pi_ni[pinfo->pi_nnis]));
-+}
-+
-+static void
-+lnet_ping_info_destroy(void)
-+{
-+	struct lnet_ni *ni;
-+
-+	lnet_net_lock(LNET_LOCK_EX);
-+
-+	list_for_each_entry(ni, &the_lnet.ln_nis, ni_list) {
-+		lnet_ni_lock(ni);
-+		ni->ni_status = NULL;
-+		lnet_ni_unlock(ni);
-+	}
-+
-+	lnet_ping_info_free(the_lnet.ln_ping_info);
-+	the_lnet.ln_ping_info = NULL;
-+
-+	lnet_net_unlock(LNET_LOCK_EX);
-+}
-+
-+static void
-+lnet_ping_event_handler(lnet_event_t *event)
-+{
-+	lnet_ping_info_t *pinfo = event->md.user_ptr;
-+
-+	if (event->unlinked)
-+		pinfo->pi_features = LNET_PING_FEAT_INVAL;
-+}
-+
-+static int
-+lnet_ping_info_setup(lnet_ping_info_t **ppinfo, lnet_handle_md_t *md_handle,
-+		     int ni_count, bool set_eq)
-+{
-+	lnet_process_id_t id = {LNET_NID_ANY, LNET_PID_ANY};
-+	lnet_handle_me_t me_handle;
-+	lnet_md_t md = {0};
-+	int rc, rc2;
-+
-+	if (set_eq) {
-+		rc = LNetEQAlloc(0, lnet_ping_event_handler,
-+				 &the_lnet.ln_ping_target_eq);
-+		if (rc) {
-+			CERROR("Can't allocate ping EQ: %d\n", rc);
-+			return rc;
-+		}
-+	}
-+
-+	*ppinfo = lnet_ping_info_create(ni_count);
-+	if (!*ppinfo) {
-+		rc = -ENOMEM;
-+		goto failed_0;
-+	}
-+
-+	rc = LNetMEAttach(LNET_RESERVED_PORTAL, id,
-+			  LNET_PROTO_PING_MATCHBITS, 0,
-+			  LNET_UNLINK, LNET_INS_AFTER,
-+			  &me_handle);
-+	if (rc) {
-+		CERROR("Can't create ping ME: %d\n", rc);
-+		goto failed_1;
-+	}
-+
-+	/* initialize md content */
-+	md.start = *ppinfo;
-+	md.length = offsetof(lnet_ping_info_t,
-+			     pi_ni[(*ppinfo)->pi_nnis]);
-+	md.threshold = LNET_MD_THRESH_INF;
-+	md.max_size = 0;
-+	md.options = LNET_MD_OP_GET | LNET_MD_TRUNCATE |
-+		     LNET_MD_MANAGE_REMOTE;
-+	md.user_ptr  = NULL;
-+	md.eq_handle = the_lnet.ln_ping_target_eq;
-+	md.user_ptr = *ppinfo;
-+
-+	rc = LNetMDAttach(me_handle, md, LNET_RETAIN, md_handle);
-+	if (rc) {
-+		CERROR("Can't attach ping MD: %d\n", rc);
-+		goto failed_2;
-+	}
-+
-+	return 0;
-+
-+failed_2:
-+	rc2 = LNetMEUnlink(me_handle);
-+	LASSERT(!rc2);
-+failed_1:
-+	lnet_ping_info_free(*ppinfo);
-+	*ppinfo = NULL;
-+failed_0:
-+	if (set_eq)
-+		LNetEQFree(the_lnet.ln_ping_target_eq);
-+	return rc;
-+}
-+
-+static void
-+lnet_ping_md_unlink(lnet_ping_info_t *pinfo, lnet_handle_md_t *md_handle)
-+{
-+	sigset_t blocked = cfs_block_allsigs();
-+
-+	LNetMDUnlink(*md_handle);
-+	LNetInvalidateHandle(md_handle);
-+
-+	/* NB md could be busy; this just starts the unlink */
-+	while (pinfo->pi_features != LNET_PING_FEAT_INVAL) {
-+		CDEBUG(D_NET, "Still waiting for ping MD to unlink\n");
-+		set_current_state(TASK_UNINTERRUPTIBLE);
-+		schedule_timeout(cfs_time_seconds(1));
-+	}
-+
-+	cfs_restore_sigs(blocked);
-+}
-+
-+static void
-+lnet_ping_info_install_locked(lnet_ping_info_t *ping_info)
-+{
-+	lnet_ni_status_t *ns;
-+	lnet_ni_t *ni;
-+	int i = 0;
-+
-+	list_for_each_entry(ni, &the_lnet.ln_nis, ni_list) {
-+		LASSERT(i < ping_info->pi_nnis);
-+
-+		ns = &ping_info->pi_ni[i];
-+
-+		ns->ns_nid = ni->ni_nid;
-+
-+		lnet_ni_lock(ni);
-+		ns->ns_status = (ni->ni_status) ?
-+				 ni->ni_status->ns_status : LNET_NI_STATUS_UP;
-+		ni->ni_status = ns;
-+		lnet_ni_unlock(ni);
-+
-+		i++;
-+	}
-+}
-+
-+static void
-+lnet_ping_target_update(lnet_ping_info_t *pinfo, lnet_handle_md_t md_handle)
-+{
-+	lnet_ping_info_t *old_pinfo = NULL;
-+	lnet_handle_md_t old_md;
-+
-+	/* switch the NIs to point to the new ping info created */
-+	lnet_net_lock(LNET_LOCK_EX);
-+
+ 	if (the_lnet.ln_counters) {
+ 		cfs_percpt_free(the_lnet.ln_counters);
+@@ -1501,6 +1501,8 @@ lnet_create_ping_info(void)
+ 	pinfo->pi_pid     = the_lnet.ln_pid;
+ 	pinfo->pi_magic   = LNET_PROTO_PING_MAGIC;
+ 	pinfo->pi_features = LNET_PING_FEAT_NI_STATUS;
 +	if (!the_lnet.ln_routing)
 +		pinfo->pi_features |= LNET_PING_FEAT_RTE_DISABLED;
-+	lnet_ping_info_install_locked(pinfo);
-+
-+	if (the_lnet.ln_ping_info) {
-+		old_pinfo = the_lnet.ln_ping_info;
-+		old_md = the_lnet.ln_ping_target_md;
-+	}
-+	the_lnet.ln_ping_target_md = md_handle;
-+	the_lnet.ln_ping_info = pinfo;
-+
-+	lnet_net_unlock(LNET_LOCK_EX);
-+
-+	if (old_pinfo) {
-+		/* unlink the old ping info */
-+		lnet_ping_md_unlink(old_pinfo, &old_md);
-+		lnet_ping_info_free(old_pinfo);
-+	}
-+}
-+
-+static void
-+lnet_ping_target_fini(void)
-+{
-+	int rc;
-+
-+	lnet_ping_md_unlink(the_lnet.ln_ping_info,
-+			    &the_lnet.ln_ping_target_md);
-+
-+	rc = LNetEQFree(the_lnet.ln_ping_target_eq);
-+	LASSERT(!rc);
-+
-+	lnet_ping_info_destroy();
-+}
-+
- static int
- lnet_ni_tq_credits(lnet_ni_t *ni)
- {
-@@ -837,12 +1065,74 @@ lnet_ni_tq_credits(lnet_ni_t *ni)
+ 
+ 	for (i = 0; i < n; i++) {
+ 		lnet_ni_status_t *ns = &pinfo->pi_ni[i];
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index cc8c2c5..f2b1116 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -945,9 +945,6 @@ lnet_post_routed_recv_locked(lnet_msg_t *msg, int do_recv)
+ 	rbp = lnet_msg2bufpool(msg);
+ 
+ 	if (!msg->msg_rtrcredit) {
+-		LASSERT((rbp->rbp_credits < 0) ==
+-			 !list_empty(&rbp->rbp_msgs));
+-
+ 		msg->msg_rtrcredit = 1;
+ 		rbp->rbp_credits--;
+ 		if (rbp->rbp_credits < rbp->rbp_mincredits)
+@@ -1039,6 +1036,43 @@ lnet_return_tx_credits_locked(lnet_msg_t *msg)
  }
  
- static void
--lnet_shutdown_lndnis(void)
-+lnet_clear_zombies_nis_locked(void)
+ void
++lnet_schedule_blocked_locked(lnet_rtrbufpool_t *rbp)
++{
++	lnet_msg_t *msg;
++
++	if (list_empty(&rbp->rbp_msgs))
++		return;
++	msg = list_entry(rbp->rbp_msgs.next,
++			 lnet_msg_t, msg_list);
++	list_del(&msg->msg_list);
++
++	(void)lnet_post_routed_recv_locked(msg, 1);
++}
++
++void
++lnet_drop_routed_msgs_locked(struct list_head *list, int cpt)
++{
++	struct list_head drop;
++	lnet_msg_t *msg;
++	lnet_msg_t *tmp;
++
++	INIT_LIST_HEAD(&drop);
++
++	list_splice_init(list, &drop);
++
++	lnet_net_unlock(cpt);
++
++	list_for_each_entry_safe(msg, tmp, &drop, msg_list) {
++		lnet_ni_recv(msg->msg_rxpeer->lp_ni, msg->msg_private, NULL,
++			     0, 0, 0, msg->msg_hdr.payload_length);
++		list_del_init(&msg->msg_list);
++		lnet_finalize(NULL, msg, -ECANCELED);
++	}
++
++	lnet_net_lock(cpt);
++}
++
++void
+ lnet_return_rx_credits_locked(lnet_msg_t *msg)
  {
- 	int i;
- 	int islo;
- 	lnet_ni_t *ni;
+ 	lnet_peer_t *rxpeer = msg->msg_rxpeer;
+@@ -1058,27 +1092,41 @@ lnet_return_rx_credits_locked(lnet_msg_t *msg)
  
-+	/*
-+	 * Now wait for the NI's I just nuked to show up on ln_zombie_nis
-+	 * and shut them down in guaranteed thread context
-+	 */
-+	i = 2;
-+	while (!list_empty(&the_lnet.ln_nis_zombie)) {
-+		int *ref;
-+		int j;
+ 		rb = list_entry(msg->msg_kiov, lnet_rtrbuf_t, rb_kiov[0]);
+ 		rbp = rb->rb_pool;
+-		LASSERT(rbp == lnet_msg2bufpool(msg));
+ 
+ 		msg->msg_kiov = NULL;
+ 		msg->msg_rtrcredit = 0;
+ 
+-		LASSERT((rbp->rbp_credits < 0) ==
+-			!list_empty(&rbp->rbp_msgs));
++		LASSERT(rbp == lnet_msg2bufpool(msg));
 +
-+		ni = list_entry(the_lnet.ln_nis_zombie.next,
-+				lnet_ni_t, ni_list);
-+		list_del_init(&ni->ni_list);
-+		cfs_percpt_for_each(ref, j, ni->ni_refs) {
-+			if (!*ref)
-+				continue;
-+			/* still busy, add it back to zombie list */
-+			list_add(&ni->ni_list, &the_lnet.ln_nis_zombie);
-+			break;
+ 		LASSERT((rbp->rbp_credits > 0) ==
+ 			!list_empty(&rbp->rbp_bufs));
+ 
+-		list_add(&rb->rb_list, &rbp->rbp_bufs);
+-		rbp->rbp_credits++;
+-		if (rbp->rbp_credits <= 0) {
+-			msg2 = list_entry(rbp->rbp_msgs.next,
+-					  lnet_msg_t, msg_list);
+-			list_del(&msg2->msg_list);
++		/*
++		 * If routing is now turned off, we just drop this buffer and
++		 * don't bother trying to return credits.
++		 */
++		if (!the_lnet.ln_routing) {
++			lnet_destroy_rtrbuf(rb, rbp->rbp_npages);
++			goto routing_off;
 +		}
+ 
+-			(void) lnet_post_routed_recv_locked(msg2, 1);
++		/*
++		 * It is possible that a user has lowered the desired number of
++		 * buffers in this pool.  Make sure we never put back
++		 * more buffers than the stated number.
++		 */
++		if (rbp->rbp_credits >= rbp->rbp_nbuffers) {
++			/* Discard this buffer so we don't have too many. */
++			lnet_destroy_rtrbuf(rb, rbp->rbp_npages);
++		} else {
++			list_add(&rb->rb_list, &rbp->rbp_bufs);
++			rbp->rbp_credits++;
++			if (rbp->rbp_credits <= 0)
++				lnet_schedule_blocked_locked(rbp);
+ 		}
+ 	}
+ 
++routing_off:
+ 	if (msg->msg_peerrtrcredit) {
+ 		/* give back peer router credits */
+ 		msg->msg_peerrtrcredit = 0;
+@@ -1087,7 +1135,14 @@ lnet_return_rx_credits_locked(lnet_msg_t *msg)
+ 			!list_empty(&rxpeer->lp_rtrq));
+ 
+ 		rxpeer->lp_rtrcredits++;
+-		if (rxpeer->lp_rtrcredits <= 0) {
++		/*
++		 * drop all messages which are queued to be routed on that
++		 * peer.
++		 */
++		if (!the_lnet.ln_routing) {
++			lnet_drop_routed_msgs_locked(&rxpeer->lp_rtrq,
++						     msg->msg_rx_cpt);
++		} else if (rxpeer->lp_rtrcredits <= 0) {
+ 			msg2 = list_entry(rxpeer->lp_rtrq.next,
+ 					  lnet_msg_t, msg_list);
+ 			list_del(&msg2->msg_list);
+@@ -1646,6 +1701,9 @@ lnet_parse_forward_locked(lnet_ni_t *ni, lnet_msg_t *msg)
+ {
+ 	int rc = 0;
+ 
++	if (!the_lnet.ln_routing)
++		return -ECANCELED;
 +
-+		if (!list_empty(&ni->ni_list)) {
-+			lnet_net_unlock(LNET_LOCK_EX);
-+			++i;
-+			if ((i & (-i)) == i) {
-+				CDEBUG(D_WARNING, "Waiting for zombie LNI %s\n",
-+				       libcfs_nid2str(ni->ni_nid));
-+			}
-+			set_current_state(TASK_UNINTERRUPTIBLE);
-+			schedule_timeout(cfs_time_seconds(1));
-+			lnet_net_lock(LNET_LOCK_EX);
+ 	if (msg->msg_rxpeer->lp_rtrcredits <= 0 ||
+ 	    lnet_msg2bufpool(msg)->rbp_credits <= 0) {
+ 		if (!ni->ni_lnd->lnd_eager_recv) {
+@@ -1799,9 +1857,8 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
+ 
+ 	if (the_lnet.ln_routing &&
+ 	    ni->ni_last_alive != ktime_get_real_seconds()) {
+-		lnet_ni_lock(ni);
+-
+ 		/* NB: so far here is the only place to set NI status to "up */
++		lnet_ni_lock(ni);
+ 		ni->ni_last_alive = ktime_get_real_seconds();
+ 		if (ni->ni_status &&
+ 		    ni->ni_status->ns_status == LNET_NI_STATUS_DOWN)
+diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+index 67566ca..e3a6611 100644
+--- a/drivers/staging/lustre/lnet/lnet/router.c
++++ b/drivers/staging/lustre/lnet/lnet/router.c
+@@ -28,8 +28,11 @@
+ #define LNET_NRB_TINY		(LNET_NRB_TINY_MIN * 4)
+ #define LNET_NRB_SMALL_MIN	4096	/* min value for each CPT */
+ #define LNET_NRB_SMALL		(LNET_NRB_SMALL_MIN * 4)
++#define LNET_NRB_SMALL_PAGES	1
+ #define LNET_NRB_LARGE_MIN	256	/* min value for each CPT */
+ #define LNET_NRB_LARGE		(LNET_NRB_LARGE_MIN * 4)
++#define LNET_NRB_LARGE_PAGES   ((LNET_MTU + PAGE_CACHE_SIZE - 1) >> \
++				 PAGE_CACHE_SHIFT)
+ 
+ static char *forwarding = "";
+ module_param(forwarding, charp, 0444);
+@@ -570,7 +573,8 @@ lnet_get_route(int idx, __u32 *net, __u32 *hops,
+ 					*hops     = route->lr_hops;
+ 					*priority = route->lr_priority;
+ 					*gateway  = route->lr_gateway->lp_nid;
+-					*alive    = route->lr_gateway->lp_alive;
++					*alive = route->lr_gateway->lp_alive &&
++						 !route->lr_downis;
+ 					lnet_net_unlock(cpt);
+ 					return 0;
+ 				}
+@@ -608,7 +612,7 @@ lnet_parse_rc_info(lnet_rc_data_t *rcd)
+ {
+ 	lnet_ping_info_t *info = rcd->rcd_pinginfo;
+ 	struct lnet_peer *gw = rcd->rcd_gateway;
+-	lnet_route_t *rtr;
++	lnet_route_t *rte;
+ 
+ 	if (!gw->lp_alive)
+ 		return;
+@@ -634,11 +638,16 @@ lnet_parse_rc_info(lnet_rc_data_t *rcd)
+ 	if (!(gw->lp_ping_feats & LNET_PING_FEAT_NI_STATUS))
+ 		return; /* can't carry NI status info */
+ 
+-	list_for_each_entry(rtr, &gw->lp_routes, lr_gwlist) {
++	list_for_each_entry(rte, &gw->lp_routes, lr_gwlist) {
+ 		int down = 0;
+ 		int up = 0;
+ 		int i;
+ 
++		if (gw->lp_ping_feats & LNET_PING_FEAT_RTE_DISABLED) {
++			rte->lr_downis = 1;
 +			continue;
 +		}
 +
-+		ni->ni_lnd->lnd_refcount--;
-+		lnet_net_unlock(LNET_LOCK_EX);
-+
-+		islo = ni->ni_lnd->lnd_type == LOLND;
-+
-+		LASSERT(!in_interrupt());
-+		ni->ni_lnd->lnd_shutdown(ni);
-+
-+		/*
-+		 * can't deref lnd anymore now; it might have unregistered
-+		 * itself...
-+		 */
-+		if (!islo)
-+			CDEBUG(D_LNI, "Removed LNI %s\n",
-+			       libcfs_nid2str(ni->ni_nid));
-+
-+		lnet_ni_free(ni);
-+		i = 2;
-+
-+		lnet_net_lock(LNET_LOCK_EX);
-+	}
-+}
-+
-+static void
-+lnet_shutdown_lndnis(void)
-+{
-+	lnet_ni_t *ni;
-+	int i;
-+
- 	/* NB called holding the global mutex */
+ 		for (i = 0; i < info->pi_nnis && i < LNET_MAX_RTR_NIS; i++) {
+ 			lnet_ni_status_t *stat = &info->pi_ni[i];
+ 			lnet_nid_t nid = stat->ns_nid;
+@@ -659,7 +668,7 @@ lnet_parse_rc_info(lnet_rc_data_t *rcd)
+ 			}
  
- 	/* All quiet on the API front */
-@@ -895,92 +1185,90 @@ lnet_shutdown_lndnis(void)
- 	lnet_peer_tables_cleanup(NULL);
+ 			if (stat->ns_status == LNET_NI_STATUS_UP) {
+-				if (LNET_NIDNET(nid) == rtr->lr_net) {
++				if (LNET_NIDNET(nid) == rte->lr_net) {
+ 					up = 1;
+ 					break;
+ 				}
+@@ -673,10 +682,10 @@ lnet_parse_rc_info(lnet_rc_data_t *rcd)
+ 		}
  
- 	lnet_net_lock(LNET_LOCK_EX);
--	/*
--	 * Now wait for the NI's I just nuked to show up on ln_zombie_nis
--	 * and shut them down in guaranteed thread context
--	 */
--	i = 2;
--	while (!list_empty(&the_lnet.ln_nis_zombie)) {
--		int *ref;
--		int j;
- 
--		ni = list_entry(the_lnet.ln_nis_zombie.next,
--				lnet_ni_t, ni_list);
--		list_del_init(&ni->ni_list);
--		cfs_percpt_for_each(ref, j, ni->ni_refs) {
--			if (!*ref)
--				continue;
--			/* still busy, add it back to zombie list */
--			list_add(&ni->ni_list, &the_lnet.ln_nis_zombie);
--			break;
--		}
-+	lnet_clear_zombies_nis_locked();
-+	the_lnet.ln_shutdown = 0;
-+	lnet_net_unlock(LNET_LOCK_EX);
-+}
- 
--		if (!list_empty(&ni->ni_list)) {
--			lnet_net_unlock(LNET_LOCK_EX);
--			++i;
--			if ((i & (-i)) == i) {
--				CDEBUG(D_WARNING, "Waiting for zombie LNI %s\n",
--				       libcfs_nid2str(ni->ni_nid));
--			}
--			set_current_state(TASK_UNINTERRUPTIBLE);
--			schedule_timeout(cfs_time_seconds(1));
--			lnet_net_lock(LNET_LOCK_EX);
--			continue;
--		}
-+int
-+lnet_shutdown_lndni(__u32 net)
-+{
-+	lnet_ping_info_t *pinfo;
-+	lnet_handle_md_t md_handle;
-+	lnet_ni_t *found_ni = NULL;
-+	int ni_count;
-+	int rc;
- 
--		ni->ni_lnd->lnd_refcount--;
--		lnet_net_unlock(LNET_LOCK_EX);
-+	if (LNET_NETTYP(net) == LOLND)
-+		return -EINVAL;
- 
--		islo = ni->ni_lnd->lnd_type == LOLND;
-+	ni_count = lnet_get_ni_count();
- 
--		LASSERT(!in_interrupt());
--		ni->ni_lnd->lnd_shutdown(ni);
-+	/* create and link a new ping info, before removing the old one */
-+	rc = lnet_ping_info_setup(&pinfo, &md_handle, ni_count - 1, false);
-+	if (rc)
-+		return rc;
- 
--		/*
--		 * can't deref lnd anymore now; it might have unregistered
--		 * itself...
--		 */
--		if (!islo)
--			CDEBUG(D_LNI, "Removed LNI %s\n",
--			       libcfs_nid2str(ni->ni_nid));
-+	/* proceed with shutting down the NI */
-+	lnet_net_lock(LNET_LOCK_EX);
- 
--		lnet_ni_free(ni);
--		i = 2;
-+	found_ni = lnet_net2ni_locked(net, 0);
-+	if (!found_ni) {
-+		lnet_net_unlock(LNET_LOCK_EX);
-+		lnet_ping_md_unlink(pinfo, &md_handle);
-+		lnet_ping_info_free(pinfo);
-+		return -EINVAL;
-+	}
- 
--		lnet_net_lock(LNET_LOCK_EX);
-+	/*
-+	 * decrement the reference counter on found_ni which was
-+	 * incremented when we called lnet_net2ni_locked()
-+	 */
-+	lnet_ni_decref_locked(found_ni, 0);
-+	/* Move ni to zombie list so nobody can find it anymore */
-+	list_move(&found_ni->ni_list, &the_lnet.ln_nis_zombie);
-+
-+	/* Drop the lock reference for the ln_nis ref. */
-+	lnet_ni_decref_locked(found_ni, 0);
-+
-+	if (!list_empty(&found_ni->ni_cptlist)) {
-+		list_del_init(&found_ni->ni_cptlist);
-+		lnet_ni_decref_locked(found_ni, 0);
+ 		if (up) { /* ignore downed NIs if NI for dest network is up */
+-			rtr->lr_downis = 0;
++			rte->lr_downis = 0;
+ 			continue;
+ 		}
+-		rtr->lr_downis = down;
++		rte->lr_downis = down;
  	}
+ }
  
--	the_lnet.ln_shutdown = 0;
- 	lnet_net_unlock(LNET_LOCK_EX);
-+
-+	/* Do peer table cleanup for this ni */
-+	lnet_peer_tables_cleanup(found_ni);
-+
-+	lnet_net_lock(LNET_LOCK_EX);
-+	lnet_clear_zombies_nis_locked();
-+	lnet_net_unlock(LNET_LOCK_EX);
-+
-+	lnet_ping_target_update(pinfo, md_handle);
-+
-+	return 0;
+@@ -1226,7 +1235,7 @@ rescan:
+ 	return 0;
+ }
+ 
+-static void
++void
+ lnet_destroy_rtrbuf(lnet_rtrbuf_t *rb, int npages)
+ {
+ 	int sz = offsetof(lnet_rtrbuf_t, rb_kiov[npages]);
+@@ -1273,67 +1282,103 @@ lnet_new_rtrbuf(lnet_rtrbufpool_t *rbp, int cpt)
+ }
+ 
+ static void
+-lnet_rtrpool_free_bufs(lnet_rtrbufpool_t *rbp)
++lnet_rtrpool_free_bufs(lnet_rtrbufpool_t *rbp, int cpt)
+ {
+ 	int npages = rbp->rbp_npages;
+-	int nbuffers = 0;
++	struct list_head tmp;
+ 	lnet_rtrbuf_t *rb;
+ 
+ 	if (!rbp->rbp_nbuffers) /* not initialized or already freed */
+ 		return;
+ 
+-	LASSERT(list_empty(&rbp->rbp_msgs));
+-	LASSERT(rbp->rbp_credits == rbp->rbp_nbuffers);
++	INIT_LIST_HEAD(&tmp);
+ 
+-	while (!list_empty(&rbp->rbp_bufs)) {
+-		LASSERT(rbp->rbp_credits > 0);
++	lnet_net_lock(cpt);
++	lnet_drop_routed_msgs_locked(&rbp->rbp_msgs, cpt);
++	list_splice_init(&rbp->rbp_bufs, &tmp);
++	rbp->rbp_nbuffers = 0;
++	rbp->rbp_credits = 0;
++	rbp->rbp_mincredits = 0;
++	lnet_net_unlock(cpt);
+ 
+-		rb = list_entry(rbp->rbp_bufs.next,
+-				lnet_rtrbuf_t, rb_list);
++	/* Free buffers on the free list. */
++	while (!list_empty(&tmp)) {
++		rb = list_entry(tmp.next, lnet_rtrbuf_t, rb_list);
+ 		list_del(&rb->rb_list);
+ 		lnet_destroy_rtrbuf(rb, npages);
+-		nbuffers++;
+ 	}
+-
+-	LASSERT(rbp->rbp_nbuffers == nbuffers);
+-	LASSERT(rbp->rbp_credits == nbuffers);
+-
+-	rbp->rbp_nbuffers = 0;
+-	rbp->rbp_credits = 0;
  }
  
  static int
--lnet_startup_lndnis(void)
-+lnet_startup_lndnis(struct list_head *nilist, __s32 peer_timeout,
-+		    __s32 peer_cr, __s32 peer_buf_cr, __s32 credits,
-+		    int *ni_count)
+-lnet_rtrpool_alloc_bufs(lnet_rtrbufpool_t *rbp, int nbufs, int cpt)
++lnet_rtrpool_adjust_bufs(lnet_rtrbufpool_t *rbp, int nbufs, int cpt)
  {
- 	lnd_t *lnd;
- 	struct lnet_ni *ni;
- 	struct lnet_tx_queue *tq;
--	struct list_head nilist;
- 	int i;
- 	int rc = 0;
- 	__u32 lnd_type;
--	int nicount = 0;
--	char *nets = lnet_get_networks();
--
--	INIT_LIST_HEAD(&nilist);
--
--	if (!nets)
--		goto failed;
--
--	rc = lnet_parse_networks(&nilist, nets);
--	if (rc)
--		goto failed;
++	struct list_head rb_list;
+ 	lnet_rtrbuf_t *rb;
+-	int i;
++	int num_rb;
++	int num_buffers = 0;
++	int npages = rbp->rbp_npages;
  
--	while (!list_empty(&nilist)) {
--		ni = list_entry(nilist.next, lnet_ni_t, ni_list);
-+	while (!list_empty(nilist)) {
-+		ni = list_entry(nilist->next, lnet_ni_t, ni_list);
- 		lnd_type = LNET_NETTYP(LNET_NIDNET(ni->ni_nid));
- 
--		LASSERT(libcfs_isknown_lnd(lnd_type));
-+		if (!libcfs_isknown_lnd(lnd_type))
-+			goto failed;
- 
- 		if (lnd_type == CIBLND    ||
- 		    lnd_type == OPENIBLND ||
-@@ -991,6 +1279,24 @@ lnet_startup_lndnis(void)
- 			goto failed;
- 		}
- 
-+		/* Make sure this new NI is unique. */
-+		lnet_net_lock(LNET_LOCK_EX);
-+		if (!lnet_net_unique(LNET_NIDNET(ni->ni_nid),
-+				     &the_lnet.ln_nis)) {
-+			if (lnd_type == LOLND) {
-+				lnet_net_unlock(LNET_LOCK_EX);
-+				list_del(&ni->ni_list);
-+				lnet_ni_free(ni);
-+				continue;
-+			}
-+
-+			CERROR("Net %s is not unique\n",
-+			       libcfs_net2str(LNET_NIDNET(ni->ni_nid)));
-+			lnet_net_unlock(LNET_LOCK_EX);
-+			goto failed;
-+		}
-+		lnet_net_unlock(LNET_LOCK_EX);
-+
- 		mutex_lock(&the_lnet.ln_lnd_mutex);
- 		lnd = lnet_find_lnd_by_type(lnd_type);
- 
-@@ -1029,6 +1335,25 @@ lnet_startup_lndnis(void)
- 			goto failed;
- 		}
- 
-+		/*
-+		 * If given some LND tunable parameters, parse those now to
-+		 * override the values in the NI structure.
-+		 */
-+		if (peer_buf_cr >= 0)
-+			ni->ni_peerrtrcredits = peer_buf_cr;
-+		if (peer_timeout >= 0)
-+			ni->ni_peertimeout = peer_timeout;
-+		/*
-+		 * TODO
-+		 * Note: For now, don't allow the user to change
-+		 * peertxcredits as this number is used in the
-+		 * IB LND to control queue depth.
-+		 * if (peer_cr != -1)
-+		 *	ni->ni_peertxcredits = peer_cr;
-+		 */
-+		if (credits >= 0)
-+			ni->ni_maxtxcredits = credits;
-+
- 		LASSERT(ni->ni_peertimeout <= 0 || lnd->lnd_query);
- 
- 		list_del(&ni->ni_list);
-@@ -1045,6 +1370,14 @@ lnet_startup_lndnis(void)
- 
- 		lnet_net_unlock(LNET_LOCK_EX);
- 
-+		/* increment the ni_count here to account for the LOLND as
-+		 * well.  If we increment past this point then the number
-+		 * of count will be missing the LOLND, and then ping and
-+		 * will not report the LOLND
-+		 */
-+		if (ni_count)
-+			(*ni_count)++;
-+
- 		if (lnd->lnd_type == LOLND) {
- 			lnet_ni_addref(ni);
- 			LASSERT(!the_lnet.ln_loni);
-@@ -1070,29 +1403,16 @@ lnet_startup_lndnis(void)
- 		       libcfs_nid2str(ni->ni_nid), ni->ni_peertxcredits,
- 		       lnet_ni_tq_credits(ni) * LNET_CPT_NUMBER,
- 		       ni->ni_peerrtrcredits, ni->ni_peertimeout);
--
--		nicount++;
--	}
--
--	if (the_lnet.ln_eq_waitni && nicount > 1) {
--		lnd_type = the_lnet.ln_eq_waitni->ni_lnd->lnd_type;
--		LCONSOLE_ERROR_MSG(0x109, "LND %s can only run single-network\n",
--				   libcfs_lnd2str(lnd_type));
--		goto failed;
+-	if (rbp->rbp_nbuffers) {
+-		LASSERT(rbp->rbp_nbuffers == nbufs);
++	/*
++	 * If we are called for less buffers than already in the pool, we
++	 * just lower the nbuffers number and excess buffers will be
++	 * thrown away as they are returned to the free list.  Credits
++	 * then get adjusted as well.
++	 */
++	if (nbufs <= rbp->rbp_nbuffers) {
++		lnet_net_lock(cpt);
++		rbp->rbp_nbuffers = nbufs;
++		lnet_net_unlock(cpt);
+ 		return 0;
  	}
  
+-	for (i = 0; i < nbufs; i++) {
+-		rb = lnet_new_rtrbuf(rbp, cpt);
++	INIT_LIST_HEAD(&rb_list);
++
++	/*
++	 * allocate the buffers on a local list first.  If all buffers are
++	 * allocated successfully then join this list to the rbp buffer
++	 * list. If not then free all allocated buffers.
++	 */
++	num_rb = rbp->rbp_nbuffers;
+ 
++	while (num_rb < nbufs) {
++		rb = lnet_new_rtrbuf(rbp, cpt);
+ 		if (!rb) {
+-			CERROR("Failed to allocate %d router bufs of %d pages\n",
+-			       nbufs, rbp->rbp_npages);
+-			return -ENOMEM;
++			CERROR("Failed to allocate %d route bufs of %d pages\n",
++			       nbufs, npages);
++			goto failed;
+ 		}
+ 
+-		rbp->rbp_nbuffers++;
+-		rbp->rbp_credits++;
+-		rbp->rbp_mincredits++;
+-		list_add(&rb->rb_list, &rbp->rbp_bufs);
+-
+-		/* No allocation "under fire" */
+-		/* Otherwise we'd need code to schedule blocked msgs etc */
+-		LASSERT(!the_lnet.ln_routing);
++		list_add(&rb->rb_list, &rb_list);
++		num_buffers++;
++		num_rb++;
+ 	}
+ 
+-	LASSERT(rbp->rbp_credits == nbufs);
++	lnet_net_lock(cpt);
++
++	list_splice_tail(&rb_list, &rbp->rbp_bufs);
++	rbp->rbp_nbuffers += num_buffers;
++	rbp->rbp_credits += num_buffers;
++	rbp->rbp_mincredits = rbp->rbp_credits;
++	/*
++	 * We need to schedule blocked msg using the newly
++	 * added buffers.
++	 */
++	while (!list_empty(&rbp->rbp_bufs) &&
++	       !list_empty(&rbp->rbp_msgs))
++		lnet_schedule_blocked_locked(rbp);
++
++	lnet_net_unlock(cpt);
++
  	return 0;
--
-- failed:
--	lnet_shutdown_lndnis();
--
--	while (!list_empty(&nilist)) {
--		ni = list_entry(nilist.next, lnet_ni_t, ni_list);
++
 +failed:
-+	while (!list_empty(nilist)) {
-+		ni = list_entry(nilist->next, lnet_ni_t, ni_list);
- 		list_del(&ni->ni_list);
- 		lnet_ni_free(ni);
- 	}
--
--	return -ENETDOWN;
-+	return -EINVAL;
++	while (!list_empty(&rb_list)) {
++		rb = list_entry(rb_list.next, lnet_rtrbuf_t, rb_list);
++		list_del(&rb->rb_list);
++		lnet_destroy_rtrbuf(rb, npages);
++	}
++
++	return -ENOMEM;
  }
  
- /**
-@@ -1208,6 +1528,15 @@ LNetNIInit(lnet_pid_t requested_pid)
+ static void
+@@ -1348,7 +1393,7 @@ lnet_rtrpool_init(lnet_rtrbufpool_t *rbp, int npages)
+ }
+ 
+ void
+-lnet_rtrpools_free(void)
++lnet_rtrpools_free(int keep_pools)
  {
- 	int im_a_router = 0;
- 	int rc;
-+	int ni_count = 0;
-+	int lnd_type;
-+	struct lnet_ni *ni;
-+	lnet_ping_info_t *pinfo;
-+	lnet_handle_md_t md_handle;
-+	struct list_head net_head;
-+	char *nets;
-+
-+	INIT_LIST_HEAD(&net_head);
+ 	lnet_rtrbufpool_t *rtrp;
+ 	int i;
+@@ -1357,17 +1402,19 @@ lnet_rtrpools_free(void)
+ 		return;
  
- 	mutex_lock(&the_lnet.ln_api_mutex);
- 
-@@ -1216,23 +1545,31 @@ LNetNIInit(lnet_pid_t requested_pid)
- 
- 	if (the_lnet.ln_refcount > 0) {
- 		rc = the_lnet.ln_refcount++;
--		goto out;
-+		mutex_unlock(&the_lnet.ln_api_mutex);
-+		return rc;
+ 	cfs_percpt_for_each(rtrp, i, the_lnet.ln_rtrpools) {
+-		lnet_rtrpool_free_bufs(&rtrp[0]);
+-		lnet_rtrpool_free_bufs(&rtrp[1]);
+-		lnet_rtrpool_free_bufs(&rtrp[2]);
++		lnet_rtrpool_free_bufs(&rtrp[LNET_TINY_BUF_IDX], i);
++		lnet_rtrpool_free_bufs(&rtrp[LNET_SMALL_BUF_IDX], i);
++		lnet_rtrpool_free_bufs(&rtrp[LNET_LARGE_BUF_IDX], i);
  	}
  
--	if (requested_pid == LNET_PID_ANY) {
--		/* Don't instantiate LNET just for me */
--		rc = -ENETDOWN;
--		goto failed0;
--	}
-+	nets = lnet_get_networks();
- 
- 	rc = lnet_prepare(requested_pid);
- 	if (rc)
- 		goto failed0;
- 
--	rc = lnet_startup_lndnis();
-+	rc = lnet_parse_networks(&net_head, nets);
-+	if (rc < 0)
-+		goto failed1;
-+
-+	rc = lnet_startup_lndnis(&net_head, -1, -1, -1, -1, &ni_count);
- 	if (rc)
- 		goto failed1;
- 
-+	if (the_lnet.ln_eq_waitni && ni_count > 1) {
-+		lnd_type = the_lnet.ln_eq_waitni->ni_lnd->lnd_type;
-+		LCONSOLE_ERROR_MSG(0x109, "LND %s can only run single-network\n",
-+				   libcfs_lnd2str(lnd_type));
-+		goto failed2;
+-	cfs_percpt_free(the_lnet.ln_rtrpools);
+-	the_lnet.ln_rtrpools = NULL;
++	if (!keep_pools) {
++		cfs_percpt_free(the_lnet.ln_rtrpools);
++		the_lnet.ln_rtrpools = NULL;
 +	}
-+
- 	rc = lnet_parse_routes(lnet_get_routes(), &im_a_router);
- 	if (rc)
- 		goto failed2;
-@@ -1252,26 +1589,30 @@ LNetNIInit(lnet_pid_t requested_pid)
- 	the_lnet.ln_refcount = 1;
- 	/* Now I may use my own API functions... */
+ }
  
--	/*
--	 * NB router checker needs the_lnet.ln_ping_info in
--	 * lnet_router_checker -> lnet_update_ni_status_locked
--	  */
--	rc = lnet_ping_target_init();
-+	rc = lnet_ping_info_setup(&pinfo, &md_handle, ni_count, true);
- 	if (rc)
- 		goto failed3;
+ static int
+-lnet_nrb_tiny_calculate(int npages)
++lnet_nrb_tiny_calculate(void)
+ {
+ 	int nrbs = LNET_NRB_TINY;
  
-+	lnet_ping_target_update(pinfo, md_handle);
-+
- 	rc = lnet_router_checker_start();
- 	if (rc)
- 		goto failed4;
+@@ -1386,7 +1433,7 @@ lnet_nrb_tiny_calculate(int npages)
+ }
  
- 	lnet_router_debugfs_init();
--	goto out;
-+
-+	mutex_unlock(&the_lnet.ln_api_mutex);
-+
-+	return 0;
+ static int
+-lnet_nrb_small_calculate(int npages)
++lnet_nrb_small_calculate(void)
+ {
+ 	int nrbs = LNET_NRB_SMALL;
  
-  failed4:
--	lnet_ping_target_fini();
-- failed3:
- 	the_lnet.ln_refcount = 0;
-+	lnet_ping_md_unlink(pinfo, &md_handle);
-+	lnet_ping_info_free(pinfo);
-+ failed3:
- 	lnet_acceptor_stop();
-+	rc = LNetEQFree(the_lnet.ln_ping_target_eq);
-+	LASSERT(!rc);
-  failed2:
- 	lnet_destroy_routes();
- 	lnet_shutdown_lndnis();
-@@ -1279,8 +1620,12 @@ LNetNIInit(lnet_pid_t requested_pid)
- 	lnet_unprepare();
-  failed0:
- 	LASSERT(rc < 0);
-- out:
- 	mutex_unlock(&the_lnet.ln_api_mutex);
-+	while (!list_empty(&net_head)) {
-+		ni = list_entry(net_head.next, struct lnet_ni, ni_list);
-+		list_del_init(&ni->ni_list);
-+		lnet_ni_free(ni);
-+	}
+@@ -1405,7 +1452,7 @@ lnet_nrb_small_calculate(int npages)
+ }
+ 
+ static int
+-lnet_nrb_large_calculate(int npages)
++lnet_nrb_large_calculate(void)
+ {
+ 	int nrbs = LNET_NRB_LARGE;
+ 
+@@ -1427,16 +1474,12 @@ int
+ lnet_rtrpools_alloc(int im_a_router)
+ {
+ 	lnet_rtrbufpool_t *rtrp;
+-	int large_pages;
+-	int small_pages = 1;
+ 	int nrb_tiny;
+ 	int nrb_small;
+ 	int nrb_large;
+ 	int rc;
+ 	int i;
+ 
+-	large_pages = (LNET_MTU + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+-
+ 	if (!strcmp(forwarding, "")) {
+ 		/* not set either way */
+ 		if (!im_a_router)
+@@ -1451,15 +1494,15 @@ lnet_rtrpools_alloc(int im_a_router)
+ 		return -EINVAL;
+ 	}
+ 
+-	nrb_tiny = lnet_nrb_tiny_calculate(0);
++	nrb_tiny = lnet_nrb_tiny_calculate();
+ 	if (nrb_tiny < 0)
+ 		return -EINVAL;
+ 
+-	nrb_small = lnet_nrb_small_calculate(small_pages);
++	nrb_small = lnet_nrb_small_calculate();
+ 	if (nrb_small < 0)
+ 		return -EINVAL;
+ 
+-	nrb_large = lnet_nrb_large_calculate(large_pages);
++	nrb_large = lnet_nrb_large_calculate();
+ 	if (nrb_large < 0)
+ 		return -EINVAL;
+ 
+@@ -1473,18 +1516,23 @@ lnet_rtrpools_alloc(int im_a_router)
+ 	}
+ 
+ 	cfs_percpt_for_each(rtrp, i, the_lnet.ln_rtrpools) {
+-		lnet_rtrpool_init(&rtrp[0], 0);
+-		rc = lnet_rtrpool_alloc_bufs(&rtrp[0], nrb_tiny, i);
++		lnet_rtrpool_init(&rtrp[LNET_TINY_BUF_IDX], 0);
++		rc = lnet_rtrpool_adjust_bufs(&rtrp[LNET_TINY_BUF_IDX],
++					      nrb_tiny, i);
+ 		if (rc)
+ 			goto failed;
+ 
+-		lnet_rtrpool_init(&rtrp[1], small_pages);
+-		rc = lnet_rtrpool_alloc_bufs(&rtrp[1], nrb_small, i);
++		lnet_rtrpool_init(&rtrp[LNET_SMALL_BUF_IDX],
++				  LNET_NRB_SMALL_PAGES);
++		rc = lnet_rtrpool_adjust_bufs(&rtrp[LNET_SMALL_BUF_IDX],
++					      nrb_small, i);
+ 		if (rc)
+ 			goto failed;
+ 
+-		lnet_rtrpool_init(&rtrp[2], large_pages);
+-		rc = lnet_rtrpool_alloc_bufs(&rtrp[2], nrb_large, i);
++		lnet_rtrpool_init(&rtrp[LNET_LARGE_BUF_IDX],
++				  LNET_NRB_LARGE_PAGES);
++		rc = lnet_rtrpool_adjust_bufs(&rtrp[LNET_LARGE_BUF_IDX],
++					      nrb_large, i);
+ 		if (rc)
+ 			goto failed;
+ 	}
+@@ -1496,11 +1544,114 @@ lnet_rtrpools_alloc(int im_a_router)
+ 	return 0;
+ 
+  failed:
+-	lnet_rtrpools_free();
++	lnet_rtrpools_free(0);
  	return rc;
  }
- EXPORT_SYMBOL(LNetNIInit);
-@@ -1325,6 +1670,71 @@ LNetNIFini(void)
- }
- EXPORT_SYMBOL(LNetNIFini);
  
-+int
-+lnet_dyn_add_ni(lnet_pid_t requested_pid, char *nets,
-+		__s32 peer_timeout, __s32 peer_cr, __s32 peer_buf_cr,
-+		__s32 credits)
+ int
++lnet_rtrpools_adjust(int tiny, int small, int large)
 +{
-+	lnet_ping_info_t *pinfo;
-+	lnet_handle_md_t md_handle;
-+	struct lnet_ni *ni;
-+	struct list_head net_head;
-+	int rc;
++	int nrb = 0;
++	int rc = 0;
++	int i;
++	lnet_rtrbufpool_t *rtrp;
 +
-+	INIT_LIST_HEAD(&net_head);
++	/*
++	 * this function doesn't revert the changes if adding new buffers
++	 * failed.  It's up to the user space caller to revert the
++	 * changes.
++	 */
 +
-+	/* Create a ni structure for the network string */
-+	rc = lnet_parse_networks(&net_head, nets);
-+	if (rc < 0)
-+		return rc;
++	if (!the_lnet.ln_routing)
++		return 0;
 +
-+	mutex_lock(&the_lnet.ln_api_mutex);
-+
-+	if (rc > 1) {
-+		rc = -EINVAL; /* only add one interface per call */
-+		goto failed0;
++	/*
++	 * If the provided values for each buffer pool are different than the
++	 * configured values, we need to take action.
++	 */
++	if (tiny >= 0 && tiny != tiny_router_buffers) {
++		tiny_router_buffers = tiny;
++		nrb = lnet_nrb_tiny_calculate();
++		cfs_percpt_for_each(rtrp, i, the_lnet.ln_rtrpools) {
++			rc = lnet_rtrpool_adjust_bufs(&rtrp[LNET_TINY_BUF_IDX],
++						      nrb, i);
++			if (rc)
++				return rc;
++		}
 +	}
-+
-+	rc = lnet_ping_info_setup(&pinfo, &md_handle, 1 + lnet_get_ni_count(),
-+				  false);
-+	if (rc)
-+		goto failed0;
-+
-+	rc = lnet_startup_lndnis(&net_head, peer_timeout, peer_cr,
-+				 peer_buf_cr, credits, NULL);
-+	if (rc)
-+		goto failed1;
-+
-+	lnet_ping_target_update(pinfo, md_handle);
-+	mutex_unlock(&the_lnet.ln_api_mutex);
++	if (small >= 0 && small != small_router_buffers) {
++		small_router_buffers = small;
++		nrb = lnet_nrb_small_calculate();
++		cfs_percpt_for_each(rtrp, i, the_lnet.ln_rtrpools) {
++			rc = lnet_rtrpool_adjust_bufs(&rtrp[LNET_SMALL_BUF_IDX],
++						      nrb, i);
++			if (rc)
++				return rc;
++		}
++	}
++	if (large >= 0 && large != large_router_buffers) {
++		large_router_buffers = large;
++		nrb = lnet_nrb_large_calculate();
++		cfs_percpt_for_each(rtrp, i, the_lnet.ln_rtrpools) {
++			rc = lnet_rtrpool_adjust_bufs(&rtrp[LNET_LARGE_BUF_IDX],
++						      nrb, i);
++			if (rc)
++				return rc;
++		}
++	}
 +
 +	return 0;
-+
-+failed1:
-+	lnet_ping_md_unlink(pinfo, &md_handle);
-+	lnet_ping_info_free(pinfo);
-+failed0:
-+	mutex_unlock(&the_lnet.ln_api_mutex);
-+	while (!list_empty(&net_head)) {
-+		ni = list_entry(net_head.next, struct lnet_ni, ni_list);
-+		list_del_init(&ni->ni_list);
-+		lnet_ni_free(ni);
-+	}
-+	return rc;
 +}
 +
 +int
-+lnet_dyn_del_ni(__u32 net)
++lnet_rtrpools_enable(void)
 +{
 +	int rc;
 +
-+	mutex_lock(&the_lnet.ln_api_mutex);
-+	rc = lnet_shutdown_lndni(net);
-+	mutex_unlock(&the_lnet.ln_api_mutex);
++	if (the_lnet.ln_routing)
++		return 0;
 +
-+	return rc;
++	if (!the_lnet.ln_rtrpools)
++		/*
++		 * If routing is turned off, and we have never
++		 * initialized the pools before, just call the
++		 * standard buffer pool allocation routine as
++		 * if we are just configuring this for the first
++		 * time.
++		 */
++		return lnet_rtrpools_alloc(1);
++
++	rc = lnet_rtrpools_adjust(0, 0, 0);
++	if (rc)
++		return rc;
++
++	lnet_net_lock(LNET_LOCK_EX);
++	the_lnet.ln_routing = 1;
++
++	the_lnet.ln_ping_info->pi_features &= ~LNET_PING_FEAT_RTE_DISABLED;
++	lnet_net_unlock(LNET_LOCK_EX);
++
++	return 0;
 +}
 +
- /**
-  * LNet ioctl handler.
-  *
-@@ -1339,7 +1749,6 @@ LNetCtl(unsigned int cmd, void *arg)
- 	unsigned long secs_passed;
- 
- 	LASSERT(the_lnet.ln_init);
--	LASSERT(the_lnet.ln_refcount > 0);
- 
- 	switch (cmd) {
- 	case IOC_LIBCFS_GET_NI:
-@@ -1351,12 +1760,17 @@ LNetCtl(unsigned int cmd, void *arg)
- 		return lnet_fail_nid(data->ioc_nid, data->ioc_count);
- 
- 	case IOC_LIBCFS_ADD_ROUTE:
-+		mutex_lock(&the_lnet.ln_api_mutex);
- 		rc = lnet_add_route(data->ioc_net, data->ioc_count,
- 				    data->ioc_nid, data->ioc_priority);
--		return (rc) ? rc : lnet_check_routes();
-+		mutex_unlock(&the_lnet.ln_api_mutex);
-+		return rc ? rc : lnet_check_routes();
- 
- 	case IOC_LIBCFS_DEL_ROUTE:
--		return lnet_del_route(data->ioc_net, data->ioc_nid);
-+		mutex_lock(&the_lnet.ln_api_mutex);
-+		rc = lnet_del_route(data->ioc_net, data->ioc_nid);
-+		mutex_unlock(&the_lnet.ln_api_mutex);
-+		return rc;
- 
- 	case IOC_LIBCFS_GET_ROUTE:
- 		return lnet_get_route(data->ioc_count,
-@@ -1471,194 +1885,6 @@ LNetSnprintHandle(char *str, int len, lnet_handle_any_t h)
- }
- EXPORT_SYMBOL(LNetSnprintHandle);
- 
--static int
--lnet_create_ping_info(void)
--{
--	int i;
--	int n;
--	int rc;
--	unsigned int infosz;
--	lnet_ni_t *ni;
--	lnet_process_id_t id;
--	lnet_ping_info_t *pinfo;
--
--	for (n = 0; ; n++) {
--		rc = LNetGetId(n, &id);
--		if (rc == -ENOENT)
--			break;
--
--		LASSERT(!rc);
--	}
--
--	infosz = offsetof(lnet_ping_info_t, pi_ni[n]);
--	LIBCFS_ALLOC(pinfo, infosz);
--	if (!pinfo) {
--		CERROR("Can't allocate ping info[%d]\n", n);
--		return -ENOMEM;
--	}
--
--	pinfo->pi_nnis    = n;
--	pinfo->pi_pid     = the_lnet.ln_pid;
--	pinfo->pi_magic   = LNET_PROTO_PING_MAGIC;
--	pinfo->pi_features = LNET_PING_FEAT_NI_STATUS;
--	if (!the_lnet.ln_routing)
--		pinfo->pi_features |= LNET_PING_FEAT_RTE_DISABLED;
--
--	for (i = 0; i < n; i++) {
--		lnet_ni_status_t *ns = &pinfo->pi_ni[i];
--
--		rc = LNetGetId(i, &id);
--		LASSERT(!rc);
--
--		ns->ns_nid    = id.nid;
--		ns->ns_status = LNET_NI_STATUS_UP;
--
--		lnet_net_lock(0);
--
--		ni = lnet_nid2ni_locked(id.nid, 0);
--		LASSERT(ni);
--
--		lnet_ni_lock(ni);
--		LASSERT(!ni->ni_status);
--		ni->ni_status = ns;
--		lnet_ni_unlock(ni);
--
--		lnet_ni_decref_locked(ni, 0);
--		lnet_net_unlock(0);
--	}
--
--	the_lnet.ln_ping_info = pinfo;
--	return 0;
--}
--
--static void
--lnet_destroy_ping_info(void)
--{
--	struct lnet_ni *ni;
--
--	lnet_net_lock(0);
--
--	list_for_each_entry(ni, &the_lnet.ln_nis, ni_list) {
--		lnet_ni_lock(ni);
--		ni->ni_status = NULL;
--		lnet_ni_unlock(ni);
--	}
--
--	lnet_net_unlock(0);
--
--	LIBCFS_FREE(the_lnet.ln_ping_info,
--		    offsetof(lnet_ping_info_t,
--			     pi_ni[the_lnet.ln_ping_info->pi_nnis]));
--	the_lnet.ln_ping_info = NULL;
--}
--
--int
--lnet_ping_target_init(void)
--{
--	lnet_md_t md = { NULL };
--	lnet_handle_me_t meh;
--	lnet_process_id_t id;
--	int rc;
--	int rc2;
--	int infosz;
--
--	rc = lnet_create_ping_info();
--	if (rc)
--		return rc;
--
--	/*
--	 * We can have a tiny EQ since we only need to see the unlink event on
--	 * teardown, which by definition is the last one!
--	 */
--	rc = LNetEQAlloc(2, LNET_EQ_HANDLER_NONE, &the_lnet.ln_ping_target_eq);
--	if (rc) {
--		CERROR("Can't allocate ping EQ: %d\n", rc);
--		goto failed_0;
--	}
--
--	memset(&id, 0, sizeof(lnet_process_id_t));
--	id.nid = LNET_NID_ANY;
--	id.pid = LNET_PID_ANY;
--
--	rc = LNetMEAttach(LNET_RESERVED_PORTAL, id,
--			  LNET_PROTO_PING_MATCHBITS, 0,
--			  LNET_UNLINK, LNET_INS_AFTER,
--			  &meh);
--	if (rc) {
--		CERROR("Can't create ping ME: %d\n", rc);
--		goto failed_1;
--	}
--
--	/* initialize md content */
--	infosz = offsetof(lnet_ping_info_t,
--			  pi_ni[the_lnet.ln_ping_info->pi_nnis]);
--	md.start     = the_lnet.ln_ping_info;
--	md.length    = infosz;
--	md.threshold = LNET_MD_THRESH_INF;
--	md.max_size  = 0;
--	md.options   = LNET_MD_OP_GET | LNET_MD_TRUNCATE |
--		       LNET_MD_MANAGE_REMOTE;
--	md.user_ptr  = NULL;
--	md.eq_handle = the_lnet.ln_ping_target_eq;
--
--	rc = LNetMDAttach(meh, md,
--			  LNET_RETAIN,
--			  &the_lnet.ln_ping_target_md);
--	if (rc) {
--		CERROR("Can't attach ping MD: %d\n", rc);
--		goto failed_2;
--	}
--
--	return 0;
--
-- failed_2:
--	rc2 = LNetMEUnlink(meh);
--	LASSERT(!rc2);
-- failed_1:
--	rc2 = LNetEQFree(the_lnet.ln_ping_target_eq);
--	LASSERT(!rc2);
-- failed_0:
--	lnet_destroy_ping_info();
--	return rc;
--}
--
--void
--lnet_ping_target_fini(void)
--{
--	lnet_event_t event;
--	int rc;
--	int which;
--	int timeout_ms = 1000;
--	sigset_t blocked = cfs_block_allsigs();
--
--	LNetMDUnlink(the_lnet.ln_ping_target_md);
--	/* NB md could be busy; this just starts the unlink */
--
--	for (;;) {
--		rc = LNetEQPoll(&the_lnet.ln_ping_target_eq, 1,
--				timeout_ms, &event, &which);
--
--		/* I expect overflow... */
--		LASSERT(rc >= 0 || rc == -EOVERFLOW);
--
--		if (!rc) {
--			/* timed out: provide a diagnostic */
--			CWARN("Still waiting for ping MD to unlink\n");
--			timeout_ms *= 2;
--			continue;
--		}
--
--		/* Got a valid event */
--		if (event.unlinked)
--			break;
--	}
--
--	rc = LNetEQFree(the_lnet.ln_ping_target_eq);
--	LASSERT(!rc);
--	lnet_destroy_ping_info();
--	cfs_restore_sigs(blocked);
--}
--
- static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 		     lnet_process_id_t __user *ids, int n_ids)
- {
-@@ -1670,7 +1896,7 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 	int unlinked = 0;
- 	int replied = 0;
- 	const int a_long_time = 60000; /* mS */
--	int infosz = offsetof(lnet_ping_info_t, pi_ni[n_ids]);
-+	int infosz;
- 	lnet_ping_info_t *info;
- 	lnet_process_id_t tmpid;
- 	int i;
-@@ -1679,6 +1905,8 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
- 	int rc2;
- 	sigset_t blocked;
- 
-+	infosz = offsetof(lnet_ping_info_t, pi_ni[n_ids]);
++void
++lnet_rtrpools_disable(void)
++{
++	if (!the_lnet.ln_routing)
++		return;
 +
- 	if (n_ids <= 0 ||
- 	    id.nid == LNET_NID_ANY ||
- 	    timeout_ms > 500000 ||	      /* arbitrary limit! */
-diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index bcc97b4..1ef07cd 100644
---- a/drivers/staging/lustre/lnet/lnet/config.c
-+++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -77,7 +77,7 @@ lnet_issep(char c)
- 	}
- }
- 
--static int
++	lnet_net_lock(LNET_LOCK_EX);
++	the_lnet.ln_routing = 0;
++	the_lnet.ln_ping_info->pi_features |= LNET_PING_FEAT_RTE_DISABLED;
++
++	tiny_router_buffers = 0;
++	small_router_buffers = 0;
++	large_router_buffers = 0;
++	lnet_net_unlock(LNET_LOCK_EX);
++	lnet_rtrpools_free(1);
++}
++
 +int
- lnet_net_unique(__u32 net, struct list_head *nilist)
+ lnet_notify(lnet_ni_t *ni, lnet_nid_t nid, int alive, unsigned long when)
  {
- 	struct list_head *tmp;
+ 	struct lnet_peer *lp = NULL;
 -- 
 1.7.1
