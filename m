@@ -1,33 +1,43 @@
 From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Tue, 16 Feb 2016 02:41:43 +0000
+Date: Tue, 16 Feb 2016 02:51:51 +0000
 Subject: [lustre-devel] [PATCH] staging: lustre: Fixed the parenthesis
-In-Reply-To: <20160216022812.GA25122@kroah.com>
+In-Reply-To: <1455507422-13568-1-git-send-email-shalinmehta85@gmail.com>
 References: <1455507422-13568-1-git-send-email-shalinmehta85@gmail.com>
-	<20160216022812.GA25122@kroah.com>
-Message-ID: <6A47AD82-6A8F-44E1-9CB4-C10CF9F9D72E@intel.com>
+Message-ID: <497A8642-BC1A-4EF9-92BC-C3FF3C217BA2@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg KH <gregkh@linuxfoundation.org>
-Cc: Shalin Mehta <shalinmehta85@gmail.com>, "Dilger, Andreas" <andreas.dilger@intel.com>, "<kernel-janitors@lists.osdl.org>" <kernel-janitors@lists.osdl.org>, "<devel@driverdev.osuosl.org>" <devel@driverdev.osuosl.org>, "<linux-kernel@vger.kernel.org>" <linux-kernel@vger.kernel.org>, "<lustre-devel@lists.lustre.org>" <lustre-devel@lists.lustre.org>
+To: Shalin Mehta <shalinmehta85@gmail.com>
+Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, "<kernel-janitors@lists.osdl.org>" <kernel-janitors@lists.osdl.org>, "<devel@driverdev.osuosl.org>" <devel@driverdev.osuosl.org>, "<linux-kernel@vger.kernel.org>" <linux-kernel@vger.kernel.org>, "<lustre-devel@lists.lustre.org>" <lustre-devel@lists.lustre.org>
 
 
-On Feb 15, 2016, at 9:28 PM, Greg KH wrote:
+On Feb 14, 2016, at 10:37 PM, Shalin Mehta wrote:
 
-> On Sun, Feb 14, 2016 at 07:37:02PM -0800, Shalin Mehta wrote:
->> The parentehsis are fixed in the macro for the ldlm lock to set and
->> clear the flags.
+> The parentehsis are fixed in the macro for the ldlm lock to set and
+> clear the flags.
 > 
-> "fixed" in what way?  Did you test-build this patch?  Also, you
-> mispelled a word here?
+> Signed-off-by: Shalin Mehta <shalinmehta85@gmail.com>
+> ---
+> drivers/staging/lustre/lustre/include/lustre_dlm_flags.h | 4 ++--
+> 1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
+> index 0d3ed87..4f9e9ad 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
+> @@ -365,10 +365,10 @@
+> #define LDLM_TEST_FLAG(_l, _b)        (((_l)->l_flags & (_b)) != 0)
+> 
+> /** set a ldlm_lock flag bit */
+> -#define LDLM_SET_FLAG(_l, _b)         (((_l)->l_flags |= (_b))
+> +#define LDLM_SET_FLAG(_l, _b)         ((_l)->l_flags |= (_b))
+> 
+> /** clear a ldlm_lock flag bit */
+> -#define LDLM_CLEAR_FLAG(_l, _b)       (((_l)->l_flags &= ~(_b))
+> +#define LDLM_CLEAR_FLAG(_l, _b)       ((_l)->l_flags &= ~(_b))
+> 
+> /** Mask of flags inherited from parent lock when doing intents. */
+> #define LDLM_INHERIT_FLAGS            LDLM_FL_INHERIT_MASK
 
-The fix in the patch is to make sure number of parenthesis matches, as is
-it appears there's one more opening one than the closing.
-
-The original patch that add this had an error somehow, but back then none
-of the users were later introduced, so the bug is "hidden" until
-first user actually appears.
-
-Compiles work with or without this fix as the result (I also just checked
-just to be sure).
+Acked-by: Oleg Drokin <oleg.drokin@intel.com>
