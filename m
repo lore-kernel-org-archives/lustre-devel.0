@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Tue, 16 Feb 2016 00:47:07 -0500
-Subject: [lustre-devel] [PATCH 35/45] staging/lustre/libcfs: Move private
-	tracefile structs out of header
+Date: Tue, 16 Feb 2016 00:47:04 -0500
+Subject: [lustre-devel] [PATCH 32/45] staging/lustre/libcfs: Remove stray
+	spaces after function name
 In-Reply-To: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
 References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455601637-3847710-36-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455601637-3847710-33-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,133 +14,94 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-the struct page_collection, struct cfs_trace_page and
-struct tracefiled_ctl are only used by tracefile.c, so move them
-there.
+Problem highlighted by checkpatch.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/libcfs/tracefile.c | 45 +++++++++++++++++++++
- drivers/staging/lustre/lustre/libcfs/tracefile.h | 51 ------------------------
- 2 files changed, 45 insertions(+), 51 deletions(-)
+ drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c | 2 +-
+ drivers/staging/lustre/lustre/libcfs/tracefile.c         | 2 +-
+ drivers/staging/lustre/lustre/libcfs/tracefile.h         | 3 +--
+ drivers/staging/lustre/lustre/libcfs/workitem.c          | 9 ++++-----
+ 4 files changed, 7 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c b/drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c
+index 04203b3..3f3c2d9 100644
+--- a/drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c
++++ b/drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c
+@@ -142,7 +142,7 @@ void libcfs_run_lbug_upcall(struct libcfs_debug_msg_data *msgdata)
+ 	argv[4] = buf;
+ 	argv[5] = NULL;
+ 
+-	libcfs_run_upcall (argv);
++	libcfs_run_upcall(argv);
+ }
+ EXPORT_SYMBOL(libcfs_run_lbug_upcall);
+ 
 diff --git a/drivers/staging/lustre/lustre/libcfs/tracefile.c b/drivers/staging/lustre/lustre/libcfs/tracefile.c
-index 9191f38..298135f 100644
+index 967f8d7..d9bb2b5 100644
 --- a/drivers/staging/lustre/lustre/libcfs/tracefile.c
 +++ b/drivers/staging/lustre/lustre/libcfs/tracefile.c
-@@ -56,6 +56,51 @@ static int thread_running;
+@@ -378,7 +378,7 @@ int libcfs_debug_vmsg2(struct libcfs_debug_msg_data *msgdata,
+ 	__LASSERT(debug_buf == string_buf);
  
- static atomic_t cfs_tage_allocated = ATOMIC_INIT(0);
+ 	tage->used += needed;
+-	__LASSERT (tage->used <= PAGE_CACHE_SIZE);
++	__LASSERT(tage->used <= PAGE_CACHE_SIZE);
  
-+struct page_collection {
-+	struct list_head	pc_pages;
-+	/*
-+	 * if this flag is set, collect_pages() will spill both
-+	 * ->tcd_daemon_pages and ->tcd_pages to the ->pc_pages. Otherwise,
-+	 * only ->tcd_pages are spilled.
-+	 */
-+	int		pc_want_daemon_pages;
-+};
-+
-+struct tracefiled_ctl {
-+	struct completion	tctl_start;
-+	struct completion	tctl_stop;
-+	wait_queue_head_t		tctl_waitq;
-+	pid_t			tctl_pid;
-+	atomic_t		tctl_shutdown;
-+};
-+
-+/*
-+ * small data-structure for each page owned by tracefiled.
-+ */
-+struct cfs_trace_page {
-+	/*
-+	 * page itself
-+	 */
-+	struct page	  *page;
-+	/*
-+	 * linkage into one of the lists in trace_data_union or
-+	 * page_collection
-+	 */
-+	struct list_head	   linkage;
-+	/*
-+	 * number of bytes used within this page
-+	 */
-+	unsigned int	 used;
-+	/*
-+	 * cpu that owns this page
-+	 */
-+	unsigned short       cpu;
-+	/*
-+	 * type(context) of this page
-+	 */
-+	unsigned short       type;
-+};
-+
- static void put_pages_on_tcd_daemon_list(struct page_collection *pc,
- 					 struct cfs_trace_cpu_data *tcd);
- 
+ console:
+ 	if ((mask & libcfs_printk) == 0) {
 diff --git a/drivers/staging/lustre/lustre/libcfs/tracefile.h b/drivers/staging/lustre/lustre/libcfs/tracefile.h
-index 0995da1..2d4dc73 100644
+index 92a00ed..2285744 100644
 --- a/drivers/staging/lustre/lustre/libcfs/tracefile.h
 +++ b/drivers/staging/lustre/lustre/libcfs/tracefile.h
-@@ -195,57 +195,6 @@ extern union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS];
- 	     (tcd = &(*cfs_trace_data[i])[cpu].tcd) &&			\
- 	     cfs_trace_lock_tcd(tcd, 1); cfs_trace_unlock_tcd(tcd, 1), i++)
+@@ -279,8 +279,7 @@ cfs_trace_get_tcd(void)
+ 	return tcd;
+ }
  
--/* XXX nikita: this declaration is internal to tracefile.c and should probably
-- * be moved there */
--struct page_collection {
--	struct list_head	pc_pages;
--	/*
--	 * if this flag is set, collect_pages() will spill both
--	 * ->tcd_daemon_pages and ->tcd_pages to the ->pc_pages. Otherwise,
--	 * only ->tcd_pages are spilled.
--	 */
--	int		pc_want_daemon_pages;
--};
--
--/* XXX nikita: this declaration is internal to tracefile.c and should probably
-- * be moved there */
--struct tracefiled_ctl {
--	struct completion	tctl_start;
--	struct completion	tctl_stop;
--	wait_queue_head_t		tctl_waitq;
--	pid_t			tctl_pid;
--	atomic_t		tctl_shutdown;
--};
--
--/*
-- * small data-structure for each page owned by tracefiled.
-- */
--/* XXX nikita: this declaration is internal to tracefile.c and should probably
-- * be moved there */
--struct cfs_trace_page {
--	/*
--	 * page itself
--	 */
--	struct page	  *page;
--	/*
--	 * linkage into one of the lists in trace_data_union or
--	 * page_collection
--	 */
--	struct list_head	   linkage;
--	/*
--	 * number of bytes used within this page
--	 */
--	unsigned int	 used;
--	/*
--	 * cpu that owns this page
--	 */
--	unsigned short       cpu;
--	/*
--	 * type(context) of this page
--	 */
--	unsigned short       type;
--};
--
- void cfs_set_ptldebug_header(struct ptldebug_header *header,
- 			     struct libcfs_debug_msg_data *m,
- 			     unsigned long stack);
+-static inline void
+-cfs_trace_put_tcd (struct cfs_trace_cpu_data *tcd)
++static inline void cfs_trace_put_tcd(struct cfs_trace_cpu_data *tcd)
+ {
+ 	cfs_trace_unlock_tcd(tcd, 0);
+ 
+diff --git a/drivers/staging/lustre/lustre/libcfs/workitem.c b/drivers/staging/lustre/lustre/libcfs/workitem.c
+index 24400df..9d80cfb 100644
+--- a/drivers/staging/lustre/lustre/libcfs/workitem.c
++++ b/drivers/staging/lustre/lustre/libcfs/workitem.c
+@@ -163,7 +163,7 @@ cfs_wi_deschedule(struct cfs_wi_sched *sched, cfs_workitem_t *wi)
+ 		wi->wi_scheduled = 0;
+ 	}
+ 
+-	LASSERT (list_empty(&wi->wi_list));
++	LASSERT(list_empty(&wi->wi_list));
+ 
+ 	spin_unlock(&sched->ws_lock);
+ 	return rc;
+@@ -186,7 +186,7 @@ cfs_wi_schedule(struct cfs_wi_sched *sched, cfs_workitem_t *wi)
+ 	spin_lock(&sched->ws_lock);
+ 
+ 	if (!wi->wi_scheduled) {
+-		LASSERT (list_empty(&wi->wi_list));
++		LASSERT(list_empty(&wi->wi_list));
+ 
+ 		wi->wi_scheduled = 1;
+ 		sched->ws_nscheduled++;
+@@ -198,14 +198,13 @@ cfs_wi_schedule(struct cfs_wi_sched *sched, cfs_workitem_t *wi)
+ 		}
+ 	}
+ 
+-	LASSERT (!list_empty(&wi->wi_list));
++	LASSERT(!list_empty(&wi->wi_list));
+ 	spin_unlock(&sched->ws_lock);
+ 	return;
+ }
+ EXPORT_SYMBOL(cfs_wi_schedule);
+ 
+-static int
+-cfs_wi_scheduler (void *arg)
++static int cfs_wi_scheduler(void *arg)
+ {
+ 	struct cfs_wi_sched	*sched = (struct cfs_wi_sched *)arg;
+ 
 -- 
 2.1.0
