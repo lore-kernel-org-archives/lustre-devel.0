@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Tue, 16 Feb 2016 00:46:50 -0500
-Subject: [lustre-devel] [PATCH 18/45] staging/lustre/fld: Adjust NULL
+Date: Tue, 16 Feb 2016 00:46:51 -0500
+Subject: [lustre-devel] [PATCH 19/45] staging/lustre/lclient: Adjust NULL
 	comparison codestyle
 In-Reply-To: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
 References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455601637-3847710-19-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455601637-3847710-20-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -19,246 +19,153 @@ All instances of "x == NULL" are changed to "!x" and
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/fld/fld_cache.c    | 10 +++-----
- drivers/staging/lustre/lustre/fld/fld_internal.h |  2 +-
- drivers/staging/lustre/lustre/fld/fld_request.c  | 32 +++++++++++-------------
- drivers/staging/lustre/lustre/fld/lproc_fld.c    | 11 ++------
- 4 files changed, 22 insertions(+), 33 deletions(-)
+ drivers/staging/lustre/lustre/lclient/lcommon_cl.c | 32 +++++++++++-----------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/fld/fld_cache.c b/drivers/staging/lustre/lustre/fld/fld_cache.c
-index d9459e5..a7026a9 100644
---- a/drivers/staging/lustre/lustre/fld/fld_cache.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_cache.c
-@@ -65,7 +65,7 @@ struct fld_cache *fld_cache_init(const char *name,
- {
- 	struct fld_cache *cache;
+diff --git a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
+index 4dfeb4e..efa6e2e 100644
+--- a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
++++ b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
+@@ -117,7 +117,7 @@ void *ccc_key_init(const struct lu_context *ctx, struct lu_context_key *key)
+ 	struct ccc_thread_info *info;
  
--	LASSERT(name != NULL);
-+	LASSERT(name);
- 	LASSERT(cache_threshold < cache_size);
+ 	info = kmem_cache_alloc(ccc_thread_kmem, GFP_NOFS | __GFP_ZERO);
+-	if (info == NULL)
++	if (!info)
+ 		info = ERR_PTR(-ENOMEM);
+ 	return info;
+ }
+@@ -136,7 +136,7 @@ void *ccc_session_key_init(const struct lu_context *ctx,
+ 	struct ccc_session *session;
  
- 	cache = kzalloc(sizeof(*cache), GFP_NOFS);
-@@ -100,7 +100,7 @@ void fld_cache_fini(struct fld_cache *cache)
- {
- 	__u64 pct;
+ 	session = kmem_cache_alloc(ccc_session_kmem, GFP_NOFS | __GFP_ZERO);
+-	if (session == NULL)
++	if (!session)
+ 		session = ERR_PTR(-ENOMEM);
+ 	return session;
+ }
+@@ -173,7 +173,7 @@ int ccc_device_init(const struct lu_env *env, struct lu_device *d,
+ 	vdv = lu2ccc_dev(d);
+ 	vdv->cdv_next = lu2cl_dev(next);
  
--	LASSERT(cache != NULL);
-+	LASSERT(cache);
- 	fld_cache_flush(cache);
+-	LASSERT(d->ld_site != NULL && next->ld_type != NULL);
++	LASSERT(d->ld_site && next->ld_type);
+ 	next->ld_site = d->ld_site;
+ 	rc = next->ld_type->ldt_ops->ldto_device_init(
+ 			env, next, next->ld_type->ldt_name, NULL);
+@@ -211,12 +211,12 @@ struct lu_device *ccc_device_alloc(const struct lu_env *env,
+ 	vdv->cdv_cl.cd_ops = clops;
  
- 	if (cache->fci_stat.fst_count > 0) {
-@@ -218,8 +218,6 @@ static int fld_cache_shrink(struct fld_cache *cache)
- 	struct list_head *curr;
- 	int num = 0;
- 
--	LASSERT(cache != NULL);
--
- 	if (cache->fci_cache_count < cache->fci_cache_size)
- 		return 0;
- 
-@@ -414,7 +412,7 @@ static int fld_cache_insert_nolock(struct fld_cache *cache,
+ 	site = kzalloc(sizeof(*site), GFP_NOFS);
+-	if (site != NULL) {
++	if (site) {
+ 		rc = cl_site_init(site, &vdv->cdv_cl);
+ 		if (rc == 0)
+ 			rc = lu_site_init_finish(&site->cs_lu);
+ 		else {
+-			LASSERT(lud->ld_site == NULL);
++			LASSERT(!lud->ld_site);
+ 			CERROR("Cannot init lu_site, rc %d.\n", rc);
+ 			kfree(site);
  		}
+@@ -236,7 +236,7 @@ struct lu_device *ccc_device_free(const struct lu_env *env,
+ 	struct cl_site    *site = lu2cl_site(d->ld_site);
+ 	struct lu_device  *next = cl2lu_dev(vdv->cdv_next);
+ 
+-	if (d->ld_site != NULL) {
++	if (d->ld_site) {
+ 		cl_site_fini(site);
+ 		kfree(site);
  	}
+@@ -252,7 +252,7 @@ int ccc_req_init(const struct lu_env *env, struct cl_device *dev,
+ 	int result;
  
--	if (prev == NULL)
-+	if (!prev)
- 		prev = head;
+ 	vrq = kmem_cache_alloc(ccc_req_kmem, GFP_NOFS | __GFP_ZERO);
+-	if (vrq != NULL) {
++	if (vrq) {
+ 		cl_req_slice_add(req, &vrq->crq_cl, dev, &ccc_req_ops);
+ 		result = 0;
+ 	} else
+@@ -304,7 +304,7 @@ out_kmem:
  
- 	CDEBUG(D_INFO, "insert range "DRANGE"\n", PRANGE(&f_new->fce_range));
-@@ -499,7 +497,7 @@ int fld_cache_lookup(struct fld_cache *cache,
- 	cache->fci_stat.fst_count++;
- 	list_for_each_entry(flde, head, fce_list) {
- 		if (flde->fce_range.lsr_start > seq) {
--			if (prev != NULL)
-+			if (prev)
- 				*range = prev->fce_range;
- 			break;
+ void ccc_global_fini(struct lu_device_type *device_type)
+ {
+-	if (ccc_inode_fini_env != NULL) {
++	if (ccc_inode_fini_env) {
+ 		cl_env_put(ccc_inode_fini_env, &dummy_refcheck);
+ 		ccc_inode_fini_env = NULL;
+ 	}
+@@ -328,7 +328,7 @@ struct lu_object *ccc_object_alloc(const struct lu_env *env,
+ 	struct lu_object  *obj;
+ 
+ 	vob = kmem_cache_alloc(ccc_object_kmem, GFP_NOFS | __GFP_ZERO);
+-	if (vob != NULL) {
++	if (vob) {
+ 		struct cl_object_header *hdr;
+ 
+ 		obj = ccc2lu(vob);
+@@ -365,7 +365,7 @@ int ccc_object_init(const struct lu_env *env, struct lu_object *obj,
+ 
+ 	under = &dev->cdv_next->cd_lu_dev;
+ 	below = under->ld_ops->ldo_object_alloc(env, obj->lo_header, under);
+-	if (below != NULL) {
++	if (below) {
+ 		const struct cl_object_conf *cconf;
+ 
+ 		cconf = lu2cl_conf(conf);
+@@ -397,7 +397,7 @@ int ccc_lock_init(const struct lu_env *env,
+ 	CLOBINVRNT(env, obj, ccc_object_invariant(obj));
+ 
+ 	clk = kmem_cache_alloc(ccc_lock_kmem, GFP_NOFS | __GFP_ZERO);
+-	if (clk != NULL) {
++	if (clk) {
+ 		cl_lock_slice_add(lock, &clk->clk_cl, obj, lkops);
+ 		result = 0;
+ 	} else
+@@ -660,7 +660,7 @@ void ccc_io_update_iov(const struct lu_env *env,
+ {
+ 	size_t size = io->u.ci_rw.crw_count;
+ 
+-	if (!cl_is_normalio(env, io) || cio->cui_iter == NULL)
++	if (!cl_is_normalio(env, io) || !cio->cui_iter)
+ 		return;
+ 
+ 	iov_iter_truncate(cio->cui_iter, size);
+@@ -749,7 +749,7 @@ int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
+ 			 */
+ 			ccc_object_size_unlock(obj);
+ 			result = cl_glimpse_lock(env, io, inode, obj, 0);
+-			if (result == 0 && exceed != NULL) {
++			if (result == 0 && exceed) {
+ 				/* If objective page index exceed end-of-file
+ 				 * page index, return directly. Do not expect
+ 				 * kernel will check such case correctly.
+@@ -1022,7 +1022,7 @@ int cl_file_inode_init(struct inode *inode, struct lustre_md *md)
+ 	fid  = &lli->lli_fid;
+ 	LASSERT(fid_is_sane(fid));
+ 
+-	if (lli->lli_clob == NULL) {
++	if (!lli->lli_clob) {
+ 		/* clob is slave of inode, empty lli_clob means for new inode,
+ 		 * there is no clob in cache with the given fid, so it is
+ 		 * unnecessary to perform lookup-alloc-lookup-insert, just
+@@ -1098,7 +1098,7 @@ void cl_inode_fini(struct inode *inode)
+ 	int refcheck;
+ 	int emergency;
+ 
+-	if (clob != NULL) {
++	if (clob) {
+ 		void		    *cookie;
+ 
+ 		cookie = cl_env_reenter();
+@@ -1106,7 +1106,7 @@ void cl_inode_fini(struct inode *inode)
+ 		emergency = IS_ERR(env);
+ 		if (emergency) {
+ 			mutex_lock(&ccc_inode_fini_guard);
+-			LASSERT(ccc_inode_fini_env != NULL);
++			LASSERT(ccc_inode_fini_env);
+ 			cl_env_implant(ccc_inode_fini_env, &refcheck);
+ 			env = ccc_inode_fini_env;
  		}
-diff --git a/drivers/staging/lustre/lustre/fld/fld_internal.h b/drivers/staging/lustre/lustre/fld/fld_internal.h
-index 12eb164..59eabda 100644
---- a/drivers/staging/lustre/lustre/fld/fld_internal.h
-+++ b/drivers/staging/lustre/lustre/fld/fld_internal.h
-@@ -169,7 +169,7 @@ struct fld_cache_entry
- static inline const char *
- fld_target_name(struct lu_fld_target *tar)
- {
--	if (tar->ft_srv != NULL)
-+	if (tar->ft_srv)
- 		return tar->ft_srv->lsf_name;
- 
- 	return (const char *)tar->ft_exp->exp_obd->obd_name;
-diff --git a/drivers/staging/lustre/lustre/fld/fld_request.c b/drivers/staging/lustre/lustre/fld/fld_request.c
-index d92c01b..222d18d 100644
---- a/drivers/staging/lustre/lustre/fld/fld_request.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_request.c
-@@ -148,9 +148,9 @@ again:
- 		fld->lcf_name, hash, seq, fld->lcf_count);
- 
- 	list_for_each_entry(target, &fld->lcf_targets, ft_chain) {
--		const char *srv_name = target->ft_srv != NULL  ?
-+		const char *srv_name = target->ft_srv ?
- 			target->ft_srv->lsf_name : "<null>";
--		const char *exp_name = target->ft_exp != NULL ?
-+		const char *exp_name = target->ft_exp ?
- 			(char *)target->ft_exp->exp_obd->obd_uuid.uuid :
- 			"<null>";
- 
-@@ -183,13 +183,13 @@ fld_client_get_target(struct lu_client_fld *fld, u64 seq)
- {
- 	struct lu_fld_target *target;
- 
--	LASSERT(fld->lcf_hash != NULL);
-+	LASSERT(fld->lcf_hash);
- 
- 	spin_lock(&fld->lcf_lock);
- 	target = fld->lcf_hash->fh_scan_func(fld, seq);
- 	spin_unlock(&fld->lcf_lock);
- 
--	if (target != NULL) {
-+	if (target) {
- 		CDEBUG(D_INFO, "%s: Found target (idx %llu) by seq %#llx\n",
- 		       fld->lcf_name, target->ft_idx, seq);
- 	}
-@@ -207,10 +207,10 @@ int fld_client_add_target(struct lu_client_fld *fld,
- 	const char *name;
- 	struct lu_fld_target *target, *tmp;
- 
--	LASSERT(tar != NULL);
-+	LASSERT(tar);
- 	name = fld_target_name(tar);
--	LASSERT(name != NULL);
--	LASSERT(tar->ft_srv != NULL || tar->ft_exp != NULL);
-+	LASSERT(name);
-+	LASSERT(tar->ft_srv || tar->ft_exp);
- 
- 	if (fld->lcf_flags != LUSTRE_FLD_INIT) {
- 		CERROR("%s: Attempt to add target %s (idx %llu) on fly - skip it\n",
-@@ -236,7 +236,7 @@ int fld_client_add_target(struct lu_client_fld *fld,
- 	}
- 
- 	target->ft_exp = tar->ft_exp;
--	if (target->ft_exp != NULL)
-+	if (target->ft_exp)
- 		class_export_get(target->ft_exp);
- 	target->ft_srv = tar->ft_srv;
- 	target->ft_idx = tar->ft_idx;
-@@ -264,7 +264,7 @@ int fld_client_del_target(struct lu_client_fld *fld, __u64 idx)
- 			list_del(&target->ft_chain);
- 			spin_unlock(&fld->lcf_lock);
- 
--			if (target->ft_exp != NULL)
-+			if (target->ft_exp)
- 				class_export_put(target->ft_exp);
- 
- 			kfree(target);
-@@ -326,8 +326,6 @@ int fld_client_init(struct lu_client_fld *fld,
- 	int cache_size, cache_threshold;
- 	int rc;
- 
--	LASSERT(fld != NULL);
--
- 	snprintf(fld->lcf_name, sizeof(fld->lcf_name),
- 		 "cli-%s", prefix);
- 
-@@ -379,13 +377,13 @@ void fld_client_fini(struct lu_client_fld *fld)
- 				     &fld->lcf_targets, ft_chain) {
- 		fld->lcf_count--;
- 		list_del(&target->ft_chain);
--		if (target->ft_exp != NULL)
-+		if (target->ft_exp)
- 			class_export_put(target->ft_exp);
- 		kfree(target);
- 	}
- 	spin_unlock(&fld->lcf_lock);
- 
--	if (fld->lcf_cache != NULL) {
-+	if (fld->lcf_cache) {
- 		if (!IS_ERR(fld->lcf_cache))
- 			fld_cache_fini(fld->lcf_cache);
- 		fld->lcf_cache = NULL;
-@@ -402,12 +400,12 @@ int fld_client_rpc(struct obd_export *exp,
- 	int		    rc;
- 	struct obd_import     *imp;
- 
--	LASSERT(exp != NULL);
-+	LASSERT(exp);
- 
- 	imp = class_exp2cliimp(exp);
- 	req = ptlrpc_request_alloc_pack(imp, &RQF_FLD_QUERY, LUSTRE_MDS_VERSION,
- 					FLD_QUERY);
--	if (req == NULL)
-+	if (!req)
- 		return -ENOMEM;
- 
- 	op = req_capsule_client_get(&req->rq_pill, &RMF_FLD_OPC);
-@@ -436,7 +434,7 @@ int fld_client_rpc(struct obd_export *exp,
- 		goto out_req;
- 
- 	prange = req_capsule_server_get(&req->rq_pill, &RMF_FLD_MDFLD);
--	if (prange == NULL) {
-+	if (!prange) {
- 		rc = -EFAULT;
- 		goto out_req;
- 	}
-@@ -463,7 +461,7 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
- 
- 	/* Can not find it in the cache */
- 	target = fld_client_get_target(fld, seq);
--	LASSERT(target != NULL);
-+	LASSERT(target);
- 
- 	CDEBUG(D_INFO, "%s: Lookup fld entry (seq: %#llx) on target %s (idx %llu)\n",
- 			fld->lcf_name, seq, fld_target_name(target), target->ft_idx);
-diff --git a/drivers/staging/lustre/lustre/fld/lproc_fld.c b/drivers/staging/lustre/lustre/fld/lproc_fld.c
-index 41ceaa8..da31281 100644
---- a/drivers/staging/lustre/lustre/fld/lproc_fld.c
-+++ b/drivers/staging/lustre/lustre/fld/lproc_fld.c
-@@ -60,8 +60,6 @@ fld_debugfs_targets_seq_show(struct seq_file *m, void *unused)
- 	struct lu_client_fld *fld = (struct lu_client_fld *)m->private;
- 	struct lu_fld_target *target;
- 
--	LASSERT(fld != NULL);
--
- 	spin_lock(&fld->lcf_lock);
- 	list_for_each_entry(target,
- 				&fld->lcf_targets, ft_chain)
-@@ -76,8 +74,6 @@ fld_debugfs_hash_seq_show(struct seq_file *m, void *unused)
- {
- 	struct lu_client_fld *fld = (struct lu_client_fld *)m->private;
- 
--	LASSERT(fld != NULL);
--
- 	spin_lock(&fld->lcf_lock);
- 	seq_printf(m, "%s\n", fld->lcf_hash->fh_name);
- 	spin_unlock(&fld->lcf_lock);
-@@ -102,9 +98,8 @@ fld_debugfs_hash_seq_write(struct file *file,
- 		return -EFAULT;
- 
- 	fld = ((struct seq_file *)file->private_data)->private;
--	LASSERT(fld != NULL);
- 
--	for (i = 0; fld_hash[i].fh_name != NULL; i++) {
-+	for (i = 0; fld_hash[i].fh_name; i++) {
- 		if (count != strlen(fld_hash[i].fh_name))
- 			continue;
- 
-@@ -114,7 +109,7 @@ fld_debugfs_hash_seq_write(struct file *file,
- 		}
- 	}
- 
--	if (hash != NULL) {
-+	if (hash) {
- 		spin_lock(&fld->lcf_lock);
- 		fld->lcf_hash = hash;
- 		spin_unlock(&fld->lcf_lock);
-@@ -132,8 +127,6 @@ fld_debugfs_cache_flush_write(struct file *file, const char __user *buffer,
- {
- 	struct lu_client_fld *fld = file->private_data;
- 
--	LASSERT(fld != NULL);
--
- 	fld_cache_flush(fld->lcf_cache);
- 
- 	CDEBUG(D_INFO, "%s: Lookup cache is flushed\n", fld->lcf_name);
 -- 
 2.1.0
