@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Tue, 16 Feb 2016 00:46:59 -0500
-Subject: [lustre-devel] [PATCH 27/45] staging/lustre: Remove the "write to
-	FSF to get a copy of GPL" wording
+Date: Tue, 16 Feb 2016 00:47:02 -0500
+Subject: [lustre-devel] [PATCH 30/45] staging/lustre/libcfs: style change to
+	add missing spaces for operations
 In-Reply-To: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
 References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455601637-3847710-28-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455601637-3847710-31-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,237 +14,85 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Checkpatch highlighted that some of our Lustre files carry this
-extra paragraph and indeed it does seem somewhat redundant, so remove it.
+This fixes checkpatch messages about
+"spaces preferred around that '-' (ctx:VxV)"
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/include/linux/lnet/lnetctl.h           | 4 ----
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h           | 4 ----
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c        | 3 ---
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd_modparams.c | 3 ---
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c     | 3 ---
- drivers/staging/lustre/lnet/lnet/router.c                     | 4 ----
- drivers/staging/lustre/lnet/lnet/router_proc.c                | 4 ----
- drivers/staging/lustre/lustre/include/lu_ref.h                | 4 ----
- drivers/staging/lustre/lustre/libcfs/libcfs_cpu.c             | 5 -----
- drivers/staging/lustre/lustre/libcfs/libcfs_lock.c            | 5 -----
- drivers/staging/lustre/lustre/libcfs/libcfs_mem.c             | 5 -----
- drivers/staging/lustre/lustre/libcfs/linux/linux-cpu.c        | 5 -----
- drivers/staging/lustre/lustre/ptlrpc/nrs.c                    | 4 ----
- drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c               | 4 ----
- 14 files changed, 57 deletions(-)
+ drivers/staging/lustre/lustre/libcfs/debug.c                 | 2 +-
+ drivers/staging/lustre/lustre/libcfs/linux/linux-mem.c       | 2 +-
+ drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c | 2 +-
+ drivers/staging/lustre/lustre/libcfs/tracefile.c             | 7 ++++---
+ 4 files changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lnetctl.h b/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-index bdd69b2..4b64f62 100644
---- a/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lnetctl.h
-@@ -10,10 +10,6 @@
-  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *   GNU General Public License for more details.
-  *
-- *   You should have received a copy of the GNU General Public License
-- *   along with Portals; if not, write to the Free Software
-- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-- *
-  * header for lnet ioctl
-  */
- #ifndef _LNETCTL_H_
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-index a4117ad..a176544 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-@@ -19,10 +19,6 @@
-  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *   GNU General Public License for more details.
-  *
-- *   You should have received a copy of the GNU General Public License
-- *   along with Portals; if not, write to the Free Software
-- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-- *
-  */
+diff --git a/drivers/staging/lustre/lustre/libcfs/debug.c b/drivers/staging/lustre/lustre/libcfs/debug.c
+index 9bb31f9..fa81582 100644
+--- a/drivers/staging/lustre/lustre/libcfs/debug.c
++++ b/drivers/staging/lustre/lustre/libcfs/debug.c
+@@ -418,7 +418,7 @@ libcfs_debug_str2mask(int *mask, const char *str, int is_subsys)
+ 	/* Allow a number for backwards compatibility */
  
- #ifndef _SOCKLND_SOCKLND_H_
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-index 02da02d..efb7169 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-@@ -19,9 +19,6 @@
-  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *   GNU General Public License for more details.
-  *
-- *   You should have received a copy of the GNU General Public License
-- *   along with Portals; if not, write to the Free Software
-- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-  */
+ 	for (n = strlen(str); n > 0; n--)
+-		if (!isspace(str[n-1]))
++		if (!isspace(str[n - 1]))
+ 			break;
+ 	matched = n;
+ 	t = sscanf(str, "%i%n", &m, &matched);
+diff --git a/drivers/staging/lustre/lustre/libcfs/linux/linux-mem.c b/drivers/staging/lustre/lustre/libcfs/linux/linux-mem.c
+index 025e2f0..86f32ff 100644
+--- a/drivers/staging/lustre/lustre/libcfs/linux/linux-mem.c
++++ b/drivers/staging/lustre/lustre/libcfs/linux/linux-mem.c
+@@ -50,7 +50,7 @@ void *libcfs_kvzalloc_cpt(struct cfs_cpt_table *cptab, int cpt, size_t size,
+ 	ret = kzalloc_node(size, flags | __GFP_NOWARN,
+ 			   cfs_cpt_spread_node(cptab, cpt));
+ 	if (!ret) {
+-		WARN_ON(!(flags & (__GFP_FS|__GFP_HIGH)));
++		WARN_ON(!(flags & (__GFP_FS | __GFP_HIGH)));
+ 		ret = vmalloc_node(size, cfs_cpt_spread_node(cptab, cpt));
+ 	}
  
- #include "socklnd.h"
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_modparams.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_modparams.c
-index 77ce597..6329cbe 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_modparams.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_modparams.c
-@@ -14,9 +14,6 @@
-  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *   GNU General Public License for more details.
-  *
-- *   You should have received a copy of the GNU General Public License
-- *   along with Portals; if not, write to the Free Software
-- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-  */
+diff --git a/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c b/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c
+index 89944c0..5e3c400 100644
+--- a/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c
++++ b/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c
+@@ -268,5 +268,5 @@ int cfs_trace_max_debug_mb(void)
+ {
+ 	int  total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
  
- #include "socklnd.h"
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-index 70910ed..976a072 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-@@ -19,9 +19,6 @@
-  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *   GNU General Public License for more details.
-  *
-- *   You should have received a copy of the GNU General Public License
-- *   along with Portals; if not, write to the Free Software
-- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-  */
+-	return max(512, (total_mb * 80)/100);
++	return max(512, (total_mb * 80) / 100);
+ }
+diff --git a/drivers/staging/lustre/lustre/libcfs/tracefile.c b/drivers/staging/lustre/lustre/libcfs/tracefile.c
+index 28a11b5..967f8d7 100644
+--- a/drivers/staging/lustre/lustre/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lustre/libcfs/tracefile.c
+@@ -346,7 +346,7 @@ int libcfs_debug_vmsg2(struct libcfs_debug_msg_data *msgdata,
+ 			break;
+ 	}
  
- #include "socklnd.h"
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index 735a8f2..83ed123 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -15,10 +15,6 @@
-  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *   GNU General Public License for more details.
-  *
-- *   You should have received a copy of the GNU General Public License
-- *   along with Portals; if not, write to the Free Software
-- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-- *
-  */
+-	if (*(string_buf+needed-1) != '\n')
++	if (*(string_buf + needed - 1) != '\n')
+ 		printk(KERN_INFO "format at %s:%d:%s doesn't end in newline\n",
+ 		       file, msgdata->msg_line, msgdata->msg_fn);
  
- #define DEBUG_SUBSYSTEM S_LNET
-diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-index a7aaf0c..01dd900 100644
---- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-+++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-@@ -15,10 +15,6 @@
-  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *   GNU General Public License for more details.
-  *
-- *   You should have received a copy of the GNU General Public License
-- *   along with Portals; if not, write to the Free Software
-- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-- *
-  */
+@@ -436,7 +436,7 @@ console:
+ 			remain = CFS_TRACE_CONSOLE_BUFFER_SIZE - needed;
+ 			if (remain > 0) {
+ 				va_start(ap, format2);
+-				needed += vsnprintf(string_buf+needed, remain,
++				needed += vsnprintf(string_buf + needed, remain,
+ 						    format2, ap);
+ 				va_end(ap);
+ 			}
+@@ -667,7 +667,8 @@ int cfs_tracefile_dump_all_pages(char *filename)
  
- #define DEBUG_SUBSYSTEM S_LNET
-diff --git a/drivers/staging/lustre/lustre/include/lu_ref.h b/drivers/staging/lustre/lustre/include/lu_ref.h
-index 97cd157..f7dfd83 100644
---- a/drivers/staging/lustre/lustre/include/lu_ref.h
-+++ b/drivers/staging/lustre/lustre/include/lu_ref.h
-@@ -17,10 +17,6 @@
-  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  *   GNU General Public License for more details.
-  *
-- *   You should have received a copy of the GNU General Public License
-- *   along with Lustre; if not, write to the Free Software
-- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-- *
-  */
+ 	cfs_tracefile_write_lock();
  
- #ifndef __LUSTRE_LU_REF_H
-diff --git a/drivers/staging/lustre/lustre/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lustre/libcfs/libcfs_cpu.c
-index 9137df9..33352af 100644
---- a/drivers/staging/lustre/lustre/libcfs/libcfs_cpu.c
-+++ b/drivers/staging/lustre/lustre/libcfs/libcfs_cpu.c
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lustre/libcfs/libcfs_lock.c b/drivers/staging/lustre/lustre/libcfs/libcfs_lock.c
-index 2d08ba6..9c64bfd 100644
---- a/drivers/staging/lustre/lustre/libcfs/libcfs_lock.c
-+++ b/drivers/staging/lustre/lustre/libcfs/libcfs_lock.c
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /* Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-diff --git a/drivers/staging/lustre/lustre/libcfs/libcfs_mem.c b/drivers/staging/lustre/lustre/libcfs/libcfs_mem.c
-index e0a8783..7396d66 100644
---- a/drivers/staging/lustre/lustre/libcfs/libcfs_mem.c
-+++ b/drivers/staging/lustre/lustre/libcfs/libcfs_mem.c
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lustre/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lustre/libcfs/linux/linux-cpu.c
-index 41b9512..7fb277a 100644
---- a/drivers/staging/lustre/lustre/libcfs/linux/linux-cpu.c
-+++ b/drivers/staging/lustre/lustre/libcfs/linux/linux-cpu.c
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs.c b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-index ed40be6..d603a57 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-@@ -13,10 +13,6 @@
-  * GNU General Public License version 2 for more details.  A copy is
-  * included in the COPYING file that accompanied this code.
- 
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c b/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-index 77894f8..0d8da35 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-@@ -13,10 +13,6 @@
-  * GNU General Public License version 2 for more details.  A copy is
-  * included in the COPYING file that accompanied this code.
- 
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-- *
-  * GPL HEADER END
-  */
- /*
+-	filp = filp_open(filename, O_CREAT|O_EXCL|O_WRONLY|O_LARGEFILE, 0600);
++	filp = filp_open(filename, O_CREAT | O_EXCL | O_WRONLY | O_LARGEFILE,
++			 0600);
+ 	if (IS_ERR(filp)) {
+ 		rc = PTR_ERR(filp);
+ 		filp = NULL;
 -- 
 2.1.0
