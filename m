@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Tue, 16 Feb 2016 00:46:47 -0500
-Subject: [lustre-devel] [PATCH 15/45] staging/lustre/ldlm: Adjust NULL
+Date: Tue, 16 Feb 2016 00:46:46 -0500
+Subject: [lustre-devel] [PATCH 14/45] staging/lustre/llite: Adjust NULL
 	comparison codestyle
 In-Reply-To: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
 References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455601637-3847710-16-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455601637-3847710-15-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -17,1135 +17,2328 @@ From: Oleg Drokin <green@linuxhacker.ru>
 All instances of "x == NULL" are changed to "!x" and
 "x != NULL" to "x"
 
-Also remove some redundant assertions.
+The only exception is ll_update_inode where dropping != NULL
+in the construction below would break the logic.
+I guess we could change lsm != NULL to !!lsm, but that's uglier.
+(lsm != NULL) == ((body->valid & OBD_MD_FLEASIZE) != 0)
+
+Also removed some redundant assertions.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/ldlm/interval_tree.c |  2 -
- drivers/staging/lustre/lustre/ldlm/ldlm_extent.c   |  9 ++-
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    | 13 ++---
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      | 16 +++---
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 65 +++++++++++-----------
- drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    | 45 ++++++++-------
- drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     | 17 +++---
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 65 +++++++++++-----------
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 25 ++++-----
- 9 files changed, 123 insertions(+), 134 deletions(-)
+ drivers/staging/lustre/lustre/llite/dcache.c       |  10 +-
+ drivers/staging/lustre/lustre/llite/dir.c          |  23 ++---
+ drivers/staging/lustre/lustre/llite/file.c         | 115 ++++++++++-----------
+ drivers/staging/lustre/lustre/llite/llite_close.c  |  14 +--
+ .../staging/lustre/lustre/llite/llite_internal.h   |  25 +++--
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  61 ++++++-----
+ drivers/staging/lustre/lustre/llite/llite_mmap.c   |  14 ++-
+ drivers/staging/lustre/lustre/llite/llite_rmtacl.c |  10 +-
+ drivers/staging/lustre/lustre/llite/lloop.c        |  17 ++-
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |  12 +--
+ drivers/staging/lustre/lustre/llite/namei.c        |  53 +++-------
+ drivers/staging/lustre/lustre/llite/rw.c           |  23 ++---
+ drivers/staging/lustre/lustre/llite/rw26.c         |  16 +--
+ drivers/staging/lustre/lustre/llite/statahead.c    |  40 ++++---
+ drivers/staging/lustre/lustre/llite/super25.c      |  10 +-
+ drivers/staging/lustre/lustre/llite/symlink.c      |   3 +-
+ drivers/staging/lustre/lustre/llite/vvp_dev.c      |  16 +--
+ drivers/staging/lustre/lustre/llite/vvp_io.c       |  12 +--
+ drivers/staging/lustre/lustre/llite/vvp_object.c   |   5 +-
+ drivers/staging/lustre/lustre/llite/vvp_page.c     |  22 ++--
+ drivers/staging/lustre/lustre/llite/xattr.c        |  21 ++--
+ drivers/staging/lustre/lustre/llite/xattr_cache.c  |  16 ++-
+ 22 files changed, 241 insertions(+), 297 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/interval_tree.c b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
-index a2ea8e5..fd70f65 100644
---- a/drivers/staging/lustre/lustre/ldlm/interval_tree.c
-+++ b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
-@@ -49,13 +49,11 @@ enum {
- 
- static inline int node_is_left_child(struct interval_node *node)
+diff --git a/drivers/staging/lustre/lustre/llite/dcache.c b/drivers/staging/lustre/lustre/llite/dcache.c
+index bc179e5..34eb17c 100644
+--- a/drivers/staging/lustre/lustre/llite/dcache.c
++++ b/drivers/staging/lustre/lustre/llite/dcache.c
+@@ -60,7 +60,7 @@ static void ll_release(struct dentry *de)
  {
--	LASSERT(node->in_parent != NULL);
- 	return node == node->in_parent->in_left;
- }
+ 	struct ll_dentry_data *lld;
  
- static inline int node_is_right_child(struct interval_node *node)
- {
--	LASSERT(node->in_parent != NULL);
- 	return node == node->in_parent->in_right;
- }
- 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-index 9c70f31..aa92682 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-@@ -113,7 +113,7 @@ struct ldlm_interval *ldlm_interval_alloc(struct ldlm_lock *lock)
- 
- 	LASSERT(lock->l_resource->lr_type == LDLM_EXTENT);
- 	node = kmem_cache_alloc(ldlm_interval_slab, GFP_NOFS | __GFP_ZERO);
--	if (node == NULL)
-+	if (!node)
- 		return NULL;
- 
- 	INIT_LIST_HEAD(&node->li_group);
-@@ -134,7 +134,7 @@ struct ldlm_interval *ldlm_interval_detach(struct ldlm_lock *l)
- {
- 	struct ldlm_interval *n = l->l_tree_node;
- 
--	if (n == NULL)
-+	if (!n)
- 		return NULL;
- 
- 	LASSERT(!list_empty(&n->li_group));
-@@ -168,7 +168,7 @@ void ldlm_extent_add_lock(struct ldlm_resource *res,
- 	LASSERT(lock->l_granted_mode == lock->l_req_mode);
- 
- 	node = lock->l_tree_node;
--	LASSERT(node != NULL);
-+	LASSERT(node);
- 	LASSERT(!interval_is_intree(&node->li_node));
- 
- 	idx = lock_mode_to_index(lock->l_granted_mode);
-@@ -185,7 +185,6 @@ void ldlm_extent_add_lock(struct ldlm_resource *res,
- 		struct ldlm_interval *tmp;
- 
- 		tmp = ldlm_interval_detach(lock);
--		LASSERT(tmp != NULL);
- 		ldlm_interval_free(tmp);
- 		ldlm_interval_attach(to_ldlm_interval(found), lock);
- 	}
-@@ -211,7 +210,7 @@ void ldlm_extent_unlink_lock(struct ldlm_lock *lock)
- 	LASSERT(lock->l_granted_mode == 1 << idx);
- 	tree = &res->lr_itree[idx];
- 
--	LASSERT(tree->lit_root != NULL); /* assure the tree is not null */
-+	LASSERT(tree->lit_root); /* assure the tree is not null */
- 
- 	tree->lit_size--;
- 	node = ldlm_interval_detach(lock);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 4310154..7c671e3 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -361,7 +361,7 @@ reprocess:
- 		lock->l_policy_data.l_flock.start =
- 			new->l_policy_data.l_flock.end + 1;
- 		new2->l_conn_export = lock->l_conn_export;
--		if (lock->l_export != NULL) {
-+		if (lock->l_export) {
- 			new2->l_export = class_export_lock_get(lock->l_export,
- 							       new2);
- 			if (new2->l_export->exp_lock_hash &&
-@@ -381,7 +381,7 @@ reprocess:
- 	}
- 
- 	/* if new2 is created but never used, destroy it*/
--	if (splitted == 0 && new2 != NULL)
-+	if (splitted == 0 && new2)
- 		ldlm_lock_destroy_nolock(new2);
- 
- 	/* At this point we're granting the lock request. */
-@@ -462,8 +462,7 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
- 	if ((lock->l_flags & (LDLM_FL_FAILED|LDLM_FL_LOCAL_ONLY)) ==
- 	    (LDLM_FL_FAILED|LDLM_FL_LOCAL_ONLY)) {
- 		if (lock->l_req_mode == lock->l_granted_mode &&
--		    lock->l_granted_mode != LCK_NL &&
--		    data == NULL)
-+		    lock->l_granted_mode != LCK_NL && !data)
- 			ldlm_lock_decref_internal(lock, lock->l_req_mode);
- 
- 		/* Need to wake up the waiter if we were evicted */
-@@ -475,7 +474,7 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
- 
- 	if (!(flags & (LDLM_FL_BLOCK_WAIT | LDLM_FL_BLOCK_GRANTED |
- 		       LDLM_FL_BLOCK_CONV))) {
--		if (data == NULL)
-+		if (!data)
- 			/* mds granted the lock in the reply */
- 			goto granted;
- 		/* CP AST RPC: lock get granted, wake it up */
-@@ -488,10 +487,10 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
- 	obd = class_exp2obd(lock->l_conn_export);
- 
- 	/* if this is a local lock, there is no import */
--	if (obd != NULL)
-+	if (obd)
- 		imp = obd->u.cli.cl_import;
- 
--	if (imp != NULL) {
-+	if (imp) {
- 		spin_lock(&imp->imp_lock);
- 		fwd.fwd_generation = imp->imp_generation;
- 		spin_unlock(&imp->imp_lock);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index 774d89c..0e25c45 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -373,7 +373,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 			   &obddev->obd_ldlm_client);
- 
- 	imp = class_new_import(obddev);
--	if (imp == NULL) {
-+	if (!imp) {
- 		rc = -ENOENT;
- 		goto err_ldlm;
- 	}
-@@ -409,7 +409,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 						   LDLM_NAMESPACE_CLIENT,
- 						   LDLM_NAMESPACE_GREEDY,
- 						   ns_type);
--	if (obddev->obd_namespace == NULL) {
-+	if (!obddev->obd_namespace) {
- 		CERROR("Unable to create client namespace - %s\n",
- 		       obddev->obd_name);
- 		rc = -ENOMEM;
-@@ -435,7 +435,7 @@ int client_obd_cleanup(struct obd_device *obddev)
- 	ldlm_namespace_free_post(obddev->obd_namespace);
- 	obddev->obd_namespace = NULL;
- 
--	LASSERT(obddev->u.cli.cl_import == NULL);
-+	LASSERT(!obddev->u.cli.cl_import);
- 
- 	ldlm_put_ref();
- 	return 0;
-@@ -486,7 +486,7 @@ int client_connect_import(const struct lu_env *env,
- 		LASSERT(imp->imp_state == LUSTRE_IMP_DISCON);
- 		goto out_ldlm;
- 	}
--	LASSERT(*exp != NULL && (*exp)->exp_connection);
-+	LASSERT(*exp && (*exp)->exp_connection);
- 
- 	if (data) {
- 		LASSERTF((ocd->ocd_connect_flags & data->ocd_connect_flags) ==
-@@ -555,7 +555,7 @@ int client_disconnect_export(struct obd_export *exp)
- 	 * never added.) */
- 	(void)ptlrpc_pinger_del_import(imp);
- 
--	if (obd->obd_namespace != NULL) {
-+	if (obd->obd_namespace) {
- 		/* obd_force == local only */
- 		ldlm_cli_cancel_unused(obd->obd_namespace, NULL,
- 				       obd->obd_force ? LCF_LOCAL : 0, NULL);
-@@ -642,14 +642,14 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id)
- 
- 	svcpt = req->rq_rqbd->rqbd_svcpt;
- 	rs = req->rq_reply_state;
--	if (rs == NULL || !rs->rs_difficult) {
-+	if (!rs || !rs->rs_difficult) {
- 		/* no notifiers */
- 		target_send_reply_msg(req, rc, fail_id);
+-	LASSERT(de != NULL);
++	LASSERT(de);
+ 	lld = ll_d2d(de);
+ 	if (!lld) /* NFS copies the de->d_op methods (bug 4655) */
  		return;
+@@ -178,8 +178,6 @@ static int ll_ddelete(const struct dentry *de)
+ 
+ int ll_d_init(struct dentry *de)
+ {
+-	LASSERT(de != NULL);
+-
+ 	CDEBUG(D_DENTRY, "ldd on dentry %pd (%p) parent %p inode %p refc %d\n",
+ 		de, de, de->d_parent, d_inode(de),
+ 		d_count(de));
+@@ -251,8 +249,6 @@ void ll_invalidate_aliases(struct inode *inode)
+ {
+ 	struct dentry *dentry;
+ 
+-	LASSERT(inode != NULL);
+-
+ 	CDEBUG(D_INODE, "marking dentries for ino %lu/%u(%p) invalid\n",
+ 	       inode->i_ino, inode->i_generation, inode);
+ 
+@@ -286,9 +282,7 @@ int ll_revalidate_it_finish(struct ptlrpc_request *request,
+ 
+ void ll_lookup_finish_locks(struct lookup_intent *it, struct inode *inode)
+ {
+-	LASSERT(it != NULL);
+-
+-	if (it->d.lustre.it_lock_mode && inode != NULL) {
++	if (it->d.lustre.it_lock_mode && inode) {
+ 		struct ll_sb_info *sbi = ll_i2sbi(inode);
+ 
+ 		CDEBUG(D_DLMTRACE, "setting l_data to inode %p (%lu/%u)\n",
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 36b1055..d7dc264 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -190,8 +190,6 @@ static int ll_dir_filler(void *_hash, struct page *page0)
+ 	} else if (rc == 0) {
+ 		body = req_capsule_server_get(&request->rq_pill, &RMF_MDT_BODY);
+ 		/* Checked by mdc_readpage() */
+-		LASSERT(body != NULL);
+-
+ 		if (body->valid & OBD_MD_FLSIZE)
+ 			cl_isize_write(inode, body->size);
+ 
+@@ -245,7 +243,7 @@ void ll_release_page(struct page *page, int remove)
+ 	kunmap(page);
+ 	if (remove) {
+ 		lock_page(page);
+-		if (likely(page->mapping != NULL))
++		if (likely(page->mapping))
+ 			truncate_complete_page(page->mapping, page);
+ 		unlock_page(page);
+ 	}
+@@ -393,7 +391,7 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
+ 		CERROR("dir page locate: "DFID" at %llu: rc %ld\n",
+ 		       PFID(ll_inode2fid(dir)), lhash, PTR_ERR(page));
+ 		goto out_unlock;
+-	} else if (page != NULL) {
++	} else if (page) {
+ 		/*
+ 		 * XXX nikita: not entirely correct handling of a corner case:
+ 		 * suppose hash chain of entries with hash value HASH crosses
+@@ -499,7 +497,7 @@ int ll_dir_read(struct inode *inode, struct dir_context *ctx)
+ 			__u64 next;
+ 
+ 			dp = page_address(page);
+-			for (ent = lu_dirent_start(dp); ent != NULL && !done;
++			for (ent = lu_dirent_start(dp); ent && !done;
+ 			     ent = lu_dirent_next(ent)) {
+ 				__u16	  type;
+ 				int	    namelen;
+@@ -689,7 +687,7 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
+ 	struct obd_device *mgc = lsi->lsi_mgc;
+ 	int lum_size;
+ 
+-	if (lump != NULL) {
++	if (lump) {
+ 		/*
+ 		 * This is coming from userspace, so should be in
+ 		 * local endian.  But the MDS would like it in little
+@@ -725,7 +723,7 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
+ 	if (IS_ERR(op_data))
+ 		return PTR_ERR(op_data);
+ 
+-	if (lump != NULL && lump->lmm_magic == cpu_to_le32(LMV_USER_MAGIC))
++	if (lump && lump->lmm_magic == cpu_to_le32(LMV_USER_MAGIC))
+ 		op_data->op_cli_flags |= CLI_SET_MEA;
+ 
+ 	/* swabbing is done in lov_setstripe() on server side */
+@@ -812,7 +810,6 @@ int ll_dir_getstripe(struct inode *inode, struct lov_mds_md **lmmp,
  	}
  
- 	/* must be an export if locks saved */
--	LASSERT(req->rq_export != NULL);
-+	LASSERT(req->rq_export);
- 	/* req/reply consistent */
- 	LASSERT(rs->rs_svcpt == svcpt);
+ 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+-	LASSERT(body != NULL);
  
-@@ -658,7 +658,7 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id)
- 	LASSERT(!rs->rs_scheduled_ever);
- 	LASSERT(!rs->rs_handled);
- 	LASSERT(!rs->rs_on_net);
--	LASSERT(rs->rs_export == NULL);
-+	LASSERT(!rs->rs_export);
- 	LASSERT(list_empty(&rs->rs_obd_list));
- 	LASSERT(list_empty(&rs->rs_exp_list));
+ 	lmmsize = body->eadatasize;
  
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index cf9ec0c..4fd735f 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -412,11 +412,10 @@ static struct ldlm_lock *ldlm_lock_new(struct ldlm_resource *resource)
- {
- 	struct ldlm_lock *lock;
+@@ -824,7 +821,6 @@ int ll_dir_getstripe(struct inode *inode, struct lov_mds_md **lmmp,
  
--	if (resource == NULL)
--		LBUG();
-+	LASSERT(resource);
+ 	lmm = req_capsule_server_sized_get(&req->rq_pill,
+ 					   &RMF_MDT_MD, lmmsize);
+-	LASSERT(lmm != NULL);
  
- 	lock = kmem_cache_alloc(ldlm_lock_slab, GFP_NOFS | __GFP_ZERO);
--	if (lock == NULL)
-+	if (!lock)
+ 	/*
+ 	 * This is coming from the MDS, so is probably in
+@@ -1326,7 +1322,7 @@ out_free:
+ 			return rc;
+ 
+ 		data = (void *)buf;
+-		if (data->ioc_inlbuf1 == NULL || data->ioc_inlbuf2 == NULL ||
++		if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
+ 		    data->ioc_inllen1 == 0 || data->ioc_inllen2 == 0) {
+ 			rc = -EINVAL;
+ 			goto lmv_out_free;
+@@ -1461,7 +1457,7 @@ free_lmv:
+ 		if (request) {
+ 			body = req_capsule_server_get(&request->rq_pill,
+ 						      &RMF_MDT_BODY);
+-			LASSERT(body != NULL);
++			LASSERT(body);
+ 		} else {
+ 			goto out_req;
+ 		}
+@@ -1539,7 +1535,7 @@ out_req:
+ 			return rc;
+ 
+ 		lmm = libcfs_kvzalloc(lmmsize, GFP_NOFS);
+-		if (lmm == NULL)
++		if (!lmm)
+ 			return -ENOMEM;
+ 		if (copy_from_user(lmm, lum, lmmsize)) {
+ 			rc = -EFAULT;
+@@ -1688,7 +1684,6 @@ out_quotactl:
+ 	    if (sbi->ll_flags & LL_SBI_RMT_CLIENT && is_root_inode(inode)) {
+ 		struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
+ 
+-		LASSERT(fd != NULL);
+ 		rc = rct_add(&sbi->ll_rct, current_pid(), arg);
+ 		if (!rc)
+ 			fd->fd_flags |= LL_FILE_RMTACL;
+@@ -1757,7 +1752,7 @@ out_quotactl:
+ 			return -E2BIG;
+ 
+ 		hur = libcfs_kvzalloc(totalsize, GFP_NOFS);
+-		if (hur == NULL)
++		if (!hur)
+ 			return -ENOMEM;
+ 
+ 		/* Copy the whole struct */
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 132d19b..8e854c8 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -65,7 +65,7 @@ static struct ll_file_data *ll_file_data_get(void)
+ 	struct ll_file_data *fd;
+ 
+ 	fd = kmem_cache_alloc(ll_file_data_slab, GFP_NOFS | __GFP_ZERO);
+-	if (fd == NULL)
++	if (!fd)
  		return NULL;
+ 	fd->fd_write_failed = false;
+ 	return fd;
+@@ -73,7 +73,7 @@ static struct ll_file_data *ll_file_data_get(void)
  
- 	spin_lock_init(&lock->l_lock);
-@@ -485,7 +484,7 @@ int ldlm_lock_change_resource(struct ldlm_namespace *ns, struct ldlm_lock *lock,
- 	unlock_res_and_lock(lock);
+ static void ll_file_data_put(struct ll_file_data *fd)
+ {
+-	if (fd != NULL)
++	if (fd)
+ 		kmem_cache_free(ll_file_data_slab, fd);
+ }
  
- 	newres = ldlm_resource_get(ns, NULL, new_resid, type, 1);
--	if (newres == NULL)
-+	if (!newres)
+@@ -134,7 +134,7 @@ static int ll_close_inode_openhandle(struct obd_export *md_exp,
+ 	int epoch_close = 1;
+ 	int rc;
+ 
+-	if (obd == NULL) {
++	if (!obd) {
+ 		/*
+ 		 * XXX: in case of LMV, is this correct to access
+ 		 * ->exp_handle?
+@@ -153,7 +153,7 @@ static int ll_close_inode_openhandle(struct obd_export *md_exp,
+ 	}
+ 
+ 	ll_prepare_close(inode, op_data, och);
+-	if (data_version != NULL) {
++	if (data_version) {
+ 		/* Pass in data_version implies release. */
+ 		op_data->op_bias |= MDS_HSM_RELEASE;
+ 		op_data->op_data_version = *data_version;
+@@ -251,7 +251,7 @@ int ll_md_real_close(struct inode *inode, fmode_t fmode)
+ 	*och_p = NULL;
+ 	mutex_unlock(&lli->lli_och_mutex);
+ 
+-	if (och != NULL) {
++	if (och) {
+ 		/* There might be a race and this handle may already
+ 		   be closed. */
+ 		rc = ll_close_inode_openhandle(ll_i2sbi(inode)->ll_md_exp,
+@@ -276,7 +276,7 @@ static int ll_md_close(struct obd_export *md_exp, struct inode *inode,
+ 	if (unlikely(fd->fd_flags & LL_FILE_GROUP_LOCKED))
+ 		ll_put_grouplock(inode, file, fd->fd_grouplock.cg_gid);
+ 
+-	if (fd->fd_lease_och != NULL) {
++	if (fd->fd_lease_och) {
+ 		bool lease_broken;
+ 
+ 		/* Usually the lease is not released when the
+@@ -288,7 +288,7 @@ static int ll_md_close(struct obd_export *md_exp, struct inode *inode,
+ 		fd->fd_lease_och = NULL;
+ 	}
+ 
+-	if (fd->fd_och != NULL) {
++	if (fd->fd_och) {
+ 		rc = ll_close_inode_openhandle(md_exp, inode, fd->fd_och, NULL);
+ 		fd->fd_och = NULL;
+ 		goto out;
+@@ -343,7 +343,6 @@ int ll_file_release(struct inode *inode, struct file *file)
+ 	if (sbi->ll_flags & LL_SBI_RMT_CLIENT && is_root_inode(inode)) {
+ 		struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
+ 
+-		LASSERT(fd != NULL);
+ 		if (unlikely(fd->fd_flags & LL_FILE_RMTACL)) {
+ 			fd->fd_flags &= ~LL_FILE_RMTACL;
+ 			rct_del(&sbi->ll_rct, current_pid());
+@@ -355,7 +354,7 @@ int ll_file_release(struct inode *inode, struct file *file)
+ 	if (!is_root_inode(inode))
+ 		ll_stats_ops_tally(sbi, LPROC_LL_RELEASE, 1);
+ 	fd = LUSTRE_FPRIVATE(file);
+-	LASSERT(fd != NULL);
++	LASSERT(fd);
+ 
+ 	/* The last ref on @file, maybe not the owner pid of statahead.
+ 	 * Different processes can open the same dir, "ll_opendir_key" means:
+@@ -405,7 +404,7 @@ static int ll_intent_file_open(struct dentry *dentry, void *lmm,
+ 	 * makes a good candidate for using OPEN lock */
+ 	/* If lmmsize & lmm are not 0, we are just setting stripe info
+ 	 * parameters. No need for the open lock */
+-	if (lmm == NULL && lmmsize == 0) {
++	if (!lmm && lmmsize == 0) {
+ 		itp->it_flags |= MDS_OPEN_LOCK;
+ 		if (itp->it_flags & FMODE_WRITE)
+ 			opc = LUSTRE_OPC_CREATE;
+@@ -492,7 +491,7 @@ static int ll_local_open(struct file *file, struct lookup_intent *it,
+ 
+ 	LASSERT(!LUSTRE_FPRIVATE(file));
+ 
+-	LASSERT(fd != NULL);
++	LASSERT(fd);
+ 
+ 	if (och) {
+ 		struct ptlrpc_request *req = it->d.lustre.it_data;
+@@ -543,7 +542,7 @@ int ll_file_open(struct inode *inode, struct file *file)
+ 	file->private_data = NULL; /* prevent ll_local_open assertion */
+ 
+ 	fd = ll_file_data_get();
+-	if (fd == NULL) {
++	if (!fd) {
+ 		rc = -ENOMEM;
+ 		goto out_openerr;
+ 	}
+@@ -551,7 +550,7 @@ int ll_file_open(struct inode *inode, struct file *file)
+ 	fd->fd_file = file;
+ 	if (S_ISDIR(inode->i_mode)) {
+ 		spin_lock(&lli->lli_sa_lock);
+-		if (lli->lli_opendir_key == NULL && lli->lli_sai == NULL &&
++		if (!lli->lli_opendir_key && !lli->lli_sai &&
+ 		    lli->lli_opendir_pid == 0) {
+ 			lli->lli_opendir_key = fd;
+ 			lli->lli_opendir_pid = current_pid();
+@@ -752,7 +751,7 @@ ll_lease_open(struct inode *inode, struct file *file, fmode_t fmode,
+ 	if (fmode != FMODE_WRITE && fmode != FMODE_READ)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	if (file != NULL) {
++	if (file) {
+ 		struct ll_inode_info *lli = ll_i2info(inode);
+ 		struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
+ 		struct obd_client_handle **och_p;
+@@ -764,18 +763,18 @@ ll_lease_open(struct inode *inode, struct file *file, fmode_t fmode,
+ 		/* Get the openhandle of the file */
+ 		rc = -EBUSY;
+ 		mutex_lock(&lli->lli_och_mutex);
+-		if (fd->fd_lease_och != NULL) {
++		if (fd->fd_lease_och) {
+ 			mutex_unlock(&lli->lli_och_mutex);
+ 			return ERR_PTR(rc);
+ 		}
+ 
+-		if (fd->fd_och == NULL) {
++		if (!fd->fd_och) {
+ 			if (file->f_mode & FMODE_WRITE) {
+-				LASSERT(lli->lli_mds_write_och != NULL);
++				LASSERT(lli->lli_mds_write_och);
+ 				och_p = &lli->lli_mds_write_och;
+ 				och_usecount = &lli->lli_open_fd_write_count;
+ 			} else {
+-				LASSERT(lli->lli_mds_read_och != NULL);
++				LASSERT(lli->lli_mds_read_och);
+ 				och_p = &lli->lli_mds_read_och;
+ 				och_usecount = &lli->lli_open_fd_read_count;
+ 			}
+@@ -790,7 +789,7 @@ ll_lease_open(struct inode *inode, struct file *file, fmode_t fmode,
+ 		if (rc < 0) /* more than 1 opener */
+ 			return ERR_PTR(rc);
+ 
+-		LASSERT(fd->fd_och != NULL);
++		LASSERT(fd->fd_och);
+ 		old_handle = fd->fd_och->och_fh;
+ 	}
+ 
+@@ -886,7 +885,7 @@ static int ll_lease_close(struct obd_client_handle *och, struct inode *inode,
+ 	int rc;
+ 
+ 	lock = ldlm_handle2lock(&och->och_lease_handle);
+-	if (lock != NULL) {
++	if (lock) {
+ 		lock_res_and_lock(lock);
+ 		cancelled = ldlm_is_cancel(lock);
+ 		unlock_res_and_lock(lock);
+@@ -898,7 +897,7 @@ static int ll_lease_close(struct obd_client_handle *och, struct inode *inode,
+ 
+ 	if (!cancelled)
+ 		ldlm_cli_cancel(&och->och_lease_handle, 0);
+-	if (lease_broken != NULL)
++	if (lease_broken)
+ 		*lease_broken = cancelled;
+ 
+ 	rc = ll_close_inode_openhandle(ll_i2sbi(inode)->ll_md_exp, inode, och,
+@@ -914,7 +913,7 @@ static int ll_lsm_getattr(struct lov_stripe_md *lsm, struct obd_export *exp,
+ 	struct obd_info	    oinfo = { };
+ 	int			rc;
+ 
+-	LASSERT(lsm != NULL);
++	LASSERT(lsm);
+ 
+ 	oinfo.oi_md = lsm;
+ 	oinfo.oi_oa = obdo;
+@@ -933,7 +932,7 @@ static int ll_lsm_getattr(struct lov_stripe_md *lsm, struct obd_export *exp,
+ 	}
+ 
+ 	set = ptlrpc_prep_set();
+-	if (set == NULL) {
++	if (!set) {
+ 		CERROR("can't allocate ptlrpc set\n");
+ 		rc = -ENOMEM;
+ 	} else {
+@@ -1261,7 +1260,7 @@ static int ll_lov_recreate(struct inode *inode, struct ost_id *oi, u32 ost_idx)
+ 	struct lov_stripe_md *lsm = NULL, *lsm2;
+ 
+ 	oa = kmem_cache_alloc(obdo_cachep, GFP_NOFS | __GFP_ZERO);
+-	if (oa == NULL)
++	if (!oa)
  		return -ENOMEM;
  
- 	lu_ref_add(&newres->lr_reference, "lock", lock);
-@@ -547,7 +546,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
- 	LASSERT(handle);
+ 	lsm = ccc_inode_lsm_get(inode);
+@@ -1274,7 +1273,7 @@ static int ll_lov_recreate(struct inode *inode, struct ost_id *oi, u32 ost_idx)
+ 		   (lsm->lsm_stripe_count));
  
- 	lock = class_handle2object(handle->cookie);
--	if (lock == NULL)
-+	if (!lock)
- 		return NULL;
- 
- 	/* It's unlikely but possible that someone marked the lock as
-@@ -559,7 +558,7 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
- 
- 	lock_res_and_lock(lock);
- 
--	LASSERT(lock->l_resource != NULL);
-+	LASSERT(lock->l_resource);
- 
- 	lu_ref_add_atomic(&lock->l_reference, "handle", current);
- 	if (unlikely(lock->l_flags & LDLM_FL_DESTROYED)) {
-@@ -617,7 +616,7 @@ static void ldlm_add_bl_work_item(struct ldlm_lock *lock, struct ldlm_lock *new,
- 		LASSERT(list_empty(&lock->l_bl_ast));
- 		list_add(&lock->l_bl_ast, work_list);
- 		LDLM_LOCK_GET(lock);
--		LASSERT(lock->l_blocking_lock == NULL);
-+		LASSERT(!lock->l_blocking_lock);
- 		lock->l_blocking_lock = LDLM_LOCK_GET(new);
+ 	lsm2 = libcfs_kvzalloc(lsm_size, GFP_NOFS);
+-	if (lsm2 == NULL) {
++	if (!lsm2) {
+ 		rc = -ENOMEM;
+ 		goto out;
  	}
- }
-@@ -664,7 +663,7 @@ void ldlm_lock_addref(struct lustre_handle *lockh, __u32 mode)
- 	struct ldlm_lock *lock;
- 
- 	lock = ldlm_handle2lock(lockh);
--	LASSERT(lock != NULL);
-+	LASSERT(lock);
- 	ldlm_lock_addref_internal(lock, mode);
- 	LDLM_LOCK_PUT(lock);
- }
-@@ -708,7 +707,7 @@ int ldlm_lock_addref_try(struct lustre_handle *lockh, __u32 mode)
- 
- 	result = -EAGAIN;
- 	lock = ldlm_handle2lock(lockh);
--	if (lock != NULL) {
-+	if (lock) {
- 		lock_res_and_lock(lock);
- 		if (lock->l_readers != 0 || lock->l_writers != 0 ||
- 		    !(lock->l_flags & LDLM_FL_CBPENDING)) {
-@@ -835,7 +834,7 @@ void ldlm_lock_decref(struct lustre_handle *lockh, __u32 mode)
- {
- 	struct ldlm_lock *lock = __ldlm_handle2lock(lockh, 0);
- 
--	LASSERTF(lock != NULL, "Non-existing lock: %#llx\n", lockh->cookie);
-+	LASSERTF(lock, "Non-existing lock: %#llx\n", lockh->cookie);
- 	ldlm_lock_decref_internal(lock, mode);
- 	LDLM_LOCK_PUT(lock);
- }
-@@ -852,7 +851,7 @@ void ldlm_lock_decref_and_cancel(struct lustre_handle *lockh, __u32 mode)
- {
- 	struct ldlm_lock *lock = __ldlm_handle2lock(lockh, 0);
- 
--	LASSERT(lock != NULL);
-+	LASSERT(lock);
- 
- 	LDLM_DEBUG(lock, "ldlm_lock_decref(%s)", ldlm_lockname[mode]);
- 	lock_res_and_lock(lock);
-@@ -1037,7 +1036,7 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
- 	if (lock->l_granted_mode < res->lr_most_restr)
- 		res->lr_most_restr = lock->l_granted_mode;
- 
--	if (work_list && lock->l_completion_ast != NULL)
-+	if (work_list && lock->l_completion_ast)
- 		ldlm_add_ast_work_item(lock, NULL, work_list);
- 
- 	ldlm_pool_add(&ldlm_res_to_ns(res)->ns_pool, lock);
-@@ -1201,7 +1200,7 @@ ldlm_mode_t ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
- 	struct ldlm_lock *lock, *old_lock = NULL;
+@@ -1341,7 +1340,7 @@ int ll_lov_setstripe_ea_info(struct inode *inode, struct dentry *dentry,
  	int rc = 0;
  
--	if (ns == NULL) {
-+	if (!ns) {
- 		old_lock = ldlm_handle2lock(lockh);
- 		LASSERT(old_lock);
- 
-@@ -1212,8 +1211,8 @@ ldlm_mode_t ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
+ 	lsm = ccc_inode_lsm_get(inode);
+-	if (lsm != NULL) {
++	if (lsm) {
+ 		ccc_inode_lsm_put(inode, lsm);
+ 		CDEBUG(D_IOCTL, "stripe already exists for ino %lu\n",
+ 		       inode->i_ino);
+@@ -1401,7 +1400,6 @@ int ll_lov_getstripe_ea_info(struct inode *inode, const char *filename,
  	}
  
- 	res = ldlm_resource_get(ns, NULL, res_id, type, 0);
--	if (res == NULL) {
--		LASSERT(old_lock == NULL);
-+	if (!res) {
-+		LASSERT(!old_lock);
+ 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+-	LASSERT(body != NULL); /* checked by mdc_getattr_name */
+ 
+ 	lmmsize = body->eadatasize;
+ 
+@@ -1412,7 +1410,6 @@ int ll_lov_getstripe_ea_info(struct inode *inode, const char *filename,
+ 	}
+ 
+ 	lmm = req_capsule_server_sized_get(&req->rq_pill, &RMF_MDT_MD, lmmsize);
+-	LASSERT(lmm != NULL);
+ 
+ 	if ((lmm->lmm_magic != cpu_to_le32(LOV_MAGIC_V1)) &&
+ 	    (lmm->lmm_magic != cpu_to_le32(LOV_MAGIC_V3))) {
+@@ -1469,7 +1466,7 @@ static int ll_lov_setea(struct inode *inode, struct file *file,
+ 		return -EPERM;
+ 
+ 	lump = libcfs_kvzalloc(lum_size, GFP_NOFS);
+-	if (lump == NULL)
++	if (!lump)
+ 		return -ENOMEM;
+ 
+ 	if (copy_from_user(lump, (struct lov_user_md __user *)arg, lum_size)) {
+@@ -1530,7 +1527,7 @@ static int ll_lov_getstripe(struct inode *inode, unsigned long arg)
+ 	int rc = -ENODATA;
+ 
+ 	lsm = ccc_inode_lsm_get(inode);
+-	if (lsm != NULL)
++	if (lsm)
+ 		rc = obd_iocontrol(LL_IOC_LOV_GETSTRIPE, ll_i2dtexp(inode), 0,
+ 				   lsm, (void __user *)arg);
+ 	ccc_inode_lsm_put(inode, lsm);
+@@ -1560,7 +1557,7 @@ ll_get_grouplock(struct inode *inode, struct file *file, unsigned long arg)
+ 		spin_unlock(&lli->lli_lock);
+ 		return -EINVAL;
+ 	}
+-	LASSERT(fd->fd_grouplock.cg_lock == NULL);
++	LASSERT(!fd->fd_grouplock.cg_lock);
+ 	spin_unlock(&lli->lli_lock);
+ 
+ 	rc = cl_get_grouplock(cl_i2info(inode)->lli_clob,
+@@ -1597,7 +1594,7 @@ static int ll_put_grouplock(struct inode *inode, struct file *file,
+ 		CWARN("no group lock held\n");
+ 		return -EINVAL;
+ 	}
+-	LASSERT(fd->fd_grouplock.cg_lock != NULL);
++	LASSERT(fd->fd_grouplock.cg_lock);
+ 
+ 	if (fd->fd_grouplock.cg_gid != arg) {
+ 		CWARN("group lock %lu doesn't match current id %lu\n",
+@@ -1688,7 +1685,7 @@ static int ll_do_fiemap(struct inode *inode, struct ll_user_fiemap *fiemap,
+ 	}
+ 
+ 	lsm = ccc_inode_lsm_get(inode);
+-	if (lsm == NULL)
++	if (!lsm)
+ 		return -ENOENT;
+ 
+ 	/* If the stripe_count > 1 and the application does not understand
+@@ -1794,7 +1791,7 @@ static int ll_ioctl_fiemap(struct inode *inode, unsigned long arg)
+ 					 sizeof(struct ll_fiemap_extent));
+ 
+ 	fiemap_s = libcfs_kvzalloc(num_bytes, GFP_NOFS);
+-	if (fiemap_s == NULL)
++	if (!fiemap_s)
+ 		return -ENOMEM;
+ 
+ 	/* get the fiemap value */
+@@ -1923,7 +1920,7 @@ int ll_hsm_release(struct inode *inode)
+ 	och = NULL;
+ 
+ out:
+-	if (och != NULL && !IS_ERR(och)) /* close the file */
++	if (och && !IS_ERR(och)) /* close the file */
+ 		ll_lease_close(och, inode, NULL);
+ 
+ 	return rc;
+@@ -2250,7 +2247,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			return -EPERM;
+ 
+ 		file2 = fget(lsl.sl_fd);
+-		if (file2 == NULL)
++		if (!file2)
+ 			return -EBADF;
+ 
+ 		rc = -EPERM;
+@@ -2413,13 +2410,13 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			break;
+ 		case F_UNLCK:
+ 			mutex_lock(&lli->lli_och_mutex);
+-			if (fd->fd_lease_och != NULL) {
++			if (fd->fd_lease_och) {
+ 				och = fd->fd_lease_och;
+ 				fd->fd_lease_och = NULL;
+ 			}
+ 			mutex_unlock(&lli->lli_och_mutex);
+ 
+-			if (och != NULL) {
++			if (och) {
+ 				mode = och->och_flags &
+ 				       (FMODE_READ|FMODE_WRITE);
+ 				rc = ll_lease_close(och, inode, &lease_broken);
+@@ -2444,12 +2441,12 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ 		rc = 0;
+ 		mutex_lock(&lli->lli_och_mutex);
+-		if (fd->fd_lease_och == NULL) {
++		if (!fd->fd_lease_och) {
+ 			fd->fd_lease_och = och;
+ 			och = NULL;
+ 		}
+ 		mutex_unlock(&lli->lli_och_mutex);
+-		if (och != NULL) {
++		if (och) {
+ 			/* impossible now that only excl is supported for now */
+ 			ll_lease_close(och, inode, &lease_broken);
+ 			rc = -EBUSY;
+@@ -2462,11 +2459,11 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ 		rc = 0;
+ 		mutex_lock(&lli->lli_och_mutex);
+-		if (fd->fd_lease_och != NULL) {
++		if (fd->fd_lease_och) {
+ 			struct obd_client_handle *och = fd->fd_lease_och;
+ 
+ 			lock = ldlm_handle2lock(&och->och_lease_handle);
+-			if (lock != NULL) {
++			if (lock) {
+ 				lock_res_and_lock(lock);
+ 				if (!ldlm_is_cancel(lock))
+ 					rc = och->och_flags &
+@@ -2867,8 +2864,6 @@ static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
+ 	struct obd_export *exp;
+ 	int rc = 0;
+ 
+-	LASSERT(inode != NULL);
+-
+ 	CDEBUG(D_VFSTRACE, "VFS Op:inode=%lu/%u(%p),name=%pd\n",
+ 	       inode->i_ino, inode->i_generation, inode, dentry);
+ 
+@@ -3027,7 +3022,7 @@ static int ll_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+ 				       sizeof(struct ll_fiemap_extent));
+ 	fiemap = libcfs_kvzalloc(num_bytes, GFP_NOFS);
+ 
+-	if (fiemap == NULL)
++	if (!fiemap)
+ 		return -ENOMEM;
+ 
+ 	fiemap->fm_flags = fieinfo->fi_flags;
+@@ -3181,8 +3176,7 @@ void *ll_iocontrol_register(llioc_callback_t cb, int count, unsigned int *cmd)
+ 	unsigned int size;
+ 	struct llioc_data *in_data = NULL;
+ 
+-	if (cb == NULL || cmd == NULL ||
+-	    count > LLIOC_MAX_CMD || count < 0)
++	if (!cb || !cmd || count > LLIOC_MAX_CMD || count < 0)
+ 		return NULL;
+ 
+ 	size = sizeof(*in_data) + count * sizeof(unsigned int);
+@@ -3208,7 +3202,7 @@ void ll_iocontrol_unregister(void *magic)
+ {
+ 	struct llioc_data *tmp;
+ 
+-	if (magic == NULL)
++	if (!magic)
+ 		return;
+ 
+ 	down_write(&llioc.ioc_sem);
+@@ -3262,7 +3256,7 @@ int ll_layout_conf(struct inode *inode, const struct cl_object_conf *conf)
+ 	struct lu_env *env;
+ 	int result;
+ 
+-	if (lli->lli_clob == NULL)
++	if (!lli->lli_clob)
  		return 0;
- 	}
  
-@@ -1222,7 +1221,7 @@ ldlm_mode_t ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
+ 	env = cl_env_nested_get(&nest);
+@@ -3275,7 +3269,7 @@ int ll_layout_conf(struct inode *inode, const struct cl_object_conf *conf)
+ 	if (conf->coc_opc == OBJECT_CONF_SET) {
+ 		struct ldlm_lock *lock = conf->coc_lock;
  
- 	lock = search_queue(&res->lr_granted, &mode, policy, old_lock,
- 			    flags, unref);
--	if (lock != NULL) {
-+	if (lock) {
- 		rc = 1;
+-		LASSERT(lock != NULL);
++		LASSERT(lock);
+ 		LASSERT(ldlm_has_layout(lock));
+ 		if (result == 0) {
+ 			/* it can only be allowed to match after layout is
+@@ -3304,7 +3298,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
+ 	       PFID(ll_inode2fid(inode)), !!(lock->l_flags & LDLM_FL_LVB_READY),
+ 	       lock->l_lvb_data, lock->l_lvb_len);
+ 
+-	if ((lock->l_lvb_data != NULL) && (lock->l_flags & LDLM_FL_LVB_READY))
++	if (lock->l_lvb_data && (lock->l_flags & LDLM_FL_LVB_READY))
+ 		return 0;
+ 
+ 	/* if layout lock was granted right away, the layout is returned
+@@ -3321,7 +3315,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
+ 		return rc;
+ 
+ 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+-	if (body == NULL) {
++	if (!body) {
+ 		rc = -EPROTO;
  		goto out;
  	}
-@@ -1232,7 +1231,7 @@ ldlm_mode_t ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
+@@ -3333,20 +3327,20 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
  	}
- 	lock = search_queue(&res->lr_waiting, &mode, policy, old_lock,
- 			    flags, unref);
--	if (lock != NULL) {
-+	if (lock) {
- 		rc = 1;
+ 
+ 	lmm = req_capsule_server_sized_get(&req->rq_pill, &RMF_EADATA, lmmsize);
+-	if (lmm == NULL) {
++	if (!lmm) {
+ 		rc = -EFAULT;
  		goto out;
  	}
-@@ -1324,7 +1323,7 @@ ldlm_mode_t ldlm_revalidate_lock_handle(struct lustre_handle *lockh,
- 	ldlm_mode_t mode = 0;
+ 
+ 	lvbdata = libcfs_kvzalloc(lmmsize, GFP_NOFS);
+-	if (lvbdata == NULL) {
++	if (!lvbdata) {
+ 		rc = -ENOMEM;
+ 		goto out;
+ 	}
+ 
+ 	memcpy(lvbdata, lmm, lmmsize);
+ 	lock_res_and_lock(lock);
+-	if (lock->l_lvb_data != NULL)
++	if (lock->l_lvb_data)
+ 		kvfree(lock->l_lvb_data);
+ 
+ 	lock->l_lvb_data = lvbdata;
+@@ -3377,7 +3371,7 @@ static int ll_layout_lock_set(struct lustre_handle *lockh, ldlm_mode_t mode,
+ 	LASSERT(lustre_handle_is_used(lockh));
  
  	lock = ldlm_handle2lock(lockh);
--	if (lock != NULL) {
-+	if (lock) {
- 		lock_res_and_lock(lock);
- 		if (lock->l_flags & LDLM_FL_GONE_MASK)
- 			goto out;
-@@ -1340,7 +1339,7 @@ ldlm_mode_t ldlm_revalidate_lock_handle(struct lustre_handle *lockh,
+-	LASSERT(lock != NULL);
++	LASSERT(lock);
+ 	LASSERT(ldlm_has_layout(lock));
+ 
+ 	LDLM_DEBUG(lock, "File %p/"DFID" being reconfigured: %d.\n",
+@@ -3410,12 +3404,12 @@ static int ll_layout_lock_set(struct lustre_handle *lockh, ldlm_mode_t mode,
+ 	 * lvb_data is immutable if the lock is held so it's safe to access it
+ 	 * without res lock. See the description in ldlm_lock_decref_internal()
+ 	 * for the condition to free lvb_data of layout lock */
+-	if (lock->l_lvb_data != NULL) {
++	if (lock->l_lvb_data) {
+ 		rc = obd_unpackmd(sbi->ll_dt_exp, &md.lsm,
+ 				  lock->l_lvb_data, lock->l_lvb_len);
+ 		if (rc >= 0) {
+ 			*gen = LL_LAYOUT_GEN_EMPTY;
+-			if (md.lsm != NULL)
++			if (md.lsm)
+ 				*gen = md.lsm->lsm_layout_gen;
+ 			rc = 0;
+ 		} else {
+@@ -3436,7 +3430,7 @@ static int ll_layout_lock_set(struct lustre_handle *lockh, ldlm_mode_t mode,
+ 	conf.u.coc_md = &md;
+ 	rc = ll_layout_conf(inode, &conf);
+ 
+-	if (md.lsm != NULL)
++	if (md.lsm)
+ 		obd_free_memmd(sbi->ll_dt_exp, &md.lsm);
+ 
+ 	/* refresh layout failed, need to wait */
+@@ -3537,8 +3531,7 @@ again:
+ 
+ 	rc = md_enqueue(sbi->ll_md_exp, &einfo, &it, op_data, &lockh,
+ 			NULL, 0, NULL, 0);
+-	if (it.d.lustre.it_data != NULL)
+-		ptlrpc_req_finished(it.d.lustre.it_data);
++	ptlrpc_req_finished(it.d.lustre.it_data);
+ 	it.d.lustre.it_data = NULL;
+ 
+ 	ll_finish_md_op_data(op_data);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_close.c b/drivers/staging/lustre/lustre/llite/llite_close.c
+index 3f348a3..626846e 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_close.c
++++ b/drivers/staging/lustre/lustre/llite/llite_close.c
+@@ -52,7 +52,7 @@ void vvp_write_pending(struct ccc_object *club, struct ccc_page *page)
+ 
+ 	spin_lock(&lli->lli_lock);
+ 	lli->lli_flags |= LLIF_SOM_DIRTY;
+-	if (page != NULL && list_empty(&page->cpg_pending_linkage))
++	if (page && list_empty(&page->cpg_pending_linkage))
+ 		list_add(&page->cpg_pending_linkage,
+ 			     &club->cob_pending_list);
+ 	spin_unlock(&lli->lli_lock);
+@@ -65,7 +65,7 @@ void vvp_write_complete(struct ccc_object *club, struct ccc_page *page)
+ 	int rc = 0;
+ 
+ 	spin_lock(&lli->lli_lock);
+-	if (page != NULL && !list_empty(&page->cpg_pending_linkage)) {
++	if (page && !list_empty(&page->cpg_pending_linkage)) {
+ 		list_del_init(&page->cpg_pending_linkage);
+ 		rc = 1;
+ 	}
+@@ -144,8 +144,8 @@ void ll_ioepoch_close(struct inode *inode, struct md_op_data *op_data,
+ 	spin_lock(&lli->lli_lock);
+ 	if (!(list_empty(&club->cob_pending_list))) {
+ 		if (!(lli->lli_flags & LLIF_EPOCH_PENDING)) {
+-			LASSERT(*och != NULL);
+-			LASSERT(lli->lli_pending_och == NULL);
++			LASSERT(*och);
++			LASSERT(!lli->lli_pending_och);
+ 			/* Inode is dirty and there is no pending write done
+ 			 * request yet, DONE_WRITE is to be sent later. */
+ 			lli->lli_flags |= LLIF_EPOCH_PENDING;
+@@ -215,7 +215,7 @@ int ll_som_update(struct inode *inode, struct md_op_data *op_data)
+ 	struct obdo *oa;
+ 	int rc;
+ 
+-	LASSERT(op_data != NULL);
++	LASSERT(op_data);
+ 	if (lli->lli_flags & LLIF_MDS_SIZE_LOCK)
+ 		CERROR("ino %lu/%u(flags %u) som valid it just after recovery\n",
+ 		       inode->i_ino, inode->i_generation,
+@@ -266,7 +266,7 @@ static void ll_prepare_done_writing(struct inode *inode,
+ {
+ 	ll_ioepoch_close(inode, op_data, och, LLIF_DONE_WRITING);
+ 	/* If there is no @och, we do not do D_W yet. */
+-	if (*och == NULL)
++	if (!*och)
+ 		return;
+ 
+ 	ll_pack_inode2opdata(inode, op_data, &(*och)->och_fh);
+@@ -289,7 +289,7 @@ static void ll_done_writing(struct inode *inode)
+ 
+ 	ll_prepare_done_writing(inode, op_data, &och);
+ 	/* If there is no @och, we do not do D_W yet. */
+-	if (och == NULL)
++	if (!och)
+ 		goto out;
+ 
+ 	rc = md_done_writing(ll_i2sbi(inode)->ll_md_exp, op_data, NULL);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 29c325d..7dbe86a 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -913,7 +913,7 @@ static inline struct vvp_thread_info *vvp_env_info(const struct lu_env *env)
+ 	struct vvp_thread_info      *info;
+ 
+ 	info = lu_context_key_get(&env->le_ctx, &vvp_key);
+-	LASSERT(info != NULL);
++	LASSERT(info);
+ 	return info;
+ }
+ 
+@@ -937,7 +937,7 @@ static inline struct vvp_session *vvp_env_session(const struct lu_env *env)
+ 	struct vvp_session *ses;
+ 
+ 	ses = lu_context_key_get(env->le_ses, &vvp_session_key);
+-	LASSERT(ses != NULL);
++	LASSERT(ses);
+ 	return ses;
+ }
+ 
+@@ -968,7 +968,7 @@ static inline void ll_invalidate_page(struct page *vmpage)
+ 	loff_t offset = vmpage->index << PAGE_CACHE_SHIFT;
+ 
+ 	LASSERT(PageLocked(vmpage));
+-	if (mapping == NULL)
++	if (!mapping)
+ 		return;
+ 
+ 	ll_teardown_mmaps(mapping, offset, offset + PAGE_CACHE_SIZE);
+@@ -993,7 +993,7 @@ static inline struct client_obd *sbi2mdc(struct ll_sb_info *sbi)
+ {
+ 	struct obd_device *obd = sbi->ll_md_exp->exp_obd;
+ 
+-	if (obd == NULL)
++	if (!obd)
+ 		LBUG();
+ 	return &obd->u.cli;
+ }
+@@ -1018,7 +1018,7 @@ static inline struct lu_fid *ll_inode2fid(struct inode *inode)
+ {
+ 	struct lu_fid *fid;
+ 
+-	LASSERT(inode != NULL);
++	LASSERT(inode);
+ 	fid = &ll_i2info(inode)->lli_fid;
+ 
+ 	return fid;
+@@ -1171,8 +1171,8 @@ ll_statahead_mark(struct inode *dir, struct dentry *dentry)
+ 	if (lli->lli_opendir_pid != current_pid())
+ 		return;
+ 
+-	LASSERT(ldd != NULL);
+-	if (sai != NULL)
++	LASSERT(ldd);
++	if (sai)
+ 		ldd->lld_sa_generation = sai->sai_generation;
+ }
+ 
+@@ -1191,7 +1191,7 @@ d_need_statahead(struct inode *dir, struct dentry *dentryp)
+ 		return -EAGAIN;
+ 
+ 	/* statahead has been stopped */
+-	if (lli->lli_opendir_key == NULL)
++	if (!lli->lli_opendir_key)
+ 		return -EAGAIN;
+ 
+ 	ldd = ll_d2d(dentryp);
+@@ -1345,7 +1345,6 @@ static inline int ll_file_nolock(const struct file *file)
+ 	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
+ 	struct inode *inode = file_inode(file);
+ 
+-	LASSERT(fd != NULL);
+ 	return ((fd->fd_flags & LL_FILE_IGNORE_LOCK) ||
+ 		(ll_i2sbi(inode)->ll_flags & LL_SBI_NOLCK));
+ }
+@@ -1383,7 +1382,7 @@ static inline void ll_set_lock_data(struct obd_export *exp, struct inode *inode,
+ 		it->d.lustre.it_lock_set = 1;
+ 	}
+ 
+-	if (bits != NULL)
++	if (bits)
+ 		*bits = it->d.lustre.it_lock_bits;
+ }
+ 
+@@ -1401,14 +1400,14 @@ static inline int d_lustre_invalid(const struct dentry *dentry)
+ {
+ 	struct ll_dentry_data *lld = ll_d2d(dentry);
+ 
+-	return (lld == NULL) || lld->lld_invalid;
++	return !lld || lld->lld_invalid;
+ }
+ 
+ static inline void __d_lustre_invalidate(struct dentry *dentry)
+ {
+ 	struct ll_dentry_data *lld = ll_d2d(dentry);
+ 
+-	if (lld != NULL)
++	if (lld)
+ 		lld->lld_invalid = 1;
+ }
+ 
+@@ -1442,7 +1441,7 @@ static inline void d_lustre_invalidate(struct dentry *dentry, int nested)
+ static inline void d_lustre_revalidate(struct dentry *dentry)
+ {
+ 	spin_lock(&dentry->d_lock);
+-	LASSERT(ll_d2d(dentry) != NULL);
++	LASSERT(ll_d2d(dentry));
+ 	ll_d2d(dentry)->lld_invalid = 0;
+ 	spin_unlock(&dentry->d_lock);
+ }
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 446e4b8..4de085d 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -171,7 +171,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
+ 		return -ENOMEM;
+ 	}
+ 
+-	if (llite_root != NULL) {
++	if (llite_root) {
+ 		err = ldebugfs_register_mountpoint(llite_root, sb, dt, md);
+ 		if (err < 0)
+ 			CERROR("could not register mount in <debugfs>/lustre/llite\n");
+@@ -493,7 +493,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
+ 	md_free_lustre_md(sbi->ll_md_exp, &lmd);
+ 	ptlrpc_req_finished(request);
+ 
+-	if (root == NULL || IS_ERR(root)) {
++	if (IS_ERR_OR_NULL(root)) {
+ 		if (lmd.lsm)
+ 			obd_free_memmd(sbi->ll_dt_exp, &lmd.lsm);
+ #ifdef CONFIG_FS_POSIX_ACL
+@@ -532,7 +532,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
+ 				 &sbi->ll_cache, NULL);
+ 
+ 	sb->s_root = d_make_root(root);
+-	if (sb->s_root == NULL) {
++	if (!sb->s_root) {
+ 		CERROR("%s: can't make root dentry\n",
+ 			ll_get_fsname(sb, NULL, 0));
+ 		err = -ENOMEM;
+@@ -547,7 +547,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
+ 	/* s_dev is also used in lt_compare() to compare two fs, but that is
+ 	 * only a node-local comparison. */
+ 	uuid = obd_get_uuid(sbi->ll_md_exp);
+-	if (uuid != NULL) {
++	if (uuid) {
+ 		sb->s_dev = get_uuid2int(uuid->uuid, strlen(uuid->uuid));
+ 		get_uuid2fsid(uuid->uuid, strlen(uuid->uuid), &sbi->ll_fsid);
+ 	}
+@@ -777,7 +777,7 @@ static int ll_options(char *options, int *flags)
+ next:
+ 		/* Find next opt */
+ 		s2 = strchr(s1, ',');
+-		if (s2 == NULL)
++		if (!s2)
+ 			break;
+ 		s1 = s2 + 1;
+ 	}
+@@ -904,7 +904,7 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
+ 
+ 	/* Profile set with LCFG_MOUNTOPT so we can find our mdc and osc obds */
+ 	lprof = class_get_profile(profilenm);
+-	if (lprof == NULL) {
++	if (!lprof) {
+ 		LCONSOLE_ERROR_MSG(0x156, "The client profile '%s' could not be read from the MGS.  Does that filesystem exist?\n",
+ 				   profilenm);
+ 		err = -EINVAL;
+@@ -1036,8 +1036,8 @@ void ll_clear_inode(struct inode *inode)
+ 
+ 	if (S_ISDIR(inode->i_mode)) {
+ 		/* these should have been cleared in ll_file_release */
+-		LASSERT(lli->lli_opendir_key == NULL);
+-		LASSERT(lli->lli_sai == NULL);
++		LASSERT(!lli->lli_opendir_key);
++		LASSERT(!lli->lli_sai);
+ 		LASSERT(lli->lli_opendir_pid == 0);
+ 	}
+ 
+@@ -1065,7 +1065,7 @@ void ll_clear_inode(struct inode *inode)
+ 	ll_xattr_cache_destroy(inode);
+ 
+ 	if (sbi->ll_flags & LL_SBI_RMT_CLIENT) {
+-		LASSERT(lli->lli_posix_acl == NULL);
++		LASSERT(!lli->lli_posix_acl);
+ 		if (lli->lli_remote_perms) {
+ 			free_rmtperm_hash(lli->lli_remote_perms);
+ 			lli->lli_remote_perms = NULL;
+@@ -1074,7 +1074,7 @@ void ll_clear_inode(struct inode *inode)
+ #ifdef CONFIG_FS_POSIX_ACL
+ 	else if (lli->lli_posix_acl) {
+ 		LASSERT(atomic_read(&lli->lli_posix_acl->a_refcount) == 1);
+-		LASSERT(lli->lli_remote_perms == NULL);
++		LASSERT(!lli->lli_remote_perms);
+ 		posix_acl_release(lli->lli_posix_acl);
+ 		lli->lli_posix_acl = NULL;
+ 	}
+@@ -1161,7 +1161,6 @@ static int ll_setattr_done_writing(struct inode *inode,
+ 	struct ll_inode_info *lli = ll_i2info(inode);
+ 	int rc = 0;
+ 
+-	LASSERT(op_data != NULL);
+ 	if (!S_ISREG(inode->i_mode))
+ 		return 0;
+ 
+@@ -1514,7 +1513,7 @@ void ll_update_inode(struct inode *inode, struct lustre_md *md)
+ 	struct ll_sb_info *sbi = ll_i2sbi(inode);
+ 
+ 	LASSERT((lsm != NULL) == ((body->valid & OBD_MD_FLEASIZE) != 0));
+-	if (lsm != NULL) {
++	if (lsm) {
+ 		if (!lli->lli_has_smd &&
+ 		    !(sbi->ll_flags & LL_SBI_LAYOUT_LOCK))
+ 			cl_file_inode_init(inode, md);
+@@ -1689,7 +1688,7 @@ void ll_delete_inode(struct inode *inode)
+ {
+ 	struct cl_inode_info *lli = cl_i2info(inode);
+ 
+-	if (S_ISREG(inode->i_mode) && lli->lli_clob != NULL)
++	if (S_ISREG(inode->i_mode) && lli->lli_clob)
+ 		/* discard all dirty pages before truncating them, required by
+ 		 * osc_extent implementation at LU-1030. */
+ 		cl_sync_file_range(inode, 0, OBD_OBJECT_EOF,
+@@ -1831,7 +1830,7 @@ void ll_umount_begin(struct super_block *sb)
+ 	       sb->s_count, atomic_read(&sb->s_active));
+ 
+ 	obd = class_exp2obd(sbi->ll_md_exp);
+-	if (obd == NULL) {
++	if (!obd) {
+ 		CERROR("Invalid MDC connection handle %#llx\n",
+ 		       sbi->ll_md_exp->exp_handle.h_cookie);
+ 		return;
+@@ -1839,7 +1838,7 @@ void ll_umount_begin(struct super_block *sb)
+ 	obd->obd_force = 1;
+ 
+ 	obd = class_exp2obd(sbi->ll_dt_exp);
+-	if (obd == NULL) {
++	if (!obd) {
+ 		CERROR("Invalid LOV connection handle %#llx\n",
+ 		       sbi->ll_dt_exp->exp_handle.h_cookie);
+ 		return;
+@@ -1954,7 +1953,7 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
+ 	if (*inode) {
+ 		ll_update_inode(*inode, &md);
+ 	} else {
+-		LASSERT(sb != NULL);
++		LASSERT(sb);
+ 
+ 		/*
+ 		 * At this point server returns to client's same fid as client
+@@ -1965,7 +1964,7 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
+ 		*inode = ll_iget(sb, cl_fid_build_ino(&md.body->fid1,
+ 					     sbi->ll_flags & LL_SBI_32BIT_API),
+ 				 &md);
+-		if (*inode == NULL || IS_ERR(*inode)) {
++		if (IS_ERR_OR_NULL(*inode)) {
+ #ifdef CONFIG_FS_POSIX_ACL
+ 			if (md.posix_acl) {
+ 				posix_acl_release(md.posix_acl);
+@@ -1987,13 +1986,13 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
+ 	 * 2. layout was changed by another client
+ 	 * 3. proc2: refresh layout and layout lock granted
+ 	 * 4. proc1: to apply a stale layout */
+-	if (it != NULL && it->d.lustre.it_lock_mode != 0) {
++	if (it && it->d.lustre.it_lock_mode != 0) {
+ 		struct lustre_handle lockh;
+ 		struct ldlm_lock *lock;
+ 
+ 		lockh.cookie = it->d.lustre.it_lock_handle;
+ 		lock = ldlm_handle2lock(&lockh);
+-		LASSERT(lock != NULL);
++		LASSERT(lock);
+ 		if (ldlm_has_layout(lock)) {
+ 			struct cl_object_conf conf;
+ 
+@@ -2008,7 +2007,7 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
  	}
  
  out:
--	if (lock != NULL) {
-+	if (lock) {
- 		unlock_res_and_lock(lock);
- 		LDLM_LOCK_PUT(lock);
- 	}
-@@ -1354,7 +1353,7 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
+-	if (md.lsm != NULL)
++	if (md.lsm)
+ 		obd_free_memmd(sbi->ll_dt_exp, &md.lsm);
+ 	md_free_lustre_md(sbi->ll_md_exp, &md);
+ 
+@@ -2113,15 +2112,13 @@ struct md_op_data *ll_prep_md_op_data(struct md_op_data *op_data,
+ 				       const char *name, int namelen,
+ 				       int mode, __u32 opc, void *data)
  {
- 	void *lvb;
+-	LASSERT(i1 != NULL);
+-
+ 	if (namelen > ll_i2sbi(i1)->ll_namelen)
+ 		return ERR_PTR(-ENAMETOOLONG);
  
--	LASSERT(data != NULL);
-+	LASSERT(data);
- 	LASSERT(size >= 0);
+-	if (op_data == NULL)
++	if (!op_data)
+ 		op_data = kzalloc(sizeof(*op_data), GFP_NOFS);
  
- 	switch (lock->l_lvb_type) {
-@@ -1368,7 +1367,7 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
- 				lvb = req_capsule_server_swab_get(pill,
- 						&RMF_DLM_LVB,
- 						lustre_swab_ost_lvb);
--			if (unlikely(lvb == NULL)) {
-+			if (unlikely(!lvb)) {
- 				LDLM_ERROR(lock, "no LVB");
- 				return -EPROTO;
- 			}
-@@ -1385,7 +1384,7 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
- 				lvb = req_capsule_server_sized_swab_get(pill,
- 						&RMF_DLM_LVB, size,
- 						lustre_swab_ost_lvb_v1);
--			if (unlikely(lvb == NULL)) {
-+			if (unlikely(!lvb)) {
- 				LDLM_ERROR(lock, "no LVB");
- 				return -EPROTO;
- 			}
-@@ -1410,7 +1409,7 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
- 				lvb = req_capsule_server_swab_get(pill,
- 						&RMF_DLM_LVB,
- 						lustre_swab_lquota_lvb);
--			if (unlikely(lvb == NULL)) {
-+			if (unlikely(!lvb)) {
- 				LDLM_ERROR(lock, "no LVB");
- 				return -EPROTO;
- 			}
-@@ -1431,7 +1430,7 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
- 			lvb = req_capsule_client_get(pill, &RMF_DLM_LVB);
- 		else
- 			lvb = req_capsule_server_get(pill, &RMF_DLM_LVB);
--		if (unlikely(lvb == NULL)) {
-+		if (unlikely(!lvb)) {
- 			LDLM_ERROR(lock, "no LVB");
- 			return -EPROTO;
- 		}
-@@ -1463,12 +1462,12 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
- 	struct ldlm_resource *res;
+-	if (op_data == NULL)
++	if (!op_data)
+ 		return ERR_PTR(-ENOMEM);
  
- 	res = ldlm_resource_get(ns, NULL, res_id, type, 1);
--	if (res == NULL)
-+	if (!res)
- 		return NULL;
+ 	ll_i2gids(op_data->op_suppgids, i1, i2);
+@@ -2141,8 +2138,8 @@ struct md_op_data *ll_prep_md_op_data(struct md_op_data *op_data,
+ 	op_data->op_cap = cfs_curproc_cap_pack();
+ 	op_data->op_bias = 0;
+ 	op_data->op_cli_flags = 0;
+-	if ((opc == LUSTRE_OPC_CREATE) && (name != NULL) &&
+-	     filename_is_volatile(name, namelen, NULL))
++	if ((opc == LUSTRE_OPC_CREATE) && name &&
++	    filename_is_volatile(name, namelen, NULL))
+ 		op_data->op_bias |= MDS_CREATE_VOLATILE;
+ 	op_data->op_opc = opc;
+ 	op_data->op_mds = 0;
+@@ -2177,7 +2174,7 @@ int ll_show_options(struct seq_file *seq, struct dentry *dentry)
+ {
+ 	struct ll_sb_info *sbi;
  
- 	lock = ldlm_lock_new(res);
+-	LASSERT((seq != NULL) && (dentry != NULL));
++	LASSERT(seq && dentry);
+ 	sbi = ll_s2sbi(dentry->d_sb);
  
--	if (lock == NULL)
-+	if (!lock)
- 		return NULL;
+ 	if (sbi->ll_flags & LL_SBI_NOLCK)
+@@ -2238,7 +2235,7 @@ char *ll_get_fsname(struct super_block *sb, char *buf, int buflen)
+ 	char *ptr;
+ 	int len;
  
- 	lock->l_req_mode = mode;
-@@ -1483,7 +1482,7 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
- 	lock->l_tree_node = NULL;
- 	/* if this is the extent lock, allocate the interval tree node */
- 	if (type == LDLM_EXTENT) {
--		if (ldlm_interval_alloc(lock) == NULL)
-+		if (!ldlm_interval_alloc(lock))
- 			goto out;
+-	if (buf == NULL) {
++	if (!buf) {
+ 		/* this means the caller wants to use static buffer
+ 		 * and it doesn't care about race. Usually this is
+ 		 * in error reporting path */
+@@ -2267,9 +2264,9 @@ void ll_dirty_page_discard_warn(struct page *page, int ioret)
+ 
+ 	/* this can be called inside spin lock so use GFP_ATOMIC. */
+ 	buf = (char *)__get_free_page(GFP_ATOMIC);
+-	if (buf != NULL) {
++	if (buf) {
+ 		dentry = d_find_alias(page->mapping->host);
+-		if (dentry != NULL)
++		if (dentry)
+ 			path = dentry_path_raw(dentry, buf, PAGE_SIZE);
  	}
  
-@@ -1633,7 +1632,7 @@ ldlm_work_cp_ast_lock(struct ptlrpc_request_set *rqset, void *opaq)
- 	lock->l_flags &= ~LDLM_FL_CP_REQD;
- 	unlock_res_and_lock(lock);
+@@ -2280,9 +2277,9 @@ void ll_dirty_page_discard_warn(struct page *page, int ioret)
+ 	       PFID(&obj->cob_header.coh_lu.loh_fid),
+ 	       (path && !IS_ERR(path)) ? path : "", ioret);
  
--	if (completion_callback != NULL)
-+	if (completion_callback)
- 		rc = completion_callback(lock, 0, (void *)arg);
- 	LDLM_LOCK_RELEASE(lock);
+-	if (dentry != NULL)
++	if (dentry)
+ 		dput(dentry);
  
-@@ -1752,7 +1751,7 @@ int ldlm_run_ast_work(struct ldlm_namespace *ns, struct list_head *rpc_list,
- 	 * to keep the number of requests in flight to ns_max_parallel_ast */
- 	arg->set = ptlrpc_prep_fcset(ns->ns_max_parallel_ast ? : UINT_MAX,
- 				     work_ast_lock, arg);
--	if (arg->set == NULL) {
-+	if (!arg->set) {
+-	if (buf != NULL)
++	if (buf)
+ 		free_page((unsigned long)buf);
+ }
+diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+index bbae95c..a0a58fd 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
++++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+@@ -72,7 +72,7 @@ struct vm_area_struct *our_vma(struct mm_struct *mm, unsigned long addr,
+ 	LASSERT(!down_write_trylock(&mm->mmap_sem));
+ 
+ 	for (vma = find_vma(mm, addr);
+-	    vma != NULL && vma->vm_start < (addr + count); vma = vma->vm_next) {
++	    vma && vma->vm_start < (addr + count); vma = vma->vm_next) {
+ 		if (vma->vm_ops && vma->vm_ops == &ll_file_vm_ops &&
+ 		    vma->vm_flags & VM_SHARED) {
+ 			ret = vma;
+@@ -125,7 +125,7 @@ ll_fault_io_init(struct vm_area_struct *vma, struct lu_env **env_ret,
+ 
+ 	io = ccc_env_thread_io(env);
+ 	io->ci_obj = ll_i2info(inode)->lli_clob;
+-	LASSERT(io->ci_obj != NULL);
++	LASSERT(io->ci_obj);
+ 
+ 	fio = &io->u.ci_fault;
+ 	fio->ft_index      = index;
+@@ -136,7 +136,7 @@ ll_fault_io_init(struct vm_area_struct *vma, struct lu_env **env_ret,
+ 	 * the kernel will not read other pages not covered by ldlm in
+ 	 * filemap_nopage. we do our readahead in ll_readpage.
+ 	 */
+-	if (ra_flags != NULL)
++	if (ra_flags)
+ 		*ra_flags = vma->vm_flags & (VM_RAND_READ|VM_SEQ_READ);
+ 	vma->vm_flags &= ~VM_SEQ_READ;
+ 	vma->vm_flags |= VM_RAND_READ;
+@@ -178,8 +178,6 @@ static int ll_page_mkwrite0(struct vm_area_struct *vma, struct page *vmpage,
+ 	struct inode	     *inode;
+ 	struct ll_inode_info     *lli;
+ 
+-	LASSERT(vmpage != NULL);
+-
+ 	io = ll_fault_io_init(vma, &env,  &nest, vmpage->index, NULL);
+ 	if (IS_ERR(io)) {
+ 		result = PTR_ERR(io);
+@@ -217,7 +215,7 @@ static int ll_page_mkwrite0(struct vm_area_struct *vma, struct page *vmpage,
+ 		struct ll_inode_info *lli = ll_i2info(inode);
+ 
+ 		lock_page(vmpage);
+-		if (vmpage->mapping == NULL) {
++		if (!vmpage->mapping) {
+ 			unlock_page(vmpage);
+ 
+ 			/* page was truncated and lock was cancelled, return
+@@ -320,7 +318,7 @@ static int ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 			fault_ret = vio->u.fault.fault.ft_flags;
+ 
+ 		vmpage = vio->u.fault.ft_vmpage;
+-		if (result != 0 && vmpage != NULL) {
++		if (result != 0 && vmpage) {
+ 			page_cache_release(vmpage);
+ 			vmf->page = NULL;
+ 		}
+@@ -357,7 +355,7 @@ restart:
+ 
+ 		/* check if this page has been truncated */
+ 		lock_page(vmpage);
+-		if (unlikely(vmpage->mapping == NULL)) { /* unlucky */
++		if (unlikely(!vmpage->mapping)) { /* unlucky */
+ 			unlock_page(vmpage);
+ 			page_cache_release(vmpage);
+ 			vmf->page = NULL;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_rmtacl.c b/drivers/staging/lustre/lustre/llite/llite_rmtacl.c
+index b27c3f2..63e4847 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_rmtacl.c
++++ b/drivers/staging/lustre/lustre/llite/llite_rmtacl.c
+@@ -125,12 +125,12 @@ int rct_add(struct rmtacl_ctl_table *rct, pid_t key, int ops)
+ 	struct rmtacl_ctl_entry *rce, *e;
+ 
+ 	rce = rce_alloc(key, ops);
+-	if (rce == NULL)
++	if (!rce)
+ 		return -ENOMEM;
+ 
+ 	spin_lock(&rct->rct_lock);
+ 	e = __rct_search(rct, key);
+-	if (unlikely(e != NULL)) {
++	if (unlikely(e)) {
+ 		CWARN("Unexpected stale rmtacl_entry found: [key: %d] [ops: %d]\n",
+ 		      (int)key, ops);
+ 		rce_free(e);
+@@ -213,7 +213,7 @@ static struct eacl_entry *__et_search_del(struct eacl_table *et, pid_t key,
+ 	struct eacl_entry *ee;
+ 	struct list_head *head = &et->et_entries[ee_hashfunc(key)];
+ 
+-	LASSERT(fid != NULL);
++	LASSERT(fid);
+ 	list_for_each_entry(ee, head, ee_list)
+ 		if (ee->ee_key == key) {
+ 			if (lu_fid_eq(&ee->ee_fid, fid) &&
+@@ -256,12 +256,12 @@ int ee_add(struct eacl_table *et, pid_t key, struct lu_fid *fid, int type,
+ 	struct eacl_entry *ee, *e;
+ 
+ 	ee = ee_alloc(key, fid, type, header);
+-	if (ee == NULL)
++	if (!ee)
+ 		return -ENOMEM;
+ 
+ 	spin_lock(&et->et_lock);
+ 	e = __et_search_del(et, key, fid, type);
+-	if (unlikely(e != NULL)) {
++	if (unlikely(e)) {
+ 		CWARN("Unexpected stale eacl_entry found: [key: %d] [fid: " DFID "] [type: %d]\n",
+ 		      (int)key, PFID(fid), type);
+ 		ee_free(e);
+diff --git a/drivers/staging/lustre/lustre/llite/lloop.c b/drivers/staging/lustre/lustre/llite/lloop.c
+index 69c41af..20fecaf 100644
+--- a/drivers/staging/lustre/lustre/llite/lloop.c
++++ b/drivers/staging/lustre/lustre/llite/lloop.c
+@@ -211,9 +211,8 @@ static int do_bio_lustrebacked(struct lloop_device *lo, struct bio *head)
+ 		return io->ci_result;
+ 	io->ci_lockreq = CILR_NEVER;
+ 
+-	LASSERT(head != NULL);
+ 	rw = head->bi_rw;
+-	for (bio = head; bio != NULL; bio = bio->bi_next) {
++	for (bio = head; bio ; bio = bio->bi_next) {
+ 		LASSERT(rw == bio->bi_rw);
+ 
+ 		offset = (pgoff_t)(bio->bi_iter.bi_sector << 9) + lo->lo_offset;
+@@ -297,7 +296,7 @@ static unsigned int loop_get_bio(struct lloop_device *lo, struct bio **req)
+ 
+ 	spin_lock_irq(&lo->lo_lock);
+ 	first = lo->lo_bio;
+-	if (unlikely(first == NULL)) {
++	if (unlikely(!first)) {
+ 		spin_unlock_irq(&lo->lo_lock);
+ 		return 0;
+ 	}
+@@ -458,7 +457,7 @@ static int loop_thread(void *data)
+ 			       total_count, times, total_count / times);
+ 		}
+ 
+-		LASSERT(bio != NULL);
++		LASSERT(bio);
+ 		LASSERT(count <= atomic_read(&lo->lo_pending));
+ 		loop_handle_bio(lo, bio);
+ 		atomic_sub(count, &lo->lo_pending);
+@@ -560,7 +559,7 @@ static int loop_clr_fd(struct lloop_device *lo, struct block_device *bdev,
+ 	if (lo->lo_refcnt > count)	/* we needed one fd for the ioctl */
+ 		return -EBUSY;
+ 
+-	if (filp == NULL)
++	if (!filp)
+ 		return -EINVAL;
+ 
+ 	spin_lock_irq(&lo->lo_lock);
+@@ -625,11 +624,11 @@ static int lo_ioctl(struct block_device *bdev, fmode_t mode,
+ 	case LL_IOC_LLOOP_INFO: {
+ 		struct lu_fid fid;
+ 
+-		if (lo->lo_backing_file == NULL) {
++		if (!lo->lo_backing_file) {
+ 			err = -ENOENT;
+ 			break;
+ 		}
+-		if (inode == NULL)
++		if (!inode)
+ 			inode = file_inode(lo->lo_backing_file);
+ 		if (lo->lo_state == LLOOP_BOUND)
+ 			fid = ll_i2info(inode)->lli_fid;
+@@ -676,7 +675,7 @@ static enum llioc_iter lloop_ioctl(struct inode *unused, struct file *file,
+ 	if (magic != ll_iocontrol_magic)
+ 		return LLIOC_CONT;
+ 
+-	if (disks == NULL) {
++	if (!disks) {
+ 		err = -ENODEV;
+ 		goto out1;
+ 	}
+@@ -793,7 +792,7 @@ static int __init lloop_init(void)
+ 	       lloop_major, max_loop);
+ 
+ 	ll_iocontrol_magic = ll_iocontrol_register(lloop_ioctl, 2, cmdlist);
+-	if (ll_iocontrol_magic == NULL)
++	if (!ll_iocontrol_magic)
+ 		goto out_mem1;
+ 
+ 	loop_dev = kcalloc(max_loop, sizeof(*loop_dev), GFP_KERNEL);
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index 8d3c788..4d2e4b2 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -453,7 +453,7 @@ static ssize_t ll_max_cached_mb_seq_write(struct file *file,
+ 		if (diff <= 0)
+ 			break;
+ 
+-		if (sbi->ll_dt_exp == NULL) { /* being initialized */
++		if (!sbi->ll_dt_exp) { /* being initialized */
+ 			rc = -ENODEV;
+ 			break;
+ 		}
+@@ -966,9 +966,9 @@ int ldebugfs_register_mountpoint(struct dentry *parent,
+ 
+ 	name[MAX_STRING_SIZE] = '\0';
+ 
+-	LASSERT(sbi != NULL);
+-	LASSERT(mdc != NULL);
+-	LASSERT(osc != NULL);
++	LASSERT(sbi);
++	LASSERT(mdc);
++	LASSERT(osc);
+ 
+ 	/* Get fsname */
+ 	len = strlen(lsi->lsi_lmd->lmd_profile);
+@@ -1012,7 +1012,7 @@ int ldebugfs_register_mountpoint(struct dentry *parent,
+ 	/* File operations stats */
+ 	sbi->ll_stats = lprocfs_alloc_stats(LPROC_LL_FILE_OPCODES,
+ 					    LPROCFS_STATS_FLAG_NONE);
+-	if (sbi->ll_stats == NULL) {
++	if (!sbi->ll_stats) {
+ 		err = -ENOMEM;
+ 		goto out;
+ 	}
+@@ -1039,7 +1039,7 @@ int ldebugfs_register_mountpoint(struct dentry *parent,
+ 
+ 	sbi->ll_ra_stats = lprocfs_alloc_stats(ARRAY_SIZE(ra_stat_string),
+ 					       LPROCFS_STATS_FLAG_NONE);
+-	if (sbi->ll_ra_stats == NULL) {
++	if (!sbi->ll_ra_stats) {
+ 		err = -ENOMEM;
+ 		goto out;
+ 	}
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index da5f443..dc16d43 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -118,7 +118,7 @@ struct inode *ll_iget(struct super_block *sb, ino_t hash,
+ 
+ 			ll_read_inode2(inode, md);
+ 			if (S_ISREG(inode->i_mode) &&
+-			    ll_i2info(inode)->lli_clob == NULL) {
++			    !ll_i2info(inode)->lli_clob) {
+ 				CDEBUG(D_INODE,
+ 					"%s: apply lsm %p to inode "DFID".\n",
+ 					ll_get_fsname(sb, NULL, 0), md->lsm,
+@@ -181,9 +181,9 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
+ 
+ 		/* Inode is set to lock->l_resource->lr_lvb_inode
+ 		 * for mdc - bug 24555 */
+-		LASSERT(lock->l_ast_data == NULL);
++		LASSERT(!lock->l_ast_data);
+ 
+-		if (inode == NULL)
++		if (!inode)
+ 			break;
+ 
+ 		/* Invalidate all dentries associated with this inode */
+@@ -260,7 +260,7 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
+ 		}
+ 
+ 		if ((bits & (MDS_INODELOCK_LOOKUP | MDS_INODELOCK_PERM)) &&
+-		    inode->i_sb->s_root != NULL &&
++		    inode->i_sb->s_root &&
+ 		    !is_root_inode(inode))
+ 			ll_invalidate_aliases(inode);
+ 
+@@ -288,12 +288,7 @@ __u32 ll_i2suppgid(struct inode *i)
+  * array in case it might be useful.  Not needed if doing an MDS-side upcall. */
+ void ll_i2gids(__u32 *suppgids, struct inode *i1, struct inode *i2)
+ {
+-#if 0
+-	int i;
+-#endif
+-
+-	LASSERT(i1 != NULL);
+-	LASSERT(suppgids != NULL);
++	LASSERT(i1);
+ 
+ 	suppgids[0] = ll_i2suppgid(i1);
+ 
+@@ -301,22 +296,6 @@ void ll_i2gids(__u32 *suppgids, struct inode *i1, struct inode *i2)
+ 		suppgids[1] = ll_i2suppgid(i2);
+ 		else
+ 			suppgids[1] = -1;
+-
+-#if 0
+-	for (i = 0; i < current_ngroups; i++) {
+-		if (suppgids[0] == -1) {
+-			if (current_groups[i] != suppgids[1])
+-				suppgids[0] = current_groups[i];
+-			continue;
+-		}
+-		if (suppgids[1] == -1) {
+-			if (current_groups[i] != suppgids[0])
+-				suppgids[1] = current_groups[i];
+-			continue;
+-		}
+-		break;
+-	}
+-#endif
+ }
+ 
+ /*
+@@ -445,7 +424,7 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ 		   !it_disposition(it, DISP_OPEN_CREATE)) {
+ 		/* With DISP_OPEN_CREATE dentry will
+ 		   instantiated in ll_create_it. */
+-		LASSERT(d_inode(*de) == NULL);
++		LASSERT(!d_inode(*de));
+ 		d_instantiate(*de, inode);
+ 	}
+ 
+@@ -498,7 +477,7 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
+ 	if (d_mountpoint(dentry))
+ 		CERROR("Tell Peter, lookup on mtpt, it %s\n", LL_IT2STR(it));
+ 
+-	if (it == NULL || it->it_op == IT_GETXATTR)
++	if (!it || it->it_op == IT_GETXATTR)
+ 		it = &lookup_it;
+ 
+ 	if (it->it_op == IT_GETATTR) {
+@@ -557,7 +536,7 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
+  out:
+ 	if (req)
+ 		ptlrpc_req_finished(req);
+-	if (it->it_op == IT_GETATTR && (retval == NULL || retval == dentry))
++	if (it->it_op == IT_GETATTR && (!retval || retval == dentry))
+ 		ll_statahead_mark(parent, dentry);
+ 	return retval;
+ }
+@@ -582,7 +561,7 @@ static struct dentry *ll_lookup_nd(struct inode *parent, struct dentry *dentry,
+ 		itp = &it;
+ 	de = ll_lookup_it(parent, dentry, itp, 0);
+ 
+-	if (itp != NULL)
++	if (itp)
+ 		ll_intent_release(itp);
+ 
+ 	return de;
+@@ -622,7 +601,7 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
+ 	de = ll_lookup_it(dir, dentry, it, lookup_flags);
+ 	if (IS_ERR(de))
+ 		rc = PTR_ERR(de);
+-	else if (de != NULL)
++	else if (de)
+ 		dentry = de;
+ 
+ 	if (!rc) {
+@@ -631,7 +610,7 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
+ 			rc = ll_create_it(dir, dentry, mode, it);
+ 			if (rc) {
+ 				/* We dget in ll_splice_alias. */
+-				if (de != NULL)
++				if (de)
+ 					dput(de);
+ 				goto out_release;
+ 			}
+@@ -655,7 +634,7 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
+ 				/* We dget in ll_splice_alias. finish_open takes
+ 				 * care of dget for fd open.
+ 				 */
+-				if (de != NULL)
++				if (de)
+ 					dput(de);
+ 			}
+ 		} else {
+@@ -767,7 +746,7 @@ static int ll_new_node(struct inode *dir, struct dentry *dentry,
+ 	int tgt_len = 0;
+ 	int err;
+ 
+-	if (unlikely(tgt != NULL))
++	if (unlikely(tgt))
+ 		tgt_len = strlen(tgt) + 1;
+ 
+ 	op_data = ll_prep_md_op_data(NULL, dir, NULL,
+@@ -891,7 +870,7 @@ int ll_objects_destroy(struct ptlrpc_request *request, struct inode *dir)
+ 	 * check it is complete and sensible. */
+ 	eadata = req_capsule_server_sized_get(&request->rq_pill, &RMF_MDT_MD,
+ 					      body->eadatasize);
+-	LASSERT(eadata != NULL);
++	LASSERT(eadata);
+ 
+ 	rc = obd_unpackmd(ll_i2dtexp(dir), &lsm, eadata, body->eadatasize);
+ 	if (rc < 0) {
+@@ -901,7 +880,7 @@ int ll_objects_destroy(struct ptlrpc_request *request, struct inode *dir)
+ 	LASSERT(rc >= sizeof(*lsm));
+ 
+ 	oa = kmem_cache_alloc(obdo_cachep, GFP_NOFS | __GFP_ZERO);
+-	if (oa == NULL) {
++	if (!oa) {
+ 		rc = -ENOMEM;
+ 		goto out_free_memmd;
+ 	}
+@@ -917,7 +896,7 @@ int ll_objects_destroy(struct ptlrpc_request *request, struct inode *dir)
+ 						     &RMF_LOGCOOKIES,
+ 						   sizeof(struct llog_cookie) *
+ 						     lsm->lsm_stripe_count);
+-		if (oti.oti_logcookies == NULL) {
++		if (!oti.oti_logcookies) {
+ 			oa->o_valid &= ~OBD_MD_FLCOOKIE;
+ 			body->valid &= ~OBD_MD_FLCOOKIE;
+ 		}
+diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
+index 6b587d6..da71937 100644
+--- a/drivers/staging/lustre/lustre/llite/rw.c
++++ b/drivers/staging/lustre/lustre/llite/rw.c
+@@ -70,9 +70,9 @@ static void ll_cl_fini(struct ll_cl_context *lcc)
+ 	struct cl_page *page = lcc->lcc_page;
+ 
+ 	LASSERT(lcc->lcc_cookie == current);
+-	LASSERT(env != NULL);
++	LASSERT(env);
+ 
+-	if (page != NULL) {
++	if (page) {
+ 		lu_ref_del(&page->cp_reference, "cl_io", io);
+ 		cl_page_put(env, page);
+ 	}
+@@ -97,7 +97,7 @@ static struct ll_cl_context *ll_cl_init(struct file *file,
+ 	int result = 0;
+ 
+ 	clob = ll_i2info(vmpage->mapping->host)->lli_clob;
+-	LASSERT(clob != NULL);
++	LASSERT(clob);
+ 
+ 	env = cl_env_get(&refcheck);
+ 	if (IS_ERR(env))
+@@ -111,7 +111,7 @@ static struct ll_cl_context *ll_cl_init(struct file *file,
+ 
+ 	cio = ccc_env_io(env);
+ 	io = cio->cui_cl.cis_io;
+-	if (io == NULL && create) {
++	if (!io && create) {
+ 		struct inode *inode = vmpage->mapping->host;
+ 		loff_t pos;
+ 
+@@ -163,12 +163,11 @@ static struct ll_cl_context *ll_cl_init(struct file *file,
+ 	}
+ 
+ 	lcc->lcc_io = io;
+-	if (io == NULL)
++	if (!io)
+ 		result = -EIO;
+ 	if (result == 0) {
+ 		struct cl_page   *page;
+ 
+-		LASSERT(io != NULL);
+ 		LASSERT(io->ci_state == CIS_IO_GOING);
+ 		LASSERT(cio->cui_fd == LUSTRE_FPRIVATE(file));
+ 		page = cl_page_find(env, clob, vmpage->index, vmpage,
+@@ -473,7 +472,7 @@ static int ll_read_ahead_page(const struct lu_env *env, struct cl_io *io,
+ 	const char       *msg   = NULL;
+ 
+ 	vmpage = grab_cache_page_nowait(mapping, index);
+-	if (vmpage != NULL) {
++	if (vmpage) {
+ 		/* Check if vmpage was truncated or reclaimed */
+ 		if (vmpage->mapping == mapping) {
+ 			page = cl_page_find(env, clob, vmpage->index,
+@@ -500,7 +499,7 @@ static int ll_read_ahead_page(const struct lu_env *env, struct cl_io *io,
+ 		which = RA_STAT_FAILED_GRAB_PAGE;
+ 		msg   = "g_c_p_n failed";
+ 	}
+-	if (msg != NULL) {
++	if (msg) {
+ 		ll_ra_stats_inc(mapping, which);
+ 		CDEBUG(D_READA, "%s\n", msg);
+ 	}
+@@ -616,7 +615,7 @@ static int ll_read_ahead_pages(const struct lu_env *env,
+ 	int rc, count = 0, stride_ria;
+ 	unsigned long page_idx;
+ 
+-	LASSERT(ria != NULL);
++	LASSERT(ria);
+ 	RIA_DEBUG(ria);
+ 
+ 	stride_ria = ria->ria_length > ria->ria_pages && ria->ria_pages > 0;
+@@ -699,7 +698,7 @@ int ll_readahead(const struct lu_env *env, struct cl_io *io,
+ 		bead = NULL;
+ 
+ 	/* Enlarge the RA window to encompass the full read */
+-	if (bead != NULL && ras->ras_window_start + ras->ras_window_len <
++	if (bead && ras->ras_window_start + ras->ras_window_len <
+ 	    bead->lrr_start + bead->lrr_count) {
+ 		ras->ras_window_len = bead->lrr_start + bead->lrr_count -
+ 				      ras->ras_window_start;
+@@ -1100,7 +1099,7 @@ int ll_writepage(struct page *vmpage, struct writeback_control *wbc)
+ 	LASSERT(PageLocked(vmpage));
+ 	LASSERT(!PageWriteback(vmpage));
+ 
+-	LASSERT(ll_i2dtexp(inode) != NULL);
++	LASSERT(ll_i2dtexp(inode));
+ 
+ 	env = cl_env_nested_get(&nest);
+ 	if (IS_ERR(env)) {
+@@ -1109,7 +1108,7 @@ int ll_writepage(struct page *vmpage, struct writeback_control *wbc)
+ 	}
+ 
+ 	clob  = ll_i2info(inode)->lli_clob;
+-	LASSERT(clob != NULL);
++	LASSERT(clob);
+ 
+ 	io = ccc_env_thread_io(env);
+ 	io->ci_obj = clob;
+diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
+index 711fda9..6167c9d 100644
+--- a/drivers/staging/lustre/lustre/llite/rw26.c
++++ b/drivers/staging/lustre/lustre/llite/rw26.c
+@@ -92,9 +92,9 @@ static void ll_invalidatepage(struct page *vmpage, unsigned int offset,
+ 		if (!IS_ERR(env)) {
+ 			inode = vmpage->mapping->host;
+ 			obj = ll_i2info(inode)->lli_clob;
+-			if (obj != NULL) {
++			if (obj) {
+ 				page = cl_vmpage_page(vmpage, obj);
+-				if (page != NULL) {
++				if (page) {
+ 					lu_ref_add(&page->cp_reference,
+ 						   "delete", vmpage);
+ 					cl_page_delete(env, page);
+@@ -128,11 +128,11 @@ static int ll_releasepage(struct page *vmpage, RELEASEPAGE_ARG_TYPE gfp_mask)
+ 		return 0;
+ 
+ 	mapping = vmpage->mapping;
+-	if (mapping == NULL)
++	if (!mapping)
+ 		return 1;
+ 
+ 	obj = ll_i2info(mapping->host)->lli_clob;
+-	if (obj == NULL)
++	if (!obj)
+ 		return 1;
+ 
+ 	/* 1 for page allocator, 1 for cl_page and 1 for page cache */
+@@ -149,8 +149,8 @@ static int ll_releasepage(struct page *vmpage, RELEASEPAGE_ARG_TYPE gfp_mask)
+ 		return 0;
+ 
+ 	page = cl_vmpage_page(vmpage, obj);
+-	result = page == NULL;
+-	if (page != NULL) {
++	result = !page;
++	if (page) {
+ 		if (!cl_page_in_use(page)) {
+ 			result = 1;
+ 			cl_page_delete(env, page);
+@@ -396,7 +396,7 @@ static ssize_t ll_direct_IO_26(struct kiocb *iocb, struct iov_iter *iter,
+ 	env = cl_env_get(&refcheck);
+ 	LASSERT(!IS_ERR(env));
+ 	io = ccc_env_io(env)->cui_cl.cis_io;
+-	LASSERT(io != NULL);
++	LASSERT(io);
+ 
+ 	/* 0. Need locking between buffered and direct access. and race with
+ 	 *    size changing by concurrent truncates and writes.
+@@ -461,7 +461,7 @@ out:
+ 			struct lov_stripe_md *lsm;
+ 
+ 			lsm = ccc_inode_lsm_get(inode);
+-			LASSERT(lsm != NULL);
++			LASSERT(lsm);
+ 			lov_stripe_lock(lsm);
+ 			obd_adjust_kms(ll_i2dtexp(inode), lsm, file_offset, 0);
+ 			lov_stripe_unlock(lsm);
+diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
+index 88ffd8e..bd6a6b7 100644
+--- a/drivers/staging/lustre/lustre/llite/statahead.c
++++ b/drivers/staging/lustre/lustre/llite/statahead.c
+@@ -130,7 +130,7 @@ ll_sa_entry_unhash(struct ll_statahead_info *sai, struct ll_sa_entry *entry)
+ static inline int agl_should_run(struct ll_statahead_info *sai,
+ 				 struct inode *inode)
+ {
+-	return (inode != NULL && S_ISREG(inode->i_mode) && sai->sai_agl_valid);
++	return (inode && S_ISREG(inode->i_mode) && sai->sai_agl_valid);
+ }
+ 
+ static inline int sa_sent_full(struct ll_statahead_info *sai)
+@@ -499,7 +499,7 @@ static void ll_sai_put(struct ll_statahead_info *sai)
+ 			return;
+ 		}
+ 
+-		LASSERT(lli->lli_opendir_key == NULL);
++		LASSERT(!lli->lli_opendir_key);
+ 		LASSERT(thread_is_stopped(&sai->sai_thread));
+ 		LASSERT(thread_is_stopped(&sai->sai_agl_thread));
+ 
+@@ -618,13 +618,13 @@ static void ll_post_statahead(struct ll_statahead_info *sai)
+ 	it = &minfo->mi_it;
+ 	req = entry->se_req;
+ 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+-	if (body == NULL) {
++	if (!body) {
+ 		rc = -EFAULT;
+ 		goto out;
+ 	}
+ 
+ 	child = entry->se_inode;
+-	if (child == NULL) {
++	if (!child) {
+ 		/*
+ 		 * lookup.
+ 		 */
+@@ -705,7 +705,7 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+ 
+ 	spin_lock(&lli->lli_sa_lock);
+ 	/* stale entry */
+-	if (unlikely(lli->lli_sai == NULL ||
++	if (unlikely(!lli->lli_sai ||
+ 		     lli->lli_sai->sai_generation != minfo->mi_generation)) {
+ 		spin_unlock(&lli->lli_sa_lock);
+ 		rc = -ESTALE;
+@@ -720,7 +720,7 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+ 		}
+ 
+ 		entry = ll_sa_entry_get_byindex(sai, minfo->mi_cbdata);
+-		if (entry == NULL) {
++		if (!entry) {
+ 			sai->sai_replied++;
+ 			spin_unlock(&lli->lli_sa_lock);
+ 			rc = -EIDRM;
+@@ -756,7 +756,7 @@ out:
+ 		iput(dir);
+ 		kfree(minfo);
+ 	}
+-	if (sai != NULL)
++	if (sai)
+ 		ll_sai_put(sai);
+ 	return rc;
+ }
+@@ -853,7 +853,7 @@ static int do_sa_revalidate(struct inode *dir, struct ll_sa_entry *entry,
+ 	struct ldlm_enqueue_info *einfo;
+ 	int rc;
+ 
+-	if (unlikely(inode == NULL))
++	if (unlikely(!inode))
+ 		return 1;
+ 
+ 	if (d_mountpoint(dentry))
+@@ -908,10 +908,9 @@ static void ll_statahead_one(struct dentry *parent, const char *entry_name,
+ 		rc = do_sa_revalidate(dir, entry, dentry);
+ 		if (rc == 1 && agl_should_run(sai, d_inode(dentry)))
+ 			ll_agl_add(sai, d_inode(dentry), entry->se_index);
+-	}
+ 
+-	if (dentry != NULL)
+ 		dput(dentry);
++	}
+ 
+ 	if (rc) {
+ 		rc1 = ll_sa_entry_to_stated(sai, entry,
+@@ -1070,7 +1069,7 @@ static int ll_statahead_thread(void *arg)
+ 		}
+ 
+ 		dp = page_address(page);
+-		for (ent = lu_dirent_start(dp); ent != NULL;
++		for (ent = lu_dirent_start(dp); ent;
+ 		     ent = lu_dirent_next(ent)) {
+ 			__u64 hash;
+ 			int namelen;
+@@ -1274,7 +1273,7 @@ void ll_stop_statahead(struct inode *dir, void *key)
+ {
+ 	struct ll_inode_info *lli = ll_i2info(dir);
+ 
+-	if (unlikely(key == NULL))
++	if (unlikely(!key))
+ 		return;
+ 
+ 	spin_lock(&lli->lli_sa_lock);
+@@ -1357,7 +1356,7 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
+ 		}
+ 
+ 		dp = page_address(page);
+-		for (ent = lu_dirent_start(dp); ent != NULL;
++		for (ent = lu_dirent_start(dp); ent;
+ 		     ent = lu_dirent_next(ent)) {
+ 			__u64 hash;
+ 			int namelen;
+@@ -1448,7 +1447,7 @@ ll_sai_unplug(struct ll_statahead_info *sai, struct ll_sa_entry *entry)
+ 	struct ll_sb_info    *sbi    = ll_i2sbi(sai->sai_inode);
+ 	int		   hit;
+ 
+-	if (entry != NULL && entry->se_stat == SA_ENTRY_SUCC)
++	if (entry && entry->se_stat == SA_ENTRY_SUCC)
+ 		hit = 1;
+ 	else
+ 		hit = 0;
+@@ -1540,7 +1539,7 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
+ 		}
+ 
+ 		entry = ll_sa_entry_get_byname(sai, &(*dentryp)->d_name);
+-		if (entry == NULL || only_unplug) {
++		if (!entry || only_unplug) {
+ 			ll_sai_unplug(sai, entry);
+ 			return entry ? 1 : -EAGAIN;
+ 		}
+@@ -1559,8 +1558,7 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
+ 			}
+ 		}
+ 
+-		if (entry->se_stat == SA_ENTRY_SUCC &&
+-		    entry->se_inode != NULL) {
++		if (entry->se_stat == SA_ENTRY_SUCC && entry->se_inode) {
+ 			struct inode *inode = entry->se_inode;
+ 			struct lookup_intent it = { .it_op = IT_GETATTR,
+ 						    .d.lustre.it_lock_handle =
+@@ -1570,7 +1568,7 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
+ 			rc = md_revalidate_lock(ll_i2mdexp(dir), &it,
+ 						ll_inode2fid(inode), &bits);
+ 			if (rc == 1) {
+-				if (d_inode(*dentryp) == NULL) {
++				if (!d_inode(*dentryp)) {
+ 					struct dentry *alias;
+ 
+ 					alias = ll_splice_alias(inode,
+@@ -1616,14 +1614,14 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
+ 	}
+ 
+ 	sai = ll_sai_alloc();
+-	if (sai == NULL) {
++	if (!sai) {
  		rc = -ENOMEM;
  		goto out;
  	}
-@@ -1846,7 +1845,7 @@ int ldlm_lock_set_data(struct lustre_handle *lockh, void *data)
- 	int rc = -EINVAL;
  
- 	if (lock) {
--		if (lock->l_ast_data == NULL)
-+		if (!lock->l_ast_data)
- 			lock->l_ast_data = data;
- 		if (lock->l_ast_data == data)
- 			rc = 0;
-@@ -1874,7 +1873,7 @@ void ldlm_lock_dump_handle(int level, struct lustre_handle *lockh)
- 		return;
- 
- 	lock = ldlm_handle2lock(lockh);
--	if (lock == NULL)
-+	if (!lock)
- 		return;
- 
- 	LDLM_DEBUG_LIMIT(level, lock, "###");
-@@ -1900,13 +1899,13 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 
- 	if (exp && exp->exp_connection) {
- 		nid = libcfs_nid2str(exp->exp_connection->c_peer.nid);
--	} else if (exp && exp->exp_obd != NULL) {
-+	} else if (exp && exp->exp_obd) {
- 		struct obd_import *imp = exp->exp_obd->u.cli.cl_import;
- 
- 		nid = libcfs_nid2str(imp->imp_connection->c_peer.nid);
+ 	sai->sai_ls_all = (rc == LS_FIRST_DOT_DE);
+ 	sai->sai_inode = igrab(dir);
+-	if (unlikely(sai->sai_inode == NULL)) {
++	if (unlikely(!sai->sai_inode)) {
+ 		CWARN("Do not start stat ahead on dying inode "DFID"\n",
+ 		      PFID(&lli->lli_fid));
+ 		rc = -ESTALE;
+@@ -1669,7 +1667,7 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
+ 		 * reference from allocation time. */
+ 		ll_sai_put(sai);
+ 		ll_sai_put(sai);
+-		LASSERT(lli->lli_sai == NULL);
++		LASSERT(!lli->lli_sai);
+ 		return -EAGAIN;
  	}
  
--	if (resource == NULL) {
-+	if (!resource) {
- 		libcfs_debug_vmsg2(msgdata, fmt, args,
- 				   " ns: \?\? lock: %p/%#llx lrc: %d/%d,%d mode: %s/%s res: \?\? rrc=\?\? type: \?\?\? flags: %#llx nid: %s remote: %#llx expref: %d pid: %u timeout: %lu lvb_type: %d\n",
- 				   lock,
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-index 79aeb2b..0737ded 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-@@ -136,7 +136,7 @@ void ldlm_handle_bl_callback(struct ldlm_namespace *ns,
- 		CDEBUG(D_DLMTRACE,
- 		       "Lock %p already unused, calling callback (%p)\n", lock,
- 		       lock->l_blocking_ast);
--		if (lock->l_blocking_ast != NULL)
-+		if (lock->l_blocking_ast)
- 			lock->l_blocking_ast(lock, ld, lock->l_ast_data,
- 					     LDLM_CB_BLOCKING);
- 	} else {
-@@ -185,7 +185,7 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
- 	} else if (lvb_len > 0) {
- 		if (lock->l_lvb_len > 0) {
- 			/* for extent lock, lvb contains ost_lvb{}. */
--			LASSERT(lock->l_lvb_data != NULL);
-+			LASSERT(lock->l_lvb_data);
- 
- 			if (unlikely(lock->l_lvb_len < lvb_len)) {
- 				LDLM_ERROR(lock, "Replied LVB is larger than expectation, expected = %d, replied = %d",
-@@ -205,7 +205,7 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
- 			}
- 
- 			lock_res_and_lock(lock);
--			LASSERT(lock->l_lvb_data == NULL);
-+			LASSERT(!lock->l_lvb_data);
- 			lock->l_lvb_type = LVB_T_LAYOUT;
- 			lock->l_lvb_data = lvb_data;
- 			lock->l_lvb_len = lvb_len;
-@@ -312,10 +312,10 @@ static void ldlm_handle_gl_callback(struct ptlrpc_request *req,
- 
- 	LDLM_DEBUG(lock, "client glimpse AST callback handler");
- 
--	if (lock->l_glimpse_ast != NULL)
-+	if (lock->l_glimpse_ast)
- 		rc = lock->l_glimpse_ast(lock, req);
- 
--	if (req->rq_repmsg != NULL) {
-+	if (req->rq_repmsg) {
- 		ptlrpc_reply(req);
- 	} else {
- 		req->rq_status = rc;
-@@ -393,7 +393,7 @@ static inline void init_blwi(struct ldlm_bl_work_item *blwi,
- 
- 	blwi->blwi_ns = ns;
- 	blwi->blwi_flags = cancel_flags;
--	if (ld != NULL)
-+	if (ld)
- 		blwi->blwi_ld = *ld;
- 	if (count) {
- 		list_add(&blwi->blwi_head, cancels);
-@@ -470,14 +470,14 @@ static int ldlm_handle_setinfo(struct ptlrpc_request *req)
- 	req_capsule_set(&req->rq_pill, &RQF_OBD_SET_INFO);
- 
- 	key = req_capsule_client_get(&req->rq_pill, &RMF_SETINFO_KEY);
--	if (key == NULL) {
-+	if (!key) {
- 		DEBUG_REQ(D_IOCTL, req, "no set_info key");
- 		return -EFAULT;
- 	}
- 	keylen = req_capsule_get_size(&req->rq_pill, &RMF_SETINFO_KEY,
- 				      RCL_CLIENT);
- 	val = req_capsule_client_get(&req->rq_pill, &RMF_SETINFO_VAL);
--	if (val == NULL) {
-+	if (!val) {
- 		DEBUG_REQ(D_IOCTL, req, "no set_info val");
- 		return -EFAULT;
- 	}
-@@ -519,7 +519,7 @@ static int ldlm_handle_qc_callback(struct ptlrpc_request *req)
- 	struct client_obd *cli = &req->rq_export->exp_obd->u.cli;
- 
- 	oqctl = req_capsule_client_get(&req->rq_pill, &RMF_OBD_QUOTACTL);
--	if (oqctl == NULL) {
-+	if (!oqctl) {
- 		CERROR("Can't unpack obd_quotactl\n");
- 		return -EPROTO;
- 	}
-@@ -549,15 +549,14 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
- 
- 	req_capsule_init(&req->rq_pill, req, RCL_SERVER);
- 
--	if (req->rq_export == NULL) {
-+	if (!req->rq_export) {
- 		rc = ldlm_callback_reply(req, -ENOTCONN);
- 		ldlm_callback_errmsg(req, "Operate on unconnected server",
- 				     rc, NULL);
- 		return 0;
- 	}
- 
--	LASSERT(req->rq_export != NULL);
--	LASSERT(req->rq_export->exp_obd != NULL);
-+	LASSERT(req->rq_export->exp_obd);
- 
- 	switch (lustre_msg_get_opc(req->rq_reqmsg)) {
- 	case LDLM_BL_CALLBACK:
-@@ -591,12 +590,12 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
- 	}
- 
- 	ns = req->rq_export->exp_obd->obd_namespace;
--	LASSERT(ns != NULL);
-+	LASSERT(ns);
- 
- 	req_capsule_set(&req->rq_pill, &RQF_LDLM_CALLBACK);
- 
- 	dlm_req = req_capsule_client_get(&req->rq_pill, &RMF_DLM_REQ);
--	if (dlm_req == NULL) {
-+	if (!dlm_req) {
- 		rc = ldlm_callback_reply(req, -EPROTO);
- 		ldlm_callback_errmsg(req, "Operate without parameter", rc,
- 				     NULL);
-@@ -781,17 +780,17 @@ static int ldlm_bl_thread_main(void *arg)
- 
- 		blwi = ldlm_bl_get_work(blp);
- 
--		if (blwi == NULL) {
-+		if (!blwi) {
- 			atomic_dec(&blp->blp_busy_threads);
- 			l_wait_event_exclusive(blp->blp_waitq,
--					 (blwi = ldlm_bl_get_work(blp)) != NULL,
-+					 (blwi = ldlm_bl_get_work(blp)),
- 					 &lwi);
- 			busy = atomic_inc_return(&blp->blp_busy_threads);
- 		} else {
- 			busy = atomic_read(&blp->blp_busy_threads);
- 		}
- 
--		if (blwi->blwi_ns == NULL)
-+		if (!blwi->blwi_ns)
- 			/* added by ldlm_cleanup() */
- 			break;
- 
-@@ -915,7 +914,7 @@ static int ldlm_setup(void)
- 	int rc = 0;
- 	int i;
- 
--	if (ldlm_state != NULL)
-+	if (ldlm_state)
- 		return -EALREADY;
- 
- 	ldlm_state = kzalloc(sizeof(*ldlm_state), GFP_NOFS);
-@@ -1040,7 +1039,7 @@ static int ldlm_cleanup(void)
- 
- 	ldlm_pools_fini();
- 
--	if (ldlm_state->ldlm_bl_pool != NULL) {
-+	if (ldlm_state->ldlm_bl_pool) {
- 		struct ldlm_bl_pool *blp = ldlm_state->ldlm_bl_pool;
- 
- 		while (atomic_read(&blp->blp_num_threads) > 0) {
-@@ -1059,7 +1058,7 @@ static int ldlm_cleanup(void)
- 		kfree(blp);
- 	}
- 
--	if (ldlm_state->ldlm_cb_service != NULL)
-+	if (ldlm_state->ldlm_cb_service)
- 		ptlrpc_unregister_service(ldlm_state->ldlm_cb_service);
- 
- 	if (ldlm_ns_kset)
-@@ -1085,13 +1084,13 @@ int ldlm_init(void)
- 	ldlm_resource_slab = kmem_cache_create("ldlm_resources",
- 					       sizeof(struct ldlm_resource), 0,
- 					       SLAB_HWCACHE_ALIGN, NULL);
--	if (ldlm_resource_slab == NULL)
-+	if (!ldlm_resource_slab)
- 		return -ENOMEM;
- 
- 	ldlm_lock_slab = kmem_cache_create("ldlm_locks",
- 			      sizeof(struct ldlm_lock), 0,
- 			      SLAB_HWCACHE_ALIGN | SLAB_DESTROY_BY_RCU, NULL);
--	if (ldlm_lock_slab == NULL) {
-+	if (!ldlm_lock_slab) {
- 		kmem_cache_destroy(ldlm_resource_slab);
- 		return -ENOMEM;
- 	}
-@@ -1099,7 +1098,7 @@ int ldlm_init(void)
- 	ldlm_interval_slab = kmem_cache_create("interval_node",
- 					sizeof(struct ldlm_interval),
- 					0, SLAB_HWCACHE_ALIGN, NULL);
--	if (ldlm_interval_slab == NULL) {
-+	if (!ldlm_interval_slab) {
- 		kmem_cache_destroy(ldlm_resource_slab);
- 		kmem_cache_destroy(ldlm_lock_slab);
- 		return -ENOMEM;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-index 3d7c137..3e937b0 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-@@ -246,7 +246,6 @@ static void ldlm_cli_pool_pop_slv(struct ldlm_pool *pl)
- 	 */
- 	obd = container_of(pl, struct ldlm_namespace,
- 			   ns_pool)->ns_obd;
--	LASSERT(obd != NULL);
- 	read_lock(&obd->obd_pool_lock);
- 	pl->pl_server_lock_volume = obd->obd_pool_slv;
- 	atomic_set(&pl->pl_limit, obd->obd_pool_limit);
-@@ -381,7 +380,7 @@ static int ldlm_pool_recalc(struct ldlm_pool *pl)
- 	spin_unlock(&pl->pl_lock);
- 
-  recalc:
--	if (pl->pl_ops->po_recalc != NULL) {
-+	if (pl->pl_ops->po_recalc) {
- 		count = pl->pl_ops->po_recalc(pl);
- 		lprocfs_counter_add(pl->pl_stats, LDLM_POOL_RECALC_STAT,
- 				    count);
-@@ -409,7 +408,7 @@ static int ldlm_pool_shrink(struct ldlm_pool *pl, int nr, gfp_t gfp_mask)
- {
- 	int cancel = 0;
- 
--	if (pl->pl_ops->po_shrink != NULL) {
-+	if (pl->pl_ops->po_shrink) {
- 		cancel = pl->pl_ops->po_shrink(pl, nr, gfp_mask);
- 		if (nr > 0) {
- 			lprocfs_counter_add(pl->pl_stats,
-@@ -643,11 +642,11 @@ static void ldlm_pool_sysfs_fini(struct ldlm_pool *pl)
- 
- static void ldlm_pool_debugfs_fini(struct ldlm_pool *pl)
- {
--	if (pl->pl_stats != NULL) {
-+	if (pl->pl_stats) {
- 		lprocfs_free_stats(&pl->pl_stats);
- 		pl->pl_stats = NULL;
- 	}
--	if (pl->pl_debugfs_entry != NULL) {
-+	if (pl->pl_debugfs_entry) {
- 		ldebugfs_remove(&pl->pl_debugfs_entry);
- 		pl->pl_debugfs_entry = NULL;
- 	}
-@@ -834,7 +833,7 @@ static unsigned long ldlm_pools_count(ldlm_side_t client, gfp_t gfp_mask)
- 			continue;
- 		}
- 
--		if (ns_old == NULL)
-+		if (!ns_old)
- 			ns_old = ns;
- 
- 		ldlm_namespace_get(ns);
-@@ -957,7 +956,7 @@ static int ldlm_pools_recalc(ldlm_side_t client)
- 			continue;
- 		}
- 
--		if (ns_old == NULL)
-+		if (!ns_old)
- 			ns_old = ns;
- 
- 		spin_lock(&ns->ns_lock);
-@@ -1040,7 +1039,7 @@ static int ldlm_pools_thread_start(void)
- 	struct l_wait_info lwi = { 0 };
- 	struct task_struct *task;
- 
--	if (ldlm_pools_thread != NULL)
-+	if (ldlm_pools_thread)
- 		return -EALREADY;
- 
- 	ldlm_pools_thread = kzalloc(sizeof(*ldlm_pools_thread), GFP_NOFS);
-@@ -1065,7 +1064,7 @@ static int ldlm_pools_thread_start(void)
- 
- static void ldlm_pools_thread_stop(void)
- {
--	if (ldlm_pools_thread == NULL)
-+	if (!ldlm_pools_thread)
- 		return;
- 
- 	thread_set_flags(ldlm_pools_thread, SVC_STOPPING);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index b9eb377..de276af 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -94,7 +94,7 @@ static int ldlm_expired_completion_wait(void *data)
- 	struct obd_import *imp;
- 	struct obd_device *obd;
- 
--	if (lock->l_conn_export == NULL) {
-+	if (!lock->l_conn_export) {
- 		static unsigned long next_dump, last_dump;
- 
- 		LCONSOLE_WARN("lock timed out (enqueued at %lld, %llds ago)\n",
-@@ -239,7 +239,7 @@ noreproc:
- 	obd = class_exp2obd(lock->l_conn_export);
- 
- 	/* if this is a local lock, then there is no import */
--	if (obd != NULL)
-+	if (obd)
- 		imp = obd->u.cli.cl_import;
- 
- 	/* Wait a long time for enqueue - server may have to callback a
-@@ -258,7 +258,7 @@ noreproc:
- 				       interrupted_completion_wait, &lwd);
- 	}
- 
--	if (imp != NULL) {
-+	if (imp) {
- 		spin_lock(&imp->imp_lock);
- 		lwd.lwd_conn_cnt = imp->imp_conn_cnt;
- 		spin_unlock(&imp->imp_lock);
-@@ -363,13 +363,13 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
- 
- 	/* Before we return, swab the reply */
- 	reply = req_capsule_server_get(&req->rq_pill, &RMF_DLM_REP);
--	if (reply == NULL) {
-+	if (!reply) {
- 		rc = -EPROTO;
- 		goto cleanup;
- 	}
- 
- 	if (lvb_len != 0) {
--		LASSERT(lvb != NULL);
-+		LASSERT(lvb);
- 
- 		size = req_capsule_get_size(&req->rq_pill, &RMF_DLM_LVB,
- 					    RCL_SERVER);
-@@ -445,7 +445,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
- 
- 			rc = ldlm_lock_change_resource(ns, lock,
- 					&reply->lock_desc.l_resource.lr_name);
--			if (rc || lock->l_resource == NULL) {
-+			if (rc || !lock->l_resource) {
- 				rc = -ENOMEM;
- 				goto cleanup;
- 			}
-@@ -495,7 +495,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
- 
- 	if (!is_replay) {
- 		rc = ldlm_lock_enqueue(ns, &lock, NULL, flags);
--		if (lock->l_completion_ast != NULL) {
-+		if (lock->l_completion_ast) {
- 			int err = lock->l_completion_ast(lock, *flags, NULL);
- 
- 			if (!rc)
-@@ -505,7 +505,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
- 		}
- 	}
- 
--	if (lvb_len && lvb != NULL) {
-+	if (lvb_len && lvb) {
- 		/* Copy the LVB here, and not earlier, because the completion
- 		 * AST (if any) can override what we got in the reply */
- 		memcpy(lvb, lock->l_lvb_data, lvb_len);
-@@ -579,7 +579,7 @@ int ldlm_prep_elc_req(struct obd_export *exp, struct ptlrpc_request *req,
- 	LIST_HEAD(head);
- 	int rc;
- 
--	if (cancels == NULL)
-+	if (!cancels)
- 		cancels = &head;
- 	if (ns_connect_cancelset(ns)) {
- 		/* Estimate the amount of available space in the request. */
-@@ -665,15 +665,13 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 	int		    rc, err;
- 	struct ptlrpc_request *req;
- 
--	LASSERT(exp != NULL);
--
- 	ns = exp->exp_obd->obd_namespace;
- 
- 	/* If we're replaying this lock, just check some invariants.
- 	 * If we're creating a new lock, get everything all setup nice. */
- 	if (is_replay) {
- 		lock = ldlm_handle2lock_long(lockh, 0);
--		LASSERT(lock != NULL);
-+		LASSERT(lock);
- 		LDLM_DEBUG(lock, "client-side enqueue START");
- 		LASSERT(exp == lock->l_conn_export);
- 	} else {
-@@ -685,13 +683,13 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 		lock = ldlm_lock_create(ns, res_id, einfo->ei_type,
- 					einfo->ei_mode, &cbs, einfo->ei_cbdata,
- 					lvb_len, lvb_type);
--		if (lock == NULL)
-+		if (!lock)
- 			return -ENOMEM;
- 		/* for the local lock, add the reference */
- 		ldlm_lock_addref_internal(lock, einfo->ei_mode);
- 		ldlm_lock2handle(lock, lockh);
--		if (policy != NULL)
--				lock->l_policy_data = *policy;
-+		if (policy)
-+			lock->l_policy_data = *policy;
- 
- 		if (einfo->ei_type == LDLM_EXTENT)
- 			lock->l_req_extent = policy->l_extent;
-@@ -706,12 +704,12 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 
- 	/* lock not sent to server yet */
- 
--	if (reqp == NULL || *reqp == NULL) {
-+	if (!reqp || !*reqp) {
- 		req = ptlrpc_request_alloc_pack(class_exp2cliimp(exp),
- 						&RQF_LDLM_ENQUEUE,
- 						LUSTRE_DLM_VERSION,
- 						LDLM_ENQUEUE);
--		if (req == NULL) {
-+		if (!req) {
- 			failed_lock_cleanup(ns, lock, einfo->ei_mode);
- 			LDLM_LOCK_RELEASE(lock);
- 			return -ENOMEM;
-@@ -754,7 +752,7 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 		     policy->l_extent.end == OBD_OBJECT_EOF));
- 
- 	if (async) {
--		LASSERT(reqp != NULL);
-+		LASSERT(reqp);
- 		return 0;
- 	}
- 
-@@ -773,7 +771,7 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 	else
- 		rc = err;
- 
--	if (!req_passed_in && req != NULL) {
-+	if (!req_passed_in && req) {
- 		ptlrpc_req_finished(req);
- 		if (reqp)
- 			*reqp = NULL;
-@@ -832,7 +830,7 @@ static void ldlm_cancel_pack(struct ptlrpc_request *req,
- 	int max, packed = 0;
- 
- 	dlm = req_capsule_client_get(&req->rq_pill, &RMF_DLM_REQ);
--	LASSERT(dlm != NULL);
-+	LASSERT(dlm);
- 
- 	/* Check the room in the request buffer. */
- 	max = req_capsule_get_size(&req->rq_pill, &RMF_DLM_REQ, RCL_CLIENT) -
-@@ -868,7 +866,7 @@ static int ldlm_cli_cancel_req(struct obd_export *exp,
- 	int free, sent = 0;
- 	int rc = 0;
- 
--	LASSERT(exp != NULL);
-+	LASSERT(exp);
- 	LASSERT(count > 0);
- 
- 	CFS_FAIL_TIMEOUT(OBD_FAIL_LDLM_PAUSE_CANCEL, cfs_fail_val);
-@@ -883,14 +881,14 @@ static int ldlm_cli_cancel_req(struct obd_export *exp,
- 
- 	while (1) {
- 		imp = class_exp2cliimp(exp);
--		if (imp == NULL || imp->imp_invalid) {
-+		if (!imp || imp->imp_invalid) {
- 			CDEBUG(D_DLMTRACE,
- 			       "skipping cancel on invalid import %p\n", imp);
- 			return count;
- 		}
- 
- 		req = ptlrpc_request_alloc(imp, &RQF_LDLM_CANCEL);
--		if (req == NULL) {
-+		if (!req) {
- 			rc = -ENOMEM;
- 			goto out;
- 		}
-@@ -946,7 +944,6 @@ out:
- 
- static inline struct ldlm_pool *ldlm_imp2pl(struct obd_import *imp)
- {
--	LASSERT(imp != NULL);
- 	return &imp->imp_obd->obd_namespace->ns_pool;
- }
- 
-@@ -1016,7 +1013,7 @@ int ldlm_cli_cancel(struct lustre_handle *lockh,
- 
- 	/* concurrent cancels on the same handle can happen */
- 	lock = ldlm_handle2lock_long(lockh, LDLM_FL_CANCELING);
--	if (lock == NULL) {
-+	if (!lock) {
- 		LDLM_DEBUG_NOLOCK("lock is already being destroyed\n");
- 		return 0;
- 	}
-@@ -1307,7 +1304,7 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
- 		count += unused - ns->ns_max_unused;
- 
- 	pf = ldlm_cancel_lru_policy(ns, flags);
--	LASSERT(pf != NULL);
-+	LASSERT(pf);
- 
- 	while (!list_empty(&ns->ns_unused_list)) {
- 		ldlm_policy_res_t result;
-@@ -1476,7 +1473,7 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
- 
- 	lock_res(res);
- 	list_for_each_entry(lock, &res->lr_granted, l_res_link) {
--		if (opaque != NULL && lock->l_ast_data != opaque) {
-+		if (opaque && lock->l_ast_data != opaque) {
- 			LDLM_ERROR(lock, "data %p doesn't match opaque %p",
- 				   lock->l_ast_data, opaque);
- 			continue;
-@@ -1591,7 +1588,7 @@ int ldlm_cli_cancel_unused_resource(struct ldlm_namespace *ns,
- 	int rc;
- 
- 	res = ldlm_resource_get(ns, NULL, res_id, 0, 0);
--	if (res == NULL) {
-+	if (!res) {
- 		/* This is not a problem. */
- 		CDEBUG(D_INFO, "No resource %llu\n", res_id->name[0]);
- 		return 0;
-@@ -1645,10 +1642,10 @@ int ldlm_cli_cancel_unused(struct ldlm_namespace *ns,
- 		.lc_opaque      = opaque,
- 	};
- 
--	if (ns == NULL)
-+	if (!ns)
- 		return ELDLM_OK;
- 
--	if (res_id != NULL) {
-+	if (res_id) {
- 		return ldlm_cli_cancel_unused_resource(ns, res_id, NULL,
- 						       LCK_MINMODE, flags,
- 						       opaque);
-@@ -1743,13 +1740,13 @@ int ldlm_resource_iterate(struct ldlm_namespace *ns,
- 	struct ldlm_resource *res;
- 	int rc;
- 
--	if (ns == NULL) {
-+	if (!ns) {
- 		CERROR("must pass in namespace\n");
- 		LBUG();
- 	}
- 
- 	res = ldlm_resource_get(ns, NULL, res_id, 0, 0);
--	if (res == NULL)
-+	if (!res)
- 		return 0;
- 
- 	LDLM_RESOURCE_ADDREF(res);
-@@ -1796,7 +1793,7 @@ static int replay_lock_interpret(const struct lu_env *env,
- 		goto out;
- 
- 	reply = req_capsule_server_get(&req->rq_pill, &RMF_DLM_REP);
--	if (reply == NULL) {
-+	if (!reply) {
- 		rc = -EPROTO;
- 		goto out;
- 	}
-@@ -1882,7 +1879,7 @@ static int replay_one_lock(struct obd_import *imp, struct ldlm_lock *lock)
- 
- 	req = ptlrpc_request_alloc_pack(imp, &RQF_LDLM_ENQUEUE,
- 					LUSTRE_DLM_VERSION, LDLM_ENQUEUE);
--	if (req == NULL)
-+	if (!req)
- 		return -ENOMEM;
- 
- 	/* We're part of recovery, so don't wait for it. */
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index 0ae6100..6ae8c60 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -380,7 +380,7 @@ static void ldlm_namespace_debugfs_unregister(struct ldlm_namespace *ns)
- 	else
- 		ldebugfs_remove(&ns->ns_debugfs_entry);
- 
--	if (ns->ns_stats != NULL)
-+	if (ns->ns_stats)
- 		lprocfs_free_stats(&ns->ns_stats);
- }
- 
-@@ -400,7 +400,7 @@ static int ldlm_namespace_sysfs_register(struct ldlm_namespace *ns)
- 				   "%s", ldlm_ns_name(ns));
- 
- 	ns->ns_stats = lprocfs_alloc_stats(LDLM_NSS_LAST, 0);
--	if (ns->ns_stats == NULL) {
-+	if (!ns->ns_stats) {
- 		kobject_put(&ns->ns_kobj);
- 		return -ENOMEM;
- 	}
-@@ -420,7 +420,7 @@ static int ldlm_namespace_debugfs_register(struct ldlm_namespace *ns)
- 	} else {
- 		ns_entry = debugfs_create_dir(ldlm_ns_name(ns),
- 					      ldlm_ns_debugfs_dir);
--		if (ns_entry == NULL)
-+		if (!ns_entry)
- 			return -ENOMEM;
- 		ns->ns_debugfs_entry = ns_entry;
- 	}
-@@ -631,7 +631,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
- 	int		    idx;
- 	int		    rc;
- 
--	LASSERT(obd != NULL);
-+	LASSERT(obd);
- 
- 	rc = ldlm_get_ref();
- 	if (rc) {
-@@ -664,7 +664,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
- 					 CFS_HASH_BIGNAME |
- 					 CFS_HASH_SPIN_BKTLOCK |
- 					 CFS_HASH_NO_ITEMREF);
--	if (ns->ns_rs_hash == NULL)
-+	if (!ns->ns_rs_hash)
- 		goto out_ns;
- 
- 	cfs_hash_for_each_bucket(ns->ns_rs_hash, &bd, idx) {
-@@ -763,7 +763,7 @@ static void cleanup_resource(struct ldlm_resource *res, struct list_head *q,
- 			break;
- 		}
- 
--		if (lock == NULL) {
-+		if (!lock) {
- 			unlock_res(res);
- 			break;
- 		}
-@@ -837,7 +837,7 @@ static int ldlm_resource_complain(struct cfs_hash *hs, struct cfs_hash_bd *bd,
-  */
- int ldlm_namespace_cleanup(struct ldlm_namespace *ns, __u64 flags)
- {
--	if (ns == NULL) {
-+	if (!ns) {
- 		CDEBUG(D_INFO, "NULL ns, skipping cleanup\n");
- 		return ELDLM_OK;
- 	}
-@@ -1032,7 +1032,7 @@ static struct ldlm_resource *ldlm_resource_new(void)
- 	int idx;
- 
- 	res = kmem_cache_alloc(ldlm_resource_slab, GFP_NOFS | __GFP_ZERO);
--	if (res == NULL)
-+	if (!res)
+diff --git a/drivers/staging/lustre/lustre/llite/super25.c b/drivers/staging/lustre/lustre/llite/super25.c
+index 86c371e..cd996f6 100644
+--- a/drivers/staging/lustre/lustre/llite/super25.c
++++ b/drivers/staging/lustre/lustre/llite/super25.c
+@@ -54,7 +54,7 @@ static struct inode *ll_alloc_inode(struct super_block *sb)
+ 
+ 	ll_stats_ops_tally(ll_s2sbi(sb), LPROC_LL_ALLOC_INODE, 1);
+ 	lli = kmem_cache_alloc(ll_inode_cachep, GFP_NOFS | __GFP_ZERO);
+-	if (lli == NULL)
++	if (!lli)
  		return NULL;
  
- 	INIT_LIST_HEAD(&res->lr_granted);
-@@ -1073,14 +1073,13 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
- 	__u64		 version;
- 	int		      ns_refcount = 0;
+ 	inode_init_once(&lli->lli_vfs_inode);
+@@ -108,26 +108,26 @@ static int __init init_lustre_lite(void)
+ 					    sizeof(struct ll_inode_info),
+ 					    0, SLAB_HWCACHE_ALIGN|SLAB_ACCOUNT,
+ 					    NULL);
+-	if (ll_inode_cachep == NULL)
++	if (!ll_inode_cachep)
+ 		goto out_cache;
  
--	LASSERT(ns != NULL);
--	LASSERT(parent == NULL);
--	LASSERT(ns->ns_rs_hash != NULL);
-+	LASSERT(!parent);
-+	LASSERT(ns->ns_rs_hash);
- 	LASSERT(name->name[0] != 0);
+ 	ll_file_data_slab = kmem_cache_create("ll_file_data",
+ 						 sizeof(struct ll_file_data), 0,
+ 						 SLAB_HWCACHE_ALIGN, NULL);
+-	if (ll_file_data_slab == NULL)
++	if (!ll_file_data_slab)
+ 		goto out_cache;
  
- 	cfs_hash_bd_get_and_lock(ns->ns_rs_hash, (void *)name, &bd, 0);
- 	hnode = cfs_hash_bd_lookup_locked(ns->ns_rs_hash, &bd, (void *)name);
--	if (hnode != NULL) {
-+	if (hnode) {
- 		cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 0);
- 		res = hlist_entry(hnode, struct ldlm_resource, lr_hash);
- 		/* Synchronize with regard to resource creation. */
-@@ -1117,7 +1116,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
- 	hnode = (version == cfs_hash_bd_version_get(&bd)) ?  NULL :
- 		cfs_hash_bd_lookup_locked(ns->ns_rs_hash, &bd, (void *)name);
+ 	ll_remote_perm_cachep = kmem_cache_create("ll_remote_perm_cache",
+ 						  sizeof(struct ll_remote_perm),
+ 						      0, 0, NULL);
+-	if (ll_remote_perm_cachep == NULL)
++	if (!ll_remote_perm_cachep)
+ 		goto out_cache;
  
--	if (hnode != NULL) {
-+	if (hnode) {
- 		/* Someone won the race and already added the resource. */
- 		cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 1);
- 		/* Clean lu_ref for failed resource. */
+ 	ll_rmtperm_hash_cachep = kmem_cache_create("ll_rmtperm_hash_cache",
+ 						   REMOTE_PERM_HASHSIZE *
+ 						   sizeof(struct list_head),
+ 						   0, 0, NULL);
+-	if (ll_rmtperm_hash_cachep == NULL)
++	if (!ll_rmtperm_hash_cachep)
+ 		goto out_cache;
+ 
+ 	llite_root = debugfs_create_dir("llite", debugfs_lustre_root);
+diff --git a/drivers/staging/lustre/lustre/llite/symlink.c b/drivers/staging/lustre/lustre/llite/symlink.c
+index 2610348..c2775b6 100644
+--- a/drivers/staging/lustre/lustre/llite/symlink.c
++++ b/drivers/staging/lustre/lustre/llite/symlink.c
+@@ -81,7 +81,6 @@ static int ll_readlink_internal(struct inode *inode,
+ 	}
+ 
+ 	body = req_capsule_server_get(&(*request)->rq_pill, &RMF_MDT_BODY);
+-	LASSERT(body != NULL);
+ 	if ((body->valid & OBD_MD_LINKNAME) == 0) {
+ 		CERROR("OBD_MD_LINKNAME not set on reply\n");
+ 		rc = -EPROTO;
+@@ -97,7 +96,7 @@ static int ll_readlink_internal(struct inode *inode,
+ 	}
+ 
+ 	*symname = req_capsule_server_get(&(*request)->rq_pill, &RMF_MDT_MD);
+-	if (*symname == NULL ||
++	if (!*symname ||
+ 	    strnlen(*symname, symlen) != symlen - 1) {
+ 		/* not full/NULL terminated */
+ 		CERROR("inode %lu: symlink not NULL terminated string of length %d\n",
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+index fdca4ec..6075ccf 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+@@ -80,7 +80,7 @@ static void *vvp_key_init(const struct lu_context *ctx,
+ 	struct vvp_thread_info *info;
+ 
+ 	info = kmem_cache_alloc(vvp_thread_kmem, GFP_NOFS | __GFP_ZERO);
+-	if (info == NULL)
++	if (!info)
+ 		info = ERR_PTR(-ENOMEM);
+ 	return info;
+ }
+@@ -99,7 +99,7 @@ static void *vvp_session_key_init(const struct lu_context *ctx,
+ 	struct vvp_session *session;
+ 
+ 	session = kmem_cache_alloc(vvp_session_kmem, GFP_NOFS | __GFP_ZERO);
+-	if (session == NULL)
++	if (!session)
+ 		session = ERR_PTR(-ENOMEM);
+ 	return session;
+ }
+@@ -228,7 +228,7 @@ int cl_sb_fini(struct super_block *sb)
+ 	if (!IS_ERR(env)) {
+ 		cld = sbi->ll_cl;
+ 
+-		if (cld != NULL) {
++		if (cld) {
+ 			cl_stack_fini(env, cld);
+ 			sbi->ll_cl = NULL;
+ 			sbi->ll_site = NULL;
+@@ -325,11 +325,11 @@ static struct cl_object *vvp_pgcache_obj(const struct lu_env *env,
+ 
+ 	cfs_hash_hlist_for_each(dev->ld_site->ls_obj_hash, id->vpi_bucket,
+ 				vvp_pgcache_obj_get, id);
+-	if (id->vpi_obj != NULL) {
++	if (id->vpi_obj) {
+ 		struct lu_object *lu_obj;
+ 
+ 		lu_obj = lu_object_locate(id->vpi_obj, dev->ld_type);
+-		if (lu_obj != NULL) {
++		if (lu_obj) {
+ 			lu_object_ref_add(lu_obj, "dump", current);
+ 			return lu2cl(lu_obj);
+ 		}
+@@ -355,7 +355,7 @@ static loff_t vvp_pgcache_find(const struct lu_env *env,
+ 		if (id.vpi_bucket >= CFS_HASH_NHLIST(site->ls_obj_hash))
+ 			return ~0ULL;
+ 		clob = vvp_pgcache_obj(env, dev, &id);
+-		if (clob != NULL) {
++		if (clob) {
+ 			struct cl_object_header *hdr;
+ 			int		      nr;
+ 			struct cl_page	  *pg;
+@@ -443,7 +443,7 @@ static int vvp_pgcache_show(struct seq_file *f, void *v)
+ 		vvp_pgcache_id_unpack(pos, &id);
+ 		sbi = f->private;
+ 		clob = vvp_pgcache_obj(env, &sbi->ll_cl->cd_lu_dev, &id);
+-		if (clob != NULL) {
++		if (clob) {
+ 			hdr = cl_object_header(clob);
+ 
+ 			spin_lock(&hdr->coh_page_guard);
+@@ -452,7 +452,7 @@ static int vvp_pgcache_show(struct seq_file *f, void *v)
+ 
+ 			seq_printf(f, "%8x@"DFID": ",
+ 				   id.vpi_index, PFID(&hdr->coh_lu.loh_fid));
+-			if (page != NULL) {
++			if (page) {
+ 				vvp_pgcache_page_show(env, f, page);
+ 				cl_page_put(env, page);
+ 			} else
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
+index 573ab15..f856899 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_io.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
+@@ -181,7 +181,7 @@ static void vvp_io_fault_fini(const struct lu_env *env,
+ 
+ 	CLOBINVRNT(env, io->ci_obj, ccc_object_invariant(io->ci_obj));
+ 
+-	if (page != NULL) {
++	if (page) {
+ 		lu_ref_del(&page->cp_reference, "fault", io);
+ 		cl_page_put(env, page);
+ 		io->u.ci_fault.ft_page = NULL;
+@@ -220,11 +220,11 @@ static int vvp_mmap_locks(const struct lu_env *env,
+ 	if (!cl_is_normalio(env, io))
+ 		return 0;
+ 
+-	if (vio->cui_iter == NULL) /* nfs or loop back device write */
++	if (!vio->cui_iter) /* nfs or loop back device write */
+ 		return 0;
+ 
+ 	/* No MM (e.g. NFS)? No vmas too. */
+-	if (mm == NULL)
++	if (!mm)
+ 		return 0;
+ 
+ 	iov_for_each(iov, i, *(vio->cui_iter)) {
+@@ -587,7 +587,7 @@ static int vvp_io_write_start(const struct lu_env *env,
+ 
+ 	CDEBUG(D_VFSTRACE, "write: [%lli, %lli)\n", pos, pos + (long long)cnt);
+ 
+-	if (cio->cui_iter == NULL) /* from a temp io in ll_cl_init(). */
++	if (!cio->cui_iter) /* from a temp io in ll_cl_init(). */
+ 		result = 0;
+ 	else
+ 		result = generic_file_write_iter(cio->cui_iocb, cio->cui_iter);
+@@ -673,7 +673,7 @@ static int vvp_io_fault_start(const struct lu_env *env,
+ 
+ 	/* must return locked page */
+ 	if (fio->ft_mkwrite) {
+-		LASSERT(cfio->ft_vmpage != NULL);
++		LASSERT(cfio->ft_vmpage);
+ 		lock_page(cfio->ft_vmpage);
+ 	} else {
+ 		result = vvp_io_kernel_fault(cfio);
+@@ -792,7 +792,7 @@ static int vvp_io_fault_start(const struct lu_env *env,
+ 
+ out:
+ 	/* return unlocked vmpage to avoid deadlocking */
+-	if (vmpage != NULL)
++	if (vmpage)
+ 		unlock_page(vmpage);
+ 	cfio->fault.ft_flags &= ~VM_FAULT_LOCKED;
+ 	return result;
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_object.c b/drivers/staging/lustre/lustre/llite/vvp_object.c
+index c82714e..8d7aa74 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_object.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_object.c
+@@ -147,7 +147,7 @@ static int vvp_conf_set(const struct lu_env *env, struct cl_object *obj,
+ 	if (conf->coc_opc != OBJECT_CONF_SET)
+ 		return 0;
+ 
+-	if (conf->u.coc_md != NULL && conf->u.coc_md->lsm != NULL) {
++	if (conf->u.coc_md && conf->u.coc_md->lsm) {
+ 		CDEBUG(D_VFSTRACE, DFID ": layout version change: %u -> %u\n",
+ 		       PFID(&lli->lli_fid), lli->lli_layout_gen,
+ 		       conf->u.coc_md->lsm->lsm_layout_gen);
+@@ -186,9 +186,8 @@ struct ccc_object *cl_inode2ccc(struct inode *inode)
+ 	struct cl_object     *obj = lli->lli_clob;
+ 	struct lu_object     *lu;
+ 
+-	LASSERT(obj != NULL);
+ 	lu = lu_object_locate(obj->co_lu.lo_header, &vvp_device_type);
+-	LASSERT(lu != NULL);
++	LASSERT(lu);
+ 	return lu2ccc(lu);
+ }
+ 
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_page.c b/drivers/staging/lustre/lustre/llite/vvp_page.c
+index a133475..f254ad5 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_page.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_page.c
+@@ -56,7 +56,7 @@ static void vvp_page_fini_common(struct ccc_page *cp)
+ {
+ 	struct page *vmpage = cp->cpg_page;
+ 
+-	LASSERT(vmpage != NULL);
++	LASSERT(vmpage);
+ 	page_cache_release(vmpage);
+ }
+ 
+@@ -81,7 +81,7 @@ static int vvp_page_own(const struct lu_env *env,
+ 	struct ccc_page *vpg    = cl2ccc_page(slice);
+ 	struct page      *vmpage = vpg->cpg_page;
+ 
+-	LASSERT(vmpage != NULL);
++	LASSERT(vmpage);
+ 	if (nonblock) {
+ 		if (!trylock_page(vmpage))
+ 			return -EAGAIN;
+@@ -105,7 +105,7 @@ static void vvp_page_assume(const struct lu_env *env,
+ {
+ 	struct page *vmpage = cl2vm_page(slice);
+ 
+-	LASSERT(vmpage != NULL);
++	LASSERT(vmpage);
+ 	LASSERT(PageLocked(vmpage));
+ 	wait_on_page_writeback(vmpage);
+ }
+@@ -116,7 +116,7 @@ static void vvp_page_unassume(const struct lu_env *env,
+ {
+ 	struct page *vmpage = cl2vm_page(slice);
+ 
+-	LASSERT(vmpage != NULL);
++	LASSERT(vmpage);
+ 	LASSERT(PageLocked(vmpage));
+ }
+ 
+@@ -125,7 +125,7 @@ static void vvp_page_disown(const struct lu_env *env,
+ {
+ 	struct page *vmpage = cl2vm_page(slice);
+ 
+-	LASSERT(vmpage != NULL);
++	LASSERT(vmpage);
+ 	LASSERT(PageLocked(vmpage));
+ 
+ 	unlock_page(cl2vm_page(slice));
+@@ -139,7 +139,7 @@ static void vvp_page_discard(const struct lu_env *env,
+ 	struct address_space *mapping;
+ 	struct ccc_page      *cpg     = cl2ccc_page(slice);
+ 
+-	LASSERT(vmpage != NULL);
++	LASSERT(vmpage);
+ 	LASSERT(PageLocked(vmpage));
+ 
+ 	mapping = vmpage->mapping;
+@@ -161,7 +161,7 @@ static int vvp_page_unmap(const struct lu_env *env,
+ 	struct page *vmpage = cl2vm_page(slice);
+ 	__u64       offset;
+ 
+-	LASSERT(vmpage != NULL);
++	LASSERT(vmpage);
+ 	LASSERT(PageLocked(vmpage));
+ 
+ 	offset = vmpage->index << PAGE_CACHE_SHIFT;
+@@ -199,7 +199,7 @@ static void vvp_page_export(const struct lu_env *env,
+ {
+ 	struct page *vmpage = cl2vm_page(slice);
+ 
+-	LASSERT(vmpage != NULL);
++	LASSERT(vmpage);
+ 	LASSERT(PageLocked(vmpage));
+ 	if (uptodate)
+ 		SetPageUptodate(vmpage);
+@@ -290,7 +290,7 @@ static void vvp_page_completion_read(const struct lu_env *env,
+ 	} else
+ 		cp->cpg_defer_uptodate = 0;
+ 
+-	if (page->cp_sync_io == NULL)
++	if (!page->cp_sync_io)
+ 		unlock_page(vmpage);
+ }
+ 
+@@ -317,7 +317,7 @@ static void vvp_page_completion_write(const struct lu_env *env,
+ 	cp->cpg_write_queued = 0;
+ 	vvp_write_complete(cl2ccc(slice->cpl_obj), cp);
+ 
+-	if (pg->cp_sync_io != NULL) {
++	if (pg->cp_sync_io) {
+ 		LASSERT(PageLocked(vmpage));
+ 		LASSERT(!PageWriteback(vmpage));
+ 	} else {
+@@ -385,7 +385,7 @@ static int vvp_page_print(const struct lu_env *env,
+ 	(*printer)(env, cookie, LUSTRE_VVP_NAME "-page@%p(%d:%d:%d) vm@%p ",
+ 		   vp, vp->cpg_defer_uptodate, vp->cpg_ra_used,
+ 		   vp->cpg_write_queued, vmpage);
+-	if (vmpage != NULL) {
++	if (vmpage) {
+ 		(*printer)(env, cookie, "%lx %d:%d %lx %lu %slru",
+ 			   (long)vmpage->flags, page_count(vmpage),
+ 			   page_mapcount(vmpage), vmpage->private,
+diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
+index fa477e7..8ccbf26 100644
+--- a/drivers/staging/lustre/lustre/llite/xattr.c
++++ b/drivers/staging/lustre/lustre/llite/xattr.c
+@@ -148,7 +148,7 @@ int ll_setxattr_common(struct inode *inode, const char *name,
+ 	    (xattr_type == XATTR_ACL_ACCESS_T ||
+ 	    xattr_type == XATTR_ACL_DEFAULT_T)) {
+ 		rce = rct_search(&sbi->ll_rct, current_pid());
+-		if (rce == NULL ||
++		if (!rce ||
+ 		    (rce->rce_ops != RMT_LSETFACL &&
+ 		    rce->rce_ops != RMT_RSETFACL))
+ 			return -EOPNOTSUPP;
+@@ -158,7 +158,6 @@ int ll_setxattr_common(struct inode *inode, const char *name,
+ 
+ 			ee = et_search_del(&sbi->ll_et, current_pid(),
+ 					   ll_inode2fid(inode), xattr_type);
+-			LASSERT(ee != NULL);
+ 			if (valid & OBD_MD_FLXATTR) {
+ 				acl = lustre_acl_xattr_merge2ext(
+ 						(posix_acl_xattr_header *)value,
+@@ -196,7 +195,7 @@ int ll_setxattr_common(struct inode *inode, const char *name,
+ 	 * Release the posix ACL space.
+ 	 */
+ 	kfree(new_value);
+-	if (acl != NULL)
++	if (acl)
+ 		lustre_ext_acl_xattr_free(acl);
+ #endif
+ 	if (rc) {
+@@ -239,10 +238,10 @@ int ll_setxattr(struct dentry *dentry, const char *name,
+ 		/* Attributes that are saved via getxattr will always have
+ 		 * the stripe_offset as 0.  Instead, the MDS should be
+ 		 * allowed to pick the starting OST index.   b=17846 */
+-		if (lump != NULL && lump->lmm_stripe_offset == 0)
++		if (lump && lump->lmm_stripe_offset == 0)
+ 			lump->lmm_stripe_offset = -1;
+ 
+-		if (lump != NULL && S_ISREG(inode->i_mode)) {
++		if (lump && S_ISREG(inode->i_mode)) {
+ 			int flags = FMODE_WRITE;
+ 			int lum_size = (lump->lmm_magic == LOV_USER_MAGIC_V1) ?
+ 				sizeof(*lump) : sizeof(struct lov_user_md_v3);
+@@ -324,7 +323,7 @@ int ll_getxattr_common(struct inode *inode, const char *name,
+ 	    (xattr_type == XATTR_ACL_ACCESS_T ||
+ 	    xattr_type == XATTR_ACL_DEFAULT_T)) {
+ 		rce = rct_search(&sbi->ll_rct, current_pid());
+-		if (rce == NULL ||
++		if (!rce ||
+ 		    (rce->rce_ops != RMT_LSETFACL &&
+ 		    rce->rce_ops != RMT_LGETFACL &&
+ 		    rce->rce_ops != RMT_RSETFACL &&
+@@ -365,7 +364,7 @@ do_getxattr:
+ 			goto out_xattr;
+ 
+ 		/* Add "system.posix_acl_access" to the list */
+-		if (lli->lli_posix_acl != NULL && valid & OBD_MD_FLXATTRLS) {
++		if (lli->lli_posix_acl && valid & OBD_MD_FLXATTRLS) {
+ 			if (size == 0) {
+ 				rc += sizeof(XATTR_NAME_ACL_ACCESS);
+ 			} else if (size - rc >= sizeof(XATTR_NAME_ACL_ACCESS)) {
+@@ -487,7 +486,7 @@ ssize_t ll_getxattr(struct dentry *dentry, const char *name,
+ 		}
+ 
+ 		lsm = ccc_inode_lsm_get(inode);
+-		if (lsm == NULL) {
++		if (!lsm) {
+ 			if (S_ISDIR(inode->i_mode)) {
+ 				rc = ll_dir_getstripe(inode, &lmm,
+ 						      &lmmsize, &request);
+@@ -559,7 +558,7 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
+ 	if (rc < 0)
+ 		goto out;
+ 
+-	if (buffer != NULL) {
++	if (buffer) {
+ 		struct ll_sb_info *sbi = ll_i2sbi(inode);
+ 		char *xattr_name = buffer;
+ 		int xlen, rem = rc;
+@@ -597,12 +596,12 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
+ 		const size_t name_len   = sizeof("lov") - 1;
+ 		const size_t total_len  = prefix_len + name_len + 1;
+ 
+-		if (((rc + total_len) > size) && (buffer != NULL)) {
++		if (((rc + total_len) > size) && buffer) {
+ 			ptlrpc_req_finished(request);
+ 			return -ERANGE;
+ 		}
+ 
+-		if (buffer != NULL) {
++		if (buffer) {
+ 			buffer += rc;
+ 			memcpy(buffer, XATTR_LUSTRE_PREFIX, prefix_len);
+ 			memcpy(buffer + prefix_len, "lov", name_len);
+diff --git a/drivers/staging/lustre/lustre/llite/xattr_cache.c b/drivers/staging/lustre/lustre/llite/xattr_cache.c
+index d140276..ed6e073 100644
+--- a/drivers/staging/lustre/lustre/llite/xattr_cache.c
++++ b/drivers/staging/lustre/lustre/llite/xattr_cache.c
+@@ -59,9 +59,6 @@ void ll_xattr_fini(void)
+  */
+ static void ll_xattr_cache_init(struct ll_inode_info *lli)
+ {
+-
+-	LASSERT(lli != NULL);
+-
+ 	INIT_LIST_HEAD(&lli->lli_xattrs);
+ 	lli->lli_flags |= LLIF_XATTR_CACHE;
+ }
+@@ -83,8 +80,7 @@ static int ll_xattr_cache_find(struct list_head *cache,
+ 
+ 	list_for_each_entry(entry, cache, xe_list) {
+ 		/* xattr_name == NULL means look for any entry */
+-		if (xattr_name == NULL ||
+-		    strcmp(xattr_name, entry->xe_name) == 0) {
++		if (!xattr_name || strcmp(xattr_name, entry->xe_name) == 0) {
+ 			*xattr = entry;
+ 			CDEBUG(D_CACHE, "find: [%s]=%.*s\n",
+ 			       entry->xe_name, entry->xe_vallen,
+@@ -118,7 +114,7 @@ static int ll_xattr_cache_add(struct list_head *cache,
+ 	}
+ 
+ 	xattr = kmem_cache_alloc(xattr_kmem, GFP_NOFS | __GFP_ZERO);
+-	if (xattr == NULL) {
++	if (!xattr) {
+ 		CDEBUG(D_CACHE, "failed to allocate xattr\n");
+ 		return -ENOMEM;
+ 	}
+@@ -359,7 +355,7 @@ static int ll_xattr_cache_refill(struct inode *inode, struct lookup_intent *oit)
+ 	}
+ 
+ 	/* Matched but no cache? Cancelled on error by a parallel refill. */
+-	if (unlikely(req == NULL)) {
++	if (unlikely(!req)) {
+ 		CDEBUG(D_CACHE, "cancelled by a parallel getxattr\n");
+ 		rc = -EIO;
+ 		goto out_maybe_drop;
+@@ -376,7 +372,7 @@ static int ll_xattr_cache_refill(struct inode *inode, struct lookup_intent *oit)
+ 	}
+ 
+ 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+-	if (body == NULL) {
++	if (!body) {
+ 		CERROR("no MDT BODY in the refill xattr reply\n");
+ 		rc = -EPROTO;
+ 		goto out_destroy;
+@@ -388,7 +384,7 @@ static int ll_xattr_cache_refill(struct inode *inode, struct lookup_intent *oit)
+ 						body->aclsize);
+ 	xsizes = req_capsule_server_sized_get(&req->rq_pill, &RMF_EAVALS_LENS,
+ 					      body->max_mdsize * sizeof(__u32));
+-	if (xdata == NULL || xval == NULL || xsizes == NULL) {
++	if (!xdata || !xval || !xsizes) {
+ 		CERROR("wrong setxattr reply\n");
+ 		rc = -EPROTO;
+ 		goto out_destroy;
+@@ -404,7 +400,7 @@ static int ll_xattr_cache_refill(struct inode *inode, struct lookup_intent *oit)
+ 	for (i = 0; i < body->max_mdsize; i++) {
+ 		CDEBUG(D_CACHE, "caching [%s]=%.*s\n", xdata, *xsizes, xval);
+ 		/* Perform consistency checks: attr names and vals in pill */
+-		if (memchr(xdata, 0, xtail - xdata) == NULL) {
++		if (!memchr(xdata, 0, xtail - xdata)) {
+ 			CERROR("xattr protocol violation (names are broken)\n");
+ 			rc = -EPROTO;
+ 		} else if (xval + *xsizes > xvtail) {
 -- 
 2.1.0
