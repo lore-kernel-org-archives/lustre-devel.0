@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Tue, 16 Feb 2016 00:46:34 -0500
-Subject: [lustre-devel] [PATCH 02/45] staging/lustre/obdclass: Get rid of
-	/proc references in comments.
+Date: Tue, 16 Feb 2016 00:46:35 -0500
+Subject: [lustre-devel] [PATCH 03/45] staging/lustre/libcfs: Get rid of
+	/proc references in comments
 In-Reply-To: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
 References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455601637-3847710-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455601637-3847710-4-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -19,111 +19,65 @@ remaining comments
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h       | 2 +-
- drivers/staging/lustre/lustre/include/lprocfs_status.h  | 2 +-
- drivers/staging/lustre/lustre/include/obd.h             | 7 ++++---
- drivers/staging/lustre/lustre/obdclass/class_obd.c      | 4 ++--
- drivers/staging/lustre/lustre/obdclass/lprocfs_status.c | 8 ++++----
- 5 files changed, 12 insertions(+), 11 deletions(-)
+ drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c | 4 ++--
+ drivers/staging/lustre/lustre/libcfs/module.c            | 4 ----
+ drivers/staging/lustre/lustre/libcfs/tracefile.c         | 7 ++++---
+ 3 files changed, 6 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index bd7acc2..c8f4569 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -2613,7 +2613,7 @@ struct cl_site {
- 	 * Statistical counters. Atomics do not scale, something better like
- 	 * per-cpu counters is needed.
- 	 *
--	 * These are exported as /proc/fs/lustre/llite/.../site
-+	 * These are exported as /sys/kernel/debug/lustre/llite/.../site
- 	 *
- 	 * When interpreting keep in mind that both sub-locks (and sub-pages)
- 	 * and top-locks (and top-pages) are accounted here.
-diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-index fb13094..97c2d7e 100644
---- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-+++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-@@ -54,7 +54,7 @@ struct lprocfs_vars {
- 	struct file_operations	*fops;
- 	void			*data;
- 	/**
--	 * /proc file mode.
-+	 * sysfs file mode.
- 	 */
- 	umode_t			proc_mode;
- };
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index f00d9a2..514e12b 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -302,7 +302,7 @@ struct client_obd {
- 	struct list_head	       cl_loi_read_list;
- 	int		      cl_r_in_flight;
- 	int		      cl_w_in_flight;
--	/* just a sum of the loi/lop pending numbers to be exported by /proc */
-+	/* just a sum of the loi/lop pending numbers to be exported by sysfs */
- 	atomic_t	     cl_pending_w_pages;
- 	atomic_t	     cl_pending_r_pages;
- 	__u32			 cl_max_pages_per_rpc;
-@@ -449,7 +449,7 @@ struct pool_desc {
- 	struct lov_qos_rr     pool_rr;		/* round robin qos */
- 	struct hlist_node      pool_hash;	      /* access by poolname */
- 	struct list_head	    pool_list;	      /* serial access */
--	struct dentry		*pool_debugfs_entry;	/* file in /proc */
-+	struct dentry		*pool_debugfs_entry;	/* file in debugfs */
- 	struct obd_device    *pool_lobd;	/* obd of the lov/lod to which
- 						*  this pool belongs */
- };
-@@ -737,7 +737,8 @@ struct obd_device {
- 		      obd_async_recov:1,   /* allow asynchronous orphan cleanup */
- 		      obd_no_conn:1,       /* deny new connections */
- 		      obd_inactive:1,      /* device active/inactive
--					   * (for /proc/status only!!) */
-+					    * (for sysfs status only!!)
-+					    */
- 		      obd_no_ir:1,	 /* no imperative recovery. */
- 		      obd_process_conf:1;  /* device is processing mgs config */
- 	/* use separate field as it is set in interrupt to don't mess with
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 65cf46c..84f6880 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -52,7 +52,7 @@ EXPORT_SYMBOL(obd_devs);
- struct list_head obd_types;
- DEFINE_RWLOCK(obd_dev_lock);
+diff --git a/drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c b/drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c
+index 59c7bf3..3358c3b 100644
+--- a/drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c
++++ b/drivers/staging/lustre/lustre/libcfs/linux/linux-debug.c
+@@ -87,7 +87,7 @@ void libcfs_run_debug_log_upcall(char *file)
  
--/* The following are visible and mutable through /proc/sys/lustre/. */
-+/* The following are visible and mutable through /sys/fs/lustre. */
- unsigned int obd_debug_peer_on_timeout;
- EXPORT_SYMBOL(obd_debug_peer_on_timeout);
- unsigned int obd_dump_on_timeout;
-@@ -67,7 +67,7 @@ unsigned int obd_timeout = OBD_TIMEOUT_DEFAULT;   /* seconds */
- EXPORT_SYMBOL(obd_timeout);
- unsigned int obd_timeout_set;
- EXPORT_SYMBOL(obd_timeout_set);
--/* Adaptive timeout defs here instead of ptlrpc module for /proc/sys/ access */
-+/* Adaptive timeout defs here instead of ptlrpc module for /sys/fs/ access */
- unsigned int at_min;
- EXPORT_SYMBOL(at_min);
- unsigned int at_max = 600;
-diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index eda44d8..a7e22e0 100644
---- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -149,10 +149,10 @@ int lprocfs_read_frac_helper(char *buffer, unsigned long count, long val,
- 		}
- 		/*
- 		 * Need to think these cases :
--		 *      1. #echo x.00 > /proc/xxx       output result : x
--		 *      2. #echo x.0x > /proc/xxx       output result : x.0x
--		 *      3. #echo x.x0 > /proc/xxx       output result : x.x
--		 *      4. #echo x.xx > /proc/xxx       output result : x.xx
-+		 *      1. #echo x.00 > /sys/xxx       output result : x
-+		 *      2. #echo x.0x > /sys/xxx       output result : x.0x
-+		 *      3. #echo x.x0 > /sys/xxx       output result : x.x
-+		 *      4. #echo x.xx > /sys/xxx       output result : x.xx
- 		 *      Only reserved 2 bits fraction.
- 		 */
- 		for (i = 0; i < (5 - prtn); i++)
+ 	rc = call_usermodehelper(argv[0], argv, envp, 1);
+ 	if (rc < 0 && rc != -ENOENT) {
+-		CERROR("Error %d invoking LNET debug log upcall %s %s; check /proc/sys/lnet/debug_log_upcall\n",
++		CERROR("Error %d invoking LNET debug log upcall %s %s; check /sys/kernel/debug/lnet/debug_log_upcall\n",
+ 		       rc, argv[0], argv[1]);
+ 	} else {
+ 		CDEBUG(D_HA, "Invoked LNET debug log upcall %s %s\n",
+@@ -113,7 +113,7 @@ void libcfs_run_upcall(char **argv)
+ 
+ 	rc = call_usermodehelper(argv[0], argv, envp, 1);
+ 	if (rc < 0 && rc != -ENOENT) {
+-		CERROR("Error %d invoking LNET upcall %s %s%s%s%s%s%s%s%s; check /proc/sys/lnet/upcall\n",
++		CERROR("Error %d invoking LNET upcall %s %s%s%s%s%s%s%s%s; check /sys/kernel/debug/lnet/upcall\n",
+ 		       rc, argv[0], argv[1],
+ 		       argc < 3 ? "" : ",", argc < 3 ? "" : argv[2],
+ 		       argc < 4 ? "" : ",", argc < 4 ? "" : argv[3],
+diff --git a/drivers/staging/lustre/lustre/libcfs/module.c b/drivers/staging/lustre/lustre/libcfs/module.c
+index 611607a..45838b5 100644
+--- a/drivers/staging/lustre/lustre/libcfs/module.c
++++ b/drivers/staging/lustre/lustre/libcfs/module.c
+@@ -368,10 +368,6 @@ static int proc_cpt_table(struct ctl_table *table, int write,
+ }
+ 
+ static struct ctl_table lnet_table[] = {
+-	/*
+-	 * NB No .strategy entries have been provided since sysctl(8) prefers
+-	 * to go via /proc for portability.
+-	 */
+ 	{
+ 		.procname = "debug",
+ 		.data     = &libcfs_debug,
+diff --git a/drivers/staging/lustre/lustre/libcfs/tracefile.c b/drivers/staging/lustre/lustre/libcfs/tracefile.c
+index 65c4f1a..a7d9b78 100644
+--- a/drivers/staging/lustre/lustre/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lustre/libcfs/tracefile.c
+@@ -771,9 +771,10 @@ EXPORT_SYMBOL(cfs_trace_copyin_string);
+ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
+ 			     const char *knl_buffer, char *append)
+ {
+-	/* NB if 'append' != NULL, it's a single character to append to the
+-	 * copied out string - usually "\n", for /proc entries and "" (i.e. a
+-	 * terminating zero byte) for sysctl entries */
++	/*
++	 * NB if 'append' != NULL, it's a single character to append to the
++	 * copied out string - usually "\n" or "" (i.e. a terminating zero byte)
++	 */
+ 	int   nob = strlen(knl_buffer);
+ 
+ 	if (nob > usr_buffer_nob)
 -- 
 2.1.0
