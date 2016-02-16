@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Tue, 16 Feb 2016 00:46:41 -0500
-Subject: [lustre-devel] [PATCH 09/45] staging/lustre: Remove server code
-	from class_get_type()
+Date: Tue, 16 Feb 2016 00:46:36 -0500
+Subject: [lustre-devel] [PATCH 04/45] staging/lustre/llite: Get rid of /proc
+	references in comments
 In-Reply-To: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
 References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455601637-3847710-10-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455601637-3847710-5-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,33 +14,40 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-class_get_type has some references to various server modules
-that could not exist on the server, so get rid of them.
+Now that the sysfs conversion is complete, also convert all the
+remaining comments
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/obdclass/genops.c | 9 ---------
- 1 file changed, 9 deletions(-)
+ drivers/staging/lustre/lustre/llite/lproc_llite.c | 2 +-
+ drivers/staging/lustre/lustre/llite/vvp_io.c      | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 5665655..1cb68df 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -113,15 +113,6 @@ static struct obd_type *class_get_type(const char *name)
- 	if (!type) {
- 		const char *modname = name;
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index f134ad9..8d3c788 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -43,7 +43,7 @@
+ #include "llite_internal.h"
+ #include "vvp_internal.h"
  
--		if (strcmp(modname, "obdfilter") == 0)
--			modname = "ofd";
--
--		if (strcmp(modname, LUSTRE_LWP_NAME) == 0)
--			modname = LUSTRE_OSP_NAME;
--
--		if (!strncmp(modname, LUSTRE_MDS_NAME, strlen(LUSTRE_MDS_NAME)))
--			modname = LUSTRE_MDT_NAME;
--
- 		if (!request_module("%s", modname)) {
- 			CDEBUG(D_INFO, "Loaded module '%s'\n", modname);
- 			type = class_search_type(name);
+-/* /proc/lustre/llite mount point registration */
++/* debugfs llite mount point registration */
+ static struct file_operations ll_rw_extents_stats_fops;
+ static struct file_operations ll_rw_extents_stats_pp_fops;
+ static struct file_operations ll_rw_offset_stats_fops;
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
+index 0920ac6..573ab15 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_io.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
+@@ -1003,7 +1003,7 @@ static int vvp_io_commit_write(const struct lu_env *env,
+ 	 *
+ 	 *     (3) IO is batched up to the RPC size and is async until the
+ 	 *     client max cache is hit
+-	 *     (/proc/fs/lustre/osc/OSC.../max_dirty_mb)
++	 *     (/sys/fs/lustre/osc/OSC.../max_dirty_mb)
+ 	 *
+ 	 */
+ 	if (!PageDirty(vmpage)) {
 -- 
 2.1.0
