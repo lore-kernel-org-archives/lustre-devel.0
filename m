@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Tue, 16 Feb 2016 00:46:37 -0500
-Subject: [lustre-devel] [PATCH 05/45] staging/lustre/lov: Get rid of /proc
-	references in comments
+Date: Tue, 16 Feb 2016 00:46:33 -0500
+Subject: [lustre-devel] [PATCH 01/45] staging/lustre/ptlrpc: Get rid of
+	/proc references in comments
 In-Reply-To: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
 References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455601637-3847710-6-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455601637-3847710-2-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -19,30 +19,63 @@ remaining comments
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/lov/lov_pool.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h | 2 +-
+ drivers/staging/lustre/lustre/include/lustre_net.h | 2 +-
+ drivers/staging/lustre/lustre/ptlrpc/recover.c     | 2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
-index 3ee1d40..470708c 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pool.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
-@@ -154,7 +154,7 @@ struct cfs_hash_ops pool_hash_operations = {
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 9b319f1..11a841a 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -373,7 +373,7 @@ struct ldlm_namespace {
  
- /* ifdef needed for liblustre support */
- /*
-- * pool /proc seq_file methods
-+ * pool debugfs seq_file methods
+ 	/**
+ 	 * Namespace connect flags supported by server (may be changed via
+-	 * /proc, LRU resize may be disabled/enabled).
++	 * sysfs, LRU resize may be disabled/enabled).
+ 	 */
+ 	__u64			ns_connect_flags;
+ 
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index d834ddd..d9c7267 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -1947,7 +1947,7 @@ struct ptlrpc_service_ops {
+  * or general metadata service for MDS.
   */
- /*
-  * iterator is used to go through the target pool entries
-@@ -429,7 +429,7 @@ int lov_pool_new(struct obd_device *obd, char *poolname)
- 	INIT_HLIST_NODE(&new_pool->pool_hash);
+ struct ptlrpc_service {
+-	/** serialize /proc operations */
++	/** serialize sysfs operations */
+ 	spinlock_t			srv_lock;
+ 	/** most often accessed fields */
+ 	/** chain thru all services */
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/recover.c b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+index db6626c..4359cac 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/recover.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+@@ -260,7 +260,7 @@ void ptlrpc_request_handle_notconn(struct ptlrpc_request *failed_req)
+  * Administratively active/deactive a client.
+  * This should only be called by the ioctl interface, currently
+  *  - the lctl deactivate and activate commands
+- *  - echo 0/1 >> /proc/osc/XXX/active
++ *  - echo 0/1 >> /sys/fs/lustre/osc/XXX/active
+  *  - client umount -f (ll_umount_begin)
+  */
+ int ptlrpc_set_import_active(struct obd_import *imp, int active)
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+index 22621c7..52a6c51 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+@@ -120,7 +120,7 @@ static struct ptlrpc_enc_page_pool {
+ } page_pools;
  
- 	/* we need this assert seq_file is not implemented for liblustre */
--	/* get ref for /proc file */
-+	/* get ref for debugfs file */
- 	lov_pool_getref(new_pool);
- 	new_pool->pool_debugfs_entry = ldebugfs_add_simple(
- 						lov->lov_pool_debugfs_entry,
+ /*
+- * /proc/fs/lustre/sptlrpc/encrypt_page_pools
++ * /sys/kernel/debug/lustre/sptlrpc/encrypt_page_pools
+  */
+ int sptlrpc_proc_enc_pool_seq_show(struct seq_file *m, void *v)
+ {
 -- 
 2.1.0
