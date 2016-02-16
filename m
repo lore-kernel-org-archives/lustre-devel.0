@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Tue, 16 Feb 2016 00:46:33 -0500
-Subject: [lustre-devel] [PATCH 01/45] staging/lustre/ptlrpc: Get rid of
-	/proc references in comments
+Date: Tue, 16 Feb 2016 00:46:38 -0500
+Subject: [lustre-devel] [PATCH 06/45] staging/lustre: Remove unused function
+	oti_init
 In-Reply-To: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
 References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1455601637-3847710-2-git-send-email-green@linuxhacker.ru>
+Message-ID: <1455601637-3847710-7-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,68 +14,51 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Now that the sysfs conversion is complete, also convert all the
-remaining comments
+All the users seems to have disappeared.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_dlm.h | 2 +-
- drivers/staging/lustre/lustre/include/lustre_net.h | 2 +-
- drivers/staging/lustre/lustre/ptlrpc/recover.c     | 2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h | 28 ----------------------------
+ 1 file changed, 28 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index 9b319f1..11a841a 100644
---- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -373,7 +373,7 @@ struct ldlm_namespace {
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 514e12b..991d2c6 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -595,34 +595,6 @@ struct obd_trans_info {
+ 	struct obd_uuid	 *oti_ost_uuid;
+ };
  
- 	/**
- 	 * Namespace connect flags supported by server (may be changed via
--	 * /proc, LRU resize may be disabled/enabled).
-+	 * sysfs, LRU resize may be disabled/enabled).
- 	 */
- 	__u64			ns_connect_flags;
- 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index d834ddd..d9c7267 100644
---- a/drivers/staging/lustre/lustre/include/lustre_net.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -1947,7 +1947,7 @@ struct ptlrpc_service_ops {
-  * or general metadata service for MDS.
-  */
- struct ptlrpc_service {
--	/** serialize /proc operations */
-+	/** serialize sysfs operations */
- 	spinlock_t			srv_lock;
- 	/** most often accessed fields */
- 	/** chain thru all services */
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/recover.c b/drivers/staging/lustre/lustre/ptlrpc/recover.c
-index db6626c..4359cac 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/recover.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/recover.c
-@@ -260,7 +260,7 @@ void ptlrpc_request_handle_notconn(struct ptlrpc_request *failed_req)
-  * Administratively active/deactive a client.
-  * This should only be called by the ioctl interface, currently
-  *  - the lctl deactivate and activate commands
-- *  - echo 0/1 >> /proc/osc/XXX/active
-+ *  - echo 0/1 >> /sys/fs/lustre/osc/XXX/active
-  *  - client umount -f (ll_umount_begin)
-  */
- int ptlrpc_set_import_active(struct obd_import *imp, int active)
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-index 22621c7..52a6c51 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-@@ -120,7 +120,7 @@ static struct ptlrpc_enc_page_pool {
- } page_pools;
- 
- /*
-- * /proc/fs/lustre/sptlrpc/encrypt_page_pools
-+ * /sys/kernel/debug/lustre/sptlrpc/encrypt_page_pools
-  */
- int sptlrpc_proc_enc_pool_seq_show(struct seq_file *m, void *v)
+-static inline void oti_init(struct obd_trans_info *oti,
+-			    struct ptlrpc_request *req)
+-{
+-	if (oti == NULL)
+-		return;
+-	memset(oti, 0, sizeof(*oti));
+-
+-	if (req == NULL)
+-		return;
+-
+-	oti->oti_xid = req->rq_xid;
+-	/** VBR: take versions from request */
+-	if (req->rq_reqmsg != NULL &&
+-	    lustre_msg_get_flags(req->rq_reqmsg) & MSG_REPLAY) {
+-		__u64 *pre_version = lustre_msg_get_versions(req->rq_reqmsg);
+-
+-		oti->oti_pre_version = pre_version ? pre_version[0] : 0;
+-		oti->oti_transno = lustre_msg_get_transno(req->rq_reqmsg);
+-	}
+-
+-	/** called from mds_create_objects */
+-	if (req->rq_repmsg != NULL)
+-		oti->oti_transno = lustre_msg_get_transno(req->rq_repmsg);
+-	oti->oti_thread = req->rq_svc_thread;
+-	if (req->rq_reqmsg != NULL)
+-		oti->oti_conn_cnt = lustre_msg_get_conn_cnt(req->rq_reqmsg);
+-}
+-
+ static inline void oti_alloc_cookies(struct obd_trans_info *oti,
+ 				     int num_cookies)
  {
 -- 
 2.1.0
