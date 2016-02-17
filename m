@@ -1,40 +1,54 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Tue, 16 Feb 2016 17:55:52 -0800
-Subject: [lustre-devel] Lustre versioning overhaul, input requested
-Message-ID: <56C3D328.8080202@llnl.gov>
+From: shalin mehta <shalinmehta85@gmail.com>
+Date: Tue, 16 Feb 2016 22:39:05 -0800
+Subject: [lustre-devel] [PATCH] staging: lustre: Fixed the parenthesis
+In-Reply-To: <497A8642-BC1A-4EF9-92BC-C3FF3C217BA2@intel.com>
+References: <1455507422-13568-1-git-send-email-shalinmehta85@gmail.com>
+	<497A8642-BC1A-4EF9-92BC-C3FF3C217BA2@intel.com>
+Message-ID: <CAJvEOfzMu8mdb=yq81+gZNRcazRSSZKwD2q7uW7tLf6kRnz-_Q@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: "Drokin, Oleg" <oleg.drokin@intel.com>
+Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, "<kernel-janitors@lists.osdl.org>" <kernel-janitors@lists.osdl.org>, "<devel@driverdev.osuosl.org>" <devel@driverdev.osuosl.org>, "<linux-kernel@vger.kernel.org>" <linux-kernel@vger.kernel.org>, "<lustre-devel@lists.lustre.org>" <lustre-devel@lists.lustre.org>
 
-Hello everyone,
+Hello,
 
-I am hoping to make a number of build and rpm packaging improvements
-early in the Lustre 2.9 development cycle.  One of the early changes, on
-which a number of later changes currently depend, is an overhaul of the
-method used to version Lustre.
+Should I send this patch again due the spelling mistake in the patch
+description?
 
-I would love to get some more eyes on this change and get any critiques
-in soon so we can get this landed potentially a week or two from now.
+Thanks,
+Shalin
 
-You can find the main jira ticket for the lustre versioning overhaul here:
-
-https://jira.hpdd.intel.com/browse/LU-7699
-
-The last comment in the ticket points to the current three patches
-involved in the overhaul.  The first patch is the most significant of
-the three in size and scope:
-
-  http://review.whamcloud.com/18107
-
-Change 18107 has a fairly lengthy commit comment describing the changes.
-
-Also take a look at the file "Documentation/versioning.txt" inside of
-change 18107 to see a description of how versioning works under the new
-system.
-
-Any feedback is welcome!  A lack of feedback will be interpreted as
-acceptance. :)
-
-Chris
+On Mon, Feb 15, 2016 at 6:51 PM, Drokin, Oleg <oleg.drokin@intel.com> wrote:
+>
+> On Feb 14, 2016, at 10:37 PM, Shalin Mehta wrote:
+>
+>> The parentehsis are fixed in the macro for the ldlm lock to set and
+>> clear the flags.
+>>
+>> Signed-off-by: Shalin Mehta <shalinmehta85@gmail.com>
+>> ---
+>> drivers/staging/lustre/lustre/include/lustre_dlm_flags.h | 4 ++--
+>> 1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
+>> index 0d3ed87..4f9e9ad 100644
+>> --- a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
+>> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
+>> @@ -365,10 +365,10 @@
+>> #define LDLM_TEST_FLAG(_l, _b)        (((_l)->l_flags & (_b)) != 0)
+>>
+>> /** set a ldlm_lock flag bit */
+>> -#define LDLM_SET_FLAG(_l, _b)         (((_l)->l_flags |= (_b))
+>> +#define LDLM_SET_FLAG(_l, _b)         ((_l)->l_flags |= (_b))
+>>
+>> /** clear a ldlm_lock flag bit */
+>> -#define LDLM_CLEAR_FLAG(_l, _b)       (((_l)->l_flags &= ~(_b))
+>> +#define LDLM_CLEAR_FLAG(_l, _b)       ((_l)->l_flags &= ~(_b))
+>>
+>> /** Mask of flags inherited from parent lock when doing intents. */
+>> #define LDLM_INHERIT_FLAGS            LDLM_FL_INHERIT_MASK
+>
+> Acked-by: Oleg Drokin <oleg.drokin@intel.com>
+>
