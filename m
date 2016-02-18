@@ -1,54 +1,37 @@
-From: shalin mehta <shalinmehta85@gmail.com>
-Date: Tue, 16 Feb 2016 22:39:05 -0800
-Subject: [lustre-devel] [PATCH] staging: lustre: Fixed the parenthesis
-In-Reply-To: <497A8642-BC1A-4EF9-92BC-C3FF3C217BA2@intel.com>
-References: <1455507422-13568-1-git-send-email-shalinmehta85@gmail.com>
-	<497A8642-BC1A-4EF9-92BC-C3FF3C217BA2@intel.com>
-Message-ID: <CAJvEOfzMu8mdb=yq81+gZNRcazRSSZKwD2q7uW7tLf6kRnz-_Q@mail.gmail.com>
+From: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
+Date: Thu, 18 Feb 2016 20:55:39 +0530
+Subject: [lustre-devel] [PATCH] staging: lusture: obdclass: Remove
+	unnecessary NULL check
+Message-ID: <20160218152539.GA28252@Karyakshetra>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Drokin, Oleg" <oleg.drokin@intel.com>
-Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, "<kernel-janitors@lists.osdl.org>" <kernel-janitors@lists.osdl.org>, "<devel@driverdev.osuosl.org>" <devel@driverdev.osuosl.org>, "<linux-kernel@vger.kernel.org>" <linux-kernel@vger.kernel.org>, "<lustre-devel@lists.lustre.org>" <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Dmitry Eremin <dmiter4ever@gmail.com>, Bhumika Goyal <bhumirks@gmail.com>, Julia Lawall <Julia.Lawall@lip6.fr>, Cihangir Akturk <cakturk@gmail.com>, Joe Perches <joe@perches.com>
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-Hello,
+NULL check before the  debugfs_remove_recursive function is not needed.
 
-Should I send this patch again due the spelling mistake in the patch
-description?
+This was detected using scripts/coccinelle/free/ifnullfree.cocci
 
-Thanks,
-Shalin
+Signed-off-by: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
+---
+ drivers/staging/lustre/lustre/obdclass/linux/linux-module.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-On Mon, Feb 15, 2016 at 6:51 PM, Drokin, Oleg <oleg.drokin@intel.com> wrote:
->
-> On Feb 14, 2016, at 10:37 PM, Shalin Mehta wrote:
->
->> The parentehsis are fixed in the macro for the ldlm lock to set and
->> clear the flags.
->>
->> Signed-off-by: Shalin Mehta <shalinmehta85@gmail.com>
->> ---
->> drivers/staging/lustre/lustre/include/lustre_dlm_flags.h | 4 ++--
->> 1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
->> index 0d3ed87..4f9e9ad 100644
->> --- a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
->> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
->> @@ -365,10 +365,10 @@
->> #define LDLM_TEST_FLAG(_l, _b)        (((_l)->l_flags & (_b)) != 0)
->>
->> /** set a ldlm_lock flag bit */
->> -#define LDLM_SET_FLAG(_l, _b)         (((_l)->l_flags |= (_b))
->> +#define LDLM_SET_FLAG(_l, _b)         ((_l)->l_flags |= (_b))
->>
->> /** clear a ldlm_lock flag bit */
->> -#define LDLM_CLEAR_FLAG(_l, _b)       (((_l)->l_flags &= ~(_b))
->> +#define LDLM_CLEAR_FLAG(_l, _b)       ((_l)->l_flags &= ~(_b))
->>
->> /** Mask of flags inherited from parent lock when doing intents. */
->> #define LDLM_INHERIT_FLAGS            LDLM_FL_INHERIT_MASK
->
-> Acked-by: Oleg Drokin <oleg.drokin@intel.com>
->
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+index 1913f3e..2045621 100644
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
++++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+@@ -454,8 +454,7 @@ out:
+
+ int class_procfs_clean(void)
+ {
+-	if (debugfs_lustre_root != NULL)
+-		debugfs_remove_recursive(debugfs_lustre_root);
++	debugfs_remove_recursive(debugfs_lustre_root);
+
+ 	debugfs_lustre_root = NULL;
+
+--
+2.1.4
