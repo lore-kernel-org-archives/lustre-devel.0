@@ -1,28 +1,56 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Fri, 19 Feb 2016 13:22:00 +0300
-Subject: [lustre-devel] [PATCH] staging: lustre: Fixed the parenthesis
-In-Reply-To: <CAJvEOfzMu8mdb=yq81+gZNRcazRSSZKwD2q7uW7tLf6kRnz-_Q@mail.gmail.com>
-References: <1455507422-13568-1-git-send-email-shalinmehta85@gmail.com>
-	<497A8642-BC1A-4EF9-92BC-C3FF3C217BA2@intel.com>
-	<CAJvEOfzMu8mdb=yq81+gZNRcazRSSZKwD2q7uW7tLf6kRnz-_Q@mail.gmail.com>
-Message-ID: <20160219102200.GP32153@mwanda>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Sat, 20 Feb 2016 14:34:04 -0800
+Subject: [lustre-devel] [PATCH 43/45] staging/lustre/libcfs: Replace use
+ of printk with pr_<level>
+In-Reply-To: <142FFAE8-57BF-4B57-9959-4A1BFB5463AA@linuxhacker.ru>
+References: <1455601637-3847710-1-git-send-email-green@linuxhacker.ru>
+	<1455601637-3847710-44-git-send-email-green@linuxhacker.ru>
+	<1455602117.4046.45.camel@perches.com>
+	<142FFAE8-57BF-4B57-9959-4A1BFB5463AA@linuxhacker.ru>
+Message-ID: <20160220223404.GA19692@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: shalin mehta <shalinmehta85@gmail.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, "<devel@driverdev.osuosl.org>" <devel@driverdev.osuosl.org>, "<kernel-janitors@lists.osdl.org>" <kernel-janitors@lists.osdl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, "<linux-kernel@vger.kernel.org>" <linux-kernel@vger.kernel.org>, "<lustre-devel@lists.lustre.org>" <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <green@linuxhacker.ru>
+Cc: Joe Perches <joe@perches.com>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Tue, Feb 16, 2016 at 10:39:05PM -0800, shalin mehta wrote:
-> Hello,
+On Tue, Feb 16, 2016 at 11:12:14AM -0500, Oleg Drokin wrote:
 > 
-> Should I send this patch again due the spelling mistake in the patch
-> description?
+> On Feb 16, 2016, at 12:55 AM, Joe Perches wrote:
 > 
+> > On Tue, 2016-02-16 at 00:47 -0500, green at linuxhacker.ru wrote:
+> >> From: Oleg Drokin <green@linuxhacker.ru>
+> >> 
+> >> This pacifies checkpatch amongst other things, also is shorter to write
+> >> and avoiding calls to printk_ratelimit() is also good.
+> > []
+> >> diff --git a/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c b/drivers/staging/lustre/lustre/libcfs/linux/linux-tracefile.c
+> > []
+> >> @@ -244,11 +244,11 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
+> >>  	}
+> >>  
+> >>  	if ((mask & D_CONSOLE) != 0) {
+> >> -		printk("%s%s: %.*s", ptype, prefix, len, buf);
+> >> +		pr_err("%s%s: %.*s", ptype, prefix, len, buf);
+> >>  	} else {
+> >> -		printk("%s%s: %d:%d:(%s:%d:%s()) %.*s", ptype, prefix,
+> >> -		       hdr->ph_pid, hdr->ph_extern_pid, file, hdr->ph_line_num,
+> >> -		       fn, len, buf);
+> >> +		pr_warn("%s%s: %d:%d:(%s:%d:%s()) %.*s", ptype, prefix,
+> >> +			hdr->ph_pid, hdr->ph_extern_pid, file, hdr->ph_line_num,
+> >> +			fn, len, buf);
+> >>  	}
+> >>  }
+> > 
+> > This breaks the currently correct output.
+> 
+> Hm, you are right. Thanks!
+> I guess this patch just needs some redoing.
+> 
+> Greg, if you can skip this patch but still apply the rest of the series, that would be great.
+> I just tested that the whole thing builds and runs fine with this patch omitted.
 
+Ok, now skipped, thanks.
 
-Yes.  And put what Oleg Drokin said about it worked because there were
-no users in the changelog.
-
-regards,
-dan carpenter
+greg k-h
