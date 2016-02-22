@@ -1,152 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 22 Feb 2016 17:29:19 -0500
-Subject: [lustre-devel] [PATCH 18/24] staging: lustre: remove messages from
-	lazy portal on NI shutdown
+Date: Mon, 22 Feb 2016 17:29:25 -0500
+Subject: [lustre-devel] [PATCH 24/24] staging: lustre: Remove LASSERTS from
+	router checker
 In-Reply-To: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
 References: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456180165-1105-19-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456180165-1105-25-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Doug Oucharek <doug.s.oucharek@intel.com>
 
-From: Amir Shehata <amir.shehata@intel.com>
+From: Doug Oucharek <doug.s.oucharek@intel.com>
 
-When shutting down an NI in a busy system, some messages received
-on this NI, might be on the lazy portal.  They would have grabbed
-a ref count on the NI.  Therefore NI will not be removed until
-messages are processed.
+In lnet_router_checker(), there are two LASSERTS.  Neither protects
+us from anything and one of them triggered for a customer crashing
+the system unecessarily.  This patch removes them.
 
-In order to avoid this scenario, when an NI is shutdown go through
-all messages queued on the lazy portal and drop messages for the
-NI being shutdown
-
-Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6040
-Reviewed-on: http://review.whamcloud.com/13836
-Reviewed-by: Isaac Huang <he.huang@intel.com>
-Reviewed-by: Liang Zhen <liang.zhen@intel.com>
+Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7362
+Reviewed-on: http://review.whamcloud.com/17003
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: Matt Ezell <ezellma@ornl.gov>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    1 +
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    6 ++
- drivers/staging/lustre/lnet/lnet/lib-ptl.c         |   54 +++++++++++++-------
- 3 files changed, 43 insertions(+), 18 deletions(-)
+ drivers/staging/lustre/lnet/lnet/router.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 0928bc9..a5f1aec 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -482,6 +482,7 @@ int lnet_dyn_add_ni(lnet_pid_t requested_pid, char *nets,
- 		    __s32 peer_timeout, __s32 peer_cr, __s32 peer_buf_cr,
- 		    __s32 credits);
- int lnet_dyn_del_ni(__u32 net);
-+int lnet_clear_lazy_portal(struct lnet_ni *ni, int portal, char *reason);
+diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+index 5a6086b..5e8b0ba 100644
+--- a/drivers/staging/lustre/lnet/lnet/router.c
++++ b/drivers/staging/lustre/lnet/lnet/router.c
+@@ -1228,8 +1228,6 @@ lnet_router_checker(void *arg)
  
- int lnet_islocalnid(lnet_nid_t nid);
- int lnet_islocalnet(__u32 net);
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 0c7db19..3ecc96a 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1196,10 +1196,16 @@ lnet_shutdown_lndnis(void)
- static void
- lnet_shutdown_lndni(struct lnet_ni *ni)
- {
-+	int i;
-+
- 	lnet_net_lock(LNET_LOCK_EX);
- 	lnet_ni_unlink_locked(ni);
- 	lnet_net_unlock(LNET_LOCK_EX);
+ 	cfs_block_allsigs();
  
-+	/* clear messages for this NI on the lazy portal */
-+	for (i = 0; i < the_lnet.ln_nportals; i++)
-+		lnet_clear_lazy_portal(ni, i, "Shutting down NI");
-+
- 	/* Do peer table cleanup for this ni */
- 	lnet_peer_tables_cleanup(ni);
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-index 0cdeea9..5a9ab87 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-@@ -902,17 +902,8 @@ LNetSetLazyPortal(int portal)
- }
- EXPORT_SYMBOL(LNetSetLazyPortal);
- 
--/**
-- * Turn off the lazy portal attribute. Delayed requests on the portal,
-- * if any, will be all dropped when this function returns.
-- *
-- * \param portal Index of the portal to disable the lazy attribute on.
-- *
-- * \retval 0       On success.
-- * \retval -EINVAL If \a portal is not a valid index.
-- */
- int
--LNetClearLazyPortal(int portal)
-+lnet_clear_lazy_portal(struct lnet_ni *ni, int portal, char *reason)
- {
- 	struct lnet_portal *ptl;
- 	LIST_HEAD(zombies);
-@@ -931,21 +922,48 @@ LNetClearLazyPortal(int portal)
- 		return 0;
+-	LASSERT(the_lnet.ln_rc_state == LNET_RC_STATE_RUNNING);
+-
+ 	while (the_lnet.ln_rc_state == LNET_RC_STATE_RUNNING) {
+ 		__u64 version;
+ 		int cpt;
+@@ -1287,8 +1285,6 @@ rescan:
+ 							 cfs_time_seconds(1));
  	}
  
--	if (the_lnet.ln_shutdown)
--		CWARN("Active lazy portal %d on exit\n", portal);
--	else
--		CDEBUG(D_NET, "clearing portal %d lazy\n", portal);
-+	if (ni) {
-+		struct lnet_msg *msg, *tmp;
+-	LASSERT(the_lnet.ln_rc_state == LNET_RC_STATE_STOPPING);
+-
+ 	lnet_prune_rc_data(1); /* wait for UNLINK */
  
--	/* grab all the blocked messages atomically */
--	list_splice_init(&ptl->ptl_msg_delayed, &zombies);
-+		/* grab all messages which are on the NI passed in */
-+		list_for_each_entry_safe(msg, tmp, &ptl->ptl_msg_delayed,
-+					 msg_list) {
-+			if (msg->msg_rxpeer->lp_ni == ni)
-+				list_move(&msg->msg_list, &zombies);
-+		}
-+	} else {
-+		if (the_lnet.ln_shutdown)
-+			CWARN("Active lazy portal %d on exit\n", portal);
-+		else
-+			CDEBUG(D_NET, "clearing portal %d lazy\n", portal);
-+
-+		/* grab all the blocked messages atomically */
-+		list_splice_init(&ptl->ptl_msg_delayed, &zombies);
- 
--	lnet_ptl_unsetopt(ptl, LNET_PTL_LAZY);
-+		lnet_ptl_unsetopt(ptl, LNET_PTL_LAZY);
-+	}
- 
- 	lnet_ptl_unlock(ptl);
- 	lnet_res_unlock(LNET_LOCK_EX);
- 
--	lnet_drop_delayed_msg_list(&zombies, "Clearing lazy portal attr");
-+	lnet_drop_delayed_msg_list(&zombies, reason);
- 
- 	return 0;
- }
-+
-+/**
-+ * Turn off the lazy portal attribute. Delayed requests on the portal,
-+ * if any, will be all dropped when this function returns.
-+ *
-+ * \param portal Index of the portal to disable the lazy attribute on.
-+ *
-+ * \retval 0       On success.
-+ * \retval -EINVAL If \a portal is not a valid index.
-+ */
-+int
-+LNetClearLazyPortal(int portal)
-+{
-+	return lnet_clear_lazy_portal(NULL, portal,
-+				      "Clearing lazy portal attr");
-+}
- EXPORT_SYMBOL(LNetClearLazyPortal);
+ 	the_lnet.ln_rc_state = LNET_RC_STATE_SHUTDOWN;
 -- 
 1.7.1
