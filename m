@@ -1,149 +1,106 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 22 Feb 2016 17:29:10 -0500
-Subject: [lustre-devel] [PATCH 09/24] staging: lustre: make some lnet
-	functions static
+Date: Mon, 22 Feb 2016 17:29:12 -0500
+Subject: [lustre-devel] [PATCH 11/24] staging: lustre: startup lnet acceptor
+	thread dynamically
 In-Reply-To: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
 References: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456180165-1105-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456180165-1105-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Frank Zago <fzago@cray.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>
 
-From: Frank Zago <fzago@cray.com>
+From: Amir Shehata <amir.shehata@intel.com>
 
-Some functions and variables are only used in their C file, so reduce
-their scope. This reduces the code size, and fixes sparse warnings
-such as:
+With DLC it's possible to start up a system with no NIs that require
+the acceptor thread, and thus it won't start.  Later on the user
+can add an NI that requires the acceptor thread to start, it is
+then necessary to start it up.
 
-warning: symbol 'proc_lnet_routes' was not declared.
-        Should it be static?
-warning: symbol 'proc_lnet_routers' was not declared.
-        Should it be static?
+If the user removes a NI and as a result there are no more
+NIs that require the acceptor thread then it should be stopped.
+This patch adds logic in the dynamically adding and removing NIs
+code to ensure the above logic is implemented.
 
-Some prototypes were removed from C files and added to the proper
-header.
-
-Signed-off-by: Frank Zago <fzago@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5396
-Reviewed-on: http://review.whamcloud.com/12206
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6002
+Reviewed-on: http://review.whamcloud.com/13010
+Reviewed-by: Isaac Huang <he.huang@intel.com>
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    2 ++
- drivers/staging/lustre/lnet/lnet/router_proc.c     |    2 --
- drivers/staging/lustre/lnet/selftest/console.c     |    4 +---
- drivers/staging/lustre/lnet/selftest/framework.c   |   10 ----------
- drivers/staging/lustre/lnet/selftest/module.c      |    4 +---
- drivers/staging/lustre/lnet/selftest/rpc.c         |    2 +-
- 6 files changed, 5 insertions(+), 19 deletions(-)
+ drivers/staging/lustre/lnet/lnet/acceptor.c |   10 ++++++++--
+ drivers/staging/lustre/lnet/lnet/api-ni.c   |   14 ++++++++++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 2ee3d73..0928bc9 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -448,6 +448,8 @@ lnet_ni_t *lnet_nid2ni_locked(lnet_nid_t nid, int cpt);
- lnet_ni_t *lnet_net2ni_locked(__u32 net, int cpt);
- lnet_ni_t *lnet_net2ni(__u32 net);
+diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
+index 07df727..9fe3ff7 100644
+--- a/drivers/staging/lustre/lnet/lnet/acceptor.c
++++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
+@@ -46,7 +46,9 @@ static struct {
+ 	int			pta_shutdown;
+ 	struct socket		*pta_sock;
+ 	struct completion	pta_signal;
+-} lnet_acceptor_state;
++} lnet_acceptor_state = {
++	.pta_shutdown = 1
++};
  
-+extern int portal_rotor;
+ int
+ lnet_acceptor_port(void)
+@@ -444,6 +446,10 @@ lnet_acceptor_start(void)
+ 	long rc2;
+ 	long secure;
+ 
++	/* if acceptor is already running return immediately */
++	if (!lnet_acceptor_state.pta_shutdown)
++		return 0;
 +
- int lnet_init(void);
- void lnet_fini(void);
+ 	LASSERT(!lnet_acceptor_state.pta_sock);
  
-diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-index 5cb87b8..fc643df 100644
---- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-+++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-@@ -800,8 +800,6 @@ static struct lnet_portal_rotors	portal_rotors[] = {
- 	},
- };
- 
--extern int portal_rotor;
--
- static int __proc_lnet_portal_rotor(void *data, int write,
- 				    loff_t pos, void __user *buffer, int nob)
+ 	rc = lnet_acceptor_get_tunables();
+@@ -484,7 +490,7 @@ lnet_acceptor_start(void)
+ void
+ lnet_acceptor_stop(void)
  {
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index badc696..e8ca1bf 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -1693,8 +1693,6 @@ lstcon_new_session_id(lst_sid_t *sid)
- 	sid->ses_stamp = cfs_time_current();
- }
+-	if (!lnet_acceptor_state.pta_sock) /* not running */
++	if (lnet_acceptor_state.pta_shutdown) /* not running */
+ 		return;
  
--extern srpc_service_t lstcon_acceptor_service;
--
- int
- lstcon_session_new(char *name, int key, unsigned feats,
- 		   int timeout, int force, lst_sid_t __user *sid_up)
-@@ -1973,7 +1971,7 @@ out:
- 	return rc;
- }
+ 	lnet_acceptor_state.pta_shutdown = 1;
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index f223d5d..9497ce1 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -1785,6 +1785,16 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, char *nets,
+ 	if (rc)
+ 		goto failed1;
  
--srpc_service_t lstcon_acceptor_service;
-+static srpc_service_t lstcon_acceptor_service;
- static void lstcon_init_acceptor_service(void)
- {
- 	/* initialize selftest console acceptor service table */
-diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
-index 7eca046..3bbc720 100644
---- a/drivers/staging/lustre/lnet/selftest/framework.c
-+++ b/drivers/staging/lustre/lnet/selftest/framework.c
-@@ -1629,16 +1629,6 @@ static srpc_service_t sfw_services[] = {
- 	}
- };
++	if (ni->ni_lnd->lnd_accept) {
++		rc = lnet_acceptor_start();
++		if (rc < 0) {
++			/* shutdown the ni that we just started */
++			CERROR("Failed to start up acceptor thread\n");
++			lnet_shutdown_lndni(ni);
++			goto failed1;
++		}
++	}
++
+ 	lnet_ping_target_update(pinfo, md_handle);
+ 	mutex_unlock(&the_lnet.ln_api_mutex);
  
--extern sfw_test_client_ops_t ping_test_client;
--extern srpc_service_t	ping_test_service;
--extern void ping_init_test_client(void);
--extern void ping_init_test_service(void);
--
--extern sfw_test_client_ops_t brw_test_client;
--extern srpc_service_t	brw_test_service;
--extern void brw_init_test_client(void);
--extern void brw_init_test_service(void);
--
- int
- sfw_startup(void)
- {
-diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
-index c4bf442..cbb7884 100644
---- a/drivers/staging/lustre/lnet/selftest/module.c
-+++ b/drivers/staging/lustre/lnet/selftest/module.c
-@@ -37,6 +37,7 @@
- #define DEBUG_SUBSYSTEM S_LNET
+@@ -1832,6 +1842,10 @@ lnet_dyn_del_ni(__u32 net)
+ 	lnet_ni_decref_locked(ni, 0);
  
- #include "selftest.h"
-+#include "console.h"
- 
- enum {
- 	LST_INIT_NONE = 0,
-@@ -47,9 +48,6 @@ enum {
- 	LST_INIT_CONSOLE
- };
- 
--extern int lstcon_console_init(void);
--extern int lstcon_console_fini(void);
--
- static int lst_init_step = LST_INIT_NONE;
- 
- struct cfs_wi_sched *lst_sched_serial;
-diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
-index 4213198..1b76933 100644
---- a/drivers/staging/lustre/lnet/selftest/rpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/rpc.c
-@@ -1097,7 +1097,7 @@ srpc_client_rpc_expired(void *data)
- 	spin_unlock(&srpc_data.rpc_glock);
- }
- 
--inline void
-+static void
- srpc_add_client_rpc_timer(srpc_client_rpc_t *rpc)
- {
- 	stt_timer_t *timer = &rpc->crpc_timer;
+ 	lnet_shutdown_lndni(ni);
++
++	if (!lnet_count_acceptor_nis())
++		lnet_acceptor_stop();
++
+ 	lnet_ping_target_update(pinfo, md_handle);
+ 	goto out;
+ failed:
 -- 
 1.7.1
