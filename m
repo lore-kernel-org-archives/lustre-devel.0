@@ -1,74 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 22 Feb 2016 17:29:18 -0500
-Subject: [lustre-devel] [PATCH 17/24] staging: lustre: prevent assert on
-	LNet module unload
+Date: Mon, 22 Feb 2016 17:29:21 -0500
+Subject: [lustre-devel] [PATCH 20/24] staging: lustre: avoid race during
+	lnet acceptor thread termination
 In-Reply-To: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
 References: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456180165-1105-18-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456180165-1105-21-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruno Faccini <bruno.faccini@intel.com>
 
-From: Amir Shehata <amir.shehata@intel.com>
+From: Bruno Faccini <bruno.faccini@intel.com>
 
-There is a use case where lnet can be unloaded while there are
-no NIs configured.  Removing lnet in this case will cause
-LNetFini() to be called without a prior call to LNetNIFini().
-This will cause the LASSERT(the_lnet.ln_refcount == 0) to be
-triggered.
+This patch will avoid potential race, around socket sleepers
+wait list, during acceptor thread termination and using
+sk_callback_lock RW-Lock protection.
 
-To deal with this use case when LNet is configured a reference
-count on the module is taken using try_module_get().  This way
-LNet must be unconfigured before it could be removed; therefore
-avoiding the above case.  When LNet is unconfigured module_put()
-is called to return the reference count.
-
-Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6010
-Reviewed-on: http://review.whamcloud.com/13110
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
-Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6476
+Reviewed-on: http://review.whamcloud.com/14503
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- drivers/staging/lustre/lnet/lnet/module.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ drivers/staging/lustre/lnet/lnet/acceptor.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
-index 8f053d7..e12fe37 100644
---- a/drivers/staging/lustre/lnet/lnet/module.c
-+++ b/drivers/staging/lustre/lnet/lnet/module.c
-@@ -53,13 +53,21 @@ lnet_configure(void *arg)
- 	mutex_lock(&lnet_config_mutex);
- 
- 	if (!the_lnet.ln_niinit_self) {
-+		rc = try_module_get(THIS_MODULE);
+diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
+index 8f9876b..3468433 100644
+--- a/drivers/staging/lustre/lnet/lnet/acceptor.c
++++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
+@@ -488,11 +488,17 @@ lnet_acceptor_start(void)
+ void
+ lnet_acceptor_stop(void)
+ {
++	struct sock *sk;
 +
-+		if (rc != 1)
-+			goto out;
+ 	if (lnet_acceptor_state.pta_shutdown) /* not running */
+ 		return;
+ 
+ 	lnet_acceptor_state.pta_shutdown = 1;
+-	wake_up_all(sk_sleep(lnet_acceptor_state.pta_sock->sk));
 +
- 		rc = LNetNIInit(LNET_PID_LUSTRE);
- 		if (rc >= 0) {
- 			the_lnet.ln_niinit_self = 1;
- 			rc = 0;
-+		} else {
-+			module_put(THIS_MODULE);
- 		}
- 	}
++	sk = lnet_acceptor_state.pta_sock->sk;
++
++	/* awake any sleepers using safe method */
++	sk->sk_state_change(sk);
  
-+out:
- 	mutex_unlock(&lnet_config_mutex);
- 	return rc;
- }
-@@ -74,6 +82,7 @@ lnet_unconfigure(void)
- 	if (the_lnet.ln_niinit_self) {
- 		the_lnet.ln_niinit_self = 0;
- 		LNetNIFini();
-+		module_put(THIS_MODULE);
- 	}
- 
- 	mutex_lock(&the_lnet.ln_api_mutex);
+ 	/* block until acceptor signals exit */
+ 	wait_for_completion(&lnet_acceptor_state.pta_signal);
 -- 
 1.7.1
