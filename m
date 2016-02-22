@@ -1,108 +1,57 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 22 Feb 2016 17:29:14 -0500
-Subject: [lustre-devel] [PATCH 13/24] staging: lustre: return -EEXIST if NI
-	is not unique
+Date: Mon, 22 Feb 2016 17:29:20 -0500
+Subject: [lustre-devel] [PATCH 19/24] staging: lustre: remove unnecessary
+	EXPORT_SYMBOL from lnet layer
 In-Reply-To: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
 References: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456180165-1105-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456180165-1105-20-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Frank Zago <fzago@cray.com>
 
-From: Amir Shehata <amir.shehata@intel.com>
+From: Frank Zago <fzago@cray.com>
 
-Return -EEXIST and not -EINVAL when trying to add a
-network interface which is not unique.
+A lot of symbols don't need to be exported at all because they are
+only used in the module they belong to.
 
-Some minor cleanup in api-ni.c
-
-Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5875
-Reviewed-on: http://review.whamcloud.com/13056
-Reviewed-by: Isaac Huang <he.huang@intel.com>
+Signed-off-by: Frank Zago <fzago@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5829
+Reviewed-on: http://review.whamcloud.com/13320
 Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: Isaac Huang <he.huang@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- drivers/staging/lustre/lnet/lnet/api-ni.c |   20 +++++++++-----------
- 1 files changed, 9 insertions(+), 11 deletions(-)
+ drivers/staging/lustre/lnet/lnet/lib-socket.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 62a9e45..ccd7dcd 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1219,7 +1219,7 @@ static int
- lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
- 		   __s32 peer_cr, __s32 peer_buf_cr, __s32 credits)
- {
--	int rc = 0;
-+	int rc = -EINVAL;
- 	int lnd_type;
- 	lnd_t *lnd;
- 	struct lnet_tx_queue *tq;
-@@ -1237,19 +1237,19 @@ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
- 
- 	/* Make sure this new NI is unique. */
- 	lnet_net_lock(LNET_LOCK_EX);
--	if (!lnet_net_unique(LNET_NIDNET(ni->ni_nid), &the_lnet.ln_nis)) {
-+	rc = lnet_net_unique(LNET_NIDNET(ni->ni_nid), &the_lnet.ln_nis);
-+	lnet_net_unlock(LNET_LOCK_EX);
-+	if (!rc) {
- 		if (lnd_type == LOLND) {
--			lnet_net_unlock(LNET_LOCK_EX);
- 			lnet_ni_free(ni);
- 			return 0;
- 		}
--		lnet_net_unlock(LNET_LOCK_EX);
- 
- 		CERROR("Net %s is not unique\n",
- 		       libcfs_net2str(LNET_NIDNET(ni->ni_nid)));
-+		rc = -EEXIST;
- 		goto failed0;
- 	}
--	lnet_net_unlock(LNET_LOCK_EX);
- 
- 	mutex_lock(&the_lnet.ln_lnd_mutex);
- 	lnd = lnet_find_lnd_by_type(lnd_type);
-@@ -1265,6 +1265,7 @@ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
- 			CERROR("Can't load LND %s, module %s, rc=%d\n",
- 			       libcfs_lnd2str(lnd_type),
- 			       libcfs_lnd2modname(lnd_type), rc);
-+			rc = -EINVAL;
- 			goto failed0;
- 		}
- 	}
-@@ -1354,7 +1355,7 @@ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
- 	return 0;
- failed0:
- 	lnet_ni_free(ni);
--	return -EINVAL;
-+	return rc;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+index 53dd0bd..88905d5 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+@@ -514,7 +514,6 @@ lnet_sock_listen(struct socket **sockp, __u32 local_ip, int local_port,
+ 	sock_release(*sockp);
+ 	return rc;
  }
+-EXPORT_SYMBOL(lnet_sock_listen);
  
- static int
-@@ -1503,7 +1504,7 @@ int
- LNetNIInit(lnet_pid_t requested_pid)
- {
- 	int im_a_router = 0;
--	int rc, rc2;
-+	int rc;
- 	int ni_count;
- 	lnet_ping_info_t *pinfo;
- 	lnet_handle_md_t md_handle;
-@@ -1592,10 +1593,7 @@ LNetNIInit(lnet_pid_t requested_pid)
- 	return 0;
+ int
+ lnet_sock_accept(struct socket **newsockp, struct socket *sock)
+@@ -558,7 +557,6 @@ failed:
+ 	sock_release(newsock);
+ 	return rc;
+ }
+-EXPORT_SYMBOL(lnet_sock_accept);
  
- err_stop_ping:
--	lnet_ping_md_unlink(pinfo, &md_handle);
--	lnet_ping_info_free(pinfo);
--	rc2 = LNetEQFree(the_lnet.ln_ping_target_eq);
--	LASSERT(!rc2);
-+	lnet_ping_target_fini();
- err_acceptor_stop:
- 	the_lnet.ln_refcount = 0;
- 	lnet_acceptor_stop();
+ int
+ lnet_sock_connect(struct socket **sockp, int *fatal, __u32 local_ip,
+@@ -596,4 +594,3 @@ lnet_sock_connect(struct socket **sockp, int *fatal, __u32 local_ip,
+ 	sock_release(*sockp);
+ 	return rc;
+ }
+-EXPORT_SYMBOL(lnet_sock_connect);
 -- 
 1.7.1
