@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 22 Feb 2016 17:29:09 -0500
-Subject: [lustre-devel] [PATCH 08/24] staging: lustre: return appropriate
-	errno when adding route
+Date: Mon, 22 Feb 2016 17:29:13 -0500
+Subject: [lustre-devel] [PATCH 12/24] staging: lustre: reject invalid net
+	configuration for lnet
 In-Reply-To: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
 References: <1456180165-1105-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456180165-1105-9-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456180165-1105-13-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,90 +14,65 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-When adding route it ignored specific scenarios, namely:
-1. route already exists
-2. route is on a local net
-3. route is unreacheable
-
-This patch returns the appropriate return codes from the lower level
-function lnet_add_route(), and then ignores the above case from the
-calling function, lnet_parse_route().  This is needed so we don't
-halt processing routes in the module parameters.
-
-However, we can now add routes dynamically, and it should be returned
-to the user whether adding the requested route succeeded or failed.
-
-In userspace it is determined whether to continue adding routes or to
-halt processing.  Currently "lnetctl import < config" continues
-adding the rest of the configuration and reports at the end which
-operations passed and which ones failed.
+Currently if there exists a route that goes over a
+remote net and then this net is added dynamically as
+a local net, then traffic stops because the code in
+lnet_send() determines that the destination nid
+can be reached from another local_ni, but the src_nid
+is still stuck on the earlier NI, because the src_nid
+is stored in the ptlrpc layer and is not updated
+when a local NI is configured.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6045
-Reviewed-on: http://review.whamcloud.com/13116
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
-Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5874
+Reviewed-on: http://review.whamcloud.com/12912
 Reviewed-by: Isaac Huang <he.huang@intel.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- drivers/staging/lustre/lnet/lnet/config.c |    2 +-
- drivers/staging/lustre/lnet/lnet/router.c |   11 +++++++----
- 2 files changed, 8 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lnet/lnet/api-ni.c |   18 +++++++++++++++++-
+ 1 files changed, 17 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index c04a0ef..8c80625 100644
---- a/drivers/staging/lustre/lnet/lnet/config.c
-+++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -769,7 +769,7 @@ lnet_parse_route(char *str, int *im_a_router)
- 			}
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index 9497ce1..62a9e45 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -1756,6 +1756,7 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, char *nets,
+ 	lnet_handle_md_t md_handle;
+ 	struct lnet_ni *ni;
+ 	struct list_head net_head;
++	lnet_remotenet_t *rnet;
+ 	int rc;
  
- 			rc = lnet_add_route(net, hops, nid, priority);
--			if (rc) {
-+			if (rc && rc != -EEXIST && rc != -EHOSTUNREACH) {
- 				CERROR("Can't create route to %s via %s\n",
- 				       libcfs_net2str(net),
- 				       libcfs_nid2str(nid));
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index d748931..511e446 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -317,7 +317,7 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
- 		return -EINVAL;
+ 	INIT_LIST_HEAD(&net_head);
+@@ -1772,12 +1773,27 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, char *nets,
+ 		goto failed0;
+ 	}
  
- 	if (lnet_islocalnet(net))	       /* it's a local network */
--		return 0;		       /* ignore the route entry */
-+		return -EEXIST;
- 
- 	/* Assume net, route, all new */
- 	LIBCFS_ALLOC(route, sizeof(*route));
-@@ -348,7 +348,7 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
- 		LIBCFS_FREE(rnet, sizeof(*rnet));
- 
- 		if (rc == -EHOSTUNREACH) /* gateway is not on a local net */
--			return 0;	/* ignore the route entry */
-+			return rc;	/* ignore the route entry */
- 		CERROR("Error %d creating route %s %d %s\n", rc,
- 		       libcfs_net2str(net), hops,
- 		       libcfs_nid2str(gateway));
-@@ -395,14 +395,17 @@ lnet_add_route(__u32 net, unsigned int hops, lnet_nid_t gateway,
- 	/* -1 for notify or !add_route */
- 	lnet_peer_decref_locked(route->lr_gateway);
- 	lnet_net_unlock(LNET_LOCK_EX);
-+	rc = 0;
- 
--	if (!add_route)
-+	if (!add_route) {
-+		rc = -EEXIST;
- 		LIBCFS_FREE(route, sizeof(*route));
++	ni = list_entry(net_head.next, struct lnet_ni, ni_list);
++
++	lnet_net_lock(LNET_LOCK_EX);
++	rnet = lnet_find_net_locked(LNET_NIDNET(ni->ni_nid));
++	lnet_net_unlock(LNET_LOCK_EX);
++	/*
++	 * make sure that the net added doesn't invalidate the current
++	 * configuration LNet is keeping
++	 */
++	if (rnet) {
++		CERROR("Adding net %s will invalidate routing configuration\n",
++		       nets);
++		rc = -EUSERS;
++		goto failed0;
 +	}
++
+ 	rc = lnet_ping_info_setup(&pinfo, &md_handle, 1 + lnet_get_ni_count(),
+ 				  false);
+ 	if (rc)
+ 		goto failed0;
  
- 	if (rnet != rnet2)
- 		LIBCFS_FREE(rnet, sizeof(*rnet));
+-	ni = list_entry(net_head.next, struct lnet_ni, ni_list);
+ 	list_del_init(&ni->ni_list);
  
--	return 0;
-+	return rc;
- }
- 
- int
+ 	rc = lnet_startup_lndni(ni, peer_timeout, peer_cr,
 -- 
 1.7.1
