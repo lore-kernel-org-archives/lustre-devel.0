@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:26 -0500
-Subject: [lustre-devel] [PATCH 48/56] staging/lustre/lmv: Adjust comments to
+Date: Mon, 22 Feb 2016 21:54:29 -0500
+Subject: [lustre-devel] [PATCH 51/56] staging/lustre/mgc: Adjust comments to
 	better conform to coding style
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-49-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-52-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,183 +15,234 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 From: Oleg Drokin <green@linuxhacker.ru>
 
 This patch fixes "Block comments use a trailing */ on a separate line"
-warnings from checkpatch.
+warnings from checkpatch
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/lmv/lmv_fld.c    |  3 ++-
- drivers/staging/lustre/lustre/lmv/lmv_intent.c |  9 ++++---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c    | 37 +++++++++++++++++---------
- 3 files changed, 32 insertions(+), 17 deletions(-)
+ drivers/staging/lustre/lustre/mgc/mgc_request.c | 71 ++++++++++++++++---------
+ 1 file changed, 46 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_fld.c b/drivers/staging/lustre/lustre/lmv/lmv_fld.c
-index ee23592..378691b 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_fld.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_fld.c
-@@ -58,7 +58,8 @@ int lmv_fld_lookup(struct lmv_obd *lmv,
- 	int rc;
- 
- 	/* FIXME: Currently ZFS still use local seq for ROOT unfortunately, and
--	 * this fid_is_local check should be removed once LU-2240 is fixed */
-+	 * this fid_is_local check should be removed once LU-2240 is fixed
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index 9764e57..6fc8225 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -90,7 +90,8 @@ static int mgc_name2resid(char *name, int len, struct ldlm_res_id *res_id,
+ int mgc_fsname2resid(char *fsname, struct ldlm_res_id *res_id, int type)
+ {
+ 	/* fsname is at most 8 chars long, maybe contain "-".
+-	 * e.g. "lustre", "SUN-000" */
++	 * e.g. "lustre", "SUN-000"
 +	 */
- 	LASSERTF((fid_seq_in_fldb(fid_seq(fid)) ||
- 		  fid_seq_is_local_file(fid_seq(fid))) &&
- 		 fid_is_sane(fid), DFID" is insane!\n", PFID(fid));
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_intent.c b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-index cb1ed42..259b211 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-@@ -110,11 +110,13 @@ static int lmv_intent_remote(struct obd_export *exp, void *lmm,
- 	if (parent_fid) {
- 		/* The parent fid is only for remote open to
- 		 * check whether the open is from OBF,
--		 * see mdt_cross_open */
-+		 * see mdt_cross_open
-+		 */
- 		LASSERT(it->it_op & IT_OPEN);
- 		op_data->op_fid2 = *parent_fid;
- 		/* Add object FID to op_fid3, in case it needs to check stale
--		 * (M_CHECK_STALE), see mdc_finish_intent_lock */
-+		 * (M_CHECK_STALE), see mdc_finish_intent_lock
-+		 */
- 		op_data->op_fid3 = body->fid1;
- 	}
- 
-@@ -173,7 +175,8 @@ static int lmv_intent_open(struct obd_export *exp, struct md_op_data *op_data,
- 		return PTR_ERR(tgt);
- 
- 	/* If it is ready to open the file by FID, do not need
--	 * allocate FID at all, otherwise it will confuse MDT */
-+	 * allocate FID at all, otherwise it will confuse MDT
-+	 */
- 	if ((it->it_op & IT_CREAT) &&
- 	    !(it->it_flags & MDS_OPEN_BY_FID)) {
- 		/*
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index eb1c85f..67746c9 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -679,7 +679,8 @@ repeat_fid2path:
- 		goto out_fid2path;
- 
- 	/* If remote_gf != NULL, it means just building the
--	 * path on the remote MDT, copy this path segment to gf */
-+	 * path on the remote MDT, copy this path segment to gf
-+	 */
- 	if (remote_gf) {
- 		struct getinfo_fid2path *ori_gf;
- 		char *ptr;
-@@ -797,7 +798,8 @@ static int lmv_hsm_ct_unregister(struct lmv_obd *lmv, unsigned int cmd, int len,
- 	/* unregister request (call from llapi_hsm_copytool_fini) */
- 	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
- 		/* best effort: try to clean as much as possible
--		 * (continue on error) */
-+		 * (continue on error)
-+		 */
- 		obd_iocontrol(cmd, lmv->tgts[i]->ltd_exp, len, lk, uarg);
- 	}
- 
-@@ -821,7 +823,8 @@ static int lmv_hsm_ct_register(struct lmv_obd *lmv, unsigned int cmd, int len,
- 
- 	/* All or nothing: try to register to all MDS.
- 	 * In case of failure, unregister from previous MDS,
--	 * except if it because of inactive target. */
-+	 * except if it because of inactive target.
-+	 */
- 	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
- 		err = obd_iocontrol(cmd, lmv->tgts[i]->ltd_exp,
- 				   len, lk, uarg);
-@@ -841,8 +844,8 @@ static int lmv_hsm_ct_register(struct lmv_obd *lmv, unsigned int cmd, int len,
- 				return rc;
- 			}
- 			/* else: transient error.
--			 * kuc will register to the missing MDT
--			 * when it is back */
-+			 * kuc will register to the missing MDT when it is back
-+			 */
- 		} else {
- 			any_set = true;
- 		}
-@@ -1028,7 +1031,8 @@ static int lmv_iocontrol(unsigned int cmd, struct obd_export *exp,
- 
- 		/* if the request is about a single fid
- 		 * or if there is a single MDS, no need to split
--		 * the request. */
-+		 * the request.
-+		 */
- 		if (reqcount == 1 || count == 1) {
- 			tgt = lmv_find_target(lmv,
- 					      &hur->hur_user_item[0].hui_fid);
-@@ -1104,7 +1108,8 @@ static int lmv_iocontrol(unsigned int cmd, struct obd_export *exp,
- 			if (!lmv->tgts[i] || !lmv->tgts[i]->ltd_exp)
- 				continue;
- 			/* ll_umount_begin() sets force flag but for lmv, not
--			 * mdc. Let's pass it through */
-+			 * mdc. Let's pass it through
-+			 */
- 			mdc_obd = class_exp2obd(lmv->tgts[i]->ltd_exp);
- 			mdc_obd->obd_force = obddev->obd_force;
- 			err = obd_iocontrol(cmd, lmv->tgts[i]->ltd_exp, len,
-@@ -1211,7 +1216,8 @@ static int lmv_placement_policy(struct obd_device *obd,
- 	}
- 
- 	/* Allocate new fid on target according to operation type and parent
--	 * home mds. */
-+	 * home mds.
-+	 */
- 	*mds = op_data->op_mds;
- 	return 0;
+ 	return mgc_name2resid(fsname, strlen(fsname), res_id, type);
  }
-@@ -1363,7 +1369,8 @@ static int lmv_process_config(struct obd_device *obd, u32 len, void *buf)
- 	switch (lcfg->lcfg_command) {
- 	case LCFG_ADD_MDC:
- 		/* modify_mdc_tgts add 0:lustre-clilmv  1:lustre-MDT0000_UUID
--		 * 2:0  3:1  4:lustre-MDT0000-mdc_UUID */
-+		 * 2:0  3:1  4:lustre-MDT0000-mdc_UUID
-+		 */
- 		if (LUSTRE_CFG_BUFLEN(lcfg, 1) > sizeof(obd_uuid.uuid)) {
- 			rc = -EINVAL;
- 			goto out;
-@@ -1427,7 +1434,8 @@ static int lmv_statfs(const struct lu_env *env, struct obd_export *exp,
- 			 * i.e. mount does not need the merged osfs
- 			 * from all of MDT.
- 			 * And also clients can be mounted as long as
--			 * MDT0 is in service*/
-+			 * MDT0 is in service
-+			 */
- 			if (flags & OBD_STATFS_FOR_MDT0)
- 				goto out_free_temp;
- 		} else {
-@@ -2122,7 +2130,8 @@ static void lmv_adjust_dirpages(struct page **pages, int ncfspgs, int nlupgs)
- 				break;
+ EXPORT_SYMBOL(mgc_fsname2resid);
+@@ -102,7 +103,8 @@ static int mgc_logname2resid(char *logname, struct ldlm_res_id *res_id, int type
  
- 			/* Enlarge the end entry lde_reclen from 0 to
--			 * first entry of next lu_dirpage. */
-+			 * first entry of next lu_dirpage.
-+			 */
- 			LASSERT(le16_to_cpu(end_dirent->lde_reclen) == 0);
- 			end_dirent->lde_reclen =
- 				cpu_to_le16((char *)(dp->ldp_entries) -
-@@ -2260,7 +2269,8 @@ retry:
- 	 * 4. Then A will resend unlink RPC to MDT0. (retry 2nd times).
- 	 *
- 	 * In theory, it might try unlimited time here, but it should
--	 * be very rare case.  */
-+	 * be very rare case.
+ 	/* logname consists of "fsname-nodetype".
+ 	 * e.g. "lustre-MDT0001", "SUN-000-client"
+-	 * there is an exception: llog "params" */
++	 * there is an exception: llog "params"
 +	 */
- 	op_data->op_fid2 = body->fid1;
- 	ptlrpc_req_finished(*request);
- 	*request = NULL;
-@@ -2275,7 +2285,8 @@ static int lmv_precleanup(struct obd_device *obd, enum obd_cleanup_stage stage)
- 	switch (stage) {
- 	case OBD_CLEANUP_EARLY:
- 		/* XXX: here should be calling obd_precleanup() down to
--		 * stack. */
-+		 * stack.
+ 	name_end = strrchr(logname, '-');
+ 	if (!name_end)
+ 		len = strlen(logname);
+@@ -125,7 +127,8 @@ static int config_log_get(struct config_llog_data *cld)
+ }
+ 
+ /* Drop a reference to a config log.  When no longer referenced,
+-   we can free the config log data */
++ * we can free the config log data
++ */
+ static void config_log_put(struct config_llog_data *cld)
+ {
+ 	CDEBUG(D_INFO, "log %s refs %d\n", cld->cld_logname,
+@@ -252,7 +255,8 @@ static struct config_llog_data *config_recover_log_add(struct obd_device *obd,
+ 	char logname[32];
+ 
+ 	/* we have to use different llog for clients and mdts for cmd
+-	 * where only clients are notified if one of cmd server restarts */
++	 * where only clients are notified if one of cmd server restarts
++	 */
+ 	LASSERT(strlen(fsname) < sizeof(logname) / 2);
+ 	strcpy(logname, fsname);
+ 	LASSERT(lcfg.cfg_instance);
+@@ -483,8 +487,9 @@ static void do_requeue(struct config_llog_data *cld)
+ 	LASSERT(atomic_read(&cld->cld_refcount) > 0);
+ 
+ 	/* Do not run mgc_process_log on a disconnected export or an
+-	   export which is being disconnected. Take the client
+-	   semaphore to make the check non-racy. */
++	 * export which is being disconnected. Take the client
++	 * semaphore to make the check non-racy.
++	 */
+ 	down_read(&cld->cld_mgcexp->exp_obd->u.cli.cl_sem);
+ 	if (cld->cld_mgcexp->exp_obd->u.cli.cl_conn_count != 0) {
+ 		CDEBUG(D_MGC, "updating log %s\n", cld->cld_logname);
+@@ -529,8 +534,9 @@ static int mgc_requeue_thread(void *data)
+ 		}
+ 
+ 		/* Always wait a few seconds to allow the server who
+-		   caused the lock revocation to finish its setup, plus some
+-		   random so everyone doesn't try to reconnect at once. */
++		 * caused the lock revocation to finish its setup, plus some
++		 * random so everyone doesn't try to reconnect at once.
 +		 */
- 		break;
- 	case OBD_CLEANUP_EXPORTS:
- 		fld_client_debugfs_fini(&lmv->lmv_fld);
+ 		to = MGC_TIMEOUT_MIN_SECONDS * HZ;
+ 		to += rand * HZ / 100; /* rand is centi-seconds */
+ 		lwi = LWI_TIMEOUT(to, NULL, NULL);
+@@ -559,7 +565,8 @@ static int mgc_requeue_thread(void *data)
+ 			LASSERT(atomic_read(&cld->cld_refcount) > 0);
+ 
+ 			/* Whether we enqueued again or not in mgc_process_log,
+-			 * we're done with the ref from the old enqueue */
++			 * we're done with the ref from the old enqueue
++			 */
+ 			if (cld_prev)
+ 				config_log_put(cld_prev);
+ 			cld_prev = cld;
+@@ -575,7 +582,8 @@ static int mgc_requeue_thread(void *data)
+ 			config_log_put(cld_prev);
+ 
+ 		/* break after scanning the list so that we can drop
+-		 * refcount to losing lock clds */
++		 * refcount to losing lock clds
++		 */
+ 		if (unlikely(stopped)) {
+ 			spin_lock(&config_list_lock);
+ 			break;
+@@ -598,7 +606,8 @@ static int mgc_requeue_thread(void *data)
+ }
+ 
+ /* Add a cld to the list to requeue.  Start the requeue thread if needed.
+-   We are responsible for dropping the config log reference from here on out. */
++ * We are responsible for dropping the config log reference from here on out.
++ */
+ static void mgc_requeue_add(struct config_llog_data *cld)
+ {
+ 	CDEBUG(D_INFO, "log %s: requeue (r=%d sp=%d st=%x)\n",
+@@ -635,7 +644,8 @@ static int mgc_llog_init(const struct lu_env *env, struct obd_device *obd)
+ 	int			 rc;
+ 
+ 	/* setup only remote ctxt, the local disk context is switched per each
+-	 * filesystem during mgc_fs_setup() */
++	 * filesystem during mgc_fs_setup()
++	 */
+ 	rc = llog_setup(env, obd, &obd->obd_olg, LLOG_CONFIG_REPL_CTXT, obd,
+ 			&llog_client_ops);
+ 	if (rc)
+@@ -697,7 +707,8 @@ static int mgc_precleanup(struct obd_device *obd, enum obd_cleanup_stage stage)
+ static int mgc_cleanup(struct obd_device *obd)
+ {
+ 	/* COMPAT_146 - old config logs may have added profiles we don't
+-	   know about */
++	 * know about
++	 */
+ 	if (obd->obd_type->typ_refcnt <= 1)
+ 		/* Only for the last mgc */
+ 		class_del_profiles();
+@@ -794,7 +805,8 @@ static int mgc_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
+ 			break;
+ 		}
+ 		/* Make sure not to re-enqueue when the mgc is stopping
+-		   (we get called from client_disconnect_export) */
++		 * (we get called from client_disconnect_export)
++		 */
+ 		if (!lock->l_conn_export ||
+ 		    !lock->l_conn_export->exp_obd->u.cli.cl_conn_count) {
+ 			CDEBUG(D_MGC, "log %.8s: disconnecting, won't requeue\n",
+@@ -816,7 +828,8 @@ static int mgc_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
+ 
+ /* Not sure where this should go... */
+ /* This is the timeout value for MGS_CONNECT request plus a ping interval, such
+- * that we can have a chance to try the secondary MGS if any. */
++ * that we can have a chance to try the secondary MGS if any.
++ */
+ #define  MGC_ENQUEUE_LIMIT (INITIAL_CONNECT_TIMEOUT + (AT_OFF ? 0 : at_min) \
+ 				+ PING_INTERVAL)
+ #define  MGC_TARGET_REG_LIMIT 10
+@@ -880,7 +893,8 @@ static int mgc_enqueue(struct obd_export *exp, struct lov_stripe_md *lsm,
+ 	       cld->cld_resid.name[0]);
+ 
+ 	/* We need a callback for every lockholder, so don't try to
+-	   ldlm_lock_match (see rev 1.1.2.11.2.47) */
++	 * ldlm_lock_match (see rev 1.1.2.11.2.47)
++	 */
+ 	req = ptlrpc_request_alloc_pack(class_exp2cliimp(exp),
+ 					&RQF_LDLM_ENQUEUE, LUSTRE_DLM_VERSION,
+ 					LDLM_ENQUEUE);
+@@ -895,7 +909,8 @@ static int mgc_enqueue(struct obd_export *exp, struct lov_stripe_md *lsm,
+ 	rc = ldlm_cli_enqueue(exp, &req, &einfo, &cld->cld_resid, NULL, flags,
+ 			      NULL, 0, LVB_T_NONE, lockh, 0);
+ 	/* A failed enqueue should still call the mgc_blocking_ast,
+-	   where it will be requeued if needed ("grant failed"). */
++	 * where it will be requeued if needed ("grant failed").
++	 */
+ 	ptlrpc_req_finished(req);
+ 	return rc;
+ }
+@@ -1373,7 +1388,8 @@ again:
+ 	}
+ 
+ 	/* always update the index even though it might have errors with
+-	 * handling the recover logs */
++	 * handling the recover logs
++	 */
+ 	cfg->cfg_last_idx = res->mcr_offset;
+ 	eof = res->mcr_offset == res->mcr_size;
+ 
+@@ -1400,7 +1416,8 @@ again:
+ 	mne_swab = !!ptlrpc_rep_need_swab(req);
+ #if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(3, 2, 50, 0)
+ 	/* This import flag means the server did an extra swab of IR MNE
+-	 * records (fixed in LU-1252), reverse it here if needed. LU-1644 */
++	 * records (fixed in LU-1252), reverse it here if needed. LU-1644
++	 */
+ 	if (unlikely(req->rq_import->imp_need_mne_swab))
+ 		mne_swab = !mne_swab;
+ #else
+@@ -1489,7 +1506,8 @@ static int mgc_process_cfg_log(struct obd_device *mgc,
+ 
+ 	/* logname and instance info should be the same, so use our
+ 	 * copy of the instance for the update.  The cfg_last_idx will
+-	 * be updated here. */
++	 * be updated here.
++	 */
+ 	rc = class_config_parse_llog(env, ctxt, cld->cld_logname,
+ 				     &cld->cld_cfg);
+ 
+@@ -1529,9 +1547,10 @@ int mgc_process_log(struct obd_device *mgc, struct config_llog_data *cld)
+ 	LASSERT(cld);
+ 
+ 	/* I don't want multiple processes running process_log at once --
+-	   sounds like badness.  It actually might be fine, as long as
+-	   we're not trying to update from the same log
+-	   simultaneously (in which case we should use a per-log sem.) */
++	 * sounds like badness.  It actually might be fine, as long as
++	 * we're not trying to update from the same log
++	 * simultaneously (in which case we should use a per-log sem.)
++	 */
+ 	mutex_lock(&cld->cld_lock);
+ 	if (cld->cld_stopping) {
+ 		mutex_unlock(&cld->cld_lock);
+@@ -1556,7 +1575,8 @@ int mgc_process_log(struct obd_device *mgc, struct config_llog_data *cld)
+ 		CDEBUG(D_MGC, "Can't get cfg lock: %d\n", rcl);
+ 
+ 		/* mark cld_lostlock so that it will requeue
+-		 * after MGC becomes available. */
++		 * after MGC becomes available.
++		 */
+ 		cld->cld_lostlock = 1;
+ 		/* Get extra reference, it will be put in requeue thread */
+ 		config_log_get(cld);
+@@ -1642,7 +1662,8 @@ static int mgc_process_config(struct obd_device *obd, u32 len, void *buf)
+ 
+ 		/* COMPAT_146 */
+ 		/* FIXME only set this for old logs!  Right now this forces
+-		   us to always skip the "inside markers" check */
++		 * us to always skip the "inside markers" check
++		 */
+ 		cld->cld_cfg.cfg_flags |= CFG_F_COMPAT146;
+ 
+ 		rc = mgc_process_log(obd, cld);
 -- 
 2.1.0
