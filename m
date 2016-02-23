@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:21 -0500
-Subject: [lustre-devel] [PATCH 43/56] staging/lustre/fld: Adjust comments to
-	better conform to coding style
+Date: Mon, 22 Feb 2016 21:53:59 -0500
+Subject: [lustre-devel] [PATCH 21/56] staging/lustre: Get rid of
+	ldlm_ns_type_t typedef
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-44-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-22-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,137 +14,80 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This patch fixes "Block comments use a trailing */ on a separate line"
-warnings from checkpatch.
+Replace it with enum ldlm_ns_type
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/fld/fld_cache.c    |  9 ++++++---
- drivers/staging/lustre/lustre/fld/fld_internal.h | 24 ++++++++----------------
- drivers/staging/lustre/lustre/fld/fld_request.c  |  9 ++++++---
- 3 files changed, 20 insertions(+), 22 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h | 6 +++---
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      | 2 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/fld/fld_cache.c b/drivers/staging/lustre/lustre/fld/fld_cache.c
-index a7026a9..2b09b76 100644
---- a/drivers/staging/lustre/lustre/fld/fld_cache.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_cache.c
-@@ -183,7 +183,8 @@ restart_fixup:
- 			}
- 
- 			/* we could have overlap over next
--			 * range too. better restart. */
-+			 * range too. better restart.
-+			 */
- 			goto restart_fixup;
- 		}
- 
-@@ -302,7 +303,8 @@ static void fld_cache_overlap_handle(struct fld_cache *cache,
- 	const u32 mdt = range->lsr_index;
- 
- 	/* this is overlap case, these case are checking overlapping with
--	 * prev range only. fixup will handle overlapping with next range. */
-+	 * prev range only. fixup will handle overlapping with next range.
-+	 */
- 
- 	if (f_curr->fce_range.lsr_index == mdt) {
- 		f_curr->fce_range.lsr_start = min(f_curr->fce_range.lsr_start,
-@@ -317,7 +319,8 @@ static void fld_cache_overlap_handle(struct fld_cache *cache,
- 	} else if (new_start <= f_curr->fce_range.lsr_start &&
- 			f_curr->fce_range.lsr_end <= new_end) {
- 		/* case 1: new range completely overshadowed existing range.
--		 *	 e.g. whole range migrated. update fld cache entry */
-+		 *	 e.g. whole range migrated. update fld cache entry
-+		 */
- 
- 		f_curr->fce_range = *range;
- 		kfree(f_new);
-diff --git a/drivers/staging/lustre/lustre/fld/fld_internal.h b/drivers/staging/lustre/lustre/fld/fld_internal.h
-index ee36d6b..e8a3caf 100644
---- a/drivers/staging/lustre/lustre/fld/fld_internal.h
-+++ b/drivers/staging/lustre/lustre/fld/fld_internal.h
-@@ -67,8 +67,7 @@ struct lu_fld_hash {
- struct fld_cache_entry {
- 	struct list_head	       fce_lru;
- 	struct list_head	       fce_list;
--	/**
--	 * fld cache entries are sorted on range->lsr_start field. */
-+	/** fld cache entries are sorted on range->lsr_start field. */
- 	struct lu_seq_range      fce_range;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 0f229b9..ab40bc7 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -318,7 +318,7 @@ enum {
+ 	LDLM_NSS_LAST
  };
  
-@@ -79,32 +78,25 @@ struct fld_cache {
- 	 */
- 	rwlock_t		 fci_lock;
+-typedef enum {
++enum ldlm_ns_type {
+ 	/** invalid type */
+ 	LDLM_NS_TYPE_UNKNOWN    = 0,
+ 	/** mdc namespace */
+@@ -333,7 +333,7 @@ typedef enum {
+ 	LDLM_NS_TYPE_MGC,
+ 	/** mgs namespace */
+ 	LDLM_NS_TYPE_MGT,
+-} ldlm_ns_type_t;
++};
  
--	/**
--	 * Cache shrink threshold */
-+	/** Cache shrink threshold */
- 	int		      fci_threshold;
- 
--	/**
--	 * Preferred number of cached entries */
-+	/** Preferred number of cached entries */
- 	int		      fci_cache_size;
- 
--	/**
--	 * Current number of cached entries. Protected by \a fci_lock */
-+	/** Current number of cached entries. Protected by \a fci_lock */
- 	int		      fci_cache_count;
- 
--	/**
--	 * LRU list fld entries. */
-+	/** LRU list fld entries. */
- 	struct list_head	       fci_lru;
- 
--	/**
--	 * sorted fld entries. */
-+	/** sorted fld entries. */
- 	struct list_head	       fci_entries_head;
- 
--	/**
--	 * Cache statistics. */
-+	/** Cache statistics. */
- 	struct fld_stats	 fci_stat;
- 
--	/**
--	 * Cache name used for debug and messages. */
-+	/** Cache name used for debug and messages. */
- 	char		     fci_name[LUSTRE_MDT_MAXNAMELEN];
- 	unsigned int		 fci_no_shrink:1;
- };
-diff --git a/drivers/staging/lustre/lustre/fld/fld_request.c b/drivers/staging/lustre/lustre/fld/fld_request.c
-index 0f0fbe4..b50a57b 100644
---- a/drivers/staging/lustre/lustre/fld/fld_request.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_request.c
-@@ -58,7 +58,8 @@
- #include "fld_internal.h"
- 
- /* TODO: these 3 functions are copies of flow-control code from mdc_lib.c
-- * It should be common thing. The same about mdc RPC lock */
-+ * It should be common thing. The same about mdc RPC lock
-+ */
- static int fld_req_avail(struct client_obd *cli, struct mdc_cache_waiter *mcw)
- {
+ /**
+  * LDLM Namespace.
+@@ -1177,7 +1177,7 @@ void ldlm_unlink_lock_skiplist(struct ldlm_lock *req);
+ struct ldlm_namespace *
+ ldlm_namespace_new(struct obd_device *obd, char *name,
+ 		   ldlm_side_t client, enum ldlm_appetite apt,
+-		   ldlm_ns_type_t ns_type);
++		   enum ldlm_ns_type ns_type);
+ int ldlm_namespace_cleanup(struct ldlm_namespace *ns, __u64 flags);
+ void ldlm_namespace_get(struct ldlm_namespace *ns);
+ void ldlm_namespace_put(struct ldlm_namespace *ns);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+index c22370b..d0ad28d 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+@@ -241,7 +241,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
+ 	struct obd_uuid server_uuid;
+ 	int rq_portal, rp_portal, connect_op;
+ 	char *name = obddev->obd_type->typ_name;
+-	ldlm_ns_type_t ns_type = LDLM_NS_TYPE_UNKNOWN;
++	enum ldlm_ns_type ns_type = LDLM_NS_TYPE_UNKNOWN;
  	int rc;
-@@ -124,7 +125,8 @@ fld_rrb_scan(struct lu_client_fld *fld, u64 seq)
- 	 * it should go to index 0 directly, instead of calculating
- 	 * hash again, and also if other MDTs is not being connected,
- 	 * the fld lookup requests(for seq on MDT0) should not be
--	 * blocked because of other MDTs */
-+	 * blocked because of other MDTs
-+	 */
- 	if (fid_seq_is_norm(seq))
- 		hash = fld_rrb_hash(fld, seq);
- 	else
-@@ -139,7 +141,8 @@ again:
- 	if (hash != 0) {
- 		/* It is possible the remote target(MDT) are not connected to
- 		 * with client yet, so we will refer this to MDT0, which should
--		 * be connected during mount */
-+		 * be connected during mount
-+		 */
- 		hash = 0;
- 		goto again;
- 	}
+ 
+ 	/* In a more perfect world, we would hang a ptlrpc_client off of
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 582cb21..9ab4452 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -554,7 +554,7 @@ static struct cfs_hash_ops ldlm_ns_fid_hash_ops = {
+ };
+ 
+ struct ldlm_ns_hash_def {
+-	ldlm_ns_type_t  nsd_type;
++	enum ldlm_ns_type nsd_type;
+ 	/** hash bucket bits */
+ 	unsigned	nsd_bkt_bits;
+ 	/** hash bits */
+@@ -622,7 +622,7 @@ static void ldlm_namespace_register(struct ldlm_namespace *ns,
+ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 					  ldlm_side_t client,
+ 					  enum ldlm_appetite apt,
+-					  ldlm_ns_type_t ns_type)
++					  enum ldlm_ns_type ns_type)
+ {
+ 	struct ldlm_namespace *ns = NULL;
+ 	struct ldlm_ns_bucket *nsb;
 -- 
 2.1.0
