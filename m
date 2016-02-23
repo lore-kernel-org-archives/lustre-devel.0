@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:08 -0500
-Subject: [lustre-devel] [PATCH 30/56] staging/lustre: Remove duplicated
-	quota defines
+Date: Mon, 22 Feb 2016 21:54:12 -0500
+Subject: [lustre-devel] [PATCH 34/56] staging/lustre: FMODE_READ and
+	FMODE_WRITE are always defined in the kernel
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-31-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-35-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,53 +14,28 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-QUOTABLOCK_BITS, QUOTABLOCK_SIZE and toqb are only used on the server
-and are copied from kernel code anyway.
+So no need to see if they are.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 12 ------------
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c           |  5 -----
- 2 files changed, 17 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 5 -----
+ 1 file changed, 5 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 26f1c43..ccb1b85 100644
+index ad77d33..7b5c132 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -1778,18 +1778,6 @@ void lustre_swab_ost_lvb(struct ost_lvb *lvb);
-  *   lquota data structures
-  */
+@@ -2158,11 +2158,6 @@ void lustre_swab_mdt_rec_setattr(struct mdt_rec_setattr *sa);
+ #define MDS_ATTR_FROM_OPEN  0x4000ULL /* = 16384, called from open path, ie O_TRUNC */
+ #define MDS_ATTR_BLOCKS     0x8000ULL /* = 32768 */
  
--#ifndef QUOTABLOCK_BITS
--#define QUOTABLOCK_BITS 10
+-#ifndef FMODE_READ
+-#define FMODE_READ	       00000001
+-#define FMODE_WRITE	      00000002
 -#endif
 -
--#ifndef QUOTABLOCK_SIZE
--#define QUOTABLOCK_SIZE (1 << QUOTABLOCK_BITS)
--#endif
--
--#ifndef toqb
--#define toqb(x) (((x) + QUOTABLOCK_SIZE - 1) >> QUOTABLOCK_BITS)
--#endif
--
- /* The lquota_id structure is an union of all the possible identifier types that
-  * can be used with quota, this includes:
-  * - 64-bit user ID
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index 3f9acc2..799a85ac 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -1507,11 +1507,6 @@ void lustre_assert_wire_constants(void)
- 	LASSERTF((int)sizeof(union lquota_id) == 16, "found %lld\n",
- 		 (long long)(int)sizeof(union lquota_id));
- 
--	LASSERTF(QUOTABLOCK_BITS == 10, "found %lld\n",
--		 (long long)QUOTABLOCK_BITS);
--	LASSERTF(QUOTABLOCK_SIZE == 1024, "found %lld\n",
--		 (long long)QUOTABLOCK_SIZE);
--
- 	/* Checks for struct obd_quotactl */
- 	LASSERTF((int)sizeof(struct obd_quotactl) == 112, "found %lld\n",
- 		 (long long)(int)sizeof(struct obd_quotactl));
+ #define MDS_FMODE_CLOSED	 00000000
+ #define MDS_FMODE_EXEC	   00000004
+ /* IO Epoch is opened on a closed file. */
 -- 
 2.1.0
