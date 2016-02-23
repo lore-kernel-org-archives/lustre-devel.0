@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:53:49 -0500
-Subject: [lustre-devel] [PATCH 11/56] staging/lustre: Get rid of mgs_cmd_t
-	typedef
+Date: Mon, 22 Feb 2016 21:53:53 -0500
+Subject: [lustre-devel] [PATCH 15/56] staging/lustre/ldlm: Remove unused
+	lr_most_restr from struct ldlm_resource
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-12-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-16-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,34 +14,54 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace it with enum mgs_cmd
+This member comes from the dawn of time and is no longer needed
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h | 3 ---
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 3 ---
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 1 -
+ 3 files changed, 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index d3fb6f9..19a99c5 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -2820,7 +2820,7 @@ void lustre_swab_ldlm_reply(struct ldlm_reply *r);
- /*
-  * Opcodes for mountconf (mgs and mgc)
-  */
--typedef enum {
-+enum mgs_cmd {
- 	MGS_CONNECT = 250,
- 	MGS_DISCONNECT,
- 	MGS_EXCEPTION,	 /* node died, etc. */
-@@ -2829,7 +2829,7 @@ typedef enum {
- 	MGS_SET_INFO,
- 	MGS_CONFIG_READ,
- 	MGS_LAST_OPC
--} mgs_cmd_t;
-+};
- #define MGS_FIRST_OPC MGS_CONNECT
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 61b1f98..87806a6 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -848,9 +848,6 @@ struct ldlm_resource {
+ 	struct list_head		lr_waiting;
+ 	/** @} */
  
- #define MGS_PARAM_MAXLEN 1024
+-	/* XXX No longer needed? Remove ASAP */
+-	ldlm_mode_t		lr_most_restr;
+-
+ 	/** Type of locks this resource can hold. Only one type per resource. */
+ 	enum ldlm_type		lr_type; /* LDLM_{PLAIN,EXTENT,FLOCK,IBITS} */
+ 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index bd5c09f..073dcf8 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -1033,9 +1033,6 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
+ 	else
+ 		ldlm_resource_add_lock(res, &res->lr_granted, lock);
+ 
+-	if (lock->l_granted_mode < res->lr_most_restr)
+-		res->lr_most_restr = lock->l_granted_mode;
+-
+ 	if (work_list && lock->l_completion_ast)
+ 		ldlm_add_ast_work_item(lock, NULL, work_list);
+ 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 9b65061..f9d0383 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -1111,7 +1111,6 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 	res->lr_ns_bucket  = cfs_hash_bd_extra_get(ns->ns_rs_hash, &bd);
+ 	res->lr_name       = *name;
+ 	res->lr_type       = type;
+-	res->lr_most_restr = LCK_NL;
+ 
+ 	cfs_hash_bd_lock(ns->ns_rs_hash, &bd, 1);
+ 	hnode = (version == cfs_hash_bd_version_get(&bd)) ?  NULL :
 -- 
 2.1.0
