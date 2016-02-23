@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:53:43 -0500
-Subject: [lustre-devel] [PATCH 05/56] staging/lustre: Get rid of ost_cmd_t
+Date: Mon, 22 Feb 2016 21:53:41 -0500
+Subject: [lustre-devel] [PATCH 03/56] staging/lustre: Get rid of loc_flags_t
 	typedef
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-6-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-4-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,34 +14,39 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace it with enum ost_cmd
+Replace it with direct reference of enum loc_flags
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/include/lu_object.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 0f37b61..50e70fe 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -1419,7 +1419,7 @@ enum cksum_type {
+diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
+index c1c7aa1..23e5567 100644
+--- a/drivers/staging/lustre/lustre/include/lu_object.h
++++ b/drivers/staging/lustre/lustre/include/lu_object.h
+@@ -164,11 +164,11 @@ struct lu_device_operations {
+ /**
+  * For lu_object_conf flags
   */
- 
- /* opcodes */
 -typedef enum {
-+enum ost_cmd {
- 	OST_REPLY      =  0,       /* reply ? */
- 	OST_GETATTR    =  1,
- 	OST_SETATTR    =  2,
-@@ -1440,7 +1440,7 @@ typedef enum {
- 	OST_QUOTACTL   = 19,
- 	OST_QUOTA_ADJUST_QUNIT = 20, /* not used since 2.4 */
- 	OST_LAST_OPC
--} ost_cmd_t;
++enum loc_flags {
+ 	/* This is a new object to be allocated, or the file
+ 	 * corresponding to the object does not exists. */
+ 	LOC_F_NEW	= 0x00000001,
+-} loc_flags_t;
 +};
- #define OST_FIRST_OPC  OST_REPLY
  
- enum obdo_flags {
+ /**
+  * Object configuration, describing particulars of object being created. On
+@@ -179,7 +179,7 @@ struct lu_object_conf {
+ 	/**
+ 	 * Some hints for obj find and alloc.
+ 	 */
+-	loc_flags_t     loc_flags;
++	enum loc_flags     loc_flags;
+ };
+ 
+ /**
 -- 
 2.1.0
