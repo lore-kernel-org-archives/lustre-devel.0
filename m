@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:02 -0500
-Subject: [lustre-devel] [PATCH 24/56] staging/lustre: Remove
-	lustre_build_version.h
+Date: Mon, 22 Feb 2016 21:54:03 -0500
+Subject: [lustre-devel] [PATCH 25/56] staging/lustre: Get rid of C99
+	comments in lustre_idl.h
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-25-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-26-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,88 +14,71 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-of the two macroses is contained the LUSTRE_RELEASE was unused and
-BUILD_VERSION is too generically named and was replaced with
-LUSTRE_VERSION_STRING with all the users (provided by lustre_ver.h)
-
-With in-kernel client the build version should be combined with
-kernel build information anyway.
+lustre_idl.h contains various protocol data. In order to avoid
+reusal of values that might have meant something else in the past,
+the old no longer used values are commented out, convert the
+comments into regular comments from C99 where appropriate.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../lustre/lustre/include/lustre/lustre_build_version.h       |  2 --
- drivers/staging/lustre/lustre/obdclass/class_obd.c            | 11 +++++------
- drivers/staging/lustre/lustre/obdclass/linux/linux-module.c   |  1 -
- 3 files changed, 5 insertions(+), 9 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/include/lustre/lustre_build_version.h
+ .../lustre/lustre/include/lustre/lustre_idl.h        | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_build_version.h b/drivers/staging/lustre/lustre/include/lustre/lustre_build_version.h
-deleted file mode 100644
-index 93a3d7d..0000000
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_build_version.h
-+++ /dev/null
-@@ -1,2 +0,0 @@
--#define BUILD_VERSION "v2_3_64_0-g6e62c21-CHANGED-3.9.0"
--#define LUSTRE_RELEASE 3.9.0_g6e62c21
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 4b7e21f..f805693 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -42,7 +42,6 @@
- #include "../../include/linux/lnet/lnetctl.h"
- #include "../include/lustre_debug.h"
- #include "../include/lprocfs_status.h"
--#include "../include/lustre/lustre_build_version.h"
- #include <linux/list.h>
- #include "../include/cl_object.h"
- #include "llog_internal.h"
-@@ -218,14 +217,14 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
- 			goto out;
- 		}
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 4188402..90ff181 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -113,25 +113,25 @@
  
--		if (strlen(BUILD_VERSION) + 1 > data->ioc_inllen1) {
-+		if (strlen(LUSTRE_VERSION_STRING) + 1 > data->ioc_inllen1) {
- 			CERROR("ioctl buffer too small to hold version\n");
- 			err = -EINVAL;
- 			goto out;
- 		}
+ #define CONNMGR_REQUEST_PORTAL	  1
+ #define CONNMGR_REPLY_PORTAL	    2
+-//#define OSC_REQUEST_PORTAL	    3
++/*#define OSC_REQUEST_PORTAL	    3 */
+ #define OSC_REPLY_PORTAL		4
+-//#define OSC_BULK_PORTAL	       5
++/*#define OSC_BULK_PORTAL	       5 */
+ #define OST_IO_PORTAL		   6
+ #define OST_CREATE_PORTAL	       7
+ #define OST_BULK_PORTAL		 8
+-//#define MDC_REQUEST_PORTAL	    9
++/*#define MDC_REQUEST_PORTAL	    9 */
+ #define MDC_REPLY_PORTAL	       10
+-//#define MDC_BULK_PORTAL	      11
++/*#define MDC_BULK_PORTAL	      11 */
+ #define MDS_REQUEST_PORTAL	     12
+-//#define MDS_REPLY_PORTAL	     13
++/*#define MDS_REPLY_PORTAL	     13 */
+ #define MDS_BULK_PORTAL		14
+ #define LDLM_CB_REQUEST_PORTAL	 15
+ #define LDLM_CB_REPLY_PORTAL	   16
+ #define LDLM_CANCEL_REQUEST_PORTAL     17
+ #define LDLM_CANCEL_REPLY_PORTAL       18
+-//#define PTLBD_REQUEST_PORTAL	   19
+-//#define PTLBD_REPLY_PORTAL	     20
+-//#define PTLBD_BULK_PORTAL	      21
++/*#define PTLBD_REQUEST_PORTAL	   19 */
++/*#define PTLBD_REPLY_PORTAL	     20 */
++/*#define PTLBD_BULK_PORTAL	      21 */
+ #define MDS_SETATTR_PORTAL	     22
+ #define MDS_READPAGE_PORTAL	    23
+ #define OUT_PORTAL		    24
+@@ -1187,7 +1187,7 @@ void lustre_swab_ptlrpc_body(struct ptlrpc_body *pb);
+ #define MSG_CONNECT_RECOVERING  0x00000001
+ #define MSG_CONNECT_RECONNECT   0x00000002
+ #define MSG_CONNECT_REPLAYABLE  0x00000004
+-//#define MSG_CONNECT_PEER	0x8
++/*#define MSG_CONNECT_PEER	0x8 */
+ #define MSG_CONNECT_LIBCLIENT   0x00000010
+ #define MSG_CONNECT_INITIAL     0x00000020
+ #define MSG_CONNECT_ASYNC       0x00000040
+@@ -2066,7 +2066,7 @@ enum mdt_reint_cmd {
+ 	REINT_OPEN     = 6,
+ 	REINT_SETXATTR = 7,
+ 	REINT_RMENTRY  = 8,
+-//      REINT_WRITE    = 9,
++/*      REINT_WRITE    = 9, */
+ 	REINT_MAX
+ };
  
--		memcpy(data->ioc_bulk, BUILD_VERSION,
--		       strlen(BUILD_VERSION) + 1);
-+		memcpy(data->ioc_bulk, LUSTRE_VERSION_STRING,
-+		       strlen(LUSTRE_VERSION_STRING) + 1);
- 
- 		err = obd_ioctl_popdata((void __user *)arg, data, len);
- 		if (err)
-@@ -481,7 +480,7 @@ static int __init init_obdclass(void)
- 
- 	int lustre_register_fs(void);
- 
--	LCONSOLE_INFO("Lustre: Build Version: "BUILD_VERSION"\n");
-+	LCONSOLE_INFO("Lustre: Build Version: " LUSTRE_VERSION_STRING "\n");
- 
- 	spin_lock_init(&obd_types_lock);
- 	obd_zombie_impexp_init();
-@@ -579,7 +578,7 @@ static void cleanup_obdclass(void)
- }
- 
- MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
--MODULE_DESCRIPTION("Lustre Class Driver Build Version: " BUILD_VERSION);
-+MODULE_DESCRIPTION("Lustre Class Driver Build Version: " LUSTRE_VERSION_STRING);
- MODULE_LICENSE("GPL");
- MODULE_VERSION(LUSTRE_VERSION_STRING);
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-index 689f33a..f3c4a17 100644
---- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-+++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-@@ -70,7 +70,6 @@
- #include "../../include/obd_class.h"
- #include "../../include/lprocfs_status.h"
- #include "../../include/lustre_ver.h"
--#include "../../include/lustre/lustre_build_version.h"
- 
- /* buffer MUST be at least the size of obd_ioctl_hdr */
- int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
 -- 
 2.1.0
