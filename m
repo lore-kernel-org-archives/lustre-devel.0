@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:53:44 -0500
-Subject: [lustre-devel] [PATCH 06/56] staging/lustre: Get rid of quota_cmd_t
+Date: Mon, 22 Feb 2016 21:53:52 -0500
+Subject: [lustre-devel] [PATCH 14/56] staging/lustre: Get rid of sec_cmd_t
 	typedef
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-7-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-15-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,7 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace it with enum quota_cmd
+Replace with enum sec_cmd
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
@@ -22,22 +22,24 @@ Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 50e70fe..c0b05d4 100644
+index bb82a87..d68748b 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -2006,11 +2006,11 @@ void lustre_swab_lquota_lvb(struct lquota_lvb *lvb);
- #define lvb_glb_ver  lvb_id_may_rel /* current version of the global index */
+@@ -3436,13 +3436,13 @@ union lu_page {
+ };
  
- /* op codes */
+ /* security opcodes */
 -typedef enum {
-+enum quota_cmd {
- 	QUOTA_DQACQ	= 601,
- 	QUOTA_DQREL	= 602,
- 	QUOTA_LAST_OPC
--} quota_cmd_t;
++enum sec_cmd {
+ 	SEC_CTX_INIT	    = 801,
+ 	SEC_CTX_INIT_CONT       = 802,
+ 	SEC_CTX_FINI	    = 803,
+ 	SEC_LAST_OPC,
+ 	SEC_FIRST_OPC	   = SEC_CTX_INIT
+-} sec_cmd_t;
 +};
- #define QUOTA_FIRST_OPC	QUOTA_DQACQ
  
  /*
+  * capa related definitions
 -- 
 2.1.0
