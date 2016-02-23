@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:11 -0500
-Subject: [lustre-devel] [PATCH 33/56] staging/lustre: S_DIRSYNC is always
-	defined in kernel
+Date: Mon, 22 Feb 2016 21:54:04 -0500
+Subject: [lustre-devel] [PATCH 26/56] staging/lustre: Remove server-side
+	changelog defines
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-34-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-27-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,36 +14,43 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-No need to check for it.
+CHANGELOG_MAGIC, CHANGELOG_MINMASK, CHANGELOG_ALLMASK,
+CHANGELOG_DEFMASK and CHANGELOG_USER_PREFIX are all unused
+on the client.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 11 -----------
+ 1 file changed, 11 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index b5f8453..ad77d33 100644
+index 90ff181..d2f05e3 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -2013,9 +2013,7 @@ static inline int ll_ext_to_inode_flags(int flags)
- 	return (((flags & LUSTRE_SYNC_FL)      ? S_SYNC      : 0) |
- 		((flags & LUSTRE_NOATIME_FL)   ? S_NOATIME   : 0) |
- 		((flags & LUSTRE_APPEND_FL)    ? S_APPEND    : 0) |
--#if defined(S_DIRSYNC)
- 		((flags & LUSTRE_DIRSYNC_FL)   ? S_DIRSYNC   : 0) |
--#endif
- 		((flags & LUSTRE_IMMUTABLE_FL) ? S_IMMUTABLE : 0));
- }
+@@ -3039,15 +3039,6 @@ struct llog_size_change_rec {
+ 	struct llog_rec_tail	lsc_tail;
+ } __packed;
  
-@@ -2024,9 +2022,7 @@ static inline int ll_inode_to_ext_flags(int iflags)
- 	return (((iflags & S_SYNC)      ? LUSTRE_SYNC_FL      : 0) |
- 		((iflags & S_NOATIME)   ? LUSTRE_NOATIME_FL   : 0) |
- 		((iflags & S_APPEND)    ? LUSTRE_APPEND_FL    : 0) |
--#if defined(S_DIRSYNC)
- 		((iflags & S_DIRSYNC)   ? LUSTRE_DIRSYNC_FL   : 0) |
--#endif
- 		((iflags & S_IMMUTABLE) ? LUSTRE_IMMUTABLE_FL : 0));
- }
+-#define CHANGELOG_MAGIC 0xca103000
+-
+-/** \a changelog_rec_type's that can't be masked */
+-#define CHANGELOG_MINMASK (1 << CL_MARK)
+-/** bits covering all \a changelog_rec_type's */
+-#define CHANGELOG_ALLMASK 0XFFFFFFFF
+-/** default \a changelog_rec_type mask */
+-#define CHANGELOG_DEFMASK CHANGELOG_ALLMASK & ~(1 << CL_ATIME | 1 << CL_CLOSE)
+-
+ /* changelog llog name, needed by client replicators */
+ #define CHANGELOG_CATALOG "changelog_catalog"
  
+@@ -3069,8 +3060,6 @@ struct llog_changelog_ext_rec {
+ 	struct llog_rec_tail     cr_tail; /**< for_sizezof_only */
+ } __packed;
+ 
+-#define CHANGELOG_USER_PREFIX "cl"
+-
+ struct llog_changelog_user_rec {
+ 	struct llog_rec_hdr   cur_hdr;
+ 	__u32		 cur_id;
 -- 
 2.1.0
