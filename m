@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:14 -0500
-Subject: [lustre-devel] [PATCH 36/56] staging/lustre: Remove server data
-	from struct obd_export
+Date: Mon, 22 Feb 2016 21:54:23 -0500
+Subject: [lustre-devel] [PATCH 45/56] staging/lustre/lclient: Adjust
+	comments to better conform to coding style
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-37-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-46-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,105 +14,137 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Despite it's name struct obd_export could exist on the client too
-(used for reverse exports), but all the actual server bits
-are not needed there, so could be dropped. This is mostly
-various target-related stuff.
+This patch fixes "Block comments use a trailing */ on a separate line"
+warnings from checkpatch.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../staging/lustre/lustre/include/lustre_export.h  | 70 ----------------------
- 1 file changed, 70 deletions(-)
+ drivers/staging/lustre/lustre/lclient/glimpse.c    |  3 ++-
+ drivers/staging/lustre/lustre/lclient/lcommon_cl.c | 24 ++++++++++++++--------
+ .../staging/lustre/lustre/lclient/lcommon_misc.c   |  6 ++++--
+ 3 files changed, 22 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_export.h b/drivers/staging/lustre/lustre/include/lustre_export.h
-index 86f91ce..30ae096 100644
---- a/drivers/staging/lustre/lustre/include/lustre_export.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_export.h
-@@ -50,62 +50,6 @@
- #include "lustre/lustre_idl.h"
- #include "lustre_dlm.h"
+diff --git a/drivers/staging/lustre/lustre/lclient/glimpse.c b/drivers/staging/lustre/lustre/lclient/glimpse.c
+index 8533a1e..c4e8a08 100644
+--- a/drivers/staging/lustre/lustre/lclient/glimpse.c
++++ b/drivers/staging/lustre/lustre/lclient/glimpse.c
+@@ -109,7 +109,8 @@ int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
+ 			 *       if there were no conflicting locks. If there
+ 			 *       were conflicting locks, enqueuing or waiting
+ 			 *       fails with -ENAVAIL, but valid inode
+-			 *       attributes are returned anyway. */
++			 *       attributes are returned anyway.
++			 */
+ 			*descr = whole_file;
+ 			descr->cld_obj   = clob;
+ 			descr->cld_mode  = CLM_PHANTOM;
+diff --git a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
+index efa6e2e..30651f2 100644
+--- a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
++++ b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
+@@ -613,7 +613,8 @@ void ccc_lock_state(const struct lu_env *env,
+ 		 * stale i_size when doing appending writes and effectively
+ 		 * cancel the result of the truncate.  Getting the
+ 		 * ll_inode_size_lock() after the enqueue maintains the DLM
+-		 * -> ll_inode_size_lock() acquiring order. */
++		 * -> ll_inode_size_lock() acquiring order.
++		 */
+ 		if (lock->cll_descr.cld_start == 0 &&
+ 		    lock->cll_descr.cld_end == CL_PAGE_EOF)
+ 			cl_merge_lvb(env, inode);
+@@ -754,7 +755,8 @@ int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
+ 				 * page index, return directly. Do not expect
+ 				 * kernel will check such case correctly.
+ 				 * linux-2.6.18-128.1.1 miss to do that.
+-				 * --bug 17336 */
++				 * --bug 17336
++				 */
+ 				loff_t size = cl_isize_read(inode);
+ 				loff_t cur_index = start >> PAGE_CACHE_SHIFT;
+ 				loff_t size_index = (size - 1) >>
+@@ -884,7 +886,8 @@ again:
  
--struct mds_client_data;
--struct mdt_client_data;
--struct mds_idmap_table;
--struct mdt_idmap_table;
--
--/**
-- * Target-specific export data
-- */
--struct tg_export_data {
--	/** Protects led_lcd below */
--	struct mutex		ted_lcd_lock;
--	/** Per-client data for each export */
--	struct lsd_client_data	*ted_lcd;
--	/** Offset of record in last_rcvd file */
--	loff_t			ted_lr_off;
--	/** Client index in last_rcvd file */
--	int			ted_lr_idx;
--};
--
--/**
-- * MDT-specific export data
-- */
--struct mdt_export_data {
--	struct tg_export_data	med_ted;
--	/** List of all files opened by client on this MDT */
--	struct list_head		med_open_head;
--	spinlock_t		med_open_lock; /* med_open_head, mfd_list */
--	/** Bitmask of all ibit locks this MDT understands */
--	__u64			med_ibits_known;
--	struct mutex		med_idmap_mutex;
--	struct lustre_idmap_table *med_idmap;
--};
--
--struct ec_export_data { /* echo client */
--	struct list_head eced_locks;
--};
--
--/* In-memory access to client data from OST struct */
--/** Filter (oss-side) specific import data */
--struct filter_export_data {
--	struct tg_export_data	fed_ted;
--	spinlock_t		fed_lock;	/**< protects fed_mod_list */
--	long		       fed_dirty;    /* in bytes */
--	long		       fed_grant;    /* in bytes */
--	struct list_head		 fed_mod_list; /* files being modified */
--	int			fed_mod_count;/* items in fed_writing list */
--	long		       fed_pending;  /* bytes just being written */
--	__u32		      fed_group;
--	__u8		       fed_pagesize; /* log2 of client page size */
--};
--
--struct mgs_export_data {
--	struct list_head		med_clients;	/* mgc fs client via this exp */
--	spinlock_t		med_lock;	/* protect med_clients */
--};
--
- enum obd_option {
- 	OBD_OPT_FORCE =	 0x0001,
- 	OBD_OPT_FAILOVER =      0x0002,
-@@ -200,22 +144,8 @@ struct obd_export {
- 	/** blocking dlm lock list, protected by exp_bl_list_lock */
- 	struct list_head		exp_bl_list;
- 	spinlock_t		  exp_bl_list_lock;
--
--	/** Target specific data */
--	union {
--		struct tg_export_data     eu_target_data;
--		struct mdt_export_data    eu_mdt_data;
--		struct filter_export_data eu_filter_data;
--		struct ec_export_data     eu_ec_data;
--		struct mgs_export_data    eu_mgs_data;
--	} u;
- };
+ 		if (attr->ia_valid & ATTR_FILE)
+ 			/* populate the file descriptor for ftruncate to honor
+-			 * group lock - see LU-787 */
++			 * group lock - see LU-787
++			 */
+ 			cio->cui_fd = cl_iattr2fd(inode, attr);
  
--#define exp_target_data u.eu_target_data
--#define exp_mdt_data    u.eu_mdt_data
--#define exp_filter_data u.eu_filter_data
--#define exp_ec_data     u.eu_ec_data
--
- static inline __u64 *exp_connect_flags_ptr(struct obd_export *exp)
+ 		result = cl_io_loop(env, io);
+@@ -896,7 +899,8 @@ again:
+ 		goto again;
+ 	/* HSM import case: file is released, cannot be restored
+ 	 * no need to fail except if restore registration failed
+-	 * with -ENODATA */
++	 * with -ENODATA
++	 */
+ 	if (result == -ENODATA && io->ci_restore_needed &&
+ 	    io->ci_result != -ENODATA)
+ 		result = 0;
+@@ -1026,7 +1030,8 @@ int cl_file_inode_init(struct inode *inode, struct lustre_md *md)
+ 		/* clob is slave of inode, empty lli_clob means for new inode,
+ 		 * there is no clob in cache with the given fid, so it is
+ 		 * unnecessary to perform lookup-alloc-lookup-insert, just
+-		 * alloc and insert directly. */
++		 * alloc and insert directly.
++		 */
+ 		LASSERT(inode->i_state & I_NEW);
+ 		conf.coc_lu.loc_flags = LOC_F_NEW;
+ 		clob = cl_object_find(env, lu2cl_dev(site->ls_top_dev),
+@@ -1151,7 +1156,8 @@ __u16 ll_dirent_type_get(struct lu_dirent *ent)
+ }
+ 
+ /**
+- * build inode number from passed @fid */
++ * build inode number from passed @fid
++ */
+ __u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
  {
- 	return &exp->exp_connect_data.ocd_connect_flags;
+ 	if (BITS_PER_LONG == 32 || api32)
+@@ -1162,7 +1168,8 @@ __u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
+ 
+ /**
+  * build inode generation from passed @fid.  If our FID overflows the 32-bit
+- * inode number then return a non-zero generation to distinguish them. */
++ * inode number then return a non-zero generation to distinguish them.
++ */
+ __u32 cl_fid_build_gen(const struct lu_fid *fid)
+ {
+ 	__u32 gen;
+@@ -1183,7 +1190,8 @@ __u32 cl_fid_build_gen(const struct lu_fid *fid)
+  * have to wait for the refcount to become zero to destroy the older layout.
+  *
+  * Notice that the lsm returned by this function may not be valid unless called
+- * inside layout lock - MDS_INODELOCK_LAYOUT. */
++ * inside layout lock - MDS_INODELOCK_LAYOUT.
++ */
+ struct lov_stripe_md *ccc_inode_lsm_get(struct inode *inode)
+ {
+ 	return lov_lsm_get(cl_i2info(inode)->lli_clob);
+diff --git a/drivers/staging/lustre/lustre/lclient/lcommon_misc.c b/drivers/staging/lustre/lustre/lclient/lcommon_misc.c
+index 8389a0e..d80bcedd 100644
+--- a/drivers/staging/lustre/lustre/lclient/lcommon_misc.c
++++ b/drivers/staging/lustre/lustre/lclient/lcommon_misc.c
+@@ -48,7 +48,8 @@
+ /* Initialize the default and maximum LOV EA and cookie sizes.  This allows
+  * us to make MDS RPCs with large enough reply buffers to hold the
+  * maximum-sized (= maximum striped) EA and cookie without having to
+- * calculate this (via a call into the LOV + OSCs) each time we make an RPC. */
++ * calculate this (via a call into the LOV + OSCs) each time we make an RPC.
++ */
+ int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
+ {
+ 	struct lov_stripe_md lsm = { .lsm_magic = LOV_MAGIC_V3 };
+@@ -74,7 +75,8 @@ int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
+ 	cookiesize = stripes * sizeof(struct llog_cookie);
+ 
+ 	/* default cookiesize is 0 because from 2.4 server doesn't send
+-	 * llog cookies to client. */
++	 * llog cookies to client.
++	 */
+ 	CDEBUG(D_HA,
+ 	       "updating def/max_easize: %d/%d def/max_cookiesize: 0/%d\n",
+ 	       def_easize, easize, cookiesize);
 -- 
 2.1.0
