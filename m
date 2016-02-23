@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:04 -0500
-Subject: [lustre-devel] [PATCH 26/56] staging/lustre: Remove server-side
-	changelog defines
+Date: Mon, 22 Feb 2016 21:54:17 -0500
+Subject: [lustre-devel] [PATCH 39/56] staging/lustre: MAY_NOT_BLOCK is
+	always defined, don't check for it.
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-27-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-40-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,43 +14,25 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-CHANGELOG_MAGIC, CHANGELOG_MINMASK, CHANGELOG_ALLMASK,
-CHANGELOG_DEFMASK and CHANGELOG_USER_PREFIX are all unused
-on the client.
-
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 11 -----------
- 1 file changed, 11 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 90ff181..d2f05e3 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -3039,15 +3039,6 @@ struct llog_size_change_rec {
- 	struct llog_rec_tail	lsc_tail;
- } __packed;
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index bbe6ebf..ba65fc0 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -3071,10 +3071,8 @@ int ll_inode_permission(struct inode *inode, int mask)
+ {
+ 	int rc = 0;
  
--#define CHANGELOG_MAGIC 0xca103000
--
--/** \a changelog_rec_type's that can't be masked */
--#define CHANGELOG_MINMASK (1 << CL_MARK)
--/** bits covering all \a changelog_rec_type's */
--#define CHANGELOG_ALLMASK 0XFFFFFFFF
--/** default \a changelog_rec_type mask */
--#define CHANGELOG_DEFMASK CHANGELOG_ALLMASK & ~(1 << CL_ATIME | 1 << CL_CLOSE)
--
- /* changelog llog name, needed by client replicators */
- #define CHANGELOG_CATALOG "changelog_catalog"
+-#ifdef MAY_NOT_BLOCK
+ 	if (mask & MAY_NOT_BLOCK)
+ 		return -ECHILD;
+-#endif
  
-@@ -3069,8 +3060,6 @@ struct llog_changelog_ext_rec {
- 	struct llog_rec_tail     cr_tail; /**< for_sizezof_only */
- } __packed;
- 
--#define CHANGELOG_USER_PREFIX "cl"
--
- struct llog_changelog_user_rec {
- 	struct llog_rec_hdr   cur_hdr;
- 	__u32		 cur_id;
+        /* as root inode are NOT getting validated in lookup operation,
+ 	* need to do it before permission check. */
 -- 
 2.1.0
