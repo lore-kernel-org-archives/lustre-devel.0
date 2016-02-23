@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:53:52 -0500
-Subject: [lustre-devel] [PATCH 14/56] staging/lustre: Get rid of sec_cmd_t
+Date: Mon, 22 Feb 2016 21:53:49 -0500
+Subject: [lustre-devel] [PATCH 11/56] staging/lustre: Get rid of mgs_cmd_t
 	typedef
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-15-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-12-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,7 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace with enum sec_cmd
+Replace it with enum mgs_cmd
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
@@ -22,24 +22,26 @@ Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index bb82a87..d68748b 100644
+index d3fb6f9..19a99c5 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -3436,13 +3436,13 @@ union lu_page {
- };
- 
- /* security opcodes */
--typedef enum {
-+enum sec_cmd {
- 	SEC_CTX_INIT	    = 801,
- 	SEC_CTX_INIT_CONT       = 802,
- 	SEC_CTX_FINI	    = 803,
- 	SEC_LAST_OPC,
- 	SEC_FIRST_OPC	   = SEC_CTX_INIT
--} sec_cmd_t;
-+};
- 
+@@ -2820,7 +2820,7 @@ void lustre_swab_ldlm_reply(struct ldlm_reply *r);
  /*
-  * capa related definitions
+  * Opcodes for mountconf (mgs and mgc)
+  */
+-typedef enum {
++enum mgs_cmd {
+ 	MGS_CONNECT = 250,
+ 	MGS_DISCONNECT,
+ 	MGS_EXCEPTION,	 /* node died, etc. */
+@@ -2829,7 +2829,7 @@ typedef enum {
+ 	MGS_SET_INFO,
+ 	MGS_CONFIG_READ,
+ 	MGS_LAST_OPC
+-} mgs_cmd_t;
++};
+ #define MGS_FIRST_OPC MGS_CONNECT
+ 
+ #define MGS_PARAM_MAXLEN 1024
 -- 
 2.1.0
