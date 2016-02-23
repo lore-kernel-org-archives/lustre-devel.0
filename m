@@ -1,142 +1,265 @@
-From: kbuild test robot <lkp@intel.com>
-Date: Tue, 23 Feb 2016 12:42:04 +0800
-Subject: [lustre-devel] [PATCH 10/56] staging/lustre: Remove ldlm
-	type/mode typedefs
-In-Reply-To: <1456196074-754064-11-git-send-email-green@linuxhacker.ru>
-Message-ID: <201602231215.5ZLB6MAi%fengguang.wu@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 23 Feb 2016 11:48:28 -0500
+Subject: [lustre-devel] [PATCH 3/6] staging: lustre: update the
+	MODULE_VERSION for all lustre modules
+In-Reply-To: <1456246111-26263-1-git-send-email-jsimmons@infradead.org>
+References: <1456246111-26263-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456246111-26263-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Hi Oleg,
+For several lustre modules the MODULE_VERSION has the wrong value,
+located in the wrong place in the source code, or completely missing.
+This patch brings it up to date.
 
-[auto build test ERROR on staging/staging-testing]
-[also build test ERROR on v4.5-rc5 next-20160222]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-
-url:    https://github.com/0day-ci/linux/commits/green-linuxhacker-ru/More-Lustre-cleanups/20160223-120654
-config: sparc64-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=sparc64 
-
-Note: the linux-review/green-linuxhacker-ru/More-Lustre-cleanups/20160223-120654 HEAD 340181b90a18083de9509c39311e6e7859b89274 builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
-   In file included from drivers/staging/lustre/lustre/fid/../include/lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/fid/../include/obd.h:54,
-                    from drivers/staging/lustre/lustre/fid/fid_request.c:48:
->> drivers/staging/lustre/lustre/fid/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/fld/../include/lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/fld/../include/obd.h:54,
-                    from drivers/staging/lustre/lustre/fld/fld_request.c:49:
->> drivers/staging/lustre/lustre/fld/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/llite/../include/linux/../lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/llite/../include/linux/../obd.h:54,
-                    from drivers/staging/lustre/lustre/llite/../include/linux/../obd_class.h:42,
-                    from drivers/staging/lustre/lustre/llite/../include/linux/lustre_lite.h:47,
-                    from drivers/staging/lustre/lustre/llite/../include/lustre_lite.h:45,
-                    from drivers/staging/lustre/lustre/llite/dcache.c:44:
->> drivers/staging/lustre/lustre/llite/../include/linux/../lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/llite/../include/lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/llite/../include/obd.h:54,
-                    from drivers/staging/lustre/lustre/llite/../include/obd_class.h:42,
-                    from drivers/staging/lustre/lustre/llite/dir.c:52:
->> drivers/staging/lustre/lustre/llite/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/lmv/../include/lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/lmv/../include/obd.h:54,
-                    from drivers/staging/lustre/lustre/lmv/../include/obd_class.h:42,
-                    from drivers/staging/lustre/lustre/lmv/lmv_obd.c:52:
->> drivers/staging/lustre/lustre/lmv/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/lov/lov_obd.c:51:0:
->> drivers/staging/lustre/lustre/lov/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/mdc/../include/lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/mdc/../include/obd.h:54,
-                    from drivers/staging/lustre/lustre/mdc/../include/obd_class.h:42,
-                    from drivers/staging/lustre/lustre/mdc/mdc_request.c:46:
->> drivers/staging/lustre/lustre/mdc/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/mgc/../include/lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/mgc/../include/obd.h:54,
-                    from drivers/staging/lustre/lustre/mgc/../include/obd_class.h:42,
-                    from drivers/staging/lustre/lustre/mgc/mgc_request.c:45:
->> drivers/staging/lustre/lustre/mgc/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/obdclass/../include/lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/obdclass/../include/obd.h:54,
-                    from drivers/staging/lustre/lustre/obdclass/../include/obd_class.h:42,
-                    from drivers/staging/lustre/lustre/obdclass/llog.c:50:
->> drivers/staging/lustre/lustre/obdclass/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/obdecho/../include/lustre_export.h:51:0,
-                    from drivers/staging/lustre/lustre/obdecho/../include/obd.h:54,
-                    from drivers/staging/lustre/lustre/obdecho/echo_client.c:40:
->> drivers/staging/lustre/lustre/obdecho/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
---
-   In file included from drivers/staging/lustre/lustre/osc/osc_request.c:41:0:
->> drivers/staging/lustre/lustre/osc/../include/lustre_dlm.h:852:2: error: unknown type name 'ldlm_mode_t'
-     ldlm_mode_t  lr_most_restr;
-     ^
-..
-
-vim +/ldlm_mode_t +852 drivers/staging/lustre/lustre/fid/../include/lustre_dlm.h
-
-d7e09d039 Peng Tao    2013-05-02  846  	 * List of locks that could not be granted due to conflicts and
-d7e09d039 Peng Tao    2013-05-02  847  	 * that are waiting for conflicts to go away */
-d7e09d039 Peng Tao    2013-05-02  848  	struct list_head		lr_waiting;
-d7e09d039 Peng Tao    2013-05-02  849  	/** @} */
-d7e09d039 Peng Tao    2013-05-02  850  
-d7e09d039 Peng Tao    2013-05-02  851  	/* XXX No longer needed? Remove ASAP */
-d7e09d039 Peng Tao    2013-05-02 @852  	ldlm_mode_t		lr_most_restr;
-d7e09d039 Peng Tao    2013-05-02  853  
-d7e09d039 Peng Tao    2013-05-02  854  	/** Type of locks this resource can hold. Only one type per resource. */
-795336151 Oleg Drokin 2016-02-22  855  	enum ldlm_type		lr_type; /* LDLM_{PLAIN,EXTENT,FLOCK,IBITS} */
-
-:::::: The code at line 852 was first introduced by commit
-:::::: d7e09d0397e84eefbabfd9cb353221f3c6448d83 staging: add Lustre file system client support
-
-:::::: TO: Peng Tao <bergwolf@gmail.com>
-:::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6204
+Reviewed-on: http://review.whamcloud.com/16729
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Frank Zago <fzago@cray.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 45195 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160223/999baf4c/attachment-0001.obj>
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |    2 ++
+ drivers/staging/lustre/include/linux/lnet/types.h  |    2 ++
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    1 +
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    2 +-
+ drivers/staging/lustre/lnet/lnet/module.c          |    2 +-
+ drivers/staging/lustre/lnet/selftest/module.c      |    2 +-
+ drivers/staging/lustre/lustre/fid/fid_request.c    |    2 +-
+ drivers/staging/lustre/lustre/fld/fld_request.c    |    1 +
+ drivers/staging/lustre/lustre/libcfs/module.c      |    2 +-
+ drivers/staging/lustre/lustre/llite/lloop.c        |    1 +
+ drivers/staging/lustre/lustre/llite/super25.c      |    1 +
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    1 +
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |    1 +
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |    1 +
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |    2 +-
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    2 +-
+ .../staging/lustre/lustre/ptlrpc/ptlrpc_module.c   |    2 +-
+ 17 files changed, 19 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+index 5c598c8..1eab0eb 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+@@ -42,6 +42,8 @@
+ 
+ #include "curproc.h"
+ 
++#define LIBCFS_VERSION "0.7.0"
++
+ #define LOWEST_BIT_SET(x)       ((x) & ~((x) - 1))
+ 
+ /*
+diff --git a/drivers/staging/lustre/include/linux/lnet/types.h b/drivers/staging/lustre/include/linux/lnet/types.h
+index 81d01f1..08f193c 100644
+--- a/drivers/staging/lustre/include/linux/lnet/types.h
++++ b/drivers/staging/lustre/include/linux/lnet/types.h
+@@ -39,6 +39,8 @@
+  * @{
+  */
+ 
++#define LNET_VERSION		"0.6.0"
++
+ /** \addtogroup lnet_addr
+  * @{
+  */
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 98570b3..80f7985 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2868,6 +2868,7 @@ static int __init kiblnd_module_init(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Kernel OpenIB gen2 LND v2.00");
++MODULE_VERSION("2.7.0");
+ MODULE_LICENSE("GPL");
+ 
+ module_init(kiblnd_module_init);
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+index 854814c..0cf1e43 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+@@ -2927,7 +2927,7 @@ ksocknal_module_init(void)
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Kernel TCP Socket LND v3.0.0");
+ MODULE_LICENSE("GPL");
+-MODULE_VERSION("3.0.0");
++MODULE_VERSION("2.7.0");
+ 
+ module_init(ksocknal_module_init);
+ module_exit(ksocknal_module_fini);
+diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
+index e12fe37..4923339 100644
+--- a/drivers/staging/lustre/lnet/lnet/module.c
++++ b/drivers/staging/lustre/lnet/lnet/module.c
+@@ -225,8 +225,8 @@ fini_lnet(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("LNet v3.1");
++MODULE_VERSION(LNET_VERSION);
+ MODULE_LICENSE("GPL");
+-MODULE_VERSION("1.0.0");
+ 
+ module_init(init_lnet);
+ module_exit(fini_lnet);
+diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
+index 3e48b0a..05c1de1 100644
+--- a/drivers/staging/lustre/lnet/selftest/module.c
++++ b/drivers/staging/lustre/lnet/selftest/module.c
+@@ -150,8 +150,8 @@ error:
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("LNet Selftest");
++MODULE_VERSION("2.7.0");
+ MODULE_LICENSE("GPL");
+-MODULE_VERSION("0.9.0");
+ 
+ module_init(lnet_selftest_init);
+ module_exit(lnet_selftest_fini);
+diff --git a/drivers/staging/lustre/lustre/fid/fid_request.c b/drivers/staging/lustre/lustre/fid/fid_request.c
+index 7ca65df..0d044b5 100644
+--- a/drivers/staging/lustre/lustre/fid/fid_request.c
++++ b/drivers/staging/lustre/lustre/fid/fid_request.c
+@@ -464,8 +464,8 @@ static void __exit fid_mod_exit(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre FID Module");
++MODULE_VERSION(LUSTRE_VERSION_STRING);
+ MODULE_LICENSE("GPL");
+-MODULE_VERSION("0.1.0");
+ 
+ module_init(fid_mod_init);
+ module_exit(fid_mod_exit);
+diff --git a/drivers/staging/lustre/lustre/fld/fld_request.c b/drivers/staging/lustre/lustre/fld/fld_request.c
+index 0f0fbe4..8d93fee 100644
+--- a/drivers/staging/lustre/lustre/fld/fld_request.c
++++ b/drivers/staging/lustre/lustre/fld/fld_request.c
+@@ -501,6 +501,7 @@ static void __exit fld_mod_exit(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre FLD");
++MODULE_VERSION(LUSTRE_VERSION_STRING);
+ MODULE_LICENSE("GPL");
+ 
+ module_init(fld_mod_init)
+diff --git a/drivers/staging/lustre/lustre/libcfs/module.c b/drivers/staging/lustre/lustre/libcfs/module.c
+index de6688e..778cfe3 100644
+--- a/drivers/staging/lustre/lustre/libcfs/module.c
++++ b/drivers/staging/lustre/lustre/libcfs/module.c
+@@ -666,7 +666,7 @@ static void exit_libcfs_module(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Portals v3.1");
+-MODULE_VERSION("1.0.0");
++MODULE_VERSION(LIBCFS_VERSION);
+ MODULE_LICENSE("GPL");
+ 
+ module_init(init_libcfs_module);
+diff --git a/drivers/staging/lustre/lustre/llite/lloop.c b/drivers/staging/lustre/lustre/llite/lloop.c
+index 20fecaf..aed9da1 100644
+--- a/drivers/staging/lustre/lustre/llite/lloop.c
++++ b/drivers/staging/lustre/lustre/llite/lloop.c
+@@ -878,4 +878,5 @@ module_param(max_loop, int, 0444);
+ MODULE_PARM_DESC(max_loop, "maximum of lloop_device");
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre virtual block device");
++MODULE_VERSION(LUSTRE_VERSION_STRING);
+ MODULE_LICENSE("GPL");
+diff --git a/drivers/staging/lustre/lustre/llite/super25.c b/drivers/staging/lustre/lustre/llite/super25.c
+index cd996f6..8fde9bc 100644
+--- a/drivers/staging/lustre/lustre/llite/super25.c
++++ b/drivers/staging/lustre/lustre/llite/super25.c
+@@ -208,6 +208,7 @@ static void __exit exit_lustre_lite(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre Lite Client File System");
++MODULE_VERSION(LUSTRE_VERSION_STRING);
+ MODULE_LICENSE("GPL");
+ 
+ module_init(init_lustre_lite);
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 2df369a..2ee8044 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -2817,6 +2817,7 @@ static void lmv_exit(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre Logical Metadata Volume OBD driver");
++MODULE_VERSION(LUSTRE_VERSION_STRING);
+ MODULE_LICENSE("GPL");
+ 
+ module_init(lmv_init);
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index 9f27ac1..c51dbdc 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -2528,6 +2528,7 @@ static void /*__exit*/ mdc_exit(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre Metadata Client");
++MODULE_VERSION(LUSTRE_VERSION_STRING);
+ MODULE_LICENSE("GPL");
+ 
+ module_init(mdc_init);
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index 9764e57..718ab68 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -1727,6 +1727,7 @@ static void /*__exit*/ mgc_exit(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre Management Client");
++MODULE_VERSION(LUSTRE_VERSION_STRING);
+ MODULE_LICENSE("GPL");
+ 
+ module_init(mgc_init);
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index 4b7e21f..9b6fd25 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -580,8 +580,8 @@ static void cleanup_obdclass(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre Class Driver Build Version: " BUILD_VERSION);
+-MODULE_LICENSE("GPL");
+ MODULE_VERSION(LUSTRE_VERSION_STRING);
++MODULE_LICENSE("GPL");
+ 
+ module_init(init_obdclass);
+ module_exit(cleanup_obdclass);
+diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+index ca87cc2..9f14183 100644
+--- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
++++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+@@ -1887,8 +1887,8 @@ static void /*__exit*/ obdecho_exit(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre Testing Echo OBD driver");
+-MODULE_LICENSE("GPL");
+ MODULE_VERSION(LUSTRE_VERSION_STRING);
++MODULE_LICENSE("GPL");
+ 
+ module_init(obdecho_init);
+ module_exit(obdecho_exit);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c
+index c4f1d0f..a8ec0e9 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_module.c
+@@ -162,8 +162,8 @@ static void __exit ptlrpc_exit(void)
+ 
+ MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
+ MODULE_DESCRIPTION("Lustre Request Processor and Lock Management");
++MODULE_VERSION(LUSTRE_VERSION_STRING);
+ MODULE_LICENSE("GPL");
+-MODULE_VERSION("1.0.0");
+ 
+ module_init(ptlrpc_init);
+ module_exit(ptlrpc_exit);
+-- 
+1.7.1
