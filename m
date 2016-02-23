@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:05 -0500
-Subject: [lustre-devel] [PATCH 27/56] staging/lustre: Remove FSF mailing
-	address from GPL notices
+Date: Mon, 22 Feb 2016 21:54:18 -0500
+Subject: [lustre-devel] [PATCH 40/56] staging/lustre: Remove unused
+	lli_open_count from struct ll_inode_info
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-28-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-41-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,97 +14,42 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This patch removes remaining several places that still had that
-extra paragraph included in Lustre code.
+Capabilities code was the only user and it is long gone.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h      | 5 -----
- drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h | 5 -----
- drivers/staging/lustre/lnet/lnet/lib-ptl.c                    | 5 -----
- drivers/staging/lustre/lustre/obdecho/echo_internal.h         | 5 -----
- drivers/staging/lustre/lustre/osc/osc_quota.c                 | 5 -----
- 5 files changed, 25 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_internal.h | 6 ++----
+ drivers/staging/lustre/lustre/llite/llite_lib.c      | 1 -
+ 2 files changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 1530b04..9e62c59 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-index 520209f..c04979a 100644
---- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-index 5a9ab87..0281c6a 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_internal.h b/drivers/staging/lustre/lustre/obdecho/echo_internal.h
-index 69063fa..f5034a2 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_internal.h
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_internal.h
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lustre/osc/osc_quota.c b/drivers/staging/lustre/lustre/osc/osc_quota.c
-index d6731c5..508fcf2 100644
---- a/drivers/staging/lustre/lustre/osc/osc_quota.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_quota.c
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 46144ff..bbd5ab8f 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -133,10 +133,8 @@ struct ll_inode_info {
+ 	 * for allocating OST objects after a mknod() and later open-by-FID. */
+ 	struct lu_fid		   lli_pfid;
+ 
+-	struct list_head		      lli_close_list;
+-	/* open count currently used by capability only, indicate whether
+-	 * capability needs renewal */
+-	atomic_t		    lli_open_count;
++	struct list_head	      lli_close_list;
++
+ 	unsigned long		      lli_rmtperm_time;
+ 
+ 	/* handle is to be sent to MDS later on done_writing and setattr.
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 67b4b80..b652aee 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -797,7 +797,6 @@ void ll_lli_init(struct ll_inode_info *lli)
+ 	/* Do not set lli_fid, it has been initialized already. */
+ 	fid_zero(&lli->lli_pfid);
+ 	INIT_LIST_HEAD(&lli->lli_close_list);
+-	atomic_set(&lli->lli_open_count, 0);
+ 	lli->lli_rmtperm_time = 0;
+ 	lli->lli_pending_och = NULL;
+ 	lli->lli_mds_read_och = NULL;
 -- 
 2.1.0
