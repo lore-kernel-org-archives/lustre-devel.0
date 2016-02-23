@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:54:31 -0500
-Subject: [lustre-devel] [PATCH 53/56] staging/lustre/obdecho: Adjust
-	comments to better conform to coding style
+Date: Mon, 22 Feb 2016 21:54:07 -0500
+Subject: [lustre-devel] [PATCH 29/56] staging/lustre: Remove
+	*_CONNECT_SUPPORTED defines
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-54-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-30-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,47 +14,87 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This patch fixes "Block comments use a trailing */ on a separate line"
-warnings from checkpatch
+These defines are only used on the servers to determine
+what connect flags corresponding servers support:
+MDT_CONNECT_SUPPORTED
+OST_CONNECT_SUPPORTED
+MGS_CONNECT_SUPPORTED
+ECHO_CONNECT_SUPPORTED
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/obdecho/echo_client.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      | 50 ++--------------------
+ 1 file changed, 4 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index ca87cc2..3be28c5 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -746,7 +746,8 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
- 	cleanup = 4;
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index eeb0542..26f1c43 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1248,61 +1248,19 @@ void lustre_swab_ptlrpc_body(struct ptlrpc_body *pb);
+  * submit a small patch against EVERY branch that ONLY adds the new flag,
+  * updates obd_connect_names[] for lprocfs_rd_connect_flags(), adds the
+  * flag to check_obd_connect_data(), and updates wiretests accordingly, so it
+- * can be approved and landed easily to reserve the flag for future use. */
++ * can be approved and landed easily to reserve the flag for future use.
++ */
  
- 	/* if echo client is to be stacked upon ost device, the next is
--	 * NULL since ost is not a clio device so far */
-+	 * NULL since ost is not a clio device so far
-+	 */
- 	if (next && !lu_device_is_cl(next))
- 		next = NULL;
+ /* The MNE_SWAB flag is overloading the MDS_MDS bit only for the MGS
+  * connection.  It is a temporary bug fix for Imperative Recovery interop
+  * between 2.2 and 2.3 x86/ppc nodes, and can be removed when interop for
+- * 2.2 clients/servers is no longer needed.  LU-1252/LU-1644. */
++ * 2.2 clients/servers is no longer needed.  LU-1252/LU-1644.
++ */
+ #define OBD_CONNECT_MNE_SWAB		 OBD_CONNECT_MDS_MDS
  
-@@ -965,7 +966,8 @@ static struct echo_object *cl_echo_object_find(struct echo_device *d,
- 	}
+ #define OCD_HAS_FLAG(ocd, flg)  \
+ 	(!!((ocd)->ocd_connect_flags & OBD_CONNECT_##flg))
  
- 	/* In the function below, .hs_keycmp resolves to
--	 * lu_obj_hop_keycmp() */
-+	 * lu_obj_hop_keycmp()
-+	 */
- 	/* coverity[overrun-buffer-val] */
- 	obj = cl_object_find(env, echo_dev2cl(d), fid, &conf->eoc_cl);
- 	if (IS_ERR(obj)) {
-@@ -1164,7 +1166,8 @@ static int cl_echo_object_brw(struct echo_object *eco, int rw, u64 offset,
- 		cl_page_list_add(&queue->c2_qin, clp);
- 
- 		/* drop the reference count for cl_page_find, so that the page
--		 * will be freed in cl_2queue_fini. */
-+		 * will be freed in cl_2queue_fini.
-+		 */
- 		cl_page_put(env, clp);
- 		cl_page_clip(env, clp, 0, page_size);
- 
+-#define LRU_RESIZE_CONNECT_FLAG OBD_CONNECT_LRU_RESIZE
+-
+-#define MDT_CONNECT_SUPPORTED  (OBD_CONNECT_RDONLY | OBD_CONNECT_VERSION | \
+-				OBD_CONNECT_ACL | OBD_CONNECT_XATTR | \
+-				OBD_CONNECT_IBITS | \
+-				OBD_CONNECT_NODEVOH | OBD_CONNECT_ATTRFID | \
+-				OBD_CONNECT_CANCELSET | OBD_CONNECT_AT | \
+-				OBD_CONNECT_RMT_CLIENT | \
+-				OBD_CONNECT_RMT_CLIENT_FORCE | \
+-				OBD_CONNECT_BRW_SIZE | OBD_CONNECT_MDS_CAPA | \
+-				OBD_CONNECT_OSS_CAPA | OBD_CONNECT_MDS_MDS | \
+-				OBD_CONNECT_FID | LRU_RESIZE_CONNECT_FLAG | \
+-				OBD_CONNECT_VBR | OBD_CONNECT_LOV_V3 | \
+-				OBD_CONNECT_SOM | OBD_CONNECT_FULL20 | \
+-				OBD_CONNECT_64BITHASH | OBD_CONNECT_JOBSTATS | \
+-				OBD_CONNECT_EINPROGRESS | \
+-				OBD_CONNECT_LIGHTWEIGHT | OBD_CONNECT_UMASK | \
+-				OBD_CONNECT_LVB_TYPE | OBD_CONNECT_LAYOUTLOCK |\
+-				OBD_CONNECT_PINGLESS | OBD_CONNECT_MAX_EASIZE |\
+-				OBD_CONNECT_FLOCK_DEAD | \
+-				OBD_CONNECT_DISP_STRIPE)
+-
+-#define OST_CONNECT_SUPPORTED  (OBD_CONNECT_SRVLOCK | OBD_CONNECT_GRANT | \
+-				OBD_CONNECT_REQPORTAL | OBD_CONNECT_VERSION | \
+-				OBD_CONNECT_TRUNCLOCK | OBD_CONNECT_INDEX | \
+-				OBD_CONNECT_BRW_SIZE | OBD_CONNECT_OSS_CAPA | \
+-				OBD_CONNECT_CANCELSET | OBD_CONNECT_AT | \
+-				LRU_RESIZE_CONNECT_FLAG | OBD_CONNECT_CKSUM | \
+-				OBD_CONNECT_RMT_CLIENT | \
+-				OBD_CONNECT_RMT_CLIENT_FORCE | OBD_CONNECT_VBR | \
+-				OBD_CONNECT_MDS | OBD_CONNECT_SKIP_ORPHAN | \
+-				OBD_CONNECT_GRANT_SHRINK | OBD_CONNECT_FULL20 | \
+-				OBD_CONNECT_64BITHASH | OBD_CONNECT_MAXBYTES | \
+-				OBD_CONNECT_MAX_EASIZE | \
+-				OBD_CONNECT_EINPROGRESS | \
+-				OBD_CONNECT_JOBSTATS | \
+-				OBD_CONNECT_LIGHTWEIGHT | OBD_CONNECT_LVB_TYPE|\
+-				OBD_CONNECT_LAYOUTLOCK | OBD_CONNECT_FID | \
+-				OBD_CONNECT_PINGLESS)
+-#define ECHO_CONNECT_SUPPORTED (0)
+-#define MGS_CONNECT_SUPPORTED  (OBD_CONNECT_VERSION | OBD_CONNECT_AT | \
+-				OBD_CONNECT_FULL20 | OBD_CONNECT_IMP_RECOV | \
+-				OBD_CONNECT_MNE_SWAB | OBD_CONNECT_PINGLESS)
+-
+ /* Features required for this version of the client to work with server */
+ #define CLIENT_CONNECT_MDT_REQD (OBD_CONNECT_IBITS | OBD_CONNECT_FID | \
+ 				 OBD_CONNECT_FULL20)
 -- 
 2.1.0
