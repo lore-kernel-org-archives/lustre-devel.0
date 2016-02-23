@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Mon, 22 Feb 2016 21:53:45 -0500
-Subject: [lustre-devel] [PATCH 07/56] staging/lustre: Get rid of mds_cmd_t
-	typedef
+Date: Mon, 22 Feb 2016 21:53:46 -0500
+Subject: [lustre-devel] [PATCH 08/56] staging/lustre: Get rid of mds_reint_t,
+	mdt_reint_t typedefs
 In-Reply-To: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
 References: <1456196074-754064-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456196074-754064-8-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456196074-754064-9-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,7 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace it with enum mds_cmd
+Replace with enum mdt_reint_cmd
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
@@ -22,26 +22,26 @@ Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index c0b05d4..a72fed0 100644
+index a72fed0..bd8b622 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -2018,7 +2018,7 @@ enum quota_cmd {
+@@ -2065,7 +2065,7 @@ typedef enum {
+  * Do not exceed 63
   */
  
- /* opcodes */
 -typedef enum {
-+enum mds_cmd {
- 	MDS_GETATTR		= 33,
- 	MDS_GETATTR_NAME	= 34,
- 	MDS_CLOSE		= 35,
-@@ -2049,7 +2049,7 @@ typedef enum {
- 	MDS_HSM_CT_UNREGISTER	= 60,
- 	MDS_SWAP_LAYOUTS	= 61,
- 	MDS_LAST_OPC
--} mds_cmd_t;
++enum mdt_reint_cmd {
+ 	REINT_SETATTR  = 1,
+ 	REINT_CREATE   = 2,
+ 	REINT_LINK     = 3,
+@@ -2076,7 +2076,7 @@ typedef enum {
+ 	REINT_RMENTRY  = 8,
+ //      REINT_WRITE    = 9,
+ 	REINT_MAX
+-} mds_reint_t, mdt_reint_t;
 +};
  
- #define MDS_FIRST_OPC    MDS_GETATTR
+ void lustre_swab_generic_32s(__u32 *val);
  
 -- 
 2.1.0
