@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:19 -0500
-Subject: [lustre-devel] [PATCH v2 36/84] staging/lustre: Remove server data
-	from struct obd_export
+Date: Wed, 24 Feb 2016 22:00:21 -0500
+Subject: [lustre-devel] [PATCH v2 38/84] staging/lustre: Remove dead code in
+	ldlm_lock_destroy_internal
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-37-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-39-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,105 +14,34 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Despite it's name struct obd_export could exist on the client too
-(used for reverse exports), but all the actual server bits
-are not needed there, so could be dropped. This is mostly
-various target-related stuff.
+This code has been commented out since end of 2012, so it's
+clearly not needed here.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../staging/lustre/lustre/include/lustre_export.h  | 70 ----------------------
- 1 file changed, 70 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_export.h b/drivers/staging/lustre/lustre/include/lustre_export.h
-index 86f91ce..30ae096 100644
---- a/drivers/staging/lustre/lustre/include/lustre_export.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_export.h
-@@ -50,62 +50,6 @@
- #include "lustre/lustre_idl.h"
- #include "lustre_dlm.h"
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 07e83e5..65d0cfe 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -337,16 +337,6 @@ static int ldlm_lock_destroy_internal(struct ldlm_lock *lock)
+ 	ldlm_lock_remove_from_lru(lock);
+ 	class_handle_unhash(&lock->l_handle);
  
--struct mds_client_data;
--struct mdt_client_data;
--struct mds_idmap_table;
--struct mdt_idmap_table;
--
--/**
-- * Target-specific export data
-- */
--struct tg_export_data {
--	/** Protects led_lcd below */
--	struct mutex		ted_lcd_lock;
--	/** Per-client data for each export */
--	struct lsd_client_data	*ted_lcd;
--	/** Offset of record in last_rcvd file */
--	loff_t			ted_lr_off;
--	/** Client index in last_rcvd file */
--	int			ted_lr_idx;
--};
--
--/**
-- * MDT-specific export data
-- */
--struct mdt_export_data {
--	struct tg_export_data	med_ted;
--	/** List of all files opened by client on this MDT */
--	struct list_head		med_open_head;
--	spinlock_t		med_open_lock; /* med_open_head, mfd_list */
--	/** Bitmask of all ibit locks this MDT understands */
--	__u64			med_ibits_known;
--	struct mutex		med_idmap_mutex;
--	struct lustre_idmap_table *med_idmap;
--};
--
--struct ec_export_data { /* echo client */
--	struct list_head eced_locks;
--};
--
--/* In-memory access to client data from OST struct */
--/** Filter (oss-side) specific import data */
--struct filter_export_data {
--	struct tg_export_data	fed_ted;
--	spinlock_t		fed_lock;	/**< protects fed_mod_list */
--	long		       fed_dirty;    /* in bytes */
--	long		       fed_grant;    /* in bytes */
--	struct list_head		 fed_mod_list; /* files being modified */
--	int			fed_mod_count;/* items in fed_writing list */
--	long		       fed_pending;  /* bytes just being written */
--	__u32		      fed_group;
--	__u8		       fed_pagesize; /* log2 of client page size */
--};
--
--struct mgs_export_data {
--	struct list_head		med_clients;	/* mgc fs client via this exp */
--	spinlock_t		med_lock;	/* protect med_clients */
--};
--
- enum obd_option {
- 	OBD_OPT_FORCE =	 0x0001,
- 	OBD_OPT_FAILOVER =      0x0002,
-@@ -200,22 +144,8 @@ struct obd_export {
- 	/** blocking dlm lock list, protected by exp_bl_list_lock */
- 	struct list_head		exp_bl_list;
- 	spinlock_t		  exp_bl_list_lock;
--
--	/** Target specific data */
--	union {
--		struct tg_export_data     eu_target_data;
--		struct mdt_export_data    eu_mdt_data;
--		struct filter_export_data eu_filter_data;
--		struct ec_export_data     eu_ec_data;
--		struct mgs_export_data    eu_mgs_data;
--	} u;
- };
+-#if 0
+-	/* Wake anyone waiting for this lock */
+-	/* FIXME: I should probably add yet another flag, instead of using
+-	 * l_export to only call this on clients */
+-	if (lock->l_export)
+-		class_export_put(lock->l_export);
+-	lock->l_export = NULL;
+-	if (lock->l_export && lock->l_completion_ast)
+-		lock->l_completion_ast(lock, 0);
+-#endif
+ 	return 1;
+ }
  
--#define exp_target_data u.eu_target_data
--#define exp_mdt_data    u.eu_mdt_data
--#define exp_filter_data u.eu_filter_data
--#define exp_ec_data     u.eu_ec_data
--
- static inline __u64 *exp_connect_flags_ptr(struct obd_export *exp)
- {
- 	return &exp->exp_connect_data.ocd_connect_flags;
 -- 
 2.1.0
