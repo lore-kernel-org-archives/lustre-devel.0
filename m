@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:57 -0500
-Subject: [lustre-devel] [PATCH v2 74/84] staging/lustre/osc: Fix style vs
-	open parenthesis alignment
+Date: Wed, 24 Feb 2016 22:00:58 -0500
+Subject: [lustre-devel] [PATCH v2 75/84] staging/lustre/obdclass: Fix style
+	vs open parenthesis alignment
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-75-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-76-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -19,403 +19,694 @@ This mostly fixes checkpatch complaints about
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/osc/lproc_osc.c   | 20 ++++++-------
- drivers/staging/lustre/lustre/osc/osc_cache.c   | 18 +++++-------
- drivers/staging/lustre/lustre/osc/osc_io.c      |  5 ++--
- drivers/staging/lustre/lustre/osc/osc_lock.c    | 27 +++++++++---------
- drivers/staging/lustre/lustre/osc/osc_page.c    | 37 ++++++++++++-------------
- drivers/staging/lustre/lustre/osc/osc_request.c | 17 ++++++------
- 6 files changed, 59 insertions(+), 65 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     |  20 ++--
+ drivers/staging/lustre/lustre/obdclass/cl_lock.c   |  21 ++--
+ drivers/staging/lustre/lustre/obdclass/cl_object.c |  10 +-
+ drivers/staging/lustre/lustre/obdclass/cl_page.c   |  10 +-
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |   3 +-
+ drivers/staging/lustre/lustre/obdclass/genops.c    |  26 ++---
+ .../lustre/lustre/obdclass/linux/linux-sysctl.c    |   8 +-
+ drivers/staging/lustre/lustre/obdclass/llog_cat.c  |   4 +-
+ .../lustre/lustre/obdclass/lprocfs_status.c        | 125 ++++++++++-----------
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |   3 +-
+ .../staging/lustre/lustre/obdclass/lustre_peer.c   |   2 +-
+ .../staging/lustre/lustre/obdclass/obd_config.c    |   6 +-
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |   8 +-
+ 13 files changed, 119 insertions(+), 127 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-index b5df5e6..57c43c5 100644
---- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
-+++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-@@ -397,8 +397,8 @@ static int osc_checksum_type_seq_show(struct seq_file *m, void *v)
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index 191ec43..f5128b4 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -139,7 +139,7 @@ void cl_io_fini(const struct lu_env *env, struct cl_io *io)
+ 	case CIT_MISC:
+ 		/* Check ignore layout change conf */
+ 		LASSERT(ergo(io->ci_ignore_layout || !io->ci_verify_layout,
+-				!io->ci_need_restart));
++			     !io->ci_need_restart));
+ 		break;
+ 	default:
+ 		LBUG();
+@@ -291,11 +291,11 @@ static void cl_io_locks_sort(struct cl_io *io)
+ 		prev = NULL;
+ 
+ 		list_for_each_entry_safe(curr, temp,
+-					     &io->ci_lockset.cls_todo,
+-					     cill_linkage) {
++					 &io->ci_lockset.cls_todo,
++					 cill_linkage) {
+ 			if (prev) {
+ 				switch (cl_lock_descr_sort(&prev->cill_descr,
+-							  &curr->cill_descr)) {
++							   &curr->cill_descr)) {
+ 				case 0:
+ 					/*
+ 					 * IMPOSSIBLE: Identical locks are
+@@ -306,7 +306,7 @@ static void cl_io_locks_sort(struct cl_io *io)
+ 					LBUG();
+ 				case 1:
+ 					list_move_tail(&curr->cill_linkage,
+-							   &prev->cill_linkage);
++						       &prev->cill_linkage);
+ 					done = 0;
+ 					continue; /* don't change prev: it's
+ 						   * still "previous"
+@@ -385,8 +385,7 @@ static int cl_lockset_lock_one(const struct lu_env *env,
+ 		if (!(link->cill_descr.cld_enq_flags & CEF_ASYNC)) {
+ 			result = cl_wait(env, lock);
+ 			if (result == 0)
+-				list_move(&link->cill_linkage,
+-					      &set->cls_done);
++				list_move(&link->cill_linkage, &set->cls_done);
+ 		} else
+ 			result = 0;
+ 	} else
+@@ -430,12 +429,11 @@ static int cl_lockset_lock(const struct lu_env *env, struct cl_io *io,
+ 	}
+ 	if (result == 0) {
+ 		list_for_each_entry_safe(link, temp,
+-					     &set->cls_curr, cill_linkage) {
++					 &set->cls_curr, cill_linkage) {
+ 			lock = link->cill_lock;
+ 			result = cl_wait(env, lock);
+ 			if (result == 0)
+-				list_move(&link->cill_linkage,
+-					      &set->cls_done);
++				list_move(&link->cill_linkage, &set->cls_done);
+ 			else
+ 				break;
+ 		}
+@@ -1354,7 +1352,7 @@ void cl_req_completion(const struct lu_env *env, struct cl_req *req, int rc)
+ 	 */
+ 	while (!list_empty(&req->crq_layers)) {
+ 		slice = list_entry(req->crq_layers.prev,
+-				       struct cl_req_slice, crs_linkage);
++				   struct cl_req_slice, crs_linkage);
+ 		list_del_init(&slice->crs_linkage);
+ 		if (slice->crs_ops->cro_completion)
+ 			slice->crs_ops->cro_completion(env, slice, rc);
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+index 7b7f344..6cf284b 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+@@ -259,7 +259,7 @@ static void cl_lock_free(const struct lu_env *env, struct cl_lock *lock)
+ 		struct cl_lock_slice *slice;
+ 
+ 		slice = list_entry(lock->cll_layers.next,
+-				       struct cl_lock_slice, cls_linkage);
++				   struct cl_lock_slice, cls_linkage);
+ 		list_del_init(lock->cll_layers.next);
+ 		slice->cls_ops->clo_fini(env, slice);
+ 	}
+@@ -382,8 +382,7 @@ static struct cl_lock *cl_lock_alloc(const struct lu_env *env,
+ 		CS_LOCK_INC(obj, total);
+ 		CS_LOCK_INC(obj, create);
+ 		cl_lock_lockdep_init(lock);
+-		list_for_each_entry(obj, &head->loh_layers,
+-					co_lu.lo_linkage) {
++		list_for_each_entry(obj, &head->loh_layers, co_lu.lo_linkage) {
+ 			int err;
+ 
+ 			err = obj->co_ops->coo_lock_init(env, obj, lock, io);
+@@ -534,7 +533,7 @@ static struct cl_lock *cl_lock_find(const struct lu_env *env,
+ 			if (!ghost) {
+ 				cl_lock_get_trust(lock);
+ 				list_add_tail(&lock->cll_linkage,
+-						  &head->coh_locks);
++					      &head->coh_locks);
+ 				spin_unlock(&head->coh_lock_guard);
+ 				CS_LOCK_INC(obj, busy);
+ 			} else {
+@@ -774,7 +773,7 @@ static void cl_lock_cancel0(const struct lu_env *env, struct cl_lock *lock)
+ 
+ 		lock->cll_flags |= CLF_CANCELLED;
+ 		list_for_each_entry_reverse(slice, &lock->cll_layers,
+-						cls_linkage) {
++					    cls_linkage) {
+ 			if (slice->cls_ops->clo_cancel)
+ 				slice->cls_ops->clo_cancel(env, slice);
+ 		}
+@@ -811,7 +810,7 @@ static void cl_lock_delete0(const struct lu_env *env, struct cl_lock *lock)
+ 		 * by cl_lock_lookup().
+ 		 */
+ 		list_for_each_entry_reverse(slice, &lock->cll_layers,
+-						cls_linkage) {
++					    cls_linkage) {
+ 			if (slice->cls_ops->clo_delete)
+ 				slice->cls_ops->clo_delete(env, slice);
+ 		}
+@@ -1040,7 +1039,7 @@ static int cl_unuse_try_internal(const struct lu_env *env, struct cl_lock *lock)
+ 
+ 		result = -ENOSYS;
+ 		list_for_each_entry_reverse(slice, &lock->cll_layers,
+-						cls_linkage) {
++					    cls_linkage) {
+ 			if (slice->cls_ops->clo_unuse) {
+ 				result = slice->cls_ops->clo_unuse(env, slice);
+ 				if (result != 0)
+@@ -1658,7 +1657,7 @@ void cl_lock_disclosure(const struct lu_env *env,
+ 
+ 	cl_lock_trace(D_DLMTRACE, env, "disclosure lock", closure->clc_origin);
+ 	list_for_each_entry_safe(scan, temp, &closure->clc_list,
+-				     cll_inclosure){
++				 cll_inclosure) {
+ 		list_del_init(&scan->cll_inclosure);
+ 		cl_lock_mutex_put(env, scan);
+ 		lu_ref_del(&scan->cll_reference, "closure", closure);
+@@ -1845,7 +1844,7 @@ static int check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
+ 
+ 		/* refresh non-overlapped index */
+ 		tmp = cl_lock_at_pgoff(env, lock->cll_descr.cld_obj, index,
+-					lock, 1, 0);
++				       lock, 1, 0);
+ 		if (tmp) {
+ 			/* Cache the first-non-overlapped index so as to skip
+ 			 * all pages within [index, clt_fn_index). This
+@@ -2173,8 +2172,8 @@ EXPORT_SYMBOL(cl_lock_mode_name);
+  * Prints human readable representation of a lock description.
+  */
+ void cl_lock_descr_print(const struct lu_env *env, void *cookie,
+-		       lu_printer_t printer,
+-		       const struct cl_lock_descr *descr)
++			 lu_printer_t printer,
++			 const struct cl_lock_descr *descr)
+ {
+ 	const struct lu_fid  *fid;
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+index b626914..e7c570a 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+@@ -247,8 +247,7 @@ int cl_object_attr_set(const struct lu_env *env, struct cl_object *obj,
+ 
+ 	top = obj->co_lu.lo_header;
+ 	result = 0;
+-	list_for_each_entry_reverse(obj, &top->loh_layers,
+-					co_lu.lo_linkage) {
++	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
+ 		if (obj->co_ops->coo_attr_set) {
+ 			result = obj->co_ops->coo_attr_set(env, obj, attr, v);
+ 			if (result != 0) {
+@@ -278,8 +277,7 @@ int cl_object_glimpse(const struct lu_env *env, struct cl_object *obj,
+ 
+ 	top = obj->co_lu.lo_header;
+ 	result = 0;
+-	list_for_each_entry_reverse(obj, &top->loh_layers,
+-					co_lu.lo_linkage) {
++	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
+ 		if (obj->co_ops->coo_glimpse) {
+ 			result = obj->co_ops->coo_glimpse(env, obj, lvb);
+ 			if (result != 0)
+@@ -457,13 +455,13 @@ locks: ...... ...... ...... ...... ...... [...... ...... ...... ...... ......]
+ 	seq_printf(m, " [");
+ 	for (i = 0; i < ARRAY_SIZE(site->cs_pages_state); ++i)
+ 		seq_printf(m, "%s: %u ", pstate[i],
+-				atomic_read(&site->cs_pages_state[i]));
++			   atomic_read(&site->cs_pages_state[i]));
+ 	seq_printf(m, "]\n");
+ 	cache_stats_print(&site->cs_locks, m, 0);
+ 	seq_printf(m, " [");
+ 	for (i = 0; i < ARRAY_SIZE(site->cs_locks_state); ++i)
+ 		seq_printf(m, "%s: %u ", lstate[i],
+-				atomic_read(&site->cs_locks_state[i]));
++			   atomic_read(&site->cs_locks_state[i]));
+ 	seq_printf(m, "]\n");
+ 	cache_stats_print(&cl_env_stats, m, 0);
+ 	seq_printf(m, "\n");
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+index 72f9924..231a2f2 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+@@ -255,7 +255,7 @@ static void cl_page_free(const struct lu_env *env, struct cl_page *page)
+ 		struct cl_page_slice *slice;
+ 
+ 		slice = list_entry(page->cp_layers.next,
+-				       struct cl_page_slice, cpl_linkage);
++				   struct cl_page_slice, cpl_linkage);
+ 		list_del_init(page->cp_layers.next);
+ 		slice->cpl_ops->cpo_fini(env, slice);
+ 	}
+@@ -277,8 +277,9 @@ static inline void cl_page_state_set_trust(struct cl_page *page,
  }
  
- static ssize_t osc_checksum_type_seq_write(struct file *file,
--				const char __user *buffer,
--				size_t count, loff_t *off)
-+					   const char __user *buffer,
-+					   size_t count, loff_t *off)
+ static struct cl_page *cl_page_alloc(const struct lu_env *env,
+-		struct cl_object *o, pgoff_t ind, struct page *vmpage,
+-		enum cl_page_type type)
++				     struct cl_object *o, pgoff_t ind,
++				     struct page *vmpage,
++				     enum cl_page_type type)
  {
- 	struct obd_device *obd = ((struct seq_file *)file->private_data)->private;
- 	int i;
-@@ -652,10 +652,10 @@ static int osc_rpc_stats_seq_show(struct seq_file *seq, void *v)
- 		read_cum += r;
- 		write_cum += w;
- 		seq_printf(seq, "%d:\t\t%10lu %3lu %3lu   | %10lu %3lu %3lu\n",
--				 1 << i, r, pct(r, read_tot),
--				 pct(read_cum, read_tot), w,
--				 pct(w, write_tot),
--				 pct(write_cum, write_tot));
-+			   1 << i, r, pct(r, read_tot),
-+			   pct(read_cum, read_tot), w,
-+			   pct(w, write_tot),
-+			   pct(write_cum, write_tot));
- 		if (read_cum == read_tot && write_cum == write_tot)
- 			break;
- 	}
-@@ -676,10 +676,10 @@ static int osc_rpc_stats_seq_show(struct seq_file *seq, void *v)
- 		read_cum += r;
- 		write_cum += w;
- 		seq_printf(seq, "%d:\t\t%10lu %3lu %3lu   | %10lu %3lu %3lu\n",
--				 i, r, pct(r, read_tot),
--				 pct(read_cum, read_tot), w,
--				 pct(w, write_tot),
--				 pct(write_cum, write_tot));
-+			   i, r, pct(r, read_tot),
-+			   pct(read_cum, read_tot), w,
-+			   pct(w, write_tot),
-+			   pct(write_cum, write_tot));
- 		if (read_cum == read_tot && write_cum == write_tot)
- 			break;
- 	}
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index c6623c1..031746a 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -603,7 +603,7 @@ void osc_extent_release(const struct lu_env *env, struct osc_extent *ext)
- 
- 			if (ext->oe_urgent)
- 				list_move_tail(&ext->oe_link,
--						   &obj->oo_urgent_exts);
-+					       &obj->oo_urgent_exts);
+ 	struct cl_page	  *page;
+ 	struct lu_object_header *head;
+@@ -303,8 +304,7 @@ static struct cl_page *cl_page_alloc(const struct lu_env *env,
+ 		mutex_init(&page->cp_mutex);
+ 		lu_ref_init(&page->cp_reference);
+ 		head = o->co_lu.lo_header;
+-		list_for_each_entry(o, &head->loh_layers,
+-					co_lu.lo_linkage) {
++		list_for_each_entry(o, &head->loh_layers, co_lu.lo_linkage) {
+ 			if (o->co_ops->coo_page_init) {
+ 				result = o->co_ops->coo_page_init(env, o,
+ 								  page, vmpage);
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index c1310c2..06b04d2 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -199,8 +199,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 			err = -ENOMEM;
+ 			goto out;
  		}
- 		osc_object_unlock(obj);
+-		err = copy_from_user(lcfg, data->ioc_pbuf1,
+-					 data->ioc_plen1);
++		err = copy_from_user(lcfg, data->ioc_pbuf1, data->ioc_plen1);
+ 		if (!err)
+ 			err = lustre_cfg_sanity_check(lcfg, data->ioc_plen1);
+ 		if (!err)
+diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
+index 9042632..65f2c62 100644
+--- a/drivers/staging/lustre/lustre/obdclass/genops.c
++++ b/drivers/staging/lustre/lustre/obdclass/genops.c
+@@ -461,8 +461,8 @@ EXPORT_SYMBOL(class_num2obd);
+  * otherwise any client connected to the tgt is returned.
+  */
+ struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
+-					  const char *typ_name,
+-					  struct obd_uuid *grp_uuid)
++					 const char *typ_name,
++					 struct obd_uuid *grp_uuid)
+ {
+ 	int i;
  
-@@ -855,8 +855,7 @@ int osc_extent_finish(const struct lu_env *env, struct osc_extent *ext,
- 
- 	ext->oe_rc = rc ?: ext->oe_nr_pages;
- 	EASSERT(ergo(rc == 0, ext->oe_state == OES_RPC), ext);
--	list_for_each_entry_safe(oap, tmp, &ext->oe_pages,
--				     oap_pending_item) {
-+	list_for_each_entry_safe(oap, tmp, &ext->oe_pages, oap_pending_item) {
- 		list_del_init(&oap->oap_rpc_item);
- 		list_del_init(&oap->oap_pending_item);
- 		if (last_off <= oap->oap_obj_off) {
-@@ -989,8 +988,7 @@ static int osc_extent_truncate(struct osc_extent *ext, pgoff_t trunc_index,
+@@ -582,21 +582,21 @@ int obd_init_caches(void)
+ {
+ 	LASSERT(!obd_device_cachep);
+ 	obd_device_cachep = kmem_cache_create("ll_obd_dev_cache",
+-						 sizeof(struct obd_device),
+-						 0, 0, NULL);
++					      sizeof(struct obd_device),
++					      0, 0, NULL);
+ 	if (!obd_device_cachep)
  		goto out;
  
- 	/* discard all pages with index greater then trunc_index */
--	list_for_each_entry_safe(oap, tmp, &ext->oe_pages,
--				     oap_pending_item) {
-+	list_for_each_entry_safe(oap, tmp, &ext->oe_pages, oap_pending_item) {
- 		struct cl_page *sub = oap2cl_page(oap);
- 		struct cl_page *page = cl_page_top(sub);
+ 	LASSERT(!obdo_cachep);
+ 	obdo_cachep = kmem_cache_create("ll_obdo_cache", sizeof(struct obdo),
+-					   0, 0, NULL);
++					0, 0, NULL);
+ 	if (!obdo_cachep)
+ 		goto out;
  
-@@ -1912,7 +1910,7 @@ static int get_write_extents(struct osc_object *obj, struct list_head *rpclist)
- 	LASSERT(osc_object_is_locked(obj));
- 	while (!list_empty(&obj->oo_hp_exts)) {
- 		ext = list_entry(obj->oo_hp_exts.next, struct osc_extent,
--				     oe_link);
-+				 oe_link);
- 		LASSERT(ext->oe_state == OES_CACHE);
- 		if (!try_to_add_extent_for_io(cli, ext, rpclist, &page_count,
- 					      &max_pages))
-@@ -1924,7 +1922,7 @@ static int get_write_extents(struct osc_object *obj, struct list_head *rpclist)
+ 	LASSERT(!import_cachep);
+ 	import_cachep = kmem_cache_create("ll_import_cache",
+-					     sizeof(struct obd_import),
+-					     0, 0, NULL);
++					  sizeof(struct obd_import),
++					  0, 0, NULL);
+ 	if (!import_cachep)
+ 		goto out;
  
- 	while (!list_empty(&obj->oo_urgent_exts)) {
- 		ext = list_entry(obj->oo_urgent_exts.next,
--				     struct osc_extent, oe_link);
-+				 struct osc_extent, oe_link);
- 		if (!try_to_add_extent_for_io(cli, ext, rpclist, &page_count,
- 					      &max_pages))
- 			return page_count;
-@@ -2051,8 +2049,7 @@ osc_send_read_rpc(const struct lu_env *env, struct client_obd *cli,
- 	int rc = 0;
+@@ -828,7 +828,7 @@ EXPORT_SYMBOL(class_unlink_export);
+ static void class_import_destroy(struct obd_import *imp)
+ {
+ 	CDEBUG(D_IOCTL, "destroying import %p for %s\n", imp,
+-		imp->imp_obd->obd_name);
++	       imp->imp_obd->obd_name);
  
- 	LASSERT(osc_object_is_locked(osc));
--	list_for_each_entry_safe(ext, next,
--				     &osc->oo_reading_exts, oe_link) {
-+	list_for_each_entry_safe(ext, next, &osc->oo_reading_exts, oe_link) {
- 		EASSERT(ext->oe_state == OES_LOCK_DONE, ext);
- 		if (!try_to_add_extent_for_io(cli, ext, &rpclist, &page_count,
- 					      &max_pages))
-@@ -2928,8 +2925,7 @@ int osc_cache_writeback_range(const struct lu_env *env, struct osc_object *obj,
- 					ext->oe_max_end <= end, ext);
- 				osc_extent_state_set(ext, OES_LOCKING);
- 				ext->oe_owner = current;
--				list_move_tail(&ext->oe_link,
--						   &discard_list);
-+				list_move_tail(&ext->oe_link, &discard_list);
- 				osc_update_pending(obj, OBD_BRW_WRITE,
- 						   -ext->oe_nr_pages);
- 			}
-diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
-index 2d8d93c..add94a2 100644
---- a/drivers/staging/lustre/lustre/osc/osc_io.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_io.c
-@@ -357,7 +357,7 @@ static int trunc_check_cb(const struct lu_env *env, struct cl_io *io,
- 	if (oap->oap_cmd & OBD_BRW_WRITE &&
- 	    !list_empty(&oap->oap_pending_item))
- 		CL_PAGE_DEBUG(D_ERROR, env, page, "exists %llu/%s.\n",
--				start, current->comm);
-+			      start, current->comm);
+ 	LASSERT_ATOMIC_ZERO(&imp->imp_refcount);
  
- 	{
- 		struct page *vmpage = cl_page_vmpage(env, page);
-@@ -761,8 +761,7 @@ static void osc_req_attr_set(const struct lu_env *env,
- 			struct cl_lock *scan;
+@@ -838,7 +838,7 @@ static void class_import_destroy(struct obd_import *imp)
+ 		struct obd_import_conn *imp_conn;
  
- 			head = cl_object_header(apage->cp_obj);
--			list_for_each_entry(scan, &head->coh_locks,
--						cll_linkage)
-+			list_for_each_entry(scan, &head->coh_locks, cll_linkage)
- 				CL_LOCK_DEBUG(D_ERROR, env, scan,
- 					      "no cover page!\n");
- 			CL_PAGE_DEBUG(D_ERROR, env, apage,
-diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
-index cc308149..6fcdf91 100644
---- a/drivers/staging/lustre/lustre/osc/osc_lock.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
-@@ -1117,7 +1117,7 @@ static int osc_lock_enqueue(const struct lu_env *env,
- 		 "Impossible state: %d\n", ols->ols_state);
- 
- 	LASSERTF(ergo(ols->ols_glimpse, lock->cll_descr.cld_mode <= CLM_READ),
--		"lock = %p, ols = %p\n", lock, ols);
-+		 "lock = %p, ols = %p\n", lock, ols);
- 
- 	result = osc_lock_enqueue_wait(env, ols);
- 	if (result == 0) {
-@@ -1144,12 +1144,12 @@ static int osc_lock_enqueue(const struct lu_env *env,
- 			ostid_build_res_name(&obj->oo_oinfo->loi_oi, resname);
- 			osc_lock_build_policy(env, lock, policy);
- 			result = osc_enqueue_base(osc_export(obj), resname,
--					  &ols->ols_flags, policy,
--					  &ols->ols_lvb,
--					  obj->oo_oinfo->loi_kms_valid,
--					  osc_lock_upcall,
--					  ols, einfo, &ols->ols_handle,
--					  PTLRPCD_SET, 1, ols->ols_agl);
-+						  &ols->ols_flags, policy,
-+						  &ols->ols_lvb,
-+						  obj->oo_oinfo->loi_kms_valid,
-+						  osc_lock_upcall,
-+						  ols, einfo, &ols->ols_handle,
-+						  PTLRPCD_SET, 1, ols->ols_agl);
- 			if (result != 0) {
- 				cl_lock_user_del(env, lock);
- 				cl_lock_unhold(env, lock, "upcall", lock);
-@@ -1266,11 +1266,12 @@ static int osc_lock_flush(struct osc_lock *ols, int discard)
- 
- 		if (descr->cld_mode >= CLM_WRITE) {
- 			result = osc_cache_writeback_range(env, obj,
--					descr->cld_start, descr->cld_end,
--					1, discard);
-+							   descr->cld_start,
-+							   descr->cld_end,
-+							   1, discard);
- 			LDLM_DEBUG(ols->ols_lock,
--				"lock %p: %d pages were %s.\n", lock, result,
--				discard ? "discarded" : "written");
-+				   "lock %p: %d pages were %s.\n", lock, result,
-+				   discard ? "discarded" : "written");
- 			if (result > 0)
- 				result = 0;
+ 		imp_conn = list_entry(imp->imp_conn_list.next,
+-					  struct obd_import_conn, oic_item);
++				      struct obd_import_conn, oic_item);
+ 		list_del_init(&imp_conn->oic_item);
+ 		ptlrpc_put_connection_superhack(imp_conn->oic_conn);
+ 		kfree(imp_conn);
+@@ -1125,16 +1125,16 @@ static void obd_zombie_impexp_cull(void)
+ 		import = NULL;
+ 		if (!list_empty(&obd_zombie_imports)) {
+ 			import = list_entry(obd_zombie_imports.next,
+-						struct obd_import,
+-						imp_zombie_chain);
++					    struct obd_import,
++					    imp_zombie_chain);
+ 			list_del_init(&import->imp_zombie_chain);
  		}
-@@ -1590,7 +1591,7 @@ int osc_lock_init(const struct lu_env *env,
- 			clk->ols_flags |= LDLM_FL_DENY_ON_CONTENTION;
  
- 		LDLM_DEBUG_NOLOCK("lock %p, osc lock %p, flags %llx\n",
--				lock, clk, clk->ols_flags);
-+				  lock, clk, clk->ols_flags);
+ 		export = NULL;
+ 		if (!list_empty(&obd_zombie_exports)) {
+ 			export = list_entry(obd_zombie_exports.next,
+-						struct obd_export,
+-						exp_obd_chain);
++					    struct obd_export,
++					    exp_obd_chain);
+ 			list_del_init(&export->exp_obd_chain);
+ 		}
  
- 		result = 0;
- 	} else
-@@ -1612,7 +1613,7 @@ int osc_dlm_lock_pageref(struct ldlm_lock *dlm)
- 	 */
- 	if (olock &&
- 	    atomic_add_return(_PAGEREF_MAGIC,
--				  &olock->ols_pageref) != _PAGEREF_MAGIC) {
-+			      &olock->ols_pageref) != _PAGEREF_MAGIC) {
- 		atomic_sub(_PAGEREF_MAGIC, &olock->ols_pageref);
- 		rc = 1;
- 	}
-diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
-index d11582a..537107c 100644
---- a/drivers/staging/lustre/lustre/osc/osc_page.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_page.c
-@@ -403,7 +403,7 @@ static const struct cl_page_operations osc_page_ops = {
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
+index 42fc26f..fd333b9 100644
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
++++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
+@@ -62,8 +62,8 @@ struct static_lustre_uintvalue_attr {
  };
  
- int osc_page_init(const struct lu_env *env, struct cl_object *obj,
--		struct cl_page *page, struct page *vmpage)
-+		  struct cl_page *page, struct page *vmpage)
+ static ssize_t static_uintvalue_show(struct kobject *kobj,
+-				    struct attribute *attr,
+-				    char *buf)
++				     struct attribute *attr,
++				     char *buf)
  {
- 	struct osc_object *osc = cl2osc(obj);
- 	struct osc_page *opg = cl_object_page_slice(obj, page);
-@@ -413,13 +413,12 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
- 	opg->ops_to = PAGE_CACHE_SIZE;
+ 	struct static_lustre_uintvalue_attr *lattr = (void *)attr;
  
- 	result = osc_prep_async_page(osc, opg, vmpage,
--					cl_offset(obj, page->cp_index));
-+				     cl_offset(obj, page->cp_index));
- 	if (result == 0) {
- 		struct osc_io *oio = osc_env_io(env);
- 
- 		opg->ops_srvlock = osc_io_srvlock(oio);
--		cl_page_slice_add(page, &opg->ops_cl, obj,
--				&osc_page_ops);
-+		cl_page_slice_add(page, &opg->ops_cl, obj, &osc_page_ops);
- 	}
- 	/*
- 	 * Cannot assert osc_page_protected() here as read-ahead
-@@ -462,7 +461,7 @@ void osc_page_submit(const struct lu_env *env, struct osc_page *opg,
- 	oap->oap_brw_flags = brw_flags | OBD_BRW_SYNC;
- 
- 	if (!client_is_remote(osc_export(obj)) &&
--			capable(CFS_CAP_SYS_RESOURCE)) {
-+	    capable(CFS_CAP_SYS_RESOURCE)) {
- 		oap->oap_brw_flags |= OBD_BRW_NOQUOTA;
- 		oap->oap_cmd |= OBD_BRW_NOQUOTA;
- 	}
-@@ -590,7 +589,7 @@ int osc_lru_shrink(struct client_obd *cli, int target)
- 			break;
- 
- 		opg = list_entry(cli->cl_lru_list.next, struct osc_page,
--				     ops_lru);
-+				 ops_lru);
- 		page = cl_page_top(opg->ops_cl.cpl_page);
- 		if (cl_page_in_use_noref(page)) {
- 			list_move_tail(&opg->ops_lru, &cli->cl_lru_list);
-@@ -737,14 +736,14 @@ static int osc_lru_reclaim(struct client_obd *cli)
- 	rc = osc_lru_shrink(cli, lru_shrink_min);
- 	if (rc != 0) {
- 		CDEBUG(D_CACHE, "%s: Free %d pages from own LRU: %p.\n",
--			cli->cl_import->imp_obd->obd_name, rc, cli);
-+		       cli->cl_import->imp_obd->obd_name, rc, cli);
- 		return rc;
- 	}
- 
- 	CDEBUG(D_CACHE, "%s: cli %p no free slots, pages: %d, busy: %d.\n",
--		cli->cl_import->imp_obd->obd_name, cli,
--		atomic_read(&cli->cl_lru_in_list),
--		atomic_read(&cli->cl_lru_busy));
-+	       cli->cl_import->imp_obd->obd_name, cli,
-+	       atomic_read(&cli->cl_lru_in_list),
-+	       atomic_read(&cli->cl_lru_busy));
- 
- 	/* Reclaim LRU slots from other client_obd as it can't free enough
- 	 * from its own. This should rarely happen.
-@@ -758,12 +757,12 @@ static int osc_lru_reclaim(struct client_obd *cli)
- 	max_scans = atomic_read(&cache->ccc_users);
- 	while (--max_scans > 0 && !list_empty(&cache->ccc_lru)) {
- 		cli = list_entry(cache->ccc_lru.next, struct client_obd,
--					cl_lru_osc);
-+				 cl_lru_osc);
- 
- 		CDEBUG(D_CACHE, "%s: cli %p LRU pages: %d, busy: %d.\n",
--			cli->cl_import->imp_obd->obd_name, cli,
--			atomic_read(&cli->cl_lru_in_list),
--			atomic_read(&cli->cl_lru_busy));
-+		       cli->cl_import->imp_obd->obd_name, cli,
-+		       atomic_read(&cli->cl_lru_in_list),
-+		       atomic_read(&cli->cl_lru_busy));
- 
- 		list_move_tail(&cli->cl_lru_osc, &cache->ccc_lru);
- 		if (atomic_read(&cli->cl_lru_in_list) > 0) {
-@@ -778,7 +777,7 @@ static int osc_lru_reclaim(struct client_obd *cli)
- 	spin_unlock(&cache->ccc_lru_lock);
- 
- 	CDEBUG(D_CACHE, "%s: cli %p freed %d pages.\n",
--		cli->cl_import->imp_obd->obd_name, cli, rc);
-+	       cli->cl_import->imp_obd->obd_name, cli, rc);
- 	return rc;
+@@ -71,8 +71,8 @@ static ssize_t static_uintvalue_show(struct kobject *kobj,
  }
  
-@@ -812,10 +811,10 @@ static int osc_lru_reserve(const struct lu_env *env, struct osc_object *obj,
- 
- 		gen = atomic_read(&cli->cl_lru_in_list);
- 		rc = l_wait_event(osc_lru_waitq,
--				atomic_read(cli->cl_lru_left) > 0 ||
--				(atomic_read(&cli->cl_lru_in_list) > 0 &&
--				 gen != atomic_read(&cli->cl_lru_in_list)),
--				&lwi);
-+				  atomic_read(cli->cl_lru_left) > 0 ||
-+				  (atomic_read(&cli->cl_lru_in_list) > 0 &&
-+				   gen != atomic_read(&cli->cl_lru_in_list)),
-+				  &lwi);
- 
- 		atomic_dec(&osc_lru_waiters);
- 		if (rc < 0)
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 10f262f..770d6fc 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -993,8 +993,7 @@ static int osc_grant_shrink_grant_cb(struct timeout_item *item, void *data)
+ static ssize_t static_uintvalue_store(struct kobject *kobj,
+-				     struct attribute *attr,
+-				     const char *buffer, size_t count)
++				      struct attribute *attr,
++				      const char *buffer, size_t count)
  {
- 	struct client_obd *client;
+ 	struct static_lustre_uintvalue_attr *lattr  = (void *)attr;
+ 	int rc;
+diff --git a/drivers/staging/lustre/lustre/obdclass/llog_cat.c b/drivers/staging/lustre/lustre/obdclass/llog_cat.c
+index b88ccba..c27d4ec 100644
+--- a/drivers/staging/lustre/lustre/obdclass/llog_cat.c
++++ b/drivers/staging/lustre/lustre/obdclass/llog_cat.c
+@@ -74,7 +74,7 @@ static int llog_cat_id2handle(const struct lu_env *env,
  
--	list_for_each_entry(client, &item->ti_obd_list,
--				cl_grant_shrink_list) {
-+	list_for_each_entry(client, &item->ti_obd_list, cl_grant_shrink_list) {
- 		if (osc_should_shrink_grant(client))
- 			osc_shrink_grant(client);
- 	}
-@@ -1011,7 +1010,7 @@ static int osc_add_shrink_grant(struct client_obd *client)
- 				       &client->cl_grant_shrink_list);
- 	if (rc) {
- 		CERROR("add grant client %s error %d\n",
--			client->cl_import->imp_obd->obd_name, rc);
-+		       client->cl_import->imp_obd->obd_name, rc);
- 		return rc;
- 	}
- 	CDEBUG(D_CACHE, "add grant client %s\n",
-@@ -1127,7 +1126,7 @@ static int check_write_rcs(struct ptlrpc_request *req,
+ 	down_write(&cathandle->lgh_lock);
+ 	list_for_each_entry(loghandle, &cathandle->u.chd.chd_head,
+-				u.phd.phd_entry) {
++			    u.phd.phd_entry) {
+ 		struct llog_logid *cgl = &loghandle->lgh_id;
  
- 		if (remote_rcs[i] != 0) {
- 			CDEBUG(D_INFO, "rc[%d] invalid (%d) req %p\n",
--				i, remote_rcs[i], req);
-+			       i, remote_rcs[i], req);
- 			return -EPROTO;
+ 		if (ostid_id(&cgl->lgl_oi) == ostid_id(&logid->lgl_oi) &&
+@@ -130,7 +130,7 @@ int llog_cat_close(const struct lu_env *env, struct llog_handle *cathandle)
+ 	int			 rc;
+ 
+ 	list_for_each_entry_safe(loghandle, n, &cathandle->u.chd.chd_head,
+-				     u.phd.phd_entry) {
++				 u.phd.phd_entry) {
+ 		/* unlink open-not-created llogs */
+ 		list_del_init(&loghandle->u.phd.phd_entry);
+ 		llog_close(env, loghandle);
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index 28bb4e5..3c895be 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -607,13 +607,13 @@ static void obd_connect_seq_flags2str(struct seq_file *m, __u64 flags, char *sep
+ 	for (i = 0; obd_connect_names[i]; i++, mask <<= 1) {
+ 		if (flags & mask) {
+ 			seq_printf(m, "%s%s",
+-					first ? sep : "", obd_connect_names[i]);
++				   first ? sep : "", obd_connect_names[i]);
+ 			first = false;
  		}
  	}
-@@ -1195,7 +1194,7 @@ static u32 osc_checksum_bulk(int nob, u32 pg_count,
- 			kunmap(pga[i]->pg);
- 		}
- 		cfs_crypto_hash_update_page(hdesc, pga[i]->pg,
--				  pga[i]->off & ~CFS_PAGE_MASK,
-+					    pga[i]->off & ~CFS_PAGE_MASK,
- 				  count);
- 		CDEBUG(D_PAGE,
- 		       "page %p map %p index %lu flags %lx count %u priv %0lx: off %d\n",
-@@ -1554,7 +1553,7 @@ static int osc_brw_fini_request(struct ptlrpc_request *req, int rc)
+ 	if (flags & ~(mask - 1))
+ 		seq_printf(m, "%sunknown flags %#llx",
+-				first ? sep : "", flags & ~(mask - 1));
++			   first ? sep : "", flags & ~(mask - 1));
+ }
  
- 	if (rc != req->rq_bulk->bd_nob_transferred) {
- 		CERROR("Unexpected rc %d (%d transferred)\n",
--			rc, req->rq_bulk->bd_nob_transferred);
-+		       rc, req->rq_bulk->bd_nob_transferred);
- 		return -EPROTO;
+ int lprocfs_rd_import(struct seq_file *m, void *data)
+@@ -637,26 +637,27 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 	imp = obd->u.cli.cl_import;
+ 
+ 	seq_printf(m,
+-		     "import:\n"
+-		     "    name: %s\n"
+-		     "    target: %s\n"
+-		     "    state: %s\n"
+-		     "    instance: %u\n"
+-		     "    connect_flags: [ ",
+-		     obd->obd_name,
+-		     obd2cli_tgt(obd),
+-		     ptlrpc_import_state_name(imp->imp_state),
+-		     imp->imp_connect_data.ocd_instance);
+-	obd_connect_seq_flags2str(m, imp->imp_connect_data.ocd_connect_flags, ", ");
++		   "import:\n"
++		   "    name: %s\n"
++		   "    target: %s\n"
++		   "    state: %s\n"
++		   "    instance: %u\n"
++		   "    connect_flags: [ ",
++		   obd->obd_name,
++		   obd2cli_tgt(obd),
++		   ptlrpc_import_state_name(imp->imp_state),
++		   imp->imp_connect_data.ocd_instance);
++	obd_connect_seq_flags2str(m, imp->imp_connect_data.ocd_connect_flags,
++				  ", ");
+ 	seq_printf(m,
+-		      " ]\n"
+-		      "    import_flags: [ ");
++		   " ]\n"
++		   "    import_flags: [ ");
+ 	obd_import_flags2str(imp, m);
+ 
+ 	seq_printf(m,
+-		      " ]\n"
+-		      "    connection:\n"
+-		      "       failover_nids: [ ");
++		   " ]\n"
++		   "    connection:\n"
++		   "       failover_nids: [ ");
+ 	spin_lock(&imp->imp_lock);
+ 	j = 0;
+ 	list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
+@@ -671,15 +672,15 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 	else
+ 		strncpy(nidstr, "<none>", sizeof(nidstr));
+ 	seq_printf(m,
+-		      " ]\n"
+-		      "       current_connection: %s\n"
+-		      "       connection_attempts: %u\n"
+-		      "       generation: %u\n"
+-		      "       in-progress_invalidations: %u\n",
+-		      nidstr,
+-		      imp->imp_conn_cnt,
+-		      imp->imp_generation,
+-		      atomic_read(&imp->imp_inval_count));
++		   " ]\n"
++		   "       current_connection: %s\n"
++		   "       connection_attempts: %u\n"
++		   "       generation: %u\n"
++		   "       in-progress_invalidations: %u\n",
++		   nidstr,
++		   imp->imp_conn_cnt,
++		   imp->imp_generation,
++		   atomic_read(&imp->imp_inval_count));
+ 	spin_unlock(&imp->imp_lock);
+ 
+ 	if (!obd->obd_svc_stats)
+@@ -696,15 +697,15 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 	} else
+ 		ret.lc_sum = 0;
+ 	seq_printf(m,
+-		      "    rpcs:\n"
+-		      "       inflight: %u\n"
+-		      "       unregistering: %u\n"
+-		      "       timeouts: %u\n"
+-		      "       avg_waittime: %llu %s\n",
+-		      atomic_read(&imp->imp_inflight),
+-		      atomic_read(&imp->imp_unregistering),
+-		      atomic_read(&imp->imp_timeouts),
+-		      ret.lc_sum, header->lc_units);
++		   "    rpcs:\n"
++		   "       inflight: %u\n"
++		   "       unregistering: %u\n"
++		   "       timeouts: %u\n"
++		   "       avg_waittime: %llu %s\n",
++		   atomic_read(&imp->imp_inflight),
++		   atomic_read(&imp->imp_unregistering),
++		   atomic_read(&imp->imp_timeouts),
++		   ret.lc_sum, header->lc_units);
+ 
+ 	k = 0;
+ 	for (j = 0; j < IMP_AT_MAX_PORTALS; j++) {
+@@ -714,20 +715,20 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 			  at_get(&imp->imp_at.iat_service_estimate[j]));
+ 	}
+ 	seq_printf(m,
+-		      "    service_estimates:\n"
+-		      "       services: %u sec\n"
+-		      "       network: %u sec\n",
+-		      k,
+-		      at_get(&imp->imp_at.iat_net_latency));
++		   "    service_estimates:\n"
++		   "       services: %u sec\n"
++		   "       network: %u sec\n",
++		   k,
++		   at_get(&imp->imp_at.iat_net_latency));
+ 
+ 	seq_printf(m,
+-		      "    transactions:\n"
+-		      "       last_replay: %llu\n"
+-		      "       peer_committed: %llu\n"
+-		      "       last_checked: %llu\n",
+-		      imp->imp_last_replay_transno,
+-		      imp->imp_peer_committed_transno,
+-		      imp->imp_last_transno_checked);
++		   "    transactions:\n"
++		   "       last_replay: %llu\n"
++		   "       peer_committed: %llu\n"
++		   "       last_checked: %llu\n",
++		   imp->imp_last_replay_transno,
++		   imp->imp_peer_committed_transno,
++		   imp->imp_last_transno_checked);
+ 
+ 	/* avg data rates */
+ 	for (rw = 0; rw <= 1; rw++) {
+@@ -741,10 +742,10 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 			do_div(sum, ret.lc_count);
+ 			ret.lc_sum = sum;
+ 			seq_printf(m,
+-				      "    %s_data_averages:\n"
+-				      "       bytes_per_rpc: %llu\n",
+-				      rw ? "write" : "read",
+-				      ret.lc_sum);
++				   "    %s_data_averages:\n"
++				   "       bytes_per_rpc: %llu\n",
++				   rw ? "write" : "read",
++				   ret.lc_sum);
+ 		}
+ 		k = (int)ret.lc_sum;
+ 		j = opcode_offset(OST_READ + rw) + EXTRA_MAX_OPCODES;
+@@ -757,13 +758,13 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 			do_div(sum, ret.lc_count);
+ 			ret.lc_sum = sum;
+ 			seq_printf(m,
+-				      "       %s_per_rpc: %llu\n",
+-				      header->lc_units, ret.lc_sum);
++				   "       %s_per_rpc: %llu\n",
++				   header->lc_units, ret.lc_sum);
+ 			j = (int)ret.lc_sum;
+ 			if (j > 0)
+ 				seq_printf(m,
+-					      "       MB_per_sec: %u.%.02u\n",
+-					      k / j, (100 * k / j) % 100);
++					   "       MB_per_sec: %u.%.02u\n",
++					   k / j, (100 * k / j) % 100);
+ 		}
  	}
  
-@@ -1944,7 +1943,7 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
+@@ -787,7 +788,7 @@ int lprocfs_rd_state(struct seq_file *m, void *data)
+ 	imp = obd->u.cli.cl_import;
  
- 	sort_brw_pages(pga, page_count);
- 	rc = osc_brw_prep_request(cmd, cli, oa, NULL, page_count,
--			pga, &req, 1, 0);
-+				  pga, &req, 1, 0);
- 	if (rc != 0) {
- 		CERROR("prep_req failed: %d\n", rc);
- 		goto out;
-@@ -1986,7 +1985,7 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
- 			tmp = oap;
- 		if (oap->oap_interrupted && !req->rq_intr) {
- 			CDEBUG(D_INODE, "oap %p in req %p interrupted\n",
--					oap, req);
-+			       oap, req);
- 			ptlrpc_mark_interrupted(req);
- 		}
- 	}
-@@ -2034,7 +2033,7 @@ out:
+ 	seq_printf(m, "current_state: %s\n",
+-		     ptlrpc_import_state_name(imp->imp_state));
++		   ptlrpc_import_state_name(imp->imp_state));
+ 	seq_printf(m, "state_history:\n");
+ 	k = imp->imp_state_hist_idx;
+ 	for (j = 0; j < IMP_STATE_HIST_LEN; j++) {
+@@ -1206,7 +1207,7 @@ struct file_operations lprocfs_stats_seq_fops = {
+ };
+ 
+ int ldebugfs_register_stats(struct dentry *parent, const char *name,
+-			   struct lprocfs_stats *stats)
++			    struct lprocfs_stats *stats)
+ {
+ 	struct dentry *entry;
+ 
+@@ -1427,11 +1428,9 @@ char *lprocfs_find_named_value(const char *buffer, const char *name,
+ }
+ EXPORT_SYMBOL(lprocfs_find_named_value);
+ 
+-int ldebugfs_seq_create(struct dentry *parent,
+-		       const char *name,
+-		       umode_t mode,
+-		       const struct file_operations *seq_fops,
+-		       void *data)
++int ldebugfs_seq_create(struct dentry *parent, const char *name,
++			umode_t mode, const struct file_operations *seq_fops,
++			void *data)
+ {
+ 	struct dentry *entry;
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+index 0fa4bac..09832ff 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+@@ -1473,8 +1473,7 @@ void lu_context_key_quiesce(struct lu_context_key *key)
+ 		 * XXX memory barrier has to go here.
  		 */
- 		while (!list_empty(ext_list)) {
- 			ext = list_entry(ext_list->next, struct osc_extent,
--					     oe_link);
-+					 oe_link);
- 			list_del_init(&ext->oe_link);
- 			osc_extent_finish(env, ext, 0, rc);
+ 		spin_lock(&lu_keys_guard);
+-		list_for_each_entry(ctx, &lu_context_remembered,
+-					lc_remember)
++		list_for_each_entry(ctx, &lu_context_remembered, lc_remember)
+ 			key_fini(ctx, key->lct_index);
+ 		spin_unlock(&lu_keys_guard);
+ 		++key_set_version;
+diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_peer.c b/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
+index b10ea31..5c38c83 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
++++ b/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
+@@ -173,7 +173,7 @@ int class_del_uuid(const char *uuid)
+ 
+ 	while (!list_empty(&deathrow)) {
+ 		data = list_entry(deathrow.next, struct uuid_nid_data,
+-				      un_list);
++				  un_list);
+ 		list_del(&data->un_list);
+ 
+ 		CDEBUG(D_INFO, "del uuid %s %s/%d\n",
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+index 2134b60..5395e99 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+@@ -1049,9 +1049,9 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+ 			rc = 0;
+ 		} else {
+ 			CDEBUG(D_CONFIG, "%s.%.*s: Set parameter %.*s=%s\n",
+-					 lustre_cfg_string(lcfg, 0),
+-					 (int)strlen(prefix) - 1, prefix,
+-					 (int)(sval - key - 1), key, sval);
++			       lustre_cfg_string(lcfg, 0),
++			       (int)strlen(prefix) - 1, prefix,
++			       (int)(sval - key - 1), key, sval);
  		}
+ 	}
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+index d138e05..d3e28a3 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+@@ -72,7 +72,7 @@ static void (*kill_super_cb)(struct super_block *sb);
+  *   this log, and is added to the mgc's list of logs to follow.
+  */
+ int lustre_process_log(struct super_block *sb, char *logname,
+-		     struct config_llog_instance *cfg)
++		      struct config_llog_instance *cfg)
+ {
+ 	struct lustre_cfg *lcfg;
+ 	struct lustre_cfg_bufs *bufs;
+@@ -114,7 +114,7 @@ EXPORT_SYMBOL(lustre_process_log);
+ 
+ /* Stop watching this config log for updates */
+ int lustre_end_log(struct super_block *sb, char *logname,
+-		       struct config_llog_instance *cfg)
++		   struct config_llog_instance *cfg)
+ {
+ 	struct lustre_cfg *lcfg;
+ 	struct lustre_cfg_bufs bufs;
+@@ -340,7 +340,7 @@ int lustre_start_mgc(struct super_block *sb)
+ 	/* Add any failover MGS nids */
+ 	i = 1;
+ 	while (ptr && ((*ptr == ':' ||
+-	       class_find_param(ptr, PARAM_MGSNODE, &ptr) == 0))) {
++			class_find_param(ptr, PARAM_MGSNODE, &ptr) == 0))) {
+ 		/* New failover node */
+ 		sprintf(niduuid, "%s_%x", mgcname, i);
+ 		j = 0;
+@@ -1181,7 +1181,7 @@ EXPORT_SYMBOL(lustre_register_kill_super_cb);
+ 
+ /***************** FS registration ******************/
+ static struct dentry *lustre_mount(struct file_system_type *fs_type, int flags,
+-				const char *devname, void *data)
++				   const char *devname, void *data)
+ {
+ 	struct lustre_mount_data2 lmd2 = {
+ 		.lmd2_data = data,
 -- 
 2.1.0
