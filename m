@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 21:59:56 -0500
-Subject: [lustre-devel] [PATCH v2 13/84] staging/lustre: Get rid of
-	obd_cmd_t typedef
+Date: Wed, 24 Feb 2016 21:59:58 -0500
+Subject: [lustre-devel] [PATCH v2 15/84] staging/lustre: Get rid of
+	sec_cmd_t typedef
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-14-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-16-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,7 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace with enum obd_cmd
+Replace with enum sec_cmd
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
@@ -22,24 +22,24 @@ Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 19a99c5..27ee853 100644
+index bb82a87..d68748b 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -2918,13 +2918,13 @@ void lustre_swab_cfg_marker(struct cfg_marker *marker, int swab, int size);
-  * Opcodes for multiple servers.
-  */
+@@ -3436,13 +3436,13 @@ union lu_page {
+ };
  
+ /* security opcodes */
 -typedef enum {
-+enum obd_cmd {
- 	OBD_PING = 400,
- 	OBD_LOG_CANCEL,
- 	OBD_QC_CALLBACK,
- 	OBD_IDX_READ,
- 	OBD_LAST_OPC
--} obd_cmd_t;
++enum sec_cmd {
+ 	SEC_CTX_INIT	    = 801,
+ 	SEC_CTX_INIT_CONT       = 802,
+ 	SEC_CTX_FINI	    = 803,
+ 	SEC_LAST_OPC,
+ 	SEC_FIRST_OPC	   = SEC_CTX_INIT
+-} sec_cmd_t;
 +};
- #define OBD_FIRST_OPC OBD_PING
  
- /* catalog of log objects */
+ /*
+  * capa related definitions
 -- 
 2.1.0
