@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:01:01 -0500
-Subject: [lustre-devel] [PATCH v2 78/84] staging/lustre/mgc: Fix style vs
-	open parenthesis alignment
+Date: Wed, 24 Feb 2016 22:01:06 -0500
+Subject: [lustre-devel] [PATCH v2 83/84] staging/lustre: Remove unneeded {}
+	in lprocfs_stats_unlock()
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-79-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-84-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,86 +14,47 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This mostly fixes checkpatch complaints about
-"Alignment should match open parenthesis"
+Since there's only one call in those if () else branches, the
+braces are not really necessary.
+
+Highlighted by checkpatch.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/mgc/mgc_request.c | 28 ++++++++++++-------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+ drivers/staging/lustre/lustre/include/lprocfs_status.h | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 6fc8225..68c3c84 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -245,10 +245,10 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
- 	return cld;
- }
+diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+index 89052b2..4146c9c 100644
+--- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
++++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+@@ -426,11 +426,10 @@ static inline void lprocfs_stats_unlock(struct lprocfs_stats *stats, int opc,
  
--static struct config_llog_data *config_recover_log_add(struct obd_device *obd,
--	char *fsname,
--	struct config_llog_instance *cfg,
--	struct super_block *sb)
-+static struct config_llog_data *
-+config_recover_log_add(struct obd_device *obd, char *fsname,
-+		       struct config_llog_instance *cfg,
-+		       struct super_block *sb)
- {
- 	struct config_llog_instance lcfg = *cfg;
- 	struct config_llog_data *cld;
-@@ -266,8 +266,9 @@ static struct config_llog_data *config_recover_log_add(struct obd_device *obd,
- 	return cld;
- }
+ 	case LPROCFS_GET_SMP_ID:
+ 		if (stats->ls_flags & LPROCFS_STATS_FLAG_NOPERCPU) {
+-			if (stats->ls_flags & LPROCFS_STATS_FLAG_IRQ_SAFE) {
++			if (stats->ls_flags & LPROCFS_STATS_FLAG_IRQ_SAFE)
+ 				spin_unlock_irqrestore(&stats->ls_lock, *flags);
+-			} else {
++			else
+ 				spin_unlock(&stats->ls_lock);
+-			}
+ 		} else {
+ 			put_cpu();
+ 		}
+@@ -438,11 +437,10 @@ static inline void lprocfs_stats_unlock(struct lprocfs_stats *stats, int opc,
  
--static struct config_llog_data *config_params_log_add(struct obd_device *obd,
--	struct config_llog_instance *cfg, struct super_block *sb)
-+static struct config_llog_data *
-+config_params_log_add(struct obd_device *obd,
-+		      struct config_llog_instance *cfg, struct super_block *sb)
- {
- 	struct config_llog_instance	lcfg = *cfg;
- 	struct config_llog_data		*cld;
-@@ -454,16 +455,16 @@ int lprocfs_mgc_rd_ir_state(struct seq_file *m, void *data)
- 	ocd = &imp->imp_connect_data;
- 
- 	seq_printf(m, "imperative_recovery: %s\n",
--		      OCD_HAS_FLAG(ocd, IMP_RECOV) ? "ENABLED" : "DISABLED");
-+		   OCD_HAS_FLAG(ocd, IMP_RECOV) ? "ENABLED" : "DISABLED");
- 	seq_printf(m, "client_state:\n");
- 
- 	spin_lock(&config_list_lock);
- 	list_for_each_entry(cld, &config_llog_list, cld_list_chain) {
- 		if (!cld->cld_recover)
- 			continue;
--		seq_printf(m,  "    - { client: %s, nidtbl_version: %u }\n",
--			       cld->cld_logname,
--			       cld->cld_recover->cld_cfg.cfg_last_idx);
-+		seq_printf(m, "    - { client: %s, nidtbl_version: %u }\n",
-+			   cld->cld_logname,
-+			   cld->cld_recover->cld_cfg.cfg_last_idx);
+ 	case LPROCFS_GET_NUM_CPU:
+ 		if (stats->ls_flags & LPROCFS_STATS_FLAG_NOPERCPU) {
+-			if (stats->ls_flags & LPROCFS_STATS_FLAG_IRQ_SAFE) {
++			if (stats->ls_flags & LPROCFS_STATS_FLAG_IRQ_SAFE)
+ 				spin_unlock_irqrestore(&stats->ls_lock, *flags);
+-			} else {
++			else
+ 				spin_unlock(&stats->ls_lock);
+-			}
+ 		}
+ 		return;
  	}
- 	spin_unlock(&config_list_lock);
- 
-@@ -555,8 +556,7 @@ static int mgc_requeue_thread(void *data)
- 
- 		spin_lock(&config_list_lock);
- 		rq_state &= ~RQ_PRECLEANUP;
--		list_for_each_entry(cld, &config_llog_list,
--					cld_list_chain) {
-+		list_for_each_entry(cld, &config_llog_list, cld_list_chain) {
- 			if (!cld->cld_lostlock)
- 				continue;
- 
-@@ -966,8 +966,8 @@ static int mgc_target_register(struct obd_export *exp,
- }
- 
- static int mgc_set_info_async(const struct lu_env *env, struct obd_export *exp,
--		       u32 keylen, void *key, u32 vallen,
--		       void *val, struct ptlrpc_request_set *set)
-+			      u32 keylen, void *key, u32 vallen,
-+			      void *val, struct ptlrpc_request_set *set)
- {
- 	int rc = -EINVAL;
- 
 -- 
 2.1.0
