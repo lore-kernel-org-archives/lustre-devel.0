@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:47 -0500
-Subject: [lustre-devel] [PATCH v2 64/84] staging/lustre: Remove unused
-	lustre_build_lock_params()
+Date: Wed, 24 Feb 2016 22:00:48 -0500
+Subject: [lustre-devel] [PATCH v2 65/84] staging/lustre: Convert
+	ptlrpc_at_check_timed to void
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-65-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-66-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,71 +14,61 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-And also struct lustre_rw_params that is only referenced by it.
+The only caller was not looking at the return value,
+and liblustre, that cared about it is not part of the kernel client.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../staging/lustre/lustre/include/lustre_lite.h    | 48 ----------------------
- 1 file changed, 48 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/service.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lite.h b/drivers/staging/lustre/lustre/include/lustre_lite.h
-index f6d7aae..9852325 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lite.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lite.h
-@@ -53,54 +53,6 @@
- #define LL_MAX_BLKSIZE_BITS     (22)
- #define LL_MAX_BLKSIZE	  (1UL<<LL_MAX_BLKSIZE_BITS)
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index 6f71ecc..89039bf 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -1137,7 +1137,7 @@ out_free:
+ /* Send early replies to everybody expiring within at_early_margin
+  * asking for at_extra time
+  */
+-static int ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
++static void ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
+ {
+ 	struct ptlrpc_at_array *array = &svcpt->scp_at_array;
+ 	struct ptlrpc_request *rq, *n;
+@@ -1151,14 +1151,14 @@ static int ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
+ 	spin_lock(&svcpt->scp_at_lock);
+ 	if (svcpt->scp_at_check == 0) {
+ 		spin_unlock(&svcpt->scp_at_lock);
+-		return 0;
++		return;
+ 	}
+ 	delay = cfs_time_sub(cfs_time_current(), svcpt->scp_at_checktime);
+ 	svcpt->scp_at_check = 0;
  
--#include "lustre/lustre_user.h"
+ 	if (array->paa_count == 0) {
+ 		spin_unlock(&svcpt->scp_at_lock);
+-		return 0;
++		return;
+ 	}
+ 
+ 	/* The timer went off, but maybe the nearest rpc already completed. */
+@@ -1167,7 +1167,7 @@ static int ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
+ 		/* We've still got plenty of time.  Reset the timer. */
+ 		ptlrpc_at_set_timer(svcpt);
+ 		spin_unlock(&svcpt->scp_at_lock);
+-		return 0;
++		return;
+ 	}
+ 
+ 	/* We're close to a timeout, and we don't know how much longer the
+@@ -1237,8 +1237,6 @@ static int ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
+ 
+ 		ptlrpc_server_drop_request(rq);
+ 	}
 -
--struct lustre_rw_params {
--	int		lrp_lock_mode;
--	ldlm_policy_data_t lrp_policy;
--	u32		lrp_brw_flags;
--	int		lrp_ast_flags;
--};
--
--/*
-- * XXX nikita: this function lives in the header because it is used by both
-- * llite kernel module and liblustre library, and there is no (?) better place
-- * to put it in.
-- */
--static inline void lustre_build_lock_params(int cmd, unsigned long open_flags,
--					    __u64 connect_flags,
--					    loff_t pos, ssize_t len,
--					    struct lustre_rw_params *params)
--{
--	params->lrp_lock_mode = (cmd == OBD_BRW_READ) ? LCK_PR : LCK_PW;
--	params->lrp_brw_flags = 0;
--
--	params->lrp_policy.l_extent.start = pos;
--	params->lrp_policy.l_extent.end = pos + len - 1;
--	/*
--	 * for now O_APPEND always takes local locks.
--	 */
--	if (cmd == OBD_BRW_WRITE && (open_flags & O_APPEND)) {
--		params->lrp_policy.l_extent.start = 0;
--		params->lrp_policy.l_extent.end   = OBD_OBJECT_EOF;
--	} else if (LIBLUSTRE_CLIENT && (connect_flags & OBD_CONNECT_SRVLOCK)) {
--		/*
--		 * liblustre: OST-side locking for all non-O_APPEND
--		 * reads/writes.
--		 */
--		params->lrp_lock_mode = LCK_NL;
--		params->lrp_brw_flags = OBD_BRW_SRVLOCK;
--	} else {
--		/*
--		 * nothing special for the kernel. In the future llite may use
--		 * OST-side locks for small writes into highly contended
--		 * files.
--		 */
--	}
--	params->lrp_ast_flags = (open_flags & O_NONBLOCK) ?
--		LDLM_FL_BLOCK_NOWAIT : 0;
--}
--
- /*
-  * This is embedded into liblustre and llite super-blocks to keep track of
-  * connect flags (capabilities) supported by all imports given mount is
+-	return 1; /* return "did_something" for liblustre */
+ }
+ 
+ /**
 -- 
 2.1.0
