@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:48 -0500
-Subject: [lustre-devel] [PATCH v2 65/84] staging/lustre: Convert
-	ptlrpc_at_check_timed to void
+Date: Wed, 24 Feb 2016 22:00:09 -0500
+Subject: [lustre-devel] [PATCH v2 26/84] staging/lustre: Remove server-side
+	changelog defines
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-66-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-27-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,61 +14,43 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-The only caller was not looking at the return value,
-and liblustre, that cared about it is not part of the kernel client.
+CHANGELOG_MAGIC, CHANGELOG_MINMASK, CHANGELOG_ALLMASK,
+CHANGELOG_DEFMASK and CHANGELOG_USER_PREFIX are all unused
+on the client.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/ptlrpc/service.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 6f71ecc..89039bf 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -1137,7 +1137,7 @@ out_free:
- /* Send early replies to everybody expiring within at_early_margin
-  * asking for at_extra time
-  */
--static int ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
-+static void ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
- {
- 	struct ptlrpc_at_array *array = &svcpt->scp_at_array;
- 	struct ptlrpc_request *rq, *n;
-@@ -1151,14 +1151,14 @@ static int ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
- 	spin_lock(&svcpt->scp_at_lock);
- 	if (svcpt->scp_at_check == 0) {
- 		spin_unlock(&svcpt->scp_at_lock);
--		return 0;
-+		return;
- 	}
- 	delay = cfs_time_sub(cfs_time_current(), svcpt->scp_at_checktime);
- 	svcpt->scp_at_check = 0;
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 90ff181..d2f05e3 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -3039,15 +3039,6 @@ struct llog_size_change_rec {
+ 	struct llog_rec_tail	lsc_tail;
+ } __packed;
  
- 	if (array->paa_count == 0) {
- 		spin_unlock(&svcpt->scp_at_lock);
--		return 0;
-+		return;
- 	}
- 
- 	/* The timer went off, but maybe the nearest rpc already completed. */
-@@ -1167,7 +1167,7 @@ static int ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
- 		/* We've still got plenty of time.  Reset the timer. */
- 		ptlrpc_at_set_timer(svcpt);
- 		spin_unlock(&svcpt->scp_at_lock);
--		return 0;
-+		return;
- 	}
- 
- 	/* We're close to a timeout, and we don't know how much longer the
-@@ -1237,8 +1237,6 @@ static int ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
- 
- 		ptlrpc_server_drop_request(rq);
- 	}
+-#define CHANGELOG_MAGIC 0xca103000
 -
--	return 1; /* return "did_something" for liblustre */
- }
+-/** \a changelog_rec_type's that can't be masked */
+-#define CHANGELOG_MINMASK (1 << CL_MARK)
+-/** bits covering all \a changelog_rec_type's */
+-#define CHANGELOG_ALLMASK 0XFFFFFFFF
+-/** default \a changelog_rec_type mask */
+-#define CHANGELOG_DEFMASK CHANGELOG_ALLMASK & ~(1 << CL_ATIME | 1 << CL_CLOSE)
+-
+ /* changelog llog name, needed by client replicators */
+ #define CHANGELOG_CATALOG "changelog_catalog"
  
- /**
+@@ -3069,8 +3060,6 @@ struct llog_changelog_ext_rec {
+ 	struct llog_rec_tail     cr_tail; /**< for_sizezof_only */
+ } __packed;
+ 
+-#define CHANGELOG_USER_PREFIX "cl"
+-
+ struct llog_changelog_user_rec {
+ 	struct llog_rec_hdr   cur_hdr;
+ 	__u32		 cur_id;
 -- 
 2.1.0
