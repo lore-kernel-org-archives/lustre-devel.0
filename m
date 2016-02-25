@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:28 -0500
-Subject: [lustre-devel] [PATCH v2 45/84] staging/lustre/lclient: Adjust
-	comments to better conform to coding style
+Date: Wed, 24 Feb 2016 22:00:14 -0500
+Subject: [lustre-devel] [PATCH v2 31/84] staging/lustre: Remove unused
+	struct quota_body
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-46-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-32-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,137 +14,230 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This patch fixes "Block comments use a trailing */ on a separate line"
-warnings from checkpatch.
+It's only used for communications between servers.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/lclient/glimpse.c    |  3 ++-
- drivers/staging/lustre/lustre/lclient/lcommon_cl.c | 24 ++++++++++++++--------
- .../staging/lustre/lustre/lclient/lcommon_misc.c   |  6 ++++--
- 3 files changed, 22 insertions(+), 11 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      | 31 ---------------
+ .../lustre/lustre/include/lustre_req_layout.h      |  3 --
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      | 36 ------------------
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    | 10 -----
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 44 ----------------------
+ 5 files changed, 124 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lclient/glimpse.c b/drivers/staging/lustre/lustre/lclient/glimpse.c
-index 8533a1e..c4e8a08 100644
---- a/drivers/staging/lustre/lustre/lclient/glimpse.c
-+++ b/drivers/staging/lustre/lustre/lclient/glimpse.c
-@@ -109,7 +109,8 @@ int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
- 			 *       if there were no conflicting locks. If there
- 			 *       were conflicting locks, enqueuing or waiting
- 			 *       fails with -ENAVAIL, but valid inode
--			 *       attributes are returned anyway. */
-+			 *       attributes are returned anyway.
-+			 */
- 			*descr = whole_file;
- 			descr->cld_obj   = clob;
- 			descr->cld_mode  = CLM_PHANTOM;
-diff --git a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
-index efa6e2e..30651f2 100644
---- a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
-+++ b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
-@@ -613,7 +613,8 @@ void ccc_lock_state(const struct lu_env *env,
- 		 * stale i_size when doing appending writes and effectively
- 		 * cancel the result of the truncate.  Getting the
- 		 * ll_inode_size_lock() after the enqueue maintains the DLM
--		 * -> ll_inode_size_lock() acquiring order. */
-+		 * -> ll_inode_size_lock() acquiring order.
-+		 */
- 		if (lock->cll_descr.cld_start == 0 &&
- 		    lock->cll_descr.cld_end == CL_PAGE_EOF)
- 			cl_merge_lvb(env, inode);
-@@ -754,7 +755,8 @@ int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
- 				 * page index, return directly. Do not expect
- 				 * kernel will check such case correctly.
- 				 * linux-2.6.18-128.1.1 miss to do that.
--				 * --bug 17336 */
-+				 * --bug 17336
-+				 */
- 				loff_t size = cl_isize_read(inode);
- 				loff_t cur_index = start >> PAGE_CACHE_SHIFT;
- 				loff_t size_index = (size - 1) >>
-@@ -884,7 +886,8 @@ again:
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index ccb1b85..607bfde 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1819,37 +1819,6 @@ do {					\
+ 	Q_COPY(out, in, qc_dqblk);	\
+ } while (0)
  
- 		if (attr->ia_valid & ATTR_FILE)
- 			/* populate the file descriptor for ftruncate to honor
--			 * group lock - see LU-787 */
-+			 * group lock - see LU-787
-+			 */
- 			cio->cui_fd = cl_iattr2fd(inode, attr);
+-/* Body of quota request used for quota acquire/release RPCs between quota
+- * master (aka QMT) and slaves (ak QSD). */
+-struct quota_body {
+-	struct lu_fid	qb_fid;     /* FID of global index packing the pool ID
+-				      * and type (data or metadata) as well as
+-				      * the quota type (user or group). */
+-	union lquota_id	qb_id;      /* uid or gid or directory FID */
+-	__u32		qb_flags;   /* see below */
+-	__u32		qb_padding;
+-	__u64		qb_count;   /* acquire/release count (kbytes/inodes) */
+-	__u64		qb_usage;   /* current slave usage (kbytes/inodes) */
+-	__u64		qb_slv_ver; /* slave index file version */
+-	struct lustre_handle	qb_lockh;     /* per-ID lock handle */
+-	struct lustre_handle	qb_glb_lockh; /* global lock handle */
+-	__u64		qb_padding1[4];
+-};
+-
+-/* When the quota_body is used in the reply of quota global intent
+- * lock (IT_QUOTA_CONN) reply, qb_fid contains slave index file FID. */
+-#define qb_slv_fid	qb_fid
+-/* qb_usage is the current qunit (in kbytes/inodes) when quota_body is used in
+- * quota reply */
+-#define qb_qunit	qb_usage
+-
+-#define QUOTA_DQACQ_FL_ACQ	0x1  /* acquire quota */
+-#define QUOTA_DQACQ_FL_PREACQ	0x2  /* pre-acquire */
+-#define QUOTA_DQACQ_FL_REL	0x4  /* release quota */
+-#define QUOTA_DQACQ_FL_REPORT	0x8  /* report usage */
+-
+-void lustre_swab_quota_body(struct quota_body *b);
+-
+ /* Quota types currently supported */
+ enum {
+ 	LQUOTA_TYPE_USR	= 0x00, /* maps to USRQUOTA */
+diff --git a/drivers/staging/lustre/lustre/include/lustre_req_layout.h b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+index b8a83a1..fdcdd7a 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_req_layout.h
++++ b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+@@ -176,7 +176,6 @@ extern struct req_format RQF_MDS_REINT_SETXATTR;
+ extern struct req_format RQF_MDS_QUOTACHECK;
+ extern struct req_format RQF_MDS_QUOTACTL;
+ extern struct req_format RQF_QC_CALLBACK;
+-extern struct req_format RQF_QUOTA_DQACQ;
+ extern struct req_format RQF_MDS_SWAP_LAYOUTS;
+ /* MDS hsm formats */
+ extern struct req_format RQF_MDS_HSM_STATE_GET;
+@@ -219,7 +218,6 @@ extern struct req_format RQF_LDLM_INTENT_OPEN;
+ extern struct req_format RQF_LDLM_INTENT_CREATE;
+ extern struct req_format RQF_LDLM_INTENT_UNLINK;
+ extern struct req_format RQF_LDLM_INTENT_GETXATTR;
+-extern struct req_format RQF_LDLM_INTENT_QUOTA;
+ extern struct req_format RQF_LDLM_CANCEL;
+ extern struct req_format RQF_LDLM_CALLBACK;
+ extern struct req_format RQF_LDLM_CP_CALLBACK;
+@@ -276,7 +274,6 @@ extern struct req_msg_field RMF_CAPA1;
+ extern struct req_msg_field RMF_CAPA2;
+ extern struct req_msg_field RMF_OBD_QUOTACHECK;
+ extern struct req_msg_field RMF_OBD_QUOTACTL;
+-extern struct req_msg_field RMF_QUOTA_BODY;
+ extern struct req_msg_field RMF_STRING;
+ extern struct req_msg_field RMF_SWAP_LAYOUTS;
+ extern struct req_msg_field RMF_MDS_HSM_PROGRESS;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+index aff9bf5..715088f 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+@@ -118,25 +118,6 @@ static const struct req_msg_field *quotactl_only[] = {
+ 	&RMF_OBD_QUOTACTL
+ };
  
- 		result = cl_io_loop(env, io);
-@@ -896,7 +899,8 @@ again:
- 		goto again;
- 	/* HSM import case: file is released, cannot be restored
- 	 * no need to fail except if restore registration failed
--	 * with -ENODATA */
-+	 * with -ENODATA
-+	 */
- 	if (result == -ENODATA && io->ci_restore_needed &&
- 	    io->ci_result != -ENODATA)
- 		result = 0;
-@@ -1026,7 +1030,8 @@ int cl_file_inode_init(struct inode *inode, struct lustre_md *md)
- 		/* clob is slave of inode, empty lli_clob means for new inode,
- 		 * there is no clob in cache with the given fid, so it is
- 		 * unnecessary to perform lookup-alloc-lookup-insert, just
--		 * alloc and insert directly. */
-+		 * alloc and insert directly.
-+		 */
- 		LASSERT(inode->i_state & I_NEW);
- 		conf.coc_lu.loc_flags = LOC_F_NEW;
- 		clob = cl_object_find(env, lu2cl_dev(site->ls_top_dev),
-@@ -1151,7 +1156,8 @@ __u16 ll_dirent_type_get(struct lu_dirent *ent)
+-static const struct req_msg_field *quota_body_only[] = {
+-	&RMF_PTLRPC_BODY,
+-	&RMF_QUOTA_BODY
+-};
+-
+-static const struct req_msg_field *ldlm_intent_quota_client[] = {
+-	&RMF_PTLRPC_BODY,
+-	&RMF_DLM_REQ,
+-	&RMF_LDLM_INTENT,
+-	&RMF_QUOTA_BODY
+-};
+-
+-static const struct req_msg_field *ldlm_intent_quota_server[] = {
+-	&RMF_PTLRPC_BODY,
+-	&RMF_DLM_REP,
+-	&RMF_DLM_LVB,
+-	&RMF_QUOTA_BODY
+-};
+-
+ static const struct req_msg_field *mdt_close_client[] = {
+ 	&RMF_PTLRPC_BODY,
+ 	&RMF_MDT_EPOCH,
+@@ -748,8 +729,6 @@ static struct req_format *req_formats[] = {
+ 	&RQF_LDLM_INTENT_CREATE,
+ 	&RQF_LDLM_INTENT_UNLINK,
+ 	&RQF_LDLM_INTENT_GETXATTR,
+-	&RQF_LDLM_INTENT_QUOTA,
+-	&RQF_QUOTA_DQACQ,
+ 	&RQF_LOG_CANCEL,
+ 	&RQF_LLOG_ORIGIN_HANDLE_CREATE,
+ 	&RQF_LLOG_ORIGIN_HANDLE_DESTROY,
+@@ -888,11 +867,6 @@ struct req_msg_field RMF_OBD_QUOTACTL =
+ 		    lustre_swab_obd_quotactl, NULL);
+ EXPORT_SYMBOL(RMF_OBD_QUOTACTL);
+ 
+-struct req_msg_field RMF_QUOTA_BODY =
+-	DEFINE_MSGF("quota_body", 0,
+-		    sizeof(struct quota_body), lustre_swab_quota_body, NULL);
+-EXPORT_SYMBOL(RMF_QUOTA_BODY);
+-
+ struct req_msg_field RMF_MDT_EPOCH =
+ 	DEFINE_MSGF("mdt_ioepoch", 0,
+ 		    sizeof(struct mdt_ioepoch), lustre_swab_mdt_ioepoch, NULL);
+@@ -1233,16 +1207,6 @@ struct req_format RQF_QC_CALLBACK =
+ 	DEFINE_REQ_FMT0("QC_CALLBACK", quotactl_only, empty);
+ EXPORT_SYMBOL(RQF_QC_CALLBACK);
+ 
+-struct req_format RQF_QUOTA_DQACQ =
+-	DEFINE_REQ_FMT0("QUOTA_DQACQ", quota_body_only, quota_body_only);
+-EXPORT_SYMBOL(RQF_QUOTA_DQACQ);
+-
+-struct req_format RQF_LDLM_INTENT_QUOTA =
+-	DEFINE_REQ_FMT0("LDLM_INTENT_QUOTA",
+-			ldlm_intent_quota_client,
+-			ldlm_intent_quota_server);
+-EXPORT_SYMBOL(RQF_LDLM_INTENT_QUOTA);
+-
+ struct req_format RQF_MDS_GETSTATUS =
+ 	DEFINE_REQ_FMT0("MDS_GETSTATUS", mdt_body_only, mdt_body_capa);
+ EXPORT_SYMBOL(RQF_MDS_GETSTATUS);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+index 8b020fb..d6f0e6d 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+@@ -2033,16 +2033,6 @@ void lustre_swab_ldlm_reply(struct ldlm_reply *r)
  }
+ EXPORT_SYMBOL(lustre_swab_ldlm_reply);
  
- /**
-- * build inode number from passed @fid */
-+ * build inode number from passed @fid
-+ */
- __u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
+-void lustre_swab_quota_body(struct quota_body *b)
+-{
+-	lustre_swab_lu_fid(&b->qb_fid);
+-	lustre_swab_lu_fid((struct lu_fid *)&b->qb_id);
+-	__swab32s(&b->qb_flags);
+-	__swab64s(&b->qb_count);
+-	__swab64s(&b->qb_usage);
+-	__swab64s(&b->qb_slv_ver);
+-}
+-
+ /* Dump functions */
+ void dump_ioo(struct obd_ioobj *ioo)
  {
- 	if (BITS_PER_LONG == 32 || api32)
-@@ -1162,7 +1168,8 @@ __u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+index 799a85ac..c61d46f 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+@@ -3720,50 +3720,6 @@ void lustre_assert_wire_constants(void)
+ 	LASSERTF((int)sizeof(((struct ll_fiemap_info_key *)0)->fiemap) == 32, "found %lld\n",
+ 		 (long long)(int)sizeof(((struct ll_fiemap_info_key *)0)->fiemap));
  
- /**
-  * build inode generation from passed @fid.  If our FID overflows the 32-bit
-- * inode number then return a non-zero generation to distinguish them. */
-+ * inode number then return a non-zero generation to distinguish them.
-+ */
- __u32 cl_fid_build_gen(const struct lu_fid *fid)
- {
- 	__u32 gen;
-@@ -1183,7 +1190,8 @@ __u32 cl_fid_build_gen(const struct lu_fid *fid)
-  * have to wait for the refcount to become zero to destroy the older layout.
-  *
-  * Notice that the lsm returned by this function may not be valid unless called
-- * inside layout lock - MDS_INODELOCK_LAYOUT. */
-+ * inside layout lock - MDS_INODELOCK_LAYOUT.
-+ */
- struct lov_stripe_md *ccc_inode_lsm_get(struct inode *inode)
- {
- 	return lov_lsm_get(cl_i2info(inode)->lli_clob);
-diff --git a/drivers/staging/lustre/lustre/lclient/lcommon_misc.c b/drivers/staging/lustre/lustre/lclient/lcommon_misc.c
-index 8389a0e..d80bcedd 100644
---- a/drivers/staging/lustre/lustre/lclient/lcommon_misc.c
-+++ b/drivers/staging/lustre/lustre/lclient/lcommon_misc.c
-@@ -48,7 +48,8 @@
- /* Initialize the default and maximum LOV EA and cookie sizes.  This allows
-  * us to make MDS RPCs with large enough reply buffers to hold the
-  * maximum-sized (= maximum striped) EA and cookie without having to
-- * calculate this (via a call into the LOV + OSCs) each time we make an RPC. */
-+ * calculate this (via a call into the LOV + OSCs) each time we make an RPC.
-+ */
- int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
- {
- 	struct lov_stripe_md lsm = { .lsm_magic = LOV_MAGIC_V3 };
-@@ -74,7 +75,8 @@ int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
- 	cookiesize = stripes * sizeof(struct llog_cookie);
- 
- 	/* default cookiesize is 0 because from 2.4 server doesn't send
--	 * llog cookies to client. */
-+	 * llog cookies to client.
-+	 */
- 	CDEBUG(D_HA,
- 	       "updating def/max_easize: %d/%d def/max_cookiesize: 0/%d\n",
- 	       def_easize, easize, cookiesize);
+-	/* Checks for struct quota_body */
+-	LASSERTF((int)sizeof(struct quota_body) == 112, "found %lld\n",
+-		 (long long)(int)sizeof(struct quota_body));
+-	LASSERTF((int)offsetof(struct quota_body, qb_fid) == 0, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_fid));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_fid) == 16, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_fid));
+-	LASSERTF((int)offsetof(struct quota_body, qb_id) == 16, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_id));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_id) == 16, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_id));
+-	LASSERTF((int)offsetof(struct quota_body, qb_flags) == 32, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_flags));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_flags) == 4, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_flags));
+-	LASSERTF((int)offsetof(struct quota_body, qb_padding) == 36, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_padding));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_padding) == 4, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_padding));
+-	LASSERTF((int)offsetof(struct quota_body, qb_count) == 40, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_count));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_count) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_count));
+-	LASSERTF((int)offsetof(struct quota_body, qb_usage) == 48, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_usage));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_usage) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_usage));
+-	LASSERTF((int)offsetof(struct quota_body, qb_slv_ver) == 56, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_slv_ver));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_slv_ver) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_slv_ver));
+-	LASSERTF((int)offsetof(struct quota_body, qb_lockh) == 64, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_lockh));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_lockh) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_lockh));
+-	LASSERTF((int)offsetof(struct quota_body, qb_glb_lockh) == 72, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_glb_lockh));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_glb_lockh) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_glb_lockh));
+-	LASSERTF((int)offsetof(struct quota_body, qb_padding1[4]) == 112, "found %lld\n",
+-		 (long long)(int)offsetof(struct quota_body, qb_padding1[4]));
+-	LASSERTF((int)sizeof(((struct quota_body *)0)->qb_padding1[4]) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct quota_body *)0)->qb_padding1[4]));
+-
+ 	/* Checks for struct mgs_target_info */
+ 	LASSERTF((int)sizeof(struct mgs_target_info) == 4544, "found %lld\n",
+ 		 (long long)(int)sizeof(struct mgs_target_info));
 -- 
 2.1.0
