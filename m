@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:36 -0500
-Subject: [lustre-devel] [PATCH v2 53/84] staging/lustre/obdecho: Adjust
-	comments to better conform to coding style
+Date: Wed, 24 Feb 2016 22:00:42 -0500
+Subject: [lustre-devel] [PATCH v2 59/84] staging/lustre: Remove unused
+	members of struct ll_sb_info
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-54-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-60-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,47 +14,51 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This patch fixes "Block comments use a trailing */ on a separate line"
-warnings from checkpatch
+ll_orphan_dentry_list and ll_conn_chain are not used
+and could be removed.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/obdecho/echo_client.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_internal.h | 2 --
+ drivers/staging/lustre/lustre/llite/llite_lib.c      | 4 ----
+ 2 files changed, 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index ca87cc2..3be28c5 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -746,7 +746,8 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
- 	cleanup = 4;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 12fdca9..f6921ff 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -478,10 +478,8 @@ struct ll_sb_info {
+ 	int		       ll_flags;
+ 	unsigned int		  ll_umounting:1,
+ 				  ll_xattr_cache_enabled:1;
+-	struct list_head		ll_conn_chain; /* per-conn chain of SBs */
+ 	struct lustre_client_ocd  ll_lco;
  
- 	/* if echo client is to be stacked upon ost device, the next is
--	 * NULL since ost is not a clio device so far */
-+	 * NULL since ost is not a clio device so far
-+	 */
- 	if (next && !lu_device_is_cl(next))
- 		next = NULL;
+-	struct list_head		ll_orphan_dentry_list; /*please don't ask -p*/
+ 	struct ll_close_queue    *ll_lcq;
  
-@@ -965,7 +966,8 @@ static struct echo_object *cl_echo_object_find(struct echo_device *d,
- 	}
+ 	struct lprocfs_stats     *ll_stats; /* lprocfs stats counter */
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index d03f884..9ae1cc8 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -102,8 +102,6 @@ static struct ll_sb_info *ll_init_sbi(struct super_block *sb)
+ 	sbi->ll_ra_info.ra_max_pages = sbi->ll_ra_info.ra_max_pages_per_file;
+ 	sbi->ll_ra_info.ra_max_read_ahead_whole_pages =
+ 					   SBI_DEFAULT_READAHEAD_WHOLE_MAX;
+-	INIT_LIST_HEAD(&sbi->ll_conn_chain);
+-	INIT_LIST_HEAD(&sbi->ll_orphan_dentry_list);
  
- 	/* In the function below, .hs_keycmp resolves to
--	 * lu_obj_hop_keycmp() */
-+	 * lu_obj_hop_keycmp()
-+	 */
- 	/* coverity[overrun-buffer-val] */
- 	obj = cl_object_find(env, echo_dev2cl(d), fid, &conf->eoc_cl);
- 	if (IS_ERR(obj)) {
-@@ -1164,7 +1166,8 @@ static int cl_echo_object_brw(struct echo_object *eco, int rw, u64 offset,
- 		cl_page_list_add(&queue->c2_qin, clp);
+ 	ll_generate_random_uuid(uuid);
+ 	class_uuid_unparse(uuid, &sbi->ll_sb_uuid);
+@@ -626,8 +624,6 @@ static void client_common_put_super(struct super_block *sb)
  
- 		/* drop the reference count for cl_page_find, so that the page
--		 * will be freed in cl_2queue_fini. */
-+		 * will be freed in cl_2queue_fini.
-+		 */
- 		cl_page_put(env, clp);
- 		cl_page_clip(env, clp, 0, page_size);
+ 	cl_sb_fini(sb);
  
+-	list_del(&sbi->ll_conn_chain);
+-
+ 	obd_fid_fini(sbi->ll_dt_exp->exp_obd);
+ 	obd_disconnect(sbi->ll_dt_exp);
+ 	sbi->ll_dt_exp = NULL;
 -- 
 2.1.0
