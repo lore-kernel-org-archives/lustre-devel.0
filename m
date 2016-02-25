@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:06 -0500
-Subject: [lustre-devel] [PATCH v2 23/84] staging/lustre/llite: Get rid of
-	se_stat_t typedef
+Date: Wed, 24 Feb 2016 22:00:13 -0500
+Subject: [lustre-devel] [PATCH v2 30/84] staging/lustre: Remove duplicated
+	quota defines
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-24-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-31-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,59 +14,53 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace it with enum se_stat
+QUOTABLOCK_BITS, QUOTABLOCK_SIZE and toqb are only used on the server
+and are copied from kernel code anyway.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/statahead.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 12 ------------
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c           |  5 -----
+ 2 files changed, 17 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-index 4b215d3..db220f2 100644
---- a/drivers/staging/lustre/lustre/llite/statahead.c
-+++ b/drivers/staging/lustre/lustre/llite/statahead.c
-@@ -49,13 +49,13 @@
- 
- #define SA_OMITTED_ENTRY_MAX 8ULL
- 
--typedef enum {
-+enum se_stat {
- 	/** negative values are for error cases */
- 	SA_ENTRY_INIT = 0,      /** init entry */
- 	SA_ENTRY_SUCC = 1,      /** stat succeed */
- 	SA_ENTRY_INVA = 2,      /** invalid entry */
- 	SA_ENTRY_DEST = 3,      /** entry to be destroyed */
--} se_stat_t;
-+};
- 
- struct ll_sa_entry {
- 	/* link into sai->sai_entries */
-@@ -71,7 +71,7 @@ struct ll_sa_entry {
- 	/* low layer ldlm lock handle */
- 	__u64		   se_handle;
- 	/* entry status */
--	se_stat_t	       se_stat;
-+	enum se_stat	   se_stat;
- 	/* entry size, contains name */
- 	int		     se_size;
- 	/* pointer to async getattr enqueue info */
-@@ -366,7 +366,7 @@ ll_sa_entry_fini(struct ll_statahead_info *sai, struct ll_sa_entry *entry)
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 26f1c43..ccb1b85 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1778,18 +1778,6 @@ void lustre_swab_ost_lvb(struct ost_lvb *lvb);
+  *   lquota data structures
   */
- static void
- do_sa_entry_to_stated(struct ll_statahead_info *sai,
--		      struct ll_sa_entry *entry, se_stat_t stat)
-+		      struct ll_sa_entry *entry, enum se_stat stat)
- {
- 	struct ll_sa_entry *se;
- 	struct list_head	 *pos = &sai->sai_entries_stated;
-@@ -392,7 +392,7 @@ do_sa_entry_to_stated(struct ll_statahead_info *sai,
-  */
- static int
- ll_sa_entry_to_stated(struct ll_statahead_info *sai,
--		      struct ll_sa_entry *entry, se_stat_t stat)
-+		      struct ll_sa_entry *entry, enum se_stat stat)
- {
- 	struct ll_inode_info *lli = ll_i2info(sai->sai_inode);
- 	int		   ret = 1;
+ 
+-#ifndef QUOTABLOCK_BITS
+-#define QUOTABLOCK_BITS 10
+-#endif
+-
+-#ifndef QUOTABLOCK_SIZE
+-#define QUOTABLOCK_SIZE (1 << QUOTABLOCK_BITS)
+-#endif
+-
+-#ifndef toqb
+-#define toqb(x) (((x) + QUOTABLOCK_SIZE - 1) >> QUOTABLOCK_BITS)
+-#endif
+-
+ /* The lquota_id structure is an union of all the possible identifier types that
+  * can be used with quota, this includes:
+  * - 64-bit user ID
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+index 3f9acc2..799a85ac 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+@@ -1507,11 +1507,6 @@ void lustre_assert_wire_constants(void)
+ 	LASSERTF((int)sizeof(union lquota_id) == 16, "found %lld\n",
+ 		 (long long)(int)sizeof(union lquota_id));
+ 
+-	LASSERTF(QUOTABLOCK_BITS == 10, "found %lld\n",
+-		 (long long)QUOTABLOCK_BITS);
+-	LASSERTF(QUOTABLOCK_SIZE == 1024, "found %lld\n",
+-		 (long long)QUOTABLOCK_SIZE);
+-
+ 	/* Checks for struct obd_quotactl */
+ 	LASSERTF((int)sizeof(struct obd_quotactl) == 112, "found %lld\n",
+ 		 (long long)(int)sizeof(struct obd_quotactl));
 -- 
 2.1.0
