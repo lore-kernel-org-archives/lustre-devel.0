@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 21:59:46 -0500
-Subject: [lustre-devel] [PATCH v2 03/84] staging/lustre: Get rid of
-	client_obd_lock_t typedef
+Date: Wed, 24 Feb 2016 21:59:47 -0500
+Subject: [lustre-devel] [PATCH v2 04/84] staging/lustre: Get rid of
+	loc_flags_t typedef
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-4-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-5-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,83 +14,39 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace it with struct client_obd_lock
+Replace it with direct reference of enum loc_flags
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/linux/obd.h | 12 ++++++------
- drivers/staging/lustre/lustre/include/obd.h       |  4 ++--
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/staging/lustre/lustre/include/lu_object.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/linux/obd.h b/drivers/staging/lustre/lustre/include/linux/obd.h
-index 240947b..3907bf4 100644
---- a/drivers/staging/lustre/lustre/include/linux/obd.h
-+++ b/drivers/staging/lustre/lustre/include/linux/obd.h
-@@ -57,16 +57,16 @@ struct ll_iattr {
- 
- #define CLIENT_OBD_LIST_LOCK_DEBUG 1
- 
--typedef struct {
-+struct client_obd_lock {
- 	spinlock_t		lock;
- 
- 	unsigned long       time;
- 	struct task_struct *task;
- 	const char	 *func;
- 	int		 line;
--} client_obd_lock_t;
+diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
+index c1c7aa1..23e5567 100644
+--- a/drivers/staging/lustre/lustre/include/lu_object.h
++++ b/drivers/staging/lustre/lustre/include/lu_object.h
+@@ -164,11 +164,11 @@ struct lu_device_operations {
+ /**
+  * For lu_object_conf flags
+  */
+-typedef enum {
++enum loc_flags {
+ 	/* This is a new object to be allocated, or the file
+ 	 * corresponding to the object does not exists. */
+ 	LOC_F_NEW	= 0x00000001,
+-} loc_flags_t;
 +};
  
--static inline void __client_obd_list_lock(client_obd_lock_t *lock,
-+static inline void __client_obd_list_lock(struct client_obd_lock *lock,
- 					  const char *func, int line)
- {
- 	unsigned long cur = jiffies;
-@@ -106,7 +106,7 @@ static inline void __client_obd_list_lock(client_obd_lock_t *lock,
- #define client_obd_list_lock(lock) \
- 	__client_obd_list_lock(lock, __func__, __LINE__)
- 
--static inline void client_obd_list_unlock(client_obd_lock_t *lock)
-+static inline void client_obd_list_unlock(struct client_obd_lock *lock)
- {
- 	LASSERT(lock->task);
- 	lock->task = NULL;
-@@ -114,12 +114,12 @@ static inline void client_obd_list_unlock(client_obd_lock_t *lock)
- 	spin_unlock(&lock->lock);
- }
- 
--static inline void client_obd_list_lock_init(client_obd_lock_t *lock)
-+static inline void client_obd_list_lock_init(struct client_obd_lock *lock)
- {
- 	spin_lock_init(&lock->lock);
- }
- 
--static inline void client_obd_list_lock_done(client_obd_lock_t *lock)
-+static inline void client_obd_list_lock_done(struct client_obd_lock *lock)
- {}
- 
- #endif /* __LINUX_OBD_H */
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 2245359..d6e5a17 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -294,7 +294,7 @@ struct client_obd {
- 	 * NB by Jinshan: though field names are still _loi_, but actually
- 	 * osc_object{}s are in the list.
+ /**
+  * Object configuration, describing particulars of object being created. On
+@@ -179,7 +179,7 @@ struct lu_object_conf {
+ 	/**
+ 	 * Some hints for obj find and alloc.
  	 */
--	client_obd_lock_t	cl_loi_list_lock;
-+	struct client_obd_lock	       cl_loi_list_lock;
- 	struct list_head	       cl_loi_ready_list;
- 	struct list_head	       cl_loi_hp_ready_list;
- 	struct list_head	       cl_loi_write_list;
-@@ -321,7 +321,7 @@ struct client_obd {
- 	atomic_t		 cl_lru_shrinkers;
- 	atomic_t		 cl_lru_in_list;
- 	struct list_head	 cl_lru_list; /* lru page list */
--	client_obd_lock_t	 cl_lru_list_lock; /* page list protector */
-+	struct client_obd_lock   cl_lru_list_lock; /* page list protector */
+-	loc_flags_t     loc_flags;
++	enum loc_flags     loc_flags;
+ };
  
- 	/* number of in flight destroy rpcs is limited to max_rpcs_in_flight */
- 	atomic_t	     cl_destroy_in_flight;
+ /**
 -- 
 2.1.0
