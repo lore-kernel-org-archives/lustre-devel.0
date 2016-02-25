@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:04 -0500
-Subject: [lustre-devel] [PATCH v2 21/84] staging/lustre: Get rid of
-	ldlm_ns_type_t typedef
+Date: Wed, 24 Feb 2016 22:00:12 -0500
+Subject: [lustre-devel] [PATCH v2 29/84] staging/lustre: Remove
+	*_CONNECT_SUPPORTED defines
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-22-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-30-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,80 +14,87 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace it with enum ldlm_ns_type
+These defines are only used on the servers to determine
+what connect flags corresponding servers support:
+MDT_CONNECT_SUPPORTED
+OST_CONNECT_SUPPORTED
+MGS_CONNECT_SUPPORTED
+ECHO_CONNECT_SUPPORTED
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_dlm.h | 6 +++---
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      | 2 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      | 50 ++--------------------
+ 1 file changed, 4 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index 0f229b9..ab40bc7 100644
---- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -318,7 +318,7 @@ enum {
- 	LDLM_NSS_LAST
- };
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index eeb0542..26f1c43 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1248,61 +1248,19 @@ void lustre_swab_ptlrpc_body(struct ptlrpc_body *pb);
+  * submit a small patch against EVERY branch that ONLY adds the new flag,
+  * updates obd_connect_names[] for lprocfs_rd_connect_flags(), adds the
+  * flag to check_obd_connect_data(), and updates wiretests accordingly, so it
+- * can be approved and landed easily to reserve the flag for future use. */
++ * can be approved and landed easily to reserve the flag for future use.
++ */
  
--typedef enum {
-+enum ldlm_ns_type {
- 	/** invalid type */
- 	LDLM_NS_TYPE_UNKNOWN    = 0,
- 	/** mdc namespace */
-@@ -333,7 +333,7 @@ typedef enum {
- 	LDLM_NS_TYPE_MGC,
- 	/** mgs namespace */
- 	LDLM_NS_TYPE_MGT,
--} ldlm_ns_type_t;
-+};
+ /* The MNE_SWAB flag is overloading the MDS_MDS bit only for the MGS
+  * connection.  It is a temporary bug fix for Imperative Recovery interop
+  * between 2.2 and 2.3 x86/ppc nodes, and can be removed when interop for
+- * 2.2 clients/servers is no longer needed.  LU-1252/LU-1644. */
++ * 2.2 clients/servers is no longer needed.  LU-1252/LU-1644.
++ */
+ #define OBD_CONNECT_MNE_SWAB		 OBD_CONNECT_MDS_MDS
  
- /**
-  * LDLM Namespace.
-@@ -1177,7 +1177,7 @@ void ldlm_unlink_lock_skiplist(struct ldlm_lock *req);
- struct ldlm_namespace *
- ldlm_namespace_new(struct obd_device *obd, char *name,
- 		   ldlm_side_t client, enum ldlm_appetite apt,
--		   ldlm_ns_type_t ns_type);
-+		   enum ldlm_ns_type ns_type);
- int ldlm_namespace_cleanup(struct ldlm_namespace *ns, __u64 flags);
- void ldlm_namespace_get(struct ldlm_namespace *ns);
- void ldlm_namespace_put(struct ldlm_namespace *ns);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index c22370b..d0ad28d 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -241,7 +241,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	struct obd_uuid server_uuid;
- 	int rq_portal, rp_portal, connect_op;
- 	char *name = obddev->obd_type->typ_name;
--	ldlm_ns_type_t ns_type = LDLM_NS_TYPE_UNKNOWN;
-+	enum ldlm_ns_type ns_type = LDLM_NS_TYPE_UNKNOWN;
- 	int rc;
+ #define OCD_HAS_FLAG(ocd, flg)  \
+ 	(!!((ocd)->ocd_connect_flags & OBD_CONNECT_##flg))
  
- 	/* In a more perfect world, we would hang a ptlrpc_client off of
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index 582cb21..9ab4452 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -554,7 +554,7 @@ static struct cfs_hash_ops ldlm_ns_fid_hash_ops = {
- };
- 
- struct ldlm_ns_hash_def {
--	ldlm_ns_type_t  nsd_type;
-+	enum ldlm_ns_type nsd_type;
- 	/** hash bucket bits */
- 	unsigned	nsd_bkt_bits;
- 	/** hash bits */
-@@ -622,7 +622,7 @@ static void ldlm_namespace_register(struct ldlm_namespace *ns,
- struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
- 					  ldlm_side_t client,
- 					  enum ldlm_appetite apt,
--					  ldlm_ns_type_t ns_type)
-+					  enum ldlm_ns_type ns_type)
- {
- 	struct ldlm_namespace *ns = NULL;
- 	struct ldlm_ns_bucket *nsb;
+-#define LRU_RESIZE_CONNECT_FLAG OBD_CONNECT_LRU_RESIZE
+-
+-#define MDT_CONNECT_SUPPORTED  (OBD_CONNECT_RDONLY | OBD_CONNECT_VERSION | \
+-				OBD_CONNECT_ACL | OBD_CONNECT_XATTR | \
+-				OBD_CONNECT_IBITS | \
+-				OBD_CONNECT_NODEVOH | OBD_CONNECT_ATTRFID | \
+-				OBD_CONNECT_CANCELSET | OBD_CONNECT_AT | \
+-				OBD_CONNECT_RMT_CLIENT | \
+-				OBD_CONNECT_RMT_CLIENT_FORCE | \
+-				OBD_CONNECT_BRW_SIZE | OBD_CONNECT_MDS_CAPA | \
+-				OBD_CONNECT_OSS_CAPA | OBD_CONNECT_MDS_MDS | \
+-				OBD_CONNECT_FID | LRU_RESIZE_CONNECT_FLAG | \
+-				OBD_CONNECT_VBR | OBD_CONNECT_LOV_V3 | \
+-				OBD_CONNECT_SOM | OBD_CONNECT_FULL20 | \
+-				OBD_CONNECT_64BITHASH | OBD_CONNECT_JOBSTATS | \
+-				OBD_CONNECT_EINPROGRESS | \
+-				OBD_CONNECT_LIGHTWEIGHT | OBD_CONNECT_UMASK | \
+-				OBD_CONNECT_LVB_TYPE | OBD_CONNECT_LAYOUTLOCK |\
+-				OBD_CONNECT_PINGLESS | OBD_CONNECT_MAX_EASIZE |\
+-				OBD_CONNECT_FLOCK_DEAD | \
+-				OBD_CONNECT_DISP_STRIPE)
+-
+-#define OST_CONNECT_SUPPORTED  (OBD_CONNECT_SRVLOCK | OBD_CONNECT_GRANT | \
+-				OBD_CONNECT_REQPORTAL | OBD_CONNECT_VERSION | \
+-				OBD_CONNECT_TRUNCLOCK | OBD_CONNECT_INDEX | \
+-				OBD_CONNECT_BRW_SIZE | OBD_CONNECT_OSS_CAPA | \
+-				OBD_CONNECT_CANCELSET | OBD_CONNECT_AT | \
+-				LRU_RESIZE_CONNECT_FLAG | OBD_CONNECT_CKSUM | \
+-				OBD_CONNECT_RMT_CLIENT | \
+-				OBD_CONNECT_RMT_CLIENT_FORCE | OBD_CONNECT_VBR | \
+-				OBD_CONNECT_MDS | OBD_CONNECT_SKIP_ORPHAN | \
+-				OBD_CONNECT_GRANT_SHRINK | OBD_CONNECT_FULL20 | \
+-				OBD_CONNECT_64BITHASH | OBD_CONNECT_MAXBYTES | \
+-				OBD_CONNECT_MAX_EASIZE | \
+-				OBD_CONNECT_EINPROGRESS | \
+-				OBD_CONNECT_JOBSTATS | \
+-				OBD_CONNECT_LIGHTWEIGHT | OBD_CONNECT_LVB_TYPE|\
+-				OBD_CONNECT_LAYOUTLOCK | OBD_CONNECT_FID | \
+-				OBD_CONNECT_PINGLESS)
+-#define ECHO_CONNECT_SUPPORTED (0)
+-#define MGS_CONNECT_SUPPORTED  (OBD_CONNECT_VERSION | OBD_CONNECT_AT | \
+-				OBD_CONNECT_FULL20 | OBD_CONNECT_IMP_RECOV | \
+-				OBD_CONNECT_MNE_SWAB | OBD_CONNECT_PINGLESS)
+-
+ /* Features required for this version of the client to work with server */
+ #define CLIENT_CONNECT_MDT_REQD (OBD_CONNECT_IBITS | OBD_CONNECT_FID | \
+ 				 OBD_CONNECT_FULL20)
 -- 
 2.1.0
