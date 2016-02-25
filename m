@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:59 -0500
-Subject: [lustre-devel] [PATCH v2 76/84] staging/lustre/lov: Fix style vs
-	open parenthesis alignment
+Date: Wed, 24 Feb 2016 22:00:29 -0500
+Subject: [lustre-devel] [PATCH v2 46/84] staging/lustre/ldlm: Adjust
+	comments to better conform to coding style
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-77-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-47-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,599 +14,1212 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This mostly fixes checkpatch complaints about
-"Alignment should match open parenthesis"
+This patch fixes "Block comments use a trailing */ on a separate line"
+warnings from checkpatch.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../staging/lustre/lustre/lov/lov_cl_internal.h    | 87 +++++++++++-----------
- drivers/staging/lustre/lustre/lov/lov_ea.c         |  2 +-
- drivers/staging/lustre/lustre/lov/lov_internal.h   |  6 +-
- drivers/staging/lustre/lustre/lov/lov_io.c         |  2 +-
- drivers/staging/lustre/lustre/lov/lov_lock.c       |  7 +-
- drivers/staging/lustre/lustre/lov/lov_obd.c        | 35 ++++-----
- drivers/staging/lustre/lustre/lov/lov_object.c     | 40 +++++-----
- drivers/staging/lustre/lustre/lov/lov_offset.c     |  3 +-
- drivers/staging/lustre/lustre/lov/lov_pack.c       |  7 +-
- drivers/staging/lustre/lustre/lov/lov_page.c       |  3 +-
- drivers/staging/lustre/lustre/lov/lov_pool.c       |  4 +-
- drivers/staging/lustre/lustre/lov/lovsub_lock.c    |  2 +-
- drivers/staging/lustre/lustre/lov/lovsub_page.c    |  2 +-
- drivers/staging/lustre/lustre/lov/lproc_lov.c      | 16 ++--
- 14 files changed, 106 insertions(+), 110 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/interval_tree.c |   6 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_extent.c   |  12 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |  43 ++++---
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |   3 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |  27 +++--
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |  63 ++++++----
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |  36 ++++--
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 132 ++++++++++++++-------
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  36 ++++--
+ 9 files changed, 236 insertions(+), 122 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-index b5fc159..7dd3162 100644
---- a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-@@ -579,51 +579,49 @@ extern struct kmem_cache *lovsub_req_kmem;
+diff --git a/drivers/staging/lustre/lustre/ldlm/interval_tree.c b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
+index fd70f65..3230606 100644
+--- a/drivers/staging/lustre/lustre/ldlm/interval_tree.c
++++ b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
+@@ -133,7 +133,8 @@ static void __rotate_change_maxhigh(struct interval_node *node,
  
- extern struct kmem_cache *lov_lock_link_kmem;
+ /* The left rotation "pivots" around the link from node to node->right, and
+  * - node will be linked to node->right's left child, and
+- * - node->right's left child will be linked to node's right child.  */
++ * - node->right's left child will be linked to node's right child.
++ */
+ static void __rotate_left(struct interval_node *node,
+ 			  struct interval_node **root)
+ {
+@@ -162,7 +163,8 @@ static void __rotate_left(struct interval_node *node,
  
--int   lov_object_init(const struct lu_env *env, struct lu_object *obj,
--			   const struct lu_object_conf *conf);
--int   lovsub_object_init(const struct lu_env *env, struct lu_object *obj,
--			   const struct lu_object_conf *conf);
--int   lov_lock_init(const struct lu_env *env, struct cl_object *obj,
--			   struct cl_lock *lock, const struct cl_io *io);
--int   lov_io_init(const struct lu_env *env, struct cl_object *obj,
--			   struct cl_io *io);
--int   lovsub_lock_init(const struct lu_env *env, struct cl_object *obj,
--			   struct cl_lock *lock, const struct cl_io *io);
+ /* The right rotation "pivots" around the link from node to node->left, and
+  * - node will be linked to node->left's right child, and
+- * - node->left's right child will be linked to node's left child.  */
++ * - node->left's right child will be linked to node's left child.
++ */
+ static void __rotate_right(struct interval_node *node,
+ 			   struct interval_node **root)
+ {
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
+index f07a077..222cb62 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
+@@ -62,7 +62,8 @@
+  * is the "highest lock".  This function returns the new KMS value.
+  * Caller must hold lr_lock already.
+  *
+- * NB: A lock on [x,y] protects a KMS of up to y + 1 bytes! */
++ * NB: A lock on [x,y] protects a KMS of up to y + 1 bytes!
++ */
+ __u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, __u64 old_kms)
+ {
+ 	struct ldlm_resource *res = lock->l_resource;
+@@ -72,7 +73,8 @@ __u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, __u64 old_kms)
+ 
+ 	/* don't let another thread in ldlm_extent_shift_kms race in
+ 	 * just after we finish and take our lock into account in its
+-	 * calculation of the kms */
++	 * calculation of the kms
++	 */
+ 	lock->l_flags |= LDLM_FL_KMS_IGNORE;
+ 
+ 	list_for_each(tmp, &res->lr_granted) {
+@@ -85,7 +87,8 @@ __u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, __u64 old_kms)
+ 			return old_kms;
+ 
+ 		/* This extent _has_ to be smaller than old_kms (checked above)
+-		 * so kms can only ever be smaller or the same as old_kms. */
++		 * so kms can only ever be smaller or the same as old_kms.
++		 */
+ 		if (lck->l_policy_data.l_extent.end + 1 > kms)
+ 			kms = lck->l_policy_data.l_extent.end + 1;
+ 	}
+@@ -191,7 +194,8 @@ void ldlm_extent_add_lock(struct ldlm_resource *res,
+ 	res->lr_itree[idx].lit_size++;
+ 
+ 	/* even though we use interval tree to manage the extent lock, we also
+-	 * add the locks into grant list, for debug purpose, .. */
++	 * add the locks into grant list, for debug purpose, ..
++	 */
+ 	ldlm_resource_add_lock(res, &res->lr_granted, lock);
+ }
+ 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+index 8bd6a18..b88b786 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+@@ -107,7 +107,8 @@ ldlm_flock_destroy(struct ldlm_lock *lock, enum ldlm_mode mode, __u64 flags)
+ 		lock->l_flags |= LDLM_FL_LOCAL_ONLY | LDLM_FL_CBPENDING;
+ 
+ 		/* when reaching here, it is under lock_res_and_lock(). Thus,
+-		   need call the nolock version of ldlm_lock_decref_internal*/
++		 * need call the nolock version of ldlm_lock_decref_internal
++		 */
+ 		ldlm_lock_decref_internal_nolock(lock, mode);
+ 	}
+ 
+@@ -159,13 +160,15 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req, __u64 *flags,
+ 	*err = ELDLM_OK;
+ 
+ 	/* No blocking ASTs are sent to the clients for
+-	 * Posix file & record locks */
++	 * Posix file & record locks
++	 */
+ 	req->l_blocking_ast = NULL;
+ 
+ reprocess:
+ 	if ((*flags == LDLM_FL_WAIT_NOREPROC) || (mode == LCK_NL)) {
+ 		/* This loop determines where this processes locks start
+-		 * in the resource lr_granted list. */
++		 * in the resource lr_granted list.
++		 */
+ 		list_for_each(tmp, &res->lr_granted) {
+ 			lock = list_entry(tmp, struct ldlm_lock,
+ 					      l_res_link);
+@@ -180,7 +183,8 @@ reprocess:
+ 		lockmode_verify(mode);
+ 
+ 		/* This loop determines if there are existing locks
+-		 * that conflict with the new lock request. */
++		 * that conflict with the new lock request.
++		 */
+ 		list_for_each(tmp, &res->lr_granted) {
+ 			lock = list_entry(tmp, struct ldlm_lock,
+ 					      l_res_link);
+@@ -238,8 +242,8 @@ reprocess:
+ 	}
+ 
+ 	/* Scan the locks owned by this process that overlap this request.
+-	 * We may have to merge or split existing locks. */
 -
--int   lov_lock_init_raid0(const struct lu_env *env, struct cl_object *obj,
--			   struct cl_lock *lock, const struct cl_io *io);
--int   lov_lock_init_empty(const struct lu_env *env, struct cl_object *obj,
--			   struct cl_lock *lock, const struct cl_io *io);
--int   lov_io_init_raid0(const struct lu_env *env, struct cl_object *obj,
--			   struct cl_io *io);
--int   lov_io_init_empty(const struct lu_env *env, struct cl_object *obj,
--			   struct cl_io *io);
--int   lov_io_init_released(const struct lu_env *env, struct cl_object *obj,
--			   struct cl_io *io);
--void  lov_lock_unlink(const struct lu_env *env, struct lov_lock_link *link,
--			   struct lovsub_lock *sub);
-+int lov_object_init(const struct lu_env *env, struct lu_object *obj,
-+		    const struct lu_object_conf *conf);
-+int lovsub_object_init(const struct lu_env *env, struct lu_object *obj,
-+		       const struct lu_object_conf *conf);
-+int lov_lock_init(const struct lu_env *env, struct cl_object *obj,
-+		  struct cl_lock *lock, const struct cl_io *io);
-+int lov_io_init(const struct lu_env *env, struct cl_object *obj,
-+		struct cl_io *io);
-+int lovsub_lock_init(const struct lu_env *env, struct cl_object *obj,
-+		     struct cl_lock *lock, const struct cl_io *io);
-+
-+int lov_lock_init_raid0(const struct lu_env *env, struct cl_object *obj,
-+			struct cl_lock *lock, const struct cl_io *io);
-+int lov_lock_init_empty(const struct lu_env *env, struct cl_object *obj,
-+			struct cl_lock *lock, const struct cl_io *io);
-+int lov_io_init_raid0(const struct lu_env *env, struct cl_object *obj,
-+		      struct cl_io *io);
-+int lov_io_init_empty(const struct lu_env *env, struct cl_object *obj,
-+		      struct cl_io *io);
-+int lov_io_init_released(const struct lu_env *env, struct cl_object *obj,
-+			 struct cl_io *io);
-+void lov_lock_unlink(const struct lu_env *env, struct lov_lock_link *link,
-+		     struct lovsub_lock *sub);
++	 * We may have to merge or split existing locks.
++	 */
+ 	if (!ownlocks)
+ 		ownlocks = &res->lr_granted;
  
- struct lov_io_sub *lov_sub_get(const struct lu_env *env, struct lov_io *lio,
- 			       int stripe);
--void  lov_sub_put(struct lov_io_sub *sub);
--int   lov_sublock_modify(const struct lu_env *env, struct lov_lock *lov,
--			   struct lovsub_lock *sublock,
--			   const struct cl_lock_descr *d, int idx);
--
--int   lov_page_init(const struct lu_env *env, struct cl_object *ob,
--			   struct cl_page *page, struct page *vmpage);
--int   lovsub_page_init(const struct lu_env *env, struct cl_object *ob,
--			   struct cl_page *page, struct page *vmpage);
--
--int   lov_page_init_empty(const struct lu_env *env,
--			   struct cl_object *obj,
--			   struct cl_page *page, struct page *vmpage);
--int   lov_page_init_raid0(const struct lu_env *env,
--			   struct cl_object *obj,
--			   struct cl_page *page, struct page *vmpage);
-+void lov_sub_put(struct lov_io_sub *sub);
-+int lov_sublock_modify(const struct lu_env *env, struct lov_lock *lov,
-+		       struct lovsub_lock *sublock,
-+		       const struct cl_lock_descr *d, int idx);
-+
-+int lov_page_init(const struct lu_env *env, struct cl_object *ob,
-+		  struct cl_page *page, struct page *vmpage);
-+int lovsub_page_init(const struct lu_env *env, struct cl_object *ob,
-+		     struct cl_page *page, struct page *vmpage);
-+
-+int lov_page_init_empty(const struct lu_env *env, struct cl_object *obj,
-+			struct cl_page *page, struct page *vmpage);
-+int lov_page_init_raid0(const struct lu_env *env, struct cl_object *obj,
-+			struct cl_page *page, struct page *vmpage);
- struct lu_object *lov_object_alloc(const struct lu_env *env,
--				      const struct lu_object_header *hdr,
--				      struct lu_device *dev);
-+				   const struct lu_object_header *hdr,
-+				   struct lu_device *dev);
- struct lu_object *lovsub_object_alloc(const struct lu_env *env,
- 				      const struct lu_object_header *hdr,
- 				      struct lu_device *dev);
-@@ -631,9 +629,8 @@ struct lu_object *lovsub_object_alloc(const struct lu_env *env,
- struct lov_lock_link *lov_lock_link_find(const struct lu_env *env,
- 					 struct lov_lock *lck,
- 					 struct lovsub_lock *sub);
--struct lov_io_sub    *lov_page_subio(const struct lu_env *env,
--					 struct lov_io *lio,
--					 const struct cl_page_slice *slice);
-+struct lov_io_sub *lov_page_subio(const struct lu_env *env, struct lov_io *lio,
-+				  const struct cl_page_slice *slice);
+@@ -253,7 +257,8 @@ reprocess:
+ 			/* If the modes are the same then we need to process
+ 			 * locks that overlap OR adjoin the new lock. The extra
+ 			 * logic condition is necessary to deal with arithmetic
+-			 * overflow and underflow. */
++			 * overflow and underflow.
++			 */
+ 			if ((new->l_policy_data.l_flock.start >
+ 			     (lock->l_policy_data.l_flock.end + 1))
+ 			    && (lock->l_policy_data.l_flock.end !=
+@@ -327,11 +332,13 @@ reprocess:
+ 		 * with the request but this would complicate the reply
+ 		 * processing since updates to req get reflected in the
+ 		 * reply. The client side replays the lock request so
+-		 * it must see the original lock data in the reply. */
++		 * it must see the original lock data in the reply.
++		 */
  
- #define lov_foreach_target(lov, var)		    \
- 	for (var = 0; var < lov_targets_nr(lov); ++var)
-@@ -798,7 +795,7 @@ static inline struct cl_page *lov_sub_page(const struct cl_page_slice *slice)
+ 		/* XXX - if ldlm_lock_new() can sleep we should
+ 		 * release the lr_lock, allocate the new lock,
+-		 * and restart processing this lock. */
++		 * and restart processing this lock.
++		 */
+ 		if (!new2) {
+ 			unlock_res_and_lock(req);
+ 			new2 = ldlm_lock_create(ns, &res->lr_name, LDLM_FLOCK,
+@@ -396,7 +403,8 @@ reprocess:
+ 	if (*flags != LDLM_FL_WAIT_NOREPROC) {
+ 		/* The only one possible case for client-side calls flock
+ 		 * policy function is ldlm_flock_completion_ast inside which
+-		 * carries LDLM_FL_WAIT_NOREPROC flag. */
++		 * carries LDLM_FL_WAIT_NOREPROC flag.
++		 */
+ 		CERROR("Illegal parameter for client-side-only module.\n");
+ 		LBUG();
+ 	}
+@@ -404,7 +412,8 @@ reprocess:
+ 	/* In case we're reprocessing the requested lock we can't destroy
+ 	 * it until after calling ldlm_add_ast_work_item() above so that laawi()
+ 	 * can bump the reference count on \a req. Otherwise \a req
+-	 * could be freed before the completion AST can be sent.  */
++	 * could be freed before the completion AST can be sent.
++	 */
+ 	if (added)
+ 		ldlm_flock_destroy(req, mode, *flags);
+ 
+@@ -458,7 +467,8 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+ 	/* Import invalidation. We need to actually release the lock
+ 	 * references being held, so that it can go away. No point in
+ 	 * holding the lock even if app still believes it has it, since
+-	 * server already dropped it anyway. Only for granted locks too. */
++	 * server already dropped it anyway. Only for granted locks too.
++	 */
+ 	if ((lock->l_flags & (LDLM_FL_FAILED|LDLM_FL_LOCAL_ONLY)) ==
+ 	    (LDLM_FL_FAILED|LDLM_FL_LOCAL_ONLY)) {
+ 		if (lock->l_req_mode == lock->l_granted_mode &&
+@@ -539,7 +549,8 @@ granted:
+ 	} else if (flags & LDLM_FL_TEST_LOCK) {
+ 		/* fcntl(F_GETLK) request */
+ 		/* The old mode was saved in getlk->fl_type so that if the mode
+-		 * in the lock changes we can decref the appropriate refcount.*/
++		 * in the lock changes we can decref the appropriate refcount.
++		 */
+ 		ldlm_flock_destroy(lock, getlk->fl_type, LDLM_FL_WAIT_NOREPROC);
+ 		switch (lock->l_granted_mode) {
+ 		case LCK_PR:
+@@ -558,7 +569,8 @@ granted:
+ 		__u64 noreproc = LDLM_FL_WAIT_NOREPROC;
+ 
+ 		/* We need to reprocess the lock to do merges or splits
+-		 * with existing locks owned by this process. */
++		 * with existing locks owned by this process.
++		 */
+ 		ldlm_process_flock_lock(lock, &noreproc, 1, &err, NULL);
+ 	}
+ 	unlock_res_and_lock(lock);
+@@ -575,7 +587,8 @@ void ldlm_flock_policy_wire18_to_local(const ldlm_wire_policy_data_t *wpolicy,
+ 	lpolicy->l_flock.pid = wpolicy->l_flock.lfw_pid;
+ 	/* Compat code, old clients had no idea about owner field and
+ 	 * relied solely on pid for ownership. Introduced in LU-104, 2.1,
+-	 * April 2011 */
++	 * April 2011
++	 */
+ 	lpolicy->l_flock.owner = wpolicy->l_flock.lfw_pid;
  }
  
- static inline struct lov_io *cl2lov_io(const struct lu_env *env,
--				const struct cl_io_slice *ios)
-+				       const struct cl_io_slice *ios)
- {
- 	struct lov_io *lio;
- 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index c27b884..cdf4e8e 100644
---- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -141,7 +141,7 @@ static void lsm_unpackmd_common(struct lov_stripe_md *lsm,
- 
- static void
- lsm_stripe_by_index_plain(struct lov_stripe_md *lsm, int *stripeno,
--			   u64 *lov_off, u64 *swidth)
-+			  u64 *lov_off, u64 *swidth)
- {
- 	if (swidth)
- 		*swidth = (u64)lsm->lsm_stripe_size * lsm->lsm_stripe_count;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index 725ebf9..590f932 100644
---- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -138,12 +138,10 @@ int lov_merge_lvb_kms(struct lov_stripe_md *lsm,
- 		      struct ost_lvb *lvb, __u64 *kms_place);
- 
- /* lov_offset.c */
--u64 lov_stripe_size(struct lov_stripe_md *lsm, u64 ost_size,
--			 int stripeno);
-+u64 lov_stripe_size(struct lov_stripe_md *lsm, u64 ost_size, int stripeno);
- int lov_stripe_offset(struct lov_stripe_md *lsm, u64 lov_off,
- 		      int stripeno, u64 *u64);
--u64 lov_size_to_stripe(struct lov_stripe_md *lsm, u64 file_size,
--			   int stripeno);
-+u64 lov_size_to_stripe(struct lov_stripe_md *lsm, u64 file_size, int stripeno);
- int lov_stripe_intersects(struct lov_stripe_md *lsm, int stripeno,
- 			  u64 start, u64 end,
- 			  u64 *obd_start, u64 *obd_end);
-diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
-index 50954ce..4296aac 100644
---- a/drivers/staging/lustre/lustre/lov/lov_io.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_io.c
-@@ -947,7 +947,7 @@ int lov_io_init_empty(const struct lu_env *env, struct cl_object *obj,
- }
- 
- int lov_io_init_released(const struct lu_env *env, struct cl_object *obj,
--			struct cl_io *io)
-+			 struct cl_io *io)
- {
- 	struct lov_object *lov = cl2lov(obj);
- 	struct lov_io *lio = lov_env_io(env);
-diff --git a/drivers/staging/lustre/lustre/lov/lov_lock.c b/drivers/staging/lustre/lustre/lov/lov_lock.c
-index e0a6438..455dad2 100644
---- a/drivers/staging/lustre/lustre/lov/lov_lock.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_lock.c
-@@ -683,7 +683,7 @@ static int lov_lock_unuse(const struct lu_env *env,
- }
- 
- static void lov_lock_cancel(const struct lu_env *env,
--			   const struct cl_lock_slice *slice)
-+			    const struct cl_lock_slice *slice)
- {
- 	struct lov_lock	*lck     = cl2lov_lock(slice);
- 	struct cl_lock_closure *closure = lov_closure_get(env, slice->cls_lock);
-@@ -1125,7 +1125,8 @@ static void lov_empty_lock_fini(const struct lu_env *env,
- }
- 
- static int lov_empty_lock_print(const struct lu_env *env, void *cookie,
--			lu_printer_t p, const struct cl_lock_slice *slice)
-+				lu_printer_t p,
-+				const struct cl_lock_slice *slice)
- {
- 	(*p)(env, cookie, "empty\n");
- 	return 0;
-@@ -1138,7 +1139,7 @@ static const struct cl_lock_operations lov_empty_lock_ops = {
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+index 2139a3a..e21373e 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+@@ -96,7 +96,8 @@ enum {
+ 	LDLM_CANCEL_SHRINK = 1 << 2, /* Cancel locks from shrinker. */
+ 	LDLM_CANCEL_LRUR   = 1 << 3, /* Cancel locks from lru resize. */
+ 	LDLM_CANCEL_NO_WAIT = 1 << 4 /* Cancel locks w/o blocking (neither
+-				      * sending nor waiting for any rpcs) */
++				      * sending nor waiting for any rpcs)
++				      */
  };
  
- int lov_lock_init_empty(const struct lu_env *env, struct cl_object *obj,
--		struct cl_lock *lock, const struct cl_io *io)
-+			struct cl_lock *lock, const struct cl_io *io)
+ int ldlm_cancel_lru(struct ldlm_namespace *ns, int nr,
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+index d0ad28d..b586d5a 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+@@ -219,7 +219,8 @@ EXPORT_SYMBOL(client_import_find_conn);
+ void client_destroy_import(struct obd_import *imp)
  {
- 	struct lov_lock *lck;
- 	int result = -ENOMEM;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index 6122d16..518f1a5c 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -265,7 +265,7 @@ static int lov_disconnect_obd(struct obd_device *obd, struct lov_tgt_desc *tgt)
+ 	/* Drop security policy instance after all RPCs have finished/aborted
+-	 * to let all busy contexts be released. */
++	 * to let all busy contexts be released.
++	 */
+ 	class_import_get(imp);
+ 	class_destroy_import(imp);
+ 	sptlrpc_import_sec_put(imp);
+@@ -245,7 +246,8 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
+ 	int rc;
  
- 	osc_obd = class_exp2obd(tgt->ltd_exp);
- 	CDEBUG(D_CONFIG, "%s: disconnecting target %s\n",
--		obd->obd_name, osc_obd ? osc_obd->obd_name : "NULL");
-+	       obd->obd_name, osc_obd ? osc_obd->obd_name : "NULL");
+ 	/* In a more perfect world, we would hang a ptlrpc_client off of
+-	 * obd_type and just use the values from there. */
++	 * obd_type and just use the values from there.
++	 */
+ 	if (!strcmp(name, LUSTRE_OSC_NAME)) {
+ 		rq_portal = OST_REQUEST_PORTAL;
+ 		rp_portal = OSC_REPLY_PORTAL;
+@@ -348,7 +350,8 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
+ 	/* This value may be reduced@connect time in
+ 	 * ptlrpc_connect_interpret() . We initialize it to only
+ 	 * 1MB until we know what the performance looks like.
+-	 * In the future this should likely be increased. LU-1431 */
++	 * In the future this should likely be increased. LU-1431
++	 */
+ 	cli->cl_max_pages_per_rpc = min_t(int, PTLRPC_MAX_BRW_PAGES,
+ 					  LNET_MTU >> PAGE_CACHE_SHIFT);
  
- 	if (tgt->ltd_active) {
- 		tgt->ltd_active = 0;
-@@ -594,7 +594,7 @@ static int lov_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
- 	mutex_unlock(&lov->lov_lock);
+@@ -545,14 +548,16 @@ int client_disconnect_export(struct obd_export *exp)
  
- 	CDEBUG(D_CONFIG, "idx=%d ltd_gen=%d ld_tgt_count=%d\n",
--		index, tgt->ltd_gen, lov->desc.ld_tgt_count);
-+	       index, tgt->ltd_gen, lov->desc.ld_tgt_count);
+ 	/* Mark import deactivated now, so we don't try to reconnect if any
+ 	 * of the cleanup RPCs fails (e.g. LDLM cancel, etc).  We don't
+-	 * fully deactivate the import, or that would drop all requests. */
++	 * fully deactivate the import, or that would drop all requests.
++	 */
+ 	spin_lock(&imp->imp_lock);
+ 	imp->imp_deactive = 1;
+ 	spin_unlock(&imp->imp_lock);
  
- 	rc = obd_notify(obd, tgt_obd, OBD_NOTIFY_CREATE, &index);
+ 	/* Some non-replayable imports (MDS's OSCs) are pinged, so just
+ 	 * delete it regardless.  (It's safe to delete an import that was
+-	 * never added.) */
++	 * never added.)
++	 */
+ 	(void)ptlrpc_pinger_del_import(imp);
  
-@@ -620,9 +620,9 @@ static int lov_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
- 
- 	if (lov->lov_cache) {
- 		rc = obd_set_info_async(NULL, tgt->ltd_exp,
--				sizeof(KEY_CACHE_SET), KEY_CACHE_SET,
--				sizeof(struct cl_client_cache), lov->lov_cache,
--				NULL);
-+					sizeof(KEY_CACHE_SET), KEY_CACHE_SET,
-+					sizeof(struct cl_client_cache),
-+					lov->lov_cache, NULL);
- 		if (rc < 0)
- 			goto out;
+ 	if (obd->obd_namespace) {
+@@ -564,7 +569,8 @@ int client_disconnect_export(struct obd_export *exp)
  	}
-@@ -1136,7 +1136,7 @@ static int lov_getattr_interpret(struct ptlrpc_request_set *rqset,
+ 
+ 	/* There's no need to hold sem while disconnecting an import,
+-	 * and it may actually cause deadlock in GSS. */
++	 * and it may actually cause deadlock in GSS.
++	 */
+ 	up_write(&cli->cl_sem);
+ 	rc = ptlrpc_disconnect_import(imp, 0);
+ 	down_write(&cli->cl_sem);
+@@ -573,7 +579,8 @@ int client_disconnect_export(struct obd_export *exp)
+ 
+ out_disconnect:
+ 	/* Use server style - class_disconnect should be always called for
+-	 * o_disconnect. */
++	 * o_disconnect.
++	 */
+ 	err = class_disconnect(exp);
+ 	if (!rc && err)
+ 		rc = err;
+@@ -592,7 +599,8 @@ int target_pack_pool_reply(struct ptlrpc_request *req)
+ 	struct obd_device *obd;
+ 
+ 	/* Check that we still have all structures alive as this may
+-	 * be some late RPC at shutdown time. */
++	 * be some late RPC at shutdown time.
++	 */
+ 	if (unlikely(!req->rq_export || !req->rq_export->exp_obd ||
+ 		     !exp_connect_lru_resize(req->rq_export))) {
+ 		lustre_msg_set_slv(req->rq_repmsg, 0);
+@@ -697,7 +705,8 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id)
+ 		 * reply ref until ptlrpc_handle_rs() is done
+ 		 * with the reply state (if the send was successful, there
+ 		 * would have been +1 ref for the net, which
+-		 * reply_out_callback leaves alone) */
++		 * reply_out_callback leaves alone)
++		 */
+ 		rs->rs_on_net = 0;
+ 		ptlrpc_rs_addref(rs);
+ 	}
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 65d0cfe..98975ef 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -326,9 +326,11 @@ static int ldlm_lock_destroy_internal(struct ldlm_lock *lock)
+ 
+ 	if (lock->l_export && lock->l_export->exp_lock_hash) {
+ 		/* NB: it's safe to call cfs_hash_del() even lock isn't
+-		 * in exp_lock_hash. */
++		 * in exp_lock_hash.
++		 */
+ 		/* In the function below, .hs_keycmp resolves to
+-		 * ldlm_export_lock_keycmp() */
++		 * ldlm_export_lock_keycmp()
++		 */
+ 		/* coverity[overrun-buffer-val] */
+ 		cfs_hash_del(lock->l_export->exp_lock_hash,
+ 			     &lock->l_remote_handle, &lock->l_exp_hash);
+@@ -540,7 +542,8 @@ struct ldlm_lock *__ldlm_handle2lock(const struct lustre_handle *handle,
+ 		return NULL;
+ 
+ 	/* It's unlikely but possible that someone marked the lock as
+-	 * destroyed after we did handle2object on it */
++	 * destroyed after we did handle2object on it
++	 */
+ 	if (flags == 0 && ((lock->l_flags & LDLM_FL_DESTROYED) == 0)) {
+ 		lu_ref_add(&lock->l_reference, "handle", current);
+ 		return lock;
+@@ -600,7 +603,8 @@ static void ldlm_add_bl_work_item(struct ldlm_lock *lock, struct ldlm_lock *new,
+ 		LDLM_DEBUG(lock, "lock incompatible; sending blocking AST.");
+ 		lock->l_flags |= LDLM_FL_AST_SENT;
+ 		/* If the enqueuing client said so, tell the AST recipient to
+-		 * discard dirty data, rather than writing back. */
++		 * discard dirty data, rather than writing back.
++		 */
+ 		if (new->l_flags & LDLM_FL_AST_DISCARD_DATA)
+ 			lock->l_flags |= LDLM_FL_DISCARD_DATA;
+ 		LASSERT(list_empty(&lock->l_bl_ast));
+@@ -769,7 +773,8 @@ void ldlm_lock_decref_internal(struct ldlm_lock *lock, __u32 mode)
+ 	if (lock->l_flags & LDLM_FL_LOCAL &&
+ 	    !lock->l_readers && !lock->l_writers) {
+ 		/* If this is a local lock on a server namespace and this was
+-		 * the last reference, cancel the lock. */
++		 * the last reference, cancel the lock.
++		 */
+ 		CDEBUG(D_INFO, "forcing cancel of local lock\n");
+ 		lock->l_flags |= LDLM_FL_CBPENDING;
+ 	}
+@@ -777,7 +782,8 @@ void ldlm_lock_decref_internal(struct ldlm_lock *lock, __u32 mode)
+ 	if (!lock->l_readers && !lock->l_writers &&
+ 	    (lock->l_flags & LDLM_FL_CBPENDING)) {
+ 		/* If we received a blocked AST and this was the last reference,
+-		 * run the callback. */
++		 * run the callback.
++		 */
+ 
+ 		LDLM_DEBUG(lock, "final decref done on cbpending lock");
+ 
+@@ -798,7 +804,8 @@ void ldlm_lock_decref_internal(struct ldlm_lock *lock, __u32 mode)
+ 		LDLM_DEBUG(lock, "add lock into lru list");
+ 
+ 		/* If this is a client-side namespace and this was the last
+-		 * reference, put it on the LRU. */
++		 * reference, put it on the LRU.
++		 */
+ 		ldlm_lock_add_to_lru(lock);
+ 		unlock_res_and_lock(lock);
+ 
+@@ -807,7 +814,8 @@ void ldlm_lock_decref_internal(struct ldlm_lock *lock, __u32 mode)
+ 
+ 		/* Call ldlm_cancel_lru() only if EARLY_CANCEL and LRU RESIZE
+ 		 * are not supported by the server, otherwise, it is done on
+-		 * enqueue. */
++		 * enqueue.
++		 */
+ 		if (!exp_connect_cancelset(lock->l_conn_export) &&
+ 		    !ns_connect_lru_resize(ns))
+ 			ldlm_cancel_lru(ns, 0, LCF_ASYNC, 0);
+@@ -910,7 +918,8 @@ static void search_granted_lock(struct list_head *queue,
+ 				if (lock->l_policy_data.l_inodebits.bits ==
+ 				    req->l_policy_data.l_inodebits.bits) {
+ 					/* insert point is last lock of
+-					 * the policy group */
++					 * the policy group
++					 */
+ 					prev->res_link =
+ 						&policy_end->l_res_link;
+ 					prev->mode_link =
+@@ -931,7 +940,8 @@ static void search_granted_lock(struct list_head *queue,
+ 			}  /* loop over policy groups within the mode group */
+ 
+ 			/* insert point is last lock of the mode group,
+-			 * new policy group is started */
++			 * new policy group is started
++			 */
+ 			prev->res_link = &mode_end->l_res_link;
+ 			prev->mode_link = &mode_end->l_sl_mode;
+ 			prev->policy_link = &req->l_sl_policy;
+@@ -943,7 +953,8 @@ static void search_granted_lock(struct list_head *queue,
+ 	}
+ 
+ 	/* insert point is last lock on the queue,
+-	 * new mode group and new policy group are started */
++	 * new mode group and new policy group are started
++	 */
+ 	prev->res_link = queue->prev;
+ 	prev->mode_link = &req->l_sl_mode;
+ 	prev->policy_link = &req->l_sl_policy;
+@@ -1053,7 +1064,8 @@ static struct ldlm_lock *search_queue(struct list_head *queue,
+ 			break;
+ 
+ 		/* Check if this lock can be matched.
+-		 * Used by LU-2919(exclusive open) for open lease lock */
++		 * Used by LU-2919(exclusive open) for open lease lock
++		 */
+ 		if (ldlm_is_excl(lock))
+ 			continue;
+ 
+@@ -1062,7 +1074,8 @@ static struct ldlm_lock *search_queue(struct list_head *queue,
+ 		 * if it passes in CBPENDING and the lock still has users.
+ 		 * this is generally only going to be used by children
+ 		 * whose parents already hold a lock so forward progress
+-		 * can still happen. */
++		 * can still happen.
++		 */
+ 		if (lock->l_flags & LDLM_FL_CBPENDING &&
+ 		    !(flags & LDLM_FL_CBPENDING))
+ 			continue;
+@@ -1086,7 +1099,8 @@ static struct ldlm_lock *search_queue(struct list_head *queue,
+ 			continue;
+ 
+ 		/* We match if we have existing lock with same or wider set
+-		   of bits. */
++		 * of bits.
++		 */
+ 		if (lock->l_resource->lr_type == LDLM_IBITS &&
+ 		     ((lock->l_policy_data.l_inodebits.bits &
+ 		      policy->l_inodebits.bits) !=
+@@ -1515,7 +1529,8 @@ enum ldlm_error ldlm_lock_enqueue(struct ldlm_namespace *ns,
+ 	if (lock->l_req_mode == lock->l_granted_mode) {
+ 		/* The server returned a blocked lock, but it was granted
+ 		 * before we got a chance to actually enqueue it.  We don't
+-		 * need to do anything else. */
++		 * need to do anything else.
++		 */
+ 		*flags &= ~(LDLM_FL_BLOCK_GRANTED |
+ 			    LDLM_FL_BLOCK_CONV | LDLM_FL_BLOCK_WAIT);
+ 		goto out;
+@@ -1528,7 +1543,8 @@ enum ldlm_error ldlm_lock_enqueue(struct ldlm_namespace *ns,
+ 		LBUG();
+ 
+ 	/* Some flags from the enqueue want to make it into the AST, via the
+-	 * lock's l_flags. */
++	 * lock's l_flags.
++	 */
+ 	lock->l_flags |= *flags & LDLM_FL_AST_DISCARD_DATA;
+ 
+ 	/*
+@@ -1609,14 +1625,16 @@ ldlm_work_cp_ast_lock(struct ptlrpc_request_set *rqset, void *opaq)
+ 	 * This can't happen with the blocking_ast, however, because we
+ 	 * will never call the local blocking_ast until we drop our
+ 	 * reader/writer reference, which we won't do until we get the
+-	 * reply and finish enqueueing. */
++	 * reply and finish enqueueing.
++	 */
+ 
+ 	/* nobody should touch l_cp_ast */
+ 	lock_res_and_lock(lock);
+ 	list_del_init(&lock->l_cp_ast);
+ 	LASSERT(lock->l_flags & LDLM_FL_CP_REQD);
+ 	/* save l_completion_ast since it can be changed by
+-	 * mds_intent_policy(), see bug 14225 */
++	 * mds_intent_policy(), see bug 14225
++	 */
+ 	completion_callback = lock->l_completion_ast;
+ 	lock->l_flags &= ~LDLM_FL_CP_REQD;
+ 	unlock_res_and_lock(lock);
+@@ -1737,7 +1755,8 @@ int ldlm_run_ast_work(struct ldlm_namespace *ns, struct list_head *rpc_list,
+ 	/* We create a ptlrpc request set with flow control extension.
+ 	 * This request set will use the work_ast_lock function to produce new
+ 	 * requests and will send a new request each time one completes in order
+-	 * to keep the number of requests in flight to ns_max_parallel_ast */
++	 * to keep the number of requests in flight to ns_max_parallel_ast
++	 */
+ 	arg->set = ptlrpc_prep_fcset(ns->ns_max_parallel_ast ? : UINT_MAX,
+ 				     work_ast_lock, arg);
+ 	if (!arg->set) {
+@@ -1803,7 +1822,8 @@ void ldlm_lock_cancel(struct ldlm_lock *lock)
+ 	ns  = ldlm_res_to_ns(res);
+ 
+ 	/* Please do not, no matter how tempting, remove this LBUG without
+-	 * talking to me first. -phik */
++	 * talking to me first. -phik
++	 */
+ 	if (lock->l_readers || lock->l_writers) {
+ 		LDLM_ERROR(lock, "lock still has references");
+ 		LBUG();
+@@ -1819,7 +1839,8 @@ void ldlm_lock_cancel(struct ldlm_lock *lock)
+ 		ldlm_pool_del(&ns->ns_pool, lock);
+ 
+ 	/* Make sure we will not be called again for same lock what is possible
+-	 * if not to zero out lock->l_granted_mode */
++	 * if not to zero out lock->l_granted_mode
++	 */
+ 	lock->l_granted_mode = LCK_MINMODE;
+ 	unlock_res_and_lock(lock);
+ }
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+index 209db5d..ebe9042 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+@@ -194,7 +194,8 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 				goto out;
+ 			}
+ 		} else if (ldlm_has_layout(lock)) { /* for layout lock, lvb has
+-						     * variable length */
++						     * variable length
++						     */
+ 			void *lvb_data;
+ 
+ 			lvb_data = kzalloc(lvb_len, GFP_NOFS);
+@@ -224,7 +225,8 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 	}
+ 
+ 	/* If we receive the completion AST before the actual enqueue returned,
+-	 * then we might need to switch lock modes, resources, or extents. */
++	 * then we might need to switch lock modes, resources, or extents.
++	 */
+ 	if (dlm_req->lock_desc.l_granted_mode != lock->l_req_mode) {
+ 		lock->l_req_mode = dlm_req->lock_desc.l_granted_mode;
+ 		LDLM_DEBUG(lock, "completion AST, new lock mode");
+@@ -256,7 +258,8 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 
+ 	if (dlm_req->lock_flags & LDLM_FL_AST_SENT) {
+ 		/* BL_AST locks are not needed in LRU.
+-		 * Let ldlm_cancel_lru() be fast. */
++		 * Let ldlm_cancel_lru() be fast.
++		 */
+ 		ldlm_lock_remove_from_lru(lock);
+ 		lock->l_flags |= LDLM_FL_CBPENDING | LDLM_FL_BL_AST;
+ 		LDLM_DEBUG(lock, "completion AST includes blocking AST");
+@@ -276,8 +279,7 @@ static void ldlm_handle_cp_callback(struct ptlrpc_request *req,
+ 
+ 	LDLM_DEBUG(lock, "callback handler finished, about to run_ast_work");
+ 
+-	/* Let Enqueue to call osc_lock_upcall() and initialize
+-	 * l_ast_data */
++	/* Let Enqueue to call osc_lock_upcall() and initialize l_ast_data */
+ 	OBD_FAIL_TIMEOUT(OBD_FAIL_OSC_CP_ENQ_RACE, 2);
+ 
+ 	ldlm_run_ast_work(ns, &ast_list, LDLM_WORK_CP_AST);
+@@ -371,7 +373,8 @@ static int __ldlm_bl_to_thread(struct ldlm_bl_work_item *blwi,
+ 	wake_up(&blp->blp_waitq);
+ 
+ 	/* can not check blwi->blwi_flags as blwi could be already freed in
+-	   LCF_ASYNC mode */
++	 * LCF_ASYNC mode
++	 */
+ 	if (!(cancel_flags & LCF_ASYNC))
+ 		wait_for_completion(&blwi->blwi_comp);
+ 
+@@ -541,7 +544,8 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
+ 	/* Requests arrive in sender's byte order.  The ptlrpc service
+ 	 * handler has already checked and, if necessary, byte-swapped the
+ 	 * incoming request message body, but I am responsible for the
+-	 * message buffers. */
++	 * message buffers.
++	 */
+ 
+ 	/* do nothing for sec context finalize */
+ 	if (lustre_msg_get_opc(req->rq_reqmsg) == SEC_CTX_FINI)
+@@ -603,7 +607,8 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
+ 	}
+ 
+ 	/* Force a known safe race, send a cancel to the server for a lock
+-	 * which the server has already started a blocking callback on. */
++	 * which the server has already started a blocking callback on.
++	 */
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_CANCEL_BL_CB_RACE) &&
+ 	    lustre_msg_get_opc(req->rq_reqmsg) == LDLM_BL_CALLBACK) {
+ 		rc = ldlm_cli_cancel(&dlm_req->lock_handle[0], 0);
+@@ -633,7 +638,8 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
+ 		/* If somebody cancels lock and cache is already dropped,
+ 		 * or lock is failed before cp_ast received on client,
+ 		 * we can tell the server we have no lock. Otherwise, we
+-		 * should send cancel after dropping the cache. */
++		 * should send cancel after dropping the cache.
++		 */
+ 		if (((lock->l_flags & LDLM_FL_CANCELING) &&
+ 		    (lock->l_flags & LDLM_FL_BL_DONE)) ||
+ 		    (lock->l_flags & LDLM_FL_FAILED)) {
+@@ -647,7 +653,8 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
+ 			return 0;
+ 		}
+ 		/* BL_AST locks are not needed in LRU.
+-		 * Let ldlm_cancel_lru() be fast. */
++		 * Let ldlm_cancel_lru() be fast.
++		 */
+ 		ldlm_lock_remove_from_lru(lock);
+ 		lock->l_flags |= LDLM_FL_BL_AST;
+ 	}
+@@ -660,7 +667,8 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
+ 	 * But we'd also like to be able to indicate in the reply that we're
+ 	 * cancelling right now, because it's unused, or have an intent result
+ 	 * in the reply, so we might have to push the responsibility for sending
+-	 * the reply down into the AST handlers, alas. */
++	 * the reply down into the AST handlers, alas.
++	 */
+ 
+ 	switch (lustre_msg_get_opc(req->rq_reqmsg)) {
+ 	case LDLM_BL_CALLBACK:
+@@ -809,7 +817,8 @@ static int ldlm_bl_thread_main(void *arg)
+ 			/* The special case when we cancel locks in LRU
+ 			 * asynchronously, we pass the list of locks here.
+ 			 * Thus locks are marked LDLM_FL_CANCELING, but NOT
+-			 * canceled locally yet. */
++			 * canceled locally yet.
++			 */
+ 			count = ldlm_cli_cancel_list_local(&blwi->blwi_head,
+ 							   blwi->blwi_count,
+ 							   LCF_BL_AST);
+@@ -1116,7 +1125,8 @@ void ldlm_exit(void)
+ 	kmem_cache_destroy(ldlm_resource_slab);
+ 	/* ldlm_lock_put() use RCU to call ldlm_lock_free, so need call
+ 	 * synchronize_rcu() to wait a grace period elapsed, so that
+-	 * ldlm_lock_free() get a chance to be called. */
++	 * ldlm_lock_free() get a chance to be called.
++	 */
+ 	synchronize_rcu();
+ 	kmem_cache_destroy(ldlm_lock_slab);
+ 	kmem_cache_destroy(ldlm_interval_slab);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index 718e3c3..2d501a6 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -128,7 +128,8 @@ static int ldlm_expired_completion_wait(void *data)
  }
  
- static int lov_getattr_async(struct obd_export *exp, struct obd_info *oinfo,
--			      struct ptlrpc_request_set *rqset)
-+			     struct ptlrpc_request_set *rqset)
+ /* We use the same basis for both server side and client side functions
+-   from a single node. */
++ * from a single node.
++ */
+ static int ldlm_get_enq_timeout(struct ldlm_lock *lock)
  {
- 	struct lov_request_set *lovset;
- 	struct lov_obd *lov;
-@@ -1425,8 +1425,8 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 	int timeout = at_get(ldlm_lock_to_ns_at(lock));
+@@ -136,8 +137,9 @@ static int ldlm_get_enq_timeout(struct ldlm_lock *lock)
+ 	if (AT_OFF)
+ 		return obd_timeout / 2;
+ 	/* Since these are non-updating timeouts, we should be conservative.
+-	   It would be nice to have some kind of "early reply" mechanism for
+-	   lock callbacks too... */
++	 * It would be nice to have some kind of "early reply" mechanism for
++	 * lock callbacks too...
++	 */
+ 	timeout = min_t(int, at_max, timeout + (timeout >> 1)); /* 150% */
+ 	return max(timeout, ldlm_enqueue_min);
+ }
+@@ -243,8 +245,9 @@ noreproc:
+ 		imp = obd->u.cli.cl_import;
  
- 		/* copy UUID */
- 		if (copy_to_user(data->ioc_pbuf2, obd2cli_tgt(osc_obd),
--				     min((int) data->ioc_plen2,
--					 (int) sizeof(struct obd_uuid))))
-+				 min((int)data->ioc_plen2,
-+				     (int)sizeof(struct obd_uuid))))
- 			return -EFAULT;
+ 	/* Wait a long time for enqueue - server may have to callback a
+-	   lock from another client.  Server will evict the other client if it
+-	   doesn't respond reasonably, and then give us the lock. */
++	 * lock from another client.  Server will evict the other client if it
++	 * doesn't respond reasonably, and then give us the lock.
++	 */
+ 	timeout = ldlm_get_enq_timeout(lock) * 2;
  
- 		memcpy(&flags, data->ioc_inlbuf1, sizeof(__u32));
-@@ -1439,8 +1439,8 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
- 		if (rc)
- 			return rc;
- 		if (copy_to_user(data->ioc_pbuf1, &stat_buf,
--				     min((int) data->ioc_plen1,
--					 (int) sizeof(stat_buf))))
-+				 min((int)data->ioc_plen1,
-+				     (int)sizeof(stat_buf))))
- 			return -EFAULT;
- 		break;
+ 	lwd.lwd_lock = lock;
+@@ -296,7 +299,8 @@ static void failed_lock_cleanup(struct ldlm_namespace *ns,
+ 	    !(lock->l_flags & LDLM_FL_FAILED)) {
+ 		/* Make sure that this lock will not be found by raced
+ 		 * bl_ast and -EINVAL reply is sent to server anyways.
+-		 * bug 17645 */
++		 * bug 17645
++		 */
+ 		lock->l_flags |= LDLM_FL_LOCAL_ONLY | LDLM_FL_FAILED |
+ 				 LDLM_FL_ATOMIC_CB | LDLM_FL_CBPENDING;
+ 		need_cancel = 1;
+@@ -312,11 +316,13 @@ static void failed_lock_cleanup(struct ldlm_namespace *ns,
+ 	ldlm_lock_decref_internal(lock, mode);
+ 
+ 	/* XXX - HACK because we shouldn't call ldlm_lock_destroy()
+-	 *       from llite/file.c/ll_file_flock(). */
++	 *       from llite/file.c/ll_file_flock().
++	 */
+ 	/* This code makes for the fact that we do not have blocking handler on
+ 	 * a client for flock locks. As such this is the place where we must
+ 	 * completely kill failed locks. (interrupted and those that
+-	 * were waiting to be granted when server evicted us. */
++	 * were waiting to be granted when server evicted us.
++	 */
+ 	if (lock->l_resource->lr_type == LDLM_FLOCK) {
+ 		lock_res_and_lock(lock);
+ 		ldlm_resource_unlink_lock(lock);
+@@ -402,7 +408,8 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 	/* Key change rehash lock in per-export hash with new key */
+ 	if (exp->exp_lock_hash) {
+ 		/* In the function below, .hs_keycmp resolves to
+-		 * ldlm_export_lock_keycmp() */
++		 * ldlm_export_lock_keycmp()
++		 */
+ 		/* coverity[overrun-buffer-val] */
+ 		cfs_hash_rehash_key(exp->exp_lock_hash,
+ 				    &lock->l_remote_handle,
+@@ -416,7 +423,8 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 	lock->l_flags |= ldlm_flags_from_wire(reply->lock_flags &
+ 					      LDLM_INHERIT_FLAGS);
+ 	/* move NO_TIMEOUT flag to the lock to force ldlm_lock_match()
+-	 * to wait with no timeout as well */
++	 * to wait with no timeout as well
++	 */
+ 	lock->l_flags |= ldlm_flags_from_wire(reply->lock_flags &
+ 					      LDLM_FL_NO_TIMEOUT);
+ 	unlock_res_and_lock(lock);
+@@ -426,7 +434,8 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 
+ 	/* If enqueue returned a blocked lock but the completion handler has
+ 	 * already run, then it fixed up the resource and we don't need to do it
+-	 * again. */
++	 * again.
++	 */
+ 	if ((*flags) & LDLM_FL_LOCK_CHANGED) {
+ 		int newmode = reply->lock_desc.l_req_mode;
+ 
+@@ -468,7 +477,8 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 	if ((*flags) & LDLM_FL_AST_SENT ||
+ 	    /* Cancel extent locks as soon as possible on a liblustre client,
+ 	     * because it cannot handle asynchronous ASTs robustly (see
+-	     * bug 7311). */
++	     * bug 7311).
++	     */
+ 	    (LIBLUSTRE_CLIENT && type == LDLM_EXTENT)) {
+ 		lock_res_and_lock(lock);
+ 		lock->l_flags |= LDLM_FL_CBPENDING |  LDLM_FL_BL_AST;
+@@ -477,12 +487,14 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
  	}
-@@ -1774,7 +1774,8 @@ static int lov_fiemap(struct lov_obd *lov, __u32 keylen, void *key,
- 		fm_end = fm_key->oa.o_size;
  
- 	last_stripe = fiemap_calc_last_stripe(lsm, fm_start, fm_end,
--					    actual_start_stripe, &stripe_count);
-+					      actual_start_stripe,
-+					      &stripe_count);
+ 	/* If the lock has already been granted by a completion AST, don't
+-	 * clobber the LVB with an older one. */
++	 * clobber the LVB with an older one.
++	 */
+ 	if (lvb_len != 0) {
+ 		/* We must lock or a racing completion might update lvb without
+ 		 * letting us know and we'll clobber the correct value.
+-		 * Cannot unlock after the check either, a that still leaves
+-		 * a tiny window for completion to get in */
++		 * Cannot unlock after the check either, as that still leaves
++		 * a tiny window for completion to get in
++		 */
+ 		lock_res_and_lock(lock);
+ 		if (lock->l_req_mode != lock->l_granted_mode)
+ 			rc = ldlm_fill_lvb(lock, &req->rq_pill, RCL_SERVER,
+@@ -508,7 +520,8 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
  
- 	fm_end_offset = fiemap_calc_fm_end_offset(fiemap, lsm, fm_start,
- 						  fm_end, &start_stripe);
-@@ -2142,12 +2143,12 @@ static int lov_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 	if (lvb_len && lvb) {
+ 		/* Copy the LVB here, and not earlier, because the completion
+-		 * AST (if any) can override what we got in the reply */
++		 * AST (if any) can override what we got in the reply
++		 */
+ 		memcpy(lvb, lock->l_lvb_data, lvb_len);
+ 	}
  
- 			/* Only want a specific OSC */
- 			if (mgi->uuid && !obd_uuid_equals(mgi->uuid,
--						&tgt->ltd_uuid))
-+							  &tgt->ltd_uuid))
+@@ -594,7 +607,8 @@ int ldlm_prep_elc_req(struct obd_export *exp, struct ptlrpc_request *req,
+ 
+ 		/* Cancel LRU locks here _only_ if the server supports
+ 		 * EARLY_CANCEL. Otherwise we have to send extra CANCEL
+-		 * RPC, which will make us slower. */
++		 * RPC, which will make us slower.
++		 */
+ 		if (avail > count)
+ 			count += ldlm_cancel_lru_local(ns, cancels, to_free,
+ 						       avail - count, 0, flags);
+@@ -619,7 +633,8 @@ int ldlm_prep_elc_req(struct obd_export *exp, struct ptlrpc_request *req,
+ 			/* Skip first lock handler in ldlm_request_pack(),
+ 			 * this method will increment @lock_count according
+ 			 * to the lock handle amount actually written to
+-			 * the buffer. */
++			 * the buffer.
++			 */
+ 			dlm->lock_count = canceloff;
+ 		}
+ 		/* Pack into the request @pack lock handles. */
+@@ -669,7 +684,8 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
+ 	ns = exp->exp_obd->obd_namespace;
+ 
+ 	/* If we're replaying this lock, just check some invariants.
+-	 * If we're creating a new lock, get everything all setup nice. */
++	 * If we're creating a new lock, get everything all setup nicely.
++	 */
+ 	if (is_replay) {
+ 		lock = ldlm_handle2lock_long(lockh, 0);
+ 		LASSERT(lock);
+@@ -766,7 +782,8 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
+ 				    lockh, rc);
+ 
+ 	/* If ldlm_cli_enqueue_fini did not find the lock, we need to free
+-	 * one reference that we took */
++	 * one reference that we took
++	 */
+ 	if (err == -ENOLCK)
+ 		LDLM_LOCK_RELEASE(lock);
+ 	else
+@@ -842,7 +859,8 @@ static void ldlm_cancel_pack(struct ptlrpc_request *req,
+ 
+ 	/* XXX: it would be better to pack lock handles grouped by resource.
+ 	 * so that the server cancel would call filter_lvbo_update() less
+-	 * frequently. */
++	 * frequently.
++	 */
+ 	list_for_each_entry(lock, head, l_bl_ast) {
+ 		if (!count--)
+ 			break;
+@@ -857,7 +875,8 @@ static void ldlm_cancel_pack(struct ptlrpc_request *req,
+ 
+ /**
+  * Prepare and send a batched cancel RPC. It will include \a count lock
+- * handles of locks given in \a cancels list. */
++ * handles of locks given in \a cancels list.
++ */
+ static int ldlm_cli_cancel_req(struct obd_export *exp,
+ 			       struct list_head *cancels,
+ 			       int count, enum ldlm_cancel_flags flags)
+@@ -969,7 +988,8 @@ int ldlm_cli_update_pool(struct ptlrpc_request *req)
+ 	 * is the case when server does not support LRU resize feature.
+ 	 * This is also possible in some recovery cases when server-side
+ 	 * reqs have no reference to the OBD export and thus access to
+-	 * server-side namespace is not possible. */
++	 * server-side namespace is not possible.
++	 */
+ 	if (lustre_msg_get_slv(req->rq_repmsg) == 0 ||
+ 	    lustre_msg_get_limit(req->rq_repmsg) == 0) {
+ 		DEBUG_REQ(D_HA, req,
+@@ -987,7 +1007,8 @@ int ldlm_cli_update_pool(struct ptlrpc_request *req)
+ 	 * to the pool thread. We do not access obd_namespace and pool
+ 	 * directly here as there is no reliable way to make sure that
+ 	 * they are still alive at cleanup time. Evil races are possible
+-	 * which may cause Oops at that time. */
++	 * which may cause Oops at that time.
++	 */
+ 	write_lock(&obd->obd_pool_lock);
+ 	obd->obd_pool_slv = new_slv;
+ 	obd->obd_pool_limit = new_limit;
+@@ -1026,7 +1047,8 @@ int ldlm_cli_cancel(struct lustre_handle *lockh,
+ 	}
+ 	/* Even if the lock is marked as LDLM_FL_BL_AST, this is a LDLM_CANCEL
+ 	 * RPC which goes to canceld portal, so we can cancel other LRU locks
+-	 * here and send them all as one LDLM_CANCEL RPC. */
++	 * here and send them all as one LDLM_CANCEL RPC.
++	 */
+ 	LASSERT(list_empty(&lock->l_bl_ast));
+ 	list_add(&lock->l_bl_ast, &cancels);
+ 
+@@ -1074,7 +1096,8 @@ int ldlm_cli_cancel_list_local(struct list_head *cancels, int count,
+ 		/* Until we have compound requests and can send LDLM_CANCEL
+ 		 * requests batched with generic RPCs, we need to send cancels
+ 		 * with the LDLM_FL_BL_AST flag in a separate RPC from
+-		 * the one being generated now. */
++		 * the one being generated now.
++		 */
+ 		if (!(flags & LCF_BL_AST) && (rc == LDLM_FL_BL_AST)) {
+ 			LDLM_DEBUG(lock, "Cancel lock separately");
+ 			list_del_init(&lock->l_bl_ast);
+@@ -1114,7 +1137,8 @@ static ldlm_policy_res_t ldlm_cancel_no_wait_policy(struct ldlm_namespace *ns,
+ 	lock_res_and_lock(lock);
+ 
+ 	/* don't check added & count since we want to process all locks
+-	 * from unused list */
++	 * from unused list
++	 */
+ 	switch (lock->l_resource->lr_type) {
+ 	case LDLM_EXTENT:
+ 	case LDLM_IBITS:
+@@ -1150,7 +1174,8 @@ static ldlm_policy_res_t ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
+ 	unsigned long la;
+ 
+ 	/* Stop LRU processing when we reach past @count or have checked all
+-	 * locks in LRU. */
++	 * locks in LRU.
++	 */
+ 	if (count && added >= count)
+ 		return LDLM_POLICY_KEEP_LOCK;
+ 
+@@ -1164,7 +1189,8 @@ static ldlm_policy_res_t ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
+ 	ldlm_pool_set_clv(pl, lv);
+ 
+ 	/* Stop when SLV is not yet come from server or lv is smaller than
+-	 * it is. */
++	 * it is.
++	 */
+ 	return (slv == 0 || lv < slv) ?
+ 		LDLM_POLICY_KEEP_LOCK : LDLM_POLICY_CANCEL_LOCK;
+ }
+@@ -1184,7 +1210,8 @@ static ldlm_policy_res_t ldlm_cancel_passed_policy(struct ldlm_namespace *ns,
+ 						   int count)
+ {
+ 	/* Stop LRU processing when we reach past @count or have checked all
+-	 * locks in LRU. */
++	 * locks in LRU.
++	 */
+ 	return (added >= count) ?
+ 		LDLM_POLICY_KEEP_LOCK : LDLM_POLICY_CANCEL_LOCK;
+ }
+@@ -1225,7 +1252,8 @@ static ldlm_policy_res_t ldlm_cancel_default_policy(struct ldlm_namespace *ns,
+ 						    int count)
+ {
+ 	/* Stop LRU processing when we reach past count or have checked all
+-	 * locks in LRU. */
++	 * locks in LRU.
++	 */
+ 	return (added >= count) ?
+ 		LDLM_POLICY_KEEP_LOCK : LDLM_POLICY_CANCEL_LOCK;
+ }
+@@ -1329,7 +1357,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
  				continue;
  
- 			err = obd_set_info_async(env, tgt->ltd_exp,
--					 keylen, key, sizeof(int),
--					 &mgi->group, set);
-+						 keylen, key, sizeof(int),
-+						 &mgi->group, set);
- 		} else if (next_id) {
- 			err = obd_set_info_async(env, tgt->ltd_exp,
- 					 keylen, key, vallen,
-@@ -2159,7 +2160,7 @@ static int lov_set_info_async(const struct lu_env *env, struct obd_export *exp,
- 				continue;
+ 			/* Somebody is already doing CANCEL. No need for this
+-			 * lock in LRU, do not traverse it again. */
++			 * lock in LRU, do not traverse it again.
++			 */
+ 			if (!(lock->l_flags & LDLM_FL_CANCELING))
+ 				break;
  
- 			err = obd_set_info_async(env, tgt->ltd_exp,
--					 keylen, key, vallen, val, set);
-+						 keylen, key, vallen, val, set);
+@@ -1378,7 +1407,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 			/* Another thread is removing lock from LRU, or
+ 			 * somebody is already doing CANCEL, or there
+ 			 * is a blocking request which will send cancel
+-			 * by itself, or the lock is no longer unused. */
++			 * by itself, or the lock is no longer unused.
++			 */
+ 			unlock_res_and_lock(lock);
+ 			lu_ref_del(&lock->l_reference,
+ 				   __func__, current);
+@@ -1392,7 +1422,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 		 * better send cancel notification to server, so that it
+ 		 * frees appropriate state. This might lead to a race
+ 		 * where while we are doing cancel here, server is also
+-		 * silently cancelling this lock. */
++		 * silently cancelling this lock.
++		 */
+ 		lock->l_flags &= ~LDLM_FL_CANCEL_ON_BLOCK;
+ 
+ 		/* Setting the CBPENDING flag is a little misleading,
+@@ -1400,7 +1431,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 		 * CBPENDING is set, the lock can accumulate no more
+ 		 * readers/writers. Since readers and writers are
+ 		 * already zero here, ldlm_lock_decref() won't see
+-		 * this flag and call l_blocking_ast */
++		 * this flag and call l_blocking_ast
++		 */
+ 		lock->l_flags |= LDLM_FL_CBPENDING | LDLM_FL_CANCELING;
+ 
+ 		/* We can't re-add to l_lru as it confuses the
+@@ -1408,7 +1440,8 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
+ 		 * arrives after we drop lr_lock below. We use l_bl_ast
+ 		 * and can't use l_pending_chain as it is used both on
+ 		 * server and client nevertheless bug 5666 says it is
+-		 * used only on server */
++		 * used only on server
++		 */
+ 		LASSERT(list_empty(&lock->l_bl_ast));
+ 		list_add(&lock->l_bl_ast, cancels);
+ 		unlock_res_and_lock(lock);
+@@ -1449,7 +1482,8 @@ int ldlm_cancel_lru(struct ldlm_namespace *ns, int nr,
+ 	int count, rc;
+ 
+ 	/* Just prepare the list of locks, do not actually cancel them yet.
+-	 * Locks are cancelled later in a separate thread. */
++	 * Locks are cancelled later in a separate thread.
++	 */
+ 	count = ldlm_prepare_lru_list(ns, &cancels, nr, 0, flags);
+ 	rc = ldlm_bl_to_thread_list(ns, NULL, &cancels, count, cancel_flags);
+ 	if (rc == 0)
+@@ -1485,7 +1519,8 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
+ 			continue;
+ 
+ 		/* If somebody is already doing CANCEL, or blocking AST came,
+-		 * skip this lock. */
++		 * skip this lock.
++		 */
+ 		if (lock->l_flags & LDLM_FL_BL_AST ||
+ 		    lock->l_flags & LDLM_FL_CANCELING)
+ 			continue;
+@@ -1494,7 +1529,8 @@ int ldlm_cancel_resource_local(struct ldlm_resource *res,
+ 			continue;
+ 
+ 		/* If policy is given and this is IBITS lock, add to list only
+-		 * those locks that match by policy. */
++		 * those locks that match by policy.
++		 */
+ 		if (policy && (lock->l_resource->lr_type == LDLM_IBITS) &&
+ 		    !(lock->l_policy_data.l_inodebits.bits &
+ 		      policy->l_inodebits.bits))
+@@ -1539,7 +1575,8 @@ int ldlm_cli_cancel_list(struct list_head *cancels, int count,
+ 	 * Usually it is enough to have just 1 RPC, but it is possible that
+ 	 * there are too many locks to be cancelled in LRU or on a resource.
+ 	 * It would also speed up the case when the server does not support
+-	 * the feature. */
++	 * the feature.
++	 */
+ 	while (count > 0) {
+ 		LASSERT(!list_empty(cancels));
+ 		lock = list_entry(cancels->next, struct ldlm_lock,
+@@ -1577,7 +1614,8 @@ EXPORT_SYMBOL(ldlm_cli_cancel_list);
+  * Cancel all locks on a resource that have 0 readers/writers.
+  *
+  * If flags & LDLM_FL_LOCAL_ONLY, throw the locks away without trying
+- * to notify the server. */
++ * to notify the server.
++ */
+ int ldlm_cli_cancel_unused_resource(struct ldlm_namespace *ns,
+ 				    const struct ldlm_res_id *res_id,
+ 				    ldlm_policy_data_t *policy,
+@@ -1815,7 +1853,8 @@ static int replay_lock_interpret(const struct lu_env *env,
+ 	exp = req->rq_export;
+ 	if (exp && exp->exp_lock_hash) {
+ 		/* In the function below, .hs_keycmp resolves to
+-		 * ldlm_export_lock_keycmp() */
++		 * ldlm_export_lock_keycmp()
++		 */
+ 		/* coverity[overrun-buffer-val] */
+ 		cfs_hash_rehash_key(exp->exp_lock_hash,
+ 				    &lock->l_remote_handle,
+@@ -1850,7 +1889,8 @@ static int replay_one_lock(struct obd_import *imp, struct ldlm_lock *lock)
+ 
+ 	/* If this is reply-less callback lock, we cannot replay it, since
+ 	 * server might have long dropped it, but notification of that event was
+-	 * lost by network. (and server granted conflicting lock already) */
++	 * lost by network. (and server granted conflicting lock already)
++	 */
+ 	if (lock->l_flags & LDLM_FL_CANCEL_ON_BLOCK) {
+ 		LDLM_DEBUG(lock, "Not replaying reply-less lock:");
+ 		ldlm_lock_cancel(lock);
+@@ -1901,7 +1941,8 @@ static int replay_one_lock(struct obd_import *imp, struct ldlm_lock *lock)
+ 	/* notify the server we've replayed all requests.
+ 	 * also, we mark the request to be put on a dedicated
+ 	 * queue to be processed after all request replayes.
+-	 * bug 6063 */
++	 * bug 6063
++	 */
+ 	lustre_msg_set_flags(req->rq_reqmsg, MSG_REQ_REPLAY_DONE);
+ 
+ 	LDLM_DEBUG(lock, "replaying lock:");
+@@ -1936,7 +1977,8 @@ static void ldlm_cancel_unused_locks_for_replay(struct ldlm_namespace *ns)
+ 
+ 	/* We don't need to care whether or not LRU resize is enabled
+ 	 * because the LDLM_CANCEL_NO_WAIT policy doesn't use the
+-	 * count parameter */
++	 * count parameter
++	 */
+ 	canceled = ldlm_cancel_lru_local(ns, &cancels, ns->ns_nr_unused, 0,
+ 					 LCF_LOCAL, LDLM_CANCEL_NO_WAIT);
+ 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 9ab4452..03b9726 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -56,7 +56,8 @@ LIST_HEAD(ldlm_srv_namespace_list);
+ struct mutex ldlm_cli_namespace_lock;
+ /* Client Namespaces that have active resources in them.
+  * Once all resources go away, ldlm_poold moves such namespaces to the
+- * inactive list */
++ * inactive list
++ */
+ LIST_HEAD(ldlm_cli_active_namespace_list);
+ /* Client namespaces that don't have any locks in them */
+ static LIST_HEAD(ldlm_cli_inactive_namespace_list);
+@@ -66,7 +67,8 @@ static struct dentry *ldlm_ns_debugfs_dir;
+ struct dentry *ldlm_svc_debugfs_dir;
+ 
+ /* during debug dump certain amount of granted locks for one resource to avoid
+- * DDOS. */
++ * DDOS.
++ */
+ static unsigned int ldlm_dump_granted_max = 256;
+ 
+ static ssize_t
+@@ -275,7 +277,8 @@ static ssize_t lru_size_store(struct kobject *kobj, struct attribute *attr,
+ 		ldlm_cancel_lru(ns, 0, LCF_ASYNC, LDLM_CANCEL_PASSED);
+ 
+ 		/* Make sure that LRU resize was originally supported before
+-		 * turning it on here. */
++		 * turning it on here.
++		 */
+ 		if (lru_resize &&
+ 		    (ns->ns_orig_connect_flags & OBD_CONNECT_LRU_RESIZE)) {
+ 			CDEBUG(D_DLMTRACE,
+@@ -749,7 +752,8 @@ static void cleanup_resource(struct ldlm_resource *res, struct list_head *q,
+ 		struct lustre_handle lockh;
+ 
+ 		/* First, we look for non-cleaned-yet lock
+-		 * all cleaned locks are marked by CLEANED flag. */
++		 * all cleaned locks are marked by CLEANED flag.
++		 */
+ 		lock_res(res);
+ 		list_for_each(tmp, q) {
+ 			lock = list_entry(tmp, struct ldlm_lock,
+@@ -769,7 +773,8 @@ static void cleanup_resource(struct ldlm_resource *res, struct list_head *q,
  		}
  
- 		if (!rc)
-@@ -2349,8 +2350,8 @@ static int __init lov_init(void)
- 		return rc;
+ 		/* Set CBPENDING so nothing in the cancellation path
+-		 * can match this lock. */
++		 * can match this lock.
++		 */
+ 		lock->l_flags |= LDLM_FL_CBPENDING;
+ 		lock->l_flags |= LDLM_FL_FAILED;
+ 		lock->l_flags |= flags;
+@@ -782,7 +787,8 @@ static void cleanup_resource(struct ldlm_resource *res, struct list_head *q,
+ 			/* This is a little bit gross, but much better than the
+ 			 * alternative: pretend that we got a blocking AST from
+ 			 * the server, so that when the lock is decref'd, it
+-			 * will go away ... */
++			 * will go away ...
++			 */
+ 			unlock_res(res);
+ 			LDLM_DEBUG(lock, "setting FL_LOCAL_ONLY");
+ 			if (lock->l_completion_ast)
+@@ -873,7 +879,8 @@ force_wait:
+ 				  atomic_read(&ns->ns_bref) == 0, &lwi);
  
- 	lov_oinfo_slab = kmem_cache_create("lov_oinfo",
--					      sizeof(struct lov_oinfo),
--					      0, SLAB_HWCACHE_ALIGN, NULL);
-+					   sizeof(struct lov_oinfo),
-+					   0, SLAB_HWCACHE_ALIGN, NULL);
- 	if (!lov_oinfo_slab) {
- 		lu_kmem_fini(lov_caches);
- 		return -ENOMEM;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-index 4101696..9cea9dc 100644
---- a/drivers/staging/lustre/lustre/lov/lov_object.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-@@ -59,7 +59,7 @@ struct lov_layout_operations {
- 			const struct cl_object_conf *conf,
- 			union lov_layout_state *state);
- 	int (*llo_delete)(const struct lu_env *env, struct lov_object *lov,
--			   union lov_layout_state *state);
-+			  union lov_layout_state *state);
- 	void (*llo_fini)(const struct lu_env *env, struct lov_object *lov,
- 			 union lov_layout_state *state);
- 	void (*llo_install)(const struct lu_env *env, struct lov_object *lov,
-@@ -67,7 +67,7 @@ struct lov_layout_operations {
- 	int  (*llo_print)(const struct lu_env *env, void *cookie,
- 			  lu_printer_t p, const struct lu_object *o);
- 	int  (*llo_page_init)(const struct lu_env *env, struct cl_object *obj,
--				struct cl_page *page, struct page *vmpage);
-+			      struct cl_page *page, struct page *vmpage);
- 	int  (*llo_lock_init)(const struct lu_env *env,
- 			      struct cl_object *obj, struct cl_lock *lock,
- 			      const struct cl_io *io);
-@@ -266,9 +266,9 @@ out:
- }
+ 		/* Forced cleanups should be able to reclaim all references,
+-		 * so it's safe to wait forever... we can't leak locks... */
++		 * so it's safe to wait forever... we can't leak locks...
++		 */
+ 		if (force && rc == -ETIMEDOUT) {
+ 			LCONSOLE_ERROR("Forced cleanup waiting for %s namespace with %d resources in use, (rc=%d)\n",
+ 				       ldlm_ns_name(ns),
+@@ -943,7 +950,8 @@ static void ldlm_namespace_unregister(struct ldlm_namespace *ns,
+ 	LASSERT(!list_empty(&ns->ns_list_chain));
+ 	/* Some asserts and possibly other parts of the code are still
+ 	 * using list_empty(&ns->ns_list_chain). This is why it is
+-	 * important to use list_del_init() here. */
++	 * important to use list_del_init() here.
++	 */
+ 	list_del_init(&ns->ns_list_chain);
+ 	ldlm_namespace_nr_dec(client);
+ 	mutex_unlock(ldlm_namespace_lock(client));
+@@ -963,7 +971,8 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
+ 	ldlm_namespace_unregister(ns, ns->ns_client);
+ 	/* Fini pool _before_ parent proc dir is removed. This is important as
+ 	 * ldlm_pool_fini() removes own proc dir which is child to @dir.
+-	 * Removing it after @dir may cause oops. */
++	 * Removing it after @dir may cause oops.
++	 */
+ 	ldlm_pool_fini(&ns->ns_pool);
  
- static int lov_init_released(const struct lu_env *env,
--			struct lov_device *dev, struct lov_object *lov,
--			const struct cl_object_conf *conf,
--			union  lov_layout_state *state)
-+			     struct lov_device *dev, struct lov_object *lov,
-+			     const struct cl_object_conf *conf,
-+			     union  lov_layout_state *state)
- {
- 	struct lov_stripe_md *lsm = conf->u.coc_md->lsm;
+ 	ldlm_namespace_debugfs_unregister(ns);
+@@ -971,7 +980,8 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
+ 	cfs_hash_putref(ns->ns_rs_hash);
+ 	/* Namespace \a ns should be not on list at this time, otherwise
+ 	 * this will cause issues related to using freed \a ns in poold
+-	 * thread. */
++	 * thread.
++	 */
+ 	LASSERT(list_empty(&ns->ns_list_chain));
+ 	kfree(ns);
+ 	ldlm_put_ref();
+@@ -1050,7 +1060,8 @@ static struct ldlm_resource *ldlm_resource_new(void)
+ 	lu_ref_init(&res->lr_reference);
  
-@@ -389,7 +389,7 @@ static void lov_fini_raid0(const struct lu_env *env, struct lov_object *lov,
- }
+ 	/* The creator of the resource must unlock the mutex after LVB
+-	 * initialization. */
++	 * initialization.
++	 */
+ 	mutex_init(&res->lr_lvb_mutex);
+ 	mutex_lock(&res->lr_lvb_mutex);
  
- static void lov_fini_released(const struct lu_env *env, struct lov_object *lov,
--				union lov_layout_state *state)
-+			      union lov_layout_state *state)
- {
- 	dump_lsm(D_INODE, lov->lo_lsm);
- 	lov_free_memmd(&lov->lo_lsm);
-@@ -411,9 +411,9 @@ static int lov_print_raid0(const struct lu_env *env, void *cookie,
- 	int			 i;
- 
- 	(*p)(env, cookie, "stripes: %d, %s, lsm{%p 0x%08X %d %u %u}:\n",
--		r0->lo_nr, lov->lo_layout_invalid ? "invalid" : "valid", lsm,
--		lsm->lsm_magic, atomic_read(&lsm->lsm_refc),
--		lsm->lsm_stripe_count, lsm->lsm_layout_gen);
-+	     r0->lo_nr, lov->lo_layout_invalid ? "invalid" : "valid", lsm,
-+	     lsm->lsm_magic, atomic_read(&lsm->lsm_refc),
-+	     lsm->lsm_stripe_count, lsm->lsm_layout_gen);
- 	for (i = 0; i < r0->lo_nr; ++i) {
- 		struct lu_object *sub;
- 
-@@ -428,16 +428,16 @@ static int lov_print_raid0(const struct lu_env *env, void *cookie,
- }
- 
- static int lov_print_released(const struct lu_env *env, void *cookie,
--				lu_printer_t p, const struct lu_object *o)
-+			      lu_printer_t p, const struct lu_object *o)
- {
- 	struct lov_object	*lov = lu2lov(o);
- 	struct lov_stripe_md	*lsm = lov->lo_lsm;
- 
- 	(*p)(env, cookie,
--		"released: %s, lsm{%p 0x%08X %d %u %u}:\n",
--		lov->lo_layout_invalid ? "invalid" : "valid", lsm,
--		lsm->lsm_magic, atomic_read(&lsm->lsm_refc),
--		lsm->lsm_stripe_count, lsm->lsm_layout_gen);
-+	     "released: %s, lsm{%p 0x%08X %d %u %u}:\n",
-+	     lov->lo_layout_invalid ? "invalid" : "valid", lsm,
-+	     lsm->lsm_magic, atomic_read(&lsm->lsm_refc),
-+	     lsm->lsm_stripe_count, lsm->lsm_layout_gen);
- 	return 0;
- }
- 
-@@ -646,9 +646,9 @@ static int lov_layout_wait(const struct lu_env *env, struct lov_object *lov)
- 	struct l_wait_info lwi = { 0 };
- 
- 	while (atomic_read(&lov->lo_active_ios) > 0) {
--		CDEBUG(D_INODE, "file:"DFID" wait for active IO, now: %d.\n",
--			PFID(lu_object_fid(lov2lu(lov))),
--			atomic_read(&lov->lo_active_ios));
-+		CDEBUG(D_INODE, "file:" DFID " wait for active IO, now: %d.\n",
-+		       PFID(lu_object_fid(lov2lu(lov))),
-+		       atomic_read(&lov->lo_active_ios));
- 
- 		l_wait_event(lov->lo_waitq,
- 			     atomic_read(&lov->lo_active_ios) == 0, &lwi);
-@@ -825,7 +825,7 @@ static int lov_object_print(const struct lu_env *env, void *cookie,
- }
- 
- int lov_page_init(const struct lu_env *env, struct cl_object *obj,
--		struct cl_page *page, struct page *vmpage)
-+		  struct cl_page *page, struct page *vmpage)
- {
- 	return LOV_2DISPATCH_NOLOCK(cl2lov(obj),
- 				    llo_page_init, env, obj, page, vmpage);
-@@ -924,8 +924,8 @@ static struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
- 	if (lov->lo_lsm) {
- 		lsm = lsm_addref(lov->lo_lsm);
- 		CDEBUG(D_INODE, "lsm %p addref %d/%d by %p.\n",
--			lsm, atomic_read(&lsm->lsm_refc),
--			lov->lo_layout_invalid, current);
-+		       lsm, atomic_read(&lsm->lsm_refc),
-+		       lov->lo_layout_invalid, current);
- 	}
- 	lov_conf_thaw(lov);
- 	return lsm;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_offset.c b/drivers/staging/lustre/lustre/lov/lov_offset.c
-index 1ceea3d..ae83eb0 100644
---- a/drivers/staging/lustre/lustre/lov/lov_offset.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_offset.c
-@@ -43,8 +43,7 @@
- #include "lov_internal.h"
- 
- /* compute object size given "stripeno" and the ost size */
--u64 lov_stripe_size(struct lov_stripe_md *lsm, u64 ost_size,
--			 int stripeno)
-+u64 lov_stripe_size(struct lov_stripe_md *lsm, u64 ost_size, int stripeno)
- {
- 	unsigned long ssize = lsm->lsm_stripe_size;
- 	unsigned long stripe_size;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index 9235d7d..3925633 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -134,7 +134,7 @@ int lov_packmd(struct obd_export *exp, struct lov_mds_md **lmmp,
- 	if ((lmm_magic != LOV_MAGIC_V1) &&
- 	    (lmm_magic != LOV_MAGIC_V3)) {
- 		CERROR("bad mem LOV MAGIC: 0x%08X != 0x%08X nor 0x%08X\n",
--			lmm_magic, LOV_MAGIC_V1, LOV_MAGIC_V3);
-+		       lmm_magic, LOV_MAGIC_V1, LOV_MAGIC_V3);
- 		return -EINVAL;
- 
- 	}
-@@ -145,7 +145,7 @@ int lov_packmd(struct obd_export *exp, struct lov_mds_md **lmmp,
- 		 */
- 		if (!lmmp) {
- 			stripe_count = lov_get_stripecnt(lov, lmm_magic,
--							lsm->lsm_stripe_count);
-+							 lsm->lsm_stripe_count);
- 			lsm->lsm_stripe_count = stripe_count;
- 		} else if (!lsm_is_released(lsm)) {
- 			stripe_count = lsm->lsm_stripe_count;
-@@ -267,7 +267,8 @@ static int lov_verify_lmm(void *lmm, int lmm_bytes, __u16 *stripe_count)
- 		return -EINVAL;
- 	}
- 	rc = lsm_op_find(le32_to_cpu(*(__u32 *)lmm))->lsm_lmm_verify(lmm,
--				     lmm_bytes, stripe_count);
-+								     lmm_bytes,
-+								  stripe_count);
- 	return rc;
- }
- 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
-index 17ae450..fdcaf80 100644
---- a/drivers/staging/lustre/lustre/lov/lov_page.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_page.c
-@@ -172,8 +172,7 @@ int lov_page_init_raid0(const struct lu_env *env, struct cl_object *obj,
- 	offset = cl_offset(obj, page->cp_index);
- 	stripe = lov_stripe_number(loo->lo_lsm, offset);
- 	LASSERT(stripe < r0->lo_nr);
--	rc = lov_stripe_offset(loo->lo_lsm, offset, stripe,
--				   &suboff);
-+	rc = lov_stripe_offset(loo->lo_lsm, offset, stripe, &suboff);
- 	LASSERT(rc == 0);
- 
- 	lpg->lps_invalid = 1;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
-index 8608b09..be95dd7 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pool.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
-@@ -444,7 +444,7 @@ int lov_pool_new(struct obd_device *obd, char *poolname)
- 		lov_pool_putref(new_pool);
- 	}
- 	CDEBUG(D_INFO, "pool %p - proc %p\n",
--		new_pool, new_pool->pool_debugfs_entry);
-+	       new_pool, new_pool->pool_debugfs_entry);
- 
- 	spin_lock(&obd->obd_dev_lock);
- 	list_add_tail(&new_pool->pool_list, &lov->lov_pool_list);
-@@ -638,7 +638,7 @@ struct pool_desc *lov_find_pool(struct lov_obd *lov, char *poolname)
- 			      poolname);
- 		if (pool && (pool_tgt_count(pool) == 0)) {
- 			CWARN("Request for an empty pool ("LOV_POOLNAMEF")\n",
--			       poolname);
-+			      poolname);
- 			/* pool is ignored, so we remove ref on it */
- 			lov_pool_putref(pool);
- 			pool = NULL;
-diff --git a/drivers/staging/lustre/lustre/lov/lovsub_lock.c b/drivers/staging/lustre/lustre/lov/lovsub_lock.c
-index 0046812..b041739 100644
---- a/drivers/staging/lustre/lustre/lov/lovsub_lock.c
-+++ b/drivers/staging/lustre/lustre/lov/lovsub_lock.c
-@@ -404,7 +404,7 @@ static void lovsub_lock_delete(const struct lu_env *env,
- 
- 		restart = 0;
- 		list_for_each_entry_safe(scan, temp,
--					     &sub->lss_parents, lll_list) {
-+					 &sub->lss_parents, lll_list) {
- 			lov     = scan->lll_super;
- 			subdata = &lov->lls_sub[scan->lll_idx];
- 			lovsub_parent_lock(env, lov);
-diff --git a/drivers/staging/lustre/lustre/lov/lovsub_page.c b/drivers/staging/lustre/lustre/lov/lovsub_page.c
-index 3f00ce9..2d94553 100644
---- a/drivers/staging/lustre/lustre/lov/lovsub_page.c
-+++ b/drivers/staging/lustre/lustre/lov/lovsub_page.c
-@@ -60,7 +60,7 @@ static const struct cl_page_operations lovsub_page_ops = {
- };
- 
- int lovsub_page_init(const struct lu_env *env, struct cl_object *obj,
--			struct cl_page *page, struct page *unused)
-+		     struct cl_page *page, struct page *unused)
- {
- 	struct lovsub_page *lsb = cl_object_page_slice(obj, page);
- 
-diff --git a/drivers/staging/lustre/lustre/lov/lproc_lov.c b/drivers/staging/lustre/lustre/lov/lproc_lov.c
-index bb81d04..0dcb6b6 100644
---- a/drivers/staging/lustre/lustre/lov/lproc_lov.c
-+++ b/drivers/staging/lustre/lustre/lov/lproc_lov.c
-@@ -53,8 +53,8 @@ static int lov_stripesize_seq_show(struct seq_file *m, void *v)
- }
- 
- static ssize_t lov_stripesize_seq_write(struct file *file,
--				const char __user *buffer,
--				size_t count, loff_t *off)
-+					const char __user *buffer,
-+					size_t count, loff_t *off)
- {
- 	struct obd_device *dev = ((struct seq_file *)file->private_data)->private;
- 	struct lov_desc *desc;
-@@ -86,8 +86,8 @@ static int lov_stripeoffset_seq_show(struct seq_file *m, void *v)
- }
- 
- static ssize_t lov_stripeoffset_seq_write(struct file *file,
--				const char __user *buffer,
--				size_t count, loff_t *off)
-+					  const char __user *buffer,
-+					  size_t count, loff_t *off)
- {
- 	struct obd_device *dev = ((struct seq_file *)file->private_data)->private;
- 	struct lov_desc *desc;
-@@ -118,8 +118,8 @@ static int lov_stripetype_seq_show(struct seq_file *m, void *v)
- }
- 
- static ssize_t lov_stripetype_seq_write(struct file *file,
--				const char __user *buffer,
--				size_t count, loff_t *off)
-+					const char __user *buffer,
-+					size_t count, loff_t *off)
- {
- 	struct obd_device *dev = ((struct seq_file *)file->private_data)->private;
- 	struct lov_desc *desc;
-@@ -150,8 +150,8 @@ static int lov_stripecount_seq_show(struct seq_file *m, void *v)
- }
- 
- static ssize_t lov_stripecount_seq_write(struct file *file,
--				const char __user *buffer,
--				size_t count, loff_t *off)
-+					 const char __user *buffer,
-+					 size_t count, loff_t *off)
- {
- 	struct obd_device *dev = ((struct seq_file *)file->private_data)->private;
- 	struct lov_desc *desc;
+@@ -1166,7 +1177,8 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 	/* Let's see if we happened to be the very first resource in this
+ 	 * namespace. If so, and this is a client namespace, we need to move
+ 	 * the namespace into the active namespaces list to be patrolled by
+-	 * the ldlm_poold. */
++	 * the ldlm_poold.
++	 */
+ 	if (ns_refcount == 1) {
+ 		mutex_lock(ldlm_namespace_lock(LDLM_NAMESPACE_CLIENT));
+ 		ldlm_namespace_move_to_active_locked(ns, LDLM_NAMESPACE_CLIENT);
 -- 
 2.1.0
