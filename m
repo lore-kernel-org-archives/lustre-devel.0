@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 21:59:51 -0500
-Subject: [lustre-devel] [PATCH v2 08/84] staging/lustre: Get rid of
-	mds_cmd_t typedef
+Date: Wed, 24 Feb 2016 21:59:53 -0500
+Subject: [lustre-devel] [PATCH v2 10/84] staging/lustre: Get rid of
+	ldlm_cmd_t typedef
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-9-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-11-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,7 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Replace it with enum mds_cmd
+Replace it with enum ldlm_cmd
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
@@ -22,26 +22,26 @@ Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index c0b05d4..a72fed0 100644
+index bd8b622..938f91b 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -2018,7 +2018,7 @@ enum quota_cmd {
+@@ -2659,7 +2659,7 @@ void lustre_swab_lov_desc(struct lov_desc *ld);
+  *   LDLM requests:
   */
- 
- /* opcodes */
+ /* opcodes -- MUST be distinct from OST/MDS opcodes */
 -typedef enum {
-+enum mds_cmd {
- 	MDS_GETATTR		= 33,
- 	MDS_GETATTR_NAME	= 34,
- 	MDS_CLOSE		= 35,
-@@ -2049,7 +2049,7 @@ typedef enum {
- 	MDS_HSM_CT_UNREGISTER	= 60,
- 	MDS_SWAP_LAYOUTS	= 61,
- 	MDS_LAST_OPC
--} mds_cmd_t;
++enum ldlm_cmd {
+ 	LDLM_ENQUEUE     = 101,
+ 	LDLM_CONVERT     = 102,
+ 	LDLM_CANCEL      = 103,
+@@ -2668,7 +2668,7 @@ typedef enum {
+ 	LDLM_GL_CALLBACK = 106,
+ 	LDLM_SET_INFO    = 107,
+ 	LDLM_LAST_OPC
+-} ldlm_cmd_t;
 +};
+ #define LDLM_FIRST_OPC LDLM_ENQUEUE
  
- #define MDS_FIRST_OPC    MDS_GETATTR
- 
+ #define RES_NAME_SIZE 4
 -- 
 2.1.0
