@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:00:10 -0500
-Subject: [lustre-devel] [PATCH v2 27/84] staging/lustre: Remove FSF mailing
-	address from GPL notices
+Date: Wed, 24 Feb 2016 22:00:15 -0500
+Subject: [lustre-devel] [PATCH v2 32/84] staging/lustre: Remove
+	lquota_glb_rec, lquota_slv_rec and lquota_acct_rec
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-28-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-33-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,97 +14,139 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This patch removes remaining several places that still had that
-extra paragraph included in Lustre code.
+These server-only structures and some supporting defines are unused
+on the client.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h      | 5 -----
- drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h | 5 -----
- drivers/staging/lustre/lnet/lnet/lib-ptl.c                    | 5 -----
- drivers/staging/lustre/lustre/obdecho/echo_internal.h         | 5 -----
- drivers/staging/lustre/lustre/osc/osc_quota.c                 | 5 -----
- 5 files changed, 25 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      | 52 ----------------------
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 44 ------------------
+ 2 files changed, 96 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 1530b04..9e62c59 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-index 520209f..c04979a 100644
---- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-index 5a9ab87..0281c6a 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_internal.h b/drivers/staging/lustre/lustre/obdecho/echo_internal.h
-index 69063fa..f5034a2 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_internal.h
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_internal.h
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
-diff --git a/drivers/staging/lustre/lustre/osc/osc_quota.c b/drivers/staging/lustre/lustre/osc/osc_quota.c
-index d6731c5..508fcf2 100644
---- a/drivers/staging/lustre/lustre/osc/osc_quota.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_quota.c
-@@ -13,11 +13,6 @@
-  * General Public License version 2 for more details (a copy is included
-  * in the LICENSE file that accompanied this code).
-  *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; if not, write to the
-- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-- * Boston, MA 021110-1307, USA
-- *
-  * GPL HEADER END
-  */
- /*
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 607bfde..b5f8453 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1819,58 +1819,6 @@ do {					\
+ 	Q_COPY(out, in, qc_dqblk);	\
+ } while (0)
+ 
+-/* Quota types currently supported */
+-enum {
+-	LQUOTA_TYPE_USR	= 0x00, /* maps to USRQUOTA */
+-	LQUOTA_TYPE_GRP	= 0x01, /* maps to GRPQUOTA */
+-	LQUOTA_TYPE_MAX
+-};
+-
+-/* There are 2 different resource types on which a quota limit can be enforced:
+- * - inodes on the MDTs
+- * - blocks on the OSTs */
+-enum {
+-	LQUOTA_RES_MD		= 0x01, /* skip 0 to avoid null oid in FID */
+-	LQUOTA_RES_DT		= 0x02,
+-	LQUOTA_LAST_RES,
+-	LQUOTA_FIRST_RES	= LQUOTA_RES_MD
+-};
+-
+-#define LQUOTA_NR_RES (LQUOTA_LAST_RES - LQUOTA_FIRST_RES + 1)
+-
+-/*
+- * Space accounting support
+- * Format of an accounting record, providing disk usage information for a given
+- * user or group
+- */
+-struct lquota_acct_rec { /* 16 bytes */
+-	__u64 bspace;  /* current space in use */
+-	__u64 ispace;  /* current # inodes in use */
+-};
+-
+-/*
+- * Global quota index support
+- * Format of a global record, providing global quota settings for a given quota
+- * identifier
+- */
+-struct lquota_glb_rec { /* 32 bytes */
+-	__u64 qbr_hardlimit; /* quota hard limit, in #inodes or kbytes */
+-	__u64 qbr_softlimit; /* quota soft limit, in #inodes or kbytes */
+-	__u64 qbr_time;      /* grace time, in seconds */
+-	__u64 qbr_granted;   /* how much is granted to slaves, in #inodes or
+-			      * kbytes */
+-};
+-
+-/*
+- * Slave index support
+- * Format of a slave record, recording how much space is granted to a given
+- * slave
+- */
+-struct lquota_slv_rec { /* 8 bytes */
+-	__u64 qsr_granted; /* space granted to the slave for the key=ID,
+-			    * in #inodes or kbytes */
+-};
+-
+ /* Data structures associated with the quota locks */
+ 
+ /* Glimpse descriptor used for the index & per-ID quota locks */
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+index c61d46f..249f9b3 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+@@ -336,10 +336,6 @@ void lustre_assert_wire_constants(void)
+ 	CLASSERT(LUSTRE_RES_ID_QUOTA_SEQ_OFF == 2);
+ 	CLASSERT(LUSTRE_RES_ID_QUOTA_VER_OID_OFF == 3);
+ 	CLASSERT(LUSTRE_RES_ID_HSH_OFF == 3);
+-	CLASSERT(LQUOTA_TYPE_USR == 0);
+-	CLASSERT(LQUOTA_TYPE_GRP == 1);
+-	CLASSERT(LQUOTA_RES_MD == 1);
+-	CLASSERT(LQUOTA_RES_DT == 2);
+ 	LASSERTF(OBD_PING == 400, "found %lld\n",
+ 		 (long long)OBD_PING);
+ 	LASSERTF(OBD_LOG_CANCEL == 401, "found %lld\n",
+@@ -1609,46 +1605,6 @@ void lustre_assert_wire_constants(void)
+ 	LASSERTF(Q_FINVALIDATE == 0x800104, "found 0x%.8x\n",
+ 		Q_FINVALIDATE);
+ 
+-	/* Checks for struct lquota_acct_rec */
+-	LASSERTF((int)sizeof(struct lquota_acct_rec) == 16, "found %lld\n",
+-		 (long long)(int)sizeof(struct lquota_acct_rec));
+-	LASSERTF((int)offsetof(struct lquota_acct_rec, bspace) == 0, "found %lld\n",
+-		 (long long)(int)offsetof(struct lquota_acct_rec, bspace));
+-	LASSERTF((int)sizeof(((struct lquota_acct_rec *)0)->bspace) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct lquota_acct_rec *)0)->bspace));
+-	LASSERTF((int)offsetof(struct lquota_acct_rec, ispace) == 8, "found %lld\n",
+-		 (long long)(int)offsetof(struct lquota_acct_rec, ispace));
+-	LASSERTF((int)sizeof(((struct lquota_acct_rec *)0)->ispace) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct lquota_acct_rec *)0)->ispace));
+-
+-	/* Checks for struct lquota_glb_rec */
+-	LASSERTF((int)sizeof(struct lquota_glb_rec) == 32, "found %lld\n",
+-		 (long long)(int)sizeof(struct lquota_glb_rec));
+-	LASSERTF((int)offsetof(struct lquota_glb_rec, qbr_hardlimit) == 0, "found %lld\n",
+-		 (long long)(int)offsetof(struct lquota_glb_rec, qbr_hardlimit));
+-	LASSERTF((int)sizeof(((struct lquota_glb_rec *)0)->qbr_hardlimit) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct lquota_glb_rec *)0)->qbr_hardlimit));
+-	LASSERTF((int)offsetof(struct lquota_glb_rec, qbr_softlimit) == 8, "found %lld\n",
+-		 (long long)(int)offsetof(struct lquota_glb_rec, qbr_softlimit));
+-	LASSERTF((int)sizeof(((struct lquota_glb_rec *)0)->qbr_softlimit) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct lquota_glb_rec *)0)->qbr_softlimit));
+-	LASSERTF((int)offsetof(struct lquota_glb_rec, qbr_time) == 16, "found %lld\n",
+-		 (long long)(int)offsetof(struct lquota_glb_rec, qbr_time));
+-	LASSERTF((int)sizeof(((struct lquota_glb_rec *)0)->qbr_time) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct lquota_glb_rec *)0)->qbr_time));
+-	LASSERTF((int)offsetof(struct lquota_glb_rec, qbr_granted) == 24, "found %lld\n",
+-		 (long long)(int)offsetof(struct lquota_glb_rec, qbr_granted));
+-	LASSERTF((int)sizeof(((struct lquota_glb_rec *)0)->qbr_granted) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct lquota_glb_rec *)0)->qbr_granted));
+-
+-	/* Checks for struct lquota_slv_rec */
+-	LASSERTF((int)sizeof(struct lquota_slv_rec) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(struct lquota_slv_rec));
+-	LASSERTF((int)offsetof(struct lquota_slv_rec, qsr_granted) == 0, "found %lld\n",
+-		 (long long)(int)offsetof(struct lquota_slv_rec, qsr_granted));
+-	LASSERTF((int)sizeof(((struct lquota_slv_rec *)0)->qsr_granted) == 8, "found %lld\n",
+-		 (long long)(int)sizeof(((struct lquota_slv_rec *)0)->qsr_granted));
+-
+ 	/* Checks for struct idx_info */
+ 	LASSERTF((int)sizeof(struct idx_info) == 80, "found %lld\n",
+ 		 (long long)(int)sizeof(struct idx_info));
 -- 
 2.1.0
