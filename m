@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 21:59:45 -0500
-Subject: [lustre-devel] [PATCH v2 02/84] staging/lustre/fld: Remove useless
-	typedefs
+Date: Wed, 24 Feb 2016 21:59:49 -0500
+Subject: [lustre-devel] [PATCH v2 06/84] staging/lustre: Get rid of
+	ost_cmd_t typedef
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-7-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,35 +14,34 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Typedefs fld_hash_func_t and fld_scan_func_t are used exectly once in
-the following structure so don't really help anything at all.
+Replace it with enum ost_cmd
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/fld/fld_internal.h | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/fld/fld_internal.h b/drivers/staging/lustre/lustre/fld/fld_internal.h
-index 59eabda..ee36d6b 100644
---- a/drivers/staging/lustre/lustre/fld/fld_internal.h
-+++ b/drivers/staging/lustre/lustre/fld/fld_internal.h
-@@ -58,15 +58,10 @@ struct fld_stats {
- 	__u64   fst_inflight;
- };
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 0f37b61..50e70fe 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1419,7 +1419,7 @@ enum cksum_type {
+  */
  
--typedef int (*fld_hash_func_t) (struct lu_client_fld *, __u64);
--
--typedef struct lu_fld_target *
--(*fld_scan_func_t) (struct lu_client_fld *, __u64);
--
- struct lu_fld_hash {
- 	const char	      *fh_name;
--	fld_hash_func_t	  fh_hash_func;
--	fld_scan_func_t	  fh_scan_func;
-+	int (*fh_hash_func)(struct lu_client_fld *, __u64);
-+	struct lu_fld_target *(*fh_scan_func)(struct lu_client_fld *, __u64);
- };
+ /* opcodes */
+-typedef enum {
++enum ost_cmd {
+ 	OST_REPLY      =  0,       /* reply ? */
+ 	OST_GETATTR    =  1,
+ 	OST_SETATTR    =  2,
+@@ -1440,7 +1440,7 @@ typedef enum {
+ 	OST_QUOTACTL   = 19,
+ 	OST_QUOTA_ADJUST_QUNIT = 20, /* not used since 2.4 */
+ 	OST_LAST_OPC
+-} ost_cmd_t;
++};
+ #define OST_FIRST_OPC  OST_REPLY
  
- struct fld_cache_entry {
+ enum obdo_flags {
 -- 
 2.1.0
