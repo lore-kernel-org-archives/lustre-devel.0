@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 24 Feb 2016 22:01:00 -0500
-Subject: [lustre-devel] [PATCH v2 77/84] staging/lustre/mdc: Fix style vs
-	open parenthesis alignment
+Date: Wed, 24 Feb 2016 22:00:36 -0500
+Subject: [lustre-devel] [PATCH v2 53/84] staging/lustre/obdecho: Adjust
+	comments to better conform to coding style
 In-Reply-To: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
 References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456369267-904461-78-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456369267-904461-54-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,175 +14,47 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This mostly fixes checkpatch complaints about
-"Alignment should match open parenthesis"
+This patch fixes "Block comments use a trailing */ on a separate line"
+warnings from checkpatch
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/mdc/mdc_internal.h |  2 +-
- drivers/staging/lustre/lustre/mdc/mdc_locks.c    | 26 +++++++++++-------------
- drivers/staging/lustre/lustre/mdc/mdc_reint.c    |  2 +-
- drivers/staging/lustre/lustre/mdc/mdc_request.c  | 12 +++++------
- 4 files changed, 20 insertions(+), 22 deletions(-)
+ drivers/staging/lustre/lustre/obdecho/echo_client.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_internal.h b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-index 54f4ca6..c5519ae 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-@@ -53,7 +53,7 @@ void mdc_readdir_pack(struct ptlrpc_request *req, __u64 pgoff, __u32 size,
- void mdc_getattr_pack(struct ptlrpc_request *req, __u64 valid, int flags,
- 		      struct md_op_data *data, int ea_size);
- void mdc_setattr_pack(struct ptlrpc_request *req, struct md_op_data *op_data,
--		     void *ea, int ealen, void *ea2, int ea2len);
-+		      void *ea, int ealen, void *ea2, int ea2len);
- void mdc_create_pack(struct ptlrpc_request *req, struct md_op_data *op_data,
- 		     const void *data, int datalen, __u32 mode, __u32 uid,
- 		     __u32 gid, cfs_cap_t capability, __u64 rdev);
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 6dae574..958a164 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -366,7 +366,7 @@ mdc_intent_getxattr_pack(struct obd_export *exp,
- 	LIST_HEAD(cancels);
+diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+index ca87cc2..3be28c5 100644
+--- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
++++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+@@ -746,7 +746,8 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
+ 	cleanup = 4;
  
- 	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
--					&RQF_LDLM_INTENT_GETXATTR);
-+				   &RQF_LDLM_INTENT_GETXATTR);
- 	if (!req)
- 		return ERR_PTR(-ENOMEM);
+ 	/* if echo client is to be stacked upon ost device, the next is
+-	 * NULL since ost is not a clio device so far */
++	 * NULL since ost is not a clio device so far
++	 */
+ 	if (next && !lu_device_is_cl(next))
+ 		next = NULL;
  
-@@ -386,14 +386,12 @@ mdc_intent_getxattr_pack(struct obd_export *exp,
- 	mdc_pack_body(req, &op_data->op_fid1, op_data->op_valid, maxdata, -1,
- 		      0);
- 
--	req_capsule_set_size(&req->rq_pill, &RMF_EADATA,
--				RCL_SERVER, maxdata);
-+	req_capsule_set_size(&req->rq_pill, &RMF_EADATA, RCL_SERVER, maxdata);
- 
--	req_capsule_set_size(&req->rq_pill, &RMF_EAVALS,
--				RCL_SERVER, maxdata);
-+	req_capsule_set_size(&req->rq_pill, &RMF_EAVALS, RCL_SERVER, maxdata);
- 
- 	req_capsule_set_size(&req->rq_pill, &RMF_EAVALS_LENS,
--				RCL_SERVER, maxdata);
-+			     RCL_SERVER, maxdata);
- 
- 	ptlrpc_request_set_replen(req);
- 
-@@ -439,8 +437,8 @@ static struct ptlrpc_request *mdc_intent_unlink_pack(struct obd_export *exp,
- }
- 
- static struct ptlrpc_request *mdc_intent_getattr_pack(struct obd_export *exp,
--						    struct lookup_intent *it,
--						    struct md_op_data *op_data)
-+						      struct lookup_intent *it,
-+						     struct md_op_data *op_data)
- {
- 	struct ptlrpc_request *req;
- 	struct obd_device     *obddev = class_exp2obd(exp);
-@@ -498,7 +496,7 @@ static struct ptlrpc_request *mdc_intent_layout_pack(struct obd_export *exp,
- 	int rc;
- 
- 	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
--				&RQF_LDLM_INTENT_LAYOUT);
-+				   &RQF_LDLM_INTENT_LAYOUT);
- 	if (!req)
- 		return ERR_PTR(-ENOMEM);
- 
-@@ -718,7 +716,7 @@ static int mdc_finish_enqueue(struct obd_export *exp,
- 		void *lmm;
- 
- 		LDLM_DEBUG(lock, "layout lock returned by: %s, lvb_len: %d\n",
--			ldlm_it2str(it->it_op), lvb_len);
-+			   ldlm_it2str(it->it_op), lvb_len);
- 
- 		lmm = libcfs_kvzalloc(lvb_len, GFP_NOFS);
- 		if (!lmm) {
-@@ -1094,7 +1092,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
- 		}
- 
- 		mode = mdc_lock_match(exp, LDLM_FL_BLOCK_GRANTED, fid,
--				       LDLM_IBITS, &policy,
-+				      LDLM_IBITS, &policy,
- 				      LCK_CR | LCK_CW | LCK_PR | LCK_PW,
- 				      &lockh);
+@@ -965,7 +966,8 @@ static struct echo_object *cl_echo_object_find(struct echo_device *d,
  	}
-@@ -1264,9 +1262,9 @@ int mdc_intent_getattr_async(struct obd_export *exp,
- 	__u64		    flags = LDLM_FL_HAS_INTENT;
  
- 	CDEBUG(D_DLMTRACE,
--		"name: %.*s in inode "DFID", intent: %s flags %#Lo\n",
--		op_data->op_namelen, op_data->op_name, PFID(&op_data->op_fid1),
--		ldlm_it2str(it->it_op), it->it_flags);
-+	       "name: %.*s in inode " DFID ", intent: %s flags %#Lo\n",
-+	       op_data->op_namelen, op_data->op_name, PFID(&op_data->op_fid1),
-+	       ldlm_it2str(it->it_op), it->it_flags);
+ 	/* In the function below, .hs_keycmp resolves to
+-	 * lu_obj_hop_keycmp() */
++	 * lu_obj_hop_keycmp()
++	 */
+ 	/* coverity[overrun-buffer-val] */
+ 	obj = cl_object_find(env, echo_dev2cl(d), fid, &conf->eoc_cl);
+ 	if (IS_ERR(obj)) {
+@@ -1164,7 +1166,8 @@ static int cl_echo_object_brw(struct echo_object *eco, int rw, u64 offset,
+ 		cl_page_list_add(&queue->c2_qin, clp);
  
- 	fid_build_reg_res_name(&op_data->op_fid1, &res_id);
- 	req = mdc_intent_getattr_pack(exp, it, op_data);
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_reint.c b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-index 019b237..4ef3db1 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-@@ -422,7 +422,7 @@ int mdc_rename(struct obd_export *exp, struct md_op_data *op_data,
- 						 &cancels, LCK_EX,
- 						 MDS_INODELOCK_LOOKUP);
- 	if ((op_data->op_flags & MF_MDC_CANCEL_FID4) &&
--	     (fid_is_sane(&op_data->op_fid4)))
-+	    (fid_is_sane(&op_data->op_fid4)))
- 		count += mdc_resource_get_unused(exp, &op_data->op_fid4,
- 						 &cancels, LCK_EX,
- 						 MDS_INODELOCK_FULL);
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index c7a0fa1..7bdb205 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -165,7 +165,7 @@ static int mdc_getattr_common(struct obd_export *exp,
- }
+ 		/* drop the reference count for cl_page_find, so that the page
+-		 * will be freed in cl_2queue_fini. */
++		 * will be freed in cl_2queue_fini.
++		 */
+ 		cl_page_put(env, clp);
+ 		cl_page_clip(env, clp, 0, page_size);
  
- static int mdc_getattr(struct obd_export *exp, struct md_op_data *op_data,
--		struct ptlrpc_request **request)
-+		       struct ptlrpc_request **request)
- {
- 	struct ptlrpc_request *req;
- 	int		    rc;
-@@ -207,7 +207,7 @@ static int mdc_getattr(struct obd_export *exp, struct md_op_data *op_data,
- }
- 
- static int mdc_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
--		     struct ptlrpc_request **request)
-+			    struct ptlrpc_request **request)
- {
- 	struct ptlrpc_request *req;
- 	int		    rc;
-@@ -1036,8 +1036,8 @@ restart_bulk:
- 
- 	if (req->rq_bulk->bd_nob_transferred & ~LU_PAGE_MASK) {
- 		CERROR("Unexpected # bytes transferred: %d (%ld expected)\n",
--			req->rq_bulk->bd_nob_transferred,
--			PAGE_CACHE_SIZE * op_data->op_npages);
-+		       req->rq_bulk->bd_nob_transferred,
-+		       PAGE_CACHE_SIZE * op_data->op_npages);
- 		ptlrpc_req_finished(req);
- 		return -EPROTO;
- 	}
-@@ -1815,7 +1815,7 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
- 		/* copy UUID */
- 		if (copy_to_user(data->ioc_pbuf2, obd2cli_tgt(obd),
- 				 min_t(size_t, data->ioc_plen2,
--					       sizeof(struct obd_uuid)))) {
-+				       sizeof(struct obd_uuid)))) {
- 			rc = -EFAULT;
- 			goto out;
- 		}
-@@ -1828,7 +1828,7 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
- 
- 		if (copy_to_user(data->ioc_pbuf1, &stat_buf,
- 				 min_t(size_t, data->ioc_plen1,
--					       sizeof(stat_buf)))) {
-+				       sizeof(stat_buf)))) {
- 			rc = -EFAULT;
- 			goto out;
- 		}
 -- 
 2.1.0
