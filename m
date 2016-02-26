@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Fri, 26 Feb 2016 01:49:51 -0500
-Subject: [lustre-devel] [PATCH 03/25] staging/lustre/fld: Fix style vs open
-	parenthesis alignment
+Date: Fri, 26 Feb 2016 01:49:53 -0500
+Subject: [lustre-devel] [PATCH 05/25] staging/lustre: Remove unused
+	lustre_build_lock_params()
 In-Reply-To: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
 References: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456469413-931943-4-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456469413-931943-6-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,141 +14,71 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-This mostly fixes checkpatch complaints about
-"Alignment should match open parenthesis"
+And also struct lustre_rw_params that is only referenced by it.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/fld/fld_cache.c   | 14 +++++++-------
- drivers/staging/lustre/lustre/fld/fld_request.c | 17 +++++++----------
- drivers/staging/lustre/lustre/fld/lproc_fld.c   |  3 +--
- 3 files changed, 15 insertions(+), 19 deletions(-)
+ .../staging/lustre/lustre/include/lustre_lite.h    | 48 ----------------------
+ 1 file changed, 48 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/fld/fld_cache.c b/drivers/staging/lustre/lustre/fld/fld_cache.c
-index 2b09b76..062f388 100644
---- a/drivers/staging/lustre/lustre/fld/fld_cache.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_cache.c
-@@ -233,7 +233,7 @@ static int fld_cache_shrink(struct fld_cache *cache)
- 	}
+diff --git a/drivers/staging/lustre/lustre/include/lustre_lite.h b/drivers/staging/lustre/lustre/include/lustre_lite.h
+index f6d7aae..9852325 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_lite.h
++++ b/drivers/staging/lustre/lustre/include/lustre_lite.h
+@@ -53,54 +53,6 @@
+ #define LL_MAX_BLKSIZE_BITS     (22)
+ #define LL_MAX_BLKSIZE	  (1UL<<LL_MAX_BLKSIZE_BITS)
  
- 	CDEBUG(D_INFO, "%s: FLD cache - Shrunk by %d entries\n",
--			cache->fci_name, num);
-+	       cache->fci_name, num);
- 
- 	return 0;
- }
-@@ -294,8 +294,8 @@ static void fld_cache_punch_hole(struct fld_cache *cache,
-  * handle range overlap in fld cache.
-  */
- static void fld_cache_overlap_handle(struct fld_cache *cache,
--				struct fld_cache_entry *f_curr,
--				struct fld_cache_entry *f_new)
-+				     struct fld_cache_entry *f_curr,
-+				     struct fld_cache_entry *f_new)
- {
- 	const struct lu_seq_range *range = &f_new->fce_range;
- 	const u64 new_start  = range->lsr_start;
-@@ -402,8 +402,8 @@ static int fld_cache_insert_nolock(struct fld_cache *cache,
- 	list_for_each_entry_safe(f_curr, n, head, fce_list) {
- 		/* add list if next is end of list */
- 		if (new_end < f_curr->fce_range.lsr_start ||
--		   (new_end == f_curr->fce_range.lsr_start &&
--		    new_flags != f_curr->fce_range.lsr_flags))
-+		    (new_end == f_curr->fce_range.lsr_start &&
-+		     new_flags != f_curr->fce_range.lsr_flags))
- 			break;
- 
- 		prev = &f_curr->fce_list;
-@@ -460,8 +460,8 @@ struct fld_cache_entry
- 	head = &cache->fci_entries_head;
- 	list_for_each_entry(flde, head, fce_list) {
- 		if (range->lsr_start == flde->fce_range.lsr_start ||
--		   (range->lsr_end == flde->fce_range.lsr_end &&
--		    range->lsr_flags == flde->fce_range.lsr_flags)) {
-+		    (range->lsr_end == flde->fce_range.lsr_end &&
-+		     range->lsr_flags == flde->fce_range.lsr_flags)) {
- 			got = flde;
- 			break;
- 		}
-diff --git a/drivers/staging/lustre/lustre/fld/fld_request.c b/drivers/staging/lustre/lustre/fld/fld_request.c
-index b50a57b..19b81c9 100644
---- a/drivers/staging/lustre/lustre/fld/fld_request.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_request.c
-@@ -148,7 +148,7 @@ again:
- 	}
- 
- 	CERROR("%s: Can't find target by hash %d (seq %#llx). Targets (%d):\n",
--		fld->lcf_name, hash, seq, fld->lcf_count);
-+	       fld->lcf_name, hash, seq, fld->lcf_count);
- 
- 	list_for_each_entry(target, &fld->lcf_targets, ft_chain) {
- 		const char *srv_name = target->ft_srv ?
-@@ -217,11 +217,11 @@ int fld_client_add_target(struct lu_client_fld *fld,
- 
- 	if (fld->lcf_flags != LUSTRE_FLD_INIT) {
- 		CERROR("%s: Attempt to add target %s (idx %llu) on fly - skip it\n",
--			fld->lcf_name, name, tar->ft_idx);
-+		       fld->lcf_name, name, tar->ft_idx);
- 		return 0;
- 	}
- 	CDEBUG(D_INFO, "%s: Adding target %s (idx %llu)\n",
--			fld->lcf_name, name, tar->ft_idx);
-+	       fld->lcf_name, name, tar->ft_idx);
- 
- 	target = kzalloc(sizeof(*target), GFP_NOFS);
- 	if (!target)
-@@ -244,8 +244,7 @@ int fld_client_add_target(struct lu_client_fld *fld,
- 	target->ft_srv = tar->ft_srv;
- 	target->ft_idx = tar->ft_idx;
- 
--	list_add_tail(&target->ft_chain,
--			  &fld->lcf_targets);
-+	list_add_tail(&target->ft_chain, &fld->lcf_targets);
- 
- 	fld->lcf_count++;
- 	spin_unlock(&fld->lcf_lock);
-@@ -260,8 +259,7 @@ int fld_client_del_target(struct lu_client_fld *fld, __u64 idx)
- 	struct lu_fld_target *target, *tmp;
- 
- 	spin_lock(&fld->lcf_lock);
--	list_for_each_entry_safe(target, tmp,
--				     &fld->lcf_targets, ft_chain) {
-+	list_for_each_entry_safe(target, tmp, &fld->lcf_targets, ft_chain) {
- 		if (target->ft_idx == idx) {
- 			fld->lcf_count--;
- 			list_del(&target->ft_chain);
-@@ -376,8 +374,7 @@ void fld_client_fini(struct lu_client_fld *fld)
- 	struct lu_fld_target *target, *tmp;
- 
- 	spin_lock(&fld->lcf_lock);
--	list_for_each_entry_safe(target, tmp,
--				     &fld->lcf_targets, ft_chain) {
-+	list_for_each_entry_safe(target, tmp, &fld->lcf_targets, ft_chain) {
- 		fld->lcf_count--;
- 		list_del(&target->ft_chain);
- 		if (target->ft_exp)
-@@ -467,7 +464,7 @@ int fld_client_lookup(struct lu_client_fld *fld, u64 seq, u32 *mds,
- 	LASSERT(target);
- 
- 	CDEBUG(D_INFO, "%s: Lookup fld entry (seq: %#llx) on target %s (idx %llu)\n",
--			fld->lcf_name, seq, fld_target_name(target), target->ft_idx);
-+	       fld->lcf_name, seq, fld_target_name(target), target->ft_idx);
- 
- 	res.lsr_start = seq;
- 	fld_range_set_type(&res, flags);
-diff --git a/drivers/staging/lustre/lustre/fld/lproc_fld.c b/drivers/staging/lustre/lustre/fld/lproc_fld.c
-index da31281..ca898be 100644
---- a/drivers/staging/lustre/lustre/fld/lproc_fld.c
-+++ b/drivers/staging/lustre/lustre/fld/lproc_fld.c
-@@ -61,8 +61,7 @@ fld_debugfs_targets_seq_show(struct seq_file *m, void *unused)
- 	struct lu_fld_target *target;
- 
- 	spin_lock(&fld->lcf_lock);
--	list_for_each_entry(target,
--				&fld->lcf_targets, ft_chain)
-+	list_for_each_entry(target, &fld->lcf_targets, ft_chain)
- 		seq_printf(m, "%s\n", fld_target_name(target));
- 	spin_unlock(&fld->lcf_lock);
- 
+-#include "lustre/lustre_user.h"
+-
+-struct lustre_rw_params {
+-	int		lrp_lock_mode;
+-	ldlm_policy_data_t lrp_policy;
+-	u32		lrp_brw_flags;
+-	int		lrp_ast_flags;
+-};
+-
+-/*
+- * XXX nikita: this function lives in the header because it is used by both
+- * llite kernel module and liblustre library, and there is no (?) better place
+- * to put it in.
+- */
+-static inline void lustre_build_lock_params(int cmd, unsigned long open_flags,
+-					    __u64 connect_flags,
+-					    loff_t pos, ssize_t len,
+-					    struct lustre_rw_params *params)
+-{
+-	params->lrp_lock_mode = (cmd == OBD_BRW_READ) ? LCK_PR : LCK_PW;
+-	params->lrp_brw_flags = 0;
+-
+-	params->lrp_policy.l_extent.start = pos;
+-	params->lrp_policy.l_extent.end = pos + len - 1;
+-	/*
+-	 * for now O_APPEND always takes local locks.
+-	 */
+-	if (cmd == OBD_BRW_WRITE && (open_flags & O_APPEND)) {
+-		params->lrp_policy.l_extent.start = 0;
+-		params->lrp_policy.l_extent.end   = OBD_OBJECT_EOF;
+-	} else if (LIBLUSTRE_CLIENT && (connect_flags & OBD_CONNECT_SRVLOCK)) {
+-		/*
+-		 * liblustre: OST-side locking for all non-O_APPEND
+-		 * reads/writes.
+-		 */
+-		params->lrp_lock_mode = LCK_NL;
+-		params->lrp_brw_flags = OBD_BRW_SRVLOCK;
+-	} else {
+-		/*
+-		 * nothing special for the kernel. In the future llite may use
+-		 * OST-side locks for small writes into highly contended
+-		 * files.
+-		 */
+-	}
+-	params->lrp_ast_flags = (open_flags & O_NONBLOCK) ?
+-		LDLM_FL_BLOCK_NOWAIT : 0;
+-}
+-
+ /*
+  * This is embedded into liblustre and llite super-blocks to keep track of
+  * connect flags (capabilities) supported by all imports given mount is
 -- 
 2.1.0
