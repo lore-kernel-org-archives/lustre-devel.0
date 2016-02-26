@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Fri, 26 Feb 2016 01:50:02 -0500
-Subject: [lustre-devel] [PATCH 14/25] staging/lustre/ptlrpc: Fix style vs
+Date: Fri, 26 Feb 2016 01:50:04 -0500
+Subject: [lustre-devel] [PATCH 16/25] staging/lustre/obdclass: Fix style vs
 	open parenthesis alignment
 In-Reply-To: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
 References: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456469413-931943-15-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456469413-931943-17-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -19,910 +19,694 @@ This mostly fixes checkpatch complaints about
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c      | 40 +++++-------
- drivers/staging/lustre/lustre/ptlrpc/import.c      | 21 +++----
- drivers/staging/lustre/lustre/ptlrpc/layout.c      | 35 +++++------
- .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    | 15 +++--
- drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |  4 +-
- drivers/staging/lustre/lustre/ptlrpc/nrs.c         | 19 +++---
- drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c    |  2 +-
- .../staging/lustre/lustre/ptlrpc/pack_generic.c    |  4 +-
- drivers/staging/lustre/lustre/ptlrpc/pinger.c      |  5 +-
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |  9 ++-
- drivers/staging/lustre/lustre/ptlrpc/recover.c     |  6 +-
- drivers/staging/lustre/lustre/ptlrpc/sec.c         |  6 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |  2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |  4 +-
- drivers/staging/lustre/lustre/ptlrpc/service.c     | 73 ++++++++++------------
- 15 files changed, 111 insertions(+), 134 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     |  20 ++--
+ drivers/staging/lustre/lustre/obdclass/cl_lock.c   |  21 ++--
+ drivers/staging/lustre/lustre/obdclass/cl_object.c |  10 +-
+ drivers/staging/lustre/lustre/obdclass/cl_page.c   |  10 +-
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |   3 +-
+ drivers/staging/lustre/lustre/obdclass/genops.c    |  26 ++---
+ .../lustre/lustre/obdclass/linux/linux-sysctl.c    |   8 +-
+ drivers/staging/lustre/lustre/obdclass/llog_cat.c  |   4 +-
+ .../lustre/lustre/obdclass/lprocfs_status.c        | 125 ++++++++++-----------
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |   3 +-
+ .../staging/lustre/lustre/obdclass/lustre_peer.c   |   2 +-
+ .../staging/lustre/lustre/obdclass/obd_config.c    |   6 +-
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |   8 +-
+ 13 files changed, 119 insertions(+), 127 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 9b89068..0003158 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -557,7 +557,7 @@ ptlrpc_prep_req_from_pool(struct ptlrpc_request_pool *pool)
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index 191ec43..f5128b4 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -139,7 +139,7 @@ void cl_io_fini(const struct lu_env *env, struct cl_io *io)
+ 	case CIT_MISC:
+ 		/* Check ignore layout change conf */
+ 		LASSERT(ergo(io->ci_ignore_layout || !io->ci_verify_layout,
+-				!io->ci_need_restart));
++			     !io->ci_need_restart));
+ 		break;
+ 	default:
+ 		LBUG();
+@@ -291,11 +291,11 @@ static void cl_io_locks_sort(struct cl_io *io)
+ 		prev = NULL;
+ 
+ 		list_for_each_entry_safe(curr, temp,
+-					     &io->ci_lockset.cls_todo,
+-					     cill_linkage) {
++					 &io->ci_lockset.cls_todo,
++					 cill_linkage) {
+ 			if (prev) {
+ 				switch (cl_lock_descr_sort(&prev->cill_descr,
+-							  &curr->cill_descr)) {
++							   &curr->cill_descr)) {
+ 				case 0:
+ 					/*
+ 					 * IMPOSSIBLE: Identical locks are
+@@ -306,7 +306,7 @@ static void cl_io_locks_sort(struct cl_io *io)
+ 					LBUG();
+ 				case 1:
+ 					list_move_tail(&curr->cill_linkage,
+-							   &prev->cill_linkage);
++						       &prev->cill_linkage);
+ 					done = 0;
+ 					continue; /* don't change prev: it's
+ 						   * still "previous"
+@@ -385,8 +385,7 @@ static int cl_lockset_lock_one(const struct lu_env *env,
+ 		if (!(link->cill_descr.cld_enq_flags & CEF_ASYNC)) {
+ 			result = cl_wait(env, lock);
+ 			if (result == 0)
+-				list_move(&link->cill_linkage,
+-					      &set->cls_done);
++				list_move(&link->cill_linkage, &set->cls_done);
+ 		} else
+ 			result = 0;
+ 	} else
+@@ -430,12 +429,11 @@ static int cl_lockset_lock(const struct lu_env *env, struct cl_io *io,
  	}
- 
- 	request = list_entry(pool->prp_req_list.next, struct ptlrpc_request,
--				 rq_list);
-+			     rq_list);
- 	list_del_init(&request->rq_list);
- 	spin_unlock(&pool->prp_lock);
- 
-@@ -725,7 +725,7 @@ struct ptlrpc_request *__ptlrpc_request_alloc(struct obd_import *imp,
- 		LASSERTF((unsigned long)imp > 0x1000, "%p", imp);
- 		LASSERT(imp != LP_POISON);
- 		LASSERTF((unsigned long)imp->imp_client > 0x1000, "%p",
--			imp->imp_client);
-+			 imp->imp_client);
- 		LASSERT(imp->imp_client != LP_POISON);
- 
- 		request->rq_import = class_import_get(imp);
-@@ -896,8 +896,7 @@ void ptlrpc_set_destroy(struct ptlrpc_request_set *set)
- 			 RQ_PHASE_COMPLETE : RQ_PHASE_NEW;
- 	list_for_each(tmp, &set->set_requests) {
- 		struct ptlrpc_request *req =
--			list_entry(tmp, struct ptlrpc_request,
--				       rq_set_chain);
-+			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
- 
- 		LASSERT(req->rq_phase == expected_phase);
- 		n++;
-@@ -909,8 +908,7 @@ void ptlrpc_set_destroy(struct ptlrpc_request_set *set)
- 
- 	list_for_each_safe(tmp, next, &set->set_requests) {
- 		struct ptlrpc_request *req =
--			list_entry(tmp, struct ptlrpc_request,
--				       rq_set_chain);
-+			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
- 		list_del_init(&req->rq_set_chain);
- 
- 		LASSERT(req->rq_phase == expected_phase);
-@@ -1331,8 +1329,8 @@ static int after_reply(struct ptlrpc_request *req)
- 			struct ptlrpc_request *last;
- 
- 			last = list_entry(imp->imp_replay_list.prev,
--					      struct ptlrpc_request,
--					      rq_replay_list);
-+					  struct ptlrpc_request,
-+					  rq_replay_list);
- 			/*
- 			 * Requests with rq_replay stay on the list even if no
- 			 * commit is expected.
-@@ -1475,8 +1473,7 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
- 	INIT_LIST_HEAD(&comp_reqs);
- 	list_for_each_safe(tmp, next, &set->set_requests) {
- 		struct ptlrpc_request *req =
--			list_entry(tmp, struct ptlrpc_request,
--				       rq_set_chain);
-+			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
- 		struct obd_import *imp = req->rq_import;
- 		int unregistered = 0;
- 		int rc = 0;
-@@ -1618,8 +1615,7 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
- 					 */
- 					list_del_init(&req->rq_list);
- 					list_add_tail(&req->rq_list,
--							  &imp->
--							  imp_delayed_list);
-+						      &imp->imp_delayed_list);
- 					spin_unlock(&imp->imp_lock);
- 					continue;
- 				}
-@@ -1627,7 +1623,7 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
- 				if (status != 0) {
- 					req->rq_status = status;
- 					ptlrpc_rqphase_move(req,
--						RQ_PHASE_INTERPRET);
-+							    RQ_PHASE_INTERPRET);
- 					spin_unlock(&imp->imp_lock);
- 					goto interpret;
- 				}
-@@ -1642,7 +1638,7 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
- 
- 				list_del_init(&req->rq_list);
- 				list_add_tail(&req->rq_list,
--						  &imp->imp_sending_list);
-+					      &imp->imp_sending_list);
- 
- 				spin_unlock(&imp->imp_lock);
- 
-@@ -1944,8 +1940,7 @@ int ptlrpc_expired_set(void *data)
- 	/* A timeout expired. See which reqs it applies to...  */
- 	list_for_each(tmp, &set->set_requests) {
- 		struct ptlrpc_request *req =
--			list_entry(tmp, struct ptlrpc_request,
--				       rq_set_chain);
-+			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
- 
- 		/* don't expire request waiting for context */
- 		if (req->rq_wait_ctx)
-@@ -2001,8 +1996,7 @@ void ptlrpc_interrupted_set(void *data)
- 
- 	list_for_each(tmp, &set->set_requests) {
- 		struct ptlrpc_request *req =
--			list_entry(tmp, struct ptlrpc_request,
--				       rq_set_chain);
-+			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
- 
- 		if (req->rq_phase != RQ_PHASE_RPC &&
- 		    req->rq_phase != RQ_PHASE_UNREGISTERING)
-@@ -2075,7 +2069,7 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
- 	else
- 		list_for_each(tmp, &set->set_requests) {
- 			req = list_entry(tmp, struct ptlrpc_request,
--					     rq_set_chain);
-+					 rq_set_chain);
- 			if (req->rq_phase == RQ_PHASE_NEW)
- 				(void)ptlrpc_send_new_req(req);
+ 	if (result == 0) {
+ 		list_for_each_entry_safe(link, temp,
+-					     &set->cls_curr, cill_linkage) {
++					 &set->cls_curr, cill_linkage) {
+ 			lock = link->cill_lock;
+ 			result = cl_wait(env, lock);
+ 			if (result == 0)
+-				list_move(&link->cill_linkage,
+-					      &set->cls_done);
++				list_move(&link->cill_linkage, &set->cls_done);
+ 			else
+ 				break;
  		}
-@@ -2149,7 +2143,7 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
- 		if (rc == 0 && atomic_read(&set->set_remaining) == 0) {
- 			list_for_each(tmp, &set->set_requests) {
- 				req = list_entry(tmp, struct ptlrpc_request,
--						     rq_set_chain);
-+						 rq_set_chain);
- 				spin_lock(&req->rq_lock);
- 				req->rq_invalid_rqset = 1;
- 				spin_unlock(&req->rq_lock);
-@@ -2568,8 +2562,7 @@ void ptlrpc_retain_replayable_request(struct ptlrpc_request *req,
- 	ptlrpc_request_addref(req);
- 	list_for_each_prev(tmp, &imp->imp_replay_list) {
- 		struct ptlrpc_request *iter =
--			list_entry(tmp, struct ptlrpc_request,
--				       rq_replay_list);
-+			list_entry(tmp, struct ptlrpc_request, rq_replay_list);
+@@ -1354,7 +1352,7 @@ void cl_req_completion(const struct lu_env *env, struct cl_req *req, int rc)
+ 	 */
+ 	while (!list_empty(&req->crq_layers)) {
+ 		slice = list_entry(req->crq_layers.prev,
+-				       struct cl_req_slice, crs_linkage);
++				   struct cl_req_slice, crs_linkage);
+ 		list_del_init(&slice->crs_linkage);
+ 		if (slice->crs_ops->cro_completion)
+ 			slice->crs_ops->cro_completion(env, slice, rc);
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+index 7b7f344..6cf284b 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+@@ -259,7 +259,7 @@ static void cl_lock_free(const struct lu_env *env, struct cl_lock *lock)
+ 		struct cl_lock_slice *slice;
  
- 		/*
- 		 * We may have duplicate transnos if we create and then
-@@ -2842,8 +2835,7 @@ void ptlrpc_abort_set(struct ptlrpc_request_set *set)
+ 		slice = list_entry(lock->cll_layers.next,
+-				       struct cl_lock_slice, cls_linkage);
++				   struct cl_lock_slice, cls_linkage);
+ 		list_del_init(lock->cll_layers.next);
+ 		slice->cls_ops->clo_fini(env, slice);
+ 	}
+@@ -382,8 +382,7 @@ static struct cl_lock *cl_lock_alloc(const struct lu_env *env,
+ 		CS_LOCK_INC(obj, total);
+ 		CS_LOCK_INC(obj, create);
+ 		cl_lock_lockdep_init(lock);
+-		list_for_each_entry(obj, &head->loh_layers,
+-					co_lu.lo_linkage) {
++		list_for_each_entry(obj, &head->loh_layers, co_lu.lo_linkage) {
+ 			int err;
  
- 	list_for_each_safe(pos, tmp, &set->set_requests) {
- 		struct ptlrpc_request *req =
--			list_entry(pos, struct ptlrpc_request,
--				       rq_set_chain);
-+			list_entry(pos, struct ptlrpc_request, rq_set_chain);
- 
- 		spin_lock(&req->rq_lock);
- 		if (req->rq_phase != RQ_PHASE_RPC) {
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index 70fcac1..9a9c4d3 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -140,7 +140,7 @@ static void deuuidify(char *uuid, const char *prefix, char **uuid_start,
- 		return;
- 
- 	if (!strncmp(*uuid_start + *uuid_len - strlen(UUID_STR),
--		    UUID_STR, strlen(UUID_STR)))
-+		     UUID_STR, strlen(UUID_STR)))
- 		*uuid_len -= strlen(UUID_STR);
- }
- 
-@@ -344,18 +344,18 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 				rc = 0;
+ 			err = obj->co_ops->coo_lock_init(env, obj, lock, io);
+@@ -534,7 +533,7 @@ static struct cl_lock *cl_lock_find(const struct lu_env *env,
+ 			if (!ghost) {
+ 				cl_lock_get_trust(lock);
+ 				list_add_tail(&lock->cll_linkage,
+-						  &head->coh_locks);
++					      &head->coh_locks);
+ 				spin_unlock(&head->coh_lock_guard);
+ 				CS_LOCK_INC(obj, busy);
  			} else {
- 				list_for_each_safe(tmp, n,
--						       &imp->imp_sending_list) {
-+						   &imp->imp_sending_list) {
- 					req = list_entry(tmp,
--							     struct ptlrpc_request,
--							     rq_list);
-+							 struct ptlrpc_request,
-+							 rq_list);
- 					DEBUG_REQ(D_ERROR, req,
- 						  "still on sending list");
- 				}
- 				list_for_each_safe(tmp, n,
--						       &imp->imp_delayed_list) {
-+						   &imp->imp_delayed_list) {
- 					req = list_entry(tmp,
--							     struct ptlrpc_request,
--							     rq_list);
-+							 struct ptlrpc_request,
-+							 rq_list);
- 					DEBUG_REQ(D_ERROR, req,
- 						  "still on delayed list");
- 				}
-@@ -511,7 +511,7 @@ static int import_select_connection(struct obd_import *imp)
+@@ -774,7 +773,7 @@ static void cl_lock_cancel0(const struct lu_env *env, struct cl_lock *lock)
+ 
+ 		lock->cll_flags |= CLF_CANCELLED;
+ 		list_for_each_entry_reverse(slice, &lock->cll_layers,
+-						cls_linkage) {
++					    cls_linkage) {
+ 			if (slice->cls_ops->clo_cancel)
+ 				slice->cls_ops->clo_cancel(env, slice);
+ 		}
+@@ -811,7 +810,7 @@ static void cl_lock_delete0(const struct lu_env *env, struct cl_lock *lock)
+ 		 * by cl_lock_lookup().
  		 */
- 		if ((conn->oic_last_attempt == 0) ||
- 		    cfs_time_beforeq_64(conn->oic_last_attempt,
--				       imp->imp_last_success_conn)) {
-+					imp->imp_last_success_conn)) {
- 			imp_conn = conn;
- 			tried_all = 0;
- 			break;
-@@ -1032,8 +1032,7 @@ finish:
+ 		list_for_each_entry_reverse(slice, &lock->cll_layers,
+-						cls_linkage) {
++					    cls_linkage) {
+ 			if (slice->cls_ops->clo_delete)
+ 				slice->cls_ops->clo_delete(env, slice);
+ 		}
+@@ -1040,7 +1039,7 @@ static int cl_unuse_try_internal(const struct lu_env *env, struct cl_lock *lock)
  
- 		spin_lock(&imp->imp_lock);
- 		list_del(&imp->imp_conn_current->oic_item);
--		list_add(&imp->imp_conn_current->oic_item,
--			     &imp->imp_conn_list);
-+		list_add(&imp->imp_conn_current->oic_item, &imp->imp_conn_list);
- 		imp->imp_last_success_conn =
- 			imp->imp_conn_current->oic_last_attempt;
+ 		result = -ENOSYS;
+ 		list_for_each_entry_reverse(slice, &lock->cll_layers,
+-						cls_linkage) {
++					    cls_linkage) {
+ 			if (slice->cls_ops->clo_unuse) {
+ 				result = slice->cls_ops->clo_unuse(env, slice);
+ 				if (result != 0)
+@@ -1658,7 +1657,7 @@ void cl_lock_disclosure(const struct lu_env *env,
  
-@@ -1366,7 +1365,7 @@ int ptlrpc_import_recovery_state_machine(struct obd_import *imp)
- 		 */
- 		class_import_get(imp);
- 		task = kthread_run(ptlrpc_invalidate_import_thread, imp,
--				     "ll_imp_inval");
-+				   "ll_imp_inval");
- 		if (IS_ERR(task)) {
- 			class_import_put(imp);
- 			CERROR("error starting invalidate thread: %d\n", rc);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
-index 0e60264..bdd9053 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
-@@ -890,12 +890,12 @@ EXPORT_SYMBOL(RMF_SYMTGT);
+ 	cl_lock_trace(D_DLMTRACE, env, "disclosure lock", closure->clc_origin);
+ 	list_for_each_entry_safe(scan, temp, &closure->clc_list,
+-				     cll_inclosure){
++				 cll_inclosure) {
+ 		list_del_init(&scan->cll_inclosure);
+ 		cl_lock_mutex_put(env, scan);
+ 		lu_ref_del(&scan->cll_reference, "closure", closure);
+@@ -1845,7 +1844,7 @@ static int check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
  
- struct req_msg_field RMF_TGTUUID =
- 	DEFINE_MSGF("tgtuuid", RMF_F_STRING, sizeof(struct obd_uuid) - 1, NULL,
--	NULL);
-+		    NULL);
- EXPORT_SYMBOL(RMF_TGTUUID);
- 
- struct req_msg_field RMF_CLUUID =
- 	DEFINE_MSGF("cluuid", RMF_F_STRING, sizeof(struct obd_uuid) - 1, NULL,
--	NULL);
-+		    NULL);
- EXPORT_SYMBOL(RMF_CLUUID);
- 
- struct req_msg_field RMF_STRING =
-@@ -1030,7 +1030,7 @@ EXPORT_SYMBOL(RMF_RCS);
- 
- struct req_msg_field RMF_EAVALS_LENS =
- 	DEFINE_MSGF("eavals_lens", RMF_F_STRUCT_ARRAY, sizeof(__u32),
--		lustre_swab_generic_32s, NULL);
-+		    lustre_swab_generic_32s, NULL);
- EXPORT_SYMBOL(RMF_EAVALS_LENS);
- 
- struct req_msg_field RMF_OBD_ID =
-@@ -1141,17 +1141,17 @@ EXPORT_SYMBOL(RQF_SEC_CTX);
- 
- struct req_format RQF_MGS_TARGET_REG =
- 	DEFINE_REQ_FMT0("MGS_TARGET_REG", mgs_target_info_only,
--			 mgs_target_info_only);
-+			mgs_target_info_only);
- EXPORT_SYMBOL(RQF_MGS_TARGET_REG);
- 
- struct req_format RQF_MGS_SET_INFO =
- 	DEFINE_REQ_FMT0("MGS_SET_INFO", mgs_set_info,
--			 mgs_set_info);
-+			mgs_set_info);
- EXPORT_SYMBOL(RQF_MGS_SET_INFO);
- 
- struct req_format RQF_MGS_CONFIG_READ =
- 	DEFINE_REQ_FMT0("MGS_CONFIG_READ", mgs_config_read_client,
--			 mgs_config_read_server);
-+			mgs_config_read_server);
- EXPORT_SYMBOL(RQF_MGS_CONFIG_READ);
- 
- struct req_format RQF_SEQ_QUERY =
-@@ -1516,32 +1516,32 @@ EXPORT_SYMBOL(RQF_OST_STATFS);
- 
- struct req_format RQF_OST_SET_GRANT_INFO =
- 	DEFINE_REQ_FMT0("OST_SET_GRANT_INFO", ost_grant_shrink_client,
--			 ost_body_only);
-+			ost_body_only);
- EXPORT_SYMBOL(RQF_OST_SET_GRANT_INFO);
- 
- struct req_format RQF_OST_GET_INFO_GENERIC =
- 	DEFINE_REQ_FMT0("OST_GET_INFO", ost_get_info_generic_client,
--					ost_get_info_generic_server);
-+			ost_get_info_generic_server);
- EXPORT_SYMBOL(RQF_OST_GET_INFO_GENERIC);
- 
- struct req_format RQF_OST_GET_INFO_LAST_ID =
- 	DEFINE_REQ_FMT0("OST_GET_INFO_LAST_ID", ost_get_info_generic_client,
--						ost_get_last_id_server);
-+			ost_get_last_id_server);
- EXPORT_SYMBOL(RQF_OST_GET_INFO_LAST_ID);
- 
- struct req_format RQF_OST_GET_INFO_LAST_FID =
- 	DEFINE_REQ_FMT0("OST_GET_INFO_LAST_FID", obd_set_info_client,
--						 ost_get_last_fid_server);
-+			ost_get_last_fid_server);
- EXPORT_SYMBOL(RQF_OST_GET_INFO_LAST_FID);
- 
- struct req_format RQF_OST_SET_INFO_LAST_FID =
- 	DEFINE_REQ_FMT0("OST_SET_INFO_LAST_FID", obd_set_info_client,
--						 empty);
-+			empty);
- EXPORT_SYMBOL(RQF_OST_SET_INFO_LAST_FID);
- 
- struct req_format RQF_OST_GET_INFO_FIEMAP =
- 	DEFINE_REQ_FMT0("OST_GET_INFO_FIEMAP", ost_get_fiemap_client,
--					       ost_get_fiemap_server);
-+			ost_get_fiemap_server);
- EXPORT_SYMBOL(RQF_OST_GET_INFO_FIEMAP);
- 
- #if !defined(__REQ_LAYOUT_USER__)
-@@ -1733,8 +1733,8 @@ int req_capsule_server_pack(struct req_capsule *pill)
- 			       pill->rc_area[RCL_SERVER], NULL);
- 	if (rc != 0) {
- 		DEBUG_REQ(D_ERROR, pill->rc_req,
--		       "Cannot pack %d fields in format `%s': ",
--		       count, fmt->rf_name);
-+			  "Cannot pack %d fields in format `%s': ",
-+			  count, fmt->rf_name);
- 	}
- 	return rc;
- }
-@@ -1751,9 +1751,8 @@ static int __req_capsule_offset(const struct req_capsule *pill,
- 	int offset;
- 
- 	offset = field->rmf_offset[pill->rc_fmt->rf_idx][loc];
--	LASSERTF(offset > 0, "%s:%s, off=%d, loc=%d\n",
--			    pill->rc_fmt->rf_name,
--			    field->rmf_name, offset, loc);
-+	LASSERTF(offset > 0, "%s:%s, off=%d, loc=%d\n", pill->rc_fmt->rf_name,
-+		 field->rmf_name, offset, loc);
- 	offset--;
- 
- 	LASSERT(0 <= offset && offset < REQ_MAX_FIELD_NR);
-@@ -2213,7 +2212,7 @@ void req_capsule_shrink(struct req_capsule *pill,
- 	msg = __req_msg(pill, loc);
- 	len = lustre_msg_buflen(msg, offset);
- 	LASSERTF(newlen <= len, "%s:%s, oldlen=%d, newlen=%d\n",
--				fmt->rf_name, field->rmf_name, len, newlen);
-+		 fmt->rf_name, field->rmf_name, len, newlen);
- 
- 	if (loc == RCL_CLIENT)
- 		pill->rc_req->rq_reqlen = lustre_shrink_msg(msg, offset, newlen,
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-index fcaa289..cee04ef 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
-@@ -454,7 +454,7 @@ static const char *nrs_state2str(enum ptlrpc_nrs_pol_state state)
-  * \param[out] info  Holds returned status information
+ 		/* refresh non-overlapped index */
+ 		tmp = cl_lock_at_pgoff(env, lock->cll_descr.cld_obj, index,
+-					lock, 1, 0);
++				       lock, 1, 0);
+ 		if (tmp) {
+ 			/* Cache the first-non-overlapped index so as to skip
+ 			 * all pages within [index, clt_fn_index). This
+@@ -2173,8 +2172,8 @@ EXPORT_SYMBOL(cl_lock_mode_name);
+  * Prints human readable representation of a lock description.
   */
- static void nrs_policy_get_info_locked(struct ptlrpc_nrs_policy *policy,
--				struct ptlrpc_nrs_pol_info *info)
-+				       struct ptlrpc_nrs_pol_info *info)
+ void cl_lock_descr_print(const struct lu_env *env, void *cookie,
+-		       lu_printer_t printer,
+-		       const struct cl_lock_descr *descr)
++			 lu_printer_t printer,
++			 const struct cl_lock_descr *descr)
  {
- 	assert_spin_locked(&policy->pol_nrs->nrs_lock);
+ 	const struct lu_fid  *fid;
  
-@@ -518,8 +518,7 @@ again:
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+index b626914..e7c570a 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+@@ -247,8 +247,7 @@ int cl_object_attr_set(const struct lu_env *env, struct cl_object *obj,
  
- 		pol_idx = 0;
+ 	top = obj->co_lu.lo_header;
+ 	result = 0;
+-	list_for_each_entry_reverse(obj, &top->loh_layers,
+-					co_lu.lo_linkage) {
++	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
+ 		if (obj->co_ops->coo_attr_set) {
+ 			result = obj->co_ops->coo_attr_set(env, obj, attr, v);
+ 			if (result != 0) {
+@@ -278,8 +277,7 @@ int cl_object_glimpse(const struct lu_env *env, struct cl_object *obj,
  
--		list_for_each_entry(policy, &nrs->nrs_policy_list,
--					pol_list) {
-+		list_for_each_entry(policy, &nrs->nrs_policy_list, pol_list) {
- 			LASSERT(pol_idx < num_pols);
+ 	top = obj->co_lu.lo_header;
+ 	result = 0;
+-	list_for_each_entry_reverse(obj, &top->loh_layers,
+-					co_lu.lo_linkage) {
++	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
+ 		if (obj->co_ops->coo_glimpse) {
+ 			result = obj->co_ops->coo_glimpse(env, obj, lvb);
+ 			if (result != 0)
+@@ -457,13 +455,13 @@ locks: ...... ...... ...... ...... ...... [...... ...... ...... ...... ......]
+ 	seq_printf(m, " [");
+ 	for (i = 0; i < ARRAY_SIZE(site->cs_pages_state); ++i)
+ 		seq_printf(m, "%s: %u ", pstate[i],
+-				atomic_read(&site->cs_pages_state[i]));
++			   atomic_read(&site->cs_pages_state[i]));
+ 	seq_printf(m, "]\n");
+ 	cache_stats_print(&site->cs_locks, m, 0);
+ 	seq_printf(m, " [");
+ 	for (i = 0; i < ARRAY_SIZE(site->cs_locks_state); ++i)
+ 		seq_printf(m, "%s: %u ", lstate[i],
+-				atomic_read(&site->cs_locks_state[i]));
++			   atomic_read(&site->cs_locks_state[i]));
+ 	seq_printf(m, "]\n");
+ 	cache_stats_print(&cl_env_stats, m, 0);
+ 	seq_printf(m, "\n");
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+index 72f9924..231a2f2 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+@@ -255,7 +255,7 @@ static void cl_page_free(const struct lu_env *env, struct cl_page *page)
+ 		struct cl_page_slice *slice;
  
- 			nrs_policy_get_info_locked(policy, &tmp);
-@@ -590,7 +589,7 @@ again:
- 	 *	    active: 0
- 	 */
- 	seq_printf(m, "%s\n",
--		      !hp ?  "\nregular_requests:" : "high_priority_requests:");
-+		   !hp ?  "\nregular_requests:" : "high_priority_requests:");
- 
- 	for (pol_idx = 0; pol_idx < num_pols; pol_idx++) {
- 		seq_printf(m,  "  - name: %s\n"
-@@ -970,7 +969,7 @@ static int ptlrpc_lprocfs_timeouts_seq_show(struct seq_file *m, void *n)
- 
- 	if (AT_OFF) {
- 		seq_printf(m, "adaptive timeouts off, using obd_timeout %u\n",
--			       obd_timeout);
-+			   obd_timeout);
- 		return 0;
+ 		slice = list_entry(page->cp_layers.next,
+-				       struct cl_page_slice, cpl_linkage);
++				   struct cl_page_slice, cpl_linkage);
+ 		list_del_init(page->cp_layers.next);
+ 		slice->cpl_ops->cpo_fini(env, slice);
  	}
- 
-@@ -981,8 +980,8 @@ static int ptlrpc_lprocfs_timeouts_seq_show(struct seq_file *m, void *n)
- 		s2dhms(&ts, ktime_get_real_seconds() - worstt);
- 
- 		seq_printf(m, "%10s : cur %3u  worst %3u (at %lld, "
--			      DHMS_FMT" ago) ", "service",
--			      cur, worst, (s64)worstt, DHMS_VARS(&ts));
-+			   DHMS_FMT " ago) ", "service",
-+			   cur, worst, (s64)worstt, DHMS_VARS(&ts));
- 
- 		lprocfs_at_hist_helper(m, &svcpt->scp_at_estimate);
- 	}
-@@ -1297,7 +1296,7 @@ int lprocfs_rd_pinger_recov(struct seq_file *m, void *n)
- EXPORT_SYMBOL(lprocfs_rd_pinger_recov);
- 
- int lprocfs_wr_pinger_recov(struct file *file, const char __user *buffer,
--		      size_t count, loff_t *off)
-+			    size_t count, loff_t *off)
- {
- 	struct obd_device *obd = ((struct seq_file *)file->private_data)->private;
- 	struct client_obd *cli = &obd->u.cli;
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-index c5bbf7b..10b8fe8 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-@@ -507,11 +507,11 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
- 	 */
- 	LASSERT(!request->rq_receiving_reply);
- 	LASSERT(!((lustre_msg_get_flags(request->rq_reqmsg) & MSG_REPLAY) &&
--		(request->rq_import->imp_state == LUSTRE_IMP_FULL)));
-+		  (request->rq_import->imp_state == LUSTRE_IMP_FULL)));
- 
- 	if (unlikely(obd && obd->obd_fail)) {
- 		CDEBUG(D_HA, "muting rpc for failed imp obd %s\n",
--			obd->obd_name);
-+		       obd->obd_name);
- 		/* this prevents us from waiting in ptlrpc_queue_wait */
- 		spin_lock(&request->rq_lock);
- 		request->rq_err = 1;
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs.c b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-index 58e5d86..1244751 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
-@@ -304,7 +304,7 @@ static void nrs_policy_put_locked(struct ptlrpc_nrs_policy *policy)
- 
- 	policy->pol_ref--;
- 	if (unlikely(policy->pol_ref == 0 &&
--	    policy->pol_state == NRS_POL_STATE_STOPPING))
-+		     policy->pol_state == NRS_POL_STATE_STOPPING))
- 		nrs_policy_stop0(policy);
+@@ -277,8 +277,9 @@ static inline void cl_page_state_set_trust(struct cl_page *page,
  }
  
-@@ -319,7 +319,7 @@ static void nrs_policy_put(struct ptlrpc_nrs_policy *policy)
-  * Find and return a policy by name.
+ static struct cl_page *cl_page_alloc(const struct lu_env *env,
+-		struct cl_object *o, pgoff_t ind, struct page *vmpage,
+-		enum cl_page_type type)
++				     struct cl_object *o, pgoff_t ind,
++				     struct page *vmpage,
++				     enum cl_page_type type)
+ {
+ 	struct cl_page	  *page;
+ 	struct lu_object_header *head;
+@@ -303,8 +304,7 @@ static struct cl_page *cl_page_alloc(const struct lu_env *env,
+ 		mutex_init(&page->cp_mutex);
+ 		lu_ref_init(&page->cp_reference);
+ 		head = o->co_lu.lo_header;
+-		list_for_each_entry(o, &head->loh_layers,
+-					co_lu.lo_linkage) {
++		list_for_each_entry(o, &head->loh_layers, co_lu.lo_linkage) {
+ 			if (o->co_ops->coo_page_init) {
+ 				result = o->co_ops->coo_page_init(env, o,
+ 								  page, vmpage);
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index c1310c2..06b04d2 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -199,8 +199,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 			err = -ENOMEM;
+ 			goto out;
+ 		}
+-		err = copy_from_user(lcfg, data->ioc_pbuf1,
+-					 data->ioc_plen1);
++		err = copy_from_user(lcfg, data->ioc_pbuf1, data->ioc_plen1);
+ 		if (!err)
+ 			err = lustre_cfg_sanity_check(lcfg, data->ioc_plen1);
+ 		if (!err)
+diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
+index 9042632..65f2c62 100644
+--- a/drivers/staging/lustre/lustre/obdclass/genops.c
++++ b/drivers/staging/lustre/lustre/obdclass/genops.c
+@@ -461,8 +461,8 @@ EXPORT_SYMBOL(class_num2obd);
+  * otherwise any client connected to the tgt is returned.
   */
- static struct ptlrpc_nrs_policy *nrs_policy_find_locked(struct ptlrpc_nrs *nrs,
--							 char *name)
-+							char *name)
+ struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
+-					  const char *typ_name,
+-					  struct obd_uuid *grp_uuid)
++					 const char *typ_name,
++					 struct obd_uuid *grp_uuid)
  {
- 	struct ptlrpc_nrs_policy *tmp;
+ 	int i;
  
-@@ -797,7 +797,7 @@ static void ptlrpc_nrs_req_add_nolock(struct ptlrpc_request *req)
- 	 */
- 	if (unlikely(list_empty(&policy->pol_list_queued)))
- 		list_add_tail(&policy->pol_list_queued,
--				  &policy->pol_nrs->nrs_policy_queued);
-+			      &policy->pol_nrs->nrs_policy_queued);
+@@ -582,21 +582,21 @@ int obd_init_caches(void)
+ {
+ 	LASSERT(!obd_device_cachep);
+ 	obd_device_cachep = kmem_cache_create("ll_obd_dev_cache",
+-						 sizeof(struct obd_device),
+-						 0, 0, NULL);
++					      sizeof(struct obd_device),
++					      0, 0, NULL);
+ 	if (!obd_device_cachep)
+ 		goto out;
+ 
+ 	LASSERT(!obdo_cachep);
+ 	obdo_cachep = kmem_cache_create("ll_obdo_cache", sizeof(struct obdo),
+-					   0, 0, NULL);
++					0, 0, NULL);
+ 	if (!obdo_cachep)
+ 		goto out;
+ 
+ 	LASSERT(!import_cachep);
+ 	import_cachep = kmem_cache_create("ll_import_cache",
+-					     sizeof(struct obd_import),
+-					     0, 0, NULL);
++					  sizeof(struct obd_import),
++					  0, 0, NULL);
+ 	if (!import_cachep)
+ 		goto out;
+ 
+@@ -828,7 +828,7 @@ EXPORT_SYMBOL(class_unlink_export);
+ static void class_import_destroy(struct obd_import *imp)
+ {
+ 	CDEBUG(D_IOCTL, "destroying import %p for %s\n", imp,
+-		imp->imp_obd->obd_name);
++	       imp->imp_obd->obd_name);
+ 
+ 	LASSERT_ATOMIC_ZERO(&imp->imp_refcount);
+ 
+@@ -838,7 +838,7 @@ static void class_import_destroy(struct obd_import *imp)
+ 		struct obd_import_conn *imp_conn;
+ 
+ 		imp_conn = list_entry(imp->imp_conn_list.next,
+-					  struct obd_import_conn, oic_item);
++				      struct obd_import_conn, oic_item);
+ 		list_del_init(&imp_conn->oic_item);
+ 		ptlrpc_put_connection_superhack(imp_conn->oic_conn);
+ 		kfree(imp_conn);
+@@ -1125,16 +1125,16 @@ static void obd_zombie_impexp_cull(void)
+ 		import = NULL;
+ 		if (!list_empty(&obd_zombie_imports)) {
+ 			import = list_entry(obd_zombie_imports.next,
+-						struct obd_import,
+-						imp_zombie_chain);
++					    struct obd_import,
++					    imp_zombie_chain);
+ 			list_del_init(&import->imp_zombie_chain);
+ 		}
+ 
+ 		export = NULL;
+ 		if (!list_empty(&obd_zombie_exports)) {
+ 			export = list_entry(obd_zombie_exports.next,
+-						struct obd_export,
+-						exp_obd_chain);
++					    struct obd_export,
++					    exp_obd_chain);
+ 			list_del_init(&export->exp_obd_chain);
+ 		}
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
+index 42fc26f..fd333b9 100644
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
++++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
+@@ -62,8 +62,8 @@ struct static_lustre_uintvalue_attr {
+ };
+ 
+ static ssize_t static_uintvalue_show(struct kobject *kobj,
+-				    struct attribute *attr,
+-				    char *buf)
++				     struct attribute *attr,
++				     char *buf)
+ {
+ 	struct static_lustre_uintvalue_attr *lattr = (void *)attr;
+ 
+@@ -71,8 +71,8 @@ static ssize_t static_uintvalue_show(struct kobject *kobj,
  }
  
- /**
-@@ -978,8 +978,7 @@ again:
- 	nrs = nrs_svcpt2nrs(svcpt, hp);
- 	nrs->nrs_stopping = 1;
+ static ssize_t static_uintvalue_store(struct kobject *kobj,
+-				     struct attribute *attr,
+-				     const char *buffer, size_t count)
++				      struct attribute *attr,
++				      const char *buffer, size_t count)
+ {
+ 	struct static_lustre_uintvalue_attr *lattr  = (void *)attr;
+ 	int rc;
+diff --git a/drivers/staging/lustre/lustre/obdclass/llog_cat.c b/drivers/staging/lustre/lustre/obdclass/llog_cat.c
+index b88ccba..c27d4ec 100644
+--- a/drivers/staging/lustre/lustre/obdclass/llog_cat.c
++++ b/drivers/staging/lustre/lustre/obdclass/llog_cat.c
+@@ -74,7 +74,7 @@ static int llog_cat_id2handle(const struct lu_env *env,
  
--	list_for_each_entry_safe(policy, tmp, &nrs->nrs_policy_list,
--				     pol_list) {
-+	list_for_each_entry_safe(policy, tmp, &nrs->nrs_policy_list, pol_list) {
- 		rc = nrs_policy_unregister(nrs, policy->pol_desc->pd_name);
- 		LASSERT(rc == 0);
+ 	down_write(&cathandle->lgh_lock);
+ 	list_for_each_entry(loghandle, &cathandle->u.chd.chd_head,
+-				u.phd.phd_entry) {
++			    u.phd.phd_entry) {
+ 		struct llog_logid *cgl = &loghandle->lgh_id;
+ 
+ 		if (ostid_id(&cgl->lgl_oi) == ostid_id(&logid->lgl_oi) &&
+@@ -130,7 +130,7 @@ int llog_cat_close(const struct lu_env *env, struct llog_handle *cathandle)
+ 	int			 rc;
+ 
+ 	list_for_each_entry_safe(loghandle, n, &cathandle->u.chd.chd_head,
+-				     u.phd.phd_entry) {
++				 u.phd.phd_entry) {
+ 		/* unlink open-not-created llogs */
+ 		list_del_init(&loghandle->u.phd.phd_entry);
+ 		llog_close(env, loghandle);
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index 28bb4e5..3c895be 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -607,13 +607,13 @@ static void obd_connect_seq_flags2str(struct seq_file *m, __u64 flags, char *sep
+ 	for (i = 0; obd_connect_names[i]; i++, mask <<= 1) {
+ 		if (flags & mask) {
+ 			seq_printf(m, "%s%s",
+-					first ? sep : "", obd_connect_names[i]);
++				   first ? sep : "", obd_connect_names[i]);
+ 			first = false;
+ 		}
  	}
-@@ -1100,7 +1099,7 @@ static int ptlrpc_nrs_policy_register(struct ptlrpc_nrs_pol_conf *conf)
- 	LASSERT(conf->nc_ops);
- 	LASSERT(conf->nc_compat);
- 	LASSERT(ergo(conf->nc_compat == nrs_policy_compat_one,
--		conf->nc_compat_svc_name));
-+		     conf->nc_compat_svc_name));
- 	LASSERT(ergo((conf->nc_flags & PTLRPC_NRS_FL_REG_EXTERN) != 0,
- 		     conf->nc_owner));
- 
-@@ -1414,7 +1413,7 @@ static void nrs_request_removed(struct ptlrpc_nrs_policy *policy)
- 			policy->pol_nrs->nrs_req_queued);
- 
- 		list_move_tail(&policy->pol_list_queued,
--				   &policy->pol_nrs->nrs_policy_queued);
-+			       &policy->pol_nrs->nrs_policy_queued);
- 	}
+ 	if (flags & ~(mask - 1))
+ 		seq_printf(m, "%sunknown flags %#llx",
+-				first ? sep : "", flags & ~(mask - 1));
++			   first ? sep : "", flags & ~(mask - 1));
  }
  
-@@ -1446,8 +1445,7 @@ ptlrpc_nrs_req_get_nolock0(struct ptlrpc_service_part *svcpt, bool hp,
- 	 * Always try to drain requests from all NRS polices even if they are
- 	 * inactive, because the user can change policy status at runtime.
- 	 */
--	list_for_each_entry(policy, &nrs->nrs_policy_queued,
--				pol_list_queued) {
-+	list_for_each_entry(policy, &nrs->nrs_policy_queued, pol_list_queued) {
- 		nrq = nrs_request_get(policy, peek, force);
- 		if (nrq) {
- 			if (likely(!peek)) {
-@@ -1599,8 +1597,7 @@ void ptlrpc_nrs_fini(void)
- 	struct ptlrpc_nrs_pol_desc *desc;
- 	struct ptlrpc_nrs_pol_desc *tmp;
+ int lprocfs_rd_import(struct seq_file *m, void *data)
+@@ -637,26 +637,27 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 	imp = obd->u.cli.cl_import;
  
--	list_for_each_entry_safe(desc, tmp, &nrs_core.nrs_policies,
--				     pd_list) {
-+	list_for_each_entry_safe(desc, tmp, &nrs_core.nrs_policies, pd_list) {
- 		list_del_init(&desc->pd_list);
- 		kfree(desc);
+ 	seq_printf(m,
+-		     "import:\n"
+-		     "    name: %s\n"
+-		     "    target: %s\n"
+-		     "    state: %s\n"
+-		     "    instance: %u\n"
+-		     "    connect_flags: [ ",
+-		     obd->obd_name,
+-		     obd2cli_tgt(obd),
+-		     ptlrpc_import_state_name(imp->imp_state),
+-		     imp->imp_connect_data.ocd_instance);
+-	obd_connect_seq_flags2str(m, imp->imp_connect_data.ocd_connect_flags, ", ");
++		   "import:\n"
++		   "    name: %s\n"
++		   "    target: %s\n"
++		   "    state: %s\n"
++		   "    instance: %u\n"
++		   "    connect_flags: [ ",
++		   obd->obd_name,
++		   obd2cli_tgt(obd),
++		   ptlrpc_import_state_name(imp->imp_state),
++		   imp->imp_connect_data.ocd_instance);
++	obd_connect_seq_flags2str(m, imp->imp_connect_data.ocd_connect_flags,
++				  ", ");
+ 	seq_printf(m,
+-		      " ]\n"
+-		      "    import_flags: [ ");
++		   " ]\n"
++		   "    import_flags: [ ");
+ 	obd_import_flags2str(imp, m);
+ 
+ 	seq_printf(m,
+-		      " ]\n"
+-		      "    connection:\n"
+-		      "       failover_nids: [ ");
++		   " ]\n"
++		   "    connection:\n"
++		   "       failover_nids: [ ");
+ 	spin_lock(&imp->imp_lock);
+ 	j = 0;
+ 	list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
+@@ -671,15 +672,15 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 	else
+ 		strncpy(nidstr, "<none>", sizeof(nidstr));
+ 	seq_printf(m,
+-		      " ]\n"
+-		      "       current_connection: %s\n"
+-		      "       connection_attempts: %u\n"
+-		      "       generation: %u\n"
+-		      "       in-progress_invalidations: %u\n",
+-		      nidstr,
+-		      imp->imp_conn_cnt,
+-		      imp->imp_generation,
+-		      atomic_read(&imp->imp_inval_count));
++		   " ]\n"
++		   "       current_connection: %s\n"
++		   "       connection_attempts: %u\n"
++		   "       generation: %u\n"
++		   "       in-progress_invalidations: %u\n",
++		   nidstr,
++		   imp->imp_conn_cnt,
++		   imp->imp_generation,
++		   atomic_read(&imp->imp_inval_count));
+ 	spin_unlock(&imp->imp_lock);
+ 
+ 	if (!obd->obd_svc_stats)
+@@ -696,15 +697,15 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 	} else
+ 		ret.lc_sum = 0;
+ 	seq_printf(m,
+-		      "    rpcs:\n"
+-		      "       inflight: %u\n"
+-		      "       unregistering: %u\n"
+-		      "       timeouts: %u\n"
+-		      "       avg_waittime: %llu %s\n",
+-		      atomic_read(&imp->imp_inflight),
+-		      atomic_read(&imp->imp_unregistering),
+-		      atomic_read(&imp->imp_timeouts),
+-		      ret.lc_sum, header->lc_units);
++		   "    rpcs:\n"
++		   "       inflight: %u\n"
++		   "       unregistering: %u\n"
++		   "       timeouts: %u\n"
++		   "       avg_waittime: %llu %s\n",
++		   atomic_read(&imp->imp_inflight),
++		   atomic_read(&imp->imp_unregistering),
++		   atomic_read(&imp->imp_timeouts),
++		   ret.lc_sum, header->lc_units);
+ 
+ 	k = 0;
+ 	for (j = 0; j < IMP_AT_MAX_PORTALS; j++) {
+@@ -714,20 +715,20 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 			  at_get(&imp->imp_at.iat_service_estimate[j]));
  	}
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c b/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-index 0d8da35..b123a93 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
-@@ -163,7 +163,7 @@ struct ptlrpc_nrs_request *nrs_fifo_req_get(struct ptlrpc_nrs_policy *policy,
+ 	seq_printf(m,
+-		      "    service_estimates:\n"
+-		      "       services: %u sec\n"
+-		      "       network: %u sec\n",
+-		      k,
+-		      at_get(&imp->imp_at.iat_net_latency));
++		   "    service_estimates:\n"
++		   "       services: %u sec\n"
++		   "       network: %u sec\n",
++		   k,
++		   at_get(&imp->imp_at.iat_net_latency));
  
- 	nrq = unlikely(list_empty(&head->fh_list)) ? NULL :
- 	      list_entry(head->fh_list.next, struct ptlrpc_nrs_request,
--			     nr_u.fifo.fr_list);
-+			 nr_u.fifo.fr_list);
+ 	seq_printf(m,
+-		      "    transactions:\n"
+-		      "       last_replay: %llu\n"
+-		      "       peer_committed: %llu\n"
+-		      "       last_checked: %llu\n",
+-		      imp->imp_last_replay_transno,
+-		      imp->imp_peer_committed_transno,
+-		      imp->imp_last_transno_checked);
++		   "    transactions:\n"
++		   "       last_replay: %llu\n"
++		   "       peer_committed: %llu\n"
++		   "       last_checked: %llu\n",
++		   imp->imp_last_replay_transno,
++		   imp->imp_peer_committed_transno,
++		   imp->imp_last_transno_checked);
  
- 	if (likely(!peek && nrq)) {
- 		struct ptlrpc_request *req = container_of(nrq,
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-index f3ac810..492d63f 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-@@ -280,7 +280,7 @@ lustre_get_emerg_rs(struct ptlrpc_service_part *svcpt)
+ 	/* avg data rates */
+ 	for (rw = 0; rw <= 1; rw++) {
+@@ -741,10 +742,10 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 			do_div(sum, ret.lc_count);
+ 			ret.lc_sum = sum;
+ 			seq_printf(m,
+-				      "    %s_data_averages:\n"
+-				      "       bytes_per_rpc: %llu\n",
+-				      rw ? "write" : "read",
+-				      ret.lc_sum);
++				   "    %s_data_averages:\n"
++				   "       bytes_per_rpc: %llu\n",
++				   rw ? "write" : "read",
++				   ret.lc_sum);
+ 		}
+ 		k = (int)ret.lc_sum;
+ 		j = opcode_offset(OST_READ + rw) + EXTRA_MAX_OPCODES;
+@@ -757,13 +758,13 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
+ 			do_div(sum, ret.lc_count);
+ 			ret.lc_sum = sum;
+ 			seq_printf(m,
+-				      "       %s_per_rpc: %llu\n",
+-				      header->lc_units, ret.lc_sum);
++				   "       %s_per_rpc: %llu\n",
++				   header->lc_units, ret.lc_sum);
+ 			j = (int)ret.lc_sum;
+ 			if (j > 0)
+ 				seq_printf(m,
+-					      "       MB_per_sec: %u.%.02u\n",
+-					      k / j, (100 * k / j) % 100);
++					   "       MB_per_sec: %u.%.02u\n",
++					   k / j, (100 * k / j) % 100);
+ 		}
  	}
  
- 	rs = list_entry(svcpt->scp_rep_idle.next,
--			    struct ptlrpc_reply_state, rs_list);
-+			struct ptlrpc_reply_state, rs_list);
- 	list_del(&rs->rs_list);
+@@ -787,7 +788,7 @@ int lprocfs_rd_state(struct seq_file *m, void *data)
+ 	imp = obd->u.cli.cl_import;
  
- 	spin_unlock(&svcpt->scp_rep_lock);
-@@ -1908,7 +1908,7 @@ static void print_lum(struct lov_user_md *lum)
- 	CDEBUG(D_OTHER, "\tlmm_stripe_size: %#x\n", lum->lmm_stripe_size);
- 	CDEBUG(D_OTHER, "\tlmm_stripe_count: %#x\n", lum->lmm_stripe_count);
- 	CDEBUG(D_OTHER, "\tlmm_stripe_offset/lmm_layout_gen: %#x\n",
--			lum->lmm_stripe_offset);
-+	       lum->lmm_stripe_offset);
+ 	seq_printf(m, "current_state: %s\n",
+-		     ptlrpc_import_state_name(imp->imp_state));
++		   ptlrpc_import_state_name(imp->imp_state));
+ 	seq_printf(m, "state_history:\n");
+ 	k = imp->imp_state_hist_idx;
+ 	for (j = 0; j < IMP_STATE_HIST_LEN; j++) {
+@@ -1206,7 +1207,7 @@ struct file_operations lprocfs_stats_seq_fops = {
+ };
+ 
+ int ldebugfs_register_stats(struct dentry *parent, const char *name,
+-			   struct lprocfs_stats *stats)
++			    struct lprocfs_stats *stats)
+ {
+ 	struct dentry *entry;
+ 
+@@ -1427,11 +1428,9 @@ char *lprocfs_find_named_value(const char *buffer, const char *name,
  }
+ EXPORT_SYMBOL(lprocfs_find_named_value);
  
- static void lustre_swab_lmm_oi(struct ost_id *oi)
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-index 44bf026..8a86931 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-@@ -242,7 +242,7 @@ static int ptlrpc_pinger_main(void *arg)
- 		list_for_each(iter, &pinger_imports) {
- 			struct obd_import *imp =
- 				list_entry(iter, struct obd_import,
--					       imp_pinger_chain);
-+					   imp_pinger_chain);
+-int ldebugfs_seq_create(struct dentry *parent,
+-		       const char *name,
+-		       umode_t mode,
+-		       const struct file_operations *seq_fops,
+-		       void *data)
++int ldebugfs_seq_create(struct dentry *parent, const char *name,
++			umode_t mode, const struct file_operations *seq_fops,
++			void *data)
+ {
+ 	struct dentry *entry;
  
- 			ptlrpc_pinger_process_import(imp, this_ping);
- 			/* obd_timeout might have changed */
-@@ -404,7 +404,8 @@ EXPORT_SYMBOL(ptlrpc_pinger_del_import);
-  * be called when timeout happens.
+diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+index 0fa4bac..09832ff 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+@@ -1473,8 +1473,7 @@ void lu_context_key_quiesce(struct lu_context_key *key)
+ 		 * XXX memory barrier has to go here.
+ 		 */
+ 		spin_lock(&lu_keys_guard);
+-		list_for_each_entry(ctx, &lu_context_remembered,
+-					lc_remember)
++		list_for_each_entry(ctx, &lu_context_remembered, lc_remember)
+ 			key_fini(ctx, key->lct_index);
+ 		spin_unlock(&lu_keys_guard);
+ 		++key_set_version;
+diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_peer.c b/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
+index b10ea31..5c38c83 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
++++ b/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
+@@ -173,7 +173,7 @@ int class_del_uuid(const char *uuid)
+ 
+ 	while (!list_empty(&deathrow)) {
+ 		data = list_entry(deathrow.next, struct uuid_nid_data,
+-				      un_list);
++				  un_list);
+ 		list_del(&data->un_list);
+ 
+ 		CDEBUG(D_INFO, "del uuid %s %s/%d\n",
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+index 2134b60..5395e99 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+@@ -1049,9 +1049,9 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+ 			rc = 0;
+ 		} else {
+ 			CDEBUG(D_CONFIG, "%s.%.*s: Set parameter %.*s=%s\n",
+-					 lustre_cfg_string(lcfg, 0),
+-					 (int)strlen(prefix) - 1, prefix,
+-					 (int)(sval - key - 1), key, sval);
++			       lustre_cfg_string(lcfg, 0),
++			       (int)strlen(prefix) - 1, prefix,
++			       (int)(sval - key - 1), key, sval);
+ 		}
+ 	}
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+index d138e05..d3e28a3 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+@@ -72,7 +72,7 @@ static void (*kill_super_cb)(struct super_block *sb);
+  *   this log, and is added to the mgc's list of logs to follow.
   */
- static struct timeout_item *ptlrpc_new_timeout(int time,
--	enum timeout_event event, timeout_cb_t cb, void *data)
-+					       enum timeout_event event,
-+					       timeout_cb_t cb, void *data)
+ int lustre_process_log(struct super_block *sb, char *logname,
+-		     struct config_llog_instance *cfg)
++		      struct config_llog_instance *cfg)
  {
- 	struct timeout_item *ti;
+ 	struct lustre_cfg *lcfg;
+ 	struct lustre_cfg_bufs *bufs;
+@@ -114,7 +114,7 @@ EXPORT_SYMBOL(lustre_process_log);
  
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-index 0c36663..00b19ab 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-@@ -207,11 +207,10 @@ static int ptlrpcd_steal_rqset(struct ptlrpc_request_set *des,
- 	if (likely(!list_empty(&src->set_new_requests))) {
- 		list_for_each_safe(pos, tmp, &src->set_new_requests) {
- 			req = list_entry(pos, struct ptlrpc_request,
--					     rq_set_chain);
-+					 rq_set_chain);
- 			req->rq_set = des;
- 		}
--		list_splice_init(&src->set_new_requests,
--				     &des->set_requests);
-+		list_splice_init(&src->set_new_requests, &des->set_requests);
- 		rc = atomic_read(&src->set_new_count);
- 		atomic_add(rc, &des->set_remaining);
- 		atomic_set(&src->set_new_count, 0);
-@@ -285,9 +284,9 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
- 		spin_lock(&set->set_new_req_lock);
- 		if (likely(!list_empty(&set->set_new_requests))) {
- 			list_splice_init(&set->set_new_requests,
--					     &set->set_requests);
-+					 &set->set_requests);
- 			atomic_add(atomic_read(&set->set_new_count),
--				       &set->set_remaining);
-+				   &set->set_remaining);
- 			atomic_set(&set->set_new_count, 0);
- 			/*
- 			 * Need to calculate its timeout.
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/recover.c b/drivers/staging/lustre/lustre/ptlrpc/recover.c
-index e5d344d..5f27d9c 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/recover.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/recover.c
-@@ -107,8 +107,7 @@ int ptlrpc_replay_next(struct obd_import *imp, int *inflight)
- 	/* Replay all the committed open requests on committed_list first */
- 	if (!list_empty(&imp->imp_committed_list)) {
- 		tmp = imp->imp_committed_list.prev;
--		req = list_entry(tmp, struct ptlrpc_request,
--				     rq_replay_list);
-+		req = list_entry(tmp, struct ptlrpc_request, rq_replay_list);
+ /* Stop watching this config log for updates */
+ int lustre_end_log(struct super_block *sb, char *logname,
+-		       struct config_llog_instance *cfg)
++		   struct config_llog_instance *cfg)
+ {
+ 	struct lustre_cfg *lcfg;
+ 	struct lustre_cfg_bufs bufs;
+@@ -340,7 +340,7 @@ int lustre_start_mgc(struct super_block *sb)
+ 	/* Add any failover MGS nids */
+ 	i = 1;
+ 	while (ptr && ((*ptr == ':' ||
+-	       class_find_param(ptr, PARAM_MGSNODE, &ptr) == 0))) {
++			class_find_param(ptr, PARAM_MGSNODE, &ptr) == 0))) {
+ 		/* New failover node */
+ 		sprintf(niduuid, "%s_%x", mgcname, i);
+ 		j = 0;
+@@ -1181,7 +1181,7 @@ EXPORT_SYMBOL(lustre_register_kill_super_cb);
  
- 		/* The last request on committed_list hasn't been replayed */
- 		if (req->rq_transno > last_transno) {
-@@ -195,8 +194,7 @@ int ptlrpc_resend(struct obd_import *imp)
- 		return -1;
- 	}
- 
--	list_for_each_entry_safe(req, next, &imp->imp_sending_list,
--				     rq_list) {
-+	list_for_each_entry_safe(req, next, &imp->imp_sending_list, rq_list) {
- 		LASSERTF((long)req > PAGE_CACHE_SIZE && req != LP_POISON,
- 			 "req %p bad\n", req);
- 		LASSERTF(req->rq_type != LI_POISON, "req %p freed\n", req);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-index 85f8f7c..14d0fc7 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-@@ -610,7 +610,7 @@ again:
- 
- 	if (sec->ps_flvr.sf_rpc != req->rq_flvr.sf_rpc) {
- 		CDEBUG(D_SEC, "req %p: flavor has changed %x -> %x\n",
--		      req, req->rq_flvr.sf_rpc, sec->ps_flvr.sf_rpc);
-+		       req, req->rq_flvr.sf_rpc, sec->ps_flvr.sf_rpc);
- 		req_off_ctx_list(req, ctx);
- 		sptlrpc_req_replace_dead_ctx(req);
- 		ctx = req->rq_cli_ctx;
-@@ -1996,8 +1996,8 @@ int sptlrpc_svc_alloc_rs(struct ptlrpc_request *req, int msglen)
- 		   msglen + sizeof(struct ptlrpc_reply_state)) {
- 			/* Just return failure if the size is too big */
- 			CERROR("size of message is too big (%zd), %d allowed",
--				msglen + sizeof(struct ptlrpc_reply_state),
--				svcpt->scp_service->srv_max_reply_size);
-+			       msglen + sizeof(struct ptlrpc_reply_state),
-+			       svcpt->scp_service->srv_max_reply_size);
- 			return -ENOMEM;
- 		}
- 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-index 93b91bf..ef68afe 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-@@ -467,7 +467,7 @@ static void sptlrpc_conf_free_rsets(struct sptlrpc_conf *conf)
- 	sptlrpc_rule_set_free(&conf->sc_rset);
- 
- 	list_for_each_entry_safe(conf_tgt, conf_tgt_next,
--				     &conf->sc_tgts, sct_list) {
-+				 &conf->sc_tgts, sct_list) {
- 		sptlrpc_rule_set_free(&conf_tgt->sct_rset);
- 		list_del(&conf_tgt->sct_list);
- 		kfree(conf_tgt);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
-index d5afc4f..9082da0 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
-@@ -109,7 +109,7 @@ static void sec_process_ctx_list(void)
- 
- 	while (!list_empty(&sec_gc_ctx_list)) {
- 		ctx = list_entry(sec_gc_ctx_list.next,
--				     struct ptlrpc_cli_ctx, cc_gc_chain);
-+				 struct ptlrpc_cli_ctx, cc_gc_chain);
- 		list_del_init(&ctx->cc_gc_chain);
- 		spin_unlock(&sec_gc_ctx_list_lock);
- 
-@@ -131,7 +131,7 @@ static void sec_do_gc(struct ptlrpc_sec *sec)
- 
- 	if (unlikely(sec->ps_gc_next == 0)) {
- 		CDEBUG(D_SEC, "sec %p(%s) has 0 gc time\n",
--		      sec, sec->ps_policy->sp_name);
-+		       sec, sec->ps_policy->sp_name);
- 		return;
- 	}
- 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 89039bf..7941540 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -299,8 +299,8 @@ ptlrpc_server_post_idle_rqbds(struct ptlrpc_service_part *svcpt)
- 		}
- 
- 		rqbd = list_entry(svcpt->scp_rqbd_idle.next,
--				      struct ptlrpc_request_buffer_desc,
--				      rqbd_list);
-+				  struct ptlrpc_request_buffer_desc,
-+				  rqbd_list);
- 		list_del(&rqbd->rqbd_list);
- 
- 		/* assume we will post successfully */
-@@ -770,8 +770,8 @@ static void ptlrpc_server_drop_request(struct ptlrpc_request *req)
- 		 */
- 		while (svcpt->scp_hist_nrqbds > svc->srv_hist_nrqbds_cpt_max) {
- 			rqbd = list_entry(svcpt->scp_hist_rqbds.next,
--					      struct ptlrpc_request_buffer_desc,
--					      rqbd_list);
-+					  struct ptlrpc_request_buffer_desc,
-+					  rqbd_list);
- 
- 			list_del(&rqbd->rqbd_list);
- 			svcpt->scp_hist_nrqbds--;
-@@ -781,7 +781,7 @@ static void ptlrpc_server_drop_request(struct ptlrpc_request *req)
- 			 */
- 			list_for_each(tmp, &rqbd->rqbd_reqs) {
- 				req = list_entry(tmp, struct ptlrpc_request,
--						     rq_list);
-+						 rq_list);
- 				/* Track the highest culled req seq */
- 				if (req->rq_history_seq >
- 				    svcpt->scp_hist_seq_culled) {
-@@ -795,8 +795,8 @@ static void ptlrpc_server_drop_request(struct ptlrpc_request *req)
- 
- 			list_for_each_safe(tmp, nxt, &rqbd->rqbd_reqs) {
- 				req = list_entry(rqbd->rqbd_reqs.next,
--						     struct ptlrpc_request,
--						     rq_list);
-+						 struct ptlrpc_request,
-+						 rq_list);
- 				list_del(&req->rq_list);
- 				ptlrpc_server_free_request(req);
- 			}
-@@ -808,8 +808,7 @@ static void ptlrpc_server_drop_request(struct ptlrpc_request *req)
- 			 */
- 			LASSERT(atomic_read(&rqbd->rqbd_req.rq_refcount) ==
- 				0);
--			list_add_tail(&rqbd->rqbd_list,
--					  &svcpt->scp_rqbd_idle);
-+			list_add_tail(&rqbd->rqbd_list, &svcpt->scp_rqbd_idle);
- 		}
- 
- 		spin_unlock(&svcpt->scp_lock);
-@@ -957,12 +956,11 @@ static int ptlrpc_at_add_timed(struct ptlrpc_request *req)
- 		/* latest rpcs will have the latest deadlines in the list,
- 		 * so search backward.
- 		 */
--		list_for_each_entry_reverse(rq,
--						&array->paa_reqs_array[index],
--						rq_timed_list) {
-+		list_for_each_entry_reverse(rq, &array->paa_reqs_array[index],
-+					    rq_timed_list) {
- 			if (req->rq_deadline >= rq->rq_deadline) {
- 				list_add(&req->rq_timed_list,
--					     &rq->rq_timed_list);
-+					 &rq->rq_timed_list);
- 				break;
- 			}
- 		}
-@@ -970,8 +968,7 @@ static int ptlrpc_at_add_timed(struct ptlrpc_request *req)
- 
- 	/* Add the request at the head of the list */
- 	if (list_empty(&req->rq_timed_list))
--		list_add(&req->rq_timed_list,
--			     &array->paa_reqs_array[index]);
-+		list_add(&req->rq_timed_list, &array->paa_reqs_array[index]);
- 
- 	spin_lock(&req->rq_lock);
- 	req->rq_at_linked = 1;
-@@ -1179,9 +1176,8 @@ static void ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
- 	count = array->paa_count;
- 	while (count > 0) {
- 		count -= array->paa_reqs_count[index];
--		list_for_each_entry_safe(rq, n,
--					     &array->paa_reqs_array[index],
--					     rq_timed_list) {
-+		list_for_each_entry_safe(rq, n, &array->paa_reqs_array[index],
-+					 rq_timed_list) {
- 			if (rq->rq_deadline > now + at_early_margin) {
- 				/* update the earliest deadline */
- 				if (deadline == -1 ||
-@@ -1229,7 +1225,7 @@ static void ptlrpc_at_check_timed(struct ptlrpc_service_part *svcpt)
- 	 */
- 	while (!list_empty(&work_list)) {
- 		rq = list_entry(work_list.next, struct ptlrpc_request,
--				    rq_timed_list);
-+				rq_timed_list);
- 		list_del_init(&rq->rq_timed_list);
- 
- 		if (ptlrpc_at_send_early_reply(rq) == 0)
-@@ -1278,8 +1274,7 @@ static int ptlrpc_server_hpreq_init(struct ptlrpc_service_part *svcpt,
- 		}
- 
- 		spin_lock_bh(&req->rq_export->exp_rpc_lock);
--		list_add(&req->rq_exp_list,
--			     &req->rq_export->exp_hp_rpcs);
-+		list_add(&req->rq_exp_list, &req->rq_export->exp_hp_rpcs);
- 		spin_unlock_bh(&req->rq_export->exp_rpc_lock);
- 	}
- 
-@@ -1479,7 +1474,7 @@ ptlrpc_server_handle_req_in(struct ptlrpc_service_part *svcpt,
- 	}
- 
- 	req = list_entry(svcpt->scp_req_incoming.next,
--			     struct ptlrpc_request, rq_list);
-+			 struct ptlrpc_request, rq_list);
- 	list_del_init(&req->rq_list);
- 	svcpt->scp_nreqs_incoming--;
- 	/* Consider this still a "queued" request as far as stats are
-@@ -2062,7 +2057,7 @@ static int ptlrpc_main(void *arg)
- 			continue;
- 
- 		CERROR("Failed to post rqbd for %s on CPT %d: %d\n",
--			svc->srv_name, svcpt->scp_cpt, rc);
-+		       svc->srv_name, svcpt->scp_cpt, rc);
- 		goto out_srv_fini;
- 	}
- 
-@@ -2235,9 +2230,8 @@ static int ptlrpc_hr_main(void *arg)
- 		while (!list_empty(&replies)) {
- 			struct ptlrpc_reply_state *rs;
- 
--			rs = list_entry(replies.prev,
--					    struct ptlrpc_reply_state,
--					    rs_list);
-+			rs = list_entry(replies.prev, struct ptlrpc_reply_state,
-+					rs_list);
- 			list_del_init(&rs->rs_list);
- 			ptlrpc_handle_rs(rs);
- 		}
-@@ -2268,8 +2262,8 @@ static void ptlrpc_stop_hr_threads(void)
- 		if (!hrp->hrp_thrs)
- 			continue; /* uninitialized */
- 		wait_event(ptlrpc_hr.hr_waitq,
--			       atomic_read(&hrp->hrp_nstopped) ==
--			       atomic_read(&hrp->hrp_nstarted));
-+			   atomic_read(&hrp->hrp_nstopped) ==
-+			   atomic_read(&hrp->hrp_nstarted));
- 	}
- }
- 
-@@ -2287,17 +2281,16 @@ static int ptlrpc_start_hr_threads(void)
- 			struct task_struct *task;
- 
- 			task = kthread_run(ptlrpc_hr_main,
--						 &hrp->hrp_thrs[j],
--						 "ptlrpc_hr%02d_%03d",
--						 hrp->hrp_cpt,
--						 hrt->hrt_id);
-+					   &hrp->hrp_thrs[j],
-+					   "ptlrpc_hr%02d_%03d",
-+					   hrp->hrp_cpt, hrt->hrt_id);
- 			if (IS_ERR(task)) {
- 				rc = PTR_ERR(task);
- 				break;
- 			}
- 		}
- 		wait_event(ptlrpc_hr.hr_waitq,
--			       atomic_read(&hrp->hrp_nstarted) == j);
-+			   atomic_read(&hrp->hrp_nstarted) == j);
- 
- 		if (rc < 0) {
- 			CERROR("cannot start reply handler thread %d:%d: rc = %d\n",
-@@ -2330,7 +2323,7 @@ static void ptlrpc_svcpt_stop_threads(struct ptlrpc_service_part *svcpt)
- 
- 	while (!list_empty(&svcpt->scp_threads)) {
- 		thread = list_entry(svcpt->scp_threads.next,
--					struct ptlrpc_thread, t_link);
-+				    struct ptlrpc_thread, t_link);
- 		if (thread_is_stopped(thread)) {
- 			list_del(&thread->t_link);
- 			list_add(&thread->t_link, &zombie);
-@@ -2691,7 +2684,7 @@ ptlrpc_service_purge_all(struct ptlrpc_service *svc)
- 		spin_lock(&svcpt->scp_rep_lock);
- 		while (!list_empty(&svcpt->scp_rep_active)) {
- 			rs = list_entry(svcpt->scp_rep_active.next,
--					    struct ptlrpc_reply_state, rs_list);
-+					struct ptlrpc_reply_state, rs_list);
- 			spin_lock(&rs->rs_lock);
- 			ptlrpc_schedule_difficult_reply(rs);
- 			spin_unlock(&rs->rs_lock);
-@@ -2704,7 +2697,7 @@ ptlrpc_service_purge_all(struct ptlrpc_service *svc)
- 		 */
- 		while (!list_empty(&svcpt->scp_req_incoming)) {
- 			req = list_entry(svcpt->scp_req_incoming.next,
--					     struct ptlrpc_request, rq_list);
-+					 struct ptlrpc_request, rq_list);
- 
- 			list_del(&req->rq_list);
- 			svcpt->scp_nreqs_incoming--;
-@@ -2730,16 +2723,16 @@ ptlrpc_service_purge_all(struct ptlrpc_service *svc)
- 
- 		while (!list_empty(&svcpt->scp_rqbd_idle)) {
- 			rqbd = list_entry(svcpt->scp_rqbd_idle.next,
--					      struct ptlrpc_request_buffer_desc,
--					      rqbd_list);
-+					  struct ptlrpc_request_buffer_desc,
-+					  rqbd_list);
- 			ptlrpc_free_rqbd(rqbd);
- 		}
- 		ptlrpc_wait_replies(svcpt);
- 
- 		while (!list_empty(&svcpt->scp_rep_idle)) {
- 			rs = list_entry(svcpt->scp_rep_idle.next,
--					    struct ptlrpc_reply_state,
--					    rs_list);
-+					struct ptlrpc_reply_state,
-+					rs_list);
- 			list_del(&rs->rs_list);
- 			kvfree(rs);
- 		}
+ /***************** FS registration ******************/
+ static struct dentry *lustre_mount(struct file_system_type *fs_type, int flags,
+-				const char *devname, void *data)
++				   const char *devname, void *data)
+ {
+ 	struct lustre_mount_data2 lmd2 = {
+ 		.lmd2_data = data,
 -- 
 2.1.0
