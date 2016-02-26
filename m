@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Fri, 26 Feb 2016 01:49:55 -0500
-Subject: [lustre-devel] [PATCH 07/25] staging/lustre: Remove misleading
-	liblustre comments.
+Date: Fri, 26 Feb 2016 01:50:00 -0500
+Subject: [lustre-devel] [PATCH 12/25] staging/lustre: Remove
+	RELEASEPAGE_ARG_TYPE compat macro
 In-Reply-To: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
 References: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456469413-931943-8-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456469413-931943-13-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,33 +14,30 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-These two comments certainly refer to some ifdefed code that is
-no longer present, so remove them too.
+Not used in the kernel proper.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/lov/lov_pool.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/staging/lustre/lustre/llite/rw26.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
-index 210304f..8608b09 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pool.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
-@@ -152,7 +152,6 @@ struct cfs_hash_ops pool_hash_operations = {
+diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
+index 64110c5..6a5762e 100644
+--- a/drivers/staging/lustre/lustre/llite/rw26.c
++++ b/drivers/staging/lustre/lustre/llite/rw26.c
+@@ -109,12 +109,7 @@ static void ll_invalidatepage(struct page *vmpage, unsigned int offset,
+ 	}
+ }
  
- };
- 
--/* ifdef needed for liblustre support */
- /*
-  * pool debugfs seq_file methods
-  */
-@@ -432,7 +431,6 @@ int lov_pool_new(struct obd_device *obd, char *poolname)
- 
- 	INIT_HLIST_NODE(&new_pool->pool_hash);
- 
--	/* we need this assert seq_file is not implemented for liblustre */
- 	/* get ref for debugfs file */
- 	lov_pool_getref(new_pool);
- 	new_pool->pool_debugfs_entry = ldebugfs_add_simple(
+-#ifdef HAVE_RELEASEPAGE_WITH_INT
+-#define RELEASEPAGE_ARG_TYPE int
+-#else
+-#define RELEASEPAGE_ARG_TYPE gfp_t
+-#endif
+-static int ll_releasepage(struct page *vmpage, RELEASEPAGE_ARG_TYPE gfp_mask)
++static int ll_releasepage(struct page *vmpage, gfp_t gfp_mask)
+ {
+ 	struct cl_env_nest nest;
+ 	struct lu_env     *env;
 -- 
 2.1.0
