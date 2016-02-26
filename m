@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Fri, 26 Feb 2016 01:49:58 -0500
-Subject: [lustre-devel] [PATCH 10/25] staging/lustre: F_SETLKW64 F_SETLK64
-	F_GETLK64 are always defined
+Date: Fri, 26 Feb 2016 01:49:59 -0500
+Subject: [lustre-devel] [PATCH 11/25] staging/lustre: MS_POSIXACL is always
+	defined, don't check for it
 In-Reply-To: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
 References: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456469413-931943-11-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456469413-931943-12-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,38 +14,30 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Remove the ifdefs for the around usage.
-
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/file.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_lib.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 477dc0e..2e30c52 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -2746,21 +2746,15 @@ ll_file_flock(struct file *file, int cmd, struct file_lock *file_lock)
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 47f9ad7..0cdaa48 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -309,15 +309,11 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
+ 	}
  
- 	switch (cmd) {
- 	case F_SETLKW:
--#ifdef F_SETLKW64
- 	case F_SETLKW64:
+ 	if (data->ocd_connect_flags & OBD_CONNECT_ACL) {
+-#ifdef MS_POSIXACL
+ 		sb->s_flags |= MS_POSIXACL;
 -#endif
- 		flags = 0;
- 		break;
- 	case F_SETLK:
--#ifdef F_SETLK64
- 	case F_SETLK64:
+ 		sbi->ll_flags |= LL_SBI_ACL;
+ 	} else {
+ 		LCONSOLE_INFO("client wants to enable acl, but mdt not!\n");
+-#ifdef MS_POSIXACL
+ 		sb->s_flags &= ~MS_POSIXACL;
 -#endif
- 		flags = LDLM_FL_BLOCK_NOWAIT;
- 		break;
- 	case F_GETLK:
--#ifdef F_GETLK64
- 	case F_GETLK64:
--#endif
- 		flags = LDLM_FL_TEST_LOCK;
- 		/* Save the old mode so that if the mode in the lock changes we
- 		 * can decrement the appropriate reader or writer refcount.
+ 		sbi->ll_flags &= ~LL_SBI_ACL;
+ 	}
+ 
 -- 
 2.1.0
