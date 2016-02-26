@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Fri, 26 Feb 2016 01:50:01 -0500
-Subject: [lustre-devel] [PATCH 13/25] staging/lustre: NEED_QUOTA_DEFS is
-	never defined, drop it.
+Date: Fri, 26 Feb 2016 01:49:58 -0500
+Subject: [lustre-devel] [PATCH 10/25] staging/lustre: F_SETLKW64 F_SETLK64
+	F_GETLK64 are always defined
 In-Reply-To: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
 References: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456469413-931943-14-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456469413-931943-11-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,37 +14,38 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
+Remove the ifdefs for the around usage.
+
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../staging/lustre/lustre/include/lustre/lustre_user.h   | 16 ----------------
- 1 file changed, 16 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-index 2e9f025..9f026bd 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-@@ -552,22 +552,6 @@ enum {
- 	RMT_RGETFACL    = 4
- };
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 477dc0e..2e30c52 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -2746,21 +2746,15 @@ ll_file_flock(struct file *file, int cmd, struct file_lock *file_lock)
  
--#ifdef NEED_QUOTA_DEFS
--#ifndef QIF_BLIMITS
--#define QIF_BLIMITS     1
--#define QIF_SPACE       2
--#define QIF_ILIMITS     4
--#define QIF_INODES      8
--#define QIF_BTIME       16
--#define QIF_ITIME       32
--#define QIF_LIMITS      (QIF_BLIMITS | QIF_ILIMITS)
--#define QIF_USAGE       (QIF_SPACE | QIF_INODES)
--#define QIF_TIMES       (QIF_BTIME | QIF_ITIME)
--#define QIF_ALL	 (QIF_LIMITS | QIF_USAGE | QIF_TIMES)
+ 	switch (cmd) {
+ 	case F_SETLKW:
+-#ifdef F_SETLKW64
+ 	case F_SETLKW64:
 -#endif
--
--#endif /* !__KERNEL__ */
--
- /* lustre volatile file support
-  * file name header: .^L^S^T^R:volatile"
-  */
+ 		flags = 0;
+ 		break;
+ 	case F_SETLK:
+-#ifdef F_SETLK64
+ 	case F_SETLK64:
+-#endif
+ 		flags = LDLM_FL_BLOCK_NOWAIT;
+ 		break;
+ 	case F_GETLK:
+-#ifdef F_GETLK64
+ 	case F_GETLK64:
+-#endif
+ 		flags = LDLM_FL_TEST_LOCK;
+ 		/* Save the old mode so that if the mode in the lock changes we
+ 		 * can decrement the appropriate reader or writer refcount.
 -- 
 2.1.0
