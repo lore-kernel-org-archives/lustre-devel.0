@@ -1,47 +1,42 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 25 Feb 2016 20:07:12 -0500
-Subject: [lustre-devel] [PATCH v2 6/6] staging: lustre: update comment for
-	lnet_lib_init/exit
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Fri, 26 Feb 2016 06:03:44 +0000
+Subject: [lustre-devel] [PATCH v2 0/6] staging: lustre: update modinfo
+	data
 In-Reply-To: <1456448832-959-1-git-send-email-jsimmons@infradead.org>
 References: <1456448832-959-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456448832-959-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <20160226060343.GA29216@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: Andreas Dilger <andreas.dilger@intel.com>
+On Thu, Feb 25, 2016 at 08:07:06PM -0500, James Simmons wrote:
+> The module information for Lustre is stale or in some cases
+> completely missing. This collection of patches brings the
+> modinfo up to date as well as filling in any missing information.
+> This patch set has been redone to rebase it on Oleg's latest
+> patch set to avoid collisons in merging.
+> 
+> Andreas Dilger (4):
+>   staging: lustre: add missing MODULE_AUTHOR for LNet selftest module
+>   staging: lustre: update the MODULE_DESCRIPTION for all lustre modules
+>   staging: lustre: make module_init/exit naming consistent
+>   staging: lustre: update comment for lnet_lib_init/exit
+> 
+> James Simmons (2):
+>   staging: lustre: move module info to end of libcfs module.c file
+>   staging: lustre: update the MODULE_VERSION for all lustre modules
 
-The documentation about the return values for lnet_lib_init
-and lnet_lib_exit was in the old style format. Bring it in
-sync with the rest of the LNet core. Broken out of patch 16787.
+What changed to need a v2 of this series?
 
-Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6204
-Reviewed-on: http://review.whamcloud.com/16787
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Frank Zago <fzago@cray.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
----
- drivers/staging/lustre/lnet/lnet/api-ni.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Please ALWAYS say what the difference is, don't expect us to "just
+know".
 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index a911aef..aa24489 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1389,7 +1389,8 @@ failed:
-  * lnet_lib_exit() after a call to lnet_lib_init(), if and only if the
-  * latter returned 0. It must be called exactly once.
-  *
-- * \return 0 on success, and -ve on failures.
-+ * \retval 0 on success
-+ * \retval -ve on failures.
-  */
- int lnet_lib_init(void)
- {
--- 
-1.7.1
+Please send a v3 of this, describing the changes, in the correct format,
+in each patch.  You know better than this...
+
+thanks,
+
+greg k-h
