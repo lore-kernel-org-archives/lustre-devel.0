@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Fri, 26 Feb 2016 01:50:00 -0500
-Subject: [lustre-devel] [PATCH 12/25] staging/lustre: Remove
-	RELEASEPAGE_ARG_TYPE compat macro
+Date: Fri, 26 Feb 2016 01:50:01 -0500
+Subject: [lustre-devel] [PATCH 13/25] staging/lustre: NEED_QUOTA_DEFS is
+	never defined, drop it.
 In-Reply-To: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
 References: <1456469413-931943-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1456469413-931943-13-git-send-email-green@linuxhacker.ru>
+Message-ID: <1456469413-931943-14-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,30 +14,37 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Oleg Drokin <green@linuxhacker.ru>
 
-Not used in the kernel proper.
-
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/rw26.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ .../staging/lustre/lustre/include/lustre/lustre_user.h   | 16 ----------------
+ 1 file changed, 16 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
-index 64110c5..6a5762e 100644
---- a/drivers/staging/lustre/lustre/llite/rw26.c
-+++ b/drivers/staging/lustre/lustre/llite/rw26.c
-@@ -109,12 +109,7 @@ static void ll_invalidatepage(struct page *vmpage, unsigned int offset,
- 	}
- }
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+index 2e9f025..9f026bd 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+@@ -552,22 +552,6 @@ enum {
+ 	RMT_RGETFACL    = 4
+ };
  
--#ifdef HAVE_RELEASEPAGE_WITH_INT
--#define RELEASEPAGE_ARG_TYPE int
--#else
--#define RELEASEPAGE_ARG_TYPE gfp_t
+-#ifdef NEED_QUOTA_DEFS
+-#ifndef QIF_BLIMITS
+-#define QIF_BLIMITS     1
+-#define QIF_SPACE       2
+-#define QIF_ILIMITS     4
+-#define QIF_INODES      8
+-#define QIF_BTIME       16
+-#define QIF_ITIME       32
+-#define QIF_LIMITS      (QIF_BLIMITS | QIF_ILIMITS)
+-#define QIF_USAGE       (QIF_SPACE | QIF_INODES)
+-#define QIF_TIMES       (QIF_BTIME | QIF_ITIME)
+-#define QIF_ALL	 (QIF_LIMITS | QIF_USAGE | QIF_TIMES)
 -#endif
--static int ll_releasepage(struct page *vmpage, RELEASEPAGE_ARG_TYPE gfp_mask)
-+static int ll_releasepage(struct page *vmpage, gfp_t gfp_mask)
- {
- 	struct cl_env_nest nest;
- 	struct lu_env     *env;
+-
+-#endif /* !__KERNEL__ */
+-
+ /* lustre volatile file support
+  * file name header: .^L^S^T^R:volatile"
+  */
 -- 
 2.1.0
