@@ -1,29 +1,45 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Fri, 26 Feb 2016 06:10:17 +0000
-Subject: [lustre-devel] [PATCH v2 60/84] staging/lustre/llite: Fix style
-	vs open parenthesis alignment
-In-Reply-To: <1456369267-904461-61-git-send-email-green@linuxhacker.ru>
-References: <1456369267-904461-1-git-send-email-green@linuxhacker.ru>
-	<1456369267-904461-61-git-send-email-green@linuxhacker.ru>
-Message-ID: <20160226061016.GA3356@kroah.com>
+From: Drokin, Oleg <oleg.drokin@intel.com>
+Date: Fri, 26 Feb 2016 06:11:07 +0000
+Subject: [lustre-devel] [PATCH v2 0/6] staging: lustre: update
+	modinfo	data
+In-Reply-To: <20160226060343.GA29216@kroah.com>
+References: <1456448832-959-1-git-send-email-jsimmons@infradead.org>
+	<20160226060343.GA29216@kroah.com>
+Message-ID: <54D84798-42F5-44E9-BE99-CBD9A7DF6E51@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: green@linuxhacker.ru
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: James Simmons <jsimmons@infradead.org>, "<devel@driverdev.osuosl.org>" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Wed, Feb 24, 2016 at 10:00:43PM -0500, green at linuxhacker.ru wrote:
-> From: Oleg Drokin <green@linuxhacker.ru>
+
+On Feb 26, 2016, at 1:03 AM, Greg Kroah-Hartman wrote:
+
+> On Thu, Feb 25, 2016 at 08:07:06PM -0500, James Simmons wrote:
+>> The module information for Lustre is stale or in some cases
+>> completely missing. This collection of patches brings the
+>> modinfo up to date as well as filling in any missing information.
+>> This patch set has been redone to rebase it on Oleg's latest
+>> patch set to avoid collisons in merging.
+>> 
+>> Andreas Dilger (4):
+>>  staging: lustre: add missing MODULE_AUTHOR for LNet selftest module
+>>  staging: lustre: update the MODULE_DESCRIPTION for all lustre modules
+>>  staging: lustre: make module_init/exit naming consistent
+>>  staging: lustre: update comment for lnet_lib_init/exit
+>> 
+>> James Simmons (2):
+>>  staging: lustre: move module info to end of libcfs module.c file
+>>  staging: lustre: update the MODULE_VERSION for all lustre modules
 > 
-> This mostly fixes checkpatch complaints about
-> "Alignment should match open parenthesis"
+> What changed to need a v2 of this series?
 > 
-> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+> Please ALWAYS say what the difference is, don't expect us to "just
+> know".
+> 
+> Please send a v3 of this, describing the changes, in the correct format,
+> in each patch.  You know better than this?
 
-This patch doesn't apply to the tree, so I've stopped applying this
-series here.  Please rebase and resend the rest of these.
-
-thanks,
-
-greg k-h
+I think it says above that the rebase was done on top of my patchset
+to resolve the conflict that arose?
