@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  2 Mar 2016 17:01:55 -0500
-Subject: [lustre-devel] [PATCH 12/27] staging: lustre: fix socklnd issues
-	found by Klocwork Insight tool
+Date: Wed,  2 Mar 2016 17:01:58 -0500
+Subject: [lustre-devel] [PATCH 15/27] staging: lustre: fix framework.c
+	issues found by Klocwork Insight tool
 In-Reply-To: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
 References: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456956130-6110-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456956130-6110-16-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,9 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Null pointer 'best_iface' that comes from line 802 may be
-dereferenced at line 832.
+The functions sfw_test_buffers() and sfw_unload_test() from LNet
+selftest both assume sfw_test_instance_t being passed in is never
+null. This is corrected here.
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4629
@@ -24,30 +25,43 @@ Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Isaac Huang <he.huang@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/staging/lustre/lnet/selftest/framework.c |   14 +++++++++++---
+ 1 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 2c83b95..a710541 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -804,6 +804,8 @@ ksocknal_select_ips(ksock_peer_t *peer, __u32 *peerips, int n_peerips)
- 			ip = peer->ksnp_passive_ips[i];
- 			best_iface = ksocknal_ip2iface(peer->ksnp_ni, ip);
+diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+index 3bbc720..e4a9724 100644
+--- a/drivers/staging/lustre/lnet/selftest/framework.c
++++ b/drivers/staging/lustre/lnet/selftest/framework.c
+@@ -541,10 +541,16 @@ sfw_test_rpc_fini(srpc_client_rpc_t *rpc)
+ static inline int
+ sfw_test_buffers(sfw_test_instance_t *tsi)
+ {
+-	struct sfw_test_case *tsc = sfw_find_test_case(tsi->tsi_service);
+-	struct srpc_service *svc = tsc->tsc_srv_service;
++	struct sfw_test_case *tsc;
++	struct srpc_service *svc;
+ 	int nbuf;
  
-+			/* peer passive ips are kept up to date */
-+			LASSERT(best_iface);
- 		} else {
- 			/* choose a new interface */
- 			LASSERT(i == peer->ksnp_n_passive_ips);
-@@ -838,6 +840,8 @@ ksocknal_select_ips(ksock_peer_t *peer, __u32 *peerips, int n_peerips)
- 				best_npeers = iface->ksni_npeers;
- 			}
- 
-+			LASSERT(best_iface);
++	LASSERT(tsi);
++	tsc = sfw_find_test_case(tsi->tsi_service);
++	LASSERT(tsc);
++	svc = tsc->tsc_srv_service;
++	LASSERT(svc);
 +
- 			best_iface->ksni_npeers++;
- 			ip = best_iface->ksni_ipaddr;
- 			peer->ksnp_passive_ips[i] = ip;
+ 	nbuf = min(svc->sv_wi_total, tsi->tsi_loop) / svc->sv_ncpts;
+ 	return max(SFW_TEST_WI_MIN, nbuf + SFW_TEST_WI_EXTRA);
+ }
+@@ -591,8 +597,10 @@ sfw_load_test(struct sfw_test_instance *tsi)
+ static void
+ sfw_unload_test(struct sfw_test_instance *tsi)
+ {
+-	struct sfw_test_case *tsc = sfw_find_test_case(tsi->tsi_service);
++	struct sfw_test_case *tsc;
+ 
++	LASSERT(tsi);
++	tsc = sfw_find_test_case(tsi->tsi_service);
+ 	LASSERT(tsc);
+ 
+ 	if (tsi->tsi_is_client)
 -- 
 1.7.1
