@@ -1,158 +1,207 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  2 Mar 2016 17:02:01 -0500
-Subject: [lustre-devel] [PATCH 18/27] staging: lustre: make o2iblnd_cb.c
-	local functions static
+Date: Wed,  2 Mar 2016 17:02:05 -0500
+Subject: [lustre-devel] [PATCH 22/27] staging: lustre: make ko2iblnd connect
+	parameters persistent
 In-Reply-To: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
 References: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456956130-6110-19-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456956130-6110-23-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Frank Zago <fzago@cray.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>
 
-From: Frank Zago <fzago@cray.com>
+From: Amir Shehata <amir.shehata@intel.com>
 
-This reduces the code size by about 1KiB.
+Store map-on-demand and peertx credits in the peer, since the peer
+is persistent. Also made sure that when assigning the parameters
+received on the connection to the peer structure through create,
+that if another peer is added before grabbing the lock we assign
+these parameters to it as well.
 
-Signed-off-by: Frank Zago <fzago@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5396
-Reviewed-on: http://review.whamcloud.com/11256
-Reviewed-by: Patrick Farrell <paf@cray.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3322
+Reviewed-on: http://review.whamcloud.com/17074
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |   10 --------
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   25 +++++++++++++------
- 2 files changed, 17 insertions(+), 18 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   14 +++-----
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    6 +++-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   38 ++++++++++++++------
+ 3 files changed, 37 insertions(+), 21 deletions(-)
 
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 0b1ffbe..56c221b 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -335,6 +335,8 @@ int kiblnd_create_peer(lnet_ni_t *ni, kib_peer_t **peerp, lnet_nid_t nid)
+ 	peer->ibp_nid = nid;
+ 	peer->ibp_error = 0;
+ 	peer->ibp_last_alive = 0;
++	peer->ibp_max_frags = IBLND_CFG_RDMA_FRAGS;
++	peer->ibp_queue_depth = *kiblnd_tunables.kib_peertxcredits;
+ 	atomic_set(&peer->ibp_refcount, 1);  /* 1 ref for caller */
+ 
+ 	INIT_LIST_HEAD(&peer->ibp_list);     /* not in the peer table yet */
+@@ -631,7 +633,7 @@ static int kiblnd_get_completion_vector(kib_conn_t *conn, int cpt)
+ }
+ 
+ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
+-			       int state, int version, kib_connparams_t *cp)
++			       int state, int version)
+ {
+ 	/*
+ 	 * CAVEAT EMPTOR:
+@@ -685,14 +687,8 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
+ 	conn->ibc_peer = peer;		  /* I take the caller's ref */
+ 	cmid->context = conn;		   /* for future CM callbacks */
+ 	conn->ibc_cmid = cmid;
+-
+-	if (!cp) {
+-		conn->ibc_max_frags = IBLND_CFG_RDMA_FRAGS;
+-		conn->ibc_queue_depth = *kiblnd_tunables.kib_peertxcredits;
+-	} else {
+-		conn->ibc_max_frags = cp->ibcp_max_frags;
+-		conn->ibc_queue_depth = cp->ibcp_queue_depth;
+-	}
++	conn->ibc_max_frags = peer->ibp_max_frags;
++	conn->ibc_queue_depth = peer->ibp_queue_depth;
+ 
+ 	INIT_LIST_HEAD(&conn->ibc_early_rxs);
+ 	INIT_LIST_HEAD(&conn->ibc_tx_noops);
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index 4f09776..4fe38cb 100644
+index 59a26c4..3db1413 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -939,30 +939,20 @@ int  kiblnd_create_peer(lnet_ni_t *ni, kib_peer_t **peerp, lnet_nid_t nid);
- void kiblnd_destroy_peer(kib_peer_t *peer);
- void kiblnd_destroy_dev(kib_dev_t *dev);
- void kiblnd_unlink_peer_locked(kib_peer_t *peer);
--void kiblnd_peer_alive(kib_peer_t *peer);
- kib_peer_t *kiblnd_find_peer_locked(lnet_nid_t nid);
--void kiblnd_peer_connect_failed(kib_peer_t *peer, int active, int error);
- int  kiblnd_close_stale_conns_locked(kib_peer_t *peer,
- 				     int version, __u64 incarnation);
+@@ -586,6 +586,10 @@ typedef struct kib_peer {
+ 	int              ibp_error;       /* errno on closing this peer */
+ 	unsigned long    ibp_last_alive;  /* when (in jiffies) I was last alive
+ 					   */
++	/* max map_on_demand */
++	__u16		 ibp_max_frags;
++	/* max_peer_credits */
++	__u16		 ibp_queue_depth;
+ } kib_peer_t;
+ 
+ extern kib_data_t kiblnd_data;
+@@ -946,7 +950,7 @@ int  kiblnd_close_stale_conns_locked(kib_peer_t *peer,
  int  kiblnd_close_peer_conns_locked(kib_peer_t *peer, int why);
  
--void kiblnd_connreq_done(kib_conn_t *conn, int status);
  kib_conn_t *kiblnd_create_conn(kib_peer_t *peer, struct rdma_cm_id *cmid,
- 			       int state, int version);
+-			       int state, int version, kib_connparams_t *cp);
++			       int state, int version);
  void kiblnd_destroy_conn(kib_conn_t *conn);
  void kiblnd_close_conn(kib_conn_t *conn, int error);
  void kiblnd_close_conn_locked(kib_conn_t *conn, int error);
- 
--int  kiblnd_init_rdma(kib_conn_t *conn, kib_tx_t *tx, int type,
--		      int nob, kib_rdma_desc_t *dstrd, __u64 dstcookie);
--
- void kiblnd_launch_tx(lnet_ni_t *ni, kib_tx_t *tx, lnet_nid_t nid);
--void kiblnd_queue_tx_locked(kib_tx_t *tx, kib_conn_t *conn);
--void kiblnd_queue_tx(kib_tx_t *tx, kib_conn_t *conn);
--void kiblnd_init_tx_msg(lnet_ni_t *ni, kib_tx_t *tx, int type, int body_nob);
- void kiblnd_txlist_done(lnet_ni_t *ni, struct list_head *txlist,
- 			int status);
--void kiblnd_check_sends(kib_conn_t *conn);
- 
- void kiblnd_qp_event(struct ib_event *event, void *arg);
- void kiblnd_cq_event(struct ib_event *event, void *arg);
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index d955a66..11c0b49 100644
+index 22420c0..fb3873a 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -40,6 +40,15 @@
+@@ -2323,6 +2323,10 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 		goto failed;
+ 	}
  
- #include "o2iblnd.h"
++	/* We have validated the peer's parameters so use those */
++	peer->ibp_max_frags = reqmsg->ibm_u.connparams.ibcp_max_frags;
++	peer->ibp_queue_depth = reqmsg->ibm_u.connparams.ibcp_queue_depth;
++
+ 	write_lock_irqsave(g_lock, flags);
  
-+static void kiblnd_peer_alive(kib_peer_t *peer);
-+static void kiblnd_peer_connect_failed(kib_peer_t *peer, int active, int error);
-+static void kiblnd_check_sends(kib_conn_t *conn);
-+static void kiblnd_init_tx_msg(lnet_ni_t *ni, kib_tx_t *tx,
-+				int type, int body_nob);
-+static int kiblnd_init_rdma(kib_conn_t *conn, kib_tx_t *tx, int type,
-+			     int resid, kib_rdma_desc_t *dstrd, __u64 dstcookie);
-+static void kiblnd_queue_tx_locked(kib_tx_t *tx, kib_conn_t *conn);
-+static void kiblnd_queue_tx(kib_tx_t *tx, kib_conn_t *conn);
- static void kiblnd_unmap_tx(lnet_ni_t *ni, kib_tx_t *tx);
+ 	peer2 = kiblnd_find_peer_locked(nid);
+@@ -2361,6 +2365,14 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 		peer2->ibp_accepting++;
+ 		kiblnd_peer_addref(peer2);
  
- static void
-@@ -891,7 +900,7 @@ kiblnd_post_tx_locked(kib_conn_t *conn, kib_tx_t *tx, int credit)
- 	return -EIO;
- }
++		/**
++		 * Race with kiblnd_launch_tx (active connect) to create peer
++		 * so copy validated parameters since we now know what the
++		 * peer's limits are
++		 */
++		peer2->ibp_max_frags = peer->ibp_max_frags;
++		peer2->ibp_queue_depth = peer->ibp_queue_depth;
++
+ 		write_unlock_irqrestore(g_lock, flags);
+ 		kiblnd_peer_decref(peer);
+ 		peer = peer2;
+@@ -2383,8 +2395,8 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 		write_unlock_irqrestore(g_lock, flags);
+ 	}
  
--void
-+static void
- kiblnd_check_sends(kib_conn_t *conn)
- {
- 	int ver = conn->ibc_version;
-@@ -1019,7 +1028,7 @@ kiblnd_tx_complete(kib_tx_t *tx, int status)
- 	kiblnd_conn_decref(conn);	       /* ...until here */
- }
+-	conn = kiblnd_create_conn(peer, cmid, IBLND_CONN_PASSIVE_WAIT, version,
+-				  &reqmsg->ibm_u.connparams);
++	conn = kiblnd_create_conn(peer, cmid, IBLND_CONN_PASSIVE_WAIT,
++				  version);
+ 	if (!conn) {
+ 		kiblnd_peer_connect_failed(peer, 0, -ENOMEM);
+ 		kiblnd_peer_decref(peer);
+@@ -2397,8 +2409,8 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 	 * CM callback doesn't destroy cmid.
+ 	 */
+ 	conn->ibc_incarnation      = reqmsg->ibm_srcstamp;
+-	conn->ibc_credits          = reqmsg->ibm_u.connparams.ibcp_queue_depth;
+-	conn->ibc_reserved_credits = reqmsg->ibm_u.connparams.ibcp_queue_depth;
++	conn->ibc_credits          = conn->ibc_queue_depth;
++	conn->ibc_reserved_credits = conn->ibc_queue_depth;
+ 	LASSERT(conn->ibc_credits + conn->ibc_reserved_credits +
+ 		IBLND_OOB_MSGS(version) <= IBLND_RX_MSGS(conn));
  
--void
-+static void
- kiblnd_init_tx_msg(lnet_ni_t *ni, kib_tx_t *tx, int type, int body_nob)
- {
- 	kib_hca_dev_t *hdev = tx->tx_pool->tpo_hdev;
-@@ -1053,7 +1062,7 @@ kiblnd_init_tx_msg(lnet_ni_t *ni, kib_tx_t *tx, int type, int body_nob)
- 	tx->tx_nwrq++;
- }
+@@ -2407,10 +2419,8 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
  
--int
-+static int
- kiblnd_init_rdma(kib_conn_t *conn, kib_tx_t *tx, int type,
- 		 int resid, kib_rdma_desc_t *dstrd, __u64 dstcookie)
- {
-@@ -1137,7 +1146,7 @@ kiblnd_init_rdma(kib_conn_t *conn, kib_tx_t *tx, int type,
- 	return rc;
- }
+ 	kiblnd_init_msg(ackmsg, IBLND_MSG_CONNACK,
+ 			sizeof(ackmsg->ibm_u.connparams));
+-	ackmsg->ibm_u.connparams.ibcp_queue_depth =
+-		reqmsg->ibm_u.connparams.ibcp_queue_depth;
+-	ackmsg->ibm_u.connparams.ibcp_max_frags =
+-		reqmsg->ibm_u.connparams.ibcp_max_frags;
++	ackmsg->ibm_u.connparams.ibcp_queue_depth = conn->ibc_queue_depth;
++	ackmsg->ibm_u.connparams.ibcp_max_frags = conn->ibc_max_frags;
+ 	ackmsg->ibm_u.connparams.ibcp_max_msg_size = IBLND_MSG_SIZE;
  
--void
-+static void
- kiblnd_queue_tx_locked(kib_tx_t *tx, kib_conn_t *conn)
- {
- 	struct list_head *q;
-@@ -1192,7 +1201,7 @@ kiblnd_queue_tx_locked(kib_tx_t *tx, kib_conn_t *conn)
- 	list_add_tail(&tx->tx_list, q);
- }
+ 	kiblnd_pack_msg(ni, ackmsg, version, 0, nid, reqmsg->ibm_srcstamp);
+@@ -2495,6 +2505,9 @@ kiblnd_reconnect(kib_conn_t *conn, int version,
+ 		break;
  
--void
-+static void
- kiblnd_queue_tx(kib_tx_t *tx, kib_conn_t *conn)
- {
- 	spin_lock(&conn->ibc_lock);
-@@ -1792,7 +1801,7 @@ kiblnd_thread_fini(void)
- 	atomic_dec(&kiblnd_data.kib_nthreads);
- }
+ 	case IBLND_REJECT_RDMA_FRAGS:
++		if (!cp)
++			goto failed;
++
+ 		if (conn->ibc_max_frags <= cp->ibcp_max_frags) {
+ 			CNETERR("Unsupported max frags, peer supports %d\n",
+ 				cp->ibcp_max_frags);
+@@ -2504,18 +2517,21 @@ kiblnd_reconnect(kib_conn_t *conn, int version,
+ 			goto failed;
+ 		}
  
--void
-+static void
- kiblnd_peer_alive(kib_peer_t *peer)
- {
- 	/* This is racy, but everyone's only writing cfs_time_current() */
-@@ -1993,7 +2002,7 @@ kiblnd_finalise_conn(kib_conn_t *conn)
- 	kiblnd_handle_early_rxs(conn);
- }
+-		conn->ibc_max_frags = cp->ibcp_max_frags;
++		peer->ibp_max_frags = cp->ibcp_max_frags;
+ 		reason = "rdma fragments";
+ 		break;
  
--void
-+static void
- kiblnd_peer_connect_failed(kib_peer_t *peer, int active, int error)
- {
- 	LIST_HEAD(zombies);
-@@ -2047,7 +2056,7 @@ kiblnd_peer_connect_failed(kib_peer_t *peer, int active, int error)
- 	kiblnd_txlist_done(peer->ibp_ni, &zombies, -EHOSTUNREACH);
- }
+ 	case IBLND_REJECT_MSG_QUEUE_SIZE:
++		if (!cp)
++			goto failed;
++
+ 		if (conn->ibc_queue_depth <= cp->ibcp_queue_depth) {
+ 			CNETERR("Unsupported queue depth, peer supports %d\n",
+ 				cp->ibcp_queue_depth);
+ 			goto failed;
+ 		}
  
--void
-+static void
- kiblnd_connreq_done(kib_conn_t *conn, int status)
- {
- 	kib_peer_t *peer = conn->ibc_peer;
+-		conn->ibc_queue_depth = cp->ibcp_queue_depth;
++		peer->ibp_queue_depth = cp->ibcp_queue_depth;
+ 		reason = "queue depth";
+ 		break;
+ 
+@@ -2796,7 +2812,7 @@ kiblnd_active_connect(struct rdma_cm_id *cmid)
+ 	read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
+ 
+ 	conn = kiblnd_create_conn(peer, cmid, IBLND_CONN_ACTIVE_CONNECT,
+-				  version, NULL);
++				  version);
+ 	if (!conn) {
+ 		kiblnd_peer_connect_failed(peer, 1, -ENOMEM);
+ 		kiblnd_peer_decref(peer); /* lose cmid's ref */
 -- 
 1.7.1
