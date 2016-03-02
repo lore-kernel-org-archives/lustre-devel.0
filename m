@@ -1,33 +1,27 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Wed, 2 Mar 2016 15:21:46 -0800
-Subject: [lustre-devel] [PATCH] staging/lustre: Unbreak ll_prep_inode
-	iget result check
-In-Reply-To: <1456925139-1058929-1-git-send-email-green@linuxhacker.ru>
-References: <1456925139-1058929-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <20160302232146.GA24687@kroah.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Wed, 2 Mar 2016 15:22:51 -0800
+Subject: [lustre-devel] [PATCH] staging: lustre: Support different
+ ko2iblnd configs between systems
+In-Reply-To: <1456956130-6110-22-git-send-email-jsimmons@infradead.org>
+References: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
+	<1456956130-6110-22-git-send-email-jsimmons@infradead.org>
+Message-ID: <20160302232251.GA24740@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: green@linuxhacker.ru
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jeremy Filizetti <jeremy.filizetti@gmail.com>
 
-On Wed, Mar 02, 2016 at 08:25:39AM -0500, green at linuxhacker.ru wrote:
-> From: Oleg Drokin <green@linuxhacker.ru>
+On Wed, Mar 02, 2016 at 05:02:04PM -0500, James Simmons wrote:
+> From: Jeremy Filizetti <jeremy.filizetti@gmail.com>
 > 
-> commit 020ecc6f3229 ("staging: lustre: llite: Remove IS_ERR tests")
-> managed to break one of the converted checks by losing a dereference
-> causing the condition to be wrong and hence leading
-> to a crash later on in case of actual error.
-> IS_ERR_OR_NULL(*inode) got converted into !inode.
-> 
-> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
-> CC: Amitoj Kaur Chawla <amitoj1606@gmail.com>
-> ---
-> I am not sure where did that patch came from as I cannot see
-> it in either my inbox or in any public mailinglists via google.
+> This patch adds suppoort for ko2iblnd to have different values for
+> peer_credits and map_on_demand between systems.
 
-My fault, it is part of the Outreachy application process, I missed that
-bug, sorry about this.
+Your subject has no number for this patch, is it really patch 21 in the
+series?
+
+thanks,
 
 greg k-h
