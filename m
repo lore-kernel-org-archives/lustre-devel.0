@@ -1,112 +1,239 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  2 Mar 2016 17:02:08 -0500
-Subject: [lustre-devel] [PATCH 25/27] staging: lustre: check wr_id returned
-	by ib_poll_cq
+Date: Wed,  2 Mar 2016 17:01:47 -0500
+Subject: [lustre-devel] [PATCH 04/27] staging: lustre: return proper error
+	code for LNet core
 In-Reply-To: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
 References: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456956130-6110-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456956130-6110-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Liang Zhen <liang.zhen@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-From: Liang Zhen <liang.zhen@intel.com>
+It is consider bad style in the linux kernel to
+return -1 or a positive number for an error.
+Instead return the appropriate error codes.
 
-If ib_poll_cq returned +ve without initialising ib_wc::wr_id (bug
-in driver), then o2iblnd will run into unpredictable situation
-because ib_wc::wr_id may refer to stale tx/rx pointer in stack.
-
-It indicates bug in HCA driver if this happened, ko2iblnd should
-output console error then close current connection.
-
-This patch could also be helpful for LU-5271
-
-Signed-off-by: Liang Zhen <liang.zhen@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-519
-Reviewed-on: http://review.whamcloud.com/12747
-Reviewed-by: Isaac Huang <he.huang@intel.com>
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6142
+Reviewed-on: http://review.whamcloud.com/17626
 Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    9 ++++---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   21 ++++++++++++++++++-
- 2 files changed, 24 insertions(+), 6 deletions(-)
+ drivers/staging/lustre/lnet/lnet/api-ni.c     |    4 ++--
+ drivers/staging/lustre/lnet/lnet/config.c     |    6 +++---
+ drivers/staging/lustre/lnet/lnet/lib-eq.c     |    2 +-
+ drivers/staging/lustre/lnet/lnet/lib-move.c   |   22 +++++++++++-----------
+ drivers/staging/lustre/lnet/lnet/nidstrings.c |    2 +-
+ drivers/staging/lustre/lnet/lnet/router.c     |    6 +++---
+ 6 files changed, 21 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index 3db1413..6a4c4ac 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -762,10 +762,11 @@ kiblnd_queue2str(kib_conn_t *conn, struct list_head *q)
- /* CAVEAT EMPTOR: We rely on descriptor alignment to allow us to use the */
- /* lowest bits of the work request id to stash the work item type. */
- 
--#define IBLND_WID_TX    0
--#define IBLND_WID_RDMA  1
--#define IBLND_WID_RX    2
--#define IBLND_WID_MASK  3UL
-+#define IBLND_WID_INVAL	0
-+#define IBLND_WID_TX	1
-+#define IBLND_WID_RX	2
-+#define IBLND_WID_RDMA	3
-+#define IBLND_WID_MASK	3UL
- 
- static inline __u64
- kiblnd_ptr2wreqid(void *ptr, int type)
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 9428166..1c62875 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -768,7 +768,6 @@ kiblnd_post_tx_locked(kib_conn_t *conn, kib_tx_t *tx, int credit)
- 	int ver = conn->ibc_version;
- 	int rc;
- 	int done;
--	struct ib_send_wr *bad_wrq;
- 
- 	LASSERT(tx->tx_queued);
- 	/* We rely on this for QP sizing */
-@@ -852,7 +851,14 @@ kiblnd_post_tx_locked(kib_conn_t *conn, kib_tx_t *tx, int credit)
- 		/* close_conn will launch failover */
- 		rc = -ENETDOWN;
- 	} else {
--		rc = ib_post_send(conn->ibc_cmid->qp, &tx->tx_wrq->wr, &bad_wrq);
-+		struct ib_send_wr *wrq = &tx->tx_wrq[tx->tx_nwrq - 1].wr;
-+
-+		LASSERTF(wrq->wr_id == kiblnd_ptr2wreqid(tx, IBLND_WID_TX),
-+			 "bad wr_id %llx, opc %d, flags %d, peer: %s\n",
-+			 wrq->wr_id, wrq->opcode, wrq->send_flags,
-+		libcfs_nid2str(conn->ibc_peer->ibp_nid));
-+		wrq = NULL;
-+		rc = ib_post_send(conn->ibc_cmid->qp, &tx->tx_wrq->wr, &wrq);
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index aa24489..6c42786 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -1409,7 +1409,7 @@ int lnet_lib_init(void)
+ 		/* we are under risk of consuming all lh_cookie */
+ 		CERROR("Can't have %d CPTs for LNet (max allowed is %d), please change setting of CPT-table and retry\n",
+ 		       the_lnet.ln_cpt_number, LNET_CPT_MAX);
+-		return -1;
++		return -E2BIG;
  	}
  
- 	conn->ibc_last_send = jiffies;
-@@ -3421,6 +3427,8 @@ kiblnd_scheduler(void *arg)
+ 	while ((1 << the_lnet.ln_cpt_bits) < the_lnet.ln_cpt_number)
+@@ -1418,7 +1418,7 @@ int lnet_lib_init(void)
+ 	rc = lnet_create_locks();
+ 	if (rc) {
+ 		CERROR("Can't create LNet global locks: %d\n", rc);
+-		return -1;
++		return rc;
+ 	}
  
- 			spin_unlock_irqrestore(&sched->ibs_lock, flags);
- 
-+			wc.wr_id = IBLND_WID_INVAL;
-+
- 			rc = ib_poll_cq(conn->ibc_cq, 1, &wc);
- 			if (!rc) {
- 				rc = ib_req_notify_cq(conn->ibc_cq,
-@@ -3438,6 +3446,15 @@ kiblnd_scheduler(void *arg)
- 				rc = ib_poll_cq(conn->ibc_cq, 1, &wc);
+ 	the_lnet.ln_refcount = 0;
+diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
+index 4c40acb..e71eea7 100644
+--- a/drivers/staging/lustre/lnet/lnet/config.c
++++ b/drivers/staging/lustre/lnet/lnet/config.c
+@@ -467,7 +467,7 @@ lnet_str2tbs_sep(struct list_head *tbs, char *str)
+ 			ltb = lnet_new_text_buf(nob);
+ 			if (!ltb) {
+ 				lnet_free_text_bufs(&pending);
+-				return -1;
++				return -ENOMEM;
  			}
  
-+			if (unlikely(rc > 0 && wc.wr_id == IBLND_WID_INVAL)) {
-+				LCONSOLE_ERROR("ib_poll_cq (rc: %d) returned invalid wr_id, opcode %d, status: %d, vendor_err: %d, conn: %s status: %d\nplease upgrade firmware and OFED or contact vendor.\n",
-+					       rc, wc.opcode, wc.status,
-+					       wc.vendor_err,
-+					       libcfs_nid2str(conn->ibc_peer->ibp_nid),
-+					       conn->ibc_state);
-+				rc = -EINVAL;
-+			}
-+
- 			if (rc < 0) {
- 				CWARN("%s: ib_poll_cq failed: %d, closing connection\n",
- 				      libcfs_nid2str(conn->ibc_peer->ibp_nid),
+ 			for (i = 0; i < nob; i++)
+@@ -598,7 +598,7 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
+ 
+  failed:
+ 	lnet_free_text_bufs(&pending);
+-	return -1;
++	return -EINVAL;
+ }
+ 
+ static int
+@@ -634,7 +634,7 @@ lnet_parse_priority(char *str, unsigned int *priority, char **token)
+ 		 * priority as the token to report in the error message.
+ 		 */
+ 		*token += sep - str + 1;
+-		return -1;
++		return -EINVAL;
+ 	}
+ 
+ 	CDEBUG(D_NET, "gateway %s, priority %d, nob %d\n", str, *priority, nob);
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+index 042e974..adbcadb 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+@@ -320,7 +320,7 @@ __must_hold(&the_lnet.ln_eq_wait_lock)
+ 	unsigned long now;
+ 
+ 	if (!tms)
+-		return -1; /* don't want to wait and no new event */
++		return -ENXIO; /* don't want to wait and no new event */
+ 
+ 	init_waitqueue_entry(&wl, current);
+ 	set_current_state(TASK_INTERRUPTIBLE);
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index 8a21198..2d187e4 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -1167,30 +1167,30 @@ lnet_compare_routes(lnet_route_t *r1, lnet_route_t *r2)
+ 		return 1;
+ 
+ 	if (r1->lr_priority > r2->lr_priority)
+-		return -1;
++		return -ERANGE;
+ 
+ 	if (r1_hops < r2_hops)
+ 		return 1;
+ 
+ 	if (r1_hops > r2_hops)
+-		return -1;
++		return -ERANGE;
+ 
+ 	if (p1->lp_txqnob < p2->lp_txqnob)
+ 		return 1;
+ 
+ 	if (p1->lp_txqnob > p2->lp_txqnob)
+-		return -1;
++		return -ERANGE;
+ 
+ 	if (p1->lp_txcredits > p2->lp_txcredits)
+ 		return 1;
+ 
+ 	if (p1->lp_txcredits < p2->lp_txcredits)
+-		return -1;
++		return -ERANGE;
+ 
+ 	if (r1->lr_seq - r2->lr_seq <= 0)
+ 		return 1;
+ 
+-	return -1;
++	return -ERANGE;
+ }
+ 
+ static lnet_peer_t *
+@@ -1517,7 +1517,7 @@ lnet_parse_put(lnet_ni_t *ni, lnet_msg_t *msg)
+ 			libcfs_id2str(info.mi_id), info.mi_portal,
+ 			info.mi_mbits, info.mi_roffset, info.mi_rlength, rc);
+ 
+-		return ENOENT;	/* +ve: OK but no match */
++		return -ENOENT;	/* -ve: OK but no match */
+ 	}
+ }
+ 
+@@ -1548,7 +1548,7 @@ lnet_parse_get(lnet_ni_t *ni, lnet_msg_t *msg, int rdma_get)
+ 		CNETERR("Dropping GET from %s portal %d match %llu offset %d length %d\n",
+ 			libcfs_id2str(info.mi_id), info.mi_portal,
+ 			info.mi_mbits, info.mi_roffset, info.mi_rlength);
+-		return ENOENT;	/* +ve: OK but no match */
++		return -ENOENT;	/* -ve: OK but no match */
+ 	}
+ 
+ 	LASSERT(rc == LNET_MATCHMD_OK);
+@@ -1615,7 +1615,7 @@ lnet_parse_reply(lnet_ni_t *ni, lnet_msg_t *msg)
+ 			       md->md_me->me_portal);
+ 
+ 		lnet_res_unlock(cpt);
+-		return ENOENT;		  /* +ve: OK but no match */
++		return -ENOENT;	/* -ve: OK but no match */
+ 	}
+ 
+ 	LASSERT(!md->md_offset);
+@@ -1630,7 +1630,7 @@ lnet_parse_reply(lnet_ni_t *ni, lnet_msg_t *msg)
+ 			rlength, hdr->msg.reply.dst_wmd.wh_object_cookie,
+ 			mlength);
+ 		lnet_res_unlock(cpt);
+-		return ENOENT;	  /* +ve: OK but no match */
++		return -ENOENT;	/* -ve: OK but no match */
+ 	}
+ 
+ 	CDEBUG(D_NET, "%s: Reply from %s of length %d/%d into md %#llx\n",
+@@ -1683,7 +1683,7 @@ lnet_parse_ack(lnet_ni_t *ni, lnet_msg_t *msg)
+ 			       md->md_me->me_portal);
+ 
+ 		lnet_res_unlock(cpt);
+-		return ENOENT;		  /* +ve! */
++		return -ENOENT;	/* -ve! */
+ 	}
+ 
+ 	CDEBUG(D_NET, "%s: ACK from %s into md %#llx\n",
+@@ -2030,7 +2030,7 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
+ 	if (!rc)
+ 		return 0;
+ 
+-	LASSERT(rc == ENOENT);
++	LASSERT(rc == -ENOENT);
+ 
+  free_drop:
+ 	LASSERT(!msg->msg_md);
+diff --git a/drivers/staging/lustre/lnet/lnet/nidstrings.c b/drivers/staging/lustre/lnet/lnet/nidstrings.c
+index 00010f3..9d1c7fd 100644
+--- a/drivers/staging/lustre/lnet/lnet/nidstrings.c
++++ b/drivers/staging/lustre/lnet/lnet/nidstrings.c
+@@ -1085,7 +1085,7 @@ libcfs_str2lnd(const char *str)
+ 	if (nf)
+ 		return nf->nf_type;
+ 
+-	return -1;
++	return -ENXIO;
+ }
+ EXPORT_SYMBOL(libcfs_str2lnd);
+ 
+diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+index 51a831e..9543ba3 100644
+--- a/drivers/staging/lustre/lnet/lnet/router.c
++++ b/drivers/staging/lustre/lnet/lnet/router.c
+@@ -1503,7 +1503,7 @@ lnet_nrb_tiny_calculate(void)
+ 		LCONSOLE_ERROR_MSG(0x10c,
+ 				   "tiny_router_buffers=%d invalid when routing enabled\n",
+ 				   tiny_router_buffers);
+-		return -1;
++		return -EINVAL;
+ 	}
+ 
+ 	if (tiny_router_buffers > 0)
+@@ -1522,7 +1522,7 @@ lnet_nrb_small_calculate(void)
+ 		LCONSOLE_ERROR_MSG(0x10c,
+ 				   "small_router_buffers=%d invalid when routing enabled\n",
+ 				   small_router_buffers);
+-		return -1;
++		return -EINVAL;
+ 	}
+ 
+ 	if (small_router_buffers > 0)
+@@ -1541,7 +1541,7 @@ lnet_nrb_large_calculate(void)
+ 		LCONSOLE_ERROR_MSG(0x10c,
+ 				   "large_router_buffers=%d invalid when routing enabled\n",
+ 				   large_router_buffers);
+-		return -1;
++		return -EINVAL;
+ 	}
+ 
+ 	if (large_router_buffers > 0)
 -- 
 1.7.1
