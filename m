@@ -1,94 +1,57 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  2 Mar 2016 17:01:43 -0500
-Subject: [lustre-devel] [PATCH 00/27] Third batch of LNet fixes
-Message-ID: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
+Date: Wed,  2 Mar 2016 17:01:50 -0500
+Subject: [lustre-devel] [PATCH 07/27] staging: lustre: issue in the offset
+	in lnet match hash table
+In-Reply-To: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
+References: <1456956130-6110-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1456956130-6110-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Alyona Romanenko <alyona.romanenko@seagate.com>
 
-This patch set merges all the fixes for the klnd drivers, socklnd and
-o2iblnd, to what is currently used in production environments. Several
-more fixes for the LNet core are also included with this patch set.
+From: Alyona Romanenko <alyona.romanenko@seagate.com>
 
-Alyona Romanenko (1):
-  staging: lustre: issue in the offset in lnet match hash table
+the offset in hash table is overflowed for no wildcard portal.
+The offset for no wildcard has been corrected as for wildcard
+in the LU-1622
 
-Amir Shehata (3):
-  staging: lustre: change ibh_mrs from array to pointer
-  staging: lustre: make ko2iblnd connect parameters persistent
-  staging: lustre: Ignore hops if not explicitly set
+Signed-off-by: Alyona Romanenko <alyona.romanenko@seagate.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7774
+Reviewed-on: http://review.whamcloud.com/18422
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+---
+ drivers/staging/lustre/lnet/lnet/lib-ptl.c |    9 ++++-----
+ 1 files changed, 4 insertions(+), 5 deletions(-)
 
-Dmitry Eremin (4):
-  staging: lustre: fix socklnd issues found by Klocwork Insight tool
-  staging: lustre: fix api-ni.c issues found by Klocwork Insight tool
-  staging: lustre: fix conctl.c issues found by Klocwork Insight tool
-  staging: lustre: fix framework.c issues found by Klocwork Insight tool
-
-Doug Oucharek (1):
-  staging: lustre: Change connect peer failed cleanup order
-
-Frank Zago (3):
-  staging: lustre: make o2iblnd local functions static
-  staging: lustre: make o2iblnd_cb.c local functions static
-  staging: lustre: corrected some typos and grammar errors
-
-James Simmons (3):
-  staging: lustre: return proper error code for LNet core
-  staging: lustre: bind socklnd peers to a specific CPT
-  staging: lustre: reverse LNet and infinband header order
-
-Jeremy Filizetti (1):
-  staging: lustre: Support different ko2iblnd configs between systems
-
-Jian Yu (1):
-  staging: lustre: replace direct LNet HZ access with kernel APIs
-
-John L. Hammond (1):
-  staging: lustre: set task state before scheduling in lnet_sock_accept
-
-Li Xi (1):
-  staging: lustre: remove annoying message in parse_nidrange
-
-Liang Zhen (6):
-  staging: lustre: set downis to 1 if there's no NI for remote net
-  staging: lustre: recv could access freed message
-  staging: lustre: take extra refcount in kiblnd_connreq_done
-  staging: lustre: check wr_id returned by ib_poll_cq
-  staging: lustre: avoid intensive reconnecting for ko2iblnd
-  staging: lustre: do less intense allocating retry for ko2iblnd
-
-Olaf Weber (1):
-  staging: lustre: Use after free in lnet_ptl_match_delay()
-
-Sebastien Buisson (1):
-  staging: lustre: fix 'copy into fixed size buffer' errors
-
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    2 +-
- .../staging/lustre/include/linux/lnet/lib-types.h  |    2 +-
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  230 ++++------
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  135 ++++---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |  475 ++++++++++++++------
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    7 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    8 +-
- drivers/staging/lustre/lnet/lnet/config.c          |   14 +-
- drivers/staging/lustre/lnet/lnet/lib-eq.c          |    2 +-
- drivers/staging/lustre/lnet/lnet/lib-move.c        |   51 ++-
- drivers/staging/lustre/lnet/lnet/lib-ptl.c         |   93 +++--
- drivers/staging/lustre/lnet/lnet/lib-socket.c      |   45 +-
- drivers/staging/lustre/lnet/lnet/nidstrings.c      |    3 +-
- drivers/staging/lustre/lnet/lnet/router.c          |   22 +-
- drivers/staging/lustre/lnet/lnet/router_proc.c     |    2 +-
- drivers/staging/lustre/lnet/selftest/conctl.c      |    9 +-
- drivers/staging/lustre/lnet/selftest/conrpc.c      |    2 +-
- drivers/staging/lustre/lnet/selftest/console.c     |   23 +-
- drivers/staging/lustre/lnet/selftest/framework.c   |   14 +-
- drivers/staging/lustre/lustre/libcfs/workitem.c    |    6 +-
- drivers/staging/lustre/lustre/llite/dir.c          |    6 +-
- drivers/staging/lustre/lustre/obdclass/lu_object.c |    2 +-
- drivers/staging/lustre/lustre/ptlrpc/import.c      |    2 +-
- drivers/staging/lustre/lustre/ptlrpc/nrs.c         |    8 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |    7 +-
- 25 files changed, 715 insertions(+), 455 deletions(-)
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+index 2b41205..3947e8b 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+@@ -360,16 +360,15 @@ lnet_mt_match_head(struct lnet_match_table *mtable,
+ 		   lnet_process_id_t id, __u64 mbits)
+ {
+ 	struct lnet_portal *ptl = the_lnet.ln_portals[mtable->mt_portal];
++	unsigned long hash = mbits;
+ 
+-	if (lnet_ptl_is_wildcard(ptl)) {
+-		return &mtable->mt_mhash[mbits & LNET_MT_HASH_MASK];
+-	} else {
+-		unsigned long hash = mbits + id.nid + id.pid;
++	if (!lnet_ptl_is_wildcard(ptl)) {
++		hash += id.nid + id.pid;
+ 
+ 		LASSERT(lnet_ptl_is_unique(ptl));
+ 		hash = hash_long(hash, LNET_MT_HASH_BITS);
+-		return &mtable->mt_mhash[hash];
+ 	}
++	return &mtable->mt_mhash[hash & LNET_MT_HASH_MASK];
+ }
+ 
+ int
+-- 
+1.7.1
