@@ -1,85 +1,82 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  2 Mar 2016 18:53:26 -0500
-Subject: [lustre-devel] [PATCH 3/7] staging: lustre: take extra refcount in
-	kiblnd_connreq_done
-In-Reply-To: <1456962810-21806-1-git-send-email-jsimmons@infradead.org>
-References: <1456962810-21806-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1456962810-21806-4-git-send-email-jsimmons@infradead.org>
+Date: Thu,  3 Mar 2016 11:00:58 -0500
+Subject: [lustre-devel] [PATCH] staging: lustre: handle complex strings in
+	cfs_str2num_check
+Message-ID: <1457020858-15839-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Liang Zhen <liang.zhen@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Liang Zhen <liang.zhen@intel.com>
+Originally the function cfs_str2num_check used simple_strtoul
+but has been updated to kstrtoul. The string passed into
+cfs_str2num_check can be a very complex, for example we could
+have 10.37.202.[59-61]. When simple_strtoul was used the first
+number until we hit a non-digit character could be extracted
+but testing showed that kstrtoul will not return any value if
+it detects any non-digit character. Because of this change in
+behavior a different approach is needed to handle these types
+of complex strings. The use of sscanf was investigated to see
+if it could be used to extract numbers from the passed in
+string but unlike its glibc counterpart the kernel version
+also just reported a error with no results if a non-digit value
+in the string was encountered. Another possible approach would
+be to use __parse_int directly but that class of functions is
+not exported by the kernel. So the approach in this patch is
+to scan the string passed in for the first non-digit character
+and replace that character with a '\0' so kstrtoul can be used.
+Once completed the original character is restored. We also
+restore a original behavior that was removed to return 0 when
+we encounter any non digit character before the nob count.
 
-refcount taken by cmid is not reliable after kiblnd_connreq_done
-released the glock because this connection is visible to other
-threads, another thread can find and close this connection right
-after kiblnd_connreq_done released the glock, if kiblnd_cm_callback
-for RDMA_CM_EVENT_DISCONNECTED is called, it can release the
-connection refcount taken by cmid. It means the connection could be
-destroyed before kiblnd_connreq_done() finish operations on it.
-
-Signed-off-by: Liang Zhen <liang.zhen@intel.com>
-ntel-bug-id: https://jira.hpdd.intel.com/browse/LU-7210
-Reviewed-on: http://review.whamcloud.com/17527
-Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Tested-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   16 ++++++++++++----
- 1 files changed, 12 insertions(+), 4 deletions(-)
+ .../staging/lustre/lustre/libcfs/libcfs_string.c   |   27 +++++++++++++++++++-
+ 1 files changed, 26 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 6c8f09e..f76c570 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -939,8 +939,6 @@ kiblnd_check_sends(kib_conn_t *conn)
- 			kiblnd_queue_tx_locked(tx, conn);
- 	}
+diff --git a/drivers/staging/lustre/lustre/libcfs/libcfs_string.c b/drivers/staging/lustre/lustre/libcfs/libcfs_string.c
+index 9dca666..50ac153 100644
+--- a/drivers/staging/lustre/lustre/libcfs/libcfs_string.c
++++ b/drivers/staging/lustre/lustre/libcfs/libcfs_string.c
+@@ -229,11 +229,36 @@ int
+ cfs_str2num_check(char *str, int nob, unsigned *num,
+ 		  unsigned min, unsigned max)
+ {
++	bool all_numbers = true;
++	char *endp, cache;
+ 	int rc;
  
--	kiblnd_conn_addref(conn); /* 1 ref for me.... (see b21911) */
--
- 	for (;;) {
- 		int credit;
- 
-@@ -966,8 +964,6 @@ kiblnd_check_sends(kib_conn_t *conn)
- 	}
- 
- 	spin_unlock(&conn->ibc_lock);
--
--	kiblnd_conn_decref(conn); /* ...until here */
- }
- 
- static void
-@@ -2131,6 +2127,16 @@ kiblnd_connreq_done(kib_conn_t *conn, int status)
- 		return;
- 	}
- 
-+	/**
-+	 * refcount taken by cmid is not reliable after I released the glock
-+	 * because this connection is visible to other threads now, another
-+	 * thread can find and close this connection right after I released
-+	 * the glock, if kiblnd_cm_callback for RDMA_CM_EVENT_DISCONNECTED is
-+	 * called, it can release the connection refcount taken by cmid.
-+	 * It means the connection could be destroyed before I finish my
-+	 * operations on it.
-+	 */
-+	kiblnd_conn_addref(conn);
- 	write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
- 
- 	/* Schedule blocked txs */
-@@ -2146,6 +2152,8 @@ kiblnd_connreq_done(kib_conn_t *conn, int status)
- 
- 	/* schedule blocked rxs */
- 	kiblnd_handle_early_rxs(conn);
+ 	str = cfs_trimwhite(str);
 +
-+	kiblnd_conn_decref(conn);
- }
++	/**
++	 * kstrouint can only handle strings composed
++	 * of only numbers. We need to scan the string
++	 * passed in for the first non-digit character
++	 * and end the string at that location. If we
++	 * don't find any non-digit character we still
++	 * need to place a '\0' at position nob since
++	 * we are not interested in the rest of the
++	 * string which is longer than nob in size.
++	 * After we are done the character at the
++	 * position we placed '\0' must be restored.
++	 */
++	for (endp = str; endp < str + nob; endp++) {
++		if (!isdigit(*endp)) {
++			all_numbers = false;
++			break;
++		}
++	}
++	cache = *endp;
++	*endp = '\0';
++
+ 	rc = kstrtouint(str, 10, num);
+-	if (rc)
++	*endp = cache;
++	if (rc || !all_numbers)
+ 		return 0;
  
- static void
+ 	return (*num >= min && *num <= max);
 -- 
 1.7.1
