@@ -1,82 +1,37 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu,  3 Mar 2016 11:00:58 -0500
-Subject: [lustre-devel] [PATCH] staging: lustre: handle complex strings in
-	cfs_str2num_check
-Message-ID: <1457020858-15839-1-git-send-email-jsimmons@infradead.org>
+From: =?ISO-8859-1?B?MTAwMDA=?= <10000@candesoft.com>
+Date: Fri, 4 Mar 2016 21:55:11 +0800
+Subject: [lustre-devel] Bug found: Missing lnetctl command on any recent
+	daily built package
+Message-ID: <tencent_4A8CFD8250BEDB3A3649365E@qq.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+To: lustre-devel@lists.lustre.org
 
-Originally the function cfs_str2num_check used simple_strtoul
-but has been updated to kstrtoul. The string passed into
-cfs_str2num_check can be a very complex, for example we could
-have 10.37.202.[59-61]. When simple_strtoul was used the first
-number until we hit a non-digit character could be extracted
-but testing showed that kstrtoul will not return any value if
-it detects any non-digit character. Because of this change in
-behavior a different approach is needed to handle these types
-of complex strings. The use of sscanf was investigated to see
-if it could be used to extract numbers from the passed in
-string but unlike its glibc counterpart the kernel version
-also just reported a error with no results if a non-digit value
-in the string was encountered. Another possible approach would
-be to use __parse_int directly but that class of functions is
-not exported by the kernel. So the approach in this patch is
-to scan the string passed in for the first non-digit character
-and replace that character with a '\0' so kstrtoul can be used.
-Once completed the original character is restored. We also
-restore a original behavior that was removed to return 0 when
-we encounter any non digit character before the nob count.
+Hi,
+      First I would like to answer the question that llmount.sh cannot successfully run when Install lustre at CentOS 7.2 which I post a month ago, hopefully it would be useful. If you have the same problem, maybe it is due to you have more than one network card on the machine and the ip where hostname sets are not the same as Lustre using, try running "dmesg", and if you find something like "NIDs not found", you can add a conf file in /etc/modprobe.d/ which contains the line "options lnet networks=tcp0(enp0s8)". The word 'tcp0' stands for drivers and the word 'enp0s8' for the network card. You can find more about such configuration at Chapter 15 on the official manual.
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- .../staging/lustre/lustre/libcfs/libcfs_string.c   |   27 +++++++++++++++++++-
- 1 files changed, 26 insertions(+), 1 deletions(-)
+      Now Let's come to the bug (or some reason developers are not specified). It's easy to repeat it at CentOS 7.2, just follow these steps.
+      1. Install all package that it is needed for compiling Lustre but libyaml-devel
+      2. Build the Lustre customerized Linux kernel, my version is 3.10.0-327.el7.x86_64. You can refer the old manual at Chapter 30. Installing a Lustre File System from Source Code although there are some mistakes.
+      3. git clone the newest Lustre-release code from git://git.hpdd.intel.com/fs/lustre-release.git
+      4. Run 'configure' at root folder of lustre-release code with the path of the modified kernel source. It may look like as follow:
+        ./configure --with-linux=/root/rpmbuild/BUILD/kernel-3.10.0_327.el7_lustre.x86_64/ --with-o2ib=no
+      5. run 'make' at root folder of lustre-release code
+      6. Once you finished, just go to the folder lustre-release/lnet/utils and you will see that the lnetctl are not exist while other such as 'lst' is.
+      7. Check the Makefile under that folder, you will find that there comment symbol '#' on line 123:
+            line 121:          sbin_PROGRAMS = routerstat$(EXEEXT) lst$(EXEEXT) \
+            line 122:            $(am__EXEEXT_1) $(am__EXEEXT_2)
+            line 123:          #am__append_1 = lnetctl
+            line 124:          am__append_2 = wirecheck
+            line 125:          subdir = lnet/utils
+          And also at line 176: #am__EXEEXT_1 = lnetctl$(EXEEXT)
+          And also at the folder lustre-release/lnet/utils/lnetconfig there are no 'lnetconfig.la' which should exist because lnetctl need it to compile.
 
-diff --git a/drivers/staging/lustre/lustre/libcfs/libcfs_string.c b/drivers/staging/lustre/lustre/libcfs/libcfs_string.c
-index 9dca666..50ac153 100644
---- a/drivers/staging/lustre/lustre/libcfs/libcfs_string.c
-+++ b/drivers/staging/lustre/lustre/libcfs/libcfs_string.c
-@@ -229,11 +229,36 @@ int
- cfs_str2num_check(char *str, int nob, unsigned *num,
- 		  unsigned min, unsigned max)
- {
-+	bool all_numbers = true;
-+	char *endp, cache;
- 	int rc;
- 
- 	str = cfs_trimwhite(str);
-+
-+	/**
-+	 * kstrouint can only handle strings composed
-+	 * of only numbers. We need to scan the string
-+	 * passed in for the first non-digit character
-+	 * and end the string at that location. If we
-+	 * don't find any non-digit character we still
-+	 * need to place a '\0' at position nob since
-+	 * we are not interested in the rest of the
-+	 * string which is longer than nob in size.
-+	 * After we are done the character at the
-+	 * position we placed '\0' must be restored.
-+	 */
-+	for (endp = str; endp < str + nob; endp++) {
-+		if (!isdigit(*endp)) {
-+			all_numbers = false;
-+			break;
-+		}
-+	}
-+	cache = *endp;
-+	*endp = '\0';
-+
- 	rc = kstrtouint(str, 10, num);
--	if (rc)
-+	*endp = cache;
-+	if (rc || !all_numbers)
- 		return 0;
- 
- 	return (*num >= min && *num <= max);
--- 
-1.7.1
+      It won't help even you run 'configure' and 'make' for more times. And now you install libyaml-devel, you can install it by yum or source. I use yum to install it by simpily running: sudo yum install libyaml-devel.
+      Now you run 'configure' and 'make' again, you will find 'lnetctl' has been successfully compiled and placed at lustre-release/lnet/utils. You can also run './lnetctl' at the folder and find it seems work.
+
+      Since lnetctl is an important tool to configure LNET, and the total Chapter 9 are tell us how to use it configuring network. I think if it is due to lack of some package, it should have a message to tell us that was lacking a package, however, the 'configure' and 'make' are running successfully without any message but not produce the 'lnetctl'.  That Makefile must be auto-gernerate by running 'configure'. I hope the developers can check this problem, and a bad news is that all recent daily built package at https://build.hpdd.intel.com/job/lustre-master/ , such as '#3330' are not containing 'lnetctl', you can just download, install and check. (Mostly you will get "bash: lnetctl: command not found", I add this to make search engine find this email on purpose which may help others, the Lustre are lacking of documents ^_^)
+
+Yingdi Guo
