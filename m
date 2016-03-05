@@ -1,67 +1,77 @@
-From: Christopher J. Morrone <morrone2@llnl.gov>
-Date: Fri, 4 Mar 2016 11:24:27 -0800
-Subject: [lustre-devel] Bug found: Missing lnetctl command on any recent
- daily built package
-In-Reply-To: <tencent_4A8CFD8250BEDB3A3649365E@qq.com>
-References: <tencent_4A8CFD8250BEDB3A3649365E@qq.com>
-Message-ID: <56D9E0EB.1070508@llnl.gov>
+From: James Simmons <jsimmons@infradead.org>
+Date: Fri,  4 Mar 2016 21:09:40 -0500
+Subject: [lustre-devel] [PATCH 00/10] Last batch of fixes for LNet
+Message-ID: <1457143790-19422-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Please open a bug report for this in the Lustre issue tracker:
+This batch merges the remaining LNet patches from the OpenSFS
+branch for the upstream client. Once merged the LNet code
+will be up to date with the latest production code. Only style
+issues are remaining. Still future patches being developed
+for LNet will be landed to the upstream client as soon as they
+are ready after extensive testing.
 
-  https://jira.hpdd.intel.com/
+Frank Zago (1):
+  staging: lustre: add last missing sparse annotation __user
 
-If you check your configure output you will likely see that it does tell
-you that it could not find libyaml.  lnet/autoconf/lustre-lnet.m4
-contains the LN_CONFIG_DLC function that should be printing "libyaml not
-present".  Granted, it is only a warning, and the consequences of
-it being missing are not going to be clear to anyone.
+James Nunez (1):
+  staging: lustre: Correct missing newline
 
-I would not have thought that llmount.sh would require lnetctl.  If it
-does, then the LN_CONFIG_DLC function should be throwing an error not a
-warning.
+James Simmons (3):
+  staging: lustre: change test to asser in LNetGetId
+  staging: lustre: rename proc_call_handler to lprocfs_call_handler
+  staging: lustre: make LNet use lprocfs_call_handler
 
-And Intel's build farm should definitely be fixed to build lnetctl.
-That is worrying if they missed that.
+Liang Zhen (2):
+  staging: lustre: LNet drop rule implementation
+  staging: lustre: LNet network latency simulation
 
-But like I said, open a bug report and we'll get to the bottom of it.
+Sebastien Buisson (3):
+  staging: lustre: fix 'data race condition' issue in conrpc.c
+  staging: lustre: fix 'NULL pointer dereference' errors
+  staging: lustre: fix 'data race condition' issue in framework.c
 
-Chris
-
-On 03/04/2016 05:55 AM, 10000 wrote:
-> Hi,
->       First I would like to answer the question that llmount.sh cannot successfully run when Install lustre at CentOS 7.2 which I post a month ago, hopefully it would be useful. If you have the same problem, maybe it is due to you have more than one network card on the machine and the ip where hostname sets are not the same as Lustre using, try running "dmesg", and if you find something like "NIDs not found", you can add a conf file in /etc/modprobe.d/ which contains the line "options lnet networks=tcp0(enp0s8)". The word 'tcp0' stands for drivers and the word 'enp0s8' for the network card. You can find more about such configuration at Chapter 15 on the official manual.
-> 
->       Now Let's come to the bug (or some reason developers are not specified). It's easy to repeat it at CentOS 7.2, just follow these steps.
->       1. Install all package that it is needed for compiling Lustre but libyaml-devel
->       2. Build the Lustre customerized Linux kernel, my version is 3.10.0-327.el7.x86_64. You can refer the old manual at Chapter 30. Installing a Lustre File System from Source Code although there are some mistakes.
->       3. git clone the newest Lustre-release code from git://git.hpdd.intel.com/fs/lustre-release.git
->       4. Run 'configure' at root folder of lustre-release code with the path of the modified kernel source. It may look like as follow:
->         ./configure --with-linux=/root/rpmbuild/BUILD/kernel-3.10.0_327.el7_lustre.x86_64/ --with-o2ib=no
->       5. run 'make' at root folder of lustre-release code
->       6. Once you finished, just go to the folder lustre-release/lnet/utils and you will see that the lnetctl are not exist while other such as 'lst' is.
->       7. Check the Makefile under that folder, you will find that there comment symbol '#' on line 123:
->             line 121:          sbin_PROGRAMS = routerstat$(EXEEXT) lst$(EXEEXT) \
->             line 122:            $(am__EXEEXT_1) $(am__EXEEXT_2)
->             line 123:          #am__append_1 = lnetctl
->             line 124:          am__append_2 = wirecheck
->             line 125:          subdir = lnet/utils
->           And also at line 176: #am__EXEEXT_1 = lnetctl$(EXEEXT)
->           And also at the folder lustre-release/lnet/utils/lnetconfig there are no 'lnetconfig.la' which should exist because lnetctl need it to compile.
-> 
->       It won't help even you run 'configure' and 'make' for more times. And now you install libyaml-devel, you can install it by yum or source. I use yum to install it by simpily running: sudo yum install libyaml-devel.
->       Now you run 'configure' and 'make' again, you will find 'lnetctl' has been successfully compiled and placed at lustre-release/lnet/utils. You can also run './lnetctl' at the folder and find it seems work.
-> 
->       Since lnetctl is an important tool to configure LNET, and the total Chapter 9 are tell us how to use it configuring network. I think if it is due to lack of some package, it should have a message to tell us that was lacking a package, however, the 'configure' and 'make' are running successfully without any message but not produce the 'lnetctl'.  That Makefile must be auto-gernerate by running 'configure'. I hope the developers can check this problem, and a bad news is that all recent daily built package at https://build.hpdd.intel.com/job/lustre-master/ , such as '#3330' are not containing 'lnetctl', you can just download, install and check. (Mostly you will get "bash: lnetctl: command not found", I add this to make search engine find this email on purpose which may help others, the Lustre are lacking of documents ^_^)
-> 
-> Yingdi Guo
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> .
-> 
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |    4 +
+ .../lustre/include/linux/libcfs/libcfs_ioctl.h     |    1 +
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |   27 +
+ .../staging/lustre/include/linux/lnet/lib-types.h  |    5 +
+ .../staging/lustre/include/linux/lnet/lnetctl.h    |  100 ++
+ drivers/staging/lustre/lnet/lnet/Makefile          |    2 +-
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |   13 +-
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |   83 +-
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         |    6 +
+ drivers/staging/lustre/lnet/lnet/net_fault.c       | 1025 ++++++++++++++++++++
+ drivers/staging/lustre/lnet/lnet/router_proc.c     |   32 +-
+ drivers/staging/lustre/lnet/selftest/conctl.c      |   49 +-
+ drivers/staging/lustre/lnet/selftest/conrpc.c      |    8 +-
+ drivers/staging/lustre/lnet/selftest/framework.c   |    9 +-
+ drivers/staging/lustre/lnet/selftest/rpc.c         |    2 +-
+ .../lustre/lustre/include/lustre/lustre_user.h     |    3 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |    9 +-
+ .../staging/lustre/lustre/libcfs/libcfs_string.c   |   27 +-
+ drivers/staging/lustre/lustre/libcfs/module.c      |   25 +-
+ drivers/staging/lustre/lustre/llite/file.c         |    8 +-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    4 +-
+ drivers/staging/lustre/lustre/lov/lov_lock.c       |    2 +-
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |    2 +-
+ drivers/staging/lustre/lustre/lov/lov_pool.c       |    4 +-
+ drivers/staging/lustre/lustre/lov/lov_request.c    |    2 +-
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |    3 +-
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |   11 +-
+ drivers/staging/lustre/lustre/obdclass/cl_lock.c   |    2 +-
+ .../lustre/lustre/obdclass/lprocfs_status.c        |   26 +-
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |    2 +-
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    8 +-
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |    9 +-
+ drivers/staging/lustre/lustre/osc/osc_lock.c       |    2 +-
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    3 +-
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |    6 +-
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec.c         |    4 +-
+ 37 files changed, 1380 insertions(+), 150 deletions(-)
+ create mode 100644 drivers/staging/lustre/lnet/lnet/net_fault.c
