@@ -1,39 +1,27 @@
-From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Sat, 5 Mar 2016 12:16:11 +0000
-Subject: [lustre-devel] Bug found: Missing lnetctl command on
-	any	recentdaily built package
-In-Reply-To: <tencent_457D7F416B6B8DD22BD6CC15@qq.com>
-References: <tencent_4A8CFD8250BEDB3A3649365E@qq.com>
-	<56D9E0EB.1070508@llnl.gov>
-	<51102781-6DE8-418E-B236-F1ADAA287986@intel.com>
-	<tencent_457D7F416B6B8DD22BD6CC15@qq.com>
-Message-ID: <81210C5B-0329-418A-9956-D9546EB09D32@intel.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Sat, 5 Mar 2016 11:52:56 -0800
+Subject: [lustre-devel] [PATCH 00/10] Last batch of fixes for LNet
+In-Reply-To: <1457143790-19422-1-git-send-email-jsimmons@infradead.org>
+References: <1457143790-19422-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <20160305195256.GA8126@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: James Simmons <jsimmons@infradead.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Hello!
+On Fri, Mar 04, 2016 at 09:09:40PM -0500, James Simmons wrote:
+> This batch merges the remaining LNet patches from the OpenSFS
+> branch for the upstream client. Once merged the LNet code
+> will be up to date with the latest production code. Only style
+> issues are remaining. Still future patches being developed
+> for LNet will be landed to the upstream client as soon as they
+> are ready after extensive testing.
 
-On Mar 5, 2016, at 1:08 AM, 10000 wrote:
+Please fix up the build issue, and figure out what went wrong with the
+__user patch that you sent and resend this series after reworking them.
 
-> On Mar 5, 2016, at 11:14 AM, Drokin, Oleg wrote:
-> 
->> llmount.sh does not appear to need lnetctl (I use the llmount.sh,
->> and I do not have lnetctl built). 
-> 
-> I would say it may be needed at some situation. I can repeat this situation at VirtualBox with the following steps:
-...
-> It seems successfully running "llmount.sh". Although these steps are producing at a virtual machine, I think the key point to truggle the bug is that you have two network card, and the hostname is set to the second rather than the first (at /etc/hosts or some other name resolving settings).
+thanks,
 
-You are right that in the situation you describe llmount.sh does not work.
-But since it does not call lnetctl, even if lnetctl was available, llmount.sh still would not work in your scenario. Also since llmount.sh loads and reloads the modules, you really
-need those lnet module parameters.
-
-> I will post it at jira also.
-
-Thanks! the lnetctl building issue really needs to be fixed.
-
-Bye,
-    Oleg
+greg k-h
