@@ -1,8 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue,  8 Mar 2016 17:35:25 -0500
-Subject: [lustre-devel] [PATCH 0/4] Support lustre routers with stand alone
-	LNet stack
-Message-ID: <1457476529-27708-1-git-send-email-jsimmons@infradead.org>
+Date: Tue,  8 Mar 2016 17:35:29 -0500
+Subject: [lustre-devel] [PATCH 4/4] staging: lustre: make lustre dependent
+	on LNet
+In-Reply-To: <1457476529-27708-1-git-send-email-jsimmons@infradead.org>
+References: <1457476529-27708-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1457476529-27708-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -10,70 +12,65 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Often lustre file systems will employ LNet routers in their
-set ups. Those routers tend to be very light weight so we want
-to avoid installing additional software that will burden the
-system. Installing the entire lustre client can be pretty heavy
-so we want to give the ability to only enable the LNet stack for
-the routers which is all that is needed anyways. This patch series
-allows that option for users of the upstream client.
+In the case of lustre routers you only need a functioning
+LNet stack. Especially since often the routers are very
+light weight and want to avoid any addition software that
+would create additional pressures on the system.
 
-James Simmons (4):
-  staging: lustre: move libcfs to lnet layer
-  staging: lustre: fixup kernel Kconfig option LNET_MAX_PAYLOAD
-  staging: lustre: add help section of Kconfig config LNET
-  staging: lustre: make lustre dependent on LNet
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/Makefile              |    2 +-
+ drivers/staging/lustre/Kconfig        |    4 ++--
+ drivers/staging/lustre/lnet/Kconfig   |    2 +-
+ drivers/staging/lustre/lustre/Kconfig |    2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
- drivers/staging/Makefile                           |    2 +-
- drivers/staging/lustre/Kconfig                     |    4 ++--
- drivers/staging/lustre/lnet/Kconfig                |   14 ++++++++++----
- drivers/staging/lustre/lnet/Makefile               |    2 +-
- .../lustre/{lustre => lnet}/libcfs/Makefile        |    2 +-
- .../staging/lustre/{lustre => lnet}/libcfs/debug.c |    0
- .../staging/lustre/{lustre => lnet}/libcfs/fail.c  |    0
- .../staging/lustre/{lustre => lnet}/libcfs/hash.c  |    0
- .../lustre/{lustre => lnet}/libcfs/libcfs_cpu.c    |    0
- .../lustre/{lustre => lnet}/libcfs/libcfs_lock.c   |    0
- .../lustre/{lustre => lnet}/libcfs/libcfs_mem.c    |    0
- .../lustre/{lustre => lnet}/libcfs/libcfs_string.c |    0
- .../{lustre => lnet}/libcfs/linux/linux-cpu.c      |    0
- .../libcfs/linux/linux-crypto-adler.c              |    0
- .../{lustre => lnet}/libcfs/linux/linux-crypto.c   |    0
- .../{lustre => lnet}/libcfs/linux/linux-crypto.h   |    0
- .../{lustre => lnet}/libcfs/linux/linux-curproc.c  |    0
- .../{lustre => lnet}/libcfs/linux/linux-debug.c    |    0
- .../{lustre => lnet}/libcfs/linux/linux-mem.c      |    0
- .../{lustre => lnet}/libcfs/linux/linux-module.c   |    0
- .../{lustre => lnet}/libcfs/linux/linux-prim.c     |    0
- .../libcfs/linux/linux-tracefile.c                 |    0
- .../lustre/{lustre => lnet}/libcfs/module.c        |    0
- .../staging/lustre/{lustre => lnet}/libcfs/prng.c  |    0
- .../lustre/{lustre => lnet}/libcfs/tracefile.c     |    0
- .../lustre/{lustre => lnet}/libcfs/tracefile.h     |    0
- .../lustre/{lustre => lnet}/libcfs/workitem.c      |    0
- drivers/staging/lustre/lustre/Kconfig              |    2 +-
- drivers/staging/lustre/lustre/Makefile             |    2 +-
- 29 files changed, 17 insertions(+), 11 deletions(-)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/Makefile (93%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/debug.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/fail.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/hash.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/libcfs_cpu.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/libcfs_lock.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/libcfs_mem.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/libcfs_string.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-cpu.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-crypto-adler.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-crypto.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-crypto.h (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-curproc.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-debug.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-mem.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-module.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-prim.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/linux/linux-tracefile.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/module.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/prng.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/tracefile.c (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/tracefile.h (100%)
- rename drivers/staging/lustre/{lustre => lnet}/libcfs/workitem.c (100%)
+diff --git a/drivers/staging/Makefile b/drivers/staging/Makefile
+index 8242923..c008cfc 100644
+--- a/drivers/staging/Makefile
++++ b/drivers/staging/Makefile
+@@ -30,7 +30,7 @@ obj-$(CONFIG_WIMAX_GDM72XX)	+= gdm72xx/
+ obj-$(CONFIG_LTE_GDM724X)	+= gdm724x/
+ obj-$(CONFIG_FIREWIRE_SERIAL)	+= fwserial/
+ obj-$(CONFIG_GOLDFISH)		+= goldfish/
+-obj-$(CONFIG_LUSTRE_FS)		+= lustre/
++obj-$(CONFIG_LNET)		+= lustre/
+ obj-$(CONFIG_DGNC)			+= dgnc/
+ obj-$(CONFIG_MTD_SPINAND_MT29F)	+= mt29f_spinand/
+ obj-$(CONFIG_GS_FPGABOOT)	+= gs_fpgaboot/
+diff --git a/drivers/staging/lustre/Kconfig b/drivers/staging/lustre/Kconfig
+index a224d88..b7d8109 100644
+--- a/drivers/staging/lustre/Kconfig
++++ b/drivers/staging/lustre/Kconfig
+@@ -1,3 +1,3 @@
+-source "drivers/staging/lustre/lustre/Kconfig"
+-
+ source "drivers/staging/lustre/lnet/Kconfig"
++
++source "drivers/staging/lustre/lustre/Kconfig"
+diff --git a/drivers/staging/lustre/lnet/Kconfig b/drivers/staging/lustre/lnet/Kconfig
+index 980ce44..2b59301 100644
+--- a/drivers/staging/lustre/lnet/Kconfig
++++ b/drivers/staging/lustre/lnet/Kconfig
+@@ -1,6 +1,6 @@
+ config LNET
+ 	tristate "Lustre networking subsystem (LNet)"
+-	depends on LUSTRE_FS
++	depends on INET && m
+ 	help
+ 	  The Lustre network layer, also known as LNet, is a networking abstaction
+ 	  level API that was initially created to allow Lustre Filesystem to utilize
+diff --git a/drivers/staging/lustre/lustre/Kconfig b/drivers/staging/lustre/lustre/Kconfig
+index 62c7bba..a09b51c 100644
+--- a/drivers/staging/lustre/lustre/Kconfig
++++ b/drivers/staging/lustre/lustre/Kconfig
+@@ -1,6 +1,6 @@
+ config LUSTRE_FS
+ 	tristate "Lustre file system client support"
+-	depends on INET && m && !MIPS && !XTENSA && !SUPERH
++	depends on m && !MIPS && !XTENSA && !SUPERH
+ 	select LNET
+ 	select CRYPTO
+ 	select CRYPTO_CRC32
+-- 
+1.7.1
