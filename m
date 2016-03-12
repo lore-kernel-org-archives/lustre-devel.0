@@ -1,54 +1,47 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 11 Mar 2016 20:29:42 -0500
-Subject: [lustre-devel] [PATCH 01/10] staging: lustre: fix bogus lst errors
-	for lnet selftest
-In-Reply-To: <1457746191-27981-1-git-send-email-jsimmons@infradead.org>
-References: <1457746191-27981-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1457746191-27981-2-git-send-email-jsimmons@infradead.org>
+Date: Fri, 11 Mar 2016 20:29:41 -0500
+Subject: [lustre-devel] [PATCH 00/10] Cleanup and audit of lnet selftest code
+Message-ID: <1457746191-27981-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Isaac Huang <he.huang@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Isaac Huang <he.huang@intel.com>
+With lnet selftest nearly in sync with the OpenSFS code base it
+was time to do a audit to see if anything was missed. One patch
+was missed a few errors unique to upstream needed to be addressed.
+Besides adding in fixes it was time to do more kernel style
+cleanups. In the process several more checkpatch issues were
+addressed.
 
-It should not be counted as errors if a test RPC
-has been stopped due to administrative actions,
-e.g. lst end_session from the remote test console.
+Isaac Huang (1):
+  staging: lustre: fix bogus lst errors for lnet selftest
 
-Signed-off-by: Isaac Huang <he.huang@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4181
-Reviewed-on: http://review.whamcloud.com/13279
-Reviewed-by: Amir Shehata <amir.shehata@intel.com>
-Reviewed-by: Liang Zhen <liang.zhen@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
----
- drivers/staging/lustre/lnet/selftest/rpc.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+James Simmons (9):
+  staging: lustre: remove returns in void function for lnet selftest
+  staging: lustre: fix spacing issues checkpatch reported in lnet selftest
+  staging: lustre: remove extra spacing of variable declartions for lnet selftest
+  staging: lustre: remove extra spacing when setting variable for lnet selftest
+  staging: lustre: filter remaining extra spacing for lnet selftest
+  staging: lustre: cleanup comment style for lnet selftest
+  staging: lustre: test for proper errno code in lstcon_rpc_trans_abort
+  staging: lustre: report minimum of two buffers for LNet selftest load test
+  staging: lustre: fix aligments in lnet selftest
 
-diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
-index 5eb4232..60d38df 100644
---- a/drivers/staging/lustre/lnet/selftest/rpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/rpc.c
-@@ -1427,9 +1427,16 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 	LASSERT(!in_interrupt());
- 
- 	if (ev->status) {
-+		__u32 errors;
-+
- 		spin_lock(&srpc_data.rpc_glock);
--		srpc_data.rpc_counters.errors++;
-+		if (ev->status != -ECANCELED) /* cancellation is not error */
-+			srpc_data.rpc_counters.errors++;
-+		errors = srpc_data.rpc_counters.errors;
- 		spin_unlock(&srpc_data.rpc_glock);
-+
-+		CNETERR("LNet event status %d type %d, RPC errors %u\n",
-+			ev->status, ev->type, errors);
- 	}
- 
- 	rpcev->ev_lnet = ev->type;
--- 
-1.7.1
+ drivers/staging/lustre/lnet/selftest/brw_test.c  |   97 ++++----
+ drivers/staging/lustre/lnet/selftest/conctl.c    |  106 ++++----
+ drivers/staging/lustre/lnet/selftest/conrpc.c    |  148 ++++++------
+ drivers/staging/lustre/lnet/selftest/conrpc.h    |   56 +++---
+ drivers/staging/lustre/lnet/selftest/console.c   |  140 ++++++------
+ drivers/staging/lustre/lnet/selftest/console.h   |  116 +++++-----
+ drivers/staging/lustre/lnet/selftest/framework.c |  187 +++++++--------
+ drivers/staging/lustre/lnet/selftest/module.c    |    5 +-
+ drivers/staging/lustre/lnet/selftest/ping_test.c |   21 +-
+ drivers/staging/lustre/lnet/selftest/rpc.c       |  143 ++++++------
+ drivers/staging/lustre/lnet/selftest/rpc.h       |  180 +++++++-------
+ drivers/staging/lustre/lnet/selftest/selftest.h  |  278 +++++++++++-----------
+ drivers/staging/lustre/lnet/selftest/timer.c     |   14 +-
+ drivers/staging/lustre/lnet/selftest/timer.h     |    6 +-
+ 14 files changed, 735 insertions(+), 762 deletions(-)
