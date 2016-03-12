@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 11 Mar 2016 20:29:48 -0500
-Subject: [lustre-devel] [PATCH 07/10] staging: lustre: cleanup comment style
-	for lnet selftest
+Date: Fri, 11 Mar 2016 20:29:46 -0500
+Subject: [lustre-devel] [PATCH 05/10] staging: lustre: remove extra spacing
+	when setting variable for lnet selftest
 In-Reply-To: <1457746191-27981-1-git-send-email-jsimmons@infradead.org>
 References: <1457746191-27981-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1457746191-27981-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1457746191-27981-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,661 +12,942 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Apply a consistent style for comments in the lnet selftest
-code.
+Remove any extra spacing for the lines of code setting variables to
+some value.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/selftest/brw_test.c  |    8 ++--
- drivers/staging/lustre/lnet/selftest/conctl.c    |   50 +++++++++++-----------
- drivers/staging/lustre/lnet/selftest/conrpc.c    |   23 +++++-----
- drivers/staging/lustre/lnet/selftest/console.c   |   11 +++--
- drivers/staging/lustre/lnet/selftest/framework.c |   20 ++++----
- drivers/staging/lustre/lnet/selftest/ping_test.c |    2 +-
- drivers/staging/lustre/lnet/selftest/rpc.c       |   46 ++++++++++----------
- drivers/staging/lustre/lnet/selftest/rpc.h       |    2 +-
- drivers/staging/lustre/lnet/selftest/selftest.h  |    3 +-
- drivers/staging/lustre/lnet/selftest/timer.c     |    6 +-
- 10 files changed, 87 insertions(+), 84 deletions(-)
+ drivers/staging/lustre/lnet/selftest/brw_test.c  |   40 ++++++------
+ drivers/staging/lustre/lnet/selftest/conrpc.c    |   68 ++++++++++----------
+ drivers/staging/lustre/lnet/selftest/console.c   |   78 +++++++++++-----------
+ drivers/staging/lustre/lnet/selftest/framework.c |   60 ++++++++--------
+ drivers/staging/lustre/lnet/selftest/ping_test.c |   14 ++--
+ drivers/staging/lustre/lnet/selftest/rpc.c       |   68 ++++++++++----------
+ drivers/staging/lustre/lnet/selftest/selftest.h  |   20 +++---
+ 7 files changed, 174 insertions(+), 174 deletions(-)
 
 diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
-index eebc924..6ac4d02 100644
+index 6b1f983..0d0c22c 100644
 --- a/drivers/staging/lustre/lnet/selftest/brw_test.c
 +++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
-@@ -86,7 +86,7 @@ brw_client_init(sfw_test_instance_t *tsi)
- 		opc = breq->blk_opc;
+@@ -83,14 +83,14 @@ brw_client_init(sfw_test_instance_t *tsi)
+ 	if (!(sn->sn_features & LST_FEAT_BULK_LEN)) {
+ 		test_bulk_req_t *breq = &tsi->tsi_u.bulk_v0;
+ 
+-		opc   = breq->blk_opc;
++		opc = breq->blk_opc;
  		flags = breq->blk_flags;
- 		npg = breq->blk_npg;
--		/*
-+		/**
+-		npg   = breq->blk_npg;
++		npg = breq->blk_npg;
+ 		/*
  		 * NB: this is not going to work for variable page size,
  		 * but we have to keep it for compatibility
  		 */
-@@ -95,7 +95,7 @@ brw_client_init(sfw_test_instance_t *tsi)
+-		len   = npg * PAGE_CACHE_SIZE;
++		len = npg * PAGE_CACHE_SIZE;
+ 
  	} else {
  		test_bulk_req_v1_t *breq = &tsi->tsi_u.bulk_v1;
- 
--		/*
-+		/**
- 		 * I should never get this step if it's unknown feature
- 		 * because make_session will reject unknown feature
+@@ -101,10 +101,10 @@ brw_client_init(sfw_test_instance_t *tsi)
  		 */
-@@ -283,7 +283,7 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
- 	} else {
- 		test_bulk_req_v1_t *breq = &tsi->tsi_u.bulk_v1;
+ 		LASSERT(!(sn->sn_features & ~LST_FEATS_MASK));
  
--		/*
-+		/**
- 		 * I should never get this step if it's unknown feature
- 		 * because make_session will reject unknown feature
- 		 */
-@@ -329,7 +329,7 @@ brw_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
- 	if (rpc->crpc_status) {
- 		CERROR("BRW RPC to %s failed with %d\n",
- 		       libcfs_id2str(rpc->crpc_dest), rpc->crpc_status);
--		if (!tsi->tsi_stopping) /* rpc could have been aborted */
-+		if (!tsi->tsi_stopping)	/* rpc could have been aborted */
- 			atomic_inc(&sn->sn_brw_errors);
- 		return;
+-		opc   = breq->blk_opc;
++		opc = breq->blk_opc;
+ 		flags = breq->blk_flags;
+-		len   = breq->blk_len;
+-		npg   = (len + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
++		len = breq->blk_len;
++		npg = (len + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
  	}
-diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-index 872df72..d045ac5 100644
---- a/drivers/staging/lustre/lnet/selftest/conctl.c
-+++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-@@ -51,9 +51,9 @@ lst_session_new_ioctl(lstio_session_new_args_t *args)
- 	char *name;
- 	int rc;
  
--	if (!args->lstio_ses_idp || /* address for output sid */
--	    !args->lstio_ses_key ||    /* no key is specified */
--	    !args->lstio_ses_namep || /* session name */
-+	if (!args->lstio_ses_idp ||	/* address for output sid */
-+	    !args->lstio_ses_key ||	/* no key is specified */
-+	    !args->lstio_ses_namep ||	/* session name */
- 	    args->lstio_ses_nmlen <= 0 ||
- 	    args->lstio_ses_nmlen > LST_NAME_SIZE)
- 		return -EINVAL;
-@@ -95,11 +95,11 @@ lst_session_info_ioctl(lstio_session_info_args_t *args)
+ 	if (npg > LNET_MAX_IOV || npg <= 0)
+@@ -275,10 +275,10 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
+ 	if (!(sn->sn_features & LST_FEAT_BULK_LEN)) {
+ 		test_bulk_req_t *breq = &tsi->tsi_u.bulk_v0;
+ 
+-		opc   = breq->blk_opc;
++		opc = breq->blk_opc;
+ 		flags = breq->blk_flags;
+-		npg   = breq->blk_npg;
+-		len   = npg * PAGE_CACHE_SIZE;
++		npg = breq->blk_npg;
++		len = npg * PAGE_CACHE_SIZE;
+ 
+ 	} else {
+ 		test_bulk_req_v1_t *breq = &tsi->tsi_u.bulk_v1;
+@@ -289,10 +289,10 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
+ 		 */
+ 		LASSERT(!(sn->sn_features & ~LST_FEATS_MASK));
+ 
+-		opc   = breq->blk_opc;
++		opc = breq->blk_opc;
+ 		flags = breq->blk_flags;
+-		len   = breq->blk_len;
+-		npg   = (len + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
++		len = breq->blk_len;
++		npg = (len + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+ 	}
+ 
+ 	rc = sfw_create_test_rpc(tsu, dest, sn->sn_features, npg, len, &rpc);
+@@ -307,8 +307,8 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
+ 
+ 	req = &rpc->crpc_reqstmsg.msg_body.brw_reqst;
+ 	req->brw_flags = flags;
+-	req->brw_rw    = opc;
+-	req->brw_len   = len;
++	req->brw_rw = opc;
++	req->brw_len = len;
+ 
+ 	*rpcpp = rpc;
+ 	return 0;
+@@ -493,8 +493,8 @@ brw_server_handle(struct srpc_server_rpc *rpc)
+ sfw_test_client_ops_t brw_test_client;
+ void brw_init_test_client(void)
  {
- 	/* no checking of key */
- 
--	if (!args->lstio_ses_idp || /* address for output sid */
--	    !args->lstio_ses_keyp || /* address for output key */
--	    !args->lstio_ses_featp || /* address for output features */
--	    !args->lstio_ses_ndinfo || /* address for output ndinfo */
--	    !args->lstio_ses_namep || /* address for output name */
-+	if (!args->lstio_ses_idp ||	/* address for output sid */
-+	    !args->lstio_ses_keyp ||	/* address for output key */
-+	    !args->lstio_ses_featp ||	/* address for output features */
-+	    !args->lstio_ses_ndinfo ||	/* address for output ndinfo */
-+	    !args->lstio_ses_namep ||	/* address for output name */
- 	    args->lstio_ses_nmlen <= 0 ||
- 	    args->lstio_ses_nmlen > LST_NAME_SIZE)
- 		return -EINVAL;
-@@ -125,7 +125,7 @@ lst_debug_ioctl(lstio_debug_args_t *args)
- 	if (!args->lstio_dbg_resultp)
- 		return -EINVAL;
- 
--	if (args->lstio_dbg_namep && /* name of batch/group */
-+	if (args->lstio_dbg_namep &&	/* name of batch/group */
- 	    (args->lstio_dbg_nmlen <= 0 ||
- 	     args->lstio_dbg_nmlen > LST_NAME_SIZE))
- 		return -EINVAL;
-@@ -327,7 +327,7 @@ lst_nodes_add_ioctl(lstio_group_nodes_args_t *args)
- 	if (args->lstio_grp_key != console_session.ses_key)
- 		return -EACCES;
- 
--	if (!args->lstio_grp_idsp || /* array of ids */
-+	if (!args->lstio_grp_idsp ||	/* array of ids */
- 	    args->lstio_grp_count <= 0 ||
- 	    !args->lstio_grp_resultp ||
- 	    !args->lstio_grp_featp ||
-@@ -395,13 +395,13 @@ lst_group_info_ioctl(lstio_group_info_args_t *args)
- 	    args->lstio_grp_nmlen > LST_NAME_SIZE)
- 		return -EINVAL;
- 
--	if (!args->lstio_grp_entp &&  /* output: group entry */
--	    !args->lstio_grp_dentsp)  /* output: node entry */
-+	if (!args->lstio_grp_entp &&	/* output: group entry */
-+	    !args->lstio_grp_dentsp)	/* output: node entry */
- 		return -EINVAL;
- 
--	if (args->lstio_grp_dentsp) { /* have node entry */
--		if (!args->lstio_grp_idxp || /* node index */
--		    !args->lstio_grp_ndentp) /* # of node entry */
-+	if (args->lstio_grp_dentsp) {		/* have node entry */
-+		if (!args->lstio_grp_idxp ||	/* node index */
-+		    !args->lstio_grp_ndentp)	/* # of node entry */
- 			return -EINVAL;
- 
- 		if (copy_from_user(&ndent, args->lstio_grp_ndentp,
-@@ -613,18 +613,18 @@ lst_batch_info_ioctl(lstio_batch_info_args_t *args)
- 	if (args->lstio_bat_key != console_session.ses_key)
- 		return -EACCES;
- 
--	if (!args->lstio_bat_namep || /* batch name */
-+	if (!args->lstio_bat_namep ||	/* batch name */
- 	    args->lstio_bat_nmlen <= 0 ||
- 	    args->lstio_bat_nmlen > LST_NAME_SIZE)
- 		return -EINVAL;
- 
--	if (!args->lstio_bat_entp && /* output: batch entry */
--	    !args->lstio_bat_dentsp) /* output: node entry */
-+	if (!args->lstio_bat_entp &&	/* output: batch entry */
-+	    !args->lstio_bat_dentsp)	/* output: node entry */
- 		return -EINVAL;
- 
--	if (args->lstio_bat_dentsp) { /* have node entry */
--		if (!args->lstio_bat_idxp || /* node index */
--		    !args->lstio_bat_ndentp) /* # of node entry */
-+	if (args->lstio_bat_dentsp) {		/* have node entry */
-+		if (!args->lstio_bat_idxp ||	/* node index */
-+		    !args->lstio_bat_ndentp)	/* # of node entry */
- 			return -EINVAL;
- 
- 		if (copy_from_user(&index, args->lstio_bat_idxp,
-@@ -723,18 +723,18 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
- 
- 	if (!args->lstio_tes_resultp ||
- 	    !args->lstio_tes_retp ||
--	    !args->lstio_tes_bat_name || /* no specified batch */
-+	    !args->lstio_tes_bat_name ||	/* no specified batch */
- 	    args->lstio_tes_bat_nmlen <= 0 ||
- 	    args->lstio_tes_bat_nmlen > LST_NAME_SIZE ||
--	    !args->lstio_tes_sgrp_name || /* no source group */
-+	    !args->lstio_tes_sgrp_name ||	/* no source group */
- 	    args->lstio_tes_sgrp_nmlen <= 0 ||
- 	    args->lstio_tes_sgrp_nmlen > LST_NAME_SIZE ||
--	    !args->lstio_tes_dgrp_name || /* no target group */
-+	    !args->lstio_tes_dgrp_name ||	/* no target group */
- 	    args->lstio_tes_dgrp_nmlen <= 0 ||
- 	    args->lstio_tes_dgrp_nmlen > LST_NAME_SIZE)
- 		return -EINVAL;
- 
--	if (!args->lstio_tes_loop || /* negative is infinite */
-+	if (!args->lstio_tes_loop ||		/* negative is infinite */
- 	    args->lstio_tes_concur <= 0 ||
- 	    args->lstio_tes_dist <= 0 ||
- 	    args->lstio_tes_span <= 0)
+-	brw_test_client.tso_init     = brw_client_init;
+-	brw_test_client.tso_fini     = brw_client_fini;
++	brw_test_client.tso_init = brw_client_init;
++	brw_test_client.tso_fini = brw_client_fini;
+ 	brw_test_client.tso_prep_rpc = brw_client_prep_rpc;
+ 	brw_test_client.tso_done_rpc = brw_client_done_rpc;
+ };
+@@ -502,9 +502,9 @@ void brw_init_test_client(void)
+ srpc_service_t brw_test_service;
+ void brw_init_test_service(void)
+ {
+-	brw_test_service.sv_id         = SRPC_SERVICE_BRW;
+-	brw_test_service.sv_name       = "brw_test";
+-	brw_test_service.sv_handler    = brw_server_handle;
++	brw_test_service.sv_id = SRPC_SERVICE_BRW;
++	brw_test_service.sv_name = "brw_test";
++	brw_test_service.sv_handler = brw_server_handle;
+ 	brw_test_service.sv_bulk_ready = brw_bulk_ready;
+-	brw_test_service.sv_wi_total   = brw_srv_workitems;
++	brw_test_service.sv_wi_total = brw_srv_workitems;
+ }
 diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-index cdb660e..9401e1a 100644
+index 77ea41b..cdb660e 100644
 --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
 +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-@@ -60,7 +60,7 @@ lstcon_rpc_done(srpc_client_rpc_t *rpc)
- 	spin_lock(&rpc->crpc_lock);
+@@ -78,7 +78,7 @@ lstcon_rpc_done(srpc_client_rpc_t *rpc)
+ 		/* not aborted */
+ 		LASSERT(!crpc->crp_status);
  
- 	if (!crpc->crp_trans) {
--		/*
-+		/**
- 		 * Orphan RPC is not in any transaction,
- 		 * I'm just a poor body and nobody loves me
- 		 */
-@@ -242,7 +242,7 @@ lstcon_rpc_trans_prep(struct list_head *translist,
+-		crpc->crp_stamp  = cfs_time_current();
++		crpc->crp_stamp = cfs_time_current();
+ 		crpc->crp_status = rpc->crpc_status;
+ 	}
  
- 	if (translist) {
- 		list_for_each_entry(trans, translist, tas_link) {
--			/*
-+			/**
- 			 * Can't enqueue two private transaction on
- 			 * the same object
- 			 */
-@@ -296,8 +296,8 @@ lstcon_rpc_trans_abort(lstcon_rpc_trans_t *trans, int error)
+@@ -99,13 +99,13 @@ lstcon_rpc_init(lstcon_node_t *nd, int service, unsigned feats,
+ 	if (!crpc->crp_rpc)
+ 		return -ENOMEM;
  
- 		spin_lock(&rpc->crpc_lock);
+-	crpc->crp_trans    = NULL;
+-	crpc->crp_node     = nd;
+-	crpc->crp_posted   = 0;
++	crpc->crp_trans = NULL;
++	crpc->crp_node = nd;
++	crpc->crp_posted = 0;
+ 	crpc->crp_finished = 0;
+ 	crpc->crp_unpacked = 0;
+-	crpc->crp_status   = 0;
+-	crpc->crp_stamp    = 0;
++	crpc->crp_status = 0;
++	crpc->crp_stamp = 0;
+ 	crpc->crp_embedded = embedded;
+ 	INIT_LIST_HEAD(&crpc->crp_link);
  
--		if (!crpc->crp_posted || /* not posted */
--		    crpc->crp_stamp) { /* rpc done or aborted already */
-+		if (!crpc->crp_posted ||	/* not posted */
-+		    crpc->crp_stamp) {		/* rpc done or aborted already */
- 			if (!crpc->crp_stamp) {
- 				crpc->crp_stamp = cfs_time_current();
- 				crpc->crp_status = -EINTR;
-@@ -563,11 +563,11 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
+@@ -306,7 +306,7 @@ lstcon_rpc_trans_abort(lstcon_rpc_trans_t *trans, int error)
  			continue;
  		}
  
--		/*
--		 * rpcs can be still not callbacked (even LNetMDUnlink is called)
--		 * because huge timeout for inaccessible network, don't make
--		 * user wait for them, just abandon them, they will be recycled
--		 * in callback
-+		/**
-+		 * rpcs can be still not callbacked (even LNetMDUnlink is
-+		 * called) because huge timeout for inaccessible network,
-+		 * don't make user wait for them, just abandon them, they
-+		 * will be recycled in callback
+-		crpc->crp_stamp  = cfs_time_current();
++		crpc->crp_stamp = cfs_time_current();
+ 		crpc->crp_status = error;
+ 
+ 		spin_unlock(&rpc->crpc_lock);
+@@ -571,7 +571,7 @@ lstcon_rpc_trans_destroy(lstcon_rpc_trans_t *trans)
  		 */
  		LASSERT(crpc->crp_status);
  
-@@ -941,7 +941,7 @@ lstcon_sesnew_stat_reply(lstcon_rpc_trans_t *trans,
+-		crpc->crp_node  = NULL;
++		crpc->crp_node = NULL;
+ 		crpc->crp_trans = NULL;
+ 		list_del_init(&crpc->crp_link);
+ 		count++;
+@@ -609,8 +609,8 @@ lstcon_sesrpc_prep(lstcon_node_t *nd, int transop,
+ 			return rc;
  
- 	if (!trans->tas_feats_updated) {
- 		spin_lock(&console_session.ses_rpc_lock);
--		if (!trans->tas_feats_updated) { /* recheck with lock */
-+		if (!trans->tas_feats_updated) {	/* recheck with lock */
- 			trans->tas_feats_updated = 1;
- 			trans->tas_features = reply->msg_ses_feats;
+ 		msrq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.mksn_reqst;
+-		msrq->mksn_sid     = console_session.ses_id;
+-		msrq->mksn_force   = console_session.ses_force;
++		msrq->mksn_sid = console_session.ses_id;
++		msrq->mksn_force = console_session.ses_force;
+ 		strlcpy(msrq->mksn_name, console_session.ses_name,
+ 			sizeof(msrq->mksn_name));
+ 		break;
+@@ -644,7 +644,7 @@ lstcon_dbgrpc_prep(lstcon_node_t *nd, unsigned feats, lstcon_rpc_t **crpc)
+ 
+ 	drq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.dbg_reqst;
+ 
+-	drq->dbg_sid   = console_session.ses_id;
++	drq->dbg_sid = console_session.ses_id;
+ 	drq->dbg_flags = 0;
+ 
+ 	return rc;
+@@ -664,10 +664,10 @@ lstcon_batrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
+ 
+ 	brq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.bat_reqst;
+ 
+-	brq->bar_sid     = console_session.ses_id;
+-	brq->bar_bid     = tsb->tsb_id;
++	brq->bar_sid = console_session.ses_id;
++	brq->bar_bid = tsb->tsb_id;
+ 	brq->bar_testidx = tsb->tsb_index;
+-	brq->bar_opc     = transop == LST_TRANS_TSBRUN ? SRPC_BATCH_OPC_RUN :
++	brq->bar_opc = transop == LST_TRANS_TSBRUN ? SRPC_BATCH_OPC_RUN :
+ 			   (transop == LST_TRANS_TSBSTOP ? SRPC_BATCH_OPC_STOP :
+ 			    SRPC_BATCH_OPC_QUERY);
+ 
+@@ -695,7 +695,7 @@ lstcon_statrpc_prep(lstcon_node_t *nd, unsigned feats, lstcon_rpc_t **crpc)
+ 
+ 	srq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.stat_reqst;
+ 
+-	srq->str_sid  = console_session.ses_id;
++	srq->str_sid = console_session.ses_id;
+ 	srq->str_type = 0; /* XXX remove it */
+ 
+ 	return 0;
+@@ -735,7 +735,7 @@ lstcon_dstnodes_prep(lstcon_group_t *grp, int idx,
+ 		return -EINVAL;
+ 
+ 	start = ((idx / dist) * span) % grp->grp_nnode;
+-	end   = ((idx / dist) * span + span - 1) % grp->grp_nnode;
++	end = ((idx / dist) * span + span - 1) % grp->grp_nnode;
+ 
+ 	list_for_each_entry(ndl, &grp->grp_ndl_list, ndl_link) {
+ 		nd = ndl->ndl_node;
+@@ -775,7 +775,7 @@ lstcon_pingrpc_prep(lst_test_ping_param_t *param, srpc_test_reqst_t *req)
+ {
+ 	test_ping_req_t *prq = &req->tsr_u.ping;
+ 
+-	prq->png_size  = param->png_size;
++	prq->png_size = param->png_size;
+ 	prq->png_flags = param->png_flags;
+ 	/* TODO dest */
+ 	return 0;
+@@ -786,9 +786,9 @@ lstcon_bulkrpc_v0_prep(lst_test_bulk_param_t *param, srpc_test_reqst_t *req)
+ {
+ 	test_bulk_req_t *brq = &req->tsr_u.bulk_v0;
+ 
+-	brq->blk_opc   = param->blk_opc;
+-	brq->blk_npg   = (param->blk_size + PAGE_CACHE_SIZE - 1) /
+-			  PAGE_CACHE_SIZE;
++	brq->blk_opc = param->blk_opc;
++	brq->blk_npg = (param->blk_size + PAGE_CACHE_SIZE - 1) /
++			PAGE_CACHE_SIZE;
+ 	brq->blk_flags = param->blk_flags;
+ 
+ 	return 0;
+@@ -799,9 +799,9 @@ lstcon_bulkrpc_v1_prep(lst_test_bulk_param_t *param, srpc_test_reqst_t *req)
+ {
+ 	test_bulk_req_v1_t *brq = &req->tsr_u.bulk_v1;
+ 
+-	brq->blk_opc	= param->blk_opc;
+-	brq->blk_flags	= param->blk_flags;
+-	brq->blk_len	= param->blk_size;
++	brq->blk_opc = param->blk_opc;
++	brq->blk_flags = param->blk_flags;
++	brq->blk_len = param->blk_size;
+ 	brq->blk_offset	= 0; /* reserved */
+ 
+ 	return 0;
+@@ -818,7 +818,7 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
+ 	int i;
+ 	int npg = 0;
+ 	int nob = 0;
+-	int rc  = 0;
++	int rc = 0;
+ 
+ 	if (transop == LST_TRANS_TSBCLIADD) {
+ 		npg = sfw_id_pages(test->tes_span);
+@@ -831,7 +831,7 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
+ 	if (rc)
+ 		return rc;
+ 
+-	trq  = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.tes_reqst;
++	trq = &(*crpc)->crp_rpc->crpc_reqstmsg.msg_body.tes_reqst;
+ 
+ 	if (transop == LST_TRANS_TSBSRVADD) {
+ 		int ndist = (sgrp->grp_nnode + test->tes_dist - 1) /
+@@ -841,7 +841,7 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
+ 		int nmax = (ndist + nspan - 1) / nspan;
+ 
+ 		trq->tsr_ndest = 0;
+-		trq->tsr_loop  = nmax * test->tes_dist * test->tes_concur;
++		trq->tsr_loop = nmax * test->tes_dist * test->tes_concur;
+ 
+ 	} else {
+ 		bulk = &(*crpc)->crp_rpc->crpc_bulk;
+@@ -857,8 +857,8 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
+ 			nob -= len;
+ 
+ 			bulk->bk_iovs[i].kiov_offset = 0;
+-			bulk->bk_iovs[i].kiov_len    = len;
+-			bulk->bk_iovs[i].kiov_page   =
++			bulk->bk_iovs[i].kiov_len = len;
++			bulk->bk_iovs[i].kiov_page =
+ 				alloc_page(GFP_KERNEL);
+ 
+ 			if (!bulk->bk_iovs[i].kiov_page) {
+@@ -882,13 +882,13 @@ lstcon_testrpc_prep(lstcon_node_t *nd, int transop, unsigned feats,
  		}
-@@ -1181,7 +1181,8 @@ lstcon_rpc_pinger(void *arg)
- 	int count = 0;
- 	int rc;
  
--	/* RPC pinger is a special case of transaction,
-+	/**
-+	 * RPC pinger is a special case of transaction,
- 	 * it's called by timer at 8 seconds interval.
- 	 */
- 	mutex_lock(&console_session.ses_mutex);
+ 		trq->tsr_ndest = test->tes_span;
+-		trq->tsr_loop  = test->tes_loop;
++		trq->tsr_loop = test->tes_loop;
+ 	}
+ 
+-	trq->tsr_sid        = console_session.ses_id;
+-	trq->tsr_bid        = test->tes_hdr.tsb_id;
+-	trq->tsr_concur     = test->tes_concur;
+-	trq->tsr_is_client  = (transop == LST_TRANS_TSBCLIADD) ? 1 : 0;
++	trq->tsr_sid = console_session.ses_id;
++	trq->tsr_bid = test->tes_hdr.tsb_id;
++	trq->tsr_concur = test->tes_concur;
++	trq->tsr_is_client = (transop == LST_TRANS_TSBCLIADD) ? 1 : 0;
+ 	trq->tsr_stop_onerr = !!test->tes_stop_onerr;
+ 
+ 	switch (test->tes_type) {
+@@ -1262,7 +1262,7 @@ lstcon_rpc_pinger(void *arg)
+ 
+ 		drq = &crpc->crp_rpc->crpc_reqstmsg.msg_body.dbg_reqst;
+ 
+-		drq->dbg_sid   = console_session.ses_id;
++		drq->dbg_sid = console_session.ses_id;
+ 		drq->dbg_flags = 0;
+ 
+ 		lstcon_rpc_trans_addreq(trans, crpc);
 diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index 6017f21..25917ac 100644
+index aac159b..15cd830 100644
 --- a/drivers/staging/lustre/lnet/selftest/console.c
 +++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -104,7 +104,7 @@ lstcon_node_find(lnet_process_id_t id, lstcon_node_t **ndpp, int create)
+@@ -97,8 +97,8 @@ lstcon_node_find(lnet_process_id_t id, lstcon_node_t **ndpp, int create)
+ 
+ 	ndl->ndl_node = *ndpp;
+ 
+-	ndl->ndl_node->nd_ref   = 1;
+-	ndl->ndl_node->nd_id    = id;
++	ndl->ndl_node->nd_ref = 1;
++	ndl->ndl_node->nd_id = id;
+ 	ndl->ndl_node->nd_stamp = cfs_time_current();
+ 	ndl->ndl_node->nd_state = LST_NODE_UNKNOWN;
  	ndl->ndl_node->nd_timeout = 0;
- 	memset(&ndl->ndl_node->nd_ping, 0, sizeof(lstcon_rpc_t));
+@@ -179,7 +179,7 @@ lstcon_ndlink_find(struct list_head *hash,
+ 	INIT_LIST_HEAD(&ndl->ndl_link);
+ 	list_add_tail(&ndl->ndl_hlink, &hash[idx]);
  
--	/*
-+	/**
- 	 * queued in global hash & list, no refcount is taken by
- 	 * global hash & list, if caller release his refcount,
- 	 * node will be released
-@@ -276,7 +276,7 @@ lstcon_group_find(const char *name, lstcon_group_t **grpp)
- 		if (strncmp(grp->grp_name, name, LST_NAME_SIZE))
- 			continue;
+-	return  0;
++	return 0;
+ }
  
--		lstcon_group_addref(grp);  /* +1 ref for caller */
-+		lstcon_group_addref(grp); /* +1 ref for caller */
- 		*grpp = grp;
- 		return 0;
+ static void
+@@ -978,8 +978,8 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
+ 		entp->u.tbe_batch.bae_state = bat->bat_state;
+ 
+ 	} else {
+-		entp->u.tbe_test.tse_type   = test->tes_type;
+-		entp->u.tbe_test.tse_loop   = test->tes_loop;
++		entp->u.tbe_test.tse_type = test->tes_type;
++		entp->u.tbe_test.tse_loop = test->tes_loop;
+ 		entp->u.tbe_test.tse_concur = test->tes_concur;
  	}
-@@ -608,7 +608,7 @@ lstcon_group_del(char *name)
- 	lstcon_rpc_trans_destroy(trans);
  
- 	lstcon_group_decref(grp);
--	/*
-+	/**
- 	 * -ref for session, it's destroyed,
- 	 * status can't be rolled back, destroy group anyway
- 	 */
-@@ -1289,7 +1289,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
- 	lstcon_group_t *dst_grp = NULL;
- 	lstcon_batch_t *batch = NULL;
+@@ -1196,7 +1196,7 @@ lstcon_test_nodes_add(lstcon_test_t *test, struct list_head __user *result_up)
+ 	LASSERT(test->tes_dst_grp);
  
--	/*
-+	/**
- 	 * verify that a batch of the given name exists, and the groups
- 	 * that will be part of the batch exist and have at least one
- 	 * active node
-@@ -1447,7 +1447,8 @@ lstcon_test_batch_query(char *name, int testidx, int client,
+ 	transop = LST_TRANS_TSBSRVADD;
+-	grp  = test->tes_dst_grp;
++	grp = test->tes_dst_grp;
+ again:
+ 	rc = lstcon_rpc_trans_ndlist(&grp->grp_ndl_list,
+ 				     &test->tes_trans_list, transop,
+@@ -1317,18 +1317,18 @@ lstcon_test_add(char *batch_name, int type, int loop,
+ 		goto out;
+ 	}
  
- 	lstcon_rpc_trans_postwait(trans, timeout);
+-	test->tes_hdr.tsb_id	= batch->bat_hdr.tsb_id;
+-	test->tes_batch		= batch;
+-	test->tes_type		= type;
+-	test->tes_oneside	= 0; /* TODO */
+-	test->tes_loop		= loop;
+-	test->tes_concur	= concur;
+-	test->tes_stop_onerr	= 1; /* TODO */
+-	test->tes_span		= span;
+-	test->tes_dist		= dist;
+-	test->tes_cliidx	= 0; /* just used for creating RPC */
+-	test->tes_src_grp	= src_grp;
+-	test->tes_dst_grp	= dst_grp;
++	test->tes_hdr.tsb_id = batch->bat_hdr.tsb_id;
++	test->tes_batch	= batch;
++	test->tes_type = type;
++	test->tes_oneside = 0; /* TODO */
++	test->tes_loop = loop;
++	test->tes_concur = concur;
++	test->tes_stop_onerr = 1; /* TODO */
++	test->tes_span = span;
++	test->tes_dist = dist;
++	test->tes_cliidx = 0; /* just used for creating RPC */
++	test->tes_src_grp = src_grp;
++	test->tes_dst_grp = dst_grp;
+ 	INIT_LIST_HEAD(&test->tes_trans_list);
  
--	if (!testidx && /* query a batch, not a test */
-+	/* query a batch, not a test */
-+	if (!testidx &&
- 	    !lstcon_rpc_stat_failure(lstcon_trans_stat(), 0) &&
- 	    !lstcon_tsbqry_stat_run(lstcon_trans_stat(), 0)) {
- 		/* all RPCs finished, and no active test */
+ 	if (param) {
+@@ -1420,8 +1420,8 @@ lstcon_test_batch_query(char *name, int testidx, int client,
+ 
+ 	if (!testidx) {
+ 		translist = &batch->bat_trans_list;
+-		ndlist    = &batch->bat_cli_list;
+-		hdr       = &batch->bat_hdr;
++		ndlist = &batch->bat_cli_list;
++		hdr = &batch->bat_hdr;
+ 
+ 	} else {
+ 		/* query specified test only */
+@@ -1432,8 +1432,8 @@ lstcon_test_batch_query(char *name, int testidx, int client,
+ 		}
+ 
+ 		translist = &test->tes_trans_list;
+-		ndlist    = &test->tes_src_grp->grp_ndl_list;
+-		hdr       = &test->tes_hdr;
++		ndlist = &test->tes_src_grp->grp_ndl_list;
++		hdr = &test->tes_hdr;
+ 	}
+ 
+ 	transop = client ? LST_TRANS_TSBCLIQRY : LST_TRANS_TSBSRVQRY;
+@@ -1689,7 +1689,7 @@ lstcon_nodes_debug(int timeout,
+ int
+ lstcon_session_match(lst_sid_t sid)
+ {
+-	return (console_session.ses_id.ses_nid   == sid.ses_nid &&
++	return (console_session.ses_id.ses_nid == sid.ses_nid &&
+ 		console_session.ses_id.ses_stamp == sid.ses_stamp) ?  1 : 0;
+ }
+ 
+@@ -1701,7 +1701,7 @@ lstcon_new_session_id(lst_sid_t *sid)
+ 	LASSERT(console_session.ses_state == LST_SESSION_NONE);
+ 
+ 	LNetGetId(1, &id);
+-	sid->ses_nid   = id.nid;
++	sid->ses_nid = id.nid;
+ 	sid->ses_stamp = cfs_time_current();
+ }
+ 
+@@ -1839,9 +1839,9 @@ lstcon_session_end(void)
+ 	/* waiting for orphan rpcs to die */
+ 	lstcon_rpc_cleanup_wait();
+ 
+-	console_session.ses_id    = LST_INVALID_SID;
++	console_session.ses_id = LST_INVALID_SID;
+ 	console_session.ses_state = LST_SESSION_NONE;
+-	console_session.ses_key   = 0;
++	console_session.ses_key = 0;
+ 	console_session.ses_force = 0;
+ 	console_session.ses_feats_updated = 0;
+ 
+@@ -1866,7 +1866,7 @@ lstcon_session_end(void)
+ 	LASSERT(list_empty(&console_session.ses_ndl_list));
+ 
+ 	console_session.ses_shutdown = 0;
+-	console_session.ses_expired  = 0;
++	console_session.ses_expired = 0;
+ 
+ 	return rc;
+ }
+@@ -1965,7 +1965,7 @@ lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
+ 		goto out;
+ 	}
+ 
+-	ndl->ndl_node->nd_state   = LST_NODE_ACTIVE;
++	ndl->ndl_node->nd_state = LST_NODE_ACTIVE;
+ 	ndl->ndl_node->nd_timeout = console_session.ses_timeout;
+ 
+ 	if (!grp->grp_userland)
+@@ -1974,7 +1974,7 @@ lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
+ 	strlcpy(jrep->join_session, console_session.ses_name,
+ 		sizeof(jrep->join_session));
+ 	jrep->join_timeout = console_session.ses_timeout;
+-	jrep->join_status  = 0;
++	jrep->join_status = 0;
+ 
+ out:
+ 	rep->msg_ses_feats = console_session.ses_features;
+@@ -1990,9 +1990,9 @@ static srpc_service_t lstcon_acceptor_service;
+ static void lstcon_init_acceptor_service(void)
+ {
+ 	/* initialize selftest console acceptor service table */
+-	lstcon_acceptor_service.sv_name     = "join session";
+-	lstcon_acceptor_service.sv_handler  = lstcon_acceptor_handle;
+-	lstcon_acceptor_service.sv_id       = SRPC_SERVICE_JOIN;
++	lstcon_acceptor_service.sv_name = "join session";
++	lstcon_acceptor_service.sv_handler = lstcon_acceptor_handle;
++	lstcon_acceptor_service.sv_id = SRPC_SERVICE_JOIN;
+ 	lstcon_acceptor_service.sv_wi_total = SFW_FRWK_WI_MAX;
+ }
+ 
+@@ -2009,14 +2009,14 @@ lstcon_console_init(void)
+ 
+ 	memset(&console_session, 0, sizeof(struct lstcon_session));
+ 
+-	console_session.ses_id		  = LST_INVALID_SID;
+-	console_session.ses_state	  = LST_SESSION_NONE;
+-	console_session.ses_timeout	  = 0;
+-	console_session.ses_force	  = 0;
+-	console_session.ses_expired	  = 0;
++	console_session.ses_id = LST_INVALID_SID;
++	console_session.ses_state = LST_SESSION_NONE;
++	console_session.ses_timeout = 0;
++	console_session.ses_force = 0;
++	console_session.ses_expired = 0;
+ 	console_session.ses_feats_updated = 0;
+-	console_session.ses_features	  = LST_FEATS_MASK;
+-	console_session.ses_laststamp	  = ktime_get_real_seconds();
++	console_session.ses_features = LST_FEATS_MASK;
++	console_session.ses_laststamp = ktime_get_real_seconds();
+ 
+ 	mutex_init(&console_session.ses_mutex);
+ 
 diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
-index 2ff47d2..ed2f7e9 100644
+index 04bab32..a3ccd78 100644
 --- a/drivers/staging/lustre/lnet/selftest/framework.c
 +++ b/drivers/staging/lustre/lnet/selftest/framework.c
-@@ -226,7 +226,7 @@ __must_hold(&sfw_data.fw_lock)
- 	}
+@@ -149,7 +149,7 @@ sfw_register_test(srpc_service_t *service, sfw_test_client_ops_t *cliops)
+ 	if (!tsc)
+ 		return -ENOMEM;
  
- 	if (nactive)
--		return;   /* wait for active batches to stop */
-+		return;	/* wait for active batches to stop */
+-	tsc->tsc_cli_ops     = cliops;
++	tsc->tsc_cli_ops = cliops;
+ 	tsc->tsc_srv_service = service;
  
- 	list_del_init(&sn->sn_list);
- 	spin_unlock(&sfw_data.fw_lock);
-@@ -382,7 +382,7 @@ sfw_get_stats(srpc_stat_reqst_t *request, srpc_stat_reply_t *reply)
- 	lnet_counters_get(&reply->str_lnet);
- 	srpc_get_counters(&reply->str_rpc);
+ 	list_add_tail(&tsc->tsc_list, &sfw_data.fw_tests);
+@@ -271,10 +271,10 @@ sfw_init_session(sfw_session_t *sn, lst_sid_t sid,
+ 	strlcpy(&sn->sn_name[0], name, sizeof(sn->sn_name));
  
--	/*
-+	/**
+ 	sn->sn_timer_active = 0;
+-	sn->sn_id           = sid;
+-	sn->sn_features	    = features;
+-	sn->sn_timeout      = session_timeout;
+-	sn->sn_started      = cfs_time_current();
++	sn->sn_id = sid;
++	sn->sn_features = features;
++	sn->sn_timeout = session_timeout;
++	sn->sn_started = cfs_time_current();
+ 
+ 	timer->stt_data = sn;
+ 	timer->stt_func = sfw_session_expired;
+@@ -350,9 +350,9 @@ sfw_bid2batch(lst_bid_t bid)
+ 	if (!bat)
+ 		return NULL;
+ 
+-	bat->bat_error    = 0;
+-	bat->bat_session  = sn;
+-	bat->bat_id       = bid;
++	bat->bat_error = 0;
++	bat->bat_session = sn;
++	bat->bat_id = bid;
+ 	atomic_set(&bat->bat_nactive, 0);
+ 	INIT_LIST_HEAD(&bat->bat_tests);
+ 
+@@ -386,9 +386,9 @@ sfw_get_stats(srpc_stat_reqst_t *request, srpc_stat_reply_t *reply)
  	 * send over the msecs since the session was started
  	 * with 32 bits to send, this is ~49 days
  	 */
-@@ -435,7 +435,7 @@ sfw_make_session(srpc_mksn_reqst_t *request, srpc_mksn_reply_t *reply)
+-	cnt->running_ms	     = jiffies_to_msecs(jiffies - sn->sn_started);
+-	cnt->brw_errors      = atomic_read(&sn->sn_brw_errors);
+-	cnt->ping_errors     = atomic_read(&sn->sn_ping_errors);
++	cnt->running_ms = jiffies_to_msecs(jiffies - sn->sn_started);
++	cnt->brw_errors = atomic_read(&sn->sn_brw_errors);
++	cnt->ping_errors = atomic_read(&sn->sn_ping_errors);
+ 	cnt->zombie_sessions = atomic_read(&sfw_data.fw_nzombies);
+ 
+ 	cnt->active_batches = 0;
+@@ -416,8 +416,8 @@ sfw_make_session(srpc_mksn_reqst_t *request, srpc_mksn_reply_t *reply)
+ 	}
+ 
+ 	if (sn) {
+-		reply->mksn_status  = 0;
+-		reply->mksn_sid     = sn->sn_id;
++		reply->mksn_status = 0;
++		reply->mksn_sid = sn->sn_id;
+ 		reply->mksn_timeout = sn->sn_timeout;
+ 
+ 		if (sfw_sid_equal(request->mksn_sid, sn->sn_id)) {
+@@ -466,8 +466,8 @@ sfw_make_session(srpc_mksn_reqst_t *request, srpc_mksn_reply_t *reply)
+ 
+ 	spin_unlock(&sfw_data.fw_lock);
+ 
+-	reply->mksn_status  = 0;
+-	reply->mksn_sid     = sn->sn_id;
++	reply->mksn_status = 0;
++	reply->mksn_sid = sn->sn_id;
+ 	reply->mksn_timeout = sn->sn_timeout;
+ 	return 0;
+ }
+@@ -499,7 +499,7 @@ sfw_remove_session(srpc_rmsn_reqst_t *request, srpc_rmsn_reply_t *reply)
+ 	spin_unlock(&sfw_data.fw_lock);
+ 
+ 	reply->rmsn_status = 0;
+-	reply->rmsn_sid    = LST_INVALID_SID;
++	reply->rmsn_sid = LST_INVALID_SID;
+ 	LASSERT(!sfw_data.fw_session);
+ 	return 0;
+ }
+@@ -511,12 +511,12 @@ sfw_debug_session(srpc_debug_reqst_t *request, srpc_debug_reply_t *reply)
+ 
+ 	if (!sn) {
+ 		reply->dbg_status = ESRCH;
+-		reply->dbg_sid    = LST_INVALID_SID;
++		reply->dbg_sid = LST_INVALID_SID;
+ 		return 0;
+ 	}
+ 
+-	reply->dbg_status  = 0;
+-	reply->dbg_sid     = sn->sn_id;
++	reply->dbg_status = 0;
++	reply->dbg_sid = sn->sn_id;
+ 	reply->dbg_timeout = sn->sn_timeout;
+ 	if (strlcpy(reply->dbg_name, &sn->sn_name[0], sizeof(reply->dbg_name))
+ 	    >= sizeof(reply->dbg_name))
+@@ -753,12 +753,12 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
+ 	INIT_LIST_HEAD(&tsi->tsi_free_rpcs);
+ 	INIT_LIST_HEAD(&tsi->tsi_active_rpcs);
+ 
+-	tsi->tsi_stopping      = 0;
+-	tsi->tsi_batch         = tsb;
+-	tsi->tsi_loop          = req->tsr_loop;
+-	tsi->tsi_concur        = req->tsr_concur;
+-	tsi->tsi_service       = req->tsr_service;
+-	tsi->tsi_is_client     = !!(req->tsr_is_client);
++	tsi->tsi_stopping = 0;
++	tsi->tsi_batch = tsb;
++	tsi->tsi_loop = req->tsr_loop;
++	tsi->tsi_concur = req->tsr_concur;
++	tsi->tsi_service = req->tsr_service;
++	tsi->tsi_is_client = !!(req->tsr_is_client);
+ 	tsi->tsi_stoptsu_onerr = !!(req->tsr_stop_onerr);
+ 
+ 	rc = sfw_load_test(tsi);
+@@ -806,7 +806,7 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
+ 			tsu->tsu_dest.nid = id.nid;
+ 			tsu->tsu_dest.pid = id.pid;
+ 			tsu->tsu_instance = tsi;
+-			tsu->tsu_private  = NULL;
++			tsu->tsu_private = NULL;
+ 			list_add_tail(&tsu->tsu_list, &tsi->tsi_units);
  		}
  	}
+@@ -1269,7 +1269,7 @@ sfw_handle_server_rpc(struct srpc_server_rpc *rpc)
+ 			CNETERR("Features of framework RPC don't match features of current session: %x/%x\n",
+ 				request->msg_ses_feats, sn->sn_features);
+ 			reply->msg_body.reply.status = EPROTO;
+-			reply->msg_body.reply.sid    = sn->sn_id;
++			reply->msg_body.reply.sid = sn->sn_id;
+ 			goto out;
+ 		}
  
--	/*
-+	/**
- 	 * reject the request if it requires unknown features
- 	 * NB: old version will always accept all features because it's not
- 	 * aware of srpc_msg_t::msg_ses_feats, it's a defect but it's also
-@@ -576,7 +576,7 @@ sfw_load_test(struct sfw_test_instance *tsi)
- 	if (rc) {
- 		CWARN("Failed to reserve enough buffers: service %s, %d needed: %d\n",
- 		      svc->sv_name, nbuf, rc);
--		/*
-+		/**
- 		 * NB: this error handler is not strictly correct, because
- 		 * it may release more buffers than already allocated,
- 		 * but it doesn't matter because request portal should
-@@ -604,7 +604,7 @@ sfw_unload_test(struct sfw_test_instance *tsi)
- 	if (tsi->tsi_is_client)
- 		return;
+@@ -1652,7 +1652,7 @@ sfw_startup(void)
  
--	/*
-+	/**
- 	 * shrink buffers, because request portal is lazy portal
- 	 * which can grow buffers at runtime so we may leave
- 	 * some buffers behind, but never mind...
-@@ -693,7 +693,7 @@ sfw_unpack_addtest_req(srpc_msg_t *msg)
- 	LASSERT(req->tsr_is_client);
+ 	memset(&sfw_data, 0, sizeof(struct smoketest_framework));
  
- 	if (msg->msg_magic == SRPC_MSG_MAGIC)
--		return; /* no flipping needed */
-+		return;	/* no flipping needed */
+-	sfw_data.fw_session     = NULL;
++	sfw_data.fw_session = NULL;
+ 	sfw_data.fw_active_srpc = NULL;
+ 	spin_lock_init(&sfw_data.fw_lock);
+ 	atomic_set(&sfw_data.fw_nzombies, 0);
+@@ -1689,8 +1689,8 @@ sfw_startup(void)
+ 			break;
  
- 	LASSERT(msg->msg_magic == __swab32(SRPC_MSG_MAGIC));
+ 		sv->sv_bulk_ready = NULL;
+-		sv->sv_handler    = sfw_handle_server_rpc;
+-		sv->sv_wi_total   = SFW_FRWK_WI_MAX;
++		sv->sv_handler = sfw_handle_server_rpc;
++		sv->sv_wi_total = SFW_FRWK_WI_MAX;
+ 		if (sv->sv_id == SRPC_SERVICE_TEST)
+ 			sv->sv_bulk_ready = sfw_bulk_ready;
  
-@@ -789,7 +789,7 @@ sfw_add_test_instance(sfw_batch_t *tsb, struct srpc_server_rpc *rpc)
- 		int j;
- 
- 		dests = page_address(bk->bk_iovs[i / SFW_ID_PER_PAGE].kiov_page);
--		LASSERT(dests);  /* my pages are within KVM always */
-+		LASSERT(dests);		/* my pages are within KVM always */
- 		id = dests[i % SFW_ID_PER_PAGE];
- 		if (msg->msg_magic != SRPC_MSG_MAGIC)
- 			sfw_unpack_id(id);
-@@ -844,8 +844,8 @@ sfw_test_unit_done(sfw_test_unit_t *tsu)
- 
- 	spin_lock(&sfw_data.fw_lock);
- 
--	if (!atomic_dec_and_test(&tsb->bat_nactive) ||/* tsb still active */
--	    sn == sfw_data.fw_session) {		  /* sn also active */
-+	if (!atomic_dec_and_test(&tsb->bat_nactive) ||	/* tsb still active */
-+	    sn == sfw_data.fw_session) {		/* sn also active */
- 		spin_unlock(&sfw_data.fw_lock);
- 		return;
- 	}
-@@ -978,7 +978,7 @@ sfw_run_test(swi_workitem_t *wi)
- 	return 0;
- 
- test_done:
--	/*
-+	/**
- 	 * No one can schedule me now since:
- 	 * - previous RPC, if any, has done and
- 	 * - no new RPC is initiated.
 diff --git a/drivers/staging/lustre/lnet/selftest/ping_test.c b/drivers/staging/lustre/lnet/selftest/ping_test.c
-index 81a4504..e05acce 100644
+index b5e69a7..cb2707a 100644
 --- a/drivers/staging/lustre/lnet/selftest/ping_test.c
 +++ b/drivers/staging/lustre/lnet/selftest/ping_test.c
-@@ -129,7 +129,7 @@ ping_client_done_rpc(sfw_test_unit_t *tsu, srpc_client_rpc_t *rpc)
- 	LASSERT(sn);
+@@ -111,7 +111,7 @@ ping_client_prep_rpc(sfw_test_unit_t *tsu,
+ 	spin_unlock(&lst_ping_data.pnd_lock);
  
- 	if (rpc->crpc_status) {
--		if (!tsi->tsi_stopping) /* rpc could have been aborted */
-+		if (!tsi->tsi_stopping)	/* rpc could have been aborted */
- 			atomic_inc(&sn->sn_ping_errors);
- 		CERROR("Unable to ping %s (%d): %d\n",
- 		       libcfs_id2str(rpc->crpc_dest),
-diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
-index 69be7d6..83216aa 100644
---- a/drivers/staging/lustre/lnet/selftest/rpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/rpc.c
-@@ -276,7 +276,7 @@ srpc_service_init(struct srpc_service *svc)
- 		scd->scd_ev.ev_data = scd;
- 		scd->scd_ev.ev_type = SRPC_REQUEST_RCVD;
+ 	ktime_get_real_ts64(&ts);
+-	req->pnr_time_sec  = ts.tv_sec;
++	req->pnr_time_sec = ts.tv_sec;
+ 	req->pnr_time_usec = ts.tv_nsec / NSEC_PER_USEC;
  
--		/*
-+		/**
- 		 * NB: don't use lst_sched_serial for adding buffer,
- 		 * see details in srpc_service_add_buffers()
- 		 */
-@@ -284,7 +284,7 @@ srpc_service_init(struct srpc_service *svc)
- 				  srpc_add_buffer, lst_sched_test[i]);
- 
- 		if (i && srpc_serv_is_framework(svc)) {
--			/*
-+			/**
- 			 * NB: framework service only needs srpc_service_cd for
- 			 * one partition, but we allocate for all to make
- 			 * it easier to implement, it will waste a little
-@@ -415,7 +415,7 @@ srpc_post_active_rdma(int portal, __u64 matchbits, void *buf, int len,
- 		return -ENOMEM;
+ 	return rc;
+@@ -194,7 +194,7 @@ ping_server_handle(struct srpc_server_rpc *rpc)
+ 		return -EINVAL;
  	}
  
--	/*
-+	/**
- 	 * this is kind of an abuse of the LNET_MD_OP_{PUT,GET} options.
- 	 * they're only meaningful for MDs attached to an ME (i.e. passive
- 	 * buffers...
-@@ -434,7 +434,7 @@ srpc_post_active_rdma(int portal, __u64 matchbits, void *buf, int len,
- 		       options & LNET_MD_OP_PUT ? "Put" : "Get",
- 		       libcfs_id2str(peer), portal, matchbits, rc);
+-	rep->pnr_seq   = req->pnr_seq;
++	rep->pnr_seq = req->pnr_seq;
+ 	rep->pnr_magic = LST_PING_TEST_MAGIC;
  
--		/*
-+		/**
- 		 * The forthcoming unlink event will complete this operation
- 		 * with failure, so fall through and return success here.
- 		 */
-@@ -479,7 +479,7 @@ __must_hold(&scd->scd_lock)
- 				      msg, sizeof(*msg), &buf->buf_mdh,
- 				      &scd->scd_ev);
+ 	if (reqstmsg->msg_ses_feats & ~LST_FEATS_MASK) {
+@@ -213,8 +213,8 @@ ping_server_handle(struct srpc_server_rpc *rpc)
+ sfw_test_client_ops_t ping_test_client;
+ void ping_init_test_client(void)
+ {
+-	ping_test_client.tso_init     = ping_client_init;
+-	ping_test_client.tso_fini     = ping_client_fini;
++	ping_test_client.tso_init = ping_client_init;
++	ping_test_client.tso_fini = ping_client_fini;
+ 	ping_test_client.tso_prep_rpc = ping_client_prep_rpc;
+ 	ping_test_client.tso_done_rpc = ping_client_done_rpc;
+ }
+@@ -222,8 +222,8 @@ void ping_init_test_client(void)
+ srpc_service_t ping_test_service;
+ void ping_init_test_service(void)
+ {
+-	ping_test_service.sv_id       = SRPC_SERVICE_PING;
+-	ping_test_service.sv_name     = "ping_test";
+-	ping_test_service.sv_handler  = ping_server_handle;
++	ping_test_service.sv_id = SRPC_SERVICE_PING;
++	ping_test_service.sv_name = "ping_test";
++	ping_test_service.sv_handler = ping_server_handle;
+ 	ping_test_service.sv_wi_total = ping_srv_workitems;
+ }
+diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
+index 1af978f..f344d56 100644
+--- a/drivers/staging/lustre/lnet/selftest/rpc.c
++++ b/drivers/staging/lustre/lnet/selftest/rpc.c
+@@ -96,8 +96,8 @@ srpc_add_bulk_page(srpc_bulk_t *bk, struct page *pg, int i, int nob)
+ 	LASSERT(i >= 0 && i < bk->bk_niov);
  
--	/*
-+	/**
- 	 * At this point, a RPC (new or delayed) may have arrived in
- 	 * msg and its event handler has been called. So we must add
- 	 * buf to scd_buf_posted _before_ dropping scd_lock
-@@ -491,7 +491,7 @@ __must_hold(&scd->scd_lock)
- 			return 0;
- 
- 		spin_unlock(&scd->scd_lock);
--		/*
-+		/**
- 		 * srpc_shutdown_service might have tried to unlink me
- 		 * when my buf_mdh was still invalid
- 		 */
-@@ -520,7 +520,7 @@ srpc_add_buffer(struct swi_workitem *wi)
- 	struct srpc_buffer *buf;
- 	int rc = 0;
- 
--	/*
-+	/**
- 	 * it's called by workitem scheduler threads, these threads
- 	 * should have been set CPT affinity, so buffers will be posted
- 	 * on CPT local list of Portal
-@@ -602,7 +602,7 @@ srpc_service_add_buffers(struct srpc_service *sv, int nbuffer)
- 
- 	cfs_percpt_for_each(scd, i, sv->sv_cpt_data) {
- 		spin_lock(&scd->scd_lock);
--		/*
-+		/**
- 		 * NB: srpc_service_add_buffers() can be called inside
- 		 * thread context of lst_sched_serial, and we don't normally
- 		 * allow to sleep inside thread context of WI scheduler
-@@ -740,7 +740,7 @@ srpc_abort_service(struct srpc_service *sv)
- 	cfs_percpt_for_each(scd, i, sv->sv_cpt_data) {
- 		spin_lock(&scd->scd_lock);
- 
--		/*
-+		/**
- 		 * schedule in-flight RPCs to notice the abort, NB:
- 		 * racing with incoming RPCs; complete fix should make test
- 		 * RPCs carry session ID in its headers
-@@ -782,7 +782,7 @@ srpc_shutdown_service(srpc_service_t *sv)
- 
- 		spin_unlock(&scd->scd_lock);
- 
--		/*
-+		/**
- 		 * OK to traverse scd_buf_posted without lock, since no one
- 		 * touches scd_buf_posted now
- 		 */
-@@ -927,7 +927,7 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
- 	spin_lock(&scd->scd_lock);
- 
- 	if (rpc->srpc_reqstbuf) {
--		/*
-+		/**
- 		 * NB might drop sv_lock in srpc_service_recycle_buffer, but
- 		 * sv won't go away for scd_rpc_active must not be empty
- 		 */
-@@ -937,7 +937,7 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
- 
- 	list_del(&rpc->srpc_list); /* from scd->scd_rpc_active */
- 
--	/*
-+	/**
- 	 * No one can schedule me now since:
- 	 * - I'm not on scd_rpc_active.
- 	 * - all LNet events have been fired.
-@@ -1110,7 +1110,7 @@ srpc_add_client_rpc_timer(srpc_client_rpc_t *rpc)
- 	stt_add_timer(timer);
+ 	bk->bk_iovs[i].kiov_offset = 0;
+-	bk->bk_iovs[i].kiov_page   = pg;
+-	bk->bk_iovs[i].kiov_len    = nob;
++	bk->bk_iovs[i].kiov_page = pg;
++	bk->bk_iovs[i].kiov_len = nob;
+ 	return nob;
  }
  
--/*
-+/**
-  * Called with rpc->crpc_lock held.
-  *
-  * Upon exit the RPC expiry timer is not queued and the handler is not
-@@ -1157,7 +1157,7 @@ srpc_client_rpc_done(srpc_client_rpc_t *rpc, int status)
- 		     rpc->crpc_service, libcfs_id2str(rpc->crpc_dest),
- 		     swi_state2str(wi->swi_state), rpc->crpc_aborted, status);
+@@ -136,9 +136,9 @@ srpc_alloc_bulk(int cpt, unsigned bulk_npg, unsigned bulk_len, int sink)
+ 	}
  
--	/*
-+	/**
- 	 * No one can schedule me now since:
- 	 * - RPC timer has been defused.
- 	 * - all LNet events have been fired.
-@@ -1222,7 +1222,7 @@ srpc_send_rpc(swi_workitem_t *wi)
- 		break;
+ 	memset(bk, 0, offsetof(srpc_bulk_t, bk_iovs[bulk_npg]));
+-	bk->bk_sink   = sink;
+-	bk->bk_len    = bulk_len;
+-	bk->bk_niov   = bulk_npg;
++	bk->bk_sink = sink;
++	bk->bk_len = bulk_len;
++	bk->bk_niov = bulk_npg;
  
- 	case SWI_STATE_REQUEST_SUBMITTED:
--		/*
-+		/**
- 		 * CAVEAT EMPTOR: rqtev, rpyev, and bulkev may come in any
- 		 * order; however, they're processed in a strict order:
- 		 * rqt, rpy, and bulk.
-@@ -1273,7 +1273,7 @@ srpc_send_rpc(swi_workitem_t *wi)
+ 	for (i = 0; i < bulk_npg; i++) {
+ 		struct page *pg;
+@@ -182,10 +182,10 @@ srpc_init_server_rpc(struct srpc_server_rpc *rpc,
  
- 		rc = do_bulk ? rpc->crpc_bulkev.ev_status : 0;
+ 	rpc->srpc_ev.ev_fired = 1; /* no event expected now */
  
--		/*
-+		/**
- 		 * Bulk buffer was unlinked due to remote error. Clear error
- 		 * since reply buffer still contains valid data.
- 		 * NB rpc->crpc_done shouldn't look into bulk data in case of
-@@ -1332,8 +1332,8 @@ srpc_abort_rpc(srpc_client_rpc_t *rpc, int why)
- {
- 	LASSERT(why);
+-	rpc->srpc_scd      = scd;
++	rpc->srpc_scd = scd;
+ 	rpc->srpc_reqstbuf = buffer;
+-	rpc->srpc_peer     = buffer->buf_peer;
+-	rpc->srpc_self     = buffer->buf_self;
++	rpc->srpc_peer = buffer->buf_peer;
++	rpc->srpc_self = buffer->buf_self;
+ 	LNetInvalidateHandle(&rpc->srpc_replymdh);
+ }
  
--	if (rpc->crpc_aborted || /* already aborted */
--	    rpc->crpc_closed)	 /* callback imminent */
-+	if (rpc->crpc_aborted ||	/* already aborted */
-+	    rpc->crpc_closed)		/* callback imminent */
+@@ -372,10 +372,10 @@ srpc_post_passive_rdma(int portal, int local, __u64 matchbits, void *buf,
+ 	}
+ 
+ 	md.threshold = 1;
+-	md.user_ptr  = ev;
+-	md.start     = buf;
+-	md.length    = len;
+-	md.options   = options;
++	md.user_ptr = ev;
++	md.start = buf;
++	md.length = len;
++	md.options = options;
+ 	md.eq_handle = srpc_data.rpc_lnet_eq;
+ 
+ 	rc = LNetMDAttach(meh, md, LNET_UNLINK, mdh);
+@@ -401,12 +401,12 @@ srpc_post_active_rdma(int portal, __u64 matchbits, void *buf, int len,
+ 	int rc;
+ 	lnet_md_t md;
+ 
+-	md.user_ptr  = ev;
+-	md.start     = buf;
+-	md.length    = len;
++	md.user_ptr = ev;
++	md.start = buf;
++	md.length = len;
+ 	md.eq_handle = srpc_data.rpc_lnet_eq;
+ 	md.threshold = options & LNET_MD_OP_GET ? 2 : 1;
+-	md.options   = options & ~(LNET_MD_OP_PUT | LNET_MD_OP_GET);
++	md.options = options & ~(LNET_MD_OP_PUT | LNET_MD_OP_GET);
+ 
+ 	rc = LNetMDBind(md, LNET_UNLINK, mdh);
+ 	if (rc) {
+@@ -798,8 +798,8 @@ srpc_send_request(srpc_client_rpc_t *rpc)
+ 	int rc;
+ 
+ 	ev->ev_fired = 0;
+-	ev->ev_data  = rpc;
+-	ev->ev_type  = SRPC_REQUEST_SENT;
++	ev->ev_data = rpc;
++	ev->ev_type = SRPC_REQUEST_SENT;
+ 
+ 	 rc = srpc_post_active_rdma(srpc_serv_portal(rpc->crpc_service),
+ 				    rpc->crpc_service, &rpc->crpc_reqstmsg,
+@@ -821,8 +821,8 @@ srpc_prepare_reply(srpc_client_rpc_t *rpc)
+ 	int rc;
+ 
+ 	ev->ev_fired = 0;
+-	ev->ev_data  = rpc;
+-	ev->ev_type  = SRPC_REPLY_RCVD;
++	ev->ev_data = rpc;
++	ev->ev_type = SRPC_REPLY_RCVD;
+ 
+ 	*id = srpc_next_id();
+ 
+@@ -855,8 +855,8 @@ srpc_prepare_bulk(srpc_client_rpc_t *rpc)
+ 	opt |= LNET_MD_KIOV;
+ 
+ 	ev->ev_fired = 0;
+-	ev->ev_data  = rpc;
+-	ev->ev_type  = SRPC_BULK_REQ_RCVD;
++	ev->ev_data = rpc;
++	ev->ev_type = SRPC_BULK_REQ_RCVD;
+ 
+ 	*id = srpc_next_id();
+ 
+@@ -885,8 +885,8 @@ srpc_do_bulk(struct srpc_server_rpc *rpc)
+ 	opt |= LNET_MD_KIOV;
+ 
+ 	ev->ev_fired = 0;
+-	ev->ev_data  = rpc;
+-	ev->ev_type  = bk->bk_sink ? SRPC_BULK_GET_RPLD : SRPC_BULK_PUT_SENT;
++	ev->ev_data = rpc;
++	ev->ev_type = bk->bk_sink ? SRPC_BULK_GET_RPLD : SRPC_BULK_PUT_SENT;
+ 
+ 	rc = srpc_post_active_rdma(SRPC_RDMA_PORTAL, id,
+ 				   &bk->bk_iovs[0], bk->bk_niov, opt,
+@@ -1104,8 +1104,8 @@ srpc_add_client_rpc_timer(srpc_client_rpc_t *rpc)
  		return;
  
- 	CDEBUG(D_NET, "Aborting RPC: service %d, peer %s, state %s, why %d\n",
-@@ -1377,7 +1377,7 @@ srpc_send_reply(struct srpc_server_rpc *rpc)
- 	spin_lock(&scd->scd_lock);
+ 	INIT_LIST_HEAD(&timer->stt_list);
+-	timer->stt_data    = rpc;
+-	timer->stt_func    = srpc_client_rpc_expired;
++	timer->stt_data = rpc;
++	timer->stt_func = srpc_client_rpc_expired;
+ 	timer->stt_expires = ktime_get_real_seconds() + rpc->crpc_timeout;
+ 	stt_add_timer(timer);
+ }
+@@ -1341,7 +1341,7 @@ srpc_abort_rpc(srpc_client_rpc_t *rpc, int why)
+ 	       swi_state2str(rpc->crpc_wi.swi_state), why);
  
- 	if (!sv->sv_shuttingdown && !srpc_serv_is_framework(sv)) {
--		/*
-+		/**
- 		 * Repost buffer before replying since test client
- 		 * might send me another RPC once it gets the reply
- 		 */
-@@ -1401,7 +1401,7 @@ srpc_send_reply(struct srpc_server_rpc *rpc)
- 				   rpc->srpc_peer, rpc->srpc_self,
- 				   &rpc->srpc_replymdh, ev);
- 	if (rc)
--		ev->ev_fired = 1;  /* no more event expected */
-+		ev->ev_fired = 1; /* no more event expected */
- 	return rc;
+ 	rpc->crpc_aborted = 1;
+-	rpc->crpc_status  = why;
++	rpc->crpc_status = why;
+ 	swi_schedule_workitem(&rpc->crpc_wi);
  }
  
-@@ -1494,7 +1494,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 		scd->scd_buf_nposted--;
+@@ -1389,12 +1389,12 @@ srpc_send_reply(struct srpc_server_rpc *rpc)
+ 	spin_unlock(&scd->scd_lock);
  
- 		if (sv->sv_shuttingdown) {
--			/*
-+			/**
- 			 * Leave buffer on scd->scd_buf_nposted since
- 			 * srpc_finish_service needs to traverse it.
- 			 */
-@@ -1509,7 +1509,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 			scd->scd_buf_err = 0;
+ 	ev->ev_fired = 0;
+-	ev->ev_data  = rpc;
+-	ev->ev_type  = SRPC_REPLY_SENT;
++	ev->ev_data = rpc;
++	ev->ev_type = SRPC_REPLY_SENT;
+ 
+-	msg->msg_magic   = SRPC_MSG_MAGIC;
++	msg->msg_magic = SRPC_MSG_MAGIC;
+ 	msg->msg_version = SRPC_MSG_VERSION;
+-	msg->msg_type    = srpc_service2reply(sv->sv_id);
++	msg->msg_type = srpc_service2reply(sv->sv_id);
+ 
+ 	rc = srpc_post_active_rdma(SRPC_RDMA_PORTAL, rpyid, msg,
+ 				   sizeof(*msg), LNET_MD_OP_PUT,
+@@ -1464,7 +1464,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
+ 		spin_lock(&crpc->crpc_lock);
+ 
+ 		LASSERT(!rpcev->ev_fired);
+-		rpcev->ev_fired  = 1;
++		rpcev->ev_fired = 1;
+ 		rpcev->ev_status = (ev->type == LNET_EVENT_UNLINK) ?
+ 						-EINTR : ev->status;
+ 		swi_schedule_workitem(&crpc->crpc_wi);
+@@ -1582,13 +1582,13 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
  		}
+ 	case SRPC_REPLY_SENT:
+ 		srpc = rpcev->ev_data;
+-		scd  = srpc->srpc_scd;
++		scd = srpc->srpc_scd;
  
--		if (!scd->scd_buf_err && /* adding buffer is enabled */
-+		if (!scd->scd_buf_err &&	/* adding buffer is enabled */
- 		    !scd->scd_buf_adjust &&
- 		    scd->scd_buf_nposted < scd->scd_buf_low) {
- 			scd->scd_buf_adjust = max(scd->scd_buf_total / 2,
-@@ -1531,7 +1531,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 			       ev->status, ev->mlength,
- 			       msg->msg_type, msg->msg_magic);
+ 		LASSERT(rpcev == &srpc->srpc_ev);
  
--			/*
-+			/**
- 			 * NB can't call srpc_service_recycle_buffer here since
- 			 * it may call LNetM[DE]Attach. The invalid magic tells
- 			 * srpc_handle_rpc to drop this RPC
-diff --git a/drivers/staging/lustre/lnet/selftest/rpc.h b/drivers/staging/lustre/lnet/selftest/rpc.h
-index a79c315..7cbf19d 100644
---- a/drivers/staging/lustre/lnet/selftest/rpc.h
-+++ b/drivers/staging/lustre/lnet/selftest/rpc.h
-@@ -281,7 +281,7 @@ srpc_unpack_msg_hdr(srpc_msg_t *msg)
- 	if (msg->msg_magic == SRPC_MSG_MAGIC)
- 		return; /* no flipping needed */
+ 		spin_lock(&scd->scd_lock);
  
--	/*
-+	/**
- 	 * We do not swap the magic number here as it is needed to
- 	 * determine whether the body needs to be swapped.
- 	 */
+-		rpcev->ev_fired  = 1;
++		rpcev->ev_fired = 1;
+ 		rpcev->ev_status = (ev->type == LNET_EVENT_UNLINK) ?
+ 				   -EINTR : ev->status;
+ 		swi_schedule_workitem(&srpc->srpc_wi);
 diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
-index 288522d..b1460f3 100644
+index b605f7f..7a22bd3 100644
 --- a/drivers/staging/lustre/lnet/selftest/selftest.h
 +++ b/drivers/staging/lustre/lnet/selftest/selftest.h
-@@ -71,7 +71,8 @@ struct srpc_service_cd;
- struct sfw_test_unit;
- struct sfw_test_instance;
- 
--/* services below SRPC_FRAMEWORK_SERVICE_MAX_ID are framework
-+/**
-+ * services below SRPC_FRAMEWORK_SERVICE_MAX_ID are framework
-  * services, e.g. create/modify session.
-  */
- #define SRPC_SERVICE_DEBUG		0
-diff --git a/drivers/staging/lustre/lnet/selftest/timer.c b/drivers/staging/lustre/lnet/selftest/timer.c
-index 8be5252..3e83442 100644
---- a/drivers/staging/lustre/lnet/selftest/timer.c
-+++ b/drivers/staging/lustre/lnet/selftest/timer.c
-@@ -42,14 +42,14 @@
- 
- #include "selftest.h"
- 
--/*
-+/**
-  * Timers are implemented as a sorted queue of expiry times. The queue
-  * is slotted, with each slot holding timers which expire in a
-  * 2**STTIMER_MINPOLL (8) second period. The timers in each slot are
-  * sorted by increasing expiry time. The number of slots is 2**7 (128),
-  * to cover a time period of 1024 seconds into the future before wrapping.
-  */
--#define STTIMER_MINPOLL        3   /* log2 min poll interval (8 s) */
-+#define STTIMER_MINPOLL        3	/* log2 min poll interval (8 s) */
- #define STTIMER_SLOTTIME       (1 << STTIMER_MINPOLL)
- #define STTIMER_SLOTTIMEMASK   (~(STTIMER_SLOTTIME - 1))
- #define STTIMER_NSLOTS	       (1 << 7)
-@@ -92,7 +92,7 @@ stt_add_timer(struct stt_timer *timer)
- 	spin_unlock(&stt_data.stt_lock);
+@@ -472,9 +472,9 @@ static inline void
+ swi_init_workitem(swi_workitem_t *swi, void *data,
+ 		  swi_action_t action, struct cfs_wi_sched *sched)
+ {
+-	swi->swi_sched  = sched;
++	swi->swi_sched = sched;
+ 	swi->swi_action = action;
+-	swi->swi_state  = SWI_STATE_NEWBORN;
++	swi->swi_state = SWI_STATE_NEWBORN;
+ 	cfs_wi_init(&swi->swi_workitem, data, swi_wi_action);
  }
  
--/*
-+/**
-  * The function returns whether it has deactivated a pending timer or not.
-  * (ie. del_timer() of an inactive timer returns 0, del_timer() of an
-  * active timer returns 1.)
+@@ -531,13 +531,13 @@ srpc_init_client_rpc(srpc_client_rpc_t *rpc, lnet_process_id_t peer,
+ 	spin_lock_init(&rpc->crpc_lock);
+ 	atomic_set(&rpc->crpc_refcount, 1); /* 1 ref for caller */
+ 
+-	rpc->crpc_dest         = peer;
+-	rpc->crpc_priv         = priv;
+-	rpc->crpc_service      = service;
+-	rpc->crpc_bulk.bk_len  = bulklen;
++	rpc->crpc_dest = peer;
++	rpc->crpc_priv = priv;
++	rpc->crpc_service = service;
++	rpc->crpc_bulk.bk_len = bulklen;
+ 	rpc->crpc_bulk.bk_niov = nbulkiov;
+-	rpc->crpc_done         = rpc_done;
+-	rpc->crpc_fini         = rpc_fini;
++	rpc->crpc_done = rpc_done;
++	rpc->crpc_fini = rpc_fini;
+ 	LNetInvalidateHandle(&rpc->crpc_reqstmdh);
+ 	LNetInvalidateHandle(&rpc->crpc_replymdh);
+ 	LNetInvalidateHandle(&rpc->crpc_bulk.bk_mdh);
+@@ -547,9 +547,9 @@ srpc_init_client_rpc(srpc_client_rpc_t *rpc, lnet_process_id_t peer,
+ 	rpc->crpc_reqstev.ev_fired = 1;
+ 	rpc->crpc_replyev.ev_fired = 1;
+ 
+-	rpc->crpc_reqstmsg.msg_magic   = SRPC_MSG_MAGIC;
++	rpc->crpc_reqstmsg.msg_magic = SRPC_MSG_MAGIC;
+ 	rpc->crpc_reqstmsg.msg_version = SRPC_MSG_VERSION;
+-	rpc->crpc_reqstmsg.msg_type    = srpc_service2request(service);
++	rpc->crpc_reqstmsg.msg_type = srpc_service2request(service);
+ }
+ 
+ static inline const char *
 -- 
 1.7.1
