@@ -1,49 +1,69 @@
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 14 Mar 2016 23:51:09 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: really make lustre
-	dependent on LNet
-Message-ID: <1457995886-1592279-1-git-send-email-arnd@arndb.de>
+From: David Binderman <dcb314@hotmail.com>
+Date: Mon, 14 Mar 2016 23:09:37 +0000
+Subject: [lustre-devel]
+ linux-4.5/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c:880: wrong %
+ specifier ?
+In-Reply-To: <E9028481-4DFE-40AD-8714-11EBC1127138@intel.com>
+References: <DUB128-W424197BF214665EBD6F6C39C880@phx.gbl>,
+	<E9028481-4DFE-40AD-8714-11EBC1127138@intel.com>
+Message-ID: <DUB128-W44446C87CDBDFEA237A0D79C880@phx.gbl>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Arnd Bergmann <arnd@arndb.de>, Andrew Morton <akpm@linux-foundation.org>, James Simmons <jsimmons@infradead.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: lustre-devel@lists.lustre.org
 
-A patch intended to add a dependency on LNET for lustre didn't
-actually do that and instead allowed configurations that contain
-lustre with lnet but without IPv4 support that subsequently
-fail to link:
+Hello there,
 
-warning: (LUSTRE_FS) selects LNET which has unmet direct dependencies (STAGING && INET && m && MODULES)
-ERROR: "kernel_sendmsg" [drivers/staging/lustre/lnet/lnet/lnet.ko] undefined!
-ERROR: "sock_create_lite" [drivers/staging/lustre/lnet/lnet/lnet.ko] undefined!
-ERROR: "sock_release" [drivers/staging/lustre/lnet/lnet/lnet.ko] undefined!
-ERROR: "release_sock" [drivers/staging/lustre/lnet/klnds/socklnd/ksocklnd.ko] undefined!
-ERROR: "kernel_sendmsg" [drivers/staging/lustre/lnet/klnds/socklnd/ksocklnd.ko] undefined!
-ERROR: "tcp_sendpage" [drivers/staging/lustre/lnet/klnds/socklnd/ksocklnd.ko] undefined!
+----------------------------------------
+>? so I suspect there are a large number of such warnings that need to be repaired.
 
-This adds the one-line change that was evidently missing from the
-commit, doing what was intended there to have a correct set of dependencies.
+About a dozen:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b08bb6bb5af5 ("staging: lustre: make lustre dependent on LNet")
----
- drivers/staging/lustre/lustre/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+$ fgrep "(warning)" cppcheck.45.all.out | fgrep /lustre/ | fgrep "in format string" | sort | uniq | more
+[linux-4.5/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c:880]: (warning) %d in format string (no. 1) requires 'int' but the argument type is 'unsigned int'.
+[linux-4.5/drivers/staging/lustre/lustre/llite/lproc_llite.c:649]: (warning) %u in format string (no. 1) requires 'unsigned int' but the argument type is 'signed int'.
+[linux-4.5/drivers/staging/lustre/lustre/llite/lproc_llite.c:699]: (warning) %u in format string (no. 1) requires 'unsigned int' but the argument type is 'signed int'.
+[linux-4.5/drivers/staging/lustre/lustre/mdc/lproc_mdc.c:53]: (warning) %u in format string (no. 1) requires 'unsigned int' but the argument type is 'signed int'.
+[linux-4.5/drivers/staging/lustre/lustre/osc/lproc_osc.c:243]: (warning) %lu in format string (no. 1) requires 'unsigned long' but the argument type is 'signed long'.
+[linux-4.5/drivers/staging/lustre/lustre/osc/lproc_osc.c:260]: (warning) %lu in format string (no. 1) requires 'unsigned long' but the argument type is 'signed long'.
+[linux-4.5/drivers/staging/lustre/lustre/osc/lproc_osc.c:307]: (warning) %lu in format string (no. 1) requires 'unsigned long' but the argument type is 'signed long'.
+[linux-4.5/drivers/staging/lustre/lustre/osc/lproc_osc.c:472]: (warning) %u in format string (no. 1) requires 'unsigned int' but the argument type is 'signed int'.
+[linux-4.5/drivers/staging/lustre/lustre/osc/lproc_osc.c:497]: (warning) %u in format string (no. 1) requires 'unsigned int' but the argument type is 'signed int'.
+[linux-4.5/drivers/staging/lustre/lustre/osc/lproc_osc.c:88]: (warning) %u in format string (no. 1) requires 'unsigned int' but the argument type is 'signed int'.
+[linux-4.5/drivers/staging/lustre/lustre/ptlrpc/service.c:2437]: (warning) %d in format string (no. 3) requires 'int' but the argument type is 'unsigned int'.
+[linux-4.5/drivers/staging/lustre/lustre/ptlrpc/service.c:2440]: (warning) %d in format string (no. 2) requires 'int' but the argument type is 'unsigned int'.
+$ 
 
-diff --git a/drivers/staging/lustre/lustre/Kconfig b/drivers/staging/lustre/lustre/Kconfig
-index a09b51ce8265..8ac7cd4d6fdb 100644
---- a/drivers/staging/lustre/lustre/Kconfig
-+++ b/drivers/staging/lustre/lustre/Kconfig
-@@ -1,7 +1,7 @@
- config LUSTRE_FS
- 	tristate "Lustre file system client support"
- 	depends on m && !MIPS && !XTENSA && !SUPERH
--	select LNET
-+	depends on LNET
- 	select CRYPTO
- 	select CRYPTO_CRC32
- 	select CRYPTO_CRC32_PCLMUL if X86
--- 
-2.7.0
+The messages are generated by cppcheck, a static analysis tool, not gcc.
+
+
+Regards
+
+David Binderman
+
+>
+> Cheers, Andreas
+>
+>> On Mar 14, 2016, at 13:36, David Binderman <dcb314@hotmail.com> wrote:
+>>
+>> Hello there,
+>>
+>> [linux-4.5/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c:880]: (warning) %d in format string (no. 1) requires 'int' but the argument type is 'unsigned int'.
+>>
+>> Source code is
+>>
+>> return sprintf(buf, "%d\n", ldlm_cancel_unused_locks_before_replay);
+>>
+>> but
+>>
+>> extern unsigned int ldlm_cancel_unused_locks_before_replay;
+>>
+>> Suggest use %u, not %d.
+>>
+>>
+>> Regards
+>>
+>> David Binderman
+>>
+ 		 	   		  
