@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 22 Mar 2016 19:04:13 -0400
-Subject: [lustre-devel] [PATCH 26/29] staging: lustre: libcfs: add uapi
-	headers to libcfs_ioctl.h
+Date: Tue, 22 Mar 2016 19:04:16 -0400
+Subject: [lustre-devel] [PATCH 29/29] staging: lustre: libcfs: return size_t
+	for libcfs_ioctl_packlen
 In-Reply-To: <1458687856-24959-1-git-send-email-jsimmons@infradead.org>
 References: <1458687856-24959-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1458687856-24959-27-git-send-email-jsimmons@infradead.org>
+Message-ID: <1458687856-24959-30-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,8 +12,7 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Need a few uapi headers to make libcfs_ioctl.h compilable in
-userland.
+Change return value to size_t.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
@@ -23,22 +22,24 @@ Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_ioctl.h     |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ .../lustre/lnet/libcfs/linux/linux-module.c        |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-index 48372c4..4b9102b 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-@@ -41,6 +41,9 @@
- #ifndef __LIBCFS_IOCTL_H__
- #define __LIBCFS_IOCTL_H__
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+index cf191ef..b86e937 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+@@ -40,9 +40,9 @@
  
-+#include <linux/types.h>
-+#include <linux/ioctl.h>
-+
- #define LIBCFS_IOCTL_VERSION	0x0001000a
- #define LIBCFS_IOCTL_VERSION2	0x0001000b
+ #define LNET_MINOR 240
  
+-static inline int libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
++static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
+ {
+-	int len = sizeof(*data);
++	size_t len = sizeof(*data);
+ 
+ 	len += cfs_size_round(data->ioc_inllen1);
+ 	len += cfs_size_round(data->ioc_inllen2);
 -- 
 1.7.1
