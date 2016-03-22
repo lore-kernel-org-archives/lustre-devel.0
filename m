@@ -1,78 +1,44 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 18 Mar 2016 19:38:09 +0000
-Subject: [lustre-devel] [patch] staging: lustre: checking for NULL
- instead of IS_ERR
-In-Reply-To: <D311B2C7.13716D%andreas.dilger@intel.com>
-References: <20160318054247.GF2111@mwanda>
-	<D311B2C7.13716D%andreas.dilger@intel.com>
-Message-ID: <D311B485.137187%andreas.dilger@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 22 Mar 2016 18:21:04 -0400
+Subject: [lustre-devel] [PATCH] Revert "Staging: lustre: o2iblnd: Use sizeof
+	type *pointer instead of sizeof type."
+Message-ID: <1458685264-22755-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-On 2016/03/18, 13:28, "lustre-devel on behalf of Dilger, Andreas"
-<lustre-devel-bounces at lists.lustre.org on behalf of
-andreas.dilger@intel.com> wrote:
+Latest testing fails when using ko2iblnd. It was tracked down
+to commit 4671a026616df26000f7d8ad2f2ea4b6de79263c.
 
->On 2016/03/17, 23:42, "Dan Carpenter" <dan.carpenter@oracle.com> wrote:
->
->>lustre_cfg_new() returns error pointers on error, it never returns NULL.
+This reverts commit 4671a026616df26000f7d8ad2f2ea4b6de79263c.
+---
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Hmm, looking at the broader context, I see there are other callers of
-lustre_cfg_new() that are checking for NULL, and in some cases not
-checking the return code at all.
-
-I'm not sure why Peng Tao changed the return value of this function to
-ERR_PTR() instead of NULL, but it may be better to have lustre_cfg_new()
-return NULL on failure to avoid changing more code, and because it is
-essentially an alloc+init function and the only error it could ever
-return is -ENOMEM and typically allocator functions return NULL.
-
-Cheers, Andreas
-
->>Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
->>
->>diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c
->>b/drivers/staging/lustre/lustre/mgc/mgc_request.c
->>index 65caffe..b7dc872 100644
->>--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
->>+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
->>@@ -1282,7 +1282,7 @@ static int mgc_apply_recover_logs(struct obd_device
->>*mgc,
->> 
->> 		rc = -ENOMEM;
->> 		lcfg = lustre_cfg_new(LCFG_PARAM, &bufs);
->>-		if (!lcfg) {
->>+		if (IS_ERR(lcfg)) {
->> 			CERROR("mgc: cannot allocate memory\n");
->> 			break;
->> 		}
->
->Looks good.  Thanks for the patch.
->
->Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
->
->
->Cheers, Andreas
->-- 
->Andreas Dilger
->
->Lustre Principal Architect
->Intel High Performance Data Division
->
->
->_______________________________________________
->lustre-devel mailing list
->lustre-devel at lists.lustre.org
->http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->
-
-
-Cheers, Andreas
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 89f9390..0d32e65 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -1968,7 +1968,7 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
+ 	 */
+ 
+ 	net->ibn_fmr_ps = cfs_percpt_alloc(lnet_cpt_table(),
+-					   sizeof(*net->ibn_fmr_ps));
++					   sizeof(kib_fmr_poolset_t));
+ 	if (!net->ibn_fmr_ps) {
+ 		CERROR("Failed to allocate FMR pool array\n");
+ 		rc = -ENOMEM;
+@@ -1992,7 +1992,7 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
+ 
+  create_tx_pool:
+ 	net->ibn_tx_ps = cfs_percpt_alloc(lnet_cpt_table(),
+-					  sizeof(*net->ibn_tx_ps));
++					  sizeof(kib_tx_poolset_t));
+ 	if (!net->ibn_tx_ps) {
+ 		CERROR("Failed to allocate tx pool array\n");
+ 		rc = -ENOMEM;
 -- 
-Andreas Dilger
-
-Lustre Principal Architect
-Intel High Performance Data Division
+1.7.1
