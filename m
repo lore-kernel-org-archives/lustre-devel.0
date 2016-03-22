@@ -1,130 +1,105 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 22 Mar 2016 19:04:08 -0400
-Subject: [lustre-devel] [PATCH 21/29] staging:lustre: remove libcfs pseudo
-	device abstraction
+Date: Tue, 22 Mar 2016 19:04:12 -0400
+Subject: [lustre-devel] [PATCH 25/29] staging: lustre: libcfs: make
+	libcfs_ioctl.h readable
 In-Reply-To: <1458687856-24959-1-git-send-email-jsimmons@infradead.org>
 References: <1458687856-24959-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1458687856-24959-22-git-send-email-jsimmons@infradead.org>
+Message-ID: <1458687856-24959-26-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Parinay Kondekar <parinay.kondekar@seagate.com>, James Simmons <uja.ornl@yahoo.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-From: Parinay Kondekar <parinay.kondekar@seagate.com>
+Fix up all thw whitescapes and line up the IOCTL defines
+so it is readable.
 
-With the libcfs ioctl cleanup we no longer need the libcfs
-pseudo device abstraction.
-
-Signed-off-by: Parinay Kondekar <parinay.kondekar@seagate.com>
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5844
-Reviewed-on: http://review.whamcloud.com/17492
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+Reviewed-on: http://review.whamcloud.com/17643
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
 Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../staging/lustre/include/linux/libcfs/libcfs.h   |   22 +-------------------
- .../lustre/lnet/libcfs/linux/linux-module.c        |    4 +--
- drivers/staging/lustre/lnet/libcfs/module.c        |    8 +------
- 3 files changed, 3 insertions(+), 31 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_ioctl.h     |   57 ++++++++++----------
+ 1 files changed, 29 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index 592ad31..1cd1879 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -60,24 +60,6 @@
- #define LNET_ACCEPTOR_MAX_RESERVED_PORT    1023
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
+index c379d29..48372c4 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
+@@ -82,41 +82,42 @@ struct libcfs_debug_ioctl_data {
+ 	unsigned int debug;
+ };
+ 
+-/* FIXME check conflict with lustre_lib.h */
+-#define LIBCFS_IOC_DEBUG_MASK	     _IOWR('f', 250, long)
++/* 'f' ioctls are defined in lustre_ioctl.h and lustre_user.h except for: */
++#define LIBCFS_IOC_DEBUG_MASK		   _IOWR('f', 250, long)
++#define IOCTL_LIBCFS_TYPE		   long
+ 
+-#define IOC_LIBCFS_TYPE		   'e'
+-#define IOC_LIBCFS_MIN_NR		 30
++#define IOC_LIBCFS_TYPE			   ('e')
++#define IOC_LIBCFS_MIN_NR		   30
+ /* libcfs ioctls */
+ /* IOC_LIBCFS_PANIC obsolete in 2.8.0, was _IOWR('e', 30, IOCTL_LIBCFS_TYPE) */
+-#define IOC_LIBCFS_CLEAR_DEBUG	     _IOWR('e', 31, long)
+-#define IOC_LIBCFS_MARK_DEBUG	      _IOWR('e', 32, long)
++#define IOC_LIBCFS_CLEAR_DEBUG		   _IOWR('e', 31, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_MARK_DEBUG		   _IOWR('e', 32, IOCTL_LIBCFS_TYPE)
+ /* IOC_LIBCFS_MEMHOG obsolete in 2.8.0, was _IOWR('e', 36, IOCTL_LIBCFS_TYPE) */
+ /* lnet ioctls */
+-#define IOC_LIBCFS_GET_NI		  _IOWR('e', 50, long)
+-#define IOC_LIBCFS_FAIL_NID		_IOWR('e', 51, long)
+-#define IOC_LIBCFS_NOTIFY_ROUTER	   _IOWR('e', 55, long)
+-#define IOC_LIBCFS_UNCONFIGURE	     _IOWR('e', 56, long)
+-/*	#define IOC_LIBCFS_PORTALS_COMPATIBILITY   _IOWR('e', 57, long) */
+-#define IOC_LIBCFS_LNET_DIST	       _IOWR('e', 58, long)
+-#define IOC_LIBCFS_CONFIGURE	       _IOWR('e', 59, long)
+-#define IOC_LIBCFS_TESTPROTOCOMPAT	 _IOWR('e', 60, long)
+-#define IOC_LIBCFS_PING		    _IOWR('e', 61, long)
+-/*	#define IOC_LIBCFS_DEBUG_PEER	      _IOWR('e', 62, long) */
+-#define IOC_LIBCFS_LNETST		  _IOWR('e', 63, long)
+-#define	IOC_LIBCFS_LNET_FAULT		_IOWR('e', 64, long)
++#define IOC_LIBCFS_GET_NI		   _IOWR('e', 50, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_FAIL_NID		   _IOWR('e', 51, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_NOTIFY_ROUTER	   _IOWR('e', 55, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_UNCONFIGURE		   _IOWR('e', 56, IOCTL_LIBCFS_TYPE)
++/*	 IOC_LIBCFS_PORTALS_COMPATIBILITY  _IOWR('e', 57, IOCTL_LIBCFS_TYPE) */
++#define IOC_LIBCFS_LNET_DIST		   _IOWR('e', 58, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_CONFIGURE		   _IOWR('e', 59, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_TESTPROTOCOMPAT	   _IOWR('e', 60, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_PING			   _IOWR('e', 61, IOCTL_LIBCFS_TYPE)
++/*	IOC_LIBCFS_DEBUG_PEER		   _IOWR('e', 62, IOCTL_LIBCFS_TYPE) */
++#define IOC_LIBCFS_LNETST		   _IOWR('e', 63, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_LNET_FAULT		   _IOWR('e', 64, IOCTL_LIBCFS_TYPE)
+ /* lnd ioctls */
+-#define IOC_LIBCFS_REGISTER_MYNID	  _IOWR('e', 70, long)
+-#define IOC_LIBCFS_CLOSE_CONNECTION	_IOWR('e', 71, long)
+-#define IOC_LIBCFS_PUSH_CONNECTION	 _IOWR('e', 72, long)
+-#define IOC_LIBCFS_GET_CONN		_IOWR('e', 73, long)
+-#define IOC_LIBCFS_DEL_PEER		_IOWR('e', 74, long)
+-#define IOC_LIBCFS_ADD_PEER		_IOWR('e', 75, long)
+-#define IOC_LIBCFS_GET_PEER		_IOWR('e', 76, long)
++#define IOC_LIBCFS_REGISTER_MYNID	   _IOWR('e', 70, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_CLOSE_CONNECTION	   _IOWR('e', 71, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_PUSH_CONNECTION	   _IOWR('e', 72, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_GET_CONN		   _IOWR('e', 73, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_DEL_PEER		   _IOWR('e', 74, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_ADD_PEER		   _IOWR('e', 75, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_GET_PEER		   _IOWR('e', 76, IOCTL_LIBCFS_TYPE)
+ /* ioctl 77 is free for use */
+-#define IOC_LIBCFS_ADD_INTERFACE	   _IOWR('e', 78, long)
+-#define IOC_LIBCFS_DEL_INTERFACE	   _IOWR('e', 79, long)
+-#define IOC_LIBCFS_GET_INTERFACE	   _IOWR('e', 80, long)
++#define IOC_LIBCFS_ADD_INTERFACE	   _IOWR('e', 78, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_DEL_INTERFACE	   _IOWR('e', 79, IOCTL_LIBCFS_TYPE)
++#define IOC_LIBCFS_GET_INTERFACE	   _IOWR('e', 80, IOCTL_LIBCFS_TYPE)
  
  /*
-- * libcfs pseudo device operations
-- *
-- * It's just draft now.
-- */
--
--struct cfs_psdev_file {
--	unsigned long   off;
--	void	    *private_data;
--	unsigned long   reserved1;
--	unsigned long   reserved2;
--};
--
--struct cfs_psdev_ops {
--	int (*p_read)(struct cfs_psdev_file *, char *, unsigned long);
--	int (*p_write)(struct cfs_psdev_file *, char *, unsigned long);
--};
--
--/*
-  * Drop into debugger, if possible. Implementation is provided by platform.
-  */
- 
-@@ -130,7 +112,7 @@ struct libcfs_ioctl_handler {
- int libcfs_register_ioctl(struct libcfs_ioctl_handler *hand);
- int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand);
- 
--int libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd, void *arg);
-+int libcfs_ioctl(unsigned long cmd, void *arg);
- 
- /* container_of depends on "likely" which is defined in libcfs_private.h */
- static inline void *__container_of(void *ptr, unsigned long shift)
-@@ -156,8 +138,6 @@ extern struct miscdevice libcfs_dev;
- extern char lnet_upcall[1024];
- extern char lnet_debug_log_upcall[1024];
- 
--extern struct cfs_psdev_ops libcfs_psdev_ops;
--
- extern struct cfs_wi_sched *cfs_sched_rehash;
- 
- struct lnet_debugfs_symlink_def {
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-index 6f35a80..7634551 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-@@ -98,8 +98,6 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
- static long
- libcfs_psdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- {
--	struct cfs_psdev_file	 pfile;
--
- 	if (!capable(CAP_SYS_ADMIN))
- 		return -EACCES;
- 
-@@ -111,7 +109,7 @@ libcfs_psdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 		return -EINVAL;
- 	}
- 
--	return libcfs_ioctl(&pfile, cmd, (void __user *)arg);
-+	return libcfs_ioctl(cmd, (void __user *)arg);
- }
- 
- static const struct file_operations libcfs_fops = {
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index 4af4557..49c2d03 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -98,8 +98,7 @@ int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand)
- }
- EXPORT_SYMBOL(libcfs_deregister_ioctl);
- 
--int libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd,
--		 void __user *uparam)
-+int libcfs_ioctl(unsigned long cmd, void __user *uparam)
- {
- 	struct libcfs_ioctl_data *data = NULL;
- 	struct libcfs_ioctl_hdr *hdr;
-@@ -165,11 +164,6 @@ out:
- 	return err;
- }
- 
--struct cfs_psdev_ops libcfs_psdev_ops = {
--	NULL,
--	NULL,
--};
--
- int lprocfs_call_handler(void *data, int write, loff_t *ppos,
- 			 void __user *buffer, size_t *lenp,
- 			 int (*handler)(void *data, int write, loff_t pos,
+  * DLC Specific IOCTL numbers.
 -- 
 1.7.1
