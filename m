@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 22 Mar 2016 19:03:48 -0400
-Subject: [lustre-devel] [PATCH 01/29] staging: lustre: libcfs: replace
-	LNET_MAX_IOCTL_BUF_LEN with something bigger
+Date: Tue, 22 Mar 2016 19:03:54 -0400
+Subject: [lustre-devel] [PATCH 07/29] staging: lustre: libcfs: test if data
+	is NULL
 In-Reply-To: <1458687856-24959-1-git-send-email-jsimmons@infradead.org>
 References: <1458687856-24959-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1458687856-24959-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1458687856-24959-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,11 +14,8 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Liang Zhen <liang.zhen@intel.com>
 
-The size of LNET_MAX_IOCTL_BUF_LEN restricts the size of
-libcfs ioctl to the maximum needs of the LNet layer. Since
-libcfs also handles things like debugging we might need
-to let user land pass more data to or from the kernel than
-what is possible
+Make sure data is not NULL otherwise we get an oops
+when using the IOC_LIBCFS_MARK_DEBUG ioctl.
 
 Signed-off-by: Liang Zhen <liang.zhen@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5435
@@ -27,46 +24,21 @@ Reviewed-by: Bobi Jam <bobijam@gmail.com>
 Reviewed-by: Johann Lombardi <johann.lombardi@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_ioctl.h     |    3 +++
- drivers/staging/lustre/lnet/libcfs/module.c        |    5 +----
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/module.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-index 5ca99bd..c71d125 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_ioctl.h
-@@ -49,6 +49,9 @@ struct libcfs_ioctl_hdr {
- 	__u32 ioc_version;
- };
- 
-+/** max size to copy from userspace */
-+#define LIBCFS_IOC_DATA_MAX	(128 * 1024)
-+
- struct libcfs_ioctl_data {
- 	struct libcfs_ioctl_hdr ioc_hdr;
- 
 diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index cdc640b..f9f9d59 100644
+index 4c3fe87..cce6ce3 100644
 --- a/drivers/staging/lustre/lnet/libcfs/module.c
 +++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -54,9 +54,6 @@
- 
- # define DEBUG_SUBSYSTEM S_LNET
- 
--#define LNET_MAX_IOCTL_BUF_LEN (sizeof(struct lnet_ioctl_net_config) + \
--				sizeof(struct lnet_ioctl_config_data))
--
- #include "../../include/linux/libcfs/libcfs.h"
- #include <asm/div64.h>
- 
-@@ -186,7 +183,7 @@ static int libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd,
- 	 * do a check here to restrict the size of the memory
- 	 * to allocate to guard against DoS attacks.
+@@ -150,7 +150,7 @@ static int libcfs_ioctl(struct cfs_psdev_file *pfile, unsigned long cmd,
+ 	 * Handled in arch/cfs_module.c
  	 */
--	if (buf_len > LNET_MAX_IOCTL_BUF_LEN) {
-+	if (buf_len > LIBCFS_IOC_DATA_MAX) {
- 		CERROR("LNET: user buffer exceeds kernel buffer\n");
- 		return -EINVAL;
- 	}
+ 	case IOC_LIBCFS_MARK_DEBUG:
+-		if (!data->ioc_inlbuf1 ||
++		if (!data || !data->ioc_inlbuf1 ||
+ 		    data->ioc_inlbuf1[data->ioc_inllen1 - 1] != '\0') {
+ 			err = -EINVAL;
+ 			goto out;
 -- 
 1.7.1
