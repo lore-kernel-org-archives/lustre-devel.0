@@ -1,44 +1,72 @@
-From: 'Greg Kroah-Hartman' <gregkh@linuxfoundation.org>
-Date: Wed, 23 Mar 2016 16:43:39 -0400
-Subject: [lustre-devel] [PATCH] Revert "Staging: lustre: o2iblnd: Use
- sizeof type *pointer instead of sizeof type."
-In-Reply-To: <7dcad179d49c4535b4f24d3ceb85607a@EXCHCS32.ornl.gov>
-References: <1458685264-22755-1-git-send-email-jsimmons@infradead.org>
-	<20160323014916.GF3190@kroah.com>
-	<D317846B.138487%andreas.dilger@intel.com>
-	<20160323134107.GA4356@kroah.com>
-	<bb9ab572a3944b38814b0533323e0299@EXCHCS32.ornl.gov>
-	<1458758864.18165.4.camel@perches.com>
-	<7dcad179d49c4535b4f24d3ceb85607a@EXCHCS32.ornl.gov>
-Message-ID: <20160323204339.GA21923@kroah.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 24 Mar 2016 11:24:02 -0400
+Subject: [lustre-devel] [PATCH v2] staging: lustre: lnet: revert commit
+	4671a0266
+Message-ID: <1458833042-23538-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Simmons, James A." <simmonsja@ornl.gov>
-Cc: 'Joe Perches' <joe@perches.com>, "Dilger, Andreas" <andreas.dilger@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-On Wed, Mar 23, 2016 at 08:29:49PM +0000, Simmons, James A. wrote:
-> 
-> >> > > so the right code should be:
-> >> > > 
-> >> > > ????????sizeof(**net->ibn_tx_ps);
-> >> > > and the same for sizeof(**net->ibn_fmr_ps)
-> >> > That's a mess, isn't there some other way to fix this up to be more
-> >> > "obvious"?
-> >> This must have been encountered in the past. How was it handle in those
-> >> other cases?
-> >
-> >I fail to see why it's a mess.  It's just **
-> >and someone making a mistake.
-> 
-> I have no trouble with **.  If we revert it someone else will come along and
-> do the same mistake so I think we are stuck with the change to **.
+Commit 4671a0266 change the parameter of the second parameter of
+cfs_precpt_alloc() from a sizeof type to sizeof type *pointer.
+This was incorrect in this case and it caused a crash when the LNet
+layer was brought up in my testing. The reason is cfs_precpt_alloc()
+creates an array of items where the arrays size is equal to the
+number of CPTs that exist. Changing to type *pointer only had
+cfs_precpt_alloc() create an array of pointers instead of an array
+of actual data structures. This patch reverse this change and adds
+comments to explain what cfs_precpt_alloc() is actually doing to
+avoid potential issues like this again.
 
-That's fine, but if you do that, just comment it well so that no one
-tries to change it again.  That's why I can't accept the original patch
-in this email thread.
+Changelog:
 
-thanks,
+v1) Simple revert of the original patch
 
-greg k-h
+v2) Added in comments to explain why cfs_precpt_alloc() has the
+    arguments it uses.
+
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   14 +++++++++++---
+ 1 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 89f9390..e89c2a1 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -1965,10 +1965,13 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
+ 	/*
+ 	 * premapping can fail if ibd_nmr > 1, so we always create
+ 	 * FMR pool and map-on-demand if premapping failed
++	 *
++	 * cfs_precpt_alloc is creating an array of struct kib_fmr_poolset
++	 * The number of struct kib_fmr_poolsets create is equal to the
++	 * number of CPTs that exist, i.e net->ibn_fmr_ps[cpt].
+ 	 */
+-
+ 	net->ibn_fmr_ps = cfs_percpt_alloc(lnet_cpt_table(),
+-					   sizeof(*net->ibn_fmr_ps));
++					   sizeof(kib_fmr_poolset_t));
+ 	if (!net->ibn_fmr_ps) {
+ 		CERROR("Failed to allocate FMR pool array\n");
+ 		rc = -ENOMEM;
+@@ -1991,8 +1994,13 @@ static int kiblnd_net_init_pools(kib_net_t *net, __u32 *cpts, int ncpts)
+ 		LASSERT(i == ncpts);
+ 
+  create_tx_pool:
++	/*
++	 * cfs_precpt_alloc is creating an array of struct kib_tx_poolset
++	 * The number of struct kib_tx_poolsets create is equal to the
++	 * number of CPTs that exist, i.e net->ibn_tx_ps[cpt].
++	 */
+ 	net->ibn_tx_ps = cfs_percpt_alloc(lnet_cpt_table(),
+-					  sizeof(*net->ibn_tx_ps));
++					  sizeof(kib_tx_poolset_t));
+ 	if (!net->ibn_tx_ps) {
+ 		CERROR("Failed to allocate tx pool array\n");
+ 		rc = -ENOMEM;
+-- 
+1.7.1
