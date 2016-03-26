@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 26 Mar 2016 15:40:51 -0400
-Subject: [lustre-devel] [PATCH 07/12] staging: lustre: libcfs: bug fixes for
-	cfs_crypto_hash_final()
+Date: Sat, 26 Mar 2016 15:40:47 -0400
+Subject: [lustre-devel] [PATCH 03/12] staging: lustre: libcfs: rename some
+	variables for crypto handling
 In-Reply-To: <1459021256-23857-1-git-send-email-jsimmons@infradead.org>
 References: <1459021256-23857-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459021256-23857-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459021256-23857-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,13 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Andreas Dilger <andreas.dilger@intel.com>
 
-Change cfs_crypto_hash_final() to always clean up the hash descrptor
-instead of not doing this in error cases.  All of the callers were
-just calling cfs_crypto_hash_final() immediately to clean up the
-descriptor anyway, and the old behaviour is unlike other init/fini
-functions, and prone to memory leaks and other incorrect usage.  The
-callers can call cfs_crypto_digest_size() to determine the hash size
-in advance if needed, and avoid complexity in cfs_crypto_hash_final().
+For the crypto algorthim type use the same name hash_alg everywhere.
 
 Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5053
@@ -29,120 +23,152 @@ Reviewed-by: Bob Glossman <bob.glossman@intel.com>
 Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/lnet/libcfs/linux/linux-crypto.c        |   24 +++++++++----------
- drivers/staging/lustre/lustre/osc/osc_request.c    |    5 +---
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |   12 +++++-----
- 3 files changed, 18 insertions(+), 23 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_crypto.h    |    4 +-
+ .../lustre/lnet/libcfs/linux/linux-crypto.c        |   30 ++++++++++----------
+ 2 files changed, 17 insertions(+), 17 deletions(-)
 
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_crypto.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_crypto.h
+index 5182416..0782bfb 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_crypto.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_crypto.h
+@@ -134,7 +134,7 @@ static inline unsigned char cfs_crypto_hash_alg(const char *algname)
+ 	return (i == CFS_HASH_ALG_MAX ? 0xFF : i);
+ }
+ 
+-int cfs_crypto_hash_digest(unsigned char alg,
++int cfs_crypto_hash_digest(unsigned char hash_alg,
+ 			   const void *buf, unsigned int buf_len,
+ 			   unsigned char *key, unsigned int key_len,
+ 			   unsigned char *hash, unsigned int *hash_len);
+@@ -143,7 +143,7 @@ int cfs_crypto_hash_digest(unsigned char alg,
+ struct cfs_crypto_hash_desc;
+ 
+ struct cfs_crypto_hash_desc*
+-	cfs_crypto_hash_init(unsigned char alg,
++	cfs_crypto_hash_init(unsigned char hash_alg,
+ 			     unsigned char *key, unsigned int key_len);
+ int cfs_crypto_hash_update_page(struct cfs_crypto_hash_desc *desc,
+ 				struct page *page, unsigned int offset,
 diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
-index 6fe1fdd..d5bb10f 100644
+index 8960c3a..1a9eb77 100644
 --- a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
 +++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
-@@ -265,8 +265,8 @@ EXPORT_SYMBOL(cfs_crypto_hash_update);
-  * \param[in,out] hash_len	pointer to hash buffer size, if \a hdesc = NULL
-  *				only free \a hdesc instead of computing the hash
-  *
-- * \retval	-ENOSPC if \a hash = NULL, or \a hash_len < digest size
-  * \retval	0 for success
-+ * \retval	-EOVERFLOW if hash_len is too small for the hash digest
-  * \retval	negative errno for other errors from lower layers
+@@ -57,7 +57,7 @@ static int cfs_crypto_hash_speeds[CFS_HASH_ALG_MAX];
+  * \retval			0 on success
+  * \retval			negative errno on failure
   */
- int cfs_crypto_hash_final(struct cfs_crypto_hash_desc *hdesc,
-@@ -276,22 +276,20 @@ int cfs_crypto_hash_final(struct cfs_crypto_hash_desc *hdesc,
- 	struct ahash_request *req = (void *)hdesc;
- 	int size = crypto_ahash_digestsize(crypto_ahash_reqtfm(req));
+-static int cfs_crypto_hash_alloc(unsigned char alg_id,
++static int cfs_crypto_hash_alloc(unsigned char hash_alg,
+ 				 const struct cfs_crypto_hash_type **type,
+ 				 struct ahash_request **req,
+ 				 unsigned char *key,
+@@ -66,11 +66,11 @@ static int cfs_crypto_hash_alloc(unsigned char alg_id,
+ 	struct crypto_ahash *tfm;
+ 	int     err = 0;
  
--	if (!hash_len) {
--		crypto_free_ahash(crypto_ahash_reqtfm(req));
--		ahash_request_free(req);
--		return 0;
-+	if (!hash || !hash_len) {
-+		err = 0;
-+		goto free_ahash;
+-	*type = cfs_crypto_hash_type(alg_id);
++	*type = cfs_crypto_hash_type(hash_alg);
+ 
+ 	if (!*type) {
+ 		CWARN("Unsupported hash algorithm id = %d, max id is %d\n",
+-		      alg_id, CFS_HASH_ALG_MAX);
++		      hash_alg, CFS_HASH_ALG_MAX);
+ 		return -EINVAL;
  	}
--	if (!hash || *hash_len < size) {
--		*hash_len = size;
--		return -ENOSPC;
-+	if (*hash_len < size) {
-+		err = -EOVERFLOW;
-+		goto free_ahash;
- 	}
-+
- 	ahash_request_set_crypt(req, NULL, hash, 0);
- 	err = crypto_ahash_final(req);
--
--	if (err < 0) {
--		/* May be caller can fix error */
--		return err;
--	}
-+	if (!err)
-+		*hash_len = size;
-+free_ahash:
- 	crypto_free_ahash(crypto_ahash_reqtfm(req));
- 	ahash_request_free(req);
- 	return err;
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 74805f1..ec0287f 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -1208,12 +1208,9 @@ static u32 osc_checksum_bulk(int nob, u32 pg_count,
- 		i++;
- 	}
+ 	tfm = crypto_alloc_ahash((*type)->cht_name, 0, CRYPTO_ALG_ASYNC);
+@@ -105,7 +105,7 @@ static int cfs_crypto_hash_alloc(unsigned char alg_id,
  
--	bufsize = 4;
-+	bufsize = sizeof(cksum);
- 	err = cfs_crypto_hash_final(hdesc, (unsigned char *)&cksum, &bufsize);
+ 	CDEBUG(D_INFO, "Using crypto hash: %s (%s) speed %d MB/s\n",
+ 	       crypto_ahash_alg_name(tfm), crypto_ahash_driver_name(tfm),
+-	       cfs_crypto_hash_speeds[alg_id]);
++	       cfs_crypto_hash_speeds[hash_alg]);
  
--	if (err)
--		cfs_crypto_hash_final(hdesc, NULL, NULL);
--
- 	/* For sending we only compute the wrong checksum instead
- 	 * of corrupting the data so it is still correct on a redo
- 	 */
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-index 72d5b9b..54a0c1f 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-@@ -41,7 +41,6 @@
- #define DEBUG_SUBSYSTEM S_SEC
+ 	err = crypto_ahash_init(*req);
+ 	if (err) {
+@@ -133,7 +133,7 @@ static int cfs_crypto_hash_alloc(unsigned char alg_id,
+  * \param[in,out] hash_len	size of \a hash buffer
+  *
+  * \retval -EINVAL		\a buf, \a buf_len, \a hash_len,
+- *				\a alg_id invalid
++ *				\a hash_alg invalid
+  * \retval -ENOENT		\a hash_alg is unsupported
+  * \retval -ENOSPC		\a hash is NULL, or \a hash_len less than
+  *				digest size
+@@ -141,7 +141,7 @@ static int cfs_crypto_hash_alloc(unsigned char alg_id,
+  * \retval			negative errno for other errors from lower
+  *				layers.
+  */
+-int cfs_crypto_hash_digest(unsigned char alg_id,
++int cfs_crypto_hash_digest(unsigned char hash_alg,
+ 			   const void *buf, unsigned int buf_len,
+ 			   unsigned char *key, unsigned int key_len,
+ 			   unsigned char *hash, unsigned int *hash_len)
+@@ -154,7 +154,7 @@ int cfs_crypto_hash_digest(unsigned char alg_id,
+ 	if (!buf || buf_len == 0 || !hash_len)
+ 		return -EINVAL;
  
- #include "../../include/linux/libcfs/libcfs.h"
--#include <linux/crypto.h>
+-	err = cfs_crypto_hash_alloc(alg_id, &type, &req, key, key_len);
++	err = cfs_crypto_hash_alloc(hash_alg, &type, &req, key, key_len);
+ 	if (err != 0)
+ 		return err;
  
- #include "../include/obd.h"
- #include "../include/obd_cksum.h"
-@@ -511,7 +510,6 @@ int sptlrpc_get_bulk_checksum(struct ptlrpc_bulk_desc *desc, __u8 alg,
+@@ -193,14 +193,14 @@ EXPORT_SYMBOL(cfs_crypto_hash_digest);
+  * \retval		ERR_PTR(errno) in case of error
+  */
+ struct cfs_crypto_hash_desc *
+-	cfs_crypto_hash_init(unsigned char alg_id,
++	cfs_crypto_hash_init(unsigned char hash_alg,
+ 			     unsigned char *key, unsigned int key_len)
  {
- 	struct cfs_crypto_hash_desc *hdesc;
- 	int hashsize;
--	char hashbuf[64];
- 	unsigned int bufsize;
- 	int i, err;
+ 	struct ahash_request *req;
+ 	int		     err;
+ 	const struct cfs_crypto_hash_type       *type;
  
-@@ -532,18 +530,20 @@ int sptlrpc_get_bulk_checksum(struct ptlrpc_bulk_desc *desc, __u8 alg,
- 				  desc->bd_iov[i].kiov_offset & ~CFS_PAGE_MASK,
- 				  desc->bd_iov[i].kiov_len);
- 	}
-+
- 	if (hashsize > buflen) {
-+		unsigned char hashbuf[CFS_CRYPTO_HASH_DIGESTSIZE_MAX];
-+
- 		bufsize = sizeof(hashbuf);
--		err = cfs_crypto_hash_final(hdesc, (unsigned char *)hashbuf,
--					    &bufsize);
-+		LASSERTF(bufsize >= hashsize, "bufsize = %u < hashsize %u\n",
-+			 bufsize, hashsize);
-+		err = cfs_crypto_hash_final(hdesc, hashbuf, &bufsize);
- 		memcpy(buf, hashbuf, buflen);
+-	err = cfs_crypto_hash_alloc(alg_id, &type, &req, key, key_len);
++	err = cfs_crypto_hash_alloc(hash_alg, &type, &req, key, key_len);
+ 
+ 	if (err)
+ 		return ERR_PTR(err);
+@@ -309,7 +309,7 @@ EXPORT_SYMBOL(cfs_crypto_hash_final);
+  * \param[in] buf	data buffer on which to compute the hash
+  * \param[in] buf_len	length of \buf on which to compute hash
+  */
+-static void cfs_crypto_performance_test(unsigned char alg_id,
++static void cfs_crypto_performance_test(unsigned char hash_alg,
+ 					const unsigned char *buf,
+ 					unsigned int buf_len)
+ {
+@@ -321,7 +321,7 @@ static void cfs_crypto_performance_test(unsigned char alg_id,
+ 
+ 	for (start = jiffies, end = start + sec * HZ, bcount = 0;
+ 	     time_before(jiffies, end); bcount++) {
+-		err = cfs_crypto_hash_digest(alg_id, buf, buf_len, NULL, 0,
++		err = cfs_crypto_hash_digest(hash_alg, buf, buf_len, NULL, 0,
+ 					     hash, &hash_len);
+ 		if (err)
+ 			break;
+@@ -329,18 +329,18 @@ static void cfs_crypto_performance_test(unsigned char alg_id,
+ 	end = jiffies;
+ 
+ 	if (err) {
+-		cfs_crypto_hash_speeds[alg_id] =  -1;
++		cfs_crypto_hash_speeds[hash_alg] =  -1;
+ 		CDEBUG(D_INFO, "Crypto hash algorithm %s, err = %d\n",
+-		       cfs_crypto_hash_name(alg_id), err);
++		       cfs_crypto_hash_name(hash_alg), err);
  	} else {
- 		bufsize = buflen;
- 		err = cfs_crypto_hash_final(hdesc, buf, &bufsize);
- 	}
+ 		unsigned long   tmp;
  
--	if (err)
--		cfs_crypto_hash_final(hdesc, NULL, NULL);
- 	return err;
+ 		tmp = ((bcount * buf_len / jiffies_to_msecs(end - start)) *
+ 		       1000) / (1024 * 1024);
+-		cfs_crypto_hash_speeds[alg_id] = (int)tmp;
++		cfs_crypto_hash_speeds[hash_alg] = (int)tmp;
+ 	}
+ 	CDEBUG(D_INFO, "Crypto hash algorithm %s speed = %d MB/s\n",
+-	       cfs_crypto_hash_name(alg_id), cfs_crypto_hash_speeds[alg_id]);
++	       cfs_crypto_hash_name(hash_alg), cfs_crypto_hash_speeds[hash_alg]);
  }
- EXPORT_SYMBOL(sptlrpc_get_bulk_checksum);
+ 
+ /**
 -- 
 1.7.1
