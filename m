@@ -1,64 +1,48 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 26 Mar 2016 15:40:56 -0400
-Subject: [lustre-devel] [PATCH 12/12] staging: lustre: libcfs: calculate
-	crypto performance using pages
-In-Reply-To: <1459021256-23857-1-git-send-email-jsimmons@infradead.org>
-References: <1459021256-23857-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459021256-23857-13-git-send-email-jsimmons@infradead.org>
+Date: Sun, 27 Mar 2016 20:26:20 -0400
+Subject: [lustre-devel] [PATCH 0/9] bunch of small bug fixes for libcfs
+Message-ID: <1459124789-20758-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Andreas Dilger <andreas.dilger@intel.com>
+Various small miscellanous fixes that have gone into libcfs.
 
-Use alloc_page() and use cfs_crypto_hash_update_page()
-to compute the hash instead of cfs_crypto_hash_digest(), since
-tgt_checksum_bulk() computes the hash by page anyway.
+James Simmons (7):
+  staging: lustre: libcfs: remove function declarations in libcfs.h
+  staging: lustre: libcfs: remove cfs_signal_pending wrapper
+  staging: lustre: libcfs: remove atomic cpt allocations
+  staging: lustre: libcfs: remove cfs_percpt_[current|index]
+  staging: lustre: libcfs: move all cpt handling to libcfs_cpu.h
+  staging: lustre: libcfs: add CFS_FAULT_CHECK()
+  staging: lustre: libcfs: remove cfs_workitem_t typedefs
 
-Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5279
-Reviewed-on: http://review.whamcloud.com/10982
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
-Reviewed-by: Alexander Boyko <alexander_boyko@xyratex.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
----
- .../lustre/lnet/libcfs/linux/linux-crypto.c        |   19 +++++++++++++++++--
- 1 files changed, 17 insertions(+), 2 deletions(-)
+Jian Yu (1):
+  staging: lustre: libcfs: replace direct HZ access with kernel APIs
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
-index aec7916..f8383dc 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
-@@ -330,8 +330,23 @@ static void cfs_crypto_performance_test(enum cfs_crypto_hash_alg hash_alg)
- 
- 	for (start = jiffies, end = start + sec * HZ, bcount = 0;
- 	     time_before(jiffies, end); bcount++) {
--		err = cfs_crypto_hash_digest(hash_alg, buf, buf_len, NULL, 0,
--					     hash, &hash_len);
-+		struct cfs_crypto_hash_desc *hdesc;
-+		int i;
-+
-+		hdesc = cfs_crypto_hash_init(hash_alg, NULL, 0);
-+		if (IS_ERR(hdesc)) {
-+			err = PTR_ERR(hdesc);
-+			break;
-+		}
-+
-+		for (i = 0; i < buf_len / PAGE_SIZE; i++) {
-+			err = cfs_crypto_hash_update_page(hdesc, page, 0,
-+							  PAGE_SIZE);
-+			if (err)
-+				break;
-+		}
-+
-+		err = cfs_crypto_hash_final(hdesc, hash, &hash_len);
- 		if (err)
- 			break;
- 	}
--- 
-1.7.1
+Liang Zhen (1):
+  staging: lustre: libcfs: add lock-class for cfs_percpt_lock
+
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |    8 --
+ .../lustre/include/linux/libcfs/libcfs_cpu.h       |   79 ++++++++++++++++++++
+ .../lustre/include/linux/libcfs/libcfs_fail.h      |   15 +++-
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |    4 +-
+ .../lustre/include/linux/libcfs/libcfs_private.h   |   75 -------------------
+ .../lustre/include/linux/libcfs/libcfs_workitem.h  |   12 ++--
+ .../lustre/include/linux/libcfs/linux/linux-time.h |    4 +-
+ drivers/staging/lustre/lnet/libcfs/fail.c          |    3 +
+ drivers/staging/lustre/lnet/libcfs/hash.c          |    6 +-
+ drivers/staging/lustre/lnet/libcfs/libcfs_lock.c   |   54 +++-----------
+ drivers/staging/lustre/lnet/libcfs/libcfs_mem.c    |   28 -------
+ .../lustre/lnet/libcfs/linux/linux-crypto.c        |    5 +-
+ .../staging/lustre/lnet/libcfs/linux/linux-prim.c  |    7 --
+ drivers/staging/lustre/lnet/libcfs/module.c        |    7 ++
+ drivers/staging/lustre/lnet/libcfs/workitem.c      |   12 ++--
+ drivers/staging/lustre/lnet/selftest/selftest.h    |    4 +-
+ drivers/staging/lustre/lustre/include/lustre_lib.h |    2 +-
+ drivers/staging/lustre/lustre/obdclass/cl_lock.c   |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |    6 +-
+ 19 files changed, 139 insertions(+), 194 deletions(-)
