@@ -1,104 +1,98 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 27 Mar 2016 20:26:26 -0400
-Subject: [lustre-devel] [PATCH 6/9] staging: lustre: libcfs: add lock-class
-	for cfs_percpt_lock
+Date: Sun, 27 Mar 2016 20:26:27 -0400
+Subject: [lustre-devel] [PATCH 7/9] staging: lustre: libcfs: replace direct
+	HZ access with kernel APIs
 In-Reply-To: <1459124789-20758-1-git-send-email-jsimmons@infradead.org>
 References: <1459124789-20758-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459124789-20758-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459124789-20758-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Liang Zhen <liang.zhen@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jian Yu <jian.yu@intel.com>
 
-From: Liang Zhen <liang.zhen@intel.com>
+From: Jian Yu <jian.yu@intel.com>
 
-initialise lock-class for each sublock of cfs_percpt_lock
-to eliminate false alarm ""possible recursive locking detected"
+On some customers' systems, the kernel was compiled with HZ defined
+to 100, instead of 1000. This improves performance for HPC applications.
+However, to use these systems with Lustre, customers have to re-build
+Lustre for the kernel because Lustre directly uses the defined constant
+HZ.
 
-Signed-off-by: Liang Zhen <liang.zhen@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6432
-Reviewed-on: http://review.whamcloud.com/14368
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Since kernel 2.6.21, some non-HZ dependent timing APIs become non-
+inline functions, which can be used in Lustre codes to replace the
+direct HZ access.
+
+These kernel APIs include:
+  jiffies_to_msecs()
+  jiffies_to_usecs()
+  jiffies_to_timespec()
+  msecs_to_jiffies()
+  usecs_to_jiffies()
+  timespec_to_jiffies()
+
+ And here are some samples of the replacement:
+  HZ            -> msecs_to_jiffies(MSEC_PER_SEC)
+  n * HZ        -> msecs_to_jiffies(n * MSEC_PER_SEC)
+  HZ / n        -> msecs_to_jiffies(MSEC_PER_SEC / n)
+  n / HZ        -> jiffies_to_msecs(n) / MSEC_PER_SEC
+  n / HZ * 1000 -> jiffies_to_msecs(n)
+
+This patch replaces the direct HZ access in the libcfs module.
+
+Signed-off-by: Jian Yu <jian.yu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5443
+Reviewed-on: http://review.whamcloud.com/11993
+Reviewed-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_cpu.h       |   19 +++++++++++++++++--
- drivers/staging/lustre/lnet/libcfs/libcfs_lock.c   |   13 ++++++++++---
- 2 files changed, 27 insertions(+), 5 deletions(-)
+ .../lustre/include/linux/libcfs/linux/linux-time.h |    4 ++--
+ .../lustre/lnet/libcfs/linux/linux-crypto.c        |    5 ++---
+ 2 files changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 71ad93b..81d8079 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -256,8 +256,8 @@ struct cfs_percpt_lock {
-  * create a cpu-partition lock based on CPU partition table \a cptab,
-  * each private lock has extra \a psize bytes padding data
-  */
--struct cfs_percpt_lock *cfs_percpt_lock_alloc(struct cfs_cpt_table *cptab);
--
-+struct cfs_percpt_lock *cfs_percpt_lock_create(struct cfs_cpt_table *cptab,
-+					       struct lock_class_key *keys);
- /* destroy a cpu-partition lock */
- void cfs_percpt_lock_free(struct cfs_percpt_lock *pcl);
+diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
+index ed8764b..7656b09 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
++++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
+@@ -70,12 +70,12 @@ static inline unsigned long cfs_time_current(void)
  
-@@ -267,6 +267,21 @@ void cfs_percpt_lock(struct cfs_percpt_lock *pcl, int index);
- /* unlock private lock \a index of \a pcl */
- void cfs_percpt_unlock(struct cfs_percpt_lock *pcl, int index);
- 
-+#define CFS_PERCPT_LOCK_KEYS	256
-+
-+/* NB: don't allocate keys dynamically, lockdep needs them to be in ".data" */
-+#define cfs_percpt_lock_alloc(cptab)					\
-+({									\
-+	static struct lock_class_key ___keys[CFS_PERCPT_LOCK_KEYS];	\
-+	struct cfs_percpt_lock *___lk;					\
-+									\
-+	if (cfs_cpt_number(cptab) > CFS_PERCPT_LOCK_KEYS)		\
-+		___lk = cfs_percpt_lock_create(cptab, NULL);		\
-+	else								\
-+		___lk = cfs_percpt_lock_create(cptab, ___keys);		\
-+	___lk;								\
-+})
-+
- /**
-  * iterate over all CPU partitions in \a cptab
-  */
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c b/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
-index d38954a..83543f9 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
-@@ -49,7 +49,8 @@ EXPORT_SYMBOL(cfs_percpt_lock_free);
-  * reason we always allocate cacheline-aligned memory block.
-  */
- struct cfs_percpt_lock *
--cfs_percpt_lock_alloc(struct cfs_cpt_table *cptab)
-+cfs_percpt_lock_create(struct cfs_cpt_table *cptab,
-+		       struct lock_class_key *keys)
+ static inline long cfs_time_seconds(int seconds)
  {
- 	struct cfs_percpt_lock	*pcl;
- 	spinlock_t		*lock;
-@@ -67,12 +68,18 @@ cfs_percpt_lock_alloc(struct cfs_cpt_table *cptab)
- 		return NULL;
- 	}
- 
--	cfs_percpt_for_each(lock, i, pcl->pcl_locks)
-+	if (!keys)
-+		CWARN("Cannot setup class key for percpt lock, you may see recursive locking warnings which are actually fake.\n");
-+
-+	cfs_percpt_for_each(lock, i, pcl->pcl_locks) {
- 		spin_lock_init(lock);
-+		if (keys != NULL)
-+			lockdep_set_class(lock, &keys[i]);
-+	}
- 
- 	return pcl;
+-	return ((long)seconds) * HZ;
++	return ((long)seconds) * msecs_to_jiffies(MSEC_PER_SEC);
  }
--EXPORT_SYMBOL(cfs_percpt_lock_alloc);
-+EXPORT_SYMBOL(cfs_percpt_lock_create);
  
- /**
-  * lock a CPU partition
+ static inline long cfs_duration_sec(long d)
+ {
+-	return d / HZ;
++	return d / msecs_to_jiffies(MSEC_PER_SEC);
+ }
+ 
+ #define cfs_time_current_64 get_jiffies_64
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
+index f8383dc..0715101 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
+@@ -313,7 +313,6 @@ static void cfs_crypto_performance_test(enum cfs_crypto_hash_alg hash_alg)
+ 	void *buf;
+ 	unsigned long		   start, end;
+ 	int			     bcount, err = 0;
+-	int			     sec = 1; /* do test only 1 sec */
+ 	struct page *page;
+ 	unsigned char hash[CFS_CRYPTO_HASH_DIGESTSIZE_MAX];
+ 	unsigned int hash_len = sizeof(hash);
+@@ -328,8 +327,8 @@ static void cfs_crypto_performance_test(enum cfs_crypto_hash_alg hash_alg)
+ 	memset(buf, 0xAD, PAGE_SIZE);
+ 	kunmap(page);
+ 
+-	for (start = jiffies, end = start + sec * HZ, bcount = 0;
+-	     time_before(jiffies, end); bcount++) {
++	for (start = jiffies, end = start + msecs_to_jiffies(MSEC_PER_SEC),
++	     bcount = 0; time_before(jiffies, end); bcount++) {
+ 		struct cfs_crypto_hash_desc *hdesc;
+ 		int i;
+ 
 -- 
 1.7.1
