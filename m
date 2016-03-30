@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 12:47:51 -0400
-Subject: [lustre-devel] [PATCH 19/43] staging/lustre/clio: cl_lock
+Date: Wed, 30 Mar 2016 19:48:40 -0400
+Subject: [lustre-devel] [PATCH v2 19/46] staging/lustre/clio: cl_lock
 	simplification
-In-Reply-To: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
-References: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1459356495-2794775-20-git-send-email-green@linuxhacker.ru>
+In-Reply-To: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
+References: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459381747-2886687-20-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
