@@ -1,169 +1,368 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 12:47:32 -0400
-Subject: [lustre-devel] [PATCH 00/43] Lustre IO stack simplifications and
-	cleanups
-Message-ID: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
+Date: Wed, 30 Mar 2016 12:47:38 -0400
+Subject: [lustre-devel] [PATCH 06/43] staging/lustre/osc: to drop LRU pages
+	with cl_lru_work
+In-Reply-To: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
+References: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459356495-2794775-7-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Oleg Drokin <green@linuxhacker.ru>
+From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-This large body of patches mostly deals with Lustre IO stack
-simplifications and related cleanups.
-In particular the whole cl_page and cl_lock stuff is reduced to
-basically nothing.
-The simplifications remove about 5K lines of code and the other 5k
-are mostly due to shuffling code around and renaming stuff
-to get rid of now defunct layers.
+This way we can drop it async.
 
-Bobi Jam (1):
-  staging/lustre: update comments after cl_lock simplification
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-on: http://review.whamcloud.com/7891
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3321
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Bobi Jam <bobijam@gmail.com>
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ drivers/staging/lustre/lustre/include/obd.h        |  1 +
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |  9 ++++-
+ drivers/staging/lustre/lustre/osc/lproc_osc.c      | 12 +++++-
+ .../staging/lustre/lustre/osc/osc_cl_internal.h    |  1 +
+ drivers/staging/lustre/lustre/osc/osc_internal.h   |  3 +-
+ drivers/staging/lustre/lustre/osc/osc_page.c       | 45 ++++++++++++++--------
+ drivers/staging/lustre/lustre/osc/osc_request.c    | 23 ++++++++++-
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     | 16 ++++++--
+ 8 files changed, 85 insertions(+), 25 deletions(-)
 
-Jinshan Xiong (14):
-  staging/lustre: Reintroduce global env list
-  staging/lustre/osc: Adjustment on osc LRU for performance
-  staging/lustre/osc: to drop LRU pages with cl_lru_work
-  staging/lustre/clio: collapse layer of cl_page
-  staging/lustre/obdclass: Add a preallocated percpu cl_env
-  staging/lustre/clio: add pages into writeback cache in batches
-  staging/lustre/osc: add weight function for DLM lock
-  staging/lustre/clio: remove stackable cl_page completely
-  staging/lustre/clio: optimize read ahead code
-  staging/lustre/clio: generalize cl_sync_io
-  staging/lustre/clio: cl_lock simplification
-  staging/lustre/llite: clip page correctly for vvp_io_commit_sync
-  staging/lustre/llite: deadlock for page write
-  staging/lustre/ldlm: ELC picks locks in a safer policy
-
-John Hammond (5):
-  staging/lustre/llite: Rename struct ccc_grouplock to ll_grouplock
-  staging/lustre/llite: Rename struct vvp_thread_info to ll_thread_info
-  staging/lustre/llite: rename struct ccc_thread_info to vvp_thread_info
-  staging/lustre/llite: Remove ccc_global_{init,fini}()
-  staging/lustre/llite: Move several declarations to llite_internal.h
-
-John L. Hammond (15):
-  staging/lustre: merge lclient/*.c into llite/
-  staging/lustre/llite: remove lli_lvb
-  staging/lustre/lmv: remove lmv_init_{lock,unlock}()
-  staging/lustre/obd: remove struct client_obd_lock
-  staging/lustre/llite: remove some cl wrappers
-  staging/lustre/llite: merge lclient.h into llite/vvp_internal.h
-  staging/lustre/llite: rename ccc_device to vvp_device
-  staging/lustre/llite: rename ccc_object to vvp_object
-  staging/lustre/llite: rename ccc_page to vvp_page
-  staging/lustre/llite: rename ccc_lock to vvp_lock
-  staging/lustre:llite: remove struct ll_ra_read
-  staging/lustre/llite: merge ccc_io and vvp_io
-  staging/lustre/llite: use vui prefix for struct vvp_io members
-  staging/lustre/llite: move vvp_io functions to vvp_io.c
-  staging/lustre/llite: rename ccc_req to vvp_req
-
-Li Dongyang (1):
-  staging/lustre/llite: make sure we do cl_page_clip on the last page
-
-Niu Yawei (1):
-  staging/lustre/ldlm: revert changes to ldlm_cancel_aged_policy()
-
-Oleg Drokin (5):
-  staging/lustre/obdclass: limit lu_site hash table size
-  staging/lustre: Get rid of CFS_PAGE_MASK
-  staging/lustre: Remove struct ll_iattr
-  staging/lustre/llite: Move ll_dirent_type_get and make it static
-  staging/lustre/llite: Remove unused vui_local_lock field
-
-Vitaly Fertman (1):
-  staging/lustre/ldlm: restore the ELC for enqueue
-
- .../lustre/include/linux/libcfs/linux/linux-mem.h  |    1 -
- .../lustre/lnet/libcfs/linux/linux-crypto.c        |    2 +-
- drivers/staging/lustre/lnet/selftest/brw_test.c    |    2 +-
- drivers/staging/lustre/lustre/fld/fld_request.c    |   14 +-
- drivers/staging/lustre/lustre/include/cl_object.h  |  962 ++-------
- drivers/staging/lustre/lustre/include/lclient.h    |  408 ----
- drivers/staging/lustre/lustre/include/linux/obd.h  |  125 --
- .../lustre/lustre/include/lustre/lustre_idl.h      |    2 +
- drivers/staging/lustre/lustre/include/lustre_dlm.h |   14 +-
- drivers/staging/lustre/lustre/include/obd.h        |   14 +-
- drivers/staging/lustre/lustre/lclient/glimpse.c    |  270 ---
- drivers/staging/lustre/lustre/lclient/lcommon_cl.c | 1203 -----------
- .../staging/lustre/lustre/lclient/lcommon_misc.c   |  200 --
- drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |    7 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |    5 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |    3 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   74 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    1 +
- drivers/staging/lustre/lustre/llite/Makefile       |    5 +-
- drivers/staging/lustre/lustre/llite/dir.c          |   24 +-
- drivers/staging/lustre/lustre/llite/file.c         |  133 +-
- drivers/staging/lustre/lustre/llite/glimpse.c      |  255 +++
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   |  327 +++
- drivers/staging/lustre/lustre/llite/lcommon_misc.c |  201 ++
- drivers/staging/lustre/lustre/llite/llite_close.c  |   28 +-
- .../staging/lustre/lustre/llite/llite_internal.h   |  244 +--
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   21 +-
- drivers/staging/lustre/lustre/llite/llite_mmap.c   |   38 +-
- drivers/staging/lustre/lustre/llite/lproc_llite.c  |   10 +-
- drivers/staging/lustre/lustre/llite/rw.c           |  363 ++--
- drivers/staging/lustre/lustre/llite/rw26.c         |  304 ++-
- drivers/staging/lustre/lustre/llite/super25.c      |   14 +-
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |  253 ++-
- drivers/staging/lustre/lustre/llite/vvp_internal.h |  332 ++-
- drivers/staging/lustre/lustre/llite/vvp_io.c       |  925 +++++----
- drivers/staging/lustre/lustre/llite/vvp_lock.c     |   53 +-
- drivers/staging/lustre/lustre/llite/vvp_object.c   |  141 +-
- drivers/staging/lustre/lustre/llite/vvp_page.c     |  209 +-
- drivers/staging/lustre/lustre/llite/vvp_req.c      |  121 ++
- drivers/staging/lustre/lustre/lmv/lmv_internal.h   |    3 -
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   26 +-
- .../staging/lustre/lustre/lov/lov_cl_internal.h    |  105 +-
- drivers/staging/lustre/lustre/lov/lov_dev.c        |    5 +-
- drivers/staging/lustre/lustre/lov/lov_internal.h   |    2 +
- drivers/staging/lustre/lustre/lov/lov_io.c         |  229 +--
- drivers/staging/lustre/lustre/lov/lov_lock.c       |  996 +--------
- drivers/staging/lustre/lustre/lov/lov_obd.c        |    1 -
- drivers/staging/lustre/lustre/lov/lov_object.c     |   48 +-
- drivers/staging/lustre/lustre/lov/lov_offset.c     |   13 +
- drivers/staging/lustre/lustre/lov/lov_page.c       |  183 +-
- drivers/staging/lustre/lustre/lov/lovsub_lock.c    |  383 ----
- drivers/staging/lustre/lustre/lov/lovsub_page.c    |    4 +-
- drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |    8 +-
- drivers/staging/lustre/lustre/mdc/mdc_lib.c        |   21 +-
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    4 +-
- drivers/staging/lustre/lustre/obdclass/cl_io.c     |  416 ++--
- drivers/staging/lustre/lustre/obdclass/cl_lock.c   | 2152 +-------------------
- drivers/staging/lustre/lustre/obdclass/cl_object.c |  294 ++-
- drivers/staging/lustre/lustre/obdclass/cl_page.c   |  654 +-----
- drivers/staging/lustre/lustre/obdclass/class_obd.c |    2 +-
- drivers/staging/lustre/lustre/obdclass/lu_object.c |    4 +-
- drivers/staging/lustre/lustre/obdclass/obdo.c      |    3 +-
- .../staging/lustre/lustre/obdecho/echo_client.c    |  115 +-
- drivers/staging/lustre/lustre/osc/lproc_osc.c      |   50 +-
- drivers/staging/lustre/lustre/osc/osc_cache.c      |  378 +++-
- .../staging/lustre/lustre/osc/osc_cl_internal.h    |  137 +-
- drivers/staging/lustre/lustre/osc/osc_internal.h   |   23 +-
- drivers/staging/lustre/lustre/osc/osc_io.c         |  279 +--
- drivers/staging/lustre/lustre/osc/osc_lock.c       | 1693 ++++++---------
- drivers/staging/lustre/lustre/osc/osc_object.c     |   35 +-
- drivers/staging/lustre/lustre/osc/osc_page.c       |  513 +++--
- drivers/staging/lustre/lustre/osc/osc_request.c    |  376 ++--
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |   16 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |    2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |    2 +-
- 75 files changed, 5713 insertions(+), 10770 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/include/lclient.h
- delete mode 100644 drivers/staging/lustre/lustre/include/linux/obd.h
- delete mode 100644 drivers/staging/lustre/lustre/lclient/glimpse.c
- delete mode 100644 drivers/staging/lustre/lustre/lclient/lcommon_cl.c
- delete mode 100644 drivers/staging/lustre/lustre/lclient/lcommon_misc.c
- create mode 100644 drivers/staging/lustre/lustre/llite/glimpse.c
- create mode 100644 drivers/staging/lustre/lustre/llite/lcommon_cl.c
- create mode 100644 drivers/staging/lustre/lustre/llite/lcommon_misc.c
- create mode 100644 drivers/staging/lustre/lustre/llite/vvp_req.c
-
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 4a0f2e8..26182ca 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -364,6 +364,7 @@ struct client_obd {
+ 
+ 	/* ptlrpc work for writeback in ptlrpcd context */
+ 	void		    *cl_writeback_work;
++	void			*cl_lru_work;
+ 	/* hash tables for osc_quota_info */
+ 	struct cfs_hash	      *cl_quota_hash[MAXQUOTAS];
+ };
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index 45941a6..9e8e61a 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -393,6 +393,8 @@ static ssize_t ll_max_cached_mb_seq_write(struct file *file,
+ 	struct super_block *sb = ((struct seq_file *)file->private_data)->private;
+ 	struct ll_sb_info *sbi = ll_s2sbi(sb);
+ 	struct cl_client_cache *cache = &sbi->ll_cache;
++	struct lu_env *env;
++	int refcheck;
+ 	int mult, rc, pages_number;
+ 	int diff = 0;
+ 	int nrpages = 0;
+@@ -430,6 +432,10 @@ static ssize_t ll_max_cached_mb_seq_write(struct file *file,
+ 		goto out;
+ 	}
+ 
++	env = cl_env_get(&refcheck);
++	if (IS_ERR(env))
++		return 0;
++
+ 	diff = -diff;
+ 	while (diff > 0) {
+ 		int tmp;
+@@ -461,13 +467,14 @@ static ssize_t ll_max_cached_mb_seq_write(struct file *file,
+ 
+ 		/* difficult - have to ask OSCs to drop LRU slots. */
+ 		tmp = diff << 1;
+-		rc = obd_set_info_async(NULL, sbi->ll_dt_exp,
++		rc = obd_set_info_async(env, sbi->ll_dt_exp,
+ 					sizeof(KEY_CACHE_LRU_SHRINK),
+ 					KEY_CACHE_LRU_SHRINK,
+ 					sizeof(tmp), &tmp, NULL);
+ 		if (rc < 0)
+ 			break;
+ 	}
++	cl_env_put(env, &refcheck);
+ 
+ out:
+ 	if (rc >= 0) {
+diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
+index 3eff12c..e6e2029 100644
+--- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
++++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
+@@ -222,8 +222,16 @@ static ssize_t osc_cached_mb_seq_write(struct file *file,
+ 		return -ERANGE;
+ 
+ 	rc = atomic_read(&cli->cl_lru_in_list) - pages_number;
+-	if (rc > 0)
+-		(void)osc_lru_shrink(cli, rc, true);
++	if (rc > 0) {
++		struct lu_env *env;
++		int refcheck;
++
++		env = cl_env_get(&refcheck);
++		if (!IS_ERR(env)) {
++			(void)osc_lru_shrink(env, cli, rc, true);
++			cl_env_put(env, &refcheck);
++		}
++	}
+ 
+ 	return count;
+ }
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+index f516848..b6325f5 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+@@ -457,6 +457,7 @@ int osc_cache_wait_range(const struct lu_env *env, struct osc_object *obj,
+ 			 pgoff_t start, pgoff_t end);
+ void osc_io_unplug(const struct lu_env *env, struct client_obd *cli,
+ 		   struct osc_object *osc);
++int lru_queue_work(const struct lu_env *env, void *data);
+ 
+ void osc_object_set_contended  (struct osc_object *obj);
+ void osc_object_clear_contended(struct osc_object *obj);
+diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
+index ec12962..b3b15d4 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
+@@ -130,7 +130,8 @@ int osc_sync_base(struct obd_export *exp, struct obd_info *oinfo,
+ int osc_process_config_base(struct obd_device *obd, struct lustre_cfg *cfg);
+ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
+ 		  struct list_head *ext_list, int cmd);
+-int osc_lru_shrink(struct client_obd *cli, int target, bool force);
++int osc_lru_shrink(const struct lu_env *env, struct client_obd *cli,
++		   int target, bool force);
+ int osc_lru_reclaim(struct client_obd *cli);
+ 
+ extern spinlock_t osc_ast_guard;
+diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
+index a60b783..f0a9870 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_page.c
++++ b/drivers/staging/lustre/lustre/osc/osc_page.c
+@@ -508,6 +508,18 @@ static int osc_cache_too_much(struct client_obd *cli)
+ 	return 0;
+ }
+ 
++int lru_queue_work(const struct lu_env *env, void *data)
++{
++	struct client_obd *cli = data;
++
++	CDEBUG(D_CACHE, "Run LRU work for client obd %p.\n", cli);
++
++	if (osc_cache_too_much(cli))
++		osc_lru_shrink(env, cli, lru_shrink_max, true);
++
++	return 0;
++}
++
+ void osc_lru_add_batch(struct client_obd *cli, struct list_head *plist)
+ {
+ 	LIST_HEAD(lru);
+@@ -533,7 +545,8 @@ void osc_lru_add_batch(struct client_obd *cli, struct list_head *plist)
+ 		client_obd_list_unlock(&cli->cl_lru_list_lock);
+ 
+ 		/* XXX: May set force to be true for better performance */
+-		osc_lru_shrink(cli, osc_cache_too_much(cli), false);
++		if (osc_cache_too_much(cli))
++			(void)ptlrpcd_queue_work(cli->cl_lru_work);
+ 	}
+ }
+ 
+@@ -566,7 +579,7 @@ static void osc_lru_del(struct client_obd *cli, struct osc_page *opg)
+ 		 * stealing one of them.
+ 		 */
+ 		if (!memory_pressure_get())
+-			osc_lru_shrink(cli, osc_cache_too_much(cli), false);
++			(void)ptlrpcd_queue_work(cli->cl_lru_work);
+ 		wake_up(&osc_lru_waitq);
+ 	} else {
+ 		LASSERT(list_empty(&opg->ops_lru));
+@@ -610,10 +623,9 @@ static void discard_pagevec(const struct lu_env *env, struct cl_io *io,
+ /**
+  * Drop @target of pages from LRU at most.
+  */
+-int osc_lru_shrink(struct client_obd *cli, int target, bool force)
++int osc_lru_shrink(const struct lu_env *env, struct client_obd *cli,
++		   int target, bool force)
+ {
+-	struct cl_env_nest nest;
+-	struct lu_env *env;
+ 	struct cl_io *io;
+ 	struct cl_object *clobj = NULL;
+ 	struct cl_page **pvec;
+@@ -640,12 +652,6 @@ int osc_lru_shrink(struct client_obd *cli, int target, bool force)
+ 		atomic_inc(&cli->cl_lru_shrinkers);
+ 	}
+ 
+-	env = cl_env_nested_get(&nest);
+-	if (IS_ERR(env)) {
+-		rc = PTR_ERR(env);
+-		goto out;
+-	}
+-
+ 	pvec = osc_env_info(env)->oti_pvec;
+ 	io = &osc_env_info(env)->oti_io;
+ 
+@@ -735,9 +741,7 @@ int osc_lru_shrink(struct client_obd *cli, int target, bool force)
+ 		cl_io_fini(env, io);
+ 		cl_object_put(env, clobj);
+ 	}
+-	cl_env_nested_put(&nest, env);
+ 
+-out:
+ 	atomic_dec(&cli->cl_lru_shrinkers);
+ 	if (count > 0) {
+ 		atomic_add(count, cli->cl_lru_left);
+@@ -753,20 +757,26 @@ static inline int max_to_shrink(struct client_obd *cli)
+ 
+ int osc_lru_reclaim(struct client_obd *cli)
+ {
++	struct cl_env_nest nest;
++	struct lu_env *env;
+ 	struct cl_client_cache *cache = cli->cl_cache;
+ 	int max_scans;
+ 	int rc = 0;
+ 
+ 	LASSERT(cache);
+ 
+-	rc = osc_lru_shrink(cli, lru_shrink_min, false);
++	env = cl_env_nested_get(&nest);
++	if (IS_ERR(env))
++		return 0;
++
++	rc = osc_lru_shrink(env, cli, osc_cache_too_much(cli), false);
+ 	if (rc != 0) {
+ 		if (rc == -EBUSY)
+ 			rc = 0;
+ 
+ 		CDEBUG(D_CACHE, "%s: Free %d pages from own LRU: %p.\n",
+ 		       cli->cl_import->imp_obd->obd_name, rc, cli);
+-		return rc;
++		goto out;
+ 	}
+ 
+ 	CDEBUG(D_CACHE, "%s: cli %p no free slots, pages: %d, busy: %d.\n",
+@@ -797,7 +807,8 @@ int osc_lru_reclaim(struct client_obd *cli)
+ 		if (osc_cache_too_much(cli) > 0) {
+ 			spin_unlock(&cache->ccc_lru_lock);
+ 
+-			rc = osc_lru_shrink(cli, osc_cache_too_much(cli), true);
++			rc = osc_lru_shrink(env, cli, osc_cache_too_much(cli),
++					    true);
+ 			spin_lock(&cache->ccc_lru_lock);
+ 			if (rc != 0)
+ 				break;
+@@ -805,6 +816,8 @@ int osc_lru_reclaim(struct client_obd *cli)
+ 	}
+ 	spin_unlock(&cache->ccc_lru_lock);
+ 
++out:
++	cl_env_nested_put(&nest, env);
+ 	CDEBUG(D_CACHE, "%s: cli %p freed %d pages.\n",
+ 	       cli->cl_import->imp_obd->obd_name, cli, rc);
+ 	return rc;
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 6dadda4..c055511b3 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -2910,7 +2910,7 @@ static int osc_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 		int nr = atomic_read(&cli->cl_lru_in_list) >> 1;
+ 		int target = *(int *)val;
+ 
+-		nr = osc_lru_shrink(cli, min(nr, target), true);
++		nr = osc_lru_shrink(env, cli, min(nr, target), true);
+ 		*(int *)val -= nr;
+ 		return 0;
+ 	}
+@@ -3167,6 +3167,14 @@ int osc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 	}
+ 	cli->cl_writeback_work = handler;
+ 
++	handler = ptlrpcd_alloc_work(cli->cl_import, lru_queue_work, cli);
++	if (IS_ERR(handler)) {
++		rc = PTR_ERR(handler);
++		goto out_ptlrpcd_work;
++	}
++
++	cli->cl_lru_work = handler;
++
+ 	rc = osc_quota_setup(obd);
+ 	if (rc)
+ 		goto out_ptlrpcd_work;
+@@ -3199,7 +3207,14 @@ int osc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 	return rc;
+ 
+ out_ptlrpcd_work:
+-	ptlrpcd_destroy_work(handler);
++	if (cli->cl_writeback_work) {
++		ptlrpcd_destroy_work(cli->cl_writeback_work);
++		cli->cl_writeback_work = NULL;
++	}
++	if (cli->cl_lru_work) {
++		ptlrpcd_destroy_work(cli->cl_lru_work);
++		cli->cl_lru_work = NULL;
++	}
+ out_client_setup:
+ 	client_obd_cleanup(obd);
+ out_ptlrpcd:
+@@ -3238,6 +3253,10 @@ static int osc_precleanup(struct obd_device *obd, enum obd_cleanup_stage stage)
+ 			ptlrpcd_destroy_work(cli->cl_writeback_work);
+ 			cli->cl_writeback_work = NULL;
+ 		}
++		if (cli->cl_lru_work) {
++			ptlrpcd_destroy_work(cli->cl_lru_work);
++			cli->cl_lru_work = NULL;
++		}
+ 		obd_cleanup_client_import(obd);
+ 		ptlrpc_lprocfs_unregister_obd(obd);
+ 		lprocfs_obd_cleanup(obd);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index db003f5..dbc3376 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -387,7 +387,8 @@ static int ptlrpcd(void *arg)
+ {
+ 	struct ptlrpcd_ctl *pc = arg;
+ 	struct ptlrpc_request_set *set;
+-	struct lu_env env = { .le_ses = NULL };
++	struct lu_context ses = { 0 };
++	struct lu_env env = { .le_ses = &ses };
+ 	int rc = 0;
+ 	int exit = 0;
+ 
+@@ -416,6 +417,13 @@ static int ptlrpcd(void *arg)
+ 	 */
+ 	rc = lu_context_init(&env.le_ctx,
+ 			     LCT_CL_THREAD|LCT_REMEMBER|LCT_NOREF);
++	if (rc == 0) {
++		rc = lu_context_init(env.le_ses,
++				     LCT_SESSION | LCT_REMEMBER | LCT_NOREF);
++		if (rc != 0)
++			lu_context_fini(&env.le_ctx);
++	}
++
+ 	if (rc != 0)
+ 		goto failed;
+ 
+@@ -436,9 +444,10 @@ static int ptlrpcd(void *arg)
+ 				  ptlrpc_expired_set, set);
+ 
+ 		lu_context_enter(&env.le_ctx);
+-		l_wait_event(set->set_waitq,
+-			     ptlrpcd_check(&env, pc), &lwi);
++		lu_context_enter(env.le_ses);
++		l_wait_event(set->set_waitq, ptlrpcd_check(&env, pc), &lwi);
+ 		lu_context_exit(&env.le_ctx);
++		lu_context_exit(env.le_ses);
+ 
+ 		/*
+ 		 * Abort inflight rpcs for forced stop case.
+@@ -461,6 +470,7 @@ static int ptlrpcd(void *arg)
+ 	if (!list_empty(&set->set_requests))
+ 		ptlrpc_set_wait(set);
+ 	lu_context_fini(&env.le_ctx);
++	lu_context_fini(env.le_ses);
+ 
+ 	complete(&pc->pc_finishing);
+ 
 -- 
 2.1.0
