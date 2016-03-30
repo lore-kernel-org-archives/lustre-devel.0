@@ -1,238 +1,184 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 19:48:39 -0400
-Subject: [lustre-devel] [PATCH v2 18/46] staging/lustre/clio: generalize
-	cl_sync_io
+Date: Wed, 30 Mar 2016 19:48:38 -0400
+Subject: [lustre-devel] [PATCH v2 17/46] staging/lustre: Remove struct
+	ll_iattr
 In-Reply-To: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
 References: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1459381747-2886687-19-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459381747-2886687-18-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Jinshan Xiong <jinshan.xiong@intel.com>
+From: Oleg Drokin <green@linuxhacker.ru>
 
-To make cl_sync_io interfaces not just wait for pages, but to be
-a generic synchronization mechanism.
+This was a compat code from the time it had ia_attr_flags.
+Instead convert all the cryptic callers that did
+((struct ll_iattr *)&op_data->op_attr)->ia_attr_flags into
+direct access to op_data->op_attr_flags
 
-Also remove cl_io_cancel that became not used.
+This also makes lustre/include/linux/obd.h not needed anymore,
+so remove it.
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-on: http://review.whamcloud.com/8656
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4198
-Reviewed-by: Bobi Jam <bobijam@gmail.com>
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h | 13 ++--
- drivers/staging/lustre/lustre/obdclass/cl_io.c    | 74 +++++++++++------------
- drivers/staging/lustre/lustre/obdclass/cl_page.c  |  2 +-
- 3 files changed, 44 insertions(+), 45 deletions(-)
+ drivers/staging/lustre/lustre/include/linux/obd.h | 58 -----------------------
+ drivers/staging/lustre/lustre/include/obd.h       |  2 +-
+ drivers/staging/lustre/lustre/llite/file.c        |  4 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c   |  2 +-
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c       |  3 +-
+ drivers/staging/lustre/lustre/obdclass/obdo.c     |  3 +-
+ 6 files changed, 6 insertions(+), 66 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lustre/include/linux/obd.h
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index 69b40f5..91261b1 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -3125,13 +3125,18 @@ struct cl_sync_io {
- 	atomic_t		csi_barrier;
- 	/** completion to be signaled when transfer is complete. */
- 	wait_queue_head_t		csi_waitq;
-+	/** callback to invoke when this IO is finished */
-+	void			(*csi_end_io)(const struct lu_env *,
-+					      struct cl_sync_io *);
- };
- 
--void cl_sync_io_init(struct cl_sync_io *anchor, int nrpages);
--int  cl_sync_io_wait(const struct lu_env *env, struct cl_io *io,
--		     struct cl_page_list *queue, struct cl_sync_io *anchor,
-+void cl_sync_io_init(struct cl_sync_io *anchor, int nr,
-+		     void (*end)(const struct lu_env *, struct cl_sync_io *));
-+int  cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
- 		     long timeout);
--void cl_sync_io_note(struct cl_sync_io *anchor, int ioret);
-+void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
-+		     int ioret);
-+void cl_sync_io_end(const struct lu_env *env, struct cl_sync_io *anchor);
- 
- /** @} cl_sync_io */
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-index 65d6cee..6a8dd9f 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-@@ -800,6 +800,9 @@ int cl_io_submit_rw(const struct lu_env *env, struct cl_io *io,
- }
- EXPORT_SYMBOL(cl_io_submit_rw);
- 
-+static void cl_page_list_assume(const struct lu_env *env,
-+				struct cl_io *io, struct cl_page_list *plist);
-+
- /**
-  * Submit a sync_io and wait for the IO to be finished, or error happens.
-  * If \a timeout is zero, it means to wait for the IO unconditionally.
-@@ -817,7 +820,7 @@ int cl_io_submit_sync(const struct lu_env *env, struct cl_io *io,
- 		pg->cp_sync_io = anchor;
- 	}
- 
--	cl_sync_io_init(anchor, queue->c2_qin.pl_nr);
-+	cl_sync_io_init(anchor, queue->c2_qin.pl_nr, &cl_sync_io_end);
- 	rc = cl_io_submit_rw(env, io, iot, queue);
- 	if (rc == 0) {
- 		/*
-@@ -828,12 +831,12 @@ int cl_io_submit_sync(const struct lu_env *env, struct cl_io *io,
- 		 */
- 		cl_page_list_for_each(pg, &queue->c2_qin) {
- 			pg->cp_sync_io = NULL;
--			cl_sync_io_note(anchor, 1);
-+			cl_sync_io_note(env, anchor, 1);
- 		}
- 
- 		/* wait for the IO to be finished. */
--		rc = cl_sync_io_wait(env, io, &queue->c2_qout,
--				     anchor, timeout);
-+		rc = cl_sync_io_wait(env, anchor, timeout);
-+		cl_page_list_assume(env, io, &queue->c2_qout);
- 	} else {
- 		LASSERT(list_empty(&queue->c2_qout.pl_pages));
- 		cl_page_list_for_each(pg, &queue->c2_qin)
-@@ -844,25 +847,6 @@ int cl_io_submit_sync(const struct lu_env *env, struct cl_io *io,
- EXPORT_SYMBOL(cl_io_submit_sync);
- 
- /**
-- * Cancel an IO which has been submitted by cl_io_submit_rw.
+diff --git a/drivers/staging/lustre/lustre/include/linux/obd.h b/drivers/staging/lustre/lustre/include/linux/obd.h
+deleted file mode 100644
+index e1063e8..0000000
+--- a/drivers/staging/lustre/lustre/include/linux/obd.h
++++ /dev/null
+@@ -1,58 +0,0 @@
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
+- *
+- * GPL HEADER END
 - */
--static int cl_io_cancel(const struct lu_env *env, struct cl_io *io,
--			struct cl_page_list *queue)
--{
--	struct cl_page *page;
--	int result = 0;
+-/*
+- * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2011, 2012, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- */
 -
--	CERROR("Canceling ongoing page transmission\n");
--	cl_page_list_for_each(page, queue) {
--		int rc;
+-#ifndef __LINUX_OBD_H
+-#define __LINUX_OBD_H
 -
--		rc = cl_page_cancel(env, page);
--		result = result ?: rc;
--	}
--	return result;
--}
+-#ifndef __OBD_H
+-#error Do not #include this file directly. #include <obd.h> instead
+-#endif
 -
--/**
-  * Main io loop.
-  *
-  * Pumps io through iterations calling
-@@ -1433,25 +1417,38 @@ void cl_req_attr_set(const struct lu_env *env, struct cl_req *req,
- }
- EXPORT_SYMBOL(cl_req_attr_set);
- 
-+/* cl_sync_io_callback assumes the caller must call cl_sync_io_wait() to
-+ * wait for the IO to finish.
-+ */
-+void cl_sync_io_end(const struct lu_env *env, struct cl_sync_io *anchor)
-+{
-+	wake_up_all(&anchor->csi_waitq);
-+
-+	/* it's safe to nuke or reuse anchor now */
-+	atomic_set(&anchor->csi_barrier, 0);
-+}
-+EXPORT_SYMBOL(cl_sync_io_end);
- 
- /**
-- * Initialize synchronous io wait anchor, for transfer of \a nrpages pages.
-+ * Initialize synchronous io wait anchor
-  */
--void cl_sync_io_init(struct cl_sync_io *anchor, int nrpages)
-+void cl_sync_io_init(struct cl_sync_io *anchor, int nr,
-+		     void (*end)(const struct lu_env *, struct cl_sync_io *))
- {
- 	init_waitqueue_head(&anchor->csi_waitq);
--	atomic_set(&anchor->csi_sync_nr, nrpages);
--	atomic_set(&anchor->csi_barrier, nrpages > 0);
-+	atomic_set(&anchor->csi_sync_nr, nr);
-+	atomic_set(&anchor->csi_barrier, nr > 0);
- 	anchor->csi_sync_rc = 0;
-+	anchor->csi_end_io = end;
-+	LASSERT(end);
- }
- EXPORT_SYMBOL(cl_sync_io_init);
- 
- /**
-- * Wait until all transfer completes. Transfer completion routine has to call
-- * cl_sync_io_note() for every page.
-+ * Wait until all IO completes. Transfer completion routine has to call
-+ * cl_sync_io_note() for every entity.
-  */
--int cl_sync_io_wait(const struct lu_env *env, struct cl_io *io,
--		    struct cl_page_list *queue, struct cl_sync_io *anchor,
-+int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
- 		    long timeout)
- {
- 	struct l_wait_info lwi = LWI_TIMEOUT_INTR(cfs_time_seconds(timeout),
-@@ -1464,11 +1461,9 @@ int cl_sync_io_wait(const struct lu_env *env, struct cl_io *io,
- 			  atomic_read(&anchor->csi_sync_nr) == 0,
- 			  &lwi);
- 	if (rc < 0) {
--		CERROR("SYNC IO failed with error: %d, try to cancel %d remaining pages\n",
-+		CERROR("IO failed: %d, still wait for %d remaining entries\n",
- 		       rc, atomic_read(&anchor->csi_sync_nr));
- 
--		(void)cl_io_cancel(env, io, queue);
+-#include "../obd_support.h"
 -
- 		lwi = (struct l_wait_info) { 0 };
- 		(void)l_wait_event(anchor->csi_waitq,
- 				   atomic_read(&anchor->csi_sync_nr) == 0,
-@@ -1477,14 +1472,12 @@ int cl_sync_io_wait(const struct lu_env *env, struct cl_io *io,
- 		rc = anchor->csi_sync_rc;
+-#include <linux/fs.h>
+-#include <linux/list.h>
+-#include <linux/sched.h>  /* for struct task_struct, for current.h */
+-#include <linux/mount.h>
+-
+-#include "../lustre_intent.h"
+-
+-struct ll_iattr {
+-	struct iattr	iattr;
+-	unsigned int	ia_attr_flags;
+-};
+-
+-#endif /* __LINUX_OBD_H */
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 84cc001..ded7b10 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -38,7 +38,6 @@
+ #define __OBD_H
+ 
+ #include <linux/spinlock.h>
+-#include "linux/obd.h"
+ 
+ #define IOC_OSC_TYPE	 'h'
+ #define IOC_OSC_MIN_NR       20
+@@ -55,6 +54,7 @@
+ #include "lustre_export.h"
+ #include "lustre_fid.h"
+ #include "lustre_fld.h"
++#include "lustre_intent.h"
+ 
+ #define MAX_OBD_DEVICES 8192
+ 
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index c3c258f..bf2a5ee 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -45,6 +45,7 @@
+ #include "../include/lustre_lite.h"
+ #include <linux/pagemap.h>
+ #include <linux/file.h>
++#include <linux/mount.h>
+ #include "llite_internal.h"
+ #include "../include/lustre/ll_fiemap.h"
+ 
+@@ -87,8 +88,7 @@ void ll_pack_inode2opdata(struct inode *inode, struct md_op_data *op_data,
+ 	op_data->op_attr.ia_ctime = inode->i_ctime;
+ 	op_data->op_attr.ia_size = i_size_read(inode);
+ 	op_data->op_attr_blocks = inode->i_blocks;
+-	((struct ll_iattr *)&op_data->op_attr)->ia_attr_flags =
+-					ll_inode_to_ext_flags(inode->i_flags);
++	op_data->op_attr_flags = ll_inode_to_ext_flags(inode->i_flags);
+ 	op_data->op_ioepoch = ll_i2info(inode)->lli_ioepoch;
+ 	if (fh)
+ 		op_data->op_handle = *fh;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 041d221..0f01cfc 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -1771,7 +1771,7 @@ int ll_iocontrol(struct inode *inode, struct file *file,
+ 		if (IS_ERR(op_data))
+ 			return PTR_ERR(op_data);
+ 
+-		((struct ll_iattr *)&op_data->op_attr)->ia_attr_flags = flags;
++		op_data->op_attr_flags = flags;
+ 		op_data->op_attr.ia_valid |= ATTR_ATTR_FLAG;
+ 		rc = md_setattr(sbi->ll_md_exp, op_data,
+ 				NULL, 0, NULL, 0, &req, NULL);
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+index bd29eb7..be0acf7 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+@@ -279,8 +279,7 @@ static void mdc_setattr_pack_rec(struct mdt_rec_setattr *rec,
+ 	rec->sa_atime  = LTIME_S(op_data->op_attr.ia_atime);
+ 	rec->sa_mtime  = LTIME_S(op_data->op_attr.ia_mtime);
+ 	rec->sa_ctime  = LTIME_S(op_data->op_attr.ia_ctime);
+-	rec->sa_attr_flags =
+-			((struct ll_iattr *)&op_data->op_attr)->ia_attr_flags;
++	rec->sa_attr_flags = op_data->op_attr_flags;
+ 	if ((op_data->op_attr.ia_valid & ATTR_GID) &&
+ 	    in_group_p(op_data->op_attr.ia_gid))
+ 		rec->sa_suppgid =
+diff --git a/drivers/staging/lustre/lustre/obdclass/obdo.c b/drivers/staging/lustre/lustre/obdclass/obdo.c
+index e6436cb..748e33f 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obdo.c
++++ b/drivers/staging/lustre/lustre/obdclass/obdo.c
+@@ -185,8 +185,7 @@ void md_from_obdo(struct md_op_data *op_data, struct obdo *oa, u32 valid)
+ 		op_data->op_attr.ia_valid |= ATTR_BLOCKS;
  	}
- 	LASSERT(atomic_read(&anchor->csi_sync_nr) == 0);
--	cl_page_list_assume(env, io, queue);
- 
- 	/* wait until cl_sync_io_note() has done wakeup */
- 	while (unlikely(atomic_read(&anchor->csi_barrier) != 0)) {
- 		cpu_relax();
- 	}
- 
--	POISON(anchor, 0x5a, sizeof(*anchor));
- 	return rc;
- }
- EXPORT_SYMBOL(cl_sync_io_wait);
-@@ -1492,7 +1485,8 @@ EXPORT_SYMBOL(cl_sync_io_wait);
- /**
-  * Indicate that transfer of a single page completed.
-  */
--void cl_sync_io_note(struct cl_sync_io *anchor, int ioret)
-+void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
-+		     int ioret)
- {
- 	if (anchor->csi_sync_rc == 0 && ioret < 0)
- 		anchor->csi_sync_rc = ioret;
-@@ -1503,9 +1497,9 @@ void cl_sync_io_note(struct cl_sync_io *anchor, int ioret)
- 	 */
- 	LASSERT(atomic_read(&anchor->csi_sync_nr) > 0);
- 	if (atomic_dec_and_test(&anchor->csi_sync_nr)) {
--		wake_up_all(&anchor->csi_waitq);
--		/* it's safe to nuke or reuse anchor now */
--		atomic_set(&anchor->csi_barrier, 0);
-+		LASSERT(anchor->csi_end_io);
-+		anchor->csi_end_io(env, anchor);
-+		/* Can't access anchor any more */
+ 	if (valid & OBD_MD_FLFLAGS) {
+-		((struct ll_iattr *)&op_data->op_attr)->ia_attr_flags =
+-			oa->o_flags;
++		op_data->op_attr_flags = oa->o_flags;
+ 		op_data->op_attr.ia_valid |= ATTR_ATTR_FLAG;
  	}
  }
- EXPORT_SYMBOL(cl_sync_io_note);
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-index 506a9f9..ad7f0ae 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-@@ -887,7 +887,7 @@ void cl_page_completion(const struct lu_env *env,
- 	cl_page_put(env, pg);
- 
- 	if (anchor)
--		cl_sync_io_note(anchor, ioret);
-+		cl_sync_io_note(env, anchor, ioret);
- }
- EXPORT_SYMBOL(cl_page_completion);
- 
 -- 
 2.1.0
