@@ -1,1696 +1,3445 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 19:48:28 -0400
-Subject: [lustre-devel] [PATCH v2 07/46] staging/lustre/clio: collapse layer
-	of cl_page
+Date: Wed, 30 Mar 2016 19:48:24 -0400
+Subject: [lustre-devel] [PATCH v2 03/46] staging/lustre: merge lclient/*.c
+	into llite/
 In-Reply-To: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
 References: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1459381747-2886687-8-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459381747-2886687-4-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Jinshan Xiong <jinshan.xiong@intel.com>
+From: "John L. Hammond" <john.hammond@intel.com>
 
-Move radix tree to osc layer to for performance improvement.
+Separate lclient was necessary to be shared between
+different client implementations, make no sense to have
+them separate in Linux kernel.
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-on: http://review.whamcloud.com/7892
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3321
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
-Reviewed-by: Bobi Jam <bobijam@gmail.com>
+Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Based-on: http://review.whamcloud.com/10171
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h  |  36 +--
- drivers/staging/lustre/lustre/llite/rw.c           |   2 +-
- drivers/staging/lustre/lustre/llite/rw26.c         |   4 -
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |  47 +--
- drivers/staging/lustre/lustre/llite/vvp_io.c       |   1 -
- drivers/staging/lustre/lustre/llite/vvp_object.c   |  13 +
- drivers/staging/lustre/lustre/llite/vvp_page.c     |  36 +--
- drivers/staging/lustre/lustre/lov/lov_object.c     |   9 +-
- drivers/staging/lustre/lustre/lov/lov_page.c       |  29 +-
- drivers/staging/lustre/lustre/obdclass/cl_io.c     |   1 +
- drivers/staging/lustre/lustre/obdclass/cl_lock.c   | 131 +-------
- drivers/staging/lustre/lustre/obdclass/cl_object.c |  47 +--
- drivers/staging/lustre/lustre/obdclass/cl_page.c   | 354 ++-------------------
- drivers/staging/lustre/lustre/osc/osc_cache.c      | 207 +++++++++++-
- .../staging/lustre/lustre/osc/osc_cl_internal.h    |  27 +-
- drivers/staging/lustre/lustre/osc/osc_io.c         |  14 +-
- drivers/staging/lustre/lustre/osc/osc_lock.c       |  10 +-
- drivers/staging/lustre/lustre/osc/osc_object.c     |   2 +
- drivers/staging/lustre/lustre/osc/osc_page.c       |  28 +-
- 19 files changed, 394 insertions(+), 604 deletions(-)
+ drivers/staging/lustre/lustre/lclient/glimpse.c    |  270 -----
+ drivers/staging/lustre/lustre/lclient/lcommon_cl.c | 1203 -------------------
+ .../staging/lustre/lustre/lclient/lcommon_misc.c   |  200 ----
+ drivers/staging/lustre/lustre/llite/Makefile       |    2 +-
+ drivers/staging/lustre/lustre/llite/glimpse.c      |  273 +++++
+ drivers/staging/lustre/lustre/llite/lcommon_cl.c   | 1209 ++++++++++++++++++++
+ drivers/staging/lustre/lustre/llite/lcommon_misc.c |  200 ++++
+ 7 files changed, 1683 insertions(+), 1674 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lustre/lclient/glimpse.c
+ delete mode 100644 drivers/staging/lustre/lustre/lclient/lcommon_cl.c
+ delete mode 100644 drivers/staging/lustre/lustre/lclient/lcommon_misc.c
+ create mode 100644 drivers/staging/lustre/lustre/llite/glimpse.c
+ create mode 100644 drivers/staging/lustre/lustre/llite/lcommon_cl.c
+ create mode 100644 drivers/staging/lustre/lustre/llite/lcommon_misc.c
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index e611f79..5daf688 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -388,6 +388,12 @@ struct cl_object_operations {
- 	 */
- 	int (*coo_glimpse)(const struct lu_env *env,
- 			   const struct cl_object *obj, struct ost_lvb *lvb);
-+	/**
-+	 * Object prune method. Called when the layout is going to change on
-+	 * this object, therefore each layer has to clean up their cache,
-+	 * mainly pages and locks.
-+	 */
-+	int (*coo_prune)(const struct lu_env *env, struct cl_object *obj);
- };
- 
- /**
-@@ -403,15 +409,9 @@ struct cl_object_header {
- 	 * mostly useless otherwise.
- 	 */
- 	/** @{ */
--	/** Lock protecting page tree. */
--	spinlock_t		 coh_page_guard;
- 	/** Lock protecting lock list. */
- 	spinlock_t		 coh_lock_guard;
- 	/** @} locks */
--	/** Radix tree of cl_page's, cached for this object. */
--	struct radix_tree_root   coh_tree;
--	/** # of pages in radix tree. */
--	unsigned long	    coh_pages;
- 	/** List of cl_lock's granted for this object. */
- 	struct list_head	       coh_locks;
- 
-@@ -897,14 +897,6 @@ struct cl_page_operations {
- 	void  (*cpo_export)(const struct lu_env *env,
- 			    const struct cl_page_slice *slice, int uptodate);
- 	/**
--	 * Unmaps page from the user space (if it is mapped).
--	 *
--	 * \see cl_page_unmap()
--	 * \see vvp_page_unmap()
--	 */
--	int (*cpo_unmap)(const struct lu_env *env,
--			 const struct cl_page_slice *slice, struct cl_io *io);
--	/**
- 	 * Checks whether underlying VM page is locked (in the suitable
- 	 * sense). Used for assertions.
- 	 *
-@@ -2794,19 +2786,13 @@ enum {
- };
- 
- /* callback of cl_page_gang_lookup() */
--typedef int   (*cl_page_gang_cb_t)  (const struct lu_env *, struct cl_io *,
--				     struct cl_page *, void *);
--int cl_page_gang_lookup(const struct lu_env *env, struct cl_object *obj,
--			struct cl_io *io, pgoff_t start, pgoff_t end,
--			cl_page_gang_cb_t cb, void *cbdata);
--struct cl_page *cl_page_lookup(struct cl_object_header *hdr, pgoff_t index);
- struct cl_page *cl_page_find(const struct lu_env *env, struct cl_object *obj,
- 			     pgoff_t idx, struct page *vmpage,
- 			     enum cl_page_type type);
--struct cl_page *cl_page_find_sub(const struct lu_env *env,
--				 struct cl_object *obj,
--				 pgoff_t idx, struct page *vmpage,
--				     struct cl_page *parent);
-+struct cl_page *cl_page_alloc(const struct lu_env *env,
-+			      struct cl_object *o, pgoff_t ind,
-+			      struct page *vmpage,
-+			      enum cl_page_type type);
- void cl_page_get(struct cl_page *page);
- void cl_page_put(const struct lu_env *env, struct cl_page *page);
- void cl_page_print(const struct lu_env *env, void *cookie, lu_printer_t printer,
-@@ -2872,8 +2858,6 @@ int cl_page_flush(const struct lu_env *env, struct cl_io *io,
- void cl_page_discard(const struct lu_env *env, struct cl_io *io,
- 		     struct cl_page *pg);
- void cl_page_delete(const struct lu_env *env, struct cl_page *pg);
--int cl_page_unmap(const struct lu_env *env, struct cl_io *io,
--		  struct cl_page *pg);
- int cl_page_is_vmlocked(const struct lu_env *env, const struct cl_page *pg);
- void cl_page_export(const struct lu_env *env, struct cl_page *pg, int uptodate);
- int cl_page_is_under_lock(const struct lu_env *env, struct cl_io *io,
-diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
-index 34614ac..01b8365 100644
---- a/drivers/staging/lustre/lustre/llite/rw.c
-+++ b/drivers/staging/lustre/lustre/llite/rw.c
-@@ -442,7 +442,7 @@ static int cl_read_ahead_page(const struct lu_env *env, struct cl_io *io,
- 			cl_page_list_add(queue, page);
- 			rc = 1;
- 		} else {
--			cl_page_delete(env, page);
-+			cl_page_discard(env, io, page);
- 			rc = -ENOLCK;
- 		}
- 	} else {
-diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
-index 3d7e64e..b5335de 100644
---- a/drivers/staging/lustre/lustre/llite/rw26.c
-+++ b/drivers/staging/lustre/lustre/llite/rw26.c
-@@ -95,11 +95,7 @@ static void ll_invalidatepage(struct page *vmpage, unsigned int offset,
- 			if (obj) {
- 				page = cl_vmpage_page(vmpage, obj);
- 				if (page) {
--					lu_ref_add(&page->cp_reference,
--						   "delete", vmpage);
- 					cl_page_delete(env, page);
--					lu_ref_del(&page->cp_reference,
--						   "delete", vmpage);
- 					cl_page_put(env, page);
- 				}
- 			} else
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index 282b70b..29d24c9 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -36,6 +36,7 @@
-  * cl_device and cl_device_type implementation for VVP layer.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- #define DEBUG_SUBSYSTEM S_LLITE
-@@ -356,23 +357,18 @@ static loff_t vvp_pgcache_find(const struct lu_env *env,
- 			return ~0ULL;
- 		clob = vvp_pgcache_obj(env, dev, &id);
- 		if (clob) {
--			struct cl_object_header *hdr;
--			int		      nr;
--			struct cl_page	  *pg;
-+			struct inode *inode = ccc_object_inode(clob);
-+			struct page *vmpage;
-+			int nr;
- 
--			/* got an object. Find next page. */
--			hdr = cl_object_header(clob);
+diff --git a/drivers/staging/lustre/lustre/lclient/glimpse.c b/drivers/staging/lustre/lustre/lclient/glimpse.c
+deleted file mode 100644
+index c4e8a08..0000000
+--- a/drivers/staging/lustre/lustre/lclient/glimpse.c
++++ /dev/null
+@@ -1,270 +0,0 @@
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
+- *
+- * GPL HEADER END
+- */
+-/*
+- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2011, 2012, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- *
+- * glimpse code shared between vvp and liblustre (and other Lustre clients in
+- * the future).
+- *
+- *   Author: Nikita Danilov <nikita.danilov@sun.com>
+- *   Author: Oleg Drokin <oleg.drokin@sun.com>
+- */
 -
--			spin_lock(&hdr->coh_page_guard);
--			nr = radix_tree_gang_lookup(&hdr->coh_tree,
--						    (void **)&pg,
--						    id.vpi_index, 1);
-+			nr = find_get_pages_contig(inode->i_mapping,
-+						   id.vpi_index, 1, &vmpage);
- 			if (nr > 0) {
--				id.vpi_index = pg->cp_index;
-+				id.vpi_index = vmpage->index;
- 				/* Cant support over 16T file */
--				nr = !(pg->cp_index > 0xffffffff);
-+				nr = !(vmpage->index > 0xffffffff);
-+				page_cache_release(vmpage);
- 			}
--			spin_unlock(&hdr->coh_page_guard);
- 
- 			lu_object_ref_del(&clob->co_lu, "dump", current);
- 			cl_object_put(env, clob);
-@@ -431,8 +427,6 @@ static int vvp_pgcache_show(struct seq_file *f, void *v)
- 	struct ll_sb_info       *sbi;
- 	struct cl_object	*clob;
- 	struct lu_env	   *env;
--	struct cl_page	  *page;
--	struct cl_object_header *hdr;
- 	struct vvp_pgcache_id    id;
- 	int		      refcheck;
- 	int		      result;
-@@ -444,14 +438,23 @@ static int vvp_pgcache_show(struct seq_file *f, void *v)
- 		sbi = f->private;
- 		clob = vvp_pgcache_obj(env, &sbi->ll_cl->cd_lu_dev, &id);
- 		if (clob) {
--			hdr = cl_object_header(clob);
+-#include "../../include/linux/libcfs/libcfs.h"
+-#include "../include/obd_class.h"
+-#include "../include/obd_support.h"
+-#include "../include/obd.h"
 -
--			spin_lock(&hdr->coh_page_guard);
--			page = cl_page_lookup(hdr, id.vpi_index);
--			spin_unlock(&hdr->coh_page_guard);
-+			struct inode *inode = ccc_object_inode(clob);
-+			struct cl_page *page = NULL;
-+			struct page *vmpage;
-+
-+			result = find_get_pages_contig(inode->i_mapping,
-+						       id.vpi_index, 1,
-+						       &vmpage);
-+			if (result > 0) {
-+				lock_page(vmpage);
-+				page = cl_vmpage_page(vmpage, clob);
-+				unlock_page(vmpage);
-+
-+				page_cache_release(vmpage);
-+			}
- 
--			seq_printf(f, "%8x@"DFID": ",
--				   id.vpi_index, PFID(&hdr->coh_lu.loh_fid));
-+			seq_printf(f, "%8x@" DFID ": ", id.vpi_index,
-+				   PFID(lu_object_fid(&clob->co_lu)));
- 			if (page) {
- 				vvp_pgcache_page_show(env, f, page);
- 				cl_page_put(env, page);
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 984699a..ffe301b 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -763,7 +763,6 @@ static int vvp_io_fault_start(const struct lu_env *env,
- 
- 			vmpage = NULL;
- 			if (result < 0) {
--				cl_page_unmap(env, io, page);
- 				cl_page_discard(env, io, page);
- 				cl_page_disown(env, io, page);
- 
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_object.c b/drivers/staging/lustre/lustre/llite/vvp_object.c
-index 03c887d..b9a1d01 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_object.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_object.c
-@@ -165,6 +165,18 @@ static int vvp_conf_set(const struct lu_env *env, struct cl_object *obj,
- 	return 0;
- }
- 
-+static int vvp_prune(const struct lu_env *env, struct cl_object *obj)
-+{
-+	struct inode *inode = ccc_object_inode(obj);
-+	int rc;
-+
-+	rc = cl_sync_file_range(inode, 0, OBD_OBJECT_EOF, CL_FSYNC_ALL, 1);
-+	if (rc == 0)
-+		truncate_inode_pages(inode->i_mapping, 0);
-+
-+	return rc;
-+}
-+
- static const struct cl_object_operations vvp_ops = {
- 	.coo_page_init = vvp_page_init,
- 	.coo_lock_init = vvp_lock_init,
-@@ -172,6 +184,7 @@ static const struct cl_object_operations vvp_ops = {
- 	.coo_attr_get  = vvp_attr_get,
- 	.coo_attr_set  = vvp_attr_set,
- 	.coo_conf_set  = vvp_conf_set,
-+	.coo_prune     = vvp_prune,
- 	.coo_glimpse   = ccc_object_glimpse
- };
- 
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_page.c b/drivers/staging/lustre/lustre/llite/vvp_page.c
-index 850bae7..11e609e 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_page.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_page.c
-@@ -138,6 +138,7 @@ static void vvp_page_discard(const struct lu_env *env,
- 	struct page	   *vmpage  = cl2vm_page(slice);
- 	struct address_space *mapping;
- 	struct ccc_page      *cpg     = cl2ccc_page(slice);
-+	__u64 offset;
- 
- 	LASSERT(vmpage);
- 	LASSERT(PageLocked(vmpage));
-@@ -147,6 +148,9 @@ static void vvp_page_discard(const struct lu_env *env,
- 	if (cpg->cpg_defer_uptodate && !cpg->cpg_ra_used)
- 		ll_ra_stats_inc(mapping, RA_STAT_DISCARDED);
- 
-+	offset = vmpage->index << PAGE_SHIFT;
-+	ll_teardown_mmaps(vmpage->mapping, offset, offset + PAGE_SIZE);
-+
- 	/*
- 	 * truncate_complete_page() calls
- 	 * a_ops->invalidatepage()->cl_page_delete()->vvp_page_delete().
-@@ -154,37 +158,26 @@ static void vvp_page_discard(const struct lu_env *env,
- 	truncate_complete_page(mapping, vmpage);
- }
- 
--static int vvp_page_unmap(const struct lu_env *env,
--			  const struct cl_page_slice *slice,
--			  struct cl_io *unused)
+-#include "../include/lustre_dlm.h"
+-#include "../include/lustre_lite.h"
+-#include "../include/lustre_mdc.h"
+-#include <linux/pagemap.h>
+-#include <linux/file.h>
+-
+-#include "../include/cl_object.h"
+-#include "../include/lclient.h"
+-#include "../llite/llite_internal.h"
+-
+-static const struct cl_lock_descr whole_file = {
+-	.cld_start = 0,
+-	.cld_end   = CL_PAGE_EOF,
+-	.cld_mode  = CLM_READ
+-};
+-
+-/*
+- * Check whether file has possible unwriten pages.
+- *
+- * \retval 1    file is mmap-ed or has dirty pages
+- *	 0    otherwise
+- */
+-blkcnt_t dirty_cnt(struct inode *inode)
 -{
--	struct page *vmpage = cl2vm_page(slice);
--	__u64       offset;
+-	blkcnt_t cnt = 0;
+-	struct ccc_object *vob = cl_inode2ccc(inode);
+-	void	      *results[1];
 -
--	LASSERT(vmpage);
--	LASSERT(PageLocked(vmpage));
+-	if (inode->i_mapping)
+-		cnt += radix_tree_gang_lookup_tag(&inode->i_mapping->page_tree,
+-						  results, 0, 1,
+-						  PAGECACHE_TAG_DIRTY);
+-	if (cnt == 0 && atomic_read(&vob->cob_mmap_cnt) > 0)
+-		cnt = 1;
 -
--	offset = vmpage->index << PAGE_CACHE_SHIFT;
+-	return (cnt > 0) ? 1 : 0;
+-}
 -
+-int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
+-		    struct inode *inode, struct cl_object *clob, int agl)
+-{
+-	struct cl_lock_descr *descr = &ccc_env_info(env)->cti_descr;
+-	struct cl_inode_info *lli   = cl_i2info(inode);
+-	const struct lu_fid  *fid   = lu_object_fid(&clob->co_lu);
+-	struct ccc_io	*cio   = ccc_env_io(env);
+-	struct cl_lock       *lock;
+-	int result;
+-
+-	result = 0;
+-	if (!(lli->lli_flags & LLIF_MDS_SIZE_LOCK)) {
+-		CDEBUG(D_DLMTRACE, "Glimpsing inode "DFID"\n", PFID(fid));
+-		if (lli->lli_has_smd) {
+-			/* NOTE: this looks like DLM lock request, but it may
+-			 *       not be one. Due to CEF_ASYNC flag (translated
+-			 *       to LDLM_FL_HAS_INTENT by osc), this is
+-			 *       glimpse request, that won't revoke any
+-			 *       conflicting DLM locks held. Instead,
+-			 *       ll_glimpse_callback() will be called on each
+-			 *       client holding a DLM lock against this file,
+-			 *       and resulting size will be returned for each
+-			 *       stripe. DLM lock on [0, EOF] is acquired only
+-			 *       if there were no conflicting locks. If there
+-			 *       were conflicting locks, enqueuing or waiting
+-			 *       fails with -ENAVAIL, but valid inode
+-			 *       attributes are returned anyway.
+-			 */
+-			*descr = whole_file;
+-			descr->cld_obj   = clob;
+-			descr->cld_mode  = CLM_PHANTOM;
+-			descr->cld_enq_flags = CEF_ASYNC | CEF_MUST;
+-			if (agl)
+-				descr->cld_enq_flags |= CEF_AGL;
+-			cio->cui_glimpse = 1;
+-			/*
+-			 * CEF_ASYNC is used because glimpse sub-locks cannot
+-			 * deadlock (because they never conflict with other
+-			 * locks) and, hence, can be enqueued out-of-order.
+-			 *
+-			 * CEF_MUST protects glimpse lock from conversion into
+-			 * a lockless mode.
+-			 */
+-			lock = cl_lock_request(env, io, descr, "glimpse",
+-					       current);
+-			cio->cui_glimpse = 0;
+-
+-			if (!lock)
+-				return 0;
+-
+-			if (IS_ERR(lock))
+-				return PTR_ERR(lock);
+-
+-			LASSERT(agl == 0);
+-			result = cl_wait(env, lock);
+-			if (result == 0) {
+-				cl_merge_lvb(env, inode);
+-				if (cl_isize_read(inode) > 0 &&
+-				    inode->i_blocks == 0) {
+-					/*
+-					 * LU-417: Add dirty pages block count
+-					 * lest i_blocks reports 0, some "cp" or
+-					 * "tar" may think it's a completely
+-					 * sparse file and skip it.
+-					 */
+-					inode->i_blocks = dirty_cnt(inode);
+-				}
+-				cl_unuse(env, lock);
+-			}
+-			cl_lock_release(env, lock, "glimpse", current);
+-		} else {
+-			CDEBUG(D_DLMTRACE, "No objects for inode\n");
+-			cl_merge_lvb(env, inode);
+-		}
+-	}
+-
+-	return result;
+-}
+-
+-static int cl_io_get(struct inode *inode, struct lu_env **envout,
+-		     struct cl_io **ioout, int *refcheck)
+-{
+-	struct lu_env	  *env;
+-	struct cl_io	   *io;
+-	struct cl_inode_info   *lli = cl_i2info(inode);
+-	struct cl_object       *clob = lli->lli_clob;
+-	int result;
+-
+-	if (S_ISREG(cl_inode_mode(inode))) {
+-		env = cl_env_get(refcheck);
+-		if (!IS_ERR(env)) {
+-			io = ccc_env_thread_io(env);
+-			io->ci_obj = clob;
+-			*envout = env;
+-			*ioout  = io;
+-			result = 1;
+-		} else
+-			result = PTR_ERR(env);
+-	} else
+-		result = 0;
+-	return result;
+-}
+-
+-int cl_glimpse_size0(struct inode *inode, int agl)
+-{
 -	/*
--	 * XXX is it safe to call this with the page lock held?
+-	 * We don't need ast_flags argument to cl_glimpse_size(), because
+-	 * osc_lock_enqueue() takes care of the possible deadlock that said
+-	 * argument was introduced to avoid.
 -	 */
--	ll_teardown_mmaps(vmpage->mapping, offset, offset + PAGE_CACHE_SIZE);
+-	/*
+-	 * XXX but note that ll_file_seek() passes LDLM_FL_BLOCK_NOWAIT to
+-	 * cl_glimpse_size(), which doesn't make sense: glimpse locks are not
+-	 * blocking anyway.
+-	 */
+-	struct lu_env	  *env = NULL;
+-	struct cl_io	   *io  = NULL;
+-	int		     result;
+-	int		     refcheck;
+-
+-	result = cl_io_get(inode, &env, &io, &refcheck);
+-	if (result > 0) {
+-again:
+-		io->ci_verify_layout = 1;
+-		result = cl_io_init(env, io, CIT_MISC, io->ci_obj);
+-		if (result > 0)
+-			/*
+-			 * nothing to do for this io. This currently happens
+-			 * when stripe sub-object's are not yet created.
+-			 */
+-			result = io->ci_result;
+-		else if (result == 0)
+-			result = cl_glimpse_lock(env, io, inode, io->ci_obj,
+-						 agl);
+-
+-		OBD_FAIL_TIMEOUT(OBD_FAIL_GLIMPSE_DELAY, 2);
+-		cl_io_fini(env, io);
+-		if (unlikely(io->ci_need_restart))
+-			goto again;
+-		cl_env_put(env, &refcheck);
+-	}
+-	return result;
+-}
+-
+-int cl_local_size(struct inode *inode)
+-{
+-	struct lu_env	   *env = NULL;
+-	struct cl_io	    *io  = NULL;
+-	struct ccc_thread_info  *cti;
+-	struct cl_object	*clob;
+-	struct cl_lock_descr    *descr;
+-	struct cl_lock	  *lock;
+-	int		      result;
+-	int		      refcheck;
+-
+-	if (!cl_i2info(inode)->lli_has_smd)
+-		return 0;
+-
+-	result = cl_io_get(inode, &env, &io, &refcheck);
+-	if (result <= 0)
+-		return result;
+-
+-	clob = io->ci_obj;
+-	result = cl_io_init(env, io, CIT_MISC, clob);
+-	if (result > 0)
+-		result = io->ci_result;
+-	else if (result == 0) {
+-		cti = ccc_env_info(env);
+-		descr = &cti->cti_descr;
+-
+-		*descr = whole_file;
+-		descr->cld_obj = clob;
+-		lock = cl_lock_peek(env, io, descr, "localsize", current);
+-		if (lock) {
+-			cl_merge_lvb(env, inode);
+-			cl_unuse(env, lock);
+-			cl_lock_release(env, lock, "localsize", current);
+-			result = 0;
+-		} else
+-			result = -ENODATA;
+-	}
+-	cl_io_fini(env, io);
+-	cl_env_put(env, &refcheck);
+-	return result;
+-}
+diff --git a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c b/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
+deleted file mode 100644
+index aced41a..0000000
+--- a/drivers/staging/lustre/lustre/lclient/lcommon_cl.c
++++ /dev/null
+@@ -1,1203 +0,0 @@
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
+- *
+- * GPL HEADER END
+- */
+-/*
+- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2011, 2015, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- *
+- * cl code shared between vvp and liblustre (and other Lustre clients in the
+- * future).
+- *
+- *   Author: Nikita Danilov <nikita.danilov@sun.com>
+- */
+-
+-#define DEBUG_SUBSYSTEM S_LLITE
+-
+-#include "../../include/linux/libcfs/libcfs.h"
+-# include <linux/fs.h>
+-# include <linux/sched.h>
+-# include <linux/mm.h>
+-# include <linux/quotaops.h>
+-# include <linux/highmem.h>
+-# include <linux/pagemap.h>
+-# include <linux/rbtree.h>
+-
+-#include "../include/obd.h"
+-#include "../include/obd_support.h"
+-#include "../include/lustre_fid.h"
+-#include "../include/lustre_lite.h"
+-#include "../include/lustre_dlm.h"
+-#include "../include/lustre_ver.h"
+-#include "../include/lustre_mdc.h"
+-#include "../include/cl_object.h"
+-
+-#include "../include/lclient.h"
+-
+-#include "../llite/llite_internal.h"
+-
+-static const struct cl_req_operations ccc_req_ops;
+-
+-/*
+- * ccc_ prefix stands for "Common Client Code".
+- */
+-
+-static struct kmem_cache *ccc_lock_kmem;
+-static struct kmem_cache *ccc_object_kmem;
+-static struct kmem_cache *ccc_thread_kmem;
+-static struct kmem_cache *ccc_session_kmem;
+-static struct kmem_cache *ccc_req_kmem;
+-
+-static struct lu_kmem_descr ccc_caches[] = {
+-	{
+-		.ckd_cache = &ccc_lock_kmem,
+-		.ckd_name  = "ccc_lock_kmem",
+-		.ckd_size  = sizeof(struct ccc_lock)
+-	},
+-	{
+-		.ckd_cache = &ccc_object_kmem,
+-		.ckd_name  = "ccc_object_kmem",
+-		.ckd_size  = sizeof(struct ccc_object)
+-	},
+-	{
+-		.ckd_cache = &ccc_thread_kmem,
+-		.ckd_name  = "ccc_thread_kmem",
+-		.ckd_size  = sizeof(struct ccc_thread_info),
+-	},
+-	{
+-		.ckd_cache = &ccc_session_kmem,
+-		.ckd_name  = "ccc_session_kmem",
+-		.ckd_size  = sizeof(struct ccc_session)
+-	},
+-	{
+-		.ckd_cache = &ccc_req_kmem,
+-		.ckd_name  = "ccc_req_kmem",
+-		.ckd_size  = sizeof(struct ccc_req)
+-	},
+-	{
+-		.ckd_cache = NULL
+-	}
+-};
+-
+-/*****************************************************************************
+- *
+- * Vvp device and device type functions.
+- *
+- */
+-
+-void *ccc_key_init(const struct lu_context *ctx, struct lu_context_key *key)
+-{
+-	struct ccc_thread_info *info;
+-
+-	info = kmem_cache_zalloc(ccc_thread_kmem, GFP_NOFS);
+-	if (!info)
+-		info = ERR_PTR(-ENOMEM);
+-	return info;
+-}
+-
+-void ccc_key_fini(const struct lu_context *ctx,
+-			 struct lu_context_key *key, void *data)
+-{
+-	struct ccc_thread_info *info = data;
+-
+-	kmem_cache_free(ccc_thread_kmem, info);
+-}
+-
+-void *ccc_session_key_init(const struct lu_context *ctx,
+-				  struct lu_context_key *key)
+-{
+-	struct ccc_session *session;
+-
+-	session = kmem_cache_zalloc(ccc_session_kmem, GFP_NOFS);
+-	if (!session)
+-		session = ERR_PTR(-ENOMEM);
+-	return session;
+-}
+-
+-void ccc_session_key_fini(const struct lu_context *ctx,
+-				 struct lu_context_key *key, void *data)
+-{
+-	struct ccc_session *session = data;
+-
+-	kmem_cache_free(ccc_session_kmem, session);
+-}
+-
+-struct lu_context_key ccc_key = {
+-	.lct_tags = LCT_CL_THREAD,
+-	.lct_init = ccc_key_init,
+-	.lct_fini = ccc_key_fini
+-};
+-
+-struct lu_context_key ccc_session_key = {
+-	.lct_tags = LCT_SESSION,
+-	.lct_init = ccc_session_key_init,
+-	.lct_fini = ccc_session_key_fini
+-};
+-
+-/* type constructor/destructor: ccc_type_{init,fini,start,stop}(). */
+-/* LU_TYPE_INIT_FINI(ccc, &ccc_key, &ccc_session_key); */
+-
+-int ccc_device_init(const struct lu_env *env, struct lu_device *d,
+-			   const char *name, struct lu_device *next)
+-{
+-	struct ccc_device  *vdv;
+-	int rc;
+-
+-	vdv = lu2ccc_dev(d);
+-	vdv->cdv_next = lu2cl_dev(next);
+-
+-	LASSERT(d->ld_site && next->ld_type);
+-	next->ld_site = d->ld_site;
+-	rc = next->ld_type->ldt_ops->ldto_device_init(
+-			env, next, next->ld_type->ldt_name, NULL);
+-	if (rc == 0) {
+-		lu_device_get(next);
+-		lu_ref_add(&next->ld_reference, "lu-stack", &lu_site_init);
+-	}
+-	return rc;
+-}
+-
+-struct lu_device *ccc_device_fini(const struct lu_env *env,
+-					 struct lu_device *d)
+-{
+-	return cl2lu_dev(lu2ccc_dev(d)->cdv_next);
+-}
+-
+-struct lu_device *ccc_device_alloc(const struct lu_env *env,
+-				   struct lu_device_type *t,
+-				   struct lustre_cfg *cfg,
+-				   const struct lu_device_operations *luops,
+-				   const struct cl_device_operations *clops)
+-{
+-	struct ccc_device *vdv;
+-	struct lu_device  *lud;
+-	struct cl_site    *site;
+-	int rc;
+-
+-	vdv = kzalloc(sizeof(*vdv), GFP_NOFS);
+-	if (!vdv)
+-		return ERR_PTR(-ENOMEM);
+-
+-	lud = &vdv->cdv_cl.cd_lu_dev;
+-	cl_device_init(&vdv->cdv_cl, t);
+-	ccc2lu_dev(vdv)->ld_ops = luops;
+-	vdv->cdv_cl.cd_ops = clops;
+-
+-	site = kzalloc(sizeof(*site), GFP_NOFS);
+-	if (site) {
+-		rc = cl_site_init(site, &vdv->cdv_cl);
+-		if (rc == 0)
+-			rc = lu_site_init_finish(&site->cs_lu);
+-		else {
+-			LASSERT(!lud->ld_site);
+-			CERROR("Cannot init lu_site, rc %d.\n", rc);
+-			kfree(site);
+-		}
+-	} else
+-		rc = -ENOMEM;
+-	if (rc != 0) {
+-		ccc_device_free(env, lud);
+-		lud = ERR_PTR(rc);
+-	}
+-	return lud;
+-}
+-
+-struct lu_device *ccc_device_free(const struct lu_env *env,
+-					 struct lu_device *d)
+-{
+-	struct ccc_device *vdv  = lu2ccc_dev(d);
+-	struct cl_site    *site = lu2cl_site(d->ld_site);
+-	struct lu_device  *next = cl2lu_dev(vdv->cdv_next);
+-
+-	if (d->ld_site) {
+-		cl_site_fini(site);
+-		kfree(site);
+-	}
+-	cl_device_fini(lu2cl_dev(d));
+-	kfree(vdv);
+-	return next;
+-}
+-
+-int ccc_req_init(const struct lu_env *env, struct cl_device *dev,
+-			struct cl_req *req)
+-{
+-	struct ccc_req *vrq;
+-	int result;
+-
+-	vrq = kmem_cache_zalloc(ccc_req_kmem, GFP_NOFS);
+-	if (vrq) {
+-		cl_req_slice_add(req, &vrq->crq_cl, dev, &ccc_req_ops);
+-		result = 0;
+-	} else
+-		result = -ENOMEM;
+-	return result;
+-}
+-
+-/**
+- * An `emergency' environment used by ccc_inode_fini() when cl_env_get()
+- * fails. Access to this environment is serialized by ccc_inode_fini_guard
+- * mutex.
+- */
+-static struct lu_env *ccc_inode_fini_env;
+-
+-/**
+- * A mutex serializing calls to slp_inode_fini() under extreme memory
+- * pressure, when environments cannot be allocated.
+- */
+-static DEFINE_MUTEX(ccc_inode_fini_guard);
+-static int dummy_refcheck;
+-
+-int ccc_global_init(struct lu_device_type *device_type)
+-{
+-	int result;
+-
+-	result = lu_kmem_init(ccc_caches);
+-	if (result)
+-		return result;
+-
+-	result = lu_device_type_init(device_type);
+-	if (result)
+-		goto out_kmem;
+-
+-	ccc_inode_fini_env = cl_env_alloc(&dummy_refcheck,
+-					  LCT_REMEMBER|LCT_NOREF);
+-	if (IS_ERR(ccc_inode_fini_env)) {
+-		result = PTR_ERR(ccc_inode_fini_env);
+-		goto out_device;
+-	}
+-
+-	ccc_inode_fini_env->le_ctx.lc_cookie = 0x4;
+-	return 0;
+-out_device:
+-	lu_device_type_fini(device_type);
+-out_kmem:
+-	lu_kmem_fini(ccc_caches);
+-	return result;
+-}
+-
+-void ccc_global_fini(struct lu_device_type *device_type)
+-{
+-	if (ccc_inode_fini_env) {
+-		cl_env_put(ccc_inode_fini_env, &dummy_refcheck);
+-		ccc_inode_fini_env = NULL;
+-	}
+-	lu_device_type_fini(device_type);
+-	lu_kmem_fini(ccc_caches);
+-}
+-
+-/*****************************************************************************
+- *
+- * Object operations.
+- *
+- */
+-
+-struct lu_object *ccc_object_alloc(const struct lu_env *env,
+-				   const struct lu_object_header *unused,
+-				   struct lu_device *dev,
+-				   const struct cl_object_operations *clops,
+-				   const struct lu_object_operations *luops)
+-{
+-	struct ccc_object *vob;
+-	struct lu_object  *obj;
+-
+-	vob = kmem_cache_zalloc(ccc_object_kmem, GFP_NOFS);
+-	if (vob) {
+-		struct cl_object_header *hdr;
+-
+-		obj = ccc2lu(vob);
+-		hdr = &vob->cob_header;
+-		cl_object_header_init(hdr);
+-		lu_object_init(obj, &hdr->coh_lu, dev);
+-		lu_object_add_top(&hdr->coh_lu, obj);
+-
+-		vob->cob_cl.co_ops = clops;
+-		obj->lo_ops = luops;
+-	} else
+-		obj = NULL;
+-	return obj;
+-}
+-
+-int ccc_object_init0(const struct lu_env *env,
+-			    struct ccc_object *vob,
+-			    const struct cl_object_conf *conf)
+-{
+-	vob->cob_inode = conf->coc_inode;
+-	vob->cob_transient_pages = 0;
+-	cl_object_page_init(&vob->cob_cl, sizeof(struct ccc_page));
 -	return 0;
 -}
 -
- static void vvp_page_delete(const struct lu_env *env,
- 			    const struct cl_page_slice *slice)
- {
- 	struct page       *vmpage = cl2vm_page(slice);
- 	struct inode     *inode  = vmpage->mapping->host;
- 	struct cl_object *obj    = slice->cpl_obj;
-+	struct cl_page   *page   = slice->cpl_page;
-+	int refc;
- 
- 	LASSERT(PageLocked(vmpage));
--	LASSERT((struct cl_page *)vmpage->private == slice->cpl_page);
-+	LASSERT((struct cl_page *)vmpage->private == page);
- 	LASSERT(inode == ccc_object_inode(obj));
- 
- 	vvp_write_complete(cl2ccc(obj), cl2ccc_page(slice));
-+
-+	/* Drop the reference count held in vvp_page_init */
-+	refc = atomic_dec_return(&page->cp_ref);
-+	LASSERTF(refc >= 1, "page = %p, refc = %d\n", page, refc);
-+
-+	ClearPageUptodate(vmpage);
- 	ClearPagePrivate(vmpage);
- 	vmpage->private = 0;
- 	/*
-@@ -404,7 +397,6 @@ static const struct cl_page_operations vvp_page_ops = {
- 	.cpo_vmpage	= ccc_page_vmpage,
- 	.cpo_discard       = vvp_page_discard,
- 	.cpo_delete	= vvp_page_delete,
--	.cpo_unmap	 = vvp_page_unmap,
- 	.cpo_export	= vvp_page_export,
- 	.cpo_is_vmlocked   = vvp_page_is_vmlocked,
- 	.cpo_fini	  = vvp_page_fini,
-@@ -541,6 +533,8 @@ int vvp_page_init(const struct lu_env *env, struct cl_object *obj,
- 
- 	INIT_LIST_HEAD(&cpg->cpg_pending_linkage);
- 	if (page->cp_type == CPT_CACHEABLE) {
-+		/* in cache, decref in vvp_page_delete */
-+		atomic_inc(&page->cp_ref);
- 		SetPagePrivate(vmpage);
- 		vmpage->private = (unsigned long)page;
- 		cl_page_slice_add(page, &cpg->cpg_cl, obj, &vvp_page_ops);
-diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-index 1f8ed95..5d8a2b6 100644
---- a/drivers/staging/lustre/lustre/lov/lov_object.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-@@ -287,7 +287,7 @@ static int lov_delete_empty(const struct lu_env *env, struct lov_object *lov,
- 
- 	lov_layout_wait(env, lov);
- 
--	cl_object_prune(env, &lov->lo_cl);
-+	cl_locks_prune(env, &lov->lo_cl, 0);
- 	return 0;
- }
- 
-@@ -364,7 +364,7 @@ static int lov_delete_raid0(const struct lu_env *env, struct lov_object *lov,
- 			}
- 		}
- 	}
--	cl_object_prune(env, &lov->lo_cl);
-+	cl_locks_prune(env, &lov->lo_cl, 0);
- 	return 0;
- }
- 
-@@ -666,7 +666,6 @@ static int lov_layout_change(const struct lu_env *unused,
- 	const struct lov_layout_operations *old_ops;
- 	const struct lov_layout_operations *new_ops;
- 
--	struct cl_object_header *hdr = cl_object_header(&lov->lo_cl);
- 	void *cookie;
- 	struct lu_env *env;
- 	int refcheck;
-@@ -691,13 +690,13 @@ static int lov_layout_change(const struct lu_env *unused,
- 	old_ops = &lov_dispatch[lov->lo_type];
- 	new_ops = &lov_dispatch[llt];
- 
-+	cl_object_prune(env, &lov->lo_cl);
-+
- 	result = old_ops->llo_delete(env, lov, &lov->u);
- 	if (result == 0) {
- 		old_ops->llo_fini(env, lov, &lov->u);
- 
- 		LASSERT(atomic_read(&lov->lo_active_ios) == 0);
--		LASSERT(!hdr->coh_tree.rnode);
--		LASSERT(hdr->coh_pages == 0);
- 
- 		lov->lo_type = LLT_EMPTY;
- 		result = new_ops->llo_init(env,
-diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
-index fdcaf80..9728da2 100644
---- a/drivers/staging/lustre/lustre/lov/lov_page.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_page.c
-@@ -36,6 +36,7 @@
-  * Implementation of cl_page for LOV layer.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- #define DEBUG_SUBSYSTEM S_LOV
-@@ -179,31 +180,21 @@ int lov_page_init_raid0(const struct lu_env *env, struct cl_object *obj,
- 	cl_page_slice_add(page, &lpg->lps_cl, obj, &lov_page_ops);
- 
- 	sub = lov_sub_get(env, lio, stripe);
--	if (IS_ERR(sub)) {
--		rc = PTR_ERR(sub);
--		goto out;
--	}
-+	if (IS_ERR(sub))
-+		return PTR_ERR(sub);
- 
- 	subobj = lovsub2cl(r0->lo_sub[stripe]);
--	subpage = cl_page_find_sub(sub->sub_env, subobj,
--				   cl_index(subobj, suboff), vmpage, page);
--	lov_sub_put(sub);
--	if (IS_ERR(subpage)) {
--		rc = PTR_ERR(subpage);
--		goto out;
--	}
--
--	if (likely(subpage->cp_parent == page)) {
--		lu_ref_add(&subpage->cp_reference, "lov", page);
-+	subpage = cl_page_alloc(sub->sub_env, subobj, cl_index(subobj, suboff),
-+				vmpage, page->cp_type);
-+	if (!IS_ERR(subpage)) {
-+		subpage->cp_parent = page;
-+		page->cp_child = subpage;
- 		lpg->lps_invalid = 0;
--		rc = 0;
- 	} else {
--		CL_PAGE_DEBUG(D_ERROR, env, page, "parent page\n");
--		CL_PAGE_DEBUG(D_ERROR, env, subpage, "child page\n");
--		LASSERT(0);
-+		rc = PTR_ERR(subpage);
- 	}
-+	lov_sub_put(sub);
- 
--out:
- 	return rc;
- }
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-index f5128b4..cf94284 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-@@ -36,6 +36,7 @@
-  * Client IO.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- #define DEBUG_SUBSYSTEM S_CLASS
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-index f952c1c..32ecc5a 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-@@ -36,6 +36,7 @@
-  * Client Extent Lock.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- #define DEBUG_SUBSYSTEM S_CLASS
-@@ -1816,128 +1817,6 @@ struct cl_lock *cl_lock_at_pgoff(const struct lu_env *env,
- EXPORT_SYMBOL(cl_lock_at_pgoff);
- 
- /**
-- * Calculate the page offset at the layer of @lock.
-- * At the time of this writing, @page is top page and @lock is sub lock.
-- */
--static pgoff_t pgoff_at_lock(struct cl_page *page, struct cl_lock *lock)
+-int ccc_object_init(const struct lu_env *env, struct lu_object *obj,
+-			   const struct lu_object_conf *conf)
 -{
--	struct lu_device_type *dtype;
--	const struct cl_page_slice *slice;
--
--	dtype = lock->cll_descr.cld_obj->co_lu.lo_dev->ld_type;
--	slice = cl_page_at(page, dtype);
--	return slice->cpl_page->cp_index;
--}
--
--/**
-- * Check if page @page is covered by an extra lock or discard it.
-- */
--static int check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
--				struct cl_page *page, void *cbdata)
--{
--	struct cl_thread_info *info = cl_env_info(env);
--	struct cl_lock *lock = cbdata;
--	pgoff_t index = pgoff_at_lock(page, lock);
--
--	if (index >= info->clt_fn_index) {
--		struct cl_lock *tmp;
--
--		/* refresh non-overlapped index */
--		tmp = cl_lock_at_pgoff(env, lock->cll_descr.cld_obj, index,
--				       lock, 1, 0);
--		if (tmp) {
--			/* Cache the first-non-overlapped index so as to skip
--			 * all pages within [index, clt_fn_index). This
--			 * is safe because if tmp lock is canceled, it will
--			 * discard these pages.
--			 */
--			info->clt_fn_index = tmp->cll_descr.cld_end + 1;
--			if (tmp->cll_descr.cld_end == CL_PAGE_EOF)
--				info->clt_fn_index = CL_PAGE_EOF;
--			cl_lock_put(env, tmp);
--		} else if (cl_page_own(env, io, page) == 0) {
--			/* discard the page */
--			cl_page_unmap(env, io, page);
--			cl_page_discard(env, io, page);
--			cl_page_disown(env, io, page);
--		} else {
--			LASSERT(page->cp_state == CPS_FREEING);
--		}
--	}
--
--	info->clt_next_index = index + 1;
--	return CLP_GANG_OKAY;
--}
--
--static int discard_cb(const struct lu_env *env, struct cl_io *io,
--		      struct cl_page *page, void *cbdata)
--{
--	struct cl_thread_info *info = cl_env_info(env);
--	struct cl_lock *lock   = cbdata;
--
--	LASSERT(lock->cll_descr.cld_mode >= CLM_WRITE);
--	KLASSERT(ergo(page->cp_type == CPT_CACHEABLE,
--		      !PageWriteback(cl_page_vmpage(env, page))));
--	KLASSERT(ergo(page->cp_type == CPT_CACHEABLE,
--		      !PageDirty(cl_page_vmpage(env, page))));
--
--	info->clt_next_index = pgoff_at_lock(page, lock) + 1;
--	if (cl_page_own(env, io, page) == 0) {
--		/* discard the page */
--		cl_page_unmap(env, io, page);
--		cl_page_discard(env, io, page);
--		cl_page_disown(env, io, page);
--	} else {
--		LASSERT(page->cp_state == CPS_FREEING);
--	}
--
--	return CLP_GANG_OKAY;
--}
--
--/**
-- * Discard pages protected by the given lock. This function traverses radix
-- * tree to find all covering pages and discard them. If a page is being covered
-- * by other locks, it should remain in cache.
-- *
-- * If error happens on any step, the process continues anyway (the reasoning
-- * behind this being that lock cancellation cannot be delayed indefinitely).
-- */
--int cl_lock_discard_pages(const struct lu_env *env, struct cl_lock *lock)
--{
--	struct cl_thread_info *info  = cl_env_info(env);
--	struct cl_io	  *io    = &info->clt_io;
--	struct cl_lock_descr  *descr = &lock->cll_descr;
--	cl_page_gang_cb_t      cb;
--	int res;
+-	struct ccc_device *dev = lu2ccc_dev(obj->lo_dev);
+-	struct ccc_object *vob = lu2ccc(obj);
+-	struct lu_object  *below;
+-	struct lu_device  *under;
 -	int result;
 -
--	LINVRNT(cl_lock_invariant(env, lock));
+-	under = &dev->cdv_next->cd_lu_dev;
+-	below = under->ld_ops->ldo_object_alloc(env, obj->lo_header, under);
+-	if (below) {
+-		const struct cl_object_conf *cconf;
 -
--	io->ci_obj = cl_object_top(descr->cld_obj);
--	io->ci_ignore_layout = 1;
--	result = cl_io_init(env, io, CIT_MISC, io->ci_obj);
--	if (result != 0)
--		goto out;
--
--	cb = descr->cld_mode == CLM_READ ? check_and_discard_cb : discard_cb;
--	info->clt_fn_index = info->clt_next_index = descr->cld_start;
--	do {
--		res = cl_page_gang_lookup(env, descr->cld_obj, io,
--					  info->clt_next_index, descr->cld_end,
--					  cb, (void *)lock);
--		if (info->clt_next_index > descr->cld_end)
--			break;
--
--		if (res == CLP_GANG_RESCHED)
--			cond_resched();
--	} while (res != CLP_GANG_OKAY);
--out:
--	cl_io_fini(env, io);
+-		cconf = lu2cl_conf(conf);
+-		INIT_LIST_HEAD(&vob->cob_pending_list);
+-		lu_object_add(obj, below);
+-		result = ccc_object_init0(env, vob, cconf);
+-	} else
+-		result = -ENOMEM;
 -	return result;
 -}
--EXPORT_SYMBOL(cl_lock_discard_pages);
 -
--/**
-  * Eliminate all locks for a given object.
-  *
-  * Caller has to guarantee that no lock is in active use.
-@@ -1951,12 +1830,6 @@ void cl_locks_prune(const struct lu_env *env, struct cl_object *obj, int cancel)
- 	struct cl_lock	  *lock;
- 
- 	head = cl_object_header(obj);
+-void ccc_object_free(const struct lu_env *env, struct lu_object *obj)
+-{
+-	struct ccc_object *vob = lu2ccc(obj);
+-
+-	lu_object_fini(obj);
+-	lu_object_header_fini(obj->lo_header);
+-	kmem_cache_free(ccc_object_kmem, vob);
+-}
+-
+-int ccc_lock_init(const struct lu_env *env,
+-		  struct cl_object *obj, struct cl_lock *lock,
+-		  const struct cl_io *unused,
+-		  const struct cl_lock_operations *lkops)
+-{
+-	struct ccc_lock *clk;
+-	int result;
+-
+-	CLOBINVRNT(env, obj, ccc_object_invariant(obj));
+-
+-	clk = kmem_cache_zalloc(ccc_lock_kmem, GFP_NOFS);
+-	if (clk) {
+-		cl_lock_slice_add(lock, &clk->clk_cl, obj, lkops);
+-		result = 0;
+-	} else
+-		result = -ENOMEM;
+-	return result;
+-}
+-
+-int ccc_object_glimpse(const struct lu_env *env,
+-		       const struct cl_object *obj, struct ost_lvb *lvb)
+-{
+-	struct inode *inode = ccc_object_inode(obj);
+-
+-	lvb->lvb_mtime = cl_inode_mtime(inode);
+-	lvb->lvb_atime = cl_inode_atime(inode);
+-	lvb->lvb_ctime = cl_inode_ctime(inode);
 -	/*
--	 * If locks are destroyed without cancellation, all pages must be
--	 * already destroyed (as otherwise they will be left unprotected).
+-	 * LU-417: Add dirty pages block count lest i_blocks reports 0, some
+-	 * "cp" or "tar" on remote node may think it's a completely sparse file
+-	 * and skip it.
 -	 */
--	LASSERT(ergo(!cancel,
--		     !head->coh_tree.rnode && head->coh_pages == 0));
- 
- 	spin_lock(&head->coh_lock_guard);
- 	while (!list_empty(&head->coh_locks)) {
-@@ -2095,8 +1968,8 @@ void cl_lock_hold_add(const struct lu_env *env, struct cl_lock *lock,
- 	LINVRNT(cl_lock_invariant(env, lock));
- 	LASSERT(lock->cll_state != CLS_FREEING);
- 
--	cl_lock_hold_mod(env, lock, 1);
- 	cl_lock_get(lock);
-+	cl_lock_hold_mod(env, lock, 1);
- 	lu_ref_add(&lock->cll_holders, scope, source);
- 	lu_ref_add(&lock->cll_reference, scope, source);
- }
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-index 0772706..65b6402 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-@@ -36,6 +36,7 @@
-  * Client Lustre Object.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- /*
-@@ -43,7 +44,6 @@
-  *
-  *  i_mutex
-  *      PG_locked
-- *	  ->coh_page_guard
-  *	  ->coh_lock_guard
-  *	  ->coh_attr_guard
-  *	  ->ls_guard
-@@ -63,8 +63,6 @@
- 
- static struct kmem_cache *cl_env_kmem;
- 
--/** Lock class of cl_object_header::coh_page_guard */
--static struct lock_class_key cl_page_guard_class;
- /** Lock class of cl_object_header::coh_lock_guard */
- static struct lock_class_key cl_lock_guard_class;
- /** Lock class of cl_object_header::coh_attr_guard */
-@@ -81,15 +79,10 @@ int cl_object_header_init(struct cl_object_header *h)
- 
- 	result = lu_object_header_init(&h->coh_lu);
- 	if (result == 0) {
--		spin_lock_init(&h->coh_page_guard);
- 		spin_lock_init(&h->coh_lock_guard);
- 		spin_lock_init(&h->coh_attr_guard);
--		lockdep_set_class(&h->coh_page_guard, &cl_page_guard_class);
- 		lockdep_set_class(&h->coh_lock_guard, &cl_lock_guard_class);
- 		lockdep_set_class(&h->coh_attr_guard, &cl_attr_guard_class);
--		h->coh_pages = 0;
--		/* XXX hard coded GFP_* mask. */
--		INIT_RADIX_TREE(&h->coh_tree, GFP_ATOMIC);
- 		INIT_LIST_HEAD(&h->coh_locks);
- 		h->coh_page_bufsize = ALIGN(sizeof(struct cl_page), 8);
- 	}
-@@ -315,6 +308,32 @@ int cl_conf_set(const struct lu_env *env, struct cl_object *obj,
- EXPORT_SYMBOL(cl_conf_set);
- 
- /**
-+ * Prunes caches of pages and locks for this object.
-+ */
-+void cl_object_prune(const struct lu_env *env, struct cl_object *obj)
-+{
-+	struct lu_object_header *top;
-+	struct cl_object *o;
-+	int result;
-+
-+	top = obj->co_lu.lo_header;
-+	result = 0;
-+	list_for_each_entry(o, &top->loh_layers, co_lu.lo_linkage) {
-+		if (o->co_ops->coo_prune) {
-+			result = o->co_ops->coo_prune(env, o);
-+			if (result != 0)
-+				break;
-+		}
-+	}
-+
-+	/* TODO: pruning locks will be moved into layers after cl_lock
-+	 * simplification is done
-+	 */
-+	cl_locks_prune(env, obj, 1);
-+}
-+EXPORT_SYMBOL(cl_object_prune);
-+
-+/**
-  * Helper function removing all object locks, and marking object for
-  * deletion. All object pages must have been deleted at this point.
-  *
-@@ -326,8 +345,6 @@ void cl_object_kill(const struct lu_env *env, struct cl_object *obj)
- 	struct cl_object_header *hdr;
- 
- 	hdr = cl_object_header(obj);
--	LASSERT(!hdr->coh_tree.rnode);
--	LASSERT(hdr->coh_pages == 0);
- 
- 	set_bit(LU_OBJECT_HEARD_BANSHEE, &hdr->coh_lu.loh_flags);
- 	/*
-@@ -341,16 +358,6 @@ void cl_object_kill(const struct lu_env *env, struct cl_object *obj)
- }
- EXPORT_SYMBOL(cl_object_kill);
- 
--/**
-- * Prunes caches of pages and locks for this object.
-- */
--void cl_object_prune(const struct lu_env *env, struct cl_object *obj)
--{
--	cl_pages_prune(env, obj);
--	cl_locks_prune(env, obj, 1);
+-	if (lvb->lvb_size > 0 && lvb->lvb_blocks == 0)
+-		lvb->lvb_blocks = dirty_cnt(inode);
+-	return 0;
 -}
--EXPORT_SYMBOL(cl_object_prune);
 -
- void cache_stats_init(struct cache_stats *cs, const char *name)
- {
- 	int i;
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-index 231a2f2..8169836 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-@@ -36,6 +36,7 @@
-  * Client Lustre Page.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- #define DEBUG_SUBSYSTEM S_CLASS
-@@ -48,8 +49,7 @@
- #include "../include/cl_object.h"
- #include "cl_internal.h"
- 
--static void cl_page_delete0(const struct lu_env *env, struct cl_page *pg,
--			    int radix);
-+static void cl_page_delete0(const struct lu_env *env, struct cl_page *pg);
- 
- # define PASSERT(env, page, expr)					   \
- 	do {								   \
-@@ -79,8 +79,7 @@ static struct cl_page *cl_page_top_trusted(struct cl_page *page)
-  *
-  * This function can be used to obtain initial reference to previously
-  * unreferenced cached object. It can be called only if concurrent page
-- * reclamation is somehow prevented, e.g., by locking page radix-tree
-- * (cl_object_header::hdr->coh_page_guard), or by keeping a lock on a VM page,
-+ * reclamation is somehow prevented, e.g., by keeping a lock on a VM page,
-  * associated with \a page.
-  *
-  * Use with care! Not exported.
-@@ -114,132 +113,6 @@ cl_page_at_trusted(const struct cl_page *page,
- 	return NULL;
- }
- 
--/**
-- * Returns a page with given index in the given object, or NULL if no page is
-- * found. Acquires a reference on \a page.
+-static void ccc_object_size_lock(struct cl_object *obj)
+-{
+-	struct inode *inode = ccc_object_inode(obj);
+-
+-	ll_inode_size_lock(inode);
+-	cl_object_attr_lock(obj);
+-}
+-
+-static void ccc_object_size_unlock(struct cl_object *obj)
+-{
+-	struct inode *inode = ccc_object_inode(obj);
+-
+-	cl_object_attr_unlock(obj);
+-	ll_inode_size_unlock(inode);
+-}
+-
+-/*****************************************************************************
 - *
-- * Locking: called under cl_object_header::coh_page_guard spin-lock.
+- * Page operations.
+- *
 - */
--struct cl_page *cl_page_lookup(struct cl_object_header *hdr, pgoff_t index)
+-
+-struct page *ccc_page_vmpage(const struct lu_env *env,
+-			    const struct cl_page_slice *slice)
 -{
--	struct cl_page *page;
--
--	assert_spin_locked(&hdr->coh_page_guard);
--
--	page = radix_tree_lookup(&hdr->coh_tree, index);
--	if (page)
--		cl_page_get_trust(page);
--	return page;
+-	return cl2vm_page(slice);
 -}
--EXPORT_SYMBOL(cl_page_lookup);
+-
+-int ccc_page_is_under_lock(const struct lu_env *env,
+-			   const struct cl_page_slice *slice,
+-			   struct cl_io *io)
+-{
+-	struct ccc_io	*cio  = ccc_env_io(env);
+-	struct cl_lock_descr *desc = &ccc_env_info(env)->cti_descr;
+-	struct cl_page       *page = slice->cpl_page;
+-
+-	int result;
+-
+-	if (io->ci_type == CIT_READ || io->ci_type == CIT_WRITE ||
+-	    io->ci_type == CIT_FAULT) {
+-		if (cio->cui_fd->fd_flags & LL_FILE_GROUP_LOCKED)
+-			result = -EBUSY;
+-		else {
+-			desc->cld_start = page->cp_index;
+-			desc->cld_end   = page->cp_index;
+-			desc->cld_obj   = page->cp_obj;
+-			desc->cld_mode  = CLM_READ;
+-			result = cl_queue_match(&io->ci_lockset.cls_done,
+-						desc) ? -EBUSY : 0;
+-		}
+-	} else
+-		result = 0;
+-	return result;
+-}
+-
+-int ccc_fail(const struct lu_env *env, const struct cl_page_slice *slice)
+-{
+-	/*
+-	 * Cached read?
+-	 */
+-	LBUG();
+-	return 0;
+-}
+-
+-int ccc_transient_page_prep(const struct lu_env *env,
+-				   const struct cl_page_slice *slice,
+-				   struct cl_io *unused)
+-{
+-	/* transient page should always be sent. */
+-	return 0;
+-}
+-
+-/*****************************************************************************
+- *
+- * Lock operations.
+- *
+- */
+-
+-void ccc_lock_delete(const struct lu_env *env,
+-		     const struct cl_lock_slice *slice)
+-{
+-	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
+-}
+-
+-void ccc_lock_fini(const struct lu_env *env, struct cl_lock_slice *slice)
+-{
+-	struct ccc_lock *clk = cl2ccc_lock(slice);
+-
+-	kmem_cache_free(ccc_lock_kmem, clk);
+-}
+-
+-int ccc_lock_enqueue(const struct lu_env *env,
+-		     const struct cl_lock_slice *slice,
+-		     struct cl_io *unused, __u32 enqflags)
+-{
+-	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
+-	return 0;
+-}
+-
+-int ccc_lock_use(const struct lu_env *env, const struct cl_lock_slice *slice)
+-{
+-	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
+-	return 0;
+-}
+-
+-int ccc_lock_unuse(const struct lu_env *env, const struct cl_lock_slice *slice)
+-{
+-	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
+-	return 0;
+-}
+-
+-int ccc_lock_wait(const struct lu_env *env, const struct cl_lock_slice *slice)
+-{
+-	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
+-	return 0;
+-}
 -
 -/**
-- * Returns a list of pages by a given [start, end] of \a obj.
+- * Implementation of cl_lock_operations::clo_fits_into() methods for ccc
+- * layer. This function is executed every time io finds an existing lock in
+- * the lock cache while creating new lock. This function has to decide whether
+- * cached lock "fits" into io.
 - *
-- * \param resched If not NULL, then we give up before hogging CPU for too
-- * long and set *resched = 1, in that case caller should implement a retry
-- * logic.
+- * \param slice lock to be checked
+- * \param io    IO that wants a lock.
 - *
-- * Gang tree lookup (radix_tree_gang_lookup()) optimization is absolutely
-- * crucial in the face of [offset, EOF] locks.
-- *
-- * Return at least one page in @queue unless there is no covered page.
+- * \see lov_lock_fits_into().
 - */
--int cl_page_gang_lookup(const struct lu_env *env, struct cl_object *obj,
--			struct cl_io *io, pgoff_t start, pgoff_t end,
--			cl_page_gang_cb_t cb, void *cbdata)
+-int ccc_lock_fits_into(const struct lu_env *env,
+-		       const struct cl_lock_slice *slice,
+-		       const struct cl_lock_descr *need,
+-		       const struct cl_io *io)
 -{
--	struct cl_object_header *hdr;
--	struct cl_page	  *page;
--	struct cl_page	 **pvec;
--	const struct cl_page_slice  *slice;
--	const struct lu_device_type *dtype;
--	pgoff_t		  idx;
--	unsigned int	     nr;
--	unsigned int	     i;
--	unsigned int	     j;
--	int		      res = CLP_GANG_OKAY;
--	int		      tree_lock = 1;
--
--	idx = start;
--	hdr = cl_object_header(obj);
--	pvec = cl_env_info(env)->clt_pvec;
--	dtype = cl_object_top(obj)->co_lu.lo_dev->ld_type;
--	spin_lock(&hdr->coh_page_guard);
--	while ((nr = radix_tree_gang_lookup(&hdr->coh_tree, (void **)pvec,
--					    idx, CLT_PVEC_SIZE)) > 0) {
--		int end_of_region = 0;
--
--		idx = pvec[nr - 1]->cp_index + 1;
--		for (i = 0, j = 0; i < nr; ++i) {
--			page = pvec[i];
--			pvec[i] = NULL;
--
--			LASSERT(page->cp_type == CPT_CACHEABLE);
--			if (page->cp_index > end) {
--				end_of_region = 1;
--				break;
--			}
--			if (page->cp_state == CPS_FREEING)
--				continue;
--
--			slice = cl_page_at_trusted(page, dtype);
--			/*
--			 * Pages for lsm-less file has no underneath sub-page
--			 * for osc, in case of ...
--			 */
--			PASSERT(env, page, slice);
--
--			page = slice->cpl_page;
--			/*
--			 * Can safely call cl_page_get_trust() under
--			 * radix-tree spin-lock.
--			 *
--			 * XXX not true, because @page is from object another
--			 * than @hdr and protected by different tree lock.
--			 */
--			cl_page_get_trust(page);
--			lu_ref_add_atomic(&page->cp_reference,
--					  "gang_lookup", current);
--			pvec[j++] = page;
--		}
--
--		/*
--		 * Here a delicate locking dance is performed. Current thread
--		 * holds a reference to a page, but has to own it before it
--		 * can be placed into queue. Owning implies waiting, so
--		 * radix-tree lock is to be released. After a wait one has to
--		 * check that pages weren't truncated (cl_page_own() returns
--		 * error in the latter case).
--		 */
--		spin_unlock(&hdr->coh_page_guard);
--		tree_lock = 0;
--
--		for (i = 0; i < j; ++i) {
--			page = pvec[i];
--			if (res == CLP_GANG_OKAY)
--				res = (*cb)(env, io, page, cbdata);
--			lu_ref_del(&page->cp_reference,
--				   "gang_lookup", current);
--			cl_page_put(env, page);
--		}
--		if (nr < CLT_PVEC_SIZE || end_of_region)
--			break;
--
--		if (res == CLP_GANG_OKAY && need_resched())
--			res = CLP_GANG_RESCHED;
--		if (res != CLP_GANG_OKAY)
--			break;
--
--		spin_lock(&hdr->coh_page_guard);
--		tree_lock = 1;
--	}
--	if (tree_lock)
--		spin_unlock(&hdr->coh_page_guard);
--	return res;
--}
--EXPORT_SYMBOL(cl_page_gang_lookup);
--
- static void cl_page_free(const struct lu_env *env, struct cl_page *page)
- {
- 	struct cl_object *obj  = page->cp_obj;
-@@ -276,10 +149,10 @@ static inline void cl_page_state_set_trust(struct cl_page *page,
- 	*(enum cl_page_state *)&page->cp_state = state;
- }
- 
--static struct cl_page *cl_page_alloc(const struct lu_env *env,
--				     struct cl_object *o, pgoff_t ind,
--				     struct page *vmpage,
--				     enum cl_page_type type)
-+struct cl_page *cl_page_alloc(const struct lu_env *env,
-+			      struct cl_object *o, pgoff_t ind,
-+			      struct page *vmpage,
-+			      enum cl_page_type type)
- {
- 	struct cl_page	  *page;
- 	struct lu_object_header *head;
-@@ -289,8 +162,6 @@ static struct cl_page *cl_page_alloc(const struct lu_env *env,
- 		int result = 0;
- 
- 		atomic_set(&page->cp_ref, 1);
--		if (type == CPT_CACHEABLE) /* for radix tree */
--			atomic_inc(&page->cp_ref);
- 		page->cp_obj = o;
- 		cl_object_get(o);
- 		lu_object_ref_add_at(&o->co_lu, &page->cp_obj_ref, "cl_page",
-@@ -309,7 +180,7 @@ static struct cl_page *cl_page_alloc(const struct lu_env *env,
- 				result = o->co_ops->coo_page_init(env, o,
- 								  page, vmpage);
- 				if (result != 0) {
--					cl_page_delete0(env, page, 0);
-+					cl_page_delete0(env, page);
- 					cl_page_free(env, page);
- 					page = ERR_PTR(result);
- 					break;
-@@ -321,6 +192,7 @@ static struct cl_page *cl_page_alloc(const struct lu_env *env,
- 	}
- 	return page;
- }
-+EXPORT_SYMBOL(cl_page_alloc);
- 
- /**
-  * Returns a cl_page with index \a idx at the object \a o, and associated with
-@@ -333,16 +205,13 @@ static struct cl_page *cl_page_alloc(const struct lu_env *env,
-  *
-  * \see cl_object_find(), cl_lock_find()
-  */
--static struct cl_page *cl_page_find0(const struct lu_env *env,
--				     struct cl_object *o,
--				     pgoff_t idx, struct page *vmpage,
--				     enum cl_page_type type,
--				     struct cl_page *parent)
-+struct cl_page *cl_page_find(const struct lu_env *env,
-+			     struct cl_object *o,
-+			     pgoff_t idx, struct page *vmpage,
-+			     enum cl_page_type type)
- {
- 	struct cl_page	  *page = NULL;
--	struct cl_page	  *ghost = NULL;
- 	struct cl_object_header *hdr;
--	int err;
- 
- 	LASSERT(type == CPT_CACHEABLE || type == CPT_TRANSIENT);
- 	might_sleep();
-@@ -368,90 +237,19 @@ static struct cl_page *cl_page_find0(const struct lu_env *env,
- 		 *       reference on it.
- 		 */
- 		page = cl_vmpage_page(vmpage, o);
--		PINVRNT(env, page,
--			ergo(page,
--			     cl_page_vmpage(env, page) == vmpage &&
--			     (void *)radix_tree_lookup(&hdr->coh_tree,
--						       idx) == page));
--	}
- 
--	if (page)
--		return page;
-+		if (page)
-+			return page;
-+	}
- 
- 	/* allocate and initialize cl_page */
- 	page = cl_page_alloc(env, o, idx, vmpage, type);
--	if (IS_ERR(page))
--		return page;
--
--	if (type == CPT_TRANSIENT) {
--		if (parent) {
--			LASSERT(!page->cp_parent);
--			page->cp_parent = parent;
--			parent->cp_child = page;
--		}
--		return page;
--	}
+-	const struct cl_lock       *lock  = slice->cls_lock;
+-	const struct cl_lock_descr *descr = &lock->cll_descr;
+-	const struct ccc_io	*cio   = ccc_env_io(env);
+-	int			 result;
 -
 -	/*
--	 * XXX optimization: use radix_tree_preload() here, and change tree
--	 * gfp mask to GFP_KERNEL in cl_object_header_init().
+-	 * Work around DLM peculiarity: it assumes that glimpse
+-	 * (LDLM_FL_HAS_INTENT) lock is always LCK_PR, and returns reads lock
+-	 * when asked for LCK_PW lock with LDLM_FL_HAS_INTENT flag set. Make
+-	 * sure that glimpse doesn't get CLM_WRITE top-lock, so that it
+-	 * doesn't enqueue CLM_WRITE sub-locks.
 -	 */
--	spin_lock(&hdr->coh_page_guard);
--	err = radix_tree_insert(&hdr->coh_tree, idx, page);
--	if (err != 0) {
--		ghost = page;
--		/*
--		 * Noted by Jay: a lock on \a vmpage protects cl_page_find()
--		 * from this race, but
--		 *
--		 *     0. it's better to have cl_page interface "locally
--		 *     consistent" so that its correctness can be reasoned
--		 *     about without appealing to the (obscure world of) VM
--		 *     locking.
--		 *
--		 *     1. handling this race allows ->coh_tree to remain
--		 *     consistent even when VM locking is somehow busted,
--		 *     which is very useful during diagnosing and debugging.
+-	if (cio->cui_glimpse)
+-		result = descr->cld_mode != CLM_WRITE;
+-
+-	/*
+-	 * Also, don't match incomplete write locks for read, otherwise read
+-	 * would enqueue missing sub-locks in the write mode.
+-	 */
+-	else if (need->cld_mode != descr->cld_mode)
+-		result = lock->cll_state >= CLS_ENQUEUED;
+-	else
+-		result = 1;
+-	return result;
+-}
+-
+-/**
+- * Implements cl_lock_operations::clo_state() method for ccc layer, invoked
+- * whenever lock state changes. Transfers object attributes, that might be
+- * updated as a result of lock acquiring into inode.
+- */
+-void ccc_lock_state(const struct lu_env *env,
+-		    const struct cl_lock_slice *slice,
+-		    enum cl_lock_state state)
+-{
+-	struct cl_lock *lock = slice->cls_lock;
+-
+-	/*
+-	 * Refresh inode attributes when the lock is moving into CLS_HELD
+-	 * state, and only when this is a result of real enqueue, rather than
+-	 * of finding lock in the cache.
+-	 */
+-	if (state == CLS_HELD && lock->cll_state < CLS_HELD) {
+-		struct cl_object *obj;
+-		struct inode     *inode;
+-
+-		obj   = slice->cls_obj;
+-		inode = ccc_object_inode(obj);
+-
+-		/* vmtruncate() sets the i_size
+-		 * under both a DLM lock and the
+-		 * ll_inode_size_lock().  If we don't get the
+-		 * ll_inode_size_lock() here we can match the DLM lock and
+-		 * reset i_size.  generic_file_write can then trust the
+-		 * stale i_size when doing appending writes and effectively
+-		 * cancel the result of the truncate.  Getting the
+-		 * ll_inode_size_lock() after the enqueue maintains the DLM
+-		 * -> ll_inode_size_lock() acquiring order.
 -		 */
--		page = ERR_PTR(err);
--		CL_PAGE_DEBUG(D_ERROR, env, ghost,
--			      "fail to insert into radix tree: %d\n", err);
+-		if (lock->cll_descr.cld_start == 0 &&
+-		    lock->cll_descr.cld_end == CL_PAGE_EOF)
+-			cl_merge_lvb(env, inode);
+-	}
+-}
+-
+-/*****************************************************************************
+- *
+- * io operations.
+- *
+- */
+-
+-int ccc_io_one_lock_index(const struct lu_env *env, struct cl_io *io,
+-			  __u32 enqflags, enum cl_lock_mode mode,
+-			  pgoff_t start, pgoff_t end)
+-{
+-	struct ccc_io	  *cio   = ccc_env_io(env);
+-	struct cl_lock_descr   *descr = &cio->cui_link.cill_descr;
+-	struct cl_object       *obj   = io->ci_obj;
+-
+-	CLOBINVRNT(env, obj, ccc_object_invariant(obj));
+-
+-	CDEBUG(D_VFSTRACE, "lock: %d [%lu, %lu]\n", mode, start, end);
+-
+-	memset(&cio->cui_link, 0, sizeof(cio->cui_link));
+-
+-	if (cio->cui_fd && (cio->cui_fd->fd_flags & LL_FILE_GROUP_LOCKED)) {
+-		descr->cld_mode = CLM_GROUP;
+-		descr->cld_gid  = cio->cui_fd->fd_grouplock.cg_gid;
 -	} else {
--		if (parent) {
--			LASSERT(!page->cp_parent);
--			page->cp_parent = parent;
--			parent->cp_child = page;
--		}
--		hdr->coh_pages++;
+-		descr->cld_mode  = mode;
 -	}
--	spin_unlock(&hdr->coh_page_guard);
+-	descr->cld_obj   = obj;
+-	descr->cld_start = start;
+-	descr->cld_end   = end;
+-	descr->cld_enq_flags = enqflags;
 -
--	if (unlikely(ghost)) {
--		cl_page_delete0(env, ghost, 0);
--		cl_page_free(env, ghost);
--	}
- 	return page;
- }
--
--struct cl_page *cl_page_find(const struct lu_env *env, struct cl_object *o,
--			     pgoff_t idx, struct page *vmpage,
--			     enum cl_page_type type)
--{
--	return cl_page_find0(env, o, idx, vmpage, type, NULL);
+-	cl_io_lock_add(env, io, &cio->cui_link);
+-	return 0;
 -}
- EXPORT_SYMBOL(cl_page_find);
- 
--struct cl_page *cl_page_find_sub(const struct lu_env *env, struct cl_object *o,
--				 pgoff_t idx, struct page *vmpage,
--				 struct cl_page *parent)
+-
+-void ccc_io_update_iov(const struct lu_env *env,
+-		       struct ccc_io *cio, struct cl_io *io)
 -{
--	return cl_page_find0(env, o, idx, vmpage, parent->cp_type, parent);
+-	size_t size = io->u.ci_rw.crw_count;
+-
+-	if (!cl_is_normalio(env, io) || !cio->cui_iter)
+-		return;
+-
+-	iov_iter_truncate(cio->cui_iter, size);
 -}
--EXPORT_SYMBOL(cl_page_find_sub);
 -
- static inline int cl_page_invariant(const struct cl_page *pg)
- {
--	struct cl_object_header *header;
- 	struct cl_page	  *parent;
- 	struct cl_page	  *child;
- 	struct cl_io	    *owner;
-@@ -461,7 +259,6 @@ static inline int cl_page_invariant(const struct cl_page *pg)
- 	 */
- 	LINVRNT(cl_page_is_vmlocked(NULL, pg));
- 
--	header = cl_object_header(pg->cp_obj);
- 	parent = pg->cp_parent;
- 	child  = pg->cp_child;
- 	owner  = pg->cp_owner;
-@@ -473,15 +270,7 @@ static inline int cl_page_invariant(const struct cl_page *pg)
- 		ergo(parent, pg->cp_obj != parent->cp_obj) &&
- 		ergo(owner && parent,
- 		     parent->cp_owner == pg->cp_owner->ci_parent) &&
--		ergo(owner && child, child->cp_owner->ci_parent == owner) &&
--		/*
--		 * Either page is early in initialization (has neither child
--		 * nor parent yet), or it is in the object radix tree.
--		 */
--		ergo(pg->cp_state < CPS_FREEING && pg->cp_type == CPT_CACHEABLE,
--		     (void *)radix_tree_lookup(&header->coh_tree,
--					       pg->cp_index) == pg ||
--		     (!child && !parent));
-+		ergo(owner && child, child->cp_owner->ci_parent == owner);
- }
- 
- static void cl_page_state_set0(const struct lu_env *env,
-@@ -1001,11 +790,8 @@ EXPORT_SYMBOL(cl_page_discard);
-  * pages, e.g,. in a error handling cl_page_find()->cl_page_delete0()
-  * path. Doesn't check page invariant.
-  */
--static void cl_page_delete0(const struct lu_env *env, struct cl_page *pg,
--			    int radix)
-+static void cl_page_delete0(const struct lu_env *env, struct cl_page *pg)
- {
--	struct cl_page *tmp = pg;
+-int ccc_io_one_lock(const struct lu_env *env, struct cl_io *io,
+-		    __u32 enqflags, enum cl_lock_mode mode,
+-		    loff_t start, loff_t end)
+-{
+-	struct cl_object *obj = io->ci_obj;
 -
- 	PASSERT(env, pg, pg == cl_page_top(pg));
- 	PASSERT(env, pg, pg->cp_state != CPS_FREEING);
- 
-@@ -1014,41 +800,11 @@ static void cl_page_delete0(const struct lu_env *env, struct cl_page *pg,
- 	 */
- 	cl_page_owner_clear(pg);
- 
+-	return ccc_io_one_lock_index(env, io, enqflags, mode,
+-				     cl_index(obj, start), cl_index(obj, end));
+-}
+-
+-void ccc_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
+-{
+-	CLOBINVRNT(env, ios->cis_io->ci_obj,
+-		   ccc_object_invariant(ios->cis_io->ci_obj));
+-}
+-
+-void ccc_io_advance(const struct lu_env *env,
+-		    const struct cl_io_slice *ios,
+-		    size_t nob)
+-{
+-	struct ccc_io    *cio = cl2ccc_io(env, ios);
+-	struct cl_io     *io  = ios->cis_io;
+-	struct cl_object *obj = ios->cis_io->ci_obj;
+-
+-	CLOBINVRNT(env, obj, ccc_object_invariant(obj));
+-
+-	if (!cl_is_normalio(env, io))
+-		return;
+-
+-	iov_iter_reexpand(cio->cui_iter, cio->cui_tot_count  -= nob);
+-}
+-
+-/**
+- * Helper function that if necessary adjusts file size (inode->i_size), when
+- * position at the offset \a pos is accessed. File size can be arbitrary stale
+- * on a Lustre client, but client at least knows KMS. If accessed area is
+- * inside [0, KMS], set file size to KMS, otherwise glimpse file size.
+- *
+- * Locking: cl_isize_lock is used to serialize changes to inode size and to
+- * protect consistency between inode size and cl_object
+- * attributes. cl_object_size_lock() protects consistency between cl_attr's of
+- * top-object and sub-objects.
+- */
+-int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
+-		  struct cl_io *io, loff_t start, size_t count, int *exceed)
+-{
+-	struct cl_attr *attr  = ccc_env_thread_attr(env);
+-	struct inode   *inode = ccc_object_inode(obj);
+-	loff_t	  pos   = start + count - 1;
+-	loff_t kms;
+-	int result;
+-
 -	/*
--	 * unexport the page firstly before freeing it so that
--	 * the page content is considered to be invalid.
--	 * We have to do this because a CPS_FREEING cl_page may
--	 * be NOT under the protection of a cl_lock.
--	 * Afterwards, if this page is found by other threads, then this
--	 * page will be forced to reread.
+-	 * Consistency guarantees: following possibilities exist for the
+-	 * relation between region being accessed and real file size at this
+-	 * moment:
+-	 *
+-	 *  (A): the region is completely inside of the file;
+-	 *
+-	 *  (B-x): x bytes of region are inside of the file, the rest is
+-	 *  outside;
+-	 *
+-	 *  (C): the region is completely outside of the file.
+-	 *
+-	 * This classification is stable under DLM lock already acquired by
+-	 * the caller, because to change the class, other client has to take
+-	 * DLM lock conflicting with our lock. Also, any updates to ->i_size
+-	 * by other threads on this client are serialized by
+-	 * ll_inode_size_lock(). This guarantees that short reads are handled
+-	 * correctly in the face of concurrent writes and truncates.
 -	 */
--	cl_page_export(env, pg, 0);
- 	cl_page_state_set0(env, pg, CPS_FREEING);
- 
--	CL_PAGE_INVOID(env, pg, CL_PAGE_OP(cpo_delete),
--		       (const struct lu_env *, const struct cl_page_slice *));
--
--	if (tmp->cp_type == CPT_CACHEABLE) {
--		if (!radix)
--			/* !radix means that @pg is not yet in the radix tree,
--			 * skip removing it.
+-	ccc_object_size_lock(obj);
+-	result = cl_object_attr_get(env, obj, attr);
+-	if (result == 0) {
+-		kms = attr->cat_kms;
+-		if (pos > kms) {
+-			/*
+-			 * A glimpse is necessary to determine whether we
+-			 * return a short read (B) or some zeroes at the end
+-			 * of the buffer (C)
 -			 */
--			tmp = pg->cp_child;
--		for (; tmp; tmp = tmp->cp_child) {
--			void		    *value;
--			struct cl_object_header *hdr;
+-			ccc_object_size_unlock(obj);
+-			result = cl_glimpse_lock(env, io, inode, obj, 0);
+-			if (result == 0 && exceed) {
+-				/* If objective page index exceed end-of-file
+-				 * page index, return directly. Do not expect
+-				 * kernel will check such case correctly.
+-				 * linux-2.6.18-128.1.1 miss to do that.
+-				 * --bug 17336
+-				 */
+-				loff_t size = cl_isize_read(inode);
+-				loff_t cur_index = start >> PAGE_CACHE_SHIFT;
+-				loff_t size_index = (size - 1) >>
+-						    PAGE_CACHE_SHIFT;
 -
--			hdr = cl_object_header(tmp->cp_obj);
--			spin_lock(&hdr->coh_page_guard);
--			value = radix_tree_delete(&hdr->coh_tree,
--						  tmp->cp_index);
--			PASSERT(env, tmp, value == tmp);
--			PASSERT(env, tmp, hdr->coh_pages > 0);
--			hdr->coh_pages--;
--			spin_unlock(&hdr->coh_page_guard);
--			cl_page_put(env, tmp);
+-				if ((size == 0 && cur_index != 0) ||
+-				    size_index < cur_index)
+-					*exceed = 1;
+-			}
+-			return result;
+-		}
+-		/*
+-		 * region is within kms and, hence, within real file
+-		 * size (A). We need to increase i_size to cover the
+-		 * read region so that generic_file_read() will do its
+-		 * job, but that doesn't mean the kms size is
+-		 * _correct_, it is only the _minimum_ size. If
+-		 * someone does a stat they will get the correct size
+-		 * which will always be >= the kms value here.
+-		 * b=11081
+-		 */
+-		if (cl_isize_read(inode) < kms) {
+-			cl_isize_write_nolock(inode, kms);
+-			CDEBUG(D_VFSTRACE,
+-					DFID" updating i_size %llu\n",
+-					PFID(lu_object_fid(&obj->co_lu)),
+-					(__u64)cl_isize_read(inode));
+-
 -		}
 -	}
-+	CL_PAGE_INVOID_REVERSE(env, pg, CL_PAGE_OP(cpo_delete),
-+			       (const struct lu_env *,
-+				const struct cl_page_slice *));
- }
- 
- /**
-@@ -1079,30 +835,11 @@ static void cl_page_delete0(const struct lu_env *env, struct cl_page *pg,
- void cl_page_delete(const struct lu_env *env, struct cl_page *pg)
- {
- 	PINVRNT(env, pg, cl_page_invariant(pg));
--	cl_page_delete0(env, pg, 1);
-+	cl_page_delete0(env, pg);
- }
- EXPORT_SYMBOL(cl_page_delete);
- 
- /**
-- * Unmaps page from user virtual memory.
-- *
-- * Calls cl_page_operations::cpo_unmap() through all layers top-to-bottom. The
-- * layer responsible for VM interaction has to unmap page from user space
-- * virtual memory.
-- *
-- * \see cl_page_operations::cpo_unmap()
-- */
--int cl_page_unmap(const struct lu_env *env,
--		  struct cl_io *io, struct cl_page *pg)
--{
--	PINVRNT(env, pg, cl_page_is_owned(pg, io));
--	PINVRNT(env, pg, cl_page_invariant(pg));
--
--	return cl_page_invoke(env, io, pg, CL_PAGE_OP(cpo_unmap));
+-	ccc_object_size_unlock(obj);
+-	return result;
 -}
--EXPORT_SYMBOL(cl_page_unmap);
 -
--/**
-  * Marks page up-to-date.
-  *
-  * Call cl_page_operations::cpo_export() through all layers top-to-bottom. The
-@@ -1359,53 +1096,6 @@ int cl_page_is_under_lock(const struct lu_env *env, struct cl_io *io,
- }
- EXPORT_SYMBOL(cl_page_is_under_lock);
- 
--static int page_prune_cb(const struct lu_env *env, struct cl_io *io,
--			 struct cl_page *page, void *cbdata)
+-/*****************************************************************************
+- *
+- * Transfer operations.
+- *
+- */
+-
+-void ccc_req_completion(const struct lu_env *env,
+-			const struct cl_req_slice *slice, int ioret)
 -{
--	cl_page_own(env, io, page);
--	cl_page_unmap(env, io, page);
--	cl_page_discard(env, io, page);
--	cl_page_disown(env, io, page);
--	return CLP_GANG_OKAY;
+-	struct ccc_req *vrq;
+-
+-	if (ioret > 0)
+-		cl_stats_tally(slice->crs_dev, slice->crs_req->crq_type, ioret);
+-
+-	vrq = cl2ccc_req(slice);
+-	kmem_cache_free(ccc_req_kmem, vrq);
 -}
 -
 -/**
-- * Purges all cached pages belonging to the object \a obj.
+- * Implementation of struct cl_req_operations::cro_attr_set() for ccc
+- * layer. ccc is responsible for
+- *
+- *    - o_[mac]time
+- *
+- *    - o_mode
+- *
+- *    - o_parent_seq
+- *
+- *    - o_[ug]id
+- *
+- *    - o_parent_oid
+- *
+- *    - o_parent_ver
+- *
+- *    - o_ioepoch,
+- *
 - */
--int cl_pages_prune(const struct lu_env *env, struct cl_object *clobj)
+-void ccc_req_attr_set(const struct lu_env *env,
+-		      const struct cl_req_slice *slice,
+-		      const struct cl_object *obj,
+-		      struct cl_req_attr *attr, u64 flags)
 -{
--	struct cl_thread_info   *info;
--	struct cl_object	*obj = cl_object_top(clobj);
--	struct cl_io	    *io;
--	int		      result;
+-	struct inode *inode;
+-	struct obdo  *oa;
+-	u32	      valid_flags;
 -
--	info  = cl_env_info(env);
--	io    = &info->clt_io;
+-	oa = attr->cra_oa;
+-	inode = ccc_object_inode(obj);
+-	valid_flags = OBD_MD_FLTYPE;
 -
--	/*
--	 * initialize the io. This is ugly since we never do IO in this
--	 * function, we just make cl_page_list functions happy. -jay
+-	if (slice->crs_req->crq_type == CRT_WRITE) {
+-		if (flags & OBD_MD_FLEPOCH) {
+-			oa->o_valid |= OBD_MD_FLEPOCH;
+-			oa->o_ioepoch = cl_i2info(inode)->lli_ioepoch;
+-			valid_flags |= OBD_MD_FLMTIME | OBD_MD_FLCTIME |
+-				       OBD_MD_FLUID | OBD_MD_FLGID;
+-		}
+-	}
+-	obdo_from_inode(oa, inode, valid_flags & flags);
+-	obdo_set_parent_fid(oa, &cl_i2info(inode)->lli_fid);
+-	memcpy(attr->cra_jobid, cl_i2info(inode)->lli_jobid,
+-	       JOBSTATS_JOBID_SIZE);
+-}
+-
+-static const struct cl_req_operations ccc_req_ops = {
+-	.cro_attr_set   = ccc_req_attr_set,
+-	.cro_completion = ccc_req_completion
+-};
+-
+-int cl_setattr_ost(struct inode *inode, const struct iattr *attr)
+-{
+-	struct lu_env *env;
+-	struct cl_io  *io;
+-	int	    result;
+-	int	    refcheck;
+-
+-	env = cl_env_get(&refcheck);
+-	if (IS_ERR(env))
+-		return PTR_ERR(env);
+-
+-	io = ccc_env_thread_io(env);
+-	io->ci_obj = cl_i2info(inode)->lli_clob;
+-
+-	io->u.ci_setattr.sa_attr.lvb_atime = LTIME_S(attr->ia_atime);
+-	io->u.ci_setattr.sa_attr.lvb_mtime = LTIME_S(attr->ia_mtime);
+-	io->u.ci_setattr.sa_attr.lvb_ctime = LTIME_S(attr->ia_ctime);
+-	io->u.ci_setattr.sa_attr.lvb_size = attr->ia_size;
+-	io->u.ci_setattr.sa_valid = attr->ia_valid;
+-
+-again:
+-	if (cl_io_init(env, io, CIT_SETATTR, io->ci_obj) == 0) {
+-		struct ccc_io *cio = ccc_env_io(env);
+-
+-		if (attr->ia_valid & ATTR_FILE)
+-			/* populate the file descriptor for ftruncate to honor
+-			 * group lock - see LU-787
+-			 */
+-			cio->cui_fd = cl_iattr2fd(inode, attr);
+-
+-		result = cl_io_loop(env, io);
+-	} else {
+-		result = io->ci_result;
+-	}
+-	cl_io_fini(env, io);
+-	if (unlikely(io->ci_need_restart))
+-		goto again;
+-	/* HSM import case: file is released, cannot be restored
+-	 * no need to fail except if restore registration failed
+-	 * with -ENODATA
 -	 */
+-	if (result == -ENODATA && io->ci_restore_needed &&
+-	    io->ci_result != -ENODATA)
+-		result = 0;
+-	cl_env_put(env, &refcheck);
+-	return result;
+-}
+-
+-/*****************************************************************************
+- *
+- * Type conversions.
+- *
+- */
+-
+-struct lu_device *ccc2lu_dev(struct ccc_device *vdv)
+-{
+-	return &vdv->cdv_cl.cd_lu_dev;
+-}
+-
+-struct ccc_device *lu2ccc_dev(const struct lu_device *d)
+-{
+-	return container_of0(d, struct ccc_device, cdv_cl.cd_lu_dev);
+-}
+-
+-struct ccc_device *cl2ccc_dev(const struct cl_device *d)
+-{
+-	return container_of0(d, struct ccc_device, cdv_cl);
+-}
+-
+-struct lu_object *ccc2lu(struct ccc_object *vob)
+-{
+-	return &vob->cob_cl.co_lu;
+-}
+-
+-struct ccc_object *lu2ccc(const struct lu_object *obj)
+-{
+-	return container_of0(obj, struct ccc_object, cob_cl.co_lu);
+-}
+-
+-struct ccc_object *cl2ccc(const struct cl_object *obj)
+-{
+-	return container_of0(obj, struct ccc_object, cob_cl);
+-}
+-
+-struct ccc_lock *cl2ccc_lock(const struct cl_lock_slice *slice)
+-{
+-	return container_of(slice, struct ccc_lock, clk_cl);
+-}
+-
+-struct ccc_io *cl2ccc_io(const struct lu_env *env,
+-			 const struct cl_io_slice *slice)
+-{
+-	struct ccc_io *cio;
+-
+-	cio = container_of(slice, struct ccc_io, cui_cl);
+-	LASSERT(cio == ccc_env_io(env));
+-	return cio;
+-}
+-
+-struct ccc_req *cl2ccc_req(const struct cl_req_slice *slice)
+-{
+-	return container_of0(slice, struct ccc_req, crq_cl);
+-}
+-
+-struct page *cl2vm_page(const struct cl_page_slice *slice)
+-{
+-	return cl2ccc_page(slice)->cpg_page;
+-}
+-
+-/*****************************************************************************
+- *
+- * Accessors.
+- *
+- */
+-int ccc_object_invariant(const struct cl_object *obj)
+-{
+-	struct inode	 *inode = ccc_object_inode(obj);
+-	struct cl_inode_info *lli   = cl_i2info(inode);
+-
+-	return (S_ISREG(cl_inode_mode(inode)) ||
+-		/* i_mode of unlinked inode is zeroed. */
+-		cl_inode_mode(inode) == 0) && lli->lli_clob == obj;
+-}
+-
+-struct inode *ccc_object_inode(const struct cl_object *obj)
+-{
+-	return cl2ccc(obj)->cob_inode;
+-}
+-
+-/**
+- * Initialize or update CLIO structures for regular files when new
+- * meta-data arrives from the server.
+- *
+- * \param inode regular file inode
+- * \param md    new file metadata from MDS
+- * - allocates cl_object if necessary,
+- * - updated layout, if object was already here.
+- */
+-int cl_file_inode_init(struct inode *inode, struct lustre_md *md)
+-{
+-	struct lu_env	*env;
+-	struct cl_inode_info *lli;
+-	struct cl_object     *clob;
+-	struct lu_site       *site;
+-	struct lu_fid	*fid;
+-	struct cl_object_conf conf = {
+-		.coc_inode = inode,
+-		.u = {
+-			.coc_md    = md
+-		}
+-	};
+-	int result = 0;
+-	int refcheck;
+-
+-	LASSERT(md->body->valid & OBD_MD_FLID);
+-	LASSERT(S_ISREG(cl_inode_mode(inode)));
+-
+-	env = cl_env_get(&refcheck);
+-	if (IS_ERR(env))
+-		return PTR_ERR(env);
+-
+-	site = cl_i2sbi(inode)->ll_site;
+-	lli  = cl_i2info(inode);
+-	fid  = &lli->lli_fid;
+-	LASSERT(fid_is_sane(fid));
+-
+-	if (!lli->lli_clob) {
+-		/* clob is slave of inode, empty lli_clob means for new inode,
+-		 * there is no clob in cache with the given fid, so it is
+-		 * unnecessary to perform lookup-alloc-lookup-insert, just
+-		 * alloc and insert directly.
+-		 */
+-		LASSERT(inode->i_state & I_NEW);
+-		conf.coc_lu.loc_flags = LOC_F_NEW;
+-		clob = cl_object_find(env, lu2cl_dev(site->ls_top_dev),
+-				      fid, &conf);
+-		if (!IS_ERR(clob)) {
+-			/*
+-			 * No locking is necessary, as new inode is
+-			 * locked by I_NEW bit.
+-			 */
+-			lli->lli_clob = clob;
+-			lli->lli_has_smd = lsm_has_objects(md->lsm);
+-			lu_object_ref_add(&clob->co_lu, "inode", inode);
+-		} else
+-			result = PTR_ERR(clob);
+-	} else {
+-		result = cl_conf_set(env, lli->lli_clob, &conf);
+-	}
+-
+-	cl_env_put(env, &refcheck);
+-
+-	if (result != 0)
+-		CERROR("Failure to initialize cl object "DFID": %d\n",
+-		       PFID(fid), result);
+-	return result;
+-}
+-
+-/**
+- * Wait for others drop their references of the object at first, then we drop
+- * the last one, which will lead to the object be destroyed immediately.
+- * Must be called after cl_object_kill() against this object.
+- *
+- * The reason we want to do this is: destroying top object will wait for sub
+- * objects being destroyed first, so we can't let bottom layer (e.g. from ASTs)
+- * to initiate top object destroying which may deadlock. See bz22520.
+- */
+-static void cl_object_put_last(struct lu_env *env, struct cl_object *obj)
+-{
+-	struct lu_object_header *header = obj->co_lu.lo_header;
+-	wait_queue_t	   waiter;
+-
+-	if (unlikely(atomic_read(&header->loh_ref) != 1)) {
+-		struct lu_site *site = obj->co_lu.lo_dev->ld_site;
+-		struct lu_site_bkt_data *bkt;
+-
+-		bkt = lu_site_bkt_from_fid(site, &header->loh_fid);
+-
+-		init_waitqueue_entry(&waiter, current);
+-		add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+-
+-		while (1) {
+-			set_current_state(TASK_UNINTERRUPTIBLE);
+-			if (atomic_read(&header->loh_ref) == 1)
+-				break;
+-			schedule();
+-		}
+-
+-		set_current_state(TASK_RUNNING);
+-		remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+-	}
+-
+-	cl_object_put(env, obj);
+-}
+-
+-void cl_inode_fini(struct inode *inode)
+-{
+-	struct lu_env	   *env;
+-	struct cl_inode_info    *lli  = cl_i2info(inode);
+-	struct cl_object	*clob = lli->lli_clob;
+-	int refcheck;
+-	int emergency;
+-
+-	if (clob) {
+-		void		    *cookie;
+-
+-		cookie = cl_env_reenter();
+-		env = cl_env_get(&refcheck);
+-		emergency = IS_ERR(env);
+-		if (emergency) {
+-			mutex_lock(&ccc_inode_fini_guard);
+-			LASSERT(ccc_inode_fini_env);
+-			cl_env_implant(ccc_inode_fini_env, &refcheck);
+-			env = ccc_inode_fini_env;
+-		}
+-		/*
+-		 * cl_object cache is a slave to inode cache (which, in turn
+-		 * is a slave to dentry cache), don't keep cl_object in memory
+-		 * when its master is evicted.
+-		 */
+-		cl_object_kill(env, clob);
+-		lu_object_ref_del(&clob->co_lu, "inode", inode);
+-		cl_object_put_last(env, clob);
+-		lli->lli_clob = NULL;
+-		if (emergency) {
+-			cl_env_unplant(ccc_inode_fini_env, &refcheck);
+-			mutex_unlock(&ccc_inode_fini_guard);
+-		} else
+-			cl_env_put(env, &refcheck);
+-		cl_env_reexit(cookie);
+-	}
+-}
+-
+-/**
+- * return IF_* type for given lu_dirent entry.
+- * IF_* flag shld be converted to particular OS file type in
+- * platform llite module.
+- */
+-__u16 ll_dirent_type_get(struct lu_dirent *ent)
+-{
+-	__u16 type = 0;
+-	struct luda_type *lt;
+-	int len = 0;
+-
+-	if (le32_to_cpu(ent->lde_attrs) & LUDA_TYPE) {
+-		const unsigned align = sizeof(struct luda_type) - 1;
+-
+-		len = le16_to_cpu(ent->lde_namelen);
+-		len = (len + align) & ~align;
+-		lt = (void *)ent->lde_name + len;
+-		type = IFTODT(le16_to_cpu(lt->lt_type));
+-	}
+-	return type;
+-}
+-
+-/**
+- * build inode number from passed @fid
+- */
+-__u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
+-{
+-	if (BITS_PER_LONG == 32 || api32)
+-		return fid_flatten32(fid);
+-	else
+-		return fid_flatten(fid);
+-}
+-
+-/**
+- * build inode generation from passed @fid.  If our FID overflows the 32-bit
+- * inode number then return a non-zero generation to distinguish them.
+- */
+-__u32 cl_fid_build_gen(const struct lu_fid *fid)
+-{
+-	__u32 gen;
+-
+-	if (fid_is_igif(fid)) {
+-		gen = lu_igif_gen(fid);
+-		return gen;
+-	}
+-
+-	gen = fid_flatten(fid) >> 32;
+-	return gen;
+-}
+-
+-/* lsm is unreliable after hsm implementation as layout can be changed at
+- * any time. This is only to support old, non-clio-ized interfaces. It will
+- * cause deadlock if clio operations are called with this extra layout refcount
+- * because in case the layout changed during the IO, ll_layout_refresh() will
+- * have to wait for the refcount to become zero to destroy the older layout.
+- *
+- * Notice that the lsm returned by this function may not be valid unless called
+- * inside layout lock - MDS_INODELOCK_LAYOUT.
+- */
+-struct lov_stripe_md *ccc_inode_lsm_get(struct inode *inode)
+-{
+-	return lov_lsm_get(cl_i2info(inode)->lli_clob);
+-}
+-
+-inline void ccc_inode_lsm_put(struct inode *inode, struct lov_stripe_md *lsm)
+-{
+-	lov_lsm_put(cl_i2info(inode)->lli_clob, lsm);
+-}
+diff --git a/drivers/staging/lustre/lustre/lclient/lcommon_misc.c b/drivers/staging/lustre/lustre/lclient/lcommon_misc.c
+deleted file mode 100644
+index d80bcedd..0000000
+--- a/drivers/staging/lustre/lustre/lclient/lcommon_misc.c
++++ /dev/null
+@@ -1,200 +0,0 @@
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+- *
+- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+- * CA 95054 USA or visit www.sun.com if you need additional information or
+- * have any questions.
+- *
+- * GPL HEADER END
+- */
+-/*
+- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2011, 2012, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- *
+- * cl code shared between vvp and liblustre (and other Lustre clients in the
+- * future).
+- *
+- */
+-#include "../include/obd_class.h"
+-#include "../include/obd_support.h"
+-#include "../include/obd.h"
+-#include "../include/cl_object.h"
+-#include "../include/lclient.h"
+-
+-#include "../include/lustre_lite.h"
+-
+-/* Initialize the default and maximum LOV EA and cookie sizes.  This allows
+- * us to make MDS RPCs with large enough reply buffers to hold the
+- * maximum-sized (= maximum striped) EA and cookie without having to
+- * calculate this (via a call into the LOV + OSCs) each time we make an RPC.
+- */
+-int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
+-{
+-	struct lov_stripe_md lsm = { .lsm_magic = LOV_MAGIC_V3 };
+-	__u32 valsize = sizeof(struct lov_desc);
+-	int rc, easize, def_easize, cookiesize;
+-	struct lov_desc desc;
+-	__u16 stripes, def_stripes;
+-
+-	rc = obd_get_info(NULL, dt_exp, sizeof(KEY_LOVDESC), KEY_LOVDESC,
+-			  &valsize, &desc, NULL);
+-	if (rc)
+-		return rc;
+-
+-	stripes = min_t(__u32, desc.ld_tgt_count, LOV_MAX_STRIPE_COUNT);
+-	lsm.lsm_stripe_count = stripes;
+-	easize = obd_size_diskmd(dt_exp, &lsm);
+-
+-	def_stripes = min_t(__u32, desc.ld_default_stripe_count,
+-			    LOV_MAX_STRIPE_COUNT);
+-	lsm.lsm_stripe_count = def_stripes;
+-	def_easize = obd_size_diskmd(dt_exp, &lsm);
+-
+-	cookiesize = stripes * sizeof(struct llog_cookie);
+-
+-	/* default cookiesize is 0 because from 2.4 server doesn't send
+-	 * llog cookies to client.
+-	 */
+-	CDEBUG(D_HA,
+-	       "updating def/max_easize: %d/%d def/max_cookiesize: 0/%d\n",
+-	       def_easize, easize, cookiesize);
+-
+-	rc = md_init_ea_size(md_exp, easize, def_easize, cookiesize, 0);
+-	return rc;
+-}
+-
+-/**
+- * This function is used as an upcall-callback hooked by liblustre and llite
+- * clients into obd_notify() listeners chain to handle notifications about
+- * change of import connect_flags. See llu_fsswop_mount() and
+- * lustre_common_fill_super().
+- */
+-int cl_ocd_update(struct obd_device *host,
+-		  struct obd_device *watched,
+-		  enum obd_notify_event ev, void *owner, void *data)
+-{
+-	struct lustre_client_ocd *lco;
+-	struct client_obd	*cli;
+-	__u64 flags;
+-	int   result;
+-
+-	if (!strcmp(watched->obd_type->typ_name, LUSTRE_OSC_NAME)) {
+-		cli = &watched->u.cli;
+-		lco = owner;
+-		flags = cli->cl_import->imp_connect_data.ocd_connect_flags;
+-		CDEBUG(D_SUPER, "Changing connect_flags: %#llx -> %#llx\n",
+-		       lco->lco_flags, flags);
+-		mutex_lock(&lco->lco_lock);
+-		lco->lco_flags &= flags;
+-		/* for each osc event update ea size */
+-		if (lco->lco_dt_exp)
+-			cl_init_ea_size(lco->lco_md_exp, lco->lco_dt_exp);
+-
+-		mutex_unlock(&lco->lco_lock);
+-		result = 0;
+-	} else {
+-		CERROR("unexpected notification from %s %s!\n",
+-		       watched->obd_type->typ_name,
+-		       watched->obd_name);
+-		result = -EINVAL;
+-	}
+-	return result;
+-}
+-
+-#define GROUPLOCK_SCOPE "grouplock"
+-
+-int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
+-		     struct ccc_grouplock *cg)
+-{
+-	struct lu_env	  *env;
+-	struct cl_io	   *io;
+-	struct cl_lock	 *lock;
+-	struct cl_lock_descr   *descr;
+-	__u32		   enqflags;
+-	int		     refcheck;
+-	int		     rc;
+-
+-	env = cl_env_get(&refcheck);
+-	if (IS_ERR(env))
+-		return PTR_ERR(env);
+-
+-	io = ccc_env_thread_io(env);
 -	io->ci_obj = obj;
 -	io->ci_ignore_layout = 1;
--	result = cl_io_init(env, io, CIT_MISC, obj);
--	if (result != 0) {
--		cl_io_fini(env, io);
--		return io->ci_result;
+-
+-	rc = cl_io_init(env, io, CIT_MISC, io->ci_obj);
+-	if (rc) {
+-		/* Does not make sense to take GL for released layout */
+-		if (rc > 0)
+-			rc = -ENOTSUPP;
+-		cl_env_put(env, &refcheck);
+-		return rc;
 -	}
 -
--	do {
--		result = cl_page_gang_lookup(env, obj, io, 0, CL_PAGE_EOF,
--					     page_prune_cb, NULL);
--		if (result == CLP_GANG_RESCHED)
--			cond_resched();
--	} while (result != CLP_GANG_OKAY);
+-	descr = &ccc_env_info(env)->cti_descr;
+-	descr->cld_obj = obj;
+-	descr->cld_start = 0;
+-	descr->cld_end = CL_PAGE_EOF;
+-	descr->cld_gid = gid;
+-	descr->cld_mode = CLM_GROUP;
 -
--	cl_io_fini(env, io);
--	return result;
+-	enqflags = CEF_MUST | (nonblock ? CEF_NONBLOCK : 0);
+-	descr->cld_enq_flags = enqflags;
+-
+-	lock = cl_lock_request(env, io, descr, GROUPLOCK_SCOPE, current);
+-	if (IS_ERR(lock)) {
+-		cl_io_fini(env, io);
+-		cl_env_put(env, &refcheck);
+-		return PTR_ERR(lock);
+-	}
+-
+-	cg->cg_env  = cl_env_get(&refcheck);
+-	cg->cg_io   = io;
+-	cg->cg_lock = lock;
+-	cg->cg_gid  = gid;
+-	LASSERT(cg->cg_env == env);
+-
+-	cl_env_unplant(env, &refcheck);
+-	return 0;
 -}
--EXPORT_SYMBOL(cl_pages_prune);
 -
- /**
-  * Tells transfer engine that only part of a page is to be transmitted.
-  *
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 6196c3b..c9d4e3c 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -1015,7 +1015,6 @@ static int osc_extent_truncate(struct osc_extent *ext, pgoff_t trunc_index,
- 		lu_ref_add(&page->cp_reference, "truncate", current);
+-void cl_put_grouplock(struct ccc_grouplock *cg)
+-{
+-	struct lu_env  *env  = cg->cg_env;
+-	struct cl_io   *io   = cg->cg_io;
+-	struct cl_lock *lock = cg->cg_lock;
+-	int	     refcheck;
+-
+-	LASSERT(cg->cg_env);
+-	LASSERT(cg->cg_gid);
+-
+-	cl_env_implant(env, &refcheck);
+-	cl_env_put(env, &refcheck);
+-
+-	cl_unuse(env, lock);
+-	cl_lock_release(env, lock, GROUPLOCK_SCOPE, current);
+-	cl_io_fini(env, io);
+-	cl_env_put(env, NULL);
+-}
+diff --git a/drivers/staging/lustre/lustre/llite/Makefile b/drivers/staging/lustre/lustre/llite/Makefile
+index 9ac29e7..24085e2 100644
+--- a/drivers/staging/lustre/lustre/llite/Makefile
++++ b/drivers/staging/lustre/lustre/llite/Makefile
+@@ -4,7 +4,7 @@ lustre-y := dcache.o dir.o file.o llite_close.o llite_lib.o llite_nfs.o \
+ 	    rw.o namei.o symlink.o llite_mmap.o \
+ 	    xattr.o xattr_cache.o remote_perm.o llite_rmtacl.o \
+ 	    rw26.o super25.o statahead.o \
+-	    ../lclient/glimpse.o ../lclient/lcommon_cl.o ../lclient/lcommon_misc.o \
++	    glimpse.o lcommon_cl.o lcommon_misc.o \
+ 	    vvp_dev.o vvp_page.o vvp_lock.o vvp_io.o vvp_object.o lproc_llite.o
  
- 		if (cl_page_own(env, io, page) == 0) {
--			cl_page_unmap(env, io, page);
- 			cl_page_discard(env, io, page);
- 			cl_page_disown(env, io, page);
- 		} else {
-@@ -2136,8 +2135,7 @@ static void osc_check_rpcs(const struct lu_env *env, struct client_obd *cli)
- 
- 		cl_object_get(obj);
- 		client_obd_list_unlock(&cli->cl_loi_list_lock);
--		lu_object_ref_add_at(&obj->co_lu, &link, "check",
--				     current);
-+		lu_object_ref_add_at(&obj->co_lu, &link, "check", current);
- 
- 		/* attempt some read/write balancing by alternating between
- 		 * reads and writes in an object.  The makes_rpc checks here
-@@ -2180,8 +2178,7 @@ static void osc_check_rpcs(const struct lu_env *env, struct client_obd *cli)
- 		osc_object_unlock(osc);
- 
- 		osc_list_maint(cli, osc);
--		lu_object_ref_del_at(&obj->co_lu, &link, "check",
--				     current);
-+		lu_object_ref_del_at(&obj->co_lu, &link, "check", current);
- 		cl_object_put(env, obj);
- 
- 		client_obd_list_lock(&cli->cl_loi_list_lock);
-@@ -2994,4 +2991,204 @@ int osc_cache_writeback_range(const struct lu_env *env, struct osc_object *obj,
- 	return result;
- }
- 
-+/**
-+ * Returns a list of pages by a given [start, end] of \a obj.
+ llite_lloop-y := lloop.o
+diff --git a/drivers/staging/lustre/lustre/llite/glimpse.c b/drivers/staging/lustre/lustre/llite/glimpse.c
+new file mode 100644
+index 0000000..f235f35
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/llite/glimpse.c
+@@ -0,0 +1,273 @@
++/*
++ * GPL HEADER START
 + *
-+ * \param resched If not NULL, then we give up before hogging CPU for too
-+ * long and set *resched = 1, in that case caller should implement a retry
-+ * logic.
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 + *
-+ * Gang tree lookup (radix_tree_gang_lookup()) optimization is absolutely
-+ * crucial in the face of [offset, EOF] locks.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
 + *
-+ * Return at least one page in @queue unless there is no covered page.
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
++ *
++ * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
++ * CA 95054 USA or visit www.sun.com if you need additional information or
++ * have any questions.
++ *
++ * GPL HEADER END
 + */
-+int osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
-+			 struct osc_object *osc, pgoff_t start, pgoff_t end,
-+			 osc_page_gang_cbt cb, void *cbdata)
++/*
++ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
++ * Use is subject to license terms.
++ *
++ * Copyright (c) 2011, 2012, Intel Corporation.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ * Lustre is a trademark of Sun Microsystems, Inc.
++ *
++ * glimpse code shared between vvp and liblustre (and other Lustre clients in
++ * the future).
++ *
++ *   Author: Nikita Danilov <nikita.danilov@sun.com>
++ *   Author: Oleg Drokin <oleg.drokin@sun.com>
++ */
++
++#include "../../include/linux/libcfs/libcfs.h"
++#include "../include/obd_class.h"
++#include "../include/obd_support.h"
++#include "../include/obd.h"
++
++#include "../include/lustre_dlm.h"
++#include "../include/lustre_lite.h"
++#include "../include/lustre_mdc.h"
++#include <linux/pagemap.h>
++#include <linux/file.h>
++
++#include "../include/cl_object.h"
++#include "../include/lclient.h"
++#include "../llite/llite_internal.h"
++
++static const struct cl_lock_descr whole_file = {
++	.cld_start = 0,
++	.cld_end   = CL_PAGE_EOF,
++	.cld_mode  = CLM_READ
++};
++
++/*
++ * Check whether file has possible unwriten pages.
++ *
++ * \retval 1    file is mmap-ed or has dirty pages
++ *	 0    otherwise
++ */
++blkcnt_t dirty_cnt(struct inode *inode)
 +{
-+	struct osc_page *ops;
-+	void            **pvec;
-+	pgoff_t         idx;
-+	unsigned int    nr;
-+	unsigned int    i;
-+	unsigned int    j;
-+	int             res = CLP_GANG_OKAY;
-+	bool            tree_lock = true;
++	blkcnt_t cnt = 0;
++	struct ccc_object *vob = cl_inode2ccc(inode);
++	void	      *results[1];
 +
-+	idx = start;
-+	pvec = osc_env_info(env)->oti_pvec;
-+	spin_lock(&osc->oo_tree_lock);
-+	while ((nr = radix_tree_gang_lookup(&osc->oo_tree, pvec,
-+					    idx, OTI_PVEC_SIZE)) > 0) {
-+		struct cl_page *page;
-+		bool end_of_region = false;
++	if (inode->i_mapping)
++		cnt += radix_tree_gang_lookup_tag(&inode->i_mapping->page_tree,
++						  results, 0, 1,
++						  PAGECACHE_TAG_DIRTY);
++	if (cnt == 0 && atomic_read(&vob->cob_mmap_cnt) > 0)
++		cnt = 1;
 +
-+		for (i = 0, j = 0; i < nr; ++i) {
-+			ops = pvec[i];
-+			pvec[i] = NULL;
-+
-+			idx = osc_index(ops);
-+			if (idx > end) {
-+				end_of_region = true;
-+				break;
-+			}
-+
-+			page = cl_page_top(ops->ops_cl.cpl_page);
-+			LASSERT(page->cp_type == CPT_CACHEABLE);
-+			if (page->cp_state == CPS_FREEING)
-+				continue;
-+
-+			cl_page_get(page);
-+			lu_ref_add_atomic(&page->cp_reference,
-+					  "gang_lookup", current);
-+			pvec[j++] = ops;
-+		}
-+		++idx;
-+
-+		/*
-+		 * Here a delicate locking dance is performed. Current thread
-+		 * holds a reference to a page, but has to own it before it
-+		 * can be placed into queue. Owning implies waiting, so
-+		 * radix-tree lock is to be released. After a wait one has to
-+		 * check that pages weren't truncated (cl_page_own() returns
-+		 * error in the latter case).
-+		 */
-+		spin_unlock(&osc->oo_tree_lock);
-+		tree_lock = false;
-+
-+		for (i = 0; i < j; ++i) {
-+			ops = pvec[i];
-+			if (res == CLP_GANG_OKAY)
-+				res = (*cb)(env, io, ops, cbdata);
-+
-+			page = cl_page_top(ops->ops_cl.cpl_page);
-+			lu_ref_del(&page->cp_reference, "gang_lookup", current);
-+			cl_page_put(env, page);
-+		}
-+		if (nr < OTI_PVEC_SIZE || end_of_region)
-+			break;
-+
-+		if (res == CLP_GANG_OKAY && need_resched())
-+			res = CLP_GANG_RESCHED;
-+		if (res != CLP_GANG_OKAY)
-+			break;
-+
-+		spin_lock(&osc->oo_tree_lock);
-+		tree_lock = true;
-+	}
-+	if (tree_lock)
-+		spin_unlock(&osc->oo_tree_lock);
-+	return res;
++	return (cnt > 0) ? 1 : 0;
 +}
 +
-+/**
-+ * Check if page @page is covered by an extra lock or discard it.
-+ */
-+static int check_and_discard_cb(const struct lu_env *env, struct cl_io *io,
-+				struct osc_page *ops, void *cbdata)
++int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
++		    struct inode *inode, struct cl_object *clob, int agl)
 +{
-+	struct osc_thread_info *info = osc_env_info(env);
-+	struct cl_lock *lock = cbdata;
-+	pgoff_t index;
-+
-+	index = osc_index(ops);
-+	if (index >= info->oti_fn_index) {
-+		struct cl_lock *tmp;
-+		struct cl_page *page = cl_page_top(ops->ops_cl.cpl_page);
-+
-+		/* refresh non-overlapped index */
-+		tmp = cl_lock_at_pgoff(env, lock->cll_descr.cld_obj, index,
-+				       lock, 1, 0);
-+		if (tmp) {
-+			/* Cache the first-non-overlapped index so as to skip
-+			 * all pages within [index, oti_fn_index). This
-+			 * is safe because if tmp lock is canceled, it will
-+			 * discard these pages.
-+			 */
-+			info->oti_fn_index = tmp->cll_descr.cld_end + 1;
-+			if (tmp->cll_descr.cld_end == CL_PAGE_EOF)
-+				info->oti_fn_index = CL_PAGE_EOF;
-+			cl_lock_put(env, tmp);
-+		} else if (cl_page_own(env, io, page) == 0) {
-+			/* discard the page */
-+			cl_page_discard(env, io, page);
-+			cl_page_disown(env, io, page);
-+		} else {
-+			LASSERT(page->cp_state == CPS_FREEING);
-+		}
-+	}
-+
-+	info->oti_next_index = index + 1;
-+	return CLP_GANG_OKAY;
-+}
-+
-+static int discard_cb(const struct lu_env *env, struct cl_io *io,
-+		      struct osc_page *ops, void *cbdata)
-+{
-+	struct osc_thread_info *info = osc_env_info(env);
-+	struct cl_lock *lock = cbdata;
-+	struct cl_page *page = cl_page_top(ops->ops_cl.cpl_page);
-+
-+	LASSERT(lock->cll_descr.cld_mode >= CLM_WRITE);
-+	KLASSERT(ergo(page->cp_type == CPT_CACHEABLE,
-+		      !PageWriteback(cl_page_vmpage(env, page))));
-+	KLASSERT(ergo(page->cp_type == CPT_CACHEABLE,
-+		      !PageDirty(cl_page_vmpage(env, page))));
-+
-+	/* page is top page. */
-+	info->oti_next_index = osc_index(ops) + 1;
-+	if (cl_page_own(env, io, page) == 0) {
-+		/* discard the page */
-+		cl_page_discard(env, io, page);
-+		cl_page_disown(env, io, page);
-+	} else {
-+		LASSERT(page->cp_state == CPS_FREEING);
-+	}
-+
-+	return CLP_GANG_OKAY;
-+}
-+
-+/**
-+ * Discard pages protected by the given lock. This function traverses radix
-+ * tree to find all covering pages and discard them. If a page is being covered
-+ * by other locks, it should remain in cache.
-+ *
-+ * If error happens on any step, the process continues anyway (the reasoning
-+ * behind this being that lock cancellation cannot be delayed indefinitely).
-+ */
-+int osc_lock_discard_pages(const struct lu_env *env, struct osc_lock *ols)
-+{
-+	struct osc_thread_info *info = osc_env_info(env);
-+	struct cl_io *io = &info->oti_io;
-+	struct cl_object *osc = ols->ols_cl.cls_obj;
-+	struct cl_lock *lock = ols->ols_cl.cls_lock;
-+	struct cl_lock_descr *descr = &lock->cll_descr;
-+	osc_page_gang_cbt cb;
-+	int res;
++	struct cl_lock_descr *descr = &ccc_env_info(env)->cti_descr;
++	struct cl_inode_info *lli   = cl_i2info(inode);
++	const struct lu_fid  *fid   = lu_object_fid(&clob->co_lu);
++	struct ccc_io	*cio   = ccc_env_io(env);
++	struct cl_lock       *lock;
 +	int result;
 +
-+	io->ci_obj = cl_object_top(osc);
-+	io->ci_ignore_layout = 1;
-+	result = cl_io_init(env, io, CIT_MISC, io->ci_obj);
-+	if (result != 0)
-+		goto out;
++	result = 0;
++	if (!(lli->lli_flags & LLIF_MDS_SIZE_LOCK)) {
++		CDEBUG(D_DLMTRACE, "Glimpsing inode " DFID "\n", PFID(fid));
++		if (lli->lli_has_smd) {
++			/* NOTE: this looks like DLM lock request, but it may
++			 *       not be one. Due to CEF_ASYNC flag (translated
++			 *       to LDLM_FL_HAS_INTENT by osc), this is
++			 *       glimpse request, that won't revoke any
++			 *       conflicting DLM locks held. Instead,
++			 *       ll_glimpse_callback() will be called on each
++			 *       client holding a DLM lock against this file,
++			 *       and resulting size will be returned for each
++			 *       stripe. DLM lock on [0, EOF] is acquired only
++			 *       if there were no conflicting locks. If there
++			 *       were conflicting locks, enqueuing or waiting
++			 *       fails with -ENAVAIL, but valid inode
++			 *       attributes are returned anyway.
++			 */
++			*descr = whole_file;
++			descr->cld_obj   = clob;
++			descr->cld_mode  = CLM_PHANTOM;
++			descr->cld_enq_flags = CEF_ASYNC | CEF_MUST;
++			if (agl)
++				descr->cld_enq_flags |= CEF_AGL;
++			cio->cui_glimpse = 1;
++			/*
++			 * CEF_ASYNC is used because glimpse sub-locks cannot
++			 * deadlock (because they never conflict with other
++			 * locks) and, hence, can be enqueued out-of-order.
++			 *
++			 * CEF_MUST protects glimpse lock from conversion into
++			 * a lockless mode.
++			 */
++			lock = cl_lock_request(env, io, descr, "glimpse",
++					       current);
++			cio->cui_glimpse = 0;
 +
-+	cb = descr->cld_mode == CLM_READ ? check_and_discard_cb : discard_cb;
-+	info->oti_fn_index = info->oti_next_index = descr->cld_start;
-+	do {
-+		res = osc_page_gang_lookup(env, io, cl2osc(osc),
-+					   info->oti_next_index, descr->cld_end,
-+					   cb, (void *)lock);
-+		if (info->oti_next_index > descr->cld_end)
-+			break;
++			if (!lock)
++				return 0;
 +
-+		if (res == CLP_GANG_RESCHED)
-+			cond_resched();
-+	} while (res != CLP_GANG_OKAY);
-+out:
-+	cl_io_fini(env, io);
++			if (IS_ERR(lock))
++				return PTR_ERR(lock);
++
++			LASSERT(agl == 0);
++			result = cl_wait(env, lock);
++			if (result == 0) {
++				cl_merge_lvb(env, inode);
++				if (cl_isize_read(inode) > 0 &&
++				    inode->i_blocks == 0) {
++					/*
++					 * LU-417: Add dirty pages block count
++					 * lest i_blocks reports 0, some "cp" or
++					 * "tar" may think it's a completely
++					 * sparse file and skip it.
++					 */
++					inode->i_blocks = dirty_cnt(inode);
++				}
++				cl_unuse(env, lock);
++			}
++			cl_lock_release(env, lock, "glimpse", current);
++		} else {
++			CDEBUG(D_DLMTRACE, "No objects for inode\n");
++			cl_merge_lvb(env, inode);
++		}
++	}
++
 +	return result;
 +}
 +
- /** @} osc */
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-index b6325f5..e70f06c 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-@@ -111,7 +111,12 @@ struct osc_thread_info {
- 	struct lustre_handle    oti_handle;
- 	struct cl_page_list     oti_plist;
- 	struct cl_io		oti_io;
--	struct cl_page	       *oti_pvec[OTI_PVEC_SIZE];
-+	void			*oti_pvec[OTI_PVEC_SIZE];
-+	/**
-+	 * Fields used by cl_lock_discard_pages().
-+	 */
-+	pgoff_t			oti_next_index;
-+	pgoff_t			oti_fn_index; /* first non-overlapped index */
- };
- 
- struct osc_object {
-@@ -161,6 +166,13 @@ struct osc_object {
- 	 * oo_{read|write}_pages soon.
- 	 */
- 	spinlock_t	    oo_lock;
-+
-+	/**
-+	 * Radix tree for caching pages
-+	 */
-+	struct radix_tree_root	oo_tree;
-+	spinlock_t		oo_tree_lock;
-+	unsigned long		oo_npages;
- };
- 
- static inline void osc_object_lock(struct osc_object *obj)
-@@ -569,6 +581,11 @@ static inline struct osc_page *oap2osc_page(struct osc_async_page *oap)
- 	return (struct osc_page *)container_of(oap, struct osc_page, ops_oap);
- }
- 
-+static inline pgoff_t osc_index(struct osc_page *opg)
++static int cl_io_get(struct inode *inode, struct lu_env **envout,
++		     struct cl_io **ioout, int *refcheck)
 +{
-+	return opg->ops_cl.cpl_page->cp_index;
++	struct lu_env	  *env;
++	struct cl_io	   *io;
++	struct cl_inode_info   *lli = cl_i2info(inode);
++	struct cl_object       *clob = lli->lli_clob;
++	int result;
++
++	if (S_ISREG(cl_inode_mode(inode))) {
++		env = cl_env_get(refcheck);
++		if (!IS_ERR(env)) {
++			io = ccc_env_thread_io(env);
++			io->ci_obj = clob;
++			*envout = env;
++			*ioout  = io;
++			result = 1;
++		} else {
++			result = PTR_ERR(env);
++		}
++	} else {
++		result = 0;
++	}
++	return result;
 +}
 +
- static inline struct osc_lock *cl2osc_lock(const struct cl_lock_slice *slice)
- {
- 	LINVRNT(osc_is_object(&slice->cls_obj->co_lu));
-@@ -691,6 +708,14 @@ int osc_extent_finish(const struct lu_env *env, struct osc_extent *ext,
- 		      int sent, int rc);
- void osc_extent_release(const struct lu_env *env, struct osc_extent *ext);
- 
-+int osc_lock_discard_pages(const struct lu_env *env, struct osc_lock *lock);
++int cl_glimpse_size0(struct inode *inode, int agl)
++{
++	/*
++	 * We don't need ast_flags argument to cl_glimpse_size(), because
++	 * osc_lock_enqueue() takes care of the possible deadlock that said
++	 * argument was introduced to avoid.
++	 */
++	/*
++	 * XXX but note that ll_file_seek() passes LDLM_FL_BLOCK_NOWAIT to
++	 * cl_glimpse_size(), which doesn't make sense: glimpse locks are not
++	 * blocking anyway.
++	 */
++	struct lu_env	  *env = NULL;
++	struct cl_io	   *io  = NULL;
++	int		     result;
++	int		     refcheck;
 +
-+typedef int (*osc_page_gang_cbt)(const struct lu_env *, struct cl_io *,
-+				 struct osc_page *, void *);
-+int osc_page_gang_lookup(const struct lu_env *env, struct cl_io *io,
-+			 struct osc_object *osc, pgoff_t start, pgoff_t end,
-+			 osc_page_gang_cbt cb, void *cbdata);
++	result = cl_io_get(inode, &env, &io, &refcheck);
++	if (result > 0) {
++again:
++		io->ci_verify_layout = 1;
++		result = cl_io_init(env, io, CIT_MISC, io->ci_obj);
++		if (result > 0)
++			/*
++			 * nothing to do for this io. This currently happens
++			 * when stripe sub-object's are not yet created.
++			 */
++			result = io->ci_result;
++		else if (result == 0)
++			result = cl_glimpse_lock(env, io, inode, io->ci_obj,
++						 agl);
 +
- /** @} osc */
- 
- #endif /* OSC_CL_INTERNAL_H */
-diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
-index a0fa533..1536d31 100644
---- a/drivers/staging/lustre/lustre/osc/osc_io.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_io.c
-@@ -391,18 +391,13 @@ static int osc_async_upcall(void *a, int rc)
-  * Checks that there are no pages being written in the extent being truncated.
-  */
- static int trunc_check_cb(const struct lu_env *env, struct cl_io *io,
--			  struct cl_page *page, void *cbdata)
-+			  struct osc_page *ops, void *cbdata)
- {
--	const struct cl_page_slice *slice;
--	struct osc_page *ops;
-+	struct cl_page *page = ops->ops_cl.cpl_page;
- 	struct osc_async_page *oap;
- 	__u64 start = *(__u64 *)cbdata;
- 
--	slice = cl_page_at(page, &osc_device_type);
--	LASSERT(slice);
--	ops = cl2osc_page(slice);
- 	oap = &ops->ops_oap;
--
- 	if (oap->oap_cmd & OBD_BRW_WRITE &&
- 	    !list_empty(&oap->oap_pending_item))
- 		CL_PAGE_DEBUG(D_ERROR, env, page, "exists %llu/%s.\n",
-@@ -434,8 +429,9 @@ static void osc_trunc_check(const struct lu_env *env, struct cl_io *io,
- 	/*
- 	 * Complain if there are pages in the truncated region.
- 	 */
--	cl_page_gang_lookup(env, clob, io, start + partial, CL_PAGE_EOF,
--			    trunc_check_cb, (void *)&size);
-+	osc_page_gang_lookup(env, io, cl2osc(clob),
-+			     start + partial, CL_PAGE_EOF,
-+			     trunc_check_cb, (void *)&size);
- }
- 
- static int osc_io_setattr_start(const struct lu_env *env,
-diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
-index 013df97..3a8a6d1 100644
---- a/drivers/staging/lustre/lustre/osc/osc_lock.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
-@@ -36,6 +36,7 @@
-  * Implementation of cl_lock for OSC layer.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- #define DEBUG_SUBSYSTEM S_OSC
-@@ -897,11 +898,8 @@ static int osc_ldlm_glimpse_ast(struct ldlm_lock *dlmlock, void *data)
- static unsigned long osc_lock_weigh(const struct lu_env *env,
- 				    const struct cl_lock_slice *slice)
- {
--	/*
--	 * don't need to grab coh_page_guard since we don't care the exact #
--	 * of pages..
--	 */
--	return cl_object_header(slice->cls_obj)->coh_pages;
-+	/* TODO: check how many pages are covered by this lock */
-+	return cl2osc(slice->cls_obj)->oo_npages;
- }
- 
- static void osc_lock_build_einfo(const struct lu_env *env,
-@@ -1276,7 +1274,7 @@ static int osc_lock_flush(struct osc_lock *ols, int discard)
- 				result = 0;
- 		}
- 
--		rc = cl_lock_discard_pages(env, lock);
-+		rc = osc_lock_discard_pages(env, ols);
- 		if (result == 0 && rc < 0)
- 			result = rc;
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_object.c b/drivers/staging/lustre/lustre/osc/osc_object.c
-index 9d474fc..2d2d39a 100644
---- a/drivers/staging/lustre/lustre/osc/osc_object.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_object.c
-@@ -36,6 +36,7 @@
-  * Implementation of cl_object for OSC layer.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- #define DEBUG_SUBSYSTEM S_OSC
-@@ -94,6 +95,7 @@ static int osc_object_init(const struct lu_env *env, struct lu_object *obj,
- 	atomic_set(&osc->oo_nr_reads, 0);
- 	atomic_set(&osc->oo_nr_writes, 0);
- 	spin_lock_init(&osc->oo_lock);
-+	spin_lock_init(&osc->oo_tree_lock);
- 
- 	cl_object_page_init(lu2cl(obj), sizeof(struct osc_page));
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
-index f0a9870..91ff607 100644
---- a/drivers/staging/lustre/lustre/osc/osc_page.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_page.c
-@@ -36,6 +36,7 @@
-  * Implementation of cl_page for OSC layer.
-  *
-  *   Author: Nikita Danilov <nikita.danilov@sun.com>
-+ *   Author: Jinshan Xiong <jinshan.xiong@intel.com>
-  */
- 
- #define DEBUG_SUBSYSTEM S_OSC
-@@ -326,6 +327,18 @@ static void osc_page_delete(const struct lu_env *env,
- 	spin_unlock(&obj->oo_seatbelt);
- 
- 	osc_lru_del(osc_cli(obj), opg);
-+
-+	if (slice->cpl_page->cp_type == CPT_CACHEABLE) {
-+		void *value;
-+
-+		spin_lock(&obj->oo_tree_lock);
-+		value = radix_tree_delete(&obj->oo_tree, osc_index(opg));
-+		if (value)
-+			--obj->oo_npages;
-+		spin_unlock(&obj->oo_tree_lock);
-+
-+		LASSERT(ergo(value, value == opg));
++		OBD_FAIL_TIMEOUT(OBD_FAIL_GLIMPSE_DELAY, 2);
++		cl_io_fini(env, io);
++		if (unlikely(io->ci_need_restart))
++			goto again;
++		cl_env_put(env, &refcheck);
 +	}
- }
- 
- static void osc_page_clip(const struct lu_env *env,
-@@ -422,8 +435,18 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
- 	INIT_LIST_HEAD(&opg->ops_lru);
- 
- 	/* reserve an LRU space for this page */
--	if (page->cp_type == CPT_CACHEABLE && result == 0)
-+	if (page->cp_type == CPT_CACHEABLE && result == 0) {
- 		result = osc_lru_reserve(env, osc, opg);
-+		if (result == 0) {
-+			spin_lock(&osc->oo_tree_lock);
-+			result = radix_tree_insert(&osc->oo_tree,
-+						   page->cp_index, opg);
-+			if (result == 0)
-+				++osc->oo_npages;
-+			spin_unlock(&osc->oo_tree_lock);
-+			LASSERT(result == 0);
++	return result;
++}
++
++int cl_local_size(struct inode *inode)
++{
++	struct lu_env	   *env = NULL;
++	struct cl_io	    *io  = NULL;
++	struct ccc_thread_info  *cti;
++	struct cl_object	*clob;
++	struct cl_lock_descr    *descr;
++	struct cl_lock	  *lock;
++	int		      result;
++	int		      refcheck;
++
++	if (!cl_i2info(inode)->lli_has_smd)
++		return 0;
++
++	result = cl_io_get(inode, &env, &io, &refcheck);
++	if (result <= 0)
++		return result;
++
++	clob = io->ci_obj;
++	result = cl_io_init(env, io, CIT_MISC, clob);
++	if (result > 0) {
++		result = io->ci_result;
++	} else if (result == 0) {
++		cti = ccc_env_info(env);
++		descr = &cti->cti_descr;
++
++		*descr = whole_file;
++		descr->cld_obj = clob;
++		lock = cl_lock_peek(env, io, descr, "localsize", current);
++		if (lock) {
++			cl_merge_lvb(env, inode);
++			cl_unuse(env, lock);
++			cl_lock_release(env, lock, "localsize", current);
++			result = 0;
++		} else {
++			result = -ENODATA;
 +		}
 +	}
- 
- 	return result;
- }
-@@ -611,7 +634,6 @@ static void discard_pagevec(const struct lu_env *env, struct cl_io *io,
- 		struct cl_page *page = pvec[i];
- 
- 		LASSERT(cl_page_is_owned(page, io));
--		cl_page_unmap(env, io, page);
- 		cl_page_discard(env, io, page);
- 		cl_page_disown(env, io, page);
- 		cl_page_put(env, page);
-@@ -652,7 +674,7 @@ int osc_lru_shrink(const struct lu_env *env, struct client_obd *cli,
- 		atomic_inc(&cli->cl_lru_shrinkers);
- 	}
- 
--	pvec = osc_env_info(env)->oti_pvec;
-+	pvec = (struct cl_page **)osc_env_info(env)->oti_pvec;
- 	io = &osc_env_info(env)->oti_io;
- 
- 	client_obd_list_lock(&cli->cl_lru_list_lock);
++	cl_io_fini(env, io);
++	cl_env_put(env, &refcheck);
++	return result;
++}
+diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+new file mode 100644
+index 0000000..065b0f2
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+@@ -0,0 +1,1209 @@
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
++ *
++ * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
++ * CA 95054 USA or visit www.sun.com if you need additional information or
++ * have any questions.
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
++ * Use is subject to license terms.
++ *
++ * Copyright (c) 2011, 2015, Intel Corporation.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ * Lustre is a trademark of Sun Microsystems, Inc.
++ *
++ * cl code shared between vvp and liblustre (and other Lustre clients in the
++ * future).
++ *
++ *   Author: Nikita Danilov <nikita.danilov@sun.com>
++ */
++
++#define DEBUG_SUBSYSTEM S_LLITE
++
++#include "../../include/linux/libcfs/libcfs.h"
++# include <linux/fs.h>
++# include <linux/sched.h>
++# include <linux/mm.h>
++# include <linux/quotaops.h>
++# include <linux/highmem.h>
++# include <linux/pagemap.h>
++# include <linux/rbtree.h>
++
++#include "../include/obd.h"
++#include "../include/obd_support.h"
++#include "../include/lustre_fid.h"
++#include "../include/lustre_lite.h"
++#include "../include/lustre_dlm.h"
++#include "../include/lustre_ver.h"
++#include "../include/lustre_mdc.h"
++#include "../include/cl_object.h"
++
++#include "../include/lclient.h"
++
++#include "../llite/llite_internal.h"
++
++static const struct cl_req_operations ccc_req_ops;
++
++/*
++ * ccc_ prefix stands for "Common Client Code".
++ */
++
++static struct kmem_cache *ccc_lock_kmem;
++static struct kmem_cache *ccc_object_kmem;
++static struct kmem_cache *ccc_thread_kmem;
++static struct kmem_cache *ccc_session_kmem;
++static struct kmem_cache *ccc_req_kmem;
++
++static struct lu_kmem_descr ccc_caches[] = {
++	{
++		.ckd_cache = &ccc_lock_kmem,
++		.ckd_name  = "ccc_lock_kmem",
++		.ckd_size  = sizeof(struct ccc_lock)
++	},
++	{
++		.ckd_cache = &ccc_object_kmem,
++		.ckd_name  = "ccc_object_kmem",
++		.ckd_size  = sizeof(struct ccc_object)
++	},
++	{
++		.ckd_cache = &ccc_thread_kmem,
++		.ckd_name  = "ccc_thread_kmem",
++		.ckd_size  = sizeof(struct ccc_thread_info),
++	},
++	{
++		.ckd_cache = &ccc_session_kmem,
++		.ckd_name  = "ccc_session_kmem",
++		.ckd_size  = sizeof(struct ccc_session)
++	},
++	{
++		.ckd_cache = &ccc_req_kmem,
++		.ckd_name  = "ccc_req_kmem",
++		.ckd_size  = sizeof(struct ccc_req)
++	},
++	{
++		.ckd_cache = NULL
++	}
++};
++
++/*****************************************************************************
++ *
++ * Vvp device and device type functions.
++ *
++ */
++
++void *ccc_key_init(const struct lu_context *ctx, struct lu_context_key *key)
++{
++	struct ccc_thread_info *info;
++
++	info = kmem_cache_zalloc(ccc_thread_kmem, GFP_NOFS);
++	if (!info)
++		info = ERR_PTR(-ENOMEM);
++	return info;
++}
++
++void ccc_key_fini(const struct lu_context *ctx,
++		  struct lu_context_key *key, void *data)
++{
++	struct ccc_thread_info *info = data;
++
++	kmem_cache_free(ccc_thread_kmem, info);
++}
++
++void *ccc_session_key_init(const struct lu_context *ctx,
++			   struct lu_context_key *key)
++{
++	struct ccc_session *session;
++
++	session = kmem_cache_zalloc(ccc_session_kmem, GFP_NOFS);
++	if (!session)
++		session = ERR_PTR(-ENOMEM);
++	return session;
++}
++
++void ccc_session_key_fini(const struct lu_context *ctx,
++			  struct lu_context_key *key, void *data)
++{
++	struct ccc_session *session = data;
++
++	kmem_cache_free(ccc_session_kmem, session);
++}
++
++struct lu_context_key ccc_key = {
++	.lct_tags = LCT_CL_THREAD,
++	.lct_init = ccc_key_init,
++	.lct_fini = ccc_key_fini
++};
++
++struct lu_context_key ccc_session_key = {
++	.lct_tags = LCT_SESSION,
++	.lct_init = ccc_session_key_init,
++	.lct_fini = ccc_session_key_fini
++};
++
++/* type constructor/destructor: ccc_type_{init,fini,start,stop}(). */
++/* LU_TYPE_INIT_FINI(ccc, &ccc_key, &ccc_session_key); */
++
++int ccc_device_init(const struct lu_env *env, struct lu_device *d,
++		    const char *name, struct lu_device *next)
++{
++	struct ccc_device  *vdv;
++	int rc;
++
++	vdv = lu2ccc_dev(d);
++	vdv->cdv_next = lu2cl_dev(next);
++
++	LASSERT(d->ld_site && next->ld_type);
++	next->ld_site = d->ld_site;
++	rc = next->ld_type->ldt_ops->ldto_device_init(
++			env, next, next->ld_type->ldt_name, NULL);
++	if (rc == 0) {
++		lu_device_get(next);
++		lu_ref_add(&next->ld_reference, "lu-stack", &lu_site_init);
++	}
++	return rc;
++}
++
++struct lu_device *ccc_device_fini(const struct lu_env *env,
++				  struct lu_device *d)
++{
++	return cl2lu_dev(lu2ccc_dev(d)->cdv_next);
++}
++
++struct lu_device *ccc_device_alloc(const struct lu_env *env,
++				   struct lu_device_type *t,
++				   struct lustre_cfg *cfg,
++				   const struct lu_device_operations *luops,
++				   const struct cl_device_operations *clops)
++{
++	struct ccc_device *vdv;
++	struct lu_device  *lud;
++	struct cl_site    *site;
++	int rc;
++
++	vdv = kzalloc(sizeof(*vdv), GFP_NOFS);
++	if (!vdv)
++		return ERR_PTR(-ENOMEM);
++
++	lud = &vdv->cdv_cl.cd_lu_dev;
++	cl_device_init(&vdv->cdv_cl, t);
++	ccc2lu_dev(vdv)->ld_ops = luops;
++	vdv->cdv_cl.cd_ops = clops;
++
++	site = kzalloc(sizeof(*site), GFP_NOFS);
++	if (site) {
++		rc = cl_site_init(site, &vdv->cdv_cl);
++		if (rc == 0) {
++			rc = lu_site_init_finish(&site->cs_lu);
++		} else {
++			LASSERT(!lud->ld_site);
++			CERROR("Cannot init lu_site, rc %d.\n", rc);
++			kfree(site);
++		}
++	} else {
++		rc = -ENOMEM;
++	}
++	if (rc != 0) {
++		ccc_device_free(env, lud);
++		lud = ERR_PTR(rc);
++	}
++	return lud;
++}
++
++struct lu_device *ccc_device_free(const struct lu_env *env,
++				  struct lu_device *d)
++{
++	struct ccc_device *vdv  = lu2ccc_dev(d);
++	struct cl_site    *site = lu2cl_site(d->ld_site);
++	struct lu_device  *next = cl2lu_dev(vdv->cdv_next);
++
++	if (d->ld_site) {
++		cl_site_fini(site);
++		kfree(site);
++	}
++	cl_device_fini(lu2cl_dev(d));
++	kfree(vdv);
++	return next;
++}
++
++int ccc_req_init(const struct lu_env *env, struct cl_device *dev,
++		 struct cl_req *req)
++{
++	struct ccc_req *vrq;
++	int result;
++
++	vrq = kmem_cache_zalloc(ccc_req_kmem, GFP_NOFS);
++	if (vrq) {
++		cl_req_slice_add(req, &vrq->crq_cl, dev, &ccc_req_ops);
++		result = 0;
++	} else {
++		result = -ENOMEM;
++	}
++	return result;
++}
++
++/**
++ * An `emergency' environment used by ccc_inode_fini() when cl_env_get()
++ * fails. Access to this environment is serialized by ccc_inode_fini_guard
++ * mutex.
++ */
++static struct lu_env *ccc_inode_fini_env;
++
++/**
++ * A mutex serializing calls to slp_inode_fini() under extreme memory
++ * pressure, when environments cannot be allocated.
++ */
++static DEFINE_MUTEX(ccc_inode_fini_guard);
++static int dummy_refcheck;
++
++int ccc_global_init(struct lu_device_type *device_type)
++{
++	int result;
++
++	result = lu_kmem_init(ccc_caches);
++	if (result)
++		return result;
++
++	result = lu_device_type_init(device_type);
++	if (result)
++		goto out_kmem;
++
++	ccc_inode_fini_env = cl_env_alloc(&dummy_refcheck,
++					  LCT_REMEMBER | LCT_NOREF);
++	if (IS_ERR(ccc_inode_fini_env)) {
++		result = PTR_ERR(ccc_inode_fini_env);
++		goto out_device;
++	}
++
++	ccc_inode_fini_env->le_ctx.lc_cookie = 0x4;
++	return 0;
++out_device:
++	lu_device_type_fini(device_type);
++out_kmem:
++	lu_kmem_fini(ccc_caches);
++	return result;
++}
++
++void ccc_global_fini(struct lu_device_type *device_type)
++{
++	if (ccc_inode_fini_env) {
++		cl_env_put(ccc_inode_fini_env, &dummy_refcheck);
++		ccc_inode_fini_env = NULL;
++	}
++	lu_device_type_fini(device_type);
++	lu_kmem_fini(ccc_caches);
++}
++
++/*****************************************************************************
++ *
++ * Object operations.
++ *
++ */
++
++struct lu_object *ccc_object_alloc(const struct lu_env *env,
++				   const struct lu_object_header *unused,
++				   struct lu_device *dev,
++				   const struct cl_object_operations *clops,
++				   const struct lu_object_operations *luops)
++{
++	struct ccc_object *vob;
++	struct lu_object  *obj;
++
++	vob = kmem_cache_zalloc(ccc_object_kmem, GFP_NOFS);
++	if (vob) {
++		struct cl_object_header *hdr;
++
++		obj = ccc2lu(vob);
++		hdr = &vob->cob_header;
++		cl_object_header_init(hdr);
++		lu_object_init(obj, &hdr->coh_lu, dev);
++		lu_object_add_top(&hdr->coh_lu, obj);
++
++		vob->cob_cl.co_ops = clops;
++		obj->lo_ops = luops;
++	} else {
++		obj = NULL;
++	}
++	return obj;
++}
++
++int ccc_object_init0(const struct lu_env *env,
++		     struct ccc_object *vob,
++		     const struct cl_object_conf *conf)
++{
++	vob->cob_inode = conf->coc_inode;
++	vob->cob_transient_pages = 0;
++	cl_object_page_init(&vob->cob_cl, sizeof(struct ccc_page));
++	return 0;
++}
++
++int ccc_object_init(const struct lu_env *env, struct lu_object *obj,
++		    const struct lu_object_conf *conf)
++{
++	struct ccc_device *dev = lu2ccc_dev(obj->lo_dev);
++	struct ccc_object *vob = lu2ccc(obj);
++	struct lu_object  *below;
++	struct lu_device  *under;
++	int result;
++
++	under = &dev->cdv_next->cd_lu_dev;
++	below = under->ld_ops->ldo_object_alloc(env, obj->lo_header, under);
++	if (below) {
++		const struct cl_object_conf *cconf;
++
++		cconf = lu2cl_conf(conf);
++		INIT_LIST_HEAD(&vob->cob_pending_list);
++		lu_object_add(obj, below);
++		result = ccc_object_init0(env, vob, cconf);
++	} else {
++		result = -ENOMEM;
++	}
++	return result;
++}
++
++void ccc_object_free(const struct lu_env *env, struct lu_object *obj)
++{
++	struct ccc_object *vob = lu2ccc(obj);
++
++	lu_object_fini(obj);
++	lu_object_header_fini(obj->lo_header);
++	kmem_cache_free(ccc_object_kmem, vob);
++}
++
++int ccc_lock_init(const struct lu_env *env,
++		  struct cl_object *obj, struct cl_lock *lock,
++		  const struct cl_io *unused,
++		  const struct cl_lock_operations *lkops)
++{
++	struct ccc_lock *clk;
++	int result;
++
++	CLOBINVRNT(env, obj, ccc_object_invariant(obj));
++
++	clk = kmem_cache_zalloc(ccc_lock_kmem, GFP_NOFS);
++	if (clk) {
++		cl_lock_slice_add(lock, &clk->clk_cl, obj, lkops);
++		result = 0;
++	} else {
++		result = -ENOMEM;
++	}
++	return result;
++}
++
++int ccc_object_glimpse(const struct lu_env *env,
++		       const struct cl_object *obj, struct ost_lvb *lvb)
++{
++	struct inode *inode = ccc_object_inode(obj);
++
++	lvb->lvb_mtime = cl_inode_mtime(inode);
++	lvb->lvb_atime = cl_inode_atime(inode);
++	lvb->lvb_ctime = cl_inode_ctime(inode);
++	/*
++	 * LU-417: Add dirty pages block count lest i_blocks reports 0, some
++	 * "cp" or "tar" on remote node may think it's a completely sparse file
++	 * and skip it.
++	 */
++	if (lvb->lvb_size > 0 && lvb->lvb_blocks == 0)
++		lvb->lvb_blocks = dirty_cnt(inode);
++	return 0;
++}
++
++static void ccc_object_size_lock(struct cl_object *obj)
++{
++	struct inode *inode = ccc_object_inode(obj);
++
++	ll_inode_size_lock(inode);
++	cl_object_attr_lock(obj);
++}
++
++static void ccc_object_size_unlock(struct cl_object *obj)
++{
++	struct inode *inode = ccc_object_inode(obj);
++
++	cl_object_attr_unlock(obj);
++	ll_inode_size_unlock(inode);
++}
++
++/*****************************************************************************
++ *
++ * Page operations.
++ *
++ */
++
++struct page *ccc_page_vmpage(const struct lu_env *env,
++			     const struct cl_page_slice *slice)
++{
++	return cl2vm_page(slice);
++}
++
++int ccc_page_is_under_lock(const struct lu_env *env,
++			   const struct cl_page_slice *slice,
++			   struct cl_io *io)
++{
++	struct ccc_io	*cio  = ccc_env_io(env);
++	struct cl_lock_descr *desc = &ccc_env_info(env)->cti_descr;
++	struct cl_page       *page = slice->cpl_page;
++
++	int result;
++
++	if (io->ci_type == CIT_READ || io->ci_type == CIT_WRITE ||
++	    io->ci_type == CIT_FAULT) {
++		if (cio->cui_fd->fd_flags & LL_FILE_GROUP_LOCKED) {
++			result = -EBUSY;
++		} else {
++			desc->cld_start = page->cp_index;
++			desc->cld_end   = page->cp_index;
++			desc->cld_obj   = page->cp_obj;
++			desc->cld_mode  = CLM_READ;
++			result = cl_queue_match(&io->ci_lockset.cls_done,
++						desc) ? -EBUSY : 0;
++		}
++	} else {
++		result = 0;
++	}
++	return result;
++}
++
++int ccc_fail(const struct lu_env *env, const struct cl_page_slice *slice)
++{
++	/*
++	 * Cached read?
++	 */
++	LBUG();
++	return 0;
++}
++
++int ccc_transient_page_prep(const struct lu_env *env,
++			    const struct cl_page_slice *slice,
++			    struct cl_io *unused)
++{
++	/* transient page should always be sent. */
++	return 0;
++}
++
++/*****************************************************************************
++ *
++ * Lock operations.
++ *
++ */
++
++void ccc_lock_delete(const struct lu_env *env,
++		     const struct cl_lock_slice *slice)
++{
++	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
++}
++
++void ccc_lock_fini(const struct lu_env *env, struct cl_lock_slice *slice)
++{
++	struct ccc_lock *clk = cl2ccc_lock(slice);
++
++	kmem_cache_free(ccc_lock_kmem, clk);
++}
++
++int ccc_lock_enqueue(const struct lu_env *env,
++		     const struct cl_lock_slice *slice,
++		     struct cl_io *unused, __u32 enqflags)
++{
++	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
++	return 0;
++}
++
++int ccc_lock_use(const struct lu_env *env, const struct cl_lock_slice *slice)
++{
++	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
++	return 0;
++}
++
++int ccc_lock_unuse(const struct lu_env *env, const struct cl_lock_slice *slice)
++{
++	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
++	return 0;
++}
++
++int ccc_lock_wait(const struct lu_env *env, const struct cl_lock_slice *slice)
++{
++	CLOBINVRNT(env, slice->cls_obj, ccc_object_invariant(slice->cls_obj));
++	return 0;
++}
++
++/**
++ * Implementation of cl_lock_operations::clo_fits_into() methods for ccc
++ * layer. This function is executed every time io finds an existing lock in
++ * the lock cache while creating new lock. This function has to decide whether
++ * cached lock "fits" into io.
++ *
++ * \param slice lock to be checked
++ * \param io    IO that wants a lock.
++ *
++ * \see lov_lock_fits_into().
++ */
++int ccc_lock_fits_into(const struct lu_env *env,
++		       const struct cl_lock_slice *slice,
++		       const struct cl_lock_descr *need,
++		       const struct cl_io *io)
++{
++	const struct cl_lock       *lock  = slice->cls_lock;
++	const struct cl_lock_descr *descr = &lock->cll_descr;
++	const struct ccc_io	*cio   = ccc_env_io(env);
++	int			 result;
++
++	/*
++	 * Work around DLM peculiarity: it assumes that glimpse
++	 * (LDLM_FL_HAS_INTENT) lock is always LCK_PR, and returns reads lock
++	 * when asked for LCK_PW lock with LDLM_FL_HAS_INTENT flag set. Make
++	 * sure that glimpse doesn't get CLM_WRITE top-lock, so that it
++	 * doesn't enqueue CLM_WRITE sub-locks.
++	 */
++	if (cio->cui_glimpse)
++		result = descr->cld_mode != CLM_WRITE;
++
++	/*
++	 * Also, don't match incomplete write locks for read, otherwise read
++	 * would enqueue missing sub-locks in the write mode.
++	 */
++	else if (need->cld_mode != descr->cld_mode)
++		result = lock->cll_state >= CLS_ENQUEUED;
++	else
++		result = 1;
++	return result;
++}
++
++/**
++ * Implements cl_lock_operations::clo_state() method for ccc layer, invoked
++ * whenever lock state changes. Transfers object attributes, that might be
++ * updated as a result of lock acquiring into inode.
++ */
++void ccc_lock_state(const struct lu_env *env,
++		    const struct cl_lock_slice *slice,
++		    enum cl_lock_state state)
++{
++	struct cl_lock *lock = slice->cls_lock;
++
++	/*
++	 * Refresh inode attributes when the lock is moving into CLS_HELD
++	 * state, and only when this is a result of real enqueue, rather than
++	 * of finding lock in the cache.
++	 */
++	if (state == CLS_HELD && lock->cll_state < CLS_HELD) {
++		struct cl_object *obj;
++		struct inode     *inode;
++
++		obj   = slice->cls_obj;
++		inode = ccc_object_inode(obj);
++
++		/* vmtruncate() sets the i_size
++		 * under both a DLM lock and the
++		 * ll_inode_size_lock().  If we don't get the
++		 * ll_inode_size_lock() here we can match the DLM lock and
++		 * reset i_size.  generic_file_write can then trust the
++		 * stale i_size when doing appending writes and effectively
++		 * cancel the result of the truncate.  Getting the
++		 * ll_inode_size_lock() after the enqueue maintains the DLM
++		 * -> ll_inode_size_lock() acquiring order.
++		 */
++		if (lock->cll_descr.cld_start == 0 &&
++		    lock->cll_descr.cld_end == CL_PAGE_EOF)
++			cl_merge_lvb(env, inode);
++	}
++}
++
++/*****************************************************************************
++ *
++ * io operations.
++ *
++ */
++
++int ccc_io_one_lock_index(const struct lu_env *env, struct cl_io *io,
++			  __u32 enqflags, enum cl_lock_mode mode,
++			  pgoff_t start, pgoff_t end)
++{
++	struct ccc_io	  *cio   = ccc_env_io(env);
++	struct cl_lock_descr   *descr = &cio->cui_link.cill_descr;
++	struct cl_object       *obj   = io->ci_obj;
++
++	CLOBINVRNT(env, obj, ccc_object_invariant(obj));
++
++	CDEBUG(D_VFSTRACE, "lock: %d [%lu, %lu]\n", mode, start, end);
++
++	memset(&cio->cui_link, 0, sizeof(cio->cui_link));
++
++	if (cio->cui_fd && (cio->cui_fd->fd_flags & LL_FILE_GROUP_LOCKED)) {
++		descr->cld_mode = CLM_GROUP;
++		descr->cld_gid  = cio->cui_fd->fd_grouplock.cg_gid;
++	} else {
++		descr->cld_mode  = mode;
++	}
++	descr->cld_obj   = obj;
++	descr->cld_start = start;
++	descr->cld_end   = end;
++	descr->cld_enq_flags = enqflags;
++
++	cl_io_lock_add(env, io, &cio->cui_link);
++	return 0;
++}
++
++void ccc_io_update_iov(const struct lu_env *env,
++		       struct ccc_io *cio, struct cl_io *io)
++{
++	size_t size = io->u.ci_rw.crw_count;
++
++	if (!cl_is_normalio(env, io) || !cio->cui_iter)
++		return;
++
++	iov_iter_truncate(cio->cui_iter, size);
++}
++
++int ccc_io_one_lock(const struct lu_env *env, struct cl_io *io,
++		    __u32 enqflags, enum cl_lock_mode mode,
++		    loff_t start, loff_t end)
++{
++	struct cl_object *obj = io->ci_obj;
++
++	return ccc_io_one_lock_index(env, io, enqflags, mode,
++				     cl_index(obj, start), cl_index(obj, end));
++}
++
++void ccc_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
++{
++	CLOBINVRNT(env, ios->cis_io->ci_obj,
++		   ccc_object_invariant(ios->cis_io->ci_obj));
++}
++
++void ccc_io_advance(const struct lu_env *env,
++		    const struct cl_io_slice *ios,
++		    size_t nob)
++{
++	struct ccc_io    *cio = cl2ccc_io(env, ios);
++	struct cl_io     *io  = ios->cis_io;
++	struct cl_object *obj = ios->cis_io->ci_obj;
++
++	CLOBINVRNT(env, obj, ccc_object_invariant(obj));
++
++	if (!cl_is_normalio(env, io))
++		return;
++
++	iov_iter_reexpand(cio->cui_iter, cio->cui_tot_count  -= nob);
++}
++
++/**
++ * Helper function that if necessary adjusts file size (inode->i_size), when
++ * position at the offset \a pos is accessed. File size can be arbitrary stale
++ * on a Lustre client, but client at least knows KMS. If accessed area is
++ * inside [0, KMS], set file size to KMS, otherwise glimpse file size.
++ *
++ * Locking: cl_isize_lock is used to serialize changes to inode size and to
++ * protect consistency between inode size and cl_object
++ * attributes. cl_object_size_lock() protects consistency between cl_attr's of
++ * top-object and sub-objects.
++ */
++int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
++		  struct cl_io *io, loff_t start, size_t count, int *exceed)
++{
++	struct cl_attr *attr  = ccc_env_thread_attr(env);
++	struct inode   *inode = ccc_object_inode(obj);
++	loff_t	  pos   = start + count - 1;
++	loff_t kms;
++	int result;
++
++	/*
++	 * Consistency guarantees: following possibilities exist for the
++	 * relation between region being accessed and real file size at this
++	 * moment:
++	 *
++	 *  (A): the region is completely inside of the file;
++	 *
++	 *  (B-x): x bytes of region are inside of the file, the rest is
++	 *  outside;
++	 *
++	 *  (C): the region is completely outside of the file.
++	 *
++	 * This classification is stable under DLM lock already acquired by
++	 * the caller, because to change the class, other client has to take
++	 * DLM lock conflicting with our lock. Also, any updates to ->i_size
++	 * by other threads on this client are serialized by
++	 * ll_inode_size_lock(). This guarantees that short reads are handled
++	 * correctly in the face of concurrent writes and truncates.
++	 */
++	ccc_object_size_lock(obj);
++	result = cl_object_attr_get(env, obj, attr);
++	if (result == 0) {
++		kms = attr->cat_kms;
++		if (pos > kms) {
++			/*
++			 * A glimpse is necessary to determine whether we
++			 * return a short read (B) or some zeroes at the end
++			 * of the buffer (C)
++			 */
++			ccc_object_size_unlock(obj);
++			result = cl_glimpse_lock(env, io, inode, obj, 0);
++			if (result == 0 && exceed) {
++				/* If objective page index exceed end-of-file
++				 * page index, return directly. Do not expect
++				 * kernel will check such case correctly.
++				 * linux-2.6.18-128.1.1 miss to do that.
++				 * --bug 17336
++				 */
++				loff_t size = cl_isize_read(inode);
++				loff_t cur_index = start >> PAGE_CACHE_SHIFT;
++				loff_t size_index = (size - 1) >>
++						    PAGE_CACHE_SHIFT;
++
++				if ((size == 0 && cur_index != 0) ||
++				    size_index < cur_index)
++					*exceed = 1;
++			}
++			return result;
++		}
++		/*
++		 * region is within kms and, hence, within real file
++		 * size (A). We need to increase i_size to cover the
++		 * read region so that generic_file_read() will do its
++		 * job, but that doesn't mean the kms size is
++		 * _correct_, it is only the _minimum_ size. If
++		 * someone does a stat they will get the correct size
++		 * which will always be >= the kms value here.
++		 * b=11081
++		 */
++		if (cl_isize_read(inode) < kms) {
++			cl_isize_write_nolock(inode, kms);
++			CDEBUG(D_VFSTRACE, DFID " updating i_size %llu\n",
++			       PFID(lu_object_fid(&obj->co_lu)),
++			       (__u64)cl_isize_read(inode));
++		}
++	}
++	ccc_object_size_unlock(obj);
++	return result;
++}
++
++/*****************************************************************************
++ *
++ * Transfer operations.
++ *
++ */
++
++void ccc_req_completion(const struct lu_env *env,
++			const struct cl_req_slice *slice, int ioret)
++{
++	struct ccc_req *vrq;
++
++	if (ioret > 0)
++		cl_stats_tally(slice->crs_dev, slice->crs_req->crq_type, ioret);
++
++	vrq = cl2ccc_req(slice);
++	kmem_cache_free(ccc_req_kmem, vrq);
++}
++
++/**
++ * Implementation of struct cl_req_operations::cro_attr_set() for ccc
++ * layer. ccc is responsible for
++ *
++ *    - o_[mac]time
++ *
++ *    - o_mode
++ *
++ *    - o_parent_seq
++ *
++ *    - o_[ug]id
++ *
++ *    - o_parent_oid
++ *
++ *    - o_parent_ver
++ *
++ *    - o_ioepoch,
++ *
++ */
++void ccc_req_attr_set(const struct lu_env *env,
++		      const struct cl_req_slice *slice,
++		      const struct cl_object *obj,
++		      struct cl_req_attr *attr, u64 flags)
++{
++	struct inode *inode;
++	struct obdo  *oa;
++	u32	      valid_flags;
++
++	oa = attr->cra_oa;
++	inode = ccc_object_inode(obj);
++	valid_flags = OBD_MD_FLTYPE;
++
++	if (slice->crs_req->crq_type == CRT_WRITE) {
++		if (flags & OBD_MD_FLEPOCH) {
++			oa->o_valid |= OBD_MD_FLEPOCH;
++			oa->o_ioepoch = cl_i2info(inode)->lli_ioepoch;
++			valid_flags |= OBD_MD_FLMTIME | OBD_MD_FLCTIME |
++				       OBD_MD_FLUID | OBD_MD_FLGID;
++		}
++	}
++	obdo_from_inode(oa, inode, valid_flags & flags);
++	obdo_set_parent_fid(oa, &cl_i2info(inode)->lli_fid);
++	memcpy(attr->cra_jobid, cl_i2info(inode)->lli_jobid,
++	       JOBSTATS_JOBID_SIZE);
++}
++
++static const struct cl_req_operations ccc_req_ops = {
++	.cro_attr_set   = ccc_req_attr_set,
++	.cro_completion = ccc_req_completion
++};
++
++int cl_setattr_ost(struct inode *inode, const struct iattr *attr)
++{
++	struct lu_env *env;
++	struct cl_io  *io;
++	int	    result;
++	int	    refcheck;
++
++	env = cl_env_get(&refcheck);
++	if (IS_ERR(env))
++		return PTR_ERR(env);
++
++	io = ccc_env_thread_io(env);
++	io->ci_obj = cl_i2info(inode)->lli_clob;
++
++	io->u.ci_setattr.sa_attr.lvb_atime = LTIME_S(attr->ia_atime);
++	io->u.ci_setattr.sa_attr.lvb_mtime = LTIME_S(attr->ia_mtime);
++	io->u.ci_setattr.sa_attr.lvb_ctime = LTIME_S(attr->ia_ctime);
++	io->u.ci_setattr.sa_attr.lvb_size = attr->ia_size;
++	io->u.ci_setattr.sa_valid = attr->ia_valid;
++
++again:
++	if (cl_io_init(env, io, CIT_SETATTR, io->ci_obj) == 0) {
++		struct ccc_io *cio = ccc_env_io(env);
++
++		if (attr->ia_valid & ATTR_FILE)
++			/* populate the file descriptor for ftruncate to honor
++			 * group lock - see LU-787
++			 */
++			cio->cui_fd = cl_iattr2fd(inode, attr);
++
++		result = cl_io_loop(env, io);
++	} else {
++		result = io->ci_result;
++	}
++	cl_io_fini(env, io);
++	if (unlikely(io->ci_need_restart))
++		goto again;
++	/* HSM import case: file is released, cannot be restored
++	 * no need to fail except if restore registration failed
++	 * with -ENODATA
++	 */
++	if (result == -ENODATA && io->ci_restore_needed &&
++	    io->ci_result != -ENODATA)
++		result = 0;
++	cl_env_put(env, &refcheck);
++	return result;
++}
++
++/*****************************************************************************
++ *
++ * Type conversions.
++ *
++ */
++
++struct lu_device *ccc2lu_dev(struct ccc_device *vdv)
++{
++	return &vdv->cdv_cl.cd_lu_dev;
++}
++
++struct ccc_device *lu2ccc_dev(const struct lu_device *d)
++{
++	return container_of0(d, struct ccc_device, cdv_cl.cd_lu_dev);
++}
++
++struct ccc_device *cl2ccc_dev(const struct cl_device *d)
++{
++	return container_of0(d, struct ccc_device, cdv_cl);
++}
++
++struct lu_object *ccc2lu(struct ccc_object *vob)
++{
++	return &vob->cob_cl.co_lu;
++}
++
++struct ccc_object *lu2ccc(const struct lu_object *obj)
++{
++	return container_of0(obj, struct ccc_object, cob_cl.co_lu);
++}
++
++struct ccc_object *cl2ccc(const struct cl_object *obj)
++{
++	return container_of0(obj, struct ccc_object, cob_cl);
++}
++
++struct ccc_lock *cl2ccc_lock(const struct cl_lock_slice *slice)
++{
++	return container_of(slice, struct ccc_lock, clk_cl);
++}
++
++struct ccc_io *cl2ccc_io(const struct lu_env *env,
++			 const struct cl_io_slice *slice)
++{
++	struct ccc_io *cio;
++
++	cio = container_of(slice, struct ccc_io, cui_cl);
++	LASSERT(cio == ccc_env_io(env));
++	return cio;
++}
++
++struct ccc_req *cl2ccc_req(const struct cl_req_slice *slice)
++{
++	return container_of0(slice, struct ccc_req, crq_cl);
++}
++
++struct page *cl2vm_page(const struct cl_page_slice *slice)
++{
++	return cl2ccc_page(slice)->cpg_page;
++}
++
++/*****************************************************************************
++ *
++ * Accessors.
++ *
++ */
++int ccc_object_invariant(const struct cl_object *obj)
++{
++	struct inode	 *inode = ccc_object_inode(obj);
++	struct cl_inode_info *lli   = cl_i2info(inode);
++
++	return (S_ISREG(cl_inode_mode(inode)) ||
++		/* i_mode of unlinked inode is zeroed. */
++		cl_inode_mode(inode) == 0) && lli->lli_clob == obj;
++}
++
++struct inode *ccc_object_inode(const struct cl_object *obj)
++{
++	return cl2ccc(obj)->cob_inode;
++}
++
++/**
++ * Initialize or update CLIO structures for regular files when new
++ * meta-data arrives from the server.
++ *
++ * \param inode regular file inode
++ * \param md    new file metadata from MDS
++ * - allocates cl_object if necessary,
++ * - updated layout, if object was already here.
++ */
++int cl_file_inode_init(struct inode *inode, struct lustre_md *md)
++{
++	struct lu_env	*env;
++	struct cl_inode_info *lli;
++	struct cl_object     *clob;
++	struct lu_site       *site;
++	struct lu_fid	*fid;
++	struct cl_object_conf conf = {
++		.coc_inode = inode,
++		.u = {
++			.coc_md    = md
++		}
++	};
++	int result = 0;
++	int refcheck;
++
++	LASSERT(md->body->valid & OBD_MD_FLID);
++	LASSERT(S_ISREG(cl_inode_mode(inode)));
++
++	env = cl_env_get(&refcheck);
++	if (IS_ERR(env))
++		return PTR_ERR(env);
++
++	site = cl_i2sbi(inode)->ll_site;
++	lli  = cl_i2info(inode);
++	fid  = &lli->lli_fid;
++	LASSERT(fid_is_sane(fid));
++
++	if (!lli->lli_clob) {
++		/* clob is slave of inode, empty lli_clob means for new inode,
++		 * there is no clob in cache with the given fid, so it is
++		 * unnecessary to perform lookup-alloc-lookup-insert, just
++		 * alloc and insert directly.
++		 */
++		LASSERT(inode->i_state & I_NEW);
++		conf.coc_lu.loc_flags = LOC_F_NEW;
++		clob = cl_object_find(env, lu2cl_dev(site->ls_top_dev),
++				      fid, &conf);
++		if (!IS_ERR(clob)) {
++			/*
++			 * No locking is necessary, as new inode is
++			 * locked by I_NEW bit.
++			 */
++			lli->lli_clob = clob;
++			lli->lli_has_smd = lsm_has_objects(md->lsm);
++			lu_object_ref_add(&clob->co_lu, "inode", inode);
++		} else {
++			result = PTR_ERR(clob);
++		}
++	} else {
++		result = cl_conf_set(env, lli->lli_clob, &conf);
++	}
++
++	cl_env_put(env, &refcheck);
++
++	if (result != 0)
++		CERROR("Failure to initialize cl object " DFID ": %d\n",
++		       PFID(fid), result);
++	return result;
++}
++
++/**
++ * Wait for others drop their references of the object at first, then we drop
++ * the last one, which will lead to the object be destroyed immediately.
++ * Must be called after cl_object_kill() against this object.
++ *
++ * The reason we want to do this is: destroying top object will wait for sub
++ * objects being destroyed first, so we can't let bottom layer (e.g. from ASTs)
++ * to initiate top object destroying which may deadlock. See bz22520.
++ */
++static void cl_object_put_last(struct lu_env *env, struct cl_object *obj)
++{
++	struct lu_object_header *header = obj->co_lu.lo_header;
++	wait_queue_t	   waiter;
++
++	if (unlikely(atomic_read(&header->loh_ref) != 1)) {
++		struct lu_site *site = obj->co_lu.lo_dev->ld_site;
++		struct lu_site_bkt_data *bkt;
++
++		bkt = lu_site_bkt_from_fid(site, &header->loh_fid);
++
++		init_waitqueue_entry(&waiter, current);
++		add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
++
++		while (1) {
++			set_current_state(TASK_UNINTERRUPTIBLE);
++			if (atomic_read(&header->loh_ref) == 1)
++				break;
++			schedule();
++		}
++
++		set_current_state(TASK_RUNNING);
++		remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
++	}
++
++	cl_object_put(env, obj);
++}
++
++void cl_inode_fini(struct inode *inode)
++{
++	struct lu_env	   *env;
++	struct cl_inode_info    *lli  = cl_i2info(inode);
++	struct cl_object	*clob = lli->lli_clob;
++	int refcheck;
++	int emergency;
++
++	if (clob) {
++		void		    *cookie;
++
++		cookie = cl_env_reenter();
++		env = cl_env_get(&refcheck);
++		emergency = IS_ERR(env);
++		if (emergency) {
++			mutex_lock(&ccc_inode_fini_guard);
++			LASSERT(ccc_inode_fini_env);
++			cl_env_implant(ccc_inode_fini_env, &refcheck);
++			env = ccc_inode_fini_env;
++		}
++		/*
++		 * cl_object cache is a slave to inode cache (which, in turn
++		 * is a slave to dentry cache), don't keep cl_object in memory
++		 * when its master is evicted.
++		 */
++		cl_object_kill(env, clob);
++		lu_object_ref_del(&clob->co_lu, "inode", inode);
++		cl_object_put_last(env, clob);
++		lli->lli_clob = NULL;
++		if (emergency) {
++			cl_env_unplant(ccc_inode_fini_env, &refcheck);
++			mutex_unlock(&ccc_inode_fini_guard);
++		} else {
++			cl_env_put(env, &refcheck);
++		}
++		cl_env_reexit(cookie);
++	}
++}
++
++/**
++ * return IF_* type for given lu_dirent entry.
++ * IF_* flag shld be converted to particular OS file type in
++ * platform llite module.
++ */
++__u16 ll_dirent_type_get(struct lu_dirent *ent)
++{
++	__u16 type = 0;
++	struct luda_type *lt;
++	int len = 0;
++
++	if (le32_to_cpu(ent->lde_attrs) & LUDA_TYPE) {
++		const unsigned int align = sizeof(struct luda_type) - 1;
++
++		len = le16_to_cpu(ent->lde_namelen);
++		len = (len + align) & ~align;
++		lt = (void *)ent->lde_name + len;
++		type = IFTODT(le16_to_cpu(lt->lt_type));
++	}
++	return type;
++}
++
++/**
++ * build inode number from passed @fid
++ */
++__u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
++{
++	if (BITS_PER_LONG == 32 || api32)
++		return fid_flatten32(fid);
++	else
++		return fid_flatten(fid);
++}
++
++/**
++ * build inode generation from passed @fid.  If our FID overflows the 32-bit
++ * inode number then return a non-zero generation to distinguish them.
++ */
++__u32 cl_fid_build_gen(const struct lu_fid *fid)
++{
++	__u32 gen;
++
++	if (fid_is_igif(fid)) {
++		gen = lu_igif_gen(fid);
++		return gen;
++	}
++
++	gen = fid_flatten(fid) >> 32;
++	return gen;
++}
++
++/* lsm is unreliable after hsm implementation as layout can be changed at
++ * any time. This is only to support old, non-clio-ized interfaces. It will
++ * cause deadlock if clio operations are called with this extra layout refcount
++ * because in case the layout changed during the IO, ll_layout_refresh() will
++ * have to wait for the refcount to become zero to destroy the older layout.
++ *
++ * Notice that the lsm returned by this function may not be valid unless called
++ * inside layout lock - MDS_INODELOCK_LAYOUT.
++ */
++struct lov_stripe_md *ccc_inode_lsm_get(struct inode *inode)
++{
++	return lov_lsm_get(cl_i2info(inode)->lli_clob);
++}
++
++inline void ccc_inode_lsm_put(struct inode *inode, struct lov_stripe_md *lsm)
++{
++	lov_lsm_put(cl_i2info(inode)->lli_clob, lsm);
++}
+diff --git a/drivers/staging/lustre/lustre/llite/lcommon_misc.c b/drivers/staging/lustre/lustre/llite/lcommon_misc.c
+new file mode 100644
+index 0000000..d80bcedd
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/llite/lcommon_misc.c
+@@ -0,0 +1,200 @@
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
++ *
++ * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
++ * CA 95054 USA or visit www.sun.com if you need additional information or
++ * have any questions.
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
++ * Use is subject to license terms.
++ *
++ * Copyright (c) 2011, 2012, Intel Corporation.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ * Lustre is a trademark of Sun Microsystems, Inc.
++ *
++ * cl code shared between vvp and liblustre (and other Lustre clients in the
++ * future).
++ *
++ */
++#include "../include/obd_class.h"
++#include "../include/obd_support.h"
++#include "../include/obd.h"
++#include "../include/cl_object.h"
++#include "../include/lclient.h"
++
++#include "../include/lustre_lite.h"
++
++/* Initialize the default and maximum LOV EA and cookie sizes.  This allows
++ * us to make MDS RPCs with large enough reply buffers to hold the
++ * maximum-sized (= maximum striped) EA and cookie without having to
++ * calculate this (via a call into the LOV + OSCs) each time we make an RPC.
++ */
++int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
++{
++	struct lov_stripe_md lsm = { .lsm_magic = LOV_MAGIC_V3 };
++	__u32 valsize = sizeof(struct lov_desc);
++	int rc, easize, def_easize, cookiesize;
++	struct lov_desc desc;
++	__u16 stripes, def_stripes;
++
++	rc = obd_get_info(NULL, dt_exp, sizeof(KEY_LOVDESC), KEY_LOVDESC,
++			  &valsize, &desc, NULL);
++	if (rc)
++		return rc;
++
++	stripes = min_t(__u32, desc.ld_tgt_count, LOV_MAX_STRIPE_COUNT);
++	lsm.lsm_stripe_count = stripes;
++	easize = obd_size_diskmd(dt_exp, &lsm);
++
++	def_stripes = min_t(__u32, desc.ld_default_stripe_count,
++			    LOV_MAX_STRIPE_COUNT);
++	lsm.lsm_stripe_count = def_stripes;
++	def_easize = obd_size_diskmd(dt_exp, &lsm);
++
++	cookiesize = stripes * sizeof(struct llog_cookie);
++
++	/* default cookiesize is 0 because from 2.4 server doesn't send
++	 * llog cookies to client.
++	 */
++	CDEBUG(D_HA,
++	       "updating def/max_easize: %d/%d def/max_cookiesize: 0/%d\n",
++	       def_easize, easize, cookiesize);
++
++	rc = md_init_ea_size(md_exp, easize, def_easize, cookiesize, 0);
++	return rc;
++}
++
++/**
++ * This function is used as an upcall-callback hooked by liblustre and llite
++ * clients into obd_notify() listeners chain to handle notifications about
++ * change of import connect_flags. See llu_fsswop_mount() and
++ * lustre_common_fill_super().
++ */
++int cl_ocd_update(struct obd_device *host,
++		  struct obd_device *watched,
++		  enum obd_notify_event ev, void *owner, void *data)
++{
++	struct lustre_client_ocd *lco;
++	struct client_obd	*cli;
++	__u64 flags;
++	int   result;
++
++	if (!strcmp(watched->obd_type->typ_name, LUSTRE_OSC_NAME)) {
++		cli = &watched->u.cli;
++		lco = owner;
++		flags = cli->cl_import->imp_connect_data.ocd_connect_flags;
++		CDEBUG(D_SUPER, "Changing connect_flags: %#llx -> %#llx\n",
++		       lco->lco_flags, flags);
++		mutex_lock(&lco->lco_lock);
++		lco->lco_flags &= flags;
++		/* for each osc event update ea size */
++		if (lco->lco_dt_exp)
++			cl_init_ea_size(lco->lco_md_exp, lco->lco_dt_exp);
++
++		mutex_unlock(&lco->lco_lock);
++		result = 0;
++	} else {
++		CERROR("unexpected notification from %s %s!\n",
++		       watched->obd_type->typ_name,
++		       watched->obd_name);
++		result = -EINVAL;
++	}
++	return result;
++}
++
++#define GROUPLOCK_SCOPE "grouplock"
++
++int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
++		     struct ccc_grouplock *cg)
++{
++	struct lu_env	  *env;
++	struct cl_io	   *io;
++	struct cl_lock	 *lock;
++	struct cl_lock_descr   *descr;
++	__u32		   enqflags;
++	int		     refcheck;
++	int		     rc;
++
++	env = cl_env_get(&refcheck);
++	if (IS_ERR(env))
++		return PTR_ERR(env);
++
++	io = ccc_env_thread_io(env);
++	io->ci_obj = obj;
++	io->ci_ignore_layout = 1;
++
++	rc = cl_io_init(env, io, CIT_MISC, io->ci_obj);
++	if (rc) {
++		/* Does not make sense to take GL for released layout */
++		if (rc > 0)
++			rc = -ENOTSUPP;
++		cl_env_put(env, &refcheck);
++		return rc;
++	}
++
++	descr = &ccc_env_info(env)->cti_descr;
++	descr->cld_obj = obj;
++	descr->cld_start = 0;
++	descr->cld_end = CL_PAGE_EOF;
++	descr->cld_gid = gid;
++	descr->cld_mode = CLM_GROUP;
++
++	enqflags = CEF_MUST | (nonblock ? CEF_NONBLOCK : 0);
++	descr->cld_enq_flags = enqflags;
++
++	lock = cl_lock_request(env, io, descr, GROUPLOCK_SCOPE, current);
++	if (IS_ERR(lock)) {
++		cl_io_fini(env, io);
++		cl_env_put(env, &refcheck);
++		return PTR_ERR(lock);
++	}
++
++	cg->cg_env  = cl_env_get(&refcheck);
++	cg->cg_io   = io;
++	cg->cg_lock = lock;
++	cg->cg_gid  = gid;
++	LASSERT(cg->cg_env == env);
++
++	cl_env_unplant(env, &refcheck);
++	return 0;
++}
++
++void cl_put_grouplock(struct ccc_grouplock *cg)
++{
++	struct lu_env  *env  = cg->cg_env;
++	struct cl_io   *io   = cg->cg_io;
++	struct cl_lock *lock = cg->cg_lock;
++	int	     refcheck;
++
++	LASSERT(cg->cg_env);
++	LASSERT(cg->cg_gid);
++
++	cl_env_implant(env, &refcheck);
++	cl_env_put(env, &refcheck);
++
++	cl_unuse(env, lock);
++	cl_lock_release(env, lock, GROUPLOCK_SCOPE, current);
++	cl_io_fini(env, io);
++	cl_env_put(env, NULL);
++}
 -- 
 2.1.0
