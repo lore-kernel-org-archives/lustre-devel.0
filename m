@@ -1,352 +1,241 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 19:48:23 -0400
-Subject: [lustre-devel] [PATCH v2 02/46] staging/lustre: Get rid of
-	CFS_PAGE_MASK
+Date: Wed, 30 Mar 2016 19:48:25 -0400
+Subject: [lustre-devel] [PATCH v2 04/46] staging/lustre: Reintroduce global
+	env list
 In-Reply-To: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
 References: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1459381747-2886687-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459381747-2886687-5-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Oleg Drokin <green@linuxhacker.ru>
+From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-CFS_PAGE_MASK is the same as PAGE_MASK, so get rid of it.
+This reverts a patch that was merged before lustre client
+was introduced into the stagign tree, so it's not in the history.
 
-We are replacing it with PAGE_MASK instead of PAGE_CACHE_MASK
-because PAGE_CACHE_* stuff is apparently going away.
+The performance dropped a lot when memory reclaim process kicked
+in as ll_releasepage() was called to destroy lustre pages. It turned
+out that big overhead to allocate cl_env and keys on the fly so we
+have to revert this patch.
 
+The original problem for the reverted patch would be solved in a
+follow on patch instead.
+
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-on: http://review.whamcloud.com/7888
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3321
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../lustre/include/linux/libcfs/linux/linux-mem.h  |  1 -
- .../lustre/lnet/libcfs/linux/linux-crypto.c        |  2 +-
- drivers/staging/lustre/lnet/selftest/brw_test.c    |  2 +-
- drivers/staging/lustre/lustre/llite/llite_mmap.c   |  4 ++--
- drivers/staging/lustre/lustre/llite/rw26.c         |  8 ++++----
- drivers/staging/lustre/lustre/llite/vvp_io.c       |  6 +++---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  2 +-
- drivers/staging/lustre/lustre/obdclass/class_obd.c |  2 +-
- .../staging/lustre/lustre/obdecho/echo_client.c    |  6 +++---
- drivers/staging/lustre/lustre/osc/osc_cache.c      |  4 ++--
- drivers/staging/lustre/lustre/osc/osc_request.c    | 24 +++++++++++-----------
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |  2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |  2 +-
- 13 files changed, 32 insertions(+), 33 deletions(-)
+ drivers/staging/lustre/lustre/include/cl_object.h  |  1 +
+ drivers/staging/lustre/lustre/llite/lcommon_misc.c |  3 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  2 +
+ drivers/staging/lustre/lustre/obdclass/cl_object.c | 90 ++++++++++++++++++++--
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |  2 +
+ 5 files changed, 92 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
-index 0f2fd79..448379b 100644
---- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
-@@ -57,7 +57,6 @@
- #include "../libcfs_cpu.h"
- #endif
+diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+index fb971de..e611f79 100644
+--- a/drivers/staging/lustre/lustre/include/cl_object.h
++++ b/drivers/staging/lustre/lustre/include/cl_object.h
+@@ -3241,6 +3241,7 @@ void *cl_env_reenter(void);
+ void cl_env_reexit(void *cookie);
+ void cl_env_implant(struct lu_env *env, int *refcheck);
+ void cl_env_unplant(struct lu_env *env, int *refcheck);
++unsigned int cl_env_cache_purge(unsigned int nr);
  
--#define CFS_PAGE_MASK		   (~((__u64)PAGE_CACHE_SIZE-1))
- #define page_index(p)       ((p)->index)
+ /** @} cl_env */
  
- #define memory_pressure_get() (current->flags & PF_MEMALLOC)
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
-index 0715101..84f9b7b 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
-@@ -227,7 +227,7 @@ int cfs_crypto_hash_update_page(struct cfs_crypto_hash_desc *hdesc,
- 	struct scatterlist sl;
+diff --git a/drivers/staging/lustre/lustre/llite/lcommon_misc.c b/drivers/staging/lustre/lustre/llite/lcommon_misc.c
+index d80bcedd..f68c368 100644
+--- a/drivers/staging/lustre/lustre/llite/lcommon_misc.c
++++ b/drivers/staging/lustre/lustre/llite/lcommon_misc.c
+@@ -146,10 +146,11 @@ int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
  
- 	sg_init_table(&sl, 1);
--	sg_set_page(&sl, page, len, offset & ~CFS_PAGE_MASK);
-+	sg_set_page(&sl, page, len, offset & ~PAGE_MASK);
+ 	rc = cl_io_init(env, io, CIT_MISC, io->ci_obj);
+ 	if (rc) {
++		cl_io_fini(env, io);
++		cl_env_put(env, &refcheck);
+ 		/* Does not make sense to take GL for released layout */
+ 		if (rc > 0)
+ 			rc = -ENOTSUPP;
+-		cl_env_put(env, &refcheck);
+ 		return rc;
+ 	}
  
- 	ahash_request_set_crypt(req, &sl, NULL, sl.length);
- 	return crypto_ahash_update(req);
-diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
-index b33c356..1988cee 100644
---- a/drivers/staging/lustre/lnet/selftest/brw_test.c
-+++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
-@@ -457,7 +457,7 @@ brw_server_handle(struct srpc_server_rpc *rpc)
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 6d6bb33..673d31e 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -999,6 +999,8 @@ void ll_put_super(struct super_block *sb)
  
- 	if (!(reqstmsg->msg_ses_feats & LST_FEAT_BULK_LEN)) {
- 		/* compat with old version */
--		if (reqst->brw_len & ~CFS_PAGE_MASK) {
-+		if (reqst->brw_len & ~PAGE_MASK) {
- 			reply->brw_status = EINVAL;
- 			return 0;
- 		}
-diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-index 69445a9..baccf93 100644
---- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-@@ -57,10 +57,10 @@ void policy_from_vma(ldlm_policy_data_t *policy,
- 		     struct vm_area_struct *vma, unsigned long addr,
- 		     size_t count)
- {
--	policy->l_extent.start = ((addr - vma->vm_start) & CFS_PAGE_MASK) +
-+	policy->l_extent.start = ((addr - vma->vm_start) & PAGE_MASK) +
- 				 (vma->vm_pgoff << PAGE_CACHE_SHIFT);
- 	policy->l_extent.end = (policy->l_extent.start + count - 1) |
--			       ~CFS_PAGE_MASK;
-+			       ~PAGE_MASK;
+ 	lustre_common_put_super(sb);
+ 
++	cl_env_cache_purge(~0);
++
+ 	module_put(THIS_MODULE);
+ } /* client_put_super */
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+index 43e299d..0772706 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+@@ -492,6 +492,13 @@ EXPORT_SYMBOL(cl_site_stats_print);
+  * bz20044, bz22683.
+  */
+ 
++static LIST_HEAD(cl_envs);
++static unsigned int cl_envs_cached_nr;
++static unsigned int cl_envs_cached_max = 128; /* XXX: prototype: arbitrary limit
++					       * for now.
++					       */
++static DEFINE_SPINLOCK(cl_envs_guard);
++
+ struct cl_env {
+ 	void	     *ce_magic;
+ 	struct lu_env     ce_lu;
+@@ -697,6 +704,39 @@ static void cl_env_fini(struct cl_env *cle)
+ 	kmem_cache_free(cl_env_kmem, cle);
  }
  
- struct vm_area_struct *our_vma(struct mm_struct *mm, unsigned long addr,
-diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
-index 7a5db67..3d7e64e 100644
---- a/drivers/staging/lustre/lustre/llite/rw26.c
-+++ b/drivers/staging/lustre/lustre/llite/rw26.c
-@@ -376,7 +376,7 @@ static ssize_t ll_direct_IO_26(struct kiocb *iocb, struct iov_iter *iter,
- 		return -EBADF;
++static struct lu_env *cl_env_obtain(void *debug)
++{
++	struct cl_env *cle;
++	struct lu_env *env;
++
++	spin_lock(&cl_envs_guard);
++	LASSERT(equi(cl_envs_cached_nr == 0, list_empty(&cl_envs)));
++	if (cl_envs_cached_nr > 0) {
++		int rc;
++
++		cle = container_of(cl_envs.next, struct cl_env, ce_linkage);
++		list_del_init(&cle->ce_linkage);
++		cl_envs_cached_nr--;
++		spin_unlock(&cl_envs_guard);
++
++		env = &cle->ce_lu;
++		rc = lu_env_refill(env);
++		if (rc == 0) {
++			cl_env_init0(cle, debug);
++			lu_context_enter(&env->le_ctx);
++			lu_context_enter(&cle->ce_ses);
++		} else {
++			cl_env_fini(cle);
++			env = ERR_PTR(rc);
++		}
++	} else {
++		spin_unlock(&cl_envs_guard);
++		env = cl_env_new(lu_context_tags_default,
++				 lu_session_tags_default, debug);
++	}
++	return env;
++}
++
+ static inline struct cl_env *cl_env_container(struct lu_env *env)
+ {
+ 	return container_of(env, struct cl_env, ce_lu);
+@@ -727,6 +767,8 @@ static struct lu_env *cl_env_peek(int *refcheck)
+  * Returns lu_env: if there already is an environment associated with the
+  * current thread, it is returned, otherwise, new environment is allocated.
+  *
++ * Allocations are amortized through the global cache of environments.
++ *
+  * \param refcheck pointer to a counter used to detect environment leaks. In
+  * the usual case cl_env_get() and cl_env_put() are called in the same lexical
+  * scope and pointer to the same integer is passed as \a refcheck. This is
+@@ -740,10 +782,7 @@ struct lu_env *cl_env_get(int *refcheck)
  
- 	/* FIXME: io smaller than PAGE_SIZE is broken on ia64 ??? */
--	if ((file_offset & ~CFS_PAGE_MASK) || (count & ~CFS_PAGE_MASK))
-+	if ((file_offset & ~PAGE_MASK) || (count & ~PAGE_MASK))
- 		return -EINVAL;
+ 	env = cl_env_peek(refcheck);
+ 	if (!env) {
+-		env = cl_env_new(lu_context_tags_default,
+-				 lu_session_tags_default,
+-				 __builtin_return_address(0));
+-
++		env = cl_env_obtain(__builtin_return_address(0));
+ 		if (!IS_ERR(env)) {
+ 			struct cl_env *cle;
  
- 	CDEBUG(D_VFSTRACE,
-@@ -386,7 +386,7 @@ static ssize_t ll_direct_IO_26(struct kiocb *iocb, struct iov_iter *iter,
- 	       MAX_DIO_SIZE >> PAGE_CACHE_SHIFT);
+@@ -787,6 +826,32 @@ static void cl_env_exit(struct cl_env *cle)
+ }
  
- 	/* Check that all user buffers are aligned as well */
--	if (iov_iter_alignment(iter) & ~CFS_PAGE_MASK)
-+	if (iov_iter_alignment(iter) & ~PAGE_MASK)
- 		return -EINVAL;
- 
- 	env = cl_env_get(&refcheck);
-@@ -435,8 +435,8 @@ static ssize_t ll_direct_IO_26(struct kiocb *iocb, struct iov_iter *iter,
- 			    size > (PAGE_CACHE_SIZE / sizeof(*pages)) *
- 				   PAGE_CACHE_SIZE) {
- 				size = ((((size / 2) - 1) |
--					 ~CFS_PAGE_MASK) + 1) &
--					CFS_PAGE_MASK;
-+					 ~PAGE_MASK) + 1) &
-+					PAGE_MASK;
- 				CDEBUG(D_VFSTRACE, "DIO size now %lu\n",
- 				       size);
- 				continue;
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index fb0c26e..984699a 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -234,8 +234,8 @@ static int vvp_mmap_locks(const struct lu_env *env,
- 		if (count == 0)
- 			continue;
- 
--		count += addr & (~CFS_PAGE_MASK);
--		addr &= CFS_PAGE_MASK;
-+		count += addr & (~PAGE_MASK);
-+		addr &= PAGE_MASK;
- 
- 		down_read(&mm->mmap_sem);
- 		while ((vma = our_vma(mm, addr, count)) != NULL) {
-@@ -1043,7 +1043,7 @@ static int vvp_io_commit_write(const struct lu_env *env,
- 				to = PAGE_CACHE_SIZE;
- 				need_clip = false;
- 			} else if (last_index == pg->cp_index) {
--				int size_to = i_size_read(inode) & ~CFS_PAGE_MASK;
-+				int size_to = i_size_read(inode) & ~PAGE_MASK;
- 
- 				if (to < size_to)
- 					to = size_to;
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 0f776cf..e3a7216 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -2071,7 +2071,7 @@ static void lmv_adjust_dirpages(struct page **pages, int ncfspgs, int nlupgs)
- 			dp = (struct lu_dirpage *)((char *)dp + LU_PAGE_SIZE);
- 
- 			/* Check if we've reached the end of the CFS_PAGE. */
--			if (!((unsigned long)dp & ~CFS_PAGE_MASK))
-+			if (!((unsigned long)dp & ~PAGE_MASK))
- 				break;
- 
- 			/* Save the hash and flags of this lu_dirpage. */
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 1a938e1..d9844ba 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -461,7 +461,7 @@ static int obd_init_checks(void)
- 		CWARN("LPD64 wrong length! strlen(%s)=%d != 2\n", buf, len);
- 		ret = -EINVAL;
+ /**
++ * Finalizes and frees a given number of cached environments. This is done to
++ * (1) free some memory (not currently hooked into VM), or (2) release
++ * references to modules.
++ */
++unsigned int cl_env_cache_purge(unsigned int nr)
++{
++	struct cl_env *cle;
++
++	spin_lock(&cl_envs_guard);
++	for (; !list_empty(&cl_envs) && nr > 0; --nr) {
++		cle = container_of(cl_envs.next, struct cl_env, ce_linkage);
++		list_del_init(&cle->ce_linkage);
++		LASSERT(cl_envs_cached_nr > 0);
++		cl_envs_cached_nr--;
++		spin_unlock(&cl_envs_guard);
++
++		cl_env_fini(cle);
++		spin_lock(&cl_envs_guard);
++	}
++	LASSERT(equi(cl_envs_cached_nr == 0, list_empty(&cl_envs)));
++	spin_unlock(&cl_envs_guard);
++	return nr;
++}
++EXPORT_SYMBOL(cl_env_cache_purge);
++
++/**
+  * Release an environment.
+  *
+  * Decrement \a env reference counter. When counter drops to 0, nothing in
+@@ -808,7 +873,22 @@ void cl_env_put(struct lu_env *env, int *refcheck)
+ 		cl_env_detach(cle);
+ 		cle->ce_debug = NULL;
+ 		cl_env_exit(cle);
+-		cl_env_fini(cle);
++		/*
++		 * Don't bother to take a lock here.
++		 *
++		 * Return environment to the cache only when it was allocated
++		 * with the standard tags.
++		 */
++		if (cl_envs_cached_nr < cl_envs_cached_max &&
++		    (env->le_ctx.lc_tags & ~LCT_HAS_EXIT) == LCT_CL_THREAD &&
++		    (env->le_ses->lc_tags & ~LCT_HAS_EXIT) == LCT_SESSION) {
++			spin_lock(&cl_envs_guard);
++			list_add(&cle->ce_linkage, &cl_envs);
++			cl_envs_cached_nr++;
++			spin_unlock(&cl_envs_guard);
++		} else {
++			cl_env_fini(cle);
++		}
  	}
--	if ((u64val & ~CFS_PAGE_MASK) >= PAGE_CACHE_SIZE) {
-+	if ((u64val & ~PAGE_MASK) >= PAGE_CACHE_SIZE) {
- 		CWARN("mask failed: u64val %llu >= %llu\n", u64val,
- 		      (__u64)PAGE_CACHE_SIZE);
- 		ret = -EINVAL;
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index 64ffe24..33ce0c8 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -1119,7 +1119,7 @@ static int cl_echo_object_brw(struct echo_object *eco, int rw, u64 offset,
- 	int rc;
- 	int i;
+ }
+ EXPORT_SYMBOL(cl_env_put);
+diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+index 69fdcee..770d5bd 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+@@ -55,6 +55,7 @@
+ #include "../include/lustre_disk.h"
+ #include "../include/lustre_fid.h"
+ #include "../include/lu_object.h"
++#include "../include/cl_object.h"
+ #include "../include/lu_ref.h"
+ #include <linux/list.h>
  
--	LASSERT((offset & ~CFS_PAGE_MASK) == 0);
-+	LASSERT((offset & ~PAGE_MASK) == 0);
- 	LASSERT(ed->ed_next);
- 	env = cl_env_get(&refcheck);
- 	if (IS_ERR(env))
-@@ -1387,7 +1387,7 @@ static int echo_client_kbrw(struct echo_device *ed, int rw, struct obdo *oa,
- 	LASSERT(rw == OBD_BRW_WRITE || rw == OBD_BRW_READ);
- 
- 	if (count <= 0 ||
--	    (count & (~CFS_PAGE_MASK)) != 0)
-+	    (count & (~PAGE_MASK)) != 0)
- 		return -EINVAL;
- 
- 	/* XXX think again with misaligned I/O */
-@@ -1470,7 +1470,7 @@ static int echo_client_prep_commit(const struct lu_env *env,
- 	u64 npages, tot_pages;
- 	int i, ret = 0, brw_flags = 0;
- 
--	if (count <= 0 || (count & (~CFS_PAGE_MASK)) != 0)
-+	if (count <= 0 || (count & (~PAGE_MASK)) != 0)
- 		return -EINVAL;
- 
- 	npages = batch >> PAGE_CACHE_SHIFT;
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 6336311..3cfd2b0 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -877,7 +877,7 @@ int osc_extent_finish(const struct lu_env *env, struct osc_extent *ext,
- 		 * span a whole chunk on the OST side, or our accounting goes
- 		 * wrong.  Should match the code in filter_grant_check.
+@@ -1468,6 +1469,7 @@ void lu_context_key_quiesce(struct lu_context_key *key)
+ 		/*
+ 		 * XXX layering violation.
  		 */
--		int offset = oap->oap_page_off & ~CFS_PAGE_MASK;
-+		int offset = oap->oap_page_off & ~PAGE_MASK;
- 		int count = oap->oap_count + (offset & (blocksize - 1));
- 		int end = (offset + oap->oap_count) & (blocksize - 1);
- 
-@@ -2238,7 +2238,7 @@ int osc_prep_async_page(struct osc_object *osc, struct osc_page *ops,
- 
- 	oap->oap_page = page;
- 	oap->oap_obj_off = offset;
--	LASSERT(!(offset & ~CFS_PAGE_MASK));
-+	LASSERT(!(offset & ~PAGE_MASK));
- 
- 	if (!client_is_remote(exp) && capable(CFS_CAP_SYS_RESOURCE))
- 		oap->oap_brw_flags = OBD_BRW_NOQUOTA;
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index ec0287f..850d5dd 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -1082,7 +1082,7 @@ static void handle_short_read(int nob_read, u32 page_count,
- 		if (pga[i]->count > nob_read) {
- 			/* EOF inside this page */
- 			ptr = kmap(pga[i]->pg) +
--				(pga[i]->off & ~CFS_PAGE_MASK);
-+				(pga[i]->off & ~PAGE_MASK);
- 			memset(ptr + nob_read, 0, pga[i]->count - nob_read);
- 			kunmap(pga[i]->pg);
- 			page_count--;
-@@ -1097,7 +1097,7 @@ static void handle_short_read(int nob_read, u32 page_count,
- 
- 	/* zero remaining pages */
- 	while (page_count-- > 0) {
--		ptr = kmap(pga[i]->pg) + (pga[i]->off & ~CFS_PAGE_MASK);
-+		ptr = kmap(pga[i]->pg) + (pga[i]->off & ~PAGE_MASK);
- 		memset(ptr, 0, pga[i]->count);
- 		kunmap(pga[i]->pg);
- 		i++;
-@@ -1188,20 +1188,20 @@ static u32 osc_checksum_bulk(int nob, u32 pg_count,
- 		if (i == 0 && opc == OST_READ &&
- 		    OBD_FAIL_CHECK(OBD_FAIL_OSC_CHECKSUM_RECEIVE)) {
- 			unsigned char *ptr = kmap(pga[i]->pg);
--			int off = pga[i]->off & ~CFS_PAGE_MASK;
-+			int off = pga[i]->off & ~PAGE_MASK;
- 
- 			memcpy(ptr + off, "bad1", min(4, nob));
- 			kunmap(pga[i]->pg);
- 		}
- 		cfs_crypto_hash_update_page(hdesc, pga[i]->pg,
--					    pga[i]->off & ~CFS_PAGE_MASK,
-+					    pga[i]->off & ~PAGE_MASK,
- 				  count);
- 		CDEBUG(D_PAGE,
- 		       "page %p map %p index %lu flags %lx count %u priv %0lx: off %d\n",
- 		       pga[i]->pg, pga[i]->pg->mapping, pga[i]->pg->index,
- 		       (long)pga[i]->pg->flags, page_count(pga[i]->pg),
- 		       page_private(pga[i]->pg),
--		       (int)(pga[i]->off & ~CFS_PAGE_MASK));
-+		       (int)(pga[i]->off & ~PAGE_MASK));
- 
- 		nob -= pga[i]->count;
- 		pg_count--;
-@@ -1309,7 +1309,7 @@ static int osc_brw_prep_request(int cmd, struct client_obd *cli,
- 	pg_prev = pga[0];
- 	for (requested_nob = i = 0; i < page_count; i++, niobuf++) {
- 		struct brw_page *pg = pga[i];
--		int poff = pg->off & ~CFS_PAGE_MASK;
-+		int poff = pg->off & ~PAGE_MASK;
- 
- 		LASSERT(pg->count > 0);
- 		/* make sure there is no gap in the middle of page array */
-@@ -2227,8 +2227,8 @@ int osc_enqueue_base(struct obd_export *exp, struct ldlm_res_id *res_id,
- 	/* Filesystem lock extents are extended to page boundaries so that
- 	 * dealing with the page cache is a little smoother.
- 	 */
--	policy->l_extent.start -= policy->l_extent.start & ~CFS_PAGE_MASK;
--	policy->l_extent.end |= ~CFS_PAGE_MASK;
-+	policy->l_extent.start -= policy->l_extent.start & ~PAGE_MASK;
-+	policy->l_extent.end |= ~PAGE_MASK;
- 
- 	/*
- 	 * kms is not valid when either object is completely fresh (so that no
-@@ -2378,8 +2378,8 @@ int osc_match_base(struct obd_export *exp, struct ldlm_res_id *res_id,
- 	/* Filesystem lock extents are extended to page boundaries so that
- 	 * dealing with the page cache is a little smoother
- 	 */
--	policy->l_extent.start -= policy->l_extent.start & ~CFS_PAGE_MASK;
--	policy->l_extent.end |= ~CFS_PAGE_MASK;
-+	policy->l_extent.start -= policy->l_extent.start & ~PAGE_MASK;
-+	policy->l_extent.end |= ~PAGE_MASK;
- 
- 	/* Next, search for already existing extent locks that will cover us */
- 	/* If we're trying to read, we also search for an existing PW lock.  The
-@@ -2784,7 +2784,7 @@ out:
- 			goto skip_locking;
- 
- 		policy.l_extent.start = fm_key->fiemap.fm_start &
--						CFS_PAGE_MASK;
-+						PAGE_MASK;
- 
- 		if (OBD_OBJECT_EOF - fm_key->fiemap.fm_length <=
- 		    fm_key->fiemap.fm_start + PAGE_CACHE_SIZE - 1)
-@@ -2792,7 +2792,7 @@ out:
- 		else
- 			policy.l_extent.end = (fm_key->fiemap.fm_start +
- 				fm_key->fiemap.fm_length +
--				PAGE_CACHE_SIZE - 1) & CFS_PAGE_MASK;
-+				PAGE_CACHE_SIZE - 1) & PAGE_MASK;
- 
- 		ostid_build_res_name(&fm_key->oa.o_oi, &res_id);
- 		mode = ldlm_lock_match(exp->exp_obd->obd_namespace,
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-index 54a0c1f..33d1411 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-@@ -527,7 +527,7 @@ int sptlrpc_get_bulk_checksum(struct ptlrpc_bulk_desc *desc, __u8 alg,
- 
- 	for (i = 0; i < desc->bd_iov_count; i++) {
- 		cfs_crypto_hash_update_page(hdesc, desc->bd_iov[i].kiov_page,
--				  desc->bd_iov[i].kiov_offset & ~CFS_PAGE_MASK,
-+				  desc->bd_iov[i].kiov_offset & ~PAGE_MASK,
- 				  desc->bd_iov[i].kiov_len);
- 	}
- 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-index 6276bf5..37c9f4c 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-@@ -162,7 +162,7 @@ static void corrupt_bulk_data(struct ptlrpc_bulk_desc *desc)
- 			continue;
- 
- 		ptr = kmap(desc->bd_iov[i].kiov_page);
--		off = desc->bd_iov[i].kiov_offset & ~CFS_PAGE_MASK;
-+		off = desc->bd_iov[i].kiov_offset & ~PAGE_MASK;
- 		ptr[off] ^= 0x1;
- 		kunmap(desc->bd_iov[i].kiov_page);
- 		return;
++		cl_env_cache_purge(~0);
+ 		key->lct_tags |= LCT_QUIESCENT;
+ 		/*
+ 		 * XXX memory barrier has to go here.
 -- 
 2.1.0
