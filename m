@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 12:47:53 -0400
-Subject: [lustre-devel] [PATCH 21/43] staging/lustre/llite: clip page
-	correctly for vvp_io_commit_sync
+Date: Wed, 30 Mar 2016 12:47:54 -0400
+Subject: [lustre-devel] [PATCH 22/43] staging/lustre/llite: deadlock for
+	page write
 In-Reply-To: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
 References: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1459356495-2794775-22-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459356495-2794775-23-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,45 +14,44 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-The original code was wrong which clipped page incorrectly for
-partial pages started with zero.
+Writing thread already locked page #1, and then wait for the
+Writeback bit of page #2;
+
+Ptlrpc thread is composing a write RPC, so it sets Writeback on
+page #2 and tries to lock page #1 to make it ready.
+
+Deadlocked.
 
 Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-on: http://review.whamcloud.com/8531
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4201
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-on: http://review.whamcloud.com/9036
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4540
 Reviewed-by: wangdi <di.wang@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/vvp_io.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/llite/rw26.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index fb6f932..e44ef21 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -595,15 +595,17 @@ static int vvp_io_commit_sync(const struct lu_env *env, struct cl_io *io,
- 	if (plist->pl_nr == 0)
- 		return 0;
+diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
+index 50d8289..f87238b 100644
+--- a/drivers/staging/lustre/lustre/llite/rw26.c
++++ b/drivers/staging/lustre/lustre/llite/rw26.c
+@@ -512,7 +512,7 @@ static int ll_write_begin(struct file *file, struct address_space *mapping,
  
--	if (from != 0) {
-+	if (from > 0 || to != PAGE_SIZE) {
- 		page = cl_page_list_first(plist);
--		cl_page_clip(env, page, from,
--			     plist->pl_nr == 1 ? to : PAGE_SIZE);
--	}
--	if (to != PAGE_SIZE && plist->pl_nr > 1) {
-+		if (plist->pl_nr == 1) {
-+			cl_page_clip(env, page, from, to);
-+		} else if (from > 0) {
-+			cl_page_clip(env, page, from, PAGE_SIZE);
-+		} else {
- 		page = cl_page_list_last(plist);
- 		cl_page_clip(env, page, 0, to);
- 	}
-+	}
+ 	/* To avoid deadlock, try to lock page first. */
+ 	vmpage = grab_cache_page_nowait(mapping, index);
+-	if (unlikely(!vmpage || PageDirty(vmpage))) {
++	if (unlikely(!vmpage || PageDirty(vmpage) || PageWriteback(vmpage))) {
+ 		struct ccc_io *cio = ccc_env_io(env);
+ 		struct cl_page_list *plist = &cio->u.write.cui_queue;
  
- 	cl_2queue_init(queue);
- 	cl_page_list_splice(plist, &queue->c2_qin);
+@@ -522,7 +522,7 @@ static int ll_write_begin(struct file *file, struct address_space *mapping,
+ 		 * more grants. It's okay for the dirty page to be the first
+ 		 * one in commit page list, though.
+ 		 */
+-		if (vmpage && PageDirty(vmpage) && plist->pl_nr > 0) {
++		if (vmpage && plist->pl_nr > 0) {
+ 			unlock_page(vmpage);
+ 			page_cache_release(vmpage);
+ 			vmpage = NULL;
 -- 
 2.1.0
