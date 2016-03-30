@@ -1,10 +1,10 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 19:48:46 -0400
-Subject: [lustre-devel] [PATCH v2 25/46] staging/lustre/llite: rename
-	ccc_device to vvp_device
+Date: Wed, 30 Mar 2016 19:48:50 -0400
+Subject: [lustre-devel] [PATCH v2 29/46] staging/lustre:llite: remove struct
+	ll_ra_read
 In-Reply-To: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
 References: <1459381747-2886687-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1459381747-2886687-26-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459381747-2886687-30-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,359 +14,265 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: "John L. Hammond" <john.hammond@intel.com>
 
-Rename struct ccc_device to struct vvp_device and merge the CCC device
-methods into the VVP device methods.
+Ever since removal of the the unused function ll_ra_read_get(),
+the struct ll_ra_read members lrr_reader and lrr_linkage and
+the struct ll_readahead_state member ras_read_beads unnecessary
+so remove them.
+In struct vvp_io replace the struct ll_ra_read cui_bead member with
+cui_ra_start and cui_ra_count.
 
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-on: http://review.whamcloud.com/13075
+Reviewed-on: http://review.whamcloud.com/13347
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5971
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Lai Siyao <lai.siyao@intel.com>
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h  |   2 +-
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   | 104 +--------------------
- .../staging/lustre/lustre/llite/llite_internal.h   |   2 +-
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |  84 ++++++++++++++++-
- drivers/staging/lustre/lustre/llite/vvp_internal.h |  38 ++++----
- 5 files changed, 102 insertions(+), 128 deletions(-)
+ .../staging/lustre/lustre/llite/llite_internal.h   | 30 +++---------
+ drivers/staging/lustre/lustre/llite/rw.c           | 53 ++++++----------------
+ drivers/staging/lustre/lustre/llite/vvp_io.c       | 31 ++++---------
+ 3 files changed, 28 insertions(+), 86 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index f2bb8f8..f2a242b 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -149,7 +149,7 @@ struct cl_device_operations {
- /**
-  * Device in the client stack.
-  *
-- * \see ccc_device, lov_device, lovsub_device, osc_device
-+ * \see vvp_device, lov_device, lovsub_device, osc_device
-  */
- struct cl_device {
- 	/** Super-class. */
-diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-index 79cdf83..b0d4a3d 100644
---- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-+++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-@@ -159,91 +159,6 @@ struct lu_context_key ccc_session_key = {
- 	.lct_fini = ccc_session_key_fini
- };
- 
--/* type constructor/destructor: ccc_type_{init,fini,start,stop}(). */
--/* LU_TYPE_INIT_FINI(ccc, &ccc_key, &ccc_session_key); */
--
--int ccc_device_init(const struct lu_env *env, struct lu_device *d,
--		    const char *name, struct lu_device *next)
--{
--	struct ccc_device  *vdv;
--	int rc;
--
--	vdv = lu2ccc_dev(d);
--	vdv->cdv_next = lu2cl_dev(next);
--
--	LASSERT(d->ld_site && next->ld_type);
--	next->ld_site = d->ld_site;
--	rc = next->ld_type->ldt_ops->ldto_device_init(
--			env, next, next->ld_type->ldt_name, NULL);
--	if (rc == 0) {
--		lu_device_get(next);
--		lu_ref_add(&next->ld_reference, "lu-stack", &lu_site_init);
--	}
--	return rc;
--}
--
--struct lu_device *ccc_device_fini(const struct lu_env *env,
--				  struct lu_device *d)
--{
--	return cl2lu_dev(lu2ccc_dev(d)->cdv_next);
--}
--
--struct lu_device *ccc_device_alloc(const struct lu_env *env,
--				   struct lu_device_type *t,
--				   struct lustre_cfg *cfg,
--				   const struct lu_device_operations *luops,
--				   const struct cl_device_operations *clops)
--{
--	struct ccc_device *vdv;
--	struct lu_device  *lud;
--	struct cl_site    *site;
--	int rc;
--
--	vdv = kzalloc(sizeof(*vdv), GFP_NOFS);
--	if (!vdv)
--		return ERR_PTR(-ENOMEM);
--
--	lud = &vdv->cdv_cl.cd_lu_dev;
--	cl_device_init(&vdv->cdv_cl, t);
--	ccc2lu_dev(vdv)->ld_ops = luops;
--	vdv->cdv_cl.cd_ops = clops;
--
--	site = kzalloc(sizeof(*site), GFP_NOFS);
--	if (site) {
--		rc = cl_site_init(site, &vdv->cdv_cl);
--		if (rc == 0) {
--			rc = lu_site_init_finish(&site->cs_lu);
--		} else {
--			LASSERT(!lud->ld_site);
--			CERROR("Cannot init lu_site, rc %d.\n", rc);
--			kfree(site);
--		}
--	} else {
--		rc = -ENOMEM;
--	}
--	if (rc != 0) {
--		ccc_device_free(env, lud);
--		lud = ERR_PTR(rc);
--	}
--	return lud;
--}
--
--struct lu_device *ccc_device_free(const struct lu_env *env,
--				  struct lu_device *d)
--{
--	struct ccc_device *vdv  = lu2ccc_dev(d);
--	struct cl_site    *site = lu2cl_site(d->ld_site);
--	struct lu_device  *next = cl2lu_dev(vdv->cdv_next);
--
--	if (d->ld_site) {
--		cl_site_fini(site);
--		kfree(site);
--	}
--	cl_device_fini(lu2cl_dev(d));
--	kfree(vdv);
--	return next;
--}
--
- int ccc_req_init(const struct lu_env *env, struct cl_device *dev,
- 		 struct cl_req *req)
- {
-@@ -360,13 +275,13 @@ int ccc_object_init0(const struct lu_env *env,
- int ccc_object_init(const struct lu_env *env, struct lu_object *obj,
- 		    const struct lu_object_conf *conf)
- {
--	struct ccc_device *dev = lu2ccc_dev(obj->lo_dev);
-+	struct vvp_device *dev = lu2vvp_dev(obj->lo_dev);
- 	struct ccc_object *vob = lu2ccc(obj);
- 	struct lu_object  *below;
- 	struct lu_device  *under;
- 	int result;
- 
--	under = &dev->cdv_next->cd_lu_dev;
-+	under = &dev->vdv_next->cd_lu_dev;
- 	below = under->ld_ops->ldo_object_alloc(env, obj->lo_header, under);
- 	if (below) {
- 		const struct cl_object_conf *cconf;
-@@ -779,21 +694,6 @@ again:
-  *
-  */
- 
--struct lu_device *ccc2lu_dev(struct ccc_device *vdv)
--{
--	return &vdv->cdv_cl.cd_lu_dev;
--}
--
--struct ccc_device *lu2ccc_dev(const struct lu_device *d)
--{
--	return container_of0(d, struct ccc_device, cdv_cl.cd_lu_dev);
--}
--
--struct ccc_device *cl2ccc_dev(const struct cl_device *d)
--{
--	return container_of0(d, struct ccc_device, cdv_cl);
--}
--
- struct lu_object *ccc2lu(struct ccc_object *vob)
- {
- 	return &vob->cob_cl.co_lu;
 diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 5686b94..1e9e41b 100644
+index 78b3edd..9dd4325 100644
 --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
 +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -1321,7 +1321,7 @@ static inline void cl_stats_tally(struct cl_device *dev, enum cl_req_type crt,
- 	int opc = (crt == CRT_READ) ? LPROC_LL_OSC_READ :
- 				      LPROC_LL_OSC_WRITE;
- 
--	ll_stats_ops_tally(ll_s2sbi(cl2ccc_dev(dev)->cdv_sb), opc, rc);
-+	ll_stats_ops_tally(ll_s2sbi(cl2vvp_dev(dev)->vdv_sb), opc, rc);
- }
- 
- ssize_t ll_direct_rw_pages(const struct lu_env *env, struct cl_io *io,
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index 29d24c9..e934ec8 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -136,11 +136,85 @@ static const struct cl_device_operations vvp_cl_ops = {
- 	.cdo_req_init = ccc_req_init
+@@ -528,13 +528,6 @@ struct ll_sb_info {
+ 	struct completion	 ll_kobj_unregister;
  };
  
-+static struct lu_device *vvp_device_free(const struct lu_env *env,
-+					 struct lu_device *d)
-+{
-+	struct vvp_device *vdv  = lu2vvp_dev(d);
-+	struct cl_site    *site = lu2cl_site(d->ld_site);
-+	struct lu_device  *next = cl2lu_dev(vdv->vdv_next);
+-struct ll_ra_read {
+-	pgoff_t	     lrr_start;
+-	pgoff_t	     lrr_count;
+-	struct task_struct *lrr_reader;
+-	struct list_head	  lrr_linkage;
+-};
+-
+ /*
+  * per file-descriptor read-ahead data.
+  */
+@@ -593,12 +586,6 @@ struct ll_readahead_state {
+ 	 */
+ 	unsigned long   ras_request_index;
+ 	/*
+-	 * list of struct ll_ra_read's one per read(2) call current in
+-	 * progress against this file descriptor. Used by read-ahead code,
+-	 * protected by ->ras_lock.
+-	 */
+-	struct list_head      ras_read_beads;
+-	/*
+ 	 * The following 3 items are used for detecting the stride I/O
+ 	 * mode.
+ 	 * In stride I/O mode,
+@@ -666,8 +653,7 @@ static inline int ll_need_32bit_api(struct ll_sb_info *sbi)
+ #endif
+ }
+ 
+-void ll_ra_read_in(struct file *f, struct ll_ra_read *rar);
+-void ll_ra_read_ex(struct file *f, struct ll_ra_read *rar);
++void ll_ras_enter(struct file *f);
+ 
+ /* llite/lproc_llite.c */
+ int ldebugfs_register_mountpoint(struct dentry *parent,
+@@ -876,14 +862,12 @@ struct vvp_io {
+ 			} fault;
+ 		} fault;
+ 	} u;
+-	/**
+-	 * Read-ahead state used by read and page-fault IO contexts.
+-	 */
+-	struct ll_ra_read    cui_bead;
+-	/**
+-	 * Set when cui_bead has been initialized.
+-	 */
+-	int		  cui_ra_window_set;
 +
-+	if (d->ld_site) {
-+		cl_site_fini(site);
-+		kfree(site);
-+	}
-+	cl_device_fini(lu2cl_dev(d));
-+	kfree(vdv);
-+	return next;
-+}
-+
- static struct lu_device *vvp_device_alloc(const struct lu_env *env,
- 					  struct lu_device_type *t,
- 					  struct lustre_cfg *cfg)
++	/* Readahead state. */
++	pgoff_t	cui_ra_start;
++	pgoff_t cui_ra_count;
++	/* Set when cui_ra_{start,count} have been initialized. */
++	bool	cui_ra_valid;
+ };
+ 
+ /**
+diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
+index 2c4d4c4..f06d8be 100644
+--- a/drivers/staging/lustre/lustre/llite/rw.c
++++ b/drivers/staging/lustre/lustre/llite/rw.c
+@@ -258,38 +258,15 @@ static int index_in_window(unsigned long index, unsigned long point,
+ 	return start <= index && index <= end;
+ }
+ 
+-static struct ll_readahead_state *ll_ras_get(struct file *f)
++void ll_ras_enter(struct file *f)
  {
--	return ccc_device_alloc(env, t, cfg, &vvp_lu_ops, &vvp_cl_ops);
-+	struct vvp_device *vdv;
-+	struct lu_device  *lud;
-+	struct cl_site    *site;
-+	int rc;
-+
-+	vdv = kzalloc(sizeof(*vdv), GFP_NOFS);
-+	if (!vdv)
-+		return ERR_PTR(-ENOMEM);
-+
-+	lud = &vdv->vdv_cl.cd_lu_dev;
-+	cl_device_init(&vdv->vdv_cl, t);
-+	vvp2lu_dev(vdv)->ld_ops = &vvp_lu_ops;
-+	vdv->vdv_cl.cd_ops = &vvp_cl_ops;
-+
-+	site = kzalloc(sizeof(*site), GFP_NOFS);
-+	if (site) {
-+		rc = cl_site_init(site, &vdv->vdv_cl);
-+		if (rc == 0) {
-+			rc = lu_site_init_finish(&site->cs_lu);
-+		} else {
-+			LASSERT(!lud->ld_site);
-+			CERROR("Cannot init lu_site, rc %d.\n", rc);
-+			kfree(site);
-+		}
-+	} else {
-+		rc = -ENOMEM;
-+	}
-+	if (rc != 0) {
-+		vvp_device_free(env, lud);
-+		lud = ERR_PTR(rc);
-+	}
-+	return lud;
-+}
-+
-+static int vvp_device_init(const struct lu_env *env, struct lu_device *d,
-+			   const char *name, struct lu_device *next)
-+{
-+	struct vvp_device  *vdv;
-+	int rc;
-+
-+	vdv = lu2vvp_dev(d);
-+	vdv->vdv_next = lu2cl_dev(next);
-+
-+	LASSERT(d->ld_site && next->ld_type);
-+	next->ld_site = d->ld_site;
-+	rc = next->ld_type->ldt_ops->ldto_device_init(env, next,
-+						      next->ld_type->ldt_name,
-+						      NULL);
-+	if (rc == 0) {
-+		lu_device_get(next);
-+		lu_ref_add(&next->ld_reference, "lu-stack", &lu_site_init);
-+	}
-+	return rc;
-+}
-+
-+static struct lu_device *vvp_device_fini(const struct lu_env *env,
-+					 struct lu_device *d)
-+{
-+	return cl2lu_dev(lu2vvp_dev(d)->vdv_next);
+-	struct ll_file_data       *fd;
+-
+-	fd = LUSTRE_FPRIVATE(f);
+-	return &fd->fd_ras;
+-}
+-
+-void ll_ra_read_in(struct file *f, struct ll_ra_read *rar)
+-{
+-	struct ll_readahead_state *ras;
+-
+-	ras = ll_ras_get(f);
++	struct ll_file_data *fd = LUSTRE_FPRIVATE(f);
++	struct ll_readahead_state *ras = &fd->fd_ras;
+ 
+ 	spin_lock(&ras->ras_lock);
+ 	ras->ras_requests++;
+ 	ras->ras_request_index = 0;
+ 	ras->ras_consecutive_requests++;
+-	rar->lrr_reader = current;
+-
+-	list_add(&rar->lrr_linkage, &ras->ras_read_beads);
+-	spin_unlock(&ras->ras_lock);
+-}
+-
+-void ll_ra_read_ex(struct file *f, struct ll_ra_read *rar)
+-{
+-	struct ll_readahead_state *ras;
+-
+-	ras = ll_ras_get(f);
+-
+-	spin_lock(&ras->ras_lock);
+-	list_del_init(&rar->lrr_linkage);
+ 	spin_unlock(&ras->ras_lock);
  }
  
- static const struct lu_device_type_operations vvp_device_type_ops = {
-@@ -151,9 +225,9 @@ static const struct lu_device_type_operations vvp_device_type_ops = {
- 	.ldto_stop  = vvp_type_stop,
+@@ -551,7 +528,6 @@ int ll_readahead(const struct lu_env *env, struct cl_io *io,
+ 	unsigned long start = 0, end = 0, reserved;
+ 	unsigned long ra_end, len, mlen = 0;
+ 	struct inode *inode;
+-	struct ll_ra_read *bead;
+ 	struct ra_io_arg *ria = &vti->vti_ria;
+ 	struct cl_object *clob;
+ 	int ret = 0;
+@@ -575,17 +551,15 @@ int ll_readahead(const struct lu_env *env, struct cl_io *io,
+ 	}
  
- 	.ldto_device_alloc = vvp_device_alloc,
--	.ldto_device_free  = ccc_device_free,
--	.ldto_device_init  = ccc_device_init,
--	.ldto_device_fini  = ccc_device_fini
-+	.ldto_device_free	= vvp_device_free,
-+	.ldto_device_init	= vvp_device_init,
-+	.ldto_device_fini	= vvp_device_fini,
- };
+ 	spin_lock(&ras->ras_lock);
+-	if (vio->cui_ra_window_set)
+-		bead = &vio->cui_bead;
+-	else
+-		bead = NULL;
  
- struct lu_device_type vvp_device_type = {
-@@ -206,7 +280,7 @@ int cl_sb_init(struct super_block *sb)
- 		cl = cl_type_setup(env, NULL, &vvp_device_type,
- 				   sbi->ll_dt_exp->exp_obd->obd_lu_dev);
- 		if (!IS_ERR(cl)) {
--			cl2ccc_dev(cl)->cdv_sb = sb;
-+			cl2vvp_dev(cl)->vdv_sb = sb;
- 			sbi->ll_cl = cl;
- 			sbi->ll_site = cl2lu_dev(cl)->ld_site;
- 		}
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_internal.h b/drivers/staging/lustre/lustre/llite/vvp_internal.h
-index d4fe611..34509f9 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/vvp_internal.h
-@@ -264,10 +264,10 @@ static inline pgoff_t ccc_index(struct ccc_page *ccc)
- 
- struct cl_page *ccc_vmpage_page_transient(struct page *vmpage);
- 
--struct ccc_device {
--	struct cl_device    cdv_cl;
--	struct super_block *cdv_sb;
--	struct cl_device   *cdv_next;
-+struct vvp_device {
-+	struct cl_device    vdv_cl;
-+	struct super_block *vdv_sb;
-+	struct cl_device   *vdv_next;
- };
- 
- struct ccc_lock {
-@@ -287,18 +287,6 @@ void *ccc_session_key_init(const struct lu_context *ctx,
- void  ccc_session_key_fini(const struct lu_context *ctx,
- 			   struct lu_context_key *key, void *data);
- 
--int ccc_device_init(const struct lu_env *env,
--		    struct lu_device *d,
--		    const char *name, struct lu_device *next);
--struct lu_device *ccc_device_fini(const struct lu_env *env,
--				  struct lu_device *d);
--struct lu_device *ccc_device_alloc(const struct lu_env *env,
--				   struct lu_device_type *t,
--				   struct lustre_cfg *cfg,
--				   const struct lu_device_operations *luops,
--				   const struct cl_device_operations *clops);
--struct lu_device *ccc_device_free(const struct lu_env *env,
--				  struct lu_device *d);
- struct lu_object *ccc_object_alloc(const struct lu_env *env,
- 				   const struct lu_object_header *hdr,
- 				   struct lu_device *dev,
-@@ -351,10 +339,22 @@ void ccc_req_attr_set(const struct lu_env *env,
- 		      const struct cl_object *obj,
- 		      struct cl_req_attr *oa, u64 flags);
- 
--struct lu_device *ccc2lu_dev(struct ccc_device *vdv);
-+static inline struct lu_device *vvp2lu_dev(struct vvp_device *vdv)
-+{
-+	return &vdv->vdv_cl.cd_lu_dev;
-+}
+ 	/* Enlarge the RA window to encompass the full read */
+-	if (bead && ras->ras_window_start + ras->ras_window_len <
+-	    bead->lrr_start + bead->lrr_count) {
+-		ras->ras_window_len = bead->lrr_start + bead->lrr_count -
++	if (vio->cui_ra_valid &&
++	    ras->ras_window_start + ras->ras_window_len <
++	    vio->cui_ra_start + vio->cui_ra_count) {
++		ras->ras_window_len = vio->cui_ra_start + vio->cui_ra_count -
+ 				      ras->ras_window_start;
+ 	}
 +
-+static inline struct vvp_device *lu2vvp_dev(const struct lu_device *d)
-+{
-+	return container_of0(d, struct vvp_device, vdv_cl.cd_lu_dev);
-+}
-+
-+static inline struct vvp_device *cl2vvp_dev(const struct cl_device *d)
-+{
-+	return container_of0(d, struct vvp_device, vdv_cl);
-+}
-+
- struct lu_object *ccc2lu(struct ccc_object *vob);
--struct ccc_device *lu2ccc_dev(const struct lu_device *d);
--struct ccc_device *cl2ccc_dev(const struct cl_device *d);
- struct ccc_object *lu2ccc(const struct lu_object *obj);
- struct ccc_object *cl2ccc(const struct cl_object *obj);
- struct ccc_lock *cl2ccc_lock(const struct cl_lock_slice *slice);
+ 	/* Reserve a part of the read-ahead window that we'll be issuing */
+ 	if (ras->ras_window_len) {
+ 		start = ras->ras_next_readahead;
+@@ -641,15 +615,15 @@ int ll_readahead(const struct lu_env *env, struct cl_io *io,
+ 	CDEBUG(D_READA, DFID ": ria: %lu/%lu, bead: %lu/%lu, hit: %d\n",
+ 	       PFID(lu_object_fid(&clob->co_lu)),
+ 	       ria->ria_start, ria->ria_end,
+-	       !bead ? 0 : bead->lrr_start,
+-	       !bead ? 0 : bead->lrr_count,
++	       vio->cui_ra_valid ? vio->cui_ra_start : 0,
++	       vio->cui_ra_valid ? vio->cui_ra_count : 0,
+ 	       hit);
+ 
+ 	/* at least to extend the readahead window to cover current read */
+-	if (!hit && bead &&
+-	    bead->lrr_start + bead->lrr_count > ria->ria_start) {
++	if (!hit && vio->cui_ra_valid &&
++	    vio->cui_ra_start + vio->cui_ra_count > ria->ria_start) {
+ 		/* to the end of current read window. */
+-		mlen = bead->lrr_start + bead->lrr_count - ria->ria_start;
++		mlen = vio->cui_ra_start + vio->cui_ra_count - ria->ria_start;
+ 		/* trim to RPC boundary */
+ 		start = ria->ria_start & (PTLRPC_MAX_BRW_PAGES - 1);
+ 		mlen = min(mlen, PTLRPC_MAX_BRW_PAGES - start);
+@@ -730,7 +704,6 @@ void ll_readahead_init(struct inode *inode, struct ll_readahead_state *ras)
+ 	spin_lock_init(&ras->ras_lock);
+ 	ras_reset(inode, ras, 0);
+ 	ras->ras_requests = 0;
+-	INIT_LIST_HEAD(&ras->ras_read_beads);
+ }
+ 
+ /*
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
+index eb6ce1c..86e73d5 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_io.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
+@@ -500,7 +500,6 @@ static int vvp_io_read_start(const struct lu_env *env,
+ 	struct cl_io      *io    = ios->cis_io;
+ 	struct cl_object  *obj   = io->ci_obj;
+ 	struct inode      *inode = vvp_object_inode(obj);
+-	struct ll_ra_read *bead  = &vio->cui_bead;
+ 	struct file       *file  = cio->cui_fd->fd_file;
+ 
+ 	int     result;
+@@ -530,14 +529,11 @@ static int vvp_io_read_start(const struct lu_env *env,
+ 	cio->cui_fd->fd_file->f_ra.ra_pages = 0;
+ 
+ 	/* initialize read-ahead window once per syscall */
+-	if (!vio->cui_ra_window_set) {
+-		vio->cui_ra_window_set = 1;
+-		bead->lrr_start = cl_index(obj, pos);
+-		/*
+-		 * XXX: explicit PAGE_CACHE_SIZE
+-		 */
+-		bead->lrr_count = cl_index(obj, tot + PAGE_CACHE_SIZE - 1);
+-		ll_ra_read_in(file, bead);
++	if (!vio->cui_ra_valid) {
++		vio->cui_ra_valid = true;
++		vio->cui_ra_start = cl_index(obj, pos);
++		vio->cui_ra_count = cl_index(obj, tot + PAGE_CACHE_SIZE - 1);
++		ll_ras_enter(file);
+ 	}
+ 
+ 	/* BUG: 5972 */
+@@ -574,17 +570,6 @@ out:
+ 	return result;
+ }
+ 
+-static void vvp_io_read_fini(const struct lu_env *env, const struct cl_io_slice *ios)
+-{
+-	struct vvp_io *vio = cl2vvp_io(env, ios);
+-	struct ccc_io *cio = cl2ccc_io(env, ios);
+-
+-	if (vio->cui_ra_window_set)
+-		ll_ra_read_ex(cio->cui_fd->fd_file, &vio->cui_bead);
+-
+-	vvp_io_fini(env, ios);
+-}
+-
+ static int vvp_io_commit_sync(const struct lu_env *env, struct cl_io *io,
+ 			      struct cl_page_list *plist, int from, int to)
+ {
+@@ -1092,10 +1077,10 @@ static int vvp_io_read_page(const struct lu_env *env,
+ static const struct cl_io_operations vvp_io_ops = {
+ 	.op = {
+ 		[CIT_READ] = {
+-			.cio_fini      = vvp_io_read_fini,
++			.cio_fini	= vvp_io_fini,
+ 			.cio_lock      = vvp_io_read_lock,
+ 			.cio_start     = vvp_io_read_start,
+-			.cio_advance   = ccc_io_advance
++			.cio_advance	= ccc_io_advance,
+ 		},
+ 		[CIT_WRITE] = {
+ 			.cio_fini      = vvp_io_fini,
+@@ -1148,7 +1133,7 @@ int vvp_io_init(const struct lu_env *env, struct cl_object *obj,
+ 
+ 	CL_IO_SLICE_CLEAN(cio, cui_cl);
+ 	cl_io_slice_add(io, &cio->cui_cl, obj, &vvp_io_ops);
+-	vio->cui_ra_window_set = 0;
++	vio->cui_ra_valid = false;
+ 	result = 0;
+ 	if (io->ci_type == CIT_READ || io->ci_type == CIT_WRITE) {
+ 		size_t count;
 -- 
 2.1.0
