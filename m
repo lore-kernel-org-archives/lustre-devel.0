@@ -1,267 +1,238 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 12:47:45 -0400
-Subject: [lustre-devel] [PATCH 13/43] staging/lustre/llite: remove lli_lvb
+Date: Wed, 30 Mar 2016 12:47:50 -0400
+Subject: [lustre-devel] [PATCH 18/43] staging/lustre/clio: generalize
+	cl_sync_io
 In-Reply-To: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
 References: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1459356495-2794775-14-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459356495-2794775-19-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: "John L. Hammond" <john.hammond@intel.com>
+From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-In struct ll_inode_info remove the struct ost_lvb lli_lvb member and
-replace it with s64 lli_{a,m,c}time. Rename ll_merge_lvb() to
-ll_merge_attr(). Remove cl_merge_lvb() and replace calls to it with
-calls to ll_merge_attr().
+To make cl_sync_io interfaces not just wait for pages, but to be
+a generic synchronization mechanism.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-on: http://review.whamcloud.com/12849
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
+Also remove cl_io_cancel that became not used.
+
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-on: http://review.whamcloud.com/8656
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4198
 Reviewed-by: Bobi Jam <bobijam@gmail.com>
 Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/file.c         | 65 ++++++++++++----------
- drivers/staging/lustre/lustre/llite/glimpse.c      |  6 +-
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   |  2 +-
- .../staging/lustre/lustre/llite/llite_internal.h   | 11 ++--
- drivers/staging/lustre/lustre/llite/llite_lib.c    |  6 +-
- drivers/staging/lustre/lustre/llite/vvp_io.c       |  2 +-
- 6 files changed, 48 insertions(+), 44 deletions(-)
+ drivers/staging/lustre/lustre/include/cl_object.h | 13 ++--
+ drivers/staging/lustre/lustre/obdclass/cl_io.c    | 74 +++++++++++------------
+ drivers/staging/lustre/lustre/obdclass/cl_page.c  |  2 +-
+ 3 files changed, 44 insertions(+), 45 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 127fff6..8fc9da0 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -994,50 +994,57 @@ int ll_inode_getattr(struct inode *inode, struct obdo *obdo,
- 	return rc;
+diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+index 69b40f5..91261b1 100644
+--- a/drivers/staging/lustre/lustre/include/cl_object.h
++++ b/drivers/staging/lustre/lustre/include/cl_object.h
+@@ -3125,13 +3125,18 @@ struct cl_sync_io {
+ 	atomic_t		csi_barrier;
+ 	/** completion to be signaled when transfer is complete. */
+ 	wait_queue_head_t		csi_waitq;
++	/** callback to invoke when this IO is finished */
++	void			(*csi_end_io)(const struct lu_env *,
++					      struct cl_sync_io *);
+ };
+ 
+-void cl_sync_io_init(struct cl_sync_io *anchor, int nrpages);
+-int  cl_sync_io_wait(const struct lu_env *env, struct cl_io *io,
+-		     struct cl_page_list *queue, struct cl_sync_io *anchor,
++void cl_sync_io_init(struct cl_sync_io *anchor, int nr,
++		     void (*end)(const struct lu_env *, struct cl_sync_io *));
++int  cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
+ 		     long timeout);
+-void cl_sync_io_note(struct cl_sync_io *anchor, int ioret);
++void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
++		     int ioret);
++void cl_sync_io_end(const struct lu_env *env, struct cl_sync_io *anchor);
+ 
+ /** @} cl_sync_io */
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index 65d6cee..6a8dd9f 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -800,6 +800,9 @@ int cl_io_submit_rw(const struct lu_env *env, struct cl_io *io,
  }
+ EXPORT_SYMBOL(cl_io_submit_rw);
  
--int ll_merge_lvb(const struct lu_env *env, struct inode *inode)
-+int ll_merge_attr(const struct lu_env *env, struct inode *inode)
- {
- 	struct ll_inode_info *lli = ll_i2info(inode);
- 	struct cl_object *obj = lli->lli_clob;
- 	struct cl_attr *attr = ccc_env_thread_attr(env);
--	struct ost_lvb lvb;
-+	s64 atime;
-+	s64 mtime;
-+	s64 ctime;
- 	int rc = 0;
- 
- 	ll_inode_size_lock(inode);
++static void cl_page_list_assume(const struct lu_env *env,
++				struct cl_io *io, struct cl_page_list *plist);
 +
- 	/* merge timestamps the most recently obtained from mds with
- 	 * timestamps obtained from osts
- 	 */
--	LTIME_S(inode->i_atime) = lli->lli_lvb.lvb_atime;
--	LTIME_S(inode->i_mtime) = lli->lli_lvb.lvb_mtime;
--	LTIME_S(inode->i_ctime) = lli->lli_lvb.lvb_ctime;
-+	LTIME_S(inode->i_atime) = lli->lli_atime;
-+	LTIME_S(inode->i_mtime) = lli->lli_mtime;
-+	LTIME_S(inode->i_ctime) = lli->lli_ctime;
- 
--	lvb.lvb_size = i_size_read(inode);
--	lvb.lvb_blocks = inode->i_blocks;
--	lvb.lvb_mtime = LTIME_S(inode->i_mtime);
--	lvb.lvb_atime = LTIME_S(inode->i_atime);
--	lvb.lvb_ctime = LTIME_S(inode->i_ctime);
-+	mtime = LTIME_S(inode->i_mtime);
-+	atime = LTIME_S(inode->i_atime);
-+	ctime = LTIME_S(inode->i_ctime);
- 
- 	cl_object_attr_lock(obj);
- 	rc = cl_object_attr_get(env, obj, attr);
- 	cl_object_attr_unlock(obj);
- 
--	if (rc == 0) {
--		if (lvb.lvb_atime < attr->cat_atime)
--			lvb.lvb_atime = attr->cat_atime;
--		if (lvb.lvb_ctime < attr->cat_ctime)
--			lvb.lvb_ctime = attr->cat_ctime;
--		if (lvb.lvb_mtime < attr->cat_mtime)
--			lvb.lvb_mtime = attr->cat_mtime;
-+	if (rc != 0)
-+		goto out_size_unlock;
- 
--		CDEBUG(D_VFSTRACE, DFID " updating i_size %llu\n",
--		       PFID(&lli->lli_fid), attr->cat_size);
--		cl_isize_write_nolock(inode, attr->cat_size);
-+	if (atime < attr->cat_atime)
-+		atime = attr->cat_atime;
- 
--		inode->i_blocks = attr->cat_blocks;
-+	if (ctime < attr->cat_ctime)
-+		ctime = attr->cat_ctime;
- 
--		LTIME_S(inode->i_mtime) = lvb.lvb_mtime;
--		LTIME_S(inode->i_atime) = lvb.lvb_atime;
--		LTIME_S(inode->i_ctime) = lvb.lvb_ctime;
--	}
-+	if (mtime < attr->cat_mtime)
-+		mtime = attr->cat_mtime;
-+
-+	CDEBUG(D_VFSTRACE, DFID " updating i_size %llu\n",
-+	       PFID(&lli->lli_fid), attr->cat_size);
-+
-+	cl_isize_write_nolock(inode, attr->cat_size);
-+
-+	inode->i_blocks = attr->cat_blocks;
-+
-+	LTIME_S(inode->i_mtime) = mtime;
-+	LTIME_S(inode->i_atime) = atime;
-+	LTIME_S(inode->i_ctime) = ctime;
-+
-+out_size_unlock:
- 	ll_inode_size_unlock(inode);
- 
- 	return rc;
-@@ -1936,7 +1943,7 @@ int ll_hsm_release(struct inode *inode)
- 		goto out;
+ /**
+  * Submit a sync_io and wait for the IO to be finished, or error happens.
+  * If \a timeout is zero, it means to wait for the IO unconditionally.
+@@ -817,7 +820,7 @@ int cl_io_submit_sync(const struct lu_env *env, struct cl_io *io,
+ 		pg->cp_sync_io = anchor;
  	}
  
--	ll_merge_lvb(env, inode);
-+	ll_merge_attr(env, inode);
- 	cl_env_nested_put(&nest, env);
- 
- 	/* Release the file.
-@@ -3001,9 +3008,9 @@ static int ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
- 
- 	/* if object isn't regular file, don't validate size */
- 	if (!S_ISREG(inode->i_mode)) {
--		LTIME_S(inode->i_atime) = ll_i2info(inode)->lli_lvb.lvb_atime;
--		LTIME_S(inode->i_mtime) = ll_i2info(inode)->lli_lvb.lvb_mtime;
--		LTIME_S(inode->i_ctime) = ll_i2info(inode)->lli_lvb.lvb_ctime;
-+		LTIME_S(inode->i_atime) = ll_i2info(inode)->lli_atime;
-+		LTIME_S(inode->i_mtime) = ll_i2info(inode)->lli_mtime;
-+		LTIME_S(inode->i_ctime) = ll_i2info(inode)->lli_ctime;
- 	} else {
- 		/* In case of restore, the MDT has the right size and has
- 		 * already send it back without granting the layout lock,
-diff --git a/drivers/staging/lustre/lustre/llite/glimpse.c b/drivers/staging/lustre/lustre/llite/glimpse.c
-index f235f35..88bc7c9 100644
---- a/drivers/staging/lustre/lustre/llite/glimpse.c
-+++ b/drivers/staging/lustre/lustre/llite/glimpse.c
-@@ -139,7 +139,7 @@ int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
- 			LASSERT(agl == 0);
- 			result = cl_wait(env, lock);
- 			if (result == 0) {
--				cl_merge_lvb(env, inode);
-+				ll_merge_attr(env, inode);
- 				if (cl_isize_read(inode) > 0 &&
- 				    inode->i_blocks == 0) {
- 					/*
-@@ -155,7 +155,7 @@ int cl_glimpse_lock(const struct lu_env *env, struct cl_io *io,
- 			cl_lock_release(env, lock, "glimpse", current);
- 		} else {
- 			CDEBUG(D_DLMTRACE, "No objects for inode\n");
--			cl_merge_lvb(env, inode);
-+			ll_merge_attr(env, inode);
- 		}
- 	}
- 
-@@ -259,7 +259,7 @@ int cl_local_size(struct inode *inode)
- 		descr->cld_obj = clob;
- 		lock = cl_lock_peek(env, io, descr, "localsize", current);
- 		if (lock) {
--			cl_merge_lvb(env, inode);
-+			ll_merge_attr(env, inode);
- 			cl_unuse(env, lock);
- 			cl_lock_release(env, lock, "localsize", current);
- 			result = 0;
-diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-index e34d832..4871d0f 100644
---- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-+++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-@@ -591,7 +591,7 @@ void ccc_lock_state(const struct lu_env *env,
+-	cl_sync_io_init(anchor, queue->c2_qin.pl_nr);
++	cl_sync_io_init(anchor, queue->c2_qin.pl_nr, &cl_sync_io_end);
+ 	rc = cl_io_submit_rw(env, io, iot, queue);
+ 	if (rc == 0) {
+ 		/*
+@@ -828,12 +831,12 @@ int cl_io_submit_sync(const struct lu_env *env, struct cl_io *io,
  		 */
- 		if (lock->cll_descr.cld_start == 0 &&
- 		    lock->cll_descr.cld_end == CL_PAGE_EOF)
--			cl_merge_lvb(env, inode);
-+			ll_merge_attr(env, inode);
- 	}
- }
+ 		cl_page_list_for_each(pg, &queue->c2_qin) {
+ 			pg->cp_sync_io = NULL;
+-			cl_sync_io_note(anchor, 1);
++			cl_sync_io_note(env, anchor, 1);
+ 		}
  
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index cd69173..c1d747a 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -161,7 +161,9 @@ struct ll_inode_info {
- 	struct inode			lli_vfs_inode;
+ 		/* wait for the IO to be finished. */
+-		rc = cl_sync_io_wait(env, io, &queue->c2_qout,
+-				     anchor, timeout);
++		rc = cl_sync_io_wait(env, anchor, timeout);
++		cl_page_list_assume(env, io, &queue->c2_qout);
+ 	} else {
+ 		LASSERT(list_empty(&queue->c2_qout.pl_pages));
+ 		cl_page_list_for_each(pg, &queue->c2_qin)
+@@ -844,25 +847,6 @@ int cl_io_submit_sync(const struct lu_env *env, struct cl_io *io,
+ EXPORT_SYMBOL(cl_io_submit_sync);
  
- 	/* the most recent timestamps obtained from mds */
--	struct ost_lvb			lli_lvb;
-+	s64				lli_atime;
-+	s64				lli_mtime;
-+	s64				lli_ctime;
- 	spinlock_t			lli_agl_lock;
- 
- 	/* Try to make the d::member and f::member are aligned. Before using
-@@ -752,7 +754,7 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
- int ll_dir_getstripe(struct inode *inode, struct lov_mds_md **lmmp,
- 		     int *lmm_size, struct ptlrpc_request **request);
- int ll_fsync(struct file *file, loff_t start, loff_t end, int data);
--int ll_merge_lvb(const struct lu_env *env, struct inode *inode);
-+int ll_merge_attr(const struct lu_env *env, struct inode *inode);
- int ll_fid2path(struct inode *inode, void __user *arg);
- int ll_data_version(struct inode *inode, __u64 *data_version, int extent_lock);
- int ll_hsm_release(struct inode *inode);
-@@ -1319,11 +1321,6 @@ static inline void cl_isize_write(struct inode *inode, loff_t kms)
- 
- #define cl_isize_read(inode)	     i_size_read(inode)
- 
--static inline int cl_merge_lvb(const struct lu_env *env, struct inode *inode)
+ /**
+- * Cancel an IO which has been submitted by cl_io_submit_rw.
+- */
+-static int cl_io_cancel(const struct lu_env *env, struct cl_io *io,
+-			struct cl_page_list *queue)
 -{
--	return ll_merge_lvb(env, inode);
+-	struct cl_page *page;
+-	int result = 0;
+-
+-	CERROR("Canceling ongoing page transmission\n");
+-	cl_page_list_for_each(page, queue) {
+-		int rc;
+-
+-		rc = cl_page_cancel(env, page);
+-		result = result ?: rc;
+-	}
+-	return result;
 -}
 -
- #define cl_inode_atime(inode) LTIME_S((inode)->i_atime)
- #define cl_inode_ctime(inode) LTIME_S((inode)->i_ctime)
- #define cl_inode_mtime(inode) LTIME_S((inode)->i_mtime)
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index a4401f2..0b4e0db 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -1551,7 +1551,7 @@ void ll_update_inode(struct inode *inode, struct lustre_md *md)
- 	if (body->valid & OBD_MD_FLATIME) {
- 		if (body->atime > LTIME_S(inode->i_atime))
- 			LTIME_S(inode->i_atime) = body->atime;
--		lli->lli_lvb.lvb_atime = body->atime;
-+		lli->lli_atime = body->atime;
+-/**
+  * Main io loop.
+  *
+  * Pumps io through iterations calling
+@@ -1433,25 +1417,38 @@ void cl_req_attr_set(const struct lu_env *env, struct cl_req *req,
+ }
+ EXPORT_SYMBOL(cl_req_attr_set);
+ 
++/* cl_sync_io_callback assumes the caller must call cl_sync_io_wait() to
++ * wait for the IO to finish.
++ */
++void cl_sync_io_end(const struct lu_env *env, struct cl_sync_io *anchor)
++{
++	wake_up_all(&anchor->csi_waitq);
++
++	/* it's safe to nuke or reuse anchor now */
++	atomic_set(&anchor->csi_barrier, 0);
++}
++EXPORT_SYMBOL(cl_sync_io_end);
+ 
+ /**
+- * Initialize synchronous io wait anchor, for transfer of \a nrpages pages.
++ * Initialize synchronous io wait anchor
+  */
+-void cl_sync_io_init(struct cl_sync_io *anchor, int nrpages)
++void cl_sync_io_init(struct cl_sync_io *anchor, int nr,
++		     void (*end)(const struct lu_env *, struct cl_sync_io *))
+ {
+ 	init_waitqueue_head(&anchor->csi_waitq);
+-	atomic_set(&anchor->csi_sync_nr, nrpages);
+-	atomic_set(&anchor->csi_barrier, nrpages > 0);
++	atomic_set(&anchor->csi_sync_nr, nr);
++	atomic_set(&anchor->csi_barrier, nr > 0);
+ 	anchor->csi_sync_rc = 0;
++	anchor->csi_end_io = end;
++	LASSERT(end);
+ }
+ EXPORT_SYMBOL(cl_sync_io_init);
+ 
+ /**
+- * Wait until all transfer completes. Transfer completion routine has to call
+- * cl_sync_io_note() for every page.
++ * Wait until all IO completes. Transfer completion routine has to call
++ * cl_sync_io_note() for every entity.
+  */
+-int cl_sync_io_wait(const struct lu_env *env, struct cl_io *io,
+-		    struct cl_page_list *queue, struct cl_sync_io *anchor,
++int cl_sync_io_wait(const struct lu_env *env, struct cl_sync_io *anchor,
+ 		    long timeout)
+ {
+ 	struct l_wait_info lwi = LWI_TIMEOUT_INTR(cfs_time_seconds(timeout),
+@@ -1464,11 +1461,9 @@ int cl_sync_io_wait(const struct lu_env *env, struct cl_io *io,
+ 			  atomic_read(&anchor->csi_sync_nr) == 0,
+ 			  &lwi);
+ 	if (rc < 0) {
+-		CERROR("SYNC IO failed with error: %d, try to cancel %d remaining pages\n",
++		CERROR("IO failed: %d, still wait for %d remaining entries\n",
+ 		       rc, atomic_read(&anchor->csi_sync_nr));
+ 
+-		(void)cl_io_cancel(env, io, queue);
+-
+ 		lwi = (struct l_wait_info) { 0 };
+ 		(void)l_wait_event(anchor->csi_waitq,
+ 				   atomic_read(&anchor->csi_sync_nr) == 0,
+@@ -1477,14 +1472,12 @@ int cl_sync_io_wait(const struct lu_env *env, struct cl_io *io,
+ 		rc = anchor->csi_sync_rc;
  	}
- 	if (body->valid & OBD_MD_FLMTIME) {
- 		if (body->mtime > LTIME_S(inode->i_mtime)) {
-@@ -1560,12 +1560,12 @@ void ll_update_inode(struct inode *inode, struct lustre_md *md)
- 			       body->mtime);
- 			LTIME_S(inode->i_mtime) = body->mtime;
- 		}
--		lli->lli_lvb.lvb_mtime = body->mtime;
-+		lli->lli_mtime = body->mtime;
- 	}
- 	if (body->valid & OBD_MD_FLCTIME) {
- 		if (body->ctime > LTIME_S(inode->i_ctime))
- 			LTIME_S(inode->i_ctime) = body->ctime;
--		lli->lli_lvb.lvb_ctime = body->ctime;
-+		lli->lli_ctime = body->ctime;
- 	}
- 	if (body->valid & OBD_MD_FLMODE)
- 		inode->i_mode = (inode->i_mode & S_IFMT)|(body->mode & ~S_IFMT);
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 18127d3..c7db318 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -739,7 +739,7 @@ int vvp_io_write_commit(const struct lu_env *env, struct cl_io *io)
+ 	LASSERT(atomic_read(&anchor->csi_sync_nr) == 0);
+-	cl_page_list_assume(env, io, queue);
+ 
+ 	/* wait until cl_sync_io_note() has done wakeup */
+ 	while (unlikely(atomic_read(&anchor->csi_barrier) != 0)) {
+ 		cpu_relax();
  	}
  
- 	/* update inode size */
--	ll_merge_lvb(env, inode);
-+	ll_merge_attr(env, inode);
+-	POISON(anchor, 0x5a, sizeof(*anchor));
+ 	return rc;
+ }
+ EXPORT_SYMBOL(cl_sync_io_wait);
+@@ -1492,7 +1485,8 @@ EXPORT_SYMBOL(cl_sync_io_wait);
+ /**
+  * Indicate that transfer of a single page completed.
+  */
+-void cl_sync_io_note(struct cl_sync_io *anchor, int ioret)
++void cl_sync_io_note(const struct lu_env *env, struct cl_sync_io *anchor,
++		     int ioret)
+ {
+ 	if (anchor->csi_sync_rc == 0 && ioret < 0)
+ 		anchor->csi_sync_rc = ioret;
+@@ -1503,9 +1497,9 @@ void cl_sync_io_note(struct cl_sync_io *anchor, int ioret)
+ 	 */
+ 	LASSERT(atomic_read(&anchor->csi_sync_nr) > 0);
+ 	if (atomic_dec_and_test(&anchor->csi_sync_nr)) {
+-		wake_up_all(&anchor->csi_waitq);
+-		/* it's safe to nuke or reuse anchor now */
+-		atomic_set(&anchor->csi_barrier, 0);
++		LASSERT(anchor->csi_end_io);
++		anchor->csi_end_io(env, anchor);
++		/* Can't access anchor any more */
+ 	}
+ }
+ EXPORT_SYMBOL(cl_sync_io_note);
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+index 506a9f9..ad7f0ae 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+@@ -887,7 +887,7 @@ void cl_page_completion(const struct lu_env *env,
+ 	cl_page_put(env, pg);
  
- 	/* Now the pages in queue were failed to commit, discard them
- 	 * unless they were dirtied before.
+ 	if (anchor)
+-		cl_sync_io_note(anchor, ioret);
++		cl_sync_io_note(env, anchor, ioret);
+ }
+ EXPORT_SYMBOL(cl_page_completion);
+ 
 -- 
 2.1.0
