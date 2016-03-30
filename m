@@ -1,568 +1,228 @@
 From: green at linuxhacker.ru <green@linuxhacker.ru>
-Date: Wed, 30 Mar 2016 12:48:04 -0400
-Subject: [lustre-devel] [PATCH 32/43] staging/lustre/llite: move vvp_io
-	functions to vvp_io.c
+Date: Wed, 30 Mar 2016 12:48:07 -0400
+Subject: [lustre-devel] [PATCH 35/43] staging/lustre/llite: Rename struct
+	vvp_thread_info to ll_thread_info
 In-Reply-To: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
 References: <1459356495-2794775-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1459356495-2794775-33-git-send-email-green@linuxhacker.ru>
+Message-ID: <1459356495-2794775-36-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, John Hammond <john.hammond@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: "John L. Hammond" <john.hammond@intel.com>
+From: John Hammond <john.hammond@intel.com>
 
-Move all vvp_io related functions from lustre/llite/lcommon_cl.c to
-the sole file where they are used lustre/llite/vvp_io.c.
+struct vvp_thread_info is used in the non-VVP parts of llite so rename
+it struct ll_thread_info. Rename supporting functions accordingly.
 
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-on: http://review.whamcloud.com/13376
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-on: http://review.whamcloud.com/13714
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5971
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   | 197 --------------------
- .../staging/lustre/lustre/llite/llite_internal.h   |   1 -
- drivers/staging/lustre/lustre/llite/vvp_internal.h |  22 +--
- drivers/staging/lustre/lustre/llite/vvp_io.c       | 198 ++++++++++++++++++++-
- 4 files changed, 196 insertions(+), 222 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c         |  6 ++--
+ .../staging/lustre/lustre/llite/llite_internal.h   | 30 ++++++++++----------
+ drivers/staging/lustre/lustre/llite/rw.c           |  6 ++--
+ drivers/staging/lustre/lustre/llite/vvp_dev.c      | 33 +++++++++++++---------
+ 4 files changed, 40 insertions(+), 35 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-index 630c371..1b11103 100644
---- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-+++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-@@ -184,192 +184,6 @@ void ccc_global_fini(struct lu_device_type *device_type)
- 	lu_kmem_fini(ccc_caches);
- }
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 210d1e2..f7aabac 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -1221,7 +1221,7 @@ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ 	if (IS_ERR(env))
+ 		return PTR_ERR(env);
  
--static void vvp_object_size_lock(struct cl_object *obj)
--{
--	struct inode *inode = vvp_object_inode(obj);
--
--	ll_inode_size_lock(inode);
--	cl_object_attr_lock(obj);
--}
--
--static void vvp_object_size_unlock(struct cl_object *obj)
--{
--	struct inode *inode = vvp_object_inode(obj);
--
--	cl_object_attr_unlock(obj);
--	ll_inode_size_unlock(inode);
--}
--
--/*****************************************************************************
-- *
-- * io operations.
-- *
-- */
--
--int vvp_io_one_lock_index(const struct lu_env *env, struct cl_io *io,
--			  __u32 enqflags, enum cl_lock_mode mode,
--			  pgoff_t start, pgoff_t end)
--{
--	struct vvp_io          *vio   = vvp_env_io(env);
--	struct cl_lock_descr   *descr = &vio->vui_link.cill_descr;
--	struct cl_object       *obj   = io->ci_obj;
--
--	CLOBINVRNT(env, obj, vvp_object_invariant(obj));
--
--	CDEBUG(D_VFSTRACE, "lock: %d [%lu, %lu]\n", mode, start, end);
--
--	memset(&vio->vui_link, 0, sizeof(vio->vui_link));
--
--	if (vio->vui_fd && (vio->vui_fd->fd_flags & LL_FILE_GROUP_LOCKED)) {
--		descr->cld_mode = CLM_GROUP;
--		descr->cld_gid  = vio->vui_fd->fd_grouplock.cg_gid;
--	} else {
--		descr->cld_mode  = mode;
--	}
--	descr->cld_obj   = obj;
--	descr->cld_start = start;
--	descr->cld_end   = end;
--	descr->cld_enq_flags = enqflags;
--
--	cl_io_lock_add(env, io, &vio->vui_link);
--	return 0;
--}
--
--void vvp_io_update_iov(const struct lu_env *env,
--		       struct vvp_io *vio, struct cl_io *io)
--{
--	size_t size = io->u.ci_rw.crw_count;
--
--	if (!cl_is_normalio(env, io) || !vio->vui_iter)
--		return;
--
--	iov_iter_truncate(vio->vui_iter, size);
--}
--
--int vvp_io_one_lock(const struct lu_env *env, struct cl_io *io,
--		    __u32 enqflags, enum cl_lock_mode mode,
--		    loff_t start, loff_t end)
--{
--	struct cl_object *obj = io->ci_obj;
--
--	return vvp_io_one_lock_index(env, io, enqflags, mode,
--				     cl_index(obj, start), cl_index(obj, end));
--}
--
--void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
--{
--	CLOBINVRNT(env, ios->cis_io->ci_obj,
--		   vvp_object_invariant(ios->cis_io->ci_obj));
--}
--
--void vvp_io_advance(const struct lu_env *env,
--		    const struct cl_io_slice *ios,
--		    size_t nob)
--{
--	struct vvp_io    *vio = cl2vvp_io(env, ios);
--	struct cl_io     *io  = ios->cis_io;
--	struct cl_object *obj = ios->cis_io->ci_obj;
--
--	CLOBINVRNT(env, obj, vvp_object_invariant(obj));
--
--	if (!cl_is_normalio(env, io))
--		return;
--
--	iov_iter_reexpand(vio->vui_iter, vio->vui_tot_count  -= nob);
--}
--
--/**
-- * Helper function that if necessary adjusts file size (inode->i_size), when
-- * position at the offset \a pos is accessed. File size can be arbitrary stale
-- * on a Lustre client, but client at least knows KMS. If accessed area is
-- * inside [0, KMS], set file size to KMS, otherwise glimpse file size.
-- *
-- * Locking: cl_isize_lock is used to serialize changes to inode size and to
-- * protect consistency between inode size and cl_object
-- * attributes. cl_object_size_lock() protects consistency between cl_attr's of
-- * top-object and sub-objects.
-- */
--int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
--		  struct cl_io *io, loff_t start, size_t count, int *exceed)
--{
--	struct cl_attr *attr  = ccc_env_thread_attr(env);
--	struct inode   *inode = vvp_object_inode(obj);
--	loff_t	  pos   = start + count - 1;
--	loff_t kms;
--	int result;
--
--	/*
--	 * Consistency guarantees: following possibilities exist for the
--	 * relation between region being accessed and real file size at this
--	 * moment:
--	 *
--	 *  (A): the region is completely inside of the file;
--	 *
--	 *  (B-x): x bytes of region are inside of the file, the rest is
--	 *  outside;
--	 *
--	 *  (C): the region is completely outside of the file.
--	 *
--	 * This classification is stable under DLM lock already acquired by
--	 * the caller, because to change the class, other client has to take
--	 * DLM lock conflicting with our lock. Also, any updates to ->i_size
--	 * by other threads on this client are serialized by
--	 * ll_inode_size_lock(). This guarantees that short reads are handled
--	 * correctly in the face of concurrent writes and truncates.
--	 */
--	vvp_object_size_lock(obj);
--	result = cl_object_attr_get(env, obj, attr);
--	if (result == 0) {
--		kms = attr->cat_kms;
--		if (pos > kms) {
--			/*
--			 * A glimpse is necessary to determine whether we
--			 * return a short read (B) or some zeroes at the end
--			 * of the buffer (C)
--			 */
--			vvp_object_size_unlock(obj);
--			result = cl_glimpse_lock(env, io, inode, obj, 0);
--			if (result == 0 && exceed) {
--				/* If objective page index exceed end-of-file
--				 * page index, return directly. Do not expect
--				 * kernel will check such case correctly.
--				 * linux-2.6.18-128.1.1 miss to do that.
--				 * --bug 17336
--				 */
--				loff_t size = i_size_read(inode);
--				loff_t cur_index = start >> PAGE_CACHE_SHIFT;
--				loff_t size_index = (size - 1) >>
--						    PAGE_CACHE_SHIFT;
--
--				if ((size == 0 && cur_index != 0) ||
--				    size_index < cur_index)
--					*exceed = 1;
--			}
--			return result;
--		}
--		/*
--		 * region is within kms and, hence, within real file
--		 * size (A). We need to increase i_size to cover the
--		 * read region so that generic_file_read() will do its
--		 * job, but that doesn't mean the kms size is
--		 * _correct_, it is only the _minimum_ size. If
--		 * someone does a stat they will get the correct size
--		 * which will always be >= the kms value here.
--		 * b=11081
--		 */
--		if (i_size_read(inode) < kms) {
--			i_size_write(inode, kms);
--			CDEBUG(D_VFSTRACE, DFID " updating i_size %llu\n",
--			       PFID(lu_object_fid(&obj->co_lu)),
--			       (__u64)i_size_read(inode));
--		}
--	}
--
--	vvp_object_size_unlock(obj);
--
--	return result;
--}
--
- /*****************************************************************************
-  *
-  * Transfer operations.
-@@ -493,17 +307,6 @@ again:
-  *
-  */
+-	args = vvp_env_args(env, IO_NORMAL);
++	args = ll_env_args(env, IO_NORMAL);
+ 	args->u.normal.via_iter = to;
+ 	args->u.normal.via_iocb = iocb;
  
--struct vvp_io *cl2vvp_io(const struct lu_env *env,
--			 const struct cl_io_slice *slice)
--{
--	struct vvp_io *vio;
--
--	vio = container_of(slice, struct vvp_io, vui_cl);
--	LASSERT(vio == vvp_env_io(env));
--
--	return vio;
--}
--
- struct ccc_req *cl2ccc_req(const struct cl_req_slice *slice)
- {
- 	return container_of0(slice, struct ccc_req, crq_cl);
+@@ -1245,7 +1245,7 @@ static ssize_t ll_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
+ 	if (IS_ERR(env))
+ 		return PTR_ERR(env);
+ 
+-	args = vvp_env_args(env, IO_NORMAL);
++	args = ll_env_args(env, IO_NORMAL);
+ 	args->u.normal.via_iter = from;
+ 	args->u.normal.via_iocb = iocb;
+ 
+@@ -1271,7 +1271,7 @@ static ssize_t ll_file_splice_read(struct file *in_file, loff_t *ppos,
+ 	if (IS_ERR(env))
+ 		return PTR_ERR(env);
+ 
+-	args = vvp_env_args(env, IO_SPLICE);
++	args = ll_env_args(env, IO_SPLICE);
+ 	args->u.splice.via_pipe = pipe;
+ 	args->u.splice.via_flags = flags;
+ 
 diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 9856bb6..86e93c0 100644
+index 8b943df..a6ee2fe 100644
 --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
 +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -693,7 +693,6 @@ void ll_readahead_init(struct inode *inode, struct ll_readahead_state *ras);
- int ll_readahead(const struct lu_env *env, struct cl_io *io,
- 		 struct cl_page_list *queue, struct ll_readahead_state *ras,
- 		 bool hit);
--int vvp_io_write_commit(const struct lu_env *env, struct cl_io *io);
- struct ll_cl_context *ll_cl_init(struct file *file, struct page *vmpage);
- void ll_cl_fini(struct ll_cl_context *lcc);
- 
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_internal.h b/drivers/staging/lustre/lustre/llite/vvp_internal.h
-index e04f23e..7af8c44 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/vvp_internal.h
-@@ -164,12 +164,6 @@ struct vvp_io {
- 	bool		vui_ra_valid;
+@@ -855,30 +855,30 @@ struct ll_cl_context {
+ 	int	     lcc_refcheck;
  };
  
--/**
-- * True, if \a io is a normal io, False for other splice_{read,write}.
-- * must be implemented in arch specific code.
-- */
--int cl_is_normalio(const struct lu_env *env, const struct cl_io *io);
--
- extern struct lu_context_key ccc_key;
- extern struct lu_context_key vvp_session_key;
+-struct vvp_thread_info {
+-	struct vvp_io_args   vti_args;
+-	struct ra_io_arg     vti_ria;
+-	struct ll_cl_context vti_io_ctx;
++struct ll_thread_info {
++	struct vvp_io_args   lti_args;
++	struct ra_io_arg     lti_ria;
++	struct ll_cl_context lti_io_ctx;
+ };
  
-@@ -334,19 +328,6 @@ void ccc_umount(const struct lu_env *env, struct cl_device *dev);
- int ccc_global_init(struct lu_device_type *device_type);
- void ccc_global_fini(struct lu_device_type *device_type);
+-static inline struct vvp_thread_info *vvp_env_info(const struct lu_env *env)
++extern struct lu_context_key ll_thread_key;
++static inline struct ll_thread_info *ll_env_info(const struct lu_env *env)
+ {
+-	extern struct lu_context_key vvp_key;
+-	struct vvp_thread_info      *info;
++	struct ll_thread_info *lti;
  
--int vvp_io_one_lock_index(const struct lu_env *env, struct cl_io *io,
--			  __u32 enqflags, enum cl_lock_mode mode,
--			  pgoff_t start, pgoff_t end);
--int vvp_io_one_lock(const struct lu_env *env, struct cl_io *io,
--		    __u32 enqflags, enum cl_lock_mode mode,
--		    loff_t start, loff_t end);
--void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios);
--void vvp_io_advance(const struct lu_env *env, const struct cl_io_slice *ios,
--		    size_t nob);
--void vvp_io_update_iov(const struct lu_env *env, struct vvp_io *cio,
--		       struct cl_io *io);
--int ccc_prep_size(const struct lu_env *env, struct cl_object *obj,
--		  struct cl_io *io, loff_t start, size_t count, int *exceed);
- void ccc_req_completion(const struct lu_env *env,
- 			const struct cl_req_slice *slice, int ioret);
- void ccc_req_attr_set(const struct lu_env *env,
-@@ -397,8 +378,6 @@ static inline struct vvp_lock *cl2vvp_lock(const struct cl_lock_slice *slice)
- 	return container_of(slice, struct vvp_lock, vlk_cl);
+-	info = lu_context_key_get(&env->le_ctx, &vvp_key);
+-	LASSERT(info);
+-	return info;
++	lti = lu_context_key_get(&env->le_ctx, &ll_thread_key);
++	LASSERT(lti);
++	return lti;
  }
  
--struct vvp_io *cl2vvp_io(const struct lu_env *env,
--			 const struct cl_io_slice *slice);
- struct ccc_req *cl2ccc_req(const struct cl_req_slice *slice);
+-static inline struct vvp_io_args *vvp_env_args(const struct lu_env *env,
+-					       enum vvp_io_subtype type)
++static inline struct vvp_io_args *ll_env_args(const struct lu_env *env,
++					      enum vvp_io_subtype type)
+ {
+-	struct vvp_io_args *ret = &vvp_env_info(env)->vti_args;
++	struct vvp_io_args *via = &ll_env_info(env)->lti_args;
  
- int cl_setattr_ost(struct inode *inode, const struct iattr *attr);
-@@ -447,6 +426,7 @@ void ccc_inode_lsm_put(struct inode *inode, struct lov_stripe_md *lsm);
+-	ret->via_io_subtype = type;
++	via->via_io_subtype = type;
  
- int vvp_io_init(const struct lu_env *env, struct cl_object *obj,
- 		struct cl_io *io);
-+int vvp_io_write_commit(const struct lu_env *env, struct cl_io *io);
- int vvp_lock_init(const struct lu_env *env, struct cl_object *obj,
- 		  struct cl_lock *lock, const struct cl_io *io);
- int vvp_page_init(const struct lu_env *env, struct cl_object *obj,
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 53cf2be..48b0693 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -47,10 +47,21 @@
- #include "llite_internal.h"
- #include "vvp_internal.h"
+-	return ret;
++	return via;
+ }
  
-+struct vvp_io *cl2vvp_io(const struct lu_env *env,
-+			 const struct cl_io_slice *slice)
-+{
-+	struct vvp_io *vio;
-+
-+	vio = container_of(slice, struct vvp_io, vui_cl);
-+	LASSERT(vio == vvp_env_io(env));
-+
-+	return vio;
-+}
-+
- /**
-  * True, if \a io is a normal io, False for splice_{read,write}
-  */
--int cl_is_normalio(const struct lu_env *env, const struct cl_io *io)
-+static int cl_is_normalio(const struct lu_env *env, const struct cl_io *io)
+ int vvp_global_init(void);
+diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
+index 634f0bb..f9bc3e4 100644
+--- a/drivers/staging/lustre/lustre/llite/rw.c
++++ b/drivers/staging/lustre/lustre/llite/rw.c
+@@ -102,7 +102,7 @@ struct ll_cl_context *ll_cl_init(struct file *file, struct page *vmpage)
+ 	if (IS_ERR(env))
+ 		return ERR_CAST(env);
+ 
+-	lcc = &vvp_env_info(env)->vti_io_ctx;
++	lcc = &ll_env_info(env)->lti_io_ctx;
+ 	memset(lcc, 0, sizeof(*lcc));
+ 	lcc->lcc_env = env;
+ 	lcc->lcc_refcheck = refcheck;
+@@ -523,12 +523,12 @@ int ll_readahead(const struct lu_env *env, struct cl_io *io,
+ 		 bool hit)
  {
  	struct vvp_io *vio = vvp_env_io(env);
- 
-@@ -93,12 +104,160 @@ static bool can_populate_pages(const struct lu_env *env, struct cl_io *io,
- 	return rc;
- }
- 
-+static void vvp_object_size_lock(struct cl_object *obj)
-+{
-+	struct inode *inode = vvp_object_inode(obj);
-+
-+	ll_inode_size_lock(inode);
-+	cl_object_attr_lock(obj);
-+}
-+
-+static void vvp_object_size_unlock(struct cl_object *obj)
-+{
-+	struct inode *inode = vvp_object_inode(obj);
-+
-+	cl_object_attr_unlock(obj);
-+	ll_inode_size_unlock(inode);
-+}
-+
-+/**
-+ * Helper function that if necessary adjusts file size (inode->i_size), when
-+ * position at the offset \a pos is accessed. File size can be arbitrary stale
-+ * on a Lustre client, but client at least knows KMS. If accessed area is
-+ * inside [0, KMS], set file size to KMS, otherwise glimpse file size.
-+ *
-+ * Locking: cl_isize_lock is used to serialize changes to inode size and to
-+ * protect consistency between inode size and cl_object
-+ * attributes. cl_object_size_lock() protects consistency between cl_attr's of
-+ * top-object and sub-objects.
-+ */
-+static int vvp_prep_size(const struct lu_env *env, struct cl_object *obj,
-+			 struct cl_io *io, loff_t start, size_t count,
-+			 int *exceed)
-+{
-+	struct cl_attr *attr  = ccc_env_thread_attr(env);
-+	struct inode   *inode = vvp_object_inode(obj);
-+	loff_t	  pos   = start + count - 1;
-+	loff_t kms;
-+	int result;
-+
-+	/*
-+	 * Consistency guarantees: following possibilities exist for the
-+	 * relation between region being accessed and real file size at this
-+	 * moment:
-+	 *
-+	 *  (A): the region is completely inside of the file;
-+	 *
-+	 *  (B-x): x bytes of region are inside of the file, the rest is
-+	 *  outside;
-+	 *
-+	 *  (C): the region is completely outside of the file.
-+	 *
-+	 * This classification is stable under DLM lock already acquired by
-+	 * the caller, because to change the class, other client has to take
-+	 * DLM lock conflicting with our lock. Also, any updates to ->i_size
-+	 * by other threads on this client are serialized by
-+	 * ll_inode_size_lock(). This guarantees that short reads are handled
-+	 * correctly in the face of concurrent writes and truncates.
-+	 */
-+	vvp_object_size_lock(obj);
-+	result = cl_object_attr_get(env, obj, attr);
-+	if (result == 0) {
-+		kms = attr->cat_kms;
-+		if (pos > kms) {
-+			/*
-+			 * A glimpse is necessary to determine whether we
-+			 * return a short read (B) or some zeroes at the end
-+			 * of the buffer (C)
-+			 */
-+			vvp_object_size_unlock(obj);
-+			result = cl_glimpse_lock(env, io, inode, obj, 0);
-+			if (result == 0 && exceed) {
-+				/* If objective page index exceed end-of-file
-+				 * page index, return directly. Do not expect
-+				 * kernel will check such case correctly.
-+				 * linux-2.6.18-128.1.1 miss to do that.
-+				 * --bug 17336
-+				 */
-+				loff_t size = i_size_read(inode);
-+				loff_t cur_index = start >> PAGE_CACHE_SHIFT;
-+				loff_t size_index = (size - 1) >>
-+						    PAGE_CACHE_SHIFT;
-+
-+				if ((size == 0 && cur_index != 0) ||
-+				    size_index < cur_index)
-+					*exceed = 1;
-+			}
-+			return result;
-+		}
-+		/*
-+		 * region is within kms and, hence, within real file
-+		 * size (A). We need to increase i_size to cover the
-+		 * read region so that generic_file_read() will do its
-+		 * job, but that doesn't mean the kms size is
-+		 * _correct_, it is only the _minimum_ size. If
-+		 * someone does a stat they will get the correct size
-+		 * which will always be >= the kms value here.
-+		 * b=11081
-+		 */
-+		if (i_size_read(inode) < kms) {
-+			i_size_write(inode, kms);
-+			CDEBUG(D_VFSTRACE, DFID " updating i_size %llu\n",
-+			       PFID(lu_object_fid(&obj->co_lu)),
-+			       (__u64)i_size_read(inode));
-+		}
-+	}
-+
-+	vvp_object_size_unlock(obj);
-+
-+	return result;
-+}
-+
- /*****************************************************************************
-  *
-  * io operations.
-  *
+-	struct vvp_thread_info *vti = vvp_env_info(env);
++	struct ll_thread_info *lti = ll_env_info(env);
+ 	struct cl_attr *attr = ccc_env_thread_attr(env);
+ 	unsigned long start = 0, end = 0, reserved;
+ 	unsigned long ra_end, len, mlen = 0;
+ 	struct inode *inode;
+-	struct ra_io_arg *ria = &vti->vti_ria;
++	struct ra_io_arg *ria = &lti->lti_ria;
+ 	struct cl_object *clob;
+ 	int ret = 0;
+ 	__u64 kms;
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+index 5d3beb6..cafc2c2 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+@@ -57,13 +57,18 @@
+  * "llite_" (var. "ll_") prefix.
   */
  
-+static int vvp_io_one_lock_index(const struct lu_env *env, struct cl_io *io,
-+				 __u32 enqflags, enum cl_lock_mode mode,
-+			  pgoff_t start, pgoff_t end)
-+{
-+	struct vvp_io          *vio   = vvp_env_io(env);
-+	struct cl_lock_descr   *descr = &vio->vui_link.cill_descr;
-+	struct cl_object       *obj   = io->ci_obj;
-+
-+	CLOBINVRNT(env, obj, vvp_object_invariant(obj));
-+
-+	CDEBUG(D_VFSTRACE, "lock: %d [%lu, %lu]\n", mode, start, end);
-+
-+	memset(&vio->vui_link, 0, sizeof(vio->vui_link));
-+
-+	if (vio->vui_fd && (vio->vui_fd->fd_flags & LL_FILE_GROUP_LOCKED)) {
-+		descr->cld_mode = CLM_GROUP;
-+		descr->cld_gid  = vio->vui_fd->fd_grouplock.cg_gid;
-+	} else {
-+		descr->cld_mode  = mode;
-+	}
-+	descr->cld_obj   = obj;
-+	descr->cld_start = start;
-+	descr->cld_end   = end;
-+	descr->cld_enq_flags = enqflags;
-+
-+	cl_io_lock_add(env, io, &vio->vui_link);
-+	return 0;
-+}
-+
-+static int vvp_io_one_lock(const struct lu_env *env, struct cl_io *io,
-+			   __u32 enqflags, enum cl_lock_mode mode,
-+			   loff_t start, loff_t end)
-+{
-+	struct cl_object *obj = io->ci_obj;
-+
-+	return vvp_io_one_lock_index(env, io, enqflags, mode,
-+				     cl_index(obj, start), cl_index(obj, end));
-+}
-+
- static int vvp_io_write_iter_init(const struct lu_env *env,
- 				  const struct cl_io_slice *ios)
++static struct kmem_cache *ll_thread_kmem;
+ struct kmem_cache *vvp_lock_kmem;
+ struct kmem_cache *vvp_object_kmem;
+ struct kmem_cache *vvp_req_kmem;
+-static struct kmem_cache *vvp_thread_kmem;
+ static struct kmem_cache *vvp_session_kmem;
+ static struct lu_kmem_descr vvp_caches[] = {
+ 	{
++		.ckd_cache = &ll_thread_kmem,
++		.ckd_name  = "ll_thread_kmem",
++		.ckd_size  = sizeof(struct ll_thread_info),
++	},
++	{
+ 		.ckd_cache = &vvp_lock_kmem,
+ 		.ckd_name  = "vvp_lock_kmem",
+ 		.ckd_size  = sizeof(struct vvp_lock),
+@@ -93,25 +98,31 @@ static struct lu_kmem_descr vvp_caches[] = {
+ 	}
+ };
+ 
+-static void *vvp_key_init(const struct lu_context *ctx,
+-			  struct lu_context_key *key)
++static void *ll_thread_key_init(const struct lu_context *ctx,
++				struct lu_context_key *key)
  {
-@@ -303,6 +462,33 @@ static int vvp_mmap_locks(const struct lu_env *env,
- 	return result;
+ 	struct vvp_thread_info *info;
+ 
+-	info = kmem_cache_zalloc(vvp_thread_kmem, GFP_NOFS);
++	info = kmem_cache_zalloc(ll_thread_kmem, GFP_NOFS);
+ 	if (!info)
+ 		info = ERR_PTR(-ENOMEM);
+ 	return info;
  }
  
-+static void vvp_io_advance(const struct lu_env *env,
-+			   const struct cl_io_slice *ios,
-+			   size_t nob)
-+{
-+	struct vvp_io    *vio = cl2vvp_io(env, ios);
-+	struct cl_io     *io  = ios->cis_io;
-+	struct cl_object *obj = ios->cis_io->ci_obj;
-+
-+	CLOBINVRNT(env, obj, vvp_object_invariant(obj));
-+
-+	if (!cl_is_normalio(env, io))
-+		return;
-+
-+	iov_iter_reexpand(vio->vui_iter, vio->vui_tot_count  -= nob);
-+}
-+
-+static void vvp_io_update_iov(const struct lu_env *env,
-+			      struct vvp_io *vio, struct cl_io *io)
-+{
-+	size_t size = io->u.ci_rw.crw_count;
-+
-+	if (!cl_is_normalio(env, io) || !vio->vui_iter)
-+		return;
-+
-+	iov_iter_truncate(vio->vui_iter, size);
-+}
-+
- static int vvp_io_rw_lock(const struct lu_env *env, struct cl_io *io,
- 			  enum cl_lock_mode mode, loff_t start, loff_t end)
+-static void vvp_key_fini(const struct lu_context *ctx,
+-			 struct lu_context_key *key, void *data)
++static void ll_thread_key_fini(const struct lu_context *ctx,
++			       struct lu_context_key *key, void *data)
  {
-@@ -514,7 +700,7 @@ static int vvp_io_read_start(const struct lu_env *env,
- 	if (!can_populate_pages(env, io, inode))
- 		return 0;
+ 	struct vvp_thread_info *info = data;
  
--	result = ccc_prep_size(env, obj, io, pos, tot, &exceed);
-+	result = vvp_prep_size(env, obj, io, pos, tot, &exceed);
- 	if (result != 0)
- 		return result;
- 	else if (exceed != 0)
-@@ -886,7 +1072,7 @@ static int vvp_io_fault_start(const struct lu_env *env,
- 	/* offset of the last byte on the page */
- 	offset = cl_offset(obj, fio->ft_index + 1) - 1;
- 	LASSERT(cl_index(obj, offset) == fio->ft_index);
--	result = ccc_prep_size(env, obj, io, 0, offset + 1, NULL);
-+	result = vvp_prep_size(env, obj, io, 0, offset + 1, NULL);
- 	if (result != 0)
- 		return result;
- 
-@@ -1075,6 +1261,12 @@ static int vvp_io_read_page(const struct lu_env *env,
- 	return 0;
+-	kmem_cache_free(vvp_thread_kmem, info);
++	kmem_cache_free(ll_thread_kmem, info);
  }
  
-+void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
-+{
-+	CLOBINVRNT(env, ios->cis_io->ci_obj,
-+		   vvp_object_invariant(ios->cis_io->ci_obj));
-+}
++struct lu_context_key ll_thread_key = {
++	.lct_tags = LCT_CL_THREAD,
++	.lct_init = ll_thread_key_init,
++	.lct_fini = ll_thread_key_fini
++};
 +
- static const struct cl_io_operations vvp_io_ops = {
- 	.op = {
- 		[CIT_READ] = {
+ static void *vvp_session_key_init(const struct lu_context *ctx,
+ 				  struct lu_context_key *key)
+ {
+@@ -131,12 +142,6 @@ static void vvp_session_key_fini(const struct lu_context *ctx,
+ 	kmem_cache_free(vvp_session_kmem, session);
+ }
+ 
+-struct lu_context_key vvp_key = {
+-	.lct_tags = LCT_CL_THREAD,
+-	.lct_init = vvp_key_init,
+-	.lct_fini = vvp_key_fini
+-};
+-
+ struct lu_context_key vvp_session_key = {
+ 	.lct_tags = LCT_SESSION,
+ 	.lct_init = vvp_session_key_init,
+@@ -144,7 +149,7 @@ struct lu_context_key vvp_session_key = {
+ };
+ 
+ /* type constructor/destructor: vvp_type_{init,fini,start,stop}(). */
+-LU_TYPE_INIT_FINI(vvp, &ccc_key, &vvp_key, &vvp_session_key);
++LU_TYPE_INIT_FINI(vvp, &ccc_key, &ll_thread_key, &vvp_session_key);
+ 
+ static const struct lu_device_operations vvp_lu_ops = {
+ 	.ldo_object_alloc      = vvp_object_alloc
 -- 
 2.1.0
