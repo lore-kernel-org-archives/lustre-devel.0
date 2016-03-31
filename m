@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 31 Mar 2016 10:18:35 -0400
-Subject: [lustre-devel] [PATCH 1/6] staging: lustre: libcfs: move
-	add_wait_queue_exclusive_head to lustre layer
+Date: Thu, 31 Mar 2016 10:18:36 -0400
+Subject: [lustre-devel] [PATCH 2/6] staging: lustre: libcfs: move
+	memory_pressure functions to libcfs_prim.h
 In-Reply-To: <1459433920-23644-1-git-send-email-jsimmons@infradead.org>
 References: <1459433920-23644-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459433920-23644-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459433920-23644-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,101 +12,71 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@gmail.com>
 
-Only lustre client uses add_wait_queue_exclusive_head() so move
-it from libcfs layer to lustre_lib.h where it is needed.
+Long ago libcfs_prim.h was used for userland code which is why
+memory_pressure_*() handling is in both libcfs_prim.h and
+linux-mem.h headers. So lets just move the memory_pressure_*()
+to libcfs_prim.h.
 
 Signed-off-by: James Simmons <uja.ornl@gmail.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
-Reviewed-on: http://review.whamcloud.com/13874
+ntel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+Reviewed-on: http://review.whamcloud.com/13841
+Reviewed-by: frank zago <fzago@cray.com>
 Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_prim.h      |    2 -
- .../staging/lustre/lnet/libcfs/linux/linux-prim.c  |   24 --------------------
- drivers/staging/lustre/lustre/include/lustre_lib.h |   22 ++++++++++++++++++
- 3 files changed, 22 insertions(+), 26 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_prim.h      |   23 ++++++++++++-------
+ .../lustre/include/linux/libcfs/linux/linux-mem.h  |    4 ---
+ 2 files changed, 14 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_prim.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_prim.h
-index 082fe6d..d7846e8 100644
+index d7846e8..d97060b 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_prim.h
 +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_prim.h
-@@ -40,8 +40,6 @@
- #ifndef __LIBCFS_PRIM_H__
- #define __LIBCFS_PRIM_H__
- 
--void add_wait_queue_exclusive_head(wait_queue_head_t *, wait_queue_t *);
--
+@@ -43,15 +43,20 @@
  /*
   * Memory
   */
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
-index 7e5ef0a..bbe19a6 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
-@@ -46,30 +46,6 @@
- #include <linux/kgdb.h>
- #endif
- 
--/**
-- * wait_queue_t of Linux (version < 2.6.34) is a FIFO list for exclusively
-- * waiting threads, which is not always desirable because all threads will
-- * be waken up again and again, even user only needs a few of them to be
-- * active most time. This is not good for performance because cache can
-- * be polluted by different threads.
-- *
-- * LIFO list can resolve this problem because we always wakeup the most
-- * recent active thread by default.
-- *
-- * NB: please don't call non-exclusive & exclusive wait on the same
-- * waitq if add_wait_queue_exclusive_head is used.
-- */
--void
--add_wait_queue_exclusive_head(wait_queue_head_t *waitq, wait_queue_t *link)
--{
--	unsigned long flags;
--
--	spin_lock_irqsave(&waitq->lock, flags);
--	__add_wait_queue_exclusive(waitq, link);
--	spin_unlock_irqrestore(&waitq->lock, flags);
--}
--EXPORT_SYMBOL(add_wait_queue_exclusive_head);
--
- sigset_t
- cfs_block_allsigs(void)
- {
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-index 2e66b27..00b9767 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-@@ -522,6 +522,28 @@ struct l_wait_info {
- 			   sigmask(SIGTERM) | sigmask(SIGQUIT) |	\
- 			   sigmask(SIGALRM))
- 
-+/**
-+ * wait_queue_t of Linux (version < 2.6.34) is a FIFO list for exclusively
-+ * waiting threads, which is not always desirable because all threads will
-+ * be waken up again and again, even user only needs a few of them to be
-+ * active most time. This is not good for performance because cache can
-+ * be polluted by different threads.
-+ *
-+ * LIFO list can resolve this problem because we always wakeup the most
-+ * recent active thread by default.
-+ *
-+ * NB: please don't call non-exclusive & exclusive wait on the same
-+ * waitq if add_wait_queue_exclusive_head is used.
-+ */
-+#define add_wait_queue_exclusive_head(waitq, link)		\
-+{								\
-+	unsigned long flags;					\
-+								\
-+	spin_lock_irqsave(&((waitq)->lock), flags);		\
-+	__add_wait_queue_exclusive(waitq, link);		\
-+	spin_unlock_irqrestore(&((waitq)->lock), flags);	\
+-#ifndef memory_pressure_get
+-#define memory_pressure_get() (0)
+-#endif
+-#ifndef memory_pressure_set
+-#define memory_pressure_set() do {} while (0)
+-#endif
+-#ifndef memory_pressure_clr
+-#define memory_pressure_clr() do {} while (0)
+-#endif
++static inline unsigned int memory_pressure_get(void)
++{
++	return current->flags & PF_MEMALLOC;
 +}
 +
- /*
-  * wait for @condition to become true, but no longer than timeout, specified
-  * by @info.
++static inline void memory_pressure_set(void)
++{
++	current->flags |= PF_MEMALLOC;
++}
++
++static inline void memory_pressure_clr(void)
++{
++	current->flags &= ~PF_MEMALLOC;
++}
+ 
+ static inline int cfs_memory_pressure_get_and_set(void)
+ {
+diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
+index 448379b..c50ef83 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
++++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
+@@ -59,10 +59,6 @@
+ 
+ #define page_index(p)       ((p)->index)
+ 
+-#define memory_pressure_get() (current->flags & PF_MEMALLOC)
+-#define memory_pressure_set() do { current->flags |= PF_MEMALLOC; } while (0)
+-#define memory_pressure_clr() do { current->flags &= ~PF_MEMALLOC; } while (0)
+-
+ #if BITS_PER_LONG == 32
+ /* limit to lowmem on 32-bit systems */
+ #define NUM_CACHEPAGES \
 -- 
 1.7.1
