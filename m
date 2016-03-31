@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 31 Mar 2016 10:18:40 -0400
-Subject: [lustre-devel] [PATCH 6/6] staging: lustre: libcfs: delete
-	linux-mem.h
+Date: Thu, 31 Mar 2016 10:18:37 -0400
+Subject: [lustre-devel] [PATCH 3/6] staging: lustre: libcfs: remove
+	page_index() macro
 In-Reply-To: <1459433920-23644-1-git-send-email-jsimmons@infradead.org>
 References: <1459433920-23644-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459433920-23644-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459433920-23644-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,7 +12,7 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@gmail.com>
 
-The header linux-mem.h is no longer needed.
+Just use the index field directly for struct page.
 
 Signed-off-by: James Simmons <uja.ornl@gmail.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
@@ -22,110 +22,49 @@ Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 ---
- .../lustre/include/linux/libcfs/linux/libcfs.h     |    2 +-
- .../lustre/include/linux/libcfs/linux/linux-cpu.h  |    2 +-
- .../lustre/include/linux/libcfs/linux/linux-mem.h  |   60 --------------------
- 3 files changed, 2 insertions(+), 62 deletions(-)
- delete mode 100644 drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
+ .../lustre/include/linux/libcfs/linux/linux-mem.h  |    2 --
+ drivers/staging/lustre/lustre/llite/vvp_page.c     |    2 +-
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    2 +-
+ 3 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
-index d94b266..a268ef7 100644
---- a/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
-@@ -60,6 +60,7 @@
- #include <linux/moduleparam.h>
- #include <linux/mutex.h>
- #include <linux/notifier.h>
-+#include <linux/pagemap.h>
- #include <linux/random.h>
- #include <linux/rbtree.h>
- #include <linux/rwsem.h>
-@@ -83,7 +84,6 @@
- #include <stdarg.h>
- #include "linux-cpu.h"
- #include "linux-time.h"
--#include "linux-mem.h"
- 
- #define LUSTRE_TRACE_SIZE (THREAD_SIZE >> 5)
- 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-index c04979a..f63cb47 100644
---- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-@@ -23,7 +23,7 @@
-  * This file is part of Lustre, http://www.lustre.org/
-  * Lustre is a trademark of Sun Microsystems, Inc.
-  *
-- * libcfs/include/libcfs/linux/linux-mem.h
-+ * libcfs/include/libcfs/linux/linux-cpu.h
-  *
-  * Basic library routines.
-  *
 diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
-deleted file mode 100644
-index 9285fef..0000000
+index c50ef83..12fde3c 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
-+++ /dev/null
-@@ -1,60 +0,0 @@
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-- *
-- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
-- * CA 95054 USA or visit www.sun.com if you need additional information or
-- * have any questions.
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- *
-- * Copyright (c) 2011, 2012, Intel Corporation.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- *
-- * libcfs/include/libcfs/linux/linux-mem.h
-- *
-- * Basic library routines.
-- */
++++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-mem.h
+@@ -57,8 +57,6 @@
+ #include "../libcfs_cpu.h"
+ #endif
+ 
+-#define page_index(p)       ((p)->index)
 -
--#ifndef __LIBCFS_LINUX_CFS_MEM_H__
--#define __LIBCFS_LINUX_CFS_MEM_H__
--
--#ifndef __LIBCFS_LIBCFS_H__
--#error Do not #include this file directly. #include <linux/libcfs/libcfs.h> instead
--#endif
--
--#include <linux/mm.h>
--#include <linux/vmalloc.h>
--#include <linux/pagemap.h>
--#include <linux/slab.h>
--#include <linux/memcontrol.h>
--#include <linux/mm_inline.h>
--
--#ifndef HAVE_LIBCFS_CPT
--/* Need this for cfs_cpt_table */
--#include "../libcfs_cpu.h"
--#endif
--
--#endif /* __LINUX_CFS_MEM_H__ */
+ #if BITS_PER_LONG == 32
+ /* limit to lowmem on 32-bit systems */
+ #define NUM_CACHEPAGES \
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_page.c b/drivers/staging/lustre/lustre/llite/vvp_page.c
+index 69316c1..0c92293 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_page.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_page.c
+@@ -394,7 +394,7 @@ static int vvp_page_print(const struct lu_env *env,
+ 		(*printer)(env, cookie, "%lx %d:%d %lx %lu %slru",
+ 			   (long)vmpage->flags, page_count(vmpage),
+ 			   page_mapcount(vmpage), vmpage->private,
+-			   page_index(vmpage),
++			   vmpage->index,
+ 			   list_empty(&vmpage->lru) ? "not-" : "");
+ 	}
+ 
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 4d3eed6..547539c 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -1934,7 +1934,7 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
+ 		pga[i] = &oap->oap_brw_page;
+ 		pga[i]->off = oap->oap_obj_off + oap->oap_page_off;
+ 		CDEBUG(0, "put page %p index %lu oap %p flg %x to pga\n",
+-		       pga[i]->pg, page_index(oap->oap_page), oap,
++		       pga[i]->pg, oap->oap_page->index, oap,
+ 		       pga[i]->flag);
+ 		i++;
+ 		cl_req_page_add(env, clerq, page);
 -- 
 1.7.1
