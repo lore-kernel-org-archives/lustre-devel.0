@@ -1,28 +1,49 @@
-From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Thu, 31 Mar 2016 20:33:34 +0000
-Subject: [lustre-devel] [PATCH 2/6] staging: lustre: libcfs: move
- memory_pressure functions to libcfs_prim.h
-In-Reply-To: <20160331200358.GA28146@kroah.com>
-References: <1459433920-23644-1-git-send-email-jsimmons@infradead.org>
-	<1459433920-23644-3-git-send-email-jsimmons@infradead.org>
-	<20160331200358.GA28146@kroah.com>
-Message-ID: <647018c9fc784e15832340a614e205cc@EXCHCS32.ornl.gov>
+From: Joe Perches <joe@perches.com>
+Date: Fri,  1 Apr 2016 06:02:08 -0700
+Subject: [lustre-devel] [RFC PATCH 0/3] staging: lustre: detypedef
+Message-ID: <cover.1459515208.git.joe@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: 'Greg Kroah-Hartman' <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>
-Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, James Simmons <uja.ornl@gmail.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: linux-kernel@vger.kernel.org
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org
 
->On Thu, Mar 31, 2016 at 10:18:36AM -0400, James Simmons wrote:
->> Long ago libcfs_prim.h was used for userland code which is why
->> memory_pressure_*() handling is in both libcfs_prim.h and
->> linux-mem.h headers. So lets just move the memory_pressure_*()
->> to libcfs_prim.h.
->> 
->> Signed-off-by: James Simmons <uja.ornl@gmail.com>
->> ntel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
->
->"ntel-bug-id:"?  :)
+Question about removing lustre typedefs.
 
-Thanks for fixing that.
+Various bits of lustre code use a mix of struct foo and foo_t.
+
+When would be an appropriate time to submit patches similar to
+below that individually remove various typedefs from lustre code?
+
+These are pretty trivial to produce and verify so there's no
+particular hurry to do them now but applying them will require
+resync points for active and actually useful developers.
+
+A few scripted examples are done:
+
+Joe Perches (3):
+  staging: lustre: Remove typedef lnet_peer_t
+  staging: lustre: Remove typedef lnd_t
+  staging: lustre: Remove typedef lnet_msg_t
+
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   | 62 +++++++--------
+ .../staging/lustre/include/linux/lnet/lib-types.h  | 22 +++---
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  4 +-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  6 +-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |  8 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |  2 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |  6 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |  6 +-
+ drivers/staging/lustre/lnet/lnet/api-ni.c          | 16 ++--
+ drivers/staging/lustre/lnet/lnet/lib-move.c        | 92 +++++++++++-----------
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         | 24 +++---
+ drivers/staging/lustre/lnet/lnet/lib-ptl.c         |  4 +-
+ drivers/staging/lustre/lnet/lnet/lo.c              |  8 +-
+ drivers/staging/lustre/lnet/lnet/peer.c            | 30 +++----
+ drivers/staging/lustre/lnet/lnet/router.c          | 28 +++----
+ drivers/staging/lustre/lnet/lnet/router_proc.c     |  4 +-
+ 16 files changed, 161 insertions(+), 161 deletions(-)
+
+-- 
+2.8.0.rc4.16.g56331f8
