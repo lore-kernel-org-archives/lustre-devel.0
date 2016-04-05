@@ -1,73 +1,76 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  4 Apr 2016 21:36:45 -0400
-Subject: [lustre-devel] [PATCH 00/18] fill in missing patches present in
-	2.4.92 version
-Message-ID: <1459820223-24754-1-git-send-email-jsimmons@infradead.org>
+Date: Mon,  4 Apr 2016 21:36:52 -0400
+Subject: [lustre-devel] [PATCH 07/18] staging: lustre: hsm: rename
+	hai_zero() HSM function
+In-Reply-To: <1459820223-24754-1-git-send-email-jsimmons@infradead.org>
+References: <1459820223-24754-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459820223-24754-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, JC Lafoucriere <jacques-charles.lafoucriere@cea.fr>, James Simmons <jsimmons@infradead.org>
 
-After the lustre client code was merged patches continued to land but
-gaps did happen were several patches were missed. This batch of patches
-are bug fixes that happened after the upstream client merger and before
-the creation of lustre version 2.4.92 tag.
+From: JC Lafoucriere <jacques-charles.lafoucriere@cea.fr>
 
-Aurelien Degremont (1):
-  staging: lustre: hsm: copy start error should set HP_FLAG_COMPLETED
+rename hai_zero() to hai_first(). Use a better name for hai helper
 
-Gaurav Mahajan (1):
-  staging: lustre: llite: Delaying creation of client side proc entries.
-
-JC Lafoucriere (2):
-  staging: lustre: hsm: rename hai_zero() HSM function
-  staging: lustre: hsm: Add CLF_RENAME_LAST flag
-
-James Simmons (1):
-  staging: lustre: osc: Lustre returns EINTR from writes when SA_RESTART is set
-
-Jinshan Xiong (7):
-  staging: lustre: libcfs: remove userland comments in libcfs_debug.h
-  staging: lustre: libcfs: create array of debug names
-  staging: lustre: libcfs: make D_HSM a unique value
-  staging: lustre: hsm: Fix lu_ref for lease handle
-  staging: lustre: llite: reset writeback index in ll_writepages
-  staging: lustre: llite: cancel open lock before closing file
-  staging: lustre: hsm: Add support to drop all pages for ll_data_version
-
-Ned Bass (1):
-  staging: lustre: mdc: document mdc_rpc_lock
-
-Niu Yawei (1):
-  staging: lustre: llite: use 64bits flags in ll_lov_setea()
-
-Sebastien Buisson (3):
-  staging: lustre: ldlm: fix 'deadcode' errors
-  staging: lustre: fix 'NULL pointer dereference' errors
-  staging: lustre: fix 'no effect' errors
-
-Swapnil Pimpale (1):
-  staging: lustre: lov: Get the correct address of lmm_objects
-
- .../lustre/include/linux/libcfs/libcfs_debug.h     |   18 ++-
- drivers/staging/lustre/lnet/libcfs/debug.c         |  126 ++------------------
- .../lustre/lustre/include/lustre/lustre_idl.h      |    1 +
- .../lustre/lustre/include/lustre/lustre_user.h     |   18 ++-
- drivers/staging/lustre/lustre/include/lustre_mdc.h |   18 +++
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |    6 -
- drivers/staging/lustre/lustre/llite/dir.c          |   18 ++-
- drivers/staging/lustre/lustre/llite/file.c         |   59 ++++++----
- .../staging/lustre/lustre/llite/llite_internal.h   |    4 +-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   16 ++-
- drivers/staging/lustre/lustre/llite/rw.c           |    5 +-
- drivers/staging/lustre/lustre/llite/xattr.c        |    9 +-
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    2 +-
- drivers/staging/lustre/lustre/lov/lov_io.c         |    3 +-
- drivers/staging/lustre/lustre/lov/lov_merge.c      |   11 ++
- drivers/staging/lustre/lustre/lov/lov_pack.c       |    3 +-
- drivers/staging/lustre/lustre/mdc/mdc_lib.c        |    2 +-
+Signed-off-by: JC Lafoucriere <jacques-charles.lafoucriere@cea.fr>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3709
+Reviewed-on: http://review.whamcloud.com/7254
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ .../lustre/lustre/include/lustre/lustre_user.h     |    6 +++---
  drivers/staging/lustre/lustre/mdc/mdc_request.c    |    2 +-
- drivers/staging/lustre/lustre/osc/osc_cache.c      |   42 +++++--
- 19 files changed, 166 insertions(+), 197 deletions(-)
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+index 19f2271..4672145 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+@@ -1095,7 +1095,7 @@ struct hsm_action_list {
+ 	__u32 padding1;
+ 	char  hal_fsname[0];   /* null-terminated */
+ 	/* struct hsm_action_item[hal_count] follows, aligned on 8-byte
+-	 * boundaries. See hai_zero
++	 * boundaries. See hai_first
+ 	 */
+ } __packed;
+ 
+@@ -1109,7 +1109,7 @@ static inline int cfs_size_round(int val)
+ #endif
+ 
+ /* Return pointer to first hai in action list */
+-static inline struct hsm_action_item *hai_zero(struct hsm_action_list *hal)
++static inline struct hsm_action_item *hai_first(struct hsm_action_list *hal)
+ {
+ 	return (struct hsm_action_item *)(hal->hal_fsname +
+ 					  cfs_size_round(strlen(hal-> \
+@@ -1131,7 +1131,7 @@ static inline int hal_size(struct hsm_action_list *hal)
+ 	struct hsm_action_item *hai;
+ 
+ 	sz = sizeof(*hal) + cfs_size_round(strlen(hal->hal_fsname) + 1);
+-	hai = hai_zero(hal);
++	hai = hai_first(hal);
+ 	for (i = 0; i < hal->hal_count; i++, hai = hai_next(hai))
+ 		sz += cfs_size_round(hai->hai_len);
+ 
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index 98b27f1..a089237 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -1952,7 +1952,7 @@ static void lustre_swab_hal(struct hsm_action_list *h)
+ 	__swab32s(&h->hal_count);
+ 	__swab32s(&h->hal_archive_id);
+ 	__swab64s(&h->hal_flags);
+-	hai = hai_zero(h);
++	hai = hai_first(h);
+ 	for (i = 0; i < h->hal_count; i++, hai = hai_next(hai))
+ 		lustre_swab_hai(hai);
+ }
+-- 
+1.7.1
