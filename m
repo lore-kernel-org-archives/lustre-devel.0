@@ -1,63 +1,47 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  4 Apr 2016 21:36:57 -0400
-Subject: [lustre-devel] [PATCH 12/18] staging: lustre: mdc: document
-	mdc_rpc_lock
+Date: Mon,  4 Apr 2016 21:36:54 -0400
+Subject: [lustre-devel] [PATCH 09/18] staging: lustre: lov: Get the correct
+	address of lmm_objects
 In-Reply-To: <1459820223-24754-1-git-send-email-jsimmons@infradead.org>
 References: <1459820223-24754-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459820223-24754-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459820223-24754-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Ned Bass <bass6@llnl.gov>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Swapnil Pimpale <spimpale@ddn.com>, James Simmons <jsimmons@infradead.org>
 
-From: Ned Bass <bass6@llnl.gov>
+From: Swapnil Pimpale <spimpale@ddn.com>
 
-As this lock can be a bottleneck, clarifying why it is needed may be
-helpful to those working on client performance.
+The introduction of lmm_layout_gen makes the assumption that
+lmm_objects is present after lmm_stripe_count incorrect.
+Fixed this to get the correct address of lmm_objects when lmmk is cast
+to lov_mds_md_v1.
 
-Signed-off-by: Ned Bass <bass6@llnl.gov>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3443
-Reviewed-on: http://review.whamcloud.com/6593
+Signed-off-by: Swapnil Pimpale <spimpale@ddn.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3162
+Reviewed-on: http://review.whamcloud.com/7258
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Keith Mannthey <keith.mannthey@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_mdc.h |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_pack.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_mdc.h b/drivers/staging/lustre/lustre/include/lustre_mdc.h
-index df94f9f..9e54790 100644
---- a/drivers/staging/lustre/lustre/include/lustre_mdc.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_mdc.h
-@@ -64,9 +64,27 @@ struct obd_export;
- struct ptlrpc_request;
- struct obd_device;
- 
-+/**
-+ * Serializes in-flight MDT-modifying RPC requests to preserve idempotency.
-+ *
-+ * This mutex is used to implement execute-once semantics on the MDT.
-+ * The MDT stores the last transaction ID and result for every client in
-+ * its last_rcvd file. If the client doesn't get a reply, it can safely
-+ * resend the request and the MDT will reconstruct the reply being aware
-+ * that the request has already been executed. Without this lock,
-+ * execution status of concurrent in-flight requests would be
-+ * overwritten.
-+ *
-+ * This design limits the extent to which we can keep a full pipeline of
-+ * in-flight requests from a single client.  This limitation could be
-+ * overcome by allowing multiple slots per client in the last_rcvd file.
-+ */
- struct mdc_rpc_lock {
-+	/** Lock protecting in-flight RPC concurrency. */
- 	struct mutex		rpcl_mutex;
-+	/** Intent associated with currently executing request. */
- 	struct lookup_intent	*rpcl_it;
-+	/** Used for MDS/RPC load testing purposes. */
- 	int			rpcl_fakes;
- };
- 
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index 3925633..2f02be5 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -444,8 +444,7 @@ int lov_getstripe(struct obd_export *exp, struct lov_stripe_md *lsm,
+ 	if (lum.lmm_magic == LOV_USER_MAGIC) {
+ 		/* User request for v1, we need skip lmm_pool_name */
+ 		if (lmmk->lmm_magic == LOV_MAGIC_V3) {
+-			memmove((char *)(&lmmk->lmm_stripe_count) +
+-				sizeof(lmmk->lmm_stripe_count),
++			memmove(((struct lov_mds_md_v1 *)lmmk)->lmm_objects,
+ 				((struct lov_mds_md_v3 *)lmmk)->lmm_objects,
+ 				lmmk->lmm_stripe_count *
+ 				sizeof(struct lov_ost_data_v1));
 -- 
 1.7.1
