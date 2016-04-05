@@ -1,62 +1,75 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  4 Apr 2016 21:36:48 -0400
-Subject: [lustre-devel] [PATCH 03/18] staging: lustre: libcfs: remove
-	userland comments in libcfs_debug.h
+Date: Mon,  4 Apr 2016 21:36:56 -0400
+Subject: [lustre-devel] [PATCH 11/18] staging: lustre: llite: Delaying
+	creation of client side proc entries.
 In-Reply-To: <1459820223-24754-1-git-send-email-jsimmons@infradead.org>
 References: <1459820223-24754-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459820223-24754-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459820223-24754-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Gaurav Mahajan <gmahajan@ddn.com>, James Simmons <jsimmons@infradead.org>
 
-From: Jinshan Xiong <jinshan.xiong@intel.com>
+From: Gaurav Mahajan <gmahajan@ddn.com>
 
-Remove comments about userland use.
+In client_common_fill_super() proc entries are created before
+before cl_sb_init() and therefore lu_site is not allocated resulting
+in client crash when tried reading lu_site stats.
+Delaying creation of proc entries after creation of all required data
+structures fixed the problem.
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3647
-Reviewed-on: http://review.whamcloud.com/7243
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: jacques-Charles Lafoucriere <jacques-charles.lafoucriere@cea.fr>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: Gaurav Mahajan <gmahajan@ddn.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2941
+Reviewed-on: http://review.whamcloud.com/6852
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Emoly Liu <emoly.liu@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/linux/libcfs/libcfs_debug.h     |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_lib.c |   16 +++++++++-------
+ 1 files changed, 9 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h
-index 98430e7..7472a31 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h
-@@ -85,7 +85,6 @@ struct ptldebug_header {
- #define PH_FLAG_FIRST_RECORD 1
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 95c55c3..9571742 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -166,12 +166,6 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
+ 		return -ENOMEM;
+ 	}
  
- /* Debugging subsystems (32 bits, non-overlapping) */
--/* keep these in sync with lnet/utils/debug.c and lnet/libcfs/debug.c */
- #define S_UNDEFINED	0x00000001
- #define S_MDC		0x00000002
- #define S_MDS		0x00000004
-@@ -118,10 +117,8 @@ struct ptldebug_header {
- #define S_MGS		0x20000000
- #define S_FID		0x40000000 /* b_new_cmd */
- #define S_FLD		0x80000000 /* b_new_cmd */
--/* keep these in sync with lnet/utils/debug.c and lnet/libcfs/debug.c */
+-	if (llite_root) {
+-		err = ldebugfs_register_mountpoint(llite_root, sb, dt, md);
+-		if (err < 0)
+-			CERROR("could not register mount in <debugfs>/lustre/llite\n");
+-	}
+-
+ 	/* indicate the features supported by this client */
+ 	data->ocd_connect_flags = OBD_CONNECT_IBITS    | OBD_CONNECT_NODEVOH  |
+ 				  OBD_CONNECT_ATTRFID  |
+@@ -552,6 +546,15 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
+ 	kfree(data);
+ 	kfree(osfs);
  
- /* Debugging masks (32 bits, non-overlapping) */
--/* keep these in sync with lnet/utils/debug.c and lnet/libcfs/debug.c */
- #define D_TRACE		0x00000001 /* ENTRY/EXIT markers */
- #define D_INODE		0x00000002
- #define D_SUPER		0x00000004
-@@ -151,7 +148,6 @@ struct ptldebug_header {
- #define D_QUOTA		0x04000000
- #define D_SEC		0x08000000
- #define D_LFSCK		0x10000000 /* For both OI scrub and LFSCK */
--/* keep these in sync with lnet/{utils,libcfs}/debug.c */
- 
- #define D_HSM	 D_TRACE
++	if (llite_root) {
++		err = ldebugfs_register_mountpoint(llite_root, sb, dt, md);
++		if (err < 0) {
++			CERROR("%s: could not register mount in debugfs: "
++			       "rc = %d\n", ll_get_fsname(sb, NULL, 0), err);
++			err = 0;
++		}
++	}
++
+ 	return err;
+ out_root:
+ 	iput(root);
+@@ -570,7 +573,6 @@ out_md:
+ out:
+ 	kfree(data);
+ 	kfree(osfs);
+-	ldebugfs_unregister_mountpoint(sbi);
+ 	return err;
+ }
  
 -- 
 1.7.1
