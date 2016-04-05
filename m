@@ -1,21 +1,38 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Tue, 5 Apr 2016 08:59:27 -0400
-Subject: [lustre-devel] [PATCH 08/27] staging: lustre: avoid to use
-	bio->bi_vcnt directly
-In-Reply-To: <1459857443-20611-9-git-send-email-tom.leiming@gmail.com>
-References: <1459857443-20611-1-git-send-email-tom.leiming@gmail.com>
-	<1459857443-20611-9-git-send-email-tom.leiming@gmail.com>
-Message-ID: <20160405125927.GA25853@kroah.com>
+From: Sudip Mukherjee <sudipm.mukherjee@gmail.com>
+Date: Tue,  5 Apr 2016 20:15:34 +0530
+Subject: [lustre-devel] [PATCH] staging/lustre/obdclass: fix build warning
+Message-ID: <1459867534-4507-1-git-send-email-sudipm.mukherjee@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Ming Lei <tom.leiming@gmail.com>
-Cc: Jens Axboe <axboe@fb.com>, linux-kernel@vger.kernel.org, "open list:STAGING SUBSYSTEM" <devel@driverdev.osuosl.org>, Christoph Hellwig <hch@infradead.org>, Julia Lawall <Julia.Lawall@lip6.fr>, Andreas Dilger <andreas.dilger@intel.com>, Boaz Harrosh <boaz@plexistor.com>, Oleg Drokin <oleg.drokin@intel.com>, linux-block@vger.kernel.org, Al Viro <viro@zeniv.linux.org.uk>, James Simmons <jsimmons@infradead.org>, "John L. Hammond" <john.hammond@intel.com>, Frank Zago <fzago@cray.com>, Kent Overstreet <kent.overstreet@gmail.com>, "moderated list:STAGING - LUSTRE PARALLEL FILESYSTEM" <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, Sudip Mukherjee <sudipm.mukherjee@gmail.com>
 
-On Tue, Apr 05, 2016 at 07:56:53PM +0800, Ming Lei wrote:
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+While building with W=1 we were getting the warning:
 
-A bit more of a commit message is always nice :)
+drivers/staging/lustre/lustre/obdclass/cl_object.c:1056:16:
+	warning: old-style function definition
+ struct lu_env *cl_env_percpu_get()
+                ^
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
+---
+ drivers/staging/lustre/lustre/obdclass/cl_object.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+index 395b92c..d84ec00 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
+@@ -1053,7 +1053,7 @@ void cl_env_percpu_put(struct lu_env *env)
+ }
+ EXPORT_SYMBOL(cl_env_percpu_put);
+ 
+-struct lu_env *cl_env_percpu_get()
++struct lu_env *cl_env_percpu_get(void)
+ {
+ 	struct cl_env *cle;
+ 
+-- 
+1.9.1
