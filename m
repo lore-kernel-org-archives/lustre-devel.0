@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  6 Apr 2016 15:25:43 -0400
-Subject: [lustre-devel] [PATCH 17/24] staging: lustre: selftest: convert
-	lstcon_ndlink_t to proper struct
+Date: Wed,  6 Apr 2016 15:25:31 -0400
+Subject: [lustre-devel] [PATCH 05/24] staging: lustre: selftest: convert
+	swi_workitem_t to proper struct
 In-Reply-To: <1459970750-5377-1-git-send-email-jsimmons@infradead.org>
 References: <1459970750-5377-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459970750-5377-18-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459970750-5377-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,330 +12,180 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@gmail.com>
 
-Turn typedef lstcon_ndlink_t to proper structure
+Turn typedef swi_workitem_t to proper structure
 
 Signed-off-by: James Simmons <uja.ornl@gmail.com>
 ---
- drivers/staging/lustre/lnet/selftest/conrpc.c  |    6 +-
- drivers/staging/lustre/lnet/selftest/console.c |   64 ++++++++++++------------
- drivers/staging/lustre/lnet/selftest/console.h |    7 ++-
- 3 files changed, 39 insertions(+), 38 deletions(-)
+ drivers/staging/lustre/lnet/selftest/framework.c |    4 +-
+ drivers/staging/lustre/lnet/selftest/rpc.c       |    8 +++---
+ drivers/staging/lustre/lnet/selftest/selftest.h  |   26 +++++++++++----------
+ 3 files changed, 20 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-index 194b6dc..5cbd631 100644
---- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-@@ -719,7 +719,7 @@ lstcon_dstnodes_prep(lstcon_group_t *grp, int idx,
- 		     int dist, int span, int nkiov, lnet_kiov_t *kiov)
- {
- 	lnet_process_id_packed_t *pid;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	struct lstcon_node *nd;
- 	int start;
- 	int end;
-@@ -1086,7 +1086,7 @@ lstcon_rpc_trans_ndlist(struct list_head *ndlist,
- 			struct lstcon_rpc_trans **transpp)
- {
- 	struct lstcon_rpc_trans *trans;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	struct lstcon_node *nd;
- 	struct lstcon_rpc *rpc;
- 	unsigned feats;
-@@ -1172,7 +1172,7 @@ lstcon_rpc_pinger(void *arg)
- 	struct lstcon_rpc *crpc;
- 	srpc_msg_t *rep;
- 	srpc_debug_reqst_t *drq;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	struct lstcon_node *nd;
- 	int intv;
- 	int count = 0;
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index 32364b4..e068c13 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -71,7 +71,7 @@ lstcon_node_get(struct lstcon_node *nd)
- static int
- lstcon_node_find(lnet_process_id_t id, struct lstcon_node **ndpp, int create)
- {
--	lstcon_ndlink_t	*ndl;
-+	struct lstcon_ndlink	*ndl;
- 	unsigned int idx = LNET_NIDADDR(id.nid) % LST_GLOBAL_HASHSIZE;
- 
- 	LASSERT(id.nid != LNET_NID_ANY);
-@@ -90,11 +90,11 @@ lstcon_node_find(lnet_process_id_t id, struct lstcon_node **ndpp, int create)
- 	if (!create)
- 		return -ENOENT;
- 
--	LIBCFS_ALLOC(*ndpp, sizeof(struct lstcon_node) + sizeof(lstcon_ndlink_t));
-+	LIBCFS_ALLOC(*ndpp, sizeof(struct lstcon_node) + sizeof(struct lstcon_ndlink));
- 	if (!*ndpp)
- 		return -ENOMEM;
- 
--	ndl = (lstcon_ndlink_t *)(*ndpp + 1);
-+	ndl = (struct lstcon_ndlink *)(*ndpp + 1);
- 
- 	ndl->ndl_node = *ndpp;
- 
-@@ -119,14 +119,14 @@ lstcon_node_find(lnet_process_id_t id, struct lstcon_node **ndpp, int create)
- static void
- lstcon_node_put(struct lstcon_node *nd)
- {
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 
- 	LASSERT(nd->nd_ref > 0);
- 
- 	if (--nd->nd_ref > 0)
- 		return;
- 
--	ndl = (lstcon_ndlink_t *)(nd + 1);
-+	ndl = (struct lstcon_ndlink *)(nd + 1);
- 
- 	LASSERT(!list_empty(&ndl->ndl_link));
- 	LASSERT(!list_empty(&ndl->ndl_hlink));
-@@ -135,15 +135,15 @@ lstcon_node_put(struct lstcon_node *nd)
- 	list_del(&ndl->ndl_link);
- 	list_del(&ndl->ndl_hlink);
- 
--	LIBCFS_FREE(nd, sizeof(struct lstcon_node) + sizeof(lstcon_ndlink_t));
-+	LIBCFS_FREE(nd, sizeof(struct lstcon_node) + sizeof(struct lstcon_ndlink));
+diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+index 40a3da9..b2df184 100644
+--- a/drivers/staging/lustre/lnet/selftest/framework.c
++++ b/drivers/staging/lustre/lnet/selftest/framework.c
+@@ -942,7 +942,7 @@ sfw_create_test_rpc(sfw_test_unit_t *tsu, lnet_process_id_t peer,
  }
  
  static int
- lstcon_ndlink_find(struct list_head *hash,
--		   lnet_process_id_t id, lstcon_ndlink_t **ndlpp, int create)
-+		   lnet_process_id_t id, struct lstcon_ndlink **ndlpp, int create)
+-sfw_run_test(swi_workitem_t *wi)
++sfw_run_test(struct swi_workitem *wi)
  {
- 	unsigned int idx = LNET_NIDADDR(id.nid) % LST_NODE_HASHSIZE;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	struct lstcon_node *nd;
- 	int rc;
- 
-@@ -168,7 +168,7 @@ lstcon_ndlink_find(struct list_head *hash,
- 	if (rc)
- 		return rc;
- 
--	LIBCFS_ALLOC(ndl, sizeof(lstcon_ndlink_t));
-+	LIBCFS_ALLOC(ndl, sizeof(struct lstcon_ndlink));
- 	if (!ndl) {
- 		lstcon_node_put(nd);
- 		return -ENOMEM;
-@@ -184,7 +184,7 @@ lstcon_ndlink_find(struct list_head *hash,
- }
- 
- static void
--lstcon_ndlink_release(lstcon_ndlink_t *ndl)
-+lstcon_ndlink_release(struct lstcon_ndlink *ndl)
- {
- 	LASSERT(list_empty(&ndl->ndl_link));
- 	LASSERT(!list_empty(&ndl->ndl_hlink));
-@@ -234,13 +234,13 @@ lstcon_group_addref(lstcon_group_t *grp)
- 	grp->grp_ref++;
- }
- 
--static void lstcon_group_ndlink_release(lstcon_group_t *, lstcon_ndlink_t *);
-+static void lstcon_group_ndlink_release(lstcon_group_t *, struct lstcon_ndlink *);
- 
- static void
- lstcon_group_drain(lstcon_group_t *grp, int keep)
- {
--	lstcon_ndlink_t *ndl;
--	lstcon_ndlink_t *tmp;
-+	struct lstcon_ndlink *ndl;
-+	struct lstcon_ndlink *tmp;
- 
- 	list_for_each_entry_safe(ndl, tmp, &grp->grp_ndl_list, ndl_link) {
- 		if (!(ndl->ndl_node->nd_state & keep))
-@@ -287,7 +287,7 @@ lstcon_group_find(const char *name, lstcon_group_t **grpp)
- 
+ 	sfw_test_unit_t *tsu = wi->swi_workitem.wi_data;
+ 	sfw_test_instance_t *tsi = tsu->tsu_instance;
+@@ -993,7 +993,7 @@ test_done:
  static int
- lstcon_group_ndlink_find(lstcon_group_t *grp, lnet_process_id_t id,
--			 lstcon_ndlink_t **ndlpp, int create)
-+			 struct lstcon_ndlink **ndlpp, int create)
+ sfw_run_batch(sfw_batch_t *tsb)
  {
- 	int rc;
+-	swi_workitem_t *wi;
++	struct swi_workitem *wi;
+ 	sfw_test_unit_t *tsu;
+ 	sfw_test_instance_t *tsi;
  
-@@ -305,7 +305,7 @@ lstcon_group_ndlink_find(lstcon_group_t *grp, lnet_process_id_t id,
+diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
+index 316ccf7..b0d5a89 100644
+--- a/drivers/staging/lustre/lnet/selftest/rpc.c
++++ b/drivers/staging/lustre/lnet/selftest/rpc.c
+@@ -71,7 +71,7 @@ srpc_serv_portal(int svc_id)
  }
  
+ /* forward ref's */
+-int srpc_handle_rpc(swi_workitem_t *wi);
++int srpc_handle_rpc(struct swi_workitem *wi);
+ 
+ void srpc_get_counters(srpc_counters_t *cnt)
+ {
+@@ -963,7 +963,7 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
+ 
+ /* handles an incoming RPC */
+ int
+-srpc_handle_rpc(swi_workitem_t *wi)
++srpc_handle_rpc(struct swi_workitem *wi)
+ {
+ 	struct srpc_server_rpc *rpc = wi->swi_workitem.wi_data;
+ 	struct srpc_service_cd *scd = rpc->srpc_scd;
+@@ -1140,7 +1140,7 @@ srpc_del_client_rpc_timer(srpc_client_rpc_t *rpc)
  static void
--lstcon_group_ndlink_release(lstcon_group_t *grp, lstcon_ndlink_t *ndl)
-+lstcon_group_ndlink_release(lstcon_group_t *grp, struct lstcon_ndlink *ndl)
+ srpc_client_rpc_done(srpc_client_rpc_t *rpc, int status)
  {
- 	list_del_init(&ndl->ndl_link);
- 	lstcon_ndlink_release(ndl);
-@@ -314,7 +314,7 @@ lstcon_group_ndlink_release(lstcon_group_t *grp, lstcon_ndlink_t *ndl)
+-	swi_workitem_t *wi = &rpc->crpc_wi;
++	struct swi_workitem *wi = &rpc->crpc_wi;
  
- static void
- lstcon_group_ndlink_move(lstcon_group_t *old,
--			 lstcon_group_t *new, lstcon_ndlink_t *ndl)
-+			 lstcon_group_t *new, struct lstcon_ndlink *ndl)
- {
- 	unsigned int idx = LNET_NIDADDR(ndl->ndl_node->nd_id.nid) %
- 					LST_NODE_HASHSIZE;
-@@ -331,11 +331,11 @@ lstcon_group_ndlink_move(lstcon_group_t *old,
- static void
- lstcon_group_move(lstcon_group_t *old, lstcon_group_t *new)
- {
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
+ 	LASSERT(status || wi->swi_state == SWI_STATE_DONE);
  
- 	while (!list_empty(&old->grp_ndl_list)) {
- 		ndl = list_entry(old->grp_ndl_list.next,
--				 lstcon_ndlink_t, ndl_link);
-+				 struct lstcon_ndlink, ndl_link);
- 		lstcon_group_ndlink_move(old, new, ndl);
- 	}
- }
-@@ -404,7 +404,7 @@ lstcon_group_nodes_add(lstcon_group_t *grp,
- 		       unsigned *featp, struct list_head __user *result_up)
- {
- 	struct lstcon_rpc_trans *trans;
--	lstcon_ndlink_t	*ndl;
-+	struct lstcon_ndlink	*ndl;
- 	lstcon_group_t *tmp;
- 	lnet_process_id_t id;
- 	int i;
-@@ -471,7 +471,7 @@ lstcon_group_nodes_remove(lstcon_group_t *grp,
- 			  struct list_head __user *result_up)
- {
- 	struct lstcon_rpc_trans *trans;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	lstcon_group_t *tmp;
- 	lnet_process_id_t id;
- 	int rc;
-@@ -744,7 +744,7 @@ static int
- lstcon_nodes_getent(struct list_head *head, int *index_p,
- 		    int *count_p, lstcon_node_ent_t __user *dents_up)
- {
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	struct lstcon_node *nd;
- 	int count = 0;
- 	int index = 0;
-@@ -787,7 +787,7 @@ lstcon_group_info(char *name, lstcon_ndlist_ent_t __user *gents_p,
- {
- 	lstcon_ndlist_ent_t *gentp;
- 	lstcon_group_t *grp;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	int rc;
+@@ -1175,7 +1175,7 @@ srpc_client_rpc_done(srpc_client_rpc_t *rpc, int status)
  
- 	rc = lstcon_group_find(name, &grp);
-@@ -936,7 +936,7 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
- 	struct list_head *srvlst;
- 	lstcon_test_t *test = NULL;
- 	lstcon_batch_t *bat;
--	lstcon_ndlink_t	*ndl;
-+	struct lstcon_ndlink	*ndl;
- 	int rc;
- 
- 	rc = lstcon_batch_find(name, &bat);
-@@ -1090,7 +1090,7 @@ lstcon_batch_stop(char *name, int force, struct list_head __user *result_up)
- static void
- lstcon_batch_destroy(lstcon_batch_t *bat)
+ /* sends an outgoing RPC */
+ int
+-srpc_send_rpc(swi_workitem_t *wi)
++srpc_send_rpc(struct swi_workitem *wi)
  {
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	lstcon_test_t *test;
- 	int i;
- 
-@@ -1114,7 +1114,7 @@ lstcon_batch_destroy(lstcon_batch_t *bat)
- 
- 	while (!list_empty(&bat->bat_cli_list)) {
- 		ndl = list_entry(bat->bat_cli_list.next,
--				 lstcon_ndlink_t, ndl_link);
-+				 struct lstcon_ndlink, ndl_link);
- 		list_del_init(&ndl->ndl_link);
- 
- 		lstcon_ndlink_release(ndl);
-@@ -1122,7 +1122,7 @@ lstcon_batch_destroy(lstcon_batch_t *bat)
- 
- 	while (!list_empty(&bat->bat_srv_list)) {
- 		ndl = list_entry(bat->bat_srv_list.next,
--				 lstcon_ndlink_t, ndl_link);
-+				 struct lstcon_ndlink, ndl_link);
- 		list_del_init(&ndl->ndl_link);
- 
- 		lstcon_ndlink_release(ndl);
-@@ -1145,7 +1145,7 @@ lstcon_testrpc_condition(int transop, struct lstcon_node *nd, void *arg)
- {
- 	lstcon_test_t *test;
- 	lstcon_batch_t *batch;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	struct list_head *hash;
- 	struct list_head *head;
- 
-@@ -1258,7 +1258,7 @@ static int
- lstcon_verify_group(const char *name, lstcon_group_t **grp)
- {
- 	int rc;
--	lstcon_ndlink_t	*ndl;
-+	struct lstcon_ndlink	*ndl;
- 
- 	rc = lstcon_group_find(name, grp);
- 	if (rc) {
-@@ -1535,7 +1535,7 @@ int
- lstcon_nodes_stat(int count, lnet_process_id_t __user *ids_up,
- 		  int timeout, struct list_head __user *result_up)
- {
--	lstcon_ndlink_t	*ndl;
-+	struct lstcon_ndlink	*ndl;
- 	lstcon_group_t *tmp;
- 	lnet_process_id_t id;
- 	int i;
-@@ -1648,7 +1648,7 @@ lstcon_nodes_debug(int timeout,
- 		   struct list_head __user *result_up)
- {
- 	lnet_process_id_t id;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	lstcon_group_t *grp;
- 	int i;
- 	int rc;
-@@ -1781,7 +1781,7 @@ lstcon_session_info(lst_sid_t __user *sid_up, int __user *key_up,
- 		    char __user *name_up, int len)
- {
- 	lstcon_ndlist_ent_t *entp;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
  	int rc = 0;
+ 	srpc_client_rpc_t *rpc;
+diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
+index 04e742e..d6799b6 100644
+--- a/drivers/staging/lustre/lnet/selftest/selftest.h
++++ b/drivers/staging/lustre/lnet/selftest/selftest.h
+@@ -175,19 +175,19 @@ struct srpc_buffer {
+ struct swi_workitem;
+ typedef int (*swi_action_t) (struct swi_workitem *);
  
- 	if (console_session.ses_state != LST_SESSION_ACTIVE)
-@@ -1910,7 +1910,7 @@ lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
- 	srpc_join_reqst_t *jreq = &req->msg_body.join_reqst;
- 	srpc_join_reply_t *jrep = &rep->msg_body.join_reply;
- 	lstcon_group_t *grp = NULL;
--	lstcon_ndlink_t *ndl;
-+	struct lstcon_ndlink *ndl;
- 	int rc = 0;
- 
- 	sfw_unpack_message(req);
-diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
-index 7c37967..dd9674d 100644
---- a/drivers/staging/lustre/lnet/selftest/console.h
-+++ b/drivers/staging/lustre/lnet/selftest/console.h
-@@ -60,11 +60,12 @@ struct lstcon_node {
- 	struct lstcon_rpc nd_ping;    /* ping rpc */
- };
- 
--typedef struct {
-+/* node link descriptor */
-+struct lstcon_ndlink {
- 	struct list_head ndl_link;    /* chain on list */
- 	struct list_head ndl_hlink;   /* chain on hash */
--	struct lstcon_node	 *ndl_node;   /* pointer to node */
--} lstcon_ndlink_t; /* node link descriptor */
-+	struct lstcon_node	*ndl_node;	/* pointer to node */
+-typedef struct swi_workitem {
++struct swi_workitem {
+ 	struct cfs_wi_sched *swi_sched;
+ 	struct cfs_workitem swi_workitem;
+ 	swi_action_t	    swi_action;
+ 	int		    swi_state;
+-} swi_workitem_t;
 +};
  
- typedef struct {
- 	struct list_head grp_link;		  /* chain on global group list
+ /* server-side state of a RPC */
+ struct srpc_server_rpc {
+ 	/* chain on srpc_service::*_rpcq */
+ 	struct list_head       srpc_list;
+ 	struct srpc_service_cd *srpc_scd;
+-	swi_workitem_t	       srpc_wi;
++	struct swi_workitem	srpc_wi;
+ 	struct srpc_event	srpc_ev;	/* bulk/reply event */
+ 	lnet_nid_t	       srpc_self;
+ 	lnet_process_id_t      srpc_peer;
+@@ -209,7 +209,7 @@ typedef struct srpc_client_rpc {
+ 	atomic_t	  crpc_refcount;
+ 	int		  crpc_timeout;   /* # seconds to wait for reply */
+ 	struct stt_timer       crpc_timer;
+-	swi_workitem_t	  crpc_wi;
++	struct swi_workitem	crpc_wi;
+ 	lnet_process_id_t crpc_dest;
+ 
+ 	void		  (*crpc_done)(struct srpc_client_rpc *);
+@@ -273,7 +273,7 @@ struct srpc_service_cd {
+ 	/** in-flight RPCs */
+ 	struct list_head	scd_rpc_active;
+ 	/** workitem for posting buffer */
+-	swi_workitem_t		scd_buf_wi;
++	struct swi_workitem	scd_buf_wi;
+ 	/** CPT id */
+ 	int			scd_cpt;
+ 	/** error code for scd_buf_wi */
+@@ -404,7 +404,7 @@ typedef struct sfw_test_unit {
+ 	int		    tsu_loop;	   /* loop count of the test */
+ 	sfw_test_instance_t *tsu_instance; /* pointer to test instance */
+ 	void		    *tsu_private;  /* private data */
+-	swi_workitem_t	    tsu_worker;    /* workitem of the test unit */
++	struct swi_workitem	tsu_worker;	/* workitem of the test unit */
+ } sfw_test_unit_t;
+ 
+ typedef struct sfw_test_case {
+@@ -440,7 +440,7 @@ void srpc_abort_rpc(srpc_client_rpc_t *rpc, int why);
+ void srpc_free_bulk(struct srpc_bulk *bk);
+ struct srpc_bulk *srpc_alloc_bulk(int cpt, unsigned bulk_npg,
+ 				  unsigned bulk_len, int sink);
+-int srpc_send_rpc(swi_workitem_t *wi);
++int srpc_send_rpc(struct swi_workitem *wi);
+ int srpc_send_reply(struct srpc_server_rpc *rpc);
+ int srpc_add_service(srpc_service_t *sv);
+ int srpc_remove_service(srpc_service_t *sv);
+@@ -464,13 +464,15 @@ srpc_serv_is_framework(struct srpc_service *svc)
+ static inline int
+ swi_wi_action(struct cfs_workitem *wi)
+ {
+-	swi_workitem_t *swi = container_of(wi, swi_workitem_t, swi_workitem);
++	struct swi_workitem *swi;
++
++	swi = container_of(wi, struct swi_workitem, swi_workitem);
+ 
+ 	return swi->swi_action(swi);
+ }
+ 
+ static inline void
+-swi_init_workitem(swi_workitem_t *swi, void *data,
++swi_init_workitem(struct swi_workitem *swi, void *data,
+ 		  swi_action_t action, struct cfs_wi_sched *sched)
+ {
+ 	swi->swi_sched = sched;
+@@ -480,19 +482,19 @@ swi_init_workitem(swi_workitem_t *swi, void *data,
+ }
+ 
+ static inline void
+-swi_schedule_workitem(swi_workitem_t *wi)
++swi_schedule_workitem(struct swi_workitem *wi)
+ {
+ 	cfs_wi_schedule(wi->swi_sched, &wi->swi_workitem);
+ }
+ 
+ static inline void
+-swi_exit_workitem(swi_workitem_t *swi)
++swi_exit_workitem(struct swi_workitem *swi)
+ {
+ 	cfs_wi_exit(swi->swi_sched, &swi->swi_workitem);
+ }
+ 
+ static inline int
+-swi_deschedule_workitem(swi_workitem_t *swi)
++swi_deschedule_workitem(struct swi_workitem *swi)
+ {
+ 	return cfs_wi_deschedule(swi->swi_sched, &swi->swi_workitem);
+ }
 -- 
 1.7.1
