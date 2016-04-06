@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  6 Apr 2016 15:25:30 -0400
-Subject: [lustre-devel] [PATCH 04/24] staging: lustre: selftest: convert
-	srpc_buffer_t to proper struct
+Date: Wed,  6 Apr 2016 15:25:37 -0400
+Subject: [lustre-devel] [PATCH 11/24] staging: lustre: selftest: convert
+	sfw_test_instance_t to proper struct
 In-Reply-To: <1459970750-5377-1-git-send-email-jsimmons@infradead.org>
 References: <1459970750-5377-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459970750-5377-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459970750-5377-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,100 +12,246 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@gmail.com>
 
-Turn typedef srpc_buffer_t to proper structure
+Turn typedef sfw_test_instance_t to proper structure
 
 Signed-off-by: James Simmons <uja.ornl@gmail.com>
 ---
- drivers/staging/lustre/lnet/selftest/rpc.c      |   12 ++++++------
- drivers/staging/lustre/lnet/selftest/selftest.h |    6 +++---
- 2 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/staging/lustre/lnet/selftest/brw_test.c  |    8 +++---
+ drivers/staging/lustre/lnet/selftest/framework.c |   26 +++++++++++-----------
+ drivers/staging/lustre/lnet/selftest/ping_test.c |    8 +++---
+ drivers/staging/lustre/lnet/selftest/selftest.h  |    6 ++--
+ 4 files changed, 24 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
-index 387c306..316ccf7 100644
---- a/drivers/staging/lustre/lnet/selftest/rpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/rpc.c
-@@ -697,7 +697,7 @@ srpc_finish_service(struct srpc_service *sv)
+diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
+index 5cba2c3..90fabd0 100644
+--- a/drivers/staging/lustre/lnet/selftest/brw_test.c
++++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
+@@ -49,7 +49,7 @@ module_param(brw_inject_errors, int, 0644);
+ MODULE_PARM_DESC(brw_inject_errors, "# data errors to inject randomly, zero by default");
  
- /* called with sv->sv_lock held */
  static void
--srpc_service_recycle_buffer(struct srpc_service_cd *scd, srpc_buffer_t *buf)
-+srpc_service_recycle_buffer(struct srpc_service_cd *scd, struct srpc_buffer *buf)
- __must_hold(&scd->scd_lock)
+-brw_client_fini(sfw_test_instance_t *tsi)
++brw_client_fini(struct sfw_test_instance *tsi)
  {
- 	if (!scd->scd_svc->sv_shuttingdown && scd->scd_buf_adjust >= 0) {
-@@ -759,7 +759,7 @@ srpc_shutdown_service(srpc_service_t *sv)
+ 	struct srpc_bulk *bulk;
+ 	sfw_test_unit_t	*tsu;
+@@ -67,7 +67,7 @@ brw_client_fini(sfw_test_instance_t *tsi)
+ }
+ 
+ static int
+-brw_client_init(sfw_test_instance_t *tsi)
++brw_client_init(struct sfw_test_instance *tsi)
  {
- 	struct srpc_service_cd *scd;
- 	struct srpc_server_rpc *rpc;
--	srpc_buffer_t *buf;
-+	struct srpc_buffer *buf;
+ 	struct sfw_session *sn = tsi->tsi_batch->bat_session;
+ 	int flags;
+@@ -258,7 +258,7 @@ brw_client_prep_rpc(sfw_test_unit_t *tsu,
+ 		    lnet_process_id_t dest, struct srpc_client_rpc **rpcpp)
+ {
+ 	struct srpc_bulk *bulk = tsu->tsu_private;
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 	struct sfw_session *sn = tsi->tsi_batch->bat_session;
+ 	struct srpc_client_rpc *rpc;
+ 	srpc_brw_reqst_t *req;
+@@ -316,7 +316,7 @@ static void
+ brw_client_done_rpc(sfw_test_unit_t *tsu, struct srpc_client_rpc *rpc)
+ {
+ 	__u64 magic = BRW_MAGIC;
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 	struct sfw_session *sn = tsi->tsi_batch->bat_session;
+ 	srpc_msg_t *msg = &rpc->crpc_replymsg;
+ 	srpc_brw_reply_t *reply = &msg->msg_body.brw_reply;
+diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+index d42ee18..5cc4807 100644
+--- a/drivers/staging/lustre/lnet/selftest/framework.c
++++ b/drivers/staging/lustre/lnet/selftest/framework.c
+@@ -529,7 +529,7 @@ static void
+ sfw_test_rpc_fini(struct srpc_client_rpc *rpc)
+ {
+ 	sfw_test_unit_t *tsu = rpc->crpc_priv;
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 
+ 	/* Called with hold of tsi->tsi_lock */
+ 	LASSERT(list_empty(&rpc->crpc_list));
+@@ -537,7 +537,7 @@ sfw_test_rpc_fini(struct srpc_client_rpc *rpc)
+ }
+ 
+ static inline int
+-sfw_test_buffers(sfw_test_instance_t *tsi)
++sfw_test_buffers(struct sfw_test_instance *tsi)
+ {
+ 	struct sfw_test_case *tsc;
+ 	struct srpc_service *svc;
+@@ -614,7 +614,7 @@ sfw_unload_test(struct sfw_test_instance *tsi)
+ }
+ 
+ static void
+-sfw_destroy_test_instance(sfw_test_instance_t *tsi)
++sfw_destroy_test_instance(struct sfw_test_instance *tsi)
+ {
+ 	struct srpc_client_rpc *rpc;
+ 	sfw_test_unit_t *tsu;
+@@ -650,14 +650,14 @@ clean:
+ static void
+ sfw_destroy_batch(struct sfw_batch *tsb)
+ {
+-	sfw_test_instance_t *tsi;
++	struct sfw_test_instance *tsi;
+ 
+ 	LASSERT(!sfw_batch_active(tsb));
+ 	LASSERT(list_empty(&tsb->bat_list));
+ 
+ 	while (!list_empty(&tsb->bat_tests)) {
+ 		tsi = list_entry(tsb->bat_tests.next,
+-				 sfw_test_instance_t, tsi_list);
++				 struct sfw_test_instance, tsi_list);
+ 		list_del_init(&tsi->tsi_list);
+ 		sfw_destroy_test_instance(tsi);
+ 	}
+@@ -736,7 +736,7 @@ sfw_add_test_instance(struct sfw_batch *tsb, struct srpc_server_rpc *rpc)
+ 	struct srpc_bulk *bk = rpc->srpc_bulk;
+ 	int ndest = req->tsr_ndest;
+ 	sfw_test_unit_t *tsu;
+-	sfw_test_instance_t *tsi;
++	struct sfw_test_instance *tsi;
  	int i;
+ 	int rc;
  
- 	CDEBUG(D_NET, "Shutting down service: id %d, name %s\n",
-@@ -903,7 +903,7 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
+@@ -826,7 +826,7 @@ error:
+ static void
+ sfw_test_unit_done(sfw_test_unit_t *tsu)
  {
- 	struct srpc_service_cd *scd = rpc->srpc_scd;
- 	struct srpc_service *sv = scd->scd_svc;
--	srpc_buffer_t *buffer;
-+	struct srpc_buffer *buffer;
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 	struct sfw_batch *tsb = tsi->tsi_batch;
+ 	struct sfw_session *sn = tsb->bat_session;
  
- 	LASSERT(status || rpc->srpc_wi.swi_state == SWI_STATE_DONE);
+@@ -869,7 +869,7 @@ static void
+ sfw_test_rpc_done(struct srpc_client_rpc *rpc)
+ {
+ 	sfw_test_unit_t *tsu = rpc->crpc_priv;
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 	int done = 0;
  
-@@ -948,7 +948,7 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
+ 	tsi->tsi_ops->tso_done_rpc(tsu, rpc);
+@@ -905,7 +905,7 @@ sfw_create_test_rpc(sfw_test_unit_t *tsu, lnet_process_id_t peer,
+ 		    struct srpc_client_rpc **rpcpp)
+ {
+ 	struct srpc_client_rpc *rpc = NULL;
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
  
- 	if (!sv->sv_shuttingdown && !list_empty(&scd->scd_buf_blocked)) {
- 		buffer = list_entry(scd->scd_buf_blocked.next,
--				    srpc_buffer_t, buf_list);
-+				    struct srpc_buffer, buf_list);
- 		list_del(&buffer->buf_list);
+ 	spin_lock(&tsi->tsi_lock);
  
- 		srpc_init_server_rpc(rpc, scd, buffer);
-@@ -1413,7 +1413,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 	struct srpc_event *rpcev = ev->md.user_ptr;
- 	srpc_client_rpc_t *crpc;
- 	struct srpc_server_rpc *srpc;
--	srpc_buffer_t *buffer;
-+	struct srpc_buffer *buffer;
- 	srpc_service_t *sv;
- 	srpc_msg_t *msg;
- 	srpc_msg_type_t type;
-@@ -1486,7 +1486,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
- 		LASSERT(ev->type != LNET_EVENT_UNLINK ||
- 			sv->sv_shuttingdown);
+@@ -945,7 +945,7 @@ static int
+ sfw_run_test(struct swi_workitem *wi)
+ {
+ 	sfw_test_unit_t *tsu = wi->swi_workitem.wi_data;
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 	struct srpc_client_rpc *rpc = NULL;
  
--		buffer = container_of(ev->md.start, srpc_buffer_t, buf_msg);
-+		buffer = container_of(ev->md.start, struct srpc_buffer, buf_msg);
- 		buffer->buf_peer = ev->initiator;
- 		buffer->buf_self = ev->target.nid;
+ 	LASSERT(wi == &tsu->tsu_worker);
+@@ -995,7 +995,7 @@ sfw_run_batch(struct sfw_batch *tsb)
+ {
+ 	struct swi_workitem *wi;
+ 	sfw_test_unit_t *tsu;
+-	sfw_test_instance_t *tsi;
++	struct sfw_test_instance *tsi;
  
+ 	if (sfw_batch_active(tsb)) {
+ 		CDEBUG(D_NET, "Batch already active: %llu (%d)\n",
+@@ -1028,7 +1028,7 @@ sfw_run_batch(struct sfw_batch *tsb)
+ int
+ sfw_stop_batch(struct sfw_batch *tsb, int force)
+ {
+-	sfw_test_instance_t *tsi;
++	struct sfw_test_instance *tsi;
+ 	struct srpc_client_rpc *rpc;
+ 
+ 	if (!sfw_batch_active(tsb)) {
+@@ -1070,7 +1070,7 @@ sfw_stop_batch(struct sfw_batch *tsb, int force)
+ static int
+ sfw_query_batch(struct sfw_batch *tsb, int testidx, srpc_batch_reply_t *reply)
+ {
+-	sfw_test_instance_t *tsi;
++	struct sfw_test_instance *tsi;
+ 
+ 	if (testidx < 0)
+ 		return -EINVAL;
+diff --git a/drivers/staging/lustre/lnet/selftest/ping_test.c b/drivers/staging/lustre/lnet/selftest/ping_test.c
+index be13004..4e45428 100644
+--- a/drivers/staging/lustre/lnet/selftest/ping_test.c
++++ b/drivers/staging/lustre/lnet/selftest/ping_test.c
+@@ -56,7 +56,7 @@ struct lst_ping_data {
+ static struct lst_ping_data  lst_ping_data;
+ 
+ static int
+-ping_client_init(sfw_test_instance_t *tsi)
++ping_client_init(struct sfw_test_instance *tsi)
+ {
+ 	struct sfw_session *sn = tsi->tsi_batch->bat_session;
+ 
+@@ -70,7 +70,7 @@ ping_client_init(sfw_test_instance_t *tsi)
+ }
+ 
+ static void
+-ping_client_fini(sfw_test_instance_t *tsi)
++ping_client_fini(struct sfw_test_instance *tsi)
+ {
+ 	struct sfw_session *sn = tsi->tsi_batch->bat_session;
+ 	int errors;
+@@ -90,7 +90,7 @@ ping_client_prep_rpc(sfw_test_unit_t *tsu, lnet_process_id_t dest,
+ 		     struct srpc_client_rpc **rpc)
+ {
+ 	srpc_ping_reqst_t *req;
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 	struct sfw_session *sn = tsi->tsi_batch->bat_session;
+ 	struct timespec64 ts;
+ 	int rc;
+@@ -120,7 +120,7 @@ ping_client_prep_rpc(sfw_test_unit_t *tsu, lnet_process_id_t dest,
+ static void
+ ping_client_done_rpc(sfw_test_unit_t *tsu, struct srpc_client_rpc *rpc)
+ {
+-	sfw_test_instance_t *tsi = tsu->tsu_instance;
++	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 	struct sfw_session *sn = tsi->tsi_batch->bat_session;
+ 	srpc_ping_reqst_t *reqst = &rpc->crpc_reqstmsg.msg_body.ping_reqst;
+ 	srpc_ping_reply_t *reply = &rpc->crpc_replymsg.msg_body.ping_reply;
 diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
-index fdf62cc..04e742e 100644
+index b536e98..75743dd 100644
 --- a/drivers/staging/lustre/lnet/selftest/selftest.h
 +++ b/drivers/staging/lustre/lnet/selftest/selftest.h
-@@ -164,13 +164,13 @@ struct srpc_bulk {
+@@ -362,7 +362,7 @@ struct sfw_test_client_ops {
+ 			     struct srpc_client_rpc *rpc);	/* done a test rpc */
  };
  
- /* message buffer descriptor */
--typedef struct srpc_buffer {
-+struct srpc_buffer {
- 	struct list_head  buf_list; /* chain on srpc_service::*_msgq */
- 	srpc_msg_t	  buf_msg;
- 	lnet_handle_md_t  buf_mdh;
- 	lnet_nid_t	  buf_self;
- 	lnet_process_id_t buf_peer;
--} srpc_buffer_t;
+-typedef struct sfw_test_instance {
++struct sfw_test_instance {
+ 	struct list_head	   tsi_list;		/* chain on batch */
+ 	int			   tsi_service;		/* test type */
+ 	struct sfw_batch		*tsi_batch;	/* batch */
+@@ -389,7 +389,7 @@ typedef struct sfw_test_instance {
+ 		test_bulk_req_t    bulk_v0; /* bulk parameter */
+ 		test_bulk_req_v1_t bulk_v1; /* bulk v1 parameter */
+ 	} tsi_u;
+-} sfw_test_instance_t;
 +};
  
- struct swi_workitem;
- typedef int (*swi_action_t) (struct swi_workitem *);
-@@ -193,7 +193,7 @@ struct srpc_server_rpc {
- 	lnet_process_id_t      srpc_peer;
- 	srpc_msg_t	       srpc_replymsg;
- 	lnet_handle_md_t       srpc_replymdh;
--	srpc_buffer_t	       *srpc_reqstbuf;
-+	struct srpc_buffer	*srpc_reqstbuf;
- 	struct srpc_bulk	*srpc_bulk;
- 
- 	unsigned int	       srpc_aborted; /* being given up */
+ /* XXX: trailing (PAGE_CACHE_SIZE % sizeof(lnet_process_id_t)) bytes at
+  * the end of pages are not used */
+@@ -402,7 +402,7 @@ typedef struct sfw_test_unit {
+ 	struct list_head    tsu_list;	   /* chain on lst_test_instance */
+ 	lnet_process_id_t   tsu_dest;	   /* id of dest node */
+ 	int		    tsu_loop;	   /* loop count of the test */
+-	sfw_test_instance_t *tsu_instance; /* pointer to test instance */
++	struct sfw_test_instance	*tsu_instance; /* pointer to test instance */
+ 	void		    *tsu_private;  /* private data */
+ 	struct swi_workitem	tsu_worker;	/* workitem of the test unit */
+ } sfw_test_unit_t;
 -- 
 1.7.1
