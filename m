@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  6 Apr 2016 15:25:46 -0400
-Subject: [lustre-devel] [PATCH 20/24] staging: lustre: selftest: convert
-	lstcon_batch_t to proper struct
+Date: Wed,  6 Apr 2016 15:25:33 -0400
+Subject: [lustre-devel] [PATCH 07/24] staging: lustre: selftest: convert
+	srpc_service_t to proper struct
 In-Reply-To: <1459970750-5377-1-git-send-email-jsimmons@infradead.org>
 References: <1459970750-5377-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459970750-5377-21-git-send-email-jsimmons@infradead.org>
+Message-ID: <1459970750-5377-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,269 +12,225 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@gmail.com>
 
-Turn typedef lstcon_batch_t to proper structure
+Turn typedef srpc_service_t to proper structure
 
 Signed-off-by: James Simmons <uja.ornl@gmail.com>
 ---
- drivers/staging/lustre/lnet/selftest/conrpc.c  |    4 +-
- drivers/staging/lustre/lnet/selftest/console.c |   46 ++++++++++++------------
- drivers/staging/lustre/lnet/selftest/console.h |    7 ++--
- 3 files changed, 29 insertions(+), 28 deletions(-)
+ drivers/staging/lustre/lnet/selftest/brw_test.c  |    3 +-
+ drivers/staging/lustre/lnet/selftest/console.c   |    3 +-
+ drivers/staging/lustre/lnet/selftest/framework.c |    8 +++---
+ drivers/staging/lustre/lnet/selftest/ping_test.c |    3 +-
+ drivers/staging/lustre/lnet/selftest/rpc.c       |   10 ++++----
+ drivers/staging/lustre/lnet/selftest/selftest.h  |   26 +++++++++++-----------
+ 6 files changed, 28 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-index be94b9c..19c9b5c 100644
---- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-@@ -652,7 +652,7 @@ int
- lstcon_batrpc_prep(struct lstcon_node *nd, int transop, unsigned feats,
- 		   struct lstcon_tsb_hdr *tsb, struct lstcon_rpc **crpc)
- {
--	lstcon_batch_t *batch;
-+	struct lstcon_batch *batch;
- 	srpc_batch_reqst_t *brq;
- 	int rc;
- 
-@@ -675,7 +675,7 @@ lstcon_batrpc_prep(struct lstcon_node *nd, int transop, unsigned feats,
- 
- 	LASSERT(!tsb->tsb_index);
- 
--	batch = (lstcon_batch_t *)tsb;
-+	batch = (struct lstcon_batch *)tsb;
- 	brq->bar_arg = batch->bat_arg;
- 
- 	return 0;
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index 41f732b..deb0bc0 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -828,9 +828,9 @@ lstcon_group_info(char *name, lstcon_ndlist_ent_t __user *gents_p,
- }
- 
- static int
--lstcon_batch_find(const char *name, lstcon_batch_t **batpp)
-+lstcon_batch_find(const char *name, struct lstcon_batch **batpp)
- {
--	lstcon_batch_t *bat;
-+	struct lstcon_batch *bat;
- 
- 	list_for_each_entry(bat, &console_session.ses_bat_list, bat_link) {
- 		if (!strncmp(bat->bat_name, name, LST_NAME_SIZE)) {
-@@ -845,7 +845,7 @@ lstcon_batch_find(const char *name, lstcon_batch_t **batpp)
- int
- lstcon_batch_add(char *name)
- {
--	lstcon_batch_t *bat;
-+	struct lstcon_batch *bat;
- 	int i;
- 	int rc;
- 
-@@ -855,7 +855,7 @@ lstcon_batch_add(char *name)
- 		return rc;
- 	}
- 
--	LIBCFS_ALLOC(bat, sizeof(lstcon_batch_t));
-+	LIBCFS_ALLOC(bat, sizeof(struct lstcon_batch));
- 	if (!bat) {
- 		CERROR("Can't allocate descriptor for batch %s\n", name);
- 		return -ENOMEM;
-@@ -865,7 +865,7 @@ lstcon_batch_add(char *name)
- 		     sizeof(struct list_head) * LST_NODE_HASHSIZE);
- 	if (!bat->bat_cli_hash) {
- 		CERROR("Can't allocate hash for batch %s\n", name);
--		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
-+		LIBCFS_FREE(bat, sizeof(struct lstcon_batch));
- 
- 		return -ENOMEM;
- 	}
-@@ -875,7 +875,7 @@ lstcon_batch_add(char *name)
- 	if (!bat->bat_srv_hash) {
- 		CERROR("Can't allocate hash for batch %s\n", name);
- 		LIBCFS_FREE(bat->bat_cli_hash, LST_NODE_HASHSIZE);
--		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
-+		LIBCFS_FREE(bat, sizeof(struct lstcon_batch));
- 
- 		return -ENOMEM;
- 	}
-@@ -883,7 +883,7 @@ lstcon_batch_add(char *name)
- 	if (strlen(name) > sizeof(bat->bat_name) - 1) {
- 		LIBCFS_FREE(bat->bat_srv_hash, LST_NODE_HASHSIZE);
- 		LIBCFS_FREE(bat->bat_cli_hash, LST_NODE_HASHSIZE);
--		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
-+		LIBCFS_FREE(bat, sizeof(struct lstcon_batch));
- 		return -E2BIG;
- 	}
- 	strncpy(bat->bat_name, name, sizeof(bat->bat_name));
-@@ -911,7 +911,7 @@ lstcon_batch_add(char *name)
- int
- lstcon_batch_list(int index, int len, char __user *name_up)
- {
--	lstcon_batch_t *bat;
-+	struct lstcon_batch *bat;
- 
- 	LASSERT(name_up);
- 	LASSERT(index >= 0);
-@@ -935,7 +935,7 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
- 	struct list_head *clilst;
- 	struct list_head *srvlst;
- 	lstcon_test_t *test = NULL;
--	lstcon_batch_t *bat;
-+	struct lstcon_batch *bat;
- 	struct lstcon_ndlink	*ndl;
- 	int rc;
- 
-@@ -1020,7 +1020,7 @@ lstcon_batrpc_condition(int transop, struct lstcon_node *nd, void *arg)
- }
- 
- static int
--lstcon_batch_op(lstcon_batch_t *bat, int transop,
-+lstcon_batch_op(struct lstcon_batch *bat, int transop,
- 		struct list_head __user *result_up)
- {
- 	struct lstcon_rpc_trans *trans;
-@@ -1046,7 +1046,7 @@ lstcon_batch_op(lstcon_batch_t *bat, int transop,
- int
- lstcon_batch_run(char *name, int timeout, struct list_head __user *result_up)
- {
--	lstcon_batch_t *bat;
-+	struct lstcon_batch *bat;
- 	int rc;
- 
- 	if (lstcon_batch_find(name, &bat)) {
-@@ -1068,7 +1068,7 @@ lstcon_batch_run(char *name, int timeout, struct list_head __user *result_up)
- int
- lstcon_batch_stop(char *name, int force, struct list_head __user *result_up)
- {
--	lstcon_batch_t *bat;
-+	struct lstcon_batch *bat;
- 	int rc;
- 
- 	if (lstcon_batch_find(name, &bat)) {
-@@ -1088,7 +1088,7 @@ lstcon_batch_stop(char *name, int force, struct list_head __user *result_up)
- }
- 
- static void
--lstcon_batch_destroy(lstcon_batch_t *bat)
-+lstcon_batch_destroy(struct lstcon_batch *bat)
- {
- 	struct lstcon_ndlink *ndl;
- 	lstcon_test_t *test;
-@@ -1137,14 +1137,14 @@ lstcon_batch_destroy(lstcon_batch_t *bat)
- 		    sizeof(struct list_head) * LST_NODE_HASHSIZE);
- 	LIBCFS_FREE(bat->bat_srv_hash,
- 		    sizeof(struct list_head) * LST_NODE_HASHSIZE);
--	LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
-+	LIBCFS_FREE(bat, sizeof(struct lstcon_batch));
- }
- 
- static int
- lstcon_testrpc_condition(int transop, struct lstcon_node *nd, void *arg)
- {
- 	lstcon_test_t *test;
--	lstcon_batch_t *batch;
-+	struct lstcon_batch *batch;
- 	struct lstcon_ndlink *ndl;
- 	struct list_head *hash;
- 	struct list_head *head;
-@@ -1236,7 +1236,7 @@ again:
- }
- 
- static int
--lstcon_verify_batch(const char *name, lstcon_batch_t **batch)
-+lstcon_verify_batch(const char *name, struct lstcon_batch **batch)
- {
- 	int rc;
- 
-@@ -1287,7 +1287,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
- 	int rc;
- 	struct lstcon_group *src_grp = NULL;
- 	struct lstcon_group *dst_grp = NULL;
--	lstcon_batch_t *batch = NULL;
-+	struct lstcon_batch *batch = NULL;
- 
- 	/*
- 	 * verify that a batch of the given name exists, and the groups
-@@ -1368,7 +1368,7 @@ out:
- }
- 
- static int
--lstcon_test_find(lstcon_batch_t *batch, int idx, lstcon_test_t **testpp)
-+lstcon_test_find(struct lstcon_batch *batch, int idx, lstcon_test_t **testpp)
- {
- 	lstcon_test_t *test;
- 
-@@ -1407,7 +1407,7 @@ lstcon_test_batch_query(char *name, int testidx, int client,
- 	struct list_head *translist;
- 	struct list_head *ndlist;
- 	struct lstcon_tsb_hdr *hdr;
--	lstcon_batch_t *batch;
-+	struct lstcon_batch *batch;
- 	lstcon_test_t *test = NULL;
- 	int transop;
- 	int rc;
-@@ -1610,7 +1610,7 @@ int
- lstcon_batch_debug(int timeout, char *name,
- 		   int client, struct list_head __user *result_up)
- {
--	lstcon_batch_t *bat;
-+	struct lstcon_batch *bat;
- 	int rc;
- 
- 	rc = lstcon_batch_find(name, &bat);
-@@ -1757,7 +1757,7 @@ lstcon_session_new(char *name, int key, unsigned feats,
- 
- 	rc = lstcon_rpc_pinger_start();
- 	if (rc) {
--		lstcon_batch_t *bat = NULL;
-+		struct lstcon_batch *bat = NULL;
- 
- 		lstcon_batch_find(LST_DEFAULT_BATCH, &bat);
- 		lstcon_batch_destroy(bat);
-@@ -1814,7 +1814,7 @@ lstcon_session_end(void)
- {
- 	struct lstcon_rpc_trans *trans;
- 	struct lstcon_group *grp;
--	lstcon_batch_t *bat;
-+	struct lstcon_batch *bat;
- 	int rc = 0;
- 
- 	LASSERT(console_session.ses_state == LST_SESSION_ACTIVE);
-@@ -1848,7 +1848,7 @@ lstcon_session_end(void)
- 	/* destroy all batches */
- 	while (!list_empty(&console_session.ses_bat_list)) {
- 		bat = list_entry(console_session.ses_bat_list.next,
--				 lstcon_batch_t, bat_link);
-+				 struct lstcon_batch, bat_link);
- 
- 		lstcon_batch_destroy(bat);
- 	}
-diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
-index 427bc9b..ccd4982 100644
---- a/drivers/staging/lustre/lnet/selftest/console.h
-+++ b/drivers/staging/lustre/lnet/selftest/console.h
-@@ -89,7 +89,8 @@ struct lstcon_tsb_hdr {
- 	int		 tsb_index;	 /* test index */
+diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
+index 442f431..d2a8379 100644
+--- a/drivers/staging/lustre/lnet/selftest/brw_test.c
++++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
+@@ -497,7 +497,8 @@ void brw_init_test_client(void)
+ 	brw_test_client.tso_done_rpc = brw_client_done_rpc;
  };
  
--typedef struct {
-+/* (tests ) batch descriptor */
-+struct lstcon_batch {
- 	struct lstcon_tsb_hdr	bat_hdr;	/* test_batch header */
- 	struct list_head bat_link;	  /* chain on session's batches list */
- 	int		 bat_ntest;	  /* # of test */
-@@ -106,12 +107,12 @@ typedef struct {
- 	struct list_head *bat_cli_hash;   /* hash table of client nodes */
- 	struct list_head bat_srv_list;	  /* list head of server nodes */
- 	struct list_head *bat_srv_hash;   /* hash table of server nodes */
--} lstcon_batch_t; /* (tests ) batch descriptor */
+-srpc_service_t brw_test_service;
++struct srpc_service brw_test_service;
++
+ void brw_init_test_service(void)
+ {
+ 	brw_test_service.sv_id = SRPC_SERVICE_BRW;
+diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
+index dcfc83d..1352310 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.c
++++ b/drivers/staging/lustre/lnet/selftest/console.c
+@@ -1986,7 +1986,8 @@ out:
+ 	return rc;
+ }
+ 
+-static srpc_service_t lstcon_acceptor_service;
++static struct srpc_service lstcon_acceptor_service;
++
+ static void lstcon_init_acceptor_service(void)
+ {
+ 	/* initialize selftest console acceptor service table */
+diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+index 6c0af58..0eb275f 100644
+--- a/drivers/staging/lustre/lnet/selftest/framework.c
++++ b/drivers/staging/lustre/lnet/selftest/framework.c
+@@ -135,7 +135,7 @@ sfw_find_test_case(int id)
+ }
+ 
+ static int
+-sfw_register_test(srpc_service_t *service, sfw_test_client_ops_t *cliops)
++sfw_register_test(struct srpc_service *service, sfw_test_client_ops_t *cliops)
+ {
+ 	sfw_test_case_t *tsc;
+ 
+@@ -1584,7 +1584,7 @@ sfw_post_rpc(struct srpc_client_rpc *rpc)
+ 	spin_unlock(&rpc->crpc_lock);
+ }
+ 
+-static srpc_service_t sfw_services[] = {
++static struct srpc_service sfw_services[] = {
+ 	{
+ 		/* sv_id */    SRPC_SERVICE_DEBUG,
+ 		/* sv_name */  "debug",
+@@ -1628,7 +1628,7 @@ sfw_startup(void)
+ 	int i;
+ 	int rc;
+ 	int error;
+-	srpc_service_t *sv;
++	struct srpc_service *sv;
+ 	sfw_test_case_t *tsc;
+ 
+ 	if (session_timeout < 0) {
+@@ -1721,7 +1721,7 @@ sfw_startup(void)
+ void
+ sfw_shutdown(void)
+ {
+-	srpc_service_t *sv;
++	struct srpc_service *sv;
+ 	sfw_test_case_t	*tsc;
+ 	int i;
+ 
+diff --git a/drivers/staging/lustre/lnet/selftest/ping_test.c b/drivers/staging/lustre/lnet/selftest/ping_test.c
+index 1f2ddf6..c09b599 100644
+--- a/drivers/staging/lustre/lnet/selftest/ping_test.c
++++ b/drivers/staging/lustre/lnet/selftest/ping_test.c
+@@ -219,7 +219,8 @@ void ping_init_test_client(void)
+ 	ping_test_client.tso_done_rpc = ping_client_done_rpc;
+ }
+ 
+-srpc_service_t ping_test_service;
++struct srpc_service ping_test_service;
++
+ void ping_init_test_service(void)
+ {
+ 	ping_test_service.sv_id = SRPC_SERVICE_PING;
+diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
+index e711571..1e2fd8a 100644
+--- a/drivers/staging/lustre/lnet/selftest/rpc.c
++++ b/drivers/staging/lustre/lnet/selftest/rpc.c
+@@ -56,7 +56,7 @@ typedef enum {
+ 
+ static struct smoketest_rpc {
+ 	spinlock_t	 rpc_glock;	/* global lock */
+-	srpc_service_t	*rpc_services[SRPC_SERVICE_MAX_ID + 1];
++	struct srpc_service	*rpc_services[SRPC_SERVICE_MAX_ID + 1];
+ 	lnet_handle_eq_t rpc_lnet_eq;	/* _the_ LNet event queue */
+ 	srpc_state_t	 rpc_state;
+ 	srpc_counters_t	 rpc_counters;
+@@ -338,7 +338,7 @@ srpc_add_service(struct srpc_service *sv)
+ }
+ 
+ int
+-srpc_remove_service(srpc_service_t *sv)
++srpc_remove_service(struct srpc_service *sv)
+ {
+ 	int id = sv->sv_id;
+ 
+@@ -755,7 +755,7 @@ srpc_abort_service(struct srpc_service *sv)
+ }
+ 
+ void
+-srpc_shutdown_service(srpc_service_t *sv)
++srpc_shutdown_service(struct srpc_service *sv)
+ {
+ 	struct srpc_service_cd *scd;
+ 	struct srpc_server_rpc *rpc;
+@@ -1414,7 +1414,7 @@ srpc_lnet_ev_handler(lnet_event_t *ev)
+ 	struct srpc_client_rpc *crpc;
+ 	struct srpc_server_rpc *srpc;
+ 	struct srpc_buffer *buffer;
+-	srpc_service_t *sv;
++	struct srpc_service *sv;
+ 	srpc_msg_t *msg;
+ 	srpc_msg_type_t type;
+ 
+@@ -1663,7 +1663,7 @@ srpc_shutdown(void)
+ 		spin_lock(&srpc_data.rpc_glock);
+ 
+ 		for (i = 0; i <= SRPC_SERVICE_MAX_ID; i++) {
+-			srpc_service_t *sv = srpc_data.rpc_services[i];
++			struct srpc_service *sv = srpc_data.rpc_services[i];
+ 
+ 			LASSERTF(!sv, "service not empty: id %d, name %s\n",
+ 				 i, sv->sv_name);
+diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
+index 55f8154..0ad6e53 100644
+--- a/drivers/staging/lustre/lnet/selftest/selftest.h
++++ b/drivers/staging/lustre/lnet/selftest/selftest.h
+@@ -307,7 +307,7 @@ struct srpc_service_cd {
+ #define SFW_FRWK_WI_MIN		16
+ #define SFW_FRWK_WI_MAX		256
+ 
+-typedef struct srpc_service {
++struct srpc_service {
+ 	int			sv_id;		/* service id */
+ 	const char		*sv_name;	/* human readable name */
+ 	int			sv_wi_total;	/* total server workitems */
+@@ -321,7 +321,7 @@ typedef struct srpc_service {
+ 	 */
+ 	int (*sv_handler)(struct srpc_server_rpc *);
+ 	int (*sv_bulk_ready)(struct srpc_server_rpc *, int);
+-} srpc_service_t;
 +};
  
- typedef struct lstcon_test {
- 	struct lstcon_tsb_hdr	tes_hdr;	/* test batch header */
- 	struct list_head tes_link;	 /* chain on batch's tests list */
--	lstcon_batch_t	 *tes_batch;	 /* pointer to batch */
-+	struct lstcon_batch	*tes_batch;	 /* pointer to batch */
+ typedef struct {
+ 	struct list_head sn_list;    /* chain on fw_zombie_sessions */
+@@ -409,7 +409,7 @@ typedef struct sfw_test_unit {
  
- 	int		 tes_type;	 /* type of the test, i.e: bulk, ping */
- 	int		 tes_stop_onerr; /* stop on error */
+ typedef struct sfw_test_case {
+ 	struct list_head      tsc_list;		/* chain on fw_tests */
+-	srpc_service_t	      *tsc_srv_service; /* test service */
++	struct srpc_service	*tsc_srv_service;	/* test service */
+ 	sfw_test_client_ops_t *tsc_cli_ops;	/* ops of test client */
+ } sfw_test_case_t;
+ 
+@@ -442,13 +442,13 @@ struct srpc_bulk *srpc_alloc_bulk(int cpt, unsigned bulk_npg,
+ 				  unsigned bulk_len, int sink);
+ int srpc_send_rpc(struct swi_workitem *wi);
+ int srpc_send_reply(struct srpc_server_rpc *rpc);
+-int srpc_add_service(srpc_service_t *sv);
+-int srpc_remove_service(srpc_service_t *sv);
+-void srpc_shutdown_service(srpc_service_t *sv);
+-void srpc_abort_service(srpc_service_t *sv);
+-int srpc_finish_service(srpc_service_t *sv);
+-int srpc_service_add_buffers(srpc_service_t *sv, int nbuffer);
+-void srpc_service_remove_buffers(srpc_service_t *sv, int nbuffer);
++int srpc_add_service(struct srpc_service *sv);
++int srpc_remove_service(struct srpc_service *sv);
++void srpc_shutdown_service(struct srpc_service *sv);
++void srpc_abort_service(struct srpc_service *sv);
++int srpc_finish_service(struct srpc_service *sv);
++int srpc_service_add_buffers(struct srpc_service *sv, int nbuffer);
++void srpc_service_remove_buffers(struct srpc_service *sv, int nbuffer);
+ void srpc_get_counters(srpc_counters_t *cnt);
+ void srpc_set_counters(const srpc_counters_t *cnt);
+ 
+@@ -595,7 +595,7 @@ do {									\
+ } while (0)
+ 
+ static inline void
+-srpc_wait_service_shutdown(srpc_service_t *sv)
++srpc_wait_service_shutdown(struct srpc_service *sv)
+ {
+ 	int i = 2;
+ 
+@@ -613,13 +613,13 @@ srpc_wait_service_shutdown(srpc_service_t *sv)
+ extern sfw_test_client_ops_t brw_test_client;
+ void brw_init_test_client(void);
+ 
+-extern srpc_service_t brw_test_service;
++extern struct srpc_service brw_test_service;
+ void brw_init_test_service(void);
+ 
+ extern sfw_test_client_ops_t ping_test_client;
+ void ping_init_test_client(void);
+ 
+-extern srpc_service_t ping_test_service;
++extern struct srpc_service ping_test_service;
+ void ping_init_test_service(void);
+ 
+ #endif /* __SELFTEST_SELFTEST_H__ */
 -- 
 1.7.1
