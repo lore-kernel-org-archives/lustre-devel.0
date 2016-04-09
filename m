@@ -1,206 +1,152 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  6 Apr 2016 15:25:47 -0400
-Subject: [lustre-devel] [PATCH 21/24] staging: lustre: selftest: convert
-	lstcon_test_t to proper struct
-In-Reply-To: <1459970750-5377-1-git-send-email-jsimmons@infradead.org>
-References: <1459970750-5377-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1459970750-5377-22-git-send-email-jsimmons@infradead.org>
+From: Cihangir Akturk <cakturk@gmail.com>
+Date: Sat,  9 Apr 2016 21:47:44 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: split error handling code
+	into multiple labels
+Message-ID: <1460227664-28540-1-git-send-email-cakturk@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@gmail.com>
+To: lustre-devel@lists.lustre.org
 
-Turn typedef lstcon_test_t to proper structure
+Instead of using a switch-case statement to find out what kind of error
+has just happened, split error handling logic into multiple labels and
+jump right into the appropriate label to do the error handling. This way
+it is easier to follow different code paths. It also looks easy on the
+eyes.
 
-Signed-off-by: James Simmons <uja.ornl@gmail.com>
+Additionally silences the following coccinelle warning:
+
+drivers/staging/lustre/lustre/obdecho/echo_client.c:762:22-27: ERROR: ed
+is NULL but dereferenced.
+
+Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
 ---
- drivers/staging/lustre/lnet/selftest/conctl.c  |    2 +-
- drivers/staging/lustre/lnet/selftest/conrpc.c  |    5 ++-
- drivers/staging/lustre/lnet/selftest/console.c |   26 ++++++++++++------------
- drivers/staging/lustre/lnet/selftest/console.h |    7 +++--
- 4 files changed, 21 insertions(+), 19 deletions(-)
+ .../staging/lustre/lustre/obdecho/echo_client.c    | 54 ++++++++--------------
+ 1 file changed, 20 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-index 6e2a81d..730122f 100644
---- a/drivers/staging/lustre/lnet/selftest/conctl.c
-+++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-@@ -743,7 +743,7 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
- 	if (args->lstio_tes_param &&
- 	    (args->lstio_tes_param_len <= 0 ||
- 	     args->lstio_tes_param_len >
--	     PAGE_CACHE_SIZE - sizeof(lstcon_test_t)))
-+	     PAGE_CACHE_SIZE - sizeof(struct lstcon_test)))
- 		return -EINVAL;
+diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+index a752bb4..f143f7a 100644
+--- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
++++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+@@ -668,8 +668,7 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
+ 	struct obd_device  *obd = NULL; /* to keep compiler happy */
+ 	struct obd_device  *tgt;
+ 	const char *tgt_type_name;
+-	int rc;
+-	int cleanup = 0;
++	int rc, err;
  
- 	LIBCFS_ALLOC(batch_name, args->lstio_tes_bat_nmlen + 1);
-diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-index 19c9b5c..5cec1c9 100644
---- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-@@ -807,7 +807,7 @@ lstcon_bulkrpc_v1_prep(lst_test_bulk_param_t *param, srpc_test_reqst_t *req)
- 
- int
- lstcon_testrpc_prep(struct lstcon_node *nd, int transop, unsigned feats,
--		    lstcon_test_t *test, struct lstcon_rpc **crpc)
-+		    struct lstcon_test *test, struct lstcon_rpc **crpc)
- {
- 	struct lstcon_group *sgrp = test->tes_src_grp;
- 	struct lstcon_group *dgrp = test->tes_dst_grp;
-@@ -1128,7 +1128,8 @@ lstcon_rpc_trans_ndlist(struct list_head *ndlist,
- 		case LST_TRANS_TSBCLIADD:
- 		case LST_TRANS_TSBSRVADD:
- 			rc = lstcon_testrpc_prep(nd, transop, feats,
--						 (lstcon_test_t *)arg, &rpc);
-+						 (struct lstcon_test *)arg,
-+						 &rpc);
- 			break;
- 		case LST_TRANS_TSBRUN:
- 		case LST_TRANS_TSBSTOP:
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index deb0bc0..cdbcee7 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -934,7 +934,7 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
- 	lstcon_test_batch_ent_t *entp;
- 	struct list_head *clilst;
- 	struct list_head *srvlst;
--	lstcon_test_t *test = NULL;
-+	struct lstcon_test *test = NULL;
- 	struct lstcon_batch *bat;
- 	struct lstcon_ndlink	*ndl;
- 	int rc;
-@@ -1091,14 +1091,14 @@ static void
- lstcon_batch_destroy(struct lstcon_batch *bat)
- {
- 	struct lstcon_ndlink *ndl;
--	lstcon_test_t *test;
-+	struct lstcon_test *test;
- 	int i;
- 
- 	list_del(&bat->bat_link);
- 
- 	while (!list_empty(&bat->bat_test_list)) {
- 		test = list_entry(bat->bat_test_list.next,
--				  lstcon_test_t, tes_link);
-+				  struct lstcon_test, tes_link);
- 		LASSERT(list_empty(&test->tes_trans_list));
- 
- 		list_del(&test->tes_link);
-@@ -1106,7 +1106,7 @@ lstcon_batch_destroy(struct lstcon_batch *bat)
- 		lstcon_group_decref(test->tes_src_grp);
- 		lstcon_group_decref(test->tes_dst_grp);
- 
--		LIBCFS_FREE(test, offsetof(lstcon_test_t,
-+		LIBCFS_FREE(test, offsetof(struct lstcon_test,
- 					   tes_param[test->tes_paramlen]));
+ 	ed = kzalloc(sizeof(*ed), GFP_NOFS);
+ 	if (!ed) {
+@@ -677,16 +676,14 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
+ 		goto out;
  	}
  
-@@ -1143,13 +1143,13 @@ lstcon_batch_destroy(struct lstcon_batch *bat)
- static int
- lstcon_testrpc_condition(int transop, struct lstcon_node *nd, void *arg)
- {
--	lstcon_test_t *test;
-+	struct lstcon_test *test;
- 	struct lstcon_batch *batch;
- 	struct lstcon_ndlink *ndl;
- 	struct list_head *hash;
- 	struct list_head *head;
+-	cleanup = 1;
+ 	cd = &ed->ed_cl;
+ 	rc = cl_device_init(cd, t);
+ 	if (rc)
+-		goto out;
++		goto out_free;
  
--	test = (lstcon_test_t *)arg;
-+	test = (struct lstcon_test *)arg;
- 	LASSERT(test);
+ 	cd->cd_lu_dev.ld_ops = &echo_device_lu_ops;
+ 	cd->cd_ops = &echo_device_cl_ops;
  
- 	batch = test->tes_batch;
-@@ -1185,7 +1185,7 @@ lstcon_testrpc_condition(int transop, struct lstcon_node *nd, void *arg)
+-	cleanup = 2;
+ 	obd = class_name2obd(lustre_cfg_string(cfg, 0));
+ 	LASSERT(obd);
+ 	LASSERT(env);
+@@ -696,28 +693,25 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
+ 		CERROR("Can not find tgt device %s\n",
+ 		       lustre_cfg_string(cfg, 1));
+ 		rc = -ENODEV;
+-		goto out;
++		goto out_device_fini;
+ 	}
+ 
+ 	next = tgt->obd_lu_dev;
+ 	if (!strcmp(tgt->obd_type->typ_name, LUSTRE_MDT_NAME)) {
+ 		CERROR("echo MDT client must be run on server\n");
+ 		rc = -EOPNOTSUPP;
+-		goto out;
++		goto out_device_fini;
+ 	}
+ 
+ 	rc = echo_site_init(env, ed);
+ 	if (rc)
+-		goto out;
+-
+-	cleanup = 3;
++		goto out_device_fini;
+ 
+ 	rc = echo_client_setup(env, obd, cfg);
+ 	if (rc)
+-		goto out;
++		goto out_site_fini;
+ 
+ 	ed->ed_ec = &obd->u.echo_client;
+-	cleanup = 4;
+ 
+ 	/* if echo client is to be stacked upon ost device, the next is
+ 	 * NULL since ost is not a clio device so far
+@@ -729,7 +723,7 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
+ 	if (next) {
+ 		if (next->ld_site) {
+ 			rc = -EBUSY;
+-			goto out;
++			goto out_cleanup;
+ 		}
+ 
+ 		next->ld_site = &ed->ed_site->cs_lu;
+@@ -737,7 +731,7 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
+ 						next->ld_type->ldt_name,
+ 							      NULL);
+ 		if (rc)
+-			goto out;
++			goto out_cleanup;
+ 
+ 	} else {
+ 		LASSERT(strcmp(tgt_type_name, LUSTRE_OST_NAME) == 0);
+@@ -745,27 +739,19 @@ static struct lu_device *echo_device_alloc(const struct lu_env *env,
+ 
+ 	ed->ed_next = next;
+ 	return &cd->cd_lu_dev;
+-out:
+-	switch (cleanup) {
+-	case 4: {
+-		int rc2;
+-
+-		rc2 = echo_client_cleanup(obd);
+-		if (rc2)
+-			CERROR("Cleanup obd device %s error(%d)\n",
+-			       obd->obd_name, rc2);
+-	}
+ 
+-	case 3:
+-		echo_site_fini(env, ed);
+-	case 2:
+-		cl_device_fini(&ed->ed_cl);
+-	case 1:
+-		kfree(ed);
+-	case 0:
+-	default:
+-		break;
+-	}
++out_cleanup:
++	err = echo_client_cleanup(obd);
++	if (err)
++		CERROR("Cleanup obd device %s error(%d)\n",
++		       obd->obd_name, err);
++out_site_fini:
++	echo_site_fini(env, ed);
++out_device_fini:
++	cl_device_fini(&ed->ed_cl);
++out_free:
++	kfree(ed);
++out:
+ 	return ERR_PTR(rc);
  }
  
- static int
--lstcon_test_nodes_add(lstcon_test_t *test, struct list_head __user *result_up)
-+lstcon_test_nodes_add(struct lstcon_test *test, struct list_head __user *result_up)
- {
- 	struct lstcon_rpc_trans *trans;
- 	struct lstcon_group *grp;
-@@ -1283,7 +1283,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
- 		void *param, int paramlen, int *retp,
- 		struct list_head __user *result_up)
- {
--	lstcon_test_t *test = NULL;
-+	struct lstcon_test *test = NULL;
- 	int rc;
- 	struct lstcon_group *src_grp = NULL;
- 	struct lstcon_group *dst_grp = NULL;
-@@ -1309,7 +1309,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
- 	if (dst_grp->grp_userland)
- 		*retp = 1;
- 
--	LIBCFS_ALLOC(test, offsetof(lstcon_test_t, tes_param[paramlen]));
-+	LIBCFS_ALLOC(test, offsetof(struct lstcon_test, tes_param[paramlen]));
- 	if (!test) {
- 		CERROR("Can't allocate test descriptor\n");
- 		rc = -ENOMEM;
-@@ -1356,7 +1356,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
- 	return rc;
- out:
- 	if (test)
--		LIBCFS_FREE(test, offsetof(lstcon_test_t, tes_param[paramlen]));
-+		LIBCFS_FREE(test, offsetof(struct lstcon_test, tes_param[paramlen]));
- 
- 	if (dst_grp)
- 		lstcon_group_decref(dst_grp);
-@@ -1368,9 +1368,9 @@ out:
- }
- 
- static int
--lstcon_test_find(struct lstcon_batch *batch, int idx, lstcon_test_t **testpp)
-+lstcon_test_find(struct lstcon_batch *batch, int idx, struct lstcon_test **testpp)
- {
--	lstcon_test_t *test;
-+	struct lstcon_test *test;
- 
- 	list_for_each_entry(test, &batch->bat_test_list, tes_link) {
- 		if (idx == test->tes_hdr.tsb_index) {
-@@ -1408,7 +1408,7 @@ lstcon_test_batch_query(char *name, int testidx, int client,
- 	struct list_head *ndlist;
- 	struct lstcon_tsb_hdr *hdr;
- 	struct lstcon_batch *batch;
--	lstcon_test_t *test = NULL;
-+	struct lstcon_test *test = NULL;
- 	int transop;
- 	int rc;
- 
-diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
-index ccd4982..becd22e 100644
---- a/drivers/staging/lustre/lnet/selftest/console.h
-+++ b/drivers/staging/lustre/lnet/selftest/console.h
-@@ -99,7 +99,7 @@ struct lstcon_batch {
- 					   * for run, force for stop */
- 	char		 bat_name[LST_NAME_SIZE];/* name of batch */
- 
--	struct list_head bat_test_list;   /* list head of tests (lstcon_test_t)
-+	struct list_head bat_test_list;   /* list head of tests (struct lstcon_test)
- 					   */
- 	struct list_head bat_trans_list;  /* list head of transaction */
- 	struct list_head bat_cli_list;	  /* list head of client nodes
-@@ -109,7 +109,8 @@ struct lstcon_batch {
- 	struct list_head *bat_srv_hash;   /* hash table of server nodes */
- };
- 
--typedef struct lstcon_test {
-+/* a single test descriptor */
-+struct lstcon_test {
- 	struct lstcon_tsb_hdr	tes_hdr;	/* test batch header */
- 	struct list_head tes_link;	 /* chain on batch's tests list */
- 	struct lstcon_batch	*tes_batch;	 /* pointer to batch */
-@@ -129,7 +130,7 @@ typedef struct lstcon_test {
- 
- 	int		 tes_paramlen;	 /* test parameter length */
- 	char		 tes_param[0];	 /* test parameter */
--} lstcon_test_t; /* a single test descriptor */
-+};
- 
- #define LST_GLOBAL_HASHSIZE 503	     /* global nodes hash table size */
- #define LST_NODE_HASHSIZE   239	     /* node hash table (for batch or group) */
 -- 
-1.7.1
+2.1.4
