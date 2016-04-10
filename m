@@ -1,54 +1,66 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 10 Apr 2016 09:13:25 -0400
-Subject: [lustre-devel] [PATCH 02/17] staging: lustre: clio: incorrect
-	assertions in 'enable-invariants'
+Date: Sun, 10 Apr 2016 09:13:26 -0400
+Subject: [lustre-devel] [PATCH 03/17] staging: lustre: ldlm: Fix a race
+	during FLock handling
 In-Reply-To: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
 References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460294020-2111-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460294020-2111-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruno Faccini <bruno.faccini@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: Bruno Faccini <bruno.faccini@intel.com>
 
-Fixed several incorrect assumptions in 'enable-invariants'.
+Protect against race where lock could have been just destroyed
+due to overlap, in ldlm_process_flock_lock().
+Easy reproducer is BULL's NFS Locktests in pthread mode.
+(http://nfsv4.bullopensource.org/tools/tests/locktest.php)
 
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3521
-Reviewed-on: http://review.whamcloud.com/6832
-Reviewed-by: Bobi Jam <bobijam@gmail.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-1126
+Reviewed-on: http://review.whamcloud.com/7134
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/obdclass/cl_page.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-index 8df39ce..03aab85 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-@@ -498,7 +498,7 @@ void cl_page_disown0(const struct lu_env *env,
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+index 3f97e1c..5102d78 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+@@ -520,11 +520,6 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+ granted:
+ 	OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_CP_CB_WAIT, 10);
  
- 	state = pg->cp_state;
- 	PINVRNT(env, pg, state == CPS_OWNED || state == CPS_FREEING);
--	PINVRNT(env, pg, cl_page_invariant(pg));
-+	PINVRNT(env, pg, cl_page_invariant(pg) || state == CPS_FREEING);
- 	cl_page_owner_clear(pg);
+-	if (lock->l_flags & LDLM_FL_DESTROYED) {
+-		LDLM_DEBUG(lock, "client-side enqueue waking up: destroyed");
+-		return 0;
+-	}
+-
+ 	if (lock->l_flags & LDLM_FL_FAILED) {
+ 		LDLM_DEBUG(lock, "client-side enqueue waking up: failed");
+ 		return -EIO;
+@@ -534,6 +529,16 @@ granted:
  
- 	if (state == CPS_OWNED)
-@@ -670,7 +670,8 @@ EXPORT_SYMBOL(cl_page_unassume);
- void cl_page_disown(const struct lu_env *env,
- 		    struct cl_io *io, struct cl_page *pg)
- {
--	PINVRNT(env, pg, cl_page_is_owned(pg, io));
-+	PINVRNT(env, pg, cl_page_is_owned(pg, io) ||
-+		pg->cp_state == CPS_FREEING);
+ 	lock_res_and_lock(lock);
  
- 	io = cl_io_top(io);
- 	cl_page_disown0(env, io, pg);
++	/*
++	 * Protect against race where lock could have been just destroyed
++	 * due to overlap in ldlm_process_flock_lock().
++	 */
++	if (lock->l_flags & LDLM_FL_DESTROYED) {
++		unlock_res_and_lock(lock);
++		LDLM_DEBUG(lock, "client-side enqueue waking up: destroyed");
++		return 0;
++	}
++
+ 	/* ldlm_lock_enqueue() has already placed lock on the granted list. */
+ 	list_del_init(&lock->l_res_link);
+ 
 -- 
 1.7.1
