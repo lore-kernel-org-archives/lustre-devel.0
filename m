@@ -1,74 +1,110 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 10 Apr 2016 09:13:31 -0400
-Subject: [lustre-devel] [PATCH 08/17] staging: lustre: obd: MDT mount fails
-	on MDS w/o MGS on it
+Date: Sun, 10 Apr 2016 09:13:32 -0400
+Subject: [lustre-devel] [PATCH 09/17] staging: lustre: ptlrpc: return a
+	meaningful status from ptlrpcd_init()
 In-Reply-To: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
 References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460294020-2111-9-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460294020-2111-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Swapnil Pimpale <spimpale@ddn.com>, James Simmons <jsimons@infradead.org>
 
-From: Bobi Jam <bobijam.xu@intel.com>
+From: Swapnil Pimpale <spimpale@ddn.com>
 
-If we specify multiple --mgsnode for a MDT, when we start MDS upon
-it while MGS is no the other node, the MGC import connection will
-always select the local nid (which is one of the candidate mgsnode)
-since it think its the closest connection.
+This patch has the following:
+1) Fix for the return value from ptlrpcd_init(). It will now return a
+   correct status instead of returning zero always.
+2) ptlrpcd_addref() should not increment ptlrpcd_users on error.
+3) Added code in a mdc_setup() and mgc_setup() to test the return
+   value of ptlrpcd_addref() and return on error.
 
-This patch treats further --mgsnode nids as failover nids, so that
-multiple import connections are added for the MGC import.
-
-Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3829
-Reviewed-on: http://review.whamcloud.com/7509
-Reviewed-by: Liang Zhen <liang.zhen@intel.com>
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: Swapnil Pimpale <spimpale@ddn.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3808
+Reviewed-on: http://review.whamcloud.com/7522
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Signed-off-by: James Simmons <jsimons@infradead.org>
 ---
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |   13 ++++++++-----
- 1 files changed, 8 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/mdc/mdc_request.c |    9 ++++++---
+ drivers/staging/lustre/lustre/mgc/mgc_request.c |    5 ++++-
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c  |    5 ++++-
+ 3 files changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index d3e28a3..9474aa9 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -307,7 +307,8 @@ int lustre_start_mgc(struct super_block *sb)
- 	while (class_parse_nid(ptr, &nid, &ptr) == 0) {
- 		rc = do_lcfg(mgcname, nid,
- 			     LCFG_ADD_UUID, niduuid, NULL, NULL, NULL);
--		i++;
-+		if (!rc)
-+			i++;
- 		/* Stop at the first failover nid */
- 		if (*ptr == ':')
- 			break;
-@@ -345,16 +346,18 @@ int lustre_start_mgc(struct super_block *sb)
- 		sprintf(niduuid, "%s_%x", mgcname, i);
- 		j = 0;
- 		while (class_parse_nid_quiet(ptr, &nid, &ptr) == 0) {
--			j++;
--			rc = do_lcfg(mgcname, nid,
--				     LCFG_ADD_UUID, niduuid, NULL, NULL, NULL);
-+			rc = do_lcfg(mgcname, nid, LCFG_ADD_UUID, niduuid,
-+				     NULL, NULL, NULL);
-+			if (!rc)
-+				++j;
- 			if (*ptr == ':')
- 				break;
- 		}
- 		if (j > 0) {
- 			rc = do_lcfg(mgcname, 0, LCFG_ADD_CONN,
- 				     niduuid, NULL, NULL, NULL);
--			i++;
-+			if (!rc)
-+				i++;
- 		} else {
- 			/* at ":/fsname" */
- 			break;
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index a089237..97f8669 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -2314,12 +2314,14 @@ static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
+ 		return -ENOMEM;
+ 	mdc_init_rpc_lock(cli->cl_rpc_lock);
+ 
+-	ptlrpcd_addref();
++	rc = ptlrpcd_addref();
++	if (rc < 0)
++		goto err_rpc_lock;
+ 
+ 	cli->cl_close_lock = kzalloc(sizeof(*cli->cl_close_lock), GFP_NOFS);
+ 	if (!cli->cl_close_lock) {
+ 		rc = -ENOMEM;
+-		goto err_rpc_lock;
++		goto err_ptlrpcd_decref;
+ 	}
+ 	mdc_init_rpc_lock(cli->cl_close_lock);
+ 
+@@ -2345,9 +2347,10 @@ static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
+ 
+ err_close_lock:
+ 	kfree(cli->cl_close_lock);
++err_ptlrpcd_decref:
++	ptlrpcd_decref();
+ err_rpc_lock:
+ 	kfree(cli->cl_rpc_lock);
+-	ptlrpcd_decref();
+ 	return rc;
+ }
+ 
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index b7dc872..3f5f884 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -734,7 +734,9 @@ static int mgc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 	struct task_struct *task;
+ 	int rc;
+ 
+-	ptlrpcd_addref();
++	rc = ptlrpcd_addref();
++	if (rc < 0)
++		goto err_noref;
+ 
+ 	rc = client_obd_setup(obd, lcfg);
+ 	if (rc)
+@@ -773,6 +775,7 @@ err_cleanup:
+ 	client_obd_cleanup(obd);
+ err_decref:
+ 	ptlrpcd_decref();
++err_noref:
+ 	return rc;
+ }
+ 
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index dbc3376..76a355a 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -909,8 +909,11 @@ int ptlrpcd_addref(void)
+ 	int rc = 0;
+ 
+ 	mutex_lock(&ptlrpcd_mutex);
+-	if (++ptlrpcd_users == 1)
++	if (++ptlrpcd_users == 1) {
+ 		rc = ptlrpcd_init();
++		if (rc < 0)
++			ptlrpcd_users--;
++	}
+ 	mutex_unlock(&ptlrpcd_mutex);
+ 	return rc;
+ }
 -- 
 1.7.1
