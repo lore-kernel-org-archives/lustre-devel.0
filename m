@@ -1,66 +1,88 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 10 Apr 2016 09:13:26 -0400
-Subject: [lustre-devel] [PATCH 03/17] staging: lustre: ldlm: Fix a race
-	during FLock handling
+Date: Sun, 10 Apr 2016 09:13:29 -0400
+Subject: [lustre-devel] [PATCH 06/17] staging: lustre: llite: speedup in
+	unlink/rmdir
 In-Reply-To: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
 References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460294020-2111-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460294020-2111-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruno Faccini <bruno.faccini@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andrew Perepechko <andrew_perepechko@xyratex.com>, James Simmons <jsimmons@infradead.org>
 
-From: Bruno Faccini <bruno.faccini@intel.com>
+From: Andrew Perepechko <andrew_perepechko@xyratex.com>
 
-Protect against race where lock could have been just destroyed
-due to overlap, in ldlm_process_flock_lock().
-Easy reproducer is BULL's NFS Locktests in pthread mode.
-(http://nfsv4.bullopensource.org/tools/tests/locktest.php)
+Assume dchild argument is fully initialized in ->unlink and
+->rmdir callbacks, so additional lookup for ELC is not needed.
 
-Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-1126
-Reviewed-on: http://review.whamcloud.com/7134
+Signed-off-by: Andrew Perepechko <andrew_perepechko@xyratex.com>
+Reviewed-by: Alexander Boyko <Alexander_Boyko@xyratex.com>
+Reviewed-by: Vitaly Fertman <Vitaly_Fertman@xyratex.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3473
+Xyratex-bug-id: MRP-1027
+Reviewed-on: http://review.whamcloud.com/6648
+Reviewed-by: Fan Yong <fan.yong@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/llite/namei.c |   21 +++++++++++----------
+ 1 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 3f97e1c..5102d78 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -520,11 +520,6 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
- granted:
- 	OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_CP_CB_WAIT, 10);
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index 6445bc1..7e4247a 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -845,12 +845,6 @@ static int ll_create_nd(struct inode *dir, struct dentry *dentry,
+ 	return rc;
+ }
  
--	if (lock->l_flags & LDLM_FL_DESTROYED) {
--		LDLM_DEBUG(lock, "client-side enqueue waking up: destroyed");
--		return 0;
--	}
+-static inline void ll_get_child_fid(struct dentry *child, struct lu_fid *fid)
+-{
+-	if (d_really_is_positive(child))
+-		*fid = *ll_inode2fid(d_inode(child));
+-}
 -
- 	if (lock->l_flags & LDLM_FL_FAILED) {
- 		LDLM_DEBUG(lock, "client-side enqueue waking up: failed");
- 		return -EIO;
-@@ -534,6 +529,16 @@ granted:
+ int ll_objects_destroy(struct ptlrpc_request *request, struct inode *dir)
+ {
+ 	struct mdt_body *body;
+@@ -943,7 +937,9 @@ static int ll_unlink(struct inode *dir, struct dentry *dchild)
+ 	if (IS_ERR(op_data))
+ 		return PTR_ERR(op_data);
  
- 	lock_res_and_lock(lock);
- 
-+	/*
-+	 * Protect against race where lock could have been just destroyed
-+	 * due to overlap in ldlm_process_flock_lock().
-+	 */
-+	if (lock->l_flags & LDLM_FL_DESTROYED) {
-+		unlock_res_and_lock(lock);
-+		LDLM_DEBUG(lock, "client-side enqueue waking up: destroyed");
-+		return 0;
-+	}
+-	ll_get_child_fid(dchild, &op_data->op_fid3);
++	if (dchild && dchild->d_inode)
++		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
 +
- 	/* ldlm_lock_enqueue() has already placed lock on the granted list. */
- 	list_del_init(&lock->l_res_link);
+ 	op_data->op_fid2 = op_data->op_fid3;
+ 	rc = md_unlink(ll_i2sbi(dir)->ll_md_exp, op_data, &request);
+ 	ll_finish_md_op_data(op_data);
+@@ -993,7 +989,9 @@ static int ll_rmdir(struct inode *dir, struct dentry *dchild)
+ 	if (IS_ERR(op_data))
+ 		return PTR_ERR(op_data);
  
+-	ll_get_child_fid(dchild, &op_data->op_fid3);
++	if (dchild && dchild->d_inode)
++		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
++
+ 	op_data->op_fid2 = op_data->op_fid3;
+ 	rc = md_unlink(ll_i2sbi(dir)->ll_md_exp, op_data, &request);
+ 	ll_finish_md_op_data(op_data);
+@@ -1074,8 +1072,11 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
+ 	if (IS_ERR(op_data))
+ 		return PTR_ERR(op_data);
+ 
+-	ll_get_child_fid(src_dchild, &op_data->op_fid3);
+-	ll_get_child_fid(tgt_dchild, &op_data->op_fid4);
++	if (src_dchild && src_dchild->d_inode)
++		op_data->op_fid3 = *ll_inode2fid(src_dchild->d_inode);
++	if (tgt_dchild && tgt_dchild->d_inode)
++		op_data->op_fid4 = *ll_inode2fid(tgt_dchild->d_inode);
++
+ 	err = md_rename(sbi->ll_md_exp, op_data,
+ 			src_dchild->d_name.name,
+ 			src_dchild->d_name.len,
 -- 
 1.7.1
