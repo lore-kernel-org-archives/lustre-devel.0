@@ -1,73 +1,74 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 10 Apr 2016 09:13:37 -0400
-Subject: [lustre-devel] [PATCH 14/17] staging: lustre: lov: return minimal
-	FIEMAP for released files
-In-Reply-To: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
+Date: Sun, 10 Apr 2016 15:04:51 +0100 (BST)
+Subject: [lustre-devel] [PATCH 13/17] staging: lustre: lloop: Fix build
+ failure on ppc64
+In-Reply-To: <63807394-FF62-4376-95FD-412309D47BF7@suse.com>
 References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460294020-2111-15-git-send-email-jsimmons@infradead.org>
+	<1460294020-2111-14-git-send-email-jsimmons@infradead.org>
+	<63807394-FF62-4376-95FD-412309D47BF7@suse.com>
+Message-ID: <alpine.LFD.2.20.1604101500520.32661@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruno Faccini <bruno.faccini@intel.com>, James Simmons <jsimmons@infradead.org>
+To: Jeff Mahoney <jeffm@suse.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: Bruno Faccini <bruno.faccini@intel.com>
 
-Since st_blocks = NULL is returned for released files, FIEMAP
-should at least return a minimal mapping to make users aware
-that file contains data but it is not immediately available.
-This will make coreutils and tools such tar happy and have
-them presume file is sparse.
+> This patch was shown not to work. I just haven't removed it from opensuse yet.
 
-Also, add a new test_228 in sanity-hsm to verify it works
-for "[cp,tar] --sparse" commands.
+Its been running in our production tree as well for some time. Guess that 
+change is a noop. In any case we have been discussing redoing the lloop 
+driver anyways. Just need to find the cycles.
 
-Also fix a LBUG ("lov_fiemap()) ASSERTION( fm_local ) failed")
-likely to occur when no-object/ENOMEM conditions and also now
-when released.
-
-Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3864
-Reviewed-on: http://review.whamcloud.com/7584
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Aurelien Degremont <aurelien.degremont@cea.fr>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/lov/lov_obd.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index 1a9e3e8..9b72671 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -1733,6 +1733,27 @@ static int lov_fiemap(struct lov_obd *lov, __u32 keylen, void *key,
- 	unsigned int buffer_size = FIEMAP_BUFFER_SIZE;
- 
- 	if (!lsm_has_objects(lsm)) {
-+		if (lsm && lsm_is_released(lsm) && (fm_key->fiemap.fm_start <
-+		    fm_key->oa.o_size)) {
-+			/*
-+			 * released file, return a minimal FIEMAP if
-+			 * request fits in file-size.
-+			 */
-+			fiemap->fm_mapped_extents = 1;
-+			fiemap->fm_extents[0].fe_logical =
-+					fm_key->fiemap.fm_start;
-+			if (fm_key->fiemap.fm_start + fm_key->fiemap.fm_length <
-+			    fm_key->oa.o_size) {
-+				fiemap->fm_extents[0].fe_length =
-+					fm_key->fiemap.fm_length;
-+			} else {
-+				fiemap->fm_extents[0].fe_length =
-+					fm_key->oa.o_size - fm_key->fiemap.fm_start;
-+				fiemap->fm_extents[0].fe_flags |=
-+						(FIEMAP_EXTENT_UNKNOWN |
-+						 FIEMAP_EXTENT_LAST);
-+			}
-+		}
- 		rc = 0;
- 		goto out;
- 	}
--- 
-1.7.1
+> --
+> Jeff Mahoney
+> (apologies for the top post -- from my mobile)
+> 
+> > On Apr 10, 2016, at 9:13 AM, James Simmons <jsimmons@infradead.org> wrote:
+> > 
+> > From: Jeff Mahoney <jeffm@suse.com>
+> > 
+> > On ppc64 with 64k pages, we get a build failure in lloop:
+> > 
+> > drivers/staging/lustre/lustre/llite/lloop.c:527:2:
+> > note: in expansion of macro 'CLASSERT'
+> > CLASSERT(PAGE_CACHE_SIZE < (1 << (sizeof(unsigned short) * 8)));
+> > 
+> > There's no need to change the queue's logical block size. Even if it could
+> > accept a 64k value, that would result in any file system on top of it
+> > needing to also use 64k blocks. It'd be safe to set it to 4k, but there's
+> > no actual need for it. It's not used to split requests except for WRITE_SAME,
+> > which lloop doesn't implement anyway.
+> > 
+> > Signed-off-by: Jeff Mahoney <jeffm@suse.com>
+> > Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4000
+> > Reviewed-on: http://review.whamcloud.com/7745
+> > Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+> > Reviewed-by: Minh Diep <minh.diep@intel.com>
+> > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > ---
+> > drivers/staging/lustre/lustre/llite/lloop.c |    3 ---
+> > 1 files changed, 0 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/staging/lustre/lustre/llite/lloop.c b/drivers/staging/lustre/lustre/llite/lloop.c
+> > index b725fc1..f396753 100644
+> > --- a/drivers/staging/lustre/lustre/llite/lloop.c
+> > +++ b/drivers/staging/lustre/lustre/llite/lloop.c
+> > @@ -525,9 +525,6 @@ static int loop_set_fd(struct lloop_device *lo, struct file *unused,
+> >    lo->lo_queue->queuedata = lo;
+> > 
+> >    /* queue parameters */
+> > -    CLASSERT(PAGE_CACHE_SIZE < (1 << (sizeof(unsigned short) * 8)));
+> > -    blk_queue_logical_block_size(lo->lo_queue,
+> > -                     (unsigned short)PAGE_CACHE_SIZE);
+> >    blk_queue_max_hw_sectors(lo->lo_queue,
+> >                 LLOOP_MAX_SEGMENTS << (PAGE_CACHE_SHIFT - 9));
+> >    blk_queue_max_segments(lo->lo_queue, LLOOP_MAX_SEGMENTS);
+> > -- 
+> > 1.7.1
+> > 
+> > 
+> 
+> 
