@@ -1,53 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 10 Apr 2016 09:13:35 -0400
-Subject: [lustre-devel] [PATCH 12/17] staging: lustre: lprocfs: implement
-	log2 using bitops
+Date: Sun, 10 Apr 2016 09:13:38 -0400
+Subject: [lustre-devel] [PATCH 15/17] staging: lustre: lov: Don't wait for
+	active target with OBD_STATFS_NODELAY
 In-Reply-To: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
 References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460294020-2111-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460294020-2111-16-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andrew Perepechko <andrew_perepechko@xyratex.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andriy Skulysh <Andriy_Skulysh@xyratex.com>, James Simmons <jsimmons@infradead.org>
 
-From: Andrew Perepechko <andrew_perepechko@xyratex.com>
+From: Andriy Skulysh <Andriy_Skulysh@xyratex.com>
 
-This patch implements log2 using fls.
+Patch for LU-631 which was landed before the upstream merge broke
+OBD_STATFS_NODELAY behaviour. It adds unnecessary delay while
+running df command with inactive OSTs. We shouldn't try to recover
+connection to OST in this case.
 
-Signed-off-by: Andrew Perepechko <andrew_perepechko@xyratex.com>
-Reviewed-by: Alexander Boyko <Alexander_Boyko@xyratex.com>
-Reviewed-by: alexander_zarochentsev at xyratex.com
-Reviewed-by: Vitaly Fertman <Vitaly_Fertman@xyratex.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3496
-Xyratex-bug-id: MRP-999
-Reviewed-on: http://review.whamcloud.com/6757
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Signed-off-by: Andriy Skulysh <Andriy_Skulysh@xyratex.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4010
+Reviewed-on: http://review.whamcloud.com/7762
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/obdclass/lprocfs_status.c        |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_request.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index d93f42f..172fc91 100644
---- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -1471,10 +1471,10 @@ EXPORT_SYMBOL(lprocfs_oh_tally);
+diff --git a/drivers/staging/lustre/lustre/lov/lov_request.c b/drivers/staging/lustre/lustre/lov/lov_request.c
+index 7178a02..475ca2f 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_request.c
++++ b/drivers/staging/lustre/lustre/lov/lov_request.c
+@@ -716,12 +716,15 @@ int lov_prep_statfs_set(struct obd_device *obd, struct obd_info *oinfo,
+ 		struct lov_request *req;
  
- void lprocfs_oh_tally_log2(struct obd_histogram *oh, unsigned int value)
- {
--	unsigned int val;
-+	unsigned int val = 0;
+ 		if (!lov->lov_tgts[i] ||
+-		    (!lov_check_and_wait_active(lov, i) &&
+-		     (oinfo->oi_flags & OBD_STATFS_NODELAY))) {
++		    (oinfo->oi_flags & OBD_STATFS_NODELAY &&
++		     !lov->lov_tgts[i]->ltd_active)) {
+ 			CDEBUG(D_HA, "lov idx %d inactive\n", i);
+ 			continue;
+ 		}
  
--	for (val = 0; ((1 << val) < value) && (val <= OBD_HIST_MAX); val++)
--		;
-+	if (likely(value != 0))
-+		val = min(fls(value - 1), OBD_HIST_MAX);
- 
- 	lprocfs_oh_tally(oh, val);
- }
++		if (!lov->lov_tgts[i]->ltd_active)
++			lov_check_and_wait_active(lov, i);
++
+ 		/* skip targets that have been explicitly disabled by the
+ 		 * administrator
+ 		 */
 -- 
 1.7.1
