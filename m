@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 10 Apr 2016 09:13:40 -0400
-Subject: [lustre-devel] [PATCH 17/17] staging: lustre: hsm: don't use real
-	suppgid
+Date: Sun, 10 Apr 2016 09:13:39 -0400
+Subject: [lustre-devel] [PATCH 16/17] staging: lustre: hsm: permission
+	checks for HSM ioctl operations
 In-Reply-To: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
 References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460294020-2111-18-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460294020-2111-17-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,9 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: John L. Hammond <john.hammond@intel.com>
 
-In the MDC HSM handlers that do not pack a real suppgid, use -1 rather
-than 0 for the suppgid in mdt_body.
+In the LL_IOC_HSM_CT_START case of ll_dir_ioctl() require
+CAP_SYS_ADMIN, since the local handler for this ioctl may modify the
+global KUC table.
 
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3866
@@ -26,48 +27,22 @@ Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/mdc/mdc_request.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/llite/dir.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 97f8669..513290f 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -1169,7 +1169,7 @@ static int mdc_ioc_hsm_progress(struct obd_export *exp,
- 		goto out;
- 	}
- 
--	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
-+	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, -1, 0);
- 
- 	/* Copy hsm_progress struct */
- 	req_hpk = req_capsule_client_get(&req->rq_pill, &RMF_MDS_HSM_PROGRESS);
-@@ -1203,7 +1203,7 @@ static int mdc_ioc_hsm_ct_register(struct obd_import *imp, __u32 archives)
- 		goto out;
- 	}
- 
--	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
-+	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, -1, 0);
- 
- 	/* Copy hsm_progress struct */
- 	archive_mask = req_capsule_client_get(&req->rq_pill,
-@@ -1278,7 +1278,7 @@ static int mdc_ioc_hsm_ct_unregister(struct obd_import *imp)
- 		goto out;
- 	}
- 
--	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
-+	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, -1, 0);
- 
- 	ptlrpc_request_set_replen(req);
- 
-@@ -1395,7 +1395,7 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 45bdf8f..94f3800 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -1844,6 +1844,9 @@ out_quotactl:
  		return rc;
  	}
- 
--	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
-+	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, -1, 0);
- 
- 	/* Copy hsm_request struct */
- 	req_hr = req_capsule_client_get(&req->rq_pill, &RMF_MDS_HSM_REQUEST);
+ 	case LL_IOC_HSM_CT_START:
++		if (!capable(CFS_CAP_SYS_ADMIN))
++			return -EPERM;
++
+ 		rc = copy_and_ioctl(cmd, sbi->ll_md_exp, (void __user *)arg,
+ 				    sizeof(struct lustre_kernelcomm));
+ 		return rc;
 -- 
 1.7.1
