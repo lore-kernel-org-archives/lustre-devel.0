@@ -1,32 +1,47 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Sun, 10 Apr 2016 08:35:07 -0700
-Subject: [lustre-devel] [PATCH 13/17] staging: lustre: lloop: Fix build
-	failure on ppc64
-In-Reply-To: <alpine.LFD.2.20.1604101500520.32661@casper.infradead.org>
-References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
-	<1460294020-2111-14-git-send-email-jsimmons@infradead.org>
-	<63807394-FF62-4376-95FD-412309D47BF7@suse.com>
-	<alpine.LFD.2.20.1604101500520.32661@casper.infradead.org>
-Message-ID: <20160410153507.GA1326@kroah.com>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Sun, 10 Apr 2016 08:39:59 -0700
+Subject: [lustre-devel] [PATCH] Mark a pointer as an userspace pointer
+ using __user macro.
+In-Reply-To: <1460292400-2732-1-git-send-email-antoine.blin@lip6.fr>
+References: <1460292400-2732-1-git-send-email-antoine.blin@lip6.fr>
+Message-ID: <20160410153959.GA1564@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Jeff Mahoney <jeffm@suse.com>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Sun, Apr 10, 2016 at 03:04:51PM +0100, James Simmons wrote:
+On Sun, Apr 10, 2016 at 02:46:40PM +0200, Antoine BLIN wrote:
+> This change fixes below sparse error: "error: incompatible types
+> in comparison expression (different address spaces)"
 > 
-> > This patch was shown not to work. I just haven't removed it from opensuse yet.
+> Signed-off-by: Antoine BLIN <antoine.blin@lip6.fr>
+> ---
+>  drivers/staging/lustre/lnet/selftest/conrpc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+
+Please always cc: the driverdev mailing list for staging patches.
+
+Also use the name of the driver, and the subsystem in the patch, like
+the others written for this driver, look at 'git log' for details.
+
 > 
-> Its been running in our production tree as well for some time. Guess that 
-> change is a noop. In any case we have been discussing redoing the lloop 
-> driver anyways. Just need to find the cycles.
+> diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
+> index 2be9451..1fdabb3 100644
+> --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
+> +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
+> @@ -490,10 +490,10 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
+>  				   sizeof(struct list_head)))
+>  			return -EFAULT;
+>  
+> -		if (tmp.next == head_up)
+> -			return 0;
+> +		next = (struct list_head __user *)tmp.next;
 
-Why do you need this driver?  I know Christoph has pointed out many
-times that it should just be dropped as it's not needed.
+Kernel structures in userspace?  While that might be the case, this
+really should be fixed "properly" and not papered over like this, sorry.
 
-And should I drop this patch from the series?
+Do you have access to a lustre system to test changes like this?
 
 thanks,
 
