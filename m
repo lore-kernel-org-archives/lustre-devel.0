@@ -1,48 +1,35 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Sun, 10 Apr 2016 08:39:59 -0700
-Subject: [lustre-devel] [PATCH] Mark a pointer as an userspace pointer
- using __user macro.
-In-Reply-To: <1460292400-2732-1-git-send-email-antoine.blin@lip6.fr>
-References: <1460292400-2732-1-git-send-email-antoine.blin@lip6.fr>
-Message-ID: <20160410153959.GA1564@kroah.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sun, 10 Apr 2016 16:52:46 +0100 (BST)
+Subject: [lustre-devel] [PATCH 13/17] staging: lustre: lloop: Fix build
+ failure on ppc64
+In-Reply-To: <20160410153507.GA1326@kroah.com>
+References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
+	<1460294020-2111-14-git-send-email-jsimmons@infradead.org>
+	<63807394-FF62-4376-95FD-412309D47BF7@suse.com>
+	<alpine.LFD.2.20.1604101500520.32661@casper.infradead.org>
+	<20160410153507.GA1326@kroah.com>
+Message-ID: <alpine.LFD.2.20.1604101647340.3112@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jeff Mahoney <jeffm@suse.com>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Sun, Apr 10, 2016 at 02:46:40PM +0200, Antoine BLIN wrote:
-> This change fixes below sparse error: "error: incompatible types
-> in comparison expression (different address spaces)"
+
+> > > This patch was shown not to work. I just haven't removed it from opensuse yet.
+> > 
+> > Its been running in our production tree as well for some time. Guess that 
+> > change is a noop. In any case we have been discussing redoing the lloop 
+> > driver anyways. Just need to find the cycles.
 > 
-> Signed-off-by: Antoine BLIN <antoine.blin@lip6.fr>
-> ---
->  drivers/staging/lustre/lnet/selftest/conrpc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> Why do you need this driver?  I know Christoph has pointed out many
+> times that it should just be dropped as it's not needed.
 
-Please always cc: the driverdev mailing list for staging patches.
+Please don't drop this driver just yet. The reason we kept it was for the DIO 
+support that the loop back device lacked earlier. We need to do some 
+testing to make sure the loop can completely replace this driver.
 
-Also use the name of the driver, and the subsystem in the patch, like
-the others written for this driver, look at 'git log' for details.
+> And should I drop this patch from the series?
 
-> 
-> diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-> index 2be9451..1fdabb3 100644
-> --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-> +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-> @@ -490,10 +490,10 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
->  				   sizeof(struct list_head)))
->  			return -EFAULT;
->  
-> -		if (tmp.next == head_up)
-> -			return 0;
-> +		next = (struct list_head __user *)tmp.next;
-
-Kernel structures in userspace?  While that might be the case, this
-really should be fixed "properly" and not papered over like this, sorry.
-
-Do you have access to a lustre system to test changes like this?
-
-thanks,
-
-greg k-h
+Yes since it is a noop. No other patches are dependent on it.
