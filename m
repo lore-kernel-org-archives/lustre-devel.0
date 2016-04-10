@@ -1,76 +1,48 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 10 Apr 2016 09:13:23 -0400
-Subject: [lustre-devel] [PATCH 00/17] staging : lustre : rest of missing
-	patches from 2.5.0 release
-Message-ID: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
+Date: Sun, 10 Apr 2016 09:13:30 -0400
+Subject: [lustre-devel] [PATCH 07/17] staging: lustre: llite: error setting
+	max_cache_mb at mount time
+In-Reply-To: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
+References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460294020-2111-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
 
-This is the last collection of missing fixes present in the
-Lustre 2.5.0 release. Once these are merged the upstream
-client will be equal to the pre-2.6 lustre version since the
-major of clio cleanups from that time frame have already
-landed.
+From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-Andrew Perepechko (3):
-  staging: lustre: llite: variable rename in namei.c
-  staging: lustre: llite: speedup in unlink/rmdir
-  staging: lustre: lprocfs: implement log2 using bitops
+The root cause is that when max_cache_mb conf parameter is applied,
+the client isn't connected to the OST yet so that sbi->ll_dt_exp is
+NULL. However, it's not necessary to shrink the cache memory in this
+case so success should be returned.
 
-Andriy Skulysh (1):
-  staging: lustre: lov: Don't wait for active target with OBD_STATFS_NODELAY
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3676
+Reviewed-on: http://review.whamcloud.com/7194
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Bobi Jam <bobijam@gmail.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/llite/lproc_llite.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Bobi Jam (1):
-  staging: lustre: obd: MDT mount fails on MDS w/o MGS on it
-
-Bruno Faccini (3):
-  staging: lustre: ldlm: Fix a race during FLock handling
-  staging: lustre: ldlm: refine LU-2665 patch for POSIX compliance
-  staging: lustre: lov: return minimal FIEMAP for released files
-
-Jeff Mahoney (1):
-  staging: lustre: lloop: Fix build failure on ppc64
-
-Jinshan Xiong (3):
-  staging: lustre: llite: error setting max_cache_mb at mount time
-  staging: lustre: llite: Truncate to restore file
-  staging: lustre: osc: osc_extent_wait() shouldn't be interruptible
-
-John L. Hammond (2):
-  staging: lustre: hsm: permission checks for HSM ioctl operations
-  staging: lustre: hsm: don't use real suppgid
-
-Niu Yawei (1):
-  staging: lustre: clio: incorrect assertions in 'enable-invariants'
-
-Sebastien Buisson (1):
-  staging: lustre: osc: fix race issues thanks to oap_lock
-
-Swapnil Pimpale (1):
-  staging: lustre: ptlrpc: return a meaningful status from ptlrpcd_init()
-
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |   15 +++--
- drivers/staging/lustre/lustre/llite/dir.c          |    3 +
- drivers/staging/lustre/lustre/llite/file.c         |    5 +-
- .../staging/lustre/lustre/llite/llite_internal.h   |    2 +-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   60 +++++++++----------
- drivers/staging/lustre/lustre/llite/lloop.c        |    3 -
- drivers/staging/lustre/lustre/llite/lproc_llite.c  |    4 +-
- drivers/staging/lustre/lustre/llite/namei.c        |   65 ++++++++++----------
- drivers/staging/lustre/lustre/llite/vvp_io.c       |    5 +-
- drivers/staging/lustre/lustre/lov/lov_obd.c        |   21 ++++++
- drivers/staging/lustre/lustre/lov/lov_request.c    |    7 ++-
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    4 +-
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |   17 +++--
- drivers/staging/lustre/lustre/mgc/mgc_request.c    |    5 +-
- drivers/staging/lustre/lustre/obdclass/cl_page.c   |    5 +-
- .../lustre/lustre/obdclass/lprocfs_status.c        |    6 +-
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |   13 +++--
- drivers/staging/lustre/lustre/osc/osc_cache.c      |   10 +++-
- drivers/staging/lustre/lustre/osc/osc_io.c         |    2 +
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    5 +-
- 20 files changed, 155 insertions(+), 102 deletions(-)
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index 091144f..6947913 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -461,8 +461,8 @@ static ssize_t ll_max_cached_mb_seq_write(struct file *file,
+ 			break;
+ 
+ 		if (!sbi->ll_dt_exp) { /* being initialized */
+-			rc = -ENODEV;
+-			break;
++			rc = 0;
++			goto out;
+ 		}
+ 
+ 		/* difficult - have to ask OSCs to drop LRU slots. */
+-- 
+1.7.1
