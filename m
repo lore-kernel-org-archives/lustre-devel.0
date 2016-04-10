@@ -1,88 +1,74 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 10 Apr 2016 09:13:29 -0400
-Subject: [lustre-devel] [PATCH 06/17] staging: lustre: llite: speedup in
-	unlink/rmdir
+Date: Sun, 10 Apr 2016 09:13:31 -0400
+Subject: [lustre-devel] [PATCH 08/17] staging: lustre: obd: MDT mount fails
+	on MDS w/o MGS on it
 In-Reply-To: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
 References: <1460294020-2111-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460294020-2111-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460294020-2111-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andrew Perepechko <andrew_perepechko@xyratex.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Andrew Perepechko <andrew_perepechko@xyratex.com>
+From: Bobi Jam <bobijam.xu@intel.com>
 
-Assume dchild argument is fully initialized in ->unlink and
-->rmdir callbacks, so additional lookup for ELC is not needed.
+If we specify multiple --mgsnode for a MDT, when we start MDS upon
+it while MGS is no the other node, the MGC import connection will
+always select the local nid (which is one of the candidate mgsnode)
+since it think its the closest connection.
 
-Signed-off-by: Andrew Perepechko <andrew_perepechko@xyratex.com>
-Reviewed-by: Alexander Boyko <Alexander_Boyko@xyratex.com>
-Reviewed-by: Vitaly Fertman <Vitaly_Fertman@xyratex.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3473
-Xyratex-bug-id: MRP-1027
-Reviewed-on: http://review.whamcloud.com/6648
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+This patch treats further --mgsnode nids as failover nids, so that
+multiple import connections are added for the MGC import.
+
+Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3829
+Reviewed-on: http://review.whamcloud.com/7509
+Reviewed-by: Liang Zhen <liang.zhen@intel.com>
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/namei.c |   21 +++++++++++----------
- 1 files changed, 11 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |   13 ++++++++-----
+ 1 files changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 6445bc1..7e4247a 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -845,12 +845,6 @@ static int ll_create_nd(struct inode *dir, struct dentry *dentry,
- 	return rc;
- }
- 
--static inline void ll_get_child_fid(struct dentry *child, struct lu_fid *fid)
--{
--	if (d_really_is_positive(child))
--		*fid = *ll_inode2fid(d_inode(child));
--}
--
- int ll_objects_destroy(struct ptlrpc_request *request, struct inode *dir)
- {
- 	struct mdt_body *body;
-@@ -943,7 +937,9 @@ static int ll_unlink(struct inode *dir, struct dentry *dchild)
- 	if (IS_ERR(op_data))
- 		return PTR_ERR(op_data);
- 
--	ll_get_child_fid(dchild, &op_data->op_fid3);
-+	if (dchild && dchild->d_inode)
-+		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
-+
- 	op_data->op_fid2 = op_data->op_fid3;
- 	rc = md_unlink(ll_i2sbi(dir)->ll_md_exp, op_data, &request);
- 	ll_finish_md_op_data(op_data);
-@@ -993,7 +989,9 @@ static int ll_rmdir(struct inode *dir, struct dentry *dchild)
- 	if (IS_ERR(op_data))
- 		return PTR_ERR(op_data);
- 
--	ll_get_child_fid(dchild, &op_data->op_fid3);
-+	if (dchild && dchild->d_inode)
-+		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
-+
- 	op_data->op_fid2 = op_data->op_fid3;
- 	rc = md_unlink(ll_i2sbi(dir)->ll_md_exp, op_data, &request);
- 	ll_finish_md_op_data(op_data);
-@@ -1074,8 +1072,11 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
- 	if (IS_ERR(op_data))
- 		return PTR_ERR(op_data);
- 
--	ll_get_child_fid(src_dchild, &op_data->op_fid3);
--	ll_get_child_fid(tgt_dchild, &op_data->op_fid4);
-+	if (src_dchild && src_dchild->d_inode)
-+		op_data->op_fid3 = *ll_inode2fid(src_dchild->d_inode);
-+	if (tgt_dchild && tgt_dchild->d_inode)
-+		op_data->op_fid4 = *ll_inode2fid(tgt_dchild->d_inode);
-+
- 	err = md_rename(sbi->ll_md_exp, op_data,
- 			src_dchild->d_name.name,
- 			src_dchild->d_name.len,
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+index d3e28a3..9474aa9 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+@@ -307,7 +307,8 @@ int lustre_start_mgc(struct super_block *sb)
+ 	while (class_parse_nid(ptr, &nid, &ptr) == 0) {
+ 		rc = do_lcfg(mgcname, nid,
+ 			     LCFG_ADD_UUID, niduuid, NULL, NULL, NULL);
+-		i++;
++		if (!rc)
++			i++;
+ 		/* Stop at the first failover nid */
+ 		if (*ptr == ':')
+ 			break;
+@@ -345,16 +346,18 @@ int lustre_start_mgc(struct super_block *sb)
+ 		sprintf(niduuid, "%s_%x", mgcname, i);
+ 		j = 0;
+ 		while (class_parse_nid_quiet(ptr, &nid, &ptr) == 0) {
+-			j++;
+-			rc = do_lcfg(mgcname, nid,
+-				     LCFG_ADD_UUID, niduuid, NULL, NULL, NULL);
++			rc = do_lcfg(mgcname, nid, LCFG_ADD_UUID, niduuid,
++				     NULL, NULL, NULL);
++			if (!rc)
++				++j;
+ 			if (*ptr == ':')
+ 				break;
+ 		}
+ 		if (j > 0) {
+ 			rc = do_lcfg(mgcname, 0, LCFG_ADD_CONN,
+ 				     niduuid, NULL, NULL, NULL);
+-			i++;
++			if (!rc)
++				i++;
+ 		} else {
+ 			/* at ":/fsname" */
+ 			break;
 -- 
 1.7.1
