@@ -1,39 +1,29 @@
-From: Antoine BLIN <antoine.blin@lip6.fr>
-Date: Sun, 10 Apr 2016 14:46:40 +0200
-Subject: [lustre-devel] [PATCH] Mark a pointer as an userspace pointer using
-	__user macro.
-Message-ID: <1460292400-2732-1-git-send-email-antoine.blin@lip6.fr>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 11 Apr 2016 22:20:03 +0100 (BST)
+Subject: [lustre-devel] [PATCH] staging: lustre: Fix warnings reported
+ by sparse
+In-Reply-To: <20160411201519.GB24540@kroah.com>
+References: <87fuus9c7g.fsf@hp.cfotr.com> <20160411201519.GB24540@kroah.com>
+Message-ID: <alpine.LFD.2.20.1604112216520.32767@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This change fixes below sparse error: "error: incompatible types
-in comparison expression (different address spaces)"
 
-Signed-off-by: Antoine BLIN <antoine.blin@lip6.fr>
----
- drivers/staging/lustre/lnet/selftest/conrpc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+> On Mon, Apr 11, 2016 at 10:28:51PM +0300, Aleksey Fedotov wrote:
+> > >From c3b19bf16c1a11f78362847646399309c4ff6d41 Mon Sep 17 00:00:00 2001
+> > From: Aleksei Fedotov <lexa@cfotr.com>
+> > Date: Mon, 11 Apr 2016 21:13:27 +0300
+> > Subject: [PATCH] staging: lustre: Fix warnings reported by sparse
+> 
+> What is all of this here for?
+> 
+> And always cc: the public driverdevel mailing list for all staging
+> patches, like get_maintainer.pl told you to...
 
-diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-index 2be9451..1fdabb3 100644
---- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-+++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-@@ -490,10 +490,10 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
- 				   sizeof(struct list_head)))
- 			return -EFAULT;
- 
--		if (tmp.next == head_up)
--			return 0;
-+		next = (struct list_head __user *)tmp.next;
- 
--		next = tmp.next;
-+		if (next == head_up)
-+			return 0;
- 
- 		ent = list_entry(next, lstcon_rpc_ent_t, rpe_link);
- 
--- 
-2.7.4
+For the new people wanting to get involved in the lustre upstream
+client please read this link:
+
+http://wiki.lustre.org/Upstream_contributing
