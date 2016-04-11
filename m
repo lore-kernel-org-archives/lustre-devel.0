@@ -1,29 +1,26 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 11 Apr 2016 22:20:03 +0100 (BST)
-Subject: [lustre-devel] [PATCH] staging: lustre: Fix warnings reported
- by sparse
-In-Reply-To: <20160411201519.GB24540@kroah.com>
-References: <87fuus9c7g.fsf@hp.cfotr.com> <20160411201519.GB24540@kroah.com>
-Message-ID: <alpine.LFD.2.20.1604112216520.32767@casper.infradead.org>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Mon, 11 Apr 2016 15:09:11 -0700
+Subject: [lustre-devel] [PATCH] staging: lustre: libcfs: Fix warnings
+ reported by 'make C=1'
+In-Reply-To: <87bn5fan0a.fsf@hp.cfotr.com>
+References: <87bn5fan0a.fsf@hp.cfotr.com>
+Message-ID: <20160411220911.GA9944@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Mon, Apr 11, 2016 at 11:50:13PM +0300, Aleksey Fedotov wrote:
+> >From 08473aa48a1726c09dbab43e99059be9b0e88af2 Mon Sep 17 00:00:00 2001
+> From: Aleksei Fedotov <lexa@cfotr.com>
+> Date: Mon, 11 Apr 2016 21:13:27 +0300
+> Subject: [PATCH] staging: lustre: libcfs: Fix warnings reported by sparse
 
-> On Mon, Apr 11, 2016 at 10:28:51PM +0300, Aleksey Fedotov wrote:
-> > >From c3b19bf16c1a11f78362847646399309c4ff6d41 Mon Sep 17 00:00:00 2001
-> > From: Aleksei Fedotov <lexa@cfotr.com>
-> > Date: Mon, 11 Apr 2016 21:13:27 +0300
-> > Subject: [PATCH] staging: lustre: Fix warnings reported by sparse
-> 
-> What is all of this here for?
-> 
-> And always cc: the public driverdevel mailing list for all staging
-> patches, like get_maintainer.pl told you to...
+Why is this here in the body of your patch?
 
-For the new people wanting to get involved in the lustre upstream
-client please read this link:
+Please use git send-email so it does not show up.
 
-http://wiki.lustre.org/Upstream_contributing
+thanks,
+
+greg k-h
