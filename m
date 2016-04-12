@@ -1,10 +1,10 @@
-From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Mon, 11 Apr 2016 22:16:47 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: libcfs: Fix warnings
- reported by 'make C=1'
-In-Reply-To: <87bn5fan0a.fsf@hp.cfotr.com>
-References: <87bn5fan0a.fsf@hp.cfotr.com>
-Message-ID: <51E52CE1-EB1C-40CB-AC27-392F2003EA4E@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 12 Apr 2016 01:05:32 +0100 (BST)
+Subject: [lustre-devel] [PATCH] Mark a pointer as an userspace pointer
+ using __user macro.
+In-Reply-To: <1460292400-2732-1-git-send-email-antoine.blin@lip6.fr>
+References: <1460292400-2732-1-git-send-email-antoine.blin@lip6.fr>
+Message-ID: <alpine.LFD.2.20.1604120102560.32767@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,45 +12,43 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-On Apr 11, 2016, at 4:50 PM, Aleksey Fedotov wrote:
-
-> From 08473aa48a1726c09dbab43e99059be9b0e88af2 Mon Sep 17 00:00:00 2001
-> From: Aleksei Fedotov <lexa@cfotr.com>
-> Date: Mon, 11 Apr 2016 21:13:27 +0300
-> Subject: [PATCH] staging: lustre: libcfs: Fix warnings reported by sparse
-
-A better title would be something like:
-staging: lustre: libcfs: Fix libcfs_ioctl() prototype.
-
-Thanks.
-
+> This change fixes below sparse error: "error: incompatible types
+> in comparison expression (different address spaces)"
 > 
-> This patch fixes sparse warnings:
-> 
-> lustre/lnet/libcfs/linux/linux-module.c:177:35: warning: incorrect type
-> in argument 2 (different address spaces)
-> 
-> lustre/lnet/libcfs/module.c:101:5: error: symbol 'libcfs_ioctl'
-> redeclared with different type
-> 
-> Signed-off-by: Aleksey Fedotov <lexa@cfotr.com>
+> Signed-off-by: Antoine BLIN <antoine.blin@lip6.fr>
+
+Sigh, I thought the worst was behind us for the LNet/libcfs cleanup.
+I agree with Greg this is just papering over the problem. Properly
+fixing this will require the tools to be fixed as well. I wonder
+if ioctls are best way to handle this, perhaps debugfs?
+
 > ---
-> drivers/staging/lustre/include/linux/libcfs/libcfs.h | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/staging/lustre/lnet/selftest/conrpc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> index 9158c61..4141afb 100644
-> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> @@ -106,7 +106,7 @@ int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand);
-> int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
-> 			 const struct libcfs_ioctl_hdr __user *uparam);
-> int libcfs_ioctl_data_adjust(struct libcfs_ioctl_data *data);
-> -int libcfs_ioctl(unsigned long cmd, void *arg);
-> +int libcfs_ioctl(unsigned long cmd, void __user *arg);
-> 
-> /* container_of depends on "likely" which is defined in libcfs_private.h */
-> static inline void *__container_of(void *ptr, unsigned long shift)
+> diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
+> index 2be9451..1fdabb3 100644
+> --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
+> +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
+> @@ -490,10 +490,10 @@ lstcon_rpc_trans_interpreter(lstcon_rpc_trans_t *trans,
+>  				   sizeof(struct list_head)))
+>  			return -EFAULT;
+>  
+> -		if (tmp.next == head_up)
+> -			return 0;
+> +		next = (struct list_head __user *)tmp.next;
+>  
+> -		next = tmp.next;
+> +		if (next == head_up)
+> +			return 0;
+>  
+>  		ent = list_entry(next, lstcon_rpc_ent_t, rpe_link);
+>  
 > -- 
-> 2.5.5
+> 2.7.4
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 > 
