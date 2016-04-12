@@ -1,110 +1,205 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 12 Apr 2016 16:14:09 -0400
-Subject: [lustre-devel] [PATCH v2 09/16] staging: lustre: ptlrpc: return a
-	meaningful status from ptlrpcd_init()
+Date: Tue, 12 Apr 2016 16:14:10 -0400
+Subject: [lustre-devel] [PATCH v2 10/16] staging: lustre: llite: Truncate to
+	restore file
 In-Reply-To: <1460492056-31792-1-git-send-email-jsimmons@infradead.org>
 References: <1460492056-31792-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460492056-31792-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460492056-31792-11-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Swapnil Pimpale <spimpale@ddn.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Swapnil Pimpale <spimpale@ddn.com>
+From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-This patch has the following:
-1) Fix for the return value from ptlrpcd_init(). It will now return a
-   correct status instead of returning zero always.
-2) ptlrpcd_addref() should not increment ptlrpcd_users on error.
-3) Added code in a mdc_setup() and mgc_setup() to test the return
-   value of ptlrpcd_addref() and return on error.
+Truncate up is safe so it won't trigger restore.
 
-Signed-off-by: Swapnil Pimpale <spimpale@ddn.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3808
-Reviewed-on: http://review.whamcloud.com/7522
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Copy optimization for truncate down - only copy the part under
+truncate length. If a file is truncated to zero usually it'll be
+followed by write so I choose to restore the file and set correct
+stripe information.
+
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3817
+Reviewed-on: http://review.whamcloud.com/7505
+Reviewed-by: jacques-Charles Lafoucriere <jacques-charles.lafoucriere@cea.fr>
+Reviewed-by: Henri Doreau <henri.doreau@cea.fr>
+Reviewed-by: Aurelien Degremont <aurelien.degremont@cea.fr>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/mdc/mdc_request.c |    9 ++++++---
- drivers/staging/lustre/lustre/mgc/mgc_request.c |    5 ++++-
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c  |    5 ++++-
- 3 files changed, 14 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c         |    5 +-
+ .../staging/lustre/lustre/llite/llite_internal.h   |    2 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |   60 +++++++++----------
+ drivers/staging/lustre/lustre/llite/vvp_io.c       |    5 +-
+ 4 files changed, 35 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 6023c2c..5f1ac58 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -2314,12 +2314,14 @@ static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
- 		return -ENOMEM;
- 	mdc_init_rpc_lock(cli->cl_rpc_lock);
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 9b553d2..24fa24b 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -3621,7 +3621,7 @@ again:
+ /**
+  *  This function send a restore request to the MDT
+  */
+-int ll_layout_restore(struct inode *inode)
++int ll_layout_restore(struct inode *inode, loff_t offset, __u64 length)
+ {
+ 	struct hsm_user_request	*hur;
+ 	int			 len, rc;
+@@ -3637,7 +3637,8 @@ int ll_layout_restore(struct inode *inode)
+ 	hur->hur_request.hr_flags = 0;
+ 	memcpy(&hur->hur_user_item[0].hui_fid, &ll_i2info(inode)->lli_fid,
+ 	       sizeof(hur->hur_user_item[0].hui_fid));
+-	hur->hur_user_item[0].hui_extent.length = -1;
++	hur->hur_user_item[0].hui_extent.offset = offset;
++	hur->hur_user_item[0].hui_extent.length = length;
+ 	hur->hur_request.hr_itemcount = 1;
+ 	rc = obd_iocontrol(LL_IOC_HSM_REQUEST, ll_i2sbi(inode)->ll_md_exp,
+ 			   len, hur, NULL);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 2a11664..22e9989 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -1377,7 +1377,7 @@ enum {
  
--	ptlrpcd_addref();
-+	rc = ptlrpcd_addref();
-+	if (rc < 0)
-+		goto err_rpc_lock;
+ int ll_layout_conf(struct inode *inode, const struct cl_object_conf *conf);
+ int ll_layout_refresh(struct inode *inode, __u32 *gen);
+-int ll_layout_restore(struct inode *inode);
++int ll_layout_restore(struct inode *inode, loff_t start, __u64 length);
  
- 	cli->cl_close_lock = kzalloc(sizeof(*cli->cl_close_lock), GFP_NOFS);
- 	if (!cli->cl_close_lock) {
- 		rc = -ENOMEM;
--		goto err_rpc_lock;
-+		goto err_ptlrpcd_decref;
+ int ll_xattr_init(void);
+ void ll_xattr_fini(void);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index b0948a7..9f338b1 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -1266,14 +1266,6 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
+ 		       LTIME_S(attr->ia_mtime), LTIME_S(attr->ia_ctime),
+ 		       (s64)ktime_get_real_seconds());
+ 
+-	/* If we are changing file size, file content is modified, flag it. */
+-	if (attr->ia_valid & ATTR_SIZE) {
+-		attr->ia_valid |= MDS_OPEN_OWNEROVERRIDE;
+-		spin_lock(&lli->lli_lock);
+-		lli->lli_flags |= LLIF_DATA_MODIFIED;
+-		spin_unlock(&lli->lli_lock);
+-	}
+-
+ 	/* We always do an MDS RPC, even if we're only changing the size;
+ 	 * only the MDS knows whether truncate() should fail with -ETXTBUSY
+ 	 */
+@@ -1285,13 +1277,6 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
+ 	if (!S_ISDIR(inode->i_mode))
+ 		inode_unlock(inode);
+ 
+-	memcpy(&op_data->op_attr, attr, sizeof(*attr));
+-
+-	/* Open epoch for truncate. */
+-	if (exp_connect_som(ll_i2mdexp(inode)) &&
+-	    (attr->ia_valid & (ATTR_SIZE | ATTR_MTIME | ATTR_MTIME_SET)))
+-		op_data->op_flags = MF_EPOCH_OPEN;
+-
+ 	/* truncate on a released file must failed with -ENODATA,
+ 	 * so size must not be set on MDS for released file
+ 	 * but other attributes must be set
+@@ -1305,29 +1290,40 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
+ 		if (lsm && lsm->lsm_pattern & LOV_PATTERN_F_RELEASED)
+ 			file_is_released = true;
+ 		ccc_inode_lsm_put(inode, lsm);
++
++		if (!hsm_import && attr->ia_valid & ATTR_SIZE) {
++			if (file_is_released) {
++				rc = ll_layout_restore(inode, 0, attr->ia_size);
++				if (rc < 0)
++					goto out;
++
++				file_is_released = false;
++				ll_layout_refresh(inode, &gen);
++			}
++
++			/*
++			 * If we are changing file size, file content is
++			 * modified, flag it.
++			 */
++			attr->ia_valid |= MDS_OPEN_OWNEROVERRIDE;
++			spin_lock(&lli->lli_lock);
++			lli->lli_flags |= LLIF_DATA_MODIFIED;
++			spin_unlock(&lli->lli_lock);
++			op_data->op_bias |= MDS_DATA_MODIFIED;
++		}
  	}
- 	mdc_init_rpc_lock(cli->cl_close_lock);
  
-@@ -2345,9 +2347,10 @@ static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
+-	/* if not in HSM import mode, clear size attr for released file
+-	 * we clear the attribute send to MDT in op_data, not the original
+-	 * received from caller in attr which is used later to
+-	 * decide return code
+-	 */
+-	if (file_is_released && (attr->ia_valid & ATTR_SIZE) && !hsm_import)
+-		op_data->op_attr.ia_valid &= ~ATTR_SIZE;
++	memcpy(&op_data->op_attr, attr, sizeof(*attr));
++
++	/* Open epoch for truncate. */
++	if (exp_connect_som(ll_i2mdexp(inode)) && !hsm_import &&
++	    (attr->ia_valid & (ATTR_SIZE | ATTR_MTIME | ATTR_MTIME_SET)))
++		op_data->op_flags = MF_EPOCH_OPEN;
  
- err_close_lock:
- 	kfree(cli->cl_close_lock);
-+err_ptlrpcd_decref:
-+	ptlrpcd_decref();
- err_rpc_lock:
- 	kfree(cli->cl_rpc_lock);
--	ptlrpcd_decref();
- 	return rc;
- }
- 
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 3924b09..0f75040 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -734,7 +734,9 @@ static int mgc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
- 	struct task_struct *task;
- 	int rc;
- 
--	ptlrpcd_addref();
-+	rc = ptlrpcd_addref();
-+	if (rc < 0)
-+		goto err_noref;
- 
- 	rc = client_obd_setup(obd, lcfg);
+ 	rc = ll_md_setattr(dentry, op_data, &mod);
  	if (rc)
-@@ -773,6 +775,7 @@ err_cleanup:
- 	client_obd_cleanup(obd);
- err_decref:
- 	ptlrpcd_decref();
-+err_noref:
- 	return rc;
- }
+ 		goto out;
  
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-index dbc3376..76a355a 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-@@ -909,8 +909,11 @@ int ptlrpcd_addref(void)
- 	int rc = 0;
+-	/* truncate failed (only when non HSM import), others succeed */
+-	if (file_is_released) {
+-		if ((attr->ia_valid & ATTR_SIZE) && !hsm_import)
+-			rc = -ENODATA;
+-		else
+-			rc = 0;
+-		goto out;
+-	}
+-
+ 	/* RPC to MDT is sent, cancel data modification flag */
+ 	if (op_data->op_bias & MDS_DATA_MODIFIED) {
+ 		spin_lock(&lli->lli_lock);
+@@ -1336,7 +1332,7 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
+ 	}
  
- 	mutex_lock(&ptlrpcd_mutex);
--	if (++ptlrpcd_users == 1)
-+	if (++ptlrpcd_users == 1) {
- 		rc = ptlrpcd_init();
-+		if (rc < 0)
-+			ptlrpcd_users--;
-+	}
- 	mutex_unlock(&ptlrpcd_mutex);
- 	return rc;
- }
+ 	ll_ioepoch_open(lli, op_data->op_ioepoch);
+-	if (!S_ISREG(inode->i_mode)) {
++	if (!S_ISREG(inode->i_mode) || file_is_released) {
+ 		rc = 0;
+ 		goto out;
+ 	}
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
+index 26dfbf1..5bf9592 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_io.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
+@@ -294,6 +294,7 @@ static void vvp_io_fini(const struct lu_env *env, const struct cl_io_slice *ios)
+ 	struct cl_io     *io  = ios->cis_io;
+ 	struct cl_object *obj = io->ci_obj;
+ 	struct vvp_io    *vio = cl2vvp_io(env, ios);
++	struct inode *inode = vvp_object_inode(obj);
+ 
+ 	CLOBINVRNT(env, obj, vvp_object_invariant(obj));
+ 
+@@ -309,7 +310,7 @@ static void vvp_io_fini(const struct lu_env *env, const struct cl_io_slice *ios)
+ 		/* file was detected release, we need to restore it
+ 		 * before finishing the io
+ 		 */
+-		rc = ll_layout_restore(vvp_object_inode(obj));
++		rc = ll_layout_restore(inode, 0, OBD_OBJECT_EOF);
+ 		/* if restore registration failed, no restart,
+ 		 * we will return -ENODATA
+ 		 */
+@@ -335,7 +336,7 @@ static void vvp_io_fini(const struct lu_env *env, const struct cl_io_slice *ios)
+ 		__u32 gen = 0;
+ 
+ 		/* check layout version */
+-		ll_layout_refresh(vvp_object_inode(obj), &gen);
++		ll_layout_refresh(inode, &gen);
+ 		io->ci_need_restart = vio->vui_layout_gen != gen;
+ 		if (io->ci_need_restart) {
+ 			CDEBUG(D_VFSTRACE,
 -- 
 1.7.1
