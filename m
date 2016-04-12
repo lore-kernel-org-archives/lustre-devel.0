@@ -1,66 +1,88 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 12 Apr 2016 16:14:03 -0400
-Subject: [lustre-devel] [PATCH v2 03/16] staging: lustre: ldlm: Fix a race
-	during FLock handling
+Date: Tue, 12 Apr 2016 16:14:01 -0400
+Subject: [lustre-devel] [PATCH v2 01/16] staging: lustre: osc: fix race
+	issues thanks to oap_lock
 In-Reply-To: <1460492056-31792-1-git-send-email-jsimmons@infradead.org>
 References: <1460492056-31792-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460492056-31792-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460492056-31792-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruno Faccini <bruno.faccini@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Sebastien Buisson <sbuisson@ddn.com>, James Simmons <jsimmons@infradead.org>
 
-From: Bruno Faccini <bruno.faccini@intel.com>
+From: Sebastien Buisson <sbuisson@ddn.com>
 
-Protect against race where lock could have been just destroyed
-due to overlap, in ldlm_process_flock_lock().
-Easy reproducer is BULL's NFS Locktests in pthread mode.
-(http://nfsv4.bullopensource.org/tools/tests/locktest.php)
+Fix 'data race condition' defects found by Coverity version 6.5.0:
 
-Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-1126
-Reviewed-on: http://review.whamcloud.com/7134
+Data race condition (MISSING_LOCK)
+
+Accessing variable without holding lock. Elsewhere,
+this variable is accessed with lock held.
+
+This patch is dedicated to code fragments involving oap_lock.
+
+Signed-off-by: Sebastien Buisson <sbuisson@ddn.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2744
+Reviewed-on: http://review.whamcloud.com/6572
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c |    8 ++++++++
+ drivers/staging/lustre/lustre/osc/osc_io.c    |    2 ++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 3f97e1c..5102d78 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -520,11 +520,6 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
- granted:
- 	OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_CP_CB_WAIT, 10);
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+index ef68821..a5743b4 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cache.c
++++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+@@ -1147,7 +1147,9 @@ static int osc_extent_make_ready(const struct lu_env *env,
+ 		last->oap_count = osc_refresh_count(env, last, OBD_BRW_WRITE);
+ 		LASSERT(last->oap_count > 0);
+ 		LASSERT(last->oap_page_off + last->oap_count <= PAGE_SIZE);
++		spin_lock(&last->oap_lock);
+ 		last->oap_async_flags |= ASYNC_COUNT_STABLE;
++		spin_unlock(&last->oap_lock);
+ 	}
  
--	if (lock->l_flags & LDLM_FL_DESTROYED) {
--		LDLM_DEBUG(lock, "client-side enqueue waking up: destroyed");
--		return 0;
--	}
--
- 	if (lock->l_flags & LDLM_FL_FAILED) {
- 		LDLM_DEBUG(lock, "client-side enqueue waking up: failed");
- 		return -EIO;
-@@ -534,6 +529,16 @@ granted:
+ 	/* for the rest of pages, we don't need to call osf_refresh_count()
+@@ -1156,7 +1158,9 @@ static int osc_extent_make_ready(const struct lu_env *env,
+ 	list_for_each_entry(oap, &ext->oe_pages, oap_pending_item) {
+ 		if (!(oap->oap_async_flags & ASYNC_COUNT_STABLE)) {
+ 			oap->oap_count = PAGE_SIZE - oap->oap_page_off;
++			spin_lock(&last->oap_lock);
+ 			oap->oap_async_flags |= ASYNC_COUNT_STABLE;
++			spin_unlock(&last->oap_lock);
+ 		}
+ 	}
  
- 	lock_res_and_lock(lock);
- 
+@@ -2328,6 +2332,10 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
+ 	oap->oap_cmd = cmd;
+ 	oap->oap_page_off = ops->ops_from;
+ 	oap->oap_count = ops->ops_to - ops->ops_from;
 +	/*
-+	 * Protect against race where lock could have been just destroyed
-+	 * due to overlap in ldlm_process_flock_lock().
++	 * No need to hold a lock here,
++	 * since this page is not in any list yet.
 +	 */
-+	if (lock->l_flags & LDLM_FL_DESTROYED) {
-+		unlock_res_and_lock(lock);
-+		LDLM_DEBUG(lock, "client-side enqueue waking up: destroyed");
-+		return 0;
-+	}
-+
- 	/* ldlm_lock_enqueue() has already placed lock on the granted list. */
- 	list_del_init(&lock->l_res_link);
+ 	oap->oap_async_flags = 0;
+ 	oap->oap_brw_flags = brw_flags;
  
+diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
+index c1efcb3..39c3930 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_io.c
++++ b/drivers/staging/lustre/lustre/osc/osc_io.c
+@@ -168,8 +168,10 @@ static int osc_io_submit(const struct lu_env *env,
+ 		}
+ 
+ 		cl_page_list_move(qout, qin, page);
++		spin_lock(&oap->oap_lock);
+ 		oap->oap_async_flags = ASYNC_URGENT|ASYNC_READY;
+ 		oap->oap_async_flags |= ASYNC_COUNT_STABLE;
++		spin_unlock(&oap->oap_lock);
+ 
+ 		osc_page_submit(env, opg, crt, brw_flags);
+ 		list_add_tail(&oap->oap_pending_item, &list);
 -- 
 1.7.1
