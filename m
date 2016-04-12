@@ -1,50 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 12 Apr 2016 16:14:11 -0400
-Subject: [lustre-devel] [PATCH v2 11/16] staging: lustre: osc:
-	osc_extent_wait() shouldn't be interruptible
+Date: Tue, 12 Apr 2016 16:14:14 -0400
+Subject: [lustre-devel] [PATCH v2 14/16] staging: lustre: lov: Don't wait
+	for active target with OBD_STATFS_NODELAY
 In-Reply-To: <1460492056-31792-1-git-send-email-jsimmons@infradead.org>
 References: <1460492056-31792-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460492056-31792-12-git-send-email-jsimmons@infradead.org>
+Message-ID: <1460492056-31792-15-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andriy Skulysh <Andriy_Skulysh@xyratex.com>, James Simmons <jsimmons@infradead.org>
 
-From: Jinshan Xiong <jinshan.xiong@intel.com>
+From: Andriy Skulysh <Andriy_Skulysh@xyratex.com>
 
-Otherwise it will hit the assertion at cl_lock.c:
+Patch for LU-631 which was landed before the upstream merge broke
+OBD_STATFS_NODELAY behaviour. It adds unnecessary delay while
+running df command with inactive OSTs. We shouldn't try to recover
+connection to OST in this case.
 
- cl_lock.c:1967:discard_cb())
-  ASSERTION( (!(page->cp_type == CPT_CACHEABLE) ||
-  (!PageWriteback(cl_page_vmpage(env, page)))) ) failed:
-
-This is because in osc_lock_flush() we have to make sure the IO
-is finished before discarding the pages.
-
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2779
-Reviewed-on: http://review.whamcloud.com/5419
-Reviewed-by: Bobi Jam <bobijam@gmail.com>
+Signed-off-by: Andriy Skulysh <Andriy_Skulysh@xyratex.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4010
+Reviewed-on: http://review.whamcloud.com/7762
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_request.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index a5743b4..9723197 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -965,7 +965,7 @@ static int osc_extent_wait(const struct lu_env *env, struct osc_extent *ext,
- 			"%s: wait ext to %d timedout, recovery in progress?\n",
- 			osc_export(obj)->exp_obd->obd_name, state);
+diff --git a/drivers/staging/lustre/lustre/lov/lov_request.c b/drivers/staging/lustre/lustre/lov/lov_request.c
+index 7178a02..475ca2f 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_request.c
++++ b/drivers/staging/lustre/lustre/lov/lov_request.c
+@@ -716,12 +716,15 @@ int lov_prep_statfs_set(struct obd_device *obd, struct obd_info *oinfo,
+ 		struct lov_request *req;
  
--		lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
-+		lwi = LWI_INTR(NULL, NULL);
- 		rc = l_wait_event(ext->oe_waitq, extent_wait_cb(ext, state),
- 				  &lwi);
- 	}
+ 		if (!lov->lov_tgts[i] ||
+-		    (!lov_check_and_wait_active(lov, i) &&
+-		     (oinfo->oi_flags & OBD_STATFS_NODELAY))) {
++		    (oinfo->oi_flags & OBD_STATFS_NODELAY &&
++		     !lov->lov_tgts[i]->ltd_active)) {
+ 			CDEBUG(D_HA, "lov idx %d inactive\n", i);
+ 			continue;
+ 		}
+ 
++		if (!lov->lov_tgts[i]->ltd_active)
++			lov_check_and_wait_active(lov, i);
++
+ 		/* skip targets that have been explicitly disabled by the
+ 		 * administrator
+ 		 */
 -- 
 1.7.1
