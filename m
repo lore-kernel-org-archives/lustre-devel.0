@@ -1,73 +1,60 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 12 Apr 2016 16:14:16 -0400
-Subject: [lustre-devel] [PATCH v2 16/16] staging: lustre: hsm: don't use
-	real suppgid
-In-Reply-To: <1460492056-31792-1-git-send-email-jsimmons@infradead.org>
-References: <1460492056-31792-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1460492056-31792-17-git-send-email-jsimmons@infradead.org>
+From: green at linuxhacker.ru <green@linuxhacker.ru>
+Date: Tue, 12 Apr 2016 21:11:07 -0400
+Subject: [lustre-devel] [PATCH 0/2] Couple of lustre cleanups
+Message-ID: <1460509869-3288664-1-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: Oleg Drokin <green@linuxhacker.ru>
 
-In the MDC HSM handlers that do not pack a real suppgid, use -1 rather
-than 0 for the suppgid in mdt_body.
+These are rebased cleanups from before -
+style fixes and suppressign a spurious message.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3866
-Reviewed-on: http://review.whamcloud.com/7565
-Reviewed-by: Aurelien Degremont <aurelien.degremont@cea.fr>
-Reviewed-by: Faccini Bruno <bruno.faccini@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/mdc/mdc_request.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+Bobi Jam (1):
+  staging/lustre/llite: suppress non active IO error message
 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 5f1ac58..46e3a75 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -1169,7 +1169,7 @@ static int mdc_ioc_hsm_progress(struct obd_export *exp,
- 		goto out;
- 	}
- 
--	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
-+	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, -1, 0);
- 
- 	/* Copy hsm_progress struct */
- 	req_hpk = req_capsule_client_get(&req->rq_pill, &RMF_MDS_HSM_PROGRESS);
-@@ -1203,7 +1203,7 @@ static int mdc_ioc_hsm_ct_register(struct obd_import *imp, __u32 archives)
- 		goto out;
- 	}
- 
--	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
-+	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, -1, 0);
- 
- 	/* Copy hsm_progress struct */
- 	archive_mask = req_capsule_client_get(&req->rq_pill,
-@@ -1278,7 +1278,7 @@ static int mdc_ioc_hsm_ct_unregister(struct obd_import *imp)
- 		goto out;
- 	}
- 
--	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
-+	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, -1, 0);
- 
- 	ptlrpc_request_set_replen(req);
- 
-@@ -1395,7 +1395,7 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
- 		return rc;
- 	}
- 
--	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, 0, 0);
-+	mdc_pack_body(req, NULL, OBD_MD_FLRMTPERM, 0, -1, 0);
- 
- 	/* Copy hsm_request struct */
- 	req_hr = req_capsule_client_get(&req->rq_pill, &RMF_MDS_HSM_REQUEST);
+Oleg Drokin (1):
+  staging/lustre: Fix blank line after/before {/} style
+
+ drivers/staging/lustre/lustre/fld/fld_request.c     |  1 -
+ drivers/staging/lustre/lustre/include/lu_object.h   |  1 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c       |  1 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c      |  1 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c   |  1 -
+ drivers/staging/lustre/lustre/llite/dir.c           |  2 --
+ drivers/staging/lustre/lustre/llite/lproc_llite.c   |  1 -
+ drivers/staging/lustre/lustre/llite/rw.c            | 11 ++---------
+ drivers/staging/lustre/lustre/llite/xattr.c         |  1 -
+ drivers/staging/lustre/lustre/llite/xattr_cache.c   |  1 -
+ drivers/staging/lustre/lustre/lov/lov_io.c          |  1 -
+ drivers/staging/lustre/lustre/lov/lov_obd.c         |  1 -
+ drivers/staging/lustre/lustre/lov/lov_pack.c        |  1 -
+ drivers/staging/lustre/lustre/lov/lov_request.c     |  1 -
+ drivers/staging/lustre/lustre/lov/lovsub_object.c   |  1 -
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c         |  1 -
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c       |  1 -
+ drivers/staging/lustre/lustre/mgc/mgc_request.c     |  1 -
+ drivers/staging/lustre/lustre/obdclass/class_obd.c  |  1 -
+ drivers/staging/lustre/lustre/obdclass/genops.c     |  1 -
+ drivers/staging/lustre/lustre/obdclass/llog.c       |  1 -
+ drivers/staging/lustre/lustre/obdclass/lu_object.c  |  2 --
+ drivers/staging/lustre/lustre/obdclass/obd_config.c |  1 -
+ drivers/staging/lustre/lustre/obdecho/echo_client.c |  2 --
+ drivers/staging/lustre/lustre/osc/osc_cache.c       |  1 -
+ drivers/staging/lustre/lustre/osc/osc_io.c          |  1 -
+ drivers/staging/lustre/lustre/osc/osc_page.c        |  1 -
+ drivers/staging/lustre/lustre/osc/osc_request.c     |  1 -
+ drivers/staging/lustre/lustre/ptlrpc/client.c       |  1 -
+ drivers/staging/lustre/lustre/ptlrpc/events.c       |  1 -
+ drivers/staging/lustre/lustre/ptlrpc/import.c       |  3 ---
+ drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c |  1 -
+ drivers/staging/lustre/lustre/ptlrpc/nrs.c          |  1 -
+ drivers/staging/lustre/lustre/ptlrpc/pack_generic.c |  3 ---
+ 34 files changed, 2 insertions(+), 49 deletions(-)
+
 -- 
-1.7.1
+2.1.0
