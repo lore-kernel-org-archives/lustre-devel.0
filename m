@@ -1,78 +1,131 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Apr 2016 18:20:55 -0400
-Subject: [lustre-devel] [PATCH 03/15] staging: lustre: obdclass: add
-	LCT_SERVER_SESSION for server session
+Date: Wed, 27 Apr 2016 18:20:59 -0400
+Subject: [lustre-devel] [PATCH 07/15] staging: lustre: ldlm: remove code
+	wireshark handling
 In-Reply-To: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
 References: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1461795667-29035-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1461795667-29035-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Wang Di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruce Korb <bruce.korb@gmail.com>, James Simmons <jsimmons@infradead.org>
 
-From: Wang Di <di.wang@intel.com>
+From: Bruce Korb <bruce.korb@gmail.com>
 
-Add LCT_SERVER_SESSION for server session, and separate the
-server session flag from LCT_SESSION, so to avoid allocating
-session info for client stack for each server request, if
-client and server are on the same node.
+Wireshark output moved to userland file "lustre_dlm_flags_wshark.c"
+and only bits that can actually appear "on the wire" are emitted.
+The user land "packet-lustre.c" code that references these bits
+now gets emitted into that file. e.g. the "local_only" bit is
+never put on the wire, so references to it in wireshark are gone.
 
-Signed-off-by: Wang Di <di.wang@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3806
-Reviewed-on: http://review.whamcloud.com/7412
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Mike Pershin <mike.pershin@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: Bruce Korb <bruce.korb@gmail.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2906
+Reviewed-by: Keith Mannthey <Keith.Mannthey@intel.com>
+Reviewed-on: http://review.whamcloud.com/7963
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h |    4 ++++
- drivers/staging/lustre/lustre/include/obd_class.h |    2 +-
- drivers/staging/lustre/lustre/ptlrpc/service.c    |    3 ++-
- 3 files changed, 7 insertions(+), 2 deletions(-)
+ .../lustre/lustre/include/lustre_dlm_flags.h       |   87 +-------------------
+ 1 files changed, 1 insertions(+), 86 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index b5b0c81..a27e76f 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -1006,6 +1006,10 @@ enum lu_context_tag {
- 	 */
- 	LCT_LOCAL = 1 << 7,
- 	/**
-+	 * session for server thread
-+	 **/
-+	LCT_SERVER_SESSION = BIT(8),
-+	/**
- 	 * Set when@least one of keys, having values in this context has
- 	 * non-NULL lu_context_key::lct_exit() method. This is used to
- 	 * optimize lu_context_exit() call.
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 40f7a23..32863bc 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -477,7 +477,7 @@ static inline int obd_setup(struct obd_device *obd, struct lustre_cfg *cfg)
- 		struct lu_context  session_ctx;
- 		struct lu_env env;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
+index 62d3b31..1eb0cc4 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
+@@ -386,90 +386,5 @@
  
--		lu_context_init(&session_ctx, LCT_SESSION);
-+		lu_context_init(&session_ctx, LCT_SESSION | LCT_SERVER_SESSION);
- 		session_ctx.lc_thread = NULL;
- 		lu_context_enter(&session_ctx);
- 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 1bbd1d3..fc2632f 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -1649,7 +1649,8 @@ ptlrpc_server_handle_request(struct ptlrpc_service_part *svcpt,
- 				    at_get(&svcpt->scp_at_estimate));
- 	}
- 
--	rc = lu_context_init(&request->rq_session, LCT_SESSION | LCT_NOREF);
-+	rc = lu_context_init(&request->rq_session, LCT_SERVER_SESSION |
-+						   LCT_NOREF);
- 	if (rc) {
- 		CERROR("Failure to initialize session: %d\n", rc);
- 		goto out_req;
+ /** @} subgroup */
+ /** @} group */
+-#ifdef WIRESHARK_COMPILE
+-static int hf_lustre_ldlm_fl_lock_changed        = -1;
+-static int hf_lustre_ldlm_fl_block_granted       = -1;
+-static int hf_lustre_ldlm_fl_block_conv          = -1;
+-static int hf_lustre_ldlm_fl_block_wait          = -1;
+-static int hf_lustre_ldlm_fl_ast_sent            = -1;
+-static int hf_lustre_ldlm_fl_replay              = -1;
+-static int hf_lustre_ldlm_fl_intent_only         = -1;
+-static int hf_lustre_ldlm_fl_has_intent          = -1;
+-static int hf_lustre_ldlm_fl_flock_deadlock      = -1;
+-static int hf_lustre_ldlm_fl_discard_data        = -1;
+-static int hf_lustre_ldlm_fl_no_timeout          = -1;
+-static int hf_lustre_ldlm_fl_block_nowait        = -1;
+-static int hf_lustre_ldlm_fl_test_lock           = -1;
+-static int hf_lustre_ldlm_fl_cancel_on_block     = -1;
+-static int hf_lustre_ldlm_fl_deny_on_contention  = -1;
+-static int hf_lustre_ldlm_fl_ast_discard_data    = -1;
+-static int hf_lustre_ldlm_fl_fail_loc            = -1;
+-static int hf_lustre_ldlm_fl_skipped             = -1;
+-static int hf_lustre_ldlm_fl_cbpending           = -1;
+-static int hf_lustre_ldlm_fl_wait_noreproc       = -1;
+-static int hf_lustre_ldlm_fl_cancel              = -1;
+-static int hf_lustre_ldlm_fl_local_only          = -1;
+-static int hf_lustre_ldlm_fl_failed              = -1;
+-static int hf_lustre_ldlm_fl_canceling           = -1;
+-static int hf_lustre_ldlm_fl_local               = -1;
+-static int hf_lustre_ldlm_fl_lvb_ready           = -1;
+-static int hf_lustre_ldlm_fl_kms_ignore          = -1;
+-static int hf_lustre_ldlm_fl_cp_reqd             = -1;
+-static int hf_lustre_ldlm_fl_cleaned             = -1;
+-static int hf_lustre_ldlm_fl_atomic_cb           = -1;
+-static int hf_lustre_ldlm_fl_bl_ast              = -1;
+-static int hf_lustre_ldlm_fl_bl_done             = -1;
+-static int hf_lustre_ldlm_fl_no_lru              = -1;
+-static int hf_lustre_ldlm_fl_fail_notified       = -1;
+-static int hf_lustre_ldlm_fl_destroyed           = -1;
+-static int hf_lustre_ldlm_fl_server_lock         = -1;
+-static int hf_lustre_ldlm_fl_res_locked          = -1;
+-static int hf_lustre_ldlm_fl_waited              = -1;
+-static int hf_lustre_ldlm_fl_ns_srv              = -1;
+-static int hf_lustre_ldlm_fl_excl                = -1;
+-
+-const value_string lustre_ldlm_flags_vals[] = {
+-	{LDLM_FL_LOCK_CHANGED,        "LDLM_FL_LOCK_CHANGED"},
+-	{LDLM_FL_BLOCK_GRANTED,       "LDLM_FL_BLOCK_GRANTED"},
+-	{LDLM_FL_BLOCK_CONV,          "LDLM_FL_BLOCK_CONV"},
+-	{LDLM_FL_BLOCK_WAIT,          "LDLM_FL_BLOCK_WAIT"},
+-	{LDLM_FL_AST_SENT,            "LDLM_FL_AST_SENT"},
+-	{LDLM_FL_REPLAY,              "LDLM_FL_REPLAY"},
+-	{LDLM_FL_INTENT_ONLY,         "LDLM_FL_INTENT_ONLY"},
+-	{LDLM_FL_HAS_INTENT,          "LDLM_FL_HAS_INTENT"},
+-	{LDLM_FL_FLOCK_DEADLOCK,      "LDLM_FL_FLOCK_DEADLOCK"},
+-	{LDLM_FL_DISCARD_DATA,        "LDLM_FL_DISCARD_DATA"},
+-	{LDLM_FL_NO_TIMEOUT,          "LDLM_FL_NO_TIMEOUT"},
+-	{LDLM_FL_BLOCK_NOWAIT,        "LDLM_FL_BLOCK_NOWAIT"},
+-	{LDLM_FL_TEST_LOCK,           "LDLM_FL_TEST_LOCK"},
+-	{LDLM_FL_CANCEL_ON_BLOCK,     "LDLM_FL_CANCEL_ON_BLOCK"},
+-	{LDLM_FL_DENY_ON_CONTENTION,  "LDLM_FL_DENY_ON_CONTENTION"},
+-	{LDLM_FL_AST_DISCARD_DATA,    "LDLM_FL_AST_DISCARD_DATA"},
+-	{LDLM_FL_FAIL_LOC,            "LDLM_FL_FAIL_LOC"},
+-	{LDLM_FL_SKIPPED,             "LDLM_FL_SKIPPED"},
+-	{LDLM_FL_CBPENDING,           "LDLM_FL_CBPENDING"},
+-	{LDLM_FL_WAIT_NOREPROC,       "LDLM_FL_WAIT_NOREPROC"},
+-	{LDLM_FL_CANCEL,              "LDLM_FL_CANCEL"},
+-	{LDLM_FL_LOCAL_ONLY,          "LDLM_FL_LOCAL_ONLY"},
+-	{LDLM_FL_FAILED,              "LDLM_FL_FAILED"},
+-	{LDLM_FL_CANCELING,           "LDLM_FL_CANCELING"},
+-	{LDLM_FL_LOCAL,               "LDLM_FL_LOCAL"},
+-	{LDLM_FL_LVB_READY,           "LDLM_FL_LVB_READY"},
+-	{LDLM_FL_KMS_IGNORE,          "LDLM_FL_KMS_IGNORE"},
+-	{LDLM_FL_CP_REQD,             "LDLM_FL_CP_REQD"},
+-	{LDLM_FL_CLEANED,             "LDLM_FL_CLEANED"},
+-	{LDLM_FL_ATOMIC_CB,           "LDLM_FL_ATOMIC_CB"},
+-	{LDLM_FL_BL_AST,              "LDLM_FL_BL_AST"},
+-	{LDLM_FL_BL_DONE,             "LDLM_FL_BL_DONE"},
+-	{LDLM_FL_NO_LRU,              "LDLM_FL_NO_LRU"},
+-	{LDLM_FL_FAIL_NOTIFIED,       "LDLM_FL_FAIL_NOTIFIED"},
+-	{LDLM_FL_DESTROYED,           "LDLM_FL_DESTROYED"},
+-	{LDLM_FL_SERVER_LOCK,         "LDLM_FL_SERVER_LOCK"},
+-	{LDLM_FL_RES_LOCKED,          "LDLM_FL_RES_LOCKED"},
+-	{LDLM_FL_WAITED,              "LDLM_FL_WAITED"},
+-	{LDLM_FL_NS_SRV,              "LDLM_FL_NS_SRV"},
+-	{LDLM_FL_EXCL,                "LDLM_FL_EXCL"},
+-	{ 0, NULL }
+-};
+-#endif /*  WIRESHARK_COMPILE */
++
+ #endif /* LDLM_ALL_FLAGS_MASK */
 -- 
 1.7.1
