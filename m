@@ -1,96 +1,61 @@
-From: Drokin, Oleg <oleg.drokin@intel.com>
-Date: Thu, 21 Apr 2016 01:44:58 +0000
-Subject: [lustre-devel] new tag 2.8.52
-Message-ID: <7D2CE7D8-883E-4B77-A02E-2D8750A78572@intel.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Wed, 27 Apr 2016 15:28:47 +0300
+Subject: [lustre-devel] staging: add Lustre file system client support
+Message-ID: <20160427122846.GA6441@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+Hello Lustre devs,
 
-   I just tagged a new 2.8.52 in the master branch of the opensfs tree.
+The patch d7e09d0397e8: "staging: add Lustre file system client
+support" from May 2, 2013, leads to the following Parfait warning.
+Parfait is an Oracle static analysis tool.  If there is a patch from
+this could you give credit to Lidza Louina <lidza.louina@oracle.com>?
 
-   Here's the changelog:
-Alex Zhuravlev (3):
-      LU-7408 target: comment as per inspection
-      LU-7355 osd: supress useless warning about many credits
-      LU-7772 llog: do not destroy llog twice
+drivers/staging/lustre/lustre/ldlm/interval_tree.c
+   399  void interval_erase(struct interval_node *node,
+   400                      struct interval_node **root)
+   401  {
+   402          struct interval_node *child, *parent;
+   403          int color;
+   404  
+   405          LASSERT(interval_is_intree(node));
+   406          node->in_intree = 0;
+   407          if (!node->in_left) {
+   408                  child = node->in_right;
+   409          } else if (!node->in_right) {
+   410                  child = node->in_left;
+   411          } else { /* Both left and right child are not NULL */
+   412                  struct interval_node *old = node;
+   413  
+   414                  node = interval_next(node);
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+It looks like interval_next() can return NULL.
 
-Alexander Boyko (2):
-      LU-7928 mdd: wrong params order at mdd_declare_rename
-      LU-7156 mdd: add changelog_size to procfs
+   415                  child = node->in_right;
+   416                  parent = node->in_parent;
+   417                  color = node->in_color;
+   418  
 
-Amir Shehata (1):
-      LU-7101 lnet: per NI map-on-demand value
+Here is the interval_next() function:
 
-Andrew Perepechko (1):
-      LU-7925 llite: avoid clearing i_nlink for inodes in use
+drivers/staging/lustre/lustre/ldlm/interval_tree.c
+   111  static struct interval_node *interval_next(struct interval_node *node)
+   112  {
+   113          if (!node)
+   114                  return NULL;
+   115          if (node->in_right)
+   116                  return interval_first(node->in_right);
+   117          while (node->in_parent && node_is_right_child(node))
+                       ^^^^^^^^^^^^^^^
+We assume that ->in_parent can be NULL here.  Is that actually possible?
 
-Ben Evans (1):
-      LU-6401 headers: move seq_range.h to correct directory
+   118                  node = node->in_parent;
+   119          return node->in_parent;
+   120  }
 
-Bob Glossman (3):
-      LU-6163 kernel: use do_div64() for 64 bit divides
-      LU-7907 kernel: kernel update RHEL 6.7 [2.6.32-573.22.1.el6]
-      LU-7967 kernel: kernel update RHEL7.2 [3.10.0-327.13.1.el7]
-
-Christopher J. Morrone (2):
-      LU-7962 build: Support builds w/ weak module ZFS
-      LU-7699 build: Eliminate lustre_build_version.h
-
-Dmitry Eremin (5):
-      LU-7887 lbuild: use "make rpms" for building Lustre RPMs
-      LU-7968 lbuild: Fix reuse signature calculation
-      LU-7936 utils: fix resource lost
-      LU-7979 o2iblnd: fix free of IS_ERR pointer
-      LU-7220 llog: fix fd lost and correct error reporting
-
-Emoly Liu (1):
-      LU-7055 osd: move dput() out of osd_ost_fini()'s rwlock
-
-Fan Yong (1):
-      LU-4182 tests: enable sanity-scrub test_15 under DNE mode
-
-Giuseppe Di Natale (1):
-      LU-7060 ldev: Added MGS NID substitution to ldev
-
-Gregoire Pichon (1):
-      LU-7965 utils: fix stack corruption in mkfs.lustre
-
-Hongchao Zhang (1):
-      LU-7428 test: commit the label change to disk
-
-James Simmons (3):
-      LU-6215 lprocfs: handle seq_printf api change
-      LU-6245 libcfs: fix racey module handling
-      LU-6245 libcfs: remove libcfs userland time abstraction
-
-Jinshan Xiong (1):
-      LU-7990 rpc: increase bulk size
-
-Lai Siyao (1):
-      LU-28 fileset: add fileset mount support
-
-Li Xi (1):
-      LU-4931 ladvise: Add feature of giving file access advices
-
-Mike Shuey (1):
-      LU-4423 lnet: remove LNET_MUTEX_LOCK macro
-
-Oleg Drokin (1):
-      New version 2.8.52
-
-Ryan Haasken (1):
-      LU-7796 utils: print error with valueless lctl set_param
-
-Shivani Bhardwaj (1):
-      LU-4423 lnet: Drop unnecessary wrapper function srpc_post_active_rqtbuf
-
-Vitaly Osipov (1):
-      LU-4423 lnet: remove memset(0) after LIBCFS_ALLOC
-
-Yang Sheng (2):
-      LU-7759 utils: build mount.lustre with libmount
-      LU-6601 osp: update obd status while osp status changed
+regards,
+dan carpenter
