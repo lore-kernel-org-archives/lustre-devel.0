@@ -1,61 +1,44 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Wed, 27 Apr 2016 15:28:47 +0300
-Subject: [lustre-devel] staging: add Lustre file system client support
-Message-ID: <20160427122846.GA6441@mwanda>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 27 Apr 2016 18:20:54 -0400
+Subject: [lustre-devel] [PATCH 02/15] staging: lustre: llite: NFS reexport
+	issue
+In-Reply-To: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
+References: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1461795667-29035-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
 
-Hello Lustre devs,
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-The patch d7e09d0397e8: "staging: add Lustre file system client
-support" from May 2, 2013, leads to the following Parfait warning.
-Parfait is an Oracle static analysis tool.  If there is a patch from
-this could you give credit to Lidza Louina <lidza.louina@oracle.com>?
+Suppress erroneous/confusing messages when NFS
+is out of sync and requests old data.
 
-drivers/staging/lustre/lustre/ldlm/interval_tree.c
-   399  void interval_erase(struct interval_node *node,
-   400                      struct interval_node **root)
-   401  {
-   402          struct interval_node *child, *parent;
-   403          int color;
-   404  
-   405          LASSERT(interval_is_intree(node));
-   406          node->in_intree = 0;
-   407          if (!node->in_left) {
-   408                  child = node->in_right;
-   409          } else if (!node->in_right) {
-   410                  child = node->in_left;
-   411          } else { /* Both left and right child are not NULL */
-   412                  struct interval_node *old = node;
-   413  
-   414                  node = interval_next(node);
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-It looks like interval_next() can return NULL.
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4050
+Reviewed-on: http://review.whamcloud.com/7850
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/llite/llite_nfs.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-   415                  child = node->in_right;
-   416                  parent = node->in_parent;
-   417                  color = node->in_color;
-   418  
-
-Here is the interval_next() function:
-
-drivers/staging/lustre/lustre/ldlm/interval_tree.c
-   111  static struct interval_node *interval_next(struct interval_node *node)
-   112  {
-   113          if (!node)
-   114                  return NULL;
-   115          if (node->in_right)
-   116                  return interval_first(node->in_right);
-   117          while (node->in_parent && node_is_right_child(node))
-                       ^^^^^^^^^^^^^^^
-We assume that ->in_parent can be NULL here.  Is that actually possible?
-
-   118                  node = node->in_parent;
-   119          return node->in_parent;
-   120  }
-
-regards,
-dan carpenter
+diff --git a/drivers/staging/lustre/lustre/llite/llite_nfs.c b/drivers/staging/lustre/lustre/llite/llite_nfs.c
+index 193aab8..2c26815 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_nfs.c
++++ b/drivers/staging/lustre/lustre/llite/llite_nfs.c
+@@ -119,7 +119,7 @@ struct inode *search_inode_for_lustre(struct super_block *sb,
+ 	rc = md_getattr(sbi->ll_md_exp, op_data, &req);
+ 	kfree(op_data);
+ 	if (rc) {
+-		CERROR("can't get object attrs, fid "DFID", rc %d\n",
++		CDEBUG(D_INFO, "can't get object attrs, fid "DFID", rc %d\n",
+ 		       PFID(fid), rc);
+ 		return ERR_PTR(rc);
+ 	}
+-- 
+1.7.1
