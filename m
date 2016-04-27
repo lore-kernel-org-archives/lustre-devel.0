@@ -1,98 +1,83 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Apr 2016 18:20:58 -0400
-Subject: [lustre-devel] [PATCH 06/15] staging: lustre: ldlm: clean up l_flags
+Date: Wed, 27 Apr 2016 18:21:07 -0400
+Subject: [lustre-devel] [PATCH 15/15] staging: lustre: ptlrpc: quiet warning
+	for 2.1/2.5 connections
 In-Reply-To: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
 References: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1461795667-29035-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1461795667-29035-16-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruce Korb <bruce.korb@gmail.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Bruce Korb <bruce.korb@gmail.com>
+From: Andreas Dilger <andreas.dilger@intel.com>
 
-Remove the now obsolete LDLM_AST_FLAGS and LDLM_INHERIT_FLAGS defines.
-Remove the obsolete LDLM_FL_HIDE_LOCK_MASK define.
-Rename "local_only" mask to "off_wire" since it is confusingly similar
-to a flag that (I think) means, "do not copy this lock over the wire."
+The Lustre 2.5.4 client will print a warning about connections with
+2.1.3 servers, yet they are still supposed to be interoperable.
+Increase the window of warning to be up to Lustre 2.5.50, since we
+do not intend to allow interoperability between 2.1 and 2.6 systems.
+This was from the time when major releases like Lustre 1.4 and 1.8
+were many years apart would have no chance for interoperation.
 
-Signed-off-by: Bruce Korb <bruce.korb@gmail.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2906
-Reviewed-by: Keith Mannthey <Keith.Mannthey@intel.com>
-Reviewed-on: http://review.whamcloud.com/7963
-Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Only print this message once per client, to avoid flooding the console
+for connections to many servers or frequent network reconnections.
+Server versions should all be nearly the same in any case.
+
+Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2528
+Reviewed-on: http://review.whamcloud.com/7916
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: Jian Yu <jian.yu@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre_dlm_flags.h       |   16 ++--------------
- drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |    2 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |    2 +-
- 3 files changed, 4 insertions(+), 16 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/import.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
-index aff0904..62d3b31 100644
---- a/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_dlm_flags.h
-@@ -37,17 +37,11 @@
- /** l_flags bits marked as "gone" bits */
- #define LDLM_FL_GONE_MASK               0x0006004000000000ULL
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index bf7b9d2..a4f7544 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -1001,6 +1001,8 @@ finish:
+ 			return 0;
+ 		}
+ 	} else {
++		static bool warned;
++
+ 		spin_lock(&imp->imp_lock);
+ 		list_del(&imp->imp_conn_current->oic_item);
+ 		list_add(&imp->imp_conn_current->oic_item, &imp->imp_conn_list);
+@@ -1020,7 +1022,7 @@ finish:
+ 			goto out;
+ 		}
  
--/** l_flags bits marked as "hide_lock" bits */
--#define LDLM_FL_HIDE_LOCK_MASK          0x0000206400000000ULL
--
- /** l_flags bits marked as "inherit" bits */
- #define LDLM_FL_INHERIT_MASK            0x0000000000800000ULL
+-		if ((ocd->ocd_connect_flags & OBD_CONNECT_VERSION) &&
++		if (!warned && (ocd->ocd_connect_flags & OBD_CONNECT_VERSION) &&
+ 		    (ocd->ocd_version > LUSTRE_VERSION_CODE +
+ 					LUSTRE_VERSION_OFFSET_WARN ||
+ 		     ocd->ocd_version < LUSTRE_VERSION_CODE -
+@@ -1028,10 +1030,8 @@ finish:
+ 			/* Sigh, some compilers do not like #ifdef in the middle
+ 			 * of macro arguments
+ 			 */
+-			const char *older = "older. Consider upgrading server or downgrading client"
+-				;
+-			const char *newer = "newer than client version. Consider upgrading client"
+-					    ;
++			const char *older = "older than client. Consider upgrading server";
++			const char *newer = "newer than client. Consider recompiling application";
  
--/** l_flags bits marked as "local_only" bits */
--#define LDLM_FL_LOCAL_ONLY_MASK         0x00FFFFFF00000000ULL
--
--/** l_flags bits marked as "on_wire" bits */
--#define LDLM_FL_ON_WIRE_MASK            0x00000000C08F932FULL
-+/** l_flags bits marked as "off_wire" bits */
-+#define LDLM_FL_OFF_WIRE_MASK           0x00FFFFFF00000000ULL
+ 			LCONSOLE_WARN("Server %s version (%d.%d.%d.%d) is much %s (%s)\n",
+ 				      obd2cli_tgt(imp->imp_obd),
+@@ -1041,6 +1041,7 @@ finish:
+ 				      OBD_OCD_VERSION_FIX(ocd->ocd_version),
+ 				      ocd->ocd_version > LUSTRE_VERSION_CODE ?
+ 				      newer : older, LUSTRE_VERSION_STRING);
++			warned = true;
+ 		}
  
- /** extent, mode, or resource changed */
- #define LDLM_FL_LOCK_CHANGED            0x0000000000000001ULL /* bit 0 */
-@@ -390,12 +384,6 @@
- /** clear a ldlm_lock flag bit */
- #define LDLM_CLEAR_FLAG(_l, _b)       ((_l)->l_flags &= ~(_b))
- 
--/** Mask of flags inherited from parent lock when doing intents. */
--#define LDLM_INHERIT_FLAGS            LDLM_FL_INHERIT_MASK
--
--/** Mask of Flags sent in AST lock_flags to map into the receiving lock. */
--#define LDLM_AST_FLAGS                LDLM_FL_AST_MASK
--
- /** @} subgroup */
- /** @} group */
- #ifdef WIRESHARK_COMPILE
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-index 024185b..ab739f0 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-@@ -632,7 +632,7 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
- 	/* Copy hints/flags (e.g. LDLM_FL_DISCARD_DATA) from AST. */
- 	lock_res_and_lock(lock);
- 	lock->l_flags |= ldlm_flags_from_wire(dlm_req->lock_flags &
--					      LDLM_AST_FLAGS);
-+					      LDLM_FL_AST_MASK);
- 	if (lustre_msg_get_opc(req->rq_reqmsg) == LDLM_BL_CALLBACK) {
- 		/* If somebody cancels lock and cache is already dropped,
- 		 * or lock is failed before cp_ast received on client,
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index 0e4ab2c..107314e 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -421,7 +421,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
- 
- 	*flags = ldlm_flags_from_wire(reply->lock_flags);
- 	lock->l_flags |= ldlm_flags_from_wire(reply->lock_flags &
--					      LDLM_INHERIT_FLAGS);
-+					      LDLM_FL_INHERIT_MASK);
- 	/* move NO_TIMEOUT flag to the lock to force ldlm_lock_match()
- 	 * to wait with no timeout as well
- 	 */
+ #if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(3, 2, 50, 0)
 -- 
 1.7.1
