@@ -1,44 +1,53 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Apr 2016 21:37:21 -0400
-Subject: [lustre-devel] [PATCH 12/12] staging: lustre: llite: fixup return
-	value ll_direct_IO_26
+Date: Wed, 27 Apr 2016 21:37:16 -0400
+Subject: [lustre-devel] [PATCH 07/12] staging: lustre: libcfs: Fix NUMA
+	emulated mode
 In-Reply-To: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
 References: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1461807441-3210-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1461807441-3210-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andriy Skulysh <Andriy_Skulysh@xyratex.com>, James Simmons <jsimmons@infradead.org>
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+From: Andriy Skulysh <Andriy_Skulysh@xyratex.com>
 
-Return the correct values from ll_direct_IO_26.
+Kernel commit c1c3443c9c5e9be92641029ed229a41563e44506
+assigns all allowed cpus to emulated node.
 
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4069
-Reviewed-on: http://review.whamcloud.com/8080
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
+End cpt initialization loop when all CPUs are assigned.
+
+Signed-off-by: Andriy Skulysh <Andriy_Skulysh@xyratex.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3992
+Reviewed-on: http://review.whamcloud.com/7724
+Reviewed-by: Liang Zhen <liang.zhen@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-Off-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/rw26.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
-index a740c7a..9341189 100644
---- a/drivers/staging/lustre/lustre/llite/rw26.c
-+++ b/drivers/staging/lustre/lustre/llite/rw26.c
-@@ -446,7 +446,7 @@ out:
- 	}
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+index 389fb9e..b52518c5 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+@@ -755,8 +755,13 @@ cfs_cpt_table_create(int ncpt)
+ 			struct cfs_cpu_partition *part;
+ 			int    n;
  
- 	cl_env_put(env, &refcheck);
--	return tot_bytes ? : result;
-+	return tot_bytes ? tot_bytes : result;
- }
+-			if (cpt >= ncpt)
+-				goto failed;
++			/*
++			 * Each emulated NUMA node has all allowed CPUs in
++			 * the mask.
++			 * End loop when all partitions have assigned CPUs.
++			 */
++			if (cpt == ncpt)
++				break;
  
- /**
+ 			part = &cptab->ctb_parts[cpt];
+ 
 -- 
 2.7.4
