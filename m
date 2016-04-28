@@ -1,133 +1,115 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Apr 2016 18:21:05 -0400
-Subject: [lustre-devel] [PATCH 13/15] staging: lustre: osc: Track number of
-	"unstable" pages per osc
-In-Reply-To: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
-References: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1461795667-29035-14-git-send-email-jsimmons@infradead.org>
+Date: Wed, 27 Apr 2016 21:37:12 -0400
+Subject: [lustre-devel] [PATCH 03/12] staging: lustre: ptlrpc: use unified
+	handler for OST requests
+In-Reply-To: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
+References: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1461807441-3210-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Prakash Surya <surya1@llnl.gov>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Mikhail Pershin <mike.pershin@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Prakash Surya <surya1@llnl.gov>
+From: Mikhail Pershin <mike.pershin@intel.com>
 
-This change adds simple accounting hooks for "unstable" pages on a per
-OSC basis. Now, in addition to the per filesystem tracking, each OSC
-will maintain a running total of its unstable pages. These counters are
-exported through the proc interface, and can be read using the lctl
-command.
+Switch OST/OFD request processing to the unified request
+handle.
 
-For example:
-
-	# Read number of unstable pages contained by each OSC
-	lctl get_param osc.*.unstable_stats
-
-The motivation for this change is in anticipation of implementing a
-"soft sync" functionality, urging servers to commit these unstable
-pages to stable storage. The per OSC accounting allows a client to
-limit the soft sync request to only the OSCs which have outstanding
-unstable pages.
-
-Signed-off-by: Prakash Surya <surya1@llnl.gov>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2139
-Reviewed-on: http://review.whamcloud.com/4374
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Signed-off-by: Mikhail Pershin <mike.pershin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3467
+Reviewed-on: http://review.whamcloud.com/7130
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h   |    1 +
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c |    1 +
- drivers/staging/lustre/lustre/osc/lproc_osc.c |   18 ++++++++++++++++++
- drivers/staging/lustre/lustre/osc/osc_cache.c |    6 ++++++
- 4 files changed, 26 insertions(+), 0 deletions(-)
+ .../staging/lustre/lustre/include/lustre_req_layout.h    |  2 +-
+ drivers/staging/lustre/lustre/include/obd_support.h      |  1 +
+ drivers/staging/lustre/lustre/ptlrpc/layout.c            | 16 +++++++++++-----
+ 3 files changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 3f24a5b..d0c0c26 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -325,6 +325,7 @@ struct client_obd {
- 	atomic_t		 cl_lru_in_list;
- 	struct list_head	 cl_lru_list; /* lru page list */
- 	spinlock_t		 cl_lru_list_lock; /* page list protector */
-+	atomic_t		 cl_unstable_count;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_req_layout.h b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+index b2e67fc..b0bc751 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_req_layout.h
++++ b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+@@ -199,7 +199,7 @@ extern struct req_format RQF_OST_BRW_READ;
+ extern struct req_format RQF_OST_BRW_WRITE;
+ extern struct req_format RQF_OST_STATFS;
+ extern struct req_format RQF_OST_SET_GRANT_INFO;
+-extern struct req_format RQF_OST_GET_INFO_GENERIC;
++extern struct req_format RQF_OST_GET_INFO;
+ extern struct req_format RQF_OST_GET_INFO_LAST_ID;
+ extern struct req_format RQF_OST_GET_INFO_LAST_FID;
+ extern struct req_format RQF_OST_SET_INFO_LAST_FID;
+diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
+index c7267b7..2aaa343 100644
+--- a/drivers/staging/lustre/lustre/include/obd_support.h
++++ b/drivers/staging/lustre/lustre/include/obd_support.h
+@@ -290,6 +290,7 @@ extern char obd_jobid_var[];
+ #define OBD_FAIL_OST_ENOINO	      0x229
+ #define OBD_FAIL_OST_DQACQ_NET	   0x230
+ #define OBD_FAIL_OST_STATFS_EINPROGRESS  0x231
++#define OBD_FAIL_OST_SET_INFO_NET		0x232
  
- 	/* number of in flight destroy rpcs is limited to max_rpcs_in_flight */
- 	atomic_t	     cl_destroy_in_flight;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index bc951c0..32486b2 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -334,6 +334,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	atomic_set(&cli->cl_lru_in_list, 0);
- 	INIT_LIST_HEAD(&cli->cl_lru_list);
- 	spin_lock_init(&cli->cl_lru_list_lock);
-+	atomic_set(&cli->cl_unstable_count, 0);
+ #define OBD_FAIL_LDLM		    0x300
+ #define OBD_FAIL_LDLM_NAMESPACE_NEW      0x301
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+index 5b06901..ccc1f3e 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+@@ -566,7 +566,7 @@ static const struct req_msg_field *ost_get_info_generic_server[] = {
  
- 	init_waitqueue_head(&cli->cl_destroy_waitq);
- 	atomic_set(&cli->cl_destroy_in_flight, 0);
-diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-index 6e57f53..33a1132 100644
---- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
-+++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-@@ -593,6 +593,23 @@ static ssize_t max_pages_per_rpc_store(struct kobject *kobj,
- }
- LUSTRE_RW_ATTR(max_pages_per_rpc);
- 
-+static ssize_t unstable_stats_show(struct kobject *kobj,
-+				   struct attribute *attr,
-+				   char *buf)
-+{
-+	struct obd_device *dev = container_of(kobj, struct obd_device,
-+					      obd_kobj);
-+	struct client_obd *cli = &dev->u.cli;
-+	int pages, mb;
-+
-+	pages = atomic_read(&cli->cl_unstable_count);
-+	mb = (pages * PAGE_SIZE) >> 20;
-+
-+	return sprintf(buf, "unstable_pages: %8d\n"
-+		       "unstable_mb:    %8d\n", pages, mb);
-+}
-+LUSTRE_RO_ATTR(unstable_stats);
-+
- LPROC_SEQ_FOPS_RO_TYPE(osc, connect_flags);
- LPROC_SEQ_FOPS_RO_TYPE(osc, server_uuid);
- LPROC_SEQ_FOPS_RO_TYPE(osc, conn_uuid);
-@@ -802,6 +819,7 @@ static struct attribute *osc_attrs[] = {
- 	&lustre_attr_max_pages_per_rpc.attr,
- 	&lustre_attr_max_rpcs_in_flight.attr,
- 	&lustre_attr_resend_count.attr,
-+	&lustre_attr_unstable_stats.attr,
- 	NULL,
+ static const struct req_msg_field *ost_get_info_generic_client[] = {
+ 	&RMF_PTLRPC_BODY,
+-	&RMF_SETINFO_KEY
++	&RMF_GETINFO_KEY
  };
  
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 5cd8eef..7d1c2c5 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -1873,6 +1873,9 @@ void osc_dec_unstable_pages(struct ptlrpc_request *req)
- 	atomic_sub(page_count, &cli->cl_cache->ccc_unstable_nr);
- 	LASSERT(atomic_read(&cli->cl_cache->ccc_unstable_nr) >= 0);
+ static const struct req_msg_field *ost_get_last_id_server[] = {
+@@ -574,6 +574,12 @@ static const struct req_msg_field *ost_get_last_id_server[] = {
+ 	&RMF_OBD_ID
+ };
  
-+	atomic_sub(page_count, &cli->cl_unstable_count);
-+	LASSERT(atomic_read(&cli->cl_unstable_count) >= 0);
++static const struct req_msg_field *ost_get_last_fid_client[] = {
++	&RMF_PTLRPC_BODY,
++	&RMF_GETINFO_KEY,
++	&RMF_FID,
++};
 +
- 	atomic_sub(page_count, &obd_unstable_pages);
- 	LASSERT(atomic_read(&obd_unstable_pages) >= 0);
+ static const struct req_msg_field *ost_get_last_fid_server[] = {
+ 	&RMF_PTLRPC_BODY,
+ 	&RMF_FID,
+@@ -696,7 +702,7 @@ static struct req_format *req_formats[] = {
+ 	&RQF_OST_BRW_WRITE,
+ 	&RQF_OST_STATFS,
+ 	&RQF_OST_SET_GRANT_INFO,
+-	&RQF_OST_GET_INFO_GENERIC,
++	&RQF_OST_GET_INFO,
+ 	&RQF_OST_GET_INFO_LAST_ID,
+ 	&RQF_OST_GET_INFO_LAST_FID,
+ 	&RQF_OST_SET_INFO_LAST_FID,
+@@ -1519,10 +1525,10 @@ struct req_format RQF_OST_SET_GRANT_INFO =
+ 			ost_body_only);
+ EXPORT_SYMBOL(RQF_OST_SET_GRANT_INFO);
  
-@@ -1904,6 +1907,9 @@ void osc_inc_unstable_pages(struct ptlrpc_request *req)
- 	LASSERT(atomic_read(&cli->cl_cache->ccc_unstable_nr) >= 0);
- 	atomic_add(page_count, &cli->cl_cache->ccc_unstable_nr);
+-struct req_format RQF_OST_GET_INFO_GENERIC =
++struct req_format RQF_OST_GET_INFO =
+ 	DEFINE_REQ_FMT0("OST_GET_INFO", ost_get_info_generic_client,
+ 			ost_get_info_generic_server);
+-EXPORT_SYMBOL(RQF_OST_GET_INFO_GENERIC);
++EXPORT_SYMBOL(RQF_OST_GET_INFO);
  
-+	LASSERT(atomic_read(&cli->cl_unstable_count) >= 0);
-+	atomic_add(page_count, &cli->cl_unstable_count);
-+
- 	LASSERT(atomic_read(&obd_unstable_pages) >= 0);
- 	atomic_add(page_count, &obd_unstable_pages);
+ struct req_format RQF_OST_GET_INFO_LAST_ID =
+ 	DEFINE_REQ_FMT0("OST_GET_INFO_LAST_ID", ost_get_info_generic_client,
+@@ -1530,7 +1536,7 @@ struct req_format RQF_OST_GET_INFO_LAST_ID =
+ EXPORT_SYMBOL(RQF_OST_GET_INFO_LAST_ID);
+ 
+ struct req_format RQF_OST_GET_INFO_LAST_FID =
+-	DEFINE_REQ_FMT0("OST_GET_INFO_LAST_FID", obd_set_info_client,
++	DEFINE_REQ_FMT0("OST_GET_INFO_LAST_FID", ost_get_last_fid_client,
+ 			ost_get_last_fid_server);
+ EXPORT_SYMBOL(RQF_OST_GET_INFO_LAST_FID);
  
 -- 
-1.7.1
+2.7.4
