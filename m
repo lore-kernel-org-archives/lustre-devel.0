@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Apr 2016 21:37:19 -0400
-Subject: [lustre-devel] [PATCH 10/12] staging: lustre: llog: we don't need
-	vfsmount
+Date: Wed, 27 Apr 2016 21:37:15 -0400
+Subject: [lustre-devel] [PATCH 06/12] staging: lustre: fid: add a connect
+	flag for open by FID
 In-Reply-To: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
 References: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1461807441-3210-11-git-send-email-jsimmons@infradead.org>
+Message-ID: <1461807441-3210-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,41 +14,48 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Lai Siyao <lai.siyao@intel.com>
 
-The patch for LU-3286 removed vfsmount instances used
-on the server side. Since this is server side only we
-can remove it from the upstream client.
+Add OBD_CONNECT_OPEN_BY_FID for open by FID, if MDS supports this,
+for open by FID, it won't retry with name if object with the FID
+doesn't exist; while if client supports this, client won't pack
+name in open request if FID is known.
 
 Signed-off-by: Lai Siyao <lai.siyao@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3286
-Reviewed-on: http://review.whamcloud.com/8286
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-Reviewed-by: Mike Pershin <mike.pershin@intel.com>
-Reviewed-by: Jian Yu <jian.yu@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3544
+Reviewed-on: http://review.whamcloud.com/8093
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_disk.h | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 3 +++
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c           | 2 ++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_disk.h b/drivers/staging/lustre/lustre/include/lustre_disk.h
-index 95fd360..b36821f 100644
---- a/drivers/staging/lustre/lustre/include/lustre_disk.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_disk.h
-@@ -130,7 +130,6 @@ struct lustre_sb_info {
- 	struct lustre_mount_data *lsi_lmd;     /* mount command info */
- 	struct ll_sb_info	*lsi_llsbi;   /* add'l client sbi info */
- 	struct dt_device	 *lsi_dt_dev;  /* dt device to access disk fs*/
--	struct vfsmount	  *lsi_srv_mnt; /* the one server mount */
- 	atomic_t	      lsi_mounts;  /* references to the srv_mnt */
- 	char			  lsi_svname[MTI_NAME_MAXLEN];
- 	char			  lsi_osd_obdname[64];
-@@ -158,7 +157,6 @@ struct lustre_sb_info {
- struct lustre_mount_info {
- 	char		 *lmi_name;
- 	struct super_block   *lmi_sb;
--	struct vfsmount      *lmi_mnt;
- 	struct list_head	    lmi_list_chain;
- };
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 26819ee..0ef540a 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1257,6 +1257,9 @@ void lustre_swab_ptlrpc_body(struct ptlrpc_body *pb);
+ #define OBD_CONNECT_PINGLESS	0x4000000000000ULL/* pings not required */
+ #define OBD_CONNECT_FLOCK_DEAD	0x8000000000000ULL/* flock deadlock detection */
+ #define OBD_CONNECT_DISP_STRIPE 0x10000000000000ULL/*create stripe disposition*/
++#define OBD_CONNECT_OPEN_BY_FID	0x20000000000000ULL	/* open by fid won't pack
++							 * name in request
++							 */
  
+ /* XXX README XXX:
+  * Please DO NOT add flag values here before first ensuring that this same
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+index 87555e4..308b6b96 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+@@ -1069,6 +1069,8 @@ void lustre_assert_wire_constants(void)
+ 		 OBD_CONNECT_PINGLESS);
+ 	LASSERTF(OBD_CONNECT_FLOCK_DEAD == 0x8000000000000ULL,
+ 		 "found 0x%.16llxULL\n", OBD_CONNECT_FLOCK_DEAD);
++	LASSERTF(OBD_CONNECT_OPEN_BY_FID == 0x20000000000000ULL,
++		 "found 0x%.16llxULL\n", OBD_CONNECT_OPEN_BY_FID);
+ 	LASSERTF(OBD_CKSUM_CRC32 == 0x00000001UL, "found 0x%.8xUL\n",
+ 		(unsigned)OBD_CKSUM_CRC32);
+ 	LASSERTF(OBD_CKSUM_ADLER == 0x00000002UL, "found 0x%.8xUL\n",
 -- 
 2.7.4
