@@ -1,59 +1,47 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Apr 2016 21:37:09 -0400
-Subject: [lustre-devel] [PATCH 00/12] staging: lustre: add patches from
-	lustre 2.5.52 version
-Message-ID: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
+Date: Wed, 27 Apr 2016 21:37:14 -0400
+Subject: [lustre-devel] [PATCH 05/12] staging: lustre: obd: cleanup client
+	import if client_obd_setup fails
+In-Reply-To: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
+References: <1461807441-3210-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1461807441-3210-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Swapnil Pimpale <spimpale@ddn.com>, James Simmons <jsimmons@infradead.org>
 
-Assortment of bug fixes that are present in the 2.5.52 version
-of lustre that is missing in the upstream client.
+From: Swapnil Pimpale <spimpale@ddn.com>
 
-Amir Shehata (2):
-  staging: lustre: obd: remove newline from LCONSOLE string
-  staging: lustre: obd: add newline for dumped config record
+client_obd_setup() allocates an obd_import which should be cleaned up
+if there is any failure afterwards in callers of client_obd_setup().
+This patch fixes the bug in osc_setup(), mgc_setup(), mdc_setup() and
+lwp_setup(). The fix is to call obd_cleanup_client_import() before
+calling client_obd_cleanup() in case of an error.
 
-Andreas Dilger (1):
-  staging: lustre: llite: debugging for ll_file_open LASSERT
+Signed-off-by: Swapnil Pimpale <spimpale@ddn.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3810
+Reviewed-on: http://review.whamcloud.com/7561
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Andriy Skulysh (1):
-  staging: lustre: libcfs: Fix NUMA emulated mode
-
-Dmitry Eremin (2):
-  staging: lustre: ldlm: check all errors during ldlm_debugfs_setup()
-  staging: lustre: llite: fixup return value ll_direct_IO_26
-
-Lai Siyao (2):
-  staging: lustre: fid: add a connect flag for open by FID
-  staging: lustre: llog: we don't need vfsmount
-
-Mikhail Pershin (2):
-  staging: lustre: ptlrpc: use unified handler for OST requests
-  staging: lustre: ptlrpc: initialize request session early
-
-Swapnil Pimpale (2):
-  staging: lustre: obd: cleanup client import if client_obd_setup fails
-  staging: lustre: llite: check ret of ll_prep_md_op_data in ll_dir_filler
-
- .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   |  9 +++-
- .../lustre/lustre/include/lustre/lustre_idl.h      |  3 ++
- .../staging/lustre/lustre/include/lustre_disk.h    |  2 -
- .../lustre/lustre/include/lustre_req_layout.h      |  2 +-
- .../staging/lustre/lustre/include/obd_support.h    |  1 +
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |  1 +
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  6 +++
- drivers/staging/lustre/lustre/llite/dir.c          |  7 ++-
- drivers/staging/lustre/lustre/llite/file.c         |  4 +-
- drivers/staging/lustre/lustre/llite/rw26.c         |  2 +-
- .../staging/lustre/lustre/obdclass/obd_config.c    |  3 +-
- drivers/staging/lustre/lustre/ptlrpc/layout.c      | 16 +++++--
- drivers/staging/lustre/lustre/ptlrpc/service.c     | 53 +++++++++++++---------
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |  2 +
- 14 files changed, 74 insertions(+), 37 deletions(-)
-
---
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+index 932aef2..00c93f3 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+@@ -439,6 +439,7 @@ int client_obd_cleanup(struct obd_device *obddev)
+ 	ldlm_namespace_free_post(obddev->obd_namespace);
+ 	obddev->obd_namespace = NULL;
+ 
++	obd_cleanup_client_import(obddev);
+ 	LASSERT(!obddev->u.cli.cl_import);
+ 
+ 	ldlm_put_ref();
+-- 
 2.7.4
