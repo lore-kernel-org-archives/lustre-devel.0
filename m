@@ -1,40 +1,55 @@
-From: Bruce Korb <bruce.korb@gmail.com>
-Date: Wed, 27 Apr 2016 15:51:09 -0700
-Subject: [lustre-devel] [PATCH 05/15] staging: lustre: ldlm: use
- accessor macros for l_flags
-In-Reply-To: <1461795667-29035-6-git-send-email-jsimmons@infradead.org>
-References: <1461795667-29035-1-git-send-email-jsimmons@infradead.org>
-	<1461795667-29035-6-git-send-email-jsimmons@infradead.org>
-Message-ID: <5721425D.5050606@gmail.com>
+From: George Spelvin <linux@horizon.com>
+Date: 1 May 2016 19:43:12 -0400
+Subject: [lustre-devel] Lustre use of hash_long() & cfs_hash_u32_hash()
+Message-ID: <20160501234312.20601.qmail@ns.horizon.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-Wow!  I remember this stuff, even if from 3 years ago.  Feels like a 
-lifetime.  Is this patch being applied to official Linux, hence this 
-message?  Xyratex collapsed, shed a mess of employees and sold the 
-remnant to Seagate.  Consequently, I don't really follow Lustre any 
-more.  Sorry.
+I notice you have copies of the <linux/hash.h> functions in libcfs_hash.h,
+and use a mixture of the generic and copied functions in the Lustre code.
 
-On 04/27/16 15:20, James Simmons wrote:
-> From: Bruce Korb <bruce.korb@gmail.com>
->
-> Convert most of the ldlm lock's l_flags references from direct
-> bit twiddling to using bit specific macros.  A few multi-bit
-> operations are left as an exercise for the reader.
->
-> The changes are mostly in ldlm, but also in llite, osc and quota.
-> Also add a multi-bit (mask) test.
->
-> Signed-off-by: Bruce Korb <bruce.korb@gmail.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2906
-> Reviewed-by: Keith Mannthey <Keith.Mannthey@intel.com>
-> Reviewed-on: http://review.whamcloud.com/7963
-> Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> ---
->   .../lustre/lustre/include/lustre_dlm_flags.h       |    3 +
+I'm revising the hash_64() function to fix some horrible collision
+problems that Thomas Gleixner found, and I wanted to give you a heads-up.
+
+If there are cases where you use the generic ones but need
+reproducible outputs, they'll break.
+
+If there are places where you're using the copied ones and *don't*
+need reproducible outputs, you're getting bad performance.
+
+
+I made a brief attempt to figure out what is used for what, but it's
+too confusing for me.  It's hard to figure out code like:
+
+static unsigned lu_obj_hop_hash(struct cfs_hash *hs,
+                                const void *key, unsigned mask)
+{
+	struct lu_fid  *fid = (struct lu_fid *)key;
+	__u32	   hash;
+
+	hash = fid_flatten32(fid);
+	hash += (hash >> 4) + (hash << 12); /* mixing oid and seq */
+	hash = hash_long(hash, hs->hs_bkt_bits);
+
+	/* give me another random factor */
+	hash -= hash_long((unsigned long)hs, fid_oid(fid) % 11 + 3);
+
+	hash <<= hs->hs_cur_bits - hs->hs_bkt_bits;
+	hash |= (fid_seq(fid) + fid_oid(fid)) & (CFS_HASH_NBKT(hs) - 1);
+
+	return hash & mask;
+}
+
+The whole business of selecting the number of bits of the hash based
+on a mod-11 hash of something else seems quite peculiar.
+
+Second, hash_long is multiplicative, meaning hash_long(a) - hash_long(b)
+= hash_long(a-b).  The different bit shifts complicate it, but subtracting
+two such values from each other is not a great way to mix.
+
+Third, you're using the functions strangely.  The first hash_long() takes
+a 32-bit input and would be more efficient on 64-bit platforms if it
+were hash_32.  The second could be hash_ptr(),
