@@ -1,58 +1,31 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 4 May 2016 21:05:11 +0100 (BST)
-Subject: [lustre-devel] New wiki documentation
-In-Reply-To: <D34F9639.144AC8%andreas.dilger@intel.com>
-References: <D34F9639.144AC8%andreas.dilger@intel.com>
-Message-ID: <alpine.LFD.2.20.1605042048390.32671@casper.infradead.org>
+Date: Thu,  5 May 2016 14:52:59 -0400
+Subject: [lustre-devel] [PATCH 0/8] staging: lustre: o2iblnd: Add Fast Reg
+	memory registration support
+Message-ID: <1462474387-11406-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
+FMR is deprecated and it not supported by the mlx5 driver.
+This patch adds memory management extensions support as
+backup of FMR. This was combined with the work from
+Li Dongyang to make it work with the latest kernels.
 
-> James,
-> would it make sense/is it possible to have a default module parameters for MLX4 and/or MLX5 in ko2iblnd.conf that
-> "do the right thing" to avoid the need for users to deal with this, or is that not possible due to conflicting
-> requirements between these two drivers?
+Dmitry Eremin (8):
+  staging: lustre: o2iblnd: rename kib_fmr_pool_t
+  staging: lustre: o2iblnd: Use list_for_each_entry_safe in kiblnd_destroy_fmr_pool_list
+  staging: lustre: o2iblnd: create union to contain FMR
+  staging: lustre: o2iblnd: break up kiblnd_create_fmr_pool
+  staging: lustre: o2iblnd: cache FMR key in kib_fmr_t
+  staging: lustre: o2iblnd: handle unmapping of FMR in kiblnd_fmr_pool_unmap
+  staging: lustre: o2iblnd: add IBLND_WID_MR
+  staging: lustre: o2iblnd: Add Fast Reg memory registration support
 
-For the stand alone mlx5 case yes we could have ko2iblnd.conf set 
-peer_credits=16. As for making mlx5 <-> mlx4 to work together that
-requires setting map_on_demand=256 which normally is turned off.
-Since we can never know if someone is creating a system with a mix
-environment and if we want it to be automatic for the non-power user
-then map_ond_demand=256 would have to be apart of the normal
-configuration.
-
-One limitation of using the modprobe config for this setup when compared 
-to using the DLC yaml configuration file is that with the DLC approach is 
-that you can set the LND tunebles per interface. If you use the modprobe 
-config file it is global to all IB interfaces on a node. Especially once
-multi-rail becomes reality we need to really rethink how to create a
-default configuration for the non-power user using DLC.
-
-> Cheers, Andreas
-> --
-> Andreas Dilger
-> Lustre Principal Architect
-> Intel High Performance Data Division
-> 
-> On 2016/05/04, 09:06, "lustre-devel on behalf of Simmons, James A." <lustre-devel-bounces at lists.lustre.org<mailto:lustre-devel-bounces@lists.lustre.org> on behalf of simmonsja at ornl.gov<mailto:simmonsja@ornl.gov>> wrote:
-> 
-> Hello folks
-> 
->     I have added new documentation to the wiki. The first doc is about the upstream
-> client which can be found at:
-> 
-> http://wiki.lustre.org/Development#Upstream_contributing
-> 
-> People have also been approaching me about how to get mlx4 hardware working with
-> mlx5 hardware so I wrote a wiki about what I did at:
-> 
-> http://wiki.lustre.org/Infiniband_Configuration_Howto
-> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> 
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  312 +++++++++++++++++---
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |   33 ++-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   58 ++--
+ 3 files changed, 322 insertions(+), 81 deletions(-)
