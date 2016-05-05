@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu,  5 May 2016 14:53:04 -0400
-Subject: [lustre-devel] [PATCH 5/8] staging: lustre: o2iblnd: cache FMR key
-	in kib_fmr_t
+Date: Thu,  5 May 2016 14:53:03 -0400
+Subject: [lustre-devel] [PATCH 4/8] staging: lustre: o2iblnd: break up
+	kiblnd_create_fmr_pool
 In-Reply-To: <1462474387-11406-1-git-send-email-jsimmons@infradead.org>
 References: <1462474387-11406-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1462474387-11406-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1462474387-11406-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,10 +14,11 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Move the FMR key handling from kiblnd_fmr_map_tx() to the
-function kiblnd_fmr_pool_map(). This will allow the
-function kiblnd_fmr_map_tx() to handle keys for both
-FMR and Fast Registration.
+Break the function kiblnd_create_fmr_pool() into two functions,
+with the new function called kiblnd_alloc_fmr_pool(). The
+function kiblnd_create_fmr_pool() will be used as the front
+end to allocate any type of pool. The new function will
+used to create specifically FMR pools.
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5783
@@ -27,102 +28,95 @@ Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   11 +++++++----
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    5 +++--
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    8 ++++----
- 3 files changed, 14 insertions(+), 10 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   55 +++++++++++++++-----
+ 1 files changed, 41 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index 9c30915..491bd6c 100644
+index 26d8a11..9c30915 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -1506,7 +1506,7 @@ void kiblnd_fmr_pool_unmap(kib_fmr_t *fmr, int status)
+@@ -1335,12 +1335,8 @@ static int kiblnd_fmr_flush_trigger(int ncpts)
+ 	return max(IBLND_FMR_POOL_FLUSH, size);
  }
  
- int kiblnd_fmr_pool_map(kib_fmr_poolset_t *fps, __u64 *pages, int npages,
--			__u64 iov, kib_fmr_t *fmr)
-+			__u32 nob, __u64 iov, bool is_rx, kib_fmr_t *fmr)
+-static int kiblnd_create_fmr_pool(kib_fmr_poolset_t *fps,
+-				  kib_fmr_pool_t **pp_fpo)
++static int kiblnd_alloc_fmr_pool(kib_fmr_poolset_t *fps, kib_fmr_pool_t *fpo)
  {
- 	struct ib_pool_fmr *pfmr;
- 	kib_fmr_pool_t *fpo;
-@@ -1524,16 +1524,19 @@ int kiblnd_fmr_pool_map(kib_fmr_poolset_t *fps, __u64 *pages, int npages,
- 		pfmr = ib_fmr_pool_map_phys(fpo->fmr.fpo_fmr_pool,
- 					    pages, npages, iov);
- 		if (likely(!IS_ERR(pfmr))) {
--			fmr->fmr_pool = fpo;
-+			fmr->fmr_key = is_rx ? pfmr->fmr->rkey :
-+					       pfmr->fmr->lkey;
- 			fmr->fmr_pfmr = pfmr;
-+			fmr->fmr_pool = fpo;
- 			return 0;
- 		}
-+		rc = PTR_ERR(pfmr);
+-	/* FMR pool for RDMA */
+-	kib_dev_t *dev = fps->fps_net->ibn_dev;
+-	kib_fmr_pool_t *fpo;
+ 	struct ib_fmr_pool_param param = {
+ 		.max_pages_per_fmr = LNET_MAX_PAYLOAD / PAGE_SIZE,
+ 		.page_shift        = PAGE_SHIFT,
+@@ -1351,6 +1347,26 @@ static int kiblnd_create_fmr_pool(kib_fmr_poolset_t *fps,
+ 		.flush_function    = NULL,
+ 		.flush_arg         = NULL,
+ 		.cache             = !!*kiblnd_tunables.kib_fmr_cache};
++	int rc = 0;
++
++	fpo->fmr.fpo_fmr_pool = ib_create_fmr_pool(fpo->fpo_hdev->ibh_pd,
++						   &param);
++	if (IS_ERR(fpo->fmr.fpo_fmr_pool)) {
++		rc = PTR_ERR(fpo->fmr.fpo_fmr_pool);
++		if (rc != -ENOSYS)
++			CERROR("Failed to create FMR pool: %d\n", rc);
++		else
++			CERROR("FMRs are not supported\n");
++	}
++
++	return rc;
++}
++
++static int kiblnd_create_fmr_pool(kib_fmr_poolset_t *fps,
++				  kib_fmr_pool_t **pp_fpo)
++{
++	kib_dev_t *dev = fps->fps_net->ibn_dev;
++	kib_fmr_pool_t *fpo;
+ 	int rc;
  
- 		spin_lock(&fps->fps_lock);
- 		fpo->fpo_map_count--;
--		if (PTR_ERR(pfmr) != -EAGAIN) {
-+		if (rc != -EAGAIN) {
- 			spin_unlock(&fps->fps_lock);
--			return PTR_ERR(pfmr);
-+			return rc;
- 		}
+ 	LIBCFS_CPT_ALLOC(fpo, lnet_cpt_table(), fps->fps_cpt, sizeof(*fpo));
+@@ -1359,21 +1375,32 @@ static int kiblnd_create_fmr_pool(kib_fmr_poolset_t *fps,
  
- 		/* EAGAIN and ... */
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index 0120170..90c8aa5 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -308,6 +308,7 @@ typedef struct {
- typedef struct {
- 	kib_fmr_pool_t        *fmr_pool;           /* pool of FMR */
- 	struct ib_pool_fmr    *fmr_pfmr;           /* IB pool fmr */
-+	u32		       fmr_key;
- } kib_fmr_t;
+ 	fpo->fpo_hdev = kiblnd_current_hdev(dev);
  
- typedef struct kib_net {
-@@ -959,8 +960,8 @@ void kiblnd_unmap_rx_descs(kib_conn_t *conn);
- void kiblnd_pool_free_node(kib_pool_t *pool, struct list_head *node);
- struct list_head *kiblnd_pool_alloc_node(kib_poolset_t *ps);
+-	fpo->fmr.fpo_fmr_pool = ib_create_fmr_pool(fpo->fpo_hdev->ibh_pd, &param);
+-	if (IS_ERR(fpo->fmr.fpo_fmr_pool)) {
+-		rc = PTR_ERR(fpo->fmr.fpo_fmr_pool);
+-		CERROR("Failed to create FMR pool: %d\n", rc);
+-
+-		kiblnd_hdev_decref(fpo->fpo_hdev);
+-		LIBCFS_FREE(fpo, sizeof(*fpo));
+-		return rc;
++	/* Check for FMR support */
++	if (fpo->fpo_hdev->ibh_ibdev->alloc_fmr &&
++	    fpo->fpo_hdev->ibh_ibdev->dealloc_fmr &&
++	    fpo->fpo_hdev->ibh_ibdev->map_phys_fmr &&
++	    fpo->fpo_hdev->ibh_ibdev->unmap_fmr) {
++		LCONSOLE_INFO("Using FMR for registration\n");
++	} else {
++		rc = -ENOSYS;
++		LCONSOLE_ERROR_MSG(rc, "IB device does not support FMRs, can't register memory\n");
++		goto out_fpo;
+ 	}
  
--int  kiblnd_fmr_pool_map(kib_fmr_poolset_t *fps, __u64 *pages,
--			 int npages, __u64 iov, kib_fmr_t *fmr);
-+int  kiblnd_fmr_pool_map(kib_fmr_poolset_t *fps, __u64 *pages, int npages,
-+			 __u32 nob, __u64 iov, bool is_rx, kib_fmr_t *fmr);
- void kiblnd_fmr_pool_unmap(kib_fmr_t *fmr, int status);
++	rc = kiblnd_alloc_fmr_pool(fps, fpo);
++	if (rc)
++		goto out_fpo;
++
+ 	fpo->fpo_deadline = cfs_time_shift(IBLND_POOL_DEADLINE);
+-	fpo->fpo_owner    = fps;
++	fpo->fpo_owner = fps;
+ 	*pp_fpo = fpo;
  
- int  kiblnd_tunables_init(void);
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index cd3fde7..b243f1f 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -561,7 +561,7 @@ kiblnd_kvaddr_to_page(unsigned long vaddr)
+ 	return 0;
++
++out_fpo:
++	kiblnd_hdev_decref(fpo->fpo_hdev);
++	LIBCFS_FREE(fpo, sizeof(*fpo));
++	return rc;
  }
  
- static int
--kiblnd_fmr_map_tx(kib_net_t *net, kib_tx_t *tx, kib_rdma_desc_t *rd, int nob)
-+kiblnd_fmr_map_tx(kib_net_t *net, kib_tx_t *tx, kib_rdma_desc_t *rd, __u32 nob)
- {
- 	kib_hca_dev_t *hdev;
- 	__u64 *pages = tx->tx_pages;
-@@ -588,7 +588,8 @@ kiblnd_fmr_map_tx(kib_net_t *net, kib_tx_t *tx, kib_rdma_desc_t *rd, int nob)
- 	cpt = tx->tx_pool->tpo_pool.po_owner->ps_cpt;
- 
- 	fps = net->ibn_fmr_ps[cpt];
--	rc = kiblnd_fmr_pool_map(fps, pages, npages, 0, &tx->fmr);
-+	rc = kiblnd_fmr_pool_map(fps, pages, npages, nob, 0, (rd != tx->tx_rd),
-+				 &tx->fmr);
- 	if (rc) {
- 		CERROR("Can't map %d pages: %d\n", npages, rc);
- 		return rc;
-@@ -598,8 +599,7 @@ kiblnd_fmr_map_tx(kib_net_t *net, kib_tx_t *tx, kib_rdma_desc_t *rd, int nob)
- 	 * If rd is not tx_rd, it's going to get sent to a peer, who will need
- 	 * the rkey
- 	 */
--	rd->rd_key = (rd != tx->tx_rd) ? tx->fmr.fmr_pfmr->fmr->rkey :
--					 tx->fmr.fmr_pfmr->fmr->lkey;
-+	rd->rd_key = tx->fmr.fmr_key;
- 	rd->rd_frags[0].rf_addr &= ~hdev->ibh_page_mask;
- 	rd->rd_frags[0].rf_nob = nob;
- 	rd->rd_nfrags = 1;
+ static void kiblnd_fail_fmr_poolset(kib_fmr_poolset_t *fps,
 -- 
 1.7.1
