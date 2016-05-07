@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri,  6 May 2016 21:30:22 -0400
-Subject: [lustre-devel] [PATCH 01/10] staging: lustre: lnet: use struct
-	lnet_ioctl_config_data for NI bring up
+Date: Fri,  6 May 2016 21:30:26 -0400
+Subject: [lustre-devel] [PATCH 05/10] staging: lustre: o2iblnd: create
+	default o2iblnd tunable settings
 In-Reply-To: <1462584631-5388-1-git-send-email-jsimmons@infradead.org>
 References: <1462584631-5388-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1462584631-5388-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1462584631-5388-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,9 +14,9 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-The LNet layer passes around the individual fields of struct
-lnet_ioctl_config_data for the case of NI bring up. To simplify
-the code lets just pass struct lnet_ioctl_config directly.
+Create and set the default o2iblnd tunables when the ko2iblnd
+module loads. Move kiblnd_tunables_setup() to when the NI
+iterface is initialized.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
@@ -27,127 +27,96 @@ Reviewed-by: Olaf Weber <olaf@sgi.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    5 +--
- drivers/staging/lustre/lnet/lnet/api-ni.c          |   37 +++++++++++--------
- drivers/staging/lustre/lnet/lnet/module.c          |    7 +---
- 3 files changed, 24 insertions(+), 25 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    9 ++++-----
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    3 ++-
+ .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  |   16 ++++++++++++++--
+ 3 files changed, 20 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index dfc0208..1865c85 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -478,9 +478,8 @@ int lnet_rtrpools_enable(void);
- void lnet_rtrpools_disable(void);
- void lnet_rtrpools_free(int keep_pools);
- lnet_remotenet_t *lnet_find_net_locked(__u32 net);
--int lnet_dyn_add_ni(lnet_pid_t requested_pid, char *nets,
--		    __s32 peer_timeout, __s32 peer_cr, __s32 peer_buf_cr,
--		    __s32 credits);
-+int lnet_dyn_add_ni(lnet_pid_t requested_pid,
-+		    struct lnet_ioctl_config_data *conf);
- int lnet_dyn_del_ni(__u32 net);
- int lnet_clear_lazy_portal(struct lnet_ni *ni, int portal, char *reason);
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index a2e188e..a06689b 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2921,6 +2921,9 @@ static int kiblnd_startup(lnet_ni_t *ni)
+ 	net->ibn_incarnation = tv.tv_sec * USEC_PER_SEC +
+ 			       tv.tv_nsec / NSEC_PER_USEC;
  
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index f825784..6340ad1 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1215,8 +1215,7 @@ lnet_shutdown_lndni(struct lnet_ni *ni)
++	rc = kiblnd_tunables_setup();
++	if (rc)
++		goto net_failed;
+ 	ni->ni_peertimeout    = *kiblnd_tunables.kib_peertimeout;
+ 	ni->ni_maxtxcredits   = *kiblnd_tunables.kib_credits;
+ 	ni->ni_peertxcredits  = *kiblnd_tunables.kib_peertxcredits;
+@@ -3006,8 +3009,6 @@ static void __exit ko2iblnd_exit(void)
+ 
+ static int __init ko2iblnd_init(void)
+ {
+-	int rc;
+-
+ 	CLASSERT(sizeof(kib_msg_t) <= IBLND_MSG_SIZE);
+ 	CLASSERT(offsetof(kib_msg_t,
+ 			  ibm_u.get.ibgm_rd.rd_frags[IBLND_MAX_RDMA_FRAGS])
+@@ -3016,9 +3017,7 @@ static int __init ko2iblnd_init(void)
+ 			  ibm_u.putack.ibpam_rd.rd_frags[IBLND_MAX_RDMA_FRAGS])
+ 			  <= IBLND_MSG_SIZE);
+ 
+-	rc = kiblnd_tunables_init();
+-	if (rc)
+-		return rc;
++	kiblnd_tunables_init();
+ 
+ 	lnet_register_lnd(&the_o2iblnd);
+ 
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+index fab0ef9..80e11bc 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -994,7 +994,8 @@ int  kiblnd_fmr_pool_map(kib_fmr_poolset_t *fps, kib_tx_t *tx,
+ 			 kib_fmr_t *fmr);
+ void kiblnd_fmr_pool_unmap(kib_fmr_t *fmr, int status);
+ 
+-int  kiblnd_tunables_init(void);
++int kiblnd_tunables_setup(void);
++void kiblnd_tunables_init(void);
+ void kiblnd_tunables_fini(void);
+ 
+ int  kiblnd_connd(void *arg);
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
+index a6415fc..cc1469d 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
+@@ -171,6 +171,8 @@ kib_tunables_t kiblnd_tunables = {
+ 	.kib_nscheds           = &nscheds
+ };
+ 
++static struct lnet_ioctl_config_o2iblnd_tunables default_tunables;
++
+ /* # messages/RDMAs in-flight */
+ int kiblnd_msg_queue_size(int version, lnet_ni_t *ni)
+ {
+@@ -182,8 +184,7 @@ int kiblnd_msg_queue_size(int version, lnet_ni_t *ni)
+ 		return peer_credits;
  }
  
- static int
--lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
--		   __s32 peer_cr, __s32 peer_buf_cr, __s32 credits)
-+lnet_startup_lndni(struct lnet_ni *ni, struct lnet_ioctl_config_data *conf)
+-int
+-kiblnd_tunables_init(void)
++int kiblnd_tunables_setup(void)
  {
- 	int rc = -EINVAL;
- 	int lnd_type;
-@@ -1292,20 +1291,28 @@ lnet_startup_lndni(struct lnet_ni *ni, __s32 peer_timeout,
- 	 * If given some LND tunable parameters, parse those now to
- 	 * override the values in the NI structure.
- 	 */
--	if (peer_buf_cr >= 0)
--		ni->ni_peerrtrcredits = peer_buf_cr;
--	if (peer_timeout >= 0)
--		ni->ni_peertimeout = peer_timeout;
-+	if (conf && conf->cfg_config_u.cfg_net.net_peer_rtr_credits >= 0) {
-+		ni->ni_peerrtrcredits =
-+			conf->cfg_config_u.cfg_net.net_peer_rtr_credits;
-+	}
-+	if (conf && conf->cfg_config_u.cfg_net.net_peer_timeout >= 0) {
-+		ni->ni_peertimeout =
-+			conf->cfg_config_u.cfg_net.net_peer_timeout;
-+	}
- 	/*
- 	 * TODO
- 	 * Note: For now, don't allow the user to change
- 	 * peertxcredits as this number is used in the
- 	 * IB LND to control queue depth.
--	 * if (peer_cr != -1)
--	 *	ni->ni_peertxcredits = peer_cr;
-+	 *
-+	 * if (conf && conf->cfg_config_u.cfg_net.net_peer_tx_credits != -1)
-+	 *	ni->ni_peertxcredits =
-+	 *		conf->cfg_config_u.cfg_net.net_peer_tx_credits;
- 	 */
--	if (credits >= 0)
--		ni->ni_maxtxcredits = credits;
-+	if (conf && conf->cfg_config_u.cfg_net.net_max_tx_credits >= 0) {
-+		ni->ni_maxtxcredits =
-+			conf->cfg_config_u.cfg_net.net_max_tx_credits;
-+	}
+ 	if (kiblnd_translate_mtu(*kiblnd_tunables.kib_ib_mtu) < 0) {
+ 		CERROR("Invalid ib_mtu %d, expected 256/512/1024/2048/4096\n",
+@@ -234,3 +235,14 @@ kiblnd_tunables_init(void)
  
- 	LASSERT(ni->ni_peertimeout <= 0 || lnd->lnd_query);
- 
-@@ -1367,7 +1374,7 @@ lnet_startup_lndnis(struct list_head *nilist)
- 	while (!list_empty(nilist)) {
- 		ni = list_entry(nilist->next, lnet_ni_t, ni_list);
- 		list_del(&ni->ni_list);
--		rc = lnet_startup_lndni(ni, -1, -1, -1, -1);
-+		rc = lnet_startup_lndni(ni, NULL);
- 
- 		if (rc < 0)
- 			goto failed;
-@@ -1725,10 +1732,9 @@ lnet_get_net_config(int idx, __u32 *cpt_count, __u64 *nid, int *peer_timeout,
+ 	return 0;
  }
- 
- int
--lnet_dyn_add_ni(lnet_pid_t requested_pid, char *nets,
--		__s32 peer_timeout, __s32 peer_cr, __s32 peer_buf_cr,
--		__s32 credits)
-+lnet_dyn_add_ni(lnet_pid_t requested_pid, struct lnet_ioctl_config_data *conf)
- {
-+	char *nets = conf->cfg_config_u.cfg_net.net_intf;
- 	lnet_ping_info_t *pinfo;
- 	lnet_handle_md_t md_handle;
- 	struct lnet_ni *ni;
-@@ -1773,8 +1779,7 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, char *nets,
- 
- 	list_del_init(&ni->ni_list);
- 
--	rc = lnet_startup_lndni(ni, peer_timeout, peer_cr,
--				peer_buf_cr, credits);
-+	rc = lnet_startup_lndni(ni, conf);
- 	if (rc)
- 		goto failed1;
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
-index 93037c1..246b5c1 100644
---- a/drivers/staging/lustre/lnet/lnet/module.c
-+++ b/drivers/staging/lustre/lnet/lnet/module.c
-@@ -108,12 +108,7 @@ lnet_dyn_configure(struct libcfs_ioctl_hdr *hdr)
- 		rc = -EINVAL;
- 		goto out_unlock;
- 	}
--	rc = lnet_dyn_add_ni(LNET_PID_LUSTRE,
--			     conf->cfg_config_u.cfg_net.net_intf,
--			     conf->cfg_config_u.cfg_net.net_peer_timeout,
--			     conf->cfg_config_u.cfg_net.net_peer_tx_credits,
--			     conf->cfg_config_u.cfg_net.net_peer_rtr_credits,
--			     conf->cfg_config_u.cfg_net.net_max_tx_credits);
-+	rc = lnet_dyn_add_ni(LNET_PID_LUSTRE, conf);
- out_unlock:
- 	mutex_unlock(&lnet_config_mutex);
- 
++
++void kiblnd_tunables_init(void)
++{
++	default_tunables.lnd_version = 0;
++	default_tunables.lnd_peercredits_hiw = peer_credits_hiw,
++	default_tunables.lnd_map_on_demand = map_on_demand;
++	default_tunables.lnd_concurrent_sends = concurrent_sends;
++	default_tunables.lnd_fmr_pool_size = fmr_pool_size;
++	default_tunables.lnd_fmr_flush_trigger = fmr_flush_trigger;
++	default_tunables.lnd_fmr_cache = fmr_cache;
++}
 -- 
 1.7.1
