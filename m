@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri,  6 May 2016 21:30:29 -0400
-Subject: [lustre-devel] [PATCH 08/10] staging: lustre: o2iblnd: remove last
-	of kiblnd_tunables_fini
+Date: Fri,  6 May 2016 21:30:30 -0400
+Subject: [lustre-devel] [PATCH 09/10] staging: lustre: o2iblnd: properly set
+	ibr_why
 In-Reply-To: <1462584631-5388-1-git-send-email-jsimmons@infradead.org>
 References: <1462584631-5388-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1462584631-5388-9-git-send-email-jsimmons@infradead.org>
+Message-ID: <1462584631-5388-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,10 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-The function kibnd_tunables_fini() no longer exist. Remove
-it from o2iblnd.h
+For the case of when the connections supported fragment count
+is smaller than what is supported locally only set ibr_why to
+IBLND_REJECT_RDMA_FRAGS if the ko2iblnd protocol verison is
+IBLND_MSG_VERSION.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
@@ -26,20 +28,21 @@ Reviewed-by: Olaf Weber <olaf@sgi.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index d458773..b22984f 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -995,7 +995,6 @@ void kiblnd_fmr_pool_unmap(kib_fmr_t *fmr, int status);
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index c4daf95..0f7e3a1 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -2368,7 +2368,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 		      reqmsg->ibm_u.connparams.ibcp_max_frags,
+ 		      kiblnd_rdma_frags(version, ni));
  
- int kiblnd_tunables_setup(struct lnet_ni *ni);
- void kiblnd_tunables_init(void);
--void kiblnd_tunables_fini(void);
+-		if (version >= IBLND_MSG_VERSION)
++		if (version == IBLND_MSG_VERSION)
+ 			rej.ibr_why = IBLND_REJECT_RDMA_FRAGS;
  
- int  kiblnd_connd(void *arg);
- int  kiblnd_scheduler(void *arg);
+ 		goto failed;
 -- 
 1.7.1
