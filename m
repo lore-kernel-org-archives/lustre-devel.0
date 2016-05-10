@@ -1,50 +1,21 @@
-From: Quentin BOUGET <quentin.bouget.ocre@cea.fr>
-Date: Tue, 10 May 2016 16:14:55 +0200
-Subject: [lustre-devel] Fwd: llmount.sh does not use fs-specific paths to
- the ost(s) and mds it mounts
-In-Reply-To: <5731EAC3.5070207@cea.fr>
-References: <5731EAC3.5070207@cea.fr>
-Message-ID: <5731ECDF.10801@cea.fr>
+From: Hammond, John <john.hammond@intel.com>
+Date: Tue, 10 May 2016 16:50:01 +0000
+Subject: [lustre-devel] sanity-hsm failures on master
+Message-ID: <C6D48C5819337145905EDC9DB164E6971F4CCFCE@fmsmsx120.amr.corp.intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello!
+All,
 
-While trying to mount two different lustre filesystems on a local node 
-with the "llmount.sh" script, I noticed that the path to mount mds and 
-ost(s) was computed like this:
+A recent switch from CentOS 6.7 to CentOS 7 for the lustre-reviews test nodes has broken a subtest of sanity-hsm. Everything pushed against any recent revision of master is likely to fail until the fix http://review.whamcloud.com/20093 has landed. Please see LU-6937 for details.
 
-    eval mntpt=${!var:-${MOUNT%/*}/$facet} # var is not defined by
-    default, so this removes
-         # everything after the last '/' of $MOUNT
+So if you have something to push you might wait until 20093 has landed or base your change on 20093.
 
-The code can be found at test-framework.sh in the function "facet_mntpt" 
-around the line 3226.
+Sorry for the inconvenience.
 
+Best,
 
-By default MOUNT is initialized like this:
-
-    MOUNT=${MOUNT:-/mnt/${FSNAME}} # default: "/mnt/lustre"
-
-Thus the default mountpoints for mds and ost(s) are "/mnt/mds1" and 
-"/mnt/ost1".
-Because of that, when trying to do two successive calls to "llmount.sh" 
-with two different values for FSNAME, the second fs to be mounted will 
-unmount the first's mds and ost(s) (paths are identical).
-
-
-Is there any reason to truncate the MOUNT variable like this ? Shouldn't 
-the mountpoint path look more like "/mnt/<fsname>-mds1" and 
-"/mnt/<fsname>-ost1" ?
-
-
-Regards,
-Quentin Bouget
-
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160510/809629ec/attachment.htm>
+John
