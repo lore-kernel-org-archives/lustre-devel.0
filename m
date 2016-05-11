@@ -1,53 +1,47 @@
-From: Lidza Louina <lidza.louina@oracle.com>
-Date: Thu, 12 May 2016 18:33:12 -0400
-Subject: [lustre-devel] [PATCH] staging/lustre/ptlrpc: Removes potential
-	null dereference
-Message-ID: <1463092392.16344.4.camel@oracle.com>
+From: Andreas Gruenbacher <agruenba@redhat.com>
+Date: Wed, 11 May 2016 19:01:37 +0200
+Subject: [lustre-devel] [PATCH] xattr handlers: fixup generic_listxattr
+In-Reply-To: <alpine.LFD.2.20.1605111649310.27778@casper.infradead.org>
+References: <1462229118-13123-1-git-send-email-agruenba@redhat.com>
+	<551ED650-CBF8-40D6-85A0-BDB3C281C247@dilger.ca>
+	<alpine.LFD.2.20.1605111649310.27778@casper.infradead.org>
+Message-ID: <CAHc6FU4LPMkMqYcY17ksDBBhLfUhGyz6K6HvLogCZKvahDzdwQ@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: James Simmons <jsimmons@infradead.org>
+Cc: Alexander Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Tyler Hicks <tyhicks@canonical.com>, ecryptfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, linux-unionfs@vger.kernel.org, fuse-devel@lists.sourceforge.net, Mimi Zohar <zohar@linux.vnet.ibm.com>, linux-ima-devel@lists.sourceforge.net, LSM <linux-security-module@vger.kernel.org>, David Howells <dhowells@redhat.com>, Serge Hallyn <serge.hallyn@canonical.com>, Dmitry Kasatkin <dmitry.kasatkin@gmail.com>, Paul Moore <paul@paul-moore.com>, Stephen Smalley <sds@tycho.nsa.gov>, Eric Paris <eparis@parisplace.org>, Casey Schaufler <casey@schaufler-ca.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Lustre Developement <lustre-devel@lists.lustre.org>
 
-The lustre_msg_buf method could return NULL. Subsequent code didn't
-check if it's null before using it. This patch adds two checks.
-????
-Signed-off-by: Lidza Louina <Lidza.Louina@oracle.com>
+On Wed, May 11, 2016 at 5:54 PM, James Simmons <jsimmons@infradead.org> wrote:
+> While looking at porting lustre to use xattr handlers I
+> noticed issues in generic_listxattr() when handle->list()
+> is used. The function generic_listxattr() generates it
+> results from the handle->name field. If the current handle
+> name field is NULL then generic_listxattr() will call
+> handle->list() if it exist.
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-index 187fd1d..e6fedc3 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-@@ -2195,6 +2195,8 @@ int sptlrpc_pack_user_desc(struct lustre_msg *msg, int offset)
-?	struct ptlrpc_user_desc *pud;
-?
-?	pud = lustre_msg_buf(msg, offset, 0);
-+	if (!pud)
-+		return -EINVAL;
-?
-?	pud->pud_uid = from_kuid(&init_user_ns, current_uid());
-?	pud->pud_gid = from_kgid(&init_user_ns, current_gid());
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-index 37c9f4c..7736aa9 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-@@ -542,6 +542,7 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
-?{
-?	__u32 buflens[PLAIN_PACK_SEGMENTS] = { 0, };
-?	int alloc_len;
-+	int desc;
-?
-?	buflens[PLAIN_PACK_HDR_OFF] = sizeof(struct plain_header);
-?	buflens[PLAIN_PACK_MSG_OFF] = msgsize;
-@@ -575,7 +576,10 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
-?	req->rq_reqmsg = lustre_msg_buf(req->rq_reqbuf, PLAIN_PACK_MSG_OFF, 0);
-?
-?	if (req->rq_pack_udesc)
--		sptlrpc_pack_user_desc(req->rq_reqbuf, PLAIN_PACK_USER_OFF);
-+		desc = sptlrpc_pack_user_desc(req->rq_reqbuf, PLAIN_PACK_USER_OFF);
-+		if (!desc){
-+			return desc;
-+		}
-?
-?	return 0;
-?}
+generic_listxattr() is different from generic_getxattr() /
+generic_setxattr() / generic_removexattr. It makes sense only for
+filesystems that support a fixed set of xattrs, which means that all
+handlers will have handler->name set.
+
+If any of the handlers has handler->prefix set instead, that handler
+matches a whole set of attributes. Generic_listxattr() would have to
+fill in all of those names matching that handler, but it doesn't know
+which those are.
+
+It is common for filesystems to have their own listxattr inode
+operation and still use generic_{get,set,remove}xattr.
+
+> Calling handle->list() has no
+> affect on the output since their is no way to set the
+> name field of the handler. This patch allows the passing
+> in of the handler to *list() so the handle->name field
+> can be set.
+
+No, that's broken. The handlers pointed at by sb->s_xattr must not be
+modified. Doing so would mess up all other concurrent getxattr /
+setxattr / listxattr / removexattr operations on that superblock.
+
+Andreas
