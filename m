@@ -1,111 +1,77 @@
-From: Alexey Lyashkov <alexey.lyashkov@seagate.com>
-Date: Wed, 11 May 2016 19:44:55 +0300
-Subject: [lustre-devel] [PATCH 1/4] staging: lustre: o2iblnd: limit
- cap.max_send_wr for MLX5
-In-Reply-To: <1462805628-23403-2-git-send-email-jsimmons@infradead.org>
-References: <1462805628-23403-1-git-send-email-jsimmons@infradead.org>
-	<1462805628-23403-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <CAJ2e-W3KxFfp=Tm+3NXf78So3BPGftK54Kummg5eoDN7Ya9=JQ@mail.gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 12 May 2016 00:53:25 +0100 (BST)
+Subject: [lustre-devel] staging: add Lustre file system client support
+In-Reply-To: <20160427122846.GA6441@mwanda>
+References: <20160427122846.GA6441@mwanda>
+Message-ID: <alpine.LFD.2.20.1605120051380.32203@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Sergey Cheremensev
-<https://jira.xyratex.com/secure/ViewProfile.jspa?name=scheremencev>  comment
--
 
-[49672.067906] mlx5_ib:mlx5_0:calc_sq_size:485:(pid 8297): wqe_size 192
+> Hello Lustre devs,
+> 
+> The patch d7e09d0397e8: "staging: add Lustre file system client
+> support" from May 2, 2013, leads to the following Parfait warning.
+> Parfait is an Oracle static analysis tool.  If there is a patch from
+> this could you give credit to Lidza Louina <lidza.louina@oracle.com>
 
-[49672.067908] mlx5_ib:mlx5_0:calc_sq_size:507:(pid 8297): wqe
-count(65536) exceeds limits(16384)
-[49672.067910] mlx5_ib:mlx5_0:create_kernel_qp:1051:(pid 8297): err -12
+Just to let you know we have a ticket to track this issue at:
 
-According to above data mlx5 has internal limit for wqe count 16384:
+https://jira.hpdd.intel.com/browse/LU-8128
 
-        wq_size = roundup_pow_of_two(attr->cap.max_send_wr * wqe_size);
-        qp->sq.wqe_cnt = wq_size / MLX5_SEND_WQE_BB;
-        if (qp->sq.wqe_cnt > (1 << MLX5_CAP_GEN(dev->mdev, log_max_qp_sz))) {
-                mlx5_ib_dbg(dev, "wqe count(%d) exceeds limits(%d)\n",
-                            qp->sq.wqe_cnt,
-                            1 << MLX5_CAP_GEN(dev->mdev, log_max_qp_sz));
-                return -ENOMEM;
-        }
-
-So -12(ENOMEM) in message "Can't create QP" doesn't point to any problems
-with free memory in the system.
-Imo better error code here is -EINVAL.
-It seems peer_credits==16 is the maximum value that is supported by mlx5.
-
-On Mon, May 9, 2016 at 5:53 PM, James Simmons <jsimmons@infradead.org>
-wrote:
-
-> From: Dmitry Eremin <dmitry.eremin@intel.com>
->
-> Decrease cap.max_send_wr until it is accepted by rdma_create_qp()
->
-> Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7124
-> Reviewed-on: http://review.whamcloud.com/18347
-> Reviewed-by: Olaf Weber <olaf@sgi.com>
-> Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> ---
->  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   11 ++++++++++-
->  1 files changed, 10 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> index d99b4fa..bc179a2 100644
-> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> @@ -768,7 +768,12 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer,
-> struct rdma_cm_id *cmid,
->
->         conn->ibc_sched = sched;
->
-> -       rc = rdma_create_qp(cmid, conn->ibc_hdev->ibh_pd, init_qp_attr);
-> +       do {
-> +               rc = rdma_create_qp(cmid, conn->ibc_hdev->ibh_pd,
-> init_qp_attr);
-> +               if (!rc || init_qp_attr->cap.max_send_wr < 16)
-> +                       break;
-> +       } while (rc);
-> +
->         if (rc) {
->                 CERROR("Can't create QP: %d, send_wr: %d, recv_wr: %d\n",
->                        rc, init_qp_attr->cap.max_send_wr,
-> @@ -776,6 +781,10 @@ kib_conn_t *kiblnd_create_conn(kib_peer_t *peer,
-> struct rdma_cm_id *cmid,
->                 goto failed_2;
->         }
->
-> +       if (init_qp_attr->cap.max_send_wr != IBLND_SEND_WRS(conn))
-> +               CDEBUG(D_NET, "original send wr %d, created with %d\n",
-> +                      IBLND_SEND_WRS(conn),
-> init_qp_attr->cap.max_send_wr);
-> +
->         LIBCFS_FREE(init_qp_attr, sizeof(*init_qp_attr));
->
->         /* 1 ref for caller and each rxmsg */
-> --
-> 1.7.1
->
+The reason we have been avoiding this is that in the past small
+fixes to the ldlm layer has caused havoc at very large scale.
+So we are very careful when approaching this class of fixes.
+ 
+> drivers/staging/lustre/lustre/ldlm/interval_tree.c
+>    399  void interval_erase(struct interval_node *node,
+>    400                      struct interval_node **root)
+>    401  {
+>    402          struct interval_node *child, *parent;
+>    403          int color;
+>    404  
+>    405          LASSERT(interval_is_intree(node));
+>    406          node->in_intree = 0;
+>    407          if (!node->in_left) {
+>    408                  child = node->in_right;
+>    409          } else if (!node->in_right) {
+>    410                  child = node->in_left;
+>    411          } else { /* Both left and right child are not NULL */
+>    412                  struct interval_node *old = node;
+>    413  
+>    414                  node = interval_next(node);
+>                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> It looks like interval_next() can return NULL.
+> 
+>    415                  child = node->in_right;
+>    416                  parent = node->in_parent;
+>    417                  color = node->in_color;
+>    418  
+> 
+> Here is the interval_next() function:
+> 
+> drivers/staging/lustre/lustre/ldlm/interval_tree.c
+>    111  static struct interval_node *interval_next(struct interval_node *node)
+>    112  {
+>    113          if (!node)
+>    114                  return NULL;
+>    115          if (node->in_right)
+>    116                  return interval_first(node->in_right);
+>    117          while (node->in_parent && node_is_right_child(node))
+>                        ^^^^^^^^^^^^^^^
+> We assume that ->in_parent can be NULL here.  Is that actually possible?
+> 
+>    118                  node = node->in_parent;
+>    119          return node->in_parent;
+>    120  }
+> 
+> regards,
+> dan carpenter
 > _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->
-
-
-
--- 
-Alexey Lyashkov *?* Technical lead for a Morpheus team
-Seagate Technology, LLC
-www.seagate.com
-www.lustre.org
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160511/823a9059/attachment-0001.htm>
+> devel mailing list
+> devel at linuxdriverproject.org
+> http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
+> 
