@@ -1,9 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 12 May 2016 00:53:25 +0100 (BST)
-Subject: [lustre-devel] staging: add Lustre file system client support
-In-Reply-To: <20160427122846.GA6441@mwanda>
-References: <20160427122846.GA6441@mwanda>
-Message-ID: <alpine.LFD.2.20.1605120051380.32203@casper.infradead.org>
+Date: Thu, 12 May 2016 01:28:54 +0100 (BST)
+Subject: [lustre-devel] Lustre use of hash_long() & cfs_hash_u32_hash()
+In-Reply-To: <20160501234312.20601.qmail@ns.horizon.com>
+References: <20160501234312.20601.qmail@ns.horizon.com>
+Message-ID: <alpine.LFD.2.20.1605120110580.32203@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -11,67 +11,74 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> Hello Lustre devs,
+> I notice you have copies of the <linux/hash.h> functions in libcfs_hash.h,
+> and use a mixture of the generic and copied functions in the Lustre code.
 > 
-> The patch d7e09d0397e8: "staging: add Lustre file system client
-> support" from May 2, 2013, leads to the following Parfait warning.
-> Parfait is an Oracle static analysis tool.  If there is a patch from
-> this could you give credit to Lidza Louina <lidza.louina@oracle.com>
+> I'm revising the hash_64() function to fix some horrible collision
+> problems that Thomas Gleixner found, and I wanted to give you a heads-up.
+> 
+> If there are cases where you use the generic ones but need
+> reproducible outputs, they'll break.
+> 
+> If there are places where you're using the copied ones and *don't*
+> need reproducible outputs, you're getting bad performance. 
+> 
+> I made a brief attempt to figure out what is used for what, but it's
+> too confusing for me.  It's hard to figure out code like:
 
-Just to let you know we have a ticket to track this issue at:
+Thanks for looking into this. Do you have a tree some where we can look
+at for the changes?
 
-https://jira.hpdd.intel.com/browse/LU-8128
+We opened a ticket to help track the progress for this at
 
-The reason we have been avoiding this is that in the past small
-fixes to the ldlm layer has caused havoc at very large scale.
-So we are very careful when approaching this class of fixes.
- 
-> drivers/staging/lustre/lustre/ldlm/interval_tree.c
->    399  void interval_erase(struct interval_node *node,
->    400                      struct interval_node **root)
->    401  {
->    402          struct interval_node *child, *parent;
->    403          int color;
->    404  
->    405          LASSERT(interval_is_intree(node));
->    406          node->in_intree = 0;
->    407          if (!node->in_left) {
->    408                  child = node->in_right;
->    409          } else if (!node->in_right) {
->    410                  child = node->in_left;
->    411          } else { /* Both left and right child are not NULL */
->    412                  struct interval_node *old = node;
->    413  
->    414                  node = interval_next(node);
->                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
-> It looks like interval_next() can return NULL.
+https://jira.hpdd.intel.com/browse/LU-8130
+
+Opening tickets is what gets people to look at these types of changes.
+Again thanks for letting us know about these changes.
+
+> static unsigned lu_obj_hop_hash(struct cfs_hash *hs,
+>                                 const void *key, unsigned mask)
+> {
+> 	struct lu_fid  *fid = (struct lu_fid *)key;
+> 	__u32	   hash;
 > 
->    415                  child = node->in_right;
->    416                  parent = node->in_parent;
->    417                  color = node->in_color;
->    418  
+> 	hash = fid_flatten32(fid);
+> 	hash += (hash >> 4) + (hash << 12); /* mixing oid and seq */
+> 	hash = hash_long(hash, hs->hs_bkt_bits);
 > 
-> Here is the interval_next() function:
+> 	/* give me another random factor */
+> 	hash -= hash_long((unsigned long)hs, fid_oid(fid) % 11 + 3);
 > 
-> drivers/staging/lustre/lustre/ldlm/interval_tree.c
->    111  static struct interval_node *interval_next(struct interval_node *node)
->    112  {
->    113          if (!node)
->    114                  return NULL;
->    115          if (node->in_right)
->    116                  return interval_first(node->in_right);
->    117          while (node->in_parent && node_is_right_child(node))
->                        ^^^^^^^^^^^^^^^
-> We assume that ->in_parent can be NULL here.  Is that actually possible?
+> 	hash <<= hs->hs_cur_bits - hs->hs_bkt_bits;
+> 	hash |= (fid_seq(fid) + fid_oid(fid)) & (CFS_HASH_NBKT(hs) - 1);
 > 
->    118                  node = node->in_parent;
->    119          return node->in_parent;
->    120  }
+> 	return hash & mask;
+> }
 > 
-> regards,
-> dan carpenter
-> _______________________________________________
-> devel mailing list
-> devel at linuxdriverproject.org
-> http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
+> The whole business of selecting the number of bits of the hash based
+> on a mod-11 hash of something else seems quite peculiar.
 > 
+> Second, hash_long is multiplicative, meaning hash_long(a) - hash_long(b)
+> = hash_long(a-b).  The different bit shifts complicate it, but subtracting
+> two such values from each other is not a great way to mix.
+> 
+> Third, you're using the functions strangely.  The first hash_long() takes
+> a 32-bit input and would be more efficient on 64-bit platforms if it
+> were hash_32.  The second could be hash_ptr(),
+
+Details about this change are at
+
+https://jira.hpdd.intel.com/browse/LU-143
+
+and the original patch with those changes are at
+
+http://review.whamcloud.com/#/c/374
+
+Is this the only code that doesn't make sense or is their more?
+Looking at the source tree I see the hash code being used in 
+
+lnet/lnet/api-ni.c
+lnet/lnet/lib-ptl.c
+lustre/include/lustre_fid.h
+lustre/ldlm/ldlm_resource.c
+lustre/obdclass/lu_object.c
