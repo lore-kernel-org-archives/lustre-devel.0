@@ -1,37 +1,53 @@
-From: Muhammad Falak R Wani <falakreyaz@gmail.com>
-Date: Wed, 11 May 2016 20:53:31 +0530
-Subject: [lustre-devel] [PATCH] staging: lustre: use setup_timer().
-Message-ID: <1462980251-6608-1-git-send-email-falakreyaz@gmail.com>
+From: Lidza Louina <lidza.louina@oracle.com>
+Date: Thu, 12 May 2016 18:33:12 -0400
+Subject: [lustre-devel] [PATCH] staging/lustre/ptlrpc: Removes potential
+	null dereference
+Message-ID: <1463092392.16344.4.camel@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>
-Cc: Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: lustre-devel@lists.lustre.org
 
-Use setup_timer() for initializing the timer, instead of structure
-assignments.
-This is the preferred/standard way.
+The lustre_msg_buf method could return NULL. Subsequent code didn't
+check if it's null before using it. This patch adds two checks.
+????
+Signed-off-by: Lidza Louina <Lidza.Louina@oracle.com>
 
-Signed-off-by: Muhammad Falak R Wani <falakreyaz@gmail.com>
----
- drivers/staging/lustre/lnet/lnet/net_fault.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/drivers/staging/lustre/lnet/lnet/net_fault.c b/drivers/staging/lustre/lnet/lnet/net_fault.c
-index 7d76f28..e4aceb7 100644
---- a/drivers/staging/lustre/lnet/lnet/net_fault.c
-+++ b/drivers/staging/lustre/lnet/lnet/net_fault.c
-@@ -760,9 +760,7 @@ lnet_delay_rule_add(struct lnet_fault_attr *attr)
- 		wait_event(delay_dd.dd_ctl_waitq, delay_dd.dd_running);
- 	}
- 
--	init_timer(&rule->dl_timer);
--	rule->dl_timer.function = delay_timer_cb;
--	rule->dl_timer.data = (unsigned long)rule;
-+	setup_timer(&rule->dl_timer, delay_timer_cb, (unsigned long)rule);
- 
- 	spin_lock_init(&rule->dl_lock);
- 	INIT_LIST_HEAD(&rule->dl_msg_list);
--- 
-1.9.1
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+index 187fd1d..e6fedc3 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+@@ -2195,6 +2195,8 @@ int sptlrpc_pack_user_desc(struct lustre_msg *msg, int offset)
+?	struct ptlrpc_user_desc *pud;
+?
+?	pud = lustre_msg_buf(msg, offset, 0);
++	if (!pud)
++		return -EINVAL;
+?
+?	pud->pud_uid = from_kuid(&init_user_ns, current_uid());
+?	pud->pud_gid = from_kgid(&init_user_ns, current_gid());
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+index 37c9f4c..7736aa9 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+@@ -542,6 +542,7 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
+?{
+?	__u32 buflens[PLAIN_PACK_SEGMENTS] = { 0, };
+?	int alloc_len;
++	int desc;
+?
+?	buflens[PLAIN_PACK_HDR_OFF] = sizeof(struct plain_header);
+?	buflens[PLAIN_PACK_MSG_OFF] = msgsize;
+@@ -575,7 +576,10 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
+?	req->rq_reqmsg = lustre_msg_buf(req->rq_reqbuf, PLAIN_PACK_MSG_OFF, 0);
+?
+?	if (req->rq_pack_udesc)
+-		sptlrpc_pack_user_desc(req->rq_reqbuf, PLAIN_PACK_USER_OFF);
++		desc = sptlrpc_pack_user_desc(req->rq_reqbuf, PLAIN_PACK_USER_OFF);
++		if (!desc){
++			return desc;
++		}
+?
+?	return 0;
+?}
