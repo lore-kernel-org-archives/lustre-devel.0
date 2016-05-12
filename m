@@ -1,52 +1,82 @@
-From: George Spelvin <linux@horizon.com>
-Date: 11 May 2016 21:33:22 -0400
-Subject: [lustre-devel] Lustre use of hash_long() & cfs_hash_u32_hash()
-In-Reply-To: <alpine.LFD.2.20.1605120110580.32203@casper.infradead.org>
-Message-ID: <20160512013322.5730.qmail@ns.horizon.com>
+From: Quentin BOUGET <quentin.bouget.ocre@cea.fr>
+Date: Thu, 12 May 2016 09:17:42 +0200
+Subject: [lustre-devel] llmount.sh does not use fs-specific paths to the
+ ost(s) and mds it mounts
+In-Reply-To: <alpine.LFD.2.20.1605111657520.27778@casper.infradead.org>
+References: <5731EAC3.5070207@cea.fr> <5731ECDF.10801@cea.fr>
+	<D3579394.14730F%andreas.dilger@intel.com>
+	<5A0B9E9B-D8D8-4645-B9F6-BBC7EF41F769@intel.com>
+	<5732DA23.6070603@cea.fr>
+	<alpine.LFD.2.20.1605111657520.27778@casper.infradead.org>
+Message-ID: <57342E16.5070702@cea.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Thank you very much for the response!
-
-> Thanks for looking into this. Do you have a tree some where we can look
-> at for the changes?
-
-Linus committed the most important fix to 4.6-rc7 as
-689de1d6ca95b3b5bd8ee446863bf81a4883ea25
-
-I'm following up with additional, less urgent cleanups of kernel hashing.
-
-(Fundamentally, I'm trying to reduce the number of different hash
-functions, and find a good balance between execution-time performance
-and mixing performance of what remains.)
-
-> Details about this change are at
-> 
-> https://jira.hpdd.intel.com/browse/LU-143
-> 
-> and the original patch with those changes are at
-> 
-> http://review.whamcloud.com/#/c/374
-
-Thanks a lot for the pointers!
-
-> Is this the only code that doesn't make sense or is their more?
-
-I expect there's more; that was just what first jumped out at me.
-My primary goal was elsewhere, so once it became clear that Lustre would
-be a time-consuming side quest, I gave up and sent that e-mail.
-
-But if Lustre would appreciate more attention, I can take another look.
-
-
-I did do a pass over the kernel and fixed improper use of the current
-<linux/hash.h> functions.  I posted it as
-
-Subject: [RFC PATCH 3/2] (Rant) Fix various hash abuses
-https://marc.info/?l=linux-kernel&m=146218484201133
-
-Since Lustre was the single biggest culprit (about 25% of that patch),
-I was planning on sending a broken-out patch.
+Le 11/05/2016 17:58, James Simmons a ?crit :
+>> Le 11/05/2016 03:17, Drokin, Oleg a ?crit :
+>>> On May 10, 2016, at 3:42 PM, Dilger, Andreas wrote:
+>>>
+>>>> On 2016/05/10, 08:14, "Quentin BOUGET" <quentin.bouget.ocre@cea.fr> wrote:
+>>>>> Hello!
+>>>>>
+>>>>> While trying to mount two different lustre filesystems on a local node
+>>>>> with the "llmount.sh" script, I noticed that the path to mount mds and
+>>>>> ost(s) was computed like this:
+>>>>>
+>>>>> eval mntpt=${!var:-${MOUNT%/*}/$facet} # var is not defined by default,
+>>>>> so this removes
+>>>>>                                                                      #
+>>>>> everything after the last '/' of $MOUNT
+>>>>>
+>>>>>
+>>>>> The code can be found at test-framework.sh in the function "facet_mntpt"
+>>>>> around the line 3226.
+>>>>>
+>>>>>
+>>>>> By default MOUNT is initialized like this:
+>>>>>
+>>>>> MOUNT=${MOUNT:-/mnt/${FSNAME}} # default: "/mnt/lustre"
+>>>>>
+>>>>>
+>>>>> Thus the default mountpoints for mds and ost(s) are "/mnt/mds1" and
+>>>>> "/mnt/ost1".
+>>>>> Because of that, when trying to do two successive calls to "llmount.sh"
+>>>>> with two different values for FSNAME, the second fs to be mounted will
+>>>>> unmount the first's mds and ost(s) (paths are identical).
+>>>>>
+>>>>>
+>>>>> Is there any reason to truncate the MOUNT variable like this ? Shouldn't
+>>>>> the mountpoint path look more like "/mnt/<fsname>-mds1" and
+>>>>> "/mnt/<fsname>-ost1"?
+>>>> I don't think there is any particular reason it was implemented this way,
+>>>> just that it has worked for many years without the need to include the
+>>>> fsname into the MDT/OST mount points... :-)
+>>>>
+>>>> If you want to expand it to allow exporting multiple filesystems from the
+>>>> same MDS/OSS nodes then your suggestion to use $FSNAME-$facet in
+>>>> facet_mntpt() is reasonable.  Please submit a patch to verify this is
+>>>> working correctly.  There may be some places in the tests that aren't
+>>>> using facet_mntpt() yet.
+>>> I guess to expand on this, since llmount.sh is primarily a testing
+>>> infrastructure and typically only one filesystem at a time is tested,
+>>> the more than one mountpoint was never bothering anyone till you
+>>> discovered this bit, I guess.
+>>>
+>>> Bye,
+>>>       Oleg
+>>>
+>>>
+>> Ok, thank you. I will submit a patch about it.
+> Please post a link to the JIRA ticket here. Thanks for the work.
+>   
+>> Bye,
+>>      Quentin
+>> _______________________________________________
+>> lustre-devel mailing list
+>> lustre-devel at lists.lustre.org
+>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+Here is a link to the JIRA ticket:
+https://jira.hpdd.intel.com/browse/LU-8132
