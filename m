@@ -1,82 +1,68 @@
-From: Quentin BOUGET <quentin.bouget.ocre@cea.fr>
-Date: Thu, 12 May 2016 09:17:42 +0200
-Subject: [lustre-devel] llmount.sh does not use fs-specific paths to the
- ost(s) and mds it mounts
-In-Reply-To: <alpine.LFD.2.20.1605111657520.27778@casper.infradead.org>
-References: <5731EAC3.5070207@cea.fr> <5731ECDF.10801@cea.fr>
-	<D3579394.14730F%andreas.dilger@intel.com>
-	<5A0B9E9B-D8D8-4645-B9F6-BBC7EF41F769@intel.com>
-	<5732DA23.6070603@cea.fr>
-	<alpine.LFD.2.20.1605111657520.27778@casper.infradead.org>
-Message-ID: <57342E16.5070702@cea.fr>
+From: Drokin, Oleg <oleg.drokin@intel.com>
+Date: Fri, 13 May 2016 16:18:57 +0000
+Subject: [lustre-devel] staging: add Lustre file system client support
+In-Reply-To: <20160427122846.GA6441@mwanda>
+References: <20160427122846.GA6441@mwanda>
+Message-ID: <2312D059-0594-4A81-90F8-E439C1A533B0@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Le 11/05/2016 17:58, James Simmons a ?crit :
->> Le 11/05/2016 03:17, Drokin, Oleg a ?crit :
->>> On May 10, 2016, at 3:42 PM, Dilger, Andreas wrote:
->>>
->>>> On 2016/05/10, 08:14, "Quentin BOUGET" <quentin.bouget.ocre@cea.fr> wrote:
->>>>> Hello!
->>>>>
->>>>> While trying to mount two different lustre filesystems on a local node
->>>>> with the "llmount.sh" script, I noticed that the path to mount mds and
->>>>> ost(s) was computed like this:
->>>>>
->>>>> eval mntpt=${!var:-${MOUNT%/*}/$facet} # var is not defined by default,
->>>>> so this removes
->>>>>                                                                      #
->>>>> everything after the last '/' of $MOUNT
->>>>>
->>>>>
->>>>> The code can be found at test-framework.sh in the function "facet_mntpt"
->>>>> around the line 3226.
->>>>>
->>>>>
->>>>> By default MOUNT is initialized like this:
->>>>>
->>>>> MOUNT=${MOUNT:-/mnt/${FSNAME}} # default: "/mnt/lustre"
->>>>>
->>>>>
->>>>> Thus the default mountpoints for mds and ost(s) are "/mnt/mds1" and
->>>>> "/mnt/ost1".
->>>>> Because of that, when trying to do two successive calls to "llmount.sh"
->>>>> with two different values for FSNAME, the second fs to be mounted will
->>>>> unmount the first's mds and ost(s) (paths are identical).
->>>>>
->>>>>
->>>>> Is there any reason to truncate the MOUNT variable like this ? Shouldn't
->>>>> the mountpoint path look more like "/mnt/<fsname>-mds1" and
->>>>> "/mnt/<fsname>-ost1"?
->>>> I don't think there is any particular reason it was implemented this way,
->>>> just that it has worked for many years without the need to include the
->>>> fsname into the MDT/OST mount points... :-)
->>>>
->>>> If you want to expand it to allow exporting multiple filesystems from the
->>>> same MDS/OSS nodes then your suggestion to use $FSNAME-$facet in
->>>> facet_mntpt() is reasonable.  Please submit a patch to verify this is
->>>> working correctly.  There may be some places in the tests that aren't
->>>> using facet_mntpt() yet.
->>> I guess to expand on this, since llmount.sh is primarily a testing
->>> infrastructure and typically only one filesystem at a time is tested,
->>> the more than one mountpoint was never bothering anyone till you
->>> discovered this bit, I guess.
->>>
->>> Bye,
->>>       Oleg
->>>
->>>
->> Ok, thank you. I will submit a patch about it.
-> Please post a link to the JIRA ticket here. Thanks for the work.
->   
->> Bye,
->>      Quentin
->> _______________________________________________
->> lustre-devel mailing list
->> lustre-devel at lists.lustre.org
->> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-Here is a link to the JIRA ticket:
-https://jira.hpdd.intel.com/browse/LU-8132
+
+On Apr 27, 2016, at 8:28 AM, Dan Carpenter wrote:
+
+> Hello Lustre devs,
+> 
+> The patch d7e09d0397e8: "staging: add Lustre file system client
+> support" from May 2, 2013, leads to the following Parfait warning.
+> Parfait is an Oracle static analysis tool.  If there is a patch from
+> this could you give credit to Lidza Louina <lidza.louina@oracle.com>?
+> 
+> drivers/staging/lustre/lustre/ldlm/interval_tree.c
+>   399  void interval_erase(struct interval_node *node,
+>   400                      struct interval_node **root)
+>   401  {
+>   402          struct interval_node *child, *parent;
+>   403          int color;
+>   404  
+>   405          LASSERT(interval_is_intree(node));
+>   406          node->in_intree = 0;
+>   407          if (!node->in_left) {
+>   408                  child = node->in_right;
+>   409          } else if (!node->in_right) {
+>   410                  child = node->in_left;
+>   411          } else { /* Both left and right child are not NULL */
+>   412                  struct interval_node *old = node;
+>   413  
+>   414                  node = interval_next(node);
+>                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> It looks like interval_next() can return NULL.
+
+In fact it cannot.
+When we are called here, node->in_right is not NULL.
+
+> 
+>   415                  child = node->in_right;
+>   416                  parent = node->in_parent;
+>   417                  color = node->in_color;
+>   418  
+> 
+> Here is the interval_next() function:
+> 
+> drivers/staging/lustre/lustre/ldlm/interval_tree.c
+>   111  static struct interval_node *interval_next(struct interval_node *node)
+>   112  {
+>   113          if (!node)
+>   114                  return NULL;
+>   115          if (node->in_right)
+>   116                  return interval_first(node->in_right);
+
+So we take this branch here. and interval_first does not return NULL unless node itself is NULL.
+
+
+Thanks.
+
+Bye,
+    Oleg
