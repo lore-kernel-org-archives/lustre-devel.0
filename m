@@ -1,47 +1,68 @@
-From: Andreas Gruenbacher <agruenba@redhat.com>
-Date: Wed, 11 May 2016 19:01:37 +0200
-Subject: [lustre-devel] [PATCH] xattr handlers: fixup generic_listxattr
-In-Reply-To: <alpine.LFD.2.20.1605111649310.27778@casper.infradead.org>
-References: <1462229118-13123-1-git-send-email-agruenba@redhat.com>
-	<551ED650-CBF8-40D6-85A0-BDB3C281C247@dilger.ca>
-	<alpine.LFD.2.20.1605111649310.27778@casper.infradead.org>
-Message-ID: <CAHc6FU4LPMkMqYcY17ksDBBhLfUhGyz6K6HvLogCZKvahDzdwQ@mail.gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Fri, 13 May 2016 20:38:31 +0100 (BST)
+Subject: [lustre-devel] Lustre use of hash_long() & cfs_hash_u32_hash()
+In-Reply-To: <20160512013322.5730.qmail@ns.horizon.com>
+References: <20160512013322.5730.qmail@ns.horizon.com>
+Message-ID: <alpine.LFD.2.20.1605132027210.5961@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Alexander Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Tyler Hicks <tyhicks@canonical.com>, ecryptfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, linux-unionfs@vger.kernel.org, fuse-devel@lists.sourceforge.net, Mimi Zohar <zohar@linux.vnet.ibm.com>, linux-ima-devel@lists.sourceforge.net, LSM <linux-security-module@vger.kernel.org>, David Howells <dhowells@redhat.com>, Serge Hallyn <serge.hallyn@canonical.com>, Dmitry Kasatkin <dmitry.kasatkin@gmail.com>, Paul Moore <paul@paul-moore.com>, Stephen Smalley <sds@tycho.nsa.gov>, Eric Paris <eparis@parisplace.org>, Casey Schaufler <casey@schaufler-ca.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Lustre Developement <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Wed, May 11, 2016 at 5:54 PM, James Simmons <jsimmons@infradead.org> wrote:
-> While looking at porting lustre to use xattr handlers I
-> noticed issues in generic_listxattr() when handle->list()
-> is used. The function generic_listxattr() generates it
-> results from the handle->name field. If the current handle
-> name field is NULL then generic_listxattr() will call
-> handle->list() if it exist.
 
-generic_listxattr() is different from generic_getxattr() /
-generic_setxattr() / generic_removexattr. It makes sense only for
-filesystems that support a fixed set of xattrs, which means that all
-handlers will have handler->name set.
+> Thank you very much for the response!
+> 
+> > Thanks for looking into this. Do you have a tree some where we can look
+> > at for the changes?
+> 
+> Linus committed the most important fix to 4.6-rc7 as
+> 689de1d6ca95b3b5bd8ee446863bf81a4883ea25
 
-If any of the handlers has handler->prefix set instead, that handler
-matches a whole set of attributes. Generic_listxattr() would have to
-fill in all of those names matching that handler, but it doesn't know
-which those are.
+Not too huge of a changed. Looks like I need to move to using these 
+functions.
 
-It is common for filesystems to have their own listxattr inode
-operation and still use generic_{get,set,remove}xattr.
+> I'm following up with additional, less urgent cleanups of kernel hashing.
+> 
+> (Fundamentally, I'm trying to reduce the number of different hash
+> functions, and find a good balance between execution-time performance
+> and mixing performance of what remains.)
 
-> Calling handle->list() has no
-> affect on the output since their is no way to set the
-> name field of the handler. This patch allows the passing
-> in of the handler to *list() so the handle->name field
-> can be set.
+Looking at our code I see our duplication is cfs_hash_u32_hash and
+cfs_hash_u64_hash which could be replaced by the standard linux functions.
+Am I missing anything else?
 
-No, that's broken. The handlers pointed at by sb->s_xattr must not be
-modified. Doing so would mess up all other concurrent getxattr /
-setxattr / listxattr / removexattr operations on that superblock.
+> > Details about this change are at
+> > 
+> > https://jira.hpdd.intel.com/browse/LU-143
+> > 
+> > and the original patch with those changes are at
+> > 
+> > http://review.whamcloud.com/#/c/374
+> 
+> Thanks a lot for the pointers!
 
-Andreas
+Any time. I also CC Liang Zhen who wrote the bulk of the hashing code.
+
+> > Is this the only code that doesn't make sense or is their more?
+> 
+> I expect there's more; that was just what first jumped out at me.
+> My primary goal was elsewhere, so once it became clear that Lustre would
+> be a time-consuming side quest, I gave up and sent that e-mail.
+> 
+> But if Lustre would appreciate more attention, I can take another look.
+
+Yep. We are here to help. 
+
+> I did do a pass over the kernel and fixed improper use of the current
+> <linux/hash.h> functions.  I posted it as
+> 
+> Subject: [RFC PATCH 3/2] (Rant) Fix various hash abuses
+> https://marc.info/?l=linux-kernel&m=146218484201133
+> 
+> Since Lustre was the single biggest culprit (about 25% of that patch),
+> I was planning on sending a broken-out patch.
+
+I expect this is not all the changes needed. Do you have a newer patch or 
+should I run with this patch? Also I will look into replace the 
+cfs_hash_u[32|64]_* code with standard linux hash code.
