@@ -1,68 +1,49 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 13 May 2016 20:38:31 +0100 (BST)
-Subject: [lustre-devel] Lustre use of hash_long() & cfs_hash_u32_hash()
-In-Reply-To: <20160512013322.5730.qmail@ns.horizon.com>
-References: <20160512013322.5730.qmail@ns.horizon.com>
-Message-ID: <alpine.LFD.2.20.1605132027210.5961@casper.infradead.org>
+Date: Fri, 13 May 2016 20:42:42 +0100 (BST)
+Subject: [lustre-devel] [PATCH] staging: lustre: use setup_timer().
+In-Reply-To: <1462980251-6608-1-git-send-email-falakreyaz@gmail.com>
+References: <1462980251-6608-1-git-send-email-falakreyaz@gmail.com>
+Message-ID: <alpine.LFD.2.20.1605132042210.5961@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Muhammad Falak R Wani <falakreyaz@gmail.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, devel@driverdev.osuosl.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
 
-> Thank you very much for the response!
+> Use setup_timer() for initializing the timer, instead of structure
+> assignments.
+> This is the preferred/standard way.
 > 
-> > Thanks for looking into this. Do you have a tree some where we can look
-> > at for the changes?
+> Signed-off-by: Muhammad Falak R Wani <falakreyaz@gmail.com>
+
+Acked-by: James Simmons <jsimmons@infradead.org>
+
+> ---
+>  drivers/staging/lustre/lnet/lnet/net_fault.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 > 
-> Linus committed the most important fix to 4.6-rc7 as
-> 689de1d6ca95b3b5bd8ee446863bf81a4883ea25
-
-Not too huge of a changed. Looks like I need to move to using these 
-functions.
-
-> I'm following up with additional, less urgent cleanups of kernel hashing.
+> diff --git a/drivers/staging/lustre/lnet/lnet/net_fault.c b/drivers/staging/lustre/lnet/lnet/net_fault.c
+> index 7d76f28..e4aceb7 100644
+> --- a/drivers/staging/lustre/lnet/lnet/net_fault.c
+> +++ b/drivers/staging/lustre/lnet/lnet/net_fault.c
+> @@ -760,9 +760,7 @@ lnet_delay_rule_add(struct lnet_fault_attr *attr)
+>  		wait_event(delay_dd.dd_ctl_waitq, delay_dd.dd_running);
+>  	}
+>  
+> -	init_timer(&rule->dl_timer);
+> -	rule->dl_timer.function = delay_timer_cb;
+> -	rule->dl_timer.data = (unsigned long)rule;
+> +	setup_timer(&rule->dl_timer, delay_timer_cb, (unsigned long)rule);
+>  
+>  	spin_lock_init(&rule->dl_lock);
+>  	INIT_LIST_HEAD(&rule->dl_msg_list);
+> -- 
+> 1.9.1
 > 
-> (Fundamentally, I'm trying to reduce the number of different hash
-> functions, and find a good balance between execution-time performance
-> and mixing performance of what remains.)
-
-Looking at our code I see our duplication is cfs_hash_u32_hash and
-cfs_hash_u64_hash which could be replaced by the standard linux functions.
-Am I missing anything else?
-
-> > Details about this change are at
-> > 
-> > https://jira.hpdd.intel.com/browse/LU-143
-> > 
-> > and the original patch with those changes are at
-> > 
-> > http://review.whamcloud.com/#/c/374
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 > 
-> Thanks a lot for the pointers!
-
-Any time. I also CC Liang Zhen who wrote the bulk of the hashing code.
-
-> > Is this the only code that doesn't make sense or is their more?
-> 
-> I expect there's more; that was just what first jumped out at me.
-> My primary goal was elsewhere, so once it became clear that Lustre would
-> be a time-consuming side quest, I gave up and sent that e-mail.
-> 
-> But if Lustre would appreciate more attention, I can take another look.
-
-Yep. We are here to help. 
-
-> I did do a pass over the kernel and fixed improper use of the current
-> <linux/hash.h> functions.  I posted it as
-> 
-> Subject: [RFC PATCH 3/2] (Rant) Fix various hash abuses
-> https://marc.info/?l=linux-kernel&m=146218484201133
-> 
-> Since Lustre was the single biggest culprit (about 25% of that patch),
-> I was planning on sending a broken-out patch.
-
-I expect this is not all the changes needed. Do you have a newer patch or 
-should I run with this patch? Also I will look into replace the 
-cfs_hash_u[32|64]_* code with standard linux hash code.
