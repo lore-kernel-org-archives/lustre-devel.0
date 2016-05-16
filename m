@@ -1,9 +1,11 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 May 2016 18:28:20 +0100 (BST)
-Subject: [lustre-devel] Lustre use of hash_long() & cfs_hash_u32_hash()
-In-Reply-To: <20160513202507.26286.qmail@ns.horizon.com>
-References: <20160513202507.26286.qmail@ns.horizon.com>
-Message-ID: <alpine.LFD.2.20.1605161735250.9721@casper.infradead.org>
+From: Lidza Louina <lidza.louina@oracle.com>
+Date: Mon, 16 May 2016 10:11:52 -0400
+Subject: [lustre-devel] [PATCH] staging/lustre/ptlrpc: Removes potential
+	null dereference
+In-Reply-To: <7641B85C-A5E1-499C-9426-8A860900C35C@intel.com>
+References: <1463092392.16344.4.camel@oracle.com>
+	<7641B85C-A5E1-499C-9426-8A860900C35C@intel.com>
+Message-ID: <5739D528.4000606@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -11,112 +13,59 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> > Looking at our code I see our duplication is cfs_hash_u32_hash and
-> > cfs_hash_u64_hash which could be replaced by the standard linux functions.
-> > Am I missing anything else?
-> 
-> The question is, why were they copied in the first place?
-...
-> If there's no reason for the duplication, then yes, merge them.
 
-As Oleg pointed out their is no need for the duplication.
+On 05/13/2016 12:43 PM, Drokin, Oleg wrote:
+> On May 12, 2016, at 6:33 PM, Lidza Louina wrote:
+>
+>> The lustre_msg_buf method could return NULL. Subsequent code didn't
+>> check if it's null before using it. This patch adds two checks.
+> Thank you for the patch, it looks good code-wise, but there are some style issues.
+>
+>>      
+>> Signed-off-by: Lidza Louina <Lidza.Louina@oracle.com>
+>>
+>> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+>> index 187fd1d..e6fedc3 100644
+>> --- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
+>> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+>> @@ -2195,6 +2195,8 @@ int sptlrpc_pack_user_desc(struct lustre_msg *msg, int offset)
+>>   	struct ptlrpc_user_desc *pud;
+>>   
+>>   	pud = lustre_msg_buf(msg, offset, 0);
+>> +	if (!pud)
+>> +		return -EINVAL;
+>>   
+>>   	pud->pud_uid = from_kuid(&init_user_ns, current_uid());
+>>   	pud->pud_gid = from_kgid(&init_user_ns, current_gid());
+>> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+>> index 37c9f4c..7736aa9 100644
+>> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+>> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+>> @@ -542,6 +542,7 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
+>>   {
+>>   	__u32 buflens[PLAIN_PACK_SEGMENTS] = { 0, };
+>>   	int alloc_len;
+>> +	int desc;
+>>   
+>>   	buflens[PLAIN_PACK_HDR_OFF] = sizeof(struct plain_header);
+>>   	buflens[PLAIN_PACK_MSG_OFF] = msgsize;
+>> @@ -575,7 +576,10 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
+>>   	req->rq_reqmsg = lustre_msg_buf(req->rq_reqbuf, PLAIN_PACK_MSG_OFF, 0);
+>>   
+>>   	if (req->rq_pack_udesc)
+>> -		sptlrpc_pack_user_desc(req->rq_reqbuf, PLAIN_PACK_USER_OFF);
+>> +		desc = sptlrpc_pack_user_desc(req->rq_reqbuf, PLAIN_PACK_USER_OFF);
+> This makes the line longer than 80 chars.
+> Also why not declare desc right here as opposed to the start of the function like you did?
+>
+>> +		if (!desc){
+>> +			return desc;
+>> +		}
+> We don't really need these curvy braces here.
+>
+> Thanks!
+>
+>
+Thanks for the feedback. I'm sending a new patch in now.
 
-> >> Since Lustre was the single biggest culprit (about 25% of that patch),
-> >> I was planning on sending a broken-out patch.
-> 
-> > I expect this is not all the changes needed. Do you have a newer patch or 
-> > should I run with this patch?  Also I will look into replace the 
-> > cfs_hash_u[32|64]_* code with standard linux hash code.
-> 
-> I don't have anything newer ATM.  I agree there's probably more; if
-> nothing else I didn't check the copied hash functions at all.  What I
-> posted was just what I noticed during a search through the kernel for
-> all users of the functions I was planning on changing.
-
-I started a patch with your cleanups. So I started to look at replacing
-cfs_hash_u[64|32]_hash() with the standard hash_[64|32]() function. 
-First I need to explain the code path to make it clear what is going on.
-From the top level the code path in which the cfs_hash_uXX_hash might
-be called is:
-
-cfs_hash_bd_get() -> cfs_hash_bd_from_key() -> cfs_hash_id()
-
-cfs_hash_id() is defined as:
-
-static inline unsigned
-cfs_hash_id(struct cfs_hash *hs, const void *key, unsigned mask)
-{
-        return hs->hs_ops->hs_hash(hs, key, mask);
-}
-
-and hs_hash is 
-
-struct cfs_hash_ops {
-        /** return hashed value from @key */
-        unsigned (*hs_hash)(struct cfs_hash *hs, const void *key,
-                            unsigned mask);
-        ...
-}
-
-So ops->hs_hash() is filled in by various lustre layers to generate
-some hash value. It is these *hs_hash() that some times uses
-cfs_hash_u64_hash() and cfs_hash_u32_hash(). An example of this is
-in cl_object.c:
-
-struct cfs_hash_ops pool_hash_operations = {
-        .hs_hash        = cl_env_hops_hash,
-	...
-};
-
-which is defined as:
-
-static unsigned cl_env_hops_hash(struct cfs_hash *lh,
-                                 const void *key, unsigned mask)
-{
-#if BITS_PER_LONG == 64
-        return cfs_hash_u64_hash((__u64)key, mask);
-#else
-        return cfs_hash_u32_hash((__u32)key, mask);
-#endif
-}
-
-If we change to using hash_64() or hash_32() instead this
-will change the behavior we currently have.
-
-Now cfs_hash_u64_hash() is defined as
-
-static inline unsigned
-cfs_hash_u64_hash(const __u64 key, unsigned mask)
-{
-        return ((unsigned)(key * CFS_GOLDEN_RATIO_PRIME_64) & mask);
-}
-
-which uses a mask directly. That mask is generated in cfs_hash_id()
-with :
-
-unsigned int index = cfs_hash_id(hs, key, (1U << bits) - 1);
-
-So the mask uses the lower bits. We can't change this behavior
-since other hp_ops->hs_hash functions that don't use 
-cfs_hash_u[64|32]_hash() at all treat this as a mask.
-
-Now for using the standand functions we have for example:
-
-static __always_inline u64 hash_64(u64 val, unsigned int bits)
-{
-        u64 hash = val;
-
-#if BITS_PER_LONG == 64
-        hash = hash * GOLDEN_RATIO_64;
-#else
-        ....
-#endif
-
-        /* High bits are more random, so use them. */
-        return hash >> (64 - bits);
-}
-
-which generates the mask on the fly using the higher bits.
-I can work the code so the mask can be turned into a bit offset
-but the mask will still be different. Will this difference
-break things?
+Lidza
