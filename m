@@ -1,60 +1,108 @@
-From: Andreas Gruenbacher <agruenba@redhat.com>
-Date: Tue, 17 May 2016 04:03:32 +0200
-Subject: [lustre-devel] [PATCH] xattr handlers: fixup generic_listxattr
-In-Reply-To: <alpine.LFD.2.20.1605170137480.13979@casper.infradead.org>
-References: <1462229118-13123-1-git-send-email-agruenba@redhat.com>
-	<551ED650-CBF8-40D6-85A0-BDB3C281C247@dilger.ca>
-	<alpine.LFD.2.20.1605111649310.27778@casper.infradead.org>
-	<CAHc6FU4LPMkMqYcY17ksDBBhLfUhGyz6K6HvLogCZKvahDzdwQ@mail.gmail.com>
-	<alpine.LFD.2.20.1605170137480.13979@casper.infradead.org>
-Message-ID: <CAHc6FU5x2ShKT1FYvSMtX2ucqQNO9ojm434hPEPKSGYM_FREjw@mail.gmail.com>
+From: George Spelvin <linux@sciencehorizons.net>
+Date: 17 May 2016 04:52:22 -0400
+Subject: [lustre-devel] Lustre use of hash_long() & cfs_hash_u32_hash()
+In-Reply-To: <alpine.LFD.2.20.1605161735250.9721@casper.infradead.org>
+Message-ID: <20160517085222.10484.qmail@ns.sciencehorizons.net>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Alexander Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Tyler Hicks <tyhicks@canonical.com>, ecryptfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, linux-unionfs@vger.kernel.org, fuse-devel@lists.sourceforge.net, Mimi Zohar <zohar@linux.vnet.ibm.com>, linux-ima-devel@lists.sourceforge.net, LSM <linux-security-module@vger.kernel.org>, David Howells <dhowells@redhat.com>, Serge Hallyn <serge.hallyn@canonical.com>, Dmitry Kasatkin <dmitry.kasatkin@gmail.com>, Paul Moore <paul@paul-moore.com>, Stephen Smalley <sds@tycho.nsa.gov>, Eric Paris <eparis@parisplace.org>, Casey Schaufler <casey@schaufler-ca.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Lustre Developement <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Tue, May 17, 2016 at 3:12 AM, James Simmons <jsimmons@infradead.org> wrote:
->> generic_listxattr() is different from generic_getxattr() /
->> generic_setxattr() / generic_removexattr. It makes sense only for
->> filesystems that support a fixed set of xattrs, which means that all
->> handlers will have handler->name set.
->>
->> If any of the handlers has handler->prefix set instead, that handler
->> matches a whole set of attributes. Generic_listxattr() would have to
->> fill in all of those names matching that handler, but it doesn't know
->> which those are.
->>
->> It is common for filesystems to have their own listxattr inode
->> operation and still use generic_{get,set,remove}xattr.
+> If we change to using hash_64() or hash_32() instead this
+> will change the behavior we currently have.
+
+There is hash_long for exactly this purpose.
+The problem was that Lustre was using hash_long() on values that are 64
+bits even on 32-bit platforms.  I wasn't trying to get rid of all
+calls to hash_long, just the buggy ones.
+
+hash_32: Hash 32 bits
+hash_64: Hash 64 bits
+hash_long: Alias for one of the preceding, depending on BITS_PER_LONG.
+
+The thing is to use the correct one for the argument.
+
+> Now cfs_hash_u64_hash() is defined as
 >
-> That clears things up a bit. So that leaves a few questions. First
-> question is looking at several of the file system's implementations
-> I noticed it contains loops such as:
->
-> list_for_each_xattr(entry, base_addr) {
->         const struct xattr_handler *handler =
->                 blah_xattr_handler(entry->e_name_index);
->         const char *prefix;
->         size_t prefix_len;
->         size_t size;
->
->         if (!handler || (handler->list && !handler->list(dentry)))
->                 continue;
->
->         ...
+> static inline unsigned
+> cfs_hash_u64_hash(const __u64 key, unsigned mask)
+> {
+>         return ((unsigned)(key * CFS_GOLDEN_RATIO_PRIME_64) & mask);
 > }
->
-> Is the handler->list() test needed for a private listxattr implementation?
-> Also I don't see anyone using handler->list() which which brings up the
-> next question. What is the purpose of list() function?
+> 
+> which uses a mask directly. That mask is generated in cfs_hash_id() with :
+> 
+> unsigned int index = cfs_hash_id(hs, key, (1U << bits) - 1);
+> 
+> So the mask uses the lower bits. We can't change this behavior
+> since other hp_ops->hs_hash functions that don't use 
+> cfs_hash_u[64|32]_hash() at all treat this as a mask.
 
-Trusted xattrs are meant to only be visible to tasks with the
-CAP_SYS_ADMIN capability. For deciding which names to include in its
-result, listxattr implementations can use the list function, or any
-other suitable mechanism. On filesystems that store the complete xattr
-names as strings, a strncmp check for a "trusted." prefix together
-with capable(CAP_SYS_ADMIN) would do, for example.
+This is a bit of a problem.  My hash changes won't make it any worse,
+but it's a *current* problem that you probably want to fix.
 
-Andreas
+The thing is, a multiply has lower bits of the input affect higher bits
+of the output, but there is no propagation at all in the other direction.
+(See http://burtleburtle.net/bob/hash/integer.html for a discussion of
+"half-avalanche".)
+
+On other words, for a mask which is a power of 2 minus 1,
+(hash_64(x) & mask) == (hash_64(x & mask) & mask).
+
+(This is NOT true if the mask has trailing zero bits.)
+
+Given that a typical mask has far less than 64 bits set, you can
+see how this will lead to huge numbers of collisions.
+
+
+There are a few possible solutions depending on the typical
+size of mask:
+
+- Since you're returning only 32 bits at most, shift down 32 bits
+  before masking.  This still has you ignoring some high-order bits,
+  but it improves things a lot.  (One of my pending patches to hash_64()
+  does exactly this.)
+- bswap() the result.  May still ignore input bits if the mask is less
+  than 8 bits, but it's getting decent.
+- (Less efficient on some embedded platforms, but none likely to run Lustre
+  in the first place): Use the low bits of the *high* word of the product.
+  This has high bits of the hash value unaffected by low bits of the
+  argument (except by carry propagation, which is unlikely to
+  propagate many bits), but gets you what you need.
+- Use a totally different hash function like jhash_2words() that
+  achieves more mixing (but is slower).
+- Change the Lustre code to use the high bits everywhere.
+
+One alternative to jhash_2words() is Thomas Wang's
+64-to-32 bit hash from
+https://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm
+
+Translated from Java to C, that's:
+
+u32 hash6432shift(u64 key)
+{
+	key = ~key + (key << 18);	// key = (key << 18) - key - 1;
+	key ^= key >> 31;
+	key *= 21;		// key = key + (key << 2) + (key << 4);
+	key ^= key >> 11;
+	key += key << 6;
+	key ^= key >> 22;
+	return (u32) key;
+}
+
+> I can work the code so the mask can be turned into a bit offset
+> but the mask will still be different. Will this difference
+> break things?
+
+I'm not sure I understand the question.  As long as the hashing is
+always done the same way, the details of *how* the hashing is
+done are opaque to the rest of the code.
+
+The problem arises if someone assumes a mathematical relationship
+between hash_64(x, bits) and hash_64(x, bits+1), such as when
+growing or shrinking a dynamic hash table.  
+
+If the calling code "knows" that hash64(x, mask) can be ANDed with
+mask/2 to produce the same number as hash64(x, mask/2) then things
+will make a mess.
