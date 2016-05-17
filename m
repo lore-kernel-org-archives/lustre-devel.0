@@ -1,55 +1,51 @@
-From: Lidza Louina <lidza.louina@oracle.com>
-Date: Mon, 16 May 2016 14:51:42 -0400
-Subject: [lustre-devel] [PATCH v3] staging/lustre/ptlrpc: Removes potential
-	null dereference
-Message-ID: <1463424702-5467-1-git-send-email-lidza.louina@oracle.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 17 May 2016 02:12:15 +0100 (BST)
+Subject: [lustre-devel] [PATCH] xattr handlers: fixup generic_listxattr
+In-Reply-To: <CAHc6FU4LPMkMqYcY17ksDBBhLfUhGyz6K6HvLogCZKvahDzdwQ@mail.gmail.com>
+References: <1462229118-13123-1-git-send-email-agruenba@redhat.com>
+	<551ED650-CBF8-40D6-85A0-BDB3C281C247@dilger.ca>
+	<alpine.LFD.2.20.1605111649310.27778@casper.infradead.org>
+	<CAHc6FU4LPMkMqYcY17ksDBBhLfUhGyz6K6HvLogCZKvahDzdwQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1605170137480.13979@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Andreas Gruenbacher <agruenba@redhat.com>
+Cc: Alexander Viro <viro@zeniv.linux.org.uk>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Tyler Hicks <tyhicks@canonical.com>, ecryptfs@vger.kernel.org, Miklos Szeredi <miklos@szeredi.hu>, linux-unionfs@vger.kernel.org, fuse-devel@lists.sourceforge.net, Mimi Zohar <zohar@linux.vnet.ibm.com>, linux-ima-devel@lists.sourceforge.net, LSM <linux-security-module@vger.kernel.org>, David Howells <dhowells@redhat.com>, Serge Hallyn <serge.hallyn@canonical.com>, Dmitry Kasatkin <dmitry.kasatkin@gmail.com>, Paul Moore <paul@paul-moore.com>, Stephen Smalley <sds@tycho.nsa.gov>, Eric Paris <eparis@parisplace.org>, Casey Schaufler <casey@schaufler-ca.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Lustre Developement <lustre-devel@lists.lustre.org>
 
-The lustre_msg_buf method could return NULL. Subsequent code didn't
-check if it's null before using it. This patch adds two checks.
 
-Signed-off-by: Lidza Louina <lidza.louina@oracle.com>
----
- drivers/staging/lustre/lustre/ptlrpc/sec.c       | 3 +++
- drivers/staging/lustre/lustre/ptlrpc/sec_plain.c | 8 ++++++--
- 2 files changed, 9 insertions(+), 2 deletions(-)
+> generic_listxattr() is different from generic_getxattr() /
+> generic_setxattr() / generic_removexattr. It makes sense only for
+> filesystems that support a fixed set of xattrs, which means that all
+> handlers will have handler->name set.
+> 
+> If any of the handlers has handler->prefix set instead, that handler
+> matches a whole set of attributes. Generic_listxattr() would have to
+> fill in all of those names matching that handler, but it doesn't know
+> which those are.
+> 
+> It is common for filesystems to have their own listxattr inode
+> operation and still use generic_{get,set,remove}xattr.
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-index 187fd1d..657b41f 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-@@ -2196,6 +2196,9 @@ int sptlrpc_pack_user_desc(struct lustre_msg *msg, int offset)
+That clears things up a bit. So that leaves a few questions. First 
+question is looking at several of the file system's implementations
+I noticed it contains loops such as:
+
+list_for_each_xattr(entry, base_addr) {
+	const struct xattr_handler *handler =                
+		blah_xattr_handler(entry->e_name_index);
+        const char *prefix;
+        size_t prefix_len;
+        size_t size;
+
+        if (!handler || (handler->list && !handler->list(dentry)))
+        	continue;
+
+	...
+}
+
+Is the handler->list() test needed for a private listxattr implementation? 
+Also I don't see anyone using handler->list() which which brings up the
+next question. What is the purpose of list() function? 
  
- 	pud = lustre_msg_buf(msg, offset, 0);
- 
-+	if (!pud)
-+		return -EINVAL;
-+
- 	pud->pud_uid = from_kuid(&init_user_ns, current_uid());
- 	pud->pud_gid = from_kgid(&init_user_ns, current_gid());
- 	pud->pud_fsuid = from_kuid(&init_user_ns, current_fsuid());
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-index 37c9f4c..ec8edbf 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-@@ -574,8 +574,12 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
- 	lustre_init_msg_v2(req->rq_reqbuf, PLAIN_PACK_SEGMENTS, buflens, NULL);
- 	req->rq_reqmsg = lustre_msg_buf(req->rq_reqbuf, PLAIN_PACK_MSG_OFF, 0);
- 
--	if (req->rq_pack_udesc)
--		sptlrpc_pack_user_desc(req->rq_reqbuf, PLAIN_PACK_USER_OFF);
-+	if (req->rq_pack_udesc) {
-+		int rc = sptlrpc_pack_user_desc(req->rq_reqbuf,
-+					      PLAIN_PACK_USER_OFF);
-+		if (rc < 0)
-+			return rc;
-+	}
- 
- 	return 0;
- }
--- 
-1.9.1
