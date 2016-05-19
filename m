@@ -1,13 +1,23 @@
-From: Simmons, James A. <simmonsja@ornl.gov>
-Date: Thu, 19 May 2016 19:54:47 +0000
-Subject: [lustre-devel] LWN article on kernel stats reveal upstream client
-	progress.
-Message-ID: <11629f7822674b1d872d078bcb422717@EXCHCS32.ornl.gov>
+From: Oucharek, Doug S <doug.s.oucharek@intel.com>
+Date: Thu, 19 May 2016 21:31:33 +0000
+Subject: [lustre-devel] LWN article on kernel stats reveal upstream
+ client	progress.
+In-Reply-To: <11629f7822674b1d872d078bcb422717@EXCHCS32.ornl.gov>
+References: <11629f7822674b1d872d078bcb422717@EXCHCS32.ornl.gov>
+Message-ID: <924F1865-65B5-4DBE-85C3-982D0BAF99D7@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+James,
+
+How close are we to getting LNet out of staging and into mainline?  If we are getting close, should we consider ?separating? LNet from Lustre making it a standalone item?  Considering how we have to propagate all LNet fixes to every active repo/version, I get the feeling that LNet should be separate anyway to make updating just LNet in the field easier.
+
+Doug
+
+On May 19, 2016, at 12:54 PM, Simmons, James A. <simmonsja at ornl.gov<mailto:simmonsja@ornl.gov>> wrote:
 
 
 With all the work going into the upstream lustre  client Oleg and I showed up
@@ -29,6 +39,11 @@ LNet updates which brings it into line with the latest LNet stack. It will be in
 to see what the new stats will be.
 
 
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160519/4eeaa203/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160519/63e131bb/attachment.htm>
