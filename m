@@ -1,49 +1,43 @@
-From: Oucharek, Doug S <doug.s.oucharek@intel.com>
-Date: Thu, 19 May 2016 21:31:33 +0000
-Subject: [lustre-devel] LWN article on kernel stats reveal upstream
- client	progress.
-In-Reply-To: <11629f7822674b1d872d078bcb422717@EXCHCS32.ornl.gov>
-References: <11629f7822674b1d872d078bcb422717@EXCHCS32.ornl.gov>
-Message-ID: <924F1865-65B5-4DBE-85C3-982D0BAF99D7@intel.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Sat, 21 May 2016 05:51:09 +0000
+Subject: [lustre-devel] [lustre-discuss] more on lustre striping
+In-Reply-To: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
+References: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
+Message-ID: <38EA9F32-3869-43BA-B215-EB2E5BA62FD5@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-James,
+This is probably getting to be more of a topic for lustre-devel.
 
-How close are we to getting LNet out of staging and into mainline?  If we are getting close, should we consider ?separating? LNet from Lustre making it a standalone item?  Considering how we have to propagate all LNet fixes to every active repo/version, I get the feeling that LNet should be separate anyway to make updating just LNet in the field easier.
+There currently isn't any way to do what you ask, since (IIRC) it will cause an error for apps that try to write to the files before the layout is set.
 
-Doug
+What you could do is to create an LD_PRELOAD library to intercept the open() calls and set O_LOV_DELAY_CREATE and set the layout explicitly for each file. This might be a win if each file needs a different layout, but since it uses two RPCs per file it would be slower than using the default layout.
 
-On May 19, 2016, at 12:54 PM, Simmons, James A. <simmonsja at ornl.gov<mailto:simmonsja@ornl.gov>> wrote:
+Cheers, Andreas
+
+On May 18, 2016, at 16:46, John Bauer <bauerj at iodoctors.com<mailto:bauerj@iodoctors.com>> wrote:
 
 
-With all the work going into the upstream lustre  client Oleg and I showed up
-in the linux kernel developments stats reported by LWN.
+Since today's topic seems to be Lustre striping, I will revisit a previous line of questions I had.
 
-https://lwn.net/Articles/686393
+Andreas had put me on to O_LOV_DELAY_CREATE which I have been experimenting with. My question is : Is there a way to flag a directory with O_LOV_DELAY_CREATE so that a file created in that directory will be created with O_LOV_DELAY_CREATE also.  Much like a file can inherit a directory's stripe count and stripe size, it would be convenient if a file could also inherit O_LOV_DELAY_CREATE?  That way, for open()s that I can not intercept ( and thus can not set O_LOV_DELAY_CREATE in oflags) , such as those issued by fopen(), I can then get the fd with fileno() and set the striping with ioctl(fd, LL_IOC_LOV_SETSTRIPE, lum).
 
-As the article pointed out Oleg showed up 3rd for the number of patches submitted
-as well as 5th for line changes. I showed up 16th. We both also showed up in the
-most active reviewers list. Note the changes in kernel 4.6 where the changes
-mostly done during the 4.5 development cycle. The staging tree work is merged
-to the 4.X-rc1 branch so any work done after that remains in the staging tree until
-the next merge window. The 4.6 version of the kernel contains the same LNet stack
-as the Lustre 2.8.0 release and Oleg removed most of the code style violations in the
-4.6 version.
+Thanks
 
-When linux 4.7 is released it will contain the CLIO simplification work as well as new
-LNet updates which brings it into line with the latest LNet stack. It will be interesting
-to see what the new stats will be.
+John
 
+--
+I/O Doctors, LLC
+507-766-0378
+bauerj at iodoctors.com<mailto:bauerj@iodoctors.com>
 
 _______________________________________________
-lustre-devel mailing list
-lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
+lustre-discuss mailing list
+lustre-discuss at lists.lustre.org<mailto:lustre-discuss@lists.lustre.org>
+http://lists.lustre.org/listinfo.cgi/lustre-discuss-lustre.org
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160519/63e131bb/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160521/de0cd052/attachment.htm>
