@@ -1,100 +1,91 @@
-From: John Bauer <bauerj@iodoctors.com>
-Date: Sat, 21 May 2016 15:01:22 -0500
-Subject: [lustre-devel] [lustre-discuss] more on lustre striping
-In-Reply-To: <38EA9F32-3869-43BA-B215-EB2E5BA62FD5@intel.com>
-References: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
-	<38EA9F32-3869-43BA-B215-EB2E5BA62FD5@intel.com>
-Message-ID: <f4c0c992-1e1a-41d8-7a04-2fc5182c6b31@iodoctors.com>
+From: Tobin C Harding <me@tobin.cc>
+Date: Mon, 23 May 2016 07:49:29 +1000
+Subject: [lustre-devel] [PATCH] staging: lustre: llite: kzalloc/copy_to_user
+	to memdup_user
+Message-ID: <1463953771-16942-1-git-send-email-me@tobin.cc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: patrik.r.jakobsson@gmail.com
+Cc: Dmitry Eremin <dmitry.eremin@intel.com>, Abdul Hussain <habdul@visteon.com>, David Airlie <airlied@linux.ie>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Nunez <james.a.nunez@intel.com>, "open list:DRM DRIVERS FOR GMA500 Poulsbo, Moorestown and...,
+ linux-kernel@vger.kernel.org open list,
+ lustre-devel@lists.lustre.org moderated list:STAGING - LUSTRE PARALLEL
+ FILESYSTEM, devel@driverdev.osuosl.org open list:STAGING SUBSYSTEM" <dri-devel@lists.freedesktop.org>, Oleg Drokin <oleg.drokin@intel.com>, Julia Lawall <Julia.Lawall@lip6.fr>, Al Viro <viro@zeniv.linux.org.uk>, Andreas Dilger <andreas.dilger@intel.com>, "John L. Hammond" <john.hammond@intel.com>, Frank Zago <fzago@cray.com>, "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>, Tobin C Harding <me@tobin.cc>
 
-Andreas,
+kzalloc call followed by copy_to_user can be replaced by call to memdup_user.
 
-Thanks for the reply.  For what it's worth, extending a file that does 
-not have layout set does work.
+Signed-off-by: Tobin C Harding <me@tobin.cc>
+---
+ drivers/gpu/drm/gma500/gma_display.c      |  2 +-
+ drivers/staging/lustre/lustre/llite/dir.c | 22 +++++++---------------
+ 2 files changed, 8 insertions(+), 16 deletions(-)
 
-    % *rm -f file.dat*
-    % *./no_stripe.exe file.dat*
-    fd=3
-    % *lfs getstripe file.dat*
-    file.dat has no stripe info
-    % *date >> file.dat*
-    % *lfs getstripe file.dat*
-    file.dat
-    lmm_stripe_count:   1
-    lmm_stripe_size:    1048576
-    lmm_pattern:        1
-    lmm_layout_gen:     0
-    lmm_stripe_offset:  21
-             obdidx           objid           objid           group
-                 21         6143298       0x5dbd42                0
-
-    %
-
-The LD_PRELOAD is exactly what I am doing in my I/O library. 
-Unfortunately, one can not intercept the open() that results from a call 
-to fopen().  That open is hard linked to the open in libc and not 
-satisfied by the runtime linker.  This is what is driving this topic for 
-me. I can not conveniently set the striping for a file opened with 
-fopen() and other functions where the open is called from inside libc. I 
-used to believe that not too many application use stdio for heavy I/O, 
-but I have been come across several recently.
-
-John
-
-On 5/21/2016 12:51 AM, Dilger, Andreas wrote:
-> This is probably getting to be more of a topic for lustre-devel.
->
-> There currently isn't any way to do what you ask, since (IIRC) it will 
-> cause an error for apps that try to write to the files before the 
-> layout is set.
->
-> What you could do is to create an LD_PRELOAD library to intercept the 
-> open() calls and set O_LOV_DELAY_CREATE and set the layout explicitly 
-> for each file. This might be a win if each file needs a different 
-> layout, but since it uses two RPCs per file it would be slower than 
-> using the default layout.
->
-> Cheers, Andreas
->
-> On May 18, 2016, at 16:46, John Bauer <bauerj@iodoctors.com 
-> <mailto:bauerj@iodoctors.com>> wrote:
->
->> Since today's topic seems to be Lustre striping, I will revisit a 
->> previous line of questions I had.
->>
->> Andreas had put me on to O_LOV_DELAY_CREATE which I have been 
->> experimenting with. My question is : Is there a way to flag a 
->> directory with O_LOV_DELAY_CREATE so that a file created in that 
->> directory will be created with O_LOV_DELAY_CREATE also.  Much like a 
->> file can inherit a directory's stripe count and stripe size, it would 
->> be convenient if a file could also inherit O_LOV_DELAY_CREATE? That 
->> way, for open()s that I can not intercept ( and thus can not set 
->> O_LOV_DELAY_CREATE in oflags) , such as those issued by fopen(), I 
->> can then get the fd with fileno() and set the striping withioctl(fd, 
->> LL_IOC_LOV_SETSTRIPE, lum).
->>
->> Thanks
->>
->> John
->>
->> -- 
->> I/O Doctors, LLC
->> 507-766-0378
->> bauerj at iodoctors.com
->> _______________________________________________
->> lustre-discuss mailing list
->> lustre-discuss at lists.lustre.org <mailto:lustre-discuss@lists.lustre.org>
->> http://lists.lustre.org/listinfo.cgi/lustre-discuss-lustre.org
-
+diff --git a/drivers/gpu/drm/gma500/gma_display.c b/drivers/gpu/drm/gma500/gma_display.c
+index 5bf765d..8a1fb25 100644
+--- a/drivers/gpu/drm/gma500/gma_display.c
++++ b/drivers/gpu/drm/gma500/gma_display.c
+@@ -285,7 +285,7 @@ void gma_crtc_dpms(struct drm_crtc *crtc, int mode)
+ 
+ 		/* Wait for vblank for the disable to take effect */
+ 		gma_wait_for_vblank(dev);
+-
++l
+ 		/* Disable plane */
+ 		temp = REG_READ(map->cntr);
+ 		if ((temp & DISPLAY_PLANE_ENABLE) != 0) {
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 4b00d1a..b0eb102 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -1076,19 +1076,14 @@ static int copy_and_ioctl(int cmd, struct obd_export *exp,
+ 	void *copy;
+ 	int rc;
+ 
+-	copy = kzalloc(size, GFP_NOFS);
+-	if (!copy)
+-		return -ENOMEM;
+-
+-	if (copy_from_user(copy, data, size)) {
+-		rc = -EFAULT;
++	copy = memdup_user(data, size);
++	if (IS_ERR(copy)) {
++		rc = PTR_ERR(copy);
+ 		goto out;
+ 	}
+ 
+ 	rc = obd_iocontrol(cmd, exp, size, copy, NULL);
+ out:
+-	kfree(copy);
+-
+ 	return rc;
+ }
+ 
+@@ -1689,12 +1684,9 @@ out_poll:
+ 	case LL_IOC_QUOTACTL: {
+ 		struct if_quotactl *qctl;
+ 
+-		qctl = kzalloc(sizeof(*qctl), GFP_NOFS);
+-		if (!qctl)
+-			return -ENOMEM;
+-
+-		if (copy_from_user(qctl, (void __user *)arg, sizeof(*qctl))) {
+-			rc = -EFAULT;
++		qctl = memdup_user((void __user *)arg, sizeof(*qctl));
++		if (IS_ERR(qctl)) {
++			rc = PTR_ERR(qctl);
+ 			goto out_quotactl;
+ 		}
+ 
+@@ -1704,8 +1696,8 @@ out_poll:
+ 					    sizeof(*qctl)))
+ 			rc = -EFAULT;
+ 
+-out_quotactl:
+ 		kfree(qctl);
++out_quotactl:
+ 		return rc;
+ 	}
+ 	case OBD_IOC_GETDTNAME:
 -- 
-I/O Doctors, LLC
-507-766-0378
-bauerj at iodoctors.com
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160521/35b3264d/attachment-0001.htm>
+2.8.2
