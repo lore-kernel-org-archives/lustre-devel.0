@@ -1,91 +1,117 @@
 From: Tobin C Harding <me@tobin.cc>
-Date: Mon, 23 May 2016 07:52:17 +1000
-Subject: [lustre-devel] [PATCH] staging: lustre: llite: kzalloc/copy_to_user
-	to memdup_user
-Message-ID: <1463953938-17192-1-git-send-email-me@tobin.cc>
+Date: Mon, 23 May 2016 20:17:46 +1000
+Subject: [lustre-devel] [PATCH] staging: lustre: set function scope with
+	static
+Message-ID: <1463998666-4636-1-git-send-email-me@tobin.cc>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: patrik.r.jakobsson@gmail.com
-Cc: Dmitry Eremin <dmitry.eremin@intel.com>, Abdul Hussain <habdul@visteon.com>, David Airlie <airlied@linux.ie>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Nunez <james.a.nunez@intel.com>, "open list:DRM DRIVERS FOR GMA500 Poulsbo, Moorestown and...,
- linux-kernel@vger.kernel.org open list,
- lustre-devel@lists.lustre.org moderated list:STAGING - LUSTRE PARALLEL
- FILESYSTEM, devel@driverdev.osuosl.org open list:STAGING SUBSYSTEM" <dri-devel@lists.freedesktop.org>, Oleg Drokin <oleg.drokin@intel.com>, Julia Lawall <Julia.Lawall@lip6.fr>, Al Viro <viro@zeniv.linux.org.uk>, Andreas Dilger <andreas.dilger@intel.com>, "John L. Hammond" <john.hammond@intel.com>, Frank Zago <fzago@cray.com>, "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>, Tobin C Harding <me@tobin.cc>
+To: lustre-devel@lists.lustre.org
 
-kzalloc call followed by copy_to_user can be replaced by call to memdup_user.
+A number of function definitions were found to be candidates for
+static scoping. This patch adds static to these functions.
 
 Signed-off-by: Tobin C Harding <me@tobin.cc>
 ---
- drivers/gpu/drm/gma500/gma_display.c      |  2 +-
- drivers/staging/lustre/lustre/llite/dir.c | 22 +++++++---------------
- 2 files changed, 8 insertions(+), 16 deletions(-)
+ drivers/staging/lustre/lustre/llite/vvp_dev.c      |  8 ++++----
+ drivers/staging/lustre/lustre/llite/vvp_io.c       |  6 +++---
+ drivers/staging/lustre/lustre/llite/vvp_req.c      | 12 ++++++------
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |  2 +-
+ 4 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/gpu/drm/gma500/gma_display.c b/drivers/gpu/drm/gma500/gma_display.c
-index 5bf765d..8a1fb25 100644
---- a/drivers/gpu/drm/gma500/gma_display.c
-+++ b/drivers/gpu/drm/gma500/gma_display.c
-@@ -285,7 +285,7 @@ void gma_crtc_dpms(struct drm_crtc *crtc, int mode)
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+index 47101de..c63def9 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+@@ -150,8 +150,8 @@ struct lu_context_key vvp_session_key = {
+ 	.lct_fini = vvp_session_key_fini
+ };
  
- 		/* Wait for vblank for the disable to take effect */
- 		gma_wait_for_vblank(dev);
--
-+l
- 		/* Disable plane */
- 		temp = REG_READ(map->cntr);
- 		if ((temp & DISPLAY_PLANE_ENABLE) != 0) {
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 4b00d1a..b0eb102 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -1076,19 +1076,14 @@ static int copy_and_ioctl(int cmd, struct obd_export *exp,
- 	void *copy;
- 	int rc;
+-void *vvp_thread_key_init(const struct lu_context *ctx,
+-			  struct lu_context_key *key)
++static void *vvp_thread_key_init(const struct lu_context *ctx,
++				 struct lu_context_key *key)
+ {
+ 	struct vvp_thread_info *vti;
  
--	copy = kzalloc(size, GFP_NOFS);
--	if (!copy)
--		return -ENOMEM;
--
--	if (copy_from_user(copy, data, size)) {
--		rc = -EFAULT;
-+	copy = memdup_user(data, size);
-+	if (IS_ERR(copy)) {
-+		rc = PTR_ERR(copy);
- 		goto out;
- 	}
+@@ -161,8 +161,8 @@ void *vvp_thread_key_init(const struct lu_context *ctx,
+ 	return vti;
+ }
  
- 	rc = obd_iocontrol(cmd, exp, size, copy, NULL);
- out:
--	kfree(copy);
--
+-void vvp_thread_key_fini(const struct lu_context *ctx,
+-			 struct lu_context_key *key, void *data)
++static void vvp_thread_key_fini(const struct lu_context *ctx,
++				struct lu_context_key *key, void *data)
+ {
+ 	struct vvp_thread_info *vti = data;
+ 
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
+index 5bf9592..e26e0f8 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_io.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
+@@ -47,8 +47,8 @@
+ #include "llite_internal.h"
+ #include "vvp_internal.h"
+ 
+-struct vvp_io *cl2vvp_io(const struct lu_env *env,
+-			 const struct cl_io_slice *slice)
++static struct vvp_io *cl2vvp_io(const struct lu_env *env,
++				const struct cl_io_slice *slice)
+ {
+ 	struct vvp_io *vio;
+ 
+@@ -1259,7 +1259,7 @@ static int vvp_io_read_page(const struct lu_env *env,
+ 	return 0;
+ }
+ 
+-void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
++static void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
+ {
+ 	CLOBINVRNT(env, ios->cis_io->ci_obj,
+ 		   vvp_object_invariant(ios->cis_io->ci_obj));
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_req.c b/drivers/staging/lustre/lustre/llite/vvp_req.c
+index fb88629..9fe9d6c 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_req.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_req.c
+@@ -60,10 +60,10 @@ static inline struct vvp_req *cl2vvp_req(const struct cl_req_slice *slice)
+  *    - o_ioepoch,
+  *
+  */
+-void vvp_req_attr_set(const struct lu_env *env,
+-		      const struct cl_req_slice *slice,
+-		      const struct cl_object *obj,
+-		      struct cl_req_attr *attr, u64 flags)
++static void vvp_req_attr_set(const struct lu_env *env,
++			     const struct cl_req_slice *slice,
++			     const struct cl_object *obj,
++			     struct cl_req_attr *attr, u64 flags)
+ {
+ 	struct inode *inode;
+ 	struct obdo  *oa;
+@@ -87,8 +87,8 @@ void vvp_req_attr_set(const struct lu_env *env,
+ 	       JOBSTATS_JOBID_SIZE);
+ }
+ 
+-void vvp_req_completion(const struct lu_env *env,
+-			const struct cl_req_slice *slice, int ioret)
++static void vvp_req_completion(const struct lu_env *env,
++			       const struct cl_req_slice *slice, int ioret)
+ {
+ 	struct vvp_req *vrq;
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+index e0c90ad..bc4e1e4 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+@@ -192,7 +192,7 @@ static int lustre_start_simple(char *obdname, char *type, char *uuid,
  	return rc;
  }
  
-@@ -1689,12 +1684,9 @@ out_poll:
- 	case LL_IOC_QUOTACTL: {
- 		struct if_quotactl *qctl;
+-DEFINE_MUTEX(mgc_start_lock);
++static DEFINE_MUTEX(mgc_start_lock);
  
--		qctl = kzalloc(sizeof(*qctl), GFP_NOFS);
--		if (!qctl)
--			return -ENOMEM;
--
--		if (copy_from_user(qctl, (void __user *)arg, sizeof(*qctl))) {
--			rc = -EFAULT;
-+		qctl = memdup_user((void __user *)arg, sizeof(*qctl));
-+		if (IS_ERR(qctl)) {
-+			rc = PTR_ERR(qctl);
- 			goto out_quotactl;
- 		}
- 
-@@ -1704,8 +1696,8 @@ out_poll:
- 					    sizeof(*qctl)))
- 			rc = -EFAULT;
- 
--out_quotactl:
- 		kfree(qctl);
-+out_quotactl:
- 		return rc;
- 	}
- 	case OBD_IOC_GETDTNAME:
+ /** Set up a mgc obd to process startup logs
+  *
 -- 
 2.8.2
