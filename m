@@ -1,53 +1,35 @@
 From: Andreas Gruenbacher <agruenba@redhat.com>
-Date: Wed, 25 May 2016 00:08:33 +0200
-Subject: [lustre-devel] [PATCH] staging: lustre: llite: drop acl from
-	cache
-In-Reply-To: <alpine.LFD.2.20.1605242135500.4622@casper.infradead.org>
-References: <1464050108-28015-1-git-send-email-jsimmons@infradead.org>
-	<CAHpGcMJtzz4MYcRKkG-ybKgDArchQ_CFOtFjpJ8axe8Ls2G7rw@mail.gmail.com>
-	<alpine.LFD.2.20.1605242135500.4622@casper.infradead.org>
-Message-ID: <CAHc6FU7RpdNmj5HxcHizKHdsDb9myPBmDNXPNSQOGdLHvvwTcQ@mail.gmail.com>
+Date: Wed, 25 May 2016 00:40:54 +0200
+Subject: [lustre-devel] [PATCH] posix acls: Move namespace conversion
+ into filesystem / xattr handlers
+In-Reply-To: <alpine.LFD.2.20.1605242122110.4622@casper.infradead.org>
+References: <1464008989-3812-1-git-send-email-agruenba@redhat.com>
+	<alpine.LFD.2.20.1605232035110.24983@casper.infradead.org>
+	<CF8AFD90-BC52-43BD-BB1E-BBFEC5086727@intel.com>
+	<alpine.LFD.2.20.1605242122110.4622@casper.infradead.org>
+Message-ID: <CAHc6FU5s-W=fGcg+Liq2546Ss=fbwURGtr7gAzDtqSTUy1A=rQ@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: =?UTF-8?Q?Andreas_Gr=C3=BCnbacher?= <andreas.gruenbacher@gmail.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: James Simmons <jsimmons-wEGCiKHe2LqWVfeAwA7xHQ@public.gmane.org>
+Cc: "Dilger, Andreas" <andreas.dilger-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, "devel-gWbeCf7V1WCQmaza687I9mD2FQJk+8+b@public.gmane.org" <devel-gWbeCf7V1WCQmaza687I9mD2FQJk+8+b@public.gmane.org>, Steve French <sfrench-eUNUBHrolfbYtjvyW6yDsg@public.gmane.org>, "linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org" <linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Greg Kroah-Hartman <gregkh-hQyY1W1yCW8ekmWlsbkhG0B+6BGkLq7r@public.gmane.org>, "Drokin, Oleg" <oleg.drokin-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, Alexander Viro <viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org>, "linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org" <linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Lustre Developement <lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org>
 
-On Tue, May 24, 2016 at 10:38 PM, James Simmons <jsimmons@infradead.org> wrote:
->> 2016-05-24 2:35 GMT+02:00 James Simmons <jsimmons@infradead.org>:
->> > Commit b8a7a3a6 change get_acl() for posix xattr to always cache
->> > the ACL which increases the reference count. That reference count
->> > can be reduced by have ll_get_acl() call forget_cached_acl() which
->> > it wasn't. When an inode gets deleted by Lustre the POSIX ACL
->> > reference count is tested to ensure its 1 and if not produces an error.
->>
->> Lustre shouldn't assume that the VFS immediately drops the reference
->> it is passed. Please remove that check as well.
->
-> The piece of code in question from ll_delete_inode() is
->
-> #ifdef CONFIG_FS_POSIX_ACL
->         else if (lli->lli_posix_acl) {
->                 LASSERT(atomic_read(&lli->lli_posix_acl->a_refcount) ==
-> 1);
->                 LASSERT(!lli->lli_remote_perms);
->                 posix_acl_release(lli->lli_posix_acl);
->                 lli->lli_posix_acl = NULL;
->         }
-> #endif
->
-> So we want to prevent a leak should I do a
->
-> while (atomic_read(&lli->lli_posix_acl->a_refcount))
->         posix_acl_release(lli->lli_posix_acl);
-> lli->lli_posix_acl = NULL;
->
-> Or does the VFS do this cleanup for us?
+On Tue, May 24, 2016 at 10:35 PM, James Simmons <jsimmons@infradead.org> wrote:
+> That is a huge cleanup which will make Greg very happy. The tools and test
+> are going to be updated so the landing has to be just right so we
+> don't have a flood of test failures. Gruenbacher with the 19789 patch
+> Dilger pointed out Lustre's POSIX ACL code just becomes ordinary which
+> means we can use the default POSIS xattr handler. You wouldn't have to
+> keep posix_acl.c around with these changes.
 
-This conversation is unreal. Just remove the misguided assert and
-you're good. After that, please have someone explain basic reference
-counting to you.
+Change http://review.whamcloud.com/19789 doesn't switch Lustre over to
+using xattr handlers. As long as Lustre doesn't use those (i.e., use
+posix_acl_access_xattr_handler and posix_acl_default_xattr_handler),
+it will still need the uid/gid namespace conversion code in ll_getxattr and
+ll_setxattr for this patch to be correct.
 
-Thanks,
+The merge conflict between this patch and http://review.whamcloud.com/19789
+is easily resolved though.
+
 Andreas
