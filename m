@@ -1,21 +1,33 @@
-From: Christoph Hellwig <hch@infradead.org>
-Date: Tue, 24 May 2016 01:47:24 -0700
-Subject: [lustre-devel] [PATCH] posix acls: Move namespace conversion
- into filesystem / xattr handlers
-In-Reply-To: <1464008989-3812-1-git-send-email-agruenba@redhat.com>
-References: <1464008989-3812-1-git-send-email-agruenba@redhat.com>
-Message-ID: <20160524084724.GA8121@infradead.org>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 24 May 2016 15:44:32 +0100 (BST)
+Subject: [lustre-devel] LWN article on kernel stats reveal upstream
+ client progress.
+In-Reply-To: <924F1865-65B5-4DBE-85C3-982D0BAF99D7@intel.com>
+References: <11629f7822674b1d872d078bcb422717@EXCHCS32.ornl.gov>
+	<924F1865-65B5-4DBE-85C3-982D0BAF99D7@intel.com>
+Message-ID: <alpine.LFD.2.20.1605241528380.4622@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Andreas Gruenbacher <agruenba-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>
-Cc: Alexander Viro <viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org>, Oleg Drokin <oleg.drokin-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, Andreas Dilger <andreas.dilger-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, Steve French <sfrench-eUNUBHrolfbYtjvyW6yDsg@public.gmane.org>, linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org, linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org
+To: lustre-devel@lists.lustre.org
 
-On Mon, May 23, 2016 at 03:09:49PM +0200, Andreas Gruenbacher wrote:
-> I'm reasonably confident about the core and cifs changes in this patch.
-> The lustre code is pretty weird though, so could I please get a careful
-> review on the changes there?
 
-Lustre is in the staging tree because it's an unrescuable piece of junk.
-Please just ignore it and move the proper parts of the kernel forward.
+> James,
+> How close are we to getting LNet out of staging and into mainline? ?If we are getting close, should we consider
+> ?separating? LNet from Lustre making it a standalone item? ?Considering how we have to propagate all LNet fixes to
+> every active repo/version, I get the feeling that LNet should be separate anyway to make updating just LNet in the
+> field easier.
+
+Well that depends on Greg. Before Greg stated it was an all or nothing 
+deal for destaging. Some people would like to see LNet leave destaging
+first but we still need to resolve some things.
+
+First we have some more checkpatch cleanups to do. Lots of typedefs are
+left. I cleaned up the lnetself test ones but more are left. Other odds
+and ends for checkpatch as well. Besides these cleanups Greg discovered
+lnetself uses linux kernel list to pass data back and forth with the
+ioctls. This gave Greg very bad heartburn. Other missing pieces are
+moving from the obsolete socket api's to the netlink api. Another piece
+of concern is the lack of IPv6 but that would require a massive rewrite
+:-(. We might be able to avoid the lack of IPv6 to get out of staging.   
