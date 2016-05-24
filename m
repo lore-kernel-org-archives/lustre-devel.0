@@ -1,38 +1,21 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 23 May 2016 20:35:08 -0400
-Subject: [lustre-devel] [PATCH] staging: lustre: llite: drop acl from cache
-Message-ID: <1464050108-28015-1-git-send-email-jsimmons@infradead.org>
+From: Christoph Hellwig <hch@infradead.org>
+Date: Tue, 24 May 2016 01:47:24 -0700
+Subject: [lustre-devel] [PATCH] posix acls: Move namespace conversion
+ into filesystem / xattr handlers
+In-Reply-To: <1464008989-3812-1-git-send-email-agruenba@redhat.com>
+References: <1464008989-3812-1-git-send-email-agruenba@redhat.com>
+Message-ID: <20160524084724.GA8121@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Gruenbacher <agruenba@redhat.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+To: Andreas Gruenbacher <agruenba-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>
+Cc: Alexander Viro <viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org>, Oleg Drokin <oleg.drokin-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, Andreas Dilger <andreas.dilger-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, Steve French <sfrench-eUNUBHrolfbYtjvyW6yDsg@public.gmane.org>, linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org, linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org
 
-Commit b8a7a3a6 change get_acl() for posix xattr to always cache
-the ACL which increases the reference count. That reference count
-can be reduced by have ll_get_acl() call forget_cached_acl() which
-it wasn't. When an inode gets deleted by Lustre the POSIX ACL
-reference count is tested to ensure its 1 and if not produces an error.
-Since forget_cached_acl() was not called Lustre started to complain.
-This patch changes ll_get_acl() to call forget_cached_acl().
+On Mon, May 23, 2016 at 03:09:49PM +0200, Andreas Gruenbacher wrote:
+> I'm reasonably confident about the core and cifs changes in this patch.
+> The lustre code is pretty weird though, so could I please get a careful
+> review on the changes there?
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/llite/file.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index f47f2ac..0191945 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -3124,6 +3124,7 @@ struct posix_acl *ll_get_acl(struct inode *inode, int type)
- 	spin_lock(&lli->lli_lock);
- 	/* VFS' acl_permission_check->check_acl will release the refcount */
- 	acl = posix_acl_dup(lli->lli_posix_acl);
-+	forget_cached_acl(inode, type);
- 	spin_unlock(&lli->lli_lock);
- 
- 	return acl;
--- 
-1.7.1
+Lustre is in the staging tree because it's an unrescuable piece of junk.
+Please just ignore it and move the proper parts of the kernel forward.
