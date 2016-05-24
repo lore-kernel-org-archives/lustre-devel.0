@@ -1,33 +1,40 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 24 May 2016 15:44:32 +0100 (BST)
-Subject: [lustre-devel] LWN article on kernel stats reveal upstream
- client progress.
-In-Reply-To: <924F1865-65B5-4DBE-85C3-982D0BAF99D7@intel.com>
-References: <11629f7822674b1d872d078bcb422717@EXCHCS32.ornl.gov>
-	<924F1865-65B5-4DBE-85C3-982D0BAF99D7@intel.com>
-Message-ID: <alpine.LFD.2.20.1605241528380.4622@casper.infradead.org>
+From: Andreas Gruenbacher <agruenba@redhat.com>
+Date: Tue, 24 May 2016 18:31:51 +0200
+Subject: [lustre-devel] [PATCH] posix acls: Move namespace conversion
+ into filesystem / xattr handlers
+In-Reply-To: <20160524153949.GA2830@dztty.fritz.box>
+References: <1464008989-3812-1-git-send-email-agruenba@redhat.com>
+	<20160524153949.GA2830@dztty.fritz.box>
+Message-ID: <CAHc6FU5mTAM6cCP9S5CxrJ7PhZ-_3SxQeOLty1UgtVCu3ZVshw@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Djalal Harouni <tixxdz@gmail.com>
+Cc: Alexander Viro <viro@zeniv.linux.org.uk>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Steve French <sfrench@samba.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, Lustre Developement <lustre-devel@lists.lustre.org>, linux-cifs@vger.kernel.org, Eric Biederman <ebiederm@xmission.com>, Andy Lutomirski <luto@amacapital.net>
 
+On Tue, May 24, 2016 at 5:41 PM, Djalal Harouni <tixxdz@gmail.com> wrote:
+> On Mon, May 23, 2016 at 03:09:49PM +0200, Andreas Gruenbacher wrote:
+>> Currently, getxattr() and setxattr() check for the xattr names
+>> "system.posix_acl_{access,default}" and perform in-place UID / GID
+>> namespace mappings in the xattr values. Filesystems then again check for
+>> the same xattr names to handle those attributes, almost always using the
+>> standard posix_acl_{access,default}_xattr_handler handlers.  This is
+>> unnecessary overhead; move the namespace conversion into the xattr
+>> handlers instead.
+>
+> Please, are you sure that the changes in posix_acl_xattr_get() and
+> posix_acl_xattr_set() are safe ? you are reading into current user
+> namespace, from a first view this is not safe unless I'm missing
+> something... they should map into init_user_ns...
 
-> James,
-> How close are we to getting LNet out of staging and into mainline? ?If we are getting close, should we consider
-> ?separating? LNet from Lustre making it a standalone item? ?Considering how we have to propagate all LNet fixes to
-> every active repo/version, I get the feeling that LNet should be separate anyway to make updating just LNet in the
-> field easier.
+Yes, moving the namespace conversion from the VFS into those functions
+so that we don't have to check for those attributes and parse them
+twice is exactly the point of this patch.
 
-Well that depends on Greg. Before Greg stated it was an all or nothing 
-deal for destaging. Some people would like to see LNet leave destaging
-first but we still need to resolve some things.
+> Please Cc the user namespace maintainers before. Thank you!
 
-First we have some more checkpatch cleanups to do. Lots of typedefs are
-left. I cleaned up the lnetself test ones but more are left. Other odds
-and ends for checkpatch as well. Besides these cleanups Greg discovered
-lnetself uses linux kernel list to pass data back and forth with the
-ioctls. This gave Greg very bad heartburn. Other missing pieces are
-moving from the obsolete socket api's to the netlink api. Another piece
-of concern is the lack of IPv6 but that would require a massive rewrite
-:-(. We might be able to avoid the lack of IPv6 to get out of staging.   
+Eric, Andy, anyone else?
+
+Thanks,
+Andreas
