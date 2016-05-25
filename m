@@ -1,117 +1,81 @@
-From: Tobin C Harding <me@tobin.cc>
-Date: Mon, 23 May 2016 20:17:46 +1000
-Subject: [lustre-devel] [PATCH] staging: lustre: set function scope with
-	static
-Message-ID: <1463998666-4636-1-git-send-email-me@tobin.cc>
+From: Eric W. Biederman <ebiederm@xmission.com>
+Date: Wed, 25 May 2016 18:30:45 -0500
+Subject: [lustre-devel] [PATCH] posix acls: Move namespace conversion
+	into filesystem / xattr handlers
+In-Reply-To: <CAHc6FU5mTAM6cCP9S5CxrJ7PhZ-_3SxQeOLty1UgtVCu3ZVshw@mail.gmail.com>
+	(Andreas Gruenbacher's message of "Tue, 24 May 2016 18:31:51 +0200")
+References: <1464008989-3812-1-git-send-email-agruenba@redhat.com>
+	<20160524153949.GA2830@dztty.fritz.box>
+	<CAHc6FU5mTAM6cCP9S5CxrJ7PhZ-_3SxQeOLty1UgtVCu3ZVshw@mail.gmail.com>
+Message-ID: <87h9dllnq2.fsf@x220.int.ebiederm.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Andreas Gruenbacher <agruenba-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>
+Cc: Djalal Harouni <tixxdz-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>, Alexander Viro <viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org>, Oleg Drokin <oleg.drokin-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, Andreas Dilger <andreas.dilger-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, Steve French <sfrench-eUNUBHrolfbYtjvyW6yDsg@public.gmane.org>, linux-fsdevel <linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Lustre Developement <lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org>, linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Andy Lutomirski <luto-kltTT9wpgjJwATOyAt5JVQ@public.gmane.org>, "Serge E. Hallyn" <serge-A9i7LUbDfNHQT0dZR+AlfA@public.gmane.org>
 
-A number of function definitions were found to be candidates for
-static scoping. This patch adds static to these functions.
+Andreas Gruenbacher <agruenba@redhat.com> writes:
 
-Signed-off-by: Tobin C Harding <me@tobin.cc>
----
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |  8 ++++----
- drivers/staging/lustre/lustre/llite/vvp_io.c       |  6 +++---
- drivers/staging/lustre/lustre/llite/vvp_req.c      | 12 ++++++------
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |  2 +-
- 4 files changed, 14 insertions(+), 14 deletions(-)
+> On Tue, May 24, 2016 at 5:41 PM, Djalal Harouni <tixxdz@gmail.com> wrote:
+>> On Mon, May 23, 2016 at 03:09:49PM +0200, Andreas Gruenbacher wrote:
+>>> Currently, getxattr() and setxattr() check for the xattr names
+>>> "system.posix_acl_{access,default}" and perform in-place UID / GID
+>>> namespace mappings in the xattr values. Filesystems then again check for
+>>> the same xattr names to handle those attributes, almost always using the
+>>> standard posix_acl_{access,default}_xattr_handler handlers.  This is
+>>> unnecessary overhead; move the namespace conversion into the xattr
+>>> handlers instead.
+>>
+>> Please, are you sure that the changes in posix_acl_xattr_get() and
+>> posix_acl_xattr_set() are safe ? you are reading into current user
+>> namespace, from a first view this is not safe unless I'm missing
+>> something... they should map into init_user_ns...
+>
+> Yes, moving the namespace conversion from the VFS into those functions
+> so that we don't have to check for those attributes and parse them
+> twice is exactly the point of this patch.
 
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index 47101de..c63def9 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -150,8 +150,8 @@ struct lu_context_key vvp_session_key = {
- 	.lct_fini = vvp_session_key_fini
- };
- 
--void *vvp_thread_key_init(const struct lu_context *ctx,
--			  struct lu_context_key *key)
-+static void *vvp_thread_key_init(const struct lu_context *ctx,
-+				 struct lu_context_key *key)
- {
- 	struct vvp_thread_info *vti;
- 
-@@ -161,8 +161,8 @@ void *vvp_thread_key_init(const struct lu_context *ctx,
- 	return vti;
- }
- 
--void vvp_thread_key_fini(const struct lu_context *ctx,
--			 struct lu_context_key *key, void *data)
-+static void vvp_thread_key_fini(const struct lu_context *ctx,
-+				struct lu_context_key *key, void *data)
- {
- 	struct vvp_thread_info *vti = data;
- 
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 5bf9592..e26e0f8 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -47,8 +47,8 @@
- #include "llite_internal.h"
- #include "vvp_internal.h"
- 
--struct vvp_io *cl2vvp_io(const struct lu_env *env,
--			 const struct cl_io_slice *slice)
-+static struct vvp_io *cl2vvp_io(const struct lu_env *env,
-+				const struct cl_io_slice *slice)
- {
- 	struct vvp_io *vio;
- 
-@@ -1259,7 +1259,7 @@ static int vvp_io_read_page(const struct lu_env *env,
- 	return 0;
- }
- 
--void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
-+static void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
- {
- 	CLOBINVRNT(env, ios->cis_io->ci_obj,
- 		   vvp_object_invariant(ios->cis_io->ci_obj));
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_req.c b/drivers/staging/lustre/lustre/llite/vvp_req.c
-index fb88629..9fe9d6c 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_req.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_req.c
-@@ -60,10 +60,10 @@ static inline struct vvp_req *cl2vvp_req(const struct cl_req_slice *slice)
-  *    - o_ioepoch,
-  *
-  */
--void vvp_req_attr_set(const struct lu_env *env,
--		      const struct cl_req_slice *slice,
--		      const struct cl_object *obj,
--		      struct cl_req_attr *attr, u64 flags)
-+static void vvp_req_attr_set(const struct lu_env *env,
-+			     const struct cl_req_slice *slice,
-+			     const struct cl_object *obj,
-+			     struct cl_req_attr *attr, u64 flags)
- {
- 	struct inode *inode;
- 	struct obdo  *oa;
-@@ -87,8 +87,8 @@ void vvp_req_attr_set(const struct lu_env *env,
- 	       JOBSTATS_JOBID_SIZE);
- }
- 
--void vvp_req_completion(const struct lu_env *env,
--			const struct cl_req_slice *slice, int ioret)
-+static void vvp_req_completion(const struct lu_env *env,
-+			       const struct cl_req_slice *slice, int ioret)
- {
- 	struct vvp_req *vrq;
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index e0c90ad..bc4e1e4 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -192,7 +192,7 @@ static int lustre_start_simple(char *obdname, char *type, char *uuid,
- 	return rc;
- }
- 
--DEFINE_MUTEX(mgc_start_lock);
-+static DEFINE_MUTEX(mgc_start_lock);
- 
- /** Set up a mgc obd to process startup logs
-  *
--- 
-2.8.2
+In general I am in favor of cleaning up the xattr and acl code in the
+kernel.  However I am not certain that your changes succeed in getting
+us where we want to go.
+
+My feel is that what we want to do is to update the cached acl when we
+write it from userspace, to update the disk with the new acl when the
+inode is sync'd to disk, and let the vfs handle the translation from
+the cached posix acl to the vfs getxattr and setxattr system calls.
+In the long term anything else is madness.
+
+Currently posix acl reads and updates bypass the vfs acl cache for the
+inode and that just looks wrong.
+
+
+The reason that fixup happens in a separate pass from everything else
+today is that when I was wrote posix_acl_fix_xattr_to_user and
+posix_acl_xattr_from_user a number of filesystems had a very strange
+structure that completely bypassed any code conversion routines and
+made some strange assumptions.  I don't remember which filesystems those
+were but it was neither lustre, nor cifs, nor nfs that were the problem
+cases when I was looking.  I don't see your patch  addressing that
+problem so either someone has already fixed those issues or they have
+been overlooked.
+
+
+There is a complication that is comming shortly (next merge window
+unless major unfixable bugs show up between now and them).  There is a
+new field s_user_ns that is being introduced for filesystems to record
+their owner and their default translation rules to kuids.  That will
+make the hard coded &init_user_ns values in your patch wrong.
+
+>> Please Cc the user namespace maintainers before. Thank you!
+>
+> Eric, Andy, anyone else?
+
+Serge Hallyn has a pending patch that adds a similar translation to
+the security.capability xattr.  Which is one more case of where caching
+and translation at the VFS layer are makes sense.
+
+All of that said I am definitely in favor of cleaning up this area of
+code.
+
+Eric
