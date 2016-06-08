@@ -1,97 +1,95 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 8 Jun 2016 18:49:04 +0100 (BST)
-Subject: [lustre-devel] [PATCH 1/2] staging: lustre: lloop_device:
- Replace semaphore lo_sem with completion
-In-Reply-To: <1465372242-7116-2-git-send-email-binoy.jayan@linaro.org>
+From: Binoy Jayan <binoy.jayan@linaro.org>
+Date: Wed,  8 Jun 2016 13:20:42 +0530
+Subject: [lustre-devel] [PATCH 2/2] staging: lustre: lnet: Replace semaphore
+	ln_rc_signal with completion
+In-Reply-To: <1465372242-7116-1-git-send-email-binoy.jayan@linaro.org>
 References: <1465372242-7116-1-git-send-email-binoy.jayan@linaro.org>
-	<1465372242-7116-2-git-send-email-binoy.jayan@linaro.org>
-Message-ID: <alpine.LFD.2.20.1606081846390.30765@casper.infradead.org>
+Message-ID: <1465372242-7116-3-git-send-email-binoy.jayan@linaro.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Binoy Jayan <binoy.jayan@linaro.org>
-Cc: Andreas Dilger <andreas.dilger@intel.com>, Arnd Bergmann <arnd@arndb.de>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, driverdev-devel@linuxdriverproject.org, linux-kernel@vger.kernel.org, Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org
+Cc: Binoy Jayan <binoy.jayan@linaro.org>, driverdev-devel@linuxdriverproject.org, linux-kernel@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>
 
+The semaphore ln_rc_signal is used as completion, so convert it to
+struct completion.  Semaphores are going away in the future.
 
-> The semaphore 'lo_sem' in lloop_device is used as completion, so it
-> should be written as one. Semaphores are going away in the future.
-> 
-> Signed-off-by: Binoy Jayan <binoy.jayan@linaro.org>
+Signed-off-by: Binoy Jayan <binoy.jayan@linaro.org>
+---
+ drivers/staging/lustre/include/linux/lnet/lib-types.h | 3 ++-
+ drivers/staging/lustre/lnet/lnet/router.c             | 9 +++++----
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
-NAK. The lloop_device is about to get deleted.
-
-> ---
->  drivers/staging/lustre/lustre/llite/lloop.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/lloop.c b/drivers/staging/lustre/lustre/llite/lloop.c
-> index 813a9a3..90b31ba 100644
-> --- a/drivers/staging/lustre/lustre/llite/lloop.c
-> +++ b/drivers/staging/lustre/lustre/llite/lloop.c
-> @@ -131,7 +131,7 @@ struct lloop_device {
->  	struct bio		*lo_bio;
->  	struct bio		*lo_biotail;
->  	int			lo_state;
-> -	struct semaphore	lo_sem;
-> +	struct completion	lo_comp;
->  	struct mutex		lo_ctl_mutex;
->  	atomic_t	 lo_pending;
->  	wait_queue_head_t	  lo_bh_wait;
-> @@ -423,9 +423,9 @@ static int loop_thread(void *data)
->  	lo->lo_pvec.ldp_offsets = lo->lo_requests[0].lrd_offsets;
->  
->  	/*
-> -	 * up sem, we are running
-> +	 * signal completion, we are running
->  	 */
-> -	up(&lo->lo_sem);
-> +	complete(&lo->lo_comp);
->  
->  	for (;;) {
->  		wait_event(lo->lo_bh_wait, loop_active(lo));
-> @@ -466,7 +466,7 @@ static int loop_thread(void *data)
->  	cl_env_put(env, &refcheck);
->  
->  out:
-> -	up(&lo->lo_sem);
-> +	complete(&lo->lo_comp);
->  	return ret;
->  }
->  
-> @@ -539,7 +539,7 @@ static int loop_set_fd(struct lloop_device *lo, struct file *unused,
->  	set_blocksize(bdev, lo->lo_blocksize);
->  
->  	kthread_run(loop_thread, lo, "lloop%d", lo->lo_number);
-> -	down(&lo->lo_sem);
-> +	wait_for_completion(&lo->lo_comp);
->  	return 0;
->  
->  out:
-> @@ -568,7 +568,7 @@ static int loop_clr_fd(struct lloop_device *lo, struct block_device *bdev,
->  	spin_unlock_irq(&lo->lo_lock);
->  	wake_up(&lo->lo_bh_wait);
->  
-> -	down(&lo->lo_sem);
-> +	wait_for_completion(&lo->lo_comp);
->  	lo->lo_backing_file = NULL;
->  	lo->lo_device = NULL;
->  	lo->lo_offset = 0;
-> @@ -821,7 +821,7 @@ static int __init lloop_init(void)
->  			goto out_mem4;
->  
->  		mutex_init(&lo->lo_ctl_mutex);
-> -		sema_init(&lo->lo_sem, 0);
-> +		init_completion(&lo->lo_comp);
->  		init_waitqueue_head(&lo->lo_bh_wait);
->  		lo->lo_number = i;
->  		spin_lock_init(&lo->lo_lock);
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> _______________________________________________
-> devel mailing list
-> devel at linuxdriverproject.org
-> http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
-> 
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+index 24c4a08..7967b01 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+@@ -38,6 +38,7 @@
+ #include <linux/kthread.h>
+ #include <linux/uio.h>
+ #include <linux/types.h>
++#include <linux/completion.h>
+ 
+ #include "types.h"
+ #include "lnetctl.h"
+@@ -610,7 +611,7 @@ typedef struct {
+ 	/* rcd ready for free */
+ 	struct list_head		  ln_rcd_zombie;
+ 	/* serialise startup/shutdown */
+-	struct semaphore		  ln_rc_signal;
++	struct completion		  ln_rc_signal;
+ 
+ 	struct mutex			  ln_api_mutex;
+ 	struct mutex			  ln_lnd_mutex;
+diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+index b01dc42..0635432 100644
+--- a/drivers/staging/lustre/lnet/lnet/router.c
++++ b/drivers/staging/lustre/lnet/lnet/router.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #define DEBUG_SUBSYSTEM S_LNET
++#include <linux/completion.h>
+ #include "../../include/linux/lnet/lib-lnet.h"
+ 
+ #define LNET_NRB_TINY_MIN	512	/* min value for each CPT */
+@@ -1065,7 +1066,7 @@ lnet_router_checker_start(void)
+ 		return -EINVAL;
+ 	}
+ 
+-	sema_init(&the_lnet.ln_rc_signal, 0);
++	init_completion(&the_lnet.ln_rc_signal);
+ 
+ 	rc = LNetEQAlloc(0, lnet_router_checker_event, &the_lnet.ln_rc_eqh);
+ 	if (rc) {
+@@ -1079,7 +1080,7 @@ lnet_router_checker_start(void)
+ 		rc = PTR_ERR(task);
+ 		CERROR("Can't start router checker thread: %d\n", rc);
+ 		/* block until event callback signals exit */
+-		down(&the_lnet.ln_rc_signal);
++		wait_for_completion(&the_lnet.ln_rc_signal);
+ 		rc = LNetEQFree(the_lnet.ln_rc_eqh);
+ 		LASSERT(!rc);
+ 		the_lnet.ln_rc_state = LNET_RC_STATE_SHUTDOWN;
+@@ -1112,7 +1113,7 @@ lnet_router_checker_stop(void)
+ 	wake_up(&the_lnet.ln_rc_waitq);
+ 
+ 	/* block until event callback signals exit */
+-	down(&the_lnet.ln_rc_signal);
++	wait_for_completion(&the_lnet.ln_rc_signal);
+ 	LASSERT(the_lnet.ln_rc_state == LNET_RC_STATE_SHUTDOWN);
+ 
+ 	rc = LNetEQFree(the_lnet.ln_rc_eqh);
+@@ -1295,7 +1296,7 @@ rescan:
+ 	lnet_prune_rc_data(1); /* wait for UNLINK */
+ 
+ 	the_lnet.ln_rc_state = LNET_RC_STATE_SHUTDOWN;
+-	up(&the_lnet.ln_rc_signal);
++	complete(&the_lnet.ln_rc_signal);
+ 	/* The unlink event callback will signal final completion */
+ 	return 0;
+ }
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
