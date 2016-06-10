@@ -1,10 +1,10 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Thu,  9 Jun 2016 22:35:14 -0400
-Subject: [lustre-devel] [PATCH 4/8] staging/lustre/llite: Fix Multiple
+Date: Thu,  9 Jun 2016 22:35:13 -0400
+Subject: [lustre-devel] [PATCH 3/8] staging/lustre/ldlm: Fix Multiple
 	Assignments
 In-Reply-To: <1465526118-521053-1-git-send-email-green@linuxhacker.ru>
 References: <1465526118-521053-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1465526118-521053-5-git-send-email-green@linuxhacker.ru>
+Message-ID: <1465526118-521053-4-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,57 +14,47 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Nathaniel Clark <nathaniel.l.clark@intel.com>
 
-Fix all multiple assignments on lustre/llite directory.
+Fix all multiple assignments on lustre/ldlm directory.
 
 Signed-off-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/llite_lib.c | 3 ++-
- drivers/staging/lustre/lustre/llite/namei.c     | 3 ++-
- drivers/staging/lustre/lustre/llite/vvp_io.c    | 3 ++-
- 3 files changed, 6 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c   | 3 ++-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c | 8 +++++---
+ 2 files changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 96c7e9f..b260f60 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -864,7 +864,8 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
- 	try_module_get(THIS_MODULE);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+index b4ffbe2..b6a90b0 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+@@ -345,7 +345,8 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
+ 	 * Set cl_chksum* to CRC32 for now to avoid returning screwed info
+ 	 * through procfs.
+ 	 */
+-	cli->cl_cksum_type = cli->cl_supp_cksum_types = OBD_CKSUM_CRC32;
++	cli->cl_cksum_type = OBD_CKSUM_CRC32;
++	cli->cl_supp_cksum_types = OBD_CKSUM_CRC32;
+ 	atomic_set(&cli->cl_resends, OSC_DEFAULT_RESENDS);
  
- 	/* client additional sb info */
--	lsi->lsi_llsbi = sbi = ll_init_sbi(sb);
-+	sbi = ll_init_sbi(sb);
-+	lsi->lsi_llsbi = sbi;
- 	if (!sbi) {
- 		module_put(THIS_MODULE);
- 		kfree(cfg);
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 5eba0eb..95643bc 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -318,7 +318,8 @@ static struct dentry *ll_find_alias(struct inode *inode, struct dentry *dentry)
- 	if (hlist_empty(&inode->i_dentry))
- 		return NULL;
- 
--	discon_alias = invalid_alias = NULL;
-+	discon_alias = NULL;
-+	invalid_alias = NULL;
- 
- 	ll_lock_dcache(inode);
- 	hlist_for_each_entry(alias, &inode->i_dentry, d_u.d_alias) {
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index e26e0f8..763d336 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -954,7 +954,8 @@ static int vvp_io_write_start(const struct lu_env *env,
- 		 * out-of-order writes.
- 		 */
- 		ll_merge_attr(env, inode);
--		pos = io->u.ci_wr.wr.crw_pos = i_size_read(inode);
-+		pos = i_size_read(inode);
-+		io->u.ci_wr.wr.crw_pos = pos;
- 		vio->vui_iocb->ki_pos = pos;
+ 	/* This value may be reduced at connect time in
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+index ab739f0..3303ffa 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+@@ -1011,9 +1011,11 @@ static int ldlm_setup(void)
+ 		blp->blp_min_threads = LDLM_NTHRS_INIT;
+ 		blp->blp_max_threads = LDLM_NTHRS_MAX;
  	} else {
- 		LASSERT(vio->vui_iocb->ki_pos == pos);
+-		blp->blp_min_threads = blp->blp_max_threads =
+-			min_t(int, LDLM_NTHRS_MAX, max_t(int, LDLM_NTHRS_INIT,
+-							 ldlm_num_threads));
++		blp->blp_min_threads = min_t(int, LDLM_NTHRS_MAX,
++					     max_t(int, LDLM_NTHRS_INIT,
++						   ldlm_num_threads));
++
++		blp->blp_max_threads = blp->blp_min_threads;
+ 	}
+ 
+ 	for (i = 0; i < blp->blp_min_threads; i++) {
 -- 
 2.7.4
