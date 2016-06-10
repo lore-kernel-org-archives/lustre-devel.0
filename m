@@ -1,41 +1,55 @@
-From: Ashley Pittman <ashley@pittman.co.uk>
-Date: Fri, 10 Jun 2016 13:29:02 +0100
-Subject: [lustre-devel] [lustre-discuss] more on lustre striping
-In-Reply-To: <9ebe9f4c-d5a2-4c93-4f00-49029850cbbe@iodoctors.com>
-References: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
-	<38EA9F32-3869-43BA-B215-EB2E5BA62FD5@intel.com>
-	<f4c0c992-1e1a-41d8-7a04-2fc5182c6b31@iodoctors.com>
-	<01EE2B9D-2359-49B5-A50F-E7C2D97E6696@intel.com>
-	<44e2353d-3bef-ddd7-f15e-ad4bfdda040f@iodoctors.com>
-	<EB476743-98B4-49D3-B436-7F257E3284DD@intel.com>
-	<9ebe9f4c-d5a2-4c93-4f00-49029850cbbe@iodoctors.com>
-Message-ID: <575AB28E.7090404@pittman.co.uk>
+From: Faccini, Bruno <bruno.faccini@intel.com>
+Date: Fri, 10 Jun 2016 15:25:28 +0000
+Subject: [lustre-devel] [PATCH 2/3] staging: lustre: lnet: Allocate MEs
+ and small MDs in own kmem_caches
+In-Reply-To: <20160610012833.GA6804@kroah.com>
+References: <1465512347-11650-1-git-send-email-jsimmons@infradead.org>
+	<1465512347-11650-3-git-send-email-jsimmons@infradead.org>
+	<20160610012833.GA6804@kroah.com>
+Message-ID: <B6A45EE2-D900-4578-AC42-4F5933F945DA@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: James Simmons <jsimmons@infradead.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On 22/05/16 02:56, John Bauer wrote:
->
-> Oleg
->
-> I can intercept the fopen(), but that does me no good as I can't set 
-> the O_LOV_DELAY_CREATE bit.  What I can not intercept is the open() 
-> downstream of fopen().  If one examines the symbols in libc you will 
-> see there are no unsatisfied externals relating to open, which means 
-> there is nothing for the runtime linker to find concerning open's.  I 
-> will have a look at the Lustre 1.8 source, but I seriously doubt that 
-> the open beneath fopen() was intercepted with LD_PRELOAD.  I would 
-> love to find a way to do that.  I could throw away a lot of code. 
-> Thanks,  John
->
+Hello,
+The intent of this patch is not to solve the corruptions for sure, but only to avoid the concerned MEs/small-MDs LNet structs to be quite frequently impacted due to their high allocation/free rate. This may also possibly help to save cycles due to high usage and contention when using a generic kmem_cache (when they stay separate from others, thanks for the precision!).
+Bye,
+Bruno.
 
-Could you not intercept fopen() and implement it with calls to open() 
-and fdopen() yourself which would give you full control over what you're 
-looking for here?
+> Le Jun 10, 2016 ? 03:28, Greg Kroah-Hartman <gregkh@linuxfoundation.org> a ?crit :
+> 
+> On Thu, Jun 09, 2016 at 06:45:46PM -0400, James Simmons wrote:
+>> From: Bruno Faccini <bruno.faccini@intel.com>
+>> 
+>> As part of LU-3848 and LU-4330, it has been discovered that LNET
+>> MEs and small MDs (<=128 Bytes) are allocated in <size-128> kmem_cache
+>> and thus can suffer quite frequent corruptions, from other modules or
+>> Kernel parts, that occur there. To avoid this, MEs and small-MDs
+>> specific kmem_cache have been created.
+> 
+> What?  Who corrupts them?  That shouldn't be possible, and on some
+> systems, even if you do ask for a separate slab, it will be merged
+> togther with others of the same size.  So this patch doesn't do all that
+> much.
+> 
+> I think you are having some other problem here, changing to a separate
+> memory cache shouldn't solve corruption issues.
+> 
+> sorry,
+> 
+> greg k-h
 
-Ashley.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160610/ac16a068/attachment.htm>
+---------------------------------------------------------------------
+Intel Corporation SAS (French simplified joint stock company)
+Registered headquarters: "Les Montalets"- 2, rue de Paris, 
+92196 Meudon Cedex, France
+Registration Number:  302 456 199 R.C.S. NANTERRE
+Capital: 4,572,000 Euros
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
