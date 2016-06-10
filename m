@@ -1,5 +1,5 @@
 From: John Bauer <bauerj@iodoctors.com>
-Date: Fri, 10 Jun 2016 10:28:01 -0500
+Date: Fri, 10 Jun 2016 11:04:52 -0500
 Subject: [lustre-devel] [lustre-discuss] more on lustre striping
 In-Reply-To: <575AB28E.7090404@pittman.co.uk>
 References: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
@@ -10,22 +10,44 @@ References: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
 	<EB476743-98B4-49D3-B436-7F257E3284DD@intel.com>
 	<9ebe9f4c-d5a2-4c93-4f00-49029850cbbe@iodoctors.com>
 	<575AB28E.7090404@pittman.co.uk>
-Message-ID: <75a3831b-04ad-f8fd-1ec6-17e540d67e1d@iodoctors.com>
+Message-ID: <8a9e4e45-ea99-1147-5c58-94a73d9010a8@iodoctors.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ashley
+To confirm the point that you can not intercept the open called by fopen 
+by using LD_PRELOAD, I have written a simple test case. Note that the 
+runtime linker never looks for open().  Only fopen()
 
-That is what I have done for this case.  But it does not solve the 
-entire problem.  One stdio call that is problematic is the freopen().  
-There is no way to pass the fd from open() to an existing FILE *.
+*$ cat a.c*
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <stdio.h>
 
-Thanks,
-
-John
+int
+main(int argc, char ** argv ){
+    FILE *f = fopen("a", "r" ) ;
+    fprintf(stderr,"f=%p\n",f);
+    fclose(f);
+}
+*$ file a*
+a: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically 
+linked (uses shared libs), for GNU/Linux 2.6.32, 
+BuildID[sha1]=dfe043b4ec8cf19d5fd3fab524d7c72ed1453574, not stripped
+*$ cat a.csh*
+#!/bin/csh
+setenv LD_DEBUG all
+./a >&! a.cpr
+*$ ./a.csh*
+*$ grep -i open a.cpr*
+     120584:     symbol=fopen;  lookup in file=./a [0]
+     120584:     symbol=fopen;  lookup in file=/lib64/libc.so.6 [0]
+     120584:     binding file ./a [0] to /lib64/libc.so.6 [0]: normal 
+symbol `fopen' [GLIBC_2.2.5]
+*$*
 
 
 On 6/10/2016 7:29 AM, Ashley Pittman wrote:
@@ -54,3 +76,7 @@ On 6/10/2016 7:29 AM, Ashley Pittman wrote:
 I/O Doctors, LLC
 507-766-0378
 bauerj at iodoctors.com
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160610/0da6b324/attachment.htm>
