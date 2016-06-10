@@ -1,10 +1,10 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Thu,  9 Jun 2016 22:35:13 -0400
-Subject: [lustre-devel] [PATCH 3/8] staging/lustre/ldlm: Fix Multiple
+Date: Thu,  9 Jun 2016 22:35:15 -0400
+Subject: [lustre-devel] [PATCH 5/8] staging/lustre/lov: Fix Multiple
 	Assignments
 In-Reply-To: <1465526118-521053-1-git-send-email-green@linuxhacker.ru>
 References: <1465526118-521053-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1465526118-521053-4-git-send-email-green@linuxhacker.ru>
+Message-ID: <1465526118-521053-6-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,47 +14,41 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Nathaniel Clark <nathaniel.l.clark@intel.com>
 
-Fix all multiple assignments on lustre/ldlm directory.
+Fix all multiple assignments on lustre/lov directory.
 
 Signed-off-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c   | 3 ++-
- drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c | 8 +++++---
- 2 files changed, 7 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_obd.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index b4ffbe2..b6a90b0 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -345,7 +345,8 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	 * Set cl_chksum* to CRC32 for now to avoid returning screwed info
- 	 * through procfs.
- 	 */
--	cli->cl_cksum_type = cli->cl_supp_cksum_types = OBD_CKSUM_CRC32;
-+	cli->cl_cksum_type = OBD_CKSUM_CRC32;
-+	cli->cl_supp_cksum_types = OBD_CKSUM_CRC32;
- 	atomic_set(&cli->cl_resends, OSC_DEFAULT_RESENDS);
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index e15ef2e..c179b31 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -1772,7 +1772,8 @@ static int lov_fiemap(struct lov_obd *lov, __u32 keylen, void *key,
+ 	fm_start = fiemap->fm_start;
+ 	fm_length = fiemap->fm_length;
+ 	/* Calculate start stripe, last stripe and length of mapping */
+-	actual_start_stripe = start_stripe = lov_stripe_number(lsm, fm_start);
++	start_stripe = lov_stripe_number(lsm, fm_start);
++	actual_start_stripe = start_stripe;
+ 	fm_end = (fm_length == ~0ULL ? fm_key->oa.o_size :
+ 						fm_start + fm_length - 1);
+ 	/* If fm_length != ~0ULL but fm_start+fm_length-1 exceeds file size */
+@@ -2095,11 +2096,9 @@ static int lov_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 	u32 count;
+ 	int i, rc = 0, err;
+ 	struct lov_tgt_desc *tgt;
+-	unsigned incr, check_uuid,
+-		 do_inactive, no_set;
+-	unsigned next_id = 0,  mds_con = 0;
++	unsigned int incr = 0, check_uuid = 0, do_inactive = 0, no_set = 0;
++	unsigned int next_id = 0, mds_con = 0;
  
- 	/* This value may be reduced at connect time in
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-index ab739f0..3303ffa 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-@@ -1011,9 +1011,11 @@ static int ldlm_setup(void)
- 		blp->blp_min_threads = LDLM_NTHRS_INIT;
- 		blp->blp_max_threads = LDLM_NTHRS_MAX;
- 	} else {
--		blp->blp_min_threads = blp->blp_max_threads =
--			min_t(int, LDLM_NTHRS_MAX, max_t(int, LDLM_NTHRS_INIT,
--							 ldlm_num_threads));
-+		blp->blp_min_threads = min_t(int, LDLM_NTHRS_MAX,
-+					     max_t(int, LDLM_NTHRS_INIT,
-+						   ldlm_num_threads));
-+
-+		blp->blp_max_threads = blp->blp_min_threads;
- 	}
- 
- 	for (i = 0; i < blp->blp_min_threads; i++) {
+-	incr = check_uuid = do_inactive = no_set = 0;
+ 	if (!set) {
+ 		no_set = 1;
+ 		set = ptlrpc_prep_set();
 -- 
 2.7.4
