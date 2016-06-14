@@ -1,44 +1,85 @@
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 13 Jun 2016 22:44:57 +0200
-Subject: [lustre-devel] [PATCH] lustre: hide call to Posix ACL in ifdef
-Message-ID: <1465850722-3534417-1-git-send-email-arnd@arndb.de>
+From: Xose Vazquez Perez <xose.vazquez@gmail.com>
+Date: Wed, 15 Jun 2016 00:25:17 +0200
+Subject: [lustre-devel] staging: lustre headers include outdated and wrong
+	(c) information
+Message-ID: <cf6e56c1-4ae4-d466-d7ea-446abcebdb21@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Arnd Bergmann <arnd@arndb.de>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, John Hammond <john.hammond@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, Mike Rapoport <mike.rapoport@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, Greg KH <gregkh@linuxfoundation.org>, Linux Driver Project Developer List <driverdev-devel@linuxdriverproject.org>, "<lustre-devel@lists.lustre.org> Development" <lustre-devel@lists.lustre.org>
 
-A call to forget_cached_acl() was recently added to the lustre file
-system, but this is only available when CONFIG_FS_POSIX_ACL is
-enabled, otherwise the build now fails with:
+It should be resolved ASAP.
 
-lustre/llite/file.c: In function 'll_get_acl':
-lustre/llite/file.c:3134:2: error: implicit declaration of function 'forget_cached_acl' [-Werror=implicit-function-declaration]
-  forget_cached_acl(inode, type);
+This wrong/outdated info is in every staging/lustre file.
 
-This adds one more #ifdef for this call, corresponding to the
-other 22 such checks for ACL in lustre.
+> /*
+>  * GPL HEADER START
+>  *
+>  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+>  *
+>  * This program is free software; you can redistribute it and/or modify
+>  * it under the terms of the GNU General Public License version 2 only,
+>  * as published by the Free Software Foundation.
+>  *
+>  * This program is distributed in the hope that it will be useful, but
+>  * WITHOUT ANY WARRANTY; without even the implied warranty of
+>  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>  * General Public License version 2 for more details (a copy is included
+>  * in the LICENSE file that accompanied this code).
+>  *
+>  * You should have received a copy of the GNU General Public License
+>  * version 2 along with this program; If not, see
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b788dc51e425 ("staging: lustre: llite: drop acl from cache")
----
- drivers/staging/lustre/lustre/llite/file.c | 2 ++
- 1 file changed, 2 insertions(+)
+That's OK.
 
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index bafa0b701e87..26c6cd60ae1d 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -3131,7 +3131,9 @@ struct posix_acl *ll_get_acl(struct inode *inode, int type)
- 	spin_lock(&lli->lli_lock);
- 	/* VFS' acl_permission_check->check_acl will release the refcount */
- 	acl = posix_acl_dup(lli->lli_posix_acl);
-+#ifdef CONFIG_FS_POSIX_ACL
- 	forget_cached_acl(inode, type);
-+#endif
- 	spin_unlock(&lli->lli_lock);
- 
- 	return acl;
--- 
-2.7.0
+>  * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+>  *
+>  * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+>  * CA 95054 USA or visit www.sun.com if you need additional information or
+>  * have any questions.
+
+But this must be removed/replaced.
+
+>  *
+>  * GPL HEADER END
+>  */
+
+-
+
+> /*
+>  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+>  * Use is subject to license terms.
+
+And this must be replaced by the current (C) owner.
+
+>  *
+>  * Copyright (c) 2011, 2015, Intel Corporation.
+>  */
+> /*
+>  * This file is part of Lustre, http://www.lustre.org/
+>  * Lustre is a trademark of Sun Microsystems, Inc.
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ << ------ Also outdated.
+
+
+References:
+
+- http://www.oracle.com/us/corporate/press/018363
+  Oracle Buys Sun
+
+- https://www.xyratex.com/news/press-releases/xyratex-advances-lustre%C2%AE-initiative-assumes-ownership-related-assets
+  "[...]
+  Xyratex has recently acquired the original Lustre trademark, logo,
+  website and associated intellectual property from Oracle, and will
+  assume responsibility for providing support to Lustre customers going
+  forward.
+  [...]"
+
+- https://www.xyratex.com/news/press-releases/seagate-completes-acquisition-xyratex
+ "Seagate Completes Acquisition of Xyratex"
+
+- http://lustre.org/about/
+ "Lustre is a registered trademark of Seagate Technology LLC in the United States."
+
+
+Thank you.
