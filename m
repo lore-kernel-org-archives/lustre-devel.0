@@ -1,29 +1,56 @@
-From: Xose Vazquez Perez <xose.vazquez@gmail.com>
-Date: Wed, 15 Jun 2016 15:04:33 +0200
-Subject: [lustre-devel] [PATCH 2/5] staging/lustre: Replace sun.com
- GPLv2 URL with gnu.org one
-In-Reply-To: <BB8DC5F8-9DB2-40E1-BC6A-1C5FB3DC8817@intel.com>
-References: <4da9baaf-6369-0eb0-850b-87c827d94c3b@gmail.com>
-	<BB8DC5F8-9DB2-40E1-BC6A-1C5FB3DC8817@intel.com>
-Message-ID: <c1c7add3-9348-c40d-b2b2-603e8ebc7545@gmail.com>
+From: Luis de Bethencourt <luisbg@osg.samsung.com>
+Date: Wed, 15 Jun 2016 21:15:57 +0100
+Subject: [lustre-devel] [PATCH 0/8] Lustre: Multiple assignments removal.
+In-Reply-To: <1465526118-521053-1-git-send-email-green@linuxhacker.ru>
+References: <1465526118-521053-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <5761B77D.5090603@osg.samsung.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>
-Cc: Greg KH <gregkh@linuxfoundation.org>, Linux Driver Project Developer List <driverdev-devel@linuxdriverproject.org>, "Dilger,
- Andreas" <andreas.dilger@intel.com>, "<lustre-devel@lists.lustre.org> Development" <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <green@linuxhacker.ru>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On 06/15/2016 05:15 AM, Oleg Drokin wrote:
-
-> On Jun 14, 2016, at 11:11 PM, Xose Vazquez Perez wrote:
-
->> And "http://www.gnu.org/licenses/" is preferred
+On 10/06/16 03:35, Oleg Drokin wrote:
+> These patches remove multiple assignments in Lustre, that makes
+> checkpatch (somewhat understandably) unhappy.
 > 
-> Is it? I don't mind it either way, but since we do "GPLv2 only",
-> seemed to make sense to only link to that?
+> Nathaniel Clark (8):
+>   staging/lustre/osc: Fix Multiple Assignment Warnings
+>   staging/lustre/fid: Fix Multiple Assignments
+>   staging/lustre/ldlm: Fix Multiple Assignments
+>   staging/lustre/llite: Fix Multiple Assignments
+>   staging/lustre/lov: Fix Multiple Assignments
+>   staging/lustre/obdclass: Fix Multiple Assignments
+>   staging/lustre/ptlrpc: Fix Multiple Assignments
+>   staging/lustre/lmv: Fix Multiple Assignments
+> 
+>  drivers/staging/lustre/lustre/fid/fid_request.c     |  6 ++++--
+>  drivers/staging/lustre/lustre/ldlm/ldlm_lib.c       |  3 ++-
+>  drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c     |  8 +++++---
+>  drivers/staging/lustre/lustre/llite/llite_lib.c     |  3 ++-
+>  drivers/staging/lustre/lustre/llite/namei.c         |  3 ++-
+>  drivers/staging/lustre/lustre/llite/vvp_io.c        |  3 ++-
+>  drivers/staging/lustre/lustre/lmv/lmv_obd.c         |  3 +--
+>  drivers/staging/lustre/lustre/lov/lov_obd.c         |  9 ++++-----
+>  drivers/staging/lustre/lustre/obdclass/llog.c       |  6 ++++--
+>  drivers/staging/lustre/lustre/osc/osc_cache.c       |  6 ++++--
+>  drivers/staging/lustre/lustre/osc/osc_io.c          | 12 ++++++++----
+>  drivers/staging/lustre/lustre/osc/osc_lock.c        |  3 ++-
+>  drivers/staging/lustre/lustre/osc/osc_request.c     |  6 ++++--
+>  drivers/staging/lustre/lustre/ptlrpc/client.c       |  6 ++++--
+>  drivers/staging/lustre/lustre/ptlrpc/import.c       |  3 ++-
+>  drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c |  3 ++-
+>  drivers/staging/lustre/lustre/ptlrpc/pinger.c       |  3 ++-
+>  drivers/staging/lustre/lustre/ptlrpc/sec_null.c     |  3 ++-
+>  18 files changed, 56 insertions(+), 33 deletions(-)
+> 
 
-Shorter and less prone to future modification.
-GPLv3 points exactly to that url:
-"You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>."
+Hi,
+
+Documentation/CodingStyle says (in line 65):
+"Don't put multiple assignments on a single line either.  Kernel coding style
+is super simple.  Avoid tricky expressions."
+
+This patch set looks good.
+Luis
