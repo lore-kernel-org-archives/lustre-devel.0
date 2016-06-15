@@ -1,34 +1,40 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 15 Jun 2016 04:02:40 +0100 (BST)
-Subject: [lustre-devel] [PATCH 2/3] staging: lustre: lnet: Allocate MEs
- and small MDs in own kmem_caches
-In-Reply-To: <20160610163610.GA20291@kroah.com>
-References: <1465512347-11650-1-git-send-email-jsimmons@infradead.org>
-	<1465512347-11650-3-git-send-email-jsimmons@infradead.org>
-	<20160610012833.GA6804@kroah.com>
-	<B6A45EE2-D900-4578-AC42-4F5933F945DA@intel.com>
-	<20160610163610.GA20291@kroah.com>
-Message-ID: <alpine.LFD.2.20.1606150400230.17751@casper.infradead.org>
+From: Xose Vazquez Perez <xose.vazquez@gmail.com>
+Date: Wed, 15 Jun 2016 05:11:29 +0200
+Subject: [lustre-devel] [PATCH 2/5] staging/lustre: Replace sun.com
+ GPLv2 URL with gnu.org one
+Message-ID: <4da9baaf-6369-0eb0-850b-87c827d94c3b@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: "Faccini, Bruno" <bruno.faccini@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, Greg KH <gregkh@linuxfoundation.org>, Linux Driver Project Developer List <driverdev-devel@linuxdriverproject.org>, "<lustre-devel@lists.lustre.org> Development" <lustre-devel@lists.lustre.org>
 
+Oleg Drokin wrote:
 
-> > This may also possibly help to save cycles due to high usage and
-> > contention when using a generic kmem_cache (when they stay separate
-> > from others, thanks for the precision!).
-> 
-> Have you measured this?
-> 
-> This isn't applicable for 4.7-rc at this time, _unless_ it fixes a bug,
-> which is why I pushed back on this.  If you want your own cache for
-> these variables, fine, I don't care, but that makes it a 4.8-rc1 patch
-> instead.
-> 
-> hope that helps explain things better,
+> http://www.sun.com/software/products/lustre/docs/GPLv2.pdf is no
+> longer around, so replace it with (hopefully more permanent)
+> http://http://www.gnu.org/licenses/gpl-2.0.html
+        ^^^^^^
 
-As a side question when is the window to push patches of this class?
-Is it when 4.7-rc7 is merged to staging? 
+> [...]
+> drivers/staging/lustre/lustre/ptlrpc/service.c                        | 2 +-
+>  drivers/staging/lustre/lustre/ptlrpc/wiretest.c                       | 2 +-
+>  240 files changed, 240 insertions(+), 240 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/curproc.h b/drivers/staging/lustre/include/linux/libcfs/curproc.h
+> index c673dfc..2ab5002 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/curproc.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/curproc.h
+> @@ -15,7 +15,7 @@
+>   *
+>   * You should have received a copy of the GNU General Public License
+>   * version 2 along with this program; If not, see
+> - * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+> + * http://http://www.gnu.org/licenses/gpl-2.0.html
+            ^^^^^^^
+
+"http://" was repeated.
+
+And "http://www.gnu.org/licenses/" is preferred
+
+Thank you.
