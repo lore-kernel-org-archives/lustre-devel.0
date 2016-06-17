@@ -1,24 +1,83 @@
-From: Jones, Peter A <peter.a.jones@intel.com>
-Date: Fri, 17 Jun 2016 00:18:45 +0000
-Subject: [lustre-devel] Community Release Update
-In-Reply-To: <D2DF7987.BC02C%peter.a.jones@intel.com>
-References: <D2DF7987.BC02C%peter.a.jones@intel.com>
-Message-ID: <D38889B6.D05AE%peter.a.jones@intel.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Fri, 17 Jun 2016 18:28:51 +0000
+Subject: [lustre-devel] [lustre-discuss] more on lustre striping
+In-Reply-To: <8a9e4e45-ea99-1147-5c58-94a73d9010a8@iodoctors.com>
+References: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
+	<38EA9F32-3869-43BA-B215-EB2E5BA62FD5@intel.com>
+	<f4c0c992-1e1a-41d8-7a04-2fc5182c6b31@iodoctors.com>
+	<01EE2B9D-2359-49B5-A50F-E7C2D97E6696@intel.com>
+	<44e2353d-3bef-ddd7-f15e-ad4bfdda040f@iodoctors.com>
+	<EB476743-98B4-49D3-B436-7F257E3284DD@intel.com>
+	<9ebe9f4c-d5a2-4c93-4f00-49029850cbbe@iodoctors.com>
+	<575AB28E.7090404@pittman.co.uk>
+	<8a9e4e45-ea99-1147-5c58-94a73d9010a8@iodoctors.com>
+Message-ID: <444B216F-8A15-4D1D-AED6-9387D4EC0515@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi there
+If I recall correctly from when we implemented liblustre, which hooked into userspace using LD_PRELOAD, we had to capture the __open() call instead of open() (or something similar) to ensure that glibc didn't bypass our LD_PRELOAD from inside of fopen().
 
-Apologies for the long overdue update but I wanted to formally let everyone know that the 2.9 feature freeze is in effect and we are in the stabilization period for the release. You can see the details of the features that made it in time on http://wiki.lustre.org/Release_2.9.0 . There still may also be some further enhancements to the builds to come ? Chris Morrone and others have been beavering away there. However, from a runtime point of view, the core content is in place and we will be focusing on hardening it ahead of a GA (which is targeted for the end of August)
+You might consider downloading the source for glibc to see what it is doing in fopen().
 
-Although it is still some months out (tentatively September) until master opens for feature landings again, we?re already thinking ahead and there is a draft page to start collecting details of candidate features for the community 2.10 release - http://wiki.lustre.org/Release_2.10.0. Naturally the details of supported third party software will change as we get closer to the time and newer versions emerge but the existing ?latest and greatest? are there as placeholders and there are also details of features currently in the frame. Please add details of anything that you are working on that you would like to propose for consideration.
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel High Performance Data Division
 
-Regards
+On 2016/06/10, 10:04, "lustre-discuss on behalf of John Bauer" <lustre-discuss-bounces at lists.lustre.org<mailto:lustre-discuss-bounces@lists.lustre.org> on behalf of bauerj at iodoctors.com<mailto:bauerj@iodoctors.com>> wrote:
 
-Peter
+
+To confirm the point that you can not intercept the open called by fopen by using LD_PRELOAD, I have written a simple test case.  Note that the runtime linker never looks for open().  Only fopen()
+
+$ cat a.c
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <stdio.h>
+
+int
+main(int argc, char ** argv ){
+   FILE *f = fopen("a", "r" ) ;
+   fprintf(stderr,"f=%p\n",f);
+   fclose(f);
+}
+$ file a
+a: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked (uses shared libs), for GNU/Linux 2.6.32, BuildID[sha1]=dfe043b4ec8cf19d5fd3fab524d7c72ed1453574, not stripped
+$ cat a.csh
+#!/bin/csh
+setenv LD_DEBUG all
+./a >&! a.cpr
+$ ./a.csh
+$ grep -i open a.cpr
+    120584:     symbol=fopen;  lookup in file=./a [0]
+    120584:     symbol=fopen;  lookup in file=/lib64/libc.so.6 [0]
+    120584:     binding file ./a [0] to /lib64/libc.so.6 [0]: normal symbol `fopen' [GLIBC_2.2.5]
+$
+
+On 6/10/2016 7:29 AM, Ashley Pittman wrote:
+On 22/05/16 02:56, John Bauer wrote:
+
+Oleg
+
+I can intercept the fopen(), but that does me no good as I can't set the O_LOV_DELAY_CREATE bit.  What I can not intercept is the open() downstream of fopen().  If one examines the symbols in libc you will see there are no unsatisfied externals relating to open, which means there is nothing for the runtime linker to find concerning open's.  I will have a look at the Lustre 1.8 source, but I seriously doubt that the open beneath fopen() was intercepted with LD_PRELOAD.  I would love to find a way to do that.  I could throw away a lot of code. Thanks,  John
+
+Could you not intercept fopen() and implement it with calls to open() and fdopen() yourself which would give you full control over what you're looking for here?
+
+Ashley.
+
+
+
+--
+
+I/O Doctors, LLC
+
+507-766-0378
+
+bauerj at iodoctors.com<mailto:bauerj@iodoctors.com>
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160617/8aae3b48/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160617/fe11079b/attachment.htm>
