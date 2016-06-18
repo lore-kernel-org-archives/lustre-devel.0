@@ -1,83 +1,27 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Thu, 23 Jun 2016 15:49:55 -0400
-Subject: [lustre-devel] [PATCH v2] staging/lustre/lnet: changes value to
-	correct type for assignment
-In-Reply-To: <21218c92-e429-45df-aa98-1d91c6333957@default>
-References: <21218c92-e429-45df-aa98-1d91c6333957@default>
-Message-ID: <4238F4C0-29B1-4B6A-8618-EAF8748BDECC@intel.com>
+From: Craig Inches <craig@craiginches.com>
+Date: Sat, 18 Jun 2016 22:25:27 +0100
+Subject: [lustre-devel] [PATCH 0/3] staging: luster: cl_object.h Checkpatch
+	Cleanup
+Message-ID: <cover.1466279901.git.craig@craiginches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
+Fix three different issues from checkpatch:
+Line over 80 Chars
+Unsigned int prefered over unsigned
+Macros with complex values should be enclosed in parenthesis
 
-On Jun 23, 2016, at 3:27 PM, Lidza Louina wrote:
+Craig Inches (3):
+  checkpatch style issue: Line over 80 char
+  Checkpatch style issue:
+  Checkpatch error cleanup
 
-> 
-> ----- Original Message -----
-> From: oleg.drokin at intel.com
-> To: lidza.louina at oracle.com
-> Cc: gregkh at linuxfoundation.org, lustre-devel at lists.lustre.org, devel at driverdev.osuosl.org, andreas.dilger at intel.com
-> Sent: Thursday, June 23, 2016 12:14:28 PM GMT -08:00 US/Canada Pacific
-> Subject: Re: [lustre-devel] [PATCH v2] staging/lustre/lnet: changes value to correct type for assignment
-> 
-> 
-> On Jun 23, 2016, at 2:56 PM, Lidza Louina wrote:
-> 
->> The code attempted to add an unsigned int to a an unsigned 64-bit
->> integer. This patch makes the code use the correct type of int to
->> suppress a smatch warning.
-> 
-> I think you might want to update the commit message too, because
-> it does not really make much sense now.
-> 
-> How about
-> 
-> "The patch changes a value's type so it can be assigned correctly. 
-> This problem was caught by smatch."
+ drivers/staging/lustre/lustre/include/cl_object.h | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-I think that still does not convey the idea of teh change, also there's no
-assignment going on here.
-Perhaps
-To make the shift safer, have it operate on a 64 bit integer instead of
-default 32bit?
-There's no bug yet, so this is just for future-proofing.
-This potential problem was caught by smatch.
-
-Also you'll need to update the patch subject.
-
-> 
->> 
->> Signed-off-by: Lidza Louina <lidza.louina@oracle.com>
->> ---
->> drivers/staging/lustre/lnet/lnet/api-ni.c | 2 +-
->> 1 file changed, 1 insertion(+), 1 deletion(-)
->> 
->> diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
->> index 346db89..fc5b763 100644
->> --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
->> +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
->> @@ -513,7 +513,7 @@ lnet_res_lh_initialize(struct lnet_res_container *rec, lnet_libhandle_t *lh)
->> 	unsigned int hash;
->> 
->> 	lh->lh_cookie = rec->rec_lh_cookie;
->> -	rec->rec_lh_cookie += 1 << ibits;
->> +	rec->rec_lh_cookie += (1ULL << ibits);
->> 
->> 	hash = (lh->lh_cookie >> ibits) & LNET_LH_HASH_MASK;
->> 
->> -- 
->> 1.9.1
->> 
->> 
->> 
->> _______________________________________________
->> lustre-devel mailing list
->> lustre-devel at lists.lustre.org
->> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+-- 
+2.7.3
