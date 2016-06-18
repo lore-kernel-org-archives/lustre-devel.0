@@ -1,83 +1,48 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 17 Jun 2016 18:28:51 +0000
-Subject: [lustre-devel] [lustre-discuss] more on lustre striping
-In-Reply-To: <8a9e4e45-ea99-1147-5c58-94a73d9010a8@iodoctors.com>
-References: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
-	<38EA9F32-3869-43BA-B215-EB2E5BA62FD5@intel.com>
-	<f4c0c992-1e1a-41d8-7a04-2fc5182c6b31@iodoctors.com>
-	<01EE2B9D-2359-49B5-A50F-E7C2D97E6696@intel.com>
-	<44e2353d-3bef-ddd7-f15e-ad4bfdda040f@iodoctors.com>
-	<EB476743-98B4-49D3-B436-7F257E3284DD@intel.com>
-	<9ebe9f4c-d5a2-4c93-4f00-49029850cbbe@iodoctors.com>
-	<575AB28E.7090404@pittman.co.uk>
-	<8a9e4e45-ea99-1147-5c58-94a73d9010a8@iodoctors.com>
-Message-ID: <444B216F-8A15-4D1D-AED6-9387D4EC0515@intel.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Fri, 17 Jun 2016 20:32:03 -0700
+Subject: [lustre-devel] [PATCH 2/3] staging: lustre: lnet: Allocate MEs
+ and small MDs in own kmem_caches
+In-Reply-To: <alpine.LFD.2.20.1606150400230.17751@casper.infradead.org>
+References: <1465512347-11650-1-git-send-email-jsimmons@infradead.org>
+	<1465512347-11650-3-git-send-email-jsimmons@infradead.org>
+	<20160610012833.GA6804@kroah.com>
+	<B6A45EE2-D900-4578-AC42-4F5933F945DA@intel.com>
+	<20160610163610.GA20291@kroah.com>
+	<alpine.LFD.2.20.1606150400230.17751@casper.infradead.org>
+Message-ID: <20160618033203.GA13004@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: James Simmons <jsimmons@infradead.org>
+Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, "Faccini, Bruno" <bruno.faccini@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-If I recall correctly from when we implemented liblustre, which hooked into userspace using LD_PRELOAD, we had to capture the __open() call instead of open() (or something similar) to ensure that glibc didn't bypass our LD_PRELOAD from inside of fopen().
+On Wed, Jun 15, 2016 at 04:02:40AM +0100, James Simmons wrote:
+> 
+> > > This may also possibly help to save cycles due to high usage and
+> > > contention when using a generic kmem_cache (when they stay separate
+> > > from others, thanks for the precision!).
+> > 
+> > Have you measured this?
+> > 
+> > This isn't applicable for 4.7-rc at this time, _unless_ it fixes a bug,
+> > which is why I pushed back on this.  If you want your own cache for
+> > these variables, fine, I don't care, but that makes it a 4.8-rc1 patch
+> > instead.
+> > 
+> > hope that helps explain things better,
+> 
+> As a side question when is the window to push patches of this class?
+> Is it when 4.7-rc7 is merged to staging? 
 
-You might consider downloading the source for glibc to see what it is doing in fopen().
+You can send them to me anytime, I'll queue them up in my "-next" branch
+to be merged in the next merge window.  Like I do for almost all lustre
+patches that aren't bugfixes or regressions.
 
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel High Performance Data Division
+But I think you have a bigger problem here that you need to debug, using
+a separate cache isn't going to solve that bug, only postpone you
+finding it...
 
-On 2016/06/10, 10:04, "lustre-discuss on behalf of John Bauer" <lustre-discuss-bounces at lists.lustre.org<mailto:lustre-discuss-bounces@lists.lustre.org> on behalf of bauerj at iodoctors.com<mailto:bauerj@iodoctors.com>> wrote:
+thanks,
 
-
-To confirm the point that you can not intercept the open called by fopen by using LD_PRELOAD, I have written a simple test case.  Note that the runtime linker never looks for open().  Only fopen()
-
-$ cat a.c
-#include <unistd.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <stdio.h>
-
-int
-main(int argc, char ** argv ){
-   FILE *f = fopen("a", "r" ) ;
-   fprintf(stderr,"f=%p\n",f);
-   fclose(f);
-}
-$ file a
-a: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked (uses shared libs), for GNU/Linux 2.6.32, BuildID[sha1]=dfe043b4ec8cf19d5fd3fab524d7c72ed1453574, not stripped
-$ cat a.csh
-#!/bin/csh
-setenv LD_DEBUG all
-./a >&! a.cpr
-$ ./a.csh
-$ grep -i open a.cpr
-    120584:     symbol=fopen;  lookup in file=./a [0]
-    120584:     symbol=fopen;  lookup in file=/lib64/libc.so.6 [0]
-    120584:     binding file ./a [0] to /lib64/libc.so.6 [0]: normal symbol `fopen' [GLIBC_2.2.5]
-$
-
-On 6/10/2016 7:29 AM, Ashley Pittman wrote:
-On 22/05/16 02:56, John Bauer wrote:
-
-Oleg
-
-I can intercept the fopen(), but that does me no good as I can't set the O_LOV_DELAY_CREATE bit.  What I can not intercept is the open() downstream of fopen().  If one examines the symbols in libc you will see there are no unsatisfied externals relating to open, which means there is nothing for the runtime linker to find concerning open's.  I will have a look at the Lustre 1.8 source, but I seriously doubt that the open beneath fopen() was intercepted with LD_PRELOAD.  I would love to find a way to do that.  I could throw away a lot of code. Thanks,  John
-
-Could you not intercept fopen() and implement it with calls to open() and fdopen() yourself which would give you full control over what you're looking for here?
-
-Ashley.
-
-
-
---
-
-I/O Doctors, LLC
-
-507-766-0378
-
-bauerj at iodoctors.com<mailto:bauerj@iodoctors.com>
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160617/fe11079b/attachment.htm>
+greg k-h
