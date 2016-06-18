@@ -1,65 +1,121 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Sat, 18 Jun 2016 12:20:53 -0400
-Subject: [lustre-devel] dead??? URLs in code/comments
-In-Reply-To: <a6359829-3b23-d2b2-9efa-cad5f0c63812@gmail.com>
-References: <a6359829-3b23-d2b2-9efa-cad5f0c63812@gmail.com>
-Message-ID: <D61CFFFF-2CED-4C48-ABBE-A12FF11A92B3@intel.com>
+From: kbuild test robot <lkp@intel.com>
+Date: Sun, 19 Jun 2016 07:39:07 +0800
+Subject: [lustre-devel] [PATCH 2/3] staging: luster: Checkpatch Cleanup
+In-Reply-To: <109b0da96b67ae70145433b585ada631a5f7c668.1466279901.git.craig@craiginches.com>
+Message-ID: <201606190749.P22lESms%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Hi,
 
-On Jun 18, 2016, at 5:50 AM, Xose Vazquez Perez wrote:
+[auto build test WARNING on staging/staging-testing]
+[also build test WARNING on v4.7-rc3 next-20160617]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> Hi,
-> 
-> Do you want to keep these URLs?
-> 
-> include/linux/libcfs/libcfs_crypto.h: * Please  visit http://www.xyratex.com/contact if you need additional
-> lnet/libcfs/linux/linux-crypto.c: * Please  visit http://www.xyratex.com/contact if you need additional
-> lnet/libcfs/linux/linux-crypto.h: * Please  visit http://www.xyratex.com/contact if you need additional
-> lnet/libcfs/linux/linux-crypto-adler.c: * Please  visit http://www.xyratex.com/contact if you need additional
+url:    https://github.com/0day-ci/linux/commits/Craig-Inches/staging-luster-cl_object-h-Checkpatch-Cleanup/20160619-052805
+config: x86_64-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-We can let Seagate deal with that I guess.
+All warnings (new ones prefixed by >>):
 
-> include/linux/libcfs/libcfs_hash.h: * http://www.citi.umich.edu/techreports/reports/citi-tr-00-1.pdf
+   In file included from drivers/staging/lustre/lustre/obdclass/cl_lock.c:44:0:
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c: In function 'cl_lock_descr_print':
+>> drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1206:39: warning: right-hand operand of comma expression has no effect [-Wunused-value]
+     (cl_lock_mode_name((descr)->cld_mode), (descr)->cld_mode, \
+                                          ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: note: in expansion of macro 'PDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                                            ^~~~~~
+   drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1206:58: warning: right-hand operand of comma expression has no effect [-Wunused-value]
+     (cl_lock_mode_name((descr)->cld_mode), (descr)->cld_mode, \
+                                                             ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: note: in expansion of macro 'PDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                                            ^~~~~~
+   drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1207:20: warning: right-hand operand of comma expression has no effect [-Wunused-value]
+     (descr)->cld_start, (descr)->cld_end, (descr)->cld_enq_flags)
+                       ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: note: in expansion of macro 'PDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                                            ^~~~~~
+>> drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1204:16: warning: format '%s' expects argument of type 'char *', but argument 4 has type '__u32 {aka const unsigned int}' [-Wformat=]
+    #define DDESCR "%s(%d):[%lu, %lu]:%x"
+                   ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: note: in expansion of macro 'DDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                             ^~~~~~
+>> drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1204:16: warning: format '%d' expects argument of type 'int', but argument 5 has type '__u64 {aka const long long unsigned int}' [-Wformat=]
+    #define DDESCR "%s(%d):[%lu, %lu]:%x"
+                   ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: note: in expansion of macro 'DDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                             ^~~~~~
+>> drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1204:16: warning: format '%lu' expects argument of type 'long unsigned int', but argument 6 has type '__u32 {aka const unsigned int}' [-Wformat=]
+    #define DDESCR "%s(%d):[%lu, %lu]:%x"
+                   ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: note: in expansion of macro 'DDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                             ^~~~~~
+   drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1204:16: warning: format '%lu' expects argument of type 'long unsigned int', but argument 7 has type '__u32 {aka const unsigned int}' [-Wformat=]
+    #define DDESCR "%s(%d):[%lu, %lu]:%x"
+                   ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: note: in expansion of macro 'DDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                             ^~~~~~
+>> drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1204:16: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat=]
+    #define DDESCR "%s(%d):[%lu, %lu]:%x"
+                   ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: note: in expansion of macro 'DDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                             ^~~~~~
+>> drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1204:16: warning: format '%llx' expects a matching 'long long unsigned int' argument [-Wformat=]
+    #define DDESCR "%s(%d):[%lu, %lu]:%x"
+                   ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: note: in expansion of macro 'DDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                             ^~~~~~
+>> drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1204:16: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat=]
+    #define DDESCR "%s(%d):[%lu, %lu]:%x"
+                   ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: note: in expansion of macro 'DDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                             ^~~~~~
+>> drivers/staging/lustre/lustre/obdclass/../include/cl_object.h:1204:16: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat=]
+    #define DDESCR "%s(%d):[%lu, %lu]:%x"
+                   ^
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: note: in expansion of macro 'DDESCR'
+     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+                             ^~~~~~
 
-This one is still alive, why kill it?
+vim +1206 drivers/staging/lustre/lustre/obdclass/../include/cl_object.h
 
-> 
-> lnet/lnet/router.c: *   http://sourceforge.net/projects/sandiaportals/
-> lnet/lnet/router_proc.c: *   http://sourceforge.net/projects/sandiaportals/
+  1198		 * flags to enqueue lock. A combination of bit-flags from
+  1199		 * enum cl_enq_flags.
+  1200		 */
+  1201		__u32	     cld_enq_flags;
+  1202	};
+  1203	
+> 1204	#define DDESCR "%s(%d):[%lu, %lu]:%x"
+  1205	#define PDESCR(descr)						   \
+> 1206		(cl_lock_mode_name((descr)->cld_mode), (descr)->cld_mode,	\
+> 1207		(descr)->cld_start, (descr)->cld_end, (descr)->cld_enq_flags)
+  1208	
+  1209	const char *cl_lock_mode_name(const enum cl_lock_mode mode);
+  1210	
 
-This one is also alive and it does point to predecessor of the code.
-
-> lustre/include/lustre_fid.h: * http://wiki.lustre.org/index.php/Architecture_-_Interoperability_fids_zfs
-> lustre/include/lustre/lustre_idl.h: * http://arch.lustre.org/index.php?title=Interoperability_fids_zfs
-> lustre/include/lustre/lustre_idl.h: * http://arch.lustre.org/index.php?title=Interoperability_fids_zfs#NEW.0
-
-Hm, these were moved to, I guess 
-http://wiki.old.lustre.org/index.php/Architecture_-_Interoperability_fids_zfs
-
-We can change that. The ZFS is relatively new and sure, it's server side,
-but there are client implications, that's why the pointer is still useful.
-
-> lustre/Kconfig:   http://downloads.whamcloud.com/public/lustre/
-> 
-> lustre/Kconfig:   http://git.whamcloud.com/?p=fs/lustre-release.git;a=summary
-
-These two still work just fine.
-They are pointers to the userspace tools (you know, you need them to operate)
-and to server side stuff (that I imagine you might want too unless you bought
-it from a vendor).
-
-> lustre/llite/llite_lib.c:                        "inode="DFID"(%p) nrpages=%lu, see http://jira.whamcloud.com/browse/LU-118\n",
-> 
-> lustre/obdecho/echo_client.c:   LCONSOLE_INFO("Echo OBD driver; http://www.lustre.org/\n");
-> 
-> lustre/osc/osc_request.c:                       CWARN("Saw flags 0x%x and 0x%x in the same brw, please report this at http://bugs.whamcloud.com/\n",
-> 
-> lustre/ptlrpc/import.c:         CERROR("%s went back in time (transno %lld was previously committed, server now claims %lld)!  See https://bugzilla.lustre.org/show_bug.cgi?id=9646\n",
-
-What's wrong with these, they are essentially pointers to documentation in one way or
-the other.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 54771 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160619/1ac4f30a/attachment-0001.obj>
