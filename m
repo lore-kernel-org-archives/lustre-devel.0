@@ -1,51 +1,67 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sat, 18 Jun 2016 23:53:09 -0400
-Subject: [lustre-devel] [PATCH 0/4] Some Lustre style cleanups
-Message-ID: <1466308393-1183295-1-git-send-email-green@linuxhacker.ru>
+Date: Sat, 18 Jun 2016 23:53:11 -0400
+Subject: [lustre-devel] [PATCH 2/4] staging/lustre: Keep logical
+	continuations on the previous line
+In-Reply-To: <1466308393-1183295-1-git-send-email-green@linuxhacker.ru>
+References: <1466308393-1183295-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466308393-1183295-3-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Emoly Liu <emoly.liu@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-These are just some more cleanups in Lustre styel and comments
+From: Emoly Liu <emoly.liu@intel.com>
 
-Emoly Liu (2):
-  staging/lustre: Fix blank line before EXPORT_SYMBOL()
-  staging/lustre: Keep logical continuations on the previous line
+This patch fixes all checkpatch occurences of
+"CHECK: Logical continuations should be on the previous line"
+in Lustre code.
 
-Oleg Drokin (2):
-  staging/lustre: Remove unnecessary space after a cast
-  staging/lustre: Update FID documentation link.
+Signed-off-by: Emoly Liu <emoly.liu@intel.com>
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c     | 9 ++++-----
+ drivers/staging/lustre/lustre/obdclass/obd_config.c | 4 ++--
+ 2 files changed, 6 insertions(+), 7 deletions(-)
 
- drivers/staging/lustre/include/linux/lnet/lib-dlc.h       |  2 +-
- drivers/staging/lustre/include/linux/lnet/types.h         |  4 ++--
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h       |  2 +-
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c    |  2 +-
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c       |  4 ++--
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c    |  4 ++--
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c |  6 +++---
- drivers/staging/lustre/lnet/lnet/api-ni.c                 |  2 +-
- drivers/staging/lustre/lnet/lnet/module.c                 |  2 +-
- drivers/staging/lustre/lustre/include/lustre/lustre_idl.h |  4 ++--
- drivers/staging/lustre/lustre/include/lustre_fid.h        |  2 +-
- drivers/staging/lustre/lustre/include/lustre_sec.h        |  6 +++---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c           |  9 ++++-----
- drivers/staging/lustre/lustre/llite/file.c                |  2 +-
- drivers/staging/lustre/lustre/llite/vvp_dev.c             |  2 +-
- drivers/staging/lustre/lustre/mdc/mdc_request.c           |  4 ++--
- drivers/staging/lustre/lustre/mgc/mgc_request.c           |  4 ++--
- drivers/staging/lustre/lustre/obdclass/cl_object.c        |  6 +++---
- drivers/staging/lustre/lustre/obdclass/obd_config.c       |  6 +++---
- drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c       |  1 -
- drivers/staging/lustre/lustre/ptlrpc/nrs.c                |  2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec.c                |  4 ++--
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c           |  2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_config.c         |  2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_null.c           |  4 ++--
- drivers/staging/lustre/lustre/ptlrpc/sec_plain.c          | 10 +++++-----
- 26 files changed, 48 insertions(+), 50 deletions(-)
-
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+index 38c507f..d6b61bc 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+@@ -255,14 +255,13 @@ reprocess:
+ 			 * overflow and underflow.
+ 			 */
+ 			if ((new->l_policy_data.l_flock.start >
+-			     (lock->l_policy_data.l_flock.end + 1))
+-			    && (lock->l_policy_data.l_flock.end !=
+-				OBD_OBJECT_EOF))
++			     (lock->l_policy_data.l_flock.end + 1)) &&
++			    (lock->l_policy_data.l_flock.end != OBD_OBJECT_EOF))
+ 				continue;
+ 
+ 			if ((new->l_policy_data.l_flock.end <
+-			     (lock->l_policy_data.l_flock.start - 1))
+-			    && (lock->l_policy_data.l_flock.start != 0))
++			     (lock->l_policy_data.l_flock.start - 1)) &&
++			    (lock->l_policy_data.l_flock.start != 0))
+ 				break;
+ 
+ 			if (new->l_policy_data.l_flock.start <
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+index 694c58e..f1c41a1 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+@@ -1017,8 +1017,8 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+ 		/* Search proc entries */
+ 		while (lvars[j].name) {
+ 			var = &lvars[j];
+-			if (!class_match_param(key, var->name, NULL)
+-			    && keylen == strlen(var->name)) {
++			if (!class_match_param(key, var->name, NULL) &&
++			    keylen == strlen(var->name)) {
+ 				matched++;
+ 				rc = -EROFS;
+ 				if (var->fops && var->fops->write) {
 -- 
 2.7.4
