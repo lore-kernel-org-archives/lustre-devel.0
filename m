@@ -1,85 +1,28 @@
-From: kbuild test robot <lkp@intel.com>
-Date: Sun, 19 Jun 2016 09:46:29 +0800
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Sat, 18 Jun 2016 19:02:35 -0700
 Subject: [lustre-devel] [PATCH 2/3] staging: luster: Checkpatch Cleanup
 In-Reply-To: <109b0da96b67ae70145433b585ada631a5f7c668.1466279901.git.craig@craiginches.com>
-Message-ID: <201606190956.mZaEp8l4%fengguang.wu@intel.com>
+References: <cover.1466279901.git.craig@craiginches.com>
+	<109b0da96b67ae70145433b585ada631a5f7c668.1466279901.git.craig@craiginches.com>
+Message-ID: <20160619020235.GA18034@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Craig Inches <craig@craiginches.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-Hi,
+On Sat, Jun 18, 2016 at 10:25:55PM +0100, Craig Inches wrote:
+> Macros with complex values should be enclosed in parenthesis
+> 
+> Signed-off-by: Craig Inches <craig@craiginches.com>
+> ---
+>  drivers/staging/lustre/lustre/include/cl_object.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-[auto build test WARNING on staging/staging-testing]
-[also build test WARNING on v4.7-rc3 next-20160617]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+ALWAYS test build your patches, to not do so just makes maintainers
+grumpy...
 
-url:    https://github.com/0day-ci/linux/commits/Craig-Inches/staging-luster-cl_object-h-Checkpatch-Cleanup/20160619-052805
-config: tile-allyesconfig (attached as .config)
-compiler: tilegx-linux-gcc (GCC) 4.6.2
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=tile 
+Remember, checkpatch is a _hint_, it's not always right.
 
-All warnings (new ones prefixed by >>):
-
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c: In function 'cl_lock_descr_print':
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: warning: value computed is not used [-Wunused-value]
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: warning: value computed is not used [-Wunused-value]
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: warning: value computed is not used [-Wunused-value]
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%s' expects argument of type 'char *', but argument 4 has type '__u32' [-Wformat]
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%d' expects argument of type 'int', but argument 5 has type '__u64' [-Wformat]
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%lu' expects argument of type 'long unsigned int', but argument 6 has type '__u32' [-Wformat]
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%lu' expects argument of type 'long unsigned int', but argument 7 has type '__u32' [-Wformat]
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat]
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%llx' expects a matching 'long long unsigned int' argument [-Wformat]
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat]
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat]
-
-vim +249 drivers/staging/lustre/lustre/obdclass/cl_lock.c
-
-d7e09d039 Peng Tao 2013-05-02  233  		return names[mode];
-d7e09d039 Peng Tao 2013-05-02  234  	else
-d7e09d039 Peng Tao 2013-05-02  235  		return "U";
-d7e09d039 Peng Tao 2013-05-02  236  }
-d7e09d039 Peng Tao 2013-05-02  237  EXPORT_SYMBOL(cl_lock_mode_name);
-d7e09d039 Peng Tao 2013-05-02  238  
-d7e09d039 Peng Tao 2013-05-02  239  /**
-d7e09d039 Peng Tao 2013-05-02  240   * Prints human readable representation of a lock description.
-d7e09d039 Peng Tao 2013-05-02  241   */
-d7e09d039 Peng Tao 2013-05-02  242  void cl_lock_descr_print(const struct lu_env *env, void *cookie,
-d7e09d039 Peng Tao 2013-05-02  243  			 lu_printer_t printer,
-d7e09d039 Peng Tao 2013-05-02  244  			 const struct cl_lock_descr *descr)
-d7e09d039 Peng Tao 2013-05-02  245  {
-d7e09d039 Peng Tao 2013-05-02  246  	const struct lu_fid  *fid;
-d7e09d039 Peng Tao 2013-05-02  247  
-d7e09d039 Peng Tao 2013-05-02  248  	fid = lu_object_fid(&descr->cld_obj->co_lu);
-d7e09d039 Peng Tao 2013-05-02 @249  	(*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
-d7e09d039 Peng Tao 2013-05-02  250  }
-d7e09d039 Peng Tao 2013-05-02  251  EXPORT_SYMBOL(cl_lock_descr_print);
-d7e09d039 Peng Tao 2013-05-02  252  
-d7e09d039 Peng Tao 2013-05-02  253  /**
-d7e09d039 Peng Tao 2013-05-02  254   * Prints human readable representation of \a lock to the \a f.
-d7e09d039 Peng Tao 2013-05-02  255   */
-d7e09d039 Peng Tao 2013-05-02  256  void cl_lock_print(const struct lu_env *env, void *cookie,
-d7e09d039 Peng Tao 2013-05-02  257  		   lu_printer_t printer, const struct cl_lock *lock)
-
-:::::: The code at line 249 was first introduced by commit
-:::::: d7e09d0397e84eefbabfd9cb353221f3c6448d83 staging: add Lustre file system client support
-
-:::::: TO: Peng Tao <bergwolf@gmail.com>
-:::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 44884 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160619/e4400981/attachment-0001.obj>
+greg k-h
