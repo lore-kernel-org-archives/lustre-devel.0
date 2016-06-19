@@ -1,10 +1,10 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sat, 18 Jun 2016 23:53:11 -0400
-Subject: [lustre-devel] [PATCH 2/4] staging/lustre: Keep logical
-	continuations on the previous line
+Date: Sat, 18 Jun 2016 23:53:10 -0400
+Subject: [lustre-devel] [PATCH 1/4] staging/lustre: Fix blank line before
+	EXPORT_SYMBOL()
 In-Reply-To: <1466308393-1183295-1-git-send-email-green@linuxhacker.ru>
 References: <1466308393-1183295-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466308393-1183295-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466308393-1183295-2-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,54 +14,26 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Emoly Liu <emoly.liu@intel.com>
 
-This patch fixes all checkpatch occurences of
-"CHECK: Logical continuations should be on the previous line"
-in Lustre code.
+This patch fixes one checkpatch warning in lustre:
+WARNING: EXPORT_SYMBOL(foo); should immediately follow its function/variable
 
 Signed-off-by: Emoly Liu <emoly.liu@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c     | 9 ++++-----
- drivers/staging/lustre/lustre/obdclass/obd_config.c | 4 ++--
- 2 files changed, 6 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 38c507f..d6b61bc 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -255,14 +255,13 @@ reprocess:
- 			 * overflow and underflow.
- 			 */
- 			if ((new->l_policy_data.l_flock.start >
--			     (lock->l_policy_data.l_flock.end + 1))
--			    && (lock->l_policy_data.l_flock.end !=
--				OBD_OBJECT_EOF))
-+			     (lock->l_policy_data.l_flock.end + 1)) &&
-+			    (lock->l_policy_data.l_flock.end != OBD_OBJECT_EOF))
- 				continue;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+index fe6f7a6..bc93b75 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+@@ -1158,7 +1158,6 @@ void ptlrpc_lprocfs_brw(struct ptlrpc_request *req, int bytes)
  
- 			if ((new->l_policy_data.l_flock.end <
--			     (lock->l_policy_data.l_flock.start - 1))
--			    && (lock->l_policy_data.l_flock.start != 0))
-+			     (lock->l_policy_data.l_flock.start - 1)) &&
-+			    (lock->l_policy_data.l_flock.start != 0))
- 				break;
+ 	lprocfs_counter_add(svc_stats, idx, bytes);
+ }
+-
+ EXPORT_SYMBOL(ptlrpc_lprocfs_brw);
  
- 			if (new->l_policy_data.l_flock.start <
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index 694c58e..f1c41a1 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -1017,8 +1017,8 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
- 		/* Search proc entries */
- 		while (lvars[j].name) {
- 			var = &lvars[j];
--			if (!class_match_param(key, var->name, NULL)
--			    && keylen == strlen(var->name)) {
-+			if (!class_match_param(key, var->name, NULL) &&
-+			    keylen == strlen(var->name)) {
- 				matched++;
- 				rc = -EROFS;
- 				if (var->fops && var->fops->write) {
+ void ptlrpc_lprocfs_unregister_service(struct ptlrpc_service *svc)
 -- 
 2.7.4
