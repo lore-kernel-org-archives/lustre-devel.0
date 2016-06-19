@@ -1,8 +1,8 @@
 From: kbuild test robot <lkp@intel.com>
-Date: Sun, 19 Jun 2016 09:19:30 +0800
+Date: Sun, 19 Jun 2016 09:46:29 +0800
 Subject: [lustre-devel] [PATCH 2/3] staging: luster: Checkpatch Cleanup
 In-Reply-To: <109b0da96b67ae70145433b585ada631a5f7c668.1466279901.git.craig@craiginches.com>
-Message-ID: <201606190949.XMOiiUu4%fengguang.wu@intel.com>
+Message-ID: <201606190956.mZaEp8l4%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,34 +16,28 @@ Hi,
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
 url:    https://github.com/0day-ci/linux/commits/Craig-Inches/staging-luster-cl_object-h-Checkpatch-Cleanup/20160619-052805
-config: i386-allyesconfig (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+config: tile-allyesconfig (attached as .config)
+compiler: tilegx-linux-gcc (GCC) 4.6.2
 reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make ARCH=i386 
+        make.cross ARCH=tile 
 
 All warnings (new ones prefixed by >>):
 
    drivers/staging/lustre/lustre/obdclass/cl_lock.c: In function 'cl_lock_descr_print':
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:113: warning: right-hand operand of comma expression has no effect [-Wunused-value]
-     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
-                                                                                                                    ^
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:132: warning: right-hand operand of comma expression has no effect [-Wunused-value]
-     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
-                                                                                                                                       ^
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:152: warning: right-hand operand of comma expression has no effect [-Wunused-value]
-     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
-                                                                                                                                                           ^
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: warning: format '%s' expects argument of type 'char *', but argument 4 has type '__u32 {aka const unsigned int}' [-Wformat=]
-     (*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
-                             ^~~~~~~~~~~~~~~~~~~~~~
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: warning: format '%d' expects argument of type 'int', but argument 5 has type '__u64 {aka const long long unsigned int}' [-Wformat=]
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: warning: format '%lu' expects argument of type 'long unsigned int', but argument 6 has type '__u32 {aka const unsigned int}' [-Wformat=]
-   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: warning: format '%lu' expects argument of type 'long unsigned int', but argument 7 has type '__u32 {aka const unsigned int}' [-Wformat=]
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat=]
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: warning: format '%llx' expects a matching 'long long unsigned int' argument [-Wformat=]
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat=]
->> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:26: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat=]
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: warning: value computed is not used [-Wunused-value]
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: warning: value computed is not used [-Wunused-value]
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:41: warning: value computed is not used [-Wunused-value]
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%s' expects argument of type 'char *', but argument 4 has type '__u32' [-Wformat]
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%d' expects argument of type 'int', but argument 5 has type '__u64' [-Wformat]
+>> drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%lu' expects argument of type 'long unsigned int', but argument 6 has type '__u32' [-Wformat]
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%lu' expects argument of type 'long unsigned int', but argument 7 has type '__u32' [-Wformat]
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat]
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%llx' expects a matching 'long long unsigned int' argument [-Wformat]
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat]
+   drivers/staging/lustre/lustre/obdclass/cl_lock.c:249:2: warning: format '%x' expects a matching 'unsigned int' argument [-Wformat]
 
 vim +249 drivers/staging/lustre/lustre/obdclass/cl_lock.c
 
@@ -86,6 +80,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/octet-stream
-Size: 54411 bytes
+Size: 44884 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160619/9fe5e540/attachment-0001.obj>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160619/e4400981/attachment-0001.obj>
