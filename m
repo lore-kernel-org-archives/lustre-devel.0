@@ -1,41 +1,370 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Jun 2016 22:07:21 -0400
-Subject: [lustre-devel] [PATCH 06/28] staging/lustre/osc: Fix reverted
-	condition in osc_lock_weight
+Date: Sun, 19 Jun 2016 22:07:26 -0400
+Subject: [lustre-devel] [PATCH 11/28] staging/lustre/ptlrpc: lost bulk leads
+	to a hang
 In-Reply-To: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
 References: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466388463-1817551-7-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466388463-1817551-12-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Vitaly Fertman <vitaly.fertman@seagate.com>, Oleg Drokin <green@linuxhacker.ru>
 
-When importing clio simplification patch, the check for
-object got reversed by mistake when converting from
-if (obj == NULL) it somehow became if (obj) which is obviously wrong,
-and so when it does hit, a crash was happening as result.
+From: Vitaly Fertman <vitaly.fertman@seagate.com>
 
-Fix the condition and all if fine now.
+The reverse order of request_out_callback() and reply_in_callback()
+puts the RPC into UNREGISTERING state, which is waiting for RPC &
+bulk md unlink, whereas only RPC md unlink has been called so far.
+If bulk is lost, even expired_set does not check for UNREGISTERING
+state.
 
+The same for write if server returns an error.
+
+This phase is ambiguous, split to UNREG_RPC and UNREG_BULK.
+
+Signed-off-by: Vitaly Fertman <vitaly.fertman@seagate.com>
+Seagate-bug-id:  MRP-2953, MRP-3206
+Reviewed-by: Andriy Skulysh <andriy.skulysh@seagate.com>
+Reviewed-by: Alexey Leonidovich Lyashkov <alexey.lyashkov@seagate.com>
+Tested-by: Elena V. Gryaznova <elena.gryaznova@seagate.com>
+Reviewed-on: http://review.whamcloud.com/19953
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: Ann Koehler <amk@cray.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/osc/osc_lock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/include/lustre_net.h | 48 +++++++++-------
+ .../staging/lustre/lustre/include/obd_support.h    |  3 +
+ drivers/staging/lustre/lustre/ptlrpc/client.c      | 64 +++++++++++++++++++---
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |  3 +-
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |  4 +-
+ 5 files changed, 91 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
-index d856775..5455d9d 100644
---- a/drivers/staging/lustre/lustre/osc/osc_lock.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
-@@ -699,7 +699,7 @@ unsigned long osc_ldlm_weigh_ast(struct ldlm_lock *dlmlock)
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 523d082..3f43664 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -480,8 +480,9 @@ enum rq_phase {
+ 	RQ_PHASE_BULK	   = 0xebc0de02,
+ 	RQ_PHASE_INTERPRET      = 0xebc0de03,
+ 	RQ_PHASE_COMPLETE       = 0xebc0de04,
+-	RQ_PHASE_UNREGISTERING  = 0xebc0de05,
+-	RQ_PHASE_UNDEFINED      = 0xebc0de06
++	RQ_PHASE_UNREG_RPC	= 0xebc0de05,
++	RQ_PHASE_UNREG_BULK	= 0xebc0de06,
++	RQ_PHASE_UNDEFINED	= 0xebc0de07
+ };
  
- 	LASSERT(dlmlock->l_resource->lr_type == LDLM_EXTENT);
- 	obj = dlmlock->l_ast_data;
--	if (obj) {
-+	if (!obj) {
- 		weight = 1;
- 		goto out;
+ /** Type of request interpreter call-back */
+@@ -1263,6 +1264,8 @@ struct ptlrpc_cli_req {
+ 	time_t				 cr_reply_deadline;
+ 	/** when req bulk unlink must finish. */
+ 	time_t				 cr_bulk_deadline;
++	/** when req unlink must finish. */
++	time_t				 cr_req_deadline;
+ 	/** Portal to which this request would be sent */
+ 	short				 cr_req_ptl;
+ 	/** Portal where to wait for reply and where reply would be sent */
+@@ -1318,6 +1321,7 @@ struct ptlrpc_cli_req {
+ #define rq_real_sent		rq_cli.cr_sent_out
+ #define rq_reply_deadline	rq_cli.cr_reply_deadline
+ #define rq_bulk_deadline	rq_cli.cr_bulk_deadline
++#define rq_req_deadline		rq_cli.cr_req_deadline
+ #define rq_nr_resend		rq_cli.cr_resend_nr
+ #define rq_request_portal	rq_cli.cr_req_ptl
+ #define rq_reply_portal		rq_cli.cr_rep_ptl
+@@ -1693,8 +1697,10 @@ ptlrpc_phase2str(enum rq_phase phase)
+ 		return "Interpret";
+ 	case RQ_PHASE_COMPLETE:
+ 		return "Complete";
+-	case RQ_PHASE_UNREGISTERING:
+-		return "Unregistering";
++	case RQ_PHASE_UNREG_RPC:
++		return "UnregRPC";
++	case RQ_PHASE_UNREG_BULK:
++		return "UnregBULK";
+ 	default:
+ 		return "?Phase?";
  	}
+@@ -1721,7 +1727,7 @@ ptlrpc_rqphase2str(struct ptlrpc_request *req)
+ #define DEBUG_REQ_FLAGS(req)						    \
+ 	ptlrpc_rqphase2str(req),						\
+ 	FLAG(req->rq_intr, "I"), FLAG(req->rq_replied, "R"),		    \
+-	FLAG(req->rq_err, "E"),						 \
++	FLAG(req->rq_err, "E"),	FLAG(req->rq_net_err, "e"),		    \
+ 	FLAG(req->rq_timedout, "X") /* eXpired */, FLAG(req->rq_resend, "S"),   \
+ 	FLAG(req->rq_restart, "T"), FLAG(req->rq_replay, "P"),		  \
+ 	FLAG(req->rq_no_resend, "N"),					   \
+@@ -1729,7 +1735,7 @@ ptlrpc_rqphase2str(struct ptlrpc_request *req)
+ 	FLAG(req->rq_wait_ctx, "C"), FLAG(req->rq_hp, "H"),		     \
+ 	FLAG(req->rq_committed, "M")
+ 
+-#define REQ_FLAGS_FMT "%s:%s%s%s%s%s%s%s%s%s%s%s%s"
++#define REQ_FLAGS_FMT "%s:%s%s%s%s%s%s%s%s%s%s%s%s%s"
+ 
+ void _debug_req(struct ptlrpc_request *req,
+ 		struct libcfs_debug_msg_data *data, const char *fmt, ...)
+@@ -2380,8 +2386,7 @@ static inline int ptlrpc_client_bulk_active(struct ptlrpc_request *req)
+ 
+ 	desc = req->rq_bulk;
+ 
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK) &&
+-	    req->rq_bulk_deadline > ktime_get_real_seconds())
++	if (req->rq_bulk_deadline > ktime_get_real_seconds())
+ 		return 1;
+ 
+ 	if (!desc)
+@@ -2728,13 +2733,20 @@ ptlrpc_rqphase_move(struct ptlrpc_request *req, enum rq_phase new_phase)
+ 	if (req->rq_phase == new_phase)
+ 		return;
+ 
+-	if (new_phase == RQ_PHASE_UNREGISTERING) {
++	if (new_phase == RQ_PHASE_UNREG_RPC ||
++	    new_phase == RQ_PHASE_UNREG_BULK) {
++		/* No embedded unregistering phases */
++		if (req->rq_phase == RQ_PHASE_UNREG_RPC ||
++		    req->rq_phase == RQ_PHASE_UNREG_BULK)
++			return;
++
+ 		req->rq_next_phase = req->rq_phase;
+ 		if (req->rq_import)
+ 			atomic_inc(&req->rq_import->imp_unregistering);
+ 	}
+ 
+-	if (req->rq_phase == RQ_PHASE_UNREGISTERING) {
++	if (req->rq_phase == RQ_PHASE_UNREG_RPC ||
++	    req->rq_phase == RQ_PHASE_UNREG_BULK) {
+ 		if (req->rq_import)
+ 			atomic_dec(&req->rq_import->imp_unregistering);
+ 	}
+@@ -2751,9 +2763,6 @@ ptlrpc_rqphase_move(struct ptlrpc_request *req, enum rq_phase new_phase)
+ static inline int
+ ptlrpc_client_early(struct ptlrpc_request *req)
+ {
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    req->rq_reply_deadline > ktime_get_real_seconds())
+-		return 0;
+ 	return req->rq_early;
+ }
+ 
+@@ -2763,8 +2772,7 @@ ptlrpc_client_early(struct ptlrpc_request *req)
+ static inline int
+ ptlrpc_client_replied(struct ptlrpc_request *req)
+ {
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    req->rq_reply_deadline > ktime_get_real_seconds())
++	if (req->rq_reply_deadline > ktime_get_real_seconds())
+ 		return 0;
+ 	return req->rq_replied;
+ }
+@@ -2773,8 +2781,7 @@ ptlrpc_client_replied(struct ptlrpc_request *req)
+ static inline int
+ ptlrpc_client_recv(struct ptlrpc_request *req)
+ {
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    req->rq_reply_deadline > ktime_get_real_seconds())
++	if (req->rq_reply_deadline > ktime_get_real_seconds())
+ 		return 1;
+ 	return req->rq_receiving_reply;
+ }
+@@ -2785,8 +2792,11 @@ ptlrpc_client_recv_or_unlink(struct ptlrpc_request *req)
+ 	int rc;
+ 
+ 	spin_lock(&req->rq_lock);
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    req->rq_reply_deadline > ktime_get_real_seconds()) {
++	if (req->rq_reply_deadline > ktime_get_real_seconds()) {
++		spin_unlock(&req->rq_lock);
++		return 1;
++	}
++	if (req->rq_req_deadline > ktime_get_real_seconds()) {
+ 		spin_unlock(&req->rq_lock);
+ 		return 1;
+ 	}
+diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
+index cdf20d6..845e64a 100644
+--- a/drivers/staging/lustre/lustre/include/obd_support.h
++++ b/drivers/staging/lustre/lustre/include/obd_support.h
+@@ -364,6 +364,9 @@ extern char obd_jobid_var[];
+ #define OBD_FAIL_PTLRPC_CLIENT_BULK_CB2  0x515
+ #define OBD_FAIL_PTLRPC_DELAY_IMP_FULL   0x516
+ #define OBD_FAIL_PTLRPC_CANCEL_RESEND    0x517
++#define OBD_FAIL_PTLRPC_DROP_BULK	 0x51a
++#define OBD_FAIL_PTLRPC_LONG_REQ_UNLINK	 0x51b
++#define OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK 0x51c
+ 
+ #define OBD_FAIL_OBD_PING_NET	    0x600
+ #define OBD_FAIL_OBD_LOG_CANCEL_NET      0x601
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index 5d832eb..d4463d7 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -621,6 +621,8 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
+ 	request->rq_reply_cbid.cbid_arg = request;
+ 
+ 	request->rq_reply_deadline = 0;
++	request->rq_bulk_deadline = 0;
++	request->rq_req_deadline = 0;
+ 	request->rq_phase = RQ_PHASE_NEW;
+ 	request->rq_next_phase = RQ_PHASE_UNDEFINED;
+ 
+@@ -632,6 +634,37 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
+ 	request->rq_xid = ptlrpc_next_xid();
+ 	lustre_msg_set_opc(request->rq_reqmsg, opcode);
+ 
++	/* Let's setup deadline for req/reply/bulk unlink for opcode. */
++	if (cfs_fail_val == opcode) {
++		time_t *fail_t = NULL, *fail2_t = NULL;
++
++		if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK)) {
++			fail_t = &request->rq_bulk_deadline;
++		} else if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK)) {
++			fail_t = &request->rq_reply_deadline;
++		} else if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REQ_UNLINK)) {
++			fail_t = &request->rq_req_deadline;
++		} else if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK)) {
++			fail_t = &request->rq_reply_deadline;
++			fail2_t = &request->rq_bulk_deadline;
++		}
++
++		if (fail_t) {
++			*fail_t = ktime_get_real_seconds() + LONG_UNLINK;
++
++			if (fail2_t)
++				*fail2_t = ktime_get_real_seconds() +
++						 LONG_UNLINK;
++
++			/* The RPC is infected, let the test change the
++			 * fail_loc
++			 */
++			set_current_state(TASK_UNINTERRUPTIBLE);
++			schedule_timeout(cfs_time_seconds(2));
++			set_current_state(TASK_RUNNING);
++		}
++	}
++
+ 	return 0;
+ 
+ out_ctx:
+@@ -1481,16 +1514,28 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ 		if (!(req->rq_phase == RQ_PHASE_RPC ||
+ 		      req->rq_phase == RQ_PHASE_BULK ||
+ 		      req->rq_phase == RQ_PHASE_INTERPRET ||
+-		      req->rq_phase == RQ_PHASE_UNREGISTERING ||
++		      req->rq_phase == RQ_PHASE_UNREG_RPC ||
++		      req->rq_phase == RQ_PHASE_UNREG_BULK ||
+ 		      req->rq_phase == RQ_PHASE_COMPLETE)) {
+ 			DEBUG_REQ(D_ERROR, req, "bad phase %x", req->rq_phase);
+ 			LBUG();
+ 		}
+ 
+-		if (req->rq_phase == RQ_PHASE_UNREGISTERING) {
++		if (req->rq_phase == RQ_PHASE_UNREG_RPC ||
++		    req->rq_phase == RQ_PHASE_UNREG_BULK) {
+ 			LASSERT(req->rq_next_phase != req->rq_phase);
+ 			LASSERT(req->rq_next_phase != RQ_PHASE_UNDEFINED);
+ 
++			if (req->rq_req_deadline &&
++			    !OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REQ_UNLINK))
++				req->rq_req_deadline = 0;
++			if (req->rq_reply_deadline &&
++			    !OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK))
++				req->rq_reply_deadline = 0;
++			if (req->rq_bulk_deadline &&
++			    !OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK))
++				req->rq_bulk_deadline = 0;
++
+ 			/*
+ 			 * Skip processing until reply is unlinked. We
+ 			 * can't return to pool before that and we can't
+@@ -1498,7 +1543,10 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ 			 * sure that all rdma transfers finished and will
+ 			 * not corrupt any data.
+ 			 */
+-			if (ptlrpc_client_recv_or_unlink(req) ||
++			if (req->rq_phase == RQ_PHASE_UNREG_RPC &&
++			    ptlrpc_client_recv_or_unlink(req))
++				continue;
++			if (req->rq_phase == RQ_PHASE_UNREG_BULK &&
+ 			    ptlrpc_client_bulk_active(req))
+ 				continue;
+ 
+@@ -1976,7 +2024,7 @@ void ptlrpc_interrupted_set(void *data)
+ 			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
+ 
+ 		if (req->rq_phase != RQ_PHASE_RPC &&
+-		    req->rq_phase != RQ_PHASE_UNREGISTERING)
++		    req->rq_phase != RQ_PHASE_UNREG_RPC)
+ 			continue;
+ 
+ 		ptlrpc_mark_interrupted(req);
+@@ -2288,8 +2336,9 @@ int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
+ 
+ 	/* Let's setup deadline for reply unlink. */
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    async && request->rq_reply_deadline == 0)
+-		request->rq_reply_deadline = ktime_get_real_seconds()+LONG_UNLINK;
++	    async && request->rq_reply_deadline == 0 && cfs_fail_val == 0)
++		request->rq_reply_deadline =
++			ktime_get_real_seconds() + LONG_UNLINK;
+ 
+ 	/* Nothing left to do. */
+ 	if (!ptlrpc_client_recv_or_unlink(request))
+@@ -2302,7 +2351,7 @@ int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
+ 		return 1;
+ 
+ 	/* Move to "Unregistering" phase as reply was not unlinked yet. */
+-	ptlrpc_rqphase_move(request, RQ_PHASE_UNREGISTERING);
++	ptlrpc_rqphase_move(request, RQ_PHASE_UNREG_RPC);
+ 
+ 	/* Do not wait for unlink to finish. */
+ 	if (async)
+@@ -2932,7 +2981,6 @@ static void ptlrpcd_add_work_req(struct ptlrpc_request *req)
+ 	req->rq_timeout		= obd_timeout;
+ 	req->rq_sent		= ktime_get_real_seconds();
+ 	req->rq_deadline	= req->rq_sent + req->rq_timeout;
+-	req->rq_reply_deadline	= req->rq_deadline;
+ 	req->rq_phase		= RQ_PHASE_INTERPRET;
+ 	req->rq_next_phase	= RQ_PHASE_COMPLETE;
+ 	req->rq_xid		= ptlrpc_next_xid();
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index 914bbd2..3292e6e 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -356,9 +356,8 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+ 						  "still on delayed list");
+ 				}
+ 
+-				CERROR("%s: RPCs in \"%s\" phase found (%d). Network is sluggish? Waiting them to error out.\n",
++				CERROR("%s: Unregistering RPCs found (%d). Network is sluggish? Waiting them to error out.\n",
+ 				       cli_tgt,
+-				       ptlrpc_phase2str(RQ_PHASE_UNREGISTERING),
+ 				       atomic_read(&imp->
+ 						   imp_unregistering));
+ 			}
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+index 8c49f5e..11ec825 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+@@ -247,7 +247,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+ 
+ 	/* Let's setup deadline for reply unlink. */
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK) &&
+-	    async && req->rq_bulk_deadline == 0)
++	    async && req->rq_bulk_deadline == 0 && cfs_fail_val == 0)
+ 		req->rq_bulk_deadline = ktime_get_real_seconds() + LONG_UNLINK;
+ 
+ 	if (ptlrpc_client_bulk_active(req) == 0)	/* completed or */
+@@ -266,7 +266,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+ 		return 1;				/* never registered */
+ 
+ 	/* Move to "Unregistering" phase as bulk was not unlinked yet. */
+-	ptlrpc_rqphase_move(req, RQ_PHASE_UNREGISTERING);
++	ptlrpc_rqphase_move(req, RQ_PHASE_UNREG_BULK);
+ 
+ 	/* Do not wait for unlink to finish. */
+ 	if (async)
 -- 
 2.7.4
