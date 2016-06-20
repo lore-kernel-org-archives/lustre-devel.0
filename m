@@ -1,342 +1,370 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Mon, 20 Jun 2016 16:55:24 -0400
-Subject: [lustre-devel] [PATCH v2 01/29] staging/lustre/llite: allocate and
-	free client cache asynchronously
+Date: Mon, 20 Jun 2016 16:55:34 -0400
+Subject: [lustre-devel] [PATCH v2 11/29] staging/lustre/ptlrpc: lost bulk
+	leads to a hang
 In-Reply-To: <1466456152-2199975-1-git-send-email-green@linuxhacker.ru>
 References: <1466456152-2199975-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466456152-2199975-2-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466456152-2199975-12-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Emoly Liu <emoly.liu@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Vitaly Fertman <vitaly.fertman@seagate.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Emoly Liu <emoly.liu@intel.com>
+From: Vitaly Fertman <vitaly.fertman@seagate.com>
 
-Since the inflight request holds import refcount as well as export,
-sometimes obd_disconnect() in client_common_put_super() can't put
-the last refcount of OSC import (e.g. due to network disconnection),
-this will cause cl_cache being accessed after free.
+The reverse order of request_out_callback() and reply_in_callback()
+puts the RPC into UNREGISTERING state, which is waiting for RPC &
+bulk md unlink, whereas only RPC md unlink has been called so far.
+If bulk is lost, even expired_set does not check for UNREGISTERING
+state.
 
-To fix this issue, ccc_users is used as cl_cache refcount, and
-lov/llite/osc all hold one cl_cache refcount respectively, to avoid
-the race that a new OST is being added into the system when the client
-is mounted.
-The following cl_cache functions are added:
-- cl_cache_init(): allocate and initialize cl_cache
-- cl_cache_incref(): increase cl_cache refcount
-- cl_cache_decref(): decrease cl_cache refcount and free the cache
-  if refcount=0.
+The same for write if server returns an error.
 
-Signed-off-by: Emoly Liu <emoly.liu@intel.com>
-Reviewed-on: http://review.whamcloud.com/13746
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6173
-Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+This phase is ambiguous, split to UNREG_RPC and UNREG_BULK.
+
+Signed-off-by: Vitaly Fertman <vitaly.fertman@seagate.com>
+Seagate-bug-id:  MRP-2953, MRP-3206
+Reviewed-by: Andriy Skulysh <andriy.skulysh@seagate.com>
+Reviewed-by: Alexey Leonidovich Lyashkov <alexey.lyashkov@seagate.com>
+Tested-by: Elena V. Gryaznova <elena.gryaznova@seagate.com>
+Reviewed-on: http://review.whamcloud.com/19953
+Reviewed-by: Chris Horn <hornc@cray.com>
+Reviewed-by: Ann Koehler <amk@cray.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h  | 10 ++++-
- drivers/staging/lustre/lustre/include/obd.h        |  2 +-
- .../staging/lustre/lustre/llite/llite_internal.h   |  2 +-
- drivers/staging/lustre/lustre/llite/llite_lib.c    | 35 +++++++---------
- drivers/staging/lustre/lustre/llite/lproc_llite.c  |  6 +--
- drivers/staging/lustre/lustre/lov/lov_obd.c        |  7 ++++
- drivers/staging/lustre/lustre/obdclass/cl_page.c   | 46 ++++++++++++++++++++++
- drivers/staging/lustre/lustre/osc/osc_page.c       |  4 +-
- drivers/staging/lustre/lustre/osc/osc_request.c    |  4 +-
- 9 files changed, 86 insertions(+), 30 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_net.h | 48 +++++++++-------
+ .../staging/lustre/lustre/include/obd_support.h    |  3 +
+ drivers/staging/lustre/lustre/ptlrpc/client.c      | 64 +++++++++++++++++++---
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |  3 +-
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |  4 +-
+ 5 files changed, 91 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index 36ca935..3cd4a25 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -2322,7 +2322,8 @@ void cl_lock_descr_print(const struct lu_env *env, void *cookie,
-  */
- struct cl_client_cache {
- 	/**
--	 * # of users (OSCs)
-+	 * # of client cache refcount
-+	 * # of users (OSCs) + 2 (held by llite and lov)
- 	 */
- 	atomic_t		ccc_users;
- 	/**
-@@ -2357,6 +2358,13 @@ struct cl_client_cache {
- 
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 523d082..3f43664 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -480,8 +480,9 @@ enum rq_phase {
+ 	RQ_PHASE_BULK	   = 0xebc0de02,
+ 	RQ_PHASE_INTERPRET      = 0xebc0de03,
+ 	RQ_PHASE_COMPLETE       = 0xebc0de04,
+-	RQ_PHASE_UNREGISTERING  = 0xebc0de05,
+-	RQ_PHASE_UNDEFINED      = 0xebc0de06
++	RQ_PHASE_UNREG_RPC	= 0xebc0de05,
++	RQ_PHASE_UNREG_BULK	= 0xebc0de06,
++	RQ_PHASE_UNDEFINED	= 0xebc0de07
  };
  
-+/**
-+ * cl_cache functions
-+ */
-+struct cl_client_cache *cl_cache_init(unsigned long lru_page_max);
-+void cl_cache_incref(struct cl_client_cache *cache);
-+void cl_cache_decref(struct cl_client_cache *cache);
+ /** Type of request interpreter call-back */
+@@ -1263,6 +1264,8 @@ struct ptlrpc_cli_req {
+ 	time_t				 cr_reply_deadline;
+ 	/** when req bulk unlink must finish. */
+ 	time_t				 cr_bulk_deadline;
++	/** when req unlink must finish. */
++	time_t				 cr_req_deadline;
+ 	/** Portal to which this request would be sent */
+ 	short				 cr_req_ptl;
+ 	/** Portal where to wait for reply and where reply would be sent */
+@@ -1318,6 +1321,7 @@ struct ptlrpc_cli_req {
+ #define rq_real_sent		rq_cli.cr_sent_out
+ #define rq_reply_deadline	rq_cli.cr_reply_deadline
+ #define rq_bulk_deadline	rq_cli.cr_bulk_deadline
++#define rq_req_deadline		rq_cli.cr_req_deadline
+ #define rq_nr_resend		rq_cli.cr_resend_nr
+ #define rq_request_portal	rq_cli.cr_req_ptl
+ #define rq_reply_portal		rq_cli.cr_rep_ptl
+@@ -1693,8 +1697,10 @@ ptlrpc_phase2str(enum rq_phase phase)
+ 		return "Interpret";
+ 	case RQ_PHASE_COMPLETE:
+ 		return "Complete";
+-	case RQ_PHASE_UNREGISTERING:
+-		return "Unregistering";
++	case RQ_PHASE_UNREG_RPC:
++		return "UnregRPC";
++	case RQ_PHASE_UNREG_BULK:
++		return "UnregBULK";
+ 	default:
+ 		return "?Phase?";
+ 	}
+@@ -1721,7 +1727,7 @@ ptlrpc_rqphase2str(struct ptlrpc_request *req)
+ #define DEBUG_REQ_FLAGS(req)						    \
+ 	ptlrpc_rqphase2str(req),						\
+ 	FLAG(req->rq_intr, "I"), FLAG(req->rq_replied, "R"),		    \
+-	FLAG(req->rq_err, "E"),						 \
++	FLAG(req->rq_err, "E"),	FLAG(req->rq_net_err, "e"),		    \
+ 	FLAG(req->rq_timedout, "X") /* eXpired */, FLAG(req->rq_resend, "S"),   \
+ 	FLAG(req->rq_restart, "T"), FLAG(req->rq_replay, "P"),		  \
+ 	FLAG(req->rq_no_resend, "N"),					   \
+@@ -1729,7 +1735,7 @@ ptlrpc_rqphase2str(struct ptlrpc_request *req)
+ 	FLAG(req->rq_wait_ctx, "C"), FLAG(req->rq_hp, "H"),		     \
+ 	FLAG(req->rq_committed, "M")
+ 
+-#define REQ_FLAGS_FMT "%s:%s%s%s%s%s%s%s%s%s%s%s%s"
++#define REQ_FLAGS_FMT "%s:%s%s%s%s%s%s%s%s%s%s%s%s%s"
+ 
+ void _debug_req(struct ptlrpc_request *req,
+ 		struct libcfs_debug_msg_data *data, const char *fmt, ...)
+@@ -2380,8 +2386,7 @@ static inline int ptlrpc_client_bulk_active(struct ptlrpc_request *req)
+ 
+ 	desc = req->rq_bulk;
+ 
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK) &&
+-	    req->rq_bulk_deadline > ktime_get_real_seconds())
++	if (req->rq_bulk_deadline > ktime_get_real_seconds())
+ 		return 1;
+ 
+ 	if (!desc)
+@@ -2728,13 +2733,20 @@ ptlrpc_rqphase_move(struct ptlrpc_request *req, enum rq_phase new_phase)
+ 	if (req->rq_phase == new_phase)
+ 		return;
+ 
+-	if (new_phase == RQ_PHASE_UNREGISTERING) {
++	if (new_phase == RQ_PHASE_UNREG_RPC ||
++	    new_phase == RQ_PHASE_UNREG_BULK) {
++		/* No embedded unregistering phases */
++		if (req->rq_phase == RQ_PHASE_UNREG_RPC ||
++		    req->rq_phase == RQ_PHASE_UNREG_BULK)
++			return;
 +
- /** @} cl_page */
+ 		req->rq_next_phase = req->rq_phase;
+ 		if (req->rq_import)
+ 			atomic_inc(&req->rq_import->imp_unregistering);
+ 	}
  
- /** \defgroup cl_lock cl_lock
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index e654d42..ed1081a 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -415,7 +415,7 @@ struct lov_obd {
- 	enum lustre_sec_part    lov_sp_me;
- 
- 	/* Cached LRU and unstable data from upper layer */
--	void		       *lov_cache;
-+	struct cl_client_cache *lov_cache;
- 
- 	struct rw_semaphore     lov_notify_lock;
- 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 7c1a3254..74cd241 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -493,7 +493,7 @@ struct ll_sb_info {
- 	 * any page which is sent to a server as part of a bulk request,
- 	 * but is uncommitted to stable storage.
- 	 */
--	struct cl_client_cache    ll_cache;
-+	struct cl_client_cache    *ll_cache;
- 
- 	struct lprocfs_stats     *ll_ra_stats;
- 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index ac833db..83f4e1a 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -83,15 +83,11 @@ static struct ll_sb_info *ll_init_sbi(struct super_block *sb)
- 	pages = si.totalram - si.totalhigh;
- 	lru_page_max = pages / 2;
- 
--	/* initialize ll_cache data */
--	atomic_set(&sbi->ll_cache.ccc_users, 0);
--	sbi->ll_cache.ccc_lru_max = lru_page_max;
--	atomic_set(&sbi->ll_cache.ccc_lru_left, lru_page_max);
--	spin_lock_init(&sbi->ll_cache.ccc_lru_lock);
--	INIT_LIST_HEAD(&sbi->ll_cache.ccc_lru);
--
--	atomic_set(&sbi->ll_cache.ccc_unstable_nr, 0);
--	init_waitqueue_head(&sbi->ll_cache.ccc_unstable_waitq);
-+	sbi->ll_cache = cl_cache_init(lru_page_max);
-+	if (!sbi->ll_cache) {
-+		kfree(sbi);
-+		return NULL;
-+	}
- 
- 	sbi->ll_ra_info.ra_max_pages_per_file = min(pages / 32,
- 					   SBI_DEFAULT_READAHEAD_MAX);
-@@ -131,6 +127,11 @@ static void ll_free_sbi(struct super_block *sb)
+-	if (req->rq_phase == RQ_PHASE_UNREGISTERING) {
++	if (req->rq_phase == RQ_PHASE_UNREG_RPC ||
++	    req->rq_phase == RQ_PHASE_UNREG_BULK) {
+ 		if (req->rq_import)
+ 			atomic_dec(&req->rq_import->imp_unregistering);
+ 	}
+@@ -2751,9 +2763,6 @@ ptlrpc_rqphase_move(struct ptlrpc_request *req, enum rq_phase new_phase)
+ static inline int
+ ptlrpc_client_early(struct ptlrpc_request *req)
  {
- 	struct ll_sb_info *sbi = ll_s2sbi(sb);
- 
-+	if (sbi->ll_cache) {
-+		cl_cache_decref(sbi->ll_cache);
-+		sbi->ll_cache = NULL;
-+	}
-+
- 	kfree(sbi);
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    req->rq_reply_deadline > ktime_get_real_seconds())
+-		return 0;
+ 	return req->rq_early;
  }
  
-@@ -514,8 +515,8 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
- 	cl_sb_init(sb);
+@@ -2763,8 +2772,7 @@ ptlrpc_client_early(struct ptlrpc_request *req)
+ static inline int
+ ptlrpc_client_replied(struct ptlrpc_request *req)
+ {
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    req->rq_reply_deadline > ktime_get_real_seconds())
++	if (req->rq_reply_deadline > ktime_get_real_seconds())
+ 		return 0;
+ 	return req->rq_replied;
+ }
+@@ -2773,8 +2781,7 @@ ptlrpc_client_replied(struct ptlrpc_request *req)
+ static inline int
+ ptlrpc_client_recv(struct ptlrpc_request *req)
+ {
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    req->rq_reply_deadline > ktime_get_real_seconds())
++	if (req->rq_reply_deadline > ktime_get_real_seconds())
+ 		return 1;
+ 	return req->rq_receiving_reply;
+ }
+@@ -2785,8 +2792,11 @@ ptlrpc_client_recv_or_unlink(struct ptlrpc_request *req)
+ 	int rc;
  
- 	err = obd_set_info_async(NULL, sbi->ll_dt_exp, sizeof(KEY_CACHE_SET),
--				 KEY_CACHE_SET, sizeof(sbi->ll_cache),
--				 &sbi->ll_cache, NULL);
-+				 KEY_CACHE_SET, sizeof(*sbi->ll_cache),
-+				 sbi->ll_cache, NULL);
- 
- 	sb->s_root = d_make_root(root);
- 	if (!sb->s_root) {
-@@ -560,8 +561,6 @@ out_lock_cn_cb:
- out_dt:
- 	obd_disconnect(sbi->ll_dt_exp);
- 	sbi->ll_dt_exp = NULL;
--	/* Make sure all OScs are gone, since cl_cache is accessing sbi. */
--	obd_zombie_barrier();
- out_md_fid:
- 	obd_fid_fini(sbi->ll_md_exp->exp_obd);
- out_md:
-@@ -618,10 +617,6 @@ static void client_common_put_super(struct super_block *sb)
- 	obd_fid_fini(sbi->ll_dt_exp->exp_obd);
- 	obd_disconnect(sbi->ll_dt_exp);
- 	sbi->ll_dt_exp = NULL;
--	/* wait till all OSCs are gone, since cl_cache is accessing sbi.
--	 * see LU-2543.
--	 */
--	obd_zombie_barrier();
- 
- 	ldebugfs_unregister_mountpoint(sbi);
- 
-@@ -962,12 +957,12 @@ void ll_put_super(struct super_block *sb)
- 	if (!force) {
- 		struct l_wait_info lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
- 
--		rc = l_wait_event(sbi->ll_cache.ccc_unstable_waitq,
--				  !atomic_read(&sbi->ll_cache.ccc_unstable_nr),
-+		rc = l_wait_event(sbi->ll_cache->ccc_unstable_waitq,
-+				  !atomic_read(&sbi->ll_cache->ccc_unstable_nr),
- 				  &lwi);
+ 	spin_lock(&req->rq_lock);
+-	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    req->rq_reply_deadline > ktime_get_real_seconds()) {
++	if (req->rq_reply_deadline > ktime_get_real_seconds()) {
++		spin_unlock(&req->rq_lock);
++		return 1;
++	}
++	if (req->rq_req_deadline > ktime_get_real_seconds()) {
+ 		spin_unlock(&req->rq_lock);
+ 		return 1;
  	}
+diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
+index cdf20d6..845e64a 100644
+--- a/drivers/staging/lustre/lustre/include/obd_support.h
++++ b/drivers/staging/lustre/lustre/include/obd_support.h
+@@ -364,6 +364,9 @@ extern char obd_jobid_var[];
+ #define OBD_FAIL_PTLRPC_CLIENT_BULK_CB2  0x515
+ #define OBD_FAIL_PTLRPC_DELAY_IMP_FULL   0x516
+ #define OBD_FAIL_PTLRPC_CANCEL_RESEND    0x517
++#define OBD_FAIL_PTLRPC_DROP_BULK	 0x51a
++#define OBD_FAIL_PTLRPC_LONG_REQ_UNLINK	 0x51b
++#define OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK 0x51c
  
--	ccc_count = atomic_read(&sbi->ll_cache.ccc_unstable_nr);
-+	ccc_count = atomic_read(&sbi->ll_cache->ccc_unstable_nr);
- 	if (!force && rc != -EINTR)
- 		LASSERTF(!ccc_count, "count: %i\n", ccc_count);
+ #define OBD_FAIL_OBD_PING_NET	    0x600
+ #define OBD_FAIL_OBD_LOG_CANCEL_NET      0x601
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index 5d832eb..d4463d7 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -621,6 +621,8 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
+ 	request->rq_reply_cbid.cbid_arg = request;
  
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 6e9a8a5..1f00bce 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -360,7 +360,7 @@ static int ll_max_cached_mb_seq_show(struct seq_file *m, void *v)
- {
- 	struct super_block     *sb    = m->private;
- 	struct ll_sb_info      *sbi   = ll_s2sbi(sb);
--	struct cl_client_cache *cache = &sbi->ll_cache;
-+	struct cl_client_cache *cache = sbi->ll_cache;
- 	int shift = 20 - PAGE_SHIFT;
- 	int max_cached_mb;
- 	int unused_mb;
-@@ -387,7 +387,7 @@ static ssize_t ll_max_cached_mb_seq_write(struct file *file,
- {
- 	struct super_block *sb = ((struct seq_file *)file->private_data)->private;
- 	struct ll_sb_info *sbi = ll_s2sbi(sb);
--	struct cl_client_cache *cache = &sbi->ll_cache;
-+	struct cl_client_cache *cache = sbi->ll_cache;
- 	struct lu_env *env;
- 	int refcheck;
- 	int mult, rc, pages_number;
-@@ -826,7 +826,7 @@ static ssize_t unstable_stats_show(struct kobject *kobj,
- {
- 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
- 					      ll_kobj);
--	struct cl_client_cache *cache = &sbi->ll_cache;
-+	struct cl_client_cache *cache = sbi->ll_cache;
- 	int pages, mb;
+ 	request->rq_reply_deadline = 0;
++	request->rq_bulk_deadline = 0;
++	request->rq_req_deadline = 0;
+ 	request->rq_phase = RQ_PHASE_NEW;
+ 	request->rq_next_phase = RQ_PHASE_UNDEFINED;
  
- 	pages = atomic_read(&cache->ccc_unstable_nr);
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index c87096e..9b92d55 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -892,6 +892,12 @@ static int lov_cleanup(struct obd_device *obd)
- 		kfree(lov->lov_tgts);
- 		lov->lov_tgt_size = 0;
- 	}
+@@ -632,6 +634,37 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
+ 	request->rq_xid = ptlrpc_next_xid();
+ 	lustre_msg_set_opc(request->rq_reqmsg, opcode);
+ 
++	/* Let's setup deadline for req/reply/bulk unlink for opcode. */
++	if (cfs_fail_val == opcode) {
++		time_t *fail_t = NULL, *fail2_t = NULL;
 +
-+	if (lov->lov_cache) {
-+		cl_cache_decref(lov->lov_cache);
-+		lov->lov_cache = NULL;
++		if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK)) {
++			fail_t = &request->rq_bulk_deadline;
++		} else if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK)) {
++			fail_t = &request->rq_reply_deadline;
++		} else if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REQ_UNLINK)) {
++			fail_t = &request->rq_req_deadline;
++		} else if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BOTH_UNLINK)) {
++			fail_t = &request->rq_reply_deadline;
++			fail2_t = &request->rq_bulk_deadline;
++		}
++
++		if (fail_t) {
++			*fail_t = ktime_get_real_seconds() + LONG_UNLINK;
++
++			if (fail2_t)
++				*fail2_t = ktime_get_real_seconds() +
++						 LONG_UNLINK;
++
++			/* The RPC is infected, let the test change the
++			 * fail_loc
++			 */
++			set_current_state(TASK_UNINTERRUPTIBLE);
++			schedule_timeout(cfs_time_seconds(2));
++			set_current_state(TASK_RUNNING);
++		}
 +	}
 +
  	return 0;
- }
  
-@@ -2121,6 +2127,7 @@ static int lov_set_info_async(const struct lu_env *env, struct obd_export *exp,
- 		LASSERT(!lov->lov_cache);
- 		lov->lov_cache = val;
- 		do_inactive = 1;
-+		cl_cache_incref(lov->lov_cache);
- 	}
+ out_ctx:
+@@ -1481,16 +1514,28 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ 		if (!(req->rq_phase == RQ_PHASE_RPC ||
+ 		      req->rq_phase == RQ_PHASE_BULK ||
+ 		      req->rq_phase == RQ_PHASE_INTERPRET ||
+-		      req->rq_phase == RQ_PHASE_UNREGISTERING ||
++		      req->rq_phase == RQ_PHASE_UNREG_RPC ||
++		      req->rq_phase == RQ_PHASE_UNREG_BULK ||
+ 		      req->rq_phase == RQ_PHASE_COMPLETE)) {
+ 			DEBUG_REQ(D_ERROR, req, "bad phase %x", req->rq_phase);
+ 			LBUG();
+ 		}
  
- 	for (i = 0; i < count; i++, val = (char *)val + incr) {
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-index 71bff49..db2dc6b 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-@@ -1072,3 +1072,49 @@ void cl_page_slice_add(struct cl_page *page, struct cl_page_slice *slice,
- 	slice->cpl_page = page;
- }
- EXPORT_SYMBOL(cl_page_slice_add);
+-		if (req->rq_phase == RQ_PHASE_UNREGISTERING) {
++		if (req->rq_phase == RQ_PHASE_UNREG_RPC ||
++		    req->rq_phase == RQ_PHASE_UNREG_BULK) {
+ 			LASSERT(req->rq_next_phase != req->rq_phase);
+ 			LASSERT(req->rq_next_phase != RQ_PHASE_UNDEFINED);
+ 
++			if (req->rq_req_deadline &&
++			    !OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REQ_UNLINK))
++				req->rq_req_deadline = 0;
++			if (req->rq_reply_deadline &&
++			    !OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK))
++				req->rq_reply_deadline = 0;
++			if (req->rq_bulk_deadline &&
++			    !OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK))
++				req->rq_bulk_deadline = 0;
 +
-+/**
-+ * Allocate and initialize cl_cache, called by ll_init_sbi().
-+ */
-+struct cl_client_cache *cl_cache_init(unsigned long lru_page_max)
-+{
-+	struct cl_client_cache	*cache = NULL;
-+
-+	cache = kzalloc(sizeof(*cache), GFP_KERNEL);
-+	if (!cache)
-+		return NULL;
-+
-+	/* Initialize cache data */
-+	atomic_set(&cache->ccc_users, 1);
-+	cache->ccc_lru_max = lru_page_max;
-+	atomic_set(&cache->ccc_lru_left, lru_page_max);
-+	spin_lock_init(&cache->ccc_lru_lock);
-+	INIT_LIST_HEAD(&cache->ccc_lru);
-+
-+	atomic_set(&cache->ccc_unstable_nr, 0);
-+	init_waitqueue_head(&cache->ccc_unstable_waitq);
-+
-+	return cache;
-+}
-+EXPORT_SYMBOL(cl_cache_init);
-+
-+/**
-+ * Increase cl_cache refcount
-+ */
-+void cl_cache_incref(struct cl_client_cache *cache)
-+{
-+	atomic_inc(&cache->ccc_users);
-+}
-+EXPORT_SYMBOL(cl_cache_incref);
-+
-+/**
-+ * Decrease cl_cache refcount and free the cache if refcount=0.
-+ * Since llite, lov and osc all hold cl_cache refcount,
-+ * the free will not cause race. (LU-6173)
-+ */
-+void cl_cache_decref(struct cl_client_cache *cache)
-+{
-+	if (atomic_dec_and_test(&cache->ccc_users))
-+		kfree(cache);
-+}
-+EXPORT_SYMBOL(cl_cache_decref);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
-index 57d8a5a..c1aa11e 100644
---- a/drivers/staging/lustre/lustre/osc/osc_page.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_page.c
-@@ -414,7 +414,7 @@ static int osc_cache_too_much(struct client_obd *cli)
- 	int pages = atomic_read(&cli->cl_lru_in_list);
- 	unsigned long budget;
+ 			/*
+ 			 * Skip processing until reply is unlinked. We
+ 			 * can't return to pool before that and we can't
+@@ -1498,7 +1543,10 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ 			 * sure that all rdma transfers finished and will
+ 			 * not corrupt any data.
+ 			 */
+-			if (ptlrpc_client_recv_or_unlink(req) ||
++			if (req->rq_phase == RQ_PHASE_UNREG_RPC &&
++			    ptlrpc_client_recv_or_unlink(req))
++				continue;
++			if (req->rq_phase == RQ_PHASE_UNREG_BULK &&
+ 			    ptlrpc_client_bulk_active(req))
+ 				continue;
  
--	budget = cache->ccc_lru_max / atomic_read(&cache->ccc_users);
-+	budget = cache->ccc_lru_max / (atomic_read(&cache->ccc_users) - 2);
+@@ -1976,7 +2024,7 @@ void ptlrpc_interrupted_set(void *data)
+ 			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
  
- 	/* if it's going to run out LRU slots, we should free some, but not
- 	 * too much to maintain fairness among OSCs.
-@@ -714,7 +714,7 @@ int osc_lru_reclaim(struct client_obd *cli)
- 	cache->ccc_lru_shrinkers++;
- 	list_move_tail(&cli->cl_lru_osc, &cache->ccc_lru);
+ 		if (req->rq_phase != RQ_PHASE_RPC &&
+-		    req->rq_phase != RQ_PHASE_UNREGISTERING)
++		    req->rq_phase != RQ_PHASE_UNREG_RPC)
+ 			continue;
  
--	max_scans = atomic_read(&cache->ccc_users);
-+	max_scans = atomic_read(&cache->ccc_users) - 2;
- 	while (--max_scans > 0 && !list_empty(&cache->ccc_lru)) {
- 		cli = list_entry(cache->ccc_lru.next, struct client_obd,
- 				 cl_lru_osc);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 7260027..9334349 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -2913,7 +2913,7 @@ static int osc_set_info_async(const struct lu_env *env, struct obd_export *exp,
+ 		ptlrpc_mark_interrupted(req);
+@@ -2288,8 +2336,9 @@ int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
  
- 		LASSERT(!cli->cl_cache); /* only once */
- 		cli->cl_cache = val;
--		atomic_inc(&cli->cl_cache->ccc_users);
-+		cl_cache_incref(cli->cl_cache);
- 		cli->cl_lru_left = &cli->cl_cache->ccc_lru_left;
+ 	/* Let's setup deadline for reply unlink. */
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_REPL_UNLINK) &&
+-	    async && request->rq_reply_deadline == 0)
+-		request->rq_reply_deadline = ktime_get_real_seconds()+LONG_UNLINK;
++	    async && request->rq_reply_deadline == 0 && cfs_fail_val == 0)
++		request->rq_reply_deadline =
++			ktime_get_real_seconds() + LONG_UNLINK;
  
- 		/* add this osc into entity list */
-@@ -3293,7 +3293,7 @@ static int osc_cleanup(struct obd_device *obd)
- 		list_del_init(&cli->cl_lru_osc);
- 		spin_unlock(&cli->cl_cache->ccc_lru_lock);
- 		cli->cl_lru_left = NULL;
--		atomic_dec(&cli->cl_cache->ccc_users);
-+		cl_cache_decref(cli->cl_cache);
- 		cli->cl_cache = NULL;
- 	}
+ 	/* Nothing left to do. */
+ 	if (!ptlrpc_client_recv_or_unlink(request))
+@@ -2302,7 +2351,7 @@ int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
+ 		return 1;
  
+ 	/* Move to "Unregistering" phase as reply was not unlinked yet. */
+-	ptlrpc_rqphase_move(request, RQ_PHASE_UNREGISTERING);
++	ptlrpc_rqphase_move(request, RQ_PHASE_UNREG_RPC);
+ 
+ 	/* Do not wait for unlink to finish. */
+ 	if (async)
+@@ -2932,7 +2981,6 @@ static void ptlrpcd_add_work_req(struct ptlrpc_request *req)
+ 	req->rq_timeout		= obd_timeout;
+ 	req->rq_sent		= ktime_get_real_seconds();
+ 	req->rq_deadline	= req->rq_sent + req->rq_timeout;
+-	req->rq_reply_deadline	= req->rq_deadline;
+ 	req->rq_phase		= RQ_PHASE_INTERPRET;
+ 	req->rq_next_phase	= RQ_PHASE_COMPLETE;
+ 	req->rq_xid		= ptlrpc_next_xid();
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index 914bbd2..3292e6e 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -356,9 +356,8 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+ 						  "still on delayed list");
+ 				}
+ 
+-				CERROR("%s: RPCs in \"%s\" phase found (%d). Network is sluggish? Waiting them to error out.\n",
++				CERROR("%s: Unregistering RPCs found (%d). Network is sluggish? Waiting them to error out.\n",
+ 				       cli_tgt,
+-				       ptlrpc_phase2str(RQ_PHASE_UNREGISTERING),
+ 				       atomic_read(&imp->
+ 						   imp_unregistering));
+ 			}
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+index 8c49f5e..11ec825 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+@@ -247,7 +247,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+ 
+ 	/* Let's setup deadline for reply unlink. */
+ 	if (OBD_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK) &&
+-	    async && req->rq_bulk_deadline == 0)
++	    async && req->rq_bulk_deadline == 0 && cfs_fail_val == 0)
+ 		req->rq_bulk_deadline = ktime_get_real_seconds() + LONG_UNLINK;
+ 
+ 	if (ptlrpc_client_bulk_active(req) == 0)	/* completed or */
+@@ -266,7 +266,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+ 		return 1;				/* never registered */
+ 
+ 	/* Move to "Unregistering" phase as bulk was not unlinked yet. */
+-	ptlrpc_rqphase_move(req, RQ_PHASE_UNREGISTERING);
++	ptlrpc_rqphase_move(req, RQ_PHASE_UNREG_BULK);
+ 
+ 	/* Do not wait for unlink to finish. */
+ 	if (async)
 -- 
 2.7.4
