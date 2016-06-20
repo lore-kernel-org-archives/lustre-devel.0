@@ -1,53 +1,57 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Jun 2016 22:07:17 -0400
-Subject: [lustre-devel] [PATCH 02/28] staging/lustre/llite: correct request
-	handling after ll_lookup_it()
+Date: Sun, 19 Jun 2016 22:07:19 -0400
+Subject: [lustre-devel] [PATCH 04/28] staging/lustre/llite: lock i_lock
+	before __d_drop()
 In-Reply-To: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
 References: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466388463-1817551-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466388463-1817551-5-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruno Faccini <bruno.faccini@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: "John L. Hammond" <john.hammond@intel.com>
+From: Bruno Faccini <bruno.faccini@intel.com>
 
-In the FIFO cases of ll_atomic_open() and ll_lookup_nd() remove
-spurious calls to ptlrpc_req_finished(). Explain that these cases are
-unreachable in practice anyway.
+There has been several Lustre Client crashes reported by sites
+running with Lustre versions 2.1/2.5, all showing the same
+dentry->d_hash->next corrupted pointer cause.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-on: http://review.whamcloud.com/17068
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7402
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+This patch fixes a regression that has been introduced since a
+long time by commit :
+(LU-506 kernel: FC15 - support dcache scalability changes.)
+
+where i_lock protection usage has been removed and
+that is likely to cause racy condition during dentry [un]hashing
+and to be the root cause of these crashes.
+
+Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
+Reviewed-on: http://review.whamcloud.com/19287
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7973
 Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Yang Sheng <yang.sheng@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/namei.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index d7459bd..6414d52 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -622,13 +622,10 @@ static int ll_atomic_open(struct inode *dir, struct dentry *dentry,
- 		if (d_really_is_positive(dentry) && it_disposition(it, DISP_OPEN_OPEN)) {
- 			/* Open dentry. */
- 			if (S_ISFIFO(d_inode(dentry)->i_mode)) {
--				/* We cannot call open here as it would
--				 * deadlock.
-+				/* We cannot call open here as it might
-+				 * deadlock. This case is unreachable in
-+				 * practice because of OBD_CONNECT_NODEVOH.
- 				 */
--				if (it_disposition(it, DISP_ENQ_OPEN_REF))
--					ptlrpc_req_finished(
--						       (struct ptlrpc_request *)
--							  it->d.lustre.it_data);
- 				rc = finish_no_open(file, de);
- 			} else {
- 				file->private_data = it;
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index b0c4548..5436a54 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -2975,8 +2975,11 @@ static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
+ 		 * here to preserve get_cwd functionality on 2.6.
+ 		 * Bug 10503
+ 		 */
+-		if (!d_inode(dentry)->i_nlink)
++		if (!d_inode(dentry)->i_nlink) {
++			spin_lock(&inode->i_lock);
+ 			d_lustre_invalidate(dentry, 0);
++			spin_unlock(&inode->i_lock);
++		}
+ 
+ 		ll_lookup_finish_locks(&oit, inode);
+ 	} else if (!ll_have_md_lock(d_inode(dentry), &ibits, LCK_MINMODE)) {
 -- 
 2.7.4
