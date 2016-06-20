@@ -1,46 +1,50 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Jun 2016 22:07:41 -0400
-Subject: [lustre-devel] [PATCH 26/28] staging/lustre/osc: fix signed one bit
-	field
+Date: Sun, 19 Jun 2016 22:07:40 -0400
+Subject: [lustre-devel] [PATCH 25/28] staging/lustre/llite:
+	IOC_MDC_GETFILEINFO returns the wrong ino
 In-Reply-To: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
 References: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466388463-1817551-27-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466388463-1817551-26-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, akam kumar bharathi <azurelustre@gmail.com>, John Hammond <john.hammond@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+From: akam kumar bharathi <azurelustre@gmail.com>
 
-Bit field 'oi_lockless' and 'oi_is_active' has one bit and is signed
-which is confusing.
+req_capsule_server_get() through  __req_capsule_get in ll_dir_ioctl()
+returns a pointer to a PTLRPC request or reply buffer, which is assigned
+to struct mdt_body.
 
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-on: http://review.whamcloud.com/19196
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7258
+If the command is IOC_MDS_GETFILEINFO then the inode "st.st_ino" should
+be assigned from one extracted from mdt_body through cl_fid_build_ino().
+
+Signed-off-by: John Hammond <john.hammond@intel.com>
+Signed-off-by: akam kumar bharathi <azurelustre@gmail.com>
+Reviewed-on: http://review.whamcloud.com/17618
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5954
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Frank Zago <fzago@cray.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/osc/osc_cl_internal.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/llite/dir.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-index 437c659..c8c3f1c 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-@@ -62,7 +62,7 @@ struct osc_io {
- 	/** super class */
- 	struct cl_io_slice oi_cl;
- 	/** true if this io is lockless. */
--	int		oi_lockless;
-+	unsigned int		oi_lockless;
- 	/** how many LRU pages are reserved for this IO */
- 	int oi_lru_reserved;
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index f0eb64b..7e7425d 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -1528,7 +1528,9 @@ skip_lmm:
+ 			st.st_atime   = body->atime;
+ 			st.st_mtime   = body->mtime;
+ 			st.st_ctime   = body->ctime;
+-			st.st_ino     = inode->i_ino;
++			st.st_ino     = cl_fid_build_ino(&body->fid1,
++							 sbi->ll_flags &
++							 LL_SBI_32BIT_API);
  
+ 			lmdp = (struct lov_user_mds_data __user *)arg;
+ 			if (copy_to_user(&lmdp->lmd_st, &st, sizeof(st))) {
 -- 
 2.7.4
