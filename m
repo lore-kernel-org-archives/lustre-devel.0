@@ -1,45 +1,44 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Jun 2016 22:07:29 -0400
-Subject: [lustre-devel] [PATCH 14/28] staging/lustre: Add newline to
-	LU_OBJECT_DEBUG() message
+Date: Sun, 19 Jun 2016 22:07:42 -0400
+Subject: [lustre-devel] [PATCH 27/28] staging/lustre: Add documentation for
+	unstable_stats in sysfs
 In-Reply-To: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
 References: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466388463-1817551-15-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466388463-1817551-28-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bob Glossman <bob.glossman@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Bob Glossman <bob.glossman@intel.com>
+commit ac5b14810952 ("staging: lustre: osc: Track and limit
+"unstable" pages") added a new sysfs variable, but corresponding bit of
+documentation was not forgotten.
 
-LU_OBJECT_DEBUG expects non \n terminated message from the caller,
-so it should add it's own to keep debug logger happy.
-
-Signed-off-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-on: http://review.whamcloud.com/19960
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8094
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/sysfs-fs-lustre | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index c6281e6..6e25c1b 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -779,7 +779,7 @@ do {								      \
- 	if (cfs_cdebug_show(mask, DEBUG_SUBSYSTEM)) {		     \
- 		LIBCFS_DEBUG_MSG_DATA_DECL(msgdata, mask, NULL);		\
- 		lu_object_print(env, &msgdata, lu_cdebug_printer, object);\
--		CDEBUG(mask, format, ## __VA_ARGS__);		    \
-+		CDEBUG(mask, format "\n", ## __VA_ARGS__);		    \
- 	}								 \
- } while (0)
+diff --git a/drivers/staging/lustre/sysfs-fs-lustre b/drivers/staging/lustre/sysfs-fs-lustre
+index 873e2cf..20206ba 100644
+--- a/drivers/staging/lustre/sysfs-fs-lustre
++++ b/drivers/staging/lustre/sysfs-fs-lustre
+@@ -294,6 +294,14 @@ Description:
+ 		Controls extended attributes client-side cache.
+ 		1 to enable, 0 to disable.
  
++What:		/sys/fs/lustre/llite/<fsname>-<uuid>/unstable_stats
++Date:		Apr 2016
++Contact:	"Oleg Drokin" <oleg.drokin@intel.com>
++Description:
++		Shows number of pages that were sent and acknowledged by
++		server but were not yet committed and therefore still
++		pinned in client memory even though no longer dirty.
++
+ What:		/sys/fs/lustre/ldlm/cancel_unused_locks_before_replay
+ Date:		May 2015
+ Contact:	"Oleg Drokin" <oleg.drokin@intel.com>
 -- 
 2.7.4
