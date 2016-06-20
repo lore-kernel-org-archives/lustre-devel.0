@@ -1,59 +1,53 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Jun 2016 22:07:36 -0400
-Subject: [lustre-devel] [PATCH 21/28] staging/lustre/o2ib: Don't access NULL
-	NI on failure path
+Date: Sun, 19 Jun 2016 22:07:37 -0400
+Subject: [lustre-devel] [PATCH 22/28] staging/lustre/llite: don't panic when
+	fid is insane
 In-Reply-To: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
 References: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466388463-1817551-22-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466388463-1817551-23-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Doug Oucharek <doug.s.oucharek@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Sergey Cheremencev <sergey.cheremencev@seagate.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Doug Oucharek <doug.s.oucharek@intel.com>
+From: Sergey Cheremencev <sergey.cheremencev@seagate.com>
 
-In kiblnd_passive_connect(), if we are failing the connection
-attempt because we cannot find a valid NI (we have a NULL NI),
-we were coring after the "goto fail" because the failure
-path was assuming non-NULL NI.
+LASSERT should never be done on data that is
+received to over the network. Return EINVAL
+when server returns invalid fid despite of
+it_status == 0.
 
-This patch ensures we don't dereference a NULL NI on that
-failure path.
-
-Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
-Reviewed-on: http://review.whamcloud.com/19614
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8022
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Matt Ezell <ezellma@ornl.gov>
+Signed-off-by: Sergey Cheremencev <sergey.cheremencev@seagate.com>
+Seagate-bug-id: MRP-3073
+Reviewed-on: http://review.whamcloud.com/17985
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7422
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_lib.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index e32e43b..a585d22 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -2525,12 +2525,14 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
- 	return 0;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 539fdd1..118e41d 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -1971,7 +1971,13 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
+ 		 * At this point server returns to client's same fid as client
+ 		 * generated for creating. So using ->fid1 is okay here.
+ 		 */
+-		LASSERT(fid_is_sane(&md.body->fid1));
++		if (!fid_is_sane(&md.body->fid1)) {
++			CERROR("%s: Fid is insane " DFID "\n",
++			       ll_get_fsname(sb, NULL, 0),
++			       PFID(&md.body->fid1));
++			rc = -EINVAL;
++			goto out;
++		}
  
-  failed:
--	if (ni)
-+	if (ni) {
- 		lnet_ni_decref(ni);
-+		rej.ibr_cp.ibcp_queue_depth =
-+			kiblnd_msg_queue_size(version, ni);
-+		rej.ibr_cp.ibcp_max_frags = kiblnd_rdma_frags(version, ni);
-+	}
- 
- 	rej.ibr_version             = version;
--	rej.ibr_cp.ibcp_queue_depth = kiblnd_msg_queue_size(version, ni);
--	rej.ibr_cp.ibcp_max_frags = kiblnd_rdma_frags(version, ni);
- 	kiblnd_reject(cmid, &rej);
- 
- 	return -ECONNREFUSED;
+ 		*inode = ll_iget(sb, cl_fid_build_ino(&md.body->fid1,
+ 					     sbi->ll_flags & LL_SBI_32BIT_API),
 -- 
 2.7.4
