@@ -1,61 +1,93 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Jun 2016 22:07:43 -0400
-Subject: [lustre-devel] [PATCH 28/28] staging/lustre/osc: glimpse lock
-	should match only with granted locks
+Date: Sun, 19 Jun 2016 22:07:31 -0400
+Subject: [lustre-devel] [PATCH 16/28] staging/lustre: Inline Lustre intent
+	disposition functions
 In-Reply-To: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
 References: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466388463-1817551-29-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466388463-1817551-17-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andriy Skulysh <andriy.skulysh@seagate.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Andriy Skulysh <andriy.skulysh@seagate.com>
+They are just one-liners, so no point in having them exported
+and called through a different module.
 
-A deadlock is possible during ccc_prep_size()->ldlm_lock_match() vs
-cl_io_lock() which is waiting for a matched lock and conflicts with
-already taken lock before ccc_prep_size().
-
-It is better to send an additional lock request to avoid deadlock.
-
-Seagate-bug-id: MRP-3312
-Signed-off-by: Andriy Skulysh <andriy.skulysh@seagate.com>
-Reviewed-on: http://review.whamcloud.com/18738
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7829
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/osc/osc_request.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_intent.h | 15 +++++++++++++++
+ drivers/staging/lustre/lustre/include/lustre_mdc.h    |  3 ---
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c         | 18 ------------------
+ 3 files changed, 15 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 9334349..536b868 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -2246,7 +2246,7 @@ int osc_enqueue_base(struct obd_export *exp, struct ldlm_res_id *res_id,
- 	struct lustre_handle lockh = { 0 };
- 	struct ptlrpc_request *req = NULL;
- 	int intent = *flags & LDLM_FL_HAS_INTENT;
--	__u64 match_lvb = agl ? 0 : LDLM_FL_LVB_READY;
-+	__u64 match_flags = *flags;
- 	enum ldlm_mode mode;
- 	int rc;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_intent.h b/drivers/staging/lustre/lustre/include/lustre_intent.h
+index 41c03d7..3aed810 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_intent.h
++++ b/drivers/staging/lustre/lustre/include/lustre_intent.h
+@@ -50,4 +50,19 @@ struct lookup_intent {
+ 	unsigned int    it_lock_set:1;
+ };
  
-@@ -2281,7 +2281,11 @@ int osc_enqueue_base(struct obd_export *exp, struct ldlm_res_id *res_id,
- 	mode = einfo->ei_mode;
- 	if (einfo->ei_mode == LCK_PR)
- 		mode |= LCK_PW;
--	mode = ldlm_lock_match(obd->obd_namespace, *flags | match_lvb, res_id,
-+	if (agl == 0)
-+		match_flags |= LDLM_FL_LVB_READY;
-+	if (intent != 0)
-+		match_flags |= LDLM_FL_BLOCK_GRANTED;
-+	mode = ldlm_lock_match(obd->obd_namespace, match_flags, res_id,
- 			       einfo->ei_type, policy, mode, &lockh, 0);
- 	if (mode) {
- 		struct ldlm_lock *matched;
++static inline int it_disposition(struct lookup_intent *it, int flag)
++{
++	return it->it_disposition & flag;
++}
++
++static inline void it_set_disposition(struct lookup_intent *it, int flag)
++{
++	it->it_disposition |= flag;
++}
++
++static inline void it_clear_disposition(struct lookup_intent *it, int flag)
++{
++	it->it_disposition &= ~flag;
++}
++
+ #endif
+diff --git a/drivers/staging/lustre/lustre/include/lustre_mdc.h b/drivers/staging/lustre/lustre/include/lustre_mdc.h
+index 0ef4226..fa62b95 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_mdc.h
++++ b/drivers/staging/lustre/lustre/include/lustre_mdc.h
+@@ -185,9 +185,6 @@ struct mdc_cache_waiter {
+ };
+ 
+ /* mdc/mdc_locks.c */
+-int it_disposition(struct lookup_intent *it, int flag);
+-void it_clear_disposition(struct lookup_intent *it, int flag);
+-void it_set_disposition(struct lookup_intent *it, int flag);
+ int it_open_error(int phase, struct lookup_intent *it);
+ 
+ static inline bool cl_is_lov_delay_create(unsigned int flags)
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+index 5da2a1e..c43b3a2 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+@@ -50,24 +50,6 @@ struct mdc_getattr_args {
+ 	struct ldlm_enqueue_info    *ga_einfo;
+ };
+ 
+-int it_disposition(struct lookup_intent *it, int flag)
+-{
+-	return it->it_disposition & flag;
+-}
+-EXPORT_SYMBOL(it_disposition);
+-
+-void it_set_disposition(struct lookup_intent *it, int flag)
+-{
+-	it->it_disposition |= flag;
+-}
+-EXPORT_SYMBOL(it_set_disposition);
+-
+-void it_clear_disposition(struct lookup_intent *it, int flag)
+-{
+-	it->it_disposition &= ~flag;
+-}
+-EXPORT_SYMBOL(it_clear_disposition);
+-
+ int it_open_error(int phase, struct lookup_intent *it)
+ {
+ 	if (it_disposition(it, DISP_OPEN_LEASE)) {
 -- 
 2.7.4
