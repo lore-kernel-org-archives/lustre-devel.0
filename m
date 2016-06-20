@@ -1,87 +1,41 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Jun 2016 22:07:20 -0400
-Subject: [lustre-devel] [PATCH 05/28] staging/lustre/osc: osc_lock_weight
-	endless loop fix
+Date: Sun, 19 Jun 2016 22:07:21 -0400
+Subject: [lustre-devel] [PATCH 06/28] staging/lustre/osc: Fix reverted
+	condition in osc_lock_weight
 In-Reply-To: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
 References: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466388463-1817551-6-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466388463-1817551-7-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Alexander Zarochentsev <alexander.zarochentsev@seagate.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Jinshan Xiong <jinshan.xiong@intel.com>
+When importing clio simplification patch, the check for
+object got reversed by mistake when converting from
+if (obj == NULL) it somehow became if (obj) which is obviously wrong,
+and so when it does hit, a crash was happening as result.
 
-With huge number of pages to scan by osc_lock_weight() it is likely
-CLP_GANG_RESCHED is returned from osc_page_gang_lookup() and the scan
-will be repeated again from the start. To be sure that the scan is
-progressing across those restarts, next scan should be started from
-the last scanned page index plus one.
+Fix the condition and all if fine now.
 
-Xyratex-bug-id: MRP-2145
-Signed-off-by: Alexander Zarochentsev <alexander.zarochentsev@seagate.com>
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-on: http://review.whamcloud.com/12362
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5781
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/osc/osc_lock.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_lock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
-index 42def38..d856775 100644
+index d856775..5455d9d 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_lock.c
 +++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
-@@ -634,11 +634,10 @@ static int weigh_cb(const struct lu_env *env, struct cl_io *io,
+@@ -699,7 +699,7 @@ unsigned long osc_ldlm_weigh_ast(struct ldlm_lock *dlmlock)
  
- 	if (cl_page_is_vmlocked(env, page) ||
- 	    PageDirty(page->cp_vmpage) || PageWriteback(page->cp_vmpage)
--	   ) {
--		(*(unsigned long *)cbdata)++;
-+	   )
- 		return CLP_GANG_ABORT;
--	}
- 
-+	*(pgoff_t *)cbdata = osc_index(ops) + 1;
- 	return CLP_GANG_OKAY;
- }
- 
-@@ -648,7 +647,7 @@ static unsigned long osc_lock_weight(const struct lu_env *env,
- {
- 	struct cl_io *io = &osc_env_info(env)->oti_io;
- 	struct cl_object *obj = cl_object_top(&oscobj->oo_cl);
--	unsigned long npages = 0;
-+	pgoff_t page_index;
- 	int result;
- 
- 	io->ci_obj = obj;
-@@ -657,11 +656,12 @@ static unsigned long osc_lock_weight(const struct lu_env *env,
- 	if (result != 0)
- 		return result;
- 
-+	page_index = cl_index(obj, extent->start);
- 	do {
- 		result = osc_page_gang_lookup(env, io, oscobj,
--					      cl_index(obj, extent->start),
-+					      page_index,
- 					      cl_index(obj, extent->end),
--					      weigh_cb, (void *)&npages);
-+					      weigh_cb, (void *)&page_index);
- 		if (result == CLP_GANG_ABORT)
- 			break;
- 		if (result == CLP_GANG_RESCHED)
-@@ -669,7 +669,7 @@ static unsigned long osc_lock_weight(const struct lu_env *env,
- 	} while (result != CLP_GANG_OKAY);
- 	cl_io_fini(env, io);
- 
--	return npages;
-+	return result == CLP_GANG_ABORT ? 1 : 0;
- }
- 
- /**
+ 	LASSERT(dlmlock->l_resource->lr_type == LDLM_EXTENT);
+ 	obj = dlmlock->l_ast_data;
+-	if (obj) {
++	if (!obj) {
+ 		weight = 1;
+ 		goto out;
+ 	}
 -- 
 2.7.4
