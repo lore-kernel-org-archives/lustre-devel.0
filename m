@@ -1,93 +1,46 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Jun 2016 22:07:31 -0400
-Subject: [lustre-devel] [PATCH 16/28] staging/lustre: Inline Lustre intent
-	disposition functions
+Date: Sun, 19 Jun 2016 22:07:41 -0400
+Subject: [lustre-devel] [PATCH 26/28] staging/lustre/osc: fix signed one bit
+	field
 In-Reply-To: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
 References: <1466388463-1817551-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466388463-1817551-17-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466388463-1817551-27-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-They are just one-liners, so no point in having them exported
-and called through a different module.
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
+Bit field 'oi_lockless' and 'oi_is_active' has one bit and is signed
+which is confusing.
+
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-on: http://review.whamcloud.com/19196
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7258
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Frank Zago <fzago@cray.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_intent.h | 15 +++++++++++++++
- drivers/staging/lustre/lustre/include/lustre_mdc.h    |  3 ---
- drivers/staging/lustre/lustre/mdc/mdc_locks.c         | 18 ------------------
- 3 files changed, 15 insertions(+), 21 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cl_internal.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_intent.h b/drivers/staging/lustre/lustre/include/lustre_intent.h
-index 41c03d7..3aed810 100644
---- a/drivers/staging/lustre/lustre/include/lustre_intent.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_intent.h
-@@ -50,4 +50,19 @@ struct lookup_intent {
- 	unsigned int    it_lock_set:1;
- };
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+index 437c659..c8c3f1c 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+@@ -62,7 +62,7 @@ struct osc_io {
+ 	/** super class */
+ 	struct cl_io_slice oi_cl;
+ 	/** true if this io is lockless. */
+-	int		oi_lockless;
++	unsigned int		oi_lockless;
+ 	/** how many LRU pages are reserved for this IO */
+ 	int oi_lru_reserved;
  
-+static inline int it_disposition(struct lookup_intent *it, int flag)
-+{
-+	return it->it_disposition & flag;
-+}
-+
-+static inline void it_set_disposition(struct lookup_intent *it, int flag)
-+{
-+	it->it_disposition |= flag;
-+}
-+
-+static inline void it_clear_disposition(struct lookup_intent *it, int flag)
-+{
-+	it->it_disposition &= ~flag;
-+}
-+
- #endif
-diff --git a/drivers/staging/lustre/lustre/include/lustre_mdc.h b/drivers/staging/lustre/lustre/include/lustre_mdc.h
-index 0ef4226..fa62b95 100644
---- a/drivers/staging/lustre/lustre/include/lustre_mdc.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_mdc.h
-@@ -185,9 +185,6 @@ struct mdc_cache_waiter {
- };
- 
- /* mdc/mdc_locks.c */
--int it_disposition(struct lookup_intent *it, int flag);
--void it_clear_disposition(struct lookup_intent *it, int flag);
--void it_set_disposition(struct lookup_intent *it, int flag);
- int it_open_error(int phase, struct lookup_intent *it);
- 
- static inline bool cl_is_lov_delay_create(unsigned int flags)
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 5da2a1e..c43b3a2 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -50,24 +50,6 @@ struct mdc_getattr_args {
- 	struct ldlm_enqueue_info    *ga_einfo;
- };
- 
--int it_disposition(struct lookup_intent *it, int flag)
--{
--	return it->it_disposition & flag;
--}
--EXPORT_SYMBOL(it_disposition);
--
--void it_set_disposition(struct lookup_intent *it, int flag)
--{
--	it->it_disposition |= flag;
--}
--EXPORT_SYMBOL(it_set_disposition);
--
--void it_clear_disposition(struct lookup_intent *it, int flag)
--{
--	it->it_disposition &= ~flag;
--}
--EXPORT_SYMBOL(it_clear_disposition);
--
- int it_open_error(int phase, struct lookup_intent *it)
- {
- 	if (it_disposition(it, DISP_OPEN_LEASE)) {
 -- 
 2.7.4
