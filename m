@@ -1,49 +1,44 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Mon, 20 Jun 2016 16:55:46 -0400
-Subject: [lustre-devel] [PATCH v2 23/29] staging/lustre/llite:
-	ll_revalidate_dentry update
+Date: Mon, 20 Jun 2016 16:55:49 -0400
+Subject: [lustre-devel] [PATCH v2 26/29] staging/lustre: Add documentation
+	for unstable_stats in sysfs
 In-Reply-To: <1466456152-2199975-1-git-send-email-green@linuxhacker.ru>
 References: <1466456152-2199975-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1466456152-2199975-24-git-send-email-green@linuxhacker.ru>
+Message-ID: <1466456152-2199975-27-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <oleg.drokin@intel.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Oleg Drokin <oleg.drokin@intel.com>
-
-There are a couple of cases in ll_revalidate_dentry() where
-we are pretty sure the dentry is valid, so check for them early
-and save more expensive checks for later.
+commit ac5b14810952 ("staging: lustre: osc: Track and limit
+"unstable" pages") added a new sysfs variable, but corresponding bit of
+documentation was not forgotten.
 
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/llite/dcache.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/staging/lustre/sysfs-fs-lustre | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dcache.c b/drivers/staging/lustre/lustre/llite/dcache.c
-index d964f4f..581a63a 100644
---- a/drivers/staging/lustre/lustre/llite/dcache.c
-+++ b/drivers/staging/lustre/lustre/llite/dcache.c
-@@ -302,6 +302,17 @@ static int ll_revalidate_dentry(struct dentry *dentry,
- {
- 	struct inode *dir = d_inode(dentry->d_parent);
+diff --git a/drivers/staging/lustre/sysfs-fs-lustre b/drivers/staging/lustre/sysfs-fs-lustre
+index 873e2cf..20206ba 100644
+--- a/drivers/staging/lustre/sysfs-fs-lustre
++++ b/drivers/staging/lustre/sysfs-fs-lustre
+@@ -294,6 +294,14 @@ Description:
+ 		Controls extended attributes client-side cache.
+ 		1 to enable, 0 to disable.
  
-+	/* If this is intermediate component path lookup and we were able to get
-+	 * to this dentry, then its lock has not been revoked and the
-+	 * path component is valid.
-+	 */
-+	if (lookup_flags & LOOKUP_PARENT)
-+		return 1;
++What:		/sys/fs/lustre/llite/<fsname>-<uuid>/unstable_stats
++Date:		Apr 2016
++Contact:	"Oleg Drokin" <oleg.drokin@intel.com>
++Description:
++		Shows number of pages that were sent and acknowledged by
++		server but were not yet committed and therefore still
++		pinned in client memory even though no longer dirty.
 +
-+	/* Symlink - always valid as long as the dentry was found */
-+	if (dentry->d_inode && S_ISLNK(dentry->d_inode->i_mode))
-+		return 1;
-+
- 	/*
- 	 * if open&create is set, talk to MDS to make sure file is created if
- 	 * necessary, because we can't do this in ->open() later since that's
+ What:		/sys/fs/lustre/ldlm/cancel_unused_locks_before_replay
+ Date:		May 2015
+ Contact:	"Oleg Drokin" <oleg.drokin@intel.com>
 -- 
 2.7.4
