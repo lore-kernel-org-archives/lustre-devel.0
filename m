@@ -1,193 +1,108 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 20 Jun 2016 18:47:50 -0400
-Subject: [lustre-devel] [PATCH] staging: lustre: llite: break
-	ll_getxattr_common into 2 functions
-Message-ID: <1466462870-20745-1-git-send-email-jsimmons@infradead.org>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 21 Jun 2016 17:00:37 +0200
+Subject: [lustre-devel] [Y2038] [PATCH v2 00/24] Delete CURRENT_TIME and
+	CURRENT_TIME_SEC macros
+In-Reply-To: <CA+55aFzK2K-7UeQRsWR7ooNHMMbtMFRAF60byR1Gvmbf9XWhbA@mail.gmail.com>
+References: <1466382443-11063-1-git-send-email-deepa.kernel@gmail.com>
+	<CA+55aFzK2K-7UeQRsWR7ooNHMMbtMFRAF60byR1Gvmbf9XWhbA@mail.gmail.com>
+Message-ID: <4953017.3z0GqUlq8o@wuerfel>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+To: y2038-cunTk1MwBs8s++Sfvej+rw@public.gmane.org
+Cc: Linus Torvalds <torvalds-de/tnXTf+JLsfHDXvbKv3WD2FQJk+8+b@public.gmane.org>, Deepa Dinamani <deepa.kernel-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>, Dave Kleikamp <shaggy-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org>, jfs-discussion-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, Trond Myklebust <trond.myklebust-7I+n7zu2hftEKMMhf/gKZA@public.gmane.org>, Adrian Hunter <adrian.hunter-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, Chris Mason <clm-b10kYP2dOMg@public.gmane.org>, "adilger.kernel-m1MBpc4rdrD3fQ9qLvQP4Q@public.gmane.org" <adilger.kernel-m1MBpc4rdrD3fQ9qLvQP4Q@public.gmane.org>, buchino-FYB4Gu1CFyUAvxtiuMwx3w@public.gmane.org, Thomas Gleixner <tglx-hfZtesqFncYOwBW4kG4KsQ@public.gmane.org>, "Yan, Zheng" <zyan-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, jejb-23VcF4HTsmIX0ybBhKVfKdBPR1lH4CV8@public.gmane.org, Paul Moore <paul-r2n+y4ga6xFZroRs9YW3xA@public.gmane.org>, Linux SCSI List <linux-scsi-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Ilya Dryomov <idryomov-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>, "linux-ext4-u79uwXL29TY76Z2rM5mHXA@public.gmane.org" <linux-ext4-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Changman Lee <cm224.lee-Sze3O3UU22JBDgjK7y7TUQ@public.gmane.org>, Mark Fasheh <mfasheh-IBi9RG/b67k@public.gmane.org>, sramars-FYB4Gu1CFyUAvxtiuMwx3w@public.gmane.org, John Stultz <john.stultz-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org>, Al Viro <viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org>, David Sterba <dsterba-IBi9RG/b67k@public.gmane.org>, Jaegeuk Kim <jaegeuk-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org>, ceph-devel <ceph-devel@v>
 
-Split the function ll_getxattr_common into two functions.
-The code used for listing xattrs and ll_getxattr_common is
-placed into a new function ll_getxattr_list. This allows
-ll_listxattr to call directly ll_getxattr_list instead of
-going through ll_getxattr_common. This change is needed
-for the upcoming VFS move xattr_handler from [s|g]etxattr.
+On Monday, June 20, 2016 11:03:01 AM CEST you wrote:
+> On Sun, Jun 19, 2016 at 5:26 PM, Deepa Dinamani <deepa.kernel@gmail.com> wrote:
+> > The series is aimed at getting rid of CURRENT_TIME and CURRENT_TIME_SEC macros.
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/llite/xattr.c |  122 ++++++++++++++-------------
- 1 files changed, 62 insertions(+), 60 deletions(-)
+> Gcc handles 8-byte structure returns (on most architectures) by
+> returning them as two 32-bit registers (%edx:%eax on x86). But once it
+> is timespec64, that will no longer be the case, and the calling
+> convention will end up using a pointer to the local stack instead.
 
-diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 98303cf..a034a5f 100644
---- a/drivers/staging/lustre/lustre/llite/xattr.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -217,69 +217,18 @@ int ll_removexattr(struct dentry *dentry, const char *name)
- 				  OBD_MD_FLXATTRRM);
- }
- 
--static
--int ll_getxattr_common(struct inode *inode, const char *name,
--		       void *buffer, size_t size, __u64 valid)
-+static int
-+ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
-+	      size_t size, __u64 valid)
- {
-+	struct ll_inode_info *lli = ll_i2info(inode);
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	struct ptlrpc_request *req = NULL;
- 	struct mdt_body *body;
--	int xattr_type, rc;
- 	void *xdata;
--	struct ll_inode_info *lli = ll_i2info(inode);
--
--	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p)\n",
--	       PFID(ll_inode2fid(inode)), inode);
--
--	/* listxattr have slightly different behavior from of ext3:
--	 * without 'user_xattr' ext3 will list all xattr names but
--	 * filtered out "^user..*"; we list them all for simplicity.
--	 */
--	if (!name) {
--		xattr_type = XATTR_OTHER_T;
--		goto do_getxattr;
--	}
--
--	xattr_type = get_xattr_type(name);
--	rc = xattr_type_filter(sbi, xattr_type);
--	if (rc)
--		return rc;
--
--	/* b15587: ignore security.capability xattr for now */
--	if ((xattr_type == XATTR_SECURITY_T &&
--	     strcmp(name, "security.capability") == 0))
--		return -ENODATA;
--
--	/* LU-549:  Disable security.selinux when selinux is disabled */
--	if (xattr_type == XATTR_SECURITY_T && !selinux_is_enabled() &&
--	    strcmp(name, "security.selinux") == 0)
--		return -EOPNOTSUPP;
--
--#ifdef CONFIG_FS_POSIX_ACL
--	/* posix acl is under protection of LOOKUP lock. when calling to this,
--	 * we just have path resolution to the target inode, so we have great
--	 * chance that cached ACL is uptodate.
--	 */
--	if (xattr_type == XATTR_ACL_ACCESS_T) {
--		struct posix_acl *acl;
--
--		spin_lock(&lli->lli_lock);
--		acl = posix_acl_dup(lli->lli_posix_acl);
--		spin_unlock(&lli->lli_lock);
--
--		if (!acl)
--			return -ENODATA;
--
--		rc = posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
--		posix_acl_release(acl);
--		return rc;
--	}
--	if (xattr_type == XATTR_ACL_DEFAULT_T && !S_ISDIR(inode->i_mode))
--		return -ENODATA;
--#endif
-+	int rc;
- 
--do_getxattr:
--	if (sbi->ll_xattr_cache_enabled && xattr_type != XATTR_ACL_ACCESS_T) {
-+	if (sbi->ll_xattr_cache_enabled && type != XATTR_ACL_ACCESS_T) {
- 		rc = ll_xattr_cache_get(inode, name, buffer, size, valid);
- 		if (rc == -EAGAIN)
- 			goto getxattr_nocache;
-@@ -340,7 +289,7 @@ getxattr_nocache:
- 	}
- 
- out_xattr:
--	if (rc == -EOPNOTSUPP && xattr_type == XATTR_USER_T) {
-+	if (rc == -EOPNOTSUPP && type == XATTR_USER_T) {
- 		LCONSOLE_INFO(
- 			"%s: disabling user_xattr feature because it is not supported on the server: rc = %d\n",
- 			ll_get_fsname(inode->i_sb, NULL, 0), rc);
-@@ -351,6 +300,58 @@ out:
- 	return rc;
- }
- 
-+static
-+int ll_getxattr_common(struct inode *inode, const char *name,
-+		       void *buffer, size_t size)
-+{
-+	struct ll_sb_info *sbi = ll_i2sbi(inode);
-+	int xattr_type, rc;
-+	struct ll_inode_info *lli = ll_i2info(inode);
-+
-+	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p)\n",
-+	       PFID(ll_inode2fid(inode)), inode);
-+
-+	xattr_type = get_xattr_type(name);
-+	rc = xattr_type_filter(sbi, xattr_type);
-+	if (rc)
-+		return rc;
-+
-+	/* b15587: ignore security.capability xattr for now */
-+	if ((xattr_type == XATTR_SECURITY_T &&
-+	     strcmp(name, "security.capability") == 0))
-+		return -ENODATA;
-+
-+	/* LU-549:  Disable security.selinux when selinux is disabled */
-+	if (xattr_type == XATTR_SECURITY_T && !selinux_is_enabled() &&
-+	    strcmp(name, "security.selinux") == 0)
-+		return -EOPNOTSUPP;
-+
-+#ifdef CONFIG_FS_POSIX_ACL
-+	/* posix acl is under protection of LOOKUP lock. when calling to this,
-+	 * we just have path resolution to the target inode, so we have great
-+	 * chance that cached ACL is uptodate.
-+	 */
-+	if (xattr_type == XATTR_ACL_ACCESS_T) {
-+		struct posix_acl *acl;
-+
-+		spin_lock(&lli->lli_lock);
-+		acl = posix_acl_dup(lli->lli_posix_acl);
-+		spin_unlock(&lli->lli_lock);
-+
-+		if (!acl)
-+			return -ENODATA;
-+
-+		rc = posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
-+		posix_acl_release(acl);
-+		return rc;
-+	}
-+	if (xattr_type == XATTR_ACL_DEFAULT_T && !S_ISDIR(inode->i_mode))
-+		return -ENODATA;
-+#endif
-+	return ll_xattr_list(inode, name, xattr_type, buffer, size,
-+			     OBD_MD_FLXATTR);
-+}
-+
- ssize_t ll_getxattr(struct dentry *dentry, struct inode *inode,
- 		    const char *name, void *buffer, size_t size)
- {
-@@ -439,7 +440,7 @@ out:
- 		return rc;
- 	}
- 
--	return ll_getxattr_common(inode, name, buffer, size, OBD_MD_FLXATTR);
-+	return ll_getxattr_common(inode, name, buffer, size);
- }
- 
- ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
-@@ -457,7 +458,8 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
- 
- 	ll_stats_ops_tally(ll_i2sbi(inode), LPROC_LL_LISTXATTR, 1);
- 
--	rc = ll_getxattr_common(inode, NULL, buffer, size, OBD_MD_FLXATTRLS);
-+	rc = ll_xattr_list(inode, NULL, XATTR_OTHER_T, buffer, size,
-+			   OBD_MD_FLXATTRLS);
- 	if (rc < 0)
- 		goto out;
- 
--- 
-1.7.1
+I guess we already have that today, as the implementation of
+current_fs_time() is
+
+static inline struct timespec64 tk_xtime(struct timekeeper *tk)
+{
+        struct timespec64 ts;
+
+        ts.tv_sec = tk->xtime_sec;
+        ts.tv_nsec = (long)(tk->tkr_mono.xtime_nsec >> tk->tkr_mono.shift);
+        return ts;
+}
+extern struct timespec64 current_kernel_time64(void);
+struct timespec64 current_kernel_time64(void)
+{
+        struct timekeeper *tk = &tk_core.timekeeper;
+        struct timespec64 now;
+        unsigned long seq;
+
+        do {
+                seq = read_seqcount_begin(&tk_core.seq);
+
+                now = tk_xtime(tk);
+        } while (read_seqcount_retry(&tk_core.seq, seq));
+
+        return now;
+}
+static inline struct timespec current_kernel_time(void)
+{
+        struct timespec64 now = current_kernel_time64();
+
+        return timespec64_to_timespec(now);
+}
+extern struct timespec current_fs_time(struct super_block *sb);
+struct timespec current_fs_time(struct super_block *sb)
+{       
+        struct timespec now = current_kernel_time();
+        return timespec_trunc(now, sb->s_time_gran);
+}       
+
+We can surely do a little better than this, independent of the
+conversion in Deepa's patch set.
+
+> So for 32-bit code generation, we *may* want to introduce a new model of doing
+> 
+>     set_inode_time(inode, ATTR_ATIME | ATTR_MTIME);
+> 
+> which basically just does
+> 
+>     inode->i_atime = inode->i_mtime = current_time(inode);
+> 
+> but with a much easier calling convention on 32-bit architectures.
+> 
+> But that is entirely orthogonal to this patch-set, and should be seen
+> as a separate issue.
+
+I've played around with that, but found it hard to avoid going
+through memory other than going all the way to the tk_xtime()
+access to copy both tk->xtime_sec and the nanoseconds into
+the inode fields.
+
+Without that, the set_inode_time() implementation ends up
+being more expensive than
+inode->i_atime = inode->i_ctime = inode->i_mtime = current_time(inode);
+because we still copy through the stack but also have
+a couple of conditional branches that we don't have at the
+moment.
+
+At the moment, the triple assignment becomes (here on ARM)
+
+   c:   4668            mov     r0, sp
+  12:   f7ff fffe       bl      0 <current_kernel_time64>
+  3e:   f107 0520       add.w   r5, r7, #32
+                        12: R_ARM_THM_CALL      current_kernel_time64
+  16:   f106 0410       add.w   r4, r6, #16
+  1a:   e89d 000f       ldmia.w sp, {r0, r1, r2, r3} # load from stack
+  1e:   e885 000f       stmia.w r5, {r0, r1, r2, r3} # store into i_atime
+  22:   e884 000f       stmia.w r4, {r0, r1, r2, r3} #            i_ctime
+  26:   e886 000f       stmia.w r6, {r0, r1, r2, r3} #            i_mtime
+
+and a slightly more verbose version of the same thing on x86
+(storing only 12 bytes instead of 16 is cheaper there, while
+ARM does a store-multiple to copy the entire structure).
+
+        Arnd
