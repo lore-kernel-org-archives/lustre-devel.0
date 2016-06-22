@@ -1,95 +1,54 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 22 Jun 2016 11:19:54 -0400
-Subject: [lustre-devel] [PATCH] staging: lustre: lnet: Remove old commented
-	out code
-Message-ID: <1466608794-27947-1-git-send-email-jsimmons@infradead.org>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 22 Jun 2016 17:49:48 +0200
+Subject: [lustre-devel] [Y2038] [PATCH v2 00/24] Delete CURRENT_TIME and
+	CURRENT_TIME_SEC macros
+In-Reply-To: <1466382443-11063-1-git-send-email-deepa.kernel@gmail.com>
+References: <1466382443-11063-1-git-send-email-deepa.kernel@gmail.com>
+Message-ID: <5119217.EGiBXE3Be4@wuerfel>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Ben Evans <bevans@cray.com>, James Simmons <jsimmons@infradead.org>
+To: y2038@lists.linaro.org, tglx@linutronix.de, linux-ext4@vger.kernel.org, jbacik@fb.com
+Cc: shaggy@kernel.org, jfs-discussion@lists.sourceforge.net, trond.myklebust@primarydata.com, adrian.hunter@intel.com, clm@fb.com, adilger.kernel@dilger.ca, Deepa Dinamani <deepa.kernel@gmail.com>, sfrench@samba.org, jejb@linux.vnet.ibm.com, paul@paul-moore.com, linux-scsi@vger.kernel.org, cm224.lee@samsung.com, mfasheh@suse.com, linux-nfs@vger.kernel.org, john.stultz@linaro.org, viro@zeniv.linux.org.uk, dsterba@suse.com, jaegeuk@kernel.org, ceph-devel@vger.kernel.org, jlbec@evilplan.org, sramars@cisco.com, elder@kernel.org, tytso@mit.edu, sage@redhat.com, martin.petersen@oracle.com, gregkh@linuxfoundation.org, hiralpat@cisco.com, linux-kernel@vger.kernel.org, eparis@redhat.com, linux-f2fs-devel@lists.sourceforge.net, zyan@redhat.com, linux-audit@redhat.com, linux-btrfs@vger.kernel.org, jack@suse.com, linux-fsdevel@vger.kernel.org, linux-mtd@lists.infradead.org, torvalds@lin
 
-From: Ben Evans <bevans@cray.com>
+On Sunday, June 19, 2016 5:26:59 PM CEST Deepa Dinamani wrote:
+> The series is aimed at getting rid of CURRENT_TIME and CURRENT_TIME_SEC macros.
+> The macros are not y2038 safe. There is no plan to transition them into being
+> y2038 safe.
+> ktime_get_* api's can be used in their place. And, these are y2038 safe.
+> 
+> Thanks to Arnd Bergmann for all the guidance and discussions.
+> 
+> Patches 2-4 were mostly generated using coccinelle scripts.
+> 
+> All filesystem timestamps use current_fs_time() for right granularity as
+> mentioned in the respective commit texts of patches. This has a changed
+> signature, renamed to current_time() and moved to the fs/inode.c.
+> 
+> This series also serves as a preparatory series to transition vfs to 64 bit
+> timestamps as outlined here: https://lkml.org/lkml/2016/2/12/104 .
+> 
+> As per Linus's suggestion in https://lkml.org/lkml/2016/5/24/663 , all the
+> inode timestamp changes have been squashed into a single patch. Also,
+> current_time() now is used as a single generic vfs filesystem timestamp api.
+> It also takes struct inode* as argument instead of struct super_block*.
+> Posting all patches together in a bigger series so that the big picture is
+> clear.
+> 
+> As per the suggestion in https://lwn.net/Articles/672598/, CURRENT_TIME macro
+> bug fixes are being handled in a series separate from transitioning vfs to use.
 
-These #if 0 blocks have been in place for years. Assume
-they are not used and remove them
+I've looked in detail at all the patches in this version now, and while
+overall everything is fine, I found that two patches cannot be part of the
+series because of the dependency on the patch that John already took (adding
+time64_to_tm), but I think that's ok because we just need to change over
+all the users of CURRENT_TIME and CURRENT_TIME_SEC that assign to inode
+timestamps in order to prepare for the type change, the other ones
+can be changed later.
 
-Signed-off-by: Ben Evans <bevans@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8058
-Reviewed-on: http://review.whamcloud.com/20414
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    5 -----
- .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |    7 -------
- drivers/staging/lustre/lnet/lnet/lib-msg.c         |   18 +-----------------
- 3 files changed, 1 insertions(+), 29 deletions(-)
+I also found a few things that could be done differently to make the
+later conversion slightly easier, but it's also possible that I missed
+part of your bigger plan for those files, and none of them seem important.
 
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 07ec540..cbc9a9c 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -1468,11 +1468,6 @@ ksocknal_close_conn_locked(struct ksock_conn *conn, int error)
- 
- 		conn->ksnc_route = NULL;
- 
--#if 0	   /* irrelevant with only eager routes */
--		/* make route least favourite */
--		list_del(&route->ksnr_list);
--		list_add_tail(&route->ksnr_list, &peer->ksnp_routes);
--#endif
- 		ksocknal_route_decref(route);     /* drop conn's ref on route */
- 	}
- 
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-index 303576d..d53da55 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-@@ -2008,13 +2008,6 @@ ksocknal_connect(struct ksock_route *route)
- 		list_splice_init(&peer->ksnp_tx_queue, &zombies);
- 	}
- 
--#if 0	   /* irrelevant with only eager routes */
--	if (!route->ksnr_deleted) {
--		/* make this route least-favourite for re-selection */
--		list_del(&route->ksnr_list);
--		list_add_tail(&route->ksnr_list, &peer->ksnp_routes);
--	}
--#endif
- 	write_unlock_bh(&ksocknal_data.ksnd_global_lock);
- 
- 	ksocknal_peer_failed(peer);
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
-index 910e106..0897e58 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
-@@ -449,23 +449,7 @@ lnet_finalize(lnet_ni_t *ni, lnet_msg_t *msg, int status)
- 
- 	if (!msg)
- 		return;
--#if 0
--	CDEBUG(D_WARNING, "%s msg->%s Flags:%s%s%s%s%s%s%s%s%s%s%s txp %s rxp %s\n",
--	       lnet_msgtyp2str(msg->msg_type), libcfs_id2str(msg->msg_target),
--	       msg->msg_target_is_router ? "t" : "",
--	       msg->msg_routing ? "X" : "",
--	       msg->msg_ack ? "A" : "",
--	       msg->msg_sending ? "S" : "",
--	       msg->msg_receiving ? "R" : "",
--	       msg->msg_delayed ? "d" : "",
--	       msg->msg_txcredit ? "C" : "",
--	       msg->msg_peertxcredit ? "c" : "",
--	       msg->msg_rtrcredit ? "F" : "",
--	       msg->msg_peerrtrcredit ? "f" : "",
--	       msg->msg_onactivelist ? "!" : "",
--	       !msg->msg_txpeer ? "<none>" : libcfs_nid2str(msg->msg_txpeer->lp_nid),
--	       !msg->msg_rxpeer ? "<none>" : libcfs_nid2str(msg->msg_rxpeer->lp_nid));
--#endif
-+
- 	msg->msg_ev.status = status;
- 
- 	if (msg->msg_md) {
--- 
-1.7.1
+	Arnd
