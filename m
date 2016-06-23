@@ -1,15 +1,21 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Thu, 23 Jun 2016 15:14:20 -0400
+From: Lidza Louina <lidza.louina@oracle.com>
+Date: Thu, 23 Jun 2016 12:27:45 -0700 (PDT)
 Subject: [lustre-devel] [PATCH v2] staging/lustre/lnet: changes value to
-	correct type for assignment
-In-Reply-To: <1466708196.10566.1.camel@lidza-VirtualBox>
-References: <1466708196.10566.1.camel@lidza-VirtualBox>
-Message-ID: <700D06CB-A2AD-43BE-BA82-555E78AC252C@intel.com>
+ correct type for assignment
+Message-ID: <21218c92-e429-45df-aa98-1d91c6333957@default>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+
+----- Original Message -----
+From: oleg.drokin@intel.com
+To: lidza.louina at oracle.com
+Cc: gregkh at linuxfoundation.org, lustre-devel at lists.lustre.org, devel at driverdev.osuosl.org, andreas.dilger at intel.com
+Sent: Thursday, June 23, 2016 12:14:28 PM GMT -08:00 US/Canada Pacific
+Subject: Re: [lustre-devel] [PATCH v2] staging/lustre/lnet: changes value to correct type for assignment
 
 
 On Jun 23, 2016, at 2:56 PM, Lidza Louina wrote:
@@ -20,6 +26,11 @@ On Jun 23, 2016, at 2:56 PM, Lidza Louina wrote:
 
 I think you might want to update the commit message too, because
 it does not really make much sense now.
+
+How about
+
+"The patch changes a value's type so it can be assigned correctly. 
+This problem was caught by smatch."
 
 > 
 > Signed-off-by: Lidza Louina <lidza.louina@oracle.com>
