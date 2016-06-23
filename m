@@ -1,85 +1,103 @@
-From: Craig Inches <craig@craiginches.com>
-Date: Sat, 18 Jun 2016 22:26:08 +0100
-Subject: [lustre-devel] [PATCH 3/3] staging: luster: Checkpatch Cleanup
-In-Reply-To: <cover.1466279901.git.craig@craiginches.com>
-References: <cover.1466279901.git.craig@craiginches.com>
-Message-ID: <34e8b044236880f37be45c5d8fd527071bdfe9f9.1466279901.git.craig@craiginches.com>
+From: Lidza Louina <lidza.louina@oracle.com>
+Date: Thu, 23 Jun 2016 14:03:51 -0700 (PDT)
+Subject: [lustre-devel] [PATCH v2] staging/lustre/lnet: changes value to
+ correct type for assignment
+Message-ID: <d5a781a4-d91a-478a-91d3-81309f83f8a6@default>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: lustre-devel@lists.lustre.org
 
-WARNING: Prefer 'unsigned int' to bare use of 'unsigned'
 
-Signed-off-by: Craig Inches <craig@craiginches.com>
----
- drivers/staging/lustre/lustre/include/cl_object.h | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+----- Original Message -----
+From: oleg.drokin@intel.com
+To: lidza.louina at oracle.com
+Cc: devel at driverdev.osuosl.org, gregkh at linuxfoundation.org, lustre-devel at lists.lustre.org
+Sent: Thursday, June 23, 2016 12:50:01 PM GMT -08:00 US/Canada Pacific
+Subject: Re: [lustre-devel] [PATCH v2] staging/lustre/lnet: changes value to correct type for assignment
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index 712355a..5c5e319 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -371,7 +371,7 @@ struct cl_object_operations {
- 	 * cl_object_operations::coo_attr_get() is used.
- 	 */
- 	int (*coo_attr_set)(const struct lu_env *env, struct cl_object *obj,
--			    const struct cl_attr *attr, unsigned valid);
-+			    const struct cl_attr *attr, unsigned int valid);
- 	/**
- 	 * Update object configuration. Called top-to-bottom to modify object
- 	 * configuration.
-@@ -761,7 +761,7 @@ struct cl_page {
- 	/** Link to a queue, for debugging. */
- 	struct lu_ref_link       cp_queue_ref;
- 	/** Per-page flags from enum cl_page_flags. Protected by a VM lock. */
--	unsigned                 cp_flags;
-+	unsigned int                cp_flags;
- 	/** Assigned if doing a sync_io */
- 	struct cl_sync_io       *cp_sync_io;
- };
-@@ -1320,7 +1320,7 @@ do {								    \
-  * @{
-  */
- struct cl_page_list {
--	unsigned	     pl_nr;
-+	unsigned int	     pl_nr;
- 	struct list_head	   pl_pages;
- 	struct task_struct	*pl_owner;
- };
-@@ -1838,7 +1838,7 @@ struct cl_io {
- 	/**
- 	 * Number of pages owned by this IO. For invariant checking.
- 	 */
--	unsigned	     ci_owned_nr;
-+	unsigned int	     ci_owned_nr;
- };
- 
- /** @} cl_io */
-@@ -1996,11 +1996,11 @@ struct cl_req {
- 	/** A list of pages being transferred */
- 	struct list_head	    crq_pages;
- 	/** Number of pages in cl_req::crq_pages */
--	unsigned	      crq_nrpages;
-+	unsigned int	      crq_nrpages;
- 	/** An array of objects which pages are in ->crq_pages */
- 	struct cl_req_obj    *crq_o;
- 	/** Number of elements in cl_req::crq_objs[] */
--	unsigned	      crq_nrobjs;
-+	unsigned int	      crq_nrobjs;
- 	struct list_head	    crq_layers;
- };
- 
-@@ -2181,7 +2181,7 @@ void cl_object_attr_unlock(struct cl_object *o);
- int  cl_object_attr_get(const struct lu_env *env, struct cl_object *obj,
- 			struct cl_attr *attr);
- int  cl_object_attr_set(const struct lu_env *env, struct cl_object *obj,
--			const struct cl_attr *attr, unsigned valid);
-+			const struct cl_attr *attr, unsigned int valid);
- int  cl_object_glimpse(const struct lu_env *env, struct cl_object *obj,
- 		       struct ost_lvb *lvb);
- int  cl_conf_set(const struct lu_env *env, struct cl_object *obj,
--- 
-2.7.3
+
+On Jun 23, 2016, at 3:27 PM, Lidza Louina wrote:
+
+> 
+> ----- Original Message -----
+> From: oleg.drokin at intel.com
+> To: lidza.louina at oracle.com
+> Cc: gregkh at linuxfoundation.org, lustre-devel at lists.lustre.org, devel at driverdev.osuosl.org, andreas.dilger at intel.com
+> Sent: Thursday, June 23, 2016 12:14:28 PM GMT -08:00 US/Canada Pacific
+> Subject: Re: [lustre-devel] [PATCH v2] staging/lustre/lnet: changes value to correct type for assignment
+> 
+> 
+> On Jun 23, 2016, at 2:56 PM, Lidza Louina wrote:
+> 
+>> The code attempted to add an unsigned int to a an unsigned 64-bit
+>> integer. This patch makes the code use the correct type of int to
+>> suppress a smatch warning.
+> 
+> I think you might want to update the commit message too, because
+> it does not really make much sense now.
+> 
+> How about
+> 
+> "The patch changes a value's type so it can be assigned correctly. 
+> This problem was caught by smatch."
+
+I think that still does not convey the idea of teh change, also there's no
+assignment going on here.
+Perhaps
+To make the shift safer, have it operate on a 64 bit integer instead of
+default 32bit?
+There's no bug yet, so this is just for future-proofing.
+This potential problem was caught by smatch.
+
+Also you'll need to update the patch subject.
+
+
+I didn't want to copy you word-for-word:
+
+[PATCH v3] staging/lustre/lnet: changes type for safer shift
+
+The shift was potentially unsafe because of conflicting types. 
+
+This patch changes the regular int (1) to an unsigned long long int because 
+rec->rec_lh_cookie is an unsigned 64-bit value. This could be a problem down
+the line. 
+
+This was caught by smatch.
+
+
+> 
+>> 
+>> Signed-off-by: Lidza Louina <lidza.louina@oracle.com>
+>> ---
+>> drivers/staging/lustre/lnet/lnet/api-ni.c | 2 +-
+>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+>> index 346db89..fc5b763 100644
+>> --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
+>> +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+>> @@ -513,7 +513,7 @@ lnet_res_lh_initialize(struct lnet_res_container *rec, lnet_libhandle_t *lh)
+>> 	unsigned int hash;
+>> 
+>> 	lh->lh_cookie = rec->rec_lh_cookie;
+>> -	rec->rec_lh_cookie += 1 << ibits;
+>> +	rec->rec_lh_cookie += (1ULL << ibits);
+>> 
+>> 	hash = (lh->lh_cookie >> ibits) & LNET_LH_HASH_MASK;
+>> 
+>> -- 
+>> 1.9.1
+>> 
+>> 
+>> 
+>> _______________________________________________
+>> lustre-devel mailing list
+>> lustre-devel at lists.lustre.org
+>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
