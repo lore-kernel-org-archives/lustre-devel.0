@@ -1,15 +1,21 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Thu, 23 Jun 2016 13:52:17 -0400
+From: Lidza Louina <lidza.louina@oracle.com>
+Date: Thu, 23 Jun 2016 11:07:28 -0700 (PDT)
 Subject: [lustre-devel] [PATCH] staging/lustre/lnet: correctly casts
-	value for arithmetic
-In-Reply-To: <1466702665.3759.5.camel@lidza-VirtualBox>
-References: <1466702665.3759.5.camel@lidza-VirtualBox>
-Message-ID: <05FFA4DA-9EF9-40E5-BA9E-0FAB6B023C01@intel.com>
+ value for arithmetic
+Message-ID: <db0de3d1-1ae3-4121-9a59-36fe5619caea@default>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+
+----- Original Message -----
+From: oleg.drokin@intel.com
+To: lidza.louina at oracle.com
+Cc: gregkh at linuxfoundation.org, lustre-devel at lists.lustre.org, devel at driverdev.osuosl.org, andreas.dilger at intel.com
+Sent: Thursday, June 23, 2016 10:52:24 AM GMT -08:00 US/Canada Pacific
+Subject: Re: [lustre-devel] [PATCH] staging/lustre/lnet: correctly casts value for arithmetic
 
 NAK.
 
@@ -50,6 +56,14 @@ And adding 32bit int to 64bit int should always be ok anyway, right?
 Is it that the addition of signed to unsigned is problematic?
 
 Or what was the smatch warning?
+
+The smatch warning had to do with the type of value rec->rec_1h_cookie 
+was expecting. It's expecting it to be an unsigned 64 bit integer (I 
+realize I didn't make that clear in my log). The math is correct, it's 
+just the assignment that should be cast. 
+
+The smatch warning was "drivers/staging/lustre/lnet/lnet/api-ni.c:516 
+lnet_res_lh_initialize() warn: should '1 << ibits' be a 64 bit type?"
 
 > 
 > 	hash = (lh->lh_cookie >> ibits) & LNET_LH_HASH_MASK;
