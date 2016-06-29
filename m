@@ -1,83 +1,53 @@
-From: John Bauer <bauerj@iodoctors.com>
-Date: Sun, 26 Jun 2016 14:17:15 -0500
-Subject: [lustre-devel] [lustre-discuss] more on lustre striping
-In-Reply-To: <22ECFBA2-BD72-4751-8B92-E58D6FEAD9FF@intel.com>
-References: <1ef5a267-334c-be0d-13f4-c0fab917d1bf@iodoctors.com>
-	<38EA9F32-3869-43BA-B215-EB2E5BA62FD5@intel.com>
-	<f4c0c992-1e1a-41d8-7a04-2fc5182c6b31@iodoctors.com>
-	<01EE2B9D-2359-49B5-A50F-E7C2D97E6696@intel.com>
-	<44e2353d-3bef-ddd7-f15e-ad4bfdda040f@iodoctors.com>
-	<EB476743-98B4-49D3-B436-7F257E3284DD@intel.com>
-	<9ebe9f4c-d5a2-4c93-4f00-49029850cbbe@iodoctors.com>
-	<575AB28E.7090404@pittman.co.uk>
-	<8a9e4e45-ea99-1147-5c58-94a73d9010a8@iodoctors.com>
-	<22ECFBA2-BD72-4751-8B92-E58D6FEAD9FF@intel.com>
-Message-ID: <dc33401b-be85-72b1-0215-1fb666a352cd@iodoctors.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 29 Jun 2016 21:48:02 +0200
+Subject: [lustre-devel] [Y2038] [PATCH v3 00/24] Delete CURRENT_TIME_SEC
+	and replace current_fs_time()
+In-Reply-To: <1466890668-23400-1-git-send-email-deepa.kernel@gmail.com>
+References: <1466890668-23400-1-git-send-email-deepa.kernel@gmail.com>
+Message-ID: <4878160.cRxJJ9CCsj@wuerfel>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: y2038-cunTk1MwBs8s++Sfvej+rw@public.gmane.org
+Cc: shaggy-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, jfs-discussion-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, trond.myklebust-7I+n7zu2hftEKMMhf/gKZA@public.gmane.org, adrian.hunter-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org, clm-b10kYP2dOMg@public.gmane.org, adilger.kernel-m1MBpc4rdrD3fQ9qLvQP4Q@public.gmane.org, Deepa Dinamani <deepa.kernel-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>, tglx-hfZtesqFncYOwBW4kG4KsQ@public.gmane.org, sfrench-eUNUBHrolfbYtjvyW6yDsg@public.gmane.org, paul-r2n+y4ga6xFZroRs9YW3xA@public.gmane.org, sage-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, idryomov-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org, linux-ext4-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, cm224.lee-Sze3O3UU22JBDgjK7y7TUQ@public.gmane.org, mfasheh-IBi9RG/b67k@public.gmane.org, john.stultz-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org, viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org, dsterba-IBi9RG/b67k@public.gmane.org, jaegeuk-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, jlbec-aKy9MeLSZ9dg9hUCZPvPmw@public.gmane.org, linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, elder-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, tytso-3s7WtUTddSA@public.gmane.org, dedekind1-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org, jbacik-b10kYP2dOMg@public.gmane.org, gregkh-hQyY1W1yCW8ekmWlsbkhG0B+6BGkLq7r@public.gmane.org, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, eparis-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, linux-f2fs-devel-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, zyan-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, linux-audit-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, linux-btrfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, jack-IBi9RG/b67k@public.gmane.org, linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, linux-mtd-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org, torvalds@linux-foundation.
 
-Oleg
+On Saturday, June 25, 2016 2:37:24 PM CEST Deepa Dinamani wrote:
+> The series is aimed at getting rid of CURRENT_TIME, CURRENT_TIME_SEC macros
+> and replacing current_fs_time() with current_time().
+> The macros are not y2038 safe. There is no plan to transition them into being
+> y2038 safe.
+> ktime_get_* api's can be used in their place. And, these are y2038 safe.
+> 
+> CURRENT_TIME will be deleted after 4.8 rc1 as there is a dependency function
+> time64_to_tm() for one of the CURRENT_TIME occurance.
+> 
+> Thanks to Arnd Bergmann for all the guidance and discussions.
+> 
+> Patches 3-5 were mostly generated using coccinelle.
+> 
+> All filesystem timestamps use current_fs_time() for right granularity as
+> mentioned in the respective commit texts of patches. This has a changed
+> signature, renamed to current_time() and moved to the fs/inode.c.
+> 
+> This series also serves as a preparatory series to transition vfs to 64 bit
+> timestamps as outlined here: https://lkml.org/lkml/2016/2/12/104 .
+> 
+> As per Linus's suggestion in https://lkml.org/lkml/2016/5/24/663 , all the
+> inode timestamp changes have been squashed into a single patch. Also,
+> current_time() now is used as a single generic vfs filesystem timestamp api.
+> It also takes struct inode* as argument instead of struct super_block*.
+> Posting all patches together in a bigger series so that the big picture is
+> clear.
+> 
+> As per the suggestion in https://lwn.net/Articles/672598/, CURRENT_TIME macro
+> bug fixes are being handled in a series separate from transitioning vfs to use.
+> 
 
-I have written a simple test case that addresses your suggestions.  My 
-simple test program now calls __open() and the LD_PRELOAD'd shared 
-object, libopen.so, exports __open().  The attached tar file creates a 
-directory stdio.  cd into it and *make clean all*. Then run 
-*./stdio.csh*.  You will see that the program's call to __open() is 
-intercepted, as evidenced by the fprintf() from the preloaded __open().  
-But the open() call made by fopen() is still not reported by the 
-preloaded function.  I am thoroughly convinced fopen()'s call to open(), 
-by whatever name it is using for open(), can not be intercepted.  The 
-most compelling evidence is the output from the run-time loader when 
-LD_DEBUG=all is set. If I remove the call to __open() from the test 
-program, the only function with open in its name that the run-time 
-loader reports searching for is fopen().  The call that fopen() makes to 
-open() is probably satisfied when libc is built.
+Everything in this version looks good to me. Please add
 
-Per Andreas's suggestion, I have tried to build a debug version of 
-glibc, but I think this is a bit outside my wheelhouse.  It always turns 
-into some type of struggle to get glibc to build correctly for the 
-system I am on.  I am seeking assistance on that front from admins on 
-the system I am using.  This URL is an interesting read, 
-http://blog.hostilefork.com/where-printf-rubber-meets-road/  .  It 
-covers the write() call from fprintf(), but I assume open() would have 
-the same issues.  If I understand this correctly, the write() call from 
-fprintf() boils down to a syscall at compile time.  It doesn't even 
-bother will calling write().  glibc skips the step of calling write() 
-and goes straight to syscall() when calling write() from inside of glibc.
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks again.
+and send a pull request to Al Viro, based on the latest linux-4.7-rc release.
 
-John
-
-
-On 6/23/2016 4:50 PM, Oleg Drokin wrote:
-> #include <unistd.h>
-> >#include <stdlib.h>
-> >#include <fcntl.h>
-> >#include <stdio.h>
-> >
-> >int
-> >main(int argc, char ** argv ){
-> >    FILE *f = fopen("a", "r" ) ;
-> >    fprintf(stderr,"f=%p\n",f);
-> >    fclose(f);
-> >}
-
--- 
-I/O Doctors, LLC
-507-766-0378
-bauerj at iodoctors.com
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160626/41199577/attachment.htm>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: stdio.tgz
-Type: application/octet-stream
-Size: 806 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160626/41199577/attachment.obj>
+	Arnd
