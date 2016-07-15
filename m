@@ -1,70 +1,36 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Fri, 15 Jul 2016 01:01:35 -0400
+From: Al Viro <viro@ZenIV.linux.org.uk>
+Date: Fri, 15 Jul 2016 06:14:13 +0100
 Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: iov fixes for
 	kiblnd_send
-In-Reply-To: <1468257501-20630-1-git-send-email-jsimmons@infradead.org>
+In-Reply-To: <72A3B3D7-69A3-40D4-8B89-103EB342E894@intel.com>
 References: <1468257501-20630-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <72A3B3D7-69A3-40D4-8B89-103EB342E894@intel.com>
+	<72A3B3D7-69A3-40D4-8B89-103EB342E894@intel.com>
+Message-ID: <20160715051413.GI14480@ZenIV.linux.org.uk>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Al Viro <viro@ZenIV.linux.org.uk>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, linux-fsdevel@vger.kernel.org, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <oleg.drokin@intel.com>
+Cc: James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, linux-fsdevel@vger.kernel.org, Lustre Development List <lustre-devel@lists.lustre.org>
 
+On Fri, Jul 15, 2016 at 01:01:35AM -0400, Oleg Drokin wrote:
 
-On Jul 11, 2016, at 1:18 PM, James Simmons wrote:
-
-> With the move to iov_iter handling two issues merged
-> for the ko2iblnd driver. The first fix address a simple
-> typo of the wrong flag being used with iov_iter_kvec.
-> The second fix adds the payload offset to the payload
-> size.
+> > +	} else {
+> > +		iov_iter_kvec(&from, ITER_KVEC | WRITE,
+> > +			      payload_iov, payload_niov,
+> > +			      payload_nob + payload_offset);
+> > +	}
+> > 	iov_iter_advance(&from, payload_offset);
 > 
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> ---
-> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 13 ++++++++-----
-> 1 file changed, 8 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> index 3d597dc..437e149 100644
-> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> @@ -1519,12 +1519,15 @@ kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
-> 	/* payload is either all vaddrs or all pages */
-> 	LASSERT(!(payload_kiov && payload_iov));
-> 
-> -	if (payload_kiov)
-> +	if (payload_kiov) {
+> Ah, I guess we added it there to then subtract here?
 
-The braces are in fact going to make checkpatch complain that we do not
-need them here.
+Yes (and that actually fixes a real bug there).
 
-> 		iov_iter_bvec(&from, ITER_BVEC | WRITE,
-> -				payload_kiov, payload_niov, payload_nob);
-> -	else
-> -		iov_iter_kvec(&from, ITER_BVEC | WRITE,
-> -				payload_iov, payload_niov, payload_nob);
-> +			      payload_kiov, payload_niov,
-> +			      payload_nob + payload_offset);
+> Do you mind if I just merge this change into Al's patch with you as another
+> Signed-off-by line instead?
+> Since we caught this early, probably no point in having a breakage point in
+> the history as it might break a future bisect.
 
-Why are we adding the offset to number of bytes here?
-
-> +	} else {
-> +		iov_iter_kvec(&from, ITER_KVEC | WRITE,
-> +			      payload_iov, payload_niov,
-> +			      payload_nob + payload_offset);
-> +	}
-> 	iov_iter_advance(&from, payload_offset);
-
-Ah, I guess we added it there to then subtract here?
-
-Do you mind if I just merge this change into Al's patch with you as another
-Signed-off-by line instead?
-Since we caught this early, probably no point in having a breakage point in
-the history as it might break a future bisect.
-
-
-> 	switch (type) {
-> -- 
-> 2.7.4
+No objections from me.  FWIW, I'd rather have all of that go through your
+tree - it's independent from everything else in vfs.git and pulls quite
+a bit from yours, so...
