@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:11 -0400
-Subject: [lustre-devel] [PATCH 18/58] staging: lustre: llite: do post work
-	for statahead in readdir case
+Date: Thu, 21 Jul 2016 22:44:25 -0400
+Subject: [lustre-devel] [PATCH 32/58] staging: lustre: delete striped
+	directory
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-19-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-33-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,60 +14,225 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: wang di <di.wang@intel.com>
 
-Increase the post-work for the statahead thread in the readdir
-case since it can become very busy.
+Add delete striped directory, it includes
+
+1. enable sync log between MDTs, so slave objects will
+   be delete by unlink log, which is similar as deleting ost
+   object.
+
+2. retrieve layout information of striped directory on MDT,
+   then lock all of the slave objects before unlink.
 
 Signed-off-by: wang di <di.wang@intel.com>
-Reviewed-on: http://review.whamcloud.com/10761
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4906
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
+Reviewed-on: http://review.whamcloud.com/7445
+Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
 Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lustre/llite/llite_internal.h   |    3 ++-
- drivers/staging/lustre/lustre/llite/statahead.c    |    7 +++++++
- 2 files changed, 9 insertions(+), 1 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |    1 +
+ drivers/staging/lustre/lustre/include/lustre_fid.h |    1 +
+ drivers/staging/lustre/lustre/llite/dir.c          |   10 ---
+ drivers/staging/lustre/lustre/lmv/lmv_intent.c     |    5 ++
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   75 +++++++++++++++-----
+ 5 files changed, 65 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index e650aeb..dc15957 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -997,7 +997,8 @@ struct ll_statahead_info {
- 	unsigned int	    sai_ls_all:1,   /* "ls -al", do stat-ahead for
- 					     * hidden entries
- 					     */
--				sai_agl_valid:1;/* AGL is valid for the dir */
-+				sai_agl_valid:1,/* AGL is valid for the dir */
-+				sai_in_readpage:1;/* statahead is in readdir() */
- 	wait_queue_head_t	sai_waitq;      /* stat-ahead wait queue */
- 	struct ptlrpc_thread    sai_thread;     /* stat-ahead thread */
- 	struct ptlrpc_thread    sai_agl_thread; /* AGL thread */
-diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-index e4ca525..b5bd107 100644
---- a/drivers/staging/lustre/lustre/llite/statahead.c
-+++ b/drivers/staging/lustre/lustre/llite/statahead.c
-@@ -1229,7 +1229,9 @@ do_it:
- 			 */
- 			ll_release_page(page, le32_to_cpu(dp->ldp_flags) &
- 					      LDF_COLLIDE);
-+			sai->sai_in_readpage = 1;
- 			page = ll_get_dir_page(dir, pos, &chain);
-+			sai->sai_in_readpage = 0;
- 		}
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 60051a5..f7805cc 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -968,6 +968,7 @@ struct ldlm_enqueue_info {
+ 	void *ei_cb_cp;  /** lock completion callback */
+ 	void *ei_cb_gl;  /** lock glimpse callback */
+ 	void *ei_cbdata; /** Data to be passed into callbacks. */
++	unsigned int ei_enq_slave:1; /* whether enqueue slave stripes */
+ };
+ 
+ extern struct obd_ops ldlm_obd_ops;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
+index 743671a..61f3930 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_fid.h
++++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
+@@ -229,6 +229,7 @@ enum local_oid {
+ 	MDD_LOV_OBJ_OSEQ	= 4121UL,
+ 	LFSCK_NAMESPACE_OID     = 4122UL,
+ 	REMOTE_PARENT_DIR_OID	= 4123UL,
++	SLAVE_LLOG_CATALOGS_OID	= 4124UL,
+ };
+ 
+ static inline void lu_local_obj_fid(struct lu_fid *fid, __u32 oid)
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 5288750..96ae7d5 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -679,16 +679,6 @@ static int ll_dir_setdirstripe(struct inode *dir, struct lmv_user_md *lump,
+ 	if (unlikely(lump->lum_magic != LMV_USER_MAGIC))
+ 		return -EINVAL;
+ 
+-	if (lump->lum_stripe_offset == (__u32)-1) {
+-		int mdtidx;
+-
+-		mdtidx = ll_get_mdt_idx(dir);
+-		if (mdtidx < 0)
+-			return mdtidx;
+-
+-		lump->lum_stripe_offset = mdtidx;
+-	}
+-
+ 	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p) name %s stripe_offset %d, stripe_count: %u\n",
+ 	       PFID(ll_inode2fid(dir)), dir, filename,
+ 	       (int)lump->lum_stripe_offset, lump->lum_stripe_count);
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_intent.c b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
+index 1b9bbb2..5313dfc 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_intent.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
+@@ -244,6 +244,11 @@ update:
+ 				if (req)
+ 					ptlrpc_req_finished(req);
+ 
++				if (it.it_lock_mode && lockh) {
++					ldlm_lock_decref(lockh, it.it_lock_mode);
++					it.it_lock_mode = 0;
++				}
++
+ 				rc = -EIO;
+ 				goto cleanup;
+ 			}
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index df29ad5..4995735 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -103,6 +103,9 @@ int lmv_name_to_stripe_index(enum lmv_hash_type hashtype,
+ 		return -EINVAL;
  	}
  
-@@ -1548,6 +1550,11 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
- 			return entry ? 1 : -EAGAIN;
- 		}
- 
-+		/* if statahead is busy in readdir, help it do post-work */
-+		while (!ll_sa_entry_stated(entry) && sai->sai_in_readpage &&
-+		       !sa_received_empty(sai))
-+			ll_post_statahead(sai);
++	CDEBUG(D_INFO, "name %.*s hash_type %d idx %d\n", namelen, name,
++	       hashtype, idx);
 +
- 		if (!ll_sa_entry_stated(entry)) {
- 			sai->sai_index_wait = entry->se_index;
- 			lwi = LWI_TIMEOUT_INTR(cfs_time_seconds(30), NULL,
+ 	LASSERT(idx < max_mdt_index);
+ 	return idx;
+ }
+@@ -1232,7 +1235,16 @@ static int lmv_placement_policy(struct obd_device *obd,
+ 		struct lmv_user_md *lum;
+ 
+ 		lum = op_data->op_data;
+-		*mds = lum->lum_stripe_offset;
++		if (lum->lum_stripe_offset != (__u32)-1) {
++			*mds = lum->lum_stripe_offset;
++		} else {
++			/*
++			 * -1 means default, which will be in the same MDT with
++			 * the stripe
++			 */
++			*mds = op_data->op_mds;
++			lum->lum_stripe_offset = op_data->op_mds;
++		}
+ 	} else {
+ 		/*
+ 		 * Allocate new fid on target according to operation type and
+@@ -1648,12 +1660,28 @@ static int lmv_close(struct obd_export *exp, struct md_op_data *op_data,
+  * For striped-directory, it will locate MDT by name. And also
+  * it will reset op_fid1 with the FID of the chosen stripe.
+  **/
++struct lmv_tgt_desc *
++lmv_locate_target_for_name(struct lmv_obd *lmv, struct lmv_stripe_md *lsm,
++			   const char *name, int namelen, struct lu_fid *fid,
++			   u32 *mds)
++{
++	const struct lmv_oinfo *oinfo;
++	struct lmv_tgt_desc *tgt;
++
++	oinfo = lsm_name_to_stripe_info(lsm, name, namelen);
++	*fid = oinfo->lmo_fid;
++	*mds = oinfo->lmo_mds;
++	tgt = lmv_get_target(lmv, *mds);
++
++	CDEBUG(D_INFO, "locate on mds %u "DFID"\n", *mds, PFID(fid));
++	return tgt;
++}
++
+ struct lmv_tgt_desc
+ *lmv_locate_mds(struct lmv_obd *lmv, struct md_op_data *op_data,
+ 		struct lu_fid *fid)
+ {
+ 	struct lmv_stripe_md *lsm = op_data->op_mea1;
+-	const struct lmv_oinfo *oinfo;
+ 	struct lmv_tgt_desc *tgt;
+ 
+ 	if (!lsm || lsm->lsm_md_stripe_count <= 1 ||
+@@ -1667,15 +1695,9 @@ struct lmv_tgt_desc
+ 		return tgt;
+ 	}
+ 
+-	oinfo = lsm_name_to_stripe_info(lsm, op_data->op_name,
+-					op_data->op_namelen);
+-	*fid = oinfo->lmo_fid;
+-	op_data->op_mds = oinfo->lmo_mds;
+-	tgt = lmv_get_target(lmv, op_data->op_mds);
+-
+-	CDEBUG(D_INFO, "locate on mds %u\n", op_data->op_mds);
+-
+-	return tgt;
++	return lmv_locate_target_for_name(lmv, lsm, op_data->op_name,
++					  op_data->op_namelen, fid,
++					  &op_data->op_mds);
+ }
+ 
+ static int lmv_create(struct obd_export *exp, struct md_op_data *op_data,
+@@ -2077,6 +2099,9 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+ 				      LCK_EX, MDS_INODELOCK_FULL,
+ 				      MF_MDC_CANCEL_FID4);
+ 
++	CDEBUG(D_INODE, DFID":m%d to "DFID"\n", PFID(&op_data->op_fid1),
++	       op_data->op_mds, PFID(&op_data->op_fid2));
++
+ 	if (rc == 0)
+ 		rc = md_rename(src_tgt->ltd_exp, op_data, old, oldlen,
+ 			       new, newlen, request);
+@@ -2290,12 +2315,26 @@ static int lmv_unlink(struct obd_export *exp, struct md_op_data *op_data,
+ 		return rc;
+ retry:
+ 	/* Send unlink requests to the MDT where the child is located */
+-	if (likely(!fid_is_zero(&op_data->op_fid2)))
+-		tgt = lmv_locate_mds(lmv, op_data, &op_data->op_fid2);
+-	else
++	if (likely(!fid_is_zero(&op_data->op_fid2))) {
++		tgt = lmv_find_target(lmv, &op_data->op_fid2);
++		if (IS_ERR(tgt))
++			return PTR_ERR(tgt);
++
++		/* For striped dir, we need to locate the parent as well */
++		if (op_data->op_mea1 &&
++		    op_data->op_mea1->lsm_md_stripe_count > 1) {
++			LASSERT(op_data->op_name && op_data->op_namelen);
++			lmv_locate_target_for_name(lmv, op_data->op_mea1,
++						   op_data->op_name,
++						   op_data->op_namelen,
++						   &op_data->op_fid1,
++						   &op_data->op_mds);
++		}
++	} else {
+ 		tgt = lmv_locate_mds(lmv, op_data, &op_data->op_fid1);
+-	if (IS_ERR(tgt))
+-		return PTR_ERR(tgt);
++		if (IS_ERR(tgt))
++			return PTR_ERR(tgt);
++	}
+ 
+ 	op_data->op_fsuid = from_kuid(&init_user_ns, current_fsuid());
+ 	op_data->op_fsgid = from_kgid(&init_user_ns, current_fsgid());
+@@ -2801,8 +2840,10 @@ static int lmv_free_lustre_md(struct obd_export *exp, struct lustre_md *md)
+ 	struct lmv_obd	  *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc *tgt = lmv->tgts[0];
+ 
+-	if (md->lmv)
++	if (md->lmv) {
+ 		lmv_free_memmd(md->lmv);
++		md->lmv = NULL;
++	}
+ 	if (!tgt || !tgt->ltd_exp)
+ 		return -EINVAL;
+ 	return md_free_lustre_md(tgt->ltd_exp, md);
 -- 
 1.7.1
