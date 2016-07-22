@@ -1,58 +1,60 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:39 -0400
-Subject: [lustre-devel] [PATCH 46/58] staging: lustre: lmv: access
-	lum_stripe_offset as little endian
+Date: Thu, 21 Jul 2016 22:44:43 -0400
+Subject: [lustre-devel] [PATCH 50/58] staging: lustre: lov: handle the case
+	of stripe size is not power 2
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-47-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-51-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-By the time that a struct lmv_user_md reaches lmv_placement_policy()
-it has already been converted to little endian. Therefore use the
-appropriate macros around accesses to this this field. This issue was
-found by rewriting the definition of struct lmv_user_md to use the
-__leXX typedefs and running sparse.
+Calculate the end of current stripe correctly when the stripe size
+is not power 2.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4738
-Reviewed-on: http://review.whamcloud.com/9671
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Swapnil Pimpale <spimpale@ddn.com>
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4860
+Reviewed-on: http://review.whamcloud.com/9882
+Reviewed-by: Bobi Jam <bobijam@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_page.c |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 9e3d35a..5830fc1 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1244,15 +1244,15 @@ static int lmv_placement_policy(struct obd_device *obd,
- 		struct lmv_user_md *lum;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
+index c17026f..45b5ae9 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_page.c
++++ b/drivers/staging/lustre/lustre/lov/lov_page.c
+@@ -65,7 +65,9 @@ static int lov_raid0_page_is_under_lock(const struct lu_env *env,
+ 	pgoff_t index = *max_index;
+ 	unsigned int pps; /* pages per stripe */
  
- 		lum = op_data->op_data;
--		if (lum->lum_stripe_offset != (__u32)-1) {
--			*mds = lum->lum_stripe_offset;
-+		if (le32_to_cpu(lum->lum_stripe_offset) != (__u32)-1) {
-+			*mds = le32_to_cpu(lum->lum_stripe_offset);
- 		} else {
- 			/*
- 			 * -1 means default, which will be in the same MDT with
- 			 * the stripe
- 			 */
- 			*mds = op_data->op_mds;
--			lum->lum_stripe_offset = op_data->op_mds;
-+			lum->lum_stripe_offset = cpu_to_le32(op_data->op_mds);
- 		}
- 	} else {
- 		/*
+-	CDEBUG(D_READA, "*max_index = %lu, nr = %d\n", index, r0->lo_nr);
++	CDEBUG(D_READA, DFID "*max_index = %lu, nr = %d\n",
++	       PFID(lu_object_fid(lov2lu(loo))), index, r0->lo_nr);
++
+ 	if (index == 0) /* the page is not covered by any lock */
+ 		return 0;
+ 
+@@ -80,7 +82,12 @@ static int lov_raid0_page_is_under_lock(const struct lu_env *env,
+ 
+ 	/* calculate the end of current stripe */
+ 	pps = loo->lo_lsm->lsm_stripe_size >> PAGE_SHIFT;
+-	index = ((slice->cpl_index + pps) & ~(pps - 1)) - 1;
++	index = slice->cpl_index + pps - slice->cpl_index % pps - 1;
++
++	CDEBUG(D_READA, DFID "*max_index = %lu, index = %lu, pps = %u, stripe_size = %u, stripe no = %u, page index = %lu\n",
++	       PFID(lu_object_fid(lov2lu(loo))), *max_index, index, pps,
++	       loo->lo_lsm->lsm_stripe_size, lov_page_stripe(slice->cpl_page),
++	       slice->cpl_index);
+ 
+ 	/* never exceed the end of the stripe */
+ 	*max_index = min_t(pgoff_t, *max_index, index);
 -- 
 1.7.1
