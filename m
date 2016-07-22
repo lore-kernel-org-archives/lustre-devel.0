@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:12 -0400
-Subject: [lustre-devel] [PATCH 19/58] staging: lustre: llite: add md_op_data
-	parameter to ll_get_dir_page
+Date: Thu, 21 Jul 2016 22:44:33 -0400
+Subject: [lustre-devel] [PATCH 40/58] staging: lustre: llite: a few fixes
+	for migration.
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-41-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,127 +14,210 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: wang di <di.wang@intel.com>
 
-Pass in struct md_op_data for ll_get_dir_page function.
+1. Clear the client dentry cache before migrating file/directory
+   to the remote MDT.
+
+2. Do not return stripe information to client, if it did not get
+   the layout lock.
 
 Signed-off-by: wang di <di.wang@intel.com>
-Reviewed-on: http://review.whamcloud.com/7043
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4682
+Reviewed-on: http://review.whamcloud.com/9522
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/dir.c          |    8 ++++----
- .../staging/lustre/lustre/llite/llite_internal.h   |    4 ++--
- drivers/staging/lustre/lustre/llite/statahead.c    |   15 +++++++++++----
- 3 files changed, 17 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lustre/llite/dir.c          |   22 +++---------
+ drivers/staging/lustre/lustre/llite/file.c         |   34 +++++++++++---------
+ .../staging/lustre/lustre/llite/llite_internal.h   |    2 +
+ drivers/staging/lustre/lustre/lov/lov_object.c     |    1 +
+ 4 files changed, 28 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 031c9e4..82c7f88 100644
+index ef7322e..84bec03 100644
 --- a/drivers/staging/lustre/lustre/llite/dir.c
 +++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -322,8 +322,8 @@ static struct page *ll_dir_page_locate(struct inode *dir, __u64 *hash,
- 	return page;
- }
- 
--struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
--			     struct ll_dir_chain *chain)
-+struct page *ll_get_dir_page(struct inode *dir, struct md_op_data *op_data,
-+			     __u64 hash, struct ll_dir_chain *chain)
- {
- 	ldlm_policy_data_t policy = {.l_inodebits = {MDS_INODELOCK_UPDATE} };
- 	struct address_space *mapping = dir->i_mapping;
-@@ -503,7 +503,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- 
- 	ll_dir_chain_init(&chain);
- 
--	page = ll_get_dir_page(inode, pos, &chain);
-+	page = ll_get_dir_page(inode, op_data, pos, &chain);
- 
- 	while (rc == 0 && !done) {
- 		struct lu_dirpage *dp;
-@@ -585,7 +585,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- 					le32_to_cpu(dp->ldp_flags) &
- 					LDF_COLLIDE);
- 			next = pos;
--			page = ll_get_dir_page(inode, pos,
-+			page = ll_get_dir_page(inode, op_data, pos,
- 					       &chain);
- 		}
+@@ -1318,11 +1318,9 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		return 0;
  	}
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index dc15957..fc0c72c 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -651,8 +651,8 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- void ll_release_page(struct page *page, int remove);
- extern const struct file_operations ll_dir_operations;
- extern const struct inode_operations ll_dir_inode_operations;
--struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
--			     struct ll_dir_chain *chain);
-+struct page *ll_get_dir_page(struct inode *dir, struct md_op_data *op_data,
-+			     __u64 hash, struct ll_dir_chain *chain);
- int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- 		struct dir_context *ctx);
+ 	case IOC_MDC_LOOKUP: {
+-		struct ptlrpc_request *request = NULL;
+ 		int namelen, len = 0;
+ 		char *buf = NULL;
+ 		char *filename;
+-		struct md_op_data *op_data;
  
-diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-index b5bd107..f6c1709 100644
---- a/drivers/staging/lustre/lustre/llite/statahead.c
-+++ b/drivers/staging/lustre/lustre/llite/statahead.c
-@@ -1065,7 +1065,7 @@ static int ll_statahead_thread(void *arg)
- 	wake_up(&thread->t_ctl_waitq);
- 
- 	ll_dir_chain_init(&chain);
--	page = ll_get_dir_page(dir, pos, &chain);
-+	page = ll_get_dir_page(dir, op_data, pos, &chain);
- 
- 	while (1) {
- 		struct lu_dirpage *dp;
-@@ -1230,7 +1230,7 @@ do_it:
- 			ll_release_page(page, le32_to_cpu(dp->ldp_flags) &
- 					      LDF_COLLIDE);
- 			sai->sai_in_readpage = 1;
--			page = ll_get_dir_page(dir, pos, &chain);
-+			page = ll_get_dir_page(dir, op_data, pos, &chain);
- 			sai->sai_in_readpage = 0;
+ 		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
+ 		if (rc)
+@@ -1338,21 +1336,13 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			goto out_free;
  		}
- 	}
-@@ -1342,13 +1342,19 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
- {
- 	struct ll_dir_chain   chain;
- 	struct qstr	  *target = &dentry->d_name;
-+	struct md_op_data *op_data;
- 	struct page	  *page;
- 	__u64		 pos    = 0;
- 	int		   dot_de;
- 	int		   rc     = LS_NONE_FIRST_DE;
  
-+	op_data = ll_prep_md_op_data(NULL, dir, dir, NULL, 0, 0,
-+				     LUSTRE_OPC_ANY, dir);
-+	if (IS_ERR(op_data))
-+		return PTR_ERR(op_data);
-+
- 	ll_dir_chain_init(&chain);
--	page = ll_get_dir_page(dir, pos, &chain);
-+	page = ll_get_dir_page(dir, op_data, pos, &chain);
- 
- 	while (1) {
- 		struct lu_dirpage *dp;
-@@ -1436,12 +1442,13 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
- 			 */
- 			ll_release_page(page, le32_to_cpu(dp->ldp_flags) &
- 					      LDF_COLLIDE);
--			page = ll_get_dir_page(dir, pos, &chain);
-+			page = ll_get_dir_page(dir, op_data, pos, &chain);
+-		op_data = ll_prep_md_op_data(NULL, inode, NULL, filename, namelen,
+-					     0, LUSTRE_OPC_ANY, NULL);
+-		if (IS_ERR(op_data)) {
+-			rc = PTR_ERR(op_data);
+-			goto out_free;
+-		}
+-
+-		op_data->op_valid = OBD_MD_FLID;
+-		rc = md_getattr_name(sbi->ll_md_exp, op_data, &request);
+-		ll_finish_md_op_data(op_data);
++		rc = ll_get_fid_by_name(inode, filename, namelen, NULL);
+ 		if (rc < 0) {
+-			CDEBUG(D_INFO, "md_getattr_name: %d\n", rc);
++			CERROR("%s: lookup %.*s failed: rc = %d\n",
++			       ll_get_fsname(inode->i_sb, NULL, 0), namelen,
++			       filename, rc);
+ 			goto out_free;
  		}
- 	}
+-		ptlrpc_req_finished(request);
+ out_free:
+ 		obd_ioctl_freedata(buf, len);
+ 		return rc;
+@@ -1981,7 +1971,7 @@ out_quotactl:
  
- out:
- 	ll_dir_chain_fini(&chain);
-+	ll_finish_md_op_data(op_data);
+ 		filename = data->ioc_inlbuf1;
+ 		namelen = data->ioc_inllen1;
+-		if (namelen < 1) {
++		if (namelen < 1 || namelen != strlen(filename) + 1) {
+ 			rc = -EINVAL;
+ 			goto migrate_free;
+ 		}
+@@ -1992,7 +1982,7 @@ out_quotactl:
+ 		}
+ 		mdtidx = *(int *)data->ioc_inlbuf2;
+ 
+-		rc = ll_migrate(inode, file, mdtidx, filename, namelen);
++		rc = ll_migrate(inode, file, mdtidx, filename, namelen - 1);
+ migrate_free:
+ 		obd_ioctl_freedata(buf, len);
+ 
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 391748c..4e483c0 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -2828,8 +2828,8 @@ ll_file_flock(struct file *file, int cmd, struct file_lock *file_lock)
  	return rc;
  }
+ 
+-static int ll_get_fid_by_name(struct inode *parent, const char *name,
+-			      int namelen, struct lu_fid *fid)
++int ll_get_fid_by_name(struct inode *parent, const char *name,
++		       int namelen, struct lu_fid *fid)
+ {
+ 	struct md_op_data *op_data = NULL;
+ 	struct ptlrpc_request *req;
+@@ -2843,20 +2843,19 @@ static int ll_get_fid_by_name(struct inode *parent, const char *name,
+ 
+ 	op_data->op_valid = OBD_MD_FLID;
+ 	rc = md_getattr_name(ll_i2sbi(parent)->ll_md_exp, op_data, &req);
++	ll_finish_md_op_data(op_data);
+ 	if (rc < 0)
+-		goto out_free;
++		return rc;
+ 
+ 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+ 	if (!body) {
+ 		rc = -EFAULT;
+ 		goto out_req;
+ 	}
+-	*fid = body->fid1;
++	if (fid)
++		*fid = body->fid1;
+ out_req:
+ 	ptlrpc_req_finished(req);
+-out_free:
+-	if (op_data)
+-		ll_finish_md_op_data(op_data);
+ 	return rc;
+ }
+ 
+@@ -2864,12 +2863,13 @@ int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
+ 	       const char *name, int namelen)
+ {
+ 	struct ptlrpc_request *request = NULL;
++	struct inode *child_inode = NULL;
+ 	struct dentry *dchild = NULL;
+ 	struct md_op_data *op_data;
+ 	struct qstr qstr;
+ 	int rc;
+ 
+-	CDEBUG(D_VFSTRACE, "migrate %s under"DFID" to MDT%d\n",
++	CDEBUG(D_VFSTRACE, "migrate %s under "DFID" to MDT%d\n",
+ 	       name, PFID(ll_inode2fid(parent)), mdtidx);
+ 
+ 	op_data = ll_prep_md_op_data(NULL, parent, NULL, name, namelen,
+@@ -2884,8 +2884,13 @@ int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
+ 	dchild = d_lookup(file_dentry(file), &qstr);
+ 	if (dchild && dchild->d_inode) {
+ 		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
++		if (dchild->d_inode) {
++			child_inode = igrab(dchild->d_inode);
++			ll_invalidate_aliases(child_inode);
++		}
++		dput(dchild);
+ 	} else {
+-		rc = ll_get_fid_by_name(parent, name, strnlen(name, namelen),
++		rc = ll_get_fid_by_name(parent, name, namelen,
+ 					&op_data->op_fid3);
+ 		if (rc)
+ 			goto out_free;
+@@ -2895,6 +2900,7 @@ int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
+ 		CERROR("%s: migrate %s, but fid "DFID" is insane\n",
+ 		       ll_get_fsname(parent->i_sb, NULL, 0), name,
+ 		       PFID(&op_data->op_fid3));
++		rc = -EINVAL;
+ 		goto out_free;
+ 	}
+ 
+@@ -2912,18 +2918,16 @@ int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
+ 	op_data->op_mds = mdtidx;
+ 	op_data->op_cli_flags = CLI_MIGRATE;
+ 	rc = md_rename(ll_i2sbi(parent)->ll_md_exp, op_data, name,
+-		       strnlen(name, namelen), name, strnlen(name, namelen),
+-		       &request);
++		       namelen, name, namelen, &request);
+ 	if (!rc)
+ 		ll_update_times(request, parent);
+ 
+ 	ptlrpc_req_finished(request);
+ 
+ out_free:
+-	if (dchild) {
+-		if (dchild->d_inode)
+-			ll_delete_inode(dchild->d_inode);
+-		dput(dchild);
++	if (child_inode) {
++		clear_nlink(child_inode);
++		iput(child_inode);
+ 	}
+ 
+ 	ll_finish_md_op_data(op_data);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 69492f0..120aca3 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -721,6 +721,8 @@ int ll_getattr(struct vfsmount *mnt, struct dentry *de, struct kstat *stat);
+ struct posix_acl *ll_get_acl(struct inode *inode, int type);
+ int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
+ 	       const char *name, int namelen);
++int ll_get_fid_by_name(struct inode *parent, const char *name,
++		       int namelen, struct lu_fid *fid);
+ int ll_inode_permission(struct inode *inode, int mask);
+ 
+ int ll_lov_setstripe_ea_info(struct inode *inode, struct dentry *dentry,
+diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
+index f9621b0..2a52d0c 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_object.c
++++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+@@ -224,6 +224,7 @@ static int lov_init_raid0(const struct lu_env *env,
+ 
+ 	LASSERT(!lov->lo_lsm);
+ 	lov->lo_lsm = lsm_addref(lsm);
++	lov->lo_layout_invalid = true;
+ 	r0->lo_nr  = lsm->lsm_stripe_count;
+ 	LASSERT(r0->lo_nr <= lov_targets_nr(dev));
  
 -- 
 1.7.1
