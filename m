@@ -1,246 +1,162 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:43:58 -0400
-Subject: [lustre-devel] [PATCH 05/58] staging: lustre: lmv: add new lmv
-	structures
-In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-6-git-send-email-jsimmons@infradead.org>
+Date: Thu, 21 Jul 2016 22:43:53 -0400
+Subject: [lustre-devel] [PATCH 00/58] staging: lustre: bug fixes from lustre
+	2.5.[56-58]
+Message-ID: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: wang di <di.wang@intel.com>
+Here is the next batch of fixes and cleanups that went into
+Lustre from versions 2.5.56 up to 2.5.58. Besides those changes
+the patches for LU-3531/LU-4906 were broken into several smaller
+patches as required for the staging tree. The rest of the patches
+here are minor fixes and some removal of dead or obsolete code.
 
-Newer lustre version on metadata servers support different
-version of lmv magic. This add the new data structures
-to handle these new lmv magic versions.
+Chris Horn (1):
+  staging: lustre: ptlrpc: Early replies need to honor at_max
 
-Signed-off-by: wang di <di.wang@intel.com>
-Reviewed-on: http://review.whamcloud.com/7043
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- .../lustre/lustre/include/lustre/lustre_idl.h      |   81 +++++++++++++++++---
- drivers/staging/lustre/lustre/include/lustre_lmv.h |   66 ++++++++++++++++
- drivers/staging/lustre/lustre/lmv/lmv_internal.h   |    1 +
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    1 +
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    1 +
- 5 files changed, 140 insertions(+), 10 deletions(-)
+Dmitry Eremin (1):
+  staging: lustre: lmv: fix issue found by Klocwork Insight tool
+
+Fan Yong (4):
+  staging: lustre: obdclass: bug fixes for lu_device_type handling
+  staging: lustre: llite: enable clients to inject error for lfsck
+  staging: lustre: obdclass: unified flow control interfaces
+  staging: lustre: reorder LOV_MAGIC_* definition
+
+Jian Yu (1):
+  staging: lustre: obdclass: fix lmd_parse() to handle comma-separated
+    NIDs
+
+Jinshan Xiong (3):
+  staging: lustre: osc: allow to call brw_commit() multiple times
+  staging: lustre: llite: avoid a deadlock in page write
+  staging: lustre: lov: handle the case of stripe size is not power 2
+
+John L. Hammond (9):
+  staging: lustre: mdc: fixup MDS_SWAP_LAYOUTS ELC handling
+  staging: lustre: don't need to const __u64 parameters for
+    lustre_idl.h
+  staging: lustre: const correct FID/OSTID/... helpers
+  staging: lustre: use bool for several function in
+    lustre_idl.h/lustre_fid.h
+  staging: lustre: simplify inline functions in lustre_fid.h
+  staging: lustre: lmv: access lum_stripe_offset as little endian
+  staging: lustre: lmv: cleanup req in lmv_getattr_name()
+  staging: lustre: lmv: rename request to preq in lmv_getattr_name()
+  staging: lustre: move ioctls to lustre_ioctl.h
+
+Nathaniel Clark (1):
+  staging: lustre: lmv: Ensure lmv_intent_lookup cleans up reqp
+
+Ryan Haasken (1):
+  staging: lustre: libcfs: Only dump log once per sec. to avoid EEXIST
+
+Vitaly Fertman (1):
+  staging: lustre: ldlm: flock completion fixes.
+
+wang di (36):
+  staging: lustre: obd: expand op_cli_flags
+  staging: lustre: obd: rename struct lmv_stripe_md field mea to lmv
+  staging: lustre: ptlrpc: remove wirecheck for struct lmv_stripe_md
+  staging: lustre: llite: cache directory striping information
+  staging: lustre: lmv: add new lmv structures
+  staging: lustre: mdc: handle IT_READDIR operations
+  staging: lustre: llite: label the debug info
+  staging: lustre: llite: pass struct md_op_data to ll_dir_read
+  staging: lustre: llite: remove debug message in ll_dir_read
+  staging: lustre: llite: reduce indent in ll_dir_read
+  staging: lustre: llite: set next only when needed in ll_dir_read
+  staging: lustre: llite: handle done flags differently in ll_dir_read
+  staging: lustre: llite: change done flag in ll_dir_read to bool
+  staging: lustre: llite: rename some variables for ll_dir_read
+  staging: lustre: llite: clarify some debug messages for statahead
+  staging: lustre: llite: remove code never called
+  staging: lustre: llite: pass in __u64 pos for ll_dir_read
+  staging: lustre: llite: do post work for statahead in readdir case
+  staging: lustre: llite: add md_op_data parameter to ll_get_dir_page
+  staging: lustre: llite: remove comment from ll_dir_read
+  staging: lustre: llite: style cleanup for llite_internal.h
+  staging: lustre: llite: pass inode to ll_release_page
+  staging: lustre: llite: change remove parameter to bool
+  staging: lustre: mdc: don't take rpc lock for readdir case
+  staging: lustre: lmv: remove unused lmv_get_mea function
+  staging: lustre: lmv: remove duplicate MAX_HASH_*
+  staging: lustre: lmv: change handling of lmv striping information
+  staging: lustre: lmv: remove lmv_get_easize
+  staging: lustre: lmv: replace obd_free_memmd with lmv_free_memmd
+  staging: lustre: create striped directory
+  staging: lustre: llite: fix "getdirstripe" to show stripe info
+  staging: lustre: delete striped directory
+  staging: lustre: add ability to migrate inodes.
+  staging: lustre: llite: a few fixes for migration.
+  staging: lustre: lmv: lookup remote migrating object in LMV
+  staging: lustre: llite: add error handler in inode prepare phase
+
+ .../lustre/include/linux/libcfs/libcfs_fail.h      |    3 +
+ drivers/staging/lustre/lnet/libcfs/debug.c         |    9 +-
+ drivers/staging/lustre/lnet/libcfs/fail.c          |    6 +-
+ drivers/staging/lustre/lustre/fld/fld_request.c    |   55 +--
+ drivers/staging/lustre/lustre/include/cl_object.h  |    3 +
+ drivers/staging/lustre/lustre/include/lu_object.h  |    3 +-
+ .../lustre/lustre/include/lustre/lustre_idl.h      |  250 ++++++--
+ .../lustre/lustre/include/lustre/lustre_ioctl.h    |  412 ++++++++++++
+ .../lustre/lustre/include/lustre/lustre_user.h     |   39 +-
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |   11 +-
+ .../lustre/lustre/include/lustre_dlm_flags.h       |   36 +-
+ drivers/staging/lustre/lustre/include/lustre_fid.h |   30 +-
+ drivers/staging/lustre/lustre/include/lustre_lib.h |  286 +---------
+ drivers/staging/lustre/lustre/include/lustre_lmv.h |  130 ++++
+ drivers/staging/lustre/lustre/include/lustre_mdc.h |    9 +-
+ drivers/staging/lustre/lustre/include/obd.h        |   60 +--
+ drivers/staging/lustre/lustre/include/obd_class.h  |   24 +
+ .../staging/lustre/lustre/include/obd_support.h    |    5 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |   98 +++-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |    4 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   23 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   16 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    8 +-
+ drivers/staging/lustre/lustre/llite/dir.c          |  471 +++++++++-----
+ drivers/staging/lustre/lustre/llite/file.c         |  178 +++++-
+ .../staging/lustre/lustre/llite/llite_internal.h   |   49 ++-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  258 ++++++++-
+ drivers/staging/lustre/lustre/llite/llite_nfs.c    |   19 +-
+ drivers/staging/lustre/lustre/llite/namei.c        |  104 +++-
+ drivers/staging/lustre/lustre/llite/rw.c           |    4 +
+ drivers/staging/lustre/lustre/llite/rw26.c         |    5 +-
+ drivers/staging/lustre/lustre/llite/statahead.c    |   77 ++-
+ drivers/staging/lustre/lustre/llite/vvp_dev.c      |    6 -
+ drivers/staging/lustre/lustre/llite/vvp_req.c      |    2 +
+ drivers/staging/lustre/lustre/llite/xattr.c        |    7 +-
+ drivers/staging/lustre/lustre/lmv/lmv_intent.c     |  287 ++++++++--
+ drivers/staging/lustre/lustre/lmv/lmv_internal.h   |   67 ++-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  656 ++++++++++++++++----
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |    1 +
+ drivers/staging/lustre/lustre/lov/lov_object.c     |    1 +
+ drivers/staging/lustre/lustre/lov/lov_page.c       |   11 +-
+ drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   17 +-
+ drivers/staging/lustre/lustre/mdc/mdc_internal.h   |    2 -
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c        |   66 +--
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c      |   21 +-
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |   22 +-
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |    8 +-
+ drivers/staging/lustre/lustre/obdclass/genops.c    |  132 ++++
+ .../lustre/lustre/obdclass/linux/linux-module.c    |    1 +
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |   34 +-
+ .../staging/lustre/lustre/obdclass/obd_config.c    |    1 +
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |   21 +-
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    1 +
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |   19 +-
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    9 +-
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |    8 +-
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |   11 +-
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |   37 ++
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |   18 +-
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |   33 +-
+ 60 files changed, 2942 insertions(+), 1242 deletions(-)
+ create mode 100644 drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
  create mode 100644 drivers/staging/lustre/lustre/include/lustre_lmv.h
-
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 051864c..32471a6 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -2482,16 +2482,6 @@ struct lmv_desc {
- 	struct obd_uuid ld_uuid;
- };
- 
--/* TODO: lmv_stripe_md should contain mds capabilities for all slave fids */
--struct lmv_stripe_md {
--	__u32	 mea_magic;
--	__u32	 mea_count;
--	__u32	 mea_master;
--	__u32	 mea_padding;
--	char	  mea_pool_name[LOV_MAXPOOLNAME];
--	struct lu_fid mea_ids[0];
--};
--
- #define MEA_MAGIC_LAST_CHAR      0xb2221ca1
- #define MEA_MAGIC_ALL_CHARS      0xb222a11c
- #define MEA_MAGIC_HASH_SEGMENT   0xb222a11b
-@@ -2500,6 +2490,77 @@ struct lmv_stripe_md {
- #define MAX_HASH_SIZE	    0x7fffffffffffffffULL
- #define MAX_HASH_HIGHEST_BIT     0x1000000000000000ULL
- 
-+/* lmv structures */
-+#define LMV_MAGIC_V1	0x0CD10CD0	/* normal stripe lmv magic */
-+#define LMV_USER_MAGIC	0x0CD20CD0	/* default lmv magic*/
-+#define LMV_MAGIC	LMV_MAGIC_V1
-+struct lmv_mds_md_v1 {
-+	__u32 lmv_magic;
-+	__u32 lmv_stripe_count;		/* stripe count */
-+	__u32 lmv_master_mdt_index;	/* master MDT index */
-+	__u32 lmv_hash_type;		/* dir stripe policy, i.e. indicate
-+					 * which hash function to be used
-+					 */
-+	__u32 lmv_layout_version;	/* Used for directory restriping */
-+	__u32 lmv_padding;
-+	char lmv_pool_name[LOV_MAXPOOLNAME];	/* pool name */
-+	struct lu_fid lmv_stripe_fids[0];	/* FIDs for each stripe */
-+};
-+
-+union lmv_mds_md {
-+	__u32			lmv_magic;
-+	struct lmv_mds_md_v1	lmv_md_v1;
-+	struct lmv_user_md	lmv_user_md;
-+};
-+
-+static inline ssize_t lmv_mds_md_size(int stripe_count, unsigned int lmm_magic)
-+{
-+	ssize_t len = -EINVAL;
-+
-+	switch (lmm_magic) {
-+	case LMV_MAGIC_V1: {
-+		struct lmv_mds_md_v1 *lmm1;
-+
-+		len = sizeof(*lmm1);
-+		len += stripe_count * sizeof(lmm1->lmv_stripe_fids[0]);
-+		break; }
-+	default:
-+		break;
-+	}
-+	return len;
-+}
-+
-+static inline int lmv_mds_md_stripe_count_get(const union lmv_mds_md *lmm)
-+{
-+	switch (le32_to_cpu(lmm->lmv_magic)) {
-+	case LMV_MAGIC_V1:
-+		return le32_to_cpu(lmm->lmv_md_v1.lmv_stripe_count);
-+	case LMV_USER_MAGIC:
-+		return le32_to_cpu(lmm->lmv_user_md.lum_stripe_count);
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+static inline int lmv_mds_md_stripe_count_set(union lmv_mds_md *lmm,
-+					      unsigned int stripe_count)
-+{
-+	int rc = 0;
-+
-+	switch (le32_to_cpu(lmm->lmv_magic)) {
-+	case LMV_MAGIC_V1:
-+		lmm->lmv_md_v1.lmv_stripe_count = cpu_to_le32(stripe_count);
-+		break;
-+	case LMV_USER_MAGIC:
-+		lmm->lmv_user_md.lum_stripe_count = cpu_to_le32(stripe_count);
-+		break;
-+	default:
-+		rc = -EINVAL;
-+		break;
-+	}
-+	return rc;
-+}
-+
- enum fld_rpc_opc {
- 	FLD_QUERY	= 900,
- 	FLD_READ	= 901,
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lmv.h b/drivers/staging/lustre/lustre/include/lustre_lmv.h
-new file mode 100644
-index 0000000..0620c8c
---- /dev/null
-+++ b/drivers/staging/lustre/lustre/include/lustre_lmv.h
-@@ -0,0 +1,66 @@
-+/*
-+ * GPL HEADER START
-+ *
-+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 only,
-+ * as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License version 2 for more details.  A copy is
-+ * included in the COPYING file that accompanied this code.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 along with this program; If not, see
-+ * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
-+ *
-+ * GPL HEADER END
-+ */
-+/*
-+ * Copyright (c) 2013, Intel Corporation.
-+ */
-+/*
-+ * lustre/include/lustre_lmv.h
-+ *
-+ * Lustre LMV structures and functions.
-+ *
-+ * Author: Di Wang <di.wang@intel.com>
-+ */
-+
-+#ifndef _LUSTRE_LMV_H
-+#define _LUSTRE_LMV_H
-+#include "lustre/lustre_idl.h"
-+
-+struct lmv_oinfo {
-+	struct lu_fid	lmo_fid;
-+	u32		lmo_mds;
-+	struct inode	*lmo_root;
-+};
-+
-+struct lmv_stripe_md {
-+	__u32	mea_magic;
-+	__u32	mea_count;
-+	__u32	mea_master;
-+	__u32	mea_padding;
-+	char	mea_pool_name[LOV_MAXPOOLNAME];
-+	struct lu_fid mea_ids[0];
-+};
-+
-+union lmv_mds_md;
-+
-+int lmv_unpack_md(struct obd_export *exp, struct lmv_stripe_md **lsmp,
-+		  const union lmv_mds_md *lmm, int stripe_count);
-+
-+static inline int lmv_alloc_memmd(struct lmv_stripe_md **lsmp, int stripe_count)
-+{
-+	return lmv_unpack_md(NULL, lsmp, NULL, stripe_count);
-+}
-+
-+static inline void lmv_free_memmd(struct lmv_stripe_md *lsm)
-+{
-+	lmv_unpack_md(NULL, &lsm, NULL, 0);
-+}
-+#endif
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_internal.h b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
-index 0beafc4..471470b 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_internal.h
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
-@@ -35,6 +35,7 @@
- 
- #include "../include/lustre/lustre_idl.h"
- #include "../include/obd.h"
-+#include "../include/lustre_lmv.h"
- 
- #define LMV_MAX_TGT_COUNT 128
- 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index fac04f0..8e83263 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -46,6 +46,7 @@
- #include "../include/lustre_lib.h"
- #include "../include/lustre_net.h"
- #include "../include/obd_class.h"
-+#include "../include/lustre_lmv.h"
- #include "../include/lprocfs_status.h"
- #include "../include/lustre_lite.h"
- #include "../include/lustre_fid.h"
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 4fc3f9b..ab78754 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -40,6 +40,7 @@
- 
- #include "../include/lustre_acl.h"
- #include "../include/obd_class.h"
-+#include "../include/lustre_lmv.h"
- #include "../include/lustre_fid.h"
- #include "../include/lprocfs_status.h"
- #include "../include/lustre_param.h"
--- 
-1.7.1
