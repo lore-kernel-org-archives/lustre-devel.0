@@ -1,94 +1,58 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:26 -0400
-Subject: [lustre-devel] [PATCH 33/58] staging: lustre: obdclass: fix
-	lmd_parse() to handle comma-separated NIDs
+Date: Thu, 21 Jul 2016 22:44:39 -0400
+Subject: [lustre-devel] [PATCH 46/58] staging: lustre: lmv: access
+	lum_stripe_offset as little endian
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-34-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-47-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jian Yu <jian.yu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Jian Yu <jian.yu@intel.com>
+From: John L. Hammond <john.hammond@intel.com>
 
-This patch handles the  upgrade situation that old mountdata already
-contains comma-separated NIDs. The correct way to fix the original
-issue is to parse comma-separated NIDs in lmd_parse().
+By the time that a struct lmv_user_md reaches lmv_placement_policy()
+it has already been converted to little endian. Therefore use the
+appropriate macros around accesses to this this field. This issue was
+found by rewriting the definition of struct lmv_user_md to use the
+__leXX typedefs and running sparse.
 
-Signed-off-by: Jian Yu <jian.yu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4460
-Reviewed-on: http://review.whamcloud.com/8918
-Reviewed-by: Niu Yawei <yawei.niu@intel.com>
-Reviewed-by: Bobi Jam <bobijam@gmail.com>
-Reviewed-by: Sebastien Buisson <sebastien.buisson@bull.net>
+Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4738
+Reviewed-on: http://review.whamcloud.com/9671
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Swapnil Pimpale <spimpale@ddn.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |   20 ++++++++++++++++----
- 1 files changed, 16 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index aa84a50..4931e37 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -880,7 +880,7 @@ static int lmd_parse_mgs(struct lustre_mount_data *lmd, char **ptr)
-  */
- static int lmd_parse(char *options, struct lustre_mount_data *lmd)
- {
--	char *s1, *s2, *devname = NULL;
-+	char *s1, *s2, *s3, *devname = NULL;
- 	struct lustre_mount_data *raw = (struct lustre_mount_data *)options;
- 	int rc = 0;
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 9e3d35a..5830fc1 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -1244,15 +1244,15 @@ static int lmv_placement_policy(struct obd_device *obd,
+ 		struct lmv_user_md *lum;
  
-@@ -913,6 +913,7 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
- 		/* Skip whitespace and extra commas */
- 		while (*s1 == ' ' || *s1 == ',')
- 			s1++;
-+		s3 = s1;
- 
- 		/* Client options are parsed in ll_options: eg. flock,
- 		 * user_xattr, acl
-@@ -970,6 +971,7 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
- 			rc = lmd_parse_mgssec(lmd, s1 + 7);
- 			if (rc)
- 				goto invalid;
-+			s3 = s2;
- 			clear++;
- 		/* ost exclusion list */
- 		} else if (strncmp(s1, "exclude=", 8) == 0) {
-@@ -990,10 +992,19 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
- 			size_t length, params_length;
- 			char *tail = strchr(s1 + 6, ',');
- 
--			if (!tail)
-+			if (!tail) {
- 				length = strlen(s1);
--			else
--				length = tail - s1;
-+			} else {
-+				lnet_nid_t nid;
-+				char *param_str = tail + 1;
-+				int supplementary = 1;
-+
-+				while (!class_parse_nid_quiet(param_str, &nid,
-+							      &param_str)) {
-+					supplementary = 0;
-+				}
-+				length = param_str - s1 - supplementary;
-+			}
- 			length -= 6;
- 			params_length = strlen(lmd->lmd_params);
- 			if (params_length + length + 1 >= LMD_PARAMS_MAXLEN)
-@@ -1001,6 +1012,7 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
- 			strncat(lmd->lmd_params, s1 + 6, length);
- 			lmd->lmd_params[params_length + length] = '\0';
- 			strlcat(lmd->lmd_params, " ", LMD_PARAMS_MAXLEN);
-+			s3 = s1 + 6 + length;
- 			clear++;
- 		} else if (strncmp(s1, "osd=", 4) == 0) {
- 			rc = lmd_parse_string(&lmd->lmd_osd_type, s1 + 4);
+ 		lum = op_data->op_data;
+-		if (lum->lum_stripe_offset != (__u32)-1) {
+-			*mds = lum->lum_stripe_offset;
++		if (le32_to_cpu(lum->lum_stripe_offset) != (__u32)-1) {
++			*mds = le32_to_cpu(lum->lum_stripe_offset);
+ 		} else {
+ 			/*
+ 			 * -1 means default, which will be in the same MDT with
+ 			 * the stripe
+ 			 */
+ 			*mds = op_data->op_mds;
+-			lum->lum_stripe_offset = op_data->op_mds;
++			lum->lum_stripe_offset = cpu_to_le32(op_data->op_mds);
+ 		}
+ 	} else {
+ 		/*
 -- 
 1.7.1
