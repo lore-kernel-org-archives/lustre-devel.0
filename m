@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:08 -0400
-Subject: [lustre-devel] [PATCH 15/58] staging: lustre: llite: clarify some
-	debug messages for statahead
+Date: Thu, 21 Jul 2016 22:44:18 -0400
+Subject: [lustre-devel] [PATCH 25/58] staging: lustre: lmv: remove unused
+	lmv_get_mea function
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-16-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-26-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: wang di <di.wang@intel.com>
 
-Make some of the error reporting more clear for the statahead
-thread startup and is_first_dirent() function.
+The function lmv_get_mea() is not used so remove it.
 
 Signed-off-by: wang di <di.wang@intel.com>
 Reviewed-on: http://review.whamcloud.com/7043
@@ -26,37 +25,43 @@ Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/statahead.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/lmv/lmv_internal.h |   24 ----------------------
+ 1 files changed, 0 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-index 7a7b11c..fc24a65 100644
---- a/drivers/staging/lustre/lustre/llite/statahead.c
-+++ b/drivers/staging/lustre/lustre/llite/statahead.c
-@@ -1073,9 +1073,9 @@ static int ll_statahead_thread(void *arg)
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_internal.h b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
+index 471470b..ab01560 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_internal.h
++++ b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
+@@ -55,30 +55,6 @@ int __lmv_fid_alloc(struct lmv_obd *lmv, struct lu_fid *fid, u32 mds);
+ int lmv_fid_alloc(struct obd_export *exp, struct lu_fid *fid,
+ 		  struct md_op_data *op_data);
  
- 		if (IS_ERR(page)) {
- 			rc = PTR_ERR(page);
--			CDEBUG(D_READA, "error reading dir "DFID" at %llu/%llu: [rc %d] [parent %u]\n",
-+			CDEBUG(D_READA, "error reading dir "DFID" at %llu/%llu: opendir_pid = %u: rc = %d\n",
- 			       PFID(ll_inode2fid(dir)), pos, sai->sai_index,
--			       rc, plli->lli_opendir_pid);
-+			       plli->lli_opendir_pid, rc);
- 			goto out;
- 		}
- 
-@@ -1362,9 +1362,10 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
- 			struct ll_inode_info *lli = ll_i2info(dir);
- 
- 			rc = PTR_ERR(page);
--			CERROR("error reading dir "DFID" at %llu: [rc %d] [parent %u]\n",
-+			CERROR("%s: error reading dir "DFID" at %llu: opendir_pid = %u : rc = %d\n",
-+			       ll_get_fsname(dir->i_sb, NULL, 0),
- 			       PFID(ll_inode2fid(dir)), pos,
--			       rc, lli->lli_opendir_pid);
-+			       lli->lli_opendir_pid, rc);
- 			break;
- 		}
- 
+-static inline struct lmv_stripe_md *lmv_get_mea(struct ptlrpc_request *req)
+-{
+-	struct mdt_body	 *body;
+-	struct lmv_stripe_md    *mea;
+-
+-	LASSERT(req);
+-
+-	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
+-
+-	if (!body || !S_ISDIR(body->mode) || !body->eadatasize)
+-		return NULL;
+-
+-	mea = req_capsule_server_sized_get(&req->rq_pill, &RMF_MDT_MD,
+-					   body->eadatasize);
+-	if (mea->mea_count == 0)
+-		return NULL;
+-	if (mea->mea_magic != MEA_MAGIC_LAST_CHAR &&
+-	    mea->mea_magic != MEA_MAGIC_ALL_CHARS &&
+-	    mea->mea_magic != MEA_MAGIC_HASH_SEGMENT)
+-		return NULL;
+-
+-	return mea;
+-}
+-
+ static inline int lmv_get_easize(struct lmv_obd *lmv)
+ {
+ 	return sizeof(struct lmv_stripe_md) +
 -- 
 1.7.1
