@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:07 -0400
-Subject: [lustre-devel] [PATCH 14/58] staging: lustre: llite: rename some
-	variables for ll_dir_read
+Date: Thu, 21 Jul 2016 22:43:59 -0400
+Subject: [lustre-devel] [PATCH 06/58] staging: lustre: mdc: handle
+	IT_READDIR operations
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,8 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: wang di <di.wang@intel.com>
 
-The variables api32 and hash64 was renamed to is_api32 and
-is_hash64.
+The readdir operations lock was incomplete. This
+patch fills in the missing pieces.
 
 Signed-off-by: wang di <di.wang@intel.com>
 Reviewed-on: http://review.whamcloud.com/7043
@@ -26,38 +26,59 @@ Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/dir.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h   |    4 +++-
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c |    8 +++++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 70a3ca0..907fae4 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -494,8 +494,8 @@ int ll_dir_read(struct inode *inode, struct md_op_data *op_data,
- {
- 	struct ll_sb_info    *sbi	= ll_i2sbi(inode);
- 	__u64		   pos		= ctx->pos;
--	int		   api32      = ll_need_32bit_api(sbi);
--	int		   hash64     = sbi->ll_flags & LL_SBI_64BIT_HASH;
-+	int		   is_api32 = ll_need_32bit_api(sbi);
-+	int		   is_hash64 = sbi->ll_flags & LL_SBI_64BIT_HASH;
- 	struct page	  *page;
- 	struct ll_dir_chain   chain;
- 	bool		   done = false;
-@@ -545,12 +545,12 @@ int ll_dir_read(struct inode *inode, struct md_op_data *op_data,
- 				 */
- 				continue;
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 1575c82..17b8d22 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -801,9 +801,11 @@ static inline int it_to_lock_mode(struct lookup_intent *it)
+ 	/* CREAT needs to be tested before open (both could be set) */
+ 	if (it->it_op & IT_CREAT)
+ 		return LCK_CW;
+-	else if (it->it_op & (IT_READDIR | IT_GETATTR | IT_OPEN | IT_LOOKUP |
++	else if (it->it_op & (IT_GETATTR | IT_OPEN | IT_LOOKUP |
+ 			      IT_LAYOUT))
+ 		return LCK_CR;
++	else if (it->it_op & IT_READDIR)
++		return LCK_PR;
+ 	else if (it->it_op &  IT_GETXATTR)
+ 		return LCK_PR;
+ 	else if (it->it_op &  IT_SETXATTR)
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+index f48b584..06a1274 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+@@ -903,6 +903,9 @@ static int mdc_finish_intent_lock(struct obd_export *exp,
+ 	LASSERT(request != LP_POISON);
+ 	LASSERT(request->rq_repmsg != LP_POISON);
  
--			if (api32 && hash64)
-+			if (is_api32 && is_hash64)
- 				lhash = hash >> 32;
- 			else
- 				lhash = hash;
- 			fid_le_to_cpu(&fid, &ent->lde_fid);
--			ino = cl_fid_build_ino(&fid, api32);
-+			ino = cl_fid_build_ino(&fid, is_api32);
- 			type = ll_dirent_type_get(ent);
- 			ctx->pos = lhash;
- 			/* For 'll_nfs_get_name_filldir()', it will try
++	if (it->it_op & IT_READDIR)
++		return 0;
++
+ 	if (!it_disposition(it, DISP_IT_EXECD)) {
+ 		/* The server failed before it even started executing the
+ 		 * intent, i.e. because it couldn't unpack the request.
+@@ -1042,6 +1045,9 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
+ 						  MDS_INODELOCK_LOOKUP |
+ 						  MDS_INODELOCK_PERM;
+ 			break;
++		case IT_READDIR:
++			policy.l_inodebits.bits = MDS_INODELOCK_UPDATE;
++			break;
+ 		case IT_LAYOUT:
+ 			policy.l_inodebits.bits = MDS_INODELOCK_LAYOUT;
+ 			break;
+@@ -1119,7 +1125,7 @@ int mdc_intent_lock(struct obd_export *exp, struct md_op_data *op_data,
+ 
+ 	lockh.cookie = 0;
+ 	if (fid_is_sane(&op_data->op_fid2) &&
+-	    (it->it_op & (IT_LOOKUP | IT_GETATTR))) {
++	    (it->it_op & (IT_LOOKUP | IT_GETATTR | IT_READDIR))) {
+ 		/* We could just return 1 immediately, but since we should only
+ 		 * be called in revalidate_it if we already have a lock, let's
+ 		 * verify that.
 -- 
 1.7.1
