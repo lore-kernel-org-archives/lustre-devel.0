@@ -1,544 +1,959 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:46 -0400
-Subject: [lustre-devel] [PATCH 53/58] staging: lustre: obdclass: unified
-	flow control interfaces
+Date: Thu, 21 Jul 2016 22:44:28 -0400
+Subject: [lustre-devel] [PATCH 35/58] staging: lustre: add ability to
+	migrate inodes.
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-54-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-36-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Fan Yong <fan.yong@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Fan Yong <fan.yong@intel.com>
+From: wang di <di.wang@intel.com>
 
-Unify the flow control interfaces for MDC RPC and FLD RPC.
-We allow to adjust the maximum inflight RPCs count via /sys
-interface.
+Add client support to migrate the individual inodes
+from one MDT to another MDT, and this functionality
+will only migrate inode layout on MDT but not touch
+data object on OST.
 
-Signed-off-by: Fan Yong <fan.yong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4687
-Reviewed-on: http://review.whamcloud.com/9562
-Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+The directory will be migrated from top to the bottom,
+i.e. migrating parent first, then migrating the child.
+
+Signed-off-by: wang di <di.wang@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2430
+Reviewed-on: http://review.whamcloud.com/6662
 Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/fld/fld_request.c    |   55 +--------
- drivers/staging/lustre/lustre/include/lustre_mdc.h |    5 -
- drivers/staging/lustre/lustre/include/obd.h        |   14 +--
- drivers/staging/lustre/lustre/include/obd_class.h  |    5 +
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |    4 +-
- drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   17 +--
- drivers/staging/lustre/lustre/mdc/mdc_internal.h   |    2 -
- drivers/staging/lustre/lustre/mdc/mdc_lib.c        |   64 ----------
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |   10 +-
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    6 +-
- drivers/staging/lustre/lustre/obdclass/genops.c    |  132 ++++++++++++++++++++
- 11 files changed, 161 insertions(+), 153 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      |   11 +-
+ .../lustre/lustre/include/lustre/lustre_user.h     |    1 +
+ drivers/staging/lustre/lustre/include/lustre_lmv.h |    2 +
+ drivers/staging/lustre/lustre/include/obd.h        |   12 +--
+ drivers/staging/lustre/lustre/llite/dir.c          |   43 +++++-
+ drivers/staging/lustre/lustre/llite/file.c         |  113 ++++++++++++-
+ .../staging/lustre/lustre/llite/llite_internal.h   |   14 ++-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |   33 ++++-
+ drivers/staging/lustre/lustre/llite/namei.c        |    3 +-
+ drivers/staging/lustre/lustre/llite/rw.c           |    4 +
+ drivers/staging/lustre/lustre/llite/statahead.c    |    1 +
+ drivers/staging/lustre/lustre/lmv/lmv_intent.c     |   32 +++-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  176 ++++++++++++++------
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c        |    2 +
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |    4 +-
+ 15 files changed, 368 insertions(+), 83 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/fld/fld_request.c b/drivers/staging/lustre/lustre/fld/fld_request.c
-index e59d626..ed7962e 100644
---- a/drivers/staging/lustre/lustre/fld/fld_request.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_request.c
-@@ -53,57 +53,6 @@
- #include "../include/lustre_mdc.h"
- #include "fld_internal.h"
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 0ff30c6..6853f62 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1482,6 +1482,7 @@ enum obdo_flags {
+ #define LOV_MAGIC	 LOV_MAGIC_V1
+ #define LOV_MAGIC_JOIN_V1 0x0BD20BD0
+ #define LOV_MAGIC_V3      0x0BD30BD0
++#define LOV_MAGIC_MIGRATE 0x0BD40BD0
  
--/* TODO: these 3 functions are copies of flow-control code from mdc_lib.c
-- * It should be common thing. The same about mdc RPC lock
-- */
--static int fld_req_avail(struct client_obd *cli, struct mdc_cache_waiter *mcw)
--{
--	int rc;
--
--	spin_lock(&cli->cl_loi_list_lock);
--	rc = list_empty(&mcw->mcw_entry);
--	spin_unlock(&cli->cl_loi_list_lock);
--	return rc;
--};
--
--static void fld_enter_request(struct client_obd *cli)
--{
--	struct mdc_cache_waiter mcw;
--	struct l_wait_info lwi = { 0 };
--
--	spin_lock(&cli->cl_loi_list_lock);
--	if (cli->cl_r_in_flight >= cli->cl_max_rpcs_in_flight) {
--		list_add_tail(&mcw.mcw_entry, &cli->cl_cache_waiters);
--		init_waitqueue_head(&mcw.mcw_waitq);
--		spin_unlock(&cli->cl_loi_list_lock);
--		l_wait_event(mcw.mcw_waitq, fld_req_avail(cli, &mcw), &lwi);
--	} else {
--		cli->cl_r_in_flight++;
--		spin_unlock(&cli->cl_loi_list_lock);
--	}
--}
--
--static void fld_exit_request(struct client_obd *cli)
--{
--	struct list_head *l, *tmp;
--	struct mdc_cache_waiter *mcw;
--
--	spin_lock(&cli->cl_loi_list_lock);
--	cli->cl_r_in_flight--;
--	list_for_each_safe(l, tmp, &cli->cl_cache_waiters) {
--		if (cli->cl_r_in_flight >= cli->cl_max_rpcs_in_flight) {
--			/* No free request slots anymore */
--			break;
--		}
--
--		mcw = list_entry(l, struct mdc_cache_waiter, mcw_entry);
--		list_del_init(&mcw->mcw_entry);
--		cli->cl_r_in_flight++;
--		wake_up(&mcw->mcw_waitq);
--	}
--	spin_unlock(&cli->cl_loi_list_lock);
--}
--
- static int fld_rrb_hash(struct lu_client_fld *fld, u64 seq)
+ /*
+  * magic for fully defined striping
+@@ -1987,7 +1988,7 @@ enum mdt_reint_cmd {
+ 	REINT_OPEN     = 6,
+ 	REINT_SETXATTR = 7,
+ 	REINT_RMENTRY  = 8,
+-/*      REINT_WRITE    = 9, */
++	REINT_MIGRATE  = 9,
+ 	REINT_MAX
+ };
+ 
+@@ -2280,6 +2281,7 @@ enum mds_op_bias {
+ 	MDS_CREATE_VOLATILE	= 1 << 10,
+ 	MDS_OWNEROVERRIDE	= 1 << 11,
+ 	MDS_HSM_RELEASE		= 1 << 12,
++	MDS_RENAME_MIGRATE	= BIT(13),
+ };
+ 
+ /* instance of mdt_reint_rec */
+@@ -2488,11 +2490,13 @@ struct lmv_desc {
+ /* lmv structures */
+ #define LMV_MAGIC_V1	0x0CD10CD0	/* normal stripe lmv magic */
+ #define LMV_USER_MAGIC	0x0CD20CD0	/* default lmv magic*/
++#define LMV_MAGIC_MIGRATE	0x0CD30CD0	/* migrate stripe lmv magic */
+ #define LMV_MAGIC	LMV_MAGIC_V1
+ 
+ enum lmv_hash_type {
+ 	LMV_HASH_TYPE_ALL_CHARS = 1,
+ 	LMV_HASH_TYPE_FNV_1A_64 = 2,
++	LMV_HASH_TYPE_MIGRATION = 3,
+ };
+ 
+ #define LMV_HASH_NAME_ALL_CHARS		"all_char"
+@@ -2552,7 +2556,8 @@ static inline ssize_t lmv_mds_md_size(int stripe_count, unsigned int lmm_magic)
+ 	ssize_t len = -EINVAL;
+ 
+ 	switch (lmm_magic) {
+-	case LMV_MAGIC_V1: {
++	case LMV_MAGIC_V1:
++	case LMV_MAGIC_MIGRATE: {
+ 		struct lmv_mds_md_v1 *lmm1;
+ 
+ 		len = sizeof(*lmm1);
+@@ -2568,6 +2573,7 @@ static inline int lmv_mds_md_stripe_count_get(const union lmv_mds_md *lmm)
  {
- 	LASSERT(fld->lcf_count > 0);
-@@ -439,9 +388,9 @@ int fld_client_rpc(struct obd_export *exp,
- 	req->rq_reply_portal = MDC_REPLY_PORTAL;
- 	ptlrpc_at_set_req_timeout(req);
+ 	switch (le32_to_cpu(lmm->lmv_magic)) {
+ 	case LMV_MAGIC_V1:
++	case LMV_MAGIC_MIGRATE:
+ 		return le32_to_cpu(lmm->lmv_md_v1.lmv_stripe_count);
+ 	case LMV_USER_MAGIC:
+ 		return le32_to_cpu(lmm->lmv_user_md.lum_stripe_count);
+@@ -2583,6 +2589,7 @@ static inline int lmv_mds_md_stripe_count_set(union lmv_mds_md *lmm,
  
--	fld_enter_request(&exp->exp_obd->u.cli);
-+	obd_get_request_slot(&exp->exp_obd->u.cli);
- 	rc = ptlrpc_queue_wait(req);
--	fld_exit_request(&exp->exp_obd->u.cli);
-+	obd_put_request_slot(&exp->exp_obd->u.cli);
- 	if (rc)
- 		goto out_req;
+ 	switch (le32_to_cpu(lmm->lmv_magic)) {
+ 	case LMV_MAGIC_V1:
++	case LMV_MAGIC_MIGRATE:
+ 		lmm->lmv_md_v1.lmv_stripe_count = cpu_to_le32(stripe_count);
+ 		break;
+ 	case LMV_USER_MAGIC:
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+index 26dbda0..4746320 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+@@ -243,6 +243,7 @@ struct ost_id {
+ #define LL_IOC_GET_LEASE		_IO('f', 244)
+ #define LL_IOC_HSM_IMPORT		_IOWR('f', 245, struct hsm_user_import)
+ #define LL_IOC_LMV_SET_DEFAULT_STRIPE	_IOWR('f', 246, struct lmv_user_md)
++#define LL_IOC_MIGRATE			_IOR('f', 247, int)
  
-diff --git a/drivers/staging/lustre/lustre/include/lustre_mdc.h b/drivers/staging/lustre/lustre/include/lustre_mdc.h
-index 0a8c639..bf6f87a 100644
---- a/drivers/staging/lustre/lustre/include/lustre_mdc.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_mdc.h
-@@ -179,11 +179,6 @@ static inline void mdc_update_max_ea_from_body(struct obd_export *exp,
- 	}
- }
- 
--struct mdc_cache_waiter {
--	struct list_head	      mcw_entry;
--	wait_queue_head_t	     mcw_waitq;
--};
--
- /* mdc/mdc_locks.c */
- int it_open_error(int phase, struct lookup_intent *it);
- 
+ #define LL_STATFS_LMV	   1
+ #define LL_STATFS_LOV	   2
+diff --git a/drivers/staging/lustre/lustre/include/lustre_lmv.h b/drivers/staging/lustre/lustre/include/lustre_lmv.h
+index 4036fce..feee981 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_lmv.h
++++ b/drivers/staging/lustre/lustre/include/lustre_lmv.h
+@@ -106,6 +106,7 @@ static inline void lmv_cpu_to_le(union lmv_mds_md *lmv_dst,
+ {
+ 	switch (lmv_src->lmv_magic) {
+ 	case LMV_MAGIC_V1:
++	case LMV_MAGIC_MIGRATE:
+ 		lmv1_cpu_to_le(&lmv_dst->lmv_md_v1, &lmv_src->lmv_md_v1);
+ 		break;
+ 	default:
+@@ -118,6 +119,7 @@ static inline void lmv_le_to_cpu(union lmv_mds_md *lmv_dst,
+ {
+ 	switch (le32_to_cpu(lmv_src->lmv_magic)) {
+ 	case LMV_MAGIC_V1:
++	case LMV_MAGIC_MIGRATE:
+ 		lmv1_le_to_cpu(&lmv_dst->lmv_md_v1, &lmv_src->lmv_md_v1);
+ 		break;
+ 	default:
 diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index f5eeb05..cacd472 100644
+index a9f4e13..f5eeb05 100644
 --- a/drivers/staging/lustre/lustre/include/obd.h
 +++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -211,11 +211,12 @@ struct timeout_item {
- 	struct list_head	 ti_chain;
+@@ -847,9 +847,6 @@ struct md_op_data {
+ 	/* Various operation flags. */
+ 	enum mds_op_bias        op_bias;
+ 
+-	/* Operation type */
+-	__u32		   op_opc;
+-
+ 	/* Used by readdir */
+ 	__u64		   op_offset;
+ 
+@@ -871,6 +868,7 @@ enum op_cli_flags {
+ 	CLI_RM_ENTRY	= 1 << 1,
+ 	CLI_HASH64	= BIT(2),
+ 	CLI_API32	= BIT(3),
++	CLI_MIGRATE	= BIT(4),
  };
  
--#define OSC_MAX_RIF_DEFAULT       8
--#define OSC_MAX_RIF_MAX	 256
--#define OSC_MAX_DIRTY_DEFAULT  (OSC_MAX_RIF_DEFAULT * 4)
--#define OSC_MAX_DIRTY_MB_MAX   2048     /* arbitrary, but < MAX_LONG bytes */
--#define OSC_DEFAULT_RESENDS      10
-+#define OBD_MAX_RIF_DEFAULT	8
-+#define OBD_MAX_RIF_MAX		512
-+#define OSC_MAX_RIF_MAX		256
-+#define OSC_MAX_DIRTY_DEFAULT	(OBD_MAX_RIF_DEFAULT * 4)
-+#define OSC_MAX_DIRTY_MB_MAX	2048	/* arbitrary, but < MAX_LONG bytes */
-+#define OSC_DEFAULT_RESENDS	10
- 
- /* possible values for fo_sync_lock_cancel */
- enum {
-@@ -225,9 +226,6 @@ enum {
- 	NUM_SYNC_ON_CANCEL_STATES
+ struct md_enqueue_info;
+@@ -1013,14 +1011,6 @@ struct obd_ops {
+ 	 */
  };
  
--#define MDC_MAX_RIF_DEFAULT       8
--#define MDC_MAX_RIF_MAX	 512
--
- enum obd_cl_sem_lock_class {
- 	OBD_CLI_SEM_NORMAL,
- 	OBD_CLI_SEM_MGC,
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 2f111a8..de808ee 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -97,6 +97,11 @@ int obd_zombie_impexp_init(void);
- void obd_zombie_impexp_stop(void);
- void obd_zombie_barrier(void);
- 
-+int obd_get_request_slot(struct client_obd *cli);
-+void obd_put_request_slot(struct client_obd *cli);
-+__u32 obd_get_max_rpcs_in_flight(struct client_obd *cli);
-+int obd_set_max_rpcs_in_flight(struct client_obd *cli, __u32 max);
-+
- struct llog_handle;
- struct llog_rec_hdr;
- typedef int (*llog_cb_t)(const struct lu_env *, struct llog_handle *,
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index 7c832aa..ee40006 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -360,7 +360,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	cli->cl_chunkbits = PAGE_SHIFT;
- 
- 	if (!strcmp(name, LUSTRE_MDC_NAME)) {
--		cli->cl_max_rpcs_in_flight = MDC_MAX_RIF_DEFAULT;
-+		cli->cl_max_rpcs_in_flight = OBD_MAX_RIF_DEFAULT;
- 	} else if (totalram_pages >> (20 - PAGE_SHIFT) <= 128 /* MB */) {
- 		cli->cl_max_rpcs_in_flight = 2;
- 	} else if (totalram_pages >> (20 - PAGE_SHIFT) <= 256 /* MB */) {
-@@ -368,7 +368,7 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	} else if (totalram_pages >> (20 - PAGE_SHIFT) <= 512 /* MB */) {
- 		cli->cl_max_rpcs_in_flight = 4;
- 	} else {
--		cli->cl_max_rpcs_in_flight = OSC_MAX_RIF_DEFAULT;
-+		cli->cl_max_rpcs_in_flight = OBD_MAX_RIF_DEFAULT;
- 	}
- 	rc = ldlm_get_ref();
- 	if (rc) {
-diff --git a/drivers/staging/lustre/lustre/mdc/lproc_mdc.c b/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-index 98d15fb..fca9450 100644
---- a/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-+++ b/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-@@ -43,11 +43,10 @@ static ssize_t max_rpcs_in_flight_show(struct kobject *kobj,
- 	int len;
- 	struct obd_device *dev = container_of(kobj, struct obd_device,
- 					      obd_kobj);
--	struct client_obd *cli = &dev->u.cli;
-+	__u32 max;
- 
--	spin_lock(&cli->cl_loi_list_lock);
--	len = sprintf(buf, "%u\n", cli->cl_max_rpcs_in_flight);
--	spin_unlock(&cli->cl_loi_list_lock);
-+	max = obd_get_max_rpcs_in_flight(&dev->u.cli);
-+	len = sprintf(buf, "%u\n", max);
- 
- 	return len;
- }
-@@ -59,7 +58,6 @@ static ssize_t max_rpcs_in_flight_store(struct kobject *kobj,
- {
- 	struct obd_device *dev = container_of(kobj, struct obd_device,
- 					      obd_kobj);
--	struct client_obd *cli = &dev->u.cli;
- 	int rc;
- 	unsigned long val;
- 
-@@ -67,12 +65,9 @@ static ssize_t max_rpcs_in_flight_store(struct kobject *kobj,
- 	if (rc)
- 		return rc;
- 
--	if (val < 1 || val > MDC_MAX_RIF_MAX)
--		return -ERANGE;
--
--	spin_lock(&cli->cl_loi_list_lock);
--	cli->cl_max_rpcs_in_flight = val;
--	spin_unlock(&cli->cl_loi_list_lock);
-+	rc = obd_set_max_rpcs_in_flight(&dev->u.cli, val);
-+	if (rc)
-+		count = rc;
- 
- 	return count;
- }
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_internal.h b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-index 58f2841..53b4063 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-@@ -61,8 +61,6 @@ void mdc_link_pack(struct ptlrpc_request *req, struct md_op_data *op_data);
- void mdc_rename_pack(struct ptlrpc_request *req, struct md_op_data *op_data,
- 		     const char *old, int oldlen, const char *new, int newlen);
- void mdc_close_pack(struct ptlrpc_request *req, struct md_op_data *op_data);
--int mdc_enter_request(struct client_obd *cli);
--void mdc_exit_request(struct client_obd *cli);
- 
- /* mdc/mdc_locks.c */
- int mdc_set_lock_data(struct obd_export *exp,
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-index 95c4550..b532623 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-@@ -484,67 +484,3 @@ void mdc_close_pack(struct ptlrpc_request *req, struct md_op_data *op_data)
- 	mdc_ioepoch_pack(epoch, op_data);
- 	mdc_hsm_release_pack(req, op_data);
- }
--
--static int mdc_req_avail(struct client_obd *cli, struct mdc_cache_waiter *mcw)
--{
--	int rc;
--
--	spin_lock(&cli->cl_loi_list_lock);
--	rc = list_empty(&mcw->mcw_entry);
--	spin_unlock(&cli->cl_loi_list_lock);
--	return rc;
+-enum {
+-	LUSTRE_OPC_MKDIR    = (1 << 0),
+-	LUSTRE_OPC_SYMLINK  = (1 << 1),
+-	LUSTRE_OPC_MKNOD    = (1 << 2),
+-	LUSTRE_OPC_CREATE   = (1 << 3),
+-	LUSTRE_OPC_ANY      = (1 << 4)
 -};
 -
--/* We record requests in flight in cli->cl_r_in_flight here.
-- * There is only one write rpc possible in mdc anyway. If this to change
-- * in the future - the code may need to be revisited.
-- */
--int mdc_enter_request(struct client_obd *cli)
--{
--	int rc = 0;
--	struct mdc_cache_waiter mcw;
--	struct l_wait_info lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
--
--	spin_lock(&cli->cl_loi_list_lock);
--	if (cli->cl_r_in_flight >= cli->cl_max_rpcs_in_flight) {
--		list_add_tail(&mcw.mcw_entry, &cli->cl_cache_waiters);
--		init_waitqueue_head(&mcw.mcw_waitq);
--		spin_unlock(&cli->cl_loi_list_lock);
--		rc = l_wait_event(mcw.mcw_waitq, mdc_req_avail(cli, &mcw),
--				  &lwi);
--		if (rc) {
--			spin_lock(&cli->cl_loi_list_lock);
--			if (list_empty(&mcw.mcw_entry))
--				cli->cl_r_in_flight--;
--			list_del_init(&mcw.mcw_entry);
--			spin_unlock(&cli->cl_loi_list_lock);
--		}
--	} else {
--		cli->cl_r_in_flight++;
--		spin_unlock(&cli->cl_loi_list_lock);
--	}
--	return rc;
--}
--
--void mdc_exit_request(struct client_obd *cli)
--{
--	struct list_head *l, *tmp;
--	struct mdc_cache_waiter *mcw;
--
--	spin_lock(&cli->cl_loi_list_lock);
--	cli->cl_r_in_flight--;
--	list_for_each_safe(l, tmp, &cli->cl_cache_waiters) {
--		if (cli->cl_r_in_flight >= cli->cl_max_rpcs_in_flight) {
--			/* No free request slots anymore */
--			break;
--		}
--
--		mcw = list_entry(l, struct mdc_cache_waiter, mcw_entry);
--		list_del_init(&mcw->mcw_entry);
--		cli->cl_r_in_flight++;
--		wake_up(&mcw->mcw_waitq);
--	}
--	/* Empty waiting list? Decrease reqs in-flight number */
--
--	spin_unlock(&cli->cl_loi_list_lock);
--}
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 626fce5..d8406d5 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -809,7 +809,7 @@ resend:
- 	 */
- 	if (it) {
- 		mdc_get_rpc_lock(obddev->u.cli.cl_rpc_lock, it);
--		rc = mdc_enter_request(&obddev->u.cli);
-+		rc = obd_get_request_slot(&obddev->u.cli);
- 		if (rc != 0) {
- 			mdc_put_rpc_lock(obddev->u.cli.cl_rpc_lock, it);
- 			mdc_clear_replay_flag(req, 0);
-@@ -837,7 +837,7 @@ resend:
- 		return rc;
- 	}
- 
--	mdc_exit_request(&obddev->u.cli);
-+	obd_put_request_slot(&obddev->u.cli);
- 	mdc_put_rpc_lock(obddev->u.cli.cl_rpc_lock, it);
- 
- 	if (rc < 0) {
-@@ -1179,7 +1179,7 @@ static int mdc_intent_getattr_async_interpret(const struct lu_env *env,
- 
- 	obddev = class_exp2obd(exp);
- 
--	mdc_exit_request(&obddev->u.cli);
-+	obd_put_request_slot(&obddev->u.cli);
- 	if (OBD_FAIL_CHECK(OBD_FAIL_MDC_GETATTR_ENQUEUE))
- 		rc = -ETIMEDOUT;
- 
-@@ -1239,7 +1239,7 @@ int mdc_intent_getattr_async(struct obd_export *exp,
- 	if (IS_ERR(req))
- 		return PTR_ERR(req);
- 
--	rc = mdc_enter_request(&obddev->u.cli);
-+	rc = obd_get_request_slot(&obddev->u.cli);
- 	if (rc != 0) {
- 		ptlrpc_req_finished(req);
- 		return rc;
-@@ -1248,7 +1248,7 @@ int mdc_intent_getattr_async(struct obd_export *exp,
- 	rc = ldlm_cli_enqueue(exp, &req, einfo, &res_id, &policy, &flags, NULL,
- 			      0, LVB_T_NONE, &minfo->mi_lockh, 1);
- 	if (rc < 0) {
--		mdc_exit_request(&obddev->u.cli);
-+		obd_put_request_slot(&obddev->u.cli);
- 		ptlrpc_req_finished(req);
- 		return rc;
- 	}
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index d0a2073..ce5df23 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -58,16 +58,16 @@ static inline int mdc_queue_wait(struct ptlrpc_request *req)
- 	struct client_obd *cli = &req->rq_import->imp_obd->u.cli;
- 	int rc;
- 
--	/* mdc_enter_request() ensures that this client has no more
-+	/* obd_get_request_slot() ensures that this client has no more
- 	 * than cl_max_rpcs_in_flight RPCs simultaneously inf light
- 	 * against an MDT.
- 	 */
--	rc = mdc_enter_request(cli);
-+	rc = obd_get_request_slot(cli);
- 	if (rc != 0)
- 		return rc;
- 
- 	rc = ptlrpc_queue_wait(req);
--	mdc_exit_request(cli);
-+	obd_put_request_slot(cli);
- 
+ /* lmv structures */
+ struct lustre_md {
+ 	struct mdt_body	 *body;
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 96ae7d5..ef7322e 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -883,6 +883,7 @@ int ll_dir_getstripe(struct inode *inode, void **plmm, int *plmm_size,
+ 			lustre_swab_lov_user_md_v3((struct lov_user_md_v3 *)lmm);
+ 		break;
+ 	case LMV_USER_MAGIC:
++	case LMV_MAGIC_MIGRATE:
+ 		if (cpu_to_le32(LMV_USER_MAGIC) != LMV_USER_MAGIC)
+ 			lustre_swab_lmv_user_md((struct lmv_user_md *)lmm);
+ 		break;
+@@ -897,8 +898,7 @@ out:
  	return rc;
  }
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 99c2da6..be25434 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -1312,3 +1312,135 @@ void obd_zombie_impexp_stop(void)
- 	obd_zombie_impexp_notify();
- 	wait_for_completion(&obd_zombie_stop);
- }
+ 
+-static int ll_get_mdt_idx_by_fid(struct ll_sb_info *sbi,
+-				 const struct lu_fid *fid)
++int ll_get_mdt_idx_by_fid(struct ll_sb_info *sbi, const struct lu_fid *fid)
+ {
+ 	struct md_op_data *op_data;
+ 	int mdt_index, rc;
+@@ -1960,6 +1960,45 @@ out_quotactl:
+ 		kfree(copy);
+ 		return rc;
+ 	}
++	case LL_IOC_MIGRATE: {
++		char *buf = NULL;
++		const char *filename;
++		int namelen = 0;
++		int len;
++		int rc;
++		int mdtidx;
 +
-+struct obd_request_slot_waiter {
-+	struct list_head	orsw_entry;
-+	wait_queue_head_t	orsw_waitq;
-+	bool			orsw_signaled;
-+};
++		rc = obd_ioctl_getdata(&buf, &len, (void __user *)arg);
++		if (rc < 0)
++			return rc;
 +
-+static bool obd_request_slot_avail(struct client_obd *cli,
-+				   struct obd_request_slot_waiter *orsw)
-+{
-+	bool avail;
++		data = (struct obd_ioctl_data *)buf;
++		if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
++		    !data->ioc_inllen1 || !data->ioc_inllen2) {
++			rc = -EINVAL;
++			goto migrate_free;
++		}
 +
-+	spin_lock(&cli->cl_loi_list_lock);
-+	avail = !!list_empty(&orsw->orsw_entry);
-+	spin_unlock(&cli->cl_loi_list_lock);
++		filename = data->ioc_inlbuf1;
++		namelen = data->ioc_inllen1;
++		if (namelen < 1) {
++			rc = -EINVAL;
++			goto migrate_free;
++		}
 +
-+	return avail;
-+};
++		if (data->ioc_inllen2 != sizeof(mdtidx)) {
++			rc = -EINVAL;
++			goto migrate_free;
++		}
++		mdtidx = *(int *)data->ioc_inlbuf2;
 +
-+/*
-+ * For network flow control, the RPC sponsor needs to acquire a credit
-+ * before sending the RPC. The credits count for a connection is defined
-+ * by the "cl_max_rpcs_in_flight". If all the credits are occpuied, then
-+ * the subsequent RPC sponsors need to wait until others released their
-+ * credits, or the administrator increased the "cl_max_rpcs_in_flight".
-+ */
-+int obd_get_request_slot(struct client_obd *cli)
-+{
-+	struct obd_request_slot_waiter orsw;
-+	struct l_wait_info lwi;
-+	int rc;
++		rc = ll_migrate(inode, file, mdtidx, filename, namelen);
++migrate_free:
++		obd_ioctl_freedata(buf, len);
 +
-+	spin_lock(&cli->cl_loi_list_lock);
-+	if (cli->cl_r_in_flight < cli->cl_max_rpcs_in_flight) {
-+		cli->cl_r_in_flight++;
-+		spin_unlock(&cli->cl_loi_list_lock);
-+		return 0;
++		return rc;
 +	}
 +
-+	init_waitqueue_head(&orsw.orsw_waitq);
-+	list_add_tail(&orsw.orsw_entry, &cli->cl_loi_read_list);
-+	orsw.orsw_signaled = false;
-+	spin_unlock(&cli->cl_loi_list_lock);
+ 	default:
+ 		return obd_iocontrol(cmd, sbi->ll_dt_exp, 0, NULL,
+ 				     (void __user *)arg);
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 18fb713..391748c 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -364,7 +364,8 @@ int ll_file_release(struct inode *inode, struct file *file)
+ 	}
+ 
+ 	if (!S_ISDIR(inode->i_mode)) {
+-		lov_read_and_clear_async_rc(lli->lli_clob);
++		if (lli->lli_clob)
++			lov_read_and_clear_async_rc(lli->lli_clob);
+ 		lli->lli_async_rc = 0;
+ 	}
+ 
+@@ -2593,9 +2594,11 @@ static int ll_flush(struct file *file, fl_owner_t id)
+ 	 */
+ 	rc = lli->lli_async_rc;
+ 	lli->lli_async_rc = 0;
+-	err = lov_read_and_clear_async_rc(lli->lli_clob);
+-	if (rc == 0)
+-		rc = err;
++	if (lli->lli_clob) {
++		err = lov_read_and_clear_async_rc(lli->lli_clob);
++		if (!rc)
++			rc = err;
++	}
+ 
+ 	/* The application has been told about write failure already.
+ 	 * Do not report failure again.
+@@ -2825,6 +2828,108 @@ ll_file_flock(struct file *file, int cmd, struct file_lock *file_lock)
+ 	return rc;
+ }
+ 
++static int ll_get_fid_by_name(struct inode *parent, const char *name,
++			      int namelen, struct lu_fid *fid)
++{
++	struct md_op_data *op_data = NULL;
++	struct ptlrpc_request *req;
++	struct mdt_body *body;
++	int rc;
 +
-+	lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
-+	rc = l_wait_event(orsw.orsw_waitq,
-+			  obd_request_slot_avail(cli, &orsw) ||
-+			  orsw.orsw_signaled,
-+			  &lwi);
++	op_data = ll_prep_md_op_data(NULL, parent, NULL, name, namelen, 0,
++				     LUSTRE_OPC_ANY, NULL);
++	if (IS_ERR(op_data))
++		return PTR_ERR(op_data);
 +
-+	/*
-+	 * Here, we must take the lock to avoid the on-stack 'orsw' to be
-+	 * freed but other (such as obd_put_request_slot) is using it.
-+	 */
-+	spin_lock(&cli->cl_loi_list_lock);
-+	if (rc) {
-+		if (!orsw.orsw_signaled) {
-+			if (list_empty(&orsw.orsw_entry))
-+				cli->cl_r_in_flight--;
-+			else
-+				list_del(&orsw.orsw_entry);
++	op_data->op_valid = OBD_MD_FLID;
++	rc = md_getattr_name(ll_i2sbi(parent)->ll_md_exp, op_data, &req);
++	if (rc < 0)
++		goto out_free;
++
++	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
++	if (!body) {
++		rc = -EFAULT;
++		goto out_req;
++	}
++	*fid = body->fid1;
++out_req:
++	ptlrpc_req_finished(req);
++out_free:
++	if (op_data)
++		ll_finish_md_op_data(op_data);
++	return rc;
++}
++
++int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
++	       const char *name, int namelen)
++{
++	struct ptlrpc_request *request = NULL;
++	struct dentry *dchild = NULL;
++	struct md_op_data *op_data;
++	struct qstr qstr;
++	int rc;
++
++	CDEBUG(D_VFSTRACE, "migrate %s under"DFID" to MDT%d\n",
++	       name, PFID(ll_inode2fid(parent)), mdtidx);
++
++	op_data = ll_prep_md_op_data(NULL, parent, NULL, name, namelen,
++				     0, LUSTRE_OPC_ANY, NULL);
++	if (IS_ERR(op_data))
++		return PTR_ERR(op_data);
++
++	/* Get child FID first */
++	qstr.hash = full_name_hash(name, namelen);
++	qstr.name = name;
++	qstr.len = namelen;
++	dchild = d_lookup(file_dentry(file), &qstr);
++	if (dchild && dchild->d_inode) {
++		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
++	} else {
++		rc = ll_get_fid_by_name(parent, name, strnlen(name, namelen),
++					&op_data->op_fid3);
++		if (rc)
++			goto out_free;
++	}
++
++	if (!fid_is_sane(&op_data->op_fid3)) {
++		CERROR("%s: migrate %s, but fid "DFID" is insane\n",
++		       ll_get_fsname(parent->i_sb, NULL, 0), name,
++		       PFID(&op_data->op_fid3));
++		goto out_free;
++	}
++
++	rc = ll_get_mdt_idx_by_fid(ll_i2sbi(parent), &op_data->op_fid3);
++	if (rc < 0)
++		goto out_free;
++
++	if (rc == mdtidx) {
++		CDEBUG(D_INFO, "%s:"DFID" is already on MDT%d.\n", name,
++		       PFID(&op_data->op_fid3), mdtidx);
++		rc = 0;
++		goto out_free;
++	}
++
++	op_data->op_mds = mdtidx;
++	op_data->op_cli_flags = CLI_MIGRATE;
++	rc = md_rename(ll_i2sbi(parent)->ll_md_exp, op_data, name,
++		       strnlen(name, namelen), name, strnlen(name, namelen),
++		       &request);
++	if (!rc)
++		ll_update_times(request, parent);
++
++	ptlrpc_req_finished(request);
++
++out_free:
++	if (dchild) {
++		if (dchild->d_inode)
++			ll_delete_inode(dchild->d_inode);
++		dput(dchild);
++	}
++
++	ll_finish_md_op_data(op_data);
++	return rc;
++}
++
+ static int
+ ll_file_noflock(struct file *file, int cmd, struct file_lock *file_lock)
+ {
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 82c3a88..69492f0 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -660,6 +660,7 @@ extern const struct inode_operations ll_dir_inode_operations;
+ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
+ 		struct dir_context *ctx);
+ int ll_get_mdt_idx(struct inode *inode);
++int ll_get_mdt_idx_by_fid(struct ll_sb_info *sbi, const struct lu_fid *fid);
+ struct page *ll_get_dir_page(struct inode *dir, struct md_op_data *op_data,
+ 			     __u64 hash, struct ll_dir_chain *chain);
+ void ll_release_page(struct inode *inode, struct page *page, bool remove);
+@@ -675,6 +676,7 @@ int ll_test_inode_by_fid(struct inode *inode, void *opaque);
+ int ll_md_blocking_ast(struct ldlm_lock *, struct ldlm_lock_desc *,
+ 		       void *data, int flag);
+ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de);
++void ll_update_times(struct ptlrpc_request *request, struct inode *inode);
+ 
+ /* llite/rw.c */
+ int ll_writepage(struct page *page, struct writeback_control *wbc);
+@@ -717,7 +719,8 @@ void ll_pack_inode2opdata(struct inode *inode, struct md_op_data *op_data,
+ 			  struct lustre_handle *fh);
+ int ll_getattr(struct vfsmount *mnt, struct dentry *de, struct kstat *stat);
+ struct posix_acl *ll_get_acl(struct inode *inode, int type);
+-
++int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
++	       const char *name, int namelen);
+ int ll_inode_permission(struct inode *inode, int mask);
+ 
+ int ll_lov_setstripe_ea_info(struct inode *inode, struct dentry *dentry,
+@@ -777,6 +780,15 @@ int ll_obd_statfs(struct inode *inode, void __user *arg);
+ int ll_get_max_mdsize(struct ll_sb_info *sbi, int *max_mdsize);
+ int ll_get_default_mdsize(struct ll_sb_info *sbi, int *default_mdsize);
+ int ll_process_config(struct lustre_cfg *lcfg);
++
++enum {
++	LUSTRE_OPC_MKDIR	= 0,
++	LUSTRE_OPC_SYMLINK	= 1,
++	LUSTRE_OPC_MKNOD	= 2,
++	LUSTRE_OPC_CREATE	= 3,
++	LUSTRE_OPC_ANY		= 5,
++};
++
+ struct md_op_data *ll_prep_md_op_data(struct md_op_data *op_data,
+ 				      struct inode *i1, struct inode *i2,
+ 				      const char *name, int namelen,
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index ef8d87a..e320400 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -1114,8 +1114,34 @@ static void ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
+ 	struct lmv_stripe_md *lsm = md->lmv;
+ 	int idx;
+ 
+-	LASSERT(lsm);
+ 	LASSERT(S_ISDIR(inode->i_mode));
++	CDEBUG(D_INODE, "update lsm %p of "DFID"\n", lli->lli_lsm_md,
++	       PFID(ll_inode2fid(inode)));
++
++	/* no striped information from request. */
++	if (!lsm) {
++		if (!lli->lli_lsm_md) {
++			return;
++		} else if (lli->lli_lsm_md->lsm_md_magic == LMV_MAGIC_MIGRATE) {
++			/*
++			 * migration is done, the temporay MIGRATE layout has
++			 * been removed
++			 */
++			CDEBUG(D_INODE, DFID" finish migration.\n",
++			       PFID(ll_inode2fid(inode)));
++			lmv_free_memmd(lli->lli_lsm_md);
++			lli->lli_lsm_md = NULL;
++			return;
++		} else {
++			/*
++			 * The lustre_md from req does not include stripeEA,
++			 * see ll_md_setattr
++			 */
++			return;
 +		}
 +	}
 +
-+	if (orsw.orsw_signaled) {
-+		LASSERT(list_empty(&orsw.orsw_entry));
++	/* set the directory layout */
+ 	if (!lli->lli_lsm_md) {
+ 		int rc;
+ 
+@@ -1132,6 +1158,8 @@ static void ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
+ 		 * will not free this lsm
+ 		 */
+ 		md->lmv = NULL;
++		CDEBUG(D_INODE, "Set lsm %p magic %x to "DFID"\n", lsm,
++		       lsm->lsm_md_magic, PFID(ll_inode2fid(inode)));
+ 		return;
+ 	}
+ 
+@@ -1668,7 +1696,7 @@ void ll_update_inode(struct inode *inode, struct lustre_md *md)
+ 			lli->lli_maxbytes = MAX_LFS_FILESIZE;
+ 	}
+ 
+-	if (S_ISDIR(inode->i_mode) && md->lmv)
++	if (S_ISDIR(inode->i_mode))
+ 		ll_update_lsm_md(inode, md);
+ 
+ #ifdef CONFIG_FS_POSIX_ACL
+@@ -2306,7 +2334,6 @@ struct md_op_data *ll_prep_md_op_data(struct md_op_data *op_data,
+ 	if ((opc == LUSTRE_OPC_CREATE) && name &&
+ 	    filename_is_volatile(name, namelen, NULL))
+ 		op_data->op_bias |= MDS_CREATE_VOLATILE;
+-	op_data->op_opc = opc;
+ 	op_data->op_mds = 0;
+ 	op_data->op_data = data;
+ 
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index 1d28714..41591dd 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -757,8 +757,7 @@ static int ll_create_it(struct inode *dir, struct dentry *dentry, int mode,
+ 	return 0;
+ }
+ 
+-static void ll_update_times(struct ptlrpc_request *request,
+-			    struct inode *inode)
++void ll_update_times(struct ptlrpc_request *request, struct inode *inode)
+ {
+ 	struct mdt_body *body = req_capsule_server_get(&request->rq_pill,
+ 						       &RMF_MDT_BODY);
+diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
+index 87393c4..01aee84 100644
+--- a/drivers/staging/lustre/lustre/llite/rw.c
++++ b/drivers/staging/lustre/lustre/llite/rw.c
+@@ -1015,6 +1015,10 @@ int ll_writepages(struct address_space *mapping, struct writeback_control *wbc)
+ 		 * is called later on.
+ 		 */
+ 		ignore_layout = 1;
 +
-+		rc = -EINTR;
++	if (!ll_i2info(inode)->lli_clob)
++		return 0;
++
+ 	result = cl_sync_file_range(inode, start, end, mode, ignore_layout);
+ 	if (result > 0) {
+ 		wbc->nr_to_write -= result;
+diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
+index 7b23497..0a28599 100644
+--- a/drivers/staging/lustre/lustre/llite/statahead.c
++++ b/drivers/staging/lustre/lustre/llite/statahead.c
+@@ -1605,6 +1605,7 @@ int do_statahead_enter(struct inode *dir, struct dentry **dentryp,
+ 					       *dentryp,
+ 					       PFID(ll_inode2fid(d_inode(*dentryp))),
+ 					       PFID(ll_inode2fid(inode)));
++					ll_intent_release(&it);
+ 					ll_sai_unplug(sai, entry);
+ 					return -ESTALE;
+ 				} else {
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_intent.c b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
+index 5313dfc..2bc1098 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_intent.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
+@@ -43,6 +43,7 @@
+ #include "../include/lustre_lib.h"
+ #include "../include/lustre_net.h"
+ #include "../include/lustre_dlm.h"
++#include "../include/lustre_mdc.h"
+ #include "../include/obd_class.h"
+ #include "../include/lprocfs_status.h"
+ #include "lmv_internal.h"
+@@ -332,6 +333,8 @@ static int lmv_intent_open(struct obd_export *exp, struct md_op_data *op_data,
+ 
+ 			oinfo = lsm_name_to_stripe_info(lsm, op_data->op_name,
+ 							op_data->op_namelen);
++			if (IS_ERR(oinfo))
++				return PTR_ERR(oinfo);
+ 			op_data->op_fid1 = oinfo->lmo_fid;
+ 		}
+ 
+@@ -408,6 +411,7 @@ static int lmv_intent_lookup(struct obd_export *exp,
+ 			     ldlm_blocking_callback cb_blocking,
+ 			     __u64 extra_lock_flags)
+ {
++	struct lmv_stripe_md *lsm = op_data->op_mea1;
+ 	struct obd_device      *obd = exp->exp_obd;
+ 	struct lmv_obd	 *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc    *tgt = NULL;
+@@ -421,17 +425,15 @@ static int lmv_intent_lookup(struct obd_export *exp,
+ 	if (!fid_is_sane(&op_data->op_fid2))
+ 		fid_zero(&op_data->op_fid2);
+ 
+-	CDEBUG(D_INODE, "LOOKUP_INTENT with fid1="DFID", fid2="DFID
+-	       ", name='%s' -> mds #%d\n", PFID(&op_data->op_fid1),
+-	       PFID(&op_data->op_fid2),
++	CDEBUG(D_INODE, "LOOKUP_INTENT with fid1="DFID", fid2="DFID", name='%s' -> mds #%d lsm=%p lsm_magic=%x\n",
++	       PFID(&op_data->op_fid1), PFID(&op_data->op_fid2),
+ 	       op_data->op_name ? op_data->op_name : "<NULL>",
+-	       tgt->ltd_idx);
++	       tgt->ltd_idx, lsm, !lsm ? -1 : lsm->lsm_md_magic);
+ 
+ 	op_data->op_bias &= ~MDS_CROSS_REF;
+ 
+ 	rc = md_intent_lock(tgt->ltd_exp, op_data, lmm, lmmsize, it,
+ 			    flags, reqp, cb_blocking, extra_lock_flags);
+-
+ 	if (rc < 0)
+ 		return rc;
+ 
+@@ -448,6 +450,26 @@ static int lmv_intent_lookup(struct obd_export *exp,
+ 				return rc;
+ 		}
+ 		return rc;
++	} else if (it_disposition(it, DISP_LOOKUP_NEG) && lsm &&
++		   lsm->lsm_md_magic == LMV_MAGIC_MIGRATE) {
++		/*
++		 * For migrating directory, if it can not find the child in
++		 * the source directory(master stripe), try the targeting
++		 * directory(stripe 1)
++		 */
++		tgt = lmv_find_target(lmv, &lsm->lsm_md_oinfo[1].lmo_fid);
++		if (IS_ERR(tgt))
++			return PTR_ERR(tgt);
++
++		ptlrpc_req_finished(*reqp);
++		CDEBUG(D_INODE, "For migrating dir, try target dir "DFID"\n",
++		       PFID(&lsm->lsm_md_oinfo[1].lmo_fid));
++
++		op_data->op_fid1 = lsm->lsm_md_oinfo[1].lmo_fid;
++		it->it_disposition &= ~DISP_ENQ_COMPLETE;
++		rc = md_intent_lock(tgt->ltd_exp, op_data, lmm, lmmsize, it,
++				    flags, reqp, cb_blocking, extra_lock_flags);
++		return rc;
+ 	}
+ 
+ 	/*
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 4995735..e51ea1f 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -98,6 +98,15 @@ int lmv_name_to_stripe_index(enum lmv_hash_type hashtype,
+ 	case LMV_HASH_TYPE_FNV_1A_64:
+ 		idx = lmv_hash_fnv1a(max_mdt_index, name, namelen);
+ 		break;
++	/*
++	 * LMV_HASH_TYPE_MIGRATION means the file is being migrated,
++	 * and the file should be accessed by client, except for
++	 * lookup(see lmv_intent_lookup), return -EACCES here
++	 */
++	case LMV_HASH_TYPE_MIGRATION:
++		CERROR("%.*s is being migrated: rc = %d\n", namelen,
++		       name, -EACCES);
++		return -EACCES;
+ 	default:
+ 		CERROR("Unknown hash type 0x%x\n", hashtype);
+ 		return -EINVAL;
+@@ -1669,6 +1678,9 @@ lmv_locate_target_for_name(struct lmv_obd *lmv, struct lmv_stripe_md *lsm,
+ 	struct lmv_tgt_desc *tgt;
+ 
+ 	oinfo = lsm_name_to_stripe_info(lsm, name, namelen);
++	if (IS_ERR(oinfo))
++		return ERR_CAST(oinfo);
++
+ 	*fid = oinfo->lmo_fid;
+ 	*mds = oinfo->lmo_mds;
+ 	tgt = lmv_get_target(lmv, *mds);
+@@ -1685,7 +1697,8 @@ struct lmv_tgt_desc
+ 	struct lmv_tgt_desc *tgt;
+ 
+ 	if (!lsm || lsm->lsm_md_stripe_count <= 1 ||
+-	    !op_data->op_namelen) {
++	    !op_data->op_namelen ||
++	    lsm->lsm_md_magic == LMV_MAGIC_MIGRATE) {
+ 		tgt = lmv_find_target(lmv, fid);
+ 		if (IS_ERR(tgt))
+ 			return tgt;
+@@ -1931,23 +1944,24 @@ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
+ 	 fl == MF_MDC_CANCEL_FID4 ? &op_data->op_fid4 : \
+ 	 NULL)
+ 
+-static int lmv_early_cancel(struct obd_export *exp, struct md_op_data *op_data,
+-			    int op_tgt, enum ldlm_mode mode, int bits,
+-			    int flag)
++static int lmv_early_cancel(struct obd_export *exp, struct lmv_tgt_desc *tgt,
++			    struct md_op_data *op_data, int op_tgt,
++			    enum ldlm_mode mode, int bits, int flag)
+ {
+ 	struct lu_fid	  *fid = md_op_data_fid(op_data, flag);
+ 	struct obd_device      *obd = exp->exp_obd;
+ 	struct lmv_obd	 *lmv = &obd->u.lmv;
+-	struct lmv_tgt_desc    *tgt;
+ 	ldlm_policy_data_t      policy = { {0} };
+ 	int		     rc = 0;
+ 
+ 	if (!fid_is_sane(fid))
+ 		return 0;
+ 
+-	tgt = lmv_find_target(lmv, fid);
+-	if (IS_ERR(tgt))
+-		return PTR_ERR(tgt);
++	if (!tgt) {
++		tgt = lmv_find_target(lmv, fid);
++		if (IS_ERR(tgt))
++			return PTR_ERR(tgt);
 +	}
-+	spin_unlock(&cli->cl_loi_list_lock);
+ 
+ 	if (tgt->ltd_idx != op_tgt) {
+ 		CDEBUG(D_INODE, "EARLY_CANCEL on "DFID"\n", PFID(fid));
+@@ -1996,6 +2010,9 @@ static int lmv_link(struct obd_export *exp, struct md_op_data *op_data,
+ 
+ 		oinfo = lsm_name_to_stripe_info(lsm, op_data->op_name,
+ 						op_data->op_namelen);
++		if (IS_ERR(oinfo))
++			return PTR_ERR(oinfo);
 +
-+	return rc;
-+}
-+EXPORT_SYMBOL(obd_get_request_slot);
+ 		op_data->op_fid2 = oinfo->lmo_fid;
+ 	}
+ 
+@@ -2007,7 +2024,7 @@ static int lmv_link(struct obd_export *exp, struct md_op_data *op_data,
+ 	 * Cancel UPDATE lock on child (fid1).
+ 	 */
+ 	op_data->op_flags |= MF_MDC_CANCEL_FID2;
+-	rc = lmv_early_cancel(exp, op_data, tgt->ltd_idx, LCK_EX,
++	rc = lmv_early_cancel(exp, NULL, op_data, tgt->ltd_idx, LCK_EX,
+ 			      MDS_INODELOCK_UPDATE, MF_MDC_CANCEL_FID1);
+ 	if (rc != 0)
+ 		return rc;
+@@ -2042,31 +2059,44 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+ 	op_data->op_fsgid = from_kgid(&init_user_ns, current_fsgid());
+ 	op_data->op_cap = cfs_curproc_cap_pack();
+ 
+-	if (op_data->op_mea1) {
+-		struct lmv_stripe_md *lsm = op_data->op_mea1;
+-		const struct lmv_oinfo *oinfo;
+-
+-		oinfo = lsm_name_to_stripe_info(lsm, old, oldlen);
+-		op_data->op_fid1 = oinfo->lmo_fid;
+-		op_data->op_mds = oinfo->lmo_mds;
+-		src_tgt = lmv_get_target(lmv, op_data->op_mds);
+-		if (IS_ERR(src_tgt))
+-			return PTR_ERR(src_tgt);
++	if (op_data->op_cli_flags & CLI_MIGRATE) {
++		LASSERTF(fid_is_sane(&op_data->op_fid3), "invalid FID "DFID"\n",
++			 PFID(&op_data->op_fid3));
++		rc = lmv_fid_alloc(exp, &op_data->op_fid2, op_data);
++		if (rc)
++			return rc;
++		src_tgt = lmv_locate_mds(lmv, op_data, &op_data->op_fid3);
+ 	} else {
+-		src_tgt = lmv_find_target(lmv, &op_data->op_fid1);
+-		if (IS_ERR(src_tgt))
+-			return PTR_ERR(src_tgt);
++		if (op_data->op_mea1) {
++			struct lmv_stripe_md *lsm = op_data->op_mea1;
 +
-+void obd_put_request_slot(struct client_obd *cli)
-+{
-+	struct obd_request_slot_waiter *orsw;
++			src_tgt = lmv_locate_target_for_name(lmv, lsm, old,
++							     oldlen,
++							     &op_data->op_fid1,
++							     &op_data->op_mds);
++			if (IS_ERR(src_tgt))
++				return PTR_ERR(src_tgt);
++		} else {
++			src_tgt = lmv_find_target(lmv, &op_data->op_fid1);
++			if (IS_ERR(src_tgt))
++				return PTR_ERR(src_tgt);
+ 
+-		op_data->op_mds = src_tgt->ltd_idx;
+-	}
++			op_data->op_mds = src_tgt->ltd_idx;
++		}
+ 
+-	if (op_data->op_mea2) {
+-		struct lmv_stripe_md *lsm = op_data->op_mea2;
+-		const struct lmv_oinfo *oinfo;
++		if (op_data->op_mea2) {
++			struct lmv_stripe_md *lsm = op_data->op_mea2;
++			const struct lmv_oinfo *oinfo;
+ 
+-		oinfo = lsm_name_to_stripe_info(lsm, new, newlen);
+-		op_data->op_fid2 = oinfo->lmo_fid;
++			oinfo = lsm_name_to_stripe_info(lsm, new, newlen);
++			if (IS_ERR(oinfo))
++				return PTR_ERR(oinfo);
 +
-+	spin_lock(&cli->cl_loi_list_lock);
-+	cli->cl_r_in_flight--;
++			op_data->op_fid2 = oinfo->lmo_fid;
++		}
+ 	}
++	if (IS_ERR(src_tgt))
++		return PTR_ERR(src_tgt);
+ 
+ 	/*
+ 	 * LOOKUP lock on src child (fid3) should also be cancelled for
+@@ -2078,33 +2108,48 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+ 	 * Cancel UPDATE locks on tgt parent (fid2), tgt_tgt is its
+ 	 * own target.
+ 	 */
+-	rc = lmv_early_cancel(exp, op_data, src_tgt->ltd_idx,
++	rc = lmv_early_cancel(exp, NULL, op_data, src_tgt->ltd_idx,
+ 			      LCK_EX, MDS_INODELOCK_UPDATE,
+ 			      MF_MDC_CANCEL_FID2);
+-
++	if (rc)
++		return rc;
+ 	/*
+-	 * Cancel LOOKUP locks on tgt child (fid4) for parent tgt_tgt.
++	 * Cancel LOOKUP locks on source child (fid3) for parent tgt_tgt.
+ 	 */
+-	if (rc == 0) {
+-		rc = lmv_early_cancel(exp, op_data, src_tgt->ltd_idx,
++	if (fid_is_sane(&op_data->op_fid3)) {
++		struct lmv_tgt_desc *tgt;
 +
-+	/* If there is free slot, wakeup the first waiter. */
-+	if (!list_empty(&cli->cl_loi_read_list) &&
-+	    likely(cli->cl_r_in_flight < cli->cl_max_rpcs_in_flight)) {
-+		orsw = list_entry(cli->cl_loi_read_list.next,
-+				  struct obd_request_slot_waiter, orsw_entry);
-+		list_del_init(&orsw->orsw_entry);
-+		cli->cl_r_in_flight++;
-+		wake_up(&orsw->orsw_waitq);
++		tgt = lmv_find_target(lmv, &op_data->op_fid1);
++		if (IS_ERR(tgt))
++			return PTR_ERR(tgt);
++
++		/* Cancel LOOKUP lock on its parent */
++		rc = lmv_early_cancel(exp, tgt, op_data, src_tgt->ltd_idx,
+ 				      LCK_EX, MDS_INODELOCK_LOOKUP,
+-				      MF_MDC_CANCEL_FID4);
++				      MF_MDC_CANCEL_FID3);
++		if (rc)
++			return rc;
++
++		rc = lmv_early_cancel(exp, NULL, op_data, src_tgt->ltd_idx,
++				      LCK_EX, MDS_INODELOCK_FULL,
++				      MF_MDC_CANCEL_FID3);
++		if (rc)
++			return rc;
+ 	}
+ 
+ 	/*
+ 	 * Cancel all the locks on tgt child (fid4).
+ 	 */
+-	if (rc == 0)
+-		rc = lmv_early_cancel(exp, op_data, src_tgt->ltd_idx,
++	if (fid_is_sane(&op_data->op_fid4))
++		rc = lmv_early_cancel(exp, NULL, op_data, src_tgt->ltd_idx,
+ 				      LCK_EX, MDS_INODELOCK_FULL,
+ 				      MF_MDC_CANCEL_FID4);
+ 
+ 	CDEBUG(D_INODE, DFID":m%d to "DFID"\n", PFID(&op_data->op_fid1),
+ 	       op_data->op_mds, PFID(&op_data->op_fid2));
+ 
+-	if (rc == 0)
+-		rc = md_rename(src_tgt->ltd_exp, op_data, old, oldlen,
+-			       new, newlen, request);
++	rc = md_rename(src_tgt->ltd_exp, op_data, old, oldlen,
++		       new, newlen, request);
+ 	return rc;
+ }
+ 
+@@ -2306,6 +2351,7 @@ static int lmv_unlink(struct obd_export *exp, struct md_op_data *op_data,
+ {
+ 	struct obd_device       *obd = exp->exp_obd;
+ 	struct lmv_obd	  *lmv = &obd->u.lmv;
++	struct lmv_tgt_desc *parent_tgt = NULL;
+ 	struct lmv_tgt_desc     *tgt = NULL;
+ 	struct mdt_body		*body;
+ 	int		     rc;
+@@ -2323,12 +2369,16 @@ retry:
+ 		/* For striped dir, we need to locate the parent as well */
+ 		if (op_data->op_mea1 &&
+ 		    op_data->op_mea1->lsm_md_stripe_count > 1) {
++			struct lmv_tgt_desc *tmp;
++
+ 			LASSERT(op_data->op_name && op_data->op_namelen);
+-			lmv_locate_target_for_name(lmv, op_data->op_mea1,
+-						   op_data->op_name,
+-						   op_data->op_namelen,
+-						   &op_data->op_fid1,
+-						   &op_data->op_mds);
++			tmp = lmv_locate_target_for_name(lmv, op_data->op_mea1,
++							 op_data->op_name,
++							 op_data->op_namelen,
++							 &op_data->op_fid1,
++							 &op_data->op_mds);
++			if (IS_ERR(tmp))
++				return PTR_ERR(tmp);
+ 		}
+ 	} else {
+ 		tgt = lmv_locate_mds(lmv, op_data, &op_data->op_fid1);
+@@ -2352,9 +2402,18 @@ retry:
+ 	/*
+ 	 * Cancel FULL locks on child (fid3).
+ 	 */
+-	rc = lmv_early_cancel(exp, op_data, tgt->ltd_idx, LCK_EX,
+-			      MDS_INODELOCK_FULL, MF_MDC_CANCEL_FID3);
++	parent_tgt = lmv_find_target(lmv, &op_data->op_fid1);
++	if (IS_ERR(parent_tgt))
++		return PTR_ERR(parent_tgt);
++
++	if (parent_tgt != tgt) {
++		rc = lmv_early_cancel(exp, parent_tgt, op_data, tgt->ltd_idx,
++				      LCK_EX, MDS_INODELOCK_LOOKUP,
++				      MF_MDC_CANCEL_FID3);
 +	}
-+	spin_unlock(&cli->cl_loi_list_lock);
-+}
-+EXPORT_SYMBOL(obd_put_request_slot);
+ 
++	rc = lmv_early_cancel(exp, NULL, op_data, tgt->ltd_idx, LCK_EX,
++			      MDS_INODELOCK_FULL, MF_MDC_CANCEL_FID3);
+ 	if (rc != 0)
+ 		return rc;
+ 
+@@ -2683,13 +2742,25 @@ int lmv_unpack_md(struct obd_export *exp, struct lmv_stripe_md **lsmp,
+ 	}
+ 
+ 	/* Unpack memmd */
+-	if (le32_to_cpu(lmm->lmv_magic) != LMV_MAGIC_V1) {
+-		CERROR("%s: invalid magic %x.\n", exp->exp_obd->obd_name,
+-		       le32_to_cpu(lmm->lmv_magic));
+-		return -EINVAL;
++	if (le32_to_cpu(lmm->lmv_magic) != LMV_MAGIC_V1 &&
++	    le32_to_cpu(lmm->lmv_magic) != LMV_MAGIC_MIGRATE &&
++	    le32_to_cpu(lmm->lmv_magic) != LMV_USER_MAGIC) {
++		CERROR("%s: invalid lmv magic %x: rc = %d\n",
++		       exp->exp_obd->obd_name, le32_to_cpu(lmm->lmv_magic),
++		       -EIO);
++		return -EIO;
+ 	}
+ 
+-	lsm_size = lmv_stripe_md_size(lmv_mds_md_stripe_count_get(lmm));
++	if (le32_to_cpu(lmm->lmv_magic) == LMV_MAGIC_V1 ||
++	    le32_to_cpu(lmm->lmv_magic) == LMV_MAGIC_MIGRATE)
++		lsm_size = lmv_stripe_md_size(lmv_mds_md_stripe_count_get(lmm));
++	else
++		/**
++		 * Unpack default dirstripe(lmv_user_md) to lmv_stripe_md,
++		 * stripecount should be 0 then.
++		 */
++		lsm_size = lmv_stripe_md_size(0);
 +
-+__u32 obd_get_max_rpcs_in_flight(struct client_obd *cli)
-+{
-+	return cli->cl_max_rpcs_in_flight;
-+}
-+EXPORT_SYMBOL(obd_get_max_rpcs_in_flight);
-+
-+int obd_set_max_rpcs_in_flight(struct client_obd *cli, __u32 max)
-+{
-+	struct obd_request_slot_waiter *orsw;
-+	__u32 old;
-+	int diff;
-+	int i;
-+
-+	if (max > OBD_MAX_RIF_MAX || max < 1)
-+		return -ERANGE;
-+
-+	spin_lock(&cli->cl_loi_list_lock);
-+	old = cli->cl_max_rpcs_in_flight;
-+	cli->cl_max_rpcs_in_flight = max;
-+	diff = max - old;
-+
-+	/* We increase the max_rpcs_in_flight, then wakeup some waiters. */
-+	for (i = 0; i < diff; i++) {
-+		if (list_empty(&cli->cl_loi_read_list))
-+			break;
-+
-+		orsw = list_entry(cli->cl_loi_read_list.next,
-+				  struct obd_request_slot_waiter, orsw_entry);
-+		list_del_init(&orsw->orsw_entry);
-+		cli->cl_r_in_flight++;
-+		wake_up(&orsw->orsw_waitq);
-+	}
-+	spin_unlock(&cli->cl_loi_list_lock);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(obd_set_max_rpcs_in_flight);
+ 	if (!lsm) {
+ 		lsm = libcfs_kvzalloc(lsm_size, GFP_NOFS);
+ 		if (!lsm)
+@@ -2700,6 +2771,7 @@ int lmv_unpack_md(struct obd_export *exp, struct lmv_stripe_md **lsmp,
+ 
+ 	switch (le32_to_cpu(lmm->lmv_magic)) {
+ 	case LMV_MAGIC_V1:
++	case LMV_MAGIC_MIGRATE:
+ 		rc = lmv_unpack_md_v1(exp, lsm, &lmm->lmv_md_v1);
+ 		break;
+ 	default:
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+index 143bd76..95c4550 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+@@ -390,6 +390,8 @@ void mdc_rename_pack(struct ptlrpc_request *req, struct md_op_data *op_data,
+ 	rec = req_capsule_client_get(&req->rq_pill, &RMF_REC_REINT);
+ 
+ 	/* XXX do something about time, uid, gid */
++	rec->rn_opcode	 = op_data->op_cli_flags & CLI_MIGRATE ?
++				REINT_MIGRATE : REINT_RENAME;
+ 	rec->rn_opcode   = REINT_RENAME;
+ 	rec->rn_fsuid    = op_data->op_fsuid;
+ 	rec->rn_fsgid    = op_data->op_fsgid;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+index 4c500a9..bc27f8d 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+@@ -190,7 +190,9 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)REINT_SETXATTR);
+ 	LASSERTF(REINT_RMENTRY == 8, "found %lld\n",
+ 		 (long long)REINT_RMENTRY);
+-	LASSERTF(REINT_MAX == 9, "found %lld\n",
++	LASSERTF(REINT_MIGRATE == 9, "found %lld\n",
++		 (long long)REINT_MIGRATE);
++	LASSERTF(REINT_MAX == 10, "found %lld\n",
+ 		 (long long)REINT_MAX);
+ 	LASSERTF(DISP_IT_EXECD == 0x00000001UL, "found 0x%.8xUL\n",
+ 		(unsigned)DISP_IT_EXECD);
 -- 
 1.7.1
