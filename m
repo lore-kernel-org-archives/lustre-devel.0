@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:06 -0400
-Subject: [lustre-devel] [PATCH 13/58] staging: lustre: llite: change done
-	flag in ll_dir_read to bool
+Date: Thu, 21 Jul 2016 22:44:19 -0400
+Subject: [lustre-devel] [PATCH 26/58] staging: lustre: lmv: remove duplicate
+	MAX_HASH_*
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-27-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,31 +14,35 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: wang di <di.wang@intel.com>
 
-Change the done flag from integer to bool.
+The MAX_HASH_* macros already exist in obd.h. Remove
+the duplicated defines in lustre_idl.h.
 
 Signed-off-by: wang di <di.wang@intel.com>
-Reviewed-on: http://review.whamcloud.com/10761
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4906
+Reviewed-on: http://review.whamcloud.com/7043
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
 Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/dir.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index e4d3176..70a3ca0 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -498,7 +498,7 @@ int ll_dir_read(struct inode *inode, struct md_op_data *op_data,
- 	int		   hash64     = sbi->ll_flags & LL_SBI_64BIT_HASH;
- 	struct page	  *page;
- 	struct ll_dir_chain   chain;
--	int		   done = 0;
-+	bool		   done = false;
- 	int		   rc = 0;
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 32471a6..5f31724 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -2486,10 +2486,6 @@ struct lmv_desc {
+ #define MEA_MAGIC_ALL_CHARS      0xb222a11c
+ #define MEA_MAGIC_HASH_SEGMENT   0xb222a11b
  
- 	ll_dir_chain_init(&chain);
+-#define MAX_HASH_SIZE_32	 0x7fffffffUL
+-#define MAX_HASH_SIZE	    0x7fffffffffffffffULL
+-#define MAX_HASH_HIGHEST_BIT     0x1000000000000000ULL
+-
+ /* lmv structures */
+ #define LMV_MAGIC_V1	0x0CD10CD0	/* normal stripe lmv magic */
+ #define LMV_USER_MAGIC	0x0CD20CD0	/* default lmv magic*/
 -- 
 1.7.1
