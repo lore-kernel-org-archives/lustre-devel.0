@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:44:44 -0400
-Subject: [lustre-devel] [PATCH 51/58] staging: lustre: lmv: cleanup req in
-	lmv_getattr_name()
+Date: Thu, 21 Jul 2016 22:44:45 -0400
+Subject: [lustre-devel] [PATCH 52/58] staging: lustre: lmv: rename request
+	to preq in lmv_getattr_name()
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-52-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-53-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,7 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: John L. Hammond <john.hammond@intel.com>
 
-In lmv_getattr_name() don't return a freed request in the error path.
+Rename request to preq.
 
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4826
@@ -24,20 +24,59 @@ Reviewed-by: Bob Glossman <bob.glossman@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c |   16 +++++++---------
+ 1 files changed, 7 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 5830fc1..9982484 100644
+index 9982484..ff0fbd8 100644
 --- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
 +++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1922,6 +1922,7 @@ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
+@@ -1885,7 +1885,7 @@ lmv_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
+ 
+ static int
+ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
+-		 struct ptlrpc_request **request)
++		 struct ptlrpc_request **preq)
+ {
+ 	struct ptlrpc_request   *req = NULL;
+ 	struct obd_device       *obd = exp->exp_obd;
+@@ -1906,13 +1906,11 @@ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
+ 	       op_data->op_namelen, op_data->op_name, PFID(&op_data->op_fid1),
+ 	       tgt->ltd_idx);
+ 
+-	rc = md_getattr_name(tgt->ltd_exp, op_data, request);
++	rc = md_getattr_name(tgt->ltd_exp, op_data, preq);
+ 	if (rc != 0)
+ 		return rc;
+ 
+-	body = req_capsule_server_get(&(*request)->rq_pill,
+-				      &RMF_MDT_BODY);
+-
++	body = req_capsule_server_get(&(*preq)->rq_pill, &RMF_MDT_BODY);
+ 	if (body->valid & OBD_MD_MDS) {
+ 		struct lu_fid rid = body->fid1;
+ 
+@@ -1921,8 +1919,8 @@ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
+ 
  		tgt = lmv_find_target(lmv, &rid);
  		if (IS_ERR(tgt)) {
- 			ptlrpc_req_finished(*request);
-+			*request = NULL;
+-			ptlrpc_req_finished(*request);
+-			*request = NULL;
++			ptlrpc_req_finished(*preq);
++			*preq = NULL;
  			return PTR_ERR(tgt);
  		}
  
+@@ -1931,8 +1929,8 @@ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
+ 		op_data->op_namelen = 0;
+ 		op_data->op_name = NULL;
+ 		rc = md_getattr_name(tgt->ltd_exp, op_data, &req);
+-		ptlrpc_req_finished(*request);
+-		*request = req;
++		ptlrpc_req_finished(*preq);
++		*preq = req;
+ 	}
+ 
+ 	return rc;
 -- 
 1.7.1
