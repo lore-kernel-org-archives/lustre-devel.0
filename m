@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jul 2016 22:43:56 -0400
-Subject: [lustre-devel] [PATCH 03/58] staging: lustre: ptlrpc: remove
-	wirecheck for struct lmv_stripe_md
+Date: Thu, 21 Jul 2016 22:44:02 -0400
+Subject: [lustre-devel] [PATCH 09/58] staging: lustre: llite: remove debug
+	message in ll_dir_read
 In-Reply-To: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
 References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1469155491-15265-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1469155491-15265-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,59 +14,39 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: wang di <di.wang@intel.com>
 
-Remove the wiretest check for this data structure.
+Remove debug message and struct ll_inode_info.
 
 Signed-off-by: wang di <di.wang@intel.com>
-Reviewed-on: http://review.whamcloud.com/7043
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
+Reviewed-on: http://review.whamcloud.com/10761
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4906
 Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c |   29 -----------------------
- 1 files changed, 0 insertions(+), 29 deletions(-)
+ drivers/staging/lustre/lustre/llite/dir.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index 6cc2b2e..4c500a9 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -2617,35 +2617,6 @@ void lustre_assert_wire_constants(void)
- 	LASSERTF((int)sizeof(((struct lmv_desc *)0)->ld_uuid) == 40, "found %lld\n",
- 		 (long long)(int)sizeof(((struct lmv_desc *)0)->ld_uuid));
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 75d0176..5b46dd8 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -492,7 +492,6 @@ static __u16 ll_dirent_type_get(struct lu_dirent *ent)
+ int ll_dir_read(struct inode *inode, struct md_op_data *op_data,
+ 		struct dir_context *ctx)
+ {
+-	struct ll_inode_info *info       = ll_i2info(inode);
+ 	struct ll_sb_info    *sbi	= ll_i2sbi(inode);
+ 	__u64		   pos		= ctx->pos;
+ 	int		   api32      = ll_need_32bit_api(sbi);
+@@ -596,8 +595,6 @@ int ll_dir_read(struct inode *inode, struct md_op_data *op_data,
+ 			}
+ 		} else {
+ 			rc = PTR_ERR(page);
+-			CERROR("error reading dir "DFID" at %lu: rc %d\n",
+-			       PFID(&info->lli_fid), (unsigned long)pos, rc);
+ 		}
+ 	}
  
--	/* Checks for struct lmv_stripe_md */
--	LASSERTF((int)sizeof(struct lmv_stripe_md) == 32, "found %lld\n",
--		 (long long)(int)sizeof(struct lmv_stripe_md));
--	LASSERTF((int)offsetof(struct lmv_stripe_md, mea_magic) == 0, "found %lld\n",
--		 (long long)(int)offsetof(struct lmv_stripe_md, mea_magic));
--	LASSERTF((int)sizeof(((struct lmv_stripe_md *)0)->mea_magic) == 4, "found %lld\n",
--		 (long long)(int)sizeof(((struct lmv_stripe_md *)0)->mea_magic));
--	LASSERTF((int)offsetof(struct lmv_stripe_md, mea_count) == 4, "found %lld\n",
--		 (long long)(int)offsetof(struct lmv_stripe_md, mea_count));
--	LASSERTF((int)sizeof(((struct lmv_stripe_md *)0)->mea_count) == 4, "found %lld\n",
--		 (long long)(int)sizeof(((struct lmv_stripe_md *)0)->mea_count));
--	LASSERTF((int)offsetof(struct lmv_stripe_md, mea_master) == 8, "found %lld\n",
--		 (long long)(int)offsetof(struct lmv_stripe_md, mea_master));
--	LASSERTF((int)sizeof(((struct lmv_stripe_md *)0)->mea_master) == 4, "found %lld\n",
--		 (long long)(int)sizeof(((struct lmv_stripe_md *)0)->mea_master));
--	LASSERTF((int)offsetof(struct lmv_stripe_md, mea_padding) == 12, "found %lld\n",
--		 (long long)(int)offsetof(struct lmv_stripe_md, mea_padding));
--	LASSERTF((int)sizeof(((struct lmv_stripe_md *)0)->mea_padding) == 4, "found %lld\n",
--		 (long long)(int)sizeof(((struct lmv_stripe_md *)0)->mea_padding));
--	CLASSERT(LOV_MAXPOOLNAME == 16);
--	LASSERTF((int)offsetof(struct lmv_stripe_md, mea_pool_name[16]) == 32, "found %lld\n",
--		 (long long)(int)offsetof(struct lmv_stripe_md, mea_pool_name[16]));
--	LASSERTF((int)sizeof(((struct lmv_stripe_md *)0)->mea_pool_name[16]) == 1, "found %lld\n",
--		 (long long)(int)sizeof(((struct lmv_stripe_md *)0)->mea_pool_name[16]));
--	LASSERTF((int)offsetof(struct lmv_stripe_md, mea_ids[0]) == 32, "found %lld\n",
--		 (long long)(int)offsetof(struct lmv_stripe_md, mea_ids[0]));
--	LASSERTF((int)sizeof(((struct lmv_stripe_md *)0)->mea_ids[0]) == 16, "found %lld\n",
--		 (long long)(int)sizeof(((struct lmv_stripe_md *)0)->mea_ids[0]));
--
- 	/* Checks for struct lov_desc */
- 	LASSERTF((int)sizeof(struct lov_desc) == 88, "found %lld\n",
- 		 (long long)(int)sizeof(struct lov_desc));
 -- 
 1.7.1
