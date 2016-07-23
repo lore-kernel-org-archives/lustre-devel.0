@@ -1,40 +1,78 @@
-From: kbuild test robot <lkp@intel.com>
-Date: Fri, 22 Jul 2016 22:38:59 +0800
-Subject: [lustre-devel] [PATCH 30/58] staging: lustre: create striped
-	directory
-In-Reply-To: <1469155491-15265-31-git-send-email-jsimmons@infradead.org>
-Message-ID: <201607222223.bachI0GU%fengguang.wu@intel.com>
+From: Oleg Drokin <green@linuxhacker.ru>
+Date: Sat, 23 Jul 2016 02:36:58 -0400
+Subject: [lustre-devel] [PATCH 01/15] lustre: switch lnet_sock_write() to
+	sock_sendmsg()
+In-Reply-To: <1469255832-746785-1-git-send-email-green@linuxhacker.ru>
+References: <1469255832-746785-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <1469255832-746785-2-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Al Viro <viro@zeniv.linux.org.uk>
 
-Hi,
+From: Al Viro <viro@zeniv.linux.org.uk>
 
-[auto build test ERROR on staging/staging-testing]
-[also build test ERROR on next-20160722]
-[cannot apply to v4.7-rc7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/James-Simmons/staging-lustre-bug-fixes-from-lustre-2-5-56-58/20160722-145652
-config: i386-allyesconfig (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
->> ERROR: "__umoddi3" [drivers/staging/lustre/lustre/lmv/lmv.ko] undefined!
-
+Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 54414 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160722/5feb02b8/attachment-0001.obj>
+ drivers/staging/lustre/lnet/lnet/lib-socket.c | 21 +++++++--------------
+ 1 file changed, 7 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+index 891fd59..4e6dd51 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+@@ -265,21 +265,17 @@ lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout)
+ 	long jiffies_left = timeout * msecs_to_jiffies(MSEC_PER_SEC);
+ 	unsigned long then;
+ 	struct timeval tv;
++	struct kvec  iov = { .iov_base = buffer, .iov_len  = nob };
++	struct msghdr msg = {NULL,};
+ 
+ 	LASSERT(nob > 0);
+ 	/*
+ 	 * Caller may pass a zero timeout if she thinks the socket buffer is
+ 	 * empty enough to take the whole message immediately
+ 	 */
++	iov_iter_kvec(&msg.msg_iter, WRITE | ITER_KVEC, &iov, 1, nob);
+ 	for (;;) {
+-		struct kvec  iov = {
+-			.iov_base = buffer,
+-			.iov_len  = nob
+-		};
+-		struct msghdr msg = {
+-			.msg_flags      = !timeout ? MSG_DONTWAIT : 0
+-		};
+-
++		msg.msg_flags = !timeout ? MSG_DONTWAIT : 0;
+ 		if (timeout) {
+ 			/* Set send timeout to remaining time */
+ 			jiffies_to_timeval(jiffies_left, &tv);
+@@ -296,9 +292,6 @@ lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout)
+ 		rc = kernel_sendmsg(sock, &msg, &iov, 1, nob);
+ 		jiffies_left -= jiffies - then;
+ 
+-		if (rc == nob)
+-			return 0;
+-
+ 		if (rc < 0)
+ 			return rc;
+ 
+@@ -307,11 +300,11 @@ lnet_sock_write(struct socket *sock, void *buffer, int nob, int timeout)
+ 			return -ECONNABORTED;
+ 		}
+ 
++		if (!msg_data_left(&msg))
++			break;
++
+ 		if (jiffies_left <= 0)
+ 			return -EAGAIN;
+-
+-		buffer = ((char *)buffer) + rc;
+-		nob -= rc;
+ 	}
+ 	return 0;
+ }
+-- 
+2.7.4
