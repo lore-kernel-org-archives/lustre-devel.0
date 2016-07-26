@@ -1,60 +1,46 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 26 Jul 2016 19:09:33 +0100 (BST)
-Subject: [lustre-devel] [PATCH v2 30/58] staging: lustre: create striped
-	directory
-In-Reply-To: <1469552361.1900.214.camel@perches.com>
-References: <1469155491-15265-31-git-send-email-jsimmons@infradead.org>
-	<1469550997-2180-1-git-send-email-jsimmons@infradead.org>
-	<1469552361.1900.214.camel@perches.com>
-Message-ID: <alpine.LFD.2.20.1607261841010.21275@casper.infradead.org>
+From: SF Markus Elfring <elfring@users.sourceforge.net>
+Date: Tue, 26 Jul 2016 20:54:17 +0200
+Subject: [lustre-devel] [PATCH 00/12] staging-Lustre: Fine-tuning for seven
+ function implementations
+In-Reply-To: <20151221234857.GA27079@kroah.com>
+References: <566ABCD9.1060404@users.sourceforge.net>
+	<566D7733.1030102@users.sourceforge.net>
+	<56784D83.7080108@users.sourceforge.net>
+	<56784F0C.6040007@users.sourceforge.net>
+	<20151221234857.GA27079@kroah.com>
+Message-ID: <59d94e70-7476-728e-5f63-013557ec2db9@users.sourceforge.net>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Joe Perches <joe@perches.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>
+To: devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: LKML <linux-kernel@vger.kernel.org>, kernel-janitors@vger.kernel.org, Julia Lawall <julia.lawall@lip6.fr>, Bhumika Goyal <bhumirks@gmail.com>
 
+From: Markus Elfring <elfring@users.sourceforge.net>
 
-> On Tue, 2016-07-26 at 12:36 -0400, James Simmons wrote:
-> > From: wang di <di.wang@intel.com>
-> > 
-> > 1. client send create request to the master MDT, which
-> > ? will allocate FIDs and create slaves. for all of slaves.
-> > 
-> > 2. Client needs to revalidate slaves during intent getattr
-> > ???and open request.
-> > 
-> > 3. lmv_stripe_md will include attributes(size, nlink etc)
-> > ???from all of stripe, which will be protected by UPDATE lock.
-> > ???client needs to merge these attributes when update inode.
-> > 
-> > 4. send create request to the MDT where the file is located,
-> > ???which can help creating master stripe of striped directory.
-> > 
-> > Changelog
-> > 
-> > v1) Original submitted patch
-> > 
-> > v2) fixed lmv_hash_fnv1a function to use do_div64 to fix
-> > ????__umoddi3 undefined bug on 32 bit platforms.
-> > 
-> > Signed-off-by: wang di <di.wang@intel.com>
-> > Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3529
-> > Reviewed-on: http://review.whamcloud.com/7196
-> 
-> Updated?	2 years, 5 months ago
-> 
-> how many of these old changes are yet to be integrated?
+Further update suggestions were taken into account
+after a patch was applied from static source code analysis.
 
-For the lnet/libcfs layer it is the lastest code so none.
-For the lustre client code the further back you go the
-more older patches are missing. The last 6 months I have
-been filling in those gaps. Currently we are at the 2.5.58
-version with this last code drop. As we approach the latest
-release way less patches are needed to get caught up. Once
-we get to the 2.6+ version of lustre the number of missing
-patches should drop off greatly. Thats not to far away now.
-I would estimate a few hundred patches are missing. Mind you
-this is considering that larger patches need to be broken up.
-For this last code drop 30 of the 50 patches was from an
-original single large patch. 
+Markus Elfring (12):
+  ldlm: Delete unnecessary checks before the function call "kset_unregister"
+  Delete unnecessary checks before the function call "kobject_put"
+  One function call less in class_register_type() after error detection
+  Split a condition check in class_register_type()
+  Optimize error handling in class_register_type()
+  Return directly after a failed kcalloc() in mgc_process_recover_log()
+  Less checks after a failed alloc_page() in mgc_process_recover_log()
+  Less checks after a failed ptlrpc_request_alloc() inmgc_process_recover_log()
+  Delete a check for the variable "req" in mgc_process_recover_log()
+  Rename jump labels in mgc_process_recover_log()
+  Move an assignment for the variable "eof" in mgc_process_recover_log()
+  Delete an unnecessary variable initialisation in mgc_process_recover_log()
+
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c | 10 ++---
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c     |  5 +--
+ drivers/staging/lustre/lustre/lov/lov_obd.c     |  4 +-
+ drivers/staging/lustre/lustre/mgc/mgc_request.c | 50 ++++++++++++-------------
+ drivers/staging/lustre/lustre/obdclass/genops.c | 41 ++++++++++++--------
+ 5 files changed, 54 insertions(+), 56 deletions(-)
+
+-- 
+2.9.2
