@@ -1,51 +1,77 @@
-From: SF Markus Elfring <elfring@users.sourceforge.net>
-Date: Tue, 26 Jul 2016 22:11:00 +0200
-Subject: [lustre-devel] staging: lustre: Optimize error handling in
-	class_register_type()
-In-Reply-To: <3F437188-382B-46C8-9C30-7DBAB17F62E3@intel.com>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Tue, 26 Jul 2016 17:49:49 -0400
+Subject: [lustre-devel] staging: lustre: One function call less in
+	class_register_type() after error detection
+In-Reply-To: <0f9ecc7c-f98a-0296-563b-6fcfab459c31@users.sourceforge.net>
 References: <566ABCD9.1060404@users.sourceforge.net>
 	<566D7733.1030102@users.sourceforge.net>
 	<56784D83.7080108@users.sourceforge.net>
 	<56784F0C.6040007@users.sourceforge.net>
 	<20151221234857.GA27079@kroah.com>
 	<59d94e70-7476-728e-5f63-013557ec2db9@users.sourceforge.net>
-	<d1f69f4d-539b-e97d-fc0e-cb0a8754bd3a@users.sourceforge.net>
-	<3F437188-382B-46C8-9C30-7DBAB17F62E3@intel.com>
-Message-ID: <9f6275cc-6e7a-e26a-9aa0-3fec17648132@users.sourceforge.net>
+	<a92aee0c-7a2c-a509-c19e-44cc9d8335a1@users.sourceforge.net>
+	<AD87A1DA-2C87-4A36-AA19-45961B51FBE7@intel.com>
+	<0f9ecc7c-f98a-0296-563b-6fcfab459c31@users.sourceforge.net>
+Message-ID: <2BFF8460-ECEA-470D-ACD6-A9D7E540FE33@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>
+To: SF Markus Elfring <elfring@users.sourceforge.net>
 Cc: devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, LKML <linux-kernel@vger.kernel.org>, kernel-janitors@vger.kernel.org, Julia Lawall <julia.lawall@lip6.fr>, Bhumika Goyal <bhumirks@gmail.com>
 
-> NAK.
-> when you do this, the next statement below breaks:
 
-I wonder about this conclusion.
+On Jul 26, 2016, at 3:56 PM, SF Markus Elfring wrote:
 
-
->> 	type = kzalloc(sizeof(*type), GFP_NOFS);
->> 	if (!type)
->> -		return rc;
->> +		return -ENOMEM;
->>
->> 	type->typ_dt_ops = kzalloc(sizeof(*type->typ_dt_ops), GFP_NOFS);
->> 	if (!type->typ_dt_ops) {
-> ?
->                 goto failed;
+>> But kobject_put() already checks for NULL, right?
 > 
->  failed:
-> ?
-> return rc;
+> Yes. - Such an input parameter validation is performed by the
+> function implementation.
 > 
-> So we are now returning an unitialized rc, did you get a gcc warning about it when compiling?
+> 
+>> you just submitted another batch about that in other area.
+> 
+> I sent update suggestions because of this function property for two
+> Linux software modules in the year 2015.
+> 
+> 
+>>> Adjust jump targets according to the Linux coding style convention.
+>> 
+>> Not that I am totally against this patch,
+> 
+> Thanks for your feedback.
+> 
+> 
+>> but when we do not need the extra checks, a single jump target is ok too in my mind
+> 
+> A single goto label will look convenient for a while. It will often work
+> for several use cases.
+> 
+> 
+>> (extra benefit - there's not going to be any chance of a mistake to where to jump to).
+> 
+> I have got an other opinion when you would like to care for a bit
+> more software efficiency.
+> 
+> 
+>> And when we have a single jump target, there's no supersmart naming
+>> like free_this_and_that_and_that_other_thing_too.
+> 
+> How often do you care for efficient exception handling in the shown
+> function implementations?
 
-I do not get such an impression if my corresponding update suggestion
-"[PATCH 04/12] staging: lustre: Split a condition check in class_register_type()"
-will be considered for this use case once more.
-https://lkml.org/lkml/2016/7/26/462
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1197227.html
+This function is called several times during lustre module insert.
+Namely it's called 5 times for 5 types:
+osc, mdc, lov, lmv, mgc.
 
-Regards,
-Markus
+It's not called any more than that, so it's not exactly a super hot-path function
+to overoptimize it, and the failure is presumed to never happen too
+(or the module would be non-functional).
+
+I guess you have already did all the work so I don't have any principal objections
+here, it's just like I said, in a non-super contended path, a single
+"fail" label is probably easier on the developer when they need to add another
+check there, as opposed to figuring and possibly adding a correct another
+label that would do something sensible.
+
+Thank you for your contributions.
