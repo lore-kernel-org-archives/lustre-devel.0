@@ -1,47 +1,78 @@
-From: SF Markus Elfring <elfring@users.sourceforge.net>
-Date: Tue, 26 Jul 2016 21:14:48 +0200
-Subject: [lustre-devel] [PATCH 12/12] staging: lustre: Delete an unnecessary
- variable initialisation in mgc_process_recover_log()
-In-Reply-To: <59d94e70-7476-728e-5f63-013557ec2db9@users.sourceforge.net>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Tue, 26 Jul 2016 15:16:03 -0400
+Subject: [lustre-devel] [PATCH 05/12] staging: lustre: Optimize error
+	handling in class_register_type()
+In-Reply-To: <3F437188-382B-46C8-9C30-7DBAB17F62E3@intel.com>
 References: <566ABCD9.1060404@users.sourceforge.net>
 	<566D7733.1030102@users.sourceforge.net>
 	<56784D83.7080108@users.sourceforge.net>
 	<56784F0C.6040007@users.sourceforge.net>
 	<20151221234857.GA27079@kroah.com>
 	<59d94e70-7476-728e-5f63-013557ec2db9@users.sourceforge.net>
-Message-ID: <2ea70f05-14de-7d93-83da-26e2439a7239@users.sourceforge.net>
+	<d1f69f4d-539b-e97d-fc0e-cb0a8754bd3a@users.sourceforge.net>
+	<3F437188-382B-46C8-9C30-7DBAB17F62E3@intel.com>
+Message-ID: <0F5BB200-CA27-4384-B3AE-28E30CFF42EE@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: LKML <linux-kernel@vger.kernel.org>, kernel-janitors@vger.kernel.org, Julia Lawall <julia.lawall@lip6.fr>, Bhumika Goyal <bhumirks@gmail.com>
+To: SF Markus Elfring <elfring@users.sourceforge.net>
+Cc: devel@driverdev.osuosl.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, kernel-janitors@vger.kernel.org, LKML <linux-kernel@vger.kernel.org>, Julia Lawall <julia.lawall@lip6.fr>, Bhumika Goyal <bhumirks@gmail.com>, lustre-devel@lists.lustre.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Tue, 26 Jul 2016 19:50:40 +0200
 
-The variable "req" will eventually be set to an appropriate pointer
-from a call of the ptlrpc_request_alloc() function.
-Thus omit the explicit initialisation which became unnecessary with
-a previous update step.
+On Jul 26, 2016, at 3:11 PM, Oleg Drokin wrote:
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/staging/lustre/lustre/mgc/mgc_request.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> On Jul 26, 2016, at 3:05 PM, SF Markus Elfring wrote:
+> 
+>> From: Markus Elfring <elfring@users.sourceforge.net>
+>> Date: Tue, 26 Jul 2016 14:23:23 +0200
+>> 
+>> Return a constant error code without storing it in the local variable "rc"
+>> after a failed memory allocation at the beginning of this function.
+>> 
+>> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+>> ---
+>> drivers/staging/lustre/lustre/obdclass/genops.c | 3 +--
+>> 1 file changed, 1 insertion(+), 2 deletions(-)
+>> 
+>> diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
+>> index fd5e61f..4752091 100644
+>> --- a/drivers/staging/lustre/lustre/obdclass/genops.c
+>> +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
+>> @@ -152,10 +152,9 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+>> 		return -EEXIST;
+>> 	}
+>> 
+>> -	rc = -ENOMEM;
+> 
+> NAK.
+> when you do this, the next statement below breaks:
 
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 8f5db79..6e8368e 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -1315,7 +1315,7 @@ static int mgc_apply_recover_logs(struct obd_device *mgc,
- static int mgc_process_recover_log(struct obd_device *obd,
- 				   struct config_llog_data *cld)
- {
--	struct ptlrpc_request *req = NULL;
-+	struct ptlrpc_request *req;
- 	struct config_llog_instance *cfg = &cld->cld_cfg;
- 	struct mgs_config_body *body;
- 	struct mgs_config_res  *res;
--- 
-2.9.2
+Ah, I see there was patch 4 before patch 5 that actually placed rc assignments
+everywhere.
+
+So I guess it is fine after all.
+
+Sorry for the noise.
+
+> 
+>> 	type = kzalloc(sizeof(*type), GFP_NOFS);
+>> 	if (!type)
+>> -		return rc;
+>> +		return -ENOMEM;
+>> 
+>> 	type->typ_dt_ops = kzalloc(sizeof(*type->typ_dt_ops), GFP_NOFS);
+>> 	if (!type->typ_dt_ops) {
+> ?
+>                goto failed;
+> 
+> failed:
+> ?
+> return rc;
+> 
+> So we are now returning an unitialized rc, did you get a gcc warning about it when compiling?
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
