@@ -1,39 +1,48 @@
-From: Ben Evans <bevans@cray.com>
-Date: Mon, 1 Aug 2016 13:14:42 +0000
-Subject: [lustre-devel] insanity in ll_dirty_page_discard_warn()
-In-Reply-To: <ac1b5950-071e-ad73-e272-b31eba4be9d6@cea.fr>
-References: <20160728182659.GV2356@ZenIV.linux.org.uk>
-	<FBC7930D-6970-45F6-975F-D9B349B5C7EF@intel.com>
-	<D3C10897.7672%jevans@cray.com>
-	<ac1b5950-071e-ad73-e272-b31eba4be9d6@cea.fr>
-Message-ID: <D3C4C344.7686%jevans@cray.com>
+From: Baole Ni <baolex.ni@intel.com>
+Date: Tue,  2 Aug 2016 19:59:00 +0800
+Subject: [lustre-devel] [PATCH 0928/1285] Replace numeric parameter like
+	0444 with macro
+Message-ID: <20160802115900.11871-1-baolex.ni@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, gregkh@linuxfoundation.org, jejb@linux.vnet.ibm.com, martin.petersen@oracle.com, m.chehab@samsung.com, pawel@osciak.com, m.szyprowski@samsung.com, kyungmin.park@samsung.com, k.kozlowski@samsung.com
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, jsimmons@infradead.org, amir.shehata@intel.com, john.hammond@intel.com, bruno.faccini@intel.com, mike.rapoport@gmail.com, chuansheng.liu@intel.com, baolex.ni@intel.com
 
-No, I'd looked for that failure before, but there was nothing publicly
-available.
+I find that the developers often just specified the numeric value
+when calling a macro which is defined with a parameter for access permission.
+As we know, these numeric value for access permission have had the corresponding macro,
+and that using macro can improve the robustness and readability of the code,
+thus, I suggest replacing the numeric parameter with the macro.
 
-I finally have a dev setup to reproduce this error, so I'll be working on
-the fix this week.
+Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
+Signed-off-by: Baole Ni <baolex.ni@intel.com>
+---
+ drivers/staging/lustre/lnet/lnet/acceptor.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
--Ben
-
-On 8/1/16, 3:54 AM, "DEGREMONT Aurelien" <aurelien.degremont@cea.fr> wrote:
-
->Le 29/07/2016 ? 19:22, Ben Evans a ?crit :
->> I'm also working on a fix in osc_completion where rc=-ENOMEM, and a
->>bunch
->> of the asserts are not true since various structures haven't been
->> initialized yet, so there is definitely some work to be done in the
->>area.
->Ben, did you notice?
->https://jira.hpdd.intel.com/browse/LU-8435
->
->Do you have a public tracking of your progress in this area? (jira,
->gerrit, ...
->
->
->Aur?lien
+diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
+index 1452bb3..a7c3a58 100644
+--- a/drivers/staging/lustre/lnet/lnet/acceptor.c
++++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
+@@ -67,13 +67,13 @@ lnet_accept_magic(__u32 magic, __u32 constant)
+ 
+ static char *accept = "secure";
+ 
+-module_param(accept, charp, 0444);
++module_param(accept, charp, S_IRUSR | S_IRGRP | S_IROTH);
+ MODULE_PARM_DESC(accept, "Accept connections (secure|all|none)");
+-module_param(accept_port, int, 0444);
++module_param(accept_port, int, S_IRUSR | S_IRGRP | S_IROTH);
+ MODULE_PARM_DESC(accept_port, "Acceptor's port (same on all nodes)");
+-module_param(accept_backlog, int, 0444);
++module_param(accept_backlog, int, S_IRUSR | S_IRGRP | S_IROTH);
+ MODULE_PARM_DESC(accept_backlog, "Acceptor's listen backlog");
+-module_param(accept_timeout, int, 0644);
++module_param(accept_timeout, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+ MODULE_PARM_DESC(accept_timeout, "Acceptor's timeout (seconds)");
+ 
+ static char *accept_type;
+-- 
+2.9.2
