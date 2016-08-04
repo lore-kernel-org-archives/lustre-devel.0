@@ -1,293 +1,238 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu,  4 Aug 2016 12:52:56 -0400
-Subject: [lustre-devel] [PATCH 20/32] staging: lustre: ldlm: improve
-	ldlm_lock_create() return value
+Date: Thu,  4 Aug 2016 12:52:47 -0400
+Subject: [lustre-devel] [PATCH 11/32] staging: lustre: lmv: Match MDT where
+	the FID locates first
 In-Reply-To: <1470329587-18768-1-git-send-email-jsimmons@infradead.org>
 References: <1470329587-18768-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1470329587-18768-21-git-send-email-jsimmons@infradead.org>
+Message-ID: <1470329587-18768-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Emoly Liu <emoly.liu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Emoly Liu <emoly.liu@intel.com>
+From: wang di <di.wang@intel.com>
 
-ldlm_lock_create() and ldlm_resource_get() always return NULL as
-error reporting and "NULL" is interpretted as ENOMEM incorrectly
-sometimes. This patch fixes this problem by using ERR_PTR() rather
-than NULL.
+With DNE every object can have two locks in different namespaces:
+lookup lock in space of MDT storing direntry and update/open lock
+in space of MDT storing inode. In lmv_find_cbdata/lmv_lock_lock,
+it should try the MDT that the FID maps to first, since this can
+be easily found, and only try others if that fails.
 
-Signed-off-by: Emoly Liu <emoly.liu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4524
-Reviewed-on: http://review.whamcloud.com/9004
-Reviewed-by: Bobi Jam <bobijam@gmail.com>
+In the error handler of lmv_add_targets, it should check whether
+ld_tgt_count is being increased before ld_tgt_count is being -1.
+
+Signed-off-by: wang di <di.wang@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4098
+Reviewed-on: http://review.whamcloud.com/8019
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |    4 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   28 ++++++++++++--------
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   13 +++-----
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   25 +++++------------
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    2 +-
- drivers/staging/lustre/lustre/mdc/mdc_reint.c      |    2 +-
- drivers/staging/lustre/lustre/osc/osc_request.c    |    2 +-
- 7 files changed, 34 insertions(+), 42 deletions(-)
+ drivers/staging/lustre/lustre/lmv/lmv_internal.h |   45 +++++++++++++-----
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c      |   57 +++++++++++++++-------
+ 2 files changed, 73 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 65e8e14..61d649f 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -339,10 +339,10 @@ reprocess:
- 						lock->l_granted_mode, &null_cbs,
- 						NULL, 0, LVB_T_NONE);
- 			lock_res_and_lock(req);
--			if (!new2) {
-+			if (IS_ERR(new2)) {
- 				ldlm_flock_destroy(req, lock->l_granted_mode,
- 						   *flags);
--				*err = -ENOLCK;
-+				*err = PTR_ERR(new2);
- 				return LDLM_ITER_STOP;
- 			}
- 			goto reprocess;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index 1a0fce1..a91cdb4 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -481,8 +481,8 @@ int ldlm_lock_change_resource(struct ldlm_namespace *ns, struct ldlm_lock *lock,
- 	unlock_res_and_lock(lock);
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_internal.h b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
+index dbd1da6..faf6a7b 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_internal.h
++++ b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
+@@ -64,35 +64,56 @@ int lmv_revalidate_slaves(struct obd_export *exp, struct mdt_body *mbody,
+ 			  int extra_lock_flags);
  
- 	newres = ldlm_resource_get(ns, NULL, new_resid, type, 1);
--	if (!newres)
--		return -ENOMEM;
-+	if (IS_ERR(newres))
-+		return PTR_ERR(newres);
- 
- 	lu_ref_add(&newres->lr_reference, "lock", lock);
- 	/*
-@@ -1227,7 +1227,7 @@ enum ldlm_mode ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
- 	}
- 
- 	res = ldlm_resource_get(ns, NULL, res_id, type, 0);
--	if (!res) {
-+	if (IS_ERR(res)) {
- 		LASSERT(!old_lock);
- 		return 0;
- 	}
-@@ -1475,15 +1475,15 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
+ static inline struct lmv_tgt_desc *
+-lmv_get_target(struct lmv_obd *lmv, u32 mds)
++lmv_get_target(struct lmv_obd *lmv, u32 mdt_idx, int *index)
  {
- 	struct ldlm_lock *lock;
- 	struct ldlm_resource *res;
-+	int rc;
+-	int count = lmv->desc.ld_tgt_count;
+ 	int i;
  
- 	res = ldlm_resource_get(ns, NULL, res_id, type, 1);
--	if (!res)
--		return NULL;
-+	if (IS_ERR(res))
-+		return ERR_CAST(res);
+-	for (i = 0; i < count; i++) {
++	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
+ 		if (!lmv->tgts[i])
+ 			continue;
  
- 	lock = ldlm_lock_new(res);
--
- 	if (!lock)
--		return NULL;
-+		return ERR_PTR(-ENOMEM);
- 
- 	lock->l_req_mode = mode;
- 	lock->l_ast_data = data;
-@@ -1497,27 +1497,33 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
- 	lock->l_tree_node = NULL;
- 	/* if this is the extent lock, allocate the interval tree node */
- 	if (type == LDLM_EXTENT) {
--		if (!ldlm_interval_alloc(lock))
-+		if (!ldlm_interval_alloc(lock)) {
-+			rc = -ENOMEM;
- 			goto out;
+-		if (lmv->tgts[i]->ltd_idx == mds)
++		if (lmv->tgts[i]->ltd_idx == mdt_idx) {
++			if (index)
++				*index = i;
+ 			return lmv->tgts[i];
 +		}
  	}
  
- 	if (lvb_len) {
- 		lock->l_lvb_len = lvb_len;
- 		lock->l_lvb_data = kzalloc(lvb_len, GFP_NOFS);
--		if (!lock->l_lvb_data)
-+		if (!lock->l_lvb_data) {
-+			rc = -ENOMEM;
- 			goto out;
-+		}
- 	}
- 
- 	lock->l_lvb_type = lvb_type;
--	if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_NEW_LOCK))
-+	if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_NEW_LOCK)) {
-+		rc = -ENOENT;
- 		goto out;
-+	}
- 
- 	return lock;
- 
- out:
- 	ldlm_lock_destroy(lock);
- 	LDLM_LOCK_RELEASE(lock);
--	return NULL;
-+	return ERR_PTR(rc);
+ 	return ERR_PTR(-ENODEV);
  }
  
- /**
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index 984a460..048214c 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -694,8 +694,8 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 		lock = ldlm_lock_create(ns, res_id, einfo->ei_type,
- 					einfo->ei_mode, &cbs, einfo->ei_cbdata,
- 					lvb_len, lvb_type);
--		if (!lock)
--			return -ENOMEM;
-+		if (IS_ERR(lock))
-+			return PTR_ERR(lock);
- 		/* for the local lock, add the reference */
- 		ldlm_lock_addref_internal(lock, einfo->ei_mode);
- 		ldlm_lock2handle(lock, lockh);
-@@ -1658,7 +1658,7 @@ int ldlm_cli_cancel_unused_resource(struct ldlm_namespace *ns,
- 	int rc;
- 
- 	res = ldlm_resource_get(ns, NULL, res_id, 0, 0);
--	if (!res) {
-+	if (IS_ERR(res)) {
- 		/* This is not a problem. */
- 		CDEBUG(D_INFO, "No resource %llu\n", res_id->name[0]);
- 		return 0;
-@@ -1809,13 +1809,10 @@ int ldlm_resource_iterate(struct ldlm_namespace *ns,
- 	struct ldlm_resource *res;
- 	int rc;
- 
--	if (!ns) {
--		CERROR("must pass in namespace\n");
--		LBUG();
--	}
-+	LASSERTF(ns, "must pass in namespace\n");
- 
- 	res = ldlm_resource_get(ns, NULL, res_id, 0, 0);
--	if (!res)
-+	if (IS_ERR(res))
- 		return 0;
- 
- 	LDLM_RESOURCE_ADDREF(res);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index 5866b00..c37a7b0 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -1088,7 +1088,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
- 		  int create)
+-static inline struct lmv_tgt_desc *
+-lmv_find_target(struct lmv_obd *lmv, const struct lu_fid *fid)
++static inline int
++lmv_find_target_index(struct lmv_obd *lmv, const struct lu_fid *fid)
  {
- 	struct hlist_node     *hnode;
--	struct ldlm_resource *res;
-+	struct ldlm_resource *res = NULL;
- 	struct cfs_hash_bd	 bd;
- 	__u64		 version;
- 	int		      ns_refcount = 0;
-@@ -1101,31 +1101,20 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
- 	hnode = cfs_hash_bd_lookup_locked(ns->ns_rs_hash, &bd, (void *)name);
- 	if (hnode) {
- 		cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 0);
--		res = hlist_entry(hnode, struct ldlm_resource, lr_hash);
--		/* Synchronize with regard to resource creation. */
--		if (ns->ns_lvbo && ns->ns_lvbo->lvbo_init) {
--			mutex_lock(&res->lr_lvb_mutex);
--			mutex_unlock(&res->lr_lvb_mutex);
--		}
--
--		if (unlikely(res->lr_lvb_len < 0)) {
--			ldlm_resource_putref(res);
--			res = NULL;
--		}
--		return res;
-+		goto lvbo_init;
+-	u32 mds = 0;
+-	int rc;
++	struct lmv_tgt_desc *ltd;
++	u32 mdt_idx = 0;
++	int index = 0;
+ 
+ 	if (lmv->desc.ld_tgt_count > 1) {
+-		rc = lmv_fld_lookup(lmv, fid, &mds);
+-		if (rc)
+-			return ERR_PTR(rc);
++		int rc;
++
++		rc = lmv_fld_lookup(lmv, fid, &mdt_idx);
++		if (rc < 0)
++			return rc;
  	}
  
- 	version = cfs_hash_bd_version_get(&bd);
- 	cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 0);
+-	return lmv_get_target(lmv, mds);
++	ltd = lmv_get_target(lmv, mdt_idx, &index);
++	if (IS_ERR(ltd))
++		return PTR_ERR(ltd);
++
++	return index;
++}
++
++static inline struct lmv_tgt_desc *
++lmv_find_target(struct lmv_obd *lmv, const struct lu_fid *fid)
++{
++	int index;
++
++	index = lmv_find_target_index(lmv, fid);
++	if (index < 0)
++		return ERR_PTR(index);
++
++	return lmv->tgts[index];
+ }
  
- 	if (create == 0)
--		return NULL;
-+		return ERR_PTR(-ENOENT);
+ static inline int lmv_stripe_md_size(int stripe_count)
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 9821f69..6917a03 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -480,6 +480,7 @@ static int lmv_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
+ {
+ 	struct lmv_obd      *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc *tgt;
++	int orig_tgt_count = 0;
+ 	int		  rc = 0;
  
- 	LASSERTF(type >= LDLM_MIN_TYPE && type < LDLM_MAX_TYPE,
- 		 "type: %d\n", type);
- 	res = ldlm_resource_new();
- 	if (!res)
--		return NULL;
-+		return ERR_PTR(-ENOMEM);
+ 	CDEBUG(D_CONFIG, "Target uuid: %s. index %d\n", uuidp->uuid, index);
+@@ -549,14 +550,17 @@ static int lmv_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
+ 	tgt->ltd_uuid = *uuidp;
+ 	tgt->ltd_active = 0;
+ 	lmv->tgts[index] = tgt;
+-	if (index >= lmv->desc.ld_tgt_count)
++	if (index >= lmv->desc.ld_tgt_count) {
++		orig_tgt_count = lmv->desc.ld_tgt_count;
+ 		lmv->desc.ld_tgt_count = index + 1;
++	}
  
- 	res->lr_ns_bucket  = cfs_hash_bd_extra_get(ns->ns_rs_hash, &bd);
- 	res->lr_name       = *name;
-@@ -1143,7 +1132,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
- 		/* We have taken lr_lvb_mutex. Drop it. */
- 		mutex_unlock(&res->lr_lvb_mutex);
- 		kmem_cache_free(ldlm_resource_slab, res);
--
-+lvbo_init:
- 		res = hlist_entry(hnode, struct ldlm_resource, lr_hash);
- 		/* Synchronize with regard to resource creation. */
- 		if (ns->ns_lvbo && ns->ns_lvbo->lvbo_init) {
-@@ -1153,7 +1142,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 	if (lmv->connected) {
+ 		rc = lmv_connect_mdc(obd, tgt);
+ 		if (rc) {
+ 			spin_lock(&lmv->lmv_lock);
+-			lmv->desc.ld_tgt_count--;
++			if (lmv->desc.ld_tgt_count == index + 1)
++				lmv->desc.ld_tgt_count = orig_tgt_count;
+ 			memset(tgt, 0, sizeof(*tgt));
+ 			spin_unlock(&lmv->lmv_lock);
+ 		} else {
+@@ -1263,7 +1267,7 @@ int __lmv_fid_alloc(struct lmv_obd *lmv, struct lu_fid *fid, u32 mds)
+ 	struct lmv_tgt_desc	*tgt;
+ 	int			 rc;
  
- 		if (unlikely(res->lr_lvb_len < 0)) {
- 			ldlm_resource_putref(res);
--			res = NULL;
-+			res = ERR_PTR(res->lr_lvb_len);
- 		}
- 		return res;
+-	tgt = lmv_get_target(lmv, mds);
++	tgt = lmv_get_target(lmv, mds, NULL);
+ 	if (IS_ERR(tgt))
+ 		return PTR_ERR(tgt);
+ 
+@@ -1610,6 +1614,7 @@ static int lmv_find_cbdata(struct obd_export *exp, const struct lu_fid *fid,
+ {
+ 	struct obd_device   *obd = exp->exp_obd;
+ 	struct lmv_obd      *lmv = &obd->u.lmv;
++	int tgt;
+ 	int		  i;
+ 	int		  rc;
+ 
+@@ -1622,12 +1627,22 @@ static int lmv_find_cbdata(struct obd_export *exp, const struct lu_fid *fid,
+ 	/*
+ 	 * With DNE every object can have two locks in different namespaces:
+ 	 * lookup lock in space of MDT storing direntry and update/open lock in
+-	 * space of MDT storing inode.
++	 * space of MDT storing inode. Try the MDT that the FID maps to first,
++	 * since this can be easily found, and only try others if that fails.
+ 	 */
+-	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
+-		if (!lmv->tgts[i] || !lmv->tgts[i]->ltd_exp)
++	for (i = 0, tgt = lmv_find_target_index(lmv, fid);
++	     i < lmv->desc.ld_tgt_count;
++	     i++, tgt = (tgt + 1) % lmv->desc.ld_tgt_count) {
++		if (tgt < 0) {
++			CDEBUG(D_HA, "%s: "DFID" is inaccessible: rc = %d\n",
++			       obd->obd_name, PFID(fid), tgt);
++			tgt = 0;
++		}
++
++		if (!lmv->tgts[tgt] || !lmv->tgts[tgt]->ltd_exp)
+ 			continue;
+-		rc = md_find_cbdata(lmv->tgts[i]->ltd_exp, fid, it, data);
++
++		rc = md_find_cbdata(lmv->tgts[tgt]->ltd_exp, fid, it, data);
+ 		if (rc)
+ 			return rc;
  	}
-@@ -1175,7 +1164,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
- 			res->lr_lvb_len = rc;
- 			mutex_unlock(&res->lr_lvb_mutex);
- 			ldlm_resource_putref(res);
--			return NULL;
-+			return ERR_PTR(rc);
- 		}
+@@ -1676,7 +1691,7 @@ lmv_locate_target_for_name(struct lmv_obd *lmv, struct lmv_stripe_md *lsm,
+ 
+ 	*fid = oinfo->lmo_fid;
+ 	*mds = oinfo->lmo_mds;
+-	tgt = lmv_get_target(lmv, *mds);
++	tgt = lmv_get_target(lmv, *mds, NULL);
+ 
+ 	CDEBUG(D_INFO, "locate on mds %u "DFID"\n", *mds, PFID(fid));
+ 	return tgt;
+@@ -2866,24 +2881,32 @@ static enum ldlm_mode lmv_lock_match(struct obd_export *exp, __u64 flags,
+ 	struct obd_device       *obd = exp->exp_obd;
+ 	struct lmv_obd	  *lmv = &obd->u.lmv;
+ 	enum ldlm_mode	      rc;
++	int tgt;
+ 	int		      i;
+ 
+ 	CDEBUG(D_INODE, "Lock match for "DFID"\n", PFID(fid));
+ 
+ 	/*
+-	 * With CMD every object can have two locks in different namespaces:
+-	 * lookup lock in space of mds storing direntry and update/open lock in
+-	 * space of mds storing inode. Thus we check all targets, not only that
+-	 * one fid was created in.
++	 * With DNE every object can have two locks in different namespaces:
++	 * lookup lock in space of MDT storing direntry and update/open lock in
++	 * space of MDT storing inode.  Try the MDT that the FID maps to first,
++	 * since this can be easily found, and only try others if that fails.
+ 	 */
+-	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
+-		struct lmv_tgt_desc *tgt = lmv->tgts[i];
++	for (i = 0, tgt = lmv_find_target_index(lmv, fid);
++	     i < lmv->desc.ld_tgt_count;
++	     i++, tgt = (tgt + 1) % lmv->desc.ld_tgt_count) {
++		if (tgt < 0) {
++			CDEBUG(D_HA, "%s: "DFID" is inaccessible: rc = %d\n",
++			       obd->obd_name, PFID(fid), tgt);
++			tgt = 0;
++		}
+ 
+-		if (!tgt || !tgt->ltd_exp || !tgt->ltd_active)
++		if (!lmv->tgts[tgt] || !lmv->tgts[tgt]->ltd_exp ||
++		    !lmv->tgts[tgt]->ltd_active)
+ 			continue;
+ 
+-		rc = md_lock_match(tgt->ltd_exp, flags, fid, type, policy, mode,
+-				   lockh);
++		rc = md_lock_match(lmv->tgts[tgt]->ltd_exp, flags, fid,
++				   type, policy, mode, lockh);
+ 		if (rc)
+ 			return rc;
  	}
- 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 3291201..fab83dd 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -174,7 +174,7 @@ int mdc_null_inode(struct obd_export *exp,
- 	fid_build_reg_res_name(fid, &res_id);
- 
- 	res = ldlm_resource_get(ns, NULL, &res_id, 0, 0);
--	if (!res)
-+	if (IS_ERR(res))
- 		return 0;
- 
- 	lock_res(res);
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_reint.c b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-index 9bec049..0f71392 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-@@ -86,7 +86,7 @@ int mdc_resource_get_unused(struct obd_export *exp, const struct lu_fid *fid,
- 	fid_build_reg_res_name(fid, &res_id);
- 	res = ldlm_resource_get(exp->exp_obd->obd_namespace,
- 				NULL, &res_id, 0, 0);
--	if (!res)
-+	if (IS_ERR(res))
- 		return 0;
- 	LDLM_RESOURCE_ADDREF(res);
- 	/* Initialize ibits lock policy. */
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index e5669e2..90c8416 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -650,7 +650,7 @@ static int osc_resource_get_unused(struct obd_export *exp, struct obdo *oa,
- 
- 	ostid_build_res_name(&oa->o_oi, &res_id);
- 	res = ldlm_resource_get(ns, NULL, &res_id, 0, 0);
--	if (!res)
-+	if (IS_ERR(res))
- 		return 0;
- 
- 	LDLM_RESOURCE_ADDREF(res);
 -- 
 1.7.1
