@@ -1,43 +1,44 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 15 Aug 2016 22:40:29 +0100 (BST)
-Subject: [lustre-devel] [PATCH 19/58] staging: lustre: llite: add
- md_op_data parameter to ll_get_dir_page
-In-Reply-To: <20160815163815.GA21426@kroah.com>
-References: <1469155491-15265-1-git-send-email-jsimmons@infradead.org>
-	<1469155491-15265-20-git-send-email-jsimmons@infradead.org>
-	<20160815163815.GA21426@kroah.com>
-Message-ID: <alpine.LFD.2.20.1608152239170.7973@casper.infradead.org>
+From: Joe Perches <joe@perches.com>
+Date: Mon, 15 Aug 2016 15:46:36 -0700
+Subject: [lustre-devel] Building a subdirectory ignores parent
+	subdir-ccflags
+In-Reply-To: <57B23D16.8060405@suse.com>
+References: <cover.1471289489.git.joe@perches.com>
+	<5f9f49c1e0caeb3b9ee0656b6d922dbaf52a15b7.1471289489.git.joe@perches.com>
+	<20160815210420.GA30864@kroah.com>
+	<1471295658.4075.117.camel@perches.com>
+	<1471296557.4075.127.camel@perches.com> <57B23D16.8060405@suse.com>
+Message-ID: <1471301196.4075.133.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>
+To: Michal Marek <mmarek@suse.com>, linux-kbuild <linux-kbuild@vger.kernel.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "Yann E. MORIN" <yann.morin.1998@free.fr>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
+On Tue, 2016-08-16 at 00:07 +0200, Michal Marek wrote:
 
-> > From: wang di <di.wang@intel.com>
+Hi Michal.
+
+> > Perhaps making a specific directory should also walk up
+> > any parent directory Makefiles looking for subdir flags.
 > > 
-> > Pass in struct md_op_data for ll_get_dir_page function.
-> > 
-> > Signed-off-by: wang di <di.wang@intel.com>
-> > Reviewed-on: http://review.whamcloud.com/7043
-> > Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
-> > Reviewed-by: John L. Hammond <john.hammond@intel.com>
-> > Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-> > Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-> > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> > Signed-off-by: James Simmons <jsimmons@infradead.org>
-> > ---
-> >  drivers/staging/lustre/lustre/llite/dir.c          |    8 ++++----
-> >  .../staging/lustre/lustre/llite/llite_internal.h   |    4 ++--
-> >  drivers/staging/lustre/lustre/llite/statahead.c    |   15 +++++++++++----
-> >  3 files changed, 17 insertions(+), 10 deletions(-)
-> 
-> This patch fails to apply, so I have to stop here in the patch series.
-> 
-> So I'm guesing your second patch series also will fail to apply, so can
-> you resend all of the outstanding patches you have sent me after
-> rebasing on my staging-testing branch?
+> > Is that unreasonable???Any suggestions?
+> I suggest to do make drivers/staging/lustre/. If building the lustre
+> subdirectories is going to be a common use case, then you can propagate
+> the subdir-ccflags-y assignment down to the individual Makefiles.
 
-Do you mind if I combine them into one series? Also I have a few more 
-patches I like to include. Is it okay to add those as well?
+I don't have a problem with that.
+
+Others might though for whatever reason.
+
+There are a couple other places in the tree that
+also use subdir-ccflags where the results of making
+a subdirectory would either fail or have unexpected
+results.
+
+Does it matter? ?Not much, but it could be nicer if
+it's possible for parent Makefile paths to be ascended.
+
+I'm not much of a Makefile person, but perhaps you have
+some clues/tips/suggestions for implementation?
