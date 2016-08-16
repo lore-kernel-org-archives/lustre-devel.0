@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:18:18 -0400
-Subject: [lustre-devel] [PATCH 05/80] staging: lustre: llite: change remove
-	parameter to bool
+Date: Tue, 16 Aug 2016 16:18:21 -0400
+Subject: [lustre-devel] [PATCH 08/80] staging: lustre: lmv: remove duplicate
+	MAX_HASH_*
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,8 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: wang di <di.wang@intel.com>
 
-Change the 3rd parameter remove to a bool for ll_release_page
-function.
+The MAX_HASH_* macros already exist in obd.h. Remove
+the duplicated defines in lustre_idl.h.
 
 Signed-off-by: wang di <di.wang@intel.com>
 Reviewed-on: http://review.whamcloud.com/7043
@@ -26,121 +26,23 @@ Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/dir.c          |   10 +++++-----
- .../staging/lustre/lustre/llite/llite_internal.h   |    2 +-
- drivers/staging/lustre/lustre/llite/statahead.c    |   10 +++++-----
- 3 files changed, 11 insertions(+), 11 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 3a800b2..a72b486 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -236,7 +236,7 @@ static int ll_dir_filler(void *_hash, struct page *page0)
- 	return rc;
- }
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 32471a6..5f31724 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -2486,10 +2486,6 @@ struct lmv_desc {
+ #define MEA_MAGIC_ALL_CHARS      0xb222a11c
+ #define MEA_MAGIC_HASH_SEGMENT   0xb222a11b
  
--void ll_release_page(struct inode *inode, struct page *page, int remove)
-+void ll_release_page(struct inode *inode, struct page *page, bool remove)
- {
- 	kunmap(page);
- 	if (remove) {
-@@ -297,7 +297,7 @@ static struct page *ll_dir_page_locate(struct inode *dir, __u64 *hash,
- 			CDEBUG(D_VFSTRACE, "page %lu [%llu %llu], hash %llu\n",
- 			       offset, *start, *end, *hash);
- 			if (*hash > *end) {
--				ll_release_page(dir, page, 0);
-+				ll_release_page(dir, page, false);
- 				page = NULL;
- 			} else if (*end != *start && *hash == *end) {
- 				/*
-@@ -463,7 +463,7 @@ out_unlock:
- 	return page;
- 
- fail:
--	ll_release_page(dir, page, 1);
-+	ll_release_page(dir, page, true);
- 	page = ERR_PTR(-EIO);
- 	goto out_unlock;
- }
-@@ -561,7 +561,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- 
- 		if (done) {
- 			pos = hash;
--			ll_release_page(inode, page, 0);
-+			ll_release_page(inode, page, false);
- 			break;
- 		}
- 
-@@ -572,7 +572,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- 			 * End of directory reached.
- 			 */
- 			done = 1;
--			ll_release_page(inode, page, 0);
-+			ll_release_page(inode, page, false);
- 		} else {
- 			/*
- 			 * Normal case: continue to the next
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 4b03a64..07b6918 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -655,7 +655,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- int ll_get_mdt_idx(struct inode *inode);
- struct page *ll_get_dir_page(struct inode *dir, struct md_op_data *op_data,
- 			     __u64 hash, struct ll_dir_chain *chain);
--void ll_release_page(struct inode *inode, struct page *page, int remove);
-+void ll_release_page(struct inode *inode, struct page *page, bool remove);
- 
- /* llite/namei.c */
- extern const struct inode_operations ll_special_inode_operations;
-diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-index 2949ff6..6ce7442 100644
---- a/drivers/staging/lustre/lustre/llite/statahead.c
-+++ b/drivers/staging/lustre/lustre/llite/statahead.c
-@@ -1142,7 +1142,7 @@ interpret_it:
- 				ll_post_statahead(sai);
- 
- 			if (unlikely(!thread_is_running(thread))) {
--				ll_release_page(dir, page, 0);
-+				ll_release_page(dir, page, false);
- 				rc = 0;
- 				goto out;
- 			}
-@@ -1166,7 +1166,7 @@ interpret_it:
- 
- 					if (unlikely(
- 						!thread_is_running(thread))) {
--						ll_release_page(dir, page, 0);
-+						ll_release_page(dir, page, false);
- 						rc = 0;
- 						goto out;
- 					}
-@@ -1189,7 +1189,7 @@ do_it:
- 			/*
- 			 * End of directory reached.
- 			 */
--			ll_release_page(dir, page, 0);
-+			ll_release_page(dir, page, false);
- 			while (1) {
- 				l_wait_event(thread->t_ctl_waitq,
- 					     !list_empty(&sai->sai_entries_received) ||
-@@ -1428,7 +1428,7 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
- 			else
- 				rc = LS_FIRST_DOT_DE;
- 
--			ll_release_page(dir, page, 0);
-+			ll_release_page(dir, page, false);
- 			goto out;
- 		}
- 		pos = le64_to_cpu(dp->ldp_hash_end);
-@@ -1436,7 +1436,7 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
- 			/*
- 			 * End of directory reached.
- 			 */
--			ll_release_page(dir, page, 0);
-+			ll_release_page(dir, page, false);
- 			goto out;
- 		} else {
- 			/*
+-#define MAX_HASH_SIZE_32	 0x7fffffffUL
+-#define MAX_HASH_SIZE	    0x7fffffffffffffffULL
+-#define MAX_HASH_HIGHEST_BIT     0x1000000000000000ULL
+-
+ /* lmv structures */
+ #define LMV_MAGIC_V1	0x0CD10CD0	/* normal stripe lmv magic */
+ #define LMV_USER_MAGIC	0x0CD20CD0	/* default lmv magic*/
 -- 
 1.7.1
