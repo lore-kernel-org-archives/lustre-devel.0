@@ -1,110 +1,67 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:19:05 -0400
-Subject: [lustre-devel] [PATCH 52/80] staging: lustre: llite: use the
-	correct mode for striped directory
+Date: Tue, 16 Aug 2016 16:18:32 -0400
+Subject: [lustre-devel] [PATCH 19/80] staging: lustre: libcfs: Only dump log
+	once per sec. to avoid EEXIST
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-53-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-20-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Ryan Haasken <haasken@cray.com>, James Simmons <jsimmons@infradead.org>
 
-From: wang di <di.wang@intel.com>
+From: Ryan Haasken <haasken@cray.com>
 
-Create striped directory with correct mode, which should be
-handling same as mkdir.
+Since the log file name contains the current time in seconds, dumping
+the logs more than once per second causes EEXIST errors to be emitted.
+Add a static variable to libcfs_debug_dumplog_internal that records
+the time of the last Lustre log dump.  If the current time in seconds
+is equal to the last time, do not dump logs again.
 
-Signed-off-by: wang di <di.wang@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4929
-Reviewed-on: http://review.whamcloud.com/10028
+Note that this is not thread-safe.  However, in the rare case that two
+threads try to access last_dump_time simultaneously, the worst thing
+that could happen is that one of the threads will get an EEXIST error
+when trying to write the log file.  This is no worse than the current
+situation, and it is not likely to happen.
+
+Signed-off-by: Ryan Haasken <haasken@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4129
+Reviewed-on: http://review.whamcloud.com/8964
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/dir.c |   40 +++++++++++++++++++---------
- 1 files changed, 27 insertions(+), 13 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/debug.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 3fed80d..a1b5143 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -694,28 +694,40 @@ static int ll_send_mgc_param(struct obd_export *mgc, char *string)
- 	return rc;
- }
- 
--static int ll_dir_setdirstripe(struct inode *dir, struct lmv_user_md *lump,
--			       const char *filename)
-+/**
-+ * Create striped directory with specified stripe(@lump)
-+ *
-+ * param[in] parent	the parent of the directory.
-+ * param[in] lump	the specified stripes.
-+ * param[in] dirname	the name of the directory.
-+ * param[in] mode	the specified mode of the directory.
-+ *
-+ * retval		=0 if striped directory is being created successfully.
-+ *			<0 if the creation is failed.
-+ */
-+static int ll_dir_setdirstripe(struct inode *parent, struct lmv_user_md *lump,
-+			       const char *dirname, umode_t mode)
+diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
+index 42b15a7..23b36b8 100644
+--- a/drivers/staging/lustre/lnet/libcfs/debug.c
++++ b/drivers/staging/lustre/lnet/libcfs/debug.c
+@@ -328,15 +328,20 @@ libcfs_debug_str2mask(int *mask, const char *str, int is_subsys)
+  */
+ void libcfs_debug_dumplog_internal(void *arg)
  {
- 	struct ptlrpc_request *request = NULL;
- 	struct md_op_data *op_data;
--	struct ll_sb_info *sbi = ll_i2sbi(dir);
--	int mode;
-+	struct ll_sb_info *sbi = ll_i2sbi(parent);
- 	int err;
++	static time64_t last_dump_time;
++	time64_t current_time;
+ 	void *journal_info;
  
- 	if (unlikely(lump->lum_magic != LMV_USER_MAGIC))
- 		return -EINVAL;
+ 	journal_info = current->journal_info;
+ 	current->journal_info = NULL;
++	current_time = ktime_get_real_seconds();
  
- 	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p) name %s stripe_offset %d, stripe_count: %u\n",
--	       PFID(ll_inode2fid(dir)), dir, filename,
-+	       PFID(ll_inode2fid(parent)), parent, dirname,
- 	       (int)lump->lum_stripe_offset, lump->lum_stripe_count);
- 
- 	if (lump->lum_magic != cpu_to_le32(LMV_USER_MAGIC))
- 		lustre_swab_lmv_user_md(lump);
- 
--	mode = (~current_umask() & 0755) | S_IFDIR;
--	op_data = ll_prep_md_op_data(NULL, dir, NULL, filename,
--				     strlen(filename), mode, LUSTRE_OPC_MKDIR,
-+	if (!IS_POSIXACL(parent) || !exp_connect_umask(ll_i2mdexp(parent)))
-+		mode &= ~current_umask();
-+	mode = (mode & (S_IRWXUGO | S_ISVTX)) | S_IFDIR;
-+	op_data = ll_prep_md_op_data(NULL, parent, NULL, dirname,
-+				     strlen(dirname), mode, LUSTRE_OPC_MKDIR,
- 				     lump);
- 	if (IS_ERR(op_data)) {
- 		err = PTR_ERR(op_data);
-@@ -1379,6 +1391,7 @@ out_free:
- 		char		*filename;
- 		int		 namelen = 0;
- 		int		 lumlen = 0;
-+		umode_t mode;
- 		int		 len;
- 		int		 rc;
- 
-@@ -1412,11 +1425,12 @@ out_free:
- 			goto lmv_out_free;
- 		}
- 
--		/**
--		 * ll_dir_setdirstripe will be used to set dir stripe
--		 *  mdc_create--->mdt_reint_create (with dirstripe)
--		 */
--		rc = ll_dir_setdirstripe(inode, lum, filename);
-+#if OBD_OCD_VERSION(2, 9, 50, 0) > LUSTRE_VERSION_CODE
-+		mode = data->ioc_type != 0 ? data->ioc_type : S_IRWXUGO;
-+#else
-+		mode = data->ioc_type;
-+#endif
-+		rc = ll_dir_setdirstripe(inode, lum, filename, mode);
- lmv_out_free:
- 		obd_ioctl_freedata(buf, len);
- 		return rc;
+-	if (strncmp(libcfs_debug_file_path_arr, "NONE", 4) != 0) {
++	if (strncmp(libcfs_debug_file_path_arr, "NONE", 4) &&
++	    current_time > last_dump_time) {
++		last_dump_time = current_time;
+ 		snprintf(debug_file_name, sizeof(debug_file_name) - 1,
+ 			 "%s.%lld.%ld", libcfs_debug_file_path_arr,
+-			 (s64)ktime_get_real_seconds(), (long_ptr_t)arg);
++			 (s64)current_time, (long_ptr_t)arg);
+ 		pr_alert("LustreError: dumping log to %s\n", debug_file_name);
+ 		cfs_tracefile_dump_all_pages(debug_file_name);
+ 		libcfs_run_debug_log_upcall(debug_file_name);
 -- 
 1.7.1
