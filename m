@@ -1,188 +1,188 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:19:32 -0400
-Subject: [lustre-devel] [PATCH 79/80] staging: lustre: lnet: lock
-	improvement for ko2iblnd
+Date: Tue, 16 Aug 2016 16:18:17 -0400
+Subject: [lustre-devel] [PATCH 04/80] staging: lustre: llite: pass inode to
+	ll_release_page
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-80-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Liang Zhen <liang.zhen@intel.com>, Doug Oucharek <doug.s.oucharek@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Liang Zhen <liang.zhen@intel.com>
+From: wang di <di.wang@intel.com>
 
-kiblnd_check_sends() takes conn::ibc_lock at the begin and release
-this lock at the end, this is inefficient because most use-case
-needs to explicitly release ibc_lock before caling this function.
+Add a inode parameter to ll_release_page. This will be
+used in the future.
 
-This patches changes it to kiblnd_check_sends_locked() and avoid
-unnecessary lock dances.
-
-Signed-off-by: Liang Zhen <liang.zhen@intel.com>
-Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7099
-Reviewed-on: http://review.whamcloud.com/20322
-Reviewed-by: Amir Shehata <amir.shehata@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Signed-off-by: wang di <di.wang@intel.com>
+Reviewed-on: http://review.whamcloud.com/7043
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   46 ++++++++------------
- 1 files changed, 18 insertions(+), 28 deletions(-)
+ drivers/staging/lustre/lustre/llite/dir.c          |   17 +++++++++--------
+ .../staging/lustre/lustre/llite/llite_internal.h   |    2 +-
+ drivers/staging/lustre/lustre/llite/statahead.c    |   20 +++++++++++---------
+ 3 files changed, 21 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 6cd78ea..6d1b14a 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -38,7 +38,6 @@
- 
- static void kiblnd_peer_alive(struct kib_peer *peer);
- static void kiblnd_peer_connect_failed(struct kib_peer *peer, int active, int error);
--static void kiblnd_check_sends(struct kib_conn *conn);
- static void kiblnd_init_tx_msg(lnet_ni_t *ni, struct kib_tx *tx,
- 				int type, int body_nob);
- static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
-@@ -46,6 +45,7 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
- static void kiblnd_queue_tx_locked(struct kib_tx *tx, struct kib_conn *conn);
- static void kiblnd_queue_tx(struct kib_tx *tx, struct kib_conn *conn);
- static void kiblnd_unmap_tx(lnet_ni_t *ni, struct kib_tx *tx);
-+static void kiblnd_check_sends_locked(struct kib_conn *conn);
- 
- static void
- kiblnd_tx_done(lnet_ni_t *ni, struct kib_tx *tx)
-@@ -211,9 +211,9 @@ kiblnd_post_rx(struct kib_rx *rx, int credit)
- 		conn->ibc_outstanding_credits++;
- 	else
- 		conn->ibc_reserved_credits++;
-+	kiblnd_check_sends_locked(conn);
- 	spin_unlock(&conn->ibc_lock);
- 
--	kiblnd_check_sends(conn);
- out:
- 	kiblnd_conn_decref(conn);
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index d854edd..3a800b2 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -236,7 +236,7 @@ static int ll_dir_filler(void *_hash, struct page *page0)
  	return rc;
-@@ -344,8 +344,8 @@ kiblnd_handle_rx(struct kib_rx *rx)
- 		    !IBLND_OOB_CAPABLE(conn->ibc_version)) /* v1 only */
- 			conn->ibc_outstanding_credits++;
- 
-+		kiblnd_check_sends_locked(conn);
- 		spin_unlock(&conn->ibc_lock);
--		kiblnd_check_sends(conn);
- 	}
- 
- 	switch (msg->ibm_type) {
-@@ -800,7 +800,7 @@ kiblnd_post_tx_locked(struct kib_conn *conn, struct kib_tx *tx, int credit)
- 	      conn->ibc_noops_posted == IBLND_OOB_MSGS(ver)))) {
- 		/*
- 		 * OK to drop when posted enough NOOPs, since
--		 * kiblnd_check_sends will queue NOOP again when
-+		 * kiblnd_check_sends_locked will queue NOOP again when
- 		 * posted NOOPs complete
- 		 */
- 		spin_unlock(&conn->ibc_lock);
-@@ -905,7 +905,7 @@ kiblnd_post_tx_locked(struct kib_conn *conn, struct kib_tx *tx, int credit)
  }
  
- static void
--kiblnd_check_sends(struct kib_conn *conn)
-+kiblnd_check_sends_locked(struct kib_conn *conn)
+-void ll_release_page(struct page *page, int remove)
++void ll_release_page(struct inode *inode, struct page *page, int remove)
  {
- 	int ver = conn->ibc_version;
- 	lnet_ni_t *ni = conn->ibc_peer->ibp_ni;
-@@ -918,8 +918,6 @@ kiblnd_check_sends(struct kib_conn *conn)
- 		return;
- 	}
+ 	kunmap(page);
+ 	if (remove) {
+@@ -297,7 +297,7 @@ static struct page *ll_dir_page_locate(struct inode *dir, __u64 *hash,
+ 			CDEBUG(D_VFSTRACE, "page %lu [%llu %llu], hash %llu\n",
+ 			       offset, *start, *end, *hash);
+ 			if (*hash > *end) {
+-				ll_release_page(page, 0);
++				ll_release_page(dir, page, 0);
+ 				page = NULL;
+ 			} else if (*end != *start && *hash == *end) {
+ 				/*
+@@ -306,8 +306,9 @@ static struct page *ll_dir_page_locate(struct inode *dir, __u64 *hash,
+ 				 * ll_get_dir_page() will issue RPC to fetch
+ 				 * the page we want.
+ 				 */
+-				ll_release_page(page,
+-				    le32_to_cpu(dp->ldp_flags) & LDF_COLLIDE);
++				ll_release_page(dir, page,
++						le32_to_cpu(dp->ldp_flags) &
++						LDF_COLLIDE);
+ 				page = NULL;
+ 			}
+ 		} else {
+@@ -462,7 +463,7 @@ out_unlock:
+ 	return page;
  
--	spin_lock(&conn->ibc_lock);
--
- 	LASSERT(conn->ibc_nsends_posted <= kiblnd_concurrent_sends(ver, ni));
- 	LASSERT(!IBLND_OOB_CAPABLE(ver) ||
- 		conn->ibc_noops_posted <= IBLND_OOB_MSGS(ver));
-@@ -969,8 +967,6 @@ kiblnd_check_sends(struct kib_conn *conn)
- 		if (kiblnd_post_tx_locked(conn, tx, credit))
+ fail:
+-	ll_release_page(page, 1);
++	ll_release_page(dir, page, 1);
+ 	page = ERR_PTR(-EIO);
+ 	goto out_unlock;
+ }
+@@ -560,7 +561,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
+ 
+ 		if (done) {
+ 			pos = hash;
+-			ll_release_page(page, 0);
++			ll_release_page(inode, page, 0);
  			break;
+ 		}
+ 
+@@ -571,13 +572,13 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
+ 			 * End of directory reached.
+ 			 */
+ 			done = 1;
+-			ll_release_page(page, 0);
++			ll_release_page(inode, page, 0);
+ 		} else {
+ 			/*
+ 			 * Normal case: continue to the next
+ 			 * page.
+ 			 */
+-			ll_release_page(page,
++			ll_release_page(inode, page,
+ 					le32_to_cpu(dp->ldp_flags) &
+ 					LDF_COLLIDE);
+ 			next = pos;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 1ced397..4b03a64 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -655,7 +655,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
+ int ll_get_mdt_idx(struct inode *inode);
+ struct page *ll_get_dir_page(struct inode *dir, struct md_op_data *op_data,
+ 			     __u64 hash, struct ll_dir_chain *chain);
+-void ll_release_page(struct page *page, int remove);
++void ll_release_page(struct inode *inode, struct page *page, int remove);
+ 
+ /* llite/namei.c */
+ extern const struct inode_operations ll_special_inode_operations;
+diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
+index 1b222c7..2949ff6 100644
+--- a/drivers/staging/lustre/lustre/llite/statahead.c
++++ b/drivers/staging/lustre/lustre/llite/statahead.c
+@@ -1142,7 +1142,7 @@ interpret_it:
+ 				ll_post_statahead(sai);
+ 
+ 			if (unlikely(!thread_is_running(thread))) {
+-				ll_release_page(page, 0);
++				ll_release_page(dir, page, 0);
+ 				rc = 0;
+ 				goto out;
+ 			}
+@@ -1166,7 +1166,7 @@ interpret_it:
+ 
+ 					if (unlikely(
+ 						!thread_is_running(thread))) {
+-						ll_release_page(page, 0);
++						ll_release_page(dir, page, 0);
+ 						rc = 0;
+ 						goto out;
+ 					}
+@@ -1189,7 +1189,7 @@ do_it:
+ 			/*
+ 			 * End of directory reached.
+ 			 */
+-			ll_release_page(page, 0);
++			ll_release_page(dir, page, 0);
+ 			while (1) {
+ 				l_wait_event(thread->t_ctl_waitq,
+ 					     !list_empty(&sai->sai_entries_received) ||
+@@ -1229,8 +1229,9 @@ do_it:
+ 			 * chain is exhausted.
+ 			 * Normal case: continue to the next page.
+ 			 */
+-			ll_release_page(page, le32_to_cpu(dp->ldp_flags) &
+-					      LDF_COLLIDE);
++			ll_release_page(dir, page,
++					le32_to_cpu(dp->ldp_flags) &
++					LDF_COLLIDE);
+ 			sai->sai_in_readpage = 1;
+ 			page = ll_get_dir_page(dir, op_data, pos, &chain);
+ 			sai->sai_in_readpage = 0;
+@@ -1427,7 +1428,7 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
+ 			else
+ 				rc = LS_FIRST_DOT_DE;
+ 
+-			ll_release_page(page, 0);
++			ll_release_page(dir, page, 0);
+ 			goto out;
+ 		}
+ 		pos = le64_to_cpu(dp->ldp_hash_end);
+@@ -1435,15 +1436,16 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
+ 			/*
+ 			 * End of directory reached.
+ 			 */
+-			ll_release_page(page, 0);
++			ll_release_page(dir, page, 0);
+ 			goto out;
+ 		} else {
+ 			/*
+ 			 * chain is exhausted
+ 			 * Normal case: continue to the next page.
+ 			 */
+-			ll_release_page(page, le32_to_cpu(dp->ldp_flags) &
+-					      LDF_COLLIDE);
++			ll_release_page(dir, page,
++					le32_to_cpu(dp->ldp_flags) &
++					LDF_COLLIDE);
+ 			page = ll_get_dir_page(dir, op_data, pos, &chain);
+ 		}
  	}
--
--	spin_unlock(&conn->ibc_lock);
- }
- 
- static void
-@@ -1016,16 +1012,11 @@ kiblnd_tx_complete(struct kib_tx *tx, int status)
- 	if (idle)
- 		list_del(&tx->tx_list);
- 
--	kiblnd_conn_addref(conn);	       /* 1 ref for me.... */
--
-+	kiblnd_check_sends_locked(conn);
- 	spin_unlock(&conn->ibc_lock);
- 
- 	if (idle)
- 		kiblnd_tx_done(conn->ibc_peer->ibp_ni, tx);
--
--	kiblnd_check_sends(conn);
--
--	kiblnd_conn_decref(conn);	       /* ...until here */
- }
- 
- static void
-@@ -1204,9 +1195,8 @@ kiblnd_queue_tx(struct kib_tx *tx, struct kib_conn *conn)
- {
- 	spin_lock(&conn->ibc_lock);
- 	kiblnd_queue_tx_locked(tx, conn);
-+	kiblnd_check_sends_locked(conn);
- 	spin_unlock(&conn->ibc_lock);
--
--	kiblnd_check_sends(conn);
- }
- 
- static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
-@@ -2183,14 +2173,11 @@ kiblnd_connreq_done(struct kib_conn *conn, int status)
- 		return;
- 	}
- 
--	/**
--	 * refcount taken by cmid is not reliable after I released the glock
--	 * because this connection is visible to other threads now, another
--	 * thread can find and close this connection right after I released
--	 * the glock, if kiblnd_cm_callback for RDMA_CM_EVENT_DISCONNECTED is
--	 * called, it can release the connection refcount taken by cmid.
--	 * It means the connection could be destroyed before I finish my
--	 * operations on it.
-+	/*
-+	 * +1 ref for myself, this connection is visible to other threads
-+	 * now, refcount of peer:ibp_conns can be released by connection
-+	 * close from either a different thread, or the calling of
-+	 * kiblnd_check_sends_locked() below. See bz21911 for details.
- 	 */
- 	kiblnd_conn_addref(conn);
- 	write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
-@@ -2202,10 +2189,9 @@ kiblnd_connreq_done(struct kib_conn *conn, int status)
- 
- 		kiblnd_queue_tx_locked(tx, conn);
- 	}
-+	kiblnd_check_sends_locked(conn);
- 	spin_unlock(&conn->ibc_lock);
- 
--	kiblnd_check_sends(conn);
--
- 	/* schedule blocked rxs */
- 	kiblnd_handle_early_rxs(conn);
- 
-@@ -3233,7 +3219,11 @@ kiblnd_check_conns(int idx)
- 	 */
- 	list_for_each_entry_safe(conn, temp, &checksends, ibc_connd_list) {
- 		list_del(&conn->ibc_connd_list);
--		kiblnd_check_sends(conn);
-+
-+		spin_lock(&conn->ibc_lock);
-+		kiblnd_check_sends_locked(conn);
-+		spin_unlock(&conn->ibc_lock);
-+
- 		kiblnd_conn_decref(conn);
- 	}
- }
 -- 
 1.7.1
