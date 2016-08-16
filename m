@@ -1,183 +1,238 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:18:29 -0400
-Subject: [lustre-devel] [PATCH 16/80] staging: lustre: obdclass: bug fixes
-	for lu_device_type handling
+Date: Tue, 16 Aug 2016 16:18:27 -0400
+Subject: [lustre-devel] [PATCH 14/80] staging: lustre: delete striped
+	directory
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-17-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-15-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Fan Yong <fan.yong@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Fan Yong <fan.yong@intel.com>
+From: wang di <di.wang@intel.com>
 
-There was no protection when inc/dec lu_device_type::ldt_device_nr,
-which may caused the ldt_device_nr to be wrong and trigger assert.
-This patch redefine lu_device_type::ldt_device_nr as atomic type.
+Add delete striped directory, it includes
 
-There was no protection when add/del lu_device_type::ldt_linkage
-into/from the global lu_device_types list, which may caused bad
-address accessing. This patch uses the existing obd_types_lock
-to protect related operations.
+1. enable sync log between MDTs, so slave objects will
+   be delete by unlink log, which is similar as deleting ost
+   object.
 
-We do NOT need lu_types_stop() any longer. Such function scans
-the global lu_device_types list, and for each type item on it
-which has zerod lu_device_type::ldt_device_nr, call its stop()
-method. In fact, the lu_device_type::ldt_device_nr only will be
-zero when the last lu_device_fini() is called, and at that time,
-inside the lu_device_fini(), its stop() method will be called.
-So it is unnecessary to call the stop() again via lu_types_stop().
+2. retrieve layout information of striped directory on MDT,
+   then lock all of the slave objects before unlink.
 
-Signed-off-by: Fan Yong <fan.yong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4604
-Reviewed-on: http://review.whamcloud.com/8694
-Reviewed-by: Jian Yu <jian.yu@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Signed-off-by: wang di <di.wang@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
+Reviewed-on: http://review.whamcloud.com/7445
+Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h  |    3 +-
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |    6 ---
- drivers/staging/lustre/lustre/obdclass/lu_object.c |   34 ++++++++++----------
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |    1 -
- 4 files changed, 18 insertions(+), 26 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |    1 +
+ drivers/staging/lustre/lustre/include/lustre_fid.h |    1 +
+ drivers/staging/lustre/lustre/llite/dir.c          |   10 ---
+ drivers/staging/lustre/lustre/lmv/lmv_intent.c     |    5 ++
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   75 +++++++++++++++-----
+ 5 files changed, 65 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index 6e25c1b..25c12d8 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -327,7 +327,7 @@ struct lu_device_type {
- 	/**
- 	 * Number of existing device type instances.
- 	 */
--	unsigned				ldt_device_nr;
-+	atomic_t				ldt_device_nr;
- 	/**
- 	 * Linkage into a global list of all device types.
- 	 *
-@@ -673,7 +673,6 @@ void lu_object_add(struct lu_object *before, struct lu_object *o);
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 60051a5..f7805cc 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -968,6 +968,7 @@ struct ldlm_enqueue_info {
+ 	void *ei_cb_cp;  /** lock completion callback */
+ 	void *ei_cb_gl;  /** lock glimpse callback */
+ 	void *ei_cbdata; /** Data to be passed into callbacks. */
++	unsigned int ei_enq_slave:1; /* whether enqueue slave stripes */
+ };
  
- int  lu_device_type_init(struct lu_device_type *ldt);
- void lu_device_type_fini(struct lu_device_type *ldt);
--void lu_types_stop(void);
+ extern struct obd_ops ldlm_obd_ops;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
+index 743671a..61f3930 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_fid.h
++++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
+@@ -229,6 +229,7 @@ enum local_oid {
+ 	MDD_LOV_OBJ_OSEQ	= 4121UL,
+ 	LFSCK_NAMESPACE_OID     = 4122UL,
+ 	REMOTE_PARENT_DIR_OID	= 4123UL,
++	SLAVE_LLOG_CATALOGS_OID	= 4124UL,
+ };
  
- /** @} ctors */
+ static inline void lu_local_obj_fid(struct lu_fid *fid, __u32 oid)
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 5288750..96ae7d5 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -679,16 +679,6 @@ static int ll_dir_setdirstripe(struct inode *dir, struct lmv_user_md *lump,
+ 	if (unlikely(lump->lum_magic != LMV_USER_MAGIC))
+ 		return -EINVAL;
  
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index e623216..771c0bd 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -368,12 +368,6 @@ int cl_sb_fini(struct super_block *sb)
- 		CERROR("Cannot cleanup cl-stack due to memory shortage.\n");
- 		result = PTR_ERR(env);
- 	}
--	/*
--	 * If mount failed (sbi->ll_cl == NULL), and this there are no other
--	 * mounts, stop device types manually (this usually happens
--	 * automatically when last device is destroyed).
--	 */
--	lu_types_stop();
- 	return result;
- }
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index 9b03059..0c00bf8 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -726,34 +726,31 @@ int lu_device_type_init(struct lu_device_type *ldt)
- {
- 	int result = 0;
- 
-+	atomic_set(&ldt->ldt_device_nr, 0);
- 	INIT_LIST_HEAD(&ldt->ldt_linkage);
- 	if (ldt->ldt_ops->ldto_init)
- 		result = ldt->ldt_ops->ldto_init(ldt);
--	if (result == 0)
-+
-+	if (!result) {
-+		spin_lock(&obd_types_lock);
- 		list_add(&ldt->ldt_linkage, &lu_device_types);
-+		spin_unlock(&obd_types_lock);
-+	}
-+
- 	return result;
- }
- EXPORT_SYMBOL(lu_device_type_init);
- 
- void lu_device_type_fini(struct lu_device_type *ldt)
- {
-+	spin_lock(&obd_types_lock);
- 	list_del_init(&ldt->ldt_linkage);
-+	spin_unlock(&obd_types_lock);
- 	if (ldt->ldt_ops->ldto_fini)
- 		ldt->ldt_ops->ldto_fini(ldt);
- }
- EXPORT_SYMBOL(lu_device_type_fini);
- 
--void lu_types_stop(void)
--{
--	struct lu_device_type *ldt;
+-	if (lump->lum_stripe_offset == (__u32)-1) {
+-		int mdtidx;
 -
--	list_for_each_entry(ldt, &lu_device_types, ldt_linkage) {
--		if (ldt->ldt_device_nr == 0 && ldt->ldt_ops->ldto_stop)
--			ldt->ldt_ops->ldto_stop(ldt);
+-		mdtidx = ll_get_mdt_idx(dir);
+-		if (mdtidx < 0)
+-			return mdtidx;
+-
+-		lump->lum_stripe_offset = mdtidx;
 -	}
--}
--EXPORT_SYMBOL(lu_types_stop);
 -
- /**
-  * Global list of all sites on this node
-  */
-@@ -1082,8 +1079,10 @@ EXPORT_SYMBOL(lu_device_put);
-  */
- int lu_device_init(struct lu_device *d, struct lu_device_type *t)
- {
--	if (t->ldt_device_nr++ == 0 && t->ldt_ops->ldto_start)
-+	if (atomic_inc_return(&t->ldt_device_nr) == 1 &&
-+	    t->ldt_ops->ldto_start)
- 		t->ldt_ops->ldto_start(t);
-+
- 	memset(d, 0, sizeof(*d));
- 	atomic_set(&d->ld_ref, 0);
- 	d->ld_type = t;
-@@ -1098,9 +1097,8 @@ EXPORT_SYMBOL(lu_device_init);
-  */
- void lu_device_fini(struct lu_device *d)
- {
--	struct lu_device_type *t;
-+	struct lu_device_type *t = d->ld_type;
+ 	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p) name %s stripe_offset %d, stripe_count: %u\n",
+ 	       PFID(ll_inode2fid(dir)), dir, filename,
+ 	       (int)lump->lum_stripe_offset, lump->lum_stripe_count);
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_intent.c b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
+index 1b9bbb2..5313dfc 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_intent.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
+@@ -244,6 +244,11 @@ update:
+ 				if (req)
+ 					ptlrpc_req_finished(req);
  
--	t = d->ld_type;
- 	if (d->ld_obd) {
- 		d->ld_obd->obd_lu_dev = NULL;
- 		d->ld_obd = NULL;
-@@ -1109,8 +1107,10 @@ void lu_device_fini(struct lu_device *d)
- 	lu_ref_fini(&d->ld_reference);
- 	LASSERTF(atomic_read(&d->ld_ref) == 0,
- 		 "Refcount is %u\n", atomic_read(&d->ld_ref));
--	LASSERT(t->ldt_device_nr > 0);
--	if (--t->ldt_device_nr == 0 && t->ldt_ops->ldto_stop)
-+	LASSERT(atomic_read(&t->ldt_device_nr) > 0);
++				if (it.it_lock_mode && lockh) {
++					ldlm_lock_decref(lockh, it.it_lock_mode);
++					it.it_lock_mode = 0;
++				}
 +
-+	if (atomic_dec_and_test(&t->ldt_device_nr) &&
-+	    t->ldt_ops->ldto_stop)
- 		t->ldt_ops->ldto_stop(t);
- }
- EXPORT_SYMBOL(lu_device_fini);
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index 4931e37..33d6c42 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -670,7 +670,6 @@ int lustre_common_put_super(struct super_block *sb)
+ 				rc = -EIO;
+ 				goto cleanup;
+ 			}
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index da4855d..81dcc0a 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -101,6 +101,9 @@ int lmv_name_to_stripe_index(enum lmv_hash_type hashtype,
+ 		return -EINVAL;
  	}
- 	/* Drop a ref to the mounted disk */
- 	lustre_put_lsi(sb);
--	lu_types_stop();
- 	return rc;
+ 
++	CDEBUG(D_INFO, "name %.*s hash_type %d idx %d\n", namelen, name,
++	       hashtype, idx);
++
+ 	LASSERT(idx < max_mdt_index);
+ 	return idx;
  }
- EXPORT_SYMBOL(lustre_common_put_super);
+@@ -1230,7 +1233,16 @@ static int lmv_placement_policy(struct obd_device *obd,
+ 		struct lmv_user_md *lum;
+ 
+ 		lum = op_data->op_data;
+-		*mds = lum->lum_stripe_offset;
++		if (lum->lum_stripe_offset != (__u32)-1) {
++			*mds = lum->lum_stripe_offset;
++		} else {
++			/*
++			 * -1 means default, which will be in the same MDT with
++			 * the stripe
++			 */
++			*mds = op_data->op_mds;
++			lum->lum_stripe_offset = op_data->op_mds;
++		}
+ 	} else {
+ 		/*
+ 		 * Allocate new fid on target according to operation type and
+@@ -1646,12 +1658,28 @@ static int lmv_close(struct obd_export *exp, struct md_op_data *op_data,
+  * For striped-directory, it will locate MDT by name. And also
+  * it will reset op_fid1 with the FID of the chosen stripe.
+  **/
++struct lmv_tgt_desc *
++lmv_locate_target_for_name(struct lmv_obd *lmv, struct lmv_stripe_md *lsm,
++			   const char *name, int namelen, struct lu_fid *fid,
++			   u32 *mds)
++{
++	const struct lmv_oinfo *oinfo;
++	struct lmv_tgt_desc *tgt;
++
++	oinfo = lsm_name_to_stripe_info(lsm, name, namelen);
++	*fid = oinfo->lmo_fid;
++	*mds = oinfo->lmo_mds;
++	tgt = lmv_get_target(lmv, *mds);
++
++	CDEBUG(D_INFO, "locate on mds %u "DFID"\n", *mds, PFID(fid));
++	return tgt;
++}
++
+ struct lmv_tgt_desc
+ *lmv_locate_mds(struct lmv_obd *lmv, struct md_op_data *op_data,
+ 		struct lu_fid *fid)
+ {
+ 	struct lmv_stripe_md *lsm = op_data->op_mea1;
+-	const struct lmv_oinfo *oinfo;
+ 	struct lmv_tgt_desc *tgt;
+ 
+ 	if (!lsm || lsm->lsm_md_stripe_count <= 1 ||
+@@ -1665,15 +1693,9 @@ struct lmv_tgt_desc
+ 		return tgt;
+ 	}
+ 
+-	oinfo = lsm_name_to_stripe_info(lsm, op_data->op_name,
+-					op_data->op_namelen);
+-	*fid = oinfo->lmo_fid;
+-	op_data->op_mds = oinfo->lmo_mds;
+-	tgt = lmv_get_target(lmv, op_data->op_mds);
+-
+-	CDEBUG(D_INFO, "locate on mds %u\n", op_data->op_mds);
+-
+-	return tgt;
++	return lmv_locate_target_for_name(lmv, lsm, op_data->op_name,
++					  op_data->op_namelen, fid,
++					  &op_data->op_mds);
+ }
+ 
+ static int lmv_create(struct obd_export *exp, struct md_op_data *op_data,
+@@ -2075,6 +2097,9 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+ 				      LCK_EX, MDS_INODELOCK_FULL,
+ 				      MF_MDC_CANCEL_FID4);
+ 
++	CDEBUG(D_INODE, DFID":m%d to "DFID"\n", PFID(&op_data->op_fid1),
++	       op_data->op_mds, PFID(&op_data->op_fid2));
++
+ 	if (rc == 0)
+ 		rc = md_rename(src_tgt->ltd_exp, op_data, old, oldlen,
+ 			       new, newlen, request);
+@@ -2288,12 +2313,26 @@ static int lmv_unlink(struct obd_export *exp, struct md_op_data *op_data,
+ 		return rc;
+ retry:
+ 	/* Send unlink requests to the MDT where the child is located */
+-	if (likely(!fid_is_zero(&op_data->op_fid2)))
+-		tgt = lmv_locate_mds(lmv, op_data, &op_data->op_fid2);
+-	else
++	if (likely(!fid_is_zero(&op_data->op_fid2))) {
++		tgt = lmv_find_target(lmv, &op_data->op_fid2);
++		if (IS_ERR(tgt))
++			return PTR_ERR(tgt);
++
++		/* For striped dir, we need to locate the parent as well */
++		if (op_data->op_mea1 &&
++		    op_data->op_mea1->lsm_md_stripe_count > 1) {
++			LASSERT(op_data->op_name && op_data->op_namelen);
++			lmv_locate_target_for_name(lmv, op_data->op_mea1,
++						   op_data->op_name,
++						   op_data->op_namelen,
++						   &op_data->op_fid1,
++						   &op_data->op_mds);
++		}
++	} else {
+ 		tgt = lmv_locate_mds(lmv, op_data, &op_data->op_fid1);
+-	if (IS_ERR(tgt))
+-		return PTR_ERR(tgt);
++		if (IS_ERR(tgt))
++			return PTR_ERR(tgt);
++	}
+ 
+ 	op_data->op_fsuid = from_kuid(&init_user_ns, current_fsuid());
+ 	op_data->op_fsgid = from_kgid(&init_user_ns, current_fsgid());
+@@ -2799,8 +2838,10 @@ static int lmv_free_lustre_md(struct obd_export *exp, struct lustre_md *md)
+ 	struct lmv_obd	  *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc *tgt = lmv->tgts[0];
+ 
+-	if (md->lmv)
++	if (md->lmv) {
+ 		lmv_free_memmd(md->lmv);
++		md->lmv = NULL;
++	}
+ 	if (!tgt || !tgt->ltd_exp)
+ 		return -EINVAL;
+ 	return md_free_lustre_md(tgt->ltd_exp, md);
 -- 
 1.7.1
