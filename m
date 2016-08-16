@@ -1,100 +1,60 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:18:40 -0400
-Subject: [lustre-devel] [PATCH 27/80] staging: lustre: simplify inline
-	functions in lustre_fid.h
+Date: Tue, 16 Aug 2016 16:18:45 -0400
+Subject: [lustre-devel] [PATCH 32/80] staging: lustre: lov: handle the case
+	of stripe size is not power 2
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-28-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-33-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-Several inline functions return a structure that was passed in.
-Their is no need for this so just make these function void.
+Calculate the end of current stripe correctly when the stripe size
+is not power 2.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
-Reviewed-on: http://review.whamcloud.com/8641
-Reviewed-by: wangdi <di.wang@intel.com>
-Reviewed-by: Fan Yong <fan.yong@intel.com>
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4860
+Reviewed-on: http://review.whamcloud.com/9882
+Reviewed-by: Bobi Jam <bobijam@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_fid.h |   16 ++++------------
- 1 files changed, 4 insertions(+), 12 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_page.c |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
-index 6f7dc15..f1d5bbd 100644
---- a/drivers/staging/lustre/lustre/include/lustre_fid.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
-@@ -393,14 +393,12 @@ struct ldlm_namespace;
-  * but was moved into name[1] along with the OID to avoid consuming the
-  * renaming name[2,3] fields that need to be used for the quota identifier.
-  */
--static inline struct ldlm_res_id *
-+static inline void
- fid_build_reg_res_name(const struct lu_fid *fid, struct ldlm_res_id *res)
- {
- 	memset(res, 0, sizeof(*res));
- 	res->name[LUSTRE_RES_ID_SEQ_OFF] = fid_seq(fid);
- 	res->name[LUSTRE_RES_ID_VER_OID_OFF] = fid_ver_oid(fid);
--
--	return res;
- }
+diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
+index c17026f..45b5ae9 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_page.c
++++ b/drivers/staging/lustre/lustre/lov/lov_page.c
+@@ -65,7 +65,9 @@ static int lov_raid0_page_is_under_lock(const struct lu_env *env,
+ 	pgoff_t index = *max_index;
+ 	unsigned int pps; /* pages per stripe */
  
- /*
-@@ -416,29 +414,25 @@ static inline bool fid_res_name_eq(const struct lu_fid *fid,
- /*
-  * Extract FID from LDLM resource. Reverse of fid_build_reg_res_name().
-  */
--static inline struct lu_fid *
-+static inline void
- fid_extract_from_res_name(struct lu_fid *fid, const struct ldlm_res_id *res)
- {
- 	fid->f_seq = res->name[LUSTRE_RES_ID_SEQ_OFF];
- 	fid->f_oid = (__u32)(res->name[LUSTRE_RES_ID_VER_OID_OFF]);
- 	fid->f_ver = (__u32)(res->name[LUSTRE_RES_ID_VER_OID_OFF] >> 32);
- 	LASSERT(fid_res_name_eq(fid, res));
--
--	return fid;
- }
+-	CDEBUG(D_READA, "*max_index = %lu, nr = %d\n", index, r0->lo_nr);
++	CDEBUG(D_READA, DFID "*max_index = %lu, nr = %d\n",
++	       PFID(lu_object_fid(lov2lu(loo))), index, r0->lo_nr);
++
+ 	if (index == 0) /* the page is not covered by any lock */
+ 		return 0;
  
- /*
-  * Build (DLM) resource identifier from global quota FID and quota ID.
-  */
--static inline struct ldlm_res_id *
-+static inline void
- fid_build_quota_res_name(const struct lu_fid *glb_fid, union lquota_id *qid,
- 			 struct ldlm_res_id *res)
- {
- 	fid_build_reg_res_name(glb_fid, res);
- 	res->name[LUSTRE_RES_ID_QUOTA_SEQ_OFF] = fid_seq(&qid->qid_fid);
- 	res->name[LUSTRE_RES_ID_QUOTA_VER_OID_OFF] = fid_ver_oid(&qid->qid_fid);
--
--	return res;
- }
+@@ -80,7 +82,12 @@ static int lov_raid0_page_is_under_lock(const struct lu_env *env,
  
- /*
-@@ -455,14 +449,12 @@ static inline void fid_extract_from_quota_res(struct lu_fid *glb_fid,
- 		(__u32)(res->name[LUSTRE_RES_ID_QUOTA_VER_OID_OFF] >> 32);
- }
+ 	/* calculate the end of current stripe */
+ 	pps = loo->lo_lsm->lsm_stripe_size >> PAGE_SHIFT;
+-	index = ((slice->cpl_index + pps) & ~(pps - 1)) - 1;
++	index = slice->cpl_index + pps - slice->cpl_index % pps - 1;
++
++	CDEBUG(D_READA, DFID "*max_index = %lu, index = %lu, pps = %u, stripe_size = %u, stripe no = %u, page index = %lu\n",
++	       PFID(lu_object_fid(lov2lu(loo))), *max_index, index, pps,
++	       loo->lo_lsm->lsm_stripe_size, lov_page_stripe(slice->cpl_page),
++	       slice->cpl_index);
  
--static inline struct ldlm_res_id *
-+static inline void
- fid_build_pdo_res_name(const struct lu_fid *fid, unsigned int hash,
- 		       struct ldlm_res_id *res)
- {
- 	fid_build_reg_res_name(fid, res);
- 	res->name[LUSTRE_RES_ID_HSH_OFF] = hash;
--
--	return res;
- }
- 
- /**
+ 	/* never exceed the end of the stripe */
+ 	*max_index = min_t(pgoff_t, *max_index, index);
 -- 
 1.7.1
