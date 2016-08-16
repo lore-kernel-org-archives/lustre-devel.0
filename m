@@ -1,290 +1,334 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:18:39 -0400
-Subject: [lustre-devel] [PATCH 26/80] staging: lustre: use bool for several
-	function in lustre_idl.h/lustre_fid.h
+Date: Tue, 16 Aug 2016 16:18:52 -0400
+Subject: [lustre-devel] [PATCH 39/80] staging: lustre: llite: add error
+	handler in inode prepare phase
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-27-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-40-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: wang di <di.wang@intel.com>
 
-Change the return type of several predicate functions from int to bool.
+Add error handler during inode inialization, so inode will
+become bad inode if something bad happens during inode prepare
+phase, otherwise the striped directory will not get its layout
+and being mis-regarded as normal directory.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
-Reviewed-on: http://review.whamcloud.com/8641
-Reviewed-by: wangdi <di.wang@intel.com>
+Signed-off-by: wang di <di.wang@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4930
+Reviewed-on: http://review.whamcloud.com/10170
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Reviewed-by: Fan Yong <fan.yong@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_idl.h      |   72 ++++++++++----------
- drivers/staging/lustre/lustre/include/lustre_fid.h |    4 +-
- 2 files changed, 38 insertions(+), 38 deletions(-)
+ .../staging/lustre/lustre/llite/llite_internal.h   |    4 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |   66 +++++++++++--------
+ drivers/staging/lustre/lustre/llite/namei.c        |   59 ++++++++++--------
+ 3 files changed, 72 insertions(+), 57 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index c932e20..d3a9db9 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -196,12 +196,12 @@ static inline unsigned fld_range_type(const struct lu_seq_range *range)
- 	return range->lsr_flags & LU_SEQ_RANGE_MASK;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 120aca3..e101dd8 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -766,8 +766,8 @@ int ll_setattr(struct dentry *de, struct iattr *attr);
+ int ll_statfs(struct dentry *de, struct kstatfs *sfs);
+ int ll_statfs_internal(struct super_block *sb, struct obd_statfs *osfs,
+ 		       __u64 max_age, __u32 flags);
+-void ll_update_inode(struct inode *inode, struct lustre_md *md);
+-void ll_read_inode2(struct inode *inode, void *opaque);
++int ll_update_inode(struct inode *inode, struct lustre_md *md);
++int ll_read_inode2(struct inode *inode, void *opaque);
+ void ll_delete_inode(struct inode *inode);
+ int ll_iocontrol(struct inode *inode, struct file *file,
+ 		 unsigned int cmd, unsigned long arg);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 111264e..ea79ca3 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -464,7 +464,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt,
+ 	md_free_lustre_md(sbi->ll_md_exp, &lmd);
+ 	ptlrpc_req_finished(request);
+ 
+-	if (!(root)) {
++	if (IS_ERR(root)) {
+ 		if (lmd.lsm)
+ 			obd_free_memmd(sbi->ll_dt_exp, &lmd.lsm);
+ #ifdef CONFIG_FS_POSIX_ACL
+@@ -1109,11 +1109,11 @@ static inline int lli_lsm_md_eq(const struct lmv_stripe_md *lsm_md1,
+ 		       lsm_md2->lsm_md_pool_name);
  }
  
--static inline int fld_range_is_ost(const struct lu_seq_range *range)
-+static inline bool fld_range_is_ost(const struct lu_seq_range *range)
+-static void ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
++static int ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
  {
- 	return fld_range_type(range) == LU_SEQ_RANGE_OST;
+ 	struct ll_inode_info *lli = ll_i2info(inode);
+ 	struct lmv_stripe_md *lsm = md->lmv;
+-	int idx;
++	int idx, rc;
+ 
+ 	LASSERT(S_ISDIR(inode->i_mode));
+ 	CDEBUG(D_INODE, "update lsm %p of "DFID"\n", lli->lli_lsm_md,
+@@ -1122,7 +1122,7 @@ static void ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
+ 	/* no striped information from request. */
+ 	if (!lsm) {
+ 		if (!lli->lli_lsm_md) {
+-			return;
++			return 0;
+ 		} else if (lli->lli_lsm_md->lsm_md_magic == LMV_MAGIC_MIGRATE) {
+ 			/*
+ 			 * migration is done, the temporay MIGRATE layout has
+@@ -1132,27 +1132,22 @@ static void ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
+ 			       PFID(ll_inode2fid(inode)));
+ 			lmv_free_memmd(lli->lli_lsm_md);
+ 			lli->lli_lsm_md = NULL;
+-			return;
++			return 0;
+ 		} else {
+ 			/*
+ 			 * The lustre_md from req does not include stripeEA,
+ 			 * see ll_md_setattr
+ 			 */
+-			return;
++			return 0;
+ 		}
+ 	}
+ 
+ 	/* set the directory layout */
+ 	if (!lli->lli_lsm_md) {
+-		int rc;
+-
+ 		rc = ll_init_lsm_md(inode, md);
+-		if (rc) {
+-			CERROR("%s: init "DFID" failed: rc = %d\n",
+-			       ll_get_fsname(inode->i_sb, NULL, 0),
+-			       PFID(&lli->lli_fid), rc);
+-			return;
+-		}
++		if (rc)
++			return rc;
++
+ 		lli->lli_lsm_md = lsm;
+ 		/*
+ 		 * set lsm_md to NULL, so the following free lustre_md
+@@ -1161,7 +1156,7 @@ static void ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
+ 		md->lmv = NULL;
+ 		CDEBUG(D_INODE, "Set lsm %p magic %x to "DFID"\n", lsm,
+ 		       lsm->lsm_md_magic, PFID(ll_inode2fid(inode)));
+-		return;
++		return 0;
+ 	}
+ 
+ 	/* Compare the old and new stripe information */
+@@ -1185,7 +1180,7 @@ static void ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
+ 		       lli->lli_lsm_md->lsm_md_layout_version,
+ 		       lsm->lsm_md_pool_name,
+ 		       lli->lli_lsm_md->lsm_md_pool_name);
+-		return;
++		return -EIO;
+ 	}
+ 
+ 	for (idx = 0; idx < lli->lli_lsm_md->lsm_md_stripe_count; idx++) {
+@@ -1195,12 +1190,13 @@ static void ll_update_lsm_md(struct inode *inode, struct lustre_md *md)
+ 			       ll_get_fsname(inode->i_sb, NULL, 0), idx,
+ 			       PFID(&lli->lli_lsm_md->lsm_md_oinfo[idx].lmo_fid),
+ 			       PFID(&lsm->lsm_md_oinfo[idx].lmo_fid));
+-			return;
++			return -EIO;
+ 		}
+ 	}
+ 
+-	md_update_lsm_md(ll_i2mdexp(inode), ll_i2info(inode)->lli_lsm_md,
+-			 md->body, ll_md_blocking_ast);
++	rc = md_update_lsm_md(ll_i2mdexp(inode), ll_i2info(inode)->lli_lsm_md,
++			      md->body, ll_md_blocking_ast);
++	return rc;
  }
  
--static inline int fld_range_is_mdt(const struct lu_seq_range *range)
-+static inline bool fld_range_is_mdt(const struct lu_seq_range *range)
- {
- 	return fld_range_type(range) == LU_SEQ_RANGE_MDT;
+ void ll_clear_inode(struct inode *inode)
+@@ -1252,7 +1248,7 @@ void ll_clear_inode(struct inode *inode)
+ 
+ 	if (S_ISDIR(inode->i_mode))
+ 		ll_dir_clear_lsm_md(inode);
+-	else
++	if (S_ISREG(inode->i_mode) && !is_bad_inode(inode))
+ 		LASSERT(list_empty(&lli->lli_agl_list));
+ 
+ 	/*
+@@ -1320,7 +1316,7 @@ static int ll_md_setattr(struct dentry *dentry, struct md_op_data *op_data,
+ 	op_data->op_handle = md.body->handle;
+ 	op_data->op_ioepoch = md.body->ioepoch;
+ 
+-	ll_update_inode(inode, &md);
++	rc = ll_update_inode(inode, &md);
+ 	ptlrpc_req_finished(request);
+ 
+ 	return rc;
+@@ -1679,7 +1675,7 @@ void ll_inode_size_unlock(struct inode *inode)
+ 	mutex_unlock(&lli->lli_size_mutex);
  }
-@@ -260,23 +260,23 @@ static inline void range_init(struct lu_seq_range *range)
-  * check if given seq id \a s is within given range \a r
+ 
+-void ll_update_inode(struct inode *inode, struct lustre_md *md)
++int ll_update_inode(struct inode *inode, struct lustre_md *md)
+ {
+ 	struct ll_inode_info *lli = ll_i2info(inode);
+ 	struct mdt_body *body = md->body;
+@@ -1697,8 +1693,13 @@ void ll_update_inode(struct inode *inode, struct lustre_md *md)
+ 			lli->lli_maxbytes = MAX_LFS_FILESIZE;
+ 	}
+ 
+-	if (S_ISDIR(inode->i_mode))
+-		ll_update_lsm_md(inode, md);
++	if (S_ISDIR(inode->i_mode)) {
++		int rc;
++
++		rc = ll_update_lsm_md(inode, md);
++		if (rc)
++			return rc;
++	}
+ 
+ #ifdef CONFIG_FS_POSIX_ACL
+ 	if (body->valid & OBD_MD_FLACL) {
+@@ -1819,12 +1820,15 @@ void ll_update_inode(struct inode *inode, struct lustre_md *md)
+ 		if (body->t_state & MS_RESTORE)
+ 			lli->lli_flags |= LLIF_FILE_RESTORING;
+ 	}
++
++	return 0;
+ }
+ 
+-void ll_read_inode2(struct inode *inode, void *opaque)
++int ll_read_inode2(struct inode *inode, void *opaque)
+ {
+ 	struct lustre_md *md = opaque;
+ 	struct ll_inode_info *lli = ll_i2info(inode);
++	int rc;
+ 
+ 	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p)\n",
+ 	       PFID(&lli->lli_fid), inode);
+@@ -1840,7 +1844,9 @@ void ll_read_inode2(struct inode *inode, void *opaque)
+ 	LTIME_S(inode->i_atime) = 0;
+ 	LTIME_S(inode->i_ctime) = 0;
+ 	inode->i_rdev = 0;
+-	ll_update_inode(inode, md);
++	rc = ll_update_inode(inode, md);
++	if (rc)
++		return rc;
+ 
+ 	/* OIDEBUG(inode); */
+ 
+@@ -1861,6 +1867,8 @@ void ll_read_inode2(struct inode *inode, void *opaque)
+ 		init_special_inode(inode, inode->i_mode,
+ 				   inode->i_rdev);
+ 	}
++
++	return 0;
+ }
+ 
+ void ll_delete_inode(struct inode *inode)
+@@ -2127,7 +2135,9 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
+ 		goto cleanup;
+ 
+ 	if (*inode) {
+-		ll_update_inode(*inode, &md);
++		rc = ll_update_inode(*inode, &md);
++		if (rc)
++			goto out;
+ 	} else {
+ 		LASSERT(sb);
+ 
+@@ -2146,7 +2156,7 @@ int ll_prep_inode(struct inode **inode, struct ptlrpc_request *req,
+ 		*inode = ll_iget(sb, cl_fid_build_ino(&md.body->fid1,
+ 					     sbi->ll_flags & LL_SBI_32BIT_API),
+ 				 &md);
+-		if (!*inode) {
++		if (IS_ERR(*inode)) {
+ #ifdef CONFIG_FS_POSIX_ACL
+ 			if (md.posix_acl) {
+ 				posix_acl_release(md.posix_acl);
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index f059882..6e11b99 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -96,41 +96,46 @@ static int ll_set_inode(struct inode *inode, void *opaque)
+ 	return 0;
+ }
+ 
+-/*
+- * Get an inode by inode number (already instantiated by the intent lookup).
+- * Returns inode or NULL
++/**
++ * Get an inode by inode number(@hash), which is already instantiated by
++ * the intent lookup).
   */
+ struct inode *ll_iget(struct super_block *sb, ino_t hash,
+ 		      struct lustre_md *md)
+ {
+ 	struct inode	 *inode;
++	int rc = 0;
  
--static inline int range_within(const struct lu_seq_range *range,
--			       __u64 s)
-+static inline bool range_within(const struct lu_seq_range *range,
-+				__u64 s)
- {
- 	return s >= range->lsr_start && s < range->lsr_end;
- }
- 
--static inline int range_is_sane(const struct lu_seq_range *range)
-+static inline bool range_is_sane(const struct lu_seq_range *range)
- {
- 	return (range->lsr_end >= range->lsr_start);
- }
- 
--static inline int range_is_zero(const struct lu_seq_range *range)
-+static inline bool range_is_zero(const struct lu_seq_range *range)
- {
- 	return (range->lsr_start == 0 && range->lsr_end == 0);
- }
- 
--static inline int range_is_exhausted(const struct lu_seq_range *range)
-+static inline bool range_is_exhausted(const struct lu_seq_range *range)
- 
- {
- 	return range_space(range) == 0;
-@@ -437,69 +437,69 @@ enum dot_lustre_oid {
- 	FID_OID_DOT_LUSTRE_OBF = 2UL,
- };
- 
--static inline int fid_seq_is_mdt0(__u64 seq)
-+static inline bool fid_seq_is_mdt0(__u64 seq)
- {
- 	return (seq == FID_SEQ_OST_MDT0);
- }
- 
--static inline int fid_seq_is_mdt(__u64 seq)
-+static inline bool fid_seq_is_mdt(__u64 seq)
- {
- 	return seq == FID_SEQ_OST_MDT0 || seq >= FID_SEQ_NORMAL;
- };
- 
--static inline int fid_seq_is_echo(__u64 seq)
-+static inline bool fid_seq_is_echo(__u64 seq)
- {
- 	return (seq == FID_SEQ_ECHO);
- }
- 
--static inline int fid_is_echo(const struct lu_fid *fid)
-+static inline bool fid_is_echo(const struct lu_fid *fid)
- {
- 	return fid_seq_is_echo(fid_seq(fid));
- }
- 
--static inline int fid_seq_is_llog(__u64 seq)
-+static inline bool fid_seq_is_llog(__u64 seq)
- {
- 	return (seq == FID_SEQ_LLOG);
- }
- 
--static inline int fid_is_llog(const struct lu_fid *fid)
-+static inline bool fid_is_llog(const struct lu_fid *fid)
- {
- 	/* file with OID == 0 is not llog but contains last oid */
- 	return fid_seq_is_llog(fid_seq(fid)) && fid_oid(fid) > 0;
- }
- 
--static inline int fid_seq_is_rsvd(__u64 seq)
-+static inline bool fid_seq_is_rsvd(__u64 seq)
- {
- 	return (seq > FID_SEQ_OST_MDT0 && seq <= FID_SEQ_RSVD);
- };
- 
--static inline int fid_seq_is_special(__u64 seq)
-+static inline bool fid_seq_is_special(__u64 seq)
- {
- 	return seq == FID_SEQ_SPECIAL;
- };
- 
--static inline int fid_seq_is_local_file(__u64 seq)
-+static inline bool fid_seq_is_local_file(__u64 seq)
- {
- 	return seq == FID_SEQ_LOCAL_FILE ||
- 	       seq == FID_SEQ_LOCAL_NAME;
- };
- 
--static inline int fid_seq_is_root(__u64 seq)
-+static inline bool fid_seq_is_root(__u64 seq)
- {
- 	return seq == FID_SEQ_ROOT;
- }
- 
--static inline int fid_seq_is_dot(__u64 seq)
-+static inline bool fid_seq_is_dot(__u64 seq)
- {
- 	return seq == FID_SEQ_DOT_LUSTRE;
- }
- 
--static inline int fid_seq_is_default(__u64 seq)
-+static inline bool fid_seq_is_default(__u64 seq)
- {
- 	return seq == FID_SEQ_LOV_DEFAULT;
- }
- 
--static inline int fid_is_mdt0(const struct lu_fid *fid)
-+static inline bool fid_is_mdt0(const struct lu_fid *fid)
- {
- 	return fid_seq_is_mdt0(fid_seq(fid));
- }
-@@ -516,12 +516,12 @@ static inline void lu_root_fid(struct lu_fid *fid)
-  * \param fid the fid to be tested.
-  * \return true if the fid is a igif; otherwise false.
-  */
--static inline int fid_seq_is_igif(__u64 seq)
-+static inline bool fid_seq_is_igif(__u64 seq)
- {
- 	return seq >= FID_SEQ_IGIF && seq <= FID_SEQ_IGIF_MAX;
- }
- 
--static inline int fid_is_igif(const struct lu_fid *fid)
-+static inline bool fid_is_igif(const struct lu_fid *fid)
- {
- 	return fid_seq_is_igif(fid_seq(fid));
- }
-@@ -531,27 +531,27 @@ static inline int fid_is_igif(const struct lu_fid *fid)
-  * \param fid the fid to be tested.
-  * \return true if the fid is a idif; otherwise false.
-  */
--static inline int fid_seq_is_idif(__u64 seq)
-+static inline bool fid_seq_is_idif(__u64 seq)
- {
- 	return seq >= FID_SEQ_IDIF && seq <= FID_SEQ_IDIF_MAX;
- }
- 
--static inline int fid_is_idif(const struct lu_fid *fid)
-+static inline bool fid_is_idif(const struct lu_fid *fid)
- {
- 	return fid_seq_is_idif(fid_seq(fid));
- }
- 
--static inline int fid_is_local_file(const struct lu_fid *fid)
-+static inline bool fid_is_local_file(const struct lu_fid *fid)
- {
- 	return fid_seq_is_local_file(fid_seq(fid));
- }
- 
--static inline int fid_seq_is_norm(__u64 seq)
-+static inline bool fid_seq_is_norm(__u64 seq)
- {
- 	return (seq >= FID_SEQ_NORMAL);
- }
- 
--static inline int fid_is_norm(const struct lu_fid *fid)
-+static inline bool fid_is_norm(const struct lu_fid *fid)
- {
- 	return fid_seq_is_norm(fid_seq(fid));
- }
-@@ -769,7 +769,7 @@ static inline int fid_to_ostid(const struct lu_fid *fid, struct ost_id *ostid)
- }
- 
- /* Check whether the fid is for LAST_ID */
--static inline int fid_is_last_id(const struct lu_fid *fid)
-+static inline bool fid_is_last_id(const struct lu_fid *fid)
- {
- 	return (fid_oid(fid) == 0);
- }
-@@ -838,7 +838,7 @@ static inline void fid_be_to_cpu(struct lu_fid *dst, const struct lu_fid *src)
- 	dst->f_ver = be32_to_cpu(fid_ver(src));
- }
- 
--static inline int fid_is_sane(const struct lu_fid *fid)
-+static inline bool fid_is_sane(const struct lu_fid *fid)
- {
- 	return fid &&
- 	       ((fid_seq(fid) >= FID_SEQ_START && fid_ver(fid) == 0) ||
-@@ -846,7 +846,7 @@ static inline int fid_is_sane(const struct lu_fid *fid)
- 		fid_seq_is_rsvd(fid_seq(fid)));
- }
- 
--static inline int fid_is_zero(const struct lu_fid *fid)
-+static inline bool fid_is_zero(const struct lu_fid *fid)
- {
- 	return fid_seq(fid) == 0 && fid_oid(fid) == 0;
- }
-@@ -854,7 +854,7 @@ static inline int fid_is_zero(const struct lu_fid *fid)
- void lustre_swab_lu_fid(struct lu_fid *fid);
- void lustre_swab_lu_seq_range(struct lu_seq_range *range);
- 
--static inline int lu_fid_eq(const struct lu_fid *f0, const struct lu_fid *f1)
-+static inline bool lu_fid_eq(const struct lu_fid *f0, const struct lu_fid *f1)
- {
- 	return memcmp(f0, f1, sizeof(*f0)) == 0;
- }
-@@ -1067,13 +1067,13 @@ struct lustre_handle {
- 
- #define DEAD_HANDLE_MAGIC 0xdeadbeefcafebabeULL
- 
--static inline int lustre_handle_is_used(const struct lustre_handle *lh)
-+static inline bool lustre_handle_is_used(const struct lustre_handle *lh)
- {
- 	return lh->cookie != 0ull;
- }
- 
--static inline int lustre_handle_equal(const struct lustre_handle *lh1,
--				      const struct lustre_handle *lh2)
-+static inline bool lustre_handle_equal(const struct lustre_handle *lh1,
-+				       const struct lustre_handle *lh2)
- {
- 	return lh1->cookie == lh2->cookie;
- }
-@@ -2684,8 +2684,8 @@ struct ldlm_res_id {
- #define PLDLMRES(res)	(res)->lr_name.name[0], (res)->lr_name.name[1], \
- 			(res)->lr_name.name[2], (res)->lr_name.name[3]
- 
--static inline int ldlm_res_eq(const struct ldlm_res_id *res0,
--			      const struct ldlm_res_id *res1)
-+static inline bool ldlm_res_eq(const struct ldlm_res_id *res0,
-+			       const struct ldlm_res_id *res1)
- {
- 	return !memcmp(res0, res1, sizeof(*res0));
- }
-diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
-index a85183b..6f7dc15 100644
---- a/drivers/staging/lustre/lustre/include/lustre_fid.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
-@@ -406,8 +406,8 @@ fid_build_reg_res_name(const struct lu_fid *fid, struct ldlm_res_id *res)
- /*
-  * Return true if resource is for object identified by FID.
-  */
--static inline int fid_res_name_eq(const struct lu_fid *fid,
--				  const struct ldlm_res_id *res)
-+static inline bool fid_res_name_eq(const struct lu_fid *fid,
-+				   const struct ldlm_res_id *res)
- {
- 	return res->name[LUSTRE_RES_ID_SEQ_OFF] == fid_seq(fid) &&
- 	       res->name[LUSTRE_RES_ID_VER_OID_OFF] == fid_ver_oid(fid);
+ 	LASSERT(hash != 0);
+ 	inode = iget5_locked(sb, hash, ll_test_inode, ll_set_inode, md);
+-
+-	if (inode) {
+-		if (inode->i_state & I_NEW) {
+-			int rc = 0;
+-
+-			ll_read_inode2(inode, md);
+-			if (S_ISREG(inode->i_mode) &&
+-			    !ll_i2info(inode)->lli_clob) {
+-				CDEBUG(D_INODE,
+-				       "%s: apply lsm %p to inode " DFID ".\n",
+-				       ll_get_fsname(sb, NULL, 0), md->lsm,
+-				       PFID(ll_inode2fid(inode)));
+-				rc = cl_file_inode_init(inode, md);
+-			}
+-			if (rc != 0) {
+-				iget_failed(inode);
+-				inode = NULL;
+-			} else {
+-				unlock_new_inode(inode);
+-			}
+-		} else if (!(inode->i_state & (I_FREEING | I_CLEAR))) {
+-			ll_update_inode(inode, md);
+-			CDEBUG(D_VFSTRACE, "got inode: "DFID"(%p)\n",
+-			       PFID(&md->body->fid1), inode);
++	if (!inode)
++		return ERR_PTR(-ENOMEM);
++
++	if (inode->i_state & I_NEW) {
++		rc = ll_read_inode2(inode, md);
++		if (!rc && S_ISREG(inode->i_mode) &&
++		    !ll_i2info(inode)->lli_clob) {
++			CDEBUG(D_INODE, "%s: apply lsm %p to inode "DFID"\n",
++			       ll_get_fsname(sb, NULL, 0), md->lsm,
++			       PFID(ll_inode2fid(inode)));
++			rc = cl_file_inode_init(inode, md);
++		}
++		if (rc) {
++			make_bad_inode(inode);
++			unlock_new_inode(inode);
++			iput(inode);
++			inode = ERR_PTR(rc);
++		} else {
++			unlock_new_inode(inode);
++		}
++	} else if (!(inode->i_state & (I_FREEING | I_CLEAR))) {
++		rc = ll_update_inode(inode, md);
++		CDEBUG(D_VFSTRACE, "got inode: "DFID"(%p): rc = %d\n",
++		       PFID(&md->body->fid1), inode, rc);
++		if (rc) {
++			make_bad_inode(inode);
++			iput(inode);
++			inode = ERR_PTR(rc);
+ 		}
+ 	}
+ 	return inode;
 -- 
 1.7.1
