@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:18:37 -0400
-Subject: [lustre-devel] [PATCH 24/80] staging: lustre: don't need to const
-	__u64 parameters for lustre_idl.h
+Date: Tue, 16 Aug 2016 16:18:40 -0400
+Subject: [lustre-devel] [PATCH 27/80] staging: lustre: simplify inline
+	functions in lustre_fid.h
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-25-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-28-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,8 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: John L. Hammond <john.hammond@intel.com>
 
-Remove the const for the __u64 parameters for inline functions
-in lustre_idl.h.
+Several inline functions return a structure that was passed in.
+Their is no need for this so just make these function void.
 
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
@@ -25,88 +25,76 @@ Reviewed-by: Fan Yong <fan.yong@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_idl.h      |   20 ++++++++++----------
- 1 files changed, 10 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_fid.h |   16 ++++------------
+ 1 files changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 6853f62..87e79b9 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -442,7 +442,7 @@ static inline int fid_seq_is_mdt0(__u64 seq)
- 	return (seq == FID_SEQ_OST_MDT0);
- }
- 
--static inline int fid_seq_is_mdt(const __u64 seq)
-+static inline int fid_seq_is_mdt(__u64 seq)
- {
- 	return seq == FID_SEQ_OST_MDT0 || seq >= FID_SEQ_NORMAL;
- };
-@@ -468,33 +468,33 @@ static inline int fid_is_llog(const struct lu_fid *fid)
- 	return fid_seq_is_llog(fid_seq(fid)) && fid_oid(fid) > 0;
- }
- 
--static inline int fid_seq_is_rsvd(const __u64 seq)
-+static inline int fid_seq_is_rsvd(__u64 seq)
- {
- 	return (seq > FID_SEQ_OST_MDT0 && seq <= FID_SEQ_RSVD);
- };
- 
--static inline int fid_seq_is_special(const __u64 seq)
-+static inline int fid_seq_is_special(__u64 seq)
- {
- 	return seq == FID_SEQ_SPECIAL;
- };
- 
--static inline int fid_seq_is_local_file(const __u64 seq)
-+static inline int fid_seq_is_local_file(__u64 seq)
- {
- 	return seq == FID_SEQ_LOCAL_FILE ||
- 	       seq == FID_SEQ_LOCAL_NAME;
- };
- 
--static inline int fid_seq_is_root(const __u64 seq)
-+static inline int fid_seq_is_root(__u64 seq)
- {
- 	return seq == FID_SEQ_ROOT;
- }
- 
--static inline int fid_seq_is_dot(const __u64 seq)
-+static inline int fid_seq_is_dot(__u64 seq)
- {
- 	return seq == FID_SEQ_DOT_LUSTRE;
- }
- 
--static inline int fid_seq_is_default(const __u64 seq)
-+static inline int fid_seq_is_default(__u64 seq)
- {
- 	return seq == FID_SEQ_LOV_DEFAULT;
- }
-@@ -516,7 +516,7 @@ static inline void lu_root_fid(struct lu_fid *fid)
-  * \param fid the fid to be tested.
-  * \return true if the fid is a igif; otherwise false.
+diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
+index 6f7dc15..f1d5bbd 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_fid.h
++++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
+@@ -393,14 +393,12 @@ struct ldlm_namespace;
+  * but was moved into name[1] along with the OID to avoid consuming the
+  * renaming name[2,3] fields that need to be used for the quota identifier.
   */
--static inline int fid_seq_is_igif(const __u64 seq)
-+static inline int fid_seq_is_igif(__u64 seq)
+-static inline struct ldlm_res_id *
++static inline void
+ fid_build_reg_res_name(const struct lu_fid *fid, struct ldlm_res_id *res)
  {
- 	return seq >= FID_SEQ_IGIF && seq <= FID_SEQ_IGIF_MAX;
- }
-@@ -531,7 +531,7 @@ static inline int fid_is_igif(const struct lu_fid *fid)
-  * \param fid the fid to be tested.
-  * \return true if the fid is a idif; otherwise false.
-  */
--static inline int fid_seq_is_idif(const __u64 seq)
-+static inline int fid_seq_is_idif(__u64 seq)
- {
- 	return seq >= FID_SEQ_IDIF && seq <= FID_SEQ_IDIF_MAX;
- }
-@@ -546,7 +546,7 @@ static inline int fid_is_local_file(const struct lu_fid *fid)
- 	return fid_seq_is_local_file(fid_seq(fid));
+ 	memset(res, 0, sizeof(*res));
+ 	res->name[LUSTRE_RES_ID_SEQ_OFF] = fid_seq(fid);
+ 	res->name[LUSTRE_RES_ID_VER_OID_OFF] = fid_ver_oid(fid);
+-
+-	return res;
  }
  
--static inline int fid_seq_is_norm(const __u64 seq)
-+static inline int fid_seq_is_norm(__u64 seq)
+ /*
+@@ -416,29 +414,25 @@ static inline bool fid_res_name_eq(const struct lu_fid *fid,
+ /*
+  * Extract FID from LDLM resource. Reverse of fid_build_reg_res_name().
+  */
+-static inline struct lu_fid *
++static inline void
+ fid_extract_from_res_name(struct lu_fid *fid, const struct ldlm_res_id *res)
  {
- 	return (seq >= FID_SEQ_NORMAL);
+ 	fid->f_seq = res->name[LUSTRE_RES_ID_SEQ_OFF];
+ 	fid->f_oid = (__u32)(res->name[LUSTRE_RES_ID_VER_OID_OFF]);
+ 	fid->f_ver = (__u32)(res->name[LUSTRE_RES_ID_VER_OID_OFF] >> 32);
+ 	LASSERT(fid_res_name_eq(fid, res));
+-
+-	return fid;
  }
+ 
+ /*
+  * Build (DLM) resource identifier from global quota FID and quota ID.
+  */
+-static inline struct ldlm_res_id *
++static inline void
+ fid_build_quota_res_name(const struct lu_fid *glb_fid, union lquota_id *qid,
+ 			 struct ldlm_res_id *res)
+ {
+ 	fid_build_reg_res_name(glb_fid, res);
+ 	res->name[LUSTRE_RES_ID_QUOTA_SEQ_OFF] = fid_seq(&qid->qid_fid);
+ 	res->name[LUSTRE_RES_ID_QUOTA_VER_OID_OFF] = fid_ver_oid(&qid->qid_fid);
+-
+-	return res;
+ }
+ 
+ /*
+@@ -455,14 +449,12 @@ static inline void fid_extract_from_quota_res(struct lu_fid *glb_fid,
+ 		(__u32)(res->name[LUSTRE_RES_ID_QUOTA_VER_OID_OFF] >> 32);
+ }
+ 
+-static inline struct ldlm_res_id *
++static inline void
+ fid_build_pdo_res_name(const struct lu_fid *fid, unsigned int hash,
+ 		       struct ldlm_res_id *res)
+ {
+ 	fid_build_reg_res_name(fid, res);
+ 	res->name[LUSTRE_RES_ID_HSH_OFF] = hash;
+-
+-	return res;
+ }
+ 
+ /**
 -- 
 1.7.1
