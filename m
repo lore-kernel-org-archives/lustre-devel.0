@@ -1,211 +1,174 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:19:15 -0400
-Subject: [lustre-devel] [PATCH 62/80] staging: lustre: obd: limit lu_object
-	cache
+Date: Tue, 16 Aug 2016 16:19:26 -0400
+Subject: [lustre-devel] [PATCH 73/80] staging: lustre: lmv: build error with
+	gcc 4.7.0 20110509
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-63-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-74-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Brian Behlendorf <behlendorf1@llnl.gov>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Brian Behlendorf <behlendorf1@llnl.gov>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-As the LU cache grows it can consume large enough chunks of
-memory that ends up preventing buffers for other objects,
-such as the OIs, from being cached and severely impacting
-the performance for FID lookups. Limit the lu_object cache
-to a maximum of lu_cache_nr objects.
+Fixed comparison between signed and unsigned indexes.
 
-NOTES:
-
-* In order to be able to quickly determine the number of objects in
-  the hash table the CFS_HASH_COUNTER flag is added.  This adds an
-  atomic_inc/dec to the hash insert/remove paths but is not expected
-  to have any measurable impact of performance.
-
-Signed-off-by: Brian Behlendorf <behlendorf1@llnl.gov>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5164
-Reviewed-on: http://review.whamcloud.com/10237
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-Reviewed-by: Isaac Huang <he.huang@intel.com>
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3775
+Reviewed-on: http://review.whamcloud.com/7382
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/obdclass/lu_object.c |   91 ++++++++++++++------
- 1 files changed, 64 insertions(+), 27 deletions(-)
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c |   34 ++++++++++++++------------
+ 1 files changed, 18 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index 0c00bf8..9d1c96b 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -55,6 +55,34 @@
- #include "../include/lu_ref.h"
- #include <linux/list.h>
- 
-+enum {
-+	LU_CACHE_PERCENT_MAX	 = 50,
-+	LU_CACHE_PERCENT_DEFAULT = 20
-+};
-+
-+#define LU_CACHE_NR_MAX_ADJUST		128
-+#define LU_CACHE_NR_UNLIMITED		-1
-+#define LU_CACHE_NR_DEFAULT		LU_CACHE_NR_UNLIMITED
-+#define LU_CACHE_NR_LDISKFS_LIMIT	LU_CACHE_NR_UNLIMITED
-+#define LU_CACHE_NR_ZFS_LIMIT		256
-+
-+#define LU_SITE_BITS_MIN	12
-+#define LU_SITE_BITS_MAX	24
-+/**
-+ * total 256 buckets, we don't want too many buckets because:
-+ * - consume too much memory
-+ * - avoid unbalanced LRU list
-+ */
-+#define LU_SITE_BKT_BITS	8
-+
-+static unsigned int lu_cache_percent = LU_CACHE_PERCENT_DEFAULT;
-+module_param(lu_cache_percent, int, 0644);
-+MODULE_PARM_DESC(lu_cache_percent, "Percentage of memory to be used as lu_object cache");
-+
-+static long lu_cache_nr = LU_CACHE_NR_DEFAULT;
-+module_param(lu_cache_nr, long, 0644);
-+MODULE_PARM_DESC(lu_cache_nr, "Maximum number of objects in lu_object cache");
-+
- static void lu_object_free(const struct lu_env *env, struct lu_object *o);
- static __u32 ls_stats_read(struct lprocfs_stats *stats, int idx);
- 
-@@ -573,6 +601,27 @@ static struct lu_object *lu_object_find(const struct lu_env *env,
- 	return lu_object_find_at(env, dev->ld_site->ls_top_dev, f, conf);
- }
- 
-+/*
-+ * Limit the lu_object cache to a maximum of lu_cache_nr objects.  Because
-+ * the calculation for the number of objects to reclaim is not covered by
-+ * a lock the maximum number of objects is capped by LU_CACHE_MAX_ADJUST.
-+ * This ensures that many concurrent threads will not accidentally purge
-+ * the entire cache.
-+ */
-+static void lu_object_limit(const struct lu_env *env, struct lu_device *dev)
-+{
-+	__u64 size, nr;
-+
-+	if (lu_cache_nr == LU_CACHE_NR_UNLIMITED)
-+		return;
-+
-+	size = cfs_hash_size_get(dev->ld_site->ls_obj_hash);
-+	nr = (__u64)lu_cache_nr;
-+	if (size > nr)
-+		lu_site_purge(env, dev->ld_site,
-+			      min_t(__u64, size - nr, LU_CACHE_NR_MAX_ADJUST));
-+}
-+
- static struct lu_object *lu_object_new(const struct lu_env *env,
- 				       struct lu_device *dev,
- 				       const struct lu_fid *f,
-@@ -590,6 +639,9 @@ static struct lu_object *lu_object_new(const struct lu_env *env,
- 	cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 1);
- 	cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
- 	cfs_hash_bd_unlock(hs, &bd, 1);
-+
-+	lu_object_limit(env, dev);
-+
- 	return o;
- }
- 
-@@ -656,6 +708,9 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
- 	if (likely(PTR_ERR(shadow) == -ENOENT)) {
- 		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
- 		cfs_hash_bd_unlock(hs, &bd, 1);
-+
-+		lu_object_limit(env, dev);
-+
- 		return o;
- 	}
- 
-@@ -805,20 +860,12 @@ void lu_site_print(const struct lu_env *env, struct lu_site *s, void *cookie,
- }
- EXPORT_SYMBOL(lu_site_print);
- 
--enum {
--	LU_CACHE_PERCENT_MAX     = 50,
--	LU_CACHE_PERCENT_DEFAULT = 20
--};
--
--static unsigned int lu_cache_percent = LU_CACHE_PERCENT_DEFAULT;
--module_param(lu_cache_percent, int, 0644);
--MODULE_PARM_DESC(lu_cache_percent, "Percentage of memory to be used as lu_object cache");
--
- /**
-  * Return desired hash table order.
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index b8275e1..3e41f49 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -130,12 +130,12 @@ static void lmv_activate_target(struct lmv_obd *lmv,
+  *  -ENOTCONN: The UUID is found, but the target connection is bad (!)
+  *  -EBADF   : The UUID is found, but the OBD of the wrong type (!)
   */
--static int lu_htable_order(void)
-+static int lu_htable_order(struct lu_device *top)
+-static int lmv_set_mdc_active(struct lmv_obd *lmv, struct obd_uuid *uuid,
++static int lmv_set_mdc_active(struct lmv_obd *lmv, const struct obd_uuid *uuid,
+ 			      int activate)
  {
-+	unsigned long bits_max = LU_SITE_BITS_MAX;
- 	unsigned long cache_size;
- 	int bits;
+ 	struct lmv_tgt_desc    *uninitialized_var(tgt);
+ 	struct obd_device      *obd;
+-	int		     i;
++	u32		     i;
+ 	int		     rc = 0;
  
-@@ -851,7 +898,7 @@ static int lu_htable_order(void)
- 	for (bits = 1; (1 << bits) < cache_size; ++bits) {
- 		;
- 	}
--	return bits;
-+	return clamp_t(typeof(bits), bits, LU_SITE_BITS_MIN, bits_max);
- }
- 
- static unsigned lu_obj_hop_hash(struct cfs_hash *hs,
-@@ -927,28 +974,17 @@ static void lu_dev_add_linkage(struct lu_site *s, struct lu_device *d)
- /**
-  * Initialize site \a s, with \a d as the top level device.
-  */
--#define LU_SITE_BITS_MIN    12
--#define LU_SITE_BITS_MAX    19
--/**
-- * total 256 buckets, we don't want too many buckets because:
-- * - consume too much memory
-- * - avoid unbalanced LRU list
-- */
--#define LU_SITE_BKT_BITS    8
--
- int lu_site_init(struct lu_site *s, struct lu_device *top)
+ 	CDEBUG(D_INFO, "Searching in lmv %p for uuid %s (activate=%d)\n",
+@@ -307,7 +307,7 @@ static int lmv_connect(const struct lu_env *env,
+ static void lmv_set_timeouts(struct obd_device *obd)
  {
- 	struct lu_site_bkt_data *bkt;
- 	struct cfs_hash_bd bd;
-+	unsigned long bits;
-+	unsigned long i;
- 	char name[16];
--	int bits;
--	int i;
+ 	struct lmv_obd	*lmv;
+-	int		    i;
++	u32 i;
  
- 	memset(s, 0, sizeof(*s));
--	bits = lu_htable_order();
- 	snprintf(name, 16, "lu_site_%s", top->ld_type->ldt_name);
--	for (bits = min(max(LU_SITE_BITS_MIN, bits), LU_SITE_BITS_MAX);
--	     bits >= LU_SITE_BITS_MIN; bits--) {
-+	for (bits = lu_htable_order(top); bits >= LU_SITE_BITS_MIN; bits--) {
- 		s->ls_obj_hash = cfs_hash_create(name, bits, bits,
- 						 bits - LU_SITE_BKT_BITS,
- 						 sizeof(*bkt), 0, 0,
-@@ -956,13 +992,14 @@ int lu_site_init(struct lu_site *s, struct lu_device *top)
- 						 CFS_HASH_SPIN_BKTLOCK |
- 						 CFS_HASH_NO_ITEMREF |
- 						 CFS_HASH_DEPTH |
--						 CFS_HASH_ASSERT_EMPTY);
-+						 CFS_HASH_ASSERT_EMPTY |
-+						 CFS_HASH_COUNTER);
- 		if (s->ls_obj_hash)
- 			break;
- 	}
+ 	lmv = &obd->u.lmv;
+ 	if (lmv->server_timeout == 0)
+@@ -333,7 +333,7 @@ static int lmv_init_ea_size(struct obd_export *exp, int easize,
+ {
+ 	struct obd_device   *obd = exp->exp_obd;
+ 	struct lmv_obd      *lmv = &obd->u.lmv;
+-	int		  i;
++	u32 i;
+ 	int		  rc = 0;
+ 	int		  change = 0;
  
- 	if (!s->ls_obj_hash) {
--		CERROR("failed to create lu_site hash with bits: %d\n", bits);
-+		CERROR("failed to create lu_site hash with bits: %lu\n", bits);
- 		return -ENOMEM;
- 	}
+@@ -578,7 +578,7 @@ int lmv_check_connect(struct obd_device *obd)
+ {
+ 	struct lmv_obd       *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc  *tgt;
+-	int		   i;
++	u32 i;
+ 	int		   rc;
+ 	int		   easize;
  
+@@ -693,7 +693,7 @@ static int lmv_disconnect(struct obd_export *exp)
+ 	struct obd_device     *obd = class_exp2obd(exp);
+ 	struct lmv_obd	*lmv = &obd->u.lmv;
+ 	int		    rc;
+-	int		    i;
++	u32 i;
+ 
+ 	if (!lmv->tgts)
+ 		goto out_local;
+@@ -822,7 +822,7 @@ static int lmv_hsm_req_count(struct lmv_obd *lmv,
+ 			     const struct hsm_user_request *hur,
+ 			     const struct lmv_tgt_desc *tgt_mds)
+ {
+-	int			i, nr = 0;
++	u32 i, nr = 0;
+ 	struct lmv_tgt_desc    *curr_tgt;
+ 
+ 	/* count how many requests must be sent to the given target */
+@@ -963,10 +963,10 @@ static int lmv_iocontrol(unsigned int cmd, struct obd_export *exp,
+ 	struct obd_device    *obddev = class_exp2obd(exp);
+ 	struct lmv_obd       *lmv = &obddev->u.lmv;
+ 	struct lmv_tgt_desc *tgt = NULL;
+-	int		   i = 0;
++	u32 i = 0;
+ 	int		   rc = 0;
+ 	int		   set = 0;
+-	int		   count = lmv->desc.ld_tgt_count;
++	u32 count = lmv->desc.ld_tgt_count;
+ 
+ 	if (count == 0)
+ 		return -ENOTTY;
+@@ -1444,7 +1444,7 @@ static int lmv_statfs(const struct lu_env *env, struct obd_export *exp,
+ 	struct lmv_obd	*lmv = &obd->u.lmv;
+ 	struct obd_statfs     *temp;
+ 	int		    rc = 0;
+-	int		    i;
++	u32 i;
+ 
+ 	rc = lmv_check_connect(obd);
+ 	if (rc)
+@@ -1586,7 +1586,7 @@ static int lmv_null_inode(struct obd_export *exp, const struct lu_fid *fid)
+ {
+ 	struct obd_device   *obd = exp->exp_obd;
+ 	struct lmv_obd      *lmv = &obd->u.lmv;
+-	int		  i;
++	u32 i;
+ 	int		  rc;
+ 
+ 	rc = lmv_check_connect(obd);
+@@ -1615,7 +1615,7 @@ static int lmv_find_cbdata(struct obd_export *exp, const struct lu_fid *fid,
+ 	struct obd_device   *obd = exp->exp_obd;
+ 	struct lmv_obd      *lmv = &obd->u.lmv;
+ 	int tgt;
+-	int		  i;
++	u32 i;
+ 	int		  rc;
+ 
+ 	rc = lmv_check_connect(obd);
+@@ -2923,7 +2923,7 @@ static int lmv_cancel_unused(struct obd_export *exp, const struct lu_fid *fid,
+ 	struct lmv_obd	  *lmv = &obd->u.lmv;
+ 	int		      rc = 0;
+ 	int		      err;
+-	int		      i;
++	u32 i;
+ 
+ 	LASSERT(fid);
+ 
+@@ -2966,7 +2966,7 @@ static enum ldlm_mode lmv_lock_match(struct obd_export *exp, __u64 flags,
+ 	struct lmv_obd	  *lmv = &obd->u.lmv;
+ 	enum ldlm_mode	      rc;
+ 	int tgt;
+-	int		      i;
++	u32 i;
+ 
+ 	CDEBUG(D_INODE, "Lock match for "DFID"\n", PFID(fid));
+ 
+@@ -3125,8 +3125,9 @@ static int lmv_quotactl(struct obd_device *unused, struct obd_export *exp,
+ 	struct obd_device   *obd = class_exp2obd(exp);
+ 	struct lmv_obd      *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc *tgt = lmv->tgts[0];
+-	int		  rc = 0, i;
++	int rc = 0;
+ 	__u64 curspace = 0, curinodes = 0;
++	u32 i;
+ 
+ 	if (!tgt || !tgt->ltd_exp || !tgt->ltd_active ||
+ 	    !lmv->desc.ld_tgt_count) {
+@@ -3169,7 +3170,8 @@ static int lmv_quotacheck(struct obd_device *unused, struct obd_export *exp,
+ 	struct obd_device   *obd = class_exp2obd(exp);
+ 	struct lmv_obd      *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc *tgt;
+-	int		  i, rc = 0;
++	int rc = 0;
++	u32 i;
+ 
+ 	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
+ 		int err;
 -- 
 1.7.1
