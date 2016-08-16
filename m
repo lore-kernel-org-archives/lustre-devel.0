@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:18:38 -0400
-Subject: [lustre-devel] [PATCH 25/80] staging: lustre: const correct
-	FID/OSTID/... helpers
+Date: Tue, 16 Aug 2016 16:18:39 -0400
+Subject: [lustre-devel] [PATCH 26/80] staging: lustre: use bool for several
+	function in lustre_idl.h/lustre_fid.h
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-27-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,7 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: John L. Hammond <john.hammond@intel.com>
 
-Add a const qualifier wherever possible to the pointer parameters of
-the inline helper functions in lustre_idl.h and lustre_fid.h.
+Change the return type of several predicate functions from int to bool.
 
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
@@ -25,151 +24,267 @@ Reviewed-by: Fan Yong <fan.yong@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_idl.h      |   28 ++++++++++----------
- drivers/staging/lustre/lustre/include/lustre_fid.h |    9 +++---
- 2 files changed, 19 insertions(+), 18 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      |   72 ++++++++++----------
+ drivers/staging/lustre/lustre/include/lustre_fid.h |    4 +-
+ 2 files changed, 38 insertions(+), 38 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 87e79b9..c932e20 100644
+index c932e20..d3a9db9 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -1033,7 +1033,7 @@ static inline int lu_dirent_calc_size(int namelen, __u16 attr)
- 	return (size + 7) & ~7;
+@@ -196,12 +196,12 @@ static inline unsigned fld_range_type(const struct lu_seq_range *range)
+ 	return range->lsr_flags & LU_SEQ_RANGE_MASK;
  }
  
--static inline int lu_dirent_size(struct lu_dirent *ent)
-+static inline int lu_dirent_size(const struct lu_dirent *ent)
+-static inline int fld_range_is_ost(const struct lu_seq_range *range)
++static inline bool fld_range_is_ost(const struct lu_seq_range *range)
  {
- 	if (le16_to_cpu(ent->lde_reclen) == 0) {
- 		return lu_dirent_calc_size(le16_to_cpu(ent->lde_namelen),
-@@ -1067,7 +1067,7 @@ struct lustre_handle {
+ 	return fld_range_type(range) == LU_SEQ_RANGE_OST;
+ }
+ 
+-static inline int fld_range_is_mdt(const struct lu_seq_range *range)
++static inline bool fld_range_is_mdt(const struct lu_seq_range *range)
+ {
+ 	return fld_range_type(range) == LU_SEQ_RANGE_MDT;
+ }
+@@ -260,23 +260,23 @@ static inline void range_init(struct lu_seq_range *range)
+  * check if given seq id \a s is within given range \a r
+  */
+ 
+-static inline int range_within(const struct lu_seq_range *range,
+-			       __u64 s)
++static inline bool range_within(const struct lu_seq_range *range,
++				__u64 s)
+ {
+ 	return s >= range->lsr_start && s < range->lsr_end;
+ }
+ 
+-static inline int range_is_sane(const struct lu_seq_range *range)
++static inline bool range_is_sane(const struct lu_seq_range *range)
+ {
+ 	return (range->lsr_end >= range->lsr_start);
+ }
+ 
+-static inline int range_is_zero(const struct lu_seq_range *range)
++static inline bool range_is_zero(const struct lu_seq_range *range)
+ {
+ 	return (range->lsr_start == 0 && range->lsr_end == 0);
+ }
+ 
+-static inline int range_is_exhausted(const struct lu_seq_range *range)
++static inline bool range_is_exhausted(const struct lu_seq_range *range)
+ 
+ {
+ 	return range_space(range) == 0;
+@@ -437,69 +437,69 @@ enum dot_lustre_oid {
+ 	FID_OID_DOT_LUSTRE_OBF = 2UL,
+ };
+ 
+-static inline int fid_seq_is_mdt0(__u64 seq)
++static inline bool fid_seq_is_mdt0(__u64 seq)
+ {
+ 	return (seq == FID_SEQ_OST_MDT0);
+ }
+ 
+-static inline int fid_seq_is_mdt(__u64 seq)
++static inline bool fid_seq_is_mdt(__u64 seq)
+ {
+ 	return seq == FID_SEQ_OST_MDT0 || seq >= FID_SEQ_NORMAL;
+ };
+ 
+-static inline int fid_seq_is_echo(__u64 seq)
++static inline bool fid_seq_is_echo(__u64 seq)
+ {
+ 	return (seq == FID_SEQ_ECHO);
+ }
+ 
+-static inline int fid_is_echo(const struct lu_fid *fid)
++static inline bool fid_is_echo(const struct lu_fid *fid)
+ {
+ 	return fid_seq_is_echo(fid_seq(fid));
+ }
+ 
+-static inline int fid_seq_is_llog(__u64 seq)
++static inline bool fid_seq_is_llog(__u64 seq)
+ {
+ 	return (seq == FID_SEQ_LLOG);
+ }
+ 
+-static inline int fid_is_llog(const struct lu_fid *fid)
++static inline bool fid_is_llog(const struct lu_fid *fid)
+ {
+ 	/* file with OID == 0 is not llog but contains last oid */
+ 	return fid_seq_is_llog(fid_seq(fid)) && fid_oid(fid) > 0;
+ }
+ 
+-static inline int fid_seq_is_rsvd(__u64 seq)
++static inline bool fid_seq_is_rsvd(__u64 seq)
+ {
+ 	return (seq > FID_SEQ_OST_MDT0 && seq <= FID_SEQ_RSVD);
+ };
+ 
+-static inline int fid_seq_is_special(__u64 seq)
++static inline bool fid_seq_is_special(__u64 seq)
+ {
+ 	return seq == FID_SEQ_SPECIAL;
+ };
+ 
+-static inline int fid_seq_is_local_file(__u64 seq)
++static inline bool fid_seq_is_local_file(__u64 seq)
+ {
+ 	return seq == FID_SEQ_LOCAL_FILE ||
+ 	       seq == FID_SEQ_LOCAL_NAME;
+ };
+ 
+-static inline int fid_seq_is_root(__u64 seq)
++static inline bool fid_seq_is_root(__u64 seq)
+ {
+ 	return seq == FID_SEQ_ROOT;
+ }
+ 
+-static inline int fid_seq_is_dot(__u64 seq)
++static inline bool fid_seq_is_dot(__u64 seq)
+ {
+ 	return seq == FID_SEQ_DOT_LUSTRE;
+ }
+ 
+-static inline int fid_seq_is_default(__u64 seq)
++static inline bool fid_seq_is_default(__u64 seq)
+ {
+ 	return seq == FID_SEQ_LOV_DEFAULT;
+ }
+ 
+-static inline int fid_is_mdt0(const struct lu_fid *fid)
++static inline bool fid_is_mdt0(const struct lu_fid *fid)
+ {
+ 	return fid_seq_is_mdt0(fid_seq(fid));
+ }
+@@ -516,12 +516,12 @@ static inline void lu_root_fid(struct lu_fid *fid)
+  * \param fid the fid to be tested.
+  * \return true if the fid is a igif; otherwise false.
+  */
+-static inline int fid_seq_is_igif(__u64 seq)
++static inline bool fid_seq_is_igif(__u64 seq)
+ {
+ 	return seq >= FID_SEQ_IGIF && seq <= FID_SEQ_IGIF_MAX;
+ }
+ 
+-static inline int fid_is_igif(const struct lu_fid *fid)
++static inline bool fid_is_igif(const struct lu_fid *fid)
+ {
+ 	return fid_seq_is_igif(fid_seq(fid));
+ }
+@@ -531,27 +531,27 @@ static inline int fid_is_igif(const struct lu_fid *fid)
+  * \param fid the fid to be tested.
+  * \return true if the fid is a idif; otherwise false.
+  */
+-static inline int fid_seq_is_idif(__u64 seq)
++static inline bool fid_seq_is_idif(__u64 seq)
+ {
+ 	return seq >= FID_SEQ_IDIF && seq <= FID_SEQ_IDIF_MAX;
+ }
+ 
+-static inline int fid_is_idif(const struct lu_fid *fid)
++static inline bool fid_is_idif(const struct lu_fid *fid)
+ {
+ 	return fid_seq_is_idif(fid_seq(fid));
+ }
+ 
+-static inline int fid_is_local_file(const struct lu_fid *fid)
++static inline bool fid_is_local_file(const struct lu_fid *fid)
+ {
+ 	return fid_seq_is_local_file(fid_seq(fid));
+ }
+ 
+-static inline int fid_seq_is_norm(__u64 seq)
++static inline bool fid_seq_is_norm(__u64 seq)
+ {
+ 	return (seq >= FID_SEQ_NORMAL);
+ }
+ 
+-static inline int fid_is_norm(const struct lu_fid *fid)
++static inline bool fid_is_norm(const struct lu_fid *fid)
+ {
+ 	return fid_seq_is_norm(fid_seq(fid));
+ }
+@@ -769,7 +769,7 @@ static inline int fid_to_ostid(const struct lu_fid *fid, struct ost_id *ostid)
+ }
+ 
+ /* Check whether the fid is for LAST_ID */
+-static inline int fid_is_last_id(const struct lu_fid *fid)
++static inline bool fid_is_last_id(const struct lu_fid *fid)
+ {
+ 	return (fid_oid(fid) == 0);
+ }
+@@ -838,7 +838,7 @@ static inline void fid_be_to_cpu(struct lu_fid *dst, const struct lu_fid *src)
+ 	dst->f_ver = be32_to_cpu(fid_ver(src));
+ }
+ 
+-static inline int fid_is_sane(const struct lu_fid *fid)
++static inline bool fid_is_sane(const struct lu_fid *fid)
+ {
+ 	return fid &&
+ 	       ((fid_seq(fid) >= FID_SEQ_START && fid_ver(fid) == 0) ||
+@@ -846,7 +846,7 @@ static inline int fid_is_sane(const struct lu_fid *fid)
+ 		fid_seq_is_rsvd(fid_seq(fid)));
+ }
+ 
+-static inline int fid_is_zero(const struct lu_fid *fid)
++static inline bool fid_is_zero(const struct lu_fid *fid)
+ {
+ 	return fid_seq(fid) == 0 && fid_oid(fid) == 0;
+ }
+@@ -854,7 +854,7 @@ static inline int fid_is_zero(const struct lu_fid *fid)
+ void lustre_swab_lu_fid(struct lu_fid *fid);
+ void lustre_swab_lu_seq_range(struct lu_seq_range *range);
+ 
+-static inline int lu_fid_eq(const struct lu_fid *f0, const struct lu_fid *f1)
++static inline bool lu_fid_eq(const struct lu_fid *f0, const struct lu_fid *f1)
+ {
+ 	return memcmp(f0, f1, sizeof(*f0)) == 0;
+ }
+@@ -1067,13 +1067,13 @@ struct lustre_handle {
  
  #define DEAD_HANDLE_MAGIC 0xdeadbeefcafebabeULL
  
--static inline int lustre_handle_is_used(struct lustre_handle *lh)
-+static inline int lustre_handle_is_used(const struct lustre_handle *lh)
+-static inline int lustre_handle_is_used(const struct lustre_handle *lh)
++static inline bool lustre_handle_is_used(const struct lustre_handle *lh)
  {
  	return lh->cookie != 0ull;
  }
-@@ -1079,7 +1079,7 @@ static inline int lustre_handle_equal(const struct lustre_handle *lh1,
+ 
+-static inline int lustre_handle_equal(const struct lustre_handle *lh1,
+-				      const struct lustre_handle *lh2)
++static inline bool lustre_handle_equal(const struct lustre_handle *lh1,
++				       const struct lustre_handle *lh2)
+ {
+ 	return lh1->cookie == lh2->cookie;
  }
+@@ -2684,8 +2684,8 @@ struct ldlm_res_id {
+ #define PLDLMRES(res)	(res)->lr_name.name[0], (res)->lr_name.name[1], \
+ 			(res)->lr_name.name[2], (res)->lr_name.name[3]
  
- static inline void lustre_handle_copy(struct lustre_handle *tgt,
--				      struct lustre_handle *src)
-+				      const struct lustre_handle *src)
+-static inline int ldlm_res_eq(const struct ldlm_res_id *res0,
+-			      const struct ldlm_res_id *res1)
++static inline bool ldlm_res_eq(const struct ldlm_res_id *res0,
++			       const struct ldlm_res_id *res1)
  {
- 	tgt->cookie = src->cookie;
+ 	return !memcmp(res0, res1, sizeof(*res0));
  }
-@@ -1570,25 +1570,25 @@ static inline void lmm_oi_set_id(struct ost_id *oi, __u64 oid)
- 	oi->oi.oi_id = oid;
- }
- 
--static inline __u64 lmm_oi_id(struct ost_id *oi)
-+static inline __u64 lmm_oi_id(const struct ost_id *oi)
- {
- 	return oi->oi.oi_id;
- }
- 
--static inline __u64 lmm_oi_seq(struct ost_id *oi)
-+static inline __u64 lmm_oi_seq(const struct ost_id *oi)
- {
- 	return oi->oi.oi_seq;
- }
- 
- static inline void lmm_oi_le_to_cpu(struct ost_id *dst_oi,
--				    struct ost_id *src_oi)
-+				    const struct ost_id *src_oi)
- {
- 	dst_oi->oi.oi_id = le64_to_cpu(src_oi->oi.oi_id);
- 	dst_oi->oi.oi_seq = le64_to_cpu(src_oi->oi.oi_seq);
- }
- 
- static inline void lmm_oi_cpu_to_le(struct ost_id *dst_oi,
--				    struct ost_id *src_oi)
-+				    const struct ost_id *src_oi)
- {
- 	dst_oi->oi.oi_id = cpu_to_le64(src_oi->oi.oi_id);
- 	dst_oi->oi.oi_seq = cpu_to_le64(src_oi->oi.oi_seq);
-@@ -2724,15 +2724,15 @@ struct ldlm_extent {
- 
- #define LDLM_GID_ANY ((__u64)-1)
- 
--static inline int ldlm_extent_overlap(struct ldlm_extent *ex1,
--				      struct ldlm_extent *ex2)
-+static inline int ldlm_extent_overlap(const struct ldlm_extent *ex1,
-+				      const struct ldlm_extent *ex2)
- {
- 	return (ex1->start <= ex2->end) && (ex2->start <= ex1->end);
- }
- 
- /* check if @ex1 contains @ex2 */
--static inline int ldlm_extent_contain(struct ldlm_extent *ex1,
--				      struct ldlm_extent *ex2)
-+static inline int ldlm_extent_contain(const struct ldlm_extent *ex1,
-+				      const struct ldlm_extent *ex2)
- {
- 	return (ex1->start <= ex2->start) && (ex1->end >= ex2->end);
- }
-@@ -3092,7 +3092,7 @@ enum agent_req_status {
- 	ARS_SUCCEED,
- };
- 
--static inline char *agent_req_status2name(enum agent_req_status ars)
-+static inline const char *agent_req_status2name(const enum agent_req_status ars)
- {
- 	switch (ars) {
- 	case ARS_WAITING:
-@@ -3268,7 +3268,7 @@ struct obdo {
- #define o_cksum   o_nlink
- #define o_grant_used o_data_version
- 
--static inline void lustre_set_wire_obdo(struct obd_connect_data *ocd,
-+static inline void lustre_set_wire_obdo(const struct obd_connect_data *ocd,
- 					struct obdo *wobdo,
- 					const struct obdo *lobdo)
- {
-@@ -3287,7 +3287,7 @@ static inline void lustre_set_wire_obdo(struct obd_connect_data *ocd,
- 	}
- }
- 
--static inline void lustre_get_wire_obdo(struct obd_connect_data *ocd,
-+static inline void lustre_get_wire_obdo(const struct obd_connect_data *ocd,
- 					struct obdo *lobdo,
- 					const struct obdo *wobdo)
- {
 diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
-index 61f3930..a85183b 100644
+index a85183b..6f7dc15 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_fid.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
-@@ -483,7 +483,7 @@ fid_build_pdo_res_name(const struct lu_fid *fid, unsigned int hash,
-  *    res will be built from normal FID directly, i.e. res[0] = f_seq,
-  *    res[1] = f_oid + f_ver.
+@@ -406,8 +406,8 @@ fid_build_reg_res_name(const struct lu_fid *fid, struct ldlm_res_id *res)
+ /*
+  * Return true if resource is for object identified by FID.
   */
--static inline void ostid_build_res_name(struct ost_id *oi,
-+static inline void ostid_build_res_name(const struct ost_id *oi,
- 					struct ldlm_res_id *name)
+-static inline int fid_res_name_eq(const struct lu_fid *fid,
+-				  const struct ldlm_res_id *res)
++static inline bool fid_res_name_eq(const struct lu_fid *fid,
++				   const struct ldlm_res_id *res)
  {
- 	memset(name, 0, sizeof(*name));
-@@ -498,8 +498,8 @@ static inline void ostid_build_res_name(struct ost_id *oi,
- /**
-  * Return true if the resource is for the object identified by this id & group.
-  */
--static inline int ostid_res_name_eq(struct ost_id *oi,
--				    struct ldlm_res_id *name)
-+static inline int ostid_res_name_eq(const struct ost_id *oi,
-+				    const struct ldlm_res_id *name)
- {
- 	/* Note: it is just a trick here to save some effort, probably the
- 	 * correct way would be turn them into the FID and compare
-@@ -610,7 +610,8 @@ static inline __u32 fid_flatten32(const struct lu_fid *fid)
- 	return ino ? ino : fid_oid(fid);
- }
- 
--static inline int lu_fid_diff(struct lu_fid *fid1, struct lu_fid *fid2)
-+static inline int lu_fid_diff(const struct lu_fid *fid1,
-+			      const struct lu_fid *fid2)
- {
- 	LASSERTF(fid_seq(fid1) == fid_seq(fid2), "fid1:"DFID", fid2:"DFID"\n",
- 		 PFID(fid1), PFID(fid2));
+ 	return res->name[LUSTRE_RES_ID_SEQ_OFF] == fid_seq(fid) &&
+ 	       res->name[LUSTRE_RES_ID_VER_OID_OFF] == fid_ver_oid(fid);
 -- 
 1.7.1
