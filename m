@@ -1,82 +1,139 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:18:47 -0400
-Subject: [lustre-devel] [PATCH 34/80] staging: lustre: lmv: rename request
-	to preq in lmv_getattr_name()
+Date: Tue, 16 Aug 2016 16:19:02 -0400
+Subject: [lustre-devel] [PATCH 49/80] staging: lustre: lmv: validate lock
+	with correct stripe FID
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-35-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-50-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: wang di <di.wang@intel.com>
 
-Rename request to preq.
+In ll_lookup_it_finish, we need use the real parent(stripe)
+FID to validate the parent UPDATE lock.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4826
-Reviewed-on: http://review.whamcloud.com/9863
-Reviewed-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Signed-off-by: wang di <di.wang@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4925
+Reviewed-on: http://review.whamcloud.com/10026
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c |   16 +++++++---------
- 1 files changed, 7 insertions(+), 9 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h       |    5 +++++
+ drivers/staging/lustre/lustre/include/obd_class.h |   13 +++++++++++++
+ drivers/staging/lustre/lustre/llite/namei.c       |   15 +++++++++++++--
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c       |   19 ++++++++++++++++++-
+ 4 files changed, 49 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 52020a9..b7bdd07 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -1103,6 +1103,11 @@ struct md_ops {
+ 			     ldlm_policy_data_t *, enum ldlm_mode,
+ 			     enum ldlm_cancel_flags flags, void *opaque);
+ 
++	int (*get_fid_from_lsm)(struct obd_export *,
++				const struct lmv_stripe_md *,
++				const char *name, int namelen,
++				struct lu_fid *fid);
++
+ 	int (*intent_getattr_async)(struct obd_export *,
+ 				    struct md_enqueue_info *,
+ 				    struct ldlm_enqueue_info *);
+diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+index e86961c..69b628b 100644
+--- a/drivers/staging/lustre/lustre/include/obd_class.h
++++ b/drivers/staging/lustre/lustre/include/obd_class.h
+@@ -1699,6 +1699,19 @@ static inline int md_revalidate_lock(struct obd_export *exp,
+ 	return rc;
+ }
+ 
++static inline int md_get_fid_from_lsm(struct obd_export *exp,
++				      const struct lmv_stripe_md *lsm,
++				      const char *name, int namelen,
++				      struct lu_fid *fid)
++{
++	int rc;
++
++	EXP_CHECK_MD_OP(exp, get_fid_from_lsm);
++	EXP_MD_COUNTER_INCREMENT(exp, get_fid_from_lsm);
++	rc = MDP(exp->exp_obd, get_fid_from_lsm)(exp, lsm, name, namelen, fid);
++	return rc;
++}
++
+ /* OBD Metadata Support */
+ 
+ int obd_init_caches(void);
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index 6e11b99..581b083 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -487,9 +487,20 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ 		struct lookup_intent parent_it = {
+ 					.it_op = IT_GETATTR,
+ 					.it_lock_handle = 0 };
++		struct lu_fid fid = ll_i2info(parent)->lli_fid;
++
++		/* If it is striped directory, get the real stripe parent */
++		if (unlikely(ll_i2info(parent)->lli_lsm_md)) {
++			rc = md_get_fid_from_lsm(ll_i2mdexp(parent),
++						 ll_i2info(parent)->lli_lsm_md,
++						 (*de)->d_name.name,
++						 (*de)->d_name.len, &fid);
++			if (rc)
++				return rc;
++		}
+ 
+-		if (md_revalidate_lock(ll_i2mdexp(parent), &parent_it,
+-				       &ll_i2info(parent)->lli_fid, NULL)) {
++		if (md_revalidate_lock(ll_i2mdexp(parent), &parent_it, &fid,
++				       NULL)) {
+ 			d_lustre_revalidate(*de);
+ 			ll_intent_release(&parent_it);
+ 		}
 diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index f1b8ae9..d07fd17 100644
+index 03594f0..9821f69 100644
 --- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
 +++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1883,7 +1883,7 @@ lmv_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 
- static int
- lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
--		 struct ptlrpc_request **request)
-+		 struct ptlrpc_request **preq)
- {
- 	struct ptlrpc_request   *req = NULL;
- 	struct obd_device       *obd = exp->exp_obd;
-@@ -1904,13 +1904,11 @@ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
- 	       op_data->op_namelen, op_data->op_name, PFID(&op_data->op_fid1),
- 	       tgt->ltd_idx);
- 
--	rc = md_getattr_name(tgt->ltd_exp, op_data, request);
-+	rc = md_getattr_name(tgt->ltd_exp, op_data, preq);
- 	if (rc != 0)
- 		return rc;
- 
--	body = req_capsule_server_get(&(*request)->rq_pill,
--				      &RMF_MDT_BODY);
--
-+	body = req_capsule_server_get(&(*preq)->rq_pill, &RMF_MDT_BODY);
- 	if (body->valid & OBD_MD_MDS) {
- 		struct lu_fid rid = body->fid1;
- 
-@@ -1919,8 +1917,8 @@ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
- 
- 		tgt = lmv_find_target(lmv, &rid);
- 		if (IS_ERR(tgt)) {
--			ptlrpc_req_finished(*request);
--			*request = NULL;
-+			ptlrpc_req_finished(*preq);
-+			*preq = NULL;
- 			return PTR_ERR(tgt);
- 		}
- 
-@@ -1929,8 +1927,8 @@ lmv_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
- 		op_data->op_namelen = 0;
- 		op_data->op_name = NULL;
- 		rc = md_getattr_name(tgt->ltd_exp, op_data, &req);
--		ptlrpc_req_finished(*request);
--		*request = req;
-+		ptlrpc_req_finished(*preq);
-+		*preq = req;
- 	}
- 
+@@ -2991,6 +2991,22 @@ static int lmv_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
  	return rc;
+ }
+ 
++int lmv_get_fid_from_lsm(struct obd_export *exp,
++			 const struct lmv_stripe_md *lsm,
++			 const char *name, int namelen, struct lu_fid *fid)
++{
++	const struct lmv_oinfo *oinfo;
++
++	LASSERT(lsm);
++	oinfo = lsm_name_to_stripe_info(lsm, name, namelen);
++	if (IS_ERR(oinfo))
++		return PTR_ERR(oinfo);
++
++	*fid = oinfo->lmo_fid;
++
++	return 0;
++}
++
+ /**
+  * For lmv, only need to send request to master MDT, and the master MDT will
+  * process with other slave MDTs. The only exception is Q_GETOQUOTA for which
+@@ -3155,7 +3171,8 @@ static struct md_ops lmv_md_ops = {
+ 	.set_open_replay_data	= lmv_set_open_replay_data,
+ 	.clear_open_replay_data	= lmv_clear_open_replay_data,
+ 	.intent_getattr_async	= lmv_intent_getattr_async,
+-	.revalidate_lock	= lmv_revalidate_lock
++	.revalidate_lock	= lmv_revalidate_lock,
++	.get_fid_from_lsm	= lmv_get_fid_from_lsm,
+ };
+ 
+ static int __init lmv_init(void)
 -- 
 1.7.1
