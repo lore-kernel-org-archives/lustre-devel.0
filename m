@@ -1,65 +1,58 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:18:31 -0400
-Subject: [lustre-devel] [PATCH 18/80] staging: lustre: lmv: fix issue found
-	by Klocwork Insight tool
+Date: Tue, 16 Aug 2016 16:18:41 -0400
+Subject: [lustre-devel] [PATCH 28/80] staging: lustre: lmv: access
+	lum_stripe_offset as little endian
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-19-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-29-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+From: John L. Hammond <john.hammond@intel.com>
 
-'plock.cookie' might be used uninitialized in this function.
+By the time that a struct lmv_user_md reaches lmv_placement_policy()
+it has already been converted to little endian. Therefore use the
+appropriate macros around accesses to this this field. This issue was
+found by rewriting the definition of struct lmv_user_md to use the
+__leXX typedefs and running sparse.
 
-sscanf format specification '%d' expects type 'int *' for 'd',
-but parameter 3 has a different type '__u32*'
-
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4629
-Reviewed-on: http://review.whamcloud.com/9390
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4738
+Reviewed-on: http://review.whamcloud.com/9671
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Swapnil Pimpale <spimpale@ddn.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lmv/lmv_intent.c |    6 ++++--
- drivers/staging/lustre/lustre/lmv/lmv_obd.c    |    2 +-
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_intent.c b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-index 2bc1098..51b7048 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-@@ -137,8 +137,10 @@ static int lmv_intent_remote(struct obd_export *exp, void *lmm,
- 		it->it_remote_lock_mode = it->it_lock_mode;
- 	}
- 
--	it->it_lock_handle = plock.cookie;
--	it->it_lock_mode = pmode;
-+	if (pmode) {
-+		it->it_lock_handle = plock.cookie;
-+		it->it_lock_mode = pmode;
-+	}
- 
- out_free_op_data:
- 	kfree(op_data);
 diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 09b2efe..c005a66 100644
+index c005a66..5929994 100644
 --- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
 +++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1419,7 +1419,7 @@ static int lmv_process_config(struct obd_device *obd, u32 len, void *buf)
+@@ -1242,15 +1242,15 @@ static int lmv_placement_policy(struct obd_device *obd,
+ 		struct lmv_user_md *lum;
  
- 		obd_str2uuid(&obd_uuid,  lustre_cfg_buf(lcfg, 1));
- 
--		if (sscanf(lustre_cfg_buf(lcfg, 2), "%d", &index) != 1) {
-+		if (sscanf(lustre_cfg_buf(lcfg, 2), "%u", &index) != 1) {
- 			rc = -EINVAL;
- 			goto out;
+ 		lum = op_data->op_data;
+-		if (lum->lum_stripe_offset != (__u32)-1) {
+-			*mds = lum->lum_stripe_offset;
++		if (le32_to_cpu(lum->lum_stripe_offset) != (__u32)-1) {
++			*mds = le32_to_cpu(lum->lum_stripe_offset);
+ 		} else {
+ 			/*
+ 			 * -1 means default, which will be in the same MDT with
+ 			 * the stripe
+ 			 */
+ 			*mds = op_data->op_mds;
+-			lum->lum_stripe_offset = op_data->op_mds;
++			lum->lum_stripe_offset = cpu_to_le32(op_data->op_mds);
  		}
+ 	} else {
+ 		/*
 -- 
 1.7.1
