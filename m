@@ -1,360 +1,293 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:19:22 -0400
-Subject: [lustre-devel] [PATCH 69/80] staging: lustre: osc: Automatically
-	increase the max_dirty_mb
+Date: Tue, 16 Aug 2016 16:19:13 -0400
+Subject: [lustre-devel] [PATCH 60/80] staging: lustre: ldlm: improve
+	ldlm_lock_create() return value
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-70-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-61-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Hongchao Zhang <hongchao.zhang@intel.com>, Li Xi <lixi@ddn.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Emoly Liu <emoly.liu@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Hongchao Zhang <hongchao.zhang@intel.com>
+From: Emoly Liu <emoly.liu@intel.com>
 
-When RPC size or the max RPCs in flight is increased, the actual
-limit might be max_dirty_mb. This patch automatically increases
-the max_dirty_mb value at connection time and when the related
-values are tuned manually by proc file system.
+ldlm_lock_create() and ldlm_resource_get() always return NULL as
+error reporting and "NULL" is interpretted as ENOMEM incorrectly
+sometimes. This patch fixes this problem by using ERR_PTR() rather
+than NULL.
 
-this patch also changes the unit of "cl_dirty" and "cl_dirty_max"
-in client_obd from byte to page.
-
-Signed-off-by: Li Xi <lixi@ddn.com>
-Signed-off-by: Hongchao Zhang <hongchao.zhang@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4933
-Reviewed-on: http://review.whamcloud.com/10446
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Signed-off-by: Emoly Liu <emoly.liu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4524
+Reviewed-on: http://review.whamcloud.com/9004
+Reviewed-by: Bobi Jam <bobijam@gmail.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h     |   28 +++++++++++++++++-
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c   |   12 +++++---
- drivers/staging/lustre/lustre/osc/lproc_osc.c   |   10 ++++---
- drivers/staging/lustre/lustre/osc/osc_cache.c   |   28 +++++++++---------
- drivers/staging/lustre/lustre/osc/osc_request.c |   34 +++++++++++++---------
- drivers/staging/lustre/lustre/ptlrpc/import.c   |    1 +
- 6 files changed, 74 insertions(+), 39 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |    4 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   28 ++++++++++++--------
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   13 +++-----
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   25 +++++------------
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    2 +-
+ drivers/staging/lustre/lustre/mdc/mdc_reint.c      |    2 +-
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    2 +-
+ 7 files changed, 34 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index e7e03be..e91f65a 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -222,8 +222,8 @@ struct client_obd {
- 	struct sptlrpc_flavor    cl_flvr_mgc;   /* fixed flavor of mgc->mgs */
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+index 65e8e14..61d649f 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+@@ -339,10 +339,10 @@ reprocess:
+ 						lock->l_granted_mode, &null_cbs,
+ 						NULL, 0, LVB_T_NONE);
+ 			lock_res_and_lock(req);
+-			if (!new2) {
++			if (IS_ERR(new2)) {
+ 				ldlm_flock_destroy(req, lock->l_granted_mode,
+ 						   *flags);
+-				*err = -ENOLCK;
++				*err = PTR_ERR(new2);
+ 				return LDLM_ITER_STOP;
+ 			}
+ 			goto reprocess;
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 1a0fce1..a91cdb4 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -481,8 +481,8 @@ int ldlm_lock_change_resource(struct ldlm_namespace *ns, struct ldlm_lock *lock,
+ 	unlock_res_and_lock(lock);
  
- 	/* the grant values are protected by loi_list_lock below */
--	long		     cl_dirty;	 /* all _dirty_ in bytes */
--	long		     cl_dirty_max;     /* allowed w/o rpc */
-+	long		     cl_dirty_pages;	/* all _dirty_ in pahges */
-+	long		     cl_dirty_max_pages;/* allowed w/o rpc */
- 	long		     cl_dirty_transit; /* dirty synchronous */
- 	long		     cl_avail_grant;   /* bytes of credit for ost */
- 	long		     cl_lost_grant;    /* lost credits (trunc) */
-@@ -1225,4 +1225,28 @@ static inline int cli_brw_size(struct obd_device *obd)
- 	return obd->u.cli.cl_max_pages_per_rpc << PAGE_SHIFT;
- }
+ 	newres = ldlm_resource_get(ns, NULL, new_resid, type, 1);
+-	if (!newres)
+-		return -ENOMEM;
++	if (IS_ERR(newres))
++		return PTR_ERR(newres);
  
-+/*
-+ * when RPC size or the max RPCs in flight is increased, the max dirty pages
-+ * of the client should be increased accordingly to avoid sending fragmented
-+ * RPCs over the network when the client runs out of the maximum dirty space
-+ * when so many RPCs are being generated.
-+ */
-+static inline void client_adjust_max_dirty(struct client_obd *cli)
-+{
-+	/* initializing */
-+	if (cli->cl_dirty_max_pages <= 0)
-+		cli->cl_dirty_max_pages =
-+			(OSC_MAX_DIRTY_DEFAULT * 1024 * 1024) >> PAGE_SHIFT;
-+	else {
-+		long dirty_max = cli->cl_max_rpcs_in_flight *
-+				 cli->cl_max_pages_per_rpc;
-+
-+		if (dirty_max > cli->cl_dirty_max_pages)
-+			cli->cl_dirty_max_pages = dirty_max;
+ 	lu_ref_add(&newres->lr_reference, "lock", lock);
+ 	/*
+@@ -1227,7 +1227,7 @@ enum ldlm_mode ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
+ 	}
+ 
+ 	res = ldlm_resource_get(ns, NULL, res_id, type, 0);
+-	if (!res) {
++	if (IS_ERR(res)) {
+ 		LASSERT(!old_lock);
+ 		return 0;
+ 	}
+@@ -1475,15 +1475,15 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
+ {
+ 	struct ldlm_lock *lock;
+ 	struct ldlm_resource *res;
++	int rc;
+ 
+ 	res = ldlm_resource_get(ns, NULL, res_id, type, 1);
+-	if (!res)
+-		return NULL;
++	if (IS_ERR(res))
++		return ERR_CAST(res);
+ 
+ 	lock = ldlm_lock_new(res);
+-
+ 	if (!lock)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	lock->l_req_mode = mode;
+ 	lock->l_ast_data = data;
+@@ -1497,27 +1497,33 @@ struct ldlm_lock *ldlm_lock_create(struct ldlm_namespace *ns,
+ 	lock->l_tree_node = NULL;
+ 	/* if this is the extent lock, allocate the interval tree node */
+ 	if (type == LDLM_EXTENT) {
+-		if (!ldlm_interval_alloc(lock))
++		if (!ldlm_interval_alloc(lock)) {
++			rc = -ENOMEM;
+ 			goto out;
++		}
+ 	}
+ 
+ 	if (lvb_len) {
+ 		lock->l_lvb_len = lvb_len;
+ 		lock->l_lvb_data = kzalloc(lvb_len, GFP_NOFS);
+-		if (!lock->l_lvb_data)
++		if (!lock->l_lvb_data) {
++			rc = -ENOMEM;
+ 			goto out;
++		}
+ 	}
+ 
+ 	lock->l_lvb_type = lvb_type;
+-	if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_NEW_LOCK))
++	if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_NEW_LOCK)) {
++		rc = -ENOENT;
+ 		goto out;
 +	}
-+
-+	if (cli->cl_dirty_max_pages > totalram_pages / 8)
-+		cli->cl_dirty_max_pages = totalram_pages / 8;
-+}
-+
- #endif /* __OBD_H */
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index ee40006..3c98ce2 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -299,12 +299,14 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	       min_t(unsigned int, LUSTRE_CFG_BUFLEN(lcfg, 2),
- 		     sizeof(server_uuid)));
  
--	cli->cl_dirty = 0;
-+	cli->cl_dirty_pages = 0;
- 	cli->cl_avail_grant = 0;
--	/* FIXME: Should limit this for the sum of all cl_dirty_max. */
--	cli->cl_dirty_max = OSC_MAX_DIRTY_DEFAULT * 1024 * 1024;
--	if (cli->cl_dirty_max >> PAGE_SHIFT > totalram_pages / 8)
--		cli->cl_dirty_max = totalram_pages << (PAGE_SHIFT - 3);
-+	/* FIXME: Should limit this for the sum of all cl_dirty_max_pages. */
-+	/*
-+	 * cl_dirty_max_pages may be changed@connect time in
-+	 * ptlrpc_connect_interpret().
-+	 */
-+	client_adjust_max_dirty(cli);
- 	INIT_LIST_HEAD(&cli->cl_cache_waiters);
- 	INIT_LIST_HEAD(&cli->cl_loi_ready_list);
- 	INIT_LIST_HEAD(&cli->cl_loi_hp_ready_list);
-diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-index 7e83d39..9172b78 100644
---- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
-+++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-@@ -119,6 +119,7 @@ static ssize_t max_rpcs_in_flight_store(struct kobject *kobj,
+ 	return lock;
  
- 	spin_lock(&cli->cl_loi_list_lock);
- 	cli->cl_max_rpcs_in_flight = val;
-+	client_adjust_max_dirty(cli);
- 	spin_unlock(&cli->cl_loi_list_lock);
- 
- 	return count;
-@@ -136,10 +137,10 @@ static ssize_t max_dirty_mb_show(struct kobject *kobj,
- 	int mult;
- 
- 	spin_lock(&cli->cl_loi_list_lock);
--	val = cli->cl_dirty_max;
-+	val = cli->cl_dirty_max_pages;
- 	spin_unlock(&cli->cl_loi_list_lock);
- 
--	mult = 1 << 20;
-+	mult = 1 << (20 - PAGE_SHIFT);
- 	return lprocfs_read_frac_helper(buf, PAGE_SIZE, val, mult);
- }
- 
-@@ -166,7 +167,7 @@ static ssize_t max_dirty_mb_store(struct kobject *kobj,
- 		return -ERANGE;
- 
- 	spin_lock(&cli->cl_loi_list_lock);
--	cli->cl_dirty_max = (u32)(pages_number << PAGE_SHIFT);
-+	cli->cl_dirty_max_pages = pages_number;
- 	osc_wake_cache_waiters(cli);
- 	spin_unlock(&cli->cl_loi_list_lock);
- 
-@@ -244,7 +245,7 @@ static ssize_t cur_dirty_bytes_show(struct kobject *kobj,
- 	int len;
- 
- 	spin_lock(&cli->cl_loi_list_lock);
--	len = sprintf(buf, "%lu\n", cli->cl_dirty);
-+	len = sprintf(buf, "%lu\n", cli->cl_dirty_pages << PAGE_SHIFT);
- 	spin_unlock(&cli->cl_loi_list_lock);
- 
- 	return len;
-@@ -583,6 +584,7 @@ static ssize_t max_pages_per_rpc_store(struct kobject *kobj,
- 	}
- 	spin_lock(&cli->cl_loi_list_lock);
- 	cli->cl_max_pages_per_rpc = val;
-+	client_adjust_max_dirty(cli);
- 	spin_unlock(&cli->cl_loi_list_lock);
- 
- 	return count;
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index deaf912..c6e37c0 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -1387,7 +1387,7 @@ static int osc_completion(const struct lu_env *env, struct osc_async_page *oap,
- 	       "dropped: %ld avail: %ld, reserved: %ld, flight: %d }"	      \
- 	       "lru {in list: %d, left: %d, waiters: %d }" fmt,		      \
- 	       __tmp->cl_import->imp_obd->obd_name,			      \
--	       __tmp->cl_dirty, __tmp->cl_dirty_max,			      \
-+	       __tmp->cl_dirty_pages, __tmp->cl_dirty_max_pages,	      \
- 	       atomic_read(&obd_dirty_pages), obd_max_dirty_pages,	      \
- 	       __tmp->cl_lost_grant, __tmp->cl_avail_grant,		      \
- 	       __tmp->cl_reserved_grant, __tmp->cl_w_in_flight,		      \
-@@ -1403,7 +1403,7 @@ static void osc_consume_write_grant(struct client_obd *cli,
- 	assert_spin_locked(&cli->cl_loi_list_lock);
- 	LASSERT(!(pga->flag & OBD_BRW_FROM_GRANT));
- 	atomic_inc(&obd_dirty_pages);
--	cli->cl_dirty += PAGE_SIZE;
-+	cli->cl_dirty_pages++;
- 	pga->flag |= OBD_BRW_FROM_GRANT;
- 	CDEBUG(D_CACHE, "using %lu grant credits for brw %p page %p\n",
- 	       PAGE_SIZE, pga, pga->pg);
-@@ -1423,11 +1423,11 @@ static void osc_release_write_grant(struct client_obd *cli,
- 
- 	pga->flag &= ~OBD_BRW_FROM_GRANT;
- 	atomic_dec(&obd_dirty_pages);
--	cli->cl_dirty -= PAGE_SIZE;
-+	cli->cl_dirty_pages--;
- 	if (pga->flag & OBD_BRW_NOCACHE) {
- 		pga->flag &= ~OBD_BRW_NOCACHE;
- 		atomic_dec(&obd_dirty_transit_pages);
--		cli->cl_dirty_transit -= PAGE_SIZE;
-+		cli->cl_dirty_transit--;
- 	}
- }
- 
-@@ -1496,7 +1496,7 @@ static void osc_free_grant(struct client_obd *cli, unsigned int nr_pages,
- 
- 	spin_lock(&cli->cl_loi_list_lock);
- 	atomic_sub(nr_pages, &obd_dirty_pages);
--	cli->cl_dirty -= nr_pages << PAGE_SHIFT;
-+	cli->cl_dirty_pages -= nr_pages;
- 	cli->cl_lost_grant += lost_grant;
- 	if (cli->cl_avail_grant < grant && cli->cl_lost_grant >= grant) {
- 		/* borrow some grant from truncate to avoid the case that
-@@ -1509,7 +1509,7 @@ static void osc_free_grant(struct client_obd *cli, unsigned int nr_pages,
- 	spin_unlock(&cli->cl_loi_list_lock);
- 	CDEBUG(D_CACHE, "lost %u grant: %lu avail: %lu dirty: %lu\n",
- 	       lost_grant, cli->cl_lost_grant,
--	       cli->cl_avail_grant, cli->cl_dirty);
-+	       cli->cl_avail_grant, cli->cl_dirty_pages << PAGE_SHIFT);
+ out:
+ 	ldlm_lock_destroy(lock);
+ 	LDLM_LOCK_RELEASE(lock);
+-	return NULL;
++	return ERR_PTR(rc);
  }
  
  /**
-@@ -1539,11 +1539,11 @@ static int osc_enter_cache_try(struct client_obd *cli,
- 	if (rc < 0)
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index 984a460..048214c 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -694,8 +694,8 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
+ 		lock = ldlm_lock_create(ns, res_id, einfo->ei_type,
+ 					einfo->ei_mode, &cbs, einfo->ei_cbdata,
+ 					lvb_len, lvb_type);
+-		if (!lock)
+-			return -ENOMEM;
++		if (IS_ERR(lock))
++			return PTR_ERR(lock);
+ 		/* for the local lock, add the reference */
+ 		ldlm_lock_addref_internal(lock, einfo->ei_mode);
+ 		ldlm_lock2handle(lock, lockh);
+@@ -1658,7 +1658,7 @@ int ldlm_cli_cancel_unused_resource(struct ldlm_namespace *ns,
+ 	int rc;
+ 
+ 	res = ldlm_resource_get(ns, NULL, res_id, 0, 0);
+-	if (!res) {
++	if (IS_ERR(res)) {
+ 		/* This is not a problem. */
+ 		CDEBUG(D_INFO, "No resource %llu\n", res_id->name[0]);
+ 		return 0;
+@@ -1809,13 +1809,10 @@ int ldlm_resource_iterate(struct ldlm_namespace *ns,
+ 	struct ldlm_resource *res;
+ 	int rc;
+ 
+-	if (!ns) {
+-		CERROR("must pass in namespace\n");
+-		LBUG();
+-	}
++	LASSERTF(ns, "must pass in namespace\n");
+ 
+ 	res = ldlm_resource_get(ns, NULL, res_id, 0, 0);
+-	if (!res)
++	if (IS_ERR(res))
  		return 0;
  
--	if (cli->cl_dirty + PAGE_SIZE <= cli->cl_dirty_max &&
-+	if (cli->cl_dirty_pages <= cli->cl_dirty_max_pages &&
- 	    atomic_read(&obd_dirty_pages) + 1 <= obd_max_dirty_pages) {
- 		osc_consume_write_grant(cli, &oap->oap_brw_page);
- 		if (transient) {
--			cli->cl_dirty_transit += PAGE_SIZE;
-+			cli->cl_dirty_transit++;
- 			atomic_inc(&obd_dirty_transit_pages);
- 			oap->oap_brw_flags |= OBD_BRW_NOCACHE;
- 		}
-@@ -1590,8 +1590,8 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
- 	 * of queued writes and create a discontiguous rpc stream
- 	 */
- 	if (OBD_FAIL_CHECK(OBD_FAIL_OSC_NO_GRANT) ||
--	    cli->cl_dirty_max < PAGE_SIZE     ||
--	    cli->cl_ar.ar_force_sync || loi->loi_ar.ar_force_sync) {
-+	    !cli->cl_dirty_max_pages || cli->cl_ar.ar_force_sync ||
-+	    loi->loi_ar.ar_force_sync) {
- 		rc = -EDQUOT;
- 		goto out;
+ 	LDLM_RESOURCE_ADDREF(res);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 5866b00..c37a7b0 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -1088,7 +1088,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 		  int create)
+ {
+ 	struct hlist_node     *hnode;
+-	struct ldlm_resource *res;
++	struct ldlm_resource *res = NULL;
+ 	struct cfs_hash_bd	 bd;
+ 	__u64		 version;
+ 	int		      ns_refcount = 0;
+@@ -1101,31 +1101,20 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 	hnode = cfs_hash_bd_lookup_locked(ns->ns_rs_hash, &bd, (void *)name);
+ 	if (hnode) {
+ 		cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 0);
+-		res = hlist_entry(hnode, struct ldlm_resource, lr_hash);
+-		/* Synchronize with regard to resource creation. */
+-		if (ns->ns_lvbo && ns->ns_lvbo->lvbo_init) {
+-			mutex_lock(&res->lr_lvb_mutex);
+-			mutex_unlock(&res->lr_lvb_mutex);
+-		}
+-
+-		if (unlikely(res->lr_lvb_len < 0)) {
+-			ldlm_resource_putref(res);
+-			res = NULL;
+-		}
+-		return res;
++		goto lvbo_init;
  	}
-@@ -1612,7 +1612,7 @@ static int osc_enter_cache(const struct lu_env *env, struct client_obd *cli,
- 	init_waitqueue_head(&ocw.ocw_waitq);
- 	ocw.ocw_oap   = oap;
- 	ocw.ocw_grant = bytes;
--	while (cli->cl_dirty > 0 || cli->cl_w_in_flight > 0) {
-+	while (cli->cl_dirty_pages > 0 || cli->cl_w_in_flight > 0) {
- 		list_add_tail(&ocw.ocw_entry, &cli->cl_cache_waiters);
- 		ocw.ocw_rc = 0;
- 		spin_unlock(&cli->cl_loi_list_lock);
-@@ -1667,11 +1667,11 @@ void osc_wake_cache_waiters(struct client_obd *cli)
  
- 		ocw->ocw_rc = -EDQUOT;
- 		/* we can't dirty more */
--		if ((cli->cl_dirty + PAGE_SIZE > cli->cl_dirty_max) ||
-+		if ((cli->cl_dirty_pages > cli->cl_dirty_max_pages) ||
- 		    (atomic_read(&obd_dirty_pages) + 1 > obd_max_dirty_pages)) {
- 			CDEBUG(D_CACHE, "no dirty room: dirty: %ld osc max %ld, sys max %d\n",
--			       cli->cl_dirty,
--			       cli->cl_dirty_max, obd_max_dirty_pages);
-+			       cli->cl_dirty_pages, cli->cl_dirty_max_pages,
-+			       obd_max_dirty_pages);
- 			goto wakeup;
+ 	version = cfs_hash_bd_version_get(&bd);
+ 	cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 0);
+ 
+ 	if (create == 0)
+-		return NULL;
++		return ERR_PTR(-ENOENT);
+ 
+ 	LASSERTF(type >= LDLM_MIN_TYPE && type < LDLM_MAX_TYPE,
+ 		 "type: %d\n", type);
+ 	res = ldlm_resource_new();
+ 	if (!res)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	res->lr_ns_bucket  = cfs_hash_bd_extra_get(ns->ns_rs_hash, &bd);
+ 	res->lr_name       = *name;
+@@ -1143,7 +1132,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 		/* We have taken lr_lvb_mutex. Drop it. */
+ 		mutex_unlock(&res->lr_lvb_mutex);
+ 		kmem_cache_free(ldlm_resource_slab, res);
+-
++lvbo_init:
+ 		res = hlist_entry(hnode, struct ldlm_resource, lr_hash);
+ 		/* Synchronize with regard to resource creation. */
+ 		if (ns->ns_lvbo && ns->ns_lvbo->lvbo_init) {
+@@ -1153,7 +1142,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 
+ 		if (unlikely(res->lr_lvb_len < 0)) {
+ 			ldlm_resource_putref(res);
+-			res = NULL;
++			res = ERR_PTR(res->lr_lvb_len);
  		}
+ 		return res;
+ 	}
+@@ -1175,7 +1164,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 			res->lr_lvb_len = rc;
+ 			mutex_unlock(&res->lr_lvb_mutex);
+ 			ldlm_resource_putref(res);
+-			return NULL;
++			return ERR_PTR(rc);
+ 		}
+ 	}
  
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+index 3291201..fab83dd 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+@@ -174,7 +174,7 @@ int mdc_null_inode(struct obd_export *exp,
+ 	fid_build_reg_res_name(fid, &res_id);
+ 
+ 	res = ldlm_resource_get(ns, NULL, &res_id, 0, 0);
+-	if (!res)
++	if (IS_ERR(res))
+ 		return 0;
+ 
+ 	lock_res(res);
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_reint.c b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
+index 9bec049..0f71392 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_reint.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
+@@ -86,7 +86,7 @@ int mdc_resource_get_unused(struct obd_export *exp, const struct lu_fid *fid,
+ 	fid_build_reg_res_name(fid, &res_id);
+ 	res = ldlm_resource_get(exp->exp_obd->obd_namespace,
+ 				NULL, &res_id, 0, 0);
+-	if (!res)
++	if (IS_ERR(res))
+ 		return 0;
+ 	LDLM_RESOURCE_ADDREF(res);
+ 	/* Initialize ibits lock policy. */
 diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 90c8416..c618337 100644
+index e5669e2..90c8416 100644
 --- a/drivers/staging/lustre/lustre/osc/osc_request.c
 +++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -801,11 +801,12 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
+@@ -650,7 +650,7 @@ static int osc_resource_get_unused(struct obd_export *exp, struct obdo *oa,
  
- 	oa->o_valid |= bits;
- 	spin_lock(&cli->cl_loi_list_lock);
--	oa->o_dirty = cli->cl_dirty;
--	if (unlikely(cli->cl_dirty - cli->cl_dirty_transit >
--		     cli->cl_dirty_max)) {
-+	oa->o_dirty = cli->cl_dirty_pages << PAGE_SHIFT;
-+	if (unlikely(cli->cl_dirty_pages - cli->cl_dirty_transit >
-+		     cli->cl_dirty_max_pages)) {
- 		CERROR("dirty %lu - %lu > dirty_max %lu\n",
--		       cli->cl_dirty, cli->cl_dirty_transit, cli->cl_dirty_max);
-+		       cli->cl_dirty_pages, cli->cl_dirty_transit,
-+		       cli->cl_dirty_max_pages);
- 		oa->o_undirty = 0;
- 	} else if (unlikely(atomic_read(&obd_dirty_pages) -
- 			    atomic_read(&obd_dirty_transit_pages) >
-@@ -820,15 +821,17 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
- 		       atomic_read(&obd_dirty_transit_pages),
- 		       obd_max_dirty_pages);
- 		oa->o_undirty = 0;
--	} else if (unlikely(cli->cl_dirty_max - cli->cl_dirty > 0x7fffffff)) {
-+	} else if (unlikely(cli->cl_dirty_max_pages - cli->cl_dirty_pages >
-+		   0x7fffffff)) {
- 		CERROR("dirty %lu - dirty_max %lu too big???\n",
--		       cli->cl_dirty, cli->cl_dirty_max);
-+		       cli->cl_dirty_pages, cli->cl_dirty_max_pages);
- 		oa->o_undirty = 0;
- 	} else {
- 		long max_in_flight = (cli->cl_max_pages_per_rpc <<
- 				      PAGE_SHIFT)*
- 				     (cli->cl_max_rpcs_in_flight + 1);
--		oa->o_undirty = max(cli->cl_dirty_max, max_in_flight);
-+		oa->o_undirty = max(cli->cl_dirty_max_pages << PAGE_SHIFT,
-+				    max_in_flight);
- 	}
- 	oa->o_grant = cli->cl_avail_grant + cli->cl_reserved_grant;
- 	oa->o_dropped = cli->cl_lost_grant;
-@@ -1028,22 +1031,24 @@ static void osc_init_grant(struct client_obd *cli, struct obd_connect_data *ocd)
- {
- 	/*
- 	 * ocd_grant is the total grant amount we're expect to hold: if we've
--	 * been evicted, it's the new avail_grant amount, cl_dirty will drop
--	 * to 0 as inflight RPCs fail out; otherwise, it's avail_grant + dirty.
-+	 * been evicted, it's the new avail_grant amount, cl_dirty_pages will
-+	 * drop to 0 as inflight RPCs fail out; otherwise, it's avail_grant +
-+	 * dirty.
- 	 *
- 	 * race is tolerable here: if we're evicted, but imp_state already
--	 * left EVICTED state, then cl_dirty must be 0 already.
-+	 * left EVICTED state, then cl_dirty_pages must be 0 already.
- 	 */
- 	spin_lock(&cli->cl_loi_list_lock);
- 	if (cli->cl_import->imp_state == LUSTRE_IMP_EVICTED)
- 		cli->cl_avail_grant = ocd->ocd_grant;
- 	else
--		cli->cl_avail_grant = ocd->ocd_grant - cli->cl_dirty;
-+		cli->cl_avail_grant = ocd->ocd_grant -
-+				      (cli->cl_dirty_pages << PAGE_SHIFT);
+ 	ostid_build_res_name(&oa->o_oi, &res_id);
+ 	res = ldlm_resource_get(ns, NULL, &res_id, 0, 0);
+-	if (!res)
++	if (IS_ERR(res))
+ 		return 0;
  
- 	if (cli->cl_avail_grant < 0) {
- 		CWARN("%s: available grant < 0: avail/ocd/dirty %ld/%u/%ld\n",
- 		      cli->cl_import->imp_obd->obd_name, cli->cl_avail_grant,
--		      ocd->ocd_grant, cli->cl_dirty);
-+		      ocd->ocd_grant, cli->cl_dirty_pages << PAGE_SHIFT);
- 		/* workaround for servers which do not have the patch from
- 		 * LU-2679
- 		 */
-@@ -3014,8 +3019,9 @@ static int osc_reconnect(const struct lu_env *env,
- 		long lost_grant;
- 
- 		spin_lock(&cli->cl_loi_list_lock);
--		data->ocd_grant = (cli->cl_avail_grant + cli->cl_dirty) ?:
--				2 * cli_brw_size(obd);
-+		data->ocd_grant = (cli->cl_avail_grant +
-+				   (cli->cl_dirty_pages << PAGE_SHIFT)) ?:
-+				   2 * cli_brw_size(obd);
- 		lost_grant = cli->cl_lost_grant;
- 		cli->cl_lost_grant = 0;
- 		spin_unlock(&cli->cl_loi_list_lock);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index af8ffbc..c0122ef 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -1132,6 +1132,7 @@ finish:
- 
- 		LASSERT((cli->cl_max_pages_per_rpc <= PTLRPC_MAX_BRW_PAGES) &&
- 			(cli->cl_max_pages_per_rpc > 0));
-+		client_adjust_max_dirty(cli);
- 	}
- 
- out:
+ 	LDLM_RESOURCE_ADDREF(res);
 -- 
 1.7.1
