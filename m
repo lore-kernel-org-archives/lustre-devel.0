@@ -1,77 +1,111 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:19:06 -0400
-Subject: [lustre-devel] [PATCH 53/80] staging: lustre: obd: rename
-	lsr_padding to lsr_valid
+Date: Tue, 16 Aug 2016 16:19:33 -0400
+Subject: [lustre-devel] [PATCH 80/80] staging: lustre: lnet: Stop Infinite
+	CON RACE Condition
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-54-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-81-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Doug Oucharek <doug.s.oucharek@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: Doug Oucharek <doug.s.oucharek@intel.com>
 
-Simple variable rename.
+In current code, when a CON RACE occurs, the passive side will
+let the node with the higher NID value win the race.
 
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4345
-Reviewed-on: http://review.whamcloud.com/10223
+We have a field case where a node can have a "stuck"
+connection which never goes away and is the trigger of a
+never-ending loop of re-connections.
+
+This patch introduces a counter to how many times a
+connection in a connecting state has been the cause of a CON RACE
+rejection. After 20 times (constant MAX_CONN_RACES_BEFORE_ABORT),
+we assume the connection is stuck and let the other side (with
+lower NID) win.
+
+Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7646
+Reviewed-on: http://review.whamcloud.com/19430
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Mike Pershin <mike.pershin@intel.com>
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_idl.h      |    2 +-
- drivers/staging/lustre/lustre/obdclass/llog_swab.c |    1 +
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |    8 ++++----
- 3 files changed, 6 insertions(+), 5 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    2 +
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   24 ++++++++++++++++---
+ 2 files changed, 22 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 87eef4c..bbf0c8d 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -3036,7 +3036,7 @@ struct llog_setattr64_rec {
- 	__u32			lsr_uid_h;
- 	__u32			lsr_gid;
- 	__u32			lsr_gid_h;
--	__u64			lsr_padding;
-+	__u64			lsr_valid;
- 	struct llog_rec_tail    lsr_tail;
- } __packed;
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+index 078a0c3..fbc4f68 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -582,6 +582,8 @@ struct kib_peer {
+ 	unsigned short		ibp_connecting;
+ 	/* reconnect this peer later */
+ 	unsigned short		ibp_reconnecting:1;
++	/* counter of how many times we triggered a conn race */
++	unsigned char		ibp_races;
+ 	/* # consecutive reconnection attempts to this peer */
+ 	unsigned int		ibp_reconnected;
+ 	/* errno on closing this peer */
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 6d1b14a..430ff85 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -36,6 +36,8 @@
  
-diff --git a/drivers/staging/lustre/lustre/obdclass/llog_swab.c b/drivers/staging/lustre/lustre/obdclass/llog_swab.c
-index f7b9b19..0ec6361 100644
---- a/drivers/staging/lustre/lustre/obdclass/llog_swab.c
-+++ b/drivers/staging/lustre/lustre/obdclass/llog_swab.c
-@@ -224,6 +224,7 @@ void lustre_swab_llog_rec(struct llog_rec_hdr *rec)
- 		__swab32s(&lsr->lsr_uid_h);
- 		__swab32s(&lsr->lsr_gid);
- 		__swab32s(&lsr->lsr_gid_h);
-+		__swab64s(&lsr->lsr_valid);
- 		tail = &lsr->lsr_tail;
- 		break;
- 	}
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index 9d5d2c8..8dbaf32 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -3170,10 +3170,10 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct llog_setattr64_rec, lsr_gid_h));
- 	LASSERTF((int)sizeof(((struct llog_setattr64_rec *)0)->lsr_gid_h) == 4, "found %lld\n",
- 		 (long long)(int)sizeof(((struct llog_setattr64_rec *)0)->lsr_gid_h));
--	LASSERTF((int)offsetof(struct llog_setattr64_rec, lsr_padding) == 48, "found %lld\n",
--		 (long long)(int)offsetof(struct llog_setattr64_rec, lsr_padding));
--	LASSERTF((int)sizeof(((struct llog_setattr64_rec *)0)->lsr_padding) == 8, "found %lld\n",
--		 (long long)(int)sizeof(((struct llog_setattr64_rec *)0)->lsr_padding));
-+	LASSERTF((int)offsetof(struct llog_setattr64_rec, lsr_valid) == 48, "found %lld\n",
-+		 (long long)(int)offsetof(struct llog_setattr64_rec, lsr_valid));
-+	LASSERTF((int)sizeof(((struct llog_setattr64_rec *)0)->lsr_valid) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct llog_setattr64_rec *)0)->lsr_valid));
- 	LASSERTF((int)offsetof(struct llog_setattr64_rec, lsr_tail) == 56, "found %lld\n",
- 		 (long long)(int)offsetof(struct llog_setattr64_rec, lsr_tail));
- 	LASSERTF((int)sizeof(((struct llog_setattr64_rec *)0)->lsr_tail) == 8, "found %lld\n",
+ #include "o2iblnd.h"
+ 
++#define MAX_CONN_RACES_BEFORE_ABORT 20
++
+ static void kiblnd_peer_alive(struct kib_peer *peer);
+ static void kiblnd_peer_connect_failed(struct kib_peer *peer, int active, int error);
+ static void kiblnd_init_tx_msg(lnet_ni_t *ni, struct kib_tx *tx,
+@@ -2405,23 +2407,37 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+ 			goto failed;
+ 		}
+ 
+-		/* tie-break connection race in favour of the higher NID */
++		/*
++		 * Tie-break connection race in favour of the higher NID.
++		 * If we keep running into a race condition multiple times,
++		 * we have to assume that the connection attempt with the
++		 * higher NID is stuck in a connecting state and will never
++		 * recover.  As such, we pass through this if-block and let
++		 * the lower NID connection win so we can move forward.
++		 */
+ 		if (peer2->ibp_connecting &&
+-		    nid < ni->ni_nid) {
++		    nid < ni->ni_nid && peer2->ibp_races <
++		    MAX_CONN_RACES_BEFORE_ABORT) {
++			peer2->ibp_races++;
+ 			write_unlock_irqrestore(g_lock, flags);
+ 
+-			CWARN("Conn race %s\n", libcfs_nid2str(peer2->ibp_nid));
++			CDEBUG(D_NET, "Conn race %s\n",
++			       libcfs_nid2str(peer2->ibp_nid));
+ 
+ 			kiblnd_peer_decref(peer);
+ 			rej.ibr_why = IBLND_REJECT_CONN_RACE;
+ 			goto failed;
+ 		}
+-
++		if (peer2->ibp_races >= MAX_CONN_RACES_BEFORE_ABORT)
++			CNETERR("Conn race %s: unresolved after %d attempts, letting lower NID win\n",
++				libcfs_nid2str(peer2->ibp_nid),
++				MAX_CONN_RACES_BEFORE_ABORT);
+ 		/**
+ 		 * passive connection is allowed even this peer is waiting for
+ 		 * reconnection.
+ 		 */
+ 		peer2->ibp_reconnecting = 0;
++		peer2->ibp_races = 0;
+ 		peer2->ibp_accepting++;
+ 		kiblnd_peer_addref(peer2);
+ 
 -- 
 1.7.1
