@@ -1,54 +1,54 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:19:20 -0400
-Subject: [lustre-devel] [PATCH 67/80] staging: lustre: ptlrpc: request gets
-	stuck in UNREGISTERING phase
+Date: Tue, 16 Aug 2016 16:19:31 -0400
+Subject: [lustre-devel] [PATCH 78/80] staging: lustre: lnet: make connection
+	more stable with packet loss
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-68-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-79-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andriy Skulysh <Andriy_Skulysh@xyratex.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Alexander Boyko <alexander.boyko@seagate.com>, Alexey Lyashkov <alexey.lyashkov@seagate.com>, James Simmons <jsimmons@infradead.org>
 
-From: Andriy Skulysh <Andriy_Skulysh@xyratex.com>
+From: Alexander Boyko <alexander.boyko@seagate.com>
 
-Exit condition from UNREGISTERING phase is releasing of
-both reply and bulk buffers.
+IB network may lose last connection handshake packet.
+This problem isn't Lustre specific and described at
+https://oss.oracle.com/pipermail/rds-devel/2007-December/000271.html
+for example. Solution is to make conection established if any packet
+is received for it.
 
-Call ptlrpc_unregister_bulk() if ptlrpc_unregister_reply()
-wasn't completed in async mode before switching to
-UNREGISTERING phase.
-
-Signed-off-by: Andriy Skulysh <Andriy_Skulysh@xyratex.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5259
-Xyratex-bug-id: MRP-1960
-Reviewed-on: http://review.whamcloud.com/10846
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Ann Koehler <amk@cray.com>
-Reviewed-by: Liang Zhen <liang.zhen@intel.com>
+Signed-off-by: Alexander Boyko <alexander.boyko@seagate.com>
+Signed-off-by: Alexey Lyashkov <alexey.lyashkov@seagate.com>
+Seagate-bug-id: MRP-2883
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8303
+Reviewed-on: http://review.whamcloud.com/20874
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: Alexander Zarochentsev <alexander.zarochentsev@seagate.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index f2e71b4..bae91bd 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -1630,8 +1630,10 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
- 			    req->rq_waiting || req->rq_wait_ctx) {
- 				int status;
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 19c90fc..6cd78ea 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -3419,6 +3419,12 @@ kiblnd_qp_event(struct ib_event *event, void *arg)
+ 	case IB_EVENT_COMM_EST:
+ 		CDEBUG(D_NET, "%s established\n",
+ 		       libcfs_nid2str(conn->ibc_peer->ibp_nid));
++		/*
++		 * We received a packet but connection isn't established
++		 * probably handshake packet was lost, so free to
++		 * force make connection established
++		 */
++		rdma_notify(conn->ibc_cmid, IB_EVENT_COMM_EST);
+ 		return;
  
--				if (!ptlrpc_unregister_reply(req, 1))
-+				if (!ptlrpc_unregister_reply(req, 1)) {
-+					ptlrpc_unregister_bulk(req, 1);
- 					continue;
-+				}
- 
- 				spin_lock(&imp->imp_lock);
- 				if (ptlrpc_import_delay_req(imp, req,
+ 	default:
 -- 
 1.7.1
