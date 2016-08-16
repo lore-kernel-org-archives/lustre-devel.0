@@ -1,61 +1,52 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:19:12 -0400
-Subject: [lustre-devel] [PATCH 59/80] staging: lustre: fld: add fld
-	description documentation
+Date: Tue, 16 Aug 2016 16:19:29 -0400
+Subject: [lustre-devel] [PATCH 76/80] staging: lustre: lnet: Do not drop
+	message when shutting down LNet
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-60-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-77-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Patrick Farrell <paf@cray.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Doug Oucharek <doug.s.oucharek@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Patrick Farrell <paf@cray.com>
+From: Doug Oucharek <doug.s.oucharek@intel.com>
 
-Add subsystem description from Di Wang to header file.
+There is a case in lnet_parse() where we discover that LNet
+is shutting down but we continue to use the NI when we drop the
+message and end up calling ko2iblnd_check_send_locked() which tries to
+allocate from the Tx pool which has been cleaned up already.
+This triggers a NULL pointer dereference.
 
-Signed-off-by: Patrick Farrell <paf@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5153
-Reviewed-on: http://review.whamcloud.com/10631
-Reviewed-by: wangdi <di.wang@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+This fix just returns from lnet_parse() when we disover LNet is
+shutting down.
+
+Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8106
+Reviewed-on: http://review.whamcloud.com/19993
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Liang Zhen <liang.zhen@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/fld/fld_internal.h |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+ drivers/staging/lustre/lnet/lnet/lib-move.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/fld/fld_internal.h b/drivers/staging/lustre/lustre/fld/fld_internal.h
-index f0efe5b..08eaec7 100644
---- a/drivers/staging/lustre/lustre/fld/fld_internal.h
-+++ b/drivers/staging/lustre/lustre/fld/fld_internal.h
-@@ -31,6 +31,25 @@
-  *
-  * lustre/fld/fld_internal.h
-  *
-+ * Subsystem Description:
-+ * FLD is FID Location Database, which stores where (IE, on which MDT)
-+ * FIDs are located.
-+ * The database is basically a record file, each record consists of a FID
-+ * sequence range, MDT/OST index, and flags. The FLD for the whole FS
-+ * is only stored on the sequence controller(MDT0) right now, but each target
-+ * also has its local FLD, which only stores the local sequence.
-+ *
-+ * The FLD subsystem usually has two tasks:
-+ * 1. maintain the database, i.e. when the sequence controller allocates
-+ * new sequence ranges to some nodes, it will call the FLD API to insert the
-+ * location information <sequence_range, node_index> in FLDB.
-+ *
-+ * 2. Handle requests from other nodes, i.e. if client needs to know where
-+ * the FID is located, if it can not find the information in the local cache,
-+ * it will send a FLD lookup RPC to the FLD service, and the FLD service will
-+ * look up the FLDB entry and return the location information to client.
-+ *
-+ *
-  * Author: Yury Umanets <umka@clusterfs.com>
-  * Author: Tom WangDi <wangdi@clusterfs.com>
-  */
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index 6a3f2e1..5598fa8 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -2002,6 +2002,9 @@ lnet_parse(lnet_ni_t *ni, lnet_hdr_t *hdr, lnet_nid_t from_nid,
+ 		       libcfs_nid2str(from_nid), libcfs_nid2str(src_nid),
+ 		       lnet_msgtyp2str(type), rc);
+ 		lnet_msg_free(msg);
++		if (rc == -ESHUTDOWN)
++			/* We are shutting down. Don't do anything more */
++			return 0;
+ 		goto drop;
+ 	}
+ 
 -- 
 1.7.1
