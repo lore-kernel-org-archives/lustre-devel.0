@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 16 Aug 2016 16:19:02 -0400
-Subject: [lustre-devel] [PATCH 49/80] staging: lustre: lmv: validate lock
-	with correct stripe FID
+Date: Tue, 16 Aug 2016 16:19:05 -0400
+Subject: [lustre-devel] [PATCH 52/80] staging: lustre: llite: use the
+	correct mode for striped directory
 In-Reply-To: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
 References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471378773-24590-50-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471378773-24590-53-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,126 +14,97 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: wang di <di.wang@intel.com>
 
-In ll_lookup_it_finish, we need use the real parent(stripe)
-FID to validate the parent UPDATE lock.
+Create striped directory with correct mode, which should be
+handling same as mkdir.
 
 Signed-off-by: wang di <di.wang@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4925
-Reviewed-on: http://review.whamcloud.com/10026
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4929
+Reviewed-on: http://review.whamcloud.com/10028
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h       |    5 +++++
- drivers/staging/lustre/lustre/include/obd_class.h |   13 +++++++++++++
- drivers/staging/lustre/lustre/llite/namei.c       |   15 +++++++++++++--
- drivers/staging/lustre/lustre/lmv/lmv_obd.c       |   19 ++++++++++++++++++-
- 4 files changed, 49 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/llite/dir.c |   40 +++++++++++++++++++---------
+ 1 files changed, 27 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 52020a9..b7bdd07 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -1103,6 +1103,11 @@ struct md_ops {
- 			     ldlm_policy_data_t *, enum ldlm_mode,
- 			     enum ldlm_cancel_flags flags, void *opaque);
- 
-+	int (*get_fid_from_lsm)(struct obd_export *,
-+				const struct lmv_stripe_md *,
-+				const char *name, int namelen,
-+				struct lu_fid *fid);
-+
- 	int (*intent_getattr_async)(struct obd_export *,
- 				    struct md_enqueue_info *,
- 				    struct ldlm_enqueue_info *);
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index e86961c..69b628b 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -1699,6 +1699,19 @@ static inline int md_revalidate_lock(struct obd_export *exp,
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 3fed80d..a1b5143 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -694,28 +694,40 @@ static int ll_send_mgc_param(struct obd_export *mgc, char *string)
  	return rc;
  }
  
-+static inline int md_get_fid_from_lsm(struct obd_export *exp,
-+				      const struct lmv_stripe_md *lsm,
-+				      const char *name, int namelen,
-+				      struct lu_fid *fid)
-+{
-+	int rc;
-+
-+	EXP_CHECK_MD_OP(exp, get_fid_from_lsm);
-+	EXP_MD_COUNTER_INCREMENT(exp, get_fid_from_lsm);
-+	rc = MDP(exp->exp_obd, get_fid_from_lsm)(exp, lsm, name, namelen, fid);
-+	return rc;
-+}
-+
- /* OBD Metadata Support */
+-static int ll_dir_setdirstripe(struct inode *dir, struct lmv_user_md *lump,
+-			       const char *filename)
++/**
++ * Create striped directory with specified stripe(@lump)
++ *
++ * param[in] parent	the parent of the directory.
++ * param[in] lump	the specified stripes.
++ * param[in] dirname	the name of the directory.
++ * param[in] mode	the specified mode of the directory.
++ *
++ * retval		=0 if striped directory is being created successfully.
++ *			<0 if the creation is failed.
++ */
++static int ll_dir_setdirstripe(struct inode *parent, struct lmv_user_md *lump,
++			       const char *dirname, umode_t mode)
+ {
+ 	struct ptlrpc_request *request = NULL;
+ 	struct md_op_data *op_data;
+-	struct ll_sb_info *sbi = ll_i2sbi(dir);
+-	int mode;
++	struct ll_sb_info *sbi = ll_i2sbi(parent);
+ 	int err;
  
- int obd_init_caches(void);
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 6e11b99..581b083 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -487,9 +487,20 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 		struct lookup_intent parent_it = {
- 					.it_op = IT_GETATTR,
- 					.it_lock_handle = 0 };
-+		struct lu_fid fid = ll_i2info(parent)->lli_fid;
-+
-+		/* If it is striped directory, get the real stripe parent */
-+		if (unlikely(ll_i2info(parent)->lli_lsm_md)) {
-+			rc = md_get_fid_from_lsm(ll_i2mdexp(parent),
-+						 ll_i2info(parent)->lli_lsm_md,
-+						 (*de)->d_name.name,
-+						 (*de)->d_name.len, &fid);
-+			if (rc)
-+				return rc;
-+		}
+ 	if (unlikely(lump->lum_magic != LMV_USER_MAGIC))
+ 		return -EINVAL;
  
--		if (md_revalidate_lock(ll_i2mdexp(parent), &parent_it,
--				       &ll_i2info(parent)->lli_fid, NULL)) {
-+		if (md_revalidate_lock(ll_i2mdexp(parent), &parent_it, &fid,
-+				       NULL)) {
- 			d_lustre_revalidate(*de);
- 			ll_intent_release(&parent_it);
+ 	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p) name %s stripe_offset %d, stripe_count: %u\n",
+-	       PFID(ll_inode2fid(dir)), dir, filename,
++	       PFID(ll_inode2fid(parent)), parent, dirname,
+ 	       (int)lump->lum_stripe_offset, lump->lum_stripe_count);
+ 
+ 	if (lump->lum_magic != cpu_to_le32(LMV_USER_MAGIC))
+ 		lustre_swab_lmv_user_md(lump);
+ 
+-	mode = (~current_umask() & 0755) | S_IFDIR;
+-	op_data = ll_prep_md_op_data(NULL, dir, NULL, filename,
+-				     strlen(filename), mode, LUSTRE_OPC_MKDIR,
++	if (!IS_POSIXACL(parent) || !exp_connect_umask(ll_i2mdexp(parent)))
++		mode &= ~current_umask();
++	mode = (mode & (S_IRWXUGO | S_ISVTX)) | S_IFDIR;
++	op_data = ll_prep_md_op_data(NULL, parent, NULL, dirname,
++				     strlen(dirname), mode, LUSTRE_OPC_MKDIR,
+ 				     lump);
+ 	if (IS_ERR(op_data)) {
+ 		err = PTR_ERR(op_data);
+@@ -1379,6 +1391,7 @@ out_free:
+ 		char		*filename;
+ 		int		 namelen = 0;
+ 		int		 lumlen = 0;
++		umode_t mode;
+ 		int		 len;
+ 		int		 rc;
+ 
+@@ -1412,11 +1425,12 @@ out_free:
+ 			goto lmv_out_free;
  		}
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 03594f0..9821f69 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -2991,6 +2991,22 @@ static int lmv_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
- 	return rc;
- }
  
-+int lmv_get_fid_from_lsm(struct obd_export *exp,
-+			 const struct lmv_stripe_md *lsm,
-+			 const char *name, int namelen, struct lu_fid *fid)
-+{
-+	const struct lmv_oinfo *oinfo;
-+
-+	LASSERT(lsm);
-+	oinfo = lsm_name_to_stripe_info(lsm, name, namelen);
-+	if (IS_ERR(oinfo))
-+		return PTR_ERR(oinfo);
-+
-+	*fid = oinfo->lmo_fid;
-+
-+	return 0;
-+}
-+
- /**
-  * For lmv, only need to send request to master MDT, and the master MDT will
-  * process with other slave MDTs. The only exception is Q_GETOQUOTA for which
-@@ -3155,7 +3171,8 @@ static struct md_ops lmv_md_ops = {
- 	.set_open_replay_data	= lmv_set_open_replay_data,
- 	.clear_open_replay_data	= lmv_clear_open_replay_data,
- 	.intent_getattr_async	= lmv_intent_getattr_async,
--	.revalidate_lock	= lmv_revalidate_lock
-+	.revalidate_lock	= lmv_revalidate_lock,
-+	.get_fid_from_lsm	= lmv_get_fid_from_lsm,
- };
- 
- static int __init lmv_init(void)
+-		/**
+-		 * ll_dir_setdirstripe will be used to set dir stripe
+-		 *  mdc_create--->mdt_reint_create (with dirstripe)
+-		 */
+-		rc = ll_dir_setdirstripe(inode, lum, filename);
++#if OBD_OCD_VERSION(2, 9, 50, 0) > LUSTRE_VERSION_CODE
++		mode = data->ioc_type != 0 ? data->ioc_type : S_IRWXUGO;
++#else
++		mode = data->ioc_type;
++#endif
++		rc = ll_dir_setdirstripe(inode, lum, filename, mode);
+ lmv_out_free:
+ 		obd_ioctl_freedata(buf, len);
+ 		return rc;
 -- 
 1.7.1
