@@ -1,691 +1,727 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 19 Aug 2016 14:07:30 -0400
-Subject: [lustre-devel] [PATCH 6/7] staging: lustre: obd: decruft
-	md_enqueue() and md_intent_lock()
+Date: Fri, 19 Aug 2016 14:07:29 -0400
+Subject: [lustre-devel] [PATCH 5/7] staging: lustre: obd: remove dead code
 In-Reply-To: <1471630051-26700-1-git-send-email-jsimmons@infradead.org>
 References: <1471630051-26700-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1471630051-26700-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1471630051-26700-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <uja.ornl@gmail.com>, James Simmons <jsimmons@infradead.org>
 
 From: John L. Hammond <john.hammond@intel.com>
 
-Remove the lmm and lmmsize parameters from both functions, storing
-that data in md_op_data when needed. Remove the unused lookup_flags
-parameter from md_intent_lock(), and the unused reqp parameter from
-md_enqueue(). Add a union ldlm_policy_data * parameter to
-md_enqueue(). Remove the unused function lmv_enqueue_remote().
+Remove unused OBD functions: oti_alloc_cookies(), oti_free_cookies(),
+class_observe_import(), class_unobserve_import(),
+md_is_subdir(), md_readpage(), obdo2fid(), fid2obdo().
+
+Remove several unused, get-only, and set-only structure members.
 
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Signed-off-by: James Simmons <uja.ornl@gmail.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
-Reviewed-on: http://review.whamcloud.com/10205
-Reviewed-by: wangdi <di.wang@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Reviewed-on: http://review.whamcloud.com/9784
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h       |    7 +-
- drivers/staging/lustre/lustre/include/obd_class.h |   18 ++---
- drivers/staging/lustre/lustre/llite/file.c        |   39 +++++------
- drivers/staging/lustre/lustre/llite/namei.c       |    4 +-
- drivers/staging/lustre/lustre/llite/xattr_cache.c |   12 ++--
- drivers/staging/lustre/lustre/lmv/lmv_intent.c    |   50 ++++++--------
- drivers/staging/lustre/lustre/lmv/lmv_internal.h  |    3 +-
- drivers/staging/lustre/lustre/lmv/lmv_obd.c       |   72 +-------------------
- drivers/staging/lustre/lustre/mdc/mdc_internal.h  |   10 ++--
- drivers/staging/lustre/lustre/mdc/mdc_locks.c     |   47 +++++--------
- drivers/staging/lustre/lustre/mdc/mdc_request.c   |    2 +-
- 11 files changed, 90 insertions(+), 174 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      |    6 +-
+ .../staging/lustre/lustre/include/lustre_import.h  |   22 -------
+ drivers/staging/lustre/lustre/include/lustre_log.h |    3 +-
+ .../lustre/lustre/include/lustre_req_layout.h      |    3 -
+ drivers/staging/lustre/lustre/include/obd.h        |   64 --------------------
+ drivers/staging/lustre/lustre/include/obd_class.h  |   49 +--------------
+ .../staging/lustre/lustre/include/obd_support.h    |    1 -
+ drivers/staging/lustre/lustre/mdc/mdc_internal.h   |    2 -
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c        |   15 -----
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |   27 --------
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |   25 --------
+ .../lustre/lustre/obdclass/linux/linux-obdo.c      |    2 +-
+ .../staging/lustre/lustre/obdclass/obd_config.c    |   16 +-----
+ drivers/staging/lustre/lustre/obdclass/obdo.c      |    7 +-
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    1 -
+ drivers/staging/lustre/lustre/osc/osc_request.c    |   12 +---
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      |   17 -----
+ 17 files changed, 18 insertions(+), 254 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index c57231b..35af07e 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1937,8 +1937,8 @@ enum mds_cmd {
+ 	MDS_DISCONNECT		= 39,
+ 	MDS_GETSTATUS		= 40,
+ 	MDS_STATFS		= 41,
+-	MDS_PIN			= 42,
+-	MDS_UNPIN		= 43,
++	MDS_PIN			= 42, /* obsolete, never used in a release */
++	MDS_UNPIN		= 43, /* obsolete, never used in a release */
+ 	MDS_SYNC		= 44,
+ 	MDS_DONE_WRITING	= 45,
+ 	MDS_SET_INFO		= 46,
+@@ -1947,7 +1947,7 @@ enum mds_cmd {
+ 	MDS_GETXATTR		= 49,
+ 	MDS_SETXATTR		= 50, /* obsolete, now it's MDS_REINT op */
+ 	MDS_WRITEPAGE		= 51,
+-	MDS_IS_SUBDIR		= 52,
++	MDS_IS_SUBDIR		= 52, /* obsolete, never used in a release */
+ 	MDS_GET_INFO		= 53,
+ 	MDS_HSM_STATE_GET	= 54,
+ 	MDS_HSM_STATE_SET	= 55,
+diff --git a/drivers/staging/lustre/lustre/include/lustre_import.h b/drivers/staging/lustre/lustre/include/lustre_import.h
+index 4445be7..b7a7a74 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_import.h
++++ b/drivers/staging/lustre/lustre/include/lustre_import.h
+@@ -305,28 +305,6 @@ struct obd_import {
+ 	time64_t	     imp_last_reply_time;    /* for health check */
+ };
+ 
+-typedef void (*obd_import_callback)(struct obd_import *imp, void *closure,
+-				    int event, void *event_arg, void *cb_data);
+-
+-/**
+- * Structure for import observer.
+- * It is possible to register "observer" on an import and every time
+- * something happens to an import (like connect/evict/disconnect)
+- * obderver will get its callback called with event type
+- */
+-struct obd_import_observer {
+-	struct list_head	   oio_chain;
+-	obd_import_callback  oio_cb;
+-	void		*oio_cb_data;
+-};
+-
+-void class_observe_import(struct obd_import *imp, obd_import_callback cb,
+-			  void *cb_data);
+-void class_unobserve_import(struct obd_import *imp, obd_import_callback cb,
+-			    void *cb_data);
+-void class_notify_import_observers(struct obd_import *imp, int event,
+-				   void *event_arg);
+-
+ /* import.c */
+ static inline unsigned int at_est2timeout(unsigned int val)
+ {
+diff --git a/drivers/staging/lustre/lustre/include/lustre_log.h b/drivers/staging/lustre/lustre/include/lustre_log.h
+index b96e023..995b266 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_log.h
++++ b/drivers/staging/lustre/lustre/include/lustre_log.h
+@@ -277,12 +277,11 @@ static inline void llog_ctxt_put(struct llog_ctxt *ctxt)
+ 	__llog_ctxt_put(NULL, ctxt);
+ }
+ 
+-static inline void llog_group_init(struct obd_llog_group *olg, int group)
++static inline void llog_group_init(struct obd_llog_group *olg)
+ {
+ 	init_waitqueue_head(&olg->olg_waitq);
+ 	spin_lock_init(&olg->olg_lock);
+ 	mutex_init(&olg->olg_cat_processing);
+-	olg->olg_seq = group;
+ }
+ 
+ static inline int llog_group_set_ctxt(struct obd_llog_group *olg,
+diff --git a/drivers/staging/lustre/lustre/include/lustre_req_layout.h b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+index 544a43c..ca0e683 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_req_layout.h
++++ b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+@@ -149,14 +149,11 @@ extern struct req_format RQF_MDS_GETATTR;
+ extern struct req_format RQF_MDS_GETATTR_NAME;
+ extern struct req_format RQF_MDS_CLOSE;
+ extern struct req_format RQF_MDS_RELEASE_CLOSE;
+-extern struct req_format RQF_MDS_PIN;
+-extern struct req_format RQF_MDS_UNPIN;
+ extern struct req_format RQF_MDS_CONNECT;
+ extern struct req_format RQF_MDS_DISCONNECT;
+ extern struct req_format RQF_MDS_GET_INFO;
+ extern struct req_format RQF_MDS_READPAGE;
+ extern struct req_format RQF_MDS_WRITEPAGE;
+-extern struct req_format RQF_MDS_IS_SUBDIR;
+ extern struct req_format RQF_MDS_DONE_WRITING;
+ extern struct req_format RQF_MDS_REINT;
+ extern struct req_format RQF_MDS_REINT_CREATE;
 diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 6fc0bcc..ac620fd 100644
+index 92eebff..6fc0bcc 100644
 --- a/drivers/staging/lustre/lustre/include/obd.h
 +++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -747,6 +747,7 @@ struct md_op_data {
- 	__u32		   op_fsgid;
- 	cfs_cap_t	       op_cap;
- 	void		   *op_data;
-+	size_t			op_data_size;
+@@ -243,7 +243,6 @@ struct client_obd {
+ 	 * the extent size. A chunk is max(PAGE_SIZE, OST block size)
+ 	 */
+ 	int		  cl_chunkbits;
+-	int		  cl_chunk;
+ 	int		  cl_extent_tax; /* extent overhead, by bytes */
  
- 	/* iattr fields and blocks. */
- 	struct iattr	    op_attr;
-@@ -967,15 +968,15 @@ struct md_ops {
- 	int (*done_writing)(struct obd_export *, struct md_op_data  *,
- 			    struct md_open_data *);
- 	int (*enqueue)(struct obd_export *, struct ldlm_enqueue_info *,
-+		       const ldlm_policy_data_t *,
- 		       struct lookup_intent *, struct md_op_data *,
--		       struct lustre_handle *, void *, int,
--		       struct ptlrpc_request **, __u64);
-+		       struct lustre_handle *, __u64);
- 	int (*getattr)(struct obd_export *, struct md_op_data *,
- 		       struct ptlrpc_request **);
- 	int (*getattr_name)(struct obd_export *, struct md_op_data *,
- 			    struct ptlrpc_request **);
- 	int (*intent_lock)(struct obd_export *, struct md_op_data *,
--			   void *, int, struct lookup_intent *, int,
-+			   struct lookup_intent *,
- 			   struct ptlrpc_request **,
- 			   ldlm_blocking_callback, __u64);
- 	int (*link)(struct obd_export *, struct md_op_data *,
+ 	/* keep track of objects that have lois that contain pages which
+@@ -442,7 +441,6 @@ struct niobuf_local {
+ 	__u32		flags;
+ 	struct page	*page;
+ 	struct dentry	*dentry;
+-	int		lnb_grant_used;
+ 	int		rc;
+ };
+ 
+@@ -485,7 +483,6 @@ struct niobuf_local {
+ #define N_LOCAL_TEMP_PAGE 0x10000000
+ 
+ struct obd_trans_info {
+-	__u64		    oti_transno;
+ 	__u64		    oti_xid;
+ 	/* Only used on the server side for tracking acks. */
+ 	struct oti_req_ack_lock {
+@@ -495,50 +492,11 @@ struct obd_trans_info {
+ 	void		    *oti_handle;
+ 	struct llog_cookie       oti_onecookie;
+ 	struct llog_cookie      *oti_logcookies;
+-	int		      oti_numcookies;
+-	/** synchronous write is needed */
+-	unsigned long		 oti_sync_write:1;
+ 
+-	/* initial thread handling transaction */
+-	struct ptlrpc_thread *oti_thread;
+-	__u32		    oti_conn_cnt;
+ 	/** VBR: versions */
+ 	__u64		    oti_pre_version;
+-	/** JobID */
+-	char		    *oti_jobid;
+-
+-	struct obd_uuid	 *oti_ost_uuid;
+ };
+ 
+-static inline void oti_alloc_cookies(struct obd_trans_info *oti,
+-				     int num_cookies)
+-{
+-	if (!oti)
+-		return;
+-
+-	if (num_cookies == 1)
+-		oti->oti_logcookies = &oti->oti_onecookie;
+-	else
+-		oti->oti_logcookies = libcfs_kvzalloc(num_cookies * sizeof(oti->oti_onecookie),
+-						      GFP_NOFS);
+-
+-	oti->oti_numcookies = num_cookies;
+-}
+-
+-static inline void oti_free_cookies(struct obd_trans_info *oti)
+-{
+-	if (!oti || !oti->oti_logcookies)
+-		return;
+-
+-	if (oti->oti_logcookies == &oti->oti_onecookie)
+-		LASSERT(oti->oti_numcookies == 1);
+-	else
+-		kvfree(oti->oti_logcookies);
+-
+-	oti->oti_logcookies = NULL;
+-	oti->oti_numcookies = 0;
+-}
+-
+ /*
+  * Events signalled through obd_notify() upcall-chain.
+  */
+@@ -584,7 +542,6 @@ struct target_recovery_data {
+ };
+ 
+ struct obd_llog_group {
+-	int		olg_seq;
+ 	struct llog_ctxt  *olg_ctxts[LLOG_MAX_CTXTS];
+ 	wait_queue_head_t	olg_waitq;
+ 	spinlock_t	   olg_lock;
+@@ -620,7 +577,6 @@ struct obd_device {
+ 		      obd_starting:1,      /* started setup */
+ 		      obd_force:1,	 /* cleanup with > 0 obd refcount */
+ 		      obd_fail:1,	 /* cleanup with failover */
+-		      obd_async_recov:1, /* allow asynchronous orphan cleanup */
+ 		      obd_no_conn:1,       /* deny new connections */
+ 		      obd_inactive:1,      /* device active/inactive
+ 					    * (for sysfs status only!!)
+@@ -695,9 +651,6 @@ struct obd_device {
+ 	struct completion	obd_kobj_unregister;
+ };
+ 
+-#define OBD_LLOG_FL_SENDNOW     0x0001
+-#define OBD_LLOG_FL_EXIT	0x0002
+-
+ enum obd_cleanup_stage {
+ /* Special case hack for MDS LOVs */
+ 	OBD_CLEANUP_EARLY,
+@@ -707,8 +660,6 @@ enum obd_cleanup_stage {
+ 
+ /* get/set_info keys */
+ #define KEY_ASYNC	       "async"
+-#define KEY_BLOCKSIZE_BITS      "blocksize_bits"
+-#define KEY_BLOCKSIZE	   "blocksize"
+ #define KEY_CHANGELOG_CLEAR     "changelog_clear"
+ #define KEY_FID2PATH	    "fid2path"
+ #define KEY_CHECKSUM	    "checksum"
+@@ -720,13 +671,11 @@ enum obd_cleanup_stage {
+ #define KEY_GRANT_SHRINK	"grant_shrink"
+ #define KEY_HSM_COPYTOOL_SEND   "hsm_send"
+ #define KEY_INIT_RECOV_BACKUP   "init_recov_bk"
+-#define KEY_INIT_RECOV	  "initial_recov"
+ #define KEY_INTERMDS	    "inter_mds"
+ #define KEY_LAST_ID	     "last_id"
+ #define KEY_LAST_FID		"last_fid"
+ #define KEY_LOCK_TO_STRIPE      "lock_to_stripe"
+ #define KEY_LOVDESC	     "lovdesc"
+-#define KEY_LOV_IDX	     "lov_idx"
+ #define KEY_MAX_EASIZE		"max_easize"
+ #define KEY_DEFAULT_EASIZE	"default_easize"
+ #define KEY_MDS_CONN	    "mds_conn"
+@@ -739,11 +688,9 @@ enum obd_cleanup_stage {
+ /*      KEY_SET_INFO in lustre_idl.h */
+ #define KEY_SPTLRPC_CONF	"sptlrpc_conf"
+ #define KEY_CONNECT_FLAG	"connect_flags"
+-#define KEY_SYNC_LOCK_CANCEL    "sync_lock_cancel"
+ 
+ #define KEY_CACHE_SET		"cache_set"
+ #define KEY_CACHE_LRU_SHRINK	"cache_lru_shrink"
+-#define KEY_CHANGELOG_INDEX	"changelog_index"
+ 
+ struct lu_context;
+ 
+@@ -872,8 +819,6 @@ struct obd_ops {
+ 			      __u32 keylen, void *key,
+ 			      __u32 vallen, void *val,
+ 			      struct ptlrpc_request_set *set);
+-	int (*attach)(struct obd_device *dev, u32 len, void *data);
+-	int (*detach)(struct obd_device *dev);
+ 	int (*setup)(struct obd_device *dev, struct lustre_cfg *cfg);
+ 	int (*precleanup)(struct obd_device *dev,
+ 			  enum obd_cleanup_stage cleanup_stage);
+@@ -1038,16 +983,11 @@ struct md_ops {
+ 	int (*rename)(struct obd_export *, struct md_op_data *,
+ 		      const char *, int, const char *, int,
+ 		      struct ptlrpc_request **);
+-	int (*is_subdir)(struct obd_export *, const struct lu_fid *,
+-			 const struct lu_fid *,
+-			   struct ptlrpc_request **);
+ 	int (*setattr)(struct obd_export *, struct md_op_data *, void *,
+ 		       int, void *, int, struct ptlrpc_request **,
+ 			 struct md_open_data **mod);
+ 	int (*sync)(struct obd_export *, const struct lu_fid *,
+ 		    struct ptlrpc_request **);
+-	int (*readpage)(struct obd_export *, struct md_op_data *,
+-			struct page **, struct ptlrpc_request **);
+ 	int (*read_page)(struct obd_export *, struct md_op_data *,
+ 			 struct md_callback *cb_op, __u64 hash_offset,
+ 			 struct page **ppage);
+@@ -1141,10 +1081,6 @@ static inline const struct lsm_operations *lsm_op_find(int magic)
+ 	}
+ }
+ 
+-/* Requests for obd_extent_calc() */
+-#define OBD_CALC_STRIPE_START   1
+-#define OBD_CALC_STRIPE_END     2
+-
+ static inline struct md_open_data *obd_mod_alloc(void)
+ {
+ 	struct md_open_data *mod;
 diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index fe1af94..79fc041 100644
+index daca5a0..fe1af94 100644
 --- a/drivers/staging/lustre/lustre/include/obd_class.h
 +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -1410,19 +1410,18 @@ static inline int md_done_writing(struct obd_export *exp,
+@@ -56,7 +56,6 @@
+ #define OBD_STATFS_FOR_MDT0	0x0008	/* The statfs is only for retrieving
+ 					 * information from MDT0.
+ 					 */
+-#define OBD_FL_PUNCH	    0x00000001  /* To indicate it is punch operation */
  
- static inline int md_enqueue(struct obd_export *exp,
- 			     struct ldlm_enqueue_info *einfo,
-+			     const ldlm_policy_data_t *policy,
- 			     struct lookup_intent *it,
- 			     struct md_op_data *op_data,
- 			     struct lustre_handle *lockh,
--			     void *lmm, int lmmsize,
--			     struct ptlrpc_request **req,
- 			     __u64 extra_lock_flags)
- {
- 	int rc;
+ /* OBD Device Declarations */
+ extern struct obd_device *obd_devs[MAX_OBD_DEVICES];
+@@ -270,10 +269,10 @@ static inline int lprocfs_climp_check(struct obd_device *obd)
+ struct inode;
+ struct lu_attr;
+ struct obdo;
+-void obdo_refresh_inode(struct inode *dst, struct obdo *src, u32 valid);
++void obdo_refresh_inode(struct inode *dst, const struct obdo *src, u32 valid);
  
- 	EXP_CHECK_MD_OP(exp, enqueue);
- 	EXP_MD_COUNTER_INCREMENT(exp, enqueue);
--	rc = MDP(exp->exp_obd, enqueue)(exp, einfo, it, op_data, lockh,
--					lmm, lmmsize, req, extra_lock_flags);
-+	rc = MDP(exp->exp_obd, enqueue)(exp, einfo, policy, it, op_data, lockh,
-+					extra_lock_flags);
- 	return rc;
- }
+-void obdo_to_ioobj(struct obdo *oa, struct obd_ioobj *ioobj);
+-void md_from_obdo(struct md_op_data *op_data, struct obdo *oa, u32 valid);
++void obdo_to_ioobj(const struct obdo *oa, struct obd_ioobj *ioobj);
++void md_from_obdo(struct md_op_data *op_data, const struct obdo *oa, u32 valid);
  
-@@ -1439,9 +1438,9 @@ static inline int md_getattr_name(struct obd_export *exp,
- }
- 
- static inline int md_intent_lock(struct obd_export *exp,
--				 struct md_op_data *op_data, void *lmm,
--				 int lmmsize, struct lookup_intent *it,
--				 int lookup_flags, struct ptlrpc_request **reqp,
-+				 struct md_op_data *op_data,
-+				 struct lookup_intent *it,
-+				 struct ptlrpc_request **reqp,
- 				 ldlm_blocking_callback cb_blocking,
- 				 __u64 extra_lock_flags)
- {
-@@ -1449,9 +1448,8 @@ static inline int md_intent_lock(struct obd_export *exp,
- 
- 	EXP_CHECK_MD_OP(exp, intent_lock);
- 	EXP_MD_COUNTER_INCREMENT(exp, intent_lock);
--	rc = MDP(exp->exp_obd, intent_lock)(exp, op_data, lmm, lmmsize,
--					    it, lookup_flags, reqp, cb_blocking,
--					    extra_lock_flags);
-+	rc = MDP(exp->exp_obd, intent_lock)(exp, op_data, it, reqp,
-+					    cb_blocking, extra_lock_flags);
- 	return rc;
- }
- 
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 015b0ab..b680618 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -387,7 +387,7 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
- 	struct dentry *parent = de->d_parent;
- 	const char *name = NULL;
- 	struct md_op_data *op_data;
--	struct ptlrpc_request *req;
-+	struct ptlrpc_request *req = NULL;
- 	int len = 0, rc;
- 
- 	LASSERT(parent);
-@@ -407,9 +407,11 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
- 				      O_RDWR, LUSTRE_OPC_ANY, NULL);
- 	if (IS_ERR(op_data))
- 		return PTR_ERR(op_data);
-+	op_data->op_data = lmm;
-+	op_data->op_data_size = lmmsize;
- 
--	rc = md_intent_lock(sbi->ll_md_exp, op_data, lmm, lmmsize, itp,
--			    0 /*unused */, &req, ll_md_blocking_ast, 0);
-+	rc = md_intent_lock(sbi->ll_md_exp, op_data, itp, &req,
-+			    &ll_md_blocking_ast, 0);
- 	ll_finish_md_op_data(op_data);
- 	if (rc == -ESTALE) {
- 		/* reason for keep own exit path - don`t flood log
-@@ -759,7 +761,7 @@ ll_lease_open(struct inode *inode, struct file *file, fmode_t fmode,
- 	struct lookup_intent it = { .it_op = IT_OPEN };
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	struct md_op_data *op_data;
--	struct ptlrpc_request *req;
-+	struct ptlrpc_request *req = NULL;
- 	struct lustre_handle old_handle = { 0 };
- 	struct obd_client_handle *och = NULL;
- 	int rc;
-@@ -826,8 +828,8 @@ ll_lease_open(struct inode *inode, struct file *file, fmode_t fmode,
- 
- 	it.it_flags = fmode | open_flags;
- 	it.it_flags |= MDS_OPEN_LOCK | MDS_OPEN_BY_FID | MDS_OPEN_LEASE;
--	rc = md_intent_lock(sbi->ll_md_exp, op_data, NULL, 0, &it, 0, &req,
--			    ll_md_blocking_lease_ast,
-+	rc = md_intent_lock(sbi->ll_md_exp, op_data, &it, &req,
-+			    &ll_md_blocking_lease_ast,
- 	/* LDLM_FL_NO_LRU: To not put the lease lock into LRU list, otherwise
- 	 * it can be cancelled which may mislead applications that the lease is
- 	 * broken;
-@@ -835,7 +837,7 @@ ll_lease_open(struct inode *inode, struct file *file, fmode_t fmode,
- 	 * open in ll_md_blocking_ast(). Otherwise as ll_md_blocking_lease_ast
- 	 * doesn't deal with openhandle, so normal openhandle will be leaked.
- 	 */
--				LDLM_FL_NO_LRU | LDLM_FL_EXCL);
-+			    LDLM_FL_NO_LRU | LDLM_FL_EXCL);
- 	ll_finish_md_op_data(op_data);
- 	ptlrpc_req_finished(req);
- 	if (rc < 0)
-@@ -2806,8 +2808,8 @@ ll_file_flock(struct file *file, int cmd, struct file_lock *file_lock)
- 	       PFID(ll_inode2fid(inode)), flock.l_flock.pid, flags,
- 	       einfo.ei_mode, flock.l_flock.start, flock.l_flock.end);
- 
--	rc = md_enqueue(sbi->ll_md_exp, &einfo, NULL,
--			op_data, &lockh, &flock, 0, NULL /* req */, flags);
-+	rc = md_enqueue(sbi->ll_md_exp, &einfo, &flock, NULL, op_data, &lockh,
-+			flags);
- 
- 	/* Restore the file lock type if not TEST lock. */
- 	if (!(flags & LDLM_FL_TEST_LOCK))
-@@ -2819,8 +2821,8 @@ ll_file_flock(struct file *file, int cmd, struct file_lock *file_lock)
- 
- 	if (rc2 && file_lock->fl_type != F_UNLCK) {
- 		einfo.ei_mode = LCK_NL;
--		md_enqueue(sbi->ll_md_exp, &einfo, NULL,
--			   op_data, &lockh, &flock, 0, NULL /* req */, flags);
-+		md_enqueue(sbi->ll_md_exp, &einfo, &flock, NULL, op_data,
-+			   &lockh, flags);
- 		rc = rc2;
- 	}
- 
-@@ -3059,12 +3061,8 @@ static int __ll_inode_revalidate(struct dentry *dentry, __u64 ibits)
- 		if (IS_ERR(op_data))
- 			return PTR_ERR(op_data);
- 
--		rc = md_intent_lock(exp, op_data, NULL, 0,
--				    /* we are not interested in name
--				     * based lookup
--				     */
--				    &oit, 0, &req,
--				    ll_md_blocking_ast, 0);
-+		rc = md_intent_lock(exp, op_data, &oit, &req,
-+				    &ll_md_blocking_ast, 0);
- 		ll_finish_md_op_data(op_data);
- 		if (rc < 0) {
- 			rc = ll_inode_revalidate_fini(inode, rc);
-@@ -3742,8 +3740,8 @@ int ll_layout_refresh(struct inode *inode, __u32 *gen)
- 	struct ldlm_enqueue_info einfo = {
- 		.ei_type = LDLM_IBITS,
- 		.ei_mode = LCK_CR,
--		.ei_cb_bl = ll_md_blocking_ast,
--		.ei_cb_cp = ldlm_completion_ast,
-+		.ei_cb_bl = &ll_md_blocking_ast,
-+		.ei_cb_cp = &ldlm_completion_ast,
- 	};
- 	int rc;
- 
-@@ -3789,8 +3787,7 @@ again:
- 			  ll_get_fsname(inode->i_sb, NULL, 0),
- 			  PFID(&lli->lli_fid), inode);
- 
--	rc = md_enqueue(sbi->ll_md_exp, &einfo, &it, op_data, &lockh,
--			NULL, 0, NULL, 0);
-+	rc = md_enqueue(sbi->ll_md_exp, &einfo, NULL, &it, op_data, &lockh, 0);
- 	ptlrpc_req_finished(it.it_request);
- 	it.it_request = NULL;
- 
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index ee5a42e..6345099 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -562,8 +562,8 @@ static struct dentry *ll_lookup_it(struct inode *parent, struct dentry *dentry,
- 	if (!IS_POSIXACL(parent) || !exp_connect_umask(ll_i2mdexp(parent)))
- 		it->it_create_mode &= ~current_umask();
- 
--	rc = md_intent_lock(ll_i2mdexp(parent), op_data, NULL, 0, it,
--			    lookup_flags, &req, ll_md_blocking_ast, 0);
-+	rc = md_intent_lock(ll_i2mdexp(parent), op_data, it, &req,
-+			    &ll_md_blocking_ast, 0);
- 	ll_finish_md_op_data(op_data);
- 	if (rc < 0) {
- 		retval = ERR_PTR(rc);
-diff --git a/drivers/staging/lustre/lustre/llite/xattr_cache.c b/drivers/staging/lustre/lustre/llite/xattr_cache.c
-index b66542c..0330d1a 100644
---- a/drivers/staging/lustre/lustre/llite/xattr_cache.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr_cache.c
-@@ -270,10 +270,12 @@ static int ll_xattr_find_get_lock(struct inode *inode,
- 	struct lustre_handle lockh = { 0 };
- 	struct md_op_data *op_data;
- 	struct ll_inode_info *lli = ll_i2info(inode);
--	struct ldlm_enqueue_info einfo = { .ei_type = LDLM_IBITS,
--					   .ei_mode = it_to_lock_mode(oit),
--					   .ei_cb_bl = ll_md_blocking_ast,
--					   .ei_cb_cp = ldlm_completion_ast };
-+	struct ldlm_enqueue_info einfo = {
-+		.ei_type = LDLM_IBITS,
-+		.ei_mode = it_to_lock_mode(oit),
-+		.ei_cb_bl = &ll_md_blocking_ast,
-+		.ei_cb_cp = &ldlm_completion_ast,
-+	};
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	struct obd_export *exp = sbi->ll_md_exp;
- 	int rc;
-@@ -304,7 +306,7 @@ static int ll_xattr_find_get_lock(struct inode *inode,
- 
- 	op_data->op_valid = OBD_MD_FLXATTR | OBD_MD_FLXATTRLS;
- 
--	rc = md_enqueue(exp, &einfo, oit, op_data, &lockh, NULL, 0, NULL, 0);
-+	rc = md_enqueue(exp, &einfo, NULL, oit, op_data, &lockh, 0);
- 	ll_finish_md_op_data(op_data);
- 
- 	if (rc < 0) {
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_intent.c b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-index 0559445..62f6bd0 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
-@@ -48,9 +48,8 @@
- #include "../include/lprocfs_status.h"
- #include "lmv_internal.h"
- 
--static int lmv_intent_remote(struct obd_export *exp, void *lmm,
--			     int lmmsize, struct lookup_intent *it,
--			     const struct lu_fid *parent_fid, int flags,
-+static int lmv_intent_remote(struct obd_export *exp, struct lookup_intent *it,
-+			     const struct lu_fid *parent_fid,
- 			     struct ptlrpc_request **reqp,
- 			     ldlm_blocking_callback cb_blocking,
- 			     __u64 extra_lock_flags)
-@@ -117,8 +116,8 @@ static int lmv_intent_remote(struct obd_export *exp, void *lmm,
- 	CDEBUG(D_INODE, "REMOTE_INTENT with fid="DFID" -> mds #%d\n",
- 	       PFID(&body->mbo_fid1), tgt->ltd_idx);
- 
--	rc = md_intent_lock(tgt->ltd_exp, op_data, lmm, lmmsize, it,
--			    flags, &req, cb_blocking, extra_lock_flags);
-+	rc = md_intent_lock(tgt->ltd_exp, op_data, it, &req, cb_blocking,
-+			    extra_lock_flags);
+ #define OBT(dev)	(dev)->obd_type
+ #define OBP(dev, op)    (dev)->obd_type->typ_dt_ops->op
+@@ -1216,12 +1215,7 @@ static inline int obd_notify(struct obd_device *obd,
  	if (rc)
- 		goto out_free_op_data;
- 
-@@ -206,8 +205,8 @@ int lmv_revalidate_slaves(struct obd_export *exp, struct mdt_body *mbody,
- 		CDEBUG(D_INODE, "Revalidate slave "DFID" -> mds #%d\n",
- 		       PFID(&fid), tgt->ltd_idx);
- 
--		rc = md_intent_lock(tgt->ltd_exp, op_data, NULL, 0, &it, 0,
--				    &req, cb_blocking, extra_lock_flags);
-+		rc = md_intent_lock(tgt->ltd_exp, op_data, &it, &req,
-+				    cb_blocking, extra_lock_flags);
- 		if (rc < 0)
- 			goto cleanup;
- 
-@@ -298,8 +297,8 @@ cleanup:
-  * may be split dir.
-  */
- static int lmv_intent_open(struct obd_export *exp, struct md_op_data *op_data,
--			   void *lmm, int lmmsize, struct lookup_intent *it,
--			   int flags, struct ptlrpc_request **reqp,
-+			   struct lookup_intent *it,
-+			   struct ptlrpc_request **reqp,
- 			   ldlm_blocking_callback cb_blocking,
- 			   __u64 extra_lock_flags)
- {
-@@ -352,8 +351,8 @@ static int lmv_intent_open(struct obd_export *exp, struct md_op_data *op_data,
- 	       PFID(&op_data->op_fid1),
- 	       PFID(&op_data->op_fid2), op_data->op_name, tgt->ltd_idx);
- 
--	rc = md_intent_lock(tgt->ltd_exp, op_data, lmm, lmmsize, it, flags,
--			    reqp, cb_blocking, extra_lock_flags);
-+	rc = md_intent_lock(tgt->ltd_exp, op_data, it, reqp, cb_blocking,
-+			    extra_lock_flags);
- 	if (rc != 0)
- 		return rc;
- 	/*
-@@ -371,9 +370,8 @@ static int lmv_intent_open(struct obd_export *exp, struct md_op_data *op_data,
- 
- 	/* Not cross-ref case, just get out of here. */
- 	if (unlikely((body->mbo_valid & OBD_MD_MDS))) {
--		rc = lmv_intent_remote(exp, lmm, lmmsize, it, &op_data->op_fid1,
--				       flags, reqp, cb_blocking,
--				       extra_lock_flags);
-+		rc = lmv_intent_remote(exp, it, &op_data->op_fid1, reqp,
-+				       cb_blocking, extra_lock_flags);
- 		if (rc != 0)
- 			return rc;
- 
-@@ -390,8 +388,8 @@ static int lmv_intent_open(struct obd_export *exp, struct md_op_data *op_data,
-  */
- static int lmv_intent_lookup(struct obd_export *exp,
- 			     struct md_op_data *op_data,
--			     void *lmm, int lmmsize, struct lookup_intent *it,
--			     int flags, struct ptlrpc_request **reqp,
-+			     struct lookup_intent *it,
-+			     struct ptlrpc_request **reqp,
- 			     ldlm_blocking_callback cb_blocking,
- 			     __u64 extra_lock_flags)
- {
-@@ -434,8 +432,8 @@ static int lmv_intent_lookup(struct obd_export *exp,
- 
- 	op_data->op_bias &= ~MDS_CROSS_REF;
- 
--	rc = md_intent_lock(tgt->ltd_exp, op_data, lmm, lmmsize, it,
--			    flags, reqp, cb_blocking, extra_lock_flags);
-+	rc = md_intent_lock(tgt->ltd_exp, op_data, it, reqp, cb_blocking,
-+			    extra_lock_flags);
- 	if (rc < 0)
  		return rc;
  
-@@ -480,8 +478,7 @@ static int lmv_intent_lookup(struct obd_export *exp,
- 
- 			op_data->op_fid1 = oinfo->lmo_fid;
- 			it->it_disposition &= ~DISP_ENQ_COMPLETE;
--			rc = md_intent_lock(tgt->ltd_exp, op_data, lmm,
--					    lmmsize, it, flags, reqp,
-+			rc = md_intent_lock(tgt->ltd_exp, op_data, it, reqp,
- 					    cb_blocking, extra_lock_flags);
- 			if (rc)
- 				return rc;
-@@ -498,8 +495,8 @@ static int lmv_intent_lookup(struct obd_export *exp,
- 
- 	/* Not cross-ref case, just get out of here. */
- 	if (unlikely((body->mbo_valid & OBD_MD_MDS))) {
--		rc = lmv_intent_remote(exp, lmm, lmmsize, it, NULL, flags,
--				       reqp, cb_blocking, extra_lock_flags);
-+		rc = lmv_intent_remote(exp, it, NULL, reqp, cb_blocking,
-+				       extra_lock_flags);
- 		if (rc != 0)
- 			return rc;
- 		body = req_capsule_server_get(&(*reqp)->rq_pill, &RMF_MDT_BODY);
-@@ -511,8 +508,7 @@ static int lmv_intent_lookup(struct obd_export *exp,
- }
- 
- int lmv_intent_lock(struct obd_export *exp, struct md_op_data *op_data,
--		    void *lmm, int lmmsize, struct lookup_intent *it,
--		    int flags, struct ptlrpc_request **reqp,
-+		    struct lookup_intent *it, struct ptlrpc_request **reqp,
- 		    ldlm_blocking_callback cb_blocking,
- 		    __u64 extra_lock_flags)
- {
-@@ -530,12 +526,10 @@ int lmv_intent_lock(struct obd_export *exp, struct md_op_data *op_data,
- 		return rc;
- 
- 	if (it->it_op & (IT_LOOKUP | IT_GETATTR | IT_LAYOUT))
--		rc = lmv_intent_lookup(exp, op_data, lmm, lmmsize, it,
--				       flags, reqp, cb_blocking,
-+		rc = lmv_intent_lookup(exp, op_data, it, reqp, cb_blocking,
- 				       extra_lock_flags);
- 	else if (it->it_op & IT_OPEN)
--		rc = lmv_intent_open(exp, op_data, lmm, lmmsize, it,
--				     flags, reqp, cb_blocking,
-+		rc = lmv_intent_open(exp, op_data, it, reqp, cb_blocking,
- 				     extra_lock_flags);
- 	else
- 		LBUG();
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_internal.h b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
-index ea528ae..3ce17da 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_internal.h
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
-@@ -45,8 +45,7 @@
- int lmv_check_connect(struct obd_device *obd);
- 
- int lmv_intent_lock(struct obd_export *exp, struct md_op_data *op_data,
--		    void *lmm, int lmmsize, struct lookup_intent *it,
--		    int flags, struct ptlrpc_request **reqp,
-+		    struct lookup_intent *it, struct ptlrpc_request **reqp,
- 		    ldlm_blocking_callback cb_blocking,
- 		    __u64 extra_lock_flags);
- 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 44a334a..72249bb 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1812,70 +1812,10 @@ static int lmv_done_writing(struct obd_export *exp,
- }
- 
- static int
--lmv_enqueue_remote(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
--		   struct lookup_intent *it, struct md_op_data *op_data,
--		   struct lustre_handle *lockh, void *lmm, int lmmsize,
--		   __u64 extra_lock_flags)
--{
--	struct ptlrpc_request      *req = it->it_request;
--	struct obd_device	  *obd = exp->exp_obd;
--	struct lmv_obd	     *lmv = &obd->u.lmv;
--	struct lustre_handle	plock;
--	struct lmv_tgt_desc	*tgt;
--	struct md_op_data	  *rdata;
--	struct lu_fid	       fid1;
--	struct mdt_body	    *body;
--	int			 rc = 0;
--	int			 pmode;
--
--	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
--
--	if (!(body->mbo_valid & OBD_MD_MDS))
--		return 0;
--
--	CDEBUG(D_INODE, "REMOTE_ENQUEUE '%s' on "DFID" -> "DFID"\n",
--	       LL_IT2STR(it), PFID(&op_data->op_fid1), PFID(&body->mbo_fid1));
--
--	/*
--	 * We got LOOKUP lock, but we really need attrs.
+-	/* the check for async_recov is a complete hack - I'm hereby
+-	 * overloading the meaning to also mean "this was called from
+-	 * mds_postsetup".  I know that my mds is able to handle notifies
+-	 * by this point, and it needs to get them to execute mds_postrecov.
 -	 */
--	pmode = it->it_lock_mode;
--	LASSERT(pmode != 0);
--	memcpy(&plock, lockh, sizeof(plock));
--	it->it_lock_mode = 0;
--	it->it_request = NULL;
--	fid1 = body->mbo_fid1;
+-	if (!obd->obd_set_up && !obd->obd_async_recov) {
++	if (!obd->obd_set_up) {
+ 		CDEBUG(D_HA, "obd %s not set up\n", obd->obd_name);
+ 		return -EINVAL;
+ 	}
+@@ -1485,19 +1479,6 @@ static inline int md_rename(struct obd_export *exp, struct md_op_data *op_data,
+ 	return rc;
+ }
+ 
+-static inline int md_is_subdir(struct obd_export *exp,
+-			       const struct lu_fid *pfid,
+-			       const struct lu_fid *cfid,
+-			       struct ptlrpc_request **request)
+-{
+-	int rc;
 -
--	ptlrpc_req_finished(req);
--
--	tgt = lmv_find_target(lmv, &fid1);
--	if (IS_ERR(tgt)) {
--		rc = PTR_ERR(tgt);
--		goto out;
--	}
--
--	rdata = kzalloc(sizeof(*rdata), GFP_NOFS);
--	if (!rdata) {
--		rc = -ENOMEM;
--		goto out;
--	}
--
--	rdata->op_fid1 = fid1;
--	rdata->op_bias = MDS_CROSS_REF;
--
--	rc = md_enqueue(tgt->ltd_exp, einfo, it, rdata, lockh,
--			lmm, lmmsize, NULL, extra_lock_flags);
--	kfree(rdata);
--out:
--	ldlm_lock_decref(&plock, pmode);
+-	EXP_CHECK_MD_OP(exp, is_subdir);
+-	EXP_MD_COUNTER_INCREMENT(exp, is_subdir);
+-	rc = MDP(exp->exp_obd, is_subdir)(exp, pfid, cfid, request);
 -	return rc;
 -}
 -
--static int
- lmv_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
-+	    const ldlm_policy_data_t *policy,
- 	    struct lookup_intent *it, struct md_op_data *op_data,
--	    struct lustre_handle *lockh, void *lmm, int lmmsize,
--	    struct ptlrpc_request **req, __u64 extra_lock_flags)
-+	    struct lustre_handle *lockh, __u64 extra_lock_flags)
- {
- 	struct obd_device	*obd = exp->exp_obd;
- 	struct lmv_obd	   *lmv = &obd->u.lmv;
-@@ -1896,13 +1836,9 @@ lmv_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 	CDEBUG(D_INODE, "ENQUEUE '%s' on "DFID" -> mds #%d\n",
- 	       LL_IT2STR(it), PFID(&op_data->op_fid1), tgt->ltd_idx);
- 
--	rc = md_enqueue(tgt->ltd_exp, einfo, it, op_data, lockh,
--			lmm, lmmsize, req, extra_lock_flags);
-+	rc = md_enqueue(tgt->ltd_exp, einfo, policy, it, op_data, lockh,
-+			extra_lock_flags);
- 
--	if (rc == 0 && it && it->it_op == IT_OPEN) {
--		rc = lmv_enqueue_remote(exp, einfo, it, op_data, lockh,
--					lmm, lmmsize, extra_lock_flags);
--	}
+ static inline int md_setattr(struct obd_export *exp, struct md_op_data *op_data,
+ 			     void *ea, int ealen, void *ea2, int ea2len,
+ 			     struct ptlrpc_request **request,
+@@ -1523,18 +1504,6 @@ static inline int md_sync(struct obd_export *exp, const struct lu_fid *fid,
  	return rc;
  }
  
+-static inline int md_readpage(struct obd_export *exp, struct md_op_data *opdata,
+-			      struct page **pages,
+-			      struct ptlrpc_request **request)
+-{
+-	int rc;
+-
+-	EXP_CHECK_MD_OP(exp, readpage);
+-	EXP_MD_COUNTER_INCREMENT(exp, readpage);
+-	rc = MDP(exp->exp_obd, readpage)(exp, opdata, pages, request);
+-	return rc;
+-}
+-
+ static inline int md_read_page(struct obd_export *exp,
+ 			       struct md_op_data *op_data,
+ 			       struct md_callback *cb_op,
+@@ -1735,16 +1704,6 @@ void obd_cleanup_caches(void);
+ /* support routines */
+ extern struct kmem_cache *obdo_cachep;
+ 
+-static inline void obdo2fid(struct obdo *oa, struct lu_fid *fid)
+-{
+-	/* something here */
+-}
+-
+-static inline void fid2obdo(struct lu_fid *fid, struct obdo *oa)
+-{
+-	/* something here */
+-}
+-
+ typedef int (*register_lwp_cb)(void *data);
+ 
+ struct lwp_register_item {
+diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
+index f747bca..5ef798f 100644
+--- a/drivers/staging/lustre/lustre/include/obd_support.h
++++ b/drivers/staging/lustre/lustre/include/obd_support.h
+@@ -52,7 +52,6 @@ extern unsigned int at_max;
+ extern unsigned int at_history;
+ extern int at_early_margin;
+ extern int at_extra;
+-extern unsigned int obd_sync_filter;
+ extern unsigned int obd_max_dirty_pages;
+ extern atomic_t obd_dirty_pages;
+ extern atomic_t obd_dirty_transit_pages;
 diff --git a/drivers/staging/lustre/lustre/mdc/mdc_internal.h b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-index f4d0c36..9e65cdb 100644
+index 492ebbc..f4d0c36 100644
 --- a/drivers/staging/lustre/lustre/mdc/mdc_internal.h
 +++ b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-@@ -69,16 +69,16 @@ int mdc_find_cbdata(struct obd_export *exp, const struct lu_fid *fid,
- 		    ldlm_iterator_t it, void *data);
+@@ -39,8 +39,6 @@ void lprocfs_mdc_init_vars(struct lprocfs_static_vars *lvars);
  
- int mdc_intent_lock(struct obd_export *exp,
--		    struct md_op_data *,
--		    void *lmm, int lmmsize,
--		    struct lookup_intent *, int,
-+		    struct md_op_data *op_data,
-+		    struct lookup_intent *it,
- 		    struct ptlrpc_request **reqp,
- 		    ldlm_blocking_callback cb_blocking,
- 		    __u64 extra_lock_flags);
-+
- int mdc_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
-+		const ldlm_policy_data_t *policy,
- 		struct lookup_intent *it, struct md_op_data *op_data,
--		struct lustre_handle *lockh, void *lmm, int lmmsize,
--		struct ptlrpc_request **req, __u64 extra_lock_flags);
-+		struct lustre_handle *lockh, __u64 extra_lock_flags);
+ void mdc_pack_body(struct ptlrpc_request *req, const struct lu_fid *fid,
+ 		   __u64 valid, int ea_size, __u32 suppgid, int flags);
+-void mdc_is_subdir_pack(struct ptlrpc_request *req, const struct lu_fid *pfid,
+-			const struct lu_fid *cfid, int flags);
+ void mdc_swap_layouts_pack(struct ptlrpc_request *req,
+ 			   struct md_op_data *op_data);
+ void mdc_readdir_pack(struct ptlrpc_request *req, __u64 pgoff, __u32 size,
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+index aa496f3..ecfe13e 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
+@@ -45,21 +45,6 @@ static void __mdc_pack_body(struct mdt_body *b, __u32 suppgid)
+ 	b->mbo_capability = cfs_curproc_cap_pack();
+ }
  
- int mdc_resource_get_unused(struct obd_export *exp, const struct lu_fid *fid,
- 			    struct list_head *cancels, enum ldlm_mode  mode,
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 1c3b78d..89b4ae7 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -249,15 +249,15 @@ static void mdc_realloc_openmsg(struct ptlrpc_request *req,
+-void mdc_is_subdir_pack(struct ptlrpc_request *req, const struct lu_fid *pfid,
+-			const struct lu_fid *cfid, int flags)
+-{
+-	struct mdt_body *b = req_capsule_client_get(&req->rq_pill,
+-						    &RMF_MDT_BODY);
+-
+-	if (pfid) {
+-		b->mbo_fid1 = *pfid;
+-		b->mbo_valid = OBD_MD_FLID;
+-	}
+-	if (cfid)
+-		b->mbo_fid2 = *cfid;
+-	b->mbo_flags = flags;
+-}
+-
+ void mdc_swap_layouts_pack(struct ptlrpc_request *req,
+ 			   struct md_op_data *op_data)
+ {
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index 5520819..213f31b 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -232,32 +232,6 @@ static int mdc_getattr_name(struct obd_export *exp, struct md_op_data *op_data,
+ 	return rc;
+ }
+ 
+-static int mdc_is_subdir(struct obd_export *exp,
+-			 const struct lu_fid *pfid,
+-			 const struct lu_fid *cfid,
+-			 struct ptlrpc_request **request)
+-{
+-	struct ptlrpc_request  *req;
+-	int		     rc;
+-
+-	*request = NULL;
+-	req = ptlrpc_request_alloc_pack(class_exp2cliimp(exp),
+-					&RQF_MDS_IS_SUBDIR, LUSTRE_MDS_VERSION,
+-					MDS_IS_SUBDIR);
+-	if (!req)
+-		return -ENOMEM;
+-
+-	mdc_is_subdir_pack(req, pfid, cfid, 0);
+-	ptlrpc_request_set_replen(req);
+-
+-	rc = ptlrpc_queue_wait(req);
+-	if (rc && rc != -EREMOTE)
+-		ptlrpc_req_finished(req);
+-	else
+-		*request = req;
+-	return rc;
+-}
+-
+ static int mdc_xattr_common(struct obd_export *exp,
+ 			    const struct req_format *fmt,
+ 			    const struct lu_fid *fid,
+@@ -2892,7 +2866,6 @@ static struct md_ops mdc_md_ops = {
+ 	.getattr_name		= mdc_getattr_name,
+ 	.intent_lock		= mdc_intent_lock,
+ 	.link			= mdc_link,
+-	.is_subdir		= mdc_is_subdir,
+ 	.rename			= mdc_rename,
+ 	.setattr		= mdc_setattr,
+ 	.setxattr		= mdc_setxattr,
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index 90a365b..6700167 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -115,19 +115,6 @@ int lustre_get_jobid(char *jobid)
+ }
+ EXPORT_SYMBOL(lustre_get_jobid);
+ 
+-static inline void obd_data2conn(struct lustre_handle *conn,
+-				 struct obd_ioctl_data *data)
+-{
+-	memset(conn, 0, sizeof(*conn));
+-	conn->cookie = data->ioc_cookie;
+-}
+-
+-static inline void obd_conn2data(struct obd_ioctl_data *data,
+-				 struct lustre_handle *conn)
+-{
+-	data->ioc_cookie = conn->cookie;
+-}
+-
+ static int class_resolve_dev_name(__u32 len, const char *name)
+ {
+ 	int rc;
+@@ -534,23 +521,11 @@ static int __init obdclass_init(void)
+ 
+ static void obdclass_exit(void)
+ {
+-	int i;
+-
+ 	int lustre_unregister_fs(void);
+ 
+ 	lustre_unregister_fs();
+ 
+ 	misc_deregister(&obd_psdev);
+-	for (i = 0; i < class_devno_max(); i++) {
+-		struct obd_device *obd = class_num2obd(i);
+-
+-		if (obd && obd->obd_set_up &&
+-		    OBT(obd) && OBP(obd, detach)) {
+-			/* XXX should this call generic detach otherwise? */
+-			LASSERT(obd->obd_magic == OBD_DEVICE_MAGIC);
+-			OBP(obd, detach)(obd);
+-		}
+-	}
+ 	llog_info_fini();
+ 	cl_global_fini();
+ 	lu_global_fini();
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-obdo.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-obdo.c
+index c6cc6a7..41b77a3 100644
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-obdo.c
++++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-obdo.c
+@@ -44,7 +44,7 @@
+ 
+ #include <linux/fs.h>
+ 
+-void obdo_refresh_inode(struct inode *dst, struct obdo *src, u32 valid)
++void obdo_refresh_inode(struct inode *dst, const struct obdo *src, u32 valid)
+ {
+ 	valid &= src->o_valid;
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+index 6d0890f..01034b5 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+@@ -238,7 +238,7 @@ static int class_attach(struct lustre_cfg *lcfg)
+ 	/* recovery data */
+ 	init_waitqueue_head(&obd->obd_evict_inprogress_waitq);
+ 
+-	llog_group_init(&obd->obd_olg, FID_SEQ_LLOG);
++	llog_group_init(&obd->obd_olg);
+ 
+ 	obd->obd_conn_inprogress = 0;
+ 
+@@ -251,15 +251,6 @@ static int class_attach(struct lustre_cfg *lcfg)
+ 	}
+ 	memcpy(obd->obd_uuid.uuid, uuid, len);
+ 
+-	/* do the attach */
+-	if (OBP(obd, attach)) {
+-		rc = OBP(obd, attach)(obd, sizeof(*lcfg), lcfg);
+-		if (rc) {
+-			rc = -EINVAL;
+-			goto out;
+-		}
+-	}
+-
+ 	/* Detach drops this */
+ 	spin_lock(&obd->obd_dev_lock);
+ 	atomic_set(&obd->obd_refcount, 1);
+@@ -527,11 +518,6 @@ void class_decref(struct obd_device *obd, const char *scope, const void *source)
+ 				CERROR("Cleanup %s returned %d\n",
+ 				       obd->obd_name, err);
+ 		}
+-		if (OBP(obd, detach)) {
+-			err = OBP(obd, detach)(obd);
+-			if (err)
+-				CERROR("Detach returned %d\n", err);
+-		}
+ 		class_release_dev(obd);
+ 	}
+ }
+diff --git a/drivers/staging/lustre/lustre/obdclass/obdo.c b/drivers/staging/lustre/lustre/obdclass/obdo.c
+index 8583a4a..4454764 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obdo.c
++++ b/drivers/staging/lustre/lustre/obdclass/obdo.c
+@@ -112,7 +112,7 @@ void obdo_from_inode(struct obdo *dst, struct inode *src, u32 valid)
+ }
+ EXPORT_SYMBOL(obdo_from_inode);
+ 
+-void obdo_to_ioobj(struct obdo *oa, struct obd_ioobj *ioobj)
++void obdo_to_ioobj(const struct obdo *oa, struct obd_ioobj *ioobj)
+ {
+ 	ioobj->ioo_oid = oa->o_oi;
+ 	if (unlikely(!(oa->o_valid & OBD_MD_FLGROUP)))
+@@ -125,7 +125,8 @@ void obdo_to_ioobj(struct obdo *oa, struct obd_ioobj *ioobj)
+ }
+ EXPORT_SYMBOL(obdo_to_ioobj);
+ 
+-static void iattr_from_obdo(struct iattr *attr, struct obdo *oa, u32 valid)
++static void iattr_from_obdo(struct iattr *attr, const struct obdo *oa,
++			    u32 valid)
+ {
+ 	valid &= oa->o_valid;
+ 
+@@ -173,7 +174,7 @@ static void iattr_from_obdo(struct iattr *attr, struct obdo *oa, u32 valid)
  	}
  }
  
--static struct ptlrpc_request *mdc_intent_open_pack(struct obd_export *exp,
--						   struct lookup_intent *it,
--						   struct md_op_data *op_data,
--						   void *lmm, int lmmsize,
--						   void *cb_data)
-+static struct ptlrpc_request *
-+mdc_intent_open_pack(struct obd_export *exp, struct lookup_intent *it,
-+		     struct md_op_data *op_data)
+-void md_from_obdo(struct md_op_data *op_data, struct obdo *oa, u32 valid)
++void md_from_obdo(struct md_op_data *op_data, const struct obdo *oa, u32 valid)
  {
- 	struct ptlrpc_request *req;
- 	struct obd_device     *obddev = class_exp2obd(exp);
- 	struct ldlm_intent    *lit;
-+	const void *lmm = op_data->op_data;
-+	int lmmsize = op_data->op_data_size;
- 	LIST_HEAD(cancels);
- 	int		    count = 0;
- 	int		    mode;
-@@ -708,9 +708,9 @@ static int mdc_finish_enqueue(struct obd_export *exp,
-  * we don't know in advance the file type.
-  */
- int mdc_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
-+		const ldlm_policy_data_t *policy,
- 		struct lookup_intent *it, struct md_op_data *op_data,
--		struct lustre_handle *lockh, void *lmm, int lmmsize,
--		struct ptlrpc_request **reqp, u64 extra_lock_flags)
-+		struct lustre_handle *lockh, u64 extra_lock_flags)
- {
- 	static const ldlm_policy_data_t lookup_policy = {
- 		.l_inodebits = { MDS_INODELOCK_LOOKUP }
-@@ -724,9 +724,8 @@ int mdc_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 	static const ldlm_policy_data_t getxattr_policy = {
- 		.l_inodebits = { MDS_INODELOCK_XATTR }
- 	};
--	ldlm_policy_data_t const *policy = &lookup_policy;
- 	struct obd_device *obddev = class_exp2obd(exp);
--	struct ptlrpc_request *req;
-+	struct ptlrpc_request *req = NULL;
- 	u64 flags, saved_flags = extra_lock_flags;
- 	struct ldlm_res_id res_id;
- 	int generation, resends = 0;
-@@ -736,40 +735,32 @@ int mdc_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 
- 	LASSERTF(!it || einfo->ei_type == LDLM_IBITS, "lock type %d\n",
- 		 einfo->ei_type);
--
- 	fid_build_reg_res_name(&op_data->op_fid1, &res_id);
- 
- 	if (it) {
-+		LASSERT(!policy);
-+
- 		saved_flags |= LDLM_FL_HAS_INTENT;
--		if (it->it_op & (IT_UNLINK | IT_GETATTR | IT_READDIR))
-+		if (it->it_op & (IT_OPEN | IT_UNLINK | IT_GETATTR | IT_READDIR))
- 			policy = &update_policy;
- 		else if (it->it_op & IT_LAYOUT)
- 			policy = &layout_policy;
- 		else if (it->it_op & (IT_GETXATTR | IT_SETXATTR))
- 			policy = &getxattr_policy;
-+		else
-+			policy = &lookup_policy;
- 	}
- 
--	LASSERT(!reqp);
--
- 	generation = obddev->u.cli.cl_import->imp_generation;
- resend:
- 	flags = saved_flags;
- 	if (!it) {
--		/* The only way right now is FLOCK, in this case we hide flock
--		 * policy as lmm, but lmmsize is 0
--		 */
--		LASSERT(lmm && lmmsize == 0);
-+		/* The only way right now is FLOCK. */
- 		LASSERTF(einfo->ei_type == LDLM_FLOCK, "lock type %d\n",
- 			 einfo->ei_type);
--		policy = lmm;
- 		res_id.name[3] = LDLM_FLOCK;
--		req = NULL;
- 	} else if (it->it_op & IT_OPEN) {
--		req = mdc_intent_open_pack(exp, it, op_data, lmm, lmmsize,
--					   einfo->ei_cbdata);
--		policy = &update_policy;
--		einfo->ei_cbdata = NULL;
--		lmm = NULL;
-+		req = mdc_intent_open_pack(exp, it, op_data);
- 	} else if (it->it_op & IT_UNLINK) {
- 		req = mdc_intent_unlink_pack(exp, it, op_data);
- 	} else if (it->it_op & (IT_GETATTR | IT_LOOKUP)) {
-@@ -1082,10 +1073,8 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
-  * child lookup.
-  */
- int mdc_intent_lock(struct obd_export *exp, struct md_op_data *op_data,
--		    void *lmm, int lmmsize, struct lookup_intent *it,
--		    int lookup_flags, struct ptlrpc_request **reqp,
--		    ldlm_blocking_callback cb_blocking,
--		    __u64 extra_lock_flags)
-+		    struct lookup_intent *it, struct ptlrpc_request **reqp,
-+		    ldlm_blocking_callback cb_blocking, __u64 extra_lock_flags)
- {
- 	struct ldlm_enqueue_info einfo = {
- 		.ei_type	= LDLM_IBITS,
-@@ -1128,7 +1117,7 @@ int mdc_intent_lock(struct obd_export *exp, struct md_op_data *op_data,
- 			return rc;
+ 	iattr_from_obdo(&op_data->op_attr, oa, valid);
+ 	if (valid & OBD_MD_FLBLOCKS) {
+diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+index 2cb487b..7527112 100644
+--- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
++++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+@@ -1443,7 +1443,6 @@ static int echo_client_prep_commit(const struct lu_env *env,
  		}
- 	}
--	rc = mdc_enqueue(exp, &einfo, it, op_data, &lockh, lmm, lmmsize, NULL,
-+	rc = mdc_enqueue(exp, &einfo, NULL, it, op_data, &lockh,
- 			 extra_lock_flags);
- 	if (rc < 0)
- 		return rc;
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 213f31b..88848d8 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -1330,7 +1330,7 @@ static int mdc_read_page(struct obd_export *exp, struct md_op_data *op_data,
- 	LASSERT(dir);
- 	mapping = dir->i_mapping;
  
--	rc = mdc_intent_lock(exp, op_data, NULL, 0, &it, 0, &enq_req,
-+	rc = mdc_intent_lock(exp, op_data, &it, &enq_req,
- 			     cb_op->md_blocking_ast, 0);
- 	if (enq_req)
- 		ptlrpc_req_finished(enq_req);
+ 		ioo.ioo_bufcnt = npages;
+-		oti->oti_transno = 0;
+ 
+ 		lpages = npages;
+ 		ret = obd_preprw(env, rw, exp, oa, 1, &ioo, rnb, &lpages,
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index c618337..2a4056a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -498,14 +498,10 @@ static int osc_real_create(struct obd_export *exp, struct obdo *oa,
+ 	lsm->lsm_oi = oa->o_oi;
+ 	*ea = lsm;
+ 
+-	if (oti) {
+-		oti->oti_transno = lustre_msg_get_transno(req->rq_repmsg);
+-
+-		if (oa->o_valid & OBD_MD_FLCOOKIE) {
+-			if (!oti->oti_logcookies)
+-				oti_alloc_cookies(oti, 1);
+-			*oti->oti_logcookies = oa->o_lcookie;
+-		}
++	if (oti && oa->o_valid & OBD_MD_FLCOOKIE) {
++		if (!oti->oti_logcookies)
++			oti->oti_logcookies = &oti->oti_onecookie;
++		*oti->oti_logcookies = oa->o_lcookie;
+ 	}
+ 
+ 	CDEBUG(D_HA, "transno: %lld\n",
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+index ab5d851..101ac87 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+@@ -667,11 +667,8 @@ static struct req_format *req_formats[] = {
+ 	&RQF_MDS_SYNC,
+ 	&RQF_MDS_CLOSE,
+ 	&RQF_MDS_RELEASE_CLOSE,
+-	&RQF_MDS_PIN,
+-	&RQF_MDS_UNPIN,
+ 	&RQF_MDS_READPAGE,
+ 	&RQF_MDS_WRITEPAGE,
+-	&RQF_MDS_IS_SUBDIR,
+ 	&RQF_MDS_DONE_WRITING,
+ 	&RQF_MDS_REINT,
+ 	&RQF_MDS_REINT_CREATE,
+@@ -1389,15 +1386,6 @@ struct req_format RQF_MDS_RELEASE_CLOSE =
+ 			mdt_release_close_client, mds_last_unlink_server);
+ EXPORT_SYMBOL(RQF_MDS_RELEASE_CLOSE);
+ 
+-struct req_format RQF_MDS_PIN =
+-	DEFINE_REQ_FMT0("MDS_PIN",
+-			mdt_body_capa, mdt_body_only);
+-EXPORT_SYMBOL(RQF_MDS_PIN);
+-
+-struct req_format RQF_MDS_UNPIN =
+-	DEFINE_REQ_FMT0("MDS_UNPIN", mdt_body_only, empty);
+-EXPORT_SYMBOL(RQF_MDS_UNPIN);
+-
+ struct req_format RQF_MDS_DONE_WRITING =
+ 	DEFINE_REQ_FMT0("MDS_DONE_WRITING",
+ 			mdt_close_client, mdt_body_only);
+@@ -1448,11 +1436,6 @@ struct req_format RQF_MDS_WRITEPAGE =
+ 			mdt_body_capa, mdt_body_only);
+ EXPORT_SYMBOL(RQF_MDS_WRITEPAGE);
+ 
+-struct req_format RQF_MDS_IS_SUBDIR =
+-	DEFINE_REQ_FMT0("MDS_IS_SUBDIR",
+-			mdt_body_only, mdt_body_only);
+-EXPORT_SYMBOL(RQF_MDS_IS_SUBDIR);
+-
+ struct req_format RQF_LLOG_ORIGIN_HANDLE_CREATE =
+ 	DEFINE_REQ_FMT0("LLOG_ORIGIN_HANDLE_CREATE",
+ 			llog_origin_handle_create_client, llogd_body_only);
 -- 
 1.7.1
