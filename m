@@ -1,16 +1,29 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Thu, 18 Aug 2016 22:11:59 +0000
+From: Ben Evans <bevans@cray.com>
+Date: Fri, 19 Aug 2016 13:57:22 +0000
 Subject: [lustre-devel] CentOS 6 - Build problems with kmod
-In-Reply-To: <88922ad0-ba51-f28f-b062-69b2bcfafa16@llnl.gov>
+In-Reply-To: <CY4PR11MB1751A30F582F35F12E2543F2CB150@CY4PR11MB1751.namprd11.prod.outlook.com>
 References: <CY4PR11MB1751486ABC8E7B3723D5549ACB150@CY4PR11MB1751.namprd11.prod.outlook.com>
-	<9957200e-17fe-2b8d-ad99-e8dfb5019f12@llnl.gov>,
+	<9957200e-17fe-2b8d-ad99-e8dfb5019f12@llnl.gov>
 	<88922ad0-ba51-f28f-b062-69b2bcfafa16@llnl.gov>
-Message-ID: <CY4PR11MB1751A30F582F35F12E2543F2CB150@CY4PR11MB1751.namprd11.prod.outlook.com>
+	<CY4PR11MB1751A30F582F35F12E2543F2CB150@CY4PR11MB1751.namprd11.prod.outlook.com>
+Message-ID: <D3DC8811.A3FF%jevans@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+When I ran into the problem, I did an rpm -I --nodeps and it worked fine.  The errors you are seeing are dependencies listed in the RPMs, not ones used by the actual .ko's.
+
+I spent some time trying to dig up where the 'kmod-' prefix for all the kernel symbols was getting inserted, but couldn't track it down.
+
+-Ben Evans
+
+From: lustre-devel <lustre-devel-bounces at lists.lustre.org<mailto:lustre-devel-bounces@lists.lustre.org>> on behalf of Patrick Farrell <paf at cray.com<mailto:paf@cray.com>>
+Date: Thursday, August 18, 2016 at 6:11 PM
+To: "Christopher J. Morrone" <morrone2 at llnl.gov<mailto:morrone2@llnl.gov>>, "lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>" <lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>>
+Subject: Re: [lustre-devel] CentOS 6 - Build problems with kmod
+
 
 
 Chris,
@@ -38,9 +51,9 @@ So, does anyone have any insight in to what needs to change in the documented bu
 - Patrick
 
 ________________________________
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Christopher J. Morrone <morrone2@llnl.gov>
+From: lustre-devel <lustre-devel-bounces at lists.lustre.org<mailto:lustre-devel-bounces@lists.lustre.org>> on behalf of Christopher J. Morrone <morrone2 at llnl.gov<mailto:morrone2@llnl.gov>>
 Sent: Thursday, August 18, 2016 3:44:52 PM
-To: lustre-devel at lists.lustre.org
+To: lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
 Subject: Re: [lustre-devel] CentOS 6 - Build problems with kmod
 
 On 08/18/2016 01:43 PM, Christopher J. Morrone wrote:
@@ -100,7 +113,7 @@ s/should/should NOT/
 >>
 >> _______________________________________________
 >> lustre-devel mailing list
->> lustre-devel at lists.lustre.org
+>> lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
 >> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 >>
 >
@@ -109,8 +122,8 @@ s/should/should NOT/
 
 _______________________________________________
 lustre-devel mailing list
-lustre-devel at lists.lustre.org
+lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160818/8f9908ea/attachment.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160819/9b00260c/attachment-0001.htm>
