@@ -1,68 +1,180 @@
-From: Joe Perches <joe@perches.com>
-Date: Fri, 19 Aug 2016 13:01:45 -0700
-Subject: [lustre-devel] [PATCH 0/7] staging: lustre: last missing
-	patches for lustre 2.6
-In-Reply-To: <alpine.LFD.2.20.1608192007420.7759@casper.infradead.org>
-References: <1471630051-26700-1-git-send-email-jsimmons@infradead.org>
-	<1471631966.3893.29.camel@perches.com>
-	<alpine.LFD.2.20.1608192007420.7759@casper.infradead.org>
-Message-ID: <1471636905.3893.40.camel@perches.com>
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Fri, 19 Aug 2016 13:44:10 -0700
+Subject: [lustre-devel] CentOS 6 - Build problems with kmod
+In-Reply-To: <CY4PR11MB1751A30F582F35F12E2543F2CB150@CY4PR11MB1751.namprd11.prod.outlook.com>
+References: <CY4PR11MB1751486ABC8E7B3723D5549ACB150@CY4PR11MB1751.namprd11.prod.outlook.com>
+	<9957200e-17fe-2b8d-ad99-e8dfb5019f12@llnl.gov>
+	<88922ad0-ba51-f28f-b062-69b2bcfafa16@llnl.gov>
+	<CY4PR11MB1751A30F582F35F12E2543F2CB150@CY4PR11MB1751.namprd11.prod.outlook.com>
+Message-ID: <17c61f0e-5835-b14a-2c56-6dbe01dcdca5@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Fri, 2016-08-19 at 20:44 +0100, James Simmons wrote:
-> > 1: I'd like to see the lustre #include files separated into
-> > ? ?only two internal/external directories akin to the
-> > ? ?include/linux and include/uapi directories used by linux.
-[]
-> For the first question yes it is reasonable and developers
-> have been working to cleanup and separate out the uapi headers
-> from the normal kernel headers. For staging/lustre/lustre we
-> have local headers *_internal.h which only matter for that
-> particular subdirectory. The rest of the headers are all in
+On 08/18/2016 03:11 PM, Patrick Farrell wrote:
 > 
-> staging/lustre/lustre/include/*
+> Chris,
 > 
-> In that directory we have the linux subdirectory. That has
-> gone away in newer lustre versions so I would need to push
-> the patch to remove it. The other directory
 > 
-> staging/lustre/lustre/include/lustre/*
+> I agree with your contention about the kernel symbols, that's why I
+> rebuilt from scratch and reinstalled.  Just did it again.  Still getting
+> the error.
 > 
-> contains all our uapi headers like lustre_user.h and lustre_idl.h.
-> Well that is not entirely correct. We still have uapi headers
-> like uapi_kernelcomm.h one directory up. It just if we change those
-> I need to update our userland tools as well. I have a patch ready
-> but I need to push it to our utility branch as well.
-> The next lot is all the LNet/libcfs stuff. The good news for LNet
-> the headers have been cleaned up so separating them out is easy.
-> Well there can always be more improvements. Now libcfs is a bit
-> messy. The libcfs/linux directory needs to be removed yet. Also
-> libcfs_debug.h needs to broken up for uapi use.
 > 
-> Thats the run down about where we are at for the headers. Also it
-> gives you an idea where we are heading. So how do you need this
-> layed out for what you want to do? Where do you want to place the
-> headers?
+>> It sounds like you built your own kernel.  Did you install all the
+>> resulting kernel packages before building lustre (including any
+>> devel-related packages)? 
+> 
+> Yes, but this process doesn't produce anything other than the kernel RPM.
 
-Thanks.
+You are saying that literally only one rpm is produced?  If that isn't
+what your are saying, please list all of the produced rpms, and also
+list which ones you are installing.
 
-I don't _need_ anything, but I think it'd be simpler to
-have just 2 directories, one for lustre kernel stuff
-and another for lustre uapi stuff.
+If you only have a single kernel rpm, then you almost certainly don't
+have the correct packages installed to allow Lustre to compile against
+that kernel.  Lustre is probably compiling against some other installed
+kernel.
 
-That applies for LNet and libcfs #includes as well.
+>> Is your custom kernel the newest kernel
+>> installed on your system?
+> 
+> Yes.  It's the newest and it's what's booted.
 
-To me, ideally, there'd only be 2 #include directories
-so that the only used #include styles could become:
+> So, does anyone have any insight in to what needs to change in the
+> documented build process so I can build and install Lustre on CentOS 6?
+>  (ldisksfs, not ZFS, so I must build the kernel)  It seems likely that
+> I'm missing some symbol RPMs or similar, but kernel-syms is a SuSE only
+> thing, I believe.  I believe Intel is still building and installing
+> ldiskfs Lustre on CentOS 6, so there must be something...?
 
-#include <linux/lustre/foo.h>
-and
-#include <uapi/lustre/bar.h>
+There aren't separate "symbol" rpms for RHEL.
 
-and that would work regardless of lustre's layout
-in staging or elsewhere.
+I still think that it is likely that you compiled against a kernel on
+your build node that either does not exist on your lustre node, or the
+kernel that lustre compiled about on your build node was old enough that
+its symbols are incompatible with the booted kernel on your lustre node.
+
+Here are somethings that you can try to eliminate problems:
+
+1) Remove the lustre-patched kernel altogether.  Purge it from your
+system.  Build Lustre against the stock kernel.
+
+2) Figure out which kernel you are actually compiling against.  Or at
+the very least, which ones your lustre packages are compatible with.
+
+I would probably do one or both of these:
+
+- Run "rpm -qp --requires kmod-lustre-<whatever>.rpm".  Pick out a few
+of the required kernel symbols for which you saw complaints when trying
+to install your kernel.  This will eliminate the issue of your kernel
+build that seems to be going wrong.  You can come back to this later
+when you verify that the lustre build is working correctly.
+
+- Run "rpm -q --provides" on each installed kernel package (the packages
+that have the name of the form 'kernel-<version>'.  Rum that output
+through grep a few times for each of the specific symbol names that you
+picked in the previous step.  For example:
+
+# rpm -q --provides kernel-3.10.0-327.28.2.1chaos.ch6.x86_64 |grep
+__mutex_init
+kernel(__mutex_init) = 0x9a025cd5
+
+Now, compare the hex symbol version required by the kmod-lustre package
+with the hex symbol versions provided by the various kernels that you
+currently have installed.  Which are offering compatible symbols?
+
+For instance:
+
+# rpm -qp --requires
+kmod-lustre-2.8.0_0.0.llnlpreview.33-1.ch6.x86_64.rpm | grep __mutex_init
+kernel(__mutex_init) = 0x9a025cd5
+
+Look, they match!  I can install this lustre modules with this kernel
+installed, and have no rpm requirement complaints.
+
+You are going to find that you do _not_ have a kernel package installed
+that offers the symbols that the kmod-lustre- package(s) require.
+
+Chris
+
+
+> - Patrick
+> 
+> ------------------------------------------------------------------------
+> *From:* lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf
+> of Christopher J. Morrone <morrone2@llnl.gov>
+> *Sent:* Thursday, August 18, 2016 3:44:52 PM
+> *To:* lustre-devel at lists.lustre.org
+> *Subject:* Re: [lustre-devel] CentOS 6 - Build problems with kmod
+>  
+> On 08/18/2016 01:43 PM, Christopher J. Morrone wrote:
+>> Yes, those instructions should be taken with a huge grain of salt.  For
+>> instance, instructions for compiling lustre should really employ a
+> 
+> s/should/should NOT/
+> 
+>> custom user and talk about "useradd" and such.  Also, most users can
+>> skip the whole custom-patched-kernel section.  Hopefully all developers
+>> will be able to stop that too by the time 2.9.0 comes out.
+>> 
+>> The error you are seeing almost certainly means that you don't have a
+>> kernel installed that offers symbols compatible with the kernel that
+>> lustre was compiled against.
+>> 
+>> It sounds like you built your own kernel.  Did you install all the
+>> resulting kernel packages before building lustre (including any
+>> devel-related packages)?  Is your custom kernel the newest kernel
+>> installed on your system?
+>> 
+>> Chris
+>> 
+>> On 08/18/2016 01:00 PM, Patrick Farrell wrote:
+>>> Good afternoon,
+>>>
+>>>
+>>> I'm trying to build and install updated Lustre master on CentOS 6 for
+>>> the first time in a month or two, and I'm having trouble.
+>>>
+>>>
+>>> I use the build procedure documented here:
+>>>
+>>> https://wiki.hpdd.intel.com/pages/viewpage.action?pageId=8126821
+>>>
+>>>
+>>> I've got some new kmod-* RPMs, and I need to install those to install
+>>> Lustre, which is fine, except I get a huge string of messages like this
+>>> when I try:
+>>>
+>>> error: Failed dependencies:
+>>>         ksym(__init_waitqueue_head) = 0xffc7c184 is needed by
+>>> kmod-lustre-2.8.56_44_g288e55b_dirty-1.el6.x86_64
+>>>         ksym(__mutex_init) = 0x4bf79039 is needed by
+>>> kmod-lustre-2.8.56_44_g288e55b_dirty-1.el6.x86_64
+>>>
+>>> I've rebuilt and reinstalled my kernel with this latest version of
+>>> Lustre.  Error messages remain the same, and I can't install.
+>>>
+>>>
+>>> Any thoughts or advice?
+>>>
+>>>
+>>> - Patrick
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> lustre-devel mailing list
+>>> lustre-devel at lists.lustre.org
+>>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>>>
+>> 
+>> .
+>> 
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
