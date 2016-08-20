@@ -1,299 +1,247 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sat, 20 Aug 2016 17:34:23 -0400
-Subject: [lustre-devel] [PATCH 06/13] lustre: pass iov_iter to ->lnd_recv()
+Date: Sat, 20 Aug 2016 17:34:27 -0400
+Subject: [lustre-devel] [PATCH 10/13] staging/lustre: Fix unnecessary
+	parentheses around variables
 In-Reply-To: <1471728870-518753-1-git-send-email-green@linuxhacker.ru>
 References: <1471728870-518753-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1471728870-518753-7-git-send-email-green@linuxhacker.ru>
+Message-ID: <1471728870-518753-11-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Al Viro <viro@zeniv.linux.org.uk>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Emoly Liu <emoly.liu@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Al Viro <viro@zeniv.linux.org.uk>
+From: Emoly Liu <emoly.liu@intel.com>
 
-Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+This patch fixes all checkpatch occurences of
+"CHECK: Unnecessary parentheses around xxx"
+in Lustre code.
+
+Signed-off-by: Emoly Liu <emoly.liu@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- .../staging/lustre/include/linux/lnet/lib-types.h  |  5 +---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  3 +-
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 32 ++++++++++++----------
- .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |  4 +--
- .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c | 21 ++++++--------
- drivers/staging/lustre/lnet/lnet/lib-move.c        | 11 ++++++--
- drivers/staging/lustre/lnet/lnet/lo.c              | 24 ++++++++--------
- 7 files changed, 49 insertions(+), 51 deletions(-)
+ .../staging/lustre/lustre/include/lustre/lustre_user.h   |  2 +-
+ drivers/staging/lustre/lustre/lov/lov_obd.c              |  4 ++--
+ drivers/staging/lustre/lustre/lov/lov_pool.c             | 16 ++++++++--------
+ drivers/staging/lustre/lustre/obdclass/genops.c          |  4 ++--
+ drivers/staging/lustre/lustre/obdclass/llog.c            |  2 +-
+ drivers/staging/lustre/lustre/obdclass/lustre_handles.c  |  2 +-
+ drivers/staging/lustre/lustre/obdclass/obd_config.c      |  2 +-
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c       |  2 +-
+ drivers/staging/lustre/lustre/osc/osc_request.c          |  2 +-
+ drivers/staging/lustre/lustre/ptlrpc/pack_generic.c      |  6 +++---
+ 10 files changed, 21 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 7967b01..640ff72 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -220,10 +220,7 @@ typedef struct lnet_lnd {
- 	 * credit if the LND does flow control.
- 	 */
- 	int (*lnd_recv)(struct lnet_ni *ni, void *private, lnet_msg_t *msg,
--			int delayed, unsigned int niov,
--			struct kvec *iov, lnet_kiov_t *kiov,
--			unsigned int offset, unsigned int mlen,
--			unsigned int rlen);
-+			int delayed, struct iov_iter *to, unsigned int rlen);
- 
- 	/*
- 	 * lnet_parse() has had to delay processing of this message
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index 078a0c3..f49483e 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -1034,5 +1034,4 @@ int  kiblnd_post_rx(struct kib_rx *rx, int credit);
- 
- int  kiblnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg);
- int  kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
--		 unsigned int niov, struct kvec *iov, lnet_kiov_t *kiov,
--		 unsigned int offset, unsigned int mlen, unsigned int rlen);
-+		 struct iov_iter *to, unsigned int rlen);
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 9eb1db6..1b20ae8 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -648,7 +648,7 @@ static int kiblnd_map_tx(lnet_ni_t *ni, struct kib_tx *tx, struct kib_rdma_desc
- 
- static int
- kiblnd_setup_rd_iov(lnet_ni_t *ni, struct kib_tx *tx, struct kib_rdma_desc *rd,
--		    unsigned int niov, struct kvec *iov, int offset, int nob)
-+		    unsigned int niov, const struct kvec *iov, int offset, int nob)
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+index 5fc0c5c..e077687 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+@@ -978,7 +978,7 @@ struct hsm_user_request {
+ /** Return pointer to data field in a hsm user request */
+ static inline void *hur_data(struct hsm_user_request *hur)
  {
- 	struct kib_net *net = ni->ni_data;
- 	struct page *page;
-@@ -705,7 +705,7 @@ kiblnd_setup_rd_iov(lnet_ni_t *ni, struct kib_tx *tx, struct kib_rdma_desc *rd,
+-	return &(hur->hur_user_item[hur->hur_request.hr_itemcount]);
++	return &hur->hur_user_item[hur->hur_request.hr_itemcount];
+ }
  
- static int
- kiblnd_setup_rd_kiov(lnet_ni_t *ni, struct kib_tx *tx, struct kib_rdma_desc *rd,
--		     int nkiov, lnet_kiov_t *kiov, int offset, int nob)
-+		     int nkiov, const lnet_kiov_t *kiov, int offset, int nob)
- {
- 	struct kib_net *net = ni->ni_data;
- 	struct scatterlist *sg;
-@@ -1719,8 +1719,7 @@ kiblnd_reply(lnet_ni_t *ni, struct kib_rx *rx, lnet_msg_t *lntmsg)
+ /**
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index bc71e4f..52651c4 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -940,7 +940,7 @@ int lov_process_config_base(struct obd_device *obd, struct lustre_cfg *lcfg,
+ 	}
+ 	case LCFG_PARAM: {
+ 		struct lprocfs_static_vars lvars = { NULL };
+-		struct lov_desc *desc = &(obd->u.lov.desc);
++		struct lov_desc *desc = &obd->u.lov.desc;
  
- int
- kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
--	    unsigned int niov, struct kvec *iov, lnet_kiov_t *kiov,
--	    unsigned int offset, unsigned int mlen, unsigned int rlen)
-+	    struct iov_iter *to, unsigned int rlen)
- {
- 	struct kib_rx *rx = private;
- 	struct kib_msg *rxmsg = rx->rx_msg;
-@@ -1730,10 +1729,9 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
- 	int post_credit = IBLND_POSTRX_PEER_CREDIT;
- 	int rc = 0;
- 
--	LASSERT(mlen <= rlen);
-+	LASSERT(iov_iter_count(to) <= rlen);
- 	LASSERT(!in_interrupt());
- 	/* Either all pages or all vaddrs */
--	LASSERT(!(kiov && iov));
- 
- 	switch (rxmsg->ibm_type) {
- 	default:
-@@ -1749,16 +1747,16 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
- 			break;
+ 		if (!desc) {
+ 			rc = -EINVAL;
+@@ -1460,7 +1460,7 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
  		}
  
--		if (kiov)
--			lnet_copy_flat2kiov(niov, kiov, offset,
-+		if (to->type & ITER_BVEC)
-+			lnet_copy_flat2kiov(to->nr_segs, to->bvec, to->iov_offset,
- 					    IBLND_MSG_SIZE, rxmsg,
- 					    offsetof(struct kib_msg, ibm_u.immediate.ibim_payload),
--					    mlen);
-+					    iov_iter_count(to));
- 		else
--			lnet_copy_flat2iov(niov, iov, offset,
-+			lnet_copy_flat2iov(to->nr_segs, to->kvec, to->iov_offset,
- 					   IBLND_MSG_SIZE, rxmsg,
- 					   offsetof(struct kib_msg, ibm_u.immediate.ibim_payload),
--					   mlen);
-+					   iov_iter_count(to));
- 		lnet_finalize(ni, lntmsg, 0);
- 		break;
+ 		desc = (struct lov_desc *)data->ioc_inlbuf1;
+-		memcpy(desc, &(lov->desc), sizeof(*desc));
++		memcpy(desc, &lov->desc, sizeof(*desc));
  
-@@ -1766,7 +1764,7 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
- 		struct kib_msg	*txmsg;
- 		struct kib_rdma_desc *rd;
- 
--		if (!mlen) {
-+		if (!iov_iter_count(to)) {
- 			lnet_finalize(ni, lntmsg, 0);
- 			kiblnd_send_completion(rx->rx_conn, IBLND_MSG_PUT_NAK, 0,
- 					       rxmsg->ibm_u.putreq.ibprm_cookie);
-@@ -1784,12 +1782,16 @@ kiblnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg, int delayed,
- 
- 		txmsg = tx->tx_msg;
- 		rd = &txmsg->ibm_u.putack.ibpam_rd;
--		if (!kiov)
-+		if (!(to->type & ITER_BVEC))
- 			rc = kiblnd_setup_rd_iov(ni, tx, rd,
--						 niov, iov, offset, mlen);
-+						 to->nr_segs, to->kvec,
-+						 to->iov_offset,
-+						 iov_iter_count(to));
- 		else
- 			rc = kiblnd_setup_rd_kiov(ni, tx, rd,
--						  niov, kiov, offset, mlen);
-+						  to->nr_segs, to->bvec,
-+						  to->iov_offset,
-+						  iov_iter_count(to));
- 		if (rc) {
- 			CERROR("Can't setup PUT sink for %s: %d\n",
- 			       libcfs_nid2str(conn->ibc_peer->ibp_nid), rc);
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-index 84a915c..068440e 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-@@ -614,9 +614,7 @@ void ksocknal_shutdown(lnet_ni_t *ni);
- int ksocknal_ctl(lnet_ni_t *ni, unsigned int cmd, void *arg);
- int ksocknal_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg);
- int ksocknal_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg,
--		  int delayed, unsigned int niov,
--		  struct kvec *iov, lnet_kiov_t *kiov,
--		  unsigned int offset, unsigned int mlen, unsigned int rlen);
-+		  int delayed, struct iov_iter *to, unsigned int rlen);
- int ksocknal_accept(lnet_ni_t *ni, struct socket *sock);
- 
- int ksocknal_add_peer(lnet_ni_t *ni, lnet_process_id_t id, __u32 ip, int port);
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-index f8573ed..1bdf962 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-@@ -1325,39 +1325,36 @@ ksocknal_process_receive(struct ksock_conn *conn)
- 
- int
- ksocknal_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
--	      unsigned int niov, struct kvec *iov, lnet_kiov_t *kiov,
--	      unsigned int offset, unsigned int mlen, unsigned int rlen)
-+	      struct iov_iter *to, unsigned int rlen)
- {
- 	struct ksock_conn *conn = private;
- 	struct ksock_sched *sched = conn->ksnc_scheduler;
- 
--	LASSERT(mlen <= rlen);
--	LASSERT(niov <= LNET_MAX_IOV);
-+	LASSERT(iov_iter_count(to) <= rlen);
-+	LASSERT(to->nr_segs <= LNET_MAX_IOV);
- 
- 	conn->ksnc_cookie = msg;
--	conn->ksnc_rx_nob_wanted = mlen;
-+	conn->ksnc_rx_nob_wanted = iov_iter_count(to);
- 	conn->ksnc_rx_nob_left = rlen;
- 
--	if (!mlen || iov) {
-+	if (to->type & ITER_KVEC) {
- 		conn->ksnc_rx_nkiov = 0;
- 		conn->ksnc_rx_kiov = NULL;
- 		conn->ksnc_rx_iov = conn->ksnc_rx_iov_space.iov;
- 		conn->ksnc_rx_niov =
- 			lnet_extract_iov(LNET_MAX_IOV, conn->ksnc_rx_iov,
--					 niov, iov, offset, mlen);
-+					 to->nr_segs, to->kvec,
-+					 to->iov_offset, iov_iter_count(to));
- 	} else {
- 		conn->ksnc_rx_niov = 0;
- 		conn->ksnc_rx_iov = NULL;
- 		conn->ksnc_rx_kiov = conn->ksnc_rx_iov_space.kiov;
- 		conn->ksnc_rx_nkiov =
- 			lnet_extract_kiov(LNET_MAX_IOV, conn->ksnc_rx_kiov,
--					  niov, kiov, offset, mlen);
-+					 to->nr_segs, to->bvec,
-+					 to->iov_offset, iov_iter_count(to));
+ 		uuidp = (struct obd_uuid *)data->ioc_inlbuf2;
+ 		genp = (__u32 *)data->ioc_inlbuf3;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
+index 639e086..f8c8a36 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pool.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
+@@ -61,7 +61,7 @@ void lov_pool_putref(struct pool_desc *pool)
+ 		LASSERT(hlist_unhashed(&pool->pool_hash));
+ 		LASSERT(list_empty(&pool->pool_list));
+ 		LASSERT(!pool->pool_debugfs_entry);
+-		lov_ost_pool_free(&(pool->pool_obds));
++		lov_ost_pool_free(&pool->pool_obds);
+ 		kfree(pool);
  	}
+ }
+@@ -260,7 +260,7 @@ static int pool_proc_show(struct seq_file *s, void *v)
+ 	tgt = pool_tgt(iter->pool, iter->idx);
+ 	up_read(&pool_tgt_rw_sem(iter->pool));
+ 	if (tgt)
+-		seq_printf(s, "%s\n", obd_uuid2str(&(tgt->ltd_uuid)));
++		seq_printf(s, "%s\n", obd_uuid2str(&tgt->ltd_uuid));
  
--	LASSERT(mlen ==
--		lnet_iov_nob(conn->ksnc_rx_niov, conn->ksnc_rx_iov) +
--		lnet_kiov_nob(conn->ksnc_rx_nkiov, conn->ksnc_rx_kiov));
--
- 	LASSERT(conn->ksnc_rx_scheduled);
- 
- 	spin_lock_bh(&sched->kss_lock);
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 7d8d2d6..7387731 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -569,6 +569,7 @@ lnet_ni_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
- 	unsigned int niov = 0;
- 	struct kvec *iov = NULL;
- 	lnet_kiov_t *kiov = NULL;
-+	struct iov_iter to;
+ 	return 0;
+ }
+@@ -400,7 +400,7 @@ int lov_pool_new(struct obd_device *obd, char *poolname)
+ 	struct pool_desc *new_pool;
  	int rc;
  
- 	LASSERT(!in_interrupt());
-@@ -594,8 +595,14 @@ lnet_ni_recv(lnet_ni_t *ni, void *private, lnet_msg_t *msg, int delayed,
- 		}
+-	lov = &(obd->u.lov);
++	lov = &obd->u.lov;
+ 
+ 	if (strlen(poolname) > LOV_MAXPOOLNAME)
+ 		return -ENAMETOOLONG;
+@@ -471,7 +471,7 @@ int lov_pool_del(struct obd_device *obd, char *poolname)
+ 	struct lov_obd *lov;
+ 	struct pool_desc *pool;
+ 
+-	lov = &(obd->u.lov);
++	lov = &obd->u.lov;
+ 
+ 	/* lookup and kill hash reference */
+ 	pool = cfs_hash_del_key(lov->lov_pools_hash_body, poolname);
+@@ -503,7 +503,7 @@ int lov_pool_add(struct obd_device *obd, char *poolname, char *ostname)
+ 	unsigned int lov_idx;
+ 	int rc;
+ 
+-	lov = &(obd->u.lov);
++	lov = &obd->u.lov;
+ 
+ 	pool = cfs_hash_lookup(lov->lov_pools_hash_body, poolname);
+ 	if (!pool)
+@@ -517,7 +517,7 @@ int lov_pool_add(struct obd_device *obd, char *poolname, char *ostname)
+ 		if (!lov->lov_tgts[lov_idx])
+ 			continue;
+ 		if (obd_uuid_equals(&ost_uuid,
+-				    &(lov->lov_tgts[lov_idx]->ltd_uuid)))
++				    &lov->lov_tgts[lov_idx]->ltd_uuid))
+ 			break;
+ 	}
+ 	/* test if ost found in lov */
+@@ -547,7 +547,7 @@ int lov_pool_remove(struct obd_device *obd, char *poolname, char *ostname)
+ 	unsigned int lov_idx;
+ 	int rc = 0;
+ 
+-	lov = &(obd->u.lov);
++	lov = &obd->u.lov;
+ 
+ 	pool = cfs_hash_lookup(lov->lov_pools_hash_body, poolname);
+ 	if (!pool)
+@@ -562,7 +562,7 @@ int lov_pool_remove(struct obd_device *obd, char *poolname, char *ostname)
+ 			continue;
+ 
+ 		if (obd_uuid_equals(&ost_uuid,
+-				    &(lov->lov_tgts[lov_idx]->ltd_uuid)))
++				    &lov->lov_tgts[lov_idx]->ltd_uuid))
+ 			break;
  	}
  
--	rc = ni->ni_lnd->lnd_recv(ni, private, msg, delayed,
--				  niov, iov, kiov, offset, mlen, rlen);
-+	if (iov) {
-+		iov_iter_kvec(&to, ITER_KVEC | READ, iov, niov, mlen + offset);
-+		iov_iter_advance(&to, offset);
-+	} else {
-+		iov_iter_bvec(&to, ITER_BVEC | READ, kiov, niov, mlen + offset);
-+		iov_iter_advance(&to, offset);
-+	}
-+	rc = ni->ni_lnd->lnd_recv(ni, private, msg, delayed, &to, rlen);
- 	if (rc < 0)
- 		lnet_finalize(ni, msg, rc);
+diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
+index 47c6420..d135104 100644
+--- a/drivers/staging/lustre/lustre/obdclass/genops.c
++++ b/drivers/staging/lustre/lustre/obdclass/genops.c
+@@ -166,10 +166,10 @@ int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
+ 	    !type->typ_name)
+ 		goto failed;
+ 
+-	*(type->typ_dt_ops) = *dt_ops;
++	*type->typ_dt_ops = *dt_ops;
+ 	/* md_ops is optional */
+ 	if (md_ops)
+-		*(type->typ_md_ops) = *md_ops;
++		*type->typ_md_ops = *md_ops;
+ 	strcpy(type->typ_name, name);
+ 	spin_lock_init(&type->obd_type_lock);
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/llog.c b/drivers/staging/lustre/lustre/obdclass/llog.c
+index 1784ca0..8f06141 100644
+--- a/drivers/staging/lustre/lustre/obdclass/llog.c
++++ b/drivers/staging/lustre/lustre/obdclass/llog.c
+@@ -80,7 +80,7 @@ static void llog_free_handle(struct llog_handle *loghandle)
+ 		LASSERT(list_empty(&loghandle->u.phd.phd_entry));
+ 	else if (loghandle->lgh_hdr->llh_flags & LLOG_F_IS_CAT)
+ 		LASSERT(list_empty(&loghandle->u.chd.chd_head));
+-	LASSERT(sizeof(*(loghandle->lgh_hdr)) == LLOG_CHUNK_SIZE);
++	LASSERT(sizeof(*loghandle->lgh_hdr) == LLOG_CHUNK_SIZE);
+ 	kfree(loghandle->lgh_hdr);
+ out:
+ 	kfree(loghandle);
+diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
+index 082f530..89276e6 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
++++ b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
+@@ -214,7 +214,7 @@ static int cleanup_all_handles(void)
+ 		struct portals_handle *h;
+ 
+ 		spin_lock(&handle_hash[i].lock);
+-		list_for_each_entry_rcu(h, &(handle_hash[i].head), h_link) {
++		list_for_each_entry_rcu(h, &handle_hash[i].head, h_link) {
+ 			CERROR("force clean handle %#llx addr %p ops %p\n",
+ 			       h->h_cookie, h, h->h_ops);
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+index 8daf16e..2858712 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+@@ -1026,7 +1026,7 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+ 
+ 					oldfs = get_fs();
+ 					set_fs(KERNEL_DS);
+-					rc = (var->fops->write)(&fakefile, sval,
++					rc = var->fops->write(&fakefile, sval,
+ 								vallen, NULL);
+ 					set_fs(oldfs);
+ 				}
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+index cb85ad5..f56742a 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+@@ -394,7 +394,7 @@ int lustre_start_mgc(struct super_block *sb)
+ 	    lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)
+ 		data->ocd_connect_flags &= ~OBD_CONNECT_IMP_RECOV;
+ 	data->ocd_version = LUSTRE_VERSION_CODE;
+-	rc = obd_connect(NULL, &exp, obd, &(obd->obd_uuid), data, NULL);
++	rc = obd_connect(NULL, &exp, obd, &obd->obd_uuid, data, NULL);
+ 	if (rc) {
+ 		CERROR("connect failed %d\n", rc);
+ 		goto out;
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 4161718..80ac270 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -2634,7 +2634,7 @@ static int osc_getstripe(struct lov_stripe_md *lsm,
+ 			lmm_objects =
+ 			    &(((struct lov_user_md_v1 *)lumk)->lmm_objects[0]);
+ 		else
+-			lmm_objects = &(lumk->lmm_objects[0]);
++			lmm_objects = &lumk->lmm_objects[0];
+ 		lmm_objects->l_ost_oi = lsm->lsm_oi;
+ 	} else {
+ 		lum_size = lov_mds_md_size(0, lum.lmm_magic);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+index b514f18..fd0e980 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+@@ -1941,9 +1941,9 @@ void lustre_swab_lov_user_md_objects(struct lov_user_ost_data *lod,
+ 	int i;
+ 
+ 	for (i = 0; i < stripe_count; i++) {
+-		lustre_swab_ost_id(&(lod[i].l_ost_oi));
+-		__swab32s(&(lod[i].l_ost_gen));
+-		__swab32s(&(lod[i].l_ost_idx));
++		lustre_swab_ost_id(&lod[i].l_ost_oi);
++		__swab32s(&lod[i].l_ost_gen);
++		__swab32s(&lod[i].l_ost_idx);
+ 	}
  }
-diff --git a/drivers/staging/lustre/lnet/lnet/lo.c b/drivers/staging/lustre/lnet/lnet/lo.c
-index 08402712..131f84d 100644
---- a/drivers/staging/lustre/lnet/lnet/lo.c
-+++ b/drivers/staging/lustre/lnet/lnet/lo.c
-@@ -42,35 +42,33 @@ lolnd_send(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg)
- 
- static int
- lolnd_recv(lnet_ni_t *ni, void *private, lnet_msg_t *lntmsg,
--	   int delayed, unsigned int niov,
--	   struct kvec *iov, lnet_kiov_t *kiov,
--	   unsigned int offset, unsigned int mlen, unsigned int rlen)
-+	   int delayed, struct iov_iter *to, unsigned int rlen)
- {
- 	lnet_msg_t *sendmsg = private;
- 
- 	if (lntmsg) {		   /* not discarding */
- 		if (sendmsg->msg_iov) {
--			if (iov)
--				lnet_copy_iov2iov(niov, iov, offset,
-+			if (to->type & ITER_KVEC)
-+				lnet_copy_iov2iov(to->nr_segs, to->kvec, to->iov_offset,
- 						  sendmsg->msg_niov,
- 						  sendmsg->msg_iov,
--						  sendmsg->msg_offset, mlen);
-+						  sendmsg->msg_offset, iov_iter_count(to));
- 			else
--				lnet_copy_iov2kiov(niov, kiov, offset,
-+				lnet_copy_iov2kiov(to->nr_segs, to->bvec, to->iov_offset,
- 						   sendmsg->msg_niov,
- 						   sendmsg->msg_iov,
--						   sendmsg->msg_offset, mlen);
-+						   sendmsg->msg_offset, iov_iter_count(to));
- 		} else {
--			if (iov)
--				lnet_copy_kiov2iov(niov, iov, offset,
-+			if (to->type & ITER_KVEC)
-+				lnet_copy_kiov2iov(to->nr_segs, to->kvec, to->iov_offset,
- 						   sendmsg->msg_niov,
- 						   sendmsg->msg_kiov,
--						   sendmsg->msg_offset, mlen);
-+						   sendmsg->msg_offset, iov_iter_count(to));
- 			else
--				lnet_copy_kiov2kiov(niov, kiov, offset,
-+				lnet_copy_kiov2kiov(to->nr_segs, to->bvec, to->iov_offset,
- 						    sendmsg->msg_niov,
- 						    sendmsg->msg_kiov,
--						    sendmsg->msg_offset, mlen);
-+						    sendmsg->msg_offset, iov_iter_count(to));
- 		}
- 
- 		lnet_finalize(ni, lntmsg, 0);
+ EXPORT_SYMBOL(lustre_swab_lov_user_md_objects);
 -- 
 2.7.4
