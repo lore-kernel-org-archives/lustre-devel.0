@@ -1,38 +1,47 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sat, 20 Aug 2016 17:34:21 -0400
-Subject: [lustre-devel] [PATCH 04/13] lustre: ->kss_scratch... are unused now
+Date: Sat, 20 Aug 2016 17:34:25 -0400
+Subject: [lustre-devel] [PATCH 08/13] staging/lustre: Always return EEXIST
+	on mkdir for existing names
 In-Reply-To: <1471728870-518753-1-git-send-email-green@linuxhacker.ru>
 References: <1471728870-518753-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1471728870-518753-5-git-send-email-green@linuxhacker.ru>
+Message-ID: <1471728870-518753-9-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Al Viro <viro@zeniv.linux.org.uk>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Al Viro <viro@zeniv.linux.org.uk>
+if the name already exists, but we don't have write permissions
+in the parent, force talking to the MDS to determine what
+more sensical error code to return.
+This also happens to fix matlab and other such programs that
+assume that EEXIST is the only valid error code for mkdir of
+an existing directory.
 
-Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/staging/lustre/lustre/llite/namei.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-index d5efb42..84a915c 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-@@ -86,10 +86,6 @@ struct ksock_sched {				/* per scheduler state */
- 	int                     kss_nconns;     /* # connections assigned to
- 						 * this scheduler */
- 	struct ksock_sched_info *kss_info;	/* owner of it */
--	union {
--		struct bio_vec          kss_scratch_bvec[LNET_MAX_IOV];
--		struct kvec             kss_scratch_iov[LNET_MAX_IOV];
--	};
- };
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index 09e1801..8350943 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -541,8 +541,12 @@ static struct dentry *ll_lookup_nd(struct inode *parent, struct dentry *dentry,
+ 	CDEBUG(D_VFSTRACE, "VFS Op:name=%pd, dir="DFID"(%p),flags=%u\n",
+ 	       dentry, PFID(ll_inode2fid(parent)), parent, flags);
  
- struct ksock_sched_info {
+-	/* Optimize away (CREATE && !OPEN). Let .create handle the race. */
+-	if ((flags & LOOKUP_CREATE) && !(flags & LOOKUP_OPEN))
++	/* Optimize away (CREATE && !OPEN). Let .create handle the race.
++	 * but only if we have write permissions there, otherwise we need
++	 * to proceed with lookup. LU-4185
++	 */
++	if ((flags & LOOKUP_CREATE) && !(flags & LOOKUP_OPEN) &&
++	    (inode_permission(parent, MAY_WRITE | MAY_EXEC) == 0))
+ 		return NULL;
+ 
+ 	if (flags & (LOOKUP_PARENT|LOOKUP_OPEN|LOOKUP_CREATE))
 -- 
 2.7.4
