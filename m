@@ -1,37 +1,55 @@
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 23 Aug 2016 16:51:39 +0200
-Subject: [lustre-devel] [GIT PULL] [PATCH v4 00/26] Delete CURRENT_TIME
-	and CURRENT_TIME_SEC macros
-In-Reply-To: <20160815162312.GA19794@kroah.com>
-References: <1471128518-24075-1-git-send-email-deepa.kernel@gmail.com>
-	<20160815162312.GA19794@kroah.com>
-Message-ID: <2295046.g7jOF3qsLW@wuerfel>
+From: Oleg Drokin <green@linuxhacker.ru>
+Date: Tue, 23 Aug 2016 17:11:40 -0400
+Subject: [lustre-devel] [PATCH 6/8] staging/lustre/llite: changes to avoid
+	cache corruption
+In-Reply-To: <1471986702-682922-1-git-send-email-green@linuxhacker.ru>
+References: <1471986702-682922-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <1471986702-682922-7-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg KH <gregkh-hQyY1W1yCW8ekmWlsbkhG0B+6BGkLq7r@public.gmane.org>
-Cc: shaggy-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, jfs-discussion-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, trond.myklebust-7I+n7zu2hftEKMMhf/gKZA@public.gmane.org, adrian.hunter-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org, clm-b10kYP2dOMg@public.gmane.org, adilger.kernel-m1MBpc4rdrD3fQ9qLvQP4Q@public.gmane.org, Deepa Dinamani <deepa.kernel-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>, buchino-FYB4Gu1CFyUAvxtiuMwx3w@public.gmane.org, tglx-hfZtesqFncYOwBW4kG4KsQ@public.gmane.org, zyan-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, jejb-23VcF4HTsmIX0ybBhKVfKdBPR1lH4CV8@public.gmane.org, paul-r2n+y4ga6xFZroRs9YW3xA@public.gmane.org, linux-scsi-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, y2038-cunTk1MwBs8s++Sfvej+rw@public.gmane.org, idryomov-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org, linux-ext4-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, cm224.lee-Sze3O3UU22JBDgjK7y7TUQ@public.gmane.org, dushistov-JGs/UdohzUI@public.gmane.org, mfasheh-IBi9RG/b67k@public.gmane.org, sramars-FYB4Gu1CFyUAvxtiuMwx3w@public.gmane.org, john.stultz-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org, viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org, dsterba-IBi9RG/b67k@public.gmane.org, jaegeuk-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, elder-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, tytso-3s7WtUTddSA@public.gmane.org, sage-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, martin.petersen-QHcLZuEGTsvQT0dZR+AlfA@public.gmane.org, dedekind1-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org, jbacik-b10kYP2dOMg@public.gmane.org, hiralpat-FYB4Gu1CFyUAvxtiuMwx3w@public.gmane.org, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, eparis-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, linux-f2fs-devel-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, sfrench-eUNUBHrolfbYtjvyW6yDsg@public.gmane.org, linux-audit-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Lokesh Nagappa Jaliminche <lokesh.jaliminche@seagate.com>, Oleg Drokin <green@linuxhacker.ru>
 
-On Monday, August 15, 2016 6:23:12 PM CEST Greg KH wrote:
-> On Sat, Aug 13, 2016 at 03:48:12PM -0700, Deepa Dinamani wrote:
-> > The series is aimed at getting rid of CURRENT_TIME and CURRENT_TIME_SEC macros.
-> > The macros are not y2038 safe. There is no plan to transition them into being
-> > y2038 safe.
-> > ktime_get_* api's can be used in their place. And, these are y2038 safe.
-> 
-> Who are you execting to pull this huge patch series?
+From: Lokesh Nagappa Jaliminche <lokesh.jaliminche@seagate.com>
 
-Dave Chinner suggested to have Al Viro pick up the whole series.
+ll_find_alias is responsible for getting alias for inode
+which can be reused. Directories are assumed to have unique
+alias, where in case of non-directories there can be multiple
+aliases. In case of lustre there can be two type of aliases
+i.e. discon_alias and invalid_alias. Usage of discon_alias in
+case of non-directories may corrupt dcache and leads to kernel
+crash. Changes made to avoid use of discon_alias in case of
+non-directories.
 
-> Why not just introduce the new api call, wait for that to be merged, and
-> then push the individual patches through the different subsystems?
-> After half of those get ignored, then provide a single set of patches
-> that can go through Andrew or my trees.
+Seagate-bug-id: MRP-2739, MRP-3601
+Signed-off-by: Lokesh Nagappa Jaliminche <lokesh.jaliminche@seagate.com>
+Reviewed-by: Ujjwal Lanjewar <ujjwal.lanjewar@seagate.com>
+Reviewed-by: Ashish Purkar <ashish.purkar@seagate.com>
+Reviewed-by: Andrew Perepechko <andrew.perepechko@seagate.com>
+Tested-by: Parinay Vijayprakash Kondekar <parinay.kondekar@seagate.com>
+Reviewed-on: http://review.whamcloud.com/17732
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7613
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ drivers/staging/lustre/lustre/llite/namei.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-That was the original approach for v4.7, but (along with requesting
-a number of reworks that Deepa incorporated), Linus preferred doing
-the API change done in one chunk, see
-https://patchwork.kernel.org/patch/9134249/
-
-	Arnd
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index 788a3f0..b7d448f 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -363,7 +363,8 @@ static struct dentry *ll_find_alias(struct inode *inode, struct dentry *dentry)
+ 		LASSERT(alias != dentry);
+ 
+ 		spin_lock(&alias->d_lock);
+-		if (alias->d_flags & DCACHE_DISCONNECTED)
++		if ((alias->d_flags & DCACHE_DISCONNECTED) &&
++		    S_ISDIR(inode->i_mode))
+ 			/* LASSERT(last_discon == NULL); LU-405, bz 20055 */
+ 			discon_alias = alias;
+ 		else if (alias->d_parent == dentry->d_parent	     &&
+-- 
+2.7.4
