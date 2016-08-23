@@ -1,54 +1,37 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 22 Aug 2016 16:38:01 -0400
-Subject: [lustre-devel] [PATCH 0/7] staging: lustre: last missing
-	patches for lustre 2.6
-In-Reply-To: <1471888542.3746.70.camel@perches.com>
-References: <1471630051-26700-1-git-send-email-jsimmons@infradead.org>
-	<1471631966.3893.29.camel@perches.com>
-	<alpine.LFD.2.20.1608192007420.7759@casper.infradead.org>
-	<1471636905.3893.40.camel@perches.com>
-	<alpine.LFD.2.20.1608221810590.9872@casper.infradead.org>
-	<1471888542.3746.70.camel@perches.com>
-Message-ID: <20160822203801.GB5166@kroah.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 23 Aug 2016 16:51:39 +0200
+Subject: [lustre-devel] [GIT PULL] [PATCH v4 00/26] Delete CURRENT_TIME
+	and CURRENT_TIME_SEC macros
+In-Reply-To: <20160815162312.GA19794@kroah.com>
+References: <1471128518-24075-1-git-send-email-deepa.kernel@gmail.com>
+	<20160815162312.GA19794@kroah.com>
+Message-ID: <2295046.g7jOF3qsLW@wuerfel>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Joe Perches <joe@perches.com>
-Cc: James Simmons <jsimmons@infradead.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Greg KH <gregkh-hQyY1W1yCW8ekmWlsbkhG0B+6BGkLq7r@public.gmane.org>
+Cc: shaggy-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, jfs-discussion-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, trond.myklebust-7I+n7zu2hftEKMMhf/gKZA@public.gmane.org, adrian.hunter-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org, clm-b10kYP2dOMg@public.gmane.org, adilger.kernel-m1MBpc4rdrD3fQ9qLvQP4Q@public.gmane.org, Deepa Dinamani <deepa.kernel-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>, buchino-FYB4Gu1CFyUAvxtiuMwx3w@public.gmane.org, tglx-hfZtesqFncYOwBW4kG4KsQ@public.gmane.org, zyan-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, jejb-23VcF4HTsmIX0ybBhKVfKdBPR1lH4CV8@public.gmane.org, paul-r2n+y4ga6xFZroRs9YW3xA@public.gmane.org, linux-scsi-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, y2038-cunTk1MwBs8s++Sfvej+rw@public.gmane.org, idryomov-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org, linux-ext4-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, cm224.lee-Sze3O3UU22JBDgjK7y7TUQ@public.gmane.org, dushistov-JGs/UdohzUI@public.gmane.org, mfasheh-IBi9RG/b67k@public.gmane.org, sramars-FYB4Gu1CFyUAvxtiuMwx3w@public.gmane.org, john.stultz-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org, viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org, dsterba-IBi9RG/b67k@public.gmane.org, jaegeuk-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, elder-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org, tytso-3s7WtUTddSA@public.gmane.org, sage-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, martin.petersen-QHcLZuEGTsvQT0dZR+AlfA@public.gmane.org, dedekind1-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org, jbacik-b10kYP2dOMg@public.gmane.org, hiralpat-FYB4Gu1CFyUAvxtiuMwx3w@public.gmane.org, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, eparis-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, linux-f2fs-devel-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, sfrench-eUNUBHrolfbYtjvyW6yDsg@public.gmane.org, linux-audit-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org
 
-On Mon, Aug 22, 2016 at 10:55:42AM -0700, Joe Perches wrote:
-> On Mon, 2016-08-22 at 18:41 +0100, James Simmons wrote:
-> > On Fri, 2016-08-19 at 20:44 +0100, James Simmons wrote:
+On Monday, August 15, 2016 6:23:12 PM CEST Greg KH wrote:
+> On Sat, Aug 13, 2016 at 03:48:12PM -0700, Deepa Dinamani wrote:
+> > The series is aimed at getting rid of CURRENT_TIME and CURRENT_TIME_SEC macros.
+> > The macros are not y2038 safe. There is no plan to transition them into being
+> > y2038 safe.
+> > ktime_get_* api's can be used in their place. And, these are y2038 safe.
 > 
-> Hi again James.
-> 
-> > > I don't _need_ anything, but I think it'd be simpler to
-> > > have just 2 directories, one for lustre kernel stuff
-> > > and another for lustre uapi stuff.
-> > > 
-> > > That applies for LNet and libcfs #includes as well.
-> > > 
-> > > To me, ideally, there'd only be 2 #include directories
-> > > so that the only used #include styles could become:
-> > > 
-> > > #include 
-> > > and
-> > > #include 
-> > > 
-> > > and that would work regardless of lustre's layout
-> > > in staging or elsewhere.
-> > I didn't expect this to be requested at this time. I thought this would be?
-> > addressed just before we left staging.
-> 
-> Sooner is better to me, but that's up to you all.
+> Who are you execting to pull this huge patch series?
 
-No, please, let's wait, there's still lots of "real" work to be done in
-the lustre code before messing with the .h files like this.
+Dave Chinner suggested to have Al Viro pick up the whole series.
 
-James, please just continue the great work you are doing so far, all is
-fine :)
+> Why not just introduce the new api call, wait for that to be merged, and
+> then push the individual patches through the different subsystems?
+> After half of those get ignored, then provide a single set of patches
+> that can go through Andrew or my trees.
 
-thanks,
+That was the original approach for v4.7, but (along with requesting
+a number of reworks that Deepa incorporated), Linus preferred doing
+the API change done in one chunk, see
+https://patchwork.kernel.org/patch/9134249/
 
-greg k-h
+	Arnd
