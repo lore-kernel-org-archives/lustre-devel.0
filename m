@@ -1,39 +1,42 @@
-From: Oleg Drokin <green@linuxhacker.ru>
-Date: Thu, 25 Aug 2016 13:50:59 -0400
-Subject: [lustre-devel] [PATCH] staging/lustre: Fix max_dirty_mb output in
-	sysfs
-Message-ID: <1472147459-800686-1-git-send-email-green@linuxhacker.ru>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Fri, 26 Aug 2016 15:48:27 -0400
+Subject: [lustre-devel] [PATCH] staging/lustre: avoid zero buf for the
+	first time
+In-Reply-To: <20160822100408.GA11890@kroah.com>
+References: <1471855564-15962-1-git-send-email-shawn.lin@rock-chips.com>
+	<20160822100408.GA11890@kroah.com>
+Message-ID: <5498CEC3-3AB9-487B-9899-3E9372D2C575@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Shawn Lin <shawn.lin@rock-chips.com>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-%ul definitely was supposed to be %lu in the format string,
-so we print long unsigned int value, not just unsigned int
-with a letter l added at the end.
+Hello!
 
-Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
----
- drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+On Aug 22, 2016, at 6:04 AM, Greg Kroah-Hartman wrote:
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
-index 8f70dd2..bcf005d 100644
---- a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
-+++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
-@@ -95,8 +95,9 @@ LUSTRE_STATIC_UINT_ATTR(timeout, &obd_timeout);
- static ssize_t max_dirty_mb_show(struct kobject *kobj, struct attribute *attr,
- 				 char *buf)
- {
--	return sprintf(buf, "%ul\n",
--			obd_max_dirty_pages / (1 << (20 - PAGE_SHIFT)));
-+	return sprintf(buf, "%lu\n",
-+		       (unsigned long)obd_max_dirty_pages /
-+		       (1 << (20 - PAGE_SHIFT)));
- }
- 
- static ssize_t max_dirty_mb_store(struct kobject *kobj, struct attribute *attr,
--- 
-2.7.4
+> On Mon, Aug 22, 2016 at 04:46:04PM +0800, Shawn Lin wrote:
+>> We only need to zero it when repeating in order to
+>> avoid old garbage. Let's improve it by moving this
+>> before we repeat the calculation to save some cpu
+>> cycle.
+>> 
+>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> 
+> Have you noticed a change with this in a benchmark?
+> 
+> If not, is it really worth it?
+
+The other problem is we would need to remember to memset it
+should there be more paths jumping to the repeat label
+which might be easy to miss,
+so we are probably better off without this patch.
+
+> I need an ack from the lustre developers before taking patches like
+> this...
+> 
+> thanks,
+> 
+> greg k-h
