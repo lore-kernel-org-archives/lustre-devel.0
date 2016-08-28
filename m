@@ -1,42 +1,49 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Fri, 26 Aug 2016 15:48:27 -0400
-Subject: [lustre-devel] [PATCH] staging/lustre: avoid zero buf for the
-	first time
-In-Reply-To: <20160822100408.GA11890@kroah.com>
-References: <1471855564-15962-1-git-send-email-shawn.lin@rock-chips.com>
-	<20160822100408.GA11890@kroah.com>
-Message-ID: <5498CEC3-3AB9-487B-9899-3E9372D2C575@intel.com>
+From: Julia Lawall <Julia.Lawall@lip6.fr>
+Date: Sun, 28 Aug 2016 23:16:07 +0200
+Subject: [lustre-devel] [PATCH] staging: lustre: constify
+	lmv_proc_target_fops structure
+Message-ID: <1472418967-4966-1-git-send-email-Julia.Lawall@lip6.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Shawn Lin <shawn.lin@rock-chips.com>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Oleg Drokin <oleg.drokin@intel.com>
+Cc: kernel-janitors@vger.kernel.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-Hello!
+lmv_proc_target_fops, of type struct file_operations, is never modified, so
+declare it as const.
 
-On Aug 22, 2016, at 6:04 AM, Greg Kroah-Hartman wrote:
+Done with the help of Coccinelle.
 
-> On Mon, Aug 22, 2016 at 04:46:04PM +0800, Shawn Lin wrote:
->> We only need to zero it when repeating in order to
->> avoid old garbage. Let's improve it by moving this
->> before we repeat the calculation to save some cpu
->> cycle.
->> 
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> 
-> Have you noticed a change with this in a benchmark?
-> 
-> If not, is it really worth it?
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-The other problem is we would need to remember to memset it
-should there be more paths jumping to the repeat label
-which might be easy to miss,
-so we are probably better off without this patch.
+---
+ drivers/staging/lustre/lustre/lmv/lmv_internal.h |    2 +-
+ drivers/staging/lustre/lustre/lmv/lproc_lmv.c    |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> I need an ack from the lustre developers before taking patches like
-> this...
-> 
-> thanks,
-> 
-> greg k-h
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_internal.h b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
+index 3ce17da..c4961d9 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_internal.h
++++ b/drivers/staging/lustre/lustre/lmv/lmv_internal.h
+@@ -164,6 +164,6 @@ struct lmv_tgt_desc
+ /* lproc_lmv.c */
+ void lprocfs_lmv_init_vars(struct lprocfs_static_vars *lvars);
+ 
+-extern struct file_operations lmv_proc_target_fops;
++extern const struct file_operations lmv_proc_target_fops;
+ 
+ #endif
+diff --git a/drivers/staging/lustre/lustre/lmv/lproc_lmv.c b/drivers/staging/lustre/lustre/lmv/lproc_lmv.c
+index c29c361..d2316c0 100644
+--- a/drivers/staging/lustre/lustre/lmv/lproc_lmv.c
++++ b/drivers/staging/lustre/lustre/lmv/lproc_lmv.c
+@@ -202,7 +202,7 @@ static struct lprocfs_vars lprocfs_lmv_obd_vars[] = {
+ 	{ NULL }
+ };
+ 
+-struct file_operations lmv_proc_target_fops = {
++const struct file_operations lmv_proc_target_fops = {
+ 	.owner		= THIS_MODULE,
+ 	.open		 = lmv_target_seq_open,
+ 	.read		 = seq_read,
