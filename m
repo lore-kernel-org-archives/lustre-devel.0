@@ -1,99 +1,49 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 1 Sep 2016 02:58:40 +0100 (BST)
-Subject: [lustre-devel] [PATCH 1/2] staging: lustre: fix unstable pages
-	tracking
-In-Reply-To: <20160829122023.3018966-1-arnd@arndb.de>
+Date: Thu, 1 Sep 2016 02:59:21 +0100 (BST)
+Subject: [lustre-devel] [PATCH 2/2] staging: lustre: hide unused variable
+In-Reply-To: <20160829122023.3018966-2-arnd@arndb.de>
 References: <20160829122023.3018966-1-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1609010257100.21057@casper.infradead.org>
+	<20160829122023.3018966-2-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1609010258550.21057@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Arnd Bergmann <arnd@arndb.de>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Mel Gorman <mgorman@techsingularity.net>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Lai Siyao <lai.siyao@intel.com>, Bobi Jam <bobijam.xu@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Mel Gorman <mgorman@techsingularity.net>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "John L. Hammond" <john.hammond@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
 
-> A patch to change to page accounting code (in v4.8-rc1) conflicts with
-> a change to lustre (in staging-next for v4.9), and fortunately gets
-> detected using a gcc warning:
+> After a code cleanup, we get a harmless warning about a variable
+> that is unused when CONFIG_FS_POSIX_ACL is disabled:
 > 
-> In file included from /git/arm-soc/include/linux/mm.h:1001:0,
->                  from /git/arm-soc/include/linux/highmem.h:7,
->                  from /git/arm-soc/drivers/staging/lustre/lustre/osc/../../include/linux/libcfs/linux/libcfs.h:46,
->                  from /git/arm-soc/drivers/staging/lustre/lustre/osc/../../include/linux/libcfs/libcfs.h:36,
->                  from /git/arm-soc/drivers/staging/lustre/lustre/osc/osc_cl_internal.h:45,
->                  from /git/arm-soc/drivers/staging/lustre/lustre/osc/osc_page.c:40:
-> drivers/staging/lustre/lustre/osc/osc_page.c: In function 'unstable_page_accounting':
-> include/linux/vmstat.h:117:2: error: array subscript is above array bounds [-Werror=array-bounds]
->   atomic_long_add(x, &vm_zone_stat[item]);
->   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> include/linux/vmstat.h:117:2: error: array subscript is above array bounds [-Werror=array-bounds]
->   atomic_long_add(x, &vm_zone_stat[item]);
->   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> drivers/staging/lustre/lustre/llite/xattr.c: In function 'll_xattr_get_common':
+> drivers/staging/lustre/lustre/llite/xattr.c:312:24: error: unused variable 'lli' [-Werror=unused-variable]
 > 
-> This changes the function to use the correct interface for accounting in the
-> "node" rather than the "zone".
+> This puts the variable declaration into the same #ifdef.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: d806f30e639b ("staging: lustre: osc: revise unstable pages accounting")
-> Fixes: 11fb998986a7 ("mm: move most file-based accounting to the node")
-
-Thanks for fixing things. I couldn't reproduce this problem on x86.
+> Fixes: 1e1f9ff406fd ("staging: lustre: llite: break ll_getxattr_common into 2 functions")
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 
 > ---
->  drivers/staging/lustre/lustre/osc/osc_page.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+>  drivers/staging/lustre/lustre/llite/xattr.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
-> index 583a0af2d388..c8889eabc402 100644
-> --- a/drivers/staging/lustre/lustre/osc/osc_page.c
-> +++ b/drivers/staging/lustre/lustre/osc/osc_page.c
-> @@ -789,7 +789,7 @@ out:
->  
->  /**
->   * Atomic operations are expensive. We accumulate the accounting for the
-> - * same page zone to get better performance.
-> + * same page pgdat to get better performance.
->   * In practice this can work pretty good because the pages in the same RPC
->   * are likely from the same page zone.
->   */
-> @@ -797,28 +797,28 @@ static inline void unstable_page_accounting(struct ptlrpc_bulk_desc *desc,
->  					    int factor)
+> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
+> index f252c26ec30f..7b8d4699a71a 100644
+> --- a/drivers/staging/lustre/lustre/llite/xattr.c
+> +++ b/drivers/staging/lustre/lustre/llite/xattr.c
+> @@ -309,7 +309,9 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
 >  {
->  	int page_count = desc->bd_iov_count;
-> -	void *zone = NULL;
-> +	pg_data_t *last = NULL;
->  	int count = 0;
->  	int i;
+>  	char fullname[strlen(handler->prefix) + strlen(name) + 1];
+>  	struct ll_sb_info *sbi = ll_i2sbi(inode);
+> +#ifdef CONFIG_FS_POSIX_ACL
+>  	struct ll_inode_info *lli = ll_i2info(inode);
+> +#endif
+>  	int rc;
 >  
->  	for (i = 0; i < page_count; i++) {
-> -		void *pz = page_zone(desc->bd_iov[i].bv_page);
-> +		pg_data_t *pgdat = page_pgdat(desc->bd_iov[i].bv_page);
->  
-> -		if (likely(pz == zone)) {
-> +		if (likely(pgdat == last)) {
->  			++count;
->  			continue;
->  		}
->  
->  		if (count > 0) {
-> -			mod_zone_page_state(zone, NR_UNSTABLE_NFS,
-> +			mod_node_page_state(pgdat, NR_UNSTABLE_NFS,
->  					    factor * count);
->  			count = 0;
->  		}
-> -		zone = pz;
-> +		last = pgdat;
->  		++count;
->  	}
->  	if (count > 0)
-> -		mod_zone_page_state(zone, NR_UNSTABLE_NFS, factor * count);
-> +		mod_node_page_state(last, NR_UNSTABLE_NFS, factor * count);
->  }
->  
->  static inline void add_unstable_page_accounting(struct ptlrpc_bulk_desc *desc)
+>  	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p)\n",
 > -- 
 > 2.9.0
 > 
