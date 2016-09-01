@@ -1,39 +1,100 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Tue, 27 Sep 2016 13:01:02 +0200
-Subject: [lustre-devel] [PATCH 01/37] staging: lustre: llite: add
- missing LMV_MAGIC_V1 case
-In-Reply-To: <1474901450-28730-1-git-send-email-jsimmons@infradead.org>
-References: <1474901450-28730-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <20160927110102.GA16196@kroah.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 1 Sep 2016 02:58:40 +0100 (BST)
+Subject: [lustre-devel] [PATCH 1/2] staging: lustre: fix unstable pages
+	tracking
+In-Reply-To: <20160829122023.3018966-1-arnd@arndb.de>
+References: <20160829122023.3018966-1-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1609010257100.21057@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, wang di <di.wang@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Arnd Bergmann <arnd@arndb.de>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Mel Gorman <mgorman@techsingularity.net>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Lai Siyao <lai.siyao@intel.com>, Bobi Jam <bobijam.xu@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-On Mon, Sep 26, 2016 at 10:50:50AM -0400, James Simmons wrote:
-> From: wang di <di.wang@intel.com>
+
+> A patch to change to page accounting code (in v4.8-rc1) conflicts with
+> a change to lustre (in staging-next for v4.9), and fortunately gets
+> detected using a gcc warning:
 > 
-> The port to upstream dropped handling the LMV_MAGIC_V1
-> case for ll_dir_getstripe. This adds it back.
+> In file included from /git/arm-soc/include/linux/mm.h:1001:0,
+>                  from /git/arm-soc/include/linux/highmem.h:7,
+>                  from /git/arm-soc/drivers/staging/lustre/lustre/osc/../../include/linux/libcfs/linux/libcfs.h:46,
+>                  from /git/arm-soc/drivers/staging/lustre/lustre/osc/../../include/linux/libcfs/libcfs.h:36,
+>                  from /git/arm-soc/drivers/staging/lustre/lustre/osc/osc_cl_internal.h:45,
+>                  from /git/arm-soc/drivers/staging/lustre/lustre/osc/osc_page.c:40:
+> drivers/staging/lustre/lustre/osc/osc_page.c: In function 'unstable_page_accounting':
+> include/linux/vmstat.h:117:2: error: array subscript is above array bounds [-Werror=array-bounds]
+>   atomic_long_add(x, &vm_zone_stat[item]);
+>   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> include/linux/vmstat.h:117:2: error: array subscript is above array bounds [-Werror=array-bounds]
+>   atomic_long_add(x, &vm_zone_stat[item]);
+>   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 > 
-> Signed-off-by: wang di <di.wang@intel.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
-> Reviewed-on: http://review.whamcloud.com/7228
-> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-> Reviewed-by: John L. Hammond <john.hammond@intel.com>
-> Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> This changes the function to use the correct interface for accounting in the
+> "node" rather than the "zone".
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: d806f30e639b ("staging: lustre: osc: revise unstable pages accounting")
+> Fixes: 11fb998986a7 ("mm: move most file-based accounting to the node")
+
+Thanks for fixing things. I couldn't reproduce this problem on x86.
+
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+
 > ---
->  drivers/staging/lustre/lustre/llite/dir.c           | 4 ++++
->  drivers/staging/lustre/lustre/ptlrpc/pack_generic.c | 1 +
->  2 files changed, 5 insertions(+)
-
-I got this single patch, what about the other 36 patches you are saying
-this is a series of?
-
-thanks,
-
-greg k-h
+>  drivers/staging/lustre/lustre/osc/osc_page.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
+> index 583a0af2d388..c8889eabc402 100644
+> --- a/drivers/staging/lustre/lustre/osc/osc_page.c
+> +++ b/drivers/staging/lustre/lustre/osc/osc_page.c
+> @@ -789,7 +789,7 @@ out:
+>  
+>  /**
+>   * Atomic operations are expensive. We accumulate the accounting for the
+> - * same page zone to get better performance.
+> + * same page pgdat to get better performance.
+>   * In practice this can work pretty good because the pages in the same RPC
+>   * are likely from the same page zone.
+>   */
+> @@ -797,28 +797,28 @@ static inline void unstable_page_accounting(struct ptlrpc_bulk_desc *desc,
+>  					    int factor)
+>  {
+>  	int page_count = desc->bd_iov_count;
+> -	void *zone = NULL;
+> +	pg_data_t *last = NULL;
+>  	int count = 0;
+>  	int i;
+>  
+>  	for (i = 0; i < page_count; i++) {
+> -		void *pz = page_zone(desc->bd_iov[i].bv_page);
+> +		pg_data_t *pgdat = page_pgdat(desc->bd_iov[i].bv_page);
+>  
+> -		if (likely(pz == zone)) {
+> +		if (likely(pgdat == last)) {
+>  			++count;
+>  			continue;
+>  		}
+>  
+>  		if (count > 0) {
+> -			mod_zone_page_state(zone, NR_UNSTABLE_NFS,
+> +			mod_node_page_state(pgdat, NR_UNSTABLE_NFS,
+>  					    factor * count);
+>  			count = 0;
+>  		}
+> -		zone = pz;
+> +		last = pgdat;
+>  		++count;
+>  	}
+>  	if (count > 0)
+> -		mod_zone_page_state(zone, NR_UNSTABLE_NFS, factor * count);
+> +		mod_node_page_state(last, NR_UNSTABLE_NFS, factor * count);
+>  }
+>  
+>  static inline void add_unstable_page_accounting(struct ptlrpc_bulk_desc *desc)
+> -- 
+> 2.9.0
+> 
+> 
