@@ -1,59 +1,39 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 26 Sep 2016 10:50:50 -0400
-Subject: [lustre-devel] [PATCH 01/37] staging: lustre: llite: add missing
-	LMV_MAGIC_V1 case
-Message-ID: <1474901450-28730-1-git-send-email-jsimmons@infradead.org>
+From: Baoyou Xie <baoyou.xie@linaro.org>
+Date: Thu, 08 Sep 2016 08:48:48 -0000
+Subject: [lustre-devel] [PATCH] staging/lustre/lov: add missing header
+	dependencies
+Message-ID: <1473324508-9294-1-git-send-email-baoyou.xie@linaro.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, gregkh@linuxfoundation.org, bobijam.xu@intel.com, jinshan.xiong@intel.com, lai.siyao@intel.com, mike.rapoport@gmail.com, amitoj1606@gmail.com
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, arnd@arndb.de, baoyou.xie@linaro.org, xie.baoyou@zte.com.cn
 
-From: wang di <di.wang@intel.com>
+We get 1 warning when building kernel with W=1:
+drivers/staging/lustre/lustre/lov/lov_object.c:956:23: warning: no previous prototype for 'lov_lsm_get' [-Wmissing-prototypes]
+drivers/staging/lustre/lustre/lov/lov_object.c:972:6: warning: no previous prototype for 'lov_lsm_put' [-Wmissing-prototypes]
+drivers/staging/lustre/lustre/lov/lov_object.c:979:5: warning: no previous prototype for 'lov_read_and_clear_async_rc' [-Wmissing-prototypes]
 
-The port to upstream dropped handling the LMV_MAGIC_V1
-case for ll_dir_getstripe. This adds it back.
+In fact, these functions are declared in ../llite/vvp_internal.h,
+so this patch add missing header dependencies.
 
-Signed-off-by: wang di <di.wang@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3531
-Reviewed-on: http://review.whamcloud.com/7228
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 ---
- drivers/staging/lustre/lustre/llite/dir.c           | 4 ++++
- drivers/staging/lustre/lustre/ptlrpc/pack_generic.c | 1 +
- 2 files changed, 5 insertions(+)
+ drivers/staging/lustre/lustre/lov/lov_object.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 705de1c..7f32a53 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -620,6 +620,10 @@ int ll_dir_getstripe(struct inode *inode, void **plmm, int *plmm_size,
- 		if (cpu_to_le32(LOV_MAGIC) != LOV_MAGIC)
- 			lustre_swab_lov_user_md_v3((struct lov_user_md_v3 *)lmm);
- 		break;
-+	case LMV_MAGIC_V1:
-+		if (cpu_to_le32(LMV_MAGIC) != LMV_MAGIC)
-+			lustre_swab_lmv_mds_md((union lmv_mds_md *)lmm);
-+		break;
- 	case LMV_USER_MAGIC:
- 		if (cpu_to_le32(LMV_USER_MAGIC) != LMV_USER_MAGIC)
- 			lustre_swab_lmv_user_md((struct lmv_user_md *)lmm);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-index e24d8e1..8717685 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-@@ -1861,6 +1861,7 @@ void lustre_swab_lmv_mds_md(union lmv_mds_md *lmm)
- 		break;
- 	}
- }
-+EXPORT_SYMBOL(lustre_swab_lmv_mds_md);
+diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
+index f9621b0..912c416 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_object.c
++++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+@@ -38,6 +38,7 @@
+ #define DEBUG_SUBSYSTEM S_LOV
  
- void lustre_swab_lmv_user_md(struct lmv_user_md *lum)
- {
+ #include "lov_cl_internal.h"
++#include "../llite/vvp_internal.h"
+ 
+ /** \addtogroup lov
+  *  @{
 -- 
 2.7.4
