@@ -1,55 +1,68 @@
-From: Jan Kara <jack@suse.cz>
-Date: Mon, 19 Sep 2016 11:59:14 +0200
-Subject: [lustre-devel] [PATCH 030/124] staging: lustre: llite: Replace
- write mutex with range lock
-In-Reply-To: <5FCA4C55-DF73-4AE8-8030-9A85B21A8A54@intel.com>
-References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-	<1474231143-4061-31-git-send-email-jsimmons@infradead.org>
-	<20160919072859.GA15407@kroah.com>
-	<5FCA4C55-DF73-4AE8-8030-9A85B21A8A54@intel.com>
-Message-ID: <20160919095914.GH11487@quack2.suse.cz>
+From: Baoyou Xie <baoyou.xie@linaro.org>
+Date: Fri, 09 Sep 2016 01:45:39 -0000
+Subject: [lustre-devel] [PATCH] staging/lustre/lov: add missing header
+	dependencies
+In-Reply-To: <alpine.LFD.2.20.1609081851520.14646@casper.infradead.org>
+References: <1473324508-9294-1-git-send-email-baoyou.xie@linaro.org>
+	<alpine.LFD.2.20.1609081851520.14646@casper.infradead.org>
+Message-ID: <CA+DQWkx=_J6FmWgPN2UbnprvM1KzpnEE3kgbkWY1pcAxk1jqMg@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Dilger, Andreas" <andreas.dilger@intel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Jan Kara <jack@suse.cz>, James Simmons <jsimmons@infradead.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, "linux-ext4@vger.kernel.org" <linux-ext4@vger.kernel.org>, dbueso@suse.com
+To: lustre-devel@lists.lustre.org
 
-On Mon 19-09-16 09:25:48, Dilger, Andreas wrote:
-> On Sep 19, 2016, at 09:28, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
-> > 
-> > On Sun, Sep 18, 2016 at 04:37:29PM -0400, James Simmons wrote:
-> >> + * Range lock is used to allow multiple threads writing a single shared
-> >> + * file given each thread is writing to a non-overlapping portion of the
-> >> + * file.
-> >> + *
-> >> + * Refer to the possible upstream kernel version of range lock by
-> >> + * Jan Kara <jack@suse.cz>: https://lkml.org/lkml/2013/1/31/480
-> >> + *
-> >> + * This file could later replaced by the upstream kernel version.
-> > 
-> > It doesn't look like range_lock ever got accepted in the kernel tree,
-> > any idea what happened to it?  Having a per-filesystem lock type seems
-> > odd to me...
-> 
-> I've added Jan and linux-fsdevel to the CC list to see what interest
-> there is in the range locking implementaion.  At the time we added this
-> to Lustre it appeared that this was moving nicely torward landing, but
-> it seems to have stalled.
-> 
-> I think the range locking implementation is fairly generic, and if there
-> are other users in the kernel it could easily be pulled out of the staging
-> dir into vfs/.  I'm not against it going into vfs/ directly either, but
-> not sure whether that is acceptable if the only user is in staging.
+Looks like it's better to clean it up :)
 
-Yeah, so the problem with my range_lock implementation (and your one looks
-fairly similar from a quick look) is that it is fairly heavyweight. That
-may be OK for an inode_lock replacement but it needs a careful
-benchmarking. Davidlohr was looking into making the implementation more
-efficient (he wanted to use it for mmap_sem) but I think it got preempted
-by other work.
+On 9 September 2016 at 01:59, James Simmons <jsimmons@infradead.org> wrote:
 
-								Honza
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+>
+> > We get 1 warning when building kernel with W=1:
+> > drivers/staging/lustre/lustre/lov/lov_object.c:956:23: warning: no
+> previous prototype for 'lov_lsm_get' [-Wmissing-prototypes]
+> > drivers/staging/lustre/lustre/lov/lov_object.c:972:6: warning: no
+> previous prototype for 'lov_lsm_put' [-Wmissing-prototypes]
+> > drivers/staging/lustre/lustre/lov/lov_object.c:979:5: warning: no
+> previous prototype for 'lov_read_and_clear_async_rc' [-Wmissing-prototypes]
+> >
+> > In fact, these functions are declared in ../llite/vvp_internal.h,
+> > so this patch add missing header dependencies.
+> >
+> > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+>
+> Nak. The header vvp_internal.h is meant to private to the llite layer.
+> Looking at the coming patch updates I see lov_lsm_[put|get] will not be
+> used in the lov later. Now lov_read_and_clear_async is still used in
+> both layers. The header used for this case is cl_object.h. Might rename
+> that function to be consistent with the rest of the header. I will look
+> into a cleanup for this.
+>
+> > ---
+> >  drivers/staging/lustre/lustre/lov/lov_object.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c
+> b/drivers/staging/lustre/lustre/lov/lov_object.c
+> > index f9621b0..912c416 100644
+> > --- a/drivers/staging/lustre/lustre/lov/lov_object.c
+> > +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+> > @@ -38,6 +38,7 @@
+> >  #define DEBUG_SUBSYSTEM S_LOV
+> >
+> >  #include "lov_cl_internal.h"
+> > +#include "../llite/vvp_internal.h"
+> >
+> >  /** \addtogroup lov
+> >   *  @{
+> > --
+> > 2.7.4
+> >
+> > _______________________________________________
+> > devel mailing list
+> > devel at linuxdriverproject.org
+> > http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160909/4f158d1a/attachment-0001.htm>
