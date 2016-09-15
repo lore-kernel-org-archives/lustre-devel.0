@@ -1,57 +1,59 @@
 From: Baoyou Xie <baoyou.xie@linaro.org>
-Date: Sat, 17 Sep 2016 21:37:03 +0800
-Subject: [lustre-devel] [PATCH] staging/lustre: clean function declaration
-	in super25.c up
-Message-ID: <1474119423-11723-1-git-send-email-baoyou.xie@linaro.org>
+Date: Thu, 15 Sep 2016 23:45:17 +0800
+Subject: [lustre-devel] [PATCH v2] staging: lustre: clean function
+	declarations in class_obd.c up
+Message-ID: <1473954317-27343-1-git-send-email-baoyou.xie@linaro.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, arnd@arndb.de, shraddha.6596@gmail.com, mike.rapoport@gmail.com, ksenija.stanojevic@gmail.com, gregoire.pichon@bull.net, john.hammond@intel.com, fan.yong@intel.com
-Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, baoyou.xie@linaro.org, xie.baoyou@zte.com.cn
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, john.hammond@intel.com, shraddha.6596@gmail.com, di.wang@intel.com, ksenija.stanojevic@gmail.com, mike.rapoport@gmail.com, andrew.perepechko@seagate.com, kirill.shutemov@linux.intel.com, lustre-devel@lists.lustre.org
+Cc: devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, arnd@arndb.de, baoyou.xie@linaro.org, xie.baoyou@zte.com.cn
 
-We get 1 warning when building kernel with W=1:
-drivers/staging/lustre/lustre/obdclass/obd_config.c:719:6: warning: no previous prototype for 'lustre_register_client_process_config' [-Wmissing-prototypes]
+We get 2 warnings when building kernel with W=1:
 
-In fact, this function is declared in
-drivers/staging/lustre/lustre/llite/super25.c, but should be
-moved into a header file, thus can be recognized in other file.
+drivers/staging/lustre/lustre/obdclass/linux/linux-module.c:413:5: warning: no previous prototype for 'class_procfs_init' [-Wmissing-prototypes]
+drivers/staging/lustre/lustre/obdclass/linux/linux-module.c:449:5: warning: no previous prototype for 'class_procfs_clean' [-Wmissing-prototypes]
 
-So this patch moves the declaration into
-drivers/staging/lustre/lustre/include/lprocfs_status.h.
+In fact, both functions are declared in
+drivers/staging/lustre/lustre/obdclass/class_obd.c,but should be
+declared in a header file, thus can be recognized in other file.
+
+So this patch moves the declarations into
+drivers/staging/lustre/lustre/include/obd_class.h.
 
 Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 ---
- drivers/staging/lustre/lustre/include/lprocfs_status.h | 3 +++
- drivers/staging/lustre/lustre/llite/super25.c          | 2 --
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/include/obd_class.h  | 2 ++
+ drivers/staging/lustre/lustre/obdclass/class_obd.c | 3 ---
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-index ff35e63..6768ecc 100644
---- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-+++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-@@ -363,6 +363,9 @@ static inline void s2dhms(struct dhms *ts, time64_t secs64)
- #define JOBSTATS_PROCNAME_UID		"procname_uid"
- #define JOBSTATS_NODELOCAL		"nodelocal"
+diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+index 9702ad4..324c70d 100644
+--- a/drivers/staging/lustre/lustre/include/obd_class.h
++++ b/drivers/staging/lustre/lustre/include/obd_class.h
+@@ -1716,6 +1716,8 @@ void class_exit_uuidlist(void);
+ extern char obd_jobid_node[];
+ extern struct miscdevice obd_psdev;
+ extern spinlock_t obd_types_lock;
++int class_procfs_init(void);
++int class_procfs_clean(void);
  
-+/* obd_config.c */
-+void lustre_register_client_process_config(int (*cpc)(struct lustre_cfg *lcfg));
-+
- int lprocfs_write_frac_helper(const char __user *buffer,
- 			      unsigned long count, int *val, int mult);
- int lprocfs_read_frac_helper(char *buffer, unsigned long count,
-diff --git a/drivers/staging/lustre/lustre/llite/super25.c b/drivers/staging/lustre/lustre/llite/super25.c
-index 883084e..24c79c2 100644
---- a/drivers/staging/lustre/lustre/llite/super25.c
-+++ b/drivers/staging/lustre/lustre/llite/super25.c
-@@ -83,8 +83,6 @@ struct super_operations lustre_super_operations = {
- };
- MODULE_ALIAS_FS("lustre");
+ /* prng.c */
+ #define ll_generate_random_uuid(uuid_out) cfs_get_random_bytes(uuid_out, sizeof(class_uuid_t))
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index 6700167..710039a 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -446,9 +446,6 @@ static int obd_init_checks(void)
+ 	return ret;
+ }
  
--void lustre_register_client_process_config(int (*cpc)(struct lustre_cfg *lcfg));
+-extern int class_procfs_init(void);
+-extern int class_procfs_clean(void);
 -
- static int __init lustre_init(void)
+ static int __init obdclass_init(void)
  {
- 	lnet_process_id_t lnet_id;
+ 	int i, err;
 -- 
 2.7.4
