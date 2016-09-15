@@ -1,57 +1,51 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Wed, 14 Sep 2016 05:14:02 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: lustre/ldlm: Fixed
-	sparse warnings
-In-Reply-To: <20160912102747.GA13621@kroah.com>
-References: <1473434435-27025-1-git-send-email-itachi.opsrc@gmail.com>
-	<20160912102747.GA13621@kroah.com>
-Message-ID: <47AECAA7-59D7-41DB-9A85-A23ACF6A7B1F@intel.com>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Thu, 15 Sep 2016 16:52:38 +0200
+Subject: [lustre-devel] [PATCH] staging: lustre: clean function
+ declarations in class_obd.c up
+In-Reply-To: <1473947487-25514-1-git-send-email-baoyou.xie@linaro.org>
+References: <1473947487-25514-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20160915145238.GB26016@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg KH <gregkh@linuxfoundation.org>
-Cc: Nayeemahmed Badebade <itachi.opsrc@gmail.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Baoyou Xie <baoyou.xie@linaro.org>
+Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, john.hammond@intel.com, shraddha.6596@gmail.com, di.wang@intel.com, ksenija.stanojevic@gmail.com, mike.rapoport@gmail.com, andrew.perepechko@seagate.com, kirill.shutemov@linux.intel.com, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, xie.baoyou@zte.com.cn, linux-kernel@vger.kernel.org, arnd@arndb.de
 
-On Sep 12, 2016, at 04:27, Greg KH <gregkh@linuxfoundation.org> wrote:
+On Thu, Sep 15, 2016 at 09:51:27PM +0800, Baoyou Xie wrote:
+> We get 2 warnings when building kernel with W=1:
+
+Don't do that!  :)
+
 > 
-> On Fri, Sep 09, 2016 at 08:50:35PM +0530, Nayeemahmed Badebade wrote:
->> Added __acquires / __releases sparse locking annotations
->> to lock_res_and_lock and unlock_res_and_lock functions in
->> l_lock.c, to fix below sparse warnings:
->> 
->> l_lock.c:47:22: warning: context imbalance in 'lock_res_and_lock' - wrong count at exit
->> l_lock.c:62:6: warning: context imbalance in 'unlock_res_and_lock' - unexpected unlock
->> 
->> Signed-off-by: Nayeemahmed Badebade <itachi.opsrc@gmail.com>
->> ---
->> drivers/staging/lustre/lustre/ldlm/l_lock.c | 4 ++++
->> 1 file changed, 4 insertions(+)
->> 
->> diff --git a/drivers/staging/lustre/lustre/ldlm/l_lock.c b/drivers/staging/lustre/lustre/ldlm/l_lock.c
->> index ea8840c..c4b9612 100644
->> --- a/drivers/staging/lustre/lustre/ldlm/l_lock.c
->> +++ b/drivers/staging/lustre/lustre/ldlm/l_lock.c
->> @@ -45,6 +45,8 @@
->>  * being an atomic operation.
->>  */
->> struct ldlm_resource *lock_res_and_lock(struct ldlm_lock *lock)
->> +				__acquires(&lock->l_lock)
->> +				__acquires(lock->l_resource)
+> drivers/staging/lustre/lustre/obdclass/linux/linux-module.c:413:5: warning: no previous prototype for 'class_procfs_init' [-Wmissing-prototypes]
+> drivers/staging/lustre/lustre/obdclass/linux/linux-module.c:449:5: warning: no previous prototype for 'class_procfs_clean' [-Wmissing-prototypes]
 > 
-> Hm, these are tricky, I don't want to take this type of change without
-> an ack from the lustre developers...
+> In fact, both functions are declared in
+> drivers/staging/lustre/lustre/obdclass/class_obd.c,but should be
+> declared in a header file, thus can be recognized in other file.
+> 
+> So this patch moves the declarations into
+> drivers/staging/lustre/lustre/include/obd_class.h.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  drivers/staging/lustre/lustre/include/obd_class.h  | 4 ++++
+>  drivers/staging/lustre/lustre/obdclass/class_obd.c | 2 --
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+> index 9702ad4..9965a01 100644
+> --- a/drivers/staging/lustre/lustre/include/obd_class.h
+> +++ b/drivers/staging/lustre/lustre/include/obd_class.h
+> @@ -1712,6 +1712,10 @@ int class_check_uuid(struct obd_uuid *uuid, __u64 nid);
+>  void class_init_uuidlist(void);
+>  void class_exit_uuidlist(void);
+>  
+> +/*linux-module.c*/
 
-The "__acquires(&lock->l_lock)" line here looks correct, along with the
-corresponding "__releases(&lock->l_lock)" at unlock_res_and_lock().
+Here, have a ' '.  make that two...
 
-The problem, however, is that "l_resource" is not a lock, but rather a
-struct.  The call to "lock_res(lock->l_resource)" is actually locking
-"lr_lock" internally.
+thanks,
 
-It would be better to add "__acquires(&res->lr_lock)" at lock_res() and
-"__releases(&res->lr_lock)" at unlock_res().  That will also forestall
-any other warnings about an imbalance with lock_res()/unlock_res() or
-their callsites.
-
-Cheers, Andreas
+greg k-h
