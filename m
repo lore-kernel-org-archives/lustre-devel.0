@@ -1,791 +1,871 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:38 -0400
-Subject: [lustre-devel] [PATCH 039/124] staging: lustre: remove lustre_lite.h
+Date: Sun, 18 Sep 2016 16:38:51 -0400
+Subject: [lustre-devel] [PATCH 112/124] staging: lustre: ptlrpc: remove
+	unnecessary EXPORT_SYMBOL
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-40-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-113-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, frank zago <fzago@cray.com>, James Simmons <jsimmons@infradead.org>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: frank zago <fzago@cray.com>
 
-Move several definition only used in lustre/llite/ to
-lustre/llite/llite_internal.h.
-Remove lustre/include/{,linux/}lustre_lite.h and fixup
-the missing includes in other headers that this exposes.
+A lot of symbols don't need to be exported at all because they are
+only used in the module they belong to.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
-Reviewed-on: http://review.whamcloud.com/11501
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Signed-off-by: frank zago <fzago@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5829
+Reviewed-on: http://review.whamcloud.com/12510
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/linux/lustre_lite.h      |   91 --------------------
- .../staging/lustre/lustre/include/lustre_eacl.h    |    1 +
- .../staging/lustre/lustre/include/lustre_lite.h    |   85 ------------------
- .../staging/lustre/lustre/include/lustre_param.h   |    3 +
- drivers/staging/lustre/lustre/llite/dcache.c       |    1 -
- drivers/staging/lustre/lustre/llite/dir.c          |   12 +--
- drivers/staging/lustre/lustre/llite/file.c         |    1 -
- drivers/staging/lustre/lustre/llite/glimpse.c      |    1 -
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   |    1 -
- drivers/staging/lustre/lustre/llite/lcommon_misc.c |    1 -
- drivers/staging/lustre/lustre/llite/llite_close.c  |    1 -
- .../staging/lustre/lustre/llite/llite_internal.h   |   61 +++++++++++++-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |    1 -
- drivers/staging/lustre/lustre/llite/llite_mmap.c   |    1 -
- drivers/staging/lustre/lustre/llite/llite_nfs.c    |    1 -
- drivers/staging/lustre/lustre/llite/lproc_llite.c  |    1 -
- drivers/staging/lustre/lustre/llite/namei.c        |    1 -
- drivers/staging/lustre/lustre/llite/rw.c           |    1 -
- drivers/staging/lustre/lustre/llite/rw26.c         |    1 -
- drivers/staging/lustre/lustre/llite/statahead.c    |   13 +--
- drivers/staging/lustre/lustre/llite/super25.c      |    1 -
- drivers/staging/lustre/lustre/llite/symlink.c      |    1 -
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |    1 -
- drivers/staging/lustre/lustre/llite/vvp_io.c       |    1 -
- drivers/staging/lustre/lustre/llite/vvp_lock.c     |    1 -
- drivers/staging/lustre/lustre/llite/vvp_object.c   |    1 -
- drivers/staging/lustre/lustre/llite/vvp_page.c     |    2 -
- drivers/staging/lustre/lustre/llite/vvp_req.c      |    1 -
- drivers/staging/lustre/lustre/llite/xattr.c        |    1 -
- drivers/staging/lustre/lustre/llite/xattr_cache.c  |    1 -
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    2 -
- 31 files changed, 70 insertions(+), 222 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/include/linux/lustre_lite.h
- delete mode 100644 drivers/staging/lustre/lustre/include/lustre_lite.h
+ drivers/staging/lustre/lustre/include/lustre_net.h |    7 ---
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |   17 +-----
+ drivers/staging/lustre/lustre/ptlrpc/connection.c  |    5 --
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |    1 -
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |    5 --
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |   57 --------------------
+ drivers/staging/lustre/lustre/ptlrpc/pinger.c      |    1 -
+ .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |    5 ++
+ drivers/staging/lustre/lustre/ptlrpc/recover.c     |    2 -
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |    4 --
+ drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |    1 -
+ drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |    2 -
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |    1 -
+ 13 files changed, 8 insertions(+), 100 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/linux/lustre_lite.h b/drivers/staging/lustre/lustre/include/linux/lustre_lite.h
-deleted file mode 100644
-index d18e8a7..0000000
---- a/drivers/staging/lustre/lustre/include/linux/lustre_lite.h
-+++ /dev/null
-@@ -1,91 +0,0 @@
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- */
--
--#ifndef _LINUX_LL_H
--#define _LINUX_LL_H
--
--#ifndef _LL_H
--#error Do not #include this file directly. #include <lustre_lite.h> instead
--#endif
--
--#include <linux/statfs.h>
--
--#include <linux/fs.h>
--#include <linux/dcache.h>
--
--#include "../obd_class.h"
--#include "../lustre_net.h"
--#include "../lustre_ha.h"
--
--#include <linux/rbtree.h>
--#include "../../include/linux/lustre_compat25.h"
--#include <linux/pagemap.h>
--
--/* lprocfs.c */
--enum {
--	 LPROC_LL_DIRTY_HITS = 0,
--	 LPROC_LL_DIRTY_MISSES,
--	 LPROC_LL_READ_BYTES,
--	 LPROC_LL_WRITE_BYTES,
--	 LPROC_LL_BRW_READ,
--	 LPROC_LL_BRW_WRITE,
--	 LPROC_LL_OSC_READ,
--	 LPROC_LL_OSC_WRITE,
--	 LPROC_LL_IOCTL,
--	 LPROC_LL_OPEN,
--	 LPROC_LL_RELEASE,
--	 LPROC_LL_MAP,
--	 LPROC_LL_LLSEEK,
--	 LPROC_LL_FSYNC,
--	 LPROC_LL_READDIR,
--	 LPROC_LL_SETATTR,
--	 LPROC_LL_TRUNC,
--	 LPROC_LL_FLOCK,
--	 LPROC_LL_GETATTR,
--	 LPROC_LL_CREATE,
--	 LPROC_LL_LINK,
--	 LPROC_LL_UNLINK,
--	 LPROC_LL_SYMLINK,
--	 LPROC_LL_MKDIR,
--	 LPROC_LL_RMDIR,
--	 LPROC_LL_MKNOD,
--	 LPROC_LL_RENAME,
--	 LPROC_LL_STAFS,
--	 LPROC_LL_ALLOC_INODE,
--	 LPROC_LL_SETXATTR,
--	 LPROC_LL_GETXATTR,
--	 LPROC_LL_GETXATTR_HITS,
--	 LPROC_LL_LISTXATTR,
--	 LPROC_LL_REMOVEXATTR,
--	 LPROC_LL_INODE_PERM,
--	 LPROC_LL_FILE_OPCODES
--};
--
--#endif
-diff --git a/drivers/staging/lustre/lustre/include/lustre_eacl.h b/drivers/staging/lustre/lustre/include/lustre_eacl.h
-index d1039e1..1e71a86 100644
---- a/drivers/staging/lustre/lustre/include/lustre_eacl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_eacl.h
-@@ -46,6 +46,7 @@
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 21e2267..e9aba99 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -2408,7 +2408,6 @@ int ptlrpc_send_reply(struct ptlrpc_request *req, int flags);
+ int ptlrpc_reply(struct ptlrpc_request *req);
+ int ptlrpc_send_error(struct ptlrpc_request *req, int difficult);
+ int ptlrpc_error(struct ptlrpc_request *req);
+-void ptlrpc_resend_req(struct ptlrpc_request *request);
+ int ptlrpc_at_get_net_latency(struct ptlrpc_request *req);
+ int ptl_send_rpc(struct ptlrpc_request *request, int noreply);
+ int ptlrpc_register_rqbd(struct ptlrpc_request_buffer_desc *rqbd);
+@@ -2428,23 +2427,17 @@ struct ptlrpc_connection *ptlrpc_uuid_to_connection(struct obd_uuid *uuid);
  
- #ifdef CONFIG_FS_POSIX_ACL
+ int ptlrpc_queue_wait(struct ptlrpc_request *req);
+ int ptlrpc_replay_req(struct ptlrpc_request *req);
+-int ptlrpc_unregister_reply(struct ptlrpc_request *req, int async);
+ void ptlrpc_abort_inflight(struct obd_import *imp);
+ void ptlrpc_abort_set(struct ptlrpc_request_set *set);
  
-+#include <linux/fs.h>
- #include <linux/posix_acl_xattr.h>
+ struct ptlrpc_request_set *ptlrpc_prep_set(void);
+ struct ptlrpc_request_set *ptlrpc_prep_fcset(int max, set_producer_func func,
+ 					     void *arg);
+-int ptlrpc_set_next_timeout(struct ptlrpc_request_set *);
+ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set);
+ int ptlrpc_set_wait(struct ptlrpc_request_set *);
+-int ptlrpc_expired_set(void *data);
+-void ptlrpc_interrupted_set(void *data);
+ void ptlrpc_mark_interrupted(struct ptlrpc_request *req);
+ void ptlrpc_set_destroy(struct ptlrpc_request_set *);
+ void ptlrpc_set_add_req(struct ptlrpc_request_set *, struct ptlrpc_request *);
+-void ptlrpc_set_add_new_req(struct ptlrpcd_ctl *pc,
+-			    struct ptlrpc_request *req);
  
- typedef struct {
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lite.h b/drivers/staging/lustre/lustre/include/lustre_lite.h
-deleted file mode 100644
-index 8333d76..0000000
---- a/drivers/staging/lustre/lustre/include/lustre_lite.h
-+++ /dev/null
-@@ -1,85 +0,0 @@
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- *
-- * Copyright (c) 2011, 2012, Intel Corporation.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- */
--
--#ifndef _LL_H
--#define _LL_H
--
--/** \defgroup lite lite
-- *
-- * @{
-- */
--
--#include "linux/lustre_lite.h"
--
--#include "obd_class.h"
--#include "lustre_net.h"
--#include "lustre_ha.h"
--
--/* 4UL * 1024 * 1024 */
--#define LL_MAX_BLKSIZE_BITS     (22)
--#define LL_MAX_BLKSIZE	  (1UL << LL_MAX_BLKSIZE_BITS)
--
--/*
-- * This is embedded into llite super-blocks to keep track of
-- * connect flags (capabilities) supported by all imports given mount is
-- * connected to.
-- */
--struct lustre_client_ocd {
--	/*
--	 * This is conjunction of connect_flags across all imports (LOVs) this
--	 * mount is connected to. This field is updated by cl_ocd_update()
--	 * under ->lco_lock.
--	 */
--	__u64	      lco_flags;
--	struct mutex	   lco_lock;
--	struct obd_export *lco_md_exp;
--	struct obd_export *lco_dt_exp;
--};
--
--/*
-- * Chain of hash overflow pages.
-- */
--struct ll_dir_chain {
--	/* XXX something. Later */
--};
--
--static inline void ll_dir_chain_init(struct ll_dir_chain *chain)
--{
--}
--
--static inline void ll_dir_chain_fini(struct ll_dir_chain *chain)
--{
--}
--
--/** @} lite */
--
--#endif
-diff --git a/drivers/staging/lustre/lustre/include/lustre_param.h b/drivers/staging/lustre/lustre/include/lustre_param.h
-index 82aadd3..8061a04 100644
---- a/drivers/staging/lustre/lustre/include/lustre_param.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_param.h
-@@ -39,6 +39,9 @@
- #ifndef _LUSTRE_PARAM_H
- #define _LUSTRE_PARAM_H
+ void ptlrpc_free_rq_pool(struct ptlrpc_request_pool *pool);
+ int ptlrpc_add_rqs_to_pool(struct ptlrpc_request_pool *pool, int num_rq);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index f3914cc..18c7ff7 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -45,6 +45,7 @@
  
-+#include "../../include/linux/libcfs/libcfs.h"
-+#include "../../include/linux/lnet/types.h"
-+
- /** \defgroup param param
-  *
-  * @{
-diff --git a/drivers/staging/lustre/lustre/llite/dcache.c b/drivers/staging/lustre/lustre/llite/dcache.c
-index 8c00cc6..8500080 100644
---- a/drivers/staging/lustre/lustre/llite/dcache.c
-+++ b/drivers/staging/lustre/lustre/llite/dcache.c
-@@ -37,7 +37,6 @@
- #define DEBUG_SUBSYSTEM S_LLITE
+ static int ptlrpc_send_new_req(struct ptlrpc_request *req);
+ static int ptlrpcd_check_work(struct ptlrpc_request *req);
++static int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async);
  
- #include "../include/obd_support.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre/lustre_idl.h"
- #include "../include/lustre_dlm.h"
+ /**
+  * Initialize passed in client structure \a cl.
+@@ -89,7 +90,6 @@ struct ptlrpc_connection *ptlrpc_uuid_to_connection(struct obd_uuid *uuid)
  
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 97815cf..234095e 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -48,7 +48,6 @@
- #include "../include/obd_class.h"
- #include "../include/lustre/lustre_ioctl.h"
- #include "../include/lustre_lib.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_dlm.h"
- #include "../include/lustre_fid.h"
- #include "../include/lustre_kernelcomm.h"
-@@ -135,7 +134,7 @@
-  *
-  */
- struct page *ll_get_dir_page(struct inode *dir, struct md_op_data *op_data,
--			     __u64 offset, struct ll_dir_chain *chain)
-+			     __u64 offset)
- {
- 	struct md_callback cb_op;
- 	struct page *page;
-@@ -202,13 +201,10 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- 	int		   is_api32 = ll_need_32bit_api(sbi);
- 	int		   is_hash64 = sbi->ll_flags & LL_SBI_64BIT_HASH;
- 	struct page	  *page;
--	struct ll_dir_chain   chain;
- 	bool		   done = false;
- 	int		   rc = 0;
- 
--	ll_dir_chain_init(&chain);
--
--	page = ll_get_dir_page(inode, op_data, pos, &chain);
-+	page = ll_get_dir_page(inode, op_data, pos);
- 
- 	while (rc == 0 && !done) {
- 		struct lu_dirpage *dp;
-@@ -286,13 +282,11 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- 					le32_to_cpu(dp->ldp_flags) &
- 					LDF_COLLIDE);
- 			next = pos;
--			page = ll_get_dir_page(inode, op_data, pos,
--					       &chain);
-+			page = ll_get_dir_page(inode, op_data, pos);
- 		}
- 	}
- 
- 	ctx->pos = pos;
--	ll_dir_chain_fini(&chain);
- 	return rc;
+ 	return c;
  }
+-EXPORT_SYMBOL(ptlrpc_uuid_to_connection);
  
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index d9ee255..127d0e0 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -38,7 +38,6 @@
+ /**
+  * Allocate and initialize new bulk descriptor on the sender.
+@@ -886,7 +886,6 @@ struct ptlrpc_request_set *ptlrpc_prep_fcset(int max, set_producer_func func,
  
- #define DEBUG_SUBSYSTEM S_LLITE
- #include "../include/lustre_dlm.h"
--#include "../include/lustre_lite.h"
- #include <linux/pagemap.h>
- #include <linux/file.h>
- #include <linux/sched.h>
-diff --git a/drivers/staging/lustre/lustre/llite/glimpse.c b/drivers/staging/lustre/lustre/llite/glimpse.c
-index 92004a0..22507b9 100644
---- a/drivers/staging/lustre/lustre/llite/glimpse.c
-+++ b/drivers/staging/lustre/lustre/llite/glimpse.c
-@@ -42,7 +42,6 @@
- #include "../include/obd.h"
- 
- #include "../include/lustre_dlm.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_mdc.h"
- #include <linux/pagemap.h>
- #include <linux/file.h>
-diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-index eed464b..2ded6b5 100644
---- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-+++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-@@ -49,7 +49,6 @@
- #include "../include/obd.h"
- #include "../include/obd_support.h"
- #include "../include/lustre_fid.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_dlm.h"
- #include "../include/lustre_ver.h"
- #include "../include/lustre_mdc.h"
-diff --git a/drivers/staging/lustre/lustre/llite/lcommon_misc.c b/drivers/staging/lustre/lustre/llite/lcommon_misc.c
-index f6be105..fb346c1 100644
---- a/drivers/staging/lustre/lustre/llite/lcommon_misc.c
-+++ b/drivers/staging/lustre/lustre/llite/lcommon_misc.c
-@@ -38,7 +38,6 @@
- #include "../include/obd.h"
- #include "../include/cl_object.h"
- 
--#include "../include/lustre_lite.h"
- #include "llite_internal.h"
- 
- /* Initialize the default and maximum LOV EA and cookie sizes.  This allows
-diff --git a/drivers/staging/lustre/lustre/llite/llite_close.c b/drivers/staging/lustre/lustre/llite/llite_close.c
-index 2326b40..8644631 100644
---- a/drivers/staging/lustre/lustre/llite/llite_close.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_close.c
-@@ -38,7 +38,6 @@
- 
- #define DEBUG_SUBSYSTEM S_LLITE
- 
--#include "../include/lustre_lite.h"
- #include "llite_internal.h"
- 
- /** records that a write is in flight */
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 7f0a6c9..f972ba3 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -60,6 +60,9 @@
- #define LL_DIR_END_OFF	  0x7fffffffffffffffULL
- #define LL_DIR_END_OFF_32BIT    0x7fffffffUL
- 
-+/* 4UL * 1024 * 1024 */
-+#define LL_MAX_BLKSIZE_BITS 22
-+
- #define LL_IT2STR(it) ((it) ? ldlm_it2str((it)->it_op) : "0")
- #define LUSTRE_FPRIVATE(file) ((file)->private_data)
- 
-@@ -445,6 +448,23 @@ enum stats_track_type {
- 	"norootsquash",	\
+ 	return set;
  }
+-EXPORT_SYMBOL(ptlrpc_prep_fcset);
  
-+/*
-+ * This is embedded into llite super-blocks to keep track of connect
-+ * flags (capabilities) supported by all imports given mount is
-+ * connected to.
-+ */
-+struct lustre_client_ocd {
-+	/*
-+	 * This is conjunction of connect_flags across all imports
-+	 * (LOVs) this mount is connected to. This field is updated by
-+	 * cl_ocd_update() under ->lco_lock.
-+	 */
-+	__u64			 lco_flags;
-+	struct mutex		 lco_lock;
-+	struct obd_export	*lco_md_exp;
-+	struct obd_export	*lco_dt_exp;
-+};
-+
- struct ll_sb_info {
- 	/* this protects pglist and ra_info.  It isn't safe to
- 	 * grab from interrupt contexts
-@@ -669,6 +689,45 @@ void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
- 		       struct ll_file_data *file, loff_t pos,
- 		       size_t count, int rw);
- 
-+enum {
-+	LPROC_LL_DIRTY_HITS,
-+	LPROC_LL_DIRTY_MISSES,
-+	LPROC_LL_READ_BYTES,
-+	LPROC_LL_WRITE_BYTES,
-+	LPROC_LL_BRW_READ,
-+	LPROC_LL_BRW_WRITE,
-+	LPROC_LL_OSC_READ,
-+	LPROC_LL_OSC_WRITE,
-+	LPROC_LL_IOCTL,
-+	LPROC_LL_OPEN,
-+	LPROC_LL_RELEASE,
-+	LPROC_LL_MAP,
-+	LPROC_LL_LLSEEK,
-+	LPROC_LL_FSYNC,
-+	LPROC_LL_READDIR,
-+	LPROC_LL_SETATTR,
-+	LPROC_LL_TRUNC,
-+	LPROC_LL_FLOCK,
-+	LPROC_LL_GETATTR,
-+	LPROC_LL_CREATE,
-+	LPROC_LL_LINK,
-+	LPROC_LL_UNLINK,
-+	LPROC_LL_SYMLINK,
-+	LPROC_LL_MKDIR,
-+	LPROC_LL_RMDIR,
-+	LPROC_LL_MKNOD,
-+	LPROC_LL_RENAME,
-+	LPROC_LL_STAFS,
-+	LPROC_LL_ALLOC_INODE,
-+	LPROC_LL_SETXATTR,
-+	LPROC_LL_GETXATTR,
-+	LPROC_LL_GETXATTR_HITS,
-+	LPROC_LL_LISTXATTR,
-+	LPROC_LL_REMOVEXATTR,
-+	LPROC_LL_INODE_PERM,
-+	LPROC_LL_FILE_OPCODES
-+};
-+
- /* llite/dir.c */
- extern const struct file_operations ll_dir_operations;
- extern const struct inode_operations ll_dir_inode_operations;
-@@ -677,7 +736,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
- int ll_get_mdt_idx(struct inode *inode);
- int ll_get_mdt_idx_by_fid(struct ll_sb_info *sbi, const struct lu_fid *fid);
- struct page *ll_get_dir_page(struct inode *dir, struct md_op_data *op_data,
--			     __u64 offset, struct ll_dir_chain *chain);
-+			     __u64 offset);
- void ll_release_page(struct inode *inode, struct page *page, bool remove);
- 
- /* llite/namei.c */
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 9112fa8..19d18e8 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -42,7 +42,6 @@
- #include <linux/mm.h>
- 
- #include "../include/lustre/lustre_ioctl.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_ha.h"
- #include "../include/lustre_dlm.h"
- #include "../include/lprocfs_status.h"
-diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-index 37f82ed..0cd25bf 100644
---- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-@@ -43,7 +43,6 @@
- 
- #define DEBUG_SUBSYSTEM S_LLITE
- 
--#include "../include/lustre_lite.h"
- #include "llite_internal.h"
- #include "../include/linux/lustre_compat25.h"
- 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_nfs.c b/drivers/staging/lustre/lustre/llite/llite_nfs.c
-index 1e156dc..7092305 100644
---- a/drivers/staging/lustre/lustre/llite/llite_nfs.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_nfs.c
-@@ -38,7 +38,6 @@
-  */
- 
- #define DEBUG_SUBSYSTEM S_LLITE
--#include "../include/lustre_lite.h"
- #include "llite_internal.h"
- #include <linux/exportfs.h>
- 
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index fc2ba56..6123435 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -31,7 +31,6 @@
-  */
- #define DEBUG_SUBSYSTEM S_LLITE
- 
--#include "../include/lustre_lite.h"
- #include "../include/lprocfs_status.h"
- #include <linux/seq_file.h>
- #include "../include/obd_support.h"
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 7a82ae4..e2dc920 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -42,7 +42,6 @@
- 
- #include "../include/obd_support.h"
- #include "../include/lustre_fid.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_dlm.h"
- #include "../include/lustre_ver.h"
- #include "llite_internal.h"
-diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
-index de20b7d..508cb46 100644
---- a/drivers/staging/lustre/lustre/llite/rw.c
-+++ b/drivers/staging/lustre/lustre/llite/rw.c
-@@ -50,7 +50,6 @@
- 
- #define DEBUG_SUBSYSTEM S_LLITE
- 
--#include "../include/lustre_lite.h"
- #include "../include/obd_cksum.h"
- #include "llite_internal.h"
- #include "../include/linux/lustre_compat25.h"
-diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
-index 66dba04..6df89b0 100644
---- a/drivers/staging/lustre/lustre/llite/rw26.c
-+++ b/drivers/staging/lustre/lustre/llite/rw26.c
-@@ -51,7 +51,6 @@
- 
- #define DEBUG_SUBSYSTEM S_LLITE
- 
--#include "../include/lustre_lite.h"
- #include "llite_internal.h"
- #include "../include/linux/lustre_compat25.h"
- 
-diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
-index 6577a66..5760974 100644
---- a/drivers/staging/lustre/lustre/llite/statahead.c
-+++ b/drivers/staging/lustre/lustre/llite/statahead.c
-@@ -39,7 +39,6 @@
- #define DEBUG_SUBSYSTEM S_LLITE
- 
- #include "../include/obd_support.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_dlm.h"
- #include "llite_internal.h"
- 
-@@ -1019,7 +1018,6 @@ static int ll_statahead_thread(void *arg)
- 	int		       first  = 0;
- 	int		       rc     = 0;
- 	struct md_op_data *op_data;
--	struct ll_dir_chain       chain;
- 	struct l_wait_info	lwi    = { 0 };
- 
- 	sai = ll_sai_get(dir);
-@@ -1052,13 +1050,12 @@ static int ll_statahead_thread(void *arg)
- 	spin_unlock(&lli->lli_sa_lock);
- 	wake_up(&thread->t_ctl_waitq);
- 
--	ll_dir_chain_init(&chain);
- 	while (pos != MDS_DIR_END_OFF && thread_is_running(thread)) {
- 		struct lu_dirpage *dp;
- 		struct lu_dirent  *ent;
- 
- 		sai->sai_in_readpage = 1;
--		page = ll_get_dir_page(dir, op_data, pos, &chain);
-+		page = ll_get_dir_page(dir, op_data, pos);
- 		sai->sai_in_readpage = 0;
- 		if (IS_ERR(page)) {
- 			rc = PTR_ERR(page);
-@@ -1146,7 +1143,6 @@ static int ll_statahead_thread(void *arg)
- 			break;
- 		}
+ /**
+  * Wind down and free request set structure previously allocated with
+@@ -1006,7 +1005,6 @@ void ptlrpc_set_add_new_req(struct ptlrpcd_ctl *pc,
+ 			wake_up(&pc->pc_partners[i]->pc_set->set_waitq);
  	}
--	ll_dir_chain_fini(&chain);
- 	ll_finish_md_op_data(op_data);
+ }
+-EXPORT_SYMBOL(ptlrpc_set_add_new_req);
  
- 	if (rc < 0) {
-@@ -1280,7 +1276,6 @@ enum {
- 
- static int is_first_dirent(struct inode *dir, struct dentry *dentry)
- {
--	struct ll_dir_chain   chain;
- 	const struct qstr  *target = &dentry->d_name;
- 	struct md_op_data *op_data;
- 	struct page	  *page;
-@@ -1297,8 +1292,7 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
+ /**
+  * Based on the current state of the import, determine if the request
+@@ -2005,7 +2003,6 @@ int ptlrpc_expired_set(void *data)
  	 */
- 	op_data->op_max_pages = ll_i2sbi(dir)->ll_md_brw_pages;
+ 	return 1;
+ }
+-EXPORT_SYMBOL(ptlrpc_expired_set);
  
--	ll_dir_chain_init(&chain);
--	page = ll_get_dir_page(dir, op_data, pos, &chain);
-+	page = ll_get_dir_page(dir, op_data, pos);
- 
- 	while (1) {
- 		struct lu_dirpage *dp;
-@@ -1387,11 +1381,10 @@ static int is_first_dirent(struct inode *dir, struct dentry *dentry)
- 			ll_release_page(dir, page,
- 					le32_to_cpu(dp->ldp_flags) &
- 					LDF_COLLIDE);
--			page = ll_get_dir_page(dir, op_data, pos, &chain);
-+			page = ll_get_dir_page(dir, op_data, pos);
- 		}
+ /**
+  * Sets rq_intr flag in \a req under spinlock.
+@@ -2022,7 +2019,7 @@ EXPORT_SYMBOL(ptlrpc_mark_interrupted);
+  * Interrupts (sets interrupted flag) all uncompleted requests in
+  * a set \a data. Callback for l_wait_event for interruptible waits.
+  */
+-void ptlrpc_interrupted_set(void *data)
++static void ptlrpc_interrupted_set(void *data)
+ {
+ 	struct ptlrpc_request_set *set = data;
+ 	struct list_head *tmp;
+@@ -2040,7 +2037,6 @@ void ptlrpc_interrupted_set(void *data)
+ 		ptlrpc_mark_interrupted(req);
  	}
- out:
--	ll_dir_chain_fini(&chain);
- 	ll_finish_md_op_data(op_data);
+ }
+-EXPORT_SYMBOL(ptlrpc_interrupted_set);
+ 
+ /**
+  * Get the smallest timeout in the set; this does NOT set a timeout.
+@@ -2084,7 +2080,6 @@ int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set)
+ 	}
+ 	return timeout;
+ }
+-EXPORT_SYMBOL(ptlrpc_set_next_timeout);
+ 
+ /**
+  * Send all unset request from the set and then wait until all
+@@ -2335,7 +2330,7 @@ EXPORT_SYMBOL(ptlrpc_req_xid);
+  * The request owner (i.e. the thread doing the I/O) must call...
+  * Returns 0 on success or 1 if unregistering cannot be made.
+  */
+-int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
++static int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
+ {
+ 	int rc;
+ 	wait_queue_head_t *wq;
+@@ -2400,7 +2395,6 @@ int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
+ 	}
+ 	return 0;
+ }
+-EXPORT_SYMBOL(ptlrpc_unregister_reply);
+ 
+ static void ptlrpc_free_request(struct ptlrpc_request *req)
+ {
+@@ -2555,7 +2549,6 @@ void ptlrpc_resend_req(struct ptlrpc_request *req)
+ 	ptlrpc_client_wake_req(req);
+ 	spin_unlock(&req->rq_lock);
+ }
+-EXPORT_SYMBOL(ptlrpc_resend_req);
+ 
+ /**
+  * Grab additional reference on a request \a req
+@@ -2624,7 +2617,6 @@ void ptlrpc_retain_replayable_request(struct ptlrpc_request *req,
+ 
+ 	list_add(&req->rq_replay_list, &imp->imp_replay_list);
+ }
+-EXPORT_SYMBOL(ptlrpc_retain_replayable_request);
+ 
+ /**
+  * Send request and wait until it completes.
+@@ -2797,7 +2789,6 @@ int ptlrpc_replay_req(struct ptlrpc_request *req)
+ 	ptlrpcd_add_req(req);
+ 	return 0;
+ }
+-EXPORT_SYMBOL(ptlrpc_replay_req);
+ 
+ /**
+  * Aborts all in-flight request on import \a imp sending and delayed lists
+@@ -2857,7 +2848,6 @@ void ptlrpc_abort_inflight(struct obd_import *imp)
+ 
+ 	spin_unlock(&imp->imp_lock);
+ }
+-EXPORT_SYMBOL(ptlrpc_abort_inflight);
+ 
+ /**
+  * Abort all uncompleted requests in request set \a set
+@@ -2943,7 +2933,6 @@ __u64 ptlrpc_next_xid(void)
+ 
+ 	return next;
+ }
+-EXPORT_SYMBOL(ptlrpc_next_xid);
+ 
+ /**
+  * Get a glimpse at what next xid value might have been.
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/connection.c b/drivers/staging/lustre/lustre/ptlrpc/connection.c
+index 177a379..7b020d6 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/connection.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/connection.c
+@@ -82,7 +82,6 @@ out:
+ 	       libcfs_nid2str(conn->c_peer.nid));
+ 	return conn;
+ }
+-EXPORT_SYMBOL(ptlrpc_connection_get);
+ 
+ int ptlrpc_connection_put(struct ptlrpc_connection *conn)
+ {
+@@ -118,7 +117,6 @@ int ptlrpc_connection_put(struct ptlrpc_connection *conn)
+ 
  	return rc;
  }
-diff --git a/drivers/staging/lustre/lustre/llite/super25.c b/drivers/staging/lustre/lustre/llite/super25.c
-index 24c79c2..106cd00 100644
---- a/drivers/staging/lustre/lustre/llite/super25.c
-+++ b/drivers/staging/lustre/lustre/llite/super25.c
-@@ -34,7 +34,6 @@
+-EXPORT_SYMBOL(ptlrpc_connection_put);
  
- #include <linux/module.h>
- #include <linux/types.h>
--#include "../include/lustre_lite.h"
- #include "../include/lustre_ha.h"
- #include "../include/lustre_dlm.h"
- #include <linux/init.h>
-diff --git a/drivers/staging/lustre/lustre/llite/symlink.c b/drivers/staging/lustre/lustre/llite/symlink.c
-index 47fb799..f8bc7ed 100644
---- a/drivers/staging/lustre/lustre/llite/symlink.c
-+++ b/drivers/staging/lustre/lustre/llite/symlink.c
-@@ -35,7 +35,6 @@
- #include <linux/stat.h>
- #define DEBUG_SUBSYSTEM S_LLITE
+ struct ptlrpc_connection *
+ ptlrpc_connection_addref(struct ptlrpc_connection *conn)
+@@ -130,7 +128,6 @@ ptlrpc_connection_addref(struct ptlrpc_connection *conn)
  
--#include "../include/lustre_lite.h"
- #include "llite_internal.h"
+ 	return conn;
+ }
+-EXPORT_SYMBOL(ptlrpc_connection_addref);
  
- static int ll_readlink_internal(struct inode *inode,
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index 771c0bd..8aa8ecc 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -38,7 +38,6 @@
- #define DEBUG_SUBSYSTEM S_LLITE
+ int ptlrpc_connection_init(void)
+ {
+@@ -146,13 +143,11 @@ int ptlrpc_connection_init(void)
  
- #include "../include/obd.h"
--#include "../include/lustre_lite.h"
- #include "llite_internal.h"
- #include "vvp_internal.h"
+ 	return 0;
+ }
+-EXPORT_SYMBOL(ptlrpc_connection_init);
  
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index f6dacee..27fc0b0 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -38,7 +38,6 @@
- #define DEBUG_SUBSYSTEM S_LLITE
+ void ptlrpc_connection_fini(void)
+ {
+ 	cfs_hash_putref(conn_hash);
+ }
+-EXPORT_SYMBOL(ptlrpc_connection_fini);
  
- #include "../include/obd.h"
--#include "../include/lustre_lite.h"
+ /*
+  * Hash operations for net_peer<->connection
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index 20daa06..5333cda 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -425,7 +425,6 @@ void ptlrpc_fail_import(struct obd_import *imp, __u32 conn_cnt)
+ 		ptlrpc_pinger_force(imp);
+ 	}
+ }
+-EXPORT_SYMBOL(ptlrpc_fail_import);
  
- #include "llite_internal.h"
- #include "vvp_internal.h"
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_lock.c b/drivers/staging/lustre/lustre/llite/vvp_lock.c
-index 64be0c9..07eb26c 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_lock.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_lock.c
-@@ -37,7 +37,6 @@
- #define DEBUG_SUBSYSTEM S_LLITE
+ int ptlrpc_reconnect_import(struct obd_import *imp)
+ {
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+index 5bab248..9c93739 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+@@ -295,7 +295,6 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+ 	}
+ 	return 0;
+ }
+-EXPORT_SYMBOL(ptlrpc_unregister_bulk);
  
- #include "../include/obd_support.h"
--#include "../include/lustre_lite.h"
+ static void ptlrpc_at_set_reply(struct ptlrpc_request *req, int flags)
+ {
+@@ -434,7 +433,6 @@ out:
+ 	ptlrpc_connection_put(conn);
+ 	return rc;
+ }
+-EXPORT_SYMBOL(ptlrpc_send_reply);
  
- #include "vvp_internal.h"
+ int ptlrpc_reply(struct ptlrpc_request *req)
+ {
+@@ -442,7 +440,6 @@ int ptlrpc_reply(struct ptlrpc_request *req)
+ 		return 0;
+ 	return ptlrpc_send_reply(req, 0);
+ }
+-EXPORT_SYMBOL(ptlrpc_reply);
  
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_object.c b/drivers/staging/lustre/lustre/llite/vvp_object.c
-index e4080ba..01725fb 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_object.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_object.c
-@@ -39,7 +39,6 @@
- #include "../../include/linux/libcfs/libcfs.h"
+ /**
+  * For request \a req send an error reply back. Create empty
+@@ -469,13 +466,11 @@ int ptlrpc_send_error(struct ptlrpc_request *req, int may_be_difficult)
+ 	rc = ptlrpc_send_reply(req, may_be_difficult);
+ 	return rc;
+ }
+-EXPORT_SYMBOL(ptlrpc_send_error);
  
- #include "../include/obd.h"
--#include "../include/lustre_lite.h"
+ int ptlrpc_error(struct ptlrpc_request *req)
+ {
+ 	return ptlrpc_send_error(req, 0);
+ }
+-EXPORT_SYMBOL(ptlrpc_error);
  
- #include "llite_internal.h"
- #include "vvp_internal.h"
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_page.c b/drivers/staging/lustre/lustre/llite/vvp_page.c
-index bbbb0f1..e763e7f 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_page.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_page.c
-@@ -44,8 +44,6 @@
- #include <linux/page-flags.h>
- #include <linux/pagemap.h>
+ /**
+  * Send request \a request.
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+index a1ea0c2..1349bf6 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+@@ -66,7 +66,6 @@ u32 lustre_msg_hdr_size(__u32 magic, u32 count)
+ 		return 0;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_hdr_size);
  
--#include "../include/lustre_lite.h"
--
- #include "llite_internal.h"
- #include "vvp_internal.h"
+ void ptlrpc_buf_set_swabbed(struct ptlrpc_request *req, const int inout,
+ 			    u32 index)
+@@ -76,7 +75,6 @@ void ptlrpc_buf_set_swabbed(struct ptlrpc_request *req, const int inout,
+ 	else
+ 		lustre_set_rep_swabbed(req, index);
+ }
+-EXPORT_SYMBOL(ptlrpc_buf_set_swabbed);
  
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_req.c b/drivers/staging/lustre/lustre/llite/vvp_req.c
-index 0567a15..a6e2672 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_req.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_req.c
-@@ -32,7 +32,6 @@
- #include "../include/cl_object.h"
- #include "../include/obd.h"
- #include "../include/obd_support.h"
--#include "../include/lustre_lite.h"
- #include "llite_internal.h"
- #include "vvp_internal.h"
+ int ptlrpc_buf_need_swab(struct ptlrpc_request *req, const int inout,
+ 			 u32 index)
+@@ -88,7 +86,6 @@ int ptlrpc_buf_need_swab(struct ptlrpc_request *req, const int inout,
+ 		return (ptlrpc_rep_need_swab(req) &&
+ 			!lustre_rep_swabbed(req, index));
+ }
+-EXPORT_SYMBOL(ptlrpc_buf_need_swab);
  
-diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 7b8d469..17ad04f 100644
---- a/drivers/staging/lustre/lustre/llite/xattr.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -38,7 +38,6 @@
- #define DEBUG_SUBSYSTEM S_LLITE
+ /* early reply size */
+ u32 lustre_msg_early_size(void)
+@@ -151,7 +148,6 @@ u32 lustre_msg_size(__u32 magic, int count, __u32 *lens)
+ 		return 0;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_size);
  
- #include "../include/obd_support.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_dlm.h"
- #include "../include/lustre_ver.h"
- #include "../include/lustre_eacl.h"
-diff --git a/drivers/staging/lustre/lustre/llite/xattr_cache.c b/drivers/staging/lustre/lustre/llite/xattr_cache.c
-index 0330d1a..50a19a4 100644
---- a/drivers/staging/lustre/lustre/llite/xattr_cache.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr_cache.c
-@@ -13,7 +13,6 @@
- #include <linux/sched.h>
- #include <linux/mm.h>
- #include "../include/obd_support.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_dlm.h"
- #include "../include/lustre_ver.h"
- #include "llite_internal.h"
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index e1fac0b..208a44d 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -43,13 +43,11 @@
+ /* This is used to determine the size of a buffer that was already packed
+  * and will correctly handle the different message formats.
+@@ -166,7 +162,6 @@ u32 lustre_packed_msg_size(struct lustre_msg *msg)
+ 		return 0;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_packed_msg_size);
  
- #include "../include/lustre/lustre_idl.h"
- #include "../include/obd_support.h"
--#include "../include/lustre_lib.h"
- #include "../include/lustre_net.h"
- #include "../include/obd_class.h"
- #include "../include/lustre_lmv.h"
- #include "../include/lprocfs_status.h"
- #include "../include/cl_object.h"
--#include "../include/lustre_lite.h"
- #include "../include/lustre_fid.h"
- #include "../include/lustre/lustre_ioctl.h"
- #include "../include/lustre_kernelcomm.h"
+ void lustre_init_msg_v2(struct lustre_msg_v2 *msg, int count, __u32 *lens,
+ 			char **bufs)
+@@ -227,7 +222,6 @@ int lustre_pack_request(struct ptlrpc_request *req, __u32 magic, int count,
+ 	/* only use new format, we don't need to be compatible with 1.4 */
+ 	return lustre_pack_request_v2(req, count, lens, bufs);
+ }
+-EXPORT_SYMBOL(lustre_pack_request);
+ 
+ #if RS_DEBUG
+ LIST_HEAD(ptlrpc_rs_debug_lru);
+@@ -369,7 +363,6 @@ int lustre_pack_reply_flags(struct ptlrpc_request *req, int count, __u32 *lens,
+ 		       lustre_msg_size(req->rq_reqmsg->lm_magic, count, lens));
+ 	return rc;
+ }
+-EXPORT_SYMBOL(lustre_pack_reply_flags);
+ 
+ int lustre_pack_reply(struct ptlrpc_request *req, int count, __u32 *lens,
+ 		      char **bufs)
+@@ -491,7 +484,6 @@ void lustre_free_reply_state(struct ptlrpc_reply_state *rs)
+ 
+ 	sptlrpc_svc_free_rs(rs);
+ }
+-EXPORT_SYMBOL(lustre_free_reply_state);
+ 
+ static int lustre_unpack_msg_v2(struct lustre_msg_v2 *m, int len)
+ {
+@@ -579,7 +571,6 @@ int ptlrpc_unpack_req_msg(struct ptlrpc_request *req, int len)
+ 	}
+ 	return rc;
+ }
+-EXPORT_SYMBOL(ptlrpc_unpack_req_msg);
+ 
+ int ptlrpc_unpack_rep_msg(struct ptlrpc_request *req, int len)
+ {
+@@ -592,7 +583,6 @@ int ptlrpc_unpack_rep_msg(struct ptlrpc_request *req, int len)
+ 	}
+ 	return rc;
+ }
+-EXPORT_SYMBOL(ptlrpc_unpack_rep_msg);
+ 
+ static inline int lustre_unpack_ptlrpc_body_v2(struct ptlrpc_request *req,
+ 					       const int inout, int offset)
+@@ -685,7 +675,6 @@ u32 lustre_msg_bufcount(struct lustre_msg *m)
+ 		return 0;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_bufcount);
+ 
+ char *lustre_msg_string(struct lustre_msg *m, u32 index, u32 max_len)
+ {
+@@ -729,7 +718,6 @@ char *lustre_msg_string(struct lustre_msg *m, u32 index, u32 max_len)
+ 
+ 	return str;
+ }
+-EXPORT_SYMBOL(lustre_msg_string);
+ 
+ /* Wrap up the normal fixed length cases */
+ static inline void *__lustre_swab_buf(struct lustre_msg *msg, u32 index,
+@@ -832,7 +820,6 @@ void lustre_msg_set_flags(struct lustre_msg *msg, u32 flags)
+ 		LASSERTF(0, "incorrect message magic: %08x\n", msg->lm_magic);
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_set_flags);
+ 
+ void lustre_msg_clear_flags(struct lustre_msg *msg, u32 flags)
+ {
+@@ -866,7 +853,6 @@ __u32 lustre_msg_get_op_flags(struct lustre_msg *msg)
+ 		return 0;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_get_op_flags);
+ 
+ void lustre_msg_add_op_flags(struct lustre_msg *msg, u32 flags)
+ {
+@@ -901,7 +887,6 @@ struct lustre_handle *lustre_msg_get_handle(struct lustre_msg *msg)
+ 		return NULL;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_get_handle);
+ 
+ __u32 lustre_msg_get_type(struct lustre_msg *msg)
+ {
+@@ -936,7 +921,6 @@ void lustre_msg_add_version(struct lustre_msg *msg, u32 version)
+ 		LASSERTF(0, "incorrect message magic: %08x\n", msg->lm_magic);
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_add_version);
+ 
+ __u32 lustre_msg_get_opc(struct lustre_msg *msg)
+ {
+@@ -1053,7 +1037,6 @@ __u64 lustre_msg_get_slv(struct lustre_msg *msg)
+ 		return -EINVAL;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_get_slv);
+ 
+ void lustre_msg_set_slv(struct lustre_msg *msg, __u64 slv)
+ {
+@@ -1073,7 +1056,6 @@ void lustre_msg_set_slv(struct lustre_msg *msg, __u64 slv)
+ 		return;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_set_slv);
+ 
+ __u32 lustre_msg_get_limit(struct lustre_msg *msg)
+ {
+@@ -1092,7 +1074,6 @@ __u32 lustre_msg_get_limit(struct lustre_msg *msg)
+ 		return -EINVAL;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_get_limit);
+ 
+ void lustre_msg_set_limit(struct lustre_msg *msg, __u64 limit)
+ {
+@@ -1112,7 +1093,6 @@ void lustre_msg_set_limit(struct lustre_msg *msg, __u64 limit)
+ 		return;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_set_limit);
+ 
+ __u32 lustre_msg_get_conn_cnt(struct lustre_msg *msg)
+ {
+@@ -1143,7 +1123,6 @@ __u32 lustre_msg_get_magic(struct lustre_msg *msg)
+ 		return 0;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_get_magic);
+ 
+ __u32 lustre_msg_get_timeout(struct lustre_msg *msg)
+ {
+@@ -1226,7 +1205,6 @@ void lustre_msg_set_handle(struct lustre_msg *msg, struct lustre_handle *handle)
+ 		LASSERTF(0, "incorrect message magic: %08x\n", msg->lm_magic);
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_set_handle);
+ 
+ void lustre_msg_set_type(struct lustre_msg *msg, __u32 type)
+ {
+@@ -1242,7 +1220,6 @@ void lustre_msg_set_type(struct lustre_msg *msg, __u32 type)
+ 		LASSERTF(0, "incorrect message magic: %08x\n", msg->lm_magic);
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_set_type);
+ 
+ void lustre_msg_set_opc(struct lustre_msg *msg, __u32 opc)
+ {
+@@ -1258,7 +1235,6 @@ void lustre_msg_set_opc(struct lustre_msg *msg, __u32 opc)
+ 		LASSERTF(0, "incorrect message magic: %08x\n", msg->lm_magic);
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_set_opc);
+ 
+ void lustre_msg_set_versions(struct lustre_msg *msg, __u64 *versions)
+ {
+@@ -1325,7 +1301,6 @@ void lustre_msg_set_conn_cnt(struct lustre_msg *msg, __u32 conn_cnt)
+ 		LASSERTF(0, "incorrect message magic: %08x\n", msg->lm_magic);
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_msg_set_conn_cnt);
+ 
+ void lustre_msg_set_timeout(struct lustre_msg *msg, __u32 timeout)
+ {
+@@ -1490,7 +1465,6 @@ void lustre_swab_ptlrpc_body(struct ptlrpc_body *b)
+ 	 */
+ 	CLASSERT(offsetof(typeof(*b), pb_jobid) != 0);
+ }
+-EXPORT_SYMBOL(lustre_swab_ptlrpc_body);
+ 
+ void lustre_swab_connect(struct obd_connect_data *ocd)
+ {
+@@ -1590,7 +1564,6 @@ void lustre_swab_obd_statfs(struct obd_statfs *os)
+ 	CLASSERT(offsetof(typeof(*os), os_spare8) != 0);
+ 	CLASSERT(offsetof(typeof(*os), os_spare9) != 0);
+ }
+-EXPORT_SYMBOL(lustre_swab_obd_statfs);
+ 
+ void lustre_swab_obd_ioobj(struct obd_ioobj *ioo)
+ {
+@@ -1598,7 +1571,6 @@ void lustre_swab_obd_ioobj(struct obd_ioobj *ioo)
+ 	__swab32s(&ioo->ioo_max_brw);
+ 	__swab32s(&ioo->ioo_bufcnt);
+ }
+-EXPORT_SYMBOL(lustre_swab_obd_ioobj);
+ 
+ void lustre_swab_niobuf_remote(struct niobuf_remote *nbr)
+ {
+@@ -1606,25 +1578,21 @@ void lustre_swab_niobuf_remote(struct niobuf_remote *nbr)
+ 	__swab32s(&nbr->rnb_len);
+ 	__swab32s(&nbr->rnb_flags);
+ }
+-EXPORT_SYMBOL(lustre_swab_niobuf_remote);
+ 
+ void lustre_swab_ost_body(struct ost_body *b)
+ {
+ 	lustre_swab_obdo(&b->oa);
+ }
+-EXPORT_SYMBOL(lustre_swab_ost_body);
+ 
+ void lustre_swab_ost_last_id(u64 *id)
+ {
+ 	__swab64s(id);
+ }
+-EXPORT_SYMBOL(lustre_swab_ost_last_id);
+ 
+ void lustre_swab_generic_32s(__u32 *val)
+ {
+ 	__swab32s(val);
+ }
+-EXPORT_SYMBOL(lustre_swab_generic_32s);
+ 
+ void lustre_swab_gl_desc(union ldlm_gl_desc *desc)
+ {
+@@ -1703,7 +1671,6 @@ void lustre_swab_mdt_body(struct mdt_body *b)
+ 	__swab32s(&b->mbo_gid_h);
+ 	CLASSERT(offsetof(typeof(*b), mbo_padding_5) != 0);
+ }
+-EXPORT_SYMBOL(lustre_swab_mdt_body);
+ 
+ void lustre_swab_mdt_ioepoch(struct mdt_ioepoch *b)
+ {
+@@ -1712,7 +1679,6 @@ void lustre_swab_mdt_ioepoch(struct mdt_ioepoch *b)
+ 	 __swab32s(&b->flags);
+ 	 CLASSERT(offsetof(typeof(*b), padding) != 0);
+ }
+-EXPORT_SYMBOL(lustre_swab_mdt_ioepoch);
+ 
+ void lustre_swab_mgs_target_info(struct mgs_target_info *mti)
+ {
+@@ -1728,7 +1694,6 @@ void lustre_swab_mgs_target_info(struct mgs_target_info *mti)
+ 	for (i = 0; i < MTI_NIDS_MAX; i++)
+ 		__swab64s(&mti->mti_nids[i]);
+ }
+-EXPORT_SYMBOL(lustre_swab_mgs_target_info);
+ 
+ void lustre_swab_mgs_nidtbl_entry(struct mgs_nidtbl_entry *entry)
+ {
+@@ -1759,14 +1724,12 @@ void lustre_swab_mgs_config_body(struct mgs_config_body *body)
+ 	__swab32s(&body->mcb_units);
+ 	__swab16s(&body->mcb_type);
+ }
+-EXPORT_SYMBOL(lustre_swab_mgs_config_body);
+ 
+ void lustre_swab_mgs_config_res(struct mgs_config_res *body)
+ {
+ 	__swab64s(&body->mcr_offset);
+ 	__swab64s(&body->mcr_size);
+ }
+-EXPORT_SYMBOL(lustre_swab_mgs_config_res);
+ 
+ static void lustre_swab_obd_dqinfo(struct obd_dqinfo *i)
+ {
+@@ -1799,7 +1762,6 @@ void lustre_swab_obd_quotactl(struct obd_quotactl *q)
+ 	lustre_swab_obd_dqinfo(&q->qc_dqinfo);
+ 	lustre_swab_obd_dqblk(&q->qc_dqblk);
+ }
+-EXPORT_SYMBOL(lustre_swab_obd_quotactl);
+ 
+ void lustre_swab_fid2path(struct getinfo_fid2path *gf)
+ {
+@@ -1833,7 +1795,6 @@ void lustre_swab_fiemap(struct ll_user_fiemap *fiemap)
+ 	for (i = 0; i < fiemap->fm_mapped_extents; i++)
+ 		lustre_swab_fiemap_extent(&fiemap->fm_extents[i]);
+ }
+-EXPORT_SYMBOL(lustre_swab_fiemap);
+ 
+ void lustre_swab_mdt_rec_reint (struct mdt_rec_reint *rr)
+ {
+@@ -1862,7 +1823,6 @@ void lustre_swab_mdt_rec_reint (struct mdt_rec_reint *rr)
+ 
+ 	CLASSERT(offsetof(typeof(*rr), rr_padding_4) != 0);
+ };
+-EXPORT_SYMBOL(lustre_swab_mdt_rec_reint);
+ 
+ void lustre_swab_lov_desc(struct lov_desc *ld)
+ {
+@@ -1901,7 +1861,6 @@ void lustre_swab_lmv_mds_md(union lmv_mds_md *lmm)
+ 		break;
+ 	}
+ }
+-EXPORT_SYMBOL(lustre_swab_lmv_mds_md);
+ 
+ void lustre_swab_lmv_user_md(struct lmv_user_md *lum)
+ {
+@@ -1955,7 +1914,6 @@ void lustre_swab_lov_mds_md(struct lov_mds_md *lmm)
+ 	__swab16s(&lmm->lmm_stripe_count);
+ 	__swab16s(&lmm->lmm_layout_gen);
+ }
+-EXPORT_SYMBOL(lustre_swab_lov_mds_md);
+ 
+ void lustre_swab_lov_user_md_objects(struct lov_user_ost_data *lod,
+ 				     int stripe_count)
+@@ -1995,7 +1953,6 @@ void lustre_swab_ldlm_intent(struct ldlm_intent *i)
+ {
+ 	__swab64s(&i->opc);
+ }
+-EXPORT_SYMBOL(lustre_swab_ldlm_intent);
+ 
+ static void lustre_swab_ldlm_resource_desc(struct ldlm_resource_desc *r)
+ {
+@@ -2019,7 +1976,6 @@ void lustre_swab_ldlm_request(struct ldlm_request *rq)
+ 	__swab32s(&rq->lock_count);
+ 	/* lock_handle[] opaque */
+ }
+-EXPORT_SYMBOL(lustre_swab_ldlm_request);
+ 
+ void lustre_swab_ldlm_reply(struct ldlm_reply *r)
+ {
+@@ -2030,7 +1986,6 @@ void lustre_swab_ldlm_reply(struct ldlm_reply *r)
+ 	__swab64s(&r->lock_policy_res1);
+ 	__swab64s(&r->lock_policy_res2);
+ }
+-EXPORT_SYMBOL(lustre_swab_ldlm_reply);
+ 
+ /* Dump functions */
+ void dump_ioo(struct obd_ioobj *ioo)
+@@ -2040,14 +1995,12 @@ void dump_ioo(struct obd_ioobj *ioo)
+ 	       POSTID(&ioo->ioo_oid), ioo->ioo_max_brw,
+ 	       ioo->ioo_bufcnt);
+ }
+-EXPORT_SYMBOL(dump_ioo);
+ 
+ void dump_rniobuf(struct niobuf_remote *nb)
+ {
+ 	CDEBUG(D_RPCTRACE, "niobuf_remote: offset=%llu, len=%d, flags=%x\n",
+ 	       nb->rnb_offset, nb->rnb_len, nb->rnb_flags);
+ }
+-EXPORT_SYMBOL(dump_rniobuf);
+ 
+ static void dump_obdo(struct obdo *oa)
+ {
+@@ -2115,13 +2068,11 @@ void dump_ost_body(struct ost_body *ob)
+ {
+ 	dump_obdo(&ob->oa);
+ }
+-EXPORT_SYMBOL(dump_ost_body);
+ 
+ void dump_rcs(__u32 *rc)
+ {
+ 	CDEBUG(D_RPCTRACE, "rmf_rcs: %d\n", *rc);
+ }
+-EXPORT_SYMBOL(dump_rcs);
+ 
+ static inline int req_ptlrpc_body_swabbed(struct ptlrpc_request *req)
+ {
+@@ -2206,14 +2157,12 @@ void lustre_swab_lustre_capa(struct lustre_capa *c)
+ 	__swab32s(&c->lc_timeout);
+ 	__swab32s(&c->lc_expiry);
+ }
+-EXPORT_SYMBOL(lustre_swab_lustre_capa);
+ 
+ void lustre_swab_hsm_user_state(struct hsm_user_state *state)
+ {
+ 	__swab32s(&state->hus_states);
+ 	__swab32s(&state->hus_archive_id);
+ }
+-EXPORT_SYMBOL(lustre_swab_hsm_user_state);
+ 
+ void lustre_swab_hsm_state_set(struct hsm_state_set *hss)
+ {
+@@ -2236,14 +2185,12 @@ void lustre_swab_hsm_current_action(struct hsm_current_action *action)
+ 	__swab32s(&action->hca_action);
+ 	lustre_swab_hsm_extent(&action->hca_location);
+ }
+-EXPORT_SYMBOL(lustre_swab_hsm_current_action);
+ 
+ void lustre_swab_hsm_user_item(struct hsm_user_item *hui)
+ {
+ 	lustre_swab_lu_fid(&hui->hui_fid);
+ 	lustre_swab_hsm_extent(&hui->hui_extent);
+ }
+-EXPORT_SYMBOL(lustre_swab_hsm_user_item);
+ 
+ void lustre_swab_layout_intent(struct layout_intent *li)
+ {
+@@ -2252,7 +2199,6 @@ void lustre_swab_layout_intent(struct layout_intent *li)
+ 	__swab64s(&li->li_start);
+ 	__swab64s(&li->li_end);
+ }
+-EXPORT_SYMBOL(lustre_swab_layout_intent);
+ 
+ void lustre_swab_hsm_progress_kernel(struct hsm_progress_kernel *hpk)
+ {
+@@ -2263,7 +2209,6 @@ void lustre_swab_hsm_progress_kernel(struct hsm_progress_kernel *hpk)
+ 	__swab16s(&hpk->hpk_flags);
+ 	__swab16s(&hpk->hpk_errval);
+ }
+-EXPORT_SYMBOL(lustre_swab_hsm_progress_kernel);
+ 
+ void lustre_swab_hsm_request(struct hsm_request *hr)
+ {
+@@ -2273,7 +2218,6 @@ void lustre_swab_hsm_request(struct hsm_request *hr)
+ 	__swab32s(&hr->hr_itemcount);
+ 	__swab32s(&hr->hr_data_len);
+ }
+-EXPORT_SYMBOL(lustre_swab_hsm_request);
+ 
+ void lustre_swab_swap_layouts(struct mdc_swap_layouts *msl)
+ {
+@@ -2286,4 +2230,3 @@ void lustre_swab_close_data(struct close_data *cd)
+ 	lustre_swab_lu_fid(&cd->cd_fid);
+ 	__swab64s(&cd->cd_data_version);
+ }
+-EXPORT_SYMBOL(lustre_swab_close_data);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+index c0529d8..5504fc2 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+@@ -340,7 +340,6 @@ void ptlrpc_pinger_sending_on_import(struct obd_import *imp)
+ {
+ 	ptlrpc_update_next_ping(imp, 0);
+ }
+-EXPORT_SYMBOL(ptlrpc_pinger_sending_on_import);
+ 
+ void ptlrpc_pinger_commit_expected(struct obd_import *imp)
+ {
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+index b420aa8..f14d193 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+@@ -62,6 +62,11 @@ void ptlrpc_request_cache_fini(void);
+ struct ptlrpc_request *ptlrpc_request_cache_alloc(gfp_t flags);
+ void ptlrpc_request_cache_free(struct ptlrpc_request *req);
+ void ptlrpc_init_xid(void);
++void ptlrpc_set_add_new_req(struct ptlrpcd_ctl *pc,
++			    struct ptlrpc_request *req);
++int ptlrpc_expired_set(void *data);
++int ptlrpc_set_next_timeout(struct ptlrpc_request_set *);
++void ptlrpc_resend_req(struct ptlrpc_request *request);
+ 
+ /* events.c */
+ int ptlrpc_init_portals(void);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/recover.c b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+index 718b3a8..405faf0 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/recover.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+@@ -201,7 +201,6 @@ int ptlrpc_resend(struct obd_import *imp)
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL(ptlrpc_resend);
+ 
+ /**
+  * Go through all requests in delayed list and wake their threads
+@@ -221,7 +220,6 @@ void ptlrpc_wake_delayed(struct obd_import *imp)
+ 	}
+ 	spin_unlock(&imp->imp_lock);
+ }
+-EXPORT_SYMBOL(ptlrpc_wake_delayed);
+ 
+ void ptlrpc_request_handle_notconn(struct ptlrpc_request *failed_req)
+ {
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+index 6adf274..b2cc5ea 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+@@ -348,7 +348,6 @@ void sptlrpc_enc_pool_put_pages(struct ptlrpc_bulk_desc *desc)
+ 	kfree(desc->bd_enc_iov);
+ 	desc->bd_enc_iov = NULL;
+ }
+-EXPORT_SYMBOL(sptlrpc_enc_pool_put_pages);
+ 
+ static inline void enc_pools_alloc(void)
+ {
+@@ -457,13 +456,11 @@ const char *sptlrpc_get_hash_name(__u8 hash_alg)
+ {
+ 	return cfs_crypto_hash_name(cfs_hash_alg_id[hash_alg]);
+ }
+-EXPORT_SYMBOL(sptlrpc_get_hash_name);
+ 
+ __u8 sptlrpc_get_hash_alg(const char *algname)
+ {
+ 	return cfs_crypto_hash_alg(algname);
+ }
+-EXPORT_SYMBOL(sptlrpc_get_hash_alg);
+ 
+ int bulk_sec_desc_unpack(struct lustre_msg *msg, int offset, int swabbed)
+ {
+@@ -544,4 +541,3 @@ int sptlrpc_get_bulk_checksum(struct ptlrpc_bulk_desc *desc, __u8 alg,
+ 
+ 	return err;
+ }
+-EXPORT_SYMBOL(sptlrpc_get_bulk_checksum);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
+index c140354..2181a85 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
+@@ -58,7 +58,6 @@ enum lustre_sec_part sptlrpc_target_sec_part(struct obd_device *obd)
+ 	CERROR("unknown target %p(%s)\n", obd, type);
+ 	return LUSTRE_SP_ANY;
+ }
+-EXPORT_SYMBOL(sptlrpc_target_sec_part);
+ 
+ /****************************************
+  * user supplied flavor string parsing  *
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+index f79a889..8ffd000 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+@@ -71,7 +71,6 @@ void sptlrpc_gc_add_sec(struct ptlrpc_sec *sec)
+ 
+ 	CDEBUG(D_SEC, "added sec %p(%s)\n", sec, sec->ps_policy->sp_name);
+ }
+-EXPORT_SYMBOL(sptlrpc_gc_add_sec);
+ 
+ void sptlrpc_gc_del_sec(struct ptlrpc_sec *sec)
+ {
+@@ -95,7 +94,6 @@ void sptlrpc_gc_del_sec(struct ptlrpc_sec *sec)
+ 
+ 	CDEBUG(D_SEC, "del sec %p(%s)\n", sec, sec->ps_policy->sp_name);
+ }
+-EXPORT_SYMBOL(sptlrpc_gc_del_sec);
+ 
+ static void sec_process_ctx_list(void)
+ {
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index a2fce66..3edc9b1 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -2407,7 +2407,6 @@ int ptlrpc_start_threads(struct ptlrpc_service *svc)
+ 	ptlrpc_stop_all_threads(svc);
+ 	return rc;
+ }
+-EXPORT_SYMBOL(ptlrpc_start_threads);
+ 
+ int ptlrpc_start_thread(struct ptlrpc_service_part *svcpt, int wait)
+ {
 -- 
 1.7.1
