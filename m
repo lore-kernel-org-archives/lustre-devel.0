@@ -1,430 +1,305 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:52 -0400
-Subject: [lustre-devel] [PATCH 053/124] staging: lustre: obd: restore linkea
-	support
+Date: Sun, 18 Sep 2016 16:37:53 -0400
+Subject: [lustre-devel] [PATCH 054/124] staging: lustre: llite: Add ioctl to
+	get parent fids from link EA.
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-54-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-55-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Henri Doreau <henri.doreau@cea.fr>, Thomas Leibovici <thomas.leibovici@cea.fr>, James Simmons <jsimmons@infradead.org>
 
-Original linkea was only used for the lustre server code
-so it was removed from the upstream client. Now it needs
-to be restored for client work that uses this infrastructure.
+From: Henri Doreau <henri.doreau@cea.fr>
 
+Added LL_IOC_GETPARENT to retrieve the <parent_fid>/name(s) of a given
+entry, based on its link EA. This saves multiple calls to
+path2fid/fid2path.
+
+Merged with second later patch that does various cleanups.
+Avoid unneeded allocation. Get read-only attributes from the user
+getparent structure and write the modified attributes only, instead
+of populating a whole structure in kernel and copying it back.
+
+Signed-off-by: Thomas Leibovici <thomas.leibovici@cea.fr>
+Signed-off-by: Henri Doreau <henri.doreau@cea.fr>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3613
+Reviewed-on: http://review.whamcloud.com/7069
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5837
+Reviewed-on: http://review.whamcloud.com/12527
+Reviewed-by: Ned Bass <bass6@llnl.gov>
+Reviewed-by: frank zago <fzago@cray.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h  |    7 +
- .../staging/lustre/lustre/include/lustre_linkea.h  |   79 ++++++++
- drivers/staging/lustre/lustre/obdclass/Makefile    |    2 +-
- drivers/staging/lustre/lustre/obdclass/linkea.c    |  201 ++++++++++++++++++++
- drivers/staging/lustre/lustre/obdclass/lu_object.c |   70 +++++++
- 5 files changed, 358 insertions(+), 1 deletions(-)
- create mode 100644 drivers/staging/lustre/lustre/include/lustre_linkea.h
- create mode 100644 drivers/staging/lustre/lustre/obdclass/linkea.c
+ .../lustre/lustre/include/lustre/lustre_idl.h      |    8 ++
+ .../lustre/lustre/include/lustre/lustre_user.h     |    1 +
+ drivers/staging/lustre/lustre/llite/dir.c          |    2 +
+ drivers/staging/lustre/lustre/llite/file.c         |    2 +
+ .../staging/lustre/lustre/llite/llite_internal.h   |   13 ++
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  125 ++++++++++++++++++++
+ drivers/staging/lustre/lustre/llite/xattr.c        |   10 +--
+ 7 files changed, 152 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index 66ab98a..7b37cae 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -1319,5 +1319,12 @@ struct lu_kmem_descr {
- int  lu_kmem_init(struct lu_kmem_descr *caches);
- void lu_kmem_fini(struct lu_kmem_descr *caches);
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 2dc550a..0cc47bc 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -3468,6 +3468,14 @@ struct getinfo_fid2path {
  
-+void lu_buf_free(struct lu_buf *buf);
-+void lu_buf_alloc(struct lu_buf *buf, size_t size);
-+void lu_buf_realloc(struct lu_buf *buf, size_t size);
+ void lustre_swab_fid2path(struct getinfo_fid2path *gf);
+ 
++/** path2parent request/reply structures */
++struct getparent {
++	struct lu_fid	gp_fid;		/**< parent FID */
++	__u32		gp_linkno;	/**< hardlink number */
++	__u32		gp_name_size;	/**< size of the name field */
++	char		gp_name[0];	/**< zero-terminated link name */
++} __packed;
 +
-+int lu_buf_check_and_grow(struct lu_buf *buf, size_t len);
-+struct lu_buf *lu_buf_check_and_alloc(struct lu_buf *buf, size_t len);
-+
- /** @} lu */
- #endif /* __LUSTRE_LU_OBJECT_H */
-diff --git a/drivers/staging/lustre/lustre/include/lustre_linkea.h b/drivers/staging/lustre/lustre/include/lustre_linkea.h
-new file mode 100644
-index 0000000..249e8bf
---- /dev/null
-+++ b/drivers/staging/lustre/lustre/include/lustre_linkea.h
-@@ -0,0 +1,79 @@
-+/*
-+ * GPL HEADER START
-+ *
-+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 only,
-+ * as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 for more details (a copy is included
-+ * in the LICENSE file that accompanied this code).
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 along with this program; If not, see
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-+ *
-+ * GPL HEADER END
-+ */
-+/*
-+ * Copyright (c) 2013, 2014, Intel Corporation.
-+ * Use is subject to license terms.
-+ *
-+ * Author: di wang <di.wang@intel.com>
-+ */
-+
-+#define DEFAULT_LINKEA_SIZE	4096
-+
-+struct linkea_data {
-+	/**
-+	 * Buffer to keep link EA body.
-+	 */
-+	struct lu_buf		*ld_buf;
-+	/**
-+	 * The matched header, entry and its length in the EA
-+	 */
-+	struct link_ea_header	*ld_leh;
-+	struct link_ea_entry	*ld_lee;
-+	int			ld_reclen;
-+};
-+
-+int linkea_data_new(struct linkea_data *ldata, struct lu_buf *buf);
-+int linkea_init(struct linkea_data *ldata);
-+void linkea_entry_unpack(const struct link_ea_entry *lee, int *reclen,
-+			 struct lu_name *lname, struct lu_fid *pfid);
-+int linkea_entry_pack(struct link_ea_entry *lee, const struct lu_name *lname,
-+		      const struct lu_fid *pfid);
-+int linkea_add_buf(struct linkea_data *ldata, const struct lu_name *lname,
-+		   const struct lu_fid *pfid);
-+void linkea_del_buf(struct linkea_data *ldata, const struct lu_name *lname);
-+int linkea_links_find(struct linkea_data *ldata, const struct lu_name *lname,
-+		      const struct lu_fid  *pfid);
-+
-+static inline void linkea_first_entry(struct linkea_data *ldata)
-+{
-+	LASSERT(ldata);
-+	LASSERT(ldata->ld_leh);
-+
-+	if (ldata->ld_leh->leh_reccount == 0)
-+		ldata->ld_lee = NULL;
-+	else
-+		ldata->ld_lee = (struct link_ea_entry *)(ldata->ld_leh + 1);
-+}
-+
-+static inline void linkea_next_entry(struct linkea_data *ldata)
-+{
-+	LASSERT(ldata);
-+	LASSERT(ldata->ld_leh);
-+
-+	if (ldata->ld_lee) {
-+		ldata->ld_lee = (struct link_ea_entry *)((char *)ldata->ld_lee +
-+							 ldata->ld_reclen);
-+		if ((char *)ldata->ld_lee >= ((char *)ldata->ld_leh +
-+					      ldata->ld_leh->leh_len))
-+			ldata->ld_lee = NULL;
-+	}
-+}
-diff --git a/drivers/staging/lustre/lustre/obdclass/Makefile b/drivers/staging/lustre/lustre/obdclass/Makefile
-index df7e47f..b42e109 100644
---- a/drivers/staging/lustre/lustre/obdclass/Makefile
-+++ b/drivers/staging/lustre/lustre/obdclass/Makefile
-@@ -3,6 +3,6 @@ obj-$(CONFIG_LUSTRE_FS) += obdclass.o
- obdclass-y := linux/linux-module.o linux/linux-obdo.o linux/linux-sysctl.o \
- 	      llog.o llog_cat.o llog_obd.o llog_swab.o class_obd.o debug.o \
- 	      genops.o uuid.o lprocfs_status.o lprocfs_counters.o \
--	      lustre_handles.o lustre_peer.o statfs_pack.o \
-+	      lustre_handles.o lustre_peer.o statfs_pack.o linkea.o \
- 	      obdo.o obd_config.o obd_mount.o lu_object.o lu_ref.o \
- 	      cl_object.o cl_page.o cl_lock.o cl_io.o kernelcomm.o
-diff --git a/drivers/staging/lustre/lustre/obdclass/linkea.c b/drivers/staging/lustre/lustre/obdclass/linkea.c
-new file mode 100644
-index 0000000..ee0a6e7
---- /dev/null
-+++ b/drivers/staging/lustre/lustre/obdclass/linkea.c
-@@ -0,0 +1,201 @@
-+/*
-+ * GPL HEADER START
-+ *
-+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 only,
-+ * as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 for more details (a copy is included
-+ * in the LICENSE file that accompanied this code).
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 along with this program; If not, see
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-+ *
-+ * GPL HEADER END
-+ */
-+/*
-+ * Copyright (c) 2013, 2014, Intel Corporation.
-+ * Use is subject to license terms.
-+ *
-+ * Author: Di Wang <di.wang@intel.com>
-+ */
-+
-+#include "../include/lustre/lustre_idl.h"
-+#include "../include/obd.h"
+ enum {
+ 	LAYOUT_INTENT_ACCESS    = 0,
+ 	LAYOUT_INTENT_READ      = 1,
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+index cc0a786..08ac6e4 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+@@ -245,6 +245,7 @@ struct ost_id {
+ #define LL_IOC_LMV_SET_DEFAULT_STRIPE	_IOWR('f', 246, struct lmv_user_md)
+ #define LL_IOC_MIGRATE			_IOR('f', 247, int)
+ #define LL_IOC_FID2MDTIDX		_IOWR('f', 248, struct lu_fid)
++#define LL_IOC_GETPARENT		_IOWR('f', 249, struct getparent)
+ 
+ /* Lease types for use as arg and return of LL_IOC_{GET,SET}_LEASE ioctl. */
+ enum ll_lease_type {
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 234095e..705de1c 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -1562,6 +1562,8 @@ out_quotactl:
+ 		return rc;
+ 	case OBD_IOC_FID2PATH:
+ 		return ll_fid2path(inode, (void __user *)arg);
++	case LL_IOC_GETPARENT:
++		return ll_getparent(file, (void __user *)arg);
+ 	case LL_IOC_FID2MDTIDX: {
+ 		struct obd_export *exp = ll_i2mdexp(inode);
+ 		struct lu_fid fid;
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 127d0e0..45acc5d 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -2362,6 +2362,8 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ 		return 0;
+ 	}
++	case LL_IOC_GETPARENT:
++		return ll_getparent(file, (struct getparent __user *)arg);
+ 	case OBD_IOC_FID2PATH:
+ 		return ll_fid2path(inode, (void __user *)arg);
+ 	case LL_IOC_DATA_VERSION: {
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index fc707c2..1cc427c 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -36,6 +36,7 @@
+ #include "../include/lustre_ver.h"
+ #include "../include/lustre_disk.h"	/* for s2sbi */
+ #include "../include/lustre_eacl.h"
 +#include "../include/lustre_linkea.h"
+ 
+ /* for struct cl_lock_descr and struct cl_io */
+ #include "../include/cl_object.h"
+@@ -1038,7 +1039,17 @@ static inline __u64 ll_file_maxbytes(struct inode *inode)
+ /* llite/xattr.c */
+ extern const struct xattr_handler *ll_xattr_handlers[];
+ 
++#define XATTR_USER_T		1
++#define XATTR_TRUSTED_T		2
++#define XATTR_SECURITY_T	3
++#define XATTR_ACL_ACCESS_T	4
++#define XATTR_ACL_DEFAULT_T	5
++#define XATTR_LUSTRE_T		6
++#define XATTR_OTHER_T		7
 +
-+int linkea_data_new(struct linkea_data *ldata, struct lu_buf *buf)
+ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size);
++int ll_xattr_list(struct inode *inode, const char *name, int type,
++		  void *buffer, size_t size, __u64 valid);
+ 
+ /**
+  * Common IO arguments for various VFS I/O interfaces.
+@@ -1399,6 +1410,8 @@ void ll_xattr_fini(void);
+ int ll_page_sync_io(const struct lu_env *env, struct cl_io *io,
+ 		    struct cl_page *page, enum cl_req_type crt);
+ 
++int ll_getparent(struct file *file, struct getparent __user *arg);
++
+ /* lcommon_cl.c */
+ int cl_setattr_ost(struct inode *inode, const struct iattr *attr);
+ 
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 5792354..5cbce1b 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -2545,3 +2545,128 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
+ 	}
+ 	up_write(&squash->rsi_sem);
+ }
++
++/**
++ * Parse linkea content to extract information about a given hardlink
++ *
++ * \param[in]	ldata		- Initialized linkea data
++ * \param[in]	linkno		- Link identifier
++ * \param[out]	parent_fid	- The entry's parent FID
++ * \param[in]	size		- Entry name destination buffer
++ *
++ * \retval 0 on success
++ * \retval Appropriate negative error code on failure
++ */
++static int ll_linkea_decode(struct linkea_data *ldata, unsigned int linkno,
++			    struct lu_fid *parent_fid, struct lu_name *ln)
 +{
-+	ldata->ld_buf = lu_buf_check_and_alloc(buf, PAGE_SIZE);
-+	if (!ldata->ld_buf->lb_buf)
-+		return -ENOMEM;
-+	ldata->ld_leh = ldata->ld_buf->lb_buf;
-+	ldata->ld_leh->leh_magic = LINK_EA_MAGIC;
-+	ldata->ld_leh->leh_len = sizeof(struct link_ea_header);
-+	ldata->ld_leh->leh_reccount = 0;
-+	return 0;
-+}
-+EXPORT_SYMBOL(linkea_data_new);
++	unsigned int idx;
++	int rc;
 +
-+int linkea_init(struct linkea_data *ldata)
-+{
-+	struct link_ea_header *leh;
++	rc = linkea_init(ldata);
++	if (rc < 0)
++		return rc;
 +
-+	LASSERT(ldata->ld_buf);
-+	leh = ldata->ld_buf->lb_buf;
-+	if (leh->leh_magic == __swab32(LINK_EA_MAGIC)) {
-+		leh->leh_magic = LINK_EA_MAGIC;
-+		leh->leh_reccount = __swab32(leh->leh_reccount);
-+		leh->leh_len = __swab64(leh->leh_len);
-+		/* entries are swabbed by linkea_entry_unpack */
-+	}
-+	if (leh->leh_magic != LINK_EA_MAGIC)
-+		return -EINVAL;
-+	if (leh->leh_reccount == 0)
++	if (linkno >= ldata->ld_leh->leh_reccount)
++		/* beyond last link */
 +		return -ENODATA;
 +
-+	ldata->ld_leh = leh;
++	linkea_first_entry(ldata);
++	for (idx = 0; ldata->ld_lee; idx++) {
++		linkea_entry_unpack(ldata->ld_lee, &ldata->ld_reclen, ln,
++				    parent_fid);
++		if (idx == linkno)
++			break;
++
++		linkea_next_entry(ldata);
++	}
++
++	if (idx < linkno)
++		return -ENODATA;
++
 +	return 0;
 +}
-+EXPORT_SYMBOL(linkea_init);
 +
 +/**
-+ * Pack a link_ea_entry.
-+ * All elements are stored as chars to avoid alignment issues.
-+ * Numbers are always big-endian
-+ * \retval record length
++ * Get parent FID and name of an identified link. Operation is performed for
++ * a given link number, letting the caller iterate over linkno to list one or
++ * all links of an entry.
++ *
++ * \param[in]	  file	- File descriptor against which to perform the operation
++ * \param[in,out] arg	- User-filled structure containing the linkno to operate
++ *			  on and the available size. It is eventually filled with
++ *			  the requested information or left untouched on error
++ *
++ * \retval - 0 on success
++ * \retval - Appropriate negative error code on failure
 + */
-+int linkea_entry_pack(struct link_ea_entry *lee, const struct lu_name *lname,
-+		      const struct lu_fid *pfid)
++int ll_getparent(struct file *file, struct getparent __user *arg)
 +{
-+	struct lu_fid   tmpfid;
-+	int             reclen;
++	struct inode *inode = file_inode(file);
++	struct linkea_data *ldata;
++	struct lu_fid parent_fid;
++	struct lu_buf buf = {
++		.lb_buf = NULL,
++		.lb_len = 0
++	};
++	struct lu_name ln;
++	u32 name_size;
++	u32 linkno;
++	int rc;
 +
-+	tmpfid = *pfid;
-+	if (OBD_FAIL_CHECK(OBD_FAIL_LFSCK_LINKEA_CRASH))
-+		tmpfid.f_ver = ~0;
-+	fid_cpu_to_be(&tmpfid, &tmpfid);
-+	memcpy(&lee->lee_parent_fid, &tmpfid, sizeof(tmpfid));
-+	memcpy(lee->lee_name, lname->ln_name, lname->ln_namelen);
-+	reclen = sizeof(struct link_ea_entry) + lname->ln_namelen;
++	if (!capable(CFS_CAP_DAC_READ_SEARCH) &&
++	    !(ll_i2sbi(inode)->ll_flags & LL_SBI_USER_FID2PATH))
++		return -EPERM;
 +
-+	lee->lee_reclen[0] = (reclen >> 8) & 0xff;
-+	lee->lee_reclen[1] = reclen & 0xff;
-+	return reclen;
-+}
-+EXPORT_SYMBOL(linkea_entry_pack);
++	if (get_user(name_size, &arg->gp_name_size))
++		return -EFAULT;
 +
-+void linkea_entry_unpack(const struct link_ea_entry *lee, int *reclen,
-+			 struct lu_name *lname, struct lu_fid *pfid)
-+{
-+	*reclen = (lee->lee_reclen[0] << 8) | lee->lee_reclen[1];
-+	memcpy(pfid, &lee->lee_parent_fid, sizeof(*pfid));
-+	fid_be_to_cpu(pfid, pfid);
-+	if (lname) {
-+		lname->ln_name = lee->lee_name;
-+		lname->ln_namelen = *reclen - sizeof(struct link_ea_entry);
-+	}
-+}
-+EXPORT_SYMBOL(linkea_entry_unpack);
++	if (get_user(linkno, &arg->gp_linkno))
++		return -EFAULT;
 +
-+/**
-+ * Add a record to the end of link ea buf
-+ **/
-+int linkea_add_buf(struct linkea_data *ldata, const struct lu_name *lname,
-+		   const struct lu_fid *pfid)
-+{
-+	LASSERT(ldata->ld_leh);
-+
-+	if (!lname || !pfid)
++	if (name_size > PATH_MAX)
 +		return -EINVAL;
 +
-+	ldata->ld_reclen = lname->ln_namelen + sizeof(struct link_ea_entry);
-+	if (ldata->ld_leh->leh_len + ldata->ld_reclen >
-+	    ldata->ld_buf->lb_len) {
-+		if (lu_buf_check_and_grow(ldata->ld_buf,
-+					  ldata->ld_leh->leh_len +
-+					  ldata->ld_reclen) < 0)
-+			return -ENOMEM;
-+	}
-+
-+	ldata->ld_leh = ldata->ld_buf->lb_buf;
-+	ldata->ld_lee = ldata->ld_buf->lb_buf + ldata->ld_leh->leh_len;
-+	ldata->ld_reclen = linkea_entry_pack(ldata->ld_lee, lname, pfid);
-+	ldata->ld_leh->leh_len += ldata->ld_reclen;
-+	ldata->ld_leh->leh_reccount++;
-+	CDEBUG(D_INODE, "New link_ea name '" DFID ":%.*s' is added\n",
-+	       PFID(pfid), lname->ln_namelen, lname->ln_name);
-+	return 0;
-+}
-+EXPORT_SYMBOL(linkea_add_buf);
-+
-+/** Del the current record from the link ea buf */
-+void linkea_del_buf(struct linkea_data *ldata, const struct lu_name *lname)
-+{
-+	LASSERT(ldata->ld_leh && ldata->ld_lee);
-+
-+	ldata->ld_leh->leh_reccount--;
-+	ldata->ld_leh->leh_len -= ldata->ld_reclen;
-+	memmove(ldata->ld_lee, (char *)ldata->ld_lee + ldata->ld_reclen,
-+		(char *)ldata->ld_leh + ldata->ld_leh->leh_len -
-+		(char *)ldata->ld_lee);
-+	CDEBUG(D_INODE, "Old link_ea name '%.*s' is removed\n",
-+	       lname->ln_namelen, lname->ln_name);
-+
-+	if ((char *)ldata->ld_lee >= ((char *)ldata->ld_leh +
-+				      ldata->ld_leh->leh_len))
-+		ldata->ld_lee = NULL;
-+}
-+EXPORT_SYMBOL(linkea_del_buf);
-+
-+/**
-+ * Check if such a link exists in linkEA.
-+ *
-+ * \param ldata link data the search to be done on
-+ * \param lname name in the parent's directory entry pointing to this object
-+ * \param pfid parent fid the link to be found for
-+ *
-+ * \retval   0 success
-+ * \retval -ENOENT link does not exist
-+ * \retval -ve on error
-+ */
-+int linkea_links_find(struct linkea_data *ldata, const struct lu_name *lname,
-+		      const struct lu_fid  *pfid)
-+{
-+	struct lu_name tmpname;
-+	struct lu_fid  tmpfid;
-+	int count;
-+
-+	LASSERT(ldata->ld_leh);
-+
-+	/* link #0 */
-+	ldata->ld_lee = (struct link_ea_entry *)(ldata->ld_leh + 1);
-+
-+	for (count = 0; count < ldata->ld_leh->leh_reccount; count++) {
-+		linkea_entry_unpack(ldata->ld_lee, &ldata->ld_reclen,
-+				    &tmpname, &tmpfid);
-+		if (tmpname.ln_namelen == lname->ln_namelen &&
-+		    lu_fid_eq(&tmpfid, pfid) &&
-+		    (strncmp(tmpname.ln_name, lname->ln_name,
-+			     tmpname.ln_namelen) == 0))
-+			break;
-+		ldata->ld_lee = (struct link_ea_entry *)((char *)ldata->ld_lee +
-+							 ldata->ld_reclen);
-+	}
-+
-+	if (count == ldata->ld_leh->leh_reccount) {
-+		CDEBUG(D_INODE, "Old link_ea name '%.*s' not found\n",
-+		       lname->ln_namelen, lname->ln_name);
-+		ldata->ld_lee = NULL;
-+		ldata->ld_reclen = 0;
-+		return -ENOENT;
-+	}
-+	return 0;
-+}
-+EXPORT_SYMBOL(linkea_links_find);
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index 44a854c..e284e5d 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -1984,3 +1984,73 @@ void lu_kmem_fini(struct lu_kmem_descr *caches)
- 	}
- }
- EXPORT_SYMBOL(lu_kmem_fini);
-+
-+void lu_buf_free(struct lu_buf *buf)
-+{
-+	LASSERT(buf);
-+	if (buf->lb_buf) {
-+		LASSERT(buf->lb_len > 0);
-+		kvfree(buf->lb_buf);
-+		buf->lb_buf = NULL;
-+		buf->lb_len = 0;
-+	}
-+}
-+EXPORT_SYMBOL(lu_buf_free);
-+
-+void lu_buf_alloc(struct lu_buf *buf, size_t size)
-+{
-+	LASSERT(buf);
-+	LASSERT(!buf->lb_buf);
-+	LASSERT(!buf->lb_len);
-+	buf->lb_buf = libcfs_kvzalloc(size, GFP_NOFS);
-+	if (likely(buf->lb_buf))
-+		buf->lb_len = size;
-+}
-+EXPORT_SYMBOL(lu_buf_alloc);
-+
-+void lu_buf_realloc(struct lu_buf *buf, size_t size)
-+{
-+	lu_buf_free(buf);
-+	lu_buf_alloc(buf, size);
-+}
-+EXPORT_SYMBOL(lu_buf_realloc);
-+
-+struct lu_buf *lu_buf_check_and_alloc(struct lu_buf *buf, size_t len)
-+{
-+	if (!buf->lb_buf && !buf->lb_len)
-+		lu_buf_alloc(buf, len);
-+
-+	if ((len > buf->lb_len) && buf->lb_buf)
-+		lu_buf_realloc(buf, len);
-+
-+	return buf;
-+}
-+EXPORT_SYMBOL(lu_buf_check_and_alloc);
-+
-+/**
-+ * Increase the size of the \a buf.
-+ * preserves old data in buffer
-+ * old buffer remains unchanged on error
-+ * \retval 0 or -ENOMEM
-+ */
-+int lu_buf_check_and_grow(struct lu_buf *buf, size_t len)
-+{
-+	char *ptr;
-+
-+	if (len <= buf->lb_len)
-+		return 0;
-+
-+	ptr = libcfs_kvzalloc(len, GFP_NOFS);
-+	if (!ptr)
++	ldata = kzalloc(sizeof(*ldata), GFP_NOFS);
++	if (!ldata)
 +		return -ENOMEM;
 +
-+	/* Free the old buf */
-+	if (buf->lb_buf) {
-+		memcpy(ptr, buf->lb_buf, buf->lb_len);
-+		kvfree(buf->lb_buf);
++	rc = linkea_data_new(ldata, &buf);
++	if (rc < 0)
++		goto ldata_free;
++
++	rc = ll_xattr_list(inode, XATTR_NAME_LINK, XATTR_TRUSTED_T, buf.lb_buf,
++			   buf.lb_len, OBD_MD_FLXATTR);
++	if (rc < 0)
++		goto lb_free;
++
++	rc = ll_linkea_decode(ldata, linkno, &parent_fid, &ln);
++	if (rc < 0)
++		goto lb_free;
++
++	if (ln.ln_namelen >= name_size) {
++		rc = -EOVERFLOW;
++		goto lb_free;
 +	}
 +
-+	buf->lb_buf = ptr;
-+	buf->lb_len = len;
-+	return 0;
++	if (copy_to_user(&arg->gp_fid, &parent_fid, sizeof(arg->gp_fid))) {
++		rc = -EFAULT;
++		goto lb_free;
++	}
++
++	if (copy_to_user(&arg->gp_name, ln.ln_name, ln.ln_namelen)) {
++		rc = -EFAULT;
++		goto lb_free;
++	}
++
++	if (put_user('\0', arg->gp_name + ln.ln_namelen)) {
++		rc = -EFAULT;
++		goto lb_free;
++	}
++
++lb_free:
++	lu_buf_free(&buf);
++ldata_free:
++	kfree(ldata);
++	return rc;
 +}
+diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
+index 17ad04f..0e6a559 100644
+--- a/drivers/staging/lustre/lustre/llite/xattr.c
++++ b/drivers/staging/lustre/lustre/llite/xattr.c
+@@ -44,14 +44,6 @@
+ 
+ #include "llite_internal.h"
+ 
+-#define XATTR_USER_T	    (1)
+-#define XATTR_TRUSTED_T	 (2)
+-#define XATTR_SECURITY_T	(3)
+-#define XATTR_ACL_ACCESS_T      (4)
+-#define XATTR_ACL_DEFAULT_T     (5)
+-#define XATTR_LUSTRE_T	  (6)
+-#define XATTR_OTHER_T	   (7)
+-
+ static
+ int get_xattr_type(const char *name)
+ {
+@@ -219,7 +211,7 @@ static int ll_xattr_set(const struct xattr_handler *handler,
+ 				   flags);
+ }
+ 
+-static int
++int
+ ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
+ 	      size_t size, __u64 valid)
+ {
 -- 
 1.7.1
