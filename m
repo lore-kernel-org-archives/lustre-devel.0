@@ -1,95 +1,74 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:38:06 -0400
-Subject: [lustre-devel] [PATCH 067/124] staging: lustre: changelog: fix
-	comparison between signed and unsigned
+Date: Sun, 18 Sep 2016 16:38:14 -0400
+Subject: [lustre-devel] [PATCH 075/124] staging: lustre: recovery: don't
+	replay closed open
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-68-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-76-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+From: Niu Yawei <yawei.niu@intel.com>
 
-Change type of changelog_*{namelen,size}() to size_t.
-Fixed string specifier for unsigned types.
+To avoid scanning the replay open list every time in the
+ptlrpc_free_committed(), the fix of LU-2613 (4322e0f9) changed
+the ptlrpc_free_committed() to skip the open list unless the
+import generation is changed. That introduced a race which could
+make a closed open being replayed:
 
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5577
-Reviewed-on: http://review.whamcloud.com/12474
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
+1. Application calls ll_close_inode_openhandle()-> mdc_close(),
+   to close file, rq_replay is cleared, but the open request is
+   still on the imp_committed_list;
+
+2. Before the md_clear_open_replay_data() is called for close,
+   client start replay, and that closed open will be replayed
+   mistakenly;
+
+3. Open replay interpret callback (mdc_replay_open) could race
+   with the mdc_clear_open_replay_data() at the end;
+
+This patch fix the ptlrpc_free_committed() to make sure the
+open list is scanned on recovery to prevent the closed open request
+from being replayed.
+
+Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5507
+Reviewed-on: http://review.whamcloud.com/12667
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: James Nunez <james.a.nunez@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_user.h     |   10 +++++-----
- drivers/staging/lustre/lustre/llite/file.c         |    4 ++--
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/client.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-index de52339..e8f81a5 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-@@ -819,9 +819,9 @@ struct changelog_ext_jobid {
- 	char	cr_jobid[LUSTRE_JOBID_SIZE];	/**< zero-terminated string. */
- };
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index 27fe00d..a29ccaa 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -2455,7 +2455,8 @@ void ptlrpc_free_committed(struct obd_import *imp)
+ 	       imp->imp_obd->obd_name, imp->imp_peer_committed_transno,
+ 	       imp->imp_generation);
  
--static inline unsigned int changelog_rec_offset(enum changelog_rec_flags crf)
-+static inline size_t changelog_rec_offset(enum changelog_rec_flags crf)
- {
--	unsigned int size = sizeof(struct changelog_rec);
-+	size_t size = sizeof(struct changelog_rec);
+-	if (imp->imp_generation != imp->imp_last_generation_checked)
++	if (imp->imp_generation != imp->imp_last_generation_checked ||
++	    !imp->imp_last_transno_checked)
+ 		skip_committed_list = false;
  
- 	if (crf & CLF_RENAME)
- 		size += sizeof(struct changelog_ext_rename);
-@@ -832,12 +832,12 @@ static inline unsigned int changelog_rec_offset(enum changelog_rec_flags crf)
- 	return size;
+ 	imp->imp_last_transno_checked = imp->imp_peer_committed_transno;
+@@ -2503,6 +2504,9 @@ free_req:
+ 		if (req->rq_import_generation < imp->imp_generation) {
+ 			DEBUG_REQ(D_RPCTRACE, req, "free stale open request");
+ 			ptlrpc_free_request(req);
++		} else if (!req->rq_replay) {
++			DEBUG_REQ(D_RPCTRACE, req, "free closed open request");
++			ptlrpc_free_request(req);
+ 		}
+ 	}
  }
- 
--static inline int changelog_rec_size(struct changelog_rec *rec)
-+static inline size_t changelog_rec_size(struct changelog_rec *rec)
- {
- 	return changelog_rec_offset(rec->cr_flags);
- }
- 
--static inline unsigned int changelog_rec_varsize(struct changelog_rec *rec)
-+static inline size_t changelog_rec_varsize(struct changelog_rec *rec)
- {
- 	return changelog_rec_size(rec) - sizeof(*rec) + rec->cr_namelen;
- }
-@@ -869,7 +869,7 @@ static inline char *changelog_rec_name(struct changelog_rec *rec)
- 						  CLF_SUPPORTED);
- }
- 
--static inline int changelog_rec_snamelen(struct changelog_rec *rec)
-+static inline size_t changelog_rec_snamelen(struct changelog_rec *rec)
- {
- 	return rec->cr_namelen - strlen(changelog_rec_name(rec)) - 1;
- }
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 4b10260..a562b11 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -1129,7 +1129,7 @@ ll_file_io_generic(const struct lu_env *env, struct vvp_io_args *args,
- 	struct cl_io	 *io;
- 	ssize_t	       result;
- 
--	CDEBUG(D_VFSTRACE, "file: %s, type: %d ppos: %llu, count: %zd\n",
-+	CDEBUG(D_VFSTRACE, "file: %s, type: %d ppos: %llu, count: %zu\n",
- 	       file->f_path.dentry->d_name.name, iot, *ppos, count);
- 
- restart:
-@@ -1207,7 +1207,7 @@ out:
- 	 * short read/write instead of restart io.
- 	 */
- 	if ((result == 0 || result == -ENODATA) && io->ci_need_restart) {
--		CDEBUG(D_VFSTRACE, "Restart %s on %pD from %lld, count:%zd\n",
-+		CDEBUG(D_VFSTRACE, "Restart %s on %pD from %lld, count:%zu\n",
- 		       iot == CIT_READ ? "read" : "write",
- 		       file, *ppos, count);
- 		LASSERTF(io->ci_nob == 0, "%zd\n", io->ci_nob);
 -- 
 1.7.1
