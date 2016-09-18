@@ -1,88 +1,61 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:44 -0400
-Subject: [lustre-devel] [PATCH 045/124] staging: lustre: lmv: remove dead
-	code
+Date: Sun, 18 Sep 2016 16:37:50 -0400
+Subject: [lustre-devel] [PATCH 051/124] staging: lustre: llite: ensure all
+	data flush out when umount
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-46-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-52-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Yang Sheng <yang.sheng@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+From: Yang Sheng <yang.sheng@intel.com>
 
-The member lmv_obd->server_timeout and function lmv_set_timeouts()
-are not used.
+Write out all extents when clear inode. Otherwise we
+may lose data while umount.
 
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-991
-Reviewed-on: http://review.whamcloud.com/11880
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Signed-off-by: Yang Sheng <yang.sheng@intel.com>
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5584
+Reviewed-on: http://review.whamcloud.com/12103
+Reviewed-by: Bobi Jam <bobijam@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h |    1 -
- drivers/staging/lustre/lustre/lmv/lmv_obd.c |   25 -------------------------
- 2 files changed, 0 insertions(+), 26 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_lib.c |   15 ++++-----------
+ 1 files changed, 4 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 3fbb873..b84600a 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -433,7 +433,6 @@ struct lmv_obd {
- 	int			max_def_easize;
- 	int			max_cookiesize;
- 	int			max_def_cookiesize;
--	int			server_timeout;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 2aab396..5792354 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -1909,20 +1909,13 @@ void ll_delete_inode(struct inode *inode)
+ 		 * osc_extent implementation at LU-1030.
+ 		 */
+ 		cl_sync_file_range(inode, 0, OBD_OBJECT_EOF,
+-				   CL_FSYNC_DISCARD, 1);
++				   CL_FSYNC_LOCAL, 1);
  
- 	u32			tgts_size; /* size of tgts array */
- 	struct lmv_tgt_desc	**tgts;
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 53de385..8033ae2 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -302,30 +302,6 @@ static int lmv_connect(const struct lu_env *env,
- 	return rc;
- }
+ 	truncate_inode_pages_final(&inode->i_data);
  
--static void lmv_set_timeouts(struct obd_device *obd)
--{
--	struct lmv_obd	*lmv;
--	u32 i;
--
--	lmv = &obd->u.lmv;
--	if (lmv->server_timeout == 0)
--		return;
--
--	if (lmv->connected == 0)
--		return;
--
--	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
--		struct lmv_tgt_desc *tgt = lmv->tgts[i];
--
--		tgt = lmv->tgts[i];
--		if (!tgt || !tgt->ltd_exp || !tgt->ltd_active)
--			continue;
--
--		obd_set_info_async(NULL, tgt->ltd_exp, sizeof(KEY_INTERMDS),
--				   KEY_INTERMDS, 0, NULL, NULL);
+-	/* Workaround for LU-118 */
+-	if (inode->i_data.nrpages) {
+-		spin_lock_irq(&inode->i_data.tree_lock);
+-		spin_unlock_irq(&inode->i_data.tree_lock);
+-		LASSERTF(inode->i_data.nrpages == 0,
+-			 "inode="DFID"(%p) nrpages=%lu, see http://jira.whamcloud.com/browse/LU-118\n",
+-			 PFID(ll_inode2fid(inode)), inode,
+-			 inode->i_data.nrpages);
 -	}
--}
--
- static int lmv_init_ea_size(struct obd_export *exp, int easize,
- 			    int def_easize, int cookiesize, int def_cookiesize)
- {
-@@ -616,7 +592,6 @@ int lmv_check_connect(struct obd_device *obd)
- 			goto out_disc;
- 	}
+-	/* Workaround end */
++	LASSERTF(!inode->i_data.nrpages,
++		 "inode=" DFID "(%p) nrpages=%lu, see http://jira.whamcloud.com/browse/LU-118\n",
++		 PFID(ll_inode2fid(inode)), inode, inode->i_data.nrpages);
  
--	lmv_set_timeouts(obd);
- 	class_export_put(lmv->exp);
- 	lmv->connected = 1;
- 	easize = lmv_mds_md_size(lmv->desc.ld_tgt_count, LMV_MAGIC);
+ 	ll_clear_inode(inode);
+ 	clear_inode(inode);
 -- 
 1.7.1
