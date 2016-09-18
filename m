@@ -1,67 +1,88 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:35 -0400
-Subject: [lustre-devel] [PATCH 036/124] staging: lustre: llite: no need to
-	check dentry is NULL
+Date: Sun, 18 Sep 2016 16:37:44 -0400
+Subject: [lustre-devel] [PATCH 045/124] staging: lustre: lmv: remove dead
+	code
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-37-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-46-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-We are already touching dentry in CDEBUG macros so it
-will crash long before these checks. Since this is the
-case no need to do an additional check.
+The member lmv_obd->server_timeout and function lmv_set_timeouts()
+are not used.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
-Reviewed-on: http://review.whamcloud.com/10769
-Reviewed-by: Yang Sheng <yang.sheng@intel.com>
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-991
+Reviewed-on: http://review.whamcloud.com/11880
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/namei.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h |    1 -
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c |   25 -------------------------
+ 2 files changed, 0 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 5e182fc..7a82ae4 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -987,7 +987,7 @@ static int ll_unlink(struct inode *dir, struct dentry *dchild)
- 	if (IS_ERR(op_data))
- 		return PTR_ERR(op_data);
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 3fbb873..b84600a 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -433,7 +433,6 @@ struct lmv_obd {
+ 	int			max_def_easize;
+ 	int			max_cookiesize;
+ 	int			max_def_cookiesize;
+-	int			server_timeout;
  
--	if (dchild && dchild->d_inode)
-+	if (dchild->d_inode)
- 		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
+ 	u32			tgts_size; /* size of tgts array */
+ 	struct lmv_tgt_desc	**tgts;
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 53de385..8033ae2 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -302,30 +302,6 @@ static int lmv_connect(const struct lu_env *env,
+ 	return rc;
+ }
  
- 	op_data->op_fid2 = op_data->op_fid3;
-@@ -1039,7 +1039,7 @@ static int ll_rmdir(struct inode *dir, struct dentry *dchild)
- 	if (IS_ERR(op_data))
- 		return PTR_ERR(op_data);
+-static void lmv_set_timeouts(struct obd_device *obd)
+-{
+-	struct lmv_obd	*lmv;
+-	u32 i;
+-
+-	lmv = &obd->u.lmv;
+-	if (lmv->server_timeout == 0)
+-		return;
+-
+-	if (lmv->connected == 0)
+-		return;
+-
+-	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
+-		struct lmv_tgt_desc *tgt = lmv->tgts[i];
+-
+-		tgt = lmv->tgts[i];
+-		if (!tgt || !tgt->ltd_exp || !tgt->ltd_active)
+-			continue;
+-
+-		obd_set_info_async(NULL, tgt->ltd_exp, sizeof(KEY_INTERMDS),
+-				   KEY_INTERMDS, 0, NULL, NULL);
+-	}
+-}
+-
+ static int lmv_init_ea_size(struct obd_export *exp, int easize,
+ 			    int def_easize, int cookiesize, int def_cookiesize)
+ {
+@@ -616,7 +592,6 @@ int lmv_check_connect(struct obd_device *obd)
+ 			goto out_disc;
+ 	}
  
--	if (dchild && dchild->d_inode)
-+	if (dchild->d_inode)
- 		op_data->op_fid3 = *ll_inode2fid(dchild->d_inode);
- 
- 	op_data->op_fid2 = op_data->op_fid3;
-@@ -1120,9 +1120,9 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
- 	if (IS_ERR(op_data))
- 		return PTR_ERR(op_data);
- 
--	if (src_dchild && src_dchild->d_inode)
-+	if (src_dchild->d_inode)
- 		op_data->op_fid3 = *ll_inode2fid(src_dchild->d_inode);
--	if (tgt_dchild && tgt_dchild->d_inode)
-+	if (tgt_dchild->d_inode)
- 		op_data->op_fid4 = *ll_inode2fid(tgt_dchild->d_inode);
- 
- 	err = md_rename(sbi->ll_md_exp, op_data,
+-	lmv_set_timeouts(obd);
+ 	class_export_put(lmv->exp);
+ 	lmv->connected = 1;
+ 	easize = lmv_mds_md_size(lmv->desc.ld_tgt_count, LMV_MAGIC);
 -- 
 1.7.1
