@@ -1,249 +1,430 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:30 -0400
-Subject: [lustre-devel] [PATCH 031/124] staging: lustre: vvp: Use lockless
-	__generic_file_aio_write
+Date: Sun, 18 Sep 2016 16:37:52 -0400
+Subject: [lustre-devel] [PATCH 053/124] staging: lustre: obd: restore linkea
+	support
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-32-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-54-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Prakash Surya <surya1@llnl.gov>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Prakash Surya <surya1@llnl.gov>
+Original linkea was only used for the lustre server code
+so it was removed from the upstream client. Now it needs
+to be restored for client work that uses this infrastructure.
 
-Testing multi-threaded single shard file write performance has shown
-the inode mutex to be a limiting factor when using the
-generic_file_write_iter function. To work around this bottle neck, this
-change replaces the locked version of that call with the lock less
-version, specifically, __generic_file_write_iter.
-
-In order to maintain posix consistency, Lustre must now employ it's
-own locking mechanism in the higher layers. Currently writes are
-protected using the lli_write_mutex in the ll_inode_info structure.
-To protect against simultaneous write and truncate operations, since
-we no longer take the inode mutex during writes, we must down the
-lli_trunc_sem semaphore.
-
-Unfortunately, this change by itself does not garner any performance
-benefits. Using FIO on a single machine with 32 GB of RAM, write
-performance tests were ran with and without this change applied; the
-results are below:
-
-    +---------+-----------+---------+--------+--------+
-    |     fio v2.0.13     |   Write Bandwidth (KB/s)  |
-    +---------+-----------+---------+--------+--------+
-    | # Tasks | GB / Task | Test 1  | Test 2 | Test 3 |
-    +---------+-----------+---------+--------+--------+
-    |    1    |    64     |  452446 | 454623 | 457653 |
-    |    2    |    32     |  850318 | 565373 | 602498 |
-    |    4    |    16     | 1058900 | 463546 | 529107 |
-    |    8    |     8     | 1026300 | 468190 | 576451 |
-    |   16    |     4     | 1065500 | 503160 | 462902 |
-    |   32    |     2     | 1068600 | 462228 | 466963 |
-    |   64    |     1     |  991830 | 556618 | 557863 |
-    +---------+-----------+---------+--------+--------+
-
- * Test 1: Lustre client running 04ec54f. File per process write
-           workload. This test was used as a baseline for what we
-           _could_ achieve in the single shared file tests if the
-           bottle necks were removed.
-
- * Test 2: Lustre client running 04ec54f. Single shared file
-           workload, each task writing to a unique region.
-
- * Test 3: Lustre client running 04ec54f + this patch. Single shared
-           file workload, each task writing to a unique region.
-
-In order to garner any real performance benefits out of a single
-shared file workload, the lli_write_mutex needs to be broken up into a
-range lock. That would allow write operations to unique regions of a
-file to be executed concurrently. This work is left to be done in a
-follow up patch.
-
-Signed-off-by: Prakash Surya <surya1@llnl.gov>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-1669
-Reviewed-on: http://review.whamcloud.com/6672
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/rw26.c       |    9 -------
- drivers/staging/lustre/lustre/llite/vvp_io.c     |   26 +++++++++++++++++++--
- drivers/staging/lustre/lustre/llite/vvp_page.c   |   16 -------------
- drivers/staging/lustre/lustre/obdclass/cl_page.c |    6 -----
- 4 files changed, 23 insertions(+), 34 deletions(-)
+ drivers/staging/lustre/lustre/include/lu_object.h  |    7 +
+ .../staging/lustre/lustre/include/lustre_linkea.h  |   79 ++++++++
+ drivers/staging/lustre/lustre/obdclass/Makefile    |    2 +-
+ drivers/staging/lustre/lustre/obdclass/linkea.c    |  201 ++++++++++++++++++++
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |   70 +++++++
+ 5 files changed, 358 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/staging/lustre/lustre/include/lustre_linkea.h
+ create mode 100644 drivers/staging/lustre/lustre/obdclass/linkea.c
 
-diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
-index 2f8ef54..66dba04 100644
---- a/drivers/staging/lustre/lustre/llite/rw26.c
-+++ b/drivers/staging/lustre/lustre/llite/rw26.c
-@@ -375,13 +375,6 @@ static ssize_t ll_direct_IO_26(struct kiocb *iocb, struct iov_iter *iter)
- 	io = vvp_env_io(env)->vui_cl.cis_io;
- 	LASSERT(io);
+diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
+index 66ab98a..7b37cae 100644
+--- a/drivers/staging/lustre/lustre/include/lu_object.h
++++ b/drivers/staging/lustre/lustre/include/lu_object.h
+@@ -1319,5 +1319,12 @@ struct lu_kmem_descr {
+ int  lu_kmem_init(struct lu_kmem_descr *caches);
+ void lu_kmem_fini(struct lu_kmem_descr *caches);
  
--	/* 0. Need locking between buffered and direct access. and race with
--	 *    size changing by concurrent truncates and writes.
--	 * 1. Need inode mutex to operate transient pages.
--	 */
--	if (iov_iter_rw(iter) == READ)
--		inode_lock(inode);
--
- 	LASSERT(obj->vob_transient_pages == 0);
- 	while (iov_iter_count(iter)) {
- 		struct page **pages;
-@@ -431,8 +424,6 @@ static ssize_t ll_direct_IO_26(struct kiocb *iocb, struct iov_iter *iter)
- 	}
- out:
- 	LASSERT(obj->vob_transient_pages == 0);
--	if (iov_iter_rw(iter) == READ)
--		inode_unlock(inode);
- 
- 	if (tot_bytes > 0) {
- 		struct vvp_io *vio = vvp_env_io(env);
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 09ccd1f..f6dacee 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -959,10 +959,30 @@ static int vvp_io_write_start(const struct lu_env *env,
- 
- 	CDEBUG(D_VFSTRACE, "write: [%lli, %lli)\n", pos, pos + (long long)cnt);
- 
--	if (!vio->vui_iter) /* from a temp io in ll_cl_init(). */
-+	if (!vio->vui_iter) {
-+		/* from a temp io in ll_cl_init(). */
- 		result = 0;
--	else
--		result = generic_file_write_iter(vio->vui_iocb, vio->vui_iter);
-+	} else {
-+		/*
-+		 * When using the locked AIO function (generic_file_aio_write())
-+		 * testing has shown the inode mutex to be a limiting factor
-+		 * with multi-threaded single shared file performance. To get
-+		 * around this, we now use the lockless version. To maintain
-+		 * consistency, proper locking to protect against writes,
-+		 * trucates, etc. is handled in the higher layers of lustre.
-+		 */
-+		bool lock_node = !IS_NOSEC(inode);
++void lu_buf_free(struct lu_buf *buf);
++void lu_buf_alloc(struct lu_buf *buf, size_t size);
++void lu_buf_realloc(struct lu_buf *buf, size_t size);
 +
-+		if (lock_node)
-+			inode_lock(inode);
-+		result = __generic_file_write_iter(vio->vui_iocb,
-+						   vio->vui_iter);
-+		if (lock_node)
-+			inode_unlock(inode);
++int lu_buf_check_and_grow(struct lu_buf *buf, size_t len);
++struct lu_buf *lu_buf_check_and_alloc(struct lu_buf *buf, size_t len);
 +
-+		if (result > 0 || result == -EIOCBQUEUED)
-+			result = generic_write_sync(vio->vui_iocb, result);
+ /** @} lu */
+ #endif /* __LUSTRE_LU_OBJECT_H */
+diff --git a/drivers/staging/lustre/lustre/include/lustre_linkea.h b/drivers/staging/lustre/lustre/include/lustre_linkea.h
+new file mode 100644
+index 0000000..249e8bf
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/include/lustre_linkea.h
+@@ -0,0 +1,79 @@
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2013, 2014, Intel Corporation.
++ * Use is subject to license terms.
++ *
++ * Author: di wang <di.wang@intel.com>
++ */
++
++#define DEFAULT_LINKEA_SIZE	4096
++
++struct linkea_data {
++	/**
++	 * Buffer to keep link EA body.
++	 */
++	struct lu_buf		*ld_buf;
++	/**
++	 * The matched header, entry and its length in the EA
++	 */
++	struct link_ea_header	*ld_leh;
++	struct link_ea_entry	*ld_lee;
++	int			ld_reclen;
++};
++
++int linkea_data_new(struct linkea_data *ldata, struct lu_buf *buf);
++int linkea_init(struct linkea_data *ldata);
++void linkea_entry_unpack(const struct link_ea_entry *lee, int *reclen,
++			 struct lu_name *lname, struct lu_fid *pfid);
++int linkea_entry_pack(struct link_ea_entry *lee, const struct lu_name *lname,
++		      const struct lu_fid *pfid);
++int linkea_add_buf(struct linkea_data *ldata, const struct lu_name *lname,
++		   const struct lu_fid *pfid);
++void linkea_del_buf(struct linkea_data *ldata, const struct lu_name *lname);
++int linkea_links_find(struct linkea_data *ldata, const struct lu_name *lname,
++		      const struct lu_fid  *pfid);
++
++static inline void linkea_first_entry(struct linkea_data *ldata)
++{
++	LASSERT(ldata);
++	LASSERT(ldata->ld_leh);
++
++	if (ldata->ld_leh->leh_reccount == 0)
++		ldata->ld_lee = NULL;
++	else
++		ldata->ld_lee = (struct link_ea_entry *)(ldata->ld_leh + 1);
++}
++
++static inline void linkea_next_entry(struct linkea_data *ldata)
++{
++	LASSERT(ldata);
++	LASSERT(ldata->ld_leh);
++
++	if (ldata->ld_lee) {
++		ldata->ld_lee = (struct link_ea_entry *)((char *)ldata->ld_lee +
++							 ldata->ld_reclen);
++		if ((char *)ldata->ld_lee >= ((char *)ldata->ld_leh +
++					      ldata->ld_leh->leh_len))
++			ldata->ld_lee = NULL;
 +	}
- 
- 	if (result > 0) {
- 		result = vvp_io_write_commit(env, io);
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_page.c b/drivers/staging/lustre/lustre/llite/vvp_page.c
-index 2818a68..bbbb0f1 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_page.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_page.c
-@@ -444,18 +444,10 @@ static int vvp_transient_page_prep(const struct lu_env *env,
- 	return 0;
- }
- 
--static void vvp_transient_page_verify(const struct cl_page *page)
--{
--	struct inode *inode = vvp_object_inode(page->cp_obj);
--
--	LASSERT(!inode_trylock(inode));
--}
--
- static int vvp_transient_page_own(const struct lu_env *env,
- 				  const struct cl_page_slice *slice,
- 				  struct cl_io *unused, int nonblock)
- {
--	vvp_transient_page_verify(slice->cpl_page);
- 	return 0;
- }
- 
-@@ -463,21 +455,18 @@ static void vvp_transient_page_assume(const struct lu_env *env,
- 				      const struct cl_page_slice *slice,
- 				      struct cl_io *unused)
- {
--	vvp_transient_page_verify(slice->cpl_page);
- }
- 
- static void vvp_transient_page_unassume(const struct lu_env *env,
- 					const struct cl_page_slice *slice,
- 					struct cl_io *unused)
- {
--	vvp_transient_page_verify(slice->cpl_page);
- }
- 
- static void vvp_transient_page_disown(const struct lu_env *env,
- 				      const struct cl_page_slice *slice,
- 				      struct cl_io *unused)
- {
--	vvp_transient_page_verify(slice->cpl_page);
- }
- 
- static void vvp_transient_page_discard(const struct lu_env *env,
-@@ -486,8 +475,6 @@ static void vvp_transient_page_discard(const struct lu_env *env,
- {
- 	struct cl_page *page = slice->cpl_page;
- 
--	vvp_transient_page_verify(slice->cpl_page);
--
- 	/*
- 	 * For transient pages, remove it from the radix tree.
- 	 */
-@@ -511,7 +498,6 @@ vvp_transient_page_completion(const struct lu_env *env,
- 			      const struct cl_page_slice *slice,
- 			      int ioret)
- {
--	vvp_transient_page_verify(slice->cpl_page);
- }
- 
- static void vvp_transient_page_fini(const struct lu_env *env,
-@@ -522,7 +508,6 @@ static void vvp_transient_page_fini(const struct lu_env *env,
- 	struct vvp_object *clobj = cl2vvp(clp->cp_obj);
- 
- 	vvp_page_fini_common(vpg);
--	LASSERT(!inode_trylock(clobj->vob_inode));
- 	clobj->vob_transient_pages--;
- }
- 
-@@ -570,7 +555,6 @@ int vvp_page_init(const struct lu_env *env, struct cl_object *obj,
- 	} else {
- 		struct vvp_object *clobj = cl2vvp(obj);
- 
--		LASSERT(!inode_trylock(clobj->vob_inode));
- 		cl_page_slice_add(page, &vpg->vpg_cl, obj, index,
- 				  &vvp_transient_page_ops);
- 		clobj->vob_transient_pages++;
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-index 80c6e0e..cae8d21 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-@@ -228,11 +228,6 @@ EXPORT_SYMBOL(cl_page_find);
- 
- static inline int cl_page_invariant(const struct cl_page *pg)
- {
--	/*
--	 * Page invariant is protected by a VM lock.
--	 */
--	LINVRNT(cl_page_is_vmlocked(NULL, pg));
--
- 	return cl_page_in_use_noref(pg);
- }
- 
-@@ -864,7 +859,6 @@ void cl_page_completion(const struct lu_env *env,
- 			       (const struct lu_env *,
- 				const struct cl_page_slice *, int), ioret);
- 	if (anchor) {
--		LASSERT(cl_page_is_vmlocked(env, pg));
- 		LASSERT(pg->cp_sync_io == anchor);
- 		pg->cp_sync_io = NULL;
++}
+diff --git a/drivers/staging/lustre/lustre/obdclass/Makefile b/drivers/staging/lustre/lustre/obdclass/Makefile
+index df7e47f..b42e109 100644
+--- a/drivers/staging/lustre/lustre/obdclass/Makefile
++++ b/drivers/staging/lustre/lustre/obdclass/Makefile
+@@ -3,6 +3,6 @@ obj-$(CONFIG_LUSTRE_FS) += obdclass.o
+ obdclass-y := linux/linux-module.o linux/linux-obdo.o linux/linux-sysctl.o \
+ 	      llog.o llog_cat.o llog_obd.o llog_swab.o class_obd.o debug.o \
+ 	      genops.o uuid.o lprocfs_status.o lprocfs_counters.o \
+-	      lustre_handles.o lustre_peer.o statfs_pack.o \
++	      lustre_handles.o lustre_peer.o statfs_pack.o linkea.o \
+ 	      obdo.o obd_config.o obd_mount.o lu_object.o lu_ref.o \
+ 	      cl_object.o cl_page.o cl_lock.o cl_io.o kernelcomm.o
+diff --git a/drivers/staging/lustre/lustre/obdclass/linkea.c b/drivers/staging/lustre/lustre/obdclass/linkea.c
+new file mode 100644
+index 0000000..ee0a6e7
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/obdclass/linkea.c
+@@ -0,0 +1,201 @@
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2013, 2014, Intel Corporation.
++ * Use is subject to license terms.
++ *
++ * Author: Di Wang <di.wang@intel.com>
++ */
++
++#include "../include/lustre/lustre_idl.h"
++#include "../include/obd.h"
++#include "../include/lustre_linkea.h"
++
++int linkea_data_new(struct linkea_data *ldata, struct lu_buf *buf)
++{
++	ldata->ld_buf = lu_buf_check_and_alloc(buf, PAGE_SIZE);
++	if (!ldata->ld_buf->lb_buf)
++		return -ENOMEM;
++	ldata->ld_leh = ldata->ld_buf->lb_buf;
++	ldata->ld_leh->leh_magic = LINK_EA_MAGIC;
++	ldata->ld_leh->leh_len = sizeof(struct link_ea_header);
++	ldata->ld_leh->leh_reccount = 0;
++	return 0;
++}
++EXPORT_SYMBOL(linkea_data_new);
++
++int linkea_init(struct linkea_data *ldata)
++{
++	struct link_ea_header *leh;
++
++	LASSERT(ldata->ld_buf);
++	leh = ldata->ld_buf->lb_buf;
++	if (leh->leh_magic == __swab32(LINK_EA_MAGIC)) {
++		leh->leh_magic = LINK_EA_MAGIC;
++		leh->leh_reccount = __swab32(leh->leh_reccount);
++		leh->leh_len = __swab64(leh->leh_len);
++		/* entries are swabbed by linkea_entry_unpack */
++	}
++	if (leh->leh_magic != LINK_EA_MAGIC)
++		return -EINVAL;
++	if (leh->leh_reccount == 0)
++		return -ENODATA;
++
++	ldata->ld_leh = leh;
++	return 0;
++}
++EXPORT_SYMBOL(linkea_init);
++
++/**
++ * Pack a link_ea_entry.
++ * All elements are stored as chars to avoid alignment issues.
++ * Numbers are always big-endian
++ * \retval record length
++ */
++int linkea_entry_pack(struct link_ea_entry *lee, const struct lu_name *lname,
++		      const struct lu_fid *pfid)
++{
++	struct lu_fid   tmpfid;
++	int             reclen;
++
++	tmpfid = *pfid;
++	if (OBD_FAIL_CHECK(OBD_FAIL_LFSCK_LINKEA_CRASH))
++		tmpfid.f_ver = ~0;
++	fid_cpu_to_be(&tmpfid, &tmpfid);
++	memcpy(&lee->lee_parent_fid, &tmpfid, sizeof(tmpfid));
++	memcpy(lee->lee_name, lname->ln_name, lname->ln_namelen);
++	reclen = sizeof(struct link_ea_entry) + lname->ln_namelen;
++
++	lee->lee_reclen[0] = (reclen >> 8) & 0xff;
++	lee->lee_reclen[1] = reclen & 0xff;
++	return reclen;
++}
++EXPORT_SYMBOL(linkea_entry_pack);
++
++void linkea_entry_unpack(const struct link_ea_entry *lee, int *reclen,
++			 struct lu_name *lname, struct lu_fid *pfid)
++{
++	*reclen = (lee->lee_reclen[0] << 8) | lee->lee_reclen[1];
++	memcpy(pfid, &lee->lee_parent_fid, sizeof(*pfid));
++	fid_be_to_cpu(pfid, pfid);
++	if (lname) {
++		lname->ln_name = lee->lee_name;
++		lname->ln_namelen = *reclen - sizeof(struct link_ea_entry);
++	}
++}
++EXPORT_SYMBOL(linkea_entry_unpack);
++
++/**
++ * Add a record to the end of link ea buf
++ **/
++int linkea_add_buf(struct linkea_data *ldata, const struct lu_name *lname,
++		   const struct lu_fid *pfid)
++{
++	LASSERT(ldata->ld_leh);
++
++	if (!lname || !pfid)
++		return -EINVAL;
++
++	ldata->ld_reclen = lname->ln_namelen + sizeof(struct link_ea_entry);
++	if (ldata->ld_leh->leh_len + ldata->ld_reclen >
++	    ldata->ld_buf->lb_len) {
++		if (lu_buf_check_and_grow(ldata->ld_buf,
++					  ldata->ld_leh->leh_len +
++					  ldata->ld_reclen) < 0)
++			return -ENOMEM;
++	}
++
++	ldata->ld_leh = ldata->ld_buf->lb_buf;
++	ldata->ld_lee = ldata->ld_buf->lb_buf + ldata->ld_leh->leh_len;
++	ldata->ld_reclen = linkea_entry_pack(ldata->ld_lee, lname, pfid);
++	ldata->ld_leh->leh_len += ldata->ld_reclen;
++	ldata->ld_leh->leh_reccount++;
++	CDEBUG(D_INODE, "New link_ea name '" DFID ":%.*s' is added\n",
++	       PFID(pfid), lname->ln_namelen, lname->ln_name);
++	return 0;
++}
++EXPORT_SYMBOL(linkea_add_buf);
++
++/** Del the current record from the link ea buf */
++void linkea_del_buf(struct linkea_data *ldata, const struct lu_name *lname)
++{
++	LASSERT(ldata->ld_leh && ldata->ld_lee);
++
++	ldata->ld_leh->leh_reccount--;
++	ldata->ld_leh->leh_len -= ldata->ld_reclen;
++	memmove(ldata->ld_lee, (char *)ldata->ld_lee + ldata->ld_reclen,
++		(char *)ldata->ld_leh + ldata->ld_leh->leh_len -
++		(char *)ldata->ld_lee);
++	CDEBUG(D_INODE, "Old link_ea name '%.*s' is removed\n",
++	       lname->ln_namelen, lname->ln_name);
++
++	if ((char *)ldata->ld_lee >= ((char *)ldata->ld_leh +
++				      ldata->ld_leh->leh_len))
++		ldata->ld_lee = NULL;
++}
++EXPORT_SYMBOL(linkea_del_buf);
++
++/**
++ * Check if such a link exists in linkEA.
++ *
++ * \param ldata link data the search to be done on
++ * \param lname name in the parent's directory entry pointing to this object
++ * \param pfid parent fid the link to be found for
++ *
++ * \retval   0 success
++ * \retval -ENOENT link does not exist
++ * \retval -ve on error
++ */
++int linkea_links_find(struct linkea_data *ldata, const struct lu_name *lname,
++		      const struct lu_fid  *pfid)
++{
++	struct lu_name tmpname;
++	struct lu_fid  tmpfid;
++	int count;
++
++	LASSERT(ldata->ld_leh);
++
++	/* link #0 */
++	ldata->ld_lee = (struct link_ea_entry *)(ldata->ld_leh + 1);
++
++	for (count = 0; count < ldata->ld_leh->leh_reccount; count++) {
++		linkea_entry_unpack(ldata->ld_lee, &ldata->ld_reclen,
++				    &tmpname, &tmpfid);
++		if (tmpname.ln_namelen == lname->ln_namelen &&
++		    lu_fid_eq(&tmpfid, pfid) &&
++		    (strncmp(tmpname.ln_name, lname->ln_name,
++			     tmpname.ln_namelen) == 0))
++			break;
++		ldata->ld_lee = (struct link_ea_entry *)((char *)ldata->ld_lee +
++							 ldata->ld_reclen);
++	}
++
++	if (count == ldata->ld_leh->leh_reccount) {
++		CDEBUG(D_INODE, "Old link_ea name '%.*s' not found\n",
++		       lname->ln_namelen, lname->ln_name);
++		ldata->ld_lee = NULL;
++		ldata->ld_reclen = 0;
++		return -ENOENT;
++	}
++	return 0;
++}
++EXPORT_SYMBOL(linkea_links_find);
+diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+index 44a854c..e284e5d 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+@@ -1984,3 +1984,73 @@ void lu_kmem_fini(struct lu_kmem_descr *caches)
  	}
+ }
+ EXPORT_SYMBOL(lu_kmem_fini);
++
++void lu_buf_free(struct lu_buf *buf)
++{
++	LASSERT(buf);
++	if (buf->lb_buf) {
++		LASSERT(buf->lb_len > 0);
++		kvfree(buf->lb_buf);
++		buf->lb_buf = NULL;
++		buf->lb_len = 0;
++	}
++}
++EXPORT_SYMBOL(lu_buf_free);
++
++void lu_buf_alloc(struct lu_buf *buf, size_t size)
++{
++	LASSERT(buf);
++	LASSERT(!buf->lb_buf);
++	LASSERT(!buf->lb_len);
++	buf->lb_buf = libcfs_kvzalloc(size, GFP_NOFS);
++	if (likely(buf->lb_buf))
++		buf->lb_len = size;
++}
++EXPORT_SYMBOL(lu_buf_alloc);
++
++void lu_buf_realloc(struct lu_buf *buf, size_t size)
++{
++	lu_buf_free(buf);
++	lu_buf_alloc(buf, size);
++}
++EXPORT_SYMBOL(lu_buf_realloc);
++
++struct lu_buf *lu_buf_check_and_alloc(struct lu_buf *buf, size_t len)
++{
++	if (!buf->lb_buf && !buf->lb_len)
++		lu_buf_alloc(buf, len);
++
++	if ((len > buf->lb_len) && buf->lb_buf)
++		lu_buf_realloc(buf, len);
++
++	return buf;
++}
++EXPORT_SYMBOL(lu_buf_check_and_alloc);
++
++/**
++ * Increase the size of the \a buf.
++ * preserves old data in buffer
++ * old buffer remains unchanged on error
++ * \retval 0 or -ENOMEM
++ */
++int lu_buf_check_and_grow(struct lu_buf *buf, size_t len)
++{
++	char *ptr;
++
++	if (len <= buf->lb_len)
++		return 0;
++
++	ptr = libcfs_kvzalloc(len, GFP_NOFS);
++	if (!ptr)
++		return -ENOMEM;
++
++	/* Free the old buf */
++	if (buf->lb_buf) {
++		memcpy(ptr, buf->lb_buf, buf->lb_len);
++		kvfree(buf->lb_buf);
++	}
++
++	buf->lb_buf = ptr;
++	buf->lb_len = len;
++	return 0;
++}
 -- 
 1.7.1
