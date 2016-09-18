@@ -1,117 +1,194 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:17 -0400
-Subject: [lustre-devel] [PATCH 018/124] staging: lustre: obdclass: fix
-	comparison between signed and unsigned
+Date: Sun, 18 Sep 2016 16:37:28 -0400
+Subject: [lustre-devel] [PATCH 029/124] staging: lustre: ldlm: restore some
+	of the interval functionality
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-19-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-30-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+Earlier a bunch of interval handling got removed since it wasn't
+used by the upstream client. Now some of it is needed again for
+the client code so this patch restores what is needed.
 
-Make lu_buf->lb_len unsigned.
-
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5417
-Reviewed-on: http://review.whamcloud.com/11281
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h  |    2 +-
- drivers/staging/lustre/lustre/obdclass/lu_object.c |   16 ++++++++--------
- 2 files changed, 9 insertions(+), 9 deletions(-)
+ .../staging/lustre/lustre/include/interval_tree.h  |   26 +++++
+ drivers/staging/lustre/lustre/ldlm/interval_tree.c |  100 +++++++++++++++++++-
+ 2 files changed, 125 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index fe40b42..66ab98a 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -1290,7 +1290,7 @@ static inline bool lu_name_is_valid_2(const char *name, size_t name_len)
-  */
- struct lu_buf {
- 	void   *lb_buf;
--	ssize_t lb_len;
-+	size_t	lb_len;
- };
+diff --git a/drivers/staging/lustre/lustre/include/interval_tree.h b/drivers/staging/lustre/lustre/include/interval_tree.h
+index 4a15228..5d387d3 100644
+--- a/drivers/staging/lustre/lustre/include/interval_tree.h
++++ b/drivers/staging/lustre/lustre/include/interval_tree.h
+@@ -63,6 +63,11 @@ static inline int interval_is_intree(struct interval_node *node)
+ 	return node->in_intree == 1;
+ }
  
- #define DLUBUF "(%p %zu)"
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index b6fd9af..44a854c 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -341,7 +341,7 @@ int lu_site_purge(const struct lu_env *env, struct lu_site *s, int nr)
- 	int		      start;
- 	int		      count;
- 	int		      bnr;
--	int		      i;
-+	unsigned int i;
- 
- 	if (OBD_FAIL_CHECK(OBD_FAIL_OBD_NO_LRU))
- 		return 0;
-@@ -869,11 +869,11 @@ EXPORT_SYMBOL(lu_site_print);
- /**
-  * Return desired hash table order.
-  */
--static int lu_htable_order(struct lu_device *top)
-+static unsigned int lu_htable_order(struct lu_device *top)
++static inline __u64 interval_low(struct interval_node *node)
++{
++	return node->in_extent.start;
++}
++
+ static inline __u64 interval_high(struct interval_node *node)
  {
- 	unsigned long bits_max = LU_SITE_BITS_MAX;
- 	unsigned long cache_size;
--	int bits;
-+	unsigned int bits;
+ 	return node->in_extent.end;
+@@ -77,8 +82,29 @@ static inline void interval_set(struct interval_node *node,
+ 	node->in_max_high = end;
+ }
  
- 	/*
- 	 * Calculate hash table size, assuming that we want reasonable
-@@ -1325,7 +1325,7 @@ static unsigned key_set_version;
- int lu_context_key_register(struct lu_context_key *key)
++/*
++ * Rules to write an interval callback.
++ *  - the callback returns INTERVAL_ITER_STOP when it thinks the iteration
++ *    should be stopped. It will then cause the iteration function to return
++ *    immediately with return value INTERVAL_ITER_STOP.
++ *  - callbacks for interval_iterate and interval_iterate_reverse: Every
++ *    nodes in the tree will be set to @node before the callback being called
++ *  - callback for interval_search: Only overlapped node will be set to @node
++ *    before the callback being called.
++ */
++typedef enum interval_iter (*interval_callback_t)(struct interval_node *node,
++						  void *args);
++
+ struct interval_node *interval_insert(struct interval_node *node,
+ 				      struct interval_node **root);
+ void interval_erase(struct interval_node *node, struct interval_node **root);
+ 
++/*
++ * Search the extents in the tree and call @func for each overlapped
++ * extents.
++ */
++enum interval_iter interval_search(struct interval_node *root,
++				   struct interval_node_extent *ex,
++				   interval_callback_t func, void *data);
++
+ #endif
+diff --git a/drivers/staging/lustre/lustre/ldlm/interval_tree.c b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
+index f4a70eb..e134ecd 100644
+--- a/drivers/staging/lustre/lustre/ldlm/interval_tree.c
++++ b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
+@@ -90,6 +90,17 @@ static inline int extent_equal(struct interval_node_extent *e1,
+ 	return (e1->start == e2->start) && (e1->end == e2->end);
+ }
+ 
++static inline int extent_overlapped(struct interval_node_extent *e1,
++				    struct interval_node_extent *e2)
++{
++	return (e1->start <= e2->end) && (e2->start <= e1->end);
++}
++
++static inline int node_equal(struct interval_node *n1, struct interval_node *n2)
++{
++	return extent_equal(&n1->in_extent, &n2->in_extent);
++}
++
+ static inline __u64 max_u64(__u64 x, __u64 y)
  {
- 	int result;
--	int i;
-+	unsigned int i;
+ 	return x > y ? x : y;
+@@ -262,7 +273,7 @@ struct interval_node *interval_insert(struct interval_node *node,
+ 	p = root;
+ 	while (*p) {
+ 		parent = *p;
+-		if (extent_equal(&parent->in_extent, &node->in_extent))
++		if (node_equal(parent, node))
+ 			return parent;
  
- 	LASSERT(key->lct_init);
- 	LASSERT(key->lct_fini);
-@@ -1531,7 +1531,7 @@ EXPORT_SYMBOL(lu_context_key_revive);
- 
- static void keys_fini(struct lu_context *ctx)
- {
--	int	i;
-+	unsigned int i;
- 
- 	if (!ctx->lc_value)
- 		return;
-@@ -1545,7 +1545,7 @@ static void keys_fini(struct lu_context *ctx)
- 
- static int keys_fill(struct lu_context *ctx)
- {
--	int i;
-+	unsigned int i;
- 
- 	LINVRNT(ctx->lc_value);
- 	for (i = 0; i < ARRAY_SIZE(lu_keys); ++i) {
-@@ -1658,7 +1658,7 @@ EXPORT_SYMBOL(lu_context_enter);
-  */
- void lu_context_exit(struct lu_context *ctx)
- {
--	int i;
-+	unsigned int i;
- 
- 	LINVRNT(ctx->lc_state == LCS_ENTERED);
- 	ctx->lc_state = LCS_LEFT;
-@@ -1740,7 +1740,7 @@ static void lu_site_stats_get(struct cfs_hash *hs,
- 			      struct lu_site_stats *stats, int populated)
- {
- 	struct cfs_hash_bd bd;
--	int	   i;
-+	unsigned int i;
- 
- 	cfs_hash_for_each_bucket(hs, &bd, i) {
- 		struct lu_site_bkt_data *bkt = cfs_hash_bd_extra_get(hs, &bd);
+ 		/* max_high field must be updated after each iteration */
+@@ -463,3 +474,90 @@ color:
+ 		interval_erase_color(child, parent, root);
+ }
+ EXPORT_SYMBOL(interval_erase);
++
++static inline int interval_may_overlap(struct interval_node *node,
++				       struct interval_node_extent *ext)
++{
++	return (ext->start <= node->in_max_high &&
++		ext->end >= interval_low(node));
++}
++
++/*
++ * This function finds all intervals that overlap interval ext,
++ * and calls func to handle resulted intervals one by one.
++ * in lustre, this function will find all conflicting locks in
++ * the granted queue and add these locks to the ast work list.
++ *
++ * {
++ *	if (!node)
++ *		return 0;
++ *	if (ext->end < interval_low(node)) {
++ *		interval_search(node->in_left, ext, func, data);
++ *	} else if (interval_may_overlap(node, ext)) {
++ *		if (extent_overlapped(ext, &node->in_extent))
++ *			func(node, data);
++ *		interval_search(node->in_left, ext, func, data);
++ *		interval_search(node->in_right, ext, func, data);
++ *	}
++ *	return 0;
++ * }
++ *
++ */
++enum interval_iter interval_search(struct interval_node *node,
++				   struct interval_node_extent *ext,
++				   interval_callback_t func,
++				   void *data)
++{
++	enum interval_iter rc = INTERVAL_ITER_CONT;
++	struct interval_node *parent;
++
++	LASSERT(ext);
++	LASSERT(func);
++
++	while (node) {
++		if (ext->end < interval_low(node)) {
++			if (node->in_left) {
++				node = node->in_left;
++				continue;
++			}
++		} else if (interval_may_overlap(node, ext)) {
++			if (extent_overlapped(ext, &node->in_extent)) {
++				rc = func(node, data);
++				if (rc == INTERVAL_ITER_STOP)
++					break;
++			}
++
++			if (node->in_left) {
++				node = node->in_left;
++				continue;
++			}
++			if (node->in_right) {
++				node = node->in_right;
++				continue;
++			}
++		}
++
++		parent = node->in_parent;
++		while (parent) {
++			if (node_is_left_child(node) &&
++			    parent->in_right) {
++				/*
++				 * If we ever got the left, it means that the
++				 * parent met ext->end<interval_low(parent), or
++				 * may_overlap(parent). If the former is true,
++				 * we needn't go back. So stop early and check
++				 * may_overlap(parent) after this loop.
++				 */
++				node = parent->in_right;
++				break;
++			}
++			node = parent;
++			parent = parent->in_parent;
++		}
++		if (!parent || !interval_may_overlap(parent, ext))
++			break;
++	}
++
++	return rc;
++}
++EXPORT_SYMBOL(interval_search);
 -- 
 1.7.1
