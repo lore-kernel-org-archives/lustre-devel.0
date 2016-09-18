@@ -1,74 +1,51 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:38:14 -0400
-Subject: [lustre-devel] [PATCH 075/124] staging: lustre: recovery: don't
-	replay closed open
+Date: Sun, 18 Sep 2016 16:38:22 -0400
+Subject: [lustre-devel] [PATCH 083/124] staging: lustre: ldlm: evict clients
+	returning errors on ASTs
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-76-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-84-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Alexey Lyashkov <alexey_lyashkov@xyratex.com>, James Simmons <jsimmons@infradead.org>
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: Alexey Lyashkov <alexey_lyashkov@xyratex.com>
 
-To avoid scanning the replay open list every time in the
-ptlrpc_free_committed(), the fix of LU-2613 (4322e0f9) changed
-the ptlrpc_free_committed() to skip the open list unless the
-import generation is changed. That introduced a race which could
-make a closed open being replayed:
+To test proper behavior of clients returning errors on ASTs
+we can induce a failure with setting OBD_FAIL_LDLM_BL_CALLBACK_NET.
+Handle the new additonal case of cfs_fail_err being set as well
+so that the cfs_fail_err can be sent back in a reply.
 
-1. Application calls ll_close_inode_openhandle()-> mdc_close(),
-   to close file, rq_replay is cleared, but the open request is
-   still on the imp_committed_list;
-
-2. Before the md_clear_open_replay_data() is called for close,
-   client start replay, and that closed open will be replayed
-   mistakenly;
-
-3. Open replay interpret callback (mdc_replay_open) could race
-   with the mdc_clear_open_replay_data() at the end;
-
-This patch fix the ptlrpc_free_committed() to make sure the
-open list is scanned on recovery to prevent the closed open request
-from being replayed.
-
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5507
-Reviewed-on: http://review.whamcloud.com/12667
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Signed-off-by: Alexey Lyashkov <alexey_lyashkov@xyratex.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5581
+Xyratex-bug-id: MRP-2041
+Reviewed-on: http://review.whamcloud.com/11752
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 27fe00d..a29ccaa 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -2455,7 +2455,8 @@ void ptlrpc_free_committed(struct obd_import *imp)
- 	       imp->imp_obd->obd_name, imp->imp_peer_committed_transno,
- 	       imp->imp_generation);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+index b91b26d..ff2c28e 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+@@ -559,8 +559,11 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
  
--	if (imp->imp_generation != imp->imp_last_generation_checked)
-+	if (imp->imp_generation != imp->imp_last_generation_checked ||
-+	    !imp->imp_last_transno_checked)
- 		skip_committed_list = false;
- 
- 	imp->imp_last_transno_checked = imp->imp_peer_committed_transno;
-@@ -2503,6 +2504,9 @@ free_req:
- 		if (req->rq_import_generation < imp->imp_generation) {
- 			DEBUG_REQ(D_RPCTRACE, req, "free stale open request");
- 			ptlrpc_free_request(req);
-+		} else if (!req->rq_replay) {
-+			DEBUG_REQ(D_RPCTRACE, req, "free closed open request");
-+			ptlrpc_free_request(req);
- 		}
- 	}
- }
+ 	switch (lustre_msg_get_opc(req->rq_reqmsg)) {
+ 	case LDLM_BL_CALLBACK:
+-		if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_BL_CALLBACK_NET))
++		if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_BL_CALLBACK_NET)) {
++			if (cfs_fail_err)
++				ldlm_callback_reply(req, -(int)cfs_fail_err);
+ 			return 0;
++		}
+ 		break;
+ 	case LDLM_CP_CALLBACK:
+ 		if (OBD_FAIL_CHECK(OBD_FAIL_LDLM_CP_CALLBACK_NET))
 -- 
 1.7.1
