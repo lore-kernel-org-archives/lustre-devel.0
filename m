@@ -1,302 +1,166 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:38:43 -0400
-Subject: [lustre-devel] [PATCH 104/124] staging: lustre: clio: rename
-	coo_attr_set to coo_attr_update
+Date: Sun, 18 Sep 2016 16:37:09 -0400
+Subject: [lustre-devel] [PATCH 010/124] staging: lustre: llite: add
+	LL_LEASE_{RD, WR, UN}LCK
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-105-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-11-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Bobi Jam <bobijam.xu@intel.com>
+From: John L. Hammond <john.hammond@intel.com>
 
-coo_attr_set() is used to update object's attribute but its name
-makes confusion that people intuitively think that it is used to
-pass object's attribute down to server sides.
+Define new constants LL_LEASE_{RD,WR,UN}LCK for use as the argument to
+and return value from the LL_IOC_{GET,SET}_LEASE ioctls. As arguments,
+these contants replace the use of F_{RD,WR,UN}LCK from fcntl.h. As
+return values they replace the use of FMODE_{READ,WRITE} which are
+internal to the Linux kernel source and not under the control of the
+Lustre ioctl interface.
 
-Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-1154
-Reviewed-on: http://review.whamcloud.com/12888
+Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5013
+Reviewed-on: http://review.whamcloud.com/10233
 Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h  |    8 ++++----
- drivers/staging/lustre/lustre/llite/vvp_io.c       |    2 +-
- drivers/staging/lustre/lustre/llite/vvp_object.c   |    6 +++---
- drivers/staging/lustre/lustre/lov/lov_object.c     |    6 +++---
- drivers/staging/lustre/lustre/lov/lovsub_object.c  |    6 +++---
- drivers/staging/lustre/lustre/obdclass/cl_object.c |   17 +++++++++--------
- drivers/staging/lustre/lustre/osc/osc_io.c         |    9 +++++----
- drivers/staging/lustre/lustre/osc/osc_lock.c       |    4 ++--
- drivers/staging/lustre/lustre/osc/osc_object.c     |    6 +++---
- drivers/staging/lustre/lustre/osc/osc_request.c    |    2 +-
- 10 files changed, 34 insertions(+), 32 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_user.h     |    7 +++
+ drivers/staging/lustre/lustre/llite/file.c         |   51 +++++++++++---------
+ 2 files changed, 35 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index 409a324..9403c0c 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -369,8 +369,8 @@ struct cl_object_operations {
- 	 * \return the same convention as for
- 	 * cl_object_operations::coo_attr_get() is used.
- 	 */
--	int (*coo_attr_set)(const struct lu_env *env, struct cl_object *obj,
--			    const struct cl_attr *attr, unsigned valid);
-+	int (*coo_attr_update)(const struct lu_env *env, struct cl_object *obj,
-+			       const struct cl_attr *attr, unsigned int valid);
- 	/**
- 	 * Update object configuration. Called top-to-bottom to modify object
- 	 * configuration.
-@@ -2171,8 +2171,8 @@ void cl_object_attr_lock(struct cl_object *o);
- void cl_object_attr_unlock(struct cl_object *o);
- int  cl_object_attr_get(const struct lu_env *env, struct cl_object *obj,
- 			struct cl_attr *attr);
--int  cl_object_attr_set(const struct lu_env *env, struct cl_object *obj,
--			const struct cl_attr *attr, unsigned valid);
-+int  cl_object_attr_update(const struct lu_env *env, struct cl_object *obj,
-+			   const struct cl_attr *attr, unsigned int valid);
- int  cl_object_glimpse(const struct lu_env *env, struct cl_object *obj,
- 		       struct ost_lvb *lvb);
- int  cl_conf_set(const struct lu_env *env, struct cl_object *obj,
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 27fc0b0..2ab4503 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -627,7 +627,7 @@ static int vvp_io_setattr_time(const struct lu_env *env,
- 		attr->cat_mtime = io->u.ci_setattr.sa_attr.lvb_mtime;
- 		valid |= CAT_MTIME;
- 	}
--	result = cl_object_attr_set(env, obj, attr, valid);
-+	result = cl_object_attr_update(env, obj, attr, valid);
- 	cl_object_attr_unlock(obj);
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+index c69918b..5e907af 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+@@ -246,6 +246,13 @@ struct ost_id {
+ #define LL_IOC_MIGRATE			_IOR('f', 247, int)
+ #define LL_IOC_FID2MDTIDX		_IOWR('f', 248, struct lu_fid)
  
- 	return result;
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_object.c b/drivers/staging/lustre/lustre/llite/vvp_object.c
-index 6b6a63d..b57195d 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_object.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_object.c
-@@ -101,8 +101,8 @@ static int vvp_attr_get(const struct lu_env *env, struct cl_object *obj,
- 	return 0; /* layers below have to fill in the rest */
++/* Lease types for use as arg and return of LL_IOC_{GET,SET}_LEASE ioctl. */
++enum ll_lease_type {
++	LL_LEASE_RDLCK	= 0x1,
++	LL_LEASE_WRLCK	= 0x2,
++	LL_LEASE_UNLCK	= 0x4,
++};
++
+ #define LL_STATFS_LMV	   1
+ #define LL_STATFS_LOV	   2
+ #define LL_STATFS_NODELAY	4
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index bfac6dd..e9791e3 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -2245,6 +2245,12 @@ free_hss:
+ 	return rc;
  }
  
--static int vvp_attr_set(const struct lu_env *env, struct cl_object *obj,
--			const struct cl_attr *attr, unsigned valid)
-+static int vvp_attr_update(const struct lu_env *env, struct cl_object *obj,
-+			   const struct cl_attr *attr, unsigned int valid)
++static inline long ll_lease_type_from_fmode(fmode_t fmode)
++{
++	return ((fmode & FMODE_READ) ? LL_LEASE_RDLCK : 0) |
++	       ((fmode & FMODE_WRITE) ? LL_LEASE_WRLCK : 0);
++}
++
+ static long
+ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
  {
- 	struct inode *inode = vvp_object_inode(obj);
+@@ -2449,20 +2455,20 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		struct ll_inode_info *lli = ll_i2info(inode);
+ 		struct obd_client_handle *och = NULL;
+ 		bool lease_broken;
+-		fmode_t mode = 0;
++		fmode_t fmode;
  
-@@ -209,7 +209,7 @@ static const struct cl_object_operations vvp_ops = {
- 	.coo_lock_init = vvp_lock_init,
- 	.coo_io_init   = vvp_io_init,
- 	.coo_attr_get  = vvp_attr_get,
--	.coo_attr_set  = vvp_attr_set,
-+	.coo_attr_update = vvp_attr_update,
- 	.coo_conf_set  = vvp_conf_set,
- 	.coo_prune     = vvp_prune,
- 	.coo_glimpse   = vvp_object_glimpse
-diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-index 01f95a9..52f7363 100644
---- a/drivers/staging/lustre/lustre/lov/lov_object.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-@@ -894,8 +894,8 @@ static int lov_attr_get(const struct lu_env *env, struct cl_object *obj,
- 	return LOV_2DISPATCH_NOLOCK(cl2lov(obj), llo_getattr, env, obj, attr);
- }
- 
--static int lov_attr_set(const struct lu_env *env, struct cl_object *obj,
--			const struct cl_attr *attr, unsigned valid)
-+static int lov_attr_update(const struct lu_env *env, struct cl_object *obj,
-+			   const struct cl_attr *attr, unsigned int valid)
- {
- 	/*
- 	 * No dispatch is required here, as no layout implements this.
-@@ -932,7 +932,7 @@ static const struct cl_object_operations lov_ops = {
- 	.coo_lock_init = lov_lock_init,
- 	.coo_io_init   = lov_io_init,
- 	.coo_attr_get  = lov_attr_get,
--	.coo_attr_set  = lov_attr_set,
-+	.coo_attr_update = lov_attr_update,
- 	.coo_conf_set  = lov_conf_set,
- 	.coo_getstripe = lov_object_getstripe
- };
-diff --git a/drivers/staging/lustre/lustre/lov/lovsub_object.c b/drivers/staging/lustre/lustre/lov/lovsub_object.c
-index fb2f266..a2bac7a 100644
---- a/drivers/staging/lustre/lustre/lov/lovsub_object.c
-+++ b/drivers/staging/lustre/lustre/lov/lovsub_object.c
-@@ -98,8 +98,8 @@ static int lovsub_object_print(const struct lu_env *env, void *cookie,
- 	return (*p)(env, cookie, "[%d]", los->lso_index);
- }
- 
--static int lovsub_attr_set(const struct lu_env *env, struct cl_object *obj,
--			   const struct cl_attr *attr, unsigned valid)
-+static int lovsub_attr_update(const struct lu_env *env, struct cl_object *obj,
-+			      const struct cl_attr *attr, unsigned int valid)
- {
- 	struct lov_object *lov = cl2lovsub(obj)->lso_super;
- 
-@@ -119,7 +119,7 @@ static int lovsub_object_glimpse(const struct lu_env *env,
- static const struct cl_object_operations lovsub_ops = {
- 	.coo_page_init = lovsub_page_init,
- 	.coo_lock_init = lovsub_lock_init,
--	.coo_attr_set  = lovsub_attr_set,
-+	.coo_attr_update = lovsub_attr_update,
- 	.coo_glimpse   = lovsub_object_glimpse
- };
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-index ef5b1aa..e493c80 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-@@ -163,7 +163,7 @@ static spinlock_t *cl_object_attr_guard(struct cl_object *o)
-  *
-  * Prevents data-attributes from changing, until lock is released by
-  * cl_object_attr_unlock(). This has to be called before calls to
-- * cl_object_attr_get(), cl_object_attr_set().
-+ * cl_object_attr_get(), cl_object_attr_update().
-  */
- void cl_object_attr_lock(struct cl_object *o)
- 	__acquires(cl_object_attr_guard(o))
-@@ -217,11 +217,11 @@ EXPORT_SYMBOL(cl_object_attr_get);
-  * Updates data-attributes of an object \a obj.
-  *
-  * Only attributes, mentioned in a validness bit-mask \a v are
-- * updated. Calls cl_object_operations::coo_attr_set() on every layer, bottom
-- * to top.
-+ * updated. Calls cl_object_operations::coo_attr_update() on every layer,
-+ * bottom to top.
-  */
--int cl_object_attr_set(const struct lu_env *env, struct cl_object *obj,
--		       const struct cl_attr *attr, unsigned v)
-+int cl_object_attr_update(const struct lu_env *env, struct cl_object *obj,
-+			  const struct cl_attr *attr, unsigned int v)
- {
- 	struct lu_object_header *top;
- 	int result;
-@@ -231,8 +231,9 @@ int cl_object_attr_set(const struct lu_env *env, struct cl_object *obj,
- 	top = obj->co_lu.lo_header;
- 	result = 0;
- 	list_for_each_entry_reverse(obj, &top->loh_layers, co_lu.lo_linkage) {
--		if (obj->co_ops->coo_attr_set) {
--			result = obj->co_ops->coo_attr_set(env, obj, attr, v);
-+		if (obj->co_ops->coo_attr_update) {
-+			result = obj->co_ops->coo_attr_update(env, obj, attr,
-+							      v);
- 			if (result != 0) {
- 				if (result > 0)
- 					result = 0;
-@@ -242,7 +243,7 @@ int cl_object_attr_set(const struct lu_env *env, struct cl_object *obj,
- 	}
- 	return result;
- }
--EXPORT_SYMBOL(cl_object_attr_set);
-+EXPORT_SYMBOL(cl_object_attr_update);
- 
- /**
-  * Notifies layers (bottom-to-top) that glimpse AST was received.
-diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
-index 8bbb2a6..42e9761 100644
---- a/drivers/staging/lustre/lustre/osc/osc_io.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_io.c
-@@ -233,7 +233,7 @@ static void osc_page_touch_at(const struct lu_env *env,
- 		attr->cat_size = kms;
- 		valid |= CAT_SIZE;
- 	}
--	cl_object_attr_set(env, obj, attr, valid);
-+	cl_object_attr_update(env, obj, attr, valid);
- 	cl_object_attr_unlock(obj);
- }
- 
-@@ -476,7 +476,8 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 				attr->cat_ctime = lvb->lvb_ctime;
- 				cl_valid |= CAT_CTIME;
+ 		switch (arg) {
+-		case F_WRLCK:
++		case LL_LEASE_WRLCK:
+ 			if (!(file->f_mode & FMODE_WRITE))
+ 				return -EPERM;
+-			mode = FMODE_WRITE;
++			fmode = FMODE_WRITE;
+ 			break;
+-		case F_RDLCK:
++		case LL_LEASE_RDLCK:
+ 			if (!(file->f_mode & FMODE_READ))
+ 				return -EPERM;
+-			mode = FMODE_READ;
++			fmode = FMODE_READ;
+ 			break;
+-		case F_UNLCK:
++		case LL_LEASE_UNLCK:
+ 			mutex_lock(&lli->lli_och_mutex);
+ 			if (fd->fd_lease_och) {
+ 				och = fd->fd_lease_och;
+@@ -2470,26 +2476,26 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
  			}
--			result = cl_object_attr_set(env, obj, attr, cl_valid);
-+			result = cl_object_attr_update(env, obj, attr,
-+						       cl_valid);
- 		}
- 		cl_object_attr_unlock(obj);
- 	}
-@@ -564,7 +565,7 @@ static int osc_io_read_start(const struct lu_env *env,
- 	if (!slice->cis_io->ci_noatime) {
- 		cl_object_attr_lock(obj);
- 		attr->cat_atime = ktime_get_real_seconds();
--		rc = cl_object_attr_set(env, obj, attr, CAT_ATIME);
-+		rc = cl_object_attr_update(env, obj, attr, CAT_ATIME);
- 		cl_object_attr_unlock(obj);
- 	}
- 	return rc;
-@@ -581,7 +582,7 @@ static int osc_io_write_start(const struct lu_env *env,
- 	cl_object_attr_lock(obj);
- 	attr->cat_ctime = ktime_get_real_seconds();
- 	attr->cat_mtime = attr->cat_ctime;
--	rc = cl_object_attr_set(env, obj, attr, CAT_MTIME | CAT_CTIME);
-+	rc = cl_object_attr_update(env, obj, attr, CAT_MTIME | CAT_CTIME);
- 	cl_object_attr_unlock(obj);
+ 			mutex_unlock(&lli->lli_och_mutex);
  
- 	return rc;
-diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
-index 717d3ff..39a8a58 100644
---- a/drivers/staging/lustre/lustre/osc/osc_lock.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
-@@ -222,7 +222,7 @@ static void osc_lock_lvb_update(const struct lu_env *env,
- 		ldlm_lock_allow_match_locked(dlmlock);
- 	}
+-			if (och) {
+-				mode = och->och_flags &
+-				       (FMODE_READ | FMODE_WRITE);
+-				rc = ll_lease_close(och, inode, &lease_broken);
+-				if (rc == 0 && lease_broken)
+-					mode = 0;
+-			} else {
+-				rc = -ENOLCK;
+-			}
++			if (!och)
++				return -ENOLCK;
  
--	cl_object_attr_set(env, obj, attr, valid);
-+	cl_object_attr_update(env, obj, attr, valid);
- 	cl_object_attr_unlock(obj);
- }
- 
-@@ -467,7 +467,7 @@ static int osc_dlm_blocking_ast0(const struct lu_env *env,
- 		 */
- 		attr->cat_kms = ldlm_extent_shift_kms(dlmlock, old_kms);
- 
--		cl_object_attr_set(env, obj, attr, CAT_KMS);
-+		cl_object_attr_update(env, obj, attr, CAT_KMS);
- 		cl_object_attr_unlock(obj);
- 		unlock_res_and_lock(dlmlock);
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_object.c b/drivers/staging/lustre/lustre/osc/osc_object.c
-index 5fc5479..aae3a2d 100644
---- a/drivers/staging/lustre/lustre/osc/osc_object.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_object.c
-@@ -159,8 +159,8 @@ static int osc_attr_get(const struct lu_env *env, struct cl_object *obj,
- 	return 0;
- }
- 
--static int osc_attr_set(const struct lu_env *env, struct cl_object *obj,
--			const struct cl_attr *attr, unsigned valid)
-+static int osc_attr_update(const struct lu_env *env, struct cl_object *obj,
-+			   const struct cl_attr *attr, unsigned int valid)
- {
- 	struct lov_oinfo *oinfo = cl2osc(obj)->oo_oinfo;
- 	struct ost_lvb *lvb = &oinfo->loi_lvb;
-@@ -261,7 +261,7 @@ static const struct cl_object_operations osc_ops = {
- 	.coo_lock_init = osc_lock_init,
- 	.coo_io_init   = osc_io_init,
- 	.coo_attr_get  = osc_attr_get,
--	.coo_attr_set  = osc_attr_set,
-+	.coo_attr_update = osc_attr_update,
- 	.coo_glimpse   = osc_object_glimpse,
- 	.coo_prune     = osc_object_prune
- };
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 3b59c2d..68cf115 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -1749,7 +1749,7 @@ static int brw_interpret(const struct lu_env *env,
+-			/* return the type of lease or error */
+-			return rc < 0 ? rc : (int)mode;
++			fmode = och->och_flags;
++			rc = ll_lease_close(och, inode, &lease_broken);
++			if (rc < 0)
++				return rc;
++
++			if (lease_broken)
++				fmode = 0;
++
++			return ll_lease_type_from_fmode(fmode);
+ 		default:
+ 			return -EINVAL;
  		}
  
- 		if (valid != 0)
--			cl_object_attr_set(env, obj, attr, valid);
-+			cl_object_attr_update(env, obj, attr, valid);
- 		cl_object_attr_unlock(obj);
+-		CDEBUG(D_INODE, "Set lease with mode %d\n", mode);
++		CDEBUG(D_INODE, "Set lease with mode %u\n", fmode);
+ 
+ 		/* apply for lease */
+-		och = ll_lease_open(inode, file, mode, 0);
++		och = ll_lease_open(inode, file, fmode, 0);
+ 		if (IS_ERR(och))
+ 			return PTR_ERR(och);
+ 
+@@ -2510,8 +2516,8 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	case LL_IOC_GET_LEASE: {
+ 		struct ll_inode_info *lli = ll_i2info(inode);
+ 		struct ldlm_lock *lock = NULL;
++		fmode_t fmode = 0;
+ 
+-		rc = 0;
+ 		mutex_lock(&lli->lli_och_mutex);
+ 		if (fd->fd_lease_och) {
+ 			struct obd_client_handle *och = fd->fd_lease_och;
+@@ -2520,14 +2526,13 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			if (lock) {
+ 				lock_res_and_lock(lock);
+ 				if (!ldlm_is_cancel(lock))
+-					rc = och->och_flags &
+-						(FMODE_READ | FMODE_WRITE);
++					fmode = och->och_flags;
+ 				unlock_res_and_lock(lock);
+ 				LDLM_LOCK_PUT(lock);
+ 			}
+ 		}
+ 		mutex_unlock(&lli->lli_och_mutex);
+-		return rc;
++		return ll_lease_type_from_fmode(fmode);
  	}
- 	kmem_cache_free(obdo_cachep, aa->aa_oa);
+ 	case LL_IOC_HSM_IMPORT: {
+ 		struct hsm_user_import *hui;
 -- 
 1.7.1
