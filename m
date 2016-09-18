@@ -1,129 +1,64 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sun, 18 Sep 2016 20:32:40 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: lmv: mark symbols
-	static where possible
-In-Reply-To: <1474113876-20343-1-git-send-email-baoyou.xie@linaro.org>
-References: <1474113876-20343-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <94724A85-6127-46DB-80A3-ED9303F0449D@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sun, 18 Sep 2016 16:37:02 -0400
+Subject: [lustre-devel] [PATCH 003/124] staging: lustre: ldlm: fix a use
+	after free in ldlm_resource_get()
+In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
+References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Baoyou Xie <baoyou.xie@linaro.org>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg KH <gregkh@linuxfoundation.org>, "Hammond, John" <john.hammond@intel.com>, "Wang, Di" <di.wang@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "arnd@arndb.de" <arnd@arndb.de>, "xie.baoyou@zte.com.cn" <xie.baoyou@zte.com.cn>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
 
-On Sep 17, 2016, at 06:04, Baoyou Xie <baoyou.xie@linaro.org> wrote:
-> 
-> We get a few warnings when building kernel with W=1:
-> drivers/staging/lustre/lustre/lmv/lmv_obd.c:1640:1: warning: no previous prototype for 'lmv_locate_target_for_name' [-Wmissing-prototypes]
-> drivers/staging/lustre/lustre/lmv/lmv_obd.c:2421:5: warning: no previous prototype for 'lmv_read_page' [-Wmissing-prototypes]
-> ....
-> 
-> In fact, these functions are only used in the file in which they are
-> declared and don't need a declaration, but can be made static.
-> so this patch marks these functions with 'static'.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+From: John L. Hammond <john.hammond@intel.com>
 
-Reviewed by: Andreas Dilger <andreas.dilger@intel.com>
+If lvbo initialization has failed then save the return status (from
+lr_lvb_len) before putting the resource.
 
-> ---
-> drivers/staging/lustre/lustre/lmv/lmv_obd.c | 38 ++++++++++++++++-------------
-> 1 file changed, 21 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-> index dc752d5..5783359 100644
-> --- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-> +++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-> @@ -1636,7 +1636,7 @@ static int lmv_close(struct obd_export *exp, struct md_op_data *op_data,
->  * For striped-directory, it will locate MDT by name. And also
->  * it will reset op_fid1 with the FID of the chosen stripe.
->  **/
-> -struct lmv_tgt_desc *
-> +static struct lmv_tgt_desc *
-> lmv_locate_target_for_name(struct lmv_obd *lmv, struct lmv_stripe_md *lsm,
-> 			   const char *name, int namelen, struct lu_fid *fid,
-> 			   u32 *mds)
-> @@ -2418,9 +2418,9 @@ static int lmv_read_striped_page(struct obd_export *exp,
-> 	return rc;
-> }
-> 
-> -int lmv_read_page(struct obd_export *exp, struct md_op_data *op_data,
-> -		  struct md_callback *cb_op, __u64 offset,
-> -		  struct page **ppage)
-> +static int lmv_read_page(struct obd_export *exp, struct md_op_data *op_data,
-> +			 struct md_callback *cb_op, __u64 offset,
-> +			 struct page **ppage)
-> {
-> 	struct lmv_stripe_md *lsm = op_data->op_mea1;
-> 	struct obd_device *obd = exp->exp_obd;
-> @@ -2771,8 +2771,9 @@ static int lmv_pack_md_v1(const struct lmv_stripe_md *lsm,
-> 	return 0;
-> }
-> 
-> -int lmv_pack_md(union lmv_mds_md **lmmp, const struct lmv_stripe_md *lsm,
-> -		int stripe_count)
-> +static int
-> +lmv_pack_md(union lmv_mds_md **lmmp, const struct lmv_stripe_md *lsm,
-> +	    int stripe_count)
-> {
-> 	int lmm_size = 0, rc = 0;
-> 	bool allocated = false;
-> @@ -2966,15 +2967,15 @@ int lmv_unpack_md(struct obd_export *exp, struct lmv_stripe_md **lsmp,
-> }
-> EXPORT_SYMBOL(lmv_unpack_md);
-> 
-> -int lmv_unpackmd(struct obd_export *exp, struct lov_stripe_md **lsmp,
-> -		 struct lov_mds_md *lmm, int disk_len)
-> +static int lmv_unpackmd(struct obd_export *exp, struct lov_stripe_md **lsmp,
-> +			struct lov_mds_md *lmm, int disk_len)
-> {
-> 	return lmv_unpack_md(exp, (struct lmv_stripe_md **)lsmp,
-> 			     (union lmv_mds_md *)lmm, disk_len);
-> }
-> 
-> -int lmv_packmd(struct obd_export *exp, struct lov_mds_md **lmmp,
-> -	       struct lov_stripe_md *lsm)
-> +static int lmv_packmd(struct obd_export *exp, struct lov_mds_md **lmmp,
-> +		      struct lov_stripe_md *lsm)
-> {
-> 	const struct lmv_stripe_md *lmv = (struct lmv_stripe_md *)lsm;
-> 	struct obd_device *obd = exp->exp_obd;
-> @@ -3177,9 +3178,10 @@ static int lmv_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
-> 	return rc;
-> }
-> 
-> -int lmv_get_fid_from_lsm(struct obd_export *exp,
-> -			 const struct lmv_stripe_md *lsm,
-> -			 const char *name, int namelen, struct lu_fid *fid)
-> +static int
-> +lmv_get_fid_from_lsm(struct obd_export *exp,
-> +		     const struct lmv_stripe_md *lsm,
-> +		     const char *name, int namelen, struct lu_fid *fid)
-> {
-> 	const struct lmv_oinfo *oinfo;
-> 
-> @@ -3269,14 +3271,16 @@ static int lmv_quotacheck(struct obd_device *unused, struct obd_export *exp,
-> 	return rc;
-> }
-> 
-> -int lmv_update_lsm_md(struct obd_export *exp, struct lmv_stripe_md *lsm,
-> -		      struct mdt_body *body, ldlm_blocking_callback cb_blocking)
-> +static int
-> +lmv_update_lsm_md(struct obd_export *exp, struct lmv_stripe_md *lsm,
-> +		  struct mdt_body *body, ldlm_blocking_callback cb_blocking)
-> {
-> 	return lmv_revalidate_slaves(exp, body, lsm, cb_blocking, 0);
-> }
-> 
-> -int lmv_merge_attr(struct obd_export *exp, const struct lmv_stripe_md *lsm,
-> -		   struct cl_attr *attr)
-> +static int
-> +lmv_merge_attr(struct obd_export *exp, const struct lmv_stripe_md *lsm,
-> +	       struct cl_attr *attr)
-> {
-> 	int i;
-> 
-> -- 
-> 2.7.4
-> 
+Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5305
+Reviewed-on: http://review.whamcloud.com/11017
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Emoly Liu <emoly.liu@intel.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 62d9f6f..912cd68 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -1091,6 +1091,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 	struct cfs_hash_bd	 bd;
+ 	__u64		 version;
+ 	int		      ns_refcount = 0;
++	int rc;
+ 
+ 	LASSERT(!parent);
+ 	LASSERT(ns->ns_rs_hash);
+@@ -1140,8 +1141,9 @@ lvbo_init:
+ 		}
+ 
+ 		if (unlikely(res->lr_lvb_len < 0)) {
++			rc = res->lr_lvb_len;
+ 			ldlm_resource_putref(res);
+-			res = ERR_PTR(res->lr_lvb_len);
++			res = ERR_PTR(rc);
+ 		}
+ 		return res;
+ 	}
+@@ -1152,8 +1154,6 @@ lvbo_init:
+ 
+ 	cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 1);
+ 	if (ns->ns_lvbo && ns->ns_lvbo->lvbo_init) {
+-		int rc;
+-
+ 		OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_CREATE_RESOURCE, 2);
+ 		rc = ns->ns_lvbo->lvbo_init(res);
+ 		if (rc < 0) {
+-- 
+1.7.1
