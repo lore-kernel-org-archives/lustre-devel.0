@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:34 -0400
-Subject: [lustre-devel] [PATCH 035/124] staging: lustre: llite: style
-	cleanup for ll_mkdir
+Date: Sun, 18 Sep 2016 16:37:40 -0400
+Subject: [lustre-devel] [PATCH 041/124] staging: lustre: llite: don't call
+	make_bad_inode() on an old inode
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-36-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-42-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,32 +14,31 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: John L. Hammond <john.hammond@intel.com>
 
-Style cleanup to make the code readable.
+In ll_iget() if ll_update_inode() fails then do not call
+make_bad_inode() on the inode since it may still be in use.
 
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-2675
-Reviewed-on: http://review.whamcloud.com/10769
-Reviewed-by: Yang Sheng <yang.sheng@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5468
+Reviewed-on: http://review.whamcloud.com/11609
 Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/namei.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/staging/lustre/lustre/llite/namei.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index fadac44..5e182fc 100644
+index e2dc920..85f8ce7 100644
 --- a/drivers/staging/lustre/lustre/llite/namei.c
 +++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -1015,8 +1015,8 @@ static int ll_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
- 	if (!IS_POSIXACL(dir) || !exp_connect_umask(ll_i2mdexp(dir)))
- 		mode &= ~current_umask();
- 	mode = (mode & (S_IRWXUGO | S_ISVTX)) | S_IFDIR;
--	err = ll_new_node(dir, dentry, NULL, mode, 0, LUSTRE_OPC_MKDIR);
- 
-+	err = ll_new_node(dir, dentry, NULL, mode, 0, LUSTRE_OPC_MKDIR);
- 	if (!err)
- 		ll_stats_ops_tally(ll_i2sbi(dir), LPROC_LL_MKDIR, 1);
- 
+@@ -132,7 +132,6 @@ struct inode *ll_iget(struct super_block *sb, ino_t hash,
+ 		CDEBUG(D_VFSTRACE, "got inode: "DFID"(%p): rc = %d\n",
+ 		       PFID(&md->body->mbo_fid1), inode, rc);
+ 		if (rc) {
+-			make_bad_inode(inode);
+ 			iput(inode);
+ 			inode = ERR_PTR(rc);
+ 		}
 -- 
 1.7.1
