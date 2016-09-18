@@ -1,97 +1,111 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:38:48 -0400
-Subject: [lustre-devel] [PATCH 109/124] staging: lustre: misc: remove
-	unnecessary EXPORT_SYMBOL
+Date: Sun, 18 Sep 2016 16:39:01 -0400
+Subject: [lustre-devel] [PATCH 122/124] staging: lustre: lnet: Enable
+	setting per NI peer_credits
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-110-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-123-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, frank zago <fzago@cray.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Doug Oucharek <doug.s.oucharek@intel.com>, James Simmons <uja.ornl@yahoo.com>, James Simmons <jsimmons@infradead.org>
 
-From: frank zago <fzago@cray.com>
+From: Doug Oucharek <doug.s.oucharek@intel.com>
 
-A lot of symbols don't need to be exported at all because they are
-only used in the module they belong to.
+The code to allow peer_credits to be set per NI was originally
+"left inactive" because there were concerns about peer_credits
+interfering with the ability for IB nodes to connect to each
+other when peer_credits are not the same (peer_credits controls
+the queue depth for IB). With LU-3322, the values do not have
+to match so it is now safe to enable this code so peer_credits
+can be set per NI.
 
-Signed-off-by: frank zago <fzago@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5829
-Reviewed-on: http://review.whamcloud.com/13321
-Reviewed-by: James Simmons <uja.ornl@gmail.com>
+This patch enables existing code for setting per NI peer_credits.
+
+Second this patch fixes a long standing bug in that the conf data
+was not being used to set variables in the lnet_ni structure until
+after lnd_startup() was called which meant LND drivers were
+ignoring struct lnet_ni tunable values being set. Now we change
+struct lnet_ni data fields based on conf data before calling
+lnd_startup().
+
+Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8507
+Reviewed-on: http://review.whamcloud.com/21948
+Reviewed-by: Olaf Weber <olaf@sgi.com>
 Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/fid/fid_lib.c     |    2 --
- drivers/staging/lustre/lustre/fld/fld_request.c |    2 --
- drivers/staging/lustre/lustre/lmv/lmv_obd.c     |    1 -
- drivers/staging/lustre/lustre/lov/lov_dev.c     |    1 -
- 4 files changed, 0 insertions(+), 6 deletions(-)
+ drivers/staging/lustre/lnet/lnet/api-ni.c |   46 ++++++++++++-----------------
+ 1 files changed, 19 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/fid/fid_lib.c b/drivers/staging/lustre/lustre/fid/fid_lib.c
-index 99ae7eb..4e49cb3 100644
---- a/drivers/staging/lustre/lustre/fid/fid_lib.c
-+++ b/drivers/staging/lustre/lustre/fid/fid_lib.c
-@@ -63,14 +63,12 @@ const struct lu_seq_range LUSTRE_SEQ_SPACE_RANGE = {
- 	FID_SEQ_NORMAL,
- 	(__u64)~0ULL
- };
--EXPORT_SYMBOL(LUSTRE_SEQ_SPACE_RANGE);
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index 346db89..4daf828 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -1286,6 +1286,25 @@ lnet_startup_lndni(struct lnet_ni *ni, struct lnet_ioctl_config_data *conf)
+ 		       sizeof(*ni->ni_lnd_tunables));
+ 	}
  
- /* Zero range, used for init and other purposes. */
- const struct lu_seq_range LUSTRE_SEQ_ZERO_RANGE = {
- 	0,
- 	0
- };
--EXPORT_SYMBOL(LUSTRE_SEQ_ZERO_RANGE);
++	/*
++	 * If given some LND tunable parameters, parse those now to
++	 * override the values in the NI structure.
++	 */
++	if (conf) {
++		if (conf->cfg_config_u.cfg_net.net_peer_rtr_credits >= 0)
++			ni->ni_peerrtrcredits =
++				conf->cfg_config_u.cfg_net.net_peer_rtr_credits;
++		if (conf->cfg_config_u.cfg_net.net_peer_timeout >= 0)
++			ni->ni_peertimeout =
++				conf->cfg_config_u.cfg_net.net_peer_timeout;
++		if (conf->cfg_config_u.cfg_net.net_peer_tx_credits != -1)
++			ni->ni_peertxcredits =
++				conf->cfg_config_u.cfg_net.net_peer_tx_credits;
++		if (conf->cfg_config_u.cfg_net.net_max_tx_credits >= 0)
++			ni->ni_maxtxcredits =
++				conf->cfg_config_u.cfg_net.net_max_tx_credits;
++	}
++
+ 	rc = lnd->lnd_startup(ni);
  
- /* Lustre Big Fs Lock fid. */
- const struct lu_fid LUSTRE_BFL_FID = { .f_seq = FID_SEQ_SPECIAL,
-diff --git a/drivers/staging/lustre/lustre/fld/fld_request.c b/drivers/staging/lustre/lustre/fld/fld_request.c
-index ed7962e..0de72b7 100644
---- a/drivers/staging/lustre/lustre/fld/fld_request.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_request.c
-@@ -219,7 +219,6 @@ int fld_client_del_target(struct lu_client_fld *fld, __u64 idx)
- 	spin_unlock(&fld->lcf_lock);
- 	return -ENOENT;
- }
--EXPORT_SYMBOL(fld_client_del_target);
+ 	mutex_unlock(&the_lnet.ln_lnd_mutex);
+@@ -1299,33 +1318,6 @@ lnet_startup_lndni(struct lnet_ni *ni, struct lnet_ioctl_config_data *conf)
+ 		goto failed0;
+ 	}
  
- static struct dentry *fld_debugfs_dir;
+-	/*
+-	 * If given some LND tunable parameters, parse those now to
+-	 * override the values in the NI structure.
+-	 */
+-	if (conf && conf->cfg_config_u.cfg_net.net_peer_rtr_credits >= 0) {
+-		ni->ni_peerrtrcredits =
+-			conf->cfg_config_u.cfg_net.net_peer_rtr_credits;
+-	}
+-	if (conf && conf->cfg_config_u.cfg_net.net_peer_timeout >= 0) {
+-		ni->ni_peertimeout =
+-			conf->cfg_config_u.cfg_net.net_peer_timeout;
+-	}
+-	/*
+-	 * TODO
+-	 * Note: For now, don't allow the user to change
+-	 * peertxcredits as this number is used in the
+-	 * IB LND to control queue depth.
+-	 *
+-	 * if (conf && conf->cfg_config_u.cfg_net.net_peer_tx_credits != -1)
+-	 *	ni->ni_peertxcredits =
+-	 *		conf->cfg_config_u.cfg_net.net_peer_tx_credits;
+-	 */
+-	if (conf && conf->cfg_config_u.cfg_net.net_max_tx_credits >= 0) {
+-		ni->ni_maxtxcredits =
+-			conf->cfg_config_u.cfg_net.net_max_tx_credits;
+-	}
+-
+ 	LASSERT(ni->ni_peertimeout <= 0 || lnd->lnd_query);
  
-@@ -454,7 +453,6 @@ void fld_client_flush(struct lu_client_fld *fld)
- {
- 	fld_cache_flush(fld->lcf_cache);
- }
--EXPORT_SYMBOL(fld_client_flush);
- 
- static int __init fld_init(void)
- {
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 941981d..cccb645 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -2804,7 +2804,6 @@ lmv_pack_md(union lmv_mds_md **lmmp, const struct lmv_stripe_md *lsm,
- 
- 	return lmm_size;
- }
--EXPORT_SYMBOL(lmv_pack_md);
- 
- static int lmv_unpack_md_v1(struct obd_export *exp, struct lmv_stripe_md *lsm,
- 			    const struct lmv_mds_md_v1 *lmm1)
-diff --git a/drivers/staging/lustre/lustre/lov/lov_dev.c b/drivers/staging/lustre/lustre/lov/lov_dev.c
-index b1f260d..056ae2e 100644
---- a/drivers/staging/lustre/lustre/lov/lov_dev.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_dev.c
-@@ -516,6 +516,5 @@ struct lu_device_type lov_device_type = {
- 	.ldt_ops      = &lov_device_type_ops,
- 	.ldt_ctx_tags = LCT_CL_THREAD
- };
--EXPORT_SYMBOL(lov_device_type);
- 
- /** @} lov */
+ 	lnet_net_lock(LNET_LOCK_EX);
 -- 
 1.7.1
