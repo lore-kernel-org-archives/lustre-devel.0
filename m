@@ -1,59 +1,45 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:16 -0400
-Subject: [lustre-devel] [PATCH 017/124] staging: lustre: lov: adjust page
-	bufsize after layout change
+Date: Sun, 18 Sep 2016 16:38:35 -0400
+Subject: [lustre-devel] [PATCH 096/124] staging: lustre: osc:
+	osc_object_ast_clear() LBUG
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-18-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-97-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Jinshan Xiong <jinshan.xiong@intel.com>
+From: Bobi Jam <bobijam.xu@intel.com>
 
-Otherwise, the coh_page_bufsize keeps increasing when the file's
-layout keeps changing in lov_init_raid0().
+An OSC object could be destroyed with AGL locks waiting for granted,
+so we'd get rid of the osc_object_ast_clear() assertion that its
+dlm locks all getting granted.
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5459
-Reviewed-on: http://review.whamcloud.com/11394
-Reviewed-by: frank zago <fzago@cray.com>
-Reviewed-by: Bobi Jam <bobijam@gmail.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6042
+Reviewed-on: http://review.whamcloud.com/13163
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lov/lov_object.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_object.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-index 2a52d0c..4f766e0 100644
---- a/drivers/staging/lustre/lustre/lov/lov_object.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-@@ -195,6 +195,10 @@ static int lov_page_slice_fixup(struct lov_object *lov,
- 	struct cl_object_header *hdr = cl_object_header(&lov->lo_cl);
- 	struct cl_object *o;
+diff --git a/drivers/staging/lustre/lustre/osc/osc_object.c b/drivers/staging/lustre/lustre/osc/osc_object.c
+index d211d19..5fc5479 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_object.c
++++ b/drivers/staging/lustre/lustre/osc/osc_object.c
+@@ -195,7 +195,6 @@ static int osc_object_glimpse(const struct lu_env *env,
  
-+	if (!stripe)
-+		return hdr->coh_page_bufsize - lov->lo_cl.co_slice_off -
-+		       cfs_size_round(sizeof(struct lov_page));
-+
- 	cl_object_for_each(o, stripe)
- 		o->co_slice_off += hdr->coh_page_bufsize;
- 
-@@ -720,6 +724,10 @@ static int lov_layout_change(const struct lu_env *unused,
- 		LASSERT(atomic_read(&lov->lo_active_ios) == 0);
- 
- 		lov->lo_type = LLT_EMPTY;
-+		/* page bufsize fixup */
-+		cl_object_header(&lov->lo_cl)->coh_page_bufsize -=
-+			lov_page_slice_fixup(lov, NULL);
-+
- 		result = new_ops->llo_init(env,
- 					lu2lov_dev(lov->lo_cl.co_lu.lo_dev),
- 					lov, conf, state);
+ static int osc_object_ast_clear(struct ldlm_lock *lock, void *data)
+ {
+-	LASSERT(lock->l_granted_mode == lock->l_req_mode);
+ 	if (lock->l_ast_data == data)
+ 		lock->l_ast_data = NULL;
+ 	return LDLM_ITER_CONTINUE;
 -- 
 1.7.1
