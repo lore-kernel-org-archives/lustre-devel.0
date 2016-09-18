@@ -1,305 +1,275 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:53 -0400
-Subject: [lustre-devel] [PATCH 054/124] staging: lustre: llite: Add ioctl to
-	get parent fids from link EA.
+Date: Sun, 18 Sep 2016 16:38:05 -0400
+Subject: [lustre-devel] [PATCH 066/124] staging: lustre: lov: remove
+	LL_IOC_RECREATE_{FID, OBJ}
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-55-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-67-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Henri Doreau <henri.doreau@cea.fr>, Thomas Leibovici <thomas.leibovici@cea.fr>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Henri Doreau <henri.doreau@cea.fr>
+From: John L. Hammond <john.hammond@intel.com>
 
-Added LL_IOC_GETPARENT to retrieve the <parent_fid>/name(s) of a given
-entry, based on its link EA. This saves multiple calls to
-path2fid/fid2path.
+Remove the obsolete ioctls LL_IOC_RECREATE_FID and LL_IOC_RECREATE_OBJ
+along with their handlers in llite. Remove the then unused OBD method
+lov_create(). Remove OBD_FL_RECREATE_OBJS handling from osc_create().
 
-Merged with second later patch that does various cleanups.
-Avoid unneeded allocation. Get read-only attributes from the user
-getparent structure and write the modified attributes only, instead
-of populating a whole structure in kernel and copying it back.
-
-Signed-off-by: Thomas Leibovici <thomas.leibovici@cea.fr>
-Signed-off-by: Henri Doreau <henri.doreau@cea.fr>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3613
-Reviewed-on: http://review.whamcloud.com/7069
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5837
-Reviewed-on: http://review.whamcloud.com/12527
-Reviewed-by: Ned Bass <bass6@llnl.gov>
-Reviewed-by: frank zago <fzago@cray.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5814
+Reviewed-on: http://review.whamcloud.com/12442
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Bobi Jam <bobijam@gmail.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_idl.h      |    8 ++
- .../lustre/lustre/include/lustre/lustre_user.h     |    1 +
- drivers/staging/lustre/lustre/llite/dir.c          |    2 +
- drivers/staging/lustre/lustre/llite/file.c         |    2 +
- .../staging/lustre/lustre/llite/llite_internal.h   |   13 ++
- drivers/staging/lustre/lustre/llite/llite_lib.c    |  125 ++++++++++++++++++++
- drivers/staging/lustre/lustre/llite/xattr.c        |   10 +--
- 7 files changed, 152 insertions(+), 9 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_user.h     |    4 +-
+ drivers/staging/lustre/lustre/llite/file.c         |   86 -------------------
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |   87 --------------------
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    5 -
+ 4 files changed, 2 insertions(+), 180 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 2dc550a..0cc47bc 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -3468,6 +3468,14 @@ struct getinfo_fid2path {
- 
- void lustre_swab_fid2path(struct getinfo_fid2path *gf);
- 
-+/** path2parent request/reply structures */
-+struct getparent {
-+	struct lu_fid	gp_fid;		/**< parent FID */
-+	__u32		gp_linkno;	/**< hardlink number */
-+	__u32		gp_name_size;	/**< size of the name field */
-+	char		gp_name[0];	/**< zero-terminated link name */
-+} __packed;
-+
- enum {
- 	LAYOUT_INTENT_ACCESS    = 0,
- 	LAYOUT_INTENT_READ      = 1,
 diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-index cc0a786..08ac6e4 100644
+index 3ef5db0..de52339 100644
 --- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
 +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-@@ -245,6 +245,7 @@ struct ost_id {
- #define LL_IOC_LMV_SET_DEFAULT_STRIPE	_IOWR('f', 246, struct lmv_user_md)
- #define LL_IOC_MIGRATE			_IOR('f', 247, int)
- #define LL_IOC_FID2MDTIDX		_IOWR('f', 248, struct lu_fid)
-+#define LL_IOC_GETPARENT		_IOWR('f', 249, struct getparent)
- 
- /* Lease types for use as arg and return of LL_IOC_{GET,SET}_LEASE ioctl. */
- enum ll_lease_type {
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 234095e..705de1c 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -1562,6 +1562,8 @@ out_quotactl:
- 		return rc;
- 	case OBD_IOC_FID2PATH:
- 		return ll_fid2path(inode, (void __user *)arg);
-+	case LL_IOC_GETPARENT:
-+		return ll_getparent(file, (void __user *)arg);
- 	case LL_IOC_FID2MDTIDX: {
- 		struct obd_export *exp = ll_i2mdexp(inode);
- 		struct lu_fid fid;
+@@ -202,8 +202,8 @@ struct ost_id {
+ #define LL_IOC_LOV_SETSTRIPE	    _IOW('f', 154, long)
+ #define LL_IOC_LOV_GETSTRIPE	    _IOW('f', 155, long)
+ #define LL_IOC_LOV_SETEA		_IOW('f', 156, long)
+-#define LL_IOC_RECREATE_OBJ	     _IOW('f', 157, long)
+-#define LL_IOC_RECREATE_FID	     _IOW('f', 157, struct lu_fid)
++/*	LL_IOC_RECREATE_OBJ		157 obsolete */
++/*	LL_IOC_RECREATE_FID		158 obsolete */
+ #define LL_IOC_GROUP_LOCK	       _IOW('f', 158, long)
+ #define LL_IOC_GROUP_UNLOCK	     _IOW('f', 159, long)
+ /* #define LL_IOC_QUOTACHECK		160 OBD_IOC_QUOTACHECK */
 diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 127d0e0..45acc5d 100644
+index fc81551..4b10260 100644
 --- a/drivers/staging/lustre/lustre/llite/file.c
 +++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -2362,6 +2362,8 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 
- 		return 0;
- 	}
-+	case LL_IOC_GETPARENT:
-+		return ll_getparent(file, (struct getparent __user *)arg);
- 	case OBD_IOC_FID2PATH:
- 		return ll_fid2path(inode, (void __user *)arg);
- 	case LL_IOC_DATA_VERSION: {
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index fc707c2..1cc427c 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -36,6 +36,7 @@
- #include "../include/lustre_ver.h"
- #include "../include/lustre_disk.h"	/* for s2sbi */
- #include "../include/lustre_eacl.h"
-+#include "../include/lustre_linkea.h"
- 
- /* for struct cl_lock_descr and struct cl_io */
- #include "../include/cl_object.h"
-@@ -1038,7 +1039,17 @@ static inline __u64 ll_file_maxbytes(struct inode *inode)
- /* llite/xattr.c */
- extern const struct xattr_handler *ll_xattr_handlers[];
- 
-+#define XATTR_USER_T		1
-+#define XATTR_TRUSTED_T		2
-+#define XATTR_SECURITY_T	3
-+#define XATTR_ACL_ACCESS_T	4
-+#define XATTR_ACL_DEFAULT_T	5
-+#define XATTR_LUSTRE_T		6
-+#define XATTR_OTHER_T		7
-+
- ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size);
-+int ll_xattr_list(struct inode *inode, const char *name, int type,
-+		  void *buffer, size_t size, __u64 valid);
- 
- /**
-  * Common IO arguments for various VFS I/O interfaces.
-@@ -1399,6 +1410,8 @@ void ll_xattr_fini(void);
- int ll_page_sync_io(const struct lu_env *env, struct cl_io *io,
- 		    struct cl_page *page, enum cl_req_type crt);
- 
-+int ll_getparent(struct file *file, struct getparent __user *arg);
-+
- /* lcommon_cl.c */
- int cl_setattr_ost(struct inode *inode, const struct iattr *attr);
- 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 5792354..5cbce1b 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -2545,3 +2545,128 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
- 	}
- 	up_write(&squash->rsi_sem);
+@@ -1302,88 +1302,6 @@ static ssize_t ll_file_splice_read(struct file *in_file, loff_t *ppos,
+ 	return result;
  }
-+
-+/**
-+ * Parse linkea content to extract information about a given hardlink
-+ *
-+ * \param[in]	ldata		- Initialized linkea data
-+ * \param[in]	linkno		- Link identifier
-+ * \param[out]	parent_fid	- The entry's parent FID
-+ * \param[in]	size		- Entry name destination buffer
-+ *
-+ * \retval 0 on success
-+ * \retval Appropriate negative error code on failure
-+ */
-+static int ll_linkea_decode(struct linkea_data *ldata, unsigned int linkno,
-+			    struct lu_fid *parent_fid, struct lu_name *ln)
-+{
-+	unsigned int idx;
-+	int rc;
-+
-+	rc = linkea_init(ldata);
-+	if (rc < 0)
-+		return rc;
-+
-+	if (linkno >= ldata->ld_leh->leh_reccount)
-+		/* beyond last link */
-+		return -ENODATA;
-+
-+	linkea_first_entry(ldata);
-+	for (idx = 0; ldata->ld_lee; idx++) {
-+		linkea_entry_unpack(ldata->ld_lee, &ldata->ld_reclen, ln,
-+				    parent_fid);
-+		if (idx == linkno)
-+			break;
-+
-+		linkea_next_entry(ldata);
-+	}
-+
-+	if (idx < linkno)
-+		return -ENODATA;
-+
-+	return 0;
-+}
-+
-+/**
-+ * Get parent FID and name of an identified link. Operation is performed for
-+ * a given link number, letting the caller iterate over linkno to list one or
-+ * all links of an entry.
-+ *
-+ * \param[in]	  file	- File descriptor against which to perform the operation
-+ * \param[in,out] arg	- User-filled structure containing the linkno to operate
-+ *			  on and the available size. It is eventually filled with
-+ *			  the requested information or left untouched on error
-+ *
-+ * \retval - 0 on success
-+ * \retval - Appropriate negative error code on failure
-+ */
-+int ll_getparent(struct file *file, struct getparent __user *arg)
-+{
-+	struct inode *inode = file_inode(file);
-+	struct linkea_data *ldata;
-+	struct lu_fid parent_fid;
-+	struct lu_buf buf = {
-+		.lb_buf = NULL,
-+		.lb_len = 0
-+	};
-+	struct lu_name ln;
-+	u32 name_size;
-+	u32 linkno;
-+	int rc;
-+
-+	if (!capable(CFS_CAP_DAC_READ_SEARCH) &&
-+	    !(ll_i2sbi(inode)->ll_flags & LL_SBI_USER_FID2PATH))
-+		return -EPERM;
-+
-+	if (get_user(name_size, &arg->gp_name_size))
-+		return -EFAULT;
-+
-+	if (get_user(linkno, &arg->gp_linkno))
-+		return -EFAULT;
-+
-+	if (name_size > PATH_MAX)
-+		return -EINVAL;
-+
-+	ldata = kzalloc(sizeof(*ldata), GFP_NOFS);
-+	if (!ldata)
-+		return -ENOMEM;
-+
-+	rc = linkea_data_new(ldata, &buf);
-+	if (rc < 0)
-+		goto ldata_free;
-+
-+	rc = ll_xattr_list(inode, XATTR_NAME_LINK, XATTR_TRUSTED_T, buf.lb_buf,
-+			   buf.lb_len, OBD_MD_FLXATTR);
-+	if (rc < 0)
-+		goto lb_free;
-+
-+	rc = ll_linkea_decode(ldata, linkno, &parent_fid, &ln);
-+	if (rc < 0)
-+		goto lb_free;
-+
-+	if (ln.ln_namelen >= name_size) {
-+		rc = -EOVERFLOW;
-+		goto lb_free;
-+	}
-+
-+	if (copy_to_user(&arg->gp_fid, &parent_fid, sizeof(arg->gp_fid))) {
-+		rc = -EFAULT;
-+		goto lb_free;
-+	}
-+
-+	if (copy_to_user(&arg->gp_name, ln.ln_name, ln.ln_namelen)) {
-+		rc = -EFAULT;
-+		goto lb_free;
-+	}
-+
-+	if (put_user('\0', arg->gp_name + ln.ln_namelen)) {
-+		rc = -EFAULT;
-+		goto lb_free;
-+	}
-+
-+lb_free:
-+	lu_buf_free(&buf);
-+ldata_free:
-+	kfree(ldata);
-+	return rc;
-+}
-diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 17ad04f..0e6a559 100644
---- a/drivers/staging/lustre/lustre/llite/xattr.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -44,14 +44,6 @@
  
- #include "llite_internal.h"
- 
--#define XATTR_USER_T	    (1)
--#define XATTR_TRUSTED_T	 (2)
--#define XATTR_SECURITY_T	(3)
--#define XATTR_ACL_ACCESS_T      (4)
--#define XATTR_ACL_DEFAULT_T     (5)
--#define XATTR_LUSTRE_T	  (6)
--#define XATTR_OTHER_T	   (7)
+-static int ll_lov_recreate(struct inode *inode, struct ost_id *oi, u32 ost_idx)
+-{
+-	struct obd_export *exp = ll_i2dtexp(inode);
+-	struct obd_trans_info oti = { 0 };
+-	struct obdo *oa = NULL;
+-	int lsm_size;
+-	int rc = 0;
+-	struct lov_stripe_md *lsm = NULL, *lsm2;
 -
- static
- int get_xattr_type(const char *name)
- {
-@@ -219,7 +211,7 @@ static int ll_xattr_set(const struct xattr_handler *handler,
- 				   flags);
+-	oa = kmem_cache_zalloc(obdo_cachep, GFP_NOFS);
+-	if (!oa)
+-		return -ENOMEM;
+-
+-	lsm = ccc_inode_lsm_get(inode);
+-	if (!lsm_has_objects(lsm)) {
+-		rc = -ENOENT;
+-		goto out;
+-	}
+-
+-	lsm_size = sizeof(*lsm) + (sizeof(struct lov_oinfo) *
+-		   (lsm->lsm_stripe_count));
+-
+-	lsm2 = libcfs_kvzalloc(lsm_size, GFP_NOFS);
+-	if (!lsm2) {
+-		rc = -ENOMEM;
+-		goto out;
+-	}
+-
+-	oa->o_oi = *oi;
+-	oa->o_nlink = ost_idx;
+-	oa->o_flags |= OBD_FL_RECREATE_OBJS;
+-	oa->o_valid = OBD_MD_FLID | OBD_MD_FLFLAGS | OBD_MD_FLGROUP;
+-	obdo_from_inode(oa, inode, OBD_MD_FLTYPE | OBD_MD_FLATIME |
+-				   OBD_MD_FLMTIME | OBD_MD_FLCTIME);
+-	obdo_set_parent_fid(oa, &ll_i2info(inode)->lli_fid);
+-	memcpy(lsm2, lsm, lsm_size);
+-	ll_inode_size_lock(inode);
+-	rc = obd_create(NULL, exp, oa, &lsm2, &oti);
+-	ll_inode_size_unlock(inode);
+-
+-	kvfree(lsm2);
+-	goto out;
+-out:
+-	ccc_inode_lsm_put(inode, lsm);
+-	kmem_cache_free(obdo_cachep, oa);
+-	return rc;
+-}
+-
+-static int ll_lov_recreate_obj(struct inode *inode, unsigned long arg)
+-{
+-	struct ll_recreate_obj ucreat;
+-	struct ost_id		oi;
+-
+-	if (!capable(CFS_CAP_SYS_ADMIN))
+-		return -EPERM;
+-
+-	if (copy_from_user(&ucreat, (struct ll_recreate_obj __user *)arg,
+-			   sizeof(ucreat)))
+-		return -EFAULT;
+-
+-	ostid_set_seq_mdt0(&oi);
+-	ostid_set_id(&oi, ucreat.lrc_id);
+-	return ll_lov_recreate(inode, &oi, ucreat.lrc_ost_idx);
+-}
+-
+-static int ll_lov_recreate_fid(struct inode *inode, unsigned long arg)
+-{
+-	struct lu_fid	fid;
+-	struct ost_id	oi;
+-	u32		ost_idx;
+-
+-	if (!capable(CFS_CAP_SYS_ADMIN))
+-		return -EPERM;
+-
+-	if (copy_from_user(&fid, (struct lu_fid __user *)arg, sizeof(fid)))
+-		return -EFAULT;
+-
+-	fid_to_ostid(&fid, &oi);
+-	ost_idx = (fid_seq(&fid) >> 16) & 0xffff;
+-	return ll_lov_recreate(inode, &oi, ost_idx);
+-}
+-
+ int ll_lov_setstripe_ea_info(struct inode *inode, struct dentry *dentry,
+ 			     __u64 flags, struct lov_user_md *lum,
+ 			     int lum_size)
+@@ -2322,10 +2240,6 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	}
+ 	case LL_IOC_LOV_GETSTRIPE:
+ 		return ll_lov_getstripe(inode, arg);
+-	case LL_IOC_RECREATE_OBJ:
+-		return ll_lov_recreate_obj(inode, arg);
+-	case LL_IOC_RECREATE_FID:
+-		return ll_lov_recreate_fid(inode, arg);
+ 	case FSFILT_IOC_FIEMAP:
+ 		return ll_ioctl_fiemap(inode, arg);
+ 	case FSFILT_IOC_GETFLAGS:
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index 265be08..a54cd70 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -972,92 +972,6 @@ out:
+ 	return rc;
  }
  
--static int
-+int
- ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
- 	      size_t size, __u64 valid)
- {
+-static int lov_recreate(struct obd_export *exp, struct obdo *src_oa,
+-			struct lov_stripe_md **ea, struct obd_trans_info *oti)
+-{
+-	struct lov_stripe_md *obj_mdp, *lsm;
+-	struct lov_obd *lov = &exp->exp_obd->u.lov;
+-	unsigned ost_idx;
+-	int rc, i;
+-
+-	LASSERT(src_oa->o_valid & OBD_MD_FLFLAGS &&
+-		src_oa->o_flags & OBD_FL_RECREATE_OBJS);
+-
+-	obj_mdp = kzalloc(sizeof(*obj_mdp), GFP_NOFS);
+-	if (!obj_mdp)
+-		return -ENOMEM;
+-
+-	ost_idx = src_oa->o_nlink;
+-	lsm = *ea;
+-	if (!lsm) {
+-		rc = -EINVAL;
+-		goto out;
+-	}
+-	if (ost_idx >= lov->desc.ld_tgt_count ||
+-	    !lov->lov_tgts[ost_idx]) {
+-		rc = -EINVAL;
+-		goto out;
+-	}
+-
+-	for (i = 0; i < lsm->lsm_stripe_count; i++) {
+-		struct lov_oinfo *loi = lsm->lsm_oinfo[i];
+-
+-		if (lov_oinfo_is_dummy(loi))
+-			continue;
+-
+-		if (loi->loi_ost_idx == ost_idx) {
+-			if (ostid_id(&loi->loi_oi) != ostid_id(&src_oa->o_oi)) {
+-				rc = -EINVAL;
+-				goto out;
+-			}
+-			break;
+-		}
+-	}
+-	if (i == lsm->lsm_stripe_count) {
+-		rc = -EINVAL;
+-		goto out;
+-	}
+-
+-	rc = obd_create(NULL, lov->lov_tgts[ost_idx]->ltd_exp,
+-			src_oa, &obj_mdp, oti);
+-out:
+-	kfree(obj_mdp);
+-	return rc;
+-}
+-
+-/* the LOV expects oa->o_id to be set to the LOV object id */
+-static int lov_create(const struct lu_env *env, struct obd_export *exp,
+-		      struct obdo *src_oa, struct lov_stripe_md **ea,
+-		      struct obd_trans_info *oti)
+-{
+-	struct lov_obd *lov;
+-	int rc = 0;
+-
+-	LASSERT(ea);
+-	if (!exp)
+-		return -EINVAL;
+-
+-	if ((src_oa->o_valid & OBD_MD_FLFLAGS) &&
+-	    src_oa->o_flags == OBD_FL_DELORPHAN) {
+-		/* should be used with LOV anymore */
+-		LBUG();
+-	}
+-
+-	lov = &exp->exp_obd->u.lov;
+-	if (!lov->desc.ld_active_tgt_count)
+-		return -EIO;
+-
+-	obd_getref(exp->exp_obd);
+-	/* Recreate a specific object id at the given OST index */
+-	if ((src_oa->o_valid & OBD_MD_FLFLAGS) &&
+-	    (src_oa->o_flags & OBD_FL_RECREATE_OBJS)) {
+-		rc = lov_recreate(exp, src_oa, ea, oti);
+-	}
+-
+-	obd_putref(exp->exp_obd);
+-	return rc;
+-}
+-
+ #define ASSERT_LSM_MAGIC(lsmp)						  \
+ do {									    \
+ 	LASSERT((lsmp));						\
+@@ -2281,7 +2195,6 @@ static struct obd_ops lov_obd_ops = {
+ 	.statfs_async   = lov_statfs_async,
+ 	.packmd         = lov_packmd,
+ 	.unpackmd       = lov_unpackmd,
+-	.create         = lov_create,
+ 	.destroy        = lov_destroy,
+ 	.getattr_async  = lov_getattr_async,
+ 	.setattr_async  = lov_setattr_async,
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 7449b77..11c376e 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -696,11 +696,6 @@ static int osc_create(const struct lu_env *env, struct obd_export *exp,
+ 	LASSERT(ea);
+ 	LASSERT(oa->o_valid & OBD_MD_FLGROUP);
+ 
+-	if ((oa->o_valid & OBD_MD_FLFLAGS) &&
+-	    oa->o_flags == OBD_FL_RECREATE_OBJS) {
+-		return osc_real_create(exp, oa, ea, oti);
+-	}
+-
+ 	if (!fid_seq_is_mdt(ostid_seq(&oa->o_oi)))
+ 		return osc_real_create(exp, oa, ea, oti);
+ 
 -- 
 1.7.1
