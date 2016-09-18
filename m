@@ -1,87 +1,58 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 18 Sep 2016 16:37:22 -0400
-Subject: [lustre-devel] [PATCH 023/124] staging: lustre: mdc: Report
-	D_CHANGELOG messages as D_HSM
+Date: Sun, 18 Sep 2016 16:38:39 -0400
+Subject: [lustre-devel] [PATCH 100/124] staging: lustre: obd: change type of
+	cl_conn_count to size_t
 In-Reply-To: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
 References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1474231143-4061-24-git-send-email-jsimmons@infradead.org>
+Message-ID: <1474231143-4061-101-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Henri Doreau <henri.doreau@cea.fr>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Henri Doreau <henri.doreau@cea.fr>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Removed the D_CHANGELOG pseudo-debug flag that wasn't actually defined
-as a usable one. Report the D_CHANGELOG messages as D_HSM ones instead
-since this is the primary user of these messages.
+Change type of cl_conn_count to size_t.
 
-Signed-off-by: Henri Doreau <henri.doreau@cea.fr>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5538
-Reviewed-on: http://review.whamcloud.com/11558
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: James Nunez <james.a.nunez@intel.com>
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5577
+Reviewed-on: http://review.whamcloud.com/13125
+Reviewed-by: James Simmons <uja.ornl@gmail.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/mdc/mdc_request.c |   12 +++++-------
- 1 files changed, 5 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h   |    2 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index cf94926..956b946 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -1857,8 +1857,6 @@ static struct kuc_hdr *changelog_kuc_hdr(char *buf, int len, int flags)
- 	return lh;
- }
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 5f0f1e3..986c6e9 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -202,7 +202,7 @@ struct client_obd {
+ 	struct rw_semaphore  cl_sem;
+ 	struct obd_uuid	  cl_target_uuid;
+ 	struct obd_import       *cl_import; /* ptlrpc connection state */
+-	int		      cl_conn_count;
++	size_t			 cl_conn_count;
+ 	/* max_mds_easize is purely a performance thing so we don't have to
+ 	 * call obd_size_diskmd() all the time.
+ 	 */
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+index 9a5f56a..153e990 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+@@ -536,7 +536,7 @@ int client_disconnect_export(struct obd_export *exp)
+ 	imp = cli->cl_import;
  
--#define D_CHANGELOG 0
--
- struct changelog_show {
- 	__u64		cs_startrec;
- 	__u32		cs_flags;
-@@ -1885,12 +1883,12 @@ static int changelog_kkuc_cb(const struct lu_env *env, struct llog_handle *llh,
+ 	down_write(&cli->cl_sem);
+-	CDEBUG(D_INFO, "disconnect %s - %d\n", obd->obd_name,
++	CDEBUG(D_INFO, "disconnect %s - %zu\n", obd->obd_name,
+ 	       cli->cl_conn_count);
  
- 	if (rec->cr.cr_index < cs->cs_startrec) {
- 		/* Skip entries earlier than what we are interested in */
--		CDEBUG(D_CHANGELOG, "rec=%llu start=%llu\n",
-+		CDEBUG(D_HSM, "rec=%llu start=%llu\n",
- 		       rec->cr.cr_index, cs->cs_startrec);
- 		return 0;
- 	}
- 
--	CDEBUG(D_CHANGELOG, "%llu %02d%-5s %llu 0x%x t="DFID" p="DFID
-+	CDEBUG(D_HSM, "%llu %02d%-5s %llu 0x%x t=" DFID " p=" DFID
- 		" %.*s\n", rec->cr.cr_index, rec->cr.cr_type,
- 		changelog_type2str(rec->cr.cr_type), rec->cr.cr_time,
- 		rec->cr.cr_flags & CLF_FLAGMASK,
-@@ -1904,7 +1902,7 @@ static int changelog_kkuc_cb(const struct lu_env *env, struct llog_handle *llh,
- 	memcpy(lh + 1, &rec->cr, len - sizeof(*lh));
- 
- 	rc = libcfs_kkuc_msg_put(cs->cs_fp, lh);
--	CDEBUG(D_CHANGELOG, "kucmsg fp %p len %d rc %d\n", cs->cs_fp, len, rc);
-+	CDEBUG(D_HSM, "kucmsg fp %p len %d rc %d\n", cs->cs_fp, len, rc);
- 
- 	return rc;
- }
-@@ -1917,7 +1915,7 @@ static int mdc_changelog_send_thread(void *csdata)
- 	struct kuc_hdr *kuch;
- 	int rc;
- 
--	CDEBUG(D_CHANGELOG, "changelog to fp=%p start %llu\n",
-+	CDEBUG(D_HSM, "changelog to fp=%p start %llu\n",
- 	       cs->cs_fp, cs->cs_startrec);
- 
- 	cs->cs_buf = kzalloc(KUC_CHANGELOG_MSG_MAXSIZE, GFP_NOFS);
-@@ -1996,7 +1994,7 @@ static int mdc_ioc_changelog_send(struct obd_device *obd,
- 		kfree(cs);
- 	} else {
- 		rc = 0;
--		CDEBUG(D_CHANGELOG, "%s: started changelog thread\n",
-+		CDEBUG(D_HSM, "%s: started changelog thread\n",
- 		       obd->obd_name);
- 	}
- 
+ 	if (!cli->cl_conn_count) {
 -- 
 1.7.1
