@@ -1,55 +1,55 @@
-From: Baoyou Xie <baoyou.xie@linaro.org>
-Date: Sat, 17 Sep 2016 21:41:39 +0800
-Subject: [lustre-devel] [PATCH] staging: lustre: clean function declaration
-	in super25.c up
-Message-ID: <1474119699-4965-1-git-send-email-baoyou.xie@linaro.org>
+From: Jan Kara <jack@suse.cz>
+Date: Mon, 19 Sep 2016 11:59:14 +0200
+Subject: [lustre-devel] [PATCH 030/124] staging: lustre: llite: Replace
+ write mutex with range lock
+In-Reply-To: <5FCA4C55-DF73-4AE8-8030-9A85B21A8A54@intel.com>
+References: <1474231143-4061-1-git-send-email-jsimmons@infradead.org>
+	<1474231143-4061-31-git-send-email-jsimmons@infradead.org>
+	<20160919072859.GA15407@kroah.com>
+	<5FCA4C55-DF73-4AE8-8030-9A85B21A8A54@intel.com>
+Message-ID: <20160919095914.GH11487@quack2.suse.cz>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, dmitry.eremin@intel.com, fzago@cray.com, shivanib134@gmail.com, bhumirks@gmail.com, mike.rapoport@gmail.com
-Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, arnd@arndb.de, baoyou.xie@linaro.org, xie.baoyou@zte.com.cn
+To: "Dilger, Andreas" <andreas.dilger@intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Jan Kara <jack@suse.cz>, James Simmons <jsimmons@infradead.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, "linux-ext4@vger.kernel.org" <linux-ext4@vger.kernel.org>, dbueso@suse.com
 
-We get 1 warning when building kernel with W=1:
-drivers/staging/lustre/lnet/selftest/conctl.c:804:1: warning: no previous prototype for 'lstcon_ioctl_entry' [-Wmissing-prototypes]
+On Mon 19-09-16 09:25:48, Dilger, Andreas wrote:
+> On Sep 19, 2016, at 09:28, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+> > 
+> > On Sun, Sep 18, 2016 at 04:37:29PM -0400, James Simmons wrote:
+> >> + * Range lock is used to allow multiple threads writing a single shared
+> >> + * file given each thread is writing to a non-overlapping portion of the
+> >> + * file.
+> >> + *
+> >> + * Refer to the possible upstream kernel version of range lock by
+> >> + * Jan Kara <jack@suse.cz>: https://lkml.org/lkml/2013/1/31/480
+> >> + *
+> >> + * This file could later replaced by the upstream kernel version.
+> > 
+> > It doesn't look like range_lock ever got accepted in the kernel tree,
+> > any idea what happened to it?  Having a per-filesystem lock type seems
+> > odd to me...
+> 
+> I've added Jan and linux-fsdevel to the CC list to see what interest
+> there is in the range locking implementaion.  At the time we added this
+> to Lustre it appeared that this was moving nicely torward landing, but
+> it seems to have stalled.
+> 
+> I think the range locking implementation is fairly generic, and if there
+> are other users in the kernel it could easily be pulled out of the staging
+> dir into vfs/.  I'm not against it going into vfs/ directly either, but
+> not sure whether that is acceptable if the only user is in staging.
 
-In fact, this function is declared in
-drivers/staging/lustre/lustre/llite/super25.c, but should be
-moved into a header file, thus can be recognized in other file.
+Yeah, so the problem with my range_lock implementation (and your one looks
+fairly similar from a quick look) is that it is fairly heavyweight. That
+may be OK for an inode_lock replacement but it needs a careful
+benchmarking. Davidlohr was looking into making the implementation more
+efficient (he wanted to use it for mmap_sem) but I think it got preempted
+by other work.
 
-So this patch moves the declaration into
-drivers/staging/lustre/lnet/selftest/console.h
-
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/staging/lustre/lnet/selftest/console.c | 2 --
- drivers/staging/lustre/lnet/selftest/console.h | 1 +
- 2 files changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index 4c33621..a0fcbf3 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -1993,8 +1993,6 @@ static void lstcon_init_acceptor_service(void)
- 	lstcon_acceptor_service.sv_wi_total = SFW_FRWK_WI_MAX;
- }
- 
--extern int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
--
- static DECLARE_IOCTL_HANDLER(lstcon_ioctl_handler, lstcon_ioctl_entry);
- 
- /* initialize console */
-diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
-index 78b1477..78388a6 100644
---- a/drivers/staging/lustre/lnet/selftest/console.h
-+++ b/drivers/staging/lustre/lnet/selftest/console.h
-@@ -184,6 +184,7 @@ lstcon_id2hash(lnet_process_id_t id, struct list_head *hash)
- 	return &hash[idx];
- }
- 
-+int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
- int lstcon_console_init(void);
- int lstcon_console_fini(void);
- int lstcon_session_match(lst_sid_t sid);
+								Honza
 -- 
-2.7.4
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
