@@ -1,47 +1,45 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 20 Sep 2016 18:04:00 +0100 (BST)
-Subject: [lustre-devel] lnet_upcall on LBUG & LU-8418
-In-Reply-To: <DC1659D0-0D6B-40B2-B35D-938F98E9FDD0@intel.com>
-References: <57C5A350.30302@cray.com>
-	<DC1659D0-0D6B-40B2-B35D-938F98E9FDD0@intel.com>
-Message-ID: <alpine.LFD.2.20.1609201803380.19081@casper.infradead.org>
+Date: Tue, 20 Sep 2016 13:31:09 -0400
+Subject: [lustre-devel] [PATCH v2] staging: lustre: ptlrpc: re-export
+	lustre_swab_lov_mds_md
+Message-ID: <1474392669-25174-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-> On Aug 30, 2016, at 11:16 AM, Patrick Farrell wrote:
-> 
-> > Hello,
-> > 
-> > Currently, on LBUG, Lustre tries to call a usermode helper at '/usr/lib/lustre/lnet_upcall'.  This is for some sort of binary that a user would like executed before the LBUG itself (by default, a panic) happens.  Lustre does not include an lnet_upcall script, so by default, the call fails.
-> 
-> I think this i a throwback to prehistoric times when BUG was not causing panic
-> by default to try and copy stuff off the node with no local storage
-> before it's killed.
-> Modern crashdumping more or less superseded is.
+Being over zealous in removing unused EXPORT_SYMBOLs the function
+lustre_swab_lov_mds_md exports were removed. They need to be
+exported so this patch restores those EXPORT_SYMBOLS. Same
+mistake was done when porting to the upstream client.
 
-Sorry I didn't answer earlier. I agree with Oleg. Lets just remove it. 
-This is a case of lack of document which meant no one knew about it
-worked to our advantage.
+v2 Remove exporting lustre_swab_lmv_mds_md since that is not needed
+   just yet.
+
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: http://review.whamcloud.com/14545
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6486
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+index 1349bf6..e24d8e1 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+@@ -1914,6 +1914,7 @@ void lustre_swab_lov_mds_md(struct lov_mds_md *lmm)
+ 	__swab16s(&lmm->lmm_stripe_count);
+ 	__swab16s(&lmm->lmm_layout_gen);
+ }
++EXPORT_SYMBOL(lustre_swab_lov_mds_md);
  
-> > Unfortunately, in extremely low memory situations, the attempt to make this call can hang, resulting in a node which is in an invalid state but will not actually panic.  This is quite problematic as it can, for example, prevent failover or dump collection (for debugging purposes), depending on how a system is configured.
-> > 
-> > LU-8418 (from Alexander Zarochentsev) is looking to disable this by default.  As Andreas Dilger pointed out in the patch review (http://review.whamcloud.com/#/c/21440/), this would break any existing users who had put their script in that location.
-> > 
-> > But I suspect no one is actually using this feature.
-> > 
-> > So:
-> > Do you use (or know of anyone using) the lnet_upcall feature to call a binary before LBUG?  (I'm looking for end user uses; if a developer is using it, I think it's reasonable to ask them to set it manually.)
-> 
-> I think it's unused so it should be safe to kill it, but let's see if anybody shows up
-> indeed.
-> 
-> Bye,
->     Oleg
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> 
+ void lustre_swab_lov_user_md_objects(struct lov_user_ost_data *lod,
+ 				     int stripe_count)
+-- 
+1.7.1
