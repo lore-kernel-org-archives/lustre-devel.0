@@ -1,68 +1,51 @@
-From: Baoyou Xie <baoyou.xie@linaro.org>
-Date: Fri, 09 Sep 2016 01:45:39 -0000
-Subject: [lustre-devel] [PATCH] staging/lustre/lov: add missing header
-	dependencies
-In-Reply-To: <alpine.LFD.2.20.1609081851520.14646@casper.infradead.org>
-References: <1473324508-9294-1-git-send-email-baoyou.xie@linaro.org>
-	<alpine.LFD.2.20.1609081851520.14646@casper.infradead.org>
-Message-ID: <CA+DQWkx=_J6FmWgPN2UbnprvM1KzpnEE3kgbkWY1pcAxk1jqMg@mail.gmail.com>
+From: Imre Deak <imre.deak@intel.com>
+Date: Sat, 24 Sep 2016 04:11:37 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: ldlm: Fix extern variable
+	declaration
+Message-ID: <1474679497-31549-1-git-send-email-imre.deak@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Looks like it's better to clean it up :)
+From: Imre Deak <imre.deak@gmail.com>
 
-On 9 September 2016 at 01:59, James Simmons <jsimmons@infradead.org> wrote:
+Move the extern declaration to a header file common to all users of the
+variable. This fixes the following sparse warning:
+symbol 'ldlm_cancel_unused_locks_before_replay' was not declared.
+Should it be static?
 
->
-> > We get 1 warning when building kernel with W=1:
-> > drivers/staging/lustre/lustre/lov/lov_object.c:956:23: warning: no
-> previous prototype for 'lov_lsm_get' [-Wmissing-prototypes]
-> > drivers/staging/lustre/lustre/lov/lov_object.c:972:6: warning: no
-> previous prototype for 'lov_lsm_put' [-Wmissing-prototypes]
-> > drivers/staging/lustre/lustre/lov/lov_object.c:979:5: warning: no
-> previous prototype for 'lov_read_and_clear_async_rc' [-Wmissing-prototypes]
-> >
-> > In fact, these functions are declared in ../llite/vvp_internal.h,
-> > so this patch add missing header dependencies.
-> >
-> > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
->
-> Nak. The header vvp_internal.h is meant to private to the llite layer.
-> Looking at the coming patch updates I see lov_lsm_[put|get] will not be
-> used in the lov later. Now lov_read_and_clear_async is still used in
-> both layers. The header used for this case is cl_object.h. Might rename
-> that function to be consistent with the rest of the header. I will look
-> into a cleanup for this.
->
-> > ---
-> >  drivers/staging/lustre/lustre/lov/lov_object.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c
-> b/drivers/staging/lustre/lustre/lov/lov_object.c
-> > index f9621b0..912c416 100644
-> > --- a/drivers/staging/lustre/lustre/lov/lov_object.c
-> > +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-> > @@ -38,6 +38,7 @@
-> >  #define DEBUG_SUBSYSTEM S_LOV
-> >
-> >  #include "lov_cl_internal.h"
-> > +#include "../llite/vvp_internal.h"
-> >
-> >  /** \addtogroup lov
-> >   *  @{
-> > --
-> > 2.7.4
-> >
-> > _______________________________________________
-> > devel mailing list
-> > devel at linuxdriverproject.org
-> > http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
-> >
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20160909/4f158d1a/attachment-0001.htm>
+Signed-off-by: Imre Deak <imre.deak@gmail.com>
+---
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h | 1 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    | 2 --
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+index 6536832..5e82cfc 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+@@ -103,6 +103,7 @@ int ldlm_cancel_lru_local(struct ldlm_namespace *ns,
+ 			  struct list_head *cancels, int count, int max,
+ 			  enum ldlm_cancel_flags cancel_flags, int flags);
+ extern unsigned int ldlm_enqueue_min;
++extern unsigned int ldlm_cancel_unused_locks_before_replay;
+ 
+ /* ldlm_resource.c */
+ int ldlm_resource_putref_locked(struct ldlm_resource *res);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+index ff2c28e..fde697e 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+@@ -877,8 +877,6 @@ void ldlm_put_ref(void)
+ }
+ EXPORT_SYMBOL(ldlm_put_ref);
+ 
+-extern unsigned int ldlm_cancel_unused_locks_before_replay;
+-
+ static ssize_t cancel_unused_locks_before_replay_show(struct kobject *kobj,
+ 						      struct attribute *attr,
+ 						      char *buf)
+-- 
+2.5.0
