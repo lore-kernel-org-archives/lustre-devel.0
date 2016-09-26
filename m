@@ -1,60 +1,53 @@
-From: Baoyou Xie <baoyou.xie@linaro.org>
-Date: Thu, 15 Sep 2016 21:51:27 +0800
-Subject: [lustre-devel] [PATCH] staging: lustre: clean function declarations
-	in class_obd.c up
-Message-ID: <1473947487-25514-1-git-send-email-baoyou.xie@linaro.org>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 26 Sep 2016 19:23:44 +0100 (BST)
+Subject: [lustre-devel] [PATCH] staging/lustre/lov: add missing header
+ dependencies
+In-Reply-To: <1473324508-9294-1-git-send-email-baoyou.xie@linaro.org>
+References: <1473324508-9294-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <alpine.LFD.2.20.1609261920240.5573@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, john.hammond@intel.com, shraddha.6596@gmail.com, di.wang@intel.com, ksenija.stanojevic@gmail.com, mike.rapoport@gmail.com, andrew.perepechko@seagate.com, kirill.shutemov@linux.intel.com, lustre-devel@lists.lustre.org
-Cc: devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, arnd@arndb.de, baoyou.xie@linaro.org, xie.baoyou@zte.com.cn
+To: Baoyou Xie <baoyou.xie@linaro.org>
+Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, gregkh@linuxfoundation.org, bobijam.xu@intel.com, jinshan.xiong@intel.com, lai.siyao@intel.com, mike.rapoport@gmail.com, amitoj1606@gmail.com, devel@driverdev.osuosl.org, arnd@arndb.de, xie.baoyou@zte.com.cn, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Developement <lustre-devel@lists.lustre.org>
 
-We get 2 warnings when building kernel with W=1:
 
-drivers/staging/lustre/lustre/obdclass/linux/linux-module.c:413:5: warning: no previous prototype for 'class_procfs_init' [-Wmissing-prototypes]
-drivers/staging/lustre/lustre/obdclass/linux/linux-module.c:449:5: warning: no previous prototype for 'class_procfs_clean' [-Wmissing-prototypes]
+> We get 1 warning when building kernel with W=1:
+> drivers/staging/lustre/lustre/lov/lov_object.c:956:23: warning: no previous prototype for 'lov_lsm_get' [-Wmissing-prototypes]
+> drivers/staging/lustre/lustre/lov/lov_object.c:972:6: warning: no previous prototype for 'lov_lsm_put' [-Wmissing-prototypes]
+> drivers/staging/lustre/lustre/lov/lov_object.c:979:5: warning: no previous prototype for 'lov_read_and_clear_async_rc' [-Wmissing-prototypes]
+> 
+> In fact, these functions are declared in ../llite/vvp_internal.h,
+> so this patch add missing header dependencies.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 
-In fact, both functions are declared in
-drivers/staging/lustre/lustre/obdclass/class_obd.c,but should be
-declared in a header file, thus can be recognized in other file.
+Nak. I have a patch coming soon from our server code branch that removes 
+lov_lsm_get() and makes lov_lsm_put used only in the lov layer.
+The patch is ready but I need to test it first.
 
-So this patch moves the declarations into
-drivers/staging/lustre/lustre/include/obd_class.h.
-
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/staging/lustre/lustre/include/obd_class.h  | 4 ++++
- drivers/staging/lustre/lustre/obdclass/class_obd.c | 2 --
- 2 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 9702ad4..9965a01 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -1712,6 +1712,10 @@ int class_check_uuid(struct obd_uuid *uuid, __u64 nid);
- void class_init_uuidlist(void);
- void class_exit_uuidlist(void);
- 
-+/*linux-module.c*/
-+int class_procfs_init(void);
-+int class_procfs_clean(void);
-+
- /* class_obd.c */
- extern char obd_jobid_node[];
- extern struct miscdevice obd_psdev;
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 6700167..397929a 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -446,8 +446,6 @@ static int obd_init_checks(void)
- 	return ret;
- }
- 
--extern int class_procfs_init(void);
--extern int class_procfs_clean(void);
- 
- static int __init obdclass_init(void)
- {
--- 
-2.7.4
+> ---
+>  drivers/staging/lustre/lustre/lov/lov_object.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
+> index f9621b0..912c416 100644
+> --- a/drivers/staging/lustre/lustre/lov/lov_object.c
+> +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+> @@ -38,6 +38,7 @@
+>  #define DEBUG_SUBSYSTEM S_LOV
+>  
+>  #include "lov_cl_internal.h"
+> +#include "../llite/vvp_internal.h"
+>  
+>  /** \addtogroup lov
+>   *  @{
+> -- 
+> 2.7.4
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 
