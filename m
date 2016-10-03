@@ -1,102 +1,59 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  2 Oct 2016 22:22:31 -0400
-Subject: [lustre-devel] [PATCH] staging: lustre: ko2iblbd: handle
-	ib_dereg_mr removal
-Message-ID: <1475461351-21495-1-git-send-email-jsimmons@infradead.org>
+Date: Sun,  2 Oct 2016 22:27:57 -0400
+Subject: [lustre-devel] [PATCH 01/41] staging: lustre: obdclass: fix race
+	during key quiescency
+In-Reply-To: <1475461717-21631-1-git-send-email-jsimmons@infradead.org>
+References: <1475461717-21631-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1475461717-21631-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bruno Faccini <bruno.faccini@intel.com>, James Simmons <jsimmons@infradead.org>
 
-In the rdma-next tree to be merged for 4.9-rc1 removes
-the IB core function ib_get_dma_mr. This patch migrates
-us way from this former function.
+From: Bruno Faccini <bruno.faccini@intel.com>
 
+Upon umount, presumably of last device using same OSD back-end,
+to prepare for module unload, lu_context_key_quiesce() is run to
+remove all module's key reference in any context linked on
+lu_context_remembered list.
+Threads must protect against such transversal processing when
+exiting from its context.
+
+Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5264
+Reviewed-on: http://review.whamcloud.com/13103
+Reviewed-by: Mike Pershin <mike.pershin@intel.com>
+Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   19 ++++++++++++-------
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    5 +++++
- 2 files changed, 17 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index c7a5d49..4010591 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -1316,7 +1316,7 @@ static void kiblnd_destroy_fmr_pool(struct kib_fmr_pool *fpo)
- 		list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
- 					 frd_list) {
- 			list_del(&frd->frd_list);
--			ib_dereg_mr(frd->frd_mr);
-+			kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
- 			LIBCFS_FREE(frd, sizeof(*frd));
- 			i++;
+diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+index 054e567..f0e74c6 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+@@ -1663,6 +1663,9 @@ void lu_context_exit(struct lu_context *ctx)
+ 	ctx->lc_state = LCS_LEFT;
+ 	if (ctx->lc_tags & LCT_HAS_EXIT && ctx->lc_value) {
+ 		for (i = 0; i < ARRAY_SIZE(lu_keys); ++i) {
++			/* could race with key quiescency */
++			if (ctx->lc_tags & LCT_REMEMBER)
++				spin_lock(&lu_keys_guard);
+ 			if (ctx->lc_value[i]) {
+ 				struct lu_context_key *key;
+ 
+@@ -1671,6 +1674,8 @@ void lu_context_exit(struct lu_context *ctx)
+ 					key->lct_exit(ctx,
+ 						      key, ctx->lc_value[i]);
+ 			}
++			if (ctx->lc_tags & LCT_REMEMBER)
++				spin_unlock(&lu_keys_guard);
  		}
-@@ -1422,14 +1422,14 @@ static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps, struct kib_fmr_po
- 
- out_middle:
- 	if (frd->frd_mr)
--		ib_dereg_mr(frd->frd_mr);
-+		kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
- 	LIBCFS_FREE(frd, sizeof(*frd));
- 
- out:
- 	list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
- 				 frd_list) {
- 		list_del(&frd->frd_list);
--		ib_dereg_mr(frd->frd_mr);
-+		kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
- 		LIBCFS_FREE(frd, sizeof(*frd));
  	}
- 
-@@ -2288,8 +2288,8 @@ static void kiblnd_hdev_cleanup_mrs(struct kib_hca_dev *hdev)
- 	if (!hdev->ibh_mrs)
- 		return;
- 
--	ib_dereg_mr(hdev->ibh_mrs);
--
-+	kib_dereg_mr(hdev, hdev->ibh_mrs);
-+	hdev->ibh_pd->device->dereg_mr(hdev->ibh_mrs);
- 	hdev->ibh_mrs = NULL;
  }
- 
-@@ -2316,13 +2316,18 @@ static int kiblnd_hdev_setup_mrs(struct kib_hca_dev *hdev)
- 	if (rc)
- 		return rc;
- 
--	mr = ib_get_dma_mr(hdev->ibh_pd, acflags);
-+	mr = hdev->ibh_pd->device->get_dma_mr(hdev->ibh_pd, acflags);
- 	if (IS_ERR(mr)) {
--		CERROR("Failed ib_get_dma_mr : %ld\n", PTR_ERR(mr));
-+		CERROR("Failed device get_dma_mr : %ld\n", PTR_ERR(mr));
- 		kiblnd_hdev_cleanup_mrs(hdev);
- 		return PTR_ERR(mr);
- 	}
- 
-+	mr->device = hdev->ibh_pd->device;
-+	mr->pd = hdev->ibh_pd;
-+	mr->uobject = NULL;
-+	mr->need_inval = false;
-+
- 	hdev->ibh_mrs = mr;
- 
- 	return 0;
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index 1457697..f8b49c5 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -178,6 +178,11 @@ struct kib_hca_dev {
- 	atomic_t           ibh_ref;             /* refcount */
- };
- 
-+static inline void kib_dereg_mr(struct kib_hca_dev *hdev, struct ib_mr *mr)
-+{
-+	hdev->ibh_pd->device->dereg_mr(mr);
-+}
-+
- /** # of seconds to keep pool alive */
- #define IBLND_POOL_DEADLINE     300
- /** # of seconds to retry if allocation failed */
 -- 
 1.7.1
