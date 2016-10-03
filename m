@@ -1,812 +1,353 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  2 Oct 2016 22:28:31 -0400
-Subject: [lustre-devel] [PATCH 35/41] staging: lustre: hsm: Use file lease
-	to implement migration
+Date: Sun,  2 Oct 2016 22:28:32 -0400
+Subject: [lustre-devel] [PATCH 36/41] staging: lustre: ldlm: interval tree
+	search in ldlm_lock_match()
 In-Reply-To: <1475461717-21631-1-git-send-email-jsimmons@infradead.org>
 References: <1475461717-21631-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1475461717-21631-36-git-send-email-jsimmons@infradead.org>
+Message-ID: <1475461717-21631-37-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Henri Doreau <henri.doreau@cea.fr>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Vitaly Fertman <vitaly_fertman@xyratex.com>, James Simmons <jsimmons@infradead.org>
 
-From: Henri Doreau <henri.doreau@cea.fr>
+From: Vitaly Fertman <vitaly_fertman@xyratex.com>
 
-Implement non-blocking migration based on exclusive open instead of
-group lock. Implemented exclusive close operation to atomically put
-a lease, swap two layouts and close a file. This allows race-free
-migrations.
+replace the linear search by interval_tree one for granted list
+in ldlm_lock_match()
 
-Make the caller responsible for retrying on failure (EBUSY, EAGAIN)
-in non-blocking mode.
-
-In blocking mode, allow applications to trigger layout swaps using a
-grouplock they already own, to prevent race conditions between the
-actual data copy and the layout swap. Updated lfs accordingly. File
-leases are also taken in blocking mode, so that lfs migrate can issue
-a warning if an application attempts to open a file that is being
-migrated and gets blocked.
-
-Timestamps (atime/mtime) are set from userland, after the layout swap
-is performed, to prevent conflicts with the grouplock.
-
-lli_trunc_sem is taken/released in the vvp_io layer, under the DLM
-lock. This re-ordering fixes the original issue between truncate and
-migrate.
-
-Signed-off-by: Henri Doreau <henri.doreau@cea.fr>
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4840
-Reviewed-on: http://review.whamcloud.com/10013
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: frank zago <fzago@cray.com>
+Signed-off-by: Vitaly Fertman <vitaly_fertman@xyratex.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5739
+Xyratex-bug-id: MRP-2089
+Reviewed-on: http://review.whamcloud.com/12294
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_idl.h      |    5 +-
- .../lustre/lustre/include/lustre/lustre_user.h     |    1 +
- .../lustre/lustre/include/lustre_req_layout.h      |    2 +-
- drivers/staging/lustre/lustre/llite/file.c         |  231 ++++++++++++--------
- drivers/staging/lustre/lustre/llite/llite_lib.c    |    4 -
- drivers/staging/lustre/lustre/llite/vvp_io.c       |   82 +++++---
- drivers/staging/lustre/lustre/mdc/mdc_lib.c        |   34 ++--
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    7 +-
- drivers/staging/lustre/lustre/ptlrpc/layout.c      |   10 +-
- 9 files changed, 235 insertions(+), 141 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c |  249 ++++++++++++++++--------
+ 1 files changed, 171 insertions(+), 78 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 5d2f845..7de8098 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -1703,7 +1703,9 @@ lov_mds_md_max_stripe_count(size_t buf_size, __u32 lmm_magic)
- /*	OBD_MD_FLRMTRGETFACL (0x0008000000000000ULL) lfs rgetfacl, obsolete */
- 
- #define OBD_MD_FLDATAVERSION (0x0010000000000000ULL) /* iversion sum */
--#define OBD_MD_FLRELEASED    (0x0020000000000000ULL) /* file released */
-+#define OBD_MD_CLOSE_INTENT_EXECED (0x0020000000000000ULL) /* close intent
-+							    * executed
-+							    */
- 
- #define OBD_MD_DEFAULT_MEA   (0x0040000000000000ULL) /* default MEA */
- 
-@@ -2235,6 +2237,7 @@ enum mds_op_bias {
- 	MDS_OWNEROVERRIDE	= 1 << 11,
- 	MDS_HSM_RELEASE		= 1 << 12,
- 	MDS_RENAME_MIGRATE	= BIT(13),
-+	MDS_CLOSE_LAYOUT_SWAP   = BIT(14),
- };
- 
- /* instance of mdt_reint_rec */
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-index 856e2f9..579ef14 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-@@ -650,6 +650,7 @@ struct if_quotactl {
- #define SWAP_LAYOUTS_CHECK_DV2		(1 << 1)
- #define SWAP_LAYOUTS_KEEP_MTIME		(1 << 2)
- #define SWAP_LAYOUTS_KEEP_ATIME		(1 << 3)
-+#define SWAP_LAYOUTS_CLOSE		BIT(4)
- 
- /* Swap XATTR_NAME_HSM as well, only on the MDT so far */
- #define SWAP_LAYOUTS_MDS_HSM		(1 << 31)
-diff --git a/drivers/staging/lustre/lustre/include/lustre_req_layout.h b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
-index 78857b3..7657132 100644
---- a/drivers/staging/lustre/lustre/include/lustre_req_layout.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
-@@ -148,7 +148,7 @@ extern struct req_format RQF_MDS_GETATTR;
-  */
- extern struct req_format RQF_MDS_GETATTR_NAME;
- extern struct req_format RQF_MDS_CLOSE;
--extern struct req_format RQF_MDS_RELEASE_CLOSE;
-+extern struct req_format RQF_MDS_INTENT_CLOSE;
- extern struct req_format RQF_MDS_CONNECT;
- extern struct req_format RQF_MDS_DISCONNECT;
- extern struct req_format RQF_MDS_GET_INFO;
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 9bf50bf..b9cadd9 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -113,10 +113,19 @@ out:
- 			   0, 0, LUSTRE_OPC_ANY, NULL);
- }
- 
-+/**
-+ * Perform a close, possibly with a bias.
-+ * The meaning of "data" depends on the value of "bias".
-+ *
-+ * If \a bias is MDS_HSM_RELEASE then \a data is a pointer to the data version.
-+ * If \a bias is MDS_CLOSE_LAYOUT_SWAP then \a data is a pointer to the inode to
-+ * swap layouts with.
-+ */
- static int ll_close_inode_openhandle(struct obd_export *md_exp,
--				     struct inode *inode,
- 				     struct obd_client_handle *och,
--				     const __u64 *data_version)
-+				     struct inode *inode,
-+				     enum mds_op_bias bias,
-+				     void *data)
- {
- 	struct obd_export *exp = ll_i2mdexp(inode);
- 	struct md_op_data *op_data;
-@@ -143,12 +152,26 @@ static int ll_close_inode_openhandle(struct obd_export *md_exp,
- 	}
- 
- 	ll_prepare_close(inode, op_data, och);
--	if (data_version) {
--		/* Pass in data_version implies release. */
-+	switch (bias) {
-+	case MDS_CLOSE_LAYOUT_SWAP:
-+		LASSERT(data);
-+		op_data->op_bias |= MDS_CLOSE_LAYOUT_SWAP;
-+		op_data->op_data_version = 0;
-+		op_data->op_lease_handle = och->och_lease_handle;
-+		op_data->op_fid2 = *ll_inode2fid(data);
-+		break;
-+
-+	case MDS_HSM_RELEASE:
-+		LASSERT(data);
- 		op_data->op_bias |= MDS_HSM_RELEASE;
--		op_data->op_data_version = *data_version;
-+		op_data->op_data_version = *(__u64 *)data;
- 		op_data->op_lease_handle = och->och_lease_handle;
- 		op_data->op_attr.ia_valid |= ATTR_SIZE | ATTR_BLOCKS;
-+		break;
-+
-+	default:
-+		LASSERT(!data);
-+		break;
- 	}
- 
- 	rc = md_close(md_exp, op_data, och->och_mod, &req);
-@@ -169,11 +192,12 @@ static int ll_close_inode_openhandle(struct obd_export *md_exp,
- 		spin_unlock(&lli->lli_lock);
- 	}
- 
--	if (rc == 0 && op_data->op_bias & MDS_HSM_RELEASE) {
-+	if (op_data->op_bias & (MDS_HSM_RELEASE | MDS_CLOSE_LAYOUT_SWAP) &&
-+	    !rc) {
- 		struct mdt_body *body;
- 
- 		body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
--		if (!(body->mbo_valid & OBD_MD_FLRELEASED))
-+		if (!(body->mbo_valid & OBD_MD_CLOSE_INTENT_EXECED))
- 			rc = -EBUSY;
- 	}
- 
-@@ -227,7 +251,7 @@ int ll_md_real_close(struct inode *inode, fmode_t fmode)
- 		 * be closed.
- 		 */
- 		rc = ll_close_inode_openhandle(ll_i2sbi(inode)->ll_md_exp,
--					       inode, och, NULL);
-+					       och, inode, 0, NULL);
- 	}
- 
- 	return rc;
-@@ -263,7 +287,8 @@ static int ll_md_close(struct obd_export *md_exp, struct inode *inode,
- 	}
- 
- 	if (fd->fd_och) {
--		rc = ll_close_inode_openhandle(md_exp, inode, fd->fd_och, NULL);
-+		rc = ll_close_inode_openhandle(md_exp, fd->fd_och, inode, 0,
-+					       NULL);
- 		fd->fd_och = NULL;
- 		goto out;
- 	}
-@@ -816,7 +841,7 @@ out_close:
- 		it.it_lock_mode = 0;
- 		och->och_lease_handle.cookie = 0ULL;
- 	}
--	rc2 = ll_close_inode_openhandle(sbi->ll_md_exp, inode, och, NULL);
-+	rc2 = ll_close_inode_openhandle(sbi->ll_md_exp, och, inode, 0, NULL);
- 	if (rc2 < 0)
- 		CERROR("%s: error closing file "DFID": %d\n",
- 		       ll_get_fsname(inode->i_sb, NULL, 0),
-@@ -830,6 +855,69 @@ out:
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 22b4a52..f2044ec 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -1043,88 +1043,173 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
  }
  
  /**
-+ * Check whether a layout swap can be done between two inodes.
-+ *
-+ * \param[in] inode1  First inode to check
-+ * \param[in] inode2  Second inode to check
-+ *
-+ * \retval 0 on success, layout swap can be performed between both inodes
-+ * \retval negative error code if requirements are not met
+- * Search for a lock with given properties in a queue.
++ * Describe the overlap between two locks.  itree_overlap_cb data.
 + */
-+static int ll_check_swap_layouts_validity(struct inode *inode1,
-+					  struct inode *inode2)
-+{
-+	if (!S_ISREG(inode1->i_mode) || !S_ISREG(inode2->i_mode))
-+		return -EINVAL;
++struct lock_match_data {
++	struct ldlm_lock	*lmd_old;
++	struct ldlm_lock	*lmd_lock;
++	enum ldlm_mode		*lmd_mode;
++	ldlm_policy_data_t	*lmd_policy;
++	__u64			 lmd_flags;
++	int			 lmd_unref;
++};
 +
-+	if (inode_permission(inode1, MAY_WRITE) ||
-+	    inode_permission(inode2, MAY_WRITE))
-+		return -EPERM;
++/**
++ * Check if the given @lock meets the criteria for a match.
++ * A reference on the lock is taken if matched.
+  *
+- * \retval a referenced lock or NULL.  See the flag descriptions below, in the
+- * comment above ldlm_lock_match
++ * \param lock	test-against this lock
++ * \param data	parameters
+  */
+-static struct ldlm_lock *search_queue(struct list_head *queue,
+-				      enum ldlm_mode *mode,
+-				      ldlm_policy_data_t *policy,
+-				      struct ldlm_lock *old_lock,
+-				      __u64 flags, int unref)
++static int lock_matches(struct ldlm_lock *lock, struct lock_match_data *data)
+ {
+-	struct ldlm_lock *lock;
+-	struct list_head       *tmp;
++	ldlm_policy_data_t *lpol = &lock->l_policy_data;
++	enum ldlm_mode match;
+ 
+-	list_for_each(tmp, queue) {
+-		enum ldlm_mode match;
++	if (lock == data->lmd_old)
++		return INTERVAL_ITER_STOP;
+ 
+-		lock = list_entry(tmp, struct ldlm_lock, l_res_link);
++	/*
++	 * Check if this lock can be matched.
++	 * Used by LU-2919(exclusive open) for open lease lock
++	 */
++	if (ldlm_is_excl(lock))
++		return INTERVAL_ITER_CONT;
+ 
+-		if (lock == old_lock)
+-			break;
++	/*
++	 * llite sometimes wants to match locks that will be
++	 * canceled when their users drop, but we allow it to match
++	 * if it passes in CBPENDING and the lock still has users.
++	 * this is generally only going to be used by children
++	 * whose parents already hold a lock so forward progress
++	 * can still happen.
++	 */
++	if (ldlm_is_cbpending(lock) &&
++	    !(data->lmd_flags & LDLM_FL_CBPENDING))
++		return INTERVAL_ITER_CONT;
+ 
+-		/* Check if this lock can be matched.
+-		 * Used by LU-2919(exclusive open) for open lease lock
+-		 */
+-		if (ldlm_is_excl(lock))
+-			continue;
++	if (!data->lmd_unref && ldlm_is_cbpending(lock) &&
++	    !lock->l_readers && !lock->l_writers)
++		return INTERVAL_ITER_CONT;
+ 
+-		/* llite sometimes wants to match locks that will be
+-		 * canceled when their users drop, but we allow it to match
+-		 * if it passes in CBPENDING and the lock still has users.
+-		 * this is generally only going to be used by children
+-		 * whose parents already hold a lock so forward progress
+-		 * can still happen.
+-		 */
+-		if (ldlm_is_cbpending(lock) && !(flags & LDLM_FL_CBPENDING))
+-			continue;
+-		if (!unref && ldlm_is_cbpending(lock) &&
+-		    lock->l_readers == 0 && lock->l_writers == 0)
+-			continue;
++	if (!(lock->l_req_mode & *data->lmd_mode))
++		return INTERVAL_ITER_CONT;
++	match = lock->l_req_mode;
+ 
+-		if (!(lock->l_req_mode & *mode))
+-			continue;
+-		match = lock->l_req_mode;
+-
+-		if (lock->l_resource->lr_type == LDLM_EXTENT &&
+-		    (lock->l_policy_data.l_extent.start >
+-		     policy->l_extent.start ||
+-		     lock->l_policy_data.l_extent.end < policy->l_extent.end))
+-			continue;
++	switch (lock->l_resource->lr_type) {
++	case LDLM_EXTENT:
++		if (lpol->l_extent.start > data->lmd_policy->l_extent.start ||
++		    lpol->l_extent.end < data->lmd_policy->l_extent.end)
++			return INTERVAL_ITER_CONT;
+ 
+ 		if (unlikely(match == LCK_GROUP) &&
+-		    lock->l_resource->lr_type == LDLM_EXTENT &&
+-		    policy->l_extent.gid != LDLM_GID_ANY &&
+-		    lock->l_policy_data.l_extent.gid != policy->l_extent.gid)
+-			continue;
+-
+-		/* We match if we have existing lock with same or wider set
++		    data->lmd_policy->l_extent.gid != LDLM_GID_ANY &&
++		    lpol->l_extent.gid != data->lmd_policy->l_extent.gid)
++			return INTERVAL_ITER_CONT;
++		break;
++	case LDLM_IBITS:
++		/*
++		 * We match if we have existing lock with same or wider set
+ 		 * of bits.
+ 		 */
+-		if (lock->l_resource->lr_type == LDLM_IBITS &&
+-		    ((lock->l_policy_data.l_inodebits.bits &
+-		      policy->l_inodebits.bits) !=
+-		      policy->l_inodebits.bits))
+-			continue;
++		if ((lpol->l_inodebits.bits &
++		     data->lmd_policy->l_inodebits.bits) !=
++		    data->lmd_policy->l_inodebits.bits)
++			return INTERVAL_ITER_CONT;
++		break;
++	default:
++		break;
++	}
++	/*
++	 * We match if we have existing lock with same or wider set
++	 * of bits.
++	 */
++	if (!data->lmd_unref && LDLM_HAVE_MASK(lock, GONE))
++		return INTERVAL_ITER_CONT;
 +
-+	if (inode1->i_sb != inode2->i_sb)
-+		return -EXDEV;
-+
-+	return 0;
-+}
-+
-+static int ll_swap_layouts_close(struct obd_client_handle *och,
-+				 struct inode *inode, struct inode *inode2)
-+{
-+	const struct lu_fid *fid1 = ll_inode2fid(inode);
-+	const struct lu_fid *fid2;
-+	int rc;
-+
-+	CDEBUG(D_INODE, "%s: biased close of file " DFID "\n",
-+	       ll_get_fsname(inode->i_sb, NULL, 0), PFID(fid1));
-+
-+	rc = ll_check_swap_layouts_validity(inode, inode2);
-+	if (rc < 0)
-+		goto out_free_och;
-+
-+	/* We now know that inode2 is a lustre inode */
-+	fid2 = ll_inode2fid(inode2);
-+
-+	rc = lu_fid_cmp(fid1, fid2);
-+	if (!rc) {
-+		rc = -EINVAL;
-+		goto out_free_och;
++	if ((data->lmd_flags & LDLM_FL_LOCAL_ONLY) &&
++	    !ldlm_is_local(lock))
++		return INTERVAL_ITER_CONT;
+ 
+-		if (!unref && LDLM_HAVE_MASK(lock, GONE))
++	if (data->lmd_flags & LDLM_FL_TEST_LOCK) {
++		LDLM_LOCK_GET(lock);
++		ldlm_lock_touch_in_lru(lock);
++	} else {
++		ldlm_lock_addref_internal_nolock(lock, match);
 +	}
 +
-+	/*
-+	 * Close the file and swap layouts between inode & inode2.
-+	 * NB: lease lock handle is released in mdc_close_layout_swap_pack()
-+	 * because we still need it to pack l_remote_handle to MDT.
-+	 */
-+	rc = ll_close_inode_openhandle(ll_i2sbi(inode)->ll_md_exp, och, inode,
-+				       MDS_CLOSE_LAYOUT_SWAP, inode2);
++	*data->lmd_mode = match;
++	data->lmd_lock = lock;
 +
-+	och = NULL; /* freed in ll_close_inode_openhandle() */
++	return INTERVAL_ITER_STOP;
++}
 +
-+out_free_och:
-+	kfree(och);
-+	return rc;
++static unsigned int itree_overlap_cb(struct interval_node *in, void *args)
++{
++	struct ldlm_interval *node = to_ldlm_interval(in);
++	struct lock_match_data *data = args;
++	struct ldlm_lock *lock;
++	int rc;
++
++	list_for_each_entry(lock, &node->li_group, l_sl_policy) {
++		rc = lock_matches(lock, data);
++		if (rc == INTERVAL_ITER_STOP)
++			return INTERVAL_ITER_STOP;
++	}
++	return INTERVAL_ITER_CONT;
 +}
 +
 +/**
-  * Release lease and close the file.
-  * It will check if the lease has ever broken.
-  */
-@@ -856,7 +944,7 @@ static int ll_lease_close(struct obd_client_handle *och, struct inode *inode,
- 		*lease_broken = cancelled;
- 
- 	return ll_close_inode_openhandle(ll_i2sbi(inode)->ll_md_exp,
--					 inode, och, NULL);
-+					 och, inode, 0, NULL);
- }
- 
- int ll_merge_attr(const struct lu_env *env, struct inode *inode)
-@@ -1018,7 +1106,6 @@ restart:
- 
- 				range_locked = true;
- 			}
--			down_read(&lli->lli_trunc_sem);
- 			break;
- 		case IO_SPLICE:
- 			vio->u.splice.vui_pipe = args->u.splice.via_pipe;
-@@ -1031,8 +1118,6 @@ restart:
- 		ll_cl_add(file, env, io);
- 		rc = cl_io_loop(env, io);
- 		ll_cl_remove(file, env);
--		if (args->via_io_subtype == IO_NORMAL)
--			up_read(&lli->lli_trunc_sem);
- 		if (range_locked) {
- 			CDEBUG(D_VFSTRACE, "Range unlock [%llu, %llu]\n",
- 			       range.rl_node.in_extent.start,
-@@ -1454,7 +1539,7 @@ int ll_release_openhandle(struct inode *inode, struct lookup_intent *it)
- 	ll_och_fill(ll_i2sbi(inode)->ll_md_exp, it, och);
- 
- 	rc = ll_close_inode_openhandle(ll_i2sbi(inode)->ll_md_exp,
--				       inode, och, NULL);
-+				       och, inode, 0, NULL);
- out:
- 	/* this one is in place of ll_file_open */
- 	if (it_disposition(it, DISP_ENQ_OPEN_REF)) {
-@@ -1657,8 +1742,8 @@ int ll_hsm_release(struct inode *inode)
- 	 * NB: lease lock handle is released in mdc_hsm_release_pack() because
- 	 * we still need it to pack l_remote_handle to MDT.
- 	 */
--	rc = ll_close_inode_openhandle(ll_i2sbi(inode)->ll_md_exp, inode, och,
--				       &data_version);
-+	rc = ll_close_inode_openhandle(ll_i2sbi(inode)->ll_md_exp, och, inode,
-+				       MDS_HSM_RELEASE, &data_version);
- 	och = NULL;
- 
- out:
-@@ -1669,10 +1754,12 @@ out:
- }
- 
- struct ll_swap_stack {
--	struct iattr		 ia1, ia2;
--	__u64			 dv1, dv2;
--	struct inode		*inode1, *inode2;
--	bool			 check_dv1, check_dv2;
-+	u64		dv1;
-+	u64		dv2;
-+	struct inode   *inode1;
-+	struct inode   *inode2;
-+	bool		check_dv1;
-+	bool		check_dv2;
- };
- 
- static int ll_swap_layouts(struct file *file1, struct file *file2,
-@@ -1692,21 +1779,9 @@ static int ll_swap_layouts(struct file *file1, struct file *file2,
- 	llss->inode1 = file_inode(file1);
- 	llss->inode2 = file_inode(file2);
- 
--	if (!S_ISREG(llss->inode2->i_mode)) {
--		rc = -EINVAL;
--		goto free;
--	}
--
--	if (inode_permission(llss->inode1, MAY_WRITE) ||
--	    inode_permission(llss->inode2, MAY_WRITE)) {
--		rc = -EPERM;
--		goto free;
--	}
--
--	if (llss->inode2->i_sb != llss->inode1->i_sb) {
--		rc = -EXDEV;
-+	rc = ll_check_swap_layouts_validity(llss->inode1, llss->inode2);
-+	if (rc < 0)
- 		goto free;
--	}
- 
- 	/* we use 2 bool because it is easier to swap than 2 bits */
- 	if (lsl->sl_flags & SWAP_LAYOUTS_CHECK_DV1)
-@@ -1720,10 +1795,8 @@ static int ll_swap_layouts(struct file *file1, struct file *file2,
- 	llss->dv2 = lsl->sl_dv2;
- 
- 	rc = lu_fid_cmp(ll_inode2fid(llss->inode1), ll_inode2fid(llss->inode2));
--	if (rc == 0) /* same file, done! */ {
--		rc = 0;
-+	if (!rc) /* same file, done! */
- 		goto free;
--	}
- 
- 	if (rc < 0) { /* sequentialize it */
- 		swap(llss->inode1, llss->inode2);
-@@ -1745,19 +1818,6 @@ static int ll_swap_layouts(struct file *file1, struct file *file2,
- 		}
- 	}
- 
--	/* to be able to restore mtime and atime after swap
--	 * we need to first save them
--	 */
--	if (lsl->sl_flags &
--	    (SWAP_LAYOUTS_KEEP_MTIME | SWAP_LAYOUTS_KEEP_ATIME)) {
--		llss->ia1.ia_mtime = llss->inode1->i_mtime;
--		llss->ia1.ia_atime = llss->inode1->i_atime;
--		llss->ia1.ia_valid = ATTR_MTIME | ATTR_ATIME;
--		llss->ia2.ia_mtime = llss->inode2->i_mtime;
--		llss->ia2.ia_atime = llss->inode2->i_atime;
--		llss->ia2.ia_valid = ATTR_MTIME | ATTR_ATIME;
--	}
--
- 	/* ultimate check, before swapping the layouts we check if
- 	 * dataversion has changed (if requested)
- 	 */
-@@ -1807,39 +1867,6 @@ putgl:
- 		ll_put_grouplock(llss->inode1, file1, gid);
- 	}
- 
--	/* rc can be set from obd_iocontrol() or from a GOTO(putgl, ...) */
--	if (rc != 0)
--		goto free;
--
--	/* clear useless flags */
--	if (!(lsl->sl_flags & SWAP_LAYOUTS_KEEP_MTIME)) {
--		llss->ia1.ia_valid &= ~ATTR_MTIME;
--		llss->ia2.ia_valid &= ~ATTR_MTIME;
--	}
--
--	if (!(lsl->sl_flags & SWAP_LAYOUTS_KEEP_ATIME)) {
--		llss->ia1.ia_valid &= ~ATTR_ATIME;
--		llss->ia2.ia_valid &= ~ATTR_ATIME;
--	}
--
--	/* update time if requested */
--	rc = 0;
--	if (llss->ia2.ia_valid != 0) {
--		inode_lock(llss->inode1);
--		rc = ll_setattr(file1->f_path.dentry, &llss->ia2);
--		inode_unlock(llss->inode1);
--	}
--
--	if (llss->ia1.ia_valid != 0) {
--		int rc1;
--
--		inode_lock(llss->inode2);
--		rc1 = ll_setattr(file2->f_path.dentry, &llss->ia1);
--		inode_unlock(llss->inode2);
--		if (rc == 0)
--			rc = rc1;
--	}
--
- free:
- 	kfree(llss);
- 
-@@ -1996,16 +2023,46 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 				   sizeof(struct lustre_swap_layouts)))
- 			return -EFAULT;
- 
--		if ((file->f_flags & O_ACCMODE) == 0) /* O_RDONLY */
-+		if ((file->f_flags & O_ACCMODE) == O_RDONLY)
- 			return -EPERM;
- 
- 		file2 = fget(lsl.sl_fd);
- 		if (!file2)
- 			return -EBADF;
- 
--		rc = -EPERM;
--		if ((file2->f_flags & O_ACCMODE) != 0) /* O_WRONLY or O_RDWR */
-+		/* O_WRONLY or O_RDWR */
-+		if ((file2->f_flags & O_ACCMODE) == O_RDONLY) {
-+			rc = -EPERM;
-+			goto out;
-+		}
-+
-+		if (lsl.sl_flags & SWAP_LAYOUTS_CLOSE) {
-+			struct obd_client_handle *och = NULL;
-+			struct ll_inode_info *lli;
-+			struct inode *inode2;
-+
-+			if (lsl.sl_flags != SWAP_LAYOUTS_CLOSE) {
-+				rc = -EINVAL;
-+				goto out;
-+			}
-+
-+			lli = ll_i2info(inode);
-+			mutex_lock(&lli->lli_och_mutex);
-+			if (fd->fd_lease_och) {
-+				och = fd->fd_lease_och;
-+				fd->fd_lease_och = NULL;
-+			}
-+			mutex_unlock(&lli->lli_och_mutex);
-+			if (!och) {
-+				rc = -ENOLCK;
-+				goto out;
-+			}
-+			inode2 = file_inode(file2);
-+			rc = ll_swap_layouts_close(och, inode, inode2);
-+		} else {
- 			rc = ll_swap_layouts(file, file2, &lsl);
-+		}
-+out:
- 		fput(file2);
- 		return rc;
- 	}
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 84d5556..dbb7bd7 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -1524,11 +1524,7 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
- 		 * setting times to past, but it is necessary due to possible
- 		 * time de-synchronization between MDT inode and OST objects
- 		 */
--		if (attr->ia_valid & ATTR_SIZE)
--			down_write(&lli->lli_trunc_sem);
- 		rc = cl_setattr_ost(ll_i2info(inode)->lli_clob, attr, 0);
--		if (attr->ia_valid & ATTR_SIZE)
--			up_write(&lli->lli_trunc_sem);
- 	}
- out:
- 	if (op_data)
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index 5f93db8..b43e3a3 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -608,14 +608,6 @@ static int vvp_do_vmtruncate(struct inode *inode, size_t size)
- 	return result;
- }
- 
--static int vvp_io_setattr_trunc(const struct lu_env *env,
--				const struct cl_io_slice *ios,
--				struct inode *inode, loff_t size)
--{
--	inode_dio_wait(inode);
--	return 0;
--}
--
- static int vvp_io_setattr_time(const struct lu_env *env,
- 			       const struct cl_io_slice *ios)
- {
-@@ -646,15 +638,20 @@ static int vvp_io_setattr_start(const struct lu_env *env,
- {
- 	struct cl_io	*io    = ios->cis_io;
- 	struct inode	*inode = vvp_object_inode(io->ci_obj);
--	int result = 0;
-+	struct ll_inode_info *lli = ll_i2info(inode);
- 
--	inode_lock(inode);
--	if (cl_io_is_trunc(io))
--		result = vvp_io_setattr_trunc(env, ios, inode,
--					io->u.ci_setattr.sa_attr.lvb_size);
--	if (!result && io->u.ci_setattr.sa_valid & TIMES_SET_FLAGS)
--		result = vvp_io_setattr_time(env, ios);
--	return result;
-+	if (cl_io_is_trunc(io)) {
-+		down_write(&lli->lli_trunc_sem);
-+		inode_lock(inode);
-+		inode_dio_wait(inode);
-+	} else {
-+		inode_lock(inode);
-+	}
-+
-+	if (io->u.ci_setattr.sa_valid & TIMES_SET_FLAGS)
-+		return vvp_io_setattr_time(env, ios);
-+
-+	return 0;
- }
- 
- static void vvp_io_setattr_end(const struct lu_env *env,
-@@ -662,14 +659,18 @@ static void vvp_io_setattr_end(const struct lu_env *env,
- {
- 	struct cl_io *io    = ios->cis_io;
- 	struct inode *inode = vvp_object_inode(io->ci_obj);
-+	struct ll_inode_info *lli = ll_i2info(inode);
- 
--	if (cl_io_is_trunc(io))
-+	if (cl_io_is_trunc(io)) {
- 		/* Truncate in memory pages - they must be clean pages
- 		 * because osc has already notified to destroy osc_extents.
- 		 */
- 		vvp_do_vmtruncate(inode, io->u.ci_setattr.sa_attr.lvb_size);
--
--	inode_unlock(inode);
-+		inode_unlock(inode);
-+		up_write(&lli->lli_trunc_sem);
-+	} else {
-+		inode_unlock(inode);
-+	}
- }
- 
- static void vvp_io_setattr_fini(const struct lu_env *env,
-@@ -685,6 +686,7 @@ static int vvp_io_read_start(const struct lu_env *env,
- 	struct cl_io      *io    = ios->cis_io;
- 	struct cl_object  *obj   = io->ci_obj;
- 	struct inode      *inode = vvp_object_inode(obj);
-+	struct ll_inode_info *lli = ll_i2info(inode);
- 	struct file       *file  = vio->vui_fd->fd_file;
- 
- 	int     result;
-@@ -697,6 +699,9 @@ static int vvp_io_read_start(const struct lu_env *env,
- 
- 	CDEBUG(D_VFSTRACE, "read: -> [%lli, %lli)\n", pos, pos + cnt);
- 
-+	if (vio->vui_io_subtype == IO_NORMAL)
-+		down_read(&lli->lli_trunc_sem);
-+
- 	if (!can_populate_pages(env, io, inode))
- 		return 0;
- 
-@@ -939,10 +944,14 @@ static int vvp_io_write_start(const struct lu_env *env,
- 	struct cl_io       *io    = ios->cis_io;
- 	struct cl_object   *obj   = io->ci_obj;
- 	struct inode       *inode = vvp_object_inode(obj);
-+	struct ll_inode_info *lli = ll_i2info(inode);
- 	ssize_t result = 0;
- 	loff_t pos = io->u.ci_wr.wr.crw_pos;
- 	size_t cnt = io->u.ci_wr.wr.crw_count;
- 
-+	if (vio->vui_io_subtype == IO_NORMAL)
-+		down_read(&lli->lli_trunc_sem);
-+
- 	if (!can_populate_pages(env, io, inode))
- 		return 0;
- 
-@@ -1026,6 +1035,17 @@ static int vvp_io_write_start(const struct lu_env *env,
- 	return result;
- }
- 
-+static void vvp_io_rw_end(const struct lu_env *env,
-+			  const struct cl_io_slice *ios)
++ * Search for a lock with given parameters in interval trees.
++ *
++ * \param res	search for a lock in this resource
++ * \param data	parameters
++ *
++ * \retval	a referenced lock or NULL.
++ */
++static struct ldlm_lock *search_itree(struct ldlm_resource *res,
++				      struct lock_match_data *data)
 +{
-+	struct vvp_io *vio = cl2vvp_io(env, ios);
-+	struct inode *inode = vvp_object_inode(ios->cis_obj);
-+	struct ll_inode_info *lli = ll_i2info(inode);
++	struct interval_node_extent ext = {
++		.start	= data->lmd_policy->l_extent.start,
++		.end	= data->lmd_policy->l_extent.end
++	};
++	int idx;
 +
-+	if (vio->vui_io_subtype == IO_NORMAL)
-+		up_read(&lli->lli_trunc_sem);
-+}
++	for (idx = 0; idx < LCK_MODE_NUM; idx++) {
++		struct ldlm_interval_tree *tree = &res->lr_itree[idx];
 +
- static int vvp_io_kernel_fault(struct vvp_fault_io *cfio)
- {
- 	struct vm_fault *vmf = cfio->ft_vmf;
-@@ -1078,6 +1098,7 @@ static int vvp_io_fault_start(const struct lu_env *env,
- 	struct cl_io	*io      = ios->cis_io;
- 	struct cl_object    *obj     = io->ci_obj;
- 	struct inode        *inode   = vvp_object_inode(obj);
-+	struct ll_inode_info *lli = ll_i2info(inode);
- 	struct cl_fault_io  *fio     = &io->u.ci_fault;
- 	struct vvp_fault_io *cfio    = &vio->u.fault;
- 	loff_t	       offset;
-@@ -1093,6 +1114,8 @@ static int vvp_io_fault_start(const struct lu_env *env,
- 		      " changed while waiting for the page fault lock\n",
- 		      PFID(lu_object_fid(&obj->co_lu)));
++		if (!tree->lit_root)
+ 			continue;
  
-+	down_read(&lli->lli_trunc_sem);
-+
- 	/* offset of the last byte on the page */
- 	offset = cl_offset(obj, fio->ft_index + 1) - 1;
- 	LASSERT(cl_index(obj, offset) == fio->ft_index);
-@@ -1240,6 +1263,17 @@ out:
- 	return result;
- }
+-		if ((flags & LDLM_FL_LOCAL_ONLY) && !ldlm_is_local(lock))
++		if (!(tree->lit_mode & *data->lmd_mode))
+ 			continue;
  
-+static void vvp_io_fault_end(const struct lu_env *env,
-+			     const struct cl_io_slice *ios)
-+{
-+	struct inode *inode = vvp_object_inode(ios->cis_obj);
-+	struct ll_inode_info *lli = ll_i2info(inode);
-+
-+	CLOBINVRNT(env, ios->cis_io->ci_obj,
-+		   vvp_object_invariant(ios->cis_io->ci_obj));
-+	up_read(&lli->lli_trunc_sem);
-+}
-+
- static int vvp_io_fsync_start(const struct lu_env *env,
- 			      const struct cl_io_slice *ios)
- {
-@@ -1269,18 +1303,13 @@ static int vvp_io_read_ahead(const struct lu_env *env,
- 	return result;
- }
- 
--static void vvp_io_end(const struct lu_env *env, const struct cl_io_slice *ios)
--{
--	CLOBINVRNT(env, ios->cis_io->ci_obj,
--		   vvp_object_invariant(ios->cis_io->ci_obj));
--}
--
- static const struct cl_io_operations vvp_io_ops = {
- 	.op = {
- 		[CIT_READ] = {
- 			.cio_fini	= vvp_io_fini,
- 			.cio_lock      = vvp_io_read_lock,
- 			.cio_start     = vvp_io_read_start,
-+			.cio_end	= vvp_io_rw_end,
- 			.cio_advance	= vvp_io_advance,
- 		},
- 		[CIT_WRITE] = {
-@@ -1289,6 +1318,7 @@ static const struct cl_io_operations vvp_io_ops = {
- 			.cio_iter_fini = vvp_io_write_iter_fini,
- 			.cio_lock      = vvp_io_write_lock,
- 			.cio_start     = vvp_io_write_start,
-+			.cio_end	= vvp_io_rw_end,
- 			.cio_advance   = vvp_io_advance,
- 		},
- 		[CIT_SETATTR] = {
-@@ -1303,7 +1333,7 @@ static const struct cl_io_operations vvp_io_ops = {
- 			.cio_iter_init = vvp_io_fault_iter_init,
- 			.cio_lock      = vvp_io_fault_lock,
- 			.cio_start     = vvp_io_fault_start,
--			.cio_end       = vvp_io_end,
-+			.cio_end       = vvp_io_fault_end,
- 		},
- 		[CIT_FSYNC] = {
- 			.cio_start  = vvp_io_fsync_start,
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-index 1925072..c1990f0 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-@@ -430,25 +430,29 @@ void mdc_getattr_pack(struct ptlrpc_request *req, __u64 valid, u32 flags,
- 			      op_data->op_namelen);
- }
- 
--static void mdc_hsm_release_pack(struct ptlrpc_request *req,
--				 struct md_op_data *op_data)
-+static void mdc_intent_close_pack(struct ptlrpc_request *req,
-+				  struct md_op_data *op_data)
- {
--	if (op_data->op_bias & MDS_HSM_RELEASE) {
--		struct close_data *data;
--		struct ldlm_lock *lock;
-+	enum mds_op_bias bias = op_data->op_bias;
-+	struct close_data *data;
-+	struct ldlm_lock *lock;
- 
--		data = req_capsule_client_get(&req->rq_pill, &RMF_CLOSE_DATA);
-+	if (!(bias & (MDS_HSM_RELEASE | MDS_CLOSE_LAYOUT_SWAP |
-+		      MDS_RENAME_MIGRATE)))
-+		return;
- 
--		lock = ldlm_handle2lock(&op_data->op_lease_handle);
--		if (lock) {
--			data->cd_handle = lock->l_remote_handle;
--			LDLM_LOCK_PUT(lock);
+-		if (flags & LDLM_FL_TEST_LOCK) {
+-			LDLM_LOCK_GET(lock);
+-			ldlm_lock_touch_in_lru(lock);
+-		} else {
+-			ldlm_lock_addref_internal_nolock(lock, match);
 -		}
--		ldlm_cli_cancel(&op_data->op_lease_handle, LCF_LOCAL);
-+	data = req_capsule_client_get(&req->rq_pill, &RMF_CLOSE_DATA);
-+	LASSERT(data);
- 
--		data->cd_data_version = op_data->op_data_version;
--		data->cd_fid = op_data->op_fid2;
-+	lock = ldlm_handle2lock(&op_data->op_lease_handle);
-+	if (lock) {
-+		data->cd_handle = lock->l_remote_handle;
-+		LDLM_LOCK_PUT(lock);
+-		*mode = match;
+-		return lock;
++		interval_search(tree->lit_root, &ext,
++				itree_overlap_cb, data);
  	}
-+	ldlm_cli_cancel(&op_data->op_lease_handle, LCF_LOCAL);
++	return data->lmd_lock;
++}
+ 
++/**
++ * Search for a lock with given properties in a queue.
++ *
++ * \param queue	search for a lock in this queue
++ * \param data	parameters
++ *
++ * \retval	a referenced lock or NULL.
++ */
++static struct ldlm_lock *search_queue(struct list_head *queue,
++				      struct lock_match_data *data)
++{
++	struct ldlm_lock *lock;
++	int rc;
 +
-+	data->cd_data_version = op_data->op_data_version;
-+	data->cd_fid = op_data->op_fid2;
++	list_for_each_entry(lock, queue, l_res_link) {
++		rc = lock_matches(lock, data);
++		if (rc == INTERVAL_ITER_STOP)
++			return data->lmd_lock;
++	}
+ 	return NULL;
  }
  
- void mdc_close_pack(struct ptlrpc_request *req, struct md_op_data *op_data)
-@@ -473,5 +477,5 @@ void mdc_close_pack(struct ptlrpc_request *req, struct md_op_data *op_data)
- 		rec->sa_valid &= ~MDS_ATTR_ATIME;
+@@ -1199,31 +1284,41 @@ enum ldlm_mode ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
+ 			       enum ldlm_mode mode,
+ 			       struct lustre_handle *lockh, int unref)
+ {
++	struct lock_match_data data = {
++		.lmd_old	= NULL,
++		.lmd_lock	= NULL,
++		.lmd_mode	= &mode,
++		.lmd_policy	= policy,
++		.lmd_flags	= flags,
++		.lmd_unref	= unref,
++	};
+ 	struct ldlm_resource *res;
+-	struct ldlm_lock *lock, *old_lock = NULL;
++	struct ldlm_lock *lock;
+ 	int rc = 0;
  
- 	mdc_ioepoch_pack(epoch, op_data);
--	mdc_hsm_release_pack(req, op_data);
-+	mdc_intent_close_pack(req, op_data);
- }
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 34ccff8..ac04bf3 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -720,9 +720,8 @@ static int mdc_close(struct obd_export *exp, struct md_op_data *op_data,
- 	int                    rc;
- 	int		       saved_rc = 0;
+ 	if (!ns) {
+-		old_lock = ldlm_handle2lock(lockh);
+-		LASSERT(old_lock);
++		data.lmd_old = ldlm_handle2lock(lockh);
++		LASSERT(data.lmd_old);
  
--	req_fmt = &RQF_MDS_CLOSE;
- 	if (op_data->op_bias & MDS_HSM_RELEASE) {
--		req_fmt = &RQF_MDS_RELEASE_CLOSE;
-+		req_fmt = &RQF_MDS_INTENT_CLOSE;
- 
- 		/* allocate a FID for volatile file */
- 		rc = mdc_fid_alloc(NULL, exp, &op_data->op_fid2, op_data);
-@@ -732,6 +731,10 @@ static int mdc_close(struct obd_export *exp, struct md_op_data *op_data,
- 			/* save the errcode and proceed to close */
- 			saved_rc = rc;
- 		}
-+	} else if (op_data->op_bias & MDS_CLOSE_LAYOUT_SWAP) {
-+		req_fmt = &RQF_MDS_INTENT_CLOSE;
-+	} else {
-+		req_fmt = &RQF_MDS_CLOSE;
+-		ns = ldlm_lock_to_ns(old_lock);
+-		res_id = &old_lock->l_resource->lr_name;
+-		type = old_lock->l_resource->lr_type;
+-		mode = old_lock->l_req_mode;
++		ns = ldlm_lock_to_ns(data.lmd_old);
++		res_id = &data.lmd_old->l_resource->lr_name;
++		type = data.lmd_old->l_resource->lr_type;
++		*data.lmd_mode = data.lmd_old->l_req_mode;
  	}
  
- 	*request = NULL;
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
-index f0e0448..31aa58e 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
-@@ -121,7 +121,7 @@ static const struct req_msg_field *mdt_close_client[] = {
- 	&RMF_CAPA1
- };
+ 	res = ldlm_resource_get(ns, NULL, res_id, type, 0);
+ 	if (IS_ERR(res)) {
+-		LASSERT(!old_lock);
++		LASSERT(!data.lmd_old);
+ 		return 0;
+ 	}
  
--static const struct req_msg_field *mdt_release_close_client[] = {
-+static const struct req_msg_field *mdt_intent_close_client[] = {
- 	&RMF_PTLRPC_BODY,
- 	&RMF_MDT_EPOCH,
- 	&RMF_REC_REINT,
-@@ -666,7 +666,7 @@ static struct req_format *req_formats[] = {
- 	&RQF_MDS_GETXATTR,
- 	&RQF_MDS_SYNC,
- 	&RQF_MDS_CLOSE,
--	&RQF_MDS_RELEASE_CLOSE,
-+	&RQF_MDS_INTENT_CLOSE,
- 	&RQF_MDS_READPAGE,
- 	&RQF_MDS_WRITEPAGE,
- 	&RQF_MDS_REINT,
-@@ -1365,10 +1365,10 @@ struct req_format RQF_MDS_CLOSE =
- 			mdt_close_client, mds_last_unlink_server);
- EXPORT_SYMBOL(RQF_MDS_CLOSE);
+ 	LDLM_RESOURCE_ADDREF(res);
+ 	lock_res(res);
  
--struct req_format RQF_MDS_RELEASE_CLOSE =
-+struct req_format RQF_MDS_INTENT_CLOSE =
- 	DEFINE_REQ_FMT0("MDS_CLOSE",
--			mdt_release_close_client, mds_last_unlink_server);
--EXPORT_SYMBOL(RQF_MDS_RELEASE_CLOSE);
-+			mdt_intent_close_client, mds_last_unlink_server);
-+EXPORT_SYMBOL(RQF_MDS_INTENT_CLOSE);
+-	lock = search_queue(&res->lr_granted, &mode, policy, old_lock,
+-			    flags, unref);
++	if (res->lr_type == LDLM_EXTENT)
++		lock = search_itree(res, &data);
++	else
++		lock = search_queue(&res->lr_granted, &data);
+ 	if (lock) {
+ 		rc = 1;
+ 		goto out;
+@@ -1232,14 +1327,12 @@ enum ldlm_mode ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
+ 		rc = 0;
+ 		goto out;
+ 	}
+-	lock = search_queue(&res->lr_waiting, &mode, policy, old_lock,
+-			    flags, unref);
++	lock = search_queue(&res->lr_waiting, &data);
+ 	if (lock) {
+ 		rc = 1;
+ 		goto out;
+ 	}
+-
+- out:
++out:
+ 	unlock_res(res);
+ 	LDLM_RESOURCE_DELREF(res);
+ 	ldlm_resource_putref(res);
+@@ -1311,8 +1404,8 @@ enum ldlm_mode ldlm_lock_match(struct ldlm_namespace *ns, __u64 flags,
+ 				  (type == LDLM_PLAIN || type == LDLM_IBITS) ?
+ 					res_id->name[3] : policy->l_extent.end);
+ 	}
+-	if (old_lock)
+-		LDLM_LOCK_PUT(old_lock);
++	if (data.lmd_old)
++		LDLM_LOCK_PUT(data.lmd_old);
  
- struct req_format RQF_MDS_READPAGE =
- 	DEFINE_REQ_FMT0("MDS_READPAGE",
+ 	return rc ? mode : 0;
+ }
 -- 
 1.7.1
