@@ -1,50 +1,102 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 1 Sep 2016 02:59:21 +0100 (BST)
-Subject: [lustre-devel] [PATCH 2/2] staging: lustre: hide unused variable
-In-Reply-To: <20160829122023.3018966-2-arnd@arndb.de>
-References: <20160829122023.3018966-1-arnd@arndb.de>
-	<20160829122023.3018966-2-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1609010258550.21057@casper.infradead.org>
+Date: Sun,  2 Oct 2016 22:22:31 -0400
+Subject: [lustre-devel] [PATCH] staging: lustre: ko2iblbd: handle
+	ib_dereg_mr removal
+Message-ID: <1475461351-21495-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Arnd Bergmann <arnd@arndb.de>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Mel Gorman <mgorman@techsingularity.net>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "John L. Hammond" <john.hammond@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
+In the rdma-next tree to be merged for 4.9-rc1 removes
+the IB core function ib_get_dma_mr. This patch migrates
+us way from this former function.
 
-> After a code cleanup, we get a harmless warning about a variable
-> that is unused when CONFIG_FS_POSIX_ACL is disabled:
-> 
-> drivers/staging/lustre/lustre/llite/xattr.c: In function 'll_xattr_get_common':
-> drivers/staging/lustre/lustre/llite/xattr.c:312:24: error: unused variable 'lli' [-Werror=unused-variable]
-> 
-> This puts the variable declaration into the same #ifdef.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 1e1f9ff406fd ("staging: lustre: llite: break ll_getxattr_common into 2 functions")
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   19 ++++++++++++-------
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    5 +++++
+ 2 files changed, 17 insertions(+), 7 deletions(-)
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-
-> ---
->  drivers/staging/lustre/lustre/llite/xattr.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-> index f252c26ec30f..7b8d4699a71a 100644
-> --- a/drivers/staging/lustre/lustre/llite/xattr.c
-> +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-> @@ -309,7 +309,9 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
->  {
->  	char fullname[strlen(handler->prefix) + strlen(name) + 1];
->  	struct ll_sb_info *sbi = ll_i2sbi(inode);
-> +#ifdef CONFIG_FS_POSIX_ACL
->  	struct ll_inode_info *lli = ll_i2info(inode);
-> +#endif
->  	int rc;
->  
->  	CDEBUG(D_VFSTRACE, "VFS Op:inode="DFID"(%p)\n",
-> -- 
-> 2.9.0
-> 
-> 
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index c7a5d49..4010591 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -1316,7 +1316,7 @@ static void kiblnd_destroy_fmr_pool(struct kib_fmr_pool *fpo)
+ 		list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
+ 					 frd_list) {
+ 			list_del(&frd->frd_list);
+-			ib_dereg_mr(frd->frd_mr);
++			kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
+ 			LIBCFS_FREE(frd, sizeof(*frd));
+ 			i++;
+ 		}
+@@ -1422,14 +1422,14 @@ static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps, struct kib_fmr_po
+ 
+ out_middle:
+ 	if (frd->frd_mr)
+-		ib_dereg_mr(frd->frd_mr);
++		kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
+ 	LIBCFS_FREE(frd, sizeof(*frd));
+ 
+ out:
+ 	list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
+ 				 frd_list) {
+ 		list_del(&frd->frd_list);
+-		ib_dereg_mr(frd->frd_mr);
++		kib_dereg_mr(fpo->fpo_hdev, frd->frd_mr);
+ 		LIBCFS_FREE(frd, sizeof(*frd));
+ 	}
+ 
+@@ -2288,8 +2288,8 @@ static void kiblnd_hdev_cleanup_mrs(struct kib_hca_dev *hdev)
+ 	if (!hdev->ibh_mrs)
+ 		return;
+ 
+-	ib_dereg_mr(hdev->ibh_mrs);
+-
++	kib_dereg_mr(hdev, hdev->ibh_mrs);
++	hdev->ibh_pd->device->dereg_mr(hdev->ibh_mrs);
+ 	hdev->ibh_mrs = NULL;
+ }
+ 
+@@ -2316,13 +2316,18 @@ static int kiblnd_hdev_setup_mrs(struct kib_hca_dev *hdev)
+ 	if (rc)
+ 		return rc;
+ 
+-	mr = ib_get_dma_mr(hdev->ibh_pd, acflags);
++	mr = hdev->ibh_pd->device->get_dma_mr(hdev->ibh_pd, acflags);
+ 	if (IS_ERR(mr)) {
+-		CERROR("Failed ib_get_dma_mr : %ld\n", PTR_ERR(mr));
++		CERROR("Failed device get_dma_mr : %ld\n", PTR_ERR(mr));
+ 		kiblnd_hdev_cleanup_mrs(hdev);
+ 		return PTR_ERR(mr);
+ 	}
+ 
++	mr->device = hdev->ibh_pd->device;
++	mr->pd = hdev->ibh_pd;
++	mr->uobject = NULL;
++	mr->need_inval = false;
++
+ 	hdev->ibh_mrs = mr;
+ 
+ 	return 0;
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+index 1457697..f8b49c5 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -178,6 +178,11 @@ struct kib_hca_dev {
+ 	atomic_t           ibh_ref;             /* refcount */
+ };
+ 
++static inline void kib_dereg_mr(struct kib_hca_dev *hdev, struct ib_mr *mr)
++{
++	hdev->ibh_pd->device->dereg_mr(mr);
++}
++
+ /** # of seconds to keep pool alive */
+ #define IBLND_POOL_DEADLINE     300
+ /** # of seconds to retry if allocation failed */
+-- 
+1.7.1
