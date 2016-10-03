@@ -1,799 +1,731 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun,  2 Oct 2016 22:28:36 -0400
-Subject: [lustre-devel] [PATCH 40/41] staging: lustre: lov: move LSM to LOV
-	layer
+Date: Sun,  2 Oct 2016 22:28:26 -0400
+Subject: [lustre-devel] [PATCH 30/41] staging: lustre: quota: remove
+	obsolete quota code
 In-Reply-To: <1475461717-21631-1-git-send-email-jsimmons@infradead.org>
 References: <1475461717-21631-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1475461717-21631-41-git-send-email-jsimmons@infradead.org>
+Message-ID: <1475461717-21631-31-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: John L. Hammond <john.hammond@intel.com>
+From: Niu Yawei <yawei.niu@intel.com>
 
-Move the definition of struct lov_stripe_md along with supporting
-functions from obd.h to lov_internal.h. Remove the unused functions
-obd_packmd() and obd_free_diskmd(). Simplify lov_obd_packmd()
-according to the reduced use cases and rename it lov_packmd().
+Remove the obsolete quotacheck, quotaon and quotaoff, which
+were retained for the interoperability with old (< 2.4) client
+and server.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5814
-Reviewed-on: http://review.whamcloud.com/13696
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Some other obsolete quota code related to LL_IOC_QUOTACTL_18,
+Q_INVLIDATE and Q_FINVALIDATE are removed as well.
+
+Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5975
+Reviewed-on: http://review.whamcloud.com/14705
+Reviewed-by: Fan Yong <fan.yong@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h        |   77 +----------
- drivers/staging/lustre/lustre/include/obd_class.h  |   38 -----
- .../staging/lustre/lustre/llite/llite_internal.h   |    2 -
- drivers/staging/lustre/lustre/llite/vvp_internal.h |    1 -
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  105 --------------
- drivers/staging/lustre/lustre/lov/lov_ea.c         |    4 +-
- drivers/staging/lustre/lustre/lov/lov_internal.h   |   80 +++++++++++-
- drivers/staging/lustre/lustre/lov/lov_obd.c        |    9 --
- drivers/staging/lustre/lustre/lov/lov_pack.c       |  145 +++++---------------
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    8 -
- drivers/staging/lustre/lustre/osc/osc_request.c    |   63 ---------
- 11 files changed, 118 insertions(+), 414 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      |    6 +-
+ .../lustre/lustre/include/lustre/lustre_ioctl.h    |    4 +-
+ .../lustre/lustre/include/lustre/lustre_user.h     |   13 +---
+ .../lustre/lustre/include/lustre_req_layout.h      |    3 -
+ drivers/staging/lustre/lustre/include/obd.h        |    9 ---
+ drivers/staging/lustre/lustre/include/obd_class.h  |   12 ----
+ .../staging/lustre/lustre/include/obd_support.h    |    6 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |    2 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |   24 -------
+ drivers/staging/lustre/lustre/llite/dir.c          |   65 --------------------
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   31 +---------
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |   54 +----------------
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |   50 ---------------
+ drivers/staging/lustre/lustre/osc/osc_internal.h   |    3 -
+ drivers/staging/lustre/lustre/osc/osc_quota.c      |   44 -------------
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    4 -
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      |   15 -----
+ 17 files changed, 15 insertions(+), 330 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 17feb71..7645ed9 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -1406,7 +1406,7 @@ enum ost_cmd {
+ 	OST_STATFS     = 13,
+ 	OST_SYNC       = 16,
+ 	OST_SET_INFO   = 17,
+-	OST_QUOTACHECK = 18,
++	OST_QUOTACHECK = 18, /* not used since 2.4 */
+ 	OST_QUOTACTL   = 19,
+ 	OST_QUOTA_ADJUST_QUNIT = 20, /* not used since 2.4 */
+ 	OST_LAST_OPC
+@@ -1925,7 +1925,7 @@ enum mds_cmd {
+ 	MDS_SYNC		= 44,
+ 	MDS_DONE_WRITING	= 45, /* obsolete since 2.8.0 */
+ 	MDS_SET_INFO		= 46,
+-	MDS_QUOTACHECK		= 47,
++	MDS_QUOTACHECK		= 47, /* not used since 2.4 */
+ 	MDS_QUOTACTL		= 48,
+ 	MDS_GETXATTR		= 49,
+ 	MDS_SETXATTR		= 50, /* obsolete, now it's MDS_REINT op */
+@@ -2889,7 +2889,7 @@ void lustre_swab_cfg_marker(struct cfg_marker *marker, int swab, int size);
+ enum obd_cmd {
+ 	OBD_PING = 400,
+ 	OBD_LOG_CANCEL,
+-	OBD_QC_CALLBACK,
++	OBD_QC_CALLBACK, /* not used since 2.4 */
+ 	OBD_IDX_READ,
+ 	OBD_LAST_OPC
+ };
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
+index f3d7c94..eb08df3 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
+@@ -363,8 +363,8 @@ obd_ioctl_unpack(struct obd_ioctl_data *data, char *pbuf, int max_len)
+ /*	OBD_IOC_LOV_GETSTRIPE	155 LL_IOC_LOV_GETSTRIPE */
+ /*	OBD_IOC_LOV_SETEA	156 LL_IOC_LOV_SETEA */
+ /*	lustre/lustre_user.h	157-159 */
+-#define	OBD_IOC_QUOTACHECK	_IOW('f', 160, int)
+-#define	OBD_IOC_POLL_QUOTACHECK	_IOR('f', 161, struct if_quotacheck *)
++/*	OBD_IOC_QUOTACHECK	_IOW('f', 160, int) */
++/*	OBD_IOC_POLL_QUOTACHECK	_IOR('f', 161, struct if_quotacheck *) */
+ #define OBD_IOC_QUOTACTL	_IOWR('f', 162, struct if_quotactl)
+ /*	lustre/lustre_user.h	163-176 */
+ #define OBD_IOC_CHANGELOG_REG	_IOW('f', 177, struct obd_ioctl_data)
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+index 80fecba..856e2f9 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+@@ -557,23 +557,18 @@ static inline void obd_uuid2fsname(char *buf, char *uuid, int buflen)
+ #define Q_FINVALIDATE  0x800104 /* deprecated as of 2.4 */
+ 
+ /* these must be explicitly translated into linux Q_* in ll_dir_ioctl */
+-#define LUSTRE_Q_QUOTAON    0x800002     /* turn quotas on */
+-#define LUSTRE_Q_QUOTAOFF   0x800003     /* turn quotas off */
++#define LUSTRE_Q_QUOTAON    0x800002	/* deprecated as of 2.4 */
++#define LUSTRE_Q_QUOTAOFF   0x800003	/* deprecated as of 2.4 */
+ #define LUSTRE_Q_GETINFO    0x800005     /* get information about quota files */
+ #define LUSTRE_Q_SETINFO    0x800006     /* set information about quota files */
+ #define LUSTRE_Q_GETQUOTA   0x800007     /* get user quota structure */
+ #define LUSTRE_Q_SETQUOTA   0x800008     /* set user quota structure */
+ /* lustre-specific control commands */
+-#define LUSTRE_Q_INVALIDATE  0x80000b     /* invalidate quota data */
+-#define LUSTRE_Q_FINVALIDATE 0x80000c     /* invalidate filter quota data */
++#define LUSTRE_Q_INVALIDATE  0x80000b	/* deprecated as of 2.4 */
++#define LUSTRE_Q_FINVALIDATE 0x80000c	/* deprecated as of 2.4 */
+ 
+ #define UGQUOTA 2       /* set both USRQUOTA and GRPQUOTA */
+ 
+-struct if_quotacheck {
+-	char		    obd_type[16];
+-	struct obd_uuid	 obd_uuid;
+-};
+-
+ #define IDENTITY_DOWNCALL_MAGIC 0x6d6dd629
+ 
+ /* permission */
+diff --git a/drivers/staging/lustre/lustre/include/lustre_req_layout.h b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+index dd8717e..78857b3 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_req_layout.h
++++ b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+@@ -165,9 +165,7 @@ extern struct req_format RQF_MDS_REINT_LINK;
+ extern struct req_format RQF_MDS_REINT_RENAME;
+ extern struct req_format RQF_MDS_REINT_SETATTR;
+ extern struct req_format RQF_MDS_REINT_SETXATTR;
+-extern struct req_format RQF_MDS_QUOTACHECK;
+ extern struct req_format RQF_MDS_QUOTACTL;
+-extern struct req_format RQF_QC_CALLBACK;
+ extern struct req_format RQF_MDS_SWAP_LAYOUTS;
+ /* MDS hsm formats */
+ extern struct req_format RQF_MDS_HSM_STATE_GET;
+@@ -180,7 +178,6 @@ extern struct req_format RQF_MDS_HSM_REQUEST;
+ /* OST req_format */
+ extern struct req_format RQF_OST_CONNECT;
+ extern struct req_format RQF_OST_DISCONNECT;
+-extern struct req_format RQF_OST_QUOTACHECK;
+ extern struct req_format RQF_OST_QUOTACTL;
+ extern struct req_format RQF_OST_GETATTR;
+ extern struct req_format RQF_OST_SETATTR;
 diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index f63336f..ebb3012 100644
+index 8372deb..2811901 100644
 --- a/drivers/staging/lustre/lustre/include/obd.h
 +++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -73,53 +73,7 @@ static inline void loi_init(struct lov_oinfo *loi)
- {
- }
+@@ -345,13 +345,6 @@ struct client_obd {
+ 	/* also protected by the poorly named _loi_list_lock lock above */
+ 	struct osc_async_rc      cl_ar;
  
--/*
-- * If we are unable to get the maximum object size from the OST in
-- * ocd_maxbytes using OBD_CONNECT_MAXBYTES, then we fall back to using
-- * the old maximum object size from ext3.
-- */
--#define LUSTRE_EXT3_STRIPE_MAXBYTES 0x1fffffff000ULL
+-	/* used by quotacheck when the servers are older than 2.4 */
+-	int		      cl_qchk_stat; /* quotacheck stat of the peer */
+-#define CL_NOT_QUOTACHECKED 1   /* client->cl_qchk_stat init value */
+-#if OBD_OCD_VERSION(2, 7, 53, 0) < LUSTRE_VERSION_CODE
+-#warning "please consider removing quotacheck compatibility code"
+-#endif
 -
--struct lov_stripe_md {
--	atomic_t     lsm_refc;
--	spinlock_t	lsm_lock;
--	pid_t	    lsm_lock_owner; /* debugging */
--
--	/* maximum possible file size, might change as OSTs status changes,
--	 * e.g. disconnected, deactivated
--	 */
--	loff_t		lsm_maxbytes;
--	struct ost_id	lsm_oi;
--	__u32		lsm_magic;
--	__u32		lsm_stripe_size;
--	__u32		lsm_pattern;	/* striping pattern (RAID0, RAID1) */
--	__u16		lsm_stripe_count;
--	__u16		lsm_layout_gen;
--	char		lsm_pool_name[LOV_MAXPOOLNAME + 1];
--	struct lov_oinfo *lsm_oinfo[0];
--};
--
--static inline bool lsm_is_released(struct lov_stripe_md *lsm)
--{
--	return !!(lsm->lsm_pattern & LOV_PATTERN_F_RELEASED);
--}
--
--static inline bool lsm_has_objects(struct lov_stripe_md *lsm)
--{
--	if (!lsm)
--		return false;
--	if (lsm_is_released(lsm))
--		return false;
--	return true;
--}
--
--static inline int lov_stripe_md_size(unsigned int stripe_count)
--{
--	struct lov_stripe_md lsm;
--
--	return sizeof(lsm) + stripe_count * sizeof(lsm.lsm_oinfo[0]);
--}
--
-+struct lov_stripe_md;
- struct obd_info;
+ 	/* sequence manager */
+ 	struct lu_client_seq    *cl_seq;
  
- typedef int (*obd_enqueue_update_f)(void *cookie, int rc);
-@@ -854,8 +808,6 @@ struct obd_ops {
- 		      struct obd_statfs *osfs, __u64 max_age, __u32 flags);
- 	int (*statfs_async)(struct obd_export *exp, struct obd_info *oinfo,
- 			    __u64 max_age, struct ptlrpc_request_set *set);
--	int (*packmd)(struct obd_export *exp, struct lov_mds_md **disk_tgt,
--		      struct lov_stripe_md *mem_src);
- 	int (*unpackmd)(struct obd_export *exp,
- 			struct lov_stripe_md **mem_tgt,
- 			struct lov_mds_md *disk_src, int disk_len);
-@@ -1033,33 +985,6 @@ struct md_ops {
- 	 */
- };
+@@ -930,8 +923,6 @@ struct obd_ops {
+ 	struct obd_uuid *(*get_uuid)(struct obd_export *exp);
  
--struct lsm_operations {
--	void (*lsm_free)(struct lov_stripe_md *);
--	void (*lsm_stripe_by_index)(struct lov_stripe_md *, int *, u64 *,
--				    u64 *);
--	void (*lsm_stripe_by_offset)(struct lov_stripe_md *, int *, u64 *,
--				     u64 *);
--	int (*lsm_lmm_verify)(struct lov_mds_md *lmm, int lmm_bytes,
--			      __u16 *stripe_count);
--	int (*lsm_unpackmd)(struct lov_obd *lov, struct lov_stripe_md *lsm,
--			    struct lov_mds_md *lmm);
--};
--
--extern const struct lsm_operations lsm_v1_ops;
--extern const struct lsm_operations lsm_v3_ops;
--static inline const struct lsm_operations *lsm_op_find(int magic)
--{
--	switch (magic) {
--	case LOV_MAGIC_V1:
--	       return &lsm_v1_ops;
--	case LOV_MAGIC_V3:
--	       return &lsm_v3_ops;
--	default:
--	       CERROR("Cannot recognize lsm_magic %08x\n", magic);
--	       return NULL;
--	}
--}
--
- static inline struct md_open_data *obd_mod_alloc(void)
- {
- 	struct md_open_data *mod;
+ 	/* quota methods */
+-	int (*quotacheck)(struct obd_device *, struct obd_export *,
+-			  struct obd_quotactl *);
+ 	int (*quotactl)(struct obd_device *, struct obd_export *,
+ 			struct obd_quotactl *);
+ 
 diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 0eaea54..aba96c3 100644
+index cb7160e..8f1d681 100644
 --- a/drivers/staging/lustre/lustre/include/obd_class.h
 +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -609,44 +609,6 @@ obd_process_config(struct obd_device *obd, int datalen, void *data)
- 	return rc;
+@@ -1163,18 +1163,6 @@ static inline int obd_notify_observer(struct obd_device *observer,
+ 	return rc1 ? rc1 : rc2;
  }
  
--/* Pack an in-memory MD struct for storage on disk.
-- * Returns +ve size of packed MD (0 for free), or -ve error.
-- *
-- * If @disk_tgt == NULL, MD size is returned (max size if @mem_src == NULL).
-- * If @*disk_tgt != NULL and @mem_src == NULL, @*disk_tgt will be freed.
-- * If @*disk_tgt == NULL, it will be allocated
-- */
--static inline int obd_packmd(struct obd_export *exp,
--			     struct lov_mds_md **disk_tgt,
--			     struct lov_stripe_md *mem_src)
+-static inline int obd_quotacheck(struct obd_export *exp,
+-				 struct obd_quotactl *oqctl)
 -{
 -	int rc;
 -
--	EXP_CHECK_DT_OP(exp, packmd);
--	EXP_COUNTER_INCREMENT(exp, packmd);
+-	EXP_CHECK_DT_OP(exp, quotacheck);
+-	EXP_COUNTER_INCREMENT(exp, quotacheck);
 -
--	rc = OBP(exp->exp_obd, packmd)(exp, disk_tgt, mem_src);
+-	rc = OBP(exp->exp_obd, quotacheck)(exp->exp_obd, exp, oqctl);
 -	return rc;
 -}
 -
--static inline int obd_free_diskmd(struct obd_export *exp,
--				  struct lov_mds_md **disk_tgt)
--{
--	LASSERT(disk_tgt);
--	LASSERT(*disk_tgt);
--	/*
--	 * LU-2590, for caller's convenience, *disk_tgt could be host
--	 * endianness, it needs swab to LE if necessary, while just
--	 * lov_mds_md header needs it for figuring out how much memory
--	 * needs to be freed.
--	 */
--	if ((cpu_to_le32(LOV_MAGIC) != LOV_MAGIC) &&
--	    (((*disk_tgt)->lmm_magic == LOV_MAGIC_V1) ||
--	     ((*disk_tgt)->lmm_magic == LOV_MAGIC_V3)))
--		lustre_swab_lov_mds_md(*disk_tgt);
--	return obd_packmd(exp, disk_tgt, NULL);
--}
+ static inline int obd_quotactl(struct obd_export *exp,
+ 			       struct obd_quotactl *oqctl)
+ {
+diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
+index 9d2d6f8..1233c34 100644
+--- a/drivers/staging/lustre/lustre/include/obd_support.h
++++ b/drivers/staging/lustre/lustre/include/obd_support.h
+@@ -179,7 +179,7 @@ extern char obd_jobid_var[];
+ #define OBD_FAIL_MDS_STATFS_LCW_SLEEP    0x12a
+ #define OBD_FAIL_MDS_OPEN_CREATE	 0x12b
+ #define OBD_FAIL_MDS_OST_SETATTR	 0x12c
+-#define OBD_FAIL_MDS_QUOTACHECK_NET      0x12d
++/*	OBD_FAIL_MDS_QUOTACHECK_NET      0x12d obsolete since 2.4 */
+ #define OBD_FAIL_MDS_QUOTACTL_NET	0x12e
+ #define OBD_FAIL_MDS_CLIENT_ADD	  0x12f
+ #define OBD_FAIL_MDS_GETXATTR_NET	0x130
+@@ -264,7 +264,7 @@ extern char obd_jobid_var[];
+ #define OBD_FAIL_OST_ENOSPC	      0x215
+ #define OBD_FAIL_OST_EROFS	       0x216
+ #define OBD_FAIL_OST_ENOENT	      0x217
+-#define OBD_FAIL_OST_QUOTACHECK_NET      0x218
++/*	OBD_FAIL_OST_QUOTACHECK_NET      0x218 obsolete since 2.4 */
+ #define OBD_FAIL_OST_QUOTACTL_NET	0x219
+ #define OBD_FAIL_OST_CHECKSUM_RECEIVE    0x21a
+ #define OBD_FAIL_OST_CHECKSUM_SEND       0x21b
+@@ -373,7 +373,7 @@ extern char obd_jobid_var[];
+ #define OBD_FAIL_OBD_PING_NET	    0x600
+ #define OBD_FAIL_OBD_LOG_CANCEL_NET      0x601
+ #define OBD_FAIL_OBD_LOGD_NET	    0x602
+-#define OBD_FAIL_OBD_QC_CALLBACK_NET     0x603
++/*	OBD_FAIL_OBD_QC_CALLBACK_NET     0x603 obsolete since 2.4 */
+ #define OBD_FAIL_OBD_DQACQ	       0x604
+ #define OBD_FAIL_OBD_LLOG_SETUP	  0x605
+ #define OBD_FAIL_OBD_LOG_CANCEL_REP      0x606
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+index 153e990..f3128b6 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+@@ -425,8 +425,6 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
+ 		goto err_import;
+ 	}
+ 
+-	cli->cl_qchk_stat = CL_NOT_QUOTACHECKED;
 -
- /* Unpack an MD struct from disk to in-memory format.
-  * Returns +ve size of unpacked MD (0 for free), or -ve error.
-  *
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index cf95a72..24ce243 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -609,8 +609,6 @@ struct ll_file_data {
- 	struct list_head fd_lccs; /* list of ll_cl_context */
- };
+ 	return rc;
  
--struct lov_stripe_md;
--
- extern struct dentry *llite_root;
- extern struct kset *llite_kset;
- 
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_internal.h b/drivers/staging/lustre/lustre/llite/vvp_internal.h
-index 09fa357..43e19da 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/vvp_internal.h
-@@ -42,7 +42,6 @@
- 
- enum obd_notify_event;
- struct inode;
--struct lov_stripe_md;
- struct lustre_md;
- struct obd_device;
- struct obd_export;
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 75f5958..679cd87 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -2736,90 +2736,6 @@ static int lmv_set_info_async(const struct lu_env *env, struct obd_export *exp,
- 	return -EINVAL;
+ err_import:
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+index c32b414..12647af 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+@@ -511,23 +511,6 @@ static inline void ldlm_callback_errmsg(struct ptlrpc_request *req,
+ 		CWARN("Send reply failed, maybe cause bug 21636.\n");
  }
  
--static int lmv_pack_md_v1(const struct lmv_stripe_md *lsm,
--			  struct lmv_mds_md_v1 *lmm1)
+-static int ldlm_handle_qc_callback(struct ptlrpc_request *req)
 -{
--	int cplen;
--	int i;
+-	struct obd_quotactl *oqctl;
+-	struct client_obd *cli = &req->rq_export->exp_obd->u.cli;
 -
--	lmm1->lmv_magic = cpu_to_le32(lsm->lsm_md_magic);
--	lmm1->lmv_stripe_count = cpu_to_le32(lsm->lsm_md_stripe_count);
--	lmm1->lmv_master_mdt_index = cpu_to_le32(lsm->lsm_md_master_mdt_index);
--	lmm1->lmv_hash_type = cpu_to_le32(lsm->lsm_md_hash_type);
--	cplen = strlcpy(lmm1->lmv_pool_name, lsm->lsm_md_pool_name,
--			sizeof(lmm1->lmv_pool_name));
--	if (cplen >= sizeof(lmm1->lmv_pool_name))
--		return -E2BIG;
+-	oqctl = req_capsule_client_get(&req->rq_pill, &RMF_OBD_QUOTACTL);
+-	if (!oqctl) {
+-		CERROR("Can't unpack obd_quotactl\n");
+-		return -EPROTO;
+-	}
 -
--	for (i = 0; i < lsm->lsm_md_stripe_count; i++)
--		fid_cpu_to_le(&lmm1->lmv_stripe_fids[i],
--			      &lsm->lsm_md_oinfo[i].lmo_fid);
+-	oqctl->qc_stat = ptlrpc_status_ntoh(oqctl->qc_stat);
+-
+-	cli->cl_qchk_stat = oqctl->qc_stat;
 -	return 0;
 -}
 -
--static int
--lmv_pack_md(union lmv_mds_md **lmmp, const struct lmv_stripe_md *lsm,
--	    int stripe_count)
--{
--	int lmm_size = 0, rc = 0;
--	bool allocated = false;
--
--	LASSERT(lmmp);
--
--	/* Free lmm */
--	if (*lmmp && !lsm) {
--		int stripe_cnt;
--
--		stripe_cnt = lmv_mds_md_stripe_count_get(*lmmp);
--		lmm_size = lmv_mds_md_size(stripe_cnt,
--					   le32_to_cpu((*lmmp)->lmv_magic));
--		if (!lmm_size)
--			return -EINVAL;
--		kvfree(*lmmp);
--		*lmmp = NULL;
--		return 0;
--	}
--
--	/* Alloc lmm */
--	if (!*lmmp && !lsm) {
--		lmm_size = lmv_mds_md_size(stripe_count, LMV_MAGIC);
--		LASSERT(lmm_size > 0);
--		*lmmp = libcfs_kvzalloc(lmm_size, GFP_NOFS);
--		if (!*lmmp)
--			return -ENOMEM;
--		lmv_mds_md_stripe_count_set(*lmmp, stripe_count);
--		(*lmmp)->lmv_magic = cpu_to_le32(LMV_MAGIC);
--		return lmm_size;
--	}
--
--	/* pack lmm */
--	LASSERT(lsm);
--	lmm_size = lmv_mds_md_size(lsm->lsm_md_stripe_count,
--				   lsm->lsm_md_magic);
--	if (!*lmmp) {
--		*lmmp = libcfs_kvzalloc(lmm_size, GFP_NOFS);
--		if (!*lmmp)
--			return -ENOMEM;
--		allocated = true;
--	}
--
--	switch (lsm->lsm_md_magic) {
--	case LMV_MAGIC_V1:
--		rc = lmv_pack_md_v1(lsm, &(*lmmp)->lmv_md_v1);
--		break;
--	default:
--		rc = -EINVAL;
--		break;
--	}
--
--	if (rc && allocated) {
--		kvfree(*lmmp);
--		*lmmp = NULL;
--	}
--
--	return lmm_size;
--}
--
- static int lmv_unpack_md_v1(struct obd_export *exp, struct lmv_stripe_md *lsm,
- 			    const struct lmv_mds_md_v1 *lmm1)
+ /* TODO: handle requests in a similar way as MDT: see mdt_handle_common() */
+ static int ldlm_callback_handler(struct ptlrpc_request *req)
  {
-@@ -2959,26 +2875,6 @@ static int lmv_unpackmd(struct obd_export *exp, struct lov_stripe_md **lsmp,
- 			     (union lmv_mds_md *)lmm, disk_len);
+@@ -577,13 +560,6 @@ static int ldlm_callback_handler(struct ptlrpc_request *req)
+ 		rc = ldlm_handle_setinfo(req);
+ 		ldlm_callback_reply(req, rc);
+ 		return 0;
+-	case OBD_QC_CALLBACK:
+-		req_capsule_set(&req->rq_pill, &RQF_QC_CALLBACK);
+-		if (OBD_FAIL_CHECK(OBD_FAIL_OBD_QC_CALLBACK_NET))
+-			return 0;
+-		rc = ldlm_handle_qc_callback(req);
+-		ldlm_callback_reply(req, rc);
+-		return 0;
+ 	default:
+ 		CERROR("unknown opcode %u\n",
+ 		       lustre_msg_get_opc(req->rq_reqmsg));
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 360d97f..929c32c 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -861,10 +861,6 @@ static int quotactl_ioctl(struct ll_sb_info *sbi, struct if_quotactl *qctl)
+ 	int rc = 0;
+ 
+ 	switch (cmd) {
+-	case LUSTRE_Q_INVALIDATE:
+-	case LUSTRE_Q_FINVALIDATE:
+-	case Q_QUOTAON:
+-	case Q_QUOTAOFF:
+ 	case Q_SETQUOTA:
+ 	case Q_SETINFO:
+ 		if (!capable(CFS_CAP_SYS_ADMIN))
+@@ -929,10 +925,6 @@ static int quotactl_ioctl(struct ll_sb_info *sbi, struct if_quotactl *qctl)
+ 		QCTL_COPY(oqctl, qctl);
+ 		rc = obd_quotactl(sbi->ll_md_exp, oqctl);
+ 		if (rc) {
+-			if (rc != -EALREADY && cmd == Q_QUOTAON) {
+-				oqctl->qc_cmd = Q_QUOTAOFF;
+-				obd_quotactl(sbi->ll_md_exp, oqctl);
+-			}
+ 			kfree(oqctl);
+ 			return rc;
+ 		}
+@@ -1369,63 +1361,6 @@ out_req:
+ 			ll_putname(filename);
+ 		return rc;
+ 	}
+-	case OBD_IOC_QUOTACHECK: {
+-		struct obd_quotactl *oqctl;
+-		int error = 0;
+-
+-		if (!capable(CFS_CAP_SYS_ADMIN))
+-			return -EPERM;
+-
+-		oqctl = kzalloc(sizeof(*oqctl), GFP_NOFS);
+-		if (!oqctl)
+-			return -ENOMEM;
+-		oqctl->qc_type = arg;
+-		rc = obd_quotacheck(sbi->ll_md_exp, oqctl);
+-		if (rc < 0) {
+-			CDEBUG(D_INFO, "md_quotacheck failed: rc %d\n", rc);
+-			error = rc;
+-		}
+-
+-		rc = obd_quotacheck(sbi->ll_dt_exp, oqctl);
+-		if (rc < 0)
+-			CDEBUG(D_INFO, "obd_quotacheck failed: rc %d\n", rc);
+-
+-		kfree(oqctl);
+-		return error ?: rc;
+-	}
+-	case OBD_IOC_POLL_QUOTACHECK: {
+-		struct if_quotacheck *check;
+-
+-		if (!capable(CFS_CAP_SYS_ADMIN))
+-			return -EPERM;
+-
+-		check = kzalloc(sizeof(*check), GFP_NOFS);
+-		if (!check)
+-			return -ENOMEM;
+-
+-		rc = obd_iocontrol(cmd, sbi->ll_md_exp, 0, (void *)check,
+-				   NULL);
+-		if (rc) {
+-			CDEBUG(D_QUOTA, "mdc ioctl %d failed: %d\n", cmd, rc);
+-			if (copy_to_user((void __user *)arg, check,
+-					 sizeof(*check)))
+-				CDEBUG(D_QUOTA, "copy_to_user failed\n");
+-			goto out_poll;
+-		}
+-
+-		rc = obd_iocontrol(cmd, sbi->ll_dt_exp, 0, (void *)check,
+-				   NULL);
+-		if (rc) {
+-			CDEBUG(D_QUOTA, "osc ioctl %d failed: %d\n", cmd, rc);
+-			if (copy_to_user((void __user *)arg, check,
+-					 sizeof(*check)))
+-				CDEBUG(D_QUOTA, "copy_to_user failed\n");
+-			goto out_poll;
+-		}
+-out_poll:
+-		kfree(check);
+-		return rc;
+-	}
+ 	case OBD_IOC_QUOTACTL: {
+ 		struct if_quotactl *qctl;
+ 
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 7bd7e15..67969a8 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -1128,9 +1128,7 @@ static int lmv_iocontrol(unsigned int cmd, struct obd_export *exp,
+ 			mdc_obd = class_exp2obd(tgt->ltd_exp);
+ 			mdc_obd->obd_force = obddev->obd_force;
+ 			err = obd_iocontrol(cmd, tgt->ltd_exp, len, karg, uarg);
+-			if (err == -ENODATA && cmd == OBD_IOC_POLL_QUOTACHECK) {
+-				return err;
+-			} else if (err) {
++			if (err) {
+ 				if (tgt->ltd_active) {
+ 					CERROR("error: iocontrol MDC %s on MDTidx %d cmd %x: err = %d\n",
+ 					       tgt->ltd_uuid.uuid, i, cmd, err);
+@@ -3243,32 +3241,6 @@ static int lmv_quotactl(struct obd_device *unused, struct obd_export *exp,
+ 	return rc;
  }
  
--static int lmv_packmd(struct obd_export *exp, struct lov_mds_md **lmmp,
--		      struct lov_stripe_md *lsm)
+-static int lmv_quotacheck(struct obd_device *unused, struct obd_export *exp,
+-			  struct obd_quotactl *oqctl)
 -{
--	const struct lmv_stripe_md *lmv = (struct lmv_stripe_md *)lsm;
--	struct obd_device *obd = exp->exp_obd;
--	struct lmv_obd *lmv_obd = &obd->u.lmv;
--	int stripe_count;
+-	struct obd_device   *obd = class_exp2obd(exp);
+-	struct lmv_obd      *lmv = &obd->u.lmv;
+-	struct lmv_tgt_desc *tgt;
+-	int rc = 0;
+-	u32 i;
 -
--	if (!lmmp) {
--		if (lsm)
--			stripe_count = lmv->lsm_md_stripe_count;
--		else
--			stripe_count = lmv_obd->desc.ld_tgt_count;
+-	for (i = 0; i < lmv->desc.ld_tgt_count; i++) {
+-		int err;
 -
--		return lmv_mds_md_size(stripe_count, LMV_MAGIC_V1);
+-		tgt = lmv->tgts[i];
+-		if (!tgt || !tgt->ltd_exp || !tgt->ltd_active) {
+-			CERROR("lmv idx %d inactive\n", i);
+-			return -EIO;
+-		}
+-
+-		err = obd_quotacheck(tgt->ltd_exp, oqctl);
+-		if (err && !rc)
+-			rc = err;
 -	}
 -
--	return lmv_pack_md((union lmv_mds_md **)lmmp, lmv, 0);
+-	return rc;
 -}
 -
- static int lmv_cancel_unused(struct obd_export *exp, const struct lu_fid *fid,
- 			     ldlm_policy_data_t *policy, enum ldlm_mode mode,
- 			     enum ldlm_cancel_flags flags, void *opaque)
-@@ -3282,7 +3178,6 @@ static struct obd_ops lmv_obd_ops = {
- 	.statfs		= lmv_statfs,
- 	.get_info	= lmv_get_info,
- 	.set_info_async	= lmv_set_info_async,
--	.packmd		= lmv_packmd,
- 	.unpackmd	= lmv_unpackmd,
+ static int lmv_merge_attr(struct obd_export *exp,
+ 			  const struct lmv_stripe_md *lsm,
+ 			  struct cl_attr *attr,
+@@ -3326,7 +3298,6 @@ static struct obd_ops lmv_obd_ops = {
  	.notify		= lmv_notify,
  	.get_uuid	= lmv_get_uuid,
-diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index 63dcd29..d7dc0aa 100644
---- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -206,7 +206,7 @@ static int lsm_unpackmd_common(struct lov_obd *lov,
+ 	.iocontrol	= lmv_iocontrol,
+-	.quotacheck	= lmv_quotacheck,
+ 	.quotactl	= lmv_quotactl
+ };
  
- static void
- lsm_stripe_by_index_plain(struct lov_stripe_md *lsm, int *stripeno,
--			  u64 *lov_off, u64 *swidth)
-+			  loff_t *lov_off, loff_t *swidth)
- {
- 	if (swidth)
- 		*swidth = (u64)lsm->lsm_stripe_size * lsm->lsm_stripe_count;
-@@ -214,7 +214,7 @@ lsm_stripe_by_index_plain(struct lov_stripe_md *lsm, int *stripeno,
- 
- static void
- lsm_stripe_by_offset_plain(struct lov_stripe_md *lsm, int *stripeno,
--			   u64 *lov_off, u64 *swidth)
-+			   loff_t *lov_off, loff_t *swidth)
- {
- 	if (swidth)
- 		*swidth = (u64)lsm->lsm_stripe_size * lsm->lsm_stripe_count;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index bd105d9..41e7c5f 100644
---- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -36,6 +36,84 @@
- #include "../include/obd_class.h"
- #include "../include/lustre/lustre_user.h"
- 
-+/*
-+ * If we are unable to get the maximum object size from the OST in
-+ * ocd_maxbytes using OBD_CONNECT_MAXBYTES, then we fall back to using
-+ * the old maximum object size from ext3.
-+ */
-+#define LUSTRE_EXT3_STRIPE_MAXBYTES 0x1fffffff000ULL
-+
-+struct lov_stripe_md {
-+	atomic_t	lsm_refc;
-+	spinlock_t	lsm_lock;
-+	pid_t		lsm_lock_owner; /* debugging */
-+
-+	/*
-+	 * maximum possible file size, might change as OSTs status changes,
-+	 * e.g. disconnected, deactivated
-+	 */
-+	loff_t		lsm_maxbytes;
-+	struct ost_id	lsm_oi;
-+	u32		lsm_magic;
-+	u32		lsm_stripe_size;
-+	u32		lsm_pattern; /* RAID0, RAID1, released, ... */
-+	u16		lsm_stripe_count;
-+	u16		lsm_layout_gen;
-+	char		lsm_pool_name[LOV_MAXPOOLNAME + 1];
-+	struct lov_oinfo	*lsm_oinfo[0];
-+};
-+
-+static inline bool lsm_is_released(struct lov_stripe_md *lsm)
-+{
-+	return !!(lsm->lsm_pattern & LOV_PATTERN_F_RELEASED);
-+}
-+
-+static inline bool lsm_has_objects(struct lov_stripe_md *lsm)
-+{
-+	if (!lsm)
-+		return false;
-+
-+	if (lsm_is_released(lsm))
-+		return false;
-+
-+	return true;
-+}
-+
-+static inline int lov_stripe_md_size(unsigned int stripe_count)
-+{
-+	struct lov_stripe_md lsm;
-+
-+	return sizeof(lsm) + stripe_count * sizeof(lsm.lsm_oinfo[0]);
-+}
-+
-+struct lsm_operations {
-+	void (*lsm_free)(struct lov_stripe_md *);
-+	void (*lsm_stripe_by_index)(struct lov_stripe_md *, int *, loff_t *,
-+				    loff_t *);
-+	void (*lsm_stripe_by_offset)(struct lov_stripe_md *, int *, loff_t *,
-+				     loff_t *);
-+	int (*lsm_lmm_verify)(struct lov_mds_md *lmm, int lmm_bytes,
-+			      u16 *stripe_count);
-+	int (*lsm_unpackmd)(struct lov_obd *lov, struct lov_stripe_md *lsm,
-+			    struct lov_mds_md *lmm);
-+};
-+
-+extern const struct lsm_operations lsm_v1_ops;
-+extern const struct lsm_operations lsm_v3_ops;
-+
-+static inline const struct lsm_operations *lsm_op_find(int magic)
-+{
-+	switch (magic) {
-+	case LOV_MAGIC_V1:
-+		return &lsm_v1_ops;
-+	case LOV_MAGIC_V3:
-+		return &lsm_v3_ops;
-+	default:
-+		CERROR("unrecognized lsm_magic %08x\n", magic);
-+		return NULL;
-+	}
-+}
-+
- /* lov_do_div64(a, b) returns a % b, and a = a / b.
-  * The 32-bit code is LOV-specific due to knowing about stripe limits in
-  * order to reduce the divisor to a 32-bit number.  If the divisor is
-@@ -176,8 +254,6 @@ int lov_del_target(struct obd_device *obd, __u32 index,
- /* lov_pack.c */
- ssize_t lov_lsm_pack(const struct lov_stripe_md *lsm, void *buf,
- 		     size_t buf_size);
--int lov_packmd(struct obd_export *exp, struct lov_mds_md **lmm,
--	       struct lov_stripe_md *lsm);
- int lov_unpackmd(struct obd_export *exp, struct lov_stripe_md **lsmp,
- 		 struct lov_mds_md *lmm, int lmm_bytes);
- int lov_alloc_memmd(struct lov_stripe_md **lsmp, __u16 stripe_count,
 diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index 6530187..621f66e 100644
+index 019fe95..c2a853c 100644
 --- a/drivers/staging/lustre/lustre/lov/lov_obd.c
 +++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -971,14 +971,6 @@ out:
+@@ -1217,8 +1217,6 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 			osc_obd->obd_force = obddev->obd_force;
+ 			err = obd_iocontrol(cmd, lov->lov_tgts[i]->ltd_exp,
+ 					    len, karg, uarg);
+-			if (err == -ENODATA && cmd == OBD_IOC_POLL_QUOTACHECK)
+-				return err;
+ 			if (err) {
+ 				if (lov->lov_tgts[i]->ltd_active) {
+ 					CDEBUG(err == -ENOTTY ?
+@@ -1355,12 +1353,8 @@ static int lov_quotactl(struct obd_device *obd, struct obd_export *exp,
+ 	__u64		bhardlimit = 0;
+ 	int		  i, rc = 0;
+ 
+-	if (oqctl->qc_cmd != LUSTRE_Q_QUOTAON &&
+-	    oqctl->qc_cmd != LUSTRE_Q_QUOTAOFF &&
+-	    oqctl->qc_cmd != Q_GETOQUOTA &&
+-	    oqctl->qc_cmd != Q_INITQUOTA &&
+-	    oqctl->qc_cmd != LUSTRE_Q_SETQUOTA &&
+-	    oqctl->qc_cmd != Q_FINVALIDATE) {
++	if (oqctl->qc_cmd != Q_GETOQUOTA &&
++	    oqctl->qc_cmd != LUSTRE_Q_SETQUOTA) {
+ 		CERROR("bad quota opc %x for lov obd\n", oqctl->qc_cmd);
+ 		return -EFAULT;
+ 	}
+@@ -1407,49 +1401,6 @@ static int lov_quotactl(struct obd_device *obd, struct obd_export *exp,
  	return rc;
  }
  
--#define ASSERT_LSM_MAGIC(lsmp)						  \
--do {									    \
--	LASSERT((lsmp));						\
--	LASSERTF(((lsmp)->lsm_magic == LOV_MAGIC_V1 ||			  \
--		 (lsmp)->lsm_magic == LOV_MAGIC_V3),			    \
--		 "%p->lsm_magic=%x\n", (lsmp), (lsmp)->lsm_magic);	      \
--} while (0)
--
- int lov_statfs_interpret(struct ptlrpc_request_set *rqset, void *data, int rc)
- {
- 	struct lov_request_set *lovset = (struct lov_request_set *)data;
-@@ -1414,7 +1406,6 @@ static struct obd_ops lov_obd_ops = {
- 	.disconnect     = lov_disconnect,
- 	.statfs         = lov_statfs,
- 	.statfs_async   = lov_statfs_async,
--	.packmd         = lov_packmd,
- 	.unpackmd       = lov_unpackmd,
- 	.iocontrol      = lov_iocontrol,
- 	.get_info       = lov_get_info,
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index 1156ef9..17bcead 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -153,96 +153,6 @@ ssize_t lov_lsm_pack(const struct lov_stripe_md *lsm, void *buf,
- 	return lmm_size;
- }
- 
--/* Pack LOV object metadata for disk storage.  It is packed in LE byte
-- * order and is opaque to the networking layer.
-- *
-- * XXX In the future, this will be enhanced to get the EA size from the
-- *     underlying OSC device(s) to get their EA sizes so we can stack
-- *     LOVs properly.  For now lov_mds_md_size() just assumes one u64
-- *     per stripe.
-- */
--int lov_obd_packmd(struct lov_obd *lov, struct lov_mds_md **lmmp,
--		   struct lov_stripe_md *lsm)
+-static int lov_quotacheck(struct obd_device *obd, struct obd_export *exp,
+-			  struct obd_quotactl *oqctl)
 -{
--	__u16 stripe_count;
--	int lmm_size, lmm_magic;
--
--	if (lsm) {
--		lmm_magic = lsm->lsm_magic;
--	} else {
--		if (lmmp && *lmmp)
--			lmm_magic = le32_to_cpu((*lmmp)->lmm_magic);
--		else
--			/* lsm == NULL and lmmp == NULL */
--			lmm_magic = LOV_MAGIC;
--	}
--
--	if ((lmm_magic != LOV_MAGIC_V1) &&
--	    (lmm_magic != LOV_MAGIC_V3)) {
--		CERROR("bad mem LOV MAGIC: 0x%08X != 0x%08X nor 0x%08X\n",
--		       lmm_magic, LOV_MAGIC_V1, LOV_MAGIC_V3);
--		return -EINVAL;
--	}
--
--	if (lsm) {
--		/* If we are just sizing the EA, limit the stripe count
--		 * to the actual number of OSTs in this filesystem.
--		 */
--		if (!lmmp) {
--			stripe_count = lov_get_stripecnt(lov, lmm_magic,
--							 lsm->lsm_stripe_count);
--			lsm->lsm_stripe_count = stripe_count;
--		} else if (!lsm_is_released(lsm)) {
--			stripe_count = lsm->lsm_stripe_count;
--		} else {
--			stripe_count = 0;
--		}
--	} else {
--		/*
--		 * To calculate maximum easize by active targets at present,
--		 * which is exactly the maximum easize to be seen by LOV
--		 */
--		stripe_count = lov->desc.ld_active_tgt_count;
--	}
--
--	/* XXX LOV STACKING call into osc for sizes */
--	lmm_size = lov_mds_md_size(stripe_count, lmm_magic);
--
--	if (!lmmp)
--		return lmm_size;
--
--	if (*lmmp && !lsm) {
--		stripe_count = le16_to_cpu((*lmmp)->lmm_stripe_count);
--		lmm_size = lov_mds_md_size(stripe_count, lmm_magic);
--		kvfree(*lmmp);
--		*lmmp = NULL;
--		return 0;
--	}
--
--	if (!*lmmp) {
--		*lmmp = libcfs_kvzalloc(lmm_size, GFP_NOFS);
--		if (!*lmmp)
--			return -ENOMEM;
--	}
--
--	CDEBUG(D_INFO, "lov_packmd: LOV_MAGIC 0x%08X, lmm_size = %d\n",
--	       lmm_magic, lmm_size);
--
--	if (!lsm)
--		return lmm_size;
--
--	return lov_lsm_pack(lsm, *lmmp, lmm_size);
--}
--
--int lov_packmd(struct obd_export *exp, struct lov_mds_md **lmmp,
--	       struct lov_stripe_md *lsm)
--{
--	struct obd_device *obd = class_exp2obd(exp);
 -	struct lov_obd *lov = &obd->u.lov;
+-	int	     i, rc = 0;
 -
--	return lov_obd_packmd(lov, lmmp, lsm);
--}
+-	obd_getref(obd);
 -
- /* Find the max stripecount we should use */
- __u16 lov_get_stripecnt(struct lov_obd *lov, __u32 magic, __u16 stripe_count)
- {
-@@ -393,15 +303,14 @@ int lov_unpackmd(struct obd_export *exp,  struct lov_stripe_md **lsmp,
- int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
- 		  struct lov_user_md __user *lump)
- {
--	/*
--	 * XXX huge struct allocated on stack.
--	 */
- 	/* we use lov_user_md_v3 because it is larger than lov_user_md_v1 */
--	struct lov_obd *lov;
- 	struct lov_user_md_v3 lum;
--	struct lov_mds_md *lmmk = NULL;
--	int rc, lmmk_size, lmm_size;
--	int lum_size;
-+	struct lov_mds_md *lmmk;
-+	u32 stripe_count;
-+	ssize_t lmm_size;
-+	size_t lmmk_size;
-+	size_t lum_size;
-+	int rc;
- 	mm_segment_t seg;
- 
- 	if (!lsm)
-@@ -414,6 +323,18 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
- 	seg = get_fs();
- 	set_fs(KERNEL_DS);
- 
-+	if (lsm->lsm_magic != LOV_MAGIC_V1 && lsm->lsm_magic != LOV_MAGIC_V3) {
-+		CERROR("bad LSM MAGIC: 0x%08X != 0x%08X nor 0x%08X\n",
-+		       lsm->lsm_magic, LOV_MAGIC_V1, LOV_MAGIC_V3);
-+		rc = -EIO;
-+		goto out;
-+	}
-+
-+	if (!lsm_is_released(lsm))
-+		stripe_count = lsm->lsm_stripe_count;
-+	else
-+		stripe_count = 0;
-+
- 	/* we only need the header part from user space to get lmm_magic and
- 	 * lmm_stripe_count, (the header part is common to v1 and v3)
- 	 */
-@@ -432,32 +353,40 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
- 	if (lum.lmm_stripe_count &&
- 	    (lum.lmm_stripe_count < lsm->lsm_stripe_count)) {
- 		/* Return right size of stripe to user */
--		lum.lmm_stripe_count = lsm->lsm_stripe_count;
-+		lum.lmm_stripe_count = stripe_count;
- 		rc = copy_to_user(lump, &lum, lum_size);
- 		rc = -EOVERFLOW;
- 		goto out;
- 	}
--	lov = lu2lov_dev(obj->lo_cl.co_lu.lo_dev)->ld_lov;
--	rc = lov_obd_packmd(lov, &lmmk, lsm);
--	if (rc < 0)
-+	lmmk_size = lov_mds_md_size(stripe_count, lsm->lsm_magic);
-+
-+
-+	lmmk = libcfs_kvzalloc(lmmk_size, GFP_NOFS);
-+	if (!lmmk) {
-+		rc = -ENOMEM;
- 		goto out;
--	lmmk_size = rc;
--	lmm_size = rc;
--	rc = 0;
-+	}
-+
-+	lmm_size = lov_lsm_pack(lsm, lmmk, lmmk_size);
-+	if (lmm_size < 0) {
-+		rc = lmm_size;
-+		goto out_free;
-+	}
- 
- 	/* FIXME: Bug 1185 - copy fields properly when structs change */
- 	/* struct lov_user_md_v3 and struct lov_mds_md_v3 must be the same */
- 	CLASSERT(sizeof(lum) == sizeof(struct lov_mds_md_v3));
- 	CLASSERT(sizeof(lum.lmm_objects[0]) == sizeof(lmmk->lmm_objects[0]));
- 
--	if ((cpu_to_le32(LOV_MAGIC) != LOV_MAGIC) &&
--	    ((lmmk->lmm_magic == cpu_to_le32(LOV_MAGIC_V1)) ||
--	    (lmmk->lmm_magic == cpu_to_le32(LOV_MAGIC_V3)))) {
-+	if (cpu_to_le32(LOV_MAGIC) != LOV_MAGIC &&
-+	    (lmmk->lmm_magic == cpu_to_le32(LOV_MAGIC_V1) ||
-+	     lmmk->lmm_magic == cpu_to_le32(LOV_MAGIC_V3))) {
- 		lustre_swab_lov_mds_md(lmmk);
- 		lustre_swab_lov_user_md_objects(
- 				(struct lov_user_ost_data *)lmmk->lmm_objects,
- 				lmmk->lmm_stripe_count);
- 	}
-+
- 	if (lum.lmm_magic == LOV_USER_MAGIC) {
- 		/* User request for v1, we need skip lmm_pool_name */
- 		if (lmmk->lmm_magic == LOV_MAGIC_V3) {
-@@ -491,7 +420,7 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
- 		rc = -EFAULT;
- 
- out_free:
--	kfree(lmmk);
-+	kvfree(lmmk);
- out:
- 	set_fs(seg);
- 	return rc;
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index af373af..10d0b9d 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -447,14 +447,6 @@ static int mdc_get_lustre_md(struct obd_export *exp,
- 		if (rc < 0)
- 			goto out;
- 
--		if (rc < (typeof(rc))sizeof(*md->lsm)) {
--			CDEBUG(D_INFO,
--			       "lsm size too small: rc < sizeof (*md->lsm) (%d < %d)\n",
--			       rc, (int)sizeof(*md->lsm));
--			rc = -EPROTO;
+-	for (i = 0; i < lov->desc.ld_tgt_count; i++) {
+-		if (!lov->lov_tgts[i])
+-			continue;
+-
+-		/* Skip quota check on the administratively disabled OSTs. */
+-		if (!lov->lov_tgts[i]->ltd_activate) {
+-			CWARN("lov idx %d was administratively disabled, skip quotacheck on it.\n",
+-			      i);
+-			continue;
+-		}
+-
+-		if (!lov->lov_tgts[i]->ltd_active) {
+-			CERROR("lov idx %d inactive\n", i);
+-			rc = -EIO;
 -			goto out;
 -		}
--
- 	} else if (md->body->mbo_valid & OBD_MD_FLDIREA) {
- 		int lmvsize;
- 		struct lov_mds_md *lmv;
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 0985bda..038f00c 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -103,68 +103,6 @@ static void osc_release_ppga(struct brw_page **ppga, u32 count);
- static int brw_interpret(const struct lu_env *env,
- 			 struct ptlrpc_request *req, void *data, int rc);
- 
--/* Unpack OSC object metadata from disk storage (LE byte order). */
--static int osc_unpackmd(struct obd_export *exp, struct lov_stripe_md **lsmp,
--			struct lov_mds_md *lmm, int lmm_bytes)
--{
--	int lsm_size;
--	struct obd_import *imp = class_exp2cliimp(exp);
--
--	if (lmm) {
--		if (lmm_bytes < sizeof(*lmm)) {
--			CERROR("%s: lov_mds_md too small: %d, need %d\n",
--			       exp->exp_obd->obd_name, lmm_bytes,
--			       (int)sizeof(*lmm));
--			return -EINVAL;
--		}
--		/* XXX LOV_MAGIC etc check? */
--
--		if (unlikely(ostid_id(&lmm->lmm_oi) == 0)) {
--			CERROR("%s: zero lmm_object_id: rc = %d\n",
--			       exp->exp_obd->obd_name, -EINVAL);
--			return -EINVAL;
--		}
 -	}
 -
--	lsm_size = lov_stripe_md_size(1);
--	if (!lsmp)
--		return lsm_size;
+-	for (i = 0; i < lov->desc.ld_tgt_count; i++) {
+-		int err;
 -
--	if (*lsmp && !lmm) {
--		kfree((*lsmp)->lsm_oinfo[0]);
--		kfree(*lsmp);
--		*lsmp = NULL;
--		return 0;
+-		if (!lov->lov_tgts[i] || !lov->lov_tgts[i]->ltd_activate)
+-			continue;
+-
+-		err = obd_quotacheck(lov->lov_tgts[i]->ltd_exp, oqctl);
+-		if (err && !rc)
+-			rc = err;
 -	}
 -
--	if (!*lsmp) {
--		*lsmp = kzalloc(lsm_size, GFP_NOFS);
--		if (unlikely(!*lsmp))
--			return -ENOMEM;
--		(*lsmp)->lsm_oinfo[0] = kzalloc(sizeof(struct lov_oinfo),
--						GFP_NOFS);
--		if (unlikely(!(*lsmp)->lsm_oinfo[0])) {
--			kfree(*lsmp);
--			return -ENOMEM;
--		}
--		loi_init((*lsmp)->lsm_oinfo[0]);
--	} else if (unlikely(ostid_id(&(*lsmp)->lsm_oi) == 0)) {
--		return -EBADF;
--	}
+-out:
+-	obd_putref(obd);
 -
--	if (lmm)
--		/* XXX zero *lsmp? */
--		ostid_le_to_cpu(&lmm->lmm_oi, &(*lsmp)->lsm_oi);
--
--	if (imp &&
--	    (imp->imp_connect_data.ocd_connect_flags & OBD_CONNECT_MAXBYTES))
--		(*lsmp)->lsm_maxbytes = imp->imp_connect_data.ocd_maxbytes;
--	else
--		(*lsmp)->lsm_maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
--
--	return lsm_size;
+-	return rc;
 -}
 -
- static inline void osc_pack_req_body(struct ptlrpc_request *req,
- 				     struct obdo *oa)
+ static struct obd_ops lov_obd_ops = {
+ 	.owner          = THIS_MODULE,
+ 	.setup          = lov_setup,
+@@ -1473,7 +1424,6 @@ static struct obd_ops lov_obd_ops = {
+ 	.getref         = lov_getref,
+ 	.putref         = lov_putref,
+ 	.quotactl       = lov_quotactl,
+-	.quotacheck     = lov_quotacheck,
+ };
+ 
+ struct kmem_cache *lov_oinfo_slab;
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index 1d1eaa5..b62b29f 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -1929,52 +1929,6 @@ static int mdc_ioc_changelog_send(struct obd_device *obd,
+ static int mdc_ioc_hsm_ct_start(struct obd_export *exp,
+ 				struct lustre_kernelcomm *lk);
+ 
+-static int mdc_quotacheck(struct obd_device *unused, struct obd_export *exp,
+-			  struct obd_quotactl *oqctl)
+-{
+-	struct client_obd       *cli = &exp->exp_obd->u.cli;
+-	struct ptlrpc_request   *req;
+-	struct obd_quotactl     *body;
+-	int		      rc;
+-
+-	req = ptlrpc_request_alloc_pack(class_exp2cliimp(exp),
+-					&RQF_MDS_QUOTACHECK, LUSTRE_MDS_VERSION,
+-					MDS_QUOTACHECK);
+-	if (!req)
+-		return -ENOMEM;
+-
+-	body = req_capsule_client_get(&req->rq_pill, &RMF_OBD_QUOTACTL);
+-	*body = *oqctl;
+-
+-	ptlrpc_request_set_replen(req);
+-
+-	/* the next poll will find -ENODATA, that means quotacheck is
+-	 * going on
+-	 */
+-	cli->cl_qchk_stat = -ENODATA;
+-	rc = ptlrpc_queue_wait(req);
+-	if (rc)
+-		cli->cl_qchk_stat = rc;
+-	ptlrpc_req_finished(req);
+-	return rc;
+-}
+-
+-static int mdc_quota_poll_check(struct obd_export *exp,
+-				struct if_quotacheck *qchk)
+-{
+-	struct client_obd *cli = &exp->exp_obd->u.cli;
+-	int rc;
+-
+-	qchk->obd_uuid = cli->cl_target_uuid;
+-	memcpy(qchk->obd_type, LUSTRE_MDS_NAME, strlen(LUSTRE_MDS_NAME));
+-
+-	rc = cli->cl_qchk_stat;
+-	/* the client is not the previous one */
+-	if (rc == CL_NOT_QUOTACHECKED)
+-		rc = -EINTR;
+-	return rc;
+-}
+-
+ static int mdc_quotactl(struct obd_device *unused, struct obd_export *exp,
+ 			struct obd_quotactl *oqctl)
  {
-@@ -2884,7 +2822,6 @@ static struct obd_ops osc_obd_ops = {
- 	.disconnect     = osc_disconnect,
- 	.statfs         = osc_statfs,
- 	.statfs_async   = osc_statfs_async,
--	.unpackmd       = osc_unpackmd,
- 	.create         = osc_create,
- 	.destroy        = osc_destroy,
- 	.getattr        = osc_getattr,
+@@ -2129,9 +2083,6 @@ static int mdc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 	case IOC_OSC_SET_ACTIVE:
+ 		rc = ptlrpc_set_import_active(imp, data->ioc_offset);
+ 		goto out;
+-	case OBD_IOC_POLL_QUOTACHECK:
+-		rc = mdc_quota_poll_check(exp, (struct if_quotacheck *)karg);
+-		goto out;
+ 	case OBD_IOC_PING_TARGET:
+ 		rc = ptlrpc_obd_ping(obd);
+ 		goto out;
+@@ -2794,7 +2745,6 @@ static struct obd_ops mdc_obd_ops = {
+ 	.process_config = mdc_process_config,
+ 	.get_uuid       = mdc_get_uuid,
+ 	.quotactl       = mdc_quotactl,
+-	.quotacheck     = mdc_quotacheck
+ };
+ 
+ static struct md_ops mdc_md_ops = {
+diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
+index 64684c4..61bfacb 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
+@@ -190,9 +190,6 @@ int osc_quota_setdq(struct client_obd *cli, const unsigned int qid[],
+ int osc_quota_chkdq(struct client_obd *cli, const unsigned int qid[]);
+ int osc_quotactl(struct obd_device *unused, struct obd_export *exp,
+ 		 struct obd_quotactl *oqctl);
+-int osc_quotacheck(struct obd_device *unused, struct obd_export *exp,
+-		   struct obd_quotactl *oqctl);
+-int osc_quota_poll_check(struct obd_export *exp, struct if_quotacheck *qchk);
+ void osc_inc_unstable_pages(struct ptlrpc_request *req);
+ void osc_dec_unstable_pages(struct ptlrpc_request *req);
+ bool osc_over_unstable_soft_limit(struct client_obd *cli);
+diff --git a/drivers/staging/lustre/lustre/osc/osc_quota.c b/drivers/staging/lustre/lustre/osc/osc_quota.c
+index 194d8ed..acdd91a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_quota.c
++++ b/drivers/staging/lustre/lustre/osc/osc_quota.c
+@@ -281,47 +281,3 @@ int osc_quotactl(struct obd_device *unused, struct obd_export *exp,
+ 
+ 	return rc;
+ }
+-
+-int osc_quotacheck(struct obd_device *unused, struct obd_export *exp,
+-		   struct obd_quotactl *oqctl)
+-{
+-	struct client_obd *cli = &exp->exp_obd->u.cli;
+-	struct ptlrpc_request *req;
+-	struct obd_quotactl *body;
+-	int rc;
+-
+-	req = ptlrpc_request_alloc_pack(class_exp2cliimp(exp),
+-					&RQF_OST_QUOTACHECK, LUSTRE_OST_VERSION,
+-					OST_QUOTACHECK);
+-	if (!req)
+-		return -ENOMEM;
+-
+-	body = req_capsule_client_get(&req->rq_pill, &RMF_OBD_QUOTACTL);
+-	*body = *oqctl;
+-
+-	ptlrpc_request_set_replen(req);
+-
+-	/* the next poll will find -ENODATA, that means quotacheck is going on
+-	 */
+-	cli->cl_qchk_stat = -ENODATA;
+-	rc = ptlrpc_queue_wait(req);
+-	if (rc)
+-		cli->cl_qchk_stat = rc;
+-	ptlrpc_req_finished(req);
+-	return rc;
+-}
+-
+-int osc_quota_poll_check(struct obd_export *exp, struct if_quotacheck *qchk)
+-{
+-	struct client_obd *cli = &exp->exp_obd->u.cli;
+-	int rc;
+-
+-	qchk->obd_uuid = cli->cl_target_uuid;
+-	memcpy(qchk->obd_type, LUSTRE_OST_NAME, strlen(LUSTRE_OST_NAME));
+-
+-	rc = cli->cl_qchk_stat;
+-	/* the client is not the previous one */
+-	if (rc == CL_NOT_QUOTACHECKED)
+-		rc = -EINTR;
+-	return rc;
+-}
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 2e4d2d5..ab7f82d 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -2443,9 +2443,6 @@ static int osc_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 		err = ptlrpc_set_import_active(obd->u.cli.cl_import,
+ 					       data->ioc_offset);
+ 		goto out;
+-	case OBD_IOC_POLL_QUOTACHECK:
+-		err = osc_quota_poll_check(exp, karg);
+-		goto out;
+ 	case OBD_IOC_PING_TARGET:
+ 		err = ptlrpc_obd_ping(obd);
+ 		goto out;
+@@ -2934,7 +2931,6 @@ static struct obd_ops osc_obd_ops = {
+ 	.import_event   = osc_import_event,
+ 	.process_config = osc_process_config,
+ 	.quotactl       = osc_quotactl,
+-	.quotacheck     = osc_quotacheck,
+ };
+ 
+ extern struct lu_kmem_descr osc_caches[];
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+index 358c124..f0e0448 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+@@ -680,7 +680,6 @@ static struct req_format *req_formats[] = {
+ 	&RQF_MDS_REINT_RENAME,
+ 	&RQF_MDS_REINT_SETATTR,
+ 	&RQF_MDS_REINT_SETXATTR,
+-	&RQF_MDS_QUOTACHECK,
+ 	&RQF_MDS_QUOTACTL,
+ 	&RQF_MDS_HSM_PROGRESS,
+ 	&RQF_MDS_HSM_CT_REGISTER,
+@@ -690,10 +689,8 @@ static struct req_format *req_formats[] = {
+ 	&RQF_MDS_HSM_ACTION,
+ 	&RQF_MDS_HSM_REQUEST,
+ 	&RQF_MDS_SWAP_LAYOUTS,
+-	&RQF_QC_CALLBACK,
+ 	&RQF_OST_CONNECT,
+ 	&RQF_OST_DISCONNECT,
+-	&RQF_OST_QUOTACHECK,
+ 	&RQF_OST_QUOTACTL,
+ 	&RQF_OST_GETATTR,
+ 	&RQF_OST_SETATTR,
+@@ -1179,14 +1176,6 @@ struct req_format RQF_LOG_CANCEL =
+ 	DEFINE_REQ_FMT0("OBD_LOG_CANCEL", log_cancel_client, empty);
+ EXPORT_SYMBOL(RQF_LOG_CANCEL);
+ 
+-struct req_format RQF_MDS_QUOTACHECK =
+-	DEFINE_REQ_FMT0("MDS_QUOTACHECK", quotactl_only, empty);
+-EXPORT_SYMBOL(RQF_MDS_QUOTACHECK);
+-
+-struct req_format RQF_OST_QUOTACHECK =
+-	DEFINE_REQ_FMT0("OST_QUOTACHECK", quotactl_only, empty);
+-EXPORT_SYMBOL(RQF_OST_QUOTACHECK);
+-
+ struct req_format RQF_MDS_QUOTACTL =
+ 	DEFINE_REQ_FMT0("MDS_QUOTACTL", quotactl_only, quotactl_only);
+ EXPORT_SYMBOL(RQF_MDS_QUOTACTL);
+@@ -1195,10 +1184,6 @@ struct req_format RQF_OST_QUOTACTL =
+ 	DEFINE_REQ_FMT0("OST_QUOTACTL", quotactl_only, quotactl_only);
+ EXPORT_SYMBOL(RQF_OST_QUOTACTL);
+ 
+-struct req_format RQF_QC_CALLBACK =
+-	DEFINE_REQ_FMT0("QC_CALLBACK", quotactl_only, empty);
+-EXPORT_SYMBOL(RQF_QC_CALLBACK);
+-
+ struct req_format RQF_MDS_GETSTATUS =
+ 	DEFINE_REQ_FMT0("MDS_GETSTATUS", mdt_body_only, mdt_body_capa);
+ EXPORT_SYMBOL(RQF_MDS_GETSTATUS);
 -- 
 1.7.1
