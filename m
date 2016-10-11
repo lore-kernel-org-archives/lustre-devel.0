@@ -1,37 +1,51 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Tue, 11 Oct 2016 14:37:53 +0300
-Subject: [lustre-devel] [bug report] staging: lustre: create striped
-	directory
-Message-ID: <20161011113752.GA25834@mwanda>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 12 Oct 2016 00:22:35 +0100 (BST)
+Subject: [lustre-devel] [PATCH 32/41] staging: lustre: llite: restart
+ short read/write for normal IO
+In-Reply-To: <20161009141637.GA2092@kroah.com>
+References: <1475461717-21631-1-git-send-email-jsimmons@infradead.org>
+	<1475461717-21631-33-git-send-email-jsimmons@infradead.org>
+	<20161009141637.GA2092@kroah.com>
+Message-ID: <alpine.LFD.2.20.1610120019040.28392@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>
 
-Hello wang di,
 
-The patch 2de353860782: "staging: lustre: create striped directory"
-from Aug 16, 2016, leads to the following static checker warning:
+> On Sun, Oct 02, 2016 at 10:28:28PM -0400, James Simmons wrote:
+> > From: Bobi Jam <bobijam.xu@intel.com>
+> > 
+> > If normal IO got short read/write, we'd restart the IO from where
+> > we've accomplished until we meet EOF or error happens.
+> > 
+> > Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+> > Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+> > Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6389
+> > Reviewed-on: http://review.whamcloud.com/14123
+> > Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+> > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > ---
+> >  drivers/staging/lustre/lnet/libcfs/fail.c          |    1 +
+> >  .../staging/lustre/lustre/include/obd_support.h    |    2 +
+> >  drivers/staging/lustre/lustre/llite/file.c         |   41 ++++++++++++--------
+> >  drivers/staging/lustre/lustre/llite/vvp_io.c       |   19 ++++++++-
+> >  4 files changed, 45 insertions(+), 18 deletions(-)
+> 
+> Due to other changes in the filesystem tree, this patch no longer
+> applies :(
+> 
+> Can you rebase it and resend?
 
-	drivers/staging/lustre/lustre/llite/namei.c:294 ll_md_blocking_ast()
-	warn: 'master_inode' isn't an ERR_PTR
+How long will you be accepting patches to merge for? If its going
+to be a few weeks like to just include the missing two patches with
+the next batch.
 
-drivers/staging/lustre/lustre/llite/namei.c
-   287  
-   288                                  hash = cl_fid_build_ino(&lli->lli_pfid,
-   289                                                          ll_need_32bit_api(ll_i2sbi(inode)));
-   290  
-   291                                  master_inode = ilookup5(inode->i_sb, hash,
-   292                                                          ll_test_inode_by_fid,
-   293                                                          (void *)&lli->lli_pfid);
-   294                                  if (master_inode && !IS_ERR(master_inode)) {
-                                                             ^^^^^^^^^^^^^^^^^^^^
-ilookup5() never returns ERR_PTRs.
-
-   295                                          ll_invalidate_negative_children(master_inode);
-   296                                          iput(master_inode);
-   297                                  }
-
-regards,
-dan carpenter
+Another issue I need to look at is the IB changes. That's going to
+require some heavy surgery to the ko2iblnd driver so its going to
+take time for me to port this to the new RDMA RW api. That will
+need to be push to linus so ko2iblnd can work with the 4.9 tree
+if that is okay with you.
