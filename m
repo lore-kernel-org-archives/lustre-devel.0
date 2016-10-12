@@ -1,64 +1,51 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Wed, 12 Oct 2016 08:08:02 +0200
-Subject: [lustre-devel] [PATCH 32/41] staging: lustre: llite: restart
- short read/write for normal IO
-In-Reply-To: <alpine.LFD.2.20.1610120019040.28392@casper.infradead.org>
-References: <1475461717-21631-1-git-send-email-jsimmons@infradead.org>
-	<1475461717-21631-33-git-send-email-jsimmons@infradead.org>
-	<20161009141637.GA2092@kroah.com>
-	<alpine.LFD.2.20.1610120019040.28392@casper.infradead.org>
-Message-ID: <20161012060802.GA24118@kroah.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Wed, 12 Oct 2016 12:17:55 +0300
+Subject: [lustre-devel] [bug report] staging: lustre: create striped
+	directory
+In-Reply-To: <D4225DB9.44EC%di.wang@intel.com>
+References: <20161011113752.GA25834@mwanda> <D4225DB9.44EC%di.wang@intel.com>
+Message-ID: <20161012091755.GD5687@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Bobi Jam <bobijam.xu@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Wed, Oct 12, 2016 at 12:22:35AM +0100, James Simmons wrote:
+On Tue, Oct 11, 2016 at 04:14:11PM +0000, Wang, Di wrote:
+> Hello,
 > 
-> > On Sun, Oct 02, 2016 at 10:28:28PM -0400, James Simmons wrote:
-> > > From: Bobi Jam <bobijam.xu@intel.com>
-> > > 
-> > > If normal IO got short read/write, we'd restart the IO from where
-> > > we've accomplished until we meet EOF or error happens.
-> > > 
-> > > Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
-> > > Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-> > > Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6389
-> > > Reviewed-on: http://review.whamcloud.com/14123
-> > > Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-> > > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> > > Signed-off-by: James Simmons <jsimmons@infradead.org>
-> > > ---
-> > >  drivers/staging/lustre/lnet/libcfs/fail.c          |    1 +
-> > >  .../staging/lustre/lustre/include/obd_support.h    |    2 +
-> > >  drivers/staging/lustre/lustre/llite/file.c         |   41 ++++++++++++--------
-> > >  drivers/staging/lustre/lustre/llite/vvp_io.c       |   19 ++++++++-
-> > >  4 files changed, 45 insertions(+), 18 deletions(-)
-> > 
-> > Due to other changes in the filesystem tree, this patch no longer
-> > applies :(
-> > 
-> > Can you rebase it and resend?
+> On 10/11/16, 4:37 AM, "Dan Carpenter" <dan.carpenter@oracle.com> wrote:
 > 
-> How long will you be accepting patches to merge for? If its going
-> to be a few weeks like to just include the missing two patches with
-> the next batch.
+> >Hello wang di,
+> >
+> >The patch 2de353860782: "staging: lustre: create striped directory"
+> >from Aug 16, 2016, leads to the following static checker warning:
+> >
+> >	drivers/staging/lustre/lustre/llite/namei.c:294 ll_md_blocking_ast()
+> >	warn: 'master_inode' isn't an ERR_PTR
+> >
+> >drivers/staging/lustre/lustre/llite/namei.c
+> >   287  
+> >   288                                  hash =
+> >cl_fid_build_ino(&lli->lli_pfid,
+> >   289            
+> >ll_need_32bit_api(ll_i2sbi(inode)));
+> >   290  
+> >   291                                  master_inode =
+> >ilookup5(inode->i_sb, hash,
+> >   292            
+> >ll_test_inode_by_fid,
+> >   293                                                          (void
+> >*)&lli->lli_pfid);
+> >   294                                  if (master_inode &&
+> >!IS_ERR(master_inode)) {
+> >                  
+> >^^^^^^^^^^^^^^^^^^^^
+> >ilookup5() never returns ERR_PTRs.
+> 
+> Yes, only master_inode != NULL should be enough here.
 
-I don't understand the question.  I always accept patches, no need to
-not send them, I'll queue them up to the proper branches as needed.  So
-what do you mean here?
+Please send a patch to remove the other check?
 
-> Another issue I need to look at is the IB changes. That's going to
-> require some heavy surgery to the ko2iblnd driver so its going to
-> take time for me to port this to the new RDMA RW api. That will
-> need to be push to linus so ko2iblnd can work with the 4.9 tree
-> if that is okay with you.
-
-Sure, send the patches, but maybe it is a 4.10 thing if it's too much
-work?
-
-thanks,
-
-greg k-h
+regards,
+dan carpenter
