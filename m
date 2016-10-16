@@ -1,173 +1,102 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Sun, 16 Oct 2016 13:16:44 -0400
-Subject: [lustre-devel] [PATCH 57/80] staging: lustre: osc: revise
-	unstable pages accounting
-In-Reply-To: <20161016151446.GA7740@kroah.com>
-References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
-	<1471378773-24590-58-git-send-email-jsimmons@infradead.org>
-	<20161016151446.GA7740@kroah.com>
-Message-ID: <91071BA5-593A-40C8-8525-84CBBC8BB883@intel.com>
+From: Oleg Drokin <green@linuxhacker.ru>
+Date: Sun, 16 Oct 2016 13:16:50 -0400
+Subject: [lustre-devel] [PATCH] staging/lustre/llite: Move unstable_stats
+	from sysfs to debugfs
+Message-ID: <1476638210-208994-1-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: James Simmons <jsimmons@infradead.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
+It's multiple values per file, so it has no business being in sysfs,
+besides it was assuming seqfile anyway.
 
-On Oct 16, 2016, at 11:14 AM, Greg Kroah-Hartman wrote:
+Introduced by
+commit d806f30e639b ("staging: lustre: osc: revise unstable pages accounting")
 
-> Digging up an old email...
-> 
-> On Tue, Aug 16, 2016 at 04:19:10PM -0400, James Simmons wrote:
->> From: Jinshan Xiong <jinshan.xiong@intel.com>
->> 
->> A few changes are made in this patch for unstable pages tracking:
->> 
->> 1. Remove kernel NFS unstable pages tracking because it killed
->>   performance
->> 2. Track unstable pages as part of LRU cache. Otherwise Lustre
->>   can use much more memory than max_cached_mb
->> 3. Remove obd_unstable_pages tracking to avoid using global
->>   atomic counter
->> 4. Make unstable pages track optional. Tracking unstable pages is
->>   turned off by default, and can be controlled by
->>   llite.*.unstable_stats.
->> 
->> Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
->> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4841
->> Reviewed-on: http://review.whamcloud.com/10003
->> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
->> Reviewed-by: Lai Siyao <lai.siyao@intel.com>
->> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
->> Signed-off-by: James Simmons <jsimmons@infradead.org>
->> ---
->> drivers/staging/lustre/lustre/include/cl_object.h  |   35 +++-
->> .../staging/lustre/lustre/include/obd_support.h    |    1 -
->> drivers/staging/lustre/lustre/llite/lproc_llite.c  |   41 ++++-
->> drivers/staging/lustre/lustre/obdclass/class_obd.c |    2 -
->> drivers/staging/lustre/lustre/osc/osc_cache.c      |   96 +---------
->> drivers/staging/lustre/lustre/osc/osc_internal.h   |    2 +-
->> drivers/staging/lustre/lustre/osc/osc_page.c       |  208 +++++++++++++++++---
->> drivers/staging/lustre/lustre/osc/osc_request.c    |   13 +-
->> 8 files changed, 253 insertions(+), 145 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
->> index d269b32..ec6cf7c 100644
->> --- a/drivers/staging/lustre/lustre/include/cl_object.h
->> +++ b/drivers/staging/lustre/lustre/include/cl_object.h
->> @@ -1039,23 +1039,32 @@ do {									  \
->> 	}								     \
->> } while (0)
->> 
->> -static inline int __page_in_use(const struct cl_page *page, int refc)
->> -{
->> -	if (page->cp_type == CPT_CACHEABLE)
->> -		++refc;
->> -	LASSERT(atomic_read(&page->cp_ref) > 0);
->> -	return (atomic_read(&page->cp_ref) > refc);
->> -}
->> -
->> -#define cl_page_in_use(pg)       __page_in_use(pg, 1)
->> -#define cl_page_in_use_noref(pg) __page_in_use(pg, 0)
->> -
->> static inline struct page *cl_page_vmpage(struct cl_page *page)
->> {
->> 	LASSERT(page->cp_vmpage);
->> 	return page->cp_vmpage;
->> }
->> 
->> +/**
->> + * Check if a cl_page is in use.
->> + *
->> + * Client cache holds a refcount, this refcount will be dropped when
->> + * the page is taken out of cache, see vvp_page_delete().
->> + */
->> +static inline bool __page_in_use(const struct cl_page *page, int refc)
->> +{
->> +	return (atomic_read(&page->cp_ref) > refc + 1);
->> +}
->> +
->> +/**
->> + * Caller itself holds a refcount of cl_page.
->> + */
->> +#define cl_page_in_use(pg)	 __page_in_use(pg, 1)
->> +/**
->> + * Caller doesn't hold a refcount.
->> + */
->> +#define cl_page_in_use_noref(pg) __page_in_use(pg, 0)
->> +
->> /** @} cl_page */
->> 
->> /** \addtogroup cl_lock cl_lock
->> @@ -2331,6 +2340,10 @@ struct cl_client_cache {
->> 	 */
->> 	spinlock_t		ccc_lru_lock;
->> 	/**
->> +	 * Set if unstable check is enabled
->> +	 */
->> +	unsigned int		ccc_unstable_check:1;
->> +	/**
->> 	 * # of unstable pages for this mount point
->> 	 */
->> 	atomic_t		ccc_unstable_nr;
->> diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
->> index 26fdff6..a11fff1 100644
->> --- a/drivers/staging/lustre/lustre/include/obd_support.h
->> +++ b/drivers/staging/lustre/lustre/include/obd_support.h
->> @@ -54,7 +54,6 @@ extern int at_early_margin;
->> extern int at_extra;
->> extern unsigned int obd_sync_filter;
->> extern unsigned int obd_max_dirty_pages;
->> -extern atomic_t obd_unstable_pages;
->> extern atomic_t obd_dirty_pages;
->> extern atomic_t obd_dirty_transit_pages;
->> extern char obd_jobid_var[];
->> diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
->> index 2f1f389..5f8e78d 100644
->> --- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
->> +++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
->> @@ -828,10 +828,45 @@ static ssize_t unstable_stats_show(struct kobject *kobj,
->> 	pages = atomic_read(&cache->ccc_unstable_nr);
->> 	mb = (pages * PAGE_SIZE) >> 20;
->> 
->> -	return sprintf(buf, "unstable_pages: %8d\n"
->> -			    "unstable_mb:    %8d\n", pages, mb);
->> +	return sprintf(buf, "unstable_check: %8d\n"
->> +			    "unstable_pages: %8d\n"
->> +			    "unstable_mb:    %8d\n",
->> +			    cache->ccc_unstable_check, pages, mb);
->> }
->> -LUSTRE_RO_ATTR(unstable_stats);
->> +
->> +static ssize_t unstable_stats_store(struct kobject *kobj,
->> +				    struct attribute *attr,
->> +				    const char *buffer,
->> +				    size_t count)
->> +{
->> +	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
->> +					      ll_kobj);
->> +	char kernbuf[128];
->> +	int val, rc;
->> +
->> +	if (!count)
->> +		return 0;
->> +	if (count < 0 || count >= sizeof(kernbuf))
->> +		return -EINVAL;
->> +
->> +	if (copy_from_user(kernbuf, buffer, count))
->> +		return -EFAULT;
-> 
-> It was just pointed out to me that this code has obviously never been
-> tested at all.
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ drivers/staging/lustre/lustre/llite/lproc_llite.c | 34 +++++++++++------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
-Whoops.
-
-> Sorry for missing this before, do you want me to revert this?  Or will
-> you send me a fix?
-
-I'll have a fix for you in a moment.
-
-> Also, go fix your test harness, it's not being used, or is totally buggy :)
-
-Well, at least there was no crash, right? ;)
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index 6eae605..23fda9d 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -871,12 +871,10 @@ static ssize_t xattr_cache_store(struct kobject *kobj,
+ }
+ LUSTRE_RW_ATTR(xattr_cache);
+ 
+-static ssize_t unstable_stats_show(struct kobject *kobj,
+-				   struct attribute *attr,
+-				   char *buf)
++static int ll_unstable_stats_seq_show(struct seq_file *m, void *v)
+ {
+-	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+-					      ll_kobj);
++	struct super_block     *sb    = m->private;
++	struct ll_sb_info      *sbi   = ll_s2sbi(sb);
+ 	struct cl_client_cache *cache = sbi->ll_cache;
+ 	long pages;
+ 	int mb;
+@@ -884,19 +882,21 @@ static ssize_t unstable_stats_show(struct kobject *kobj,
+ 	pages = atomic_long_read(&cache->ccc_unstable_nr);
+ 	mb = (pages * PAGE_SIZE) >> 20;
+ 
+-	return sprintf(buf, "unstable_check:     %8d\n"
+-			    "unstable_pages: %12ld\n"
+-			    "unstable_mb:        %8d\n",
+-			    cache->ccc_unstable_check, pages, mb);
++	seq_printf(m,
++		   "unstable_check:     %8d\n"
++		   "unstable_pages: %12ld\n"
++		   "unstable_mb:        %8d\n",
++		   cache->ccc_unstable_check, pages, mb);
++
++	return 0;
+ }
+ 
+-static ssize_t unstable_stats_store(struct kobject *kobj,
+-				    struct attribute *attr,
+-				    const char *buffer,
+-				    size_t count)
++static ssize_t ll_unstable_stats_seq_write(struct file *file,
++					   const char __user *buffer,
++					   size_t count, loff_t *off)
+ {
+-	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+-					      ll_kobj);
++	struct super_block *sb = ((struct seq_file *)file->private_data)->private;
++	struct ll_sb_info *sbi = ll_s2sbi(sb);
+ 	char kernbuf[128];
+ 	int val, rc;
+ 
+@@ -922,7 +922,7 @@ static ssize_t unstable_stats_store(struct kobject *kobj,
+ 
+ 	return count;
+ }
+-LUSTRE_RW_ATTR(unstable_stats);
++LPROC_SEQ_FOPS(ll_unstable_stats);
+ 
+ static ssize_t root_squash_show(struct kobject *kobj, struct attribute *attr,
+ 				char *buf)
+@@ -995,6 +995,7 @@ static struct lprocfs_vars lprocfs_llite_obd_vars[] = {
+ 	/* { "filegroups",   lprocfs_rd_filegroups,  0, 0 }, */
+ 	{ "max_cached_mb",    &ll_max_cached_mb_fops, NULL },
+ 	{ "statahead_stats",  &ll_statahead_stats_fops, NULL, 0 },
++	{ "unstable_stats",   &ll_unstable_stats_fops, NULL },
+ 	{ "sbi_flags",	      &ll_sbi_flags_fops, NULL, 0 },
+ 	{ .name =		"nosquash_nids",
+ 	  .fops =		&ll_nosquash_nids_fops		},
+@@ -1026,7 +1027,6 @@ static struct attribute *llite_attrs[] = {
+ 	&lustre_attr_max_easize.attr,
+ 	&lustre_attr_default_easize.attr,
+ 	&lustre_attr_xattr_cache.attr,
+-	&lustre_attr_unstable_stats.attr,
+ 	&lustre_attr_root_squash.attr,
+ 	NULL,
+ };
+-- 
+2.7.4
