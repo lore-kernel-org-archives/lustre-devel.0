@@ -1,42 +1,33 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Mon, 17 Oct 2016 21:38:38 +0200
-Subject: [lustre-devel] [PATCH] staging: lov.ko: lov_object.c: fix
- sparse warning setting function to static
-In-Reply-To: <1476732112-21234-1-git-send-email-ryan@ryanswan.com>
-References: <1476732112-21234-1-git-send-email-ryan@ryanswan.com>
-Message-ID: <20161017193838.GC27179@kroah.com>
+From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+Date: Mon, 17 Oct 2016 23:45:30 +0200
+Subject: [lustre-devel] [PATCH 0/2] staging: lustre: replace and remove
+	class_devno_max
+Message-ID: <cover.1476739569.git.mahfouz.saif.elyazal@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
 
-On Mon, Oct 17, 2016 at 03:21:52PM -0400, Ryan Swan wrote:
-> Fixed: sparse WARNING: symbol 'lov_read_and_clear_async_rc' was not declared. Should it be static?
+class_devno_max is an inline function that is written with
+the sole purpose of returning the value of MAX_OBD_DEVICES.
+Since no computations are made by the class_devno_max, 
+replace it with MAX_OBD_DEVICES.
 
-I don't believe you actually test-built this change :(
+Aya Mahfouz (2):
+  staging: lustre: replace uses of class_devno_max by MAX_OBD_DEVICES
+  staging: lustre: remove class_devno_max
 
-> 
-> Signed-off-by: Ryan Swan <ryan@ryanswan.com>
-> ---
->  drivers/staging/lustre/lustre/lov/lov_object.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-> index 82b99e0..c42eef6 100644
-> --- a/drivers/staging/lustre/lustre/lov/lov_object.c
-> +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-> @@ -1532,7 +1532,7 @@ struct lov_stripe_md *lov_lsm_addref(struct lov_object *lov)
->  	return lsm;
->  }
->  
-> -int lov_read_and_clear_async_rc(struct cl_object *clob)
-> +static int lov_read_and_clear_async_rc(struct cl_object *clob)
+ drivers/staging/lustre/lustre/include/obd_class.h  |  5 -----
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |  6 +++---
+ drivers/staging/lustre/lustre/obdclass/genops.c    | 22 +++++++++++-----------
+ .../lustre/lustre/obdclass/linux/linux-module.c    |  6 +++---
+ 4 files changed, 17 insertions(+), 22 deletions(-)
 
-You are turning a symbol that is explicitly exported into a static one?
-How is the compiler supposed to figure out what to do when you do that?
+-- 
+2.5.0
 
-Again, always test-build your patches so you don't get a grumpy
-maintainer telling you to test-build your patches...
 
-greg k-h
+-- 
+Kind Regards,
+Aya Saif El-yazal Mahfouz
