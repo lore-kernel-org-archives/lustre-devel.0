@@ -1,53 +1,66 @@
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 18 Oct 2016 00:08:56 +0200
-Subject: [lustre-devel] [PATCH 09/28] staging: lustre: remove broken dead
-	code in cfs_cpt_table_create_pattern
-In-Reply-To: <20161017220342.1627073-1-arnd@arndb.de>
-References: <20161017220342.1627073-1-arnd@arndb.de>
-Message-ID: <20161017220903.1746743-3-arnd@arndb.de>
+From: Patrick Farrell <paf@cray.com>
+Date: Mon, 17 Oct 2016 22:23:00 +0000
+Subject: [lustre-devel] [PATCH 08/28] staging: lustre:
+	restore	initialization of return code
+In-Reply-To: <20161017220903.1746743-2-arnd@arndb.de>
+References: <20161017220342.1627073-1-arnd@arndb.de>,
+	<20161017220903.1746743-2-arnd@arndb.de>
+Message-ID: <CY4PR11MB1751050A7C7AF840E94DDE60CBD00@CY4PR11MB1751.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>, linux-kernel@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>, Liang Zhen <liang.zhen@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org
+To: lustre-devel@lists.lustre.org
 
-After a recent bugfix, we get a warning about the use of an uninitialized
-variable:
+Arnd,
 
-drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c: In function 'cfs_cpt_table_create_pattern':
-drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c:833:7: error: 'str' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-This part of the function used to not do anything as we would reassign
-the 'str' pointer to something else right away, but now we pass an
-uninitialized pointer into 'strchr', which can cause a kernel page fault
-or worse.
+The description and the actual patch don't seem to match up.  Am I missing something?
 
-Fixes: 239fd5d41f9b ("staging: lustre: libcfs: shortcut to create CPT from NUMA topology")
-Cc: Liang Zhen <liang.zhen@intel.com>
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Arnd Bergmann <arnd@arndb.de>
+Sent: Monday, October 17, 2016 5:08:55 PM
+To: Oleg Drokin
+Cc: devel at driverdev.osuosl.org; Arnd Bergmann; Greg Kroah-Hartman; linux-kernel at vger.kernel.org; Linus Torvalds; lustre-devel at lists.lustre.org
+Subject: [lustre-devel] [PATCH 08/28] staging: lustre: restore initialization of return code
+
+A recent rework removed the initialization of the successful return
+code from lpfc_write_firmware:
+
+drivers/scsi/lpfc/lpfc_init.c: In function 'lpfc_write_firmware':
+drivers/scsi/lpfc/lpfc_init.c:10333:214: error: format '%ld' expects argument of type 'long int', but argument 9 has type 'size_t {aka const unsigned int}' [-Werror=format=]
+
+This adds it back.
+
+Fixes: e10a431b3fd0 ("staging: lustre: lov: move LSM to LOV layer")
+Cc: John L. Hammond <john.hammond@intel.com>
+Cc: Jinshan Xiong <jinshan.xiong@intel.com>
 Cc: James Simmons <jsimmons@infradead.org>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 7 -------
- 1 file changed, 7 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_pack.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-index e8b1a61..1226cba 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-@@ -824,13 +824,6 @@ cfs_cpt_table_create_pattern(char *pattern)
- 	int			ncpt;
- 	int			c;
- 
--	for (ncpt = 0;; ncpt++) { /* quick scan bracket */
--		str = strchr(str, '[');
--		if (!str)
--			break;
--		str++;
--	}
--
- 	str = cfs_trimwhite(pattern);
- 	if (*str == 'n' || *str == 'N') {
- 		pattern = str + 1;
--- 
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index be6e985..0439f54 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -474,6 +474,8 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
+         ((struct lov_user_md *)lmmk)->lmm_stripe_count = lum.lmm_stripe_count;
+         if (copy_to_user(lump, lmmk, lmm_size))
+                 rc = -EFAULT;
++       else
++               rc = 0;
+
+ out_free:
+         kfree(lmmk);
+--
 2.9.0
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20161017/de8edd6e/attachment.htm>
