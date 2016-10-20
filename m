@@ -1,54 +1,81 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Thu, 20 Oct 2016 14:17:36 +0300
-Subject: [lustre-devel] [bug report] staging: lustre: clio: Revise read
-	ahead implementation
-Message-ID: <20161020105747.GA7003@elgon.mountain>
+Date: Thu, 20 Oct 2016 15:19:09 +0300
+Subject: [lustre-devel] [bug report] staging: lustre: llite: remove
+	duplicate fiemap defines
+Message-ID: <20161020121908.GA16578@elgon.mountain>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello Jinshan Xiong,
+Hello Bobi Jam,
 
-The patch 1e1db2a97be5: "staging: lustre: clio: Revise read ahead
-implementation" from Oct 2, 2016, leads to the following static
+The patch cbd4d4a8e319: "staging: lustre: llite: remove duplicate
+fiemap defines" from Oct 2, 2016, leads to the following static
 checker warning:
 
-	drivers/staging/lustre/lustre/lov/lov_io.c:611 lov_io_read_ahead()
-	error: 'sub' dereferencing possible ERR_PTR()
+	drivers/staging/lustre/lustre/lov/lov_object.c:1241 lov_object_fiemap()
+	warn: signed overflow undefined. 'fm_start + fm_length < fm_start'
 
-drivers/staging/lustre/lustre/lov/lov_io.c
-   589  static int lov_io_read_ahead(const struct lu_env *env,
-   590                               const struct cl_io_slice *ios,
-   591                               pgoff_t start, struct cl_read_ahead *ra)
-   592  {
-   593          struct lov_io *lio = cl2lov_io(env, ios);
-   594          struct lov_object *loo = lio->lis_object;
-   595          struct cl_object *obj = lov2cl(loo);
-   596          struct lov_layout_raid0 *r0 = lov_r0(loo);
-   597          unsigned int pps; /* pages per stripe */
-   598          struct lov_io_sub *sub;
-   599          pgoff_t ra_end;
-   600          loff_t suboff;
-   601          int stripe;
-   602          int rc;
-   603  
-   604          stripe = lov_stripe_number(loo->lo_lsm, cl_offset(obj, start));
-   605          if (unlikely(!r0->lo_sub[stripe]))
-   606                  return -EIO;
-   607  
-   608          sub = lov_sub_get(env, lio, stripe);
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Do we need error handling here?
+drivers/staging/lustre/lustre/lov/lov_object.c
+  1102  static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
+  1103                               struct ll_fiemap_info_key *fmkey,
+  1104                               struct fiemap *fiemap, size_t *buflen)
+  1105  {
+  1106          struct lov_obd *lov = lu2lov_dev(obj->co_lu.lo_dev)->ld_lov;
+  1107          unsigned int buffer_size = FIEMAP_BUFFER_SIZE;
+  1108          struct fiemap_extent *lcl_fm_ext;
+  1109          struct cl_object *subobj = NULL;
+  1110          struct fiemap *fm_local = NULL;
+  1111          struct lov_stripe_md *lsm;
+  1112          loff_t fm_start;
+                       ^^^^^^^^
+  1113          loff_t fm_end;
+  1114          loff_t fm_length;
+                       ^^^^^^^^^^
+These used to be u64 types but now they are signed.
 
-   609  
-   610          lov_stripe_offset(loo->lo_lsm, cl_offset(obj, start), stripe, &suboff);
-   611          rc = cl_io_read_ahead(sub->sub_env, sub->sub_io,
-   612                                cl_index(lovsub2cl(r0->lo_sub[stripe]), suboff),
-   613                                ra);
-   614          lov_sub_put(sub);
-   615  
+  1115          loff_t fm_end_offset;
+  1116          int count_local;
+  1117          int ost_index = 0;
+  1118          int start_stripe;
+  1119          int current_extent = 0;
+  1120          int rc = 0;
+  1121          int last_stripe;
+  1122          int cur_stripe = 0;
+  1123          int cur_stripe_wrap = 0;
+  1124          int stripe_count;
+  1125          /* Whether have we collected enough extents */
+  1126          bool enough = false;
+  1127          /* EOF for object */
+  1128          bool ost_eof = false;
+  1129          /* done with required mapping for this OST? */
+  1130          bool ost_done = false;
+  1131  
+
+[ snip ]
+
+  1231                  /*
+  1232                   * If this is a continuation FIEMAP call and we are on
+  1233                   * starting stripe then lun_start needs to be set to
+  1234                   * fm_end_offset
+  1235                   */
+  1236                  if (fm_end_offset && cur_stripe == start_stripe)
+  1237                          lun_start = fm_end_offset;
+  1238  
+  1239                  if (fm_length != ~0ULL) {
+  1240                          /* Handle fm_start + fm_length overflow */
+  1241                          if (fm_start + fm_length < fm_start)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+So, technically, this is undefined behavior now.
+
+  1242                                  fm_length = ~0ULL - fm_start;
+  1243                          lun_end = lov_size_to_stripe(lsm, fm_start + fm_length,
+  1244                                                       cur_stripe);
+  1245                  } else {
+  1246                          lun_end = ~0ULL;
+  1247                  }
 
 regards,
 dan carpenter
