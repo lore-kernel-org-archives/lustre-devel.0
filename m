@@ -1,36 +1,54 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Sun, 30 Oct 2016 11:04:05 -0400
-Subject: [lustre-devel] [PATCH 12/29] staging: lustre: mdc: manage
- number of modify RPCs in flight
-In-Reply-To: <1477606323-30325-13-git-send-email-jsimmons@infradead.org>
-References: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
-	<1477606323-30325-13-git-send-email-jsimmons@infradead.org>
-Message-ID: <20161030150405.GA7100@kroah.com>
+From: =?UTF-8?Q?Giedrius_Statkevi=C4=8Dius?= <giedrius.statkevicius@gmail.com>
+Date: Thu, 20 Oct 2016 14:43:36 -0000
+Subject: [lustre-devel] [bug report] staging: lustre: clio: Revise read
+	ahead implementation
+In-Reply-To: <20161020105747.GA7003@elgon.mountain>
+References: <20161020105747.GA7003@elgon.mountain>
+Message-ID: <CABNMmsC4-fLCH+Mz9Y4ChnkkedoNj1HfrJcD8gi6BKZ4H7zWRQ@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Gregoire Pichon <gregoire.pichon@bull.net>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Thu, Oct 27, 2016 at 06:11:46PM -0400, James Simmons wrote:
-> From: Gregoire Pichon <gregoire.pichon@bull.net>
-> 
-> This patch is the main client part of a new feature that supports
-> multiple modify metadata RPCs in parallel. Its goal is to improve
-> metadata operations performance of a single client, while maintening
-> the consistency of MDT reply reconstruction and MDT recovery
-> mechanisms.
-> 
-> It allows to manage the number of modify RPCs in flight within
-> the client obd structure and to assign a virtual index (the tag) to
-> each modify RPC to help server side cleaning of reply data.
-> 
-> The mdc component uses this feature to send multiple modify RPCs
-> in parallel.
+On Thursday, October 20, 2016, Dan Carpenter <dan.carpenter@oracle.com>
+wrote:
+> Hello Jinshan Xiong,
+>
+> The patch 1e1db2a97be5: "staging: lustre: clio: Revise read ahead
+> implementation" from Oct 2, 2016, leads to the following static
+> checker warning:
+>
+>         drivers/staging/lustre/lustre/lov/lov_io.c:611 lov_io_read_ahead()
+>         error: 'sub' dereferencing possible ERR_PTR()
+>
+> drivers/staging/lustre/lustre/lov/lov_io.c
+>    589  static int lov_io_read_ahead(const struct lu_env *env,
+>    590                               const struct cl_io_slice *ios,
+>    591                               pgoff_t start, struct cl_read_ahead
+*ra)
+>    592  {
+>    593          struct lov_io *lio = cl2lov_io(env, ios);
+>    594          struct lov_object *loo = lio->lis_object;
+>    595          struct cl_object *obj = lov2cl(loo);
+>    596          struct lov_layout_raid0 *r0 = lov_r0(loo);
+>    597          unsigned int pps; /* pages per stripe */
+>    598          struct lov_io_sub *sub;
+>    599          pgoff_t ra_end;
+>    600          loff_t suboff;
+>    601          int stripe;
+>    602          int rc;
+>    603
+>    604          stripe = lov_stripe_number(loo->lo_lsm, cl_offset(obj,
+start));
+>    605          if (unlikely(!r0->lo_sub[stripe]))
+>    606                  return -EIO;
+>    607
+>    608          sub = lov_sub_get(env, lio, stripe);
+>                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-I'm not going to apply this one due to the kbuild warning it causes.
-
-thanks,
-
-greg k-h
+Hey Dan,
+May I ask what static checker are you using?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20161020/c759927a/attachment-0001.htm>
