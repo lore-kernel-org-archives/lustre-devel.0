@@ -1,110 +1,54 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 18 Oct 2016 22:43:07 +0100 (BST)
-Subject: [lustre-devel] [PATCH] staging/lustre/llite: Move
- unstable_stats from sysfs to debugfs
-In-Reply-To: <1476638210-208994-1-git-send-email-green@linuxhacker.ru>
-References: <1476638210-208994-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <alpine.LFD.2.20.1610182242140.4913@casper.infradead.org>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Thu, 20 Oct 2016 14:17:36 +0300
+Subject: [lustre-devel] [bug report] staging: lustre: clio: Revise read
+	ahead implementation
+Message-ID: <20161020105747.GA7003@elgon.mountain>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <green@linuxhacker.ru>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-> It's multiple values per file, so it has no business being in sysfs,
-> besides it was assuming seqfile anyway.
-> 
-> Introduced by
-> commit d806f30e639b ("staging: lustre: osc: revise unstable pages accounting")
+Hello Jinshan Xiong,
 
-Tested it manually to make sure it was right this time.
+The patch 1e1db2a97be5: "staging: lustre: clio: Revise read ahead
+implementation" from Oct 2, 2016, leads to the following static
+checker warning:
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
- 
-> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
-> ---
->  drivers/staging/lustre/lustre/llite/lproc_llite.c | 34 +++++++++++------------
->  1 file changed, 17 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-> index 6eae605..23fda9d 100644
-> --- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-> +++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-> @@ -871,12 +871,10 @@ static ssize_t xattr_cache_store(struct kobject *kobj,
->  }
->  LUSTRE_RW_ATTR(xattr_cache);
->  
-> -static ssize_t unstable_stats_show(struct kobject *kobj,
-> -				   struct attribute *attr,
-> -				   char *buf)
-> +static int ll_unstable_stats_seq_show(struct seq_file *m, void *v)
->  {
-> -	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
-> -					      ll_kobj);
-> +	struct super_block     *sb    = m->private;
-> +	struct ll_sb_info      *sbi   = ll_s2sbi(sb);
->  	struct cl_client_cache *cache = sbi->ll_cache;
->  	long pages;
->  	int mb;
-> @@ -884,19 +882,21 @@ static ssize_t unstable_stats_show(struct kobject *kobj,
->  	pages = atomic_long_read(&cache->ccc_unstable_nr);
->  	mb = (pages * PAGE_SIZE) >> 20;
->  
-> -	return sprintf(buf, "unstable_check:     %8d\n"
-> -			    "unstable_pages: %12ld\n"
-> -			    "unstable_mb:        %8d\n",
-> -			    cache->ccc_unstable_check, pages, mb);
-> +	seq_printf(m,
-> +		   "unstable_check:     %8d\n"
-> +		   "unstable_pages: %12ld\n"
-> +		   "unstable_mb:        %8d\n",
-> +		   cache->ccc_unstable_check, pages, mb);
-> +
-> +	return 0;
->  }
->  
-> -static ssize_t unstable_stats_store(struct kobject *kobj,
-> -				    struct attribute *attr,
-> -				    const char *buffer,
-> -				    size_t count)
-> +static ssize_t ll_unstable_stats_seq_write(struct file *file,
-> +					   const char __user *buffer,
-> +					   size_t count, loff_t *off)
->  {
-> -	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
-> -					      ll_kobj);
-> +	struct super_block *sb = ((struct seq_file *)file->private_data)->private;
-> +	struct ll_sb_info *sbi = ll_s2sbi(sb);
->  	char kernbuf[128];
->  	int val, rc;
->  
-> @@ -922,7 +922,7 @@ static ssize_t unstable_stats_store(struct kobject *kobj,
->  
->  	return count;
->  }
-> -LUSTRE_RW_ATTR(unstable_stats);
-> +LPROC_SEQ_FOPS(ll_unstable_stats);
->  
->  static ssize_t root_squash_show(struct kobject *kobj, struct attribute *attr,
->  				char *buf)
-> @@ -995,6 +995,7 @@ static struct lprocfs_vars lprocfs_llite_obd_vars[] = {
->  	/* { "filegroups",   lprocfs_rd_filegroups,  0, 0 }, */
->  	{ "max_cached_mb",    &ll_max_cached_mb_fops, NULL },
->  	{ "statahead_stats",  &ll_statahead_stats_fops, NULL, 0 },
-> +	{ "unstable_stats",   &ll_unstable_stats_fops, NULL },
->  	{ "sbi_flags",	      &ll_sbi_flags_fops, NULL, 0 },
->  	{ .name =		"nosquash_nids",
->  	  .fops =		&ll_nosquash_nids_fops		},
-> @@ -1026,7 +1027,6 @@ static struct attribute *llite_attrs[] = {
->  	&lustre_attr_max_easize.attr,
->  	&lustre_attr_default_easize.attr,
->  	&lustre_attr_xattr_cache.attr,
-> -	&lustre_attr_unstable_stats.attr,
->  	&lustre_attr_root_squash.attr,
->  	NULL,
->  };
-> -- 
-> 2.7.4
-> 
-> 
+	drivers/staging/lustre/lustre/lov/lov_io.c:611 lov_io_read_ahead()
+	error: 'sub' dereferencing possible ERR_PTR()
+
+drivers/staging/lustre/lustre/lov/lov_io.c
+   589  static int lov_io_read_ahead(const struct lu_env *env,
+   590                               const struct cl_io_slice *ios,
+   591                               pgoff_t start, struct cl_read_ahead *ra)
+   592  {
+   593          struct lov_io *lio = cl2lov_io(env, ios);
+   594          struct lov_object *loo = lio->lis_object;
+   595          struct cl_object *obj = lov2cl(loo);
+   596          struct lov_layout_raid0 *r0 = lov_r0(loo);
+   597          unsigned int pps; /* pages per stripe */
+   598          struct lov_io_sub *sub;
+   599          pgoff_t ra_end;
+   600          loff_t suboff;
+   601          int stripe;
+   602          int rc;
+   603  
+   604          stripe = lov_stripe_number(loo->lo_lsm, cl_offset(obj, start));
+   605          if (unlikely(!r0->lo_sub[stripe]))
+   606                  return -EIO;
+   607  
+   608          sub = lov_sub_get(env, lio, stripe);
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Do we need error handling here?
+
+   609  
+   610          lov_stripe_offset(loo->lo_lsm, cl_offset(obj, start), stripe, &suboff);
+   611          rc = cl_io_read_ahead(sub->sub_env, sub->sub_io,
+   612                                cl_index(lovsub2cl(r0->lo_sub[stripe]), suboff),
+   613                                ra);
+   614          lov_sub_put(sub);
+   615  
+
+regards,
+dan carpenter
