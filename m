@@ -1,33 +1,20 @@
-From: Jinshan Xiong <jinshan.xiong@intel.com>
-Date: Fri, 21 Oct 2016 07:33:52 +0800
-Subject: [lustre-devel] [PATCH] Staging: lustre: lov: check return value of
-	lov_sub_get()
-Message-ID: <20161020233352.14879-1-jinshan.xiong@intel.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Fri, 21 Oct 2016 09:20:14 +0200
+Subject: [lustre-devel] [PATCH] Staging: lustre: lov: check return value
+	of lov_sub_get()
+In-Reply-To: <20161020233352.14879-1-jinshan.xiong@intel.com>
+References: <20161020233352.14879-1-jinshan.xiong@intel.com>
+Message-ID: <20161021072014.GA22615@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Jinshan Xiong <jinshan.xiong@intel.com>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Check return value of lov_sub_get() in lov_io_read_ahead().
+On Fri, Oct 21, 2016 at 07:33:52AM +0800, Jinshan Xiong wrote:
+> Check return value of lov_sub_get() in lov_io_read_ahead().
+> 
+> Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
----
- drivers/staging/lustre/lustre/lov/lov_io.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
-index a1d1ec9..011ab0f 100644
---- a/drivers/staging/lustre/lustre/lov/lov_io.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_io.c
-@@ -606,6 +606,8 @@ static int lov_io_read_ahead(const struct lu_env *env,
- 		return -EIO;
- 
- 	sub = lov_sub_get(env, lio, stripe);
-+	if (IS_ERR(sub))
-+		return PTR_ERR(sub);
- 
- 	lov_stripe_offset(loo->lo_lsm, cl_offset(obj, start), stripe, &suboff);
- 	rc = cl_io_read_ahead(sub->sub_env, sub->sub_io,
--- 
-2.8.3
+No reported-by: tag?
