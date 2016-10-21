@@ -1,22 +1,28 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Fri, 21 Oct 2016 18:32:35 -0400
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Fri, 21 Oct 2016 22:34:53 +0000
 Subject: [lustre-devel] [PATCH] staging: lustre: Move assignments out of
 	function calls.
 In-Reply-To: <20161021221431.GA18524@lennorien.com>
 References: <20161021221431.GA18524@lennorien.com>
-Message-ID: <4C6F4077-03F4-496C-8FBB-D12DF628A907@intel.com>
+Message-ID: <9F8D3E74-59D6-443A-A4A5-33C8A5D9C613@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-
-On Oct 21, 2016, at 6:14 PM, Elise Lennion wrote:
-
+On Oct 21, 2016, at 16:14, Elise Lennion <elise.lennion@gmail.com> wrote:
+> 
 > Assignments inside of function calls confuse the reader and should be
 > avoided, so they were moved out before the call.
-> 
+
+Thanks for your patch.  I agree that this kind of usage is bad and avoid
+it in my own code and try to remove it when I see it.  However, in some
+cases it is needed to simplify the code flow (e.g. in conditionals that
+would otherwise need to duplicate logic).
+
+More comments below.
+
 > Found with Coccinelle, semantic patch:
 > @@
 > identifier f;
@@ -50,13 +56,13 @@ On Oct 21, 2016, at 6:14 PM, Elise Lennion wrote:
 > +			blwi = ldlm_bl_get_work(blp);
 > +			l_wait_event_exclusive(blp->blp_waitq, blwi, &lwi);
 
-This one is wrong.
-This is not a function call, this is a macro whee second argument
-determines when to terminate the waiting.
-ldlm_bl_get_work returns the next work item, so we need to save it somewhere
-for later processing.
+This first change is broken, since l_wait_event_exclusive() is actually a
+macro that is waiting until ldlm_bl_get_work() returns a work item.  Moving
+the blwi assignment before the wait means that this will wait forever.
 
-The way you coded it it would just hang in there as blwi becomes a constant.
+This can be ignored for now, as there is a patch in the pipeline to clean
+up this code (http://review.whamcloud.com/5843) that James should be
+getting close to pushing, and it removes this inline assignment.
 
 > 			busy = atomic_inc_return(&blp->blp_busy_threads);
 > 		} else {
@@ -73,10 +79,15 @@ The way you coded it it would just hang in there as blwi becomes a constant.
 > +	vio->vui_tot_count -= nob;
 > +	iov_iter_reexpand(vio->vui_iter, vio->vui_tot_count);
 
-This one is probably ok.
+This one is fine.  Please resubmit the patch with just this change.  You
+can add "Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>" for that
+patch.
+
+Cheers, Andreas
 
 > }
 > 
 > static void vvp_io_update_iov(const struct lu_env *env,
 > -- 
 > 2.7.4
+> 
