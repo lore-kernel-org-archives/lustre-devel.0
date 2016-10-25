@@ -1,44 +1,49 @@
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 25 Oct 2016 23:22:31 +0200
-Subject: [lustre-devel] [PATCH v2 2/2] staging: lustre: restore
-	initialization of return code
-In-Reply-To: <20161025212310.2346367-1-arnd@arndb.de>
-References: <20161025212310.2346367-1-arnd@arndb.de>
-Message-ID: <20161025212310.2346367-2-arnd@arndb.de>
+Date: Tue, 25 Oct 2016 23:22:30 +0200
+Subject: [lustre-devel] [PATCH v2 1/2] staging: lustre: remove broken dead
+	code in cfs_cpt_table_create_pattern
+Message-ID: <20161025212310.2346367-1-arnd@arndb.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Patrick Farrell <paf@cray.com>, lustre-devel@lists.lustre.org, Bobi Jam <bobijam@hotmail.com>, James Simmons <uja.ornl@yahoo.com>, Olaf Weber <olaf@sgi.com>, James Simmons <jsimmons@infradead.org>, Jinshan Xiong <jinshan.xiong@intel.com>, "John L . Hammond" <john.hammond@intel.com>, Liang Zhen <liang.zhen@intel.com>, Arnd Bergmann <arnd@arndb.de>, Andreas Dilger <andreas.dilger@intel.com>, Bobi Jam <bobijam.xu@intel.com>, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Patrick Farrell <paf@cray.com>, lustre-devel@lists.lustre.org, Bobi Jam <bobijam@hotmail.com>, James Simmons <uja.ornl@yahoo.com>, Olaf Weber <olaf@sgi.com>, James Simmons <jsimmons@infradead.org>, Jinshan Xiong <jinshan.xiong@intel.com>, "John L . Hammond" <john.hammond@intel.com>, Liang Zhen <liang.zhen@intel.com>, Arnd Bergmann <arnd@arndb.de>, Andreas Dilger <andreas.dilger@intel.com>, Shivani Bhardwaj <shivanib134@gmail.com>, Andriy Skulysh <Andriy_Skulysh@xyratex.com>, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-A recent rework removed the initialization of the successful return
-code from lov_getstripe:
+After a recent bugfix, we get a warning about the use of an uninitialized
+variable:
 
-drivers/staging/lustre/lustre/lov/lov_pack.c: In function 'lov_getstripe':
-drivers/staging/lustre/lustre/lov/lov_pack.c:426:9: error: 'rc' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-drivers/staging/lustre/lustre/lov/lov_pack.c:313:6: note: 'rc' was declared here
+drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c: In function 'cfs_cpt_table_create_pattern':
+drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c:833:7: error: 'str' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-This adds it back.
+This part of the function used to not do anything as we would reassign
+the 'str' pointer to something else right away, but now we pass an
+uninitialized pointer into 'strchr', which can cause a kernel page fault
+or worse.
 
-Fixes: e10a431b3fd0 ("staging: lustre: lov: move LSM to LOV layer")
+Fixes: 239fd5d41f9b ("staging: lustre: libcfs: shortcut to create CPT from NUMA topology")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/staging/lustre/lustre/lov/lov_pack.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index 17bceadd66f8..ccc1fae35791 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -418,6 +418,8 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
- 	((struct lov_user_md *)lmmk)->lmm_stripe_count = lum.lmm_stripe_count;
- 	if (copy_to_user(lump, lmmk, lmm_size))
- 		rc = -EFAULT;
-+	else
-+		rc = 0;
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+index 464b27923ac0..6a31521f6ae0 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+@@ -829,13 +829,6 @@ cfs_cpt_table_create_pattern(char *pattern)
+ 	int			c;
+ 	int i;
  
- out_free:
- 	kvfree(lmmk);
+-	for (ncpt = 0;; ncpt++) { /* quick scan bracket */
+-		str = strchr(str, '[');
+-		if (!str)
+-			break;
+-		str++;
+-	}
+-
+ 	str = cfs_trimwhite(pattern);
+ 	if (*str == 'n' || *str == 'N') {
+ 		pattern = str + 1;
 -- 
 2.9.0
