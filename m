@@ -1,226 +1,44 @@
-From: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-Date: Tue, 25 Oct 2016 18:47:30 +0200
-Subject: [lustre-devel] [PATCH 1/2] staging: lustre: replace uses of
- class_devno_max by MAX_OBD_DEVICES
-In-Reply-To: <D62F1CE1-61E3-43B9-8742-705AF196729C@intel.com>
-References: <cover.1476739569.git.mahfouz.saif.elyazal@gmail.com>
-	<4ba436cdccbea6c6dbc631f8cf75cd80f4f9ddb4.1476739569.git.mahfouz.saif.elyazal@gmail.com>
-	<D62F1CE1-61E3-43B9-8742-705AF196729C@intel.com>
-Message-ID: <20161025164730.GA27553@waves>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 25 Oct 2016 23:22:31 +0200
+Subject: [lustre-devel] [PATCH v2 2/2] staging: lustre: restore
+	initialization of return code
+In-Reply-To: <20161025212310.2346367-1-arnd@arndb.de>
+References: <20161025212310.2346367-1-arnd@arndb.de>
+Message-ID: <20161025212310.2346367-2-arnd@arndb.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Dilger, Andreas" <andreas.dilger@intel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Patrick Farrell <paf@cray.com>, lustre-devel@lists.lustre.org, Bobi Jam <bobijam@hotmail.com>, James Simmons <uja.ornl@yahoo.com>, Olaf Weber <olaf@sgi.com>, James Simmons <jsimmons@infradead.org>, Jinshan Xiong <jinshan.xiong@intel.com>, "John L . Hammond" <john.hammond@intel.com>, Liang Zhen <liang.zhen@intel.com>, Arnd Bergmann <arnd@arndb.de>, Andreas Dilger <andreas.dilger@intel.com>, Bobi Jam <bobijam.xu@intel.com>, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-On Mon, Oct 17, 2016 at 10:38:31PM +0000, Dilger, Andreas wrote:
-> On Oct 17, 2016, at 15:46, Aya Mahfouz <mahfouz.saif.elyazal@gmail.com> wrote:
-> > 
-> > class_devno_max is an inline function that returns
-> > MAX_OBD_DEVICES. Replace all calls to the function
-> > by MAX_OBD_DEVICES.
-> 
-> Thanks for your patch, but unfortunately it can't be accepted.
-> 
-> This function was added in preparation of being able to tune the maximum
-> number of storage devices dynamically, rather than having to hard code it
-> to the maximum possible number of servers that a client can possibly
-> connect to.
-> 
-> While the current maximum of 8192 servers has been enough for current
-> filesystems, I'd rather move in the direction of dynamically handling this
-> limit rather than re-introducing a hard-coded constant throughout the code.
->
-Hello,
+A recent rework removed the initialization of the successful return
+code from lov_getstripe:
 
-I would like to proceed with implementing the function if possible.
-Kindly direct me to some starting pointers.
+drivers/staging/lustre/lustre/lov/lov_pack.c: In function 'lov_getstripe':
+drivers/staging/lustre/lustre/lov/lov_pack.c:426:9: error: 'rc' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+drivers/staging/lustre/lustre/lov/lov_pack.c:313:6: note: 'rc' was declared here
 
-> One comment inline below, if you still want to submit a patch.
-> 
-> > Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
-> > ---
-> > drivers/staging/lustre/lustre/obdclass/class_obd.c |  6 +++---
-> > drivers/staging/lustre/lustre/obdclass/genops.c    | 22 +++++++++++-----------
-> > .../lustre/lustre/obdclass/linux/linux-module.c    |  6 +++---
-> > 3 files changed, 17 insertions(+), 17 deletions(-)
-> > 
-> > diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-> > index 2b21675..b775c74 100644
-> > --- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-> > +++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-> > @@ -345,7 +345,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
-> > 			goto out;
-> > 		}
-> > 		obd = class_name2obd(data->ioc_inlbuf4);
-> > -	} else if (data->ioc_dev < class_devno_max()) {
-> > +	} else if (data->ioc_dev < MAX_OBD_DEVICES) {
-> > 		obd = class_num2obd(data->ioc_dev);
-> > 	} else {
-> > 		CERROR("OBD ioctl: No device\n");
-> > @@ -498,7 +498,7 @@ static int __init obdclass_init(void)
-> > 	}
-> > 
-> > 	/* This struct is already zeroed for us (static global) */
-> > -	for (i = 0; i < class_devno_max(); i++)
-> > +	for (i = 0; i < MAX_OBD_DEVICES; i++)
-> > 		obd_devs[i] = NULL;
-> 
-> This block can just be removed entirely.  It used to do something useful,
-> but through a series of changes it has become useless.
-> 
-> Cheers, Andreas
-> 
-> > 	/* Default the dirty page cache cap to 1/2 of system memory.
-> > @@ -548,7 +548,7 @@ static void obdclass_exit(void)
-> > 	lustre_unregister_fs();
-> > 
-> > 	misc_deregister(&obd_psdev);
-> > -	for (i = 0; i < class_devno_max(); i++) {
-> > +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
-> > 		struct obd_device *obd = class_num2obd(i);
-> > 
-> > 		if (obd && obd->obd_set_up &&
-> > diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-> > index 99c2da6..af4fc58 100644
-> > --- a/drivers/staging/lustre/lustre/obdclass/genops.c
-> > +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-> > @@ -290,7 +290,7 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
-> > 	LASSERT(newdev->obd_magic == OBD_DEVICE_MAGIC);
-> > 
-> > 	write_lock(&obd_dev_lock);
-> > -	for (i = 0; i < class_devno_max(); i++) {
-> > +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
-> > 		struct obd_device *obd = class_num2obd(i);
-> > 
-> > 		if (obd && (strcmp(name, obd->obd_name) == 0)) {
-> > @@ -322,9 +322,9 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
-> > 	}
-> > 	write_unlock(&obd_dev_lock);
-> > 
-> > -	if (!result && i >= class_devno_max()) {
-> > +	if (!result && i >= MAX_OBD_DEVICES) {
-> > 		CERROR("all %u OBD devices used, increase MAX_OBD_DEVICES\n",
-> > -		       class_devno_max());
-> > +		       MAX_OBD_DEVICES);
-> > 		result = ERR_PTR(-EOVERFLOW);
-> > 		goto out;
-> > 	}
-> > @@ -372,7 +372,7 @@ int class_name2dev(const char *name)
-> > 		return -1;
-> > 
-> > 	read_lock(&obd_dev_lock);
-> > -	for (i = 0; i < class_devno_max(); i++) {
-> > +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
-> > 		struct obd_device *obd = class_num2obd(i);
-> > 
-> > 		if (obd && strcmp(name, obd->obd_name) == 0) {
-> > @@ -397,7 +397,7 @@ struct obd_device *class_name2obd(const char *name)
-> > {
-> > 	int dev = class_name2dev(name);
-> > 
-> > -	if (dev < 0 || dev > class_devno_max())
-> > +	if (dev < 0 || dev > MAX_OBD_DEVICES)
-> > 		return NULL;
-> > 	return class_num2obd(dev);
-> > }
-> > @@ -408,7 +408,7 @@ int class_uuid2dev(struct obd_uuid *uuid)
-> > 	int i;
-> > 
-> > 	read_lock(&obd_dev_lock);
-> > -	for (i = 0; i < class_devno_max(); i++) {
-> > +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
-> > 		struct obd_device *obd = class_num2obd(i);
-> > 
-> > 		if (obd && obd_uuid_equals(uuid, &obd->obd_uuid)) {
-> > @@ -435,7 +435,7 @@ struct obd_device *class_num2obd(int num)
-> > {
-> > 	struct obd_device *obd = NULL;
-> > 
-> > -	if (num < class_devno_max()) {
-> > +	if (num < MAX_OBD_DEVICES) {
-> > 		obd = obd_devs[num];
-> > 		if (!obd)
-> > 			return NULL;
-> > @@ -463,7 +463,7 @@ struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
-> > 	int i;
-> > 
-> > 	read_lock(&obd_dev_lock);
-> > -	for (i = 0; i < class_devno_max(); i++) {
-> > +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
-> > 		struct obd_device *obd = class_num2obd(i);
-> > 
-> > 		if (!obd)
-> > @@ -496,13 +496,13 @@ struct obd_device *class_devices_in_group(struct obd_uuid *grp_uuid, int *next)
-> > 
-> > 	if (!next)
-> > 		i = 0;
-> > -	else if (*next >= 0 && *next < class_devno_max())
-> > +	else if (*next >= 0 && *next < MAX_OBD_DEVICES)
-> > 		i = *next;
-> > 	else
-> > 		return NULL;
-> > 
-> > 	read_lock(&obd_dev_lock);
-> > -	for (; i < class_devno_max(); i++) {
-> > +	for (; i < MAX_OBD_DEVICES; i++) {
-> > 		struct obd_device *obd = class_num2obd(i);
-> > 
-> > 		if (!obd)
-> > @@ -533,7 +533,7 @@ int class_notify_sptlrpc_conf(const char *fsname, int namelen)
-> > 	LASSERT(namelen > 0);
-> > 
-> > 	read_lock(&obd_dev_lock);
-> > -	for (i = 0; i < class_devno_max(); i++) {
-> > +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
-> > 		obd = class_num2obd(i);
-> > 
-> > 		if (!obd || obd->obd_set_up == 0 || obd->obd_stopping)
-> > diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> > index 33342bf..ca5b466 100644
-> > --- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> > +++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> > @@ -228,7 +228,7 @@ static ssize_t health_show(struct kobject *kobj, struct attribute *attr,
-> > 		return sprintf(buf, "LBUG\n");
-> > 
-> > 	read_lock(&obd_dev_lock);
-> > -	for (i = 0; i < class_devno_max(); i++) {
-> > +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
-> > 		struct obd_device *obd;
-> > 
-> > 		obd = class_num2obd(i);
-> > @@ -326,7 +326,7 @@ static struct attribute *lustre_attrs[] = {
-> > 
-> > static void *obd_device_list_seq_start(struct seq_file *p, loff_t *pos)
-> > {
-> > -	if (*pos >= class_devno_max())
-> > +	if (*pos >= MAX_OBD_DEVICES)
-> > 		return NULL;
-> > 
-> > 	return pos;
-> > @@ -339,7 +339,7 @@ static void obd_device_list_seq_stop(struct seq_file *p, void *v)
-> > static void *obd_device_list_seq_next(struct seq_file *p, void *v, loff_t *pos)
-> > {
-> > 	++*pos;
-> > -	if (*pos >= class_devno_max())
-> > +	if (*pos >= MAX_OBD_DEVICES)
-> > 		return NULL;
-> > 
-> > 	return pos;
-> > -- 
-> > 2.5.0
-> > 
-> > 
-> > -- 
-> > Kind Regards,
-> > Aya Saif El-yazal Mahfouz
-> > _______________________________________________
-> > lustre-devel mailing list
-> > lustre-devel at lists.lustre.org
-> > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> 
+This adds it back.
 
+Fixes: e10a431b3fd0 ("staging: lustre: lov: move LSM to LOV layer")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/staging/lustre/lustre/lov/lov_pack.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index 17bceadd66f8..ccc1fae35791 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -418,6 +418,8 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
+ 	((struct lov_user_md *)lmmk)->lmm_stripe_count = lum.lmm_stripe_count;
+ 	if (copy_to_user(lump, lmmk, lmm_size))
+ 		rc = -EFAULT;
++	else
++		rc = 0;
+ 
+ out_free:
+ 	kvfree(lmmk);
 -- 
-Kind Regards,
-Aya Saif El-yazal Mahfouz
+2.9.0
