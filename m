@@ -1,52 +1,59 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Oct 2016 18:12:00 -0400
-Subject: [lustre-devel] [PATCH 26/29] staging: lustre: ptlrpc: do not switch
-	out-of-date context
+Date: Thu, 27 Oct 2016 18:12:02 -0400
+Subject: [lustre-devel] [PATCH 28/29] staging: lustre: ptlrpc:
+	imp_peer_committed_transno should increase
 In-Reply-To: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
 References: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1477606323-30325-27-git-send-email-jsimmons@infradead.org>
+Message-ID: <1477606323-30325-29-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Sebastien Buisson <sebastien.buisson@bull.net>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Alex Zhuravlev <alexey.zhuravlev@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Sebastien Buisson <sebastien.buisson@bull.net>
+From: Alex Zhuravlev <alexey.zhuravlev@intel.com>
 
-When trying to replace a dead sec context with a new one, we must
-ensure the new context is already up-to-date.
-If it is not the case, just return from sptlrpc_req_replace_dead_ctx()
-and come later when the new context has been updated.
+imp_peer_committed_transno should not decrease as this can
+confuse the users if imp_peer_committed_transno is used to
+check commit status.
 
-Signed-off-by: Sebastien Buisson <sebastien.buisson@bull.net>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6536
-Reviewed-on: http://review.whamcloud.com/15708
+Signed-off-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7079
+Reviewed-on: http://review.whamcloud.com/16161
 Reviewed-by: Mike Pershin <mike.pershin@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: wangdi <di.wang@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ptlrpc/sec.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/client.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-index 12f02ed..e860df7 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-@@ -515,6 +515,13 @@ static int sptlrpc_req_replace_dead_ctx(struct ptlrpc_request *req)
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index cc4b129..7cbfb4c 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -1242,6 +1242,7 @@ static int after_reply(struct ptlrpc_request *req)
+ 	int rc;
+ 	struct timespec64 work_start;
+ 	long timediff;
++	u64 committed;
  
- 		set_current_state(TASK_INTERRUPTIBLE);
- 		schedule_timeout(msecs_to_jiffies(MSEC_PER_SEC));
-+	} else if (unlikely(!test_bit(PTLRPC_CTX_UPTODATE_BIT, &newctx->cc_flags))) {
-+		/*
-+		 * new ctx not up to date yet
-+		 */
-+		CDEBUG(D_SEC,
-+		       "ctx (%p, fl %lx) doesn't switch, not up to date yet\n",
-+		       newctx, newctx->cc_flags);
- 	} else {
- 		/*
- 		 * it's possible newctx == oldctx if we're switching
+ 	LASSERT(obd);
+ 	/* repbuf must be unlinked */
+@@ -1400,10 +1401,9 @@ static int after_reply(struct ptlrpc_request *req)
+ 		}
+ 
+ 		/* Replay-enabled imports return commit-status information. */
+-		if (lustre_msg_get_last_committed(req->rq_repmsg)) {
+-			imp->imp_peer_committed_transno =
+-				lustre_msg_get_last_committed(req->rq_repmsg);
+-		}
++		committed = lustre_msg_get_last_committed(req->rq_repmsg);
++		if (likely(committed > imp->imp_peer_committed_transno))
++			imp->imp_peer_committed_transno = committed;
+ 
+ 		ptlrpc_free_committed(imp);
+ 
 -- 
 1.7.1
