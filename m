@@ -1,46 +1,165 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Oct 2016 18:11:36 -0400
-Subject: [lustre-devel] [PATCH 02/29] staging: lustre: llite: remove
-	IS_ERR(master_inode) check
+Date: Thu, 27 Oct 2016 18:11:39 -0400
+Subject: [lustre-devel] [PATCH 05/29] staging: lustre: lmv: allow cross-MDT
+	rename and link
 In-Reply-To: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
 References: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1477606323-30325-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1477606323-30325-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
 
-The kernel function ilookup5_nowait never returns
-IS_ERR so we can remove the IS_ERR check in the
-ll_md_blocking_ast() function.
+From: wang di <di.wang@intel.com>
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8697
-Reviewed-on: http://review.whamcloud.com/23151
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Reviewed-by: Frank Zago <fzago@cray.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Remove checks for cross-MDT operation, so cross-MDT
+rename and link will be allowed.
+
+Remove obsolete locality parameters in MDT lock API after all of
+cross-MDT operations are allowed.
+
+This is the client side changed only so the upstream
+client can support this.
+
+Signed-off-by: wang di <di.wang@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3537
+Reviewed-on: http://review.whamcloud.com/12282
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/namei.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c |   77 ++++++++++++++++++++-------
+ 1 files changed, 57 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index a69c8af..9b4095f 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -283,7 +283,7 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
- 				master_inode = ilookup5(inode->i_sb, hash,
- 							ll_test_inode_by_fid,
- 							(void *)&lli->lli_pfid);
--				if (master_inode && !IS_ERR(master_inode)) {
-+				if (master_inode) {
- 					ll_invalidate_negative_children(master_inode);
- 					iput(master_inode);
- 				}
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 679cd87..7a8d1c8 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -1903,7 +1903,10 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+ {
+ 	struct obd_device       *obd = exp->exp_obd;
+ 	struct lmv_obd	  *lmv = &obd->u.lmv;
++	struct obd_export *target_exp;
+ 	struct lmv_tgt_desc     *src_tgt;
++	struct lmv_tgt_desc *tgt_tgt;
++	struct mdt_body *body;
+ 	int			rc;
+ 
+ 	LASSERT(oldlen != 0);
+@@ -1943,6 +1946,10 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+ 		if (rc)
+ 			return rc;
+ 		src_tgt = lmv_find_target(lmv, &op_data->op_fid3);
++		if (IS_ERR(src_tgt))
++			return PTR_ERR(src_tgt);
++
++		target_exp = src_tgt->ltd_exp;
+ 	} else {
+ 		if (op_data->op_mea1) {
+ 			struct lmv_stripe_md *lsm = op_data->op_mea1;
+@@ -1951,29 +1958,27 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+ 							     oldlen,
+ 							     &op_data->op_fid1,
+ 							     &op_data->op_mds);
+-			if (IS_ERR(src_tgt))
+-				return PTR_ERR(src_tgt);
+ 		} else {
+ 			src_tgt = lmv_find_target(lmv, &op_data->op_fid1);
+-			if (IS_ERR(src_tgt))
+-				return PTR_ERR(src_tgt);
+-
+-			op_data->op_mds = src_tgt->ltd_idx;
+ 		}
++		if (IS_ERR(src_tgt))
++			return PTR_ERR(src_tgt);
+ 
+ 		if (op_data->op_mea2) {
+ 			struct lmv_stripe_md *lsm = op_data->op_mea2;
+-			const struct lmv_oinfo *oinfo;
+ 
+-			oinfo = lsm_name_to_stripe_info(lsm, new, newlen);
+-			if (IS_ERR(oinfo))
+-				return PTR_ERR(oinfo);
+-
+-			op_data->op_fid2 = oinfo->lmo_fid;
++			tgt_tgt = lmv_locate_target_for_name(lmv, lsm, new,
++							     newlen,
++							     &op_data->op_fid2,
++							     &op_data->op_mds);
++		} else {
++			tgt_tgt = lmv_find_target(lmv, &op_data->op_fid2);
+ 		}
++		if (IS_ERR(tgt_tgt))
++			return PTR_ERR(tgt_tgt);
++
++		target_exp = tgt_tgt->ltd_exp;
+ 	}
+-	if (IS_ERR(src_tgt))
+-		return PTR_ERR(src_tgt);
+ 
+ 	/*
+ 	 * LOOKUP lock on src child (fid3) should also be cancelled for
+@@ -2014,20 +2019,52 @@ static int lmv_rename(struct obd_export *exp, struct md_op_data *op_data,
+ 			return rc;
+ 	}
+ 
++retry_rename:
+ 	/*
+ 	 * Cancel all the locks on tgt child (fid4).
+ 	 */
+-	if (fid_is_sane(&op_data->op_fid4))
++	if (fid_is_sane(&op_data->op_fid4)) {
++		struct lmv_tgt_desc *tgt;
++
+ 		rc = lmv_early_cancel(exp, NULL, op_data, src_tgt->ltd_idx,
+ 				      LCK_EX, MDS_INODELOCK_FULL,
+ 				      MF_MDC_CANCEL_FID4);
++		if (rc)
++			return rc;
+ 
+-	CDEBUG(D_INODE, DFID":m%d to "DFID"\n", PFID(&op_data->op_fid1),
+-	       op_data->op_mds, PFID(&op_data->op_fid2));
++		tgt = lmv_find_target(lmv, &op_data->op_fid4);
++		if (IS_ERR(tgt))
++			return PTR_ERR(tgt);
+ 
+-	rc = md_rename(src_tgt->ltd_exp, op_data, old, oldlen,
+-		       new, newlen, request);
+-	return rc;
++		/*
++		 * Since the target child might be destroyed, and it might
++		 * become orphan, and we can only check orphan on the local
++		 * MDT right now, so we send rename request to the MDT where
++		 * target child is located. If target child does not exist,
++		 * then it will send the request to the target parent
++		 */
++		target_exp = tgt->ltd_exp;
++	}
++
++	rc = md_rename(target_exp, op_data, old, oldlen, new, newlen, request);
++	if (rc && rc != -EREMOTE)
++		return rc;
++
++	body = req_capsule_server_get(&(*request)->rq_pill, &RMF_MDT_BODY);
++	if (!body)
++		return -EPROTO;
++
++	/* Not cross-ref case, just get out of here. */
++	if (likely(!(body->mbo_valid & OBD_MD_MDS)))
++		return rc;
++
++	CDEBUG(D_INODE, "%s: try rename to another MDT for " DFID "\n",
++	       exp->exp_obd->obd_name, PFID(&body->mbo_fid1));
++
++	op_data->op_fid4 = body->mbo_fid1;
++	ptlrpc_req_finished(*request);
++	*request = NULL;
++	goto retry_rename;
+ }
+ 
+ static int lmv_setattr(struct obd_export *exp, struct md_op_data *op_data,
 -- 
 1.7.1
