@@ -1,45 +1,60 @@
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 27 Oct 2016 15:36:04 +0200
-Subject: [lustre-devel] [PATCH v2 1/2] staging: lustre: remove broken
-	dead code in cfs_cpt_table_create_pattern
-In-Reply-To: <20161027131242.GA11187@kroah.com>
-References: <20161025212310.2346367-1-arnd@arndb.de>
-	<20161027131242.GA11187@kroah.com>
-Message-ID: <2652666.mQoRF2ExRO@wuerfel>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 27 Oct 2016 18:11:35 -0400
+Subject: [lustre-devel] [PATCH 01/29] staging: lustre: osc: remove handling
+	cl_avail_grant less than zero
+In-Reply-To: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
+References: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1477606323-30325-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Patrick Farrell <paf@cray.com>, lustre-devel@lists.lustre.org, Bobi Jam <bobijam@hotmail.com>, James Simmons <uja.ornl@yahoo.com>, Olaf Weber <olaf@sgi.com>, James Simmons <jsimmons@infradead.org>, Jinshan Xiong <jinshan.xiong@intel.com>, "John L . Hammond" <john.hammond@intel.com>, Liang Zhen <liang.zhen@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Shivani Bhardwaj <shivanib134@gmail.com>, Andriy Skulysh <Andriy_Skulysh@xyratex.com>, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-On Thursday, October 27, 2016 3:12:42 PM CEST Greg Kroah-Hartman wrote:
-> On Tue, Oct 25, 2016 at 11:22:30PM +0200, Arnd Bergmann wrote:
-> > After a recent bugfix, we get a warning about the use of an uninitialized
-> > variable:
-> > 
-> > drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c: In function 'cfs_cpt_table_create_pattern':
-> > drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c:833:7: error: 'str' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> > 
-> > This part of the function used to not do anything as we would reassign
-> > the 'str' pointer to something else right away, but now we pass an
-> > uninitialized pointer into 'strchr', which can cause a kernel page fault
-> > or worse.
-> > 
-> > Fixes: 239fd5d41f9b ("staging: lustre: libcfs: shortcut to create CPT from NUMA topology")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 7 -------
-> >  1 file changed, 7 deletions(-)
-> 
-> Hm, I already applied the v1 versions of these, right?  What changed
-> with these, they seem identical to me...
+Earlier cl_avail_grant was changed to an unsigned int. Juila
+Lawall reported for the upstream client the following which
+affects the Intel branch as well:
 
-The patches you applied were fine, they just had not made it into linux-next
-by Tuesday, and I thought they got lost as I had sent them as part of a longer
-series and I screwed up one of the two changelogs initially (you applied the
-fixed v2 patch I sent immediately afterwards).
+drivers/staging/lustre/lustre/osc/osc_request.c:1045:5-24: WARNING: Unsigned
+expression compared with zero: cli -> cl_avail_grant < 0
 
-Sorry about the confusion.
+Since cl_avail_grant can never be negative we can remove the
+code handling the negative value case.
 
-	Arnd
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: LU-8697 https://jira.hpdd.intel.com/browse/LU-6303
+Reviewed-on: http://review.whamcloud.com/23155
+Reviewed-by: Fan Yong <fan.yong@intel.com>
+Reviewed-by: Frank Zago <fzago@cray.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/osc/osc_request.c |   10 ----------
+ 1 files changed, 0 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 038f00c..efd938a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -801,16 +801,6 @@ static void osc_init_grant(struct client_obd *cli, struct obd_connect_data *ocd)
+ 		cli->cl_avail_grant = ocd->ocd_grant -
+ 				      (cli->cl_dirty_pages << PAGE_SHIFT);
+ 
+-	if (cli->cl_avail_grant < 0) {
+-		CWARN("%s: available grant < 0: avail/ocd/dirty %ld/%u/%ld\n",
+-		      cli->cl_import->imp_obd->obd_name, cli->cl_avail_grant,
+-		      ocd->ocd_grant, cli->cl_dirty_pages << PAGE_SHIFT);
+-		/* workaround for servers which do not have the patch from
+-		 * LU-2679
+-		 */
+-		cli->cl_avail_grant = ocd->ocd_grant;
+-	}
+-
+ 	/* determine the appropriate chunk size used by osc_extent. */
+ 	cli->cl_chunkbits = max_t(int, PAGE_SHIFT, ocd->ocd_blocksize);
+ 	spin_unlock(&cli->cl_loi_list_lock);
+-- 
+1.7.1
