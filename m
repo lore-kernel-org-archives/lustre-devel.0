@@ -1,220 +1,193 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Oct 2016 18:11:57 -0400
-Subject: [lustre-devel] [PATCH 23/29] staging: lustre: ptlrpc: do not sleep
-	if encpool reached max capacity
+Date: Thu, 27 Oct 2016 18:11:37 -0400
+Subject: [lustre-devel] [PATCH 03/29] staging: lustre: llite: restart short
+	read/write for normal IO
 In-Reply-To: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
 References: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1477606323-30325-24-git-send-email-jsimmons@infradead.org>
+Message-ID: <1477606323-30325-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Sebastien Buisson <sebastien.buisson@bull.net>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Sebastien Buisson <sebastien.buisson@bull.net>
+From: Bobi Jam <bobijam.xu@intel.com>
 
-When encryption is enabled RPCs are encrypted just before being
-sent. The encryption requires allocating memory in the encoding pool.
-The current implementation in sptlrpc_enc_pool_get_pages() is
-deadlock-prone. Indeed, if there is no more free pages in the pool,
-all ptlrpcd threads can end up waiting in a queue, so there is no
-thread available to process other requests. It means client is not
-able to process replies from servers that yet contain last committed
-transno useful to release memory allocated by previous requests,
-including enc_pool pages.
+If normal IO got short read/write, we'd restart the IO from where
+we've accomplished until we meet EOF or error happens.
 
-To fix this, in sptlrpc_enc_pool_get_pages(), do not make ptlrpcd
-threads wait in queue if encoding pool has already reached its maximum
-capacity. Instead, return -ENOMEM. If functions calling ptl_send_rpc()
-get -ENOMEM, then put back request in queue by moving it back to
-RQ_PHASE_NEW phase.
-
-As an optimization, do not call ptl_send_rpc() again for requests that
-already failed to allocate in the enc_pool, as long as there is not
-enough memory in the enc_pool to satisfy theirs needs.
-
-In /sys/fs/lustre/sptlrpc/encrypt_page_pools, add a new 'out of mem'
-stat to track how many requests fail to allocate memory in the
-enc_pool.
-
-Signed-off-by: Sebastien Buisson <sebastien.buisson@bull.net>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6356
-Reviewed-on: http://review.whamcloud.com/15070
+Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6389
+Reviewed-on: http://review.whamcloud.com/14123
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_sec.h |    2 +
- drivers/staging/lustre/lustre/ptlrpc/client.c      |   25 +++++++++++++++++
- drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |    9 +++++-
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |   29 +++++++++++++++++---
- 4 files changed, 60 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/fail.c          |    1 +
+ .../staging/lustre/lustre/include/obd_support.h    |    2 +
+ drivers/staging/lustre/lustre/llite/file.c         |   41 ++++++++++++--------
+ drivers/staging/lustre/lustre/llite/vvp_io.c       |   19 ++++++++-
+ 4 files changed, 45 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_sec.h b/drivers/staging/lustre/lustre/include/lustre_sec.h
-index 90c1834..89658e0 100644
---- a/drivers/staging/lustre/lustre/include/lustre_sec.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_sec.h
-@@ -1029,6 +1029,8 @@ int  sptlrpc_target_export_check(struct obd_export *exp,
+diff --git a/drivers/staging/lustre/lnet/libcfs/fail.c b/drivers/staging/lustre/lnet/libcfs/fail.c
+index e4b1a0a..3a9c8dd 100644
+--- a/drivers/staging/lustre/lnet/libcfs/fail.c
++++ b/drivers/staging/lustre/lnet/libcfs/fail.c
+@@ -113,6 +113,7 @@ int __cfs_fail_check_set(__u32 id, __u32 value, int set)
+ 		break;
+ 	case CFS_FAIL_LOC_RESET:
+ 		cfs_fail_loc = value;
++		atomic_set(&cfs_fail_count, 0);
+ 		break;
+ 	default:
+ 		LASSERTF(0, "called with bad set %u\n", set);
+diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
+index 1233c34..7f3f8cd 100644
+--- a/drivers/staging/lustre/lustre/include/obd_support.h
++++ b/drivers/staging/lustre/lustre/include/obd_support.h
+@@ -458,6 +458,8 @@
+ #define OBD_FAIL_LOV_INIT			    0x1403
+ #define OBD_FAIL_GLIMPSE_DELAY			    0x1404
+ #define OBD_FAIL_LLITE_XATTR_ENOMEM		    0x1405
++#define OBD_FAIL_MAKE_LOVEA_HOLE		    0x1406
++#define OBD_FAIL_LLITE_LOST_LAYOUT		    0x1407
+ #define OBD_FAIL_GETATTR_DELAY			    0x1409
  
- /* bulk security api */
- void sptlrpc_enc_pool_put_pages(struct ptlrpc_bulk_desc *desc);
-+int get_free_pages_in_pool(void);
-+int pool_is_at_full_capacity(void);
- 
- int sptlrpc_cli_wrap_bulk(struct ptlrpc_request *req,
- 			  struct ptlrpc_bulk_desc *desc);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index bda925e..cc4b129 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -1440,6 +1440,13 @@ static int ptlrpc_send_new_req(struct ptlrpc_request *req)
- 	int rc;
- 
- 	LASSERT(req->rq_phase == RQ_PHASE_NEW);
-+
-+	/* do not try to go further if there is not enough memory in enc_pool */
-+	if (req->rq_sent && req->rq_bulk)
-+		if (req->rq_bulk->bd_iov_count > get_free_pages_in_pool() &&
-+		    pool_is_at_full_capacity())
-+			return -ENOMEM;
-+
- 	if (req->rq_sent && (req->rq_sent > ktime_get_real_seconds()) &&
- 	    (!req->rq_generation_set ||
- 	     req->rq_import_generation == imp->imp_generation))
-@@ -1533,6 +1540,16 @@ static int ptlrpc_send_new_req(struct ptlrpc_request *req)
- 	       lustre_msg_get_opc(req->rq_reqmsg));
- 
- 	rc = ptl_send_rpc(req, 0);
-+	if (rc == -ENOMEM) {
-+		spin_lock(&imp->imp_lock);
-+		if (!list_empty(&req->rq_list)) {
-+			list_del_init(&req->rq_list);
-+			atomic_dec(&req->rq_import->imp_inflight);
-+		}
-+		spin_unlock(&imp->imp_lock);
-+		ptlrpc_rqphase_move(req, RQ_PHASE_NEW);
-+		return rc;
-+	}
- 	if (rc) {
- 		DEBUG_REQ(D_HA, req, "send failed (%d); expect timeout", rc);
- 		spin_lock(&req->rq_lock);
-@@ -1822,6 +1839,14 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
- 				}
- 
- 				rc = ptl_send_rpc(req, 0);
-+				if (rc == -ENOMEM) {
-+					spin_lock(&imp->imp_lock);
-+					if (!list_empty(&req->rq_list))
-+						list_del_init(&req->rq_list);
-+					spin_unlock(&imp->imp_lock);
-+					ptlrpc_rqphase_move(req, RQ_PHASE_NEW);
-+					continue;
-+				}
- 				if (rc) {
- 					DEBUG_REQ(D_HA, req,
- 						  "send failed: rc = %d", rc);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-index c2dd948..4e80ba9 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-@@ -536,8 +536,15 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
- 		mpflag = cfs_memory_pressure_get_and_set();
- 
- 	rc = sptlrpc_cli_wrap_request(request);
--	if (rc)
-+	if (rc) {
-+		/*
-+		 * set rq_sent so that this request is treated
-+		 * as a delayed send in the upper layers
-+		 */
-+		if (rc == -ENOMEM)
-+			request->rq_sent = ktime_get_seconds();
- 		goto out;
-+	}
- 
- 	/* bulk register should be done after wrap_request() */
- 	if (request->rq_bulk) {
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-index ceb805d..2fe9085 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-@@ -108,6 +108,7 @@
- 	unsigned long    epp_st_lowfree;	/* lowest free pages reached */
- 	unsigned int     epp_st_max_wqlen;      /* highest waitqueue length */
- 	unsigned long       epp_st_max_wait;       /* in jiffies */
-+	unsigned long	 epp_st_outofmem;	/* # of out of mem requests */
- 	/*
- 	 * pointers to pools
- 	 */
-@@ -139,7 +140,8 @@ int sptlrpc_proc_enc_pool_seq_show(struct seq_file *m, void *v)
- 		   "cache missing:	   %lu\n"
- 		   "low free mark:	   %lu\n"
- 		   "max waitqueue depth:     %u\n"
--		   "max wait time:	   %ld/%lu\n",
-+		   "max wait time:	   %ld/%lu\n"
-+		   "out of mem:		 %lu\n",
- 		   totalram_pages,
- 		   PAGES_PER_POOL,
- 		   page_pools.epp_max_pages,
-@@ -158,7 +160,8 @@ int sptlrpc_proc_enc_pool_seq_show(struct seq_file *m, void *v)
- 		   page_pools.epp_st_lowfree,
- 		   page_pools.epp_st_max_wqlen,
- 		   page_pools.epp_st_max_wait,
--		   msecs_to_jiffies(MSEC_PER_SEC));
-+		   msecs_to_jiffies(MSEC_PER_SEC),
-+		   page_pools.epp_st_outofmem);
- 
- 	spin_unlock(&page_pools.epp_lock);
- 
-@@ -306,6 +309,22 @@ static inline void enc_pools_wakeup(void)
- 	}
- }
- 
-+/*
-+ * Export the number of free pages in the pool
-+ */
-+int get_free_pages_in_pool(void)
-+{
-+	return page_pools.epp_free_pages;
-+}
-+
-+/*
-+ * Let outside world know if enc_pool full capacity is reached
-+ */
-+int pool_is_at_full_capacity(void)
-+{
-+	return (page_pools.epp_total_pages == page_pools.epp_max_pages);
-+}
-+
- void sptlrpc_enc_pool_put_pages(struct ptlrpc_bulk_desc *desc)
+ #define OBD_FAIL_FID_INDIR	0x1501
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 0accf28..2c8df43 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -972,9 +972,11 @@ void ll_io_init(struct cl_io *io, const struct file *file, int write)
  {
- 	int p_idx, g_idx;
-@@ -406,6 +425,7 @@ int sptlrpc_enc_pool_init(void)
- 	page_pools.epp_st_lowfree = 0;
- 	page_pools.epp_st_max_wqlen = 0;
- 	page_pools.epp_st_max_wait = 0;
-+	page_pools.epp_st_outofmem = 0;
+ 	struct ll_inode_info *lli = ll_i2info(file_inode(file));
+ 	struct ll_file_data  *fd  = LUSTRE_FPRIVATE(file);
++	struct vvp_io *vio = vvp_env_io(env);
+ 	struct range_lock range;
+ 	struct cl_io	 *io;
+-	ssize_t	       result;
++	ssize_t result = 0;
++	int rc = 0;
  
- 	enc_pools_alloc();
- 	if (!page_pools.epp_pools)
-@@ -433,13 +453,14 @@ void sptlrpc_enc_pool_fini(void)
+ 	CDEBUG(D_VFSTRACE, "file: %pD, type: %d ppos: %llu, count: %zu\n",
+ 	       file, iot, *ppos, count);
+@@ -1006,16 +1008,15 @@ void ll_io_init(struct cl_io *io, const struct file *file, int write)
+ 			CDEBUG(D_VFSTRACE, "Range lock [%llu, %llu]\n",
+ 			       range.rl_node.in_extent.start,
+ 			       range.rl_node.in_extent.end);
+-			result = range_lock(&lli->lli_write_tree,
+-					    &range);
+-			if (result < 0)
++			rc = range_lock(&lli->lli_write_tree, &range);
++			if (rc < 0)
+ 				goto out;
  
- 	if (page_pools.epp_st_access > 0) {
- 		CDEBUG(D_SEC,
--		       "max pages %lu, grows %u, grow fails %u, shrinks %u, access %lu, missing %lu, max qlen %u, max wait %ld/%ld\n",
-+		       "max pages %lu, grows %u, grow fails %u, shrinks %u, access %lu, missing %lu, max qlen %u, max wait %ld/%ld, out of mem %lu\n",
- 		       page_pools.epp_st_max_pages, page_pools.epp_st_grows,
- 		       page_pools.epp_st_grow_fails,
- 		       page_pools.epp_st_shrinks, page_pools.epp_st_access,
- 		       page_pools.epp_st_missings, page_pools.epp_st_max_wqlen,
- 		       page_pools.epp_st_max_wait,
--		       msecs_to_jiffies(MSEC_PER_SEC));
-+		       msecs_to_jiffies(MSEC_PER_SEC),
-+		       page_pools.epp_st_outofmem);
+ 			range_locked = true;
+ 		}
+ 		down_read(&lli->lli_trunc_sem);
+ 		ll_cl_add(file, env, io);
+-		result = cl_io_loop(env, io);
++		rc = cl_io_loop(env, io);
+ 		ll_cl_remove(file, env);
+ 		up_read(&lli->lli_trunc_sem);
+ 		if (range_locked) {
+@@ -1026,24 +1027,26 @@ void ll_io_init(struct cl_io *io, const struct file *file, int write)
+ 		}
+ 	} else {
+ 		/* cl_io_rw_init() handled IO */
+-		result = io->ci_result;
++		rc = io->ci_result;
  	}
+ 
+ 	if (io->ci_nob > 0) {
+ 		result = io->ci_nob;
++		count -= io->ci_nob;
+ 		*ppos = io->u.ci_wr.wr.crw_pos;
++
++		/* prepare IO restart */
++		if (count > 0)
++			args->u.normal.via_iter = vio->vui_iter;
+ 	}
+-	goto out;
+ out:
+ 	cl_io_fini(env, io);
+-	/* If any bit been read/written (result != 0), we just return
+-	 * short read/write instead of restart io.
+-	 */
+-	if ((result == 0 || result == -ENODATA) && io->ci_need_restart) {
+-		CDEBUG(D_VFSTRACE, "Restart %s on %pD from %lld, count:%zu\n",
++
++	if ((!rc || rc == -ENODATA) && count > 0 && io->ci_need_restart) {
++		CDEBUG(D_VFSTRACE, "%s: restart %s from %lld, count:%zu, result: %zd\n",
++		       file_dentry(file)->d_name.name,
+ 		       iot == CIT_READ ? "read" : "write",
+-		       file, *ppos, count);
+-		LASSERTF(io->ci_nob == 0, "%zd\n", io->ci_nob);
++		       *ppos, count, result);
+ 		goto restart;
+ 	}
+ 
+@@ -1056,13 +1059,19 @@ void ll_io_init(struct cl_io *io, const struct file *file, int write)
+ 			ll_stats_ops_tally(ll_i2sbi(file_inode(file)),
+ 					   LPROC_LL_WRITE_BYTES, result);
+ 			fd->fd_write_failed = false;
+-		} else if (result != -ERESTARTSYS) {
++		} else if (!result && !rc) {
++			rc = io->ci_result;
++			if (rc < 0)
++				fd->fd_write_failed = true;
++			else
++				fd->fd_write_failed = false;
++		} else if (rc != -ERESTARTSYS) {
+ 			fd->fd_write_failed = true;
+ 		}
+ 	}
+ 	CDEBUG(D_VFSTRACE, "iot: %d, result: %zd\n", iot, result);
+ 
+-	return result;
++	return result > 0 ? result : rc;
  }
  
+ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
+index 87fdab2..3d327b4 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_io.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
+@@ -72,9 +72,10 @@ static bool can_populate_pages(const struct lu_env *env, struct cl_io *io,
+ 		/* don't need lock here to check lli_layout_gen as we have held
+ 		 * extent lock and GROUP lock has to hold to swap layout
+ 		 */
+-		if (ll_layout_version_get(lli) != vio->vui_layout_gen) {
++		if (ll_layout_version_get(lli) != vio->vui_layout_gen ||
++		    OBD_FAIL_CHECK_RESET(OBD_FAIL_LLITE_LOST_LAYOUT, 0)) {
+ 			io->ci_need_restart = 1;
+-			/* this will return application a short read/write */
++			/* this will cause a short read/write */
+ 			io->ci_continue = 0;
+ 			rc = false;
+ 		}
+@@ -924,6 +925,20 @@ static int vvp_io_write_start(const struct lu_env *env,
+ 
+ 	CDEBUG(D_VFSTRACE, "write: [%lli, %lli)\n", pos, pos + (long long)cnt);
+ 
++	/*
++	 * The maximum Lustre file size is variable, based on the OST maximum
++	 * object size and number of stripes.  This needs another check in
++	 * addition to the VFS checks earlier.
++	 */
++	if (pos + cnt > ll_file_maxbytes(inode)) {
++		CDEBUG(D_INODE,
++		       "%s: file " DFID " offset %llu > maxbytes %llu\n",
++		       ll_get_fsname(inode->i_sb, NULL, 0),
++		       PFID(ll_inode2fid(inode)), pos + cnt,
++		       ll_file_maxbytes(inode));
++		return -EFBIG;
++	}
++
+ 	if (!vio->vui_iter) {
+ 		/* from a temp io in ll_cl_init(). */
+ 		result = 0;
 -- 
 1.7.1
