@@ -1,146 +1,127 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Oct 2016 18:11:34 -0400
-Subject: [lustre-devel] [PATCH 00/29] Batch one for work from 2.7.55 to
-	2.7.59
-Message-ID: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
+Date: Thu, 27 Oct 2016 18:11:42 -0400
+Subject: [lustre-devel] [PATCH 08/29] staging: lustre: clio: update file
+	attributes after sync
+In-Reply-To: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
+References: <1477606323-30325-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1477606323-30325-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
 
-The first two patches are fixes for problems pointed out by
-Dan Carpenter and Julia LaWall. Batch of fixes from the Lustre 2.8
-version. Basic support for selinux which before this work
-prevented lustre from running. First patch to cleanup lustre_idl.h
-which is a uapi header. All these patches are independent of
-each other so they can be applied in any order.
+From: Bobi Jam <bobijam.xu@intel.com>
 
-Alex Zhuravlev (1):
-  staging: lustre: ptlrpc: imp_peer_committed_transno should increase
+This really only affects clients that are attached to lustre
+server running ZFS, because zfs does not update # of blocks
+until the blocks are flushed to disk.
 
-Amir Shehata (1):
-  staging: lustre: ptlrpc: Introduce iovec to bulk descriptor
+This patch update file's blocks attribute after OST_SYNC completes.
 
-Andreas Dilger (1):
-  staging: lustre: obdclass: variable llog chunk size
+Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4389
+Reviewed-on: http://review.whamcloud.com/12915
+Reviewed-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/osc/osc_internal.h |    2 +-
+ drivers/staging/lustre/lustre/osc/osc_io.c       |    3 +--
+ drivers/staging/lustre/lustre/osc/osc_request.c  |   21 ++++++++++++++++++++-
+ 3 files changed, 22 insertions(+), 4 deletions(-)
 
-Ben Evans (1):
-  staging: lustre: headers: Create single .h for lu_seq_range
-
-Bobi Jam (2):
-  staging: lustre: llite: restart short read/write for normal IO
-  staging: lustre: clio: update file attributes after sync
-
-Gregoire Pichon (2):
-  staging: lustre: ptlrpc: embed highest XID in each request
-  staging: lustre: mdc: manage number of modify RPCs in flight
-
-Henri Doreau (2):
-  staging: lustre: ptlrpc: Forbid too early NRS policy tunings
-  staging: lustre: llite: Inform copytool of dataversion changes
-
-Hiroya Nozaki (1):
-  staging: lustre: obdclass: race lustre_profile_list
-
-Hongchao Zhang (1):
-  staging: lustre: mdt: disable IMA support
-
-James Simmons (2):
-  staging: lustre: osc: remove handling cl_avail_grant less than zero
-  staging: lustre: llite: remove IS_ERR(master_inode) check
-
-John L. Hammond (2):
-  staging: lustre: lov: remove LSM from struct lustre_md
-  staging: lustre: llite: add LL_IOC_FUTIMES_3
-
-Lai Siyao (1):
-  staging: lustre: dne: setdirstripe should fail if not supported
-
-Niu Yawei (3):
-  staging: lustre: ldlm: reclaim granted locks defensively
-  staging: lustre: recovery: don't skip open replay on reconnect
-  staging: lustre: obdecho: don't copy lu_site
-
-Sebastien Buisson (3):
-  staging: lustre: llite: basic support of SELinux in CLIO
-  staging: lustre: ptlrpc: do not sleep if encpool reached max capacity
-  staging: lustre: ptlrpc: do not switch out-of-date context
-
-wang di (6):
-  staging: lustre: lmv: allow cross-MDT rename and link
-  staging: lustre: llite: report back to user bad stripe count
-  staging: lustre: ptlrpc: Do not resend req with allow_replay
-  staging: lustre: mdc: deactive MDT permanently
-  staging: lustre: ptlrpc: replay bulk request
-  staging: lustre: llog: record the minimum record size
-
- .../lustre/include/linux/libcfs/libcfs_hash.h      |    2 +-
- drivers/staging/lustre/lnet/libcfs/fail.c          |    1 +
- drivers/staging/lustre/lnet/libcfs/hash.c          |   24 ++-
- drivers/staging/lustre/lustre/fid/fid_request.c    |   18 +-
- drivers/staging/lustre/lustre/fid/lproc_fid.c      |    2 +-
- drivers/staging/lustre/lustre/fld/fld_cache.c      |    6 +-
- drivers/staging/lustre/lustre/include/cl_object.h  |    2 +-
- .../lustre/lustre/include/lustre/lustre_idl.h      |  154 ++++------------
- .../lustre/lustre/include/lustre/lustre_user.h     |   10 +
- drivers/staging/lustre/lustre/include/lustre_fid.h |    1 +
- drivers/staging/lustre/lustre/include/lustre_log.h |    6 +
- drivers/staging/lustre/lustre/include/lustre_mdc.h |   24 +++
- drivers/staging/lustre/lustre/include/lustre_net.h |  161 +++++++++++++---
- drivers/staging/lustre/lustre/include/lustre_sec.h |    2 +
- drivers/staging/lustre/lustre/include/obd.h        |    9 +-
- drivers/staging/lustre/lustre/include/obd_class.h  |    9 +
- .../staging/lustre/lustre/include/obd_support.h    |    2 +
- drivers/staging/lustre/lustre/include/seq_range.h  |  199 ++++++++++++++++++++
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |   37 ++++
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |    4 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    8 +-
- drivers/staging/lustre/lustre/llite/Makefile       |    6 +-
- drivers/staging/lustre/lustre/llite/dir.c          |   31 +++-
- drivers/staging/lustre/lustre/llite/file.c         |  115 ++++++++----
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   |    2 +-
- .../staging/lustre/lustre/llite/llite_internal.h   |    4 +
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   19 +-
- drivers/staging/lustre/lustre/llite/namei.c        |   14 +-
- drivers/staging/lustre/lustre/llite/vvp_io.c       |   19 ++-
- drivers/staging/lustre/lustre/llite/xattr.c        |   65 +++----
- drivers/staging/lustre/lustre/llite/xattr_cache.c  |    4 +
- .../staging/lustre/lustre/llite/xattr_security.c   |   88 +++++++++
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   78 ++++++--
- drivers/staging/lustre/lustre/lov/lov_ea.c         |    9 +-
- drivers/staging/lustre/lustre/lov/lov_internal.h   |   15 +--
- drivers/staging/lustre/lustre/lov/lov_obd.c        |    1 -
- drivers/staging/lustre/lustre/lov/lov_object.c     |  120 +++++++-----
- drivers/staging/lustre/lustre/lov/lov_pack.c       |  100 ++++------
- drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   60 ++++++
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |   28 ++--
- drivers/staging/lustre/lustre/mdc/mdc_reint.c      |   23 +--
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |   77 +++-----
- drivers/staging/lustre/lustre/mgc/mgc_request.c    |    8 +-
- drivers/staging/lustre/lustre/obdclass/genops.c    |  171 +++++++++++++++++-
- drivers/staging/lustre/lustre/obdclass/llog.c      |   49 +++--
- drivers/staging/lustre/lustre/obdclass/llog_obd.c  |    1 +
- drivers/staging/lustre/lustre/obdclass/llog_swab.c |    8 +-
- .../staging/lustre/lustre/obdclass/obd_config.c    |   57 +++++-
- .../staging/lustre/lustre/obdecho/echo_client.c    |   20 +-
- drivers/staging/lustre/lustre/osc/osc_internal.h   |    2 +-
- drivers/staging/lustre/lustre/osc/osc_io.c         |    3 +-
- drivers/staging/lustre/lustre/osc/osc_page.c       |    4 +-
- drivers/staging/lustre/lustre/osc/osc_request.c    |   38 +++--
- drivers/staging/lustre/lustre/ptlrpc/client.c      |  199 ++++++++++++++++----
- drivers/staging/lustre/lustre/ptlrpc/events.c      |    4 +-
- drivers/staging/lustre/lustre/ptlrpc/llog_client.c |   20 ++-
- drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |   16 +-
- drivers/staging/lustre/lustre/ptlrpc/nrs.c         |    9 +
- .../staging/lustre/lustre/ptlrpc/pack_generic.c    |   15 ++
- drivers/staging/lustre/lustre/ptlrpc/pers.c        |   31 ++--
- .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |    9 +-
- drivers/staging/lustre/lustre/ptlrpc/recover.c     |   12 +-
- drivers/staging/lustre/lustre/ptlrpc/sec.c         |    7 +
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |   48 ++++--
- drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |   20 +-
- 65 files changed, 1649 insertions(+), 661 deletions(-)
- create mode 100644 drivers/staging/lustre/lustre/include/seq_range.h
- create mode 100644 drivers/staging/lustre/lustre/llite/xattr_security.c
+diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
+index dc708ea..12d3b58 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
+@@ -124,7 +124,7 @@ int osc_setattr_async(struct obd_export *exp, struct obdo *oa,
+ int osc_punch_base(struct obd_export *exp, struct obdo *oa,
+ 		   obd_enqueue_update_f upcall, void *cookie,
+ 		   struct ptlrpc_request_set *rqset);
+-int osc_sync_base(struct obd_export *exp, struct obdo *oa,
++int osc_sync_base(struct osc_object *exp, struct obdo *oa,
+ 		  obd_enqueue_update_f upcall, void *cookie,
+ 		  struct ptlrpc_request_set *rqset);
+ 
+diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
+index 8eb4275..3b82d0a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_io.c
++++ b/drivers/staging/lustre/lustre/osc/osc_io.c
+@@ -760,8 +760,7 @@ static int osc_fsync_ost(const struct lu_env *env, struct osc_object *obj,
+ 
+ 	init_completion(&cbargs->opc_sync);
+ 
+-	rc = osc_sync_base(osc_export(obj), oa, osc_async_upcall, cbargs,
+-			   PTLRPCD_SET);
++	rc = osc_sync_base(obj, oa, osc_async_upcall, cbargs, PTLRPCD_SET);
+ 	return rc;
+ }
+ 
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index c570d19..091558e 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -82,6 +82,7 @@ struct osc_setattr_args {
+ };
+ 
+ struct osc_fsync_args {
++	struct osc_object	*fa_obj;
+ 	struct obdo		*fa_oa;
+ 	obd_enqueue_update_f fa_upcall;
+ 	void		*fa_cookie;
+@@ -365,8 +366,11 @@ static int osc_sync_interpret(const struct lu_env *env,
+ 			      struct ptlrpc_request *req,
+ 			      void *arg, int rc)
+ {
++	struct cl_attr *attr = &osc_env_info(env)->oti_attr;
+ 	struct osc_fsync_args *fa = arg;
++	unsigned long valid = 0;
+ 	struct ost_body *body;
++	struct cl_object *obj;
+ 
+ 	if (rc)
+ 		goto out;
+@@ -379,15 +383,29 @@ static int osc_sync_interpret(const struct lu_env *env,
+ 	}
+ 
+ 	*fa->fa_oa = body->oa;
++	obj = osc2cl(fa->fa_obj);
++
++	/* Update osc object's blocks attribute */
++	cl_object_attr_lock(obj);
++	if (body->oa.o_valid & OBD_MD_FLBLOCKS) {
++		attr->cat_blocks = body->oa.o_blocks;
++		valid |= CAT_BLOCKS;
++	}
++
++	if (valid)
++		cl_object_attr_update(env, obj, attr, valid);
++	cl_object_attr_unlock(obj);
++
+ out:
+ 	rc = fa->fa_upcall(fa->fa_cookie, rc);
+ 	return rc;
+ }
+ 
+-int osc_sync_base(struct obd_export *exp, struct obdo *oa,
++int osc_sync_base(struct osc_object *obj, struct obdo *oa,
+ 		  obd_enqueue_update_f upcall, void *cookie,
+ 		  struct ptlrpc_request_set *rqset)
+ {
++	struct obd_export *exp = osc_export(obj);
+ 	struct ptlrpc_request *req;
+ 	struct ost_body *body;
+ 	struct osc_fsync_args *fa;
+@@ -414,6 +432,7 @@ int osc_sync_base(struct obd_export *exp, struct obdo *oa,
+ 
+ 	CLASSERT(sizeof(*fa) <= sizeof(req->rq_async_args));
+ 	fa = ptlrpc_req_async_args(req);
++	fa->fa_obj = obj;
+ 	fa->fa_oa = oa;
+ 	fa->fa_upcall = upcall;
+ 	fa->fa_cookie = cookie;
+-- 
+1.7.1
