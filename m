@@ -1,724 +1,267 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  2 Nov 2016 14:46:52 -0400
-Subject: [lustre-devel] [PATCH v2] staging: lustre: mdc: manage number of
-	modify RPCs in flight
-Message-ID: <1478112412-8200-1-git-send-email-jsimmons@infradead.org>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Wed, 2 Nov 2016 23:05:29 +0000
+Subject: [lustre-devel] [PATCH 1/2] staging: lustre: replace uses of
+ class_devno_max by MAX_OBD_DEVICES
+In-Reply-To: <20161025164730.GA27553@waves>
+References: <cover.1476739569.git.mahfouz.saif.elyazal@gmail.com>
+	<4ba436cdccbea6c6dbc631f8cf75cd80f4f9ddb4.1476739569.git.mahfouz.saif.elyazal@gmail.com>
+	<D62F1CE1-61E3-43B9-8742-705AF196729C@intel.com>
+	<20161025164730.GA27553@waves>
+Message-ID: <8FDBA22B-F6A6-4CA7-B997-41327603E8A9@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Gregoire Pichon <gregoire.pichon@bull.net>, James Simmons <jsimmons@infradead.org>
+To: lustre-devel@lists.lustre.org
 
-From: Gregoire Pichon <gregoire.pichon@bull.net>
+On Oct 25, 2016, at 10:47, Aya Mahfouz <mahfouz.saif.elyazal@gmail.com> wrote:
+> 
+> On Mon, Oct 17, 2016 at 10:38:31PM +0000, Dilger, Andreas wrote:
+>> On Oct 17, 2016, at 15:46, Aya Mahfouz <mahfouz.saif.elyazal@gmail.com> wrote:
+>>> 
+>>> class_devno_max is an inline function that returns
+>>> MAX_OBD_DEVICES. Replace all calls to the function
+>>> by MAX_OBD_DEVICES.
+>> 
+>> Thanks for your patch, but unfortunately it can't be accepted.
+>> 
+>> This function was added in preparation of being able to tune the maximum
+>> number of storage devices dynamically, rather than having to hard code it
+>> to the maximum possible number of servers that a client can possibly
+>> connect to.
+>> 
+>> While the current maximum of 8192 servers has been enough for current
+>> filesystems, I'd rather move in the direction of dynamically handling this
+>> limit rather than re-introducing a hard-coded constant throughout the code.
+>> 
+> Hello,
+> 
+> I would like to proceed with implementing the function if possible.
+> Kindly direct me to some starting pointers.
 
-This patch is the main client part of a new feature that supports
-multiple modify metadata RPCs in parallel. Its goal is to improve
-metadata operations performance of a single client, while maintening
-the consistency of MDT reply reconstruction and MDT recovery
-mechanisms.
+Hi Aya,
+thanks for offering to look into this.
 
-It allows to manage the number of modify RPCs in flight within
-the client obd structure and to assign a virtual index (the tag) to
-each modify RPC to help server side cleaning of reply data.
+There are several ways to approach this problem  to make the allocation
+of the obd_devs[] array dynamic.  In most cases, there isn't any value
+to dynamically shrink this array, since the filesystem(s) will typically
+be mounted until the node is rebooted, and it is only in the tens of KB
+size range, so this will not affect ongoing operations, and that simplifies
+the implementation.
 
-The mdc component uses this feature to send multiple modify RPCs
-in parallel.
+The easiest way would be to have a dynamically-sized obd_devs[] array that
+is reallocated in class_newdev() in PAGE_SIZE chunks whenever the current
+array has no more free slots and copied to the new array, using obd_dev_lock
+to protect the array while it is being reallocated and copied.  In most
+cases, this would save memory over the static array (not many filesystems
+have so many servers), but for the few sites that have 10000+ servers they
+don't need to change the source to handle this.  Using libcfs_kvzalloc()
+would avoid issues with allocating large chunks of memory.
 
-Signed-off-by: Gregoire Pichon <gregoire.pichon@bull.net>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5319
-Reviewed-on: http://review.whamcloud.com/14374
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/fid/fid_request.c    |    4 -
- drivers/staging/lustre/lustre/include/lustre_mdc.h |   24 +++
- drivers/staging/lustre/lustre/include/obd.h        |    7 +-
- drivers/staging/lustre/lustre/include/obd_class.h  |    6 +
- drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |   37 +++++
- drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   23 +++
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |   13 +-
- drivers/staging/lustre/lustre/mdc/mdc_reint.c      |   23 +--
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |   50 ++-----
- drivers/staging/lustre/lustre/obdclass/genops.c    |  171 +++++++++++++++++++-
- 10 files changed, 293 insertions(+), 65 deletions(-)
+There are a few places where obd_devs[] is accessed outside obd_dev_lock
+that would need to be fixed now that this array may be changed at runtime.
 
-diff --git a/drivers/staging/lustre/lustre/fid/fid_request.c b/drivers/staging/lustre/lustre/fid/fid_request.c
-index 1148b9a..999f250 100644
---- a/drivers/staging/lustre/lustre/fid/fid_request.c
-+++ b/drivers/staging/lustre/lustre/fid/fid_request.c
-@@ -112,11 +112,7 @@ static int seq_client_rpc(struct lu_client_seq *seq,
- 
- 	ptlrpc_at_set_req_timeout(req);
- 
--	if (opc != SEQ_ALLOC_SUPER && seq->lcs_type == LUSTRE_SEQ_METADATA)
--		mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
- 	rc = ptlrpc_queue_wait(req);
--	if (opc != SEQ_ALLOC_SUPER && seq->lcs_type == LUSTRE_SEQ_METADATA)
--		mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
- 	if (rc)
- 		goto out_req;
- 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_mdc.h b/drivers/staging/lustre/lustre/include/lustre_mdc.h
-index 92a5c0f..198ceb0 100644
---- a/drivers/staging/lustre/lustre/include/lustre_mdc.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_mdc.h
-@@ -156,6 +156,30 @@ static inline void mdc_put_rpc_lock(struct mdc_rpc_lock *lck,
- 	mutex_unlock(&lck->rpcl_mutex);
- }
- 
-+static inline void mdc_get_mod_rpc_slot(struct ptlrpc_request *req,
-+					struct lookup_intent *it)
-+{
-+	struct client_obd *cli = &req->rq_import->imp_obd->u.cli;
-+	u32 opc;
-+	u16 tag;
-+
-+	opc = lustre_msg_get_opc(req->rq_reqmsg);
-+	tag = obd_get_mod_rpc_slot(cli, opc, it);
-+	lustre_msg_set_tag(req->rq_reqmsg, tag);
-+}
-+
-+static inline void mdc_put_mod_rpc_slot(struct ptlrpc_request *req,
-+					struct lookup_intent *it)
-+{
-+	struct client_obd *cli = &req->rq_import->imp_obd->u.cli;
-+	u32 opc;
-+	u16 tag;
-+
-+	opc = lustre_msg_get_opc(req->rq_reqmsg);
-+	tag = lustre_msg_get_tag(req->rq_reqmsg);
-+	obd_put_mod_rpc_slot(cli, opc, it, tag);
-+}
-+
- /**
-  * Update the maximum possible easize.
-  *
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index c8a6e23..09e3e71 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -263,14 +263,17 @@ struct client_obd {
- 	wait_queue_head_t	      cl_destroy_waitq;
- 
- 	struct mdc_rpc_lock     *cl_rpc_lock;
--	struct mdc_rpc_lock     *cl_close_lock;
- 
- 	/* modify rpcs in flight
- 	 * currently used for metadata only
- 	 */
- 	spinlock_t		 cl_mod_rpcs_lock;
- 	u16			 cl_max_mod_rpcs_in_flight;
--
-+	u16			 cl_mod_rpcs_in_flight;
-+	u16			 cl_close_rpcs_in_flight;
-+	wait_queue_head_t	 cl_mod_rpcs_waitq;
-+	unsigned long		*cl_mod_tag_bitmap;
-+	struct obd_histogram	 cl_mod_rpcs_hist;
- 
- 	/* mgc datastruct */
- 	atomic_t	     cl_mgc_refcount;
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 70b355e..f79133c 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -101,6 +101,12 @@ struct obd_device *class_devices_in_group(struct obd_uuid *grp_uuid,
- __u32 obd_get_max_rpcs_in_flight(struct client_obd *cli);
- int obd_set_max_rpcs_in_flight(struct client_obd *cli, __u32 max);
- int obd_set_max_mod_rpcs_in_flight(struct client_obd *cli, u16 max);
-+int obd_mod_rpc_stats_seq_show(struct client_obd *cli, struct seq_file *seq);
-+
-+u16 obd_get_mod_rpc_slot(struct client_obd *cli, u32 opc,
-+			 struct lookup_intent *it);
-+void obd_put_mod_rpc_slot(struct client_obd *cli, u32 opc,
-+			  struct lookup_intent *it, u16 tag);
- 
- struct llog_handle;
- struct llog_rec_hdr;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-index 4f9480e..ee4bb56 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-@@ -372,6 +372,25 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- 	} else {
- 		cli->cl_max_rpcs_in_flight = OBD_MAX_RIF_DEFAULT;
- 	}
-+
-+	spin_lock_init(&cli->cl_mod_rpcs_lock);
-+	spin_lock_init(&cli->cl_mod_rpcs_hist.oh_lock);
-+	cli->cl_max_mod_rpcs_in_flight = 0;
-+	cli->cl_mod_rpcs_in_flight = 0;
-+	cli->cl_close_rpcs_in_flight = 0;
-+	init_waitqueue_head(&cli->cl_mod_rpcs_waitq);
-+	cli->cl_mod_tag_bitmap = NULL;
-+
-+	if (connect_op == MDS_CONNECT) {
-+		cli->cl_max_mod_rpcs_in_flight = cli->cl_max_rpcs_in_flight - 1;
-+		cli->cl_mod_tag_bitmap = kcalloc(BITS_TO_LONGS(OBD_MAX_RIF_MAX),
-+						 sizeof(long), GFP_NOFS);
-+		if (!cli->cl_mod_tag_bitmap) {
-+			rc = -ENOMEM;
-+			goto err;
-+		}
-+	}
-+
- 	rc = ldlm_get_ref();
- 	if (rc) {
- 		CERROR("ldlm_get_ref failed: %d\n", rc);
-@@ -431,12 +450,16 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
- err_ldlm:
- 	ldlm_put_ref();
- err:
-+	kfree(cli->cl_mod_tag_bitmap);
-+	cli->cl_mod_tag_bitmap = NULL;
- 	return rc;
- }
- EXPORT_SYMBOL(client_obd_setup);
- 
- int client_obd_cleanup(struct obd_device *obddev)
- {
-+	struct client_obd *cli = &obddev->u.cli;
-+
- 	ldlm_namespace_free_post(obddev->obd_namespace);
- 	obddev->obd_namespace = NULL;
- 
-@@ -444,6 +467,10 @@ int client_obd_cleanup(struct obd_device *obddev)
- 	LASSERT(!obddev->u.cli.cl_import);
- 
- 	ldlm_put_ref();
-+
-+	kfree(cli->cl_mod_tag_bitmap);
-+	cli->cl_mod_tag_bitmap = NULL;
-+
- 	return 0;
- }
- EXPORT_SYMBOL(client_obd_cleanup);
-@@ -458,6 +485,7 @@ int client_connect_import(const struct lu_env *env,
- 	struct obd_import       *imp    = cli->cl_import;
- 	struct obd_connect_data *ocd;
- 	struct lustre_handle    conn    = { 0 };
-+	bool is_mdc = false;
- 	int		     rc;
- 
- 	*exp = NULL;
-@@ -484,6 +512,10 @@ int client_connect_import(const struct lu_env *env,
- 	ocd = &imp->imp_connect_data;
- 	if (data) {
- 		*ocd = *data;
-+		is_mdc = !strncmp(imp->imp_obd->obd_type->typ_name,
-+				  LUSTRE_MDC_NAME, 3);
-+		if (is_mdc)
-+			data->ocd_connect_flags |= OBD_CONNECT_MULTIMODRPCS;
- 		imp->imp_connect_flags_orig = data->ocd_connect_flags;
- 	}
- 
-@@ -499,6 +531,11 @@ int client_connect_import(const struct lu_env *env,
- 			 ocd->ocd_connect_flags, "old %#llx, new %#llx\n",
- 			 data->ocd_connect_flags, ocd->ocd_connect_flags);
- 		data->ocd_connect_flags = ocd->ocd_connect_flags;
-+		/* clear the flag as it was not set and is not known
-+		 * by upper layers
-+		 */
-+		if (is_mdc)
-+			data->ocd_connect_flags &= ~OBD_CONNECT_MULTIMODRPCS;
- 	}
- 
- 	ptlrpc_pinger_add_import(imp);
-diff --git a/drivers/staging/lustre/lustre/mdc/lproc_mdc.c b/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-index 76b9afc..9021c46 100644
---- a/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-+++ b/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-@@ -146,6 +146,27 @@ static ssize_t max_mod_rpcs_in_flight_store(struct kobject *kobj,
- }
- LUSTRE_RW_ATTR(max_mod_rpcs_in_flight);
- 
-+static int mdc_rpc_stats_seq_show(struct seq_file *seq, void *v)
-+{
-+	struct obd_device *dev = seq->private;
-+
-+	return obd_mod_rpc_stats_seq_show(&dev->u.cli, seq);
-+}
-+
-+static ssize_t mdc_rpc_stats_seq_write(struct file *file,
-+				       const char __user *buf,
-+				       size_t len, loff_t *off)
-+{
-+	struct seq_file *seq = file->private_data;
-+	struct obd_device *dev = seq->private;
-+	struct client_obd *cli = &dev->u.cli;
-+
-+	lprocfs_oh_clear(&cli->cl_mod_rpcs_hist);
-+
-+	return len;
-+}
-+LPROC_SEQ_FOPS(mdc_rpc_stats);
-+
- LPROC_SEQ_FOPS_WR_ONLY(mdc, ping);
- 
- LPROC_SEQ_FOPS_RO_TYPE(mdc, connect_flags);
-@@ -185,6 +206,8 @@ static ssize_t max_pages_per_rpc_show(struct kobject *kobj,
- 	{ "import",		&mdc_import_fops,		NULL, 0 },
- 	{ "state",		&mdc_state_fops,		NULL, 0 },
- 	{ "pinger_recov",	&mdc_pinger_recov_fops,		NULL, 0 },
-+	{ .name =	"rpc_stats",
-+	  .fops =	&mdc_rpc_stats_fops		},
- 	{ NULL }
- };
- 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index b9ca140..42a128f 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -766,15 +766,16 @@ int mdc_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 		req->rq_sent = ktime_get_real_seconds() + resends;
- 	}
- 
--	/* It is important to obtain rpc_lock first (if applicable), so that
--	 * threads that are serialised with rpc_lock are not polluting our
--	 * rpcs in flight counter. We do not do flock request limiting, though
-+	/* It is important to obtain modify RPC slot first (if applicable), so
-+	 * that threads that are waiting for a modify RPC slot are not polluting
-+	 * our rpcs in flight counter.
-+	 * We do not do flock request limiting, though
- 	 */
- 	if (it) {
--		mdc_get_rpc_lock(obddev->u.cli.cl_rpc_lock, it);
-+		mdc_get_mod_rpc_slot(req, it);
- 		rc = obd_get_request_slot(&obddev->u.cli);
- 		if (rc != 0) {
--			mdc_put_rpc_lock(obddev->u.cli.cl_rpc_lock, it);
-+			mdc_put_mod_rpc_slot(req, it);
- 			mdc_clear_replay_flag(req, 0);
- 			ptlrpc_req_finished(req);
- 			return rc;
-@@ -801,7 +802,7 @@ int mdc_enqueue(struct obd_export *exp, struct ldlm_enqueue_info *einfo,
- 	}
- 
- 	obd_put_request_slot(&obddev->u.cli);
--	mdc_put_rpc_lock(obddev->u.cli.cl_rpc_lock, it);
-+	mdc_put_mod_rpc_slot(req, it);
- 
- 	if (rc < 0) {
- 		CDEBUG(D_INFO, "%s: ldlm_cli_enqueue failed: rc = %d\n",
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_reint.c b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-index 1847e5a..b551c57 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-@@ -40,17 +40,15 @@
- #include "../include/lustre_fid.h"
- 
- /* mdc_setattr does its own semaphore handling */
--static int mdc_reint(struct ptlrpc_request *request,
--		     struct mdc_rpc_lock *rpc_lock,
--		     int level)
-+static int mdc_reint(struct ptlrpc_request *request, int level)
- {
- 	int rc;
- 
- 	request->rq_send_state = level;
- 
--	mdc_get_rpc_lock(rpc_lock, NULL);
-+	mdc_get_mod_rpc_slot(request, NULL);
- 	rc = ptlrpc_queue_wait(request);
--	mdc_put_rpc_lock(rpc_lock, NULL);
-+	mdc_put_mod_rpc_slot(request, NULL);
- 	if (rc)
- 		CDEBUG(D_INFO, "error in handling %d\n", rc);
- 	else if (!req_capsule_server_get(&request->rq_pill, &RMF_MDT_BODY))
-@@ -103,8 +101,6 @@ int mdc_setattr(struct obd_export *exp, struct md_op_data *op_data,
- {
- 	LIST_HEAD(cancels);
- 	struct ptlrpc_request *req;
--	struct mdc_rpc_lock *rpc_lock;
--	struct obd_device *obd = exp->exp_obd;
- 	int count = 0, rc;
- 	__u64 bits;
- 
-@@ -131,8 +127,6 @@ int mdc_setattr(struct obd_export *exp, struct md_op_data *op_data,
- 		return rc;
- 	}
- 
--	rpc_lock = obd->u.cli.cl_rpc_lock;
--
- 	if (op_data->op_attr.ia_valid & (ATTR_MTIME | ATTR_CTIME))
- 		CDEBUG(D_INODE, "setting mtime %ld, ctime %ld\n",
- 		       LTIME_S(op_data->op_attr.ia_mtime),
-@@ -141,7 +135,7 @@ int mdc_setattr(struct obd_export *exp, struct md_op_data *op_data,
- 
- 	ptlrpc_request_set_replen(req);
- 
--	rc = mdc_reint(req, rpc_lock, LUSTRE_IMP_FULL);
-+	rc = mdc_reint(req, LUSTRE_IMP_FULL);
- 
- 	if (rc == -ERESTARTSYS)
- 		rc = 0;
-@@ -220,7 +214,7 @@ int mdc_create(struct obd_export *exp, struct md_op_data *op_data,
- 	}
- 	level = LUSTRE_IMP_FULL;
-  resend:
--	rc = mdc_reint(req, exp->exp_obd->u.cli.cl_rpc_lock, level);
-+	rc = mdc_reint(req, level);
- 
- 	/* Resend if we were told to. */
- 	if (rc == -ERESTARTSYS) {
-@@ -292,7 +286,7 @@ int mdc_unlink(struct obd_export *exp, struct md_op_data *op_data,
- 
- 	*request = req;
- 
--	rc = mdc_reint(req, obd->u.cli.cl_rpc_lock, LUSTRE_IMP_FULL);
-+	rc = mdc_reint(req, LUSTRE_IMP_FULL);
- 	if (rc == -ERESTARTSYS)
- 		rc = 0;
- 	return rc;
-@@ -302,7 +296,6 @@ int mdc_link(struct obd_export *exp, struct md_op_data *op_data,
- 	     struct ptlrpc_request **request)
- {
- 	LIST_HEAD(cancels);
--	struct obd_device *obd = exp->exp_obd;
- 	struct ptlrpc_request *req;
- 	int count = 0, rc;
- 
-@@ -334,7 +327,7 @@ int mdc_link(struct obd_export *exp, struct md_op_data *op_data,
- 	mdc_link_pack(req, op_data);
- 	ptlrpc_request_set_replen(req);
- 
--	rc = mdc_reint(req, obd->u.cli.cl_rpc_lock, LUSTRE_IMP_FULL);
-+	rc = mdc_reint(req, LUSTRE_IMP_FULL);
- 	*request = req;
- 	if (rc == -ERESTARTSYS)
- 		rc = 0;
-@@ -398,7 +391,7 @@ int mdc_rename(struct obd_export *exp, struct md_op_data *op_data,
- 			     obd->u.cli.cl_default_mds_easize);
- 	ptlrpc_request_set_replen(req);
- 
--	rc = mdc_reint(req, obd->u.cli.cl_rpc_lock, LUSTRE_IMP_FULL);
-+	rc = mdc_reint(req, LUSTRE_IMP_FULL);
- 	*request = req;
- 	if (rc == -ERESTARTSYS)
- 		rc = 0;
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index c620f5c..e3a167a 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -327,12 +327,12 @@ static int mdc_xattr_common(struct obd_export *exp,
- 
- 	/* make rpc */
- 	if (opcode == MDS_REINT)
--		mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-+		mdc_get_mod_rpc_slot(req, NULL);
- 
- 	rc = ptlrpc_queue_wait(req);
- 
- 	if (opcode == MDS_REINT)
--		mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-+		mdc_put_mod_rpc_slot(req, NULL);
- 
- 	if (rc)
- 		ptlrpc_req_finished(req);
-@@ -775,9 +775,9 @@ static int mdc_close(struct obd_export *exp, struct md_op_data *op_data,
- 
- 	ptlrpc_request_set_replen(req);
- 
--	mdc_get_rpc_lock(obd->u.cli.cl_close_lock, NULL);
-+	mdc_get_mod_rpc_slot(req, NULL);
- 	rc = ptlrpc_queue_wait(req);
--	mdc_put_rpc_lock(obd->u.cli.cl_close_lock, NULL);
-+	mdc_put_mod_rpc_slot(req, NULL);
- 
- 	if (!req->rq_repmsg) {
- 		CDEBUG(D_RPCTRACE, "request failed to send: %p, %d\n", req,
-@@ -1490,9 +1490,9 @@ static int mdc_ioc_hsm_progress(struct obd_export *exp,
- 
- 	ptlrpc_request_set_replen(req);
- 
--	mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-+	mdc_get_mod_rpc_slot(req, NULL);
- 	rc = ptlrpc_queue_wait(req);
--	mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-+	mdc_put_mod_rpc_slot(req, NULL);
- out:
- 	ptlrpc_req_finished(req);
- 	return rc;
-@@ -1670,9 +1670,9 @@ static int mdc_ioc_hsm_state_set(struct obd_export *exp,
- 
- 	ptlrpc_request_set_replen(req);
- 
--	mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-+	mdc_get_mod_rpc_slot(req, NULL);
- 	rc = ptlrpc_queue_wait(req);
--	mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-+	mdc_put_mod_rpc_slot(req, NULL);
- out:
- 	ptlrpc_req_finished(req);
- 	return rc;
-@@ -1735,9 +1735,9 @@ static int mdc_ioc_hsm_request(struct obd_export *exp,
- 
- 	ptlrpc_request_set_replen(req);
- 
--	mdc_get_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-+	mdc_get_mod_rpc_slot(req, NULL);
- 	rc = ptlrpc_queue_wait(req);
--	mdc_put_rpc_lock(exp->exp_obd->u.cli.cl_rpc_lock, NULL);
-+	mdc_put_mod_rpc_slot(req, NULL);
- out:
- 	ptlrpc_req_finished(req);
- 	return rc;
-@@ -2582,29 +2582,17 @@ static void mdc_llog_finish(struct obd_device *obd)
- 
- static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
- {
--	struct client_obd *cli = &obd->u.cli;
- 	struct lprocfs_static_vars lvars = { NULL };
- 	int rc;
- 
--	cli->cl_rpc_lock = kzalloc(sizeof(*cli->cl_rpc_lock), GFP_NOFS);
--	if (!cli->cl_rpc_lock)
--		return -ENOMEM;
--	mdc_init_rpc_lock(cli->cl_rpc_lock);
--
- 	rc = ptlrpcd_addref();
- 	if (rc < 0)
--		goto err_rpc_lock;
--
--	cli->cl_close_lock = kzalloc(sizeof(*cli->cl_close_lock), GFP_NOFS);
--	if (!cli->cl_close_lock) {
--		rc = -ENOMEM;
--		goto err_ptlrpcd_decref;
--	}
--	mdc_init_rpc_lock(cli->cl_close_lock);
-+		return rc;
- 
- 	rc = client_obd_setup(obd, cfg);
- 	if (rc)
--		goto err_close_lock;
-+		goto err_ptlrpcd_decref;
-+
- 	lprocfs_mdc_init_vars(&lvars);
- 	lprocfs_obd_setup(obd, lvars.obd_vars, lvars.sysfs_vars);
- 	sptlrpc_lprocfs_cliobd_attach(obd);
-@@ -2621,17 +2609,10 @@ static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
- 		return rc;
- 	}
- 
--	spin_lock_init(&cli->cl_mod_rpcs_lock);
--	cli->cl_max_mod_rpcs_in_flight = OBD_MAX_RIF_DEFAULT - 1;
--
- 	return rc;
- 
--err_close_lock:
--	kfree(cli->cl_close_lock);
- err_ptlrpcd_decref:
- 	ptlrpcd_decref();
--err_rpc_lock:
--	kfree(cli->cl_rpc_lock);
- 	return rc;
- }
- 
-@@ -2679,11 +2660,6 @@ static int mdc_precleanup(struct obd_device *obd, enum obd_cleanup_stage stage)
- 
- static int mdc_cleanup(struct obd_device *obd)
- {
--	struct client_obd *cli = &obd->u.cli;
--
--	kfree(cli->cl_rpc_lock);
--	kfree(cli->cl_close_lock);
--
- 	ptlrpcd_decref();
- 
- 	return client_obd_cleanup(obd);
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 62e6636..438d619 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -1461,6 +1461,7 @@ int obd_set_max_mod_rpcs_in_flight(struct client_obd *cli, __u16 max)
- {
- 	struct obd_connect_data *ocd;
- 	u16 maxmodrpcs;
-+	u16 prev;
- 
- 	if (max > OBD_MAX_RIF_MAX || max < 1)
- 		return -ERANGE;
-@@ -1486,10 +1487,178 @@ int obd_set_max_mod_rpcs_in_flight(struct client_obd *cli, __u16 max)
- 		return -ERANGE;
- 	}
- 
-+	spin_lock(&cli->cl_mod_rpcs_lock);
-+
-+	prev = cli->cl_max_mod_rpcs_in_flight;
- 	cli->cl_max_mod_rpcs_in_flight = max;
- 
--	/* will have to wakeup waiters if max has been increased */
-+	/* wakeup waiters if limit has been increased */
-+	if (cli->cl_max_mod_rpcs_in_flight > prev)
-+		wake_up(&cli->cl_mod_rpcs_waitq);
-+
-+	spin_unlock(&cli->cl_mod_rpcs_lock);
- 
- 	return 0;
- }
- EXPORT_SYMBOL(obd_set_max_mod_rpcs_in_flight);
-+
-+#define pct(a, b) (b ? (a * 100) / b : 0)
-+
-+int obd_mod_rpc_stats_seq_show(struct client_obd *cli, struct seq_file *seq)
-+{
-+	unsigned long mod_tot = 0, mod_cum;
-+	struct timespec64 now;
-+	int i;
-+
-+	ktime_get_real_ts64(&now);
-+
-+	spin_lock(&cli->cl_mod_rpcs_lock);
-+
-+	seq_printf(seq, "snapshot_time:		%llu.%9lu (secs.nsecs)\n",
-+		   (s64)now.tv_sec, (unsigned long)now.tv_nsec);
-+	seq_printf(seq, "modify_RPCs_in_flight:  %hu\n",
-+		   cli->cl_mod_rpcs_in_flight);
-+
-+	seq_puts(seq, "\n\t\t\tmodify\n");
-+	seq_puts(seq, "rpcs in flight        rpcs   %% cum %%\n");
-+
-+	mod_tot = lprocfs_oh_sum(&cli->cl_mod_rpcs_hist);
-+
-+	mod_cum = 0;
-+	for (i = 0; i < OBD_HIST_MAX; i++) {
-+		unsigned long mod = cli->cl_mod_rpcs_hist.oh_buckets[i];
-+
-+		mod_cum += mod;
-+		seq_printf(seq, "%d:\t\t%10lu %3lu %3lu\n",
-+			   i, mod, pct(mod, mod_tot),
-+			   pct(mod_cum, mod_tot));
-+		if (mod_cum == mod_tot)
-+			break;
-+	}
-+
-+	spin_unlock(&cli->cl_mod_rpcs_lock);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(obd_mod_rpc_stats_seq_show);
-+#undef pct
-+
-+/*
-+ * The number of modify RPCs sent in parallel is limited
-+ * because the server has a finite number of slots per client to
-+ * store request result and ensure reply reconstruction when needed.
-+ * On the client, this limit is stored in cl_max_mod_rpcs_in_flight
-+ * that takes into account server limit and cl_max_rpcs_in_flight
-+ * value.
-+ * On the MDC client, to avoid a potential deadlock (see Bugzilla 3462),
-+ * one close request is allowed above the maximum.
-+ */
-+static inline bool obd_mod_rpc_slot_avail_locked(struct client_obd *cli,
-+						 bool close_req)
-+{
-+	bool avail;
-+
-+	/* A slot is available if
-+	 * - number of modify RPCs in flight is less than the max
-+	 * - it's a close RPC and no other close request is in flight
-+	 */
-+	avail = cli->cl_mod_rpcs_in_flight < cli->cl_max_mod_rpcs_in_flight ||
-+		(close_req && !cli->cl_close_rpcs_in_flight);
-+
-+	return avail;
-+}
-+
-+static inline bool obd_mod_rpc_slot_avail(struct client_obd *cli,
-+					  bool close_req)
-+{
-+	bool avail;
-+
-+	spin_lock(&cli->cl_mod_rpcs_lock);
-+	avail = obd_mod_rpc_slot_avail_locked(cli, close_req);
-+	spin_unlock(&cli->cl_mod_rpcs_lock);
-+	return avail;
-+}
-+
-+/* Get a modify RPC slot from the obd client @cli according
-+ * to the kind of operation @opc that is going to be sent
-+ * and the intent @it of the operation if it applies.
-+ * If the maximum number of modify RPCs in flight is reached
-+ * the thread is put to sleep.
-+ * Returns the tag to be set in the request message. Tag 0
-+ * is reserved for non-modifying requests.
-+ */
-+u16 obd_get_mod_rpc_slot(struct client_obd *cli, __u32 opc,
-+			 struct lookup_intent *it)
-+{
-+	struct l_wait_info lwi = LWI_INTR(NULL, NULL);
-+	bool close_req = false;
-+	u16 i, max;
-+
-+	/* read-only metadata RPCs don't consume a slot on MDT
-+	 * for reply reconstruction
-+	 */
-+	if (it && (it->it_op == IT_GETATTR || it->it_op == IT_LOOKUP ||
-+		   it->it_op == IT_LAYOUT || it->it_op == IT_READDIR))
-+		return 0;
-+
-+	if (opc == MDS_CLOSE)
-+		close_req = true;
-+
-+	do {
-+		spin_lock(&cli->cl_mod_rpcs_lock);
-+		max = cli->cl_max_mod_rpcs_in_flight;
-+		if (obd_mod_rpc_slot_avail_locked(cli, close_req)) {
-+			/* there is a slot available */
-+			cli->cl_mod_rpcs_in_flight++;
-+			if (close_req)
-+				cli->cl_close_rpcs_in_flight++;
-+			lprocfs_oh_tally(&cli->cl_mod_rpcs_hist,
-+					 cli->cl_mod_rpcs_in_flight);
-+			/* find a free tag */
-+			i = find_first_zero_bit(cli->cl_mod_tag_bitmap,
-+						max + 1);
-+			LASSERT(i < OBD_MAX_RIF_MAX);
-+			LASSERT(!test_and_set_bit(i, cli->cl_mod_tag_bitmap));
-+			spin_unlock(&cli->cl_mod_rpcs_lock);
-+			/* tag 0 is reserved for non-modify RPCs */
-+			return i + 1;
-+		}
-+		spin_unlock(&cli->cl_mod_rpcs_lock);
-+
-+		CDEBUG(D_RPCTRACE, "%s: sleeping for a modify RPC slot opc %u, max %hu\n",
-+		       cli->cl_import->imp_obd->obd_name, opc, max);
-+
-+		l_wait_event(cli->cl_mod_rpcs_waitq,
-+			     obd_mod_rpc_slot_avail(cli, close_req), &lwi);
-+	} while (true);
-+}
-+EXPORT_SYMBOL(obd_get_mod_rpc_slot);
-+
-+/*
-+ * Put a modify RPC slot from the obd client @cli according
-+ * to the kind of operation @opc that has been sent and the
-+ * intent @it of the operation if it applies.
-+ */
-+void obd_put_mod_rpc_slot(struct client_obd *cli, u32 opc,
-+			  struct lookup_intent *it, u16 tag)
-+{
-+	bool close_req = false;
-+
-+	if (it && (it->it_op == IT_GETATTR || it->it_op == IT_LOOKUP ||
-+		   it->it_op == IT_LAYOUT || it->it_op == IT_READDIR))
-+		return;
-+
-+	if (opc == MDS_CLOSE)
-+		close_req = true;
-+
-+	spin_lock(&cli->cl_mod_rpcs_lock);
-+	cli->cl_mod_rpcs_in_flight--;
-+	if (close_req)
-+		cli->cl_close_rpcs_in_flight--;
-+	/* release the tag in the bitmap */
-+	LASSERT(tag - 1 < OBD_MAX_RIF_MAX);
-+	LASSERT(test_and_clear_bit(tag - 1, cli->cl_mod_tag_bitmap) != 0);
-+	spin_unlock(&cli->cl_mod_rpcs_lock);
-+	wake_up(&cli->cl_mod_rpcs_waitq);
-+}
-+EXPORT_SYMBOL(obd_put_mod_rpc_slot);
--- 
-1.7.1
+A second approach that may scale better is to change obd_devs from an array
+to a doubly linked list (using standard list_head helpers).  In many cases
+the whole list is seached linearly, and most of the uses of class_num2obd()
+are just used to walk that list in order, which could be replaced with
+list_for_each_entry() list traversal.  The class_name2dev() function should
+be changed to return the pointer to the obd_device structure, and a new
+helper class_dev2num() would just return the obd_minor number from the
+obd_device struct for the one use in class_resolve_dev_name().  Using a
+linked list has the advantage that there is no need to search for free slots
+in the array, since devices would be removed from the list when it is freed.
+
+Cheers, Andreas
+
+>> One comment inline below, if you still want to submit a patch.
+>> 
+>>> Signed-off-by: Aya Mahfouz <mahfouz.saif.elyazal@gmail.com>
+>>> ---
+>>> drivers/staging/lustre/lustre/obdclass/class_obd.c |  6 +++---
+>>> drivers/staging/lustre/lustre/obdclass/genops.c    | 22 +++++++++++-----------
+>>> .../lustre/lustre/obdclass/linux/linux-module.c    |  6 +++---
+>>> 3 files changed, 17 insertions(+), 17 deletions(-)
+>>> 
+>>> diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+>>> index 2b21675..b775c74 100644
+>>> --- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
+>>> +++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+>>> @@ -345,7 +345,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+>>> 			goto out;
+>>> 		}
+>>> 		obd = class_name2obd(data->ioc_inlbuf4);
+>>> -	} else if (data->ioc_dev < class_devno_max()) {
+>>> +	} else if (data->ioc_dev < MAX_OBD_DEVICES) {
+>>> 		obd = class_num2obd(data->ioc_dev);
+>>> 	} else {
+>>> 		CERROR("OBD ioctl: No device\n");
+>>> @@ -498,7 +498,7 @@ static int __init obdclass_init(void)
+>>> 	}
+>>> 
+>>> 	/* This struct is already zeroed for us (static global) */
+>>> -	for (i = 0; i < class_devno_max(); i++)
+>>> +	for (i = 0; i < MAX_OBD_DEVICES; i++)
+>>> 		obd_devs[i] = NULL;
+>> 
+>> This block can just be removed entirely.  It used to do something useful,
+>> but through a series of changes it has become useless.
+>> 
+>> Cheers, Andreas
+>> 
+>>> 	/* Default the dirty page cache cap to 1/2 of system memory.
+>>> @@ -548,7 +548,7 @@ static void obdclass_exit(void)
+>>> 	lustre_unregister_fs();
+>>> 
+>>> 	misc_deregister(&obd_psdev);
+>>> -	for (i = 0; i < class_devno_max(); i++) {
+>>> +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
+>>> 		struct obd_device *obd = class_num2obd(i);
+>>> 
+>>> 		if (obd && obd->obd_set_up &&
+>>> diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
+>>> index 99c2da6..af4fc58 100644
+>>> --- a/drivers/staging/lustre/lustre/obdclass/genops.c
+>>> +++ b/drivers/staging/lustre/lustre/obdclass/genops.c
+>>> @@ -290,7 +290,7 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
+>>> 	LASSERT(newdev->obd_magic == OBD_DEVICE_MAGIC);
+>>> 
+>>> 	write_lock(&obd_dev_lock);
+>>> -	for (i = 0; i < class_devno_max(); i++) {
+>>> +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
+>>> 		struct obd_device *obd = class_num2obd(i);
+>>> 
+>>> 		if (obd && (strcmp(name, obd->obd_name) == 0)) {
+>>> @@ -322,9 +322,9 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
+>>> 	}
+>>> 	write_unlock(&obd_dev_lock);
+>>> 
+>>> -	if (!result && i >= class_devno_max()) {
+>>> +	if (!result && i >= MAX_OBD_DEVICES) {
+>>> 		CERROR("all %u OBD devices used, increase MAX_OBD_DEVICES\n",
+>>> -		       class_devno_max());
+>>> +		       MAX_OBD_DEVICES);
+>>> 		result = ERR_PTR(-EOVERFLOW);
+>>> 		goto out;
+>>> 	}
+>>> @@ -372,7 +372,7 @@ int class_name2dev(const char *name)
+>>> 		return -1;
+>>> 
+>>> 	read_lock(&obd_dev_lock);
+>>> -	for (i = 0; i < class_devno_max(); i++) {
+>>> +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
+>>> 		struct obd_device *obd = class_num2obd(i);
+>>> 
+>>> 		if (obd && strcmp(name, obd->obd_name) == 0) {
+>>> @@ -397,7 +397,7 @@ struct obd_device *class_name2obd(const char *name)
+>>> {
+>>> 	int dev = class_name2dev(name);
+>>> 
+>>> -	if (dev < 0 || dev > class_devno_max())
+>>> +	if (dev < 0 || dev > MAX_OBD_DEVICES)
+>>> 		return NULL;
+>>> 	return class_num2obd(dev);
+>>> }
+>>> @@ -408,7 +408,7 @@ int class_uuid2dev(struct obd_uuid *uuid)
+>>> 	int i;
+>>> 
+>>> 	read_lock(&obd_dev_lock);
+>>> -	for (i = 0; i < class_devno_max(); i++) {
+>>> +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
+>>> 		struct obd_device *obd = class_num2obd(i);
+>>> 
+>>> 		if (obd && obd_uuid_equals(uuid, &obd->obd_uuid)) {
+>>> @@ -435,7 +435,7 @@ struct obd_device *class_num2obd(int num)
+>>> {
+>>> 	struct obd_device *obd = NULL;
+>>> 
+>>> -	if (num < class_devno_max()) {
+>>> +	if (num < MAX_OBD_DEVICES) {
+>>> 		obd = obd_devs[num];
+>>> 		if (!obd)
+>>> 			return NULL;
+>>> @@ -463,7 +463,7 @@ struct obd_device *class_find_client_obd(struct obd_uuid *tgt_uuid,
+>>> 	int i;
+>>> 
+>>> 	read_lock(&obd_dev_lock);
+>>> -	for (i = 0; i < class_devno_max(); i++) {
+>>> +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
+>>> 		struct obd_device *obd = class_num2obd(i);
+>>> 
+>>> 		if (!obd)
+>>> @@ -496,13 +496,13 @@ struct obd_device *class_devices_in_group(struct obd_uuid *grp_uuid, int *next)
+>>> 
+>>> 	if (!next)
+>>> 		i = 0;
+>>> -	else if (*next >= 0 && *next < class_devno_max())
+>>> +	else if (*next >= 0 && *next < MAX_OBD_DEVICES)
+>>> 		i = *next;
+>>> 	else
+>>> 		return NULL;
+>>> 
+>>> 	read_lock(&obd_dev_lock);
+>>> -	for (; i < class_devno_max(); i++) {
+>>> +	for (; i < MAX_OBD_DEVICES; i++) {
+>>> 		struct obd_device *obd = class_num2obd(i);
+>>> 
+>>> 		if (!obd)
+>>> @@ -533,7 +533,7 @@ int class_notify_sptlrpc_conf(const char *fsname, int namelen)
+>>> 	LASSERT(namelen > 0);
+>>> 
+>>> 	read_lock(&obd_dev_lock);
+>>> -	for (i = 0; i < class_devno_max(); i++) {
+>>> +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
+>>> 		obd = class_num2obd(i);
+>>> 
+>>> 		if (!obd || obd->obd_set_up == 0 || obd->obd_stopping)
+>>> diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+>>> index 33342bf..ca5b466 100644
+>>> --- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+>>> +++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+>>> @@ -228,7 +228,7 @@ static ssize_t health_show(struct kobject *kobj, struct attribute *attr,
+>>> 		return sprintf(buf, "LBUG\n");
+>>> 
+>>> 	read_lock(&obd_dev_lock);
+>>> -	for (i = 0; i < class_devno_max(); i++) {
+>>> +	for (i = 0; i < MAX_OBD_DEVICES; i++) {
+>>> 		struct obd_device *obd;
+>>> 
+>>> 		obd = class_num2obd(i);
+>>> @@ -326,7 +326,7 @@ static struct attribute *lustre_attrs[] = {
+>>> 
+>>> static void *obd_device_list_seq_start(struct seq_file *p, loff_t *pos)
+>>> {
+>>> -	if (*pos >= class_devno_max())
+>>> +	if (*pos >= MAX_OBD_DEVICES)
+>>> 		return NULL;
+>>> 
+>>> 	return pos;
+>>> @@ -339,7 +339,7 @@ static void obd_device_list_seq_stop(struct seq_file *p, void *v)
+>>> static void *obd_device_list_seq_next(struct seq_file *p, void *v, loff_t *pos)
+>>> {
+>>> 	++*pos;
+>>> -	if (*pos >= class_devno_max())
+>>> +	if (*pos >= MAX_OBD_DEVICES)
+>>> 		return NULL;
+>>> 
+>>> 	return pos;
+>>> -- 
+>>> 2.5.0
+>>> 
+>>> 
+>>> -- 
+>>> Kind Regards,
+>>> Aya Saif El-yazal Mahfouz
+>>> _______________________________________________
+>>> lustre-devel mailing list
+>>> lustre-devel at lists.lustre.org
+>>> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>> 
+> 
+> -- 
+> Kind Regards,
+> Aya Saif El-yazal Mahfouz
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
