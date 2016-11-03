@@ -1,28 +1,42 @@
-From: Anand Jain <anand.jain@oracle.com>
-Date: Thu, 10 Nov 2016 16:16:45 -0000
-Subject: [lustre-devel] [PATCH] f2fs: support multiple devices
-In-Reply-To: <749156c9-2b3e-4210-a89b-2d664f9d2fc2@gmail.com>
-References: <20161109205653.70061-1-jaegeuk@kernel.org>
-	<0D1876A8-BB77-4C1A-BE4F-B4A0E81DD4EA@dilger.ca>
-	<4ec4d8f2-da23-762d-ba81-12e76ed09793@cn.fujitsu.com>
-	<749156c9-2b3e-4210-a89b-2d664f9d2fc2@gmail.com>
-Message-ID: <b68b3de1-3036-fce6-b27c-dbf78e6469b8@oracle.com>
+From: Andrew Kanner <andrew.kanner@gmail.com>
+Date: Thu, 03 Nov 2016 21:57:24 -0000
+Subject: [lustre-devel] [PATCH] staging: lustre: fixed shadowed variable in
+	socklnd_cb.c
+Message-ID: <1478210059-6091-1-git-send-email-andrew.kanner@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Austin S. Hemmelgarn" <ahferroin7@gmail.com>, Qu Wenruo <quwenruo@cn.fujitsu.com>, Andreas Dilger <adilger@dilger.ca>, Jaegeuk Kim <jaegeuk@kernel.org>
-Cc: LKML <linux-kernel@vger.kernel.org>, Lustre Development <lustre-devel@lists.lustre.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, linux-f2fs-devel@lists.sourceforge.net, linux-btrfs <linux-btrfs@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>
+To: oleg.drokin@intel.com
+Cc: andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, viro@zeniv.linux.org.uk, bevans@cray.com, bhaktipriya96@gmail.com, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
+Changed variable 'tx' name in local scope
+Fixed: sparse warning:
+socklnd_cb.c:2476:41: warning: symbol 'tx' shadows an earlier one
+socklnd_cb.c:2435:25: originally declared here
 
+Signed-off-by: Andrew Kanner <andrew.kanner@gmail.com>
+---
+ drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-(this is deviating from the subject, sorry about that)
-
->  Pretty much, if you're using just raid1 mode, without
-> compression, on reasonable storage devices, things are rock-solid
-> relative to the rest of BTRFS.
-
-IMO, BTRFS volume manger feature is incomplete and there is RAID1
-critical bug which affects availability, so its not suitable for 
-enterprise solutions yet. However it should be fine in a setup
-where dedicated sysadmin and maintenance downtime is a choice.
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+index c1c6f60..03fe4e5 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+@@ -2473,11 +2473,11 @@ ksocknal_check_peer_timeouts(int idx)
+ 		 * holding only shared lock
+ 		 */
+ 		if (!list_empty(&peer->ksnp_tx_queue)) {
+-			struct ksock_tx *tx = list_entry(peer->ksnp_tx_queue.next,
++			struct ksock_tx *_tx = list_entry(peer->ksnp_tx_queue.next,
+ 						    struct ksock_tx, tx_list);
+ 
+ 			if (cfs_time_aftereq(cfs_time_current(),
+-					     tx->tx_deadline)) {
++					     _tx->tx_deadline)) {
+ 				ksocknal_peer_addref(peer);
+ 				read_unlock(&ksocknal_data.ksnd_global_lock);
+ 
+-- 
+2.1.4
