@@ -1,48 +1,70 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Wed,  2 Nov 2016 21:24:59 -0400
-Subject: [lustre-devel] [PATCH 09/14] staging/lustre/ptlrpc: Suppress error
-	for flock requests
+Date: Wed,  2 Nov 2016 21:25:04 -0400
+Subject: [lustre-devel] [PATCH 14/14] staging/lustre: Get rid of
+	LIBLUSTRE_CLIENT and its users
 In-Reply-To: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
 References: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1478136304-867780-10-git-send-email-green@linuxhacker.ru>
+Message-ID: <1478136304-867780-15-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Patrick Farrell <paf@cray.com>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-From: Patrick Farrell <paf@cray.com>
+This define only made sense in a userspace library client, not in the kernel.
 
--EAGAIN is a normal return when requesting POSIX flocks.
-We can't recognize exactly that case here, but it's the
-only case that should result in -EAGAIN on LDLM_ENQUEUE, so
-don't print to console in that case.
-
-Signed-off-by: Patrick Farrell <paf@cray.com>
-Reviewed-on: http://review.whamcloud.com/22856
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8658
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/include/lustre_lib.h |  2 --
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 15 +--------------
+ 2 files changed, 1 insertion(+), 16 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 7cbfb4c..bb7ae4e 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -1191,7 +1191,9 @@ static int ptlrpc_check_status(struct ptlrpc_request *req)
- 		lnet_nid_t nid = imp->imp_connection->c_peer.nid;
- 		__u32 opc = lustre_msg_get_opc(req->rq_reqmsg);
+diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
+index 6b23191..27f3148 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_lib.h
++++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
+@@ -350,8 +350,6 @@ do {									   \
+ 	l_wait_event_exclusive_head(wq, condition, &lwi);       \
+ })
  
--		if (ptlrpc_console_allow(req))
-+		/* -EAGAIN is normal when using POSIX flocks */
-+		if (ptlrpc_console_allow(req) &&
-+		    !(opc == LDLM_ENQUEUE && err == -EAGAIN))
- 			LCONSOLE_ERROR_MSG(0x011, "%s: operation %s to node %s failed: rc = %d\n",
- 					   imp->imp_obd->obd_name,
- 					   ll_opcode2str(opc),
+-#define LIBLUSTRE_CLIENT (0)
+-
+ /** @} lib */
+ 
+ #endif /* _LUSTRE_LIB_H */
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index c5d00d1..6a96f2c 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -475,12 +475,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
+ 				   "client-side enqueue, new policy data");
+ 	}
+ 
+-	if ((*flags) & LDLM_FL_AST_SENT ||
+-	    /* Cancel extent locks as soon as possible on a liblustre client,
+-	     * because it cannot handle asynchronous ASTs robustly (see
+-	     * bug 7311).
+-	     */
+-	    (LIBLUSTRE_CLIENT && type == LDLM_EXTENT)) {
++	if ((*flags) & LDLM_FL_AST_SENT) {
+ 		lock_res_and_lock(lock);
+ 		lock->l_flags |= LDLM_FL_CBPENDING |  LDLM_FL_BL_AST;
+ 		unlock_res_and_lock(lock);
+@@ -775,14 +770,6 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
+ 	body->lock_flags = ldlm_flags_to_wire(*flags);
+ 	body->lock_handle[0] = *lockh;
+ 
+-	/*
+-	 * Liblustre client doesn't get extent locks, except for O_APPEND case
+-	 * where [0, OBD_OBJECT_EOF] lock is taken, or truncate, where
+-	 * [i_size, OBD_OBJECT_EOF] lock is taken.
+-	 */
+-	LASSERT(ergo(LIBLUSTRE_CLIENT, einfo->ei_type != LDLM_EXTENT ||
+-		     policy->l_extent.end == OBD_OBJECT_EOF));
+-
+ 	if (async) {
+ 		LASSERT(reqp);
+ 		return 0;
 -- 
 2.7.4
