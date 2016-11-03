@@ -1,70 +1,58 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Wed,  2 Nov 2016 21:25:04 -0400
-Subject: [lustre-devel] [PATCH 14/14] staging/lustre: Get rid of
-	LIBLUSTRE_CLIENT and its users
+Date: Wed,  2 Nov 2016 21:25:01 -0400
+Subject: [lustre-devel] [PATCH 11/14] staging/lustre/ptlrpc: Correctly
+	calculate hrp->hrp_nthrs
 In-Reply-To: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
 References: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <1478136304-867780-15-git-send-email-green@linuxhacker.ru>
+Message-ID: <1478136304-867780-12-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>, Oleg Drokin <green@linuxhacker.ru>
 
-This define only made sense in a userspace library client, not in the kernel.
+From: Amir Shehata <amir.shehata@intel.com>
 
+cpu_pattern can specify exactly 1 cpu in a partition:
+"0[0]". That means CPT0 will have CPU 0. CPU 0 can have
+hyperthreading enabled. This combination would result in
+
+weight = cfs_cpu_ht_nsiblings(0);
+hrp->hrp_nthrs = cfs_cpt_weight(ptlrpc_hr.hr_cpt_table, i);
+hrp->hrp_nthrs /= weight;
+
+evaluating to 0. Where
+cfs_cpt_weight(ptlrpc_hr.hr_cpt_table, i) == 1
+weight == 2
+
+Therefore, if hrp_nthrs becomes zero, just set it to 1.
+
+Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-on: http://review.whamcloud.com/19106
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8492
+Reviewed-by: Liang Zhen <liang.zhen@intel.com>
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 ---
- drivers/staging/lustre/lustre/include/lustre_lib.h |  2 --
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 15 +--------------
- 2 files changed, 1 insertion(+), 16 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/service.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-index 6b23191..27f3148 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-@@ -350,8 +350,6 @@ do {									   \
- 	l_wait_event_exclusive_head(wq, condition, &lwi);       \
- })
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index 72f3930..fc754e7 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -2541,8 +2541,9 @@ int ptlrpc_hr_init(void)
  
--#define LIBLUSTRE_CLIENT (0)
--
- /** @} lib */
+ 		hrp->hrp_nthrs = cfs_cpt_weight(ptlrpc_hr.hr_cpt_table, i);
+ 		hrp->hrp_nthrs /= weight;
++		if (hrp->hrp_nthrs == 0)
++			hrp->hrp_nthrs = 1;
  
- #endif /* _LUSTRE_LIB_H */
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index c5d00d1..6a96f2c 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -475,12 +475,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
- 				   "client-side enqueue, new policy data");
- 	}
- 
--	if ((*flags) & LDLM_FL_AST_SENT ||
--	    /* Cancel extent locks as soon as possible on a liblustre client,
--	     * because it cannot handle asynchronous ASTs robustly (see
--	     * bug 7311).
--	     */
--	    (LIBLUSTRE_CLIENT && type == LDLM_EXTENT)) {
-+	if ((*flags) & LDLM_FL_AST_SENT) {
- 		lock_res_and_lock(lock);
- 		lock->l_flags |= LDLM_FL_CBPENDING |  LDLM_FL_BL_AST;
- 		unlock_res_and_lock(lock);
-@@ -775,14 +770,6 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
- 	body->lock_flags = ldlm_flags_to_wire(*flags);
- 	body->lock_handle[0] = *lockh;
- 
--	/*
--	 * Liblustre client doesn't get extent locks, except for O_APPEND case
--	 * where [0, OBD_OBJECT_EOF] lock is taken, or truncate, where
--	 * [i_size, OBD_OBJECT_EOF] lock is taken.
--	 */
--	LASSERT(ergo(LIBLUSTRE_CLIENT, einfo->ei_type != LDLM_EXTENT ||
--		     policy->l_extent.end == OBD_OBJECT_EOF));
--
- 	if (async) {
- 		LASSERT(reqp);
- 		return 0;
+-		LASSERT(hrp->hrp_nthrs > 0);
+ 		hrp->hrp_thrs =
+ 			kzalloc_node(hrp->hrp_nthrs * sizeof(*hrt), GFP_NOFS,
+ 				     cfs_cpt_spread_node(ptlrpc_hr.hr_cpt_table,
 -- 
 2.7.4
