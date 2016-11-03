@@ -1,46 +1,39 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 Nov 2016 20:33:33 -0500
-Subject: [lustre-devel] [PATCH] staging: lustre: libcfs: repair improper
-	unlikely test
-Message-ID: <1480469613-7866-1-git-send-email-jsimmons@infradead.org>
+From: Andrew Kanner <andrew.kanner@gmail.com>
+Date: Thu, 03 Nov 2016 22:51:53 -0000
+Subject: [lustre-devel] [PATCH v2] staging: lustre: fixed shadowed variable
+	in socklnd_cb.c
+Message-ID: <1478213386-13853-1-git-send-email-andrew.kanner@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+To: oleg.drokin@intel.com
+Cc: andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, viro@zeniv.linux.org.uk, bevans@cray.com, bhaktipriya96@gmail.com, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-The scripts to replace NULL test got confused with the
-macro parenthesis so the unlikely test in libcfs_private.h
-ended up incorrect. This fixes this error.
+Removed redundant declaration of variable 'tx' in local scope
+Fixed: sparse warning:
+socklnd_cb.c:2476:41: warning: symbol 'tx' shadows an earlier one
+socklnd_cb.c:2435:25: originally declared here
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: Andrew Kanner <andrew.kanner@gmail.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_private.h   |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-index fc180b8..41a651f 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-@@ -96,7 +96,7 @@
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+index c1c6f60..f31f4a1 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+@@ -2473,8 +2473,8 @@ ksocknal_check_peer_timeouts(int idx)
+ 		 * holding only shared lock
+ 		 */
+ 		if (!list_empty(&peer->ksnp_tx_queue)) {
+-			struct ksock_tx *tx = list_entry(peer->ksnp_tx_queue.next,
+-						    struct ksock_tx, tx_list);
++			tx = list_entry(peer->ksnp_tx_queue.next,
++					struct ksock_tx, tx_list);
  
- #define LIBCFS_ALLOC_POST(ptr, size)					    \
- do {									    \
--	if (!unlikely((ptr))) {						    \
-+	if (unlikely(!(ptr))) {						    \
- 		CERROR("LNET: out of memory at %s:%d (tried to alloc '"	    \
- 		       #ptr "' = %d)\n", __FILE__, __LINE__, (int)(size));  \
- 	} else {							    \
-@@ -147,7 +147,7 @@
- 
- #define LIBCFS_FREE(ptr, size)					  \
- do {								    \
--	if (!unlikely((ptr))) {						\
-+	if (unlikely(!(ptr))) {						\
- 		CERROR("LIBCFS: free NULL '" #ptr "' (%d bytes) at "    \
- 		       "%s:%d\n", (int)(size), __FILE__, __LINE__);	\
- 		break;						  \
+ 			if (cfs_time_aftereq(cfs_time_current(),
+ 					     tx->tx_deadline)) {
 -- 
-1.7.1
+2.1.4
