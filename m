@@ -1,33 +1,76 @@
-From: Andrew Kanner <andrew.kanner@gmail.com>
-Date: Thu, 03 Nov 2016 22:22:20 -0000
-Subject: [lustre-devel] [PATCH] staging: lustre: fixed shadowed variable
-	in socklnd_cb.c
-In-Reply-To: <C754133A-93C3-4E41-92B2-F8CCA2B668FA@intel.com>
-References: <1478210059-6091-1-git-send-email-andrew.kanner@gmail.com>
-	<C754133A-93C3-4E41-92B2-F8CCA2B668FA@intel.com>
-Message-ID: <CAKbttoHuY7rw=ozcjkBMKGB2f=Fb_mkvpMurukRDWyGKhvWCDw@mail.gmail.com>
+From: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Date: Sun, 06 Nov 2016 17:11:28 -0000
+Subject: [lustre-devel] [PATCH 2/2] staging: lustre: obdclass: Add handling
+	of error returned by lustre_cfg_new
+Message-ID: <20161106171123.24929-1-christophe.jaillet@wanadoo.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Dilger, Andreas" <andreas.dilger@intel.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Alexander Viro <viro@zeniv.linux.org.uk>, "bevans@cray.com" <bevans@cray.com>, "bhaktipriya96@gmail.com" <bhaktipriya96@gmail.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, emoly.liu@intel.com
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org, Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 
-2016-11-04 1:12 GMT+03:00 Dilger, Andreas <andreas.dilger@intel.com>:
-> On Nov 3, 2016, at 15:54, Andrew Kanner <andrew.kanner@gmail.com> wrote:
->>
->> Changed variable 'tx' name in local scope
->> Fixed: sparse warning:
->> socklnd_cb.c:2476:41: warning: symbol 'tx' shadows an earlier one
->> socklnd_cb.c:2435:25: originally declared here
->
-> Looking at this more closely (or from a greater distance, hard to say),
-> the outer-scope "tx" is used only after this inner-scope "tx", so in
-> fact there is no benefit to having the inner-scope declaration at all.
->
-> Removing it may save a stack variable (depending on how the compiler
-> optimizes), and shouldn't affect functionality.
->
-> Cheers, Andreas
+'lustre_cfg_new()' can return ERR_PTR(-ENOMEM).
+Handle these errors and propagate the error code to the callers.
 
-I see, I'll correct it and resend as PATCH v2. Thank you.
+Error handling has been rearranged in 'lustre_process_log()' with the
+addition of a label in order to free some resources.
+
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+---
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+index 59fbc29aae94..5473615cd338 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+@@ -89,11 +89,14 @@ int lustre_process_log(struct super_block *sb, char *logname,
+ 	lustre_cfg_bufs_set(bufs, 2, cfg, sizeof(*cfg));
+ 	lustre_cfg_bufs_set(bufs, 3, &sb, sizeof(sb));
+ 	lcfg = lustre_cfg_new(LCFG_LOG_START, bufs);
++	if (IS_ERR(lcfg)) {
++		rc = PTR_ERR(lcfg);
++		goto out_free;
++	}
++
+ 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
+ 	lustre_cfg_free(lcfg);
+ 
+-	kfree(bufs);
+-
+ 	if (rc == -EINVAL)
+ 		LCONSOLE_ERROR_MSG(0x15b, "%s: The configuration from log '%s' failed from the MGS (%d).  Make sure this client and the MGS are running compatible versions of Lustre.\n",
+ 				   mgc->obd_name, logname, rc);
+@@ -104,6 +107,9 @@ int lustre_process_log(struct super_block *sb, char *logname,
+ 				   rc);
+ 
+ 	/* class_obd_list(); */
++
++out_free:
++	kfree(bufs);
+ 	return rc;
+ }
+ EXPORT_SYMBOL(lustre_process_log);
+@@ -127,6 +133,9 @@ int lustre_end_log(struct super_block *sb, char *logname,
+ 	if (cfg)
+ 		lustre_cfg_bufs_set(&bufs, 2, cfg, sizeof(*cfg));
+ 	lcfg = lustre_cfg_new(LCFG_LOG_END, &bufs);
++	if (IS_ERR(lcfg))
++		return PTR_ERR(lcfg);
++
+ 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
+ 	lustre_cfg_free(lcfg);
+ 	return rc;
+@@ -159,6 +168,9 @@ static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
+ 		lustre_cfg_bufs_set_string(&bufs, 4, s4);
+ 
+ 	lcfg = lustre_cfg_new(cmd, &bufs);
++	if (IS_ERR(lcfg))
++		return PTR_ERR(lcfg);
++
+ 	lcfg->lcfg_nid = nid;
+ 	rc = class_process_config(lcfg);
+ 	lustre_cfg_free(lcfg);
+-- 
+2.9.3
