@@ -1,91 +1,58 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 7 Nov 2016 01:37:31 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 02/14] staging/lustre/ldlm: fix export
- reference problem
-In-Reply-To: <1478136304-867780-3-git-send-email-green@linuxhacker.ru>
+Date: Mon, 7 Nov 2016 01:38:03 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 04/14] staging/lustre/llite: clear inode
+ timestamps after losing UPDATE lock
+In-Reply-To: <1478136304-867780-5-git-send-email-green@linuxhacker.ru>
 References: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
-	<1478136304-867780-3-git-send-email-green@linuxhacker.ru>
-Message-ID: <alpine.LFD.2.20.1611070136490.21293@casper.infradead.org>
+	<1478136304-867780-5-git-send-email-green@linuxhacker.ru>
+Message-ID: <alpine.LFD.2.20.1611070137440.21293@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <green@linuxhacker.ru>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Hongchao Zhang <hongchao.zhang@intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>
 
 
-> From: Hongchao Zhang <hongchao.zhang@intel.com>
+> From: Niu Yawei <yawei.niu@intel.com>
 > 
-> 1, in client_import_del_conn, the export returned from
->    class_conn2export is not released after using it.
-> 
-> 2, in ptlrpc_connect_interpret, the export is not released
->    if the connect_flags isn't compatible.
+> Otherwise, those leftovers would interfere with new timestamps
+> especially when the timestamps are set back in time on the other
+> clients.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> Signed-off-by: Hongchao Zhang <hongchao.zhang@intel.com>
-> Reviewed-on: http://review.whamcloud.com/22031
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8500
-> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+> Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+> Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+> Reviewed-on: http://review.whamcloud.com/22623
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8446
 > Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 > Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 > ---
->  drivers/staging/lustre/lustre/ldlm/ldlm_lib.c |  3 +++
->  drivers/staging/lustre/lustre/ptlrpc/import.c | 19 ++++++++++---------
->  2 files changed, 13 insertions(+), 9 deletions(-)
+>  drivers/staging/lustre/lustre/llite/namei.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-> index 4f9480e..06d3cc6 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
-> @@ -170,6 +170,9 @@ int client_import_del_conn(struct obd_import *imp, struct obd_uuid *uuid)
->  				ptlrpc_connection_put(dlmexp->exp_connection);
->  				dlmexp->exp_connection = NULL;
->  			}
-> +
-> +			if (dlmexp)
-> +				class_export_put(dlmexp);
+> diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+> index 74d9b73..c268f32 100644
+> --- a/drivers/staging/lustre/lustre/llite/namei.c
+> +++ b/drivers/staging/lustre/lustre/llite/namei.c
+> @@ -251,6 +251,16 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
+>  				       PFID(ll_inode2fid(inode)), rc);
 >  		}
 >  
->  		list_del(&imp_conn->oic_item);
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-> index 46ba5a4..05fd92d 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-> @@ -972,6 +972,16 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
->  
->  	spin_unlock(&imp->imp_lock);
->  
-> +	if (!exp) {
-> +		/* This could happen if export is cleaned during the
-> +		 * connect attempt
-> +		 */
-> +		CERROR("%s: missing export after connect\n",
-> +		       imp->imp_obd->obd_name);
-> +		rc = -ENODEV;
-> +		goto out;
-> +	}
+> +		if (bits & MDS_INODELOCK_UPDATE) {
+> +			struct ll_inode_info *lli = ll_i2info(inode);
 > +
->  	/* check that server granted subset of flags we asked for. */
->  	if ((ocd->ocd_connect_flags & imp->imp_connect_flags_orig) !=
->  	    ocd->ocd_connect_flags) {
-> @@ -982,15 +992,6 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
->  		goto out;
->  	}
+> +			spin_lock(&lli->lli_lock);
+> +			LTIME_S(inode->i_mtime) = 0;
+> +			LTIME_S(inode->i_atime) = 0;
+> +			LTIME_S(inode->i_ctime) = 0;
+> +			spin_unlock(&lli->lli_lock);
+> +		}
+> +
+>  		if ((bits & MDS_INODELOCK_UPDATE) && S_ISDIR(inode->i_mode)) {
+>  			struct ll_inode_info *lli = ll_i2info(inode);
 >  
-> -	if (!exp) {
-> -		/* This could happen if export is cleaned during the
-> -		 * connect attempt
-> -		 */
-> -		CERROR("%s: missing export after connect\n",
-> -		       imp->imp_obd->obd_name);
-> -		rc = -ENODEV;
-> -		goto out;
-> -	}
->  	old_connect_flags = exp_connect_flags(exp);
->  	exp->exp_connect_data = *ocd;
->  	imp->imp_obd->obd_self_export->exp_connect_data = *ocd;
 > -- 
 > 2.7.4
 > 
