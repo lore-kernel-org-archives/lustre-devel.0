@@ -1,65 +1,46 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 7 Nov 2016 01:58:17 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 11/14] staging/lustre/ptlrpc: Correctly
- calculate hrp->hrp_nthrs
-In-Reply-To: <1478136304-867780-12-git-send-email-green@linuxhacker.ru>
-References: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
-	<1478136304-867780-12-git-send-email-green@linuxhacker.ru>
-Message-ID: <alpine.LFD.2.20.1611070158050.21293@casper.infradead.org>
+Date: Mon, 7 Nov 2016 02:01:11 +0000 (GMT)
+Subject: [lustre-devel] [PATCH v2] staging: lustre: fixed shadowed
+ variable in socklnd_cb.c
+In-Reply-To: <1478213386-13853-1-git-send-email-andrew.kanner@gmail.com>
+References: <1478213386-13853-1-git-send-email-andrew.kanner@gmail.com>
+Message-ID: <alpine.LFD.2.20.1611070200570.21293@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <green@linuxhacker.ru>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>
+To: Andrew Kanner <andrew.kanner@gmail.com>
+Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, gregkh@linuxfoundation.org, viro@zeniv.linux.org.uk, bevans@cray.com, bhaktipriya96@gmail.com, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-On Wed, 2 Nov 2016, Oleg Drokin wrote:
 
-> From: Amir Shehata <amir.shehata@intel.com>
-> 
-> cpu_pattern can specify exactly 1 cpu in a partition:
-> "0[0]". That means CPT0 will have CPU 0. CPU 0 can have
-> hyperthreading enabled. This combination would result in
-> 
-> weight = cfs_cpu_ht_nsiblings(0);
-> hrp->hrp_nthrs = cfs_cpt_weight(ptlrpc_hr.hr_cpt_table, i);
-> hrp->hrp_nthrs /= weight;
-> 
-> evaluating to 0. Where
-> cfs_cpt_weight(ptlrpc_hr.hr_cpt_table, i) == 1
-> weight == 2
-> 
-> Therefore, if hrp_nthrs becomes zero, just set it to 1.
+> Removed redundant declaration of variable 'tx' in local scope
+> Fixed: sparse warning:
+> socklnd_cb.c:2476:41: warning: symbol 'tx' shadows an earlier one
+> socklnd_cb.c:2435:25: originally declared here
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-> Reviewed-on: http://review.whamcloud.com/19106
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8492
-> Reviewed-by: Liang Zhen <liang.zhen@intel.com>
-> Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+> Signed-off-by: Andrew Kanner <andrew.kanner@gmail.com>
 > ---
->  drivers/staging/lustre/lustre/ptlrpc/service.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-> index 72f3930..fc754e7 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-> @@ -2541,8 +2541,9 @@ int ptlrpc_hr_init(void)
+> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+> index c1c6f60..f31f4a1 100644
+> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+> @@ -2473,8 +2473,8 @@ ksocknal_check_peer_timeouts(int idx)
+>  		 * holding only shared lock
+>  		 */
+>  		if (!list_empty(&peer->ksnp_tx_queue)) {
+> -			struct ksock_tx *tx = list_entry(peer->ksnp_tx_queue.next,
+> -						    struct ksock_tx, tx_list);
+> +			tx = list_entry(peer->ksnp_tx_queue.next,
+> +					struct ksock_tx, tx_list);
 >  
->  		hrp->hrp_nthrs = cfs_cpt_weight(ptlrpc_hr.hr_cpt_table, i);
->  		hrp->hrp_nthrs /= weight;
-> +		if (hrp->hrp_nthrs == 0)
-> +			hrp->hrp_nthrs = 1;
->  
-> -		LASSERT(hrp->hrp_nthrs > 0);
->  		hrp->hrp_thrs =
->  			kzalloc_node(hrp->hrp_nthrs * sizeof(*hrt), GFP_NOFS,
->  				     cfs_cpt_spread_node(ptlrpc_hr.hr_cpt_table,
+>  			if (cfs_time_aftereq(cfs_time_current(),
+>  					     tx->tx_deadline)) {
 > -- 
-> 2.7.4
+> 2.1.4
 > 
 > 
