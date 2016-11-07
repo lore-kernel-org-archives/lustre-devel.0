@@ -1,92 +1,92 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Sun, 6 Nov 2016 12:26:32 -0500
-Subject: [lustre-devel] [PATCH 2/2] staging: lustre: obdclass: Add
-	handling of error returned by lustre_cfg_new
-In-Reply-To: <20161106171123.24929-1-christophe.jaillet@wanadoo.fr>
-References: <20161106171123.24929-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <97207CF4-21C1-4351-92BF-6F28E7281CF6@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 7 Nov 2016 01:37:31 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 02/14] staging/lustre/ldlm: fix export
+ reference problem
+In-Reply-To: <1478136304-867780-3-git-send-email-green@linuxhacker.ru>
+References: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
+	<1478136304-867780-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <alpine.LFD.2.20.1611070136490.21293@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-Cc: andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, emoly.liu@intel.com, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
+To: Oleg Drokin <green@linuxhacker.ru>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Hongchao Zhang <hongchao.zhang@intel.com>
 
-Hello!
 
-On Nov 6, 2016, at 12:11 PM, Christophe JAILLET wrote:
-
-> 'lustre_cfg_new()' can return ERR_PTR(-ENOMEM).
-> Handle these errors and propagate the error code to the callers.
+> From: Hongchao Zhang <hongchao.zhang@intel.com>
 > 
-> Error handling has been rearranged in 'lustre_process_log()' with the
-> addition of a label in order to free some resources.
-
-I wonder if we should just make it return NULL on allocation failure,
-and then at least the other error handling that is there (i.e. in your other patch)
-would become correct.
-This would make handling in mgc_apply_recover_logs incorrect, but it's already
-geared towards this sort of handling anyway, as it discards the passed error
-and sets ENOMEM unconditionally (just need to revert 3092c34a in a way).
-
-Thanks!
-
+> 1, in client_import_del_conn, the export returned from
+>    class_conn2export is not released after using it.
 > 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> 2, in ptlrpc_connect_interpret, the export is not released
+>    if the connect_flags isn't compatible.
+
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+ 
+> Signed-off-by: Hongchao Zhang <hongchao.zhang@intel.com>
+> Reviewed-on: http://review.whamcloud.com/22031
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8500
+> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+> Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 > ---
-> drivers/staging/lustre/lustre/obdclass/obd_mount.c | 16 ++++++++++++++--
-> 1 file changed, 14 insertions(+), 2 deletions(-)
+>  drivers/staging/lustre/lustre/ldlm/ldlm_lib.c |  3 +++
+>  drivers/staging/lustre/lustre/ptlrpc/import.c | 19 ++++++++++---------
+>  2 files changed, 13 insertions(+), 9 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> index 59fbc29aae94..5473615cd338 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> @@ -89,11 +89,14 @@ int lustre_process_log(struct super_block *sb, char *logname,
-> 	lustre_cfg_bufs_set(bufs, 2, cfg, sizeof(*cfg));
-> 	lustre_cfg_bufs_set(bufs, 3, &sb, sizeof(sb));
-> 	lcfg = lustre_cfg_new(LCFG_LOG_START, bufs);
-> +	if (IS_ERR(lcfg)) {
-> +		rc = PTR_ERR(lcfg);
-> +		goto out_free;
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+> index 4f9480e..06d3cc6 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+> @@ -170,6 +170,9 @@ int client_import_del_conn(struct obd_import *imp, struct obd_uuid *uuid)
+>  				ptlrpc_connection_put(dlmexp->exp_connection);
+>  				dlmexp->exp_connection = NULL;
+>  			}
+> +
+> +			if (dlmexp)
+> +				class_export_put(dlmexp);
+>  		}
+>  
+>  		list_del(&imp_conn->oic_item);
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+> index 46ba5a4..05fd92d 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+> @@ -972,6 +972,16 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
+>  
+>  	spin_unlock(&imp->imp_lock);
+>  
+> +	if (!exp) {
+> +		/* This could happen if export is cleaned during the
+> +		 * connect attempt
+> +		 */
+> +		CERROR("%s: missing export after connect\n",
+> +		       imp->imp_obd->obd_name);
+> +		rc = -ENODEV;
+> +		goto out;
 > +	}
 > +
-> 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
-> 	lustre_cfg_free(lcfg);
-> 
-> -	kfree(bufs);
-> -
-> 	if (rc == -EINVAL)
-> 		LCONSOLE_ERROR_MSG(0x15b, "%s: The configuration from log '%s' failed from the MGS (%d).  Make sure this client and the MGS are running compatible versions of Lustre.\n",
-> 				   mgc->obd_name, logname, rc);
-> @@ -104,6 +107,9 @@ int lustre_process_log(struct super_block *sb, char *logname,
-> 				   rc);
-> 
-> 	/* class_obd_list(); */
-> +
-> +out_free:
-> +	kfree(bufs);
-> 	return rc;
-> }
-> EXPORT_SYMBOL(lustre_process_log);
-> @@ -127,6 +133,9 @@ int lustre_end_log(struct super_block *sb, char *logname,
-> 	if (cfg)
-> 		lustre_cfg_bufs_set(&bufs, 2, cfg, sizeof(*cfg));
-> 	lcfg = lustre_cfg_new(LCFG_LOG_END, &bufs);
-> +	if (IS_ERR(lcfg))
-> +		return PTR_ERR(lcfg);
-> +
-> 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
-> 	lustre_cfg_free(lcfg);
-> 	return rc;
-> @@ -159,6 +168,9 @@ static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
-> 		lustre_cfg_bufs_set_string(&bufs, 4, s4);
-> 
-> 	lcfg = lustre_cfg_new(cmd, &bufs);
-> +	if (IS_ERR(lcfg))
-> +		return PTR_ERR(lcfg);
-> +
-> 	lcfg->lcfg_nid = nid;
-> 	rc = class_process_config(lcfg);
-> 	lustre_cfg_free(lcfg);
+>  	/* check that server granted subset of flags we asked for. */
+>  	if ((ocd->ocd_connect_flags & imp->imp_connect_flags_orig) !=
+>  	    ocd->ocd_connect_flags) {
+> @@ -982,15 +992,6 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
+>  		goto out;
+>  	}
+>  
+> -	if (!exp) {
+> -		/* This could happen if export is cleaned during the
+> -		 * connect attempt
+> -		 */
+> -		CERROR("%s: missing export after connect\n",
+> -		       imp->imp_obd->obd_name);
+> -		rc = -ENODEV;
+> -		goto out;
+> -	}
+>  	old_connect_flags = exp_connect_flags(exp);
+>  	exp->exp_connect_data = *ocd;
+>  	imp->imp_obd->obd_self_export->exp_connect_data = *ocd;
 > -- 
-> 2.9.3
+> 2.7.4
+> 
+> 
