@@ -1,57 +1,44 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 7 Nov 2016 11:38:32 +0100
-Subject: [lustre-devel] [PATCH v2] staging: lustre: mdc: manage number
- of modify RPCs in flight
-In-Reply-To: <1478112412-8200-1-git-send-email-jsimmons@infradead.org>
-References: <1478112412-8200-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <20161107103832.GA19871@kroah.com>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Mon, 7 Nov 2016 11:40:30 +0100
+Subject: [lustre-devel] [PATCH 2/2] staging: lustre: obdclass: Add
+ handling of error returned by lustre_cfg_new
+In-Reply-To: <alpine.LFD.2.20.1611070404180.21293@casper.infradead.org>
+References: <20161106171123.24929-1-christophe.jaillet@wanadoo.fr>
+	<97207CF4-21C1-4351-92BF-6F28E7281CF6@intel.com>
+	<alpine.LFD.2.20.1611070404180.21293@casper.infradead.org>
+Message-ID: <20161107104030.GB19871@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: James Simmons <jsimmons@infradead.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Gregoire Pichon <gregoire.pichon@bull.net>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, devel@driverdev.osuosl.org, andreas.dilger@intel.com, kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org, Christophe JAILLET <christophe.jaillet@wanadoo.fr>, emoly.liu@intel.com, lustre-devel@lists.lustre.org
 
-On Wed, Nov 02, 2016 at 02:46:52PM -0400, James Simmons wrote:
-> From: Gregoire Pichon <gregoire.pichon@bull.net>
+On Mon, Nov 07, 2016 at 04:10:16AM +0000, James Simmons wrote:
 > 
-> This patch is the main client part of a new feature that supports
-> multiple modify metadata RPCs in parallel. Its goal is to improve
-> metadata operations performance of a single client, while maintening
-> the consistency of MDT reply reconstruction and MDT recovery
-> mechanisms.
+> > On Nov 6, 2016, at 12:11 PM, Christophe JAILLET wrote:
+> > 
+> > > 'lustre_cfg_new()' can return ERR_PTR(-ENOMEM).
+> > > Handle these errors and propagate the error code to the callers.
+> > > 
+> > > Error handling has been rearranged in 'lustre_process_log()' with the
+> > > addition of a label in order to free some resources.
+> > 
+> > I wonder if we should just make it return NULL on allocation failure,
+> > and then at least the other error handling that is there (i.e. in your other patch)
+> > would become correct.
+> > This would make handling in mgc_apply_recover_logs incorrect, but it's already
+> > geared towards this sort of handling anyway, as it discards the passed error
+> > and sets ENOMEM unconditionally (just need to revert 3092c34a in a way).
 > 
-> It allows to manage the number of modify RPCs in flight within
-> the client obd structure and to assign a virtual index (the tag) to
-> each modify RPC to help server side cleaning of reply data.
-> 
-> The mdc component uses this feature to send multiple modify RPCs
-> in parallel.
-> 
-> Signed-off-by: Gregoire Pichon <gregoire.pichon@bull.net>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5319
-> Reviewed-on: http://review.whamcloud.com/14374
-> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-> Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> ---
->  drivers/staging/lustre/lustre/fid/fid_request.c    |    4 -
->  drivers/staging/lustre/lustre/include/lustre_mdc.h |   24 +++
->  drivers/staging/lustre/lustre/include/obd.h        |    7 +-
->  drivers/staging/lustre/lustre/include/obd_class.h  |    6 +
->  drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |   37 +++++
->  drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   23 +++
->  drivers/staging/lustre/lustre/mdc/mdc_locks.c      |   13 +-
->  drivers/staging/lustre/lustre/mdc/mdc_reint.c      |   23 +--
->  drivers/staging/lustre/lustre/mdc/mdc_request.c    |   50 ++-----
->  drivers/staging/lustre/lustre/obdclass/genops.c    |  171 +++++++++++++++++++-
->  10 files changed, 293 insertions(+), 65 deletions(-)
+> The header lustre_cfg.h is meant to be a UAPI header file. It is used for 
+> our userland tools but with the current shape of lustre_cfg.h upstream our 
+> tools will not build with it. So having kzalloc and kfree in this header
+> is incorrect. To do this right I need to update our user land tools as 
+> well so we should hold off on these patches.
 
-What changed from v1 of this patch?  You always need to put that below
-the --- line so we can remember what is going on here...
-
-Can you make a v3 with that information please?
+Ok, but the code as-is today is incorrect, so that should get fixed
+somehow, soon...
 
 thanks,
 
