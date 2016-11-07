@@ -1,102 +1,122 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Mon, 7 Nov 2016 21:33:26 +0000
-Subject: [lustre-devel] [PATCH 2/2] staging: lustre: obdclass: Add
- handling of error returned by lustre_cfg_new
-In-Reply-To: <97207CF4-21C1-4351-92BF-6F28E7281CF6@intel.com>
-References: <20161106171123.24929-1-christophe.jaillet@wanadoo.fr>
-	<97207CF4-21C1-4351-92BF-6F28E7281CF6@intel.com>
-Message-ID: <CAA32D44-F2D5-412D-8B47-6DB7E305E669@intel.com>
+Date: Mon, 7 Nov 2016 21:50:32 +0000
+Subject: [lustre-devel] [PATCH 1/2] staging: lustre: replace uses of
+ class_devno_max by MAX_OBD_DEVICES
+In-Reply-To: <CAJBmjuh8+WOoNseDFVN248gCJje2iWd2awKu16VP1usK9nQxNg@mail.gmail.com>
+References: <cover.1476739569.git.mahfouz.saif.elyazal@gmail.com>
+	<4ba436cdccbea6c6dbc631f8cf75cd80f4f9ddb4.1476739569.git.mahfouz.saif.elyazal@gmail.com>
+	<D62F1CE1-61E3-43B9-8742-705AF196729C@intel.com>
+	<20161025164730.GA27553@waves>
+	<8FDBA22B-F6A6-4CA7-B997-41327603E8A9@intel.com>
+	<CAJBmjuhuMX-qemMm1t_jhzaMc0HOWGGq66rBBWDU7eEky+-=4A@mail.gmail.com>
+	<02D3ADEE-88C0-47EE-9A24-1DF770B17893@intel.com>
+	<CAJBmjuh8+WOoNseDFVN248gCJje2iWd2awKu16VP1usK9nQxNg@mail.gmail.com>
+Message-ID: <AA65294D-6CA3-4364-992D-B205D7D2F5D8@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-Cc: James Simmons <jsimmons@infradead.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "Liu, Emoly" <emoly.liu@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "kernel-janitors@vger.kernel.org" <kernel-janitors@vger.kernel.org>
+To: lustre-devel@lists.lustre.org
 
-On Nov 6, 2016, at 10:26, Drokin, Oleg <oleg.drokin@intel.com> wrote:
+On Nov 7, 2016, at 02:07, Aya Mahfouz <mahfouz.saif.elyazal@gmail.com> wrote:
 > 
-> Hello!
+> On Mon, Nov 7, 2016 at 6:22 AM, Oleg Drokin <oleg.drokin@intel.com> wrote:
 > 
-> On Nov 6, 2016, at 12:11 PM, Christophe JAILLET wrote:
-> 
->> 'lustre_cfg_new()' can return ERR_PTR(-ENOMEM).
->> Handle these errors and propagate the error code to the callers.
+>> On Nov 4, 2016, at 4:37 AM, Aya Mahfouz wrote:
 >> 
->> Error handling has been rearranged in 'lustre_process_log()' with the
->> addition of a label in order to free some resources.
+>> >
+>> > On Thu, Nov 3, 2016 at 1:05 AM, Dilger, Andreas <andreas.dilger@intel.com> wrote:
+>> > On Oct 25, 2016, at 10:47, Aya Mahfouz <mahfouz.saif.elyazal@gmail.com> wrote:
+>> > >
+>> > > On Mon, Oct 17, 2016 at 10:38:31PM +0000, Dilger, Andreas wrote:
+>> > >> On Oct 17, 2016, at 15:46, Aya Mahfouz <mahfouz.saif.elyazal@gmail.com> wrote:
+>> > >>>
+>> > >>> class_devno_max is an inline function that returns
+>> > >>> MAX_OBD_DEVICES. Replace all calls to the function
+>> > >>> by MAX_OBD_DEVICES.
+>> > >>
+>> > >> Thanks for your patch, but unfortunately it can't be accepted.
+>> > >>
+>> > >> This function was added in preparation of being able to tune the maximum
+>> > >> number of storage devices dynamically, rather than having to hard code it
+>> > >> to the maximum possible number of servers that a client can possibly
+>> > >> connect to.
+>> > >>
+>> > >> While the current maximum of 8192 servers has been enough for current
+>> > >> filesystems, I'd rather move in the direction of dynamically handling this
+>> > >> limit rather than re-introducing a hard-coded constant throughout the code.
+>> > >>
+>> > > Hello,
+>> > >
+>> > > I would like to proceed with implementing the function if possible.
+>> > > Kindly direct me to some starting pointers.
+>> >
+>> > Hi Aya,
+>> > thanks for offering to look into this.
+>> >
+>> > There are several ways to approach this problem  to make the allocation
+>> > of the obd_devs[] array dynamic.  In most cases, there isn't any value
+>> > to dynamically shrink this array, since the filesystem(s) will typically
+>> > be mounted until the node is rebooted, and it is only in the tens of KB
+>> > size range, so this will not affect ongoing operations, and that simplifies
+>> > the implementation.
+>> >
+>> > The easiest way would be to have a dynamically-sized obd_devs[] array that
+>> > is reallocated in class_newdev() in PAGE_SIZE chunks whenever the current
+>> > array has no more free slots and copied to the new array, using obd_dev_lock
+>> > to protect the array while it is being reallocated and copied.  In most
+>> > cases, this would save memory over the static array (not many filesystems
+>> > have so many servers), but for the few sites that have 10000+ servers they
+>> > don't need to change the source to handle this.  Using libcfs_kvzalloc()
+>> > would avoid issues with allocating large chunks of memory.
+>> >
+>> > There are a few places where obd_devs[] is accessed outside obd_dev_lock
+>> > that would need to be fixed now that this array may be changed at runtime.
+>> >
+>> > A second approach that may scale better is to change obd_devs from an array
+>> > to a doubly linked list (using standard list_head helpers).  In many cases
+>> > the whole list is seached linearly, and most of the uses of class_num2obd()
+>> > are just used to walk that list in order, which could be replaced with
+>> > list_for_each_entry() list traversal.  The class_name2dev() function should
+>> > be changed to return the pointer to the obd_device structure, and a new
+>> > helper class_dev2num() would just return the obd_minor number from the
+>> > obd_device struct for the one use in class_resolve_dev_name().  Using a
+>> > linked list has the advantage that there is no need to search for free slots
+>> > in the array, since devices would be removed from the list when it is freed.
+>> >
+>> > Cheers, Andreas
+>> >
+>> > Thanks Andreas! Will start looking into it.
+>> 
+>> I also would like to point out that Alexey Lyashkov had an implementation
+>> of this in http://review.whamcloud.com/347 but it needed to be reverted
+>> as it was way too race-prone in the end.
+>> I don't know if Alexey ever improved the patch to actually work (at least
+>> there was some talk about it), but even if so, the end result was never
+>> contributed back to us.
+>> 
+>> Also please be advised that this is the kind of change that you'll need to
+>> have fully functional Lustre setup to verify it works, please let me know
+>> if you have any problems setting this up.
+>> 
+>> Thanks!
 > 
-> I wonder if we should just make it return NULL on allocation failure,
-> and then at least the other error handling that is there (i.e. in your other patch)
-> would become correct.
-> This would make handling in mgc_apply_recover_logs incorrect, but it's already
-> geared towards this sort of handling anyway, as it discards the passed error
-> and sets ENOMEM unconditionally (just need to revert 3092c34a in a way).
+> I'm currently trying to understand the concerned parts of the lustre
+> code. I will try to setup the lustre file system and take a look at
+> Alexey's implementation this week.
 
-I'd agree with Oleg that returning NULL is the preferable solution here. 
+I think it makes sense to split this change into a couple of smaller chunks than
+what was in the original patch, if the original patch is used at all.  The proposals
+I made above are relatively simple to implement and change the existing code to use
+the new dynamic array (or list) handling without introducing a lot of complexity.
 
-There are also callers of lustre_cfg_new() in class_config_llog_handler(),
-do_lcfg(), and lustre_end_log() that do not check error returns at all that
-should be fixed at the same time.
+Then, separately, it would be possible to move the code over from linear list
+walking to hash-based device name/UUID lookups, which is where things got more
+complex and error-prone.
+
+Having the changes done in a series of smaller and easily understood patches makes
+the code much easier to review, easier to test in case a bug is introduced, and
+often provides value at each step (i.e. dynamic device count) even if the later
+patches are held up or rejected for one reason or another.
 
 Cheers, Andreas
-
->> 
->> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
->> ---
->> drivers/staging/lustre/lustre/obdclass/obd_mount.c | 16 ++++++++++++++--
->> 1 file changed, 14 insertions(+), 2 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
->> index 59fbc29aae94..5473615cd338 100644
->> --- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
->> @@ -89,11 +89,14 @@ int lustre_process_log(struct super_block *sb, char *logname,
->> 	lustre_cfg_bufs_set(bufs, 2, cfg, sizeof(*cfg));
->> 	lustre_cfg_bufs_set(bufs, 3, &sb, sizeof(sb));
->> 	lcfg = lustre_cfg_new(LCFG_LOG_START, bufs);
->> +	if (IS_ERR(lcfg)) {
->> +		rc = PTR_ERR(lcfg);
->> +		goto out_free;
->> +	}
->> +
->> 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
->> 	lustre_cfg_free(lcfg);
->> 
->> -	kfree(bufs);
->> -
->> 	if (rc == -EINVAL)
->> 		LCONSOLE_ERROR_MSG(0x15b, "%s: The configuration from log '%s' failed from the MGS (%d).  Make sure this client and the MGS are running compatible versions of Lustre.\n",
->> 				   mgc->obd_name, logname, rc);
->> @@ -104,6 +107,9 @@ int lustre_process_log(struct super_block *sb, char *logname,
->> 				   rc);
->> 
->> 	/* class_obd_list(); */
->> +
->> +out_free:
->> +	kfree(bufs);
->> 	return rc;
->> }
->> EXPORT_SYMBOL(lustre_process_log);
->> @@ -127,6 +133,9 @@ int lustre_end_log(struct super_block *sb, char *logname,
->> 	if (cfg)
->> 		lustre_cfg_bufs_set(&bufs, 2, cfg, sizeof(*cfg));
->> 	lcfg = lustre_cfg_new(LCFG_LOG_END, &bufs);
->> +	if (IS_ERR(lcfg))
->> +		return PTR_ERR(lcfg);
->> +
->> 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
->> 	lustre_cfg_free(lcfg);
->> 	return rc;
->> @@ -159,6 +168,9 @@ static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
->> 		lustre_cfg_bufs_set_string(&bufs, 4, s4);
->> 
->> 	lcfg = lustre_cfg_new(cmd, &bufs);
->> +	if (IS_ERR(lcfg))
->> +		return PTR_ERR(lcfg);
->> +
->> 	lcfg->lcfg_nid = nid;
->> 	rc = class_process_config(lcfg);
->> 	lustre_cfg_free(lcfg);
->> -- 
->> 2.9.3
-> 
