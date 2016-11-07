@@ -1,30 +1,43 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Mon, 7 Nov 2016 12:38:41 +0100
-Subject: [lustre-devel] [PATCH] Staging: lustre: llite: refactor
-	lov_object_fiemap()
-In-Reply-To: <AD95A5E8-3232-4528-83A2-5922FBE23C30@intel.com>
-References: <AD95A5E8-3232-4528-83A2-5922FBE23C30@intel.com>
-Message-ID: <20161107113841.GA12277@kroah.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Mon, 7 Nov 2016 21:20:30 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: use bool
+ assignment to true/false
+In-Reply-To: <20161107190138.5730-1-nicholasjhanley@gmail.com>
+References: <20161107190138.5730-1-nicholasjhanley@gmail.com>
+Message-ID: <96662E15-7BBE-41BB-9CEB-07BBA34AA90A@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Nicholas Hanley <nicholasjhanley@gmail.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-On Mon, Nov 07, 2016 at 10:56:19AM +0000, Xu, Bobijam wrote:
->  * Change loff_t to u64 in lov_object_fiemap() since loff_t is a
->   signed value type.
-> * Add fiemap_for_stripe() to get file map extent from each stripe
->   device.
+On Nov 7, 2016, at 12:01, Nicholas Hanley <nicholasjhanley@gmail.com> wrote:
 > 
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+> Replace 0 with false in tx_pages_mapped = 0 to be consistent with
+> the rest of the lustre code.
+> 
+> Signed-off-by: Nicholas Hanley <nicholasjhanley@gmail.com>
 
-Why are you doing two different things in the same patch and also not
-cc:ing the maintainers of the driver you are modifying?
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
-Please break this up and fix the cc: issues.
-
-thanks,
-
-greg k-h
+> ---
+> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> index 13235b0..e2fc65f 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> @@ -1637,7 +1637,7 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
+> {
+> 	__u64 *pages = tx->tx_pages;
+> 	bool is_rx = (rd != tx->tx_rd);
+> -	bool tx_pages_mapped = 0;
+> +	bool tx_pages_mapped = false;
+> 	struct kib_fmr_pool *fpo;
+> 	int npages = 0;
+> 	__u64 version;
+> -- 
+> 2.10.2
+> 
