@@ -1,110 +1,81 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 7 Nov 2016 01:54:25 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 06/14] staging/lustre/llite: drop_caches
- hangs in cl_inode_fini()
-In-Reply-To: <1478136304-867780-7-git-send-email-green@linuxhacker.ru>
+Date: Mon, 7 Nov 2016 01:55:21 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 08/14] staging/lustre/ldlm: engage ELC
+ for all ldlm enqueue req
+In-Reply-To: <1478136304-867780-9-git-send-email-green@linuxhacker.ru>
 References: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
-	<1478136304-867780-7-git-send-email-green@linuxhacker.ru>
-Message-ID: <alpine.LFD.2.20.1611070154040.21293@casper.infradead.org>
+	<1478136304-867780-9-git-send-email-green@linuxhacker.ru>
+Message-ID: <alpine.LFD.2.20.1611070155090.21293@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <green@linuxhacker.ru>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andrew Perepechko <andrew.perepechko@seagate.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Hongchao Zhang <hongchao.zhang@intel.com>
 
 
-> From: Andrew Perepechko <andrew.perepechko@seagate.com>
+> From: Hongchao Zhang <hongchao.zhang@intel.com>
 > 
-> This patch releases cl_pages on error in ll_write_begin()
-> to avoid memory and object reference leaks. Also, it
-> reuses per-cpu lu_env in ll_invalidatepage() in the same
-> way as done in ll_releasepage().
+> If there is no request passed into ldlm_cli_enqueue, the enqueue
+> request will not engage ELC to drop unneeded locks. currently,
+> this kind of request is mainly related to EXTENT locks enqueue
+> requests (except for glimpse EXTENT lock for it has an intent).
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> Signed-off-by: Andrew Perepechko <andrew.perepechko@seagate.com>
-> Seagate-bug-id: MRP-3504
-> Reviewed-on: http://review.whamcloud.com/22745
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8509
-> Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-> Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+> Signed-off-by: Hongchao Zhang <hongchao.zhang@intel.com>
+> Reviewed-on: http://review.whamcloud.com/21739
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8209
+> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+> Reviewed-by: Vitaly Fertman <vitaly.fertman@seagate.com>
 > Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 > ---
->  drivers/staging/lustre/lustre/llite/rw26.c | 36 ++++++++++++++++--------------
->  1 file changed, 19 insertions(+), 17 deletions(-)
+>  drivers/staging/lustre/lustre/ldlm/ldlm_request.c | 21 ++++-----------------
+>  1 file changed, 4 insertions(+), 17 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/llite/rw26.c b/drivers/staging/lustre/lustre/llite/rw26.c
-> index 1a08a9d..ca45b44 100644
-> --- a/drivers/staging/lustre/lustre/llite/rw26.c
-> +++ b/drivers/staging/lustre/lustre/llite/rw26.c
-> @@ -71,8 +71,6 @@ static void ll_invalidatepage(struct page *vmpage, unsigned int offset,
->  	struct cl_page   *page;
->  	struct cl_object *obj;
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> index 1b9ae77..c5d00d1 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> @@ -748,17 +748,14 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
+>  	lock->l_last_activity = ktime_get_real_seconds();
 >  
-> -	int refcheck;
+>  	/* lock not sent to server yet */
 > -
->  	LASSERT(PageLocked(vmpage));
->  	LASSERT(!PageWriteback(vmpage));
->  
-> @@ -82,21 +80,21 @@ static void ll_invalidatepage(struct page *vmpage, unsigned int offset,
->  	 * happening with locked page too
->  	 */
->  	if (offset == 0 && length == PAGE_SIZE) {
-> -		env = cl_env_get(&refcheck);
-> -		if (!IS_ERR(env)) {
-> -			inode = vmpage->mapping->host;
-> -			obj = ll_i2info(inode)->lli_clob;
-> -			if (obj) {
-> -				page = cl_vmpage_page(vmpage, obj);
-> -				if (page) {
-> -					cl_page_delete(env, page);
-> -					cl_page_put(env, page);
-> -				}
-> -			} else {
-> -				LASSERT(vmpage->private == 0);
-> +		/* See the comment in ll_releasepage() */
-> +		env = cl_env_percpu_get();
-> +		LASSERT(!IS_ERR(env));
-> +		inode = vmpage->mapping->host;
-> +		obj = ll_i2info(inode)->lli_clob;
-> +		if (obj) {
-> +			page = cl_vmpage_page(vmpage, obj);
-> +			if (page) {
-> +				cl_page_delete(env, page);
-> +				cl_page_put(env, page);
->  			}
-> -			cl_env_put(env, &refcheck);
-> +		} else {
-> +			LASSERT(vmpage->private == 0);
+>  	if (!reqp || !*reqp) {
+> -		req = ptlrpc_request_alloc_pack(class_exp2cliimp(exp),
+> -						&RQF_LDLM_ENQUEUE,
+> -						LUSTRE_DLM_VERSION,
+> -						LDLM_ENQUEUE);
+> -		if (!req) {
+> +		req = ldlm_enqueue_pack(exp, lvb_len);
+> +		if (IS_ERR(req)) {
+>  			failed_lock_cleanup(ns, lock, einfo->ei_mode);
+>  			LDLM_LOCK_RELEASE(lock);
+> -			return -ENOMEM;
+> +			return PTR_ERR(req);
 >  		}
-> +		cl_env_percpu_put(env);
->  	}
->  }
+> +
+>  		req_passed_in = 0;
+>  		if (reqp)
+>  			*reqp = req;
+> @@ -778,16 +775,6 @@ int ldlm_cli_enqueue(struct obd_export *exp, struct ptlrpc_request **reqp,
+>  	body->lock_flags = ldlm_flags_to_wire(*flags);
+>  	body->lock_handle[0] = *lockh;
 >  
-> @@ -466,9 +464,9 @@ static int ll_write_begin(struct file *file, struct address_space *mapping,
->  			  struct page **pagep, void **fsdata)
->  {
->  	struct ll_cl_context *lcc;
-> -	const struct lu_env  *env;
-> +	const struct lu_env *env = NULL;
->  	struct cl_io   *io;
-> -	struct cl_page *page;
-> +	struct cl_page *page = NULL;
->  	struct cl_object *clob = ll_i2info(mapping->host)->lli_clob;
->  	pgoff_t index = pos >> PAGE_SHIFT;
->  	struct page *vmpage = NULL;
-> @@ -556,6 +554,10 @@ static int ll_write_begin(struct file *file, struct address_space *mapping,
->  			unlock_page(vmpage);
->  			put_page(vmpage);
->  		}
-> +		if (!IS_ERR_OR_NULL(page)) {
-> +			lu_ref_del(&page->cp_reference, "cl_io", io);
-> +			cl_page_put(env, page);
-> +		}
->  	} else {
->  		*pagep = vmpage;
->  		*fsdata = lcc;
+> -	/* Continue as normal. */
+> -	if (!req_passed_in) {
+> -		if (lvb_len > 0)
+> -			req_capsule_extend(&req->rq_pill,
+> -					   &RQF_LDLM_ENQUEUE_LVB);
+> -		req_capsule_set_size(&req->rq_pill, &RMF_DLM_LVB, RCL_SERVER,
+> -				     lvb_len);
+> -		ptlrpc_request_set_replen(req);
+> -	}
+> -
+>  	/*
+>  	 * Liblustre client doesn't get extent locks, except for O_APPEND case
+>  	 * where [0, OBD_OBJECT_EOF] lock is taken, or truncate, where
 > -- 
 > 2.7.4
 > 
