@@ -1,53 +1,70 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 7 Nov 2016 01:57:21 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 09/14] staging/lustre/ptlrpc: Suppress
- error for flock requests
-In-Reply-To: <1478136304-867780-10-git-send-email-green@linuxhacker.ru>
+Date: Mon, 7 Nov 2016 01:57:52 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 12/14] staging/lustre/llite: update ras
+ window correctly
+In-Reply-To: <1478136304-867780-13-git-send-email-green@linuxhacker.ru>
 References: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
-	<1478136304-867780-10-git-send-email-green@linuxhacker.ru>
-Message-ID: <alpine.LFD.2.20.1611070157110.21293@casper.infradead.org>
+	<1478136304-867780-13-git-send-email-green@linuxhacker.ru>
+Message-ID: <alpine.LFD.2.20.1611070157360.21293@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <green@linuxhacker.ru>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Patrick Farrell <paf@cray.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>
 
 
-> From: Patrick Farrell <paf@cray.com>
+> From: Bobi Jam <bobijam.xu@intel.com>
 > 
-> -EAGAIN is a normal return when requesting POSIX flocks.
-> We can't recognize exactly that case here, but it's the
-> only case that should result in -EAGAIN on LDLM_ENQUEUE, so
-> don't print to console in that case.
+> When stride-RA hit case miss, we only reset normal sequential
+> read-ahead window, but not reset the stride IO to avoid the overhead
+> of re-detecting stride IO. While when the normal RA window is set
+> to not insect with the stride-RA window, when we try to increase
+> the stride-RA window length later, the presumption does not hold.
+> 
+> This patch resets the stride IO as well in this case.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> Signed-off-by: Patrick Farrell <paf@cray.com>
-> Reviewed-on: http://review.whamcloud.com/22856
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8658
-> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-> Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+> Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+> Reviewed-on: http://review.whamcloud.com/23032
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8683
+> Reviewed-by: wangdi <di.wang@intel.com>
+> Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 > Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 > ---
->  drivers/staging/lustre/lustre/ptlrpc/client.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  drivers/staging/lustre/lustre/llite/rw.c | 15 +++++++++++----
+>  1 file changed, 11 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-> index 7cbfb4c..bb7ae4e 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-> @@ -1191,7 +1191,9 @@ static int ptlrpc_check_status(struct ptlrpc_request *req)
->  		lnet_nid_t nid = imp->imp_connection->c_peer.nid;
->  		__u32 opc = lustre_msg_get_opc(req->rq_reqmsg);
->  
-> -		if (ptlrpc_console_allow(req))
-> +		/* -EAGAIN is normal when using POSIX flocks */
-> +		if (ptlrpc_console_allow(req) &&
-> +		    !(opc == LDLM_ENQUEUE && err == -EAGAIN))
->  			LCONSOLE_ERROR_MSG(0x011, "%s: operation %s to node %s failed: rc = %d\n",
->  					   imp->imp_obd->obd_name,
->  					   ll_opcode2str(opc),
+> diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
+> index d2515a8..e34017d 100644
+> --- a/drivers/staging/lustre/lustre/llite/rw.c
+> +++ b/drivers/staging/lustre/lustre/llite/rw.c
+> @@ -809,13 +809,20 @@ static void ras_update(struct ll_sb_info *sbi, struct inode *inode,
+>  		if (ra_miss) {
+>  			if (index_in_stride_window(ras, index) &&
+>  			    stride_io_mode(ras)) {
+> -				/*If stride-RA hit cache miss, the stride dector
+> -				 *will not be reset to avoid the overhead of
+> -				 *redetecting read-ahead mode
+> -				 */
+>  				if (index != ras->ras_last_readpage + 1)
+>  					ras->ras_consecutive_pages = 0;
+>  				ras_reset(inode, ras, index);
+> +
+> +				/* If stride-RA hit cache miss, the stride
+> +				 * detector will not be reset to avoid the
+> +				 * overhead of redetecting read-ahead mode,
+> +				 * but on the condition that the stride window
+> +				 * is still intersect with normal sequential
+> +				 * read-ahead window.
+> +				 */
+> +				if (ras->ras_window_start <
+> +				    ras->ras_stride_offset)
+> +					ras_stride_reset(ras);
+>  				RAS_CDEBUG(ras);
+>  			} else {
+>  				/* Reset both stride window and normal RA
 > -- 
 > 2.7.4
 > 
