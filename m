@@ -1,57 +1,40 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 7 Nov 2016 01:38:03 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 04/14] staging/lustre/llite: clear inode
- timestamps after losing UPDATE lock
-In-Reply-To: <1478136304-867780-5-git-send-email-green@linuxhacker.ru>
+Date: Mon, 7 Nov 2016 01:38:40 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 01/14] staging/lustre/ldlm: Drop unused
+ blocking_refs flock field
+In-Reply-To: <1478136304-867780-2-git-send-email-green@linuxhacker.ru>
 References: <1478136304-867780-1-git-send-email-green@linuxhacker.ru>
-	<1478136304-867780-5-git-send-email-green@linuxhacker.ru>
-Message-ID: <alpine.LFD.2.20.1611070137440.21293@casper.infradead.org>
+	<1478136304-867780-2-git-send-email-green@linuxhacker.ru>
+Message-ID: <alpine.LFD.2.20.1611070138150.21293@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <green@linuxhacker.ru>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> From: Niu Yawei <yawei.niu@intel.com>
-> 
-> Otherwise, those leftovers would interfere with new timestamps
-> especially when the timestamps are set back in time on the other
-> clients.
+> blocking_refs is only used on the server, so drop it on the client.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
-> Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-> Reviewed-on: http://review.whamcloud.com/22623
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8446
-> Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 > Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 > ---
->  drivers/staging/lustre/lustre/llite/namei.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  drivers/staging/lustre/lustre/include/lustre_dlm.h | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-> index 74d9b73..c268f32 100644
-> --- a/drivers/staging/lustre/lustre/llite/namei.c
-> +++ b/drivers/staging/lustre/lustre/llite/namei.c
-> @@ -251,6 +251,16 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
->  				       PFID(ll_inode2fid(inode)), rc);
->  		}
->  
-> +		if (bits & MDS_INODELOCK_UPDATE) {
-> +			struct ll_inode_info *lli = ll_i2info(inode);
-> +
-> +			spin_lock(&lli->lli_lock);
-> +			LTIME_S(inode->i_mtime) = 0;
-> +			LTIME_S(inode->i_atime) = 0;
-> +			LTIME_S(inode->i_ctime) = 0;
-> +			spin_unlock(&lli->lli_lock);
-> +		}
-> +
->  		if ((bits & MDS_INODELOCK_UPDATE) && S_ISDIR(inode->i_mode)) {
->  			struct ll_inode_info *lli = ll_i2info(inode);
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> index 1c6b7b8..f770b86 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> @@ -550,8 +550,6 @@ struct ldlm_flock {
+>  	__u64 owner;
+>  	__u64 blocking_owner;
+>  	struct obd_export *blocking_export;
+> -	/* Protected by the hash lock */
+> -	__u32 blocking_refs;
+>  	__u32 pid;
+>  };
 >  
 > -- 
 > 2.7.4
