@@ -1,12 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 10 Nov 2016 17:53:31 +0000 (GMT)
-Subject: [lustre-devel] [PATCH] staging: lustre: ldlm: pl_recalc time
+Date: Thu, 10 Nov 2016 18:59:03 +0000 (GMT)
+Subject: [lustre-devel] [PATCH v2] staging: lustre: ldlm: pl_recalc time
  handling is wrong
-In-Reply-To: <5149342.oboLeYkUcs@wuerfel>
+In-Reply-To: <4839295.T6k2aHkh3K@wuerfel>
 References: <1478573240-12850-1-git-send-email-jsimmons@infradead.org>
 	<1594836.LAbS3nYoXQ@wuerfel> <20161110122108.GA7580@kroah.com>
-	<5149342.oboLeYkUcs@wuerfel>
-Message-ID: <alpine.LFD.2.20.1611101750010.31600@casper.infradead.org>
+	<4839295.T6k2aHkh3K@wuerfel>
+Message-ID: <alpine.LFD.2.20.1611101858360.31600@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,38 +15,69 @@ To: Arnd Bergmann <arnd@arndb.de>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> On Thursday, November 10, 2016 1:21:08 PM CET Greg Kroah-Hartman wrote:
-> > > 
-> > > the intention here is simply to have the console log keep the
-> > > same numbers as "date +%s" for absolute values. The patch that
-> > > James suggested converting everything to ktime_get_seconds()
-> > > would result in the same intervals that have always been there
-> > > (until I broke it by using time domains inconsistently), but
-> > > would mean we could use a u32 type for pl_recalc_time and
-> > > pl_recalc_period because that doesn't overflow until 136 years
-> > > after booting. (signed time_t overflows 68 years after 1970,
-> > > i.e 2038).
-> > 
-> > So, is this patch correct and should be merged to the tree, or not?
-> > 
+> James Simmons reports:
+> > The ldlm_pool field pl_recalc_time is set to the current
+> > monotonic clock value but the interval period is calculated
+> > with the wall clock. This means the interval period will
+> > always be far larger than the pl_recalc_period, which is
+> > just a small interval time period. The correct thing to
+> > do is to use monotomic clock current value instead of the
+> > wall clocks value when calculating recalc_interval_sec.
 > 
-> No, I think it's wrong in a different way as before. After my
-> patch, there were six instances of ktime_get_real_seconds() and
-> three instances of ktime_get_seconds(), and that was wrong.
+> This broke when I converted the 32-bit get_seconds() into
+> ktime_get_{real_,}seconds() inconsistently. Either
+> one of those two would have worked, but mixing them
+> does not.
 > 
-> James's patch converts three of the six instances to
-> ktime_get_seconds(), which is equally wrong, just different.
-> 
-> We can either convert the six ktime_get_real_seconds()
-> to ktime_get_seconds(), or convert the four (one was added
-> in the meantime) ktime_get_seconds() to ktime_get_real_seconds().
-> 
-> I'll follow up with a patch for the latter as it is what I
-> had originally intended. We can also do what James intended
-> instead.
+> Staying with the original intention of the patch, this
+> changes the ktime_get_seconds() calls into ktime_get_real_seconds(),
+> using real time instead of mononic time.
 
-I tought about it and yes ktime_get_real_seconds() is the
-right way to go due to the debug message. Especially if the
-node happens to reboot. Having a debug message after a reboot
-with a smaller time reported in the debug message compared to
-a earlier debug message might be confusing to someone.
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+ 
+> Cc: stable at vger.kernel.org # v4.4+
+> Fixes: 8f83409cf238 ("staging/lustre: use 64-bit time for pl_recalc")
+> Reported-by: James Simmons <jsimmons@infradead.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: James' patch was similarly incomplete to mine, as it only
+> addressed some of the calls. With this new version, all ktime
+> accessors use the same time domain.
+> 
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> index 19831c555c49..b820309d70e3 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> @@ -356,10 +356,10 @@ static int ldlm_pool_recalc(struct ldlm_pool *pl)
+>  	u32 recalc_interval_sec;
+>  	int count;
+>  
+> -	recalc_interval_sec = ktime_get_seconds() - pl->pl_recalc_time;
+> +	recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
+>  	if (recalc_interval_sec > 0) {
+>  		spin_lock(&pl->pl_lock);
+> -		recalc_interval_sec = ktime_get_seconds() - pl->pl_recalc_time;
+> +		recalc_interval_sec = ktime_get_real_seconds() - pl->pl_recalc_time;
+>  
+>  		if (recalc_interval_sec > 0) {
+>  			/*
+> @@ -382,7 +382,7 @@ static int ldlm_pool_recalc(struct ldlm_pool *pl)
+>  				    count);
+>  	}
+>  
+> -	recalc_interval_sec = pl->pl_recalc_time - ktime_get_seconds() +
+> +	recalc_interval_sec = pl->pl_recalc_time - ktime_get_real_seconds() +
+>  			      pl->pl_recalc_period;
+>  	if (recalc_interval_sec <= 0) {
+>  		/* DEBUG: should be re-removed after LU-4536 is fixed */
+> @@ -657,7 +657,7 @@ int ldlm_pool_init(struct ldlm_pool *pl, struct ldlm_namespace *ns,
+>  
+>  	spin_lock_init(&pl->pl_lock);
+>  	atomic_set(&pl->pl_granted, 0);
+> -	pl->pl_recalc_time = ktime_get_seconds();
+> +	pl->pl_recalc_time = ktime_get_real_seconds();
+>  	atomic_set(&pl->pl_lock_volume_factor, 1);
+>  
+>  	atomic_set(&pl->pl_grant_rate, 0);
+> 
+> 
