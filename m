@@ -1,35 +1,28 @@
-From: Nicholas Hanley <nicholasjhanley@gmail.com>
-Date: Mon, 07 Nov 2016 19:06:06 -0000
-Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: use bool
-	assignment to true/false
-Message-ID: <20161107190138.5730-1-nicholasjhanley@gmail.com>
+From: Anand Jain <anand.jain@oracle.com>
+Date: Thu, 10 Nov 2016 16:16:45 -0000
+Subject: [lustre-devel] [PATCH] f2fs: support multiple devices
+In-Reply-To: <749156c9-2b3e-4210-a89b-2d664f9d2fc2@gmail.com>
+References: <20161109205653.70061-1-jaegeuk@kernel.org>
+	<0D1876A8-BB77-4C1A-BE4F-B4A0E81DD4EA@dilger.ca>
+	<4ec4d8f2-da23-762d-ba81-12e76ed09793@cn.fujitsu.com>
+	<749156c9-2b3e-4210-a89b-2d664f9d2fc2@gmail.com>
+Message-ID: <b68b3de1-3036-fce6-b27c-dbf78e6469b8@oracle.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, gregkh@linuxfoundation.org, jsimmons@infradead.org
-Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Nicholas Hanley <nicholasjhanley@gmail.com>
+To: "Austin S. Hemmelgarn" <ahferroin7@gmail.com>, Qu Wenruo <quwenruo@cn.fujitsu.com>, Andreas Dilger <adilger@dilger.ca>, Jaegeuk Kim <jaegeuk@kernel.org>
+Cc: LKML <linux-kernel@vger.kernel.org>, Lustre Development <lustre-devel@lists.lustre.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, linux-f2fs-devel@lists.sourceforge.net, linux-btrfs <linux-btrfs@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>
 
-Replace 0 with false in tx_pages_mapped = 0 to be consistent with
-the rest of the lustre code.
 
-Signed-off-by: Nicholas Hanley <nicholasjhanley@gmail.com>
----
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index 13235b0..e2fc65f 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -1637,7 +1637,7 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
- {
- 	__u64 *pages = tx->tx_pages;
- 	bool is_rx = (rd != tx->tx_rd);
--	bool tx_pages_mapped = 0;
-+	bool tx_pages_mapped = false;
- 	struct kib_fmr_pool *fpo;
- 	int npages = 0;
- 	__u64 version;
--- 
-2.10.2
+(this is deviating from the subject, sorry about that)
+
+>  Pretty much, if you're using just raid1 mode, without
+> compression, on reasonable storage devices, things are rock-solid
+> relative to the rest of BTRFS.
+
+IMO, BTRFS volume manger feature is incomplete and there is RAID1
+critical bug which affects availability, so its not suitable for 
+enterprise solutions yet. However it should be fine in a setup
+where dedicated sysadmin and maintenance downtime is a choice.
