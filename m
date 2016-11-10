@@ -1,34 +1,46 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Thu, 10 Nov 2016 15:50:51 +0300
-Subject: [lustre-devel] [patch] staging/lustre/osc: indent an if statement
-Message-ID: <20161110125050.GA18577@mwanda>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 10 Nov 2016 16:01:18 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: ldlm: pl_recalc time
+	handling is wrong
+In-Reply-To: <20161110122108.GA7580@kroah.com>
+References: <1478573240-12850-1-git-send-email-jsimmons@infradead.org>
+	<1594836.LAbS3nYoXQ@wuerfel> <20161110122108.GA7580@kroah.com>
+Message-ID: <5149342.oboLeYkUcs@wuerfel>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-We accidentally removed a tab here.  Let's add it back, and some curly
-braces as well since this is a muti-line indent.
+On Thursday, November 10, 2016 1:21:08 PM CET Greg Kroah-Hartman wrote:
+> > 
+> > the intention here is simply to have the console log keep the
+> > same numbers as "date +%s" for absolute values. The patch that
+> > James suggested converting everything to ktime_get_seconds()
+> > would result in the same intervals that have always been there
+> > (until I broke it by using time domains inconsistently), but
+> > would mean we could use a u32 type for pl_recalc_time and
+> > pl_recalc_period because that doesn't overflow until 136 years
+> > after booting. (signed time_t overflows 68 years after 1970,
+> > i.e 2038).
+> 
+> So, is this patch correct and should be merged to the tree, or not?
+> 
 
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+No, I think it's wrong in a different way as before. After my
+patch, there were six instances of ktime_get_real_seconds() and
+three instances of ktime_get_seconds(), and that was wrong.
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
-index e337e87..bfc8d38 100644
---- a/drivers/staging/lustre/lustre/osc/osc_lock.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
-@@ -607,9 +607,11 @@ static int osc_ldlm_glimpse_ast(struct ldlm_lock *dlmlock, void *data)
- 			lvb = req_capsule_server_get(cap, &RMF_DLM_LVB);
- 			result = cl_object_glimpse(env, obj, lvb);
- 		}
--		if (!exp_connect_lvb_type(req->rq_export))
--		req_capsule_shrink(&req->rq_pill, &RMF_DLM_LVB,
--				   sizeof(struct ost_lvb_v1), RCL_SERVER);
-+		if (!exp_connect_lvb_type(req->rq_export)) {
-+			req_capsule_shrink(&req->rq_pill, &RMF_DLM_LVB,
-+					   sizeof(struct ost_lvb_v1),
-+					   RCL_SERVER);
-+		}
- 		cl_object_put(env, obj);
- 	} else {
- 		/*
+James's patch converts three of the six instances to
+ktime_get_seconds(), which is equally wrong, just different.
+
+We can either convert the six ktime_get_real_seconds()
+to ktime_get_seconds(), or convert the four (one was added
+in the meantime) ktime_get_seconds() to ktime_get_real_seconds().
+
+I'll follow up with a patch for the latter as it is what I
+had originally intended. We can also do what James intended
+instead.
+
+	Arnd
