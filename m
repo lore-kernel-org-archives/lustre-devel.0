@@ -1,37 +1,52 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 10 Nov 2016 19:44:57 +0000 (GMT)
-Subject: [lustre-devel] [patch] staging: lustre: lov: crash in error
-	handling
-In-Reply-To: <20161110194105.GB18347@mwanda>
-References: <20161110194105.GB18347@mwanda>
-Message-ID: <alpine.LFD.2.20.1611101944280.31600@casper.infradead.org>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Thu, 10 Nov 2016 22:31:08 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: lov: Fix signed wrap
+ around when decrementing index 'i'
+In-Reply-To: <20161110141910.25095-1-colin.king@canonical.com>
+References: <20161110141910.25095-1-colin.king@canonical.com>
+Message-ID: <1E6549EE-799C-45ED-A9FA-B9B362F51351@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, "John L. Hammond" <john.hammond@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Amitoj Kaur Chawla <amitoj1606@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
+To: Colin King <colin.king@canonical.com>
+Cc: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "Hammond, John" <john.hammond@intel.com>, Amitoj Kaur Chawla <amitoj1606@gmail.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-
-> We accidentally made this unsigned so now the error handling will loop
-> until it crashes.
+On Nov 10, 2016, at 07:19, Colin King <colin.king@canonical.com> wrote:
 > 
-> Fixes: 55051039fdad ('staging: lustre: lov: remove LSM from struct lustre_md')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> Change predecrement compare to post decrement compare to avoid an
+> unsigned integer wrap-around comparisomn when decrementing in the while
+> loop.
+> 
+> Issue found with static analysis with CoverityScan, CID 1375917
 
-Yep. I just sent a patch to fix that. 
+Thanks for the patch.  Seems this change has gotten a lot of attention,
+this is the third patch to the list to fix it.  My preference is to
+undo the int->unsigned declaration change, for which James has already
+submitted a patch.
 
+Cheers, Andreas
+
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+> drivers/staging/lustre/lustre/lov/lov_ea.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
 > diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-> index 53db170..2e2abed 100644
+> index 53db170..399298c 100644
 > --- a/drivers/staging/lustre/lustre/lov/lov_ea.c
 > +++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-> @@ -81,7 +81,7 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
->  	size_t oinfo_ptrs_size, lsm_size;
->  	struct lov_stripe_md *lsm;
->  	struct lov_oinfo     *loi;
-> -	unsigned int i;
-> +	int i;
->  
->  	LASSERT(stripe_count <= LOV_MAX_STRIPE_COUNT);
->  
+> @@ -102,7 +102,7 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
+> 	return lsm;
+> 
+> err:
+> -	while (--i >= 0)
+> +	while (i-- > 0)
+> 		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
+> 	kvfree(lsm);
+> 	return NULL;
+> -- 
+> 2.10.2
 > 
