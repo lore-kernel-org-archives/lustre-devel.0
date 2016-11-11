@@ -1,16 +1,16 @@
 From: kbuild test robot <lkp@intel.com>
-Date: Fri, 11 Nov 2016 12:35:29 +0800
-Subject: [lustre-devel] [PATCH 05/35] staging: lustre: llog: fix wrong
- offset in llog_process_thread()
-In-Reply-To: <1478799065-24841-6-git-send-email-jsimmons@infradead.org>
-Message-ID: <201611111201.gguisz8v%fengguang.wu@intel.com>
+Date: Fri, 11 Nov 2016 13:16:58 +0800
+Subject: [lustre-devel] [PATCH 06/35] staging: lustre: osc: Performance
+	tune for LRU
+In-Reply-To: <1478799065-24841-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <201611111328.fDXHD6zF%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi Mikhail,
+Hi Jinshan,
 
 [auto build test ERROR on staging/staging-testing]
 [also build test ERROR on next-20161110]
@@ -28,7 +28,8 @@ reproduce:
 
 All errors (new ones prefixed by >>):
 
->> ERROR: "__umoddi3" [drivers/staging/lustre/lustre/obdclass/obdclass.ko] undefined!
+>> ERROR: "__divdi3" [drivers/staging/lustre/lustre/osc/osc.ko] undefined!
+   ERROR: "__umoddi3" [drivers/staging/lustre/lustre/obdclass/obdclass.ko] undefined!
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -39,4 +40,4 @@ Name: .config.gz
 Type: application/gzip
 Size: 38321 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20161111/4b38ba54/attachment-0001.bin>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20161111/37cb9cb9/attachment-0001.bin>
