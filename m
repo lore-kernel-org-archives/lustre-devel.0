@@ -1,52 +1,42 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Thu, 10 Nov 2016 22:31:08 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: lov: Fix signed wrap
- around when decrementing index 'i'
-In-Reply-To: <20161110141910.25095-1-colin.king@canonical.com>
-References: <20161110141910.25095-1-colin.king@canonical.com>
-Message-ID: <1E6549EE-799C-45ED-A9FA-B9B362F51351@intel.com>
+From: kbuild test robot <lkp@intel.com>
+Date: Fri, 11 Nov 2016 12:35:29 +0800
+Subject: [lustre-devel] [PATCH 05/35] staging: lustre: llog: fix wrong
+ offset in llog_process_thread()
+In-Reply-To: <1478799065-24841-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <201611111201.gguisz8v%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Colin King <colin.king@canonical.com>
-Cc: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "Hammond, John" <john.hammond@intel.com>, Amitoj Kaur Chawla <amitoj1606@gmail.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+To: lustre-devel@lists.lustre.org
 
-On Nov 10, 2016, at 07:19, Colin King <colin.king@canonical.com> wrote:
-> 
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> Change predecrement compare to post decrement compare to avoid an
-> unsigned integer wrap-around comparisomn when decrementing in the while
-> loop.
-> 
-> Issue found with static analysis with CoverityScan, CID 1375917
+Hi Mikhail,
 
-Thanks for the patch.  Seems this change has gotten a lot of attention,
-this is the third patch to the list to fix it.  My preference is to
-undo the int->unsigned declaration change, for which James has already
-submitted a patch.
+[auto build test ERROR on staging/staging-testing]
+[also build test ERROR on next-20161110]
+[cannot apply to v4.9-rc4]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Cheers, Andreas
+url:    https://github.com/0day-ci/linux/commits/James-Simmons/second-batch-of-missing-lustre-2-8-patches/20161111-021225
+config: m68k-allmodconfig (attached as .config)
+compiler: m68k-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=m68k 
 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
-> drivers/staging/lustre/lustre/lov/lov_ea.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-> index 53db170..399298c 100644
-> --- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-> +++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-> @@ -102,7 +102,7 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
-> 	return lsm;
-> 
-> err:
-> -	while (--i >= 0)
-> +	while (i-- > 0)
-> 		kmem_cache_free(lov_oinfo_slab, lsm->lsm_oinfo[i]);
-> 	kvfree(lsm);
-> 	return NULL;
-> -- 
-> 2.10.2
-> 
+All errors (new ones prefixed by >>):
+
+>> ERROR: "__umoddi3" [drivers/staging/lustre/lustre/obdclass/obdclass.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38321 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20161111/4b38ba54/attachment-0001.bin>
