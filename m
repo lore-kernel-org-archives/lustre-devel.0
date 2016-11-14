@@ -1,60 +1,63 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Nov 2016 17:27:00 +0000 (GMT)
-Subject: [lustre-devel] [PATCH v4] staging: lustre: mdc: manage number
- of modify RPCs in flight
-In-Reply-To: <20161114172047.GA4989@kroah.com>
-References: <1478793073-21814-1-git-send-email-jsimmons@infradead.org>
-	<20161114151737.GA18183@kroah.com>
-	<alpine.LFD.2.20.1611141656220.29600@casper.infradead.org>
-	<20161114172047.GA4989@kroah.com>
-Message-ID: <alpine.LFD.2.20.1611141722160.29600@casper.infradead.org>
+Date: Mon, 14 Nov 2016 18:27:57 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 00/35] second batch of missing lustre 2.8
+	patches
+In-Reply-To: <20161114151650.GA12605@kroah.com>
+References: <1478799065-24841-1-git-send-email-jsimmons@infradead.org>
+	<20161114151650.GA12605@kroah.com>
+Message-ID: <alpine.LFD.2.20.1611141727250.29600@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Gregoire Pichon <gregoire.pichon@bull.net>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> On Mon, Nov 14, 2016 at 04:59:48PM +0000, James Simmons wrote:
-> > 
-> > > On Thu, Nov 10, 2016 at 10:51:13AM -0500, James Simmons wrote:
-> > > > From: Gregoire Pichon <gregoire.pichon@bull.net>
-> > > > 
-> > > > This patch is the main client part of a new feature that supports
-> > > > multiple modify metadata RPCs in parallel. Its goal is to improve
-> > > > metadata operations performance of a single client, while maintening
-> > > > the consistency of MDT reply reconstruction and MDT recovery
-> > > > mechanisms.
-> > > > 
-> > > > It allows to manage the number of modify RPCs in flight within
-> > > > the client obd structure and to assign a virtual index (the tag) to
-> > > > each modify RPC to help server side cleaning of reply data.
-> > > > 
-> > > > The mdc component uses this feature to send multiple modify RPCs
-> > > > in parallel.
-> > > 
-> > > Is this a new feature?  Why should we take this now and not just wait
-> > > until the code is out of staging?
-> > 
-> > Yes on the server side. So the problem on our meta data servers couldn't
-> > handle writing mulitiple bits of data to the back end disk at ths same
-> > time.
-> > 
-> > One client side the issue was the metadata operations were being 
-> > serialized by a mutex in the MDC layer. That is what this patch fixed.
-> > So for the client it would be a performance improvement patch. 
+> On Thu, Nov 10, 2016 at 12:30:30PM -0500, James Simmons wrote:
+> > More fixes missing from the upstream client. Also a nice cleanup
+> > with the removal of cl_req which is no longer needed. More cleanup
+> > for lustre_idl.h which is a uapi header. Like the last batch these
+> > patches are independent of order.
 > 
-> So, it's a "performance" patch, which isn't functionality, so why should
-> we merge this to staging now?  Why aren't people working on the known
-> coding issues to get this out of staging instead of working on
-> performance stuff?
+> I didn't apply a few of these (string parsing stuff, and build
+> breakages.)
+> 
+> What's the plan for getting this out of staging?  I feel like you all
+> are still adding new features along with these "cleanups".  Normally
+> that's fine, but I really really want to get this out of staging as it's
+> been there for way too long.  When is that going to happen?
 
-Because the primary goal which the people at my company, not Intel by 
-the way, wanted was to get this to what is running in production 
-environments so people would actually use the staging client. When it was 
-old and broken no one would touch it with a 10 foot pole. The currently 
-supported verison in production is lustre 2.8.0 so we are only about 30 
-patches away from reaching the goal. I'm going to respond to your other
-email in length about leaving staging. It would be really nice for the
-user base if we can reach that goal.
+First I should address why the push to bring it into sync with our
+prouction code base. One was to make it attractive to our user base.
+In my other email I explained that. Second the feed back here has been
+so valuable. We are at the point where bugs we haven't found are being
+reported here and addressed. Also your input has made the Lustre 
+developers to reflect on what we have done. In a way leaving staging will 
+be sad since that will stop :-( Lastly I really didn't want to cleanup
+the lustre client and then when it left staging do this massive dump
+of changes without people like Julia, Dan and you looking at it. I just 
+felt that wouldn't of been right.
+
+We are super close to reaching a very important mile stone of reaching
+lustre 2.8.0 level of suppport. At this point we can stop at our lustre 
+2.8.0 release for the sync since currently most the lustre users out their 
+are staying at that version. Secondly the major of patches landed to our 
+soon to be release 2.9 version was for the patches missing from the 
+staging tree.
+
+So before we consider moving out of staging some gaps need to be filled.
+The zero day system has found bugs on platforms we don't have access too.
+We really need to hook into that system. Also Julia Lawall Coccinelle
+work has been really wonderful. Intel does have a mirror of your tree and
+have started the integration of the test harness. For my work I have
+using a local private test harness setup. This Intel one is planned for
+public consumption. What is done here with Coccinelle and zero day needs
+to be intergrated. So this is what needs to be done from our side.
+
+Now for what is required to leave the staging tree. Honestly I can think
+of many many many things that need to be done. The question becomes what
+has to be done before leaving staging verses what can be completed after
+leaving staging. We have the normal style issues and checkpatch issues
+which is not much anymore. Then their is the uapi header cleanup. What 
+else beyond that?
