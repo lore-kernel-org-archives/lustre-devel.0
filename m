@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 17 Nov 2016 14:35:53 -0500
-Subject: [lustre-devel] [PATCH 15/19] staging: lustre: libcfs: Make char *
-	array envp static constant
+Date: Thu, 17 Nov 2016 14:35:41 -0500
+Subject: [lustre-devel] [PATCH 03/19] staging: lustre: libcfs: use static
+	const char const * for a suffixes array
 In-Reply-To: <1479411357-28979-1-git-send-email-jsimmons@infradead.org>
 References: <1479411357-28979-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1479411357-28979-16-git-send-email-jsimmons@infradead.org>
+Message-ID: <1479411357-28979-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,62 +12,38 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-The envp char array can be made static constant.
+Change the static const array libcfs_debug_subsystems
+to use static const char const * as pointed out by
+checkpatch.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/libcfs/linux/linux-debug.c |   14 ++++++++------
- 1 files changed, 8 insertions(+), 6 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/debug.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
-index 8d37938..d8a9894 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
-@@ -69,10 +69,11 @@ void libcfs_run_debug_log_upcall(char *file)
+diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
+index 9fe4227..f95764c 100644
+--- a/drivers/staging/lustre/lnet/libcfs/debug.c
++++ b/drivers/staging/lustre/lnet/libcfs/debug.c
+@@ -228,7 +228,8 @@ static int param_set_uintpos(const char *val, const struct kernel_param *kp)
+ static const char *
+ libcfs_debug_subsys2str(int subsys)
  {
- 	char *argv[3];
- 	int rc;
--	char *envp[] = {
-+	static const char * const envp[] = {
- 		"HOME=/",
- 		"PATH=/sbin:/bin:/usr/sbin:/usr/bin",
--		NULL};
-+		NULL
-+	};
+-	static const char *libcfs_debug_subsystems[] = LIBCFS_DEBUG_SUBSYS_NAMES;
++	static const char * const libcfs_debug_subsystems[] =
++		LIBCFS_DEBUG_SUBSYS_NAMES;
  
- 	argv[0] = lnet_debug_log_upcall;
- 
-@@ -81,7 +82,7 @@ void libcfs_run_debug_log_upcall(char *file)
- 
- 	argv[2] = NULL;
- 
--	rc = call_usermodehelper(argv[0], argv, envp, 1);
-+	rc = call_usermodehelper(argv[0], argv, (char **)envp, 1);
- 	if (rc < 0 && rc != -ENOENT) {
- 		CERROR("Error %d invoking LNET debug log upcall %s %s; check /sys/kernel/debug/lnet/debug_log_upcall\n",
- 		       rc, argv[0], argv[1]);
-@@ -95,10 +96,11 @@ void libcfs_run_upcall(char **argv)
+ 	if (subsys >= ARRAY_SIZE(libcfs_debug_subsystems))
+ 		return NULL;
+@@ -240,7 +241,8 @@ static int param_set_uintpos(const char *val, const struct kernel_param *kp)
+ static const char *
+ libcfs_debug_dbg2str(int debug)
  {
- 	int rc;
- 	int argc;
--	char *envp[] = {
-+	static const char * const envp[] = {
- 		"HOME=/",
- 		"PATH=/sbin:/bin:/usr/sbin:/usr/bin",
--		NULL};
-+		NULL
-+	};
+-	static const char *libcfs_debug_masks[] = LIBCFS_DEBUG_MASKS_NAMES;
++	static const char * const libcfs_debug_masks[] =
++		LIBCFS_DEBUG_MASKS_NAMES;
  
- 	argv[0] = lnet_upcall;
- 	argc = 1;
-@@ -107,7 +109,7 @@ void libcfs_run_upcall(char **argv)
- 
- 	LASSERT(argc >= 2);
- 
--	rc = call_usermodehelper(argv[0], argv, envp, 1);
-+	rc = call_usermodehelper(argv[0], argv, (char **)envp, 1);
- 	if (rc < 0 && rc != -ENOENT) {
- 		CERROR("Error %d invoking LNET upcall %s %s%s%s%s%s%s%s%s; check /sys/kernel/debug/lnet/upcall\n",
- 		       rc, argv[0], argv[1],
+ 	if (debug >= ARRAY_SIZE(libcfs_debug_masks))
+ 		return NULL;
 -- 
 1.7.1
