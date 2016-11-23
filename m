@@ -1,59 +1,96 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 21 Nov 2016 11:14:40 +0100
-Subject: [lustre-devel] [PATCH] staging/lustre: Use proper number of
- bytes in copy_from_user
-In-Reply-To: <1479707208-1241688-1-git-send-email-green@linuxhacker.ru>
-References: <1479707208-1241688-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <20161121101440.GA9749@kroah.com>
+From: W. Zhang <wszhang159@gmail.com>
+Date: Wed, 23 Nov 2016 16:35:40 +0800
+Subject: [lustre-devel] Failed to build a Lustre Storage Client on
+ OpenVZ Kernel ! Is this a bug?
+In-Reply-To: <alpine.LFD.2.20.1611070202430.21293@casper.infradead.org>
+References: <CAAXb9Ms-4+aDuS10g3Y4qbPiJyaP74Fk-Gh+4=7KaTLacvAZRA@mail.gmail.com>
+	<alpine.LFD.2.20.1611070202430.21293@casper.infradead.org>
+Message-ID: <CAAXb9Mv81o3RywPWhspEOyrR0QWvtgQHQLJPPyNvi77n-c-M-g@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <green@linuxhacker.ru>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Jian Yu <jian.yu@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Mon, Nov 21, 2016 at 12:46:48AM -0500, Oleg Drokin wrote:
-> From: Jian Yu <jian.yu@intel.com>
-> 
-> This patch removes the usage of MAX_STRING_SIZE from
-> copy_from_user() and just copies enough bytes to cover
-> count passed in.
-> 
-> Signed-off-by: Jian Yu <jian.yu@intel.com>
-> Reviewed-on: http://review.whamcloud.com/23462
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8774
-> Reviewed-by: John L. Hammond <john.hammond@intel.com>
-> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
-> ---
->  drivers/staging/lustre/lustre/obdclass/lprocfs_status.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> index 8a2f02f3..db49992 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> @@ -400,10 +400,17 @@ int lprocfs_wr_uint(struct file *file, const char __user *buffer,
->  	char dummy[MAX_STRING_SIZE + 1], *end;
->  	unsigned long tmp;
->  
-> -	dummy[MAX_STRING_SIZE] = '\0';
-> -	if (copy_from_user(dummy, buffer, MAX_STRING_SIZE))
-> +	if (count >= sizeof(dummy))
-> +		return -EINVAL;
-> +
-> +	if (count == 0)
-> +		return 0;
-> +
-> +	if (copy_from_user(dummy, buffer, count))
->  		return -EFAULT;
->  
-> +	dummy[count] = '\0';
-> +
+Dear James and All,
 
-You do know about simple_read_from_buffer(), right?  I suggest using
-those simple_* functions where ever you are touching user buffers, like
-this code.
+Attached is the file 'config.log'!
 
-thanks,
+Thanks very much for previous attention!
 
-greg k-h
+Best Wishes!
+
+2016-11-07 10:03 GMT+08:00 James Simmons <jsimmons@infradead.org>:
+
+>
+> > Hello,
+> >
+> > I'm trying to build a Lustre client on OpenVZ kernel (version:
+> 042stab120.5, based on RHEL 6.8 kernel
+> > 2.6.32-642.6.1.el6), and some bugs occured:
+> >
+> > (1) When build version v2_8_59_0 in git tag repo of Lustre, I
+> encountered the following errors:
+> > "
+> > LD [M] /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/fld/
+> fld.o
+> > CC [M] /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/lloop.o
+> > In file included from /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/lloop.c:109:
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/llite_internal.h:1469: error: conflicting types for
+> > 'iov_iter_iovec'
+> > include/linux/fs.h:765: note: previous definition of 'iov_iter_iovec'
+> was here
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/llite_internal.h: In function 'iov_iter_iovec':
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/llite_internal.h:1472: error: 'const struct
+> > iov_iter' has no member named 'iov'
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/llite_internal.h:1473: error: 'const struct
+> > iov_iter' has no member named 'iov'
+> > cc1: warnings being treated as errors
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/llite_internal.h:1473: error: type defaults to 'int'
+> > in declaration of '_min2'
+> > ...
+> > "
+> >
+> > (2) When build old version v2_8_50_0 in git tag repo of Lustre, the
+> following errors display:
+> > "
+> > CC [M] /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/vvp_lock.o
+> > CC [M] /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/vvp_io.o
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/vvp_io.c: In function 'vvp_mmap_locks':
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/vvp_io.c:423: error: 'struct iov_iter' has no member
+> > named 'iov'
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/vvp_io.c: In function 'vvp_io_advance':
+> > /opt/src/lustre_testvz/lustre_new/lustre-r161012/lustre/llit
+> e/vvp_io.c:514: error: 'struct iov_iter' has no member
+> > named 'iov'
+> > ...
+> > "
+> >
+> > Files with full error context are attached.
+> >
+> > So, How can I fix the problem? Is this a bug which need to be fixed?
+>
+> Can you post your config.log.
+>
+>
+> > Thanks! Any suggestion is appreciated!
+> >
+> > Best Wishes!
+> >
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20161123/01ef82f9/attachment.htm>
