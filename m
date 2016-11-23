@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 23 Nov 2016 17:59:48 -0500
-Subject: [lustre-devel] [PATCH 2/5] staging: lustre: ldlm: remove
-	ldlm_side_t typedef usage from code
+Date: Wed, 23 Nov 2016 17:59:51 -0500
+Subject: [lustre-devel] [PATCH 5/5] staging: lustre: ldlm: change "int" to
+	proper enum type
 In-Reply-To: <1479941991-30059-1-git-send-email-jsimmons@infradead.org>
 References: <1479941991-30059-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1479941991-30059-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1479941991-30059-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,8 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Andreas Dilger <andreas.dilger@intel.com>
 
-Replace usage of ldlm_side_t with named enums
-to conform to upstream coding style.
+Fix users of flags that were using "int" instead of named enum.
+Rename some "flags" variables to distinguish between different flags.
 
 Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6142
@@ -29,232 +29,140 @@ Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_dlm.h |   12 ++++++------
- drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |   17 +++++++++--------
- drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     |    9 +++++----
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   14 +++++++-------
- 4 files changed, 27 insertions(+), 25 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |   14 ++++++++------
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |    8 ++++----
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   19 +++++++++++--------
+ 3 files changed, 23 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index 02921bf..02c90b0 100644
+index 62304ba..dfef4fa 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -86,10 +86,10 @@ enum ldlm_error {
-  * decisions about lack of conflicts or do any autonomous lock granting without
-  * first speaking to a server.
+@@ -965,8 +965,8 @@ struct ldlm_ast_work {
+  * Common ldlm_enqueue parameters
   */
--typedef enum {
-+enum ldlm_side {
- 	LDLM_NAMESPACE_SERVER = 1 << 0,
- 	LDLM_NAMESPACE_CLIENT = 1 << 1
--} ldlm_side_t;
-+};
- 
- /**
-  * The blocking callback is overloaded to perform two functions.  These flags
-@@ -359,7 +359,7 @@ struct ldlm_namespace {
- 	struct obd_device	*ns_obd;
- 
- 	/** Flag indicating if namespace is on client instead of server */
--	ldlm_side_t		ns_client;
-+	enum ldlm_side		ns_client;
- 
- 	/** Resource hash table for namespace. */
- 	struct cfs_hash		*ns_rs_hash;
-@@ -1187,7 +1187,7 @@ enum ldlm_mode ldlm_revalidate_lock_handle(const struct lustre_handle *lockh,
- /* resource.c */
- struct ldlm_namespace *
- ldlm_namespace_new(struct obd_device *obd, char *name,
--		   ldlm_side_t client, enum ldlm_appetite apt,
-+		   enum ldlm_side client, enum ldlm_appetite apt,
- 		   enum ldlm_ns_type ns_type);
- int ldlm_namespace_cleanup(struct ldlm_namespace *ns, __u64 flags);
- void ldlm_namespace_get(struct ldlm_namespace *ns);
-@@ -1206,7 +1206,7 @@ void ldlm_resource_add_lock(struct ldlm_resource *res,
- 			    struct ldlm_lock *lock);
- void ldlm_resource_unlink_lock(struct ldlm_lock *lock);
- void ldlm_res2desc(struct ldlm_resource *res, struct ldlm_resource_desc *desc);
--void ldlm_dump_all_namespaces(ldlm_side_t client, int level);
-+void ldlm_dump_all_namespaces(enum ldlm_side client, int level);
- void ldlm_namespace_dump(int level, struct ldlm_namespace *);
- void ldlm_resource_dump(int level, struct ldlm_resource *);
- int ldlm_lock_change_resource(struct ldlm_namespace *, struct ldlm_lock *,
-@@ -1331,7 +1331,7 @@ static inline void check_res_locked(struct ldlm_resource *res)
- void ldlm_pools_fini(void);
- 
- int ldlm_pool_init(struct ldlm_pool *pl, struct ldlm_namespace *ns,
--		   int idx, ldlm_side_t client);
-+		   int idx, enum ldlm_side client);
- void ldlm_pool_fini(struct ldlm_pool *pl);
- void ldlm_pool_add(struct ldlm_pool *pl, struct ldlm_lock *lock);
- void ldlm_pool_del(struct ldlm_pool *pl, struct ldlm_lock *lock);
+ struct ldlm_enqueue_info {
+-	__u32 ei_type;   /** Type of the lock being enqueued. */
+-	__u32 ei_mode;   /** Mode of the lock being enqueued. */
++	enum ldlm_type	ei_type;  /** Type of the lock being enqueued. */
++	enum ldlm_mode	ei_mode;  /** Mode of the lock being enqueued. */
+ 	void *ei_cb_bl;  /** blocking lock callback */
+ 	void *ei_cb_cp;  /** lock completion callback */
+ 	void *ei_cb_gl;  /** lock glimpse callback */
+@@ -1166,10 +1166,12 @@ static inline int ldlm_res_lvbo_update(struct ldlm_resource *res,
+ struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock);
+ void ldlm_lock_put(struct ldlm_lock *lock);
+ void ldlm_lock2desc(struct ldlm_lock *lock, struct ldlm_lock_desc *desc);
+-void ldlm_lock_addref(const struct lustre_handle *lockh, __u32 mode);
+-int  ldlm_lock_addref_try(const struct lustre_handle *lockh, __u32 mode);
+-void ldlm_lock_decref(const struct lustre_handle *lockh, __u32 mode);
+-void ldlm_lock_decref_and_cancel(const struct lustre_handle *lockh, __u32 mode);
++void ldlm_lock_addref(const struct lustre_handle *lockh, enum ldlm_mode mode);
++int  ldlm_lock_addref_try(const struct lustre_handle *lockh,
++			  enum ldlm_mode mode);
++void ldlm_lock_decref(const struct lustre_handle *lockh, enum ldlm_mode mode);
++void ldlm_lock_decref_and_cancel(const struct lustre_handle *lockh,
++				 enum ldlm_mode mode);
+ void ldlm_lock_fail_match_locked(struct ldlm_lock *lock);
+ void ldlm_lock_allow_match(struct ldlm_lock *lock);
+ void ldlm_lock_allow_match_locked(struct ldlm_lock *lock);
 diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-index 1a98a31..e2c3c6e 100644
+index 49f74db..5c02501 100644
 --- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
 +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-@@ -39,13 +39,13 @@
- extern struct mutex ldlm_cli_namespace_lock;
- extern struct list_head ldlm_cli_active_namespace_list;
- 
--static inline int ldlm_namespace_nr_read(ldlm_side_t client)
-+static inline int ldlm_namespace_nr_read(enum ldlm_side client)
- {
- 	return client == LDLM_NAMESPACE_SERVER ?
- 		ldlm_srv_namespace_nr : ldlm_cli_namespace_nr;
- }
- 
--static inline void ldlm_namespace_nr_inc(ldlm_side_t client)
-+static inline void ldlm_namespace_nr_inc(enum ldlm_side client)
- {
- 	if (client == LDLM_NAMESPACE_SERVER)
- 		ldlm_srv_namespace_nr++;
-@@ -53,7 +53,7 @@ static inline void ldlm_namespace_nr_inc(ldlm_side_t client)
- 		ldlm_cli_namespace_nr++;
- }
- 
--static inline void ldlm_namespace_nr_dec(ldlm_side_t client)
-+static inline void ldlm_namespace_nr_dec(enum ldlm_side client)
- {
- 	if (client == LDLM_NAMESPACE_SERVER)
- 		ldlm_srv_namespace_nr--;
-@@ -61,13 +61,13 @@ static inline void ldlm_namespace_nr_dec(ldlm_side_t client)
- 		ldlm_cli_namespace_nr--;
- }
- 
--static inline struct list_head *ldlm_namespace_list(ldlm_side_t client)
-+static inline struct list_head *ldlm_namespace_list(enum ldlm_side client)
- {
- 	return client == LDLM_NAMESPACE_SERVER ?
- 		&ldlm_srv_namespace_list : &ldlm_cli_active_namespace_list;
- }
- 
--static inline struct mutex *ldlm_namespace_lock(ldlm_side_t client)
-+static inline struct mutex *ldlm_namespace_lock(enum ldlm_side client)
- {
- 	return client == LDLM_NAMESPACE_SERVER ?
- 		&ldlm_srv_namespace_lock : &ldlm_cli_namespace_lock;
-@@ -79,10 +79,11 @@ static inline int ldlm_ns_empty(struct ldlm_namespace *ns)
- 	return atomic_read(&ns->ns_bref) == 0;
- }
- 
--void ldlm_namespace_move_to_active_locked(struct ldlm_namespace *, ldlm_side_t);
-+void ldlm_namespace_move_to_active_locked(struct ldlm_namespace *,
-+					  enum ldlm_side);
- void ldlm_namespace_move_to_inactive_locked(struct ldlm_namespace *,
--					    ldlm_side_t);
--struct ldlm_namespace *ldlm_namespace_first_locked(ldlm_side_t);
-+					    enum ldlm_side);
-+struct ldlm_namespace *ldlm_namespace_first_locked(enum ldlm_side);
- 
- /* ldlm_request.c */
- /* Cancel lru flag, it indicates we cancel aged locks. */
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-index b820309..252bddb 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-@@ -651,7 +651,7 @@ static void ldlm_pool_debugfs_fini(struct ldlm_pool *pl)
- }
- 
- int ldlm_pool_init(struct ldlm_pool *pl, struct ldlm_namespace *ns,
--		   int idx, ldlm_side_t client)
-+		   int idx, enum ldlm_side client)
- {
- 	int rc;
- 
-@@ -788,7 +788,7 @@ static int ldlm_pool_granted(struct ldlm_pool *pl)
-  * count locks from all namespaces (if possible). Returns number of
-  * cached locks.
+@@ -138,10 +138,10 @@ struct ldlm_lock *
+ 		 void *data, __u32 lvb_len, enum lvb_type lvb_type);
+ enum ldlm_error ldlm_lock_enqueue(struct ldlm_namespace *, struct ldlm_lock **,
+ 				  void *cookie, __u64 *flags);
+-void ldlm_lock_addref_internal(struct ldlm_lock *, __u32 mode);
+-void ldlm_lock_addref_internal_nolock(struct ldlm_lock *, __u32 mode);
+-void ldlm_lock_decref_internal(struct ldlm_lock *, __u32 mode);
+-void ldlm_lock_decref_internal_nolock(struct ldlm_lock *, __u32 mode);
++void ldlm_lock_addref_internal(struct ldlm_lock *, enum ldlm_mode mode);
++void ldlm_lock_addref_internal_nolock(struct ldlm_lock *, enum ldlm_mode mode);
++void ldlm_lock_decref_internal(struct ldlm_lock *, enum ldlm_mode mode);
++void ldlm_lock_decref_internal_nolock(struct ldlm_lock *, enum ldlm_mode mode);
+ int ldlm_run_ast_work(struct ldlm_namespace *ns, struct list_head *rpc_list,
+ 		      enum ldlm_desc_ast_t ast_type);
+ int ldlm_lock_remove_from_lru_check(struct ldlm_lock *lock, time_t last_use);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 15eeb2b..d03e6d4 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -643,7 +643,7 @@ static void ldlm_add_ast_work_item(struct ldlm_lock *lock,
+  * r/w reference type is determined by \a mode
+  * Calls ldlm_lock_addref_internal.
   */
--static unsigned long ldlm_pools_count(ldlm_side_t client, gfp_t gfp_mask)
-+static unsigned long ldlm_pools_count(enum ldlm_side client, gfp_t gfp_mask)
+-void ldlm_lock_addref(const struct lustre_handle *lockh, __u32 mode)
++void ldlm_lock_addref(const struct lustre_handle *lockh, enum ldlm_mode mode)
  {
- 	unsigned long total = 0;
- 	int nr_ns;
-@@ -837,7 +837,8 @@ static unsigned long ldlm_pools_count(ldlm_side_t client, gfp_t gfp_mask)
- 	return total;
- }
+ 	struct ldlm_lock *lock;
  
--static unsigned long ldlm_pools_scan(ldlm_side_t client, int nr, gfp_t gfp_mask)
-+static unsigned long ldlm_pools_scan(enum ldlm_side client, int nr,
-+				     gfp_t gfp_mask)
+@@ -661,7 +661,8 @@ void ldlm_lock_addref(const struct lustre_handle *lockh, __u32 mode)
+  * Removes lock from LRU if it is there.
+  * Assumes the LDLM lock is already locked.
+  */
+-void ldlm_lock_addref_internal_nolock(struct ldlm_lock *lock, __u32 mode)
++void ldlm_lock_addref_internal_nolock(struct ldlm_lock *lock,
++				      enum ldlm_mode mode)
  {
- 	unsigned long freed = 0;
- 	int tmp, nr_ns;
-@@ -895,7 +896,7 @@ static unsigned long ldlm_pools_cli_scan(struct shrinker *s,
- 			       sc->gfp_mask);
- }
- 
--static int ldlm_pools_recalc(ldlm_side_t client)
-+static int ldlm_pools_recalc(enum ldlm_side client)
+ 	ldlm_lock_remove_from_lru(lock);
+ 	if (mode & (LCK_NL | LCK_CR | LCK_PR)) {
+@@ -685,7 +686,7 @@ void ldlm_lock_addref_internal_nolock(struct ldlm_lock *lock, __u32 mode)
+  *
+  * \retval -EAGAIN lock is being canceled.
+  */
+-int ldlm_lock_addref_try(const struct lustre_handle *lockh, __u32 mode)
++int ldlm_lock_addref_try(const struct lustre_handle *lockh, enum ldlm_mode mode)
+ {
+ 	struct ldlm_lock *lock;
+ 	int	       result;
+@@ -711,7 +712,7 @@ int ldlm_lock_addref_try(const struct lustre_handle *lockh, __u32 mode)
+  * Locks LDLM lock and calls ldlm_lock_addref_internal_nolock to do the work.
+  * Only called for local locks.
+  */
+-void ldlm_lock_addref_internal(struct ldlm_lock *lock, __u32 mode)
++void ldlm_lock_addref_internal(struct ldlm_lock *lock, enum ldlm_mode mode)
+ {
+ 	lock_res_and_lock(lock);
+ 	ldlm_lock_addref_internal_nolock(lock, mode);
+@@ -725,7 +726,8 @@ void ldlm_lock_addref_internal(struct ldlm_lock *lock, __u32 mode)
+  * Does NOT add lock to LRU if no r/w references left to accommodate flock locks
+  * that cannot be placed in LRU.
+  */
+-void ldlm_lock_decref_internal_nolock(struct ldlm_lock *lock, __u32 mode)
++void ldlm_lock_decref_internal_nolock(struct ldlm_lock *lock,
++				      enum ldlm_mode mode)
+ {
+ 	LDLM_DEBUG(lock, "ldlm_lock_decref(%s)", ldlm_lockname[mode]);
+ 	if (mode & (LCK_NL | LCK_CR | LCK_PR)) {
+@@ -751,7 +753,7 @@ void ldlm_lock_decref_internal_nolock(struct ldlm_lock *lock, __u32 mode)
+  * on the namespace.
+  * For blocked LDLM locks if r/w count drops to zero, blocking_ast is called.
+  */
+-void ldlm_lock_decref_internal(struct ldlm_lock *lock, __u32 mode)
++void ldlm_lock_decref_internal(struct ldlm_lock *lock, enum ldlm_mode mode)
  {
  	struct ldlm_namespace *ns;
- 	struct ldlm_namespace *ns_old = NULL;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index c452400..ca2cd4a 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -612,7 +612,7 @@ struct ldlm_ns_hash_def {
  
- /** Register \a ns in the list of namespaces */
- static void ldlm_namespace_register(struct ldlm_namespace *ns,
--				    ldlm_side_t client)
-+				    enum ldlm_side client)
- {
- 	mutex_lock(ldlm_namespace_lock(client));
- 	LASSERT(list_empty(&ns->ns_list_chain));
-@@ -625,7 +625,7 @@ static void ldlm_namespace_register(struct ldlm_namespace *ns,
-  * Create and initialize new empty namespace.
+@@ -822,7 +824,7 @@ void ldlm_lock_decref_internal(struct ldlm_lock *lock, __u32 mode)
+ /**
+  * Decrease reader/writer refcount for LDLM lock with handle \a lockh
   */
- struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
--					  ldlm_side_t client,
-+					  enum ldlm_side client,
- 					  enum ldlm_appetite apt,
- 					  enum ldlm_ns_type ns_type)
+-void ldlm_lock_decref(const struct lustre_handle *lockh, __u32 mode)
++void ldlm_lock_decref(const struct lustre_handle *lockh, enum ldlm_mode mode)
  {
-@@ -954,7 +954,7 @@ void ldlm_namespace_free_prior(struct ldlm_namespace *ns,
+ 	struct ldlm_lock *lock = __ldlm_handle2lock(lockh, 0);
  
- /** Unregister \a ns from the list of namespaces. */
- static void ldlm_namespace_unregister(struct ldlm_namespace *ns,
--				      ldlm_side_t client)
-+				      enum ldlm_side client)
- {
- 	mutex_lock(ldlm_namespace_lock(client));
- 	LASSERT(!list_empty(&ns->ns_list_chain));
-@@ -1018,7 +1018,7 @@ void ldlm_namespace_put(struct ldlm_namespace *ns)
- 
- /** Should be called with ldlm_namespace_lock(client) taken. */
- void ldlm_namespace_move_to_active_locked(struct ldlm_namespace *ns,
--					  ldlm_side_t client)
-+					  enum ldlm_side client)
- {
- 	LASSERT(!list_empty(&ns->ns_list_chain));
- 	LASSERT(mutex_is_locked(ldlm_namespace_lock(client)));
-@@ -1027,7 +1027,7 @@ void ldlm_namespace_move_to_active_locked(struct ldlm_namespace *ns,
- 
- /** Should be called with ldlm_namespace_lock(client) taken. */
- void ldlm_namespace_move_to_inactive_locked(struct ldlm_namespace *ns,
--					    ldlm_side_t client)
-+					    enum ldlm_side client)
- {
- 	LASSERT(!list_empty(&ns->ns_list_chain));
- 	LASSERT(mutex_is_locked(ldlm_namespace_lock(client)));
-@@ -1035,7 +1035,7 @@ void ldlm_namespace_move_to_inactive_locked(struct ldlm_namespace *ns,
- }
- 
- /** Should be called with ldlm_namespace_lock(client) taken. */
--struct ldlm_namespace *ldlm_namespace_first_locked(ldlm_side_t client)
-+struct ldlm_namespace *ldlm_namespace_first_locked(enum ldlm_side client)
- {
- 	LASSERT(mutex_is_locked(ldlm_namespace_lock(client)));
- 	LASSERT(!list_empty(ldlm_namespace_list(client)));
-@@ -1305,7 +1305,7 @@ void ldlm_res2desc(struct ldlm_resource *res, struct ldlm_resource_desc *desc)
-  * Print information about all locks in all namespaces on this node to debug
-  * log.
+@@ -837,7 +839,8 @@ void ldlm_lock_decref(const struct lustre_handle *lockh, __u32 mode)
+  * \a lockh and mark it for subsequent cancellation once r/w refcount
+  * drops to zero instead of putting into LRU.
   */
--void ldlm_dump_all_namespaces(ldlm_side_t client, int level)
-+void ldlm_dump_all_namespaces(enum ldlm_side client, int level)
+-void ldlm_lock_decref_and_cancel(const struct lustre_handle *lockh, __u32 mode)
++void ldlm_lock_decref_and_cancel(const struct lustre_handle *lockh,
++				 enum ldlm_mode mode)
  {
- 	struct list_head *tmp;
+ 	struct ldlm_lock *lock = __ldlm_handle2lock(lockh, 0);
  
 -- 
 1.7.1
