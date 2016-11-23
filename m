@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 23 Nov 2016 17:59:50 -0500
-Subject: [lustre-devel] [PATCH 4/5] staging: lustre: ldlm: rename
-	LDLM_CANCEL_* flags
+Date: Wed, 23 Nov 2016 17:59:49 -0500
+Subject: [lustre-devel] [PATCH 3/5] staging: lustre: ldlm: remove
+	ldlm_wire_policy_data_t typedef usage from code
 In-Reply-To: <1479941991-30059-1-git-send-email-jsimmons@infradead.org>
 References: <1479941991-30059-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1479941991-30059-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1479941991-30059-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,8 +14,8 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Andreas Dilger <andreas.dilger@intel.com>
 
-Rename LDLM_CANCEL_* flags (used with enum ldlm_lru_flags) to
-LDLM_LRU_FLAGS_* to avoid confusion with enum ldlm_cancel_flags.
+Replace usage of ldlm_wire_policy_data_t with named enums
+to conform to upstream coding style.
 
 Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6142
@@ -29,206 +29,218 @@ Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |   16 ++++----
- drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     |    4 +-
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   44 ++++++++++----------
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    8 ++--
- 4 files changed, 36 insertions(+), 36 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_idl.h      |    6 +++---
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |    2 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_extent.c   |    4 ++--
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |    4 ++--
+ .../staging/lustre/lustre/ldlm/ldlm_inodebits.c    |    4 ++--
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |   20 ++++++++++----------
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |    4 ++--
+ drivers/staging/lustre/lustre/ldlm/ldlm_plain.c    |    4 ++--
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |    2 +-
+ 9 files changed, 25 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-index 9085ee5..49f74db 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-@@ -88,14 +88,14 @@ void ldlm_namespace_move_to_inactive_locked(struct ldlm_namespace *,
- /* ldlm_request.c */
- /* Cancel lru flag, it indicates we cancel aged locks. */
- enum {
--	LDLM_CANCEL_AGED   = 1 << 0, /* Cancel aged locks (non lru resize). */
--	LDLM_CANCEL_PASSED = 1 << 1, /* Cancel passed number of locks. */
--	LDLM_CANCEL_SHRINK = 1 << 2, /* Cancel locks from shrinker. */
--	LDLM_CANCEL_LRUR   = 1 << 3, /* Cancel locks from lru resize. */
--	LDLM_CANCEL_NO_WAIT = 1 << 4, /* Cancel locks w/o blocking (neither
--				       * sending nor waiting for any rpcs)
--				       */
--	LDLM_CANCEL_LRUR_NO_WAIT = 1 << 5, /* LRUR + NO_WAIT */
-+	LDLM_LRU_FLAG_AGED	= BIT(0), /* Cancel aged locks (non lru resize). */
-+	LDLM_LRU_FLAG_PASSED	= BIT(1), /* Cancel passed number of locks. */
-+	LDLM_LRU_FLAG_SHRINK	= BIT(2), /* Cancel locks from shrinker. */
-+	LDLM_LRU_FLAG_LRUR	= BIT(3), /* Cancel locks from lru resize. */
-+	LDLM_LRU_FLAG_NO_WAIT	= BIT(4), /* Cancel locks w/o blocking (neither
-+					   * sending nor waiting for any rpcs)
-+					   */
-+	LDLM_LRU_FLAG_LRUR_NO_WAIT = BIT(5), /* LRUR + NO_WAIT */
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+index 5c1fb6c..6a4a7d8 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
+@@ -2623,11 +2623,11 @@ struct ldlm_flock_wire {
+  * on the resource type.
+  */
+ 
+-typedef union {
++union ldlm_wire_policy_data {
+ 	struct ldlm_extent l_extent;
+ 	struct ldlm_flock_wire l_flock;
+ 	struct ldlm_inodebits l_inodebits;
+-} ldlm_wire_policy_data_t;
++};
+ 
+ union ldlm_gl_desc {
+ 	struct ldlm_gl_lquota_desc	lquota_desc;
+@@ -2669,7 +2669,7 @@ struct ldlm_lock_desc {
+ 	struct ldlm_resource_desc l_resource;
+ 	enum ldlm_mode l_req_mode;
+ 	enum ldlm_mode l_granted_mode;
+-	ldlm_wire_policy_data_t l_policy_data;
++	union ldlm_wire_policy_data l_policy_data;
  };
  
- int ldlm_cancel_lru(struct ldlm_namespace *ns, int nr,
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-index 252bddb..8dfb3c8 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
-@@ -293,7 +293,7 @@ static int ldlm_cli_pool_recalc(struct ldlm_pool *pl)
- 	 * take into account pl->pl_recalc_time here.
- 	 */
- 	ret = ldlm_cancel_lru(container_of(pl, struct ldlm_namespace, ns_pool),
--			      0, LCF_ASYNC, LDLM_CANCEL_LRUR);
-+			      0, LCF_ASYNC, LDLM_LRU_FLAG_LRUR);
+ #define LDLM_LOCKREQ_HANDLES 2
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index 02c90b0..62304ba 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -560,7 +560,7 @@ struct ldlm_flock {
+ };
  
- out:
- 	spin_lock(&pl->pl_lock);
-@@ -339,7 +339,7 @@ static int ldlm_cli_pool_shrink(struct ldlm_pool *pl,
- 	if (nr == 0)
- 		return (unused / 100) * sysctl_vfs_cache_pressure;
- 	else
--		return ldlm_cancel_lru(ns, nr, LCF_ASYNC, LDLM_CANCEL_SHRINK);
-+		return ldlm_cancel_lru(ns, nr, LCF_ASYNC, LDLM_LRU_FLAG_SHRINK);
+ void ldlm_convert_policy_to_local(struct obd_export *exp, enum ldlm_type type,
+-				  const ldlm_wire_policy_data_t *wpolicy,
++				  const union ldlm_wire_policy_data *wpolicy,
+ 				  union ldlm_policy_data *lpolicy);
+ 
+ enum lvb_type {
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
+index 78cd70d..32b73ee 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
+@@ -240,7 +240,7 @@ void ldlm_extent_unlink_lock(struct ldlm_lock *lock)
+ 	}
  }
  
- static const struct ldlm_pool_ops ldlm_cli_pool_ops = {
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index b772982..c1f8693 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -593,7 +593,7 @@ int ldlm_prep_elc_req(struct obd_export *exp, struct ptlrpc_request *req,
- 		avail = ldlm_capsule_handles_avail(pill, RCL_CLIENT, canceloff);
- 
- 		flags = ns_connect_lru_resize(ns) ?
--			LDLM_CANCEL_LRUR_NO_WAIT : LDLM_CANCEL_AGED;
-+			LDLM_LRU_FLAG_LRUR_NO_WAIT : LDLM_LRU_FLAG_AGED;
- 		to_free = !ns_connect_lru_resize(ns) &&
- 			  opc == LDLM_ENQUEUE ? 1 : 0;
- 
-@@ -1057,7 +1057,7 @@ int ldlm_cli_cancel(const struct lustre_handle *lockh,
- 
- 		ns = ldlm_lock_to_ns(lock);
- 		flags = ns_connect_lru_resize(ns) ?
--			LDLM_CANCEL_LRUR : LDLM_CANCEL_AGED;
-+			LDLM_LRU_FLAG_LRUR : LDLM_LRU_FLAG_AGED;
- 		count += ldlm_cancel_lru_local(ns, &cancels, 0, avail - 1,
- 					       LCF_BL_AST, flags);
- 	}
-@@ -1284,21 +1284,21 @@ typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(
- static ldlm_cancel_lru_policy_t
- ldlm_cancel_lru_policy(struct ldlm_namespace *ns, int flags)
+-void ldlm_extent_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
++void ldlm_extent_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
+ 				      union ldlm_policy_data *lpolicy)
  {
--	if (flags & LDLM_CANCEL_NO_WAIT)
-+	if (flags & LDLM_LRU_FLAG_NO_WAIT)
- 		return ldlm_cancel_no_wait_policy;
+ 	memset(lpolicy, 0, sizeof(*lpolicy));
+@@ -250,7 +250,7 @@ void ldlm_extent_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
+ }
  
- 	if (ns_connect_lru_resize(ns)) {
--		if (flags & LDLM_CANCEL_SHRINK)
-+		if (flags & LDLM_LRU_FLAG_SHRINK)
- 			/* We kill passed number of old locks. */
- 			return ldlm_cancel_passed_policy;
--		else if (flags & LDLM_CANCEL_LRUR)
-+		else if (flags & LDLM_LRU_FLAG_LRUR)
- 			return ldlm_cancel_lrur_policy;
--		else if (flags & LDLM_CANCEL_PASSED)
-+		else if (flags & LDLM_LRU_FLAG_PASSED)
- 			return ldlm_cancel_passed_policy;
--		else if (flags & LDLM_CANCEL_LRUR_NO_WAIT)
-+		else if (flags & LDLM_LRU_FLAG_LRUR_NO_WAIT)
- 			return ldlm_cancel_lrur_no_wait_policy;
- 	} else {
--		if (flags & LDLM_CANCEL_AGED)
-+		if (flags & LDLM_LRU_FLAG_AGED)
- 			return ldlm_cancel_aged_policy;
- 	}
+ void ldlm_extent_policy_local_to_wire(const union ldlm_policy_data *lpolicy,
+-				      ldlm_wire_policy_data_t *wpolicy)
++				      union ldlm_wire_policy_data *wpolicy)
+ {
+ 	memset(wpolicy, 0, sizeof(*wpolicy));
+ 	wpolicy->l_extent.start = lpolicy->l_extent.start;
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+index 2683a7b..7221607 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+@@ -612,7 +612,7 @@ struct ldlm_flock_wait_data {
+ }
+ EXPORT_SYMBOL(ldlm_flock_completion_ast);
  
-@@ -1322,21 +1322,21 @@ typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(
-  *
-  * Calling policies for enabled LRU resize:
-  * ----------------------------------------
-- * flags & LDLM_CANCEL_LRUR - use LRU resize policy (SLV from server) to
-- *			    cancel not more than \a count locks;
-+ * flags & LDLM_LRU_FLAG_LRUR	- use LRU resize policy (SLV from server) to
-+ *				  cancel not more than \a count locks;
-  *
-- * flags & LDLM_CANCEL_PASSED - cancel \a count number of old locks (located at
-- *			      the beginning of LRU list);
-+ * flags & LDLM_LRU_FLAG_PASSED - cancel \a count number of old locks (located at
-+ *				  the beginning of LRU list);
-  *
-- * flags & LDLM_CANCEL_SHRINK - cancel not more than \a count locks according to
-- *			      memory pressure policy function;
-+ * flags & LDLM_LRU_FLAG_SHRINK - cancel not more than \a count locks according to
-+ *				  memory pressure policy function;
-  *
-- * flags & LDLM_CANCEL_AGED - cancel \a count locks according to "aged policy".
-+ * flags & LDLM_LRU_FLAG_AGED   - cancel \a count locks according to "aged policy".
-  *
-- * flags & LDLM_CANCEL_NO_WAIT - cancel as many unused locks as possible
-- *			       (typically before replaying locks) w/o
-- *			       sending any RPCs or waiting for any
-- *			       outstanding RPC to complete.
-+ * flags & LDLM_LRU_FLAG_NO_WAIT - cancel as many unused locks as possible
-+ *				   (typically before replaying locks) w/o
-+ *				   sending any RPCs or waiting for any
-+ *				   outstanding RPC to complete.
+-void ldlm_flock_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
++void ldlm_flock_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
+ 				     union ldlm_policy_data *lpolicy)
+ {
+ 	memset(lpolicy, 0, sizeof(*lpolicy));
+@@ -623,7 +623,7 @@ void ldlm_flock_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
+ }
+ 
+ void ldlm_flock_policy_local_to_wire(const union ldlm_policy_data *lpolicy,
+-				     ldlm_wire_policy_data_t *wpolicy)
++				     union ldlm_wire_policy_data *wpolicy)
+ {
+ 	memset(wpolicy, 0, sizeof(*wpolicy));
+ 	wpolicy->l_flock.lfw_start = lpolicy->l_flock.start;
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c b/drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c
+index 11b45ae..8e1709d 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c
+@@ -54,7 +54,7 @@
+ #include "../include/lustre_lib.h"
+ #include "ldlm_internal.h"
+ 
+-void ldlm_ibits_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
++void ldlm_ibits_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
+ 				     union ldlm_policy_data *lpolicy)
+ {
+ 	memset(lpolicy, 0, sizeof(*lpolicy));
+@@ -62,7 +62,7 @@ void ldlm_ibits_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
+ }
+ 
+ void ldlm_ibits_policy_local_to_wire(const union ldlm_policy_data *lpolicy,
+-				     ldlm_wire_policy_data_t *wpolicy)
++				     union ldlm_wire_policy_data *wpolicy)
+ {
+ 	memset(wpolicy, 0, sizeof(*wpolicy));
+ 	wpolicy->l_inodebits.bits = lpolicy->l_inodebits.bits;
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+index e2c3c6e..9085ee5 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+@@ -312,25 +312,25 @@ static inline int is_granted_or_cancelled(struct ldlm_lock *lock)
+ 	return ret;
+ }
+ 
+-typedef void (*ldlm_policy_wire_to_local_t)(const ldlm_wire_policy_data_t *,
++typedef void (*ldlm_policy_wire_to_local_t)(const union ldlm_wire_policy_data *,
+ 					    union ldlm_policy_data *);
+ 
+ typedef void (*ldlm_policy_local_to_wire_t)(const union ldlm_policy_data *,
+-					    ldlm_wire_policy_data_t *);
++					    union ldlm_wire_policy_data *);
+ 
+-void ldlm_plain_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
++void ldlm_plain_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
+ 				     union ldlm_policy_data *lpolicy);
+ void ldlm_plain_policy_local_to_wire(const union ldlm_policy_data *lpolicy,
+-				     ldlm_wire_policy_data_t *wpolicy);
+-void ldlm_ibits_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
++				     union ldlm_wire_policy_data *wpolicy);
++void ldlm_ibits_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
+ 				     union ldlm_policy_data *lpolicy);
+ void ldlm_ibits_policy_local_to_wire(const union ldlm_policy_data *lpolicy,
+-				     ldlm_wire_policy_data_t *wpolicy);
+-void ldlm_extent_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
++				     union ldlm_wire_policy_data *wpolicy);
++void ldlm_extent_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
+ 				      union ldlm_policy_data *lpolicy);
+ void ldlm_extent_policy_local_to_wire(const union ldlm_policy_data *lpolicy,
+-				      ldlm_wire_policy_data_t *wpolicy);
+-void ldlm_flock_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
++				      union ldlm_wire_policy_data *wpolicy);
++void ldlm_flock_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
+ 				     union ldlm_policy_data *lpolicy);
+ void ldlm_flock_policy_local_to_wire(const union ldlm_policy_data *lpolicy,
+-				     ldlm_wire_policy_data_t *wpolicy);
++				     union ldlm_wire_policy_data *wpolicy);
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index 3dc0a06..15eeb2b 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -82,7 +82,7 @@
   */
- static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
- 				 struct list_head *cancels, int count, int max,
-@@ -1345,7 +1345,7 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
- 	ldlm_cancel_lru_policy_t pf;
- 	struct ldlm_lock *lock, *next;
- 	int added = 0, unused, remained;
--	int no_wait = flags & (LDLM_CANCEL_NO_WAIT | LDLM_CANCEL_LRUR_NO_WAIT);
-+	int no_wait = flags & (LDLM_LRU_FLAG_NO_WAIT | LDLM_LRU_FLAG_LRUR_NO_WAIT);
+ static void ldlm_convert_policy_to_wire(enum ldlm_type type,
+ 					const union ldlm_policy_data *lpolicy,
+-					ldlm_wire_policy_data_t *wpolicy)
++					union ldlm_wire_policy_data *wpolicy)
+ {
+ 	ldlm_policy_local_to_wire_t convert;
  
- 	spin_lock(&ns->ns_lock);
- 	unused = ns->ns_nr_unused;
-@@ -2000,11 +2000,11 @@ static void ldlm_cancel_unused_locks_for_replay(struct ldlm_namespace *ns)
- 	       ldlm_ns_name(ns), ns->ns_nr_unused);
+@@ -95,7 +95,7 @@ static void ldlm_convert_policy_to_wire(enum ldlm_type type,
+  * Converts lock policy from on the wire lock_desc format to local format
+  */
+ void ldlm_convert_policy_to_local(struct obd_export *exp, enum ldlm_type type,
+-				  const ldlm_wire_policy_data_t *wpolicy,
++				  const union ldlm_wire_policy_data *wpolicy,
+ 				  union ldlm_policy_data *lpolicy)
+ {
+ 	ldlm_policy_wire_to_local_t convert;
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_plain.c b/drivers/staging/lustre/lustre/ldlm/ldlm_plain.c
+index 2603293..862ea0a 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_plain.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_plain.c
+@@ -54,14 +54,14 @@
  
- 	/* We don't need to care whether or not LRU resize is enabled
--	 * because the LDLM_CANCEL_NO_WAIT policy doesn't use the
-+	 * because the LDLM_LRU_FLAG_NO_WAIT policy doesn't use the
- 	 * count parameter
- 	 */
- 	canceled = ldlm_cancel_lru_local(ns, &cancels, ns->ns_nr_unused, 0,
--					 LCF_LOCAL, LDLM_CANCEL_NO_WAIT);
-+					 LCF_LOCAL, LDLM_LRU_FLAG_NO_WAIT);
+ #include "ldlm_internal.h"
  
- 	CDEBUG(D_DLMTRACE, "Canceled %d unused locks from namespace %s\n",
- 	       canceled, ldlm_ns_name(ns));
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index ca2cd4a..1095331 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -226,7 +226,7 @@ static ssize_t lru_size_store(struct kobject *kobj, struct attribute *attr,
+-void ldlm_plain_policy_wire_to_local(const ldlm_wire_policy_data_t *wpolicy,
++void ldlm_plain_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
+ 				     union ldlm_policy_data *lpolicy)
+ {
+ 	/* No policy for plain locks */
+ }
  
- 			/* Try to cancel all @ns_nr_unused locks. */
- 			canceled = ldlm_cancel_lru(ns, unused, 0,
--						   LDLM_CANCEL_PASSED);
-+						   LDLM_LRU_FLAG_PASSED);
- 			if (canceled < unused) {
- 				CDEBUG(D_DLMTRACE,
- 				       "not all requested locks are canceled, requested: %d, canceled: %d\n",
-@@ -237,7 +237,7 @@ static ssize_t lru_size_store(struct kobject *kobj, struct attribute *attr,
- 		} else {
- 			tmp = ns->ns_max_unused;
- 			ns->ns_max_unused = 0;
--			ldlm_cancel_lru(ns, 0, 0, LDLM_CANCEL_PASSED);
-+			ldlm_cancel_lru(ns, 0, 0, LDLM_LRU_FLAG_PASSED);
- 			ns->ns_max_unused = tmp;
- 		}
- 		return count;
-@@ -262,7 +262,7 @@ static ssize_t lru_size_store(struct kobject *kobj, struct attribute *attr,
- 		       "changing namespace %s unused locks from %u to %u\n",
- 		       ldlm_ns_name(ns), ns->ns_nr_unused,
- 		       (unsigned int)tmp);
--		ldlm_cancel_lru(ns, tmp, LCF_ASYNC, LDLM_CANCEL_PASSED);
-+		ldlm_cancel_lru(ns, tmp, LCF_ASYNC, LDLM_LRU_FLAG_PASSED);
+ void ldlm_plain_policy_local_to_wire(const union ldlm_policy_data *lpolicy,
+-				     ldlm_wire_policy_data_t *wpolicy)
++				     union ldlm_wire_policy_data *wpolicy)
+ {
+ 	/* No policy for plain locks */
+ }
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+index 39c4e18..2c9debb 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+@@ -2012,7 +2012,7 @@ static void lustre_swab_ldlm_res_id(struct ldlm_res_id *id)
+ 		__swab64s(&id->name[i]);
+ }
  
- 		if (!lru_resize) {
- 			CDEBUG(D_DLMTRACE,
-@@ -276,7 +276,7 @@ static ssize_t lru_size_store(struct kobject *kobj, struct attribute *attr,
- 		       ldlm_ns_name(ns), ns->ns_max_unused,
- 		       (unsigned int)tmp);
- 		ns->ns_max_unused = (unsigned int)tmp;
--		ldlm_cancel_lru(ns, 0, LCF_ASYNC, LDLM_CANCEL_PASSED);
-+		ldlm_cancel_lru(ns, 0, LCF_ASYNC, LDLM_LRU_FLAG_PASSED);
- 
- 		/* Make sure that LRU resize was originally supported before
- 		 * turning it on here.
+-static void lustre_swab_ldlm_policy_data(ldlm_wire_policy_data_t *d)
++static void lustre_swab_ldlm_policy_data(union ldlm_wire_policy_data *d)
+ {
+ 	/* the lock data is a union and the first two fields are always an
+ 	 * extent so it's ok to process an LDLM_EXTENT and LDLM_FLOCK lock
 -- 
 1.7.1
