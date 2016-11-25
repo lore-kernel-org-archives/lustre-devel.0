@@ -1,49 +1,34 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Fri, 25 Nov 2016 15:17:37 +0300
-Subject: [lustre-devel] [PATCH 08/10] staging: lustre: libcfs: remove
- NULL comparisons in headers
-In-Reply-To: <1479487724-20386-9-git-send-email-jsimmons@infradead.org>
-References: <1479487724-20386-1-git-send-email-jsimmons@infradead.org>
-	<1479487724-20386-9-git-send-email-jsimmons@infradead.org>
-Message-ID: <20161125120841.GC6266@mwanda>
+Date: Sat, 26 Nov 2016 01:12:41 +0300
+Subject: [lustre-devel] [PATCH v2] staging: lustre: osc: Performance
+	tune for LRU
+In-Reply-To: <1479942105-30220-1-git-send-email-jsimmons@infradead.org>
+References: <1479942105-30220-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <20161125221241.GN6266@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: James Simmons <jsimmons@infradead.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Fri, Nov 18, 2016 at 11:48:42AM -0500, James Simmons wrote:
-> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-> index 93bff1b..fc180b8 100644
-> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-> @@ -96,7 +96,7 @@
->  
->  #define LIBCFS_ALLOC_POST(ptr, size)					    \
->  do {									    \
-> -	if (unlikely((ptr) == NULL)) {					    \
-> +	if (!unlikely((ptr))) {						    \
+On Wed, Nov 23, 2016 at 06:01:45PM -0500, James Simmons wrote:
+> From: Jinshan Xiong <jinshan.xiong@intel.com>
+> 
+> Early launch page LRU work in osc_io_rw_iter_init();
+> Change the page LRU shrinking policy by OSC attributes;
+> Delete the contented lock osc_object::oo_seatbelt
+> 
 
-Argh....  No.  You did this with a Perl script?
+The cli_name() stuff should be in a separate patch.  It's hard to review
+this stuff (or possibly I just found the first deal breaker and gave
+up).
 
-This should be:
-
-	if (unlikely(!ptr)) { ...
-
->  		CERROR("LNET: out of memory at %s:%d (tried to alloc '"	    \
->  		       #ptr "' = %d)\n", __FILE__, __LINE__, (int)(size));  \
->  	} else {							    \
-> @@ -147,7 +147,7 @@
->  
->  #define LIBCFS_FREE(ptr, size)					  \
->  do {								    \
-> -	if (unlikely((ptr) == NULL)) {				  \
-> +	if (!unlikely((ptr))) {						\
-
-Same.
-
-Otherwise the unlikely hint is reversed from what we want.
+Anyway, please review this again and break it up into separate patches.
 
 regards,
 dan carpenter
+
+PS:  I glanced at the patch again and the very first line is changing
+"lru" to "LRU" in a comment.  We'll get a million performance increases
+from that I bet.  Don't mix random white space changes into it...
