@@ -1,117 +1,177 @@
-From: Austin S. Hemmelgarn <ahferroin7@gmail.com>
-Date: Thu, 10 Nov 2016 12:25:37 -0000
-Subject: [lustre-devel] [PATCH] f2fs: support multiple devices
-In-Reply-To: <4ec4d8f2-da23-762d-ba81-12e76ed09793@cn.fujitsu.com>
-References: <20161109205653.70061-1-jaegeuk@kernel.org>
-	<0D1876A8-BB77-4C1A-BE4F-B4A0E81DD4EA@dilger.ca>
-	<4ec4d8f2-da23-762d-ba81-12e76ed09793@cn.fujitsu.com>
-Message-ID: <749156c9-2b3e-4210-a89b-2d664f9d2fc2@gmail.com>
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date: Sat, 26 Nov 2016 23:14:54 -0000
+Subject: [lustre-devel] [PATCH 21/22] staging/lustre/libcfs: Convert to
+	hotplug state machine
+In-Reply-To: <20161126231350.10321-1-bigeasy@linutronix.de>
+References: <20161126231350.10321-1-bigeasy@linutronix.de>
+Message-ID: <20161126231350.10321-22-bigeasy@linutronix.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Qu Wenruo <quwenruo@cn.fujitsu.com>, Andreas Dilger <adilger@dilger.ca>, Jaegeuk Kim <jaegeuk@kernel.org>
-Cc: LKML <linux-kernel@vger.kernel.org>, Lustre Development <lustre-devel@lists.lustre.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, linux-f2fs-devel@lists.sourceforge.net, linux-btrfs <linux-btrfs@vger.kernel.org>, "Darrick J. Wong" <darrick.wong@oracle.com>
+To: linux-kernel@vger.kernel.org
+Cc: rt@linutronix.de, tglx@linutronix.de, Anna-Maria Gleixner <anna-maria@linutronix.de>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-On 2016-11-09 21:29, Qu Wenruo wrote:
->
->
-> At 11/10/2016 06:57 AM, Andreas Dilger wrote:
->> On Nov 9, 2016, at 1:56 PM, Jaegeuk Kim <jaegeuk@kernel.org> wrote:
->>>
->>> This patch implements multiple devices support for f2fs.
->>> Given multiple devices by mkfs.f2fs, f2fs shows them entirely as one big
->>> volume under one f2fs instance.
->>>
->>> Internal block management is very simple, but we will modify block
->>> allocation and background GC policy to boost IO speed by exploiting them
->>> accoording to each device speed.
->>
->> How will you integrate this into FIEMAP, since it is now possible if a
->> file is split across multiple devices then it will return ambiguous block
->> numbers for a file.  I've been meaning to merge the FIEMAP handling in
->> Lustre to support multiple devices in a single filesystem, so that this
->> can be detected in userspace.
->>
->> struct ll_fiemap_extent {
->>         __u64 fe_logical;  /* logical offset in bytes for the start of
->>                             * the extent from the beginning of the file
->>                             */
->>         __u64 fe_physical; /* physical offset in bytes for the start
->>                             * of the extent from the beginning of the
->> disk
->>                             */
->>         __u64 fe_length;   /* length in bytes for this extent */
->>         __u64 fe_reserved64[2];
->>         __u32 fe_flags;    /* FIEMAP_EXTENT_* flags for this extent */
->>         __u32 fe_device;   /* device number for this extent */
->>         __u32 fe_reserved[2];
->> };
->
-> Btrfs introduce a new layer for multi-device (even for single device).
->
-> So fiemap returned by btrfs is never real device bytenr, but logical
-> address in btrfs logical address space.
-> Much like traditional soft RAID.
-This is a really important point.  BTRFS does a good job of segregating 
-the layers here, so the file-level allocator really has very limited 
-knowledge of the underlying storage, which in turn means that adding 
-this to BTRFS would likely be a pretty invasive change for the FIEMAP 
-implementation.
->
->>
->> This adds the 32-bit "fe_device" field, which would optionally be filled
->> in by the filesystem (zero otherwise).  It would return the kernel device
->> number (i.e. st_dev), or for network filesystem (with FIEMAP_EXTENT_NET
->> set) this could just return an integer device number since the device
->> number is meaningless (and may conflict) on a remote system.
->>
->> Since AFAIK Btrfs also has multiple device support there are an
->> increasing
->> number of places where this would be useful.
->
-> AFAIK, btrfs multi-device is here due to scrub with its data/meta csum.
-It's also here for an attempt at parity with ZFS.
->
-> Unlike device-mapper based multi-device, btrfs has csum so it can detect
-> which mirror is correct.
-> This makes btrfs scrub a little better than soft raid.
-> For example, for RAID1 if two mirror differs from each other, btrfs can
-> find the correct one and rewrite it into the other mirror.
->
-> And further more, btrfs supports snapshot and is faster than
-> device-mapper based snapshot(LVM).
-> This makes it a little more worthy to implement multi-device support in
-> btrfs.
->
->
-> But for f2fs, no data csum, no snapshot.
-> I don't really see the point to use so many codes to implement it,
-> especially we can use mdadm or LVM to implement it.
-I'd tend to agree on this, if it weren't for the fact that this looks to 
-me like preparation for implementing storage tiering, which neither LVM 
-nor MD have a good implementation of.  Whether or not such functionality 
-is worthwhile for the embedded systems that F2FS typically targets is 
-another story of course.
->
->
-> Not to mention btrfs multi-device support still has quite a lot of bugs,
-> like scrub can corrupt correct data stripes.
-This sounds like you're lumping raid5/6 code in with the general 
-multi-device code, which is not a good way of describing things for 
-multiple reasons.  Pretty much, if you're using just raid1 mode, without 
-compression, on reasonable storage devices, things are rock-solid 
-relative to the rest of BTRFS.
+From: Anna-Maria Gleixner <anna-maria@linutronix.de>
 
-Yes, there is a bug with compression and multiple copies of things, but 
-that requires a pretty spectacular device failure to manifest, and it 
-impacts single device mode too (it happens in dup profiles as well as 
-raid1).  As far as the raid5/6 stuff, that shouldn't have been merged in 
-the state it was in when it got merged, and should probably just be 
-rewritten from the ground up.
->
-> Personally speaking, I am not a fan of btrfs multi-device management,
-> despite the above advantage.
-> As the complexity is really not worthy.
-> (So I think XFS with LVM is much better than Btrfs considering the
-> stability)
+Install the callbacks via the state machine.
+
+Cc: Oleg Drokin <oleg.drokin@intel.com>
+Cc: Andreas Dilger <andreas.dilger@intel.com>
+Cc: James Simmons <jsimmons@infradead.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: lustre-devel at lists.lustre.org
+Cc: devel at driverdev.osuosl.org
+Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   | 89 ++++++++++++----------
+ include/linux/cpuhotplug.h                         |  1 +
+ 2 files changed, 50 insertions(+), 40 deletions(-)
+
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+index e8b1a61420de..a75113ab2903 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+@@ -73,6 +73,9 @@ struct cfs_cpt_data {
+ };
+ 
+ static struct cfs_cpt_data	cpt_data;
++#ifdef CONFIG_HOTPLUG_CPU
++static enum cpuhp_state lustre_cpu_online;
++#endif
+ 
+ static void
+ cfs_node_to_cpumask(int node, cpumask_t *mask)
+@@ -942,48 +945,38 @@ cfs_cpt_table_create_pattern(char *pattern)
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-static int
+-cfs_cpu_notify(struct notifier_block *self, unsigned long action, void *hcpu)
++
++static void cfs_cpu_incr_cpt_version(void)
+ {
+-	unsigned int  cpu = (unsigned long)hcpu;
+-	bool	     warn;
+-
+-	switch (action) {
+-	case CPU_DEAD:
+-	case CPU_DEAD_FROZEN:
+-	case CPU_ONLINE:
+-	case CPU_ONLINE_FROZEN:
+-		spin_lock(&cpt_data.cpt_lock);
+-		cpt_data.cpt_version++;
+-		spin_unlock(&cpt_data.cpt_lock);
+-		/* Fall through */
+-	default:
+-		if (action != CPU_DEAD && action != CPU_DEAD_FROZEN) {
+-			CDEBUG(D_INFO, "CPU changed [cpu %u action %lx]\n",
+-			       cpu, action);
+-			break;
+-		}
+-
+-		mutex_lock(&cpt_data.cpt_mutex);
+-		/* if all HTs in a core are offline, it may break affinity */
+-		cpumask_copy(cpt_data.cpt_cpumask,
+-			     topology_sibling_cpumask(cpu));
+-		warn = cpumask_any_and(cpt_data.cpt_cpumask,
+-				       cpu_online_mask) >= nr_cpu_ids;
+-		mutex_unlock(&cpt_data.cpt_mutex);
+-		CDEBUG(warn ? D_WARNING : D_INFO,
+-		       "Lustre: can't support CPU plug-out well now, performance and stability could be impacted [CPU %u action: %lx]\n",
+-		       cpu, action);
+-	}
+-
+-	return NOTIFY_OK;
++	spin_lock(&cpt_data.cpt_lock);
++	cpt_data.cpt_version++;
++	spin_unlock(&cpt_data.cpt_lock);
+ }
+ 
+-static struct notifier_block cfs_cpu_notifier = {
+-	.notifier_call	= cfs_cpu_notify,
+-	.priority	= 0
+-};
++static int cfs_cpu_online(unsigned int cpu)
++{
++	cfs_cpu_incr_cpt_version();
++	return 0;
++}
+ 
++static int cfs_cpu_dead(unsigned int cpu)
++{
++	bool warn;
++	int next;
++
++	cfs_cpu_incr_cpt_version();
++
++	mutex_lock(&cpt_data.cpt_mutex);
++	/* if all HTs in a core are offline, it may break affinity */
++	cpumask_copy(cpt_data.cpt_cpumask, topology_sibling_cpumask(cpu));
++	next = cpumask_any_and(cpt_data.cpt_cpumask, cpu_online_mask);
++	warn = next >= nr_cpu_ids;
++	mutex_unlock(&cpt_data.cpt_mutex);
++	CDEBUG(warn ? D_WARNING : D_INFO,
++	       "Lustre: can't support CPU plug-out well now, performance and stability could be impacted [CPU %u]\n",
++	       cpu);
++	return 0;
++}
+ #endif
+ 
+ void
+@@ -993,7 +986,9 @@ cfs_cpu_fini(void)
+ 		cfs_cpt_table_free(cfs_cpt_table);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-	unregister_hotcpu_notifier(&cfs_cpu_notifier);
++	if (lustre_cpu_online)
++		cpuhp_remove_state_nocalls(lustre_cpu_online);
++	cpuhp_remove_state_nocalls(CPUHP_LUSTRE_CFS_DEAD);
+ #endif
+ 	if (cpt_data.cpt_cpumask)
+ 		LIBCFS_FREE(cpt_data.cpt_cpumask, cpumask_size());
+@@ -1002,6 +997,10 @@ cfs_cpu_fini(void)
+ int
+ cfs_cpu_init(void)
+ {
++#ifdef CONFIG_HOTPLUG_CPU
++	int ret;
++#endif
++
+ 	LASSERT(!cfs_cpt_table);
+ 
+ 	memset(&cpt_data, 0, sizeof(cpt_data));
+@@ -1016,7 +1015,17 @@ cfs_cpu_init(void)
+ 	mutex_init(&cpt_data.cpt_mutex);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-	register_hotcpu_notifier(&cfs_cpu_notifier);
++	ret = cpuhp_setup_state_nocalls(CPUHP_LUSTRE_CFS_DEAD,
++					"staging/lustre/cfe:dead", NULL,
++					cfs_cpu_dead);
++	if (ret < 0)
++		goto failed;
++	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
++					"staging/lustre/cfe:online",
++					cfs_cpu_online, NULL);
++	if (ret < 0)
++		goto failed;
++	lustre_cpu_online = ret;
+ #endif
+ 
+ 	if (*cpu_pattern != 0) {
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 22acee76cf4c..141c3be242d1 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -41,6 +41,7 @@ enum cpuhp_state {
+ 	CPUHP_NET_DEV_DEAD,
+ 	CPUHP_PCI_XGENE_DEAD,
+ 	CPUHP_IOMMU_INTEL_DEAD,
++	CPUHP_LUSTRE_CFS_DEAD,
+ 	CPUHP_WORKQUEUE_PREP,
+ 	CPUHP_POWER_NUMA_PREPARE,
+ 	CPUHP_HRTIMERS_PREPARE,
+-- 
+2.10.2
