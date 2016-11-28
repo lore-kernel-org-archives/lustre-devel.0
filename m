@@ -1,37 +1,38 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sat, 26 Nov 2016 06:22:49 +0000
-Subject: [lustre-devel] [patch] staging: lustre: lnet: memory corruption
-	in selftest
-In-Reply-To: <20161124110934.GG17225@mwanda>
-References: <20161124110934.GG17225@mwanda>
-Message-ID: <D14C4EE2-8EB5-472C-B3EE-2486C0718F1C@intel.com>
+From: Geerdes, Trent <trent.geerdes@intel.com>
+Date: Mon, 28 Nov 2016 17:31:29 +0000
+Subject: [lustre-devel] Intel HPDD Maintenance Notification
+Message-ID: <FA3271B2-4409-4142-A135-92101243915D@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Nov 24, 2016, at 04:10, Dan Carpenter <dan.carpenter@oracle.com> wrote:
-> 
-> We want sizeof(struct lstcon_node) but instead we're getting the sizeof
-> a pointer.
-> 
-> Fixes: 8d78f0f2ba76 ("staging: lustre: lnet: cleanup some of the > 80 line issues")
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Intel High Performance Data Division
+Maintenance Notification
 
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+WHAT and WHEN:
 
-> 
-> diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-> index f2d11fa..f750b9c 100644
-> --- a/drivers/staging/lustre/lnet/selftest/console.c
-> +++ b/drivers/staging/lustre/lnet/selftest/console.c
-> @@ -86,7 +86,7 @@ lstcon_node_find(lnet_process_id_t id, struct lstcon_node **ndpp, int create)
-> 	if (!create)
-> 		return -ENOENT;
-> 
-> -	LIBCFS_ALLOC(*ndpp, sizeof(*ndpp) + sizeof(*ndl));
-> +	LIBCFS_ALLOC(*ndpp, sizeof(**ndpp) + sizeof(*ndl));
-> 	if (!*ndpp)
-> 		return -ENOMEM;
-> 
+    On Thursday Dec 1, 2016 8:00am - 1:00pm Mountain time the following sites will be unavailable.
+
+    https://jira.hpdd.intel.com
+    https://wiki.hpdd.intel.com
+    http://review.whamcloud.com
+    http://git.whamcloud.com
+    http://downloads.hpdd.intel.com
+
+    Jenkins (https://build.hpdd.intel.com) will be available but jobs will be paused during the maintenance window.
+
+
+WHY:
+
+    The applications are being moved to new servers with more resources.
+    The applications are being upgraded to newer versions.
+
+
+QUESTIONS:
+
+    For questions or concerns contact
+
+    Trent Geerdes
+    e-mail: trent.geerdes at intel.com
