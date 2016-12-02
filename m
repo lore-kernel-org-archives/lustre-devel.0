@@ -1,239 +1,58 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri,  2 Dec 2016 14:40:47 -0500
-Subject: [lustre-devel] [PATCH 3/6] staging: lustre: obdclass: Create a
-	header for obdo related functions
-In-Reply-To: <1480707650-24089-1-git-send-email-jsimmons@infradead.org>
-References: <1480707650-24089-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1480707650-24089-4-git-send-email-jsimmons@infradead.org>
+Date: Fri,  2 Dec 2016 14:40:44 -0500
+Subject: [lustre-devel] [PATCH 0/6] Fix ups to make lustre_idl.h a proper
+	UAPI header
+Message-ID: <1480707650-24089-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Ben Evans <bevans@cray.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Ben Evans <bevans@cray.com>
+The header lustre_idl.h is a UAPI header which contains extras
+that don't belong. This patch set moves a bunch of very kernel
+specific material out of the header. Lastly proper byteorder
+functions are used so this file can build in user space as well.
 
-Remove all obdo related functions from lustre_idl.h
-Create lustre_odbo.h. Include where appropriate.
-Make the functions lustre_get_wire_obdo and
-lustre_set_wire_obdo to not be inlined functions.
+Ben Evans (5):
+  staging: lustre: headers: move swab functions to new header files
+  staging: lustre: headers: sort headers affected by swab move
+  staging: lustre: obdclass: Create a header for obdo related functions
+  staging: lustre: headers: sort headers affected by obdo move
+  staging: lustre: headers: Move functions out of lustre_idl.h
 
-Signed-off-by: Ben Evans <bevans@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
-Reviewed-on: http://review.whamcloud.com/16917
-Reviewed-on: http://review.whamcloud.com/19266
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- .../lustre/lustre/include/lustre/lustre_idl.h      |   46 -----------------
- .../staging/lustre/lustre/include/lustre_obdo.h    |   54 ++++++++++++++++++++
- drivers/staging/lustre/lustre/obdclass/obdo.c      |   54 ++++++++++++++++++++
+James Simmons (1):
+  staging: lustre: headers: use proper byteorder functions in lustre_idl.h
+
+ drivers/staging/lustre/lustre/include/llog_swab.h  |   65 +++++
+ .../staging/lustre/lustre/include/lprocfs_status.h |    2 +
+ .../lustre/lustre/include/lustre/lustre_idl.h      |  289 ++------------------
+ .../lustre/lustre/include/lustre/lustre_user.h     |    2 -
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |   13 +
+ .../staging/lustre/lustre/include/lustre_obdo.h    |   54 ++++
+ drivers/staging/lustre/lustre/include/lustre_sec.h |    1 +
+ .../staging/lustre/lustre/include/lustre_swab.h    |  108 ++++++++
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |    6 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |    1 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   27 ++
+ drivers/staging/lustre/lustre/llite/dir.c          |    2 +
+ drivers/staging/lustre/lustre/llite/file.c         |    1 +
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |   18 +-
+ drivers/staging/lustre/lustre/lov/lov_pack.c       |    7 +-
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c        |    6 +
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    4 +-
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |   13 +-
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |    8 +-
+ drivers/staging/lustre/lustre/obdclass/llog.c      |    3 +-
+ drivers/staging/lustre/lustre/obdclass/llog_swab.c |    1 +
+ .../staging/lustre/lustre/obdclass/obd_config.c    |    7 +-
+ drivers/staging/lustre/lustre/obdclass/obdo.c      |   54 ++++
  drivers/staging/lustre/lustre/osc/osc_io.c         |    2 +
- 4 files changed, 110 insertions(+), 46 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_request.c    |   13 +-
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      |   12 +-
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |    9 +-
+ 27 files changed, 430 insertions(+), 298 deletions(-)
+ create mode 100644 drivers/staging/lustre/lustre/include/llog_swab.h
  create mode 100644 drivers/staging/lustre/lustre/include/lustre_obdo.h
-
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 6831e4d..52bef77 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -3126,52 +3126,6 @@ struct obdo {
- #define o_cksum   o_nlink
- #define o_grant_used o_data_version
- 
--static inline void lustre_set_wire_obdo(const struct obd_connect_data *ocd,
--					struct obdo *wobdo,
--					const struct obdo *lobdo)
--{
--	*wobdo = *lobdo;
--	wobdo->o_flags &= ~OBD_FL_LOCAL_MASK;
--	if (!ocd)
--		return;
--
--	if (unlikely(!(ocd->ocd_connect_flags & OBD_CONNECT_FID)) &&
--	    fid_seq_is_echo(ostid_seq(&lobdo->o_oi))) {
--		/* Currently OBD_FL_OSTID will only be used when 2.4 echo
--		 * client communicate with pre-2.4 server
--		 */
--		wobdo->o_oi.oi.oi_id = fid_oid(&lobdo->o_oi.oi_fid);
--		wobdo->o_oi.oi.oi_seq = fid_seq(&lobdo->o_oi.oi_fid);
--	}
--}
--
--static inline void lustre_get_wire_obdo(const struct obd_connect_data *ocd,
--					struct obdo *lobdo,
--					const struct obdo *wobdo)
--{
--	__u32 local_flags = 0;
--
--	if (lobdo->o_valid & OBD_MD_FLFLAGS)
--		local_flags = lobdo->o_flags & OBD_FL_LOCAL_MASK;
--
--	*lobdo = *wobdo;
--	if (local_flags != 0) {
--		lobdo->o_valid |= OBD_MD_FLFLAGS;
--		lobdo->o_flags &= ~OBD_FL_LOCAL_MASK;
--		lobdo->o_flags |= local_flags;
--	}
--	if (!ocd)
--		return;
--
--	if (unlikely(!(ocd->ocd_connect_flags & OBD_CONNECT_FID)) &&
--	    fid_seq_is_echo(wobdo->o_oi.oi.oi_seq)) {
--		/* see above */
--		lobdo->o_oi.oi_fid.f_seq = wobdo->o_oi.oi.oi_seq;
--		lobdo->o_oi.oi_fid.f_oid = wobdo->o_oi.oi.oi_id;
--		lobdo->o_oi.oi_fid.f_ver = 0;
--	}
--}
--
- /* request structure for OST's */
- struct ost_body {
- 	struct  obdo oa;
-diff --git a/drivers/staging/lustre/lustre/include/lustre_obdo.h b/drivers/staging/lustre/lustre/include/lustre_obdo.h
-new file mode 100644
-index 0000000..1e12f8c
---- /dev/null
-+++ b/drivers/staging/lustre/lustre/include/lustre_obdo.h
-@@ -0,0 +1,54 @@
-+/*
-+ * GPL HEADER START
-+ *
-+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 only,
-+ * as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 for more details (a copy is included
-+ * in the LICENSE file that accompanied this code).
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 along with this program; If not, see
-+ * http://www.gnu.org/licenses/gpl-2.0.html
-+ *
-+ * GPL HEADER END
-+ */
-+/*
-+ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-+ * Use is subject to license terms.
-+ *
-+ * Copyright (c) 2011, 2014, Intel Corporation.
-+ *
-+ * Copyright 2015 Cray Inc, all rights reserved.
-+ * Author: Ben Evans.
-+ *
-+ * Define obdo associated functions
-+ *   obdo:  OBject Device o...
-+ */
-+
-+#ifndef _LUSTRE_OBDO_H_
-+#define _LUSTRE_OBDO_H_
-+
-+#include "lustre/lustre_idl.h"
-+
-+/**
-+ * Create an obdo to send over the wire
-+ */
-+void lustre_set_wire_obdo(const struct obd_connect_data *ocd,
-+			  struct obdo *wobdo,
-+			  const struct obdo *lobdo);
-+
-+/**
-+ * Create a local obdo from a wire based odbo
-+ */
-+void lustre_get_wire_obdo(const struct obd_connect_data *ocd,
-+			  struct obdo *lobdo,
-+			  const struct obdo *wobdo);
-+
-+#endif
-diff --git a/drivers/staging/lustre/lustre/obdclass/obdo.c b/drivers/staging/lustre/lustre/obdclass/obdo.c
-index c52b9e0..b1dfa16 100644
---- a/drivers/staging/lustre/lustre/obdclass/obdo.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obdo.c
-@@ -40,6 +40,7 @@
- 
- #include "../include/obd_class.h"
- #include "../include/lustre/lustre_idl.h"
-+#include "../include/lustre_obdo.h"
- 
- void obdo_set_parent_fid(struct obdo *dst, const struct lu_fid *parent)
- {
-@@ -124,3 +125,56 @@ void obdo_to_ioobj(const struct obdo *oa, struct obd_ioobj *ioobj)
- 	ioobj->ioo_max_brw = 0;
- }
- EXPORT_SYMBOL(obdo_to_ioobj);
-+
-+/**
-+ * Create an obdo to send over the wire
-+ */
-+void lustre_set_wire_obdo(const struct obd_connect_data *ocd,
-+			  struct obdo *wobdo, const struct obdo *lobdo)
-+{
-+	*wobdo = *lobdo;
-+	wobdo->o_flags &= ~OBD_FL_LOCAL_MASK;
-+	if (!ocd)
-+		return;
-+
-+	if (unlikely(!(ocd->ocd_connect_flags & OBD_CONNECT_FID)) &&
-+	    fid_seq_is_echo(ostid_seq(&lobdo->o_oi))) {
-+		/*
-+		 * Currently OBD_FL_OSTID will only be used when 2.4 echo
-+		 * client communicate with pre-2.4 server
-+		 */
-+		wobdo->o_oi.oi.oi_id = fid_oid(&lobdo->o_oi.oi_fid);
-+		wobdo->o_oi.oi.oi_seq = fid_seq(&lobdo->o_oi.oi_fid);
-+	}
-+}
-+EXPORT_SYMBOL(lustre_set_wire_obdo);
-+
-+/**
-+ * Create a local obdo from a wire based odbo
-+ */
-+void lustre_get_wire_obdo(const struct obd_connect_data *ocd,
-+			  struct obdo *lobdo, const struct obdo *wobdo)
-+{
-+	u32 local_flags = 0;
-+
-+	if (lobdo->o_valid & OBD_MD_FLFLAGS)
-+		local_flags = lobdo->o_flags & OBD_FL_LOCAL_MASK;
-+
-+	*lobdo = *wobdo;
-+	if (local_flags) {
-+		lobdo->o_valid |= OBD_MD_FLFLAGS;
-+		lobdo->o_flags &= ~OBD_FL_LOCAL_MASK;
-+		lobdo->o_flags |= local_flags;
-+	}
-+	if (!ocd)
-+		return;
-+
-+	if (unlikely(!(ocd->ocd_connect_flags & OBD_CONNECT_FID)) &&
-+	    fid_seq_is_echo(wobdo->o_oi.oi.oi_seq)) {
-+		/* see above */
-+		lobdo->o_oi.oi_fid.f_seq = wobdo->o_oi.oi.oi_seq;
-+		lobdo->o_oi.oi_fid.f_oid = wobdo->o_oi.oi.oi_id;
-+		lobdo->o_oi.oi_fid.f_ver = 0;
-+	}
-+}
-+EXPORT_SYMBOL(lustre_get_wire_obdo);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
-index 97b012d..443a54e 100644
---- a/drivers/staging/lustre/lustre/osc/osc_io.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_io.c
-@@ -37,6 +37,8 @@
- 
- #define DEBUG_SUBSYSTEM S_OSC
- 
-+#include "../include/lustre_obdo.h"
-+
- #include "osc_cl_internal.h"
- 
- /** \addtogroup osc
--- 
-1.7.1
+ create mode 100644 drivers/staging/lustre/lustre/include/lustre_swab.h
