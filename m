@@ -1,69 +1,36 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Fri,  2 Dec 2016 19:53:28 -0500
-Subject: [lustre-devel] [PATCH 21/22] staging: lustre: remove set but unused
-	variables
-In-Reply-To: <1480726409-20350-1-git-send-email-jsimmons@infradead.org>
-References: <1480726409-20350-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1480726409-20350-22-git-send-email-jsimmons@infradead.org>
+From: gregkh at linuxfoundation.org <gregkh@linuxfoundation.org>
+Date: Sat, 3 Dec 2016 09:55:50 +0100
+Subject: [lustre-devel] Remaining work needed for moving Lustre out of
+	staging
+In-Reply-To: <1E1B324A-F545-417D-9C35-550FA58665C7@intel.com>
+References: <1E1B324A-F545-417D-9C35-550FA58665C7@intel.com>
+Message-ID: <20161203085550.GA5375@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Yang Sheng <yang.sheng@intel.com>, James Simmons <jsimmons@infradead.org>
+To: "Dilger, Andreas" <andreas.dilger@intel.com>
+Cc: "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "jsimmons@infradead.org" <jsimmons@infradead.org>, "Drokin, Oleg" <oleg.drokin@intel.com>
 
-From: Yang Sheng <yang.sheng@intel.com>
+On Fri, Dec 02, 2016 at 09:53:08PM +0000, Dilger, Andreas wrote:
+> Al,
+> Greg recently raised the issue of what still needs to be done to
+> move the Lustre code out of staging/ and into the fs/ tree. 
+> 
+> James has been doing a great job of cleaning up various checkpatch
+> issues and keeping the code updated with the latest fixes, but we
+> were wondering what you were aware of that needed to be cleaned
+> up in Lustre?
 
-Remove set but unused variables in nidstring.c
-and osc_request.c as reported by make W=1.
+Is the whole "mixing kernel structures in userspace structures" all
+resolved now?  For some reason I thought that you had kernel locks being
+passed to userspace and then back into the kernel, but it's been a long
+time since I last looked...
 
-Signed-off-by: Yang Sheng <yang.sheng@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8378
-Reviewed-on: http://review.whamcloud.com/23221
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: Emoly Liu <emoly.liu@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lnet/lnet/nidstrings.c   |    2 --
- drivers/staging/lustre/lustre/osc/osc_request.c |    3 +--
- 2 files changed, 1 insertions(+), 4 deletions(-)
+If you feel you are ready for a "real" review, I'll be glad to go over
+the code before the vfs people look at it, just let me know.  No need to
+bother them if you still have basic things wrong that I can find...
 
-diff --git a/drivers/staging/lustre/lnet/lnet/nidstrings.c b/drivers/staging/lustre/lnet/lnet/nidstrings.c
-index e1f1ca8..a9fe3e6 100644
---- a/drivers/staging/lustre/lnet/lnet/nidstrings.c
-+++ b/drivers/staging/lustre/lnet/lnet/nidstrings.c
-@@ -247,10 +247,8 @@ struct addrrange {
- {
- 	struct cfs_lstr addrrange;
- 	struct cfs_lstr net;
--	struct cfs_lstr tmp;
- 	struct nidrange *nr;
- 
--	tmp = *src;
- 	if (!cfs_gettok(src, '@', &addrrange))
- 		goto failed;
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 0977127..0c50225 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -933,7 +933,6 @@ static u32 osc_checksum_bulk(int nob, u32 pg_count,
- 	int i = 0;
- 	struct cfs_crypto_hash_desc *hdesc;
- 	unsigned int bufsize;
--	int err;
- 	unsigned char cfs_alg = cksum_obd2cfs(cksum_type);
- 
- 	LASSERT(pg_count > 0);
-@@ -975,7 +974,7 @@ static u32 osc_checksum_bulk(int nob, u32 pg_count,
- 	}
- 
- 	bufsize = sizeof(cksum);
--	err = cfs_crypto_hash_final(hdesc, (unsigned char *)&cksum, &bufsize);
-+	cfs_crypto_hash_final(hdesc, (unsigned char *)&cksum, &bufsize);
- 
- 	/* For sending we only compute the wrong checksum instead
- 	 * of corrupting the data so it is still correct on a redo
--- 
-1.7.1
+thanks,
+
+greg k-h
