@@ -1,81 +1,69 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri,  2 Dec 2016 19:53:21 -0500
-Subject: [lustre-devel] [PATCH 14/22] staging: lustre: obd: add callback for
-	llog_cat_process_or_fork
+Date: Fri,  2 Dec 2016 19:53:28 -0500
+Subject: [lustre-devel] [PATCH 21/22] staging: lustre: remove set but unused
+	variables
 In-Reply-To: <1480726409-20350-1-git-send-email-jsimmons@infradead.org>
 References: <1480726409-20350-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1480726409-20350-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <1480726409-20350-22-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Alexander Boyko <alexander.boyko@seagate.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Yang Sheng <yang.sheng@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Alexander Boyko <alexander.boyko@seagate.com>
+From: Yang Sheng <yang.sheng@intel.com>
 
-Currently llog_process_or_fork() is hard coded to
-always pass the function pointer llog_cat_process_cb().
-Change llog_cat_process_or_fork() to pass in any
-function pointer which will allow us more options
-for llog_cat callback routines in the future.
+Remove set but unused variables in nidstring.c
+and osc_request.c as reported by make W=1.
 
-Signed-off-by: Alexander Boyko <alexander.boyko@seagate.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7156
-Seagate-bug-id: MRP-2383
-Reviewed-on: http://review.whamcloud.com/16416
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
+Signed-off-by: Yang Sheng <yang.sheng@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8378
+Reviewed-on: http://review.whamcloud.com/23221
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: Emoly Liu <emoly.liu@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/obdclass/llog_cat.c |   16 +++++++---------
- 1 files changed, 7 insertions(+), 9 deletions(-)
+ drivers/staging/lustre/lnet/lnet/nidstrings.c   |    2 --
+ drivers/staging/lustre/lustre/osc/osc_request.c |    3 +--
+ 2 files changed, 1 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/llog_cat.c b/drivers/staging/lustre/lustre/obdclass/llog_cat.c
-index ce8e2f6..de9d01d 100644
---- a/drivers/staging/lustre/lustre/obdclass/llog_cat.c
-+++ b/drivers/staging/lustre/lustre/obdclass/llog_cat.c
-@@ -188,7 +188,8 @@ static int llog_cat_process_cb(const struct lu_env *env,
- 
- static int llog_cat_process_or_fork(const struct lu_env *env,
- 				    struct llog_handle *cat_llh,
--				    llog_cb_t cb, void *data, int startcat,
-+				    llog_cb_t cat_cb, llog_cb_t cb,
-+				    void *data, int startcat,
- 				    int startidx, bool fork)
+diff --git a/drivers/staging/lustre/lnet/lnet/nidstrings.c b/drivers/staging/lustre/lnet/lnet/nidstrings.c
+index e1f1ca8..a9fe3e6 100644
+--- a/drivers/staging/lustre/lnet/lnet/nidstrings.c
++++ b/drivers/staging/lustre/lnet/lnet/nidstrings.c
+@@ -247,10 +247,8 @@ struct addrrange {
  {
- 	struct llog_process_data d;
-@@ -209,18 +210,15 @@ static int llog_cat_process_or_fork(const struct lu_env *env,
+ 	struct cfs_lstr addrrange;
+ 	struct cfs_lstr net;
+-	struct cfs_lstr tmp;
+ 	struct nidrange *nr;
  
- 		cd.lpcd_first_idx = llh->llh_cat_idx;
- 		cd.lpcd_last_idx = 0;
--		rc = llog_process_or_fork(env, cat_llh, llog_cat_process_cb,
--					  &d, &cd, fork);
-+		rc = llog_process_or_fork(env, cat_llh, cat_cb, &d, &cd, fork);
- 		if (rc != 0)
- 			return rc;
+-	tmp = *src;
+ 	if (!cfs_gettok(src, '@', &addrrange))
+ 		goto failed;
  
- 		cd.lpcd_first_idx = 0;
- 		cd.lpcd_last_idx = cat_llh->lgh_last_idx;
--		rc = llog_process_or_fork(env, cat_llh, llog_cat_process_cb,
--					  &d, &cd, fork);
-+		rc = llog_process_or_fork(env, cat_llh, cat_cb, &d, &cd, fork);
- 	} else {
--		rc = llog_process_or_fork(env, cat_llh, llog_cat_process_cb,
--					  &d, NULL, fork);
-+		rc = llog_process_or_fork(env, cat_llh, cat_cb, &d, NULL, fork);
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 0977127..0c50225 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -933,7 +933,6 @@ static u32 osc_checksum_bulk(int nob, u32 pg_count,
+ 	int i = 0;
+ 	struct cfs_crypto_hash_desc *hdesc;
+ 	unsigned int bufsize;
+-	int err;
+ 	unsigned char cfs_alg = cksum_obd2cfs(cksum_type);
+ 
+ 	LASSERT(pg_count > 0);
+@@ -975,7 +974,7 @@ static u32 osc_checksum_bulk(int nob, u32 pg_count,
  	}
  
- 	return rc;
-@@ -229,7 +227,7 @@ static int llog_cat_process_or_fork(const struct lu_env *env,
- int llog_cat_process(const struct lu_env *env, struct llog_handle *cat_llh,
- 		     llog_cb_t cb, void *data, int startcat, int startidx)
- {
--	return llog_cat_process_or_fork(env, cat_llh, cb, data, startcat,
--					startidx, false);
-+	return llog_cat_process_or_fork(env, cat_llh, llog_cat_process_cb, cb,
-+					data, startcat, startidx, false);
- }
- EXPORT_SYMBOL(llog_cat_process);
+ 	bufsize = sizeof(cksum);
+-	err = cfs_crypto_hash_final(hdesc, (unsigned char *)&cksum, &bufsize);
++	cfs_crypto_hash_final(hdesc, (unsigned char *)&cksum, &bufsize);
+ 
+ 	/* For sending we only compute the wrong checksum instead
+ 	 * of corrupting the data so it is still correct on a redo
 -- 
 1.7.1
