@@ -1,162 +1,111 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri,  2 Dec 2016 19:53:29 -0500
-Subject: [lustre-devel] [PATCH 22/22] staging: lustre: libcfs: remove lnet
-	upcall code
+Date: Fri,  2 Dec 2016 19:53:20 -0500
+Subject: [lustre-devel] [PATCH 13/22] staging: lustre: statahead: set
+	sai_index_wait with lli_sa_lock held
 In-Reply-To: <1480726409-20350-1-git-send-email-jsimmons@infradead.org>
 References: <1480726409-20350-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1480726409-20350-23-git-send-email-jsimmons@infradead.org>
+Message-ID: <1480726409-20350-14-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Alexander Zarochentsev <alexander.zarochentsev@seagate.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Fan Yong <fan.yong@intel.com>, Li Xi <lixi@ddn.com>, James Simmons <jsimmons@infradead.org>
 
-From: Alexander Zarochentsev <alexander.zarochentsev@seagate.com>
+From: Fan Yong <fan.yong@intel.com>
 
-Removing lnet upcall infrastructure completely
-as nobody uses it anymore. The upcall causes a delay
-before calling BUG() and might even cause a hang
-making getting a crash dump unreliable or containing
-outdated info.
+It is the sponsor thread of the statahead thread to update the
+sai::sai_index_wait. Originally, it didn't hold the lli_sa_lock
+when did that. Becuase of out-of-order execution others may miss
+to wakeup such thread.
 
-Signed-off-by: Alexander Zarochentsev <alexander.zarochentsev@seagate.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8418
-Seagate-bug-id: MRP-2939
-Reviewed-on: http://review.whamcloud.com/21440
+On the other hand, if the statahead RPC gets failure, it should
+wakeup the sponsor thread, not the statahead thread.
+
+Signed-off-by: Li Xi <lixi@ddn.com>
+Signed-off-by: Fan Yong <fan.yong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7828
+Reviewed-on: http://review.whamcloud.com/18499
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 -
- .../lustre/include/linux/libcfs/libcfs_private.h   |    2 -
- .../staging/lustre/lnet/libcfs/linux/linux-debug.c |   54 --------------------
- drivers/staging/lustre/lnet/libcfs/module.c        |    8 ---
- 4 files changed, 0 insertions(+), 65 deletions(-)
+ drivers/staging/lustre/lustre/llite/statahead.c |   18 +++++++++++-------
+ 1 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index 70eb08e..cc2c0e9 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -125,7 +125,6 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
- /**
-  * The path of debug log dump upcall script.
-  */
--extern char lnet_upcall[1024];
- extern char lnet_debug_log_upcall[1024];
+diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
+index b43955f..4769a22 100644
+--- a/drivers/staging/lustre/lustre/llite/statahead.c
++++ b/drivers/staging/lustre/lustre/llite/statahead.c
+@@ -659,8 +659,8 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+ 	struct ll_inode_info     *lli = ll_i2info(dir);
+ 	struct ll_statahead_info *sai = lli->lli_sai;
+ 	struct sa_entry *entry = (struct sa_entry *)minfo->mi_cbdata;
++	wait_queue_head_t *waitq = NULL;
+ 	__u64 handle = 0;
+-	bool wakeup;
  
- extern struct cfs_wi_sched *cfs_sched_rehash;
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-index 41a651f..aab15d8 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-@@ -169,8 +169,6 @@
- #define ntohs(x) ___ntohs(x)
- #endif
+ 	if (it_disposition(it, DISP_LOOKUP_NEG))
+ 		rc = -ENOENT;
+@@ -693,7 +693,8 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
  
--void libcfs_run_upcall(char **argv);
--void libcfs_run_lbug_upcall(struct libcfs_debug_msg_data *msg);
- void libcfs_debug_dumplog(void);
- int libcfs_debug_init(unsigned long bufsize);
- int libcfs_debug_cleanup(void);
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
-index d8a9894..39a72e3 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
-@@ -57,7 +57,6 @@
- 
- #include <linux/kallsyms.h>
- 
--char lnet_upcall[1024] = "/usr/lib/lustre/lnet_upcall";
- char lnet_debug_log_upcall[1024] = "/usr/lib/lustre/lnet_debug_log_upcall";
- 
- /**
-@@ -92,58 +91,6 @@ void libcfs_run_debug_log_upcall(char *file)
+ 	spin_lock(&lli->lli_sa_lock);
+ 	if (rc) {
+-		wakeup = __sa_make_ready(sai, entry, rc);
++		if (__sa_make_ready(sai, entry, rc))
++			waitq = &sai->sai_waitq;
+ 	} else {
+ 		entry->se_minfo = minfo;
+ 		entry->se_req = ptlrpc_request_addref(req);
+@@ -704,13 +705,15 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+ 		 * with parent's lock held, for example: unlink.
+ 		 */
+ 		entry->se_handle = handle;
+-		wakeup = !sa_has_callback(sai);
++		if (!sa_has_callback(sai))
++			waitq = &sai->sai_thread.t_ctl_waitq;
++
+ 		list_add_tail(&entry->se_list, &sai->sai_interim_entries);
  	}
- }
+ 	sai->sai_replied++;
  
--void libcfs_run_upcall(char **argv)
--{
--	int rc;
--	int argc;
--	static const char * const envp[] = {
--		"HOME=/",
--		"PATH=/sbin:/bin:/usr/sbin:/usr/bin",
--		NULL
--	};
--
--	argv[0] = lnet_upcall;
--	argc = 1;
--	while (argv[argc])
--		argc++;
--
--	LASSERT(argc >= 2);
--
--	rc = call_usermodehelper(argv[0], argv, (char **)envp, 1);
--	if (rc < 0 && rc != -ENOENT) {
--		CERROR("Error %d invoking LNET upcall %s %s%s%s%s%s%s%s%s; check /sys/kernel/debug/lnet/upcall\n",
--		       rc, argv[0], argv[1],
--		       argc < 3 ? "" : ",", argc < 3 ? "" : argv[2],
--		       argc < 4 ? "" : ",", argc < 4 ? "" : argv[3],
--		       argc < 5 ? "" : ",", argc < 5 ? "" : argv[4],
--		       argc < 6 ? "" : ",...");
--	} else {
--		CDEBUG(D_HA, "Invoked LNET upcall %s %s%s%s%s%s%s%s%s\n",
--		       argv[0], argv[1],
--		       argc < 3 ? "" : ",", argc < 3 ? "" : argv[2],
--		       argc < 4 ? "" : ",", argc < 4 ? "" : argv[3],
--		       argc < 5 ? "" : ",", argc < 5 ? "" : argv[4],
--		       argc < 6 ? "" : ",...");
--	}
--}
--
--void libcfs_run_lbug_upcall(struct libcfs_debug_msg_data *msgdata)
--{
--	char *argv[6];
--	char buf[32];
--
--	snprintf(buf, sizeof(buf), "%d", msgdata->msg_line);
--
--	argv[1] = "LBUG";
--	argv[2] = (char *)msgdata->msg_file;
--	argv[3] = (char *)msgdata->msg_fn;
--	argv[4] = buf;
--	argv[5] = NULL;
--
--	libcfs_run_upcall(argv);
--}
--EXPORT_SYMBOL(libcfs_run_lbug_upcall);
--
- /* coverity[+kill] */
- void __noreturn lbug_with_loc(struct libcfs_debug_msg_data *msgdata)
+-	if (wakeup)
+-		wake_up(&sai->sai_thread.t_ctl_waitq);
++	if (waitq)
++		wake_up(waitq);
+ 	spin_unlock(&lli->lli_sa_lock);
+ 
+ 	return rc;
+@@ -1397,10 +1400,10 @@ static int revalidate_statahead_dentry(struct inode *dir,
+ 				       struct dentry **dentryp,
+ 				       bool unplug)
  {
-@@ -158,7 +105,6 @@ void __noreturn lbug_with_loc(struct libcfs_debug_msg_data *msgdata)
- 	dump_stack();
- 	if (!libcfs_panic_on_lbug)
- 		libcfs_debug_dumplog();
--	libcfs_run_lbug_upcall(msgdata);
- 	if (libcfs_panic_on_lbug)
- 		panic("LBUG");
- 	set_task_state(current, TASK_UNINTERRUPTIBLE);
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index 5884a33..161e042 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -365,14 +365,6 @@ static int proc_cpt_table(struct ctl_table *table, int write,
- 		.mode     = 0444,
- 		.proc_handler = &proc_cpt_table,
- 	},
--
--	{
--		.procname = "upcall",
--		.data     = lnet_upcall,
--		.maxlen   = sizeof(lnet_upcall),
--		.mode     = 0644,
--		.proc_handler = &proc_dostring,
--	},
- 	{
- 		.procname = "debug_log_upcall",
- 		.data     = lnet_debug_log_upcall,
++	struct ll_inode_info *lli = ll_i2info(dir);
+ 	struct sa_entry *entry = NULL;
+ 	struct l_wait_info lwi = { 0 };
+ 	struct ll_dentry_data *ldd;
+-	struct ll_inode_info *lli;
+ 	int rc = 0;
+ 
+ 	if ((*dentryp)->d_name.name[0] == '.') {
+@@ -1446,7 +1449,9 @@ static int revalidate_statahead_dentry(struct inode *dir,
+ 		sa_handle_callback(sai);
+ 
+ 	if (!sa_ready(entry)) {
++		spin_lock(&lli->lli_sa_lock);
+ 		sai->sai_index_wait = entry->se_index;
++		spin_unlock(&lli->lli_sa_lock);
+ 		lwi = LWI_TIMEOUT_INTR(cfs_time_seconds(30), NULL,
+ 				       LWI_ON_SIGNAL_NOOP, NULL);
+ 		rc = l_wait_event(sai->sai_waitq, sa_ready(entry), &lwi);
+@@ -1514,7 +1519,6 @@ static int revalidate_statahead_dentry(struct inode *dir,
+ 	 * dentry_may_statahead().
+ 	 */
+ 	ldd = ll_d2d(*dentryp);
+-	lli = ll_i2info(dir);
+ 	/* ldd can be NULL if llite lookup failed. */
+ 	if (ldd)
+ 		ldd->lld_sa_generation = lli->lli_sa_generation;
 -- 
 1.7.1
