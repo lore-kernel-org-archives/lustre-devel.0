@@ -1,42 +1,39 @@
-From: Kees Cook <keescook@chromium.org>
-Date: Fri, 16 Dec 2016 17:00:45 -0800
-Subject: [lustre-devel] [PATCH] staging: lustre: ldlm: use designated
-	initializers
-Message-ID: <20161217010045.GA140343@beast>
+From: Pan Bian <bianpan201602@163.com>
+Date: Sat,  3 Dec 2016 20:52:55 +0800
+Subject: [lustre-devel] [PATCH 1/1] staging: lustre: lnet: fix improper
+	return value
+Message-ID: <1480769575-6074-1-git-send-email-bianpan201602@163.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: linux-kernel@vger.kernel.org
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "John L. Hammond" <john.hammond@intel.com>, Emoly Liu <emoly.liu@intel.com>, Vitaly Fertman <vitaly_fertman@xyratex.com>, Bruno Faccini <bruno.faccini@intel.com>, Bruce Korb <bruce.korb@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Frank Zago <fzago@cray.com>
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Pan Bian <bianpan2016@163.com>
 
-Prepare to mark sensitive kernel structures for randomization by making
-sure they're using designated initializers. These were identified during
-allyesconfig builds of x86, arm, and arm64, with most initializer fixes
-extracted from grsecurity.
+From: Pan Bian <bianpan2016@163.com>
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
+At the end of function lstcon_group_info(), "return 0" seems improper.
+It may be better to return the value of rc.
+
+Bugzilla: https://bugzilla.kernel.org/show_bug.cgi?id=188811
+
+Signed-off-by: Pan Bian <bianpan2016@163.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c | 2 +-
+ drivers/staging/lustre/lnet/selftest/console.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 722160784f83..f815827532dc 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -143,7 +143,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req, __u64 *flags,
- 	int added = (mode == LCK_NL);
- 	int overlaps = 0;
- 	int splitted = 0;
--	const struct ldlm_callback_suite null_cbs = { NULL };
-+	const struct ldlm_callback_suite null_cbs = { };
+diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
+index a0fcbf3..9a7c41a 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.c
++++ b/drivers/staging/lustre/lnet/selftest/console.c
+@@ -820,7 +820,7 @@
  
- 	CDEBUG(D_DLMTRACE,
- 	       "flags %#llx owner %llu pid %u mode %u start %llu end %llu\n",
+ 	lstcon_group_decref(grp);
+ 
+-	return 0;
++	return rc;
+ }
+ 
+ static int
 -- 
-2.7.4
-
-
--- 
-Kees Cook
-Nexus Security
+1.9.1
