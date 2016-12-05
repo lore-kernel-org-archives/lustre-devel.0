@@ -1,48 +1,46 @@
 From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Mon, 5 Dec 2016 17:44:09 -0500
-Subject: [lustre-devel] [PATCH 1/1] staging: lustre: lnet: fix improper
-	return value
-In-Reply-To: <1480769575-6074-1-git-send-email-bianpan201602@163.com>
-References: <1480769575-6074-1-git-send-email-bianpan201602@163.com>
-Message-ID: <2DA842C3-D6EF-472B-9187-A6C681ACD863@intel.com>
+Date: Mon, 5 Dec 2016 17:48:11 -0500
+Subject: [lustre-devel] [PATCH] staging: lustre: mgc: make
+	llog_process_lock static
+In-Reply-To: <1480904481-20149-1-git-send-email-sandeepjain.linux@gmail.com>
+References: <1480904481-20149-1-git-send-email-sandeepjain.linux@gmail.com>
+Message-ID: <57EFF4DF-FEA7-40D5-AD29-4DF3E16D047B@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Pan Bian <bianpan201602@163.com>
-Cc: Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org SUBSYSTEM" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Pan Bian <bianpan2016@163.com>
+To: "<sandeepjain.linux@gmail.com>" <sandeepjain.linux@gmail.com>
+Cc: andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
 
-On Dec 3, 2016, at 7:52 AM, Pan Bian wrote:
+On Dec 4, 2016, at 9:21 PM, <sandeepjain.linux@gmail.com> <sandeepjain.linux@gmail.com> wrote:
 
-> From: Pan Bian <bianpan2016@163.com>
+> From: Sandeep Jain <sandeepjain.linux@gmail.com>
 > 
-> At the end of function lstcon_group_info(), "return 0" seems improper.
-> It may be better to return the value of rc.
+> Fix following sparse warning.
+> mgc_request.c:376:1:
+> warning: symbol 'llog_process_lock' was not declared. Should it be static?
 > 
-> Bugzilla: https://bugzilla.kernel.org/show_bug.cgi?id=188811
-> 
-> Signed-off-by: Pan Bian <bianpan2016@163.com>
+> Signed-off-by: Sandeep Jain <sandeepjain.linux@gmail.com>
 
 Acked-by: Oleg Drokin <oleg.drokin@intel.com>
 
 > ---
-> drivers/staging/lustre/lnet/selftest/console.c | 2 +-
+> drivers/staging/lustre/lustre/mgc/mgc_request.c | 2 +-
 > 1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-> index a0fcbf3..9a7c41a 100644
-> --- a/drivers/staging/lustre/lnet/selftest/console.c
-> +++ b/drivers/staging/lustre/lnet/selftest/console.c
-> @@ -820,7 +820,7 @@
-> 
-> 	lstcon_group_decref(grp);
-> 
-> -	return 0;
-> +	return rc;
+> diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> index 23600fb..e98a2ce 100644
+> --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> @@ -373,7 +373,7 @@ static int config_log_add(struct obd_device *obd, char *logname,
+> 	return rc;
 > }
 > 
-> static int
-> -- 
-> 1.9.1
+> -DEFINE_MUTEX(llog_process_lock);
+> +static DEFINE_MUTEX(llog_process_lock);
 > 
+> /** Stop watching for updates on this log.
+>  */
+> -- 
+> 2.7.4
