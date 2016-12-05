@@ -1,47 +1,61 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Mon, 5 Dec 2016 23:52:00 +0300
-Subject: [lustre-devel] [PATCH] staging: lustre: Fix a spatch warning
- due to an assignment from kernel to user space
-In-Reply-To: <20161202173332.5100-1-lambert.quentin@gmail.com>
-References: <20161202173332.5100-1-lambert.quentin@gmail.com>
-Message-ID: <20161205205200.GB31243@mwanda>
+Date: Mon, 5 Dec 2016 23:54:36 +0300
+Subject: [lustre-devel] [PATCH 5/6] staging: lustre: headers: Move
+ functions out of lustre_idl.h
+In-Reply-To: <1480707650-24089-6-git-send-email-jsimmons@infradead.org>
+References: <1480707650-24089-1-git-send-email-jsimmons@infradead.org>
+	<1480707650-24089-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <20161205205435.GD31243@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Quentin Lambert <lambert.quentin@gmail.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
+To: James Simmons <jsimmons@infradead.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Ben Evans <bevans@cray.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Fri, Dec 02, 2016 at 06:33:32PM +0100, Quentin Lambert wrote:
-> lnet_ipif_enumerate was assigning a pointer from kernel space to user
-> space. This patch uses copy_to_user to properly do that assignment.
+On Fri, Dec 02, 2016 at 02:40:49PM -0500, James Simmons wrote:
+> -/* If LDLM_ENQUEUE, 1 slot is already occupied, 1 is available.
+> - * Otherwise, 2 are available.
+> - */
+> -#define ldlm_request_bufsize(count, type)				\
+> -({								      \
+> -	int _avail = LDLM_LOCKREQ_HANDLES;			      \
+> -	_avail -= (type == LDLM_ENQUEUE ? LDLM_ENQUEUE_CANCEL_OFF : 0); \
+> -	sizeof(struct ldlm_request) +				   \
+> -	(count > _avail ? count - _avail : 0) *			 \
+> -	sizeof(struct lustre_handle);				   \
+> -})
+> -
 
-Put the exact warning message here.
+> +/**
+> + * ldlm_request_bufsize
+> + *
+> + * @count:	number of ldlm handles
+> + * @type:	ldlm opcode
+> + *
+> + * If opcode=LDLM_ENQUEUE, 1 slot is already occupied,
+> + * LDLM_LOCKREQ_HANDLE -1 slots are available.
+> + * Otherwise, LDLM_LOCKREQ_HANDLE slots are available.
+> + *
+> + * Return:	size of the request buffer
+> + */
+> +int ldlm_request_bufsize(int count, int type)
+> +{
+> +	int avail = LDLM_LOCKREQ_HANDLES;
+> +
+> +	if (type == LDLM_ENQUEUE)
+> +		avail -= LDLM_ENQUEUE_CANCEL_OFF;
+> +
+> +	if (count > avail)
+> +		avail = (count - avail) * sizeof(struct lustre_handle);
+> +	else
+> +		avail = 0;
+> +
+> +	return sizeof(struct ldlm_request) + avail;
+> +}
+> +
 
-> 
-> Signed-off-by: Quentin Lambert <lambert.quentin@gmail.com>
-> ---
->  shouldn't we be using ifc_req instead of ifc_buf?
-> 
->  drivers/staging/lustre/lnet/lnet/lib-socket.c |    8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> --- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-> @@ -181,7 +181,13 @@ lnet_ipif_enumerate(char ***namesp)
->  			goto out0;
->  		}
->  
-> -		ifc.ifc_buf = (char *)ifr;
-> +		rc = copy_to_user(ifc.ifc_buf, (char *)ifr,
-> +				  nalloc * sizeof(*ifr));
-> +		if (rc) {
-> +			rc = -ENOMEM;
-> +			goto out1;
-> +		}
-
-
-No idea what's going on here.  The original code is correct.
+This is a nice cleanup.
 
 regards,
 dan carpenter
