@@ -1,28 +1,26 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Mon, 5 Dec 2016 14:09:56 +0300
-Subject: [lustre-devel] [patch] staging: lustre: cl_page: fix a typo in
-	comments
-Message-ID: <20161205110955.GA19260@elgon.mountain>
+Date: Mon, 5 Dec 2016 23:50:05 +0300
+Subject: [lustre-devel] [PATCH 3/6] staging: lustre: obdclass: Create a
+ header for obdo related functions
+In-Reply-To: <1480707650-24089-4-git-send-email-jsimmons@infradead.org>
+References: <1480707650-24089-1-git-send-email-jsimmons@infradead.org>
+	<1480707650-24089-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <20161205205005.GA31243@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: James Simmons <jsimmons@infradead.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Ben Evans <bevans@cray.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-We want to "sever" all the ways to get a new pointer to "pg".
+On Fri, Dec 02, 2016 at 02:40:47PM -0500, James Simmons wrote:
+> -	__u32 local_flags = 0;
+> +	u32 local_flags = 0;
 
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> -	if (local_flags != 0) {
+> +	if (local_flags) {
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-index bdc0aa5846ef..cd9a40ca4448 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
-@@ -667,7 +667,7 @@ static void cl_page_delete0(const struct lu_env *env, struct cl_page *pg)
- 	PASSERT(env, pg, pg->cp_state != CPS_FREEING);
- 
- 	/*
--	 * Severe all ways to obtain new pointers to @pg.
-+	 * Sever all ways to obtain new pointers to @pg.
- 	 */
- 	cl_page_owner_clear(pg);
- 
+Please avoid these unrelated white space changes.
+
+regards,
+dan carpenter
