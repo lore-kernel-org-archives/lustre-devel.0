@@ -1,58 +1,43 @@
 From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Mon, 5 Dec 2016 17:58:06 -0500
-Subject: [lustre-devel] [PATCH] staging: lustre: Fix a spatch warning
-	due to an assignment from kernel to user space
-In-Reply-To: <20161202173332.5100-1-lambert.quentin@gmail.com>
-References: <20161202173332.5100-1-lambert.quentin@gmail.com>
-Message-ID: <306D1D4D-A949-44F6-BAFE-44F08F609D9B@intel.com>
+Date: Mon, 5 Dec 2016 18:03:58 -0500
+Subject: [lustre-devel] [PATCH 04/22] staging: lustre: osc: handle osc
+	eviction correctly
+In-Reply-To: <20161205205537.GB31465@mwanda>
+References: <1480726409-20350-1-git-send-email-jsimmons@infradead.org>
+	<1480726409-20350-5-git-send-email-jsimmons@infradead.org>
+	<20161205205537.GB31465@mwanda>
+Message-ID: <A380972E-E5F6-44B5-B5B3-9446A6DA9FF5@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Quentin Lambert <lambert.quentin@gmail.com>
-Cc: Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
+To: Dan Carpenter <dan.carpenter@oracle.com>
+Cc: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Jinshan Xiong <jinshan.xiong@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-On Dec 2, 2016, at 12:33 PM, Quentin Lambert wrote:
+On Dec 5, 2016, at 3:55 PM, Dan Carpenter wrote:
 
-> lnet_ipif_enumerate was assigning a pointer from kernel space to user
-> space. This patch uses copy_to_user to properly do that assignment.
-
-I guess it's a false positive?
-
-While lnet_sock_ioctl()->kernel_sock_unlocked_ioctl() does call into the
-f_op->unlocked_ioctl() with a userspace argument, note that we have
-set_fs(KERNEL_DS); in there, therefore allowig copy_from_user
-and friends to work on kernel data too as if it was userspace.
-(I know it's ugly and we need to find a better way of getting this data,
-but at least it's not incorrect).
-
+> On Fri, Dec 02, 2016 at 07:53:11PM -0500, James Simmons wrote:
+>> @@ -3183,8 +3182,10 @@ static int discard_cb(const struct lu_env *env, struct cl_io *io,
+>> 	/* page is top page. */
+>> 	info->oti_next_index = osc_index(ops) + 1;
+>> 	if (cl_page_own(env, io, page) == 0) {
+>> -		KLASSERT(ergo(page->cp_type == CPT_CACHEABLE,
+>> -			      !PageDirty(cl_page_vmpage(page))));
+>> +		if (!ergo(page->cp_type == CPT_CACHEABLE,
+>> +			  !PageDirty(cl_page_vmpage(page))))
+>> +			CL_PAGE_DEBUG(D_ERROR, env, page,
+>> +				      "discard dirty page?\n");
 > 
-> Signed-off-by: Quentin Lambert <lambert.quentin@gmail.com>
-> ---
-> shouldn't we be using ifc_req instead of ifc_buf?
 > 
-> drivers/staging/lustre/lnet/lnet/lib-socket.c |    8 +++++++-
-> 1 file changed, 7 insertions(+), 1 deletion(-)
+> I don't understand the point of the ergo macro.  There are way too many
+> double negatives (some of them hidden for my small brain).  How is that
+> simpler than just writing it out:
 > 
-> --- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-> @@ -181,7 +181,13 @@ lnet_ipif_enumerate(char ***namesp)
-> 			goto out0;
-> 		}
-> 
-> -		ifc.ifc_buf = (char *)ifr;
-> +		rc = copy_to_user(ifc.ifc_buf, (char *)ifr,
-> +				  nalloc * sizeof(*ifr));
-> +		if (rc) {
-> +			rc = -ENOMEM;
-> +			goto out1;
-> +		}
-> +
-> 		ifc.ifc_len = nalloc * sizeof(*ifr);
-> 
-> 		rc = lnet_sock_ioctl(SIOCGIFCONF, (unsigned long)&ifc);
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 	if (page->cp_type == CPT_CACHEABLE &&
+> 	    PageDirty(cl_page_vmpage(page))
+> 		 CL_PAGE_DEBUG(D_ERROR, env, page, "discard dirty page?\n");
+
+I guess it makes it sound chic or something?
+I am not a huge fan of it either, esp. in a case like this, though
+it might be somewhat more convenient in assertions (where this is converted from).
