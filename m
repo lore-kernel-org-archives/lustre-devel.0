@@ -1,33 +1,48 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Tue, 6 Dec 2016 01:06:47 +0300
-Subject: [lustre-devel] [PATCH 3/6] staging: lustre: obdclass: Create a
- header for obdo related functions
-In-Reply-To: <2394CAB0-41C1-4F3B-AF94-03D302F6ABF5@intel.com>
-References: <1480707650-24089-1-git-send-email-jsimmons@infradead.org>
-	<1480707650-24089-4-git-send-email-jsimmons@infradead.org>
-	<20161205205005.GA31243@mwanda>
-	<2394CAB0-41C1-4F3B-AF94-03D302F6ABF5@intel.com>
-Message-ID: <20161205220647.GD8244@mwanda>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Mon, 5 Dec 2016 17:44:09 -0500
+Subject: [lustre-devel] [PATCH 1/1] staging: lustre: lnet: fix improper
+	return value
+In-Reply-To: <1480769575-6074-1-git-send-email-bianpan201602@163.com>
+References: <1480769575-6074-1-git-send-email-bianpan201602@163.com>
+Message-ID: <2DA842C3-D6EF-472B-9187-A6C681ACD863@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Dilger, Andreas" <andreas.dilger@intel.com>
-Cc: James Simmons <jsimmons@infradead.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Pan Bian <bianpan201602@163.com>
+Cc: Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org SUBSYSTEM" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Pan Bian <bianpan2016@163.com>
 
-Sorry, I was unclear.  I have no problem with white space changes on
-their own or when they are on the same line as something else you're
-changing.
 
-What I meant is that when you're just moving functions around then don't
-mix unrelated white space changes into that patch.  I have automated
-scripts for reviewing moving code around but slight changes mean that I
-have to review it manually line by line to spot the difference.  I can
-review a one liner cleanup in about 10 seconds but it's finding the line
-which changed that's the problem in this case.
+On Dec 3, 2016, at 7:52 AM, Pan Bian wrote:
 
-And I'm also fine with this patch since I already reviewed it, but in
-the future, please avoid the temptation to do cleanups until after.
+> From: Pan Bian <bianpan2016@163.com>
+> 
+> At the end of function lstcon_group_info(), "return 0" seems improper.
+> It may be better to return the value of rc.
+> 
+> Bugzilla: https://bugzilla.kernel.org/show_bug.cgi?id=188811
+> 
+> Signed-off-by: Pan Bian <bianpan2016@163.com>
 
-regards,
-dan carpenter
+Acked-by: Oleg Drokin <oleg.drokin@intel.com>
+
+> ---
+> drivers/staging/lustre/lnet/selftest/console.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
+> index a0fcbf3..9a7c41a 100644
+> --- a/drivers/staging/lustre/lnet/selftest/console.c
+> +++ b/drivers/staging/lustre/lnet/selftest/console.c
+> @@ -820,7 +820,7 @@
+> 
+> 	lstcon_group_decref(grp);
+> 
+> -	return 0;
+> +	return rc;
+> }
+> 
+> static int
+> -- 
+> 1.9.1
+> 
