@@ -1,38 +1,38 @@
-From: Tabrez khan <khan.tabrez21@gmail.com>
-Date: Thu, 15 Dec 2016 07:03:52 +0530
-Subject: [lustre-devel] [PATCH] staging : osc : Remove braces from
-	single-line body
-Message-ID: <1481765632-29876-1-git-send-email-khan.tabrez21@gmail.com>
+From: sandeepjain.linux at gmail.com <sandeepjain.linux@gmail.com>
+Date: Mon,  5 Dec 2016 07:51:21 +0530
+Subject: [lustre-devel] [PATCH] staging: lustre: mgc: make llog_process_lock
+	static
+Message-ID: <1480904481-20149-1-git-send-email-sandeepjain.linux@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: andreas.dilger@intel.com, jsimmons@infradead.org
-Cc: gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org
+Cc: gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Sandeep Jain <sandeepjain.linux@gmail.com>
 
-Remove unnecessary braces {} for single if statement block.
-This warning is found using checkpatch.pl.
+From: Sandeep Jain <sandeepjain.linux@gmail.com>
 
-Signed-off-by: Tabrez khan <khan.tabrez21@gmail.com>
+Fix following sparse warning.
+mgc_request.c:376:1:
+warning: symbol 'llog_process_lock' was not declared. Should it be static?
+
+Signed-off-by: Sandeep Jain <sandeepjain.linux@gmail.com>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/mgc/mgc_request.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 4bbe219..5ded31a 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -1420,10 +1420,8 @@ static void osc_release_write_grant(struct client_obd *cli,
- 				    struct brw_page *pga)
- {
- 	assert_spin_locked(&cli->cl_loi_list_lock);
--	if (!(pga->flag & OBD_BRW_FROM_GRANT)) {
-+	if (!(pga->flag & OBD_BRW_FROM_GRANT))
- 		return;
--	}
--
- 	pga->flag &= ~OBD_BRW_FROM_GRANT;
- 	atomic_long_dec(&obd_dirty_pages);
- 	cli->cl_dirty_pages--;
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index 23600fb..e98a2ce 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -373,7 +373,7 @@ static int config_log_add(struct obd_device *obd, char *logname,
+ 	return rc;
+ }
+ 
+-DEFINE_MUTEX(llog_process_lock);
++static DEFINE_MUTEX(llog_process_lock);
+ 
+ /** Stop watching for updates on this log.
+  */
 -- 
 2.7.4
