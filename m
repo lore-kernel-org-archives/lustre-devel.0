@@ -1,5 +1,5 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Tue, 6 Dec 2016 22:19:38 +0300
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Tue, 6 Dec 2016 21:14:07 +0100
 Subject: [lustre-devel] [bug report] staging: add Lustre file system
  client support
 In-Reply-To: <BFC6DE82-5B4E-4F67-A30C-2176DFC28451@intel.com>
@@ -9,7 +9,7 @@ References: <20161123122959.GA17323@mwanda>
 	<44BA9680-2A0D-49E2-B073-1AA664E8328C@intel.com>
 	<20161206183739.GI8244@mwanda>
 	<BFC6DE82-5B4E-4F67-A30C-2176DFC28451@intel.com>
-Message-ID: <20161206191938.GL8176@mwanda>
+Message-ID: <20161206201407.GA22765@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -35,7 +35,8 @@ On Tue, Dec 06, 2016 at 02:10:13PM -0500, Oleg Drokin wrote:
 > some real "large" negative number.
 > So trying to allocate this many negative bytes would fail, right?
 
-Oh, yeah.  You're right.  Good point...
+Not always.  Please properly bound your allocations.
 
-regards,
-dan carpenter
+thanks,
+
+greg k-h
