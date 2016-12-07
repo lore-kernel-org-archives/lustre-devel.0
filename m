@@ -1,30 +1,56 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 7 Dec 2016 19:57:13 +0000 (GMT)
-Subject: [lustre-devel] Remaining work needed for moving Lustre out of
- staging
-In-Reply-To: <EDDB386E-5258-4BF4-93A6-BF2D365756F4@dilger.ca>
-References: <1E1B324A-F545-417D-9C35-550FA58665C7@intel.com>
-	<20161203085550.GA5375@kroah.com>
-	<0F617FFB-4BD0-4477-890B-2CDC56436DCC@intel.com>
-	<20161206161524.GA5535@kroah.com>
-	<7AF464A9-1D0F-48E9-B83C-66F983268473@intel.com>
-	<EDDB386E-5258-4BF4-93A6-BF2D365756F4@dilger.ca>
-Message-ID: <alpine.LFD.2.20.1612071953050.1427@casper.infradead.org>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Wed, 7 Dec 2016 21:37:42 +0100
+Subject: [lustre-devel] [PATCH] staging/lustre/osc: Revert erroneous
+ list_for_each_entry_safe use
+In-Reply-To: <C83556FF-AFD6-4B39-9714-E5B45CB05005@linuxhacker.ru>
+References: <1481082828-1590398-1-git-send-email-green@linuxhacker.ru>
+	<20161207104043.GA21689@kroah.com>
+	<C83556FF-AFD6-4B39-9714-E5B45CB05005@linuxhacker.ru>
+Message-ID: <20161207203742.GA18474@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Andreas Dilger <adilger@dilger.ca>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg KH <gregkh@linuxfoundation.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "lustre-devel@lists.lustre.org List" <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <green@linuxhacker.ru>
+Cc: "devel@driverdev.osuosl.org SUBSYSTEM" <devel@driverdev.osuosl.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-
-> > On the warning front, we have 879 line over 80 characters, but a bunch
-> > of those are due to long error messages that we cannot split into a multiline thing anyway.
-> > 71 Prefer 'unsigned int' to bare use of 'unsigned' that is a relatively new one
-> > 22 new typedefs (all in lnet, I drove out all the lustre ones, so I guess I can tackle these too).
+On Wed, Dec 07, 2016 at 11:29:36AM -0500, Oleg Drokin wrote:
 > 
-> I think James already has a patch series getting rid of typedefs from LNet?
+> On Dec 7, 2016, at 5:40 AM, Greg Kroah-Hartman wrote:
+> 
+> > On Tue, Dec 06, 2016 at 10:53:48PM -0500, Oleg Drokin wrote:
+> >> I have been having a lot of unexplainable crashes in osc_lru_shrink
+> >> lately that I could not see a good explanation for and then I found
+> >> this patch that slip under the radar somehow that incorrectly
+> >> converted while loop for lru list iteration into
+> >> list_for_each_entry_safe totally ignoring that in the body of
+> >> the loop we drop spinlocks guarding this list and move list entries
+> >> around.
+> >> Not sure why it was not showing up right away, perhaps some of the
+> >> more recent LRU changes committed caused some extra pressure on this
+> >> code that finally highlighted the breakage.
+> >> 
+> >> Reverts: 8adddc36b1fc ("staging: lustre: osc: Use list_for_each_entry_safe")
+> >> CC: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
+> >> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+> >> ---
+> >> I also do not see this patch in any of the mailing lists I am subscribed to.
+> >> I wonder if there's a way to subscribe to those Greg's
+> >> "This is a note to let you know that I've just added the patch ...."
+> >> emails that concern Lustre to get them even if I am not on the CC list in
+> >> the patch itself?
+> > 
+> > This came in from the Outreacy application process, which now requires
+> > that they cc: the maintainers to catch this type of issue.  So you
+> > should have seen these types of patches this last round, the commit you
+> > reference was done before that change happened, sorry.
+> 
+> Do you know approximate date range of when these patches ere sneaking in?
 
-I created a big patch some time ago but I need to break it into smaller 
-pieces. We should sync our tools to be able to build against these changes
-as well. I pushed patches to change our tools.
+Anytime before a few months ago.
+
+> I'd like to take a look at the rest of it proactively just to see if there are
+> more undiscovered surprises?
+
+If your testing isn't finding any problems, all should be good, right?
+:)
