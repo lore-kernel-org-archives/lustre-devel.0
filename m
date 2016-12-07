@@ -1,40 +1,43 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Wed, 7 Dec 2016 12:22:41 -0500
-Subject: [lustre-devel] [PATCH] staging: lustre: Fix a spatch warning
-	due to an assignment from kernel to user space
-In-Reply-To: <33d23121-e5ca-0e14-bfbb-632f883e0948@gmail.com>
-References: <20161202173332.5100-1-lambert.quentin@gmail.com>
-	<306D1D4D-A949-44F6-BAFE-44F08F609D9B@intel.com>
-	<81821426-c32c-c45a-e9a3-82f9818fc986@gmail.com>
-	<33d23121-e5ca-0e14-bfbb-632f883e0948@gmail.com>
-Message-ID: <92C79E56-E447-46CB-9D4C-ECC862F2B43E@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 7 Dec 2016 19:05:28 +0000 (GMT)
+Subject: [lustre-devel] Remaining work needed for moving Lustre out of
+	staging
+In-Reply-To: <0F617FFB-4BD0-4477-890B-2CDC56436DCC@intel.com>
+References: <1E1B324A-F545-417D-9C35-550FA58665C7@intel.com>
+	<20161203085550.GA5375@kroah.com>
+	<0F617FFB-4BD0-4477-890B-2CDC56436DCC@intel.com>
+Message-ID: <alpine.LFD.2.20.1612071902300.1427@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Quentin Lambert <lambert.quentin@gmail.com>
-Cc: Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
+To: Oleg Drokin <oleg.drokin@intel.com>
+Cc: gregkh@linuxfoundation.org, "Dilger, Andreas" <andreas.dilger@intel.com>, "viro@zeniv.linux.org.uk" <viro@zeniv.linux.org.uk>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
 
 
-On Dec 7, 2016, at 10:20 AM, Quentin Lambert wrote:
+> On Dec 3, 2016, at 3:55 AM, gregkh at linuxfoundation.org wrote:
+> 
+> > On Fri, Dec 02, 2016 at 09:53:08PM +0000, Dilger, Andreas wrote:
+> >> Al,
+> >> Greg recently raised the issue of what still needs to be done to
+> >> move the Lustre code out of staging/ and into the fs/ tree. 
+> >> 
+> >> James has been doing a great job of cleaning up various checkpatch
+> >> issues and keeping the code updated with the latest fixes, but we
+> >> were wondering what you were aware of that needed to be cleaned
+> >> up in Lustre?
+> > 
+> > Is the whole "mixing kernel structures in userspace structures" all
+> > resolved now?  For some reason I thought that you had kernel locks being
+> > passed to userspace and then back into the kernel, but it's been a long
+> > time since I last looked...
+> 
+> While we certainly had our share of mixing user/kernelspace structures,
+> I don't think we ever passed anything with locks around back and forth.
 
-> Hi all,
-> 
-> I am looking at the drivers/staging/lustre/lustre/llite/dir.c:
-> 
-> 1469                 /* Call mdc_iocontrol */
-> 1470                 rc = obd_iocontrol(LL_IOC_FID2MDTIDX, exp, sizeof(fid), &fid,
-> 1471                                    &index);
-> 1472                 if (rc)
-> 
-> and sparse says:
-> 
-> drivers/staging/lustre/lustre/llite/dir.c:1471:37: warning: incorrect type in argument 5 (different address spaces)
-> 
-> I was wondering if there was any value to add a cast to fix the warning?
+I think he means the use of linux list structures as a parameter for the
+ioctls in LNet selftest. The work is being done under:
 
-These's a sister warning to this one, btw, in
-drivers/staging/lustre/lustre/lmv/lmv_obd.c:996:19: warning: cast removes address space of expression
+https://jira.hpdd.intel.com/browse/LU-8915
 
-It is an ugly kludge and I guess needs to just be reworked somehow instead to avoid
-these ugly games.
+No patch ready just yet.
