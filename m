@@ -1,40 +1,30 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 7 Dec 2016 19:52:39 +0000 (GMT)
-Subject: [lustre-devel] [PATCH] staging: lustre: Fix a spatch warning
- due to an assignment from kernel to user space
-In-Reply-To: <20161207192237.GP8176@mwanda>
-References: <20161202173332.5100-1-lambert.quentin@gmail.com>
-	<306D1D4D-A949-44F6-BAFE-44F08F609D9B@intel.com>
-	<81821426-c32c-c45a-e9a3-82f9818fc986@gmail.com>
-	<33d23121-e5ca-0e14-bfbb-632f883e0948@gmail.com>
-	<20161207153317.GO8176@mwanda>
-	<46ee428d-016f-e532-9824-4ddbe8a0cc8b@gmail.com>
-	<20161207192237.GP8176@mwanda>
-Message-ID: <alpine.LFD.2.20.1612071950340.1427@casper.infradead.org>
+Date: Wed, 7 Dec 2016 19:57:13 +0000 (GMT)
+Subject: [lustre-devel] Remaining work needed for moving Lustre out of
+ staging
+In-Reply-To: <EDDB386E-5258-4BF4-93A6-BF2D365756F4@dilger.ca>
+References: <1E1B324A-F545-417D-9C35-550FA58665C7@intel.com>
+	<20161203085550.GA5375@kroah.com>
+	<0F617FFB-4BD0-4477-890B-2CDC56436DCC@intel.com>
+	<20161206161524.GA5535@kroah.com>
+	<7AF464A9-1D0F-48E9-B83C-66F983268473@intel.com>
+	<EDDB386E-5258-4BF4-93A6-BF2D365756F4@dilger.ca>
+Message-ID: <alpine.LFD.2.20.1612071953050.1427@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Quentin Lambert <lambert.quentin@gmail.com>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org, Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org
+To: Andreas Dilger <adilger@dilger.ca>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg KH <gregkh@linuxfoundation.org>, linux-fsdevel <linux-fsdevel@vger.kernel.org>, "lustre-devel@lists.lustre.org List" <lustre-devel@lists.lustre.org>
 
 
-> > On 12/07/2016 04:33 PM, Dan Carpenter wrote:
-> > >Lustre is kind of a mess with regards to keeping user and kernel
-> > >pointers separate.  It's not going to be easy to fix.
-> > Fair enough.
-> > I am trying to make a contribution to drivers/staging using sparse.
-> > With that in mind, do you still fill I should keep clear of lustre?
-> > I feel that actually doing the work properly could be a meaningful
-> > learning experience.
+> > On the warning front, we have 879 line over 80 characters, but a bunch
+> > of those are due to long error messages that we cannot split into a multiline thing anyway.
+> > 71 Prefer 'unsigned int' to bare use of 'unsigned' that is a relatively new one
+> > 22 new typedefs (all in lnet, I drove out all the lustre ones, so I guess I can tackle these too).
 > 
-> It's just that you're the fifth person to look at lustre __user
-> annotations and it doesn't end well.  You need to be a lustre expert
-> who can test things.
-> 
-> But for other lustre things, feel free.
+> I think James already has a patch series getting rid of typedefs from LNet?
 
-Actually we are working to fix this issue. We are working on a 
-process that lustre patch posted here get sucked up and put
-into our test harness automatically. It needs more love but its
-coming along.
+I created a big patch some time ago but I need to break it into smaller 
+pieces. We should sync our tools to be able to build against these changes
+as well. I pushed patches to change our tools.
