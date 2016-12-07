@@ -1,34 +1,39 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 7 Dec 2016 19:18:36 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 3/6] staging: lustre: obdclass: Create a
- header for obdo related functions
-In-Reply-To: <20161205220647.GD8244@mwanda>
-References: <1480707650-24089-1-git-send-email-jsimmons@infradead.org>
-	<1480707650-24089-4-git-send-email-jsimmons@infradead.org>
-	<20161205205005.GA31243@mwanda>
-	<2394CAB0-41C1-4F3B-AF94-03D302F6ABF5@intel.com>
-	<20161205220647.GD8244@mwanda>
-Message-ID: <alpine.LFD.2.20.1612071917050.1427@casper.infradead.org>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Wed, 7 Dec 2016 22:22:37 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: Fix a spatch warning
+ due to an assignment from kernel to user space
+In-Reply-To: <46ee428d-016f-e532-9824-4ddbe8a0cc8b@gmail.com>
+References: <20161202173332.5100-1-lambert.quentin@gmail.com>
+	<306D1D4D-A949-44F6-BAFE-44F08F609D9B@intel.com>
+	<81821426-c32c-c45a-e9a3-82f9818fc986@gmail.com>
+	<33d23121-e5ca-0e14-bfbb-632f883e0948@gmail.com>
+	<20161207153317.GO8176@mwanda>
+	<46ee428d-016f-e532-9824-4ddbe8a0cc8b@gmail.com>
+Message-ID: <20161207192237.GP8176@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Quentin Lambert <lambert.quentin@gmail.com>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org, Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org
 
-
-> Sorry, I was unclear.  I have no problem with white space changes on
-> their own or when they are on the same line as something else you're
-> changing.
+On Wed, Dec 07, 2016 at 04:42:30PM +0100, Quentin Lambert wrote:
 > 
-> What I meant is that when you're just moving functions around then don't
-> mix unrelated white space changes into that patch.  I have automated
-> scripts for reviewing moving code around but slight changes mean that I
-> have to review it manually line by line to spot the difference.  I can
-> review a one liner cleanup in about 10 seconds but it's finding the line
-> which changed that's the problem in this case.
 > 
-> And I'm also fine with this patch since I already reviewed it, but in
-> the future, please avoid the temptation to do cleanups until after.
+> On 12/07/2016 04:33 PM, Dan Carpenter wrote:
+> >Lustre is kind of a mess with regards to keeping user and kernel
+> >pointers separate.  It's not going to be easy to fix.
+> Fair enough.
+> I am trying to make a contribution to drivers/staging using sparse.
+> With that in mind, do you still fill I should keep clear of lustre?
+> I feel that actually doing the work properly could be a meaningful
+> learning experience.
 
-Okay, I can do that. I was just trying to create checkpatch clean patches.
+It's just that you're the fifth person to look at lustre __user
+annotations and it doesn't end well.  You need to be a lustre expert
+who can test things.
+
+But for other lustre things, feel free.
+
+regards,
+dan carpenter
