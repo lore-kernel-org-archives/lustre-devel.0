@@ -1,43 +1,46 @@
-From: Oleg Drokin <green@linuxhacker.ru>
-Date: Wed,  7 Dec 2016 00:39:27 -0500
-Subject: [lustre-devel] [PATCH] staging/lustre/lnetselftest: Fix potential
-	integer overflow
-Message-ID: <1481089167-1674826-1-git-send-email-green@linuxhacker.ru>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Wed, 7 Dec 2016 11:40:43 +0100
+Subject: [lustre-devel] [PATCH] staging/lustre/osc: Revert erroneous
+ list_for_each_entry_safe use
+In-Reply-To: <1481082828-1590398-1-git-send-email-green@linuxhacker.ru>
+References: <1481082828-1590398-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <20161207104043.GA21689@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
+To: Oleg Drokin <green@linuxhacker.ru>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Bhaktipriya Shridhar <bhaktipriya96@gmail.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-It looks like if the passed in parameter is not present, but
-parameter length is non zero, then sanity checks on the length
-are skipped and lstcon_test_add() might then use incorrect
-allocation that's prone to integer overflow size.
+On Tue, Dec 06, 2016 at 10:53:48PM -0500, Oleg Drokin wrote:
+> I have been having a lot of unexplainable crashes in osc_lru_shrink
+> lately that I could not see a good explanation for and then I found
+> this patch that slip under the radar somehow that incorrectly
+> converted while loop for lru list iteration into
+> list_for_each_entry_safe totally ignoring that in the body of
+> the loop we drop spinlocks guarding this list and move list entries
+> around.
+> Not sure why it was not showing up right away, perhaps some of the
+> more recent LRU changes committed caused some extra pressure on this
+> code that finally highlighted the breakage.
+> 
+> Reverts: 8adddc36b1fc ("staging: lustre: osc: Use list_for_each_entry_safe")
+> CC: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
+> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+> ---
+> I also do not see this patch in any of the mailing lists I am subscribed to.
+> I wonder if there's a way to subscribe to those Greg's
+> "This is a note to let you know that I've just added the patch ...."
+> emails that concern Lustre to get them even if I am not on the CC list in
+> the patch itself?
 
-This patch ensures that parameter len is zero if parameter is
-not present.
+This came in from the Outreacy application process, which now requires
+that they cc: the maintainers to catch this type of issue.  So you
+should have seen these types of patches this last round, the commit you
+reference was done before that change happened, sorry.
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
----
- drivers/staging/lustre/lnet/selftest/conctl.c | 4 ++++
- 1 file changed, 4 insertions(+)
+This change should go to stable kernels, so I'll mark it that way.
 
-diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-index 02847bf..9438302 100644
---- a/drivers/staging/lustre/lnet/selftest/conctl.c
-+++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-@@ -742,6 +742,10 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
- 	     PAGE_SIZE - sizeof(struct lstcon_test)))
- 		return -EINVAL;
- 
-+	/* Enforce zero parameter length if there's no parameter */
-+	if (!args->lstio_tes_param && args->lstio_tes_param_len)
-+		return -EINVAL;
-+
- 	LIBCFS_ALLOC(batch_name, args->lstio_tes_bat_nmlen + 1);
- 	if (!batch_name)
- 		return rc;
--- 
-2.7.4
+thanks,
+
+greg k-h
