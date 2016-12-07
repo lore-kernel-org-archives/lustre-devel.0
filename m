@@ -1,46 +1,37 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Wed, 7 Dec 2016 11:40:43 +0100
-Subject: [lustre-devel] [PATCH] staging/lustre/osc: Revert erroneous
- list_for_each_entry_safe use
-In-Reply-To: <1481082828-1590398-1-git-send-email-green@linuxhacker.ru>
-References: <1481082828-1590398-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <20161207104043.GA21689@kroah.com>
+From: Quentin Lambert <lambert.quentin@gmail.com>
+Date: Wed, 7 Dec 2016 16:20:06 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: Fix a spatch warning
+ due to an assignment from kernel to user space
+In-Reply-To: <81821426-c32c-c45a-e9a3-82f9818fc986@gmail.com>
+References: <20161202173332.5100-1-lambert.quentin@gmail.com>
+	<306D1D4D-A949-44F6-BAFE-44F08F609D9B@intel.com>
+	<81821426-c32c-c45a-e9a3-82f9818fc986@gmail.com>
+Message-ID: <33d23121-e5ca-0e14-bfbb-632f883e0948@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <green@linuxhacker.ru>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Bhaktipriya Shridhar <bhaktipriya96@gmail.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <oleg.drokin@intel.com>
+Cc: Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
 
-On Tue, Dec 06, 2016 at 10:53:48PM -0500, Oleg Drokin wrote:
-> I have been having a lot of unexplainable crashes in osc_lru_shrink
-> lately that I could not see a good explanation for and then I found
-> this patch that slip under the radar somehow that incorrectly
-> converted while loop for lru list iteration into
-> list_for_each_entry_safe totally ignoring that in the body of
-> the loop we drop spinlocks guarding this list and move list entries
-> around.
-> Not sure why it was not showing up right away, perhaps some of the
-> more recent LRU changes committed caused some extra pressure on this
-> code that finally highlighted the breakage.
-> 
-> Reverts: 8adddc36b1fc ("staging: lustre: osc: Use list_for_each_entry_safe")
-> CC: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
-> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
-> ---
-> I also do not see this patch in any of the mailing lists I am subscribed to.
-> I wonder if there's a way to subscribe to those Greg's
-> "This is a note to let you know that I've just added the patch ...."
-> emails that concern Lustre to get them even if I am not on the CC list in
-> the patch itself?
+Hi all,
 
-This came in from the Outreacy application process, which now requires
-that they cc: the maintainers to catch this type of issue.  So you
-should have seen these types of patches this last round, the commit you
-reference was done before that change happened, sorry.
+I am looking at the drivers/staging/lustre/lustre/llite/dir.c:
 
-This change should go to stable kernels, so I'll mark it that way.
+1469                 /* Call mdc_iocontrol */
+1470                 rc = obd_iocontrol(LL_IOC_FID2MDTIDX, exp, 
+sizeof(fid), &fid,
+1471                                    &index);
+1472                 if (rc)
 
-thanks,
+and sparse says:
 
-greg k-h
+drivers/staging/lustre/lustre/llite/dir.c:1471:37: warning: incorrect 
+type in argument 5 (different address spaces)
+
+I was wondering if there was any value to add a cast to fix the warning?
+And I guess this solution would also apply in my original patch to
+
+drivers/staging/lustre/lnet/lnet/lib-socket.c
+
+Quentin
