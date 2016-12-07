@@ -1,7 +1,10 @@
 From: Oleg Drokin <green@linuxhacker.ru>
-Date: Wed,  7 Dec 2016 17:41:26 -0500
-Subject: [lustre-devel] [PATCH 0/8] Sparse warning fixes in Lustre.
-Message-ID: <1481150494-1853127-1-git-send-email-green@linuxhacker.ru>
+Date: Wed,  7 Dec 2016 17:41:27 -0500
+Subject: [lustre-devel] [PATCH 1/8] staging/lustre/llite: move root_squash
+	from sysfs to debugfs
+In-Reply-To: <1481150494-1853127-1-git-send-email-green@linuxhacker.ru>
+References: <1481150494-1853127-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <1481150494-1853127-2-git-send-email-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -9,37 +12,80 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-This set of fixes aims at sparse warnings.
-Most of the patches are just moving declarations around
-to deal with the
-warning: symbol 'xxx' was not declared. Should it be static?
-kind of messages.
+root_squash control got accidentally moved to sysfs instead of
+debugfs, and the write side of it was also broken expecting a
+userspace buffer.
+It contains both uid and gid values in a single file, so debugfs
+is a clear place for it.
 
-Also a screwup with root_squash sysfs control is fixed.
+Reported-by: Al Viro <viro@ZenIV.linux.org.uk>
+Fixes: c948390f10ccc "fix inconsistencies of root squash feature"
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ drivers/staging/lustre/lustre/llite/lproc_llite.c | 27 +++++++++++++----------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
 
-Oleg Drokin (8):
-  staging/lustre/llite: move root_squash from sysfs to debugfs
-  staging/lustre/ldlm: Correct itree_overlap_cb return type
-  staging/lustre/llite: mark ll_io_init() static
-  staging/lustre/lov: make lov_lsm_alloc() static
-  staging/lustre/osc: extern declare osc_caches in a header
-  staging/lustre: Declare lu_context/session_tags_default
-  staging/lustre: Move lov_read_and_clear_async_rc declaration
-  staging/lustre/ptlrpc: Move nrs_conf_fifo extern to a header
-
- drivers/staging/lustre/lustre/include/lu_object.h  |  3 +++
- drivers/staging/lustre/lustre/include/obd.h        |  3 +++
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |  2 +-
- drivers/staging/lustre/lustre/llite/file.c         |  2 +-
- drivers/staging/lustre/lustre/llite/lproc_llite.c  | 27 ++++++++++++----------
- drivers/staging/lustre/lustre/llite/vvp_internal.h |  2 --
- drivers/staging/lustre/lustre/lov/lov_pack.c       |  3 ++-
- drivers/staging/lustre/lustre/obdclass/cl_object.c |  3 +--
- drivers/staging/lustre/lustre/osc/osc_internal.h   |  2 ++
- drivers/staging/lustre/lustre/osc/osc_request.c    |  2 --
- drivers/staging/lustre/lustre/ptlrpc/nrs.c         |  3 ---
- .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |  3 +++
- 12 files changed, 31 insertions(+), 24 deletions(-)
-
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index 03682c1..f3ee584 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -924,27 +924,29 @@ static ssize_t ll_unstable_stats_seq_write(struct file *file,
+ }
+ LPROC_SEQ_FOPS(ll_unstable_stats);
+ 
+-static ssize_t root_squash_show(struct kobject *kobj, struct attribute *attr,
+-				char *buf)
++static int ll_root_squash_seq_show(struct seq_file *m, void *v)
+ {
+-	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+-					      ll_kobj);
++	struct super_block *sb = m->private;
++	struct ll_sb_info *sbi = ll_s2sbi(sb);
+ 	struct root_squash_info *squash = &sbi->ll_squash;
+ 
+-	return sprintf(buf, "%u:%u\n", squash->rsi_uid, squash->rsi_gid);
++	seq_printf(m, "%u:%u\n", squash->rsi_uid, squash->rsi_gid);
++	return 0;
+ }
+ 
+-static ssize_t root_squash_store(struct kobject *kobj, struct attribute *attr,
+-				 const char *buffer, size_t count)
++static ssize_t ll_root_squash_seq_write(struct file *file,
++					const char __user *buffer,
++					size_t count, loff_t *off)
+ {
+-	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+-					      ll_kobj);
++	struct seq_file *m = file->private_data;
++	struct super_block *sb = m->private;
++	struct ll_sb_info *sbi = ll_s2sbi(sb);
+ 	struct root_squash_info *squash = &sbi->ll_squash;
+ 
+ 	return lprocfs_wr_root_squash(buffer, count, squash,
+-				      ll_get_fsname(sbi->ll_sb, NULL, 0));
++				      ll_get_fsname(sb, NULL, 0));
+ }
+-LUSTRE_RW_ATTR(root_squash);
++LPROC_SEQ_FOPS(ll_root_squash);
+ 
+ static int ll_nosquash_nids_seq_show(struct seq_file *m, void *v)
+ {
+@@ -997,6 +999,8 @@ static struct lprocfs_vars lprocfs_llite_obd_vars[] = {
+ 	{ "statahead_stats",  &ll_statahead_stats_fops, NULL, 0 },
+ 	{ "unstable_stats",   &ll_unstable_stats_fops, NULL },
+ 	{ "sbi_flags",	      &ll_sbi_flags_fops, NULL, 0 },
++	{ .name =       "root_squash",
++	  .fops =       &ll_root_squash_fops			},
+ 	{ .name =		"nosquash_nids",
+ 	  .fops =		&ll_nosquash_nids_fops		},
+ 	{ NULL }
+@@ -1027,7 +1031,6 @@ static struct attribute *llite_attrs[] = {
+ 	&lustre_attr_max_easize.attr,
+ 	&lustre_attr_default_easize.attr,
+ 	&lustre_attr_xattr_cache.attr,
+-	&lustre_attr_root_squash.attr,
+ 	NULL,
+ };
+ 
 -- 
 2.7.4
