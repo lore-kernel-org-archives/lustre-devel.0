@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 8 Dec 2016 00:22:02 +0000 (GMT)
+Date: Thu, 8 Dec 2016 00:23:18 +0000 (GMT)
 Subject: [lustre-devel] [PATCH 5/8] staging/lustre/osc: extern declare
  osc_caches in a header
 In-Reply-To: <1481150494-1853127-6-git-send-email-green@linuxhacker.ru>
 References: <1481150494-1853127-1-git-send-email-green@linuxhacker.ru>
 	<1481150494-1853127-6-git-send-email-green@linuxhacker.ru>
-Message-ID: <alpine.LFD.2.20.1612080021490.14850@casper.infradead.org>
+Message-ID: <alpine.LFD.2.20.1612080022050.14850@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
