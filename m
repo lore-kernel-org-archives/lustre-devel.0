@@ -1,20 +1,37 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Thu, 8 Dec 2016 00:43:15 -0500
-Subject: [lustre-devel] New tag 2.9.50
-Message-ID: <FE599816-219A-4072-B172-D1EC35C0B244@intel.com>
+From: Quentin Lambert <lambert.quentin@gmail.com>
+Date: Thu,  8 Dec 2016 17:07:59 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: Fix variable type
+	declaration after refactoring
+Message-ID: <20161208160759.19649-1-lambert.quentin@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
+Cc: Quentin Lambert <lambert.quentin@gmail.com>
 
-Hello!
+A recent clean-up declared och_flags as a int rather than fmode_t. This
+lead to the following sparse warning:
 
-   I have just tagged 2.9.50 in the lustre master development branch which opens
-   up the floodgates for Lustre 2.10 development, since 2.9.0 development has just concluded.
+drivers/staging/lustre/lustre/llite/file.c:106:30: warning: restricted
+fmode_t degrades to integer
 
-   2.9.50 tag is identical to 2.9.0 release at this point so there's no changelog to
-   attach yet.
+This patch fixes this issue.
 
-Bye,
-    Oleg
+Fixes: 1200991234f7 ("staging: lustre: cleanup lustre_lib.h")
+Signed-off-by: Quentin Lambert <lambert.quentin@gmail.com>
+---
+ drivers/staging/lustre/lustre/include/obd.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -889,7 +889,7 @@ struct obd_client_handle {
+ 	struct md_open_data	*och_mod;
+ 	struct lustre_handle	 och_lease_handle; /* open lock for lease */
+ 	__u32			 och_magic;
+-	int			 och_flags;
++	fmode_t			 och_flags;
+ };
+ 
+ #define OBD_CLIENT_HANDLE_MAGIC 0xd15ea5ed
