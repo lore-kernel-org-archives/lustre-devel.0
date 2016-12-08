@@ -1,22 +1,45 @@
-From: Al Viro <viro@ZenIV.linux.org.uk>
-Date: Wed, 7 Dec 2016 23:46:39 +0000
-Subject: [lustre-devel] [PATCH 0/8] Sparse warning fixes in Lustre.
-In-Reply-To: <1481150494-1853127-1-git-send-email-green@linuxhacker.ru>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 8 Dec 2016 00:16:28 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 2/8] staging/lustre/ldlm: Correct
+ itree_overlap_cb return type
+In-Reply-To: <1481150494-1853127-3-git-send-email-green@linuxhacker.ru>
 References: <1481150494-1853127-1-git-send-email-green@linuxhacker.ru>
-Message-ID: <20161207234639.GU1555@ZenIV.linux.org.uk>
+	<1481150494-1853127-3-git-send-email-green@linuxhacker.ru>
+Message-ID: <alpine.LFD.2.20.1612080014150.14850@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <green@linuxhacker.ru>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Wed, Dec 07, 2016 at 05:41:26PM -0500, Oleg Drokin wrote:
-> This set of fixes aims at sparse warnings.
 
-Speaking of the stuff sparse catches there: class_process_proc_param().
-I've tried to describe what I think of that Fine Piece Of Software
-several times, but I had to give up - my command of obscenity is not
-up to the task, neither in English nor in Russian.  Please, take it
-out.  Preferably - along with the ->ldo_process_config()/->process_config()
-thing.
+> As per interval_search() prototype, the callback should return
+> enum, not int.
+> This fixes correspondign sparse warning.
+> 
+> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+
+> ---
+>  drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+> index a4a291a..f4cbc89 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+> @@ -1148,7 +1148,7 @@ static int lock_matches(struct ldlm_lock *lock, struct lock_match_data *data)
+>  	return INTERVAL_ITER_STOP;
+>  }
+>  
+> -static unsigned int itree_overlap_cb(struct interval_node *in, void *args)
+> +static enum interval_iter itree_overlap_cb(struct interval_node *in, void *args)
+>  {
+>  	struct ldlm_interval *node = to_ldlm_interval(in);
+>  	struct lock_match_data *data = args;
+> -- 
+> 2.7.4
+> 
+> 
