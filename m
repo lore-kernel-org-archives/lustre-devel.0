@@ -1,18 +1,17 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 8 Dec 2016 00:25:11 +0000 (GMT)
+Date: Thu, 8 Dec 2016 00:27:27 +0000 (GMT)
 Subject: [lustre-devel] [PATCH 8/8] staging/lustre/ptlrpc: Move
  nrs_conf_fifo extern to a header
 In-Reply-To: <1481150494-1853127-9-git-send-email-green@linuxhacker.ru>
 References: <1481150494-1853127-1-git-send-email-green@linuxhacker.ru>
 	<1481150494-1853127-9-git-send-email-green@linuxhacker.ru>
-Message-ID: <alpine.LFD.2.20.1612080025030.14850@casper.infradead.org>
+Message-ID: <alpine.LFD.2.20.1612080027191.14850@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <green@linuxhacker.ru>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
-
 
 > This avoids having an extern definition in a C file which is bad,
 > and also silences sparse complaint as well.
