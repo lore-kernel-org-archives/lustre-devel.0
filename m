@@ -1,40 +1,45 @@
-From: Quentin Lambert <lambert.quentin@gmail.com>
-Date: Thu,  8 Dec 2016 21:38:27 +0100
-Subject: [lustre-devel] [PATCH v2] staging: lustre: Fix variable type
-	declaration after refactoring
-In-Reply-To: <20161208160759.19649-1-lambert.quentin@gmail.com>
-Message-ID: <20161208203827.20561-1-lambert.quentin@gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sat, 10 Dec 2016 13:05:56 -0500
+Subject: [lustre-devel] [PATCH v2 0/5] Fix ups to make lustre_idl.h a proper
+	UAPI header
+Message-ID: <1481393161-22623-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
-Cc: Quentin Lambert <lambert.quentin@gmail.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons James Simmons <jsimmons@infradead.org>
 
-A recent clean-up declared och_flags as a int rather than fmode_t. This
-lead to the following sparse warning:
+From: James Simmons James Simmons <jsimmons@infradead.org>
 
-drivers/staging/lustre/lustre/llite/file.c:106:30: warning: restricted
-fmode_t degrades to integer
+Fix ups to make lustre_idl.h a proper UAPI header
 
-This patch fixes this issue.
+The header lustre_idl.h is a UAPI header which contains extras
+that don't belong. This patch set moves a bunch of very kernel
+specific material out of the header. Lastly proper byteorder
+functions are used so this file can build in user space as well.
 
-Fixes: 0a1200991234f7 ("staging: lustre: cleanup lustre_lib.h")
-Signed-off-by: Quentin Lambert <lambert.quentin@gmail.com>
----
- v2: fixes the referenced sha
+Ben Evans (4):
+  staging: lustre: obdclass: Create a header for obdo related functions
+  staging: lustre: obdclass: style cleanup for obdo related functions
+  staging: lustre: headers: sort headers affected by obdo move
+  staging: lustre: headers: Move functions out of lustre_idl.h
 
- drivers/staging/lustre/lustre/include/obd.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+James Simmons (1):
+  staging: lustre: headers: use proper byteorder functions in lustre_idl.h
 
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -889,7 +889,7 @@ struct obd_client_handle {
- 	struct md_open_data	*och_mod;
- 	struct lustre_handle	 och_lease_handle; /* open lock for lease */
- 	__u32			 och_magic;
--	int			 och_flags;
-+	fmode_t			 och_flags;
- };
- 
- #define OBD_CLIENT_HANDLE_MAGIC 0xd15ea5ed
+ .../lustre/lustre/include/lustre/lustre_idl.h      | 174 ++++-----------------
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |  13 ++
+ .../staging/lustre/lustre/include/lustre_obdo.h    |  54 +++++++
+ .../staging/lustre/lustre/include/lustre_swab.h    |   6 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |   6 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |  27 ++++
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c        |   6 +
+ drivers/staging/lustre/lustre/obdclass/obdo.c      |  54 +++++++
+ drivers/staging/lustre/lustre/osc/osc_io.c         |   2 +
+ drivers/staging/lustre/lustre/osc/osc_request.c    |  16 +-
+ 10 files changed, 206 insertions(+), 152 deletions(-)
+ create mode 100644 drivers/staging/lustre/lustre/include/lustre_obdo.h
+
+--
+1.8.3.1
