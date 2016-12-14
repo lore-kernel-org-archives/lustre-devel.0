@@ -1,43 +1,37 @@
-From: sandeepjain.linux at gmail.com <sandeepjain.linux@gmail.com>
-Date: Mon,  5 Dec 2016 08:36:37 +0530
-Subject: [lustre-devel] [PATCH] staging: lustre: Fix function
-	declaration/definition mismatch
-Message-ID: <1480907197-23201-1-git-send-email-sandeepjain.linux@gmail.com>
+From: Tabrez khan <khan.tabrez21@gmail.com>
+Date: Thu, 15 Dec 2016 02:41:24 +0530
+Subject: [lustre-devel] [PATCH] staging : osc : coding style fix
+Message-ID: <1481749884-25674-1-git-send-email-khan.tabrez21@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org
-Cc: gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Sandeep Jain <sandeepjain.linux@gmail.com>
+To: andreas.dilger@intel.com, jsimmons@infradead.org
+Cc: gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-From: Sandeep Jain <sandeepjain.linux@gmail.com>
+Remove unnecessary braces {} for single if statement block.
+This warning is found using checkpatch.pl.
 
-Fixes following Sparse errors.
-lprocfs_status.c:1568:5: error: symbol 'lprocfs_wr_root_squash'
-redeclared with different type...
-lprocfs_status.c:1632:5: error: symbol 'lprocfs_wr_nosquash_nids'
-redeclared with different type...
-
-Signed-off-by: Sandeep Jain <sandeepjain.linux@gmail.com>
+Signed-off-by: Tabrez khan <khan.tabrez21@gmail.com>
 ---
- drivers/staging/lustre/lustre/include/lprocfs_status.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-index cc0713e..b5c24ca 100644
---- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-+++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-@@ -701,9 +701,9 @@ static struct lustre_attr lustre_attr_##name = __ATTR(name, mode, show, store)
- extern const struct sysfs_ops lustre_sysfs_ops;
- 
- struct root_squash_info;
--int lprocfs_wr_root_squash(const char *buffer, unsigned long count,
-+int lprocfs_wr_root_squash(const char __user *buffer, unsigned long count,
- 			   struct root_squash_info *squash, char *name);
--int lprocfs_wr_nosquash_nids(const char *buffer, unsigned long count,
-+int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
- 			     struct root_squash_info *squash, char *name);
- 
- /* all quota proc functions */
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+index 4bbe219..5ded31a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cache.c
++++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+@@ -1420,10 +1420,8 @@ static void osc_release_write_grant(struct client_obd *cli,
+ 				    struct brw_page *pga)
+ {
+ 	assert_spin_locked(&cli->cl_loi_list_lock);
+-	if (!(pga->flag & OBD_BRW_FROM_GRANT)) {
++	if (!(pga->flag & OBD_BRW_FROM_GRANT))
+ 		return;
+-	}
+-
+ 	pga->flag &= ~OBD_BRW_FROM_GRANT;
+ 	atomic_long_dec(&obd_dirty_pages);
+ 	cli->cl_dirty_pages--;
 -- 
 2.7.4
