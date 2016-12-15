@@ -1,38 +1,44 @@
-From: Tabrez khan <khan.tabrez21@gmail.com>
-Date: Fri, 16 Dec 2016 23:29:35 +0530
-Subject: [lustre-devel] [PATCH] staging : lustre : Remove braces from
-	single-line body.
-Message-ID: <1481911175-19592-1-git-send-email-khan.tabrez21@gmail.com>
+From: Tabrez Khan <khan.tabrez21@gmail.com>
+Date: Thu, 15 Dec 2016 20:09:16 +0530
+Subject: [lustre-devel] [PATCH] staging : osc : Remove braces from
+	single-line body
+In-Reply-To: <20161215013834.GA7055@kroah.com>
+References: <1481765632-29876-1-git-send-email-khan.tabrez21@gmail.com>
+	<20161215013834.GA7055@kroah.com>
+Message-ID: <CA+JOspqNxVHU-xJcHhdbG5JvGYp=N1Rcm9hx9c2a1z4z42ffCw@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, jsimmons@infradead.org, andreas.dilger@intel.com
-Cc: gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Greg KH <gregkh@linuxfoundation.org>
+Cc: andreas.dilger@intel.com, jsimmons@infradead.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-Remove unnecessary braces {} from single line if statement.
-This warning is found using checkpatch.pl.
+On Thu, Dec 15, 2016 at 7:08 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Thu, Dec 15, 2016 at 07:03:52AM +0530, Tabrez khan wrote:
+>> Remove unnecessary braces {} for single if statement block.
+>> This warning is found using checkpatch.pl.
+>>
+>> Signed-off-by: Tabrez khan <khan.tabrez21@gmail.com>
+>> ---
+>>  drivers/staging/lustre/lustre/osc/osc_cache.c | 4 +---
+>>  1 file changed, 1 insertion(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+>> index 4bbe219..5ded31a 100644
+>> --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
+>> +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+>> @@ -1420,10 +1420,8 @@ static void osc_release_write_grant(struct client_obd *cli,
+>>                                   struct brw_page *pga)
+>>  {
+>>       assert_spin_locked(&cli->cl_loi_list_lock);
+>> -     if (!(pga->flag & OBD_BRW_FROM_GRANT)) {
+>> +     if (!(pga->flag & OBD_BRW_FROM_GRANT))
+>>               return;
+>> -     }
+>> -
+>
+> Why did you also delete the blank line?
 
-Signed-off-by: Tabrez khan <khan.tabrez21@gmail.com>
----
- drivers/staging/lustre/lustre/ptlrpc/import.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index a23d0a0..477d832 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -1134,9 +1134,9 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
- 	}
- 
- 	/* Sanity checks for a reconnected import. */
--	if (!(imp->imp_replayable) != !(msg_flags & MSG_CONNECT_REPLAYABLE)) {
-+	if (!(imp->imp_replayable) != !(msg_flags & MSG_CONNECT_REPLAYABLE))
- 		CERROR("imp_replayable flag does not match server after reconnect. We should LBUG right here.\n");
--	}
-+
- 
- 	if (lustre_msg_get_last_committed(request->rq_repmsg) > 0 &&
- 	    lustre_msg_get_last_committed(request->rq_repmsg) <
--- 
-2.7.4
+Because to keep the kernel coding style as close as possible and after
+deleting brace it leads to extra empty line so i delete it.
+Please guide if done something wrong.
