@@ -1,39 +1,38 @@
-From: Pan Bian <bianpan201602@163.com>
-Date: Sat,  3 Dec 2016 20:52:55 +0800
-Subject: [lustre-devel] [PATCH 1/1] staging: lustre: lnet: fix improper
-	return value
-Message-ID: <1480769575-6074-1-git-send-email-bianpan201602@163.com>
+From: Tabrez khan <khan.tabrez21@gmail.com>
+Date: Thu, 15 Dec 2016 07:03:52 +0530
+Subject: [lustre-devel] [PATCH] staging : osc : Remove braces from
+	single-line body
+Message-ID: <1481765632-29876-1-git-send-email-khan.tabrez21@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Frank Zago <fzago@cray.com>
-Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Pan Bian <bianpan2016@163.com>
+To: andreas.dilger@intel.com, jsimmons@infradead.org
+Cc: gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-From: Pan Bian <bianpan2016@163.com>
+Remove unnecessary braces {} for single if statement block.
+This warning is found using checkpatch.pl.
 
-At the end of function lstcon_group_info(), "return 0" seems improper.
-It may be better to return the value of rc.
-
-Bugzilla: https://bugzilla.kernel.org/show_bug.cgi?id=188811
-
-Signed-off-by: Pan Bian <bianpan2016@163.com>
+Signed-off-by: Tabrez khan <khan.tabrez21@gmail.com>
 ---
- drivers/staging/lustre/lnet/selftest/console.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-index a0fcbf3..9a7c41a 100644
---- a/drivers/staging/lustre/lnet/selftest/console.c
-+++ b/drivers/staging/lustre/lnet/selftest/console.c
-@@ -820,7 +820,7 @@
- 
- 	lstcon_group_decref(grp);
- 
--	return 0;
-+	return rc;
- }
- 
- static int
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+index 4bbe219..5ded31a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cache.c
++++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+@@ -1420,10 +1420,8 @@ static void osc_release_write_grant(struct client_obd *cli,
+ 				    struct brw_page *pga)
+ {
+ 	assert_spin_locked(&cli->cl_loi_list_lock);
+-	if (!(pga->flag & OBD_BRW_FROM_GRANT)) {
++	if (!(pga->flag & OBD_BRW_FROM_GRANT))
+ 		return;
+-	}
+-
+ 	pga->flag &= ~OBD_BRW_FROM_GRANT;
+ 	atomic_long_dec(&obd_dirty_pages);
+ 	cli->cl_dirty_pages--;
 -- 
-1.9.1
+2.7.4
