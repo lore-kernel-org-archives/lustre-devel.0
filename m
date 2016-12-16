@@ -1,38 +1,38 @@
-From: sandeepjain.linux at gmail.com <sandeepjain.linux@gmail.com>
-Date: Mon,  5 Dec 2016 07:51:21 +0530
-Subject: [lustre-devel] [PATCH] staging: lustre: mgc: make llog_process_lock
-	static
-Message-ID: <1480904481-20149-1-git-send-email-sandeepjain.linux@gmail.com>
+From: Tabrez khan <khan.tabrez21@gmail.com>
+Date: Fri, 16 Dec 2016 23:29:35 +0530
+Subject: [lustre-devel] [PATCH] staging : lustre : Remove braces from
+	single-line body.
+Message-ID: <1481911175-19592-1-git-send-email-khan.tabrez21@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org
-Cc: gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Sandeep Jain <sandeepjain.linux@gmail.com>
+To: oleg.drokin@intel.com, jsimmons@infradead.org, andreas.dilger@intel.com
+Cc: gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-From: Sandeep Jain <sandeepjain.linux@gmail.com>
+Remove unnecessary braces {} from single line if statement.
+This warning is found using checkpatch.pl.
 
-Fix following sparse warning.
-mgc_request.c:376:1:
-warning: symbol 'llog_process_lock' was not declared. Should it be static?
-
-Signed-off-by: Sandeep Jain <sandeepjain.linux@gmail.com>
+Signed-off-by: Tabrez khan <khan.tabrez21@gmail.com>
 ---
- drivers/staging/lustre/lustre/mgc/mgc_request.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/lustre/ptlrpc/import.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 23600fb..e98a2ce 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -373,7 +373,7 @@ static int config_log_add(struct obd_device *obd, char *logname,
- 	return rc;
- }
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index a23d0a0..477d832 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -1134,9 +1134,9 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
+ 	}
  
--DEFINE_MUTEX(llog_process_lock);
-+static DEFINE_MUTEX(llog_process_lock);
+ 	/* Sanity checks for a reconnected import. */
+-	if (!(imp->imp_replayable) != !(msg_flags & MSG_CONNECT_REPLAYABLE)) {
++	if (!(imp->imp_replayable) != !(msg_flags & MSG_CONNECT_REPLAYABLE))
+ 		CERROR("imp_replayable flag does not match server after reconnect. We should LBUG right here.\n");
+-	}
++
  
- /** Stop watching for updates on this log.
-  */
+ 	if (lustre_msg_get_last_committed(request->rq_repmsg) > 0 &&
+ 	    lustre_msg_get_last_committed(request->rq_repmsg) <
 -- 
 2.7.4
