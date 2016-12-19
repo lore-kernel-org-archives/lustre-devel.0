@@ -1,35 +1,49 @@
-From: Karthik Nayak <karthik.188@gmail.com>
-Date: Fri, 23 Dec 2016 15:42:13 -0000
-Subject: [lustre-devel] [PATCH] staging: lustre: selftest: Make
-	brw_inject_one_error() static
-Message-ID: <20161223154244.29145-1-Karthik.188@gmail.com>
+From: Bruce Korb <bruce.korb@gmail.com>
+Date: Mon, 19 Dec 2016 16:48:31 -0000
+Subject: [lustre-devel] [PATCH] staging: lustre: ldlm: use designated
+	initializers
+In-Reply-To: <alpine.LFD.2.20.1612191614320.25173@casper.infradead.org>
+References: <20161217010045.GA140343@beast>
+	<alpine.LFD.2.20.1612191614320.25173@casper.infradead.org>
+Message-ID: <CAKRnqNLFM_96NK3QbeoF-zC4KTe8oc7Q-eejzPgkE==XUHrwkQ@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: linux-kernel@vger.kernel.org, devel@driverdev.osuosl.org
-Cc: lustre-devel@lists.lustre.org, kirill.shutemov@linux.intel.com, liang.zhen@intel.com, gregkh@linuxfoundation.org, jsimmons@infradead.org, andreas.dilger@intel.com, oleg.drokin@intel.com, Karthik Nayak <Karthik.188@gmail.com>
+To: James Simmons <jsimmons@infradead.org>
+Cc: Kees Cook <keescook@chromium.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "John L. Hammond" <john.hammond@intel.com>, Emoly Liu <emoly.liu@intel.com>, Vitaly Fertman <vitaly_fertman@xyratex.com>, Bruno Faccini <bruno.faccini@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>, devel@driverdev.osuosl.org
 
-Since the function brw_inject_one_error() is used only within
-brw_test.c, make it static. This was reported as a warning by sparse.
+On Mon, Dec 19, 2016 at 8:22 AM, James Simmons
+>> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+>> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+>> @@ -143,7 +143,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req, __u64 *flags,
+>>       int added = (mode == LCK_NL);
+>>       int overlaps = 0;
+>>       int splitted = 0;
+>> -     const struct ldlm_callback_suite null_cbs = { NULL };
+>> +     const struct ldlm_callback_suite null_cbs = { };
+>>
+>>       CDEBUG(D_DLMTRACE,
+>>              "flags %#llx owner %llu pid %u mode %u start %llu end %llu\n",
+>
+> Nak. Filling null_cbs with random data is a bad idea. If you look at
+> ldlm_lock_create() where this is used you have
+>
+> if (cbs) {
+>         lock->l_blocking_ast = cbs->lcs_blocking;
+>         lock->l_completion_ast = cbs->lcs_completion;
+>         lock->l_glimpse_ast = cbs->lcs_glimpse;
+> }
+>
+> Having lock->l_* point to random addresses is a bad idea.
+> What really needs to be done is proper initialization of that
+> structure. A bunch of patches will be coming to address this.
 
-Signed-off-by: Karthik Nayak <Karthik.188@gmail.com>
----
- drivers/staging/lustre/lnet/selftest/brw_test.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'm not understanding the effect of the original difference.  If you
+specify any initializer, then all fields not specified are filled with
+zero bits. Any pointers are, perforce, NULL.  That should make both "{
+NULL }" and "{}" equivalent.  Maybe a worthwhile change would be to:
 
-diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
-index 67b460f..b9ac34e 100644
---- a/drivers/staging/lustre/lnet/selftest/brw_test.c
-+++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
-@@ -136,7 +136,7 @@ brw_client_init(struct sfw_test_instance *tsi)
- 	return 0;
- }
- 
--int brw_inject_one_error(void)
-+static int brw_inject_one_error(void)
- {
- 	struct timespec64 ts;
- 
--- 
-2.10.2
+    static const struct ldlm_callback_suite null_cbs;
+
+then it is not even necessary to specify an initializer.
