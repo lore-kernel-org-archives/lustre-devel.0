@@ -1,56 +1,27 @@
-From: Hammond, John <john.hammond@intel.com>
-Date: Tue, 20 Dec 2016 14:57:17 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: ldlm: use designated
-	initializers
-In-Reply-To: <20161220071034.GL8176@mwanda>
+From: Joe Perches <joe@perches.com>
+Date: Tue, 20 Dec 2016 09:29:55 -0800
+Subject: [lustre-devel] Designated initializers,
+	struct randomization and addressing?
+In-Reply-To: <20161217010045.GA140343@beast>
 References: <20161217010045.GA140343@beast>
-	<alpine.LFD.2.20.1612191614320.25173@casper.infradead.org>
-	<CAKRnqNLFM_96NK3QbeoF-zC4KTe8oc7Q-eejzPgkE==XUHrwkQ@mail.gmail.com>
-	<20161220071034.GL8176@mwanda>
-Message-ID: <C6D48C5819337145905EDC9DB164E69728D44FEC@fmsmsx120.amr.corp.intel.com>
+Message-ID: <1482254995.1984.20.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Dan Carpenter <dan.carpenter@oracle.com>, Bruce Korb <bruce.korb@gmail.com>
-Cc: James Simmons <jsimmons@infradead.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, Kees Cook <keescook@chromium.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Faccini, Bruno" <bruno.faccini@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, Vitaly Fertman <vitaly_fertman@xyratex.com>, "Liu, Emoly" <emoly.liu@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Kees Cook <keescook@chromium.org>, linux-kernel@vger.kernel.org, Julia Lawall <julia.lawall@lip6.fr>, Dan Carpenter <error27@gmail.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "John L. Hammond" <john.hammond@intel.com>, Emoly Liu <emoly.liu@intel.com>, Vitaly Fertman <vitaly_fertman@xyratex.com>, Bruno Faccini <bruno.faccini@intel.com>, Bruce Korb <bruce.korb@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org
 
-> On Mon, Dec 19, 2016 at 08:47:50AM -0800, Bruce Korb wrote:
-> > On Mon, Dec 19, 2016 at 8:22 AM, James Simmons
-> > >> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-> > >> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-> > >> @@ -143,7 +143,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock
-> *req, __u64 *flags,
-> > >>       int added = (mode == LCK_NL);
-> > >>       int overlaps = 0;
-> > >>       int splitted = 0;
-> > >> -     const struct ldlm_callback_suite null_cbs = { NULL };
-> > >> +     const struct ldlm_callback_suite null_cbs = { };
-> > >>
-> > >>       CDEBUG(D_DLMTRACE,
-> > >>              "flags %#llx owner %llu pid %u mode %u start %llu end
-> > >> %llu\n",
-> > >
-> > > Nak. Filling null_cbs with random data is a bad idea. If you look at
-> > > ldlm_lock_create() where this is used you have
-> > >
-> > > if (cbs) {
-> > >         lock->l_blocking_ast = cbs->lcs_blocking;
-> > >         lock->l_completion_ast = cbs->lcs_completion;
-> > >         lock->l_glimpse_ast = cbs->lcs_glimpse; }
-> > >
-> > > Having lock->l_* point to random addresses is a bad idea.
-> > > What really needs to be done is proper initialization of that
-> > > structure. A bunch of patches will be coming to address this.
-> >
-> > I'm not understanding the effect of the original difference.  If you
-> > specify any initializer, then all fields not specified are filled with
-> > zero bits. Any pointers are, perforce, NULL.  That should make both "{
-> > NULL }" and "{}" equivalent.
-> 
-> They are equivalent, yes, but people want to use a GCC plugin that randomizes
-> struct layouts for internal structures and the plugin doesn't work when you use
-> struct ordering to initialize the struct.  The plugin requires that you use
-> designated intializers.
+On Fri, 2016-12-16 at 17:00 -0800, Kees Cook wrote:
+> Prepare to mark sensitive kernel structures for randomization by making
+sure they're using designated initializers.
 
-"{ NULL }" is valid ISO C, but unfortunately "{}" is not.
+About the designated initializer patches,
+which by themselves are fine of course,
+and the fundamental randomization plugin,
+c guarantees that struct member ordering
+is as specified.
+
+how is the code to be verified so that
+any use of things like offsetof and any
+address/indexing is not impacted?
