@@ -1,27 +1,29 @@
-From: Joe Perches <joe@perches.com>
-Date: Tue, 20 Dec 2016 09:29:55 -0800
-Subject: [lustre-devel] Designated initializers,
-	struct randomization and addressing?
-In-Reply-To: <20161217010045.GA140343@beast>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Tue, 20 Dec 2016 21:52:40 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: ldlm: use designated
+	initializers
+In-Reply-To: <CAKRnqNJstpWfQdj=QDkhCNFp8KrX-vfjqfbiPjPzPtq8c6Ba4A@mail.gmail.com>
 References: <20161217010045.GA140343@beast>
-Message-ID: <1482254995.1984.20.camel@perches.com>
+	<alpine.LFD.2.20.1612191614320.25173@casper.infradead.org>
+	<CAKRnqNLFM_96NK3QbeoF-zC4KTe8oc7Q-eejzPgkE==XUHrwkQ@mail.gmail.com>
+	<20161220071034.GL8176@mwanda>
+	<C6D48C5819337145905EDC9DB164E69728D44FEC@fmsmsx120.amr.corp.intel.com>
+	<CAKRnqNJstpWfQdj=QDkhCNFp8KrX-vfjqfbiPjPzPtq8c6Ba4A@mail.gmail.com>
+Message-ID: <20161220185240.GK8244@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Kees Cook <keescook@chromium.org>, linux-kernel@vger.kernel.org, Julia Lawall <julia.lawall@lip6.fr>, Dan Carpenter <error27@gmail.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "John L. Hammond" <john.hammond@intel.com>, Emoly Liu <emoly.liu@intel.com>, Vitaly Fertman <vitaly_fertman@xyratex.com>, Bruno Faccini <bruno.faccini@intel.com>, Bruce Korb <bruce.korb@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org
+To: Bruce Korb <bruce.korb@gmail.com>
+Cc: "Hammond, John" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, Kees Cook <keescook@chromium.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Faccini, Bruno" <bruno.faccini@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, Vitaly Fertman <vitaly_fertman@xyratex.com>, "Liu, Emoly" <emoly.liu@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Fri, 2016-12-16 at 17:00 -0800, Kees Cook wrote:
-> Prepare to mark sensitive kernel structures for randomization by making
-sure they're using designated initializers.
+On Tue, Dec 20, 2016 at 08:47:51AM -0800, Bruce Korb wrote:
+> >
+> > "{ NULL }" is valid ISO C, but unfortunately "{}" is not.
+> 
+> Just make the thing "static const" and don't use an initializer.
 
-About the designated initializer patches,
-which by themselves are fine of course,
-and the fundamental randomization plugin,
-c guarantees that struct member ordering
-is as specified.
+That also works, of course.
 
-how is the code to be verified so that
-any use of things like offsetof and any
-address/indexing is not impacted?
+regards,
+dan carpenter
