@@ -1,33 +1,35 @@
-From: Guillermo O. Freschi <kedrot@gmail.com>
-Date: Mon, 26 Dec 2016 15:44:03 -0000
-Subject: [lustre-devel] [PATCH 1/2] Fixed signedness check
-Message-ID: <20161226154339.8916-1-kedrot@gmail.com>
+From: Karthik Nayak <karthik.188@gmail.com>
+Date: Fri, 23 Dec 2016 15:42:13 -0000
+Subject: [lustre-devel] [PATCH] staging: lustre: selftest: Make
+	brw_inject_one_error() static
+Message-ID: <20161223154244.29145-1-Karthik.188@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
-Cc: "Guillermo O. Freschi" <kedrot@gmail.com>
+To: linux-kernel@vger.kernel.org, devel@driverdev.osuosl.org
+Cc: lustre-devel@lists.lustre.org, kirill.shutemov@linux.intel.com, liang.zhen@intel.com, gregkh@linuxfoundation.org, jsimmons@infradead.org, andreas.dilger@intel.com, oleg.drokin@intel.com, Karthik Nayak <Karthik.188@gmail.com>
 
-Was `unsigned int`, but `enum`s are signed.
+Since the function brw_inject_one_error() is used only within
+brw_test.c, make it static. This was reported as a warning by sparse.
 
-Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
+Signed-off-by: Karthik Nayak <Karthik.188@gmail.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 2 +-
+ drivers/staging/lustre/lnet/selftest/brw_test.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index a4a291acb659..f4cbc89b4f24 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -1148,7 +1148,7 @@ static int lock_matches(struct ldlm_lock *lock, struct lock_match_data *data)
- 	return INTERVAL_ITER_STOP;
+diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
+index 67b460f..b9ac34e 100644
+--- a/drivers/staging/lustre/lnet/selftest/brw_test.c
++++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
+@@ -136,7 +136,7 @@ brw_client_init(struct sfw_test_instance *tsi)
+ 	return 0;
  }
  
--static unsigned int itree_overlap_cb(struct interval_node *in, void *args)
-+static enum interval_iter itree_overlap_cb(struct interval_node *in, void *args)
+-int brw_inject_one_error(void)
++static int brw_inject_one_error(void)
  {
- 	struct ldlm_interval *node = to_ldlm_interval(in);
- 	struct lock_match_data *data = args;
+ 	struct timespec64 ts;
+ 
 -- 
-2.11.0
+2.10.2
