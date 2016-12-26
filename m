@@ -1,36 +1,62 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Date: Tue, 20 Dec 2016 13:57:06 -0000
-Subject: [lustre-devel] [PATCH] staging: lustre: osc: use rb_entry_safe
-Message-ID: <0d014cb5a85c053f88ef7d53e5e3c1514f4e28c0.1482206001.git.geliangtang@gmail.com>
+From: Guillermo O. Freschi <kedrot@gmail.com>
+Date: Mon, 26 Dec 2016 15:44:05 -0000
+Subject: [lustre-devel] [PATCH 2/2] Style fixes
+In-Reply-To: <20161226154339.8916-1-kedrot@gmail.com>
+References: <20161226154339.8916-1-kedrot@gmail.com>
+Message-ID: <20161226154339.8916-2-kedrot@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Geliang Tang <geliangtang@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
+Cc: "Guillermo O. Freschi" <kedrot@gmail.com>
 
-Use rb_entry_safe() instead of container_of() to simplify the code.
+Missing braces on `if` statement; misaligned parameter.
 
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index b0f030c..6048df9 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -142,10 +142,7 @@ static const char *oes_strings[] = {
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index f4cbc89b4f24..a23e7ada3891 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -1024,11 +1024,11 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
+ 	if (work_list && lock->l_completion_ast)
+ 		ldlm_add_ast_work_item(lock, NULL, work_list);
  
- static inline struct osc_extent *rb_extent(struct rb_node *n)
- {
--	if (!n)
--		return NULL;
--
--	return container_of(n, struct osc_extent, oe_node);
-+	return rb_entry_safe(n, struct osc_extent, oe_node);
+-	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS)
++	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS) {
+ 		ldlm_grant_lock_with_skiplist(lock);
+-	else if (res->lr_type == LDLM_EXTENT)
++	} else if (res->lr_type == LDLM_EXTENT) {
+ 		ldlm_extent_add_lock(res, lock);
+-	else if (res->lr_type == LDLM_FLOCK) {
++	} else if (res->lr_type == LDLM_FLOCK) {
+ 		/*
+ 		 * We should not add locks to granted list in the following cases:
+ 		 * - this is an UNLOCK but not a real lock;
+@@ -1040,8 +1040,9 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
+ 		    ldlm_is_test_lock(lock) || ldlm_is_flock_deadlock(lock))
+ 			return;
+ 		ldlm_resource_add_lock(res, &res->lr_granted, lock);
+-	} else
++	} else {
+ 		LBUG();
++	}
+ 
+ 	ldlm_pool_add(&ldlm_res_to_ns(res)->ns_pool, lock);
  }
- 
- static inline struct osc_extent *next_extent(struct osc_extent *ext)
+@@ -1481,7 +1482,8 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
+ 							lustre_swab_ost_lvb_v1);
+ 			else
+ 				lvb = req_capsule_server_sized_swab_get(pill,
+-						&RMF_DLM_LVB, size,
++									&RMF_DLM_LVB,
++									size,
+ 						lustre_swab_ost_lvb_v1);
+ 			if (unlikely(!lvb)) {
+ 				LDLM_ERROR(lock, "no LVB");
 -- 
-2.9.3
+2.11.0
