@@ -1,62 +1,33 @@
-From: Guillermo O. Freschi <kedrot@gmail.com>
-Date: Mon, 26 Dec 2016 15:44:05 -0000
-Subject: [lustre-devel] [PATCH 2/2] Style fixes
-In-Reply-To: <20161226154339.8916-1-kedrot@gmail.com>
-References: <20161226154339.8916-1-kedrot@gmail.com>
-Message-ID: <20161226154339.8916-2-kedrot@gmail.com>
+From: SF Markus Elfring <elfring@users.sourceforge.net>
+Date: Sun, 1 Jan 2017 17:30:59 +0100
+Subject: [lustre-devel] [PATCH 0/5] staging-Lustre: Fine-tuning for some
+ function implementations
+Message-ID: <45ae8939-a775-865b-ade0-9e38a7ff2b5d@users.sourceforge.net>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
-Cc: "Guillermo O. Freschi" <kedrot@gmail.com>
+To: devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, Andreas Dilger <andreas.dilger@intel.com>, Ben Evans <bevans@cray.com>, Bobi Jam <bobijam.xu@intel.com>, Emoly Liu <emoly.liu@intel.com>, Fan Yong <fan.yong@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Gregoire Pichon <gregoire.pichon@bull.net>, Henri Doreau <henri.doreau@cea.fr>, James Simmons <jsimmons@infradead.org>, Jinshan Xiong <jinshan.xiong@intel.com>, "John L. Hammond" <john.hammond@intel.com>, "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>, Lai Siyao <lai.siyao@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Sebastien Buisson <sbuisson@ddn.com>, Stephen Champion <schamp@sgi.com>, wang di <di.wang@intel.com>
+Cc: LKML <linux-kernel@vger.kernel.org>, kernel-janitors@vger.kernel.org
 
-Missing braces on `if` statement; misaligned parameter.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sun, 1 Jan 2017 17:10:10 +0100
 
-Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
----
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+A few update suggestions were taken into account
+from static source code analysis.
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index f4cbc89b4f24..a23e7ada3891 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -1024,11 +1024,11 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
- 	if (work_list && lock->l_completion_ast)
- 		ldlm_add_ast_work_item(lock, NULL, work_list);
- 
--	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS)
-+	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS) {
- 		ldlm_grant_lock_with_skiplist(lock);
--	else if (res->lr_type == LDLM_EXTENT)
-+	} else if (res->lr_type == LDLM_EXTENT) {
- 		ldlm_extent_add_lock(res, lock);
--	else if (res->lr_type == LDLM_FLOCK) {
-+	} else if (res->lr_type == LDLM_FLOCK) {
- 		/*
- 		 * We should not add locks to granted list in the following cases:
- 		 * - this is an UNLOCK but not a real lock;
-@@ -1040,8 +1040,9 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
- 		    ldlm_is_test_lock(lock) || ldlm_is_flock_deadlock(lock))
- 			return;
- 		ldlm_resource_add_lock(res, &res->lr_granted, lock);
--	} else
-+	} else {
- 		LBUG();
-+	}
- 
- 	ldlm_pool_add(&ldlm_res_to_ns(res)->ns_pool, lock);
- }
-@@ -1481,7 +1482,8 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
- 							lustre_swab_ost_lvb_v1);
- 			else
- 				lvb = req_capsule_server_sized_swab_get(pill,
--						&RMF_DLM_LVB, size,
-+									&RMF_DLM_LVB,
-+									size,
- 						lustre_swab_ost_lvb_v1);
- 			if (unlikely(!lvb)) {
- 				LDLM_ERROR(lock, "no LVB");
+Markus Elfring (5):
+  llite: Use seq_puts() in three functions
+  mgc: Combine two seq_printf() calls into one call in lprocfs_mgc_rd_ir_state()
+  obdclass: Use seq_putc() in four functions
+  obdclass: Combine two seq_printf() calls into one call in lprocfs_rd_state()
+  obdclass: Use seq_puts() in three functions
+
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  | 12 +++++------
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |  5 +----
+ drivers/staging/lustre/lustre/obdclass/cl_object.c |  8 ++++----
+ .../lustre/lustre/obdclass/lprocfs_status.c        | 23 ++++++++++------------
+ 4 files changed, 21 insertions(+), 27 deletions(-)
+
 -- 
 2.11.0
