@@ -1,27 +1,50 @@
-From: Di Natale, Giuseppe <dinatale2@llnl.gov>
-Date: Thu, 5 Jan 2017 00:16:42 +0000
-Subject: [lustre-devel] (no subject)
-Message-ID: <974262C966B9F640899A48EB96313E9A318459F8@PRDEXMBX-08.the-lab.llnl.gov>
+From: Christopher J. Morrone <morrone2@llnl.gov>
+Date: Wed, 4 Jan 2017 17:36:09 -0800
+Subject: [lustre-devel] LUSTRE_LNET_CONFIG_UTILITY in lnet SysV script
+In-Reply-To: <974262C966B9F640899A48EB96313E9A318459F8@PRDEXMBX-08.the-lab.llnl.gov>
+References: <974262C966B9F640899A48EB96313E9A318459F8@PRDEXMBX-08.the-lab.llnl.gov>
+Message-ID: <1ea178df-8afa-135a-3bde-a2e7b7fc5e12@llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Greetings,
+lnetctl is currently an optional build, and its build is not even
+enabled by default in the lustre spec file.  To use lnetctl exclusively,
+we would need lnetctl's build would need to be unconditional.
 
-I am attempting to port the SysV lnet script as part of a transition to systemd. I ran into the following in lustre/scripts/lnet:
+I don't have a problem with making the lnetctl build unconditional.  I'm
+not sure why it was done that way.  Perhaps someone else can comment on
+that.
 
-        if [ -x $LUSTRE_LNET_CONFIG_UTILITY -a -f "$LUSTRE_LNET_CONFIG_FILE" ]; then
-                $LUSTRE_LNET_CONFIG_UTILITY lnet configure || exit 1
-        else
-                lctl network up || exit 1
-        fi
+When/if lnetctl is built unconditionally, it would be nice to purge the
+"DLC" terminology from the code.
 
-Can the check for LUSTRE_LNET_CONFIG_UTILITY  (/usr/sbin/lnetctl by default) be removed so that way lnetctl is used exclusively?
+Chris
 
-Thanks,
-Giuseppe Di Natale
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170105/7e17c5c9/attachment.htm>
+On 01/04/2017 04:16 PM, Di Natale, Giuseppe wrote:
+> Greetings,
+> 
+> I am attempting to port the SysV lnet script as part of a transition to
+> systemd. I ran into the following in lustre/scripts/lnet:
+> 
+>         if [ -x $LUSTRE_LNET_CONFIG_UTILITY -a -f
+> "$LUSTRE_LNET_CONFIG_FILE" ]; then
+>                 $LUSTRE_LNET_CONFIG_UTILITY lnet configure || exit 1
+>         else
+>                 lctl network up || exit 1
+>         fi
+> 
+> Can the check for LUSTRE_LNET_CONFIG_UTILITY  (/usr/sbin/lnetctl by
+> default) be removed so that way lnetctl is used exclusively?
+> 
+> Thanks,
+> Giuseppe Di Natale
+> 
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 
