@@ -1,33 +1,27 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Tue, 3 Jan 2017 15:15:28 +0100
-Subject: [lustre-devel] [PATCH] staging : lustre : Remove braces from
-	single-line body.
-In-Reply-To: <1482934209-10857-1-git-send-email-khan.tabrez21@gmail.com>
-References: <1482934209-10857-1-git-send-email-khan.tabrez21@gmail.com>
-Message-ID: <20170103141528.GA10415@kroah.com>
+From: Di Natale, Giuseppe <dinatale2@llnl.gov>
+Date: Thu, 5 Jan 2017 00:16:42 +0000
+Subject: [lustre-devel] (no subject)
+Message-ID: <974262C966B9F640899A48EB96313E9A318459F8@PRDEXMBX-08.the-lab.llnl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Tabrez khan <khan.tabrez21@gmail.com>
-Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
 
-On Wed, Dec 28, 2016 at 07:40:09PM +0530, Tabrez khan wrote:
-> Remove unnecessary braces from single-line if statement.
-> This warning is found using checkpatch.pl.
-> 
-> Signed-off-by: Tabrez khan <khan.tabrez21@gmail.com>
-> ---
->  drivers/staging/lustre/lustre/ptlrpc/import.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Greetings,
 
-You have sent me 5 patches, with 4 of them having duplicated subject
-lines, yet they do different things.  Also, what order am I supposed to
-apply these patches in?
+I am attempting to port the SysV lnet script as part of a transition to systemd. I ran into the following in lustre/scripts/lnet:
 
-Please resend them as a patch series, properly numbered, and with unique
-subjects.
+        if [ -x $LUSTRE_LNET_CONFIG_UTILITY -a -f "$LUSTRE_LNET_CONFIG_FILE" ]; then
+                $LUSTRE_LNET_CONFIG_UTILITY lnet configure || exit 1
+        else
+                lctl network up || exit 1
+        fi
 
-thanks,
+Can the check for LUSTRE_LNET_CONFIG_UTILITY  (/usr/sbin/lnetctl by default) be removed so that way lnetctl is used exclusively?
 
-greg k-h
+Thanks,
+Giuseppe Di Natale
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170105/7e17c5c9/attachment.htm>
