@@ -1,53 +1,31 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Fri, 13 Jan 2017 01:59:51 -0500
-Subject: [lustre-devel] [PATCH 4/5] staging/lustre/obdclass: Combine two
-	seq_printf() calls into one call in lprocfs_rd_state()
-In-Reply-To: <92ca443f-4791-f291-e2ea-5e67e3a846ac@users.sourceforge.net>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Fri, 13 Jan 2017 08:41:52 +0100
+Subject: [lustre-devel] [PATCH 2/5] staging/lustre/mgc: Combine two
+ seq_printf() calls into one call in lprocfs_mgc_rd_ir_state()
+In-Reply-To: <C204F97C-59ED-4558-9322-0EC7B63AA44B@intel.com>
 References: <45ae8939-a775-865b-ade0-9e38a7ff2b5d@users.sourceforge.net>
-	<92ca443f-4791-f291-e2ea-5e67e3a846ac@users.sourceforge.net>
-Message-ID: <3FDC3834-8D24-4761-81A0-5CBB763E018A@intel.com>
+	<25b07069-c624-cdd4-ca7b-85aaae51e79e@users.sourceforge.net>
+	<C204F97C-59ED-4558-9322-0EC7B63AA44B@intel.com>
+Message-ID: <20170113074152.GA16646@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: SF Markus Elfring <elfring@users.sourceforge.net>
-Cc: devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, Andreas Dilger <andreas.dilger@intel.com>, Ben Evans <bevans@cray.com>, Bobi Jam <bobijam.xu@intel.com>, Emoly Liu <emoly.liu@intel.com>, Fan Yong <fan.yong@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Gregoire Pichon <gregoire.pichon@bull.net>, Henri Doreau <henri.doreau@cea.fr>, James Simmons <jsimmons@infradead.org>, Jinshan Xiong <jinshan.xiong@intel.com>, "John L. Hammond" <john.hammond@intel.com>, "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>, Lai Siyao <lai.siyao@intel.com>, Sebastien Buisson <sbuisson@ddn.com>, Stephen Champion <schamp@sgi.com>, wang di <di.wang@intel.com>, LKML <linux-kernel@vger.kernel.org>, kernel-janitors@vger.kernel.org
+To: Oleg Drokin <oleg.drokin@intel.com>
+Cc: SF Markus Elfring <elfring@users.sourceforge.net>, devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, Andreas Dilger <andreas.dilger@intel.com>, Ben Evans <bevans@cray.com>, Bobi Jam <bobijam.xu@intel.com>, Emoly Liu <emoly.liu@intel.com>, Fan Yong <fan.yong@intel.com>, Gregoire Pichon <gregoire.pichon@bull.net>, Henri Doreau <henri.doreau@cea.fr>, James Simmons <jsimmons@infradead.org>, Jinshan Xiong <jinshan.xiong@intel.com>, "John L. Hammond" <john.hammond@intel.com>, "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>, Lai Siyao <lai.siyao@intel.com>, Sebastien Buisson <sbuisson@ddn.com>, Stephen Champion <schamp@sgi.com>, wang di <di.wang@intel.com>, LKML <linux-kernel@vger.kernel.org>, kernel-janitors@vger.kernel.org
 
+On Fri, Jan 13, 2017 at 01:58:37AM -0500, Oleg Drokin wrote:
+> 
+> On Jan 1, 2017, at 11:35 AM, SF Markus Elfring wrote:
 
-On Jan 1, 2017, at 11:38 AM, SF Markus Elfring wrote:
+<snip>
 
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Sun, 1 Jan 2017 16:26:36 +0100
-> 
-> Some data were printed into a sequence by two separate function calls.
-> Print the same data by a single function call instead.
-> 
-> This issue was detected by using the Coccinelle software.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
-> drivers/staging/lustre/lustre/obdclass/lprocfs_status.c | 4 +---
-> 1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> index 3f6fcab5a1fc..a167cbe8a50e 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> @@ -853,10 +853,8 @@ int lprocfs_rd_state(struct seq_file *m, void *data)
-> 		return rc;
-> 
-> 	imp = obd->u.cli.cl_import;
-> -
-> -	seq_printf(m, "current_state: %s\n",
-> +	seq_printf(m, "current_state: %s\nstate_history:\n",
-> 		   ptlrpc_import_state_name(imp->imp_state));
-> -	seq_printf(m, "state_history:\n");
+Oleg, please realize that I have blacklisted this patch author, and
+don't take contributions from them, unless you, or someone else wishes
+to properly review and pass them on.  I've found that personally, it's
+just a waste of time working with them, but you are free to do whatever
+you wish...
 
-same as in that other patch - this actually makes the code a bit harder to read,
-what's the perceived benefit to make a change like this?
+good luck!
 
-> 	k = imp->imp_state_hist_idx;
-> 	for (j = 0; j < IMP_STATE_HIST_LEN; j++) {
-> 		struct import_state_hist *ish =
-> -- 
-> 2.11.0
+greg k-h
