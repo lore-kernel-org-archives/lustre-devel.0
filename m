@@ -1,77 +1,47 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 13 Jan 2017 01:20:18 +0000
-Subject: [lustre-devel] [PATCH 2/2] Style fixes
-In-Reply-To: <20161226154339.8916-2-kedrot@gmail.com>
-References: <20161226154339.8916-1-kedrot@gmail.com>
-	<20161226154339.8916-2-kedrot@gmail.com>
-Message-ID: <03F47D3D-C497-4138-A168-5A4A3B20CF77@intel.com>
+Date: Fri, 13 Jan 2017 01:21:12 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: selftest:
+	Make	brw_inject_one_error() static
+In-Reply-To: <20161223154244.29145-1-Karthik.188@gmail.com>
+References: <20161223154244.29145-1-Karthik.188@gmail.com>
+Message-ID: <E7146D5C-6869-4DE4-ADED-11C727517555@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Guillermo O. Freschi" <kedrot@gmail.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+To: Karthik Nayak <karthik.188@gmail.com>
+Cc: LKML <linux-kernel@vger.kernel.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, "kirill.shutemov@linux.intel.com" <kirill.shutemov@linux.intel.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
 
+On Dec 23, 2016, at 08:42, Karthik Nayak <karthik.188@gmail.com> wrote:
+> 
+> Since the function brw_inject_one_error() is used only within
+> brw_test.c, make it static. This was reported as a warning by sparse.
+> 
+> Signed-off-by: Karthik Nayak <Karthik.188@gmail.com>
 
-> On Dec 26, 2016, at 08:43, Guillermo O. Freschi <kedrot@gmail.com> wrote:
-> 
-> Missing braces on `if` statement; misaligned parameter.
-> 
-> Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+
 > ---
-> drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 12 +++++++-----
-> 1 file changed, 7 insertions(+), 5 deletions(-)
+> drivers/staging/lustre/lnet/selftest/brw_test.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-> index f4cbc89b4f24..a23e7ada3891 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-> @@ -1024,11 +1024,11 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
-> 	if (work_list && lock->l_completion_ast)
-> 		ldlm_add_ast_work_item(lock, NULL, work_list);
-> 
-> -	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS)
-> +	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS) {
-> 		ldlm_grant_lock_with_skiplist(lock);
-> -	else if (res->lr_type == LDLM_EXTENT)
-> +	} else if (res->lr_type == LDLM_EXTENT) {
-> 		ldlm_extent_add_lock(res, lock);
-> -	else if (res->lr_type == LDLM_FLOCK) {
-> +	} else if (res->lr_type == LDLM_FLOCK) {
-> 		/*
-> 		 * We should not add locks to granted list in the following cases:
-> 		 * - this is an UNLOCK but not a real lock;
-
-This part is fine.
-
-> @@ -1040,8 +1040,9 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
-> 		    ldlm_is_test_lock(lock) || ldlm_is_flock_deadlock(lock))
-> 			return;
-> 		ldlm_resource_add_lock(res, &res->lr_granted, lock);
-> -	} else
-> +	} else {
-> 		LBUG();
-> +	}
-> 
-> 	ldlm_pool_add(&ldlm_res_to_ns(res)->ns_pool, lock);
+> diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
+> index 67b460f..b9ac34e 100644
+> --- a/drivers/staging/lustre/lnet/selftest/brw_test.c
+> +++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
+> @@ -136,7 +136,7 @@ brw_client_init(struct sfw_test_instance *tsi)
+> 	return 0;
 > }
-
-Fine.
-
-> @@ -1481,7 +1482,8 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
-> 							lustre_swab_ost_lvb_v1);
-> 			else
-> 				lvb = req_capsule_server_sized_swab_get(pill,
-> -						&RMF_DLM_LVB, size,
-> +									&RMF_DLM_LVB,
-> +									size,
-> 						lustre_swab_ost_lvb_v1);
-
-Not so keen on this one, since "lustre_swab_ost_lvb_v1" can't fit after the
-'(' of the original function line, there isn't any benefit to aligning the
-other two arguments but not that one.  Better to keep the indentation the
-same and save one line of whitespace.
-
-Can you please resubmit without this hunk.
-
-Cheers, Andreas
+> 
+> -int brw_inject_one_error(void)
+> +static int brw_inject_one_error(void)
+> {
+> 	struct timespec64 ts;
+> 
+> -- 
+> 2.10.2
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
