@@ -1,9 +1,10 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 13 Jan 2017 01:17:39 +0000
-Subject: [lustre-devel] [PATCH 1/2] Fixed signedness check
-In-Reply-To: <20161226154339.8916-1-kedrot@gmail.com>
+Date: Fri, 13 Jan 2017 01:20:18 +0000
+Subject: [lustre-devel] [PATCH 2/2] Style fixes
+In-Reply-To: <20161226154339.8916-2-kedrot@gmail.com>
 References: <20161226154339.8916-1-kedrot@gmail.com>
-Message-ID: <0EF6ABF1-1E3F-46DF-90CA-DA890027DEC4@intel.com>
+	<20161226154339.8916-2-kedrot@gmail.com>
+Message-ID: <03F47D3D-C497-4138-A168-5A4A3B20CF77@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -11,44 +12,66 @@ Content-Transfer-Encoding: 7bit
 To: "Guillermo O. Freschi" <kedrot@gmail.com>
 Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-On Dec 26, 2016, at 08:43, Guillermo O. Freschi <kedrot@gmail.com> wrote:
+
+> On Dec 26, 2016, at 08:43, Guillermo O. Freschi <kedrot@gmail.com> wrote:
 > 
-> Was `unsigned int`, but `enum`s are signed.
-
-Interesting that GCC didn't complain that the itree_overlap_cb() function
-signature didn't match the argument prototype for interval_search():
-
-  typedef enum interval_iter (*interval_callback_t)(struct interval_node *node,
-                                                    void *args);
-
-In the end it is a somewhat cosmetic fix, because the only enum values
-(1, 2) were unsigned, but good to be consistent.  Thanks for the fix.
-
+> Missing braces on `if` statement; misaligned parameter.
+> 
 > Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
-
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-
 > ---
-> drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
+> drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 12 +++++++-----
+> 1 file changed, 7 insertions(+), 5 deletions(-)
 > 
 > diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-> index a4a291acb659..f4cbc89b4f24 100644
+> index f4cbc89b4f24..a23e7ada3891 100644
 > --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
 > +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-> @@ -1148,7 +1148,7 @@ static int lock_matches(struct ldlm_lock *lock, struct lock_match_data *data)
-> 	return INTERVAL_ITER_STOP;
+> @@ -1024,11 +1024,11 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
+> 	if (work_list && lock->l_completion_ast)
+> 		ldlm_add_ast_work_item(lock, NULL, work_list);
+> 
+> -	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS)
+> +	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS) {
+> 		ldlm_grant_lock_with_skiplist(lock);
+> -	else if (res->lr_type == LDLM_EXTENT)
+> +	} else if (res->lr_type == LDLM_EXTENT) {
+> 		ldlm_extent_add_lock(res, lock);
+> -	else if (res->lr_type == LDLM_FLOCK) {
+> +	} else if (res->lr_type == LDLM_FLOCK) {
+> 		/*
+> 		 * We should not add locks to granted list in the following cases:
+> 		 * - this is an UNLOCK but not a real lock;
+
+This part is fine.
+
+> @@ -1040,8 +1040,9 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
+> 		    ldlm_is_test_lock(lock) || ldlm_is_flock_deadlock(lock))
+> 			return;
+> 		ldlm_resource_add_lock(res, &res->lr_granted, lock);
+> -	} else
+> +	} else {
+> 		LBUG();
+> +	}
+> 
+> 	ldlm_pool_add(&ldlm_res_to_ns(res)->ns_pool, lock);
 > }
-> 
-> -static unsigned int itree_overlap_cb(struct interval_node *in, void *args)
-> +static enum interval_iter itree_overlap_cb(struct interval_node *in, void *args)
-> {
-> 	struct ldlm_interval *node = to_ldlm_interval(in);
-> 	struct lock_match_data *data = args;
-> -- 
-> 2.11.0
-> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+Fine.
+
+> @@ -1481,7 +1482,8 @@ int ldlm_fill_lvb(struct ldlm_lock *lock, struct req_capsule *pill,
+> 							lustre_swab_ost_lvb_v1);
+> 			else
+> 				lvb = req_capsule_server_sized_swab_get(pill,
+> -						&RMF_DLM_LVB, size,
+> +									&RMF_DLM_LVB,
+> +									size,
+> 						lustre_swab_ost_lvb_v1);
+
+Not so keen on this one, since "lustre_swab_ost_lvb_v1" can't fit after the
+'(' of the original function line, there isn't any benefit to aligning the
+other two arguments but not that one.  Better to keep the indentation the
+same and save one line of whitespace.
+
+Can you please resubmit without this hunk.
+
+Cheers, Andreas
