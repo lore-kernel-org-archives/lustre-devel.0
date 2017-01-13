@@ -1,16 +1,54 @@
-From: Sagi Grimberg <sagi@grimberg.me>
-Date: Thu, 12 Jan 2017 13:45:31 +0200
-Subject: [lustre-devel] [PATCH 9/9] treewide: Inline ib_dma_map_*()
-	functions
-In-Reply-To: <20170111005648.14988-10-bart.vanassche@sandisk.com>
-References: <20170111005648.14988-1-bart.vanassche@sandisk.com>
-	<20170111005648.14988-10-bart.vanassche@sandisk.com>
-Message-ID: <811bac91-39f4-edac-db8a-d44989440b21@grimberg.me>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Fri, 13 Jan 2017 01:17:39 +0000
+Subject: [lustre-devel] [PATCH 1/2] Fixed signedness check
+In-Reply-To: <20161226154339.8916-1-kedrot@gmail.com>
+References: <20161226154339.8916-1-kedrot@gmail.com>
+Message-ID: <0EF6ABF1-1E3F-46DF-90CA-DA890027DEC4@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Bart Van Assche <bart.vanassche@sandisk.com>, Doug Ledford <dledford@redhat.com>
-Cc: Latchesar Ionkov <lucho@ionkov.net>, devel@driverdev.osuosl.org, linux-nfs@vger.kernel.org, Andreas Dilger <andreas.dilger@intel.com>, linux-rdma@vger.kernel.org, netdev@vger.kernel.org, Trond Myklebust <trond.myklebust@primarydata.com>, linux-kernel@vger.kernel.org, linux-nvme@lists.infradead.org, Anna Schumaker <anna.schumaker@netapp.com>, Oleg Drokin <oleg.drokin@intel.com>, Eric Van Hensbergen <ericvh@gmail.com>, target-devel@vger.kernel.org, Ron Minnich <rminnich@sandia.gov>, James Simmons <jsimmons@infradead.org>, v9fs-developer@lists.sourceforge.net, rds-devel@oss.oracle.com, "David S . Miller" <davem@davemloft.net>, lustre-devel@lists.lustre.org
+To: "Guillermo O. Freschi" <kedrot@gmail.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-Reviewed-by: Sagi Grimberg <sagi@grimberg.me>
+On Dec 26, 2016, at 08:43, Guillermo O. Freschi <kedrot@gmail.com> wrote:
+> 
+> Was `unsigned int`, but `enum`s are signed.
+
+Interesting that GCC didn't complain that the itree_overlap_cb() function
+signature didn't match the argument prototype for interval_search():
+
+  typedef enum interval_iter (*interval_callback_t)(struct interval_node *node,
+                                                    void *args);
+
+In the end it is a somewhat cosmetic fix, because the only enum values
+(1, 2) were unsigned, but good to be consistent.  Thanks for the fix.
+
+> Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
+
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+
+> ---
+> drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+> index a4a291acb659..f4cbc89b4f24 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+> @@ -1148,7 +1148,7 @@ static int lock_matches(struct ldlm_lock *lock, struct lock_match_data *data)
+> 	return INTERVAL_ITER_STOP;
+> }
+> 
+> -static unsigned int itree_overlap_cb(struct interval_node *in, void *args)
+> +static enum interval_iter itree_overlap_cb(struct interval_node *in, void *args)
+> {
+> 	struct ldlm_interval *node = to_ldlm_interval(in);
+> 	struct lock_match_data *data = args;
+> -- 
+> 2.11.0
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
