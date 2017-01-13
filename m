@@ -1,47 +1,55 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 13 Jan 2017 01:21:12 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: selftest:
-	Make	brw_inject_one_error() static
-In-Reply-To: <20161223154244.29145-1-Karthik.188@gmail.com>
-References: <20161223154244.29145-1-Karthik.188@gmail.com>
-Message-ID: <E7146D5C-6869-4DE4-ADED-11C727517555@intel.com>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Fri, 13 Jan 2017 01:58:37 -0500
+Subject: [lustre-devel] [PATCH 2/5] staging/lustre/mgc: Combine two
+	seq_printf() calls into one call in lprocfs_mgc_rd_ir_state()
+In-Reply-To: <25b07069-c624-cdd4-ca7b-85aaae51e79e@users.sourceforge.net>
+References: <45ae8939-a775-865b-ade0-9e38a7ff2b5d@users.sourceforge.net>
+	<25b07069-c624-cdd4-ca7b-85aaae51e79e@users.sourceforge.net>
+Message-ID: <C204F97C-59ED-4558-9322-0EC7B63AA44B@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Karthik Nayak <karthik.188@gmail.com>
-Cc: LKML <linux-kernel@vger.kernel.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, "kirill.shutemov@linux.intel.com" <kirill.shutemov@linux.intel.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+To: SF Markus Elfring <elfring@users.sourceforge.net>
+Cc: devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, Andreas Dilger <andreas.dilger@intel.com>, Ben Evans <bevans@cray.com>, Bobi Jam <bobijam.xu@intel.com>, Emoly Liu <emoly.liu@intel.com>, Fan Yong <fan.yong@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Gregoire Pichon <gregoire.pichon@bull.net>, Henri Doreau <henri.doreau@cea.fr>, James Simmons <jsimmons@infradead.org>, Jinshan Xiong <jinshan.xiong@intel.com>, "John L. Hammond" <john.hammond@intel.com>, "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>, Lai Siyao <lai.siyao@intel.com>, Sebastien Buisson <sbuisson@ddn.com>, Stephen Champion <schamp@sgi.com>, wang di <di.wang@intel.com>, LKML <linux-kernel@vger.kernel.org>, kernel-janitors@vger.kernel.org
 
-On Dec 23, 2016, at 08:42, Karthik Nayak <karthik.188@gmail.com> wrote:
+
+On Jan 1, 2017, at 11:35 AM, SF Markus Elfring wrote:
+
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sun, 1 Jan 2017 15:40:29 +0100
 > 
-> Since the function brw_inject_one_error() is used only within
-> brw_test.c, make it static. This was reported as a warning by sparse.
+> Some data were printed into a sequence by two separate function calls.
+> Print the same data by a single function call instead.
 > 
-> Signed-off-by: Karthik Nayak <Karthik.188@gmail.com>
-
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-
+> This issue was detected by using the Coccinelle software.
+> 
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 > ---
-> drivers/staging/lustre/lnet/selftest/brw_test.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
+> drivers/staging/lustre/lustre/mgc/mgc_request.c | 5 +----
+> 1 file changed, 1 insertion(+), 4 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
-> index 67b460f..b9ac34e 100644
-> --- a/drivers/staging/lustre/lnet/selftest/brw_test.c
-> +++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
-> @@ -136,7 +136,7 @@ brw_client_init(struct sfw_test_instance *tsi)
-> 	return 0;
-> }
+> diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> index b9c522a3c7a4..a6ca48d7e96b 100644
+> --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> @@ -460,11 +460,8 @@ int lprocfs_mgc_rd_ir_state(struct seq_file *m, void *data)
 > 
-> -int brw_inject_one_error(void)
-> +static int brw_inject_one_error(void)
-> {
-> 	struct timespec64 ts;
-> 
+> 	imp = obd->u.cli.cl_import;
+> 	ocd = &imp->imp_connect_data;
+> -
+> -	seq_printf(m, "imperative_recovery: %s\n",
+> +	seq_printf(m, "imperative_recovery: %s\nclient_state:\n",
+> 		   OCD_HAS_FLAG(ocd, IMP_RECOV) ? "ENABLED" : "DISABLED");
+> -	seq_printf(m, "client_state:\n");
+> -
+
+Ugh, do we really need this?
+I know it saves one call to seq_printf, but this is not a super performance-critical
+code, and two calls are actually easier to read, don't you think?
+
+> 	spin_lock(&config_list_lock);
+> 	list_for_each_entry(cld, &config_llog_list, cld_list_chain) {
+> 		if (!cld->cld_recover)
 > -- 
-> 2.10.2
-> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 2.11.0
