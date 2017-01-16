@@ -1,11 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Jan 2017 21:02:10 +0000 (GMT)
+Date: Mon, 16 Jan 2017 21:05:19 +0000 (GMT)
 Subject: [lustre-devel] (no subject)
-In-Reply-To: <67f5b76c-cadb-747b-cb90-b2b40ca30c65@llnl.gov>
+In-Reply-To: <CAAqp6i2rJHPWH0nj+TSCjWU7HEMt_MQHpT2Qu6pbLRuUQTEAyw@mail.gmail.com>
 References: <974262C966B9F640899A48EB96313E9A318459F8@PRDEXMBX-08.the-lab.llnl.gov>
 	<CAAqp6i21NbmZUsxSRZwkZdbKDp-LO8maFxMjKASYp2Aw6vdpyw@mail.gmail.com>
 	<67f5b76c-cadb-747b-cb90-b2b40ca30c65@llnl.gov>
-Message-ID: <alpine.LFD.2.20.1701162100360.27875@casper.infradead.org>
+	<CAAqp6i2rJHPWH0nj+TSCjWU7HEMt_MQHpT2Qu6pbLRuUQTEAyw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1701162102350.27875@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,64 +14,76 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> Sounds good to me.  Ideally, lnetctl should be able to do everything
-> that lctl could do (plus all of the new features).  Has it reached
-> parity?  If not, what else still remains to be done?
+> lnetctl was designed to control LNet only. We have not moved the rest of the lctl functionality. lctl does
+> a lot of other lustre specific functions.
+> The idea was to have lnetctl be only LNet specific, and lctl lustre specific. In essence we are attempting
+> to decouple LNet from lustre. There has been some talk about upstreaming LNet before lustre with all the
+> work that James Simmons from ORNL is doing.
 
-No lctl pings and the peer and connection handling is missing. I did
-some work to support the missing features in lnetctl and combined with
-multi-rail should fill in the gaps. Also we are missing lnetctl ping
-but I think multi-rail might fix that. Not 100% sure tho.
+Already done. LNet is ahead a bit for the upstream client from master but 
+just recently I have been backporting that work to the OpenSFS branch.
+Its almost synced up now. As for LNet leaving staging Greg wanted both
+LNet and lustre to leaving staging at the same time.
 
+> thanks
+> amir
 > 
-> Chris
+> On 10 January 2017 at 14:06, Christopher J. Morrone <morrone2@llnl.gov> wrote:
+>       Sounds good to me.? Ideally, lnetctl should be able to do everything
+>       that lctl could do (plus all of the new features).? Has it reached
+>       parity?? If not, what else still remains to be done?
 > 
-> On 01/10/2017 12:15 PM, Amir Shehata wrote:
-> > lctl usage is kept for backwards compatibility. Eventually, we should be
-> > moving to using lnetctl exclusively. Which lustre-release we should do
-> > that in, is the question. 2.10?
-> > 
-> > thanks
-> > amir
-> > 
-> > On 4 January 2017 at 16:16, Di Natale, Giuseppe <dinatale2@llnl.gov
-> > <mailto:dinatale2@llnl.gov>> wrote:
-> > 
-> >     Greetings,
-> > 
-> >     I am attempting to port the SysV lnet script as part of a transition
-> >     to systemd. I ran into the following in lustre/scripts/lnet:
-> > 
-> >             if [ -x $LUSTRE_LNET_CONFIG_UTILITY -a -f
-> >     "$LUSTRE_LNET_CONFIG_FILE" ]; then
-> >                     $LUSTRE_LNET_CONFIG_UTILITY lnet configure || exit 1
-> >             else
-> >                     lctl network up || exit 1
-> >             fi
-> > 
-> >     Can the check for LUSTRE_LNET_CONFIG_UTILITY  (/usr/sbin/lnetctl by
-> >     default) be removed so that way lnetctl is used exclusively?
-> > 
-> >     Thanks,
-> >     Giuseppe Di Natale
-> > 
-> >     _______________________________________________
-> >     lustre-devel mailing list
-> >     lustre-devel at lists.lustre.org <mailto:lustre-devel@lists.lustre.org>
-> >     http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> >     <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>
-> > 
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > lustre-devel mailing list
-> > lustre-devel at lists.lustre.org
-> > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> > 
+>       Chris
 > 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>       On 01/10/2017 12:15 PM, Amir Shehata wrote:
+>       > lctl usage is kept for backwards compatibility. Eventually, we should be
+>       > moving to using lnetctl exclusively. Which lustre-release we should do
+>       > that in, is the question. 2.10?
+>       >
+>       > thanks
+>       > amir
+>       >
+>       > On 4 January 2017 at 16:16, Di Natale, Giuseppe <dinatale2@llnl.gov
+>       > <mailto:dinatale2@llnl.gov>> wrote:
+>       >
+>       >? ? ?Greetings,
+>       >
+>       >? ? ?I am attempting to port the SysV lnet script as part of a transition
+>       >? ? ?to systemd. I ran into the following in lustre/scripts/lnet:
+>       >
+>       >? ? ? ? ? ? ?if [ -x $LUSTRE_LNET_CONFIG_UTILITY -a -f
+>       >? ? ?"$LUSTRE_LNET_CONFIG_FILE" ]; then
+>       >? ? ? ? ? ? ? ? ? ? ?$LUSTRE_LNET_CONFIG_UTILITY lnet configure || exit 1
+>       >? ? ? ? ? ? ?else
+>       >? ? ? ? ? ? ? ? ? ? ?lctl network up || exit 1
+>       >? ? ? ? ? ? ?fi
+>       >
+>       >? ? ?Can the check for LUSTRE_LNET_CONFIG_UTILITY? (/usr/sbin/lnetctl by
+>       >? ? ?default) be removed so that way lnetctl is used exclusively?
+>       >
+>       >? ? ?Thanks,
+>       >? ? ?Giuseppe Di Natale
+>       >
+>       >? ? ?_______________________________________________
+>       >? ? ?lustre-devel mailing list
+>       >? ? ?lustre-devel at lists.lustre.org <mailto:lustre-devel@lists.lustre.org>
+>       >? ? ?http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>       >? ? ?<http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>
+>       >
+>       >
+>       >
+>       >
+>       > _______________________________________________
+>       > lustre-devel mailing list
+>       > lustre-devel at lists.lustre.org
+>       > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>       >
+> 
+>       _______________________________________________
+>       lustre-devel mailing list
+>       lustre-devel at lists.lustre.org
+>       http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 
+> 
+> 
 > 
