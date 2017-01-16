@@ -1,163 +1,267 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Jan 2017 21:25:58 +0000 (GMT)
-Subject: [lustre-devel] (no subject)
-In-Reply-To: <34fdf36d-b7d2-4a50-9656-dd720d805d31@llnl.gov>
-References: <974262C966B9F640899A48EB96313E9A318459F8@PRDEXMBX-08.the-lab.llnl.gov>
-	<CAAqp6i21NbmZUsxSRZwkZdbKDp-LO8maFxMjKASYp2Aw6vdpyw@mail.gmail.com>
-	<67f5b76c-cadb-747b-cb90-b2b40ca30c65@llnl.gov>
-	<CAAqp6i2rJHPWH0nj+TSCjWU7HEMt_MQHpT2Qu6pbLRuUQTEAyw@mail.gmail.com>
-	<30DCC240-3E47-4A2B-8C7B-B46D165C2127@intel.com>
-	<34fdf36d-b7d2-4a50-9656-dd720d805d31@llnl.gov>
-Message-ID: <alpine.LFD.2.20.1701162106020.27875@casper.infradead.org>
+Date: Mon, 16 Jan 2017 21:28:30 +0000 (GMT)
+Subject: [lustre-devel] [PATCH] staging: lustre: headers: potential UAPI
+	headers
+In-Reply-To: <20170103141248.GA8695@kroah.com>
+References: <1482167207-22800-1-git-send-email-jsimmons@infradead.org>
+	<20170103141248.GA8695@kroah.com>
+Message-ID: <alpine.LFD.2.20.1701162126170.27875@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> Right, I meant copy in lnet-specific functionality from lctl to lnetctl.
->  I didn't mean to sound like I was suggesting moving the rest of lctl's
-> non-lnet parts into lnetctl.
-
-I think Chris means is that if we make liblnetconfig mandatory then we can
-link lctl to that library and replace alot of the functionality lctl is 
-doing itself with the work in liblnetconfig.
-
-Currently the library situation is a mess. We have:
-
-liblnetconfig.so (okay)
-libcfs.a
-libcfsutil.a
-libptlctl.a
-liblustreapi.so
-
-For liblustreapi.so it linked the libcfs*.a and libptlctl.a static
-libraries. If you look at libptlctl.a its just composed of two source
-files. One is debug.c which really belongs in libcfs. The other could
-be replaced by libnetconfig. So we can kill off libptlctl.a. For
-libcfsutil.a that should just merge into libcfs.
-
-> On 01/10/2017 08:18 PM, Dilger, Andreas wrote:
-> > It's fine to add the lnet-specific functionality from lctl to lnetctl,
-> > but we shouldn't remove existing functionality from lctl to avoid
-> > breaking scripts that may be using it today.  4+ releases after all of
-> > the LNet specific lctl functionality has been added to lnetctl we can
-> > start printing deprecation warnings, and after 8+ releases they can be
-> > removed.
+> On Mon, Dec 19, 2016 at 12:06:47PM -0500, James Simmons wrote:
+> > Not for landing. This is the purposed UAPI headers
+> > with the removal of unlikely and debugging macros.
+> > This is just for feedback to see if this is acceptable
+> > for the upstream client.
 > > 
-> >  
-> > 
-> > Cheers, Andreas
-> > 
-> > -- 
-> > 
-> > Andreas Dilger
-> > 
-> > Lustre Principal Architect
-> > 
-> > Intel High Performance Data Division
-> > 
-> >  
-> > 
-> > On 2017/01/10, 18:08, "lustre-devel on behalf of Amir Shehata"
-> > <lustre-devel-bounces@lists.lustre.org
-> > <mailto:lustre-devel-bounces@lists.lustre.org> on behalf of
-> > amir.shehata.whamcloud at gmail.com
-> > <mailto:amir.shehata.whamcloud@gmail.com>> wrote:
-> > 
-> >  
-> > 
-> > lnetctl was designed to control LNet only. We have not moved the rest of
-> > the lctl functionality. lctl does a lot of other lustre specific functions.
-> > 
-> >  
-> > 
-> > The idea was to have lnetctl be only LNet specific, and lctl lustre
-> > specific. In essence we are attempting to decouple LNet from lustre.
-> > There has been some talk about upstreaming LNet before lustre with all
-> > the work that James Simmons from ORNL is doing.
-> > 
-> >  
-> > 
-> > thanks
-> > 
-> > amir
-> > 
-> >  
-> > 
-> > On 10 January 2017 at 14:06, Christopher J. Morrone <morrone2@llnl.gov
-> > <mailto:morrone2@llnl.gov>> wrote:
-> > 
-> >     Sounds good to me.  Ideally, lnetctl should be able to do everything
-> >     that lctl could do (plus all of the new features).  Has it reached
-> >     parity?  If not, what else still remains to be done?
-> > 
-> >     Chris
-> > 
-> >     On 01/10/2017 12:15 PM, Amir Shehata wrote:
-> >     > lctl usage is kept for backwards compatibility. Eventually, we
-> >     should be
-> >     > moving to using lnetctl exclusively. Which lustre-release we should do
-> >     > that in, is the question. 2.10?
-> >     >
-> >     > thanks
-> >     > amir
-> >     >
-> >     > On 4 January 2017 at 16:16, Di Natale, Giuseppe
-> >     <dinatale2 at llnl.gov <mailto:dinatale2@llnl.gov>
-> >     > <mailto:dinatale2 at llnl.gov <mailto:dinatale2@llnl.gov>>> wrote:
-> >     >
-> >     >     Greetings,
-> >     >
-> >     >     I am attempting to port the SysV lnet script as part of a
-> >     transition
-> >     >     to systemd. I ran into the following in lustre/scripts/lnet:
-> >     >
-> >     >             if [ -x $LUSTRE_LNET_CONFIG_UTILITY -a -f
-> >     >     "$LUSTRE_LNET_CONFIG_FILE" ]; then
-> >     >                     $LUSTRE_LNET_CONFIG_UTILITY lnet configure ||
-> >     exit 1
-> >     >             else
-> >     >                     lctl network up || exit 1
-> >     >             fi
-> >     >
-> >     >     Can the check for LUSTRE_LNET_CONFIG_UTILITY 
-> >     (/usr/sbin/lnetctl by
-> >     >     default) be removed so that way lnetctl is used exclusively?
-> >     >
-> >     >     Thanks,
-> >     >     Giuseppe Di Natale
-> >     >
-> >     >     _______________________________________________
-> >     >     lustre-devel mailing list
-> >     >     lustre-devel at lists.lustre.org
-> >     <mailto:lustre-devel@lists.lustre.org>
-> >     <mailto:lustre-devel@lists.lustre.org
-> >     <mailto:lustre-devel@lists.lustre.org>>
-> >     >     http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> >     >     <http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org>
-> > 
-> >     >
-> >     >
-> >     >
-> >     >
-> >     > _______________________________________________
-> >     > lustre-devel mailing list
-> >     > lustre-devel at lists.lustre.org <mailto:lustre-devel@lists.lustre.org>
-> >     > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> >     >
-> > 
-> >     _______________________________________________
-> >     lustre-devel mailing list
-> >     lustre-devel at lists.lustre.org <mailto:lustre-devel@lists.lustre.org>
-> >     http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> > 
-> >  
-> > 
+> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > ---
+> >  .../lustre/lustre/include/lustre/lustre_fid.h      | 353 +++++++++++++++++++++
+> >  .../lustre/lustre/include/lustre/lustre_ostid.h    | 233 ++++++++++++++
 > 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> Can you make a lustre "uapi" directory so we can see which files you
+> really want to be UAPI and which you don't as time goes on?
+
+Where do you want them placed? In uapi/linux/lustre or uapi/lustre. Does
+it matter to you? The below was to forth coming UAPI headers which from
+your response you seem okay with in general.
+ 
+> >  2 files changed, 586 insertions(+)
+> >  create mode 100644 drivers/staging/lustre/lustre/include/lustre/lustre_fid.h
+> >  create mode 100644 drivers/staging/lustre/lustre/include/lustre/lustre_ostid.h
+> > 
+> > diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre/lustre_fid.h
+> > new file mode 100644
+> > index 0000000..cb6afa5
+> > --- /dev/null
+> > +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_fid.h
+> > @@ -0,0 +1,353 @@
+> > +/*
+> > + * GPL HEADER START
+> > + *
+> > + * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 only,
+> > + * as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful, but
+> > + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> > + * General Public License version 2 for more details (a copy is included
+> > + * in the LICENSE file that accompanied this code).
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * version 2 along with this program; If not, see
+> > + * http://www.gnu.org/licenses/gpl-2.0.html
+> > + *
+> > + * GPL HEADER END
+> > + */
+> > +/*
+> > + * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+> > + * Use is subject to license terms.
+> > + *
+> > + * Copyright (c) 2011, 2014, Intel Corporation.
+> > + *
+> > + * Copyright 2016 Cray Inc, all rights reserved.
+> > + * Author: Ben Evans.
+> > + *
+> > + * all fid manipulation functions go here
+> > + *
+> > + * FIDS are globally unique within a Lustre filessytem, and are made up
+> > + * of three parts: sequence, Object ID, and version.
+> > + *
+> > + */
+> > +#ifndef _LUSTRE_LUSTRE_FID_H_
+> > +#define _LUSTRE_LUSTRE_FID_H_
+> > +
+> > +#include <lustre/lustre_idl.h>
+> > +
+> > +/** returns fid object sequence */
+> > +static inline __u64 fid_seq(const struct lu_fid *fid)
+> > +{
+> > +	return fid->f_seq;
+> > +}
+> > +
+> > +/** returns fid object id */
+> > +static inline __u32 fid_oid(const struct lu_fid *fid)
+> > +{
+> > +	return fid->f_oid;
+> > +}
+> > +
+> > +/** returns fid object version */
+> > +static inline __u32 fid_ver(const struct lu_fid *fid)
+> > +{
+> > +	return fid->f_ver;
+> > +}
+> > +
+> > +static inline void fid_zero(struct lu_fid *fid)
+> > +{
+> > +	memset(fid, 0, sizeof(*fid));
+> > +}
+> > +
+> > +static inline __u64 fid_ver_oid(const struct lu_fid *fid)
+> > +{
+> > +	return (__u64)fid_ver(fid) << 32 | fid_oid(fid);
+> > +}
+> > +
+> > +static inline bool fid_seq_is_mdt0(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_OST_MDT0;
+> > +}
+> > +
+> > +static inline bool fid_seq_is_mdt(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_OST_MDT0 || seq >= FID_SEQ_NORMAL;
+> > +};
+> > +
+> > +static inline bool fid_seq_is_echo(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_ECHO;
+> > +}
+> > +
+> > +static inline bool fid_is_echo(const struct lu_fid *fid)
+> > +{
+> > +	return fid_seq_is_echo(fid_seq(fid));
+> > +}
+> > +
+> > +static inline bool fid_seq_is_llog(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_LLOG;
+> > +}
+> > +
+> > +static inline bool fid_is_llog(const struct lu_fid *fid)
+> > +{
+> > +	/* file with OID == 0 is not llog but contains last oid */
+> > +	return fid_seq_is_llog(fid_seq(fid)) && fid_oid(fid) > 0;
+> > +}
+> > +
+> > +static inline bool fid_seq_is_rsvd(__u64 seq)
+> > +{
+> > +	return seq > FID_SEQ_OST_MDT0 && seq <= FID_SEQ_RSVD;
+> > +};
+> > +
+> > +static inline bool fid_seq_is_special(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_SPECIAL;
+> > +};
+> > +
+> > +static inline bool fid_seq_is_local_file(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_LOCAL_FILE ||
+> > +	       seq == FID_SEQ_LOCAL_NAME;
+> > +};
+> > +
+> > +static inline bool fid_seq_is_root(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_ROOT;
+> > +}
+> > +
+> > +static inline bool fid_seq_is_dot(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_DOT_LUSTRE;
+> > +}
+> > +
+> > +static inline bool fid_seq_is_default(__u64 seq)
+> > +{
+> > +	return seq == FID_SEQ_LOV_DEFAULT;
+> > +}
+> > +
+> > +static inline bool fid_is_mdt0(const struct lu_fid *fid)
+> > +{
+> > +	return fid_seq_is_mdt0(fid_seq(fid));
+> > +}
+> > +
+> > +static inline void lu_root_fid(struct lu_fid *fid)
+> > +{
+> > +	fid->f_seq = FID_SEQ_ROOT;
+> > +	fid->f_oid = FID_OID_ROOT;
+> > +	fid->f_ver = 0;
+> > +}
+> > +
+> > +static inline void lu_echo_root_fid(struct lu_fid *fid)
+> > +{
+> > +	fid->f_seq = FID_SEQ_ROOT;
+> > +	fid->f_oid = FID_OID_ECHO_ROOT;
+> > +	fid->f_ver = 0;
+> > +}
+> > +
+> > +static inline void lu_update_log_fid(struct lu_fid *fid, __u32 index)
+> > +{
+> > +	fid->f_seq = FID_SEQ_UPDATE_LOG;
+> > +	fid->f_oid = index;
+> > +	fid->f_ver = 0;
+> > +}
+> > +
+> > +static inline void lu_update_log_dir_fid(struct lu_fid *fid, __u32 index)
+> > +{
+> > +	fid->f_seq = FID_SEQ_UPDATE_LOG_DIR;
+> > +	fid->f_oid = index;
+> > +	fid->f_ver = 0;
+> > +}
+> > +
+> > +/**
+> > + * Check if a fid is igif or not.
+> > + * \param fid the fid to be tested.
+> > + * \return true if the fid is an igif; otherwise false.
+> > + */
+> > +static inline bool fid_seq_is_igif(__u64 seq)
+> > +{
+> > +	return seq >= FID_SEQ_IGIF && seq <= FID_SEQ_IGIF_MAX;
+> > +}
+> > +
+> > +static inline bool fid_is_igif(const struct lu_fid *fid)
+> > +{
+> > +	return fid_seq_is_igif(fid_seq(fid));
+> > +}
+> > +
+> > +/**
+> > + * Check if a fid is idif or not.
+> > + * \param fid the fid to be tested.
+> > + * \return true if the fid is an idif; otherwise false.
+> 
+> Odd kernel doc style :(
+> 
+> > + */
+> > +static inline bool fid_seq_is_idif(__u64 seq)
+> > +{
+> > +	return seq >= FID_SEQ_IDIF && seq <= FID_SEQ_IDIF_MAX;
+> > +}
+> > +
+> > +static inline bool fid_is_idif(const struct lu_fid *fid)
+> > +{
+> > +	return fid_seq_is_idif(fid_seq(fid));
+> > +}
+> > +
+> > +static inline bool fid_is_local_file(const struct lu_fid *fid)
+> > +{
+> > +	return fid_seq_is_local_file(fid_seq(fid));
+> > +}
+> > +
+> > +static inline bool fid_seq_is_norm(__u64 seq)
+> > +{
+> > +	return (seq >= FID_SEQ_NORMAL);
+> > +}
+> > +
+> > +static inline bool fid_is_norm(const struct lu_fid *fid)
+> > +{
+> > +	return fid_seq_is_norm(fid_seq(fid));
+> > +}
+> > +
+> > +static inline int fid_is_layout_rbtree(const struct lu_fid *fid)
+> > +{
+> > +	return fid_seq(fid) == FID_SEQ_LAYOUT_RBTREE;
+> > +}
+> 
+> bool?
+> 
+> thanks,
+> 
+> greg k-h
 > 
