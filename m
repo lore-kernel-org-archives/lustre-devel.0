@@ -1,118 +1,50 @@
-From: Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de>
-Date: Wed, 18 Jan 2017 15:19:45 +0100
-Subject: [lustre-devel] Design proposal for client-side compression
-In-Reply-To: <B924BE6D-3C6A-4BA4-96F9-AC053F032B2D@intel.com>
-References: <1483967258.2622.24.camel@informatik.uni-hamburg.de>
-	<B5E18A82-79B3-484F-BEBE-998B8AE56397@intel.com>
-	<1484223328.3937.60.camel@informatik.uni-hamburg.de>
-	<B924BE6D-3C6A-4BA4-96F9-AC053F032B2D@intel.com>
-Message-ID: <1484749185.3965.114.camel@informatik.uni-hamburg.de>
+From: Ben Evans <bevans@cray.com>
+Date: Wed, 18 Jan 2017 20:08:31 +0000
+Subject: [lustre-devel] Proposal for JobID caching
+Message-ID: <D4A5356C.C519%jevans@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello,?
+Overview
+            The Lustre filesystem added the ability to track I/O performance of a job across a cluster.  The initial algorithm was relatively simplistic:  for every I/O, look up the job ID of the process and include it in the RPC being sent to the server.  This imposed a non-trivial performance impact on client I/O performance.
+            An additional algorithm was introduced to handle the single job per node case, where instead of looking up the job ID of the process, Lustre simply accesses the value of a variable set through the proc interface.  This improved performance greatly, but only functions when a single job is being run.
+            A new approach is needed for multiple job per node systems.
 
-thanks again.?
+Proposed Solution
+            The proposed solution to this is to create a small PID->JobID table in kernel memory.  When a process performs an IO, a lookup is done in the table for the PID, if a JobID exists for that PID, it is used, otherwise it is retrieved via the same methods as the original Jobstats algorithm.  Once located the JobID is stored in a PID/JobID table in memory. The existing cfs_hash_table structure and functions will be used to implement the table.
 
-> I don?t think sptlrpc page pool will cache any data. 
+Rationale
+            This reduces the number of calls into userspace, minimizing the time taken on each I/O.  It also easily supports multiple job per node scenarios, and like other proposed solutions has no issue with multiple jobs performing I/O on the same file at the same time.
 
-Ok, I will look at the caching within OSC in more detail.
+Requirements
 
-> However, it?s the right place to do compress in the sptlrpc layer,
-> you just extend the sptlrpc for a new flavor.
+?      Performance cannot significantly detract from baseline performance without jobstats
 
-Well, during my master's thesis, I have already tried to introduce
-compression in form of a new flavor for GSS. Unfortunately, I had huge
-problems to get GSS to work at all (later 2.7 or first of 2.8
-versions). The plain or null flavors for testing didn't work and any
-other approach required Kerberos (which I also couldn't make work :( ).
-Probably I just missed something, but it led me to the idea to make it
-close to, but yet independent from GSS.
+?      Supports multiple jobs per node
 
-As far I understood, currently only the RPC but not the data is handled
-by GSS on the client side??
-And from what I have seen, when using GSS, the number of niobufs within
-the RPC is restricted to 1; for compression we would need more. Also,
-the flavor is set per RPC, we need it per niobuf. Though it might be
-just implementation details, wouldn't you currently prefer to keep it
-separate to avoid mixing up bugs from our new feature and changes to
-GSS? Currently I try my change within?sptlrpc_cli_wrap_bulk in sec.c
-just before wrapping the bulks with GSS mechanisms.?
+?      Coordination with the scheduler is not required, but interfaces may be provided
 
-> 
-> With that being said, we?re going to have two options to support
-> partial block write:
-> 
-> 1. In the OSC I/O engine, it only submits ZFS block size aligned
-> plain data to ptlrpc layer and it does compress in the new flavor of
-> sptlrpc. When partial blocks are written, the OSC will have to issue
-> read RPC if the corresponding data belonging to the same block are
-> not cached;
-> 
-> 2. Or we can just disable this optimization that means plain data
-> will be issued to the sever for partial block written. It only do
-> compress for full blocks.
-> 
-> I feel the option 2 would be much simpler but needs some requirements
-> to the workload to take full advantage, e.g. if applications are
-> writing bulk and sequential data.
+?      Supports multiple PIDs per job
 
-Sounds good. In my thesis I have already spent some thoughts to the RMW
-issues. In some cases it might be the best to let the server decompress
-the specific data chunks (which is planned in the future anyway) and
-skip compression for partial writes.?
+New Data Structures
+            pid_to_jobid {
+                        struct hlist_node pj_hash;
+                        u54 pj_pid;
+                        char pj_jobid[LUSTRE_JOBID_SIZE];
+spinlock_t jp_lock;
+                        time_t jp_time;
+}
+Proc Variables
+Writing to /proc/fs/lustre/jobid_name while not in "nodelocal" mode will cause all entries in the cache for that jobID to be removed from the cache
 
-> 
-> Right now Lustre aligns BRW lock by the page size on the client side.
-> Please check the code and comments in function
-> ldlm_extent_internal_policy_fixup(). Since client doesn?t provide the
-> page size to server explicitly, the code just guess it by the
-> req_end.
-> 
-> In the new code with this feature supported, the LDLM lock should be
-> aligned to MAX(zfs_block_size, req_align).
-
-> 
-> Sounds good to me. There is a work in progress to support setting
-> block size from client side in LU-8591.
-
-Thanks for the hints!
-
-> > > ?
-> > > Also, I agree with what Jinshan said below.??Assuming that you
-> > > want
-> > > to do compressed read as well, you will need to add a compressed
-> > > read
-> > > function to the DMU.??For compressed send/receive we only added
-> > > compressed write to the DMU, because zfs send reads directly from
-> > > the
-> > > ARC (which can do compressed read).
-> > ?
-> > We are working on it right now, the functionality should be similar
-> > to
-> > the write case or do I miss some fundamental issues??
-> 
-> It should be similar to write case, i.e., to bypass the layer of dmu
-> buffer.
-
-Our first approach for read is currently the following:?
-Once compression is enabled, for OSTs we call the modified dmu_read
-with the logical (uncompressed) data size. ZFS notices, the requested
-data is compressed and delivers the physical (compressed) data size,
-the used algorithm and the actual data of size psize. Lustre gets the
-psize somehow together with the data. Psize would be used to ensure
-that the "received" amount of data, which differs from requested
-logical size, is correct.?
-
-Bypass the dbufs - you mean to transfer the data directly from ARC to
-the client?
-
-
-> Jinshan
-Be
-> > 
-> st regards,
-Anna
+Populating the Cache
+            When lustre_get_jobid is called, the process, and in the cached mode, first a check will be done in the cache for a valid PID to JobID mapping.  If none exists, it uses the same mechanisms to get the JobID and populates the appropriate PID to JobID map.
+If a lookup is performed and the PID to JobID mapping exists, but is more than 30 seconds old, the JobID is refreshed.
+Purging the Cache
+            The cache can be purged of a specific job by writing the JobID to the jobid_name proc file.  Any items in the cache that are more than 300 seconds out of date will also be purged at this time.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170118/f6d3f32a/attachment-0001.htm>
