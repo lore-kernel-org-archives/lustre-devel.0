@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 21 Jan 2017 19:40:30 -0500
-Subject: [lustre-devel] [PATCH 6/8] staging: lustre: lnet: change
-	lnet_magicversion_t to proper structure
+Date: Sat, 21 Jan 2017 19:40:32 -0500
+Subject: [lustre-devel] [PATCH 8/8] staging: lustre: lnet: change msg union
+	in struct lnet_hdr to proper structure
 In-Reply-To: <1485045632-5886-1-git-send-email-jsimmons@infradead.org>
 References: <1485045632-5886-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1485045632-5886-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1485045632-5886-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,7 +12,8 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Change lnet_magicversion_t from typedef to proper structure.
+Modify all the msg union fields from typedefs to
+to proper structures.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6142
@@ -23,99 +24,76 @@ Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/linux/lnet/types.h        |  4 ++--
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c   |  4 ++--
- .../staging/lustre/lnet/klnds/socklnd/socklnd_proto.c    |  6 +++---
- drivers/staging/lustre/lnet/lnet/api-ni.c                | 16 ++++++++--------
- 4 files changed, 15 insertions(+), 15 deletions(-)
+ drivers/staging/lustre/include/linux/lnet/types.h | 30 +++++++++++------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/types.h b/drivers/staging/lustre/include/linux/lnet/types.h
-index c14015a..a6233be 100644
+index 1448fa4..1c8de72 100644
 --- a/drivers/staging/lustre/include/linux/lnet/types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/types.h
-@@ -204,11 +204,11 @@ struct lnet_handle_wire {
-  * exchange HELLO messages when a connection is first established.  Individual
-  * LNDs can put whatever else they fancy in lnet_hdr_t::msg.
+@@ -146,36 +146,36 @@ struct lnet_handle_wire {
+  * wire structs MUST be fixed size and the smaller types are placed at the
+  * end.
   */
--typedef struct {
-+struct lnet_magicversion {
- 	__u32	magic;		/* LNET_PROTO_TCP_MAGIC */
- 	__u16	version_major;	/* increment on incompatible change */
- 	__u16	version_minor;	/* increment on compatible change */
--} WIRE_ATTR lnet_magicversion_t;
+-typedef struct lnet_ack {
++struct lnet_ack {
+ 	struct lnet_handle_wire	dst_wmd;
+ 	__u64			match_bits;
+ 	__u32			mlength;
+-} WIRE_ATTR lnet_ack_t;
 +} WIRE_ATTR;
  
- /* PROTO MAGIC for LNDs */
- #define LNET_PROTO_IB_MAGIC		0x0be91b91
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-index 972f609..42b67b0 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-@@ -1656,9 +1656,9 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 	}
+-typedef struct lnet_put {
++struct lnet_put {
+ 	struct lnet_handle_wire	ack_wmd;
+ 	__u64			match_bits;
+ 	__u64			hdr_data;
+ 	__u32			ptl_index;
+ 	__u32			offset;
+-} WIRE_ATTR lnet_put_t;
++} WIRE_ATTR;
  
- 	if (hello->kshm_magic == le32_to_cpu(LNET_PROTO_TCP_MAGIC)) {
--		lnet_magicversion_t *hmv = (lnet_magicversion_t *)hello;
-+		struct lnet_magicversion *hmv = (struct lnet_magicversion *)hello;
+-typedef struct lnet_get {
++struct lnet_get {
+ 	struct lnet_handle_wire	return_wmd;
+ 	__u64			match_bits;
+ 	__u32			ptl_index;
+ 	__u32			src_offset;
+ 	__u32			sink_length;
+-} WIRE_ATTR lnet_get_t;
++} WIRE_ATTR;
  
--		CLASSERT(sizeof(lnet_magicversion_t) ==
-+		CLASSERT(sizeof(struct lnet_magicversion) ==
- 			 offsetof(ksock_hello_msg_t, kshm_src_nid));
+-typedef struct lnet_reply {
++struct lnet_reply {
+ 	struct lnet_handle_wire	dst_wmd;
+-} WIRE_ATTR lnet_reply_t;
++} WIRE_ATTR;
  
- 		if (hmv->version_major == cpu_to_le16(KSOCK_PROTO_V1_MAJOR) &&
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-index 8f0ff6c..420597b 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-@@ -460,11 +460,11 @@
- {
- 	struct socket *sock = conn->ksnc_sock;
- 	lnet_hdr_t *hdr;
--	lnet_magicversion_t *hmv;
-+	struct lnet_magicversion *hmv;
- 	int rc;
- 	int i;
+-typedef struct lnet_hello {
++struct lnet_hello {
+ 	__u64			incarnation;
+ 	__u32			type;
+-} WIRE_ATTR lnet_hello_t;
++} WIRE_ATTR;
  
--	CLASSERT(sizeof(lnet_magicversion_t) == offsetof(lnet_hdr_t, src_nid));
-+	CLASSERT(sizeof(struct lnet_magicversion) == offsetof(lnet_hdr_t, src_nid));
+ struct lnet_hdr {
+ 	lnet_nid_t	dest_nid;
+@@ -186,11 +186,11 @@ struct lnet_hdr {
+ 	__u32		payload_length;	/* payload data to follow */
+ 	/*<------__u64 aligned------->*/
+ 	union {
+-		lnet_ack_t	ack;
+-		lnet_put_t	put;
+-		lnet_get_t	get;
+-		lnet_reply_t	reply;
+-		lnet_hello_t	hello;
++		struct lnet_ack		ack;
++		struct lnet_put		put;
++		struct lnet_get		get;
++		struct lnet_reply	reply;
++		struct lnet_hello	hello;
+ 	} msg;
+ } WIRE_ATTR;
  
- 	LIBCFS_ALLOC(hdr, sizeof(*hdr));
- 	if (!hdr) {
-@@ -472,7 +472,7 @@
- 		return -ENOMEM;
- 	}
- 
--	hmv = (lnet_magicversion_t *)&hdr->dest_nid;
-+	hmv = (struct lnet_magicversion *)&hdr->dest_nid;
- 
- 	/*
- 	 * Re-organize V2.x message header to V1.x (lnet_hdr_t)
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 3b2488f..fd4153b 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -196,14 +196,14 @@ static void lnet_assert_wire_constants(void)
- 	CLASSERT((int)offsetof(struct lnet_handle_wire, wh_object_cookie) == 8);
- 	CLASSERT((int)sizeof(((struct lnet_handle_wire *)0)->wh_object_cookie) == 8);
- 
--	/* Checks for struct lnet_magicversion_t */
--	CLASSERT((int)sizeof(lnet_magicversion_t) == 8);
--	CLASSERT((int)offsetof(lnet_magicversion_t, magic) == 0);
--	CLASSERT((int)sizeof(((lnet_magicversion_t *)0)->magic) == 4);
--	CLASSERT((int)offsetof(lnet_magicversion_t, version_major) == 4);
--	CLASSERT((int)sizeof(((lnet_magicversion_t *)0)->version_major) == 2);
--	CLASSERT((int)offsetof(lnet_magicversion_t, version_minor) == 6);
--	CLASSERT((int)sizeof(((lnet_magicversion_t *)0)->version_minor) == 2);
-+	/* Checks for struct struct lnet_magicversion */
-+	CLASSERT((int)sizeof(struct lnet_magicversion) == 8);
-+	CLASSERT((int)offsetof(struct lnet_magicversion, magic) == 0);
-+	CLASSERT((int)sizeof(((struct lnet_magicversion *)0)->magic) == 4);
-+	CLASSERT((int)offsetof(struct lnet_magicversion, version_major) == 4);
-+	CLASSERT((int)sizeof(((struct lnet_magicversion *)0)->version_major) == 2);
-+	CLASSERT((int)offsetof(struct lnet_magicversion, version_minor) == 6);
-+	CLASSERT((int)sizeof(((struct lnet_magicversion *)0)->version_minor) == 2);
- 
- 	/* Checks for struct lnet_hdr_t */
- 	CLASSERT((int)sizeof(lnet_hdr_t) == 72);
 -- 
 1.8.3.1
