@@ -1,96 +1,88 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 28 Jan 2017 19:05:07 -0500
-Subject: [lustre-devel] [PATCH 39/60] staging: libcfs: remove integer types
-	abstraction from libcfs
+Date: Sat, 28 Jan 2017 19:05:16 -0500
+Subject: [lustre-devel] [PATCH 48/60] staging: lustre: ksocklnd: ignore
+	timedout TX on closing connection
 In-Reply-To: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
 References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1485648328-2141-40-git-send-email-jsimmons@infradead.org>
+Message-ID: <1485648328-2141-49-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Liang Zhen <liang.zhen@intel.com>, James Simmons <jsimmons@infradead.org>
 
-Replace the ulong_ptr_t and long_ptr_t with standard
-kernel types.
+From: Liang Zhen <liang.zhen@intel.com>
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
-Reviewed-on: http://review.whamcloud.com/20204
-Reviewed-by: Frank Zago <fzago@cray.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+ksocklnd reaper thread always tries to close the connection for the
+first timedout zero-copy TX. This is wrong if this connection is
+already being closed, because the reaper will see the same TX again
+and again and cannot find out other timedout zero-copy TXs and close
+connections for them.
+
+Signed-off-by: Liang Zhen <liang.zhen@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8867
+Reviewed-on: https://review.whamcloud.com/23973
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h | 4 ----
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c        | 2 +-
- drivers/staging/lustre/lnet/libcfs/debug.c                 | 2 +-
- drivers/staging/lustre/lnet/lnet/acceptor.c                | 4 ++--
- 4 files changed, 4 insertions(+), 8 deletions(-)
+ drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
-index e8695e4..fa0808d 100644
---- a/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
-@@ -125,10 +125,6 @@
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+index df4f55e..b7043e2 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+@@ -2456,6 +2456,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
  
- #include <linux/capability.h>
+ 	list_for_each_entry(peer, peers, ksnp_list) {
+ 		unsigned long deadline = 0;
++		struct ksock_tx *tx_stale;
+ 		int resid = 0;
+ 		int n = 0;
  
--/* long integer with size equal to pointer */
--typedef unsigned long ulong_ptr_t;
--typedef long long_ptr_t;
--
- #ifndef WITH_WATCHDOG
- #define WITH_WATCHDOG
- #endif
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 2181c67..8aab001 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -2507,7 +2507,7 @@ static int ksocknal_push(lnet_ni_t *ni, lnet_process_id_t id)
+@@ -2503,6 +2504,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 		if (list_empty(&peer->ksnp_zc_req_list))
+ 			continue;
  
- 		snprintf(name, sizeof(name), "socknal_cd%02d", i);
- 		rc = ksocknal_thread_start(ksocknal_connd,
--					   (void *)((ulong_ptr_t)i), name);
-+					   (void *)((uintptr_t)i), name);
- 		if (rc) {
- 			spin_lock_bh(&ksocknal_data.ksnd_connd_lock);
- 			ksocknal_data.ksnd_connd_starting--;
-diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
-index a38db23..3408041 100644
---- a/drivers/staging/lustre/lnet/libcfs/debug.c
-+++ b/drivers/staging/lustre/lnet/libcfs/debug.c
-@@ -343,7 +343,7 @@ void libcfs_debug_dumplog_internal(void *arg)
- 		last_dump_time = current_time;
- 		snprintf(debug_file_name, sizeof(debug_file_name) - 1,
- 			 "%s.%lld.%ld", libcfs_debug_file_path_arr,
--			 (s64)current_time, (long_ptr_t)arg);
-+			 (s64)current_time, (long)arg);
- 		pr_alert("LustreError: dumping log to %s\n", debug_file_name);
- 		cfs_tracefile_dump_all_pages(debug_file_name);
- 		libcfs_run_debug_log_upcall(debug_file_name);
-diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
-index a55c6cd..b43a994 100644
---- a/drivers/staging/lustre/lnet/lnet/acceptor.c
-+++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
-@@ -330,7 +330,7 @@
- 	__u32 magic;
- 	__u32 peer_ip;
- 	int peer_port;
--	int secure = (int)((long_ptr_t)arg);
-+	int secure = (int)((long)arg);
++		tx_stale = NULL;
+ 		spin_lock(&peer->ksnp_lock);
+ 		list_for_each_entry(tx, &peer->ksnp_zc_req_list, tx_zc_list) {
+ 			if (!cfs_time_aftereq(cfs_time_current(),
+@@ -2511,26 +2513,26 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 			/* ignore the TX if connection is being closed */
+ 			if (tx->tx_conn->ksnc_closing)
+ 				continue;
++			if (!tx_stale)
++				tx_stale = tx;
+ 			n++;
+ 		}
  
- 	LASSERT(!lnet_acceptor_state.pta_sock);
+-		if (!n) {
++		if (!tx_stale) {
+ 			spin_unlock(&peer->ksnp_lock);
+ 			continue;
+ 		}
  
-@@ -459,7 +459,7 @@
- 	if (!lnet_count_acceptor_nis())  /* not required */
- 		return 0;
+-		tx = list_entry(peer->ksnp_zc_req_list.next,
+-				struct ksock_tx, tx_zc_list);
+-		deadline = tx->tx_deadline;
+-		resid = tx->tx_resid;
+-		conn = tx->tx_conn;
++		deadline = tx_stale->tx_deadline;
++		resid = tx_stale->tx_resid;
++		conn = tx_stale->tx_conn;
+ 		ksocknal_conn_addref(conn);
  
--	task = kthread_run(lnet_acceptor, (void *)(ulong_ptr_t)secure,
-+	task = kthread_run(lnet_acceptor, (void *)(uintptr_t)secure,
- 			   "acceptor_%03ld", secure);
- 	if (IS_ERR(task)) {
- 		rc2 = PTR_ERR(task);
+ 		spin_unlock(&peer->ksnp_lock);
+ 		read_unlock(&ksocknal_data.ksnd_global_lock);
+ 
+ 		CERROR("Total %d stale ZC_REQs for peer %s detected; the oldest(%p) timed out %ld secs ago, resid: %d, wmem: %d\n",
+-		       n, libcfs_nid2str(peer->ksnp_id.nid), tx,
++		       n, libcfs_nid2str(peer->ksnp_id.nid), tx_stale,
+ 		       cfs_duration_sec(cfs_time_current() - deadline),
+ 		       resid, conn->ksnc_sock->sk->sk_wmem_queued);
+ 
 -- 
 1.8.3.1
