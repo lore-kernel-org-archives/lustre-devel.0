@@ -1,115 +1,140 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 28 Jan 2017 19:04:40 -0500
-Subject: [lustre-devel] [PATCH 12/60] staging: lustre: lmv: Error not
-	handled for lmv_find_target
+Date: Sat, 28 Jan 2017 19:04:50 -0500
+Subject: [lustre-devel] [PATCH 22/60] staging: lustre: fid: fix race in fid
+	allocation
 In-Reply-To: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
 References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1485648328-2141-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1485648328-2141-23-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Ulka Vaze <ulka.vaze@yahoo.in>, Aditya Pandit <panditadityashreesh@yahoo.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Fan Yong <fan.yong@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Ulka Vaze <ulka.vaze@yahoo.in>
+From: Fan Yong <fan.yong@intel.com>
 
-This issue is found by smatch; has been reported as-
-Unchecked usage of potential ERR_PTR result in lmv_hsm_req_count
-and lmv_hsm_req_build. Added ERR_PTR in both functions and also
-return value check added.
+There is race condition when allocating fid/seq in parallel
+as following:
 
-Signed-off-by: Ulka Vaze <ulka.vaze@yahoo.in>
-Signed-off-by: Aditya Pandit <panditadityashreesh@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6523
-Reviewed-on: http://review.whamcloud.com/14918
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+The thread1 will release the lcs_mutex via seq_fid_alloc_prep(),
+then another fid allocation thread2 can obtain the lcs_mutex and
+allocate FID in the new sequence that has just been allocated by
+the thread1 via seq_client_alloc_seq(); and then after thread2
+released the lcs_mutex, the thread1 will re-allocate the current
+FID in the new sequence without checking whether some others have
+already taken such FID in the new sequence during it re-obtaining
+the lcs_mutex.
+
+Such race will cause two objects to use the same FID, and trigger
+OI conflict and LMA verification failures.
+
+This patch makes the fid allocation and lu_client_seq modification
+to be protected by the lcs_mutex.
+
+Signed-off-by: Fan Yong <fan.yong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8319
+Reviewed-on: http://review.whamcloud.com/20939
+Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c | 25 ++++++++++++++++++-------
- 1 file changed, 18 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/fid/fid_request.c | 55 ++++++++++++++++---------
+ 1 file changed, 35 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 6a3b83f..915415c 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -736,16 +736,18 @@ static int lmv_hsm_req_count(struct lmv_obd *lmv,
- 	/* count how many requests must be sent to the given target */
- 	for (i = 0; i < hur->hur_request.hr_itemcount; i++) {
- 		curr_tgt = lmv_find_target(lmv, &hur->hur_user_item[i].hui_fid);
-+		if (IS_ERR(curr_tgt))
-+			return PTR_ERR(curr_tgt);
- 		if (obd_uuid_equals(&curr_tgt->ltd_uuid, &tgt_mds->ltd_uuid))
- 			nr++;
- 	}
- 	return nr;
+diff --git a/drivers/staging/lustre/lustre/fid/fid_request.c b/drivers/staging/lustre/lustre/fid/fid_request.c
+index 999f250..62a9f7e 100644
+--- a/drivers/staging/lustre/lustre/fid/fid_request.c
++++ b/drivers/staging/lustre/lustre/fid/fid_request.c
+@@ -211,12 +211,35 @@ static int seq_fid_alloc_prep(struct lu_client_seq *seq,
+ 	return 0;
  }
  
--static void lmv_hsm_req_build(struct lmv_obd *lmv,
--			      struct hsm_user_request *hur_in,
--			      const struct lmv_tgt_desc *tgt_mds,
--			      struct hsm_user_request *hur_out)
-+static int lmv_hsm_req_build(struct lmv_obd *lmv,
-+			     struct hsm_user_request *hur_in,
-+			     const struct lmv_tgt_desc *tgt_mds,
-+			     struct hsm_user_request *hur_out)
+-static void seq_fid_alloc_fini(struct lu_client_seq *seq)
++static void seq_fid_alloc_fini(struct lu_client_seq *seq, u64 seqnr,
++			       bool whole)
  {
- 	int			i, nr_out;
- 	struct lmv_tgt_desc    *curr_tgt;
-@@ -756,6 +758,8 @@ static void lmv_hsm_req_build(struct lmv_obd *lmv,
- 	for (i = 0; i < hur_in->hur_request.hr_itemcount; i++) {
- 		curr_tgt = lmv_find_target(lmv,
- 					   &hur_in->hur_user_item[i].hui_fid);
-+		if (IS_ERR(curr_tgt))
-+			return PTR_ERR(curr_tgt);
- 		if (obd_uuid_equals(&curr_tgt->ltd_uuid, &tgt_mds->ltd_uuid)) {
- 			hur_out->hur_user_item[nr_out] =
- 				hur_in->hur_user_item[i];
-@@ -765,6 +769,8 @@ static void lmv_hsm_req_build(struct lmv_obd *lmv,
- 	hur_out->hur_request.hr_itemcount = nr_out;
- 	memcpy(hur_data(hur_out), hur_data(hur_in),
- 	       hur_in->hur_request.hr_data_len);
+ 	LASSERT(seq->lcs_update == 1);
 +
-+	return 0;
+ 	mutex_lock(&seq->lcs_mutex);
++	if (seqnr != 0) {
++		CDEBUG(D_INFO, "%s: New sequence [0x%16.16llx]\n",
++		       seq->lcs_name, seqnr);
++
++		seq->lcs_fid.f_seq = seqnr;
++		if (whole) {
++			/*
++			 * Since the caller require the whole seq,
++			 * so marked this seq to be used
++			 */
++			if (seq->lcs_type == LUSTRE_SEQ_METADATA)
++				seq->lcs_fid.f_oid =
++					LUSTRE_METADATA_SEQ_MAX_WIDTH;
++			else
++				seq->lcs_fid.f_oid = LUSTRE_DATA_SEQ_MAX_WIDTH;
++		} else {
++			seq->lcs_fid.f_oid = LUSTRE_FID_INIT_OID;
++		}
++		seq->lcs_fid.f_ver = 0;
++	}
++
+ 	--seq->lcs_update;
+-	wake_up(&seq->lcs_waitq);
++	wake_up_all(&seq->lcs_waitq);
  }
  
- static int lmv_hsm_ct_unregister(struct lmv_obd *lmv, unsigned int cmd, int len,
-@@ -1041,15 +1047,17 @@ static int lmv_iocontrol(unsigned int cmd, struct obd_export *exp,
- 		} else {
- 			/* split fid list to their respective MDS */
- 			for (i = 0; i < count; i++) {
--				unsigned int		nr, reqlen;
--				int			rc1;
- 				struct hsm_user_request *req;
-+				size_t reqlen;
-+				int nr, rc1;
+ /* Allocate new fid on passed client @seq and save it to @fid. */
+@@ -238,41 +261,33 @@ int seq_client_alloc_fid(const struct lu_env *env,
+ 	while (1) {
+ 		u64 seqnr;
  
- 				tgt = lmv->tgts[i];
- 				if (!tgt || !tgt->ltd_exp)
- 					continue;
+-		if (!fid_is_zero(&seq->lcs_fid) &&
+-		    fid_oid(&seq->lcs_fid) < seq->lcs_width) {
++		if (unlikely(!fid_is_zero(&seq->lcs_fid) &&
++			     fid_oid(&seq->lcs_fid) < seq->lcs_width)) {
+ 			/* Just bump last allocated fid and return to caller. */
+-			seq->lcs_fid.f_oid += 1;
++			seq->lcs_fid.f_oid++;
+ 			rc = 0;
+ 			break;
+ 		}
  
- 				nr = lmv_hsm_req_count(lmv, hur, tgt);
-+				if (nr < 0)
-+					return nr;
- 				if (nr == 0) /* nothing for this MDS */
- 					continue;
++		/*
++		 * Release seq::lcs_mutex via seq_fid_alloc_prep() to avoid
++		 * deadlock during seq_client_alloc_seq().
++		 */
+ 		rc = seq_fid_alloc_prep(seq, &link);
+ 		if (rc)
+ 			continue;
  
-@@ -1061,10 +1069,13 @@ static int lmv_iocontrol(unsigned int cmd, struct obd_export *exp,
- 				if (!req)
- 					return -ENOMEM;
+ 		rc = seq_client_alloc_seq(env, seq, &seqnr);
++		/* Re-take seq::lcs_mutex via seq_fid_alloc_fini(). */
++		seq_fid_alloc_fini(seq, rc ? 0 : seqnr, false);
+ 		if (rc) {
+-			CERROR("%s: Can't allocate new sequence, rc %d\n",
++			CERROR("%s: Can't allocate new sequence, rc = %d\n",
+ 			       seq->lcs_name, rc);
+-			seq_fid_alloc_fini(seq);
+ 			mutex_unlock(&seq->lcs_mutex);
+ 			return rc;
+ 		}
  
--				lmv_hsm_req_build(lmv, hur, tgt, req);
-+				rc1 = lmv_hsm_req_build(lmv, hur, tgt, req);
-+				if (rc1 < 0)
-+					goto hsm_req_err;
+-		CDEBUG(D_INFO, "%s: Switch to sequence [0x%16.16Lx]\n",
+-		       seq->lcs_name, seqnr);
+-
+-		seq->lcs_fid.f_oid = LUSTRE_FID_INIT_OID;
+-		seq->lcs_fid.f_seq = seqnr;
+-		seq->lcs_fid.f_ver = 0;
+-
+-		/*
+-		 * Inform caller that sequence switch is performed to allow it
+-		 * to setup FLD for it.
+-		 */
+ 		rc = 1;
+-
+-		seq_fid_alloc_fini(seq);
+ 		break;
+ 	}
  
- 				rc1 = obd_iocontrol(cmd, tgt->ltd_exp, reqlen,
- 						    req, uarg);
-+hsm_req_err:
- 				if (rc1 != 0 && rc == 0)
- 					rc = rc1;
- 				kvfree(req);
 -- 
 1.8.3.1
