@@ -1,72 +1,92 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 28 Jan 2017 19:04:53 -0500
-Subject: [lustre-devel] [PATCH 25/60] staging: lustre: llite: normal user
-	can't set FS default stripe
+Date: Sat, 28 Jan 2017 19:04:54 -0500
+Subject: [lustre-devel] [PATCH 26/60] staging: lustre: llite: Trust creates
+	in revalidate too.
 In-Reply-To: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
 References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1485648328-2141-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1485648328-2141-27-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Lai Siyao <lai.siyao@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Lai Siyao <lai.siyao@intel.com>
+From: Oleg Drokin <oleg.drokin@intel.com>
 
-Current client doesn't check permission before updating filesystem
-default stripe on MGS, which isn't secure and obvious.
+By forcing creates to always go via lookup we lose some
+important caching benefits too.
+Instead let's trust creates with positive cached entries.
 
-Since we setattr on MDS first, and then set default stripe on MGS,
-we can just return error upon setattr failure.
+Then we have 3 possible outcomes:
+1. Negative dentry - we go via atomic_open and do the create
+   by name there.
+2. Positive dentry, no contention - we just go straight to
+   ll_intent_file_open and open by fid.
+3. positive dentry, contention - by the time we reach the server,
+   the inode is gone. We get ENOENT which is unacceptable to return
+   from create. But since we know it's a create, we substitute it
+   with ESTALE and VFS retries again with LOOKUP_REVAL set, we catch
+   that in revalidate and force a lookup (same path as before this
+   patch).
 
-Now filesystem default stripe is stored in ROOT in MDT, so saving
-it in system config is for compatibility with old servers, this
-will be removed in the future.
-
-Signed-off-by: Lai Siyao <lai.siyao@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8454
-Reviewed-on: http://review.whamcloud.com/21612
-Reviewed-on: http://review.whamcloud.com/22580
-Reviewed-by: Jian Yu <jian.yu@intel.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Signed-off-by: Oleg Drokin <oleg.drokin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8371
+Reviewed-on: http://review.whamcloud.com/21168
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/dir.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lustre/llite/dcache.c | 13 +++++--------
+ drivers/staging/lustre/lustre/llite/file.c   | 11 +++++++++++
+ 2 files changed, 16 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 526fea2..13b3592 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -521,12 +521,15 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
- 	rc = md_setattr(sbi->ll_md_exp, op_data, lump, lum_size, &req);
- 	ll_finish_md_op_data(op_data);
- 	ptlrpc_req_finished(req);
--	if (rc) {
--		if (rc != -EPERM && rc != -EACCES)
--			CERROR("mdc_setattr fails: rc = %d\n", rc);
--	}
-+	if (rc)
-+		return rc;
+diff --git a/drivers/staging/lustre/lustre/llite/dcache.c b/drivers/staging/lustre/lustre/llite/dcache.c
+index 65bf0c4..966f580 100644
+--- a/drivers/staging/lustre/lustre/llite/dcache.c
++++ b/drivers/staging/lustre/lustre/llite/dcache.c
+@@ -247,17 +247,14 @@ static int ll_revalidate_dentry(struct dentry *dentry,
+ 		return 1;
  
--	/* In the following we use the fact that LOV_USER_MAGIC_V1 and
-+#if OBD_OCD_VERSION(2, 13, 53, 0) > LUSTRE_VERSION_CODE
-+	/*
-+	 * 2.9 server has stored filesystem default stripe in ROOT xattr,
-+	 * and it's stored into system config for backward compatibility.
-+	 *
-+	 * In the following we use the fact that LOV_USER_MAGIC_V1 and
- 	 * LOV_USER_MAGIC_V3 have the same initial fields so we do not
- 	 * need to make the distinction between the 2 versions
+ 	/*
+-	 * if open&create is set, talk to MDS to make sure file is created if
+-	 * necessary, because we can't do this in ->open() later since that's
+-	 * called on an inode. return 0 here to let lookup to handle this.
++	 * VFS warns us that this is the second go around and previous
++	 * operation failed (most likely open|creat), so this time
++	 * we better talk to the server via the lookup path by name,
++	 * not by fid.
  	 */
-@@ -567,6 +570,7 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
- end:
- 		kfree(param);
- 	}
-+#endif
+-	if ((lookup_flags & (LOOKUP_OPEN | LOOKUP_CREATE)) ==
+-	    (LOOKUP_OPEN | LOOKUP_CREATE))
++	if (lookup_flags & LOOKUP_REVAL)
+ 		return 0;
+ 
+-	if (lookup_flags & (LOOKUP_PARENT | LOOKUP_OPEN | LOOKUP_CREATE))
+-		return 1;
+-
+ 	if (!dentry_may_statahead(dir, dentry))
+ 		return 1;
+ 
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index b681e15..0c83bd7 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -417,6 +417,17 @@ static int ll_intent_file_open(struct dentry *de, void *lmm, int lmmsize,
+ 	ptlrpc_req_finished(req);
+ 	ll_intent_drop_lock(itp);
+ 
++	/*
++	 * We did open by fid, but by the time we got to the server,
++	 * the object disappeared. If this is a create, we cannot really
++	 * tell the userspace that the file it was trying to create
++	 * does not exist. Instead let's return -ESTALE, and the VFS will
++	 * retry the create with LOOKUP_REVAL that we are going to catch
++	 * in ll_revalidate_dentry() and use lookup then.
++	 */
++	if (rc == -ENOENT && itp->it_op & IT_CREAT)
++		rc = -ESTALE;
++
  	return rc;
  }
  
