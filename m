@@ -1,55 +1,45 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 28 Jan 2017 19:04:59 -0500
-Subject: [lustre-devel] [PATCH 31/60] staging: lustre: clio: sync write
-	should update mtime
+Date: Sat, 28 Jan 2017 19:05:02 -0500
+Subject: [lustre-devel] [PATCH 34/60] staging: lustre: libcfs: default CPT
+	matches NUMA topology
 In-Reply-To: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
 References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1485648328-2141-32-git-send-email-jsimmons@infradead.org>
+Message-ID: <1485648328-2141-35-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Liang Zhen <liang.zhen@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Sync write should update m/ctime promptly, otherwise, stale m/ctime
-could be updated on the OST object by the sync write RPC.
+Change default value of CPT pattern and make it match NUMA topology
 
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7310
-Reviewed-on: http://review.whamcloud.com/21063
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Signed-off-by: Liang Zhen <liang.zhen@intel.com>
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5050
+Reviewed-on: http://review.whamcloud.com/22377
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Olaf Weber <olaf@sgi.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/osc/osc_io.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
-index 7e5cd3a..3e61f5e 100644
---- a/drivers/staging/lustre/lustre/osc/osc_io.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_io.c
-@@ -210,6 +210,18 @@ static int osc_io_submit(const struct lu_env *env,
- 	if (queued > 0)
- 		result = osc_queue_sync_pages(env, osc, &list, cmd, brw_flags);
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+index 71a5b19..62ab76e 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+@@ -59,7 +59,7 @@
+  *
+  * NB: If user specified cpu_pattern, cpu_npartitions will be ignored
+  */
+-static char	*cpu_pattern = "";
++static char	*cpu_pattern = "N";
+ module_param(cpu_pattern, charp, 0444);
+ MODULE_PARM_DESC(cpu_pattern, "CPU partitions pattern");
  
-+	/* Update c/mtime for sync write. LU-7310 */
-+	if (qout->pl_nr > 0 && !result) {
-+		struct cl_attr *attr = &osc_env_info(env)->oti_attr;
-+		struct cl_object *obj = ios->cis_obj;
-+
-+		cl_object_attr_lock(obj);
-+		attr->cat_mtime = LTIME_S(CURRENT_TIME);
-+		attr->cat_ctime = attr->cat_mtime;
-+		cl_object_attr_update(env, obj, attr, CAT_MTIME | CAT_CTIME);
-+		cl_object_attr_unlock(obj);
-+	}
-+
- 	CDEBUG(D_INFO, "%d/%d %d\n", qin->pl_nr, qout->pl_nr, result);
- 	return qout->pl_nr > 0 ? 0 : result;
- }
 -- 
 1.8.3.1
