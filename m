@@ -1,71 +1,64 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 28 Jan 2017 19:05:09 -0500
-Subject: [lustre-devel] [PATCH 41/60] staging: lustre: osc: osc_match_base
-	prototype differs from declaration
+Date: Sat, 28 Jan 2017 19:05:25 -0500
+Subject: [lustre-devel] [PATCH 57/60] staging: lustre: lmv: remove nlink
+	check in lmv_revalidate_slaves
 In-Reply-To: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
 References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1485648328-2141-42-git-send-email-jsimmons@infradead.org>
+Message-ID: <1485648328-2141-58-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Steve Guminski <stephenx.guminski@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Steve Guminski <stephenx.guminski@intel.com>
+From: wang di <di.wang@intel.com>
 
-The patch updates the prototype in osc_internal.h to match the
-enums used in the declaration.
+If an application attempts to remove millions of files in a
+single directory it will fail. This failure was tracked down to
+the nlink < 2 check in lmv_revalidate_slaves, because after
+nlink reaches to maximum value of LDISKFS_LINK_MAX (65000),
+the nlink broadcast back from the server will be reported as
+one. The return value of 1 is not invalid so lets remove
+the check.
 
-The osc_match_base declaration in lustre/osc/osc_request.c uses
-enums for stricter checking on the type and mode parameters:
-
-int osc_match_base(struct obd_export *exp,
-                   ...
--->                enum ldlm_type type,
-                   union ldlm_policy_data *policy,
--->                enum ldlm_mode mode,
-                   ...  int unref)
-
-The prototype in lustre/osc/osc_internal.h instead used unsigned ints:
-
-int osc_match_base(struct obd_export *exp,
-                   ...
--->                __u32 type,
-                       union ldlm_policy_data *policy,
--->                __u32 mode,
-                   ...  int unref);
-
-Signed-off-by: Steve Guminski <stephenx.guminski@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8189
-Reviewed-on: http://review.whamcloud.com/23167
-Reviewed-by: Frank Zago <fzago@cray.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Signed-off-by: wang di <di.wang@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6984
+Reviewed-on: http://review.whamcloud.com/16490
 Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Jian Yu <jian.yu@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/osc/osc_internal.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/lmv/lmv_intent.c | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
-index 43a43e4..8abd83f 100644
---- a/drivers/staging/lustre/lustre/osc/osc_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
-@@ -114,9 +114,9 @@ int osc_enqueue_base(struct obd_export *exp, struct ldlm_res_id *res_id,
- 		     struct ptlrpc_request_set *rqset, int async, int agl);
- 
- int osc_match_base(struct obd_export *exp, struct ldlm_res_id *res_id,
--		   __u32 type, union ldlm_policy_data *policy, __u32 mode,
--		   __u64 *flags, void *data, struct lustre_handle *lockh,
--		   int unref);
-+		   enum ldlm_type type, union ldlm_policy_data *policy,
-+		   enum ldlm_mode mode, __u64 *flags, void *data,
-+		   struct lustre_handle *lockh, int unref);
- 
- int osc_setattr_async(struct obd_export *exp, struct obdo *oa,
- 		      obd_enqueue_update_f upcall, void *cookie,
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_intent.c b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
+index b1071cf..aa42066 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_intent.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_intent.c
+@@ -220,21 +220,7 @@ int lmv_revalidate_slaves(struct obd_export *exp,
+ 			/* refresh slave from server */
+ 			body = req_capsule_server_get(&req->rq_pill,
+ 						      &RMF_MDT_BODY);
+-			LASSERT(body);
+-
+-			if (unlikely(body->mbo_nlink < 2)) {
+-				/*
+-				 * If this is bad stripe, most likely due
+-				 * to the race between close(unlink) and
+-				 * getattr, let's return -EONENT, so llite
+-				 * will revalidate the dentry see
+-				 * ll_inode_revalidate_fini()
+-				 */
+-				CDEBUG(D_INODE, "%s: nlink %d < 2 corrupt stripe %d "DFID":" DFID"\n",
+-				       obd->obd_name, body->mbo_nlink, i,
+-				       PFID(&lsm->lsm_md_oinfo[i].lmo_fid),
+-				       PFID(&lsm->lsm_md_oinfo[0].lmo_fid));
+-
++			if (!body) {
+ 				if (it.it_lock_mode && lockh) {
+ 					ldlm_lock_decref(lockh, it.it_lock_mode);
+ 					it.it_lock_mode = 0;
 -- 
 1.8.3.1
