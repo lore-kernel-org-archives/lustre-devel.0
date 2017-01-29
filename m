@@ -1,47 +1,56 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 28 Jan 2017 19:05:05 -0500
-Subject: [lustre-devel] [PATCH 37/60] staging: lustre: llite: specify READA
-	debug mask for ras_update
+Date: Sat, 28 Jan 2017 19:05:19 -0500
+Subject: [lustre-devel] [PATCH 51/60] staging: lustre: ptlrpc: update
+	MODULE_PARAM_DESC in ptlrpcd.c
 In-Reply-To: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
 References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1485648328-2141-38-git-send-email-jsimmons@infradead.org>
+Message-ID: <1485648328-2141-52-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Bobi Jam <bobijam.xu@intel.com>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-So that debug log only contains relevant messages for debugging
-purpose.
+Update max_ptlrpcds module parameter descriptions to let
+users know its obsolete. Change cpt to CPT for the module
+parameter description ptlrpcd_per_cpt_max so it matches
+documentation.
 
-Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8413
-Reviewed-on: http://review.whamcloud.com/22753
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8890
+Reviewed-on: https://review.whamcloud.com/24065
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/rw.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
-index 18d3ccb..50d027e 100644
---- a/drivers/staging/lustre/lustre/llite/rw.c
-+++ b/drivers/staging/lustre/lustre/llite/rw.c
-@@ -729,6 +729,10 @@ static void ras_update(struct ll_sb_info *sbi, struct inode *inode,
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index 84c5551..59b5813 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -82,7 +82,8 @@ struct ptlrpcd {
+  */
+ static int max_ptlrpcds;
+ module_param(max_ptlrpcds, int, 0644);
+-MODULE_PARM_DESC(max_ptlrpcds, "Max ptlrpcd thread count to be started.");
++MODULE_PARM_DESC(max_ptlrpcds,
++		 "Max ptlrpcd thread count to be started (obsolete).");
  
- 	spin_lock(&ras->ras_lock);
+ /*
+  * ptlrpcd_bind_policy is obsolete, but retained to ensure that
+@@ -102,7 +103,7 @@ struct ptlrpcd {
+ static int ptlrpcd_per_cpt_max;
+ module_param(ptlrpcd_per_cpt_max, int, 0644);
+ MODULE_PARM_DESC(ptlrpcd_per_cpt_max,
+-		 "Max ptlrpcd thread count to be started per cpt.");
++		 "Max ptlrpcd thread count to be started per CPT.");
  
-+	if (!hit)
-+		CDEBUG(D_READA, DFID " pages at %lu miss.\n",
-+		       PFID(ll_inode2fid(inode)), index);
-+
- 	ll_ra_stats_inc_sbi(sbi, hit ? RA_STAT_HIT : RA_STAT_MISS);
- 
- 	/* reset the read-ahead window in two cases.  First when the app seeks
+ /*
+  * ptlrpcd_partner_group_size: The desired number of threads in each
 -- 
 1.8.3.1
