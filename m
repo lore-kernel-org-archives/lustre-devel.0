@@ -1,73 +1,97 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 28 Jan 2017 19:04:56 -0500
-Subject: [lustre-devel] [PATCH 28/60] staging: lustre: ldlm:
-	ASSERTION(flock->blocking_export!=0) failed
+Date: Sat, 28 Jan 2017 19:04:32 -0500
+Subject: [lustre-devel] [PATCH 04/60] staging: lustre: mdc: quiet console
+	message for known -EINTR
 In-Reply-To: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
 References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1485648328-2141-29-git-send-email-jsimmons@infradead.org>
+Message-ID: <1485648328-2141-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andriy Skulysh <andriy.skulysh@seagate.com>, Ben Evans <bevans@cray.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Andriy Skulysh <andriy.skulysh@seagate.com>
+From: Andreas Dilger <andreas.dilger@intel.com>
 
-Whole policy structure was zeroed twice. Once during enqueue
-and second time during resend or replay. Policy structure
-should be initialized with default values only in ldlm_lock_new().
+If a user process is waiting for MDS recovery during close, but the
+process is interrupted, the file is still closed but it prints a
+message on the console. Quiet the console message for -EINTR, since
+this is expected behaviour.
 
-Signed-off-by: Andriy Skulysh <andriy.skulysh@seagate.com>
-Signed-off-by: Ben Evans <bevans@cray.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8349
-Seagate-bug-id: MRP-2536, MRP-2909
-Reviewed-on: http://review.whamcloud.com/21061
-Reviewed-by: Alexander Boyko <alexander.boyko@seagate.com>
-Reviewed-by: Vitaly Fertman <vitaly.fertman@seagate.com>
-Reviewed-by: Mike Pershin <mike.pershin@intel.com>
+Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6627
+Reviewed-on: http://review.whamcloud.com/14911
+Reviewed-by: Frank Zago <fzago@cray.com>
+Reviewed-by: Emoly Liu <emoly.liu@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_extent.c    | 1 -
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c     | 1 -
- drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c | 1 -
- 3 files changed, 3 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c | 29 +++++++++++++----------------
+ 1 file changed, 13 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-index 32b73ee..5616ea4 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-@@ -243,7 +243,6 @@ void ldlm_extent_unlink_lock(struct ldlm_lock *lock)
- void ldlm_extent_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
- 				      union ldlm_policy_data *lpolicy)
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 0ee02f1..a1e51a5 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -122,26 +122,25 @@ static int ll_close_inode_openhandle(struct obd_export *md_exp,
+ 				     enum mds_op_bias bias,
+ 				     void *data)
  {
--	memset(lpolicy, 0, sizeof(*lpolicy));
- 	lpolicy->l_extent.start = wpolicy->l_extent.start;
- 	lpolicy->l_extent.end = wpolicy->l_extent.end;
- 	lpolicy->l_extent.gid = wpolicy->l_extent.gid;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index f815827..b7f28b3 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -615,7 +615,6 @@ struct ldlm_flock_wait_data {
- void ldlm_flock_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
- 				     union ldlm_policy_data *lpolicy)
- {
--	memset(lpolicy, 0, sizeof(*lpolicy));
- 	lpolicy->l_flock.start = wpolicy->l_flock.lfw_start;
- 	lpolicy->l_flock.end = wpolicy->l_flock.lfw_end;
- 	lpolicy->l_flock.pid = wpolicy->l_flock.lfw_pid;
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c b/drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c
-index 8e1709d..ae37c36 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_inodebits.c
-@@ -57,7 +57,6 @@
- void ldlm_ibits_policy_wire_to_local(const union ldlm_wire_policy_data *wpolicy,
- 				     union ldlm_policy_data *lpolicy)
- {
--	memset(lpolicy, 0, sizeof(*lpolicy));
- 	lpolicy->l_inodebits.bits = wpolicy->l_inodebits.bits;
+-	struct obd_export *exp = ll_i2mdexp(inode);
++	const struct ll_inode_info *lli = ll_i2info(inode);
+ 	struct md_op_data *op_data;
+ 	struct ptlrpc_request *req = NULL;
+-	struct obd_device *obd = class_exp2obd(exp);
+ 	int rc;
+ 
+-	if (!obd) {
+-		/*
+-		 * XXX: in case of LMV, is this correct to access
+-		 * ->exp_handle?
+-		 */
+-		CERROR("Invalid MDC connection handle %#llx\n",
+-		       ll_i2mdexp(inode)->exp_handle.h_cookie);
++	if (!class_exp2obd(md_exp)) {
++		CERROR("%s: invalid MDC connection handle closing " DFID "\n",
++		       ll_get_fsname(inode->i_sb, NULL, 0),
++		       PFID(&lli->lli_fid));
+ 		rc = 0;
+ 		goto out;
+ 	}
+ 
+ 	op_data = kzalloc(sizeof(*op_data), GFP_NOFS);
++	/*
++	 * We leak openhandle and request here on error, but not much to be
++	 * done in OOM case since app won't retry close on error either.
++	 */
+ 	if (!op_data) {
+-		/* XXX We leak openhandle and request here. */
+ 		rc = -ENOMEM;
+ 		goto out;
+ 	}
+@@ -170,10 +169,9 @@ static int ll_close_inode_openhandle(struct obd_export *md_exp,
+ 	}
+ 
+ 	rc = md_close(md_exp, op_data, och->och_mod, &req);
+-	if (rc) {
+-		CERROR("%s: inode "DFID" mdc close failed: rc = %d\n",
+-		       ll_i2mdexp(inode)->exp_obd->obd_name,
+-		       PFID(ll_inode2fid(inode)), rc);
++	if (rc && rc != -EINTR) {
++		CERROR("%s: inode " DFID " mdc close failed: rc = %d\n",
++		       md_exp->exp_obd->obd_name, PFID(&lli->lli_fid), rc);
+ 	}
+ 
+ 	if (op_data->op_bias & (MDS_HSM_RELEASE | MDS_CLOSE_LAYOUT_SWAP) &&
+@@ -192,8 +190,7 @@ static int ll_close_inode_openhandle(struct obd_export *md_exp,
+ 	och->och_fh.cookie = DEAD_HANDLE_MAGIC;
+ 	kfree(och);
+ 
+-	if (req) /* This is close request */
+-		ptlrpc_req_finished(req);
++	ptlrpc_req_finished(req);
+ 	return rc;
  }
  
 -- 
