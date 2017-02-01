@@ -1,58 +1,41 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Tue, 31 Jan 2017 13:25:20 +0000
-Subject: [lustre-devel] [PATCH 21/60] staging: lustre: ptlrpc: correct
- use of list_add_tail()
-In-Reply-To: <20170131085429.GH6881@mwanda>
+From: Olaf Weber <olaf@sgi.com>
+Date: Wed, 1 Feb 2017 14:32:13 +0100
+Subject: [lustre-devel] [PATCH 60/60] staging: lustre: libcfs: fix
+ minimum size check for libcfs ioctl
+In-Reply-To: <alpine.LFD.2.20.1701310203320.7738@casper.infradead.org>
 References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-	<1485648328-2141-22-git-send-email-jsimmons@infradead.org>,
-	<20170131085429.GH6881@mwanda>
-Message-ID: <CY4PR11MB1751E25F983A72AA507E5125CB4A0@CY4PR11MB1751.namprd11.prod.outlook.com>
+	<1485648328-2141-61-git-send-email-jsimmons@infradead.org>
+	<20170130105156.GA6881@mwanda>
+	<alpine.LFD.2.20.1701310203320.7738@casper.infradead.org>
+Message-ID: <57e8b9b1-e1c8-a5df-e34d-7124671c6888@sgi.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: James Simmons <jsimmons@infradead.org>, Dan Carpenter <dan.carpenter@oracle.com>
+Cc: devel@driverdev.osuosl.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Amir Shehata <amir.shehata@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Dan,
+On 31-01-17 03:25, James Simmons wrote:
 
+[...]
 
-This is a A) a still fairly rarely used crypto feature [A full and usable implementation of it is relatively recent, and this is supporting code that I believe is older.], and B) per that link, the crash only happens when you change your shared key during operation.  So, I'd guess it's a pretty rare thing to do.
-
-
-- Patrick
-
-________________________________
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Dan Carpenter <dan.carpenter@oracle.com>
-Sent: Tuesday, January 31, 2017 2:54:29 AM
-To: James Simmons
-Cc: devel at driverdev.osuosl.org; Greg Kroah-Hartman; Linux Kernel Mailing List; Oleg Drokin; Lustre Development List
-Subject: Re: [lustre-devel] [PATCH 21/60] staging: lustre: ptlrpc: correct use of list_add_tail()
-
-On Sat, Jan 28, 2017 at 07:04:49PM -0500, James Simmons wrote:
-> From: "John L. Hammond" <john.hammond@intel.com>
+>> Also I'm uncomfortable with:
+>>
+>> 	data = container_of(hdr, struct libcfs_ioctl_data, ioc_hdr);
+>>
+>> If hdr isn't the first member of the struct then the code is broken but
+>> container_of() implies that that isn't a hard requirement.  It should
+>> just be:
+>>
+>> 	data = (struct libcfs_ioctl_data *)hdr;
 >
-> In sptlrpc_gc_add_sec() swap the arguments to list_add_tail() so that
-> it does what we meant it to do.
->
+> Don't know if hdr being first is a hard requirment. Doug, Amir do you know
+> if it is an requirement?
 
-Huh...  This is from before lustre was merged into staging.  What are
-the user visible effects of this bug?  I would have expected it to get
-caught earlier.
+It's a requirement.
 
-
-> Signed-off-by: John L. Hammond <john.hammond@intel.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8270
-
-I bet the answer to my question is on this link but I'm reviewing
-offline right now.  Plus that's not where the bug description belongs.
-
-regards,
-dan carpenter
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel at lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170131/da8b11d3/attachment-0001.htm>
+-- 
+Olaf Weber                 SGI               Phone:  +31(0)30-6696796
+                            Veldzigt 2b       Fax:    +31(0)30-6696799
+Sr Software Engineer       3454 PW de Meern  Vnet:   955-6796
+Storage Software           The Netherlands   Email:  olaf at sgi.com
