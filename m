@@ -1,39 +1,41 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Wed, 1 Feb 2017 17:39:21 +0100
-Subject: [lustre-devel] [PATCH 60/60] staging: lustre: libcfs: fix
- minimum size check for libcfs ioctl
-In-Reply-To: <57e8b9b1-e1c8-a5df-e34d-7124671c6888@sgi.com>
-References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
-	<1485648328-2141-61-git-send-email-jsimmons@infradead.org>
-	<20170130105156.GA6881@mwanda>
-	<alpine.LFD.2.20.1701310203320.7738@casper.infradead.org>
-	<57e8b9b1-e1c8-a5df-e34d-7124671c6888@sgi.com>
-Message-ID: <20170201163921.GA25524@kroah.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed,  1 Feb 2017 17:52:38 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: shut up clang warnings on
+	CLASSERT()
+Message-ID: <20170201165314.2588373-1-arnd@arndb.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Olaf Weber <olaf@sgi.com>
-Cc: James Simmons <jsimmons@infradead.org>, Dan Carpenter <dan.carpenter@oracle.com>, devel@driverdev.osuosl.org, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Amir Shehata <amir.shehata@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Arnd Bergmann <arnd@arndb.de>, "John L. Hammond" <john.hammond@intel.com>, Dmitry Eremin <dmitry.eremin@intel.com>, "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-On Wed, Feb 01, 2017 at 02:32:13PM +0100, Olaf Weber wrote:
-> On 31-01-17 03:25, James Simmons wrote:
-> 
-> [...]
-> 
-> > > Also I'm uncomfortable with:
-> > > 
-> > > 	data = container_of(hdr, struct libcfs_ioctl_data, ioc_hdr);
-> > > 
-> > > If hdr isn't the first member of the struct then the code is broken but
-> > > container_of() implies that that isn't a hard requirement.  It should
-> > > just be:
-> > > 
-> > > 	data = (struct libcfs_ioctl_data *)hdr;
-> > 
-> > Don't know if hdr being first is a hard requirment. Doug, Amir do you know
-> > if it is an requirement?
-> 
-> It's a requirement.
+lustre uses a fake switch() statement as a compile-time assert, but unfortunately
+each use of that causes a warning when building with clang:
 
-That's horrid.  Use container_of to be "safe" here please...
+drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c:2907:2: warning: no case matching constant switch condition '42'
+drivers/staging/lustre/lnet/klnds/socklnd/../../../include/linux/libcfs/libcfs_private.h:294:36: note: expanded from macro 'CLASSERT'
+ #define CLASSERT(cond) do {switch (42) {case (cond): case 0: break; } } while (0)
+
+Adding a 'default:' label in there shuts up the warning.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/staging/lustre/include/linux/libcfs/libcfs_private.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+index aab15d8112a4..2d5435029185 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+@@ -291,7 +291,7 @@ do {							    \
+  *       value  after  conversion...
+  *
+  */
+-#define CLASSERT(cond) do {switch (42) {case (cond): case 0: break; } } while (0)
++#define CLASSERT(cond) do {switch (42) {case (cond): case 0: default: break; } } while (0)
+ 
+ /* max value for numeric network address */
+ #define MAX_NUMERIC_VALUE 0xffffffff
+-- 
+2.9.0
