@@ -1,59 +1,158 @@
-From: Jan Kara <jack@suse.cz>
-Date: Thu, 2 Feb 2017 15:48:17 +0100
-Subject: [lustre-devel] [PATCH v3 0/2] iov_iter: allow
- iov_iter_get_pages_alloc to allocate more pages per call
-In-Reply-To: <20170202095125.GF27291@ZenIV.linux.org.uk>
-References: <20170124212327.14517-1-jlayton@redhat.com>
-	<20170125133205.21704-1-jlayton@redhat.com>
-	<20170202095125.GF27291@ZenIV.linux.org.uk>
-Message-ID: <20170202144817.GB15545@quack2.suse.cz>
+From: Ben Evans <bevans@cray.com>
+Date: Thu, 2 Feb 2017 15:20:29 +0000
+Subject: [lustre-devel] Proposal for JobID caching
+In-Reply-To: <D4A7F1D5.C56F%jevans@cray.com>
+References: <D4A5356C.C519%jevans@cray.com>
+	<6E2CFE03-A158-4D82-82BA-AF0A175AA358@intel.com>
+	<9BEFFD88-0537-43AB-8352-6477F30906DA@intel.com>
+	<D4A7F1D5.C56F%jevans@cray.com>
+Message-ID: <D4B8B7AC.C6F6%jevans@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Al Viro <viro-3bDd1+5oDREiFSDQTTA3OLVCufUGDwFn@public.gmane.org>
-Cc: linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, Jeff Layton <jlayton-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Chris Wilson <chris-Y6uKTt2uX1cEflXRtASbqLVCufUGDwFn@public.gmane.org>, linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Linus Torvalds <torvalds-de/tnXTf+JLsfHDXvbKv3WD2FQJk+8+b@public.gmane.org>, "Kirill A. Shutemov" <kirill.shutemov-VuQAYsv1563Yd54FQh9/CA@public.gmane.org>, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
+To: lustre-devel@lists.lustre.org
 
-On Thu 02-02-17 09:51:25, Al Viro wrote:
-> I'm massaging that code (along with a lot of RTFS); the interesting questions
-> related to VM side of things are
-> 	* what are the relative costs of doing small vs. large batches?  Some
-> of get_user_pages_fast() instances have comments along the lines of "we ought
-> to limit the batch size, but then nobody's doing more than 64 pages at a time
-> anyway".
+https://review.whamcloud.com/#/c/25208/ is a working version of what I had
+proposed, including the suggested changes to default to procname_uid.
+This is not perfect, but the performance is much improved over the current
+methods, and unlike inode-based caching Metadata performance isn't
+negatively affected.  Multiple simultaneous jobs can be run on the same
+file, and get appropriate metrics.
 
-Well, I believe it's only about the cost of setting up page table walk and
-walking down those several levels of page tables. It is cheaper to copy
-several PTE entries from the leaf level than doing the full walk every
-time. But I didn't ever profile it to get actual numbers.
 
-Large batches are only a problem because of possible soft-lockups and irq
-latencies AFAIK. So the batch just should not be insanely large...
+-Ben
 
-> 	* Not a question: any ->fault() that returns VM_FAULT_RETRY when
-> *not* passed FAULT_FLAG_ALLOW_RETRY in flags ought to be shot.  cxlflash one
-> sure as hell is.
+On 1/20/17, 5:00 PM, "Ben Evans" <bevans@cray.com> wrote:
 
-Yep.
-
-> 	* drivers/gpu/drm/vgem/vgem_drv.c:vgem_gem_fault() is bloody odd -
-> shmem_read_mapping_page() can't return -EBUSY, AFAICS.  vm_insert_page()
-> used to (and back then vgem_gem_fault() used to be broken), but these days
-> it looks like dead code...
-
-Looks like that.
-
-> 	* ->page_mkwrite() instances sometimes return VM_FAULT_RETRY; AFAICS,
-> it's only (ab)used there as 'not zero, but doesn't contain any error bits';
-> VM_FAULT_RETRY from that source does *not* reach handle_mm_fault() callers,
-> right?
-
-I can see only Lustre doing it and IMHO it is abuse. VM_FAULT_RETRY is used
-for mmap_sem latency reduction when paging in pages and so not everybody
-handles it. If a handler wants to simply retry the fault, returning
-VM_FAULT_NOPAGE is a more common way to do that...
-
-								Honza
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+>
+>
+>On 1/20/17, 4:50 PM, "Dilger, Andreas" <andreas.dilger@intel.com> wrote:
+>
+>>On Jan 18, 2017, at 13:39, Oleg Drokin <oleg.drokin@intel.com> wrote:
+>>> 
+>>> 
+>>> On Jan 18, 2017, at 3:08 PM, Ben Evans wrote:
+>>> 
+>>>> Overview
+>>>>            The Lustre filesystem added the ability to track I/O
+>>>>performance of a job across a cluster.  The initial algorithm was
+>>>>relatively simplistic:  for every I/O, look up the job ID of the
+>>>>process and include it in the RPC being sent to the server.  This
+>>>>imposed a non-trivial performance impact on client I/O performance.
+>>>>            An additional algorithm was introduced to handle the single
+>>>>job per node case, where instead of looking up the job ID of the
+>>>>process, Lustre simply accesses the value of a variable set through the
+>>>>proc interface.  This improved performance greatly, but only functions
+>>>>when a single job is being run.
+>>>>            A new approach is needed for multiple job per node systems.
+>>>> 
+>>>> Proposed Solution
+>>>>            The proposed solution to this is to create a small
+>>>>PID->JobID table in kernel memory.  When a process performs an IO, a
+>>>>lookup is done in the table for the PID, if a JobID exists for that
+>>>>PID, it is used, otherwise it is retrieved via the same methods as the
+>>>>original Jobstats algorithm.  Once located the JobID is stored in a
+>>>>PID/JobID table in memory. The existing cfs_hash_table structure and
+>>>>functions will be used to implement the table.
+>>>> 
+>>>> Rationale
+>>>>            This reduces the number of calls into userspace, minimizing
+>>>>the time taken on each I/O.  It also easily supports multiple job per
+>>>>node scenarios, and like other proposed solutions has no issue with
+>>>>multiple jobs performing I/O on the same file at the same time.
+>>>> 
+>>>> Requirements
+>>>> ?      Performance cannot significantly detract from baseline
+>>>>performance without jobstats
+>>>> ?      Supports multiple jobs per node
+>>>> ?      Coordination with the scheduler is not required, but interfaces
+>>>>may be provided
+>>>> ?      Supports multiple PIDs per job
+>>>> 
+>>>> New Data Structures
+>>>>            pid_to_jobid {
+>>>>                        struct hlist_node pj_hash;
+>>>>                        u54 pj_pid;
+>>>>                        char pj_jobid[LUSTRE_JOBID_SIZE];
+>>>> spinlock_t jp_lock;
+>>>>                        time_t jp_time;
+>>>> }
+>>>> Proc Variables
+>>>> Writing to /proc/fs/lustre/jobid_name while not in ?nodelocal? mode
+>>>>will cause all entries in the cache for that jobID to be removed from
+>>>>the cache
+>>>> 
+>>>> Populating the Cache
+>>>>            When lustre_get_jobid is called, the process, and in the
+>>>>cached mode, first a check will be done in the cache for a valid PID to
+>>>>JobID mapping.  If none exists, it uses the same mechanisms to get the
+>>>>JobID and populates the appropriate PID to JobID map.
+>>>> If a lookup is performed and the PID to JobID mapping exists, but is
+>>>>more than 30 seconds old, the JobID is refreshed.
+>>>> Purging the Cache
+>>>>            The cache can be purged of a specific job by writing the
+>>>>JobID to the jobid_name proc file.  Any items in the cache that are
+>>>>more than 300 seconds out of date will also be purged at this time.
+>>> 
+>>> 
+>>> I'd much rather prefer you go to the table that's populated outside of
+>>>the kernel
+>>> somehow.
+>>> Let's be realistic, poking around in userspace process environments for
+>>>random
+>>> strings is not such a great idea at all even though it did look like a
+>>>good idea
+>>> in the past for simplicity reasons.
+>>> Similar to nodelocal, we probably just switch to a method where you
+>>>call a
+>>> particular lctl command that would mark the whole session as belonging
+>>> to some job. This might take several forms, e.g. nodelocal itself could
+>>> be extended to only apply to a current namespace/container
+>>> But if you do really run different jobs in the global namespace, we
+>>>probably can
+>>> probably just make the lctl to spawn a shell with commands that all
+>>>would
+>>> be marked as a particular job? Or we can probably trace the parent of
+>>>lctl and
+>>> mark that so that all its children become somehow marked too.
+>>
+>>Having lctl spawn a shell or requiring everything to run in a container
+>>is impractical for users, and will just make it harder to use JobID,
+>>IMHO.  The job scheduler is _already_ storing the JobID in the process
+>>environment so that it is available to all of the threads running as part
+>>of the job.  The question is how the job prolog script can communicate
+>>the JobID directly to Lustre without using a global /proc file?  Doing an
+>>upcall to userspace per JobID lookup is going to be *worse* for
+>>performance than the current searching through the process environment.
+>>
+>>I'm not against Ben's proposal to implement a cache in the kernel for
+>>different processes.  It is unfortunate that we can't have proper
+>>thread-local storage for Lustre, so a hash table is probably reasonable
+>>for this (there may be thousands of threads involved).  I don't think the
+>>cl_env struct would be useful, since it is not tied to a specific thread
+>>(AFAIK), but rather assigned as different threads enter/exit kernel
+>>context.  Note that we already have similar time-limited caches for the
+>>identity upcall and FMD (lustre/ofd/ofd_fmd.c), so it may be useful to
+>>see whether the code can be shared.
+>
+>I'll take a look at those, but implementing the hash table was a pretty
+>simple solution, I need to work out a few kinks with memory leaks before
+>doing real performance tests on it to make sure it performs similarly to
+>nodelocal.
+>
+>>Another (not very nice) option to avoid looking through the environment
+>>variables (which IMHO isn't so bad, even though the upstream folks don't
+>>like it) is to associate the JobID set via /proc with a process group
+>>internally and look the PGID up in the kernel to find the JobID.  That
+>>can be repeated each time a new JobID is set via /proc, since the PGID
+>>would stick around for each new job/shell/process created under the PGID.
+>> It won't be as robust as looking up the JobID in the environment, but
+>>probably good enough for most uses.
+>>
+>>I would definitely also be in favor of having some way to fall back to
+>>procname_uid if the PGID cannot be found, the job environment variable is
+>>not available, and there is nothing in nodelocal.
+>
+>That's simple enough.
+>
