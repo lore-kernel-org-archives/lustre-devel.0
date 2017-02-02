@@ -1,158 +1,106 @@
-From: Ben Evans <bevans@cray.com>
-Date: Thu, 2 Feb 2017 15:20:29 +0000
-Subject: [lustre-devel] Proposal for JobID caching
-In-Reply-To: <D4A7F1D5.C56F%jevans@cray.com>
-References: <D4A5356C.C519%jevans@cray.com>
-	<6E2CFE03-A158-4D82-82BA-AF0A175AA358@intel.com>
-	<9BEFFD88-0537-43AB-8352-6477F30906DA@intel.com>
-	<D4A7F1D5.C56F%jevans@cray.com>
-Message-ID: <D4B8B7AC.C6F6%jevans@cray.com>
+From: Jan Kara <jack@suse.cz>
+Date: Thu,  2 Feb 2017 18:34:04 +0100
+Subject: [lustre-devel] [PATCH 06/24] lustre: Convert to separately
+	allocated bdi
+In-Reply-To: <20170202173422.3240-1-jack@suse.cz>
+References: <20170202173422.3240-1-jack@suse.cz>
+Message-ID: <20170202173422.3240-7-jack@suse.cz>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: linux-fsdevel@vger.kernel.org
+Cc: Christoph Hellwig <hch@infradead.org>, linux-block@vger.kernel.org, Jan Kara <jack@suse.cz>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, lustre-devel@lists.lustre.org
 
-https://review.whamcloud.com/#/c/25208/ is a working version of what I had
-proposed, including the suggested changes to default to procname_uid.
-This is not perfect, but the performance is much improved over the current
-methods, and unlike inode-based caching Metadata performance isn't
-negatively affected.  Multiple simultaneous jobs can be run on the same
-file, and get appropriate metrics.
+Allocate struct backing_dev_info separately instead of embedding it
+inside superblock. This unifies handling of bdi among users.
 
+CC: Oleg Drokin <oleg.drokin@intel.com>
+CC: Andreas Dilger <andreas.dilger@intel.com>
+CC: James Simmons <jsimmons@infradead.org>
+CC: lustre-devel at lists.lustre.org
+Signed-off-by: Jan Kara <jack@suse.cz>
+---
+ .../staging/lustre/lustre/include/lustre_disk.h    |  4 ----
+ drivers/staging/lustre/lustre/llite/llite_lib.c    | 24 +++-------------------
+ 2 files changed, 3 insertions(+), 25 deletions(-)
 
--Ben
-
-On 1/20/17, 5:00 PM, "Ben Evans" <bevans@cray.com> wrote:
-
->
->
->On 1/20/17, 4:50 PM, "Dilger, Andreas" <andreas.dilger@intel.com> wrote:
->
->>On Jan 18, 2017, at 13:39, Oleg Drokin <oleg.drokin@intel.com> wrote:
->>> 
->>> 
->>> On Jan 18, 2017, at 3:08 PM, Ben Evans wrote:
->>> 
->>>> Overview
->>>>            The Lustre filesystem added the ability to track I/O
->>>>performance of a job across a cluster.  The initial algorithm was
->>>>relatively simplistic:  for every I/O, look up the job ID of the
->>>>process and include it in the RPC being sent to the server.  This
->>>>imposed a non-trivial performance impact on client I/O performance.
->>>>            An additional algorithm was introduced to handle the single
->>>>job per node case, where instead of looking up the job ID of the
->>>>process, Lustre simply accesses the value of a variable set through the
->>>>proc interface.  This improved performance greatly, but only functions
->>>>when a single job is being run.
->>>>            A new approach is needed for multiple job per node systems.
->>>> 
->>>> Proposed Solution
->>>>            The proposed solution to this is to create a small
->>>>PID->JobID table in kernel memory.  When a process performs an IO, a
->>>>lookup is done in the table for the PID, if a JobID exists for that
->>>>PID, it is used, otherwise it is retrieved via the same methods as the
->>>>original Jobstats algorithm.  Once located the JobID is stored in a
->>>>PID/JobID table in memory. The existing cfs_hash_table structure and
->>>>functions will be used to implement the table.
->>>> 
->>>> Rationale
->>>>            This reduces the number of calls into userspace, minimizing
->>>>the time taken on each I/O.  It also easily supports multiple job per
->>>>node scenarios, and like other proposed solutions has no issue with
->>>>multiple jobs performing I/O on the same file at the same time.
->>>> 
->>>> Requirements
->>>> ?      Performance cannot significantly detract from baseline
->>>>performance without jobstats
->>>> ?      Supports multiple jobs per node
->>>> ?      Coordination with the scheduler is not required, but interfaces
->>>>may be provided
->>>> ?      Supports multiple PIDs per job
->>>> 
->>>> New Data Structures
->>>>            pid_to_jobid {
->>>>                        struct hlist_node pj_hash;
->>>>                        u54 pj_pid;
->>>>                        char pj_jobid[LUSTRE_JOBID_SIZE];
->>>> spinlock_t jp_lock;
->>>>                        time_t jp_time;
->>>> }
->>>> Proc Variables
->>>> Writing to /proc/fs/lustre/jobid_name while not in ?nodelocal? mode
->>>>will cause all entries in the cache for that jobID to be removed from
->>>>the cache
->>>> 
->>>> Populating the Cache
->>>>            When lustre_get_jobid is called, the process, and in the
->>>>cached mode, first a check will be done in the cache for a valid PID to
->>>>JobID mapping.  If none exists, it uses the same mechanisms to get the
->>>>JobID and populates the appropriate PID to JobID map.
->>>> If a lookup is performed and the PID to JobID mapping exists, but is
->>>>more than 30 seconds old, the JobID is refreshed.
->>>> Purging the Cache
->>>>            The cache can be purged of a specific job by writing the
->>>>JobID to the jobid_name proc file.  Any items in the cache that are
->>>>more than 300 seconds out of date will also be purged at this time.
->>> 
->>> 
->>> I'd much rather prefer you go to the table that's populated outside of
->>>the kernel
->>> somehow.
->>> Let's be realistic, poking around in userspace process environments for
->>>random
->>> strings is not such a great idea at all even though it did look like a
->>>good idea
->>> in the past for simplicity reasons.
->>> Similar to nodelocal, we probably just switch to a method where you
->>>call a
->>> particular lctl command that would mark the whole session as belonging
->>> to some job. This might take several forms, e.g. nodelocal itself could
->>> be extended to only apply to a current namespace/container
->>> But if you do really run different jobs in the global namespace, we
->>>probably can
->>> probably just make the lctl to spawn a shell with commands that all
->>>would
->>> be marked as a particular job? Or we can probably trace the parent of
->>>lctl and
->>> mark that so that all its children become somehow marked too.
->>
->>Having lctl spawn a shell or requiring everything to run in a container
->>is impractical for users, and will just make it harder to use JobID,
->>IMHO.  The job scheduler is _already_ storing the JobID in the process
->>environment so that it is available to all of the threads running as part
->>of the job.  The question is how the job prolog script can communicate
->>the JobID directly to Lustre without using a global /proc file?  Doing an
->>upcall to userspace per JobID lookup is going to be *worse* for
->>performance than the current searching through the process environment.
->>
->>I'm not against Ben's proposal to implement a cache in the kernel for
->>different processes.  It is unfortunate that we can't have proper
->>thread-local storage for Lustre, so a hash table is probably reasonable
->>for this (there may be thousands of threads involved).  I don't think the
->>cl_env struct would be useful, since it is not tied to a specific thread
->>(AFAIK), but rather assigned as different threads enter/exit kernel
->>context.  Note that we already have similar time-limited caches for the
->>identity upcall and FMD (lustre/ofd/ofd_fmd.c), so it may be useful to
->>see whether the code can be shared.
->
->I'll take a look at those, but implementing the hash table was a pretty
->simple solution, I need to work out a few kinks with memory leaks before
->doing real performance tests on it to make sure it performs similarly to
->nodelocal.
->
->>Another (not very nice) option to avoid looking through the environment
->>variables (which IMHO isn't so bad, even though the upstream folks don't
->>like it) is to associate the JobID set via /proc with a process group
->>internally and look the PGID up in the kernel to find the JobID.  That
->>can be repeated each time a new JobID is set via /proc, since the PGID
->>would stick around for each new job/shell/process created under the PGID.
->> It won't be as robust as looking up the JobID in the environment, but
->>probably good enough for most uses.
->>
->>I would definitely also be in favor of having some way to fall back to
->>procname_uid if the PGID cannot be found, the job environment variable is
->>not available, and there is nothing in nodelocal.
->
->That's simple enough.
->
+diff --git a/drivers/staging/lustre/lustre/include/lustre_disk.h b/drivers/staging/lustre/lustre/include/lustre_disk.h
+index 8886458748c1..a676bccabd43 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_disk.h
++++ b/drivers/staging/lustre/lustre/include/lustre_disk.h
+@@ -133,13 +133,9 @@ struct lustre_sb_info {
+ 	struct obd_export	 *lsi_osd_exp;
+ 	char			  lsi_osd_type[16];
+ 	char			  lsi_fstype[16];
+-	struct backing_dev_info   lsi_bdi;     /* each client mountpoint needs
+-						* own backing_dev_info
+-						*/
+ };
+ 
+ #define LSI_UMOUNT_FAILOVER	      0x00200000
+-#define LSI_BDI_INITIALIZED	      0x00400000
+ 
+ #define     s2lsi(sb)	((struct lustre_sb_info *)((sb)->s_fs_info))
+ #define     s2lsi_nocast(sb) ((sb)->s_fs_info)
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 25f5aed97f63..4f07d2e60d40 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -861,15 +861,6 @@ void ll_lli_init(struct ll_inode_info *lli)
+ 	mutex_init(&lli->lli_layout_mutex);
+ }
+ 
+-static inline int ll_bdi_register(struct backing_dev_info *bdi)
+-{
+-	static atomic_t ll_bdi_num = ATOMIC_INIT(0);
+-
+-	bdi->name = "lustre";
+-	return bdi_register(bdi, NULL, "lustre-%d",
+-			    atomic_inc_return(&ll_bdi_num));
+-}
+-
+ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
+ {
+ 	struct lustre_profile *lprof = NULL;
+@@ -879,6 +870,7 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
+ 	char  *profilenm = get_profile_name(sb);
+ 	struct config_llog_instance *cfg;
+ 	int    err;
++	static atomic_t ll_bdi_num = ATOMIC_INIT(0);
+ 
+ 	CDEBUG(D_VFSTRACE, "VFS Op: sb %p\n", sb);
+ 
+@@ -901,16 +893,11 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
+ 	if (err)
+ 		goto out_free;
+ 
+-	err = bdi_init(&lsi->lsi_bdi);
+-	if (err)
+-		goto out_free;
+-	lsi->lsi_flags |= LSI_BDI_INITIALIZED;
+-	lsi->lsi_bdi.capabilities = 0;
+-	err = ll_bdi_register(&lsi->lsi_bdi);
++	err = super_setup_bdi_name(sb, "lustre-%d",
++				   atomic_inc_return(&ll_bdi_num));
+ 	if (err)
+ 		goto out_free;
+ 
+-	sb->s_bdi = &lsi->lsi_bdi;
+ 	/* kernel >= 2.6.38 store dentry operations in sb->s_d_op. */
+ 	sb->s_d_op = &ll_d_ops;
+ 
+@@ -1031,11 +1018,6 @@ void ll_put_super(struct super_block *sb)
+ 	if (profilenm)
+ 		class_del_profile(profilenm);
+ 
+-	if (lsi->lsi_flags & LSI_BDI_INITIALIZED) {
+-		bdi_destroy(&lsi->lsi_bdi);
+-		lsi->lsi_flags &= ~LSI_BDI_INITIALIZED;
+-	}
+-
+ 	ll_free_sbi(sb);
+ 	lsi->lsi_llsbi = NULL;
+ 
+-- 
+2.10.2
