@@ -1,28 +1,55 @@
-From: Jan Kara <jack@suse.cz>
-Date: Thu,  2 Feb 2017 18:33:58 +0100
-Subject: [lustre-devel] [PATCH 0/24 RFC] fs: Convert all embedded bdis into
-	separate ones
-Message-ID: <20170202173422.3240-1-jack@suse.cz>
+From: Al Viro <viro@ZenIV.linux.org.uk>
+Date: Thu, 2 Feb 2017 18:28:02 +0000
+Subject: [lustre-devel] [PATCH v3 0/2] iov_iter: allow
+ iov_iter_get_pages_alloc to allocate more pages per call
+In-Reply-To: <20170202144817.GB15545@quack2.suse.cz>
+References: <20170124212327.14517-1-jlayton@redhat.com>
+	<20170125133205.21704-1-jlayton@redhat.com>
+	<20170202095125.GF27291@ZenIV.linux.org.uk>
+	<20170202144817.GB15545@quack2.suse.cz>
+Message-ID: <20170202182802.GH27291@ZenIV.linux.org.uk>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org
-Cc: linux-block-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, linux-nilfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, ecryptfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, codalist-/uMB558Y47wP4a1z8dhFYw@public.gmane.org, Christoph Hellwig <hch-wEGCiKHe2LqWVfeAwA7xHQ@public.gmane.org>, cluster-devel-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, linux-mtd-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org, osd-dev-yNzVSZO3znNg9hUCZPvPmw@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Petr Vandrovec <petr-vPk2MGR0e28uaRcfnNAh7A@public.gmane.org>, linux-afs-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org, linux-btrfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
+To: Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>
+Cc: linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Jeff Layton <jlayton-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Chris Wilson <chris-Y6uKTt2uX1cEflXRtASbqLVCufUGDwFn@public.gmane.org>, linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Linus Torvalds <torvalds-de/tnXTf+JLsfHDXvbKv3WD2FQJk+8+b@public.gmane.org>, "Kirill A. Shutemov" <kirill.shutemov-VuQAYsv1563Yd54FQh9/CA@public.gmane.org>, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
 
-Hello,
+On Thu, Feb 02, 2017 at 03:48:17PM +0100, Jan Kara wrote:
 
-this patch series converts all embedded occurences of struct backing_dev_info
-to use standalone dynamically allocated structures. This makes bdi handling
-unified across all bdi users and generally removes some boilerplate code from
-filesystems setting up their own bdi. It also allows us to remove some code
-from generic bdi implementation.
+> > 	* ->page_mkwrite() instances sometimes return VM_FAULT_RETRY; AFAICS,
+> > it's only (ab)used there as 'not zero, but doesn't contain any error bits';
+> > VM_FAULT_RETRY from that source does *not* reach handle_mm_fault() callers,
+> > right?
+> 
+> I can see only Lustre doing it and IMHO it is abuse. VM_FAULT_RETRY is used
+> for mmap_sem latency reduction when paging in pages and so not everybody
+> handles it. If a handler wants to simply retry the fault, returning
+> VM_FAULT_NOPAGE is a more common way to do that...
 
-The patches were only compile-tested for most filesystems (I've tested
-mounting only for NFS & btrfs) so fs maintainers please have a look whether
-the changes look sound to you.
+/* Convert errno to return value from ->page_mkwrite() call */
+static inline int block_page_mkwrite_return(int err)
+{
+        if (err == 0)
+                return VM_FAULT_LOCKED;
+        if (err == -EFAULT)
+                return VM_FAULT_NOPAGE;
+        if (err == -ENOMEM)
+                return VM_FAULT_OOM;
+        if (err == -EAGAIN)
+                return VM_FAULT_RETRY;
+        /* -ENOSPC, -EDQUOT, -EIO ... */
+        return VM_FAULT_SIGBUS;
+}
 
-This series is based on top of bdi fixes that were merged into linux-block
-git tree.
-
-								Honza
+and a bunch of ->page_mkwrite() instances using that.  However, the only
+callers of ->page_mkwrite() are wp_page_shared()->do_page_mkwrite() and
+do_shared_fault()->do_page_mkwrite().  do_page_mkwrite() treates
+VM_FAULT_RETRY as "lock page and return VM_FAULT_RETRY|VM_FAULT_LOCKED".
+Both callers do the same check -
+                if (unlikely(!tmp || (tmp &
+                                      (VM_FAULT_ERROR | VM_FAULT_NOPAGE)))) {
+and the return value if that predicate is false.  FWIW, use of VM_FAULT_RETRY
+comes from your patch back in 2011 and AFAICS the same analysis used to
+apply back then, except for the open-coded method calls where we use
+do_page_mkwrite() these days...
