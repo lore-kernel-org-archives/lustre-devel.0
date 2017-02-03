@@ -1,48 +1,35 @@
-From: Christoph Hellwig <hch@infradead.org>
-Date: Fri, 3 Feb 2017 03:09:30 -0800
-Subject: [lustre-devel] [PATCH v3 0/2] iov_iter: allow
- iov_iter_get_pages_alloc to allocate more pages per call
-In-Reply-To: <20170203085415.GJ27291@ZenIV.linux.org.uk>
-References: <20170124212327.14517-1-jlayton@redhat.com>
-	<20170125133205.21704-1-jlayton@redhat.com>
-	<20170202095125.GF27291@ZenIV.linux.org.uk>
-	<20170202105651.GA32111@infradead.org>
-	<20170202111625.GG27291@ZenIV.linux.org.uk>
-	<1486040452.2812.6.camel@redhat.com>
-	<20170203074901.GA19808@infradead.org>
-	<20170203085415.GJ27291@ZenIV.linux.org.uk>
-Message-ID: <20170203110930.GA22173@infradead.org>
+From: Jan Kara <jack@suse.cz>
+Date: Fri, 3 Feb 2017 14:50:42 +0100
+Subject: [lustre-devel] [PATCH 04/24] fs: Provide infrastructure for
+ dynamic BDIs in filesystems
+In-Reply-To: <20170202192827.GF6550@localhost.localdomain>
+References: <20170202173422.3240-1-jack@suse.cz>
+	<20170202173422.3240-5-jack@suse.cz>
+	<20170202192827.GF6550@localhost.localdomain>
+Message-ID: <20170203135042.GB5844@quack2.suse.cz>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Al Viro <viro-3bDd1+5oDREiFSDQTTA3OLVCufUGDwFn@public.gmane.org>
-Cc: linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, Jeff Layton <jlayton-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Chris Wilson <chris-Y6uKTt2uX1cEflXRtASbqLVCufUGDwFn@public.gmane.org>, Christoph Hellwig <hch-wEGCiKHe2LqWVfeAwA7xHQ@public.gmane.org>, linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Linus Torvalds <torvalds-de/tnXTf+JLsfHDXvbKv3WD2FQJk+8+b@public.gmane.org>, "Kirill A. Shutemov" <kirill.shutemov-VuQAYsv1563Yd54FQh9/CA@public.gmane.org>, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
+To: Liu Bo <bo.li.liu@oracle.com>
+Cc: Jan Kara <jack@suse.cz>, linux-fsdevel@vger.kernel.org, Christoph Hellwig <hch@infradead.org>, linux-block@vger.kernel.org, linux-mtd@lists.infradead.org, linux-nfs@vger.kernel.org, Petr Vandrovec <petr@vandrovec.name>, linux-nilfs@vger.kernel.org, cluster-devel@redhat.com, osd-dev@open-osd.org, codalist@TELEMANN.coda.cs.cmu.edu, linux-afs@lists.infradead.org, ecryptfs@vger.kernel.org, linux-cifs@vger.kernel.org, ceph-devel@vger.kernel.org, linux-btrfs@vger.kernel.org, v9fs-developer@lists.sourceforge.net, lustre-devel@lists.lustre.org
 
-On Fri, Feb 03, 2017 at 08:54:15AM +0000, Al Viro wrote:
-> Hmm...  Reuse part is really nasty ;-/  OTOH, it might make sense to have
-> a "fill bio_vec array" as separate primitive - having that sucker come
-> from bio looks like an artificial restriction.
+On Thu 02-02-17 11:28:27, Liu Bo wrote:
+> Hi,
+> 
+> On Thu, Feb 02, 2017 at 06:34:02PM +0100, Jan Kara wrote:
+> > Provide helper functions for setting up dynamically allocated
+> > backing_dev_info structures for filesystems and cleaning them up on
+> > superblock destruction.
+> 
+> Just one concern, will this cause problems for multiple superblock cases
+> like nfs with nosharecache?
 
-Or just the only usecase :)  But yes, it could be generalized to take a
-bio_vec without too much effort.
+Can you ellaborate a bit? I've looked for a while what nfs with
+nosharecache does but I didn't see how it would influence anything with
+bdis...
 
-> OK, next question, seeing that you've dealt with O_DIRECT guts more than
-> I have.  When we have iov_iter_get_pages() fail on do_direct_IO() write
-> with some blocks already allocated, we pick zero page as data source.
-> So far, so good, but:
-> 	* should we bother zeroing anything unless buffer_new() is true?
-
-I don't think so.
-
-> 	* why, in case of more than a page worth of pending allocated
-> blocks, do we bother with calling iov_iter_get_pages() again and again?
-> We *do* take care not to allocate anything else after that point, but
-> dio_get_page() will be calling iov_iter_get_pages() every time in that
-> case - there's only one page in queue.
-
-There shouldn't be a need for it.
-
-But take it with a grain of salt - fs/direct-io.c is a hairy mess,
-that's one of the reasons why I replaced it with the new iomap
-code instead of trying to gradually move it to iomap API.
+								Honza
+-- 
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
