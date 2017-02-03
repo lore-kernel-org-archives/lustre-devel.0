@@ -1,60 +1,36 @@
-From: Jan Kara <jack@suse.cz>
-Date: Fri, 3 Feb 2017 17:10:05 +0100
-Subject: [lustre-devel] [PATCH] mm: Avoid returning VM_FAULT_RETRY from
- ->page_mkwrite handlers
-In-Reply-To: <20170203155326.GE2267@bombadil.infradead.org>
-References: <20170203150729.15863-1-jack@suse.cz>
-	<20170203151356.GB2267@bombadil.infradead.org>
-	<20170203154640.GA25586@quack2.suse.cz>
-	<20170203155326.GE2267@bombadil.infradead.org>
-Message-ID: <20170203161005.GB25586@quack2.suse.cz>
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Date: Fri, 3 Feb 2017 10:29:23 -0800
+Subject: [lustre-devel] [PATCH v3 0/2] iov_iter: allow
+ iov_iter_get_pages_alloc to allocate more pages per call
+In-Reply-To: <20170203072952.GI27291@ZenIV.linux.org.uk>
+References: <20170124212327.14517-1-jlayton@redhat.com>
+	<20170125133205.21704-1-jlayton@redhat.com>
+	<20170202095125.GF27291@ZenIV.linux.org.uk>
+	<20170202105651.GA32111@infradead.org>
+	<20170202111625.GG27291@ZenIV.linux.org.uk>
+	<1486040452.2812.6.camel@redhat.com>
+	<20170203072952.GI27291@ZenIV.linux.org.uk>
+Message-ID: <CA+55aFx=NPESJv9RjCNRKFH_rk9uVMov0UtFbpZH-xBsgK2h-w@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Matthew Wilcox <willy@infradead.org>
-Cc: Jan Kara <jack@suse.cz>, Al Viro <viro@ZenIV.linux.org.uk>, linux-fsdevel@vger.kernel.org, linux-mm@kvack.org, Andrew Morton <akpm@linux-foundation.org>, lustre-devel@lists.lustre.org, cluster-devel@redhat.com
+To: Al Viro <viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org>
+Cc: Linux NFS Mailing List <linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, Jeff Layton <jlayton-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, Linux Kernel Mailing List <linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Chris Wilson <chris-Y6uKTt2uX1cEflXRtASbqLVCufUGDwFn@public.gmane.org>, Christoph Hellwig <hch-wEGCiKHe2LqWVfeAwA7xHQ@public.gmane.org>, linux-fsdevel <linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, V9FS Developers <v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org>, ceph-devel <ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, "Kirill A. Shutemov" <kirill.shutemov-VuQAYsv1563Yd54FQh9/CA@public.gmane.org>, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
 
-On Fri 03-02-17 07:53:26, Matthew Wilcox wrote:
-> On Fri, Feb 03, 2017 at 04:46:40PM +0100, Jan Kara wrote:
-> > On Fri 03-02-17 07:13:59, Matthew Wilcox wrote:
-> > > On Fri, Feb 03, 2017 at 04:07:29PM +0100, Jan Kara wrote:
-> > > > Some ->page_mkwrite handlers may return VM_FAULT_RETRY as its return
-> > > > code (GFS2 or Lustre can definitely do this). However VM_FAULT_RETRY
-> > > > from ->page_mkwrite is completely unhandled by the mm code and results
-> > > > in locking and writeably mapping the page which definitely is not what
-> > > > the caller wanted. Fix Lustre and block_page_mkwrite_ret() used by other
-> > > > filesystems (notably GFS2) to return VM_FAULT_NOPAGE instead which
-> > > > results in bailing out from the fault code, the CPU then retries the
-> > > > access, and we fault again effectively doing what the handler wanted.
-> > > 
-> > > Reading this commit message makes me wonder if this is the best fix.
-> > > It would seem logical that if I want the fault to be retried that I should
-> > > return VM_FAULT_RETRY, not VM_FAULT_NOPAGE.  Why don't we have the MM
-> > > treat VM_FAULT_RETRY the same way that it treats VM_FAULT_NOPAGE and give
-> > > driver / filesystem writers one fewer way to shoot themselves in the foot?
-> > 
-> > VM_FAULT_RETRY is special, it may be used only if FAULT_FLAG_ALLOW_RETRY
-> > was set in page fault flags and it means - we have dropped mmap_sem, we
-> > loaded page needed to satisfy the fault and now we need to try again (have
-> > a look at __lock_page_or_retry()). I have my reservations about this
-> > interface but it works...
-> 
-> Oh, I understand what it's *supposed* to be used for ;-)  It's just
-> a bit of an attractive nuisance.  Maybe renaming it to something like
-> VM_FAULT_PAGE_RETRY would stop people from thinking that it meant "retry
-> the fault".  And we could #define VM_FAULT_RETRY VM_FAULT_NOPAGE so that
-> people who want to retry the fault in a normal way could use a return
-> value that sounds like it does what they want instead of a return value
-> that is supposed to be used to indicate that we put a PFN into the
-> page table?
+On Thu, Feb 2, 2017 at 11:29 PM, Al Viro <viro@zeniv.linux.org.uk> wrote:
+>
+> get_user_pages() relies upon find_extend_vma() to reject kernel
+> addresses; the fast side of get_user_pages_fast() doesn't have anything
+> of that sort
 
-So a better name for VM_FAULT_RETRY and disentangling VM_FAULT_NOPAGE so
-that it is not misused for retrying the fault would be nice. But it is a
-much larger endeavor (I actually had a look into this some time ago) than
-this simple bugfix...
+It is *supposed* to have it.
 
-								Honza
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+See pte_allows_gup(), for example. In particular, it requires the
+_PAGE_USER bit in the PTE (and the devpte case should require
+_PAGE_BIT_DEVMAP).
+
+So no, get_user_pages_fast() can not look up kernel pages. If it does,
+that would be a bug.
+
+              Linus
