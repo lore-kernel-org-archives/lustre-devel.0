@@ -1,45 +1,96 @@
-From: Jan Kara <jack@suse.cz>
-Date: Mon, 6 Feb 2017 10:24:15 +0100
-Subject: [lustre-devel] [PATCH] mm: Avoid returning VM_FAULT_RETRY from
- ->page_mkwrite handlers
-In-Reply-To: <20170203152054.6ee9f8a920e6d0ac8a93d2b9@linux-foundation.org>
-References: <20170203150729.15863-1-jack@suse.cz>
-	<20170203152054.6ee9f8a920e6d0ac8a93d2b9@linux-foundation.org>
-Message-ID: <20170206092415.GD4004@quack2.suse.cz>
+From: Al Viro <viro@ZenIV.linux.org.uk>
+Date: Mon, 6 Feb 2017 09:57:07 +0000
+Subject: [lustre-devel] [PATCH v3 0/2] iov_iter: allow
+ iov_iter_get_pages_alloc to allocate more pages per call
+In-Reply-To: <CAJfpegv5ZGd2gzSbQvgk4uX5q06AijY+TNg2jdrPBSjbFoXMfg@mail.gmail.com>
+References: <20170202095125.GF27291@ZenIV.linux.org.uk>
+	<20170204030842.GL27291@ZenIV.linux.org.uk>
+	<CAJfpegtVb8PKNnKe5wGMd0u0WzgLpjpVtVpqDScbrBJShLAfGw@mail.gmail.com>
+	<20170205015145.GB13195@ZenIV.linux.org.uk>
+	<CAJfpegv=r9J8Mqax_ZAB2h5QbRgJMHwyVMENTpYZ8u3_pqNfJw@mail.gmail.com>
+	<20170205210151.GD13195@ZenIV.linux.org.uk>
+	<CAJfpeguzOgX9d+5XCNJcmXW5KkrGbnWB5aZSP1-0q3a6i6uk2w@mail.gmail.com>
+	<20170205220445.GE13195@ZenIV.linux.org.uk>
+	<20170206030532.GF13195@ZenIV.linux.org.uk>
+	<CAJfpegv5ZGd2gzSbQvgk4uX5q06AijY+TNg2jdrPBSjbFoXMfg@mail.gmail.com>
+Message-ID: <20170206095706.GG13195@ZenIV.linux.org.uk>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Andrew Morton <akpm@linux-foundation.org>
-Cc: Jan Kara <jack@suse.cz>, Al Viro <viro@ZenIV.linux.org.uk>, linux-fsdevel@vger.kernel.org, linux-mm@kvack.org, lustre-devel@lists.lustre.org, cluster-devel@redhat.com
+To: Miklos Szeredi <miklos-sUDqSbJrdHQHWmgEVkV9KA@public.gmane.org>
+Cc: Linux NFS list <linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, Jeff Layton <jlayton-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Chris Wilson <chris-Y6uKTt2uX1cEflXRtASbqLVCufUGDwFn@public.gmane.org>, linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Linus Torvalds <torvalds-de/tnXTf+JLsfHDXvbKv3WD2FQJk+8+b@public.gmane.org>, "Kirill A. Shutemov" <kirill.shutemov-VuQAYsv1563Yd54FQh9/CA@public.gmane.org>, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
 
-On Fri 03-02-17 15:20:54, Andrew Morton wrote:
-> On Fri,  3 Feb 2017 16:07:29 +0100 Jan Kara <jack@suse.cz> wrote:
+On Mon, Feb 06, 2017 at 10:08:06AM +0100, Miklos Szeredi wrote:
+
+> Yes, I think only page lock can be used to deadlock inside
+> fuse_dev_read/write().  So requests that don't have locked pages
+> should be okay  with just waiting until copy_to/from_user() finishes
+> and only then proceeding with the abort.
+
+Actually, looking at that some more, this might be not true.  Anything
+that takes ->mmap_sem exclusive and *not* killable makes for another
+source of deadlock.
+
+Initial page fault takes ->mmap_sem shared.  OK, request sent to
+server and server tries to read() it.  In the meanwhile, something
+has closed userfaultfd for the same mm_struct.  We have userfaultfd_release()
+block on attempt to take ->mmap_sem exclusive and from now on any attempt
+to grab ->mmap_sem shared will deadlock.  And get_user_pages(), as well
+as copy_to_user(), etc. can end up doing just that.  It doesn't have to
+be an mmap of the same file, BTW - any page fault would do.
+
+All you really need is to have server sharing address space with the
+process that steps into original page fault, plus an evicted page
+of any nature (anon mmap, whatever) being used as a destination of
+read() in server.
+
+down_read() inside down_read() is fine, unless there had been down_write()
+in between.  And there are unkillable down_write() on ->mmap_sem -
+userfaultfd_release() being one example of such.  Many of those can and
+probably should become down_write_killable(), but this one can't - there
+might be nothing to deliver the signal to, if the final close() happens
+e.g. from exit(2).
+
+Warning: the above might be completely bogus - I'm on way too large
+uptime at the moment and most of the last day had been spent digging
+through various convoluted code, so take the above with a cartload of
+salt.  _If_ it's true, that kind of deadlock won't be possible to
+break with killing anything or doing umount -f, though.
+
 > 
-> > Some ->page_mkwrite handlers may return VM_FAULT_RETRY as its return
-> > code (GFS2 or Lustre can definitely do this). However VM_FAULT_RETRY
-> > from ->page_mkwrite is completely unhandled by the mm code and results
-> > in locking and writeably mapping the page which definitely is not what
-> > the caller wanted. Fix Lustre and block_page_mkwrite_ret() used by other
-> > filesystems (notably GFS2) to return VM_FAULT_NOPAGE instead which
-> > results in bailing out from the fault code, the CPU then retries the
-> > access, and we fault again effectively doing what the handler wanted.
+> Those that have locked pages must be able to be aborted during
+> copy_to/from_user() because the copy itself may try to acquire the
+> page lock.
 > 
-> I'm not getting any sense of the urgency of this fix.  The bug *sounds*
-> bad?  Which kernel versions need fixing?
+> So yes, if we want to switch to copy_to/from_user(), then we can just
+> fix the page refcounting for read and write requests and handle the
+> two cases differently.
+> 
+> >         So how about this:
+> >
+> > * explicit FR_END_IMMEDIATELY on read/write-related requests
+> > * no FR_LOCKED flipping in lock_request()/unlock_request()
+> > * modifying the call of end_requests() in fuse_abort_conn() so that it
+> > would skip request_end() for everything that isn't marked FR_END_IMMEDIATELY
+> > * make fuse_copy_pages() grab page references around the actual
+> > fuse_copy_page() - grab req->waitq.lock, check FR_ABORTED, grab a page
+> > reference in case it's not, drop req->waitq.lock and bugger off if FR_ABORTED
+> > was set.  Adjust fuse_try_move_page() accordingly.
+> >
+> > Do you see any problems with that approach for minimal fix?  If all requests
+> > in need of FR_END_IMMEDIATELY turn out to have non-page part of args already
+> > embedded into req->misc, it looks like this ought to suffice.  I probably
+> > could post something along those lines tomorrow, if you see any serious
+> > problems with that - please yell...
+> 
+> See previous mail, I don't think there's an issue with the current
+> code.  Other than being convoluted as hell.
 
-So I did more analysis of GFS2 and Lustre behavior. AFAICS GFS2 returns
-EAGAIN only for truncated page, when we then return with VM_FAULT_RETRY,
-do_page_mkwrite() locks the page, sees it is truncated and bails out
-properly thus silently fixes up the problem. The Lustre bug looks like it
-could actually result in some real problems and the bug is there since the
-initial commit in which Lustre was added in 3.11 (d7e09d0397e84).
+OK - I'm an idiot and I've managed to misread fuse_abort_conn() despite having
+reread it many times last couple of days.  And yes, state transitions of
+requests are convoluted as hell ;-/
 
-So overall the issue doesn't look like too serious currently but it is
-certainly a serious bug waiting to happen.
-
-								Honza
-
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+Anyway, bedtime for me.  With any luck the scare above re ->mmap_sem *is*
+bogus and I'll find "Al, you are an idiot - deadlock on ->mmap_sem can't
+happen for <reasons>" from somebody in the mailbox when I get up...
