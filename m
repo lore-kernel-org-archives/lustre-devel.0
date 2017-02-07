@@ -1,85 +1,56 @@
-From: Xiong, Jinshan <jinshan.xiong@intel.com>
-Date: Mon, 6 Feb 2017 20:52:29 +0000
-Subject: [lustre-devel] [PATCH] mm: Avoid returning VM_FAULT_RETRY from
- ->page_mkwrite handlers
-In-Reply-To: <20170203150729.15863-1-jack@suse.cz>
-References: <20170203150729.15863-1-jack@suse.cz>
-Message-ID: <4CD0030B-EA76-4E3D-B9F4-B2E96D05C5B6@intel.com>
+From: Al Viro <viro@ZenIV.linux.org.uk>
+Date: Tue, 7 Feb 2017 07:19:09 +0000
+Subject: [lustre-devel] [PATCH v3 0/2] iov_iter: allow
+ iov_iter_get_pages_alloc to allocate more pages per call
+In-Reply-To: <CAJfpegv-ePQE9pNwZe6O+0LjJdq2aVk3bnhxeZ=y7P+iFq72XA@mail.gmail.com>
+References: <CAJfpegtVb8PKNnKe5wGMd0u0WzgLpjpVtVpqDScbrBJShLAfGw@mail.gmail.com>
+	<20170205015145.GB13195@ZenIV.linux.org.uk>
+	<CAJfpegv=r9J8Mqax_ZAB2h5QbRgJMHwyVMENTpYZ8u3_pqNfJw@mail.gmail.com>
+	<20170205210151.GD13195@ZenIV.linux.org.uk>
+	<CAJfpeguzOgX9d+5XCNJcmXW5KkrGbnWB5aZSP1-0q3a6i6uk2w@mail.gmail.com>
+	<20170205220445.GE13195@ZenIV.linux.org.uk>
+	<20170206030532.GF13195@ZenIV.linux.org.uk>
+	<CAJfpegv5ZGd2gzSbQvgk4uX5q06AijY+TNg2jdrPBSjbFoXMfg@mail.gmail.com>
+	<20170206095706.GG13195@ZenIV.linux.org.uk>
+	<CAJfpegv-ePQE9pNwZe6O+0LjJdq2aVk3bnhxeZ=y7P+iFq72XA@mail.gmail.com>
+Message-ID: <20170207071909.GI13195@ZenIV.linux.org.uk>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Jan Kara <jack@suse.cz>
-Cc: Al Viro <viro@ZenIV.linux.org.uk>, "cluster-devel@redhat.com" <cluster-devel@redhat.com>, "linux-mm@kvack.org" <linux-mm@kvack.org>, "linux-fsdevel@vger.kernel.org" <linux-fsdevel@vger.kernel.org>, Andrew
- Morton <akpm@linux-foundation.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
+To: Miklos Szeredi <miklos-sUDqSbJrdHQHWmgEVkV9KA@public.gmane.org>
+Cc: Linux NFS list <linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, Jeff Layton <jlayton-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Chris Wilson <chris-Y6uKTt2uX1cEflXRtASbqLVCufUGDwFn@public.gmane.org>, linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Linus Torvalds <torvalds-de/tnXTf+JLsfHDXvbKv3WD2FQJk+8+b@public.gmane.org>, "Kirill A. Shutemov" <kirill.shutemov-VuQAYsv1563Yd54FQh9/CA@public.gmane.org>, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
 
-looks good to me.
+On Mon, Feb 06, 2017 at 03:18:42PM +0100, Miklos Szeredi wrote:
 
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+> But I think it's breakable in the same way: if the deadlocked request
+> is aborted, the fault will release the page lock as well as mmap_sem,
+> and from there things will resolve themselves.
 
-> On Feb 3, 2017, at 7:07 AM, Jan Kara <jack@suse.cz> wrote:
-> 
-> Some ->page_mkwrite handlers may return VM_FAULT_RETRY as its return
-> code (GFS2 or Lustre can definitely do this). However VM_FAULT_RETRY
-> from ->page_mkwrite is completely unhandled by the mm code and results
-> in locking and writeably mapping the page which definitely is not what
-> the caller wanted. Fix Lustre and block_page_mkwrite_ret() used by other
-> filesystems (notably GFS2) to return VM_FAULT_NOPAGE instead which
-> results in bailing out from the fault code, the CPU then retries the
-> access, and we fault again effectively doing what the handler wanted.
-> 
-> CC: lustre-devel at lists.lustre.org
-> CC: cluster-devel at redhat.com
-> Reported-by: Al Viro <viro@ZenIV.linux.org.uk>
-> Signed-off-by: Jan Kara <jack@suse.cz>
-> ---
-> drivers/staging/lustre/lustre/llite/llite_mmap.c | 4 +---
-> include/linux/buffer_head.h                      | 4 +---
-> 2 files changed, 2 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-> index ee01f20d8b11..9afa6bec3e6f 100644
-> --- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
-> +++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-> @@ -390,15 +390,13 @@ static int ll_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
-> 		result = VM_FAULT_LOCKED;
-> 		break;
-> 	case -ENODATA:
-> +	case -EAGAIN:
-> 	case -EFAULT:
-> 		result = VM_FAULT_NOPAGE;
-> 		break;
-> 	case -ENOMEM:
-> 		result = VM_FAULT_OOM;
-> 		break;
-> -	case -EAGAIN:
-> -		result = VM_FAULT_RETRY;
-> -		break;
-> 	default:
-> 		result = VM_FAULT_SIGBUS;
-> 		break;
-> diff --git a/include/linux/buffer_head.h b/include/linux/buffer_head.h
-> index d67ab83823ad..79591c3660cc 100644
-> --- a/include/linux/buffer_head.h
-> +++ b/include/linux/buffer_head.h
-> @@ -243,12 +243,10 @@ static inline int block_page_mkwrite_return(int err)
-> {
-> 	if (err == 0)
-> 		return VM_FAULT_LOCKED;
-> -	if (err == -EFAULT)
-> +	if (err == -EFAULT || err == -EAGAIN)
-> 		return VM_FAULT_NOPAGE;
-> 	if (err == -ENOMEM)
-> 		return VM_FAULT_OOM;
-> -	if (err == -EAGAIN)
-> -		return VM_FAULT_RETRY;
-> 	/* -ENOSPC, -EDQUOT, -EIO ... */
-> 	return VM_FAULT_SIGBUS;
-> }
-> -- 
-> 2.10.2
-> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+Right you are - original holder of ->mmap_sem is waiting for request and
+abort will wake it up...
+
+> But you are definitely right about needing to clean up that mess in
+> fuse/dev.c and doing so by fixing up the arg refcounting for just the
+> read and write requests is going to be a lot simpler than having to do
+> that for all of them (which was my original plan).
+
+Speaking of refcounting - what's going on with fuse_file one?  My reading
+of that code is that you have 4 states of that thing:
+	* new (just created, fallback request allocated, use fuse_file_free()
+to kill).  Refcount is 0.
+	* intermediate - in fact it's already opened, but still not
+put into ->private_data.  Refcount is still 0.  Use fuse_sync_release() to kill.
+	* live - normal refcounting (fuse_file_get()/fuse_file_put()).
+	* shutdown - refcount has reached 0.  Can't happen until ->release()
+(obviously - ->private_data holds a counting reference), some pieces of
+fuse_sync_release() correspond to some stuff in fuse_release_common(), some -
+to final fuse_file_put().
+
+To make it even more convoluted, cuse is using fuse_sync_release() and
+apparently relies upon no references being grabbed after fuse_do_open(),
+so that thing can be called with refcount 0 *or* refcount 1.
+
+Another thing: what guarantees that places in writepages-related paths
+where we store a reference into req->ff won't hit a request with already
+non-NULL ->ff?
