@@ -1,60 +1,72 @@
-From: Al Viro <viro@ZenIV.linux.org.uk>
-Date: Wed, 8 Feb 2017 05:54:32 +0000
-Subject: [lustre-devel] [PATCH v3 0/2] iov_iter: allow
- iov_iter_get_pages_alloc to allocate more pages per call
-In-Reply-To: <20170207113554.GA30656@veci.piliscsaba.szeredi.hu>
-References: <CAJfpegv=r9J8Mqax_ZAB2h5QbRgJMHwyVMENTpYZ8u3_pqNfJw@mail.gmail.com>
-	<20170205210151.GD13195@ZenIV.linux.org.uk>
-	<CAJfpeguzOgX9d+5XCNJcmXW5KkrGbnWB5aZSP1-0q3a6i6uk2w@mail.gmail.com>
-	<20170205220445.GE13195@ZenIV.linux.org.uk>
-	<20170206030532.GF13195@ZenIV.linux.org.uk>
-	<CAJfpegv5ZGd2gzSbQvgk4uX5q06AijY+TNg2jdrPBSjbFoXMfg@mail.gmail.com>
-	<20170206095706.GG13195@ZenIV.linux.org.uk>
-	<CAJfpegv-ePQE9pNwZe6O+0LjJdq2aVk3bnhxeZ=y7P+iFq72XA@mail.gmail.com>
-	<20170207071909.GI13195@ZenIV.linux.org.uk>
-	<20170207113554.GA30656@veci.piliscsaba.szeredi.hu>
-Message-ID: <20170208055431.GJ13195@ZenIV.linux.org.uk>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Wed, 8 Feb 2017 07:27:20 +0100
+Subject: [lustre-devel] [PATCH 10/60] staging: lustre: obdclass: add
+ more info to sysfs version string
+In-Reply-To: <ED30DA8B-BDFC-432C-93A9-309272C1C406@intel.com>
+References: <1485648328-2141-1-git-send-email-jsimmons@infradead.org>
+	<1485648328-2141-11-git-send-email-jsimmons@infradead.org>
+	<20170203103304.GA2600@kroah.com>
+	<ED30DA8B-BDFC-432C-93A9-309272C1C406@intel.com>
+Message-ID: <20170208062720.GA24445@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Miklos Szeredi <miklos-sUDqSbJrdHQHWmgEVkV9KA@public.gmane.org>
-Cc: linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Linux NFS list <linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, Linus Torvalds <torvalds-de/tnXTf+JLsfHDXvbKv3WD2FQJk+8+b@public.gmane.org>, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, Chris Wilson <chris-Y6uKTt2uX1cEflXRtASbqLVCufUGDwFn@public.gmane.org>, "Kirill A. Shutemov" <kirill.shutemov-VuQAYsv1563Yd54FQh9/CA@public.gmane.org>, Jeff Layton <jlayton-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>
+To: "Dilger, Andreas" <andreas.dilger@intel.com>
+Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Tue, Feb 07, 2017 at 12:35:54PM +0100, Miklos Szeredi wrote:
-> > Another thing: what guarantees that places in writepages-related paths
-> > where we store a reference into req->ff won't hit a request with already
-> > non-NULL ->ff?
+On Wed, Feb 08, 2017 at 01:04:52AM +0000, Dilger, Andreas wrote:
 > 
-> Well, it is set before being sent (queued onto queued_writes or queued on the
-> fuse device), but not when queued as secondary request onto an already in-flight
-> one.  It looks okay to me.
+> > On Feb 3, 2017, at 03:33, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+> > 
+> > On Sat, Jan 28, 2017 at 07:04:38PM -0500, James Simmons wrote:
+> >> From: Andreas Dilger <andreas.dilger@intel.com>
+> >> 
+> >> Update the sysfs "version" file to print "lustre: " with
+> >> the version number.
+> >> 
+> >> Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
+> >> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5969
+> >> Reviewed-on: http://review.whamcloud.com/16721
+> >> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+> >> Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> >> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> >> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> >> ---
+> >> drivers/staging/lustre/lustre/obdclass/linux/linux-module.c | 2 +-
+> >> 1 file changed, 1 insertion(+), 1 deletion(-)
+> >> 
+> >> diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+> >> index 9f5e829..22e6d1f 100644
+> >> --- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+> >> +++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+> >> @@ -208,7 +208,7 @@ struct miscdevice obd_psdev = {
+> >> static ssize_t version_show(struct kobject *kobj, struct attribute *attr,
+> >> 			    char *buf)
+> >> {
+> >> -	return sprintf(buf, "%s\n", LUSTRE_VERSION_STRING);
+> >> +	return sprintf(buf, "lustre: %s\n", LUSTRE_VERSION_STRING);
+> >> }
+> > 
+> > Why?  You "know" this is lustre, why say it again?  Doesn't this affect
+> > userspace tools?
+> 
+> It included "lustre: " as a prefix until commit 8b8284450569 when the code
+> moved from /proc to /sys, and is what the userspace tools expect.  Formerly
+> there were multiple strings printed in this file, each with a different prefix,
+> but the "lustre: " prefix was dropped in the move to sysfs.
+> 
+> That didn't matter until a userspace patch to stop using ioctl(IOC_GET_VERSION)
+> and instead get the version from the existing /proc or /sys files, so that we
+> can deprecate and eventually drop the IOC_GET_VERSION ioctl completely.
+> 
+> So this patch is returning to the previous format of the /proc file, but if
+> there is a big objection to this patch we can also change the userspace tools
+> to live with or without this prefix now that there is only a single value here.
 
->  void fuse_sync_release(struct fuse_file *ff, int flags)
->  {
-> -	WARN_ON(atomic_read(&ff->count) > 1);
-> +	WARN_ON(atomic_read(&ff->count) != 1);
->  	fuse_prepare_release(ff, flags, FUSE_RELEASE);
-> -	__set_bit(FR_FORCE, &ff->reserved_req->flags);
-> -	__clear_bit(FR_BACKGROUND, &ff->reserved_req->flags);
-> -	fuse_request_send(ff->fc, ff->reserved_req);
-> -	fuse_put_request(ff->fc, ff->reserved_req);
-> -	kfree(ff);
-> +	fuse_file_put(ff, true);
+Think about it, it's a sysfs file, which should only have one value to
+start with, and you are opening it from userspace knowing exactly where
+it is (somewhere in the lustre subtree), so of course you know it is
+"lustre"...
 
-Umm...  At the very least, that deserves a comment re "iput(NULL) is a no-op
-and since the refcount is 1 and everything's synchronous, we are fine with
-not doing igrab/iput here".  There's enough mysteries in that code as it is...
-
-	Speaking of mysteries - how can ->private_data ever be NULL in
-fuse_release_common()?  AFAICS, it's only called from ->release() instances
-and those are only called after ->open() or ->atomic_open() on that struct file
-has returned 0.  On the ->open() side, it means fuse_do_open() having returned
-0; on ->atomic_open() one - fuse_create_open() having done the same.  Neither
-is possible with ->private_data remaining NULL, and I don't see any places
-that would modify it afterwards...
-
-	Another thing: am I right assuming that ff->nodeid will be the same
-for all ff over given inode (== get_node_id(inode))?  What about ff->fh?
-Is that a per-open thing, or will it be identical for all opens of the same
-inode?
+greg k-h
