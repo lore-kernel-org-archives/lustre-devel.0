@@ -1,41 +1,42 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Mon, 13 Feb 2017 13:46:18 +0000
+From: Jones, Peter A <peter.a.jones@intel.com>
+Date: Mon, 13 Feb 2017 14:31:06 +0000
 Subject: [lustre-devel] Failing tests
-In-Reply-To: <1486990042.4090.21.camel@informatik.uni-hamburg.de>
+In-Reply-To: <1486985871.4090.13.camel@informatik.uni-hamburg.de>
 References: <1486985871.4090.13.camel@informatik.uni-hamburg.de>
-	<CY4PR11MB1751064AAAE7D5A5202B1753CB590@CY4PR11MB1751.namprd11.prod.outlook.com>,
-	<1486990042.4090.21.camel@informatik.uni-hamburg.de>
-Message-ID: <CY4PR11MB1751E82991B2EB511EBC22B3CB590@CY4PR11MB1751.namprd11.prod.outlook.com>
+Message-ID: <D4C6FC50.F3976%peter.a.jones@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Unfortunately, that's the case.  It's definitely suboptimal.
+Hi Michael
 
+Thanks for speaking up about this. Yes it is possible to re-trigger the
+tests under such circumstances and we have re-triggered the test for you.
 
-- Patrick
+Peter
 
-________________________________
-From: Michael Kuhn <michael.kuhn@informatik.uni-hamburg.de>
-Sent: Monday, February 13, 2017 6:47:22 AM
-To: Patrick Farrell; lustre-devel at lists.lustre.org
-Subject: Re: [lustre-devel] Failing tests
+On 2/13/17, 3:37 AM, "lustre-devel on behalf of Michael Kuhn"
+<lustre-devel-bounces at lists.lustre.org on behalf of
+michael.kuhn@informatik.uni-hamburg.de> wrote:
 
-Hi Patrick,
-
-thanks for the quick feedback!
-
-> [...] or you can re-submit your patch yourself (Re-make the commit with the same Change ID, etc, and just push again), to restart the test process.
-
-This forces all reviewers to redo their reviews, right? (That's why I
-first wanted to ask whether there was another way.) If this is not seen
-as a problem, though, I guess this is the easiest way.
-
-
-Best regards,
-Michael
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170213/afa9d7cd/attachment.htm>
+>Dear all,
+>
+>I could not find any information about how to handle failing tests. One
+>of my changes [0] on Gerrit has a failing test [1] that I think is not
+>actually caused by the change itself. Due to this, the change is now
+>marked as "Verified-1". How should I proceed?
+>
+>[0]: https://review.whamcloud.com/#/c/25307/
+>[1]: 
+>https://testing.hpdd.intel.com/test_sessions/93509fd6-ee24-11e6-bbfe-52540
+>06e85c2
+>
+>
+>Best regards,
+>Michael
+>_______________________________________________
+>lustre-devel mailing list
+>lustre-devel at lists.lustre.org
+>http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
