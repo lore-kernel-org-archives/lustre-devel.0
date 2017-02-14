@@ -1,18 +1,33 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 14 Feb 2017 01:57:50 +0000 (GMT)
-Subject: [lustre-devel] LUG 2017 questions
-Message-ID: <alpine.LFD.2.20.1702140146230.27997@casper.infradead.org>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Tue, 14 Feb 2017 08:23:02 +0000
+Subject: [lustre-devel] Failing tests
+In-Reply-To: <1486990042.4090.21.camel@informatik.uni-hamburg.de>
+References: <1486985871.4090.13.camel@informatik.uni-hamburg.de>
+	<CY4PR11MB1751064AAAE7D5A5202B1753CB590@CY4PR11MB1751.namprd11.prod.outlook.com>
+	<1486990042.4090.21.camel@informatik.uni-hamburg.de>
+Message-ID: <FBEBDA9A-26EC-45CE-A28F-0C1C49E7B06A@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Feb 13, 2017, at 05:47, Michael Kuhn <michael.kuhn@informatik.uni-hamburg.de> wrote:
+> 
+> Hi Patrick,
+> 
+> thanks for the quick feedback!
+> 
+>> [...] or you can re-submit your patch yourself (Re-make the commit with the same Change ID, etc, and just push again), to restart the test process.
+> 
+> This forces all reviewers to redo their reviews, right? (That's why I
+> first wanted to ask whether there was another way.) If this is not seen
+> as a problem, though, I guess this is the easiest way.
 
-Just want to make sure the details. I don't see anything about Developer's 
-day on the OpenSFS site. It starts at 9AM tuesday from what I remember 
-on the LWG call but the one detail missing is their a extra cost like in 
-the past. Next question is on the presentations. How much time is given
-to each presentation. I plan on giving my standard upstream client 
-presentation which can be done quickly but I also like to do a 
-presentation on perf/tracepoint which is a much more in depth topic.
+Usually a comment on the patch can get the tests retriggered, assuming someone is CC'd on the patch.  Alternately, if you edit only the commit comment (which can be done directly in Gerrit) and then re-push the patch, the reviews will be kept but the patch will be retested.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
