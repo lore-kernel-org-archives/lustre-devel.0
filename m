@@ -1,60 +1,72 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 18 Feb 2017 16:47:13 -0500
-Subject: [lustre-devel] [PATCH 12/14] staging: lustre: llog: change
-	lgh_hdr_lock to mutex
+Date: Sat, 18 Feb 2017 16:47:05 -0500
+Subject: [lustre-devel] [PATCH 04/14] staging: lustre: lov: cleanup when
+	cl_io_iter_init() fails
 In-Reply-To: <1487454435-4895-1-git-send-email-jsimmons@infradead.org>
 References: <1487454435-4895-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1487454435-4895-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1487454435-4895-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, wang di <di.wang@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Jinshan Xiong <jinshan.xiong@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: wang di <di.wang@intel.com>
+From: Jinshan Xiong <jinshan.xiong@intel.com>
 
-Change lgh_hdr_lock from spinlock to mutex because if
-the llog object is a remote object it can be stalled
-while being fetched.
+In lov_io_iter_init(), if cl_io_iter_init() against sub io fails,
+it should call cl_io_iter_fini() to cleanup leftover information;
 
-Signed-off-by: wang di <di.wang@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6602
-Reviewed-on: http://review.whamcloud.com/15274
+Signed-off-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6271
+Reviewed-on: http://review.whamcloud.com/16456
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_log.h | 2 +-
- drivers/staging/lustre/lustre/obdclass/llog.c      | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/lov/lov_io.c | 24 +++++++++++++-----------
+ 1 file changed, 13 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_log.h b/drivers/staging/lustre/lustre/include/lustre_log.h
-index 35e37eb..33f56ff 100644
---- a/drivers/staging/lustre/lustre/include/lustre_log.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_log.h
-@@ -211,7 +211,7 @@ struct llog_operations {
- /* In-memory descriptor for a log object or log catalog */
- struct llog_handle {
- 	struct rw_semaphore	 lgh_lock;
--	spinlock_t		 lgh_hdr_lock; /* protect lgh_hdr data */
-+	struct mutex		 lgh_hdr_mutex; /* protect lgh_hdr data */
- 	struct llog_logid	 lgh_id; /* id of this log */
- 	struct llog_log_hdr	*lgh_hdr;
- 	size_t			 lgh_hdr_size;
-diff --git a/drivers/staging/lustre/lustre/obdclass/llog.c b/drivers/staging/lustre/lustre/obdclass/llog.c
-index 736ea10..83c5b62 100644
---- a/drivers/staging/lustre/lustre/obdclass/llog.c
-+++ b/drivers/staging/lustre/lustre/obdclass/llog.c
-@@ -61,7 +61,7 @@ static struct llog_handle *llog_alloc_handle(void)
- 		return NULL;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
+index e0f0756..df77b25 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_io.c
++++ b/drivers/staging/lustre/lustre/lov/lov_io.c
+@@ -424,21 +424,23 @@ static int lov_io_iter_init(const struct lu_env *env,
  
- 	init_rwsem(&loghandle->lgh_lock);
--	spin_lock_init(&loghandle->lgh_hdr_lock);
-+	mutex_init(&loghandle->lgh_hdr_mutex);
- 	INIT_LIST_HEAD(&loghandle->u.phd.phd_entry);
- 	atomic_set(&loghandle->lgh_refcount, 1);
+ 		end = lov_offset_mod(end, 1);
+ 		sub = lov_sub_get(env, lio, stripe);
+-		if (!IS_ERR(sub)) {
+-			lov_io_sub_inherit(sub->sub_io, lio, stripe,
+-					   start, end);
+-			rc = cl_io_iter_init(sub->sub_env, sub->sub_io);
+-			lov_sub_put(sub);
+-			CDEBUG(D_VFSTRACE, "shrink: %d [%llu, %llu)\n",
+-			       stripe, start, end);
+-		} else {
++		if (IS_ERR(sub)) {
+ 			rc = PTR_ERR(sub);
++			break;
+ 		}
  
+-		if (!rc)
+-			list_add_tail(&sub->sub_linkage, &lio->lis_active);
+-		else
++		lov_io_sub_inherit(sub->sub_io, lio, stripe, start, end);
++		rc = cl_io_iter_init(sub->sub_env, sub->sub_io);
++		if (rc)
++			cl_io_iter_fini(sub->sub_env, sub->sub_io);
++		lov_sub_put(sub);
++		if (rc)
+ 			break;
++
++		CDEBUG(D_VFSTRACE, "shrink: %d [%llu, %llu)\n",
++		       stripe, start, end);
++
++		list_add_tail(&sub->sub_linkage, &lio->lis_active);
+ 	}
+ 	return rc;
+ }
 -- 
 1.8.3.1
