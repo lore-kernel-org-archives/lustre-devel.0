@@ -1,65 +1,74 @@
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Fri, 24 Feb 2017 17:58:29 +0100
-Subject: [lustre-devel] [PATCH 12/14] staging: lustre: llog: change
-	lgh_hdr_lock to mutex
-In-Reply-To: <1487454435-4895-13-git-send-email-jsimmons@infradead.org>
+Date: Fri, 24 Feb 2017 17:59:10 +0100
+Subject: [lustre-devel] [PATCH 13/14] staging: lustre: llog: limit file
+ size of plain logs
+In-Reply-To: <1487454435-4895-14-git-send-email-jsimmons@infradead.org>
 References: <1487454435-4895-1-git-send-email-jsimmons@infradead.org>
-	<1487454435-4895-13-git-send-email-jsimmons@infradead.org>
-Message-ID: <20170224165829.GA9990@kroah.com>
+	<1487454435-4895-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <20170224165910.GB9990@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: James Simmons <jsimmons@infradead.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, wang di <di.wang@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Alex Zhuravlev <alexey.zhuravlev@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Sat, Feb 18, 2017 at 04:47:13PM -0500, James Simmons wrote:
-> From: wang di <di.wang@intel.com>
+On Sat, Feb 18, 2017 at 04:47:14PM -0500, James Simmons wrote:
+> From: Alex Zhuravlev <alexey.zhuravlev@intel.com>
 > 
-> Change lgh_hdr_lock from spinlock to mutex because if
-> the llog object is a remote object it can be stalled
-> while being fetched.
-
-but this lock is never even used!  Why have it at all?
-
+> on small filesystems plain log can grow dramatically. especially
+> given large record sizes produced by DNE and extended chunksize.
+> I saw >50% of space consumed by a single llog file which was still
+> in use. this leads to test failures (sanityn, etc).
+> the patch introduces additional limit on plain llog size, which
+> is calculated as <free space>/64 (128MB at most) at llog creation
+> time.
 > 
-> Signed-off-by: wang di <di.wang@intel.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6602
-> Reviewed-on: http://review.whamcloud.com/15274
-> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-> Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+> Signed-off-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6838
+> Reviewed-on: https://review.whamcloud.com/18028
+> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+> Reviewed-by: wangdi <di.wang@intel.com>
+> Reviewed-by: Mike Pershin <mike.pershin@intel.com>
 > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
->  drivers/staging/lustre/lustre/include/lustre_log.h | 2 +-
->  drivers/staging/lustre/lustre/obdclass/llog.c      | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  drivers/staging/lustre/lustre/obdclass/llog.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
-> diff --git a/drivers/staging/lustre/lustre/include/lustre_log.h b/drivers/staging/lustre/lustre/include/lustre_log.h
-> index 35e37eb..33f56ff 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre_log.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre_log.h
-> @@ -211,7 +211,7 @@ struct llog_operations {
->  /* In-memory descriptor for a log object or log catalog */
->  struct llog_handle {
->  	struct rw_semaphore	 lgh_lock;
-> -	spinlock_t		 lgh_hdr_lock; /* protect lgh_hdr data */
-> +	struct mutex		 lgh_hdr_mutex; /* protect lgh_hdr data */
->  	struct llog_logid	 lgh_id; /* id of this log */
->  	struct llog_log_hdr	*lgh_hdr;
->  	size_t			 lgh_hdr_size;
 > diff --git a/drivers/staging/lustre/lustre/obdclass/llog.c b/drivers/staging/lustre/lustre/obdclass/llog.c
-> index 736ea10..83c5b62 100644
+> index 83c5b62..320ff6b 100644
 > --- a/drivers/staging/lustre/lustre/obdclass/llog.c
 > +++ b/drivers/staging/lustre/lustre/obdclass/llog.c
-> @@ -61,7 +61,7 @@ static struct llog_handle *llog_alloc_handle(void)
->  		return NULL;
->  
->  	init_rwsem(&loghandle->lgh_lock);
-> -	spin_lock_init(&loghandle->lgh_hdr_lock);
-> +	mutex_init(&loghandle->lgh_hdr_mutex);
+> @@ -319,10 +319,26 @@ static int llog_process_thread(void *arg)
+>  				 * the case and re-read the current chunk
+>  				 * otherwise.
+>  				 */
+> +				int records;
+> +
+>  				if (index > loghandle->lgh_last_idx) {
+>  					rc = 0;
+>  					goto out;
+>  				}
+> +				/* <2 records means no more records
+> +				 * if the last record we processed was
+> +				 * the final one, then the underlying
+> +				 * object might have been destroyed yet.
+> +				 * we better don't access that..
+> +				 */
+> +				mutex_lock(&loghandle->lgh_hdr_mutex);
+> +				records = loghandle->lgh_hdr->llh_count;
+> +				mutex_unlock(&loghandle->lgh_hdr_mutex);
+> +				if (records <= 1) {
+> +					rc = 0;
+> +					goto out;
+> +				}
 
-Can't we delete it?
+
+So you now use the lock, in only one place, when reading a single value?
+That makes no sense, it's obviously wrong, or not needed.
+
+Please fix up these two patches...
 
 thanks,
 
