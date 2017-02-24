@@ -1,59 +1,66 @@
-From: Joe Perches <joe@perches.com>
-Date: Tue, 21 Feb 2017 12:40:10 -0800
-Subject: [lustre-devel] [PATCH 5/6] staging: lustre: Using macro
-	DIV_ROUND_UP
-In-Reply-To: <20170221174631.GA22466@singhal-Inspiron-5558>
-References: <20170221174631.GA22466@singhal-Inspiron-5558>
-Message-ID: <1487709610.2853.39.camel@perches.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Fri, 24 Feb 2017 17:58:29 +0100
+Subject: [lustre-devel] [PATCH 12/14] staging: lustre: llog: change
+	lgh_hdr_lock to mutex
+In-Reply-To: <1487454435-4895-13-git-send-email-jsimmons@infradead.org>
+References: <1487454435-4895-1-git-send-email-jsimmons@infradead.org>
+	<1487454435-4895-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <20170224165829.GA9990@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: simran singhal <singhalsimran0@gmail.com>, oleg.drokin@intel.com
-Cc: andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, outreachy-kernel@googlegroups.com
+To: James Simmons <jsimmons@infradead.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, wang di <di.wang@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Tue, 2017-02-21 at 23:16 +0530, simran singhal wrote:
-> The macro DIV_ROUND_UP performs the computation (((n) + (d) - 1) /(d)).
-> It clarifies the divisor calculations. This occurence was detected using
-> the coccinelle script:
+On Sat, Feb 18, 2017 at 04:47:13PM -0500, James Simmons wrote:
+> From: wang di <di.wang@intel.com>
 > 
-> @@
-> expression e1;
-> expression e2;
-> @@
-> (
-> - ((e1) + e2 - 1) / (e2)
-> + DIV_ROUND_UP(e1,e2)
-> > 
+> Change lgh_hdr_lock from spinlock to mutex because if
+> the llog object is a remote object it can be stalled
+> while being fetched.
+
+but this lock is never even used!  Why have it at all?
+
 > 
-> - ((e1) + (e2 - 1)) / (e2)
-> + DIV_ROUND_UP(e1,e2)
-> )
+> Signed-off-by: wang di <di.wang@intel.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6602
+> Reviewed-on: http://review.whamcloud.com/15274
+> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+> Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  drivers/staging/lustre/lustre/include/lustre_log.h | 2 +-
+>  drivers/staging/lustre/lustre/obdclass/llog.c      | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_log.h b/drivers/staging/lustre/lustre/include/lustre_log.h
+> index 35e37eb..33f56ff 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_log.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_log.h
+> @@ -211,7 +211,7 @@ struct llog_operations {
+>  /* In-memory descriptor for a log object or log catalog */
+>  struct llog_handle {
+>  	struct rw_semaphore	 lgh_lock;
+> -	spinlock_t		 lgh_hdr_lock; /* protect lgh_hdr data */
+> +	struct mutex		 lgh_hdr_mutex; /* protect lgh_hdr data */
+>  	struct llog_logid	 lgh_id; /* id of this log */
+>  	struct llog_log_hdr	*lgh_hdr;
+>  	size_t			 lgh_hdr_size;
+> diff --git a/drivers/staging/lustre/lustre/obdclass/llog.c b/drivers/staging/lustre/lustre/obdclass/llog.c
+> index 736ea10..83c5b62 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/llog.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/llog.c
+> @@ -61,7 +61,7 @@ static struct llog_handle *llog_alloc_handle(void)
+>  		return NULL;
+>  
+>  	init_rwsem(&loghandle->lgh_lock);
+> -	spin_lock_init(&loghandle->lgh_hdr_lock);
+> +	mutex_init(&loghandle->lgh_hdr_mutex);
 
-Coccinelle scripts are great but please
-inspect the results for appropriate style
-and simplify the patch where possible.
+Can't we delete it?
 
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-[]
-> @@ -3136,8 +3136,7 @@ void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req)
->  	 * that server can infer the number of bulks that were prepared,
->  	 * see LU-1431
->  	 */
-> -	req->rq_mbits += ((bd->bd_iov_count + LNET_MAX_IOV - 1) /
-> -			  LNET_MAX_IOV) - 1;
-> +	req->rq_mbits += (DIV_ROUND_UP(bd->bd_iov_count, LNET_MAX_IOV)) - 1;
+thanks,
 
-Unnecessary parentheses.
-
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-[]
-> @@ -272,7 +272,7 @@ static unsigned long enc_pools_shrink_scan(struct shrinker *s,
->  static inline
->  int npages_to_npools(unsigned long npages)
->  {
-> -	return (int)((npages + PAGES_PER_POOL - 1) / PAGES_PER_POOL);
-> +	return (int)(DIV_ROUND_UP(npages, PAGES_PER_POOL));
->  }
-
-Here too.
+greg k-h
