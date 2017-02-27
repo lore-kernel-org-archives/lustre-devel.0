@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 26 Feb 2017 19:41:42 -0500
-Subject: [lustre-devel] [PATCH 17/34] staging: lustre: lnet: change
-	lnet_remotenet_t to proper structure
+Date: Sun, 26 Feb 2017 19:41:34 -0500
+Subject: [lustre-devel] [PATCH 09/34] staging: lustre: lnet: change
+	lnet_me_t to proper structure
 In-Reply-To: <1488156119-19670-1-git-send-email-jsimmons@infradead.org>
 References: <1488156119-19670-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1488156119-19670-18-git-send-email-jsimmons@infradead.org>
+Message-ID: <1488156119-19670-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,7 +12,7 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Change lnet_remotenet_t from typedef to proper structure.
+Change lnet_me_t from typedef to proper structure.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-on: https://review.whamcloud.com/20831
@@ -22,211 +22,205 @@ Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |  2 +-
- .../staging/lustre/include/linux/lnet/lib-types.h  |  4 ++--
- drivers/staging/lustre/lnet/lnet/api-ni.c          |  2 +-
- drivers/staging/lustre/lnet/lnet/lib-move.c        |  6 +++---
- drivers/staging/lustre/lnet/lnet/router.c          | 24 +++++++++++-----------
- drivers/staging/lustre/lnet/lnet/router_proc.c     |  4 ++--
- 6 files changed, 21 insertions(+), 21 deletions(-)
+ drivers/staging/lustre/include/linux/lnet/lib-lnet.h  | 18 +++++++++---------
+ drivers/staging/lustre/include/linux/lnet/lib-types.h |  6 +++---
+ drivers/staging/lustre/lnet/lnet/lib-md.c             |  2 +-
+ drivers/staging/lustre/lnet/lnet/lib-me.c             |  4 ++--
+ drivers/staging/lustre/lnet/lnet/lib-ptl.c            | 14 +++++++-------
+ 5 files changed, 22 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 93e6830..8483a4a 100644
+index 9e33d0a..a82bb3c 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -473,7 +473,7 @@ int lnet_get_route(int idx, __u32 *net, __u32 *hops,
- int lnet_rtrpools_enable(void);
- void lnet_rtrpools_disable(void);
- void lnet_rtrpools_free(int keep_pools);
--lnet_remotenet_t *lnet_find_net_locked(__u32 net);
-+struct lnet_remotenet *lnet_find_net_locked(__u32 net);
- int lnet_dyn_add_ni(lnet_pid_t requested_pid,
- 		    struct lnet_ioctl_config_data *conf);
- int lnet_dyn_del_ni(__u32 net);
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index a0d9cad..04ad728 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -384,12 +384,12 @@ struct lnet_route {
- #define LNET_REMOTE_NETS_HASH_MAX	(1U << 16)
- #define LNET_REMOTE_NETS_HASH_SIZE	(1 << the_lnet.ln_remote_nets_hbits)
- 
--typedef struct {
-+struct lnet_remotenet {
- 	struct list_head	lrn_list;	/* chain on
- 						   ln_remote_nets_hash */
- 	struct list_head	lrn_routes;	/* routes to me */
- 	__u32			lrn_net;	/* my net number */
--} lnet_remotenet_t;
-+};
- 
- /** lnet message has credit and can be submitted to lnd for send/receive */
- #define LNET_CREDIT_OK		0
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 88279ed..c03e701 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1762,7 +1762,7 @@ void lnet_lib_exit(void)
- 	struct lnet_handle_md md_handle;
- 	struct lnet_ni *ni;
- 	struct list_head net_head;
--	lnet_remotenet_t *rnet;
-+	struct lnet_remotenet *rnet;
- 	int rc;
- 
- 	INIT_LIST_HEAD(&net_head);
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 9d1ab1f..3581100 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -998,7 +998,7 @@
- lnet_find_route_locked(struct lnet_ni *ni, lnet_nid_t target,
- 		       lnet_nid_t rtr_nid)
- {
--	lnet_remotenet_t *rnet;
-+	struct lnet_remotenet *rnet;
- 	struct lnet_route *route;
- 	struct lnet_route *best_route;
- 	struct lnet_route *last_route;
-@@ -2291,7 +2291,7 @@ struct lnet_msg *
- {
- 	struct list_head *e;
- 	struct lnet_ni *ni;
--	lnet_remotenet_t *rnet;
-+	struct lnet_remotenet *rnet;
- 	__u32 dstnet = LNET_NIDNET(dstnid);
- 	int hops;
- 	int cpt;
-@@ -2348,7 +2348,7 @@ struct lnet_msg *
- 
- 	rn_list = lnet_net2rnethash(dstnet);
- 	list_for_each(e, rn_list) {
--		rnet = list_entry(e, lnet_remotenet_t, lrn_list);
-+		rnet = list_entry(e, struct lnet_remotenet, lrn_list);
- 
- 		if (rnet->lrn_net == dstnet) {
- 			struct lnet_route *route;
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index 8e5af05..9a5faba 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -217,10 +217,10 @@
- 	}
+@@ -233,17 +233,17 @@ static inline int lnet_md_unlinkable(lnet_libmd_t *md)
+ 	LIBCFS_FREE(md, size);
  }
  
--lnet_remotenet_t *
-+struct lnet_remotenet *
- lnet_find_net_locked(__u32 net)
+-static inline lnet_me_t *
++static inline struct lnet_me *
+ lnet_me_alloc(void)
  {
--	lnet_remotenet_t *rnet;
-+	struct lnet_remotenet *rnet;
- 	struct list_head *tmp;
- 	struct list_head *rn_list;
+-	lnet_me_t *me;
++	struct lnet_me *me;
  
-@@ -228,7 +228,7 @@
+ 	LIBCFS_ALLOC(me, sizeof(*me));
+ 	return me;
+ }
  
- 	rn_list = lnet_net2rnethash(net);
- 	list_for_each(tmp, rn_list) {
--		rnet = list_entry(tmp, lnet_remotenet_t, lrn_list);
-+		rnet = list_entry(tmp, struct lnet_remotenet, lrn_list);
- 
- 		if (rnet->lrn_net == net)
- 			return rnet;
-@@ -268,7 +268,7 @@ static void lnet_shuffle_seed(void)
- 
- /* NB expects LNET_LOCK held */
- static void
--lnet_add_route_to_rnet(lnet_remotenet_t *rnet, struct lnet_route *route)
-+lnet_add_route_to_rnet(struct lnet_remotenet *rnet, struct lnet_route *route)
+ static inline void
+-lnet_me_free(lnet_me_t *me)
++lnet_me_free(struct lnet_me *me)
  {
- 	unsigned int len = 0;
- 	unsigned int offset = 0;
-@@ -299,8 +299,8 @@ static void lnet_shuffle_seed(void)
- 	       unsigned int priority)
+ 	LIBCFS_FREE(me, sizeof(*me));
+ }
+@@ -342,12 +342,12 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
+ }
+ 
+ static inline void
+-lnet_me2handle(struct lnet_handle_me *handle, lnet_me_t *me)
++lnet_me2handle(struct lnet_handle_me *handle, struct lnet_me *me)
  {
- 	struct list_head *e;
--	lnet_remotenet_t *rnet;
--	lnet_remotenet_t *rnet2;
-+	struct lnet_remotenet *rnet;
-+	struct lnet_remotenet *rnet2;
- 	struct lnet_route *route;
- 	struct lnet_ni *ni;
- 	int add_route;
-@@ -416,7 +416,7 @@ static void lnet_shuffle_seed(void)
+ 	handle->cookie = me->me_lh.lh_cookie;
+ }
+ 
+-static inline lnet_me_t *
++static inline struct lnet_me *
+ lnet_handle2me(struct lnet_handle_me *handle)
+ {
+ 	/* ALWAYS called with resource lock held */
+@@ -360,7 +360,7 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
+ 	if (!lh)
+ 		return NULL;
+ 
+-	return lh_entry(lh, lnet_me_t, me_lh);
++	return lh_entry(lh, struct lnet_me, me_lh);
+ }
+ 
+ static inline void
+@@ -542,9 +542,9 @@ int lnet_mt_match_md(struct lnet_match_table *mtable,
+ 		     struct lnet_match_info *info, struct lnet_msg *msg);
+ 
+ /* portals match/attach functions */
+-void lnet_ptl_attach_md(lnet_me_t *me, lnet_libmd_t *md,
++void lnet_ptl_attach_md(struct lnet_me *me, lnet_libmd_t *md,
+ 			struct list_head *matches, struct list_head *drops);
+-void lnet_ptl_detach_md(lnet_me_t *me, lnet_libmd_t *md);
++void lnet_ptl_detach_md(struct lnet_me *me, lnet_libmd_t *md);
+ int lnet_ptl_match_md(struct lnet_match_info *info, struct lnet_msg *msg);
+ 
+ /* initialized and finalize portals */
+@@ -623,7 +623,7 @@ void lnet_copy_kiov2iter(struct iov_iter *to,
+ 			 unsigned int nkiov, const lnet_kiov_t *kiov,
+ 			 unsigned int kiovoffset, unsigned int nob);
+ 
+-void lnet_me_unlink(lnet_me_t *me);
++void lnet_me_unlink(struct lnet_me *me);
+ 
+ void lnet_md_unlink(lnet_libmd_t *md);
+ void lnet_md_deconstruct(lnet_libmd_t *lmd, lnet_md_t *umd);
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+index 19e01cc..3384860 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+@@ -127,7 +127,7 @@ struct lnet_eq {
+ 	int			**eq_refs;	/* percpt refcount for EQ */
+ };
+ 
+-typedef struct lnet_me {
++struct lnet_me {
+ 	struct list_head	 me_list;
+ 	struct lnet_libhandle	 me_lh;
+ 	lnet_process_id_t	 me_match_id;
+@@ -137,12 +137,12 @@ struct lnet_eq {
+ 	__u64			 me_ignore_bits;
+ 	lnet_unlink_t		 me_unlink;
+ 	struct lnet_libmd	*me_md;
+-} lnet_me_t;
++};
+ 
+ typedef struct lnet_libmd {
+ 	struct list_head	 md_list;
+ 	struct lnet_libhandle	 md_lh;
+-	lnet_me_t		*md_me;
++	struct lnet_me		*md_me;
+ 	char			*md_start;
+ 	unsigned int		 md_offset;
+ 	unsigned int		 md_length;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
+index 4f2700e..dd3cdda 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-md.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
+@@ -44,7 +44,7 @@
+ {
+ 	if (!(md->md_flags & LNET_MD_FLAG_ZOMBIE)) {
+ 		/* first unlink attempt... */
+-		lnet_me_t *me = md->md_me;
++		struct lnet_me *me = md->md_me;
+ 
+ 		md->md_flags |= LNET_MD_FLAG_ZOMBIE;
+ 
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-me.c b/drivers/staging/lustre/lnet/lnet/lib-me.c
+index 0ea64f6..20cc8f8 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-me.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-me.c
+@@ -222,7 +222,7 @@
  int
- lnet_check_routes(void)
+ LNetMEUnlink(struct lnet_handle_me meh)
  {
--	lnet_remotenet_t *rnet;
-+	struct lnet_remotenet *rnet;
- 	struct lnet_route *route;
- 	struct lnet_route *route2;
- 	struct list_head *e1;
-@@ -430,7 +430,7 @@ static void lnet_shuffle_seed(void)
- 	for (i = 0; i < LNET_REMOTE_NETS_HASH_SIZE; i++) {
- 		rn_list = &the_lnet.ln_remote_nets_hash[i];
- 		list_for_each(e1, rn_list) {
--			rnet = list_entry(e1, lnet_remotenet_t, lrn_list);
-+			rnet = list_entry(e1, struct lnet_remotenet, lrn_list);
- 
- 			route2 = NULL;
- 			list_for_each(e2, &rnet->lrn_routes) {
-@@ -472,7 +472,7 @@ static void lnet_shuffle_seed(void)
- lnet_del_route(__u32 net, lnet_nid_t gw_nid)
- {
- 	struct lnet_peer *gateway;
--	lnet_remotenet_t *rnet;
-+	struct lnet_remotenet *rnet;
- 	struct lnet_route *route;
- 	struct list_head *e1;
- 	struct list_head *e2;
-@@ -495,7 +495,7 @@ static void lnet_shuffle_seed(void)
- 
-  again:
- 	list_for_each(e1, rn_list) {
--		rnet = list_entry(e1, lnet_remotenet_t, lrn_list);
-+		rnet = list_entry(e1, struct lnet_remotenet, lrn_list);
- 
- 		if (!(net == LNET_NIDNET(LNET_NID_ANY) ||
- 		      net == rnet->lrn_net))
-@@ -588,7 +588,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
- {
- 	struct list_head *e1;
- 	struct list_head *e2;
--	lnet_remotenet_t *rnet;
-+	struct lnet_remotenet *rnet;
- 	struct lnet_route *route;
+-	lnet_me_t *me;
++	struct lnet_me *me;
+ 	lnet_libmd_t *md;
+ 	lnet_event_t ev;
  	int cpt;
- 	int i;
-@@ -599,7 +599,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
- 	for (i = 0; i < LNET_REMOTE_NETS_HASH_SIZE; i++) {
- 		rn_list = &the_lnet.ln_remote_nets_hash[i];
- 		list_for_each(e1, rn_list) {
--			rnet = list_entry(e1, lnet_remotenet_t, lrn_list);
-+			rnet = list_entry(e1, struct lnet_remotenet, lrn_list);
+@@ -256,7 +256,7 @@
  
- 			list_for_each(e2, &rnet->lrn_routes) {
- 				route = list_entry(e2, struct lnet_route,
-diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-index 1b2817c..779ec69 100644
---- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-+++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-@@ -172,7 +172,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
- 		struct list_head *n;
- 		struct list_head *r;
- 		struct lnet_route *route = NULL;
--		lnet_remotenet_t *rnet  = NULL;
-+		struct lnet_remotenet *rnet  = NULL;
- 		int skip  = off - 1;
- 		struct list_head *rn_list;
- 		int i;
-@@ -191,7 +191,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
- 			n = rn_list->next;
+ /* call with lnet_res_lock please */
+ void
+-lnet_me_unlink(lnet_me_t *me)
++lnet_me_unlink(struct lnet_me *me)
+ {
+ 	list_del(&me->me_list);
  
- 			while (n != rn_list && !route) {
--				rnet = list_entry(n, lnet_remotenet_t,
-+				rnet = list_entry(n, struct lnet_remotenet,
- 						  lrn_list);
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+index 891d028..b538939 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+@@ -140,7 +140,7 @@
+ 	 */
+ 	unsigned int offset;
+ 	unsigned int mlength;
+-	lnet_me_t *me = md->md_me;
++	struct lnet_me *me = md->md_me;
  
- 				r = rnet->lrn_routes.next;
+ 	/* MD exhausted */
+ 	if (lnet_md_exhausted(md))
+@@ -376,8 +376,8 @@ struct list_head *
+ 		 struct lnet_match_info *info, struct lnet_msg *msg)
+ {
+ 	struct list_head *head;
+-	lnet_me_t *me;
+-	lnet_me_t *tmp;
++	struct lnet_me *me;
++	struct lnet_me *tmp;
+ 	int exhausted = 0;
+ 	int rc;
+ 
+@@ -641,7 +641,7 @@ struct list_head *
+ }
+ 
+ void
+-lnet_ptl_detach_md(lnet_me_t *me, lnet_libmd_t *md)
++lnet_ptl_detach_md(struct lnet_me *me, lnet_libmd_t *md)
+ {
+ 	LASSERT(me->me_md == md && md->md_me == me);
+ 
+@@ -651,7 +651,7 @@ struct list_head *
+ 
+ /* called with lnet_res_lock held */
+ void
+-lnet_ptl_attach_md(lnet_me_t *me, lnet_libmd_t *md,
++lnet_ptl_attach_md(struct lnet_me *me, lnet_libmd_t *md,
+ 		   struct list_head *matches, struct list_head *drops)
+ {
+ 	struct lnet_portal *ptl = the_lnet.ln_portals[me->me_portal];
+@@ -756,7 +756,7 @@ struct list_head *
+ 	LASSERT(list_empty(&ptl->ptl_msg_stealing));
+ 	cfs_percpt_for_each(mtable, i, ptl->ptl_mtables) {
+ 		struct list_head *mhash;
+-		lnet_me_t *me;
++		struct lnet_me *me;
+ 		int j;
+ 
+ 		if (!mtable->mt_mhash) /* uninitialized match-table */
+@@ -767,7 +767,7 @@ struct list_head *
+ 		for (j = 0; j < LNET_MT_HASH_SIZE + 1; j++) {
+ 			while (!list_empty(&mhash[j])) {
+ 				me = list_entry(mhash[j].next,
+-						lnet_me_t, me_list);
++						struct lnet_me, me_list);
+ 				CERROR("Active ME %p on exit\n", me);
+ 				list_del(&me->me_list);
+ 				lnet_me_free(me);
 -- 
 1.8.3.1
