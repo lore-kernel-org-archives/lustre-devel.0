@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 26 Feb 2017 19:41:34 -0500
-Subject: [lustre-devel] [PATCH 09/34] staging: lustre: lnet: change
-	lnet_me_t to proper structure
+Date: Sun, 26 Feb 2017 19:41:37 -0500
+Subject: [lustre-devel] [PATCH 12/34] staging: lustre: lnet: change lnd_t to
+	proper structure
 In-Reply-To: <1488156119-19670-1-git-send-email-jsimmons@infradead.org>
 References: <1488156119-19670-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1488156119-19670-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1488156119-19670-13-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,7 +12,7 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Change lnet_me_t from typedef to proper structure.
+Change lnd_t from typedef to proper structure.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-on: https://review.whamcloud.com/20831
@@ -22,205 +22,175 @@ Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/linux/lnet/lib-lnet.h  | 18 +++++++++---------
+ drivers/staging/lustre/include/linux/lnet/lib-lnet.h  |  6 +++---
  drivers/staging/lustre/include/linux/lnet/lib-types.h |  6 +++---
- drivers/staging/lustre/lnet/lnet/lib-md.c             |  2 +-
- drivers/staging/lustre/lnet/lnet/lib-me.c             |  4 ++--
- drivers/staging/lustre/lnet/lnet/lib-ptl.c            | 14 +++++++-------
- 5 files changed, 22 insertions(+), 22 deletions(-)
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c   |  4 ++--
+ drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c   |  2 +-
+ drivers/staging/lustre/lnet/lnet/api-ni.c             | 14 +++++++-------
+ drivers/staging/lustre/lnet/lnet/lo.c                 |  2 +-
+ 6 files changed, 17 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 9e33d0a..a82bb3c 100644
+index 685c5d4..9a29769 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -233,17 +233,17 @@ static inline int lnet_md_unlinkable(lnet_libmd_t *md)
- 	LIBCFS_FREE(md, size);
+@@ -439,7 +439,7 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
+ 		((1U << the_lnet.ln_remote_nets_hbits) - 1)];
  }
  
--static inline lnet_me_t *
-+static inline struct lnet_me *
- lnet_me_alloc(void)
- {
--	lnet_me_t *me;
-+	struct lnet_me *me;
+-extern lnd_t the_lolnd;
++extern struct lnet_lnd the_lolnd;
+ extern int avoid_asym_router_failure;
  
- 	LIBCFS_ALLOC(me, sizeof(*me));
- 	return me;
- }
+ int lnet_cpt_of_nid_locked(lnet_nid_t nid);
+@@ -628,8 +628,8 @@ void lnet_copy_kiov2iter(struct iov_iter *to,
+ void lnet_md_unlink(struct lnet_libmd *md);
+ void lnet_md_deconstruct(struct lnet_libmd *lmd, lnet_md_t *umd);
  
- static inline void
--lnet_me_free(lnet_me_t *me)
-+lnet_me_free(struct lnet_me *me)
- {
- 	LIBCFS_FREE(me, sizeof(*me));
- }
-@@ -342,12 +342,12 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
- }
+-void lnet_register_lnd(lnd_t *lnd);
+-void lnet_unregister_lnd(lnd_t *lnd);
++void lnet_register_lnd(struct lnet_lnd *lnd);
++void lnet_unregister_lnd(struct lnet_lnd *lnd);
  
- static inline void
--lnet_me2handle(struct lnet_handle_me *handle, lnet_me_t *me)
-+lnet_me2handle(struct lnet_handle_me *handle, struct lnet_me *me)
- {
- 	handle->cookie = me->me_lh.lh_cookie;
- }
- 
--static inline lnet_me_t *
-+static inline struct lnet_me *
- lnet_handle2me(struct lnet_handle_me *handle)
- {
- 	/* ALWAYS called with resource lock held */
-@@ -360,7 +360,7 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
- 	if (!lh)
- 		return NULL;
- 
--	return lh_entry(lh, lnet_me_t, me_lh);
-+	return lh_entry(lh, struct lnet_me, me_lh);
- }
- 
- static inline void
-@@ -542,9 +542,9 @@ int lnet_mt_match_md(struct lnet_match_table *mtable,
- 		     struct lnet_match_info *info, struct lnet_msg *msg);
- 
- /* portals match/attach functions */
--void lnet_ptl_attach_md(lnet_me_t *me, lnet_libmd_t *md,
-+void lnet_ptl_attach_md(struct lnet_me *me, lnet_libmd_t *md,
- 			struct list_head *matches, struct list_head *drops);
--void lnet_ptl_detach_md(lnet_me_t *me, lnet_libmd_t *md);
-+void lnet_ptl_detach_md(struct lnet_me *me, lnet_libmd_t *md);
- int lnet_ptl_match_md(struct lnet_match_info *info, struct lnet_msg *msg);
- 
- /* initialized and finalize portals */
-@@ -623,7 +623,7 @@ void lnet_copy_kiov2iter(struct iov_iter *to,
- 			 unsigned int nkiov, const lnet_kiov_t *kiov,
- 			 unsigned int kiovoffset, unsigned int nob);
- 
--void lnet_me_unlink(lnet_me_t *me);
-+void lnet_me_unlink(struct lnet_me *me);
- 
- void lnet_md_unlink(lnet_libmd_t *md);
- void lnet_md_deconstruct(lnet_libmd_t *lmd, lnet_md_t *umd);
+ int lnet_connect(struct socket **sockp, lnet_nid_t peer_nid,
+ 		 __u32 local_ip, __u32 peer_ip, int peer_port);
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 19e01cc..3384860 100644
+index 59d7143..8a65db2 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -127,7 +127,7 @@ struct lnet_eq {
- 	int			**eq_refs;	/* percpt refcount for EQ */
- };
+@@ -179,7 +179,7 @@ struct lnet_test_peer {
  
--typedef struct lnet_me {
-+struct lnet_me {
- 	struct list_head	 me_list;
- 	struct lnet_libhandle	 me_lh;
- 	lnet_process_id_t	 me_match_id;
-@@ -137,12 +137,12 @@ struct lnet_eq {
- 	__u64			 me_ignore_bits;
- 	lnet_unlink_t		 me_unlink;
- 	struct lnet_libmd	*me_md;
--} lnet_me_t;
+ struct lnet_ni;			/* forward ref */
+ 
+-typedef struct lnet_lnd {
++struct lnet_lnd {
+ 	/* fields managed by portals */
+ 	struct list_head	lnd_list;	/* stash in the LND table */
+ 	int			lnd_refcount;	/* # active instances */
+@@ -243,7 +243,7 @@ struct lnet_test_peer {
+ 
+ 	/* accept a new connection */
+ 	int (*lnd_accept)(struct lnet_ni *ni, struct socket *sock);
+-} lnd_t;
 +};
  
- typedef struct lnet_libmd {
- 	struct list_head	 md_list;
- 	struct lnet_libhandle	 md_lh;
--	lnet_me_t		*md_me;
-+	struct lnet_me		*md_me;
- 	char			*md_start;
- 	unsigned int		 md_offset;
- 	unsigned int		 md_length;
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
-index 4f2700e..dd3cdda 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-md.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
-@@ -44,7 +44,7 @@
+ struct lnet_tx_queue {
+ 	int			tq_credits;	/* # tx credits free */
+@@ -267,7 +267,7 @@ struct lnet_tx_queue {
+ 	__u32			 *ni_cpts;	/* bond NI on some CPTs */
+ 	lnet_nid_t		  ni_nid;	/* interface's NID */
+ 	void			 *ni_data;	/* instance-specific data */
+-	lnd_t			 *ni_lnd;	/* procedural interface */
++	struct lnet_lnd		 *ni_lnd;	/* procedural interface */
+ 	struct lnet_tx_queue	**ni_tx_queues;	/* percpt TX queues */
+ 	int			**ni_refs;	/* percpt reference count */
+ 	time64_t		  ni_last_alive;/* when I was last alive */
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 6f73454..29a5263 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -38,7 +38,7 @@
+ #include <asm/page.h>
+ #include "o2iblnd.h"
+ 
+-static lnd_t the_o2iblnd;
++static struct lnet_lnd the_o2iblnd;
+ 
+ struct kib_data kiblnd_data;
+ 
+@@ -2938,7 +2938,7 @@ static int kiblnd_startup(lnet_ni_t *ni)
+ 	return -ENETDOWN;
+ }
+ 
+-static lnd_t the_o2iblnd = {
++static struct lnet_lnd the_o2iblnd = {
+ 	.lnd_type	= O2IBLND,
+ 	.lnd_startup	= kiblnd_startup,
+ 	.lnd_shutdown	= kiblnd_shutdown,
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+index 3b08aff..258507f 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+@@ -39,7 +39,7 @@
+ 
+ #include "socklnd.h"
+ 
+-static lnd_t the_ksocklnd;
++static struct lnet_lnd the_ksocklnd;
+ struct ksock_nal_data ksocknal_data;
+ 
+ static struct ksock_interface *
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index aeb9e6f..d31a50b 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -265,15 +265,15 @@ static void lnet_assert_wire_constants(void)
+ 	BUILD_BUG_ON((int)sizeof(((struct lnet_hdr *)0)->msg.hello.type) != 4);
+ }
+ 
+-static lnd_t *
++static struct lnet_lnd *
+ lnet_find_lnd_by_type(__u32 type)
  {
- 	if (!(md->md_flags & LNET_MD_FLAG_ZOMBIE)) {
- 		/* first unlink attempt... */
--		lnet_me_t *me = md->md_me;
-+		struct lnet_me *me = md->md_me;
+-	lnd_t *lnd;
++	struct lnet_lnd *lnd;
+ 	struct list_head *tmp;
  
- 		md->md_flags |= LNET_MD_FLAG_ZOMBIE;
+ 	/* holding lnd mutex */
+ 	list_for_each(tmp, &the_lnet.ln_lnds) {
+-		lnd = list_entry(tmp, lnd_t, lnd_list);
++		lnd = list_entry(tmp, struct lnet_lnd, lnd_list);
  
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-me.c b/drivers/staging/lustre/lnet/lnet/lib-me.c
-index 0ea64f6..20cc8f8 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-me.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-me.c
-@@ -222,7 +222,7 @@
- int
- LNetMEUnlink(struct lnet_handle_me meh)
- {
--	lnet_me_t *me;
-+	struct lnet_me *me;
- 	lnet_libmd_t *md;
- 	lnet_event_t ev;
- 	int cpt;
-@@ -256,7 +256,7 @@
- 
- /* call with lnet_res_lock please */
- void
--lnet_me_unlink(lnet_me_t *me)
-+lnet_me_unlink(struct lnet_me *me)
- {
- 	list_del(&me->me_list);
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-index 891d028..b538939 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-@@ -140,7 +140,7 @@
- 	 */
- 	unsigned int offset;
- 	unsigned int mlength;
--	lnet_me_t *me = md->md_me;
-+	struct lnet_me *me = md->md_me;
- 
- 	/* MD exhausted */
- 	if (lnet_md_exhausted(md))
-@@ -376,8 +376,8 @@ struct list_head *
- 		 struct lnet_match_info *info, struct lnet_msg *msg)
- {
- 	struct list_head *head;
--	lnet_me_t *me;
--	lnet_me_t *tmp;
-+	struct lnet_me *me;
-+	struct lnet_me *tmp;
- 	int exhausted = 0;
- 	int rc;
- 
-@@ -641,7 +641,7 @@ struct list_head *
+ 		if (lnd->lnd_type == type)
+ 			return lnd;
+@@ -283,7 +283,7 @@ static void lnet_assert_wire_constants(void)
  }
  
  void
--lnet_ptl_detach_md(lnet_me_t *me, lnet_libmd_t *md)
-+lnet_ptl_detach_md(struct lnet_me *me, lnet_libmd_t *md)
+-lnet_register_lnd(lnd_t *lnd)
++lnet_register_lnd(struct lnet_lnd *lnd)
  {
- 	LASSERT(me->me_md == md && md->md_me == me);
+ 	mutex_lock(&the_lnet.ln_lnd_mutex);
  
-@@ -651,7 +651,7 @@ struct list_head *
+@@ -300,7 +300,7 @@ static void lnet_assert_wire_constants(void)
+ EXPORT_SYMBOL(lnet_register_lnd);
  
- /* called with lnet_res_lock held */
  void
--lnet_ptl_attach_md(lnet_me_t *me, lnet_libmd_t *md,
-+lnet_ptl_attach_md(struct lnet_me *me, lnet_libmd_t *md,
- 		   struct list_head *matches, struct list_head *drops)
+-lnet_unregister_lnd(lnd_t *lnd)
++lnet_unregister_lnd(struct lnet_lnd *lnd)
  {
- 	struct lnet_portal *ptl = the_lnet.ln_portals[me->me_portal];
-@@ -756,7 +756,7 @@ struct list_head *
- 	LASSERT(list_empty(&ptl->ptl_msg_stealing));
- 	cfs_percpt_for_each(mtable, i, ptl->ptl_mtables) {
- 		struct list_head *mhash;
--		lnet_me_t *me;
-+		struct lnet_me *me;
- 		int j;
+ 	mutex_lock(&the_lnet.ln_lnd_mutex);
  
- 		if (!mtable->mt_mhash) /* uninitialized match-table */
-@@ -767,7 +767,7 @@ struct list_head *
- 		for (j = 0; j < LNET_MT_HASH_SIZE + 1; j++) {
- 			while (!list_empty(&mhash[j])) {
- 				me = list_entry(mhash[j].next,
--						lnet_me_t, me_list);
-+						struct lnet_me, me_list);
- 				CERROR("Active ME %p on exit\n", me);
- 				list_del(&me->me_list);
- 				lnet_me_free(me);
+@@ -1220,7 +1220,7 @@ struct lnet_libhandle *
+ 	struct lnet_ioctl_config_lnd_tunables *lnd_tunables = NULL;
+ 	int rc = -EINVAL;
+ 	int lnd_type;
+-	lnd_t *lnd;
++	struct lnet_lnd *lnd;
+ 	struct lnet_tx_queue *tq;
+ 	int i;
+ 
+@@ -1475,7 +1475,7 @@ void lnet_lib_exit(void)
+ 
+ 	while (!list_empty(&the_lnet.ln_lnds))
+ 		lnet_unregister_lnd(list_entry(the_lnet.ln_lnds.next,
+-					       lnd_t, lnd_list));
++					       struct lnet_lnd, lnd_list));
+ 	lnet_destroy_locks();
+ }
+ 
+diff --git a/drivers/staging/lustre/lnet/lnet/lo.c b/drivers/staging/lustre/lnet/lnet/lo.c
+index 12b6b3a..d11b4f9 100644
+--- a/drivers/staging/lustre/lnet/lnet/lo.c
++++ b/drivers/staging/lustre/lnet/lnet/lo.c
+@@ -88,7 +88,7 @@
+ 	return 0;
+ }
+ 
+-lnd_t the_lolnd = {
++struct lnet_lnd the_lolnd = {
+ 	/* .lnd_list       = */ {&the_lolnd.lnd_list, &the_lolnd.lnd_list},
+ 	/* .lnd_refcount   = */ 0,
+ 	/* .lnd_type       = */ LOLND,
 -- 
 1.8.3.1
