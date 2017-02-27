@@ -1,11 +1,11 @@
 From: Joe Perches <joe@perches.com>
-Date: Mon, 27 Feb 2017 11:31:08 -0800
-Subject: [lustre-devel] [PATCH 4/5] staging: sm750fb: Remove unnecessary
+Date: Mon, 27 Feb 2017 11:41:08 -0800
+Subject: [lustre-devel] [PATCH 5/5] staging: gdm724x: Remove unnecessary
  else after return
-In-Reply-To: <1488219268-3006-4-git-send-email-singhalsimran0@gmail.com>
+In-Reply-To: <1488219268-3006-5-git-send-email-singhalsimran0@gmail.com>
 References: <1488219268-3006-1-git-send-email-singhalsimran0@gmail.com>
-	<1488219268-3006-4-git-send-email-singhalsimran0@gmail.com>
-Message-ID: <1488223868.25838.10.camel@perches.com>
+	<1488219268-3006-5-git-send-email-singhalsimran0@gmail.com>
+Message-ID: <1488224468.25838.11.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,31 +16,25 @@ Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger
 On Mon, 2017-02-27 at 23:44 +0530, simran singhal wrote:
 > This patch fixes the checkpatch warning that else is not generally
 > useful after a break or return.
+
+> This was done using Coccinelle:
+> @@
+> expression e2;
+> statement s1;
+> @@
+> if(e2) { ... return ...; }
+> -else
+>          s1
 []
-> diff --git a/drivers/staging/sm750fb/ddk750_swi2c.c b/drivers/staging/sm750fb/ddk750_swi2c.c
+> diff --git a/drivers/staging/gdm724x/gdm_endian.c b/drivers/staging/gdm724x/gdm_endian.c
 []
-> @@ -295,8 +294,7 @@ static long sw_i2c_write_byte(unsigned char data)
->  
->  	if (i < 0xff)
->  		return 0;
+> @@ -26,30 +26,26 @@ __dev16 gdm_cpu_to_dev16(struct gdm_endian *ed, u16 x)
+>  {
+>  	if (ed->dev_ed == ENDIANNESS_LITTLE)
+>  		return (__force __dev16)cpu_to_le16(x);
 > -	else
-> -		return -1;
-> +	return -1;
+> -		return (__force __dev16)cpu_to_be16(x);
+> +	return (__force __dev16)cpu_to_be16(x);
 
-Assuming -1 is some sort of error,
-it'd be a more common style to use
-
-	if (i >= 0xff)
-		return -1;
-
-	return 0;
-
-Looking at the code, it might make
-sense to use something like:
-
-	/* SDA still != 0 */
-	if (i >= 0xff)
-		return -1;
-
-	return 0;
-}
+again, not a checkpatch message for any of the
+suggested modified hunks.
