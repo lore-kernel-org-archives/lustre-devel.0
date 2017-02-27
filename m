@@ -1,40 +1,57 @@
 From: Joe Perches <joe@perches.com>
-Date: Mon, 27 Feb 2017 11:41:08 -0800
-Subject: [lustre-devel] [PATCH 5/5] staging: gdm724x: Remove unnecessary
+Date: Mon, 27 Feb 2017 12:43:20 -0800
+Subject: [lustre-devel] [PATCH 1/5] staging: lustre: Remove unnecessary
  else after return
-In-Reply-To: <1488219268-3006-5-git-send-email-singhalsimran0@gmail.com>
+In-Reply-To: <CALrZqyMTTk4o5Y5e3DzH_cqXxvHsHDtByG0oYwWMjekZSR7Kkw@mail.gmail.com>
 References: <1488219268-3006-1-git-send-email-singhalsimran0@gmail.com>
-	<1488219268-3006-5-git-send-email-singhalsimran0@gmail.com>
-Message-ID: <1488224468.25838.11.camel@perches.com>
+	<1488223529.25838.8.camel@perches.com>
+	<CALrZqyMTTk4o5Y5e3DzH_cqXxvHsHDtByG0oYwWMjekZSR7Kkw@mail.gmail.com>
+Message-ID: <1488228200.25838.14.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: simran singhal <singhalsimran0@gmail.com>, gregkh@linuxfoundation.org
-Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, linux-fbdev@vger.kernel.org, outreachy-kernel@googlegroups.com
+To: SIMRAN SINGHAL <singhalsimran0@gmail.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, linux-fbdev@vger.kernel.org, outreachy-kernel@googlegroups.com
 
-On Mon, 2017-02-27 at 23:44 +0530, simran singhal wrote:
-> This patch fixes the checkpatch warning that else is not generally
-> useful after a break or return.
+On Tue, 2017-02-28 at 01:51 +0530, SIMRAN SINGHAL wrote:
+> On Tue, Feb 28, 2017 at 12:55 AM, Joe Perches <joe@perches.com> wrote:
+> > On Mon, 2017-02-27 at 23:44 +0530, simran singhal wrote:
+> > > This patch fixes the checkpatch warning that else is not generally
+> > > useful after a break or return.
+> > 
+> > checkpatch doesn't actually warn for this style
+> > 
+> >         if (foo)
+> >                 return bar;
+> >         else
+> >                 return baz;
+> > 
+> 
+> ok, My bad
+> so, I have to change commit message as checkpatch doesn't warn for this style.
 
-> This was done using Coccinelle:
-> @@
-> expression e2;
-> statement s1;
-> @@
-> if(e2) { ... return ...; }
-> -else
->          s1
+Perhaps better would be to leave them unchanged instead.
+
+> > > diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
 []
-> diff --git a/drivers/staging/gdm724x/gdm_endian.c b/drivers/staging/gdm724x/gdm_endian.c
-[]
-> @@ -26,30 +26,26 @@ __dev16 gdm_cpu_to_dev16(struct gdm_endian *ed, u16 x)
->  {
->  	if (ed->dev_ed == ENDIANNESS_LITTLE)
->  		return (__force __dev16)cpu_to_le16(x);
-> -	else
-> -		return (__force __dev16)cpu_to_be16(x);
-> +	return (__force __dev16)cpu_to_be16(x);
+> > > @@ -1806,8 +1806,7 @@ ksocknal_close_matching_conns(struct lnet_process_id id, __u32 ipaddr)
+> > > 
+> > >       if (!count)
+> > >               return -ENOENT;
+> > > -     else
+> > > -             return 0;
+> > > +     return 0;
 
-again, not a checkpatch message for any of the
-suggested modified hunks.
+There might be a case for this one.
+error returns are generally in the form
+
+{
+	[...]
+
+	err = func(...);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
