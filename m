@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 26 Feb 2017 19:41:37 -0500
-Subject: [lustre-devel] [PATCH 12/34] staging: lustre: lnet: change lnd_t to
-	proper structure
+Date: Sun, 26 Feb 2017 19:41:39 -0500
+Subject: [lustre-devel] [PATCH 14/34] staging: lustre: lnet: change
+	lnet_rc_data_t to proper structure
 In-Reply-To: <1488156119-19670-1-git-send-email-jsimmons@infradead.org>
 References: <1488156119-19670-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1488156119-19670-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1488156119-19670-15-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,7 +12,7 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Change lnd_t from typedef to proper structure.
+Change lnet_rc_data_t from typedef to proper structure.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-on: https://review.whamcloud.com/20831
@@ -22,175 +22,111 @@ Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/linux/lnet/lib-lnet.h  |  6 +++---
  drivers/staging/lustre/include/linux/lnet/lib-types.h |  6 +++---
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c   |  4 ++--
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c   |  2 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c             | 14 +++++++-------
- drivers/staging/lustre/lnet/lnet/lo.c                 |  2 +-
- 6 files changed, 17 insertions(+), 17 deletions(-)
+ drivers/staging/lustre/lnet/lnet/router.c             | 18 +++++++++---------
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 685c5d4..9a29769 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -439,7 +439,7 @@ void lnet_res_lh_initialize(struct lnet_res_container *rec,
- 		((1U << the_lnet.ln_remote_nets_hbits) - 1)];
- }
- 
--extern lnd_t the_lolnd;
-+extern struct lnet_lnd the_lolnd;
- extern int avoid_asym_router_failure;
- 
- int lnet_cpt_of_nid_locked(lnet_nid_t nid);
-@@ -628,8 +628,8 @@ void lnet_copy_kiov2iter(struct iov_iter *to,
- void lnet_md_unlink(struct lnet_libmd *md);
- void lnet_md_deconstruct(struct lnet_libmd *lmd, lnet_md_t *umd);
- 
--void lnet_register_lnd(lnd_t *lnd);
--void lnet_unregister_lnd(lnd_t *lnd);
-+void lnet_register_lnd(struct lnet_lnd *lnd);
-+void lnet_unregister_lnd(struct lnet_lnd *lnd);
- 
- int lnet_connect(struct socket **sockp, lnet_nid_t peer_nid,
- 		 __u32 local_ip, __u32 peer_ip, int peer_port);
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 59d7143..8a65db2 100644
+index bcfb0c7..10bf60f 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -179,7 +179,7 @@ struct lnet_test_peer {
- 
- struct lnet_ni;			/* forward ref */
- 
--typedef struct lnet_lnd {
-+struct lnet_lnd {
- 	/* fields managed by portals */
- 	struct list_head	lnd_list;	/* stash in the LND table */
- 	int			lnd_refcount;	/* # active instances */
-@@ -243,7 +243,7 @@ struct lnet_test_peer {
- 
- 	/* accept a new connection */
- 	int (*lnd_accept)(struct lnet_ni *ni, struct socket *sock);
--} lnd_t;
+@@ -297,13 +297,13 @@ struct lnet_ni {
+ /* router checker data, per router */
+ #define LNET_MAX_RTR_NIS   16
+ #define LNET_PINGINFO_SIZE offsetof(struct lnet_ping_info, pi_ni[LNET_MAX_RTR_NIS])
+-typedef struct {
++struct lnet_rc_data {
+ 	/* chain on the_lnet.ln_zombie_rcd or ln_deathrow_rcd */
+ 	struct list_head	 rcd_list;
+ 	struct lnet_handle_md	 rcd_mdh;	/* ping buffer MD */
+ 	struct lnet_peer	*rcd_gateway;	/* reference to gateway */
+ 	struct lnet_ping_info	*rcd_pinginfo;	/* ping buffer */
+-} lnet_rc_data_t;
 +};
  
- struct lnet_tx_queue {
- 	int			tq_credits;	/* # tx credits free */
-@@ -267,7 +267,7 @@ struct lnet_tx_queue {
- 	__u32			 *ni_cpts;	/* bond NI on some CPTs */
- 	lnet_nid_t		  ni_nid;	/* interface's NID */
- 	void			 *ni_data;	/* instance-specific data */
--	lnd_t			 *ni_lnd;	/* procedural interface */
-+	struct lnet_lnd		 *ni_lnd;	/* procedural interface */
- 	struct lnet_tx_queue	**ni_tx_queues;	/* percpt TX queues */
- 	int			**ni_refs;	/* percpt reference count */
- 	time64_t		  ni_last_alive;/* when I was last alive */
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index 6f73454..29a5263 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -38,7 +38,7 @@
- #include <asm/page.h>
- #include "o2iblnd.h"
+ typedef struct lnet_peer {
+ 	struct list_head	 lp_hashlist;	/* chain on peer hash */
+@@ -345,7 +345,7 @@ struct lnet_ni {
+ 	/* returned RC ping features */
+ 	unsigned int		 lp_ping_feats;
+ 	struct list_head	 lp_routes;	/* routers on this peer */
+-	lnet_rc_data_t		*lp_rcd;	/* router checker state */
++	struct lnet_rc_data	*lp_rcd;	/* router checker state */
+ } lnet_peer_t;
  
--static lnd_t the_o2iblnd;
-+static struct lnet_lnd the_o2iblnd;
- 
- struct kib_data kiblnd_data;
- 
-@@ -2938,7 +2938,7 @@ static int kiblnd_startup(lnet_ni_t *ni)
- 	return -ENETDOWN;
- }
- 
--static lnd_t the_o2iblnd = {
-+static struct lnet_lnd the_o2iblnd = {
- 	.lnd_type	= O2IBLND,
- 	.lnd_startup	= kiblnd_startup,
- 	.lnd_shutdown	= kiblnd_shutdown,
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 3b08aff..258507f 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -39,7 +39,7 @@
- 
- #include "socklnd.h"
- 
--static lnd_t the_ksocklnd;
-+static struct lnet_lnd the_ksocklnd;
- struct ksock_nal_data ksocknal_data;
- 
- static struct ksock_interface *
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index aeb9e6f..d31a50b 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -265,15 +265,15 @@ static void lnet_assert_wire_constants(void)
- 	BUILD_BUG_ON((int)sizeof(((struct lnet_hdr *)0)->msg.hello.type) != 4);
- }
- 
--static lnd_t *
-+static struct lnet_lnd *
- lnet_find_lnd_by_type(__u32 type)
+ /* peer hash size */
+diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+index 85fdd08..c73d7a0 100644
+--- a/drivers/staging/lustre/lnet/lnet/router.c
++++ b/drivers/staging/lustre/lnet/lnet/router.c
+@@ -642,7 +642,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+  * networks on that router.
+  */
+ static void
+-lnet_parse_rc_info(lnet_rc_data_t *rcd)
++lnet_parse_rc_info(struct lnet_rc_data *rcd)
  {
--	lnd_t *lnd;
-+	struct lnet_lnd *lnd;
- 	struct list_head *tmp;
- 
- 	/* holding lnd mutex */
- 	list_for_each(tmp, &the_lnet.ln_lnds) {
--		lnd = list_entry(tmp, lnd_t, lnd_list);
-+		lnd = list_entry(tmp, struct lnet_lnd, lnd_list);
- 
- 		if (lnd->lnd_type == type)
- 			return lnd;
-@@ -283,7 +283,7 @@ static void lnet_assert_wire_constants(void)
- }
- 
- void
--lnet_register_lnd(lnd_t *lnd)
-+lnet_register_lnd(struct lnet_lnd *lnd)
+ 	struct lnet_ping_info *info = rcd->rcd_pinginfo;
+ 	struct lnet_peer *gw = rcd->rcd_gateway;
+@@ -733,7 +733,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+ static void
+ lnet_router_checker_event(lnet_event_t *event)
  {
- 	mutex_lock(&the_lnet.ln_lnd_mutex);
+-	lnet_rc_data_t *rcd = event->md.user_ptr;
++	struct lnet_rc_data *rcd = event->md.user_ptr;
+ 	struct lnet_peer *lp;
  
-@@ -300,7 +300,7 @@ static void lnet_assert_wire_constants(void)
- EXPORT_SYMBOL(lnet_register_lnd);
+ 	LASSERT(rcd);
+@@ -878,7 +878,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+ }
  
- void
--lnet_unregister_lnd(lnd_t *lnd)
-+lnet_unregister_lnd(struct lnet_lnd *lnd)
+ static void
+-lnet_destroy_rc_data(lnet_rc_data_t *rcd)
++lnet_destroy_rc_data(struct lnet_rc_data *rcd)
  {
- 	mutex_lock(&the_lnet.ln_lnd_mutex);
- 
-@@ -1220,7 +1220,7 @@ struct lnet_libhandle *
- 	struct lnet_ioctl_config_lnd_tunables *lnd_tunables = NULL;
- 	int rc = -EINVAL;
- 	int lnd_type;
--	lnd_t *lnd;
-+	struct lnet_lnd *lnd;
- 	struct lnet_tx_queue *tq;
- 	int i;
- 
-@@ -1475,7 +1475,7 @@ void lnet_lib_exit(void)
- 
- 	while (!list_empty(&the_lnet.ln_lnds))
- 		lnet_unregister_lnd(list_entry(the_lnet.ln_lnds.next,
--					       lnd_t, lnd_list));
-+					       struct lnet_lnd, lnd_list));
- 	lnet_destroy_locks();
+ 	LASSERT(list_empty(&rcd->rcd_list));
+ 	/* detached from network */
+@@ -898,10 +898,10 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+ 	LIBCFS_FREE(rcd, sizeof(*rcd));
  }
  
-diff --git a/drivers/staging/lustre/lnet/lnet/lo.c b/drivers/staging/lustre/lnet/lnet/lo.c
-index 12b6b3a..d11b4f9 100644
---- a/drivers/staging/lustre/lnet/lnet/lo.c
-+++ b/drivers/staging/lustre/lnet/lnet/lo.c
-@@ -88,7 +88,7 @@
- 	return 0;
- }
+-static lnet_rc_data_t *
++static struct lnet_rc_data *
+ lnet_create_rc_data_locked(lnet_peer_t *gateway)
+ {
+-	lnet_rc_data_t *rcd = NULL;
++	struct lnet_rc_data *rcd = NULL;
+ 	struct lnet_ping_info *pi;
+ 	lnet_md_t md;
+ 	int rc;
+@@ -984,7 +984,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+ static void
+ lnet_ping_router_locked(lnet_peer_t *rtr)
+ {
+-	lnet_rc_data_t *rcd = NULL;
++	struct lnet_rc_data *rcd = NULL;
+ 	unsigned long now = cfs_time_current();
+ 	int secs;
  
--lnd_t the_lolnd = {
-+struct lnet_lnd the_lolnd = {
- 	/* .lnd_list       = */ {&the_lolnd.lnd_list, &the_lolnd.lnd_list},
- 	/* .lnd_refcount   = */ 0,
- 	/* .lnd_type       = */ LOLND,
+@@ -1124,8 +1124,8 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+ static void
+ lnet_prune_rc_data(int wait_unlink)
+ {
+-	lnet_rc_data_t *rcd;
+-	lnet_rc_data_t *tmp;
++	struct lnet_rc_data *rcd;
++	struct lnet_rc_data *tmp;
+ 	lnet_peer_t *lp;
+ 	struct list_head head;
+ 	int i = 2;
+@@ -1182,7 +1182,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+ 
+ 		while (!list_empty(&head)) {
+ 			rcd = list_entry(head.next,
+-					 lnet_rc_data_t, rcd_list);
++					 struct lnet_rc_data, rcd_list);
+ 			list_del_init(&rcd->rcd_list);
+ 			lnet_destroy_rc_data(rcd);
+ 		}
 -- 
 1.8.3.1
