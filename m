@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 26 Feb 2017 19:41:41 -0500
-Subject: [lustre-devel] [PATCH 16/34] staging: lustre: lnet: change
-	lnet_route_t to proper structure
+Date: Sun, 26 Feb 2017 19:41:50 -0500
+Subject: [lustre-devel] [PATCH 25/34] staging: lustre: lnet: change
+	lnet_event_t to proper structure
 In-Reply-To: <1488156119-19670-1-git-send-email-jsimmons@infradead.org>
 References: <1488156119-19670-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1488156119-19670-17-git-send-email-jsimmons@infradead.org>
+Message-ID: <1488156119-19670-26-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,7 +12,7 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Change lnet_route_t from typedef to proper structure.
+Change lnet_event_t from typedef to proper structure.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-on: https://review.whamcloud.com/20831
@@ -22,237 +22,405 @@ Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |  2 +-
- .../staging/lustre/include/linux/lnet/lib-types.h  |  6 ++---
- drivers/staging/lustre/lnet/lnet/lib-move.c        | 12 +++++-----
- drivers/staging/lustre/lnet/lnet/router.c          | 26 ++++++++++++----------
- drivers/staging/lustre/lnet/lnet/router_proc.c     | 11 ++++-----
- 5 files changed, 30 insertions(+), 27 deletions(-)
+ drivers/staging/lustre/include/linux/lnet/api.h       |  4 ++--
+ drivers/staging/lustre/include/linux/lnet/lib-lnet.h  |  4 ++--
+ drivers/staging/lustre/include/linux/lnet/lib-types.h |  4 ++--
+ drivers/staging/lustre/include/linux/lnet/types.h     |  6 +++---
+ drivers/staging/lustre/lnet/lnet/api-ni.c             |  4 ++--
+ drivers/staging/lustre/lnet/lnet/lib-eq.c             | 16 ++++++++--------
+ drivers/staging/lustre/lnet/lnet/lib-md.c             |  2 +-
+ drivers/staging/lustre/lnet/lnet/lib-me.c             |  2 +-
+ drivers/staging/lustre/lnet/lnet/lib-move.c           |  2 +-
+ drivers/staging/lustre/lnet/lnet/lib-msg.c            |  8 ++++----
+ drivers/staging/lustre/lnet/lnet/router.c             |  2 +-
+ drivers/staging/lustre/lnet/selftest/rpc.c            |  2 +-
+ drivers/staging/lustre/lustre/include/lustre_net.h    | 12 ++++++------
+ drivers/staging/lustre/lustre/ptlrpc/events.c         | 14 +++++++-------
+ 14 files changed, 41 insertions(+), 41 deletions(-)
 
+diff --git a/drivers/staging/lustre/include/linux/lnet/api.h b/drivers/staging/lustre/include/linux/lnet/api.h
+index 8609206..b46a769 100644
+--- a/drivers/staging/lustre/include/linux/lnet/api.h
++++ b/drivers/staging/lustre/include/linux/lnet/api.h
+@@ -148,7 +148,7 @@ int LNetMDBind(struct lnet_md md_in,
+  *
+  * In addition to the lnet_handle_eq, the LNet API defines two types
+  * associated with events: The ::lnet_event_kind_t defines the kinds of events
+- * that can be stored in an EQ. The lnet_event_t defines a structure that
++ * that can be stored in an EQ. The lnet_event defines a structure that
+  * holds the information about with an event.
+  *
+  * There are five functions for dealing with EQs: LNetEQAlloc() is used to
+@@ -168,7 +168,7 @@ int LNetEQAlloc(unsigned int       count_in,
+ int LNetEQPoll(struct lnet_handle_eq *eventqs_in,
+ 	       int		 neq_in,
+ 	       int		 timeout_ms,
+-	       lnet_event_t     *event_out,
++	       struct lnet_event *event_out,
+ 	       int		*which_eq_out);
+ /** @} lnet_eq */
+ 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index bcfbed1..93e6830 100644
+index a6cf5be..d770a03 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -65,7 +65,7 @@
- /** exclusive lock */
- #define LNET_LOCK_EX		CFS_PERCPT_LOCK_EX
+@@ -485,12 +485,12 @@ int lnet_dyn_add_ni(lnet_pid_t requested_pid,
+ void lnet_msg_attach_md(struct lnet_msg *msg, struct lnet_libmd *md,
+ 			unsigned int offset, unsigned int mlen);
+ void lnet_msg_detach_md(struct lnet_msg *msg, int status);
+-void lnet_build_unlink_event(struct lnet_libmd *md, lnet_event_t *ev);
++void lnet_build_unlink_event(struct lnet_libmd *md, struct lnet_event *ev);
+ void lnet_build_msg_event(struct lnet_msg *msg, lnet_event_kind_t ev_type);
+ void lnet_msg_commit(struct lnet_msg *msg, int cpt);
+ void lnet_msg_decommit(struct lnet_msg *msg, int cpt, int status);
  
--static inline int lnet_is_route_alive(lnet_route_t *route)
-+static inline int lnet_is_route_alive(struct lnet_route *route)
- {
- 	/* gateway is down */
- 	if (!route->lr_gateway->lp_alive)
+-void lnet_eq_enqueue_event(struct lnet_eq *eq, lnet_event_t *ev);
++void lnet_eq_enqueue_event(struct lnet_eq *eq, struct lnet_event *ev);
+ void lnet_prep_send(struct lnet_msg *msg, int type, lnet_process_id_t target,
+ 		    unsigned int offset, unsigned int len);
+ int lnet_send(lnet_nid_t nid, struct lnet_msg *msg, lnet_nid_t rtr_nid);
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 2cfc1bf..a0d9cad 100644
+index c98af93..808a05c 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -340,7 +340,7 @@ struct lnet_peer {
- 	lnet_nid_t		 lp_nid;	/* peer's NID */
- 	int			 lp_refcount;	/* # refs */
- 	int			 lp_cpt;	/* CPT this peer attached on */
--	/* # refs from lnet_route_t::lr_gateway */
-+	/* # refs from lnet_route::lr_gateway */
- 	int			 lp_rtr_refcount;
- 	/* returned RC ping features */
- 	unsigned int		 lp_ping_feats;
-@@ -369,7 +369,7 @@ struct lnet_peer_table {
- #define lnet_peer_aliveness_enabled(lp) (the_lnet.ln_routing && \
- 					 (lp)->lp_ni->ni_peertimeout > 0)
+@@ -104,7 +104,7 @@ struct lnet_msg {
+ 	struct kvec		*msg_iov;
+ 	lnet_kiov_t		*msg_kiov;
  
+-	lnet_event_t		 msg_ev;
++	struct lnet_event	 msg_ev;
+ 	struct lnet_hdr		 msg_hdr;
+ };
+ 
+@@ -123,7 +123,7 @@ struct lnet_eq {
+ 	lnet_seq_t		  eq_deq_seq;
+ 	unsigned int		  eq_size;
+ 	lnet_eq_handler_t	  eq_callback;
+-	lnet_event_t		 *eq_events;
++	struct lnet_event	 *eq_events;
+ 	int			**eq_refs;	/* percpt refcount for EQ */
+ };
+ 
+diff --git a/drivers/staging/lustre/include/linux/lnet/types.h b/drivers/staging/lustre/include/linux/lnet/types.h
+index bc3f3e3..53eb1da 100644
+--- a/drivers/staging/lustre/include/linux/lnet/types.h
++++ b/drivers/staging/lustre/include/linux/lnet/types.h
+@@ -568,7 +568,7 @@ struct lnet_md {
+ /**
+  * Information about an event on a MD.
+  */
 -typedef struct {
-+struct lnet_route {
- 	struct list_head	 lr_list;	/* chain on net */
- 	struct list_head	 lr_gwlist;	/* chain on gateway */
- 	struct lnet_peer	*lr_gateway;	/* router node */
-@@ -378,7 +378,7 @@ struct lnet_peer_table {
- 	unsigned int		 lr_downis;	/* number of down NIs */
- 	__u32			 lr_hops;	/* how far I am */
- 	unsigned int             lr_priority;	/* route priority */
--} lnet_route_t;
++struct lnet_event {
+ 	/** The identifier (nid, pid) of the target. */
+ 	lnet_process_id_t	target;
+ 	/** The identifier (nid, pid) of the initiator. */
+@@ -635,7 +635,7 @@ struct lnet_md {
+ 	 * to each event.
+ 	 */
+ 	volatile lnet_seq_t	sequence;
+-} lnet_event_t;
 +};
  
- #define LNET_REMOTE_NETS_HASH_DEFAULT	(1U << 7)
- #define LNET_REMOTE_NETS_HASH_MAX	(1U << 16)
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 9615dcd..9d1ab1f 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -957,7 +957,7 @@
+ /**
+  * Event queue handler function type.
+@@ -647,7 +647,7 @@ struct lnet_md {
+  * The handler must not block, must be reentrant, and must not call any LNet
+  * API functions. It should return as quickly as possible.
+  */
+-typedef void (*lnet_eq_handler_t)(lnet_event_t *event);
++typedef void (*lnet_eq_handler_t)(struct lnet_event *event);
+ #define LNET_EQ_HANDLER_NONE NULL
+ /** @} lnet_eq */
+ 
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index 53c9427..1d2004f 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -888,7 +888,7 @@ struct lnet_ni  *
+ }
+ 
+ static void
+-lnet_ping_event_handler(lnet_event_t *event)
++lnet_ping_event_handler(struct lnet_event *event)
+ {
+ 	struct lnet_ping_info *pinfo = event->md.user_ptr;
+ 
+@@ -2133,7 +2133,7 @@ static int lnet_ping(lnet_process_id_t id, int timeout_ms,
+ {
+ 	struct lnet_handle_eq eqh;
+ 	struct lnet_handle_md mdh;
+-	lnet_event_t event;
++	struct lnet_event event;
+ 	struct lnet_md md = { NULL };
+ 	int which;
+ 	int unlinked = 0;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+index 4369df3..ce4b835 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+@@ -93,7 +93,7 @@
+ 		return -ENOMEM;
+ 
+ 	if (count) {
+-		LIBCFS_ALLOC(eq->eq_events, count * sizeof(lnet_event_t));
++		LIBCFS_ALLOC(eq->eq_events, count * sizeof(struct lnet_event));
+ 		if (!eq->eq_events)
+ 			goto failed;
+ 		/*
+@@ -131,7 +131,7 @@
+ 
+ failed:
+ 	if (eq->eq_events)
+-		LIBCFS_FREE(eq->eq_events, count * sizeof(lnet_event_t));
++		LIBCFS_FREE(eq->eq_events, count * sizeof(struct lnet_event));
+ 
+ 	if (eq->eq_refs)
+ 		cfs_percpt_free(eq->eq_refs);
+@@ -155,7 +155,7 @@
+ LNetEQFree(struct lnet_handle_eq eqh)
+ {
+ 	struct lnet_eq *eq;
+-	lnet_event_t *events = NULL;
++	struct lnet_event *events = NULL;
+ 	int **refs = NULL;
+ 	int *ref;
+ 	int rc = 0;
+@@ -201,7 +201,7 @@
+ 	lnet_res_unlock(LNET_LOCK_EX);
+ 
+ 	if (events)
+-		LIBCFS_FREE(events, size * sizeof(lnet_event_t));
++		LIBCFS_FREE(events, size * sizeof(struct lnet_event));
+ 	if (refs)
+ 		cfs_percpt_free(refs);
+ 
+@@ -210,7 +210,7 @@
+ EXPORT_SYMBOL(LNetEQFree);
+ 
+ void
+-lnet_eq_enqueue_event(struct lnet_eq *eq, lnet_event_t *ev)
++lnet_eq_enqueue_event(struct lnet_eq *eq, struct lnet_event *ev)
+ {
+ 	/* MUST called with resource lock hold but w/o lnet_eq_wait_lock */
+ 	int index;
+@@ -239,10 +239,10 @@
  }
  
  static int
--lnet_compare_routes(lnet_route_t *r1, lnet_route_t *r2)
-+lnet_compare_routes(struct lnet_route *r1, struct lnet_route *r2)
+-lnet_eq_dequeue_event(struct lnet_eq *eq, lnet_event_t *ev)
++lnet_eq_dequeue_event(struct lnet_eq *eq, struct lnet_event *ev)
  {
- 	struct lnet_peer *p1 = r1->lr_gateway;
- 	struct lnet_peer *p2 = r2->lr_gateway;
-@@ -999,9 +999,9 @@
- 		       lnet_nid_t rtr_nid)
- {
- 	lnet_remotenet_t *rnet;
--	lnet_route_t *route;
--	lnet_route_t *best_route;
--	lnet_route_t *last_route;
-+	struct lnet_route *route;
-+	struct lnet_route *best_route;
-+	struct lnet_route *last_route;
- 	struct lnet_peer *lp_best;
- 	struct lnet_peer *lp;
+ 	int new_index = eq->eq_deq_seq & (eq->eq_size - 1);
+-	lnet_event_t *new_event = &eq->eq_events[new_index];
++	struct lnet_event *new_event = &eq->eq_events[new_index];
  	int rc;
-@@ -2351,8 +2351,8 @@ struct lnet_msg *
- 		rnet = list_entry(e, lnet_remotenet_t, lrn_list);
  
- 		if (rnet->lrn_net == dstnet) {
--			lnet_route_t *route;
--			lnet_route_t *shortest = NULL;
-+			struct lnet_route *route;
-+			struct lnet_route *shortest = NULL;
- 			__u32 shortest_hops = LNET_UNDEFINED_HOPS;
- 			__u32 route_hops;
+ 	/* must called with lnet_eq_wait_lock hold */
+@@ -371,7 +371,7 @@
+  */
+ int
+ LNetEQPoll(struct lnet_handle_eq *eventqs, int neq, int timeout_ms,
+-	   lnet_event_t *event, int *which)
++	   struct lnet_event *event, int *which)
+ {
+ 	int wait = 1;
+ 	int rc;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
+index a3f8927..872f63f 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-md.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
+@@ -428,7 +428,7 @@
+ int
+ LNetMDUnlink(struct lnet_handle_md mdh)
+ {
+-	lnet_event_t ev;
++	struct lnet_event ev;
+ 	struct lnet_libmd *md;
+ 	int cpt;
  
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-me.c b/drivers/staging/lustre/lnet/lnet/lib-me.c
+index 75922a5..7614088 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-me.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-me.c
+@@ -224,7 +224,7 @@
+ {
+ 	struct lnet_me *me;
+ 	struct lnet_libmd *md;
+-	lnet_event_t ev;
++	struct lnet_event ev;
+ 	int cpt;
+ 
+ 	LASSERT(the_lnet.ln_refcount > 0);
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index aea899e..96fb7fc 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -1987,7 +1987,7 @@
+  * \retval -ENOMEM Memory allocation failure.
+  * \retval -ENOENT Invalid MD object.
+  *
+- * \see lnet_event_t::hdr_data and lnet_event_kind_t.
++ * \see lnet_event::hdr_data and lnet_event_kind_t.
+  */
+ int
+ LNetPut(lnet_nid_t self, struct lnet_handle_md mdh, lnet_ack_req_t ack,
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+index 4b5e3a8..b9b0259 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+@@ -39,7 +39,7 @@
+ #include "../../include/linux/lnet/lib-lnet.h"
+ 
+ void
+-lnet_build_unlink_event(struct lnet_libmd *md, lnet_event_t *ev)
++lnet_build_unlink_event(struct lnet_libmd *md, struct lnet_event *ev)
+ {
+ 	memset(ev, 0, sizeof(*ev));
+ 
+@@ -57,7 +57,7 @@
+ lnet_build_msg_event(struct lnet_msg *msg, lnet_event_kind_t ev_type)
+ {
+ 	struct lnet_hdr *hdr = &msg->msg_hdr;
+-	lnet_event_t *ev  = &msg->msg_ev;
++	struct lnet_event *ev  = &msg->msg_ev;
+ 
+ 	LASSERT(!msg->msg_routing);
+ 
+@@ -165,7 +165,7 @@
+ lnet_msg_decommit_tx(struct lnet_msg *msg, int status)
+ {
+ 	struct lnet_counters	*counters;
+-	lnet_event_t *ev = &msg->msg_ev;
++	struct lnet_event *ev = &msg->msg_ev;
+ 
+ 	LASSERT(msg->msg_tx_committed);
+ 	if (status)
+@@ -217,7 +217,7 @@
+ lnet_msg_decommit_rx(struct lnet_msg *msg, int status)
+ {
+ 	struct lnet_counters *counters;
+-	lnet_event_t *ev = &msg->msg_ev;
++	struct lnet_event *ev = &msg->msg_ev;
+ 
+ 	LASSERT(!msg->msg_tx_committed); /* decommitted or never committed */
+ 	LASSERT(msg->msg_rx_committed);
 diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index eda829a..8e5af05 100644
+index c9edc10..84092ad 100644
 --- a/drivers/staging/lustre/lnet/lnet/router.c
 +++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -268,7 +268,7 @@ static void lnet_shuffle_seed(void)
+@@ -733,7 +733,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+ }
  
- /* NB expects LNET_LOCK held */
  static void
--lnet_add_route_to_rnet(lnet_remotenet_t *rnet, lnet_route_t *route)
-+lnet_add_route_to_rnet(lnet_remotenet_t *rnet, struct lnet_route *route)
+-lnet_router_checker_event(lnet_event_t *event)
++lnet_router_checker_event(struct lnet_event *event)
  {
- 	unsigned int len = 0;
- 	unsigned int offset = 0;
-@@ -301,7 +301,7 @@ static void lnet_shuffle_seed(void)
- 	struct list_head *e;
- 	lnet_remotenet_t *rnet;
- 	lnet_remotenet_t *rnet2;
--	lnet_route_t *route;
-+	struct lnet_route *route;
- 	struct lnet_ni *ni;
- 	int add_route;
- 	int rc;
-@@ -368,8 +368,9 @@ static void lnet_shuffle_seed(void)
- 	/* Search for a duplicate route (it's a NOOP if it is) */
- 	add_route = 1;
- 	list_for_each(e, &rnet2->lrn_routes) {
--		lnet_route_t *route2 = list_entry(e, lnet_route_t, lr_list);
-+		struct lnet_route *route2;
+ 	struct lnet_rc_data *rcd = event->md.user_ptr;
+ 	struct lnet_peer *lp;
+diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
+index e70785c..f56f740 100644
+--- a/drivers/staging/lustre/lnet/selftest/rpc.c
++++ b/drivers/staging/lustre/lnet/selftest/rpc.c
+@@ -1408,7 +1408,7 @@ struct srpc_client_rpc *
  
-+		route2 = list_entry(e, struct lnet_route, lr_list);
- 		if (route2->lr_gateway == route->lr_gateway) {
- 			add_route = 0;
- 			break;
-@@ -416,8 +417,8 @@ static void lnet_shuffle_seed(void)
- lnet_check_routes(void)
+ /* when in kernel always called with LNET_LOCK() held, and in thread context */
+ static void
+-srpc_lnet_ev_handler(lnet_event_t *ev)
++srpc_lnet_ev_handler(struct lnet_event *ev)
  {
- 	lnet_remotenet_t *rnet;
--	lnet_route_t *route;
--	lnet_route_t *route2;
-+	struct lnet_route *route;
-+	struct lnet_route *route2;
- 	struct list_head *e1;
- 	struct list_head *e2;
- 	int cpt;
-@@ -437,7 +438,7 @@ static void lnet_shuffle_seed(void)
- 				lnet_nid_t nid2;
- 				int net;
+ 	struct srpc_service_cd *scd;
+ 	struct srpc_event *rpcev = ev->md.user_ptr;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index c28c4ac..c7c7c3a 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -400,7 +400,7 @@ struct ptlrpc_set_cbdata {
+  * ptlrpc callback & work item stuff
+  */
+ struct ptlrpc_cb_id {
+-	void   (*cbid_fn)(lnet_event_t *ev);     /* specific callback fn */
++	void   (*cbid_fn)(struct lnet_event *ev); /* specific callback fn */
+ 	void    *cbid_arg;		      /* additional arg */
+ };
  
--				route = list_entry(e2, lnet_route_t, lr_list);
-+				route = list_entry(e2, struct lnet_route, lr_list);
+@@ -1757,11 +1757,11 @@ int ptlrpc_uuid_to_peer(struct obd_uuid *uuid,
+  * underlying buffer
+  * @{
+  */
+-void request_out_callback(lnet_event_t *ev);
+-void reply_in_callback(lnet_event_t *ev);
+-void client_bulk_callback(lnet_event_t *ev);
+-void request_in_callback(lnet_event_t *ev);
+-void reply_out_callback(lnet_event_t *ev);
++void request_out_callback(struct lnet_event *ev);
++void reply_in_callback(struct lnet_event *ev);
++void client_bulk_callback(struct lnet_event *ev);
++void request_in_callback(struct lnet_event *ev);
++void reply_out_callback(struct lnet_event *ev);
+ /** @} */
  
- 				if (!route2) {
- 					route2 = route;
-@@ -472,7 +473,7 @@ static void lnet_shuffle_seed(void)
+ /* ptlrpc/connection.c */
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/events.c b/drivers/staging/lustre/lustre/ptlrpc/events.c
+index ca11b03..3aec148 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/events.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/events.c
+@@ -47,7 +47,7 @@
+ /*
+  *  Client's outgoing request callback
+  */
+-void request_out_callback(lnet_event_t *ev)
++void request_out_callback(struct lnet_event *ev)
  {
- 	struct lnet_peer *gateway;
- 	lnet_remotenet_t *rnet;
--	lnet_route_t *route;
-+	struct lnet_route *route;
- 	struct list_head *e1;
- 	struct list_head *e2;
- 	int rc = -ENOENT;
-@@ -501,7 +502,7 @@ static void lnet_shuffle_seed(void)
- 			continue;
- 
- 		list_for_each(e2, &rnet->lrn_routes) {
--			route = list_entry(e2, lnet_route_t, lr_list);
-+			route = list_entry(e2, struct lnet_route, lr_list);
- 
- 			gateway = route->lr_gateway;
- 			if (!(gw_nid == LNET_NID_ANY ||
-@@ -588,7 +589,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
- 	struct list_head *e1;
- 	struct list_head *e2;
- 	lnet_remotenet_t *rnet;
--	lnet_route_t *route;
-+	struct lnet_route *route;
- 	int cpt;
- 	int i;
- 	struct list_head *rn_list;
-@@ -601,7 +602,8 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
- 			rnet = list_entry(e1, lnet_remotenet_t, lrn_list);
- 
- 			list_for_each(e2, &rnet->lrn_routes) {
--				route = list_entry(e2, lnet_route_t, lr_list);
-+				route = list_entry(e2, struct lnet_route,
-+						   lr_list);
- 
- 				if (!idx--) {
- 					*net      = rnet->lrn_net;
-@@ -646,7 +648,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+ 	struct ptlrpc_cb_id *cbid = ev->md.user_ptr;
+ 	struct ptlrpc_request *req = cbid->cbid_arg;
+@@ -86,7 +86,7 @@ void request_out_callback(lnet_event_t *ev)
+ /*
+  * Client's incoming reply callback
+  */
+-void reply_in_callback(lnet_event_t *ev)
++void reply_in_callback(struct lnet_event *ev)
  {
- 	struct lnet_ping_info *info = rcd->rcd_pinginfo;
- 	struct lnet_peer *gw = rcd->rcd_gateway;
--	lnet_route_t *rte;
-+	struct lnet_route *rte;
- 
- 	if (!gw->lp_alive)
- 		return;
-@@ -823,7 +825,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
- void
- lnet_router_ni_update_locked(struct lnet_peer *gw, __u32 net)
+ 	struct ptlrpc_cb_id *cbid = ev->md.user_ptr;
+ 	struct ptlrpc_request *req = cbid->cbid_arg;
+@@ -176,7 +176,7 @@ void reply_in_callback(lnet_event_t *ev)
+ /*
+  * Client's bulk has been written/read
+  */
+-void client_bulk_callback(lnet_event_t *ev)
++void client_bulk_callback(struct lnet_event *ev)
  {
--	lnet_route_t *rte;
-+	struct lnet_route *rte;
+ 	struct ptlrpc_cb_id *cbid = ev->md.user_ptr;
+ 	struct ptlrpc_bulk_desc *desc = cbid->cbid_arg;
+@@ -289,7 +289,7 @@ static void ptlrpc_req_add_history(struct ptlrpc_service_part *svcpt,
+ /*
+  * Server's incoming request callback
+  */
+-void request_in_callback(lnet_event_t *ev)
++void request_in_callback(struct lnet_event *ev)
+ {
+ 	struct ptlrpc_cb_id *cbid = ev->md.user_ptr;
+ 	struct ptlrpc_request_buffer_desc *rqbd = cbid->cbid_arg;
+@@ -389,7 +389,7 @@ void request_in_callback(lnet_event_t *ev)
+ /*
+  *  Server's outgoing reply callback
+  */
+-void reply_out_callback(lnet_event_t *ev)
++void reply_out_callback(struct lnet_event *ev)
+ {
+ 	struct ptlrpc_cb_id *cbid = ev->md.user_ptr;
+ 	struct ptlrpc_reply_state *rs = cbid->cbid_arg;
+@@ -429,10 +429,10 @@ void reply_out_callback(lnet_event_t *ev)
+ 	}
+ }
  
- 	if ((gw->lp_ping_feats & LNET_PING_FEAT_NI_STATUS)) {
- 		list_for_each_entry(rte, &gw->lp_routes, lr_gwlist) {
-diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-index e672148..1b2817c 100644
---- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-+++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-@@ -171,7 +171,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
- 	} else {
- 		struct list_head *n;
- 		struct list_head *r;
--		lnet_route_t *route = NULL;
-+		struct lnet_route *route = NULL;
- 		lnet_remotenet_t *rnet  = NULL;
- 		int skip  = off - 1;
- 		struct list_head *rn_list;
-@@ -197,9 +197,10 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
- 				r = rnet->lrn_routes.next;
+-static void ptlrpc_master_callback(lnet_event_t *ev)
++static void ptlrpc_master_callback(struct lnet_event *ev)
+ {
+ 	struct ptlrpc_cb_id *cbid = ev->md.user_ptr;
+-	void (*callback)(lnet_event_t *ev) = cbid->cbid_fn;
++	void (*callback)(struct lnet_event *ev) = cbid->cbid_fn;
  
- 				while (r != &rnet->lrn_routes) {
--					lnet_route_t *re =
--						list_entry(r, lnet_route_t,
--							   lr_list);
-+					struct lnet_route *re;
-+
-+					re = list_entry(r, struct lnet_route,
-+							lr_list);
- 					if (!skip) {
- 						route = re;
- 						break;
-@@ -331,7 +332,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
- 			int last_ping = cfs_duration_sec(cfs_time_sub(now,
- 						     peer->lp_ping_timestamp));
- 			int down_ni = 0;
--			lnet_route_t *rtr;
-+			struct lnet_route *rtr;
- 
- 			if ((peer->lp_ping_feats &
- 			     LNET_PING_FEAT_NI_STATUS)) {
+ 	/* Honestly, it's best to find out early. */
+ 	LASSERT(cbid->cbid_arg != LP_POISON);
 -- 
 1.8.3.1
