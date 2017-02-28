@@ -1,127 +1,85 @@
 From: Julia Lawall <julia.lawall@lip6.fr>
-Date: Tue, 28 Feb 2017 20:00:57 +0100 (CET)
-Subject: [lustre-devel] [Outreachy kernel] [PATCH 4/5] staging: sm750fb:
- Remove unnecessary else after return
-In-Reply-To: <CALrZqyNXbn1SZ8Daws7yKkYm-C-U9FHyJ_eRxvuem1Fk+Mqs=g@mail.gmail.com>
+Date: Tue, 28 Feb 2017 20:14:21 +0100 (CET)
+Subject: [lustre-devel] [Outreachy kernel] Re: [PATCH 1/5] staging:
+ lustre: Remove unnecessary else after return
+In-Reply-To: <CALrZqyP-BRPj4jEFgU=B_AV7E4-tJfgaXwwxRhUprLg_4gWQkg@mail.gmail.com>
 References: <1488219268-3006-1-git-send-email-singhalsimran0@gmail.com>
-	<1488219268-3006-4-git-send-email-singhalsimran0@gmail.com>
-	<alpine.DEB.2.20.1702272214410.2127@hadrien>
-	<CALrZqyNXbn1SZ8Daws7yKkYm-C-U9FHyJ_eRxvuem1Fk+Mqs=g@mail.gmail.com>
-Message-ID: <alpine.DEB.2.20.1702281959390.2171@hadrien>
+	<1488223529.25838.8.camel@perches.com>
+	<CALrZqyMTTk4o5Y5e3DzH_cqXxvHsHDtByG0oYwWMjekZSR7Kkw@mail.gmail.com>
+	<1488228200.25838.14.camel@perches.com>
+	<CALrZqyP-BRPj4jEFgU=B_AV7E4-tJfgaXwwxRhUprLg_4gWQkg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.20.1702282012460.2171@hadrien>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: SIMRAN SINGHAL <singhalsimran0@gmail.com>
-Cc: Greg KH <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, linux-fbdev@vger.kernel.org, outreachy-kernel@googlegroups.com
+Cc: Joe Perches <joe@perches.com>, Greg KH <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, linux-fbdev@vger.kernel.org, outreachy-kernel@googlegroups.com
 
 
 
 On Wed, 1 Mar 2017, SIMRAN SINGHAL wrote:
 
-> On Tue, Feb 28, 2017 at 2:45 AM, Julia Lawall <julia.lawall@lip6.fr> wrote:
-> >
-> >
-> > On Mon, 27 Feb 2017, simran singhal wrote:
-> >
-> >> This patch fixes the checkpatch warning that else is not generally
-> >> useful after a break or return.
+> On Tue, Feb 28, 2017 at 2:13 AM, Joe Perches <joe@perches.com> wrote:
+> > On Tue, 2017-02-28 at 01:51 +0530, SIMRAN SINGHAL wrote:
+> >> On Tue, Feb 28, 2017 at 12:55 AM, Joe Perches <joe@perches.com> wrote:
+> >> > On Mon, 2017-02-27 at 23:44 +0530, simran singhal wrote:
+> >> > > This patch fixes the checkpatch warning that else is not generally
+> >> > > useful after a break or return.
+> >> >
+> >> > checkpatch doesn't actually warn for this style
+> >> >
+> >> >         if (foo)
+> >> >                 return bar;
+> >> >         else
+> >> >                 return baz;
+> >> >
 > >>
-> >> This was done using Coccinelle:
-> >> @@
-> >> expression e2;
-> >> statement s1;
-> >> @@
-> >> if(e2) { ... return ...; }
-> >> -else
-> >>          s1
-> >>
-> >> Signed-off-by: simran singhal <singhalsimran0@gmail.com>
-> >> ---
-> >>  drivers/staging/sm750fb/ddk750_sii164.c | 6 ++----
-> >>  drivers/staging/sm750fb/ddk750_swi2c.c  | 6 ++----
-> >>  2 files changed, 4 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/drivers/staging/sm750fb/ddk750_sii164.c b/drivers/staging/sm750fb/ddk750_sii164.c
-> >> index 259006a..6906598 100644
-> >> --- a/drivers/staging/sm750fb/ddk750_sii164.c
-> >> +++ b/drivers/staging/sm750fb/ddk750_sii164.c
-> >> @@ -368,8 +368,7 @@ unsigned char sii164IsConnected(void)
-> >>       hotPlugValue = i2cReadReg(SII164_I2C_ADDRESS, SII164_DETECT) & SII164_DETECT_HOT_PLUG_STATUS_MASK;
-> >>       if (hotPlugValue == SII164_DETECT_HOT_PLUG_STATUS_ON)
-> >>               return 1;
-> >> -     else
-> >> -             return 0;
-> >> +     return 0;
+> >> ok, My bad
+> >> so, I have to change commit message as checkpatch doesn't warn for this style.
 > >
+> > Perhaps better would be to leave them unchanged instead.
 > >
-> > Totally unrelated to what you are doing, but I wonder if these return
-> > values should be true and false?  Perhaps it would help to see how the
-> > return values are used at the calling context.
+> >> > > diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> > []
+> >> > > @@ -1806,8 +1806,7 @@ ksocknal_close_matching_conns(struct lnet_process_id id, __u32 ipaddr)
+> >> > >
+> >> > >       if (!count)
+> >> > >               return -ENOENT;
+> >> > > -     else
+> >> > > -             return 0;
+> >> > > +     return 0;
 > >
-> you want me to go ahead with what Joe mentioned and also do the same
-> changes here also.
+> > There might be a case for this one.
+> > error returns are generally in the form
+> >
+> > {
+> >         [...]
+> >
+> >         err = func(...);
+> >         if (err < 0)
+> >                 return err;
+> >
+> >         return 0;
+> > }
+> Not sure, what's the problem in removing else as according to me
+> there is no use of else.
+>
+> In this case if (if condition) does not satisfy then else condition will
+> be satisfied and function will return 0.
 
-I think that it would be best to complete what you have underway already.
-When those patches are picked up by Greg, you can look into the
-possibility of using true and false.
+I think that "there might be a case for" was a positive comment.  In any
+case, it looks nicer to me if success is outside of a conditional and
+failure is under a conditional.  Or to be more precise, Coccinelle bug
+finding rules tend to work better if that property is respected.
 
 julia
 
-> > julia
-> >
-> >>  }
-> >>
-> >>  /*
-> >> @@ -387,8 +386,7 @@ unsigned char sii164CheckInterrupt(void)
-> >>       detectReg = i2cReadReg(SII164_I2C_ADDRESS, SII164_DETECT) & SII164_DETECT_MONITOR_STATE_MASK;
-> >>       if (detectReg == SII164_DETECT_MONITOR_STATE_CHANGE)
-> >>               return 1;
-> >> -     else
-> >> -             return 0;
-> >> +     return 0;
-> >>  }
-> >>
-> >>  /*
-> >> diff --git a/drivers/staging/sm750fb/ddk750_swi2c.c b/drivers/staging/sm750fb/ddk750_swi2c.c
-> >> index a4ac07c..5997349 100644
-> >> --- a/drivers/staging/sm750fb/ddk750_swi2c.c
-> >> +++ b/drivers/staging/sm750fb/ddk750_swi2c.c
-> >> @@ -199,8 +199,7 @@ static unsigned char sw_i2c_read_sda(void)
-> >>       gpio_data = peek32(sw_i2c_data_gpio_data_reg);
-> >>       if (gpio_data & (1 << sw_i2c_data_gpio))
-> >>               return 1;
-> >> -     else
-> >> -             return 0;
-> >> +     return 0;
-> >>  }
-> >>
-> >>  /*
-> >> @@ -295,8 +294,7 @@ static long sw_i2c_write_byte(unsigned char data)
-> >>
-> >>       if (i < 0xff)
-> >>               return 0;
-> >> -     else
-> >> -             return -1;
-> >> +     return -1;
-> >>  }
-> >>
-> >>  /*
-> >> --
-> >> 2.7.4
-> >>
-> >> --
-> >> You received this message because you are subscribed to the Google Groups "outreachy-kernel" group.
-> >> To unsubscribe from this group and stop receiving emails from it, send an email to outreachy-kernel+unsubscribe at googlegroups.com.
-> >> To post to this group, send email to outreachy-kernel at googlegroups.com.
-> >> To view this discussion on the web visit https://groups.google.com/d/msgid/outreachy-kernel/1488219268-3006-4-git-send-email-singhalsimran0%40gmail.com.
-> >> For more options, visit https://groups.google.com/d/optout.
-> >>
 >
 > --
 > You received this message because you are subscribed to the Google Groups "outreachy-kernel" group.
 > To unsubscribe from this group and stop receiving emails from it, send an email to outreachy-kernel+unsubscribe at googlegroups.com.
 > To post to this group, send email to outreachy-kernel at googlegroups.com.
-> To view this discussion on the web visit https://groups.google.com/d/msgid/outreachy-kernel/CALrZqyNXbn1SZ8Daws7yKkYm-C-U9FHyJ_eRxvuem1Fk%2BMqs%3Dg%40mail.gmail.com.
+> To view this discussion on the web visit https://groups.google.com/d/msgid/outreachy-kernel/CALrZqyP-BRPj4jEFgU%3DB_AV7E4-tJfgaXwwxRhUprLg_4gWQkg%40mail.gmail.com.
 > For more options, visit https://groups.google.com/d/optout.
 >
