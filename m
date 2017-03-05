@@ -1,11 +1,11 @@
 From: Julia Lawall <julia.lawall@lip6.fr>
-Date: Sun, 5 Mar 2017 18:15:23 +0100 (CET)
+Date: Sun, 5 Mar 2017 18:17:20 +0100 (CET)
 Subject: [lustre-devel] [Outreachy kernel] [PATCH 5/5] staging: lustre:
  osc_page.c: Use list_for_each_entry_safe
 In-Reply-To: <1488733610-22289-6-git-send-email-singhalsimran0@gmail.com>
 References: <1488733610-22289-1-git-send-email-singhalsimran0@gmail.com>
 	<1488733610-22289-6-git-send-email-singhalsimran0@gmail.com>
-Message-ID: <alpine.DEB.2.20.1703051814170.3052@hadrien>
+Message-ID: <alpine.DEB.2.20.1703051816120.3052@hadrien>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,7 +13,12 @@ Content-Transfer-Encoding: 7bit
 To: simran singhal <singhalsimran0@gmail.com>
 Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, outreachy-kernel@googlegroups.com
 
+By the way, the above subject line is not correct.  Normally one does not
+put .c/.h in the subject line.  Indeed, there is not really any
+deterministic algorithm for choosing the subject line.  You need to run
+git log --oneline filename to see what others have done.
 
+julia
 
 On Sun, 5 Mar 2017, simran singhal wrote:
 
@@ -24,14 +29,6 @@ On Sun, 5 Mar 2017, simran singhal wrote:
 >
 > This patch replaces the while loop containing list_empty and list_entry
 > with list_for_each_entry_safe.
-
-list_for_each_entry_safe is only needed when the current element is
-removed from the list within the loop body.  If that is not the case, you
-can just use list_for_each_entry.
-
-julia
-
-
 >
 > This was done with Coccinelle.
 >
