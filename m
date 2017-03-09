@@ -1,10 +1,10 @@
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Thu, 9 Mar 2017 13:08:50 +0100
-Subject: [lustre-devel] [PATCH] Minor Fix to please checkpatch Declaring
- 'unsigned int' instead of 'unsigned'
-In-Reply-To: <1489060251-22958-1-git-send-email-pushkar.iit@gmail.com>
-References: <1489060251-22958-1-git-send-email-pushkar.iit@gmail.com>
-Message-ID: <20170309120850.GA13054@kroah.com>
+Date: Thu, 9 Mar 2017 14:15:35 +0100
+Subject: [lustre-devel] [PATCH] Minor coding guideline Fix in lusture
+	module
+In-Reply-To: <1489062127-23258-1-git-send-email-pushkar.iit@gmail.com>
+References: <1489062127-23258-1-git-send-email-pushkar.iit@gmail.com>
+Message-ID: <20170309131535.GB2908@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,11 +12,37 @@ Content-Transfer-Encoding: 7bit
 To: Pushkar Jambhlekar <pushkar.iit@gmail.com>
 Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, "John L. Hammond" <john.hammond@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, Fan Yong <fan.yong@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-On Thu, Mar 09, 2017 at 05:20:51PM +0530, Pushkar Jambhlekar wrote:
+On Thu, Mar 09, 2017 at 05:52:07PM +0530, Pushkar Jambhlekar wrote:
+> Replacing 'unsigned' with 'unsigned int'  in vvp_pgcache_id.
+> Checkpath.pl passed.
+> 
 > Signed-off-by: Pushkar Jambhlekar <pushkar.iit@gmail.com>
 > ---
 >  drivers/staging/lustre/lustre/llite/vvp_dev.c | 9 ++++-----
 >  1 file changed, 4 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+> index 12c129f7e..8d78755 100644
+> --- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
+> +++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+> @@ -381,11 +381,10 @@ int cl_sb_fini(struct super_block *sb)
+>  #define PGC_DEPTH_SHIFT (32)
+>  
+>  struct vvp_pgcache_id {
+> -	unsigned		 vpi_bucket;
+> -	unsigned		 vpi_depth;
+> -	uint32_t		 vpi_index;
+> -
+> -	unsigned		 vpi_curdep;
+> +	unsigned int		vpi_bucket;
+> +	unsigned int		vpi_depth;
+> +	uint32_t		vpi_index;
+> +	unsigned int		vpi_curdep;
+>  	struct lu_object_header *vpi_obj;
+>  };
+>  
+> -- 
+> 2.7.4
 
 Hi,
 
