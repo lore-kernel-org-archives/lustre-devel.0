@@ -1,37 +1,135 @@
-From: Craig Inches <craig@craiginches.com>
-Date: Mon, 13 Mar 2017 13:13:51 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre fix constant comparision
- style issue in lu_object.h
-In-Reply-To: <20170313121110.GD4136@mwanda>
-References: <20170311130740.11488-1-Craig@craiginches.com>
-	<20170312133722.GC27791@kroah.com> <20170313121110.GD4136@mwanda>
-Message-ID: <20170313131351.GA14108@starbase.xayto.local>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Mon, 13 Mar 2017 13:51:41 -0400
+Subject: [lustre-devel] new tag 2.9.54
+Message-ID: <1D1A49D3-B135-4FBF-A043-2416B838B3C6@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Greg KH <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, oleg.drokin@intel.com, andreas.dilger@intel.com, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
 
-On Mon, Mar 13, 2017 at 03:11:10PM +0300, Dan Carpenter wrote:
-> On Sun, Mar 12, 2017 at 02:37:22PM +0100, Greg KH wrote:
-> > On Sat, Mar 11, 2017 at 01:07:40PM +0000, Craig Inches wrote:
-> > > This patch resolves the "Comparisons should place the constant on
-> > > the right side of the test" found with checkpatch tool.
-> > 
-> > Both are constants, I think checkpatch is the thing that is wrong here,
-> > don't you agree?
-> 
-> Sort of constant-ish...  The sizeof(*value) changes each time the macro
-> is used.  I feel like checkpatch is right.
-> 
-> regads,
-> dan carpenter
-> 
+Hello!
 
-That was my take aswell.. PAGE_SIZE is constant for each boot, but
-sizeof could change. Happy to be lead by the more experienced here
-though.
+  I just tagged 2.9.54 tag in Lustre master development tree.
 
-Cheers
-Craig
+  Here's the changelog:
+Alex Zhuravlev (1):
+      LU-8686 osd: add few more credits if debugging is enabled
+
+Alexander Boyko (1):
+      LU-8947 test: fix getting OST name at sanity test_253
+
+Andreas Dilger (4):
+      LU-5969 lustreapi: allow "version" without "lustre:"
+      LU-8139 ofd: allow brw_size with 'M' suffix
+      LU-8582 tests: skip sanity test_255a for interop
+      LU-9024 tests: improve conf-sanity test_63 output
+
+Andrew Perepechko (1):
+      LU-9127 target: tgt_cb_last_committed is too noisy
+
+Arnd Bergmann (3):
+      LU-4423 mdc: use 64-bit timestamps for mdc
+      LU-4423 llite: use 64-bit times in another debug print
+      LU-4423 llite: use 64-bit llite debugfs timestamps
+
+Ben Evans (1):
+      LU-7670 mdt: allow changelog commands to return errors
+
+Bob Glossman (1):
+      LU-9101 kernel: kernel update [SLES11 SP4 3.0.101-94]
+
+Bobi Jam (1):
+      LU-8773 llite: refactor lov_object_fiemap()
+
+Bruno Faccini (3):
+      LU-8526 tests: ensure all OSTs active for allocations
+      LU-6499 obdclass: obdclass module cleanup upon load error
+      LU-9038 obdclass: handle early requests vs CT registering
+
+Dmitry Eremin (2):
+      LU-8888 clio: remove unused members from struct cl_thread_info
+      LU-8703 libcfs: remove usless abstraction
+
+Fan Yong (2):
+      LU-9040 scrub: handle group boundary properly
+      LU-8900 snapshot: new config for MDT write barrier
+
+Giuseppe Di Natale (2):
+      LU-9100 lnet: lctl net down success when lnet not loaded
+      LU-9098 lnet: Move lnet_routes.conf to /etc
+
+Gu Zheng (1):
+      LU-9116 libcfs: avoid overflow of crypto bandwidth caculation
+
+Hongchao Zhang (1):
+      LU-9059 utils: skip label check for client
+
+Jadhav Vikram (1):
+      LU-8788 tests: modify create_pool to use as wrapper
+
+James Nunez (1):
+      LU-9125 test: Correct setstripe -s option
+
+James Shimek (1):
+      LU-8734 gnilnd: Handle dla credits exhaustion
+
+James Simmons (7):
+      LU-6142 lnet: remove most of typedefs from LNet headers
+      LU-8066 ldlm: move server side /proc/fs/lustre/ldlm to sysfs
+      LU-8560 build: announce linux kernel 4.6.7 support
+      LU-9019 mdt: use 64-bit timestamps for rename stats
+      LU-9019 obd: use 64-bit timestamps for rpc stats
+      LU-9067 utils: ensure debugfs is mounted
+      LU-9118 o2iblnd: handle MOFED libcfs time api collision
+
+John L. Hammond (5):
+      LU-9123 test: correct setstripe options in layout test
+      LU-8403 obd: remove OBD_NOTIFY_SYNC{,_NONBLOCK}
+      LU-9109 ldlm: restore missing newlines in ldlm sysfs files
+      LU-8403 obd: remove OBD_NOTIFY_CONFIG
+      LU-8827 mdt: bypass quota enforcement for HSM release
+
+Lai Siyao (2):
+      LU-8981 test: sanity 311 check is too strict
+      LU-7994 statahead: add smp_mb() to serialize ops
+
+Li Xi (3):
+      LU-8550 test: fix problems of conf-sanity test_32
+      LU-7441 nrs: Free hash table if failed to start a nrs policy
+      LU-8726 osd-ldiskfs: bypass read for benchmarking
+
+Minh Diep (1):
+      LU-8642 build: suppport building various OFED
+
+Nathaniel Clark (1):
+      LU-8934 spec: Use correct provides in lustre-dkms
+
+Niu Yawei (3):
+      LU-9081 config: don't attach sub logs for LWP
+      LU-9115 llite: buggy special handling on MULTIMODRPCS
+      LU-9132 utils: tuning max_sectors_kb on mount
+
+Oleg Drokin (2):
+      LU-9125 utils: Postpone deprecation of some options.
+      New tag 2.9.54
+
+Parinay Kondekar (1):
+      LU-9103 tests: SKIP recovery-small/110g for old MDS versions
+
+Quentin Bouget (1):
+      LU-8911 tests: sanity-hsm test_24d fails on a local setup
+
+Sergey Cheremencev (3):
+      LU-9094 o2iblnd: reconnect peer for REJ_INVALID_SERVICE_ID
+      LU-9094 lnet: remove ni from lnet_finalize
+      LU-9094 o2iblnd: kill timedout txs from ibp_tx_queue
+
+Steve Guminski (4):
+      LU-6210 utils: Change positional struct initializers to C99
+      LU-5170 utils: Add support for --list-commands option
+      LU-8767 llite: Improve proc file text in lproc_llite.c
+      LU-6210 mdd: Change positional struct initializers to C99
+
+Yang Sheng (1):
+      LU-9146 ldiskfs: backport a few patches to resolve deadlock
