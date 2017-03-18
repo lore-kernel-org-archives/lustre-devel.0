@@ -1,135 +1,258 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Mon, 13 Mar 2017 13:51:41 -0400
-Subject: [lustre-devel] new tag 2.9.54
-Message-ID: <1D1A49D3-B135-4FBF-A043-2416B838B3C6@intel.com>
+From: Oleg Drokin <green@linuxhacker.ru>
+Date: Sat, 18 Mar 2017 02:24:08 -0400
+Subject: [lustre-devel] [PATCH/RFC] staging/lustre: Rework
+	class_process_proc_param
+Message-ID: <20170318062408.3207381-1-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Al Viro <viro@ZenIV.linux.org.uk>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>
 
-Hello!
+Ever since sysfs migration, class_process_proc_param stopped working
+correctly as all the useful params were no longer present as lvars.
+Replace all the nasty fake proc writes with hopefully less nasty
+kobject attribute search and then update the attributes as needed.
 
-  I just tagged 2.9.54 tag in Lustre master development tree.
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+Reported-by: Al Viro <viro@ZenIV.linux.org.uk>
+---
+Al has quite rightfully complained in the past that class_process_proc_param
+is a terrible piece of code and needs to go.
+This patch is an attempt at improving it somewhat and in process drop
+all the user/kernel address space games we needed to play to make it work
+in the past (and which I suspect attracted Al's attention in the first place).
 
-  Here's the changelog:
-Alex Zhuravlev (1):
-      LU-8686 osd: add few more credits if debugging is enabled
+Now I wonder if iterating kobject attributes like that would be ok with
+you Greg, or do you think there is a better way?
+class_find_write_attr could be turned into something generic since it's
+certainly convenient to reuse same table of name-write_method pairs,
+but I did some cursory research and nobody else seems to need anything
+of the sort in-tree.
 
-Alexander Boyko (1):
-      LU-8947 test: fix getting OST name at sanity test_253
+I know ll_process_config is still awful and I will likely just
+replace the current hack with kset_find_obj, but I just wanted to make
+sure this new approach would be ok before spending too much time on it.
 
-Andreas Dilger (4):
-      LU-5969 lustreapi: allow "version" without "lustre:"
-      LU-8139 ofd: allow brw_size with 'M' suffix
-      LU-8582 tests: skip sanity test_255a for interop
-      LU-9024 tests: improve conf-sanity test_63 output
+Thanks!
 
-Andrew Perepechko (1):
-      LU-9127 target: tgt_cb_last_committed is too noisy
+ drivers/staging/lustre/lustre/include/obd_class.h  |  4 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    | 10 +--
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |  3 +-
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |  3 +-
+ .../staging/lustre/lustre/obdclass/obd_config.c    | 78 ++++++++++------------
+ drivers/staging/lustre/lustre/osc/osc_request.c    |  3 +-
+ 6 files changed, 44 insertions(+), 57 deletions(-)
 
-Arnd Bergmann (3):
-      LU-4423 mdc: use 64-bit timestamps for mdc
-      LU-4423 llite: use 64-bit times in another debug print
-      LU-4423 llite: use 64-bit llite debugfs timestamps
-
-Ben Evans (1):
-      LU-7670 mdt: allow changelog commands to return errors
-
-Bob Glossman (1):
-      LU-9101 kernel: kernel update [SLES11 SP4 3.0.101-94]
-
-Bobi Jam (1):
-      LU-8773 llite: refactor lov_object_fiemap()
-
-Bruno Faccini (3):
-      LU-8526 tests: ensure all OSTs active for allocations
-      LU-6499 obdclass: obdclass module cleanup upon load error
-      LU-9038 obdclass: handle early requests vs CT registering
-
-Dmitry Eremin (2):
-      LU-8888 clio: remove unused members from struct cl_thread_info
-      LU-8703 libcfs: remove usless abstraction
-
-Fan Yong (2):
-      LU-9040 scrub: handle group boundary properly
-      LU-8900 snapshot: new config for MDT write barrier
-
-Giuseppe Di Natale (2):
-      LU-9100 lnet: lctl net down success when lnet not loaded
-      LU-9098 lnet: Move lnet_routes.conf to /etc
-
-Gu Zheng (1):
-      LU-9116 libcfs: avoid overflow of crypto bandwidth caculation
-
-Hongchao Zhang (1):
-      LU-9059 utils: skip label check for client
-
-Jadhav Vikram (1):
-      LU-8788 tests: modify create_pool to use as wrapper
-
-James Nunez (1):
-      LU-9125 test: Correct setstripe -s option
-
-James Shimek (1):
-      LU-8734 gnilnd: Handle dla credits exhaustion
-
-James Simmons (7):
-      LU-6142 lnet: remove most of typedefs from LNet headers
-      LU-8066 ldlm: move server side /proc/fs/lustre/ldlm to sysfs
-      LU-8560 build: announce linux kernel 4.6.7 support
-      LU-9019 mdt: use 64-bit timestamps for rename stats
-      LU-9019 obd: use 64-bit timestamps for rpc stats
-      LU-9067 utils: ensure debugfs is mounted
-      LU-9118 o2iblnd: handle MOFED libcfs time api collision
-
-John L. Hammond (5):
-      LU-9123 test: correct setstripe options in layout test
-      LU-8403 obd: remove OBD_NOTIFY_SYNC{,_NONBLOCK}
-      LU-9109 ldlm: restore missing newlines in ldlm sysfs files
-      LU-8403 obd: remove OBD_NOTIFY_CONFIG
-      LU-8827 mdt: bypass quota enforcement for HSM release
-
-Lai Siyao (2):
-      LU-8981 test: sanity 311 check is too strict
-      LU-7994 statahead: add smp_mb() to serialize ops
-
-Li Xi (3):
-      LU-8550 test: fix problems of conf-sanity test_32
-      LU-7441 nrs: Free hash table if failed to start a nrs policy
-      LU-8726 osd-ldiskfs: bypass read for benchmarking
-
-Minh Diep (1):
-      LU-8642 build: suppport building various OFED
-
-Nathaniel Clark (1):
-      LU-8934 spec: Use correct provides in lustre-dkms
-
-Niu Yawei (3):
-      LU-9081 config: don't attach sub logs for LWP
-      LU-9115 llite: buggy special handling on MULTIMODRPCS
-      LU-9132 utils: tuning max_sectors_kb on mount
-
-Oleg Drokin (2):
-      LU-9125 utils: Postpone deprecation of some options.
-      New tag 2.9.54
-
-Parinay Kondekar (1):
-      LU-9103 tests: SKIP recovery-small/110g for old MDS versions
-
-Quentin Bouget (1):
-      LU-8911 tests: sanity-hsm test_24d fails on a local setup
-
-Sergey Cheremencev (3):
-      LU-9094 o2iblnd: reconnect peer for REJ_INVALID_SERVICE_ID
-      LU-9094 lnet: remove ni from lnet_finalize
-      LU-9094 o2iblnd: kill timedout txs from ibp_tx_queue
-
-Steve Guminski (4):
-      LU-6210 utils: Change positional struct initializers to C99
-      LU-5170 utils: Add support for --list-commands option
-      LU-8767 llite: Improve proc file text in lproc_llite.c
-      LU-6210 mdd: Change positional struct initializers to C99
-
-Yang Sheng (1):
-      LU-9146 ldiskfs: backport a few patches to resolve deadlock
+diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+index 083a6ff..badafb8 100644
+--- a/drivers/staging/lustre/lustre/include/obd_class.h
++++ b/drivers/staging/lustre/lustre/include/obd_class.h
+@@ -114,8 +114,8 @@ typedef int (*llog_cb_t)(const struct lu_env *, struct llog_handle *,
+ 			 struct llog_rec_hdr *, void *);
+ /* obd_config.c */
+ int class_process_config(struct lustre_cfg *lcfg);
+-int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+-			     struct lustre_cfg *lcfg, void *data);
++int class_process_attr_param(char *prefix, struct kobject *kobj,
++			     struct lustre_cfg *lcfg);
+ struct obd_device *class_incref(struct obd_device *obd,
+ 				const char *scope, const void *source);
+ void class_decref(struct obd_device *obd,
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 7b80040..192b877 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -2259,7 +2259,7 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
+ int ll_process_config(struct lustre_cfg *lcfg)
+ {
+ 	char *ptr;
+-	void *sb;
++	struct super_block *sb;
+ 	struct lprocfs_static_vars lvars;
+ 	unsigned long x;
+ 	int rc = 0;
+@@ -2273,15 +2273,15 @@ int ll_process_config(struct lustre_cfg *lcfg)
+ 	rc = kstrtoul(ptr, 16, &x);
+ 	if (rc != 0)
+ 		return -EINVAL;
+-	sb = (void *)x;
++	sb = (struct super_block *)x;
+ 	/* This better be a real Lustre superblock! */
+-	LASSERT(s2lsi((struct super_block *)sb)->lsi_lmd->lmd_magic == LMD_MAGIC);
++	LASSERT(s2lsi(sb)->lsi_lmd->lmd_magic == LMD_MAGIC);
+ 
+ 	/* Note we have not called client_common_fill_super yet, so
+ 	 * proc fns must be able to handle that!
+ 	 */
+-	rc = class_process_proc_param(PARAM_LLITE, lvars.obd_vars,
+-				      lcfg, sb);
++	rc = class_process_attr_param(PARAM_LLITE, &ll_s2sbi(sb)->ll_kobj,
++				      lcfg);
+ 	if (rc > 0)
+ 		rc = 0;
+ 	return rc;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index b3161fb..c33a327 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -926,8 +926,7 @@ int lov_process_config_base(struct obd_device *obd, struct lustre_cfg *lcfg,
+ 
+ 		lprocfs_lov_init_vars(&lvars);
+ 
+-		rc = class_process_proc_param(PARAM_LOV, lvars.obd_vars,
+-					      lcfg, obd);
++		rc = class_process_attr_param(PARAM_LOV, &obd->obd_kobj, lcfg);
+ 		if (rc > 0)
+ 			rc = 0;
+ 		goto out;
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index 6bc2fb8..00387b8 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -2670,8 +2670,7 @@ static int mdc_process_config(struct obd_device *obd, u32 len, void *buf)
+ 	lprocfs_mdc_init_vars(&lvars);
+ 	switch (lcfg->lcfg_command) {
+ 	default:
+-		rc = class_process_proc_param(PARAM_MDC, lvars.obd_vars,
+-					      lcfg, obd);
++		rc = class_process_attr_param(PARAM_MDC, &obd->obd_kobj, lcfg);
+ 		if (rc > 0)
+ 			rc = 0;
+ 		break;
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+index 8fce88f..08fd126 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+@@ -995,26 +995,42 @@ int class_process_config(struct lustre_cfg *lcfg)
+ }
+ EXPORT_SYMBOL(class_process_config);
+ 
+-int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+-			     struct lustre_cfg *lcfg, void *data)
++static int class_find_write_attr(struct kobject *kobj, char *name, int namelen,
++				 char *val, int vallen)
++{
++	struct attribute *attr;
++	struct kobj_type *kt = get_ktype(kobj);
++	int i;
++
++	/* Empty object? */
++	if (!kt || !kt->default_attrs)
++		return -ENOENT;
++
++	for (i = 0; (attr = kt->default_attrs[i]) != NULL; i++) {
++		if (!strncmp(attr->name, name, namelen) &&
++		    namelen == strlen(attr->name)) {
++			if (kt->sysfs_ops && kt->sysfs_ops->store)
++				return kt->sysfs_ops->store(kobj, attr, val,
++							    vallen);
++			return -EINVAL;
++		}
++	}
++
++	return -ENOENT;
++}
++
++int class_process_attr_param(char *prefix, struct kobject *kobj,
++			     struct lustre_cfg *lcfg)
+ {
+-	struct lprocfs_vars *var;
+-	struct file fakefile;
+-	struct seq_file fake_seqfile;
+ 	char *key, *sval;
+ 	int i, keylen, vallen;
+-	int matched = 0, j = 0;
+ 	int rc = 0;
+-	int skip = 0;
+ 
+ 	if (lcfg->lcfg_command != LCFG_PARAM) {
+ 		CERROR("Unknown command: %d\n", lcfg->lcfg_command);
+ 		return -EINVAL;
+ 	}
+ 
+-	/* fake a seq file so that var->fops->write can work... */
+-	fakefile.private_data = &fake_seqfile;
+-	fake_seqfile.private = data;
+ 	/* e.g. tunefs.lustre --param mdt.group_upcall=foo /r/tmp/lustre-mdt
+ 	 * or   lctl conf_param lustre-MDT0000.mdt.group_upcall=bar
+ 	 * or   lctl conf_param lustre-OST0000.osc.max_dirty_mb=36
+@@ -1038,39 +1054,16 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+ 		keylen = sval - key;
+ 		sval++;
+ 		vallen = strlen(sval);
+-		matched = 0;
+-		j = 0;
+-		/* Search proc entries */
+-		while (lvars[j].name) {
+-			var = &lvars[j];
+-			if (!class_match_param(key, var->name, NULL) &&
+-			    keylen == strlen(var->name)) {
+-				matched++;
+-				rc = -EROFS;
+-				if (var->fops && var->fops->write) {
+-					mm_segment_t oldfs;
+-
+-					oldfs = get_fs();
+-					set_fs(KERNEL_DS);
+-					rc = var->fops->write(&fakefile,
+-						(const char __user *)sval,
+-								vallen, NULL);
+-					set_fs(oldfs);
+-				}
+-				break;
+-			}
+-			j++;
+-		}
+-		if (!matched) {
++		rc = class_find_write_attr(kobj, key, keylen, sval, vallen);
++
++		if (rc == -ENOENT) {
+ 			CERROR("%.*s: %s unknown param %s\n",
+ 			       (int)strlen(prefix) - 1, prefix,
+ 			       (char *)lustre_cfg_string(lcfg, 0), key);
+ 			/* rc = -EINVAL;	continue parsing other params */
+-			skip++;
+ 		} else if (rc < 0) {
+-			CERROR("%s: error writing proc entry '%s': rc = %d\n",
+-			       prefix, var->name, rc);
+-			rc = 0;
++			CERROR("%s: error writing proc entry '%.*s': rc = %d\n",
++			       prefix, keylen, key, rc);
+ 		} else {
+ 			CDEBUG(D_CONFIG, "%s.%.*s: Set parameter %.*s=%s\n",
+ 			       lustre_cfg_string(lcfg, 0),
+@@ -1079,13 +1072,10 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+ 		}
+ 	}
+ 
+-	if (rc > 0)
+-		rc = 0;
+-	if (!rc && skip)
+-		rc = skip;
+-	return rc;
++	/* Even if we did not find anything to write to, keep processing */
++	return 0;
+ }
+-EXPORT_SYMBOL(class_process_proc_param);
++EXPORT_SYMBOL(class_process_attr_param);
+ 
+ /** Parse a configuration llog, doing various manipulations on them
+  * for various reasons, (modifications for compatibility, skip obsolete
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index d8aa3fb..158fb98 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -2773,8 +2773,7 @@ int osc_process_config_base(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 
+ 	switch (lcfg->lcfg_command) {
+ 	default:
+-		rc = class_process_proc_param(PARAM_OSC, lvars.obd_vars,
+-					      lcfg, obd);
++		rc = class_process_attr_param(PARAM_OSC, &obd->obd_kobj, lcfg);
+ 		if (rc > 0)
+ 			rc = 0;
+ 		break;
+-- 
+2.9.3
