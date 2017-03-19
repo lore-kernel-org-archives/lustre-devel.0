@@ -1,130 +1,242 @@
-From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 19 Mar 2017 00:41:20 -0400
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Sun, 19 Mar 2017 12:41:47 +0800
 Subject: [lustre-devel] [PATCH/RFC] staging/lustre: Rework
 	class_process_proc_param
-In-Reply-To: <20170319042939.GA32423@kroah.com>
+In-Reply-To: <20170318062408.3207381-1-green@linuxhacker.ru>
 References: <20170318062408.3207381-1-green@linuxhacker.ru>
-	<20170318103443.GA21943@kroah.com>
-	<9C67F0F2-005F-4D70-8320-9255625CB543@linuxhacker.ru>
-	<20170319042939.GA32423@kroah.com>
-Message-ID: <F99C2FC0-CBCA-4E49-803F-99EF64A26557@linuxhacker.ru>
+Message-ID: <20170319044147.GA931@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: Oleg Drokin <green@linuxhacker.ru>
 Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Al Viro <viro@ZenIV.linux.org.uk>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-
-On Mar 19, 2017, at 12:29 AM, Greg Kroah-Hartman wrote:
-
-> On Sat, Mar 18, 2017 at 11:17:55AM -0400, Oleg Drokin wrote:
->> 
->> On Mar 18, 2017, at 6:34 AM, Greg Kroah-Hartman wrote:
->> 
->>> On Sat, Mar 18, 2017 at 02:24:08AM -0400, Oleg Drokin wrote:
->>>> Ever since sysfs migration, class_process_proc_param stopped working
->>>> correctly as all the useful params were no longer present as lvars.
->>>> Replace all the nasty fake proc writes with hopefully less nasty
->>>> kobject attribute search and then update the attributes as needed.
->>>> 
->>>> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
->>>> Reported-by: Al Viro <viro@ZenIV.linux.org.uk>
->>>> ---
->>>> Al has quite rightfully complained in the past that class_process_proc_param
->>>> is a terrible piece of code and needs to go.
->>>> This patch is an attempt at improving it somewhat and in process drop
->>>> all the user/kernel address space games we needed to play to make it work
->>>> in the past (and which I suspect attracted Al's attention in the first place).
->>>> 
->>>> Now I wonder if iterating kobject attributes like that would be ok with
->>>> you Greg, or do you think there is a better way?
->>>> class_find_write_attr could be turned into something generic since it's
->>>> certainly convenient to reuse same table of name-write_method pairs,
->>>> but I did some cursory research and nobody else seems to need anything
->>>> of the sort in-tree.
->>>> 
->>>> I know ll_process_config is still awful and I will likely just
->>>> replace the current hack with kset_find_obj, but I just wanted to make
->>>> sure this new approach would be ok before spending too much time on it.
->>> 
->>> I'm not quite sure what exactly you are even trying to do here.  What is
->>> this interface?  Who calls it, and how?  What does it want to do?
->> 
->> This is a configuration client code.
->> Management server has ability to pass down config information in the form of:
->> fsname.subsystem.attribute=value to clients and other servers
->> (subsystem determines if it's something of interest of clients or servers or
->> both).
->> This could be changed in the real time - i.e. you update it on the server and
->> that gets propagated to all the clients/servers, so no need to ssh into
->> every node to manually apply those changes and worry about client restarts
->> (the config is remembered at the management server and would be applied to any
->> new nodes connecting/across server restarts and such).
->> 
->> So the way it then works then is once the string fsname.subsystem.attribute=value is delivered to the client, we find all instances of filesystem with fsname and then
->> all subsystems within it (one kobject per subsystem instance) and then update the
->> attributes to the value supplied.
->> 
->> The same filesystem might be mounted more than once and then some layers might have
->> multiple instances inside a single filesystems.
->> 
->> In the end it would turn something like lustre.osc.max_dirty_mb=128 into
->> writes to
->> /sys/fs/lustre/osc/lustre-OST0000-osc-ffff8800d75ca000/max_dirty_mb and
->> /sys/fs/lustre/osc/lustre-OST0001-osc-ffff8800d75ca000/max_dirty_mb
->> without actually iterating in sysfs namespace.
+On Sat, Mar 18, 2017 at 02:24:08AM -0400, Oleg Drokin wrote:
+> Ever since sysfs migration, class_process_proc_param stopped working
+> correctly as all the useful params were no longer present as lvars.
+> Replace all the nasty fake proc writes with hopefully less nasty
+> kobject attribute search and then update the attributes as needed.
 > 
-> Wait, who is doing the "write"?  From within the kernel?  Or some
-> userspace app?  I'm guessing from within the kernel, you are receiving
-> the data from some other transport within the filesystem and then need
-> to apply the settings?
-
-Yes, kernel code gets the notification "hey, there's a config change, come get it",
-then it requests the diff in the config and does the "write' by updating the
-attributes.
-
->> The alternative we considered is we can probably just do an upcall and have
->> a userspace tool called with the parameter verbatim and try to figure it out,
->> but that seems a lot less ideal, and also we'll get a bunch of complications from
->> containers and such too, I imagine.
+> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+> Reported-by: Al Viro <viro@ZenIV.linux.org.uk>
+> ---
+> Al has quite rightfully complained in the past that class_process_proc_param
+> is a terrible piece of code and needs to go.
+> This patch is an attempt at improving it somewhat and in process drop
+> all the user/kernel address space games we needed to play to make it work
+> in the past (and which I suspect attracted Al's attention in the first place).
 > 
-> Yeah, no, don't do an upcall, that's a mess.
+> Now I wonder if iterating kobject attributes like that would be ok with
+> you Greg, or do you think there is a better way?
+> class_find_write_attr could be turned into something generic since it's
+> certainly convenient to reuse same table of name-write_method pairs,
+> but I did some cursory research and nobody else seems to need anything
+> of the sort in-tree.
 > 
->> The function pre-this patch is assuming that all these values are part of
->> a list of procfs values (no longer true after sysfs migration) so just iterates
->> that list and calls the write for matched names (but also needs to supply a userspace
->> buffer so looks much uglier too).
+> I know ll_process_config is still awful and I will likely just
+> replace the current hack with kset_find_obj, but I just wanted to make
+> sure this new approach would be ok before spending too much time on it.
 > 
-> For kobjects, you don't need userspace buffers, so this should be
-> easier.
-
-Right, it's less of a mess due to that.
-
->> Hopefully this makes at least some sense.
+> Thanks!
 > 
-> Yes, a bit more, but ugh, what a mess :)
-
-Overall big systems are quite messy in many ways no matter what you do,
-so it's always a case of pick your poison.
-
->>> You can look up attributes for a kobject easily in the show/store
->>> functions (and some drivers just have a generic one and then you look at
->>> the string to see which attribute you are wanting to reference.)  But
->>> you seem to be working backwards here, why do you have to look up a
->>> kobject?
->> 
->> But that leads to the need to list attribute names essentially twice:
->> once for the attributes list, once in the show/set function to figure
->> out how to deal with that name.
+>  drivers/staging/lustre/lustre/include/obd_class.h  |  4 +-
+>  drivers/staging/lustre/lustre/llite/llite_lib.c    | 10 +--
+>  drivers/staging/lustre/lustre/lov/lov_obd.c        |  3 +-
+>  drivers/staging/lustre/lustre/mdc/mdc_request.c    |  3 +-
+>  .../staging/lustre/lustre/obdclass/obd_config.c    | 78 ++++++++++------------
+>  drivers/staging/lustre/lustre/osc/osc_request.c    |  3 +-
+>  6 files changed, 44 insertions(+), 57 deletions(-)
 > 
-> Yes, you don't need/want to do that.
-> 
-> Let me go review the code now with that info, thanks, it makes more
-> sense.
+> diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+> index 083a6ff..badafb8 100644
+> --- a/drivers/staging/lustre/lustre/include/obd_class.h
+> +++ b/drivers/staging/lustre/lustre/include/obd_class.h
+> @@ -114,8 +114,8 @@ typedef int (*llog_cb_t)(const struct lu_env *, struct llog_handle *,
+>  			 struct llog_rec_hdr *, void *);
+>  /* obd_config.c */
+>  int class_process_config(struct lustre_cfg *lcfg);
+> -int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+> -			     struct lustre_cfg *lcfg, void *data);
+> +int class_process_attr_param(char *prefix, struct kobject *kobj,
+> +			     struct lustre_cfg *lcfg);
 
-Thanks!
-In the end if the approach is mostly acceptable, I imagine if we just register the
-kobject for the config changes, we can do away with the individual layers calling the
-class_process_attr_param and instead have the class_process_config() call it directly
-more or less.
+As you are exporting these functions, they will need to end up with a
+lustre_* prefix eventually :)
+
+>  struct obd_device *class_incref(struct obd_device *obd,
+>  				const char *scope, const void *source);
+>  void class_decref(struct obd_device *obd,
+> diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+> index 7b80040..192b877 100644
+> --- a/drivers/staging/lustre/lustre/llite/llite_lib.c
+> +++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+> @@ -2259,7 +2259,7 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
+>  int ll_process_config(struct lustre_cfg *lcfg)
+>  {
+>  	char *ptr;
+> -	void *sb;
+> +	struct super_block *sb;
+>  	struct lprocfs_static_vars lvars;
+>  	unsigned long x;
+>  	int rc = 0;
+> @@ -2273,15 +2273,15 @@ int ll_process_config(struct lustre_cfg *lcfg)
+>  	rc = kstrtoul(ptr, 16, &x);
+>  	if (rc != 0)
+>  		return -EINVAL;
+> -	sb = (void *)x;
+> +	sb = (struct super_block *)x;
+>  	/* This better be a real Lustre superblock! */
+> -	LASSERT(s2lsi((struct super_block *)sb)->lsi_lmd->lmd_magic == LMD_MAGIC);
+> +	LASSERT(s2lsi(sb)->lsi_lmd->lmd_magic == LMD_MAGIC);
+>  
+>  	/* Note we have not called client_common_fill_super yet, so
+>  	 * proc fns must be able to handle that!
+>  	 */
+> -	rc = class_process_proc_param(PARAM_LLITE, lvars.obd_vars,
+> -				      lcfg, sb);
+> +	rc = class_process_attr_param(PARAM_LLITE, &ll_s2sbi(sb)->ll_kobj,
+> +				      lcfg);
+>  	if (rc > 0)
+>  		rc = 0;
+>  	return rc;
+> diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+> index b3161fb..c33a327 100644
+> --- a/drivers/staging/lustre/lustre/lov/lov_obd.c
+> +++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+> @@ -926,8 +926,7 @@ int lov_process_config_base(struct obd_device *obd, struct lustre_cfg *lcfg,
+>  
+>  		lprocfs_lov_init_vars(&lvars);
+>  
+> -		rc = class_process_proc_param(PARAM_LOV, lvars.obd_vars,
+> -					      lcfg, obd);
+> +		rc = class_process_attr_param(PARAM_LOV, &obd->obd_kobj, lcfg);
+>  		if (rc > 0)
+>  			rc = 0;
+>  		goto out;
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> index 6bc2fb8..00387b8 100644
+> --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> @@ -2670,8 +2670,7 @@ static int mdc_process_config(struct obd_device *obd, u32 len, void *buf)
+>  	lprocfs_mdc_init_vars(&lvars);
+>  	switch (lcfg->lcfg_command) {
+>  	default:
+> -		rc = class_process_proc_param(PARAM_MDC, lvars.obd_vars,
+> -					      lcfg, obd);
+> +		rc = class_process_attr_param(PARAM_MDC, &obd->obd_kobj, lcfg);
+>  		if (rc > 0)
+>  			rc = 0;
+>  		break;
+> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+> index 8fce88f..08fd126 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+> @@ -995,26 +995,42 @@ int class_process_config(struct lustre_cfg *lcfg)
+>  }
+>  EXPORT_SYMBOL(class_process_config);
+>  
+> -int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+> -			     struct lustre_cfg *lcfg, void *data)
+> +static int class_find_write_attr(struct kobject *kobj, char *name, int namelen,
+> +				 char *val, int vallen)
+> +{
+> +	struct attribute *attr;
+> +	struct kobj_type *kt = get_ktype(kobj);
+> +	int i;
+> +
+> +	/* Empty object? */
+> +	if (!kt || !kt->default_attrs)
+> +		return -ENOENT;
+> +
+> +	for (i = 0; (attr = kt->default_attrs[i]) != NULL; i++) {
+> +		if (!strncmp(attr->name, name, namelen) &&
+> +		    namelen == strlen(attr->name)) {
+
+Why do you care about namelen?  Why can't you just do a "normal"
+strcmp()?  Is this "untrusted" user data?
+
+> +			if (kt->sysfs_ops && kt->sysfs_ops->store)
+> +				return kt->sysfs_ops->store(kobj, attr, val,
+> +							    vallen);
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +	return -ENOENT;
+> +}
+> +
+> +int class_process_attr_param(char *prefix, struct kobject *kobj,
+> +			     struct lustre_cfg *lcfg)
+>  {
+> -	struct lprocfs_vars *var;
+> -	struct file fakefile;
+> -	struct seq_file fake_seqfile;
+>  	char *key, *sval;
+>  	int i, keylen, vallen;
+> -	int matched = 0, j = 0;
+>  	int rc = 0;
+> -	int skip = 0;
+>  
+>  	if (lcfg->lcfg_command != LCFG_PARAM) {
+>  		CERROR("Unknown command: %d\n", lcfg->lcfg_command);
+>  		return -EINVAL;
+>  	}
+>  
+> -	/* fake a seq file so that var->fops->write can work... */
+> -	fakefile.private_data = &fake_seqfile;
+> -	fake_seqfile.private = data;
+>  	/* e.g. tunefs.lustre --param mdt.group_upcall=foo /r/tmp/lustre-mdt
+>  	 * or   lctl conf_param lustre-MDT0000.mdt.group_upcall=bar
+>  	 * or   lctl conf_param lustre-OST0000.osc.max_dirty_mb=36
+> @@ -1038,39 +1054,16 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+>  		keylen = sval - key;
+>  		sval++;
+>  		vallen = strlen(sval);
+> -		matched = 0;
+> -		j = 0;
+> -		/* Search proc entries */
+> -		while (lvars[j].name) {
+> -			var = &lvars[j];
+> -			if (!class_match_param(key, var->name, NULL) &&
+> -			    keylen == strlen(var->name)) {
+> -				matched++;
+> -				rc = -EROFS;
+> -				if (var->fops && var->fops->write) {
+> -					mm_segment_t oldfs;
+> -
+> -					oldfs = get_fs();
+> -					set_fs(KERNEL_DS);
+> -					rc = var->fops->write(&fakefile,
+> -						(const char __user *)sval,
+> -								vallen, NULL);
+> -					set_fs(oldfs);
+> -				}
+> -				break;
+> -			}
+> -			j++;
+> -		}
+> -		if (!matched) {
+> +		rc = class_find_write_attr(kobj, key, keylen, sval, vallen);
+> +
+> +		if (rc == -ENOENT) {
+>  			CERROR("%.*s: %s unknown param %s\n",
+>  			       (int)strlen(prefix) - 1, prefix,
+>  			       (char *)lustre_cfg_string(lcfg, 0), key);
+>  			/* rc = -EINVAL;	continue parsing other params */
+> -			skip++;
+>  		} else if (rc < 0) {
+> -			CERROR("%s: error writing proc entry '%s': rc = %d\n",
+> -			       prefix, var->name, rc);
+> -			rc = 0;
+> +			CERROR("%s: error writing proc entry '%.*s': rc = %d\n",
+> +			       prefix, keylen, key, rc);
+
+It's not a "proc" entry anymore :)
+
+Other than that minor issue, and the question about namelen, this looks
+semi-sane to me.  Want to resend this as a non-rfc patch?
+
+thanks,
+
+greg k-h
