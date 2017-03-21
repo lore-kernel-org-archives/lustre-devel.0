@@ -1,110 +1,235 @@
 From: Yan Li <yanli@ascar.io>
-Date: Tue, 21 Mar 2017 12:43:32 -0700
-Subject: [lustre-devel] [PATCH 5/6] Throttle the outgoing requests according
-	to tau
+Date: Tue, 21 Mar 2017 12:43:30 -0700
+Subject: [lustre-devel] [PATCH 3/6] RLQOS main data structure
 In-Reply-To: <cover.1490122510.git.yanli@ascar.io>
 References: <cover.1490122510.git.yanli@ascar.io>
-Message-ID: <613cd7339035952e7f4dce3aa9f3db9e8bb52c92.1490122510.git.yanli@ascar.io>
+Message-ID: <ce3d46d05f2b5c89cfcc3c4ffcfa106ac180ab09.1490122510.git.yanli@ascar.io>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Each client_obd maintains a qos data structure.
+
 Signed-off-by: Yan Li <yanli@ascar.io>
 ---
- lustre/osc/osc_cache.c    |  3 +++
- lustre/osc/osc_internal.h | 66 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 69 insertions(+)
+ lustre/include/obd.h     |   8 +++
+ lustre/include/rlqos.h   | 136 +++++++++++++++++++++++++++++++++++++++++++++++
+ lustre/obdclass/genops.c |  25 +++++++++
+ 3 files changed, 169 insertions(+)
+ create mode 100644 lustre/include/rlqos.h
 
-diff --git a/lustre/osc/osc_cache.c b/lustre/osc/osc_cache.c
-index 236263c..2f9d4e1 100644
---- a/lustre/osc/osc_cache.c
-+++ b/lustre/osc/osc_cache.c
-@@ -2316,6 +2316,9 @@ static int osc_io_unplug0(const struct lu_env *env, struct client_obd *cli,
- 	} else {
- 		CDEBUG(D_CACHE, "Queue writeback work for client %p.\n", cli);
- 		LASSERT(cli->cl_writeback_work != NULL);
+diff --git a/lustre/include/obd.h b/lustre/include/obd.h
+index b4ee379..726493c 100644
+--- a/lustre/include/obd.h
++++ b/lustre/include/obd.h
+@@ -50,6 +50,9 @@
+ #include <lustre_intent.h>
+ #include <lvfs.h>
+ #include <lustre_quota.h>
 +#ifdef ENABLE_RLQOS
-+		qos_throttle(&cli->qos);
++# include "rlqos.h"
 +#endif
- 		rc = ptlrpcd_queue_work(cli->cl_writeback_work);
- 	}
- 	return rc;
-diff --git a/lustre/osc/osc_internal.h b/lustre/osc/osc_internal.h
-index 06c21b3..d31d5ba 100644
---- a/lustre/osc/osc_internal.h
-+++ b/lustre/osc/osc_internal.h
-@@ -245,4 +245,70 @@ extern unsigned long osc_cache_shrink_count(struct shrinker *sk,
- extern unsigned long osc_cache_shrink_scan(struct shrinker *sk,
- 					   struct shrink_control *sc);
  
+ #define MAX_OBD_DEVICES 8192
+ 
+@@ -331,6 +334,11 @@ struct client_obd {
+ 	void			*cl_lru_work;
+ 	/* hash tables for osc_quota_info */
+ 	struct cfs_hash		*cl_quota_hash[LL_MAXQUOTAS];
++
 +#ifdef ENABLE_RLQOS
-+static inline void qos_throttle(struct qos_data_t *qos)
++	/* rate-limiting quality of service data */
++	struct qos_data_t	qos;
++#endif
+ };
+ #define obd2cli_tgt(obd) ((char *)(obd)->u.cli.cl_target_uuid.uuid)
+ 
+diff --git a/lustre/include/rlqos.h b/lustre/include/rlqos.h
+new file mode 100644
+index 0000000..d8e012b
+--- /dev/null
++++ b/lustre/include/rlqos.h
+@@ -0,0 +1,136 @@
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
++ *
++ * Please contact Storage Systems Research Center, Computer Science Department,
++ * University of California, Santa Cruz (www.ssrc.ucsc.edu) if you need
++ * additional information or have any questions.
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2013-2017, University of California, Santa Cruz, CA, USA.
++ * All rights reserved.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ * Lustre is a trademark of Sun Microsystems, Inc.
++ *
++ * lustre/include/rlqos.h
++ */
++
++#ifndef _RLQOS_H
++#define _RLQOS_H
++
++/* We work with kernel only */
++#ifdef __KERNEL__
++# include <linux/types.h>
++# include <linux/time.h>
++# include <asm/param.h>
++# include <libcfs/libcfs.h>
++# include <linux/delay.h>
++#else /* __KERNEL__ */
++# define HZ 100
++# define ONE_MILLION 1000000
++# include <liblustre.h>
++#endif
++
++#define EWMA_ALPHA_INV (8)
++
++/**
++ * For tracking the exponentially-weighted moving average of a timeval. Note
++ * that we can't do float point div in kernel, so actually we are tracking
++ * ea = ewma * alpha. You should divide ea with alpha to get the real ewma.
++ */
++struct time_ewma {
++	__u64          alpha_inv;
++	__u64          ea;
++	struct timeval last_time;
++};
++/* We can't do float point div, so we are tracking
++ * ea = ewma * alpha = ewma / alpha_inv
++ */
++
++struct qos_rule_t {
++	__u64 ack_ewma_lower;
++	__u64 ack_ewma_upper;
++	__u64 send_ewma_lower;
++	__u64 send_ewma_upper;
++	unsigned int rtt_ratio100_lower;
++	unsigned int rtt_ratio100_upper;
++	int m100;
++	int b100;
++	unsigned int tau;
++	int used_times;
++
++	__u64 ack_ewma_avg;
++	__u64 send_ewma_avg;
++	unsigned int rtt_ratio100_avg;
++};
++
++struct qos_data_t {
++	spinlock_t       lock;
++        struct time_ewma ack_ewma;
++        struct time_ewma sent_ewma;
++        int              rtt_ratio100;
++        long             smallest_rtt;
++        int              max_rpc_in_flight100;
++        struct timeval   last_mrif_update_time;
++        int              min_gap_between_updating_mrif;
++        int              rule_no;
++        /* Following fields are for calculating I/O bandwidth,
++         * 0 for read, 1 for write */
++        long             last_req_sec[2];       /* second of last request we received */
++        __u64            tp_last_sec[2];        /* throughput of last sec */
++        __u64            sum_bytes_this_sec[2]; /* cumulative bytes read within this sec */
++        /* For throttling support */
++        unsigned int     min_usec_between_rpcs;
++        struct timeval   last_rpc_time;
++        struct qos_rule_t *rules;
++};
++
++static inline __u64 qos_get_ewma_usec(const struct time_ewma *ewma) {
++	return ewma->ea / ewma->alpha_inv;
++}
++
++int parse_qos_rules(const char *buf, struct qos_data_t *qos);
++
++/* Lock of qos must be held. op == 0 for read, 1 for write */
++static inline void calc_throughput(struct qos_data_t *qos, int op, int bytes_transferred)
 +{
 +	struct timeval now;
-+	long           usec_since_last_rpc;
-+	long           need_sleep_usec = 0;
 +
-+	spin_lock(&qos->lock);
-+	if (0 == qos->min_usec_between_rpcs)
-+		goto out;
++	if (op != 0 && op != 1)
++		return;
 +
 +	do_gettimeofday(&now);
-+	usec_since_last_rpc = cfs_timeval_sub(&now, &qos->last_rpc_time, NULL);
-+	if (usec_since_last_rpc < 0) {
-+		usec_since_last_rpc = 0;
++	if (likely(now.tv_sec == qos->last_req_sec[op])) {
++		qos->sum_bytes_this_sec[op] += bytes_transferred;
++	} else if (likely(now.tv_sec == qos->last_req_sec[op] + 1)) {
++		qos->tp_last_sec[op] = qos->sum_bytes_this_sec[op];
++		qos->last_req_sec[op] = now.tv_sec;
++		qos->sum_bytes_this_sec[op] = bytes_transferred;
++	} else if (likely(now.tv_sec > qos->last_req_sec[op] + 1)) {
++		qos->tp_last_sec[op] = 0;
++		qos->last_req_sec[op] = now.tv_sec;
++		qos->sum_bytes_this_sec[op] = bytes_transferred;
 +	}
-+	if (usec_since_last_rpc < qos->min_usec_between_rpcs) {
-+		need_sleep_usec = qos->min_usec_between_rpcs - usec_since_last_rpc;
-+	}
-+	qos->last_rpc_time = now;
-+out:
-+	spin_unlock(&qos->lock);
-+	if (0 == need_sleep_usec) {
-+		return;
-+	}
-+
-+	/* About timer ranges:
-+	   Ref: https://www.kernel.org/doc/Documentation/timers/timers-howto.txt */
-+	if (need_sleep_usec < 1000) {
-+		udelay(need_sleep_usec);
-+	} else if (need_sleep_usec < 20000) {
-+		usleep_range(need_sleep_usec - 1, need_sleep_usec);
-+	} else {
-+		msleep(need_sleep_usec / 1000);
-+	}
++	/* Ignore cases when now.tv_sec < qos->last_req_sec */
 +}
-+#endif /* ENABLE_RLQOS */
 +
-+/* You must call LPROCFS_CLIMP_CHECK() on the obd device before and
-+ * LPROCFS_CLIMP_EXIT() after calling this function. They are not called inside
-+ * this function, because they may return an error code.
-+ */
-+static inline void set_max_rpcs_in_flight(int val, struct client_obd *cli)
++#endif /* _RLQOS_H */
+diff --git a/lustre/obdclass/genops.c b/lustre/obdclass/genops.c
+index a48f887..417c612 100644
+--- a/lustre/obdclass/genops.c
++++ b/lustre/obdclass/genops.c
+@@ -284,6 +284,28 @@ int class_unregister_type(const char *name)
+ } /* class_unregister_type */
+ EXPORT_SYMBOL(class_unregister_type);
+ 
++#ifdef ENABLE_RLQOS
++static void init_time_ewma(struct time_ewma *ewma)
 +{
-+	int adding, added, req_count;
++	ewma->alpha_inv = 8;
++	ewma->ea = 0;
++	ewma->last_time.tv_sec = 0;
++	ewma->last_time.tv_usec = 0;
++}
 +
-+	adding = val - cli->cl_max_rpcs_in_flight;
-+	req_count = atomic_read(&osc_pool_req_count);
-+	if (adding > 0 && req_count < osc_reqpool_maxreqcount) {
-+		/*
-+		 * There might be some race which will cause over-limit
-+		 * allocation, but it is fine.
-+		 */
-+		if (req_count + adding > osc_reqpool_maxreqcount)
-+			adding = osc_reqpool_maxreqcount - req_count;
++static void init_qos(struct client_obd *cli)
++{
++	struct qos_data_t *qos = &cli->qos;
 +
-+		added = osc_rq_pool->prp_populate(osc_rq_pool, adding);
-+		atomic_add(added, &osc_pool_req_count);
-+	}
++	init_time_ewma(&qos->ack_ewma);
++	init_time_ewma(&qos->sent_ewma);
 +
 +	spin_lock(&cli->cl_loi_list_lock);
-+	cli->cl_max_rpcs_in_flight = val;
-+	client_adjust_max_dirty(cli);
++	qos->max_rpc_in_flight100 = cli->cl_max_rpcs_in_flight * 100;
 +	spin_unlock(&cli->cl_loi_list_lock);
 +}
++#endif
 +
- #endif /* OSC_INTERNAL_H */
+ /**
+  * Create a new obd device.
+  *
+@@ -349,6 +371,9 @@ struct obd_device *class_newdev(const char *type_name, const char *name)
+                         result->obd_type = type;
+                         strncpy(result->obd_name, name,
+                                 sizeof(result->obd_name) - 1);
++#ifdef ENABLE_RLQOS
++                        init_qos(&result->u.cli);
++#endif
+                         obd_devs[i] = result;
+                 }
+         }
 -- 
 1.8.3.1
