@@ -1,102 +1,110 @@
 From: Yan Li <yanli@ascar.io>
-Date: Tue, 21 Mar 2017 12:43:29 -0700
-Subject: [lustre-devel] [PATCH 2/6] Added fields to message for RLQOS support
+Date: Tue, 21 Mar 2017 12:43:32 -0700
+Subject: [lustre-devel] [PATCH 5/6] Throttle the outgoing requests according
+	to tau
 In-Reply-To: <cover.1490122510.git.yanli@ascar.io>
 References: <cover.1490122510.git.yanli@ascar.io>
-Message-ID: <28c79a11bf7df97be1d3355b83c55a4ceea177bc.1490122510.git.yanli@ascar.io>
+Message-ID: <613cd7339035952e7f4dce3aa9f3db9e8bb52c92.1490122510.git.yanli@ascar.io>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Modified the request message to embed sent_time, which will be
-returned from the server and used to calculate the exponentially
-weighted moving average of sent_time gap in return messages. It is
-used as a metric for rate-limiting quality of service.
-
 Signed-off-by: Yan Li <yanli@ascar.io>
 ---
- lustre/include/lustre/lustre_idl.h | 4 ++++
- lustre/ptlrpc/pack_generic.c       | 5 +++++
- lustre/ptlrpc/wiretest.c           | 2 ++
- lustre/utils/wiretest.c            | 2 ++
- 4 files changed, 13 insertions(+)
+ lustre/osc/osc_cache.c    |  3 +++
+ lustre/osc/osc_internal.h | 66 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+)
 
-diff --git a/lustre/include/lustre/lustre_idl.h b/lustre/include/lustre/lustre_idl.h
-index bf23a47..7a200d1 100644
---- a/lustre/include/lustre/lustre_idl.h
-+++ b/lustre/include/lustre/lustre_idl.h
-@@ -3336,8 +3336,12 @@ struct obdo {
- 						 * each stripe.
- 						 * brw: grant space consumed on
- 						 * the client for the write */
+diff --git a/lustre/osc/osc_cache.c b/lustre/osc/osc_cache.c
+index 236263c..2f9d4e1 100644
+--- a/lustre/osc/osc_cache.c
++++ b/lustre/osc/osc_cache.c
+@@ -2316,6 +2316,9 @@ static int osc_io_unplug0(const struct lu_env *env, struct client_obd *cli,
+ 	} else {
+ 		CDEBUG(D_CACHE, "Queue writeback work for client %p.\n", cli);
+ 		LASSERT(cli->cl_writeback_work != NULL);
 +#ifdef ENABLE_RLQOS
-+	struct timeval		o_sent_time;	/* timeval is 64x2 bits on Linux */
-+#else
- 	__u64			o_padding_4;
- 	__u64			o_padding_5;
++		qos_throttle(&cli->qos);
 +#endif
- 	__u64			o_padding_6;
- };
+ 		rc = ptlrpcd_queue_work(cli->cl_writeback_work);
+ 	}
+ 	return rc;
+diff --git a/lustre/osc/osc_internal.h b/lustre/osc/osc_internal.h
+index 06c21b3..d31d5ba 100644
+--- a/lustre/osc/osc_internal.h
++++ b/lustre/osc/osc_internal.h
+@@ -245,4 +245,70 @@ extern unsigned long osc_cache_shrink_count(struct shrinker *sk,
+ extern unsigned long osc_cache_shrink_scan(struct shrinker *sk,
+ 					   struct shrink_control *sc);
  
-diff --git a/lustre/ptlrpc/pack_generic.c b/lustre/ptlrpc/pack_generic.c
-index 8df8ea8..d0bc87a 100644
---- a/lustre/ptlrpc/pack_generic.c
-+++ b/lustre/ptlrpc/pack_generic.c
-@@ -1722,8 +1722,13 @@ void lustre_swab_obdo (struct obdo  *o)
-         __swab32s (&o->o_uid_h);
-         __swab32s (&o->o_gid_h);
-         __swab64s (&o->o_data_version);
 +#ifdef ENABLE_RLQOS
-+        __swab64s ((__u64*)&o->o_sent_time.tv_sec);
-+        __swab64s ((__u64*)&o->o_sent_time.tv_usec);
-+#else
-         CLASSERT(offsetof(typeof(*o), o_padding_4) != 0);
-         CLASSERT(offsetof(typeof(*o), o_padding_5) != 0);
-+#endif
-         CLASSERT(offsetof(typeof(*o), o_padding_6) != 0);
- 
- }
-diff --git a/lustre/ptlrpc/wiretest.c b/lustre/ptlrpc/wiretest.c
-index 070ef91..0c909a6 100644
---- a/lustre/ptlrpc/wiretest.c
-+++ b/lustre/ptlrpc/wiretest.c
-@@ -1314,6 +1314,7 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct obdo, o_data_version));
- 	LASSERTF((int)sizeof(((struct obdo *)0)->o_data_version) == 8, "found %lld\n",
- 		 (long long)(int)sizeof(((struct obdo *)0)->o_data_version));
-+#ifndef ENABLE_RLQOS
- 	LASSERTF((int)offsetof(struct obdo, o_padding_4) == 184, "found %lld\n",
- 		 (long long)(int)offsetof(struct obdo, o_padding_4));
- 	LASSERTF((int)sizeof(((struct obdo *)0)->o_padding_4) == 8, "found %lld\n",
-@@ -1322,6 +1323,7 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct obdo, o_padding_5));
- 	LASSERTF((int)sizeof(((struct obdo *)0)->o_padding_5) == 8, "found %lld\n",
- 		 (long long)(int)sizeof(((struct obdo *)0)->o_padding_5));
-+#endif
- 	LASSERTF((int)offsetof(struct obdo, o_padding_6) == 200, "found %lld\n",
- 		 (long long)(int)offsetof(struct obdo, o_padding_6));
- 	LASSERTF((int)sizeof(((struct obdo *)0)->o_padding_6) == 8, "found %lld\n",
-diff --git a/lustre/utils/wiretest.c b/lustre/utils/wiretest.c
-index 233d7d8..47fbbf0 100644
---- a/lustre/utils/wiretest.c
-+++ b/lustre/utils/wiretest.c
-@@ -1329,6 +1329,7 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct obdo, o_data_version));
- 	LASSERTF((int)sizeof(((struct obdo *)0)->o_data_version) == 8, "found %lld\n",
- 		 (long long)(int)sizeof(((struct obdo *)0)->o_data_version));
-+#ifndef ENABLE_RLQOS
- 	LASSERTF((int)offsetof(struct obdo, o_padding_4) == 184, "found %lld\n",
- 		 (long long)(int)offsetof(struct obdo, o_padding_4));
- 	LASSERTF((int)sizeof(((struct obdo *)0)->o_padding_4) == 8, "found %lld\n",
-@@ -1337,6 +1338,7 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct obdo, o_padding_5));
- 	LASSERTF((int)sizeof(((struct obdo *)0)->o_padding_5) == 8, "found %lld\n",
- 		 (long long)(int)sizeof(((struct obdo *)0)->o_padding_5));
-+#endif
- 	LASSERTF((int)offsetof(struct obdo, o_padding_6) == 200, "found %lld\n",
- 		 (long long)(int)offsetof(struct obdo, o_padding_6));
- 	LASSERTF((int)sizeof(((struct obdo *)0)->o_padding_6) == 8, "found %lld\n",
++static inline void qos_throttle(struct qos_data_t *qos)
++{
++	struct timeval now;
++	long           usec_since_last_rpc;
++	long           need_sleep_usec = 0;
++
++	spin_lock(&qos->lock);
++	if (0 == qos->min_usec_between_rpcs)
++		goto out;
++
++	do_gettimeofday(&now);
++	usec_since_last_rpc = cfs_timeval_sub(&now, &qos->last_rpc_time, NULL);
++	if (usec_since_last_rpc < 0) {
++		usec_since_last_rpc = 0;
++	}
++	if (usec_since_last_rpc < qos->min_usec_between_rpcs) {
++		need_sleep_usec = qos->min_usec_between_rpcs - usec_since_last_rpc;
++	}
++	qos->last_rpc_time = now;
++out:
++	spin_unlock(&qos->lock);
++	if (0 == need_sleep_usec) {
++		return;
++	}
++
++	/* About timer ranges:
++	   Ref: https://www.kernel.org/doc/Documentation/timers/timers-howto.txt */
++	if (need_sleep_usec < 1000) {
++		udelay(need_sleep_usec);
++	} else if (need_sleep_usec < 20000) {
++		usleep_range(need_sleep_usec - 1, need_sleep_usec);
++	} else {
++		msleep(need_sleep_usec / 1000);
++	}
++}
++#endif /* ENABLE_RLQOS */
++
++/* You must call LPROCFS_CLIMP_CHECK() on the obd device before and
++ * LPROCFS_CLIMP_EXIT() after calling this function. They are not called inside
++ * this function, because they may return an error code.
++ */
++static inline void set_max_rpcs_in_flight(int val, struct client_obd *cli)
++{
++	int adding, added, req_count;
++
++	adding = val - cli->cl_max_rpcs_in_flight;
++	req_count = atomic_read(&osc_pool_req_count);
++	if (adding > 0 && req_count < osc_reqpool_maxreqcount) {
++		/*
++		 * There might be some race which will cause over-limit
++		 * allocation, but it is fine.
++		 */
++		if (req_count + adding > osc_reqpool_maxreqcount)
++			adding = osc_reqpool_maxreqcount - req_count;
++
++		added = osc_rq_pool->prp_populate(osc_rq_pool, adding);
++		atomic_add(added, &osc_pool_req_count);
++	}
++
++	spin_lock(&cli->cl_loi_list_lock);
++	cli->cl_max_rpcs_in_flight = val;
++	client_adjust_max_dirty(cli);
++	spin_unlock(&cli->cl_loi_list_lock);
++}
++
+ #endif /* OSC_INTERNAL_H */
 -- 
 1.8.3.1
