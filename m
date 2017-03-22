@@ -1,97 +1,70 @@
-From: Ben Evans <bevans@cray.com>
-Date: Tue, 21 Mar 2017 20:09:26 +0000
-Subject: [lustre-devel] [PATCH 1/6] Autoconf option for rate-limiting
- Quality of Service (RLQOS)
-In-Reply-To: <99fe8fdaaaa5b6fd36c0782269bc45a580079696.1490122510.git.yanli@ascar.io>
-References: <cover.1490122510.git.yanli@ascar.io>
-	<99fe8fdaaaa5b6fd36c0782269bc45a580079696.1490122510.git.yanli@ascar.io>
-Message-ID: <D4F6FF83.CB29%jevans@cray.com>
+From: Julia Lawall <julia.lawall@lip6.fr>
+Date: Wed, 22 Mar 2017 11:23:27 +0100 (CET)
+Subject: [lustre-devel] [Outreachy kernel] [PATCH] staging: media:
+ Replace a bit shift by a use of BIT.
+In-Reply-To: <20170322042028.GA22848@arushi-HP-Pavilion-Notebook>
+References: <20170322042028.GA22848@arushi-HP-Pavilion-Notebook>
+Message-ID: <alpine.DEB.2.20.1703221122150.3413@hadrien>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Arushi Singhal <arushisinghal19971997@gmail.com>
+Cc: oleg.drokin@intel.com, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, outreachy-kernel@googlegroups.com
 
-I would remove the #ifdef ENABLE_RLQOS blocks, especially in lustre_idl.h
-since you're proposing to add new fields and consume some of the padding
-bits.  It will cause a lot of headache for the next feature that comes
-along and consumes some of those bits.
 
--Ben Evans
 
-On 3/21/17, 3:43 PM, "lustre-devel on behalf of Yan Li"
-<lustre-devel-bounces at lists.lustre.org on behalf of yanli@ascar.io> wrote:
+On Wed, 22 Mar 2017, Arushi Singhal wrote:
 
->This patch enables rate-limiting quality of service (RLQOS) support as
->talked in the ASCAR paper [1]. The purpose of RLQOS is to provide a
->client-side rate limiting mechanism that controls max_rpcs_in_flight
->and minimal gap between brw RPC requests (called tau in the code and
->paper).
+> This patch replaces bit shifting on 1 with the BIT(x) macro.
+> This was done with coccinelle:
+> @@
+> constant c;
+> @@
 >
->RLQOS can be enabled by passing --enable-rlqos to configure. It then
->can be controlled by tunables in procfs of each osc.
+> -1 << c
+> +BIT(c)
 >
->[1] http://storageconference.us/2015/Papers/14.Li.pdf
+> Signed-off-by: Arushi Singhal <arushisinghal19971997@gmail.com>
+> ---
+>  drivers/staging/octeon/ethernet-tx.c | 4 ++--
+
+What is the connection to media?  You also seem to have picked up the
+Lustre maintainers, who are not relevant.
+
+julia
+
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
->Signed-off-by: Yan Li <yanli@ascar.io>
->---
-> lustre/autoconf/lustre-core.m4 | 17 +++++++++++++++++
-> lustre/include/Makefile.am     |  3 ++-
-> 2 files changed, 19 insertions(+), 1 deletion(-)
+> diff --git a/drivers/staging/octeon/ethernet-tx.c b/drivers/staging/octeon/ethernet-tx.c
+> index ff4119e8de42..f00186ac4e27 100644
+> --- a/drivers/staging/octeon/ethernet-tx.c
+> +++ b/drivers/staging/octeon/ethernet-tx.c
+> @@ -381,7 +381,7 @@ int cvm_oct_xmit(struct sk_buff *skb, struct net_device *dev)
+>  	    (ip_hdr(skb)->version == 4) &&
+>  	    (ip_hdr(skb)->ihl == 5) &&
+>  	    ((ip_hdr(skb)->frag_off == 0) ||
+> -	     (ip_hdr(skb)->frag_off == htons(1 << 14))) &&
+> +	     (ip_hdr(skb)->frag_off == htons(BIT(14)))) &&
+>  	    ((ip_hdr(skb)->protocol == IPPROTO_TCP) ||
+>  	     (ip_hdr(skb)->protocol == IPPROTO_UDP))) {
+>  		/* Use hardware checksum calc */
+> @@ -613,7 +613,7 @@ int cvm_oct_xmit_pow(struct sk_buff *skb, struct net_device *dev)
+>  #endif
+>  		work->word2.s.is_frag = !((ip_hdr(skb)->frag_off == 0) ||
+>  					  (ip_hdr(skb)->frag_off ==
+> -					      1 << 14));
+> +					      BIT(14)));
+>  #if 0
+>  		/* Assume Linux is sending a good packet */
+>  		work->word2.s.IP_exc = 0;
+> --
+> 2.11.0
 >
->diff --git a/lustre/autoconf/lustre-core.m4
->b/lustre/autoconf/lustre-core.m4
->index 0578325..7f1828e 100644
->--- a/lustre/autoconf/lustre-core.m4
->+++ b/lustre/autoconf/lustre-core.m4
->@@ -369,6 +369,22 @@ AC_COMPILE_IFELSE([AC_LANG_SOURCE([
-> AC_MSG_RESULT([$enable_ssk])
-> ]) # LC_OPENSSL_SSK
-> 
->+#
->+# LC_CONFIG_RLQOS
->+#
->+# Rate-limiting Quality of Service support
->+#
->+AC_DEFUN([LC_CONFIG_RLQOS], [
->+AC_MSG_CHECKING([whether to enable rate-limiting quality of service
->support])
->+AC_ARG_ENABLE([rlqos],
->+	AC_HELP_STRING([--enable-rlqos],
->+		[enable rate-limiting quality of service support]),
->+	[], [enable_rlqos="no"])
->+AC_MSG_RESULT([$enable_rlqos])
->+AS_IF([test "x$enable_rlqos" != xno],
->+	[AC_DEFINE(ENABLE_RLQOS, 1, [enable rate-limiting quality of service
->support])])
->+]) # LC_CONFIG_RLQOS
->+
-> # LC_INODE_PERMISION_2ARGS
-> #
-> # up to v2.6.27 had a 3 arg version (inode, mask, nameidata)
->@@ -2241,6 +2257,7 @@ AC_DEFUN([LC_PROG_LINUX], [
-> 	LC_GLIBC_SUPPORT_FHANDLES
-> 	LC_CONFIG_GSS
-> 	LC_OPENSSL_SSK
->+	LC_CONFIG_RLQOS
-> 
-> 	# 2.6.32
-> 	LC_BLK_QUEUE_MAX_SEGMENTS
->diff --git a/lustre/include/Makefile.am b/lustre/include/Makefile.am
->index 9074ca4..6d72b6e 100644
->--- a/lustre/include/Makefile.am
->+++ b/lustre/include/Makefile.am
->@@ -98,4 +98,5 @@ EXTRA_DIST = \
-> 	upcall_cache.h \
-> 	lustre_kernelcomm.h \
-> 	seq_range.h \
->-	uapi_kernelcomm.h
->+	uapi_kernelcomm.h \
->+	rlqos.h
->-- 
->1.8.3.1
+> --
+> You received this message because you are subscribed to the Google Groups "outreachy-kernel" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to outreachy-kernel+unsubscribe at googlegroups.com.
+> To post to this group, send email to outreachy-kernel at googlegroups.com.
+> To view this discussion on the web visit https://groups.google.com/d/msgid/outreachy-kernel/20170322042028.GA22848%40arushi-HP-Pavilion-Notebook.
+> For more options, visit https://groups.google.com/d/optout.
 >
->_______________________________________________
->lustre-devel mailing list
->lustre-devel at lists.lustre.org
->http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
