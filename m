@@ -1,15 +1,30 @@
-From: Andreas Dilger <adilger@dilger.ca>
-Date: Sun, 26 Mar 2017 19:12:28 -0600
-Subject: [lustre-devel] [RFC] Proposal to add a new mount option
-	'norootwrite'
-In-Reply-To: <a03b58c7-e160-c55c-36f5-d0537f8d8987@nasa.gov>
+From: Prout, Andrew - LLSC - MITLL <aprout@ll.mit.edu>
+Date: Mon, 27 Mar 2017 16:37:42 +0000
+Subject: [lustre-devel] [RFC] Proposal to add a new mount
+	option	'norootwrite'
+In-Reply-To: <6682A67D-F0FB-4B0A-9D05-64AA4DC6686F@dilger.ca>
 References: <a03b58c7-e160-c55c-36f5-d0537f8d8987@nasa.gov>
-Message-ID: <6682A67D-F0FB-4B0A-9D05-64AA4DC6686F@dilger.ca>
+	<6682A67D-F0FB-4B0A-9D05-64AA4DC6686F@dilger.ca>
+Message-ID: <A1D2656179935142A626741E9FA1CF6F3610938F@LLE2K10-MBX01.mitll.ad.local>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Is the proposal essentially equivalent to dropping CAP_DAC_OVERRIDE (while keeping CAP_DAC_READ_SEARCH) on filesystems mounted with this option? Would root still have the ability to perform the actions covered by CAP_CHOWN, CAP_FOWNER, CAP_SETFCAP, or CAP_FSETID?
+
+Andrew Prout
+Lincoln Laboratory Supercomputing Center
+MIT Lincoln Laboratory
+244 Wood Street, Lexington, MA 02421
+
+-----Original Message-----
+From: lustre-devel [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Andreas Dilger
+Sent: Sunday, March 26, 2017 9:12 PM
+To: Jay Lan
+Cc: lustre-devel at lists.lustre.org List
+Subject: Re: [lustre-devel] [RFC] Proposal to add a new mount option 'norootwrite'
 
 [Limit discussion to lustre-devel, since this is Lustre-specific]
 
@@ -60,15 +75,3 @@ Cheers, Andreas
 
 
 Cheers, Andreas
-
-
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 195 bytes
-Desc: Message signed with OpenPGP
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170326/b69e2ff7/attachment.pgp>
