@@ -1,40 +1,66 @@
-From: Greg KH <greg@kroah.com>
-Date: Wed, 29 Mar 2017 09:33:20 +0200
-Subject: [lustre-devel] [PATCH] Clear sparse warning: different address
-	space
-In-Reply-To: <20170325030503.31675-1-kedrot@gmail.com>
-References: <20170325030503.31675-1-kedrot@gmail.com>
-Message-ID: <20170329073320.GD8459@kroah.com>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Wed, 29 Mar 2017 12:34:05 +0200
+Subject: [lustre-devel] [PATCH] staging: lusten: conrpc.c: fix different
+ address space sparse warning
+In-Reply-To: <20170323190901.GA22066@builder>
+References: <20170329021409.24537-1-marcos.souza.org@gmail.com>
+	<20170329073114.GA8459@kroah.com> <20170323190901.GA22066@builder>
+Message-ID: <20170329103405.GA4087@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Marcos Paulo de Souza <marcos.souza.org@gmail.com>
+Cc: devel@driverdev.osuosl.org, Doug Oucharek <doug.s.oucharek@intel.com>, linux-kernel@vger.kernel.org, Oleg Drokin <oleg.drokin@intel.com>, Al Viro <viro@zeniv.linux.org.uk>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org
 
-On Sat, Mar 25, 2017 at 12:05:03AM -0300, Guillermo O. Freschi wrote:
-> Made tagged `index` as `__user` to remove warning from
-> `obd_iocontrol` call.
-
-Your subject line is odd, please make it match other changes for this
-driver.
-
-> Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
-> ---
->  drivers/staging/lustre/lustre/llite/dir.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, Mar 23, 2017 at 04:09:03PM -0300, Marcos Paulo de Souza wrote:
+> On Wed, Mar 29, 2017 at 09:31:14AM +0200, Greg KH wrote:
+> > On Tue, Mar 28, 2017 at 11:14:06PM -0300, Marcos Paulo de Souza wrote:
+> > > head_up parameter is marked with __user attribute, tmp is filled
+> > > by a copy_from_user from next, that is also marked as __user, so
+> > > tmp.next needs to be "casted" as __user to make sparse happy.
+> > 
+> > But is it the correct change?
 > 
-> diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-> index 13b35922a4ca..acdde21d41d9 100644
-> --- a/drivers/staging/lustre/lustre/llite/dir.c
-> +++ b/drivers/staging/lustre/lustre/llite/dir.c
-> @@ -1464,7 +1464,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
->  	case LL_IOC_FID2MDTIDX: {
->  		struct obd_export *exp = ll_i2mdexp(inode);
->  		struct lu_fid fid;
-> -		__u32 index;
-> +		__u32 __user index;
+> I don't know, it's my first sparse patch, so I tried to fix this
+> warning.
+> 
+> > 
+> > You also have a typo in your subject :(
+> 
+> Sorry, didn't noticed yesterday :(
+> 
+> > 
+> > > Signed-off-by: Marcos Paulo de Souza <marcos.souza.org@gmail.com>
+> > > ---
+> > > 
+> > >  this is mt first patch addressing an issue of sparse, so let me know
+> > >  if I misunderstood the error message
+> > > 
+> > >  drivers/staging/lustre/lnet/selftest/conrpc.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
+> > > index c6a683b..fb7ad74 100644
+> > > --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
+> > > +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
+> > > @@ -487,7 +487,7 @@ lstcon_rpc_trans_interpreter(struct lstcon_rpc_trans *trans,
+> > >  				   sizeof(struct list_head)))
+> > >  			return -EFAULT;
+> > >  
+> > > -		if (tmp.next == head_up)
+> > > +		if ((struct list_head __user *)tmp.next == head_up)
+> > 
+> > Aer you sure this is correct?  __user changes for lustre is not
+> > trivial...
+> > 
+> > How did you test this?
+> 
+> I didn't tested, it just removed the warning. Is this a false positive?
 
-Are you sure?  How did you test this?
+I don't know, it's up to you to prove to me that you know this change is
+correct.  You have to justify your changes, and "because checkpatch.pl
+complained" isn't a valid justification for something like this :)
 
 thanks,
 
