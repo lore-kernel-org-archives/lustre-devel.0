@@ -1,67 +1,36 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Wed, 29 Mar 2017 12:34:05 +0200
-Subject: [lustre-devel] [PATCH] staging: lusten: conrpc.c: fix different
- address space sparse warning
-In-Reply-To: <20170323190901.GA22066@builder>
-References: <20170329021409.24537-1-marcos.souza.org@gmail.com>
-	<20170329073114.GA8459@kroah.com> <20170323190901.GA22066@builder>
-Message-ID: <20170329103405.GA4087@kroah.com>
+From: Jan Kara <jack@suse.cz>
+Date: Wed, 29 Mar 2017 12:55:58 +0200
+Subject: [lustre-devel] [PATCH 0/25 v2] fs: Convert all embedded bdis into
+	separate ones
+Message-ID: <20170329105623.18241-1-jack@suse.cz>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Marcos Paulo de Souza <marcos.souza.org@gmail.com>
-Cc: devel@driverdev.osuosl.org, Doug Oucharek <doug.s.oucharek@intel.com>, linux-kernel@vger.kernel.org, Oleg Drokin <oleg.drokin@intel.com>, Al Viro <viro@zeniv.linux.org.uk>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org
+To: linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org
+Cc: Christoph Hellwig <hch-wEGCiKHe2LqWVfeAwA7xHQ@public.gmane.org>, linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, linux-nilfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, ecryptfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, codalist-/uMB558Y47wP4a1z8dhFYw@public.gmane.org, linux-block-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, cluster-devel-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, linux-mtd-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org, osd-dev-yNzVSZO3znNg9hUCZPvPmw@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Petr Vandrovec <petr-vPk2MGR0e28uaRcfnNAh7A@public.gmane.org>, linux-afs-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org, linux-btrfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
 
-On Thu, Mar 23, 2017 at 04:09:03PM -0300, Marcos Paulo de Souza wrote:
-> On Wed, Mar 29, 2017 at 09:31:14AM +0200, Greg KH wrote:
-> > On Tue, Mar 28, 2017 at 11:14:06PM -0300, Marcos Paulo de Souza wrote:
-> > > head_up parameter is marked with __user attribute, tmp is filled
-> > > by a copy_from_user from next, that is also marked as __user, so
-> > > tmp.next needs to be "casted" as __user to make sparse happy.
-> > 
-> > But is it the correct change?
-> 
-> I don't know, it's my first sparse patch, so I tried to fix this
-> warning.
-> 
-> > 
-> > You also have a typo in your subject :(
-> 
-> Sorry, didn't noticed yesterday :(
-> 
-> > 
-> > > Signed-off-by: Marcos Paulo de Souza <marcos.souza.org@gmail.com>
-> > > ---
-> > > 
-> > >  this is mt first patch addressing an issue of sparse, so let me know
-> > >  if I misunderstood the error message
-> > > 
-> > >  drivers/staging/lustre/lnet/selftest/conrpc.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-> > > index c6a683b..fb7ad74 100644
-> > > --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-> > > +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-> > > @@ -487,7 +487,7 @@ lstcon_rpc_trans_interpreter(struct lstcon_rpc_trans *trans,
-> > >  				   sizeof(struct list_head)))
-> > >  			return -EFAULT;
-> > >  
-> > > -		if (tmp.next == head_up)
-> > > +		if ((struct list_head __user *)tmp.next == head_up)
-> > 
-> > Aer you sure this is correct?  __user changes for lustre is not
-> > trivial...
-> > 
-> > How did you test this?
-> 
-> I didn't tested, it just removed the warning. Is this a false positive?
+Hello,
 
-I don't know, it's up to you to prove to me that you know this change is
-correct.  You have to justify your changes, and "because checkpatch.pl
-complained" isn't a valid justification for something like this :)
+this is the second revision of the patch series which converts all embedded
+occurences of struct backing_dev_info to use standalone dynamically allocated
+structures. This makes bdi handling unified across all bdi users and generally
+removes some boilerplate code from filesystems setting up their own bdi. It
+also allows us to remove some code from generic bdi implementation.
 
-thanks,
+The patches were only compile-tested for most filesystems (I've tested
+mounting only for NFS & btrfs) so fs maintainers please have a look whether
+the changes look sound to you.
 
-greg k-h
+This series is based on top of bdi fixes that were merged into linux-block
+git tree into for-next branch. I have pushed out the result as a branch to
+
+git://git.kernel.org/pub/scm/linux/kernel/git/jack/linux-fs.git bdi
+
+Changes since v1:
+* Added some acks
+* Added further FUSE cleanup patch
+* Added removal of unused argument to bdi_register()
+* Fixed up some compilation failures spotted by 0-day testing
+
+								Honza
