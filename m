@@ -1,77 +1,174 @@
-From: Prout, Andrew - LLSC - MITLL <aprout@ll.mit.edu>
-Date: Mon, 27 Mar 2017 16:37:42 +0000
-Subject: [lustre-devel] [RFC] Proposal to add a new mount
-	option	'norootwrite'
-In-Reply-To: <6682A67D-F0FB-4B0A-9D05-64AA4DC6686F@dilger.ca>
-References: <a03b58c7-e160-c55c-36f5-d0537f8d8987@nasa.gov>
-	<6682A67D-F0FB-4B0A-9D05-64AA4DC6686F@dilger.ca>
-Message-ID: <A1D2656179935142A626741E9FA1CF6F3610938F@LLE2K10-MBX01.mitll.ad.local>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Tue, 28 Mar 2017 23:24:14 -0400
+Subject: [lustre-devel] [PATCH 1/1] Staging: lustre: lnet: libcfs: Fixed
+	checkpatch.pl coding style errors
+In-Reply-To: <1490695812-20475-1-git-send-email-vaibhavddit@gmail.com>
+References: <1490695812-20475-1-git-send-email-vaibhavddit@gmail.com>
+Message-ID: <5E15E74D-877E-4551-B9C2-57DDC77A8E26@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Is the proposal essentially equivalent to dropping CAP_DAC_OVERRIDE (while keeping CAP_DAC_READ_SEARCH) on filesystems mounted with this option? Would root still have the ability to perform the actions covered by CAP_CHOWN, CAP_FOWNER, CAP_SETFCAP, or CAP_FSETID?
 
-Andrew Prout
-Lincoln Laboratory Supercomputing Center
-MIT Lincoln Laboratory
-244 Wood Street, Lexington, MA 02421
+On Mar 28, 2017, at 6:10 AM, <vaibhavddit@gmail.com> <vaibhavddit@gmail.com> wrote:
 
------Original Message-----
-From: lustre-devel [mailto:lustre-devel-bounces at lists.lustre.org] On Behalf Of Andreas Dilger
-Sent: Sunday, March 26, 2017 9:12 PM
-To: Jay Lan
-Cc: lustre-devel at lists.lustre.org List
-Subject: Re: [lustre-devel] [RFC] Proposal to add a new mount option 'norootwrite'
+> From: Vaibhav Kothari <vaibhavddit@gmail.com>
+> 
+> Shifted open brace { to previous line for 8 functions as indicated by
+> checkpatch.pl
+> 
+> Signed-off-by: Vaibhav Kothari <vaibhavddit@gmail.com>
+> ---
+> drivers/staging/lustre/lnet/libcfs/hash.c | 43 +++++++++++--------------------
+> 1 file changed, 15 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lnet/libcfs/hash.c b/drivers/staging/lustre/lnet/libcfs/hash.c
+> index 5c2ce2e..bb966e2 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/hash.c
+> +++ b/drivers/staging/lustre/lnet/libcfs/hash.c
+> @@ -1348,8 +1348,7 @@ void cfs_hash_putref(struct cfs_hash *hs)
+> EXPORT_SYMBOL(cfs_hash_lookup);
+> 
+> static void
+> -cfs_hash_for_each_enter(struct cfs_hash *hs)
+> -{
+> +cfs_hash_for_each_enter(struct cfs_hash *hs) {
 
-[Limit discussion to lustre-devel, since this is Lustre-specific]
-
-On Mar 23, 2017, at 5:25 PM, Jay Lan <jay.j.lan@nasa.gov> wrote:
-> NASA Ames manages a large collection of tightly integrated Linux based systems. 100's of server nodes for Lustre, 10's of NFS servers, and >10,000 compute nodes and 10's of other role specifics systems, many of which mount several different network based filesystems. Some of these filesystems are far too large to effectively backup (e.g. >20PB), because of cost or data turnover rates. Being Linux, there are many interrelated scripts and configuration management tools running with root level privileges on all of the systems.
-> 
-> There are significant risks associated with user data loss caused by unintended root write privilege. Some of these scenarios include:
-> 1) admin typing incorrect command, or in the wrong window
-> 2) errant root script
-> 3) system configuration management tools (e.g. bcfg2), running in ways or on systems that remove data as part of configuration management.
-> 
-> Over the years, we have been bitten by all of these. A recent event with bcfg2 has motivated us to develop a mechanism to protect against this class of problems. Specifically, against root removing user data on network mounted filesystems.
-> 
-> After discussing internally, we find that there are a large number of our systems where root should not be able to unlink remotely mounted files, but root does need to be able to scan directories and read files. Root squash to nobody does not meet the needs we have in managing systems, which includes administrators debugging complex large scale problems across multiple systems.
-> 
-> We developed prototype code in the VFS layer that effectively prevents root from writing or updating directories or files on network mounted filesystems, as a mount option, called norootwrite. This can then be individually configured for each filesystem we want to protect. This has been developed/tested on NFS, Lustre and a locally mounted ext3 filesystem.
-> 
-> Some consideration was also given to potentially limit a client mount privileged by developing an /etc/exports like permission to prevent certain hosts or ip ranges from mounting without norootwrite, but this quickly ramped up the implementation complexity, so we rejected that.
-> This is considered a weakness. Specifically, a remote system could unintentionally mount without norootwrite and then remove user data. I think a complete implementation should include this.
-
-Note that this sounds like something that could be implemented fairly easily
-in the Lustre "nodemap" infrastructure that IU developed for UID/GID mapping
-and landed in the Lustre 2.9 release.  Nodemap is useful for other server-side
-enforcement mechanisms, such as root squash, and I suspect it wouldn't be hard
-to add in a check to only disallow unlink by root users.  That would avoid the
-need to even mount clients with "-o norootwrite" at all - it would be a policy
-implemented on the MDS by the admin, regardless of whether the client machine
-was configured this way or not.  It would still be possible to whitelist some
-client machines to allow root unlinking of files if needed.
-
-Cheers, Andreas
-
-> Features of Norootwrite in our prototype are
-> 1. You need to enable norootwrite option for it to work. 'Rootwrite' is the default.
-> 
-> 2. With 'norootwrite' enabled, root is treated like a normal user on write permission.
-> 
-> 3. The norootwrite option can be added to /etc/fstab entries.
-> 
-> 4. It can also be enabled/disabled on the fly via 'mount -o remount' specifying norootwrite or rootwrite.
-> 
-> In addition to a kernel patch, mount commands need to be taught to understand this new mount option: /bin/mount, /sbin/mount.nfs, and /sbin/mount.lustre.
-> 
-> The prototype was developed in SLES11 SP4. I am working on a version for SLES12 SP2 for more testing. Obviously, we don't want to carry these patches indefinitely and are looking for guidance from the community on whether something like this could land mainline or be changed in some way to be more acceptable than the current form.
-> 
-> Comments are very appreciated. A kernel patch against the latest upstream kernel release will be posted here after we concluded testing.
-> 
+Ugh, no.
+This is obviously a false positive in checkpatch.
 
 
-Cheers, Andreas
+> 	LASSERT(!cfs_hash_is_exiting(hs));
+> 
+> 	if (!cfs_hash_with_rehash(hs))
+> @@ -1375,8 +1374,7 @@ void cfs_hash_putref(struct cfs_hash *hs)
+> }
+> 
+> static void
+> -cfs_hash_for_each_exit(struct cfs_hash *hs)
+> -{
+> +cfs_hash_for_each_exit(struct cfs_hash *hs) {
+> 	int remained;
+> 	int bits;
+> 
+> @@ -1407,8 +1405,7 @@ void cfs_hash_putref(struct cfs_hash *hs)
+>  */
+> static u64
+> cfs_hash_for_each_tight(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+> -			void *data, int remove_safe)
+> -{
+> +			void *data, int remove_safe) {
+> 	struct hlist_node *hnode;
+> 	struct hlist_node *pos;
+> 	struct cfs_hash_bd bd;
+> @@ -1465,8 +1462,7 @@ struct cfs_hash_cond_arg {
+> 
+> static int
+> cfs_hash_cond_del_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+> -			 struct hlist_node *hnode, void *data)
+> -{
+> +			 struct hlist_node *hnode, void *data) {
+> 	struct cfs_hash_cond_arg *cond = data;
+> 
+> 	if (cond->func(cfs_hash_object(hs, hnode), cond->arg))
+> @@ -1480,8 +1476,8 @@ struct cfs_hash_cond_arg {
+>  * any object be reference.
+>  */
+> void
+> -cfs_hash_cond_del(struct cfs_hash *hs, cfs_hash_cond_opt_cb_t func, void *data)
+> -{
+> +cfs_hash_cond_del(struct cfs_hash *hs, cfs_hash_cond_opt_cb_t func,
+> +		void *data) {
+> 	struct cfs_hash_cond_arg arg = {
+> 		.func	= func,
+> 		.arg	= data,
+> @@ -1493,31 +1489,27 @@ struct cfs_hash_cond_arg {
+> 
+> void
+> cfs_hash_for_each(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+> -		  void *data)
+> -{
+> +		  void *data) {
+> 	cfs_hash_for_each_tight(hs, func, data, 0);
+> }
+> EXPORT_SYMBOL(cfs_hash_for_each);
+> 
+> void
+> cfs_hash_for_each_safe(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+> -		       void *data)
+> -{
+> +		       void *data) {
+> 	cfs_hash_for_each_tight(hs, func, data, 1);
+> }
+> EXPORT_SYMBOL(cfs_hash_for_each_safe);
+> 
+> static int
+> cfs_hash_peek(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+> -	      struct hlist_node *hnode, void *data)
+> -{
+> +	      struct hlist_node *hnode, void *data) {
+> 	*(int *)data = 0;
+> 	return 1; /* return 1 to break the loop */
+> }
+> 
+> int
+> -cfs_hash_is_empty(struct cfs_hash *hs)
+> -{
+> +cfs_hash_is_empty(struct cfs_hash *hs) {
+> 	int empty = 1;
+> 
+> 	cfs_hash_for_each_tight(hs, cfs_hash_peek, &empty, 0);
+> @@ -1526,8 +1518,7 @@ struct cfs_hash_cond_arg {
+> EXPORT_SYMBOL(cfs_hash_is_empty);
+> 
+> u64
+> -cfs_hash_size_get(struct cfs_hash *hs)
+> -{
+> +cfs_hash_size_get(struct cfs_hash *hs) {
+> 	return cfs_hash_with_counter(hs) ?
+> 	       atomic_read(&hs->hs_count) :
+> 	       cfs_hash_for_each_tight(hs, NULL, NULL, 0);
+> @@ -1551,8 +1542,7 @@ struct cfs_hash_cond_arg {
+>  */
+> static int
+> cfs_hash_for_each_relax(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+> -			void *data, int start)
+> -{
+> +			void *data, int start) {
+> 	struct hlist_node *hnode;
+> 	struct hlist_node *tmp;
+> 	struct cfs_hash_bd bd;
+> @@ -1629,8 +1619,7 @@ struct cfs_hash_cond_arg {
+> 
+> int
+> cfs_hash_for_each_nolock(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+> -			 void *data, int start)
+> -{
+> +			 void *data, int start) {
+> 	if (cfs_hash_with_no_lock(hs) ||
+> 	    cfs_hash_with_rehash_key(hs) ||
+> 	    !cfs_hash_with_no_itemref(hs))
+> @@ -1661,8 +1650,7 @@ struct cfs_hash_cond_arg {
+>  */
+> int
+> cfs_hash_for_each_empty(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+> -			void *data)
+> -{
+> +			void *data) {
+> 	unsigned int i = 0;
+> 
+> 	if (cfs_hash_with_no_lock(hs))
+> @@ -1718,8 +1706,7 @@ struct cfs_hash_cond_arg {
+>  */
+> void
+> cfs_hash_for_each_key(struct cfs_hash *hs, const void *key,
+> -		      cfs_hash_for_each_cb_t func, void *data)
+> -{
+> +		      cfs_hash_for_each_cb_t func, void *data) {
+> 	struct hlist_node *hnode;
+> 	struct cfs_hash_bd bds[2];
+> 	unsigned int i;
+> -- 
+> 1.9.1
