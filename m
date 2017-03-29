@@ -1,145 +1,107 @@
 From: Jan Kara <jack@suse.cz>
-Date: Wed, 29 Mar 2017 12:56:02 +0200
-Subject: [lustre-devel] [PATCH 04/25] fs: Provide infrastructure for dynamic
-	BDIs in filesystems
+Date: Wed, 29 Mar 2017 12:56:04 +0200
+Subject: [lustre-devel] [PATCH 06/25] lustre: Convert to separately
+	allocated bdi
 In-Reply-To: <20170329105623.18241-1-jack@suse.cz>
 References: <20170329105623.18241-1-jack@suse.cz>
-Message-ID: <20170329105623.18241-5-jack@suse.cz>
+Message-ID: <20170329105623.18241-7-jack@suse.cz>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: linux-fsdevel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org
-Cc: Christoph Hellwig <hch-wEGCiKHe2LqWVfeAwA7xHQ@public.gmane.org>, linux-nfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, linux-nilfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Jan Kara <jack-AlSwsSmVLrQ@public.gmane.org>, linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, ecryptfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, codalist-/uMB558Y47wP4a1z8dhFYw@public.gmane.org, linux-block-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, cluster-devel-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org, linux-mtd-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org, osd-dev-yNzVSZO3znNg9hUCZPvPmw@public.gmane.org, v9fs-developer-5NWGOfrQmneRv+LV9MX5uipxlwaOVQ5f@public.gmane.org, ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Petr Vandrovec <petr-vPk2MGR0e28uaRcfnNAh7A@public.gmane.org>, linux-afs-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org, linux-btrfs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, lustre-devel-aLEFhgZF4x6X6Mz3xDxJMA@public.gmane.org
+To: linux-fsdevel@vger.kernel.org
+Cc: linux-block@vger.kernel.org, Christoph Hellwig <hch@infradead.org>, Jan Kara <jack@suse.cz>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, lustre-devel@lists.lustre.org
 
-Provide helper functions for setting up dynamically allocated
-backing_dev_info structures for filesystems and cleaning them up on
-superblock destruction.
+Allocate struct backing_dev_info separately instead of embedding it
+inside superblock. This unifies handling of bdi among users.
 
-CC: linux-mtd at lists.infradead.org
-CC: linux-nfs at vger.kernel.org
-CC: Petr Vandrovec <petr@vandrovec.name>
-CC: linux-nilfs at vger.kernel.org
-CC: cluster-devel at redhat.com
-CC: osd-dev at open-osd.org
-CC: codalist at coda.cs.cmu.edu
-CC: linux-afs at lists.infradead.org
-CC: ecryptfs at vger.kernel.org
-CC: linux-cifs at vger.kernel.org
-CC: ceph-devel at vger.kernel.org
-CC: linux-btrfs at vger.kernel.org
-CC: v9fs-developer at lists.sourceforge.net
+CC: Oleg Drokin <oleg.drokin@intel.com>
+CC: Andreas Dilger <andreas.dilger@intel.com>
+CC: James Simmons <jsimmons@infradead.org>
 CC: lustre-devel at lists.lustre.org
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: Jan Kara <jack@suse.cz>
 ---
- fs/super.c                       | 49 ++++++++++++++++++++++++++++++++++++++++
- include/linux/backing-dev-defs.h |  2 +-
- include/linux/fs.h               |  6 +++++
- 3 files changed, 56 insertions(+), 1 deletion(-)
+ .../staging/lustre/lustre/include/lustre_disk.h    |  4 ----
+ drivers/staging/lustre/lustre/llite/llite_lib.c    | 24 +++-------------------
+ 2 files changed, 3 insertions(+), 25 deletions(-)
 
-diff --git a/fs/super.c b/fs/super.c
-index b8b6a086c03b..0f51a437c269 100644
---- a/fs/super.c
-+++ b/fs/super.c
-@@ -446,6 +446,11 @@ void generic_shutdown_super(struct super_block *sb)
- 	hlist_del_init(&sb->s_instances);
- 	spin_unlock(&sb_lock);
- 	up_write(&sb->s_umount);
-+	if (sb->s_iflags & SB_I_DYNBDI) {
-+		bdi_put(sb->s_bdi);
-+		sb->s_bdi = &noop_backing_dev_info;
-+		sb->s_iflags &= ~SB_I_DYNBDI;
-+	}
+diff --git a/drivers/staging/lustre/lustre/include/lustre_disk.h b/drivers/staging/lustre/lustre/include/lustre_disk.h
+index 8886458748c1..a676bccabd43 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_disk.h
++++ b/drivers/staging/lustre/lustre/include/lustre_disk.h
+@@ -133,13 +133,9 @@ struct lustre_sb_info {
+ 	struct obd_export	 *lsi_osd_exp;
+ 	char			  lsi_osd_type[16];
+ 	char			  lsi_fstype[16];
+-	struct backing_dev_info   lsi_bdi;     /* each client mountpoint needs
+-						* own backing_dev_info
+-						*/
+ };
+ 
+ #define LSI_UMOUNT_FAILOVER	      0x00200000
+-#define LSI_BDI_INITIALIZED	      0x00400000
+ 
+ #define     s2lsi(sb)	((struct lustre_sb_info *)((sb)->s_fs_info))
+ #define     s2lsi_nocast(sb) ((sb)->s_fs_info)
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index b229cbc7bb33..d483c44aafe5 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -863,15 +863,6 @@ void ll_lli_init(struct ll_inode_info *lli)
+ 	mutex_init(&lli->lli_layout_mutex);
  }
  
- EXPORT_SYMBOL(generic_shutdown_super);
-@@ -1256,6 +1261,50 @@ mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
- }
+-static inline int ll_bdi_register(struct backing_dev_info *bdi)
+-{
+-	static atomic_t ll_bdi_num = ATOMIC_INIT(0);
+-
+-	bdi->name = "lustre";
+-	return bdi_register(bdi, NULL, "lustre-%d",
+-			    atomic_inc_return(&ll_bdi_num));
+-}
+-
+ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
+ {
+ 	struct lustre_profile *lprof = NULL;
+@@ -881,6 +872,7 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
+ 	char  *profilenm = get_profile_name(sb);
+ 	struct config_llog_instance *cfg;
+ 	int    err;
++	static atomic_t ll_bdi_num = ATOMIC_INIT(0);
  
- /*
-+ * Setup private BDI for given superblock. It gets automatically cleaned up
-+ * in generic_shutdown_super().
-+ */
-+int super_setup_bdi_name(struct super_block *sb, char *fmt, ...)
-+{
-+	struct backing_dev_info *bdi;
-+	int err;
-+	va_list args;
-+
-+	bdi = bdi_alloc(GFP_KERNEL);
-+	if (!bdi)
-+		return -ENOMEM;
-+
-+	bdi->name = sb->s_type->name;
-+
-+	va_start(args, fmt);
-+	err = bdi_register_va(bdi, NULL, fmt, args);
-+	va_end(args);
-+	if (err) {
-+		bdi_put(bdi);
-+		return err;
-+	}
-+	WARN_ON(sb->s_bdi != &noop_backing_dev_info);
-+	sb->s_bdi = bdi;
-+	sb->s_iflags |= SB_I_DYNBDI;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(super_setup_bdi_name);
-+
-+/*
-+ * Setup private BDI for given superblock. I gets automatically cleaned up
-+ * in generic_shutdown_super().
-+ */
-+int super_setup_bdi(struct super_block *sb)
-+{
-+	static atomic_long_t bdi_seq = ATOMIC_LONG_INIT(0);
-+
-+	return super_setup_bdi_name(sb, "%.28s-%ld", sb->s_type->name,
-+				    atomic_long_inc_return(&bdi_seq));
-+}
-+EXPORT_SYMBOL(super_setup_bdi);
-+
-+/*
-  * This is an internal function, please use sb_end_{write,pagefault,intwrite}
-  * instead.
-  */
-diff --git a/include/linux/backing-dev-defs.h b/include/linux/backing-dev-defs.h
-index e66d4722db8e..866c433e7d32 100644
---- a/include/linux/backing-dev-defs.h
-+++ b/include/linux/backing-dev-defs.h
-@@ -146,7 +146,7 @@ struct backing_dev_info {
- 	congested_fn *congested_fn; /* Function pointer if device is md/dm */
- 	void *congested_data;	/* Pointer to aux data for congested func */
+ 	CDEBUG(D_VFSTRACE, "VFS Op: sb %p\n", sb);
  
--	char *name;
-+	const char *name;
+@@ -903,16 +895,11 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
+ 	if (err)
+ 		goto out_free;
  
- 	struct kref refcnt;	/* Reference counter for the structure */
- 	unsigned int capabilities; /* Device capabilities */
-diff --git a/include/linux/fs.h b/include/linux/fs.h
-index 7251f7bb45e8..98cf14ea78c0 100644
---- a/include/linux/fs.h
-+++ b/include/linux/fs.h
-@@ -1272,6 +1272,9 @@ struct mm_struct;
- /* sb->s_iflags to limit user namespace mounts */
- #define SB_I_USERNS_VISIBLE		0x00000010 /* fstype already mounted */
+-	err = bdi_init(&lsi->lsi_bdi);
+-	if (err)
+-		goto out_free;
+-	lsi->lsi_flags |= LSI_BDI_INITIALIZED;
+-	lsi->lsi_bdi.capabilities = 0;
+-	err = ll_bdi_register(&lsi->lsi_bdi);
++	err = super_setup_bdi_name(sb, "lustre-%d",
++				   atomic_inc_return(&ll_bdi_num));
+ 	if (err)
+ 		goto out_free;
  
-+/* Temporary flag until all filesystems are converted to dynamic bdis */
-+#define SB_I_DYNBDI	0x00000100
-+
- /* Possible states of 'frozen' field */
- enum {
- 	SB_UNFROZEN = 0,		/* FS is unfrozen */
-@@ -2121,6 +2124,9 @@ extern int vfs_ustat(dev_t, struct kstatfs *);
- extern int freeze_super(struct super_block *super);
- extern int thaw_super(struct super_block *super);
- extern bool our_mnt(struct vfsmount *mnt);
-+extern __printf(2, 3)
-+int super_setup_bdi_name(struct super_block *sb, char *fmt, ...);
-+extern int super_setup_bdi(struct super_block *sb);
+-	sb->s_bdi = &lsi->lsi_bdi;
+ 	/* kernel >= 2.6.38 store dentry operations in sb->s_d_op. */
+ 	sb->s_d_op = &ll_d_ops;
  
- extern int current_umask(void);
+@@ -1033,11 +1020,6 @@ void ll_put_super(struct super_block *sb)
+ 	if (profilenm)
+ 		class_del_profile(profilenm);
+ 
+-	if (lsi->lsi_flags & LSI_BDI_INITIALIZED) {
+-		bdi_destroy(&lsi->lsi_bdi);
+-		lsi->lsi_flags &= ~LSI_BDI_INITIALIZED;
+-	}
+-
+ 	ll_free_sbi(sb);
+ 	lsi->lsi_llsbi = NULL;
  
 -- 
 2.10.2
