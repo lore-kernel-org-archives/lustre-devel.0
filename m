@@ -1,174 +1,122 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Tue, 28 Mar 2017 23:24:14 -0400
-Subject: [lustre-devel] [PATCH 1/1] Staging: lustre: lnet: libcfs: Fixed
-	checkpatch.pl coding style errors
-In-Reply-To: <1490695812-20475-1-git-send-email-vaibhavddit@gmail.com>
-References: <1490695812-20475-1-git-send-email-vaibhavddit@gmail.com>
-Message-ID: <5E15E74D-877E-4551-B9C2-57DDC77A8E26@intel.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Wed, 29 Mar 2017 05:05:07 +0000
+Subject: [lustre-devel] [PATCH] Remove sparse warnings in mdc_request.c
+In-Reply-To: <58d9f73a.09c3620a.d471b.d171@mx.google.com>
+References: <58d9f73a.09c3620a.d471b.d171@mx.google.com>
+Message-ID: <1592C3AC-DE8B-4A11-8053-02B82A61E1B3@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-
-On Mar 28, 2017, at 6:10 AM, <vaibhavddit@gmail.com> <vaibhavddit@gmail.com> wrote:
-
-> From: Vaibhav Kothari <vaibhavddit@gmail.com>
+On Mar 27, 2017, at 23:40, Skanda Guruanand <skanda.kashyap@gmail.com> wrote:
 > 
-> Shifted open brace { to previous line for 8 functions as indicated by
-> checkpatch.pl
+> I have tried to fix the endian issues in the mdc_request.c in the
+> lustre file system drivers in the staging area. Your feedback is
+> welcome.
+
+Sorry, but this patch is totally wrong.  This would break the handling of this structure
+on big-endian systems.
+
+The right fix would be to change the declaration of ldp_hash_start and ldp_hash_end from
+__u64 to __le64, along with ldp_flags and ldp_pad0 (though it should be unused).
+
+Cheers, Andreas
+
+> CHECK   drivers/staging/lustre/lustre/mdc/mdc_request.c
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:958:42: warning: cast
+> to restricted __le64
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:959:42: warning: cast
+> to restricted __le64
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:962:42: warning: cast
+> to restricted __le64
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:963:42: warning: cast
+> to restricted __le64
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:985:50: warning: cast
+> to restricted __le32
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:1193:24: warning: cast
+> to restricted __le64
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:1328:25: warning: cast
+> to restricted __le64
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:1329:23: warning: cast
+> to restricted __le64
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:1332:25: warning: cast
+> to restricted __le64
+> drivers/staging/lustre/lustre/mdc/mdc_request.c:1333:23: warning: cast
+> to restricted __le64
 > 
-> Signed-off-by: Vaibhav Kothari <vaibhavddit@gmail.com>
 > ---
-> drivers/staging/lustre/lnet/libcfs/hash.c | 43 +++++++++++--------------------
-> 1 file changed, 15 insertions(+), 28 deletions(-)
+> drivers/staging/lustre/lustre/mdc/mdc_request.c | 20 ++++++++++----------
+> 1 file changed, 10 insertions(+), 10 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/libcfs/hash.c b/drivers/staging/lustre/lnet/libcfs/hash.c
-> index 5c2ce2e..bb966e2 100644
-> --- a/drivers/staging/lustre/lnet/libcfs/hash.c
-> +++ b/drivers/staging/lustre/lnet/libcfs/hash.c
-> @@ -1348,8 +1348,7 @@ void cfs_hash_putref(struct cfs_hash *hs)
-> EXPORT_SYMBOL(cfs_hash_lookup);
-> 
-> static void
-> -cfs_hash_for_each_enter(struct cfs_hash *hs)
-> -{
-> +cfs_hash_for_each_enter(struct cfs_hash *hs) {
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> index 6bc2fb8..aa8837c 100644
+> --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> @@ -955,12 +955,12 @@ static struct page *mdc_page_locate(struct address_space *mapping, __u64 *hash,
+> 		if (PageUptodate(page)) {
+> 			dp = kmap(page);
+> 			if (BITS_PER_LONG == 32 && hash64) {
+> -				*start = le64_to_cpu(dp->ldp_hash_start) >> 32;
+> -				*end   = le64_to_cpu(dp->ldp_hash_end) >> 32;
+> +				*start = dp->ldp_hash_start >> 32;
+> +				*end   = dp->ldp_hash_end >> 32;
+> 				*hash  = *hash >> 32;
+> 			} else {
+> -				*start = le64_to_cpu(dp->ldp_hash_start);
+> -				*end   = le64_to_cpu(dp->ldp_hash_end);
+> +				*start = dp->ldp_hash_start;
+> +				*end   = dp->ldp_hash_end;
+> 			}
+> 			if (unlikely(*start == 1 && *hash == 0))
+> 				*hash = *start;
+> @@ -982,7 +982,7 @@ static struct page *mdc_page_locate(struct address_space *mapping, __u64 *hash,
+> 				 */
+> 				kunmap(page);
+> 				mdc_release_page(page,
+> -						 le32_to_cpu(dp->ldp_flags) & LDF_COLLIDE);
+> +						 dp->ldp_flags & LDF_COLLIDE);
 
-Ugh, no.
-This is obviously a false positive in checkpatch.
+Note that it would also be acceptable to use "cpu_to_le32(LDF_COLLIDE)" here, since swabbing
+a constant is a compile-time operation, while swabbing a variable adds runtime overhead on
+big-endian systems.
 
-
-> 	LASSERT(!cfs_hash_is_exiting(hs));
+> 				page = NULL;
+> 			}
+> 		} else {
+> @@ -1190,7 +1190,7 @@ static int mdc_read_page_remote(void *data, struct page *page0)
+> 		SetPageUptodate(page);
 > 
-> 	if (!cfs_hash_with_rehash(hs))
-> @@ -1375,8 +1374,7 @@ void cfs_hash_putref(struct cfs_hash *hs)
-> }
+> 		dp = kmap(page);
+> -		hash = le64_to_cpu(dp->ldp_hash_start);
+> +		hash = dp->ldp_hash_start;
+> 		kunmap(page);
 > 
-> static void
-> -cfs_hash_for_each_exit(struct cfs_hash *hs)
-> -{
-> +cfs_hash_for_each_exit(struct cfs_hash *hs) {
-> 	int remained;
-> 	int bits;
-> 
-> @@ -1407,8 +1405,7 @@ void cfs_hash_putref(struct cfs_hash *hs)
->  */
-> static u64
-> cfs_hash_for_each_tight(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-> -			void *data, int remove_safe)
-> -{
-> +			void *data, int remove_safe) {
-> 	struct hlist_node *hnode;
-> 	struct hlist_node *pos;
-> 	struct cfs_hash_bd bd;
-> @@ -1465,8 +1462,7 @@ struct cfs_hash_cond_arg {
-> 
-> static int
-> cfs_hash_cond_del_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
-> -			 struct hlist_node *hnode, void *data)
-> -{
-> +			 struct hlist_node *hnode, void *data) {
-> 	struct cfs_hash_cond_arg *cond = data;
-> 
-> 	if (cond->func(cfs_hash_object(hs, hnode), cond->arg))
-> @@ -1480,8 +1476,8 @@ struct cfs_hash_cond_arg {
->  * any object be reference.
->  */
-> void
-> -cfs_hash_cond_del(struct cfs_hash *hs, cfs_hash_cond_opt_cb_t func, void *data)
-> -{
-> +cfs_hash_cond_del(struct cfs_hash *hs, cfs_hash_cond_opt_cb_t func,
-> +		void *data) {
-> 	struct cfs_hash_cond_arg arg = {
-> 		.func	= func,
-> 		.arg	= data,
-> @@ -1493,31 +1489,27 @@ struct cfs_hash_cond_arg {
-> 
-> void
-> cfs_hash_for_each(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-> -		  void *data)
-> -{
-> +		  void *data) {
-> 	cfs_hash_for_each_tight(hs, func, data, 0);
-> }
-> EXPORT_SYMBOL(cfs_hash_for_each);
-> 
-> void
-> cfs_hash_for_each_safe(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-> -		       void *data)
-> -{
-> +		       void *data) {
-> 	cfs_hash_for_each_tight(hs, func, data, 1);
-> }
-> EXPORT_SYMBOL(cfs_hash_for_each_safe);
-> 
-> static int
-> cfs_hash_peek(struct cfs_hash *hs, struct cfs_hash_bd *bd,
-> -	      struct hlist_node *hnode, void *data)
-> -{
-> +	      struct hlist_node *hnode, void *data) {
-> 	*(int *)data = 0;
-> 	return 1; /* return 1 to break the loop */
-> }
-> 
-> int
-> -cfs_hash_is_empty(struct cfs_hash *hs)
-> -{
-> +cfs_hash_is_empty(struct cfs_hash *hs) {
-> 	int empty = 1;
-> 
-> 	cfs_hash_for_each_tight(hs, cfs_hash_peek, &empty, 0);
-> @@ -1526,8 +1518,7 @@ struct cfs_hash_cond_arg {
-> EXPORT_SYMBOL(cfs_hash_is_empty);
-> 
-> u64
-> -cfs_hash_size_get(struct cfs_hash *hs)
-> -{
-> +cfs_hash_size_get(struct cfs_hash *hs) {
-> 	return cfs_hash_with_counter(hs) ?
-> 	       atomic_read(&hs->hs_count) :
-> 	       cfs_hash_for_each_tight(hs, NULL, NULL, 0);
-> @@ -1551,8 +1542,7 @@ struct cfs_hash_cond_arg {
->  */
-> static int
-> cfs_hash_for_each_relax(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-> -			void *data, int start)
-> -{
-> +			void *data, int start) {
-> 	struct hlist_node *hnode;
-> 	struct hlist_node *tmp;
-> 	struct cfs_hash_bd bd;
-> @@ -1629,8 +1619,7 @@ struct cfs_hash_cond_arg {
-> 
-> int
-> cfs_hash_for_each_nolock(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-> -			 void *data, int start)
-> -{
-> +			 void *data, int start) {
-> 	if (cfs_hash_with_no_lock(hs) ||
-> 	    cfs_hash_with_rehash_key(hs) ||
-> 	    !cfs_hash_with_no_itemref(hs))
-> @@ -1661,8 +1650,7 @@ struct cfs_hash_cond_arg {
->  */
-> int
-> cfs_hash_for_each_empty(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
-> -			void *data)
-> -{
-> +			void *data) {
-> 	unsigned int i = 0;
-> 
-> 	if (cfs_hash_with_no_lock(hs))
-> @@ -1718,8 +1706,7 @@ struct cfs_hash_cond_arg {
->  */
-> void
-> cfs_hash_for_each_key(struct cfs_hash *hs, const void *key,
-> -		      cfs_hash_for_each_cb_t func, void *data)
-> -{
-> +		      cfs_hash_for_each_cb_t func, void *data) {
-> 	struct hlist_node *hnode;
-> 	struct cfs_hash_bd bds[2];
-> 	unsigned int i;
+> 		offset = hash_x_index(hash, rp->rp_hash64);
+> @@ -1325,12 +1325,12 @@ static int mdc_read_page(struct obd_export *exp, struct md_op_data *op_data,
+> hash_collision:
+> 	dp = page_address(page);
+> 	if (BITS_PER_LONG == 32 && rp_param.rp_hash64) {
+> -		start = le64_to_cpu(dp->ldp_hash_start) >> 32;
+> -		end = le64_to_cpu(dp->ldp_hash_end) >> 32;
+> +		start = dp->ldp_hash_start >> 32;
+> +		end = dp->ldp_hash_end >> 32;
+> 		rp_param.rp_off = hash_offset >> 32;
+> 	} else {
+> -		start = le64_to_cpu(dp->ldp_hash_start);
+> -		end = le64_to_cpu(dp->ldp_hash_end);
+> +		start = dp->ldp_hash_start;
+> +		end = dp->ldp_hash_end;
+> 		rp_param.rp_off = hash_offset;
+> 	}
+> 	if (end == start) {
 > -- 
 > 1.9.1
+> 
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
