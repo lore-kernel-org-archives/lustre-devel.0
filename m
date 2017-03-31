@@ -1,107 +1,69 @@
-From: Jan Kara <jack@suse.cz>
-Date: Wed, 29 Mar 2017 12:56:04 +0200
-Subject: [lustre-devel] [PATCH 06/25] lustre: Convert to separately
-	allocated bdi
-In-Reply-To: <20170329105623.18241-1-jack@suse.cz>
-References: <20170329105623.18241-1-jack@suse.cz>
-Message-ID: <20170329105623.18241-7-jack@suse.cz>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Fri, 31 Mar 2017 07:55:16 +0200
+Subject: [lustre-devel] [PATCH] Remove sparse warnings in mdc_request.c
+In-Reply-To: <1490936959-6337-2-git-send-email-skanda.kashyap@gmail.com>
+References: <1592C3AC-DE8B-4A11-8053-02B82A61E1B3@intel.com>
+	<1490936959-6337-1-git-send-email-skanda.kashyap@gmail.com>
+	<1490936959-6337-2-git-send-email-skanda.kashyap@gmail.com>
+Message-ID: <20170331055516.GA4811@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: linux-fsdevel@vger.kernel.org
-Cc: linux-block@vger.kernel.org, Christoph Hellwig <hch@infradead.org>, Jan Kara <jack@suse.cz>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
 
-Allocate struct backing_dev_info separately instead of embedding it
-inside superblock. This unifies handling of bdi among users.
+On Thu, Mar 30, 2017 at 10:09:19PM -0700, skanda.kashyap at gmail.com wrote:
+> From: Skanda Guruanand <skanda.kashyap@gmail.com>
+> 
+> ---
+>  drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-CC: Oleg Drokin <oleg.drokin@intel.com>
-CC: Andreas Dilger <andreas.dilger@intel.com>
-CC: James Simmons <jsimmons@infradead.org>
-CC: lustre-devel at lists.lustre.org
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Signed-off-by: Jan Kara <jack@suse.cz>
----
- .../staging/lustre/lustre/include/lustre_disk.h    |  4 ----
- drivers/staging/lustre/lustre/llite/llite_lib.c    | 24 +++-------------------
- 2 files changed, 3 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_disk.h b/drivers/staging/lustre/lustre/include/lustre_disk.h
-index 8886458748c1..a676bccabd43 100644
---- a/drivers/staging/lustre/lustre/include/lustre_disk.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_disk.h
-@@ -133,13 +133,9 @@ struct lustre_sb_info {
- 	struct obd_export	 *lsi_osd_exp;
- 	char			  lsi_osd_type[16];
- 	char			  lsi_fstype[16];
--	struct backing_dev_info   lsi_bdi;     /* each client mountpoint needs
--						* own backing_dev_info
--						*/
- };
- 
- #define LSI_UMOUNT_FAILOVER	      0x00200000
--#define LSI_BDI_INITIALIZED	      0x00400000
- 
- #define     s2lsi(sb)	((struct lustre_sb_info *)((sb)->s_fs_info))
- #define     s2lsi_nocast(sb) ((sb)->s_fs_info)
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index b229cbc7bb33..d483c44aafe5 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -863,15 +863,6 @@ void ll_lli_init(struct ll_inode_info *lli)
- 	mutex_init(&lli->lli_layout_mutex);
- }
- 
--static inline int ll_bdi_register(struct backing_dev_info *bdi)
--{
--	static atomic_t ll_bdi_num = ATOMIC_INIT(0);
--
--	bdi->name = "lustre";
--	return bdi_register(bdi, NULL, "lustre-%d",
--			    atomic_inc_return(&ll_bdi_num));
--}
--
- int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
- {
- 	struct lustre_profile *lprof = NULL;
-@@ -881,6 +872,7 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
- 	char  *profilenm = get_profile_name(sb);
- 	struct config_llog_instance *cfg;
- 	int    err;
-+	static atomic_t ll_bdi_num = ATOMIC_INIT(0);
- 
- 	CDEBUG(D_VFSTRACE, "VFS Op: sb %p\n", sb);
- 
-@@ -903,16 +895,11 @@ int ll_fill_super(struct super_block *sb, struct vfsmount *mnt)
- 	if (err)
- 		goto out_free;
- 
--	err = bdi_init(&lsi->lsi_bdi);
--	if (err)
--		goto out_free;
--	lsi->lsi_flags |= LSI_BDI_INITIALIZED;
--	lsi->lsi_bdi.capabilities = 0;
--	err = ll_bdi_register(&lsi->lsi_bdi);
-+	err = super_setup_bdi_name(sb, "lustre-%d",
-+				   atomic_inc_return(&ll_bdi_num));
- 	if (err)
- 		goto out_free;
- 
--	sb->s_bdi = &lsi->lsi_bdi;
- 	/* kernel >= 2.6.38 store dentry operations in sb->s_d_op. */
- 	sb->s_d_op = &ll_d_ops;
- 
-@@ -1033,11 +1020,6 @@ void ll_put_super(struct super_block *sb)
- 	if (profilenm)
- 		class_del_profile(profilenm);
- 
--	if (lsi->lsi_flags & LSI_BDI_INITIALIZED) {
--		bdi_destroy(&lsi->lsi_bdi);
--		lsi->lsi_flags &= ~LSI_BDI_INITIALIZED;
--	}
--
- 	ll_free_sbi(sb);
- 	lsi->lsi_llsbi = NULL;
- 
--- 
-2.10.2
+Hi,
+
+This is the friendly patch-bot of Greg Kroah-Hartman.  You have sent him
+a patch that has triggered this response.  He used to manually respond
+to these common problems, but in order to save his sanity (he kept
+writing the same thing over and over, yet to different people), I was
+created.  Hopefully you will not take offence and will fix the problem
+in your patch and resubmit it so that it can be accepted into the Linux
+kernel tree.
+
+You are receiving this message because of the following common error(s)
+as indicated below:
+
+- Your patch does not have a Signed-off-by: line.  Please read the
+  kernel file, Documentation/SubmittingPatches and resend it after
+  adding that line.  Note, the line needs to be in the body of the
+  email, before the patch, not at the bottom of the patch or in the
+  email signature.
+
+- Your patch did many different things all at once, making it difficult
+  to review.  All Linux kernel patches need to only do one thing at a
+  time.  If you need to do multiple things (such as clean up all coding
+  style issues in a file/driver), do it in a sequence of patches, each
+  one doing only one thing.  This will make it easier to review the
+  patches to ensure that they are correct, and to help alleviate any
+  merge issues that larger patches can cause.
+
+- You did not specify a description of why the patch is needed, or
+  possibly, any description at all, in the email body.  Please read the
+  section entitled "The canonical patch format" in the kernel file,
+  Documentation/SubmittingPatches for what is needed in order to
+  properly describe the change.
+
+- You did not write a descriptive Subject: for the patch, allowing Greg,
+  and everyone else, to know what this patch is all about.  Please read
+  the section entitled "The canonical patch format" in the kernel file,
+  Documentation/SubmittingPatches for what a proper Subject: line should
+  look like.
+
+If you wish to discuss this problem further, or you have questions about
+how to resolve this issue, please feel free to respond to this email and
+Greg will reply once he has dug out from the pending patches received
+from other developers.
+
+thanks,
+
+greg k-h's patch email bot
