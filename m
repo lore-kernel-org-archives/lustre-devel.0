@@ -1,69 +1,102 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Fri, 31 Mar 2017 07:55:16 +0200
-Subject: [lustre-devel] [PATCH] Remove sparse warnings in mdc_request.c
-In-Reply-To: <1490936959-6337-2-git-send-email-skanda.kashyap@gmail.com>
-References: <1592C3AC-DE8B-4A11-8053-02B82A61E1B3@intel.com>
-	<1490936959-6337-1-git-send-email-skanda.kashyap@gmail.com>
-	<1490936959-6337-2-git-send-email-skanda.kashyap@gmail.com>
-Message-ID: <20170331055516.GA4811@kroah.com>
+From: Craig Inches <Craig@craiginches.com>
+Date: Mon,  3 Apr 2017 22:13:29 +0100
+Subject: [lustre-devel] [PATCH] Staging: lustre cleanup macros in
+	libcfs_private.h
+Message-ID: <20170403211329.20264-1-Craig@craiginches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, john.hammond@intel.com
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Craig Inches <Craig@craiginches.com>
 
-On Thu, Mar 30, 2017 at 10:09:19PM -0700, skanda.kashyap at gmail.com wrote:
-> From: Skanda Guruanand <skanda.kashyap@gmail.com>
-> 
-> ---
->  drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+This resolves a checkpatch warning that "Single statement macros should
+not use a do {} while (0) loop" by removing the loop and adjusting line
+length accordingly.
 
+Signed-off-by: Craig Inches <Craig@craiginches.com>
+---
+ .../lustre/include/linux/libcfs/libcfs_private.h   | 51 +++++++---------------
+ 1 file changed, 15 insertions(+), 36 deletions(-)
 
-Hi,
-
-This is the friendly patch-bot of Greg Kroah-Hartman.  You have sent him
-a patch that has triggered this response.  He used to manually respond
-to these common problems, but in order to save his sanity (he kept
-writing the same thing over and over, yet to different people), I was
-created.  Hopefully you will not take offence and will fix the problem
-in your patch and resubmit it so that it can be accepted into the Linux
-kernel tree.
-
-You are receiving this message because of the following common error(s)
-as indicated below:
-
-- Your patch does not have a Signed-off-by: line.  Please read the
-  kernel file, Documentation/SubmittingPatches and resend it after
-  adding that line.  Note, the line needs to be in the body of the
-  email, before the patch, not at the bottom of the patch or in the
-  email signature.
-
-- Your patch did many different things all at once, making it difficult
-  to review.  All Linux kernel patches need to only do one thing at a
-  time.  If you need to do multiple things (such as clean up all coding
-  style issues in a file/driver), do it in a sequence of patches, each
-  one doing only one thing.  This will make it easier to review the
-  patches to ensure that they are correct, and to help alleviate any
-  merge issues that larger patches can cause.
-
-- You did not specify a description of why the patch is needed, or
-  possibly, any description at all, in the email body.  Please read the
-  section entitled "The canonical patch format" in the kernel file,
-  Documentation/SubmittingPatches for what is needed in order to
-  properly describe the change.
-
-- You did not write a descriptive Subject: for the patch, allowing Greg,
-  and everyone else, to know what this patch is all about.  Please read
-  the section entitled "The canonical patch format" in the kernel file,
-  Documentation/SubmittingPatches for what a proper Subject: line should
-  look like.
-
-If you wish to discuss this problem further, or you have questions about
-how to resolve this issue, please feel free to respond to this email and
-Greg will reply once he has dug out from the pending patches received
-from other developers.
-
-thanks,
-
-greg k-h's patch email bot
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+index 2dae857..150454f 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+@@ -87,12 +87,9 @@ do {								    \
+ #define LIBCFS_VMALLOC_SIZE	(2 << PAGE_SHIFT) /* 2 pages */
+ #endif
+ 
+-#define LIBCFS_ALLOC_PRE(size, mask)					    \
+-do {									    \
+-	LASSERT(!in_interrupt() ||					    \
+-		((size) <= LIBCFS_VMALLOC_SIZE &&			    \
+-		 !gfpflags_allow_blocking(mask)));			    \
+-} while (0)
++#define LIBCFS_ALLOC_PRE(size, mask)					\
++	LASSERT(!in_interrupt() || ((size) <= LIBCFS_VMALLOC_SIZE	\
++		&& !gfpflags_allow_blocking(mask)))
+ 
+ #define LIBCFS_ALLOC_POST(ptr, size)					    \
+ do {									    \
+@@ -187,46 +184,28 @@ void  cfs_array_free(void *vars);
+ #if LASSERT_ATOMIC_ENABLED
+ 
+ /** assert value of @a is equal to @v */
+-#define LASSERT_ATOMIC_EQ(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) == v,		       \
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_EQ(a, v) LASSERTF(atomic_read(a) == v,		\
++					 "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is unequal to @v */
+-#define LASSERT_ATOMIC_NE(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) != v,		       \
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_NE(a, v) LASSERTF(atomic_read(a) != v,		\
++					 "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is little than @v */
+-#define LASSERT_ATOMIC_LT(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) < v,			\
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_LT(a, v) LASSERTF(atomic_read(a) < v,		\
++					 "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is little/equal to @v */
+-#define LASSERT_ATOMIC_LE(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) <= v,		       \
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_LE(a, v) LASSERTF(atomic_read(a) <= v,		\
++					 "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is great than @v */
+-#define LASSERT_ATOMIC_GT(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) > v,			\
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_GT(a, v) LASSERTF(atomic_read(a) > v,		\
++					 "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is great/equal to @v */
+-#define LASSERT_ATOMIC_GE(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) >= v,		       \
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_GE(a, v) LASSERTF(atomic_read(a) >= v,		\
++					 "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is great than @v1 and little than @v2 */
+ #define LASSERT_ATOMIC_GT_LT(a, v1, v2)			 \
+-- 
+2.10.2
