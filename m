@@ -1,56 +1,40 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Tue, 4 Apr 2017 07:34:55 +0200
-Subject: [lustre-devel] [PATCH v2] Remove sparse warnings in
-	mdc_request.c
-In-Reply-To: <1491283537-13023-1-git-send-email-skanda.kashyap@gmail.com>
-References: <1592C3AC-DE8B-4A11-8053-02B82A61E1B3@intel.com>
-	<1491283537-13023-1-git-send-email-skanda.kashyap@gmail.com>
-Message-ID: <20170404053455.GA9895@kroah.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Tue, 4 Apr 2017 12:38:52 +0300
+Subject: [lustre-devel] [PATCH] drivers/staging/lustre:
+ Coding-guideline: Missing a blank line after declarations
+In-Reply-To: <1491297326-28973-1-git-send-email-pushkar.iit@gmail.com>
+References: <1491297326-28973-1-git-send-email-pushkar.iit@gmail.com>
+Message-ID: <20170404093851.GB4521@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Pushkar Jambhlekar <pushkar.iit@gmail.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "John L. Hammond" <john.hammond@intel.com>, Al Viro <viro@zeniv.linux.org.uk>, Lai Siyao <lai.siyao@intel.com>, James Nunez <james.a.nunez@intel.com>, Andrew Perepechko <andrew.perepechko@seagate.com>, wang di <di.wang@intel.com>, Bob Glossman <bob.glossman@intel.com>, Andreas Gruenbacher <agruenba@redhat.com>, Jinshan Xiong <jinshan.xiong@intel.com>, Bobi Jam <bobijam@hotmail.com>, "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>, Henri Doreau <henri.doreau@cea.fr>, Prakash Surya <surya1@llnl.gov>, Emoly Liu <emoly.liu@intel.com>, Dmitry Eremin <dmitry.eremin@intel.com>, Johann Lombardi <johann.lombardi@intel.com>, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-On Mon, Apr 03, 2017 at 10:25:37PM -0700, skanda.kashyap at gmail.com wrote:
-> From: Skanda Guruanand <skanda.kashyap@gmail.com>
-> 
-> Signed-off-by: Skanda Guruanand <skanda.kashyap@gmail.com>
-> 
-> I have modified  struct lu_dirpage as suggested in lustre_idl.h file
-> 
-> CHECK   drivers/staging/lustre/lustre/mdc/mdc_request.c
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:958:42: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:959:42: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:962:42: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:963:42: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:985:50: warning: cast
-> to restricted __le32
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1193:24: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1328:25: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1329:23: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1332:25: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1333:23: warning: cast
-> to restricted __le64
-> 
-> ---
->  drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+On Tue, Apr 04, 2017 at 02:45:26PM +0530, Pushkar Jambhlekar wrote:
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> index cd9a40c..71fcc4c 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+> @@ -482,6 +482,7 @@ void cl_page_disown0(const struct lu_env *env,
+>  int cl_page_is_owned(const struct cl_page *pg, const struct cl_io *io)
+>  {
+>  	struct cl_io *top = cl_io_top((struct cl_io *)io);
+> +
+>  	LINVRNT(cl_object_same(pg->cp_obj, io->ci_obj));
+>  	return pg->cp_state == CPS_OWNED && pg->cp_owner == top;
+>  }
 
-What changed from v1?
+This is not related to the patch but I don't understand CLOBINVRNT() and
+LINVRNT().
 
-Always put that here below the --- line.
+# define LINVRNT(exp) LASSERT(exp)
+# define LINVRNT(exp) ((void)sizeof !!(exp))
 
-v3?
+Why do we do the sizeof() instead of just an empty define?  The compiler
+calculates the size at compile time and doesn't execute the expression
+so it's the same as an empty define so far as I can tell.
 
-thanks,
-
-greg k-h
+regards,
+dan carpenter
