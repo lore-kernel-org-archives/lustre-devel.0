@@ -1,85 +1,28 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Sat, 8 Apr 2017 13:02:37 +0200
-Subject: [lustre-devel] [PATCH v2] Remove sparse warnings in
-	mdc_request.c
-In-Reply-To: <1491283537-13023-1-git-send-email-skanda.kashyap@gmail.com>
-References: <1592C3AC-DE8B-4A11-8053-02B82A61E1B3@intel.com>
-	<1491283537-13023-1-git-send-email-skanda.kashyap@gmail.com>
-Message-ID: <20170408110237.GA6877@kroah.com>
+From: Deepa Dinamani <deepa.kernel@gmail.com>
+Date: Sat, 8 Apr 2017 10:58:05 -0700
+Subject: [lustre-devel] [PATCH 06/12] audit: Use timespec64 to represent
+	audit timestamps
+In-Reply-To: <CAHC9VhTYWeKL+BAb6F3tfwzs7OKUEA8ANM=V05sfoiahNNX=9w@mail.gmail.com>
+References: <1491613030-11599-1-git-send-email-deepa.kernel@gmail.com>
+	<1491613030-11599-7-git-send-email-deepa.kernel@gmail.com>
+	<CAHC9VhTYWeKL+BAb6F3tfwzs7OKUEA8ANM=V05sfoiahNNX=9w@mail.gmail.com>
+Message-ID: <CABeXuvoKmvbo_n3XQ0Y+iWGz88Jr3TwbPA7GiR3pia9407ANLw@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Paul Moore <paul@paul-moore.com>
+Cc: yuchao0@huawei.com, "J. Bruce Fields" <bfields@fieldses.org>, Chris Mason <clm@fb.com>, linux-mtd <linux-mtd@lists.infradead.org>, Evgeniy Dushistov <dushistov@mail.ru>, Jeff Layton <jlayton@poochiereds.net>, ceph-devel <ceph-devel@vger.kernel.org>, devel@driverdev.osuosl.org, linux-cifs@vger.kernel.org, y2038 Mailman List <y2038@lists.linaro.org>, Ingo Molnar <mingo@redhat.com>, James Simmons <jsimmons@infradead.org>, Arnd Bergmann <arnd@arndb.de>, Steven Rostedt <rostedt@goodmis.org>, oleg.drokin@intel.com, John Stultz <john.stultz@linaro.org>, Alexander Viro <viro@zeniv.linux.org.uk>, David Sterba <dsterba@suse.com>, Jaegeuk Kim <jaegeuk@kernel.org>, Thomas Gleixner <tglx@linutronix.de>, andreas.dilger@intel.com, Josef Bacik <jbacik@fb.com>, Greg KH <gregkh@linuxfoundation.org>, samba-technical@lists.samba.org, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 
-On Mon, Apr 03, 2017 at 10:25:37PM -0700, skanda.kashyap at gmail.com wrote:
-> From: Skanda Guruanand <skanda.kashyap@gmail.com>
-> 
-> Signed-off-by: Skanda Guruanand <skanda.kashyap@gmail.com>
+> I have no problem merging this patch into audit/next for v4.12, would
+> you prefer me to do that so at least this patch is merged?
 
-Changelog text goes between those two lines, right?
+This would be fine.
+But, I think whoever takes the last 2 deletion patches should also take them.
+I'm not sure how that part works out.
 
-> 
-> I have modified  struct lu_dirpage as suggested in lustre_idl.h file
+> It would probably make life a small bit easier for us in the audit
+> world too as it would reduce the potential merge conflict.  However,
+> that's a relatively small thing to worry about.
 
-Why the extra ' '?
-
-> 
-> CHECK   drivers/staging/lustre/lustre/mdc/mdc_request.c
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:958:42: warning: cast
-> to restricted __le64
-
-Why is this all wrapped?
-
-
-
-
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:959:42: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:962:42: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:963:42: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:985:50: warning: cast
-> to restricted __le32
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1193:24: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1328:25: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1329:23: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1332:25: warning: cast
-> to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1333:23: warning: cast
-> to restricted __le64
-> 
-> ---
->  drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> index 60b827e..df48b8d 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> @@ -846,10 +846,10 @@ struct luda_type {
->  #endif
->  
->  struct lu_dirpage {
-> -	__u64	    ldp_hash_start;
-> -	__u64	    ldp_hash_end;
-> -	__u32	    ldp_flags;
-> -	__u32	    ldp_pad0;
-> +	__le64	    ldp_hash_start;
-> +	__le64	    ldp_hash_end;
-> +	__le32	    ldp_flags;
-> +	__le32	    ldp_pad0;
-
-
-Are you sure this is correct?  How was it tested?
-
-Also, please fix your subject to properly match those already made for
-this driver...
-
-thanks,
-
-greg k-h
+-Deepa
