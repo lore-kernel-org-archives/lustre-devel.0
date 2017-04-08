@@ -1,65 +1,47 @@
 From: Deepa Dinamani <deepa.kernel@gmail.com>
-Date: Fri,  7 Apr 2017 17:57:10 -0700
-Subject: [lustre-devel] [PATCH 12/12] time: Delete current_fs_time() function
-In-Reply-To: <1491613030-11599-1-git-send-email-deepa.kernel@gmail.com>
+Date: Fri, 7 Apr 2017 19:16:54 -0700
+Subject: [lustre-devel] [PATCH 02/12] trace: Make trace_hwlat timestamp
+	y2038 safe
+In-Reply-To: <20170407213011.36e29f42@gandalf.local.home>
 References: <1491613030-11599-1-git-send-email-deepa.kernel@gmail.com>
-Message-ID: <1491613030-11599-13-git-send-email-deepa.kernel@gmail.com>
+	<1491613030-11599-3-git-send-email-deepa.kernel@gmail.com>
+	<20170407213011.36e29f42@gandalf.local.home>
+Message-ID: <CABeXuvoQJSg+eVH4LX5s87DtE4N3goKDnjZgJ9fLk8txgwN+QA@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: linux-kernel@vger.kernel.org, akpm@linux-foundation.org
-Cc: bfields@fieldses.org, clm@fb.com, linux-mtd@lists.infradead.org, dushistov@mail.ru, jlayton@poochiereds.net, tglx@linutronix.de, devel@driverdev.osuosl.org, linux-cifs@vger.kernel.org, paul@paul-moore.com, y2038@lists.linaro.org, mingo@redhat.com, jsimmons@infradead.org, arnd@arndb.de, rostedt@goodmis.org, oleg.drokin@intel.com, john.stultz@linaro.org, viro@zeniv.linux.org.uk, dsterba@suse.com, jaegeuk@kernel.org, ceph-devel@vger.kernel.org, andreas.dilger@intel.com, jbacik@fb.com, gregkh@linuxfoundation.org, samba-technical@lists.samba.org, eparis@redhat.com, linux-f2fs-devel@lists.sourceforge.net, linux-security-module@vger.kernel.org, linux-audit@redhat.com, netdev@vger.kernel.org, linux-fsdevel@vger.kernel.org, davem@davemloft.net, linux-btrfs@vger.kernel.org, lustre-devel@lists.lustre.org
+To: Steven Rostedt <rostedt-nx8X9YLhiw1AfugRpC6u6w@public.gmane.org>
+Cc: yuchao0-hv44wF8Li93QT0dZR+AlfA@public.gmane.org, "J. Bruce Fields" <bfields-uC3wQj2KruNg9hUCZPvPmw@public.gmane.org>, Chris Mason <clm-b10kYP2dOMg@public.gmane.org>, linux-mtd <linux-mtd-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org>, Evgeniy Dushistov <dushistov-JGs/UdohzUI@public.gmane.org>, Jeff Layton <jlayton-vpEMnDpepFuMZCB2o+C8xQ@public.gmane.org>, ceph-devel <ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, devel-gWbeCf7V1WCQmaza687I9mD2FQJk+8+b@public.gmane.org, linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Paul Moore <paul-r2n+y4ga6xFZroRs9YW3xA@public.gmane.org>, y2038 Mailman List <y2038-cunTk1MwBs8s++Sfvej+rw@public.gmane.org>, Ingo Molnar <mingo-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, Arnd Bergmann <arnd-r2nGTMty4D4@public.gmane.org>, oleg.drokin-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org, John Stultz <john.stultz-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org>, Alexander Viro <viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org>, David Sterba <dsterba-IBi9RG/b67k@public.gmane.org>, Jaegeuk Kim <jaegeuk-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org>, Thomas Gleixner <tglx-hfZtesqFncYOwBW4kG4KsQ@public.gmane.org>, Josef Bacik <jbacik-b10kYP2dOMg@public.gmane.org>, Greg KH <gregkh-hQyY1W1yCW8ekmWlsbkhG0B+6BGkLq7r@public.gmane.org>, samba-technical-w/Ol4Ecudpl8XjKLYN78aQ@public.gmane.org, Linux Kernel Mailing List <linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Eric Paris <eparis-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>
 
-All uses of the current_fs_time() function have been
-replaced by other time interfaces.
+>> -     trace_seq_printf(s, "#%-5u inner/outer(us): %4llu/%-5llu ts:%ld.%09ld",
+>> +     trace_seq_printf(s, "#%-5u inner/outer(us): %4llu/%-5llu ts:%lld.%09ld",
+>>                        field->seqnum,
+>>                        field->duration,
+>>                        field->outer_duration,
+>> -                      field->timestamp.tv_sec,
+>> +                      (long long)field->timestamp.tv_sec,
+>
+> Refresh my memory. We need the cast because on 64 bit boxes
+> timestamp.tv_sec is just a long?
 
-And, its use cases can be fulfilled by current_time()
-or ktime_get_* variants.
+This is only required until we change the definition of timespec64.
+Right now it is defined as
 
-Signed-off-by: Deepa Dinamani <deepa.kernel@gmail.com>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
----
- include/linux/fs.h |  1 -
- kernel/time/time.c | 14 --------------
- 2 files changed, 15 deletions(-)
+#if __BITS_PER_LONG == 64
+# define timespec64 timespec
+#else
+struct timespec64 {
+    time64_t tv_sec;
+    long tv_nsec;
+};
+#endif
 
-diff --git a/include/linux/fs.h b/include/linux/fs.h
-index f1d7347..cce6c57 100644
---- a/include/linux/fs.h
-+++ b/include/linux/fs.h
-@@ -1430,7 +1430,6 @@ static inline void i_gid_write(struct inode *inode, gid_t gid)
- 	inode->i_gid = make_kgid(inode->i_sb->s_user_ns, gid);
- }
- 
--extern struct timespec current_fs_time(struct super_block *sb);
- extern struct timespec current_time(struct inode *inode);
- 
- /*
-diff --git a/kernel/time/time.c b/kernel/time/time.c
-index 25bdd25..cf69cca 100644
---- a/kernel/time/time.c
-+++ b/kernel/time/time.c
-@@ -230,20 +230,6 @@ SYSCALL_DEFINE1(adjtimex, struct timex __user *, txc_p)
- 	return copy_to_user(txc_p, &txc, sizeof(struct timex)) ? -EFAULT : ret;
- }
- 
--/**
-- * current_fs_time - Return FS time
-- * @sb: Superblock.
-- *
-- * Return the current time truncated to the time granularity supported by
-- * the fs.
-- */
--struct timespec current_fs_time(struct super_block *sb)
--{
--	struct timespec now = current_kernel_time();
--	return timespec_trunc(now, sb->s_time_gran);
--}
--EXPORT_SYMBOL(current_fs_time);
--
- /*
-  * Convert jiffies to milliseconds and back.
-  *
--- 
-2.7.4
+And timespec.tv_sec is just long int on 64 bit machines.
+This is why we need the cast now.
+
+We will probably change this and only define __kernel_timespec instead
+of timespec, leaving only one definition of timespec64.
+At that time, we will not need this.
+
+-Deepa
