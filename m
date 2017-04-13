@@ -1,36 +1,106 @@
-From: David Sterba <dsterba@suse.cz>
-Date: Wed, 12 Apr 2017 15:42:45 +0200
-Subject: [lustre-devel] [PATCH 07/12] fs: btrfs: Use ktime_get_real_ts
-	for root ctime
-In-Reply-To: <1491613030-11599-8-git-send-email-deepa.kernel@gmail.com>
-References: <1491613030-11599-1-git-send-email-deepa.kernel@gmail.com>
-	<1491613030-11599-8-git-send-email-deepa.kernel@gmail.com>
-Message-ID: <20170412134245.GK4781@twin.jikos.cz>
+From: Craig Inches <Craig@craiginches.com>
+Date: Thu, 13 Apr 2017 10:24:41 +0100
+Subject: [lustre-devel] [PATCH RESEND v2] Staging: lustre cleanup macros in
+	libcfs_private.h
+Message-ID: <20170413092441.GA22444@starbase.xayto.local>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Deepa Dinamani <deepa.kernel@gmail.com>
-Cc: yuchao0@huawei.com, bfields@fieldses.org, clm@fb.com, linux-mtd@lists.infradead.org, dushistov@mail.ru, jlayton@poochiereds.net, ceph-devel@vger.kernel.org, devel@driverdev.osuosl.org, linux-cifs@vger.kernel.org, paul@paul-moore.com, y2038@lists.linaro.org, mingo@redhat.com, jsimmons@infradead.org, arnd@arndb.de, rostedt@goodmis.org, oleg.drokin@intel.com, john.stultz@linaro.org, viro@zeniv.linux.org.uk, dsterba@suse.com, jaegeuk@kernel.org, tglx@linutronix.de, andreas.dilger@intel.com, jbacik@fb.com, gregkh@linuxfoundation.org, samba-technical@lists.samba.org, linux-kernel@vger.kernel.org, eparis@redhat.com, linux-f2fs-devel@lists.sourceforge.net, linux-security-module@vger.kernel.org, linux-audit@redhat.com, netdev@vger.kernel.org, linux-fsdevel@vger.kernel.org, akpm@linux-foundation.org, davem@davemloft.net, linux-btrfs@vger.kernel.org, lustre-devel@lists.lustre.org
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, john.hammond@intel.com
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Craig Inches <Craig@craiginches.com>
 
-On Fri, Apr 07, 2017 at 05:57:05PM -0700, Deepa Dinamani wrote:
-> btrfs_root_item maintains the ctime for root updates.
-> This is not part of vfs_inode.
-> 
-> Since current_time() uses struct inode* as an argument
-> as Linus suggested, this cannot be used to update root
-> times unless, we modify the signature to use inode.
-> 
-> Since btrfs uses nanosecond time granularity, it can also
-> use ktime_get_real_ts directly to obtain timestamp for
-> the root. It is necessary to use the timespec time api
-> here because the same btrfs_set_stack_timespec_*() apis
-> are used for vfs inode times as well. These can be
-> transitioned to using timespec64 when btrfs internally
-> changes to use timespec64 as well.
-> 
-> Signed-off-by: Deepa Dinamani <deepa.kernel@gmail.com>
-> Acked-by: David Sterba <dsterba@suse.com>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+This resolves a checkpatch warning that "Single statement macros should
+not use a do {} while (0) loop" by removing the loop and adjusting line
+length accordingly.
 
-I'm going to add the patch to my 4.12 queue and will let Andrew know.
+Signed-off-by: Craig Inches <Craig@craiginches.com>
+---
+Changes in v2:
+    - Kept statements together
+    - Kept operator on previous line
+
+ .../lustre/include/linux/libcfs/libcfs_private.h   | 51 +++++++---------------
+ 1 file changed, 15 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+index 2dae857..e774c75 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+@@ -87,12 +87,9 @@ do {								    \
+ #define LIBCFS_VMALLOC_SIZE	(2 << PAGE_SHIFT) /* 2 pages */
+ #endif
+ 
+-#define LIBCFS_ALLOC_PRE(size, mask)					    \
+-do {									    \
+-	LASSERT(!in_interrupt() ||					    \
+-		((size) <= LIBCFS_VMALLOC_SIZE &&			    \
+-		 !gfpflags_allow_blocking(mask)));			    \
+-} while (0)
++#define LIBCFS_ALLOC_PRE(size, mask)					\
++	LASSERT(!in_interrupt() || ((size) <= LIBCFS_VMALLOC_SIZE &&	\
++				    !gfpflags_allow_blocking(mask)))
+ 
+ #define LIBCFS_ALLOC_POST(ptr, size)					    \
+ do {									    \
+@@ -187,46 +184,28 @@ void  cfs_array_free(void *vars);
+ #if LASSERT_ATOMIC_ENABLED
+ 
+ /** assert value of @a is equal to @v */
+-#define LASSERT_ATOMIC_EQ(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) == v,		       \
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_EQ(a, v)			\
++	LASSERTF(atomic_read(a) == v, "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is unequal to @v */
+-#define LASSERT_ATOMIC_NE(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) != v,		       \
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_NE(a, v)		\
++	LASSERTF(atomic_read(a) != v, "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is little than @v */
+-#define LASSERT_ATOMIC_LT(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) < v,			\
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_LT(a, v)		\
++	LASSERTF(atomic_read(a) < v, "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is little/equal to @v */
+-#define LASSERT_ATOMIC_LE(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) <= v,		       \
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_LE(a, v)		\
++	LASSERTF(atomic_read(a) <= v, "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is great than @v */
+-#define LASSERT_ATOMIC_GT(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) > v,			\
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_GT(a, v)		\
++	LASSERTF(atomic_read(a) > v, "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is great/equal to @v */
+-#define LASSERT_ATOMIC_GE(a, v)				 \
+-do {							    \
+-	LASSERTF(atomic_read(a) >= v,		       \
+-		 "value: %d\n", atomic_read((a)));	  \
+-} while (0)
++#define LASSERT_ATOMIC_GE(a, v)		\
++	LASSERTF(atomic_read(a) >= v, "value: %d\n", atomic_read((a)))
+ 
+ /** assert value of @a is great than @v1 and little than @v2 */
+ #define LASSERT_ATOMIC_GT_LT(a, v1, v2)			 \
+-- 
+2.10.2
