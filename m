@@ -1,88 +1,117 @@
-From: Yan Li <yanli@ascar.io>
-Date: Thu, 13 Apr 2017 19:55:15 -0700
-Subject: [lustre-devel] [PATCH 1/6] Autoconf option for rate-limiting
- Quality of Service (RLQOS)
-In-Reply-To: <3BE4A898-D944-41F9-84C8-FE8DA80D0D65@datadirectnet.com>
-References: <cover.1490122510.git.yanli@ascar.io>
-	<99fe8fdaaaa5b6fd36c0782269bc45a580079696.1490122510.git.yanli@ascar.io>
-	<3FFFCE73-97FE-4A10-8AC6-47D835CC6B3C@intel.com>
-	<3BE4A898-D944-41F9-84C8-FE8DA80D0D65@datadirectnet.com>
-Message-ID: <949ca9f8-c4a5-1413-abbb-4777189ba425@ascar.io>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Fri, 14 Apr 2017 10:15:05 +0200
+Subject: [lustre-devel] [PATCH RESEND v2] Staging: lustre cleanup macros
+ in libcfs_private.h
+In-Reply-To: <20170413092441.GA22444@starbase.xayto.local>
+References: <20170413092441.GA22444@starbase.xayto.local>
+Message-ID: <20170414081505.GA16598@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Craig Inches <Craig@craiginches.com>
+Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, john.hammond@intel.com, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-On 03/24/2017 08:36 PM, Li Xi wrote:
-> > As you already know, we (DDN and also Prof. Andr? and Lingfang from Mainz University)
-> are working together on QoS, not only server side TBF policy of NRS, but also client
-> side QoS (https://jira.hpdd.intel.com/browse/LU-7982). And also, global QoS of Lustre
-> is under development. After a glance on the paper, I think your work looks different from
-> our approach. That is good, because these mechanisms could work together to improve
-> the service quality of Lustre in different ways for different requirements.
+On Thu, Apr 13, 2017 at 10:24:41AM +0100, Craig Inches wrote:
+> This resolves a checkpatch warning that "Single statement macros should
+> not use a do {} while (0) loop" by removing the loop and adjusting line
+> length accordingly.
 > 
-> I have a few questions about LRQOS. I haven?t read all the details in the paper, so please
-> correct me if I am wrong.
+> Signed-off-by: Craig Inches <Craig@craiginches.com>
+> ---
+> Changes in v2:
+>     - Kept statements together
+>     - Kept operator on previous line
+
+Why RESEND?
+
 > 
-> 1) In my understanding, ASCAR/RLQOS is aimed at preventing congestion in the Lustre
-> client. Am I correct? Is ASCAR/RLQOS able to provide any bandwidth/IOPS guarantees
-> to each applications, or to each user, or job? There is an common use case of client side
-> QoS. For example, multiple users are sharing the same Lustre client. But one of the users
-> starts a very aggressive application which uses all the available bandwidth/IOPS and thus
-> cause very bad performance/latency to other users. So, what we (DDN) are currently working
-> on is to trying to isolate/balance performance between users/jobs. I am wondering whether
-> ASCAR/RLQOS is able to be combined with our patches (https://review.whamcloud.com/#/c/19896/,
-> https://review.whamcloud.com/#/c/19700/) to provide an even better solution.
+>  .../lustre/include/linux/libcfs/libcfs_private.h   | 51 +++++++---------------
+>  1 file changed, 15 insertions(+), 36 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+> index 2dae857..e774c75 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+> @@ -87,12 +87,9 @@ do {								    \
+>  #define LIBCFS_VMALLOC_SIZE	(2 << PAGE_SHIFT) /* 2 pages */
+>  #endif
+>  
+> -#define LIBCFS_ALLOC_PRE(size, mask)					    \
+> -do {									    \
+> -	LASSERT(!in_interrupt() ||					    \
+> -		((size) <= LIBCFS_VMALLOC_SIZE &&			    \
+> -		 !gfpflags_allow_blocking(mask)));			    \
+> -} while (0)
+> +#define LIBCFS_ALLOC_PRE(size, mask)					\
+> +	LASSERT(!in_interrupt() || ((size) <= LIBCFS_VMALLOC_SIZE &&	\
+> +				    !gfpflags_allow_blocking(mask)))
+>  
+>  #define LIBCFS_ALLOC_POST(ptr, size)					    \
+>  do {									    \
+> @@ -187,46 +184,28 @@ void  cfs_array_free(void *vars);
+>  #if LASSERT_ATOMIC_ENABLED
+>  
+>  /** assert value of @a is equal to @v */
+> -#define LASSERT_ATOMIC_EQ(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) == v,		       \
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_EQ(a, v)			\
+> +	LASSERTF(atomic_read(a) == v, "value: %d\n", atomic_read((a)))
+>  
+>  /** assert value of @a is unequal to @v */
+> -#define LASSERT_ATOMIC_NE(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) != v,		       \
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_NE(a, v)		\
+> +	LASSERTF(atomic_read(a) != v, "value: %d\n", atomic_read((a)))
+>  
+>  /** assert value of @a is little than @v */
+> -#define LASSERT_ATOMIC_LT(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) < v,			\
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_LT(a, v)		\
+> +	LASSERTF(atomic_read(a) < v, "value: %d\n", atomic_read((a)))
+>  
+>  /** assert value of @a is little/equal to @v */
+> -#define LASSERT_ATOMIC_LE(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) <= v,		       \
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_LE(a, v)		\
+> +	LASSERTF(atomic_read(a) <= v, "value: %d\n", atomic_read((a)))
+>  
+>  /** assert value of @a is great than @v */
+> -#define LASSERT_ATOMIC_GT(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) > v,			\
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_GT(a, v)		\
+> +	LASSERTF(atomic_read(a) > v, "value: %d\n", atomic_read((a)))
+>  
+>  /** assert value of @a is great/equal to @v */
+> -#define LASSERT_ATOMIC_GE(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) >= v,		       \
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_GE(a, v)		\
+> +	LASSERTF(atomic_read(a) >= v, "value: %d\n", atomic_read((a)))
+>  
+>  /** assert value of @a is great than @v1 and little than @v2 */
+>  #define LASSERT_ATOMIC_GT_LT(a, v1, v2)			 \
 
-ASCAR/RLQOS can't do bandwidth allocation for jobs accessing the same
-OSC yet. It is theoretically possible to do that for jobs accessing
-different OSCs, by using different rulesets for different OSC, but we
-don't know what is the best way to design these rulesets for bandwidth
-allocation yet.
+I need a lustre maintainer to ack this one before I can take it.
+Perhaps there was a good reasaon do { } while is used here...
 
-I agree it would be beneficial if our development effort can be
-combined. The core idea of ASCAR/RLQOS is to use a predefined ruleset to
-manage existing parameters, and this idea can be applied to any
-parameters in addition to those used in QoS.
+thanks,
 
-> 2) It is mentioned in the paper that ASCAR/RLQOS is controlling max flight RPC of OSC to
-> prevent congestion. However, for cached I/O, we found that page cache limitation on client is
-> also affecting the throughputs of applications. Especially, when multiple different applications
-> are sharing limited page caches. One of big concern is, when max flight RPC is limited,
-> the page cache will be exhausted (for example, when multiple applications keep on writing
-> data), and this is a new type of congestion. I am not sure, do you think this kind of congestion
-> will cause any performance decline/problem to the application?
-
-Yes. If that's the concern we should also tune the page cache limitation
-in addition to mrif. But the effectiveness of this needs to be carefully
-evaluated.
-
-> 3) Have you considered implementing ASCAR/RLQOS on Lustre server side? As already
-> mentioned in the paper, sometimes, clients of Lustre could connect to the servers and send
-> requests without any self-restraint which is unfair to other clients which follows the control
-> of ASCAR/RLQOS. And unfortunately, it is hard to get all the clients under control since
-> Lustre clients could change a lot from time to time. However, if a similar mechanism is
-> implemented on server side, things becomes much easier. And that is part of the reason
-> why TBF was implemented on server side rather than client side. Maybe something
-> similar to ASCAR/RLQOS could be implemented on MDTs/OSTs too. What do you think?
-
-This is definitely an interesting idea. As I said earlier, the core idea
-of ASCAR/RLQOS is actually tuning parameters dynamically, and we can
-apply this rule-based control to any parameters on both the server
-and client side.
-
-> 4) In your paper, I/O patterns detection or work load classifier are mentioned. So do you know
-> is there any any good way to detect/describe the I/O pattern of a application? Understanding
-> the I/O patterns of applications are really important and helpful for QoS. But I guess it is
-> really difficult, comparing to the pattern detection on other systems, like network. However,
-> do you have any idea or direction that looks like the right way? Maybe something like
-> machine learning?
-
-Yes. We are experimenting deep reinforcement learning-based methods and
-have seen some good results. The best part of using deep learning is
-that we don't have to worry about feature selection. As to whether deep
-learning works in real world, it has to be evaluated thoroughly.
-
-
-Yan
+greg k-h
