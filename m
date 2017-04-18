@@ -1,76 +1,41 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 18 Apr 2017 09:54:05 +0000
-Subject: [lustre-devel] [PATCH v2] staging: lustre: Fix sparse
- endianness warnings cast to restricted __le64 and __le32
-In-Reply-To: <1492303739-32762-1-git-send-email-skanda.kashyap@gmail.com>
-References: <20170414081534.GB16598@kroah.com>
-	<1492303739-32762-1-git-send-email-skanda.kashyap@gmail.com>
-Message-ID: <A0226106-C801-455B-A802-5E0C9DA85EEE@intel.com>
+From: greg at kroah.com <greg@kroah.com>
+Date: Tue, 18 Apr 2017 17:50:19 +0200
+Subject: [lustre-devel] [Patch v3 1/2] lustre: Parantheses added for
+ Macro argument to avoid precedence issues
+In-Reply-To: <VI1PR0901MB16166F494E9CECB93E1CD478A4040@VI1PR0901MB1616.eurprd09.prod.outlook.com>
+References: <a2e734ab4562ded68cb7e7b8d55f51f757189fcd.1492255078>
+	<VI1PR0901MB16166F494E9CECB93E1CD478A4040@VI1PR0901MB1616.eurprd09.prod.outlook.com>
+Message-ID: <20170418155019.GA7263@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Rishiraj Manwatkar <manwatkar@outlook.com>
+Cc: "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "andreas.dilger@intel.com" <andreas.dilger@intel.com>, "oleg.drokin@intel.com" <oleg.drokin@intel.com>
 
-On Apr 15, 2017, at 18:48, skanda.kashyap at gmail.com wrote:
+On Sat, Apr 15, 2017 at 01:50:42PM +0000, Rishiraj Manwatkar wrote:
+> Parantheses are added for Macro argument, to avoid precedence issues.
 > 
-> From: Skanda Guruanand <skanda.kashyap@gmail.com>
-> 
-> The struct lu_dirpage elements in lustre_idl.h file are modified to
-> __le64 and __le32 types since the  elements are always converted from
-> litte endian to processor native format in mdc_request.c file.
-> 
-> Following warnings are removed by this fix.
-> 
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:958:42: warning: cast to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:959:42: warning: cast to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:962:42: warning: cast to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:963:42: warning: cast to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:985:50: warning: cast to restricted __le32
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1193:24: warning: cast to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1328:25: warning: cast to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1329:23: warning: cast to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1332:25: warning: cast to restricted __le64
-> drivers/staging/lustre/lustre/mdc/mdc_request.c:1333:23: warning: cast to restricted __le64
-> 
-> Signed-off-by: Skanda Guruanand <skanda.kashyap@gmail.com>
-
-Thanks for the patch.
-
-The resend of this patch should really have been marked "[PATCH v3]", but hopefully Greg
-will still notice this one.
-
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-
+> Signed-off-by: Rishiraj Manwatkar <manwatkar@outlook.com>
 > ---
-> drivers/staging/lustre/lustre/include/lustre/lustre_idl.h | 8 ++++----
-> 1 file changed, 4 insertions(+), 4 deletions(-)
+>  v1 -> v2: Added mailing list in cc.
+>  v2 -> v3: Changed From: to be same as Signed-off-by:.
+>  drivers/staging/lustre/lustre/obdclass/cl_io.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> index 60b827e..df48b8d 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-> @@ -846,10 +846,10 @@ struct luda_type {
-> #endif
-> 
-> struct lu_dirpage {
-> -	__u64	    ldp_hash_start;
-> -	__u64	    ldp_hash_end;
-> -	__u32	    ldp_flags;
-> -	__u32	    ldp_pad0;
-> +	__le64	    ldp_hash_start;
-> +	__le64	    ldp_hash_end;
-> +	__le32	    ldp_flags;
-> +	__le32	    ldp_pad0;
-> 	struct lu_dirent ldp_entries[0];
-> };
-> 
-> -- 
-> 1.9.1
-> 
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> index ee7d677..0997254 100755
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> @@ -52,9 +52,9 @@
+>   */
+>  
+>  #define cl_io_for_each(slice, io) \
+> -	list_for_each_entry((slice), &io->ci_layers, cis_linkage)
+> +	list_for_each_entry((slice), &(io)->ci_layers, cis_linkage)
 
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel Corporation
+Really?  There is no precedence issues that I can see here, sorry.
+
+thanks,
+
+greg k-h
