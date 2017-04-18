@@ -1,55 +1,127 @@
-From: Yan Li <yanli@ascar.io>
-Date: Mon, 17 Apr 2017 09:46:03 -0700
-Subject: [lustre-devel] [PATCH 1/6] Autoconf option for rate-limiting
- Quality of Service (RLQOS)
-In-Reply-To: <E08AFD6D-2057-4CDC-8F2A-85AC18AA8203@uni-mainz.de>
-References: <cover.1490122510.git.yanli@ascar.io>
-	<99fe8fdaaaa5b6fd36c0782269bc45a580079696.1490122510.git.yanli@ascar.io>
-	<3FFFCE73-97FE-4A10-8AC6-47D835CC6B3C@intel.com>
-	<3BE4A898-D944-41F9-84C8-FE8DA80D0D65@datadirectnet.com>
-	<949ca9f8-c4a5-1413-abbb-4777189ba425@ascar.io>
-	<E08AFD6D-2057-4CDC-8F2A-85AC18AA8203@uni-mainz.de>
-Message-ID: <7ca175f0-85b1-e80d-d67b-b5d49eeacd17@ascar.io>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Tue, 18 Apr 2017 09:47:46 +0000
+Subject: [lustre-devel] [PATCH RESEND v2] Staging: lustre cleanup macros
+ in	libcfs_private.h
+In-Reply-To: <20170413092441.GA22444@starbase.xayto.local>
+References: <20170413092441.GA22444@starbase.xayto.local>
+Message-ID: <85E9E90F-59AA-4755-8CAE-F294B83DD0E9@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Craig Inches <craig@craiginches.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, "jsimmons@infradead.org" <jsimmons@infradead.org>, "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>, "Hammond, John" <john.hammond@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
 
-
-On 04/17/2017 05:32 AM, Brinkmann, Prof. Dr. Andr? wrote:
-> I fully agree that your approach to learn a small rule-set is very interesting to optimize overall 
-> Lustre bandwidth. What I have not been able to fully understand from your paper is the cost of 
-> adaptation. What is happening in a cluster running many jobs at the same time applying very different 
-> access patterns (in very different combinations to different OSSes)?
-
-When there are many jobs, their aggregated  I/O pattern can usually be
-treated as a mixed random read/write workload. The more jobs you have,
-the more uniformly random the I/O pattern is. My experience is that they
-are not that hard to optimize. The hardest to optimize are when only one
-or two I/O job is running and they have a very special I/O pattern.
-
-> We have just started to collect these patterns. Might be interesting to apply different (machine learning)
-> algorithms on top of these patters going into different directions:
+On Apr 13, 2017, at 03:24, Craig Inches <craig@craiginches.com> wrote:
 > 
-> - Optimize overall bandwidth (like ASCAR is doing)
+> This resolves a checkpatch warning that "Single statement macros should
+> not use a do {} while (0) loop" by removing the loop and adjusting line
+> length accordingly.
+> 
+> Signed-off-by: Craig Inches <Craig@craiginches.com>
 
-This is similar to what I'm working on. I've been systematically testing
-many machine learning algorithms on bandwidth optimization, and some of
-them have pretty good results. My problem is that all my workloads so
-far are synthetic.
+I don't think there was any particular reason for "do { } while(0)" here except
+force of habit.
 
-> - Optimize bandwidth while supporting QoS rules for certain
-> applications
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
-This is on my radar. I'll look into your design and implementation to
-see how we can do something interesting together.
+> ---
+> Changes in v2:
+>    - Kept statements together
+>    - Kept operator on previous line
+> 
+> .../lustre/include/linux/libcfs/libcfs_private.h   | 51 +++++++---------------
+> 1 file changed, 15 insertions(+), 36 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+> index 2dae857..e774c75 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+> @@ -87,12 +87,9 @@ do {							  \
+> #define LIBCFS_VMALLOC_SIZE	(2 << PAGE_SHIFT) /* 2 pages */
+> #endif
+> 
+> -#define LIBCFS_ALLOC_PRE(size, mask)					    \
+> -do {									    \
+> -	LASSERT(!in_interrupt() ||					    \
+> -		((size) <= LIBCFS_VMALLOC_SIZE &&			    \
+> -		 !gfpflags_allow_blocking(mask)));			    \
+> -} while (0)
+> +#define LIBCFS_ALLOC_PRE(size, mask)					\
+> +	LASSERT(!in_interrupt() || ((size) <= LIBCFS_VMALLOC_SIZE &&	\
+> +				    !gfpflags_allow_blocking(mask)))
+> 
+> #define LIBCFS_ALLOC_POST(ptr, size)					    \
+> do {									    \
+> @@ -187,46 +184,28 @@ void  cfs_array_free(void *vars);
+> #if LASSERT_ATOMIC_ENABLED
+> 
+> /** assert value of @a is equal to @v */
+> -#define LASSERT_ATOMIC_EQ(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) == v,		       \
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_EQ(a, v)			\
+> +	LASSERTF(atomic_read(a) == v, "value: %d\n", atomic_read((a)))
+> 
+> /** assert value of @a is unequal to @v */
+> -#define LASSERT_ATOMIC_NE(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) != v,		       \
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_NE(a, v)		\
+> +	LASSERTF(atomic_read(a) != v, "value: %d\n", atomic_read((a)))
+> 
+> /** assert value of @a is little than @v */
+> -#define LASSERT_ATOMIC_LT(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) < v,			\
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_LT(a, v)		\
+> +	LASSERTF(atomic_read(a) < v, "value: %d\n", atomic_read((a)))
+> 
+> /** assert value of @a is little/equal to @v */
+> -#define LASSERT_ATOMIC_LE(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) <= v,		       \
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_LE(a, v)		\
+> +	LASSERTF(atomic_read(a) <= v, "value: %d\n", atomic_read((a)))
+> 
+> /** assert value of @a is great than @v */
+> -#define LASSERT_ATOMIC_GT(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) > v,			\
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_GT(a, v)		\
+> +	LASSERTF(atomic_read(a) > v, "value: %d\n", atomic_read((a)))
+> 
+> /** assert value of @a is great/equal to @v */
+> -#define LASSERT_ATOMIC_GE(a, v)				 \
+> -do {							    \
+> -	LASSERTF(atomic_read(a) >= v,		       \
+> -		 "value: %d\n", atomic_read((a)));	  \
+> -} while (0)
+> +#define LASSERT_ATOMIC_GE(a, v)		\
+> +	LASSERTF(atomic_read(a) >= v, "value: %d\n", atomic_read((a)))
+> 
+> /** assert value of @a is great than @v1 and little than @v2 */
+> #define LASSERT_ATOMIC_GT_LT(a, v1, v2)			 \
+> -- 
+> 2.10.2
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
-> Will you be at LUG? At least Tim from our team will participate and it might be a good opportunity to discuss
-> a joint approach.
-
-I'm not sure yet. Now I've graduated I need to find my own funding
-source for travel.
-
+Cheers, Andreas
 --
-Yan
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
