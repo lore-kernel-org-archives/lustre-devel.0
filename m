@@ -1,61 +1,63 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Wed, 19 Apr 2017 01:21:04 +0000
-Subject: [lustre-devel] [Patch v3 1/2] lustre: Parantheses added for
- Macro argument to avoid precedence issues
-In-Reply-To: <20170418155019.GA7263@kroah.com>
-References: <a2e734ab4562ded68cb7e7b8d55f51f757189fcd.1492255078>
-	<VI1PR0901MB16166F494E9CECB93E1CD478A4040@VI1PR0901MB1616.eurprd09.prod.outlook.com>
-	<20170418155019.GA7263@kroah.com>
-Message-ID: <288867FC-FBC8-4E2B-B018-409822B24232@intel.com>
+From: =?utf-8?B?QnJpbmttYW5uLCBQcm9mLiBEci4gQW5kcsOp?= <brinkman@uni-mainz.de>
+Date: Fri, 21 Apr 2017 12:50:11 +0000
+Subject: [lustre-devel] [PATCH 1/6] Autoconf option for rate-limiting
+ Quality of Service (RLQOS)
+In-Reply-To: <7ca175f0-85b1-e80d-d67b-b5d49eeacd17@ascar.io>
+References: <cover.1490122510.git.yanli@ascar.io>
+	<99fe8fdaaaa5b6fd36c0782269bc45a580079696.1490122510.git.yanli@ascar.io>
+	<3FFFCE73-97FE-4A10-8AC6-47D835CC6B3C@intel.com>
+	<3BE4A898-D944-41F9-84C8-FE8DA80D0D65@datadirectnet.com>
+	<949ca9f8-c4a5-1413-abbb-4777189ba425@ascar.io>
+	<E08AFD6D-2057-4CDC-8F2A-85AC18AA8203@uni-mainz.de>
+	<7ca175f0-85b1-e80d-d67b-b5d49eeacd17@ascar.io>
+Message-ID: <DE4D86BC-E5B3-49D7-B1B7-1A24DFDFA4E6@uni-mainz.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "greg@kroah.com" <greg@kroah.com>
-Cc: Rishiraj Manwatkar <manwatkar@outlook.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>
-
-On Apr 18, 2017, at 09:50, greg at kroah.com wrote:
-> 
-> On Sat, Apr 15, 2017 at 01:50:42PM +0000, Rishiraj Manwatkar wrote:
->> Subject: [Patch v3 1/2] lustre: Parantheses added for Macro argument to avoid precedence issues
-
-(typo) s/Parantheses/parenthesis/ s/Macro/macro/
-
-The Subject line (excluding [PATCH] part) should be under 60
-
->> Parantheses are added for Macro argument, to avoid precedence issues.
+To: lustre-devel@lists.lustre.org
 
 
-Should be something like:
+    On 04/17/2017 05:32 AM, Brinkmann, Prof. Dr. Andr? wrote:
+    > I fully agree that your approach to learn a small rule-set is very interesting to optimize overall 
+    > Lustre bandwidth. What I have not been able to fully understand from your paper is the cost of 
+    > adaptation. What is happening in a cluster running many jobs at the same time applying very different 
+    > access patterns (in very different combinations to different OSSes)?
+    
+    When there are many jobs, their aggregated  I/O pattern can usually be
+    treated as a mixed random read/write workload. The more jobs you have,
+    the more uniformly random the I/O pattern is. My experience is that they
+    are not that hard to optimize. The hardest to optimize are when only one
+    or two I/O job is running and they have a very special I/O pattern.
+    
+    > We have just started to collect these patterns. Might be interesting to apply different (machine learning)
+    > algorithms on top of these patters going into different directions:
+    > 
+    > - Optimize overall bandwidth (like ASCAR is doing)
+    
+    This is similar to what I'm working on. I've been systematically testing
+    many machine learning algorithms on bandwidth optimization, and some of
+    them have pretty good results. My problem is that all my workloads so
+    far are synthetic.
+    
+    > - Optimize bandwidth while supporting QoS rules for certain
+    > applications
+    
+    This is on my radar. I'll look into your design and implementation to
+    see how we can do something interesting together.
+    
+    > Will you be at LUG? At least Tim from our team will participate and it might be a good opportunity to discuss
+    > a joint approach.
+    
+    I'm not sure yet. Now I've graduated I need to find my own funding
+    source for travel.
+ 
+We should try to setup a conf-call after LUG if you are unable to attend to streamline our development.
 
-Subject: [PATCH v4 1/2] staging/lustre: add parenthesis to macro arguments
+Cheers, 
 
-Add parenthesis to cl_io_for_each() macro to avoid potential issues with
-unexpected argument expansion in CPP.
-
->> Signed-off-by: Rishiraj Manwatkar <manwatkar@outlook.com>
->> ---
->> v1 -> v2: Added mailing list in cc.
->> v2 -> v3: Changed From: to be same as Signed-off-by:.
->> drivers/staging/lustre/lustre/obdclass/cl_io.c | 4 ++--
->> 1 file changed, 2 insertions(+), 2 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> index ee7d677..0997254 100755
->> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
->> @@ -52,9 +52,9 @@
->>  */
->> 
->> #define cl_io_for_each(slice, io) \
->> -	list_for_each_entry((slice), &io->ci_layers, cis_linkage)
->> +	list_for_each_entry((slice), &(io)->ci_layers, cis_linkage)
-> 
-> Really?  There is no precedence issues that I can see here, sorry.
-
-
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel Corporation
+Andr?
+   
+    --
+    Yan
+    
