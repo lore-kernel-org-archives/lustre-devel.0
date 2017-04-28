@@ -1,40 +1,46 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Fri, 28 Apr 2017 09:30:31 +0200
-Subject: [lustre-devel] [PATCH] drivers: staging: lustre: lustre: llite:
- file.c - fixed sparse warning about different fmode_t type
-In-Reply-To: <20170424065311.GA32527@gmail.com>
-References: <20170424065311.GA32527@gmail.com>
-Message-ID: <20170428073031.GB29107@kroah.com>
+From: greg at kroah.com <greg@kroah.com>
+Date: Fri, 28 Apr 2017 11:42:27 +0200
+Subject: [lustre-devel] [Patch v4 1/2] staging/lustre: add parenthesis
+	to macro argument
+In-Reply-To: <VI1PR0901MB161661F1051BA2598CCE8DA0A4180@VI1PR0901MB1616.eurprd09.prod.outlook.com>
+References: <eff7ffe99acb472d970754b6572573e36bfc8a7f.1492263580>
+	<VI1PR0901MB161661F1051BA2598CCE8DA0A4180@VI1PR0901MB1616.eurprd09.prod.outlook.com>
+Message-ID: <20170428094227.GA7739@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Andrea della Porta <sfaragnaus@gmail.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Rishiraj Manwatkar <manwatkar@outlook.com>
+Cc: "andreas.dilger@intel.com" <andreas.dilger@intel.com>, "oleg.drokin@intel.com" <oleg.drokin@intel.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-On Mon, Apr 24, 2017 at 07:53:11AM +0100, Andrea della Porta wrote:
-> fixed a couple of sparse warning complaining about type mismatch.
-
-That's really vague, please be specific.
-
+On Wed, Apr 19, 2017 at 03:50:05PM +0000, Rishiraj Manwatkar wrote:
+> Add parenthesis to cl_io_for_each() macro to avoid potential issues with
+> unexpected argument expansion in CPP.
 > 
-> Signed-off-by: Andrea della Porta <sfaragnaus@gmail.com>
+> Signed-off-by: Rishiraj Manwatkar <manwatkar@outlook.com>
 > ---
->  drivers/staging/lustre/lustre/include/lustre_intent.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  v1 -> v2: Added mailing list in cc.
+>  v2 -> v3: Changed From: to be same as Signed-off-by:.
+>  v3 -> v4: Changed Subject line and patch description as suggested by andreas.dilger at intel.com
+>  drivers/staging/lustre/lustre/obdclass/cl_io.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/include/lustre_intent.h b/drivers/staging/lustre/lustre/include/lustre_intent.h
-> index ed2b6c6..c036633 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre_intent.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre_intent.h
-> @@ -38,7 +38,7 @@
->  struct lookup_intent {
->  	int		it_op;
->  	int		it_create_mode;
-> -	__u64		it_flags;
-> +	fmode_t		it_flags;
+> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> index ee7d677..0997254 100755
+> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+> @@ -52,9 +52,9 @@
+>   */
+>  
+>  #define cl_io_for_each(slice, io) \
+> -	list_for_each_entry((slice), &io->ci_layers, cis_linkage)
+> +	list_for_each_entry((slice), &(io)->ci_layers, cis_linkage)
+>  #define cl_io_for_each_reverse(slice, io)		 \
+> -	list_for_each_entry_reverse((slice), &io->ci_layers, cis_linkage)
+> +	list_for_each_entry_reverse((slice), &(io)->ci_layers, cis_linkage)
 
-Are you sure?  Why?  What exact warning did this "fix"?
+No, the original code is correct, that's going to be a variable only,
+not any type of "complex argument".
 
 thanks,
 
