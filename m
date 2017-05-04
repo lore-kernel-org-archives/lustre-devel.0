@@ -1,39 +1,66 @@
-From: Tordek <kedrot@gmail.com>
-Date: Fri, 5 May 2017 10:53:11 -0300
-Subject: [lustre-devel] [PATCH] drivers: staging/lustre: conrpc.c - fix
- sparse error: incompatible types in comparison expression (different
- address spaces)
-In-Reply-To: <20170505135129.14757-1-kedrot@gmail.com>
-References: <20170505135129.14757-1-kedrot@gmail.com>
-Message-ID: <CAKUXR6Mo-3QR0PQGf_7Otx2S3imowZzBD0Xs=xAY-m_sdHGNaw@mail.gmail.com>
+From: Mathias Rav <mathiasrav@gmail.com>
+Date: Thu,  4 May 2017 12:13:38 -0400
+Subject: [lustre-devel] [PATCH 1/2] staging: lustre: lprocfs: Use
+	kstrtouint_from_user
+In-Reply-To: <20170504161339.15901-1-mathiasrav@gmail.com>
+References: <20170504161339.15901-1-mathiasrav@gmail.com>
+Message-ID: <20170504161339.15901-2-mathiasrav@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Mathias Rav <mathiasrav@gmail.com>
 
-This patch makes a lot of new warnings pop up, because the error is
-blocking the rest of the file from being processed.
+Prefer kstrtouint_from_user to copy_from_user+simple_strtoul.
 
-On 5 May 2017 at 10:51, Guillermo O. Freschi <kedrot@gmail.com> wrote:
-> Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
-> ---
->  drivers/staging/lustre/lnet/selftest/conrpc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-> index da36c55b86d3..f4578200994f 100644
-> --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-> +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-> @@ -487,7 +487,7 @@ lstcon_rpc_trans_interpreter(struct lstcon_rpc_trans *trans,
->                                    sizeof(struct list_head)))
->                         return -EFAULT;
->
-> -               if (tmp.next == head_up)
-> +               if ((struct list_head __user *)tmp.next == head_up)
->                         return 0;
->
->                 next = tmp.next;
-> --
-> 2.11.0
->
+The helper function lprocfs_wr_uint() is only used to implement
+"dump_granted_max" in debugfs.
+
+Note the slight change in semantics: The previous implementation using
+simple_strtoul allows garbage after the number, whereas kstrtox only allows
+a trailing line break. The previous implementation allowed a write of zero
+bytes whereas kstrtox will return -EINVAL. Since this only affects a single
+debugfs endpoint, this should be a permissible slight change of semantics
+in exchange for 18 fewer lines of code.
+
+Signed-off-by: Mathias Rav <mathiasrav@gmail.com>
+---
+ .../lustre/lustre/obdclass/lprocfs_status.c        | 22 +---------------------
+ 1 file changed, 1 insertion(+), 21 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index 1ec6e3767d81..338ce34d6514 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -399,27 +399,7 @@ EXPORT_SYMBOL(lprocfs_rd_uint);
+ int lprocfs_wr_uint(struct file *file, const char __user *buffer,
+ 		    unsigned long count, void *data)
+ {
+-	unsigned *p = data;
+-	char dummy[MAX_STRING_SIZE + 1], *end;
+-	unsigned long tmp;
+-
+-	if (count >= sizeof(dummy))
+-		return -EINVAL;
+-
+-	if (count == 0)
+-		return 0;
+-
+-	if (copy_from_user(dummy, buffer, count))
+-		return -EFAULT;
+-
+-	dummy[count] = '\0';
+-
+-	tmp = simple_strtoul(dummy, &end, 0);
+-	if (dummy == end)
+-		return -EINVAL;
+-
+-	*p = (unsigned int)tmp;
+-	return count;
++	return kstrtouint_from_user(buffer, count, 0, (unsigned int *)data);
+ }
+ EXPORT_SYMBOL(lprocfs_wr_uint);
+ 
+-- 
+2.12.2
