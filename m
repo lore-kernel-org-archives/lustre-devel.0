@@ -1,66 +1,67 @@
-From: Mathias Rav <mathiasrav@gmail.com>
-Date: Thu,  4 May 2017 12:13:38 -0400
-Subject: [lustre-devel] [PATCH 1/2] staging: lustre: lprocfs: Use
-	kstrtouint_from_user
-In-Reply-To: <20170504161339.15901-1-mathiasrav@gmail.com>
-References: <20170504161339.15901-1-mathiasrav@gmail.com>
-Message-ID: <20170504161339.15901-2-mathiasrav@gmail.com>
+From: Valentin Vidic <Valentin.Vidic@CARNet.hr>
+Date: Fri,  5 May 2017 07:27:41 +0200
+Subject: [lustre-devel] [PATCH v2] staging: lustre: cleanup le32 assignment
+	to ldp_flags
+In-Reply-To: <20170429154900.25819-1-Valentin.Vidic@CARNet.hr>
+References: <20170429154900.25819-1-Valentin.Vidic@CARNet.hr>
+Message-ID: <20170505052741.5713-1-Valentin.Vidic@CARNet.hr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Mathias Rav <mathiasrav@gmail.com>
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+Cc: Valentin Vidic <Valentin.Vidic@CARNet.hr>
 
-Prefer kstrtouint_from_user to copy_from_user+simple_strtoul.
+Introduces a local var to collect flags and convert
+them to le32.
 
-The helper function lprocfs_wr_uint() is only used to implement
-"dump_granted_max" in debugfs.
+Fixes the following sparse warnings:
 
-Note the slight change in semantics: The previous implementation using
-simple_strtoul allows garbage after the number, whereas kstrtox only allows
-a trailing line break. The previous implementation allowed a write of zero
-bytes whereas kstrtox will return -EINVAL. Since this only affects a single
-debugfs endpoint, this should be a permissible slight change of semantics
-in exchange for 18 fewer lines of code.
+drivers/staging/lustre/lustre/lmv/lmv_obd.c:2305:23: warning: invalid assignment: |=
+drivers/staging/lustre/lustre/lmv/lmv_obd.c:2305:23:    left side has type restricted __le32
+drivers/staging/lustre/lustre/lmv/lmv_obd.c:2305:23:    right side has type int
+drivers/staging/lustre/lustre/lmv/lmv_obd.c:2383:39: warning: invalid assignment: |=
+drivers/staging/lustre/lustre/lmv/lmv_obd.c:2383:39:    left side has type restricted __le32
+drivers/staging/lustre/lustre/lmv/lmv_obd.c:2383:39:    right side has type int
 
-Signed-off-by: Mathias Rav <mathiasrav@gmail.com>
+Signed-off-by: Valentin Vidic <Valentin.Vidic@CARNet.hr>
 ---
- .../lustre/lustre/obdclass/lprocfs_status.c        | 22 +---------------------
- 1 file changed, 1 insertion(+), 21 deletions(-)
+Changes in v2: use a local var to collect flags
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index 1ec6e3767d81..338ce34d6514 100644
---- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -399,27 +399,7 @@ EXPORT_SYMBOL(lprocfs_rd_uint);
- int lprocfs_wr_uint(struct file *file, const char __user *buffer,
- 		    unsigned long count, void *data)
- {
--	unsigned *p = data;
--	char dummy[MAX_STRING_SIZE + 1], *end;
--	unsigned long tmp;
--
--	if (count >= sizeof(dummy))
--		return -EINVAL;
--
--	if (count == 0)
--		return 0;
--
--	if (copy_from_user(dummy, buffer, count))
--		return -EFAULT;
--
--	dummy[count] = '\0';
--
--	tmp = simple_strtoul(dummy, &end, 0);
--	if (dummy == end)
--		return -EINVAL;
--
--	*p = (unsigned int)tmp;
--	return count;
-+	return kstrtouint_from_user(buffer, count, 0, (unsigned int *)data);
- }
- EXPORT_SYMBOL(lprocfs_wr_uint);
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 09b469243d73..bec8c1948fa0 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -2275,6 +2275,7 @@ static int lmv_read_striped_page(struct obd_export *exp,
+ 	struct lu_fid master_fid = op_data->op_fid1;
+ 	struct obd_device *obd = exp->exp_obd;
+ 	__u64 hash_offset = offset;
++	__u32 ldp_flags;
+ 	struct page *min_ent_page = NULL;
+ 	struct page *ent_page = NULL;
+ 	struct lu_dirent *min_ent = NULL;
+@@ -2302,7 +2303,7 @@ static int lmv_read_striped_page(struct obd_export *exp,
+ 	dp = kmap(ent_page);
+ 	memset(dp, 0, sizeof(*dp));
+ 	dp->ldp_hash_start = cpu_to_le64(offset);
+-	dp->ldp_flags |= LDF_COLLIDE;
++	ldp_flags = LDF_COLLIDE;
+ 
+ 	area = dp + 1;
+ 	left_bytes = PAGE_SIZE - sizeof(*dp);
+@@ -2380,8 +2381,8 @@ static int lmv_read_striped_page(struct obd_export *exp,
+ 		ent_page = NULL;
+ 	} else {
+ 		if (ent == area)
+-			dp->ldp_flags |= LDF_EMPTY;
+-		dp->ldp_flags = cpu_to_le32(dp->ldp_flags);
++			ldp_flags |= LDF_EMPTY;
++		dp->ldp_flags |= cpu_to_le32(ldp_flags);
+ 		dp->ldp_hash_end = cpu_to_le64(hash_offset);
+ 	}
  
 -- 
-2.12.2
+2.11.0
