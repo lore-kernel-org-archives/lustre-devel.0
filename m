@@ -1,30 +1,33 @@
-From: Joe Perches <joe@perches.com>
-Date: Fri, 05 May 2017 01:52:36 -0700
-Subject: [lustre-devel] [PATCH] staging: lustre: llite: Fix variable
- length array warning
-In-Reply-To: <1493966486-6143-1-git-send-email-gurooodas@gmail.com>
-References: <1493966486-6143-1-git-send-email-gurooodas@gmail.com>
-Message-ID: <1493974356.31950.13.camel@perches.com>
+From: Guillermo O. Freschi <kedrot@gmail.com>
+Date: Fri,  5 May 2017 10:51:29 -0300
+Subject: [lustre-devel] [PATCH] drivers: staging/lustre: conrpc.c - fix
+	sparse error: incompatible types in comparison expression
+	(different address spaces)
+Message-ID: <20170505135129.14757-1-kedrot@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Guru Das Srinagesh <gurooodas@gmail.com>, oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org
-Cc: john.hammond@intel.com, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
+Cc: "Guillermo O. Freschi" <kedrot@gmail.com>
 
-On Thu, 2017-05-04 at 23:41 -0700, Guru Das Srinagesh wrote:
-> Fix sparse warning "warning: Variable length array is used." by using
-> kmalloc_array to allocate the required amount of memory instead and
-> kfree to deallocate memory after use.
-[]
-> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-[]
-> @@ -86,7 +86,8 @@ ll_xattr_set_common(const struct xattr_handler *handler,
->  		    const char *name, const void *value, size_t size,
->  		    int flags)
->  {
-> -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
-> +	int fullname_len = strlen(handler->prefix) + strlen(name) + 1;
-> +	char *fullname = kmalloc_array(fullname_len, sizeof(char), GFP_KERNEL);
+Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
+---
+ drivers/staging/lustre/lnet/selftest/conrpc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-What happens when this allocation fails?
+diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
+index da36c55b86d3..f4578200994f 100644
+--- a/drivers/staging/lustre/lnet/selftest/conrpc.c
++++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
+@@ -487,7 +487,7 @@ lstcon_rpc_trans_interpreter(struct lstcon_rpc_trans *trans,
+ 				   sizeof(struct list_head)))
+ 			return -EFAULT;
+ 
+-		if (tmp.next == head_up)
++		if ((struct list_head __user *)tmp.next == head_up)
+ 			return 0;
+ 
+ 		next = tmp.next;
+-- 
+2.11.0
