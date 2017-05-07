@@ -1,13 +1,13 @@
 From: Guru Das Srinagesh <gurooodas@gmail.com>
-Date: Mon,  8 May 2017 23:57:16 -0700
-Subject: [lustre-devel] [PATCH v4] staging: lustre: llite: Fix variable
+Date: Sun,  7 May 2017 02:33:32 -0700
+Subject: [lustre-devel] [PATCH v3] staging: lustre: llite: Fix variable
 	length array warning
-Message-ID: <1494313036-15955-1-git-send-email-gurooodas@gmail.com>
+Message-ID: <1494149612-2631-1-git-send-email-gurooodas@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, joe@perches.com
+To: oleg.drokin@intel.com, joe@perches.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org
 Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
 Fix sparse warning "warning: Variable length array is used." by using
@@ -16,9 +16,6 @@ kfree to deallocate memory after use.
 
 Signed-off-by: Guru Das Srinagesh <gurooodas@gmail.com>
 ---
- v4:
-   - Changed kmalloc_array flags from GFP_KERNEL to GFP_ATOMIC
-
  v3:
    - Fixed checkpatch warning: Comparison to NULL could be written "!fullname"
 
@@ -29,7 +26,7 @@ Signed-off-by: Guru Das Srinagesh <gurooodas@gmail.com>
  1 file changed, 19 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 6187bff..ae2efd5 100644
+index 6187bff..35f38eb 100644
 --- a/drivers/staging/lustre/lustre/llite/xattr.c
 +++ b/drivers/staging/lustre/lustre/llite/xattr.c
 @@ -86,13 +86,17 @@ ll_xattr_set_common(const struct xattr_handler *handler,
@@ -38,7 +35,7 @@ index 6187bff..ae2efd5 100644
  {
 -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
 +	int fullname_len = strlen(handler->prefix) + strlen(name) + 1;
-+	char *fullname = kmalloc_array(fullname_len, sizeof(char), GFP_ATOMIC);
++	char *fullname = kmalloc_array(fullname_len, sizeof(char), GFP_KERNEL);
  	struct ll_sb_info *sbi = ll_i2sbi(inode);
  	struct ptlrpc_request *req = NULL;
  	const char *pv = value;
@@ -67,7 +64,7 @@ index 6187bff..ae2efd5 100644
  {
 -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
 +	int fullname_len = strlen(handler->prefix) + strlen(name) + 1;
-+	char *fullname = kmalloc_array(fullname_len, sizeof(char), GFP_ATOMIC);
++	char *fullname = kmalloc_array(fullname_len, sizeof(char), GFP_KERNEL);
  	struct ll_sb_info *sbi = ll_i2sbi(inode);
  #ifdef CONFIG_FS_POSIX_ACL
  	struct ll_inode_info *lli = ll_i2info(inode);
