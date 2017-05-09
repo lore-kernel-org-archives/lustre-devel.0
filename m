@@ -1,35 +1,19 @@
 From: Guru Das Srinagesh <gurooodas@gmail.com>
-Date: Sun, 7 May 2017 16:59:46 -0700
-Subject: [lustre-devel] [PATCH v2] staging: lustre: llite: Fix variable
+Date: Tue, 9 May 2017 02:10:34 -0700
+Subject: [lustre-devel] [PATCH v4] staging: lustre: llite: Fix variable
  length array warning
-In-Reply-To: <1494199491.31950.52.camel@perches.com>
-References: <1494149009-2121-1-git-send-email-gurooodas@gmail.com>
-	<1494199491.31950.52.camel@perches.com>
-Message-ID: <20170507235946.GA2898@alpha>
+In-Reply-To: <20170509083136.auumomyrgat4oc2k@mwanda>
+References: <1494313036-15955-1-git-send-email-gurooodas@gmail.com>
+	<20170509083136.auumomyrgat4oc2k@mwanda>
+Message-ID: <20170509091034.GA29060@alpha>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Joe Perches <joe@perches.com>
-Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Dan Carpenter <dan.carpenter@oracle.com>
+Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, joe@perches.com, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-On Sun, May 07, 2017 at 04:24:51PM -0700, Joe Perches wrote:
-> On Sun, 2017-05-07 at 02:23 -0700, Guru Das Srinagesh wrote:
-> > Fix sparse warning "warning: Variable length array is used." by using
-> > kmalloc_array to allocate the required amount of memory instead and
-> > kfree to deallocate memory after use.
-> []
-> > diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-> []
-> > @@ -86,13 +86,17 @@ ll_xattr_set_common(const struct xattr_handler *handler,
-> >  		    const char *name, const void *value, size_t size,
-> >  		    int flags)
-> >  {
-> > -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
-> > +	int fullname_len = strlen(handler->prefix) + strlen(name) + 1;
-> > +	char *fullname = kmalloc_array(fullname_len, sizeof(char), GFP_KERNEL);
+On Tue, May 09, 2017 at 11:31:36AM +0300, Dan Carpenter wrote:
+> Just ignore the warning.
 > 
-> Are you sure about using GFP_KERNEL and that sleeping is
-> allowed for this function allocation?
-> 
-I'm not sure about that. Would GFP_ATOMIC be a better flag to use?
+Thank you for your comments on this patch.
