@@ -1,34 +1,46 @@
-From: quentin.bouget at cea.fr <quentin.bouget@cea.fr>
-Date: Wed, 17 May 2017 13:16:34 +0200
-Subject: [lustre-devel] have df report a more up-to-date view of the
- filesystem
-Message-ID: <9e5f3b8d-b5f5-ce10-2b35-e6f13b7de532@cea.fr>
+From: Robin Humble <rjh+lustre@cita.utoronto.ca>
+Date: Wed, 17 May 2017 10:17:11 -0400
+Subject: [lustre-devel] [PATCH] lustre: llite: Remove filtering of seclabel
+	xattr
+Message-ID: <20170517141711.GB1064@trinity.cita.utoronto.ca>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi everyone,
+Signed-off-by: Robin Humble <plaguedbypenguins@gmail.com>
+---
+ lustre/llite/xattr.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-In LU-8940 <https://jira.hpdd.intel.com/browse/LU-8940> I describe an 
-issue I am having with df in Lustre's tests. In short, df/statfs can 
-report outdated information about a Lustre filesystem; given enough 
-time, its output gets correct. From what I understand, statfs cannot 
-report an "always up-to-date" view of the filesystem as this would cost 
-too much time and resources.
-
-I would like to know what you guys think of having Lustre's statfs 
-operation report a view of the filesystem /at least as new as when the 
-last sync operation completed/?
-
-My point being that users (and tests) would be able to run df --sync to 
-get up-to-date information (at the cost of a sync operation, and maybe 
-some accounting for statfs).
-
-Regards,
-Quentin
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170517/bb8336a2/attachment.htm>
+diff --git a/lustre/llite/xattr.c b/lustre/llite/xattr.c
+index 4d42956..527ee40 100644
+--- a/lustre/llite/xattr.c
++++ b/lustre/llite/xattr.c
+@@ -147,11 +147,6 @@ int ll_setxattr_common(struct inode *inode, const char *name,
+ 		 strcmp(name, "lustre.lov") == 0))
+ 		RETURN(0);
+ 
+-	/* b15587: ignore security.capability xattr for now */
+-	if ((xattr_type == XATTR_SECURITY_T &&
+-	    strcmp(name, "security.capability") == 0))
+-		RETURN(0);
+-
+ 	/* LU-549:  Disable security.selinux when selinux is disabled */
+ 	if (xattr_type == XATTR_SECURITY_T && !selinux_is_enabled() &&
+ 	    strcmp(name, "security.selinux") == 0)
+@@ -343,11 +338,6 @@ int ll_getxattr_common(struct inode *inode, const char *name,
+         if (rc)
+                 RETURN(rc);
+ 
+-        /* b15587: ignore security.capability xattr for now */
+-        if ((xattr_type == XATTR_SECURITY_T &&
+-            strcmp(name, "security.capability") == 0))
+-                RETURN(-ENODATA);
+-
+         /* LU-549:  Disable security.selinux when selinux is disabled */
+         if (xattr_type == XATTR_SECURITY_T && !selinux_is_enabled() &&
+             strcmp(name, "security.selinux") == 0)
+-- 
+2.9.4
