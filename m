@@ -1,46 +1,23 @@
-From: Robin Humble <rjh+lustre@cita.utoronto.ca>
-Date: Wed, 17 May 2017 10:17:11 -0400
-Subject: [lustre-devel] [PATCH] lustre: llite: Remove filtering of seclabel
-	xattr
-Message-ID: <20170517141711.GB1064@trinity.cita.utoronto.ca>
+From: Simmons, James A. <simmonsja@ornl.gov>
+Date: Wed, 17 May 2017 17:58:47 +0000
+Subject: [lustre-devel] Request for review
+In-Reply-To: <A9CE5A7F-3D47-4E03-9F8C-2EB15787F484@intel.com>
+References: <CY4PR11MB1751856322B51A0DC95662FCCBEA0@CY4PR11MB1751.namprd11.prod.outlook.com>
+	<A9CE5A7F-3D47-4E03-9F8C-2EB15787F484@intel.com>
+Message-ID: <9b6143644c894de6b1c8caba04edc024@EXCHCS32.ornl.gov>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Signed-off-by: Robin Humble <plaguedbypenguins@gmail.com>
----
- lustre/llite/xattr.c | 10 ----------
- 1 file changed, 10 deletions(-)
+>I just found this in my inbox.  Good to see that several people stepped up to do the inspection.
+>
+>Now, only a few hundred other patches that need review... :-)  I definitely think that in case of patch review that the squeaky wheel gets the attention.  Posting to lustre-devel seems like a good way to get some >wider attention onto patches?
 
-diff --git a/lustre/llite/xattr.c b/lustre/llite/xattr.c
-index 4d42956..527ee40 100644
---- a/lustre/llite/xattr.c
-+++ b/lustre/llite/xattr.c
-@@ -147,11 +147,6 @@ int ll_setxattr_common(struct inode *inode, const char *name,
- 		 strcmp(name, "lustre.lov") == 0))
- 		RETURN(0);
- 
--	/* b15587: ignore security.capability xattr for now */
--	if ((xattr_type == XATTR_SECURITY_T &&
--	    strcmp(name, "security.capability") == 0))
--		RETURN(0);
--
- 	/* LU-549:  Disable security.selinux when selinux is disabled */
- 	if (xattr_type == XATTR_SECURITY_T && !selinux_is_enabled() &&
- 	    strcmp(name, "security.selinux") == 0)
-@@ -343,11 +338,6 @@ int ll_getxattr_common(struct inode *inode, const char *name,
-         if (rc)
-                 RETURN(rc);
- 
--        /* b15587: ignore security.capability xattr for now */
--        if ((xattr_type == XATTR_SECURITY_T &&
--            strcmp(name, "security.capability") == 0))
--                RETURN(-ENODATA);
--
-         /* LU-549:  Disable security.selinux when selinux is disabled */
-         if (xattr_type == XATTR_SECURITY_T && !selinux_is_enabled() &&
-             strcmp(name, "security.selinux") == 0)
--- 
-2.9.4
+If this is the case I really like to see 
+
+https://review.whamcloud.com/#/c/26966
+
+reviewed. One more patch after that and the LU-6401 work will be completed.
+Once done only one patch to finish off the libcfs header cleanup. So close!!!!
