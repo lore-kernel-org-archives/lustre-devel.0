@@ -1,35 +1,39 @@
-From: Faaland, Olaf P. <faaland1@llnl.gov>
-Date: Tue, 16 May 2017 18:03:32 +0000
-Subject: [lustre-devel] lctl dl - different devices with same device name
-Message-ID: <F46BAA88-7E46-4614-994A-01B5CE909CC1@llnl.gov>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Wed, 17 May 2017 12:34:18 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: specify address
+	space
+In-Reply-To: <20170516205610.21324-1-melko@frugalware.org>
+References: <20170516205610.21324-1-melko@frugalware.org>
+Message-ID: <20170517093418.pv4brp4imlebqt5i@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hi All,
+On Tue, May 16, 2017 at 10:56:10PM +0200, Paolo Cretaro wrote:
+> Fix warning issued by sparse:
+> incorrect type in assignment (different address spaces).
+> 
+> Signed-off-by: Paolo Cretaro <melko@frugalware.org>
+> ---
+>  drivers/staging/lustre/lnet/lnet/lib-socket.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+> index 9fca8d225ee0..e5e5213b4da0 100644
+> --- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
+> +++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+> @@ -181,7 +181,7 @@ lnet_ipif_enumerate(char ***namesp)
+>  			goto out0;
+>  		}
+>  
+> -		ifc.ifc_buf = (char *)ifr;
+> +		ifc.ifc_buf = (char __user *)ifr;
 
-This is regarding Lustre 2.8 FE ? 2.8.0 + backported bug fixes.
+But it's not a __user pointer so this is wrong.  You have deleted a
+valuable warning message which is there to inform us about important
+bugs.
 
-Typically our MDS nodes run only a single MDT.  When this is the case, lctl dl produces 25 lines of output:
-
-Osd
-Mgc
-Mds
-Lod
-Mdt
-Mdd
-Lwp
-And 19 osp?s ? one for each other lustre target in the file system.
-
-Two of these devices listed, the mdt and the mdd, have the same name.  For example,
-
-4 UP mdt lquake-MDT000f lquake-MDT000f-UUID 327
-5 UP mdd lquake-MDT000f lquake-MDT000f-UUID 4
-
-Is it correct that they have the same name?  I ask, because the functions jt_device() calls assume that they can uniquely map from a name to a device number, but in this case that?s not possible.
-
-I could improve the utility code easily enough, but I don?t know if the device names are correct or not.  There?s no evidence the file system isn?t working correctly.
-
--Olaf
+regards,
+dan carpenter
