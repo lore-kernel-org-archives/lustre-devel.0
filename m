@@ -1,75 +1,71 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Thu, 18 May 2017 08:30:36 +0000
-Subject: [lustre-devel] [PATCH 6/6] staging/lustre: Use generic range
-	rwlock
-In-Reply-To: <20170515090725.27055-7-dave@stgolabs.net>
-References: <20170515090725.27055-1-dave@stgolabs.net>
-	<20170515090725.27055-7-dave@stgolabs.net>
-Message-ID: <907C3F64-C3AF-4027-98F2-58877E650368@intel.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Thu, 18 May 2017 15:53:22 +0200
+Subject: [lustre-devel] [PATCH 1/2] staging: lustre: lprocfs: Use
+	kstrtouint_from_user
+In-Reply-To: <20170504161339.15901-2-mathiasrav@gmail.com>
+References: <20170504161339.15901-1-mathiasrav@gmail.com>
+	<20170504161339.15901-2-mathiasrav@gmail.com>
+Message-ID: <20170518135322.GA6772@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Davidlohr Bueso <dave@stgolabs.net>
-Cc: "mingo@kernel.org" <mingo@kernel.org>, "peterz@infradead.org" <peterz@infradead.org>, "akpm@linux-foundation.org" <akpm@linux-foundation.org>, "jack@suse.cz" <jack@suse.cz>, "kirill.shutemov@linux.intel.com" <kirill.shutemov@linux.intel.com>, "ldufour@linux.vnet.ibm.com" <ldufour@linux.vnet.ibm.com>, "mhocko@suse.com" <mhocko@suse.com>, "mgorman@techsingularity.net" <mgorman@techsingularity.net>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, "jsimmons@infradead.org" <jsimmons@infradead.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, Davidlohr Bueso <dbueso@suse.de>
+To: Mathias Rav <mathiasrav@gmail.com>
+Cc: devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On May 15, 2017, at 11:07, Davidlohr Bueso <dave@stgolabs.net> wrote:
+On Thu, May 04, 2017 at 12:13:38PM -0400, Mathias Rav wrote:
+> Prefer kstrtouint_from_user to copy_from_user+simple_strtoul.
 > 
-> This replaces the in-house version, which is also derived
-> from Jan's interval tree implementation.
+> The helper function lprocfs_wr_uint() is only used to implement
+> "dump_granted_max" in debugfs.
 > 
-> Cc: oleg.drokin at intel.com
-> Cc: andreas.dilger at intel.com
-> Cc: jsimmons at infradead.org
-> Cc: lustre-devel at lists.lustre.org
-> Signed-off-by: Davidlohr Bueso <dbueso@suse.de>
-
-Repeating my request that the whole patch series should be CC'd to the linux-fsdevel list,
-since I only got this last patch and this makes it difficult to review the whole series.
-
+> Note the slight change in semantics: The previous implementation using
+> simple_strtoul allows garbage after the number, whereas kstrtox only allows
+> a trailing line break. The previous implementation allowed a write of zero
+> bytes whereas kstrtox will return -EINVAL. Since this only affects a single
+> debugfs endpoint, this should be a permissible slight change of semantics
+> in exchange for 18 fewer lines of code.
+> 
+> Signed-off-by: Mathias Rav <mathiasrav@gmail.com>
 > ---
-> diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-> index 67c4b9cc6e75..bd020bdaf85d 100644
-> --- a/drivers/staging/lustre/lustre/llite/file.c
-> +++ b/drivers/staging/lustre/lustre/llite/file.c
-> @@ -1083,10 +1083,10 @@ ll_file_io_generic(const struct lu_env *env, struct vvp_io_args *args,
-> 		if (((iot == CIT_WRITE) ||
-> 		     (iot == CIT_READ && (file->f_flags & O_DIRECT))) &&
-> 		    !(vio->vui_fd->fd_flags & LL_FILE_GROUP_LOCKED)) {
-> -			CDEBUG(D_VFSTRACE, "Range lock [%llu, %llu]\n",
-> -			       range.rl_node.in_extent.start,
-> -			       range.rl_node.in_extent.end);
-> -			rc = range_lock(&lli->lli_write_tree, &range);
-> +			CDEBUG(D_VFSTRACE, "Range lock [%lu, %lu]\n",
-> +			       range.node.start,
-> +			       range.node.last);
-> +			rc = range_write_lock_interruptible(&lli->lli_write_tree, &range);
-> 			if (rc < 0)
-> 				goto out;
+>  .../lustre/lustre/obdclass/lprocfs_status.c        | 22 +---------------------
+>  1 file changed, 1 insertion(+), 21 deletions(-)
 > 
-> @@ -1096,10 +1096,10 @@ ll_file_io_generic(const struct lu_env *env, struct vvp_io_args *args,
-> 		rc = cl_io_loop(env, io);
-> 		ll_cl_remove(file, env);
-> 		if (range_locked) {
-> -			CDEBUG(D_VFSTRACE, "Range unlock [%llu, %llu]\n",
-> -			       range.rl_node.in_extent.start,
-> -			       range.rl_node.in_extent.end);
-> -			range_unlock(&lli->lli_write_tree, &range);
-> +			CDEBUG(D_VFSTRACE, "Range unlock [%lu, %lu]\n",
-> +			       range.node.start,
-> +			       range.node.last);
-> +			range_write_unlock(&lli->lli_write_tree, &range);
-> 		}
-> 	} else {
-> 		/* cl_io_rw_init() handled IO */
+> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+> index 1ec6e3767d81..338ce34d6514 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+> @@ -399,27 +399,7 @@ EXPORT_SYMBOL(lprocfs_rd_uint);
+>  int lprocfs_wr_uint(struct file *file, const char __user *buffer,
+>  		    unsigned long count, void *data)
+>  {
+> -	unsigned *p = data;
+> -	char dummy[MAX_STRING_SIZE + 1], *end;
+> -	unsigned long tmp;
+> -
+> -	if (count >= sizeof(dummy))
+> -		return -EINVAL;
+> -
+> -	if (count == 0)
+> -		return 0;
+> -
+> -	if (copy_from_user(dummy, buffer, count))
+> -		return -EFAULT;
+> -
+> -	dummy[count] = '\0';
+> -
+> -	tmp = simple_strtoul(dummy, &end, 0);
+> -	if (dummy == end)
+> -		return -EINVAL;
+> -
+> -	*p = (unsigned int)tmp;
+> -	return count;
+> +	return kstrtouint_from_user(buffer, count, 0, (unsigned int *)data);
 
-I'm not against this patch, but it does expose an implementation difference between the
-Lustre version of this code and the in-tree version.  Preferred kernel coding style is to
-have a struct-unique prefix for struct members (e.g. using "rl_" for struct range_lock,
-using "in_" for struct interval_tree_node).  That allows tags to work properly, instead
-of trying to locate generic struct names like "start", "node" etc.
+Why not just delete this whole function and have the callers make this
+call instead?  No need for unneeded wrapper functions of core kernel
+calls.
 
-In an unexpected twist of fate, the Lustre version of this code is following preferred
-coding style and the in-tree (interval_tree) and submitted (range_rwlock) code does not.
+thanks,
 
-Cheers, Andreas
+greg k-h
