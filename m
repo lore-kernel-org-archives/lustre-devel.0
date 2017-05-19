@@ -1,109 +1,45 @@
-From: Mathias Rav <mathiasrav@gmail.com>
-Date: Thu, 18 May 2017 22:49:21 -0400
-Subject: [lustre-devel] [PATCH v2 1/2] staging: lustre: Use
-	kstrtouint_from_user in ldlm_rw_uint
-In-Reply-To: <20170519024922.15222-1-mathiasrav@gmail.com>
-References: <20170519024922.15222-1-mathiasrav@gmail.com>
-Message-ID: <20170519024922.15222-2-mathiasrav@gmail.com>
+From: Nikola Jelic <nikola.jelic83@gmail.com>
+Date: Fri, 19 May 2017 20:48:07 +0200
+Subject: [lustre-devel] [PATCH] lustre: ko2iblnd: removed forced u32 casts
+	after htonl
+Message-ID: <20170519184807.9783-1-nikola.jelic83@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: mathiasrav@gmail.com, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-Clean up the helper functions used to implement "dump_granted_max" in
-debugfs.
+sockaddr_in.sin_addr.s_addr is __be32 integral type, so the (__force u32)
+cast after the htonl call is unnecessary, and also detected by sparse:
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c:2309:33: warning: incorrect type in assignment (different base types)
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c:2381:30: warning: incorrect type in assignment (different base types)
 
-Replace the lprocfs_rd_uint() and lprocfs_wr_uint() generic callbacks
-with a simpler, more direct implementation of ldlm_rw_uint_fops.
-
-There's a slight change in lustre debugfs write semantics: Using kstrtox
-causes EINVAL when the written number is followed by other (garbage)
-characters, whereas previously the garbage would be ignored and such a
-write would succeed.
-
-Signed-off-by: Mathias Rav <mathiasrav@gmail.com>
+Signed-off-by: Nikola Jelic <nikola.jelic83@gmail.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 20 ++++++++++++-
- .../lustre/lustre/obdclass/lprocfs_status.c        | 34 ----------------------
- 2 files changed, 19 insertions(+), 35 deletions(-)
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index 633f65b078eb..1c8b0ea10c32 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -78,7 +78,25 @@ lprocfs_wr_dump_ns(struct file *file, const char __user *buffer,
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 79321e4aaf30..0520f02f670d 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2306,7 +2306,7 @@ static int kiblnd_dev_need_failover(struct kib_dev *dev)
  
- LPROC_SEQ_FOPS_WR_ONLY(ldlm, dump_ns);
+ 	memset(&srcaddr, 0, sizeof(srcaddr));
+ 	srcaddr.sin_family = AF_INET;
+-	srcaddr.sin_addr.s_addr = (__force u32)htonl(dev->ibd_ifip);
++	srcaddr.sin_addr.s_addr = htonl(dev->ibd_ifip);
  
--LPROC_SEQ_FOPS_RW_TYPE(ldlm_rw, uint);
-+static int ldlm_rw_uint_seq_show(struct seq_file *m, void *v)
-+{
-+	seq_printf(m, "%u\n", *(unsigned int *)m->private);
-+	return 0;
-+}
-+
-+static ssize_t
-+ldlm_rw_uint_seq_write(struct file *file, const char __user *buffer,
-+		       size_t count, loff_t *off)
-+{
-+	struct seq_file *seq = file->private_data;
-+
-+	if (count == 0)
-+		return 0;
-+	return kstrtouint_from_user(buffer, count, 0,
-+				    (unsigned int *)seq->private);
-+}
-+
-+LPROC_SEQ_FOPS(ldlm_rw_uint);
+ 	memset(&dstaddr, 0, sizeof(dstaddr));
+ 	dstaddr.sin_family = AF_INET;
+@@ -2378,7 +2378,7 @@ int kiblnd_dev_failover(struct kib_dev *dev)
  
- static struct lprocfs_vars ldlm_debugfs_list[] = {
- 	{ "dump_namespaces", &ldlm_dump_ns_fops, NULL, 0222 },
-diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index 1ec6e3767d81..b42c4092bf22 100644
---- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -389,40 +389,6 @@ struct dentry *ldebugfs_register(const char *name,
- EXPORT_SYMBOL_GPL(ldebugfs_register);
+ 	memset(&addr, 0, sizeof(addr));
+ 	addr.sin_family      = AF_INET;
+-	addr.sin_addr.s_addr = (__force u32)htonl(dev->ibd_ifip);
++	addr.sin_addr.s_addr = htonl(dev->ibd_ifip);
+ 	addr.sin_port	= htons(*kiblnd_tunables.kib_service);
  
- /* Generic callbacks */
--int lprocfs_rd_uint(struct seq_file *m, void *data)
--{
--	seq_printf(m, "%u\n", *(unsigned int *)data);
--	return 0;
--}
--EXPORT_SYMBOL(lprocfs_rd_uint);
--
--int lprocfs_wr_uint(struct file *file, const char __user *buffer,
--		    unsigned long count, void *data)
--{
--	unsigned *p = data;
--	char dummy[MAX_STRING_SIZE + 1], *end;
--	unsigned long tmp;
--
--	if (count >= sizeof(dummy))
--		return -EINVAL;
--
--	if (count == 0)
--		return 0;
--
--	if (copy_from_user(dummy, buffer, count))
--		return -EFAULT;
--
--	dummy[count] = '\0';
--
--	tmp = simple_strtoul(dummy, &end, 0);
--	if (dummy == end)
--		return -EINVAL;
--
--	*p = (unsigned int)tmp;
--	return count;
--}
--EXPORT_SYMBOL(lprocfs_wr_uint);
--
- static ssize_t uuid_show(struct kobject *kobj, struct attribute *attr,
- 			 char *buf)
- {
+ 	/* Bind to failover device or port */
 -- 
-2.13.0
+2.11.0
