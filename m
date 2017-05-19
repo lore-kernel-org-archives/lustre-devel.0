@@ -1,31 +1,97 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 19 May 2017 02:14:42 +0000
-Subject: [lustre-devel] have df report a more up-to-date view of the
- filesystem
-In-Reply-To: <9e5f3b8d-b5f5-ce10-2b35-e6f13b7de532@cea.fr>
-References: <9e5f3b8d-b5f5-ce10-2b35-e6f13b7de532@cea.fr>
-Message-ID: <A5B44F72-4853-44F6-B453-E919F303AA95@intel.com>
+Date: Fri, 19 May 2017 03:02:58 +0000
+Subject: [lustre-devel] [PATCH 1/2] staging: lustre: lprocfs: Use
+	kstrtouint_from_user
+In-Reply-To: <20170518111343.15a263f1@alcyone.localdomain>
+References: <20170504161339.15901-1-mathiasrav@gmail.com>
+	<20170504161339.15901-2-mathiasrav@gmail.com>
+	<20170518135322.GA6772@kroah.com>
+	<9657977C-9620-4C31-9615-E4245482B5A7@intel.com>
+	<20170518111343.15a263f1@alcyone.localdomain>
+Message-ID: <C724B088-EDD5-4214-BF83-DDF31B93A238@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Mathias Rav <mathiasrav@gmail.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On May 17, 2017, at 13:16, quentin.bouget at cea.fr wrote:
+On May 18, 2017, at 17:13, Mathias Rav <mathiasrav@gmail.com> wrote:
 > 
-> Hi everyone,
+> On Thu, 18 May 2017 14:48:25 +0000
+> "Dilger, Andreas" <andreas.dilger@intel.com> wrote:
 > 
-> In LU-8940 I describe an issue I am having with df in Lustre's tests. In short, df/statfs can report outdated information about a Lustre filesystem; given enough time, its output gets correct. From what I understand, statfs cannot report an "always up-to-date" view of the filesystem as this would cost too much time and resources.
+>> On May 18, 2017, at 15:53, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+>>> 
+>>> On Thu, May 04, 2017 at 12:13:38PM -0400, Mathias Rav wrote:  
+>>>> Prefer kstrtouint_from_user to copy_from_user+simple_strtoul.
+>>>> 
+>>>> The helper function lprocfs_wr_uint() is only used to implement
+>>>> "dump_granted_max" in debugfs.
+>>>> 
+>>>> Note the slight change in semantics: The previous implementation using
+>>>> simple_strtoul allows garbage after the number, whereas kstrtox only allows
+>>>> a trailing line break. The previous implementation allowed a write of zero
+>>>> bytes whereas kstrtox will return -EINVAL. Since this only affects a single
+>>>> debugfs endpoint, this should be a permissible slight change of semantics
+>>>> in exchange for 18 fewer lines of code.
+>>>> 
+>>>> Signed-off-by: Mathias Rav <mathiasrav@gmail.com>
+>>>> ---
+>>>> .../lustre/lustre/obdclass/lprocfs_status.c        | 22 +---------------------
+>>>> 1 file changed, 1 insertion(+), 21 deletions(-)
+>>>> 
+>>>> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>>>> index 1ec6e3767d81..338ce34d6514 100644
+>>>> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>>>> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+>>>> @@ -399,27 +399,7 @@ EXPORT_SYMBOL(lprocfs_rd_uint);
+>>>> int lprocfs_wr_uint(struct file *file, const char __user *buffer,
+>>>> 		    unsigned long count, void *data)
+>>>> {
+>>>> -	unsigned *p = data;
+>>>> -	char dummy[MAX_STRING_SIZE + 1], *end;
+>>>> -	unsigned long tmp;
+>>>> -
+>>>> -	if (count >= sizeof(dummy))
+>>>> -		return -EINVAL;
+>>>> -
+>>>> -	if (count == 0)
+>>>> -		return 0;
+>>>> -
+>>>> -	if (copy_from_user(dummy, buffer, count))
+>>>> -		return -EFAULT;
+>>>> -
+>>>> -	dummy[count] = '\0';
+>>>> -
+>>>> -	tmp = simple_strtoul(dummy, &end, 0);
+>>>> -	if (dummy == end)
+>>>> -		return -EINVAL;
+>>>> -
+>>>> -	*p = (unsigned int)tmp;
+>>>> -	return count;
+>>>> +	return kstrtouint_from_user(buffer, count, 0, (unsigned int *)data);  
+>>> 
+>>> Why not just delete this whole function and have the callers make this
+>>> call instead?  No need for unneeded wrapper functions of core kernel
+>>> calls.  
+>> 
+>> Even better, it looks like this function has no callers on the client and could just
+>> be deleted entirely.
 > 
-> I would like to know what you guys think of having Lustre's statfs operation report a view of the filesystem at least as new as when the last sync operation completed?
+> No, the functions lprocfs_{rd,wr}_uint are used once through a macro:
+> ldlm/ldlm_resource.c calls LPROC_SEQ_FOPS_RW_TYPE(ldlm_rw, uint)
+> to define ldlm_rw_uint_seq_{show,write}, which then calls
+> lprocfs_{rd,wr}_uint which in turn call seq_printf/kstrtouint_from_user.
 > 
-> My point being that users (and tests) would be able to run df --sync to get up-to-date information (at the cost of a sync operation, and maybe some accounting for statfs).
+> It seems like much indirection for almost no gain besides hiding
+> access to ((seq_file *) file->private_data)->private in a macro.
+> 
+> If you agree, I will prepare a patch that switches ldlm_resource to
+> using the LPROC_SEQ_FOPS macro directly, which allows us to remove two
+> trivial wrappers.
 
-This isn't really a problem with "df".  The client will cache the statfs information for at most 1s until it refreshes it again.
-
-What it appears is happening (from LU-8940) is that unlinking a bunch of files doesn't delete the files and destroy the objects fast enough for the small test filesystem.  If there is a real system being used then it would likely not have any significant problems seen on these small filesystems.
-
-There are methods in test-framework.sh (e.g. wait_delete_completed()) to handle the free space reporting when the filesystem is full.
+Please do.
 
 Cheers, Andreas
 --
