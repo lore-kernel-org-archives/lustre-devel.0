@@ -1,61 +1,63 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Tue, 23 May 2017 21:38:55 +0200
-Subject: [lustre-devel] [PATCH] drivers: staging: lustre: replace
- variable length array by dynamic allocation
-In-Reply-To: <8c04ebb67ffbc9482cc6170e9bd29ec513766218.1495567933.git.raphael.beamonte@gmail.com>
-References: <8c04ebb67ffbc9482cc6170e9bd29ec513766218.1495567933.git.raphael.beamonte@gmail.com>
-Message-ID: <20170523193855.GA11862@kroah.com>
+From: Oleg Drokin <green@linuxhacker.ru>
+Date: Fri, 26 May 2017 23:40:33 -0400
+Subject: [lustre-devel] [PATCH] staging/lustre/lov: remove set_fs() call
+	from lov_getstripe()
+Message-ID: <20170527034033.223677-1-green@linuxhacker.ru>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: =?iso-8859-1?Q?Rapha=EBl?= Beamonte <raphael.beamonte@gmail.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, devel@driverdev.osuosl.org, Sebastien Buisson <sebastien.buisson@bull.net>, Hongchao Zhang <hongchao.zhang@intel.com>, Fan Yong <fan.yong@intel.com>, linux-kernel@vger.kernel.org, Aditya Pandit <panditadityashreesh@yahoo.com>, Andreas Dilger <andreas.dilger@intel.com>, "John L. Hammond" <john.hammond@intel.com>, lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Al Viro <viro@ZenIV.linux.org.uk>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Oleg Drokin <green@linuxhacker.ru>, "John L . Hammond" <john.hammond@intel.com>
 
-On Tue, May 23, 2017 at 09:32:13PM +0200, Rapha?l Beamonte wrote:
-> Fixes the following sparse warnings:
-> 
-> drivers/staging/lustre/lustre/llite/xattr.c:89:62: warning: Variable
-> length array is used.
-> drivers/staging/lustre/lustre/llite/xattr.c:366:62: warning: Variable
-> length array is used.
-> 
-> Signed-off-by: Rapha?l Beamonte <raphael.beamonte@gmail.com>
-> ---
->  drivers/staging/lustre/lustre/llite/xattr.c | 24 ++++++++++++++++++++----
->  1 file changed, 20 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-> index 6187bffec8c4..ccfc728d8ec0 100644
-> --- a/drivers/staging/lustre/lustre/llite/xattr.c
-> +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-> @@ -86,7 +86,7 @@ ll_xattr_set_common(const struct xattr_handler *handler,
->  		    const char *name, const void *value, size_t size,
->  		    int flags)
->  {
-> -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
-> +	char *fullname;
->  	struct ll_sb_info *sbi = ll_i2sbi(inode);
->  	struct ptlrpc_request *req = NULL;
->  	const char *pv = value;
-> @@ -140,10 +140,18 @@ ll_xattr_set_common(const struct xattr_handler *handler,
->  			return -EPERM;
->  	}
->  
-> +	fullname = kmalloc(strlen(handler->prefix) + strlen(name) + 1,
-> +			   GFP_KERNEL);
-> +	if (!fullname)
-> +		return -ENOMEM;
-> +
->  	sprintf(fullname, "%s%s\n", handler->prefix, name);
->  	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
->  			 valid, fullname, pv, size, 0, flags,
->  			 ll_i2suppgid(inode), &req);
-> +
-> +	kfree(fullname);
+lov_getstripe() calls set_fs(KERNEL_DS) so that it can handle a struct
+lov_user_md pointer from user- or kernel-space.  This changes the
+behavior of copy_from_user() on SPARC and may result in a misaligned
+access exception which in turn oopses the kernel.  In fact the
+relevant argument to lov_getstripe() is never called with a
+kernel-space pointer and so changing the address limits is unnecessary
+and so we remove the calls to save, set, and restore the address
+limits.
 
-Didn't we reject much this same patch last week?
+Signed-off-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-on: http://review.whamcloud.com/6150
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-3221
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Li Wei <wei.g.li@intel.com>
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ drivers/staging/lustre/lustre/lov/lov_pack.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-thanks,
-
-greg k-h
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index 2e1bd47..e6727ce 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -293,18 +293,10 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
+ 	size_t lmmk_size;
+ 	size_t lum_size;
+ 	int rc;
+-	mm_segment_t seg;
+ 
+ 	if (!lsm)
+ 		return -ENODATA;
+ 
+-	/*
+-	 * "Switch to kernel segment" to allow copying from kernel space by
+-	 * copy_{to,from}_user().
+-	 */
+-	seg = get_fs();
+-	set_fs(KERNEL_DS);
+-
+ 	if (lsm->lsm_magic != LOV_MAGIC_V1 && lsm->lsm_magic != LOV_MAGIC_V3) {
+ 		CERROR("bad LSM MAGIC: 0x%08X != 0x%08X nor 0x%08X\n",
+ 		       lsm->lsm_magic, LOV_MAGIC_V1, LOV_MAGIC_V3);
+@@ -406,6 +398,5 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
+ out_free:
+ 	kvfree(lmmk);
+ out:
+-	set_fs(seg);
+ 	return rc;
+ }
+-- 
+2.9.3
