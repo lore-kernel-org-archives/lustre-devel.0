@@ -1,76 +1,72 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Wed, 31 May 2017 09:39:51 -0400
-Subject: [lustre-devel] [PATCH V2] libcfs: Fix a sleep-in-atomic bug in
-	cfs_wi_exit
-In-Reply-To: <1496217641-17002-1-git-send-email-baijiaju1990@163.com>
-References: <1496217641-17002-1-git-send-email-baijiaju1990@163.com>
-Message-ID: <440F74B1-2F94-4C08-A9F9-EDF039BE6565@intel.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 1 Jun 2017 12:22:47 +0200
+Subject: [lustre-devel] [PATCH 04/12] fs: ceph: CURRENT_TIME with
+	ktime_get_real_ts()
+In-Reply-To: <CAAM7YAmp=cZKqGHa8UqDnrQLCe+6TKx+7w9SDZv4cW5fr4dfvA@mail.gmail.com>
+References: <1491613030-11599-1-git-send-email-deepa.kernel@gmail.com>
+	<1491613030-11599-5-git-send-email-deepa.kernel@gmail.com>
+	<CAAM7YAmp=cZKqGHa8UqDnrQLCe+6TKx+7w9SDZv4cW5fr4dfvA@mail.gmail.com>
+Message-ID: <CAK8P3a1pCw1Oo-Wg70kH5L12pbtEzGDfaPZ8g6ErERJjvY8znQ@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Jia-Ju Bai <baijiaju1990@163.com>
-Cc: andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, bobijam.xu@intel.com, dmitry.eremin@intel.com, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: "Yan, Zheng" <ukernel-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>
+Cc: yuchao0-hv44wF8Li93QT0dZR+AlfA@public.gmane.org, "J. Bruce Fields" <bfields-uC3wQj2KruNg9hUCZPvPmw@public.gmane.org>, Chris Mason <clm-b10kYP2dOMg@public.gmane.org>, linux-mtd <linux-mtd-IAPFreCvJWM7uuMidbF8XUB+6BGkLq7r@public.gmane.org>, Deepa Dinamani <deepa.kernel-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>, Evgeniy Dushistov <dushistov-JGs/UdohzUI@public.gmane.org>, Jeff Layton <jlayton-vpEMnDpepFuMZCB2o+C8xQ@public.gmane.org>, ceph-devel <ceph-devel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, devel-gWbeCf7V1WCQmaza687I9mD2FQJk+8+b@public.gmane.org, linux-cifs-u79uwXL29TY76Z2rM5mHXA@public.gmane.org, Paul Moore <paul-r2n+y4ga6xFZroRs9YW3xA@public.gmane.org>, y2038 Mailman List <y2038-cunTk1MwBs8s++Sfvej+rw@public.gmane.org>, Ingo Molnar <mingo-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>, Steven Rostedt <rostedt-nx8X9YLhiw1AfugRpC6u6w@public.gmane.org>, "Drokin,
+	Oleg" <oleg.drokin-ral2JQCrhuEAvxtiuMwx3w@public.gmane.org>, John Stultz <john.stultz-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org>, Al Viro <viro-RmSDqhL/yNMiFSDQTTA3OLVCufUGDwFn@public.gmane.org>, David Sterba <dsterba-IBi9RG/b67k@public.gmane.org>, Jaegeuk Kim <jaegeuk-DgEjT+Ai2ygdnm+yROfE0A@public.gmane.org>, Thomas Gleixner <tglx-hfZtesqFncYOwBW4kG4KsQ@public.gmane.org>, Josef Bacik <jbacik-b10kYP2dOMg@public.gmane.org>, gregkh <gregkh-hQyY1W1yCW8ekmWlsbkhG0B+6BGkLq7r@public.gmane.org>, samba-technical-w/Ol4Ecudpl8XjKLYN78aQ@public.gmane.org, Linux Kernel Mailing List <linux-kernel-u79uwXL29TY76Z2rM5mHXA@public.gmane.org>, Eric
 
-Hello!
+On Thu, Jun 1, 2017 at 11:56 AM, Yan, Zheng <ukernel@gmail.com> wrote:
+> On Sat, Apr 8, 2017 at 8:57 AM, Deepa Dinamani <deepa.kernel@gmail.com> wrote:
 
-On May 31, 2017, at 4:00 AM, Jia-Ju Bai wrote:
+>> diff --git a/drivers/block/rbd.c b/drivers/block/rbd.c
+>> index 517838b..77204da 100644
+>> --- a/drivers/block/rbd.c
+>> +++ b/drivers/block/rbd.c
+>> @@ -1922,7 +1922,7 @@ static void rbd_osd_req_format_write(struct rbd_obj_request *obj_request)
+>>  {
+>>         struct ceph_osd_request *osd_req = obj_request->osd_req;
+>>
+>> -       osd_req->r_mtime = CURRENT_TIME;
+>> +       ktime_get_real_ts(&osd_req->r_mtime);
+>>         osd_req->r_data_offset = obj_request->offset;
+>>  }
+>>
+>> diff --git a/fs/ceph/mds_client.c b/fs/ceph/mds_client.c
+>> index c681762..1d3fa90 100644
+>> --- a/fs/ceph/mds_client.c
+>> +++ b/fs/ceph/mds_client.c
+>> @@ -1666,6 +1666,7 @@ struct ceph_mds_request *
+>>  ceph_mdsc_create_request(struct ceph_mds_client *mdsc, int op, int mode)
+>>  {
+>>         struct ceph_mds_request *req = kzalloc(sizeof(*req), GFP_NOFS);
+>> +       struct timespec ts;
+>>
+>>         if (!req)
+>>                 return ERR_PTR(-ENOMEM);
+>> @@ -1684,7 +1685,8 @@ ceph_mdsc_create_request(struct ceph_mds_client *mdsc, int op, int mode)
+>>         init_completion(&req->r_safe_completion);
+>>         INIT_LIST_HEAD(&req->r_unsafe_item);
+>>
+>> -       req->r_stamp = current_fs_time(mdsc->fsc->sb);
+>> +       ktime_get_real_ts(&ts);
+>> +       req->r_stamp = timespec_trunc(ts, mdsc->fsc->sb->s_time_gran);
+>
+> This change causes our kernel_untar_tar test case to fail (inode's
+> ctime goes back). The reason is that there is time drift between the
+> time stamps got by  ktime_get_real_ts() and current_time(). We need to
+> revert this change until current_time() uses ktime_get_real_ts()
+> internally.
 
-> The driver may sleep under a spin lock, and the function call path is:
-> cfs_wi_exit (acquire the lock by spin_lock)
->  LASSERT
->    lbug_with_loc
->      libcfs_debug_dumplog
->        schedule and kthread_run --> may sleep
-> 
-> To fix it, all "LASSERT" is placed out of the spin_lock and spin_unlock.
-> 
-> Signed-off-by: Jia-Ju Bai <baijiaju1990@163.com>
-> ---
-> drivers/staging/lustre/lnet/libcfs/workitem.c |   13 +++++++------
-> 1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lnet/libcfs/workitem.c b/drivers/staging/lustre/lnet/libcfs/workitem.c
-> index dbc2a9b..928d06d 100644
-> --- a/drivers/staging/lustre/lnet/libcfs/workitem.c
-> +++ b/drivers/staging/lustre/lnet/libcfs/workitem.c
-> @@ -111,22 +111,23 @@ struct cfs_wi_sched {
-> {
-> 	LASSERT(!in_interrupt()); /* because we use plain spinlock */
-> 	LASSERT(!sched->ws_stopping);
-> +	LASSERT(wi->wi_running);
-> +	if (wi->wi_scheduled) {
-> +		LASSERT(!list_empty(&wi->wi_list));
-> +		LASSERT(sched->ws_nscheduled > 0);
-> +	}
+Hmm, the change was not supposed to have a user-visible effect, so
+something has gone wrong, but I don't immediately see how it
+relates to what you observe.
 
-Similarly here and in all other patches about LASSERT calls under spinlocks() from you,
-just think of them as a panic() call, no operations are expected to continue
-after it triggers.
+ktime_get_real_ts() and current_time() use the same time base, there
+is no drift, but there is a difference in resolution, as the latter uses
+the time stamp of the last jiffies update, which may be up to one jiffy
+(10ms) behind the exact time we put in the request stamps here.
 
-Thanks.
+Do you still see problems if you use current_kernel_time() instead of
+ktime_get_real_ts()?
 
-> 
-> 	spin_lock(&sched->ws_lock);
-> 
-> -	LASSERT(wi->wi_running);
-> 	if (wi->wi_scheduled) { /* cancel pending schedules */
-> -		LASSERT(!list_empty(&wi->wi_list));
-> 		list_del_init(&wi->wi_list);
-> -
-> -		LASSERT(sched->ws_nscheduled > 0);
-> 		sched->ws_nscheduled--;
-> 	}
-> 
-> -	LASSERT(list_empty(&wi->wi_list));
-> -
-> 	wi->wi_scheduled = 1; /* LBUG future schedule attempts */
-> 	spin_unlock(&sched->ws_lock);
-> +
-> +	LASSERT(list_empty(&wi->wi_list));
-> }
-> EXPORT_SYMBOL(cfs_wi_exit);
-> 
-> -- 
-> 1.7.9.5
-> 
+        Arnd
