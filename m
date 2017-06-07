@@ -1,37 +1,40 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Sat, 3 Jun 2017 17:50:35 +0900
-Subject: [lustre-devel] [PATCH V2] libcfs: Fix a sleep-in-atomic bug in
-	cfs_wi_exit
-In-Reply-To: <1496217641-17002-1-git-send-email-baijiaju1990@163.com>
-References: <1496217641-17002-1-git-send-email-baijiaju1990@163.com>
-Message-ID: <20170603085035.GB23970@kroah.com>
+From: Guillermo O. Freschi <kedrot@gmail.com>
+Date: Wed,  7 Jun 2017 06:15:18 -0300
+Subject: [lustre-devel] [PATCH 1/2] drivers: staging/lustre: conrpc.c - fix
+	sparse error: incompatible types in comparison expression
+	(different address spaces)
+In-Reply-To: <8FAAC9A9-A33E-40FA-B073-C4E0EAA7725A@intel.com>
+References: <8FAAC9A9-A33E-40FA-B073-C4E0EAA7725A@intel.com>
+Message-ID: <20170607091519.5248-1-kedrot@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Jia-Ju Bai <baijiaju1990@163.com>
-Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, bobijam.xu@intel.com, dmitry.eremin@intel.com, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
+To: Oleg Drokin <oleg.drokin@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
+Cc: "Guillermo O. Freschi" <kedrot@gmail.com>
 
-On Wed, May 31, 2017 at 04:00:41PM +0800, Jia-Ju Bai wrote:
-> The driver may sleep under a spin lock, and the function call path is:
-> cfs_wi_exit (acquire the lock by spin_lock)
->   LASSERT
->     lbug_with_loc
->       libcfs_debug_dumplog
->         schedule and kthread_run --> may sleep
-> 
-> To fix it, all "LASSERT" is placed out of the spin_lock and spin_unlock.
-> 
-> Signed-off-by: Jia-Ju Bai <baijiaju1990@163.com>
-> ---
->  drivers/staging/lustre/lnet/libcfs/workitem.c |   13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
+This patch reveals hidden warnings after this line.
 
-What changed from v1?  You have to always tell us that.
+(This is a stepping-stone patch for the following one, it should be
+ignored as per Andreas Dilger.)
 
-Please redo all of these, if they are still valid patches, and send them
-as a patch series, so I know what order they should be applied in.
+Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
+---
+ drivers/staging/lustre/lnet/selftest/conrpc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-thanks,
-
-greg k-h
+diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
+index da36c55b86d3..f4578200994f 100644
+--- a/drivers/staging/lustre/lnet/selftest/conrpc.c
++++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
+@@ -487,7 +487,7 @@ lstcon_rpc_trans_interpreter(struct lstcon_rpc_trans *trans,
+ 				   sizeof(struct list_head)))
+ 			return -EFAULT;
+ 
+-		if (tmp.next == head_up)
++		if ((struct list_head __user *)tmp.next == head_up)
+ 			return 0;
+ 
+ 		next = tmp.next;
+-- 
+2.11.0
