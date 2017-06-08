@@ -1,36 +1,35 @@
-From: Guillermo O. Freschi <kedrot@gmail.com>
-Date: Thu,  8 Jun 2017 02:35:27 -0300
-Subject: [lustre-devel] [PATCH] staging/lustre: echo_client.c - fix sparse
-	warning: cast removes address space of expression
-Message-ID: <20170608053527.21599-1-kedrot@gmail.com>
+From: Roman Storozhenko <romeusmeister@gmail.com>
+Date: Thu, 8 Jun 2017 20:25:41 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: llite: Replace the symbolic
+ file permission mode with the numeric one
+Message-ID: <20170608172541.GA2314@home>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
-Cc: "Guillermo O. Freschi" <kedrot@gmail.com>
+To: lustre-devel@lists.lustre.org
 
-The function only cares about the value of the pointer, not the contents
-of the pointed-to data. Adding a `__force` annotation to the cast
-removes this warning.
+Replaces S_IRWXUGO with 0007. The reason is that symbolic permissions
+considered harmful:
+https://lwn.net/Articles/696229/
 
-Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
+Signed-off-by: Roman Storozhenko <romeusmeister@gmail.com>
 ---
- drivers/staging/lustre/lustre/obdecho/echo_client.c | 2 +-
+ drivers/staging/lustre/lustre/llite/dir.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index d4768311cf92..1757714c56a0 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -1428,7 +1428,7 @@ static int echo_client_brw_ioctl(const struct lu_env *env, int rw,
- 	oa->o_valid &= ~OBD_MD_FLHANDLE;
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 13b3592..de5b4bf 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -1141,7 +1141,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		}
  
- 	/* OFD/obdfilter works only via prep/commit */
--	test_mode = (long)data->ioc_pbuf1;
-+	test_mode = (__force long)data->ioc_pbuf1;
- 	if (test_mode == 1)
- 		async = 0;
- 
+ #if OBD_OCD_VERSION(2, 9, 50, 0) > LUSTRE_VERSION_CODE
+-		mode = data->ioc_type != 0 ? data->ioc_type : S_IRWXUGO;
++		mode = data->ioc_type != 0 ? data->ioc_type : 0777;
+ #else
+ 		mode = data->ioc_type;
+ #endif
 -- 
-2.11.0
+2.7.4
