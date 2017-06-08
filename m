@@ -1,36 +1,36 @@
-From: Michael Sartain <mikesart@fastmail.com>
-Date: Wed, 7 Jun 2017 14:09:06 -0600
-Subject: [lustre-devel] [PATCH] drivers: staging/lustre: lmv_obd.c -
- suppress Sparse user cast warning
-Message-ID: <20170607200906.6af6jd7vmfnpq2gt@mikesart-cos>
+From: Guillermo O. Freschi <kedrot@gmail.com>
+Date: Thu,  8 Jun 2017 02:35:27 -0300
+Subject: [lustre-devel] [PATCH] staging/lustre: echo_client.c - fix sparse
+	warning: cast removes address space of expression
+Message-ID: <20170608053527.21599-1-kedrot@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
+Cc: "Guillermo O. Freschi" <kedrot@gmail.com>
 
-Comment above assignment states that uarg does not point to user space memory
-(ll_dir_ioctl does copy_from_user), so this is a valid cast. This patch adds a
-__force annotation to suppress the "cast removes address space of expression"
-Sparse warning.
+The function only cares about the value of the pointer, not the contents
+of the pointed-to data. Adding a `__force` annotation to the cast
+removes this warning.
 
-Signed-off-by: Michael Sartain <mikesart@fastmail.com>
+Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
 ---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c | 2 +-
+ drivers/staging/lustre/lustre/obdecho/echo_client.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 271e18966f50..a6473a06dcf7 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -989,7 +989,7 @@ static int lmv_iocontrol(unsigned int cmd, struct obd_export *exp,
- 		 * Note: this is from llite(see ll_dir_ioctl()), @uarg does not
- 		 * point to user space memory for FID2MDTIDX.
- 		 */
--		*(__u32 *)uarg = mdt_index;
-+		*(__force __u32 *)uarg = mdt_index;
- 		break;
- 	}
- 	case OBD_IOC_FID2PATH: {
+diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+index d4768311cf92..1757714c56a0 100644
+--- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
++++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+@@ -1428,7 +1428,7 @@ static int echo_client_brw_ioctl(const struct lu_env *env, int rw,
+ 	oa->o_valid &= ~OBD_MD_FLHANDLE;
+ 
+ 	/* OFD/obdfilter works only via prep/commit */
+-	test_mode = (long)data->ioc_pbuf1;
++	test_mode = (__force long)data->ioc_pbuf1;
+ 	if (test_mode == 1)
+ 		async = 0;
+ 
 -- 
 2.11.0
