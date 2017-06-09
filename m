@@ -1,34 +1,25 @@
-From: Roman Storozhenko <romeusmeister@gmail.com>
-Date: Fri, 9 Jun 2017 15:35:58 +0300
-Subject: [lustre-devel] [PATCH] staging: lustre: fid: Fixes debug output
-	style problem
-Message-ID: <20170609123558.GA22491@home>
+From: Cory Spitz <spitzcor@cray.com>
+Date: Fri, 9 Jun 2017 20:13:49 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: llite: Replace the
+ symbolic file permission mode with the numeric one
+In-Reply-To: <20170608172541.GA2314@home>
+References: <20170608172541.GA2314@home>
+Message-ID: <78EAE665-9BDD-4EF4-8793-3FC55D565AFB@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Fixes a style problems. Replaces non-standard 'Lx' specifier with a
-standard 'llx'.
+Roman,
+You have ?0007? in the description vs. ?0777? in the patch.
+-Cory
 
-Signed-off-by: Roman Storozhenko <romeusmeister@gmail.com>
----
- drivers/staging/lustre/lustre/fid/fid_request.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/fid/fid_request.c b/drivers/staging/lustre/lustre/fid/fid_request.c
-index 999f250..cd84b42 100644
---- a/drivers/staging/lustre/lustre/fid/fid_request.c
-+++ b/drivers/staging/lustre/lustre/fid/fid_request.c
-@@ -259,7 +259,7 @@ int seq_client_alloc_fid(const struct lu_env *env,
- 			return rc;
- 		}
+On 6/8/17, 12:25 PM, "lustre-devel on behalf of Roman Storozhenko" <lustre-devel-bounces at lists.lustre.org on behalf of romeusmeister@gmail.com> wrote:
+
+    Replaces S_IRWXUGO with 0007. The reason is that symbolic permissions
+
+
++		mode = data->ioc_type != 0 ? data->ioc_type : 0777;
  
--		CDEBUG(D_INFO, "%s: Switch to sequence [0x%16.16Lx]\n",
-+		CDEBUG(D_INFO, "%s: Switch to sequence [0x%16.16llx]\n",
- 		       seq->lcs_name, seqnr);
- 
- 		seq->lcs_fid.f_oid = LUSTRE_FID_INIT_OID;
--- 
-2.7.4
