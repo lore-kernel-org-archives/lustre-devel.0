@@ -1,11 +1,11 @@
 From: Joe Perches <joe@perches.com>
-Date: Wed, 14 Jun 2017 11:15:28 -0700
-Subject: [lustre-devel] [PATCH 5/6] staging: lustre: lustre: several
- over 80 characters cleanups
-In-Reply-To: <1497452481-31124-6-git-send-email-jsimmons@infradead.org>
+Date: Wed, 14 Jun 2017 11:25:06 -0700
+Subject: [lustre-devel] [PATCH 6/6] staging: lustre: lustre: fix all
+ braces issues reported by checkpatch
+In-Reply-To: <1497452481-31124-7-git-send-email-jsimmons@infradead.org>
 References: <1497452481-31124-1-git-send-email-jsimmons@infradead.org>
-	<1497452481-31124-6-git-send-email-jsimmons@infradead.org>
-Message-ID: <1497464128.18751.59.camel@perches.com>
+	<1497452481-31124-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1497464706.18751.62.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,15 +14,57 @@ To: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoun
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
-> Cleanup many of the over 80 characters reported by checkpatch
+> Cleanup all braces that was reported by checkpatch. The only
+> issue not fixed up is in mdc_lock.c. Removing the braces in
+> the case of mdc_lock.c will break the build.
 
-Please don't let checkpatch get in the way of lustre
-readability.
+[]
 
-lustre commonly uses very long identifiers.
-Long identifiers and 80 columns don't mix well.
+> diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+[]
+> @@ -591,9 +591,10 @@ static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
+>  	env = cl_env_get(&refcheck);
+>  	if (!IS_ERR(env)) {
+>  		sbi = f->private;
+> -		if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT)
+> +		if (sbi->ll_site->ls_obj_hash->hs_cur_bits >
+> +		    64 - PGC_OBJ_SHIFT) {
+>  			pos = ERR_PTR(-EFBIG);
+> -		else {
+> +		} else {
+>  			*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev,
+>  						*pos);
+>  			if (*pos == ~0ULL)
 
-It might be simpler to declare in some document that
-lustre uses lines of up to whatever length and require
-that checkpatch should be used with the --max-line-length
-option when run on lustre code.
+Sometimes is nicer to rearrange the code with smaller
+indentation by using early returns and/or goto <labels>.
+
+Something like:
+
+static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
+{
+	struct ll_sb_info *sbi;
+	struct lu_env?????*env;
+	u16 refcheck;
+
+	sbi = f->private;
+
+	env = cl_env_get(&refcheck);
+	if (IS_ERR(env))
+		return pos;
+
+	sbi = f->private;
+	if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT) {
+		pos = ERR_PTR(-EFBIG);
+		goto out;
+	}
+
+	*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev, *pos);
+	if (*pos == ~0ULL)
+		pos = NULL;
+
+out:
+	cl_env_put(env, &refcheck);
+
+	return pos;
+}
