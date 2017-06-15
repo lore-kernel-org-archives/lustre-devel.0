@@ -1,83 +1,46 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 15 Jun 2017 17:38:32 +0100 (BST)
-Subject: [lustre-devel] [PATCH 6/6] staging: lustre: lustre: fix all
- braces issues reported by checkpatch
-In-Reply-To: <1497464706.18751.62.camel@perches.com>
-References: <1497452481-31124-1-git-send-email-jsimmons@infradead.org>
-	<1497452481-31124-7-git-send-email-jsimmons@infradead.org>
-	<1497464706.18751.62.camel@perches.com>
-Message-ID: <alpine.LFD.2.20.1706151708230.11322@casper.infradead.org>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Thu, 15 Jun 2017 18:56:33 +0200
+Subject: [lustre-devel] [PATCH] staging: lustre: headers: potential UAPI
+ headers
+In-Reply-To: <alpine.LFD.2.20.1706140149160.20798@casper.infradead.org>
+References: <1482167207-22800-1-git-send-email-jsimmons@infradead.org>
+	<20170103141248.GA8695@kroah.com>
+	<alpine.LFD.2.20.1701162126170.27875@casper.infradead.org>
+	<20170117074140.GA19328@kroah.com>
+	<alpine.LFD.2.20.1701202331420.11070@casper.infradead.org>
+	<20170121092459.GA29138@kroah.com>
+	<32AAAA94-0C88-40F5-8FAD-37F35A401AC3@intel.com>
+	<20170613042531.GB13308@kroah.com>
+	<alpine.LFD.2.20.1706140149160.20798@casper.infradead.org>
+Message-ID: <20170615165633.GA4478@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Joe Perches <joe@perches.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
+On Thu, Jun 15, 2017 at 04:48:20PM +0100, James Simmons wrote:
+> So this is coming from trying to understand the "merge them together" 
+> part. Some people reading this it implies all the headers would be 
+> eventually merged into one big header and placed into include/uapi/linux. 
 
-> On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
-> > Cleanup all braces that was reported by checkpatch. The only
-> > issue not fixed up is in mdc_lock.c. Removing the braces in
-> > the case of mdc_lock.c will break the build.
-> 
-> []
-> 
-> > diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-> []
-> > @@ -591,9 +591,10 @@ static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
-> >  	env = cl_env_get(&refcheck);
-> >  	if (!IS_ERR(env)) {
-> >  		sbi = f->private;
-> > -		if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT)
-> > +		if (sbi->ll_site->ls_obj_hash->hs_cur_bits >
-> > +		    64 - PGC_OBJ_SHIFT) {
-> >  			pos = ERR_PTR(-EFBIG);
-> > -		else {
-> > +		} else {
-> >  			*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev,
-> >  						*pos);
-> >  			if (*pos == ~0ULL)
-> 
-> Sometimes is nicer to rearrange the code with smaller
-> indentation by using early returns and/or goto <labels>.
+Sounds like a good plan, why wouldn't you want something nice and simple
+like that?  :)
 
-Do you mind if I submit a separate patch for this? It would be nice to
-land the current cleanups as is. Looking at the code I see where more
-simplication along this line can be done. I submitted a patch for our
-test harness:
+> We are getting to the point where some sites are migrating from the out
+> of tree branch to this client. This also means they will be moving 
+> external open source userland applications shortly. If we expose UAPI 
+> headers that are completely different that it breaks their tools users
+> will dump this client and go back to the out source tree. We really like
+> to avoid that.
 
-https://review.whamcloud.com/#/c/27664
+Note, as the code is still in staging, files will get renamed and moved
+around, you know that, nothing we can do here at the moment.
 
-In the near future it will be pushed here.
+I have yet to see any patches yet, so I don't know why people are
+complaining...
 
-> Something like:
-> 
-> static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
-> {
-> 	struct ll_sb_info *sbi;
-> 	struct lu_env?????*env;
-> 	u16 refcheck;
-> 
-> 	sbi = f->private;
-> 
-> 	env = cl_env_get(&refcheck);
-> 	if (IS_ERR(env))
-> 		return pos;
-> 
-> 	sbi = f->private;
-> 	if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT) {
-> 		pos = ERR_PTR(-EFBIG);
-> 		goto out;
-> 	}
-> 
-> 	*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev, *pos);
-> 	if (*pos == ~0ULL)
-> 		pos = NULL;
-> 
-> out:
-> 	cl_env_put(env, &refcheck);
-> 
-> 	return pos;
-> }
-> 
-> 
+thanks,
+
+greg k-h
