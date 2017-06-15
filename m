@@ -1,46 +1,66 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Thu, 15 Jun 2017 18:56:33 +0200
-Subject: [lustre-devel] [PATCH] staging: lustre: headers: potential UAPI
- headers
-In-Reply-To: <alpine.LFD.2.20.1706140149160.20798@casper.infradead.org>
-References: <1482167207-22800-1-git-send-email-jsimmons@infradead.org>
-	<20170103141248.GA8695@kroah.com>
-	<alpine.LFD.2.20.1701162126170.27875@casper.infradead.org>
-	<20170117074140.GA19328@kroah.com>
-	<alpine.LFD.2.20.1701202331420.11070@casper.infradead.org>
-	<20170121092459.GA29138@kroah.com>
-	<32AAAA94-0C88-40F5-8FAD-37F35A401AC3@intel.com>
-	<20170613042531.GB13308@kroah.com>
-	<alpine.LFD.2.20.1706140149160.20798@casper.infradead.org>
-Message-ID: <20170615165633.GA4478@kroah.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 15 Jun 2017 17:57:14 +0100 (BST)
+Subject: [lustre-devel] [PATCH 1/6] staging: lustre: lustre: resolve
+ "use spaces between elements" checkpatch errors
+In-Reply-To: <1497543584.14396.8.camel@perches.com>
+References: <1497452481-31124-1-git-send-email-jsimmons@infradead.org>
+	<1497452481-31124-2-git-send-email-jsimmons@infradead.org>
+	<1497463820.18751.57.camel@perches.com>
+	<alpine.LFD.2.20.1706151700220.11322@casper.infradead.org>
+	<1497543584.14396.8.camel@perches.com>
+Message-ID: <alpine.LFD.2.20.1706151748060.11322@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Joe Perches <joe@perches.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Thu, Jun 15, 2017 at 04:48:20PM +0100, James Simmons wrote:
-> So this is coming from trying to understand the "merge them together" 
-> part. Some people reading this it implies all the headers would be 
-> eventually merged into one big header and placed into include/uapi/linux. 
 
-Sounds like a good plan, why wouldn't you want something nice and simple
-like that?  :)
+> On Thu, 2017-06-15 at 17:03 +0100, James Simmons wrote:
+> > > On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
+> > > > Due to the way the DFID was embedded in our debug strings checkpatch
+> > > > would report the following error:
+> > > 
+> > > unrelated trivia
+> > > 
+> > > > diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+> > > 
+> > > []
+> > > > @@ -532,7 +532,7 @@ static inline void obd_uuid2fsname(char *buf, char *uuid, int buflen)
+> > > >  #define FID_NOBRACE_LEN 40
+> > > >  #define FID_LEN (FID_NOBRACE_LEN + 2)
+> > > >  #define DFID_NOBRACE "%#llx:0x%x:0x%x"
+> > > 
+> > > It's odd to use a mixture of %#x and 0x%x.
+> > > 
+> > > Using
+> > > 	#define DFID_NOBRACE "%#llx:%#x:%#x"
+> > > would also save a couple bytes per use.
+> > 
+> > Changing that format would break things very badly. This is used in user 
+> > land utilities and the kernel code. 
+> 
+> Really?  Why would anything break?
 
-> We are getting to the point where some sites are migrating from the out
-> of tree branch to this client. This also means they will be moving 
-> external open source userland applications shortly. If we expose UAPI 
-> headers that are completely different that it breaks their tools users
-> will dump this client and go back to the out source tree. We really like
-> to avoid that.
-
-Note, as the code is still in staging, files will get renamed and moved
-around, you know that, nothing we can do here at the moment.
-
-I have yet to see any patches yet, so I don't know why people are
-complaining...
-
-thanks,
-
-greg k-h
+It shouldn't break anything but I'm paranoid. In the past I have change 
+"simple" things to have it blow up. I pushed the change to our test 
+harness just to make sure. 
+ 
+> $ cat fmt.c
+> #include <stdio.h>
+> #include <stdlib.h>
+> 
+> int main(int argc, char **argv)
+> {
+> 	printf("%#llx:0x%x:0x%x\n", (unsigned long long)1, 2, 3);
+> 	printf("%#llx:%#x:%#x\n", (unsigned long long)1, 2, 3);
+> 	return 0;
+> }
+> 
+> $ gcc fmt.c
+> $ ./a.out
+> 0x1:0x2:0x3
+> 0x1:0x2:0x3
+> 
+> 
