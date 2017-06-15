@@ -1,12 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 15 Jun 2017 17:03:53 +0100 (BST)
-Subject: [lustre-devel] [PATCH 1/6] staging: lustre: lustre: resolve
- "use spaces between elements" checkpatch errors
-In-Reply-To: <1497463820.18751.57.camel@perches.com>
+Date: Thu, 15 Jun 2017 17:06:30 +0100 (BST)
+Subject: [lustre-devel] [PATCH 5/6] staging: lustre: lustre: several
+ over 80 characters cleanups
+In-Reply-To: <1497464128.18751.59.camel@perches.com>
 References: <1497452481-31124-1-git-send-email-jsimmons@infradead.org>
-	<1497452481-31124-2-git-send-email-jsimmons@infradead.org>
-	<1497463820.18751.57.camel@perches.com>
-Message-ID: <alpine.LFD.2.20.1706151700220.11322@casper.infradead.org>
+	<1497452481-31124-6-git-send-email-jsimmons@infradead.org>
+	<1497464128.18751.59.camel@perches.com>
+Message-ID: <alpine.LFD.2.20.1706151704110.11322@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,28 +16,18 @@ Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org,
 
 
 > On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
-> > Due to the way the DFID was embedded in our debug strings checkpatch
-> > would report the following error:
+> > Cleanup many of the over 80 characters reported by checkpatch
 > 
-> unrelated trivia
+> Please don't let checkpatch get in the way of lustre
+> readability.
 > 
-> > diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-> []
-> > @@ -532,7 +532,7 @@ static inline void obd_uuid2fsname(char *buf, char *uuid, int buflen)
-> >  #define FID_NOBRACE_LEN 40
-> >  #define FID_LEN (FID_NOBRACE_LEN + 2)
-> >  #define DFID_NOBRACE "%#llx:0x%x:0x%x"
+> lustre commonly uses very long identifiers.
+> Long identifiers and 80 columns don't mix well.
 > 
-> It's odd to use a mixture of %#x and 0x%x.
-> 
-> Using
-> 	#define DFID_NOBRACE "%#llx:%#x:%#x"
-> would also save a couple bytes per use.
+> It might be simpler to declare in some document that
+> lustre uses lines of up to whatever length and require
+> that checkpatch should be used with the --max-line-length
+> option when run on lustre code.
 
-Changing that format would break things very badly. This is used in user 
-land utilities and the kernel code. 
- 
-> Does there need to be a difference between an SFID
-> and a DFID_NOBRACE?
-
- 
+Greg would you be okay with this? If we changed to a max-line-length to 
+say 128 thay would mean very few checkpatch issues would remain.
