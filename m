@@ -1,13 +1,15 @@
 From: Joe Perches <joe@perches.com>
-Date: Thu, 15 Jun 2017 09:58:46 -0700
-Subject: [lustre-devel] [PATCH 6/6] staging: lustre: lustre: fix all
- braces issues reported by checkpatch
-In-Reply-To: <alpine.LFD.2.20.1706151708230.11322@casper.infradead.org>
+Date: Thu, 15 Jun 2017 10:04:46 -0700
+Subject: [lustre-devel] [PATCH 1/6] staging: lustre: lustre: resolve
+ "use spaces between elements" checkpatch errors
+In-Reply-To: <alpine.LFD.2.20.1706151748060.11322@casper.infradead.org>
 References: <1497452481-31124-1-git-send-email-jsimmons@infradead.org>
-	<1497452481-31124-7-git-send-email-jsimmons@infradead.org>
-	<1497464706.18751.62.camel@perches.com>
-	<alpine.LFD.2.20.1706151708230.11322@casper.infradead.org>
-Message-ID: <1497545926.14396.11.camel@perches.com>
+	<1497452481-31124-2-git-send-email-jsimmons@infradead.org>
+	<1497463820.18751.57.camel@perches.com>
+	<alpine.LFD.2.20.1706151700220.11322@casper.infradead.org>
+	<1497543584.14396.8.camel@perches.com>
+	<alpine.LFD.2.20.1706151748060.11322@casper.infradead.org>
+Message-ID: <1497546286.14396.13.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,58 +17,45 @@ Content-Transfer-Encoding: 7bit
 To: James Simmons <jsimmons@infradead.org>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Thu, 2017-06-15 at 17:38 +0100, James Simmons wrote:
-> > On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
-> > > Cleanup all braces that was reported by checkpatch. The only
-> > > issue not fixed up is in mdc_lock.c. Removing the braces in
-> > > the case of mdc_lock.c will break the build.
+On Thu, 2017-06-15 at 17:57 +0100, James Simmons wrote:
+> > On Thu, 2017-06-15 at 17:03 +0100, James Simmons wrote:
+> > > > On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
+> > > > > Due to the way the DFID was embedded in our debug strings checkpatch
+> > > > > would report the following error:
+> > > > 
+> > > > unrelated trivia
+> > > > 
+> > > > > diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
+> > > > 
+> > > > []
+> > > > > @@ -532,7 +532,7 @@ static inline void obd_uuid2fsname(char *buf, char *uuid, int buflen)
+> > > > >  #define FID_NOBRACE_LEN 40
+> > > > >  #define FID_LEN (FID_NOBRACE_LEN + 2)
+> > > > >  #define DFID_NOBRACE "%#llx:0x%x:0x%x"
+> > > > 
+> > > > It's odd to use a mixture of %#x and 0x%x.
+> > > > 
+> > > > Using
+> > > > 	#define DFID_NOBRACE "%#llx:%#x:%#x"
+> > > > would also save a couple bytes per use.
+> > > 
+> > > Changing that format would break things very badly. This is used in user 
+> > > land utilities and the kernel code. 
 > > 
-> > []
-> > 
-> > > diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-> > 
-> > []
-> > > @@ -591,9 +591,10 @@ static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
-> > >  	env = cl_env_get(&refcheck);
-> > >  	if (!IS_ERR(env)) {
-> > >  		sbi = f->private;
-> > > -		if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT)
-> > > +		if (sbi->ll_site->ls_obj_hash->hs_cur_bits >
-> > > +		    64 - PGC_OBJ_SHIFT) {
-> > >  			pos = ERR_PTR(-EFBIG);
-> > > -		else {
-> > > +		} else {
-> > >  			*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev,
-> > >  						*pos);
-> > >  			if (*pos == ~0ULL)
-> > 
-> > Sometimes is nicer to rearrange the code with smaller
-> > indentation by using early returns and/or goto <labels>.
+> > Really?  Why would anything break?
 > 
-> Do you mind if I submit a separate patch for this?
-> It would be nice to land the current cleanups as is.
+> It shouldn't break anything but I'm paranoid.
 
-Of course not.
+Which is an entirely different thing than
+writing "would break things very badly".
 
-> Looking at the code I see where more
-> simplication along this line can be done. I submitted a patch for our
-> test harness:
+Paranoia is fine, incorrect statements of fact
+like that less so.
 
-Oh good.
+> In the past I have change 
+> "simple" things to have it blow up. I pushed the change to our test 
+> harness just to make sure. 
 
-> In the near future it will be pushed here.
+Understandable.
 
-Swell.
-
-One of the blocks in vvp_pgcache_show looks like it
-has asymmetric braces though.
-
-	 } else
-
-Perhaps you should be using the linux-next version
-of checkpatch which warns about this.
-
-And don't take any of what I wrote as a requirement.
-
-All were merely suggestions and could be implemented
-an appropriate time or ignored completely.
+cheers, Joe
