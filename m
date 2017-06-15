@@ -1,70 +1,84 @@
-From: Joe Perches <joe@perches.com>
-Date: Wed, 14 Jun 2017 11:25:06 -0700
-Subject: [lustre-devel] [PATCH 6/6] staging: lustre: lustre: fix all
- braces issues reported by checkpatch
-In-Reply-To: <1497452481-31124-7-git-send-email-jsimmons@infradead.org>
-References: <1497452481-31124-1-git-send-email-jsimmons@infradead.org>
-	<1497452481-31124-7-git-send-email-jsimmons@infradead.org>
-Message-ID: <1497464706.18751.62.camel@perches.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 15 Jun 2017 16:48:20 +0100 (BST)
+Subject: [lustre-devel] [PATCH] staging: lustre: headers: potential UAPI
+ headers
+In-Reply-To: <20170613042531.GB13308@kroah.com>
+References: <1482167207-22800-1-git-send-email-jsimmons@infradead.org>
+	<20170103141248.GA8695@kroah.com>
+	<alpine.LFD.2.20.1701162126170.27875@casper.infradead.org>
+	<20170117074140.GA19328@kroah.com>
+	<alpine.LFD.2.20.1701202331420.11070@casper.infradead.org>
+	<20170121092459.GA29138@kroah.com>
+	<32AAAA94-0C88-40F5-8FAD-37F35A401AC3@intel.com>
+	<20170613042531.GB13308@kroah.com>
+Message-ID: <alpine.LFD.2.20.1706140149160.20798@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
-> Cleanup all braces that was reported by checkpatch. The only
-> issue not fixed up is in mdc_lock.c. Removing the braces in
-> the case of mdc_lock.c will break the build.
 
-[]
+> On Mon, Jun 12, 2017 at 08:20:15PM +0000, Dilger, Andreas wrote:
+> > On Jan 21, 2017, at 02:24, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+> > > 
+> > > On Fri, Jan 20, 2017 at 11:33:11PM +0000, James Simmons wrote:
+> > >> 
+> > >>>>> On Mon, Dec 19, 2016 at 12:06:47PM -0500, James Simmons wrote:
+> > >>>>>> Not for landing. This is the purposed UAPI headers
+> > >>>>>> with the removal of unlikely and debugging macros.
+> > >>>>>> This is just for feedback to see if this is acceptable
+> > >>>>>> for the upstream client.
+> > >>>>>> 
+> > >>>>>> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > >>>>>> ---
+> > >>>>>> .../lustre/lustre/include/lustre/lustre_fid.h      | 353 +++++++++++++++++++++
+> > >>>>>> .../lustre/lustre/include/lustre/lustre_ostid.h    | 233 ++++++++++++++
+> > >>>>> 
+> > >>>>> Can you make a lustre "uapi" directory so we can see which files you
+> > >>>>> really want to be UAPI and which you don't as time goes on?
+> 
+> I said that ^^^
+> 
+> > >>>> Where do you want them placed? In uapi/linux/lustre or uapi/lustre. Does
+> > >>>> it matter to you? The below was to forth coming UAPI headers which from
+> > >>>> your response you seem okay with in general.
+> > >>> 
+> > >>> How many .h files are there going to be?  It's just a single filesystem,
+> > >>> shouldn't you just need a single file?  If so, how about
+> > >>> 	drivers/staging/lustre/include/uapi/lustre.h
+> > >>> ?
+> > >>> 
+> > >>> If you really need multiple .h files, put them all in the same uapi/
+> > >>> directory with a lustre_ prefix, you don't need a whole subdir just for
+> > >>> yourself, right?
+> > >> 
+> > >> We have 12 UAPI headers and yes they all begin with lustre_*. Okay I will
+> > >> create a driver/staging/lustre/include/uapi/linux directory and start
+> > >> moving headers there.
+> > > 
+> > > 12 seems like a lot just for a single, tiny, filesystem :)
+> > > 
+> > > But moving them all to a single directory will see where we can later
+> > > merge them together, sounds like a good plan.
+> > 
+> > Greg,
+> > are you really adamantly against moving the Lustre headers into their own lustre/
+> > subdirectory?
+> 
+> I did not say that.
+> 
+> Please, when responding to 5 month old email messages, get your quoting
+> correct...
 
-> diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-[]
-> @@ -591,9 +591,10 @@ static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
->  	env = cl_env_get(&refcheck);
->  	if (!IS_ERR(env)) {
->  		sbi = f->private;
-> -		if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT)
-> +		if (sbi->ll_site->ls_obj_hash->hs_cur_bits >
-> +		    64 - PGC_OBJ_SHIFT) {
->  			pos = ERR_PTR(-EFBIG);
-> -		else {
-> +		} else {
->  			*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev,
->  						*pos);
->  			if (*pos == ~0ULL)
+So this is coming from trying to understand the "merge them together" 
+part. Some people reading this it implies all the headers would be 
+eventually merged into one big header and placed into include/uapi/linux. 
 
-Sometimes is nicer to rearrange the code with smaller
-indentation by using early returns and/or goto <labels>.
-
-Something like:
-
-static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
-{
-	struct ll_sb_info *sbi;
-	struct lu_env?????*env;
-	u16 refcheck;
-
-	sbi = f->private;
-
-	env = cl_env_get(&refcheck);
-	if (IS_ERR(env))
-		return pos;
-
-	sbi = f->private;
-	if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT) {
-		pos = ERR_PTR(-EFBIG);
-		goto out;
-	}
-
-	*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev, *pos);
-	if (*pos == ~0ULL)
-		pos = NULL;
-
-out:
-	cl_env_put(env, &refcheck);
-
-	return pos;
-}
+We are getting to the point where some sites are migrating from the out
+of tree branch to this client. This also means they will be moving 
+external open source userland applications shortly. If we expose UAPI 
+headers that are completely different that it breaks their tools users
+will dump this client and go back to the out source tree. We really like
+to avoid that.
