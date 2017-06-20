@@ -1,69 +1,46 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 15 Jun 2017 18:16:38 +0100 (BST)
-Subject: [lustre-devel] [PATCH 1/6] staging: lustre: lustre: resolve
- "use spaces between elements" checkpatch errors
-In-Reply-To: <1497546286.14396.13.camel@perches.com>
-References: <1497452481-31124-1-git-send-email-jsimmons@infradead.org>
-	<1497452481-31124-2-git-send-email-jsimmons@infradead.org>
-	<1497463820.18751.57.camel@perches.com>
-	<alpine.LFD.2.20.1706151700220.11322@casper.infradead.org>
-	<1497543584.14396.8.camel@perches.com>
-	<alpine.LFD.2.20.1706151748060.11322@casper.infradead.org>
-	<1497546286.14396.13.camel@perches.com>
-Message-ID: <alpine.LFD.2.20.1706151813250.11322@casper.infradead.org>
+From: simran singhal <singhalsimran0@gmail.com>
+Date: Tue, 20 Jun 2017 14:36:37 +0530
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: selftest: Change the
+ type of variable to bool
+Message-ID: <20170620090637.GA15837@singhal-Inspiron-5558>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Joe Perches <joe@perches.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <oleg.drokin@intel.com>
+Cc: Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
+This patch changes the type of variable done from int to boolean. As it
+is been used as a boolean in the function sfw_test_rpc_done(). It also
+makes the code more readable and bool data type also requires less
+memory in comparison to int data type.
 
-> On Thu, 2017-06-15 at 17:57 +0100, James Simmons wrote:
-> > > On Thu, 2017-06-15 at 17:03 +0100, James Simmons wrote:
-> > > > > On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
-> > > > > > Due to the way the DFID was embedded in our debug strings checkpatch
-> > > > > > would report the following error:
-> > > > > 
-> > > > > unrelated trivia
-> > > > > 
-> > > > > > diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_user.h b/drivers/staging/lustre/lustre/include/lustre/lustre_user.h
-> > > > > 
-> > > > > []
-> > > > > > @@ -532,7 +532,7 @@ static inline void obd_uuid2fsname(char *buf, char *uuid, int buflen)
-> > > > > >  #define FID_NOBRACE_LEN 40
-> > > > > >  #define FID_LEN (FID_NOBRACE_LEN + 2)
-> > > > > >  #define DFID_NOBRACE "%#llx:0x%x:0x%x"
-> > > > > 
-> > > > > It's odd to use a mixture of %#x and 0x%x.
-> > > > > 
-> > > > > Using
-> > > > > 	#define DFID_NOBRACE "%#llx:%#x:%#x"
-> > > > > would also save a couple bytes per use.
-> > > > 
-> > > > Changing that format would break things very badly. This is used in user 
-> > > > land utilities and the kernel code. 
-> > > 
-> > > Really?  Why would anything break?
-> > 
-> > It shouldn't break anything but I'm paranoid.
-> 
-> Which is an entirely different thing than
-> writing "would break things very badly".
-> 
-> Paranoia is fine, incorrect statements of fact
-> like that less so.
+Signed-off-by: simran singhal <singhalsimran0@gmail.com>
+---
+ drivers/staging/lustre/lnet/selftest/framework.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Meant no offense. When you said "would also save a couple bytes per use"
-I took that as meaning it would change the data format. Should of tried
-it myself to see if that was the case. 
+diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+index ef27bff..3789df6 100644
+--- a/drivers/staging/lustre/lnet/selftest/framework.c
++++ b/drivers/staging/lustre/lnet/selftest/framework.c
+@@ -869,7 +869,7 @@ sfw_test_rpc_done(struct srpc_client_rpc *rpc)
+ {
+ 	struct sfw_test_unit *tsu = rpc->crpc_priv;
+ 	struct sfw_test_instance *tsi = tsu->tsu_instance;
+-	int done = 0;
++	bool done = false;
  
-> > In the past I have change 
-> > "simple" things to have it blow up. I pushed the change to our test 
-> > harness just to make sure. 
-> 
-> Understandable.
-> 
-> cheers, Joe
-> 
-> 
+ 	tsi->tsi_ops->tso_done_rpc(tsu, rpc);
+ 
+@@ -883,7 +883,7 @@ sfw_test_rpc_done(struct srpc_client_rpc *rpc)
+ 	/* batch is stopping or loop is done or get error */
+ 	if (tsi->tsi_stopping || !tsu->tsu_loop ||
+ 	    (rpc->crpc_status && tsi->tsi_stoptsu_onerr))
+-		done = 1;
++		done = true;
+ 
+ 	/* dec ref for poster */
+ 	srpc_client_rpc_decref(rpc);
+-- 
+2.7.4
