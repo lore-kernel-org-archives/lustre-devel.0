@@ -1,49 +1,47 @@
-From: Tordek <kedrot@gmail.com>
-Date: Wed, 21 Jun 2017 04:24:08 -0300
-Subject: [lustre-devel] [PATCH] staging/lustre: echo_client.c - fix
- sparse warning: cast removes address space of expression
-In-Reply-To: <20170608053527.21599-1-kedrot@gmail.com>
-References: <20170608053527.21599-1-kedrot@gmail.com>
-Message-ID: <CAKUXR6MpyuJv=+SLaZjPV5YB_RpAfYAKkuZ0VW6HUP0gm3bdvA@mail.gmail.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Sat, 24 Jun 2017 00:12:58 +0800
+Subject: [lustre-devel] [PATCH 5/6] staging: lustre: lustre: several
+ over 80 characters cleanups
+In-Reply-To: <alpine.LFD.2.20.1706151704110.11322@casper.infradead.org>
+References: <1497452481-31124-1-git-send-email-jsimmons@infradead.org>
+	<1497452481-31124-6-git-send-email-jsimmons@infradead.org>
+	<1497464128.18751.59.camel@perches.com>
+	<alpine.LFD.2.20.1706151704110.11322@casper.infradead.org>
+Message-ID: <20170623161258.GA20104@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: Joe Perches <joe@perches.com>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Hi, List
+On Thu, Jun 15, 2017 at 05:06:30PM +0100, James Simmons wrote:
+> 
+> > On Wed, 2017-06-14 at 11:01 -0400, James Simmons wrote:
+> > > Cleanup many of the over 80 characters reported by checkpatch
+> > 
+> > Please don't let checkpatch get in the way of lustre
+> > readability.
+> > 
+> > lustre commonly uses very long identifiers.
+> > Long identifiers and 80 columns don't mix well.
+> > 
+> > It might be simpler to declare in some document that
+> > lustre uses lines of up to whatever length and require
+> > that checkpatch should be used with the --max-line-length
+> > option when run on lustre code.
+> 
+> Greg would you be okay with this? If we changed to a max-line-length to 
+> say 128 thay would mean very few checkpatch issues would remain.
 
-I don't want to be a bother but should I be doing something different
-when submitting patches? I know it's minor but it's a simple change
-and it's received no response after two weeks; not even a rejection.
+No, I don't want you go change the max-line-length, just use your best
+judgement.  Some of the changes here in this very-big patch are just
+fine, and should be done as they make the code easier to read.
 
-Cheers
---
-Tordek
+Others, you are just having to fix pedantic things and there's no need
+for that.  Let me give you a few examples in this patch of what I'm
+talking about to help you understand the difference...
 
-On 8 June 2017 at 02:35, Guillermo O. Freschi <kedrot@gmail.com> wrote:
-> The function only cares about the value of the pointer, not the contents
-> of the pointed-to data. Adding a `__force` annotation to the cast
-> removes this warning.
->
-> Signed-off-by: Guillermo O. Freschi <kedrot@gmail.com>
-> ---
->  drivers/staging/lustre/lustre/obdecho/echo_client.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-> index d4768311cf92..1757714c56a0 100644
-> --- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-> +++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-> @@ -1428,7 +1428,7 @@ static int echo_client_brw_ioctl(const struct lu_env *env, int rw,
->         oa->o_valid &= ~OBD_MD_FLHANDLE;
->
->         /* OFD/obdfilter works only via prep/commit */
-> -       test_mode = (long)data->ioc_pbuf1;
-> +       test_mode = (__force long)data->ioc_pbuf1;
->         if (test_mode == 1)
->                 async = 0;
->
-> --
-> 2.11.0
->
+thanks,
+
+greg k-h
