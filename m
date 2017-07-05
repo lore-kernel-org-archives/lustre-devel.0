@@ -1,54 +1,46 @@
-From: Frans Klaver <fransklaver@gmail.com>
-Date: Thu, 6 Jul 2017 09:23:53 +0200
-Subject: [lustre-devel] [PATCH 8/8] Staging: lustre :lustre: include
- :lustre_compat.h: Prefer using the BIT macro
-In-Reply-To: <1499325195-17466-1-git-send-email-rjdurga@gmail.com>
-References: <1499325195-17466-1-git-send-email-rjdurga@gmail.com>
-Message-ID: <CAH6sp9PuJ_zxK1D=t_i2aAeeNzaoUP+UqnGQC_Pin-QNgjJ7hg@mail.gmail.com>
+From: Jeff Layton <jlayton@kernel.org>
+Date: Wed,  5 Jul 2017 12:37:44 -0400
+Subject: [lustre-devel] [PATCH] lustre: don't set f_version in ll_readdir
+Message-ID: <20170705163744.3228-1-jlayton@kernel.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Jaya Durga <rjdurga@gmail.com>
-Cc: Greg KH <gregkh@linuxfoundation.org>, driverdevel <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, oleg.drokin@intel.com, andreas.dilger@intel.com, john.hammond@intel.com, bobijam@hotmail.com, Ingo Molnar <mingo@kernel.org>, lustre-devel@lists.lustre.org
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: lustre-devel@lists.lustre.org, linux-fsdevel@vger.kernel.org
 
-On Thu, Jul 6, 2017 at 9:13 AM, Jaya Durga <rjdurga@gmail.com> wrote:
-> Subject: Staging: lustre :lustre: include :lustre_compat.h: Prefer using the BIT macro
+From: Jeff Layton <jlayton@redhat.com>
 
-Don't overdo it ;-).
+f_version is only ever used by filesystem-specific code. Generic
+VFS code never uses it.
 
-Subject: staging: lustre: lustre_compat.h: Prefer using the BIT macro
+Nothing in lustre ever looks at it, so just remove this.
 
-> Replace all instances of (1 << 27) with BIT(27) to fix
-> checkpatch check messages
+Signed-off-by: Jeff Layton <jlayton@redhat.com>
+---
+ drivers/staging/lustre/lustre/llite/dir.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-While it may technically be true that this one instance is every
-instance of (1<<27) there is in lustre_compat.h, I must say I expected
-a bigger patch when I saw "replace all instances".
-
-
-> Signed-off-by: Jaya Durga <rjdurga@gmail.com>
-> ---
->  drivers/staging/lustre/lustre/include/lustre_compat.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/staging/lustre/lustre/include/lustre_compat.h b/drivers/staging/lustre/lustre/include/lustre_compat.h
-> index da9ce19..686a251 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre_compat.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre_compat.h
-> @@ -43,7 +43,7 @@
->   * set ATTR_BLOCKS to a high value to avoid any risk of collision with other
->   * ATTR_* attributes (see bug 13828)
->   */
-> -#define ATTR_BLOCKS    (1 << 27)
-> +#define ATTR_BLOCKS    BIT(27)
->
->  #define current_ngroups current_cred()->group_info->ngroups
->  #define current_groups current_cred()->group_info->small_block
-> --
-> 1.9.1
->
-> _______________________________________________
-> devel mailing list
-> devel at linuxdriverproject.org
-> http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 03a72c07f57c..ab53500007bf 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -367,8 +367,6 @@ static int ll_readdir(struct file *filp, struct dir_context *ctx)
+ 	}
+ 	ctx->pos = pos;
+ 	ll_finish_md_op_data(op_data);
+-	filp->f_version = inode->i_version;
+-
+ out:
+ 	if (!rc)
+ 		ll_stats_ops_tally(sbi, LPROC_LL_READDIR, 1);
+@@ -1675,7 +1673,6 @@ static loff_t ll_dir_seek(struct file *file, loff_t offset, int origin)
+ 			else
+ 				fd->lfd_pos = offset;
+ 			file->f_pos = offset;
+-			file->f_version = 0;
+ 		}
+ 		ret = offset;
+ 	}
+-- 
+2.13.0
