@@ -1,31 +1,54 @@
-From: Dmitriy Cherkasov <dmitriy@oss-tech.org>
-Date: Wed, 5 Jul 2017 22:03:21 +0000
-Subject: [lustre-devel] Dead code cleanup
-Message-ID: <2d7d67d4-3716-c521-e7dd-b8f934330c7e@oss-tech.org>
+From: Frans Klaver <fransklaver@gmail.com>
+Date: Thu, 6 Jul 2017 09:23:53 +0200
+Subject: [lustre-devel] [PATCH 8/8] Staging: lustre :lustre: include
+ :lustre_compat.h: Prefer using the BIT macro
+In-Reply-To: <1499325195-17466-1-git-send-email-rjdurga@gmail.com>
+References: <1499325195-17466-1-git-send-email-rjdurga@gmail.com>
+Message-ID: <CAH6sp9PuJ_zxK1D=t_i2aAeeNzaoUP+UqnGQC_Pin-QNgjJ7hg@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Jaya Durga <rjdurga@gmail.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>, driverdevel <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, oleg.drokin@intel.com, andreas.dilger@intel.com, john.hammond@intel.com, bobijam@hotmail.com, Ingo Molnar <mingo@kernel.org>, lustre-devel@lists.lustre.org
 
-Folks,
+On Thu, Jul 6, 2017 at 9:13 AM, Jaya Durga <rjdurga@gmail.com> wrote:
+> Subject: Staging: lustre :lustre: include :lustre_compat.h: Prefer using the BIT macro
 
-I've found one last #if 0 block in the code, but when attempting to investigate 
-its origin I ran into a dead end.
+Don't overdo it ;-).
 
-The code in question [1] has not been touched since 2013 [2], and seems to 
-originate from one big patch [3] with a non-public commit history. I found the 
-relevant bugzilla entry [4], but no history beyond that.
+Subject: staging: lustre: lustre_compat.h: Prefer using the BIT macro
 
-Although I was unable to find the original intent behind it, I think it's safe 
-to assume it is not used and if there are no objections I'll post a patch to 
-remove it.
+> Replace all instances of (1 << 27) with BIT(27) to fix
+> checkpatch check messages
 
-Thanks,
-Dmitriy
+While it may technically be true that this one instance is every
+instance of (1<<27) there is in lustre_compat.h, I must say I expected
+a bigger patch when I saw "replace all instances".
 
-[1] 
-https://git.hpdd.intel.com/?p=fs/lustre-release.git;a=blob;f=lustre/lov/lov_io.c;h=2339ea56;hb=HEAD#l1067
-[2] https://git.hpdd.intel.com/?p=fs/lustre-release.git;a=commit;h=d2589286
-[3] https://git.hpdd.intel.com/?p=fs/lustre-release.git;a=commit;h=fbf5870b
-[4] https://projectlava.xyratex.com/show_bug.cgi?id=14166
+
+> Signed-off-by: Jaya Durga <rjdurga@gmail.com>
+> ---
+>  drivers/staging/lustre/lustre/include/lustre_compat.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_compat.h b/drivers/staging/lustre/lustre/include/lustre_compat.h
+> index da9ce19..686a251 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_compat.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_compat.h
+> @@ -43,7 +43,7 @@
+>   * set ATTR_BLOCKS to a high value to avoid any risk of collision with other
+>   * ATTR_* attributes (see bug 13828)
+>   */
+> -#define ATTR_BLOCKS    (1 << 27)
+> +#define ATTR_BLOCKS    BIT(27)
+>
+>  #define current_ngroups current_cred()->group_info->ngroups
+>  #define current_groups current_cred()->group_info->small_block
+> --
+> 1.9.1
+>
+> _______________________________________________
+> devel mailing list
+> devel at linuxdriverproject.org
+> http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
