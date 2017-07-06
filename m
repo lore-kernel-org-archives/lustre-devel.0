@@ -1,35 +1,22 @@
-From: Jaya Durga <rjdurga@gmail.com>
-Date: Thu,  6 Jul 2017 12:43:15 +0530
-Subject: [lustre-devel] [PATCH 8/8] Staging: lustre :lustre: include
-	:lustre_compat.h: Prefer using the BIT macro
-Message-ID: <1499325195-17466-1-git-send-email-rjdurga@gmail.com>
+From: Dmitriy Cherkasov <dmitriy@oss-tech.org>
+Date: Thu, 6 Jul 2017 12:14:04 -0700
+Subject: [lustre-devel] [PATCH v4] staging: lustre: lnet: remove dead
+ code and crc32_le() wrapper
+In-Reply-To: <1498801841-5799-1-git-send-email-dmitriy@oss-tech.org>
+References: <1498794766-12298-1-git-send-email-dmitriy@oss-tech.org>
+	<1498801841-5799-1-git-send-email-dmitriy@oss-tech.org>
+Message-ID: <71e755f4-eac5-f74f-7add-399355141b16@oss-tech.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: gregkh@linuxfoundation.org
-Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, john.hammond@intel.com, bobijam@hotmail.com, mingo@kernel.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Jaya Durga <rjdurga@gmail.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Replace all instances of (1 << 27) with BIT(27) to fix
-checkpatch check messages
+On 06/29/2017 10:50 PM, Dmitriy Cherkasov wrote:
+> After removing code which was permanently disabled with ifdefs, the
+> function ksocknal_csum() becomes just a wrapper for crc32_le(). Remove
+> this useless wrapper and instead call crc32_le() directly.
+> 
 
-Signed-off-by: Jaya Durga <rjdurga@gmail.com>
----
- drivers/staging/lustre/lustre/include/lustre_compat.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/staging/lustre/lustre/include/lustre_compat.h b/drivers/staging/lustre/lustre/include/lustre_compat.h
-index da9ce19..686a251 100644
---- a/drivers/staging/lustre/lustre/include/lustre_compat.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_compat.h
-@@ -43,7 +43,7 @@
-  * set ATTR_BLOCKS to a high value to avoid any risk of collision with other
-  * ATTR_* attributes (see bug 13828)
-  */
--#define ATTR_BLOCKS    (1 << 27)
-+#define ATTR_BLOCKS    BIT(27)
- 
- #define current_ngroups current_cred()->group_info->ngroups
- #define current_groups current_cred()->group_info->small_block
--- 
-1.9.1
+Any feedback on v4 please?
