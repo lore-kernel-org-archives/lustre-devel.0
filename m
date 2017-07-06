@@ -1,46 +1,35 @@
-From: Jeff Layton <jlayton@kernel.org>
-Date: Wed,  5 Jul 2017 12:37:44 -0400
-Subject: [lustre-devel] [PATCH] lustre: don't set f_version in ll_readdir
-Message-ID: <20170705163744.3228-1-jlayton@kernel.org>
+From: Jaya Durga <rjdurga@gmail.com>
+Date: Thu,  6 Jul 2017 12:43:15 +0530
+Subject: [lustre-devel] [PATCH 8/8] Staging: lustre :lustre: include
+	:lustre_compat.h: Prefer using the BIT macro
+Message-ID: <1499325195-17466-1-git-send-email-rjdurga@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: lustre-devel@lists.lustre.org, linux-fsdevel@vger.kernel.org
+To: gregkh@linuxfoundation.org
+Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, john.hammond@intel.com, bobijam@hotmail.com, mingo@kernel.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Jaya Durga <rjdurga@gmail.com>
 
-From: Jeff Layton <jlayton@redhat.com>
+Replace all instances of (1 << 27) with BIT(27) to fix
+checkpatch check messages
 
-f_version is only ever used by filesystem-specific code. Generic
-VFS code never uses it.
-
-Nothing in lustre ever looks at it, so just remove this.
-
-Signed-off-by: Jeff Layton <jlayton@redhat.com>
+Signed-off-by: Jaya Durga <rjdurga@gmail.com>
 ---
- drivers/staging/lustre/lustre/llite/dir.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_compat.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index 03a72c07f57c..ab53500007bf 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -367,8 +367,6 @@ static int ll_readdir(struct file *filp, struct dir_context *ctx)
- 	}
- 	ctx->pos = pos;
- 	ll_finish_md_op_data(op_data);
--	filp->f_version = inode->i_version;
--
- out:
- 	if (!rc)
- 		ll_stats_ops_tally(sbi, LPROC_LL_READDIR, 1);
-@@ -1675,7 +1673,6 @@ static loff_t ll_dir_seek(struct file *file, loff_t offset, int origin)
- 			else
- 				fd->lfd_pos = offset;
- 			file->f_pos = offset;
--			file->f_version = 0;
- 		}
- 		ret = offset;
- 	}
+diff --git a/drivers/staging/lustre/lustre/include/lustre_compat.h b/drivers/staging/lustre/lustre/include/lustre_compat.h
+index da9ce19..686a251 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_compat.h
++++ b/drivers/staging/lustre/lustre/include/lustre_compat.h
+@@ -43,7 +43,7 @@
+  * set ATTR_BLOCKS to a high value to avoid any risk of collision with other
+  * ATTR_* attributes (see bug 13828)
+  */
+-#define ATTR_BLOCKS    (1 << 27)
++#define ATTR_BLOCKS    BIT(27)
+ 
+ #define current_ngroups current_cred()->group_info->ngroups
+ #define current_groups current_cred()->group_info->small_block
 -- 
-2.13.0
+1.9.1
