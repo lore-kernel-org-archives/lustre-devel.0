@@ -1,123 +1,76 @@
-From: Dmitriy Cherkasov <dmitriy@oss-tech.org>
-Date: Fri,  7 Jul 2017 16:03:42 -0700
-Subject: [lustre-devel] [PATCH v5] staging: lustre: lnet: remove dead code
-	and useless wrapper
-In-Reply-To: <1498801841-5799-1-git-send-email-dmitriy@oss-tech.org>
-References: <1498801841-5799-1-git-send-email-dmitriy@oss-tech.org>
-Message-ID: <1499468622-10276-1-git-send-email-dmitriy@oss-tech.org>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 10 Jul 2017 15:08:03 +0200
+Subject: [lustre-devel] [PATCH] lustre: check copy_from_iter/copy_to_iter
+	return code
+Message-ID: <20170710130833.1834210-1-arnd@arndb.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitriy Cherkasov <dmitriy@oss-tech.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Arnd Bergmann <arnd@arndb.de>, stable@vger.kernel.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Doug Oucharek <doug.s.oucharek@intel.com>, Dmitry Eremin <dmitry.eremin@intel.com>, Al Viro <viro@zeniv.linux.org.uk>, Liang Zhen <liang.zhen@intel.com>, Nicholas Hanley <nicholasjhanley@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-After removing commented out code, ksocknal_csum() becomes a useless 
-wrapper for crc32_le(). Remove it, and instead call crc32_le() directly.
+We now get a helpful warning for code that calls copy_{from,to}_iter
+without checking the return value, introduced by commit aa28de275a24
+("iov_iter/hardening: move object size checks to inlined part").
 
-Fixes the following checkpatch warning:
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_send':
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1643:2: error: ignoring return value of 'copy_from_iter', declared with attribute warn_unused_result [-Werror=unused-result]
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_recv':
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1744:3: error: ignoring return value of 'copy_to_iter', declared with attribute warn_unused_result [-Werror=unused-result]
 
-WARNING: space prohibited before semicolon
+In case we get short copies here, we may get incorrect behavior.
+I've added failure handling for both rx and tx now, returning
+-EFAULT as expected.
 
-Signed-off-by: Dmitriy Cherkasov <dmitriy@oss-tech.org>
+Cc: stable at vger.kernel.org
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-v5:
-	- fix incomplete patch changelog
-	- improve code alignment
-	- reword commit message and summary to be more concise
-v4:
-	- fix spacing issues
-	- fix typo in commit message
-	- add patch changelog
-v3:
-	- fix spacing and alignment issues 
-	  (suggested by Joe Perches)
-v2:
-	- remove ksocknal_csum() and call crc32_le() directly
-	  (suggested by Greg KH)
-	- update commit message and summary to reflect these changes
+This warning now shows up in 'allmodconfig' builds, so it would be
+good to get it fixed quickly for 4.13, but my patch should not go
+in without careful review since I'm not familiar with with code
+and the error handling is a bit tricky here.
 
- drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h  | 11 -----------
- .../staging/lustre/lnet/klnds/socklnd/socklnd_lib.c  | 20 ++++++++++----------
- 2 files changed, 10 insertions(+), 21 deletions(-)
+I added 'Cc: stable' since this is a preexisting condition that we
+only started warning about now.
+---
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-index 5540de6..9eb169d 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-@@ -519,17 +519,6 @@ struct ksock_proto {
- #define CPU_MASK_NONE   0UL
- #endif
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 85b242ec5f9b..70256a0ffd2e 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1640,8 +1640,13 @@ kiblnd_send(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg)
+ 	ibmsg = tx->tx_msg;
+ 	ibmsg->ibm_u.immediate.ibim_hdr = *hdr;
  
--static inline __u32 ksocknal_csum(__u32 crc, unsigned char const *p, size_t len)
--{
--#if 1
--	return crc32_le(crc, p, len);
--#else
--	while (len-- > 0)
--		crc = ((crc + 0x100) & ~0xff) | ((crc + *p++) & 0xff) ;
--	return crc;
--#endif
--}
--
- static inline int
- ksocknal_route_mask(void)
- {
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
-index 8a036f4..9c328dc 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_lib.c
-@@ -201,9 +201,9 @@
- 			if (fragnob > sum)
- 				fragnob = sum;
+-	copy_from_iter(&ibmsg->ibm_u.immediate.ibim_payload, IBLND_MSG_SIZE,
++	rc = copy_from_iter(&ibmsg->ibm_u.immediate.ibim_payload, IBLND_MSG_SIZE,
+ 		       &from);
++	if (rc != IBLND_MSG_SIZE) {
++		kiblnd_pool_free_node(&tx->tx_pool->tpo_pool, &tx->tx_list);
++		return -EFAULT;
++	}
++
+ 	nob = offsetof(struct kib_immediate_msg, ibim_payload[payload_nob]);
+ 	kiblnd_init_tx_msg(ni, tx, IBLND_MSG_IMMEDIATE, nob);
  
--			conn->ksnc_rx_csum = ksocknal_csum(conn->ksnc_rx_csum,
--							   iov[i].iov_base,
--							   fragnob);
-+			conn->ksnc_rx_csum = crc32_le(conn->ksnc_rx_csum,
-+						      iov[i].iov_base,
-+						      fragnob);
+@@ -1741,8 +1746,14 @@ kiblnd_recv(struct lnet_ni *ni, void *private, struct lnet_msg *lntmsg,
+ 			break;
  		}
- 		conn->ksnc_msg.ksm_csum = saved_csum;
- 	}
-@@ -243,8 +243,8 @@
- 			if (fragnob > sum)
- 				fragnob = sum;
  
--			conn->ksnc_rx_csum = ksocknal_csum(conn->ksnc_rx_csum,
--							   base, fragnob);
-+			conn->ksnc_rx_csum = crc32_le(conn->ksnc_rx_csum,
-+						      base, fragnob);
+-		copy_to_iter(&rxmsg->ibm_u.immediate.ibim_payload,
++		rc = copy_to_iter(&rxmsg->ibm_u.immediate.ibim_payload,
+ 			     IBLND_MSG_SIZE, to);
++		if (rc != IBLND_MSG_SIZE) {
++			rc = -EFAULT;
++			break;
++		}
++
++		rc = 0;
+ 		lnet_finalize(ni, lntmsg, 0);
+ 		break;
  
- 			kunmap(kiov[i].bv_page);
- 		}
-@@ -265,22 +265,22 @@
- 
- 	tx->tx_msg.ksm_csum = 0;
- 
--	csum = ksocknal_csum(~0, tx->tx_iov[0].iov_base,
--			     tx->tx_iov[0].iov_len);
-+	csum = crc32_le(~0, tx->tx_iov[0].iov_base,
-+			tx->tx_iov[0].iov_len);
- 
- 	if (tx->tx_kiov) {
- 		for (i = 0; i < tx->tx_nkiov; i++) {
- 			base = kmap(tx->tx_kiov[i].bv_page) +
- 			       tx->tx_kiov[i].bv_offset;
- 
--			csum = ksocknal_csum(csum, base, tx->tx_kiov[i].bv_len);
-+			csum = crc32_le(csum, base, tx->tx_kiov[i].bv_len);
- 
- 			kunmap(tx->tx_kiov[i].bv_page);
- 		}
- 	} else {
- 		for (i = 1; i < tx->tx_niov; i++)
--			csum = ksocknal_csum(csum, tx->tx_iov[i].iov_base,
--					     tx->tx_iov[i].iov_len);
-+			csum = crc32_le(csum, tx->tx_iov[i].iov_base,
-+					tx->tx_iov[i].iov_len);
- 	}
- 
- 	if (*ksocknal_tunables.ksnd_inject_csum_error) {
 -- 
-1.9.1
+2.9.0
