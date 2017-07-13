@@ -5,7 +5,7 @@ Subject: [lustre-devel] [PATCH v5] staging: lustre: lnet: remove dead
 In-Reply-To: <1499468622-10276-1-git-send-email-dmitriy@oss-tech.org>
 References: <1498801841-5799-1-git-send-email-dmitriy@oss-tech.org>
 	<1499468622-10276-1-git-send-email-dmitriy@oss-tech.org>
-Message-ID: <58312993-66C3-4B40-A8B7-A2BFC07069E8@intel.com>
+Message-ID: <E6268FDE-5BC3-4D38-BD7B-A69E5470EBCD@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
