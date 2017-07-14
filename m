@@ -1,35 +1,51 @@
-From: Jones, Peter A <peter.a.jones@intel.com>
-Date: Thu, 13 Jul 2017 21:25:42 +0000
-Subject: [lustre-devel] Lustre 2.10.0 released
-Message-ID: <D17F6C2E-90D0-4C61-94AE-79C13DB08F75@intel.com>
+From: Al Viro <viro@ZenIV.linux.org.uk>
+Date: Fri, 14 Jul 2017 02:50:34 +0100
+Subject: [lustre-devel] [PATCH] lustre: check
+	copy_from_iter/copy_to_iter return code
+In-Reply-To: <CAK8P3a3nJRN2QQO4AGVB3V=jKafqvjdwoJ5u4ntEMsEugzJ_+Q@mail.gmail.com>
+References: <20170710130833.1834210-1-arnd@arndb.de>
+	<alpine.LFD.2.20.1707131806080.14535@casper.infradead.org>
+	<CAK8P3a3nJRN2QQO4AGVB3V=jKafqvjdwoJ5u4ntEMsEugzJ_+Q@mail.gmail.com>
+Message-ID: <20170714015034.GE13102@ZenIV.linux.org.uk>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Arnd Bergmann <arnd@arndb.de>
+Cc: James Simmons <jsimmons@infradead.org>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, "# 3.4.x" <stable@vger.kernel.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Doug Oucharek <doug.s.oucharek@intel.com>, Dmitry Eremin <dmitry.eremin@intel.com>, Liang Zhen <liang.zhen@intel.com>, Nicholas Hanley <nicholasjhanley@gmail.com>, Lustre Development List <lustre-devel@lists.lustre.org>, devel@driverdev.osuosl.org, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 
-We are pleased to announce that the Lustre 2.10.0 Release has been declared GA and is available for <https://downloads.hpdd.intel.com/public/lustre/latest-feature-release/> download<https://downloads.hpdd.intel.com/public/lustre/lustre-2.10.0/> <https://downloads.hpdd.intel.com/public/lustre/lustre-2.10.0/> . You can also grab the source from <http://git.whamcloud.com/fs/lustre-release.git/commit/ea79df5af4d9b034e39caa396cefc2a075e572ba> git<https://git.hpdd.intel.com/?p=fs/lustre-release.git;a=commit;h=58fd06e4d9fcee95f5c60bc8120d782b61f0823c>
+On Thu, Jul 13, 2017 at 10:57:59PM +0200, Arnd Bergmann wrote:
 
-This major release includes new features:
+> Thanks for testing it!
+> 
+> That means we did not copy any data and the kernel continues with
+> an uninitialized buffer, right? The problem may be the definition of
+> 
+> struct kib_immediate_msg {
+>         struct lnet_hdr ibim_hdr;        /* portals header */
+>         char         ibim_payload[0]; /* piggy-backed payload */
+> } WIRE_ATTR;
+> 
+> The check that Al added will try to ensure that we don't write
+> beyond the size of the ibim_payload[] array, which unfortunately
+> is defined as a zero-byte array, so I can see why it will now
+> fail. However, it's already broken in mainline now, with or without
+> my patch.
+> 
+> Are you able to come up with a fix that avoids the warning in
+> 'allmodconfig' and makes the function do something reasonable
+> again?
 
-Progressive File Layouts  Enables file layouts to automatically adjust as size of files grow thus optimizing performance for diverse workloads    (LU-8898<https://jira.hpdd.intel.com/browse/LU-8998>)
+Might make sense to try and use valid C99 for "array of indefinite
+size as the last member", i.e.
+struct kib_immediate_msg {
+         struct lnet_hdr ibim_hdr;        /* portals header */
+         char         ibim_payload[]; /* piggy-backed payload */
+} WIRE_ATTR;
 
-Multi-Rail LNet Allows LNet to utilize multiple network interfaces on a node in parallel, aggregating their performance (LU-7734<https://jira.hpdd.intel.com/browse/LU-7734>)
+	Zero-sized array as the last member is gcc hack predating that;
+looks like gcc gets confused into deciding that it knows the distance
+from the end of object...
 
-Project Quotas  Extension to the Lustre quotas feature to provide the option to place quotas on a per project basis rather than just per user or per group (LU-4017<https://jira.hpdd.intel.com/browse/LU-4017>)
-
-Simplified Userspace Snapshots Provides a mechanism to leverage the snapshot capability in OpenZFS to take a coordinated snapshot of a Lustre filesystem. (LU-8900<https://jira.hpdd.intel.com/browse/LU-8900>)
-
-NRS Delay Policy Simulates high server load as a way of validating the resilience of Lustre under load . (LU-6283<https://jira.hpdd.intel.com/browse/LU-6283>)
-
-Fuller details can be found in the 2.10 wiki page<http://wiki.lustre.org/Release_2.10.0> (including the ch<http://wiki.lustre.org/Lustre_2.10.0_Changelog>ange log<http://wiki.lustre.org/Lustre_2.10.0_Changelog> and test mat<http://wiki.lustre.org/Release_2.10.0#Test_Matrix>rix<http://wiki.lustre.org/Release_2.10.0#Test_Matrix>)
-
-Please log any issues found in the issue tracking system<https://jira.hpdd.intel.com/>
-
-Thanks to all those who have contributed to the creation of this release.
-
-This is the first release of the 2.10.x LTS release stream. We are planning to release a freely available Lustre 2.10.1 in the coming weeks
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170713/6eb64259/attachment.htm>
+	Said that, are we really guaranteed the IBLND_MSG_SIZE bytes
+in there?
