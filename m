@@ -1,73 +1,91 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 15 Jul 2017 11:32:08 -0400
-Subject: [lustre-devel] [PATCH] staging: lustre: ko2iblnd: check
-	copy_from_iter/copy_to_iter return code
-Message-ID: <1500132728-28511-1-git-send-email-jsimmons@infradead.org>
+Date: Sat, 15 Jul 2017 11:39:22 -0400
+Subject: [lustre-devel] [PATCH] staging: lustre: lustre: fix all braces
+	issues reported by checkpatch
+Message-ID: <1500133162-29310-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Arnd Bergmann <arnd@arndb.de>, Al Viro <viro@zeniv.linux.org.uk>
-Cc: Amir Shehata <amir.shehata@intel.com>, Olaf Weber <olaf.weber@hpe.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, stable@vger.kernel.org, James Simmons <jsimmons@infradead.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: Arnd Bergmann <arnd@arndb.de>
+Cleanup all braces that was reported by checkpatch. The only
+issue not fixed up is in mdc_lock.c. Removing the braces in
+the case of mdc_lock.c will break the build.
 
-We now get a helpful warning for code that calls copy_{from,to}_iter
-without checking the return value, introduced by commit aa28de275a24
-("iov_iter/hardening: move object size checks to inlined part").
-
-drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_send':
-drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1643:2: error: ignoring return value of 'copy_from_iter', declared with attribute warn_unused_result [-Werror=unused-result]
-drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_recv':
-drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1744:3: error: ignoring return value of 'copy_to_iter', declared with attribute warn_unused_result [-Werror=unused-result]
-
-In case we get short copies here, we may get incorrect behavior.
-I've added failure handling for both rx and tx now, returning
--EFAULT as expected.
-
-Cc: stable at vger.kernel.org
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
+------------------------------------------------------------------
+v1) Initial patch
+v2) Rebased against latest staging-next tree
 ---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c    | 19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/fld/fld_cache.c  | 3 ++-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 9 +++++----
+ drivers/staging/lustre/lustre/llite/vvp_dev.c  | 5 +++--
+ 3 files changed, 10 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 85b242e..8fc191d 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -1640,8 +1640,13 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 	ibmsg = tx->tx_msg;
- 	ibmsg->ibm_u.immediate.ibim_hdr = *hdr;
+diff --git a/drivers/staging/lustre/lustre/fld/fld_cache.c b/drivers/staging/lustre/lustre/fld/fld_cache.c
+index b852fed..adaa094 100644
+--- a/drivers/staging/lustre/lustre/fld/fld_cache.c
++++ b/drivers/staging/lustre/lustre/fld/fld_cache.c
+@@ -348,9 +348,10 @@ static void fld_cache_overlap_handle(struct fld_cache *cache,
  
--	copy_from_iter(&ibmsg->ibm_u.immediate.ibim_payload, IBLND_MSG_SIZE,
--		       &from);
-+	rc = copy_from_iter(&ibmsg->ibm_u.immediate.ibim_payload, payload_nob,
-+			    &from);
-+	if (rc != payload_nob) {
-+		kiblnd_pool_free_node(&tx->tx_pool->tpo_pool, &tx->tx_list);
-+		return -EFAULT;
+ 		f_curr->fce_range.lsr_end = new_start;
+ 		fld_cache_entry_add(cache, f_new, &f_curr->fce_list);
+-	} else
++	} else {
+ 		CERROR("NEW range =" DRANGE " curr = " DRANGE "\n",
+ 		       PRANGE(range), PRANGE(&f_curr->fce_range));
 +	}
-+
- 	nob = offsetof(struct kib_immediate_msg, ibim_payload[payload_nob]);
- 	kiblnd_init_tx_msg(ni, tx, IBLND_MSG_IMMEDIATE, nob);
+ }
  
-@@ -1741,8 +1746,14 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 			break;
- 		}
+ struct fld_cache_entry
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+index ddb4642..181025d 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
+@@ -1029,11 +1029,11 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
+ 	if (work_list && lock->l_completion_ast)
+ 		ldlm_add_ast_work_item(lock, NULL, work_list);
  
--		copy_to_iter(&rxmsg->ibm_u.immediate.ibim_payload,
--			     IBLND_MSG_SIZE, to);
-+		rc = copy_to_iter(&rxmsg->ibm_u.immediate.ibim_payload, rlen,
-+				  to);
-+		if (rc != rlen) {
-+			rc = -EFAULT;
-+			break;
-+		}
-+
-+		rc = 0;
- 		lnet_finalize(ni, lntmsg, 0);
- 		break;
+-	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS)
++	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS) {
+ 		ldlm_grant_lock_with_skiplist(lock);
+-	else if (res->lr_type == LDLM_EXTENT)
++	} else if (res->lr_type == LDLM_EXTENT) {
+ 		ldlm_extent_add_lock(res, lock);
+-	else if (res->lr_type == LDLM_FLOCK) {
++	} else if (res->lr_type == LDLM_FLOCK) {
+ 		/*
+ 		 * We should not add locks to granted list in the following cases:
+ 		 * - this is an UNLOCK but not a real lock;
+@@ -1045,8 +1045,9 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
+ 		    ldlm_is_test_lock(lock) || ldlm_is_flock_deadlock(lock))
+ 			return;
+ 		ldlm_resource_add_lock(res, &res->lr_granted, lock);
+-	} else
++	} else {
+ 		LBUG();
++	}
  
+ 	ldlm_pool_add(&ldlm_res_to_ns(res)->ns_pool, lock);
+ }
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+index 8e45672..2b60699 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+@@ -591,9 +591,10 @@ static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
+ 	env = cl_env_get(&refcheck);
+ 	if (!IS_ERR(env)) {
+ 		sbi = f->private;
+-		if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT)
++		if (sbi->ll_site->ls_obj_hash->hs_cur_bits >
++		    64 - PGC_OBJ_SHIFT) {
+ 			pos = ERR_PTR(-EFBIG);
+-		else {
++		} else {
+ 			*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev,
+ 						*pos);
+ 			if (*pos == ~0ULL)
 -- 
 1.8.3.1
