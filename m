@@ -1,73 +1,73 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 15 Jul 2017 15:40:29 +0100 (BST)
-Subject: [lustre-devel] [PATCH] lustre: check
+Date: Sat, 15 Jul 2017 11:32:08 -0400
+Subject: [lustre-devel] [PATCH] staging: lustre: ko2iblnd: check
 	copy_from_iter/copy_to_iter return code
-In-Reply-To: <20170714015034.GE13102@ZenIV.linux.org.uk>
-References: <20170710130833.1834210-1-arnd@arndb.de>
-	<alpine.LFD.2.20.1707131806080.14535@casper.infradead.org>
-	<CAK8P3a3nJRN2QQO4AGVB3V=jKafqvjdwoJ5u4ntEMsEugzJ_+Q@mail.gmail.com>
-	<20170714015034.GE13102@ZenIV.linux.org.uk>
-Message-ID: <alpine.LFD.2.20.1707151520150.24574@casper.infradead.org>
+Message-ID: <1500132728-28511-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Al Viro <viro@ZenIV.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, "# 3.4.x" <stable@vger.kernel.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Doug Oucharek <doug.s.oucharek@intel.com>, Dmitry Eremin <dmitry.eremin@intel.com>, Liang Zhen <liang.zhen@intel.com>, Nicholas Hanley <nicholasjhanley@gmail.com>, Lustre Development List <lustre-devel@lists.lustre.org>, devel@driverdev.osuosl.org, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Arnd Bergmann <arnd@arndb.de>, Al Viro <viro@zeniv.linux.org.uk>
+Cc: Amir Shehata <amir.shehata@intel.com>, Olaf Weber <olaf.weber@hpe.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, stable@vger.kernel.org, James Simmons <jsimmons@infradead.org>
 
+From: Arnd Bergmann <arnd@arndb.de>
 
+We now get a helpful warning for code that calls copy_{from,to}_iter
+without checking the return value, introduced by commit aa28de275a24
+("iov_iter/hardening: move object size checks to inlined part").
 
-On Fri, 14 Jul 2017, Al Viro wrote:
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_send':
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1643:2: error: ignoring return value of 'copy_from_iter', declared with attribute warn_unused_result [-Werror=unused-result]
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_recv':
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1744:3: error: ignoring return value of 'copy_to_iter', declared with attribute warn_unused_result [-Werror=unused-result]
 
-> On Thu, Jul 13, 2017 at 10:57:59PM +0200, Arnd Bergmann wrote:
-> 
-> > Thanks for testing it!
-> > 
-> > That means we did not copy any data and the kernel continues with
-> > an uninitialized buffer, right? The problem may be the definition of
-> > 
-> > struct kib_immediate_msg {
-> >         struct lnet_hdr ibim_hdr;        /* portals header */
-> >         char         ibim_payload[0]; /* piggy-backed payload */
-> > } WIRE_ATTR;
-> > 
-> > The check that Al added will try to ensure that we don't write
-> > beyond the size of the ibim_payload[] array, which unfortunately
-> > is defined as a zero-byte array, so I can see why it will now
-> > fail. However, it's already broken in mainline now, with or without
-> > my patch.
-> > 
-> > Are you able to come up with a fix that avoids the warning in
-> > 'allmodconfig' and makes the function do something reasonable
-> > again?
+In case we get short copies here, we may get incorrect behavior.
+I've added failure handling for both rx and tx now, returning
+-EFAULT as expected.
 
-Yes, I'm testing a fix right now which I will merge with the original
-patch. Greg this patch will need to be sent to Linus as well so the
-kernel release isn't broken for users.
+Cc: stable at vger.kernel.org
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c    | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 85b242e..8fc191d 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1640,8 +1640,13 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	ibmsg = tx->tx_msg;
+ 	ibmsg->ibm_u.immediate.ibim_hdr = *hdr;
  
-> Might make sense to try and use valid C99 for "array of indefinite
-> size as the last member", i.e.
-> struct kib_immediate_msg {
->          struct lnet_hdr ibim_hdr;        /* portals header */
->          char         ibim_payload[]; /* piggy-backed payload */
-> } WIRE_ATTR;
-> 
-> 	Zero-sized array as the last member is gcc hack predating that;
-> looks like gcc gets confused into deciding that it knows the distance
-> from the end of object...
-
-I did some profiling and found gcc was doing the right thing. That
-should be updated to a C99 flexable array in a latter patch. 
-
-> 	Said that, are we really guaranteed the IBLND_MSG_SIZE bytes
-> in there?
-
-This is what the real bug was. In the current code we are telling
-copy_from_iter and copy_to_iter that the number of bytes are always
-IBLND_MSG_SIZE. Arnd thought this was always the size so in his
-patch he was testing the returned result of copy_[from|to]_iter to 
-IBLND_MSG_SIZE. This nearly always failed since variable sized messages 
-are being created. The zero size I initially saw was from doing pings. 
-When I later tested with pushing I/O packets of other sizes were
-observed but none of them were IBLND_MSG_SIZE in size so they failed to 
-transmit. As soon as I'm done testing I will send a patch.
+-	copy_from_iter(&ibmsg->ibm_u.immediate.ibim_payload, IBLND_MSG_SIZE,
+-		       &from);
++	rc = copy_from_iter(&ibmsg->ibm_u.immediate.ibim_payload, payload_nob,
++			    &from);
++	if (rc != payload_nob) {
++		kiblnd_pool_free_node(&tx->tx_pool->tpo_pool, &tx->tx_list);
++		return -EFAULT;
++	}
++
+ 	nob = offsetof(struct kib_immediate_msg, ibim_payload[payload_nob]);
+ 	kiblnd_init_tx_msg(ni, tx, IBLND_MSG_IMMEDIATE, nob);
+ 
+@@ -1741,8 +1746,14 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 			break;
+ 		}
+ 
+-		copy_to_iter(&rxmsg->ibm_u.immediate.ibim_payload,
+-			     IBLND_MSG_SIZE, to);
++		rc = copy_to_iter(&rxmsg->ibm_u.immediate.ibim_payload, rlen,
++				  to);
++		if (rc != rlen) {
++			rc = -EFAULT;
++			break;
++		}
++
++		rc = 0;
+ 		lnet_finalize(ni, lntmsg, 0);
+ 		break;
+ 
+-- 
+1.8.3.1
