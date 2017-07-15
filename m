@@ -1,91 +1,25 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 15 Jul 2017 11:39:22 -0400
+From: Joe Perches <joe@perches.com>
+Date: Sat, 15 Jul 2017 08:52:54 -0700
 Subject: [lustre-devel] [PATCH] staging: lustre: lustre: fix all braces
-	issues reported by checkpatch
-Message-ID: <1500133162-29310-1-git-send-email-jsimmons@infradead.org>
+ issues reported by checkpatch
+In-Reply-To: <1500133162-29310-1-git-send-email-jsimmons@infradead.org>
+References: <1500133162-29310-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1500133974.4457.79.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+To: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Cleanup all braces that was reported by checkpatch. The only
-issue not fixed up is in mdc_lock.c. Removing the braces in
-the case of mdc_lock.c will break the build.
+On Sat, 2017-07-15 at 11:39 -0400, James Simmons wrote:
+> Cleanup all braces that was reported by checkpatch. The only
+> issue not fixed up is in mdc_lock.c. Removing the braces in
+> the case of mdc_lock.c will break the build.
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
-------------------------------------------------------------------
-v1) Initial patch
-v2) Rebased against latest staging-next tree
----
- drivers/staging/lustre/lustre/fld/fld_cache.c  | 3 ++-
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c | 9 +++++----
- drivers/staging/lustre/lustre/llite/vvp_dev.c  | 5 +++--
- 3 files changed, 10 insertions(+), 7 deletions(-)
+what checkpatch warning in mdc_locks.c is that?
 
-diff --git a/drivers/staging/lustre/lustre/fld/fld_cache.c b/drivers/staging/lustre/lustre/fld/fld_cache.c
-index b852fed..adaa094 100644
---- a/drivers/staging/lustre/lustre/fld/fld_cache.c
-+++ b/drivers/staging/lustre/lustre/fld/fld_cache.c
-@@ -348,9 +348,10 @@ static void fld_cache_overlap_handle(struct fld_cache *cache,
- 
- 		f_curr->fce_range.lsr_end = new_start;
- 		fld_cache_entry_add(cache, f_new, &f_curr->fce_list);
--	} else
-+	} else {
- 		CERROR("NEW range =" DRANGE " curr = " DRANGE "\n",
- 		       PRANGE(range), PRANGE(&f_curr->fce_range));
-+	}
- }
- 
- struct fld_cache_entry
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index ddb4642..181025d 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -1029,11 +1029,11 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
- 	if (work_list && lock->l_completion_ast)
- 		ldlm_add_ast_work_item(lock, NULL, work_list);
- 
--	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS)
-+	if (res->lr_type == LDLM_PLAIN || res->lr_type == LDLM_IBITS) {
- 		ldlm_grant_lock_with_skiplist(lock);
--	else if (res->lr_type == LDLM_EXTENT)
-+	} else if (res->lr_type == LDLM_EXTENT) {
- 		ldlm_extent_add_lock(res, lock);
--	else if (res->lr_type == LDLM_FLOCK) {
-+	} else if (res->lr_type == LDLM_FLOCK) {
- 		/*
- 		 * We should not add locks to granted list in the following cases:
- 		 * - this is an UNLOCK but not a real lock;
-@@ -1045,8 +1045,9 @@ void ldlm_grant_lock(struct ldlm_lock *lock, struct list_head *work_list)
- 		    ldlm_is_test_lock(lock) || ldlm_is_flock_deadlock(lock))
- 			return;
- 		ldlm_resource_add_lock(res, &res->lr_granted, lock);
--	} else
-+	} else {
- 		LBUG();
-+	}
- 
- 	ldlm_pool_add(&ldlm_res_to_ns(res)->ns_pool, lock);
- }
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index 8e45672..2b60699 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -591,9 +591,10 @@ static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
- 	env = cl_env_get(&refcheck);
- 	if (!IS_ERR(env)) {
- 		sbi = f->private;
--		if (sbi->ll_site->ls_obj_hash->hs_cur_bits > 64 - PGC_OBJ_SHIFT)
-+		if (sbi->ll_site->ls_obj_hash->hs_cur_bits >
-+		    64 - PGC_OBJ_SHIFT) {
- 			pos = ERR_PTR(-EFBIG);
--		else {
-+		} else {
- 			*pos = vvp_pgcache_find(env, &sbi->ll_cl->cd_lu_dev,
- 						*pos);
- 			if (*pos == ~0ULL)
--- 
-1.8.3.1
+$ ./scripts/checkpatch.pl -f --terse --nosummary drivers/staging/lustre/lustre/mdc/mdc_locks.c?
+drivers/staging/lustre/lustre/mdc/mdc_locks.c:590: WARNING: line over 80 characters
+drivers/staging/lustre/lustre/mdc/mdc_locks.c:600: WARNING: line over 80 characters
+drivers/staging/lustre/lustre/mdc/mdc_locks.c:637: WARNING: line over 80 characters
