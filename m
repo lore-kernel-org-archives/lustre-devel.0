@@ -1,45 +1,73 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Fri, 14 Jul 2017 17:46:29 -0400
-Subject: [lustre-devel] [PATCH][V2] staging: lustre: fix spelling
-	mistake, "grranted" -> "granted"
-In-Reply-To: <20170714213354.25101-1-colin.king@canonical.com>
-References: <20170714213354.25101-1-colin.king@canonical.com>
-Message-ID: <D03F15A6-04AE-46C3-9564-55CA055C08DF@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sat, 15 Jul 2017 15:40:29 +0100 (BST)
+Subject: [lustre-devel] [PATCH] lustre: check
+	copy_from_iter/copy_to_iter return code
+In-Reply-To: <20170714015034.GE13102@ZenIV.linux.org.uk>
+References: <20170710130833.1834210-1-arnd@arndb.de>
+	<alpine.LFD.2.20.1707131806080.14535@casper.infradead.org>
+	<CAK8P3a3nJRN2QQO4AGVB3V=jKafqvjdwoJ5u4ntEMsEugzJ_+Q@mail.gmail.com>
+	<20170714015034.GE13102@ZenIV.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1707151520150.24574@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Colin King <colin.king@canonical.com>
-Cc: Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "John L . Hammond" <john.hammond@intel.com>, Hongchao Zhang <hongchao.zhang@intel.com>, Alexander Boyko <alexander_boyko@xyratex.com>, Gregoire Pichon <gregoire.pichon@bull.net>, Mikhal Pershin <mike.pershin@intel.com>, Niu Yawei <yawei.niu@intel.com>, Thibaut Robert <thibaut.robert@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Al Viro <viro@ZenIV.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, "# 3.4.x" <stable@vger.kernel.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Doug Oucharek <doug.s.oucharek@intel.com>, Dmitry Eremin <dmitry.eremin@intel.com>, Liang Zhen <liang.zhen@intel.com>, Nicholas Hanley <nicholasjhanley@gmail.com>, Lustre Development List <lustre-devel@lists.lustre.org>, devel@driverdev.osuosl.org, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 
 
-On Jul 14, 2017, at 5:33 PM, Colin King wrote:
 
-> From: Colin Ian King <colin.king@canonical.com>
+On Fri, 14 Jul 2017, Al Viro wrote:
+
+> On Thu, Jul 13, 2017 at 10:57:59PM +0200, Arnd Bergmann wrote:
 > 
-> Trivial fix to spelling mistake in CERROR error message. Also
-> clean up the grammar.
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> > Thanks for testing it!
+> > 
+> > That means we did not copy any data and the kernel continues with
+> > an uninitialized buffer, right? The problem may be the definition of
+> > 
+> > struct kib_immediate_msg {
+> >         struct lnet_hdr ibim_hdr;        /* portals header */
+> >         char         ibim_payload[0]; /* piggy-backed payload */
+> > } WIRE_ATTR;
+> > 
+> > The check that Al added will try to ensure that we don't write
+> > beyond the size of the ibim_payload[] array, which unfortunately
+> > is defined as a zero-byte array, so I can see why it will now
+> > fail. However, it's already broken in mainline now, with or without
+> > my patch.
+> > 
+> > Are you able to come up with a fix that avoids the warning in
+> > 'allmodconfig' and makes the function do something reasonable
+> > again?
 
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-
-> ---
-> drivers/staging/lustre/lustre/ptlrpc/import.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes, I'm testing a fix right now which I will merge with the original
+patch. Greg this patch will need to be sent to Linus as well so the
+kernel release isn't broken for users.
+ 
+> Might make sense to try and use valid C99 for "array of indefinite
+> size as the last member", i.e.
+> struct kib_immediate_msg {
+>          struct lnet_hdr ibim_hdr;        /* portals header */
+>          char         ibim_payload[]; /* piggy-backed payload */
+> } WIRE_ATTR;
 > 
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-> index 52cb1f0c9c94..b19dac15e901 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-> @@ -1026,7 +1026,7 @@ static int ptlrpc_connect_interpret(const struct lu_env *env,
-> 	/* check that server granted subset of flags we asked for. */
-> 	if ((ocd->ocd_connect_flags & imp->imp_connect_flags_orig) !=
-> 	    ocd->ocd_connect_flags) {
-> -		CERROR("%s: Server didn't granted asked subset of flags: asked=%#llx grranted=%#llx\n",
-> +		CERROR("%s: Server didn't grant the asked for subset of flags: asked=%#llx granted=%#llx\n",
-> 		       imp->imp_obd->obd_name, imp->imp_connect_flags_orig,
-> 		       ocd->ocd_connect_flags);
-> 		rc = -EPROTO;
-> -- 
-> 2.11.0
+> 	Zero-sized array as the last member is gcc hack predating that;
+> looks like gcc gets confused into deciding that it knows the distance
+> from the end of object...
+
+I did some profiling and found gcc was doing the right thing. That
+should be updated to a C99 flexable array in a latter patch. 
+
+> 	Said that, are we really guaranteed the IBLND_MSG_SIZE bytes
+> in there?
+
+This is what the real bug was. In the current code we are telling
+copy_from_iter and copy_to_iter that the number of bytes are always
+IBLND_MSG_SIZE. Arnd thought this was always the size so in his
+patch he was testing the returned result of copy_[from|to]_iter to 
+IBLND_MSG_SIZE. This nearly always failed since variable sized messages 
+are being created. The zero size I initially saw was from doing pings. 
+When I later tested with pushing I/O packets of other sizes were
+observed but none of them were IBLND_MSG_SIZE in size so they failed to 
+transmit. As soon as I'm done testing I will send a patch.
