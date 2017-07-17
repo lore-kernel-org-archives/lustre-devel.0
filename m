@@ -1,43 +1,47 @@
-From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Mon, 17 Jul 2017 13:11:53 +0530
-Subject: [lustre-devel] [PATCH 3/4] staging: lustre: obdclass: linux:
- constify attribute_group structures.
-In-Reply-To: <1500270540-5928-4-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1500270540-5928-1-git-send-email-arvind.yadav.cs@gmail.com>
-	<1500270540-5928-4-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <97f530fa-1a6a-b129-4190-2e96f2f0b81f@gmail.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Mon, 17 Jul 2017 17:44:59 +0000
+Subject: [lustre-devel] [PATCH v2 4/4] Staging: Lustre Fix block
+	statement style issue
+In-Reply-To: <774a2f25b839305f100e7fa99ebf835fb2ab7d44.1499849566.git.Craig@craiginches.com>
+References: <cover.1499849566.git.Craig@craiginches.com>
+	<774a2f25b839305f100e7fa99ebf835fb2ab7d44.1499849566.git.Craig@craiginches.com>
+Message-ID: <F6F7D587-CD46-40B8-A5B5-678B6A16AD8F@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
-Cc: john.hammond@intel.com, dmitry.eremin@intel.com, fan.yong@intel.com
+To: Craig Inches <craig@craiginches.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-Sorry for noise. Please ignore this.
-
-~arvind
-
-
-On Monday 17 July 2017 11:18 AM, Arvind Yadav wrote:
-> attribute_groups are not supposed to change at runtime. All functions
-> working with attribute_groups provided by <linux/sysfs.h> work
-> with const attribute_group. So mark the non-const structs as const.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+On Jul 12, 2017, at 03:03, Craig Inches <craig@craiginches.com> wrote:
+> 
+> This fixes a block statement which didnt end with */
+> 
+> Signed-off-by: Craig Inches <Craig@craiginches.com>
 > ---
->   drivers/staging/lustre/lustre/obdclass/linux/linux-module.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> index 9f5e829..eb88bd9 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> @@ -405,7 +405,7 @@ static int obd_device_list_open(struct inode *inode, struct file *file)
->   struct kobject *lustre_kobj;
->   EXPORT_SYMBOL_GPL(lustre_kobj);
->   
-> -static struct attribute_group lustre_attr_group = {
-> +static const struct attribute_group lustre_attr_group = {
->   	.attrs = lustre_attrs,
->   };
->   
+> drivers/staging/lustre/include/linux/lnet/socklnd.h | 3 ++-
+> 1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/include/linux/lnet/socklnd.h b/drivers/staging/lustre/include/linux/lnet/socklnd.h
+> index dd5bc0e46560..a1ae66ede7a8 100644
+> --- a/drivers/staging/lustre/include/linux/lnet/socklnd.h
+> +++ b/drivers/staging/lustre/include/linux/lnet/socklnd.h
+> @@ -76,7 +76,8 @@ struct ksock_msg {
+> 	__u64	ksm_zc_cookies[2];	/* Zero-Copy request/ACK cookie */
+> 	union {
+> 		struct ksock_lnet_msg lnetmsg; /* lnet message, it's empty if
+> -					  * it's NOOP */
+> +						* it's NOOP
+> +						*/
+
+Rather than making the multi-line comments even more space consuming (I'm not a big
+fan of "*/ must be on a line by itself" since it wastes a lot of vertical space),
+I'd prefer to just shorten the comment, if possible, like:
+
+		struct ksock_lnet_msg lnetmsg; /* lnet message, empty if NOOP */
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
