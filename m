@@ -1,11 +1,10 @@
 From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Mon, 17 Jul 2017 13:11:33 +0530
-Subject: [lustre-devel] [PATCH 3/4] staging: lustre: obdclass: linux:
- constify attribute_group structures.
-In-Reply-To: <1500270540-5928-4-git-send-email-arvind.yadav.cs@gmail.com>
+Date: Mon, 17 Jul 2017 11:18:58 +0530
+Subject: [lustre-devel] [PATCH 2/4] staging: lustre: ldlm: constify
+	attribute_group structures.
+In-Reply-To: <1500270540-5928-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1500270540-5928-1-git-send-email-arvind.yadav.cs@gmail.com>
-	<1500270540-5928-4-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <e6ee7f53-62fd-4318-4450-cd8ecf433f25@gmail.com>
+Message-ID: <1500270540-5928-3-git-send-email-arvind.yadav.cs@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,31 +12,27 @@ Content-Transfer-Encoding: 7bit
 To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 Cc: john.hammond@intel.com, dmitry.eremin@intel.com, fan.yong@intel.com
 
-Sorry for noise. Please ignore this.
+attribute_groups are not supposed to change at runtime. All functions
+working with attribute_groups provided by <linux/sysfs.h> work
+with const attribute_group. So mark the non-const structs as const.
 
-~arvind
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-On Monday 17 July 2017 11:18 AM, Arvind Yadav wrote:
-> attribute_groups are not supposed to change at runtime. All functions
-> working with attribute_groups provided by <linux/sysfs.h> work
-> with const attribute_group. So mark the non-const structs as const.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->   drivers/staging/lustre/lustre/obdclass/linux/linux-module.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> index 9f5e829..eb88bd9 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-> @@ -405,7 +405,7 @@ static int obd_device_list_open(struct inode *inode, struct file *file)
->   struct kobject *lustre_kobj;
->   EXPORT_SYMBOL_GPL(lustre_kobj);
->   
-> -static struct attribute_group lustre_attr_group = {
-> +static const struct attribute_group lustre_attr_group = {
->   	.attrs = lustre_attrs,
->   };
->   
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+index fff930f..e0c3e5d 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
+@@ -926,7 +926,7 @@ static ssize_t cancel_unused_locks_before_replay_store(struct kobject *kobj,
+ 	NULL,
+ };
+ 
+-static struct attribute_group ldlm_attr_group = {
++static const struct attribute_group ldlm_attr_group = {
+ 	.attrs = ldlm_attrs,
+ };
+ 
+-- 
+1.9.1
