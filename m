@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 19 Jul 2017 09:26:47 +1000
-Subject: [lustre-devel] [PATCH 01/12] staging: lustre: fix minor typos in
-	comments
+Subject: [lustre-devel] [PATCH 02/12] staging: lustre: llite: fix incorrect
+ DCACHE_DISCONNECTED test
 In-Reply-To: <150041997277.20736.17112251996623587423.stgit@noble>
 References: <150041997277.20736.17112251996623587423.stgit@noble>
-Message-ID: <150042040735.20736.6997246449635538567.stgit@noble>
+Message-ID: <150042040741.20736.10796456139862947849.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,44 +12,36 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
+It is almost always wrong to test DCACHE_DISCONNECTED, except in
+"exportfs" code.
+The flag tells us that this dentry *might* not be connected to the
+root through a chain of d_parent links.  Following the d_parent
+to an IS_ROOT() dentry *might* find one that is on the s_anon list
+rather than s_root.
+
+The code here need to know if it is safe to call __d_drop(), and
+the correct test is "!IS_ROOT(dentry)".
+If a dentry IS_ROOT(), then it might be the filesystem root, or it
+might be the root of a DCACHE_DISCONNECTED tree, and so be on
+the s_anon list.  In these two cases it should not be __d_drop()ed.
+If !IS_ROOT(), then the dentry is attached to its parent through
+d_subdir, and can safely be unhashed.
+
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/llite/namei.c   |    2 +-
- drivers/staging/lustre/lustre/mdc/mdc_locks.c |    4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ .../staging/lustre/lustre/llite/llite_internal.h   |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index a208a8b02c2c..293a3180ec70 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -490,7 +490,7 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 	*de = alias;
- 
- 	if (!it_disposition(it, DISP_LOOKUP_NEG)) {
--		/* we have lookup look - unhide dentry */
-+		/* We have the "lookup" lock, so unhide dentry */
- 		if (bits & MDS_INODELOCK_LOOKUP)
- 			d_lustre_revalidate(*de);
- 	} else if (!it_disposition(it, DISP_OPEN_CREATE)) {
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 3eb66cea65db..ae97c6f1aeb0 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -1030,7 +1030,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
-  * If we're performing a creation, that means that unless the creation
-  * failed with EEXIST, we should fake up a negative dentry.
-  *
-- * For everything else, we want to lookup to succeed.
-+ * For everything else, we want the lookup to succeed.
-  *
-  * One additional note: if CREATE or OPEN succeeded, we add an extra
-  * reference to the request because we need to keep it around until
-@@ -1040,7 +1040,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
-  * exactly what it_status refers to.
-  *
-  * If DISP_OPEN_OPEN is set, then it_status refers to the open() call,
-- * otherwise if DISP_OPEN_CREATE is set, then it status is the
-+ * otherwise if DISP_OPEN_CREATE is set, then it_status is the
-  * creation failure mode.  In either case, one of DISP_LOOKUP_NEG or
-  * DISP_LOOKUP_POS will be set, indicating whether the child lookup
-  * was successful.
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index cd3311abf999..4854985bf4d3 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -1299,7 +1299,7 @@ static inline void d_lustre_invalidate(struct dentry *dentry, int nested)
+ 	 * If we unhashed such a dentry, unmount would not be able to find
+ 	 * it and busy inodes would be reported.
+ 	 */
+-	if (d_count(dentry) == 0 && !(dentry->d_flags & DCACHE_DISCONNECTED))
++	if (d_count(dentry) == 0 && !IS_ROOT(dentry))
+ 		__d_drop(dentry);
+ 	spin_unlock(&dentry->d_lock);
+ }
