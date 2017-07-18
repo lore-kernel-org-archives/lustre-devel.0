@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 19 Jul 2017 09:26:47 +1000
-Subject: [lustre-devel] [PATCH 04/12] staging: lustre: ldlm: remove
- 'first_enq' arg from ldlm_process_flock_lock()
+Subject: [lustre-devel] [PATCH 05/12] staging: lustre: ldlm: remove unused
+ 'work_list' arg from ldlm_process_flock_lock()
 In-Reply-To: <150041997277.20736.17112251996623587423.stgit@noble>
 References: <150041997277.20736.17112251996623587423.stgit@noble>
-Message-ID: <150042040748.20736.16657316764497795112.stgit@noble>
+Message-ID: <150042040750.20736.7704797489296782229.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,52 +12,34 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-it is only ever set to '1', so we can just assume that and remove the code.
+'work_list' is only set to NULL, and is never used.
+So discard it.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index b7f28b39c7b3..8ba3eaf49c65 100644
+index 8ba3eaf49c65..dce81fbf3049 100644
 --- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
 +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -121,15 +121,9 @@ ldlm_flock_destroy(struct ldlm_lock *lock, enum ldlm_mode mode, __u64 flags)
-  * It is also responsible for splitting a lock if a portion of the lock
-  * is released.
+@@ -123,8 +123,7 @@ ldlm_flock_destroy(struct ldlm_lock *lock, enum ldlm_mode mode, __u64 flags)
   *
-- * If \a first_enq is 0 (ie, called from ldlm_reprocess_queue):
-- *   - blocking ASTs have already been sent
-- *
-- * If \a first_enq is 1 (ie, called from ldlm_lock_enqueue):
-- *   - blocking ASTs have not been sent yet, so list of conflicting locks
-- *     would be collected and ASTs sent.
   */
  static int ldlm_process_flock_lock(struct ldlm_lock *req, __u64 *flags,
--				   int first_enq, enum ldlm_error *err,
-+				   enum ldlm_error *err,
- 				   struct list_head *work_list)
+-				   enum ldlm_error *err,
+-				   struct list_head *work_list)
++				   enum ldlm_error *err)
  {
  	struct ldlm_resource *res = req->l_resource;
-@@ -197,11 +191,6 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req, __u64 *flags,
- 			if (!ldlm_flocks_overlap(lock, req))
- 				continue;
- 
--			if (!first_enq) {
--				reprocess_failed = 1;
--				continue;
--			}
--
- 			if (*flags & LDLM_FL_BLOCK_NOWAIT) {
- 				ldlm_flock_destroy(req, mode, *flags);
- 				*err = -EAGAIN;
-@@ -605,7 +594,7 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+ 	struct ldlm_namespace *ns = ldlm_res_to_ns(res);
+@@ -594,7 +593,7 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
  		/* We need to reprocess the lock to do merges or splits
  		 * with existing locks owned by this process.
  		 */
--		ldlm_process_flock_lock(lock, &noreproc, 1, &err, NULL);
-+		ldlm_process_flock_lock(lock, &noreproc, &err, NULL);
+-		ldlm_process_flock_lock(lock, &noreproc, &err, NULL);
++		ldlm_process_flock_lock(lock, &noreproc, &err);
  	}
  	unlock_res_and_lock(lock);
  	return rc;
