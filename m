@@ -1,7 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Wed, 19 Jul 2017 09:26:46 +1000
-Subject: [lustre-devel] [PATCH 00/12] Assorted lustre fixes and improvements
-Message-ID: <150041997277.20736.17112251996623587423.stgit@noble>
+Date: Wed, 19 Jul 2017 09:26:47 +1000
+Subject: [lustre-devel] [PATCH 01/12] staging: lustre: fix minor typos in
+	comments
+In-Reply-To: <150041997277.20736.17112251996623587423.stgit@noble>
+References: <150041997277.20736.17112251996623587423.stgit@noble>
+Message-ID: <150042040735.20736.6997246449635538567.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -9,49 +12,44 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Hi,
- I've been looking through lustre, finding things, and fixing some of
- them.
- There are three distinct subsets of patches here.
- - 1 patch to fix a few typos in comments
- - 2 patches to fix dcache issues, particularly around
-    DCACHE_DISCONNECTED
- - 9 patches to clean up code in ldlm_flock().  These started
-   as some simple list_entry tidy-ups, and just grew....
-
- The most interesting from a review perspective is
-      staging: lustre: llite: fix various issues with ll_splice_alias.
- there are real locking issues in there, but its hard to be 100%
- sure I've fixed them all and not introduced new issues.
- It would be *really* nice if we could get rid of the concept of
- "invalid" dentries, but I don't yet understand it well enough to
- propose and alternative.
-
-Thanks,
-NeilBrown
-
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
+ drivers/staging/lustre/lustre/llite/namei.c   |    2 +-
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-NeilBrown (12):
-      staging: lustre: fix minor typos in comments
-      staging: lustre: llite: fix incorrect DCACHE_DISCONNECTED test
-      staging: lustre: llite: fix various issues with ll_splice_alias.
-      staging: lustre: ldlm: remove 'first_enq' arg from ldlm_process_flock_lock()
-      staging: lustre: ldlm: remove unused 'work_list' arg from ldlm_process_flock_lock()
-      staging: lustre: ldlm: remove unneeded 'err' arg to ldlm_process_flock_lock()
-      staging: lustre: ldlm: remove 'flags' arg from ldlm_process_flock_lock()
-      staging: lustre: ldlm: remove unused 'overlaps' variable
-      staging: lustre: ldlm: remove 'flags' arg from ldlm_flock_destroy()
-      staging: lustre: ldlm: tidy list walking in ldlm_flock()
-      staging: lustre: ldlm: remove unnecessary 'ownlocks' variable.
-      staging: lustre: ldlm: remove unused field 'fwd_generation'
-
-
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |  208 ++++----------------
- .../staging/lustre/lustre/llite/llite_internal.h   |    2 
- drivers/staging/lustre/lustre/llite/namei.c        |   71 +++----
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    4 
- 4 files changed, 80 insertions(+), 205 deletions(-)
-
---
-Signature
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index a208a8b02c2c..293a3180ec70 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -490,7 +490,7 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
+ 	*de = alias;
+ 
+ 	if (!it_disposition(it, DISP_LOOKUP_NEG)) {
+-		/* we have lookup look - unhide dentry */
++		/* We have the "lookup" lock, so unhide dentry */
+ 		if (bits & MDS_INODELOCK_LOOKUP)
+ 			d_lustre_revalidate(*de);
+ 	} else if (!it_disposition(it, DISP_OPEN_CREATE)) {
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+index 3eb66cea65db..ae97c6f1aeb0 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+@@ -1030,7 +1030,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
+  * If we're performing a creation, that means that unless the creation
+  * failed with EEXIST, we should fake up a negative dentry.
+  *
+- * For everything else, we want to lookup to succeed.
++ * For everything else, we want the lookup to succeed.
+  *
+  * One additional note: if CREATE or OPEN succeeded, we add an extra
+  * reference to the request because we need to keep it around until
+@@ -1040,7 +1040,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
+  * exactly what it_status refers to.
+  *
+  * If DISP_OPEN_OPEN is set, then it_status refers to the open() call,
+- * otherwise if DISP_OPEN_CREATE is set, then it status is the
++ * otherwise if DISP_OPEN_CREATE is set, then it_status is the
+  * creation failure mode.  In either case, one of DISP_LOOKUP_NEG or
+  * DISP_LOOKUP_POS will be set, indicating whether the child lookup
+  * was successful.
