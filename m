@@ -1,53 +1,57 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Mon, 17 Jul 2017 21:21:43 +0300
-Subject: [lustre-devel] [PATCH v2 4/4] Staging: Lustre Fix block
-	statement style issue
-In-Reply-To: <20170717175017.GA32268@battlestar>
-References: <cover.1499849566.git.Craig@craiginches.com>
-	<774a2f25b839305f100e7fa99ebf835fb2ab7d44.1499849566.git.Craig@craiginches.com>
-	<F6F7D587-CD46-40B8-A5B5-678B6A16AD8F@intel.com>
-	<20170717175017.GA32268@battlestar>
-Message-ID: <20170717182143.6xns7ncwdn2wqxyf@mwanda>
+From: NeilBrown <neilb@suse.com>
+Date: Wed, 19 Jul 2017 09:26:46 +1000
+Subject: [lustre-devel] [PATCH 00/12] Assorted lustre fixes and improvements
+Message-ID: <150041997277.20736.17112251996623587423.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Mon, Jul 17, 2017 at 05:50:27PM +0000, Craig Inches wrote:
-> On Mon, Jul 17, 2017 at 05:44:59PM +0000, Dilger, Andreas wrote:
-> > On Jul 12, 2017, at 03:03, Craig Inches <craig@craiginches.com> wrote:
-> > > 
-> > > This fixes a block statement which didnt end with */
-> > > 
-> > > Signed-off-by: Craig Inches <Craig@craiginches.com>
-> > > ---
-> > > drivers/staging/lustre/include/linux/lnet/socklnd.h | 3 ++-
-> > > 1 file changed, 2 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/staging/lustre/include/linux/lnet/socklnd.h b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-> > > index dd5bc0e46560..a1ae66ede7a8 100644
-> > > --- a/drivers/staging/lustre/include/linux/lnet/socklnd.h
-> > > +++ b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-> > > @@ -76,7 +76,8 @@ struct ksock_msg {
-> > > 	__u64	ksm_zc_cookies[2];	/* Zero-Copy request/ACK cookie */
-> > > 	union {
-> > > 		struct ksock_lnet_msg lnetmsg; /* lnet message, it's empty if
-> > > -					  * it's NOOP */
-> > > +						* it's NOOP
-> > > +						*/
-> > 
-> > Rather than making the multi-line comments even more space consuming (I'm not a big
-> > fan of "*/ must be on a line by itself" since it wastes a lot of vertical space),
-> > I'd prefer to just shorten the comment, if possible, like:
-> > 
-> > 		struct ksock_lnet_msg lnetmsg; /* lnet message, empty if NOOP */
-> 
-> That makes sense, I believe the series has already made it to
-> staging-next, so not sure what the process would be to fix it up.
+Hi,
+ I've been looking through lustre, finding things, and fixing some of
+ them.
+ There are three distinct subsets of patches here.
+ - 1 patch to fix a few typos in comments
+ - 2 patches to fix dcache issues, particularly around
+    DCACHE_DISCONNECTED
+ - 9 patches to clean up code in ldlm_flock().  These started
+   as some simple list_entry tidy-ups, and just grew....
 
-staging-next can't be rebased (barring something very drastic).  Send a
-new patch based on what's been committed.
+ The most interesting from a review perspective is
+      staging: lustre: llite: fix various issues with ll_splice_alias.
+ there are real locking issues in there, but its hard to be 100%
+ sure I've fixed them all and not introduced new issues.
+ It would be *really* nice if we could get rid of the concept of
+ "invalid" dentries, but I don't yet understand it well enough to
+ propose and alternative.
 
-regards,
-dan carpenter
+Thanks,
+NeilBrown
+
+---
+
+NeilBrown (12):
+      staging: lustre: fix minor typos in comments
+      staging: lustre: llite: fix incorrect DCACHE_DISCONNECTED test
+      staging: lustre: llite: fix various issues with ll_splice_alias.
+      staging: lustre: ldlm: remove 'first_enq' arg from ldlm_process_flock_lock()
+      staging: lustre: ldlm: remove unused 'work_list' arg from ldlm_process_flock_lock()
+      staging: lustre: ldlm: remove unneeded 'err' arg to ldlm_process_flock_lock()
+      staging: lustre: ldlm: remove 'flags' arg from ldlm_process_flock_lock()
+      staging: lustre: ldlm: remove unused 'overlaps' variable
+      staging: lustre: ldlm: remove 'flags' arg from ldlm_flock_destroy()
+      staging: lustre: ldlm: tidy list walking in ldlm_flock()
+      staging: lustre: ldlm: remove unnecessary 'ownlocks' variable.
+      staging: lustre: ldlm: remove unused field 'fwd_generation'
+
+
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |  208 ++++----------------
+ .../staging/lustre/lustre/llite/llite_internal.h   |    2 
+ drivers/staging/lustre/lustre/llite/namei.c        |   71 +++----
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    4 
+ 4 files changed, 80 insertions(+), 205 deletions(-)
+
+--
+Signature
