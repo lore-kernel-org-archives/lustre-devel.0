@@ -1,156 +1,87 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 19 Jul 2017 14:36:07 +1000
-Subject: [lustre-devel] [PATCH 10/12] staging: lustre: ldlm: tidy list
-	walking in ldlm_flock()
-In-Reply-To: <BN6PR1101MB2132359E48C9904D3E305EE7CBA60@BN6PR1101MB2132.namprd11.prod.outlook.com>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Wed, 19 Jul 2017 02:18:39 -0400
+Subject: [lustre-devel] [PATCH 03/12] staging: lustre: llite: fix
+	various issues with ll_splice_alias.
+In-Reply-To: <87o9shxcyq.fsf@notabene.neil.brown.name>
 References: <150041997277.20736.17112251996623587423.stgit@noble>
-	<150042040763.20736.17969183285195201575.stgit@noble>
-	<BN6PR1101MB2132359E48C9904D3E305EE7CBA60@BN6PR1101MB2132.namprd11.prod.outlook.com>
-Message-ID: <87lgnlxcug.fsf@notabene.neil.brown.name>
+	<150042040744.20736.6110134708456645941.stgit@noble>
+	<030281CD-CC74-429C-910F-86706CFC57DA@intel.com>
+	<87o9shxcyq.fsf@notabene.neil.brown.name>
+Message-ID: <244467F8-2775-4014-90FF-9CBC74F76B38@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Patrick Farrell <paf@cray.com>, Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
-
-On Wed, Jul 19 2017, Patrick Farrell wrote:
-
-> Neil,
->
-> Minor...
-> "order might not be a lock" looks like it should say "or"?
-
-Yes: s/order/or/ as you say.
-
-Thanks,
-NeilBrown
+To: NeilBrown <neilb@suse.com>
+Cc: Al Viro <viro@ZenIV.linux.org.uk>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
->
-> - Patrick
-> ________________________________
-> From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
-> Sent: Tuesday, July 18, 2017 6:26:47 PM
-> To: Oleg Drokin; Greg Kroah-Hartman; Andreas Dilger
-> Cc: Linux Kernel Mailing List; Lustre Development List
-> Subject: [lustre-devel] [PATCH 10/12] staging: lustre: ldlm: tidy list walking in ldlm_flock()
->
-> Use list_for_each_entry variants to
-> avoid the explicit list_entry() calls.
-> This allows us to use list_for_each_entry_safe_from()
-> instread of adding a local list-walking macro.
->
-> Also improve some comments so that it is more obvious
-> that the locks are sorted per-owner and that we need
-> to find the insertion point.
->
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   45 ++++++++++-------------
->  1 file changed, 19 insertions(+), 26 deletions(-)
->
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-> index 9a888e1ce923..58227728a002 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-> @@ -59,17 +59,6 @@
->  #include <linux/list.h>
->  #include "ldlm_internal.h"
->
-> -/**
-> - * list_for_remaining_safe - iterate over the remaining entries in a list
-> - *           and safeguard against removal of a list entry.
-> - * \param pos   the &struct list_head to use as a loop counter. pos MUST
-> - *           have been initialized prior to using it in this macro.
-> - * \param n     another &struct list_head to use as temporary storage
-> - * \param head  the head for your list.
-> - */
-> -#define list_for_remaining_safe(pos, n, head) \
-> -       for (n = pos->next; pos != (head); pos = n, n = pos->next)
-> -
->  static inline int
->  ldlm_same_flock_owner(struct ldlm_lock *lock, struct ldlm_lock *new)
->  {
-> @@ -125,8 +114,8 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
->  {
->          struct ldlm_resource *res = req->l_resource;
->          struct ldlm_namespace *ns = ldlm_res_to_ns(res);
-> -       struct list_head *tmp;
-> -       struct list_head *ownlocks = NULL;
-> +       struct ldlm_lock *tmp;
-> +       struct ldlm_lock *ownlocks = NULL;
->          struct ldlm_lock *lock = NULL;
->          struct ldlm_lock *new = req;
->          struct ldlm_lock *new2 = NULL;
-> @@ -151,23 +140,23 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
->          /* This loop determines where this processes locks start
->           * in the resource lr_granted list.
->           */
-> -       list_for_each(tmp, &res->lr_granted) {
-> -               lock = list_entry(tmp, struct ldlm_lock,
-> -                                 l_res_link);
-> +       list_for_each_entry(lock, &res->lr_granted, l_res_link) {
->                  if (ldlm_same_flock_owner(lock, req)) {
-> -                       ownlocks = tmp;
-> +                       ownlocks = lock;
->                          break;
->                  }
->          }
->
-> -       /* Scan the locks owned by this process that overlap this request.
-> +       /* Scan the locks owned by this process to find the insertion point
-> +        * (as locks are ordered), and to handle overlaps.
->           * We may have to merge or split existing locks.
->           */
-> -       if (!ownlocks)
-> -               ownlocks = &res->lr_granted;
-> -
-> -       list_for_remaining_safe(ownlocks, tmp, &res->lr_granted) {
-> -               lock = list_entry(ownlocks, struct ldlm_lock, l_res_link);
-> +       if (ownlocks)
-> +               lock = ownlocks;
-> +       else
-> +               lock = list_entry(&res->lr_granted,
-> +                                 struct ldlm_lock, l_res_link);
-> +       list_for_each_entry_safe_from(lock, tmp, &res->lr_granted, l_res_link) {
->
->                  if (!ldlm_same_flock_owner(lock, new))
->                          break;
-> @@ -295,7 +284,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
->                                                   lock->l_granted_mode);
->
->                  /* insert new2 at lock */
-> -               ldlm_resource_add_lock(res, ownlocks, new2);
-> +               ldlm_resource_add_lock(res, &lock->l_res_link, new2);
->                  LDLM_LOCK_RELEASE(new2);
->                  break;
->          }
-> @@ -309,8 +298,12 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
->
->          if (!added) {
->                  list_del_init(&req->l_res_link);
-> -               /* insert new lock before ownlocks in list. */
-> -               ldlm_resource_add_lock(res, ownlocks, req);
-> +               /* insert new lock before "lock", which might be
-> +                * the next lock for this owner, or might be the first
-> +                * lock for the next owner, order might not be a lock
-> +                * at all, but instead points at the head of the list
-> +                */
-> +               ldlm_resource_add_lock(res, &lock->l_res_link, req);
->          }
->
->          /* In case we're reprocessing the requested lock we can't destroy
->
->
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170719/7f9a98d2/attachment.pgp>
+On Jul 19, 2017, at 12:33 AM, NeilBrown wrote:
+
+> On Tue, Jul 18 2017, Oleg Drokin wrote:
+> 
+>> Unfortunately this patch causes insta-crash on first stat call after mount.
+>> Sorry, I cannot dig into this deeper right this moment, but I will a bit later.
+> 
+> V.strange.  The crash suggests that the lock, and hence the inode, is
+> not initialized.  I cannot see how that might happen.
+> though...
+> 
+>>> +		spin_lock(&lli->lli_lock);
+>>> +		new = ll_find_invalid_alias(inode, de);
+>>> +		if (!new)
+>>> +			d_add(de, inode);
+>>> +		spin_lock(&lli->lli_lock);
+> 
+> Had it not crashed, it would have deadlocked.  That second spin_lock()
+> should be spin_unlock() :-( I don't *think* that would have caused this crash?
+
+No, that's not it.
+-	d_add(de, inode);
+-	CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
+-	       de, d_inode(de), d_count(de), de->d_flags);
++	de = d_splice_alias(inode, de);
++	if (!IS_ERR(de))
++		CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
++		       de, d_inode(de), d_count(de), de->d_flags);
+	return de;
+
+This is likely it.
+d_splice_alias would return NULL if there's no alias, after d_add of the de.
+But ll_splice_alias callers expect either an ERR_PTR on error or dentry to use
+otherwise.
+So in ll_lookup_it_finish() we have:
+        alias = ll_splice_alias(inode, *de);
+        if (IS_ERR(alias)) {
+                rc = PTR_ERR(alias);
+                goto out;
+        }
+        *de = alias;
+?
+                if (md_revalidate_lock(ll_i2mdexp(parent), &parent_it, &fid,
+                                       NULL)) {
+===>>> whoops!          d_lustre_revalidate(*de);
+                        ll_intent_release(&parent_it);
+                }
+
+>> I am adding Al that we discussed this code at some length and he found no problems
+>> here, so I am a bit surprised by your findings.
+> I'd be very happy to read Al's thoughts.
+
+Some of the discussions were in lkml under subject of "More parallel
+atomic_open/d_splice_alias fun with NFS and possibly more FSes"
+in July 2016, in between nfs stuff.
+There was more but I cannot readily find it.
+
+>> Also the reason we reinvent the d_splice_alias is because we need to
+>> splice not just directories, but also regular files.
+> 
+> I see that.  A key simplification I bring is that directories and
+> non-directories can be handled separately.  d_splice_alias() does
+> all we need for directories, and nothing useful for non-dirs.
+
+I see.
+I still need to  think some more about this whole thing.
+
+Please see commit 99f1c013194e64d4b67d5d318148303b0e1585e1 for double d_add
+of the same dentry fix.6
