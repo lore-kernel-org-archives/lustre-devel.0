@@ -1,26 +1,40 @@
-From: Greg KH <gregkh@linuxfoundation.org>
-Date: Wed, 19 Jul 2017 10:29:55 +0200
-Subject: [lustre-devel] [PATCH 01/12] staging: lustre: fix minor typos
-	in comments
-In-Reply-To: <150042040735.20736.6997246449635538567.stgit@noble>
-References: <150041997277.20736.17112251996623587423.stgit@noble>
-	<150042040735.20736.6997246449635538567.stgit@noble>
-Message-ID: <20170719082955.GA30088@kroah.com>
+From: Colin King <colin.king@canonical.com>
+Date: Wed, 19 Jul 2017 17:20:36 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: fix incorrect
+	arguments order calling lstcon_session_new
+Message-ID: <20170719162036.21621-1-colin.king@canonical.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Doug Oucharek <doug.s.oucharek@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org
+Cc: kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org
 
-On Wed, Jul 19, 2017 at 09:26:47AM +1000, NeilBrown wrote:
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  drivers/staging/lustre/lustre/llite/namei.c   |    2 +-
->  drivers/staging/lustre/lustre/mdc/mdc_locks.c |    4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
+From: Colin Ian King <colin.king@canonical.com>
 
-As "obvious" as this is, I can't take patches without any changelog text
-at all, sorry.
+The arguments args->lstio_ses_force and args->lstio_ses_timeout are
+in the incorrect order. Fix this by swapping them around.
 
-greg k-h
+Detected by CoverityScan, CID#1226833 ("Arguments in wrong order")
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/staging/lustre/lnet/selftest/conctl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
+index 6ca7192b03b7..043eafb5ea40 100644
+--- a/drivers/staging/lustre/lnet/selftest/conctl.c
++++ b/drivers/staging/lustre/lnet/selftest/conctl.c
+@@ -69,8 +69,8 @@ lst_session_new_ioctl(struct lstio_session_new_args *args)
+ 	rc = lstcon_session_new(name,
+ 				args->lstio_ses_key,
+ 				args->lstio_ses_feats,
+-				args->lstio_ses_force,
+ 				args->lstio_ses_timeout,
++				args->lstio_ses_force,
+ 				args->lstio_ses_idp);
+ 
+ 	LIBCFS_FREE(name, args->lstio_ses_nmlen + 1);
+-- 
+2.11.0
