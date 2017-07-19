@@ -1,41 +1,83 @@
-From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Fri, 21 Jul 2017 11:11:37 +0530
-Subject: [lustre-devel] [PATCH v2 2/3] staging: lustre: ldlm: constify
-	attribute_group structures.
-In-Reply-To: <1500615698-21001-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1500615698-21001-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1500615698-21001-3-git-send-email-arvind.yadav.cs@gmail.com>
+From: Shehata, Amir <amir.shehata@intel.com>
+Date: Wed, 19 Jul 2017 20:26:20 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: ko2iblnd: check
+ copy_from_iter/copy_to_iter return code
+In-Reply-To: <1500132728-28511-1-git-send-email-jsimmons@infradead.org>
+References: <1500132728-28511-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <859F5EEE7D708F47B769E2BA7556E11A424232DF@CRSMSX104.amr.corp.intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, di.wang@intel.com
-Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, Arnd Bergmann <arnd@arndb.de>, Al Viro <viro@zeniv.linux.org.uk>
+Cc: Olaf Weber <olaf.weber@hpe.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "stable@vger.kernel.org" <stable@vger.kernel.org>
 
-attribute_groups are not supposed to change at runtime. All functions
-working with attribute_groups provided by <linux/sysfs.h> work
-with const attribute_group. So mark the non-const structs as const.
+The changes look good to me.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+-----Original Message-----
+From: James Simmons [mailto:jsimmons at infradead.org] 
+Sent: Saturday, July 15, 2017 8:32 AM
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>; devel at driverdev.osuosl.org; Dilger, Andreas <andreas.dilger@intel.com>; Drokin, Oleg <oleg.drokin@intel.com>; Arnd Bergmann <arnd@arndb.de>; Al Viro <viro@zeniv.linux.org.uk>
+Cc: Shehata, Amir <amir.shehata@intel.com>; Olaf Weber <olaf.weber@hpe.com>; Linux Kernel Mailing List <linux-kernel@vger.kernel.org>; Lustre Development List <lustre-devel@lists.lustre.org>; stable at vger.kernel.org; James Simmons <jsimmons@infradead.org>
+Subject: [PATCH] staging: lustre: ko2iblnd: check copy_from_iter/copy_to_iter return code
+
+From: Arnd Bergmann <arnd@arndb.de>
+
+We now get a helpful warning for code that calls copy_{from,to}_iter without checking the return value, introduced by commit aa28de275a24
+("iov_iter/hardening: move object size checks to inlined part").
+
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_send':
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1643:2: error: ignoring return value of 'copy_from_iter', declared with attribute warn_unused_result [-Werror=unused-result]
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_recv':
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1744:3: error: ignoring return value of 'copy_to_iter', declared with attribute warn_unused_result [-Werror=unused-result]
+
+In case we get short copies here, we may get incorrect behavior.
+I've added failure handling for both rx and tx now, returning -EFAULT as expected.
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: Amir Shehata <amir.shehata@intel.com>
 ---
-Changes in v2:
-              patch was sent to wrong group.
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c    | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
- drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-index fff930f..e0c3e5d 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c
-@@ -926,7 +926,7 @@ static ssize_t cancel_unused_locks_before_replay_store(struct kobject *kobj,
- 	NULL,
- };
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 85b242e..8fc191d 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1640,8 +1640,13 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	ibmsg = tx->tx_msg;
+ 	ibmsg->ibm_u.immediate.ibim_hdr = *hdr;
  
--static struct attribute_group ldlm_attr_group = {
-+static const struct attribute_group ldlm_attr_group = {
- 	.attrs = ldlm_attrs,
- };
+-	copy_from_iter(&ibmsg->ibm_u.immediate.ibim_payload, IBLND_MSG_SIZE,
+-		       &from);
++	rc = copy_from_iter(&ibmsg->ibm_u.immediate.ibim_payload, payload_nob,
++			    &from);
++	if (rc != payload_nob) {
++		kiblnd_pool_free_node(&tx->tx_pool->tpo_pool, &tx->tx_list);
++		return -EFAULT;
++	}
++
+ 	nob = offsetof(struct kib_immediate_msg, ibim_payload[payload_nob]);
+ 	kiblnd_init_tx_msg(ni, tx, IBLND_MSG_IMMEDIATE, nob);
  
--- 
-1.9.1
+@@ -1741,8 +1746,14 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 			break;
+ 		}
+ 
+-		copy_to_iter(&rxmsg->ibm_u.immediate.ibim_payload,
+-			     IBLND_MSG_SIZE, to);
++		rc = copy_to_iter(&rxmsg->ibm_u.immediate.ibim_payload, rlen,
++				  to);
++		if (rc != rlen) {
++			rc = -EFAULT;
++			break;
++		}
++
++		rc = 0;
+ 		lnet_finalize(ni, lntmsg, 0);
+ 		break;
+ 
+--
+1.8.3.1
