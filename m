@@ -1,113 +1,57 @@
-From: Xiong, Jinshan <jinshan.xiong@intel.com>
-Date: Fri, 21 Jul 2017 19:19:39 +0000
-Subject: [lustre-devel] Design proposal for client-side compression
-In-Reply-To: <BN6PR1101MB2132311AB19B104AD044797ACBA40@BN6PR1101MB2132.namprd11.prod.outlook.com>
-References: <1483967258.2622.24.camel@informatik.uni-hamburg.de>
-	<B5E18A82-79B3-484F-BEBE-998B8AE56397@intel.com>
-	<1484223328.3937.60.camel@informatik.uni-hamburg.de>
-	<B924BE6D-3C6A-4BA4-96F9-AC053F032B2D@intel.com>
-	<1484749185.3965.114.camel@informatik.uni-hamburg.de>
-	<1487254536.4777.51.camel@informatik.uni-hamburg.de>
-	<1500650130.3158.6.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132311AB19B104AD044797ACBA40@BN6PR1101MB2132.namprd11.prod.outlook.com>
-Message-ID: <11E369DA-8B2C-4DB3-B4A6-C7288B4290F6@intel.com>
+From: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Date: Fri, 21 Jul 2017 11:29:53 +0530
+Subject: [lustre-devel] [PATCH v3 3/3] staging: lustre: obdclass: linux:
+	constify attribute_group structures.
+In-Reply-To: <1500616793-21569-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1500616793-21569-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1500616793-21569-4-git-send-email-arvind.yadav.cs@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, di.wang@intel.com
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
+attribute_groups are not supposed to change at runtime. All functions
+working with attribute_groups provided by <linux/sysfs.h> work
+with const attribute_group. So mark the non-const structs as const.
 
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+Changes in v2:
+              patch was sent to wrong group.
+Changes in v3:
+              typo error in cover-latter.
 
-From: Patrick Farrell <paf@cray.com>
-Date: Friday, July 21, 2017 at 9:44 AM
-To: Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de>, "Xiong, Jinshan" <jinshan.xiong@intel.com>
-Cc: Matthew Ahrens <mahrens@delphix.com>, "Zhuravlev, Alexey" <alexey.zhuravlev@intel.com>, lustre-devel <lustre-devel@lists.lustre.org>
-Subject: Re: [lustre-devel] Design proposal for client-side compression
+ drivers/staging/lustre/lustre/obdclass/linux/linux-module.c | 2 +-
+ drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-
-I think basing this on the maximum number of stripes it too simple, and maybe not necessary.
-
-Apologies in advance if what I say below rests on a misunderstanding of the compression design, I should know it better than I do.
-
-
-
-But, here goes.
-
-About based on maximum stripe count, there are a number of 1000 OST systems in the world today.  Imagine one of them with 16 MiB stripes, that's ~16 GiB of memory for this.  I think that's clearly too large.  But a global (rather than per OSC) pool could be tricky too, leading to contention on getting and returning pages.
-
-You mention later a 50 MiB pool per client.  As a per OST pre-allocated pool, that would likely be too large.  As a global pool, it seems small...
-
-
-
-But why use a global pool?  It sounds like the compression would be handled by the thread putting the data on the wire (Sorry if I've got that wrong).  So - What about a per-thread block of pages, for each ptlrpcd thread?  If the idea is that this compressed data is not retained for replay (instead, you would re-compress), then we only need a block of max rpc size for each thread (You could just use the largest RPC size supported by the client), so it can send that compressed data.
-
-
-
-The writing thread would also need to issue RPC in its own process context, but it can be revised to use ptlrpcd thread. I tend to think using a global ptlrpc thread would be reasonable for now because compression should be slow so I don?t expect there would be a lot of lock contention for the global pool.
-
-
-
-Jinshan
-
-The overhead of compression for replay is probably not something we need to worry about.
-
-
-
-Or even per-CPU blocks of pages.  That would probably be better still (less total memory if there are more ptlrpcds than CPUs), if we can guarantee not sleeping during the time the pool is in use.  (I'm not sure.)
-
-Also, you mention limiting the # of threads.  Why is limiting the number of threads doing compression of interest?  What are you specifically trying to avoid with that?
-
-________________________________
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de>
-Sent: Friday, July 21, 2017 10:15:30 AM
-To: Xiong, Jinshan
-Cc: Matthew Ahrens; Zhuravlev, Alexey; lustre-devel
-Subject: Re: [lustre-devel] Design proposal for client-side compression
-
-Dear all,
-
-for compression within the osc module we need a bunch of pages for the
-compressed output (at most the same size like original data), and few
-pages for working memory of the algorithms. Since allocating (and later
-freeing) the pages every time we enter the compression loop might be
-expensive and annoying, we thought about a pool of pages, which is
-present exclusively for compression purposes.
-
-We would create that pool at file system start (when loading the osc
-module) and destroy at file system stop (when unloading the osc
-module). The condition is, of course, the configure option --enable-
-compression. The pool would be a queue of page bunches where a thread
-can pop pages for compression and put them back after the compressed
-portion was transferred. The page content will not be visible to anyone
-outside and will also not be cached after the transmission.
-
-We would like to make the pool static since we think, we do not need a
-lot of memory. However it depends on the number of stripes or MBs, that
-one client can handle at the same time. E.g. for 32 stripes of 1MB
-processed at the same time, we need at most 32 MB + few MB for
-overhead. Where can I find the exact number or how can I estimate how
-many stripes there are at most at the same time? Another limitation is
-the number of threads, which can work in parallel on compression at the
-same time. We think to exclusively reserve not more than 50 MB for the
-compression page pool per client. Do you think it might hurt the
-performance?
-
-Once there are not enough pages, for whatever reason, we wouldn't wait,
-but just skip the compression for the respective chunk.
-
-Are there any problems you see in that approach?
-
-Regards,
-Anna
-
---
-Anna Fuchs
-https://wr.informatik.uni-hamburg.de/people/anna_fuchs
-_______________________________________________
-lustre-devel mailing list
-lustre-devel at lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170721/204968dc/attachment.htm>
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+index 9f5e829..eb88bd9 100644
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
++++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+@@ -405,7 +405,7 @@ static int obd_device_list_open(struct inode *inode, struct file *file)
+ struct kobject *lustre_kobj;
+ EXPORT_SYMBOL_GPL(lustre_kobj);
+ 
+-static struct attribute_group lustre_attr_group = {
++static const struct attribute_group lustre_attr_group = {
+ 	.attrs = lustre_attrs,
+ };
+ 
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
+index e6c785a..814334b 100644
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
++++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
+@@ -151,7 +151,7 @@ static ssize_t max_dirty_mb_store(struct kobject *kobj, struct attribute *attr,
+ 	NULL,
+ };
+ 
+-static struct attribute_group lustre_attr_group = {
++static const struct attribute_group lustre_attr_group = {
+ 	.attrs = lustre_attrs,
+ };
+ 
+-- 
+1.9.1
