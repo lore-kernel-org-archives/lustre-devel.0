@@ -1,117 +1,231 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 26 Jul 2017 11:22:17 -0400
-Subject: [lustre-devel] [PATCH 01/20] staging: lustre: osc: soft lock -
-	osc_makes_rpc()
+Date: Wed, 26 Jul 2017 11:22:19 -0400
+Subject: [lustre-devel] [PATCH 03/20] staging: lustre: ldlm: crash on umount
+	in cleanup_resource
 In-Reply-To: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
 References: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1501082556-17962-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1501082556-17962-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Andriy Skulysh <andriy.skulysh@seagate.com>, James Simmons <jsimmons@infradead.org>
 
-From: Bobi Jam <bobijam.xu@intel.com>
+From: Andriy Skulysh <andriy.skulysh@seagate.com>
 
-It is possible that an osc_extent contains more than 256 chunks, and
-the IO engine won't add this extent in one RPC
-(try_to_add_extent_for_io) so that osc_check_rpcs() run into a loop
-upon this extent and never break.
+cfs_hash_for_each_relax() assumes that cfs_hash_put_locked()
+doesn't release bd lock, but it isn't true for
+ldlm_res_hop_put_locked().
 
-This patch changes osc_max_write_chunks() to make sure the value
-can cover all possible osc_extent, so that all osc_extent will be
-added into one RPC.
+Add recfcount on next hnode in cfs_hash_for_each_relax() and
+remove ldlm_res_hop_put_locked()
 
-This patch also add another field erd_max_extents in extent_rpc_data
-to make sure not to add too many fragments in a single RPC.
-
-Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8680
-Reviewed-on: http://review.whamcloud.com/23326
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
-Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Signed-off-by: Andriy Skulysh <andriy.skulysh@seagate.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6304
+Xyratex-bug-id: MRP-2352
+Reviewed-by: Vitaly Fertman <vitaly.fertman@seagate.com>
+Reviewed-by: Alexander Boyko <alexander.boyko@seagate.com>
+Tested-by: Alexander Lezhoev <alexander.lezhoev@seagate.com>
+Reviewed-on: http://review.whamcloud.com/13908
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/osc/osc_cache.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/hash.c          | 47 ++++++++++++++--------
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |  3 --
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c | 43 --------------------
+ 3 files changed, 31 insertions(+), 62 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index d8a95f8..0100d27 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -1887,6 +1887,7 @@ struct extent_rpc_data {
- 	unsigned int		erd_page_count;
- 	unsigned int		erd_max_pages;
- 	unsigned int		erd_max_chunks;
-+	unsigned int		erd_max_extents;
- };
+diff --git a/drivers/staging/lustre/lnet/libcfs/hash.c b/drivers/staging/lustre/lnet/libcfs/hash.c
+index 5c2ce2e..ff54eaf 100644
+--- a/drivers/staging/lustre/lnet/libcfs/hash.c
++++ b/drivers/staging/lustre/lnet/libcfs/hash.c
+@@ -1008,7 +1008,7 @@ struct cfs_hash *
+ 	LASSERT(ops->hs_object);
+ 	LASSERT(ops->hs_keycmp);
+ 	LASSERT(ops->hs_get);
+-	LASSERT(ops->hs_put_locked);
++	LASSERT(ops->hs_put || ops->hs_put_locked);
  
- static inline unsigned int osc_extent_chunks(const struct osc_extent *ext)
-@@ -1915,11 +1916,23 @@ static int try_to_add_extent_for_io(struct client_obd *cli,
- 	EASSERT((ext->oe_state == OES_CACHE || ext->oe_state == OES_LOCK_DONE),
- 		ext);
+ 	if (flags & CFS_HASH_REHASH)
+ 		flags |= CFS_HASH_COUNTER; /* must have counter */
+@@ -1553,19 +1553,20 @@ struct cfs_hash_cond_arg {
+ cfs_hash_for_each_relax(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+ 			void *data, int start)
+ {
++	struct hlist_node *next = NULL;
+ 	struct hlist_node *hnode;
+-	struct hlist_node *tmp;
+ 	struct cfs_hash_bd bd;
+ 	u32 version;
+ 	int count = 0;
+ 	int stop_on_change;
++	int has_put_locked;
+ 	int end = -1;
+ 	int rc = 0;
+ 	int i;
  
-+	if (!data->erd_max_extents)
-+		return 0;
+ 	stop_on_change = cfs_hash_with_rehash_key(hs) ||
+-			 !cfs_hash_with_no_itemref(hs) ||
+-			 !hs->hs_ops->hs_put_locked;
++			 !cfs_hash_with_no_itemref(hs);
++	has_put_locked = hs->hs_ops->hs_put_locked != NULL;
+ 	cfs_hash_lock(hs, 0);
+ again:
+ 	LASSERT(!cfs_hash_is_rehashing(hs));
+@@ -1582,38 +1583,52 @@ struct cfs_hash_cond_arg {
+ 		version = cfs_hash_bd_version_get(&bd);
+ 
+ 		cfs_hash_bd_for_each_hlist(hs, &bd, hhead) {
+-			for (hnode = hhead->first; hnode;) {
++			hnode = hhead->first;
++			if (!hnode)
++				continue;
++			cfs_hash_get(hs, hnode);
 +
- 	chunk_count = osc_extent_chunks(ext);
-+	EASSERTF(data->erd_page_count != 0 ||
-+		 chunk_count <= data->erd_max_chunks, ext,
-+		 "The first extent to be fit in a RPC contains %u chunks, which is over the limit %u.\n",
-+		 chunk_count, data->erd_max_chunks);
-+
- 	if (chunk_count > data->erd_max_chunks)
- 		return 0;
++			for (; hnode; hnode = next) {
+ 				cfs_hash_bucket_validate(hs, &bd, hnode);
+-				cfs_hash_get(hs, hnode);
++				next = hnode->next;
++				if (next)
++					cfs_hash_get(hs, next);
+ 				cfs_hash_bd_unlock(hs, &bd, 0);
+ 				cfs_hash_unlock(hs, 0);
  
- 	data->erd_max_pages = max(ext->oe_mppr, data->erd_max_pages);
-+	EASSERTF(data->erd_page_count != 0 ||
-+		 ext->oe_nr_pages <= data->erd_max_pages, ext,
-+		 "The first extent to be fit in a RPC contains %u pages, which is over the limit %u.\n",
-+		 ext->oe_nr_pages, data->erd_max_pages);
- 	if (data->erd_page_count + ext->oe_nr_pages > data->erd_max_pages)
- 		return 0;
+ 				rc = func(hs, &bd, hnode, data);
+-				if (stop_on_change)
++				if (stop_on_change || !has_put_locked)
+ 					cfs_hash_put(hs, hnode);
+ 				cond_resched();
+ 				count++;
  
-@@ -1943,6 +1956,7 @@ static int try_to_add_extent_for_io(struct client_obd *cli,
- 		break;
+ 				cfs_hash_lock(hs, 0);
+ 				cfs_hash_bd_lock(hs, &bd, 0);
+-				if (!stop_on_change) {
+-					tmp = hnode->next;
+-					cfs_hash_put_locked(hs, hnode);
+-					hnode = tmp;
+-				} else { /* bucket changed? */
++				if (stop_on_change) {
+ 					if (version !=
+ 					    cfs_hash_bd_version_get(&bd))
+-						break;
+-					/* safe to continue because no change */
+-					hnode = hnode->next;
++						rc = -EINTR;
++				} else if (has_put_locked) {
++					cfs_hash_put_locked(hs, hnode);
+ 				}
+ 				if (rc) /* callback wants to break iteration */
+ 					break;
+ 			}
+-			if (rc) /* callback wants to break iteration */
++			if (next) {
++				if (has_put_locked) {
++					cfs_hash_put_locked(hs, next);
++					next = NULL;
++				}
+ 				break;
++			} else if (rc) {
++				break;
++			}
+ 		}
+ 		cfs_hash_bd_unlock(hs, &bd, 0);
++		if (next && !has_put_locked) {
++			cfs_hash_put(hs, next);
++			next = NULL;
++		}
+ 		if (rc) /* callback wants to break iteration */
+ 			break;
  	}
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+index ec3b23c..2bf5c84 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+@@ -106,9 +106,6 @@ int ldlm_cancel_lru_local(struct ldlm_namespace *ns,
+ extern unsigned int ldlm_enqueue_min;
+ extern unsigned int ldlm_cancel_unused_locks_before_replay;
  
-+	data->erd_max_extents--;
- 	data->erd_max_chunks -= chunk_count;
- 	data->erd_page_count += ext->oe_nr_pages;
- 	list_move_tail(&ext->oe_link, data->erd_rpc_list);
-@@ -1972,10 +1986,12 @@ static inline unsigned int osc_max_write_chunks(const struct client_obd *cli)
- 	 *
- 	 * This limitation doesn't apply to ldiskfs, which allows as many
- 	 * chunks in one RPC as we want. However, it won't have any benefits
--	 * to have too many discontiguous pages in one RPC. Therefore, it
--	 * can only have 256 chunks at most in one RPC.
-+	 * to have too many discontiguous pages in one RPC.
-+	 *
-+	 * An osc_extent won't cover over a RPC size, so the chunks in an
-+	 * osc_extent won't bigger than PTLRPC_MAX_BRW_SIZE >> chunkbits.
- 	 */
--	return min(PTLRPC_MAX_BRW_SIZE >> cli->cl_chunkbits, 256);
-+	return PTLRPC_MAX_BRW_SIZE >> cli->cl_chunkbits;
+-/* ldlm_resource.c */
+-int ldlm_resource_putref_locked(struct ldlm_resource *res);
+-
+ /* ldlm_lock.c */
+ 
+ struct ldlm_cb_set_arg {
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index eab44dc..4e805e7 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -536,16 +536,6 @@ static void ldlm_res_hop_get_locked(struct cfs_hash *hs,
+ 	ldlm_resource_getref(res);
  }
  
+-static void ldlm_res_hop_put_locked(struct cfs_hash *hs,
+-				    struct hlist_node *hnode)
+-{
+-	struct ldlm_resource *res;
+-
+-	res = hlist_entry(hnode, struct ldlm_resource, lr_hash);
+-	/* cfs_hash_for_each_nolock is the only chance we call it */
+-	ldlm_resource_putref_locked(res);
+-}
+-
+ static void ldlm_res_hop_put(struct cfs_hash *hs, struct hlist_node *hnode)
+ {
+ 	struct ldlm_resource *res;
+@@ -561,7 +551,6 @@ static void ldlm_res_hop_put(struct cfs_hash *hs, struct hlist_node *hnode)
+ 	.hs_keycpy      = NULL,
+ 	.hs_object      = ldlm_res_hop_object,
+ 	.hs_get		= ldlm_res_hop_get_locked,
+-	.hs_put_locked  = ldlm_res_hop_put_locked,
+ 	.hs_put		= ldlm_res_hop_put
+ };
+ 
+@@ -572,7 +561,6 @@ static void ldlm_res_hop_put(struct cfs_hash *hs, struct hlist_node *hnode)
+ 	.hs_keycpy      = NULL,
+ 	.hs_object      = ldlm_res_hop_object,
+ 	.hs_get		= ldlm_res_hop_get_locked,
+-	.hs_put_locked  = ldlm_res_hop_put_locked,
+ 	.hs_put		= ldlm_res_hop_put
+ };
+ 
+@@ -1249,37 +1237,6 @@ int ldlm_resource_putref(struct ldlm_resource *res)
+ }
+ EXPORT_SYMBOL(ldlm_resource_putref);
+ 
+-/* Returns 1 if the resource was freed, 0 if it remains. */
+-int ldlm_resource_putref_locked(struct ldlm_resource *res)
+-{
+-	struct ldlm_namespace *ns = ldlm_res_to_ns(res);
+-
+-	LASSERT_ATOMIC_GT_LT(&res->lr_refcount, 0, LI_POISON);
+-	CDEBUG(D_INFO, "putref res: %p count: %d\n",
+-	       res, atomic_read(&res->lr_refcount) - 1);
+-
+-	if (atomic_dec_and_test(&res->lr_refcount)) {
+-		struct cfs_hash_bd bd;
+-
+-		cfs_hash_bd_get(ldlm_res_to_ns(res)->ns_rs_hash,
+-				&res->lr_name, &bd);
+-		__ldlm_resource_putref_final(&bd, res);
+-		cfs_hash_bd_unlock(ns->ns_rs_hash, &bd, 1);
+-		/* NB: ns_rs_hash is created with CFS_HASH_NO_ITEMREF,
+-		 * so we should never be here while calling cfs_hash_del,
+-		 * cfs_hash_for_each_nolock is the only case we can get
+-		 * here, which is safe to release cfs_hash_bd_lock.
+-		 */
+-		if (ns->ns_lvbo && ns->ns_lvbo->lvbo_free)
+-			ns->ns_lvbo->lvbo_free(res);
+-		kmem_cache_free(ldlm_resource_slab, res);
+-
+-		cfs_hash_bd_lock(ns->ns_rs_hash, &bd, 1);
+-		return 1;
+-	}
+-	return 0;
+-}
+-
  /**
-@@ -2002,6 +2018,7 @@ static unsigned int get_write_extents(struct osc_object *obj,
- 		.erd_page_count = 0,
- 		.erd_max_pages = cli->cl_max_pages_per_rpc,
- 		.erd_max_chunks = osc_max_write_chunks(cli),
-+		.erd_max_extents = 256,
- 	};
- 
- 	LASSERT(osc_object_is_locked(obj));
-@@ -2140,6 +2157,7 @@ static unsigned int get_write_extents(struct osc_object *obj,
- 		.erd_page_count = 0,
- 		.erd_max_pages = cli->cl_max_pages_per_rpc,
- 		.erd_max_chunks = UINT_MAX,
-+		.erd_max_extents = UINT_MAX,
- 	};
- 	int rc = 0;
- 
+  * Add a lock into a given resource into specified lock list.
+  */
 -- 
 1.8.3.1
