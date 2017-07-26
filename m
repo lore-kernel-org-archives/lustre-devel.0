@@ -1,108 +1,108 @@
-From: Shreeya Patel <shreeya.patel23498@gmail.com>
-Date: Sat, 22 Jul 2017 22:26:41 +0530
-Subject: [lustre-devel] [PATCH] Staging: lustre: Place the open brace on
-	previous line.
-Message-ID: <1500742601-10733-1-git-send-email-shreeya.patel23498@gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 26 Jul 2017 11:22:16 -0400
+Subject: [lustre-devel] [PATCH 00/20] staging: lustre: batch of fixes to
+	decrease test failures
+Message-ID: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
-Cc: Shreeya Patel <shreeya.patel23498@gmail.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Remove errors by placing the open braces on previous line.
-This saves the vertical space of the code.
+New batch of patches to reduce the number of the bugs we are
+seeing in our testing of the upstream client. This set of
+patches is order independent. Removal of some dead code in
+the lov layer as well.
 
-Problem found by checkpatch.
+Andriy Skulysh (1):
+  staging: lustre: ldlm: crash on umount in cleanup_resource
 
-Signed-off-by: Shreeya Patel <shreeya.patel23498@gmail.com>
----
- drivers/staging/lustre/lnet/libcfs/hash.c | 24 ++++++++----------------
- 1 file changed, 8 insertions(+), 16 deletions(-)
+Bob Glosman (1):
+  staging: lustre: ptlrpc: print times in microseconds
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/hash.c b/drivers/staging/lustre/lnet/libcfs/hash.c
-index 5c2ce2e..a255e04 100644
---- a/drivers/staging/lustre/lnet/libcfs/hash.c
-+++ b/drivers/staging/lustre/lnet/libcfs/hash.c
-@@ -1348,8 +1348,7 @@ cfs_hash_lookup(struct cfs_hash *hs, const void *key)
- EXPORT_SYMBOL(cfs_hash_lookup);
- 
- static void
--cfs_hash_for_each_enter(struct cfs_hash *hs)
--{
-+cfs_hash_for_each_enter(struct cfs_hash *hs) {
- 	LASSERT(!cfs_hash_is_exiting(hs));
- 
- 	if (!cfs_hash_with_rehash(hs))
-@@ -1375,8 +1374,7 @@ cfs_hash_for_each_enter(struct cfs_hash *hs)
- }
- 
- static void
--cfs_hash_for_each_exit(struct cfs_hash *hs)
--{
-+cfs_hash_for_each_exit(struct cfs_hash *hs) {
- 	int remained;
- 	int bits;
- 
-@@ -1407,8 +1405,7 @@ cfs_hash_for_each_exit(struct cfs_hash *hs)
-  */
- static u64
- cfs_hash_for_each_tight(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
--			void *data, int remove_safe)
--{
-+			void *data, int remove_safe) {
- 	struct hlist_node *hnode;
- 	struct hlist_node *pos;
- 	struct cfs_hash_bd bd;
-@@ -1501,8 +1498,7 @@ EXPORT_SYMBOL(cfs_hash_for_each);
- 
- void
- cfs_hash_for_each_safe(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
--		       void *data)
--{
-+		       void *data) {
- 	cfs_hash_for_each_tight(hs, func, data, 1);
- }
- EXPORT_SYMBOL(cfs_hash_for_each_safe);
-@@ -1551,8 +1547,7 @@ EXPORT_SYMBOL(cfs_hash_size_get);
-  */
- static int
- cfs_hash_for_each_relax(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
--			void *data, int start)
--{
-+			void *data, int start) {
- 	struct hlist_node *hnode;
- 	struct hlist_node *tmp;
- 	struct cfs_hash_bd bd;
-@@ -1629,8 +1624,7 @@ cfs_hash_for_each_relax(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
- 
- int
- cfs_hash_for_each_nolock(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
--			 void *data, int start)
--{
-+			 void *data, int start) {
- 	if (cfs_hash_with_no_lock(hs) ||
- 	    cfs_hash_with_rehash_key(hs) ||
- 	    !cfs_hash_with_no_itemref(hs))
-@@ -1661,8 +1655,7 @@ EXPORT_SYMBOL(cfs_hash_for_each_nolock);
-  */
- int
- cfs_hash_for_each_empty(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
--			void *data)
--{
-+			void *data) {
- 	unsigned int i = 0;
- 
- 	if (cfs_hash_with_no_lock(hs))
-@@ -1718,8 +1711,7 @@ EXPORT_SYMBOL(cfs_hash_hlist_for_each);
-  */
- void
- cfs_hash_for_each_key(struct cfs_hash *hs, const void *key,
--		      cfs_hash_for_each_cb_t func, void *data)
--{
-+		      cfs_hash_for_each_cb_t func, void *data) {
- 	struct hlist_node *hnode;
- 	struct cfs_hash_bd bds[2];
- 	unsigned int i;
+Bobi Jam (1):
+  staging: lustre: osc: soft lock - osc_makes_rpc()
+
+Dmitry Eremin (2):
+  staging: lustre: llite: allow cached acls
+  staging: lustre: llite: add xattr.h header to xattr.c
+
+Fan Yong (1):
+  staging: lustre: linkea: linkEA size limitation
+
+James Simmons (6):
+  staging: lustre: ldlm: restore interval_iterate_reverse function
+  staging: lustre: lustre: fix all less than 0 comparison for unsigned values
+  staging: lustre: ptlrpc: restore 64-bit time for struct ptlrpc_cli_req
+  staging: lustre: ptlrpc: don't use CFS_DURATION_T for time64_t
+  staging: lustre: libcfs: fix test for libcfs_ioctl_hdr minimum size
+  staging: lustre: llite: set security xattr using __vfs_setxattr
+
+John L. Hammond (4):
+  staging: lustre: ldlm: restore missing newlines in ldlm sysfs files
+  staging: lustre: lov: remove unused code
+  staging: lustre: lmv: assume a real connection in lmv_connect()
+  staging: lustre: ptlrpc: correct use of list_add_tail()
+
+Nathaniel Clark (1):
+  staging: lustre: lov: Ensure correct operation for large object sizes
+
+Niu Yawei (1):
+  staging: lustre: ptlrpc: no need to reassign mbits for replay
+
+Robin Humble (1):
+  staging: lustre: llite: Remove filtering of seclabel xattr
+
+Sebastien Buisson (1):
+  staging: lustre: lov: fix 'control flow' error in lov_io_init_released
+
+ drivers/staging/lustre/lnet/libcfs/hash.c          |  47 ++++--
+ .../lustre/lnet/libcfs/linux/linux-module.c        |   2 +-
+ drivers/staging/lustre/lustre/include/cl_object.h  |   2 +-
+ .../staging/lustre/lustre/include/interval_tree.h  |   4 +
+ .../lustre/lustre/include/lustre/lustre_idl.h      |   7 +-
+ .../staging/lustre/lustre/include/lustre_linkea.h  |  15 +-
+ drivers/staging/lustre/lustre/include/lustre_net.h |  10 +-
+ drivers/staging/lustre/lustre/include/obd.h        |   2 -
+ drivers/staging/lustre/lustre/include/obd_class.h  |   9 +-
+ drivers/staging/lustre/lustre/ldlm/interval_tree.c |  40 +++++
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |   3 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  47 +-----
+ drivers/staging/lustre/lustre/llite/file.c         |  61 +++++++-
+ .../staging/lustre/lustre/llite/llite_internal.h   |   4 +
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |   6 +-
+ drivers/staging/lustre/lustre/llite/namei.c        |   6 +
+ drivers/staging/lustre/lustre/llite/rw.c           |   2 +-
+ drivers/staging/lustre/lustre/llite/xattr.c        |   1 +
+ .../staging/lustre/lustre/llite/xattr_security.c   |  23 ++-
+ drivers/staging/lustre/lustre/lmv/lmv_intent.c     |   5 -
+ drivers/staging/lustre/lustre/lmv/lmv_internal.h   |   2 -
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        | 161 +++------------------
+ drivers/staging/lustre/lustre/lov/Makefile         |   2 +-
+ .../staging/lustre/lustre/lov/lov_cl_internal.h    |  90 ------------
+ drivers/staging/lustre/lustre/lov/lov_dev.c        |  85 -----------
+ drivers/staging/lustre/lustre/lov/lov_ea.c         |  23 +--
+ drivers/staging/lustre/lustre/lov/lov_internal.h   |  27 ----
+ drivers/staging/lustre/lustre/lov/lov_io.c         | 146 ++++++-------------
+ drivers/staging/lustre/lustre/lov/lov_lock.c       |  11 --
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |   3 +-
+ drivers/staging/lustre/lustre/lov/lov_object.c     |   8 +-
+ drivers/staging/lustre/lustre/lov/lov_page.c       |   1 -
+ drivers/staging/lustre/lustre/lov/lov_request.c    |  40 +----
+ drivers/staging/lustre/lustre/lov/lovsub_dev.c     |   1 -
+ drivers/staging/lustre/lustre/lov/lovsub_io.c      |  51 -------
+ drivers/staging/lustre/lustre/lov/lovsub_lock.c    |   2 -
+ drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   2 +-
+ drivers/staging/lustre/lustre/obdclass/linkea.c    |  69 +++++++--
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |  31 +++-
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |  35 +++--
+ .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |  15 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |   2 +-
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |  15 +-
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |  16 +-
+ 44 files changed, 416 insertions(+), 718 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lustre/lov/lovsub_io.c
+
 -- 
-2.7.4
+1.8.3.1
