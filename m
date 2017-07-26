@@ -1,268 +1,73 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 26 Jul 2017 11:22:28 -0400
-Subject: [lustre-devel] [PATCH 12/20] staging: lustre: linkea: linkEA size
-	limitation
+Date: Wed, 26 Jul 2017 11:22:31 -0400
+Subject: [lustre-devel] [PATCH 15/20] staging: lustre: ptlrpc: print times
+	in microseconds
 In-Reply-To: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
 References: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1501082556-17962-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1501082556-17962-16-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Fan Yong <fan.yong@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bob Glosman <bob.glossman@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Fan Yong <fan.yong@intel.com>
+From: Bob Glosman <bob.glossman@intel.com>
 
-Under DNE mode, if we do not restrict the linkEA size, and if there
-are too many cross-MDTs hard links to the same object, then it will
-cause the llog overflow. On the other hand, too many linkEA entries
-in the linkEA will serious affect the linkEA performance because we
-only support to locate linkEA entry consecutively.
+report times and time diffs in seconds.microseconds instead of seconds
 
-So we need to restrict the linkEA size. Currently, it is 4096 bytes,
-that is independent from the backend. If too many hard links caused
-the linkEA overflowed, we will add overflow timestamp in the linkEA
-header.
-
-Signed-off-by: Fan Yong <fan.yong@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8569
-Reviewed-on: https://review.whamcloud.com/23500
+Signed-off-by: Bob Glosman <bob.glossman@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7733
+Reviewed-on: http://review.whamcloud.com/18335
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: wangdi <di.wang@intel.com>
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Minh Diep <minh.diep@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_idl.h      |  5 +-
- .../staging/lustre/lustre/include/lustre_linkea.h  | 15 ++++-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |  2 +-
- drivers/staging/lustre/lustre/obdclass/linkea.c    | 69 +++++++++++++++++-----
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 16 ++---
- 5 files changed, 80 insertions(+), 27 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 441a2e3..1db1ab8 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -3217,9 +3217,8 @@ struct link_ea_header {
- 	__u32 leh_magic;
- 	__u32 leh_reccount;
- 	__u64 leh_len;      /* total size */
--	/* future use */
--	__u32 padding1;
--	__u32 padding2;
-+	__u32 leh_overflow_time;
-+	__u32 leh_padding;
- };
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+index f874781..c429613 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+@@ -905,11 +905,18 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
+ 	rc = ptlrpc_lprocfs_svc_req_history_seek(svcpt, srhi, srhi->srhi_seq);
  
- /** Hardlink data is name and parent fid.
-diff --git a/drivers/staging/lustre/lustre/include/lustre_linkea.h b/drivers/staging/lustre/lustre/include/lustre_linkea.h
-index 249e8bf..3ff008f 100644
---- a/drivers/staging/lustre/lustre/include/lustre_linkea.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_linkea.h
-@@ -26,7 +26,19 @@
-  * Author: di wang <di.wang@intel.com>
-  */
+ 	if (rc == 0) {
++		struct timespec64 arrival, sent, arrivaldiff;
+ 		char nidstr[LNET_NIDSTR_SIZE];
  
--#define DEFAULT_LINKEA_SIZE	4096
-+/* There are several reasons to restrict the linkEA size:
-+ *
-+ * 1. Under DNE mode, if we do not restrict the linkEA size, and if there
-+ *    are too many cross-MDTs hard links to the same object, then it will
-+ *    casue the llog overflow.
-+ *
-+ * 2. Some backend has limited size for EA. For example, if without large
-+ *    EA enabled, the ldiskfs will make all EAs to share one (4K) EA block.
-+ *
-+ * 3. Too many entries in linkEA will seriously affect linkEA performance
-+ *    because we only support to locate linkEA entry consecutively.
-+ */
-+#define MAX_LINKEA_SIZE		4096
+ 		req = srhi->srhi_req;
  
- struct linkea_data {
- 	/**
-@@ -43,6 +55,7 @@ struct linkea_data {
- 
- int linkea_data_new(struct linkea_data *ldata, struct lu_buf *buf);
- int linkea_init(struct linkea_data *ldata);
-+int linkea_init_with_rec(struct linkea_data *ldata);
- void linkea_entry_unpack(const struct link_ea_entry *lee, int *reclen,
- 			 struct lu_name *lname, struct lu_fid *pfid);
- int linkea_entry_pack(struct link_ea_entry *lee, const struct lu_name *lname,
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 69d895d..ba7d3b9 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -2540,7 +2540,7 @@ static int ll_linkea_decode(struct linkea_data *ldata, unsigned int linkno,
- 	unsigned int idx;
- 	int rc;
- 
--	rc = linkea_init(ldata);
-+	rc = linkea_init_with_rec(ldata);
- 	if (rc < 0)
- 		return rc;
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/linkea.c b/drivers/staging/lustre/lustre/obdclass/linkea.c
-index 0b1d2f0..cf3ad04 100644
---- a/drivers/staging/lustre/lustre/obdclass/linkea.c
-+++ b/drivers/staging/lustre/lustre/obdclass/linkea.c
-@@ -39,6 +39,8 @@ int linkea_data_new(struct linkea_data *ldata, struct lu_buf *buf)
- 	ldata->ld_leh->leh_magic = LINK_EA_MAGIC;
- 	ldata->ld_leh->leh_len = sizeof(struct link_ea_header);
- 	ldata->ld_leh->leh_reccount = 0;
-+	ldata->ld_leh->leh_overflow_time = 0;
-+	ldata->ld_leh->leh_padding = 0;
- 	return 0;
- }
- EXPORT_SYMBOL(linkea_data_new);
-@@ -53,11 +55,15 @@ int linkea_init(struct linkea_data *ldata)
- 		leh->leh_magic = LINK_EA_MAGIC;
- 		leh->leh_reccount = __swab32(leh->leh_reccount);
- 		leh->leh_len = __swab64(leh->leh_len);
--		/* entries are swabbed by linkea_entry_unpack */
-+		leh->leh_overflow_time = __swab32(leh->leh_overflow_time);
-+		leh->leh_padding = __swab32(leh->leh_padding);
-+		/* individual entries are swabbed by linkea_entry_unpack() */
- 	}
+ 		libcfs_nid2str_r(req->rq_self, nidstr, sizeof(nidstr));
++		arrival.tv_sec = req->rq_arrival_time.tv_sec;
++		arrival.tv_nsec = req->rq_arrival_time.tv_nsec;
++		sent.tv_sec = req->rq_sent;
++		sent.tv_nsec = 0;
++		arrivaldiff = timespec64_sub(sent, arrival);
 +
- 	if (leh->leh_magic != LINK_EA_MAGIC)
- 		return -EINVAL;
--	if (leh->leh_reccount == 0)
-+
-+	if (leh->leh_reccount == 0 && leh->leh_overflow_time == 0)
- 		return -ENODATA;
- 
- 	ldata->ld_leh = leh;
-@@ -65,6 +71,18 @@ int linkea_init(struct linkea_data *ldata)
- }
- EXPORT_SYMBOL(linkea_init);
- 
-+int linkea_init_with_rec(struct linkea_data *ldata)
-+{
-+	int rc;
-+
-+	rc = linkea_init(ldata);
-+	if (!rc && ldata->ld_leh->leh_reccount == 0)
-+		rc = -ENODATA;
-+
-+	return rc;
-+}
-+EXPORT_SYMBOL(linkea_init_with_rec);
-+
- /**
-  * Pack a link_ea_entry.
-  * All elements are stored as chars to avoid alignment issues.
-@@ -94,6 +112,8 @@ int linkea_entry_pack(struct link_ea_entry *lee, const struct lu_name *lname,
- void linkea_entry_unpack(const struct link_ea_entry *lee, int *reclen,
- 			 struct lu_name *lname, struct lu_fid *pfid)
- {
-+	LASSERT(lee);
-+
- 	*reclen = (lee->lee_reclen[0] << 8) | lee->lee_reclen[1];
- 	memcpy(pfid, &lee->lee_parent_fid, sizeof(*pfid));
- 	fid_be_to_cpu(pfid, pfid);
-@@ -110,25 +130,44 @@ void linkea_entry_unpack(const struct link_ea_entry *lee, int *reclen,
- int linkea_add_buf(struct linkea_data *ldata, const struct lu_name *lname,
- 		   const struct lu_fid *pfid)
- {
--	LASSERT(ldata->ld_leh);
-+	struct link_ea_header *leh = ldata->ld_leh;
-+	int reclen;
-+
-+	LASSERT(leh);
- 
- 	if (!lname || !pfid)
- 		return -EINVAL;
- 
--	ldata->ld_reclen = lname->ln_namelen + sizeof(struct link_ea_entry);
--	if (ldata->ld_leh->leh_len + ldata->ld_reclen >
--	    ldata->ld_buf->lb_len) {
-+	reclen = lname->ln_namelen + sizeof(struct link_ea_entry);
-+	if (unlikely(leh->leh_len + reclen > MAX_LINKEA_SIZE)) {
-+		/*
-+		 * Use 32-bits to save the overflow time, although it will
-+		 * shrink the ktime_get_real_seconds() returned 64-bits value
-+		 * to 32-bits value, it is still quite large and can be used
-+		 * for about 140 years. That is enough.
-+		 */
-+		leh->leh_overflow_time = ktime_get_real_seconds();
-+		if (unlikely(leh->leh_overflow_time == 0))
-+			leh->leh_overflow_time++;
-+
-+		CDEBUG(D_INODE, "No enough space to hold linkea entry '" DFID ": %.*s' at %u\n",
-+		       PFID(pfid), lname->ln_namelen,
-+		       lname->ln_name, leh->leh_overflow_time);
-+		return 0;
-+	}
-+
-+	if (leh->leh_len + reclen > ldata->ld_buf->lb_len) {
- 		if (lu_buf_check_and_grow(ldata->ld_buf,
--					  ldata->ld_leh->leh_len +
--					  ldata->ld_reclen) < 0)
-+					  leh->leh_len + reclen) < 0)
- 			return -ENOMEM;
-+
-+		leh = ldata->ld_leh = ldata->ld_buf->lb_buf;
- 	}
- 
--	ldata->ld_leh = ldata->ld_buf->lb_buf;
--	ldata->ld_lee = ldata->ld_buf->lb_buf + ldata->ld_leh->leh_len;
-+	ldata->ld_lee = ldata->ld_buf->lb_buf + leh->leh_len;
- 	ldata->ld_reclen = linkea_entry_pack(ldata->ld_lee, lname, pfid);
--	ldata->ld_leh->leh_len += ldata->ld_reclen;
--	ldata->ld_leh->leh_reccount++;
-+	leh->leh_len += ldata->ld_reclen;
-+	leh->leh_reccount++;
- 	CDEBUG(D_INODE, "New link_ea name '" DFID ":%.*s' is added\n",
- 	       PFID(pfid), lname->ln_namelen, lname->ln_name);
- 	return 0;
-@@ -139,6 +178,7 @@ int linkea_add_buf(struct linkea_data *ldata, const struct lu_name *lname,
- void linkea_del_buf(struct linkea_data *ldata, const struct lu_name *lname)
- {
- 	LASSERT(ldata->ld_leh && ldata->ld_lee);
-+	LASSERT(ldata->ld_leh->leh_reccount > 0);
- 
- 	ldata->ld_leh->leh_reccount--;
- 	ldata->ld_leh->leh_len -= ldata->ld_reclen;
-@@ -174,8 +214,9 @@ int linkea_links_find(struct linkea_data *ldata, const struct lu_name *lname,
- 
- 	LASSERT(ldata->ld_leh);
- 
--	/* link #0 */
--	ldata->ld_lee = (struct link_ea_entry *)(ldata->ld_leh + 1);
-+	/* link #0, if leh_reccount == 0 we skip the loop and return -ENOENT */
-+	if (likely(ldata->ld_leh->leh_reccount > 0))
-+		ldata->ld_lee = (struct link_ea_entry *)(ldata->ld_leh + 1);
- 
- 	for (count = 0; count < ldata->ld_leh->leh_reccount; count++) {
- 		linkea_entry_unpack(ldata->ld_lee, &ldata->ld_reclen,
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index 367f7e2..311c526 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -3820,14 +3820,14 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct link_ea_header, leh_len));
- 	LASSERTF((int)sizeof(((struct link_ea_header *)0)->leh_len) == 8, "found %lld\n",
- 		 (long long)(int)sizeof(((struct link_ea_header *)0)->leh_len));
--	LASSERTF((int)offsetof(struct link_ea_header, padding1) == 16, "found %lld\n",
--		 (long long)(int)offsetof(struct link_ea_header, padding1));
--	LASSERTF((int)sizeof(((struct link_ea_header *)0)->padding1) == 4, "found %lld\n",
--		 (long long)(int)sizeof(((struct link_ea_header *)0)->padding1));
--	LASSERTF((int)offsetof(struct link_ea_header, padding2) == 20, "found %lld\n",
--		 (long long)(int)offsetof(struct link_ea_header, padding2));
--	LASSERTF((int)sizeof(((struct link_ea_header *)0)->padding2) == 4, "found %lld\n",
--		 (long long)(int)sizeof(((struct link_ea_header *)0)->padding2));
-+	LASSERTF((int)offsetof(struct link_ea_header, leh_overflow_time) == 16, "found %lld\n",
-+		 (long long)(int)offsetof(struct link_ea_header, leh_overflow_time));
-+	LASSERTF((int)sizeof(((struct link_ea_header *)0)->leh_overflow_time) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct link_ea_header *)0)->leh_overflow_time));
-+	LASSERTF((int)offsetof(struct link_ea_header, leh_padding) == 20, "found %lld\n",
-+		 (long long)(int)offsetof(struct link_ea_header, leh_padding));
-+	LASSERTF((int)sizeof(((struct link_ea_header *)0)->leh_padding) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct link_ea_header *)0)->leh_padding));
- 	BUILD_BUG_ON(LINK_EA_MAGIC != 0x11EAF1DFUL);
- 
- 	/* Checks for struct link_ea_entry */
+ 		/* Print common req fields.
+ 		 * CAVEAT EMPTOR: we're racing with the service handler
+ 		 * here.  The request could contain any old crap, so you
+@@ -917,13 +924,15 @@ static int ptlrpc_lprocfs_svc_req_history_show(struct seq_file *s, void *iter)
+ 		 * parser. Currently I only print stuff here I know is OK
+ 		 * to look at coz it was set up in request_in_callback()!!!
+ 		 */
+-		seq_printf(s, "%lld:%s:%s:x%llu:%d:%s:%lld:%lds(%+lds) ",
++		seq_printf(s, "%lld:%s:%s:x%llu:%d:%s:%lld.%06lld:%lld.%06llds(%+lld.0s) ",
+ 			   req->rq_history_seq, nidstr,
+ 			   libcfs_id2str(req->rq_peer), req->rq_xid,
+ 			   req->rq_reqlen, ptlrpc_rqphase2str(req),
+ 			   (s64)req->rq_arrival_time.tv_sec,
+-			   (long)(req->rq_sent - req->rq_arrival_time.tv_sec),
+-			   (long)(req->rq_sent - req->rq_deadline));
++			   (s64)req->rq_arrival_time.tv_nsec / NSEC_PER_USEC,
++			   (s64)arrivaldiff.tv_sec,
++			   (s64)(arrivaldiff.tv_nsec / NSEC_PER_USEC),
++			   (s64)(req->rq_sent - req->rq_deadline));
+ 		if (!svc->srv_ops.so_req_printer)
+ 			seq_putc(s, '\n');
+ 		else
 -- 
 1.8.3.1
