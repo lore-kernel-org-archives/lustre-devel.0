@@ -1,97 +1,77 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 26 Jul 2017 11:22:26 -0400
-Subject: [lustre-devel] [PATCH 10/20] staging: lustre: ldlm: restore
-	interval_iterate_reverse function
+Date: Wed, 26 Jul 2017 11:22:29 -0400
+Subject: [lustre-devel] [PATCH 13/20] staging: lustre: ptlrpc: restore
+	64-bit time for struct ptlrpc_cli_req
 In-Reply-To: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
 References: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1501082556-17962-11-git-send-email-jsimmons@infradead.org>
+Message-ID: <1501082556-17962-14-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>, Liang Zhen <liang.zhen@intel.com>
 
-Earlier the function interval_iterate_reverse function was
-removed since it wasn't used by anyone. Now it is being
-restored since it will be used by a future patch.
+During the reorganization of ptlrpc_request some of the
+time64_t fields were incorrectly turned into time_t.
+Restore those fields back to time_64_t.
 
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-on: https://review.whamcloud.com/24977
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-4423
+Fixes: 32c8728d87dc ("staging/lustre/ptlrpc: reorganize ptlrpc_request")
+CC: Liang Zhen <liang.zhen@intel.com>
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lustre/include/interval_tree.h  |  4 +++
- drivers/staging/lustre/lustre/ldlm/interval_tree.c | 40 ++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
+ drivers/staging/lustre/lustre/include/lustre_net.h | 10 +++++-----
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/interval_tree.h b/drivers/staging/lustre/lustre/include/interval_tree.h
-index 0d4f92e..a4d7280 100644
---- a/drivers/staging/lustre/lustre/include/interval_tree.h
-+++ b/drivers/staging/lustre/lustre/include/interval_tree.h
-@@ -111,4 +111,8 @@ enum interval_iter interval_search(struct interval_node *root,
- 				   struct interval_node_extent *ex,
- 				   interval_callback_t func, void *data);
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index d61b000..05f02b1 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -558,13 +558,13 @@ struct ptlrpc_cli_req {
+ 	/** request sent timeval */
+ 	struct timespec64		 cr_sent_tv;
+ 	/** time for request really sent out */
+-	time_t				 cr_sent_out;
++	time64_t			 cr_sent_out;
+ 	/** when req reply unlink must finish. */
+-	time_t				 cr_reply_deadline;
++	time64_t			 cr_reply_deadline;
+ 	/** when req bulk unlink must finish. */
+-	time_t				 cr_bulk_deadline;
++	time64_t			 cr_bulk_deadline;
+ 	/** when req unlink must finish. */
+-	time_t				 cr_req_deadline;
++	time64_t			 cr_req_deadline;
+ 	/** Portal to which this request would be sent */
+ 	short				 cr_req_ptl;
+ 	/** Portal where to wait for reply and where reply would be sent */
+@@ -663,7 +663,7 @@ struct ptlrpc_srv_req {
+ 	/** history sequence # */
+ 	__u64				sr_hist_seq;
+ 	/** the index of service's srv_at_array into which request is linked */
+-	time_t				sr_at_index;
++	time64_t			sr_at_index;
+ 	/** authed uid */
+ 	uid_t				sr_auth_uid;
+ 	/** authed uid mapped to */
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index 1247686..9f4f17a 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -742,7 +742,7 @@ int ptlrpc_request_bufs_pack(struct ptlrpc_request *request,
  
-+enum interval_iter interval_iterate_reverse(struct interval_node *root,
-+					    interval_callback_t func,
-+					    void *data);
-+
- #endif
-diff --git a/drivers/staging/lustre/lustre/ldlm/interval_tree.c b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
-index e106902..5bebd9a 100644
---- a/drivers/staging/lustre/lustre/ldlm/interval_tree.c
-+++ b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
-@@ -110,6 +110,15 @@ static struct interval_node *interval_first(struct interval_node *node)
- 	return node;
- }
+ 	/* Let's setup deadline for req/reply/bulk unlink for opcode. */
+ 	if (cfs_fail_val == opcode) {
+-		time_t *fail_t = NULL, *fail2_t = NULL;
++		time64_t *fail_t = NULL, *fail2_t = NULL;
  
-+static struct interval_node *interval_last(struct interval_node *node)
-+{
-+	if (!node)
-+		return NULL;
-+	while (node->in_right)
-+		node = node->in_right;
-+	return node;
-+}
-+
- static struct interval_node *interval_next(struct interval_node *node)
- {
- 	if (!node)
-@@ -121,6 +130,37 @@ static struct interval_node *interval_next(struct interval_node *node)
- 	return node->in_parent;
- }
- 
-+static struct interval_node *interval_prev(struct interval_node *node)
-+{
-+	if (!node)
-+		return NULL;
-+
-+	if (node->in_left)
-+		return interval_last(node->in_left);
-+
-+	while (node->in_parent && node_is_left_child(node))
-+		node = node->in_parent;
-+
-+	return node->in_parent;
-+}
-+
-+enum interval_iter interval_iterate_reverse(struct interval_node *root,
-+					    interval_callback_t func,
-+					    void *data)
-+{
-+	enum interval_iter rc = INTERVAL_ITER_CONT;
-+	struct interval_node *node;
-+
-+	for (node = interval_last(root); node; node = interval_prev(node)) {
-+		rc = func(node, data);
-+		if (rc == INTERVAL_ITER_STOP)
-+			break;
-+	}
-+
-+	return rc;
-+}
-+EXPORT_SYMBOL(interval_iterate_reverse);
-+
- static void __rotate_change_maxhigh(struct interval_node *node,
- 				    struct interval_node *rotate)
- {
+ 		if (CFS_FAIL_CHECK(OBD_FAIL_PTLRPC_LONG_BULK_UNLINK)) {
+ 			fail_t = &request->rq_bulk_deadline;
 -- 
 1.8.3.1
