@@ -1,90 +1,47 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 26 Jul 2017 11:22:23 -0400
-Subject: [lustre-devel] [PATCH 07/20] staging: lustre: lov: Ensure correct
-	operation for large object sizes
+Date: Wed, 26 Jul 2017 11:22:32 -0400
+Subject: [lustre-devel] [PATCH 16/20] staging: lustre: libcfs: fix test for
+	libcfs_ioctl_hdr minimum size
 In-Reply-To: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
 References: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1501082556-17962-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1501082556-17962-17-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Nathaniel Clark <nathaniel.l.clark@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@gmail.com>
 
-From: Nathaniel Clark <nathaniel.l.clark@intel.com>
+The function libcfs_ioctl_getdata() test to see if libcfs_ioctl_hdr
+is smaller than struct libcfs_ioctl_data in size. This is wrong
+and it breaks the ioctl that is used to collect LNet stats. The
+correct size to compare against is struct libcfs_ioctl_hdr.
 
-If a backing filesystem (ZFS) returns that it supports very large
-(LLONG_MAX) object sizes, that should be correctly supported.  This
-fixes the check for unitialized stripe_maxbytes in
-lsm_unpackmd_common(), so that ZFS can return LLONG_MAX and it will be
-okay. This issue is excersized by writing to or past the 2TB boundry
-of a singly stripped file.
-
-Signed-off-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7890
-Reviewed-on: http://review.whamcloud.com/19066
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
+Signed-off-by: James Simmons <uja.ornl@gmail.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-5935
+Reviewed-on: http://review.whamcloud.com/12782
+Fixes: ed2f549dc0f6 ("staging: lustre: libcfs: test if userland data is to small")
+Reported-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: Liang Zhen <liang.zhen@intel.com>
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lov/lov_ea.c | 23 +++++++++++++----------
- 1 file changed, 13 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/linux/linux-module.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index ac0bf64..2a8fee8 100644
---- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -150,9 +150,10 @@ static int lsm_unpackmd_common(struct lov_obd *lov,
- 			       struct lov_mds_md *lmm,
- 			       struct lov_ost_data_v1 *objects)
- {
--	loff_t stripe_maxbytes = LLONG_MAX;
-+	loff_t min_stripe_maxbytes = 0;
- 	unsigned int stripe_count;
- 	struct lov_oinfo *loi;
-+	loff_t lov_bytes;
- 	unsigned int i;
- 
- 	/*
-@@ -168,8 +169,6 @@ static int lsm_unpackmd_common(struct lov_obd *lov,
- 	stripe_count = lsm_is_released(lsm) ? 0 : lsm->lsm_stripe_count;
- 
- 	for (i = 0; i < stripe_count; i++) {
--		loff_t tgt_bytes;
--
- 		loi = lsm->lsm_oinfo[i];
- 		ostid_le_to_cpu(&objects[i].l_ost_oi, &loi->loi_oi);
- 		loi->loi_ost_idx = le32_to_cpu(objects[i].l_ost_idx);
-@@ -194,17 +193,21 @@ static int lsm_unpackmd_common(struct lov_obd *lov,
- 			continue;
- 		}
- 
--		tgt_bytes = lov_tgt_maxbytes(lov->lov_tgts[loi->loi_ost_idx]);
--		stripe_maxbytes = min_t(loff_t, stripe_maxbytes, tgt_bytes);
-+		lov_bytes = lov_tgt_maxbytes(lov->lov_tgts[loi->loi_ost_idx]);
-+		if (min_stripe_maxbytes == 0 || lov_bytes < min_stripe_maxbytes)
-+			min_stripe_maxbytes = lov_bytes;
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+index 075826b..c6837bc 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+@@ -134,7 +134,7 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
+ 		return -EINVAL;
  	}
  
--	if (stripe_maxbytes == LLONG_MAX)
--		stripe_maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
-+	if (min_stripe_maxbytes == 0)
-+		min_stripe_maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
-+
-+	stripe_count = lsm->lsm_stripe_count ?: lov->desc.ld_tgt_count;
-+	lov_bytes = min_stripe_maxbytes * stripe_count;
- 
--	if (!lsm->lsm_stripe_count)
--		lsm->lsm_maxbytes = stripe_maxbytes * lov->desc.ld_tgt_count;
-+	if (lov_bytes < min_stripe_maxbytes) /* handle overflow */
-+		lsm->lsm_maxbytes = MAX_LFS_FILESIZE;
- 	else
--		lsm->lsm_maxbytes = stripe_maxbytes * lsm->lsm_stripe_count;
-+		lsm->lsm_maxbytes = lov_bytes;
- 
- 	return 0;
- }
+-	if (hdr.ioc_len < sizeof(struct libcfs_ioctl_data)) {
++	if (hdr.ioc_len < sizeof(hdr)) {
+ 		CERROR("libcfs ioctl: user buffer too small for ioctl\n");
+ 		return -EINVAL;
+ 	}
 -- 
 1.8.3.1
