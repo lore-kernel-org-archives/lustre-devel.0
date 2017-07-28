@@ -1,183 +1,79 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 27 Jul 2017 20:42:46 +0100 (BST)
-Subject: [lustre-devel] [PATCH 18/20] staging: lustre: llite: Remove
- filtering of seclabel xattr
-In-Reply-To: <20170727171431.GA14966@trinity.cita.utoronto.ca>
-References: <1501082556-17962-1-git-send-email-jsimmons@infradead.org>
-	<1501082556-17962-19-git-send-email-jsimmons@infradead.org>
-	<20170727171431.GA14966@trinity.cita.utoronto.ca>
-Message-ID: <alpine.LFD.2.20.1707272042280.6670@casper.infradead.org>
+From: Anna Fuchs <anna.fuchs@informatik.uni-hamburg.de>
+Date: Fri, 28 Jul 2017 11:57:27 +0200
+Subject: [lustre-devel] Design proposal for client-side compression
+In-Reply-To: <BN6PR1101MB2132BBFB8979EA3FBFA4AE2DCBBE0@BN6PR1101MB2132.namprd11.prod.outlook.com>
+References: <1483967258.2622.24.camel@informatik.uni-hamburg.de>
+	<B5E18A82-79B3-484F-BEBE-998B8AE56397@intel.com>
+	<1484223328.3937.60.camel@informatik.uni-hamburg.de>
+	<B924BE6D-3C6A-4BA4-96F9-AC053F032B2D@intel.com>
+	<1484749185.3965.114.camel@informatik.uni-hamburg.de>
+	<1487254536.4777.51.camel@informatik.uni-hamburg.de>
+	,<1500650130.3158.6.camel@informatik.uni-hamburg.de>
+	<BN6PR1101MB2132311AB19B104AD044797ACBA40@BN6PR1101MB2132.namprd11.prod.outlook.com>
+	,<1500992740.4728.5.camel@informatik.uni-hamburg.de>
+	<BN6PR1101MB2132DD0CCFF2F83BB3BE7F54CBB90@BN6PR1101MB2132.namprd11.prod.outlook.com>
+	,<1501143960.3412.3.camel@informatik.uni-hamburg.de>
+	<BN6PR1101MB2132BBFB8979EA3FBFA4AE2DCBBE0@BN6PR1101MB2132.namprd11.prod.outlook.com>
+Message-ID: <1501235847.3412.12.camel@informatik.uni-hamburg.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Patrick,
 
-> Hi James,
+On Thu, 2017-07-27 at 19:22 +0000, Patrick Farrell wrote:
+> Ann,
 > 
-> sorry, but this isn't my patch.
-> I deleted a couple of lines from xattr.c, not the below.
-> 
-> I think you might have got the wrong commit comment somehow?
-> 
-> I took lkml etc. out of the CC 'cos I'm not subscribed there.
+> I would be happy to help with review, etc, on this once it's ready to
+> be posted.
 
-I sent the email. Sorry about the mix up.
- 
-> cheers,
-> robin
-> 
-> On Wed, Jul 26, 2017 at 11:22:34AM -0400, James Simmons wrote:
-> >From: Robin Humble <plaguedbypenguins@gmail.com>
-> >
-> >The security.capability xattr is used to implement File
-> >Capabilities in recent Linux versions. Capabilities are a
-> >fine grained approach to granting executables elevated
-> >privileges. eg. /bin/ping can have capabilities
-> >cap_net_admin, cap_net_raw+ep instead of being setuid root.
-> >
-> >This xattr has long been filtered out by llite, initially for
-> >stability reasons (b15587), and later over performance
-> >concerns as this xattr is read for every file with eg.
-> >'ls --color'. Since LU-2869 xattr's are cached on clients,
-> >alleviating most performance concerns.
-> >
-> >Removing llite's filtering of the security.capability xattr
-> >enables using Lustre as a root filesystem, which is used on
-> >some large clusters.
-> >
-> >Signed-off-by: Robin Humble <plaguedbypenguins@gmail.com>
-> >Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9562
-> >Reviewed-on: https://review.whamcloud.com/27292
-> >Reviewed-by: John L. Hammond <john.hammond@intel.com>
-> >Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
-> >Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> >Signed-off-by: James Simmons <jsimmons@infradead.org>
-> >---
-> > drivers/staging/lustre/lustre/llite/file.c         | 58 ++++++++++++++++++++++
-> > .../staging/lustre/lustre/llite/llite_internal.h   |  4 ++
-> > drivers/staging/lustre/lustre/llite/namei.c        |  6 +++
-> > 3 files changed, 68 insertions(+)
-> >
-> >diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-> >index 215479a..a324580 100644
-> >--- a/drivers/staging/lustre/lustre/llite/file.c
-> >+++ b/drivers/staging/lustre/lustre/llite/file.c
-> >@@ -3040,6 +3040,61 @@ struct posix_acl *ll_get_acl(struct inode *inode, int type)
-> > 	return acl;
-> > }
-> > 
-> >+#ifdef CONFIG_FS_POSIX_ACL
-> >+int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type)
-> >+{
-> >+	const char *name = NULL;
-> >+	char *value = NULL;
-> >+	size_t size = 0;
-> >+	int rc = 0;
-> >+
-> >+	switch (type) {
-> >+	case ACL_TYPE_ACCESS:
-> >+		if (acl) {
-> >+			rc = posix_acl_update_mode(inode, &inode->i_mode, &acl);
-> >+			if (rc)
-> >+				goto out;
-> >+		}
-> >+		name = XATTR_NAME_POSIX_ACL_ACCESS;
-> >+		break;
-> >+	case ACL_TYPE_DEFAULT:
-> >+		if (!S_ISDIR(inode->i_mode)) {
-> >+			rc = acl ? -EACCES : 0;
-> >+			goto out;
-> >+		}
-> >+		name = XATTR_NAME_POSIX_ACL_DEFAULT;
-> >+		break;
-> >+	default:
-> >+		rc = -EINVAL;
-> >+		goto out;
-> >+	}
-> >+
-> >+	if (acl) {
-> >+		size = posix_acl_xattr_size(acl->a_count);
-> >+		value = kmalloc(size, GFP_NOFS);
-> >+		if (!value) {
-> >+			rc = -ENOMEM;
-> >+			goto out;
-> >+		}
-> >+
-> >+		rc = posix_acl_to_xattr(&init_user_ns, acl, value, size);
-> >+		if (rc < 0)
-> >+			goto out_free;
-> >+	}
-> >+
-> >+	/* dentry is only used for *.lov attributes so it's safe to be NULL */
-> >+	rc = __vfs_setxattr(NULL, inode, name, value, size, XATTR_CREATE);
-> >+out_free:
-> >+	kfree(value);
-> >+out:
-> >+	if (!rc)
-> >+		set_cached_acl(inode, type, acl);
-> >+	else
-> >+		forget_cached_acl(inode, type);
-> >+	return rc;
-> >+}
-> >+#endif /* CONFIG_FS_POSIX_ACL */
-> >+
-> > int ll_inode_permission(struct inode *inode, int mask)
-> > {
-> > 	struct ll_sb_info *sbi;
-> >@@ -3162,6 +3217,9 @@ int ll_inode_permission(struct inode *inode, int mask)
-> > 	.listxattr	= ll_listxattr,
-> > 	.fiemap		= ll_fiemap,
-> > 	.get_acl	= ll_get_acl,
-> >+#ifdef CONFIG_FS_POSIX_ACL
-> >+	.set_acl	= ll_set_acl,
-> >+#endif
-> > };
-> > 
-> > /* dynamic ioctl number support routines */
-> >diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-> >index cd3311a..b3374bc 100644
-> >--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-> >+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-> >@@ -752,6 +752,10 @@ enum ldlm_mode ll_take_md_lock(struct inode *inode, __u64 bits,
-> > int ll_getattr(const struct path *path, struct kstat *stat,
-> > 	       u32 request_mask, unsigned int flags);
-> > struct posix_acl *ll_get_acl(struct inode *inode, int type);
-> >+#ifdef CONFIG_FS_POSIX_ACL
-> >+int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type);
-> >+#endif /* CONFIG_FS_POSIX_ACL */
-> >+
-> > int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
-> > 	       const char *name, int namelen);
-> > int ll_get_fid_by_name(struct inode *parent, const char *name,
-> >diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-> >index a208a8b..14dccbe 100644
-> >--- a/drivers/staging/lustre/lustre/llite/namei.c
-> >+++ b/drivers/staging/lustre/lustre/llite/namei.c
-> >@@ -1187,6 +1187,9 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
-> > 	.permission	 = ll_inode_permission,
-> > 	.listxattr	  = ll_listxattr,
-> > 	.get_acl	    = ll_get_acl,
-> >+#ifdef CONFIG_FS_POSIX_ACL
-> >+	.set_acl	= ll_set_acl,
-> >+#endif
-> > };
-> > 
-> > const struct inode_operations ll_special_inode_operations = {
-> >@@ -1195,4 +1198,7 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
-> > 	.permission     = ll_inode_permission,
-> > 	.listxattr      = ll_listxattr,
-> > 	.get_acl	    = ll_get_acl,
-> >+#ifdef CONFIG_FS_POSIX_ACL
-> >+	.set_acl	= ll_set_acl,
-> >+#endif
-> > };
-> >-- 
-> >1.8.3.1
-> >
-> >_______________________________________________
-> >lustre-devel mailing list
-> >lustre-devel at lists.lustre.org
-> >http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> 
+thanks for that! 
+
+> In the meantime, I am curious about how you handled the compression
+> and the discontiguous set of pages problem.  Did you use scatter-
+> gather lists like the encryption code does, or some other solution?
+
+I am mainly working on the infrastructure and Lustre/ZFS integration
+regardless the concrete algorithm, but we faced this problem very
+early. In my prototype I still have the very costly approach of
+allocating three contiguous buffers (src, dst, wrkmem), allocating
+additional destination pages, copying original pages to void* src
+buffer, compressing to void* dst buffer and again copying to dst page
+buffer. A lot of expensive copies and memory wasting. But with the
+original Kernel-LZ4 there is no other way. I can send you the
+corresponding code part, but it is totally boring - alloc, alloc,
+alloc... copy, copy, ... copy.
+
+In parallel to my work site, we assigned a student to adopt LZ4 to the
+page structure. Our first idea has also been scatter-lists seen in the
+encryption code. Since scatter-lists use linked lists it somehow turned
+out to be very inefficient for traversing the data. The corresponding
+Bachelor's thesis will be submitted soon (within a month?), so we have
+to proofread it in detail. However, the student implemented another
+version of LZ4, which works directly on pages (code party online, full
+version will follow).
+It is tested, but might be not in the productive stage now (will
+hopefully be after submission and reviewing). This version shows a
+little lower compression ratio but comparable or better speed. We will
+see how we can use it to avoid the memory and copy overhead. It seemed 
+there is no good way how to change only the data structure in a clean
+way without changing the de-/compressor's logic. 
+
+Another interesting thing is the newest LZ4m [0], which is similar to
+the work of our student in many aspects, but still differs (waiting for
+final thesis). 
+
+However, for the LZ4 we see good chances to get rid of that overhead by
+using which ever modification. But since we want and should support
+more algorithms, we still do not have any universal solution. E.g. for
+zstd, which also seems to be suitable for our needs (another thesis..),
+we would need to make same efforts again or pay the overhead. 
+
+[0] http://csl.skku.edu/papers/icce17.pdf
+
+If anyone has other ideas, please, let me know!
+
+Regards,
+Anna
