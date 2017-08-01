@@ -1,99 +1,78 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Tue, 1 Aug 2017 14:10:58 +0300
-Subject: [lustre-devel] [bug report] staging: lustre: lov: Ensure correct
- operation for large object sizes
-Message-ID: <20170801111058.xlmx7tmvmfkyihxh@mwanda>
+From: Cihangir Akturk <cakturk@gmail.com>
+Date: Wed,  2 Aug 2017 02:12:29 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: grab the cld->cld_lock
+	mutex unconditionally
+Message-ID: <1501629149-6081-1-git-send-email-cakturk@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Hello Nathaniel Clark,
+Instead of using the locked variable as a helper to determine the state
+of the mutex cld->cld_lock, expand the scope of the recover_cld variable
+and assign to the cld->cld_recover variable depending on whether the
+value of the recover_cld variable is valid or not.
 
-The patch 476f575cf070: "staging: lustre: lov: Ensure correct
-operation for large object sizes" from Jul 26, 2017, leads to the
-following static checker warning:
+As a bonus, code size is slightly reduced.
 
-	drivers/staging/lustre/lustre/lov/lov_ea.c:207 lsm_unpackmd_common()
-	warn: signed overflow undefined. 'min_stripe_maxbytes * stripe_count < min_stripe_maxbytes'
+before:
+text    data     bss     dec     hex filename
+26188    2256    4208   32652    7f8c drivers/staging/lustre/lustre/mgc/mgc_request.o
 
-drivers/staging/lustre/lustre/lov/lov_ea.c
-   148  static int lsm_unpackmd_common(struct lov_obd *lov,
-   149                                 struct lov_stripe_md *lsm,
-   150                                 struct lov_mds_md *lmm,
-   151                                 struct lov_ost_data_v1 *objects)
-   152  {
-   153          loff_t min_stripe_maxbytes = 0;
-                ^^^^^^
-loff_t is long long.
+after:
+text    data     bss     dec     hex filename
+26140    2256    4208   32604    7f5c drivers/staging/lustre/lustre/mgc/mgc_request.o
 
-   154          unsigned int stripe_count;
-   155          struct lov_oinfo *loi;
-   156          loff_t lov_bytes;
-   157          unsigned int i;
-   158  
-   159          /*
-   160           * This supposes lov_mds_md_v1/v3 first fields are
-   161           * are the same
-   162           */
-   163          lmm_oi_le_to_cpu(&lsm->lsm_oi, &lmm->lmm_oi);
-   164          lsm->lsm_stripe_size = le32_to_cpu(lmm->lmm_stripe_size);
-   165          lsm->lsm_pattern = le32_to_cpu(lmm->lmm_pattern);
-   166          lsm->lsm_layout_gen = le16_to_cpu(lmm->lmm_layout_gen);
-   167          lsm->lsm_pool_name[0] = '\0';
-   168  
-   169          stripe_count = lsm_is_released(lsm) ? 0 : lsm->lsm_stripe_count;
-   170  
-   171          for (i = 0; i < stripe_count; i++) {
-   172                  loi = lsm->lsm_oinfo[i];
-   173                  ostid_le_to_cpu(&objects[i].l_ost_oi, &loi->loi_oi);
-   174                  loi->loi_ost_idx = le32_to_cpu(objects[i].l_ost_idx);
-   175                  loi->loi_ost_gen = le32_to_cpu(objects[i].l_ost_gen);
-   176                  if (lov_oinfo_is_dummy(loi))
-   177                          continue;
-   178  
-   179                  if (loi->loi_ost_idx >= lov->desc.ld_tgt_count &&
-   180                      !lov2obd(lov)->obd_process_conf) {
-   181                          CERROR("%s: OST index %d more than OST count %d\n",
-   182                                 (char *)lov->desc.ld_uuid.uuid,
-   183                                 loi->loi_ost_idx, lov->desc.ld_tgt_count);
-   184                          lov_dump_lmm_v1(D_WARNING, lmm);
-   185                          return -EINVAL;
-   186                  }
-   187  
-   188                  if (!lov->lov_tgts[loi->loi_ost_idx]) {
-   189                          CERROR("%s: OST index %d missing\n",
-   190                                 (char *)lov->desc.ld_uuid.uuid,
-   191                                 loi->loi_ost_idx);
-   192                          lov_dump_lmm_v1(D_WARNING, lmm);
-   193                          continue;
-   194                  }
-   195  
-   196                  lov_bytes = lov_tgt_maxbytes(lov->lov_tgts[loi->loi_ost_idx]);
-   197                  if (min_stripe_maxbytes == 0 || lov_bytes < min_stripe_maxbytes)
-   198                          min_stripe_maxbytes = lov_bytes;
-   199          }
-   200  
-   201          if (min_stripe_maxbytes == 0)
-   202                  min_stripe_maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
-   203  
-   204          stripe_count = lsm->lsm_stripe_count ?: lov->desc.ld_tgt_count;
-   205          lov_bytes = min_stripe_maxbytes * stripe_count;
-                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-This is undefined in C.
+Additionally silences the following warning reported by coccinelle:
 
-   206  
-   207          if (lov_bytes < min_stripe_maxbytes) /* handle overflow */
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-So this might be wrong.
+drivers/staging/lustre/lustre/mgc/mgc_request.c:359:2-12: second lock on
+line 365
 
-   208                  lsm->lsm_maxbytes = MAX_LFS_FILESIZE;
-   209          else
-   210                  lsm->lsm_maxbytes = lov_bytes;
-   211  
-   212          return 0;
-   213  }
+Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
+---
+ drivers/staging/lustre/lustre/mgc/mgc_request.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
-regards,
-dan carpenter
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index eee0b66..6718474 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -288,7 +288,7 @@ config_log_add(struct obd_device *obd, char *logname,
+ 	struct config_llog_data *cld;
+ 	struct config_llog_data *sptlrpc_cld;
+ 	struct config_llog_data *params_cld;
+-	bool locked = false;
++	struct config_llog_data *recover_cld = ERR_PTR(-EINVAL);
+ 	char			seclogname[32];
+ 	char			*ptr;
+ 	int			rc;
+@@ -338,8 +338,6 @@ config_log_add(struct obd_device *obd, char *logname,
+ 
+ 	LASSERT(lsi->lsi_lmd);
+ 	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)) {
+-		struct config_llog_data *recover_cld;
+-
+ 		ptr = strrchr(seclogname, '-');
+ 		if (ptr) {
+ 			*ptr = 0;
+@@ -355,14 +353,11 @@ config_log_add(struct obd_device *obd, char *logname,
+ 			rc = PTR_ERR(recover_cld);
+ 			goto out_cld;
+ 		}
+-
+-		mutex_lock(&cld->cld_lock);
+-		locked = true;
+-		cld->cld_recover = recover_cld;
+ 	}
+ 
+-	if (!locked)
+-		mutex_lock(&cld->cld_lock);
++	mutex_lock(&cld->cld_lock);
++	if (!IS_ERR(recover_cld))
++		cld->cld_recover = recover_cld;
+ 	cld->cld_params = params_cld;
+ 	cld->cld_sptlrpc = sptlrpc_cld;
+ 	mutex_unlock(&cld->cld_lock);
+-- 
+2.7.4
