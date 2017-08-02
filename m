@@ -1,69 +1,19 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 02 Aug 2017 13:26:11 +1000
-Subject: [lustre-devel] [PATCH] staging: lustre: fix minor typos in comments
-In-Reply-To: <20170719082955.GA30088@kroah.com>
-References: <150041997277.20736.17112251996623587423.stgit@noble>
-	<150042040735.20736.6997246449635538567.stgit@noble>
-	<20170719082955.GA30088@kroah.com>
-Message-ID: <87379aveek.fsf@notabene.neil.brown.name>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Wed, 2 Aug 2017 11:52:29 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: grab the cld->cld_lock
+ mutex unconditionally
+In-Reply-To: <1501629149-6081-1-git-send-email-cakturk@gmail.com>
+References: <1501629149-6081-1-git-send-email-cakturk@gmail.com>
+Message-ID: <20170802085229.etni5p3sjf4wsx4x@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg KH <gregkh@linuxfoundation.org>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
+I guess that does look a bit simpler.
 
-Fix minor typos in comments.
+Reviewed-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lustre/llite/namei.c   | 2 +-
- drivers/staging/lustre/lustre/mdc/mdc_locks.c | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 8ed24ec1255d..7a1133661a65 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -488,7 +488,7 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
- 	*de = alias;
- 
- 	if (!it_disposition(it, DISP_LOOKUP_NEG)) {
--		/* we have lookup look - unhide dentry */
-+		/* We have the "lookup" lock, so unhide dentry */
- 		if (bits & MDS_INODELOCK_LOOKUP)
- 			d_lustre_revalidate(*de);
- 	} else if (!it_disposition(it, DISP_OPEN_CREATE)) {
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 3eb66cea65db..ae97c6f1aeb0 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -1030,7 +1030,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
-  * If we're performing a creation, that means that unless the creation
-  * failed with EEXIST, we should fake up a negative dentry.
-  *
-- * For everything else, we want to lookup to succeed.
-+ * For everything else, we want the lookup to succeed.
-  *
-  * One additional note: if CREATE or OPEN succeeded, we add an extra
-  * reference to the request because we need to keep it around until
-@@ -1040,7 +1040,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
-  * exactly what it_status refers to.
-  *
-  * If DISP_OPEN_OPEN is set, then it_status refers to the open() call,
-- * otherwise if DISP_OPEN_CREATE is set, then it status is the
-+ * otherwise if DISP_OPEN_CREATE is set, then it_status is the
-  * creation failure mode.  In either case, one of DISP_LOOKUP_NEG or
-  * DISP_LOOKUP_POS will be set, indicating whether the child lookup
-  * was successful.
--- 
-2.12.2
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170802/fc892112/attachment.pgp>
+regards,
+dan carpenter
