@@ -1,67 +1,102 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 3 Aug 2017 18:29:11 +0100 (BST)
-Subject: [lustre-devel] [PATCH] staging: lustre: fix minor typos in
- comments
-In-Reply-To: <87379aveek.fsf@notabene.neil.brown.name>
-References: <150041997277.20736.17112251996623587423.stgit@noble>
-	<150042040735.20736.6997246449635538567.stgit@noble>
-	<20170719082955.GA30088@kroah.com>
-	<87379aveek.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.20.1708031828430.21881@casper.infradead.org>
+From: Cihangir Akturk <cakturk@gmail.com>
+Date: Thu, 3 Aug 2017 20:31:15 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: grab the cld->cld_lock
+ mutex unconditionally
+In-Reply-To: <alpine.LFD.2.20.1708031749100.21881@casper.infradead.org>
+References: <1501629149-6081-1-git-send-email-cakturk@gmail.com>
+	<alpine.LFD.2.20.1708031749100.21881@casper.infradead.org>
+Message-ID: <20170803173115.GA1061@mbp>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: Greg KH <gregkh@linuxfoundation.org>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
+On Thu, Aug 03, 2017 at 05:52:44PM +0100, James Simmons wrote:
+> 
+> > Instead of using the locked variable as a helper to determine the state
+> > of the mutex cld->cld_lock, expand the scope of the recover_cld variable
+> > and assign to the cld->cld_recover variable depending on whether the
+> > value of the recover_cld variable is valid or not.
+> > 
+> > As a bonus, code size is slightly reduced.
+> > 
+> > before:
+> > text    data     bss     dec     hex filename
+> > 26188    2256    4208   32652    7f8c drivers/staging/lustre/lustre/mgc/mgc_request.o
+> > 
+> > after:
+> > text    data     bss     dec     hex filename
+> > 26140    2256    4208   32604    7f5c drivers/staging/lustre/lustre/mgc/mgc_request.o
+> > 
+> > Additionally silences the following warning reported by coccinelle:
+> > 
+> > drivers/staging/lustre/lustre/mgc/mgc_request.c:359:2-12: second lock on
+> > line 365
+> > 
+> > Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
+> > ---
+> >  drivers/staging/lustre/lustre/mgc/mgc_request.c | 13 ++++---------
+> >  1 file changed, 4 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> > index eee0b66..6718474 100644
+> > --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> > +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> > @@ -288,7 +288,7 @@ config_log_add(struct obd_device *obd, char *logname,
+> >  	struct config_llog_data *cld;
+> >  	struct config_llog_data *sptlrpc_cld;
+> >  	struct config_llog_data *params_cld;
+> > -	bool locked = false;
+> > +	struct config_llog_data *recover_cld = ERR_PTR(-EINVAL);
+> >  	char			seclogname[32];
+> >  	char			*ptr;
+> >  	int			rc;
+> 
+> Why not just set it to NULL? 
 
-> Fix minor typos in comments.
+Hi,
 
-Acked-by: James Simmons <jsimmons@infradead.org>
- 
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  drivers/staging/lustre/lustre/llite/namei.c   | 2 +-
->  drivers/staging/lustre/lustre/mdc/mdc_locks.c | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
+Because config_recover_log_add() function does not return NULL on
+error. And I don't think IS_ERR on NULL pointer returns true.
+
+Thanks.
+
+> > @@ -338,8 +338,6 @@ config_log_add(struct obd_device *obd, char *logname,
+> >  
+> >  	LASSERT(lsi->lsi_lmd);
+> >  	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)) {
+> > -		struct config_llog_data *recover_cld;
+> > -
+> >  		ptr = strrchr(seclogname, '-');
+> >  		if (ptr) {
+> >  			*ptr = 0;
+> > @@ -355,14 +353,11 @@ config_log_add(struct obd_device *obd, char *logname,
+> >  			rc = PTR_ERR(recover_cld);
+> >  			goto out_cld;
+> >  		}
+> > -
+> > -		mutex_lock(&cld->cld_lock);
+> > -		locked = true;
+> > -		cld->cld_recover = recover_cld;
+> >  	}
+> >  
+> > -	if (!locked)
+> > -		mutex_lock(&cld->cld_lock);
+> > +	mutex_lock(&cld->cld_lock);
+> > +	if (!IS_ERR(recover_cld))
 > 
-> diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-> index 8ed24ec1255d..7a1133661a65 100644
-> --- a/drivers/staging/lustre/lustre/llite/namei.c
-> +++ b/drivers/staging/lustre/lustre/llite/namei.c
-> @@ -488,7 +488,7 @@ static int ll_lookup_it_finish(struct ptlrpc_request *request,
->  	*de = alias;
->  
->  	if (!it_disposition(it, DISP_LOOKUP_NEG)) {
-> -		/* we have lookup look - unhide dentry */
-> +		/* We have the "lookup" lock, so unhide dentry */
->  		if (bits & MDS_INODELOCK_LOOKUP)
->  			d_lustre_revalidate(*de);
->  	} else if (!it_disposition(it, DISP_OPEN_CREATE)) {
-> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-> index 3eb66cea65db..ae97c6f1aeb0 100644
-> --- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-> +++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-> @@ -1030,7 +1030,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
->   * If we're performing a creation, that means that unless the creation
->   * failed with EEXIST, we should fake up a negative dentry.
->   *
-> - * For everything else, we want to lookup to succeed.
-> + * For everything else, we want the lookup to succeed.
->   *
->   * One additional note: if CREATE or OPEN succeeded, we add an extra
->   * reference to the request because we need to keep it around until
-> @@ -1040,7 +1040,7 @@ int mdc_revalidate_lock(struct obd_export *exp, struct lookup_intent *it,
->   * exactly what it_status refers to.
->   *
->   * If DISP_OPEN_OPEN is set, then it_status refers to the open() call,
-> - * otherwise if DISP_OPEN_CREATE is set, then it status is the
-> + * otherwise if DISP_OPEN_CREATE is set, then it_status is the
->   * creation failure mode.  In either case, one of DISP_LOOKUP_NEG or
->   * DISP_LOOKUP_POS will be set, indicating whether the child lookup
->   * was successful.
-> -- 
-> 2.12.2
+> Don't need this test if by default recover_cld = NULL.
 > 
-> 
+> > +		cld->cld_recover = recover_cld;
+> >  	cld->cld_params = params_cld;
+> >  	cld->cld_sptlrpc = sptlrpc_cld;
+> >  	mutex_unlock(&cld->cld_lock);
+> > -- 
+> > 2.7.4
+> > 
+> > _______________________________________________
+> > devel mailing list
+> > devel at linuxdriverproject.org
+> > http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
+> > 
