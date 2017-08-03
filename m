@@ -1,10 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 3 Aug 2017 17:52:44 +0100 (BST)
+Date: Thu, 3 Aug 2017 18:06:54 +0100 (BST)
 Subject: [lustre-devel] [PATCH] staging: lustre: grab the cld->cld_lock
  mutex unconditionally
-In-Reply-To: <1501629149-6081-1-git-send-email-cakturk@gmail.com>
+In-Reply-To: <alpine.LFD.2.20.1708031749100.21881@casper.infradead.org>
 References: <1501629149-6081-1-git-send-email-cakturk@gmail.com>
-Message-ID: <alpine.LFD.2.20.1708031749100.21881@casper.infradead.org>
+	<alpine.LFD.2.20.1708031749100.21881@casper.infradead.org>
+Message-ID: <alpine.LFD.2.20.1708031801060.21881@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,82 +13,83 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> Instead of using the locked variable as a helper to determine the state
-> of the mutex cld->cld_lock, expand the scope of the recover_cld variable
-> and assign to the cld->cld_recover variable depending on whether the
-> value of the recover_cld variable is valid or not.
+> > Instead of using the locked variable as a helper to determine the state
+> > of the mutex cld->cld_lock, expand the scope of the recover_cld variable
+> > and assign to the cld->cld_recover variable depending on whether the
+> > value of the recover_cld variable is valid or not.
+> > 
+> > As a bonus, code size is slightly reduced.
+> > 
+> > before:
+> > text    data     bss     dec     hex filename
+> > 26188    2256    4208   32652    7f8c drivers/staging/lustre/lustre/mgc/mgc_request.o
+> > 
+> > after:
+> > text    data     bss     dec     hex filename
+> > 26140    2256    4208   32604    7f5c drivers/staging/lustre/lustre/mgc/mgc_request.o
+> > 
+> > Additionally silences the following warning reported by coccinelle:
+> > 
+> > drivers/staging/lustre/lustre/mgc/mgc_request.c:359:2-12: second lock on
+> > line 365
+> > 
+> > Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
+> > ---
+> >  drivers/staging/lustre/lustre/mgc/mgc_request.c | 13 ++++---------
+> >  1 file changed, 4 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> > index eee0b66..6718474 100644
+> > --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> > +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> > @@ -288,7 +288,7 @@ config_log_add(struct obd_device *obd, char *logname,
+> >  	struct config_llog_data *cld;
+> >  	struct config_llog_data *sptlrpc_cld;
+> >  	struct config_llog_data *params_cld;
+> > -	bool locked = false;
+> > +	struct config_llog_data *recover_cld = ERR_PTR(-EINVAL);
+> >  	char			seclogname[32];
+> >  	char			*ptr;
+> >  	int			rc;
 > 
-> As a bonus, code size is slightly reduced.
+> Why not just set it to NULL? 
 > 
-> before:
-> text    data     bss     dec     hex filename
-> 26188    2256    4208   32652    7f8c drivers/staging/lustre/lustre/mgc/mgc_request.o
+> > @@ -338,8 +338,6 @@ config_log_add(struct obd_device *obd, char *logname,
+> >  
+> >  	LASSERT(lsi->lsi_lmd);
+> >  	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)) {
+> > -		struct config_llog_data *recover_cld;
+> > -
+> >  		ptr = strrchr(seclogname, '-');
+> >  		if (ptr) {
+> >  			*ptr = 0;
+> > @@ -355,14 +353,11 @@ config_log_add(struct obd_device *obd, char *logname,
+> >  			rc = PTR_ERR(recover_cld);
+> >  			goto out_cld;
+> >  		}
+> > -
+> > -		mutex_lock(&cld->cld_lock);
+> > -		locked = true;
+> > -		cld->cld_recover = recover_cld;
+> >  	}
+> >  
+> > -	if (!locked)
+> > -		mutex_lock(&cld->cld_lock);
+> > +	mutex_lock(&cld->cld_lock);
+> > +	if (!IS_ERR(recover_cld))
 > 
-> after:
-> text    data     bss     dec     hex filename
-> 26140    2256    4208   32604    7f5c drivers/staging/lustre/lustre/mgc/mgc_request.o
+> Don't need this test if by default recover_cld = NULL.
 > 
-> Additionally silences the following warning reported by coccinelle:
-> 
-> drivers/staging/lustre/lustre/mgc/mgc_request.c:359:2-12: second lock on
-> line 365
-> 
-> Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
-> ---
->  drivers/staging/lustre/lustre/mgc/mgc_request.c | 13 ++++---------
->  1 file changed, 4 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-> index eee0b66..6718474 100644
-> --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-> +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-> @@ -288,7 +288,7 @@ config_log_add(struct obd_device *obd, char *logname,
->  	struct config_llog_data *cld;
->  	struct config_llog_data *sptlrpc_cld;
->  	struct config_llog_data *params_cld;
-> -	bool locked = false;
-> +	struct config_llog_data *recover_cld = ERR_PTR(-EINVAL);
->  	char			seclogname[32];
->  	char			*ptr;
->  	int			rc;
+> > +		cld->cld_recover = recover_cld;
+> >  	cld->cld_params = params_cld;
+> >  	cld->cld_sptlrpc = sptlrpc_cld;
+> >  	mutex_unlock(&cld->cld_lock);
 
-Why not just set it to NULL? 
-
-> @@ -338,8 +338,6 @@ config_log_add(struct obd_device *obd, char *logname,
->  
->  	LASSERT(lsi->lsi_lmd);
->  	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)) {
-> -		struct config_llog_data *recover_cld;
-> -
->  		ptr = strrchr(seclogname, '-');
->  		if (ptr) {
->  			*ptr = 0;
-> @@ -355,14 +353,11 @@ config_log_add(struct obd_device *obd, char *logname,
->  			rc = PTR_ERR(recover_cld);
->  			goto out_cld;
->  		}
-> -
-> -		mutex_lock(&cld->cld_lock);
-> -		locked = true;
-> -		cld->cld_recover = recover_cld;
->  	}
->  
-> -	if (!locked)
-> -		mutex_lock(&cld->cld_lock);
-> +	mutex_lock(&cld->cld_lock);
-> +	if (!IS_ERR(recover_cld))
-
-Don't need this test if by default recover_cld = NULL.
-
-> +		cld->cld_recover = recover_cld;
->  	cld->cld_params = params_cld;
->  	cld->cld_sptlrpc = sptlrpc_cld;
->  	mutex_unlock(&cld->cld_lock);
-> -- 
-> 2.7.4
-> 
-> _______________________________________________
-> devel mailing list
-> devel at linuxdriverproject.org
-> http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
-> 
+I forgot to mention another reason not to merge this patch. It could
+lead to future breakage by making people think it is okay to set the
+cld_XXXX items to ERR_PTR at the start of this function. In the 
+cld_recover case it is last item process but if it wasn't then
+config_log_put(), which is called in the error path, does not test
+if it is a err ptr and would blow up. I have a patch that fixes
+this which I haven't pushed yet. That fix test if cld_XXX is NULL
+and returns right away.   
