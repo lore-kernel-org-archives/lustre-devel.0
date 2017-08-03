@@ -1,144 +1,93 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Thu, 3 Aug 2017 15:55:07 +0000
-Subject: [lustre-devel] Design proposal for client-side compression
-In-Reply-To: <72B5372C-E274-44AD-8C7A-FAFE988F9323@intel.com>
-References: <1483967258.2622.24.camel@informatik.uni-hamburg.de>
-	<B5E18A82-79B3-484F-BEBE-998B8AE56397@intel.com>
-	<1484223328.3937.60.camel@informatik.uni-hamburg.de>
-	<B924BE6D-3C6A-4BA4-96F9-AC053F032B2D@intel.com>
-	<1484749185.3965.114.camel@informatik.uni-hamburg.de>
-	<1487254536.4777.51.camel@informatik.uni-hamburg.de>
-	<1500650130.3158.6.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132311AB19B104AD044797ACBA40@BN6PR1101MB2132.namprd11.prod.outlook.com>
-	<1500992740.4728.5.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132DD0CCFF2F83BB3BE7F54CBB90@BN6PR1101MB2132.namprd11.prod.outlook.com>
-	<1501143960.3412.3.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132BBFB8979EA3FBFA4AE2DCBBE0@BN6PR1101MB2132.namprd11.prod.outlook.com>
-	<1501235847.3412.12.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132018DF6EED212C690693FCBBF0@BN6PR1101MB2132.namprd11.prod.outlook.com>
-	<1501254736.3412.16.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132360AE4E81FD3597240F7CBBF0@BN6PR1101MB2132.namprd11.prod.outlook.com>,
-	<72B5372C-E274-44AD-8C7A-FAFE988F9323@intel.com>
-Message-ID: <BN6PR1101MB2132C64BEB442726ADA57004CBB10@BN6PR1101MB2132.namprd11.prod.outlook.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 3 Aug 2017 17:52:44 +0100 (BST)
+Subject: [lustre-devel] [PATCH] staging: lustre: grab the cld->cld_lock
+ mutex unconditionally
+In-Reply-To: <1501629149-6081-1-git-send-email-cakturk@gmail.com>
+References: <1501629149-6081-1-git-send-email-cakturk@gmail.com>
+Message-ID: <alpine.LFD.2.20.1708031749100.21881@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Yes, agreed.  After digging in to it a bit, though, the crypto code proved harder to adjust/add to than I expected, so I've tentatively decided I'd like to piggyback off of what Anna and company do.  At the very least, I would like their version of the compression algorithm, so it seemed best to wait and see what form their code takes.
 
+> Instead of using the locked variable as a helper to determine the state
+> of the mutex cld->cld_lock, expand the scope of the recover_cld variable
+> and assign to the cld->cld_recover variable depending on whether the
+> value of the recover_cld variable is valid or not.
+> 
+> As a bonus, code size is slightly reduced.
+> 
+> before:
+> text    data     bss     dec     hex filename
+> 26188    2256    4208   32652    7f8c drivers/staging/lustre/lustre/mgc/mgc_request.o
+> 
+> after:
+> text    data     bss     dec     hex filename
+> 26140    2256    4208   32604    7f5c drivers/staging/lustre/lustre/mgc/mgc_request.o
+> 
+> Additionally silences the following warning reported by coccinelle:
+> 
+> drivers/staging/lustre/lustre/mgc/mgc_request.c:359:2-12: second lock on
+> line 365
+> 
+> Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
+> ---
+>  drivers/staging/lustre/lustre/mgc/mgc_request.c | 13 ++++---------
+>  1 file changed, 4 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> index eee0b66..6718474 100644
+> --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+> @@ -288,7 +288,7 @@ config_log_add(struct obd_device *obd, char *logname,
+>  	struct config_llog_data *cld;
+>  	struct config_llog_data *sptlrpc_cld;
+>  	struct config_llog_data *params_cld;
+> -	bool locked = false;
+> +	struct config_llog_data *recover_cld = ERR_PTR(-EINVAL);
+>  	char			seclogname[32];
+>  	char			*ptr;
+>  	int			rc;
 
-If it's easily tweakable to do what I'd like, then I will likely just do that. (If nothing else, I badly need to prototype this idea to see how workable it is before getting serious, so I will do that in the easiest way possible...)  If their code isn't easily adjustable to this, I plan to take their improved algorithm and go back to using the crypto infrastructure (effectively adding a new crypto mode).
+Why not just set it to NULL? 
 
-________________________________
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Sent: Thursday, August 3, 2017 8:41:15 AM
-To: Patrick Farrell
-Cc: Anna Fuchs; Xiong, Jinshan; Matthew Ahrens; Zhuravlev, Alexey; lustre-devel
-Subject: Re: [lustre-devel] Design proposal for client-side compression
+> @@ -338,8 +338,6 @@ config_log_add(struct obd_device *obd, char *logname,
+>  
+>  	LASSERT(lsi->lsi_lmd);
+>  	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)) {
+> -		struct config_llog_data *recover_cld;
+> -
+>  		ptr = strrchr(seclogname, '-');
+>  		if (ptr) {
+>  			*ptr = 0;
+> @@ -355,14 +353,11 @@ config_log_add(struct obd_device *obd, char *logname,
+>  			rc = PTR_ERR(recover_cld);
+>  			goto out_cld;
+>  		}
+> -
+> -		mutex_lock(&cld->cld_lock);
+> -		locked = true;
+> -		cld->cld_recover = recover_cld;
+>  	}
+>  
+> -	if (!locked)
+> -		mutex_lock(&cld->cld_lock);
+> +	mutex_lock(&cld->cld_lock);
+> +	if (!IS_ERR(recover_cld))
 
-Patrick,
-If you consider over-the-wire compression only, you could probably treat it the same as a crypto algorithm that decompresses the data at the server?
+Don't need this test if by default recover_cld = NULL.
 
-Unfortunately, I haven't looked at either the crypto or compression code closely, but one would think that they could share a fair amount of infrastructure.
-
-Cheers, Andreas
-
-On Jul 28, 2017, at 18:53, Patrick Farrell <paf at cray.com<mailto:paf@cray.com>> wrote:
-
-
-Ah, OK.  Reading this, I understand now that your intention is to keep the data compressed on disk - I hadn't thought through the implications of that fully.  There's obviously a lot of benefit from that.
-
-That said, it seems like it would be relatively straightforward to make a version of this that uncompressed the data on arrival at the server, simply unpacking that buffer before writing it to disk.  (Straightforward, that is, once the actual compression/decompression code is ready...)
-
-That obviously takes more CPU on the server side and does not reduce the space required, but...
-
-
-If you don't mind, when you consider the performant version of the compression code to be ready for at least testing, I'd like to see the code so I can try out the on-the-wire-only compression idea.  It might have significant benefits for a case of interest to me, and if it worked well, it could (long term) probably coexist with the larger on-disk compression idea.  (Since who knows if we'll ever implement the whole thing for ldiskfs.)
-
-
-Thanks again for engaging with me on this.
-
-
-- Patrick
-
-________________________________
-From: Anna Fuchs <anna.fuchs at informatik.uni-hamburg.de<mailto:anna.fuchs@informatik.uni-hamburg.de>>
-Sent: Friday, July 28, 2017 10:12:16 AM
-To: Patrick Farrell; Xiong, Jinshan
-Cc: Matthew Ahrens; Zhuravlev, Alexey; lustre-devel
-Subject: Re: [lustre-devel] Design proposal for client-side compression
-
-
-> Ah.  As it turns out, much more complicated than I anticipated.
->  Thanks for explaining...
->
-> I have no expertise in compression algorithms, so that I will have to
-> just watch from the sidelines.  Good luck.
->
-> When you are further along, I remain interested in helping out with
-> the Lustre side of things.
->
-> One more question - Do you have a plan to make this work *without*
-> the ZFS integration as well, for those using ldiskfs?  That seems
-> straightforward enough - compress/decompress at send and recieve time
-> - even if the benefits would be smaller, but not everyone (Cray,
-> f.x.) is using ZFS, so I'm very interested in something that would
-> help ldiskfs as well.  (Which is not to say don't do the deeper
-> integration with ZFS.  Just that we'd like something available for
-> ldiskfs too.)
-
-I fear it is also much more complicated :)
-
-At the very beginning of the project proposal we hoped we wouldn't need
-to touch the server so much. It turned out wrong, moreover we have to
-modify not only the Lustre server, but also pretty much the backend
-itself. We chose ZFS since it already provides a lot of infrastructure
-that we would need to implement completely new in ldiskfs. Since, at
-least for me, it is a research project, ldiskfs is out of scope. Once
-we proved the concept, one could re-implement the whole compression
-stack for ldiskfs. So it is not impossible, but not our focus for this
-project.
-
-Nevertheless we tried to keep our changes as far as possible not very
-backend specific. For example we need some additional information to be
-stored per compressed chunk. One possibility would be to change the
-block pointer of ZFS and add those fields, but I don't think anyone
-except of us would like the BP to be modified :) So we decided to store
-them as a header for every chunk. For ldiskfs, since one would need to
-implement everything from scratch anyway, one might not need that
-header, but take the required fields into account from the beginning
-and add them to ldiskfs' "block pointer". For that reason, we wanted to
-leave the compressed data "headerless" on client-side, and add the
-header only on the server side if the corresponding backend requires
-it.
-
-Well, we did it, and it even works sometimes, but it looks horrible
-and is really counterintuitive. We send less data from client than
-lands on the OST, recalculate offsets, since we add the header during
-receiving on server side, recalculate the sent and received sizes,
-shift buffers by offsets and so on. The only advantage of this approach
-is client's independence from backend. We decided the price is too
-high. So now, I will construct the chunk with the header just after
-compressing the data on client-side, get rid of all those offset stuff
-on the server. But ldiskfs will have to deal with that ZFS-motivated
-details.
-
-However, a light version of compression could work with smaller changes
-to ldiskfs, when we only allow a completely compressed or not
-compressed files and allow potential performance drops for broken read-
-ahead (due to gaps within the data).
-
-Hope it is somehow more clear now.
-
-Regards,
-Anna
-
-_______________________________________________
-lustre-devel mailing list
-lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170803/51c964a2/attachment.htm>
+> +		cld->cld_recover = recover_cld;
+>  	cld->cld_params = params_cld;
+>  	cld->cld_sptlrpc = sptlrpc_cld;
+>  	mutex_unlock(&cld->cld_lock);
+> -- 
+> 2.7.4
+> 
+> _______________________________________________
+> devel mailing list
+> devel at linuxdriverproject.org
+> http://driverdev.linuxdriverproject.org/mailman/listinfo/driverdev-devel
+> 
