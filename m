@@ -1,126 +1,49 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Thu, 3 Aug 2017 13:41:15 +0000
-Subject: [lustre-devel] Design proposal for client-side compression
-In-Reply-To: <BN6PR1101MB2132360AE4E81FD3597240F7CBBF0@BN6PR1101MB2132.namprd11.prod.outlook.com>
-References: <1483967258.2622.24.camel@informatik.uni-hamburg.de>
-	<B5E18A82-79B3-484F-BEBE-998B8AE56397@intel.com>
-	<1484223328.3937.60.camel@informatik.uni-hamburg.de>
-	<B924BE6D-3C6A-4BA4-96F9-AC053F032B2D@intel.com>
-	<1484749185.3965.114.camel@informatik.uni-hamburg.de>
-	<1487254536.4777.51.camel@informatik.uni-hamburg.de>
-	<1500650130.3158.6.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132311AB19B104AD044797ACBA40@BN6PR1101MB2132.namprd11.prod.outlook.com>
-	<1500992740.4728.5.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132DD0CCFF2F83BB3BE7F54CBB90@BN6PR1101MB2132.namprd11.prod.outlook.com>
-	<1501143960.3412.3.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132BBFB8979EA3FBFA4AE2DCBBE0@BN6PR1101MB2132.namprd11.prod.outlook.com>
-	<1501235847.3412.12.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132018DF6EED212C690693FCBBF0@BN6PR1101MB2132.namprd11.prod.outlook.com>
-	<1501254736.3412.16.camel@informatik.uni-hamburg.de>
-	<BN6PR1101MB2132360AE4E81FD3597240F7CBBF0@BN6PR1101MB2132.namprd11.prod.outlook.com>
-Message-ID: <72B5372C-E274-44AD-8C7A-FAFE988F9323@intel.com>
+Date: Thu, 3 Aug 2017 13:41:12 +0000
+Subject: [lustre-devel] HSM partial archive/restore
+In-Reply-To: <BN6PR1101MB2132BF4D44A3965F09A83523CBBE0@BN6PR1101MB2132.namprd11.prod.outlook.com>
+References: <BN6PR1101MB2132BF4D44A3965F09A83523CBBE0@BN6PR1101MB2132.namprd11.prod.outlook.com>
+Message-ID: <7B037A9A-BF93-400D-AFC1-AAD4E9B4DC97@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Patrick,
-If you consider over-the-wire compression only, you could probably treat it the same as a crypto algorithm that decompresses the data at the server?
+I've thought about partial HSM archive/restore a few times in conjunction with composite layouts.
 
-Unfortunately, I haven't looked at either the crypto or compression code closely, but one would think that they could share a fair amount of infrastructure.
+It wouldn't be too hard to create PFL/composite layouts for chunks of the file arbitrarily (e.g. every 10GB for very large files) so that the file can be restored partially or incrementally or in parallel from multiple tapes.
+
+This may also be useful for File Level Redundancy, so that the file can be resync'd in chunks if only part of the file is lost.
+
+On the Lustre side, PFL has implemented virtually all of the support needed to do this in the 2.10 release.
+
+For HSM this might involve putting the HSM archive information into the composite layout itself, so that different archive identifiers (UUIDs) can be stored for different extents of the file, or possibly different archived replica versions of the file. That would need some work, and integration with the copy tools and coordinator to be able to understand components that represent partially-restored files.
 
 Cheers, Andreas
 
-On Jul 28, 2017, at 18:53, Patrick Farrell <paf at cray.com<mailto:paf@cray.com>> wrote:
+On Jul 27, 2017, at 21:16, Patrick Farrell <paf at cray.com<mailto:paf@cray.com>> wrote:
 
 
-Ah, OK.  Reading this, I understand now that your intention is to keep the data compressed on disk - I hadn't thought through the implications of that fully.  There's obviously a lot of benefit from that.
-
-That said, it seems like it would be relatively straightforward to make a version of this that uncompressed the data on arrival at the server, simply unpacking that buffer before writing it to disk.  (Straightforward, that is, once the actual compression/decompression code is ready...)
-
-That obviously takes more CPU on the server side and does not reduce the space required, but...
+Hello all,
 
 
-If you don't mind, when you consider the performant version of the compression code to be ready for at least testing, I'd like to see the code so I can try out the on-the-wire-only compression idea.  It might have significant benefits for a case of interest to me, and if it worked well, it could (long term) probably coexist with the larger on-disk compression idea.  (Since who knows if we'll ever implement the whole thing for ldiskfs.)
+There has been some prior conversation around HSM partial archive/restore (Seagate at LUG'17: <http://cdn.opensfs.org/wp-content/uploads/2017/06/LUG-2017-Lustre-HSM-for-HPC-High-Speed-Distributed-Data-Mover-r1.11.pdf> http://cdn.opensfs.org/wp-content/uploads/2017/06/LUG-2017-Lustre-HSM-for-HPC-High-Speed-Distributed-Data-Mover-r1.11.pdf
 
 
-Thanks again for engaging with me on this.
 
+<http://cdn.opensfs.org/wp-content/uploads/2017/06/LUG-2017-Lustre-HSM-for-HPC-High-Speed-Distributed-Data-Mover-r1.11.pdf>With complex file layouts and fallocate support being called out as requirements for enabling this.  But as far as I can tell, this has not progressed to any concrete design work.
+
+Is this correct?  Is there work happening somewhere I'm not aware of?
+
+If not, is there interest in starting some?  Cray has interest in this, and could help drive such a project, though we would need outside assistance (particularly with design) since we have no internal expertise relating to complex layouts.
+
+
+Regards,
 
 - Patrick
 
-________________________________
-From: Anna Fuchs <anna.fuchs at informatik.uni-hamburg.de<mailto:anna.fuchs@informatik.uni-hamburg.de>>
-Sent: Friday, July 28, 2017 10:12:16 AM
-To: Patrick Farrell; Xiong, Jinshan
-Cc: Matthew Ahrens; Zhuravlev, Alexey; lustre-devel
-Subject: Re: [lustre-devel] Design proposal for client-side compression
 
-
-> Ah.  As it turns out, much more complicated than I anticipated.
->  Thanks for explaining...
->
-> I have no expertise in compression algorithms, so that I will have to
-> just watch from the sidelines.  Good luck.
->
-> When you are further along, I remain interested in helping out with
-> the Lustre side of things.
->
-> One more question - Do you have a plan to make this work *without*
-> the ZFS integration as well, for those using ldiskfs?  That seems
-> straightforward enough - compress/decompress at send and recieve time
-> - even if the benefits would be smaller, but not everyone (Cray,
-> f.x.) is using ZFS, so I'm very interested in something that would
-> help ldiskfs as well.  (Which is not to say don't do the deeper
-> integration with ZFS.  Just that we'd like something available for
-> ldiskfs too.)
-
-I fear it is also much more complicated :)
-
-At the very beginning of the project proposal we hoped we wouldn't need
-to touch the server so much. It turned out wrong, moreover we have to
-modify not only the Lustre server, but also pretty much the backend
-itself. We chose ZFS since it already provides a lot of infrastructure
-that we would need to implement completely new in ldiskfs. Since, at
-least for me, it is a research project, ldiskfs is out of scope. Once
-we proved the concept, one could re-implement the whole compression
-stack for ldiskfs. So it is not impossible, but not our focus for this
-project.
-
-Nevertheless we tried to keep our changes as far as possible not very
-backend specific. For example we need some additional information to be
-stored per compressed chunk. One possibility would be to change the
-block pointer of ZFS and add those fields, but I don't think anyone
-except of us would like the BP to be modified :) So we decided to store
-them as a header for every chunk. For ldiskfs, since one would need to
-implement everything from scratch anyway, one might not need that
-header, but take the required fields into account from the beginning
-and add them to ldiskfs' "block pointer". For that reason, we wanted to
-leave the compressed data "headerless" on client-side, and add the
-header only on the server side if the corresponding backend requires
-it.
-
-Well, we did it, and it even works sometimes, but it looks horrible
-and is really counterintuitive. We send less data from client than
-lands on the OST, recalculate offsets, since we add the header during
-receiving on server side, recalculate the sent and received sizes,
-shift buffers by offsets and so on. The only advantage of this approach
-is client's independence from backend. We decided the price is too
-high. So now, I will construct the chunk with the header just after
-compressing the data on client-side, get rid of all those offset stuff
-on the server. But ldiskfs will have to deal with that ZFS-motivated
-details.
-
-However, a light version of compression could work with smaller changes
-to ldiskfs, when we only allow a completely compressed or not
-compressed files and allow potential performance drops for broken read-
-ahead (due to gaps within the data).
-
-Hope it is somehow more clear now.
-
-Regards,
-Anna
 
 _______________________________________________
 lustre-devel mailing list
@@ -128,4 +51,4 @@ lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
 http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170803/9c8fee84/attachment-0001.htm>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20170803/489584eb/attachment-0001.htm>
