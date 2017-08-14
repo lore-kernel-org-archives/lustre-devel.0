@@ -1,10 +1,8 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 11:47:32 -0400
-Subject: [lustre-devel] [PATCH 64/64] staging: lustre: lnet: cleanup paths
-	for all LNet headers
-In-Reply-To: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
-References: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502725652-26280-65-git-send-email-jsimmons@infradead.org>
+Date: Mon, 14 Aug 2017 12:20:50 -0400
+Subject: [lustre-devel] [PATCH 00/14] staging: lustre: llite: xattr related
+	handling fixes
+Message-ID: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,127 +10,40 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Rationalize include paths in all the lnet header files.
+This batch of patches resolves several issues with how lustre handles
+xattrs. Some of the patches also resolve some style issues with the code.
+The patch set is order dependent. These fixes resolve some of the test
+failures that happen.
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/include/linux/lnet/api.h           |  2 +-
- drivers/staging/lustre/include/linux/lnet/lib-lnet.h      | 14 +++++++-------
- drivers/staging/lustre/include/linux/lnet/lib-types.h     |  4 ++--
- drivers/staging/lustre/include/linux/lnet/socklnd.h       |  4 ++--
- drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h |  4 ++--
- drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h  |  2 +-
- drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h   |  2 +-
- 7 files changed, 16 insertions(+), 16 deletions(-)
+Bobi Jam (2):
+  staging: lustre: llite: break up ll_setstripe_ea function
+  staging: lustre: llite: return from ll_adjust_lum() if lump is NULL
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/api.h b/drivers/staging/lustre/include/linux/lnet/api.h
-index 01ae62e..9c37f3e 100644
---- a/drivers/staging/lustre/include/linux/lnet/api.h
-+++ b/drivers/staging/lustre/include/linux/lnet/api.h
-@@ -44,7 +44,7 @@
-  * @{
-  */
- 
--#include "../../uapi/linux/lnet/lnet-types.h"
-+#include <uapi/linux/lnet/lnet-types.h>
- 
- /** \defgroup lnet_init_fini Initialization and cleanup
-  * The LNet must be properly initialized before any LNet calls can be made.
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index bc55d57..e0968ab 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -35,13 +35,13 @@
- #ifndef __LNET_LIB_LNET_H__
- #define __LNET_LIB_LNET_H__
- 
--#include "../libcfs/libcfs.h"
--#include "api.h"
--#include "lib-types.h"
--#include "../../uapi/linux/lnet/lnet-dlc.h"
--#include "../../uapi/linux/lnet/lnet-types.h"
--#include "../../uapi/linux/lnet/lnetctl.h"
--#include "../../uapi/linux/lnet/nidstr.h"
-+#include <linux/libcfs/libcfs.h>
-+#include <linux/lnet/api.h>
-+#include <linux/lnet/lib-types.h>
-+#include <uapi/linux/lnet/lnet-dlc.h>
-+#include <uapi/linux/lnet/lnet-types.h>
-+#include <uapi/linux/lnet/lnetctl.h>
-+#include <uapi/linux/lnet/nidstr.h>
- 
- extern struct lnet the_lnet;	/* THE network */
- 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 94d3a53..eea3b8e 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -40,8 +40,8 @@
- #include <linux/types.h>
- #include <linux/completion.h>
- 
--#include "../../uapi/linux/lnet/lnet-types.h"
--#include "../../uapi/linux/lnet/lnetctl.h"
-+#include <uapi/linux/lnet/lnet-types.h>
-+#include <uapi/linux/lnet/lnetctl.h>
- 
- /* Max payload size */
- #define LNET_MAX_PAYLOAD      CONFIG_LNET_MAX_PAYLOAD
-diff --git a/drivers/staging/lustre/include/linux/lnet/socklnd.h b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-index c24fe45..553fb64 100644
---- a/drivers/staging/lustre/include/linux/lnet/socklnd.h
-+++ b/drivers/staging/lustre/include/linux/lnet/socklnd.h
-@@ -34,8 +34,8 @@
- #ifndef __LNET_LNET_SOCKLND_H__
- #define __LNET_LNET_SOCKLND_H__
- 
--#include "../../uapi/linux/lnet/lnet-types.h"
--#include "../../uapi/linux/lnet/socklnd.h"
-+#include <uapi/linux/lnet/lnet-types.h>
-+#include <uapi/linux/lnet/socklnd.h>
- 
- struct ksock_hello_msg {
- 	__u32		kshm_magic;	/* magic number of socklnd message */
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-index a3821d9..e45d828 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-@@ -29,8 +29,8 @@
- #ifndef LNET_DLC_H
- #define LNET_DLC_H
- 
--#include "libcfs_ioctl.h"
--#include "lnet-types.h"
-+#include <uapi/linux/lnet/libcfs_ioctl.h>
-+#include <uapi/linux/lnet/lnet-types.h>
- 
- #define MAX_NUM_SHOW_ENTRIES	32
- #define LNET_MAX_STR_LEN	128
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-index f7ffc53..d9da625 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-@@ -15,7 +15,7 @@
- #ifndef _LNETCTL_H_
- #define _LNETCTL_H_
- 
--#include "lnet-types.h"
-+#include <uapi/linux/lnet/lnet-types.h>
- 
- /** \addtogroup lnet_fault_simulation
-  * @{
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h b/drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h
-index d153c97..882074e 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h
-@@ -28,7 +28,7 @@
- #ifndef _LNET_NIDSTRINGS_H
- #define _LNET_NIDSTRINGS_H
- 
--#include "lnet-types.h"
-+#include <uapi/linux/lnet/lnet-types.h>
- 
- /**
-  *  Lustre Network Driver types.
+Dmitry Eremin (1):
+  staging: lustre: llite: add support set_acl method in inode operations
+
+James Simmons (8):
+  staging: lustre: llite: eat -EEXIST on setting trunsted.lov
+  staging: lustre: llite: fix sparse variable length array warning
+  staging: lustre: llite: fix invalid size test in ll_setstripe_ea()
+  staging: lustre: llite: record in stats attempted removal of lma/link xattr
+  staging: lustre: llite: cleanup posix acl xattr code
+  staging: lustre: llite: use proper types in the xattr code
+  staging: lustre: llite: cleanup xattr code comments
+  staging: lustre: llite: style changes in xattr.c
+
+Niu Yawei (2):
+  staging: lustre: llite: refactor lustre.lov xattr handling
+  staging: lustre: llite: add simple comment about lustre.lov xattrs
+
+Robin Humble (1):
+  staging: lustre: llite: Remove filtering of seclabel xattr
+
+ drivers/staging/lustre/lustre/llite/file.c         |  58 ++++++
+ .../staging/lustre/lustre/llite/llite_internal.h   |   4 +
+ drivers/staging/lustre/lustre/llite/namei.c        |  10 +-
+ drivers/staging/lustre/lustre/llite/xattr.c        | 222 ++++++++++++---------
+ 4 files changed, 196 insertions(+), 98 deletions(-)
+
 -- 
 1.8.3.1
