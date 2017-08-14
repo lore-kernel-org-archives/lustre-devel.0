@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 11:47:12 -0400
-Subject: [lustre-devel] [PATCH 44/64] staging: lustre: uapi: remove BIT
-	macro from UAPI headers
+Date: Mon, 14 Aug 2017 11:47:25 -0400
+Subject: [lustre-devel] [PATCH 57/64] staging: lustre: lustre: cleanup paths
+	for lustre UAPI headers
 In-Reply-To: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
 References: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502725652-26280-45-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502725652-26280-58-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,120 +12,100 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-The BIT macro is not available for UAPI headers so remove
-it from the lustre UAPI headers.
+Rationalize include paths for the lustre uapi headers
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/uapi/linux/lustre/lustre_idl.h  | 38 +++++++++++-----------
- .../lustre/include/uapi/linux/lustre/lustre_user.h | 12 +++----
- 2 files changed, 25 insertions(+), 25 deletions(-)
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h   | 2 +-
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h   | 2 +-
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h   | 6 +++---
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h | 2 +-
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h | 2 +-
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h  | 2 +-
+ 6 files changed, 8 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
+index 2b7deaa..11b51d9 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
+@@ -35,7 +35,7 @@
+ 
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+-#include "../../../uapi/linux/lustre/lustre_user.h"
++#include <uapi/linux/lustre/lustre_user.h>
+ 
+ /** \defgroup cfg cfg
+  *
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
+index dd3785a..2e7a8d1 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
+@@ -37,7 +37,7 @@
+ #ifndef _UAPI_LUSTRE_FID_H_
+ #define _UAPI_LUSTRE_FID_H_
+ 
+-#include "../../../uapi/linux/lustre/lustre_idl.h"
++#include <uapi/linux/lustre/lustre_idl.h>
+ 
+ /** returns fid object sequence */
+ static inline __u64 fid_seq(const struct lu_fid *fid)
 diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-index 9613f7c..cc59c1a 100644
+index cc59c1a..aac98db 100644
 --- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
 +++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-@@ -1554,8 +1554,8 @@ enum mds_op_bias {
- 	MDS_CREATE_VOLATILE	= 1 << 10,
- 	MDS_OWNEROVERRIDE	= 1 << 11,
- 	MDS_HSM_RELEASE		= 1 << 12,
--	MDS_RENAME_MIGRATE	= BIT(13),
--	MDS_CLOSE_LAYOUT_SWAP   = BIT(14),
-+	MDS_RENAME_MIGRATE	= 1 << 13,
-+	MDS_CLOSE_LAYOUT_SWAP	= 1 << 14,
- };
+@@ -70,10 +70,10 @@
+ #include <asm/byteorder.h>
+ #include <linux/types.h>
  
- /* instance of mdt_reint_rec */
-@@ -1993,21 +1993,21 @@ struct ldlm_flock_wire {
- };
+-#include "../lnet/lnet-types.h"
++#include <uapi/linux/lnet/lnet-types.h>
+ /* Defn's shared with user-space. */
+-#include "lustre_user.h"
+-#include "lustre_ver.h"
++#include <uapi/linux/lustre/lustre_user.h>
++#include <uapi/linux/lustre/lustre_ver.h>
  
- enum ldlm_intent_flags {
--	IT_OPEN		= BIT(0),
--	IT_CREAT	= BIT(1),
--	IT_OPEN_CREAT	= BIT(1) | BIT(0),
--	IT_READDIR	= BIT(2),
--	IT_GETATTR	= BIT(3),
--	IT_LOOKUP	= BIT(4),
--	IT_UNLINK	= BIT(5),
--	IT_TRUNC	= BIT(6),
--	IT_GETXATTR	= BIT(7),
--	IT_EXEC		= BIT(8),
--	IT_PIN		= BIT(9),
--	IT_LAYOUT	= BIT(10),
--	IT_QUOTA_DQACQ	= BIT(11),
--	IT_QUOTA_CONN	= BIT(12),
--	IT_SETXATTR	= BIT(13),
-+	IT_OPEN		= 0x00000001,
-+	IT_CREAT	= 0x00000002,
-+	IT_OPEN_CREAT	= 0x00000003,
-+	IT_READDIR	= 0x00000004,
-+	IT_GETATTR	= 0x00000008,
-+	IT_LOOKUP	= 0x00000010,
-+	IT_UNLINK	= 0x00000020,
-+	IT_TRUNC	= 0x00000040,
-+	IT_GETXATTR	= 0x00000080,
-+	IT_EXEC		= 0x00000100,
-+	IT_PIN		= 0x00000200,
-+	IT_LAYOUT	= 0x00000400,
-+	IT_QUOTA_DQACQ	= 0x00000800,
-+	IT_QUOTA_CONN	= 0x00001000,
-+	IT_SETXATTR	= 0x00002000,
- };
+ /*
+  *  GENERAL STUFF
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h
+index 1f52477..9590864 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h
+@@ -31,7 +31,7 @@
+ #include <linux/ioctl.h>
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+-#include "../../../uapi/linux/lustre/lustre_idl.h"
++#include <uapi/linux/lustre/lustre_idl.h>
  
- struct ldlm_intent {
-@@ -2375,8 +2375,8 @@ enum llog_flag {
- 	LLOG_F_ZAP_WHEN_EMPTY	= 0x1,
- 	LLOG_F_IS_CAT		= 0x2,
- 	LLOG_F_IS_PLAIN		= 0x4,
--	LLOG_F_EXT_JOBID        = BIT(3),
--	LLOG_F_IS_FIXSIZE	= BIT(4),
-+	LLOG_F_EXT_JOBID        = 0x8,
-+	LLOG_F_IS_FIXSIZE	= 0x10,
+ #if !defined(__KERNEL__) && !defined(LUSTRE_UTILS)
+ # error This file is for Lustre internal use only.
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
+index 167d482..552b2fc 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
+@@ -34,7 +34,7 @@
+ #ifndef _UAPI_LUSTRE_OSTID_H_
+ #define _UAPI_LUSTRE_OSTID_H_
  
- 	/*
- 	 * Note: Flags covered by LLOG_F_EXT_MASK will be inherited from
+-#include "lustre_fid.h"
++#include <uapi/linux/lustre/lustre_fid.h>
+ 
+ static inline __u64 lmm_oi_id(const struct ost_id *oi)
+ {
 diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-index ca720f1..2fcfe2b 100644
+index 2fcfe2b..5e332e3 100644
 --- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
 +++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-@@ -645,7 +645,7 @@ struct if_quotactl {
- #define SWAP_LAYOUTS_CHECK_DV2		(1 << 1)
- #define SWAP_LAYOUTS_KEEP_MTIME		(1 << 2)
- #define SWAP_LAYOUTS_KEEP_ATIME		(1 << 3)
--#define SWAP_LAYOUTS_CLOSE		BIT(4)
-+#define SWAP_LAYOUTS_CLOSE		(1 << 4)
+@@ -55,7 +55,7 @@
+ # include <sys/quota.h>
+ # include <sys/stat.h>
+ #endif /* __KERNEL__ */
+-#include "lustre_fiemap.h"
++#include <uapi/linux/lustre/lustre_fiemap.h>
  
- /* Swap XATTR_NAME_HSM as well, only on the MDT so far */
- #define SWAP_LAYOUTS_MDS_HSM		(1 << 31)
-@@ -792,15 +792,15 @@ static inline void hsm_set_cl_error(int *flags, int error)
- 
- enum changelog_send_flag {
- 	/* Not yet implemented */
--	CHANGELOG_FLAG_FOLLOW	= BIT(0),
-+	CHANGELOG_FLAG_FOLLOW	= 0x01,
- 	/*
- 	 * Blocking IO makes sense in case of slow user parsing of the records,
- 	 * but it also prevents us from cleaning up if the records are not
- 	 * consumed.
- 	 */
--	CHANGELOG_FLAG_BLOCK	= BIT(1),
-+	CHANGELOG_FLAG_BLOCK	= 0x02,
- 	/* Pack jobid into the changelog records if available. */
--	CHANGELOG_FLAG_JOBID	= BIT(2),
-+	CHANGELOG_FLAG_JOBID	= 0x04,
- };
- 
- #define CR_MAXSIZE cfs_size_round(2 * NAME_MAX + 2 + \
-@@ -981,8 +981,8 @@ struct ioc_data_version {
- 	__u64 idv_flags;     /* See LL_DV_xxx */
- };
- 
--#define LL_DV_RD_FLUSH	BIT(0)	/* Flush dirty pages from clients */
--#define LL_DV_WR_FLUSH	BIT(1)	/* Flush all caching pages from clients */
-+#define LL_DV_RD_FLUSH	(1 << 0) /* Flush dirty pages from clients */
-+#define LL_DV_WR_FLUSH	(1 << 1) /* Flush all caching pages from clients */
- 
- #ifndef offsetof
- # define offsetof(typ, memb)     ((unsigned long)((char *)&(((typ *)0)->memb)))
+ /*
+  * We need to always use 64bit version because the structure
 -- 
 1.8.3.1
