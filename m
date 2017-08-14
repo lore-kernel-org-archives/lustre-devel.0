@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 11:46:53 -0400
-Subject: [lustre-devel] [PATCH 25/64] staging: lustre: uapi: move
-	lustre_cfg.h to uapi directory
+Date: Mon, 14 Aug 2017 11:46:34 -0400
+Subject: [lustre-devel] [PATCH 06/64] staging: lustre: uapi: remove unused
+	function in lustre_disk.h
 In-Reply-To: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
 References: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502725652-26280-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502725652-26280-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,82 +12,58 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Move lustre_cfg.h to its proper place. Adjust additonal headers
-included in lustre_cfg.h.
+Delete code that is used by only the server or just in user
+land. Now this file is a normal kernel header. The UAPI
+version of this header is only needed for server side so
+no need to create a new header in uapi directory.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
-Reviewed-on: https://review.whamcloud.com/26966
-Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
-Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-on: https://review.whamcloud.com/25194
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../{lustre/include => include/uapi/linux/lustre}/lustre_cfg.h      | 6 ++----
- drivers/staging/lustre/lustre/include/lprocfs_status.h              | 2 +-
- drivers/staging/lustre/lustre/include/lustre_lib.h                  | 2 +-
- 3 files changed, 4 insertions(+), 6 deletions(-)
- rename drivers/staging/lustre/{lustre/include => include/uapi/linux/lustre}/lustre_cfg.h (99%)
+ drivers/staging/lustre/lustre/include/lustre_disk.h | 18 ------------------
+ 1 file changed, 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_cfg.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
-similarity index 99%
-rename from drivers/staging/lustre/lustre/include/lustre_cfg.h
-rename to drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
-index 21a48b1..a762aab 100644
---- a/drivers/staging/lustre/lustre/include/lustre_cfg.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
-@@ -33,6 +33,8 @@
- #ifndef _LUSTRE_CFG_H
- #define _LUSTRE_CFG_H
+diff --git a/drivers/staging/lustre/lustre/include/lustre_disk.h b/drivers/staging/lustre/lustre/include/lustre_disk.h
+index a676bcc..1a532ad 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_disk.h
++++ b/drivers/staging/lustre/lustre/include/lustre_disk.h
+@@ -108,14 +108,6 @@ struct lustre_mount_data {
  
-+#include "../../../../lustre/include/lustre/lustre_user.h"
-+
- /** \defgroup cfg cfg
-  *
-  * @{
-@@ -191,8 +193,6 @@ static inline __u32 lustre_cfg_len(__u32 bufcount, __u32 *buflens)
- 	return cfs_size_round(len);
- }
+ #define lmd_is_client(x) ((x)->lmd_flags & LMD_FLG_CLIENT)
  
--#include "obd_support.h"
+-/****************** last_rcvd file *********************/
 -
- static inline void lustre_cfg_init(struct lustre_cfg *lcfg, int cmd,
- 				   struct lustre_cfg_bufs *bufs)
- {
-@@ -238,8 +238,6 @@ static inline int lustre_cfg_sanity_check(void *buf, size_t len)
- 	return 0;
- }
- 
--#include "lustre/lustre_user.h"
+-/** version recovery epoch */
+-#define LR_EPOCH_BITS   32
+-#define lr_epoch(a) ((a) >> LR_EPOCH_BITS)
+-#define LR_EXPIRE_INTERVALS 16 /**< number of intervals to track transno */
+-#define ENOENT_VERSION 1 /** 'virtual' version of non-existent object */
 -
- /** @} cfg */
+ /****************** superblock additional info *********************/
  
- #endif /* _LUSTRE_CFG_H */
-diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-index 9054d37..694062a 100644
---- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-+++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-@@ -44,7 +44,7 @@
- #include <linux/types.h>
+ struct ll_sb_info;
+@@ -141,16 +133,6 @@ struct lustre_sb_info {
+ #define     s2lsi_nocast(sb) ((sb)->s_fs_info)
  
- #include "../../include/linux/libcfs/libcfs.h"
--#include "lustre_cfg.h"
-+#include "../../include/uapi/linux/lustre/lustre_cfg.h"
- #include "lustre/lustre_idl.h"
+ #define     get_profile_name(sb)   (s2lsi(sb)->lsi_lmd->lmd_profile)
+-#define	    get_mount_flags(sb)	   (s2lsi(sb)->lsi_lmd->lmd_flags)
+-#define	    get_mntdev_name(sb)	   (s2lsi(sb)->lsi_lmd->lmd_dev)
+-
+-/****************** mount lookup info *********************/
+-
+-struct lustre_mount_info {
+-	char		 *lmi_name;
+-	struct super_block   *lmi_sb;
+-	struct list_head	    lmi_list_chain;
+-};
  
- struct lprocfs_vars {
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-index f24970d..c68dd5d 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-@@ -48,7 +48,7 @@
- #include "../../include/linux/libcfs/libcfs.h"
- #include "lustre/lustre_idl.h"
- #include "lustre_ver.h"
--#include "lustre_cfg.h"
-+#include "../../include/uapi/linux/lustre/lustre_cfg.h"
+ /****************** prototypes *********************/
  
- /* target.c */
- struct ptlrpc_request;
 -- 
 1.8.3.1
