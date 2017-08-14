@@ -1,99 +1,53 @@
-From: Cihangir Akturk <cakturk@gmail.com>
-Date: Mon,  7 Aug 2017 13:43:00 +0300
-Subject: [lustre-devel] [PATCH] staging: lustre: mgc: fix potential use
-	after free in error path
-Message-ID: <1502102580-29556-1-git-send-email-cakturk@gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 14 Aug 2017 15:58:57 +0100 (BST)
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: fix incorrect
+ arguments order calling lstcon_session_new
+In-Reply-To: <20170719162036.21621-1-colin.king@canonical.com>
+References: <20170719162036.21621-1-colin.king@canonical.com>
+Message-ID: <alpine.LFD.2.20.1708141556560.14369@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
-Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, Cihangir Akturk <cakturk@gmail.com>
+To: Colin King <colin.king@canonical.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Doug Oucharek <doug.s.oucharek@intel.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org
 
-The config_log_add() function first calls config_log_put() with the
-variable 'cld' and then jumps to label 'out_cld', which will call
-the same function with the same 'cld' variable. However, at this
-point, 'cld' might have been already freed by the first invocation
-of config_log_put(). Even if we remove the invocation at that point,
-we will still get into trouble. This is because, in the error path,
-just below the label 'out_cld', we try to put 'params_cls' and
-'sptlrpc_cld', which might also have been freed by config_log_put().
 
-The point is that, config_llog_data::cld_sptlrpc and
-config_llog_data::cld_params members are assigned at the beginning
-of this function.
 
-To avoid this, do not call config_log_put() inside the else block,
-immediately jump to 'out_cld' instead. Moreover, remove assignments
-to config_llog_data::cld_sptlrpc and config_llog_data::cld_params at
-the beginning, since we already assign them below in the function
-with 'cld_lock' held.
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> The arguments args->lstio_ses_force and args->lstio_ses_timeout are
+> in the incorrect order. Fix this by swapping them around.
+> 
+> Detected by CoverityScan, CID#1226833 ("Arguments in wrong order")
 
-As an additional benefit, code size gets smaller.
+This patch is being tracked under 
 
-before:
-text    data     bss     dec     hex filename
-26188   2256    4208   32652    7f8c drivers/staging/lustre/lustre/mgc/mgc_request.o
+https://jira.hpdd.intel.com/browse/LU-9869
 
-after:
-text    data     bss     dec     hex filename
-26092   2256    4208   32556    7f2c drivers/staging/lustre/lustre/mgc/mgc_request.o
-
-Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
----
- drivers/staging/lustre/lustre/mgc/mgc_request.c | 16 +++-------------
- 1 file changed, 3 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index eee0b66..36c3049 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -288,7 +288,7 @@ config_log_add(struct obd_device *obd, char *logname,
- 	struct config_llog_data *cld;
- 	struct config_llog_data *sptlrpc_cld;
- 	struct config_llog_data *params_cld;
--	bool locked = false;
-+	struct config_llog_data *recover_cld = NULL;
- 	char			seclogname[32];
- 	char			*ptr;
- 	int			rc;
-@@ -333,20 +333,14 @@ config_log_add(struct obd_device *obd, char *logname,
- 		goto out_params;
- 	}
+I pushed the patch into our main test framework which passed testing.
+Just waiting for reviews. Thank you.
  
--	cld->cld_sptlrpc = sptlrpc_cld;
--	cld->cld_params = params_cld;
--
- 	LASSERT(lsi->lsi_lmd);
- 	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)) {
--		struct config_llog_data *recover_cld;
--
- 		ptr = strrchr(seclogname, '-');
- 		if (ptr) {
- 			*ptr = 0;
- 		} else {
- 			CERROR("%s: sptlrpc log name not correct, %s: rc = %d\n",
- 			       obd->obd_name, seclogname, -EINVAL);
--			config_log_put(cld);
- 			rc = -EINVAL;
- 			goto out_cld;
- 		}
-@@ -355,14 +349,10 @@ config_log_add(struct obd_device *obd, char *logname,
- 			rc = PTR_ERR(recover_cld);
- 			goto out_cld;
- 		}
--
--		mutex_lock(&cld->cld_lock);
--		locked = true;
--		cld->cld_recover = recover_cld;
- 	}
- 
--	if (!locked)
--		mutex_lock(&cld->cld_lock);
-+	mutex_lock(&cld->cld_lock);
-+	cld->cld_recover = recover_cld;
- 	cld->cld_params = params_cld;
- 	cld->cld_sptlrpc = sptlrpc_cld;
- 	mutex_unlock(&cld->cld_lock);
--- 
-2.7.4
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/staging/lustre/lnet/selftest/conctl.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
+> index 6ca7192b03b7..043eafb5ea40 100644
+> --- a/drivers/staging/lustre/lnet/selftest/conctl.c
+> +++ b/drivers/staging/lustre/lnet/selftest/conctl.c
+> @@ -69,8 +69,8 @@ lst_session_new_ioctl(struct lstio_session_new_args *args)
+>  	rc = lstcon_session_new(name,
+>  				args->lstio_ses_key,
+>  				args->lstio_ses_feats,
+> -				args->lstio_ses_force,
+>  				args->lstio_ses_timeout,
+> +				args->lstio_ses_force,
+>  				args->lstio_ses_idp);
+>  
+>  	LIBCFS_FREE(name, args->lstio_ses_nmlen + 1);
+> -- 
+> 2.11.0
+> 
+> 
