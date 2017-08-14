@@ -1,62 +1,188 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 12:21:02 -0400
-Subject: [lustre-devel] [PATCH 12/14] staging: lustre: llite: cleanup xattr
-	code comments
+Date: Mon, 14 Aug 2017 12:20:52 -0400
+Subject: [lustre-devel] [PATCH 02/14] staging: lustre: llite: refactor
+	lustre.lov xattr handling
 In-Reply-To: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
 References: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502727664-29438-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502727664-29438-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
 
-Add proper punctuation to the comments. Change buf_size to size
-for comment in ll_listxattr() since buf_size doesn't exit which
-will confuse someone reading the code.
+From: Niu Yawei <yawei.niu@intel.com>
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9183
-Reviewed-on: https://review.whamcloud.com/27240
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+The function ll_xattr_set() contains special code to handle
+the lustre specific xattr lustre.lov. Move all this code to
+a new function ll_setstripe_ea().
+
+Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8998
+Reviewed-on: https://review.whamcloud.com/24851
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/xattr.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/llite/xattr.c | 131 +++++++++++++++-------------
+ 1 file changed, 69 insertions(+), 62 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index ff11dd8..adaff56 100644
+index 56f42b8..fb53942 100644
 --- a/drivers/staging/lustre/lustre/llite/xattr.c
 +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -567,7 +567,7 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
- 		return rc;
- 	/*
- 	 * If we're being called to get the size of the xattr list
--	 * (buf_size == 0) then just assume that a lustre.lov xattr
-+	 * (size == 0) then just assume that a lustre.lov xattr
- 	 * exists.
- 	 */
- 	if (!size)
-@@ -580,14 +580,14 @@ ssize_t ll_listxattr(struct dentry *dentry, char *buffer, size_t size)
- 		len = strnlen(xattr_name, rem - 1) + 1;
- 		rem -= len;
- 		if (!xattr_type_filter(sbi, get_xattr_type(xattr_name))) {
--			/* Skip OK xattr type leave it in buffer */
-+			/* Skip OK xattr type, leave it in buffer. */
- 			xattr_name += len;
- 			continue;
- 		}
+@@ -183,6 +183,73 @@ static int get_hsm_state(struct inode *inode, u32 *hus_states)
+ 	return rc;
+ }
  
- 		/*
- 		 * Move up remaining xattrs in buffer
--		 * removing the xattr that is not OK
-+		 * removing the xattr that is not OK.
- 		 */
- 		memmove(xattr_name, xattr_name + len, rem);
- 		rc -= len;
++static int ll_setstripe_ea(struct dentry *dentry, struct lov_user_md *lump,
++			   size_t size)
++{
++	struct inode *inode = d_inode(dentry);
++	int rc = 0;
++
++	if (size != 0 && size < sizeof(struct lov_user_md))
++		return -EINVAL;
++
++	/*
++	 * It is possible to set an xattr to a "" value of zero size.
++	 * For this case we are going to treat it as a removal.
++	 */
++	if (!size && lump)
++		lump = NULL;
++
++	/* Attributes that are saved via getxattr will always have
++	 * the stripe_offset as 0.  Instead, the MDS should be
++	 * allowed to pick the starting OST index.   b=17846
++	 */
++	if (lump && lump->lmm_stripe_offset == 0)
++		lump->lmm_stripe_offset = -1;
++
++	/* Avoid anyone directly setting the RELEASED flag. */
++	if (lump && (lump->lmm_pattern & LOV_PATTERN_F_RELEASED)) {
++		/* Only if we have a released flag check if the file
++		 * was indeed archived.
++		 */
++		u32 state = HS_NONE;
++
++		rc = get_hsm_state(inode, &state);
++		if (rc)
++			return rc;
++
++		if (!(state & HS_ARCHIVED)) {
++			CDEBUG(D_VFSTRACE,
++			       "hus_states state = %x, pattern = %x\n",
++				state, lump->lmm_pattern);
++			/*
++			 * Here the state is: real file is not
++			 * archived but user is requesting to set
++			 * the RELEASED flag so we mask off the
++			 * released flag from the request
++			 */
++			lump->lmm_pattern ^= LOV_PATTERN_F_RELEASED;
++		}
++	}
++
++	if (lump && S_ISREG(inode->i_mode)) {
++		__u64 it_flags = FMODE_WRITE;
++		int lum_size;
++
++		lum_size = ll_lov_user_md_size(lump);
++		if (lum_size < 0 || size < lum_size)
++			return 0; /* b=10667: ignore error */
++
++		rc = ll_lov_setstripe_ea_info(inode, dentry, it_flags, lump,
++					      lum_size);
++		/* b=10667: rc always be 0 here for now */
++		rc = 0;
++	} else if (S_ISDIR(inode->i_mode)) {
++		rc = ll_dir_setstripe(inode, lump, 0);
++	}
++
++	return rc;
++}
++
+ static int ll_xattr_set(const struct xattr_handler *handler,
+ 			struct dentry *dentry, struct inode *inode,
+ 			const char *name, const void *value, size_t size,
+@@ -195,73 +262,13 @@ static int ll_xattr_set(const struct xattr_handler *handler,
+ 	       PFID(ll_inode2fid(inode)), inode, name);
+ 
+ 	if (!strcmp(name, "lov")) {
+-		struct lov_user_md *lump = (struct lov_user_md *)value;
+ 		int op_type = flags == XATTR_REPLACE ? LPROC_LL_REMOVEXATTR :
+ 						       LPROC_LL_SETXATTR;
+-		int rc = 0;
+ 
+ 		ll_stats_ops_tally(ll_i2sbi(inode), op_type, 1);
+ 
+-		if (size != 0 && size < sizeof(struct lov_user_md))
+-			return -EINVAL;
+-
+-		/*
+-		 * It is possible to set an xattr to a "" value of zero size.
+-		 * For this case we are going to treat it as a removal.
+-		 */
+-		if (!size && lump)
+-			lump = NULL;
+-
+-		/* Attributes that are saved via getxattr will always have
+-		 * the stripe_offset as 0.  Instead, the MDS should be
+-		 * allowed to pick the starting OST index.   b=17846
+-		 */
+-		if (lump && lump->lmm_stripe_offset == 0)
+-			lump->lmm_stripe_offset = -1;
+-
+-		/* Avoid anyone directly setting the RELEASED flag. */
+-		if (lump && (lump->lmm_pattern & LOV_PATTERN_F_RELEASED)) {
+-			/* Only if we have a released flag check if the file
+-			 * was indeed archived.
+-			 */
+-			u32 state = HS_NONE;
+-
+-			rc = get_hsm_state(inode, &state);
+-			if (rc)
+-				return rc;
+-
+-			if (!(state & HS_ARCHIVED)) {
+-				CDEBUG(D_VFSTRACE,
+-				       "hus_states state = %x, pattern = %x\n",
+-				state, lump->lmm_pattern);
+-				/*
+-				 * Here the state is: real file is not
+-				 * archived but user is requesting to set
+-				 * the RELEASED flag so we mask off the
+-				 * released flag from the request
+-				 */
+-				lump->lmm_pattern ^= LOV_PATTERN_F_RELEASED;
+-			}
+-		}
+-
+-		if (lump && S_ISREG(inode->i_mode)) {
+-			__u64 it_flags = FMODE_WRITE;
+-			int lum_size;
+-
+-			lum_size = ll_lov_user_md_size(lump);
+-			if (lum_size < 0 || size < lum_size)
+-				return 0; /* b=10667: ignore error */
+-
+-			rc = ll_lov_setstripe_ea_info(inode, dentry, it_flags,
+-						      lump, lum_size);
+-			/* b=10667: rc always be 0 here for now */
+-			rc = 0;
+-		} else if (S_ISDIR(inode->i_mode)) {
+-			rc = ll_dir_setstripe(inode, lump, 0);
+-		}
+-
+-		return rc;
+-
++		return ll_setstripe_ea(dentry, (struct lov_user_md *)value,
++				       size);
+ 	} else if (!strcmp(name, "lma") || !strcmp(name, "link")) {
+ 		ll_stats_ops_tally(ll_i2sbi(inode), LPROC_LL_SETXATTR, 1);
+ 		return 0;
 -- 
 1.8.3.1
