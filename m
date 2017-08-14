@@ -1,49 +1,64 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 12:20:50 -0400
-Subject: [lustre-devel] [PATCH 00/14] staging: lustre: llite: xattr related
-	handling fixes
-Message-ID: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
+Date: Mon, 14 Aug 2017 12:20:56 -0400
+Subject: [lustre-devel] [PATCH 06/14] staging: lustre: llite: eat -EEXIST on
+	setting trunsted.lov
+In-Reply-To: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
+References: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502727664-29438-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, Bobi Jam <bobijam.xu@intel.com>
 
-This batch of patches resolves several issues with how lustre handles
-xattrs. Some of the patches also resolve some style issues with the code.
-The patch set is order dependent. These fixes resolve some of the test
-failures that happen.
+Tools like rsync, tar, cp may copy and restore the xattrs on a file.
+The client previously ignored the setting of trusted.lov/lustre.lov
+if the layout had already been specified, to avoid causing these
+tools to fail for no reason.
 
-Bobi Jam (2):
-  staging: lustre: llite: break up ll_setstripe_ea function
-  staging: lustre: llite: return from ll_adjust_lum() if lump is NULL
+For PFL files we still need to silently eat -EEXIST on setting these
+attributes to avoid problems.
 
-Dmitry Eremin (1):
-  staging: lustre: llite: add support set_acl method in inode operations
+Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9484
+Reviewed-on: https://review.whamcloud.com/27126
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/llite/xattr.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-James Simmons (8):
-  staging: lustre: llite: eat -EEXIST on setting trunsted.lov
-  staging: lustre: llite: fix sparse variable length array warning
-  staging: lustre: llite: fix invalid size test in ll_setstripe_ea()
-  staging: lustre: llite: record in stats attempted removal of lma/link xattr
-  staging: lustre: llite: cleanup posix acl xattr code
-  staging: lustre: llite: use proper types in the xattr code
-  staging: lustre: llite: cleanup xattr code comments
-  staging: lustre: llite: style changes in xattr.c
-
-Niu Yawei (2):
-  staging: lustre: llite: refactor lustre.lov xattr handling
-  staging: lustre: llite: add simple comment about lustre.lov xattrs
-
-Robin Humble (1):
-  staging: lustre: llite: Remove filtering of seclabel xattr
-
- drivers/staging/lustre/lustre/llite/file.c         |  58 ++++++
- .../staging/lustre/lustre/llite/llite_internal.h   |   4 +
- drivers/staging/lustre/lustre/llite/namei.c        |  10 +-
- drivers/staging/lustre/lustre/llite/xattr.c        | 222 ++++++++++++---------
- 4 files changed, 196 insertions(+), 98 deletions(-)
-
+diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
+index d862189..ca803ed 100644
+--- a/drivers/staging/lustre/lustre/llite/xattr.c
++++ b/drivers/staging/lustre/lustre/llite/xattr.c
+@@ -251,12 +251,20 @@ static int ll_setstripe_ea(struct dentry *dentry, struct lov_user_md *lump,
+ 
+ 		lum_size = ll_lov_user_md_size(lump);
+ 		if (lum_size < 0 || size < lum_size)
+-			return 0; /* b=10667: ignore error */
++			return -ERANGE;
+ 
+ 		rc = ll_lov_setstripe_ea_info(inode, dentry, it_flags, lump,
+ 					      lum_size);
+-		/* b=10667: rc always be 0 here for now */
+-		rc = 0;
++		/**
++		 * b=10667: ignore -EEXIST.
++		 * Silently eat error on setting trusted.lov/lustre.lov
++		 * attribute for platforms that added the default option
++		 * to copy all attributes in 'cp' command. Both rsync and
++		 * tar --xattrs also will try to set LOVEA for existing
++		 * files.
++		 */
++		if (rc == -EEXIST)
++			rc = 0;
+ 	} else if (S_ISDIR(inode->i_mode)) {
+ 		rc = ll_dir_setstripe(inode, lump, 0);
+ 	}
 -- 
 1.8.3.1
