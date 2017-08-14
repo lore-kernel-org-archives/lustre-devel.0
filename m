@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 11:46:51 -0400
-Subject: [lustre-devel] [PATCH 23/64] staging: lustre: uapi: move
-	lustre_cfg_string() to obd_config.c
+Date: Mon, 14 Aug 2017 11:47:06 -0400
+Subject: [lustre-devel] [PATCH 38/64] staging: lustre: lnet: remove userland
+	function prototype in lnetctl.h
 In-Reply-To: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
 References: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502725652-26280-24-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502725652-26280-39-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,132 +12,70 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-To perserve the truncate warning move lustre_cfg_string()
-to obd_config.c. A identical function was created for
-userland. This function was a bit big for a inline function.
+Several function prototypes of the form jt_ptl_* are only needed
+by userland so they can be removed.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
-Reviewed-on: https://review.whamcloud.com/26966
-Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
-Reviewed-by: Ben Evans <bevans@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+Reviewed-on: http://review.whamcloud.com/17643
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_cfg.h | 29 ------------------
- drivers/staging/lustre/lustre/include/obd_class.h  |  1 +
- .../staging/lustre/lustre/obdclass/obd_config.c    | 34 ++++++++++++++++++++++
- drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |  1 +
- 4 files changed, 36 insertions(+), 29 deletions(-)
+ .../lustre/include/uapi/linux/lnet/lnetctl.h       | 41 ----------------------
+ 1 file changed, 41 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_cfg.h b/drivers/staging/lustre/lustre/include/lustre_cfg.h
-index 9d6934b..21a48b1 100644
---- a/drivers/staging/lustre/lustre/include/lustre_cfg.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_cfg.h
-@@ -179,35 +179,6 @@ static inline void lustre_cfg_bufs_init(struct lustre_cfg_bufs *bufs,
- 	}
- }
+diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
+index 2ce1c50..65b2bf8 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
++++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
+@@ -131,45 +131,4 @@ struct lnet_fault_stat {
+ #define SMFS_DEV_MAJOR 10
+ #define SMFS_DEV_MINOR 242
  
--static inline char *lustre_cfg_string(struct lustre_cfg *lcfg, __u32 index)
--{
--	char *s;
+-int ptl_initialize(int argc, char **argv);
+-int jt_ptl_network(int argc, char **argv);
+-int jt_ptl_list_nids(int argc, char **argv);
+-int jt_ptl_which_nid(int argc, char **argv);
+-int jt_ptl_print_interfaces(int argc, char **argv);
+-int jt_ptl_add_interface(int argc, char **argv);
+-int jt_ptl_del_interface(int argc, char **argv);
+-int jt_ptl_print_peers(int argc, char **argv);
+-int jt_ptl_add_peer(int argc, char **argv);
+-int jt_ptl_del_peer(int argc, char **argv);
+-int jt_ptl_print_connections(int argc, char **argv);
+-int jt_ptl_disconnect(int argc, char **argv);
+-int jt_ptl_push_connection(int argc, char **argv);
+-int jt_ptl_print_active_txs(int argc, char **argv);
+-int jt_ptl_ping(int argc, char **argv);
+-int jt_ptl_mynid(int argc, char **argv);
+-int jt_ptl_add_uuid(int argc, char **argv);
+-int jt_ptl_add_uuid_old(int argc, char **argv); /* backwards compatibility  */
+-int jt_ptl_close_uuid(int argc, char **argv);
+-int jt_ptl_del_uuid(int argc, char **argv);
+-int jt_ptl_add_route(int argc, char **argv);
+-int jt_ptl_del_route(int argc, char **argv);
+-int jt_ptl_notify_router(int argc, char **argv);
+-int jt_ptl_print_routes(int argc, char **argv);
+-int jt_ptl_fail_nid(int argc, char **argv);
+-int jt_ptl_lwt(int argc, char **argv);
+-int jt_ptl_testprotocompat(int argc, char **argv);
+-int jt_ptl_memhog(int argc, char **argv);
 -
--	if (lcfg->lcfg_buflens[index] == 0)
--		return NULL;
+-int dbg_initialize(int argc, char **argv);
+-int jt_dbg_filter(int argc, char **argv);
+-int jt_dbg_show(int argc, char **argv);
+-int jt_dbg_list(int argc, char **argv);
+-int jt_dbg_debug_kernel(int argc, char **argv);
+-int jt_dbg_debug_daemon(int argc, char **argv);
+-int jt_dbg_debug_file(int argc, char **argv);
+-int jt_dbg_clear_debug_buf(int argc, char **argv);
+-int jt_dbg_mark_debug_buf(int argc, char **argv);
+-int jt_dbg_modules(int argc, char **argv);
+-int jt_dbg_panic(int argc, char **argv);
 -
--	s = lustre_cfg_buf(lcfg, index);
--	if (!s)
--		return NULL;
--
--	/*
--	 * make sure it's NULL terminated, even if this kills a char
--	 * of data.  Try to use the padding first though.
--	 */
--	if (s[lcfg->lcfg_buflens[index] - 1] != '\0') {
--		size_t last = min((size_t)lcfg->lcfg_buflens[index],
--				  cfs_size_round(lcfg->lcfg_buflens[index]) - 1);
--		char lost = s[last];
--
--		s[last] = '\0';
--		if (lost != '\0') {
--			CWARN("Truncated buf %d to '%s' (lost '%c'...)\n",
--			      index, s, lost);
--		}
--	}
--	return s;
--}
--
- static inline __u32 lustre_cfg_len(__u32 bufcount, __u32 *buflens)
- {
- 	__u32 i;
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 8cc13ea..7d98485 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -107,6 +107,7 @@ typedef int (*llog_cb_t)(const struct lu_env *, struct llog_handle *,
- 			 struct llog_rec_hdr *, void *);
- 
- /* obd_config.c */
-+char *lustre_cfg_string(struct lustre_cfg *lcfg, u32 index);
- int class_process_config(struct lustre_cfg *lcfg);
- int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
- 			     struct lustre_cfg *lcfg, void *data);
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index 4c7c4f3..dc7b27e 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -170,6 +170,40 @@ int class_parse_nid_quiet(char *buf, lnet_nid_t *nid, char **endh)
- }
- EXPORT_SYMBOL(class_parse_nid_quiet);
- 
-+char *lustre_cfg_string(struct lustre_cfg *lcfg, u32 index)
-+{
-+	char *s;
-+
-+	if (!lcfg->lcfg_buflens[index])
-+		return NULL;
-+
-+	s = lustre_cfg_buf(lcfg, index);
-+	if (!s)
-+		return NULL;
-+
-+	/*
-+	 * make sure it's NULL terminated, even if this kills a char
-+	 * of data.  Try to use the padding first though.
-+	 */
-+	if (s[lcfg->lcfg_buflens[index] - 1] != '\0') {
-+		size_t last = ALIGN(lcfg->lcfg_buflens[index], 8) - 1;
-+		char lost;
-+
-+		/* Use the smaller value */
-+		if (last > lcfg->lcfg_buflens[index])
-+			last = lcfg->lcfg_buflens[index];
-+
-+		lost = s[last];
-+		s[last] = '\0';
-+		if (lost != '\0') {
-+			CWARN("Truncated buf %d to '%s' (lost '%c'...)\n",
-+			      index, s, lost);
-+		}
-+	}
-+	return s;
-+}
-+EXPORT_SYMBOL(lustre_cfg_string);
-+
- /********************** class fns **********************/
- 
- /**
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-index bb953d4..9143441 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-@@ -37,6 +37,7 @@
- #include <linux/key.h>
- 
- #include "../include/obd.h"
-+#include "../include/obd_class.h"
- #include "../include/obd_support.h"
- #include "../include/lustre_import.h"
- #include "../../include/uapi/linux/lustre/lustre_param.h"
+ #endif
 -- 
 1.8.3.1
