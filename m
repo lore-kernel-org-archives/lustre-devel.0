@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 11:46:46 -0400
-Subject: [lustre-devel] [PATCH 18/64] staging: lustre: uapi: move
-	lustre_param.h to uapi directory
+Date: Mon, 14 Aug 2017 11:47:05 -0400
+Subject: [lustre-devel] [PATCH 37/64] staging: lustre: libcfs: sort headers
+	in libcfs.h
 In-Reply-To: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
 References: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502725652-26280-19-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502725652-26280-38-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,121 +12,72 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Move the header lustre_param.h to proper uapi directory.
+Move all the included headers in libcfs.h to the top of the
+file.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
-Reviewed-on: https://review.whamcloud.com/24325
-Reviewed-by: Ben Evans <bevans@cray.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+Reviewed-on: https://review.whamcloud.com/28089
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/{lustre/include => include/uapi/linux/lustre}/lustre_param.h | 0
- drivers/staging/lustre/lustre/llite/llite_lib.c                         | 2 +-
- drivers/staging/lustre/lustre/lov/lov_obd.c                             | 2 +-
- drivers/staging/lustre/lustre/mdc/mdc_request.c                         | 2 +-
- drivers/staging/lustre/lustre/obdclass/obd_config.c                     | 2 +-
- drivers/staging/lustre/lustre/obdclass/obd_mount.c                      | 2 +-
- drivers/staging/lustre/lustre/osc/osc_request.c                         | 2 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_config.c                       | 2 +-
- 8 files changed, 7 insertions(+), 7 deletions(-)
- rename drivers/staging/lustre/{lustre/include => include/uapi/linux/lustre}/lustre_param.h (100%)
+ .../staging/lustre/include/linux/libcfs/libcfs.h   | 26 ++++++++++------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_param.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_param.h
-similarity index 100%
-rename from drivers/staging/lustre/lustre/include/lustre_param.h
-rename to drivers/staging/lustre/include/uapi/linux/lustre/lustre_param.h
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index e7d5228..3ab3a63 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -46,7 +46,7 @@
- #include "../include/lustre_dlm.h"
- #include "../include/lprocfs_status.h"
- #include "../include/lustre_disk.h"
--#include "../include/lustre_param.h"
-+#include "../../include/uapi/linux/lustre/lustre_param.h"
- #include "../include/lustre_log.h"
- #include "../include/cl_object.h"
- #include "../include/obd_cksum.h"
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index 8777d4b..475bf7e 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -49,7 +49,7 @@
- #include "../include/lustre_lib.h"
- #include "../include/lustre_mds.h"
- #include "../include/lustre_net.h"
--#include "../include/lustre_param.h"
-+#include "../../include/uapi/linux/lustre/lustre_param.h"
- #include "../include/lustre_swab.h"
- #include "../include/lprocfs_status.h"
- #include "../include/obd_class.h"
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 93fb195..4dcf3902 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -49,7 +49,7 @@
- #include "../include/lustre_kernelcomm.h"
- #include "../include/lustre_lmv.h"
- #include "../include/lustre_log.h"
--#include "../include/lustre_param.h"
-+#include "../../include/uapi/linux/lustre/lustre_param.h"
- #include "../include/lustre_swab.h"
- #include "../include/obd_class.h"
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+index 71bb55e..3a5ebc2 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+@@ -33,9 +33,20 @@
+ #ifndef __LIBCFS_LIBCFS_H__
+ #define __LIBCFS_LIBCFS_H__
  
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index 2a93d67..783f9e0 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -42,7 +42,7 @@
- #include "../include/llog_swab.h"
- #include "../include/lprocfs_status.h"
- #include "../include/lustre_log.h"
--#include "../include/lustre_param.h"
-+#include "../../include/uapi/linux/lustre/lustre_param.h"
- #include "../include/obd_class.h"
+-#include "linux/libcfs.h"
+ #include <linux/gfp.h>
++#include <linux/list.h>
  
- #include "llog_internal.h"
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index 8e0d4b1..555e67e 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -46,7 +46,7 @@
- #include "../include/lustre/lustre_user.h"
- #include "../include/lustre_log.h"
- #include "../include/lustre_disk.h"
--#include "../include/lustre_param.h"
-+#include "../../include/uapi/linux/lustre/lustre_param.h"
++#include "../../uapi/linux/lnet/libcfs_ioctl.h"
++#include "linux/libcfs.h"
++#include "libcfs_debug.h"
++#include "libcfs_private.h"
++#include "libcfs_cpu.h"
++#include "libcfs_prim.h"
++#include "libcfs_time.h"
++#include "libcfs_string.h"
++#include "libcfs_workitem.h"
++#include "libcfs_hash.h"
++#include "libcfs_fail.h"
+ #include "curproc.h"
  
- static int (*client_fill_super)(struct super_block *sb,
- 				struct vfsmount *mnt);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index e103d5a..453a59a 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -44,7 +44,7 @@
- #include "../../include/uapi/linux/lustre/lustre_ioctl.h"
- #include "../include/lustre_debug.h"
- #include "../include/lustre_obdo.h"
--#include "../include/lustre_param.h"
-+#include "../../include/uapi/linux/lustre/lustre_param.h"
- #include "../include/lustre_fid.h"
- #include "../include/obd_class.h"
- #include "../include/obd.h"
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-index 2181a85..bb953d4 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-@@ -39,7 +39,7 @@
- #include "../include/obd.h"
- #include "../include/obd_support.h"
- #include "../include/lustre_import.h"
--#include "../include/lustre_param.h"
-+#include "../../include/uapi/linux/lustre/lustre_param.h"
- #include "../include/lustre_sec.h"
+ #define LIBCFS_VERSION "0.7.0"
+@@ -49,8 +60,6 @@
+ #define LERRCHKSUM(hexnum) (((hexnum) & 0xf) ^ ((hexnum) >> 4 & 0xf) ^ \
+ 			   ((hexnum) >> 8 & 0xf))
  
- #include "ptlrpc_internal.h"
+-#include <linux/list.h>
+-
+ /* need both kernel and user-land acceptor */
+ #define LNET_ACCEPTOR_MIN_RESERVED_PORT    512
+ #define LNET_ACCEPTOR_MAX_RESERVED_PORT    1023
+@@ -74,17 +83,6 @@
+ void cfs_srand(unsigned int seed1, unsigned int seed2);
+ void cfs_get_random_bytes(void *buf, int size);
+ 
+-#include "libcfs_debug.h"
+-#include "libcfs_cpu.h"
+-#include "libcfs_private.h"
+-#include "../../uapi/linux/lnet/libcfs_ioctl.h"
+-#include "libcfs_prim.h"
+-#include "libcfs_time.h"
+-#include "libcfs_string.h"
+-#include "libcfs_workitem.h"
+-#include "libcfs_hash.h"
+-#include "libcfs_fail.h"
+-
+ struct libcfs_ioctl_handler {
+ 	struct list_head item;
+ 	int (*handle_ioctl)(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
 -- 
 1.8.3.1
