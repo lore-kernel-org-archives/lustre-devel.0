@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 12:21:01 -0400
-Subject: [lustre-devel] [PATCH 11/14] staging: lustre: llite: use proper
-	types in the xattr code
+Date: Mon, 14 Aug 2017 12:20:57 -0400
+Subject: [lustre-devel] [PATCH 07/14] staging: lustre: llite: fix sparse
+	variable length array warning
 In-Reply-To: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
 References: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502727664-29438-12-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502727664-29438-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,9 +12,8 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Convert __uXX types to uXX types since this is kernel code.
-The function ll_lov_user_md_size() returns ssize_t so change
-lum_size from int to ssize_t.
+Currently sparse reports "warning: Variable length array is used."
+The solution is use kasprintf to allocate full xattr name.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9183
@@ -25,41 +24,72 @@ Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/xattr.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/llite/xattr.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 64fa65a..ff11dd8 100644
+index ca803ed..86b5df9 100644
 --- a/drivers/staging/lustre/lustre/llite/xattr.c
 +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -91,7 +91,7 @@ static int xattr_type_filter(struct ll_sb_info *sbi,
+@@ -87,10 +87,10 @@ static int xattr_type_filter(struct ll_sb_info *sbi,
+ 		    const char *name, const void *value, size_t size,
+ 		    int flags)
+ {
+-	char fullname[strlen(handler->prefix) + strlen(name) + 1];
+ 	struct ll_sb_info *sbi = ll_i2sbi(inode);
  	struct ptlrpc_request *req = NULL;
  	const char *pv = value;
- 	char *fullname;
--	__u64 valid;
-+	u64 valid;
++	char *fullname;
+ 	__u64 valid;
  	int rc;
  
- 	if (flags == XATTR_REPLACE) {
-@@ -247,8 +247,8 @@ static int ll_setstripe_ea(struct dentry *dentry, struct lov_user_md *lump,
- 		return rc;
+@@ -136,10 +136,14 @@ static int xattr_type_filter(struct ll_sb_info *sbi,
+ 			return -EPERM;
+ 	}
  
- 	if (lump && S_ISREG(inode->i_mode)) {
--		__u64 it_flags = FMODE_WRITE;
--		int lum_size;
-+		u64 it_flags = FMODE_WRITE;
-+		ssize_t lum_size;
- 
- 		lum_size = ll_lov_user_md_size(lump);
- 		if (lum_size < 0 || size < lum_size)
-@@ -310,7 +310,7 @@ static int ll_xattr_set(const struct xattr_handler *handler,
- 
- int
- ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
--	      size_t size, __u64 valid)
-+	      size_t size, u64 valid)
+-	sprintf(fullname, "%s%s\n", handler->prefix, name);
++	fullname = kasprintf(GFP_KERNEL, "%s%s", handler->prefix, name);
++	if (!fullname)
++		return -ENOMEM;
++
+ 	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
+ 			 valid, fullname, pv, size, 0, flags,
+ 			 ll_i2suppgid(inode), &req);
++	kfree(fullname);
+ 	if (rc) {
+ 		if (rc == -EOPNOTSUPP && handler->flags == XATTR_USER_T) {
+ 			LCONSOLE_INFO("Disabling user_xattr feature because it is not supported on the server\n");
+@@ -389,11 +393,11 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
+ 			       struct dentry *dentry, struct inode *inode,
+ 			       const char *name, void *buffer, size_t size)
  {
- 	struct ll_inode_info *lli = ll_i2info(inode);
+-	char fullname[strlen(handler->prefix) + strlen(name) + 1];
  	struct ll_sb_info *sbi = ll_i2sbi(inode);
+ #ifdef CONFIG_FS_POSIX_ACL
+ 	struct ll_inode_info *lli = ll_i2info(inode);
+ #endif
++	char *fullname;
+ 	int rc;
+ 
+ 	CDEBUG(D_VFSTRACE, "VFS Op:inode=" DFID "(%p)\n",
+@@ -432,9 +436,15 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
+ 	if (handler->flags == XATTR_ACL_DEFAULT_T && !S_ISDIR(inode->i_mode))
+ 		return -ENODATA;
+ #endif
+-	sprintf(fullname, "%s%s\n", handler->prefix, name);
+-	return ll_xattr_list(inode, fullname, handler->flags, buffer, size,
+-			     OBD_MD_FLXATTR);
++
++	fullname = kasprintf(GFP_KERNEL, "%s%s", handler->prefix, name);
++	if (!fullname)
++		return -ENOMEM;
++
++	rc = ll_xattr_list(inode, fullname, handler->flags, buffer, size,
++			   OBD_MD_FLXATTR);
++	kfree(fullname);
++	return rc;
+ }
+ 
+ static ssize_t ll_getxattr_lov(struct inode *inode, void *buf, size_t buf_size)
 -- 
 1.8.3.1
