@@ -1,58 +1,65 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 12:20:55 -0400
-Subject: [lustre-devel] [PATCH 05/14] staging: lustre: llite: return from
-	ll_adjust_lum() if lump is NULL
+Date: Mon, 14 Aug 2017 12:21:01 -0400
+Subject: [lustre-devel] [PATCH 11/14] staging: lustre: llite: use proper
+	types in the xattr code
 In-Reply-To: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
 References: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502727664-29438-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502727664-29438-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-From: Bobi Jam <bobijam.xu@intel.com>
+Convert __uXX types to uXX types since this is kernel code.
+The function ll_lov_user_md_size() returns ssize_t so change
+lum_size from int to ssize_t.
 
-No need to check several times if lump is NULL. Just test once and
-return 0 if NULL.
-
-Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9484
-Reviewed-on: https://review.whamcloud.com/27126
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9183
+Reviewed-on: https://review.whamcloud.com/27240
 Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Niu Yawei <yawei.niu@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Bob Glossman <bob.glossman@intel.com>
+Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/xattr.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/llite/xattr.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 7a17114..d862189 100644
+index 64fa65a..ff11dd8 100644
 --- a/drivers/staging/lustre/lustre/llite/xattr.c
 +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -187,15 +187,18 @@ static int ll_adjust_lum(struct inode *inode, struct lov_user_md *lump)
+@@ -91,7 +91,7 @@ static int xattr_type_filter(struct ll_sb_info *sbi,
+ 	struct ptlrpc_request *req = NULL;
+ 	const char *pv = value;
+ 	char *fullname;
+-	__u64 valid;
++	u64 valid;
+ 	int rc;
+ 
+ 	if (flags == XATTR_REPLACE) {
+@@ -247,8 +247,8 @@ static int ll_setstripe_ea(struct dentry *dentry, struct lov_user_md *lump,
+ 		return rc;
+ 
+ 	if (lump && S_ISREG(inode->i_mode)) {
+-		__u64 it_flags = FMODE_WRITE;
+-		int lum_size;
++		u64 it_flags = FMODE_WRITE;
++		ssize_t lum_size;
+ 
+ 		lum_size = ll_lov_user_md_size(lump);
+ 		if (lum_size < 0 || size < lum_size)
+@@ -310,7 +310,7 @@ static int ll_xattr_set(const struct xattr_handler *handler,
+ 
+ int
+ ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
+-	      size_t size, __u64 valid)
++	      size_t size, u64 valid)
  {
- 	int rc = 0;
- 
-+	if (!lump)
-+		return 0;
-+
- 	/* Attributes that are saved via getxattr will always have
- 	 * the stripe_offset as 0.  Instead, the MDS should be
- 	 * allowed to pick the starting OST index.   b=17846
- 	 */
--	if (lump && lump->lmm_stripe_offset == 0)
-+	if (lump->lmm_stripe_offset == 0)
- 		lump->lmm_stripe_offset = -1;
- 
- 	/* Avoid anyone directly setting the RELEASED flag. */
--	if (lump && (lump->lmm_pattern & LOV_PATTERN_F_RELEASED)) {
-+	if (lump->lmm_pattern & LOV_PATTERN_F_RELEASED) {
- 		/* Only if we have a released flag check if the file
- 		 * was indeed archived.
- 		 */
+ 	struct ll_inode_info *lli = ll_i2info(inode);
+ 	struct ll_sb_info *sbi = ll_i2sbi(inode);
 -- 
 1.8.3.1
