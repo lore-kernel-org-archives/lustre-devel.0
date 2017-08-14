@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 11:47:19 -0400
-Subject: [lustre-devel] [PATCH 51/64] staging: lustre: mdc: add include path
-	to Makefile
+Date: Mon, 14 Aug 2017 11:47:30 -0400
+Subject: [lustre-devel] [PATCH 62/64] staging: lustre: libcfs: add include
+	path to Makefile
 In-Reply-To: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
 References: <1502725652-26280-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502725652-26280-52-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502725652-26280-63-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,157 +12,313 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Rationalize include paths in the mdc source code files.
+Rationalize include paths in the libcfs source code files.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/mdc/Makefile       |  3 +++
- drivers/staging/lustre/lustre/mdc/lproc_mdc.c    |  4 ++--
- drivers/staging/lustre/lustre/mdc/mdc_internal.h |  2 +-
- drivers/staging/lustre/lustre/mdc/mdc_lib.c      |  4 ++--
- drivers/staging/lustre/lustre/mdc/mdc_locks.c    | 22 ++++++++++----------
- drivers/staging/lustre/lustre/mdc/mdc_reint.c    |  4 ++--
- drivers/staging/lustre/lustre/mdc/mdc_request.c  | 26 ++++++++++++------------
- 7 files changed, 34 insertions(+), 31 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/Makefile                | 3 +++
+ drivers/staging/lustre/lnet/libcfs/debug.c                 | 2 +-
+ drivers/staging/lustre/lnet/libcfs/fail.c                  | 2 +-
+ drivers/staging/lustre/lnet/libcfs/hash.c                  | 2 +-
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c            | 2 +-
+ drivers/staging/lustre/lnet/libcfs/libcfs_lock.c           | 2 +-
+ drivers/staging/lustre/lnet/libcfs/libcfs_mem.c            | 2 +-
+ drivers/staging/lustre/lnet/libcfs/libcfs_string.c         | 2 +-
+ drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c       | 2 +-
+ drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c    | 4 ++--
+ drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c   | 2 +-
+ drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c     | 2 +-
+ drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c       | 2 +-
+ drivers/staging/lustre/lnet/libcfs/linux/linux-module.c    | 2 +-
+ drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c      | 2 +-
+ drivers/staging/lustre/lnet/libcfs/linux/linux-tracefile.c | 2 +-
+ drivers/staging/lustre/lnet/libcfs/module.c                | 8 ++++----
+ drivers/staging/lustre/lnet/libcfs/prng.c                  | 2 +-
+ drivers/staging/lustre/lnet/libcfs/tracefile.c             | 2 +-
+ drivers/staging/lustre/lnet/libcfs/tracefile.h             | 2 +-
+ drivers/staging/lustre/lnet/libcfs/workitem.c              | 2 +-
+ 21 files changed, 27 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/mdc/Makefile b/drivers/staging/lustre/lustre/mdc/Makefile
-index 99ba9ff..c7bc335 100644
---- a/drivers/staging/lustre/lustre/mdc/Makefile
-+++ b/drivers/staging/lustre/lustre/mdc/Makefile
-@@ -1,2 +1,5 @@
+diff --git a/drivers/staging/lustre/lnet/libcfs/Makefile b/drivers/staging/lustre/lnet/libcfs/Makefile
+index 8c89455..215fa23 100644
+--- a/drivers/staging/lustre/lnet/libcfs/Makefile
++++ b/drivers/staging/lustre/lnet/libcfs/Makefile
+@@ -1,3 +1,6 @@
 +subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
 +subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
 +
- obj-$(CONFIG_LUSTRE_FS) += mdc.o
- mdc-y := mdc_request.o mdc_reint.o mdc_lib.o mdc_locks.o lproc_mdc.o
-diff --git a/drivers/staging/lustre/lustre/mdc/lproc_mdc.c b/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-index 51a7047..f685137 100644
---- a/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-+++ b/drivers/staging/lustre/lustre/mdc/lproc_mdc.c
-@@ -32,8 +32,8 @@
- #define DEBUG_SUBSYSTEM S_CLASS
+ obj-$(CONFIG_LNET) += libcfs.o
  
- #include <linux/vfs.h>
--#include "../include/obd_class.h"
--#include "../include/lprocfs_status.h"
-+#include <obd_class.h>
-+#include <lprocfs_status.h>
- #include "mdc_internal.h"
+ libcfs-linux-objs := linux-tracefile.o linux-debug.o
+diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
+index 49deb44..1ab394c 100644
+--- a/drivers/staging/lustre/lnet/libcfs/debug.c
++++ b/drivers/staging/lustre/lnet/libcfs/debug.c
+@@ -37,7 +37,7 @@
  
- static ssize_t active_show(struct kobject *kobj, struct attribute *attr,
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_internal.h b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-index fecedc88..cbf0115 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_internal.h
-@@ -33,7 +33,7 @@
- #ifndef _MDC_INTERNAL_H
- #define _MDC_INTERNAL_H
+ # define DEBUG_SUBSYSTEM S_LNET
  
--#include "../include/lustre_mdc.h"
-+#include <lustre_mdc.h>
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ #include "tracefile.h"
  
- void lprocfs_mdc_init_vars(struct lprocfs_static_vars *lvars);
- 
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-index bfd8fbe..ba13f089 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-@@ -31,8 +31,8 @@
+ static char debug_file_name[1024];
+diff --git a/drivers/staging/lustre/lnet/libcfs/fail.c b/drivers/staging/lustre/lnet/libcfs/fail.c
+index 12dd50a..24f4701 100644
+--- a/drivers/staging/lustre/lnet/libcfs/fail.c
++++ b/drivers/staging/lustre/lnet/libcfs/fail.c
+@@ -29,7 +29,7 @@
+  * Lustre is a trademark of Oracle Corporation, Inc.
   */
  
- #define DEBUG_SUBSYSTEM S_MDC
--#include "../include/lustre_net.h"
--#include "../../include/uapi/linux/lustre/lustre_idl.h"
-+#include <lustre_net.h>
-+#include <uapi/linux/lustre/lustre_idl.h>
- #include "mdc_internal.h"
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
  
- static void set_mrc_cr_flags(struct mdt_rec_create *mrc, u64 flags)
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 3eb66ce..b9bf440 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -32,17 +32,17 @@
+ unsigned long cfs_fail_loc;
+ EXPORT_SYMBOL(cfs_fail_loc);
+diff --git a/drivers/staging/lustre/lnet/libcfs/hash.c b/drivers/staging/lustre/lnet/libcfs/hash.c
+index ff54eaf..49a04a2 100644
+--- a/drivers/staging/lustre/lnet/libcfs/hash.c
++++ b/drivers/staging/lustre/lnet/libcfs/hash.c
+@@ -105,7 +105,7 @@
+ #include <linux/seq_file.h>
+ #include <linux/log2.h>
  
- #define DEBUG_SUBSYSTEM S_MDC
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
  
--# include <linux/module.h>
--
--#include "../include/lustre_intent.h"
--#include "../include/obd.h"
--#include "../include/obd_class.h"
--#include "../include/lustre_dlm.h"
--#include "../include/lustre_fid.h"
--#include "../include/lustre_mdc.h"
--#include "../include/lustre_net.h"
--#include "../include/lustre_req_layout.h"
--#include "../include/lustre_swab.h"
-+#include <linux/module.h>
-+
-+#include <lustre_intent.h>
-+#include <obd.h>
-+#include <obd_class.h>
-+#include <lustre_dlm.h>
-+#include <lustre_fid.h>
-+#include <lustre_mdc.h>
-+#include <lustre_net.h>
-+#include <lustre_req_layout.h>
-+#include <lustre_swab.h>
+ #if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
+ static unsigned int warn_on_depth = 8;
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+index 55caa19..2ddd09a 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+@@ -30,7 +30,7 @@
  
- #include "mdc_internal.h"
+ #define DEBUG_SUBSYSTEM S_LNET
  
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_reint.c b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-index 2287bd4..f45c91d 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_reint.c
-@@ -35,9 +35,9 @@
- # include <linux/module.h>
- # include <linux/kernel.h>
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
  
--#include "../include/obd_class.h"
-+#include <obd_class.h>
- #include "mdc_internal.h"
--#include "../include/lustre_fid.h"
-+#include <lustre_fid.h>
+ /** Global CPU partition table */
+ struct cfs_cpt_table   *cfs_cpt_table __read_mostly;
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c b/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
+index 1967b97..77fd3d06 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
+@@ -27,7 +27,7 @@
  
- /* mdc_setattr does its own semaphore handling */
- static int mdc_reint(struct ptlrpc_request *request, int level)
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 3556307..6ef8dde 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -38,19 +38,19 @@
- # include <linux/init.h>
- # include <linux/utsname.h>
+ #define DEBUG_SUBSYSTEM S_LNET
  
--#include "../include/lustre_errno.h"
--#include "../include/cl_object.h"
--#include "../include/llog_swab.h"
--#include "../include/lprocfs_status.h"
--#include "../include/lustre_acl.h"
--#include "../include/lustre_fid.h"
--#include "../../include/uapi/linux/lustre/lustre_ioctl.h"
--#include "../include/lustre_kernelcomm.h"
--#include "../include/lustre_lmv.h"
--#include "../include/lustre_log.h"
--#include "../../include/uapi/linux/lustre/lustre_param.h"
--#include "../include/lustre_swab.h"
--#include "../include/obd_class.h"
-+#include <lustre_errno.h>
-+#include <cl_object.h>
-+#include <llog_swab.h>
-+#include <lprocfs_status.h>
-+#include <lustre_acl.h>
-+#include <lustre_fid.h>
-+#include <uapi/linux/lustre/lustre_ioctl.h>
-+#include <lustre_kernelcomm.h>
-+#include <lustre_lmv.h>
-+#include <lustre_log.h>
-+#include <uapi/linux/lustre/lustre_param.h>
-+#include <lustre_swab.h>
-+#include <obd_class.h>
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
  
- #include "mdc_internal.h"
+ /** destroy cpu-partition lock, see libcfs_private.h for more detail */
+ void
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c b/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
+index ef085ba..1a0c7ca 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
+@@ -28,7 +28,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LNET
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ struct cfs_var_array {
+ 	unsigned int		va_count;	/* # of buffers */
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_string.c b/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
+index 02de1ee..333e47f 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
+@@ -36,7 +36,7 @@
+  * Author: Nathan Rutman <nathan.rutman@sun.com>
+  */
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ /* Convert a text string to a bitmask */
+ int cfs_str2mask(const char *str, const char *(*bit2str)(int bit),
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+index 4d35a37..2da051c 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+@@ -31,7 +31,7 @@
+ 
+ #include <linux/cpu.h>
+ #include <linux/sched.h>
+-#include "../../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ #ifdef CONFIG_SMP
+ 
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
+index 68e34b4..5566339 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-crypto.c
+@@ -29,8 +29,8 @@
+ 
+ #include <crypto/hash.h>
+ #include <linux/scatterlist.h>
+-#include "../../../include/linux/libcfs/libcfs.h"
+-#include "../../../include/linux/libcfs/libcfs_crypto.h"
++#include <linux/libcfs/libcfs.h>
++#include <linux/libcfs/libcfs_crypto.h>
+ #include "linux-crypto.h"
+ 
+ /**
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c
+index 3e22cad..528d497 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c
+@@ -44,7 +44,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LNET
+ 
+-#include "../../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ /*
+  * Implementation of cfs_curproc API (see portals/include/libcfs/curproc.h)
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
+index 7035356..972677b 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-debug.c
+@@ -51,7 +51,7 @@
+ 
+ # define DEBUG_SUBSYSTEM S_LNET
+ 
+-#include "../../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ #include "../tracefile.h"
+ 
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c
+index 8f63826..3f5dec1 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c
+@@ -29,7 +29,7 @@
+ #include <linux/slab.h>
+ #include <linux/vmalloc.h>
+ 
+-#include "../../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ void *libcfs_kvzalloc(size_t size, gfp_t flags)
+ {
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+index c6837bc..4357221 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+@@ -32,7 +32,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LNET
+ 
+-#include "../../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ #define LNET_MINOR 240
+ 
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
+index bcf9f3d..4e331e7 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
+@@ -36,7 +36,7 @@
+ #include <linux/fs_struct.h>
+ #include <linux/sched/signal.h>
+ 
+-#include "../../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ #if defined(CONFIG_KGDB)
+ #include <linux/kgdb.h>
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-tracefile.c
+index a5a9478..16a3ae7 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-tracefile.c
+@@ -33,7 +33,7 @@
+ #define DEBUG_SUBSYSTEM S_LNET
+ #define LUSTRE_TRACEFILE_PRIVATE
+ 
+-#include "../../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ #include "../tracefile.h"
+ 
+ /* percents to share the total debug memory for each type */
+diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
+index 657c495..6aed98f 100644
+--- a/drivers/staging/lustre/lnet/libcfs/module.c
++++ b/drivers/staging/lustre/lnet/libcfs/module.c
+@@ -50,12 +50,12 @@
+ 
+ # define DEBUG_SUBSYSTEM S_LNET
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ #include <asm/div64.h>
+ 
+-#include "../../include/linux/libcfs/libcfs_crypto.h"
+-#include "../../include/linux/lnet/lib-lnet.h"
+-#include "../../include/uapi/linux/lnet/lnet-dlc.h"
++#include <linux/libcfs/libcfs_crypto.h>
++#include <linux/lnet/lib-lnet.h>
++#include <uapi/linux/lnet/lnet-dlc.h>
+ #include "tracefile.h"
+ 
+ static struct dentry *lnet_debugfs_root;
+diff --git a/drivers/staging/lustre/lnet/libcfs/prng.c b/drivers/staging/lustre/lnet/libcfs/prng.c
+index 21d5a39..963ef4a 100644
+--- a/drivers/staging/lustre/lnet/libcfs/prng.c
++++ b/drivers/staging/lustre/lnet/libcfs/prng.c
+@@ -35,7 +35,7 @@
+  * algorithm recommended by Marsaglia
+  */
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ /*
+  * From: George Marsaglia <geo@stat.fsu.edu>
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+index d1aa79b..68f283a 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+@@ -40,7 +40,7 @@
+ #define pr_fmt(fmt) "Lustre: " fmt
+ #include "tracefile.h"
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ /* XXX move things up to the top, comment */
+ union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+index f644cbc..c3547cd 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+@@ -33,7 +33,7 @@
+ #ifndef __LIBCFS_TRACEFILE_H__
+ #define __LIBCFS_TRACEFILE_H__
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ enum cfs_trace_buf_type {
+ 	CFS_TCD_TYPE_PROC = 0,
+diff --git a/drivers/staging/lustre/lnet/libcfs/workitem.c b/drivers/staging/lustre/lnet/libcfs/workitem.c
+index dbc2a9b..038ed8c 100644
+--- a/drivers/staging/lustre/lnet/libcfs/workitem.c
++++ b/drivers/staging/lustre/lnet/libcfs/workitem.c
+@@ -37,7 +37,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LNET
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ 
+ #define CFS_WS_NAME_LEN	 16
  
 -- 
 1.8.3.1
