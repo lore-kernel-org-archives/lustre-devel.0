@@ -1,44 +1,92 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 12:20:53 -0400
-Subject: [lustre-devel] [PATCH 03/14] staging: lustre: llite: add simple
-	comment about lustre.lov xattrs
+Date: Mon, 14 Aug 2017 12:20:54 -0400
+Subject: [lustre-devel] [PATCH 04/14] staging: lustre: llite: break up
+	ll_setstripe_ea function
 In-Reply-To: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
 References: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502727664-29438-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1502727664-29438-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Niu Yawei <yawei.niu@intel.com>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Bobi Jam <bobijam.xu@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: Bobi Jam <bobijam.xu@intel.com>
 
-Simple comment added to ll_xattr_set.
+Place all the handling of information of trusted.lov that
+is not stripe related into the new function ll_adjust_lum().
+Now ll_setstripe_ea() only handles striping information.
 
 Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8998
-Reviewed-on: https://review.whamcloud.com/24851
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9484
+Reviewed-on: https://review.whamcloud.com/27126
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Lai Siyao <lai.siyao@intel.com>
-Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/xattr.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/staging/lustre/lustre/llite/xattr.c | 37 +++++++++++++++++++----------
+ 1 file changed, 24 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index fb53942..f201021 100644
+index f201021..7a17114 100644
 --- a/drivers/staging/lustre/lustre/llite/xattr.c
 +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -261,6 +261,7 @@ static int ll_xattr_set(const struct xattr_handler *handler,
- 	CDEBUG(D_VFSTRACE, "VFS Op:inode=" DFID "(%p), xattr %s\n",
- 	       PFID(ll_inode2fid(inode)), inode, name);
+@@ -183,22 +183,10 @@ static int get_hsm_state(struct inode *inode, u32 *hus_states)
+ 	return rc;
+ }
  
-+	/* lustre/trusted.lov.xxx would be passed through xattr API */
- 	if (!strcmp(name, "lov")) {
- 		int op_type = flags == XATTR_REPLACE ? LPROC_LL_REMOVEXATTR :
- 						       LPROC_LL_SETXATTR;
+-static int ll_setstripe_ea(struct dentry *dentry, struct lov_user_md *lump,
+-			   size_t size)
++static int ll_adjust_lum(struct inode *inode, struct lov_user_md *lump)
+ {
+-	struct inode *inode = d_inode(dentry);
+ 	int rc = 0;
+ 
+-	if (size != 0 && size < sizeof(struct lov_user_md))
+-		return -EINVAL;
+-
+-	/*
+-	 * It is possible to set an xattr to a "" value of zero size.
+-	 * For this case we are going to treat it as a removal.
+-	 */
+-	if (!size && lump)
+-		lump = NULL;
+-
+ 	/* Attributes that are saved via getxattr will always have
+ 	 * the stripe_offset as 0.  Instead, the MDS should be
+ 	 * allowed to pick the starting OST index.   b=17846
+@@ -231,6 +219,29 @@ static int ll_setstripe_ea(struct dentry *dentry, struct lov_user_md *lump,
+ 		}
+ 	}
+ 
++	return rc;
++}
++
++static int ll_setstripe_ea(struct dentry *dentry, struct lov_user_md *lump,
++			   size_t size)
++{
++	struct inode *inode = d_inode(dentry);
++	int rc = 0;
++
++	if (size != 0 && size < sizeof(struct lov_user_md))
++		return -EINVAL;
++
++	/*
++	 * It is possible to set an xattr to a "" value of zero size.
++	 * For this case we are going to treat it as a removal.
++	 */
++	if (!size && lump)
++		lump = NULL;
++
++	rc = ll_adjust_lum(inode, lump);
++	if (rc)
++		return rc;
++
+ 	if (lump && S_ISREG(inode->i_mode)) {
+ 		__u64 it_flags = FMODE_WRITE;
+ 		int lum_size;
 -- 
 1.8.3.1
