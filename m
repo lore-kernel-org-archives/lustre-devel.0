@@ -1,47 +1,118 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 Aug 2017 12:20:59 -0400
-Subject: [lustre-devel] [PATCH 09/14] staging: lustre: llite: record in
-	stats attempted removal of lma/link xattr
-In-Reply-To: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
-References: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1502727664-29438-10-git-send-email-jsimmons@infradead.org>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Tue, 15 Aug 2017 14:12:14 +0300
+Subject: [lustre-devel] [bug report] staging: lustre: lov: Ensure
+ correct operation for large object sizes
+In-Reply-To: <alpine.LFD.2.20.1708141602050.14369@casper.infradead.org>
+References: <20170801111058.xlmx7tmvmfkyihxh@mwanda>
+	<alpine.LFD.2.20.1708141602050.14369@casper.infradead.org>
+Message-ID: <20170815110145.i5gn3cxn4ss5mm3k@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
+To: lustre-devel@lists.lustre.org
 
-Keep track of attempted deletions as well as changing of the
-lma/link xattrs.
+On Mon, Aug 14, 2017 at 04:09:34PM +0100, James Simmons wrote:
+> 
+> > Hello Nathaniel Clark,
+> > 
+> > The patch 476f575cf070: "staging: lustre: lov: Ensure correct
+> > operation for large object sizes" from Jul 26, 2017, leads to the
+> > following static checker warning:
+> > 
+> > 	drivers/staging/lustre/lustre/lov/lov_ea.c:207 lsm_unpackmd_common()
+> > 	warn: signed overflow undefined. 'min_stripe_maxbytes * stripe_count < min_stripe_maxbytes'
+> > 
+> > drivers/staging/lustre/lustre/lov/lov_ea.c
+> >    148  static int lsm_unpackmd_common(struct lov_obd *lov,
+> >    149                                 struct lov_stripe_md *lsm,
+> >    150                                 struct lov_mds_md *lmm,
+> >    151                                 struct lov_ost_data_v1 *objects)
+> >    152  {
+> >    153          loff_t min_stripe_maxbytes = 0;
+> >                 ^^^^^^
+> > loff_t is long long.
+> > 
+> >    154          unsigned int stripe_count;
+> >    155          struct lov_oinfo *loi;
+> >    156          loff_t lov_bytes;
+> >    157          unsigned int i;
+> >    158  
+> >    159          /*
+> >    160           * This supposes lov_mds_md_v1/v3 first fields are
+> >    161           * are the same
+> >    162           */
+> >    163          lmm_oi_le_to_cpu(&lsm->lsm_oi, &lmm->lmm_oi);
+> >    164          lsm->lsm_stripe_size = le32_to_cpu(lmm->lmm_stripe_size);
+> >    165          lsm->lsm_pattern = le32_to_cpu(lmm->lmm_pattern);
+> >    166          lsm->lsm_layout_gen = le16_to_cpu(lmm->lmm_layout_gen);
+> >    167          lsm->lsm_pool_name[0] = '\0';
+> >    168  
+> >    169          stripe_count = lsm_is_released(lsm) ? 0 : lsm->lsm_stripe_count;
+> >    170  
+> >    171          for (i = 0; i < stripe_count; i++) {
+> >    172                  loi = lsm->lsm_oinfo[i];
+> >    173                  ostid_le_to_cpu(&objects[i].l_ost_oi, &loi->loi_oi);
+> >    174                  loi->loi_ost_idx = le32_to_cpu(objects[i].l_ost_idx);
+> >    175                  loi->loi_ost_gen = le32_to_cpu(objects[i].l_ost_gen);
+> >    176                  if (lov_oinfo_is_dummy(loi))
+> >    177                          continue;
+> >    178  
+> >    179                  if (loi->loi_ost_idx >= lov->desc.ld_tgt_count &&
+> >    180                      !lov2obd(lov)->obd_process_conf) {
+> >    181                          CERROR("%s: OST index %d more than OST count %d\n",
+> >    182                                 (char *)lov->desc.ld_uuid.uuid,
+> >    183                                 loi->loi_ost_idx, lov->desc.ld_tgt_count);
+> >    184                          lov_dump_lmm_v1(D_WARNING, lmm);
+> >    185                          return -EINVAL;
+> >    186                  }
+> >    187  
+> >    188                  if (!lov->lov_tgts[loi->loi_ost_idx]) {
+> >    189                          CERROR("%s: OST index %d missing\n",
+> >    190                                 (char *)lov->desc.ld_uuid.uuid,
+> >    191                                 loi->loi_ost_idx);
+> >    192                          lov_dump_lmm_v1(D_WARNING, lmm);
+> >    193                          continue;
+> >    194                  }
+> >    195  
+> >    196                  lov_bytes = lov_tgt_maxbytes(lov->lov_tgts[loi->loi_ost_idx]);
+> >    197                  if (min_stripe_maxbytes == 0 || lov_bytes < min_stripe_maxbytes)
+> >    198                          min_stripe_maxbytes = lov_bytes;
+> >    199          }
+> >    200  
+> >    201          if (min_stripe_maxbytes == 0)
+> >    202                  min_stripe_maxbytes = LUSTRE_EXT3_STRIPE_MAXBYTES;
+> >    203  
+> >    204          stripe_count = lsm->lsm_stripe_count ?: lov->desc.ld_tgt_count;
+> >    205          lov_bytes = min_stripe_maxbytes * stripe_count;
+> >                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > This is undefined in C.
+> > 
+> >    206  
+> >    207          if (lov_bytes < min_stripe_maxbytes) /* handle overflow */
+> >                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > So this might be wrong.
+> > 
+> >    208                  lsm->lsm_maxbytes = MAX_LFS_FILESIZE;
+> >    209          else
+> >    210                  lsm->lsm_maxbytes = lov_bytes;
+> >    211  
+> >    212          return 0;
+> >    213  }
+> 
+> Dan what exact command did you use to find this bug? We do use smatch to 
+> find these kinds of issues before patches land but some how we are missing
+> this class from time to time.
+> 
+> Just to let you know the bug is being tracked under 
+> 
+> https://jira.hpdd.intel.com/browse/LU-9862
+> 
+> We do have a patch as well under going testing and review.
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9183
-Reviewed-on: https://review.whamcloud.com/27240
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/llite/xattr.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+It's something I hadn't pushed.  I'll push that check right now.  But
+it has few warnings and I'm not actually sure it matters with the
+kernel.
 
-diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index a54be09..5728579 100644
---- a/drivers/staging/lustre/lustre/llite/xattr.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -297,7 +297,10 @@ static int ll_xattr_set(const struct xattr_handler *handler,
- 		return ll_setstripe_ea(dentry, (struct lov_user_md *)value,
- 				       size);
- 	} else if (!strcmp(name, "lma") || !strcmp(name, "link")) {
--		ll_stats_ops_tally(ll_i2sbi(inode), LPROC_LL_SETXATTR, 1);
-+		int op_type = flags == XATTR_REPLACE ? LPROC_LL_REMOVEXATTR :
-+						       LPROC_LL_SETXATTR;
-+
-+		ll_stats_ops_tally(ll_i2sbi(inode), op_type, 1);
- 		return 0;
- 	}
- 
--- 
-1.8.3.1
+regards,
+dan carpenter
