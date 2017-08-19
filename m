@@ -1,46 +1,53 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sat, 19 Aug 2017 00:07:13 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: lustre: Off by two in
-	lmv_fid2path()
-In-Reply-To: <20170817154752.GA18912@kroah.com>
-References: <20170728144227.uml3x27mqug3ciox@mwanda>
-	<alpine.LFD.2.20.1708141559060.14369@casper.infradead.org>
-	<20170817154752.GA18912@kroah.com>
-Message-ID: <62C696A2-E013-4473-85DB-F378ADF61605@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Fri, 18 Aug 2017 23:04:14 -0400
+Subject: [lustre-devel] [PATCH] staging: lustre: uapi: properly include
+	lustre_errno.h
+Message-ID: <1503111854-29944-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
+The path for lustre_errno.h was not updated to the new path
+for errno.c. Also the header lustre_net.h uses code found in
+lustre_errno.h but doesn't include the header directly. It
+is easy to forget to add the header lustre_errno.h before
+including lustre_net.h so it is just easier to include
+lustre_errno.h in lustre_net.h. This should resolve the
+build issues seen on the ia64 platform.
 
-> On Aug 17, 2017, at 09:47, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
-> 
-> On Mon, Aug 14, 2017 at 04:01:17PM +0100, James Simmons wrote:
->> 
->>> We want to concatonate join string one, a '/' character, string two and
->>> then a NUL terminator.  The destination buffer holds ori_gf->gf_pathlen
->>> characters.  The strlen() function returns the number of characters not
->>> counting the NUL terminator.  So we should be adding two extra spaces,
->>> one for the foward slash and one for the NUL.
->>> 
->>> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
->>> ---
->>> Not tested.  Please review this one carefully.
->> 
->> This is a real bug which is impacting users. The bug is being tracked
->> at https://jira.hpdd.intel.com/browse/LU-9863. It passed our test suite
->> and its being reviewed.
-> 
-> So what am I supposed to do with this patch?
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/include/lustre_net.h | 1 +
+ drivers/staging/lustre/lustre/ptlrpc/errno.c       | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-The patch has been reviewed and you could add them before landing:
-
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: frank zago <fzago@cray.com>
-
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel Corporation
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 1ae7e83..bc18131 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -55,6 +55,7 @@
+ #include "../../include/uapi/linux/lnet/nidstr.h"
+ #include "../../include/linux/lnet/api.h"
+ #include "../../include/uapi/linux/lustre/lustre_idl.h"
++#include "lustre_errno.h"
+ #include "lustre_ha.h"
+ #include "lustre_sec.h"
+ #include "lustre_import.h"
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/errno.c b/drivers/staging/lustre/lustre/ptlrpc/errno.c
+index 73f8374..faad8d8 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/errno.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/errno.c
+@@ -26,7 +26,7 @@
+  */
+ 
+ #include "../../include/linux/libcfs/libcfs.h"
+-#include "../include/lustre/lustre_errno.h"
++#include "../include/lustre_errno.h"
+ 
+ /*
+  * The two translation tables below must define a one-to-one mapping between
+-- 
+1.8.3.1
