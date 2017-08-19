@@ -1,53 +1,35 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 18 Aug 2017 23:04:14 -0400
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Fri, 18 Aug 2017 20:41:45 -0700
 Subject: [lustre-devel] [PATCH] staging: lustre: uapi: properly include
 	lustre_errno.h
-Message-ID: <1503111854-29944-1-git-send-email-jsimmons@infradead.org>
+In-Reply-To: <1503111854-29944-1-git-send-email-jsimmons@infradead.org>
+References: <1503111854-29944-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <20170819034145.GB4144@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-The path for lustre_errno.h was not updated to the new path
-for errno.c. Also the header lustre_net.h uses code found in
-lustre_errno.h but doesn't include the header directly. It
-is easy to forget to add the header lustre_errno.h before
-including lustre_net.h so it is just easier to include
-lustre_errno.h in lustre_net.h. This should resolve the
-build issues seen on the ia64 platform.
+On Fri, Aug 18, 2017 at 11:04:14PM -0400, James Simmons wrote:
+> The path for lustre_errno.h was not updated to the new path
+> for errno.c. Also the header lustre_net.h uses code found in
+> lustre_errno.h but doesn't include the header directly. It
+> is easy to forget to add the header lustre_errno.h before
+> including lustre_net.h so it is just easier to include
+> lustre_errno.h in lustre_net.h. This should resolve the
+> build issues seen on the ia64 platform.
+> 
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  drivers/staging/lustre/lustre/include/lustre_net.h | 1 +
+>  drivers/staging/lustre/lustre/ptlrpc/errno.c       | 2 +-
+>  2 files changed, 2 insertions(+), 1 deletion(-)
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/include/lustre_net.h | 1 +
- drivers/staging/lustre/lustre/ptlrpc/errno.c       | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+Merge this into the correct patch and send both patch series again
+please.
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index 1ae7e83..bc18131 100644
---- a/drivers/staging/lustre/lustre/include/lustre_net.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -55,6 +55,7 @@
- #include "../../include/uapi/linux/lnet/nidstr.h"
- #include "../../include/linux/lnet/api.h"
- #include "../../include/uapi/linux/lustre/lustre_idl.h"
-+#include "lustre_errno.h"
- #include "lustre_ha.h"
- #include "lustre_sec.h"
- #include "lustre_import.h"
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/errno.c b/drivers/staging/lustre/lustre/ptlrpc/errno.c
-index 73f8374..faad8d8 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/errno.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/errno.c
-@@ -26,7 +26,7 @@
-  */
- 
- #include "../../include/linux/libcfs/libcfs.h"
--#include "../include/lustre/lustre_errno.h"
-+#include "../include/lustre_errno.h"
- 
- /*
-  * The two translation tables below must define a one-to-one mapping between
--- 
-1.8.3.1
+thanks,
+
+greg k-h
