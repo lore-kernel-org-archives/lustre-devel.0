@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 19 Aug 2017 22:25:56 -0400
-Subject: [lustre-devel] [PATCH 02/64 v2] staging: lustre: uapi: remove
-	unused functions for lustre_fid.h
+Date: Sat, 19 Aug 2017 22:26:33 -0400
+Subject: [lustre-devel] [PATCH 39/64 v2] staging: lustre: lnet: remove BIT
+	macro from lnetctl.h
 In-Reply-To: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
 References: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1503196018-24500-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1503196018-24500-40-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,60 +12,32 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-The inline function fid_is_namespace_visible and ost_fid_from_resid
-are only used for server code so we can remove it.
+Now that lnetctl.h is a UAPI header the BIT macro has to be
+removed.
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_fid.h | 29 ----------------------
- 1 file changed, 29 deletions(-)
+ drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_fid.h b/drivers/staging/lustre/lustre/include/lustre_fid.h
-index 6dc24a7..681f698 100644
---- a/drivers/staging/lustre/lustre/include/lustre_fid.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_fid.h
-@@ -288,18 +288,6 @@ static inline int fid_is_quota(const struct lu_fid *fid)
- 	       fid_seq(fid) == FID_SEQ_QUOTA_GLB;
- }
+diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
+index 65b2bf8..f7ffc53 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
++++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
+@@ -32,10 +32,10 @@ enum {
+ 	LNET_CTL_DELAY_LIST,
+ };
  
--static inline int fid_is_namespace_visible(const struct lu_fid *fid)
--{
--	const __u64 seq = fid_seq(fid);
--
--	/* Here, we cannot distinguish whether the normal FID is for OST
--	 * object or not. It is caller's duty to check more if needed.
--	 */
--	return (!fid_is_last_id(fid) &&
--		(fid_seq_is_norm(seq) || fid_seq_is_igif(seq))) ||
--	       fid_is_root(fid) || fid_is_dot_lustre(fid);
--}
--
- static inline int fid_seq_in_fldb(__u64 seq)
- {
- 	return fid_seq_is_igif(seq) || fid_seq_is_norm(seq) ||
-@@ -522,23 +510,6 @@ static inline void ost_fid_build_resid(const struct lu_fid *fid,
- 	}
- }
+-#define LNET_ACK_BIT		BIT(0)
+-#define LNET_PUT_BIT		BIT(1)
+-#define LNET_GET_BIT		BIT(2)
+-#define LNET_REPLY_BIT		BIT(3)
++#define LNET_ACK_BIT		(1 << 0)
++#define LNET_PUT_BIT		(1 << 1)
++#define LNET_GET_BIT		(1 << 2)
++#define LNET_REPLY_BIT		(1 << 3)
  
--static inline void ost_fid_from_resid(struct lu_fid *fid,
--				      const struct ldlm_res_id *name,
--				      int ost_idx)
--{
--	if (fid_seq_is_mdt0(name->name[LUSTRE_RES_ID_VER_OID_OFF])) {
--		/* old resid */
--		struct ost_id oi;
--
--		ostid_set_seq(&oi, name->name[LUSTRE_RES_ID_VER_OID_OFF]);
--		ostid_set_id(&oi, name->name[LUSTRE_RES_ID_SEQ_OFF]);
--		ostid_to_fid(fid, &oi, ost_idx);
--	} else {
--		/* new resid */
--		fid_extract_from_res_name(fid, name);
--	}
--}
--
- /**
-  * Flatten 128-bit FID values into a 64-bit value for use as an inode number.
-  * For non-IGIF FIDs this starts just over 2^32, and continues without
+ /** ioctl parameter for LNet fault simulation */
+ struct lnet_fault_attr {
 -- 
 1.8.3.1
