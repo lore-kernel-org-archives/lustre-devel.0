@@ -1,44 +1,63 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 20 Aug 2017 03:52:26 +0100 (BST)
-Subject: [lustre-devel] [PATCH] staging: lustre: fix structure size for
-	ARM OABI
-In-Reply-To: <E541F5C8-64B1-4BA6-97B7-1C79B9BABB77@intel.com>
-References: <1502894655-9731-1-git-send-email-cakturk@gmail.com>
-	<20170817162639.GA13066@kroah.com>
-	<E541F5C8-64B1-4BA6-97B7-1C79B9BABB77@intel.com>
-Message-ID: <alpine.LFD.2.20.1708200351190.5810@casper.infradead.org>
+Date: Sun, 20 Aug 2017 03:53:39 +0100 (BST)
+Subject: [lustre-devel] [PATCH v2 01/14] staging: lustre: llite: Remove
+ filtering of seclabel xattr
+In-Reply-To: <20170817162348.GA22834@kroah.com>
+References: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
+	<1502727664-29438-2-git-send-email-jsimmons@infradead.org>
+	<20170817162348.GA22834@kroah.com>
+Message-ID: <alpine.LFD.2.20.1708200352470.5810@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Dilger, Andreas" <andreas.dilger@intel.com>
-Cc: Greg KH <gregkh@linuxfoundation.org>, Cihangir Akturk <cakturk@gmail.com>, Lustre Development List <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Robin Humble <plaguedbypenguins@gmail.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> On Aug 17, 2017, at 10:26, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Mon, Aug 14, 2017 at 12:20:51PM -0400, James Simmons wrote:
+> > From: Robin Humble <plaguedbypenguins@gmail.com>
 > > 
-> > On Wed, Aug 16, 2017 at 05:44:15PM +0300, Cihangir Akturk wrote:
-> >> When building the kernel for the ARM architecture without setting
-> >> CONFIG_AEABI, size of struct lov_user_md_v3 and struct lov_mds_md_v3
-> >> differs, due to different alignment requirements of OABI and EABI.
-
-I have to ask are you testing the lustre on ARM?
- 
-> >> Marking the anonymous union within struct lov_user_md_v3 as
-> >> '_packed' solves this issue. Otherwise we get the following
-> >> error:
-> >> 
-> >> drivers/staging/lustre/lustre/lov/lov_pack.c:352:2: note: in expansion
-> >> of macro ?BUILD_BUG_ON?
-> >>  BUILD_BUG_ON(sizeof(lum) != sizeof(struct lov_mds_md_v3));
-> >> 
-> >> Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
-> >> ---
-> >> drivers/staging/lustre/lustre/include/lustre/lustre_user.h | 2 +-
-> >> 1 file changed, 1 insertion(+), 1 deletion(-)
+> > The security.capability xattr is used to implement File
+> > Capabilities in recent Linux versions. Capabilities are a
+> > fine grained approach to granting executables elevated
+> > privileges. eg. /bin/ping can have capabilities
+> > cap_net_admin, cap_net_raw+ep instead of being setuid root.
 > > 
-> > This file is no longer in the tree :(
+> > This xattr has long been filtered out by llite, initially for
+> > stability reasons (b15587), and later over performance
+> > concerns as this xattr is read for every file with eg.
+> > 'ls --color'. Since LU-2869 xattr's are cached on clients,
+> > alleviating most performance concerns.
+> > 
+> > Removing llite's filtering of the security.capability xattr
+> > enables using Lustre as a root filesystem, which is used on
+> > some large clusters.
+> > 
+> > Signed-off-by: Robin Humble <plaguedbypenguins@gmail.com>
+> > Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9562
+> > Reviewed-on: https://review.whamcloud.com/27292
+> > Reviewed-by: John L. Hammond <john.hammond@intel.com>
+> > Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
+> > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > ---
+> > Changelog:
+> > 
+> > v1) Initial submit with wrong patch attached.
+> > v2) Proper patch this time.
 > 
-> With James' recent patch series, this has moved to include/uapi/linux/lustre/lustre_user.h
+> I don't see a v1 patch anywhere...
 
-BTW is __packed valid for UAPI headers?
+Its the patch I asked you to drop earlier. Same commit message but I mixed
+up the patch with another patch.
+
+> Anyway, when you do this, please make your subject such that I can sort
+> the emails properly and they show up in the correct order, so put the
+> "v2" after the patch number like this:
+> 
+>    Subject: [PATCH 01/14 v2] staging: lustre: llite: Remove filtering of
+> 
+> I think git does that correctly for you automatically if you use it...
+
+Will do.
