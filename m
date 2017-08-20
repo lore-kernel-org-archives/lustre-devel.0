@@ -1,81 +1,148 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 19 Aug 2017 22:26:32 -0400
-Subject: [lustre-devel] [PATCH 38/64 v2] staging: lustre: lnet: remove
-	userland function prototype in lnetctl.h
+Date: Sat, 19 Aug 2017 22:26:40 -0400
+Subject: [lustre-devel] [PATCH 46/64 v2] staging: lustre: fld: add include
+	path to Makefile
 In-Reply-To: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
 References: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1503196018-24500-39-git-send-email-jsimmons@infradead.org>
+Message-ID: <1503196018-24500-47-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Several function prototypes of the form jt_ptl_* are only needed
-by userland so they can be removed.
+Rationalize include paths in the fld source code files.
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
-Reviewed-on: http://review.whamcloud.com/17643
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: John L. Hammond <john.hammond@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/uapi/linux/lnet/lnetctl.h       | 41 ----------------------
- 1 file changed, 41 deletions(-)
+ drivers/staging/lustre/lustre/fld/Makefile       |  3 +++
+ drivers/staging/lustre/lustre/fld/fld_cache.c    | 16 ++++++++--------
+ drivers/staging/lustre/lustre/fld/fld_internal.h |  8 ++++----
+ drivers/staging/lustre/lustre/fld/fld_request.c  | 18 +++++++++---------
+ drivers/staging/lustre/lustre/fld/lproc_fld.c    | 14 +++++++-------
+ 5 files changed, 31 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-index 2ce1c50..65b2bf8 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-@@ -131,45 +131,4 @@ struct lnet_fault_stat {
- #define SMFS_DEV_MAJOR 10
- #define SMFS_DEV_MINOR 242
+diff --git a/drivers/staging/lustre/lustre/fld/Makefile b/drivers/staging/lustre/lustre/fld/Makefile
+index 646e315..426deba 100644
+--- a/drivers/staging/lustre/lustre/fld/Makefile
++++ b/drivers/staging/lustre/lustre/fld/Makefile
+@@ -1,2 +1,5 @@
++subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
++subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include/
++
+ obj-$(CONFIG_LUSTRE_FS) += fld.o
+ fld-y := fld_request.o fld_cache.o lproc_fld.o
+diff --git a/drivers/staging/lustre/lustre/fld/fld_cache.c b/drivers/staging/lustre/lustre/fld/fld_cache.c
+index 68d009b..b723ece 100644
+--- a/drivers/staging/lustre/lustre/fld/fld_cache.c
++++ b/drivers/staging/lustre/lustre/fld/fld_cache.c
+@@ -39,18 +39,18 @@
  
--int ptl_initialize(int argc, char **argv);
--int jt_ptl_network(int argc, char **argv);
--int jt_ptl_list_nids(int argc, char **argv);
--int jt_ptl_which_nid(int argc, char **argv);
--int jt_ptl_print_interfaces(int argc, char **argv);
--int jt_ptl_add_interface(int argc, char **argv);
--int jt_ptl_del_interface(int argc, char **argv);
--int jt_ptl_print_peers(int argc, char **argv);
--int jt_ptl_add_peer(int argc, char **argv);
--int jt_ptl_del_peer(int argc, char **argv);
--int jt_ptl_print_connections(int argc, char **argv);
--int jt_ptl_disconnect(int argc, char **argv);
--int jt_ptl_push_connection(int argc, char **argv);
--int jt_ptl_print_active_txs(int argc, char **argv);
--int jt_ptl_ping(int argc, char **argv);
--int jt_ptl_mynid(int argc, char **argv);
--int jt_ptl_add_uuid(int argc, char **argv);
--int jt_ptl_add_uuid_old(int argc, char **argv); /* backwards compatibility  */
--int jt_ptl_close_uuid(int argc, char **argv);
--int jt_ptl_del_uuid(int argc, char **argv);
--int jt_ptl_add_route(int argc, char **argv);
--int jt_ptl_del_route(int argc, char **argv);
--int jt_ptl_notify_router(int argc, char **argv);
--int jt_ptl_print_routes(int argc, char **argv);
--int jt_ptl_fail_nid(int argc, char **argv);
--int jt_ptl_lwt(int argc, char **argv);
--int jt_ptl_testprotocompat(int argc, char **argv);
--int jt_ptl_memhog(int argc, char **argv);
--
--int dbg_initialize(int argc, char **argv);
--int jt_dbg_filter(int argc, char **argv);
--int jt_dbg_show(int argc, char **argv);
--int jt_dbg_list(int argc, char **argv);
--int jt_dbg_debug_kernel(int argc, char **argv);
--int jt_dbg_debug_daemon(int argc, char **argv);
--int jt_dbg_debug_file(int argc, char **argv);
--int jt_dbg_clear_debug_buf(int argc, char **argv);
--int jt_dbg_mark_debug_buf(int argc, char **argv);
--int jt_dbg_modules(int argc, char **argv);
--int jt_dbg_panic(int argc, char **argv);
--
- #endif
+ #define DEBUG_SUBSYSTEM S_FLD
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ #include <linux/module.h>
+ #include <asm/div64.h>
+ 
+-#include "../include/obd.h"
+-#include "../include/obd_class.h"
+-#include "../../include/uapi/linux/lustre/lustre_ver.h"
+-#include "../include/obd_support.h"
+-#include "../include/lprocfs_status.h"
++#include <obd.h>
++#include <obd_class.h>
++#include <uapi/linux/lustre/lustre_ver.h>
++#include <obd_support.h>
++#include <lprocfs_status.h>
+ 
+-#include "../include/lustre_req_layout.h"
+-#include "../include/lustre_fld.h"
++#include <lustre_req_layout.h>
++#include <lustre_fld.h>
+ #include "fld_internal.h"
+ 
+ /**
+diff --git a/drivers/staging/lustre/lustre/fld/fld_internal.h b/drivers/staging/lustre/lustre/fld/fld_internal.h
+index 3412c90..fe6f278 100644
+--- a/drivers/staging/lustre/lustre/fld/fld_internal.h
++++ b/drivers/staging/lustre/lustre/fld/fld_internal.h
+@@ -56,11 +56,11 @@
+ #ifndef __FLD_INTERNAL_H
+ #define __FLD_INTERNAL_H
+ 
+-#include "../../include/uapi/linux/lustre/lustre_idl.h"
++#include <uapi/linux/lustre/lustre_idl.h>
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
+-#include "../include/lustre_req_layout.h"
+-#include "../include/lustre_fld.h"
++#include <linux/libcfs/libcfs.h>
++#include <lustre_req_layout.h>
++#include <lustre_fld.h>
+ 
+ struct fld_stats {
+ 	__u64   fst_count;
+diff --git a/drivers/staging/lustre/lustre/fld/fld_request.c b/drivers/staging/lustre/lustre/fld/fld_request.c
+index 1282992..5b18083 100644
+--- a/drivers/staging/lustre/lustre/fld/fld_request.c
++++ b/drivers/staging/lustre/lustre/fld/fld_request.c
+@@ -38,19 +38,19 @@
+ 
+ #define DEBUG_SUBSYSTEM S_FLD
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ #include <linux/module.h>
+ #include <asm/div64.h>
+ 
+-#include "../include/obd.h"
+-#include "../include/obd_class.h"
+-#include "../../include/uapi/linux/lustre/lustre_ver.h"
+-#include "../include/obd_support.h"
+-#include "../include/lprocfs_status.h"
++#include <obd.h>
++#include <obd_class.h>
++#include <uapi/linux/lustre/lustre_ver.h>
++#include <obd_support.h>
++#include <lprocfs_status.h>
+ 
+-#include "../include/lustre_req_layout.h"
+-#include "../include/lustre_fld.h"
+-#include "../include/lustre_mdc.h"
++#include <lustre_req_layout.h>
++#include <lustre_fld.h>
++#include <lustre_mdc.h>
+ #include "fld_internal.h"
+ 
+ static int fld_rrb_hash(struct lu_client_fld *fld, u64 seq)
+diff --git a/drivers/staging/lustre/lustre/fld/lproc_fld.c b/drivers/staging/lustre/lustre/fld/lproc_fld.c
+index b83d7eb..6cae803 100644
+--- a/drivers/staging/lustre/lustre/fld/lproc_fld.c
++++ b/drivers/staging/lustre/lustre/fld/lproc_fld.c
+@@ -39,15 +39,15 @@
+ 
+ #define DEBUG_SUBSYSTEM S_FLD
+ 
+-#include "../../include/linux/libcfs/libcfs.h"
++#include <linux/libcfs/libcfs.h>
+ #include <linux/module.h>
+ 
+-#include "../include/obd.h"
+-#include "../include/obd_class.h"
+-#include "../include/obd_support.h"
+-#include "../include/lustre_req_layout.h"
+-#include "../include/lustre_fld.h"
+-#include "../include/lustre_fid.h"
++#include <obd.h>
++#include <obd_class.h>
++#include <obd_support.h>
++#include <lustre_req_layout.h>
++#include <lustre_fld.h>
++#include <lustre_fid.h>
+ #include "fld_internal.h"
+ 
+ static int
 -- 
 1.8.3.1
