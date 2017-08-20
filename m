@@ -1,63 +1,72 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 20 Aug 2017 03:53:39 +0100 (BST)
-Subject: [lustre-devel] [PATCH v2 01/14] staging: lustre: llite: Remove
- filtering of seclabel xattr
-In-Reply-To: <20170817162348.GA22834@kroah.com>
-References: <1502727664-29438-1-git-send-email-jsimmons@infradead.org>
-	<1502727664-29438-2-git-send-email-jsimmons@infradead.org>
-	<20170817162348.GA22834@kroah.com>
-Message-ID: <alpine.LFD.2.20.1708200352470.5810@casper.infradead.org>
+Date: Sun, 20 Aug 2017 03:58:03 +0100 (BST)
+Subject: [lustre-devel] [PATCH 0/6] dcache/namei fixes for lustre
+In-Reply-To: <150164273003.13199.7841976922211510658.stgit@noble>
+References: <150164273003.13199.7841976922211510658.stgit@noble>
+Message-ID: <alpine.LFD.2.20.1708200354030.5810@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Robin Humble <plaguedbypenguins@gmail.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: NeilBrown <neilb@suse.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> On Mon, Aug 14, 2017 at 12:20:51PM -0400, James Simmons wrote:
-> > From: Robin Humble <plaguedbypenguins@gmail.com>
-> > 
-> > The security.capability xattr is used to implement File
-> > Capabilities in recent Linux versions. Capabilities are a
-> > fine grained approach to granting executables elevated
-> > privileges. eg. /bin/ping can have capabilities
-> > cap_net_admin, cap_net_raw+ep instead of being setuid root.
-> > 
-> > This xattr has long been filtered out by llite, initially for
-> > stability reasons (b15587), and later over performance
-> > concerns as this xattr is read for every file with eg.
-> > 'ls --color'. Since LU-2869 xattr's are cached on clients,
-> > alleviating most performance concerns.
-> > 
-> > Removing llite's filtering of the security.capability xattr
-> > enables using Lustre as a root filesystem, which is used on
-> > some large clusters.
-> > 
-> > Signed-off-by: Robin Humble <plaguedbypenguins@gmail.com>
-> > Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9562
-> > Reviewed-on: https://review.whamcloud.com/27292
-> > Reviewed-by: John L. Hammond <john.hammond@intel.com>
-> > Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
-> > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> > Signed-off-by: James Simmons <jsimmons@infradead.org>
-> > ---
-> > Changelog:
-> > 
-> > v1) Initial submit with wrong patch attached.
-> > v2) Proper patch this time.
+> This series is a revised version of two patches I sent
+> previously (one of which was sadly broken).
+> That patch has been broken into multiple parts for easy
+> review.  The other is included unchanged as the last of
+> this series.
 > 
-> I don't see a v1 patch anywhere...
-
-Its the patch I asked you to drop earlier. Same commit message but I mixed
-up the patch with another patch.
-
-> Anyway, when you do this, please make your subject such that I can sort
-> the emails properly and they show up in the correct order, so put the
-> "v2" after the patch number like this:
+> I was drawn to look at this code due to the tests on
+> DCACHE_DISCONNECTED which are often wrong, and it turns out
+> they are used wrongly in lustre too.  Fixing one led to some
+> clean-up.  Fixing the other is straight forward.
 > 
->    Subject: [PATCH 01/14 v2] staging: lustre: llite: Remove filtering of
+> A particular change here from the previous posting is
+> the first patch which tests for DCACHE_PAR_LOOKUP in ll_dcompare().
+> Without this patch, two threads can be looking up the same
+> name in a given directory in parallel.  This parallelism lead
+> to my concerns about needing improved locking in ll_splice_alias().
+> Instead of improving the locking, I now avoid the need for it
+> by fixing ll_dcompare.
 > 
-> I think git does that correctly for you automatically if you use it...
+> This code passes basic "smoke tests".
+> 
+> Note that the cast to "struct dentry *" in the first patch is because
+> we have a "const struct dentry *" but d_in_lookup() requires a
+> pointer to a non-const structure.  I'll send a separate patch to
+> change d_in_lookup().
 
-Will do.
+To let you know this patch has been under going testing and we have a
+ticket open to track the progess:
+
+https://jira.hpdd.intel.com/browse/LU-9868
+
+Your patch did reveal that a piece of a fix landed earlier is missing :-(
+So currently the client can oops. I will send the fix shortly but this
+work will have to rebased after. As soon as we can get some cycles we will
+figure out what is going on. Thanks for helping out.
+ 
+> NeilBrown (6):
+>       staging: lustre: llite: handle DCACHE_PAR_LOOKUP in ll_dcompare
+>       staging: lustre: llite: use d_splice_alias for directories.
+>       staging: lustre: llite: remove directory-specific code from ll_find_alias()
+>       staging: lluste: llite: simplify ll_find_alias()
+>       staging: lustre: llite: refine ll_find_alias based on d_exact_alias
+>       staging: lustre: llite: fix incorrect DCACHE_DISCONNECTED test
+> 
+> 
+>  drivers/staging/lustre/lustre/llite/dcache.c       |   10 +++
+>  .../staging/lustre/lustre/llite/llite_internal.h   |    2 -
+>  drivers/staging/lustre/lustre/llite/namei.c        |   60 ++++++++++----------
+>  3 files changed, 40 insertions(+), 32 deletions(-)
+> 
+> --
+> Signature
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 
