@@ -1,123 +1,207 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 19 Aug 2017 22:25:57 -0400
-Subject: [lustre-devel] [PATCH 03/64 v2] staging: lustre: uapi: return error
-	code for ostid_set_id
+Date: Sat, 19 Aug 2017 22:26:05 -0400
+Subject: [lustre-devel] [PATCH 11/64 v2] staging: lustre: uapi: move
+	obd_ioctl_is_invalid() to linux-module.c
 In-Reply-To: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
 References: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1503196018-24500-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1503196018-24500-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Ben Evans <bevans@cray.com>, James Simmons <uja.ornl@yahoo.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-From: Ben Evans <bevans@cray.com>
+The inline function obd_ioctl_is_invalid() is no longer needed by
+userland and also the function was pretty bug for a inline function.
+Since this is the case we can move this kernel only code to the
+linux-module.c which is the only place it is used.
 
-Currently the function ostid_set_id() just logs an error
-and just keeps going. This function is also used by user
-land tools so having special lustre kernel debugging
-code is not desired. So instead just return an error
-code and have the calling kernel code print the error
-instead.
-
-Signed-off-by: Ben Evans <bevans@cray.com>
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
-Reviewed-on: https://review.whamcloud.com/22712
-Reviewed-on: https://review.whamcloud.com/24569
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Frank Zago <fzago@cray.com>
+Reviewed-on: https://review.whamcloud.com/24568
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Ben Evans <bevans@cray.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_idl.h      | 23 ++++++++--------------
- .../staging/lustre/lustre/obdecho/echo_client.c    |  7 +++++--
- drivers/staging/lustre/lustre/osc/osc_object.c     |  9 ++++++++-
- 3 files changed, 21 insertions(+), 18 deletions(-)
+ .../lustre/lustre/include/lustre/lustre_ioctl.h    | 76 ----------------------
+ .../lustre/lustre/obdclass/linux/linux-module.c    | 76 ++++++++++++++++++++++
+ 2 files changed, 76 insertions(+), 76 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-index 1e8ecdf..d70495d 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_idl.h
-@@ -515,32 +515,25 @@ static inline void ostid_set_seq_llog(struct ost_id *oi)
-  * Note: we need check oi_seq to decide where to set oi_id,
-  * so oi_seq should always be set ahead of oi_id.
-  */
--static inline void ostid_set_id(struct ost_id *oi, __u64 oid)
-+static inline int ostid_set_id(struct ost_id *oi, __u64 oid)
- {
- 	if (fid_seq_is_mdt0(oi->oi.oi_seq)) {
--		if (oid >= IDIF_MAX_OID) {
--			CERROR("Too large OID %#llx to set MDT0 " DOSTID "\n",
--			       oid, POSTID(oi));
--			return;
--		}
-+		if (oid >= IDIF_MAX_OID)
-+			return -E2BIG;
- 		oi->oi.oi_id = oid;
- 	} else if (fid_is_idif(&oi->oi_fid)) {
--		if (oid >= IDIF_MAX_OID) {
--			CERROR("Too large OID %#llx to set IDIF " DOSTID "\n",
--			       oid, POSTID(oi));
--			return;
--		}
-+		if (oid >= IDIF_MAX_OID)
-+			return -E2BIG;
- 		oi->oi_fid.f_seq = fid_idif_seq(oid,
- 						fid_idif_ost_idx(&oi->oi_fid));
- 		oi->oi_fid.f_oid = oid;
- 		oi->oi_fid.f_ver = oid >> 48;
- 	} else {
--		if (oid >= OBIF_MAX_OID) {
--			CERROR("Bad %llu to set " DOSTID "\n", oid, POSTID(oi));
--			return;
--		}
-+		if (oid >= OBIF_MAX_OID)
-+			return -E2BIG;
- 		oi->oi_fid.f_oid = oid;
- 	}
-+	return 0;
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
+index 914cea1..8585302 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
+@@ -132,82 +132,6 @@ static inline __u32 obd_ioctl_packlen(struct obd_ioctl_data *data)
+ 	return len;
  }
  
- static inline int fid_set_id(struct lu_fid *fid, __u64 oid)
-diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-index b3fbc3c..363d205 100644
---- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
-+++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
-@@ -1102,8 +1102,11 @@ static int echo_create_object(const struct lu_env *env, struct echo_device *ed,
- 		return -EINVAL;
- 	}
+-static inline int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
+-{
+-	if (data->ioc_len > (1 << 30)) {
+-		CERROR("OBD ioctl: ioc_len larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inllen1 > (1 << 30)) {
+-		CERROR("OBD ioctl: ioc_inllen1 larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inllen2 > (1 << 30)) {
+-		CERROR("OBD ioctl: ioc_inllen2 larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inllen3 > (1 << 30)) {
+-		CERROR("OBD ioctl: ioc_inllen3 larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inllen4 > (1 << 30)) {
+-		CERROR("OBD ioctl: ioc_inllen4 larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inlbuf1 && !data->ioc_inllen1) {
+-		CERROR("OBD ioctl: inlbuf1 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inlbuf2 && !data->ioc_inllen2) {
+-		CERROR("OBD ioctl: inlbuf2 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inlbuf3 && !data->ioc_inllen3) {
+-		CERROR("OBD ioctl: inlbuf3 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inlbuf4 && !data->ioc_inllen4) {
+-		CERROR("OBD ioctl: inlbuf4 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_pbuf1 && !data->ioc_plen1) {
+-		CERROR("OBD ioctl: pbuf1 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_pbuf2 && !data->ioc_plen2) {
+-		CERROR("OBD ioctl: pbuf2 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (!data->ioc_pbuf1 && data->ioc_plen1) {
+-		CERROR("OBD ioctl: plen1 set but NULL pointer\n");
+-		return 1;
+-	}
+-
+-	if (!data->ioc_pbuf2 && data->ioc_plen2) {
+-		CERROR("OBD ioctl: plen2 set but NULL pointer\n");
+-		return 1;
+-	}
+-
+-	if (obd_ioctl_packlen(data) > data->ioc_len) {
+-		CERROR("OBD ioctl: packlen exceeds ioc_len (%d > %d)\n",
+-		       obd_ioctl_packlen(data), data->ioc_len);
+-		return 1;
+-	}
+-
+-	return 0;
+-}
+-
+ /*
+  * OBD_IOC_DATA_TYPE is only for compatibility reasons with older
+  * Linux Lustre user tools. New ioctls should NOT use this macro as
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+index 3a394d2..092e68a 100644
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
++++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+@@ -68,6 +68,82 @@
+ #include "../../include/lustre/lustre_ioctl.h"
+ #include "../../include/lustre_ver.h"
  
--	if (!ostid_id(&oa->o_oi))
--		ostid_set_id(&oa->o_oi, ++last_object_id);
-+	if (!ostid_id(&oa->o_oi)) {
-+		rc = ostid_set_id(&oa->o_oi, ++last_object_id);
-+		if (rc)
-+			goto failed;
++static int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
++{
++	if (data->ioc_len > BIT(30)) {
++		CERROR("OBD ioctl: ioc_len larger than 1<<30\n");
++		return 1;
 +	}
- 
- 	rc = obd_create(env, ec->ec_exp, oa);
- 	if (rc != 0) {
-diff --git a/drivers/staging/lustre/lustre/osc/osc_object.c b/drivers/staging/lustre/lustre/osc/osc_object.c
-index fa621bd..945ae6e 100644
---- a/drivers/staging/lustre/lustre/osc/osc_object.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_object.c
-@@ -369,7 +369,14 @@ static void osc_req_attr_set(const struct lu_env *env, struct cl_object *obj,
- 		oa->o_valid |= OBD_MD_FLGROUP;
- 	}
- 	if (flags & OBD_MD_FLID) {
--		ostid_set_id(&oa->o_oi, ostid_id(&oinfo->loi_oi));
-+		int rc;
 +
-+		rc = ostid_set_id(&oa->o_oi, ostid_id(&oinfo->loi_oi));
-+		if (rc) {
-+			CERROR("Bad %llu to set " DOSTID " : rc %d\n",
-+			       (unsigned long long)ostid_id(&oinfo->loi_oi),
-+			       POSTID(&oa->o_oi), rc);
-+		}
- 		oa->o_valid |= OBD_MD_FLID;
- 	}
- 	if (flags & OBD_MD_FLHANDLE) {
++	if (data->ioc_inllen1 > BIT(30)) {
++		CERROR("OBD ioctl: ioc_inllen1 larger than 1<<30\n");
++		return 1;
++	}
++
++	if (data->ioc_inllen2 > BIT(30)) {
++		CERROR("OBD ioctl: ioc_inllen2 larger than 1<<30\n");
++		return 1;
++	}
++
++	if (data->ioc_inllen3 > BIT(30)) {
++		CERROR("OBD ioctl: ioc_inllen3 larger than 1<<30\n");
++		return 1;
++	}
++
++	if (data->ioc_inllen4 > BIT(30)) {
++		CERROR("OBD ioctl: ioc_inllen4 larger than 1<<30\n");
++		return 1;
++	}
++
++	if (data->ioc_inlbuf1 && data->ioc_inllen1 == 0) {
++		CERROR("OBD ioctl: inlbuf1 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_inlbuf2 && data->ioc_inllen2 == 0) {
++		CERROR("OBD ioctl: inlbuf2 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_inlbuf3 && data->ioc_inllen3 == 0) {
++		CERROR("OBD ioctl: inlbuf3 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_inlbuf4 && data->ioc_inllen4 == 0) {
++		CERROR("OBD ioctl: inlbuf4 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_pbuf1 && data->ioc_plen1 == 0) {
++		CERROR("OBD ioctl: pbuf1 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_pbuf2 && data->ioc_plen2 == 0) {
++		CERROR("OBD ioctl: pbuf2 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (!data->ioc_pbuf1 && data->ioc_plen1 != 0) {
++		CERROR("OBD ioctl: plen1 set but NULL pointer\n");
++		return 1;
++	}
++
++	if (!data->ioc_pbuf2 && data->ioc_plen2 != 0) {
++		CERROR("OBD ioctl: plen2 set but NULL pointer\n");
++		return 1;
++	}
++
++	if (obd_ioctl_packlen(data) > data->ioc_len) {
++		CERROR("OBD ioctl: packlen exceeds ioc_len (%d > %d)\n",
++		obd_ioctl_packlen(data), data->ioc_len);
++		return 1;
++	}
++
++	return 0;
++}
++
+ /* buffer MUST be at least the size of obd_ioctl_hdr */
+ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
+ {
 -- 
 1.8.3.1
