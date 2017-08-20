@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 19 Aug 2017 22:26:19 -0400
-Subject: [lustre-devel] [PATCH 25/64 v2] staging: lustre: uapi: move
-	lustre_cfg.h to uapi directory
+Date: Sat, 19 Aug 2017 22:26:20 -0400
+Subject: [lustre-devel] [PATCH 26/64 v2] staging: lustre: uapi: remove need
+	for libcfs.h from lustre_cfg.h
 In-Reply-To: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
 References: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1503196018-24500-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1503196018-24500-27-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,8 +12,10 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Move lustre_cfg.h to its proper place. Adjust additonal headers
-included in lustre_cfg.h.
+Several libcfs.h macros are present in lustre_cfg.h, but libcfs.h
+is not available so lets replace those macros with real code.
+The header libcfs.h also provides errno.h so with libcfs.h gone
+include errno.h directly.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
@@ -23,71 +25,63 @@ Reviewed-by: Ben Evans <bevans@cray.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../{lustre/include => include/uapi/linux/lustre}/lustre_cfg.h      | 6 ++----
- drivers/staging/lustre/lustre/include/lprocfs_status.h              | 2 +-
- drivers/staging/lustre/lustre/include/lustre_lib.h                  | 2 +-
- 3 files changed, 4 insertions(+), 6 deletions(-)
- rename drivers/staging/lustre/{lustre/include => include/uapi/linux/lustre}/lustre_cfg.h (99%)
+ .../staging/lustre/include/uapi/linux/lustre/lustre_cfg.h | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_cfg.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
-similarity index 99%
-rename from drivers/staging/lustre/lustre/include/lustre_cfg.h
-rename to drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
-index 21a48b1..a762aab 100644
---- a/drivers/staging/lustre/lustre/include/lustre_cfg.h
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
+index a762aab..a45d167 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
 +++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
 @@ -33,6 +33,8 @@
  #ifndef _LUSTRE_CFG_H
  #define _LUSTRE_CFG_H
  
-+#include "../../../../lustre/include/lustre/lustre_user.h"
-+
++#include <linux/errno.h>
++#include <linux/kernel.h>
+ #include "../../../../lustre/include/lustre/lustre_user.h"
+ 
  /** \defgroup cfg cfg
-  *
-  * @{
-@@ -191,8 +193,6 @@ static inline __u32 lustre_cfg_len(__u32 bufcount, __u32 *buflens)
- 	return cfs_size_round(len);
+@@ -48,7 +50,7 @@
+ #define LUSTRE_CFG_MAX_BUFCOUNT 8
+ 
+ #define LCFG_HDR_SIZE(count) \
+-	cfs_size_round(offsetof(struct lustre_cfg, lcfg_buflens[(count)]))
++	__ALIGN_KERNEL(offsetof(struct lustre_cfg, lcfg_buflens[(count)]), 8)
+ 
+ /** If the LCFG_REQUIRED bit is set in a configuration command,
+  * then the client is required to understand this parameter
+@@ -165,7 +167,7 @@ static inline void *lustre_cfg_buf(struct lustre_cfg *lcfg, __u32 index)
+ 
+ 	offset = LCFG_HDR_SIZE(lcfg->lcfg_bufcount);
+ 	for (i = 0; i < index; i++)
+-		offset += cfs_size_round(lcfg->lcfg_buflens[i]);
++		offset += __ALIGN_KERNEL(lcfg->lcfg_buflens[i], 8);
+ 	return (char *)lcfg + offset;
  }
  
--#include "obd_support.h"
--
+@@ -188,9 +190,9 @@ static inline __u32 lustre_cfg_len(__u32 bufcount, __u32 *buflens)
+ 
+ 	len = LCFG_HDR_SIZE(bufcount);
+ 	for (i = 0; i < bufcount; i++)
+-		len += cfs_size_round(buflens[i]);
++		len += __ALIGN_KERNEL(buflens[i], 8);
+ 
+-	return cfs_size_round(len);
++	return __ALIGN_KERNEL(len, 8);
+ }
+ 
  static inline void lustre_cfg_init(struct lustre_cfg *lcfg, int cmd,
- 				   struct lustre_cfg_bufs *bufs)
- {
-@@ -238,8 +238,6 @@ static inline int lustre_cfg_sanity_check(void *buf, size_t len)
- 	return 0;
+@@ -206,7 +208,10 @@ static inline void lustre_cfg_init(struct lustre_cfg *lcfg, int cmd,
+ 	ptr = (char *)lcfg + LCFG_HDR_SIZE(lcfg->lcfg_bufcount);
+ 	for (i = 0; i < lcfg->lcfg_bufcount; i++) {
+ 		lcfg->lcfg_buflens[i] = bufs->lcfg_buflen[i];
+-		LOGL((char *)bufs->lcfg_buf[i], bufs->lcfg_buflen[i], ptr);
++		if (bufs->lcfg_buf[i]) {
++			memcpy(ptr, bufs->lcfg_buf[i], bufs->lcfg_buflen[i]);
++			ptr += __ALIGN_KERNEL(bufs->lcfg_buflen[i], 8);
++		}
+ 	}
  }
  
--#include "lustre/lustre_user.h"
--
- /** @} cfg */
- 
- #endif /* _LUSTRE_CFG_H */
-diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-index 9054d37..694062a 100644
---- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-+++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-@@ -44,7 +44,7 @@
- #include <linux/types.h>
- 
- #include "../../include/linux/libcfs/libcfs.h"
--#include "lustre_cfg.h"
-+#include "../../include/uapi/linux/lustre/lustre_cfg.h"
- #include "lustre/lustre_idl.h"
- 
- struct lprocfs_vars {
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-index f24970d..c68dd5d 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-@@ -48,7 +48,7 @@
- #include "../../include/linux/libcfs/libcfs.h"
- #include "lustre/lustre_idl.h"
- #include "lustre_ver.h"
--#include "lustre_cfg.h"
-+#include "../../include/uapi/linux/lustre/lustre_cfg.h"
- 
- /* target.c */
- struct ptlrpc_request;
 -- 
 1.8.3.1
