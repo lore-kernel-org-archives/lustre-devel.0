@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 19 Aug 2017 22:26:44 -0400
-Subject: [lustre-devel] [PATCH 50/64 v2] staging: lustre: lov: add include
-	path to Makefile
+Date: Sat, 19 Aug 2017 22:26:51 -0400
+Subject: [lustre-devel] [PATCH 57/64 v2] staging: lustre: lustre: cleanup
+	paths for lustre UAPI headers
 In-Reply-To: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
 References: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1503196018-24500-51-git-send-email-jsimmons@infradead.org>
+Message-ID: <1503196018-24500-58-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,243 +12,100 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-Rationalize include paths in the lov source code files.
+Rationalize include paths for the lustre uapi headers
 
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/lov/Makefile         |  3 ++
- .../staging/lustre/lustre/lov/lov_cl_internal.h    |  6 ++--
- drivers/staging/lustre/lustre/lov/lov_dev.c        |  2 +-
- drivers/staging/lustre/lustre/lov/lov_ea.c         |  6 ++--
- drivers/staging/lustre/lustre/lov/lov_internal.h   |  4 +--
- drivers/staging/lustre/lustre/lov/lov_merge.c      |  4 +--
- drivers/staging/lustre/lustre/lov/lov_obd.c        | 32 +++++++++++-----------
- drivers/staging/lustre/lustre/lov/lov_offset.c     |  4 +--
- drivers/staging/lustre/lustre/lov/lov_pack.c       | 10 +++----
- drivers/staging/lustre/lustre/lov/lov_pool.c       |  4 +--
- drivers/staging/lustre/lustre/lov/lov_request.c    |  6 ++--
- drivers/staging/lustre/lustre/lov/lproc_lov.c      |  4 +--
- 12 files changed, 44 insertions(+), 41 deletions(-)
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h   | 2 +-
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h   | 2 +-
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h   | 6 +++---
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h | 2 +-
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h | 2 +-
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h  | 2 +-
+ 6 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/Makefile b/drivers/staging/lustre/lustre/lov/Makefile
-index ea93add..3abfb4e 100644
---- a/drivers/staging/lustre/lustre/lov/Makefile
-+++ b/drivers/staging/lustre/lustre/lov/Makefile
-@@ -1,3 +1,6 @@
-+subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
-+subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
-+
- obj-$(CONFIG_LUSTRE_FS) += lov.o
- lov-y := lov_obd.o lov_pack.o lov_offset.o lov_merge.o \
- 	 lov_request.o lov_ea.o lov_dev.o lov_object.o lov_page.o  \
-diff --git a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-index 38281b2..89d92b0 100644
---- a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-@@ -42,10 +42,10 @@
- #ifndef LOV_CL_INTERNAL_H
- #define LOV_CL_INTERNAL_H
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
+index 2b7deaa..11b51d9 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
+@@ -35,7 +35,7 @@
  
--#include "../../include/linux/libcfs/libcfs.h"
-+#include <linux/libcfs/libcfs.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+-#include "../../../uapi/linux/lustre/lustre_user.h"
++#include <uapi/linux/lustre/lustre_user.h>
  
--#include "../include/obd.h"
--#include "../include/cl_object.h"
-+#include <obd.h>
-+#include <cl_object.h>
- #include "lov_internal.h"
- 
- /** \defgroup lov lov
-diff --git a/drivers/staging/lustre/lustre/lov/lov_dev.c b/drivers/staging/lustre/lustre/lov/lov_dev.c
-index 531b4fe..cea5f9d 100644
---- a/drivers/staging/lustre/lustre/lov/lov_dev.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_dev.c
+ /** \defgroup cfg cfg
+  *
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
+index dd3785a..2e7a8d1 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
 @@ -37,7 +37,7 @@
- #define DEBUG_SUBSYSTEM S_LOV
+ #ifndef _UAPI_LUSTRE_FID_H_
+ #define _UAPI_LUSTRE_FID_H_
  
- /* class_name2obd() */
--#include "../include/obd_class.h"
-+#include <obd_class.h>
- 
- #include "lov_cl_internal.h"
- #include "lov_internal.h"
-diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index 530a4e9..1124fd5 100644
---- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -37,10 +37,10 @@
- #define DEBUG_SUBSYSTEM S_LOV
- 
- #include <asm/div64.h>
--#include "../../include/linux/libcfs/libcfs.h"
-+#include <linux/libcfs/libcfs.h>
- 
--#include "../include/obd_class.h"
--#include "../../include/uapi/linux/lustre/lustre_idl.h"
-+#include <obd_class.h>
+-#include "../../../uapi/linux/lustre/lustre_idl.h"
 +#include <uapi/linux/lustre/lustre_idl.h>
  
- #include "lov_internal.h"
+ /** returns fid object sequence */
+ static inline __u64 fid_seq(const struct lu_fid *fid)
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+index cc59c1a..aac98db 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+@@ -70,10 +70,10 @@
+ #include <asm/byteorder.h>
+ #include <linux/types.h>
  
-diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index 4d9437e..a21f074 100644
---- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -33,8 +33,8 @@
- #ifndef LOV_INTERNAL_H
- #define LOV_INTERNAL_H
- 
--#include "../include/obd_class.h"
--#include "../../include/uapi/linux/lustre/lustre_idl.h"
-+#include <obd_class.h>
-+#include <uapi/linux/lustre/lustre_idl.h>
+-#include "../lnet/lnet-types.h"
++#include <uapi/linux/lnet/lnet-types.h>
+ /* Defn's shared with user-space. */
+-#include "lustre_user.h"
+-#include "lustre_ver.h"
++#include <uapi/linux/lustre/lustre_user.h>
++#include <uapi/linux/lustre/lustre_ver.h>
  
  /*
-  * If we are unable to get the maximum object size from the OST in
-diff --git a/drivers/staging/lustre/lustre/lov/lov_merge.c b/drivers/staging/lustre/lustre/lov/lov_merge.c
-index 034b4fc..9163361 100644
---- a/drivers/staging/lustre/lustre/lov/lov_merge.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_merge.c
-@@ -32,9 +32,9 @@
- 
- #define DEBUG_SUBSYSTEM S_LOV
- 
--#include "../../include/linux/libcfs/libcfs.h"
-+#include <linux/libcfs/libcfs.h>
- 
--#include "../include/obd_class.h"
-+#include <obd_class.h>
- #include "lov_internal.h"
- 
- /** Merge the lock value block(&lvb) attributes and KMS from each of the
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index 953ed71..fefd3c5 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -38,22 +38,22 @@
-  */
- 
- #define DEBUG_SUBSYSTEM S_LOV
--#include "../../include/linux/libcfs/libcfs.h"
--
--#include "../../include/uapi/linux/lustre/lustre_idl.h"
--#include "../../include/uapi/linux/lustre/lustre_ioctl.h"
--
--#include "../include/cl_object.h"
--#include "../include/lustre_dlm.h"
--#include "../include/lustre_fid.h"
--#include "../include/lustre_lib.h"
--#include "../include/lustre_mds.h"
--#include "../include/lustre_net.h"
--#include "../../include/uapi/linux/lustre/lustre_param.h"
--#include "../include/lustre_swab.h"
--#include "../include/lprocfs_status.h"
--#include "../include/obd_class.h"
--#include "../include/obd_support.h"
-+#include <linux/libcfs/libcfs.h>
-+
+  *  GENERAL STUFF
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h
+index 1f52477..9590864 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h
+@@ -31,7 +31,7 @@
+ #include <linux/ioctl.h>
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+-#include "../../../uapi/linux/lustre/lustre_idl.h"
 +#include <uapi/linux/lustre/lustre_idl.h>
-+#include <uapi/linux/lustre/lustre_ioctl.h>
-+
-+#include <cl_object.h>
-+#include <lustre_dlm.h>
-+#include <lustre_fid.h>
-+#include <lustre_lib.h>
-+#include <lustre_mds.h>
-+#include <lustre_net.h>
-+#include <uapi/linux/lustre/lustre_param.h>
-+#include <lustre_swab.h>
-+#include <lprocfs_status.h>
-+#include <obd_class.h>
-+#include <obd_support.h>
  
- #include "lov_internal.h"
+ #if !defined(__KERNEL__) && !defined(LUSTRE_UTILS)
+ # error This file is for Lustre internal use only.
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
+index 9110229..3343b60 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
+@@ -35,7 +35,7 @@
+ #define _UAPI_LUSTRE_OSTID_H_
  
-diff --git a/drivers/staging/lustre/lustre/lov/lov_offset.c b/drivers/staging/lustre/lustre/lov/lov_offset.c
-index ecca74f..899d12c 100644
---- a/drivers/staging/lustre/lustre/lov/lov_offset.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_offset.c
-@@ -32,9 +32,9 @@
+ #include <linux/errno.h>
+-#include "lustre_fid.h"
++#include <uapi/linux/lustre/lustre_fid.h>
  
- #define DEBUG_SUBSYSTEM S_LOV
+ static inline __u64 lmm_oi_id(const struct ost_id *oi)
+ {
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
+index 2fcfe2b..5e332e3 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
+@@ -55,7 +55,7 @@
+ # include <sys/quota.h>
+ # include <sys/stat.h>
+ #endif /* __KERNEL__ */
+-#include "lustre_fiemap.h"
++#include <uapi/linux/lustre/lustre_fiemap.h>
  
--#include "../../include/linux/libcfs/libcfs.h"
-+#include <linux/libcfs/libcfs.h>
- 
--#include "../include/obd_class.h"
-+#include <obd_class.h>
- 
- #include "lov_internal.h"
- 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index fd346c5..24fb2a9 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -38,11 +38,11 @@
- 
- #define DEBUG_SUBSYSTEM S_LOV
- 
--#include "../include/lustre_net.h"
--#include "../include/lustre_swab.h"
--#include "../include/obd.h"
--#include "../include/obd_class.h"
--#include "../include/obd_support.h"
-+#include <lustre_net.h>
-+#include <lustre_swab.h>
-+#include <obd.h>
-+#include <obd_class.h>
-+#include <obd_support.h>
- 
- #include "lov_cl_internal.h"
- #include "lov_internal.h"
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
-index 39daa17..d774ee2 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pool.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
-@@ -40,9 +40,9 @@
- 
- #define DEBUG_SUBSYSTEM S_LOV
- 
--#include "../../include/linux/libcfs/libcfs.h"
-+#include <linux/libcfs/libcfs.h>
- 
--#include "../include/obd.h"
-+#include <obd.h>
- #include "lov_internal.h"
- 
- #define pool_tgt(_p, _i) \
-diff --git a/drivers/staging/lustre/lustre/lov/lov_request.c b/drivers/staging/lustre/lustre/lov/lov_request.c
-index 74aeb94..9d3b3f3 100644
---- a/drivers/staging/lustre/lustre/lov/lov_request.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_request.c
-@@ -32,10 +32,10 @@
- 
- #define DEBUG_SUBSYSTEM S_LOV
- 
--#include "../../include/linux/libcfs/libcfs.h"
-+#include <linux/libcfs/libcfs.h>
- 
--#include "../include/obd_class.h"
--#include "../../include/uapi/linux/lustre/lustre_idl.h"
-+#include <obd_class.h>
-+#include <uapi/linux/lustre/lustre_idl.h>
- #include "lov_internal.h"
- 
- static void lov_init_set(struct lov_request_set *set)
-diff --git a/drivers/staging/lustre/lustre/lov/lproc_lov.c b/drivers/staging/lustre/lustre/lov/lproc_lov.c
-index ce46821..9bb7e9e 100644
---- a/drivers/staging/lustre/lustre/lov/lproc_lov.c
-+++ b/drivers/staging/lustre/lustre/lov/lproc_lov.c
-@@ -32,8 +32,8 @@
- #define DEBUG_SUBSYSTEM S_CLASS
- 
- #include <linux/statfs.h>
--#include "../include/lprocfs_status.h"
--#include "../include/obd_class.h"
-+#include <lprocfs_status.h>
-+#include <obd_class.h>
- #include <linux/seq_file.h>
- #include "lov_internal.h"
- 
+ /*
+  * We need to always use 64bit version because the structure
 -- 
 1.8.3.1
