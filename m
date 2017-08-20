@@ -1,189 +1,142 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 19 Aug 2017 22:26:49 -0400
-Subject: [lustre-devel] [PATCH 55/64 v2] staging: lustre: osc: add include
-	path to Makefile
+Date: Sat, 19 Aug 2017 22:26:02 -0400
+Subject: [lustre-devel] [PATCH 08/64 v2] staging: lustre: uapi: remove
+	obd_ioctl_freedata() wrapper
 In-Reply-To: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
 References: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1503196018-24500-56-git-send-email-jsimmons@infradead.org>
+Message-ID: <1503196018-24500-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Rationalize include paths in the osc source code files.
+Replace obd_ioctl_freedata() with direct kvfree() call.
 
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
+Reviewed-on: https://review.whamcloud.com/24568
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/osc/Makefile         |  3 ++
- drivers/staging/lustre/lustre/osc/lproc_osc.c      |  6 ++--
- .../staging/lustre/lustre/osc/osc_cl_internal.h    |  6 ++--
- drivers/staging/lustre/lustre/osc/osc_dev.c        |  2 +-
- drivers/staging/lustre/lustre/osc/osc_internal.h   |  2 +-
- drivers/staging/lustre/lustre/osc/osc_io.c         |  2 +-
- drivers/staging/lustre/lustre/osc/osc_lock.c       |  4 +--
- drivers/staging/lustre/lustre/osc/osc_quota.c      |  2 +-
- drivers/staging/lustre/lustre/osc/osc_request.c    | 32 +++++++++++-----------
- 9 files changed, 31 insertions(+), 28 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h | 5 -----
+ drivers/staging/lustre/lustre/llite/dir.c                   | 6 +++---
+ drivers/staging/lustre/lustre/llite/llite_lib.c             | 3 +--
+ drivers/staging/lustre/lustre/lov/lov_obd.c                 | 8 ++++----
+ drivers/staging/lustre/lustre/obdclass/class_obd.c          | 3 +--
+ 5 files changed, 9 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/Makefile b/drivers/staging/lustre/lustre/osc/Makefile
-index 37cdeea..30dec90 100644
---- a/drivers/staging/lustre/lustre/osc/Makefile
-+++ b/drivers/staging/lustre/lustre/osc/Makefile
-@@ -1,3 +1,6 @@
-+subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
-+subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
-+
- obj-$(CONFIG_LUSTRE_FS) += osc.o
- osc-y := osc_request.o osc_dev.o osc_object.o \
- 	 osc_page.o osc_lock.o osc_io.o osc_quota.o osc_cache.o lproc_osc.o
-diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-index 6e0fd15..ae13eb055 100644
---- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
-+++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-@@ -32,9 +32,9 @@
- #define DEBUG_SUBSYSTEM S_CLASS
+diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
+index 84654af..7a61a00 100644
+--- a/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
++++ b/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
+@@ -211,11 +211,6 @@ static inline int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
+ int obd_ioctl_getdata(char **buf, int *len, void __user *arg);
+ int obd_ioctl_popdata(void __user *arg, void *data, int len);
  
- #include <linux/statfs.h>
--#include "../include/obd_cksum.h"
--#include "../include/obd_class.h"
--#include "../include/lprocfs_status.h"
-+#include <obd_cksum.h>
-+#include <obd_class.h>
-+#include <lprocfs_status.h>
- #include <linux/seq_file.h>
- #include "osc_internal.h"
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-index 270212f..35bdbfb 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-@@ -42,11 +42,11 @@
- #ifndef OSC_CL_INTERNAL_H
- #define OSC_CL_INTERNAL_H
- 
--#include "../../include/linux/libcfs/libcfs.h"
-+#include <linux/libcfs/libcfs.h>
- 
--#include "../include/obd.h"
-+#include <obd.h>
- /* osc_build_res_name() */
--#include "../include/cl_object.h"
-+#include <cl_object.h>
- #include "osc_internal.h"
- 
- /** \defgroup osc osc
-diff --git a/drivers/staging/lustre/lustre/osc/osc_dev.c b/drivers/staging/lustre/lustre/osc/osc_dev.c
-index c5d62ae..cf7b887 100644
---- a/drivers/staging/lustre/lustre/osc/osc_dev.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_dev.c
-@@ -37,7 +37,7 @@
- #define DEBUG_SUBSYSTEM S_OSC
- 
- /* class_name2obd() */
--#include "../include/obd_class.h"
-+#include <obd_class.h>
- 
- #include "osc_cl_internal.h"
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
-index 13a40f6..a536908 100644
---- a/drivers/staging/lustre/lustre/osc/osc_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
-@@ -99,7 +99,7 @@ struct osc_cache_waiter {
+-static inline void obd_ioctl_freedata(char *buf, size_t len)
+-{
+-	kvfree(buf);
+-}
+-
  /*
-  * cl integration.
-  */
--#include "../include/cl_object.h"
-+#include <cl_object.h>
+  * OBD_IOC_DATA_TYPE is only for compatibility reasons with older
+  * Linux Lustre user tools. New ioctls should NOT use this macro as
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 03a72c0..dd592d9 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -1097,7 +1097,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			goto out_free;
+ 		}
+ out_free:
+-		obd_ioctl_freedata(buf, len);
++		kvfree(buf);
+ 		return rc;
+ 	}
+ 	case LL_IOC_LMV_SETSTRIPE: {
+@@ -1147,7 +1147,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ #endif
+ 		rc = ll_dir_setdirstripe(inode, lum, filename, mode);
+ lmv_out_free:
+-		obd_ioctl_freedata(buf, len);
++		kvfree(buf);
+ 		return rc;
+ 	}
+ 	case LL_IOC_LMV_SET_DEFAULT_STRIPE: {
+@@ -1626,7 +1626,7 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
  
- extern struct ptlrpc_request_set *PTLRPCD_SET;
+ 		rc = ll_migrate(inode, file, mdtidx, filename, namelen - 1);
+ migrate_free:
+-		obd_ioctl_freedata(buf, len);
++		kvfree(buf);
  
-diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
-index cbab800..f7969e3 100644
---- a/drivers/staging/lustre/lustre/osc/osc_io.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_io.c
-@@ -37,7 +37,7 @@
+ 		return rc;
+ 	}
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 5c8405c..451e4fa 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -2231,8 +2231,7 @@ int ll_obd_statfs(struct inode *inode, void __user *arg)
+ 	if (rc)
+ 		goto out_statfs;
+ out_statfs:
+-	if (buf)
+-		obd_ioctl_freedata(buf, len);
++	kvfree(buf);
+ 	return rc;
+ }
  
- #define DEBUG_SUBSYSTEM S_OSC
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index f27b11f..8871624 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -1087,17 +1087,17 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
+ 		data = (struct obd_ioctl_data *)buf;
  
--#include "../include/lustre_obdo.h"
-+#include <lustre_obdo.h>
+ 		if (sizeof(*desc) > data->ioc_inllen1) {
+-			obd_ioctl_freedata(buf, len);
++			kvfree(buf);
+ 			return -EINVAL;
+ 		}
  
- #include "osc_cl_internal.h"
+ 		if (sizeof(uuidp->uuid) * count > data->ioc_inllen2) {
+-			obd_ioctl_freedata(buf, len);
++			kvfree(buf);
+ 			return -EINVAL;
+ 		}
  
-diff --git a/drivers/staging/lustre/lustre/osc/osc_lock.c b/drivers/staging/lustre/lustre/osc/osc_lock.c
-index 940c10c..b4f1f74 100644
---- a/drivers/staging/lustre/lustre/osc/osc_lock.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_lock.c
-@@ -37,9 +37,9 @@
+ 		if (sizeof(__u32) * count > data->ioc_inllen3) {
+-			obd_ioctl_freedata(buf, len);
++			kvfree(buf);
+ 			return -EINVAL;
+ 		}
  
- #define DEBUG_SUBSYSTEM S_OSC
+@@ -1116,7 +1116,7 @@ static int lov_iocontrol(unsigned int cmd, struct obd_export *exp, int len,
  
--#include "../../include/linux/libcfs/libcfs.h"
-+#include <linux/libcfs/libcfs.h>
- /* fid_build_reg_res_name() */
--#include "../include/lustre_fid.h"
-+#include <lustre_fid.h>
+ 		if (copy_to_user(uarg, buf, len))
+ 			rc = -EFAULT;
+-		obd_ioctl_freedata(buf, len);
++		kvfree(buf);
+ 		break;
+ 	}
+ 	case OBD_IOC_QUOTACTL: {
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index 76e1ee8..8cc1fdc 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -369,8 +369,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 	}
  
- #include "osc_cl_internal.h"
- 
-diff --git a/drivers/staging/lustre/lustre/osc/osc_quota.c b/drivers/staging/lustre/lustre/osc/osc_quota.c
-index fed4da6..a6118f8 100644
---- a/drivers/staging/lustre/lustre/osc/osc_quota.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_quota.c
-@@ -23,7 +23,7 @@
-  * Code originally extracted from quota directory
-  */
- 
--#include "../include/obd_class.h"
-+#include <obd_class.h>
- #include "osc_internal.h"
- 
- static inline struct osc_quota_info *osc_oqi_alloc(u32 id)
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index af96ac5..4c68c42 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -32,22 +32,22 @@
- 
- #define DEBUG_SUBSYSTEM S_OSC
- 
--#include "../../include/linux/libcfs/libcfs.h"
--
--#include "../include/lustre_dlm.h"
--#include "../include/lustre_net.h"
--#include "../../include/uapi/linux/lustre/lustre_idl.h"
--#include "../include/obd_cksum.h"
--
--#include "../include/lustre_ha.h"
--#include "../include/lprocfs_status.h"
--#include "../../include/uapi/linux/lustre/lustre_ioctl.h"
--#include "../include/lustre_debug.h"
--#include "../include/lustre_obdo.h"
--#include "../../include/uapi/linux/lustre/lustre_param.h"
--#include "../include/lustre_fid.h"
--#include "../include/obd_class.h"
--#include "../include/obd.h"
-+#include <linux/libcfs/libcfs.h>
-+
-+#include <lustre_dlm.h>
-+#include <lustre_net.h>
-+#include <uapi/linux/lustre/lustre_idl.h>
-+#include <obd_cksum.h>
-+
-+#include <lustre_ha.h>
-+#include <lprocfs_status.h>
-+#include <uapi/linux/lustre/lustre_ioctl.h>
-+#include <lustre_debug.h>
-+#include <lustre_obdo.h>
-+#include <uapi/linux/lustre/lustre_param.h>
-+#include <lustre_fid.h>
-+#include <obd_class.h>
-+#include <obd.h>
- #include "osc_internal.h"
- #include "osc_cl_internal.h"
+  out:
+-	if (buf)
+-		obd_ioctl_freedata(buf, len);
++	kvfree(buf);
+ 	return err;
+ } /* class_handle_ioctl */
  
 -- 
 1.8.3.1
