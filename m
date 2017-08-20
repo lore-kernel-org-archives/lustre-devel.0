@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 19 Aug 2017 22:26:03 -0400
-Subject: [lustre-devel] [PATCH 09/64 v2] staging: lustre: uapi: remove
-	obd_ioctl_popdata() wrapper
+Date: Sat, 19 Aug 2017 22:26:10 -0400
+Subject: [lustre-devel] [PATCH 16/64 v2] staging: lustre: uapi: move kernel
+	only prototypes out of lustre_param.h
 In-Reply-To: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
 References: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1503196018-24500-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1503196018-24500-17-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,109 +12,76 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Replace obd_ioctl_popdata() with direct copy_to_user() call.
+Move all the kernel specific function prototypes from
+lustre_param.h into obd_config.h which is a kernel only
+header.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
-Reviewed-on: https://review.whamcloud.com/24568
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Reviewed-on: https://review.whamcloud.com/24325
 Reviewed-by: Ben Evans <bevans@cray.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/lustre/include/lustre/lustre_ioctl.h        |  1 -
- drivers/staging/lustre/lustre/obdclass/class_obd.c     | 18 +++++++-----------
- .../lustre/lustre/obdclass/linux/linux-module.c        |  8 --------
- 3 files changed, 7 insertions(+), 20 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_param.h | 11 -----------
+ drivers/staging/lustre/lustre/include/obd_class.h    | 18 ++++++++++++++++++
+ 2 files changed, 18 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h b/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
-index 7a61a00..da9a071 100644
---- a/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
-+++ b/drivers/staging/lustre/lustre/include/lustre/lustre_ioctl.h
-@@ -209,7 +209,6 @@ static inline int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
- }
+diff --git a/drivers/staging/lustre/lustre/include/lustre_param.h b/drivers/staging/lustre/lustre/include/lustre_param.h
+index 8061a04..2620e02 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_param.h
++++ b/drivers/staging/lustre/lustre/include/lustre_param.h
+@@ -47,17 +47,6 @@
+  * @{
+  */
  
- int obd_ioctl_getdata(char **buf, int *len, void __user *arg);
--int obd_ioctl_popdata(void __user *arg, void *data, int len);
- 
- /*
-  * OBD_IOC_DATA_TYPE is only for compatibility reasons with older
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 8cc1fdc..477d611 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -206,8 +206,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
- 		memcpy(data->ioc_bulk, LUSTRE_VERSION_STRING,
- 		       strlen(LUSTRE_VERSION_STRING) + 1);
- 
--		err = obd_ioctl_popdata((void __user *)arg, data, len);
--		if (err)
-+		if (copy_to_user((void __user *)arg, data, len))
- 			err = -EFAULT;
- 		goto out;
- 
-@@ -225,9 +224,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
- 			goto out;
- 		}
- 
--		err = obd_ioctl_popdata((void __user *)arg, data,
--					sizeof(*data));
--		if (err)
-+		if (copy_to_user((void __user *)arg, data, sizeof(*data)))
- 			err = -EFAULT;
- 		goto out;
- 	}
-@@ -263,8 +260,8 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
- 
- 		CDEBUG(D_IOCTL, "device name %s, dev %d\n", data->ioc_inlbuf1,
- 		       dev);
--		err = obd_ioctl_popdata((void __user *)arg, data,
--					sizeof(*data));
+-/* For interoperability */
+-struct cfg_interop_param {
+-	char *old_param;
+-	char *new_param;
+-};
+-
+-/* obd_config.c */
+-int class_find_param(char *buf, char *key, char **valp);
+-int class_parse_nid(char *buf, lnet_nid_t *nid, char **endh);
+-int class_parse_nid_quiet(char *buf, lnet_nid_t *nid, char **endh);
+-
+ /****************** User-settable parameter keys *********************/
+ /* e.g.
+ 	tunefs.lustre --param="failover.node=192.168.0.13 at tcp0" /dev/sda
+diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+index d4a632a..8cc13ea 100644
+--- a/drivers/staging/lustre/lustre/include/obd_class.h
++++ b/drivers/staging/lustre/lustre/include/obd_class.h
+@@ -105,10 +105,28 @@ void obd_put_mod_rpc_slot(struct client_obd *cli, u32 opc,
+ struct llog_rec_hdr;
+ typedef int (*llog_cb_t)(const struct lu_env *, struct llog_handle *,
+ 			 struct llog_rec_hdr *, void *);
 +
-+		if (copy_to_user((void __user *)arg, data, sizeof(*data)))
- 		if (err)
- 			err = -EFAULT;
- 		goto out;
-@@ -304,9 +301,9 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
- 			 (int)index, status, obd->obd_type->typ_name,
- 			 obd->obd_name, obd->obd_uuid.uuid,
- 			 atomic_read(&obd->obd_refcount));
--		err = obd_ioctl_popdata((void __user *)arg, data, len);
- 
--		err = 0;
-+		if (copy_to_user((void __user *)arg, data, len))
-+			err = -EFAULT;
- 		goto out;
- 	}
- 	}
-@@ -361,8 +358,7 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
- 		if (err)
- 			goto out;
- 
--		err = obd_ioctl_popdata((void __user *)arg, data, len);
--		if (err)
-+		if (copy_to_user((void __user *)arg, data, len))
- 			err = -EFAULT;
- 		goto out;
- 	}
-diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-index eb88bd9..3a394d2 100644
---- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-+++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-@@ -151,14 +151,6 @@ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
- }
- EXPORT_SYMBOL(obd_ioctl_getdata);
- 
--int obd_ioctl_popdata(void __user *arg, void *data, int len)
--{
--	int err;
--
--	err = copy_to_user(arg, data, len) ? -EFAULT : 0;
--	return err;
--}
--
- /*  opening /dev/obd */
- static int obd_class_open(struct inode *inode, struct file *file)
- {
+ /* obd_config.c */
+ int class_process_config(struct lustre_cfg *lcfg);
+ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+ 			     struct lustre_cfg *lcfg, void *data);
++
++/* For interoperability */
++struct cfg_interop_param {
++	char *old_param;
++	char *new_param;
++};
++
++int class_find_param(char *buf, char *key, char **valp);
++struct cfg_interop_param *class_find_old_param(const char *param,
++					       struct cfg_interop_param *ptr);
++int class_get_next_param(char **params, char *copy);
++int class_parse_nid(char *buf, lnet_nid_t *nid, char **endh);
++int class_parse_nid_quiet(char *buf, lnet_nid_t *nid, char **endh);
++int class_parse_net(char *buf, u32 *net, char **endh);
++int class_match_nid(char *buf, char *key, lnet_nid_t nid);
++int class_match_net(char *buf, char *key, u32 net);
++
+ struct obd_device *class_incref(struct obd_device *obd,
+ 				const char *scope, const void *source);
+ void class_decref(struct obd_device *obd,
 -- 
 1.8.3.1
