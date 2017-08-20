@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 19 Aug 2017 22:26:15 -0400
-Subject: [lustre-devel] [PATCH 21/64 v2] staging: lustre: uapi: remove
-	lustre_cfg_free wrapper
+Date: Sat, 19 Aug 2017 22:26:29 -0400
+Subject: [lustre-devel] [PATCH 35/64 v2] staging: lustre: lnet: delete lnet.h
 In-Reply-To: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
 References: <1503196018-24500-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1503196018-24500-22-git-send-email-jsimmons@infradead.org>
+Message-ID: <1503196018-24500-36-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,105 +11,181 @@ Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>, James Simmons <uja.ornl@yahoo.com>
 
-Replace all lustre_cfg_free() calls with direct kfree()
-call.
+The header lnet.h is just a bunch of headers included in
+a header. Just delete it and include the appropriate
+headers where needed.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6401
-Reviewed-on: https://review.whamcloud.com/26966
-Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
-Reviewed-by: Ben Evans <bevans@cray.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6245
+Reviewed-on: https://review.whamcloud.com/28089
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_cfg.h  | 6 ------
- drivers/staging/lustre/lustre/mgc/mgc_request.c     | 2 +-
- drivers/staging/lustre/lustre/obdclass/obd_config.c | 4 ++--
- drivers/staging/lustre/lustre/obdclass/obd_mount.c  | 6 +++---
- 4 files changed, 6 insertions(+), 12 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |  4 +-
+ drivers/staging/lustre/include/linux/lnet/lnet.h   | 44 ----------------------
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  1 -
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |  1 -
+ drivers/staging/lustre/lnet/libcfs/module.c        |  1 -
+ drivers/staging/lustre/lnet/lnet/nidstrings.c      |  2 +-
+ drivers/staging/lustre/lnet/selftest/conrpc.h      |  1 -
+ drivers/staging/lustre/lnet/selftest/console.h     |  1 -
+ drivers/staging/lustre/lnet/selftest/selftest.h    |  1 -
+ 9 files changed, 4 insertions(+), 52 deletions(-)
+ delete mode 100644 drivers/staging/lustre/include/linux/lnet/lnet.h
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_cfg.h b/drivers/staging/lustre/lustre/include/lustre_cfg.h
-index 8eb394e..3f280b5 100644
---- a/drivers/staging/lustre/lustre/include/lustre_cfg.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_cfg.h
-@@ -246,12 +246,6 @@ static inline struct lustre_cfg *lustre_cfg_new(int cmd,
- 	return lcfg;
- }
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+index f534115..9b923ec 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+@@ -37,9 +37,11 @@
  
--static inline void lustre_cfg_free(struct lustre_cfg *lcfg)
--{
--	kfree(lcfg);
--	return;
--}
+ #include "../libcfs/libcfs.h"
+ #include "api.h"
+-#include "lnet.h"
+ #include "lib-types.h"
+ #include "lib-dlc.h"
++#include "types.h"
++#include "lnetctl.h"
++#include "nidstr.h"
+ 
+ extern struct lnet the_lnet;	/* THE network */
+ 
+diff --git a/drivers/staging/lustre/include/linux/lnet/lnet.h b/drivers/staging/lustre/include/linux/lnet/lnet.h
+deleted file mode 100644
+index 5d1559a..0000000
+--- a/drivers/staging/lustre/include/linux/lnet/lnet.h
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.gnu.org/licenses/gpl-2.0.html
+- *
+- * GPL HEADER END
+- */
+-/*
+- * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2012 - 2015, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Seagate, Inc.
+- */
 -
- static inline int lustre_cfg_sanity_check(void *buf, size_t len)
- {
- 	struct lustre_cfg *lcfg = (struct lustre_cfg *)buf;
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 36c3049..192b24d 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -1293,7 +1293,7 @@ static int mgc_apply_recover_logs(struct obd_device *mgc,
- 		       prev_version, max_version, obdname, params);
+-#ifndef __LNET_H__
+-#define __LNET_H__
+-
+-/*
+- * lnet.h
+- *
+- * User application interface file
+- */
+-#include "types.h"
+-#include "nidstr.h"
+-
+-#endif
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+index 16e437b..8e59506 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -64,7 +64,6 @@
+ #define DEBUG_SUBSYSTEM S_LND
  
- 		rc = class_process_config(lcfg);
--		lustre_cfg_free(lcfg);
-+		kfree(lcfg);
- 		if (rc)
- 			CDEBUG(D_INFO, "process config for %s error %d\n",
- 			       obdname, rc);
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index 783f9e0..4b5cd7d 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -1262,7 +1262,7 @@ int class_config_llog_handler(const struct lu_env *env,
- 		lcfg_new->lcfg_nal = 0; /* illegal value for obsolete field */
+ #include "../../../include/linux/libcfs/libcfs.h"
+-#include "../../../include/linux/lnet/lnet.h"
+ #include "../../../include/linux/lnet/lib-lnet.h"
  
- 		rc = class_process_config(lcfg_new);
--		lustre_cfg_free(lcfg_new);
-+		kfree(lcfg_new);
+ #define IBLND_PEER_HASH_SIZE		101	/* # peer lists */
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
+index 9eb169d..88afe09 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
+@@ -47,7 +47,6 @@
+ #include <net/tcp.h>
  
- 		if (inst)
- 			kfree(inst_name);
-@@ -1442,7 +1442,7 @@ int class_manual_cleanup(struct obd_device *obd)
- 	if (rc)
- 		CERROR("detach failed %d: %s\n", rc, obd->obd_name);
- out:
--	lustre_cfg_free(lcfg);
-+	kfree(lcfg);
- 	return rc;
- }
- EXPORT_SYMBOL(class_manual_cleanup);
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index 555e67e..74de1fa 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -90,7 +90,7 @@ int lustre_process_log(struct super_block *sb, char *logname,
- 	lustre_cfg_bufs_set(bufs, 3, &sb, sizeof(sb));
- 	lcfg = lustre_cfg_new(LCFG_LOG_START, bufs);
- 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
--	lustre_cfg_free(lcfg);
-+	kfree(lcfg);
+ #include "../../../include/linux/libcfs/libcfs.h"
+-#include "../../../include/linux/lnet/lnet.h"
+ #include "../../../include/linux/lnet/lib-lnet.h"
+ #include "../../../include/linux/lnet/socklnd.h"
  
- 	kfree(bufs);
+diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
+index c388550..9ece869 100644
+--- a/drivers/staging/lustre/lnet/libcfs/module.c
++++ b/drivers/staging/lustre/lnet/libcfs/module.c
+@@ -56,7 +56,6 @@
+ #include "../../include/linux/libcfs/libcfs_crypto.h"
+ #include "../../include/linux/lnet/lib-lnet.h"
+ #include "../../include/linux/lnet/lib-dlc.h"
+-#include "../../include/linux/lnet/lnet.h"
+ #include "tracefile.h"
  
-@@ -128,7 +128,7 @@ int lustre_end_log(struct super_block *sb, char *logname,
- 		lustre_cfg_bufs_set(&bufs, 2, cfg, sizeof(*cfg));
- 	lcfg = lustre_cfg_new(LCFG_LOG_END, &bufs);
- 	rc = obd_process_config(mgc, sizeof(*lcfg), lcfg);
--	lustre_cfg_free(lcfg);
-+	kfree(lcfg);
- 	return rc;
- }
- EXPORT_SYMBOL(lustre_end_log);
-@@ -161,7 +161,7 @@ static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
- 	lcfg = lustre_cfg_new(cmd, &bufs);
- 	lcfg->lcfg_nid = nid;
- 	rc = class_process_config(lcfg);
--	lustre_cfg_free(lcfg);
-+	kfree(lcfg);
- 	return rc;
- }
+ static struct dentry *lnet_debugfs_root;
+diff --git a/drivers/staging/lustre/lnet/lnet/nidstrings.c b/drivers/staging/lustre/lnet/lnet/nidstrings.c
+index 298533d..cbbd11f 100644
+--- a/drivers/staging/lustre/lnet/lnet/nidstrings.c
++++ b/drivers/staging/lustre/lnet/lnet/nidstrings.c
+@@ -37,7 +37,7 @@
+ #define DEBUG_SUBSYSTEM S_LNET
  
+ #include "../../include/linux/libcfs/libcfs.h"
+-#include "../../include/linux/lnet/lnet.h"
++#include "../../include/linux/lnet/nidstr.h"
+ 
+ /* max value for numeric network address */
+ #define MAX_NUMERIC_VALUE 0xffffffff
+diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.h b/drivers/staging/lustre/lnet/selftest/conrpc.h
+index 7141d2c..e2a78b6 100644
+--- a/drivers/staging/lustre/lnet/selftest/conrpc.h
++++ b/drivers/staging/lustre/lnet/selftest/conrpc.h
+@@ -40,7 +40,6 @@
+ #define __LST_CONRPC_H__
+ 
+ #include "../../include/linux/libcfs/libcfs.h"
+-#include "../../include/linux/lnet/lnet.h"
+ #include "../../include/linux/lnet/lib-types.h"
+ #include "../../include/linux/lnet/lnetst.h"
+ #include "rpc.h"
+diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
+index e3e11aa..0a9ba06 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.h
++++ b/drivers/staging/lustre/lnet/selftest/console.h
+@@ -40,7 +40,6 @@
+ #define __LST_CONSOLE_H__
+ 
+ #include "../../include/linux/libcfs/libcfs.h"
+-#include "../../include/linux/lnet/lnet.h"
+ #include "../../include/linux/lnet/lib-types.h"
+ #include "../../include/linux/lnet/lnetst.h"
+ #include "selftest.h"
+diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
+index b614e6f..bfa4971 100644
+--- a/drivers/staging/lustre/lnet/selftest/selftest.h
++++ b/drivers/staging/lustre/lnet/selftest/selftest.h
+@@ -39,7 +39,6 @@
+ #define LNET_ONLY
+ 
+ #include "../../include/linux/libcfs/libcfs.h"
+-#include "../../include/linux/lnet/lnet.h"
+ #include "../../include/linux/lnet/lib-lnet.h"
+ #include "../../include/linux/lnet/lib-types.h"
+ #include "../../include/linux/lnet/lnetst.h"
 -- 
 1.8.3.1
