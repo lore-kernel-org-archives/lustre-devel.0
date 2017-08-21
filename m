@@ -1,72 +1,51 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 20 Aug 2017 03:58:03 +0100 (BST)
-Subject: [lustre-devel] [PATCH 0/6] dcache/namei fixes for lustre
-In-Reply-To: <150164273003.13199.7841976922211510658.stgit@noble>
-References: <150164273003.13199.7841976922211510658.stgit@noble>
-Message-ID: <alpine.LFD.2.20.1708200354030.5810@casper.infradead.org>
+From: Cihangir Akturk <cakturk@gmail.com>
+Date: Mon, 21 Aug 2017 15:38:32 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: fix structure size for
+	ARM OABI
+In-Reply-To: <alpine.LFD.2.20.1708200351190.5810@casper.infradead.org>
+References: <1502894655-9731-1-git-send-email-cakturk@gmail.com>
+	<20170817162639.GA13066@kroah.com>
+	<E541F5C8-64B1-4BA6-97B7-1C79B9BABB77@intel.com>
+	<alpine.LFD.2.20.1708200351190.5810@casper.infradead.org>
+Message-ID: <20170821123832.GC6148@yoga.localdomain>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, Greg KH <gregkh@linuxfoundation.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>
 
+On Sun, Aug 20, 2017 at 03:52:26AM +0100, James Simmons wrote:
+> 
+> > On Aug 17, 2017, at 10:26, Greg KH <gregkh@linuxfoundation.org> wrote:
+> > > 
+> > > On Wed, Aug 16, 2017 at 05:44:15PM +0300, Cihangir Akturk wrote:
+> > >> When building the kernel for the ARM architecture without setting
+> > >> CONFIG_AEABI, size of struct lov_user_md_v3 and struct lov_mds_md_v3
+> > >> differs, due to different alignment requirements of OABI and EABI.
+> 
+> I have to ask are you testing the lustre on ARM?
 
-> This series is a revised version of two patches I sent
-> previously (one of which was sadly broken).
-> That patch has been broken into multiple parts for easy
-> review.  The other is included unchanged as the last of
-> this series.
-> 
-> I was drawn to look at this code due to the tests on
-> DCACHE_DISCONNECTED which are often wrong, and it turns out
-> they are used wrongly in lustre too.  Fixing one led to some
-> clean-up.  Fixing the other is straight forward.
-> 
-> A particular change here from the previous posting is
-> the first patch which tests for DCACHE_PAR_LOOKUP in ll_dcompare().
-> Without this patch, two threads can be looking up the same
-> name in a given directory in parallel.  This parallelism lead
-> to my concerns about needing improved locking in ll_splice_alias().
-> Instead of improving the locking, I now avoid the need for it
-> by fixing ll_dcompare.
-> 
-> This code passes basic "smoke tests".
-> 
-> Note that the cast to "struct dentry *" in the first patch is because
-> we have a "const struct dentry *" but d_in_lookup() requires a
-> pointer to a non-const structure.  I'll send a separate patch to
-> change d_in_lookup().
+No, I was just compiling the kernel for ARM architecture, and I hit
+this issue. If it's possible, I can give it a try with a bunch of
+raspberry pis or another cheap board?
 
-To let you know this patch has been under going testing and we have a
-ticket open to track the progess:
-
-https://jira.hpdd.intel.com/browse/LU-9868
-
-Your patch did reveal that a piece of a fix landed earlier is missing :-(
-So currently the client can oops. I will send the fix shortly but this
-work will have to rebased after. As soon as we can get some cycles we will
-figure out what is going on. Thanks for helping out.
- 
-> NeilBrown (6):
->       staging: lustre: llite: handle DCACHE_PAR_LOOKUP in ll_dcompare
->       staging: lustre: llite: use d_splice_alias for directories.
->       staging: lustre: llite: remove directory-specific code from ll_find_alias()
->       staging: lluste: llite: simplify ll_find_alias()
->       staging: lustre: llite: refine ll_find_alias based on d_exact_alias
->       staging: lustre: llite: fix incorrect DCACHE_DISCONNECTED test
+>  
+> > >> Marking the anonymous union within struct lov_user_md_v3 as
+> > >> '_packed' solves this issue. Otherwise we get the following
+> > >> error:
+> > >> 
+> > >> drivers/staging/lustre/lustre/lov/lov_pack.c:352:2: note: in expansion
+> > >> of macro ?BUILD_BUG_ON?
+> > >>  BUILD_BUG_ON(sizeof(lum) != sizeof(struct lov_mds_md_v3));
+> > >> 
+> > >> Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
+> > >> ---
+> > >> drivers/staging/lustre/lustre/include/lustre/lustre_user.h | 2 +-
+> > >> 1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > This file is no longer in the tree :(
+> > 
+> > With James' recent patch series, this has moved to include/uapi/linux/lustre/lustre_user.h
 > 
-> 
->  drivers/staging/lustre/lustre/llite/dcache.c       |   10 +++
->  .../staging/lustre/lustre/llite/llite_internal.h   |    2 -
->  drivers/staging/lustre/lustre/llite/namei.c        |   60 ++++++++++----------
->  3 files changed, 40 insertions(+), 32 deletions(-)
-> 
-> --
-> Signature
-> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-> 
+> BTW is __packed valid for UAPI headers?
