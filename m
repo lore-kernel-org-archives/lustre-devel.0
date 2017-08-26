@@ -1,35 +1,31 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Wed, 23 Aug 2017 16:22:54 -0700
-Subject: [lustre-devel] [PATCH] staging: lustre: obd: check for
-	allocation failure
-In-Reply-To: <20170823064917.afedqlponb5qu6og@mwanda>
-References: <20170823064917.afedqlponb5qu6og@mwanda>
-Message-ID: <20170823232254.GA6868@kroah.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Sat, 26 Aug 2017 09:02:55 +0300
+Subject: [lustre-devel] [PATCH 1/3] staging: lustre: obdclass: return
+ -EFAULT if copy_to_user() fails
+Message-ID: <20170826060255.tf4vnkfd4e2rey45@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Aug 23, 2017 at 09:51:31AM +0300, Dan Carpenter wrote:
-> lustre_cfg_new() can fail with ERR_PTR(-ENOMEM) so we should check for
-> that.
-> 
-> Fixes: d7e09d0397e8 ("staging: add Lustre file system client support")
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> index 8e0d4b1d86dc..7cb99f11caa0 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> @@ -159,6 +159,8 @@ static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
->  		lustre_cfg_bufs_set_string(&bufs, 4, s4);
->  
->  	lcfg = lustre_cfg_new(cmd, &bufs);
-> +	if (IS_ERR(lcfg))
-> +		return PTR_ERR(lcfg);
->  	lcfg->lcfg_nid = nid;
->  	rc = class_process_config(lcfg);
->  	lustre_cfg_free(lcfg);
+We recently changed from using obd_ioctl_popdata() to calling
+copy_to_user() directly.  This if statement was supposed to be deleted
+but it was over looked.  "err" is zero at this point so it means we
+return success.
 
-Doesn't apply to my tree anymore :(
+Fixes: b03679f6a41a ("staging: lustre: uapi: remove obd_ioctl_popdata() wrapper")
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index 57c84e8e1d8e..8ad3adb2ceb1 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -262,7 +262,6 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
+ 		       dev);
+ 
+ 		if (copy_to_user((void __user *)arg, data, sizeof(*data)))
+-		if (err)
+ 			err = -EFAULT;
+ 		goto out;
+ 	}
