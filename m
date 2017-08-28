@@ -1,33 +1,26 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Sat, 26 Aug 2017 09:04:46 +0300
-Subject: [lustre-devel] [PATCH 3/3] staging: lustre: obdclass: fix checking
- for obd_init_checks()
-Message-ID: <20170826060446.ezohk7527vuphcy7@mwanda>
+From: Greg KH <gregkh@linuxfoundation.org>
+Date: Mon, 28 Aug 2017 10:24:26 +0200
+Subject: [lustre-devel] [PATCH] staging: lustre: constify
+	cl_lock_operations
+In-Reply-To: <b86916f54cd6a22e0aa1d7570c0e1c793a3025e2.1503813780.git.arvind.yadav.cs@gmail.com>
+References: <b86916f54cd6a22e0aa1d7570c0e1c793a3025e2.1503813780.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170828082426.GA1401@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>
-Cc: Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Ben Evans <bevans@cray.com>, Baoyou Xie <baoyou.xie@linaro.org>, Stephen Champion <schamp@sgi.com>, frank zago <fzago@cray.com>, Henri Doreau <henri.doreau@cea.fr>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org
+To: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, john.hammond@intel.com, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-The obd_init_checks() function can either return -EOVERFLOW or -EINVAL
-but we accidentally ignore -EINVAL returns.
+On Sun, Aug 27, 2017 at 11:35:27AM +0530, Arvind Yadav wrote:
+> cl_lock_operations are not supposed to change at runtime.
+> cl_lock_slice_add is working with const cl_lock_operations.
+> So mark the non-const cl_lock_operations structs as const.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/staging/lustre/lustre/obdecho/echo_client.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
----
-This patch is the right thing, but it's always a bit risky turning on
-new checks and I haven't tested this.
-
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 545358923271..2df218b010e1 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -448,7 +448,7 @@ static int __init obdclass_init(void)
- 	obd_zombie_impexp_init();
- 
- 	err = obd_init_checks();
--	if (err == -EOVERFLOW)
-+	if (err)
- 		return err;
- 
- 	class_init_uuidlist();
+Someone else already sent this same patch in, and it's already applied
+in my tree :(
