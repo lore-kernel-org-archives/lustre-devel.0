@@ -1,38 +1,45 @@
-From: Jones, Peter A <peter.a.jones@intel.com>
-Date: Mon, 4 Sep 2017 14:08:22 +0000
-Subject: [lustre-devel] [gerrit] merge accounts
-In-Reply-To: <8059fd2d-8e11-4cfe-70b6-16699757664f@cea.fr>
-References: <8059fd2d-8e11-4cfe-70b6-16699757664f@cea.fr>
-Message-ID: <2E24D6B6-657B-4B17-AC26-034A6900E751@intel.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Tue, 5 Sep 2017 20:25:25 +0000
+Subject: [lustre-devel] [PATCH] lustre: ptlrpc: kfree used instead of kvfree
+Message-ID: <4F34B6C1-3A14-4F29-B241-A80F5A66E90B@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Send me the details and I can get this sorted out for you
+From: Nadav Amit <namit@vmware.com>
 
+rq_reqbuf is allocated using kvmalloc() but released in one occasion
+using kfree() instead of kvfree().
 
+The issue was found using grep based on a similar bug.
 
+Fixes: d7e09d0397e8 ("add Lustre file system client support")
+Fixes: ee0ec1946ec2 ("lustre: ptlrpc: Replace uses of OBD_{ALLOC,FREE}_LARGE")
 
-On 9/4/17, 12:29 AM, "lustre-devel on behalf of quentin.bouget at cea.fr" <lustre-devel-bounces at lists.lustre.org on behalf of quentin.bouget@cea.fr> wrote:
+Cc: Peng Tao <bergwolf@gmail.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>
+Cc: James Simmons <jsimmons@infradead.org>
 
->Hi all,
->
->I mistakenly logged on lustre's gerrit from two different OpenID 
->providers (actually, I used the same openID but from two different 
->domains: login.ubuntu.com and login.launchpad.net/+openid) and now I 
->would like to merge them.
->
->I can see there is a feature for this in "settings > identities > Link 
->Another Identity", but I cannot get it to work: it fails with "Not 
->Found", and the url suggests I contact someone 
->(https://review.whamcloud.com/#SignInFailure,LINK_IDENTIY,Contact+site+administrator).
->
->Regards,
->Quentin Bouget
->
->_______________________________________________
->lustre-devel mailing list
->lustre-devel at lists.lustre.org
->http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+Signed-off-by: Nadav Amit <namit@vmware.com>
+Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
+---
+drivers/staging/lustre/lustre/ptlrpc/sec.c | 2 +-
+1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+index 366f2ce20f5e..2f1c9e15f47c 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+@@ -847,7 +847,7 @@ void sptlrpc_request_out_callback(struct ptlrpc_request *req)
+ 	if (req->rq_pool || !req->rq_reqbuf)
+ 		return;
+ 
+-	kfree(req->rq_reqbuf);
++	kvfree(req->rq_reqbuf);
+ 	req->rq_reqbuf = NULL;
+ 	req->rq_reqbuf_len = 0;
+ }
+-- 
+2.11.0
