@@ -1,112 +1,69 @@
 From: Tyson Whitehead <twhitehead@gmail.com>
-Date: Wed, 06 Sep 2017 12:05:01 -0400
-Subject: [lustre-devel] [PATCH 2/2] LU-6808 ptlrpc: no need to reassign
-	mbits for replay
-Message-ID: <2356378.V5F8jgOxsl@whitehead.beowulf.uwo.ca>
+Date: Wed, 06 Sep 2017 12:04:39 -0400
+Subject: [lustre-devel] [PATCH 1/2] LU-6808 ptlrpc: properly set "rq_xid"
+	for 4MB IO
+Message-ID: <7562960.y17JJjcatH@whitehead.beowulf.uwo.ca>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: Fan Yong <fan.yong@intel.com>
 
-It's not necessary reassgin & re-adjust rq_mbits for replay
-request in ptlrpc_set_bulk_mbits(), they all must have already
-been correctly assigned before.
+The commit d099fdd6 replaced the "rq_xid" with "rq_mbits" as
+the matchbits of bulk data transferring. To be interoperable
+with old servers, it introduced the new connection flag:
+OBD_CONNECT_BULK_MBITS. If the server does not support such
+feature, then the "rq_xid" would be set the same value as
+"rq_mbits". Unfortunately, it forgot to handle multiple bulk
+operations, for example 4MB IO. If the new client wants to
+make 4MB IO with old server, it may send a small "rq_xid" to
+the old server, as to the old server will regard it as an 1MB
+IO or 2MB IO. So the data transfer will not complete because
+of only part of data transferred. Then the client will timeout
+failure and retry again and again.
 
-Such unecessary reassign could make the first matchbit not
-PTLRPC_BULK_OPS_MASK aligned, that'll trigger LASSERT in
-ptlrpc_register_bulk():
-
-- ptlrpc_set_bulk_mbits() is called when first time sending
-  request, rq_mbits is set as xid, which is BULK_OPS aligned;
-
-- ptlrpc_set_bulk_mbits() continue to adjust the mbits for
-  multi-bulk RPC, rq_mbits is not aligned anymore, then rq_xid
-  is changed accordingly if client is connecting to an old
-  server, so rq_xid became unaligned too;
-
-- The request is replayed, ptlrpc_set_bulk_mbits() reassign
-  the rq_mbits as rq_xid, which isn't aligned already, but
-  ptlrpc_register_bulk() still assumes this value as the
-  first matchbits and LASSERT it's BULK_OPS aligned.
-
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+Test-Parameters: alwaysuploadlogs testlist=sanity envdefinitions=ONLY=224c ossjob=lustre-b2_7_fe mdsjob=lustre-b2_7_fe ossbuildno=95 mdsbuildno=95 mdsdistro=el6.7 ossdistro=el6.7
+Signed-off-by: Fan Yong <fan.yong@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6808
-Reviewed-on: http://review.whamcloud.com/23048
+Reviewed-on: http://review.whamcloud.com/22373
 Tested-by: Jenkins
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@intel.com>
 Tested-by: Maloo <hpdd-maloo@intel.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Liang Zhen <liang.zhen@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: Tyson Whitehead <twhitehead@gmail.com>
 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c | 34 +++++++++++++++++++--------
- 1 file changed, 24 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/client.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 0f9db5526ba5..6ddbd1289a2f 100644
+index 6466974a43e7..0f9db5526ba5 100644
 --- a/drivers/staging/lustre/lustre/ptlrpc/client.c
 +++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -3116,26 +3116,37 @@ void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req)
+@@ -3123,8 +3123,7 @@ void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req)
+ 	} else { /* needs to generate a new matchbits for resend */
+ 		u64 old_mbits = req->rq_mbits;
  
- 	LASSERT(bd);
- 
--	if (!req->rq_resend) {
--		/* this request has a new xid, just use it as bulk matchbits */
--		req->rq_mbits = req->rq_xid;
--
--	} else { /* needs to generate a new matchbits for resend */
--		u64 old_mbits = req->rq_mbits;
--
-+	/* Generate new matchbits for all resend requests, including
-+	 * resend replay. */
-+	if (req->rq_resend) {
-+		__u64 old_mbits = req->rq_mbits;
-+
-+		/* First time resend on -EINPROGRESS will generate new xid,
-+		 * so we can actually use the rq_xid as rq_mbits in such case,
-+		 * however, it's bit hard to distinguish such resend with a
-+		 * 'resend for the -EINPROGRESS resend'. To make it simple,
-+		 * we opt to generate mbits for all resend cases. */
- 		if (OCD_HAS_FLAG(&bd->bd_import->imp_connect_data, BULK_MBITS)){
+-		if ((bd->bd_import->imp_connect_data.ocd_connect_flags &
+-		     OBD_CONNECT_BULK_MBITS)) {
++		if (OCD_HAS_FLAG(&bd->bd_import->imp_connect_data, BULK_MBITS)){
  			req->rq_mbits = ptlrpc_next_xid();
  		} else {
--			/* old version transfers rq_xid to peer as matchbits */
-+			/* Old version transfers rq_xid to peer as
-+			 * matchbits. */
- 			spin_lock(&req->rq_import->imp_lock);
- 			list_del_init(&req->rq_unreplied_list);
- 			ptlrpc_assign_next_xid_nolock(req);
--			req->rq_mbits = req->rq_xid;
- 			spin_unlock(&req->rq_import->imp_lock);
-+			req->rq_mbits = req->rq_xid;
- 		}
- 
- 		CDEBUG(D_HA, "resend bulk old x%llu new x%llu\n",
- 		       old_mbits, req->rq_mbits);
-+	} else if (!(lustre_msg_get_flags(req->rq_reqmsg) & MSG_REPLAY)) {
-+		/* Request being sent first time, use xid as matchbits. */
-+		req->rq_mbits = req->rq_xid;
-+	} else {
-+		/* Replay request, xid and matchbits have already been
-+		 * correctly assigned. */
-+		return;
- 	}
- 
- 	/*
-@@ -3146,7 +3157,10 @@ void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req)
+ 			/* old version transfers rq_xid to peer as matchbits */
+@@ -3145,6 +3144,11 @@ void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req)
+ 	 * see LU-1431
+ 	 */
  	req->rq_mbits += DIV_ROUND_UP(bd->bd_iov_count, LNET_MAX_IOV) - 1;
- 
- 	/* Set rq_xid as rq_mbits to indicate the final bulk for the old
--	 * server which does not support OBD_CONNECT_BULK_MBITS. LU-6808 */
-+	 * server which does not support OBD_CONNECT_BULK_MBITS. LU-6808.
-+	 *
-+	 * It's ok to directly set the rq_xid here, since this xid bump
-+	 * won't affect the request position in unreplied list. */
- 	if (!OCD_HAS_FLAG(&bd->bd_import->imp_connect_data, BULK_MBITS))
- 		req->rq_xid = req->rq_mbits;
++
++	/* Set rq_xid as rq_mbits to indicate the final bulk for the old
++	 * server which does not support OBD_CONNECT_BULK_MBITS. LU-6808 */
++	if (!OCD_HAS_FLAG(&bd->bd_import->imp_connect_data, BULK_MBITS))
++		req->rq_xid = req->rq_mbits;
  }
+ 
+ /**
 -- 
 2.14.0
