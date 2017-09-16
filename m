@@ -1,189 +1,113 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Fri, 15 Sep 2017 00:58:29 -0400
-Subject: [lustre-devel] new tag 2.10.53
-Message-ID: <6AEDE68A-9D25-499C-9876-3B73ED80902B@intel.com>
+From: Julia Lawall <julia.lawall@lip6.fr>
+Date: Sat, 16 Sep 2017 13:23:28 +0200 (CEST)
+Subject: [lustre-devel] [Outreachy kernel] [PATCH] staging: lustre:
+ lnet: Replace list_for_each with list_for_each_entry
+In-Reply-To: <20170916004148.GA25693@Haneen>
+References: <20170916004148.GA25693@Haneen>
+Message-ID: <alpine.DEB.2.20.1709161320250.2943@hadrien>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Haneen Mohammed <hamohammed.sa@gmail.com>
+Cc: outreachy-kernel <outreachy-kernel@googlegroups.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-Hello!
 
-   I just tagged a new tag 2.10.53 in master development branch of the Lustre community tree.
 
-   Here's the changelog:
-Alexander Boyko (1):
-      LU-7001 osp: fix llog processing
+On Fri, 15 Sep 2017, Haneen Mohammed wrote:
 
-Alexey Lyashkov (2):
-      LU-9810 lnet: fix build with M-OFED 4.1
-      LU-9810 lnet: prefer Fast Reg
+> Replace use of the combination of list_for_each and list_entry
+> with list_for_each_entry to simplify the code and remove variables
+> that are used only in list_for_each.
+> Issue found and corrected using Coccinelle script:
+>
+> @r@
+> expression head, member, e;
+> type T1, T2, T3;
+> iterator name list_for_each, list_for_each_entry;
+> identifier pos, var;
+> @@
+>
+> -T1 *pos;
+> ...when!=pos=e;
+>
+> -list_for_each(pos, head)
+> +list_for_each_entry(var, head, member)
+> {
+> ...when!=pos=e;
+>    when!=T3 *var;
+> -var = list_entry(pos, T2, member);
+> ...when!=pos=e;
+> }
+> ...when!=pos=e;
 
-Amir Shehata (6):
-      LU-9480 lnet: add enhanced statistics
-      LU-9480 lnet: show peer state
-      LU-9909 lnet: fix memory leak and lnet_interfaces_max
-      LU-9918 lnet: decref on peer after use
-      LU-9917 lnet: rediscover peer if it changed
-      LU-9921 lnet: resolve unsafe list access
+Actually, one could consider that there should be when != pos, not when !=
+pos=e, because you need that there are no references at all to pos to be
+able to delete it.  But it's true that if pos is not initialized then
+there should be no other kinds of references either.  The other
+possibility for initialization would be eg
 
-Andreas Dilger (4):
-      LU-8653 lod: use stripe_count instead of stripe_nr
-      LU-5965 tests: fix parsing for older Lustre versions
-      LU-9679 ldlm: remove flock accessor macros
-      LU-7746 tests: skip tests for older (upstream) client
+f(...,&pos,...)
 
-Aurelien Degremont (1):
-      LU-8435 tests: slab alloc error does not LBUG
+You could be suspicious of &pos in general.  But anyway there is no &pos
+in this code.
 
-Bob Glossman (2):
-      LU-9866 kernel: kernel update [SLES12 SP2 4.4.74-92.35]
-      LU-9882 kernel: kernel update RHEL7.4 [3.10.0-693.1.1.el7]
+julia
 
-Bobi Jam (1):
-      LU-9941 lov: lsm_is_composite isn't right
+> Signed-off-by: Haneen Mohammed <hamohammed.sa@gmail.com>
 
-Bruno Faccini (1):
-      LU-7988 hsm: update many cookie status at once
+Acked-by: Julia Lawall <julia.lawall@lip6.fr>
 
-Chris Horn (1):
-      LU-9803 tests: cast st_blksize for printf
-
-Colin Ian King (1):
-      LU-9869 lnet: fix incorrect arguments order calling lstcon_session_new
-
-Dan Carpenter (1):
-      LU-9863 lmv: Off by two in lmv_fid2path()
-
-Doug Oucharek (1):
-      LU-9828 ptlrpc: Do not assert when bd_nob_transferred != 0
-
-Elena Gryaznova (1):
-      LU-8691 tests: add mdtest to ha.sh
-
-Emoly Liu (2):
-      LU-9657 pfl: llapi_layout_comp_usei should handle non-pfl file
-      LU-9347 ioctl: Add BLKSSZGET ioctl support
-
-Fan Yong (2):
-      LU-9842 osd: return ENODATA for XATTR_NAME_FID on MDT
-      LU-9410 ldiskfs: no check mb bitmap if flex_bg enabled
-
-Frank Zago (1):
-      LU-7988 hsm: added coordinator housekeeping flag
-
-Giuseppe Di Natale (3):
-      LU-9781 llog: Improve catalog full warning
-      LU-9890 osd-zfs: dmu_objset_own/disown changes
-      LU-8342 utils: Set dnodesize/recordsize at zfs dataset create
-
-Gu Zheng (1):
-      LU-9950 build: add support for Ubuntu(debian) arm64
-
-Henri Doreau (1):
-      LU-9519 utils: liblustreapi header cleanup
-
-Hongchao Zhang (1):
-      LU-8066 libcfs: call kernel_param_unlock on error
-
-James Nunez (3):
-      LU-9860 tests: Add conf-sanity tests to ALWAYS_EXCEPT list
-      LU-9899 tests: mount client on MGS for ost-pools
-      LU-9891 tests: Increase space not released for ZFS
-
-James Simmons (6):
-      LU-9767 utils: validate filesystem name for mkfs.lustre
-      LU-9019 mdd: migrate from jiffies64 to ktime
-      LU-8066 libcfs: test for both __kernel_param_[un]lock and kernel_param_[un]lock
-      LU-9915 build: remove LC_CONFIG_OBD_BUFFER_SIZE
-      LU-9791 obd: always call lprocfs_obd_setup
-      LU-9870 build: handle SNMP missing on build box
-
-Jinshan Xiong (1):
-      LU-9841 lov: do not split IO for single striped file
-
-John L. Hammond (2):
-      LU-9913 lnet: balance references in lnet_discover_peer_locked()
-      LU-9856 mdd: handle NULL buffer in mdd_xattr_list()
-
-Lai Siyao (2):
-      LU-9848 llog: check padding size for update reclen
-      LU-9857 lmv: stripe dir page may be released mistakenly
-
-Minh Diep (1):
-      LU-9907 build: add patchless server for lbuild
-
-Olaf Weber (21):
-      LU-9480 lnet: add lnet_interfaces_max tunable
-      LU-9480 lnet: configure lnet_interfaces_max tunable from dlc
-      LU-9480 lnet: add struct lnet_ping_buffer
-      LU-9480 lnet: automatic sizing of router pinger buffers
-      LU-9480 lnet: add Multi-Rail and Discovery ping feature bits
-      LU-9480 lnet: add sanity checks on ping-related constants
-      LU-9480 lnet: cleanup of lnet_peer_ni_addref/decref_locked()
-      LU-9480 lnet: rename lnet_add/del_peer_ni_to/from_peer()
-      LU-9480 lnet: refactor lnet_del_peer_ni()
-      LU-9480 lnet: refactor lnet_add_peer_ni()
-      LU-9480 lnet: introduce LNET_PEER_MULTI_RAIL flag bit
-      LU-9480 lnet: preferred NIs for non-Multi-Rail peers
-      LU-9480 lnet: add LNET_PEER_CONFIGURED flag
-      LU-9480 lnet: reference counts on lnet_peer/lnet_peer_net
-      LU-9480 lnet: add msg_type to lnet_event
-      LU-9480 lnet: add discovery thread
-      LU-9480 lnet: tune lnet_peer_discovery_disabled with lnetctl
-      LU-9480 lnet: add the Push target
-      LU-9480 lnet: implement Peer Discovery
-      LU-9480 lnet: add "lnetctl peer list"
-      LU-9480 lnet: add "lnetctl ping" command
-
-Oleg Drokin (4):
-      LU-9480 lnet: Multi-Rail Dynamic Discovery feature
-      Revert "LU-5541 lustreapi: only export the API symbols"
-      Revert "LU-5541 build: build static and dynamic liblustreapi"
-      New tag 2.10.53
-
-Patrick Farrell (1):
-      LU-8276 ldlm: Make lru clear always discard read lock pages
-
-Sonia (1):
-      LU-9480 lnet: cleanup lnetctl and cyaml
-
-Sonia Sharma (1):
-      LU-9480 lnet: add "lnetctl discover"
-
-Steve Guminski (8):
-      LU-8993 utils: Use absolute pathname for debug_daemon log file
-      LU-6210 utils: Use C99 initializers in lfs_changelog()
-      LU-6210 utils: Use C99 struct initializers in lfs_getdirstripe
-      LU-6210 ptlrpc: Use C99 initializer in ptlrpc_register_rqbd()
-      LU-5170 lfs: Standardize error messages in lfs_setdirstripe()
-      LU-6210 lnet: Use C99 struct initializer in framework.c
-      LU-6210 utils: Use C99 struct initializers in lnetctl
-      LU-6051 utils: Remove incorrect request for getstripe help
-
-Wang Shilong (1):
-      LU-9874 osd-ldiskfs: simplify project transfer codes
-
-Wei Liu (2):
-      LU-832 test: Add error check when running run-llog.sh
-      LU-9260 test: Use the correct mount device when test against lustre
-
-Yang Sheng (1):
-      LU-2776 tests: waiting multiop finished in sanityn:51a
-
-dilip krishnagiri (7):
-      LU-9591 tests: remove replay-vbr tests 12a from ALWAYS_EXCEPT
-      LU-9593 tests: remove sanity-sec tests from ALWAYS_EXCEPT
-      LU-9580 tests: remove performance-sanity tests from ALWAYS_EXCEPT
-      LU-9588 tests: remove replay-ost-single test from ALWAYS_EXCEPT
-      LU-9042 test: Remove conf-sanity tests from ALWAYS_EXCEPT
-      LU-9044 test: remove conf-sanity tests from ALWAYS_EXCEPT
-      LU-9595 tests: remove sanityn test 18c from ALWAYS_EXCEPT
-
-frank zago (2):
-      LU-5541 build: build static and dynamic liblustreapi
-      LU-5541 lustreapi: only export the API symbols
-
-sharmaso (1):
-      LU-9077 lnet: fix for static analysis issues
+> ---
+>  drivers/staging/lustre/lnet/lnet/router.c | 9 ++-------
+>  1 file changed, 2 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+> index 3df101b..b8eba33 100644
+> --- a/drivers/staging/lustre/lnet/lnet/router.c
+> +++ b/drivers/staging/lustre/lnet/lnet/router.c
+> @@ -222,15 +222,12 @@ struct lnet_remotenet *
+>  lnet_find_net_locked(__u32 net)
+>  {
+>  	struct lnet_remotenet *rnet;
+> -	struct list_head *tmp;
+>  	struct list_head *rn_list;
+>
+>  	LASSERT(!the_lnet.ln_shutdown);
+>
+>  	rn_list = lnet_net2rnethash(net);
+> -	list_for_each(tmp, rn_list) {
+> -		rnet = list_entry(tmp, struct lnet_remotenet, lrn_list);
+> -
+> +	list_for_each_entry(rnet, rn_list, lrn_list) {
+>  		if (rnet->lrn_net == net)
+>  			return rnet;
+>  	}
+> @@ -243,7 +240,6 @@ static void lnet_shuffle_seed(void)
+>  	__u32 lnd_type, seed[2];
+>  	struct timespec64 ts;
+>  	struct lnet_ni *ni;
+> -	struct list_head *tmp;
+>
+>  	if (seeded)
+>  		return;
+> @@ -254,8 +250,7 @@ static void lnet_shuffle_seed(void)
+>  	 * Nodes with small feet have little entropy
+>  	 * the NID for this node gives the most entropy in the low bits
+>  	 */
+> -	list_for_each(tmp, &the_lnet.ln_nis) {
+> -		ni = list_entry(tmp, struct lnet_ni, ni_list);
+> +	list_for_each_entry(ni, &the_lnet.ln_nis, ni_list) {
+>  		lnd_type = LNET_NETTYP(LNET_NIDNET(ni->ni_nid));
+>
+>  		if (lnd_type != LOLND)
+> --
+> 2.7.4
+>
+> --
+> You received this message because you are subscribed to the Google Groups "outreachy-kernel" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to outreachy-kernel+unsubscribe at googlegroups.com.
+> To post to this group, send email to outreachy-kernel at googlegroups.com.
+> To view this discussion on the web visit https://groups.google.com/d/msgid/outreachy-kernel/20170916004148.GA25693%40Haneen.
+> For more options, visit https://groups.google.com/d/optout.
+>
