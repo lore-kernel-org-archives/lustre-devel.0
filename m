@@ -1,12 +1,18 @@
 From: Jones, Peter A <peter.a.jones@intel.com>
-Date: Tue, 3 Oct 2017 06:16:25 +0000
-Subject: [lustre-devel] Lustre 2.10.1 released
-Message-ID: <E067783F-3593-4EC1-9534-FA4D68B3DAE9@intel.com>
+Date: Tue, 3 Oct 2017 07:30:36 +0000
+Subject: [lustre-devel] FW: Lustre 2.10.1 released
+In-Reply-To: <E067783F-3593-4EC1-9534-FA4D68B3DAE9@intel.com>
+References: <E067783F-3593-4EC1-9534-FA4D68B3DAE9@intel.com>
+Message-ID: <4446146B-8BA5-46C3-87D7-A24A22FDBE30@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+
+
+On 2017-10-02, 11:16 PM, "Jones, Peter A" <peter.a.jones at intel.com<mailto:peter.a.jones@intel.com>> wrote:
 
 We are pleased to announce that the Lustre 2.10.1 Release has been declared GA and is available for download<https://downloads.hpdd.intel.com/public/lustre/lustre-2.10.1/>. You can also grab the source from git<https://git.hpdd.intel.com/?p=fs/lustre-release.git;a=commit;h=4044521770d2258ee0fa998d77830183155e2532>.
 
@@ -42,4 +48,4 @@ Thanks to all those who have contributed to the creation of this release.
 We are planning to release Lustre 2.10.2 during Q4.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171003/44604c29/attachment-0001.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171003/3bc0cba7/attachment-0001.html>
