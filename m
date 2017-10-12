@@ -1,51 +1,103 @@
-From: Jones, Peter A <peter.a.jones@intel.com>
-Date: Tue, 3 Oct 2017 07:30:36 +0000
-Subject: [lustre-devel] FW: Lustre 2.10.1 released
-In-Reply-To: <E067783F-3593-4EC1-9534-FA4D68B3DAE9@intel.com>
-References: <E067783F-3593-4EC1-9534-FA4D68B3DAE9@intel.com>
-Message-ID: <4446146B-8BA5-46C3-87D7-A24A22FDBE30@intel.com>
+From: Oleg Drokin <oleg.drokin@intel.com>
+Date: Thu, 12 Oct 2017 01:48:42 -0400
+Subject: [lustre-devel] New tag 2.10.54
+Message-ID: <14F8A520-633E-4BFF-858B-F9EC08B09281@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Hello!
 
+   I just tagged 2.10.54 in the Lustre master branch for Lustre community tree.
 
-On 2017-10-02, 11:16 PM, "Jones, Peter A" <peter.a.jones at intel.com<mailto:peter.a.jones@intel.com>> wrote:
+   Here's the changelog:
 
-We are pleased to announce that the Lustre 2.10.1 Release has been declared GA and is available for download<https://downloads.hpdd.intel.com/public/lustre/lustre-2.10.1/>. You can also grab the source from git<https://git.hpdd.intel.com/?p=fs/lustre-release.git;a=commit;h=4044521770d2258ee0fa998d77830183155e2532>.
+Alex Zhuravlev (1):
+      LU-9967 tests: run-llog to cleanup properly
 
-Along with a number of useful bug fixes, this maintenance release includes the following notable enhancements over 2.10.0:
+Amir Shehata (2):
+      LU-9992 lnet: don't discover loopback interface
+      LU-9904 lnet: reduce logging severity
 
+Andreas Dilger (1):
+      LU-3308 tests: fix sanity/sanityn test_mkdir() usage
 
-  *   RHEL 7.4 support for Lustre Servers and Clients (LU-9816<https://jira.hpdd.intel.com/browse/LU-9816>)
+Arshad Hussain (1):
+      LU-9379 tests: Improve get_version to handle empty return value
 
+Ben Evans (2):
+      LU-9221 jobstats: Create a pid-based hash for jobid values
+      LU-9855 obdclass: Code cleanup
 
-  *   ZFS 0.7.1 is now the default version of ZFS used for the release (LU-8619<https://jira.hpdd.intel.com/browse/LU-8619>)
+Bob Glossman (3):
+      LU-9966 test: add a skip test to test_411
+      LU-9979 kernel: kernel update RHEL6.9 [2.6.32-696.10.2.el6]
+      LU-9978 kernel: kernel update RHEL7.4 [3.10.0-693.2.2.el7]
 
+Bruno Faccini (1):
+      LU-9930 llite: only clear lli_sai if the setter
 
-  *   RHEL 6.9 support for Lustre Clients (LU-9979<https://jira.hpdd.intel.com/browse/LU-9979>)
+Di Wang (1):
+      LU-9840 lod: add ldo_dir_stripe_loaded
 
+Elena Gryaznova (2):
+      LU-9980 tests: save specific facet in save_lustre_params()
+      LU-9931 tests: : fix REQFAIL calculation
 
-  *   Ubuntu 16.04 support for Lustre Clients
+Emoly Liu (2):
+      LU-9682 nodemap: delete nids range from nodemap correctly
+      LU-9929 nodemap: add default ACL unmapping handling
 
+Erich Focht (1):
+      LU-9214 llite: enable readahead for small read_ahead_per_file
 
-  *   Patchless server build for ldiskfs is now routinely provided. Note that the patched kernel version must still be used to make use of project quotas
+Fan Yong (2):
+      LU-9887 lfsck: calculate LFSCK speed properly
+      LU-9995 lfsck: keep the LMV_HASH_FLAG_DEAD flag
 
+Frank Zago (1):
+      LU-7988 hsm: split mdt_hsm_add_actions()
 
-  *   4.9 Kernel support for Lustre client (LU-9183<https://jira.hpdd.intel.com/browse/LU-9183>)
+Henri Doreau (1):
+      LU-8400 mdd: remove OBD_IOC_GET_MNTOPT
 
+James Nunez (1):
+      LU-10024 tests: sanity 120f restore stripe count option
 
-  *   MOFED 4.1 support
+James Simmons (3):
+      LU-8541 ldlm: don't use jiffies as sysfs parameter
+      LU-9558 tests: add completion.h header to kinode.c
+      LU-9019 ptlrpc: migrate pinger to 64 bit time
 
-Details of changes since 2.10.0<http://wiki.lustre.org/Lustre_2.10.0_Changelog> can be found in the 2.10.1 change log<http://wiki.lustre.org/Lustre_2.10.1_Changelog>.
+Jinshan Xiong (2):
+      LU-9574 llite: pipeline readahead better with large I/O
+      LU-9802 pfl: swapping lcm_entry_count correctly
 
-Please log any issues found in the issue tracking system<https://jira.hpdd.intel.com/>.
+Minh Diep (1):
+      LU-9996 build: include MOFED lib
 
-Thanks to all those who have contributed to the creation of this release.
+Nathaniel Clark (2):
+      LU-9888 tests: Update disk2_7-zfs.tar.bz2 for quota
+      LU-9960 osd-zfs: don't auto-upgrade quota
 
-We are planning to release Lustre 2.10.2 during Q4.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171003/3bc0cba7/attachment-0001.html>
+Olaf Weber (1):
+      LU-9933 lnet: Handle ping buffer with only loopback NID
+
+Oleg Drokin (5):
+      LU-9995 lfsck: Have LMV_HASH_FLAG_DEAD defined for a while longer
+      LU-8066 obd: make ldebugfs_remove recursive
+      LU-8066 lnet: port lnet router to debugfs
+      Revert "LU-9810 lnet: prefer Fast Reg"
+      New tag 2.10.54
+
+Patrick Farrell (2):
+      LU-6179 llite: Implement ladvise lockahead
+      LU-7802 ldlm: No -EINVAL for canceled != unused
+
+Wang Shilong (1):
+      LU-10011 utils: suppress annoying messages for project quota
+
+dilip krishnagiri (1):
+      LU-9963 test: add parallel-scale tests to ALWAYS_EXCEPT
