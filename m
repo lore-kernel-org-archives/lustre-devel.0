@@ -1,11 +1,11 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 17 Oct 2017 23:04:00 +0000
-Subject: [lustre-devel] [PATCH 19/20] staging: lustre: ptlrpc: mark
+Date: Tue, 17 Oct 2017 23:05:05 +0000
+Subject: [lustre-devel] [PATCH 20/20] staging: lustre: rpc: mark
  expected switch fall-throughs
-In-Reply-To: <afa1f786515ab143ba5710a6df3797286269bbe2.1507781178.git.garsilva@embeddedor.com>
+In-Reply-To: <93be012259825eb72c235b293f44e729797b38c9.1507781178.git.garsilva@embeddedor.com>
 References: <cover.1507781178.git.garsilva@embeddedor.com>
- <afa1f786515ab143ba5710a6df3797286269bbe2.1507781178.git.garsilva@embeddedor.com>
-Message-ID: <D8E42C0A-24EF-4312-9C0E-0D90BF296193@intel.com>
+ <93be012259825eb72c235b293f44e729797b38c9.1507781178.git.garsilva@embeddedor.com>
+Message-ID: <6EFF7C2E-4962-49DE-A71A-072C9E9FCBC1@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -18,45 +18,88 @@ On Oct 12, 2017, at 10:17, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
 > In preparation to enabling -Wimplicit-fallthrough, mark switch cases
 > where we are expecting to fall through.
 > 
+> Addresses-Coverity-ID: 1077604
+> Addresses-Coverity-ID: 1077605
 > Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
 > ---
-> drivers/staging/lustre/lustre/ptlrpc/pack_generic.c | 6 +++---
-> 1 file changed, 3 insertions(+), 3 deletions(-)
+> drivers/staging/lustre/lnet/selftest/rpc.c | 13 +++++++++----
+> 1 file changed, 9 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-> index aad4ff1..a3664c1 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-> @@ -786,7 +786,7 @@ __u32 lustre_msg_get_flags(struct lustre_msg *msg)
+> diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
+> index 77c222c..74ef3c3 100644
+> --- a/drivers/staging/lustre/lnet/selftest/rpc.c
+> +++ b/drivers/staging/lustre/lnet/selftest/rpc.c
+> @@ -1037,6 +1037,7 @@ srpc_handle_rpc(struct swi_workitem *wi)
+> 			ev->ev_status = rc;
+> 		}
+> 	}
+> +		/* fall through */
+> 	case SWI_STATE_BULK_STARTED:
+> 		LASSERT(!rpc->srpc_bulk || ev->ev_fired);
 > 
-> 		CERROR("invalid msg %p: no ptlrpc body!\n", msg);
-> 	}
-> -	/* no break */
-> +	/* fall through */
-> 	default:
-> 		/* flags might be printed in debug code while message
-> 		 * uninitialized
-> @@ -854,7 +854,7 @@ __u32 lustre_msg_get_op_flags(struct lustre_msg *msg)
+> @@ -1237,7 +1238,8 @@ srpc_send_rpc(struct swi_workitem *wi)
+> 			break;
 > 
-> 		CERROR("invalid msg %p: no ptlrpc body!\n", msg);
-> 	}
-> -	/* no break */
-> +	/* fall through */
-> 	default:
-> 		return 0;
-> 	}
-> @@ -1035,7 +1035,7 @@ int lustre_msg_get_status(struct lustre_msg *msg)
+> 		wi->swi_state = SWI_STATE_REQUEST_SENT;
+> -		/* perhaps more events, fall thru */
+> +		/* perhaps more events */
+> +		/* fall through */
+> 	case SWI_STATE_REQUEST_SENT: {
+> 		enum srpc_msg_type type = srpc_service2reply(rpc->crpc_service);
 > 
-> 		CERROR("invalid msg %p: no ptlrpc body!\n", msg);
+> @@ -1269,6 +1271,7 @@ srpc_send_rpc(struct swi_workitem *wi)
+> 
+> 		wi->swi_state = SWI_STATE_REPLY_RECEIVED;
 > 	}
-> -	/* no break */
-> +	/* fall through */
-> 	default:
-> 		/* status might be printed in debug code while message
-> 		 * uninitialized
+> +		/* fall through */
+> 	case SWI_STATE_REPLY_RECEIVED:
+> 		if (do_bulk && !rpc->crpc_bulkev.ev_fired)
+> 			break;
+> @@ -1448,6 +1451,7 @@ srpc_lnet_ev_handler(struct lnet_event *ev)
+> 			srpc_data.rpc_counters.rpcs_sent++;
+> 			spin_unlock(&srpc_data.rpc_glock);
+> 		}
+> +		/* fall through */
+> 	case SRPC_REPLY_RCVD:
+> 	case SRPC_BULK_REQ_RCVD:
+> 		crpc = rpcev->ev_data;
+> @@ -1570,7 +1574,7 @@ srpc_lnet_ev_handler(struct lnet_event *ev)
+> 
+> 		if (!ev->unlinked)
+> 			break; /* wait for final event */
+> -
+> +		/* fall through */
+> 	case SRPC_BULK_PUT_SENT:
+> 		if (!ev->status && ev->type != LNET_EVENT_UNLINK) {
+> 			spin_lock(&srpc_data.rpc_glock);
+> @@ -1582,6 +1586,7 @@ srpc_lnet_ev_handler(struct lnet_event *ev)
+> 
+> 			spin_unlock(&srpc_data.rpc_glock);
+> 		}
+> +		/* fall through */
+> 	case SRPC_REPLY_SENT:
+> 		srpc = rpcev->ev_data;
+> 		scd = srpc->srpc_scd;
+> @@ -1674,14 +1679,14 @@ srpc_shutdown(void)
+> 		spin_unlock(&srpc_data.rpc_glock);
+> 
+> 		stt_shutdown();
+> -
+> +		/* fall through */
+> 	case SRPC_STATE_EQ_INIT:
+> 		rc = LNetClearLazyPortal(SRPC_FRAMEWORK_REQUEST_PORTAL);
+> 		rc = LNetClearLazyPortal(SRPC_REQUEST_PORTAL);
+> 		LASSERT(!rc);
+> 		rc = LNetEQFree(srpc_data.rpc_lnet_eq);
+> 		LASSERT(!rc); /* the EQ should have no user by now */
+> -
+> +		/* fall through */
+> 	case SRPC_STATE_NI_INIT:
+> 		LNetNIFini();
+> 	}
 > -- 
 > 2.7.4
 > 
