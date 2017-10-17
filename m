@@ -1,11 +1,11 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 17 Oct 2017 23:00:02 +0000
-Subject: [lustre-devel] [PATCH 15/20] staging: lustre: llite: mark
- expected switch fall-through
-In-Reply-To: <661e7cdf247c7662f4f27ac7c54fb4636fd9c1e3.1507781178.git.garsilva@embeddedor.com>
+Date: Tue, 17 Oct 2017 23:00:26 +0000
+Subject: [lustre-devel] [PATCH 16/20] staging: lustre: lprocfs: mark
+ expected switch fall-throughs
+In-Reply-To: <734912e09d855035cfa64746101cc24b8695bf3e.1507781178.git.garsilva@embeddedor.com>
 References: <cover.1507781178.git.garsilva@embeddedor.com>
- <661e7cdf247c7662f4f27ac7c54fb4636fd9c1e3.1507781178.git.garsilva@embeddedor.com>
-Message-ID: <0B7757C2-00D8-47E2-A30D-B7C394E12832@intel.com>
+ <734912e09d855035cfa64746101cc24b8695bf3e.1507781178.git.garsilva@embeddedor.com>
+Message-ID: <113524DE-3EF5-4437-A1AF-93D5CCD85A93@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,38 +13,44 @@ Content-Transfer-Encoding: 7bit
 To: "Gustavo A. R. Silva" <garsilva@embeddedor.com>
 Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-
-> On Oct 12, 2017, at 10:17, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
+On Oct 12, 2017, at 10:17, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
 > 
 > In preparation to enabling -Wimplicit-fallthrough, mark switch cases
 > where we are expecting to fall through.
 > 
+> Addresses-Coverity-ID: 1271166
+> Addresses-Coverity-ID: 1271167
+> Addresses-Coverity-ID: 1271168
+> Addresses-Coverity-ID: 1271169
 > Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
-
-Not sure why you moved the "for mode = 0" comment to a separate line?
-Not the end of the world though.
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
 > ---
-> drivers/staging/lustre/lustre/llite/namei.c | 4 +++-
-> 1 file changed, 3 insertions(+), 1 deletion(-)
+> drivers/staging/lustre/lustre/obdclass/lprocfs_status.c | 4 ++++
+> 1 file changed, 4 insertions(+)
 > 
-> diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-> index 5cc2b32..55e0d03 100644
-> --- a/drivers/staging/lustre/lustre/llite/namei.c
-> +++ b/drivers/staging/lustre/lustre/llite/namei.c
-> @@ -949,7 +949,9 @@ static int ll_mknod(struct inode *dir, struct dentry *dchild,
-> 
-> 	switch (mode & S_IFMT) {
-> 	case 0:
-> -		mode |= S_IFREG; /* for mode = 0 case, fallthrough */
-> +		mode |= S_IFREG;
-> +		/* for mode = 0 case */
-> +		/* fall through */
-> 	case S_IFREG:
-> 	case S_IFCHR:
-> 	case S_IFBLK:
+> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+> index e79485b..4ec582f 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+> @@ -1507,12 +1507,16 @@ int lprocfs_write_frac_u64_helper(const char __user *buffer,
+> 		switch (tolower(*end)) {
+> 		case 'p':
+> 			units <<= 10;
+> +			/* fall through */
+> 		case 't':
+> 			units <<= 10;
+> +			/* fall through */
+> 		case 'g':
+> 			units <<= 10;
+> +			/* fall through */
+> 		case 'm':
+> 			units <<= 10;
+> +			/* fall through */
+> 		case 'k':
+> 			units <<= 10;
+> 		}
 > -- 
 > 2.7.4
 > 
