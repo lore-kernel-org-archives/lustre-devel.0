@@ -1,11 +1,11 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 17 Oct 2017 23:01:52 +0000
-Subject: [lustre-devel] [PATCH 17/20] staging: lustre: ldlm: mark
- expected switch fall-through
-In-Reply-To: <b524d6353d6e118ac537d41ff944bcf10aa38f5c.1507781178.git.garsilva@embeddedor.com>
+Date: Tue, 17 Oct 2017 23:04:00 +0000
+Subject: [lustre-devel] [PATCH 19/20] staging: lustre: ptlrpc: mark
+ expected switch fall-throughs
+In-Reply-To: <afa1f786515ab143ba5710a6df3797286269bbe2.1507781178.git.garsilva@embeddedor.com>
 References: <cover.1507781178.git.garsilva@embeddedor.com>
- <b524d6353d6e118ac537d41ff944bcf10aa38f5c.1507781178.git.garsilva@embeddedor.com>
-Message-ID: <0BB0D9A1-2A0E-415F-B772-72C9C069FD18@intel.com>
+ <afa1f786515ab143ba5710a6df3797286269bbe2.1507781178.git.garsilva@embeddedor.com>
+Message-ID: <D8E42C0A-24EF-4312-9C0E-0D90BF296193@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -23,21 +23,40 @@ On Oct 12, 2017, at 10:17, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
 > ---
-> drivers/staging/lustre/lustre/ldlm/ldlm_request.c | 1 +
-> 1 file changed, 1 insertion(+)
+> drivers/staging/lustre/lustre/ptlrpc/pack_generic.c | 6 +++---
+> 1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-> index f3bf238..6943987 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-> @@ -1175,6 +1175,7 @@ ldlm_cancel_no_wait_policy(struct ldlm_namespace *ns, struct ldlm_lock *lock,
-> 	case LDLM_IBITS:
-> 		if (ns->ns_cancel && ns->ns_cancel(lock) != 0)
-> 			break;
-> +		/* fall through */
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+> index aad4ff1..a3664c1 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+> @@ -786,7 +786,7 @@ __u32 lustre_msg_get_flags(struct lustre_msg *msg)
+> 
+> 		CERROR("invalid msg %p: no ptlrpc body!\n", msg);
+> 	}
+> -	/* no break */
+> +	/* fall through */
 > 	default:
-> 		result = LDLM_POLICY_SKIP_LOCK;
-> 		lock_res_and_lock(lock);
+> 		/* flags might be printed in debug code while message
+> 		 * uninitialized
+> @@ -854,7 +854,7 @@ __u32 lustre_msg_get_op_flags(struct lustre_msg *msg)
+> 
+> 		CERROR("invalid msg %p: no ptlrpc body!\n", msg);
+> 	}
+> -	/* no break */
+> +	/* fall through */
+> 	default:
+> 		return 0;
+> 	}
+> @@ -1035,7 +1035,7 @@ int lustre_msg_get_status(struct lustre_msg *msg)
+> 
+> 		CERROR("invalid msg %p: no ptlrpc body!\n", msg);
+> 	}
+> -	/* no break */
+> +	/* fall through */
+> 	default:
+> 		/* status might be printed in debug code while message
+> 		 * uninitialized
 > -- 
 > 2.7.4
 > 
