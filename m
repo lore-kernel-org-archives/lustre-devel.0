@@ -1,17 +1,17 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 17 Oct 2017 22:56:21 +0000
-Subject: [lustre-devel] [PATCH 02/20] staging: lustre: lnet: socklnd:
+Date: Tue, 17 Oct 2017 22:57:37 +0000
+Subject: [lustre-devel] [PATCH 05/20] staging: lustre: lnet: net_fault:
  mark expected switch fall-through
-In-Reply-To: <ee379f071a9cc01fb06eff3205a9da1087279bf4.1507781178.git.garsilva@embeddedor.com>
+In-Reply-To: <f6688e6db89b8d9004deeeffcb78d0d4f628f73c.1507781178.git.garsilva@embeddedor.com>
 References: <cover.1507781178.git.garsilva@embeddedor.com>
- <ee379f071a9cc01fb06eff3205a9da1087279bf4.1507781178.git.garsilva@embeddedor.com>
-Message-ID: <236BFBC5-3722-413F-A8F9-1273E2221A24@intel.com>
+ <f6688e6db89b8d9004deeeffcb78d0d4f628f73c.1507781178.git.garsilva@embeddedor.com>
+Message-ID: <0EFF5864-9A26-49AA-B527-47BA1EC3C079@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: "Gustavo A. R. Silva" <garsilva@embeddedor.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "Shehata, Amir" <amir.shehata@intel.com>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 
 On Oct 12, 2017, at 10:16, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
 > 
@@ -20,28 +20,26 @@ On Oct 12, 2017, at 10:16, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
 > 
 > Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 
-This isn't strictly necessary, since LASSERT() never returns, but
-not harmful either.
+This could also just be "continue;", but doesn't appear harmful.
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
 > ---
-> drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
+> drivers/staging/lustre/lnet/lnet/net_fault.c | 1 +
+> 1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> index d0ee58d..7b014ca 100644
-> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> @@ -2308,7 +2308,7 @@ ksocknal_base_shutdown(void)
-> 	switch (ksocknal_data.ksnd_init) {
-> 	default:
-> 		LASSERT(0);
-> -
-> +		/* fall through */
-> 	case SOCKNAL_INIT_ALL:
-> 	case SOCKNAL_INIT_DATA:
-> 		LASSERT(ksocknal_data.ksnd_peers);
+> diff --git a/drivers/staging/lustre/lnet/lnet/net_fault.c b/drivers/staging/lustre/lnet/lnet/net_fault.c
+> index 03f3d18..7391e16 100644
+> --- a/drivers/staging/lustre/lnet/lnet/net_fault.c
+> +++ b/drivers/staging/lustre/lnet/lnet/net_fault.c
+> @@ -629,6 +629,7 @@ delayed_msg_process(struct list_head *msg_list, bool drop)
+> 			case LNET_CREDIT_OK:
+> 				lnet_ni_recv(ni, msg->msg_private, msg, 0,
+> 					     0, msg->msg_len, msg->msg_len);
+> +				/* fall through */
+> 			case LNET_CREDIT_WAIT:
+> 				continue;
+> 			default: /* failures */
 > -- 
 > 2.7.4
 > 
