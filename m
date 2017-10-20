@@ -1,50 +1,66 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 17 Oct 2017 23:03:36 +0000
-Subject: [lustre-devel] [PATCH 18/20] staging: lustre: osc: mark
- expected switch fall-through
-In-Reply-To: <ed0b43170d08cda14de2b6a8069e77054b03fae0.1507781178.git.garsilva@embeddedor.com>
-References: <cover.1507781178.git.garsilva@embeddedor.com>
- <ed0b43170d08cda14de2b6a8069e77054b03fae0.1507781178.git.garsilva@embeddedor.com>
-Message-ID: <274B25B3-8F82-4DDA-87F9-419C7F3BC510@intel.com>
+From: NeilBrown <neilb@suse.com>
+Date: Fri, 20 Oct 2017 11:39:50 +1100
+Subject: [lustre-devel] [PATCH 0/6] dcache/namei fixes for lustre
+In-Reply-To: <alpine.LFD.2.20.1708200354030.5810@casper.infradead.org>
+References: <150164273003.13199.7841976922211510658.stgit@noble>
+ <alpine.LFD.2.20.1708200354030.5810@casper.infradead.org>
+Message-ID: <87k1zqfy95.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Gustavo A. R. Silva" <garsilva@embeddedor.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Oct 12, 2017, at 10:17, Gustavo A. R. Silva <garsilva@embeddedor.com> wrote:
-> 
-> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
-> where we are expecting to fall through.
-> 
-> Addresses-Coverity-ID: 1077598
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+On Sun, Aug 20 2017, James Simmons wrote:
 
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+>> This series is a revised version of two patches I sent
+>> previously (one of which was sadly broken).
+>> That patch has been broken into multiple parts for easy
+>> review.  The other is included unchanged as the last of
+>> this series.
+>> 
+>> I was drawn to look at this code due to the tests on
+>> DCACHE_DISCONNECTED which are often wrong, and it turns out
+>> they are used wrongly in lustre too.  Fixing one led to some
+>> clean-up.  Fixing the other is straight forward.
+>> 
+>> A particular change here from the previous posting is
+>> the first patch which tests for DCACHE_PAR_LOOKUP in ll_dcompare().
+>> Without this patch, two threads can be looking up the same
+>> name in a given directory in parallel.  This parallelism lead
+>> to my concerns about needing improved locking in ll_splice_alias().
+>> Instead of improving the locking, I now avoid the need for it
+>> by fixing ll_dcompare.
+>> 
+>> This code passes basic "smoke tests".
+>> 
+>> Note that the cast to "struct dentry *" in the first patch is because
+>> we have a "const struct dentry *" but d_in_lookup() requires a
+>> pointer to a non-const structure.  I'll send a separate patch to
+>> change d_in_lookup().
+>
+> To let you know this patch has been under going testing and we have a
+> ticket open to track the progess:
+>
+> https://jira.hpdd.intel.com/browse/LU-9868
+>
+> Your patch did reveal that a piece of a fix landed earlier is missing :-(
+> So currently the client can oops. I will send the fix shortly but this
+> work will have to rebased after. As soon as we can get some cycles we will
+> figure out what is going on. Thanks for helping out.
 
-> ---
-> drivers/staging/lustre/lustre/osc/osc_cache.c | 1 +
-> 1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-> index e1207c2..eab7759 100644
-> --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-> +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-> @@ -227,6 +227,7 @@ static int osc_extent_sanity_check0(struct osc_extent *ext,
-> 			rc = 65;
-> 			goto out;
-> 		}
-> +		/* fall through */
-> 	default:
-> 		if (atomic_read(&ext->oe_users) > 0) {
-> 			rc = 70;
-> -- 
-> 2.7.4
-> 
+Hi,
+ what happened about this?  I had a look around the ticket and couldn't
+ find anything about an oops.  If there is still a problem I'd be very
+ happy to help work out what it is - but I don't know where to look.
 
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel Corporation
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171020/cf8c2e9e/attachment.sig>
