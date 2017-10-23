@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 23 Oct 2017 11:53:49 +1100
-Subject: [lustre-devel] [PATCH 9/9] staging: lustre: ldlm: remove unused
- field 'fwd_generation'
+Subject: [lustre-devel] [PATCH 7/9] staging: lustre: ldlm: tidy list walking
+ in ldlm_flock()
 In-Reply-To: <150871988297.3340.4522589460981284121.stgit@noble>
 References: <150871988297.3340.4522589460981284121.stgit@noble>
-Message-ID: <150872002986.3340.15607846693582678949.stgit@noble>
+Message-ID: <150872002980.3340.10618324564169458593.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,57 +12,108 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
 
-With this field gone, we don't need local variables 'imp' or 'obd'
-any more.
+Use list_for_each_entry variants to
+avoid the explicit list_entry() calls.
+This allows us to use list_for_each_entry_safe_from()
+instread of adding a local list-walking macro.
+
+Also improve some comments so that it is more obvious
+that the locks are sorted per-owner and that we need
+to find the insertion point.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   21 +++------------------
- 1 file changed, 3 insertions(+), 18 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   45 ++++++++++-------------
+ 1 file changed, 19 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 774d8667769a..9c0e9cd00000 100644
+index 1bf56892fcf5..0bf6dce1c5b1 100644
 --- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
 +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -311,7 +311,6 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+@@ -59,17 +59,6 @@
+ #include <linux/list.h>
+ #include "ldlm_internal.h"
  
- struct ldlm_flock_wait_data {
- 	struct ldlm_lock *fwd_lock;
--	int	       fwd_generation;
- };
- 
- static void
-@@ -342,11 +341,9 @@ int
- ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+-/**
+- * list_for_remaining_safe - iterate over the remaining entries in a list
+- *	      and safeguard against removal of a list entry.
+- * \param pos   the &struct list_head to use as a loop counter. pos MUST
+- *	      have been initialized prior to using it in this macro.
+- * \param n     another &struct list_head to use as temporary storage
+- * \param head  the head for your list.
+- */
+-#define list_for_remaining_safe(pos, n, head) \
+-	for (n = pos->next; pos != (head); pos = n, n = pos->next)
+-
+ static inline int
+ ldlm_same_flock_owner(struct ldlm_lock *lock, struct ldlm_lock *new)
  {
- 	struct file_lock		*getlk = lock->l_ast_data;
--	struct obd_device	      *obd;
--	struct obd_import	      *imp = NULL;
--	struct ldlm_flock_wait_data     fwd;
--	struct l_wait_info	      lwi;
--	int			     rc = 0;
-+	struct ldlm_flock_wait_data	fwd;
-+	struct l_wait_info		lwi;
-+	int				rc = 0;
+@@ -125,8 +114,8 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+ {
+ 	struct ldlm_resource *res = req->l_resource;
+ 	struct ldlm_namespace *ns = ldlm_res_to_ns(res);
+-	struct list_head *tmp;
+-	struct list_head *ownlocks = NULL;
++	struct ldlm_lock *tmp;
++	struct ldlm_lock *ownlocks = NULL;
+ 	struct ldlm_lock *lock = NULL;
+ 	struct ldlm_lock *new = req;
+ 	struct ldlm_lock *new2 = NULL;
+@@ -151,23 +140,23 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+ 	/* This loop determines where this processes locks start
+ 	 * in the resource lr_granted list.
+ 	 */
+-	list_for_each(tmp, &res->lr_granted) {
+-		lock = list_entry(tmp, struct ldlm_lock,
+-				  l_res_link);
++	list_for_each_entry(lock, &res->lr_granted, l_res_link) {
+ 		if (ldlm_same_flock_owner(lock, req)) {
+-			ownlocks = tmp;
++			ownlocks = lock;
+ 			break;
+ 		}
+ 	}
  
- 	OBD_FAIL_TIMEOUT(OBD_FAIL_LDLM_CP_CB_WAIT2, 4);
- 	if (OBD_FAIL_PRECHECK(OBD_FAIL_LDLM_CP_CB_WAIT3)) {
-@@ -374,18 +371,6 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+-	/* Scan the locks owned by this process that overlap this request.
++	/* Scan the locks owned by this process to find the insertion point
++	 * (as locks are ordered), and to handle overlaps.
+ 	 * We may have to merge or split existing locks.
+ 	 */
+-	if (!ownlocks)
+-		ownlocks = &res->lr_granted;
+-
+-	list_for_remaining_safe(ownlocks, tmp, &res->lr_granted) {
+-		lock = list_entry(ownlocks, struct ldlm_lock, l_res_link);
++	if (ownlocks)
++		lock = ownlocks;
++	else
++		lock = list_entry(&res->lr_granted,
++				  struct ldlm_lock, l_res_link);
++	list_for_each_entry_safe_from(lock, tmp, &res->lr_granted, l_res_link) {
  
- 	LDLM_DEBUG(lock, "client-side enqueue returned a blocked lock, sleeping");
- 	fwd.fwd_lock = lock;
--	obd = class_exp2obd(lock->l_conn_export);
--
--	/* if this is a local lock, there is no import */
--	if (obd)
--		imp = obd->u.cli.cl_import;
--
--	if (imp) {
--		spin_lock(&imp->imp_lock);
--		fwd.fwd_generation = imp->imp_generation;
--		spin_unlock(&imp->imp_lock);
--	}
--
- 	lwi = LWI_TIMEOUT_INTR(0, NULL, ldlm_flock_interrupted_wait, &fwd);
+ 		if (!ldlm_same_flock_owner(lock, new))
+ 			break;
+@@ -295,7 +284,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+ 						 lock->l_granted_mode);
  
- 	/* Go to sleep until the lock is granted. */
+ 		/* insert new2 at lock */
+-		ldlm_resource_add_lock(res, ownlocks, new2);
++		ldlm_resource_add_lock(res, &lock->l_res_link, new2);
+ 		LDLM_LOCK_RELEASE(new2);
+ 		break;
+ 	}
+@@ -309,8 +298,12 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+ 
+ 	if (!added) {
+ 		list_del_init(&req->l_res_link);
+-		/* insert new lock before ownlocks in list. */
+-		ldlm_resource_add_lock(res, ownlocks, req);
++		/* insert new lock before "lock", which might be the
++		 * next lock for this owner, or might be the first
++		 * lock for the next owner, or might not be a lock at
++		 * all, but instead points at the head of the list
++		 */
++		ldlm_resource_add_lock(res, &lock->l_res_link, req);
+ 	}
+ 
+ 	/* In case we're reprocessing the requested lock we can't destroy
