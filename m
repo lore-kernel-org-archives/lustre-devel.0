@@ -1,71 +1,66 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 23 Oct 2017 11:53:49 +1100
-Subject: [lustre-devel] [PATCH 8/9] staging: lustre: ldlm: remove
- unnecessary 'ownlocks' variable.
-In-Reply-To: <150871988297.3340.4522589460981284121.stgit@noble>
-References: <150871988297.3340.4522589460981284121.stgit@noble>
-Message-ID: <150872002983.3340.10585764760968162389.stgit@noble>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 24 Oct 2017 22:50:48 +0100 (BST)
+Subject: [lustre-devel] [PATCH 0/6] dcache/namei fixes for lustre
+In-Reply-To: <87k1zqfy95.fsf@notabene.neil.brown.name>
+References: <150164273003.13199.7841976922211510658.stgit@noble>
+ <alpine.LFD.2.20.1708200354030.5810@casper.infradead.org>
+ <87k1zqfy95.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.20.1710240229440.24440@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
+To: NeilBrown <neilb@suse.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <greg@kroah.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Alexander Viro <viro@zeniv.linux.org.uk>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Now that the code has been simplified, 'ownlocks' is not
-necessary.
 
-The loop which sets it exits with 'lock' having the same value as
-'ownlocks', or pointing to the head of the list if ownlocks is NULL.
+> >> This series is a revised version of two patches I sent
+> >> previously (one of which was sadly broken).
+> >> That patch has been broken into multiple parts for easy
+> >> review.  The other is included unchanged as the last of
+> >> this series.
+> >> 
+> >> I was drawn to look at this code due to the tests on
+> >> DCACHE_DISCONNECTED which are often wrong, and it turns out
+> >> they are used wrongly in lustre too.  Fixing one led to some
+> >> clean-up.  Fixing the other is straight forward.
+> >> 
+> >> A particular change here from the previous posting is
+> >> the first patch which tests for DCACHE_PAR_LOOKUP in ll_dcompare().
+> >> Without this patch, two threads can be looking up the same
+> >> name in a given directory in parallel.  This parallelism lead
+> >> to my concerns about needing improved locking in ll_splice_alias().
+> >> Instead of improving the locking, I now avoid the need for it
+> >> by fixing ll_dcompare.
+> >> 
+> >> This code passes basic "smoke tests".
+> >> 
+> >> Note that the cast to "struct dentry *" in the first patch is because
+> >> we have a "const struct dentry *" but d_in_lookup() requires a
+> >> pointer to a non-const structure.  I'll send a separate patch to
+> >> change d_in_lookup().
+> >
+> > To let you know this patch has been under going testing and we have a
+> > ticket open to track the progess:
+> >
+> > https://jira.hpdd.intel.com/browse/LU-9868
+> >
+> > Your patch did reveal that a piece of a fix landed earlier is missing :-(
+> > So currently the client can oops. I will send the fix shortly but this
+> > work will have to rebased after. As soon as we can get some cycles we will
+> > figure out what is going on. Thanks for helping out.
+> 
+> Hi,
+>  what happened about this?  I had a look around the ticket and couldn't
+>  find anything about an oops.  If there is still a problem I'd be very
+>  happy to help work out what it is - but I don't know where to look.
 
-The current code then tests ownlocks and sets 'lock' to exactly the
-value that it currently has.
+The oops is specific to the in kernel client. Some where along the way the
+calls to ll_d_init() were removed from ll_splice_alias(). It was unnoticed
+until your patch came along. I do have a fix that I will be pushing to 
+the next staging tree very shortly.
 
-So discard 'ownlocks'.
-
-Also remove unnecessary initialization of 'lock'.
-
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-index 0bf6dce1c5b1..774d8667769a 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-@@ -115,8 +115,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
- 	struct ldlm_resource *res = req->l_resource;
- 	struct ldlm_namespace *ns = ldlm_res_to_ns(res);
- 	struct ldlm_lock *tmp;
--	struct ldlm_lock *ownlocks = NULL;
--	struct ldlm_lock *lock = NULL;
-+	struct ldlm_lock *lock;
- 	struct ldlm_lock *new = req;
- 	struct ldlm_lock *new2 = NULL;
- 	enum ldlm_mode mode = req->l_req_mode;
-@@ -140,22 +139,14 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
- 	/* This loop determines where this processes locks start
- 	 * in the resource lr_granted list.
- 	 */
--	list_for_each_entry(lock, &res->lr_granted, l_res_link) {
--		if (ldlm_same_flock_owner(lock, req)) {
--			ownlocks = lock;
-+	list_for_each_entry(lock, &res->lr_granted, l_res_link)
-+		if (ldlm_same_flock_owner(lock, req))
- 			break;
--		}
--	}
- 
- 	/* Scan the locks owned by this process to find the insertion point
- 	 * (as locks are ordered), and to handle overlaps.
- 	 * We may have to merge or split existing locks.
- 	 */
--	if (ownlocks)
--		lock = ownlocks;
--	else
--		lock = list_entry(&res->lr_granted,
--				  struct ldlm_lock, l_res_link);
- 	list_for_each_entry_safe_from(lock, tmp, &res->lr_granted, l_res_link) {
- 
- 		if (!ldlm_same_flock_owner(lock, new))
+I have been testing the patch series and for me I don't see any issue. Our 
+test suite is reporting failures with this patch which I'm attempting to 
+figure out how to reproduce locally on my test system. Once I have a 
+reproducer I can send it to you. 
