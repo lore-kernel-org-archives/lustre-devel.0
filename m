@@ -1,45 +1,41 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 26 Oct 2017 08:55:06 +1100
-Subject: [lustre-devel] [PATCH 0/9] Assorted cleanups for
- staging/.../lustre/ldlm/ldlm_flock.c
-In-Reply-To: <alpine.LFD.2.20.1710242320020.20646@casper.infradead.org>
-References: <150871988297.3340.4522589460981284121.stgit@noble>
- <alpine.LFD.2.20.1710242320020.20646@casper.infradead.org>
-Message-ID: <874lqmevut.fsf@notabene.neil.brown.name>
+From: Abe Asraoui <AbeA@supermicro.com>
+Date: Thu, 26 Oct 2017 00:27:24 +0000
+Subject: [lustre-devel] Zfs recovery time
+In-Reply-To: <3675C0E7-8B03-49FE-9410-2C0B1184BE4D@intel.com>
+References: <a9bcec7262434923a9276e5fc839994a@Ex2013-MBX2.supermicro.com>
+ <3675C0E7-8B03-49FE-9410-2C0B1184BE4D@intel.com>
+Message-ID: <9a61cf88df0041fea3e8b237ebac37a2@Ex2013-MBX2.supermicro.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org
+To: lustre-devel@lists.lustre.org
 
-On Tue, Oct 24 2017, James Simmons wrote:
+Hi Andreas,
 
->> This file contains quite a bit of dead code and unused variables.
->> This patch series cleans it up in various ways.
->> It should change behaviour at all, just code
->> readability/maintainabilty.
->> 
->> I sent the back in July but got not response, possibly because there
->> were included with other patches which caused a distraction.
->> So here they are by themselves.
->
-> Thanks for separating them out. I will give them a spin.
->
+I'm looking for any data regarding resilvering time for a zfs pool in a case of a drive failure and 
+again with full or fragmented pools.
 
-Thanks.  I have a growing series of cleanups (43 at present, including
-these and the namei/dcache patches).  Is posting them here the best
-approach?  I assume I should keep them in well-defined groups.  Should I
-wait for one set to be merged before sending more, or should I just send
-them when I think they are ready and you (or others) will look at them
-as time permits.
+Thanks in Advance,
+Abe
 
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171026/38e34cca/attachment.sig>
+-----Original Message-----
+From: Dilger, Andreas [mailto:andreas.dilger at intel.com] 
+Sent: Wednesday, October 25, 2017 11:34 AM
+To: Abe Asraoui (Server)
+Cc: Lustre Development List
+Subject: Re: [lustre-devel] Zfs recovery time
+
+On Oct 25, 2017, at 12:00, Abe Asraoui <AbeA@supermicro.com> wrote:
+> 
+> Hi All,
+> 
+> Does anyone know what the Zfs recovery time for a disk failure under lustre filesystem, or is there any documentation around this topic ?
+
+Could you please clarify the question?  Do you mean what the resilvering time is for a ZFS zpool when a drive fails?  That depends heavily on your zpool configuration (number and performance of drives), and how full/fragmented the pool is.  This is more of a ZFS question, but some numbers I saw recently were about 20-40MB/s resilvering for the *used* data on the HDD.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
