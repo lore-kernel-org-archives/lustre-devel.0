@@ -1,11 +1,11 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 27 Oct 2017 09:20:31 +0000
-Subject: [lustre-devel] [PATCH 5/9] staging: lustre: ldlm: remove unused
- 'overlaps' variable
-In-Reply-To: <150872002972.3340.9372825368625571993.stgit@noble>
+Date: Fri, 27 Oct 2017 09:23:59 +0000
+Subject: [lustre-devel] [PATCH 6/9] staging: lustre: ldlm: remove
+ 'flags' arg from ldlm_flock_destroy()
+In-Reply-To: <150872002976.3340.17760141414233585370.stgit@noble>
 References: <150871988297.3340.4522589460981284121.stgit@noble>
- <150872002972.3340.9372825368625571993.stgit@noble>
-Message-ID: <77ADF410-2FBC-4F06-B5C5-275EE18D703D@intel.com>
+ <150872002976.3340.17760141414233585370.stgit@noble>
+Message-ID: <D702959F-FD04-4996-8C43-98263EC36D9D@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,37 +15,113 @@ Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.or
 
 On Oct 22, 2017, at 18:53, NeilBrown <neilb@suse.com> wrote:
 > 
-> 'overlaps' is never used, only incremented.
+> The only value ever passed in LDLM_FL_WAIT_NOREPROC, so assume that
+> instead of passing it.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
 > ---
-> drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |    3 ---
-> 1 file changed, 3 deletions(-)
+> drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   36 ++++++++++-------------
+> 1 file changed, 16 insertions(+), 20 deletions(-)
 > 
 > diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-> index 2d1fa2b33129..d5a5742a1171 100644
+> index d5a5742a1171..1bf56892fcf5 100644
 > --- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
 > +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
-> @@ -133,7 +133,6 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
-> 	struct ldlm_lock *new2 = NULL;
-> 	enum ldlm_mode mode = req->l_req_mode;
-> 	int added = (mode == LCK_NL);
-> -	int overlaps = 0;
-> 	int splitted = 0;
-> 	const struct ldlm_callback_suite null_cbs = { };
+> @@ -88,24 +88,23 @@ ldlm_flocks_overlap(struct ldlm_lock *lock, struct ldlm_lock *new)
+> }
 > 
-> @@ -226,8 +225,6 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
-> 		    lock->l_policy_data.l_flock.start)
-> 			break;
+> static inline void
+> -ldlm_flock_destroy(struct ldlm_lock *lock, enum ldlm_mode mode, __u64 flags)
+> +ldlm_flock_destroy(struct ldlm_lock *lock, enum ldlm_mode mode)
+> {
+> -	LDLM_DEBUG(lock, "%s(mode: %d, flags: 0x%llx)",
+> -		   __func__, mode, flags);
+> +	LDLM_DEBUG(lock, "%s(mode: %d)",
+> +		   __func__, mode);
 > 
-> -		++overlaps;
-> -
-> 		if (new->l_policy_data.l_flock.start <=
-> 		    lock->l_policy_data.l_flock.start) {
-> 			if (new->l_policy_data.l_flock.end <
+> 	/* Safe to not lock here, since it should be empty anyway */
+> 	LASSERT(hlist_unhashed(&lock->l_exp_flock_hash));
+> 
+> 	list_del_init(&lock->l_res_link);
+> -	if (flags == LDLM_FL_WAIT_NOREPROC) {
+> -		/* client side - set a flag to prevent sending a CANCEL */
+> -		lock->l_flags |= LDLM_FL_LOCAL_ONLY | LDLM_FL_CBPENDING;
+> 
+> -		/* when reaching here, it is under lock_res_and_lock(). Thus,
+> -		 * need call the nolock version of ldlm_lock_decref_internal
+> -		 */
+> -		ldlm_lock_decref_internal_nolock(lock, mode);
+> -	}
+> +	/* client side - set a flag to prevent sending a CANCEL */
+> +	lock->l_flags |= LDLM_FL_LOCAL_ONLY | LDLM_FL_CBPENDING;
+> +
+> +	/* when reaching here, it is under lock_res_and_lock(). Thus,
+> +	 * need call the nolock version of ldlm_lock_decref_internal
+> +	 */
+> +	ldlm_lock_decref_internal_nolock(lock, mode);
+> 
+> 	ldlm_lock_destroy_nolock(lock);
+> }
+> @@ -208,8 +207,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+> 			}
+> 
+> 			if (added) {
+> -				ldlm_flock_destroy(lock, mode,
+> -						   LDLM_FL_WAIT_NOREPROC);
+> +				ldlm_flock_destroy(lock, mode);
+> 			} else {
+> 				new = lock;
+> 				added = 1;
+> @@ -233,8 +231,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+> 					new->l_policy_data.l_flock.end + 1;
+> 				break;
+> 			}
+> -			ldlm_flock_destroy(lock, lock->l_req_mode,
+> -					   LDLM_FL_WAIT_NOREPROC);
+> +			ldlm_flock_destroy(lock, lock->l_req_mode);
+> 			continue;
+> 		}
+> 		if (new->l_policy_data.l_flock.end >=
+> @@ -265,8 +262,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+> 						NULL, 0, LVB_T_NONE);
+> 			lock_res_and_lock(req);
+> 			if (IS_ERR(new2)) {
+> -				ldlm_flock_destroy(req, lock->l_granted_mode,
+> -						   LDLM_FL_WAIT_NOREPROC);
+> +				ldlm_flock_destroy(req, lock->l_granted_mode);
+> 				return LDLM_ITER_STOP;
+> 			}
+> 			goto reprocess;
+> @@ -323,7 +319,7 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req)
+> 	 * could be freed before the completion AST can be sent.
+> 	 */
+> 	if (added)
+> -		ldlm_flock_destroy(req, mode, LDLM_FL_WAIT_NOREPROC);
+> +		ldlm_flock_destroy(req, mode);
+> 
+> 	ldlm_resource_dump(D_INFO, res);
+> 	return LDLM_ITER_CONTINUE;
+> @@ -477,7 +473,7 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+> 			LDLM_DEBUG(lock, "client-side enqueue deadlock received");
+> 			rc = -EDEADLK;
+> 		}
+> -		ldlm_flock_destroy(lock, mode, LDLM_FL_WAIT_NOREPROC);
+> +		ldlm_flock_destroy(lock, mode);
+> 		unlock_res_and_lock(lock);
+> 
+> 		/* Need to wake up the waiter if we were evicted */
+> @@ -498,7 +494,7 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+> 		 * in the lock changes we can decref the appropriate refcount.
+> 		 */
+> 		LASSERT(ldlm_is_test_lock(lock));
+> -		ldlm_flock_destroy(lock, getlk->fl_type, LDLM_FL_WAIT_NOREPROC);
+> +		ldlm_flock_destroy(lock, getlk->fl_type);
+> 		switch (lock->l_granted_mode) {
+> 		case LCK_PR:
+> 			getlk->fl_type = F_RDLCK;
 > 
 > 
 
