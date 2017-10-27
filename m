@@ -1,38 +1,74 @@
-From: Abe Asraoui <AbeA@supermicro.com>
-Date: Thu, 26 Oct 2017 00:27:24 +0000
-Subject: [lustre-devel] Zfs recovery time
-In-Reply-To: <3675C0E7-8B03-49FE-9410-2C0B1184BE4D@intel.com>
-References: <a9bcec7262434923a9276e5fc839994a@Ex2013-MBX2.supermicro.com>
- <3675C0E7-8B03-49FE-9410-2C0B1184BE4D@intel.com>
-Message-ID: <9a61cf88df0041fea3e8b237ebac37a2@Ex2013-MBX2.supermicro.com>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Fri, 27 Oct 2017 09:08:29 +0000
+Subject: [lustre-devel] [PATCH 1/9] staging: lustre: ldlm: remove
+ 'first_enq' arg from ldlm_process_flock_lock()
+In-Reply-To: <150872002958.3340.14294625301256962751.stgit@noble>
+References: <150871988297.3340.4522589460981284121.stgit@noble>
+ <150872002958.3340.14294625301256962751.stgit@noble>
+Message-ID: <DC057AF3-8C2F-45C3-80C8-F92587BAA462@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: NeilBrown <neilb@suse.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-Hi Andreas,
-
-I'm looking for any data regarding resilvering time for a zfs pool in a case of a drive failure and 
-again with full or fragmented pools.
-
-Thanks in Advance,
-Abe
-
------Original Message-----
-From: Dilger, Andreas [mailto:andreas.dilger at intel.com] 
-Sent: Wednesday, October 25, 2017 11:34 AM
-To: Abe Asraoui (Server)
-Cc: Lustre Development List
-Subject: Re: [lustre-devel] Zfs recovery time
-
-On Oct 25, 2017, at 12:00, Abe Asraoui <AbeA@supermicro.com> wrote:
+On Oct 22, 2017, at 18:53, NeilBrown <neilb@suse.com> wrote:
 > 
-> Hi All,
+> it is only ever set to '1', so we can just assume that and remove the code.
 > 
-> Does anyone know what the Zfs recovery time for a disk failure under lustre filesystem, or is there any documentation around this topic ?
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
-Could you please clarify the question?  Do you mean what the resilvering time is for a ZFS zpool when a drive fails?  That depends heavily on your zpool configuration (number and performance of drives), and how full/fragmented the pool is.  This is more of a ZFS question, but some numbers I saw recently were about 20-40MB/s resilvering for the *used* data on the HDD.
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+
+> ---
+> drivers/staging/lustre/lustre/ldlm/ldlm_flock.c |   15 ++-------------
+> 1 file changed, 2 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+> index cb826e9e840e..f719dc05e1ea 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_flock.c
+> @@ -121,15 +121,9 @@ ldlm_flock_destroy(struct ldlm_lock *lock, enum ldlm_mode mode, __u64 flags)
+>  * It is also responsible for splitting a lock if a portion of the lock
+>  * is released.
+>  *
+> - * If \a first_enq is 0 (ie, called from ldlm_reprocess_queue):
+> - *   - blocking ASTs have already been sent
+> - *
+> - * If \a first_enq is 1 (ie, called from ldlm_lock_enqueue):
+> - *   - blocking ASTs have not been sent yet, so list of conflicting locks
+> - *     would be collected and ASTs sent.
+>  */
+> static int ldlm_process_flock_lock(struct ldlm_lock *req, __u64 *flags,
+> -				   int first_enq, enum ldlm_error *err,
+> +				   enum ldlm_error *err,
+> 				   struct list_head *work_list)
+> {
+> 	struct ldlm_resource *res = req->l_resource;
+> @@ -197,11 +191,6 @@ static int ldlm_process_flock_lock(struct ldlm_lock *req, __u64 *flags,
+> 			if (!ldlm_flocks_overlap(lock, req))
+> 				continue;
+> 
+> -			if (!first_enq) {
+> -				reprocess_failed = 1;
+> -				continue;
+> -			}
+> -
+> 			if (*flags & LDLM_FL_BLOCK_NOWAIT) {
+> 				ldlm_flock_destroy(req, mode, *flags);
+> 				*err = -EAGAIN;
+> @@ -605,7 +594,7 @@ ldlm_flock_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+> 		/* We need to reprocess the lock to do merges or splits
+> 		 * with existing locks owned by this process.
+> 		 */
+> -		ldlm_process_flock_lock(lock, &noreproc, 1, &err, NULL);
+> +		ldlm_process_flock_lock(lock, &noreproc, &err, NULL);
+> 	}
+> 	unlock_res_and_lock(lock);
+> 	return rc;
+> 
+> 
 
 Cheers, Andreas
 --
