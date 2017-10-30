@@ -1,8 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 30 Oct 2017 15:59:27 +1100
-Subject: [lustre-devel] [PATCH 00/10] staging: lustre: assorted code
- improvements for list manipulations.
-Message-ID: <150933945578.22133.8029060522107378499.stgit@noble>
+Subject: [lustre-devel] [PATCH 02/10] staging: lustre: ldlm: use
+ list_for_each_entry in ldlm_extent_shift_kms()
+In-Reply-To: <150933945578.22133.8029060522107378499.stgit@noble>
+References: <150933945578.22133.8029060522107378499.stgit@noble>
+Message-ID: <150933956707.22133.18031734709320073959.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -10,39 +12,30 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-There are mostly conversions of list_for_each() to
-list_for_each_entry() and similar.  list_first_entry()
-also makes a few appearances.
-
-Thanks,
-NeilBrown
-
-
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
+ drivers/staging/lustre/lustre/ldlm/ldlm_extent.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-NeilBrown (10):
-      staging: lustre: use list_last_entry to simplify fld_cache_shrink
-      staging: lustre: ldlm: use list_for_each_entry in ldlm_extent_shift_kms()
-      staging: lustre: ldlm: use list_first_entry in ldlm_lock
-      staging: lustre: ldlm: use list_for_each_entry in ldlm_lock.c
-      staging: lustre: ldlm: use list_first_entry in ldlm_lockd.c
-      staging: lustre: ldlm: minor list_entry improvements in ldlm_request.c
-      staging: lustre: ldlm: use list_for_each_entry in ldlm_resource.c
-      staging: lustre: lov: use list_for_each_entry in lov_obd.c
-      staging: lustre: simplfy lov_finish_set()
-      staging: lustre: obdclass: simplify cl_lock_fini()
-
-
- drivers/staging/lustre/lustre/fld/fld_cache.c      |   13 ++++++-------
- drivers/staging/lustre/lustre/ldlm/ldlm_extent.c   |    4 +---
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   18 +++++++-----------
- drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |   10 +++++-----
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   12 ++++--------
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   20 +++++++-------------
- drivers/staging/lustre/lustre/lov/lov_obd.c        |    6 ++----
- drivers/staging/lustre/lustre/lov/lov_request.c    |   10 ++++------
- drivers/staging/lustre/lustre/obdclass/cl_lock.c   |    9 ++++-----
- 9 files changed, 40 insertions(+), 62 deletions(-)
-
---
-Signature
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
+index 2cc6dc2b281f..c9bf9ae40f7d 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
+@@ -63,7 +63,6 @@
+ __u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, __u64 old_kms)
+ {
+ 	struct ldlm_resource *res = lock->l_resource;
+-	struct list_head *tmp;
+ 	struct ldlm_lock *lck;
+ 	__u64 kms = 0;
+ 
+@@ -73,8 +72,7 @@ __u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, __u64 old_kms)
+ 	 */
+ 	ldlm_set_kms_ignore(lock);
+ 
+-	list_for_each(tmp, &res->lr_granted) {
+-		lck = list_entry(tmp, struct ldlm_lock, l_res_link);
++	list_for_each_entry(lck, &res->lr_granted, l_res_link) {
+ 
+ 		if (ldlm_is_kms_ignore(lck))
+ 			continue;
