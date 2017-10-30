@@ -1,44 +1,59 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 30 Oct 2017 15:59:27 +1100
-Subject: [lustre-devel] [PATCH 10/10] staging: lustre: obdclass: simplify
- cl_lock_fini()
-In-Reply-To: <150933945578.22133.8029060522107378499.stgit@noble>
-References: <150933945578.22133.8029060522107378499.stgit@noble>
-Message-ID: <150933956737.22133.10532579319852492812.stgit@noble>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Mon, 30 Oct 2017 23:38:29 +0000
+Subject: [lustre-devel] [PATCH] lustre: don't set f_version in ll_readdir
+In-Reply-To: <20171030150012.2101-1-jlayton@kernel.org>
+References: <20171030150012.2101-1-jlayton@kernel.org>
+Message-ID: <884F92FF-0C9D-4B97-A034-865351D22D56@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
 
-Using list_first_entry_or_null() makes this (slightly)
-simpler.
+On Oct 30, 2017, at 23:00, Jeff Layton <jlayton@kernel.org> wrote:
+> 
+> From: Jeff Layton <jlayton@redhat.com>
+> 
+> f_version is only ever used by filesystem-specific code. Generic
+> VFS code never uses it.
+> 
+> Nothing in lustre ever looks at it, so just remove this.
+> 
+> Signed-off-by: Jeff Layton <jlayton@redhat.com>
 
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lustre/obdclass/cl_lock.c |    9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-index 20e64051d2d6..fa97f4b39bd1 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
-@@ -78,13 +78,12 @@ EXPORT_SYMBOL(cl_lock_slice_add);
- 
- void cl_lock_fini(const struct lu_env *env, struct cl_lock *lock)
- {
-+	struct cl_lock_slice *slice;
- 	cl_lock_trace(D_DLMTRACE, env, "destroy lock", lock);
- 
--	while (!list_empty(&lock->cll_layers)) {
--		struct cl_lock_slice *slice;
--
--		slice = list_entry(lock->cll_layers.next,
--				   struct cl_lock_slice, cls_linkage);
-+	while ((slice = list_first_entry_or_null(&lock->cll_layers,
-+						 struct cl_lock_slice,
-+						 cls_linkage)) != NULL) {
- 		list_del_init(lock->cll_layers.next);
- 		slice->cls_ops->clo_fini(env, slice);
- 	}
+> ---
+> drivers/staging/lustre/lustre/llite/dir.c | 3 ---
+> 1 file changed, 3 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+> index 1db3e7f345c5..9664447ffcd7 100644
+> --- a/drivers/staging/lustre/lustre/llite/dir.c
+> +++ b/drivers/staging/lustre/lustre/llite/dir.c
+> @@ -367,8 +367,6 @@ static int ll_readdir(struct file *filp, struct dir_context *ctx)
+> 	}
+> 	ctx->pos = pos;
+> 	ll_finish_md_op_data(op_data);
+> -	filp->f_version = inode->i_version;
+> -
+> out:
+> 	if (!rc)
+> 		ll_stats_ops_tally(sbi, LPROC_LL_READDIR, 1);
+> @@ -1675,7 +1673,6 @@ static loff_t ll_dir_seek(struct file *file, loff_t offset, int origin)
+> 			else
+> 				fd->lfd_pos = offset;
+> 			file->f_pos = offset;
+> -			file->f_version = 0;
+> 		}
+> 		ret = offset;
+> 	}
+> -- 
+> 2.13.6
+> 
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
