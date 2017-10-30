@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 30 Oct 2017 15:59:27 +1100
-Subject: [lustre-devel] [PATCH 09/10] staging: lustre: simplfy
- lov_finish_set()
+Subject: [lustre-devel] [PATCH 10/10] staging: lustre: obdclass: simplify
+ cl_lock_fini()
 In-Reply-To: <150933945578.22133.8029060522107378499.stgit@noble>
 References: <150933945578.22133.8029060522107378499.stgit@noble>
-Message-ID: <150933956733.22133.5869125353037664313.stgit@noble>
+Message-ID: <150933956737.22133.10532579319852492812.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,35 +12,33 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-When deleting everything from a list, a while loop
-is cleaner than list_for_each_safe().
+Using list_first_entry_or_null() makes this (slightly)
+simpler.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/lov/lov_request.c |   10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/cl_lock.c |    9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_request.c b/drivers/staging/lustre/lustre/lov/lov_request.c
-index 9d3b3f3e9f10..54f883e359ce 100644
---- a/drivers/staging/lustre/lustre/lov/lov_request.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_request.c
-@@ -48,15 +48,13 @@ static void lov_init_set(struct lov_request_set *set)
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_lock.c b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+index 20e64051d2d6..fa97f4b39bd1 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_lock.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_lock.c
+@@ -78,13 +78,12 @@ EXPORT_SYMBOL(cl_lock_slice_add);
  
- static void lov_finish_set(struct lov_request_set *set)
+ void cl_lock_fini(const struct lu_env *env, struct cl_lock *lock)
  {
--	struct list_head *pos, *n;
-+	struct lov_request *req;
++	struct cl_lock_slice *slice;
+ 	cl_lock_trace(D_DLMTRACE, env, "destroy lock", lock);
  
- 	LASSERT(set);
--	list_for_each_safe(pos, n, &set->set_list) {
--		struct lov_request *req = list_entry(pos,
--							 struct lov_request,
--							 rq_link);
-+	while ((req = list_first_entry_or_null(&set->set_list,
-+					       struct lov_request,
-+					       rq_link)) != NULL) {
- 		list_del_init(&req->rq_link);
+-	while (!list_empty(&lock->cll_layers)) {
+-		struct cl_lock_slice *slice;
 -
- 		kfree(req->rq_oi.oi_osfs);
- 		kfree(req);
+-		slice = list_entry(lock->cll_layers.next,
+-				   struct cl_lock_slice, cls_linkage);
++	while ((slice = list_first_entry_or_null(&lock->cll_layers,
++						 struct cl_lock_slice,
++						 cls_linkage)) != NULL) {
+ 		list_del_init(lock->cll_layers.next);
+ 		slice->cls_ops->clo_fini(env, slice);
  	}
