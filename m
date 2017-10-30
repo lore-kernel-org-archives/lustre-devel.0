@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 30 Oct 2017 15:59:27 +1100
-Subject: [lustre-devel] [PATCH 02/10] staging: lustre: ldlm: use
- list_for_each_entry in ldlm_extent_shift_kms()
+Subject: [lustre-devel] [PATCH 01/10] staging: lustre: use list_last_entry
+ to simplify fld_cache_shrink
 In-Reply-To: <150933945578.22133.8029060522107378499.stgit@noble>
 References: <150933945578.22133.8029060522107378499.stgit@noble>
-Message-ID: <150933956707.22133.18031734709320073959.stgit@noble>
+Message-ID: <150933956703.22133.5329157273101330596.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,28 +14,36 @@ Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_extent.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/fld/fld_cache.c |   13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-index 2cc6dc2b281f..c9bf9ae40f7d 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_extent.c
-@@ -63,7 +63,6 @@
- __u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, __u64 old_kms)
+diff --git a/drivers/staging/lustre/lustre/fld/fld_cache.c b/drivers/staging/lustre/lustre/fld/fld_cache.c
+index b723ece02eff..c01709cd22a1 100644
+--- a/drivers/staging/lustre/lustre/fld/fld_cache.c
++++ b/drivers/staging/lustre/lustre/fld/fld_cache.c
+@@ -212,19 +212,18 @@ static inline void fld_cache_entry_add(struct fld_cache *cache,
+  */
+ static int fld_cache_shrink(struct fld_cache *cache)
  {
- 	struct ldlm_resource *res = lock->l_resource;
--	struct list_head *tmp;
- 	struct ldlm_lock *lck;
- 	__u64 kms = 0;
+-	struct fld_cache_entry *flde;
+-	struct list_head *curr;
+ 	int num = 0;
  
-@@ -73,8 +72,7 @@ __u64 ldlm_extent_shift_kms(struct ldlm_lock *lock, __u64 old_kms)
- 	 */
- 	ldlm_set_kms_ignore(lock);
+ 	if (cache->fci_cache_count < cache->fci_cache_size)
+ 		return 0;
  
--	list_for_each(tmp, &res->lr_granted) {
--		lck = list_entry(tmp, struct ldlm_lock, l_res_link);
-+	list_for_each_entry(lck, &res->lr_granted, l_res_link) {
- 
- 		if (ldlm_is_kms_ignore(lck))
- 			continue;
+-	curr = cache->fci_lru.prev;
+-
+ 	while (cache->fci_cache_count + cache->fci_threshold >
+-	       cache->fci_cache_size && curr != &cache->fci_lru) {
+-		flde = list_entry(curr, struct fld_cache_entry, fce_lru);
+-		curr = curr->prev;
++	       cache->fci_cache_size &&
++	       !list_empty(&cache->fci_lru)) {
++		struct fld_cache_entry *flde =
++			list_last_entry(&cache->fci_lru,
++					struct fld_cache_entry, fce_lru);
++
+ 		fld_cache_entry_delete(cache, flde);
+ 		num++;
+ 	}
