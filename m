@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 30 Oct 2017 15:59:27 +1100
-Subject: [lustre-devel] [PATCH 06/10] staging: lustre: ldlm: minor
- list_entry improvements in ldlm_request.c
+Subject: [lustre-devel] [PATCH 07/10] staging: lustre: ldlm: use
+ list_for_each_entry in ldlm_resource.c
 In-Reply-To: <150933945578.22133.8029060522107378499.stgit@noble>
 References: <150933945578.22133.8029060522107378499.stgit@noble>
-Message-ID: <150933956722.22133.16215765622967632452.stgit@noble>
+Message-ID: <150933956725.22133.1599266866891541124.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,49 +14,62 @@ Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c |   12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   20 +++++++-------------
+ 1 file changed, 7 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index f5e791a92f62..1e7b8fc4dd00 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -1642,7 +1642,7 @@ int ldlm_cli_cancel_list(struct list_head *cancels, int count,
- 	 */
- 	while (count > 0) {
- 		LASSERT(!list_empty(cancels));
--		lock = list_entry(cancels->next, struct ldlm_lock, l_bl_ast);
-+		lock = list_first_entry(cancels, struct ldlm_lock, l_bl_ast);
- 		LASSERT(lock->l_conn_export);
- 
- 		if (exp_connect_cancelset(lock->l_conn_export)) {
-@@ -1766,7 +1766,7 @@ EXPORT_SYMBOL(ldlm_cli_cancel_unused);
- static int ldlm_resource_foreach(struct ldlm_resource *res,
- 				 ldlm_iterator_t iter, void *closure)
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index c2ddf7312571..980d970174d8 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -751,24 +751,22 @@ extern struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock);
+ static void cleanup_resource(struct ldlm_resource *res, struct list_head *q,
+ 			     __u64 flags)
  {
--	struct list_head *tmp, *next;
-+	struct ldlm_lock *tmp;
- 	struct ldlm_lock *lock;
- 	int rc = LDLM_ITER_CONTINUE;
+-	struct list_head *tmp;
+ 	int rc = 0;
+ 	bool local_only = !!(flags & LDLM_FL_LOCAL_ONLY);
  
-@@ -1774,18 +1774,14 @@ static int ldlm_resource_foreach(struct ldlm_resource *res,
- 		return LDLM_ITER_CONTINUE;
+ 	do {
+-		struct ldlm_lock *lock = NULL;
++		struct ldlm_lock *lock = NULL, *tmp;
+ 		struct lustre_handle lockh;
  
- 	lock_res(res);
--	list_for_each_safe(tmp, next, &res->lr_granted) {
--		lock = list_entry(tmp, struct ldlm_lock, l_res_link);
+ 		/* First, we look for non-cleaned-yet lock
+ 		 * all cleaned locks are marked by CLEANED flag.
+ 		 */
+ 		lock_res(res);
+-		list_for_each(tmp, q) {
+-			lock = list_entry(tmp, struct ldlm_lock, l_res_link);
+-			if (ldlm_is_cleaned(lock)) {
+-				lock = NULL;
++		list_for_each_entry(tmp, q, l_res_link) {
++			if (ldlm_is_cleaned(tmp))
+ 				continue;
+-			}
++
++			lock = tmp;
+ 			LDLM_LOCK_GET(lock);
+ 			ldlm_set_cleaned(lock);
+ 			break;
+@@ -1282,19 +1280,15 @@ void ldlm_res2desc(struct ldlm_resource *res, struct ldlm_resource_desc *desc)
+  */
+ void ldlm_dump_all_namespaces(enum ldlm_side client, int level)
+ {
+-	struct list_head *tmp;
++	struct ldlm_namespace *ns;
+ 
+ 	if (!((libcfs_debug | D_ERROR) & level))
+ 		return;
+ 
+ 	mutex_lock(ldlm_namespace_lock(client));
+ 
+-	list_for_each(tmp, ldlm_namespace_list(client)) {
+-		struct ldlm_namespace *ns;
 -
-+	list_for_each_entry_safe(lock, tmp, &res->lr_granted, l_res_link) {
- 		if (iter(lock, closure) == LDLM_ITER_STOP) {
- 			rc = LDLM_ITER_STOP;
- 			goto out;
- 		}
- 	}
+-		ns = list_entry(tmp, struct ldlm_namespace, ns_list_chain);
++	list_for_each_entry(ns, ldlm_namespace_list(client), ns_list_chain)
+ 		ldlm_namespace_dump(level, ns);
+-	}
  
--	list_for_each_safe(tmp, next, &res->lr_waiting) {
--		lock = list_entry(tmp, struct ldlm_lock, l_res_link);
--
-+	list_for_each_entry_safe(lock, tmp, &res->lr_waiting, l_res_link) {
- 		if (iter(lock, closure) == LDLM_ITER_STOP) {
- 			rc = LDLM_ITER_STOP;
- 			goto out;
+ 	mutex_unlock(ldlm_namespace_lock(client));
+ }
