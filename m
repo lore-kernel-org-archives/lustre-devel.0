@@ -1,61 +1,62 @@
-From: Rick Wagner <rick@globus.org>
-Date: Thu, 23 Nov 2017 11:00:12 -0800
-Subject: [lustre-devel] [lustre-discuss] strange time of reading for
- large file
-In-Reply-To: <CY4PR06MB32554D7B2D35F990BD01F661BD210@CY4PR06MB3255.namprd06.prod.outlook.com>
-References: <CY4PR06MB32554D7B2D35F990BD01F661BD210@CY4PR06MB3255.namprd06.prod.outlook.com>
-Message-ID: <EA369C7B-467D-43EC-881A-9E2D2C8EA14F@globus.org>
+From: Tobin C. Harding <me@tobin.cc>
+Date: Fri, 24 Nov 2017 09:20:20 +1100
+Subject: [lustre-devel] [PATCH 0/4] staging: lustre: fixed some
+ signedness warns from sparse
+In-Reply-To: <20171123115138.5nku6epnct35mmha@mwanda>
+References: <20171122193831.11801-1-stefano.manni@gmail.com>
+ <20171123045926.GD12736@eros>
+ <20171123115138.5nku6epnct35mmha@mwanda>
+Message-ID: <20171123222020.GI12736@eros>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Dan Carpenter <dan.carpenter@oracle.com>
+Cc: Stefano Manni <stefano.manni@gmail.com>, devel@driverdev.osuosl.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org
 
-Hi Rosana,
+On Thu, Nov 23, 2017 at 02:51:38PM +0300, Dan Carpenter wrote:
+> On Thu, Nov 23, 2017 at 03:59:26PM +1100, Tobin C. Harding wrote:
+> > On Wed, Nov 22, 2017 at 08:38:27PM +0100, Stefano Manni wrote:
+> > > Fixed some signedness warnings from sparse on lustre.
+> > > 
+> > > Stefano Manni (4):
+> > >   staging: lustre: fixed signedness of some socklnd params
+> > >   staging: lustre: fixed signedness of llite
+> > >   staging: lustre: fixed signedness of lov
+> > >   staging: lustre: fixed signedness of obdclass
+> > 
+> > You may like to use imperative mood for your git log brief descriptions
+> > Stefano.  
+> > 
+> > s/fixed/fix/
+> > 
+> 
+> Someone once chewed me a second butt hole for not using the imperative
+> mood so I know some people care intensely about this but I think so long
+> as you can understand the description it's fine.  I will never send a
+> patch for that maintainer's subsystem again, btw, which is probably
+> grateful for and now I can poop twice as fast so we're both winners.
 
-Without knowing anything about your setup or test, my first question would be whether you accounted for caching between your read tests? That can occur at several layers within the environment, including the client, server, and underlying storage hardware. This is naturally a benefit when in production, but needs to understand during performance testing. And I?m assuming that your file system was not otherwise utilized during your tests. Another assumption would be that the file system was mostly empty so that file fragmentation and disk seeks weren?t a problem.
+I try to only make these suggestions to people doing clean up patches to
+staging, with the reasoning that if we are learning we might as well
+learn the correct method from the start.
 
-?Rick
+I try to be polite and helpful, I am not very long past learning these
+things myself. No one likes being told they are wrong, better to learn
+how to take it while in staging, that's what it's there for right.
 
-> On Nov 23, 2017, at 10:52 AM, Rosana Guimaraes Ribeiro <rosana_guimaraes_@hotmail.com> wrote:
-> 
-> Hi,
-> 
-> I have some doubts about Lustre, I already sent my issues to forums but no one answer me.
-> In our application, during the performance testing on lustre 2.4.2 we got times of reading and writing to test I/O operations with a file of almost 400GB. 
-> Running this application a lot of times, consecutively, we see that in write operations, I/O time remain on same range, but in read operations there are a huge difference of time. As you can see below:
-> Write time [sec]:
-> 325.77
-> 318.80
-> 325.44
-> 458.54
-> 316.89
-> 327.75
-> 344.90
-> 340.34
-> 383.57
-> 316.35
-> Read time [sec]:
-> 570.48
-> 601.11
-> 447.14
-> 406.39
-> 480.44
-> 5824.40
-> 299.40
-> 293.54
-> 1049.93
-> 4190.47
-> We ran on the single client with 1 process and tested on same infrastructure (hardware and network).
-> Could you explain why is reading time so distorted? What kind of problem might be occurring?
-> 
-> Regards,
-> Rosana
-> 
-> _______________________________________________
-> lustre-discuss mailing list
-> lustre-discuss at lists.lustre.org <mailto:lustre-discuss@lists.lustre.org>
-> http://lists.lustre.org/listinfo.cgi/lustre-discuss-lustre.org <http://lists.lustre.org/listinfo.cgi/lustre-discuss-lustre.org>
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171123/becbaa9b/attachment.html>
+> Especially in the 0/4 patch which is going to be discarded.  Who cares?
+
+Definitely agree for the 0/4 patch, doesn't _need_ imperative mood.
+
+For the record, I love your short snappy reviews Dan. My current
+favourite review of all time was done by you on a what was at the time a
+pretty hard patch for me. It was
+
+	Nope
+
+I burst out laughing when I got that one. It spurred me on to greater
+things (though I'm not sure everyone would be equally encouraged :)
+
+All the best,
+Tobin.
