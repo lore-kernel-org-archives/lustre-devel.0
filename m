@@ -1,35 +1,48 @@
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Wed, 29 Nov 2017 10:40:23 +0100
-Subject: [lustre-devel] [PATCH 08/10] staging: lustre: lov: use
- list_for_each_entry in lov_obd.c
-In-Reply-To: <87r2shwzyf.fsf@notabene.neil.brown.name>
-References: <150933945578.22133.8029060522107378499.stgit@noble>
- <150933956729.22133.13130557672702877610.stgit@noble>
- <20171124154341.GA16654@kroah.com>
- <87r2shwzyf.fsf@notabene.neil.brown.name>
-Message-ID: <20171129094023.GA7597@kroah.com>
+Date: Wed, 29 Nov 2017 11:41:25 +0100
+Subject: [lustre-devel] [PATCH v2] Replace 'uint32_t' with 'u32' and
+ 'uint64_t' with 'u64'
+In-Reply-To: <20171117114618.GA26318@home>
+References: <20171117114618.GA26318@home>
+Message-ID: <20171129104125.GA14678@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
 
-On Wed, Nov 29, 2017 at 02:01:12PM +1100, NeilBrown wrote:
-> Subject: [PATCH] staging: lustre: lov: use list_for_each_entry in lov_obd.c
-
-Why is there a subject line in the body of the text here?  Will git
-figure this out correctly?
-
-> Using the *_entry macro simplifies the code slightly.
+On Fri, Nov 17, 2017 at 02:46:18PM +0300, Roman Storozhenko wrote:
+> There are two reasons for that:
+> 1) As Linus Torvalds said we should use kernel types:
+> http://lkml.iu.edu/hypermail//linux/kernel/1506.0/00160.html
 > 
-> Signed-off-by: NeilBrown <neilb@suse.com>
+> 2) There are only few places in the lustre codebase that use such types.
+> In the most cases it uses 'u32' and 'u64'.
+> 
+> Signed-off-by: Roman Storozhenko <romeusmeister@gmail.com>
+> 
 > ---
+> In the first version of this patch I replaced 'uint32_t' with '__u32' and
+> 'uint64_t' with '__u64'. I was suggested to fix that by Greg K-H:
 > 
-> Resubmitted with non-empty changelog text.
+> "The __ types are only needed for when you cross the user/kernel boundry.
+> Otherwise just use the "normal" types of u32 and u64.
+> 
+> Do the changes you made here all cross that boundry?  If not, please fix
+> this up."
+> 
+> I asked lustre community whether those code used only in the kernel
+> space and Andreas Dilger said:
+> 
+> "These headers are for kernel code only, so should use the "u32" and
+> similar
+> types, rather than the "__u32" that are used for user-kernel
+> structures."
+> 
+> So I have replaced my first patch version with this one.
 
-Did I apply the others?  Can you just send a new series of whatever I
-didn't apply so it's obvious for me as to what to do?
+Please fix up the subject to have the subsystem and driver name in it:
+	Subject: [PATCH] staging: lustre: ...
 
 thanks,
 
