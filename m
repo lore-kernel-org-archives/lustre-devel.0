@@ -1,57 +1,128 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 29 Nov 2017 22:37:54 +1100
-Subject: [lustre-devel] [PATCH 08/10] staging: lustre: lov: use
- list_for_each_entry in lov_obd.c
-In-Reply-To: <20171129094023.GA7597@kroah.com>
-References: <150933945578.22133.8029060522107378499.stgit@noble>
- <150933956729.22133.13130557672702877610.stgit@noble>
- <20171124154341.GA16654@kroah.com> <87r2shwzyf.fsf@notabene.neil.brown.name>
- <20171129094023.GA7597@kroah.com>
-Message-ID: <87bmjlwc19.fsf@notabene.neil.brown.name>
+From: Roman Storozhenko <romeusmeister@gmail.com>
+Date: Wed, 29 Nov 2017 19:46:21 +0300
+Subject: [lustre-devel] [PATCH v3] staging: lustre: Replace 'uint32_t' with
+ 'u32' and 'uint64_t' with 'u64'
+Message-ID: <20171129164621.GA10881@home>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
 
-On Wed, Nov 29 2017, Greg Kroah-Hartman wrote:
+There are two reasons for that:
+1) As Linus Torvalds said we should use kernel types:
+http://lkml.iu.edu/hypermail//linux/kernel/1506.0/00160.html
 
-> On Wed, Nov 29, 2017 at 02:01:12PM +1100, NeilBrown wrote:
->> Subject: [PATCH] staging: lustre: lov: use list_for_each_entry in lov_obd.c
->
-> Why is there a subject line in the body of the text here?  Will git
-> figure this out correctly?
+2) There are only few places in the lustre codebase that use such types.
+In the most cases it uses 'u32' and 'u64'.
 
-Because I wanted to leave the original subject unchanged so it would be
-fairly clear to you the context of the email, but also wanted to be
-certain picked up the right subject (though in this case it would have
-worked right anyway I think).
-Yes, "git am" will see the Subject: line in the body and over-ride the
-Subject line in the headers.
+Signed-off-by: Roman Storozhenko <romeusmeister@gmail.com>
 
-Thanks,
-NeilBrown
+---
+In the second version of this patch I forgot to add subsystem and
+driver. As Greg K-H mentioned:
+"Please fix up the subject to have the subsystem and driver name in it:
+        Subject: [PATCH] staging: lustre: ..."
 
+In the first version of this patch I replaced 'uint32_t' with '__u32' and
+'uint64_t' with '__u64'. I was suggested to fix that by Greg K-H:
 
->
->> Using the *_entry macro simplifies the code slightly.
->> 
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> ---
->> 
->> Resubmitted with non-empty changelog text.
->
-> Did I apply the others?  Can you just send a new series of whatever I
-> didn't apply so it's obvious for me as to what to do?
->
-> thanks,
->
-> greg k-h
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171129/2003f661/attachment.sig>
+"The __ types are only needed for when you cross the user/kernel boundry.
+Otherwise just use the "normal" types of u32 and u64.
+
+Do the changes you made here all cross that boundry?  If not, please fix
+this up."
+
+I asked lustre community whether those code used only in the kernel
+space and Andreas Dilger said:
+
+"These headers are for kernel code only, so should use the "u32" and
+similar
+types, rather than the "__u32" that are used for user-kernel
+structures."
+
+So I have replaced my first patch version with this one.
+
+ drivers/staging/lustre/lustre/include/lustre_sec.h |  4 ++--
+ drivers/staging/lustre/lustre/llite/vvp_dev.c      |  2 +-
+ drivers/staging/lustre/lustre/lov/lov_internal.h   | 12 ++++++------
+ drivers/staging/lustre/lustre/osc/osc_internal.h   |  6 +++---
+ 4 files changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/include/lustre_sec.h b/drivers/staging/lustre/lustre/include/lustre_sec.h
+index a40f706..64b6fd4 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_sec.h
++++ b/drivers/staging/lustre/lustre/include/lustre_sec.h
+@@ -341,8 +341,8 @@ void sptlrpc_conf_client_adapt(struct obd_device *obd);
+ #define SPTLRPC_MAX_PAYLOAD     (1024)
+ 
+ struct vfs_cred {
+-	uint32_t	vc_uid;
+-	uint32_t	vc_gid;
++	u32	vc_uid;
++	u32	vc_gid;
+ };
+ 
+ struct ptlrpc_ctx_ops {
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+index 8ccc8b7..987c03b 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
+@@ -384,7 +384,7 @@ int cl_sb_fini(struct super_block *sb)
+ struct vvp_pgcache_id {
+ 	unsigned int		 vpi_bucket;
+ 	unsigned int		 vpi_depth;
+-	uint32_t		 vpi_index;
++	u32			 vpi_index;
+ 
+ 	unsigned int		 vpi_curdep;
+ 	struct lu_object_header *vpi_obj;
+diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
+index ae28ddf..a56d71c 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_internal.h
++++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
+@@ -115,19 +115,19 @@ static inline const struct lsm_operations *lsm_op_find(int magic)
+  */
+ #if BITS_PER_LONG == 64
+ # define lov_do_div64(n, base) ({					\
+-	uint64_t __base = (base);					\
+-	uint64_t __rem;							\
+-	__rem = ((uint64_t)(n)) % __base;				\
+-	(n) = ((uint64_t)(n)) / __base;					\
++	u64 __base = (base);					\
++	u64 __rem;							\
++	__rem = ((u64)(n)) % __base;				\
++	(n) = ((u64)(n)) / __base;					\
+ 	__rem;								\
+ })
+ #elif BITS_PER_LONG == 32
+ # define lov_do_div64(n, base) ({					\
+-	uint64_t __rem;							\
++	u64 __rem;							\
+ 	if ((sizeof(base) > 4) && (((base) & 0xffffffff00000000ULL) != 0)) {  \
+ 		int __remainder;					      \
+ 		LASSERTF(!((base) & (LOV_MIN_STRIPE_SIZE - 1)), "64 bit lov " \
+-			 "division %llu / %llu\n", (n), (uint64_t)(base));    \
++			 "division %llu / %llu\n", (n), (u64)(base));    \
+ 		__remainder = (n) & (LOV_MIN_STRIPE_SIZE - 1);		\
+ 		(n) >>= LOV_MIN_STRIPE_BITS;				\
+ 		__rem = do_div(n, (base) >> LOV_MIN_STRIPE_BITS);	\
+diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
+index feda61b..32db150 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
+@@ -168,9 +168,9 @@ struct osc_device {
+ 
+ 	/* Write stats is actually protected by client_obd's lock. */
+ 	struct osc_stats {
+-		uint64_t     os_lockless_writes;	  /* by bytes */
+-		uint64_t     os_lockless_reads;	   /* by bytes */
+-		uint64_t     os_lockless_truncates;       /* by times */
++		u64	os_lockless_writes;	  /* by bytes */
++		u64	os_lockless_reads;	  /* by bytes */
++		u64	os_lockless_truncates;    /* by times */
+ 	} od_stats;
+ 
+ 	/* configuration item(s) */
+-- 
+2.7.4
