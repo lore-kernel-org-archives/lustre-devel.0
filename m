@@ -1,113 +1,171 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Wed, 1 Nov 2017 02:01:58 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: Replaces 'uint32_t'
- with '__u32' and 'uint64_t' with '__u64'.
-In-Reply-To: <20171029175839.GA19864@home>
-References: <20171029175839.GA19864@home>
-Message-ID: <3344B573-4839-4174-A267-B637D7F9C2B8@intel.com>
+Date: Sun, 3 Dec 2017 00:47:03 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: check result of
+ register_shrinker
+In-Reply-To: <20171202184046.4338-1-akaraliou.dev@gmail.com>
+References: <20171202184046.4338-1-akaraliou.dev@gmail.com>
+Message-ID: <985AF256-3022-45FB-BFCF-1E2B0F622AA8@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Oct 30, 2017, at 01:58, Roman Storozhenko <romeusmeister@gmail.com> wrote:
+On Dec 2, 2017, at 11:40, Aliaksei Karaliou <akaraliou.dev@gmail.com> wrote:
 > 
-> There are two reasons for that:
-> 1) As Linus Torvalds said we should use kernel types:
-> http://lkml.iu.edu/hypermail//linux/kernel/1506.0/00160.html
-> 
-> 2) There are only few places in the lustre codebase that use such types.
-> In the most cases it uses '__u32' and '__u64'.
-> 
-> Signed-off-by: Roman Storozhenko <romeusmeister@gmail.com>
+> Lustre code lacks checking the result of register_shrinker()
+> in several places. register_shrinker() was tagged __must_check
+> recently so that sparse has started reporting it.
 
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Thank you for your patch.  Some comments below.
 
+> Signed-off-by: Aliaksei Karaliou <akaraliou.dev@gmail.com>
 > ---
-> drivers/staging/lustre/lustre/include/lustre_sec.h |  4 ++--
-> drivers/staging/lustre/lustre/llite/vvp_dev.c      |  2 +-
-> drivers/staging/lustre/lustre/lov/lov_internal.h   | 12 ++++++------
-> drivers/staging/lustre/lustre/osc/osc_internal.h   |  6 +++---
-> 4 files changed, 12 insertions(+), 12 deletions(-)
+> drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     |  7 +++++--
+> drivers/staging/lustre/lustre/obdclass/lu_object.c |  5 +++--
+> drivers/staging/lustre/lustre/osc/osc_request.c    |  4 +++-
+> drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    | 13 ++++++++-----
+> 4 files changed, 19 insertions(+), 10 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/include/lustre_sec.h b/drivers/staging/lustre/lustre/include/lustre_sec.h
-> index 03a970b..c616ae5 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre_sec.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre_sec.h
-> @@ -340,8 +340,8 @@ void sptlrpc_conf_client_adapt(struct obd_device *obd);
-> #define SPTLRPC_MAX_PAYLOAD     (1024)
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> index da65d00a7811..7795ececa6d3 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> @@ -1086,8 +1086,11 @@ int ldlm_pools_init(void)
+> 	int rc;
 > 
-> struct vfs_cred {
-> -	uint32_t	vc_uid;
-> -	uint32_t	vc_gid;
-> +	__u32	vc_uid;
-> +	__u32	vc_gid;
-> };
+> 	rc = ldlm_pools_thread_start();
+> -	if (rc == 0)
+> -		register_shrinker(&ldlm_pools_cli_shrinker);
+> +	if (rc == 0) {
+> +		rc = register_shrinker(&ldlm_pools_cli_shrinker);
+> +		if (rc)
+> +			ldlm_pools_thread_stop();
+> +	}
+
+Rather than nesting conditionals like this, kernel style prefers to use
+"goto label" to do the cleanup in one place at the end of the function.
+That keeps the indentation level reasonable, and avoids making the error
+handling increasingly complex if more conditions are added in the future.
+The preferred way to handle this would be:
+
+	rc = ldlm_pools_thread_start();
+	if (rc)
+		goto out;
+
+	rc = register_shrinker(&ldlm_pools_cli_shrinker);
+	if (rc)
+		goto out_pools;
+
+	return 0;
+
+out_pools:
+	ldlm_pools_thread_stop();
+out:
+	goto out;
+}
+
+Then, if a new error condition is added, it just means an "out_shrinker:"
+label is added and calling unregister_shrinker() at that point.
+
+> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> index b938a3f9d50a..9e0256ca2079 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> @@ -1951,7 +1951,7 @@ int lu_global_init(void)
+> 	 * inode, one for ea. Unfortunately setting this high value results in
+> 	 * lu_object/inode cache consuming all the memory.
+> 	 */
+> -	register_shrinker(&lu_site_shrinker);
+> +	result = register_shrinker(&lu_site_shrinker);
 > 
-> struct ptlrpc_ctx_ops {
-> diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-> index f9d9a16..9a98a95 100644
-> --- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-> +++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-> @@ -383,7 +383,7 @@ int cl_sb_fini(struct super_block *sb)
-> struct vvp_pgcache_id {
-> 	unsigned int		 vpi_bucket;
-> 	unsigned int		 vpi_depth;
-> -	uint32_t		 vpi_index;
-> +	__u32			 vpi_index;
+> 	return result;
+
+> }
+> @@ -1961,7 +1961,8 @@ int lu_global_init(void)
+>  */
+> void lu_global_fini(void)
+> {
+> -	unregister_shrinker(&lu_site_shrinker);
+> +	if (lu_site_shrinker.nr_deferred)
+> +		unregister_shrinker(&lu_site_shrinker);
+> 	lu_context_key_degister(&lu_global_key);
+
+Initially, I didn't think this was needed, but it seems that
+unregister_shrinker() is not safe to be called on a shrinker that was
+not initialized properly.
+
+While the above check makes this callsite safe, and I'm OK with landing
+this part of the patch, it might be safer for the kernel as a whole if
+unregister_shrinker() was made safe against this internally?  Something like:
+
+ void unregister_shrinker(struct shrinker *shrinker)
+ {
++	if (!shrinker->nr_deferred)
++		return;
++
+        down_write(&shrinker_rwsem);
+        list_del(&shrinker->list);
+        up_write(&shrinker_rwsem);
+        kfree(shrinker->nr_deferred);
++	shrinker->nr_deferred = NULL;
+ }
+
+That avoids the need for the caller to "know" about nr_deferred.
+
 > 
-> 	unsigned int		 vpi_curdep;
-> 	struct lu_object_header *vpi_obj;
-> diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-> index a21f074..49a106c 100644
-> --- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-> +++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-> @@ -114,19 +114,19 @@ static inline const struct lsm_operations *lsm_op_find(int magic)
-> */
-> #if BITS_PER_LONG == 64
-> # define lov_do_div64(n, base) ({					\
-> -	uint64_t __base = (base);					\
-> -	uint64_t __rem;							\
-> -	__rem = ((uint64_t)(n)) % __base;				\
-> -	(n) = ((uint64_t)(n)) / __base;					\
-> +	__u64 __base = (base);						\
-> +	__u64 __rem;							\
-> +	__rem = ((__u64)(n)) % __base;				\
-> +	(n) = ((__u64)(n)) / __base;					\
-> 	__rem;								\
-> })
-> #elif BITS_PER_LONG == 32
-> # define lov_do_div64(n, base) ({					\
-> -	uint64_t __rem;							\
-> +	__u64 __rem;							\
-> 	if ((sizeof(base) > 4) && (((base) & 0xffffffff00000000ULL) != 0)) {  \
-> 		int __remainder;					      \
-> 		LASSERTF(!((base) & (LOV_MIN_STRIPE_SIZE - 1)), "64 bit lov " \
-> -			 "division %llu / %llu\n", (n), (uint64_t)(base));    \
-> +			 "division %llu / %llu\n", (n), (__u64)(base));    \
-> 		__remainder = (n) & (LOV_MIN_STRIPE_SIZE - 1);		\
-> 		(n) >>= LOV_MIN_STRIPE_BITS;				\
-> 		__rem = do_div(n, (base) >> LOV_MIN_STRIPE_BITS);	\
-> diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
-> index a536908..92d2e1f 100644
-> --- a/drivers/staging/lustre/lustre/osc/osc_internal.h
-> +++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
-> @@ -167,9 +167,9 @@ struct osc_device {
+> 	/*
+> diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+> index 53eda4c99142..45b1ebf33363 100644
+> --- a/drivers/staging/lustre/lustre/osc/osc_request.c
+> +++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+> @@ -2844,7 +2844,9 @@ static int __init osc_init(void)
+> 	if (rc)
+> 		goto out_kmem;
 > 
-> 	/* Write stats is actually protected by client_obd's lock. */
-> 	struct osc_stats {
-> -		uint64_t     os_lockless_writes;	  /* by bytes */
-> -		uint64_t     os_lockless_reads;	   /* by bytes */
-> -		uint64_t     os_lockless_truncates;       /* by times */
-> +		__u64     os_lockless_writes;	  /* by bytes */
-> +		__u64     os_lockless_reads;	   /* by bytes */
-> +		__u64     os_lockless_truncates;       /* by times */
-> 	} od_stats;
+> -	register_shrinker(&osc_cache_shrinker);
+> +	rc = register_shrinker(&osc_cache_shrinker);
+> +	if (rc)
+> +		goto out_type;
 > 
-> 	/* configuration item(s) */
+> 	/* This is obviously too much memory, only prevent overflow here */
+> 	if (osc_reqpool_mem_max >= 1 << 12 || osc_reqpool_mem_max == 0) {
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> index 77a3721beaee..4eeff832fd4a 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> @@ -396,6 +396,8 @@ static struct shrinker pools_shrinker = {
+> 
+> int sptlrpc_enc_pool_init(void)
+> {
+> +	int rc = -ENOMEM;
+> +
+> 	/*
+> 	 * maximum capacity is 1/8 of total physical memory.
+> 	 * is the 1/8 a good number?
+> @@ -429,12 +431,13 @@ int sptlrpc_enc_pool_init(void)
+> 	page_pools.epp_st_outofmem = 0;
+> 
+> 	enc_pools_alloc();
+> -	if (!page_pools.epp_pools)
+> -		return -ENOMEM;
+> -
+> -	register_shrinker(&pools_shrinker);
+> +	if (page_pools.epp_pools) {
+> +		rc = register_shrinker(&pools_shrinker);
+> +		if (rc)
+> +			enc_pools_free();
+> +	}
+
+Same comment here as above - please use labels to handle error cleanup.
+
+> -	return 0;
+> +	return rc;
+> }
+> 
+> void sptlrpc_enc_pool_fini(void)
 > -- 
-> 2.7.4
+> 2.11.0
 > 
 
 Cheers, Andreas
