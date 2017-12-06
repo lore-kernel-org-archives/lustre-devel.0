@@ -1,41 +1,79 @@
-From: gregkh at linuxfoundation.org <gregkh@linuxfoundation.org>
-Date: Wed, 6 Dec 2017 09:53:03 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: Fix sparse,
- using plain integer as NULL pointer in lov_object_fiemap()
-In-Reply-To: <bc91bfe5-0d5d-7c93-957a-dce82a236b6f@mail.ru>
-References: <e5107da2-a834-e1fd-03b8-01f60e4e19f4@mail.ru>
- <7A48E652-421B-464B-AD2A-C3D5613B48E5@intel.com>
- <bc91bfe5-0d5d-7c93-957a-dce82a236b6f@mail.ru>
-Message-ID: <20171206085303.GA18289@kroah.com>
+From: Greg KH <greg@kroah.com>
+Date: Wed, 6 Dec 2017 19:40:14 +0100
+Subject: [lustre-devel] [PATCH v2 1/2] staging: lustre: check result of
+ register_shrinker
+In-Reply-To: <dac170c9-86d2-ba08-3865-4240a426eacc@gmail.com>
+References: <20171204191631.bkzaruzrlepp3rqy@mwanda>
+ <20171204192157.4140-1-akaraliou.dev@gmail.com>
+ <20171206085157.GA17896@kroah.com>
+ <dac170c9-86d2-ba08-3865-4240a426eacc@gmail.com>
+Message-ID: <20171206184014.GA10486@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Andrii Vladyka <tulup@mail.ru>
-Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, "jsimmons@infradead.org" <jsimmons@infradead.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+To: lustre-devel@lists.lustre.org
 
-On Mon, Dec 04, 2017 at 12:44:32PM +0200, Andrii Vladyka wrote:
-> Change 0 to NULL in lov_object_fiemap() in order to fix warning produced by
-> sparse
+On Wed, Dec 06, 2017 at 08:40:43PM +0300, Aliaksei Karaliou wrote:
+> On 12/06/2017 11:51 AM, Greg KH wrote:
 > 
-> Signed-off-by: Andrii Vladyka <tulup@mail.ru>
-> Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
-> ---
-> 
-> diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-> index 105b707..897cf2c 100644
-> --- a/drivers/staging/lustre/lustre/lov/lov_object.c
-> +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-> @@ -1335,7 +1335,7 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
->  	int rc = 0;
->  	int cur_stripe;
->  	int stripe_count;
-> -	struct fiemap_state fs = { 0 };
-> +	struct fiemap_state fs = { NULL };
->  	lsm = lov_lsm_addref(cl2lov(obj));
->  	if (!lsm)
+> > On Mon, Dec 04, 2017 at 10:21:56PM +0300, Aliaksei Karaliou wrote:
+> > > Lustre code lacks checking the result of register_shrinker()
+> > > in several places. register_shrinker() was tagged __must_check
+> > > recently so that sparse has started reporting it.
+> > > 
+> > > Signed-off-by: Aliaksei Karaliou <akaraliou.dev@gmail.com>
+> > > ---
+> > >   drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     | 12 +++++++++---
+> > >   drivers/staging/lustre/lustre/obdclass/lu_object.c |  5 +++--
+> > >   drivers/staging/lustre/lustre/osc/osc_request.c    |  4 +++-
+> > >   drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |  8 +++++++-
+> > >   4 files changed, 22 insertions(+), 7 deletions(-)
+> > > 
+> > > v2: Style fixes, as suggested by Cheers, Andreas and Dan Carpenter.
+> > >      Added one more patch to address resource cleanup, suggested by Dan Carpenter.
+> > > 
+> > > diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> > > index da65d00a7811..9fef2d52d6c2 100644
+> > > --- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> > > +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+> > > @@ -1086,10 +1086,16 @@ int ldlm_pools_init(void)
+> > >   	int rc;
+> > >   	rc = ldlm_pools_thread_start();
+> > > -	if (rc == 0)
+> > > -		register_shrinker(&ldlm_pools_cli_shrinker);
+> > > +	if (rc)
+> > > +		return rc;
+> > > -	return rc;
+> > > +	rc = register_shrinker(&ldlm_pools_cli_shrinker);
+> > > +	if (rc) {
+> > > +		ldlm_pools_thread_stop();
+> > > +		return rc;
+> > > +	}
+> > > +
+> > > +	return 0;
+> > >   }
+> > >   void ldlm_pools_fini(void)
+> > > diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> > > index b938a3f9d50a..9e0256ca2079 100644
+> > > --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> > > +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> > > @@ -1951,7 +1951,7 @@ int lu_global_init(void)
+> > >   	 * inode, one for ea. Unfortunately setting this high value results in
+> > >   	 * lu_object/inode cache consuming all the memory.
+> > >   	 */
+> > > -	register_shrinker(&lu_site_shrinker);
+> > > +	result = register_shrinker(&lu_site_shrinker);
+> > >   	return result;
+> > 	return register_shrinker()?
+> Yes, It looks easier, thank you for your comments.
+> But still what to do with the fact that this changed place actually leads to
+> resources being not freed (what I actually fix in second patch) ?
+> Should I just merge both commits together ?
 
-Patch is corrupted, and can not apply, please fix up your email client
-and try it again.
+Don't write a patch that you know is broken, and then fix it up in a
+follow-on patch.  That's not good at all.
+
+Just fix one call-site at a time, that should be easier, right?
 
 greg k-h
