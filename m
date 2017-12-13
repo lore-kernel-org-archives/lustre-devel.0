@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 13 Dec 2017 14:15:55 +1100
-Subject: [lustre-devel] [PATCH 09/12] staging: lustre: libcfs: discard
- MKSTR() macro
+Subject: [lustre-devel] [PATCH 11/12] staging: lustre: libcfs: discard
+ KLASSERT()
 In-Reply-To: <151313493380.27582.16490205348451477393.stgit@noble>
 References: <151313493380.27582.16490205348451477393.stgit@noble>
-Message-ID: <151313495503.27582.5512761213682609004.stgit@noble>
+Message-ID: <151313495508.27582.12134291439268599158.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,49 +12,48 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-This is only used for tracing when some strings might
-be NULL.  NULL strings are not a problem for tracing,
-vnsprintf() will report them as "(null)" which is probably
-better (easier to parse) than an empty string.
-
-Also remove a nearby comment that doesn't relate to the
-(remaining) code at all.
+This appears to be intended for assertions that only make
+sense in the kernel, but as this code is now kernel-only,
+it doesn't make sense any more.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_private.h   |    8 --------
- .../staging/lustre/lustre/obdclass/obd_config.c    |    2 +-
- 2 files changed, 1 insertion(+), 9 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_private.h   |    2 --
+ drivers/staging/lustre/lustre/obdclass/cl_page.c   |    4 ++--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-index dee5f650197f..27d40a7589d4 100644
+index d32ce68e6c58..31403667be6b 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
 +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-@@ -235,14 +235,6 @@ do {							    \
- /* logical equivalence */
- #define equi(a, b) (!!(a) == !!(b))
+@@ -74,8 +74,6 @@ do {									\
+ # define LINVRNT(exp) ((void)sizeof !!(exp))
+ #endif
  
--/* --------------------------------------------------------------------
-- * Light-weight trace
-- * Support for temporary event tracing with minimal Heisenberg effect.
-- * --------------------------------------------------------------------
-- */
+-#define KLASSERT(e) LASSERT(e)
 -
--#define MKSTR(ptr) ((ptr)) ? (ptr) : ""
--
- #ifndef HAVE_CFS_SIZE_ROUND
- static inline size_t cfs_size_round(int val)
+ void __noreturn lbug_with_loc(struct libcfs_debug_msg_data *msg);
+ 
+ #define LBUG()							  \
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+index 7f65439f9b95..d3b25667bc3a 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+@@ -202,7 +202,7 @@ struct cl_page *cl_page_find(const struct lu_env *env,
+ 		 * vmpage lock is used to protect the child/parent
+ 		 * relationship
+ 		 */
+-		KLASSERT(PageLocked(vmpage));
++		LASSERT(PageLocked(vmpage));
+ 		/*
+ 		 * cl_vmpage_page() can be called here without any locks as
+ 		 *
+@@ -340,7 +340,7 @@ struct cl_page *cl_vmpage_page(struct page *vmpage, struct cl_object *obj)
  {
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index c0e192ae22a9..997c0f9aafb5 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -236,7 +236,7 @@ static int class_attach(struct lustre_cfg *lcfg)
- 	uuid = lustre_cfg_string(lcfg, 2);
+ 	struct cl_page *page;
  
- 	CDEBUG(D_IOCTL, "attach type %s name: %s uuid: %s\n",
--	       MKSTR(typename), MKSTR(name), MKSTR(uuid));
-+	       typename, name, uuid);
+-	KLASSERT(PageLocked(vmpage));
++	LASSERT(PageLocked(vmpage));
  
- 	obd = class_newdev(typename, name);
- 	if (IS_ERR(obd)) {
+ 	/*
+ 	 * NOTE: absence of races and liveness of data are guaranteed by page
