@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 13 Dec 2017 14:15:55 +1100
-Subject: [lustre-devel] [PATCH 10/12] staging: lustre: libcfs: discard
- MAX_NUMERIC_VALUE
+Subject: [lustre-devel] [PATCH 12/12] staging: lustre: libcfs: discard
+ LASSERT_CHECKED
 In-Reply-To: <151313493380.27582.16490205348451477393.stgit@noble>
 References: <151313493380.27582.16490205348451477393.stgit@noble>
-Message-ID: <151313495506.27582.203930994943994556.stgit@noble>
+Message-ID: <151313495511.27582.5936753382372514332.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,26 +12,30 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-This is unused.
-drivers/staging/lustre/lnet/lnet/nidstrings.c does use the name,
-but it includes its own local definition.
+This macro isn't used, and comment is about some earlier version
+of the lustre code that never reached the mainline kernel.
+Just discard it.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_private.h   |    3 ---
- 1 file changed, 3 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_private.h   |    7 -------
+ 1 file changed, 7 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-index 27d40a7589d4..d32ce68e6c58 100644
+index 31403667be6b..940200ee632e 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
 +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-@@ -227,9 +227,6 @@ do {							    \
- #define CFS_ALLOC_PTR(ptr)      LIBCFS_ALLOC(ptr, sizeof(*(ptr)))
- #define CFS_FREE_PTR(ptr)       LIBCFS_FREE(ptr, sizeof(*(ptr)))
+@@ -43,13 +43,6 @@
+ # define DEBUG_SUBSYSTEM S_UNDEFINED
+ #endif
  
--/* max value for numeric network address */
--#define MAX_NUMERIC_VALUE 0xffffffff
+-/*
+- * When this is on, LASSERT macro includes check for assignment used instead
+- * of equality check, but doesn't have unlikely(). Turn this on from time to
+- * time to make test-builds. This shouldn't be on for production release.
+- */
+-#define LASSERT_CHECKED (0)
 -
- /* implication */
- #define ergo(a, b) (!(a) || (b))
- /* logical equivalence */
+ #define LASSERTF(cond, fmt, ...)					\
+ do {									\
+ 	if (unlikely(!(cond))) {					\
