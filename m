@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Wed, 13 Dec 2017 14:15:54 +1100
-Subject: [lustre-devel] [PATCH 05/12] staging: lustre: ldlm: use
- list_for_each_entry in ldlm_resource.c
+Date: Wed, 13 Dec 2017 14:15:55 +1100
+Subject: [lustre-devel] [PATCH 07/12] staging: lustre: libcfs: simplify
+ memory allocation.
 In-Reply-To: <151313493380.27582.16490205348451477393.stgit@noble>
 References: <151313493380.27582.16490205348451477393.stgit@noble>
-Message-ID: <151313495491.27582.1409394419999876978.stgit@noble>
+Message-ID: <151313495497.27582.5451400666802627086.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,68 +12,91 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-Having a stand-alone "list_entry()" call is often a sign
-that something like "list_for_each_entry()" would
-make the code clearer.
+1/ Use kvmalloc() instead of kmalloc or vmalloc
+2/ Discard the _GFP() interfaces that are never used.
+  We only ever do GFP_NOFS and GFP_ATOMIC allocations,
+  so support each of those explicitly.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   20 +++++++-------------
- 1 file changed, 7 insertions(+), 13 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_private.h   |   42 ++++++--------------
+ 1 file changed, 12 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index 2689ffdf10e3..9958533cc227 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -752,24 +752,22 @@ extern struct ldlm_lock *ldlm_lock_get(struct ldlm_lock *lock);
- static void cleanup_resource(struct ldlm_resource *res, struct list_head *q,
- 			     __u64 flags)
- {
--	struct list_head *tmp;
- 	int rc = 0;
- 	bool local_only = !!(flags & LDLM_FL_LOCAL_ONLY);
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+index 2f4ff595fac9..c874f9d15c72 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
+@@ -84,14 +84,6 @@ do {								    \
+ 	lbug_with_loc(&msgdata);					\
+ } while (0)
  
- 	do {
--		struct ldlm_lock *lock = NULL;
-+		struct ldlm_lock *lock = NULL, *tmp;
- 		struct lustre_handle lockh;
- 
- 		/* First, we look for non-cleaned-yet lock
- 		 * all cleaned locks are marked by CLEANED flag.
- 		 */
- 		lock_res(res);
--		list_for_each(tmp, q) {
--			lock = list_entry(tmp, struct ldlm_lock, l_res_link);
--			if (ldlm_is_cleaned(lock)) {
--				lock = NULL;
-+		list_for_each_entry(tmp, q, l_res_link) {
-+			if (ldlm_is_cleaned(tmp))
- 				continue;
--			}
-+
-+			lock = tmp;
- 			LDLM_LOCK_GET(lock);
- 			ldlm_set_cleaned(lock);
- 			break;
-@@ -1283,19 +1281,15 @@ void ldlm_res2desc(struct ldlm_resource *res, struct ldlm_resource_desc *desc)
-  */
- void ldlm_dump_all_namespaces(enum ldlm_side client, int level)
- {
--	struct list_head *tmp;
-+	struct ldlm_namespace *ns;
- 
- 	if (!((libcfs_debug | D_ERROR) & level))
- 		return;
- 
- 	mutex_lock(ldlm_namespace_lock(client));
- 
--	list_for_each(tmp, ldlm_namespace_list(client)) {
--		struct ldlm_namespace *ns;
+-#ifndef LIBCFS_VMALLOC_SIZE
+-#define LIBCFS_VMALLOC_SIZE	(2 << PAGE_SHIFT) /* 2 pages */
+-#endif
 -
--		ns = list_entry(tmp, struct ldlm_namespace, ns_list_chain);
-+	list_for_each_entry(ns, ldlm_namespace_list(client), ns_list_chain)
- 		ldlm_namespace_dump(level, ns);
--	}
+-#define LIBCFS_ALLOC_PRE(size, mask)					\
+-	LASSERT(!in_interrupt() || ((size) <= LIBCFS_VMALLOC_SIZE &&	\
+-				    !gfpflags_allow_blocking(mask)))
+-
+ #define LIBCFS_ALLOC_POST(ptr, size)					    \
+ do {									    \
+ 	if (unlikely(!(ptr))) {						    \
+@@ -103,46 +95,36 @@ do {									    \
+ } while (0)
  
- 	mutex_unlock(ldlm_namespace_lock(client));
- }
+ /**
+- * allocate memory with GFP flags @mask
++ * default allocator
+  */
+-#define LIBCFS_ALLOC_GFP(ptr, size, mask)				    \
++#define LIBCFS_ALLOC(ptr, size)						    \
+ do {									    \
+-	LIBCFS_ALLOC_PRE((size), (mask));				    \
+-	(ptr) = (size) <= LIBCFS_VMALLOC_SIZE ?				    \
+-		kmalloc((size), (mask)) : vmalloc(size);	    \
++	LASSERT(!in_interrupt());					    \
++	(ptr) = kvmalloc((size), GFP_NOFS);				    \
+ 	LIBCFS_ALLOC_POST((ptr), (size));				    \
+ } while (0)
+ 
+-/**
+- * default allocator
+- */
+-#define LIBCFS_ALLOC(ptr, size) \
+-	LIBCFS_ALLOC_GFP(ptr, size, GFP_NOFS)
+-
+ /**
+  * non-sleeping allocator
+  */
+-#define LIBCFS_ALLOC_ATOMIC(ptr, size) \
+-	LIBCFS_ALLOC_GFP(ptr, size, GFP_ATOMIC)
++#define LIBCFS_ALLOC_ATOMIC(ptr, size)					\
++do {									\
++	(ptr) = kmalloc((size), GFP_ATOMIC);				\
++	LIBCFS_ALLOC_POST(ptr, size);					\
++} while (0)
+ 
+ /**
+  * allocate memory for specified CPU partition
+  *   \a cptab != NULL, \a cpt is CPU partition id of \a cptab
+  *   \a cptab == NULL, \a cpt is HW NUMA node id
+  */
+-#define LIBCFS_CPT_ALLOC_GFP(ptr, cptab, cpt, size, mask)		    \
++#define LIBCFS_CPT_ALLOC(ptr, cptab, cpt, size)				    \
+ do {									    \
+-	LIBCFS_ALLOC_PRE((size), (mask));				    \
+-	(ptr) = (size) <= LIBCFS_VMALLOC_SIZE ?				    \
+-		kmalloc_node((size), (mask), cfs_cpt_spread_node(cptab, cpt)) :\
+-		vmalloc_node(size, cfs_cpt_spread_node(cptab, cpt));	    \
++	LASSERT(!in_interrupt());					    \
++	(ptr) = kvmalloc_node((size), GFP_NOFS, cfs_cpt_spread_node(cptab, cpt)); \
+ 	LIBCFS_ALLOC_POST((ptr), (size));				    \
+ } while (0)
+ 
+-/** default numa allocator */
+-#define LIBCFS_CPT_ALLOC(ptr, cptab, cpt, size)				    \
+-	LIBCFS_CPT_ALLOC_GFP(ptr, cptab, cpt, size, GFP_NOFS)
+-
+ #define LIBCFS_FREE(ptr, size)					  \
+ do {								    \
+ 	if (unlikely(!(ptr))) {						\
