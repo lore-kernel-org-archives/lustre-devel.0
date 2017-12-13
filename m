@@ -1,44 +1,49 @@
-From: Joe Perches <joe@perches.com>
-Date: Thu, 07 Dec 2017 09:24:47 -0800
-Subject: [lustre-devel] [PATCH] staging: lustre: Fix sparse,
- using plain integer as NULL pointer in lov_object_fiemap()
-In-Reply-To: <20171206085303.GA18289@kroah.com>
-References: <e5107da2-a834-e1fd-03b8-01f60e4e19f4@mail.ru>
- <7A48E652-421B-464B-AD2A-C3D5613B48E5@intel.com>
- <bc91bfe5-0d5d-7c93-957a-dce82a236b6f@mail.ru>
- <20171206085303.GA18289@kroah.com>
-Message-ID: <1512667487.960.46.camel@perches.com>
+From: NeilBrown <neilb@suse.com>
+Date: Wed, 13 Dec 2017 14:15:54 +1100
+Subject: [lustre-devel] [PATCH 00/13] Assorted lustre clean-ups
+Message-ID: <151313493380.27582.16490205348451477393.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>, Andrii Vladyka <tulup@mail.ru>
-Cc: "Dilger, Andreas" <andreas.dilger@intel.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, "jsimmons@infradead.org" <jsimmons@infradead.org>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-On Wed, 2017-12-06 at 09:53 +0100, gregkh at linuxfoundation.org wrote:
-> On Mon, Dec 04, 2017 at 12:44:32PM +0200, Andrii Vladyka wrote:
-> > Change 0 to NULL in lov_object_fiemap() in order to fix warning produced by
-> > sparse
-> > 
-> > Signed-off-by: Andrii Vladyka <tulup@mail.ru>
-> > Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
-> > ---
-> > 
-> > diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-> > index 105b707..897cf2c 100644
-> > --- a/drivers/staging/lustre/lustre/lov/lov_object.c
-> > +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-> > @@ -1335,7 +1335,7 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
-> >  	int rc = 0;
-> >  	int cur_stripe;
-> >  	int stripe_count;
-> > -	struct fiemap_state fs = { 0 };
-> > +	struct fiemap_state fs = { NULL };
-> >  	lsm = lov_lsm_addref(cl2lov(obj));
-> >  	if (!lsm)
-> 
-> Patch is corrupted, and can not apply, please fix up your email client
-> and try it again.
+This series includes a resend of some "list_entry" cleanup
+patches which now how better commit comments, and also
+includes some simplifications, removing unnecessary macros
+and code.
 
-It would be better to use {} to clear the struct
-rather than any member initialization.
+Thanks,
+NeilBrown
+
+---
+
+NeilBrown (12):
+      staging: lustre: use list_last_entry to simplify fld_cache_shrink
+      staging: lustre: ldlm: use list_for_each_entry in ldlm_extent_shift_kms()
+      staging: lustre: ldlm: use list_first_entry in ldlm_lockd.c
+      staging: lustre: ldlm: minor list_entry improvements in ldlm_request.c
+      staging: lustre: ldlm: use list_for_each_entry in ldlm_resource.c
+      staging: lustre: lov: use list_for_each_entry in lov_obd.c
+      staging: lustre: libcfs: simplify memory allocation.
+      staging: lustre: libcfs: remove unused rounding functions.
+      staging: lustre: libcfs: discard MKSTR() macro
+      staging: lustre: libcfs: discard MAX_NUMERIC_VALUE
+      staging: lustre: libcfs: discard KLASSERT()
+      staging: lustre: libcfs: discard LASSERT_CHECKED
+
+
+ .../lustre/include/linux/libcfs/libcfs_private.h   |   91 +++-----------------
+ drivers/staging/lustre/lustre/fld/fld_cache.c      |   13 +--
+ drivers/staging/lustre/lustre/ldlm/ldlm_extent.c   |    4 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |   10 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   12 +--
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   20 ++--
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |    6 -
+ drivers/staging/lustre/lustre/obdclass/cl_page.c   |    4 -
+ .../staging/lustre/lustre/obdclass/obd_config.c    |    2 
+ 9 files changed, 41 insertions(+), 121 deletions(-)
+
+--
+Signature
