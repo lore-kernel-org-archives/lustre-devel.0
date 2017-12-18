@@ -1,11 +1,11 @@
 From: Patrick Farrell <paf@cray.com>
-Date: Mon, 18 Dec 2017 20:55:10 +0000
-Subject: [lustre-devel] [PATCH 08/16] staging: lustre: open code polling
- loop instead of using l_wait_event()
-In-Reply-To: <151358148008.5099.7316878897181140635.stgit@noble>
+Date: Mon, 18 Dec 2017 21:03:54 +0000
+Subject: [lustre-devel] [PATCH 11/16] staging: lustre: make polling loop
+ in ptlrpc_unregister_bulk more obvious
+In-Reply-To: <151358148020.5099.4047116902359752959.stgit@noble>
 References: <151358127190.5099.12792810096274074963.stgit@noble>
- <151358148008.5099.7316878897181140635.stgit@noble>
-Message-ID: <D65D86E7.C5E12%paf@cray.com>
+ <151358148020.5099.4047116902359752959.stgit@noble>
+Message-ID: <D65D88CA.C5E2F%paf@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,88 +13,70 @@ Content-Transfer-Encoding: 7bit
 To: NeilBrown <neilb@suse.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-The lov_check_and_wait_active wait is usually (always?) going to be
-asynchronous from userspace and probably shouldn?t contribute to load.
+This probably shouldn?t contribute to load, it?s often (mostly?) run out
+of the ptlrpcd daemons.
 
-So I guess that means schedule_timeout_idle.
+- Patrick
 
 On 12/18/17, 1:18 AM, "lustre-devel on behalf of NeilBrown"
 <lustre-devel-bounces at lists.lustre.org on behalf of neilb@suse.com> wrote:
 
->Two places that LWI_TIMEOUT_INTERVAL() is used, the outcome is a
->simple polling loop that polls every second for some event (with a
->limit).
->
->So write a simple loop to make this more apparent.
+>This use of l_wait_event() is a polling loop that re-checks
+>every second.  Make this more obvious with a while loop
+>and wait_event_timeout().
 >
 >Signed-off-by: NeilBrown <neilb@suse.com>
 >---
-> drivers/staging/lustre/lustre/llite/llite_lib.c |   11 +++++------
-> drivers/staging/lustre/lustre/lov/lov_request.c |   12 +++++-------
-> 2 files changed, 10 insertions(+), 13 deletions(-)
+> drivers/staging/lustre/lustre/ptlrpc/niobuf.c |   14 +++++++-------
+> 1 file changed, 7 insertions(+), 7 deletions(-)
 >
->diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c
->b/drivers/staging/lustre/lustre/llite/llite_lib.c
->index 33dc15e9aebb..f6642fa30428 100644
->--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
->+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
->@@ -1984,8 +1984,7 @@ void ll_umount_begin(struct super_block *sb)
-> 	struct ll_sb_info *sbi = ll_s2sbi(sb);
-> 	struct obd_device *obd;
-> 	struct obd_ioctl_data *ioc_data;
->-	wait_queue_head_t waitq;
->-	struct l_wait_info lwi;
->+	int cnt = 0;
-> 
-> 	CDEBUG(D_VFSTRACE, "VFS Op: superblock %p count %d active %d\n", sb,
-> 	       sb->s_count, atomic_read(&sb->s_active));
->@@ -2021,10 +2020,10 @@ void ll_umount_begin(struct super_block *sb)
-> 	 * and then continue. For now, we just periodically checking for vfs
-> 	 * to decrement mnt_cnt and hope to finish it within 10sec.
-> 	 */
->-	init_waitqueue_head(&waitq);
->-	lwi = LWI_TIMEOUT_INTERVAL(10 * HZ,
->-				   HZ, NULL, NULL);
->-	l_wait_event(waitq, may_umount(sbi->ll_mnt.mnt), &lwi);
->+	while (cnt < 10 && !may_umount(sbi->ll_mnt.mnt)) {
->+		schedule_timeout_uninterruptible(HZ);
->+		cnt ++;
->+	}
-> 
-> 	schedule();
-> }
->diff --git a/drivers/staging/lustre/lustre/lov/lov_request.c
->b/drivers/staging/lustre/lustre/lov/lov_request.c
->index fb3b7a7fa32a..c1e58fcc30b3 100644
->--- a/drivers/staging/lustre/lustre/lov/lov_request.c
->+++ b/drivers/staging/lustre/lustre/lov/lov_request.c
->@@ -99,8 +99,7 @@ static int lov_check_set(struct lov_obd *lov, int idx)
->  */
-> static int lov_check_and_wait_active(struct lov_obd *lov, int ost_idx)
+>diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+>b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+>index 0c2ded721c49..5606c8f01b5b 100644
+>--- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+>+++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+>@@ -229,7 +229,6 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request
+>*req, int async)
 > {
->-	wait_queue_head_t waitq;
+> 	struct ptlrpc_bulk_desc *desc = req->rq_bulk;
+> 	wait_queue_head_t *wq;
 >-	struct l_wait_info lwi;
->+	int cnt = 0;
-> 	struct lov_tgt_desc *tgt;
-> 	int rc = 0;
+> 	int rc;
 > 
->@@ -125,11 +124,10 @@ static int lov_check_and_wait_active(struct lov_obd
->*lov, int ost_idx)
+> 	LASSERT(!in_interrupt());     /* might sleep */
+>@@ -246,7 +245,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request
+>*req, int async)
 > 
-> 	mutex_unlock(&lov->lov_lock);
+> 	/* the unlink ensures the callback happens ASAP and is the last
+> 	 * one.  If it fails, it must be because completion just happened,
+>-	 * but we must still l_wait_event() in this case to give liblustre
+>+	 * but we must still wait_event() in this case to give liblustre
+> 	 * a chance to run client_bulk_callback()
+> 	 */
+> 	mdunlink_iterate_helper(desc->bd_mds, desc->bd_md_max_brw);
+>@@ -270,15 +269,16 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request
+>*req, int async)
+> 		/* Network access will complete in finite time but the HUGE
+> 		 * timeout lets us CWARN for visibility of sluggish LNDs
+> 		 */
+>-		lwi = LWI_TIMEOUT_INTERVAL(LONG_UNLINK * HZ,
+>-					   HZ, NULL, NULL);
+>-		rc = l_wait_event(*wq, !ptlrpc_client_bulk_active(req), &lwi);
+>-		if (rc == 0) {
+>+		int cnt = 0;
+>+		while (cnt < LONG_UNLINK &&
+>+		       (rc = wait_event_timeout(*wq, !ptlrpc_client_bulk_active(req),
+>+						HZ)) == 0)
+>+			cnt += 1;
+>+		if (rc > 0) {
+> 			ptlrpc_rqphase_move(req, req->rq_next_phase);
+> 			return 1;
+> 		}
 > 
->-	init_waitqueue_head(&waitq);
->-	lwi = LWI_TIMEOUT_INTERVAL(obd_timeout * HZ,
->-				   HZ, NULL, NULL);
->-
->-	rc = l_wait_event(waitq, lov_check_set(lov, ost_idx), &lwi);
->+	while (cnt < obd_timeout && !lov_check_set(lov, ost_idx)) {
->+		schedule_timeout_uninterruptible(HZ);
->+		cnt ++;
->+	}
-> 	if (tgt->ltd_active)
-> 		return 1;
-> 
+>-		LASSERT(rc == -ETIMEDOUT);
+> 		DEBUG_REQ(D_WARNING, req, "Unexpectedly long timeout: desc %p",
+> 			  desc);
+> 	}
 >
 >
 >_______________________________________________
