@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 18 Dec 2017 12:25:19 +1100
-Subject: [lustre-devel] [PATCH 4/4] staging: lustre: libcfs: remove workitem
- code.
+Subject: [lustre-devel] [PATCH 3/4] staging: lustre: lnet: convert selftest
+ to use workqueues
 In-Reply-To: <151356013394.15912.9645528414310488005.stgit@noble>
 References: <151356013394.15912.9645528414310488005.stgit@noble>
-Message-ID: <151356031923.15912.14983671872492844978.stgit@noble>
+Message-ID: <151356031919.15912.12406337913485020577.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,666 +12,511 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-There are now no users.  workqueues are doing the job
-that this used to do.
+Instead of the cfs workitem library, use workqueues.
+
+As lnet wants to provide a cpu mask of allowed cpus, it
+needs to be a WQ_UNBOUND work queue so that tasks can
+run on cpus other than where they were submitted.
+
+apply_workqueue_atts needs to be exported for lustre to use it.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 
- .../lustre/include/linux/libcfs/libcfs_workitem.h  |  104 ----
- drivers/staging/lustre/lnet/libcfs/Makefile        |    2 
- drivers/staging/lustre/lnet/libcfs/module.c        |   11 
- drivers/staging/lustre/lnet/libcfs/workitem.c      |  466 --------------------
- 5 files changed, 2 insertions(+), 582 deletions(-)
- delete mode 100644 drivers/staging/lustre/include/linux/libcfs/libcfs_workitem.h
- delete mode 100644 drivers/staging/lustre/lnet/libcfs/workitem.c
+ drivers/staging/lustre/lnet/selftest/framework.c |   10 +---
+ drivers/staging/lustre/lnet/selftest/module.c    |   39 ++++++++------
+ drivers/staging/lustre/lnet/selftest/rpc.c       |   61 +++++++++-------------
+ drivers/staging/lustre/lnet/selftest/selftest.h  |   40 ++++++--------
+ kernel/workqueue.c                               |    1 
+ 5 files changed, 69 insertions(+), 82 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index dcdc05dde6b8..f2ba83ee5362 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -45,7 +45,6 @@
- #include <linux/libcfs/libcfs_prim.h>
- #include <linux/libcfs/libcfs_time.h>
- #include <linux/libcfs/libcfs_string.h>
--#include <linux/libcfs/libcfs_workitem.h>
- #include <linux/libcfs/libcfs_hash.h>
- #include <linux/libcfs/libcfs_fail.h>
- #include <linux/libcfs/curproc.h>
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_workitem.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_workitem.h
-deleted file mode 100644
-index ddaca33a13ac..000000000000
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_workitem.h
-+++ /dev/null
-@@ -1,104 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- *
-- * Copyright (c) 2012, Intel Corporation.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- *
-- * libcfs/include/libcfs/libcfs_workitem.h
-- *
-- * Author: Isaac Huang  <he.h.huang@oracle.com>
-- *	 Liang Zhen   <zhen.liang@sun.com>
-- *
-- * A workitems is deferred work with these semantics:
-- * - a workitem always runs in thread context.
-- * - a workitem can be concurrent with other workitems but is strictly
-- *   serialized with respect to itself.
-- * - no CPU affinity, a workitem does not necessarily run on the same CPU
-- *   that schedules it. However, this might change in the future.
-- * - if a workitem is scheduled again before it has a chance to run, it
-- *   runs only once.
-- * - if a workitem is scheduled while it runs, it runs again after it
-- *   completes; this ensures that events occurring while other events are
-- *   being processed receive due attention. This behavior also allows a
-- *   workitem to reschedule itself.
-- *
-- * Usage notes:
-- * - a workitem can sleep but it should be aware of how that sleep might
-- *   affect others.
-- * - a workitem runs inside a kernel thread so there's no user space to access.
-- * - do not use a workitem if the scheduling latency can't be tolerated.
-- *
-- * When wi_action returns non-zero, it means the workitem has either been
-- * freed or reused and workitem scheduler won't touch it any more.
-- */
+diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+index 2e1126552e18..c7697f66f663 100644
+--- a/drivers/staging/lustre/lnet/selftest/framework.c
++++ b/drivers/staging/lustre/lnet/selftest/framework.c
+@@ -941,15 +941,13 @@ sfw_create_test_rpc(struct sfw_test_unit *tsu, struct lnet_process_id peer,
+ 	return 0;
+ }
+ 
+-static int
++static void
+ sfw_run_test(struct swi_workitem *wi)
+ {
+ 	struct sfw_test_unit *tsu = container_of(wi, struct sfw_test_unit, tsu_worker);
+ 	struct sfw_test_instance *tsi = tsu->tsu_instance;
+ 	struct srpc_client_rpc *rpc = NULL;
+ 
+-	LASSERT(wi == &tsu->tsu_worker);
 -
--#ifndef __LIBCFS_WORKITEM_H__
--#define __LIBCFS_WORKITEM_H__
+ 	if (tsi->tsi_ops->tso_prep_rpc(tsu, tsu->tsu_dest, &rpc)) {
+ 		LASSERT(!rpc);
+ 		goto test_done;
+@@ -975,7 +973,7 @@ sfw_run_test(struct swi_workitem *wi)
+ 	rpc->crpc_timeout = rpc_timeout;
+ 	srpc_post_rpc(rpc);
+ 	spin_unlock(&rpc->crpc_lock);
+-	return 0;
++	return;
+ 
+ test_done:
+ 	/*
+@@ -985,9 +983,7 @@ sfw_run_test(struct swi_workitem *wi)
+ 	 * - my batch is still active; no one can run it again now.
+ 	 * Cancel pending schedules and prevent future schedule attempts:
+ 	 */
+-	swi_exit_workitem(wi);
+ 	sfw_test_unit_done(tsu);
+-	return 1;
+ }
+ 
+ static int
+@@ -1017,7 +1013,7 @@ sfw_run_batch(struct sfw_batch *tsb)
+ 			tsu->tsu_loop = tsi->tsi_loop;
+ 			wi = &tsu->tsu_worker;
+ 			swi_init_workitem(wi, sfw_run_test,
+-					  lst_sched_test[lnet_cpt_of_nid(tsu->tsu_dest.nid)]);
++					  lst_test_wq[lnet_cpt_of_nid(tsu->tsu_dest.nid)]);
+ 			swi_schedule_workitem(wi);
+ 		}
+ 	}
+diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
+index ba4b6145c953..aa6bfd5baf2f 100644
+--- a/drivers/staging/lustre/lnet/selftest/module.c
++++ b/drivers/staging/lustre/lnet/selftest/module.c
+@@ -47,8 +47,8 @@ enum {
+ 
+ static int lst_init_step = LST_INIT_NONE;
+ 
+-struct cfs_wi_sched *lst_sched_serial;
+-struct cfs_wi_sched **lst_sched_test;
++struct workqueue_struct *lst_serial_wq;
++struct workqueue_struct **lst_test_wq;
+ 
+ static void
+ lnet_selftest_exit(void)
+@@ -68,16 +68,16 @@ lnet_selftest_exit(void)
+ 	case LST_INIT_WI_TEST:
+ 		for (i = 0;
+ 		     i < cfs_cpt_number(lnet_cpt_table()); i++) {
+-			if (!lst_sched_test[i])
++			if (!lst_test_wq[i])
+ 				continue;
+-			cfs_wi_sched_destroy(lst_sched_test[i]);
++			destroy_workqueue(lst_test_wq[i]);
+ 		}
+-		kvfree(lst_sched_test);
+-		lst_sched_test = NULL;
++		kvfree(lst_test_wq);
++		lst_test_wq = NULL;
+ 		/* fall through */
+ 	case LST_INIT_WI_SERIAL:
+-		cfs_wi_sched_destroy(lst_sched_serial);
+-		lst_sched_serial = NULL;
++		destroy_workqueue(lst_serial_wq);
++		lst_serial_wq = NULL;
+ 	case LST_INIT_NONE:
+ 		break;
+ 	default:
+@@ -92,33 +92,40 @@ lnet_selftest_init(void)
+ 	int rc;
+ 	int i;
+ 
+-	rc = cfs_wi_sched_create("lst_s", lnet_cpt_table(), CFS_CPT_ANY,
+-				 1, &lst_sched_serial);
+-	if (rc) {
++	lst_serial_wq = alloc_ordered_workqueue("lst_s", 0);
++	if (!lst_serial_wq) {
+ 		CERROR("Failed to create serial WI scheduler for LST\n");
+ 		return rc;
+ 	}
+ 	lst_init_step = LST_INIT_WI_SERIAL;
+ 
+ 	nscheds = cfs_cpt_number(lnet_cpt_table());
+-	lst_sched_test = kvmalloc_array(nscheds, sizeof(lst_sched_test[0]),
++	lst_test_wq = kvmalloc_array(nscheds, sizeof(lst_test_wq[0]),
+ 					GFP_KERNEL | __GFP_ZERO);
+-	if (!lst_sched_test)
++	if (!lst_test_wq)
+ 		goto error;
+ 
+ 	lst_init_step = LST_INIT_WI_TEST;
+ 	for (i = 0; i < nscheds; i++) {
+ 		int nthrs = cfs_cpt_weight(lnet_cpt_table(), i);
++		struct workqueue_attrs attrs;
+ 
+ 		/* reserve@least one CPU for LND */
+ 		nthrs = max(nthrs - 1, 1);
+-		rc = cfs_wi_sched_create("lst_t", lnet_cpt_table(), i,
+-					 nthrs, &lst_sched_test[i]);
+-		if (rc) {
++		lst_test_wq[i] = alloc_workqueue("lst_t", WQ_UNBOUND, nthrs);
++		if (!lst_test_wq[i]) {
+ 			CWARN("Failed to create CPU partition affinity WI scheduler %d for LST\n",
+ 			      i);
+ 			goto error;
+ 		}
++		attrs.nice = 0;
++		#ifdef CONFIG_CPUMASK_OFFSTACK
++		attrs.cpumask = lnet_cpt_table()->ctb_parts[i].cpt_cpumask;
++		#else
++		cpumask_copy(attrs.cpumask, lnet_cpt_table()->ctb_parts[i].cpt_cpumask);
++		#endif
++		attrs.no_numa = false;
++		apply_workqueue_attrs(lst_test_wq[i], &attrs);
+ 	}
+ 
+ 	rc = srpc_startup();
+diff --git a/drivers/staging/lustre/lnet/selftest/rpc.c b/drivers/staging/lustre/lnet/selftest/rpc.c
+index 4ebb5a1107be..b515138dca2c 100644
+--- a/drivers/staging/lustre/lnet/selftest/rpc.c
++++ b/drivers/staging/lustre/lnet/selftest/rpc.c
+@@ -68,7 +68,7 @@ srpc_serv_portal(int svc_id)
+ }
+ 
+ /* forward ref's */
+-int srpc_handle_rpc(struct swi_workitem *wi);
++void srpc_handle_rpc(struct swi_workitem *wi);
+ 
+ void srpc_get_counters(struct srpc_counters *cnt)
+ {
+@@ -178,7 +178,7 @@ srpc_init_server_rpc(struct srpc_server_rpc *rpc,
+ 	memset(rpc, 0, sizeof(*rpc));
+ 	swi_init_workitem(&rpc->srpc_wi, srpc_handle_rpc,
+ 			  srpc_serv_is_framework(scd->scd_svc) ?
+-			  lst_sched_serial : lst_sched_test[scd->scd_cpt]);
++			  lst_serial_wq : lst_test_wq[scd->scd_cpt]);
+ 
+ 	rpc->srpc_ev.ev_fired = 1; /* no event expected now */
+ 
+@@ -242,7 +242,7 @@ srpc_service_nrpcs(struct srpc_service *svc)
+ 	       max(nrpcs, SFW_FRWK_WI_MIN) : max(nrpcs, SFW_TEST_WI_MIN);
+ }
+ 
+-int srpc_add_buffer(struct swi_workitem *wi);
++void srpc_add_buffer(struct swi_workitem *wi);
+ 
+ static int
+ srpc_service_init(struct srpc_service *svc)
+@@ -277,11 +277,11 @@ srpc_service_init(struct srpc_service *svc)
+ 		scd->scd_ev.ev_type = SRPC_REQUEST_RCVD;
+ 
+ 		/*
+-		 * NB: don't use lst_sched_serial for adding buffer,
++		 * NB: don't use lst_serial_wq for adding buffer,
+ 		 * see details in srpc_service_add_buffers()
+ 		 */
+ 		swi_init_workitem(&scd->scd_buf_wi,
+-				  srpc_add_buffer, lst_sched_test[i]);
++				  srpc_add_buffer, lst_test_wq[i]);
+ 
+ 		if (i && srpc_serv_is_framework(svc)) {
+ 			/*
+@@ -514,7 +514,7 @@ __must_hold(&scd->scd_lock)
+ 	return rc;
+ }
+ 
+-int
++void
+ srpc_add_buffer(struct swi_workitem *wi)
+ {
+ 	struct srpc_service_cd *scd = container_of(wi, struct srpc_service_cd, scd_buf_wi);
+@@ -573,7 +573,6 @@ srpc_add_buffer(struct swi_workitem *wi)
+ 	}
+ 
+ 	spin_unlock(&scd->scd_lock);
+-	return 0;
+ }
+ 
+ int
+@@ -605,15 +604,15 @@ srpc_service_add_buffers(struct srpc_service *sv, int nbuffer)
+ 		spin_lock(&scd->scd_lock);
+ 		/*
+ 		 * NB: srpc_service_add_buffers() can be called inside
+-		 * thread context of lst_sched_serial, and we don't normally
++		 * thread context of lst_serial_wq, and we don't normally
+ 		 * allow to sleep inside thread context of WI scheduler
+ 		 * because it will block current scheduler thread from doing
+ 		 * anything else, even worse, it could deadlock if it's
+ 		 * waiting on result from another WI of the same scheduler.
+ 		 * However, it's safe at here because scd_buf_wi is scheduled
+-		 * by thread in a different WI scheduler (lst_sched_test),
++		 * by thread in a different WI scheduler (lst_test_wq),
+ 		 * so we don't have any risk of deadlock, though this could
+-		 * block all WIs pending on lst_sched_serial for a moment
++		 * block all WIs pending on lst_serial_wq for a moment
+ 		 * which is not good but not fatal.
+ 		 */
+ 		lst_wait_until(scd->scd_buf_err ||
+@@ -660,11 +659,9 @@ srpc_finish_service(struct srpc_service *sv)
+ 	LASSERT(sv->sv_shuttingdown); /* srpc_shutdown_service called */
+ 
+ 	cfs_percpt_for_each(scd, i, sv->sv_cpt_data) {
++		swi_cancel_workitem(&scd->scd_buf_wi);
++
+ 		spin_lock(&scd->scd_lock);
+-		if (!swi_deschedule_workitem(&scd->scd_buf_wi)) {
+-			spin_unlock(&scd->scd_lock);
+-			return 0;
+-		}
+ 
+ 		if (scd->scd_buf_nposted > 0) {
+ 			CDEBUG(D_NET, "waiting for %d posted buffers to unlink\n",
+@@ -680,11 +677,9 @@ srpc_finish_service(struct srpc_service *sv)
+ 
+ 		rpc = list_entry(scd->scd_rpc_active.next,
+ 				 struct srpc_server_rpc, srpc_list);
+-		CNETERR("Active RPC %p on shutdown: sv %s, peer %s, wi %s scheduled %d running %d, ev fired %d type %d status %d lnet %d\n",
++		CNETERR("Active RPC %p on shutdown: sv %s, peer %s, wi %s, ev fired %d type %d status %d lnet %d\n",
+ 			rpc, sv->sv_name, libcfs_id2str(rpc->srpc_peer),
+ 			swi_state2str(rpc->srpc_wi.swi_state),
+-			rpc->srpc_wi.swi_workitem.wi_scheduled,
+-			rpc->srpc_wi.swi_workitem.wi_running,
+ 			rpc->srpc_ev.ev_fired, rpc->srpc_ev.ev_type,
+ 			rpc->srpc_ev.ev_status, rpc->srpc_ev.ev_lnet);
+ 		spin_unlock(&scd->scd_lock);
+@@ -947,7 +942,6 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
+ 	 * Cancel pending schedules and prevent future schedule attempts:
+ 	 */
+ 	LASSERT(rpc->srpc_ev.ev_fired);
+-	swi_exit_workitem(&rpc->srpc_wi);
+ 
+ 	if (!sv->sv_shuttingdown && !list_empty(&scd->scd_buf_blocked)) {
+ 		buffer = list_entry(scd->scd_buf_blocked.next,
+@@ -965,7 +959,7 @@ srpc_server_rpc_done(struct srpc_server_rpc *rpc, int status)
+ }
+ 
+ /* handles an incoming RPC */
+-int
++void
+ srpc_handle_rpc(struct swi_workitem *wi)
+ {
+ 	struct srpc_server_rpc *rpc = container_of(wi, struct srpc_server_rpc, srpc_wi);
+@@ -987,9 +981,8 @@ srpc_handle_rpc(struct swi_workitem *wi)
+ 
+ 		if (ev->ev_fired) { /* no more event, OK to finish */
+ 			srpc_server_rpc_done(rpc, -ESHUTDOWN);
+-			return 1;
+ 		}
+-		return 0;
++		return;
+ 	}
+ 
+ 	spin_unlock(&scd->scd_lock);
+@@ -1007,7 +1000,7 @@ srpc_handle_rpc(struct swi_workitem *wi)
+ 		if (!msg->msg_magic) {
+ 			/* moaned already in srpc_lnet_ev_handler */
+ 			srpc_server_rpc_done(rpc, EBADMSG);
+-			return 1;
++			return;
+ 		}
+ 
+ 		srpc_unpack_msg_hdr(msg);
+@@ -1023,7 +1016,7 @@ srpc_handle_rpc(struct swi_workitem *wi)
+ 			LASSERT(!reply->status || !rpc->srpc_bulk);
+ 			if (rc) {
+ 				srpc_server_rpc_done(rpc, rc);
+-				return 1;
++				return;
+ 			}
+ 		}
+ 
+@@ -1032,7 +1025,7 @@ srpc_handle_rpc(struct swi_workitem *wi)
+ 		if (rpc->srpc_bulk) {
+ 			rc = srpc_do_bulk(rpc);
+ 			if (!rc)
+-				return 0; /* wait for bulk */
++				return; /* wait for bulk */
+ 
+ 			LASSERT(ev->ev_fired);
+ 			ev->ev_status = rc;
+@@ -1050,16 +1043,16 @@ srpc_handle_rpc(struct swi_workitem *wi)
+ 
+ 			if (rc) {
+ 				srpc_server_rpc_done(rpc, rc);
+-				return 1;
++				return;
+ 			}
+ 		}
+ 
+ 		wi->swi_state = SWI_STATE_REPLY_SUBMITTED;
+ 		rc = srpc_send_reply(rpc);
+ 		if (!rc)
+-			return 0; /* wait for reply */
++			return; /* wait for reply */
+ 		srpc_server_rpc_done(rpc, rc);
+-		return 1;
++		return;
+ 
+ 	case SWI_STATE_REPLY_SUBMITTED:
+ 		if (!ev->ev_fired) {
+@@ -1072,10 +1065,8 @@ srpc_handle_rpc(struct swi_workitem *wi)
+ 
+ 		wi->swi_state = SWI_STATE_DONE;
+ 		srpc_server_rpc_done(rpc, ev->ev_status);
+-		return 1;
++		return;
+ 	}
 -
--struct cfs_wi_sched;
--
--void cfs_wi_sched_destroy(struct cfs_wi_sched *sched);
--int cfs_wi_sched_create(char *name, struct cfs_cpt_table *cptab, int cpt,
--			int nthrs, struct cfs_wi_sched **sched_pp);
--
--struct cfs_workitem;
--
--typedef int (*cfs_wi_action_t) (struct cfs_workitem *);
--struct cfs_workitem {
--	/** chain on runq or rerunq */
--	struct list_head       wi_list;
--	/** working function */
--	cfs_wi_action_t  wi_action;
--	/** in running */
--	unsigned short   wi_running:1;
--	/** scheduled */
--	unsigned short   wi_scheduled:1;
--};
+-	return 0;
+ }
+ 
+ static void
+@@ -1170,7 +1161,6 @@ srpc_client_rpc_done(struct srpc_client_rpc *rpc, int status)
+ 	 * Cancel pending schedules and prevent future schedule attempts:
+ 	 */
+ 	LASSERT(!srpc_event_pending(rpc));
+-	swi_exit_workitem(wi);
+ 
+ 	spin_unlock(&rpc->crpc_lock);
+ 
+@@ -1178,7 +1168,7 @@ srpc_client_rpc_done(struct srpc_client_rpc *rpc, int status)
+ }
+ 
+ /* sends an outgoing RPC */
+-int
++void
+ srpc_send_rpc(struct swi_workitem *wi)
+ {
+ 	int rc = 0;
+@@ -1214,7 +1204,7 @@ srpc_send_rpc(struct swi_workitem *wi)
+ 		rc = srpc_prepare_reply(rpc);
+ 		if (rc) {
+ 			srpc_client_rpc_done(rpc, rc);
+-			return 1;
++			return;
+ 		}
+ 
+ 		rc = srpc_prepare_bulk(rpc);
+@@ -1291,7 +1281,7 @@ srpc_send_rpc(struct swi_workitem *wi)
+ 
+ 		wi->swi_state = SWI_STATE_DONE;
+ 		srpc_client_rpc_done(rpc, rc);
+-		return 1;
++		return;
+ 	}
+ 
+ 	if (rc) {
+@@ -1308,10 +1298,9 @@ srpc_send_rpc(struct swi_workitem *wi)
+ 
+ 		if (!srpc_event_pending(rpc)) {
+ 			srpc_client_rpc_done(rpc, -EINTR);
+-			return 1;
++			return;
+ 		}
+ 	}
+-	return 0;
+ }
+ 
+ struct srpc_client_rpc *
+diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
+index 465417263ef1..ad04534f000c 100644
+--- a/drivers/staging/lustre/lnet/selftest/selftest.h
++++ b/drivers/staging/lustre/lnet/selftest/selftest.h
+@@ -169,11 +169,11 @@ struct srpc_buffer {
+ };
+ 
+ struct swi_workitem;
+-typedef int (*swi_action_t) (struct swi_workitem *);
++typedef void (*swi_action_t) (struct swi_workitem *);
+ 
+ struct swi_workitem {
+-	struct cfs_wi_sched *swi_sched;
+-	struct cfs_workitem swi_workitem;
++	struct workqueue_struct *swi_wq;
++	struct work_struct  swi_work;
+ 	swi_action_t	    swi_action;
+ 	int		    swi_state;
+ };
+@@ -444,7 +444,7 @@ void srpc_free_bulk(struct srpc_bulk *bk);
+ struct srpc_bulk *srpc_alloc_bulk(int cpt, unsigned int off,
+ 				  unsigned int bulk_npg, unsigned int bulk_len,
+ 				  int sink);
+-int srpc_send_rpc(struct swi_workitem *wi);
++void srpc_send_rpc(struct swi_workitem *wi);
+ int srpc_send_reply(struct srpc_server_rpc *rpc);
+ int srpc_add_service(struct srpc_service *sv);
+ int srpc_remove_service(struct srpc_service *sv);
+@@ -456,8 +456,8 @@ void srpc_service_remove_buffers(struct srpc_service *sv, int nbuffer);
+ void srpc_get_counters(struct srpc_counters *cnt);
+ void srpc_set_counters(const struct srpc_counters *cnt);
+ 
+-extern struct cfs_wi_sched *lst_sched_serial;
+-extern struct cfs_wi_sched **lst_sched_test;
++extern struct workqueue_struct *lst_serial_wq;
++extern struct workqueue_struct **lst_test_wq;
+ 
+ static inline int
+ srpc_serv_is_framework(struct srpc_service *svc)
+@@ -465,42 +465,36 @@ srpc_serv_is_framework(struct srpc_service *svc)
+ 	return svc->sv_id < SRPC_FRAMEWORK_SERVICE_MAX_ID;
+ }
+ 
+-static inline int
+-swi_wi_action(struct cfs_workitem *wi)
++static void
++swi_wi_action(struct work_struct *wi)
+ {
+ 	struct swi_workitem *swi;
+ 
+-	swi = container_of(wi, struct swi_workitem, swi_workitem);
++	swi = container_of(wi, struct swi_workitem, swi_work);
+ 
+-	return swi->swi_action(swi);
++	swi->swi_action(swi);
+ }
+ 
+ static inline void
+ swi_init_workitem(struct swi_workitem *swi,
+-		  swi_action_t action, struct cfs_wi_sched *sched)
++		  swi_action_t action, struct workqueue_struct *wq)
+ {
+-	swi->swi_sched = sched;
++	swi->swi_wq = wq;
+ 	swi->swi_action = action;
+ 	swi->swi_state = SWI_STATE_NEWBORN;
+-	cfs_wi_init(&swi->swi_workitem, swi_wi_action);
++	INIT_WORK(&swi->swi_work, swi_wi_action);
+ }
+ 
+ static inline void
+ swi_schedule_workitem(struct swi_workitem *wi)
+ {
+-	cfs_wi_schedule(wi->swi_sched, &wi->swi_workitem);
+-}
 -
 -static inline void
--cfs_wi_init(struct cfs_workitem *wi, cfs_wi_action_t action)
+-swi_exit_workitem(struct swi_workitem *swi)
 -{
--	INIT_LIST_HEAD(&wi->wi_list);
--
--	wi->wi_running   = 0;
--	wi->wi_scheduled = 0;
--	wi->wi_action    = action;
--}
--
--void cfs_wi_schedule(struct cfs_wi_sched *sched, struct cfs_workitem *wi);
--int  cfs_wi_deschedule(struct cfs_wi_sched *sched, struct cfs_workitem *wi);
--void cfs_wi_exit(struct cfs_wi_sched *sched, struct cfs_workitem *wi);
--
--int  cfs_wi_startup(void);
--void cfs_wi_shutdown(void);
--
--/** # workitem scheduler loops before reschedule */
--#define CFS_WI_RESCHED    128
--
--#endif /* __LIBCFS_WORKITEM_H__ */
-diff --git a/drivers/staging/lustre/lnet/libcfs/Makefile b/drivers/staging/lustre/lnet/libcfs/Makefile
-index 1607570ef8de..51b529434332 100644
---- a/drivers/staging/lustre/lnet/libcfs/Makefile
-+++ b/drivers/staging/lustre/lnet/libcfs/Makefile
-@@ -15,7 +15,7 @@ libcfs-linux-objs += linux-mem.o
- libcfs-linux-objs := $(addprefix linux/,$(libcfs-linux-objs))
+-	cfs_wi_exit(swi->swi_sched, &swi->swi_workitem);
++	queue_work(wi->swi_wq, &wi->swi_work);
+ }
  
- libcfs-all-objs := debug.o fail.o module.o tracefile.o \
--		   libcfs_string.o hash.o prng.o workitem.o \
-+		   libcfs_string.o hash.o prng.o \
- 		   libcfs_cpu.o libcfs_mem.o libcfs_lock.o
+ static inline int
+-swi_deschedule_workitem(struct swi_workitem *swi)
++swi_cancel_workitem(struct swi_workitem *swi)
+ {
+-	return cfs_wi_deschedule(swi->swi_sched, &swi->swi_workitem);
++	return cancel_work_sync(&swi->swi_work);
+ }
  
- libcfs-objs := $(libcfs-linux-objs) $(libcfs-all-objs)
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index 0254593b7f01..1d3e8b925d0a 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -547,12 +547,6 @@ static int libcfs_init(void)
- 		goto cleanup_cpu;
- 	}
+ int sfw_startup(void);
+@@ -534,7 +528,7 @@ srpc_init_client_rpc(struct srpc_client_rpc *rpc, struct lnet_process_id peer,
  
--	rc = cfs_wi_startup();
--	if (rc) {
--		CERROR("initialize workitem: error %d\n", rc);
--		goto cleanup_deregister;
--	}
--
- 	cfs_rehash_wq = alloc_workqueue("cfs_rh", WQ_SYSFS, 4);
- 	if (!cfs_rehash_wq) {
- 		CERROR("Failed to start rehash workqueue.\n");
-@@ -563,15 +557,13 @@ static int libcfs_init(void)
- 	rc = cfs_crypto_register();
- 	if (rc) {
- 		CERROR("cfs_crypto_register: error %d\n", rc);
--		goto cleanup_wi;
-+		goto cleanup_deregister;
- 	}
+ 	INIT_LIST_HEAD(&rpc->crpc_list);
+ 	swi_init_workitem(&rpc->crpc_wi, srpc_send_rpc,
+-			  lst_sched_test[lnet_cpt_of_nid(peer.nid)]);
++			  lst_test_wq[lnet_cpt_of_nid(peer.nid)]);
+ 	spin_lock_init(&rpc->crpc_lock);
+ 	atomic_set(&rpc->crpc_refcount, 1); /* 1 ref for caller */
  
- 	lustre_insert_debugfs(lnet_table, lnet_debugfs_symlinks);
+diff --git a/kernel/workqueue.c b/kernel/workqueue.c
+index 8fdb710bfdd7..024fd99bf7ea 100644
+--- a/kernel/workqueue.c
++++ b/kernel/workqueue.c
+@@ -3806,6 +3806,7 @@ int apply_workqueue_attrs(struct workqueue_struct *wq,
  
- 	CDEBUG(D_OTHER, "portals setup OK\n");
- 	return 0;
-- cleanup_wi:
--	cfs_wi_shutdown();
-  cleanup_deregister:
- 	misc_deregister(&libcfs_dev);
- cleanup_cpu:
-@@ -593,7 +585,6 @@ static void libcfs_exit(void)
- 	}
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(apply_workqueue_attrs);
  
- 	cfs_crypto_unregister();
--	cfs_wi_shutdown();
- 
- 	misc_deregister(&libcfs_dev);
- 
-diff --git a/drivers/staging/lustre/lnet/libcfs/workitem.c b/drivers/staging/lustre/lnet/libcfs/workitem.c
-deleted file mode 100644
-index 74a9595dc730..000000000000
---- a/drivers/staging/lustre/lnet/libcfs/workitem.c
-+++ /dev/null
-@@ -1,466 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- *
-- * Copyright (c) 2011, 2012, Intel Corporation.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- *
-- * libcfs/libcfs/workitem.c
-- *
-- * Author: Isaac Huang <isaac@clusterfs.com>
-- *	 Liang Zhen  <zhen.liang@sun.com>
-- */
--
--#define DEBUG_SUBSYSTEM S_LNET
--
--#include <linux/libcfs/libcfs.h>
--
--#define CFS_WS_NAME_LEN	 16
--
--struct cfs_wi_sched {
--	/* chain on global list */
--	struct list_head		ws_list;
--	/** serialised workitems */
--	spinlock_t			ws_lock;
--	/** where schedulers sleep */
--	wait_queue_head_t		ws_waitq;
--	/** concurrent workitems */
--	struct list_head		ws_runq;
--	/**
--	 * rescheduled running-workitems, a workitem can be rescheduled
--	 * while running in wi_action(), but we don't to execute it again
--	 * unless it returns from wi_action(), so we put it on ws_rerunq
--	 * while rescheduling, and move it to runq after it returns
--	 * from wi_action()
--	 */
--	struct list_head		ws_rerunq;
--	/** CPT-table for this scheduler */
--	struct cfs_cpt_table		*ws_cptab;
--	/** CPT id for affinity */
--	int				ws_cpt;
--	/** number of scheduled workitems */
--	int				ws_nscheduled;
--	/** started scheduler thread, protected by cfs_wi_data::wi_glock */
--	unsigned int			ws_nthreads:30;
--	/** shutting down, protected by cfs_wi_data::wi_glock */
--	unsigned int			ws_stopping:1;
--	/** serialize starting thread, protected by cfs_wi_data::wi_glock */
--	unsigned int			ws_starting:1;
--	/** scheduler name */
--	char				ws_name[CFS_WS_NAME_LEN];
--};
--
--static struct cfs_workitem_data {
--	/** serialize */
--	spinlock_t		wi_glock;
--	/** list of all schedulers */
--	struct list_head	wi_scheds;
--	/** WI module is initialized */
--	int			wi_init;
--	/** shutting down the whole WI module */
--	int			wi_stopping;
--} cfs_wi_data;
--
--static inline int
--cfs_wi_sched_cansleep(struct cfs_wi_sched *sched)
--{
--	spin_lock(&sched->ws_lock);
--	if (sched->ws_stopping) {
--		spin_unlock(&sched->ws_lock);
--		return 0;
--	}
--
--	if (!list_empty(&sched->ws_runq)) {
--		spin_unlock(&sched->ws_lock);
--		return 0;
--	}
--	spin_unlock(&sched->ws_lock);
--	return 1;
--}
--
--/* XXX:
-- * 0. it only works when called from wi->wi_action.
-- * 1. when it returns no one shall try to schedule the workitem.
-- */
--void
--cfs_wi_exit(struct cfs_wi_sched *sched, struct cfs_workitem *wi)
--{
--	LASSERT(!in_interrupt()); /* because we use plain spinlock */
--	LASSERT(!sched->ws_stopping);
--
--	spin_lock(&sched->ws_lock);
--
--	LASSERT(wi->wi_running);
--	if (wi->wi_scheduled) { /* cancel pending schedules */
--		LASSERT(!list_empty(&wi->wi_list));
--		list_del_init(&wi->wi_list);
--
--		LASSERT(sched->ws_nscheduled > 0);
--		sched->ws_nscheduled--;
--	}
--
--	LASSERT(list_empty(&wi->wi_list));
--
--	wi->wi_scheduled = 1; /* LBUG future schedule attempts */
--	spin_unlock(&sched->ws_lock);
--}
--EXPORT_SYMBOL(cfs_wi_exit);
--
--/**
-- * cancel schedule request of workitem \a wi
-- */
--int
--cfs_wi_deschedule(struct cfs_wi_sched *sched, struct cfs_workitem *wi)
--{
--	int rc;
--
--	LASSERT(!in_interrupt()); /* because we use plain spinlock */
--	LASSERT(!sched->ws_stopping);
--
--	/*
--	 * return 0 if it's running already, otherwise return 1, which
--	 * means the workitem will not be scheduled and will not have
--	 * any race with wi_action.
--	 */
--	spin_lock(&sched->ws_lock);
--
--	rc = !(wi->wi_running);
--
--	if (wi->wi_scheduled) { /* cancel pending schedules */
--		LASSERT(!list_empty(&wi->wi_list));
--		list_del_init(&wi->wi_list);
--
--		LASSERT(sched->ws_nscheduled > 0);
--		sched->ws_nscheduled--;
--
--		wi->wi_scheduled = 0;
--	}
--
--	LASSERT(list_empty(&wi->wi_list));
--
--	spin_unlock(&sched->ws_lock);
--	return rc;
--}
--EXPORT_SYMBOL(cfs_wi_deschedule);
--
--/*
-- * Workitem scheduled with (serial == 1) is strictly serialised not only with
-- * itself, but also with others scheduled this way.
-- *
-- * Now there's only one static serialised queue, but in the future more might
-- * be added, and even dynamic creation of serialised queues might be supported.
-- */
--void
--cfs_wi_schedule(struct cfs_wi_sched *sched, struct cfs_workitem *wi)
--{
--	LASSERT(!in_interrupt()); /* because we use plain spinlock */
--	LASSERT(!sched->ws_stopping);
--
--	spin_lock(&sched->ws_lock);
--
--	if (!wi->wi_scheduled) {
--		LASSERT(list_empty(&wi->wi_list));
--
--		wi->wi_scheduled = 1;
--		sched->ws_nscheduled++;
--		if (!wi->wi_running) {
--			list_add_tail(&wi->wi_list, &sched->ws_runq);
--			wake_up(&sched->ws_waitq);
--		} else {
--			list_add(&wi->wi_list, &sched->ws_rerunq);
--		}
--	}
--
--	LASSERT(!list_empty(&wi->wi_list));
--	spin_unlock(&sched->ws_lock);
--}
--EXPORT_SYMBOL(cfs_wi_schedule);
--
--static int cfs_wi_scheduler(void *arg)
--{
--	struct cfs_wi_sched *sched = (struct cfs_wi_sched *)arg;
--
--	cfs_block_allsigs();
--
--	/* CPT affinity scheduler? */
--	if (sched->ws_cptab)
--		if (cfs_cpt_bind(sched->ws_cptab, sched->ws_cpt))
--			CWARN("Unable to bind %s on CPU partition %d\n",
--			      sched->ws_name, sched->ws_cpt);
--
--	spin_lock(&cfs_wi_data.wi_glock);
--
--	LASSERT(sched->ws_starting == 1);
--	sched->ws_starting--;
--	sched->ws_nthreads++;
--
--	spin_unlock(&cfs_wi_data.wi_glock);
--
--	spin_lock(&sched->ws_lock);
--
--	while (!sched->ws_stopping) {
--		int nloops = 0;
--		int rc;
--		struct cfs_workitem *wi;
--
--		while (!list_empty(&sched->ws_runq) &&
--		       nloops < CFS_WI_RESCHED) {
--			wi = list_entry(sched->ws_runq.next,
--					struct cfs_workitem, wi_list);
--			LASSERT(wi->wi_scheduled && !wi->wi_running);
--
--			list_del_init(&wi->wi_list);
--
--			LASSERT(sched->ws_nscheduled > 0);
--			sched->ws_nscheduled--;
--
--			wi->wi_running = 1;
--			wi->wi_scheduled = 0;
--
--			spin_unlock(&sched->ws_lock);
--			nloops++;
--
--			rc = (*wi->wi_action)(wi);
--
--			spin_lock(&sched->ws_lock);
--			if (rc) /* WI should be dead, even be freed! */
--				continue;
--
--			wi->wi_running = 0;
--			if (list_empty(&wi->wi_list))
--				continue;
--
--			LASSERT(wi->wi_scheduled);
--			/* wi is rescheduled, should be on rerunq now, we
--			 * move it to runq so it can run action now
--			 */
--			list_move_tail(&wi->wi_list, &sched->ws_runq);
--		}
--
--		if (!list_empty(&sched->ws_runq)) {
--			spin_unlock(&sched->ws_lock);
--			/* don't sleep because some workitems still
--			 * expect me to come back soon
--			 */
--			cond_resched();
--			spin_lock(&sched->ws_lock);
--			continue;
--		}
--
--		spin_unlock(&sched->ws_lock);
--		rc = wait_event_interruptible_exclusive(sched->ws_waitq,
--							!cfs_wi_sched_cansleep(sched));
--		spin_lock(&sched->ws_lock);
--	}
--
--	spin_unlock(&sched->ws_lock);
--
--	spin_lock(&cfs_wi_data.wi_glock);
--	sched->ws_nthreads--;
--	spin_unlock(&cfs_wi_data.wi_glock);
--
--	return 0;
--}
--
--void
--cfs_wi_sched_destroy(struct cfs_wi_sched *sched)
--{
--	int i;
--
--	LASSERT(cfs_wi_data.wi_init);
--	LASSERT(!cfs_wi_data.wi_stopping);
--
--	spin_lock(&cfs_wi_data.wi_glock);
--	if (sched->ws_stopping) {
--		CDEBUG(D_INFO, "%s is in progress of stopping\n",
--		       sched->ws_name);
--		spin_unlock(&cfs_wi_data.wi_glock);
--		return;
--	}
--
--	LASSERT(!list_empty(&sched->ws_list));
--	sched->ws_stopping = 1;
--
--	spin_unlock(&cfs_wi_data.wi_glock);
--
--	i = 2;
--	wake_up_all(&sched->ws_waitq);
--
--	spin_lock(&cfs_wi_data.wi_glock);
--	while (sched->ws_nthreads > 0) {
--		CDEBUG(is_power_of_2(++i) ? D_WARNING : D_NET,
--		       "waiting for %d threads of WI sched[%s] to terminate\n",
--		       sched->ws_nthreads, sched->ws_name);
--
--		spin_unlock(&cfs_wi_data.wi_glock);
--		set_current_state(TASK_UNINTERRUPTIBLE);
--		schedule_timeout(cfs_time_seconds(1) / 20);
--		spin_lock(&cfs_wi_data.wi_glock);
--	}
--
--	list_del(&sched->ws_list);
--
--	spin_unlock(&cfs_wi_data.wi_glock);
--	LASSERT(!sched->ws_nscheduled);
--
--	kfree(sched);
--}
--EXPORT_SYMBOL(cfs_wi_sched_destroy);
--
--int
--cfs_wi_sched_create(char *name, struct cfs_cpt_table *cptab,
--		    int cpt, int nthrs, struct cfs_wi_sched **sched_pp)
--{
--	struct cfs_wi_sched *sched;
--	int rc;
--
--	LASSERT(cfs_wi_data.wi_init);
--	LASSERT(!cfs_wi_data.wi_stopping);
--	LASSERT(!cptab || cpt == CFS_CPT_ANY ||
--		(cpt >= 0 && cpt < cfs_cpt_number(cptab)));
--
--	sched = kzalloc(sizeof(*sched), GFP_NOFS);
--	if (!sched)
--		return -ENOMEM;
--
--	if (strlen(name) > sizeof(sched->ws_name) - 1) {
--		kfree(sched);
--		return -E2BIG;
--	}
--	strncpy(sched->ws_name, name, sizeof(sched->ws_name));
--
--	sched->ws_cptab = cptab;
--	sched->ws_cpt = cpt;
--
--	spin_lock_init(&sched->ws_lock);
--	init_waitqueue_head(&sched->ws_waitq);
--	INIT_LIST_HEAD(&sched->ws_runq);
--	INIT_LIST_HEAD(&sched->ws_rerunq);
--	INIT_LIST_HEAD(&sched->ws_list);
--
--	rc = 0;
--	while (nthrs > 0)  {
--		char name[16];
--		struct task_struct *task;
--
--		spin_lock(&cfs_wi_data.wi_glock);
--		while (sched->ws_starting > 0) {
--			spin_unlock(&cfs_wi_data.wi_glock);
--			schedule();
--			spin_lock(&cfs_wi_data.wi_glock);
--		}
--
--		sched->ws_starting++;
--		spin_unlock(&cfs_wi_data.wi_glock);
--
--		if (sched->ws_cptab && sched->ws_cpt >= 0) {
--			snprintf(name, sizeof(name), "%s_%02d_%02u",
--				 sched->ws_name, sched->ws_cpt,
--				 sched->ws_nthreads);
--		} else {
--			snprintf(name, sizeof(name), "%s_%02u",
--				 sched->ws_name, sched->ws_nthreads);
--		}
--
--		task = kthread_run(cfs_wi_scheduler, sched, "%s", name);
--		if (!IS_ERR(task)) {
--			nthrs--;
--			continue;
--		}
--		rc = PTR_ERR(task);
--
--		CERROR("Failed to create thread for WI scheduler %s: %d\n",
--		       name, rc);
--
--		spin_lock(&cfs_wi_data.wi_glock);
--
--		/* make up for cfs_wi_sched_destroy */
--		list_add(&sched->ws_list, &cfs_wi_data.wi_scheds);
--		sched->ws_starting--;
--
--		spin_unlock(&cfs_wi_data.wi_glock);
--
--		cfs_wi_sched_destroy(sched);
--		return rc;
--	}
--	spin_lock(&cfs_wi_data.wi_glock);
--	list_add(&sched->ws_list, &cfs_wi_data.wi_scheds);
--	spin_unlock(&cfs_wi_data.wi_glock);
--
--	*sched_pp = sched;
--	return 0;
--}
--EXPORT_SYMBOL(cfs_wi_sched_create);
--
--int
--cfs_wi_startup(void)
--{
--	memset(&cfs_wi_data, 0, sizeof(cfs_wi_data));
--
--	spin_lock_init(&cfs_wi_data.wi_glock);
--	INIT_LIST_HEAD(&cfs_wi_data.wi_scheds);
--	cfs_wi_data.wi_init = 1;
--
--	return 0;
--}
--
--void
--cfs_wi_shutdown(void)
--{
--	struct cfs_wi_sched *sched;
--	struct cfs_wi_sched *temp;
--
--	spin_lock(&cfs_wi_data.wi_glock);
--	cfs_wi_data.wi_stopping = 1;
--	spin_unlock(&cfs_wi_data.wi_glock);
--
--	/* nobody should contend on this list */
--	list_for_each_entry(sched, &cfs_wi_data.wi_scheds, ws_list) {
--		sched->ws_stopping = 1;
--		wake_up_all(&sched->ws_waitq);
--	}
--
--	list_for_each_entry(sched, &cfs_wi_data.wi_scheds, ws_list) {
--		spin_lock(&cfs_wi_data.wi_glock);
--
--		while (sched->ws_nthreads) {
--			spin_unlock(&cfs_wi_data.wi_glock);
--			set_current_state(TASK_UNINTERRUPTIBLE);
--			schedule_timeout(cfs_time_seconds(1) / 20);
--			spin_lock(&cfs_wi_data.wi_glock);
--		}
--		spin_unlock(&cfs_wi_data.wi_glock);
--	}
--	list_for_each_entry_safe(sched, temp, &cfs_wi_data.wi_scheds, ws_list) {
--		list_del(&sched->ws_list);
--		kfree(sched);
--	}
--
--	cfs_wi_data.wi_stopping = 0;
--	cfs_wi_data.wi_init = 0;
--}
+ /**
+  * wq_update_unbound_numa - update NUMA affinity of a wq for CPU hot[un]plug
