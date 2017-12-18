@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 18 Dec 2017 18:18:00 +1100
-Subject: [lustre-devel] [PATCH 16/16] staging: lustre: remove l_wait_event
- from ptlrpc_set_wait
+Subject: [lustre-devel] [PATCH 13/16] staging: lustre: improve waiting in
+ sptlrpc_req_refresh_ctx
 In-Reply-To: <151358127190.5099.12792810096274074963.stgit@noble>
 References: <151358127190.5099.12792810096274074963.stgit@noble>
-Message-ID: <151358148037.5099.1272439971724416652.stgit@noble>
+Message-ID: <151358148027.5099.4578208141131727886.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,204 +12,69 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-This is the last remaining use of l_wait_event().
-It is the only use of LWI_TIMEOUT_INTR_ALL() which
-has a meaning that timeouts can be interrupted.
-Only interrupts by "fatal" signals are allowed, so
-introduce l_wait_event_abortable_timeout() to
-support this.
+Replace l_wait_event with wait_event_timeout() and call the
+handler function explicitly.  This makes it more clear
+what is happening.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/lustre_lib.h |   10 ++
- drivers/staging/lustre/lustre/ptlrpc/client.c      |   86 ++++++++------------
- .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |    2 
- 3 files changed, 47 insertions(+), 51 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/sec.c |   23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-index d157ed35a0bf..b23d3015b1c0 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-@@ -440,6 +440,16 @@ do {										\
- 	__ret;								\
- })
- 
-+#define l_wait_event_abortable_timeout(wq, condition, timeout)		\
-+({									\
-+	sigset_t __blocked;						\
-+	int __ret = 0;							\
-+	__blocked = cfs_block_sigsinv(LUSTRE_FATAL_SIGS);		\
-+	__ret = wait_event_interruptible_timeout(wq, condition, timeout);\
-+	cfs_restore_sigs(__blocked);					\
-+	__ret;								\
-+})
-+
- #define l_wait_event_abortable_exclusive(wq, condition)			\
- ({									\
- 	sigset_t __blocked;						\
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index bb8c9ab68f5f..95131a34a98f 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -1774,7 +1774,7 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
- 		}
- 
- 		/*
--		 * ptlrpc_set_wait->l_wait_event sets lwi_allow_intr
-+		 * ptlrpc_set_wait allow signal to abort the timeout
- 		 * so it sets rq_intr regardless of individual rpc
- 		 * timeouts. The synchronous IO waiting path sets
- 		 * rq_intr irrespective of whether ptlrpcd
-@@ -2122,10 +2122,9 @@ int ptlrpc_expire_one_request(struct ptlrpc_request *req, int async_unlink)
- 
- /**
-  * Time out all uncompleted requests in request set pointed by \a data
-- * Callback used when waiting on sets with l_wait_event.
-- * Always returns 1.
-+ * Called when wait_event_timeout times out.
-  */
--int ptlrpc_expired_set(struct ptlrpc_request_set *set)
-+void ptlrpc_expired_set(struct ptlrpc_request_set *set)
- {
- 	struct list_head *tmp;
- 	time64_t now = ktime_get_real_seconds();
-@@ -2155,18 +2154,6 @@ int ptlrpc_expired_set(struct ptlrpc_request_set *set)
- 		 */
- 		ptlrpc_expire_one_request(req, 1);
- 	}
--
--	/*
--	 * When waiting for a whole set, we always break out of the
--	 * sleep so we can recalculate the timeout, or enable interrupts
--	 * if everyone's timed out.
--	 */
--	return 1;
--}
--static int ptlrpc_expired_set_void(void *data)
--{
--	struct ptlrpc_request_set *set = data;
--	return ptlrpc_expired_set(set);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+index 617e004d00f8..6292840f1fca 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+@@ -554,9 +554,8 @@ int ctx_check_refresh(struct ptlrpc_cli_ctx *ctx)
  }
  
- /**
-@@ -2182,11 +2169,10 @@ EXPORT_SYMBOL(ptlrpc_mark_interrupted);
- 
- /**
-  * Interrupts (sets interrupted flag) all uncompleted requests in
-- * a set \a data. Callback for l_wait_event for interruptible waits.
-+ * a set \a data. Called when wait_event_timeout receives signal.
-  */
--static void ptlrpc_interrupted_set(void *data)
-+static void ptlrpc_interrupted_set(struct ptlrpc_request_set *set)
+ static
+-int ctx_refresh_timeout(void *data)
++int ctx_refresh_timeout(struct ptlrpc_request *req)
  {
--	struct ptlrpc_request_set *set = data;
- 	struct list_head *tmp;
+-	struct ptlrpc_request *req = data;
+ 	int rc;
  
- 	CDEBUG(D_RPCTRACE, "INTERRUPTED SET %p\n", set);
-@@ -2256,7 +2242,6 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
+ 	/* conn_cnt is needed in expire_one_request */
+@@ -575,10 +574,8 @@ int ctx_refresh_timeout(void *data)
+ }
+ 
+ static
+-void ctx_refresh_interrupt(void *data)
++void ctx_refresh_interrupt(struct ptlrpc_request *req)
  {
- 	struct list_head *tmp;
- 	struct ptlrpc_request *req;
+-	struct ptlrpc_request *req = data;
+-
+ 	spin_lock(&req->rq_lock);
+ 	req->rq_intr = 1;
+ 	spin_unlock(&req->rq_lock);
+@@ -611,7 +608,6 @@ int sptlrpc_req_refresh_ctx(struct ptlrpc_request *req, long timeout)
+ {
+ 	struct ptlrpc_cli_ctx *ctx = req->rq_cli_ctx;
+ 	struct ptlrpc_sec *sec;
 -	struct l_wait_info lwi;
- 	int rc, timeout;
+ 	int rc;
  
- 	if (set->set_producer)
-@@ -2282,46 +2267,47 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
- 		CDEBUG(D_RPCTRACE, "set %p going to sleep for %d seconds\n",
- 		       set, timeout);
+ 	LASSERT(ctx);
+@@ -743,10 +739,17 @@ int sptlrpc_req_refresh_ctx(struct ptlrpc_request *req, long timeout)
+ 	req->rq_restart = 0;
+ 	spin_unlock(&req->rq_lock);
  
--		if (timeout == 0 && !signal_pending(current))
-+		if (timeout == 0 && !signal_pending(current)) {
- 			/*
- 			 * No requests are in-flight (ether timed out
- 			 * or delayed), so we can allow interrupts.
- 			 * We still want to block for a limited time,
- 			 * so we allow interrupts during the timeout.
- 			 */
--			lwi = LWI_TIMEOUT_INTR_ALL(HZ,
--						   ptlrpc_expired_set_void,
--						   ptlrpc_interrupted_set, set);
--		else
-+			rc = l_wait_event_abortable_timeout(set->set_waitq,
-+							    ptlrpc_check_set(NULL, set),
-+							    HZ);
-+			if (rc == 0) {
-+				rc = -ETIMEDOUT;
-+				ptlrpc_expired_set(set);
-+			} else if (rc < 0) {
-+				rc = -EINTR;
-+				ptlrpc_interrupted_set(set);
-+			} else
-+				rc = 0;
-+		} else {
- 			/*
- 			 * At least one request is in flight, so no
- 			 * interrupts are allowed. Wait until all
- 			 * complete, or an in-flight req times out.
- 			 */
--			lwi = LWI_TIMEOUT((timeout ? timeout : 1) * HZ,
--					  ptlrpc_expired_set_void, set);
--
--		rc = l_wait_event(set->set_waitq, ptlrpc_check_set(NULL, set), &lwi);
--
--		/*
--		 * LU-769 - if we ignored the signal because it was already
--		 * pending when we started, we need to handle it now or we risk
--		 * it being ignored forever
--		 */
--		if (rc == -ETIMEDOUT && !lwi.lwi_allow_intr &&
--		    signal_pending(current)) {
--			sigset_t blocked_sigs =
--					   cfs_block_sigsinv(LUSTRE_FATAL_SIGS);
--
--			/*
--			 * In fact we only interrupt for the "fatal" signals
--			 * like SIGINT or SIGKILL. We still ignore less
--			 * important signals since ptlrpc set is not easily
--			 * reentrant from userspace again
--			 */
--			if (signal_pending(current))
--				ptlrpc_interrupted_set(set);
--			cfs_restore_sigs(blocked_sigs);
-+			rc = wait_event_timeout(set->set_waitq,
-+						ptlrpc_check_set(NULL, set),
-+						(timeout ? timeout : 1) * HZ);
-+			if (rc == 0) {
-+				ptlrpc_expired_set(set);
-+				rc = -ETIMEDOUT;
-+				/*
-+				 * LU-769 - if we ignored the signal
-+				 * because it was already pending when
-+				 * we started, we need to handle it
-+				 * now or we risk it being ignored
-+				 * forever
-+				 */
-+				if (l_fatal_signal_pending(current))
-+					ptlrpc_interrupted_set(set);
-+			} else
-+				rc = 0;
- 		}
- 
- 		LASSERT(rc == 0 || rc == -EINTR || rc == -ETIMEDOUT);
-@@ -2528,7 +2514,7 @@ static int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
- 		return 0;
+-	lwi = LWI_TIMEOUT_INTR(msecs_to_jiffies(timeout * MSEC_PER_SEC),
+-			       ctx_refresh_timeout, ctx_refresh_interrupt,
+-			       req);
+-	rc = l_wait_event(req->rq_reply_waitq, ctx_check_refresh(ctx), &lwi);
++	rc = wait_event_timeout(req->rq_reply_waitq,
++				ctx_check_refresh(ctx),
++				timeout * HZ);
++	if (rc > 0)
++		rc = 0;
++	else if (ctx_refresh_timeout(req))
++		rc = -ETIMEDOUT;
++	else if (l_fatal_signal_pending(current)) {
++		rc = -EINTR;
++		ctx_refresh_interrupt(req);
++	}
  
  	/*
--	 * We have to l_wait_event() whatever the result, to give liblustre
-+	 * We have to wait_event_timeout() whatever the result, to give liblustre
- 	 * a chance to run reply_in_callback(), and to make sure we've
- 	 * unlinked before returning a req to the pool.
- 	 */
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-index 6dd52d99d454..b7a8d7537a66 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
-@@ -68,7 +68,7 @@ void ptlrpc_request_cache_free(struct ptlrpc_request *req);
- void ptlrpc_init_xid(void);
- void ptlrpc_set_add_new_req(struct ptlrpcd_ctl *pc,
- 			    struct ptlrpc_request *req);
--int ptlrpc_expired_set(struct ptlrpc_request_set *set);
-+void ptlrpc_expired_set(struct ptlrpc_request_set *set);
- int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set);
- void ptlrpc_resend_req(struct ptlrpc_request *request);
- void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req);
+ 	 * following cases could lead us here:
