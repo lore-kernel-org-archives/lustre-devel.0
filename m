@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 18 Dec 2017 11:46:30 +1100
-Subject: [lustre-devel] [PATCH 13/15] staging: lustre: cfs_percpt_alloc: use
- kvmalloc(GFP_KERNEL)
+Subject: [lustre-devel] [PATCH 14/15] staging: lustre: opencode
+ LIBCFS_ALLOC_ATOMIC calls.
 In-Reply-To: <151355781721.6200.2136335532722530242.stgit@noble>
 References: <151355781721.6200.2136335532722530242.stgit@noble>
-Message-ID: <151355799068.6200.10665584403840611965.stgit@noble>
+Message-ID: <151355799072.6200.1169111940083599054.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,36 +12,43 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-this allocation is called from several places, but all are
-during initialization, so GFP_NOFS is not needed.
-So use kvmalloc and GFP_KERNEL.
+Just call kzalloc(GFP_ATOMIC) directly.
+We don't need the warning on failure.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lnet/libcfs/libcfs_mem.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ .../lustre/lustre/obdclass/lprocfs_status.c        |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c b/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-index 23734cfb5d44..8e2b4f1db0a1 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-@@ -54,8 +54,7 @@ cfs_percpt_free(void *vars)
- 			LIBCFS_FREE(arr->va_ptrs[i], arr->va_size);
- 	}
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index 85483a38c6c4..e1f4ef2bddd4 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -1093,7 +1093,7 @@ int lprocfs_stats_alloc_one(struct lprocfs_stats *stats, unsigned int cpuid)
+ 	LASSERT((stats->ls_flags & LPROCFS_STATS_FLAG_NOPERCPU) == 0);
  
--	LIBCFS_FREE(arr, offsetof(struct cfs_var_array,
--				  va_ptrs[arr->va_count]));
-+	kvfree(arr);
+ 	percpusize = lprocfs_stats_counter_size(stats);
+-	LIBCFS_ALLOC_ATOMIC(stats->ls_percpu[cpuid], percpusize);
++	stats->ls_percpu[cpuid] = kzalloc(percpusize, GFP_ATOMIC);
+ 	if (stats->ls_percpu[cpuid]) {
+ 		rc = 0;
+ 		if (unlikely(stats->ls_biggest_alloc_num <= cpuid)) {
+@@ -1156,7 +1156,7 @@ struct lprocfs_stats *lprocfs_alloc_stats(unsigned int num,
+ 	if ((flags & LPROCFS_STATS_FLAG_NOPERCPU) != 0) {
+ 		/* contains only one set counters */
+ 		percpusize = lprocfs_stats_counter_size(stats);
+-		LIBCFS_ALLOC_ATOMIC(stats->ls_percpu[0], percpusize);
++		stats->ls_percpu[0] = kzalloc(percpusize, GFP_ATOMIC);
+ 		if (!stats->ls_percpu[0])
+ 			goto fail;
+ 		stats->ls_biggest_alloc_num = 1;
+@@ -1193,8 +1193,7 @@ void lprocfs_free_stats(struct lprocfs_stats **statsh)
+ 
+ 	percpusize = lprocfs_stats_counter_size(stats);
+ 	for (i = 0; i < num_entry; i++)
+-		if (stats->ls_percpu[i])
+-			LIBCFS_FREE(stats->ls_percpu[i], percpusize);
++		kfree(stats->ls_percpu[i]);
+ 	kvfree(stats->ls_cnt_header);
+ 	kvfree(stats);
  }
- EXPORT_SYMBOL(cfs_percpt_free);
- 
-@@ -79,7 +78,8 @@ cfs_percpt_alloc(struct cfs_cpt_table *cptab, unsigned int size)
- 
- 	count = cfs_cpt_number(cptab);
- 
--	LIBCFS_ALLOC(arr, offsetof(struct cfs_var_array, va_ptrs[count]));
-+	arr = kvzalloc(offsetof(struct cfs_var_array, va_ptrs[count]),
-+		       GFP_KERNEL);
- 	if (!arr)
- 		return NULL;
- 
