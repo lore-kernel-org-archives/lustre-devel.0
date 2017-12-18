@@ -1,11 +1,11 @@
 From: Patrick Farrell <paf@cray.com>
-Date: Mon, 18 Dec 2017 21:03:54 +0000
-Subject: [lustre-devel] [PATCH 11/16] staging: lustre: make polling loop
- in ptlrpc_unregister_bulk more obvious
-In-Reply-To: <151358148020.5099.4047116902359752959.stgit@noble>
+Date: Mon, 18 Dec 2017 21:09:18 +0000
+Subject: [lustre-devel] [PATCH 15/16] staging: lustre: use explicit poll
+ loop in ptlrpc_unregister_reply
+In-Reply-To: <151358148034.5099.17386685003288433122.stgit@noble>
 References: <151358127190.5099.12792810096274074963.stgit@noble>
- <151358148020.5099.4047116902359752959.stgit@noble>
-Message-ID: <D65D88CA.C5E2F%paf@cray.com>
+ <151358148034.5099.17386685003288433122.stgit@noble>
+Message-ID: <D65D8A40.C5E44%paf@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,70 +13,60 @@ Content-Transfer-Encoding: 7bit
 To: NeilBrown <neilb@suse.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-This probably shouldn?t contribute to load, it?s often (mostly?) run out
-of the ptlrpcd daemons.
-
-- Patrick
+This should not contribute to load, since it?s called out of the ptlrpcd
+daemons.
 
 On 12/18/17, 1:18 AM, "lustre-devel on behalf of NeilBrown"
 <lustre-devel-bounces at lists.lustre.org on behalf of neilb@suse.com> wrote:
 
->This use of l_wait_event() is a polling loop that re-checks
->every second.  Make this more obvious with a while loop
->and wait_event_timeout().
+>replace l_wait_event() with wait_event_timeout() and explicit
+>loop.  This approach is easier to understand.
 >
 >Signed-off-by: NeilBrown <neilb@suse.com>
 >---
-> drivers/staging/lustre/lustre/ptlrpc/niobuf.c |   14 +++++++-------
+> drivers/staging/lustre/lustre/ptlrpc/client.c |   14 +++++++-------
 > 1 file changed, 7 insertions(+), 7 deletions(-)
 >
->diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
->b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
->index 0c2ded721c49..5606c8f01b5b 100644
->--- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
->+++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
->@@ -229,7 +229,6 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request
->*req, int async)
+>diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c
+>b/drivers/staging/lustre/lustre/ptlrpc/client.c
+>index 3e6d22beb9f5..bb8c9ab68f5f 100644
+>--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
+>+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+>@@ -2500,7 +2500,6 @@ static int ptlrpc_unregister_reply(struct
+>ptlrpc_request *request, int async)
 > {
-> 	struct ptlrpc_bulk_desc *desc = req->rq_bulk;
+> 	int rc;
 > 	wait_queue_head_t *wq;
 >-	struct l_wait_info lwi;
-> 	int rc;
 > 
-> 	LASSERT(!in_interrupt());     /* might sleep */
->@@ -246,7 +245,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request
->*req, int async)
-> 
-> 	/* the unlink ensures the callback happens ASAP and is the last
-> 	 * one.  If it fails, it must be because completion just happened,
->-	 * but we must still l_wait_event() in this case to give liblustre
->+	 * but we must still wait_event() in this case to give liblustre
-> 	 * a chance to run client_bulk_callback()
-> 	 */
-> 	mdunlink_iterate_helper(desc->bd_mds, desc->bd_md_max_brw);
->@@ -270,15 +269,16 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request
->*req, int async)
-> 		/* Network access will complete in finite time but the HUGE
-> 		 * timeout lets us CWARN for visibility of sluggish LNDs
+> 	/* Might sleep. */
+> 	LASSERT(!in_interrupt());
+>@@ -2543,16 +2542,17 @@ static int ptlrpc_unregister_reply(struct
+>ptlrpc_request *request, int async)
+> 		 * Network access will complete in finite time but the HUGE
+> 		 * timeout lets us CWARN for visibility of sluggish NALs
 > 		 */
 >-		lwi = LWI_TIMEOUT_INTERVAL(LONG_UNLINK * HZ,
 >-					   HZ, NULL, NULL);
->-		rc = l_wait_event(*wq, !ptlrpc_client_bulk_active(req), &lwi);
+>-		rc = l_wait_event(*wq, !ptlrpc_client_recv_or_unlink(request),
+>-				  &lwi);
 >-		if (rc == 0) {
 >+		int cnt = 0;
 >+		while (cnt < LONG_UNLINK &&
->+		       (rc = wait_event_timeout(*wq, !ptlrpc_client_bulk_active(req),
+>+		       (rc = wait_event_timeout(*wq,
+>+						!ptlrpc_client_recv_or_unlink(request),
 >+						HZ)) == 0)
 >+			cnt += 1;
 >+		if (rc > 0) {
-> 			ptlrpc_rqphase_move(req, req->rq_next_phase);
+> 			ptlrpc_rqphase_move(request, request->rq_next_phase);
 > 			return 1;
 > 		}
 > 
 >-		LASSERT(rc == -ETIMEDOUT);
-> 		DEBUG_REQ(D_WARNING, req, "Unexpectedly long timeout: desc %p",
-> 			  desc);
-> 	}
+> 		DEBUG_REQ(D_WARNING, request,
+> 			  "Unexpectedly long timeout receiving_reply=%d req_ulinked=%d
+>reply_unlinked=%d",
+> 			  request->rq_receiving_reply,
 >
 >
 >_______________________________________________
