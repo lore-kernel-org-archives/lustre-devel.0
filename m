@@ -1,11 +1,8 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 18 Dec 2017 18:13:13 +1100
-Subject: [lustre-devel] [PATCH 08/15] staging: lustre: Convert more
- LIBCFS_ALLOC allocation to direct GFP_KERNEL
-In-Reply-To: <151355799049.6200.16488920506903028598.stgit@noble>
-References: <151355781721.6200.2136335532722530242.stgit@noble>
- <151355799049.6200.16488920506903028598.stgit@noble>
-Message-ID: <87y3m0ld9y.fsf@notabene.neil.brown.name>
+Date: Mon, 18 Dec 2017 18:17:59 +1100
+Subject: [lustre-devel] [PATCH SERIES 5: 00/16] staging: lustre: use
+ standard wait_event macros
+Message-ID: <151358127190.5099.12792810096274074963.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,291 +10,104 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
+Lustre has l_wait_event() which is a complex macro that does
+similar things to the wait_event macro family in Linux.
+This patch series converts all l_wait_event to something more
+familiar to Linux developers.
 
-Sorry, it seems I mustn't have tested the file version of this
-patch.  That "kvmalloc_node()" was clearly wrong.
-This version passes testing.
+Some of the conversions are subtle.  I think I've understood the code
+and got the conversion correct, but I've quite possibly messed up.
+If you only review one series, this is the one that demands review.
+
+I haven't converted the single use of l_wait_event_exclusive_head().
+That needs more thought.
+
+This is the last series for today.  I do have some more patches, but
+that are all individual patches that I hope to send as a  set of
+ad-hoc patches tomorrow.
 
 Thanks,
 NeilBrown
 
-"git am" will ignore everything before this line:
------------------8<-----------------
-None of these need to be GFP_NOFS, so use GFP_KERNEL explicitly
-with kmalloc(), kvmalloc(), or kvmalloc_array().
-Changing matching LIBCFS_FREE() to kfree() or kvfree()
 
-Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../lustre/lnet/libcfs/linux/linux-module.c        |  4 +--
- drivers/staging/lustre/lnet/libcfs/module.c        |  9 +++---
- drivers/staging/lustre/lnet/lnet/api-ni.c          | 17 +++++------
- drivers/staging/lustre/lnet/lnet/config.c          | 34 +++++++++-------------
- 4 files changed, 26 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-index b5746230ab31..ddf625669bff 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-@@ -146,7 +146,7 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
- 		return -EINVAL;
- 	}
- 
--	LIBCFS_ALLOC(*hdr_pp, hdr.ioc_len);
-+	*hdr_pp = kvmalloc(hdr.ioc_len, GFP_KERNEL);
- 	if (!*hdr_pp)
- 		return -ENOMEM;
- 
-@@ -164,7 +164,7 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
- 	return 0;
- 
- free:
--	LIBCFS_FREE(*hdr_pp, hdr.ioc_len);
-+	kvfree(*hdr_pp);
- 	return err;
- }
- 
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index 4ead55920e79..1bd33497a7c0 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -156,7 +156,7 @@ int libcfs_ioctl(unsigned long cmd, void __user *uparam)
- 		break; }
- 	}
- out:
--	LIBCFS_FREE(hdr, hdr->ioc_len);
-+	kvfree(hdr);
- 	return err;
- }
- 
-@@ -302,7 +302,7 @@ static int __proc_cpt_table(void *data, int write,
- 	LASSERT(cfs_cpt_table);
- 
- 	while (1) {
--		LIBCFS_ALLOC(buf, len);
-+		buf = kzalloc(len, GFP_KERNEL);
- 		if (!buf)
- 			return -ENOMEM;
- 
-@@ -311,7 +311,7 @@ static int __proc_cpt_table(void *data, int write,
- 			break;
- 
- 		if (rc == -EFBIG) {
--			LIBCFS_FREE(buf, len);
-+			kfree(buf);
- 			len <<= 1;
- 			continue;
- 		}
-@@ -325,8 +325,7 @@ static int __proc_cpt_table(void *data, int write,
- 
- 	rc = cfs_trace_copyout_string(buffer, nob, buf + pos, NULL);
-  out:
--	if (buf)
--		LIBCFS_FREE(buf, len);
-+	kfree(buf);
- 	return rc;
- }
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index e8f623190133..6a1fb0397604 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -108,7 +108,8 @@ lnet_create_remote_nets_table(void)
- 
- 	LASSERT(!the_lnet.ln_remote_nets_hash);
- 	LASSERT(the_lnet.ln_remote_nets_hbits > 0);
--	LIBCFS_ALLOC(hash, LNET_REMOTE_NETS_HASH_SIZE * sizeof(*hash));
-+	hash = kvmalloc_array(LNET_REMOTE_NETS_HASH_SIZE, sizeof(*hash),
-+			      GFP_KERNEL);
- 	if (!hash) {
- 		CERROR("Failed to create remote nets hash table\n");
- 		return -ENOMEM;
-@@ -131,9 +132,7 @@ lnet_destroy_remote_nets_table(void)
- 	for (i = 0; i < LNET_REMOTE_NETS_HASH_SIZE; i++)
- 		LASSERT(list_empty(&the_lnet.ln_remote_nets_hash[i]));
- 
--	LIBCFS_FREE(the_lnet.ln_remote_nets_hash,
--		    LNET_REMOTE_NETS_HASH_SIZE *
--		    sizeof(the_lnet.ln_remote_nets_hash[0]));
-+	kvfree(the_lnet.ln_remote_nets_hash);
- 	the_lnet.ln_remote_nets_hash = NULL;
- }
- 
-@@ -831,7 +830,7 @@ lnet_ping_info_create(int num_ni)
- 	unsigned int infosz;
- 
- 	infosz = offsetof(struct lnet_ping_info, pi_ni[num_ni]);
--	LIBCFS_ALLOC(ping_info, infosz);
-+	ping_info = kvzalloc(infosz, GFP_KERNEL);
- 	if (!ping_info) {
- 		CERROR("Can't allocate ping info[%d]\n", num_ni);
- 		return NULL;
-@@ -864,9 +863,7 @@ lnet_get_ni_count(void)
- static inline void
- lnet_ping_info_free(struct lnet_ping_info *pinfo)
- {
--	LIBCFS_FREE(pinfo,
--		    offsetof(struct lnet_ping_info,
--			     pi_ni[pinfo->pi_nnis]));
-+	kvfree(pinfo);
- }
- 
- static void
-@@ -2160,7 +2157,7 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
- 	if (id.pid == LNET_PID_ANY)
- 		id.pid = LNET_PID_LUSTRE;
- 
--	LIBCFS_ALLOC(info, infosz);
-+	info = kzalloc(infosz, GFP_KERNEL);
- 	if (!info)
- 		return -ENOMEM;
- 
-@@ -2310,6 +2307,6 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
- 	LASSERT(!rc2);
- 
-  out_0:
--	LIBCFS_FREE(info, infosz);
-+	kfree(info);
- 	return rc;
- }
-diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index 66a222e5220b..fd53c74766a7 100644
---- a/drivers/staging/lustre/lnet/lnet/config.c
-+++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -109,10 +109,8 @@ lnet_ni_free(struct lnet_ni *ni)
- 	if (ni->ni_lnd_tunables)
- 		kfree(ni->ni_lnd_tunables);
- 
--	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++) {
--		LIBCFS_FREE(ni->ni_interfaces[i],
--			    strlen(ni->ni_interfaces[i]) + 1);
--	}
-+	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++)
-+		kfree(ni->ni_interfaces[i]);
- 
- 	/* release reference to net namespace */
- 	if (ni->ni_net_ns)
-@@ -198,7 +196,6 @@ int
- lnet_parse_networks(struct list_head *nilist, char *networks)
- {
- 	struct cfs_expr_list *el = NULL;
--	int tokensize;
- 	char *tokens;
- 	char *str;
- 	char *tmp;
-@@ -219,15 +216,12 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 		return -EINVAL;
- 	}
- 
--	tokensize = strlen(networks) + 1;
--
--	LIBCFS_ALLOC(tokens, tokensize);
-+	tokens = kstrdup(networks, GFP_KERNEL);
- 	if (!tokens) {
- 		CERROR("Can't allocate net tokens\n");
- 		return -ENOMEM;
- 	}
- 
--	memcpy(tokens, networks, tokensize);
- 	tmp = tokens;
- 	str = tokens;
- 
-@@ -349,14 +343,11 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 			 * The newly allocated ni_interfaces[] can be
- 			 * freed when freeing the NI
- 			 */
--			LIBCFS_ALLOC(ni->ni_interfaces[niface],
--				     strlen(iface) + 1);
-+			ni->ni_interfaces[niface] = kstrdup(iface, GFP_KERNEL);
- 			if (!ni->ni_interfaces[niface]) {
- 				CERROR("Can't allocate net interface name\n");
- 				goto failed;
- 			}
--			strncpy(ni->ni_interfaces[niface], iface,
--				strlen(iface));
- 			niface++;
- 			iface = comma;
- 		} while (iface);
-@@ -384,7 +375,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 	list_for_each(temp_node, nilist)
- 		nnets++;
- 
--	LIBCFS_FREE(tokens, tokensize);
-+	kfree(tokens);
- 	return nnets;
- 
-  failed_syntax:
-@@ -400,7 +391,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
- 	if (el)
- 		cfs_expr_list_free(el);
- 
--	LIBCFS_FREE(tokens, tokensize);
-+	kfree(tokens);
- 
- 	return -EINVAL;
- }
-@@ -424,7 +415,7 @@ lnet_new_text_buf(int str_len)
- 		return NULL;
- 	}
- 
--	LIBCFS_ALLOC(ltb, nob);
-+	ltb = kzalloc(nob, GFP_KERNEL);
- 	if (!ltb)
- 		return NULL;
- 
-@@ -438,7 +429,7 @@ static void
- lnet_free_text_buf(struct lnet_text_buf *ltb)
- {
- 	lnet_tbnob -= ltb->ltb_size;
--	LIBCFS_FREE(ltb, ltb->ltb_size);
-+	kfree(ltb);
- }
- 
- static void
-@@ -1156,7 +1147,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
- 	if (nif <= 0)
- 		return nif;
- 
--	LIBCFS_ALLOC(ipaddrs, nif * sizeof(*ipaddrs));
-+	ipaddrs = kzalloc(nif * sizeof(*ipaddrs), GFP_KERNEL);
- 	if (!ipaddrs) {
- 		CERROR("Can't allocate ipaddrs[%d]\n", nif);
- 		lnet_ipif_free_enumeration(ifnames, nif);
-@@ -1189,7 +1180,8 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
- 		*ipaddrsp = ipaddrs;
- 	} else {
- 		if (nip > 0) {
--			LIBCFS_ALLOC(ipaddrs2, nip * sizeof(*ipaddrs2));
-+			ipaddrs2 = kzalloc(nip * sizeof(*ipaddrs2),
-+					   GFP_KERNEL);
- 			if (!ipaddrs2) {
- 				CERROR("Can't allocate ipaddrs[%d]\n", nip);
- 				nip = -ENOMEM;
-@@ -1200,7 +1192,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
- 				rc = nip;
- 			}
- 		}
--		LIBCFS_FREE(ipaddrs, nip * sizeof(*ipaddrs));
-+		kfree(ipaddrs);
- 	}
- 	return nip;
- }
-@@ -1226,7 +1218,7 @@ lnet_parse_ip2nets(char **networksp, char *ip2nets)
- 	}
- 
- 	rc = lnet_match_networks(networksp, ip2nets, ipaddrs, nip);
--	LIBCFS_FREE(ipaddrs, nip * sizeof(*ipaddrs));
-+	kfree(ipaddrs);
- 
- 	if (rc < 0) {
- 		LCONSOLE_ERROR_MSG(0x119, "Error %d parsing ip2nets\n", rc);
--- 
-2.14.0.rc0.dirty
+NeilBrown (16):
+      staging: lustre: discard SVC_SIGNAL and related functions
+      staging: lustre: replace simple cases of l_wait_event() with wait_event().
+      staging: lustre: discard cfs_time_seconds()
+      staging: lustre: use wait_event_timeout() where appropriate.
+      staging: lustre: introduce and use l_wait_event_abortable()
+      staging: lustre: simplify l_wait_event when intr handler but no timeout.
+      staging: lustre: simplify waiting in ldlm_completion_ast()
+      staging: lustre: open code polling loop instead of using l_wait_event()
+      staging: lustre: simplify waiting in ptlrpc_invalidate_import()
+      staging: lustre: remove back_to_sleep() and use loops.
+      staging: lustre: make polling loop in ptlrpc_unregister_bulk more obvious
+      staging: lustre: use wait_event_timeout in ptlrpcd()
+      staging: lustre: improve waiting in sptlrpc_req_refresh_ctx
+      staging: lustre: use explicit poll loop in ptlrpc_service_unlink_rqbd
+      staging: lustre: use explicit poll loop in ptlrpc_unregister_reply
+      staging: lustre: remove l_wait_event from ptlrpc_set_wait
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171218/d0621c4a/attachment.sig>
+
+ .../lustre/include/linux/libcfs/libcfs_debug.h     |    4 -
+ .../lustre/include/linux/libcfs/libcfs_time.h      |    2 
+ .../lustre/include/linux/libcfs/linux/linux-time.h |    7 -
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    8 +
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    4 -
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    6 -
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |   22 ++-
+ drivers/staging/lustre/lnet/libcfs/debug.c         |    2 
+ drivers/staging/lustre/lnet/libcfs/fail.c          |    2 
+ drivers/staging/lustre/lnet/libcfs/tracefile.c     |    4 -
+ drivers/staging/lustre/lnet/lnet/acceptor.c        |    2 
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |    4 -
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |    4 -
+ drivers/staging/lustre/lnet/lnet/net_fault.c       |   14 +-
+ drivers/staging/lustre/lnet/lnet/peer.c            |    2 
+ drivers/staging/lustre/lnet/lnet/router.c          |    8 +
+ drivers/staging/lustre/lnet/selftest/conrpc.c      |    4 -
+ drivers/staging/lustre/lnet/selftest/rpc.c         |    2 
+ drivers/staging/lustre/lnet/selftest/selftest.h    |    2 
+ drivers/staging/lustre/lnet/selftest/timer.c       |    2 
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |    2 
+ drivers/staging/lustre/lustre/include/lustre_lib.h |  126 ++++++++++++++++++--
+ drivers/staging/lustre/lustre/include/lustre_mdc.h |    2 
+ drivers/staging/lustre/lustre/include/lustre_net.h |    8 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |   30 +----
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   14 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |   12 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     |   17 +--
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   51 +++-----
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   14 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |   23 +---
+ drivers/staging/lustre/lustre/llite/statahead.c    |   60 ++++------
+ drivers/staging/lustre/lustre/lov/lov_object.c     |    6 -
+ drivers/staging/lustre/lustre/lov/lov_request.c    |   12 +-
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |    5 -
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |   19 +--
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     |   23 ++--
+ drivers/staging/lustre/lustre/obdclass/genops.c    |   24 +---
+ drivers/staging/lustre/lustre/obdclass/llog_obd.c  |    5 -
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    2 
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |   28 ++--
+ drivers/staging/lustre/lustre/osc/osc_object.c     |    6 -
+ drivers/staging/lustre/lustre/osc/osc_page.c       |    6 -
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    6 -
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |  101 +++++++---------
+ drivers/staging/lustre/lustre/ptlrpc/events.c      |    7 -
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |   51 +++-----
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |   14 +-
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |    9 +
+ drivers/staging/lustre/lustre/ptlrpc/pinger.c      |   28 ++--
+ .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |    2 
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |   17 +--
+ drivers/staging/lustre/lustre/ptlrpc/recover.c     |   12 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec.c         |   23 ++--
+ drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |   23 +---
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |   40 +++---
+ 56 files changed, 446 insertions(+), 487 deletions(-)
+
+--
+Signature
