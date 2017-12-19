@@ -1,74 +1,123 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 19 Dec 2017 00:52:06 +0000
-Subject: [lustre-devel] [PATCH SERIES 4: 0/4] staging: lustre: use
- standard prng
-In-Reply-To: <151356119565.24290.5570928075046338898.stgit@noble>
-References: <151356119565.24290.5570928075046338898.stgit@noble>
-Message-ID: <47156CF4-EC7A-40EB-B7B3-46D2E7B879D0@intel.com>
+Date: Tue, 19 Dec 2017 10:37:23 +0000
+Subject: [lustre-devel] [PATCH 02/16] staging: lustre: replace simple
+ cases of l_wait_event() with wait_event().
+In-Reply-To: <D65D5D21.C5BF8%paf@cray.com>
+References: <151358127190.5099.12792810096274074963.stgit@noble>
+ <151358147981.5099.13114335078693829049.stgit@noble>
+ <D65D5D21.C5BF8%paf@cray.com>
+Message-ID: <9A64B5D7-C979-4400-9AFA-9C2AFC486129@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
+To: Patrick Farrell <paf@cray.com>
+Cc: NeilBrown <neilb@suse.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-On Dec 17, 2017, at 18:41, NeilBrown <neilb@suse.com> wrote:
+On Dec 18, 2017, at 11:03, Patrick Farrell <paf@cray.com> wrote:
 > 
-> Lustre has its own internal PRNG code.
-> This adds nothing of value to the Linux standard prng code,
-> so switch over to using the standard interfaces.
-> This adds a few callers to add_device_randomness(), which
-> helps everyone, and removes unnecessary code.
+> The wait calls in ll_statahead_thread are done in a service thread, and
+> should probably *not* contribute to load.
+> 
+> The one in osc_extent_wait is perhaps tough - It is called both from user
+> threads & daemon threads depending on the situation.  The effect of adding
+> that to load average could be significant for some activities, even when
+> no user threads are busy.  Thoughts from other Lustre people would be
+> welcome here.
 
-Neil,
-Thanks for the patches.  I'll run them through our testing system, but
-they look good at first glance.
-
-An interesting anecdote as this code is removed...  When it was first
-added, we were running Lustre on a single-threaded runtime environment
-without any local storage, interrupts, local clock, or h/w RNG (Catamount,
-on the ASCI Red Storm https://en.wikipedia.org/wiki/Red_Storm_(computing)
-supercomputer) and since there were thousands of nodes booting up and
-mounting Lustre, there were often some with identical random number
-states/seeds after boot, so we had to fold in the only unique state that
-we had on each node - the network address.
-
-That system is long gone, and it is good to clean up this code in a
-more portable manner.
+The main reasons we started using l_wait_event() were:
+- it is used by the request handling threads, and wait_event() caused the
+  load average to always be == number of service threads, which was
+  wrong if those threads were idle waiting for requests to arrive.
+  That is mostly a server problem, but a couple of request handlers are
+  on the client also (DLM lock cancellation threads, etc.) that shouldn't
+  contribute to load.  It looks like there is a better solution for this
+  today with TASK_IDLE.
+- we want the userspace threads to be interruptible if the server is not
+  functional, but the client should at least get a chance to complete the
+  RPC if the server is just busy.  Since Lustre needs to work in systems
+  with 10,000+ clients pounding a server, the server response time is not
+  necessarily fast.  The l_wait_event() behavior is that it blocks signals
+  until the RPC timeout, which will normally succeed, but after the timeout
+  the signals are unblocked and the user thread can be interrupted if the
+  user wants, but it will keep waiting for the RPC to finish if not.  This
+  is half-way between NFS soft and hard mounts.  I don't think there is an
+  equivalent wait_event_* for that behaviour.
 
 Cheers, Andreas
 
-
-> ---
+> Similar issues for osc_object_invalidate.
 > 
-> NeilBrown (4):
->      staging: lustre: replace cfs_rand() with prandom_u32_max()
->      staging: lustre: replace cfs_srand() calls with add_device_randomness().
->      staging: lustre: replace cfs_get_random_bytes calls with get_random_byte()
->      staging: lustre: libcfs: remove prng
+> (If no one else speaks up, my vote is no contribution to load for those
+> OSC waits.)
 > 
+> Otherwise this one looks good...
 > 
-> .../staging/lustre/include/linux/libcfs/libcfs.h   |   10 -
-> drivers/staging/lustre/lnet/libcfs/Makefile        |    2 
-> drivers/staging/lustre/lnet/libcfs/fail.c          |    2 
-> drivers/staging/lustre/lnet/libcfs/prng.c          |  137 --------------------
-> drivers/staging/lustre/lnet/lnet/net_fault.c       |   38 +++---
-> drivers/staging/lustre/lnet/lnet/router.c          |   19 +--
-> drivers/staging/lustre/lustre/include/obd_class.h  |    2 
-> drivers/staging/lustre/lustre/llite/super25.c      |   17 +-
-> drivers/staging/lustre/lustre/mgc/mgc_request.c    |    4 -
-> .../lustre/lustre/obdclass/lustre_handles.c        |    9 -
-> drivers/staging/lustre/lustre/ptlrpc/client.c      |    2 
-> 11 files changed, 42 insertions(+), 200 deletions(-)
-> delete mode 100644 drivers/staging/lustre/lnet/libcfs/prng.c
+> On 12/18/17, 1:17 AM, "lustre-devel on behalf of NeilBrown"
+> <lustre-devel-bounces at lists.lustre.org on behalf of neilb@suse.com> wrote:
 > 
-> --
-> Signature
+>> @@ -968,7 +964,6 @@ static int ll_statahead_thread(void *arg)
+>> 	int		       first  = 0;
+>> 	int		       rc     = 0;
+>> 	struct md_op_data *op_data;
+>> -	struct l_wait_info	lwi    = { 0 };
+>> 	sai = ll_sai_get(dir);
+>> 	sa_thread = &sai->sai_thread;
+>> @@ -1069,12 +1064,11 @@ static int ll_statahead_thread(void *arg)
+>> 			/* wait for spare statahead window */
+>> 			do {
+>> -				l_wait_event(sa_thread->t_ctl_waitq,
+>> -					     !sa_sent_full(sai) ||
+>> -					     sa_has_callback(sai) ||
+>> -					     !list_empty(&sai->sai_agls) ||
+>> -					     !thread_is_running(sa_thread),
+>> -					     &lwi);
+>> +				wait_event(sa_thread->t_ctl_waitq,
+>> +					   !sa_sent_full(sai) ||
+>> +					   sa_has_callback(sai) ||
+>> +					   !list_empty(&sai->sai_agls) ||
+>> +					   !thread_is_running(sa_thread));
+>> 				sa_handle_callback(sai);
+>> 				spin_lock(&lli->lli_agl_lock);
+>> @@ -1128,11 +1122,10 @@ static int ll_statahead_thread(void *arg)
+>> 	 * for file release to stop me.
+>> 	 */
+>> 	while (thread_is_running(sa_thread)) {
+>> -		l_wait_event(sa_thread->t_ctl_waitq,
+>> -			     sa_has_callback(sai) ||
+>> -			     !agl_list_empty(sai) ||
+>> -			     !thread_is_running(sa_thread),
+>> -			     &lwi);
+>> +		wait_event(sa_thread->t_ctl_waitq,
+>> +			   sa_has_callback(sai) ||
+>> +			   !agl_list_empty(sai) ||
+>> +			   !thread_is_running(sa_thread));
+>> 		sa_handle_callback(sai);
+>> 	}
+>> @@ -1145,9 +1138,8 @@ static int ll_statahead_thread(void *arg)
+>> 		CDEBUG(D_READA, "stop agl thread: sai %p pid %u\n",
+>> 		       sai, (unsigned int)agl_thread->t_pid);
+>> -		l_wait_event(agl_thread->t_ctl_waitq,
+>> -			     thread_is_stopped(agl_thread),
+>> -			     &lwi);
+>> +		wait_event(agl_thread->t_ctl_waitq,
+>> +			   thread_is_stopped(agl_thread));
+>> 	} else {
+>> 		/* Set agl_thread flags anyway. */
+>> 		thread_set_flags(agl_thread, SVC_STOPPED);
+>> @@ -1159,8 +1151,8 @@ static int ll_statahead_thread(void *arg)
+>> 	 */
+>> 	while (sai->sai_sent != sai->sai_replied) {
+>> 		/* in case we're not woken up, timeout wait */
+>> -		lwi = LWI_TIMEOUT(msecs_to_jiffies(MSEC_PER_SEC >> 3),
+>> -				  NULL, NULL);
+>> +		struct l_wait_info lwi = LWI_TIMEOUT(msecs_to_jiffies(MSEC_PER_SEC >>
+>> 3),
+>> +						     NULL, NULL);
+>> 		l_wait_event(sa_thread->t_ctl_waitq,
+>> 			     sai->sai_sent == sai->sai_replied, &lwi);
+>> 	}
 > 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
 Cheers, Andreas
 --
