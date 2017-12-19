@@ -1,138 +1,159 @@
-From: Roman Storozhenko <romeusmeister@gmail.com>
-Date: Tue, 19 Dec 2017 20:56:54 +0300
-Subject: [lustre-devel] [PATCH v4] staging: lustre: Replace 'uint32_t' with
- 'u32' and 'uint64_t' with 'u64'
-Message-ID: <20171219175654.GA13794@home>
+From: NeilBrown <neilb@suse.com>
+Date: Wed, 20 Dec 2017 07:49:34 +1100
+Subject: [lustre-devel] [PATCH 02/16] staging: lustre: replace simple
+ cases of l_wait_event() with wait_event().
+In-Reply-To: <9A64B5D7-C979-4400-9AFA-9C2AFC486129@intel.com>
+References: <151358127190.5099.12792810096274074963.stgit@noble>
+ <151358147981.5099.13114335078693829049.stgit@noble>
+ <D65D5D21.C5BF8%paf@cray.com>
+ <9A64B5D7-C979-4400-9AFA-9C2AFC486129@intel.com>
+Message-ID: <87efnql9y9.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: "Dilger, Andreas" <andreas.dilger@intel.com>, Patrick Farrell <paf@cray.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-There are two reasons for replacing 'uint32_t' with 'u32'
-and 'uint64_t' with 'u64':
+On Tue, Dec 19 2017, Dilger, Andreas wrote:
 
-1) As Linus Torvalds have said we should use kernel types:
-http://lkml.iu.edu/hypermail//linux/kernel/1506.0/00160.html
+> On Dec 18, 2017, at 11:03, Patrick Farrell <paf@cray.com> wrote:
+>> 
+>> The wait calls in ll_statahead_thread are done in a service thread, and
+>> should probably *not* contribute to load.
+>> 
+>> The one in osc_extent_wait is perhaps tough - It is called both from user
+>> threads & daemon threads depending on the situation.  The effect of adding
+>> that to load average could be significant for some activities, even when
+>> no user threads are busy.  Thoughts from other Lustre people would be
+>> welcome here.
+>
+> The main reasons we started using l_wait_event() were:
+> - it is used by the request handling threads, and wait_event() caused the
+>   load average to always be == number of service threads, which was
+>   wrong if those threads were idle waiting for requests to arrive.
+>   That is mostly a server problem, but a couple of request handlers are
+>   on the client also (DLM lock cancellation threads, etc.) that shouldn't
+>   contribute to load.  It looks like there is a better solution for this
+>   today with TASK_IDLE.
+> - we want the userspace threads to be interruptible if the server is not
+>   functional, but the client should at least get a chance to complete the
+>   RPC if the server is just busy.  Since Lustre needs to work in systems
+>   with 10,000+ clients pounding a server, the server response time is not
+>   necessarily fast.  The l_wait_event() behavior is that it blocks signals
+>   until the RPC timeout, which will normally succeed, but after the timeout
+>   the signals are unblocked and the user thread can be interrupted if the
+>   user wants, but it will keep waiting for the RPC to finish if not.  This
+>   is half-way between NFS soft and hard mounts.  I don't think there is an
+>   equivalent wait_event_* for that behaviour.
 
-2) There are only few places in the lustre codebase that use such types.
-In the most cases it uses 'u32' and 'u64'.
+Thanks for the historical background, it can often help to understand
+why the code is the way it is!
 
-Signed-off-by: Roman Storozhenko <romeusmeister@gmail.com>
+Thanks particularly for that second point.  I missed it in the code, and
+skimmed over the explanatory comment too quickly (I'm afraid I don't
+trust comments very much).
+I would implement this two-stage wait by first calling
+ swait_event_idle_timeout(),
+then if that times out,
+ swait_event_interruptible()
 
----
-In the third version of that patch Dan Carpenter pointed out that the patch
-body should be self-explanatory:
-"
-> There are two reasons for that:
-What I'm asking is there are two reasons for what?  Where is the first
-part of that paragraph?
-"
+rather than trying to combine then both into one super-macro.  At least,
+that is my thought before I try to write the code - maybe I'll change my
+mind.
 
-In the second version of this patch I forgot to add subsystem and
-driver. As Greg K-H mentioned:
-"Please fix up the subject to have the subsystem and driver name in it:
-        Subject: [PATCH] staging: lustre: ..."
+Anyway, it is clear now that this l_wait_event() series needs to be
+rewritten now that I have a better understanding.
 
-In the first version of this patch I replaced 'uint32_t' with '__u32' and
-'uint64_t' with '__u64'. I was suggested to fix that by Greg K-H:
+Thanks,
+NeilBrown
 
-"The __ types are only needed for when you cross the user/kernel boundry.
-Otherwise just use the "normal" types of u32 and u64.
-
-Do the changes you made here all cross that boundry?  If not, please fix
-this up."
-
-I asked lustre community whether those code used only in the kernel
-space and Andreas Dilger said:
-
-"These headers are for kernel code only, so should use the "u32" and
-similar
-types, rather than the "__u32" that are used for user-kernel
-structures."
-
-So I have replaced my first patch version with this one.
-
- drivers/staging/lustre/lustre/include/lustre_sec.h |  4 ++--
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |  2 +-
- drivers/staging/lustre/lustre/lov/lov_internal.h   | 12 ++++++------
- drivers/staging/lustre/lustre/osc/osc_internal.h   |  6 +++---
- 4 files changed, 12 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/include/lustre_sec.h b/drivers/staging/lustre/lustre/include/lustre_sec.h
-index a40f706..64b6fd4 100644
---- a/drivers/staging/lustre/lustre/include/lustre_sec.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_sec.h
-@@ -341,8 +341,8 @@ void sptlrpc_conf_client_adapt(struct obd_device *obd);
- #define SPTLRPC_MAX_PAYLOAD     (1024)
  
- struct vfs_cred {
--	uint32_t	vc_uid;
--	uint32_t	vc_gid;
-+	u32	vc_uid;
-+	u32	vc_gid;
- };
- 
- struct ptlrpc_ctx_ops {
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index 8ccc8b7..987c03b 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -384,7 +384,7 @@ int cl_sb_fini(struct super_block *sb)
- struct vvp_pgcache_id {
- 	unsigned int		 vpi_bucket;
- 	unsigned int		 vpi_depth;
--	uint32_t		 vpi_index;
-+	u32			 vpi_index;
- 
- 	unsigned int		 vpi_curdep;
- 	struct lu_object_header *vpi_obj;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index ae28ddf..a56d71c 100644
---- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -115,19 +115,19 @@ static inline const struct lsm_operations *lsm_op_find(int magic)
-  */
- #if BITS_PER_LONG == 64
- # define lov_do_div64(n, base) ({					\
--	uint64_t __base = (base);					\
--	uint64_t __rem;							\
--	__rem = ((uint64_t)(n)) % __base;				\
--	(n) = ((uint64_t)(n)) / __base;					\
-+	u64 __base = (base);					\
-+	u64 __rem;							\
-+	__rem = ((u64)(n)) % __base;				\
-+	(n) = ((u64)(n)) / __base;					\
- 	__rem;								\
- })
- #elif BITS_PER_LONG == 32
- # define lov_do_div64(n, base) ({					\
--	uint64_t __rem;							\
-+	u64 __rem;							\
- 	if ((sizeof(base) > 4) && (((base) & 0xffffffff00000000ULL) != 0)) {  \
- 		int __remainder;					      \
- 		LASSERTF(!((base) & (LOV_MIN_STRIPE_SIZE - 1)), "64 bit lov " \
--			 "division %llu / %llu\n", (n), (uint64_t)(base));    \
-+			 "division %llu / %llu\n", (n), (u64)(base));    \
- 		__remainder = (n) & (LOV_MIN_STRIPE_SIZE - 1);		\
- 		(n) >>= LOV_MIN_STRIPE_BITS;				\
- 		__rem = do_div(n, (base) >> LOV_MIN_STRIPE_BITS);	\
-diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
-index feda61b..32db150 100644
---- a/drivers/staging/lustre/lustre/osc/osc_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
-@@ -168,9 +168,9 @@ struct osc_device {
- 
- 	/* Write stats is actually protected by client_obd's lock. */
- 	struct osc_stats {
--		uint64_t     os_lockless_writes;	  /* by bytes */
--		uint64_t     os_lockless_reads;	   /* by bytes */
--		uint64_t     os_lockless_truncates;       /* by times */
-+		u64	os_lockless_writes;	  /* by bytes */
-+		u64	os_lockless_reads;	  /* by bytes */
-+		u64	os_lockless_truncates;    /* by times */
- 	} od_stats;
- 
- 	/* configuration item(s) */
--- 
-2.7.4
+>
+> Cheers, Andreas
+>
+>> Similar issues for osc_object_invalidate.
+>> 
+>> (If no one else speaks up, my vote is no contribution to load for those
+>> OSC waits.)
+>> 
+>> Otherwise this one looks good...
+>> 
+>> On 12/18/17, 1:17 AM, "lustre-devel on behalf of NeilBrown"
+>> <lustre-devel-bounces at lists.lustre.org on behalf of neilb@suse.com> wrote:
+>> 
+>>> @@ -968,7 +964,6 @@ static int ll_statahead_thread(void *arg)
+>>> 	int		       first  = 0;
+>>> 	int		       rc     = 0;
+>>> 	struct md_op_data *op_data;
+>>> -	struct l_wait_info	lwi    = { 0 };
+>>> 	sai = ll_sai_get(dir);
+>>> 	sa_thread = &sai->sai_thread;
+>>> @@ -1069,12 +1064,11 @@ static int ll_statahead_thread(void *arg)
+>>> 			/* wait for spare statahead window */
+>>> 			do {
+>>> -				l_wait_event(sa_thread->t_ctl_waitq,
+>>> -					     !sa_sent_full(sai) ||
+>>> -					     sa_has_callback(sai) ||
+>>> -					     !list_empty(&sai->sai_agls) ||
+>>> -					     !thread_is_running(sa_thread),
+>>> -					     &lwi);
+>>> +				wait_event(sa_thread->t_ctl_waitq,
+>>> +					   !sa_sent_full(sai) ||
+>>> +					   sa_has_callback(sai) ||
+>>> +					   !list_empty(&sai->sai_agls) ||
+>>> +					   !thread_is_running(sa_thread));
+>>> 				sa_handle_callback(sai);
+>>> 				spin_lock(&lli->lli_agl_lock);
+>>> @@ -1128,11 +1122,10 @@ static int ll_statahead_thread(void *arg)
+>>> 	 * for file release to stop me.
+>>> 	 */
+>>> 	while (thread_is_running(sa_thread)) {
+>>> -		l_wait_event(sa_thread->t_ctl_waitq,
+>>> -			     sa_has_callback(sai) ||
+>>> -			     !agl_list_empty(sai) ||
+>>> -			     !thread_is_running(sa_thread),
+>>> -			     &lwi);
+>>> +		wait_event(sa_thread->t_ctl_waitq,
+>>> +			   sa_has_callback(sai) ||
+>>> +			   !agl_list_empty(sai) ||
+>>> +			   !thread_is_running(sa_thread));
+>>> 		sa_handle_callback(sai);
+>>> 	}
+>>> @@ -1145,9 +1138,8 @@ static int ll_statahead_thread(void *arg)
+>>> 		CDEBUG(D_READA, "stop agl thread: sai %p pid %u\n",
+>>> 		       sai, (unsigned int)agl_thread->t_pid);
+>>> -		l_wait_event(agl_thread->t_ctl_waitq,
+>>> -			     thread_is_stopped(agl_thread),
+>>> -			     &lwi);
+>>> +		wait_event(agl_thread->t_ctl_waitq,
+>>> +			   thread_is_stopped(agl_thread));
+>>> 	} else {
+>>> 		/* Set agl_thread flags anyway. */
+>>> 		thread_set_flags(agl_thread, SVC_STOPPED);
+>>> @@ -1159,8 +1151,8 @@ static int ll_statahead_thread(void *arg)
+>>> 	 */
+>>> 	while (sai->sai_sent != sai->sai_replied) {
+>>> 		/* in case we're not woken up, timeout wait */
+>>> -		lwi = LWI_TIMEOUT(msecs_to_jiffies(MSEC_PER_SEC >> 3),
+>>> -				  NULL, NULL);
+>>> +		struct l_wait_info lwi = LWI_TIMEOUT(msecs_to_jiffies(MSEC_PER_SEC >>
+>>> 3),
+>>> +						     NULL, NULL);
+>>> 		l_wait_event(sa_thread->t_ctl_waitq,
+>>> 			     sai->sai_sent == sai->sai_replied, &lwi);
+>>> 	}
+>> 
+>
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Lustre Principal Architect
+> Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171220/e05819f4/attachment.sig>
