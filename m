@@ -1,10 +1,10 @@
 From: kbuild test robot <lkp@intel.com>
-Date: Wed, 20 Dec 2017 12:12:24 +0800
+Date: Wed, 20 Dec 2017 15:14:30 +0800
 Subject: [lustre-devel] [PATCH 03/15] staging: lustre: replace simple
  cases of LIBCFS_ALLOC with kzalloc.
 In-Reply-To: <151355799030.6200.8100283223734974485.stgit@noble>
 References: <151355799030.6200.8100283223734974485.stgit@noble>
-Message-ID: <201712201243.tbG54o5k%fengguang.wu@intel.com>
+Message-ID: <201712201404.5ovmUtOH%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,27 +16,26 @@ Hi NeilBrown,
 Thank you for the patch! Yet something to improve:
 
 [auto build test ERROR on staging/staging-testing]
-[also build test ERROR on next-20171219]
+[also build test ERROR on next-20171220]
 [cannot apply to v4.15-rc4]
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
 url:    https://github.com/0day-ci/linux/commits/NeilBrown/staging-lustre-convert-most-LIBCFS-ALLOC-to-k-malloc/20171220-113029
-config: i386-randconfig-x009-201751 (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
+config: x86_64-randconfig-r0-12200451 (attached as .config)
+compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
 reproduce:
         # save the attached .config to linux build tree
-        make ARCH=i386 
+        make ARCH=x86_64 
 
 All errors (new ones prefixed by >>):
 
    drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c: In function 'kiblnd_dev_failover':
->> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c:2395:2: error: 'kdev' undeclared (first use in this function); did you mean 'hdev'?
+>> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c:2395:2: error: 'kdev' undeclared (first use in this function)
      kdev = kzalloc(sizeof(*hdev), GFP_NOFS);
      ^~~~
-     hdev
    drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c:2395:2: note: each undeclared identifier is reported only once for each function it appears in
 
-vim +2395 drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+vim +/kdev +2395 drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
 
   2329	
   2330	int kiblnd_dev_failover(struct kib_dev *dev)
@@ -180,6 +179,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 30413 bytes
+Size: 30875 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171220/42516a59/attachment-0001.bin>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20171220/9a89b2c6/attachment-0001.bin>
