@@ -1,62 +1,65 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 8 Jan 2018 18:06:01 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 5 v2: 00/19] staging: lustre: use
- standard wait_event macros
-In-Reply-To: <20180108163607.GA3046@kroah.com>
-References: <151538168618.23920.8261096424342988792.stgit@noble>
- <20180108145943.GA5761@kroah.com>
- <alpine.LFD.2.21.1801081607120.1698@casper.infradead.org>
- <20180108163607.GA3046@kroah.com>
-Message-ID: <alpine.LFD.2.21.1801081805100.9942@casper.infradead.org>
+From: NeilBrown <neilb@suse.com>
+Date: Tue, 09 Jan 2018 08:39:17 +1100
+Subject: [lustre-devel] [PATCH 03/15] staging: lustre: replace simple
+ cases of LIBCFS_ALLOC with kzalloc.
+In-Reply-To: <20180108145157.GA32570@kroah.com>
+References: <151355781721.6200.2136335532722530242.stgit@noble>
+ <151355799030.6200.8100283223734974485.stgit@noble>
+ <20180108145157.GA32570@kroah.com>
+Message-ID: <87y3l8av3u.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: NeilBrown <neilb@suse.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
+
+On Mon, Jan 08 2018, Greg Kroah-Hartman wrote:
+
+> On Mon, Dec 18, 2017 at 11:46:30AM +1100, NeilBrown wrote:
+>> All usages of the form
+>>   LIBCFS_ALLOC(variable, sizeof(variable))
+>> or
+>>   LIBCFS_ALLOC(variable, sizeof(variable's-type))
+>> 
+>> are changed to
+>>   variable = kzalloc(sizeof(...), GFP_NOFS);
+>> 
+>> Similarly, all
+>>    LIBCFS_FREE(variable, sizeof(variable))
+>> become
+>>    kfree(variable);
+>> 
+>> None of these need the vmalloc option, or any of the other minor
+>> benefits of LIBCFS_ALLOC().
+>> 
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>
+> As this broke the kbuild system, I'll stop here in this patch series.
+> Can you please fix it up, rebase and resend the remaining ones in this
+> series?
+
+Hi Greg,
+ thanks for applying the patches.
+
+ That patch had a typo in code that was only included if CONFIG_INFINIBAND is
+ enabled, which I didn't have in my testing at the time.  I hadn't
+ resent when I fixed it as I was waiting to see if there would be
+ feedback.
+ If the protocol is "you apply sometime after two weeks if there is no
+ feedback (and no breakage)", then I'll aim to work with that.
+
+ I'll resend with the rest of the kmalloc patches.
+
+Thanks,
+NeilBrown
 
 
-> On Mon, Jan 08, 2018 at 04:21:50PM +0000, James Simmons wrote:
-> > 
-> > > On Mon, Jan 08, 2018 at 02:28:13PM +1100, NeilBrown wrote:
-> > > > Hi,
-> > > >  this is a revised version of the patch series I sent under a similar
-> > > >  subject in mid December.
-> > > >  Improvements are:
-> > > >    - new wait_event_idle* macros are now in include/linux/wait.h which
-> > > >      Ack from peterz.
-> > > >    - *all* waits are now TASK_IDLE or TASK_INTERRUPTIBLE and so don't
-> > > >      affect the load average.  There is no need to choose whether load
-> > > >      is appropriate or not in each case.
-> > > >    - all l_wait_event() users are handled so l_wait_event() is
-> > > >      removed.  The one case I had left out before uses
-> > > >      wait_event_idle_exclusive() with and option of using
-> > > >      wait_event_idle_exclusive_lifo() is that ever gets approved.
-> > > > 
-> > > >  I think this set is ready to go.
-> > > >  If you only review two patches, please review
-> > > > 
-> > > >     staging: lustre: simplify waiting in ldlm_completion_ast()
-> > > > and
-> > > >     staging: lustre: remove back_to_sleep()
-> > > > 
-> > > >  as in both of those, the actual behaviour of the current code (as I
-> > > >  understand it) doesn't seem to agree with comments/debug message, or
-> > > >  just generally looks odd.
-> > > 
-> > > This series broke the build, so I'll roll back my tree and drop it.
-> > > 
-> > > Please fix it up and resend and test build it first...
-> > 
-> > Please don't merge these just yet. They need to be tested first. I don't 
-> > want to be in a position where the lustre client is totally not usable 
-> > like in the past. That kind of breakage makes no one want to use the
-> > lustre client. We have a test suite for these kinds of changes. Neill do 
-> > you know how to test your patches with the test suite? Also I have been 
-> > working on several things for the last 4 months to merge upstream. I like
-> > to coordinate with you so we don't step on each others toes.
-> 
-> If I don't hear anything for a few weeks, I merge patches.  That should
-> be long enough to test...
-
-Agree. This patch set is only a few hours old.
+ 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180109/ab498f88/attachment.sig>
