@@ -1,29 +1,46 @@
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 8 Jan 2018 15:52:28 +0100
-Subject: [lustre-devel] [PATCH 1/8] staging: lustre: Enclose complex
- macros in parantheses
-In-Reply-To: <4195720f60859773624344ef220517d9@christoph-volkert.de>
-References: <1513869932-27407-1-git-send-email-fabian_huegel@web.de>
- <1513869932-27407-2-git-send-email-fabian_huegel@web.de>
- <4195720f60859773624344ef220517d9@christoph-volkert.de>
-Message-ID: <20180108145228.GA32682@kroah.com>
+Date: Mon, 8 Jan 2018 15:59:43 +0100
+Subject: [lustre-devel] [PATCH 5 v2: 00/19] staging: lustre: use
+ standard wait_event macros
+In-Reply-To: <151538168618.23920.8261096424342988792.stgit@noble>
+References: <151538168618.23920.8261096424342988792.stgit@noble>
+Message-ID: <20180108145943.GA5761@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Christoph Volkert <linux@christoph-volkert.de>
-Cc: Fabian Huegel <fabian_huegel@web.de>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Lai Siyao <lai.siyao@intel.com>, "John L . Hammond" <john.hammond@intel.com>, devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, linux-kernel@vger.kernel.org, linux-kernel@i4.cs.fau.de
+To: NeilBrown <neilb@suse.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-On Thu, Dec 21, 2017 at 04:43:27PM +0100, Christoph Volkert wrote:
-> This is a duplicate patch. We fixed a typo and this was still left as a
-> temporary file. (emacs?) Sorry. The patch with Message-Id
-> <1513869932-27407-3-git-send-email-fabian_huegel@web.de> is the right one.
+On Mon, Jan 08, 2018 at 02:28:13PM +1100, NeilBrown wrote:
+> Hi,
+>  this is a revised version of the patch series I sent under a similar
+>  subject in mid December.
+>  Improvements are:
+>    - new wait_event_idle* macros are now in include/linux/wait.h which
+>      Ack from peterz.
+>    - *all* waits are now TASK_IDLE or TASK_INTERRUPTIBLE and so don't
+>      affect the load average.  There is no need to choose whether load
+>      is appropriate or not in each case.
+>    - all l_wait_event() users are handled so l_wait_event() is
+>      removed.  The one case I had left out before uses
+>      wait_event_idle_exclusive() with and option of using
+>      wait_event_idle_exclusive_lifo() is that ever gets approved.
 > 
-> We can provide a new patch series without the fix, if needed.
+>  I think this set is ready to go.
+>  If you only review two patches, please review
+> 
+>     staging: lustre: simplify waiting in ldlm_completion_ast()
+> and
+>     staging: lustre: remove back_to_sleep()
+> 
+>  as in both of those, the actual behaviour of the current code (as I
+>  understand it) doesn't seem to agree with comments/debug message, or
+>  just generally looks odd.
 
-Please do, as I have no idea what to do otherwise.
+This series broke the build, so I'll roll back my tree and drop it.
 
-Consider this patch series dropped.
+Please fix it up and resend and test build it first...
 
 thanks,
 
