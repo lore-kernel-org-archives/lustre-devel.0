@@ -1,13 +1,13 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 8 Jan 2018 18:04:33 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 04/19] staging: lustre: discard
- cfs_time_seconds()
-In-Reply-To: <20180108170043.GA28139@kroah.com>
+Date: Mon, 8 Jan 2018 18:06:01 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 5 v2: 00/19] staging: lustre: use
+ standard wait_event macros
+In-Reply-To: <20180108163607.GA3046@kroah.com>
 References: <151538168618.23920.8261096424342988792.stgit@noble>
- <151538209341.23920.8613572158448297057.stgit@noble>
- <alpine.LFD.2.21.1801081630470.9942@casper.infradead.org>
- <20180108170043.GA28139@kroah.com>
-Message-ID: <alpine.LFD.2.21.1801081708220.9942@casper.infradead.org>
+ <20180108145943.GA5761@kroah.com>
+ <alpine.LFD.2.21.1801081607120.1698@casper.infradead.org>
+ <20180108163607.GA3046@kroah.com>
+Message-ID: <alpine.LFD.2.21.1801081805100.9942@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,42 +16,47 @@ To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: NeilBrown <neilb@suse.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
 
-> On Mon, Jan 08, 2018 at 04:52:35PM +0000, James Simmons wrote:
+> On Mon, Jan 08, 2018 at 04:21:50PM +0000, James Simmons wrote:
 > > 
-> > > cfs_time_seconds() converts a number of seconds to the
-> > > matching number of jiffies.
-> > > The standard way to do this in Linux is  "* HZ".
-> > > So discard cfs_time_seconds() and use "* HZ" instead.
-> >  
-> > Just to make you aware I have been working for several months on 
-> > moving lustre away from using jiffies as much as possible. The
-> > problem with using HZ is that it can vary. So when you have a
-> > parallel file system with batches of nodes that have different
-> > values of HZ you can get very interesting corner cases. So I have
-> > been moving everything over to time64_t and ktime. Also I mostly
-> > have killed off the cfs_time_shift* and crap as well. You see all
-> > work under https://jira.hpdd.intel.com/browse/LU-9019. So many
-> > of the cases you did below don't event exist any more. I was
-> > planning to push those changes after the next merge window.
+> > > On Mon, Jan 08, 2018 at 02:28:13PM +1100, NeilBrown wrote:
+> > > > Hi,
+> > > >  this is a revised version of the patch series I sent under a similar
+> > > >  subject in mid December.
+> > > >  Improvements are:
+> > > >    - new wait_event_idle* macros are now in include/linux/wait.h which
+> > > >      Ack from peterz.
+> > > >    - *all* waits are now TASK_IDLE or TASK_INTERRUPTIBLE and so don't
+> > > >      affect the load average.  There is no need to choose whether load
+> > > >      is appropriate or not in each case.
+> > > >    - all l_wait_event() users are handled so l_wait_event() is
+> > > >      removed.  The one case I had left out before uses
+> > > >      wait_event_idle_exclusive() with and option of using
+> > > >      wait_event_idle_exclusive_lifo() is that ever gets approved.
+> > > > 
+> > > >  I think this set is ready to go.
+> > > >  If you only review two patches, please review
+> > > > 
+> > > >     staging: lustre: simplify waiting in ldlm_completion_ast()
+> > > > and
+> > > >     staging: lustre: remove back_to_sleep()
+> > > > 
+> > > >  as in both of those, the actual behaviour of the current code (as I
+> > > >  understand it) doesn't seem to agree with comments/debug message, or
+> > > >  just generally looks odd.
+> > > 
+> > > This series broke the build, so I'll roll back my tree and drop it.
+> > > 
+> > > Please fix it up and resend and test build it first...
+> > 
+> > Please don't merge these just yet. They need to be tested first. I don't 
+> > want to be in a position where the lustre client is totally not usable 
+> > like in the past. That kind of breakage makes no one want to use the
+> > lustre client. We have a test suite for these kinds of changes. Neill do 
+> > you know how to test your patches with the test suite? Also I have been 
+> > working on several things for the last 4 months to merge upstream. I like
+> > to coordinate with you so we don't step on each others toes.
 > 
-> First patch to me "wins", none of this "don't touch this code because
-> I'm going to work on it in the future" stuff.  That has been documented
-> to kill contributions and in one case, a whole opensource kernel
-> project.
-> 
-> So Neil's patches should be evaluated first, don't develop behind closed
-> walls like you are doing
+> If I don't hear anything for a few weeks, I merge patches.  That should
+> be long enough to test...
 
-What I'm saying is my work had been tested and various bugs have
-been worked out before it gets to you. His work is new and untested. His 
-work can be evaluated first but that doesn't mean it ready to land first. 
-The wait event changes is a pretty big change that can have unseen 
-consequences. 
-
-> I've merged almost all of them now, except for the ones that broke the
-> build :)
-
-He just posted a updated the version of the l_wait_event changes a few 
-hours ago based on feed back. Please give it more than a few hours to 
-bake. I like to test them to make sure things don't break. I hate to 
-find out it breaks things and have it reverted. Please.
+Agree. This patch set is only a few hours old.
