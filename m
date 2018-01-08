@@ -1,9 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 08 Jan 2018 14:28:13 +1100
-Subject: [lustre-devel] [PATCH 11/19] staging: lustre: remove back_to_sleep()
+Subject: [lustre-devel] [PATCH 13/19] staging: lustre: use
+ wait_event_idle_timeout in ptlrpcd()
 In-Reply-To: <151538168618.23920.8261096424342988792.stgit@noble>
 References: <151538168618.23920.8261096424342988792.stgit@noble>
-Message-ID: <151538209372.23920.9644158038491397506.stgit@noble>
+Message-ID: <151538209379.23920.12930052742997185181.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -11,89 +12,102 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-When 'back_to_sleep()' is passed as the 'timeout' function,
-the effect is to wait indefinitely for the event, polling
-once after the timeout.
-If LWI_ON_SIGNAL_NOOP is given, then after the timeout
-we allow fatal signals to interrupt the wait.
+We can replace l_wait_event() with
+wait_event_idle_timeout() here providing we call the
+timeout function when wait_event_idle_timeout() returns zero.
 
-Make this more obvious in both places "back_to_sleep()" is
-used but using two explicit sleeps.
-
-The code in ptlrpcd_add_req() looks odd - why not just have one
-wait_event_idle()?  However I believe this is a faithful
-transformation of the existing code.
+As ptlrpc_expired_set() returns 1, the l_wait_event() aborts of the
+first timeout.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/lustre_lib.h |    4 ----
- drivers/staging/lustre/lustre/ptlrpc/import.c      |   11 ++++++-----
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |   12 ++++++++----
+ .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |    2 +-
  drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    9 +++++----
- 3 files changed, 11 insertions(+), 13 deletions(-)
+ 3 files changed, 14 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-index b2a64d0e682c..1939e959b92a 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-@@ -140,10 +140,6 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id);
-  * XXX nikita: some ptlrpc daemon threads have races of that sort.
-  *
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index 81b7a7046d82..f70176c6db08 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -2125,9 +2125,8 @@ int ptlrpc_expire_one_request(struct ptlrpc_request *req, int async_unlink)
+  * Callback used when waiting on sets with l_wait_event.
+  * Always returns 1.
   */
--static inline int back_to_sleep(void *arg)
--{
--	return 0;
--}
+-int ptlrpc_expired_set(void *data)
++void ptlrpc_expired_set(struct ptlrpc_request_set *set)
+ {
+-	struct ptlrpc_request_set *set = data;
+ 	struct list_head *tmp;
+ 	time64_t now = ktime_get_real_seconds();
  
- #define LWI_ON_SIGNAL_NOOP ((void (*)(void *))(-1))
- 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index 5d62c9de27eb..faf0f606f013 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -1496,7 +1496,6 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+@@ -2156,7 +2155,12 @@ int ptlrpc_expired_set(void *data)
+ 		 */
+ 		ptlrpc_expire_one_request(req, 1);
  	}
++}
++static int ptlrpc_expired_set_void(void *data)
++{
++	struct ptlrpc_request_set *set = data;
  
- 	if (ptlrpc_import_in_recovery(imp)) {
--		struct l_wait_info lwi;
- 		long timeout;
++	ptlrpc_expired_set(set);
+ 	/*
+ 	 * When waiting for a whole set, we always break out of the
+ 	 * sleep so we can recalculate the timeout, or enable interrupts
+@@ -2286,7 +2290,7 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
+ 			 * so we allow interrupts during the timeout.
+ 			 */
+ 			lwi = LWI_TIMEOUT_INTR_ALL(HZ,
+-						   ptlrpc_expired_set,
++						   ptlrpc_expired_set_void,
+ 						   ptlrpc_interrupted_set, set);
+ 		else
+ 			/*
+@@ -2295,7 +2299,7 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
+ 			 * complete, or an in-flight req times out.
+ 			 */
+ 			lwi = LWI_TIMEOUT((timeout ? timeout : 1) * HZ,
+-					  ptlrpc_expired_set, set);
++					  ptlrpc_expired_set_void, set);
  
- 		if (AT_OFF) {
-@@ -1510,10 +1509,12 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
- 			timeout = at_get(&imp->imp_at.iat_service_estimate[idx]) * HZ;
- 		}
+ 		rc = l_wait_event(set->set_waitq, ptlrpc_check_set(NULL, set), &lwi);
  
--		lwi = LWI_TIMEOUT_INTR(cfs_timeout_cap(timeout),
--				       back_to_sleep, LWI_ON_SIGNAL_NOOP, NULL);
--		rc = l_wait_event(imp->imp_recovery_waitq,
--				  !ptlrpc_import_in_recovery(imp), &lwi);
-+		if (wait_event_idle_timeout(imp->imp_recovery_waitq,
-+					    !ptlrpc_import_in_recovery(imp),
-+					    cfs_timeout_cap(timeout)) == 0)
-+			l_wait_event_abortable(
-+				imp->imp_recovery_waitq,
-+				!ptlrpc_import_in_recovery(imp));
- 	}
- 
- 	spin_lock(&imp->imp_lock);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+index f9decbd1459d..b7a8d7537a66 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+@@ -68,7 +68,7 @@ void ptlrpc_request_cache_free(struct ptlrpc_request *req);
+ void ptlrpc_init_xid(void);
+ void ptlrpc_set_add_new_req(struct ptlrpcd_ctl *pc,
+ 			    struct ptlrpc_request *req);
+-int ptlrpc_expired_set(void *data);
++void ptlrpc_expired_set(struct ptlrpc_request_set *set);
+ int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set);
+ void ptlrpc_resend_req(struct ptlrpc_request *request);
+ void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req);
 diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-index dad2f9290f70..437b4b2a9072 100644
+index 437b4b2a9072..6ed77521d025 100644
 --- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
 +++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-@@ -230,12 +230,13 @@ void ptlrpcd_add_req(struct ptlrpc_request *req)
+@@ -435,16 +435,17 @@ static int ptlrpcd(void *arg)
+ 	 * new_req_list and ptlrpcd_check() moves them into the set.
+ 	 */
+ 	do {
+-		struct l_wait_info lwi;
+ 		int timeout;
  
- 	spin_lock(&req->rq_lock);
- 	if (req->rq_invalid_rqset) {
--		struct l_wait_info lwi = LWI_TIMEOUT(5 * HZ,
--						     back_to_sleep, NULL);
--
- 		req->rq_invalid_rqset = 0;
- 		spin_unlock(&req->rq_lock);
--		l_wait_event(req->rq_set_waitq, !req->rq_set, &lwi);
-+		if (wait_event_idle_timeout(req->rq_set_waitq,
-+					    !req->rq_set,
-+					    5 * HZ) == 0)
-+			wait_event_idle(req->rq_set_waitq,
-+					!req->rq_set);
- 	} else if (req->rq_set) {
- 		/* If we have a valid "rq_set", just reuse it to avoid double
- 		 * linked.
+ 		timeout = ptlrpc_set_next_timeout(set);
+-		lwi = LWI_TIMEOUT((timeout ? timeout : 1) * HZ,
+-				  ptlrpc_expired_set, set);
+ 
+ 		lu_context_enter(&env.le_ctx);
+ 		lu_context_enter(env.le_ses);
+-		l_wait_event(set->set_waitq, ptlrpcd_check(&env, pc), &lwi);
++		if (wait_event_idle_timeout(set->set_waitq,
++					    ptlrpcd_check(&env, pc),
++					    (timeout ? timeout : 1) * HZ) == 0)
++			ptlrpc_expired_set(set);
++
+ 		lu_context_exit(&env.le_ctx);
+ 		lu_context_exit(env.le_ses);
+ 
