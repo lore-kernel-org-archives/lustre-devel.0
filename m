@@ -1,10 +1,9 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 08 Jan 2018 14:28:13 +1100
-Subject: [lustre-devel] [PATCH 08/19] staging: lustre: simplify waiting in
- ldlm_completion_ast()
+Subject: [lustre-devel] [PATCH 11/19] staging: lustre: remove back_to_sleep()
 In-Reply-To: <151538168618.23920.8261096424342988792.stgit@noble>
 References: <151538168618.23920.8261096424342988792.stgit@noble>
-Message-ID: <151538209360.23920.8603201181939332545.stgit@noble>
+Message-ID: <151538209372.23920.9644158038491397506.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,145 +11,89 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-If a signal-callback (lwi_on_signal) is set without lwi_allow_intr, as
-is the case in ldlm_completion_ast(), the behavior depends on the
-timeout set.
+When 'back_to_sleep()' is passed as the 'timeout' function,
+the effect is to wait indefinitely for the event, polling
+once after the timeout.
+If LWI_ON_SIGNAL_NOOP is given, then after the timeout
+we allow fatal signals to interrupt the wait.
 
-If a timeout is set, then signals are ignored.  If the timeout is
-reached, the timeout handler is called.  If the timeout handler
-return 0, which ldlm_expired_completion_wait() always does, the
-l_wait_event() switches to exactly the behavior if no timeout was set.
+Make this more obvious in both places "back_to_sleep()" is
+used but using two explicit sleeps.
 
-If no timeout is set, then "fatal" signals are not ignored.  If one
-arrives the callback is run, but as the callback is empty in this
-case, that is not relevant.
-
-This can be simplified to:
- if a timeout is wanted
-     wait_event_idle_timeout()
-     if that timed out, call the timeout handler
- l_wait_event_abortable()
-
-i.e. the code always waits indefinitely.  Sometimes it performs a
-non-abortable wait first.  Sometimes it doesn't.  But it only
-aborts before the condition is true if it is signaled.
-This doesn't quite agree with the comments and debug messages.
+The code in ptlrpcd_add_req() looks odd - why not just have one
+wait_event_idle()?  However I believe this is a faithful
+transformation of the existing code.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c |   55 +++++++--------------
- 1 file changed, 18 insertions(+), 37 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_lib.h |    4 ----
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |   11 ++++++-----
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    9 +++++----
+ 3 files changed, 11 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index a244fa717134..f1233d844bbd 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -72,15 +72,6 @@ MODULE_PARM_DESC(ldlm_enqueue_min, "lock enqueue timeout minimum");
- /* in client side, whether the cached locks will be canceled before replay */
- unsigned int ldlm_cancel_unused_locks_before_replay = 1;
- 
--static void interrupted_completion_wait(void *data)
+diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
+index b2a64d0e682c..1939e959b92a 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_lib.h
++++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
+@@ -140,10 +140,6 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id);
+  * XXX nikita: some ptlrpc daemon threads have races of that sort.
+  *
+  */
+-static inline int back_to_sleep(void *arg)
 -{
--}
--
--struct lock_wait_data {
--	struct ldlm_lock *lwd_lock;
--	__u32	     lwd_conn_cnt;
--};
--
- struct ldlm_async_args {
- 	struct lustre_handle lock_handle;
- };
-@@ -112,10 +103,8 @@ static int ldlm_request_bufsize(int count, int type)
- 	return sizeof(struct ldlm_request) + avail;
- }
- 
--static int ldlm_expired_completion_wait(void *data)
-+static void ldlm_expired_completion_wait(struct ldlm_lock *lock, struct obd_import *imp2)
- {
--	struct lock_wait_data *lwd = data;
--	struct ldlm_lock *lock = lwd->lwd_lock;
- 	struct obd_import *imp;
- 	struct obd_device *obd;
- 
-@@ -135,19 +124,17 @@ static int ldlm_expired_completion_wait(void *data)
- 			if (last_dump == 0)
- 				libcfs_debug_dumplog();
- 		}
--		return 0;
-+		return;
- 	}
- 
- 	obd = lock->l_conn_export->exp_obd;
- 	imp = obd->u.cli.cl_import;
--	ptlrpc_fail_import(imp, lwd->lwd_conn_cnt);
-+	ptlrpc_fail_import(imp, imp2 ? imp2->imp_conn_cnt : 0);
- 	LDLM_ERROR(lock,
- 		   "lock timed out (enqueued at %lld, %llds ago), entering recovery for %s@%s",
- 		   (s64)lock->l_last_activity,
- 		   (s64)(ktime_get_real_seconds() - lock->l_last_activity),
- 		   obd2cli_tgt(obd), imp->imp_connection->c_remote_uuid.uuid);
--
 -	return 0;
- }
+-}
  
- /**
-@@ -251,10 +238,8 @@ EXPORT_SYMBOL(ldlm_completion_ast_async);
- int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
- {
- 	/* XXX ALLOCATE - 160 bytes */
--	struct lock_wait_data lwd;
- 	struct obd_device *obd;
- 	struct obd_import *imp = NULL;
--	struct l_wait_info lwi;
- 	__u32 timeout;
- 	int rc = 0;
+ #define LWI_ON_SIGNAL_NOOP ((void (*)(void *))(-1))
  
-@@ -281,32 +266,28 @@ int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
- 
- 	timeout = ldlm_cp_timeout(lock);
- 
--	lwd.lwd_lock = lock;
- 	lock->l_last_activity = ktime_get_real_seconds();
- 
--	if (ldlm_is_no_timeout(lock)) {
--		LDLM_DEBUG(lock, "waiting indefinitely because of NO_TIMEOUT");
--		lwi = LWI_INTR(interrupted_completion_wait, &lwd);
--	} else {
--		lwi = LWI_TIMEOUT_INTR(timeout * HZ,
--				       ldlm_expired_completion_wait,
--				       interrupted_completion_wait, &lwd);
--	}
--
--	if (imp) {
--		spin_lock(&imp->imp_lock);
--		lwd.lwd_conn_cnt = imp->imp_conn_cnt;
--		spin_unlock(&imp->imp_lock);
--	}
--
- 	if (OBD_FAIL_CHECK_RESET(OBD_FAIL_LDLM_INTR_CP_AST,
- 				 OBD_FAIL_LDLM_CP_BL_RACE | OBD_FAIL_ONCE)) {
- 		ldlm_set_fail_loc(lock);
- 		rc = -EINTR;
- 	} else {
--		/* Go to sleep until the lock is granted or cancelled. */
--		rc = l_wait_event(lock->l_waitq,
--				  is_granted_or_cancelled(lock), &lwi);
-+		/* Go to sleep until the lock is granted or canceled. */
-+		if (!ldlm_is_no_timeout(lock)) {
-+			/* Wait uninterruptible for a while first */
-+			rc = wait_event_idle_timeout(lock->l_waitq,
-+						     is_granted_or_cancelled(lock),
-+						     timeout * HZ);
-+			if (rc == 0)
-+				ldlm_expired_completion_wait(lock, imp);
-+		}
-+		/* Now wait abortable */
-+		if (rc == 0)
-+			rc = l_wait_event_abortable(lock->l_waitq,
-+						    is_granted_or_cancelled(lock));
-+		else
-+			rc = 0;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index 5d62c9de27eb..faf0f606f013 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -1496,7 +1496,6 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
  	}
  
- 	if (rc) {
+ 	if (ptlrpc_import_in_recovery(imp)) {
+-		struct l_wait_info lwi;
+ 		long timeout;
+ 
+ 		if (AT_OFF) {
+@@ -1510,10 +1509,12 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+ 			timeout = at_get(&imp->imp_at.iat_service_estimate[idx]) * HZ;
+ 		}
+ 
+-		lwi = LWI_TIMEOUT_INTR(cfs_timeout_cap(timeout),
+-				       back_to_sleep, LWI_ON_SIGNAL_NOOP, NULL);
+-		rc = l_wait_event(imp->imp_recovery_waitq,
+-				  !ptlrpc_import_in_recovery(imp), &lwi);
++		if (wait_event_idle_timeout(imp->imp_recovery_waitq,
++					    !ptlrpc_import_in_recovery(imp),
++					    cfs_timeout_cap(timeout)) == 0)
++			l_wait_event_abortable(
++				imp->imp_recovery_waitq,
++				!ptlrpc_import_in_recovery(imp));
+ 	}
+ 
+ 	spin_lock(&imp->imp_lock);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index dad2f9290f70..437b4b2a9072 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -230,12 +230,13 @@ void ptlrpcd_add_req(struct ptlrpc_request *req)
+ 
+ 	spin_lock(&req->rq_lock);
+ 	if (req->rq_invalid_rqset) {
+-		struct l_wait_info lwi = LWI_TIMEOUT(5 * HZ,
+-						     back_to_sleep, NULL);
+-
+ 		req->rq_invalid_rqset = 0;
+ 		spin_unlock(&req->rq_lock);
+-		l_wait_event(req->rq_set_waitq, !req->rq_set, &lwi);
++		if (wait_event_idle_timeout(req->rq_set_waitq,
++					    !req->rq_set,
++					    5 * HZ) == 0)
++			wait_event_idle(req->rq_set_waitq,
++					!req->rq_set);
+ 	} else if (req->rq_set) {
+ 		/* If we have a valid "rq_set", just reuse it to avoid double
+ 		 * linked.
