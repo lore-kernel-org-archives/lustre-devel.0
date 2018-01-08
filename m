@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 08 Jan 2018 14:28:13 +1100
-Subject: [lustre-devel] [PATCH 10/19] staging: lustre: simplify waiting in
- ptlrpc_invalidate_import()
+Subject: [lustre-devel] [PATCH 08/19] staging: lustre: simplify waiting in
+ ldlm_completion_ast()
 In-Reply-To: <151538168618.23920.8261096424342988792.stgit@noble>
 References: <151538168618.23920.8261096424342988792.stgit@noble>
-Message-ID: <151538209368.23920.17745110760039469689.stgit@noble>
+Message-ID: <151538209360.23920.8603201181939332545.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,79 +12,145 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-This waiter currently wakes up every second to re-test if
-imp_flight is zero.  If we ensure wakeup is called whenever
-imp_flight is decremented to zero, we can just have a simple
-wait_event_idle_timeout().
+If a signal-callback (lwi_on_signal) is set without lwi_allow_intr, as
+is the case in ldlm_completion_ast(), the behavior depends on the
+timeout set.
 
-So add a wake_up_all to the one place it is missing, and simplify
-the wait_event.
+If a timeout is set, then signals are ignored.  If the timeout is
+reached, the timeout handler is called.  If the timeout handler
+return 0, which ldlm_expired_completion_wait() always does, the
+l_wait_event() switches to exactly the behavior if no timeout was set.
+
+If no timeout is set, then "fatal" signals are not ignored.  If one
+arrives the callback is run, but as the callback is empty in this
+case, that is not relevant.
+
+This can be simplified to:
+ if a timeout is wanted
+     wait_event_idle_timeout()
+     if that timed out, call the timeout handler
+ l_wait_event_abortable()
+
+i.e. the code always waits indefinitely.  Sometimes it performs a
+non-abortable wait first.  Sometimes it doesn't.  But it only
+aborts before the condition is true if it is signaled.
+This doesn't quite agree with the comments and debug messages.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c |    3 ++-
- drivers/staging/lustre/lustre/ptlrpc/import.c |   21 ++++++++-------------
- 2 files changed, 10 insertions(+), 14 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c |   55 +++++++--------------
+ 1 file changed, 18 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 0ab13f8e5993..81b7a7046d82 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -1588,7 +1588,8 @@ static int ptlrpc_send_new_req(struct ptlrpc_request *req)
- 		spin_lock(&imp->imp_lock);
- 		if (!list_empty(&req->rq_list)) {
- 			list_del_init(&req->rq_list);
--			atomic_dec(&req->rq_import->imp_inflight);
-+			if (atomic_dec_and_test(&req->rq_import->imp_inflight))
-+				wake_up_all(&req->rq_import->imp_recovery_waitq);
- 		}
- 		spin_unlock(&imp->imp_lock);
- 		ptlrpc_rqphase_move(req, RQ_PHASE_NEW);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index ed210550f61f..5d62c9de27eb 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -265,7 +265,6 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index a244fa717134..f1233d844bbd 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -72,15 +72,6 @@ MODULE_PARM_DESC(ldlm_enqueue_min, "lock enqueue timeout minimum");
+ /* in client side, whether the cached locks will be canceled before replay */
+ unsigned int ldlm_cancel_unused_locks_before_replay = 1;
+ 
+-static void interrupted_completion_wait(void *data)
+-{
+-}
+-
+-struct lock_wait_data {
+-	struct ldlm_lock *lwd_lock;
+-	__u32	     lwd_conn_cnt;
+-};
+-
+ struct ldlm_async_args {
+ 	struct lustre_handle lock_handle;
+ };
+@@ -112,10 +103,8 @@ static int ldlm_request_bufsize(int count, int type)
+ 	return sizeof(struct ldlm_request) + avail;
+ }
+ 
+-static int ldlm_expired_completion_wait(void *data)
++static void ldlm_expired_completion_wait(struct ldlm_lock *lock, struct obd_import *imp2)
  {
- 	struct list_head *tmp, *n;
- 	struct ptlrpc_request *req;
--	struct l_wait_info lwi;
- 	unsigned int timeout;
- 	int rc;
+-	struct lock_wait_data *lwd = data;
+-	struct ldlm_lock *lock = lwd->lwd_lock;
+ 	struct obd_import *imp;
+ 	struct obd_device *obd;
  
-@@ -306,19 +305,15 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 		 * callbacks. Cap it at obd_timeout -- these should all
- 		 * have been locally cancelled by ptlrpc_abort_inflight.
- 		 */
--		lwi = LWI_TIMEOUT_INTERVAL(
--			cfs_timeout_cap(timeout * HZ),
--			(timeout > 1) ? HZ :
--			HZ / 2,
--			NULL, NULL);
--		rc = l_wait_event(imp->imp_recovery_waitq,
--				  (atomic_read(&imp->imp_inflight) == 0),
--				  &lwi);
--		if (rc) {
-+		rc = wait_event_idle_timeout(imp->imp_recovery_waitq,
-+					     atomic_read(&imp->imp_inflight) == 0,
-+					     obd_timeout * HZ);
-+
-+		if (rc == 0) {
- 			const char *cli_tgt = obd2cli_tgt(imp->imp_obd);
- 
--			CERROR("%s: rc = %d waiting for callback (%d != 0)\n",
--			       cli_tgt, rc,
-+			CERROR("%s: timeout waiting for callback (%d != 0)\n",
-+			       cli_tgt,
- 			       atomic_read(&imp->imp_inflight));
- 
- 			spin_lock(&imp->imp_lock);
-@@ -365,7 +360,7 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 			}
- 			spin_unlock(&imp->imp_lock);
+@@ -135,19 +124,17 @@ static int ldlm_expired_completion_wait(void *data)
+ 			if (last_dump == 0)
+ 				libcfs_debug_dumplog();
  		}
--	} while (rc != 0);
-+	} while (rc == 0);
+-		return 0;
++		return;
+ 	}
  
- 	/*
- 	 * Let's additionally check that no new rpcs added to import in
+ 	obd = lock->l_conn_export->exp_obd;
+ 	imp = obd->u.cli.cl_import;
+-	ptlrpc_fail_import(imp, lwd->lwd_conn_cnt);
++	ptlrpc_fail_import(imp, imp2 ? imp2->imp_conn_cnt : 0);
+ 	LDLM_ERROR(lock,
+ 		   "lock timed out (enqueued at %lld, %llds ago), entering recovery for %s@%s",
+ 		   (s64)lock->l_last_activity,
+ 		   (s64)(ktime_get_real_seconds() - lock->l_last_activity),
+ 		   obd2cli_tgt(obd), imp->imp_connection->c_remote_uuid.uuid);
+-
+-	return 0;
+ }
+ 
+ /**
+@@ -251,10 +238,8 @@ EXPORT_SYMBOL(ldlm_completion_ast_async);
+ int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+ {
+ 	/* XXX ALLOCATE - 160 bytes */
+-	struct lock_wait_data lwd;
+ 	struct obd_device *obd;
+ 	struct obd_import *imp = NULL;
+-	struct l_wait_info lwi;
+ 	__u32 timeout;
+ 	int rc = 0;
+ 
+@@ -281,32 +266,28 @@ int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+ 
+ 	timeout = ldlm_cp_timeout(lock);
+ 
+-	lwd.lwd_lock = lock;
+ 	lock->l_last_activity = ktime_get_real_seconds();
+ 
+-	if (ldlm_is_no_timeout(lock)) {
+-		LDLM_DEBUG(lock, "waiting indefinitely because of NO_TIMEOUT");
+-		lwi = LWI_INTR(interrupted_completion_wait, &lwd);
+-	} else {
+-		lwi = LWI_TIMEOUT_INTR(timeout * HZ,
+-				       ldlm_expired_completion_wait,
+-				       interrupted_completion_wait, &lwd);
+-	}
+-
+-	if (imp) {
+-		spin_lock(&imp->imp_lock);
+-		lwd.lwd_conn_cnt = imp->imp_conn_cnt;
+-		spin_unlock(&imp->imp_lock);
+-	}
+-
+ 	if (OBD_FAIL_CHECK_RESET(OBD_FAIL_LDLM_INTR_CP_AST,
+ 				 OBD_FAIL_LDLM_CP_BL_RACE | OBD_FAIL_ONCE)) {
+ 		ldlm_set_fail_loc(lock);
+ 		rc = -EINTR;
+ 	} else {
+-		/* Go to sleep until the lock is granted or cancelled. */
+-		rc = l_wait_event(lock->l_waitq,
+-				  is_granted_or_cancelled(lock), &lwi);
++		/* Go to sleep until the lock is granted or canceled. */
++		if (!ldlm_is_no_timeout(lock)) {
++			/* Wait uninterruptible for a while first */
++			rc = wait_event_idle_timeout(lock->l_waitq,
++						     is_granted_or_cancelled(lock),
++						     timeout * HZ);
++			if (rc == 0)
++				ldlm_expired_completion_wait(lock, imp);
++		}
++		/* Now wait abortable */
++		if (rc == 0)
++			rc = l_wait_event_abortable(lock->l_waitq,
++						    is_granted_or_cancelled(lock));
++		else
++			rc = 0;
+ 	}
+ 
+ 	if (rc) {
