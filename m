@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 09 Jan 2018 12:19:38 +1100
-Subject: [lustre-devel] [PATCH 07/14] staging: lustre: more LIBCFS_ALLOC
- conversions to GFP_KERNEL allocations.
+Subject: [lustre-devel] [PATCH 06/14] staging: lustre: Convert more
+ LIBCFS_ALLOC allocation to direct GFP_KERNEL
 In-Reply-To: <151546052331.9776.7408338350463291753.stgit@noble>
 References: <151546052331.9776.7408338350463291753.stgit@noble>
-Message-ID: <151546077841.9776.3578098217779896126.stgit@noble>
+Message-ID: <151546077837.9776.15653995287936476858.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,206 +12,271 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-None of these need GFP_NOFS so allocate directly.
-Change matching LIBCFS_FREE() to kfree() or kvfree().
+None of these need to be GFP_NOFS, so use GFP_KERNEL explicitly
+with kmalloc(), kvmalloc(), or kvmalloc_array().
+Change matching LIBCFS_FREE() to kfree() or kvfree()
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   |   19 +++++++------------
- drivers/staging/lustre/lnet/lnet/lib-eq.c          |    9 ++++-----
- drivers/staging/lustre/lnet/lnet/lib-socket.c      |   14 +++++++-------
- drivers/staging/lustre/lnet/selftest/conctl.c      |   11 +++++------
- 4 files changed, 23 insertions(+), 30 deletions(-)
+ .../lustre/lnet/libcfs/linux/linux-module.c        |    4 +-
+ drivers/staging/lustre/lnet/libcfs/module.c        |    9 ++---
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |   17 ++++------
+ drivers/staging/lustre/lnet/lnet/config.c          |   34 ++++++++------------
+ 4 files changed, 26 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-index 51196fda2a32..c07165e0ad95 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-@@ -93,11 +93,7 @@ cfs_cpt_table_free(struct cfs_cpt_table *cptab)
- {
- 	int i;
- 
--	if (cptab->ctb_cpu2cpt) {
--		LIBCFS_FREE(cptab->ctb_cpu2cpt,
--			    num_possible_cpus() *
--			    sizeof(cptab->ctb_cpu2cpt[0]));
--	}
-+	kvfree(cptab->ctb_cpu2cpt);
- 
- 	for (i = 0; cptab->ctb_parts && i < cptab->ctb_nparts; i++) {
- 		struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
-@@ -106,10 +102,7 @@ cfs_cpt_table_free(struct cfs_cpt_table *cptab)
- 		free_cpumask_var(part->cpt_cpumask);
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+index b5746230ab31..ddf625669bff 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+@@ -146,7 +146,7 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
+ 		return -EINVAL;
  	}
  
--	if (cptab->ctb_parts) {
--		LIBCFS_FREE(cptab->ctb_parts,
--			    cptab->ctb_nparts * sizeof(cptab->ctb_parts[0]));
--	}
-+	kvfree(cptab->ctb_parts);
- 
- 	kfree(cptab->ctb_nodemask);
- 	free_cpumask_var(cptab->ctb_cpumask);
-@@ -136,15 +129,17 @@ cfs_cpt_table_alloc(unsigned int ncpt)
- 	    !cptab->ctb_nodemask)
- 		goto failed;
- 
--	LIBCFS_ALLOC(cptab->ctb_cpu2cpt,
--		     num_possible_cpus() * sizeof(cptab->ctb_cpu2cpt[0]));
-+	cptab->ctb_cpu2cpt = kvmalloc_array(num_possible_cpus(),
-+					    sizeof(cptab->ctb_cpu2cpt[0]),
-+					    GFP_KERNEL);
- 	if (!cptab->ctb_cpu2cpt)
- 		goto failed;
- 
- 	memset(cptab->ctb_cpu2cpt, -1,
- 	       num_possible_cpus() * sizeof(cptab->ctb_cpu2cpt[0]));
- 
--	LIBCFS_ALLOC(cptab->ctb_parts, ncpt * sizeof(cptab->ctb_parts[0]));
-+	cptab->ctb_parts = kvmalloc_array(ncpt, sizeof(cptab->ctb_parts[0]),
-+					  GFP_KERNEL);
- 	if (!cptab->ctb_parts)
- 		goto failed;
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-index 7a4d1f7a693e..a173b69e2f92 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-@@ -95,7 +95,8 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
+-	LIBCFS_ALLOC(*hdr_pp, hdr.ioc_len);
++	*hdr_pp = kvmalloc(hdr.ioc_len, GFP_KERNEL);
+ 	if (!*hdr_pp)
  		return -ENOMEM;
  
- 	if (count) {
--		LIBCFS_ALLOC(eq->eq_events, count * sizeof(struct lnet_event));
-+		eq->eq_events = kvmalloc_array(count, sizeof(struct lnet_event),
-+					       GFP_KERNEL | __GFP_ZERO);
- 		if (!eq->eq_events)
- 			goto failed;
- 		/*
-@@ -132,8 +133,7 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
+@@ -164,7 +164,7 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
  	return 0;
  
- failed:
--	if (eq->eq_events)
--		LIBCFS_FREE(eq->eq_events, count * sizeof(struct lnet_event));
-+	kvfree(eq->eq_events);
+ free:
+-	LIBCFS_FREE(*hdr_pp, hdr.ioc_len);
++	kvfree(*hdr_pp);
+ 	return err;
+ }
  
- 	if (eq->eq_refs)
- 		cfs_percpt_free(eq->eq_refs);
-@@ -202,8 +202,7 @@ LNetEQFree(struct lnet_handle_eq eqh)
- 	lnet_eq_wait_unlock();
- 	lnet_res_unlock(LNET_LOCK_EX);
+diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
+index eb1a1dea723d..555f47651730 100644
+--- a/drivers/staging/lustre/lnet/libcfs/module.c
++++ b/drivers/staging/lustre/lnet/libcfs/module.c
+@@ -156,7 +156,7 @@ int libcfs_ioctl(unsigned long cmd, void __user *uparam)
+ 		break; }
+ 	}
+ out:
+-	LIBCFS_FREE(hdr, hdr->ioc_len);
++	kvfree(hdr);
+ 	return err;
+ }
  
--	if (events)
--		LIBCFS_FREE(events, size * sizeof(struct lnet_event));
-+	kvfree(events);
- 	if (refs)
- 		cfs_percpt_free(refs);
+@@ -302,7 +302,7 @@ static int __proc_cpt_table(void *data, int write,
+ 	LASSERT(cfs_cpt_table);
  
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-index 7d49d4865298..fcd9d1b7c619 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
-@@ -170,7 +170,7 @@ lnet_ipif_enumerate(char ***namesp)
- 			      nalloc);
- 		}
+ 	while (1) {
+-		LIBCFS_ALLOC(buf, len);
++		buf = kzalloc(len, GFP_KERNEL);
+ 		if (!buf)
+ 			return -ENOMEM;
  
--		LIBCFS_ALLOC(ifr, nalloc * sizeof(*ifr));
-+		ifr = kzalloc(nalloc * sizeof(*ifr), GFP_KERNEL);
- 		if (!ifr) {
- 			CERROR("ENOMEM enumerating up to %d interfaces\n",
- 			       nalloc);
-@@ -195,14 +195,14 @@ lnet_ipif_enumerate(char ***namesp)
- 		if (nfound < nalloc || toobig)
+@@ -311,7 +311,7 @@ static int __proc_cpt_table(void *data, int write,
  			break;
  
--		LIBCFS_FREE(ifr, nalloc * sizeof(*ifr));
-+		kfree(ifr);
- 		nalloc *= 2;
- 	}
- 
- 	if (!nfound)
- 		goto out1;
- 
--	LIBCFS_ALLOC(names, nfound * sizeof(*names));
-+	names = kzalloc(nfound * sizeof(*names), GFP_KERNEL);
- 	if (!names) {
- 		rc = -ENOMEM;
- 		goto out1;
-@@ -218,7 +218,7 @@ lnet_ipif_enumerate(char ***namesp)
- 			goto out2;
+ 		if (rc == -EFBIG) {
+-			LIBCFS_FREE(buf, len);
++			kfree(buf);
+ 			len <<= 1;
+ 			continue;
  		}
+@@ -325,8 +325,7 @@ static int __proc_cpt_table(void *data, int write,
  
--		LIBCFS_ALLOC(names[i], IFNAMSIZ);
-+		names[i] = kmalloc(IFNAMSIZ, GFP_KERNEL);
- 		if (!names[i]) {
- 			rc = -ENOMEM;
- 			goto out2;
-@@ -235,7 +235,7 @@ lnet_ipif_enumerate(char ***namesp)
- 	if (rc < 0)
- 		lnet_ipif_free_enumeration(names, nfound);
- out1:
--	LIBCFS_FREE(ifr, nalloc * sizeof(*ifr));
-+	kfree(ifr);
- out0:
+ 	rc = cfs_trace_copyout_string(buffer, nob, buf + pos, NULL);
+  out:
+-	if (buf)
+-		LIBCFS_FREE(buf, len);
++	kfree(buf);
  	return rc;
  }
-@@ -249,9 +249,9 @@ lnet_ipif_free_enumeration(char **names, int n)
- 	LASSERT(n > 0);
  
- 	for (i = 0; i < n && names[i]; i++)
--		LIBCFS_FREE(names[i], IFNAMSIZ);
-+		kfree(names[i]);
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index e8f623190133..6a1fb0397604 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -108,7 +108,8 @@ lnet_create_remote_nets_table(void)
  
--	LIBCFS_FREE(names, n * sizeof(*names));
-+	kfree(names);
+ 	LASSERT(!the_lnet.ln_remote_nets_hash);
+ 	LASSERT(the_lnet.ln_remote_nets_hbits > 0);
+-	LIBCFS_ALLOC(hash, LNET_REMOTE_NETS_HASH_SIZE * sizeof(*hash));
++	hash = kvmalloc_array(LNET_REMOTE_NETS_HASH_SIZE, sizeof(*hash),
++			      GFP_KERNEL);
+ 	if (!hash) {
+ 		CERROR("Failed to create remote nets hash table\n");
+ 		return -ENOMEM;
+@@ -131,9 +132,7 @@ lnet_destroy_remote_nets_table(void)
+ 	for (i = 0; i < LNET_REMOTE_NETS_HASH_SIZE; i++)
+ 		LASSERT(list_empty(&the_lnet.ln_remote_nets_hash[i]));
+ 
+-	LIBCFS_FREE(the_lnet.ln_remote_nets_hash,
+-		    LNET_REMOTE_NETS_HASH_SIZE *
+-		    sizeof(the_lnet.ln_remote_nets_hash[0]));
++	kvfree(the_lnet.ln_remote_nets_hash);
+ 	the_lnet.ln_remote_nets_hash = NULL;
  }
- EXPORT_SYMBOL(lnet_ipif_free_enumeration);
  
-diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-index 442a18ddd41f..34ba440b3c02 100644
---- a/drivers/staging/lustre/lnet/selftest/conctl.c
-+++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-@@ -648,7 +648,7 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
- 		return -EINVAL;
+@@ -831,7 +830,7 @@ lnet_ping_info_create(int num_ni)
+ 	unsigned int infosz;
  
- 	if (args->lstio_tes_param) {
--		LIBCFS_ALLOC(param, args->lstio_tes_param_len);
-+		param = kmalloc(args->lstio_tes_param_len, GFP_KERNEL);
- 		if (!param)
- 			goto out;
- 		if (copy_from_user(param, args->lstio_tes_param,
-@@ -678,8 +678,7 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
- 		rc = (copy_to_user(args->lstio_tes_retp, &ret,
- 				   sizeof(ret))) ? -EFAULT : 0;
- out:
--	if (param)
--		LIBCFS_FREE(param, args->lstio_tes_param_len);
-+	kfree(param);
- 
- 	return rc;
+ 	infosz = offsetof(struct lnet_ping_info, pi_ni[num_ni]);
+-	LIBCFS_ALLOC(ping_info, infosz);
++	ping_info = kvzalloc(infosz, GFP_KERNEL);
+ 	if (!ping_info) {
+ 		CERROR("Can't allocate ping info[%d]\n", num_ni);
+ 		return NULL;
+@@ -864,9 +863,7 @@ lnet_get_ni_count(void)
+ static inline void
+ lnet_ping_info_free(struct lnet_ping_info *pinfo)
+ {
+-	LIBCFS_FREE(pinfo,
+-		    offsetof(struct lnet_ping_info,
+-			     pi_ni[pinfo->pi_nnis]));
++	kvfree(pinfo);
  }
-@@ -702,13 +701,13 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
- 	if (data->ioc_plen1 > PAGE_SIZE)
- 		return -EINVAL;
  
--	LIBCFS_ALLOC(buf, data->ioc_plen1);
-+	buf = kmalloc(data->ioc_plen1, GFP_KERNEL);
- 	if (!buf)
+ static void
+@@ -2160,7 +2157,7 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
+ 	if (id.pid == LNET_PID_ANY)
+ 		id.pid = LNET_PID_LUSTRE;
+ 
+-	LIBCFS_ALLOC(info, infosz);
++	info = kzalloc(infosz, GFP_KERNEL);
+ 	if (!info)
  		return -ENOMEM;
  
- 	/* copy in parameter */
- 	if (copy_from_user(buf, data->ioc_pbuf1, data->ioc_plen1)) {
--		LIBCFS_FREE(buf, data->ioc_plen1);
-+		kfree(buf);
- 		return -EFAULT;
- 	}
+@@ -2310,6 +2307,6 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
+ 	LASSERT(!rc2);
  
-@@ -798,7 +797,7 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
- out:
- 	mutex_unlock(&console_session.ses_mutex);
- 
--	LIBCFS_FREE(buf, data->ioc_plen1);
-+	kfree(buf);
- 
+  out_0:
+-	LIBCFS_FREE(info, infosz);
++	kfree(info);
  	return rc;
  }
+diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
+index 4b24842e9b16..1516ac61108d 100644
+--- a/drivers/staging/lustre/lnet/lnet/config.c
++++ b/drivers/staging/lustre/lnet/lnet/config.c
+@@ -108,10 +108,8 @@ lnet_ni_free(struct lnet_ni *ni)
+ 
+ 	kfree(ni->ni_lnd_tunables);
+ 
+-	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++) {
+-		LIBCFS_FREE(ni->ni_interfaces[i],
+-			    strlen(ni->ni_interfaces[i]) + 1);
+-	}
++	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++)
++		kfree(ni->ni_interfaces[i]);
+ 
+ 	/* release reference to net namespace */
+ 	if (ni->ni_net_ns)
+@@ -197,7 +195,6 @@ int
+ lnet_parse_networks(struct list_head *nilist, char *networks)
+ {
+ 	struct cfs_expr_list *el = NULL;
+-	int tokensize;
+ 	char *tokens;
+ 	char *str;
+ 	char *tmp;
+@@ -218,15 +215,12 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 		return -EINVAL;
+ 	}
+ 
+-	tokensize = strlen(networks) + 1;
+-
+-	LIBCFS_ALLOC(tokens, tokensize);
++	tokens = kstrdup(networks, GFP_KERNEL);
+ 	if (!tokens) {
+ 		CERROR("Can't allocate net tokens\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	memcpy(tokens, networks, tokensize);
+ 	tmp = tokens;
+ 	str = tokens;
+ 
+@@ -348,14 +342,11 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 			 * The newly allocated ni_interfaces[] can be
+ 			 * freed when freeing the NI
+ 			 */
+-			LIBCFS_ALLOC(ni->ni_interfaces[niface],
+-				     strlen(iface) + 1);
++			ni->ni_interfaces[niface] = kstrdup(iface, GFP_KERNEL);
+ 			if (!ni->ni_interfaces[niface]) {
+ 				CERROR("Can't allocate net interface name\n");
+ 				goto failed;
+ 			}
+-			strncpy(ni->ni_interfaces[niface], iface,
+-				strlen(iface));
+ 			niface++;
+ 			iface = comma;
+ 		} while (iface);
+@@ -383,7 +374,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 	list_for_each(temp_node, nilist)
+ 		nnets++;
+ 
+-	LIBCFS_FREE(tokens, tokensize);
++	kfree(tokens);
+ 	return nnets;
+ 
+  failed_syntax:
+@@ -399,7 +390,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
+ 	if (el)
+ 		cfs_expr_list_free(el);
+ 
+-	LIBCFS_FREE(tokens, tokensize);
++	kfree(tokens);
+ 
+ 	return -EINVAL;
+ }
+@@ -423,7 +414,7 @@ lnet_new_text_buf(int str_len)
+ 		return NULL;
+ 	}
+ 
+-	LIBCFS_ALLOC(ltb, nob);
++	ltb = kzalloc(nob, GFP_KERNEL);
+ 	if (!ltb)
+ 		return NULL;
+ 
+@@ -437,7 +428,7 @@ static void
+ lnet_free_text_buf(struct lnet_text_buf *ltb)
+ {
+ 	lnet_tbnob -= ltb->ltb_size;
+-	LIBCFS_FREE(ltb, ltb->ltb_size);
++	kfree(ltb);
+ }
+ 
+ static void
+@@ -1155,7 +1146,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
+ 	if (nif <= 0)
+ 		return nif;
+ 
+-	LIBCFS_ALLOC(ipaddrs, nif * sizeof(*ipaddrs));
++	ipaddrs = kzalloc(nif * sizeof(*ipaddrs), GFP_KERNEL);
+ 	if (!ipaddrs) {
+ 		CERROR("Can't allocate ipaddrs[%d]\n", nif);
+ 		lnet_ipif_free_enumeration(ifnames, nif);
+@@ -1188,7 +1179,8 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
+ 		*ipaddrsp = ipaddrs;
+ 	} else {
+ 		if (nip > 0) {
+-			LIBCFS_ALLOC(ipaddrs2, nip * sizeof(*ipaddrs2));
++			ipaddrs2 = kzalloc(nip * sizeof(*ipaddrs2),
++					   GFP_KERNEL);
+ 			if (!ipaddrs2) {
+ 				CERROR("Can't allocate ipaddrs[%d]\n", nip);
+ 				nip = -ENOMEM;
+@@ -1199,7 +1191,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
+ 				rc = nip;
+ 			}
+ 		}
+-		LIBCFS_FREE(ipaddrs, nip * sizeof(*ipaddrs));
++		kfree(ipaddrs);
+ 	}
+ 	return nip;
+ }
+@@ -1225,7 +1217,7 @@ lnet_parse_ip2nets(char **networksp, char *ip2nets)
+ 	}
+ 
+ 	rc = lnet_match_networks(networksp, ip2nets, ipaddrs, nip);
+-	LIBCFS_FREE(ipaddrs, nip * sizeof(*ipaddrs));
++	kfree(ipaddrs);
+ 
+ 	if (rc < 0) {
+ 		LCONSOLE_ERROR_MSG(0x119, "Error %d parsing ip2nets\n", rc);
