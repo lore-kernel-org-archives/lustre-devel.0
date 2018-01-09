@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 09 Jan 2018 12:19:38 +1100
-Subject: [lustre-devel] [PATCH 02/14] staging: lustre: lnet: switch to
- cpumask_var_t
+Subject: [lustre-devel] [PATCH 04/14] staging: lustre: lnet: use
+ kmalloc/kvmalloc in router_proc
 In-Reply-To: <151546052331.9776.7408338350463291753.stgit@noble>
 References: <151546052331.9776.7408338350463291753.stgit@noble>
-Message-ID: <151546077819.9776.10909300709167847835.stgit@noble>
+Message-ID: <151546077828.9776.11145434430358194964.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,379 +12,173 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-So that we can use the common cpumask allocation functions,
-switch to cpumask_var_t.
-We need to be careful not to free a cpumask_var_t until the
-variable has been initialized, and it cannot be initialized
-directly.
-So we must be sure either that it is filled with zeros, or
-that zalloc_cpumask_var() has been called on it.
+The buffers allocated in router_proc are to temporarily
+hold strings created for procfs files.
+So they do not need to be zeroed and are safe to use
+GFP_KERNEL.
+So use kmalloc() directly except in two cases where it
+isn't trivial to confirm that the size is always small.
+In those cases, use kvmalloc().
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_cpu.h       |    4 -
- .../lustre/include/linux/libcfs/linux/linux-cpu.h  |    4 -
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    6 +
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    |    2 
- .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   |   92 +++++++++-----------
- 5 files changed, 49 insertions(+), 59 deletions(-)
+ drivers/staging/lustre/lnet/lnet/router_proc.c |   34 ++++++++++++------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 6d132f941281..61bce77fddd6 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -79,7 +79,7 @@
- /**
-  * return cpumask of CPU partition \a cpt
-  */
--cpumask_t *cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt);
-+cpumask_var_t *cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt);
- /**
-  * print string information of cpt-table
-  */
-@@ -96,7 +96,7 @@ struct cfs_cpt_table {
- 	u64			ctb_version;
- };
+diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
+index 43038f930ba1..1a71ffebc889 100644
+--- a/drivers/staging/lustre/lnet/lnet/router_proc.c
++++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
+@@ -95,7 +95,7 @@ static int __proc_lnet_stats(void *data, int write,
+ 	if (!ctrs)
+ 		return -ENOMEM;
  
--static inline cpumask_t *
-+static inline cpumask_var_t *
- cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt)
- {
- 	return NULL;
-diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-index 854c84358ab4..6035376f2830 100644
---- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-@@ -49,7 +49,7 @@
- /** virtual processing unit */
- struct cfs_cpu_partition {
- 	/* CPUs mask for this partition */
--	cpumask_t			*cpt_cpumask;
-+	cpumask_var_t			cpt_cpumask;
- 	/* nodes mask for this partition */
- 	nodemask_t			*cpt_nodemask;
- 	/* spread rotor for NUMA allocator */
-@@ -69,7 +69,7 @@ struct cfs_cpt_table {
- 	/* shadow HW CPU to CPU partition ID */
- 	int				*ctb_cpu2cpt;
- 	/* all cpus in this partition table */
--	cpumask_t			*ctb_cpumask;
-+	cpumask_var_t			ctb_cpumask;
- 	/* all nodes in this partition table */
- 	nodemask_t			*ctb_nodemask;
- };
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index 3aa81168c84f..9fbf8a044962 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -596,7 +596,7 @@ static void kiblnd_setup_mtu_locked(struct rdma_cm_id *cmid)
+-	LIBCFS_ALLOC(tmpstr, tmpsiz);
++	tmpstr = kmalloc(tmpsiz, GFP_KERNEL);
+ 	if (!tmpstr) {
+ 		kfree(ctrs);
+ 		return -ENOMEM;
+@@ -118,7 +118,7 @@ static int __proc_lnet_stats(void *data, int write,
+ 		rc = cfs_trace_copyout_string(buffer, nob,
+ 					      tmpstr + pos, "\n");
  
- static int kiblnd_get_completion_vector(struct kib_conn *conn, int cpt)
- {
--	cpumask_t *mask;
-+	cpumask_var_t *mask;
- 	int vectors;
- 	int off;
- 	int i;
-@@ -611,8 +611,8 @@ static int kiblnd_get_completion_vector(struct kib_conn *conn, int cpt)
+-	LIBCFS_FREE(tmpstr, tmpsiz);
++	kfree(tmpstr);
+ 	kfree(ctrs);
+ 	return rc;
+ }
+@@ -151,7 +151,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
+ 	if (!*lenp)
  		return 0;
  
- 	/* hash NID to CPU id in this partition... */
--	off = do_div(nid, cpumask_weight(mask));
--	for_each_cpu(i, mask) {
-+	off = do_div(nid, cpumask_weight(*mask));
-+	for_each_cpu(i, *mask) {
- 		if (!off--)
- 			return i % vectors;
- 	}
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index d05c3932b3b9..76291a350406 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -113,7 +113,7 @@ cfs_cpt_nodemask(struct cfs_cpt_table *cptab, int cpt)
- {
- 	return &cptab->ctb_nodemask;
- }
--EXPORT_SYMBOL(cfs_cpt_cpumask);
-+EXPORT_SYMBOL(cfs_cpt_nodemask);
+-	LIBCFS_ALLOC(tmpstr, tmpsiz);
++	tmpstr = kmalloc(tmpsiz, GFP_KERNEL);
+ 	if (!tmpstr)
+ 		return -ENOMEM;
  
- int
- cfs_cpt_set_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-index 9679bd73025d..51196fda2a32 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-@@ -72,7 +72,7 @@ struct cfs_cpt_data {
- 	/* mutex to protect cpt_cpumask */
- 	struct mutex		cpt_mutex;
- 	/* scratch buffer for set/unset_node */
--	cpumask_t		*cpt_cpumask;
-+	cpumask_var_t		cpt_cpumask;
- };
+@@ -183,7 +183,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
  
- static struct cfs_cpt_data	cpt_data;
-@@ -103,8 +103,7 @@ cfs_cpt_table_free(struct cfs_cpt_table *cptab)
- 		struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
+ 		if (ver != LNET_PROC_VERSION(the_lnet.ln_remote_nets_version)) {
+ 			lnet_net_unlock(0);
+-			LIBCFS_FREE(tmpstr, tmpsiz);
++			kfree(tmpstr);
+ 			return -ESTALE;
+ 		}
  
- 		kfree(part->cpt_nodemask);
--		if (part->cpt_cpumask)
--			LIBCFS_FREE(part->cpt_cpumask, cpumask_size());
-+		free_cpumask_var(part->cpt_cpumask);
+@@ -248,7 +248,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
+ 		}
  	}
  
- 	if (cptab->ctb_parts) {
-@@ -113,8 +112,7 @@ cfs_cpt_table_free(struct cfs_cpt_table *cptab)
+-	LIBCFS_FREE(tmpstr, tmpsiz);
++	kfree(tmpstr);
+ 
+ 	if (!rc)
+ 		*lenp = len;
+@@ -275,7 +275,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
+ 	if (!*lenp)
+ 		return 0;
+ 
+-	LIBCFS_ALLOC(tmpstr, tmpsiz);
++	tmpstr = kmalloc(tmpsiz, GFP_KERNEL);
+ 	if (!tmpstr)
+ 		return -ENOMEM;
+ 
+@@ -303,7 +303,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
+ 		if (ver != LNET_PROC_VERSION(the_lnet.ln_routers_version)) {
+ 			lnet_net_unlock(0);
+ 
+-			LIBCFS_FREE(tmpstr, tmpsiz);
++			kfree(tmpstr);
+ 			return -ESTALE;
+ 		}
+ 
+@@ -385,7 +385,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
+ 		}
  	}
  
- 	kfree(cptab->ctb_nodemask);
--	if (cptab->ctb_cpumask)
--		LIBCFS_FREE(cptab->ctb_cpumask, cpumask_size());
-+	free_cpumask_var(cptab->ctb_cpumask);
+-	LIBCFS_FREE(tmpstr, tmpsiz);
++	kfree(tmpstr);
  
- 	kfree(cptab);
- }
-@@ -132,11 +130,10 @@ cfs_cpt_table_alloc(unsigned int ncpt)
- 
- 	cptab->ctb_nparts = ncpt;
- 
--	LIBCFS_ALLOC(cptab->ctb_cpumask, cpumask_size());
- 	cptab->ctb_nodemask = kzalloc(sizeof(*cptab->ctb_nodemask),
- 				      GFP_NOFS);
--
--	if (!cptab->ctb_cpumask || !cptab->ctb_nodemask)
-+	if (!zalloc_cpumask_var(&cptab->ctb_cpumask, GFP_NOFS) ||
-+	    !cptab->ctb_nodemask)
- 		goto failed;
- 
- 	LIBCFS_ALLOC(cptab->ctb_cpu2cpt,
-@@ -154,10 +151,10 @@ cfs_cpt_table_alloc(unsigned int ncpt)
- 	for (i = 0; i < ncpt; i++) {
- 		struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
- 
--		LIBCFS_ALLOC(part->cpt_cpumask, cpumask_size());
- 		part->cpt_nodemask = kzalloc(sizeof(*part->cpt_nodemask),
- 					     GFP_NOFS);
--		if (!part->cpt_cpumask || !part->cpt_nodemask)
-+		if (!zalloc_cpumask_var(&part->cpt_cpumask, GFP_NOFS) ||
-+		    !part->cpt_nodemask)
- 			goto failed;
- 	}
- 
-@@ -248,13 +245,13 @@ cfs_cpt_online(struct cfs_cpt_table *cptab, int cpt)
- }
- EXPORT_SYMBOL(cfs_cpt_online);
- 
--cpumask_t *
-+cpumask_var_t *
- cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt)
- {
- 	LASSERT(cpt == CFS_CPT_ANY || (cpt >= 0 && cpt < cptab->ctb_nparts));
- 
- 	return cpt == CFS_CPT_ANY ?
--	       cptab->ctb_cpumask : cptab->ctb_parts[cpt].cpt_cpumask;
-+	       &cptab->ctb_cpumask : &cptab->ctb_parts[cpt].cpt_cpumask;
- }
- EXPORT_SYMBOL(cfs_cpt_cpumask);
- 
-@@ -402,7 +399,6 @@ EXPORT_SYMBOL(cfs_cpt_unset_cpumask);
- int
- cfs_cpt_set_node(struct cfs_cpt_table *cptab, int cpt, int node)
- {
--	cpumask_t *mask;
- 	int rc;
- 
- 	if (node < 0 || node >= MAX_NUMNODES) {
-@@ -413,10 +409,9 @@ cfs_cpt_set_node(struct cfs_cpt_table *cptab, int cpt, int node)
- 
- 	mutex_lock(&cpt_data.cpt_mutex);
- 
--	mask = cpt_data.cpt_cpumask;
--	cfs_node_to_cpumask(node, mask);
-+	cfs_node_to_cpumask(node, cpt_data.cpt_cpumask);
- 
--	rc = cfs_cpt_set_cpumask(cptab, cpt, mask);
-+	rc = cfs_cpt_set_cpumask(cptab, cpt, cpt_data.cpt_cpumask);
- 
- 	mutex_unlock(&cpt_data.cpt_mutex);
- 
-@@ -427,8 +422,6 @@ EXPORT_SYMBOL(cfs_cpt_set_node);
- void
- cfs_cpt_unset_node(struct cfs_cpt_table *cptab, int cpt, int node)
- {
--	cpumask_t *mask;
--
- 	if (node < 0 || node >= MAX_NUMNODES) {
- 		CDEBUG(D_INFO,
- 		       "Invalid NUMA id %d for CPU partition %d\n", node, cpt);
-@@ -437,10 +430,9 @@ cfs_cpt_unset_node(struct cfs_cpt_table *cptab, int cpt, int node)
- 
- 	mutex_lock(&cpt_data.cpt_mutex);
- 
--	mask = cpt_data.cpt_cpumask;
--	cfs_node_to_cpumask(node, mask);
-+	cfs_node_to_cpumask(node, cpt_data.cpt_cpumask);
- 
--	cfs_cpt_unset_cpumask(cptab, cpt, mask);
-+	cfs_cpt_unset_cpumask(cptab, cpt, cpt_data.cpt_cpumask);
- 
- 	mutex_unlock(&cpt_data.cpt_mutex);
- }
-@@ -556,7 +548,7 @@ EXPORT_SYMBOL(cfs_cpt_of_cpu);
- int
- cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
- {
--	cpumask_t *cpumask;
-+	cpumask_var_t *cpumask;
- 	nodemask_t *nodemask;
- 	int rc;
- 	int i;
-@@ -564,24 +556,24 @@ cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
- 	LASSERT(cpt == CFS_CPT_ANY || (cpt >= 0 && cpt < cptab->ctb_nparts));
- 
- 	if (cpt == CFS_CPT_ANY) {
--		cpumask = cptab->ctb_cpumask;
-+		cpumask = &cptab->ctb_cpumask;
- 		nodemask = cptab->ctb_nodemask;
- 	} else {
--		cpumask = cptab->ctb_parts[cpt].cpt_cpumask;
-+		cpumask = &cptab->ctb_parts[cpt].cpt_cpumask;
- 		nodemask = cptab->ctb_parts[cpt].cpt_nodemask;
- 	}
- 
--	if (cpumask_any_and(cpumask, cpu_online_mask) >= nr_cpu_ids) {
-+	if (cpumask_any_and(*cpumask, cpu_online_mask) >= nr_cpu_ids) {
- 		CERROR("No online CPU found in CPU partition %d, did someone do CPU hotplug on system? You might need to reload Lustre modules to keep system working well.\n",
- 		       cpt);
- 		return -EINVAL;
- 	}
- 
- 	for_each_online_cpu(i) {
--		if (cpumask_test_cpu(i, cpumask))
-+		if (cpumask_test_cpu(i, *cpumask))
- 			continue;
- 
--		rc = set_cpus_allowed_ptr(current, cpumask);
-+		rc = set_cpus_allowed_ptr(current, *cpumask);
- 		set_mems_allowed(*nodemask);
- 		if (!rc)
- 			schedule(); /* switch to allowed CPU */
-@@ -602,8 +594,8 @@ static int
- cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
- 		     cpumask_t *node, int number)
- {
--	cpumask_t *socket = NULL;
--	cpumask_t *core = NULL;
-+	cpumask_var_t socket;
-+	cpumask_var_t core;
- 	int rc = 0;
- 	int cpu;
- 
-@@ -621,13 +613,17 @@ cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+ 	if (!rc)
+ 		*lenp = len;
+@@ -418,7 +418,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
  		return 0;
  	}
  
--	/* allocate scratch buffer */
--	LIBCFS_ALLOC(socket, cpumask_size());
--	LIBCFS_ALLOC(core, cpumask_size());
--	if (!socket || !core) {
-+	/*
-+	 * Allocate scratch buffers
-+	 * As we cannot initialize a cpumask_var_t, we need
-+	 * to alloc both before we can risk trying to free either
-+	 */
-+	if (!zalloc_cpumask_var(&socket, GFP_NOFS))
-+		rc = -ENOMEM;
-+	if (!zalloc_cpumask_var(&core, GFP_NOFS))
- 		rc = -ENOMEM;
-+	if (rc)
- 		goto out;
--	}
+-	LIBCFS_ALLOC(tmpstr, tmpsiz);
++	tmpstr = kmalloc(tmpsiz, GFP_KERNEL);
+ 	if (!tmpstr)
+ 		return -ENOMEM;
  
- 	while (!cpumask_empty(node)) {
- 		cpu = cpumask_first(node);
-@@ -665,10 +661,8 @@ cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+@@ -448,7 +448,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+ 
+ 		if (ver != LNET_PROC_VERSION(ptable->pt_version)) {
+ 			lnet_net_unlock(cpt);
+-			LIBCFS_FREE(tmpstr, tmpsiz);
++			kfree(tmpstr);
+ 			return -ESTALE;
+ 		}
+ 
+@@ -556,7 +556,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+ 			*ppos = LNET_PROC_POS_MAKE(cpt, ver, hash, hoff);
  	}
  
- out:
--	if (socket)
--		LIBCFS_FREE(socket, cpumask_size());
--	if (core)
--		LIBCFS_FREE(core, cpumask_size());
-+	free_cpumask_var(socket);
-+	free_cpumask_var(core);
+-	LIBCFS_FREE(tmpstr, tmpsiz);
++	kfree(tmpstr);
+ 
+ 	if (!rc)
+ 		*lenp = len;
+@@ -579,7 +579,7 @@ static int __proc_lnet_buffers(void *data, int write,
+ 
+ 	/* (4 %d) * 4 * LNET_CPT_NUMBER */
+ 	tmpsiz = 64 * (LNET_NRBPOOLS + 1) * LNET_CPT_NUMBER;
+-	LIBCFS_ALLOC(tmpstr, tmpsiz);
++	tmpstr = kvmalloc(tmpsiz, GFP_KERNEL);
+ 	if (!tmpstr)
+ 		return -ENOMEM;
+ 
+@@ -618,7 +618,7 @@ static int __proc_lnet_buffers(void *data, int write,
+ 		rc = cfs_trace_copyout_string(buffer, nob,
+ 					      tmpstr + pos, NULL);
+ 
+-	LIBCFS_FREE(tmpstr, tmpsiz);
++	kvfree(tmpstr);
  	return rc;
  }
  
-@@ -721,7 +715,7 @@ static struct cfs_cpt_table *
- cfs_cpt_table_create(int ncpt)
- {
- 	struct cfs_cpt_table *cptab = NULL;
--	cpumask_t *mask = NULL;
-+	cpumask_var_t mask;
- 	int cpt = 0;
- 	int num;
+@@ -643,7 +643,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
+ 	if (!*lenp)
+ 		return 0;
+ 
+-	LIBCFS_ALLOC(tmpstr, tmpsiz);
++	tmpstr = kvmalloc(tmpsiz, GFP_KERNEL);
+ 	if (!tmpstr)
+ 		return -ENOMEM;
+ 
+@@ -744,7 +744,7 @@ static int proc_lnet_nis(struct ctl_table *table, int write,
+ 			*ppos += 1;
+ 	}
+ 
+-	LIBCFS_FREE(tmpstr, tmpsiz);
++	kvfree(tmpstr);
+ 
+ 	if (!rc)
+ 		*lenp = len;
+@@ -795,7 +795,7 @@ static int __proc_lnet_portal_rotor(void *data, int write,
  	int rc;
-@@ -754,8 +748,7 @@ cfs_cpt_table_create(int ncpt)
- 		goto failed;
+ 	int i;
+ 
+-	LIBCFS_ALLOC(buf, buf_len);
++	buf = kmalloc(buf_len, GFP_KERNEL);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+@@ -843,7 +843,7 @@ static int __proc_lnet_portal_rotor(void *data, int write,
  	}
- 
--	LIBCFS_ALLOC(mask, cpumask_size());
--	if (!mask) {
-+	if (!zalloc_cpumask_var(&mask, GFP_NOFS)){
- 		CERROR("Failed to allocate scratch cpumask\n");
- 		goto failed;
- 	}
-@@ -782,7 +775,7 @@ cfs_cpt_table_create(int ncpt)
- 
- 			rc = cfs_cpt_choose_ncpus(cptab, cpt, mask, n);
- 			if (rc < 0)
--				goto failed;
-+				goto failed_mask;
- 
- 			LASSERT(num >= cpumask_weight(part->cpt_cpumask));
- 			if (num == cpumask_weight(part->cpt_cpumask))
-@@ -795,20 +788,19 @@ cfs_cpt_table_create(int ncpt)
- 		CERROR("Expect %d(%d) CPU partitions but got %d(%d), CPU hotplug/unplug while setting?\n",
- 		       cptab->ctb_nparts, num, cpt,
- 		       cpumask_weight(cptab->ctb_parts[ncpt - 1].cpt_cpumask));
--		goto failed;
-+		goto failed_mask;
- 	}
- 
--	LIBCFS_FREE(mask, cpumask_size());
-+	free_cpumask_var(mask);
- 
- 	return cptab;
- 
-+ failed_mask:
-+	free_cpumask_var(mask);
-  failed:
- 	CERROR("Failed to setup CPU-partition-table with %d CPU-partitions, online HW nodes: %d, HW cpus: %d.\n",
- 	       ncpt, num_online_nodes(), num_online_cpus());
- 
--	if (mask)
--		LIBCFS_FREE(mask, cpumask_size());
--
- 	if (cptab)
- 		cfs_cpt_table_free(cptab);
- 
-@@ -1011,8 +1003,7 @@ cfs_cpu_fini(void)
- 		cpuhp_remove_state_nocalls(lustre_cpu_online);
- 	cpuhp_remove_state_nocalls(CPUHP_LUSTRE_CFS_DEAD);
- #endif
--	if (cpt_data.cpt_cpumask)
--		LIBCFS_FREE(cpt_data.cpt_cpumask, cpumask_size());
-+	free_cpumask_var(cpt_data.cpt_cpumask);
+ 	lnet_res_unlock(0);
+ out:
+-	LIBCFS_FREE(buf, buf_len);
++	kfree(buf);
+ 	return rc;
  }
  
- int
-@@ -1024,8 +1015,7 @@ cfs_cpu_init(void)
- 
- 	memset(&cpt_data, 0, sizeof(cpt_data));
- 
--	LIBCFS_ALLOC(cpt_data.cpt_cpumask, cpumask_size());
--	if (!cpt_data.cpt_cpumask) {
-+	if (!zalloc_cpumask_var(&cpt_data.cpt_cpumask, GFP_NOFS)) {
- 		CERROR("Failed to allocate scratch buffer\n");
- 		return -1;
- 	}
