@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 09 Jan 2018 12:19:38 +1100
-Subject: [lustre-devel] [PATCH 05/14] staging: lustre: change some
- LIBCFS_ALLOC calls to k?alloc(GFP_KERNEL)
+Subject: [lustre-devel] [PATCH 07/14] staging: lustre: more LIBCFS_ALLOC
+ conversions to GFP_KERNEL allocations.
 In-Reply-To: <151546052331.9776.7408338350463291753.stgit@noble>
 References: <151546052331.9776.7408338350463291753.stgit@noble>
-Message-ID: <151546077832.9776.10331372787316896708.stgit@noble>
+Message-ID: <151546077841.9776.3578098217779896126.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,266 +12,206 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-When an allocation happens from process context rather than
-filesystem context, it is best to use GFP_KERNEL rather than
-LIBCFS_ALLOC() which always uses GFP_NOFS.
-This include initialization during, or prior to, mount,
-and code run from separate worker threads.
-
-So for some of these cases, switch to kmalloc, kvmalloc, or
-kvmalloc_array() as appropriate.
-In some cases we preserve __GFP_ZERO (via kzalloc/kvzalloc), but in
-others it is clear that allocated memory is immediately initialized.
-
-In each case, the matching LIBCFS_FREE() is converted to
-kfree() or kvfree()
-
-This is just a subset of locations that need changing.
-As there are quite a lot, I've broken them up into several
-ad-hoc sets to avoid review-fatigue.
+None of these need GFP_NOFS so allocate directly.
+Change matching LIBCFS_FREE() to kfree() or kvfree().
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_string.h    |    4 ++--
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   11 ++++------
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   22 ++++++++------------
- drivers/staging/lustre/lnet/libcfs/hash.c          |   18 +++++++---------
- drivers/staging/lustre/lnet/libcfs/libcfs_mem.c    |    9 ++++----
- drivers/staging/lustre/lnet/libcfs/libcfs_string.c |    2 +-
- drivers/staging/lustre/lnet/lnet/config.c          |    2 +-
- 7 files changed, 29 insertions(+), 39 deletions(-)
+ .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   |   19 +++++++------------
+ drivers/staging/lustre/lnet/lnet/lib-eq.c          |    9 ++++-----
+ drivers/staging/lustre/lnet/lnet/lib-socket.c      |   14 +++++++-------
+ drivers/staging/lustre/lnet/selftest/conctl.c      |   11 +++++------
+ 4 files changed, 23 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_string.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_string.h
-index bb95eaf9f3d5..66463477074a 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_string.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_string.h
-@@ -85,11 +85,11 @@ static inline void
- cfs_expr_list_values_free(u32 *values, int num)
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+index 51196fda2a32..c07165e0ad95 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+@@ -93,11 +93,7 @@ cfs_cpt_table_free(struct cfs_cpt_table *cptab)
  {
- 	/*
--	 * This array is allocated by LIBCFS_ALLOC(), so it shouldn't be freed
-+	 * This array is allocated by kvalloc(), so it shouldn't be freed
- 	 * by OBD_FREE() if it's called by module other than libcfs & LNet,
- 	 * otherwise we will see fake memory leak
- 	 */
--	LIBCFS_FREE(values, num * sizeof(values[0]));
-+	kvfree(values);
- }
+ 	int i;
  
- void cfs_expr_list_free(struct cfs_expr_list *expr_list);
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index 9fbf8a044962..bb7b19473e3a 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -2576,11 +2576,7 @@ static void kiblnd_base_shutdown(void)
- 		break;
+-	if (cptab->ctb_cpu2cpt) {
+-		LIBCFS_FREE(cptab->ctb_cpu2cpt,
+-			    num_possible_cpus() *
+-			    sizeof(cptab->ctb_cpu2cpt[0]));
+-	}
++	kvfree(cptab->ctb_cpu2cpt);
+ 
+ 	for (i = 0; cptab->ctb_parts && i < cptab->ctb_nparts; i++) {
+ 		struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
+@@ -106,10 +102,7 @@ cfs_cpt_table_free(struct cfs_cpt_table *cptab)
+ 		free_cpumask_var(part->cpt_cpumask);
  	}
  
--	if (kiblnd_data.kib_peers) {
--		LIBCFS_FREE(kiblnd_data.kib_peers,
--			    sizeof(struct list_head) *
--			    kiblnd_data.kib_peer_hash_size);
+-	if (cptab->ctb_parts) {
+-		LIBCFS_FREE(cptab->ctb_parts,
+-			    cptab->ctb_nparts * sizeof(cptab->ctb_parts[0]));
 -	}
-+	kvfree(kiblnd_data.kib_peers);
++	kvfree(cptab->ctb_parts);
  
- 	if (kiblnd_data.kib_scheds)
- 		cfs_percpt_free(kiblnd_data.kib_scheds);
-@@ -2672,8 +2668,9 @@ static int kiblnd_base_startup(void)
- 	INIT_LIST_HEAD(&kiblnd_data.kib_failed_devs);
- 
- 	kiblnd_data.kib_peer_hash_size = IBLND_PEER_HASH_SIZE;
--	LIBCFS_ALLOC(kiblnd_data.kib_peers,
--		     sizeof(struct list_head) * kiblnd_data.kib_peer_hash_size);
-+	kiblnd_data.kib_peers = kvmalloc_array(kiblnd_data.kib_peer_hash_size,
-+					       sizeof(struct list_head),
-+					       GFP_KERNEL);
- 	if (!kiblnd_data.kib_peers)
+ 	kfree(cptab->ctb_nodemask);
+ 	free_cpumask_var(cptab->ctb_cpumask);
+@@ -136,15 +129,17 @@ cfs_cpt_table_alloc(unsigned int ncpt)
+ 	    !cptab->ctb_nodemask)
  		goto failed;
- 	for (i = 0; i < kiblnd_data.kib_peer_hash_size; i++)
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 51157ae14a9e..dc63ed2ceb97 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -1070,8 +1070,9 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_route *route,
- 	conn->ksnc_tx_carrier = NULL;
- 	atomic_set(&conn->ksnc_tx_nob, 0);
  
--	LIBCFS_ALLOC(hello, offsetof(struct ksock_hello_msg,
--				     kshm_ips[LNET_MAX_INTERFACES]));
-+	hello = kvzalloc(offsetof(struct ksock_hello_msg,
-+				  kshm_ips[LNET_MAX_INTERFACES]),
-+			 GFP_KERNEL);
- 	if (!hello) {
- 		rc = -ENOMEM;
- 		goto failed_1;
-@@ -1334,8 +1335,7 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_route *route,
- 		rc = ksocknal_send_hello(ni, conn, peerid.nid, hello);
- 	}
+-	LIBCFS_ALLOC(cptab->ctb_cpu2cpt,
+-		     num_possible_cpus() * sizeof(cptab->ctb_cpu2cpt[0]));
++	cptab->ctb_cpu2cpt = kvmalloc_array(num_possible_cpus(),
++					    sizeof(cptab->ctb_cpu2cpt[0]),
++					    GFP_KERNEL);
+ 	if (!cptab->ctb_cpu2cpt)
+ 		goto failed;
  
--	LIBCFS_FREE(hello, offsetof(struct ksock_hello_msg,
--				    kshm_ips[LNET_MAX_INTERFACES]));
-+	kvfree(hello);
+ 	memset(cptab->ctb_cpu2cpt, -1,
+ 	       num_possible_cpus() * sizeof(cptab->ctb_cpu2cpt[0]));
  
- 	/*
- 	 * setup the socket AFTER I've received hello (it disables
-@@ -1415,9 +1415,7 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_route *route,
- 	ksocknal_peer_decref(peer);
+-	LIBCFS_ALLOC(cptab->ctb_parts, ncpt * sizeof(cptab->ctb_parts[0]));
++	cptab->ctb_parts = kvmalloc_array(ncpt, sizeof(cptab->ctb_parts[0]),
++					  GFP_KERNEL);
+ 	if (!cptab->ctb_parts)
+ 		goto failed;
  
- failed_1:
--	if (hello)
--		LIBCFS_FREE(hello, offsetof(struct ksock_hello_msg,
--					    kshm_ips[LNET_MAX_INTERFACES]));
-+	kvfree(hello);
- 
- 	kfree(conn);
- 
-@@ -2269,9 +2267,7 @@ ksocknal_free_buffers(void)
- 		cfs_percpt_free(ksocknal_data.ksnd_sched_info);
- 	}
- 
--	LIBCFS_FREE(ksocknal_data.ksnd_peers,
--		    sizeof(struct list_head) *
--		    ksocknal_data.ksnd_peer_hash_size);
-+	kvfree(ksocknal_data.ksnd_peers);
- 
- 	spin_lock(&ksocknal_data.ksnd_tx_lock);
- 
-@@ -2401,9 +2397,9 @@ ksocknal_base_startup(void)
- 	memset(&ksocknal_data, 0, sizeof(ksocknal_data)); /* zero pointers */
- 
- 	ksocknal_data.ksnd_peer_hash_size = SOCKNAL_PEER_HASH_SIZE;
--	LIBCFS_ALLOC(ksocknal_data.ksnd_peers,
--		     sizeof(struct list_head) *
--		     ksocknal_data.ksnd_peer_hash_size);
-+	ksocknal_data.ksnd_peers = kvmalloc_array(ksocknal_data.ksnd_peer_hash_size,
-+						  sizeof(struct list_head),
-+						  GFP_KERNEL);
- 	if (!ksocknal_data.ksnd_peers)
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+index 7a4d1f7a693e..a173b69e2f92 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+@@ -95,7 +95,8 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
  		return -ENOMEM;
  
-diff --git a/drivers/staging/lustre/lnet/libcfs/hash.c b/drivers/staging/lustre/lnet/libcfs/hash.c
-index 4d16147602a6..f7b3c9306456 100644
---- a/drivers/staging/lustre/lnet/libcfs/hash.c
-+++ b/drivers/staging/lustre/lnet/libcfs/hash.c
-@@ -864,12 +864,10 @@ cfs_hash_buckets_free(struct cfs_hash_bucket **buckets,
- {
- 	int i;
+ 	if (count) {
+-		LIBCFS_ALLOC(eq->eq_events, count * sizeof(struct lnet_event));
++		eq->eq_events = kvmalloc_array(count, sizeof(struct lnet_event),
++					       GFP_KERNEL | __GFP_ZERO);
+ 		if (!eq->eq_events)
+ 			goto failed;
+ 		/*
+@@ -132,8 +133,7 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
+ 	return 0;
  
--	for (i = prev_size; i < size; i++) {
--		if (buckets[i])
--			LIBCFS_FREE(buckets[i], bkt_size);
--	}
-+	for (i = prev_size; i < size; i++)
-+		kfree(buckets[i]);
+ failed:
+-	if (eq->eq_events)
+-		LIBCFS_FREE(eq->eq_events, count * sizeof(struct lnet_event));
++	kvfree(eq->eq_events);
  
--	LIBCFS_FREE(buckets, sizeof(buckets[0]) * size);
-+	kvfree(buckets);
- }
+ 	if (eq->eq_refs)
+ 		cfs_percpt_free(eq->eq_refs);
+@@ -202,8 +202,7 @@ LNetEQFree(struct lnet_handle_eq eqh)
+ 	lnet_eq_wait_unlock();
+ 	lnet_res_unlock(LNET_LOCK_EX);
  
- /*
-@@ -889,7 +887,7 @@ cfs_hash_buckets_realloc(struct cfs_hash *hs, struct cfs_hash_bucket **old_bkts,
- 	if (old_bkts && old_size == new_size)
- 		return old_bkts;
+-	if (events)
+-		LIBCFS_FREE(events, size * sizeof(struct lnet_event));
++	kvfree(events);
+ 	if (refs)
+ 		cfs_percpt_free(refs);
  
--	LIBCFS_ALLOC(new_bkts, sizeof(new_bkts[0]) * new_size);
-+	new_bkts = kvmalloc_array(new_size, sizeof(new_bkts[0]), GFP_KERNEL);
- 	if (!new_bkts)
- 		return NULL;
- 
-@@ -902,7 +900,7 @@ cfs_hash_buckets_realloc(struct cfs_hash *hs, struct cfs_hash_bucket **old_bkts,
- 		struct hlist_head *hhead;
- 		struct cfs_hash_bd bd;
- 
--		LIBCFS_ALLOC(new_bkts[i], cfs_hash_bkt_size(hs));
-+		new_bkts[i] = kzalloc(cfs_hash_bkt_size(hs), GFP_KERNEL);
- 		if (!new_bkts[i]) {
- 			cfs_hash_buckets_free(new_bkts, cfs_hash_bkt_size(hs),
- 					      old_size, new_size);
-@@ -1014,7 +1012,7 @@ cfs_hash_create(char *name, unsigned int cur_bits, unsigned int max_bits,
- 
- 	len = !(flags & CFS_HASH_BIGNAME) ?
- 	      CFS_HASH_NAME_LEN : CFS_HASH_BIGNAME_LEN;
--	LIBCFS_ALLOC(hs, offsetof(struct cfs_hash, hs_name[len]));
-+	hs = kzalloc(offsetof(struct cfs_hash, hs_name[len]), GFP_KERNEL);
- 	if (!hs)
- 		return NULL;
- 
-@@ -1046,7 +1044,7 @@ cfs_hash_create(char *name, unsigned int cur_bits, unsigned int max_bits,
- 	if (hs->hs_buckets)
- 		return hs;
- 
--	LIBCFS_FREE(hs, offsetof(struct cfs_hash, hs_name[len]));
-+	kfree(hs);
- 	return NULL;
- }
- EXPORT_SYMBOL(cfs_hash_create);
-@@ -1109,7 +1107,7 @@ cfs_hash_destroy(struct cfs_hash *hs)
- 			      0, CFS_HASH_NBKT(hs));
- 	i = cfs_hash_with_bigname(hs) ?
- 	    CFS_HASH_BIGNAME_LEN : CFS_HASH_NAME_LEN;
--	LIBCFS_FREE(hs, offsetof(struct cfs_hash, hs_name[i]));
-+	kfree(hs);
- }
- 
- struct cfs_hash *cfs_hash_getref(struct cfs_hash *hs)
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c b/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-index df93d8f77ea2..23734cfb5d44 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-@@ -130,10 +130,9 @@ cfs_array_free(void *vars)
- 		if (!arr->va_ptrs[i])
- 			continue;
- 
--		LIBCFS_FREE(arr->va_ptrs[i], arr->va_size);
-+		kvfree(arr->va_ptrs[i]);
- 	}
--	LIBCFS_FREE(arr, offsetof(struct cfs_var_array,
--				  va_ptrs[arr->va_count]));
-+	kvfree(arr);
- }
- EXPORT_SYMBOL(cfs_array_free);
- 
-@@ -148,7 +147,7 @@ cfs_array_alloc(int count, unsigned int size)
- 	struct cfs_var_array *arr;
- 	int i;
- 
--	LIBCFS_ALLOC(arr, offsetof(struct cfs_var_array, va_ptrs[count]));
-+	arr = kvmalloc(offsetof(struct cfs_var_array, va_ptrs[count]), GFP_KERNEL);
- 	if (!arr)
- 		return NULL;
- 
-@@ -156,7 +155,7 @@ cfs_array_alloc(int count, unsigned int size)
- 	arr->va_size = size;
- 
- 	for (i = 0; i < count; i++) {
--		LIBCFS_ALLOC(arr->va_ptrs[i], size);
-+		arr->va_ptrs[i] = kvzalloc(size, GFP_KERNEL);
- 
- 		if (!arr->va_ptrs[i]) {
- 			cfs_array_free((void *)&arr->va_ptrs[0]);
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_string.c b/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-index b8d1ce831ff1..442889a3d729 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-@@ -437,7 +437,7 @@ cfs_expr_list_values(struct cfs_expr_list *expr_list, int max, u32 **valpp)
- 		return -EINVAL;
- 	}
- 
--	LIBCFS_ALLOC(val, sizeof(val[0]) * count);
-+	val = kvmalloc_array(count, sizeof(val[0]), GFP_KERNEL | __GFP_ZERO);
- 	if (!val)
- 		return -ENOMEM;
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index a1a3c35ea4dc..4b24842e9b16 100644
---- a/drivers/staging/lustre/lnet/lnet/config.c
-+++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -169,7 +169,7 @@ lnet_ni_alloc(__u32 net, struct cfs_expr_list *el, struct list_head *nilist)
- 
- 		LASSERT(rc <= LNET_CPT_NUMBER);
- 		if (rc == LNET_CPT_NUMBER) {
--			LIBCFS_FREE(ni->ni_cpts, rc * sizeof(ni->ni_cpts[0]));
-+			cfs_expr_list_values_free(ni->ni_cpts, LNET_CPT_NUMBER);
- 			ni->ni_cpts = NULL;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-socket.c b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+index 7d49d4865298..fcd9d1b7c619 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-socket.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-socket.c
+@@ -170,7 +170,7 @@ lnet_ipif_enumerate(char ***namesp)
+ 			      nalloc);
  		}
  
+-		LIBCFS_ALLOC(ifr, nalloc * sizeof(*ifr));
++		ifr = kzalloc(nalloc * sizeof(*ifr), GFP_KERNEL);
+ 		if (!ifr) {
+ 			CERROR("ENOMEM enumerating up to %d interfaces\n",
+ 			       nalloc);
+@@ -195,14 +195,14 @@ lnet_ipif_enumerate(char ***namesp)
+ 		if (nfound < nalloc || toobig)
+ 			break;
+ 
+-		LIBCFS_FREE(ifr, nalloc * sizeof(*ifr));
++		kfree(ifr);
+ 		nalloc *= 2;
+ 	}
+ 
+ 	if (!nfound)
+ 		goto out1;
+ 
+-	LIBCFS_ALLOC(names, nfound * sizeof(*names));
++	names = kzalloc(nfound * sizeof(*names), GFP_KERNEL);
+ 	if (!names) {
+ 		rc = -ENOMEM;
+ 		goto out1;
+@@ -218,7 +218,7 @@ lnet_ipif_enumerate(char ***namesp)
+ 			goto out2;
+ 		}
+ 
+-		LIBCFS_ALLOC(names[i], IFNAMSIZ);
++		names[i] = kmalloc(IFNAMSIZ, GFP_KERNEL);
+ 		if (!names[i]) {
+ 			rc = -ENOMEM;
+ 			goto out2;
+@@ -235,7 +235,7 @@ lnet_ipif_enumerate(char ***namesp)
+ 	if (rc < 0)
+ 		lnet_ipif_free_enumeration(names, nfound);
+ out1:
+-	LIBCFS_FREE(ifr, nalloc * sizeof(*ifr));
++	kfree(ifr);
+ out0:
+ 	return rc;
+ }
+@@ -249,9 +249,9 @@ lnet_ipif_free_enumeration(char **names, int n)
+ 	LASSERT(n > 0);
+ 
+ 	for (i = 0; i < n && names[i]; i++)
+-		LIBCFS_FREE(names[i], IFNAMSIZ);
++		kfree(names[i]);
+ 
+-	LIBCFS_FREE(names, n * sizeof(*names));
++	kfree(names);
+ }
+ EXPORT_SYMBOL(lnet_ipif_free_enumeration);
+ 
+diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
+index 442a18ddd41f..34ba440b3c02 100644
+--- a/drivers/staging/lustre/lnet/selftest/conctl.c
++++ b/drivers/staging/lustre/lnet/selftest/conctl.c
+@@ -648,7 +648,7 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
+ 		return -EINVAL;
+ 
+ 	if (args->lstio_tes_param) {
+-		LIBCFS_ALLOC(param, args->lstio_tes_param_len);
++		param = kmalloc(args->lstio_tes_param_len, GFP_KERNEL);
+ 		if (!param)
+ 			goto out;
+ 		if (copy_from_user(param, args->lstio_tes_param,
+@@ -678,8 +678,7 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
+ 		rc = (copy_to_user(args->lstio_tes_retp, &ret,
+ 				   sizeof(ret))) ? -EFAULT : 0;
+ out:
+-	if (param)
+-		LIBCFS_FREE(param, args->lstio_tes_param_len);
++	kfree(param);
+ 
+ 	return rc;
+ }
+@@ -702,13 +701,13 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
+ 	if (data->ioc_plen1 > PAGE_SIZE)
+ 		return -EINVAL;
+ 
+-	LIBCFS_ALLOC(buf, data->ioc_plen1);
++	buf = kmalloc(data->ioc_plen1, GFP_KERNEL);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+ 	/* copy in parameter */
+ 	if (copy_from_user(buf, data->ioc_pbuf1, data->ioc_plen1)) {
+-		LIBCFS_FREE(buf, data->ioc_plen1);
++		kfree(buf);
+ 		return -EFAULT;
+ 	}
+ 
+@@ -798,7 +797,7 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
+ out:
+ 	mutex_unlock(&console_session.ses_mutex);
+ 
+-	LIBCFS_FREE(buf, data->ioc_plen1);
++	kfree(buf);
+ 
+ 	return rc;
+ }
