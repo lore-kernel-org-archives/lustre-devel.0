@@ -1,89 +1,69 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 09 Jan 2018 12:19:38 +1100
-Subject: [lustre-devel] [PATCH 14/14] staging: lustre: remove LIBCFS_ALLOC,
- LIBCFS_FREE and related macros.
-In-Reply-To: <151546052331.9776.7408338350463291753.stgit@noble>
-References: <151546052331.9776.7408338350463291753.stgit@noble>
-Message-ID: <151546077867.9776.6765866963367159386.stgit@noble>
+Date: Tue, 09 Jan 2018 12:29:28 +1100
+Subject: [lustre-devel] [PATCH 3/4] staging: lustre: lnet: convert
+ selftest to use workqueues
+In-Reply-To: <20180108144558.GA6826@kroah.com>
+References: <151356013394.15912.9645528414310488005.stgit@noble>
+ <151356031919.15912.12406337913485020577.stgit@noble>
+ <20180108144558.GA6826@kroah.com>
+Message-ID: <87shbfbz0n.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>, Tejun Heo <tj@kernel.org>, Lai Jiangshan <jiangshanlai@gmail.com>
 
-LIBCFS_ALLOC
-LIBCFS_ALLOC_ATOMIC
-LIBCFS_ALLOC_POST
-LIBCFS_CPT_ALLOC
-LIBCFS_FREE
+On Mon, Jan 08 2018, Greg Kroah-Hartman wrote:
 
-are no longer used, and so are removed.
+> On Mon, Dec 18, 2017 at 12:25:19PM +1100, NeilBrown wrote:
+>> Instead of the cfs workitem library, use workqueues.
+>> 
+>> As lnet wants to provide a cpu mask of allowed cpus, it
+>> needs to be a WQ_UNBOUND work queue so that tasks can
+>> run on cpus other than where they were submitted.
+>
+> This patch doesn't apply to my tree :(
 
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- .../lustre/include/linux/libcfs/libcfs_private.h   |   51 --------------------
- 1 file changed, 51 deletions(-)
+Probably because some of the kmalloc changes didn't land, and that caused
+a context change.
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-index 50a600564fb2..491d5971d199 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_private.h
-@@ -75,57 +75,6 @@ do {								    \
- 	lbug_with_loc(&msgdata);					\
- } while (0)
- 
--#define LIBCFS_ALLOC_POST(ptr, size)					    \
--do {									    \
--	if (unlikely(!(ptr))) {						    \
--		CERROR("LNET: out of memory at %s:%d (tried to alloc '"	    \
--		       #ptr "' = %d)\n", __FILE__, __LINE__, (int)(size));  \
--	} else {							    \
--		memset((ptr), 0, (size));				    \
--	}								    \
--} while (0)
--
--/**
-- * default allocator
-- */
--#define LIBCFS_ALLOC(ptr, size)						    \
--do {									    \
--	LASSERT(!in_interrupt());					    \
--	(ptr) = kvmalloc((size), GFP_NOFS);				    \
--	LIBCFS_ALLOC_POST((ptr), (size));				    \
--} while (0)
--
--/**
-- * non-sleeping allocator
-- */
--#define LIBCFS_ALLOC_ATOMIC(ptr, size)					\
--do {									\
--	(ptr) = kmalloc((size), GFP_ATOMIC);				\
--	LIBCFS_ALLOC_POST(ptr, size);					\
--} while (0)
--
--/**
-- * allocate memory for specified CPU partition
-- *   \a cptab != NULL, \a cpt is CPU partition id of \a cptab
-- *   \a cptab == NULL, \a cpt is HW NUMA node id
-- */
--#define LIBCFS_CPT_ALLOC(ptr, cptab, cpt, size)				    \
--do {									    \
--	LASSERT(!in_interrupt());					    \
--	(ptr) = kvmalloc_node((size), GFP_NOFS, cfs_cpt_spread_node(cptab, cpt)); \
--	LIBCFS_ALLOC_POST((ptr), (size));				    \
--} while (0)
--
--#define LIBCFS_FREE(ptr, size)					  \
--do {								    \
--	if (unlikely(!(ptr))) {						\
--		CERROR("LIBCFS: free NULL '" #ptr "' (%d bytes) at "    \
--		       "%s:%d\n", (int)(size), __FILE__, __LINE__);	\
--		break;						  \
--	}							       \
--	kvfree(ptr);					  \
--} while (0)
--
- /*
-  * Use #define rather than inline, as lnet_cpt_table() might
-  * not be defined yet
+>
+>> apply_workqueue_atts needs to be exported for lustre to use it.
+>
+> That feels really odd, why is lustre so "special" that the normal
+> workqueue api doesn't work properly for it?
+
+You could ask: what is so special about apply_workqueue_atts() that it
+  isn't exported?  It seems as much a part of the workqueue api as
+  anything else.  It is even documented in
+     Documentation/core-api/workqueue.rst
+
+lustre is using it to identify a subset of CPUs for the workqueue to run
+on.
+lustre allows workers to be restricted to select cpus to avoid
+interfering with other tasks.  workqueue has an interface to support
+this, it just forgot to export it.
+
+I've added a note to the patch with some of this explanation,
+and will re-post once the kmalloc changes land.
+
+Thanks,
+NeilBrown
+
+
+
+>
+> I've dropped this, and the next patch, from my queue now.  Please fix up
+> and resend and justify why lustre is so odd :)
+>
+> thanks,
+>
+> greg k-h
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180109/8c281426/attachment.sig>
