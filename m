@@ -1,63 +1,42 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Mon, 15 Jan 2018 12:36:27 +0300
-Subject: [lustre-devel] [bug report] staging: lustre: DLC Feature dynamic
- net config
-Message-ID: <20180115093627.wwygrvhxbrthb5cx@mwanda>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Mon, 15 Jan 2018 15:48:19 +0100
+Subject: [lustre-devel] [PATCH 1/2] staging: lustre: lnet: convert
+ selftest to use workqueues
+In-Reply-To: <151564360053.21794.4058863911958997341.stgit@noble>
+References: <151564345630.21794.1667069238139184132.stgit@noble>
+ <151564360053.21794.4058863911958997341.stgit@noble>
+Message-ID: <20180115144819.GA21012@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: NeilBrown <neilb@suse.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Tejun Heo <tj@kernel.org>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-Hello Amir Shehata,
+On Thu, Jan 11, 2018 at 03:06:40PM +1100, NeilBrown wrote:
+> Instead of the cfs workitem library, use workqueues.
+> 
+> As lnet wants to provide a cpu mask of allowed cpus, it
+> needs to be a WQ_UNBOUND work queue so that tasks can
+> run on cpus other than where they were submitted.
+> 
+> This patch also exported apply_workqueue_attrs() which is
+> a documented part of the workqueue API, that isn't currently
+> exported.  lustre needs it to allow workqueue thread to be limited
+> to a subset of CPUs.
+> 
+> Acked-by: Tejun Heo <tj@kernel.org> (for export of apply_workqueue_attrs)
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
-The patch 6c9e5a55cb62: "staging: lustre: DLC Feature dynamic net
-config" from Feb 15, 2016, leads to the following static checker
-warning:
+I now see the following build warning with this patch applied:
 
-	drivers/staging/lustre/lnet/lnet/api-ni.c:1804 lnet_dyn_add_ni()
-	error: dereferencing freed memory 'ni'
+drivers/staging/lustre/lnet/selftest/module.c: In function ?lnet_selftest_init?:
+drivers/staging/lustre/lnet/selftest/module.c:98:10: warning: ?rc? may be used uninitialized in this function [-Wmaybe-uninitialized]
+   return rc;
+          ^~
 
-drivers/staging/lustre/lnet/lnet/api-ni.c
-  1212  static int
-  1213  lnet_startup_lndni(struct lnet_ni *ni, struct lnet_ioctl_config_data *conf)
-  1214  {
-  1215          struct lnet_ioctl_config_lnd_tunables *lnd_tunables = NULL;
-  1216          int rc = -EINVAL;
-  1217          int lnd_type;
-  1218          struct lnet_lnd *lnd;
-  1219          struct lnet_tx_queue *tq;
-  1220          int i;
-  1221  
-  1222          lnd_type = LNET_NETTYP(LNET_NIDNET(ni->ni_nid));
-  1223  
-  1224          LASSERT(libcfs_isknown_lnd(lnd_type));
-  1225  
-  1226          if (lnd_type == CIBLND || lnd_type == OPENIBLND ||
-  1227              lnd_type == IIBLND || lnd_type == VIBLND) {
-  1228                  CERROR("LND %s obsoleted\n", libcfs_lnd2str(lnd_type));
-  1229                  goto failed0;
-  1230          }
-  1231  
-  1232          /* Make sure this new NI is unique. */
-  1233          lnet_net_lock(LNET_LOCK_EX);
-  1234          rc = lnet_net_unique(LNET_NIDNET(ni->ni_nid), &the_lnet.ln_nis);
-  1235          lnet_net_unlock(LNET_LOCK_EX);
-  1236          if (!rc) {
-  1237                  if (lnd_type == LOLND) {
-  1238                          lnet_ni_free(ni);
-                                ^^^^^^^^^^^^^^^^
-The caller is not expecting this to be freed on the success path.
+Care to send a follow-on patch to fix it up?
 
-  1239                          return 0;
-  1240                  }
-  1241  
-  1242                  CERROR("Net %s is not unique\n",
-  1243                         libcfs_net2str(LNET_NIDNET(ni->ni_nid)));
-  1244                  rc = -EEXIST;
-  1245                  goto failed0;
-  1246          }
-  1247  
+thanks,
 
-regards,
-dan carpenter
+greg k-h
