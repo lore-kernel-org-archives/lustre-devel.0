@@ -1,63 +1,50 @@
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 16 Jan 2018 10:34:25 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: lnet: avoid uninitialized
- return value
-Message-ID: <20180116093511.3197459-1-arnd@arndb.de>
+From: Eremin, Dmitry <dmitry.eremin@intel.com>
+Date: Tue, 16 Jan 2018 15:01:49 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: Fix avoid intensive
+ reconnecting for ko2iblnd patch
+In-Reply-To: <1516114161-27679-1-git-send-email-Dmitry.Eremin@intel.com>
+References: <1516114161-27679-1-git-send-email-Dmitry.Eremin@intel.com>
+Message-ID: <9FC73D3DBECE0941BD2ED069D26863425CE75F26@irsmsx110.ger.corp.intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Arnd Bergmann <arnd@arndb.de>, NeilBrown <neilb@suse.com>, Tejun Heo <tj@kernel.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, "Dilger, Andreas" <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Dan Carpenter <dan.carpenter@oracle.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-gcc warns that the latest workqueue change leads to returning an
-uninitialized variable:
+In the original commit 4d99b2581effe115376402e710fbcb1c3c073769
+was missed one hunk. Added it now to avoid issue with use after free.
 
-drivers/staging/lustre/lnet/selftest/module.c: In function 'lnet_selftest_init':
-drivers/staging/lustre/lnet/selftest/module.c:98:10: error: 'rc' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-
-A failure from alloc_ordered_workqueue() tends to indicate an
-out-of-memory condition, so return -ENOMEM in both cases.
-The second error path was a preexisting bug, where we always
-returned zero after a kvmalloc_array() failure.
-
-Fixes: 6106c0f82481 ("staging: lustre: lnet: convert selftest to use workqueues")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Dmitry Eremin <Dmitry.Eremin@intel.com>
 ---
- drivers/staging/lustre/lnet/selftest/module.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
-index aa6bfd5baf2f..c8d999e64f28 100644
---- a/drivers/staging/lustre/lnet/selftest/module.c
-+++ b/drivers/staging/lustre/lnet/selftest/module.c
-@@ -95,15 +95,17 @@ lnet_selftest_init(void)
- 	lst_serial_wq = alloc_ordered_workqueue("lst_s", 0);
- 	if (!lst_serial_wq) {
- 		CERROR("Failed to create serial WI scheduler for LST\n");
--		return rc;
-+		return -ENOMEM;
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 2ebc484..a15a625 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -890,7 +890,8 @@ void kiblnd_destroy_conn(struct kib_conn *conn, bool free_conn)
+ 		atomic_dec(&net->ibn_nconns);
  	}
- 	lst_init_step = LST_INIT_WI_SERIAL;
  
- 	nscheds = cfs_cpt_number(lnet_cpt_table());
- 	lst_test_wq = kvmalloc_array(nscheds, sizeof(lst_test_wq[0]),
- 					GFP_KERNEL | __GFP_ZERO);
--	if (!lst_test_wq)
-+	if (!lst_test_wq) {
-+		rc = -ENOMEM;
- 		goto error;
-+	}
+-	kfree(conn);
++	if (free_conn)
++		kfree(conn);
+ }
  
- 	lst_init_step = LST_INIT_WI_TEST;
- 	for (i = 0; i < nscheds; i++) {
-@@ -116,6 +118,7 @@ lnet_selftest_init(void)
- 		if (!lst_test_wq[i]) {
- 			CWARN("Failed to create CPU partition affinity WI scheduler %d for LST\n",
- 			      i);
-+			rc = -ENOMEM;
- 			goto error;
- 		}
- 		attrs.nice = 0;
+ int kiblnd_close_peer_conns_locked(struct kib_peer *peer, int why)
 -- 
-2.9.0
+1.8.3.1
+
+
+--------------------------------------------------------------------
+Joint Stock Company Intel A/O
+Registered legal address: Krylatsky Hills Business Park,
+17 Krylatskaya Str., Bldg 4, Moscow 121614,
+Russian Federation
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
