@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 17 Jan 2018 15:26:15 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 01/19] sched/wait: add wait_event_idle()
- functions.
-In-Reply-To: <151538209329.23920.16297706354917686170.stgit@noble>
+Date: Wed, 17 Jan 2018 15:26:48 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 02/19] staging: lustre: discard
+ SVC_SIGNAL and related functions
+In-Reply-To: <151538209333.23920.9948001896186855872.stgit@noble>
 References: <151538168618.23920.8261096424342988792.stgit@noble>
- <151538209329.23920.16297706354917686170.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1801171525020.11282@casper.infradead.org>
+ <151538209333.23920.9948001896186855872.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1801171526360.11282@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,151 +14,63 @@ To: NeilBrown <neilb@suse.com>
 Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
 
-> The new TASK_IDLE state (TASK_UNINTERRUPTIBLE | __TASK_NOLOAD)
-> is not much used.  One way to make it easier to use is to
-> add wait_event*() family functions that make use of it.
-> This patch adds:
->   wait_event_idle()
->   wait_event_idle_timeout()
->   wait_event_idle_exclusive()
->   wait_event_idle_exclusive_timeout()
-> 
-> This set was chosen because lustre needs them before
-> it can discard its own l_wait_event() macro.
+> This flag is never set, so remove checks and remove
+> the flag.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  include/linux/wait.h |  114 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 114 insertions(+)
+>  drivers/staging/lustre/lustre/include/lustre_net.h |    6 ------
+>  drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |    4 +---
+>  2 files changed, 1 insertion(+), 9 deletions(-)
 > 
-> diff --git a/include/linux/wait.h b/include/linux/wait.h
-> index 158715445ffb..ec7e7c65cee6 100644
-> --- a/include/linux/wait.h
-> +++ b/include/linux/wait.h
-> @@ -597,6 +597,120 @@ do {										\
->  	__ret;									\
->  })
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+> index 3ff5de4770e8..4c665eca2467 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_net.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+> @@ -1260,7 +1260,6 @@ enum {
+>  	SVC_STARTING    = 1 << 2,
+>  	SVC_RUNNING     = 1 << 3,
+>  	SVC_EVENT       = 1 << 4,
+> -	SVC_SIGNAL      = 1 << 5,
+>  };
 >  
-> +/**
-> + * wait_event_idle - wait for a condition without contributing to system load
-> + * @wq_head: the waitqueue to wait on
-> + * @condition: a C expression for the event to wait for
-> + *
-> + * The process is put to sleep (TASK_IDLE) until the
-> + * @condition evaluates to true.
-> + * The @condition is checked each time the waitqueue @wq_head is woken up.
-> + *
-> + * wake_up() has to be called after changing any variable that could
-> + * change the result of the wait condition.
-> + *
-> + */
-> +#define wait_event_idle(wq_head, condition)					\
-> +do {										\
-> +	might_sleep();								\
-> +	if (!(condition))							\
-> +		___wait_event(wq_head, condition, TASK_IDLE, 0, 0, schedule());	\
-> +} while (0)
-> +
-> +/**
-> + * wait_event_idle_exclusive - wait for a condition with contributing to system load
-> + * @wq_head: the waitqueue to wait on
-> + * @condition: a C expression for the event to wait for
-> + *
-> + * The process is put to sleep (TASK_IDLE) until the
-> + * @condition evaluates to true.
-> + * The @condition is checked each time the waitqueue @wq_head is woken up.
-> + *
-> + * The process is put on the wait queue with an WQ_FLAG_EXCLUSIVE flag
-> + * set thus if other processes wait on the same list, when this
-> + * process is woken further processes are not considered.
-> + *
-> + * wake_up() has to be called after changing any variable that could
-> + * change the result of the wait condition.
-> + *
-> + */
-> +#define wait_event_idle_exclusive(wq_head, condition)				\
-> +do {										\
-> +	might_sleep();								\
-> +	if (!(condition))							\
-> +		___wait_event(wq_head, condition, TASK_IDLE, 1, 0, schedule());	\
-> +} while (0)
-> +
-> +#define __wait_event_idle_timeout(wq_head, condition, timeout)			\
-> +	___wait_event(wq_head, ___wait_cond_timeout(condition),			\
-> +		      TASK_IDLE, 0, timeout,					\
-> +		      __ret = schedule_timeout(__ret))
-> +
-> +/**
-> + * wait_event_idle_timeout - sleep without load until a condition becomes true or a timeout elapses
-> + * @wq_head: the waitqueue to wait on
-> + * @condition: a C expression for the event to wait for
-> + * @timeout: timeout, in jiffies
-> + *
-> + * The process is put to sleep (TASK_IDLE) until the
-> + * @condition evaluates to true. The @condition is checked each time
-> + * the waitqueue @wq_head is woken up.
-> + *
-> + * wake_up() has to be called after changing any variable that could
-> + * change the result of the wait condition.
-> + *
-> + * Returns:
-> + * 0 if the @condition evaluated to %false after the @timeout elapsed,
-> + * 1 if the @condition evaluated to %true after the @timeout elapsed,
-> + * or the remaining jiffies (at least 1) if the @condition evaluated
-> + * to %true before the @timeout elapsed.
-> + */
-> +#define wait_event_idle_timeout(wq_head, condition, timeout)			\
-> +({										\
-> +	long __ret = timeout;							\
-> +	might_sleep();								\
-> +	if (!___wait_cond_timeout(condition))					\
-> +		__ret = __wait_event_idle_timeout(wq_head, condition, timeout);	\
-> +	__ret;									\
-> +})
-> +
-> +#define __wait_event_idle_exclusive_timeout(wq_head, condition, timeout)	\
-> +	___wait_event(wq_head, ___wait_cond_timeout(condition),			\
-> +		      TASK_IDLE, 1, timeout,					\
-> +		      __ret = schedule_timeout(__ret))
-> +
-> +/**
-> + * wait_event_idle_exclusive_timeout - sleep without load until a condition becomes true or a timeout elapses
-> + * @wq_head: the waitqueue to wait on
-> + * @condition: a C expression for the event to wait for
-> + * @timeout: timeout, in jiffies
-> + *
-> + * The process is put to sleep (TASK_IDLE) until the
-> + * @condition evaluates to true. The @condition is checked each time
-> + * the waitqueue @wq_head is woken up.
-> + *
-> + * The process is put on the wait queue with an WQ_FLAG_EXCLUSIVE flag
-> + * set thus if other processes wait on the same list, when this
-> + * process is woken further processes are not considered.
-> + *
-> + * wake_up() has to be called after changing any variable that could
-> + * change the result of the wait condition.
-> + *
-> + * Returns:
-> + * 0 if the @condition evaluated to %false after the @timeout elapsed,
-> + * 1 if the @condition evaluated to %true after the @timeout elapsed,
-> + * or the remaining jiffies (at least 1) if the @condition evaluated
-> + * to %true before the @timeout elapsed.
-> + */
-> +#define wait_event_idle_exclusive_timeout(wq_head, condition, timeout)		\
-> +({										\
-> +	long __ret = timeout;							\
-> +	might_sleep();								\
-> +	if (!___wait_cond_timeout(condition))					\
-> +		__ret = __wait_event_idle_exclusive_timeout(wq_head, condition, timeout);\
-> +	__ret;									\
-> +})
-> +
->  extern int do_wait_intr(wait_queue_head_t *, wait_queue_entry_t *);
->  extern int do_wait_intr_irq(wait_queue_head_t *, wait_queue_entry_t *);
+>  #define PTLRPC_THR_NAME_LEN		32
+> @@ -1333,11 +1332,6 @@ static inline int thread_is_event(struct ptlrpc_thread *thread)
+>  	return !!(thread->t_flags & SVC_EVENT);
+>  }
 >  
+> -static inline int thread_is_signal(struct ptlrpc_thread *thread)
+> -{
+> -	return !!(thread->t_flags & SVC_SIGNAL);
+> -}
+> -
+>  static inline void thread_clear_flags(struct ptlrpc_thread *thread, __u32 flags)
+>  {
+>  	thread->t_flags &= ~flags;
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+> index 8d1e0edfcede..d85c8638c009 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+> @@ -153,7 +153,6 @@ static int sec_gc_main(void *arg)
+>  	while (1) {
+>  		struct ptlrpc_sec *sec;
+>  
+> -		thread_clear_flags(thread, SVC_SIGNAL);
+>  		sec_process_ctx_list();
+>  again:
+>  		/* go through sec list do gc.
+> @@ -184,8 +183,7 @@ static int sec_gc_main(void *arg)
+>  		lwi = LWI_TIMEOUT(msecs_to_jiffies(SEC_GC_INTERVAL * MSEC_PER_SEC),
+>  				  NULL, NULL);
+>  		l_wait_event(thread->t_ctl_waitq,
+> -			     thread_is_stopping(thread) ||
+> -			     thread_is_signal(thread),
+> +			     thread_is_stopping(thread),
+>  			     &lwi);
+>  
+>  		if (thread_test_and_clear_flags(thread, SVC_STOPPING))
 > 
 > 
 > 
