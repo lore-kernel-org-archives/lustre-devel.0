@@ -1,82 +1,37 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 19 Jan 2018 03:36:43 +0000
-Subject: [lustre-devel] [PATCH 6/8] staging: lustre: Fix overlong lines
-In-Reply-To: <1515691022-22729-7-git-send-email-fabian_huegel@web.de>
-References: <1515691022-22729-1-git-send-email-fabian_huegel@web.de>
- <1515691022-22729-7-git-send-email-fabian_huegel@web.de>
-Message-ID: <00C20AD1-618E-4F27-8DA1-4D6C4339CFFA@intel.com>
+From: Joe Perches <joe@perches.com>
+Date: Fri, 19 Jan 2018 17:53:59 -0800
+Subject: [lustre-devel] [PATCH 1/2] staging: lustre: Fix comment style
+In-Reply-To: <1516290692-11642-2-git-send-email-fabian_huegel@web.de>
+References: <20180115150259.GA17991@kroah.com>
+ <1516290692-11642-1-git-send-email-fabian_huegel@web.de>
+ <1516290692-11642-2-git-send-email-fabian_huegel@web.de>
+Message-ID: <1516413239.14739.0.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Fabian Huegel <fabian_huegel@web.de>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, "Hammond, John" <john.hammond@intel.com>, Greg
- Kroah-Hartman <gregkh@linuxfoundation.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Ben Evans <bevans@cray.com>, NeilBrown <neilb@suse.com>, Lustre Development List <lustre-devel@lists.lustre.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "linux-kernel@i4.cs.fau.de" <linux-kernel@i4.cs.fau.de>, Christoph Volkert <linux@christoph-volkert.de>
+To: Fabian Huegel <fabian_huegel@web.de>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Lai Siyao <lai.siyao@intel.com>, "John L
+ . Hammond" <john.hammond@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Ben Evans <bevans@cray.com>, NeilBrown <neilb@suse.com>
+Cc: linux-kernel@i4.cs.fau.de, Christoph Volkert <linux@christoph-volkert.de>, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
 
-On Jan 11, 2018, at 10:17, Fabian Huegel <fabian_huegel@web.de> wrote:
-> 
-> Fixed four lines that went over the 80 character limit
-> to reduce checkpatch warnings.
-> 
-> Signed-off-by: Fabian Huegel <fabian_huegel@web.de>
-> Signed-off-by: Christoph Volkert <linux@christoph-volkert.de>
-> ---
-> drivers/staging/lustre/lustre/include/obd_class.h | 14 ++++++++++----
-> 1 file changed, 10 insertions(+), 4 deletions(-)
-> 
+On Thu, 2018-01-18 at 16:51 +0100, Fabian Huegel wrote:
+> Most multi-line comments started on the first line, but the preferred
+> linux kernel style is to start multi-line comments on the second line.
+> Some comments became less readable after the change, so we changed them
+> to single-line comments.
+[]
 > diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-> index d195866..06f825b 100644
-> --- a/drivers/staging/lustre/lustre/include/obd_class.h
-> +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-> @@ -850,7 +850,9 @@ static inline int obd_pool_del(struct obd_device *obd, char *poolname)
-> 	return rc;
-> }
 > 
-> -static inline int obd_pool_add(struct obd_device *obd, char *poolname, char *ostname)
-> +static inline int obd_pool_add(struct obd_device *obd,
-> +			       char *poolname,
-> +			       char *ostname)
+> @@ -182,7 +179,8 @@ struct config_llog_data {
+>  	struct obd_export	  *cld_mgcexp;
+>  	struct mutex		    cld_lock;
+>  	int			 cld_type;
+> -	unsigned int		cld_stopping:1, /* we were told to stop
+> +	unsigned int		cld_stopping:1, /*
+> +						 * we were told to stop
+>  						 * watching
+>  						 */
+>  				cld_lostlock:1; /* lock not requeued */
 
-This only needs a single field moved onto the next line, like:
-
-+static inline int obd_pool_add(struct obd_device *obd, char *poolname,
-+			       char *ostname)
-
-
-> @@ -861,7 +863,9 @@ static inline int obd_pool_add(struct obd_device *obd, char *poolname, char *ost
-> 	return rc;
-> }
-> 
-> -static inline int obd_pool_rem(struct obd_device *obd, char *poolname, char *ostname)
-> +static inline int obd_pool_rem(struct obd_device *obd,
-> +			       char *poolname,
-> +			       char *ostname)
-
-Same.
-
-> @@ -997,7 +1001,8 @@ static inline int obd_statfs(const struct lu_env *env, struct obd_export *exp,
-> 			spin_unlock(&obd->obd_osfs_lock);
-> 		}
-> 	} else {
-> -		CDEBUG(D_SUPER, "%s: use %p cache blocks %llu/%llu objects %llu/%llu\n",
-> +		CDEBUG(D_SUPER,
-> +		       "%s: use %p cache blocks %llu/%llu objects %llu/%llu\n",
-> 		       obd->obd_name, &obd->obd_osfs,
-> 		       obd->obd_osfs.os_bavail, obd->obd_osfs.os_blocks,
-> 		       obd->obd_osfs.os_ffree, obd->obd_osfs.os_files);
-> @@ -1579,7 +1584,8 @@ int class_procfs_init(void);
-> int class_procfs_clean(void);
-> 
-> /* prng.c */
-> -#define ll_generate_random_uuid(uuid_out) get_random_bytes(uuid_out, sizeof(class_uuid_t))
-> +#define ll_generate_random_uuid(uuid_out) \
-> +	get_random_bytes(uuid_out, sizeof(class_uuid_t))
-
-This looks like it would be better to replace ll_generate_random_uuid()
-callers with generate_random_uuid().
-
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel Corporation
+probably better for both of these to be bool
+instead of bitfield.
