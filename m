@@ -1,37 +1,31 @@
-From: Joe Perches <joe@perches.com>
-Date: Fri, 19 Jan 2018 17:53:59 -0800
-Subject: [lustre-devel] [PATCH 1/2] staging: lustre: Fix comment style
-In-Reply-To: <1516290692-11642-2-git-send-email-fabian_huegel@web.de>
-References: <20180115150259.GA17991@kroah.com>
- <1516290692-11642-1-git-send-email-fabian_huegel@web.de>
- <1516290692-11642-2-git-send-email-fabian_huegel@web.de>
-Message-ID: <1516413239.14739.0.camel@perches.com>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Mon, 22 Jan 2018 13:26:14 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: libcfs: Prevent harmless
+ read underflow
+Message-ID: <20180122102614.GC23912@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Fabian Huegel <fabian_huegel@web.de>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Lai Siyao <lai.siyao@intel.com>, "John L
- . Hammond" <john.hammond@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Ben Evans <bevans@cray.com>, NeilBrown <neilb@suse.com>
-Cc: linux-kernel@i4.cs.fau.de, Christoph Volkert <linux@christoph-volkert.de>, linux-kernel@vger.kernel.org, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
 
-On Thu, 2018-01-18 at 16:51 +0100, Fabian Huegel wrote:
-> Most multi-line comments started on the first line, but the preferred
-> linux kernel style is to start multi-line comments on the second line.
-> Some comments became less readable after the change, so we changed them
-> to single-line comments.
-[]
-> diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-> 
-> @@ -182,7 +179,8 @@ struct config_llog_data {
->  	struct obd_export	  *cld_mgcexp;
->  	struct mutex		    cld_lock;
->  	int			 cld_type;
-> -	unsigned int		cld_stopping:1, /* we were told to stop
-> +	unsigned int		cld_stopping:1, /*
-> +						 * we were told to stop
->  						 * watching
->  						 */
->  				cld_lostlock:1; /* lock not requeued */
+Because this is a post-op instead of a pre-op, then it means we check
+if knl_buffer[-1] is a space.  It doesn't really hurt anything, but
+it causes a static checker warning so let's fix it.
 
-probably better for both of these to be bool
-instead of bitfield.
+Fixes: d7e09d0397e8 ("staging: add Lustre file system client support")
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+index da2844f37edf..57913aae1d88 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+@@ -785,7 +785,7 @@ int cfs_trace_copyin_string(char *knl_buffer, int knl_buffer_nob,
+ 		return -EFAULT;
+ 
+ 	nob = strnlen(knl_buffer, usr_buffer_nob);
+-	while (nob-- >= 0)		      /* strip trailing whitespace */
++	while (--nob >= 0)		      /* strip trailing whitespace */
+ 		if (!isspace(knl_buffer[nob]))
+ 			break;
+ 
