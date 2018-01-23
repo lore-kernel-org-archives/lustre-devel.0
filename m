@@ -1,77 +1,92 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 23 Jan 2018 17:27:47 +1100
-Subject: [lustre-devel] [PATCH] staging: lustre: lnet/selftest: fix compile
- error on UP build
-In-Reply-To: <151564360053.21794.4058863911958997341.stgit@noble>
-References: <151564345630.21794.1667069238139184132.stgit@noble>
- <151564360053.21794.4058863911958997341.stgit@noble>
-Message-ID: <87tvvd84yk.fsf@notabene.neil.brown.name>
+Date: Tue, 23 Jan 2018 17:55:54 +1100
+Subject: [lustre-devel] [bug report] staging: lustre: replace simple
+ cases of LIBCFS_ALLOC with kzalloc.
+In-Reply-To: <20180115092657.om2gdrcwlajo2tvi@mwanda>
+References: <20180115092657.om2gdrcwlajo2tvi@mwanda>
+Message-ID: <87r2qh83np.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
+On Mon, Jan 15 2018, Dan Carpenter wrote:
 
-When compiled without CONFIG_SMP, we get a compile error
-as ->ctb_parts is not defined.
+> [  This code was already buggy, it's just that Neil's change made it
+>    show up in static analysis.  - dan ]
 
-There is already a function, cfs_cpt_cpumask(), which will get the
-cpumask we need, and which handles the UP case by returning a NULL pointer.
-So use that and handle NULL.
-Also avoid the #ifdef by allocating a cpumask_var and copying
-into it, rather than sharing the mask.
+Thanks!
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Fixes: 6106c0f82481 ("staging: lustre: lnet: convert selftest to use workqueues")
-Signed-off-by: NeilBrown <neilb at suse.com
----
- drivers/staging/lustre/lnet/selftest/module.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+This bug was introduced by
 
-diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
-index 31a74b48c995..7359aa56d9b3 100644
---- a/drivers/staging/lustre/lnet/selftest/module.c
-+++ b/drivers/staging/lustre/lnet/selftest/module.c
-@@ -110,7 +110,8 @@ lnet_selftest_init(void)
- 	lst_init_step = LST_INIT_WI_TEST;
- 	for (i = 0; i < nscheds; i++) {
- 		int nthrs = cfs_cpt_weight(lnet_cpt_table(), i);
--		struct workqueue_attrs attrs;
-+		struct workqueue_attrs attrs = {0};
-+		cpumask_var_t *mask = cfs_cpt_cpumask(lnet_cpt_table(), i);
- 
- 		/* reserve@least one CPU for LND */
- 		nthrs = max(nthrs - 1, 1);
-@@ -121,14 +122,12 @@ lnet_selftest_init(void)
- 			rc = -ENOMEM;
- 			goto error;
- 		}
--		attrs.nice = 0;
--		#ifdef CONFIG_CPUMASK_OFFSTACK
--		attrs.cpumask = lnet_cpt_table()->ctb_parts[i].cpt_cpumask;
--		#else
--		cpumask_copy(attrs.cpumask, lnet_cpt_table()->ctb_parts[i].cpt_cpumask);
--		#endif
--		attrs.no_numa = false;
--		apply_workqueue_attrs(lst_test_wq[i], &attrs);
-+
-+		if (mask && alloc_cpumask_var(&attrs.cpumask, GFP_KERNEL)) {
-+			cpumask_copy(attrs.cpumask, *mask);
-+			apply_workqueue_attrs(lst_test_wq[i], &attrs);
-+			free_cpumask_var(attrs.cpumask);
-+		}
- 	}
- 
- 	rc = srpc_startup();
--- 
-2.14.0.rc0.dirty
+ Commit: 4d99b2581eff ("staging: lustre: avoid intensive reconnecting for ko2iblnd")
 
+which added a "free_conn" arg to kiblnd_destroy_conn(), but never used
+the arg.  Presumably it is meant to say "Don't free something", but
+exactly what should be free and what shouldn't isn't immediately clear.
+
+Liang:  do you remember what you intended for that arg to do?
+
+Thanks,
+NeilBrown
+
+>
+> Hello NeilBrown,
+>
+> The patch 3c88bdbbf919: "staging: lustre: replace simple cases of
+> LIBCFS_ALLOC with kzalloc." from Jan 9, 2018, leads to the following
+> static checker warning:
+>
+> 	drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:3323 kiblnd_connd()
+> 	error: dereferencing freed memory 'conn'
+>
+> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+>   3303                  if (!list_empty(&kiblnd_data.kib_connd_zombies)) {
+>   3304                          struct kib_peer *peer = NULL;
+>   3305  
+>   3306                          conn = list_entry(kiblnd_data.kib_connd_zombies.next,
+>   3307                                            struct kib_conn, ibc_list);
+>   3308                          list_del(&conn->ibc_list);
+>   3309                          if (conn->ibc_reconnect) {
+>   3310                                  peer = conn->ibc_peer;
+>   3311                                  kiblnd_peer_addref(peer);
+>   3312                          }
+>   3313  
+>   3314                          spin_unlock_irqrestore(lock, flags);
+>   3315                          dropped_lock = 1;
+>   3316  
+>   3317                          kiblnd_destroy_conn(conn, !peer);
+>                                                     ^^^^
+> Freed
+>
+>   3318  
+>   3319                          spin_lock_irqsave(lock, flags);
+>   3320                          if (!peer)
+>   3321                                  continue;
+>   3322  
+>   3323                          conn->ibc_peer = peer;
+>                                 ^^^^^^^^^^^^^^
+> Use after free
+>
+>   3324                          if (peer->ibp_reconnected < KIB_RECONN_HIGH_RACE)
+>   3325                                  list_add_tail(&conn->ibc_list,
+>                                                        ^^^^^^^^^^^^^^
+>
+>   3326                                                &kiblnd_data.kib_reconn_list);
+>   3327                          else
+>   3328                                  list_add_tail(&conn->ibc_list,
+>                                                        ^^^^^^^^^^^^^^
+>
+>   3329                                                &kiblnd_data.kib_reconn_wait);
+>   3330                  }
+>
+> regards,
+> dan carpenter
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180123/3c1d51dc/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180123/af35aec9/attachment.sig>
