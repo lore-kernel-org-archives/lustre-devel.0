@@ -1,77 +1,46 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Sat, 27 Jan 2018 00:41:35 +0000
-Subject: [lustre-devel] [PATCH] staging: lustre: lnet/selftest: fix
- compile error on UP build
-In-Reply-To: <87tvvd84yk.fsf@notabene.neil.brown.name>
-References: <151564345630.21794.1667069238139184132.stgit@noble>
- <151564360053.21794.4058863911958997341.stgit@noble>
- <87tvvd84yk.fsf@notabene.neil.brown.name>
-Message-ID: <37717983-8436-431F-ABCC-365E3425E35C@intel.com>
+Date: Tue, 30 Jan 2018 01:49:17 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: return of an
+ error code should be negative
+In-Reply-To: <1517117095-12643-1-git-send-email-pundirsumit11@gmail.com>
+References: <1517117095-12643-1-git-send-email-pundirsumit11@gmail.com>
+Message-ID: <0FF5C462-31A2-4D8F-9288-EE941D37826B@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>, "Wu, Fengguang" <fengguang.wu@intel.com>
+To: Sumit Pundir <pundirsumit11@gmail.com>
+Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, "Drokin,
+ Oleg" <oleg.drokin@intel.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>
 
-On Jan 22, 2018, at 23:27, NeilBrown <neilb@suse.com> wrote:
+On Jan 27, 2018, at 22:24, Sumit Pundir <pundirsumit11@gmail.com> wrote:
 > 
-> When compiled without CONFIG_SMP, we get a compile error
-> as ->ctb_parts is not defined.
+> Return value of error codes should typically be negative.
+> Issue reported by checkpatch.pl
 > 
-> There is already a function, cfs_cpt_cpumask(), which will get the
-> cpumask we need, and which handles the UP case by returning a NULL pointer.
-> So use that and handle NULL.
-> Also avoid the #ifdef by allocating a cpumask_var and copying
-> into it, rather than sharing the mask.
-> 
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> Fixes: 6106c0f82481 ("staging: lustre: lnet: convert selftest to use workqueues")
-> Signed-off-by: NeilBrown <neilb@suse.com>
+> Signed-off-by: Sumit Pundir <pundirsumit11@gmail.com>
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
 > ---
-> drivers/staging/lustre/lnet/selftest/module.c | 17 ++++++++---------
-> 1 file changed, 8 insertions(+), 9 deletions(-)
+> drivers/staging/lustre/lnet/selftest/framework.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/selftest/module.c b/drivers/staging/lustre/lnet/selftest/module.c
-> index 31a74b48c995..7359aa56d9b3 100644
-> --- a/drivers/staging/lustre/lnet/selftest/module.c
-> +++ b/drivers/staging/lustre/lnet/selftest/module.c
-> @@ -110,7 +110,8 @@ lnet_selftest_init(void)
-> 	lst_init_step = LST_INIT_WI_TEST;
-> 	for (i = 0; i < nscheds; i++) {
-> 		int nthrs = cfs_cpt_weight(lnet_cpt_table(), i);
-> -		struct workqueue_attrs attrs;
-> +		struct workqueue_attrs attrs = {0};
-> +		cpumask_var_t *mask = cfs_cpt_cpumask(lnet_cpt_table(), i);
-> 
-> 		/* reserve at least one CPU for LND */
-> 		nthrs = max(nthrs - 1, 1);
-> @@ -121,14 +122,12 @@ lnet_selftest_init(void)
-> 			rc = -ENOMEM;
-> 			goto error;
-> 		}
-> -		attrs.nice = 0;
-> -		#ifdef CONFIG_CPUMASK_OFFSTACK
-> -		attrs.cpumask = lnet_cpt_table()->ctb_parts[i].cpt_cpumask;
-> -		#else
-> -		cpumask_copy(attrs.cpumask, lnet_cpt_table()->ctb_parts[i].cpt_cpumask);
-> -		#endif
-> -		attrs.no_numa = false;
-> -		apply_workqueue_attrs(lst_test_wq[i], &attrs);
-> +
-> +		if (mask && alloc_cpumask_var(&attrs.cpumask, GFP_KERNEL)) {
-> +			cpumask_copy(attrs.cpumask, *mask);
-> +			apply_workqueue_attrs(lst_test_wq[i], &attrs);
-> +			free_cpumask_var(attrs.cpumask);
-> +		}
+> diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+> index c7697f6..0ca1e3a 100644
+> --- a/drivers/staging/lustre/lnet/selftest/framework.c
+> +++ b/drivers/staging/lustre/lnet/selftest/framework.c
+> @@ -187,7 +187,7 @@ sfw_del_session_timer(void)
+> 		return 0;
 > 	}
 > 
-> 	rc = srpc_startup();
+> -	return EBUSY; /* racing with sfw_session_expired() */
+> +	return -EBUSY; /* racing with sfw_session_expired() */
+> }
+> 
+> static void
 > -- 
-> 2.14.0.rc0.dirty
+> 2.7.4
 > 
 
 Cheers, Andreas
