@@ -1,100 +1,36 @@
-From: Sven Dziadek <sven.dziadek@gmx.de>
-Date: Sun, 4 Feb 2018 12:24:05 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: llite: replace variable
- length array
-In-Reply-To: <D887F611-EA3C-45CD-BEBC-3BA994048B59@intel.com>
-References: <20180127214228.26986-1-sven.dziadek@gmx.de>
- <D887F611-EA3C-45CD-BEBC-3BA994048B59@intel.com>
-Message-ID: <58963c7f-139c-1156-0179-13decf0bcddf@gmx.de>
+From: NeilBrown <neilb@suse.com>
+Date: Thu, 08 Feb 2018 08:31:54 +1100
+Subject: [lustre-devel] testing lustre
+In-Reply-To: <alpine.LFD.2.21.1801081607120.1698@casper.infradead.org>
+References: <151538168618.23920.8261096424342988792.stgit@noble>
+ <20180108145943.GA5761@kroah.com>
+ <alpine.LFD.2.21.1801081607120.1698@casper.infradead.org>
+Message-ID: <87po5gmqph.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Dilger, Andreas" <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Eremin,
- Dmitry" <dmitry.eremin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lkml <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, lustre-devel <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On 01/30/2018 03:04 AM, Dilger, Andreas wrote:
-> On Jan 27, 2018, at 14:42, Sven Dziadek <sven.dziadek@gmx.de> wrote:
->>
->> The functionality of the removed variable length array is already
->> implemented by the function xattr_full_name in fs/xattr.c
->>
->> This fixes the sparse warning:
->> warning: Variable length array is used.
->>
->> Signed-off-by: Sven Dziadek <sven.dziadek@gmx.de>
->> ---
->> drivers/staging/lustre/lustre/llite/xattr.c | 12 ++++--------
->> 1 file changed, 4 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
->> index 532384c91447..4fd28213c6a1 100644
->> --- a/drivers/staging/lustre/lustre/llite/xattr.c
->> +++ b/drivers/staging/lustre/lustre/llite/xattr.c
->> @@ -87,7 +87,6 @@ ll_xattr_set_common(const struct xattr_handler *handler,
->> 		    const char *name, const void *value, size_t size,
->> 		    int flags)
->> {
->> -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
->> 	struct ll_sb_info *sbi = ll_i2sbi(inode);
->> 	struct ptlrpc_request *req = NULL;
->> 	const char *pv = value;
->> @@ -141,9 +140,8 @@ ll_xattr_set_common(const struct xattr_handler *handler,
->> 			return -EPERM;
->> 	}
->>
->> -	sprintf(fullname, "%s%s\n", handler->prefix, name);
->> -	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
->> -			 valid, fullname, pv, size, 0, flags,
->> +	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode), valid,
->> +			 xattr_full_name(handler, name), pv, size, 0, flags,
->> 			 ll_i2suppgid(inode), &req);
-> 
-> Hi Sven,
-> thanks for the patch.
-> 
-> Looking at the details of "xattr_full_name()", this seems quite risky.  This
-> is essentially returning the pointer _before_ "name" on the assumption that
-> it contains the full "prefix.name" string.  IMHO, that is not necessarily a
-> safe assumption to make several layers down in the code.
-Thanks for your reply. And yeah, it feels strange, right.
 
-But it really looks like this is how the name and the prefix is handled
-in the xattr code.
-It seems this helper function has been introduced with commit
-e409de992e3ea (which also removes some fullname pointer) and indeed,
-fs/xattr.c splits the prefix and the name in xattr_resolve_name.
+Hi,
+ I've set up a little virtual cluster to run the sanity tests.
+ One problem I have is that the test harness expects that after it
+ creates a filesystem, the label (reported by e2label) will
+ spontaneously change from e.g. "lustre:MDT-0000" to "lustre-MDT-0000"
+ and that doesn't happen for me.
+ If I go and change the label manually while the test is waiting,
+ then the test continues and appears to run correctly.
 
-So I still think the patch should be correct..?
+ Can anyone tell me what this name change in meant to indicate, when
+ where in the code it is expected to happen?
 
-> James, I thought you had a patch for this to use kasprintf() instead of the
-> on-stack "fullname" declaration?
-Sorry for replying that late, I though James would maybe know if the
-above assumption is correct..
-
->> 	if (rc) {
->> 		if (rc == -EOPNOTSUPP && handler->flags == XATTR_USER_T) {
->> @@ -364,7 +362,6 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
->> 			       struct dentry *dentry, struct inode *inode,
->> 			       const char *name, void *buffer, size_t size)
->> {
->> -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
->> 	struct ll_sb_info *sbi = ll_i2sbi(inode);
->> #ifdef CONFIG_FS_POSIX_ACL
->> 	struct ll_inode_info *lli = ll_i2info(inode);
->> @@ -411,9 +408,8 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
->> 	if (handler->flags == XATTR_ACL_DEFAULT_T && !S_ISDIR(inode->i_mode))
->> 		return -ENODATA;
->> #endif
->> -	sprintf(fullname, "%s%s\n", handler->prefix, name);
->> -	return ll_xattr_list(inode, fullname, handler->flags, buffer, size,
->> -			     OBD_MD_FLXATTR);
->> +	return ll_xattr_list(inode, xattr_full_name(handler, name),
->> +			     handler->flags, buffer, size, OBD_MD_FLXATTR);
->> }
->>
->> static ssize_t ll_getxattr_lov(struct inode *inode, void *buf, size_t buf_size)
->> -- 
->> 2.11.0
->>
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180208/672f963b/attachment.sig>
