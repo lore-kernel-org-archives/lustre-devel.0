@@ -1,116 +1,67 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 10 Feb 2018 22:14:19 +0000 (GMT)
-Subject: [lustre-devel] [PATCH 41/80] staging: lustre: lmv: separate
- master object with master stripe
-In-Reply-To: <87r2pvkkl5.fsf@notabene.neil.brown.name>
-References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
- <1471378773-24590-42-git-send-email-jsimmons@infradead.org>
- <87r2pvkkl5.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1802102108430.5700@casper.infradead.org>
+Date: Sat, 10 Feb 2018 23:07:20 +0000 (GMT)
+Subject: [lustre-devel] testing lustre
+In-Reply-To: <87po5gmqph.fsf@notabene.neil.brown.name>
+References: <151538168618.23920.8261096424342988792.stgit@noble>
+ <20180108145943.GA5761@kroah.com>
+ <alpine.LFD.2.21.1801081607120.1698@casper.infradead.org>
+ <87po5gmqph.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1802102306170.11086@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, wang di <di.wang@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
 
-> > +static inline bool
-> > +lsm_md_eq(const struct lmv_stripe_md *lsm1, const struct lmv_stripe_md *lsm2)
-> > +{
-> > +	int idx;
-> > +
-> > +	if (lsm1->lsm_md_magic != lsm2->lsm_md_magic ||
-> > +	    lsm1->lsm_md_stripe_count != lsm2->lsm_md_stripe_count ||
-> > +	    lsm1->lsm_md_master_mdt_index != lsm2->lsm_md_master_mdt_index ||
-> > +	    lsm1->lsm_md_hash_type != lsm2->lsm_md_hash_type ||
-> > +	    lsm1->lsm_md_layout_version != lsm2->lsm_md_layout_version ||
-> > +	    !strcmp(lsm1->lsm_md_pool_name, lsm2->lsm_md_pool_name))
-> > +		return false;
+> Hi,
+>  I've set up a little virtual cluster to run the sanity tests.
+>  One problem I have is that the test harness expects that after it
+>  creates a filesystem, the label (reported by e2label) will
+>  spontaneously change from e.g. "lustre:MDT-0000" to "lustre-MDT-0000"
+>  and that doesn't happen for me.
+>  If I go and change the label manually while the test is waiting,
+>  then the test continues and appears to run correctly.
 > 
-> Hi James and all,
->  This patch (8f18c8a48b736c2f in linux) is different from the
->  corresponding patch in lustre-release (60e07b972114df).
+>  Can anyone tell me what this name change in meant to indicate, when
+>  where in the code it is expected to happen?
 > 
-> In that patch, the last clause in the 'if' condition is
-> 
-> +           strcmp(lsm1->lsm_md_pool_name,
-> +                     lsm2->lsm_md_pool_name) != 0)
-> 
-> Whoever converted it to "!strcmp()" inverted the condition.  This is a
-> perfect example of why I absolutely *loathe* the "!strcmp()" construct!!
-> 
-> This causes many tests in the 'sanity' test suite to return
-> -ENOMEM (that had me puzzled for a while!!).
-> This seems to suggest that no-one has been testing the mainline linux
-> lustre.
-> It also seems to suggest that there is a good chance that there
-> are other bugs that have crept in while no-one has really been caring.
-> Given that the sanity test suite doesn't complete for me, but just
-> hangs (in test_27z I think), that seems particularly likely.
-> 
-> 
-> So my real question - to anyone interested in lustre for mainline linux
-> - is: can we actually trust this code at all?
-> I'm seriously tempted to suggest that we just
->   rm -r drivers/staging/lustre
-> 
-> drivers/staging is great for letting the community work on code that has
-> been "thrown over the wall" and is not openly developed elsewhere, but
-> that is not the case for lustre.  lustre has (or seems to have) an open
-> development process.  Having on-going development happen both there and
-> in drivers/staging seems a waste of resources.
-> 
-> Might it make sense to instead start cleaning up the code in
-> lustre-release so as to make it meet the upstream kernel standards.
-> Then when the time is right, the kernel code can be moved *out* of
-> lustre-release and *in* to linux.  Then development can continue in
-> Linux (just like it does with other Linux filesystems).
-> 
-> An added bonus of this is that there is an obvious path to getting
-> server support in mainline Linux.  The current situation of client-only
-> support seems weird given how interdependent the two are.
-> 
-> What do others think?  Is there any chance that the current lustre in
-> Linux will ever be more than a poor second-cousin to the external
-> lustre-release.  If there isn't, should we just discard it now and move
-> on?
+> Thanks,
+> NeilBrown
 
-If you think that the OpenSFS/Intel branch (lustre-release) is the land
-of milk and honey you are very wrong. Take for example the UAPI header
-cleanup I push to the linux client several months ago. That work took
-5 years to complete. I had to complete that work in the Intel branch
-since it impacted our tools. This isn't the only example. I worked along
-side Intel for increasing striping of a file to more then the 160 stripe
-limit Lustre use to have. That work took 3 years to complete. If the
-patch is more than one line it will normally take 1 to 2 months to land.
-It is common to have patches 6 months or more in age.
+Hi Neil
 
-This is one of the major reasons I'm involved in the upstream client
-work. If lustre remains a tiny under manned community it is doomed to
-remain a niche file system. For years I have tried to recruit new
-developers to help out and even gave talks at lustre conferences on
-internals. That effort was meet with little success. This is not the
-case with the linux lustre client. We do have people contributing
-including you. So the reality is that if we removed the lustre client
-it would be at least 3+ years before the code would be ready to merged
-back in. It would be another 3+ years before it left staging. Many
-cleanups in the linux client which impact many lines of code have not
-been ported to the Intel branch. It would take forever to get those in.
-Honestly I gave up some time ago for those types of cleanups. The cleanups
-done in the upstream client would have to be redone. What we really
-need is to expand the community. Recently a lot of work has gone into
-supporting Ubuntu for our utilities. I hope this helps to get Canonical
-involved with the upstream lustre client.
+        Since I do regular testing of the upstream client I'm familiar
+with the strange oddities you have to deal with to make it work. Now
+in Lustre 2.10 the LNet layer changed in ways that broke using newer
+LNet tools with older lustre versions. You could avoid using lnetctl
+for network bring up but lctl net up doesn't always work with the new
+LNet stack. So the way I deal with it is to build a lustre 2.9 client
+which is what the upstream client is close too. At the same time I
+use the lustre 2.10 test suite with a patch that allows me to run the
+test suite in patchless server mode. That patchless server patch would
+take some effort to port to lustre 2.9 and I don't plan on having the
+upstream client stay at lustre 2.9 forever. You can read details about
+this at
 
-The upstream client is not as bad as you think. A year ago no one in
-their right mind would touch the upstream client but their are actually
-sites using it today. Its not perfect but it is usable and it is improving
-all the time. Yes we have quite a few bugs to squash that show up in
-our test suite but the barrier to leaving staging is much much smaller
-than it used to be. Once the number of bugs reported in test suite
-becomes reasonable we can start auto testing patches posted here. The
-ultimate goal is that as more people join in the linux client effort
-and it becomes a full member of the broader linux open source community
-that we can leave the Intel lustre-release branch in the dust. I believe
-the future is much closer than you think.
+https://jira.hppd.intel.com/browse/lustre/LU-684
+
+Also configure --disable-tests --disable-iokit doesn't work for lustre
+2.9 so you have to build everything. All you need is 
+lustre-client-2.9.0-*.rpm
+in the image. Next grab my lustre 2.10 test suite with the LU-684 patch
+from
+
+http://www.infradead.org/~jsimmons/tests-2.10.tgz
+
+The configuration files are in tests/cfg/*. The default conf files
+that comes with lustre are ncli.sh and local.sh. The file ncli.sh
+sources local.sh. Now for the tar ball I posted I have clients.sh
+and server.sh. A diff of ncli to client and a diff of local to
+server.sh will give you a idea of what is needed to change for
+testing. If you need any help just reply to this email.
+
+Note you might have better luck with lustre 2.10 rpms instead of
+lustre 2.9 with LNet setup. That is not the case for me.
+
+If you need anything just ping me.
