@@ -1,101 +1,331 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 12 Feb 2018 10:50:04 +1100
-Subject: [lustre-devel] [PATCH 41/80] staging: lustre: lmv: separate
- master object with master stripe
-In-Reply-To: <alpine.LFD.2.21.1802102027560.5700@casper.infradead.org>
-References: <1471378773-24590-1-git-send-email-jsimmons@infradead.org>
- <1471378773-24590-42-git-send-email-jsimmons@infradead.org>
- <87r2pvkkl5.fsf@notabene.neil.brown.name>
- <09CE6CEC-52BC-4B29-B609-40DE68A64A33@intel.com>
- <87o9kylux7.fsf@notabene.neil.brown.name>
- <FC7E817D-BA15-4D0A-9976-F1343F9B022A@intel.com>
- <alpine.LFD.2.21.1802102027560.5700@casper.infradead.org>
-Message-ID: <87eflrrsr7.fsf@notabene.neil.brown.name>
+Date: Mon, 12 Feb 2018 10:54:51 +1100
+Subject: [lustre-devel] Lustre upstream client TODO list
+In-Reply-To: <alpine.LFD.2.21.1802112308150.3291@casper.infradead.org>
+References: <alpine.LFD.2.21.1802112308150.3291@casper.infradead.org>
+Message-ID: <87bmgvrsj8.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: devel@driverdev.osuosl.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, wang di <di.wang@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Sat, Feb 10 2018, James Simmons wrote:
+On Sun, Feb 11 2018, James Simmons wrote:
 
->> > On Feb 8, 2018, at 10:10 PM, NeilBrown <neilb@suse.com> wrote:
->> > 
->> > On Thu, Feb 08 2018, Oleg Drokin wrote:
->> > 
->> >>> On Feb 8, 2018, at 8:39 PM, NeilBrown <neilb@suse.com> wrote:
->> >>> 
->> >>> On Tue, Aug 16 2016, James Simmons wrote:
->> >> 
->> >> my that?s an old patch
->> >> 
->> >>> 
->> > ...
->> >>> 
->> >>> Whoever converted it to "!strcmp()" inverted the condition.  This is a
->> >>> perfect example of why I absolutely *loathe* the "!strcmp()" construct!!
->> >>> 
->> >>> This causes many tests in the 'sanity' test suite to return
->> >>> -ENOMEM (that had me puzzled for a while!!).
->> >> 
->> >> huh? I am not seeing anything of the sort and I was running sanity
->> >> all the time until a recent pause (but going to resume).
->> > 
->> > That does surprised me - I reproduce it every time.
->> > I have two VMs running a SLE12-SP2 kernel with patches from
->> > lustre-release applied.  These are servers. They have 2 3G virtual disks
->> > each.
->> > I have two over VMs running current mainline.  These are clients.
->> > 
->> > I guess your 'recent pause' included between v4.15-rc1 (8e55b6fd0660)
->> > and v4.15-rc6 (a93639090a27) - a full month when lustre wouldn't work at
->> > all :-(
->> 
->> More than that, but I am pretty sure James Simmons is running tests all the time too
->> (he has a different config, I only have tcp).
+> So I sent a patch upstream that laid out what most needs to be done for
+> the linux lustre client to leave staging. I placed the new text here for
+> ease of read so you don't have to go searching for it. Feed back is
+> welcomed. Hoepfully posting it will make it clear what needs to be done.
+
+
+Thanks so much for putting this together and pushing it out.  I really
+appreciated it and hope to show that appreciation with patches :-)
+
+NeilBrown
+
 >
-> Yes I have been testing and haven't encountered this problem. Let me try 
-> the fix you pointed out. 
-
-Yeah, I guess I over reacted a bit in suggesting that no-one can have
-been testing - sorry about that.  It seemed really strange though as the
-bug was so easy for me to hit.
-
-Maybe - as you suggest in another email - it is due to some
-client/server incompatibility.  I guess it is unavoidable with an fs
-like lustre to have incompatible protocol changes.  Is there any
-mechanism for detecting the version of other peers in the cluster and
-refusing to run if versions are incompatible?
-
-If you haven't hit the problem in testing, I suspect you aren't touching
-that code path at all.  Maybe put a BUG() call in there to see :-)
-
->  
->> > Do you have a list of requested cleanups?  I would find that to be
->> > useful.
->> 
->> As Greg would tell you, ?if you don?t know what needs to be done,
->> let?s just remove the whole thing from staging now?.
->> 
->> I assume you saw drivers/staging/lustre/TODO already, it?s only partially done.
->
-> Actually the complete list is at :
+> Currently all the work directed toward the lustre upstream client is tracked
+> at the following link:
 >
 > https://jira.hpdd.intel.com/browse/LU-9679
 >
-> I need to move that to our TODO list. Sorry I have been short on cycles.
-
-Just adding that link to TODO would be a great start.  I might do that
-when I next send some patches.
-
-Thanks,
-NeilBrown
-
+> Under this ticket you will see the following work items that need to be
+> addressed:
+>
+> ******************************************************************************
+> * libcfs cleanup
+> *
+> * https://jira.hpdd.intel.com/browse/LU-9859
+> *
+> * Track all the cleanups and simplification of the libcfs module. Remove
+> * functions the kernel provides. Possible intergrate some of the functionality
+> * into the kernel proper.
+> *
+> ******************************************************************************
+>
+> https://jira.hpdd.intel.com/browse/LU-100086
+>
+> LNET_MINOR conflicts with USERIO_MINOR
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8130
+>
+> Fix and simplify libcfs hash handling
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8703
+>
+> The current way we handle SMP is wrong. Platforms like ARM and KNL can have
+> core and NUMA setups with things like NUMA nodes with no cores. We need to
+> handle such cases. This work also greatly simplified the lustre SMP code.
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9019
+>
+> Replace libcfs time API with standard kernel APIs. Also migrate away from
+> jiffies. We found jiffies can vary on nodes which can lead to corner cases
+> that can break the file system due to nodes having inconsistent behavior.
+> So move to time64_t and ktime_t as much as possible.
+>
+> ******************************************************************************
+> * Proper IB support for ko2iblnd
+> ******************************************************************************
+> https://jira.hpdd.intel.com/browse/LU-9179
+>
+> Poor performance for the ko2iblnd driver. This is related to many of the
+> patches below that are missing from the linux client.
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9886
+>
+> Crash in upstream kiblnd_handle_early_rxs()
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-10394 / LU-10526 / LU-10089
+>
+> Default to default to using MEM_REG
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-10459
+>
+> throttle tx based on queue depth
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9943
+>
+> correct WR fast reg accounting
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-10291
+>
+> remove concurrent_sends tunable
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-10213
+>
+> calculate qp max_send_wrs properly
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9810
+>
+> use less CQ entries for each connection
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-10129 / LU-9180
+>
+> rework map_on_demand behavior
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-10129
+>
+> query device capabilities
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-10015
+>
+> fix race at kiblnd_connect_peer
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9983
+>
+> allow for discontiguous fragments
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9500
+>
+> Don't Page Align remote_addr with FastReg
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9448
+>
+> handle empty CPTs
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9507
+>
+> Don't Assert On Reconnect with MultiQP
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9472
+>
+> Fix FastReg map/unmap for MLX5
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9425
+>
+> Turn on 2 sges by default
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8943
+>
+> Enable Multiple OPA Endpoints between Nodes
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-5718
+>
+> multiple sges for work request
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9094
+>
+> kill timedout txs from ibp_tx_queue
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9094
+>
+> reconnect peer for REJ_INVALID_SERVICE_ID
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8752
+>
+> Stop MLX5 triggering a dump_cqe
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8874
+>
+> Move ko2iblnd to latest RDMA changes
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8875 / LU-8874
+>
+> Change to new RDMA done callback mechanism
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9164 / LU-8874
+>
+> Incorporate RDMA map/unamp API's into ko2iblnd
+>
+> ******************************************************************************
+> * sysfs/debugfs fixes
+> *
+> * https://jira.hpdd.intel.com/browse/LU-8066
+> *
+> * The original migration to sysfs was done in haste without properly working
+> * utilities to test the changes. This covers the work to restore the proper
+> * behavior. Huge project to make this right.
+> *
+> ******************************************************************************
+>
+> https://jira.hpdd.intel.com/browse/LU-9431
+>
+> The function class_process_proc_param was used for our mass updates of proc
+> tunables. It didn't work with sysfs and it was just ugly so it was removed.
+> In the process the ability to mass update thousands of clients was lost. This
+> work restores this in a sane way.
+>
+> ------------------------------------------------------------------------------
+> https://jira.hpdd.intel.com/browse/LU-9091
+>
+> One the major request of users is the ability to pass in parameters into a
+> sysfs file in various different units. For example we can set max_pages_per_rpc
+> but this can vary on platforms due to different platform sizes. So you can
+> set this like max_pages_per_rpc=16MiB. The original code to handle this written
+> before the string helpers were created so the code doesn't follow that format
+> but it would be easy to move to. Currently the string helpers does the reverse
+> of what we need, changing bytes to string. We need to change a string to bytes.
+>
+> ******************************************************************************
+> * Proper user land to kernel space interface for Lustre
+> *
+> * https://jira.hpdd.intel.com/browse/LU-9680
+> *
+> ******************************************************************************
+>
+> https://jira.hpdd.intel.com/browse/LU-8915
+>
+> Don't use linux list structure as user land arguments for lnet selftest.
+> This code is pretty poor quality and really needs to be reworked.
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8834
+>
+> The lustre ioctl LL_IOC_FUTIMES_3 is very generic. Need to either work with
+> other file systems with similar functionality and make a common syscall
+> interface or rework our server code to automagically do it for us.
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-6202
+>
+> Cleanup up ioctl handling. We have many obsolete ioctls. Also the way we do
+> ioctls can be changed over to netlink. This also has the benefit of working
+> better with HPC systems that do IO forwarding. Such systems don't like ioctls
+> very well.
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9667
+>
+> More cleanups by making our utilities use sysfs instead of ioctls for LNet.
+> Also it has been requested to move the remaining ioctls to the netlink API.
+>
+> ******************************************************************************
+> * Misc
+> ******************************************************************************
+>
+> ------------------------------------------------------------------------------
+> https://jira.hpdd.intel.com/browse/LU-9855
+>
+> Clean up obdclass preprocessor code. One of the major eye sores is the various
+> pointer redirections and macros used by the obdclass. This makes the code very
+> difficult to understand. It was requested by the Al Viro to clean this up before
+> we leave staging.
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9633
+>
+> Migrate to sphinx kernel-doc style comments. Add documents in Documentation.
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-6142
+>
+> Possible remaining coding style fix. Remove deadcode. Enforce kernel code
+> style. Other minor misc cleanups...
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8837
+>
+> Separate client/server functionality. Functions only used by server can be
+> removed from client. Most of this has been done but we need a inspect of the
+> code to make sure.
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-8964
+>
+> Lustre client readahead/writeback control needs to better suit kernel providings.
+> Currently its being explored. We could end up replacing the CLIO read ahead
+> abstract with the kernel proper version.
+>
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9862
+>
+> Patch that landed for LU-7890 leads to static checker errors
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-9868
+>
+> dcache/namei fixes for lustre
+> ------------------------------------------------------------------------------
+>
+> https://jira.hpdd.intel.com/browse/LU-10467
+>
+> use standard linux wait_events macros work by Neil Brown
+>
+> ------------------------------------------------------------------------------
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180212/c983dead/attachment-0001.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180212/d13cd8f1/attachment.sig>
