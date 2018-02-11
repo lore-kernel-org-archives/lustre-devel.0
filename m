@@ -1,43 +1,24 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 11 Feb 2018 21:39:05 +0000 (GMT)
-Subject: [lustre-devel] [PATCH] staging: lustre: lnet: return of an
- error code should be negative
-In-Reply-To: <1517117095-12643-1-git-send-email-pundirsumit11@gmail.com>
-References: <1517117095-12643-1-git-send-email-pundirsumit11@gmail.com>
-Message-ID: <alpine.LFD.2.21.1802112138340.21780@casper.infradead.org>
+Date: Sun, 11 Feb 2018 22:42:14 +0000 (GMT)
+Subject: [lustre-devel] Proper Lustre Ubuntu/Debian support
+Message-ID: <alpine.LFD.2.21.1802112235070.21780@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Sumit Pundir <pundirsumit11@gmail.com>
-Cc: devel@driverdev.osuosl.org, andreas.dilger@intel.com, gregkh@linuxfoundation.org, linux-kernel@vger.kernel.org, oleg.drokin@intel.com, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
 
 
-> Return value of error codes should typically be negative.
-> Issue reported by checkpatch.pl
->
+Hello
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
- 
-> Signed-off-by: Sumit Pundir <pundirsumit11@gmail.com>
-> ---
->  drivers/staging/lustre/lnet/selftest/framework.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
-> index c7697f6..0ca1e3a 100644
-> --- a/drivers/staging/lustre/lnet/selftest/framework.c
-> +++ b/drivers/staging/lustre/lnet/selftest/framework.c
-> @@ -187,7 +187,7 @@ sfw_del_session_timer(void)
->  		return 0;
->  	}
->  
-> -	return EBUSY; /* racing with sfw_session_expired() */
-> +	return -EBUSY; /* racing with sfw_session_expired() */
->  }
->  
->  static void
-> -- 
-> 2.7.4
-> 
-> 
+    Sorry I didn't get back to you earlier about our libtool issues. The 
+good news is Stibor found the source of the problems. Also recently thanks
+to Schroeder we now have proper server side support on Ubuntu16 systems.
+We are now at the point that the final bits broken are the actual 
+packaging. So I'm hoping to reach out to you to help out with this to 
+figure out what is the proper way to support Ubuntu. Or at least point us
+to the who could lend a helping hand. 
+
+Also recently greater interest in the lustre linux client has been 
+happening. Would people from Ubuntu be interested in kernel development
+to help lustre get out of staging?
