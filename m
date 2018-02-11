@@ -1,108 +1,43 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 11 Feb 2018 21:38:01 +0000 (GMT)
-Subject: [lustre-devel] [PATCH] staging: lustre: llite: replace variable
- length array
-In-Reply-To: <58963c7f-139c-1156-0179-13decf0bcddf@gmx.de>
-References: <20180127214228.26986-1-sven.dziadek@gmx.de>
- <D887F611-EA3C-45CD-BEBC-3BA994048B59@intel.com>
- <58963c7f-139c-1156-0179-13decf0bcddf@gmx.de>
-Message-ID: <alpine.LFD.2.21.1802112136420.21780@casper.infradead.org>
+Date: Sun, 11 Feb 2018 21:39:05 +0000 (GMT)
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: return of an
+ error code should be negative
+In-Reply-To: <1517117095-12643-1-git-send-email-pundirsumit11@gmail.com>
+References: <1517117095-12643-1-git-send-email-pundirsumit11@gmail.com>
+Message-ID: <alpine.LFD.2.21.1802112138340.21780@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Sven Dziadek <sven.dziadek@gmx.de>
-Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Eremin,
- Dmitry" <dmitry.eremin@intel.com>, "Dilger,
- Andreas" <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, lkml <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, lustre-devel <lustre-devel@lists.lustre.org>
+To: Sumit Pundir <pundirsumit11@gmail.com>
+Cc: devel@driverdev.osuosl.org, andreas.dilger@intel.com, gregkh@linuxfoundation.org, linux-kernel@vger.kernel.org, oleg.drokin@intel.com, lustre-devel@lists.lustre.org
 
 
-> On 01/30/2018 03:04 AM, Dilger, Andreas wrote:
-> > On Jan 27, 2018, at 14:42, Sven Dziadek <sven.dziadek@gmx.de> wrote:
-> >>
-> >> The functionality of the removed variable length array is already
-> >> implemented by the function xattr_full_name in fs/xattr.c
-> >>
-> >> This fixes the sparse warning:
-> >> warning: Variable length array is used.
-> >>
-> >> Signed-off-by: Sven Dziadek <sven.dziadek@gmx.de>
-> >> ---
-> >> drivers/staging/lustre/lustre/llite/xattr.c | 12 ++++--------
-> >> 1 file changed, 4 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-> >> index 532384c91447..4fd28213c6a1 100644
-> >> --- a/drivers/staging/lustre/lustre/llite/xattr.c
-> >> +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-> >> @@ -87,7 +87,6 @@ ll_xattr_set_common(const struct xattr_handler *handler,
-> >> 		    const char *name, const void *value, size_t size,
-> >> 		    int flags)
-> >> {
-> >> -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
-> >> 	struct ll_sb_info *sbi = ll_i2sbi(inode);
-> >> 	struct ptlrpc_request *req = NULL;
-> >> 	const char *pv = value;
-> >> @@ -141,9 +140,8 @@ ll_xattr_set_common(const struct xattr_handler *handler,
-> >> 			return -EPERM;
-> >> 	}
-> >>
-> >> -	sprintf(fullname, "%s%s\n", handler->prefix, name);
-> >> -	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
-> >> -			 valid, fullname, pv, size, 0, flags,
-> >> +	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode), valid,
-> >> +			 xattr_full_name(handler, name), pv, size, 0, flags,
-> >> 			 ll_i2suppgid(inode), &req);
-> > 
-> > Hi Sven,
-> > thanks for the patch.
-> > 
-> > Looking at the details of "xattr_full_name()", this seems quite risky.  This
-> > is essentially returning the pointer _before_ "name" on the assumption that
-> > it contains the full "prefix.name" string.  IMHO, that is not necessarily a
-> > safe assumption to make several layers down in the code.
-> Thanks for your reply. And yeah, it feels strange, right.
-> 
-> But it really looks like this is how the name and the prefix is handled
-> in the xattr code.
-> It seems this helper function has been introduced with commit
-> e409de992e3ea (which also removes some fullname pointer) and indeed,
-> fs/xattr.c splits the prefix and the name in xattr_resolve_name.
-> 
-> So I still think the patch should be correct..?
-> 
-> > James, I thought you had a patch for this to use kasprintf() instead of the
-> > on-stack "fullname" declaration?
-> Sorry for replying that late, I though James would maybe know if the
-> above assumption is correct..
+> Return value of error codes should typically be negative.
+> Issue reported by checkpatch.pl
+>
 
-Yes I do have a patch for this. I pushed them several months ago but they
-got missed. It happens. I will the patches again very soon.
+Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> >> 	if (rc) {
-> >> 		if (rc == -EOPNOTSUPP && handler->flags == XATTR_USER_T) {
-> >> @@ -364,7 +362,6 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
-> >> 			       struct dentry *dentry, struct inode *inode,
-> >> 			       const char *name, void *buffer, size_t size)
-> >> {
-> >> -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
-> >> 	struct ll_sb_info *sbi = ll_i2sbi(inode);
-> >> #ifdef CONFIG_FS_POSIX_ACL
-> >> 	struct ll_inode_info *lli = ll_i2info(inode);
-> >> @@ -411,9 +408,8 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
-> >> 	if (handler->flags == XATTR_ACL_DEFAULT_T && !S_ISDIR(inode->i_mode))
-> >> 		return -ENODATA;
-> >> #endif
-> >> -	sprintf(fullname, "%s%s\n", handler->prefix, name);
-> >> -	return ll_xattr_list(inode, fullname, handler->flags, buffer, size,
-> >> -			     OBD_MD_FLXATTR);
-> >> +	return ll_xattr_list(inode, xattr_full_name(handler, name),
-> >> +			     handler->flags, buffer, size, OBD_MD_FLXATTR);
-> >> }
-> >>
-> >> static ssize_t ll_getxattr_lov(struct inode *inode, void *buf, size_t buf_size)
-> >> -- 
-> >> 2.11.0
-> >>
+> Signed-off-by: Sumit Pundir <pundirsumit11@gmail.com>
+> ---
+>  drivers/staging/lustre/lnet/selftest/framework.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+> index c7697f6..0ca1e3a 100644
+> --- a/drivers/staging/lustre/lnet/selftest/framework.c
+> +++ b/drivers/staging/lustre/lnet/selftest/framework.c
+> @@ -187,7 +187,7 @@ sfw_del_session_timer(void)
+>  		return 0;
+>  	}
+>  
+> -	return EBUSY; /* racing with sfw_session_expired() */
+> +	return -EBUSY; /* racing with sfw_session_expired() */
+>  }
+>  
+>  static void
+> -- 
+> 2.7.4
 > 
 > 
