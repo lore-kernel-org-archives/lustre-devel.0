@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 13 Feb 2018 08:22:36 +1100
-Subject: [lustre-devel] [PATCH 06/19] staging: lustre: introduce and use
- l_wait_event_abortable()
+Subject: [lustre-devel] [PATCH 08/19] staging: lustre: simplify waiting in
+ ldlm_completion_ast()
 In-Reply-To: <151847037709.22826.16175867257667686132.stgit@noble>
 References: <151847037709.22826.16175867257667686132.stgit@noble>
-Message-ID: <151847055667.22826.8544979478231411275.stgit@noble>
+Message-ID: <151847055674.22826.12912356108048917428.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,215 +12,146 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-lustre sometimes wants to wait for an event, but abort if
-one of a specific list of signals arrives.  This is a little
-bit like wait_event_killable(), except that the signals are
-identified a different way.
+If a signal-callback (lwi_on_signal) is set without lwi_allow_intr, as
+is the case in ldlm_completion_ast(), the behavior depends on the
+timeout set.
 
-So introduce l_wait_event_abortable() which provides this
-functionality.
-Having separate functions for separate needs is more in line
-with the pattern set by include/linux/wait.h, than having a
-single function which tries to include all possible needs.
+If a timeout is set, then signals are ignored.  If the timeout is
+reached, the timeout handler is called.  If the timeout handler
+return 0, which ldlm_expired_completion_wait() always does, the
+l_wait_event() switches to exactly the behavior if no timeout was set.
 
-Also introduce l_wait_event_abortable_exclusive().
+If no timeout is set, then "fatal" signals are not ignored.  If one
+arrives the callback is run, but as the callback is empty in this
+case, that is not relevant.
 
-Note that l_wait_event() return -EINTR on a signal, while
-Linux wait_event functions return -ERESTARTSYS.
-l_wait_event_{abortable_,}exclusive follow the Linux pattern.
+This can be simplified to:
+ if a timeout is wanted
+     wait_event_idle_timeout()
+     if that timed out, call the timeout handler
+ l_wait_event_abortable()
+
+i.e. the code always waits indefinitely.  Sometimes it performs a
+non-abortable wait first.  Sometimes it doesn't.  But it only
+aborts before the condition is true if it is signaled.
+This doesn't quite agree with the comments and debug messages.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/lustre_lib.h |   24 ++++++++++++++++++++
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   12 +++++-----
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   12 +++-------
- drivers/staging/lustre/lustre/obdclass/genops.c    |    9 +++-----
- drivers/staging/lustre/lustre/obdclass/llog_obd.c  |    5 ++--
- drivers/staging/lustre/lustre/osc/osc_page.c       |    6 ++---
- drivers/staging/lustre/lustre/osc/osc_request.c    |    6 ++---
- 7 files changed, 43 insertions(+), 31 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c |   55 +++++++--------------
+ 1 file changed, 18 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-index 7d950c53e962..b2a64d0e682c 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-@@ -336,4 +336,28 @@ do {									   \
- /** @} lib */
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index a244fa717134..f1233d844bbd 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -72,15 +72,6 @@ MODULE_PARM_DESC(ldlm_enqueue_min, "lock enqueue timeout minimum");
+ /* in client side, whether the cached locks will be canceled before replay */
+ unsigned int ldlm_cancel_unused_locks_before_replay = 1;
  
- 
-+
-+/* l_wait_event_abortable() is a bit like wait_event_killable()
-+ * except there is a fixed set of signals which will abort:
-+ * LUSTRE_FATAL_SIGS
-+ */
-+#define l_wait_event_abortable(wq, condition)				\
-+({									\
-+	sigset_t __blocked;						\
-+	int __ret = 0;							\
-+	__blocked = cfs_block_sigsinv(LUSTRE_FATAL_SIGS);		\
-+	__ret = wait_event_interruptible(wq, condition);		\
-+	cfs_restore_sigs(__blocked);					\
-+	__ret;								\
-+})
-+
-+#define l_wait_event_abortable_exclusive(wq, condition)			\
-+({									\
-+	sigset_t __blocked;						\
-+	int __ret = 0;							\
-+	__blocked = cfs_block_sigsinv(LUSTRE_FATAL_SIGS);		\
-+	__ret = wait_event_interruptible_exclusive(wq, condition);	\
-+	cfs_restore_sigs(__blocked);					\
-+	__ret;								\
-+})
- #endif /* _LUSTRE_LIB_H */
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index 2e66825c8f4b..4c44603ab6f9 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -879,7 +879,6 @@ static int __ldlm_namespace_free(struct ldlm_namespace *ns, int force)
- 	ldlm_namespace_cleanup(ns, force ? LDLM_FL_LOCAL_ONLY : 0);
- 
- 	if (atomic_read(&ns->ns_bref) > 0) {
--		struct l_wait_info lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
- 		int rc;
- 
- 		CDEBUG(D_DLMTRACE,
-@@ -887,11 +886,12 @@ static int __ldlm_namespace_free(struct ldlm_namespace *ns, int force)
- 		       ldlm_ns_name(ns), atomic_read(&ns->ns_bref));
- force_wait:
- 		if (force)
--			lwi = LWI_TIMEOUT(msecs_to_jiffies(obd_timeout *
--					  MSEC_PER_SEC) / 4, NULL, NULL);
+-static void interrupted_completion_wait(void *data)
+-{
+-}
 -
--		rc = l_wait_event(ns->ns_waitq,
--				  atomic_read(&ns->ns_bref) == 0, &lwi);
-+			rc = wait_event_idle_timeout(ns->ns_waitq,
-+						     atomic_read(&ns->ns_bref) == 0,
-+						     obd_timeout * HZ / 4) ? 0 : -ETIMEDOUT;
-+		else
-+			rc = l_wait_event_abortable(ns->ns_waitq,
-+						    atomic_read(&ns->ns_bref) == 0);
+-struct lock_wait_data {
+-	struct ldlm_lock *lwd_lock;
+-	__u32	     lwd_conn_cnt;
+-};
+-
+ struct ldlm_async_args {
+ 	struct lustre_handle lock_handle;
+ };
+@@ -112,10 +103,8 @@ static int ldlm_request_bufsize(int count, int type)
+ 	return sizeof(struct ldlm_request) + avail;
+ }
  
- 		/* Forced cleanups should be able to reclaim all references,
- 		 * so it's safe to wait forever... we can't leak locks...
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index c820b201af71..ccb614bd7f53 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -986,16 +986,12 @@ void ll_put_super(struct super_block *sb)
+-static int ldlm_expired_completion_wait(void *data)
++static void ldlm_expired_completion_wait(struct ldlm_lock *lock, struct obd_import *imp2)
+ {
+-	struct lock_wait_data *lwd = data;
+-	struct ldlm_lock *lock = lwd->lwd_lock;
+ 	struct obd_import *imp;
+ 	struct obd_device *obd;
+ 
+@@ -135,19 +124,17 @@ static int ldlm_expired_completion_wait(void *data)
+ 			if (last_dump == 0)
+ 				libcfs_debug_dumplog();
+ 		}
+-		return 0;
++		return;
  	}
  
- 	/* Wait for unstable pages to be committed to stable storage */
--	if (!force) {
--		struct l_wait_info lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
+ 	obd = lock->l_conn_export->exp_obd;
+ 	imp = obd->u.cli.cl_import;
+-	ptlrpc_fail_import(imp, lwd->lwd_conn_cnt);
++	ptlrpc_fail_import(imp, imp2 ? imp2->imp_conn_cnt : 0);
+ 	LDLM_ERROR(lock,
+ 		   "lock timed out (enqueued at %lld, %llds ago), entering recovery for %s@%s",
+ 		   (s64)lock->l_last_activity,
+ 		   (s64)(ktime_get_real_seconds() - lock->l_last_activity),
+ 		   obd2cli_tgt(obd), imp->imp_connection->c_remote_uuid.uuid);
 -
--		rc = l_wait_event(sbi->ll_cache->ccc_unstable_waitq,
--				  !atomic_long_read(&sbi->ll_cache->ccc_unstable_nr),
--				  &lwi);
--	}
-+	if (!force)
-+		rc = l_wait_event_abortable(sbi->ll_cache->ccc_unstable_waitq,
-+					    !atomic_long_read(&sbi->ll_cache->ccc_unstable_nr));
- 
- 	ccc_count = atomic_long_read(&sbi->ll_cache->ccc_unstable_nr);
--	if (!force && rc != -EINTR)
-+	if (!force && rc != -ERESTARTSYS)
- 		LASSERTF(!ccc_count, "count: %li\n", ccc_count);
- 
- 	/* We need to set force before the lov_disconnect in
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 3ff25b8d3b48..8f776a4058a9 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -1332,7 +1332,6 @@ static bool obd_request_slot_avail(struct client_obd *cli,
- int obd_get_request_slot(struct client_obd *cli)
- {
- 	struct obd_request_slot_waiter orsw;
--	struct l_wait_info lwi;
- 	int rc;
- 
- 	spin_lock(&cli->cl_loi_list_lock);
-@@ -1347,11 +1346,9 @@ int obd_get_request_slot(struct client_obd *cli)
- 	orsw.orsw_signaled = false;
- 	spin_unlock(&cli->cl_loi_list_lock);
- 
--	lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
--	rc = l_wait_event(orsw.orsw_waitq,
--			  obd_request_slot_avail(cli, &orsw) ||
--			  orsw.orsw_signaled,
--			  &lwi);
-+	rc = l_wait_event_abortable(orsw.orsw_waitq,
-+				    obd_request_slot_avail(cli, &orsw) ||
-+				    orsw.orsw_signaled);
- 
- 	/*
- 	 * Here, we must take the lock to avoid the on-stack 'orsw' to be
-diff --git a/drivers/staging/lustre/lustre/obdclass/llog_obd.c b/drivers/staging/lustre/lustre/obdclass/llog_obd.c
-index 28bbaa2136ac..26aea114a29b 100644
---- a/drivers/staging/lustre/lustre/obdclass/llog_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/llog_obd.c
-@@ -104,7 +104,6 @@ EXPORT_SYMBOL(__llog_ctxt_put);
- 
- int llog_cleanup(const struct lu_env *env, struct llog_ctxt *ctxt)
- {
--	struct l_wait_info lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
- 	struct obd_llog_group *olg;
- 	int rc, idx;
- 
-@@ -129,8 +128,8 @@ int llog_cleanup(const struct lu_env *env, struct llog_ctxt *ctxt)
- 		CERROR("Error %d while cleaning up ctxt %p\n",
- 		       rc, ctxt);
- 
--	l_wait_event(olg->olg_waitq,
--		     llog_group_ctxt_null(olg, idx), &lwi);
-+	l_wait_event_abortable(olg->olg_waitq,
-+			     llog_group_ctxt_null(olg, idx));
- 
- 	return rc;
+-	return 0;
  }
-diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
-index 20094b6309f9..6fdd521feb21 100644
---- a/drivers/staging/lustre/lustre/osc/osc_page.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_page.c
-@@ -759,7 +759,6 @@ static long osc_lru_reclaim(struct client_obd *cli, unsigned long npages)
- static int osc_lru_alloc(const struct lu_env *env, struct client_obd *cli,
- 			 struct osc_page *opg)
+ 
+ /**
+@@ -251,10 +238,8 @@ EXPORT_SYMBOL(ldlm_completion_ast_async);
+ int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
  {
--	struct l_wait_info lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
- 	struct osc_io *oio = osc_env_io(env);
+ 	/* XXX ALLOCATE - 160 bytes */
+-	struct lock_wait_data lwd;
+ 	struct obd_device *obd;
+ 	struct obd_import *imp = NULL;
+-	struct l_wait_info lwi;
+ 	__u32 timeout;
  	int rc = 0;
  
-@@ -782,9 +781,8 @@ static int osc_lru_alloc(const struct lu_env *env, struct client_obd *cli,
+@@ -281,32 +266,28 @@ int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
  
- 		cond_resched();
+ 	timeout = ldlm_cp_timeout(lock);
  
--		rc = l_wait_event(osc_lru_waitq,
--				  atomic_long_read(cli->cl_lru_left) > 0,
--				  &lwi);
-+		rc = l_wait_event_abortable(osc_lru_waitq,
-+					    atomic_long_read(cli->cl_lru_left) > 0);
+-	lwd.lwd_lock = lock;
+ 	lock->l_last_activity = ktime_get_real_seconds();
  
- 		if (rc < 0)
- 			break;
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index 45b1ebf33363..074b5ce6284c 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -552,14 +552,12 @@ static int osc_destroy(const struct lu_env *env, struct obd_export *exp,
- 
- 	req->rq_interpret_reply = osc_destroy_interpret;
- 	if (!osc_can_send_destroy(cli)) {
--		struct l_wait_info lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
+-	if (ldlm_is_no_timeout(lock)) {
+-		LDLM_DEBUG(lock, "waiting indefinitely because of NO_TIMEOUT");
+-		lwi = LWI_INTR(interrupted_completion_wait, &lwd);
+-	} else {
+-		lwi = LWI_TIMEOUT_INTR(timeout * HZ,
+-				       ldlm_expired_completion_wait,
+-				       interrupted_completion_wait, &lwd);
+-	}
 -
- 		/*
- 		 * Wait until the number of on-going destroy RPCs drops
- 		 * under max_rpc_in_flight
- 		 */
--		l_wait_event_exclusive(cli->cl_destroy_waitq,
--				       osc_can_send_destroy(cli), &lwi);
-+		l_wait_event_abortable_exclusive(cli->cl_destroy_waitq,
-+					       osc_can_send_destroy(cli));
+-	if (imp) {
+-		spin_lock(&imp->imp_lock);
+-		lwd.lwd_conn_cnt = imp->imp_conn_cnt;
+-		spin_unlock(&imp->imp_lock);
+-	}
+-
+ 	if (OBD_FAIL_CHECK_RESET(OBD_FAIL_LDLM_INTR_CP_AST,
+ 				 OBD_FAIL_LDLM_CP_BL_RACE | OBD_FAIL_ONCE)) {
+ 		ldlm_set_fail_loc(lock);
+ 		rc = -EINTR;
+ 	} else {
+-		/* Go to sleep until the lock is granted or cancelled. */
+-		rc = l_wait_event(lock->l_waitq,
+-				  is_granted_or_cancelled(lock), &lwi);
++		/* Go to sleep until the lock is granted or canceled. */
++		if (!ldlm_is_no_timeout(lock)) {
++			/* Wait uninterruptible for a while first */
++			rc = wait_event_idle_timeout(lock->l_waitq,
++						     is_granted_or_cancelled(lock),
++						     timeout * HZ);
++			if (rc == 0)
++				ldlm_expired_completion_wait(lock, imp);
++		}
++		/* Now wait abortable */
++		if (rc == 0)
++			rc = l_wait_event_abortable(lock->l_waitq,
++						    is_granted_or_cancelled(lock));
++		else
++			rc = 0;
  	}
  
- 	/* Do not wait for response */
+ 	if (rc) {
