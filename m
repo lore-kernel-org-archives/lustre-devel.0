@@ -1,8 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 13 Feb 2018 08:22:36 +1100
-Subject: [lustre-devel] [PATCH 00/19] RESEND staging: lustre: use standard
- wait_event macros
-Message-ID: <151847037709.22826.16175867257667686132.stgit@noble>
+Subject: [lustre-devel] [PATCH 02/19] staging: lustre: discard SVC_SIGNAL
+ and related functions
+In-Reply-To: <151847037709.22826.16175867257667686132.stgit@noble>
+References: <151847037709.22826.16175867257667686132.stgit@noble>
+Message-ID: <151847055648.22826.5480938397433602648.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -10,128 +12,59 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-Hi,
- this is a resend of patch series that I sent a little over a month
- ago.  Since then I've recieved Reviewed-By:from James Simmons
- (thanks) and confirmation that it passes his testing.
- I cannot quite say that all tests pass for me with these patch,
- but the tests produce the same results both with and without the
- patches.
+This flag is never set, so remove checks and remove
+the flag.
 
- No non-trivial changes - a couple of typos in change descriptions
- fixes, and reviewed-by's added.
-
-Previous intro text:
-Hi,
- this is a revised version of the patch series I sent under a similar
- subject in mid December.
- Improvements are:
-   - new wait_event_idle* macros are now in include/linux/wait.h which
-     Ack from peterz.
-   - *all* waits are now TASK_IDLE or TASK_INTERRUPTIBLE and so don't
-     affect the load average.  There is no need to choose whether load
-     is appropriate or not in each case.
-   - all l_wait_event() users are handled so l_wait_event() is
-     removed.  The one case I had left out before uses
-     wait_event_idle_exclusive() with and option of using
-     wait_event_idle_exclusive_lifo() is that ever gets approved.
-
- I think this set is ready to go.
- If you only review two patches, please review
-
-    staging: lustre: simplify waiting in ldlm_completion_ast()
-and
-    staging: lustre: remove back_to_sleep()
-
- as in both of those, the actual behaviour of the current code (as I
- understand it) doesn't seem to agree with comments/debug message, or
- just generally looks odd.
-
-Thanks,
-NeilBrown
-
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
+ drivers/staging/lustre/lustre/include/lustre_net.h |    6 ------
+ drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |    4 +---
+ 2 files changed, 1 insertion(+), 9 deletions(-)
 
-NeilBrown (19):
-      sched/wait: add wait_event_idle() functions.
-      staging: lustre: discard SVC_SIGNAL and related functions
-      staging: lustre: replace simple cases of l_wait_event() with wait_event().
-      staging: lustre: discard cfs_time_seconds()
-      staging: lustre: use wait_event_idle_timeout() where appropriate.
-      staging: lustre: introduce and use l_wait_event_abortable()
-      staging: lustre: simplify l_wait_event when intr handler but no timeout.
-      staging: lustre: simplify waiting in ldlm_completion_ast()
-      staging: lustre: open code polling loop instead of using l_wait_event()
-      staging: lustre: simplify waiting in ptlrpc_invalidate_import()
-      staging: lustre: remove back_to_sleep()
-      staging: lustre: make polling loop in ptlrpc_unregister_bulk more obvious
-      staging: lustre: use wait_event_idle_timeout in ptlrpcd()
-      staging: lustre: improve waiting in sptlrpc_req_refresh_ctx
-      staging: lustre: use explicit poll loop in ptlrpc_service_unlink_rqbd
-      staging: lustre: use explicit poll loop in ptlrpc_unregister_reply
-      staging: lustre: remove l_wait_event from ptlrpc_set_wait
-      staging: lustre: replace l_wait_event_exclusive_head() with wait_event_idle_exclusive
-      staging: lustre: remove l_wait_event() and related code
-
-
- .../lustre/include/linux/libcfs/libcfs_debug.h     |    4 
- .../lustre/include/linux/libcfs/libcfs_time.h      |    2 
- .../lustre/include/linux/libcfs/linux/linux-time.h |    7 
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    8 -
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    4 
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    6 
- .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |   22 +
- drivers/staging/lustre/lnet/libcfs/debug.c         |    2 
- drivers/staging/lustre/lnet/libcfs/fail.c          |    2 
- drivers/staging/lustre/lnet/libcfs/tracefile.c     |    4 
- drivers/staging/lustre/lnet/lnet/acceptor.c        |    2 
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    4 
- drivers/staging/lustre/lnet/lnet/lib-move.c        |    4 
- drivers/staging/lustre/lnet/lnet/net_fault.c       |   14 -
- drivers/staging/lustre/lnet/lnet/peer.c            |    2 
- drivers/staging/lustre/lnet/lnet/router.c          |    8 -
- drivers/staging/lustre/lnet/selftest/conrpc.c      |    4 
- drivers/staging/lustre/lnet/selftest/rpc.c         |    2 
- drivers/staging/lustre/lnet/selftest/selftest.h    |    2 
- drivers/staging/lustre/lnet/selftest/timer.c       |    2 
- drivers/staging/lustre/lustre/include/lustre_dlm.h |    2 
- drivers/staging/lustre/lustre/include/lustre_lib.h |  296 ++------------------
- drivers/staging/lustre/lustre/include/lustre_mdc.h |    2 
- drivers/staging/lustre/lustre/include/lustre_net.h |    8 -
- drivers/staging/lustre/lustre/ldlm/ldlm_flock.c    |   30 --
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |   14 -
- drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |   12 -
- drivers/staging/lustre/lustre/ldlm/ldlm_pool.c     |   17 -
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   55 +---
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   14 -
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   23 +-
- drivers/staging/lustre/lustre/llite/statahead.c    |   60 ++--
- drivers/staging/lustre/lustre/lov/lov_object.c     |    6 
- drivers/staging/lustre/lustre/lov/lov_request.c    |   12 -
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    5 
- drivers/staging/lustre/lustre/mgc/mgc_request.c    |   19 -
- drivers/staging/lustre/lustre/obdclass/cl_io.c     |   23 +-
- drivers/staging/lustre/lustre/obdclass/genops.c    |   24 +-
- drivers/staging/lustre/lustre/obdclass/llog_obd.c  |    5 
- .../staging/lustre/lustre/obdecho/echo_client.c    |    2 
- drivers/staging/lustre/lustre/osc/osc_cache.c      |   28 +-
- drivers/staging/lustre/lustre/osc/osc_object.c     |    6 
- drivers/staging/lustre/lustre/osc/osc_page.c       |    6 
- drivers/staging/lustre/lustre/osc/osc_request.c    |    6 
- drivers/staging/lustre/lustre/ptlrpc/client.c      |  101 +++----
- drivers/staging/lustre/lustre/ptlrpc/events.c      |    7 
- drivers/staging/lustre/lustre/ptlrpc/import.c      |   51 +--
- drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |   15 +
- .../staging/lustre/lustre/ptlrpc/pack_generic.c    |    9 -
- drivers/staging/lustre/lustre/ptlrpc/pinger.c      |   28 +-
- .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |    2 
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |   18 +
- drivers/staging/lustre/lustre/ptlrpc/recover.c     |   12 -
- drivers/staging/lustre/lustre/ptlrpc/sec.c         |   34 ++
- drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |   23 --
- drivers/staging/lustre/lustre/ptlrpc/service.c     |   84 +++---
- include/linux/wait.h                               |  114 ++++++++
- 57 files changed, 516 insertions(+), 762 deletions(-)
-
---
-Signature
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 3ff5de4770e8..4c665eca2467 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -1260,7 +1260,6 @@ enum {
+ 	SVC_STARTING    = 1 << 2,
+ 	SVC_RUNNING     = 1 << 3,
+ 	SVC_EVENT       = 1 << 4,
+-	SVC_SIGNAL      = 1 << 5,
+ };
+ 
+ #define PTLRPC_THR_NAME_LEN		32
+@@ -1333,11 +1332,6 @@ static inline int thread_is_event(struct ptlrpc_thread *thread)
+ 	return !!(thread->t_flags & SVC_EVENT);
+ }
+ 
+-static inline int thread_is_signal(struct ptlrpc_thread *thread)
+-{
+-	return !!(thread->t_flags & SVC_SIGNAL);
+-}
+-
+ static inline void thread_clear_flags(struct ptlrpc_thread *thread, __u32 flags)
+ {
+ 	thread->t_flags &= ~flags;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+index 8d1e0edfcede..d85c8638c009 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+@@ -153,7 +153,6 @@ static int sec_gc_main(void *arg)
+ 	while (1) {
+ 		struct ptlrpc_sec *sec;
+ 
+-		thread_clear_flags(thread, SVC_SIGNAL);
+ 		sec_process_ctx_list();
+ again:
+ 		/* go through sec list do gc.
+@@ -184,8 +183,7 @@ static int sec_gc_main(void *arg)
+ 		lwi = LWI_TIMEOUT(msecs_to_jiffies(SEC_GC_INTERVAL * MSEC_PER_SEC),
+ 				  NULL, NULL);
+ 		l_wait_event(thread->t_ctl_waitq,
+-			     thread_is_stopping(thread) ||
+-			     thread_is_signal(thread),
++			     thread_is_stopping(thread),
+ 			     &lwi);
+ 
+ 		if (thread_test_and_clear_flags(thread, SVC_STOPPING))
