@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 13 Feb 2018 10:47:59 +1100
-Subject: [lustre-devel] [PATCH 09/19] staging: lustre: open code polling
- loop instead of using l_wait_event()
+Subject: [lustre-devel] [PATCH 10/19] staging: lustre: simplify waiting in
+ ptlrpc_invalidate_import()
 In-Reply-To: <151847037709.22826.16175867257667686132.stgit@noble>
 References: <151847037709.22826.16175867257667686132.stgit@noble>
-Message-ID: <151847927897.19840.8283814090245785502.stgit@noble>
+Message-ID: <151847927900.19840.18432480230541523283.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,75 +12,80 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-Two places that LWI_TIMEOUT_INTERVAL() is used, the outcome is a
-simple polling loop that polls every second for some event (with a
-limit).
+This waiter currently wakes up every second to re-test if
+imp_flight is zero.  If we ensure wakeup is called whenever
+imp_flight is decremented to zero, we can just have a simple
+wait_event_idle_timeout().
 
-So write a simple loop to make this more apparent.
+So add a wake_up_all to the one place it is missing, and simplify
+the wait_event.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/llite/llite_lib.c |   11 +++++------
- drivers/staging/lustre/lustre/lov/lov_request.c |   12 +++++-------
- 2 files changed, 10 insertions(+), 13 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/client.c |    3 ++-
+ drivers/staging/lustre/lustre/ptlrpc/import.c |   21 ++++++++-------------
+ 2 files changed, 10 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index ccb614bd7f53..9e96a8ee1783 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -1984,8 +1984,7 @@ void ll_umount_begin(struct super_block *sb)
- 	struct ll_sb_info *sbi = ll_s2sbi(sb);
- 	struct obd_device *obd;
- 	struct obd_ioctl_data *ioc_data;
--	wait_queue_head_t waitq;
--	struct l_wait_info lwi;
-+	int cnt = 0;
- 
- 	CDEBUG(D_VFSTRACE, "VFS Op: superblock %p count %d active %d\n", sb,
- 	       sb->s_count, atomic_read(&sb->s_active));
-@@ -2021,10 +2020,10 @@ void ll_umount_begin(struct super_block *sb)
- 	 * and then continue. For now, we just periodically checking for vfs
- 	 * to decrement mnt_cnt and hope to finish it within 10sec.
- 	 */
--	init_waitqueue_head(&waitq);
--	lwi = LWI_TIMEOUT_INTERVAL(10 * HZ,
--				   HZ, NULL, NULL);
--	l_wait_event(waitq, may_umount(sbi->ll_mnt.mnt), &lwi);
-+	while (cnt < 10 && !may_umount(sbi->ll_mnt.mnt)) {
-+		schedule_timeout_uninterruptible(HZ);
-+		cnt ++;
-+	}
- 
- 	schedule();
- }
-diff --git a/drivers/staging/lustre/lustre/lov/lov_request.c b/drivers/staging/lustre/lustre/lov/lov_request.c
-index fb3b7a7fa32a..c1e58fcc30b3 100644
---- a/drivers/staging/lustre/lustre/lov/lov_request.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_request.c
-@@ -99,8 +99,7 @@ static int lov_check_set(struct lov_obd *lov, int idx)
-  */
- static int lov_check_and_wait_active(struct lov_obd *lov, int ost_idx)
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index 0ab13f8e5993..81b7a7046d82 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -1588,7 +1588,8 @@ static int ptlrpc_send_new_req(struct ptlrpc_request *req)
+ 		spin_lock(&imp->imp_lock);
+ 		if (!list_empty(&req->rq_list)) {
+ 			list_del_init(&req->rq_list);
+-			atomic_dec(&req->rq_import->imp_inflight);
++			if (atomic_dec_and_test(&req->rq_import->imp_inflight))
++				wake_up_all(&req->rq_import->imp_recovery_waitq);
+ 		}
+ 		spin_unlock(&imp->imp_lock);
+ 		ptlrpc_rqphase_move(req, RQ_PHASE_NEW);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index ed210550f61f..5d62c9de27eb 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -265,7 +265,6 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
  {
--	wait_queue_head_t waitq;
+ 	struct list_head *tmp, *n;
+ 	struct ptlrpc_request *req;
 -	struct l_wait_info lwi;
-+	int cnt = 0;
- 	struct lov_tgt_desc *tgt;
- 	int rc = 0;
+ 	unsigned int timeout;
+ 	int rc;
  
-@@ -125,11 +124,10 @@ static int lov_check_and_wait_active(struct lov_obd *lov, int ost_idx)
+@@ -306,19 +305,15 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+ 		 * callbacks. Cap it at obd_timeout -- these should all
+ 		 * have been locally cancelled by ptlrpc_abort_inflight.
+ 		 */
+-		lwi = LWI_TIMEOUT_INTERVAL(
+-			cfs_timeout_cap(timeout * HZ),
+-			(timeout > 1) ? HZ :
+-			HZ / 2,
+-			NULL, NULL);
+-		rc = l_wait_event(imp->imp_recovery_waitq,
+-				  (atomic_read(&imp->imp_inflight) == 0),
+-				  &lwi);
+-		if (rc) {
++		rc = wait_event_idle_timeout(imp->imp_recovery_waitq,
++					     atomic_read(&imp->imp_inflight) == 0,
++					     obd_timeout * HZ);
++
++		if (rc == 0) {
+ 			const char *cli_tgt = obd2cli_tgt(imp->imp_obd);
  
- 	mutex_unlock(&lov->lov_lock);
+-			CERROR("%s: rc = %d waiting for callback (%d != 0)\n",
+-			       cli_tgt, rc,
++			CERROR("%s: timeout waiting for callback (%d != 0)\n",
++			       cli_tgt,
+ 			       atomic_read(&imp->imp_inflight));
  
--	init_waitqueue_head(&waitq);
--	lwi = LWI_TIMEOUT_INTERVAL(obd_timeout * HZ,
--				   HZ, NULL, NULL);
--
--	rc = l_wait_event(waitq, lov_check_set(lov, ost_idx), &lwi);
-+	while (cnt < obd_timeout && !lov_check_set(lov, ost_idx)) {
-+		schedule_timeout_uninterruptible(HZ);
-+		cnt ++;
-+	}
- 	if (tgt->ltd_active)
- 		return 1;
+ 			spin_lock(&imp->imp_lock);
+@@ -365,7 +360,7 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+ 			}
+ 			spin_unlock(&imp->imp_lock);
+ 		}
+-	} while (rc != 0);
++	} while (rc == 0);
  
+ 	/*
+ 	 * Let's additionally check that no new rpcs added to import in
