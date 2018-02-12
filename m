@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 13 Feb 2018 10:47:59 +1100
-Subject: [lustre-devel] [PATCH 10/19] staging: lustre: simplify waiting in
- ptlrpc_invalidate_import()
+Subject: [lustre-devel] [PATCH 12/19] staging: lustre: make polling loop in
+ ptlrpc_unregister_bulk more obvious
 In-Reply-To: <151847037709.22826.16175867257667686132.stgit@noble>
 References: <151847037709.22826.16175867257667686132.stgit@noble>
-Message-ID: <151847927900.19840.18432480230541523283.stgit@noble>
+Message-ID: <151847927906.19840.2239613687503242193.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,80 +12,57 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-This waiter currently wakes up every second to re-test if
-imp_flight is zero.  If we ensure wakeup is called whenever
-imp_flight is decremented to zero, we can just have a simple
-wait_event_idle_timeout().
-
-So add a wake_up_all to the one place it is missing, and simplify
-the wait_event.
+This use of l_wait_event() is a polling loop that re-checks
+every second.  Make this more obvious with a while loop
+and wait_event_idle_timeout().
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c |    3 ++-
- drivers/staging/lustre/lustre/ptlrpc/import.c |   21 ++++++++-------------
- 2 files changed, 10 insertions(+), 14 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c |   15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 0ab13f8e5993..81b7a7046d82 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -1588,7 +1588,8 @@ static int ptlrpc_send_new_req(struct ptlrpc_request *req)
- 		spin_lock(&imp->imp_lock);
- 		if (!list_empty(&req->rq_list)) {
- 			list_del_init(&req->rq_list);
--			atomic_dec(&req->rq_import->imp_inflight);
-+			if (atomic_dec_and_test(&req->rq_import->imp_inflight))
-+				wake_up_all(&req->rq_import->imp_recovery_waitq);
- 		}
- 		spin_unlock(&imp->imp_lock);
- 		ptlrpc_rqphase_move(req, RQ_PHASE_NEW);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index ed210550f61f..5d62c9de27eb 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -265,7 +265,6 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+index 0c2ded721c49..86883abaad2c 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+@@ -229,7 +229,6 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
  {
- 	struct list_head *tmp, *n;
- 	struct ptlrpc_request *req;
+ 	struct ptlrpc_bulk_desc *desc = req->rq_bulk;
+ 	wait_queue_head_t *wq;
 -	struct l_wait_info lwi;
- 	unsigned int timeout;
  	int rc;
  
-@@ -306,19 +305,15 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 		 * callbacks. Cap it at obd_timeout -- these should all
- 		 * have been locally cancelled by ptlrpc_abort_inflight.
+ 	LASSERT(!in_interrupt());     /* might sleep */
+@@ -246,7 +245,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+ 
+ 	/* the unlink ensures the callback happens ASAP and is the last
+ 	 * one.  If it fails, it must be because completion just happened,
+-	 * but we must still l_wait_event() in this case to give liblustre
++	 * but we must still wait_event() in this case to give liblustre
+ 	 * a chance to run client_bulk_callback()
+ 	 */
+ 	mdunlink_iterate_helper(desc->bd_mds, desc->bd_md_max_brw);
+@@ -270,15 +269,17 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+ 		/* Network access will complete in finite time but the HUGE
+ 		 * timeout lets us CWARN for visibility of sluggish LNDs
  		 */
--		lwi = LWI_TIMEOUT_INTERVAL(
--			cfs_timeout_cap(timeout * HZ),
--			(timeout > 1) ? HZ :
--			HZ / 2,
--			NULL, NULL);
--		rc = l_wait_event(imp->imp_recovery_waitq,
--				  (atomic_read(&imp->imp_inflight) == 0),
--				  &lwi);
--		if (rc) {
-+		rc = wait_event_idle_timeout(imp->imp_recovery_waitq,
-+					     atomic_read(&imp->imp_inflight) == 0,
-+					     obd_timeout * HZ);
-+
-+		if (rc == 0) {
- 			const char *cli_tgt = obd2cli_tgt(imp->imp_obd);
- 
--			CERROR("%s: rc = %d waiting for callback (%d != 0)\n",
--			       cli_tgt, rc,
-+			CERROR("%s: timeout waiting for callback (%d != 0)\n",
-+			       cli_tgt,
- 			       atomic_read(&imp->imp_inflight));
- 
- 			spin_lock(&imp->imp_lock);
-@@ -365,7 +360,7 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
- 			}
- 			spin_unlock(&imp->imp_lock);
+-		lwi = LWI_TIMEOUT_INTERVAL(LONG_UNLINK * HZ,
+-					   HZ, NULL, NULL);
+-		rc = l_wait_event(*wq, !ptlrpc_client_bulk_active(req), &lwi);
+-		if (rc == 0) {
++		int cnt = 0;
++		while (cnt < LONG_UNLINK &&
++		       (rc = wait_event_idle_timeout(*wq,
++						     !ptlrpc_client_bulk_active(req),
++						     HZ)) == 0)
++			cnt += 1;
++		if (rc > 0) {
+ 			ptlrpc_rqphase_move(req, req->rq_next_phase);
+ 			return 1;
  		}
--	} while (rc != 0);
-+	} while (rc == 0);
  
- 	/*
- 	 * Let's additionally check that no new rpcs added to import in
+-		LASSERT(rc == -ETIMEDOUT);
+ 		DEBUG_REQ(D_WARNING, req, "Unexpectedly long timeout: desc %p",
+ 			  desc);
+ 	}
