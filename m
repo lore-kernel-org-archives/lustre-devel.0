@@ -1,10 +1,9 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 13 Feb 2018 10:47:59 +1100
-Subject: [lustre-devel] [PATCH 12/19] staging: lustre: make polling loop in
- ptlrpc_unregister_bulk more obvious
+Subject: [lustre-devel] [PATCH 11/19] staging: lustre: remove back_to_sleep()
 In-Reply-To: <151847037709.22826.16175867257667686132.stgit@noble>
 References: <151847037709.22826.16175867257667686132.stgit@noble>
-Message-ID: <151847927906.19840.2239613687503242193.stgit@noble>
+Message-ID: <151847927903.19840.11717617846481237765.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,57 +11,90 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-This use of l_wait_event() is a polling loop that re-checks
-every second.  Make this more obvious with a while loop
-and wait_event_idle_timeout().
+When 'back_to_sleep()' is passed as the 'timeout' function,
+the effect is to wait indefinitely for the event, polling
+once after the timeout.
+If LWI_ON_SIGNAL_NOOP is given, then after the timeout
+we allow fatal signals to interrupt the wait.
+
+Make this more obvious in both places "back_to_sleep()" is
+used but using two explicit sleeps.
+
+The code in ptlrpcd_add_req() looks odd - why not just have one
+wait_event_idle()?  However I believe this is a faithful
+transformation of the existing code.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/ptlrpc/niobuf.c |   15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_lib.h |    4 ----
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |   11 ++++++-----
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    9 +++++----
+ 3 files changed, 11 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-index 0c2ded721c49..86883abaad2c 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-@@ -229,7 +229,6 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
- {
- 	struct ptlrpc_bulk_desc *desc = req->rq_bulk;
- 	wait_queue_head_t *wq;
--	struct l_wait_info lwi;
- 	int rc;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
+index b2a64d0e682c..1939e959b92a 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_lib.h
++++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
+@@ -140,10 +140,6 @@ void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id);
+  * XXX nikita: some ptlrpc daemon threads have races of that sort.
+  *
+  */
+-static inline int back_to_sleep(void *arg)
+-{
+-	return 0;
+-}
  
- 	LASSERT(!in_interrupt());     /* might sleep */
-@@ -246,7 +245,7 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
+ #define LWI_ON_SIGNAL_NOOP ((void (*)(void *))(-1))
  
- 	/* the unlink ensures the callback happens ASAP and is the last
- 	 * one.  If it fails, it must be because completion just happened,
--	 * but we must still l_wait_event() in this case to give liblustre
-+	 * but we must still wait_event() in this case to give liblustre
- 	 * a chance to run client_bulk_callback()
- 	 */
- 	mdunlink_iterate_helper(desc->bd_mds, desc->bd_md_max_brw);
-@@ -270,15 +269,17 @@ int ptlrpc_unregister_bulk(struct ptlrpc_request *req, int async)
- 		/* Network access will complete in finite time but the HUGE
- 		 * timeout lets us CWARN for visibility of sluggish LNDs
- 		 */
--		lwi = LWI_TIMEOUT_INTERVAL(LONG_UNLINK * HZ,
--					   HZ, NULL, NULL);
--		rc = l_wait_event(*wq, !ptlrpc_client_bulk_active(req), &lwi);
--		if (rc == 0) {
-+		int cnt = 0;
-+		while (cnt < LONG_UNLINK &&
-+		       (rc = wait_event_idle_timeout(*wq,
-+						     !ptlrpc_client_bulk_active(req),
-+						     HZ)) == 0)
-+			cnt += 1;
-+		if (rc > 0) {
- 			ptlrpc_rqphase_move(req, req->rq_next_phase);
- 			return 1;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index 5d62c9de27eb..faf0f606f013 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -1496,7 +1496,6 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+ 	}
+ 
+ 	if (ptlrpc_import_in_recovery(imp)) {
+-		struct l_wait_info lwi;
+ 		long timeout;
+ 
+ 		if (AT_OFF) {
+@@ -1510,10 +1509,12 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+ 			timeout = at_get(&imp->imp_at.iat_service_estimate[idx]) * HZ;
  		}
  
--		LASSERT(rc == -ETIMEDOUT);
- 		DEBUG_REQ(D_WARNING, req, "Unexpectedly long timeout: desc %p",
- 			  desc);
+-		lwi = LWI_TIMEOUT_INTR(cfs_timeout_cap(timeout),
+-				       back_to_sleep, LWI_ON_SIGNAL_NOOP, NULL);
+-		rc = l_wait_event(imp->imp_recovery_waitq,
+-				  !ptlrpc_import_in_recovery(imp), &lwi);
++		if (wait_event_idle_timeout(imp->imp_recovery_waitq,
++					    !ptlrpc_import_in_recovery(imp),
++					    cfs_timeout_cap(timeout)) == 0)
++			l_wait_event_abortable(
++				imp->imp_recovery_waitq,
++				!ptlrpc_import_in_recovery(imp));
  	}
+ 
+ 	spin_lock(&imp->imp_lock);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index dad2f9290f70..437b4b2a9072 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -230,12 +230,13 @@ void ptlrpcd_add_req(struct ptlrpc_request *req)
+ 
+ 	spin_lock(&req->rq_lock);
+ 	if (req->rq_invalid_rqset) {
+-		struct l_wait_info lwi = LWI_TIMEOUT(5 * HZ,
+-						     back_to_sleep, NULL);
+-
+ 		req->rq_invalid_rqset = 0;
+ 		spin_unlock(&req->rq_lock);
+-		l_wait_event(req->rq_set_waitq, !req->rq_set, &lwi);
++		if (wait_event_idle_timeout(req->rq_set_waitq,
++					    !req->rq_set,
++					    5 * HZ) == 0)
++			wait_event_idle(req->rq_set_waitq,
++					!req->rq_set);
+ 	} else if (req->rq_set) {
+ 		/* If we have a valid "rq_set", just reuse it to avoid double
+ 		 * linked.
