@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 13 Feb 2018 08:30:47 +1100
-Subject: [lustre-devel] [PATCH 1/5] staging: lustre: llite: handle
- DCACHE_PAR_LOOKUP in ll_dcompare
+Date: Tue, 13 Feb 2018 08:30:48 +1100
+Subject: [lustre-devel] [PATCH 2/5] staging: lustre: llite: use
+ d_splice_alias for directories.
 In-Reply-To: <151847081541.26699.3911837371411314092.stgit@noble>
 References: <151847081541.26699.3911837371411314092.stgit@noble>
-Message-ID: <151847104793.26699.5632904371432185858.stgit@noble>
+Message-ID: <151847104797.26699.15971881529877617500.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,56 +12,43 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Al Viro <viro@ZenIV.linux.org.uk>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-ll_dcompare is used in two slightly different contexts.
-It is called (from __d_lookup, __d_lookup_rcu, and d_exact_alias)
-to compare a name against a dentry that is already in the dcache.
-It is also called (from d_alloc_parallel) to compare a name against
-a dentry that is not in the dcache yet, but is part of an active
-"lookup" or "atomic_open" call.
-
-In the first case we need to avoid matching against "invalid" dentries
-as a match implies something about ldlm locks which is not accurate.
-In the second case we need to allow matching against "invalid" dentries
-as the dentry will always be invalid (set by ll_d_init()) but we still
-want to guard against multiple concurrent lookups of the same name.
-d_alloc_parallel() will repeat the call to ll_dcompare() after
-the lookup has finished, and if the dentry is still invalid, the whole
-d_alloc_parallel() process is repeated.  This assures us that it is safe
-to report success whenever d_in_lookup().
-
-With this patch, there will never be two threads concurrently in
-ll_lookup_nd(), looking up the same name in the same directory.
+In the Linux dcache a directory only ever has one dentry,
+so d_splice_alias() can be used by ll_splice_alias() for directories.
+It will find the one dentry whether it is DCACHE_DISCONNECTED or
+IS_ROOT() or d_lustre_invalid().
+Separating out the directories from non-directories will allow us
+to simplify the non-directory code.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/llite/dcache.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/staging/lustre/lustre/llite/namei.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/dcache.c b/drivers/staging/lustre/lustre/llite/dcache.c
-index 549369739d80..dc30b4582234 100644
---- a/drivers/staging/lustre/lustre/llite/dcache.c
-+++ b/drivers/staging/lustre/lustre/llite/dcache.c
-@@ -74,6 +74,12 @@ static void ll_release(struct dentry *de)
-  * an AST before calling d_revalidate_it().  The dentry still exists (marked
-  * INVALID) so d_lookup() matches it, but we have no lock on it (so
-  * lock_match() fails) and we spin around real_lookup().
-+ *
-+ * This race doesn't apply to lookups in d_alloc_parallel(), and for
-+ * those we want to ensure that only one dentry with a given name is
-+ * in ll_lookup_nd() at a time.  So allow invalid dentries to match
-+ * while d_in_lookup().  We will be called again when the lookup
-+ * completes, and can give a different answer then.
+diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
+index a2687f46a16d..60fb18f83bf8 100644
+--- a/drivers/staging/lustre/lustre/llite/namei.c
++++ b/drivers/staging/lustre/lustre/llite/namei.c
+@@ -434,7 +434,7 @@ static struct dentry *ll_find_alias(struct inode *inode, struct dentry *dentry)
   */
- static int ll_dcompare(const struct dentry *dentry,
- 		       unsigned int len, const char *str,
-@@ -93,6 +99,10 @@ static int ll_dcompare(const struct dentry *dentry,
- 	if (d_mountpoint((struct dentry *)dentry))
- 		return 0;
+ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de)
+ {
+-	if (inode) {
++	if (inode && !S_ISDIR(inode->i_mode)) {
+ 		struct dentry *new = ll_find_alias(inode, de);
  
-+	/* ensure exclusion against parallel lookup of the same name */
-+	if (d_in_lookup((struct dentry*)dentry))
-+		return 0;
+ 		if (new) {
+@@ -445,8 +445,13 @@ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de)
+ 			      new, d_inode(new), d_count(new), new->d_flags);
+ 			return new;
+ 		}
++		d_add(de, inode);
++	} else {
++		struct dentry *new = d_splice_alias(inode, de);
 +
- 	if (d_lustre_invalid(dentry))
- 		return 1;
- 
++		if (new)
++			de = new;
+ 	}
+-	d_add(de, inode);
+ 	CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
+ 	       de, d_inode(de), d_count(de), de->d_flags);
+ 	return de;
