@@ -1,50 +1,48 @@
-From: Darrick J. Wong <darrick.wong@oracle.com>
-Date: Sun, 11 Feb 2018 18:16:09 -0800
-Subject: [lustre-devel] [e2fsprogs PATCH] tune2fs: don't recover journal
- if device is busy.
-In-Reply-To: <871shrrok4.fsf@notabene.neil.brown.name>
-References: <871shrrok4.fsf@notabene.neil.brown.name>
-Message-ID: <20180212021609.GA5204@magnolia>
+From: Joe Perches <joe@perches.com>
+Date: Sun, 11 Feb 2018 19:21:06 -0800
+Subject: [lustre-devel] [PATCH] staging: lustre: update the TODO list
+In-Reply-To: <alpine.LFD.2.21.1802120158500.3291@casper.infradead.org>
+References: <1518390008-17876-1-git-send-email-jsimmons@infradead.org>
+ <1518390961.4139.1.camel@perches.com>
+ <alpine.LFD.2.21.1802120158500.3291@casper.infradead.org>
+Message-ID: <1518405666.4139.8.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: tytso@mit.edu, linux-ext4@vger.kernel.org, lustre <lustre-devel@lists.lustre.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Mon, Feb 12, 2018 at 12:20:43PM +1100, NeilBrown wrote:
+On Mon, 2018-02-12 at 02:06 +0000, James Simmons wrote:
+> > On Sun, 2018-02-11 at 18:00 -0500, James Simmons wrote:
+> > > As more people become involved with the progression of the lustre
+> > > client it needs to more clear what needs to be done to leave
+> > > staging. Update the TODO list with the various bugs and changes
+> > > to accomplish this. Some are simple bugs and others are far more
+> > > complex task that will change many lines of code. Some even cover
+> > > updating the user land utilities to meet the kernel requirements.
+> > > Several bugs have already been addressed and just need to be
+> > > pushed to the staging tree.
+> > 
+> > Nice list.
 > 
-> tune2fs currently replays the journal if it needs
-> recovery and the filesystem isn't mounted.
+> Thanks. Its nice to have a direction :-)
 > 
-> The test for "is the filesystem mounted" isn't completely robust.
-> Lustre makes use of ext4 filesystems in a way that they are mounted
-> without being visible in /proc/mounts or similar.
-> This usage can easily be detected by attempting to open the device
-> with O_EXCL.  tune2fs already does this and the EXT2_MF_BUSY flag
-> is set if open(O_EXCL) fails.
-> Several uses other than lustre mounts could cause O_EXCL to fail,
-> but in any case it seems unwise to recover the journal when something
-> else is keeping the device busy.
+> > Are or should those entries that have been addressed
+> > also in this new list?
 > 
-> So add an extra test to avoid journal recovery when the device
-> is busy.  This fixes some problems with lustre usage.
-> 
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> 
-> --
-> Note: it seems wrong to recover the journal *after* making
-> changes to the superblock - there is a good chance that
-> recovering the journal will over-write those changes.
-> This is what was happening that lead me to this problem.
-> Shouldn't journal recovery happen *first*??
+> Do you mean by those entries what originally was in the
+> TODO list or what has been fixed over the last 2 years?
 
-Yes.  Oops. :/
+My reading of
 
-This whole hunk ought to move up to be right after
-ext2fs_check_if_mounted, I think.
+> Several bugs have already been addressed and just need to be
+> pushed to the staging tree.
 
-As for this patch itself,
-Reviewed-by: Darrick J. Wong <darrick.wong@oracle.com>
+is that the new list contains entries for things
+that have already been fixed but have not yet
+been pushed to the staging tree.
 
---D
+So, if there are entries in the new TODO list
+that really are fixed, but not yet posted, then
+marking those entries as TODO seems inappropriate.
