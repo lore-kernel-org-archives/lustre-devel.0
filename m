@@ -1,307 +1,187 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Tue, 13 Feb 2018 18:15:58 +0000
-Subject: [lustre-devel] [PATCH 19/19] staging: lustre: remove
- l_wait_event() and related code
-In-Reply-To: <151847927929.19840.14894766883488647956.stgit@noble>
+From: NeilBrown <neilb@suse.com>
+Date: Wed, 14 Feb 2018 07:17:30 +1100
+Subject: [lustre-devel] [PATCH 08/19 - v2] staging: lustre: simplify waiting
+ in ldlm_completion_ast()
+In-Reply-To: <151847055674.22826.12912356108048917428.stgit@noble>
 References: <151847037709.22826.16175867257667686132.stgit@noble>
- <151847927929.19840.14894766883488647956.stgit@noble>
-Message-ID: <7207F5AF-1798-4C53-8EBF-6A8316004D1C@cray.com>
+ <151847055674.22826.12912356108048917428.stgit@noble>
+Message-ID: <87fu64r6ed.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas
- Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-With the fix from yesterday, these look good.  Thanks, Neil.
+
+If a signal-callback (lwi_on_signal) is set without lwi_allow_intr, as
+is the case in ldlm_completion_ast(), the behavior depends on the
+timeout set.
+
+If a timeout is set, then signals are ignored.  If the timeout is
+reached, the timeout handler is called.  If the timeout handler
+return 0, which ldlm_expired_completion_wait() always does, the
+l_wait_event() switches to exactly the behavior if no timeout was set.
+
+If no timeout is set, then "fatal" signals are not ignored.  If one
+arrives the callback is run, but as the callback is empty in this
+case, that is not relevant.
+
+This can be simplified to:
+ if a timeout is wanted
+     wait_event_idle_timeout()
+     if that timed out, call the timeout handler
+ l_wait_event_abortable()
+
+i.e. the code always waits indefinitely.  Sometimes it performs a
+non-abortable wait first.  Sometimes it doesn't.  But it only
+aborts before the condition is true if it is signaled.
+This doesn't quite agree with the comments and debug messages.
+
+Now that we call the timeout handler (ldlm_expired_completion_wait())
+wait directly, we can pass the two args directly rather then
+using a special-purpose struct.
 
 Reviewed-by: Patrick Farrell <paf@cray.com>
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: NeilBrown <neilb@suse.com>
+---
 
-- Patrick
+Patrick discovered a bug in v1, which this v2 fixes.
 
-?On 2/12/18, 5:52 PM, "lustre-devel on behalf of NeilBrown" <lustre-devel-bounces at lists.lustre.org on behalf of neilb@suse.com> wrote:
+Greg - do you need me to resend the whole series, or are you ok with
+taking this replacement in the rest of the original series?
 
-    These macros are no longer used, so they can
-    be removed.
-    
-    Reviewed-by: James Simmons <jsimmons@infradead.org>
-    Signed-off-by: NeilBrown <neilb@suse.com>
-    ---
-     drivers/staging/lustre/lustre/include/lustre_lib.h |  249 --------------------
-     1 file changed, 249 deletions(-)
-    
-    diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-    index ccc1a329e42b..1efd86f18c1f 100644
-    --- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-    +++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-    @@ -76,123 +76,6 @@ int do_set_info_async(struct obd_import *imp,
-     
-     void target_send_reply(struct ptlrpc_request *req, int rc, int fail_id);
-     
-    -/*
-    - * l_wait_event is a flexible sleeping function, permitting simple caller
-    - * configuration of interrupt and timeout sensitivity along with actions to
-    - * be performed in the event of either exception.
-    - *
-    - * The first form of usage looks like this:
-    - *
-    - * struct l_wait_info lwi = LWI_TIMEOUT_INTR(timeout, timeout_handler,
-    - *					   intr_handler, callback_data);
-    - * rc = l_wait_event(waitq, condition, &lwi);
-    - *
-    - * l_wait_event() makes the current process wait on 'waitq' until 'condition'
-    - * is TRUE or a "killable" signal (SIGTERM, SIKGILL, SIGINT) is pending.  It
-    - * returns 0 to signify 'condition' is TRUE, but if a signal wakes it before
-    - * 'condition' becomes true, it optionally calls the specified 'intr_handler'
-    - * if not NULL, and returns -EINTR.
-    - *
-    - * If a non-zero timeout is specified, signals are ignored until the timeout
-    - * has expired.  At this time, if 'timeout_handler' is not NULL it is called.
-    - * If it returns FALSE l_wait_event() continues to wait as described above with
-    - * signals enabled.  Otherwise it returns -ETIMEDOUT.
-    - *
-    - * LWI_INTR(intr_handler, callback_data) is shorthand for
-    - * LWI_TIMEOUT_INTR(0, NULL, intr_handler, callback_data)
-    - *
-    - * The second form of usage looks like this:
-    - *
-    - * struct l_wait_info lwi = LWI_TIMEOUT(timeout, timeout_handler);
-    - * rc = l_wait_event(waitq, condition, &lwi);
-    - *
-    - * This form is the same as the first except that it COMPLETELY IGNORES
-    - * SIGNALS.  The caller must therefore beware that if 'timeout' is zero, or if
-    - * 'timeout_handler' is not NULL and returns FALSE, then the ONLY thing that
-    - * can unblock the current process is 'condition' becoming TRUE.
-    - *
-    - * Another form of usage is:
-    - * struct l_wait_info lwi = LWI_TIMEOUT_INTERVAL(timeout, interval,
-    - *					       timeout_handler);
-    - * rc = l_wait_event(waitq, condition, &lwi);
-    - * This is the same as previous case, but condition is checked once every
-    - * 'interval' jiffies (if non-zero).
-    - *
-    - * Subtle synchronization point: this macro does *not* necessary takes
-    - * wait-queue spin-lock before returning, and, hence, following idiom is safe
-    - * ONLY when caller provides some external locking:
-    - *
-    - *	     Thread1			    Thread2
-    - *
-    - *   l_wait_event(&obj->wq, ....);				       (1)
-    - *
-    - *				    wake_up(&obj->wq):		 (2)
-    - *					 spin_lock(&q->lock);	  (2.1)
-    - *					 __wake_up_common(q, ...);     (2.2)
-    - *					 spin_unlock(&q->lock, flags); (2.3)
-    - *
-    - *   kfree(obj);						  (3)
-    - *
-    - * As l_wait_event() may "short-cut" execution and return without taking
-    - * wait-queue spin-lock, some additional synchronization is necessary to
-    - * guarantee that step (3) can begin only after (2.3) finishes.
-    - *
-    - * XXX nikita: some ptlrpc daemon threads have races of that sort.
-    - *
-    - */
-    -
-    -#define LWI_ON_SIGNAL_NOOP ((void (*)(void *))(-1))
-    -
-    -struct l_wait_info {
-    -	long lwi_timeout;
-    -	long lwi_interval;
-    -	int	    lwi_allow_intr;
-    -	int  (*lwi_on_timeout)(void *);
-    -	void (*lwi_on_signal)(void *);
-    -	void  *lwi_cb_data;
-    -};
-    -
-    -/* NB: LWI_TIMEOUT ignores signals completely */
-    -#define LWI_TIMEOUT(time, cb, data)	     \
-    -((struct l_wait_info) {			 \
-    -	.lwi_timeout    = time,		 \
-    -	.lwi_on_timeout = cb,		   \
-    -	.lwi_cb_data    = data,		 \
-    -	.lwi_interval   = 0,		    \
-    -	.lwi_allow_intr = 0		     \
-    -})
-    -
-    -#define LWI_TIMEOUT_INTERVAL(time, interval, cb, data)  \
-    -((struct l_wait_info) {				 \
-    -	.lwi_timeout    = time,			 \
-    -	.lwi_on_timeout = cb,			   \
-    -	.lwi_cb_data    = data,			 \
-    -	.lwi_interval   = interval,		     \
-    -	.lwi_allow_intr = 0			     \
-    -})
-    -
-    -#define LWI_TIMEOUT_INTR(time, time_cb, sig_cb, data)   \
-    -((struct l_wait_info) {				 \
-    -	.lwi_timeout    = time,			 \
-    -	.lwi_on_timeout = time_cb,		      \
-    -	.lwi_on_signal  = sig_cb,		       \
-    -	.lwi_cb_data    = data,			 \
-    -	.lwi_interval   = 0,			    \
-    -	.lwi_allow_intr = 0			     \
-    -})
-    -
-    -#define LWI_TIMEOUT_INTR_ALL(time, time_cb, sig_cb, data)       \
-    -((struct l_wait_info) {					 \
-    -	.lwi_timeout    = time,				 \
-    -	.lwi_on_timeout = time_cb,			      \
-    -	.lwi_on_signal  = sig_cb,			       \
-    -	.lwi_cb_data    = data,				 \
-    -	.lwi_interval   = 0,				    \
-    -	.lwi_allow_intr = 1				     \
-    -})
-    -
-    -#define LWI_INTR(cb, data)  LWI_TIMEOUT_INTR(0, NULL, cb, data)
-    -
-     #define LUSTRE_FATAL_SIGS (sigmask(SIGKILL) | sigmask(SIGINT) |		\
-     			   sigmask(SIGTERM) | sigmask(SIGQUIT) |	\
-     			   sigmask(SIGALRM))
-    @@ -201,138 +84,6 @@ static inline int l_fatal_signal_pending(struct task_struct *p)
-     	return signal_pending(p) && sigtestsetmask(&p->pending.signal, LUSTRE_FATAL_SIGS);
-     }
-     
-    -/**
-    - * wait_queue_entry_t of Linux (version < 2.6.34) is a FIFO list for exclusively
-    - * waiting threads, which is not always desirable because all threads will
-    - * be waken up again and again, even user only needs a few of them to be
-    - * active most time. This is not good for performance because cache can
-    - * be polluted by different threads.
-    - *
-    - * LIFO list can resolve this problem because we always wakeup the most
-    - * recent active thread by default.
-    - *
-    - * NB: please don't call non-exclusive & exclusive wait on the same
-    - * waitq if add_wait_queue_exclusive_head is used.
-    - */
-    -#define add_wait_queue_exclusive_head(waitq, link)		\
-    -{								\
-    -	unsigned long flags;					\
-    -								\
-    -	spin_lock_irqsave(&((waitq)->lock), flags);		\
-    -	__add_wait_queue_exclusive(waitq, link);		\
-    -	spin_unlock_irqrestore(&((waitq)->lock), flags);	\
-    -}
-    -
-    -/*
-    - * wait for @condition to become true, but no longer than timeout, specified
-    - * by @info.
-    - */
-    -#define __l_wait_event(wq, condition, info, ret, l_add_wait)		   \
-    -do {									   \
-    -	wait_queue_entry_t __wait;						 \
-    -	long __timeout = info->lwi_timeout;			  \
-    -	sigset_t   __blocked;					      \
-    -	int   __allow_intr = info->lwi_allow_intr;			     \
-    -									       \
-    -	ret = 0;							       \
-    -	if (condition)							 \
-    -		break;							 \
-    -									       \
-    -	init_waitqueue_entry(&__wait, current);					    \
-    -	l_add_wait(&wq, &__wait);					      \
-    -									       \
-    -	/* Block all signals (just the non-fatal ones if no timeout). */       \
-    -	if (info->lwi_on_signal && (__timeout == 0 || __allow_intr))   \
-    -		__blocked = cfs_block_sigsinv(LUSTRE_FATAL_SIGS);	      \
-    -	else								   \
-    -		__blocked = cfs_block_sigsinv(0);			      \
-    -									       \
-    -	for (;;) {							     \
-    -		if (condition)						 \
-    -			break;						 \
-    -									       \
-    -		set_current_state(TASK_INTERRUPTIBLE);			       \
-    -									       \
-    -		if (__timeout == 0) {					  \
-    -			schedule();					       \
-    -		} else {						       \
-    -			long interval = info->lwi_interval ?	  \
-    -					     min_t(long,	     \
-    -						 info->lwi_interval, __timeout) : \
-    -					     __timeout;			\
-    -			long remaining = schedule_timeout(interval);\
-    -			__timeout = cfs_time_sub(__timeout,		    \
-    -					    cfs_time_sub(interval, remaining));\
-    -			if (__timeout == 0) {				  \
-    -				if (!info->lwi_on_timeout ||		      \
-    -				    info->lwi_on_timeout(info->lwi_cb_data)) { \
-    -					ret = -ETIMEDOUT;		      \
-    -					break;				 \
-    -				}					      \
-    -				/* Take signals after the timeout expires. */  \
-    -				if (info->lwi_on_signal)		       \
-    -				    (void)cfs_block_sigsinv(LUSTRE_FATAL_SIGS);\
-    -			}						      \
-    -		}							      \
-    -									       \
-    -		set_current_state(TASK_RUNNING);			       \
-    -									       \
-    -		if (condition)						 \
-    -			break;						 \
-    -		if (signal_pending(current)) {				    \
-    -			if (info->lwi_on_signal &&		     \
-    -			    (__timeout == 0 || __allow_intr)) {		\
-    -				if (info->lwi_on_signal != LWI_ON_SIGNAL_NOOP) \
-    -					info->lwi_on_signal(info->lwi_cb_data);\
-    -				ret = -EINTR;				  \
-    -				break;					 \
-    -			}						      \
-    -			/* We have to do this here because some signals */     \
-    -			/* are not blockable - ie from strace(1).       */     \
-    -			/* In these cases we want to schedule_timeout() */     \
-    -			/* again, because we don't want that to return  */     \
-    -			/* -EINTR when the RPC actually succeeded.      */     \
-    -			/* the recalc_sigpending() below will deliver the */     \
-    -			/* signal properly.			     */     \
-    -			cfs_clear_sigpending();				\
-    -		}							      \
-    -	}								      \
-    -									       \
-    -	cfs_restore_sigs(__blocked);					   \
-    -									       \
-    -	remove_wait_queue(&wq, &__wait);					   \
-    -} while (0)
-    -
-    -#define l_wait_event(wq, condition, info)		       \
-    -({							      \
-    -	int		 __ret;			      \
-    -	struct l_wait_info *__info = (info);		    \
-    -								\
-    -	__l_wait_event(wq, condition, __info,		   \
-    -		       __ret, add_wait_queue);		   \
-    -	__ret;						  \
-    -})
-    -
-    -#define l_wait_event_exclusive(wq, condition, info)	     \
-    -({							      \
-    -	int		 __ret;			      \
-    -	struct l_wait_info *__info = (info);		    \
-    -								\
-    -	__l_wait_event(wq, condition, __info,		   \
-    -		       __ret, add_wait_queue_exclusive);	 \
-    -	__ret;						  \
-    -})
-    -
-    -#define l_wait_event_exclusive_head(wq, condition, info)	\
-    -({							      \
-    -	int		 __ret;			      \
-    -	struct l_wait_info *__info = (info);		    \
-    -								\
-    -	__l_wait_event(wq, condition, __info,		   \
-    -		       __ret, add_wait_queue_exclusive_head);    \
-    -	__ret;						  \
-    -})
-    -
-     /** @} lib */
-     
-     
-    
-    
-    _______________________________________________
-    lustre-devel mailing list
-    lustre-devel at lists.lustre.org
-    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-    
+Thanks,
+NeilBrown
+
+
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c | 53 +++++++++--------------
+ 1 file changed, 20 insertions(+), 33 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+index a244fa717134..c3c9186b74ce 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+@@ -72,15 +72,6 @@ MODULE_PARM_DESC(ldlm_enqueue_min, "lock enqueue timeout minimum");
+ /* in client side, whether the cached locks will be canceled before replay */
+ unsigned int ldlm_cancel_unused_locks_before_replay = 1;
+ 
+-static void interrupted_completion_wait(void *data)
+-{
+-}
+-
+-struct lock_wait_data {
+-	struct ldlm_lock *lwd_lock;
+-	__u32	     lwd_conn_cnt;
+-};
+-
+ struct ldlm_async_args {
+ 	struct lustre_handle lock_handle;
+ };
+@@ -112,10 +103,8 @@ static int ldlm_request_bufsize(int count, int type)
+ 	return sizeof(struct ldlm_request) + avail;
+ }
+ 
+-static int ldlm_expired_completion_wait(void *data)
++static void ldlm_expired_completion_wait(struct ldlm_lock *lock, __u32 conn_cnt)
+ {
+-	struct lock_wait_data *lwd = data;
+-	struct ldlm_lock *lock = lwd->lwd_lock;
+ 	struct obd_import *imp;
+ 	struct obd_device *obd;
+ 
+@@ -135,19 +124,17 @@ static int ldlm_expired_completion_wait(void *data)
+ 			if (last_dump == 0)
+ 				libcfs_debug_dumplog();
+ 		}
+-		return 0;
++		return;
+ 	}
+ 
+ 	obd = lock->l_conn_export->exp_obd;
+ 	imp = obd->u.cli.cl_import;
+-	ptlrpc_fail_import(imp, lwd->lwd_conn_cnt);
++	ptlrpc_fail_import(imp, conn_cnt);
+ 	LDLM_ERROR(lock,
+ 		   "lock timed out (enqueued at %lld, %llds ago), entering recovery for %s@%s",
+ 		   (s64)lock->l_last_activity,
+ 		   (s64)(ktime_get_real_seconds() - lock->l_last_activity),
+ 		   obd2cli_tgt(obd), imp->imp_connection->c_remote_uuid.uuid);
+-
+-	return 0;
+ }
+ 
+ /**
+@@ -251,11 +238,10 @@ EXPORT_SYMBOL(ldlm_completion_ast_async);
+ int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+ {
+ 	/* XXX ALLOCATE - 160 bytes */
+-	struct lock_wait_data lwd;
+ 	struct obd_device *obd;
+ 	struct obd_import *imp = NULL;
+-	struct l_wait_info lwi;
+ 	__u32 timeout;
++	__u32 conn_cnt = 0;
+ 	int rc = 0;
+ 
+ 	if (flags == LDLM_FL_WAIT_NOREPROC) {
+@@ -281,32 +267,33 @@ int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
+ 
+ 	timeout = ldlm_cp_timeout(lock);
+ 
+-	lwd.lwd_lock = lock;
+ 	lock->l_last_activity = ktime_get_real_seconds();
+ 
+-	if (ldlm_is_no_timeout(lock)) {
+-		LDLM_DEBUG(lock, "waiting indefinitely because of NO_TIMEOUT");
+-		lwi = LWI_INTR(interrupted_completion_wait, &lwd);
+-	} else {
+-		lwi = LWI_TIMEOUT_INTR(timeout * HZ,
+-				       ldlm_expired_completion_wait,
+-				       interrupted_completion_wait, &lwd);
+-	}
+-
+ 	if (imp) {
+ 		spin_lock(&imp->imp_lock);
+-		lwd.lwd_conn_cnt = imp->imp_conn_cnt;
++		conn_cnt = imp->imp_conn_cnt;
+ 		spin_unlock(&imp->imp_lock);
+ 	}
+-
+ 	if (OBD_FAIL_CHECK_RESET(OBD_FAIL_LDLM_INTR_CP_AST,
+ 				 OBD_FAIL_LDLM_CP_BL_RACE | OBD_FAIL_ONCE)) {
+ 		ldlm_set_fail_loc(lock);
+ 		rc = -EINTR;
+ 	} else {
+-		/* Go to sleep until the lock is granted or cancelled. */
+-		rc = l_wait_event(lock->l_waitq,
+-				  is_granted_or_cancelled(lock), &lwi);
++		/* Go to sleep until the lock is granted or canceled. */
++		if (!ldlm_is_no_timeout(lock)) {
++			/* Wait uninterruptible for a while first */
++			rc = wait_event_idle_timeout(lock->l_waitq,
++						     is_granted_or_cancelled(lock),
++						     timeout * HZ);
++			if (rc == 0)
++				ldlm_expired_completion_wait(lock, conn_cnt);
++		}
++		/* Now wait abortable */
++		if (rc == 0)
++			rc = l_wait_event_abortable(lock->l_waitq,
++						    is_granted_or_cancelled(lock));
++		else
++			rc = 0;
+ 	}
+ 
+ 	if (rc) {
+-- 
+2.14.0.rc0.dirty
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180214/a0dfaf9a/attachment-0001.sig>
