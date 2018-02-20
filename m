@@ -1,9 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 20 Feb 2018 13:23:37 +1100
-Subject: [lustre-devel] [PATCH 03/21] staging: lustre: remove linux-curproc.c
+Subject: [lustre-devel] [PATCH 08/21] staging: lustre: make signal-blocking
+ functions inline
 In-Reply-To: <151909308778.25814.9912662268627044409.stgit@noble>
 References: <151909308778.25814.9912662268627044409.stgit@noble>
-Message-ID: <151909341763.25814.2230821270457016452.stgit@noble>
+Message-ID: <151909341780.25814.17116167688658061622.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -11,55 +12,68 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-The only functionality remaining here is
-cfs_curproc_cap_pack(),
-and it can be trivially implemented as an inline
-in curproc.h.
-So do that and remove the file.
+cfs_block_sigsinv() and cfs_restore_sigs() are now
+simple enough to inline them.
+This means we can discard linux-prim.c
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/include/linux/libcfs/curproc.h  |    6 +-
- drivers/staging/lustre/lnet/libcfs/Makefile        |    1 
- .../lustre/lnet/libcfs/linux/linux-curproc.c       |   78 --------------------
- 3 files changed, 5 insertions(+), 80 deletions(-)
- delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |   20 +++++-
+ drivers/staging/lustre/lnet/libcfs/Makefile        |    2 -
+ .../staging/lustre/lnet/libcfs/linux/linux-prim.c  |   62 --------------------
+ 3 files changed, 16 insertions(+), 68 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/curproc.h b/drivers/staging/lustre/include/linux/libcfs/curproc.h
-index 51f2179b7534..4702956805a6 100644
---- a/drivers/staging/lustre/include/linux/libcfs/curproc.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/curproc.h
-@@ -66,7 +66,11 @@ typedef u32 cfs_cap_t;
- 			 BIT(CAP_SYS_BOOT) |	\
- 			 BIT(CAP_SYS_RESOURCE))
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+index 9dff050810c4..4f8c65e6d883 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+@@ -64,11 +64,21 @@
+ #define LNET_ACCEPTOR_MIN_RESERVED_PORT    512
+ #define LNET_ACCEPTOR_MAX_RESERVED_PORT    1023
  
--cfs_cap_t cfs_curproc_cap_pack(void);
-+static inline cfs_cap_t cfs_curproc_cap_pack(void)
+-/*
+- * Defined by platform
+- */
+-void cfs_block_sigsinv(unsigned long sigs, sigset_t *sigset);
+-void cfs_restore_sigs(sigset_t *sigset);
++/* Block all signals except for the @sigs */
++static inline void cfs_block_sigsinv(unsigned long sigs, sigset_t *old)
 +{
-+	/* cfs_cap_t is only the first word of kernel_cap_t */
-+	return (cfs_cap_t)(current_cap().cap[0]);
++	sigset_t new;
++
++	siginitsetinv(&new, sigs);
++	sigorsets(&new, &current->blocked, &new);
++	sigprocmask(SIG_BLOCK, &new, old);
++}
++
++static inline void
++cfs_restore_sigs(sigset_t *old)
++{
++	sigprocmask(SIG_SETMASK, old, NULL);
 +}
  
- /* __LIBCFS_CURPROC_H__ */
- #endif
+ struct libcfs_ioctl_handler {
+ 	struct list_head item;
 diff --git a/drivers/staging/lustre/lnet/libcfs/Makefile b/drivers/staging/lustre/lnet/libcfs/Makefile
-index 730f2c675047..fccea8684f0c 100644
+index fccea8684f0c..a51a8b0b9921 100644
 --- a/drivers/staging/lustre/lnet/libcfs/Makefile
 +++ b/drivers/staging/lustre/lnet/libcfs/Makefile
-@@ -6,7 +6,6 @@ obj-$(CONFIG_LNET) += libcfs.o
+@@ -5,7 +5,7 @@ subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+ obj-$(CONFIG_LNET) += libcfs.o
  
  libcfs-linux-objs := linux-tracefile.o linux-debug.o
- libcfs-linux-objs += linux-prim.o linux-cpu.o
--libcfs-linux-objs += linux-curproc.o
+-libcfs-linux-objs += linux-prim.o linux-cpu.o
++libcfs-linux-objs += linux-cpu.o
  libcfs-linux-objs += linux-module.o
  libcfs-linux-objs += linux-crypto.o
  libcfs-linux-objs += linux-crypto-adler.o
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
 deleted file mode 100644
-index 6b75c5cdc3ec..000000000000
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c
+index 0766659ddf70..000000000000
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
 +++ /dev/null
-@@ -1,78 +0,0 @@
+@@ -1,62 +0,0 @@
 -// SPDX-License-Identifier: GPL-2.0
 -/*
 - * GPL HEADER START
@@ -86,55 +100,39 @@ index 6b75c5cdc3ec..000000000000
 - * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 - * Use is subject to license terms.
 - *
-- * Copyright (c) 2011, 2015, Intel Corporation.
+- * Copyright (c) 2011, 2012, Intel Corporation.
 - */
 -/*
 - * This file is part of Lustre, http://www.lustre.org/
 - * Lustre is a trademark of Sun Microsystems, Inc.
-- *
-- * libcfs/libcfs/linux/linux-curproc.c
-- *
-- * Lustre curproc API implementation for Linux kernel
-- *
-- * Author: Nikita Danilov <nikita@clusterfs.com>
 - */
 -
--#include <linux/sched.h>
--#include <linux/fs_struct.h>
--
--#include <linux/compat.h>
--#include <linux/thread_info.h>
--
 -#define DEBUG_SUBSYSTEM S_LNET
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/fs_struct.h>
+-#include <linux/sched/signal.h>
 -
 -#include <linux/libcfs/libcfs.h>
 -
--/*
-- * Implementation of cfs_curproc API (see portals/include/libcfs/curproc.h)
-- * for Linux kernel.
-- */
+-#if defined(CONFIG_KGDB)
+-#include <linux/kgdb.h>
+-#endif
 -
--static void cfs_kernel_cap_pack(kernel_cap_t kcap, cfs_cap_t *cap)
+-/* Block all signals except for the @sigs */
+-void cfs_block_sigsinv(unsigned long sigs, sigset_t *old)
 -{
--	/* XXX lost high byte */
--	*cap = kcap.cap[0];
--}
+-	sigset_t new;
 -
--cfs_cap_t cfs_curproc_cap_pack(void)
+-	siginitsetinv(&new, sigs);
+-	sigorsets(&new, &current->blocked, &new);
+-	sigprocmask(SIG_BLOCK, &new, old);
+-}
+-EXPORT_SYMBOL(cfs_block_sigsinv);
+-
+-void
+-cfs_restore_sigs(sigset_t *old)
 -{
--	cfs_cap_t cap;
--
--	cfs_kernel_cap_pack(current_cap(), &cap);
--	return cap;
+-	sigprocmask(SIG_SETMASK, old, NULL);
 -}
--EXPORT_SYMBOL(cfs_curproc_cap_pack);
--
--/*
-- * Local variables:
-- * c-indentation-style: "K&R"
-- * c-basic-offset: 8
-- * tab-width: 8
-- * fill-column: 80
-- * scroll-step: 1
-- * End:
-- */
+-EXPORT_SYMBOL(cfs_restore_sigs);
