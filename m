@@ -1,7 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 20 Feb 2018 13:23:37 +1100
-Subject: [lustre-devel] [PATCH 00/21] staging: assorted lustre clean-up
-Message-ID: <151909308778.25814.9912662268627044409.stgit@noble>
+Subject: [lustre-devel] [PATCH 05/21] staging: lustre: lnet: remove
+ cfs_block_allsigs calls.
+In-Reply-To: <151909308778.25814.9912662268627044409.stgit@noble>
+References: <151909308778.25814.9912662268627044409.stgit@noble>
+Message-ID: <151909341769.25814.4922187814462338726.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -9,114 +12,130 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-Following are assorted patches which clean up parts of lustre.
-One or two tiny buglets are fixed, but mostly the patches
-just make the code more readable, often by removing distractions.
+Both places that cfs_block_allsigs() is used here,
+the goal is to turn an interruptible wait into an
+uninterruptible way.
+So instead of blocking the signals, change TASK_INTERRUPTIBLE to
+TASK_NOLOAD.
+In each case, no other functions called while signals are blocked
+will sleep - just the one that has been fixed.
+In one case, an extra 'interruptible' flag needs to be passed
+down so the waiting decision can be made at the right place.
 
-The first several patches remove content from libcfs, completely
-removing 3 files.
-There are some list_for_each improvements in ptlrpc, and some
-code simplification in fid.
-Finally a small simplification in socklnd.
-
-(lnd ?? Lustre Networking Domain??)
-
-Thanks,
-NeilBrown
-
-
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
+ drivers/staging/lustre/include/linux/lnet/api.h |    1 +
+ drivers/staging/lustre/lnet/lnet/api-ni.c       |   15 +++------------
+ drivers/staging/lustre/lnet/lnet/lib-eq.c       |   10 +++++++---
+ 3 files changed, 11 insertions(+), 15 deletions(-)
 
-NeilBrown (21):
-      staging: lustre: replace all CFS_CAP_* macros with CAP_*
-      staging: lustre: opencode cfs_cap_{raise,lower,raised}
-      staging: lustre: remove linux-curproc.c
-      staging: lustre: remove unnecessary cfs_block_allsigs() calls
-      staging: lustre: lnet: remove cfs_block_allsigs calls.
-      staging: lustre: simplify linux-prim.c
-      staging: lustre: improve API and implementation of blocking signals.
-      staging: lustre: make signal-blocking functions inline
-      staging: lustre: discard libcfs_kvzalloc_cpt()
-      staging: lustre: discard lu_buf allocation library.
-      staging: lustre: improve some libcfs_kvzalloc calls.
-      staging: lustre: discard libcfs_kvzalloc and linux-mem.c
-      staging: lustre: remove phantom struct cfs_crypto_hash_desc
-      staging: lustre: fix assorted checkpatch errors
-      staging: lustre: ptlrpc: list_for_each improvements.
-      staging: lustre: fid: convert lcs_mutex to a spinlock
-      staging: lustre: fid: use wait_event_cmd()
-      staging: lustre: fid: remove seq_fid_alloc_fini() and simplify
-      staging: lustre: fid: fix up debugfs access to ->lcs_space
-      staging: lustre: fid: perform sanity checks before commiting
-      staging: lustre: socklnd: simplify ksnc_rx_iov_space
-
-
- .../staging/lustre/include/linux/libcfs/curproc.h  |   37 ++-----
- .../staging/lustre/include/linux/libcfs/libcfs.h   |   27 +++--
- .../lustre/include/linux/libcfs/libcfs_crypto.h    |   11 +-
- drivers/staging/lustre/include/linux/lnet/api.h    |    1 
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    6 -
- .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |   11 --
- .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |   10 --
- .../lustre/lnet/klnds/socklnd/socklnd_lib.c        |    2 
- drivers/staging/lustre/lnet/libcfs/Makefile        |    4 -
- .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   |    2 
- .../lustre/lnet/libcfs/linux/linux-crypto.c        |   29 ++---
- .../lustre/lnet/libcfs/linux/linux-curproc.c       |  108 -------------------
- .../staging/lustre/lnet/libcfs/linux/linux-mem.c   |   51 ---------
- .../staging/lustre/lnet/libcfs/linux/linux-prim.c  |  113 --------------------
- drivers/staging/lustre/lnet/lnet/acceptor.c        |    2 
- drivers/staging/lustre/lnet/lnet/api-ni.c          |   15 +--
- drivers/staging/lustre/lnet/lnet/lib-eq.c          |   10 +-
- drivers/staging/lustre/lnet/lnet/router.c          |    2 
- drivers/staging/lustre/lnet/selftest/timer.c       |    2 
- drivers/staging/lustre/lustre/fid/fid_request.c    |  106 ++++++-------------
- drivers/staging/lustre/lustre/fid/lproc_fid.c      |   44 +++++---
- drivers/staging/lustre/lustre/include/lu_object.h  |    7 -
- drivers/staging/lustre/lustre/include/lustre_fid.h |    2 
- drivers/staging/lustre/lustre/include/lustre_lib.h |   18 ++-
- drivers/staging/lustre/lustre/include/lustre_sec.h |    3 -
- drivers/staging/lustre/lustre/include/obd_class.h  |    8 +
- .../staging/lustre/lustre/include/obd_support.h    |    2 
- drivers/staging/lustre/lustre/llite/dcache.c       |    2 
- drivers/staging/lustre/lustre/llite/dir.c          |   10 +-
- drivers/staging/lustre/lustre/llite/file.c         |   12 +-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |    8 +
- drivers/staging/lustre/lustre/llite/llite_mmap.c   |    8 +
- drivers/staging/lustre/lustre/llite/xattr.c        |    2 
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    4 -
- drivers/staging/lustre/lustre/lov/lov_ea.c         |    2 
- drivers/staging/lustre/lustre/lov/lov_io.c         |    2 
- drivers/staging/lustre/lustre/lov/lov_lock.c       |    2 
- drivers/staging/lustre/lustre/lov/lov_object.c     |    4 -
- drivers/staging/lustre/lustre/lov/lov_pack.c       |    2 
- drivers/staging/lustre/lustre/lov/lov_request.c    |    2 
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    2 
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |    6 +
- drivers/staging/lustre/lustre/obdclass/linkea.c    |   16 ++-
- .../lustre/lustre/obdclass/linux/linux-module.c    |    4 -
- drivers/staging/lustre/lustre/obdclass/llog.c      |   22 ++--
- drivers/staging/lustre/lustre/obdclass/lu_object.c |   70 ------------
- .../lustre/lustre/obdclass/lustre_handles.c        |    4 -
- .../staging/lustre/lustre/obdecho/echo_client.c    |    8 +
- drivers/staging/lustre/lustre/osc/osc_cache.c      |    4 -
- drivers/staging/lustre/lustre/osc/osc_page.c       |    2 
- drivers/staging/lustre/lustre/osc/osc_request.c    |    2 
- drivers/staging/lustre/lustre/ptlrpc/client.c      |   93 +++++-----------
- drivers/staging/lustre/lustre/ptlrpc/import.c      |   34 ++----
- drivers/staging/lustre/lustre/ptlrpc/layout.c      |    2 
- drivers/staging/lustre/lustre/ptlrpc/pinger.c      |    8 -
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |   15 +--
- drivers/staging/lustre/lustre/ptlrpc/recover.c     |   28 ++---
- drivers/staging/lustre/lustre/ptlrpc/sec.c         |    4 -
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |    4 -
- drivers/staging/lustre/lustre/ptlrpc/sec_null.c    |    8 +
- drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |    8 +
- drivers/staging/lustre/lustre/ptlrpc/service.c     |   27 ++---
- 62 files changed, 295 insertions(+), 769 deletions(-)
- delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c
- delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c
- delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
-
---
-Signature
+diff --git a/drivers/staging/lustre/include/linux/lnet/api.h b/drivers/staging/lustre/include/linux/lnet/api.h
+index 31fcd33171b4..dae2e4f0056c 100644
+--- a/drivers/staging/lustre/include/linux/lnet/api.h
++++ b/drivers/staging/lustre/include/linux/lnet/api.h
+@@ -169,6 +169,7 @@ int LNetEQFree(struct lnet_handle_eq eventq_in);
+ int LNetEQPoll(struct lnet_handle_eq *eventqs_in,
+ 	       int		 neq_in,
+ 	       int		 timeout_ms,
++	       int		 interruptible,
+ 	       struct lnet_event *event_out,
+ 	       int		*which_eq_out);
+ /** @} lnet_eq */
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index 93e6274e9dac..48d25ccadbb3 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -961,19 +961,15 @@ static void
+ lnet_ping_md_unlink(struct lnet_ping_info *pinfo,
+ 		    struct lnet_handle_md *md_handle)
+ {
+-	sigset_t blocked = cfs_block_allsigs();
+-
+ 	LNetMDUnlink(*md_handle);
+ 	LNetInvalidateMDHandle(md_handle);
+ 
+ 	/* NB md could be busy; this just starts the unlink */
+ 	while (pinfo->pi_features != LNET_PING_FEAT_INVAL) {
+ 		CDEBUG(D_NET, "Still waiting for ping MD to unlink\n");
+-		set_current_state(TASK_UNINTERRUPTIBLE);
++		set_current_state(TASK_NOLOAD);
+ 		schedule_timeout(HZ);
+ 	}
+-
+-	cfs_restore_sigs(blocked);
+ }
+ 
+ static void
+@@ -2141,7 +2137,6 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
+ 	int nob;
+ 	int rc;
+ 	int rc2;
+-	sigset_t blocked;
+ 
+ 	infosz = offsetof(struct lnet_ping_info, pi_ni[n_ids]);
+ 
+@@ -2197,13 +2192,9 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
+ 
+ 	do {
+ 		/* MUST block for unlink to complete */
+-		if (unlinked)
+-			blocked = cfs_block_allsigs();
+-
+-		rc2 = LNetEQPoll(&eqh, 1, timeout_ms, &event, &which);
+ 
+-		if (unlinked)
+-			cfs_restore_sigs(blocked);
++		rc2 = LNetEQPoll(&eqh, 1, timeout_ms, !unlinked,
++				 &event, &which);
+ 
+ 		CDEBUG(D_NET, "poll %d(%d %d)%s\n", rc2,
+ 		       (rc2 <= 0) ? -1 : event.type,
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+index a173b69e2f92..ea53b5cb3f72 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
+@@ -308,7 +308,7 @@ lnet_eq_dequeue_event(struct lnet_eq *eq, struct lnet_event *ev)
+  */
+ 
+ static int
+-lnet_eq_wait_locked(int *timeout_ms)
++lnet_eq_wait_locked(int *timeout_ms, long state)
+ __must_hold(&the_lnet.ln_eq_wait_lock)
+ {
+ 	int tms = *timeout_ms;
+@@ -320,7 +320,7 @@ __must_hold(&the_lnet.ln_eq_wait_lock)
+ 		return -ENXIO; /* don't want to wait and no new event */
+ 
+ 	init_waitqueue_entry(&wl, current);
+-	set_current_state(TASK_INTERRUPTIBLE);
++	set_current_state(state);
+ 	add_wait_queue(&the_lnet.ln_eq_waitq, &wl);
+ 
+ 	lnet_eq_wait_unlock();
+@@ -359,6 +359,7 @@ __must_hold(&the_lnet.ln_eq_wait_lock)
+  * \param timeout_ms Time in milliseconds to wait for an event to occur on
+  * one of the EQs. The constant LNET_TIME_FOREVER can be used to indicate an
+  * infinite timeout.
++ * \param interruptible, if true, use TASK_INTERRUPTIBLE, else TASK_NOLOAD
+  * \param event,which On successful return (1 or -EOVERFLOW), \a event will
+  * hold the next event in the EQs, and \a which will contain the index of the
+  * EQ from which the event was taken.
+@@ -372,6 +373,7 @@ __must_hold(&the_lnet.ln_eq_wait_lock)
+  */
+ int
+ LNetEQPoll(struct lnet_handle_eq *eventqs, int neq, int timeout_ms,
++	   int interruptible,
+ 	   struct lnet_event *event, int *which)
+ {
+ 	int wait = 1;
+@@ -412,7 +414,9 @@ LNetEQPoll(struct lnet_handle_eq *eventqs, int neq, int timeout_ms,
+ 		 *  0 : don't want to wait anymore, but might have new event
+ 		 *      so need to call dequeue again
+ 		 */
+-		wait = lnet_eq_wait_locked(&timeout_ms);
++		wait = lnet_eq_wait_locked(&timeout_ms,
++					   interruptible ? TASK_INTERRUPTIBLE
++					   : TASK_NOLOAD);
+ 		if (wait < 0) /* no new event */
+ 			break;
+ 	}
