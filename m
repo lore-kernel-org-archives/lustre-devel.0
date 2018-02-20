@@ -1,174 +1,144 @@
-From: NeilBrown <neilb@suse.com>
-Date: Tue, 20 Feb 2018 13:23:37 +1100
-Subject: [lustre-devel] [PATCH 07/21] staging: lustre: improve API and
- implementation of blocking signals.
+From: Patrick Farrell <paf@cray.com>
+Date: Tue, 20 Feb 2018 04:18:07 +0000
+Subject: [lustre-devel] [PATCH 00/21] staging: assorted lustre clean-up
 In-Reply-To: <151909308778.25814.9912662268627044409.stgit@noble>
 References: <151909308778.25814.9912662268627044409.stgit@noble>
-Message-ID: <151909341776.25814.1357059430355267483.stgit@noble>
+Message-ID: <BN6PR1101MB213293D47D19B25752F4B7C9CBCF0@BN6PR1101MB2132.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: NeilBrown <neilb@suse.com>, Oleg Drokin <oleg.drokin@intel.com>, James
+ Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-According to comment for set_current_blocked() in
-kernel/signal.c, changing ->blocked directly is wrong.
-sigprocmask() should be called instead.
 
-So change cfs_block_sigsinv() and cfs_restore_sigs()
-to use sigprocmask().
-For consistency, change them to pass the sigset_t by reference
-rather than by value.
+Lustre networking driver.  (Or so I was taught)
 
-Also fix cfs_block_sigsinv() so that it correctly blocks
-signals above 32 on a 32bit host.
+Regards,
+Patrick
 
-Signed-off-by: NeilBrown <neilb@suse.com>
+
+________________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
+Sent: Monday, February 19, 2018 8:23:37 PM
+To: Oleg Drokin; James Simmons; Andreas Dilger; Greg Kroah-Hartman
+Cc: lkml; lustre
+Subject: [lustre-devel] [PATCH 00/21] staging: assorted lustre clean-up
+
+Following are assorted patches which clean up parts of lustre.
+One or two tiny buglets are fixed, but mostly the patches
+just make the code more readable, often by removing distractions.
+
+The first several patches remove content from libcfs, completely
+removing 3 files.
+There are some list_for_each improvements in ptlrpc, and some
+code simplification in fid.
+Finally a small simplification in socklnd.
+
+(lnd ?? Lustre Networking Domain??)
+
+Thanks,
+NeilBrown
+
+
 ---
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    4 ++-
- .../staging/lustre/lnet/libcfs/linux/linux-prim.c  |   24 ++++++--------------
- drivers/staging/lustre/lustre/include/lustre_lib.h |   18 ++++++++-------
- drivers/staging/lustre/lustre/llite/llite_mmap.c   |    8 +++----
- 4 files changed, 22 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index 7f06b0118154..9dff050810c4 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -67,8 +67,8 @@
- /*
-  * Defined by platform
-  */
--sigset_t cfs_block_sigsinv(unsigned long sigs);
--void cfs_restore_sigs(sigset_t sigset);
-+void cfs_block_sigsinv(unsigned long sigs, sigset_t *sigset);
-+void cfs_restore_sigs(sigset_t *sigset);
- 
- struct libcfs_ioctl_handler {
- 	struct list_head item;
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
-index 6b73b9845e3f..0766659ddf70 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
-@@ -44,29 +44,19 @@
- #endif
- 
- /* Block all signals except for the @sigs */
--sigset_t cfs_block_sigsinv(unsigned long sigs)
-+void cfs_block_sigsinv(unsigned long sigs, sigset_t *old)
- {
--	unsigned long flags;
--	sigset_t old;
-+	sigset_t new;
- 
--	spin_lock_irqsave(&current->sighand->siglock, flags);
--	old = current->blocked;
--	sigaddsetmask(&current->blocked, ~sigs);
--	recalc_sigpending();
--	spin_unlock_irqrestore(&current->sighand->siglock, flags);
--
--	return old;
-+	siginitsetinv(&new, sigs);
-+	sigorsets(&new, &current->blocked, &new);
-+	sigprocmask(SIG_BLOCK, &new, old);
- }
- EXPORT_SYMBOL(cfs_block_sigsinv);
- 
- void
--cfs_restore_sigs(sigset_t old)
-+cfs_restore_sigs(sigset_t *old)
- {
--	unsigned long flags;
--
--	spin_lock_irqsave(&current->sighand->siglock, flags);
--	current->blocked = old;
--	recalc_sigpending();
--	spin_unlock_irqrestore(&current->sighand->siglock, flags);
-+	sigprocmask(SIG_SETMASK, old, NULL);
- }
- EXPORT_SYMBOL(cfs_restore_sigs);
-diff --git a/drivers/staging/lustre/lustre/include/lustre_lib.h b/drivers/staging/lustre/lustre/include/lustre_lib.h
-index 1efd86f18c1f..0053eafc1c10 100644
---- a/drivers/staging/lustre/lustre/include/lustre_lib.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_lib.h
-@@ -94,31 +94,31 @@ static inline int l_fatal_signal_pending(struct task_struct *p)
-  */
- #define l_wait_event_abortable(wq, condition)				\
- ({									\
--	sigset_t __blocked;						\
-+	sigset_t __old_blocked;						\
- 	int __ret = 0;							\
--	__blocked = cfs_block_sigsinv(LUSTRE_FATAL_SIGS);		\
-+	cfs_block_sigsinv(LUSTRE_FATAL_SIGS, &__old_blocked);		\
- 	__ret = wait_event_interruptible(wq, condition);		\
--	cfs_restore_sigs(__blocked);					\
-+	cfs_restore_sigs(&__old_blocked);				\
- 	__ret;								\
- })
- 
- #define l_wait_event_abortable_timeout(wq, condition, timeout)		\
- ({									\
--	sigset_t __blocked;						\
-+	sigset_t __old_blocked;						\
- 	int __ret = 0;							\
--	__blocked = cfs_block_sigsinv(LUSTRE_FATAL_SIGS);		\
-+	cfs_block_sigsinv(LUSTRE_FATAL_SIGS, &__old_blocked);		\
- 	__ret = wait_event_interruptible_timeout(wq, condition, timeout);\
--	cfs_restore_sigs(__blocked);					\
-+	cfs_restore_sigs(&__old_blocked);				\
- 	__ret;								\
- })
- 
- #define l_wait_event_abortable_exclusive(wq, condition)			\
- ({									\
--	sigset_t __blocked;						\
-+	sigset_t __old_blocked;						\
- 	int __ret = 0;							\
--	__blocked = cfs_block_sigsinv(LUSTRE_FATAL_SIGS);		\
-+	cfs_block_sigsinv(LUSTRE_FATAL_SIGS, &__old_blocked);		\
- 	__ret = wait_event_interruptible_exclusive(wq, condition);	\
--	cfs_restore_sigs(__blocked);					\
-+	cfs_restore_sigs(&__old_blocked);				\
- 	__ret;								\
- })
- #endif /* _LUSTRE_LIB_H */
-diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-index c0533bd6f352..214b07554e62 100644
---- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-@@ -177,14 +177,14 @@ static int ll_page_mkwrite0(struct vm_area_struct *vma, struct page *vmpage,
- 	vio->u.fault.ft_vma    = vma;
- 	vio->u.fault.ft_vmpage = vmpage;
- 
--	set = cfs_block_sigsinv(sigmask(SIGKILL) | sigmask(SIGTERM));
-+	cfs_block_sigsinv(sigmask(SIGKILL) | sigmask(SIGTERM), &set);
- 
- 	inode = vvp_object_inode(io->ci_obj);
- 	lli = ll_i2info(inode);
- 
- 	result = cl_io_loop(env, io);
- 
--	cfs_restore_sigs(set);
-+	cfs_restore_sigs(&set);
- 
- 	if (result == 0) {
- 		struct inode *inode = file_inode(vma->vm_file);
-@@ -334,7 +334,7 @@ static int ll_fault(struct vm_fault *vmf)
- 	 * so that it can be killed by admin but not cause segfault by
- 	 * other signals.
- 	 */
--	set = cfs_block_sigsinv(sigmask(SIGKILL) | sigmask(SIGTERM));
-+	cfs_block_sigsinv(sigmask(SIGKILL) | sigmask(SIGTERM), &set);
- 
- restart:
- 	result = ll_fault0(vmf->vma, vmf);
-@@ -360,7 +360,7 @@ static int ll_fault(struct vm_fault *vmf)
- 
- 		result = VM_FAULT_LOCKED;
- 	}
--	cfs_restore_sigs(set);
-+	cfs_restore_sigs(&set);
- 	return result;
- }
- 
+NeilBrown (21):
+      staging: lustre: replace all CFS_CAP_* macros with CAP_*
+      staging: lustre: opencode cfs_cap_{raise,lower,raised}
+      staging: lustre: remove linux-curproc.c
+      staging: lustre: remove unnecessary cfs_block_allsigs() calls
+      staging: lustre: lnet: remove cfs_block_allsigs calls.
+      staging: lustre: simplify linux-prim.c
+      staging: lustre: improve API and implementation of blocking signals.
+      staging: lustre: make signal-blocking functions inline
+      staging: lustre: discard libcfs_kvzalloc_cpt()
+      staging: lustre: discard lu_buf allocation library.
+      staging: lustre: improve some libcfs_kvzalloc calls.
+      staging: lustre: discard libcfs_kvzalloc and linux-mem.c
+      staging: lustre: remove phantom struct cfs_crypto_hash_desc
+      staging: lustre: fix assorted checkpatch errors
+      staging: lustre: ptlrpc: list_for_each improvements.
+      staging: lustre: fid: convert lcs_mutex to a spinlock
+      staging: lustre: fid: use wait_event_cmd()
+      staging: lustre: fid: remove seq_fid_alloc_fini() and simplify
+      staging: lustre: fid: fix up debugfs access to ->lcs_space
+      staging: lustre: fid: perform sanity checks before commiting
+      staging: lustre: socklnd: simplify ksnc_rx_iov_space
+
+
+ .../staging/lustre/include/linux/libcfs/curproc.h  |   37 ++-----
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |   27 +++--
+ .../lustre/include/linux/libcfs/libcfs_crypto.h    |   11 +-
+ drivers/staging/lustre/include/linux/lnet/api.h    |    1
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    6 -
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |   11 --
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |   10 --
+ .../lustre/lnet/klnds/socklnd/socklnd_lib.c        |    2
+ drivers/staging/lustre/lnet/libcfs/Makefile        |    4 -
+ .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   |    2
+ .../lustre/lnet/libcfs/linux/linux-crypto.c        |   29 ++---
+ .../lustre/lnet/libcfs/linux/linux-curproc.c       |  108 -------------------
+ .../staging/lustre/lnet/libcfs/linux/linux-mem.c   |   51 ---------
+ .../staging/lustre/lnet/libcfs/linux/linux-prim.c  |  113 --------------------
+ drivers/staging/lustre/lnet/lnet/acceptor.c        |    2
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |   15 +--
+ drivers/staging/lustre/lnet/lnet/lib-eq.c          |   10 +-
+ drivers/staging/lustre/lnet/lnet/router.c          |    2
+ drivers/staging/lustre/lnet/selftest/timer.c       |    2
+ drivers/staging/lustre/lustre/fid/fid_request.c    |  106 ++++++-------------
+ drivers/staging/lustre/lustre/fid/lproc_fid.c      |   44 +++++---
+ drivers/staging/lustre/lustre/include/lu_object.h  |    7 -
+ drivers/staging/lustre/lustre/include/lustre_fid.h |    2
+ drivers/staging/lustre/lustre/include/lustre_lib.h |   18 ++-
+ drivers/staging/lustre/lustre/include/lustre_sec.h |    3 -
+ drivers/staging/lustre/lustre/include/obd_class.h  |    8 +
+ .../staging/lustre/lustre/include/obd_support.h    |    2
+ drivers/staging/lustre/lustre/llite/dcache.c       |    2
+ drivers/staging/lustre/lustre/llite/dir.c          |   10 +-
+ drivers/staging/lustre/lustre/llite/file.c         |   12 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |    8 +
+ drivers/staging/lustre/lustre/llite/llite_mmap.c   |    8 +
+ drivers/staging/lustre/lustre/llite/xattr.c        |    2
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    4 -
+ drivers/staging/lustre/lustre/lov/lov_ea.c         |    2
+ drivers/staging/lustre/lustre/lov/lov_io.c         |    2
+ drivers/staging/lustre/lustre/lov/lov_lock.c       |    2
+ drivers/staging/lustre/lustre/lov/lov_object.c     |    4 -
+ drivers/staging/lustre/lustre/lov/lov_pack.c       |    2
+ drivers/staging/lustre/lustre/lov/lov_request.c    |    2
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    2
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |    6 +
+ drivers/staging/lustre/lustre/obdclass/linkea.c    |   16 ++-
+ .../lustre/lustre/obdclass/linux/linux-module.c    |    4 -
+ drivers/staging/lustre/lustre/obdclass/llog.c      |   22 ++--
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |   70 ------------
+ .../lustre/lustre/obdclass/lustre_handles.c        |    4 -
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    8 +
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |    4 -
+ drivers/staging/lustre/lustre/osc/osc_page.c       |    2
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    2
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |   93 +++++-----------
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |   34 ++----
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      |    2
+ drivers/staging/lustre/lustre/ptlrpc/pinger.c      |    8 -
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |   15 +--
+ drivers/staging/lustre/lustre/ptlrpc/recover.c     |   28 ++---
+ drivers/staging/lustre/lustre/ptlrpc/sec.c         |    4 -
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |    4 -
+ drivers/staging/lustre/lustre/ptlrpc/sec_null.c    |    8 +
+ drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |    8 +
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |   27 ++---
+ 62 files changed, 295 insertions(+), 769 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-curproc.c
+ delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c
+ delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-prim.c
+
+--
+Signature
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
