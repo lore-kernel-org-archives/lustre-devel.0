@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 20 Feb 2018 13:23:37 +1100
-Subject: [lustre-devel] [PATCH 12/21] staging: lustre: discard
- libcfs_kvzalloc and linux-mem.c
+Date: Tue, 20 Feb 2018 13:23:38 +1100
+Subject: [lustre-devel] [PATCH 15/21] staging: lustre: ptlrpc: list_for_each
+ improvements.
 In-Reply-To: <151909308778.25814.9912662268627044409.stgit@noble>
 References: <151909308778.25814.9912662268627044409.stgit@noble>
-Message-ID: <151909341794.25814.12112685405079106591.stgit@noble>
+Message-ID: <151909341806.25814.159210690547707508.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,440 +12,534 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: lkml <linux-kernel@vger.kernel.org>, lustre <lustre-devel@lists.lustre.org>
 
-The only interesting difference between libcfs_kvzalloc()
-and kvzalloc() is that the former appears to work
-with GFP_NOFS, which the latter gives a WARN_ON_ONCE()
-when that is attempted.
+1/ use list_for_each_entry_safe() instead of
+   list_for_each_safe() and similar.
 
-Each libcfs_kvzalloc() should really be analysed
-and either converted to a kzalloc() call if the size is never
-more than a page, or to use GFP_KERNEL if no locks are held.
+2/ use list_first_entry() and list_last_entry() where appropriate.
 
-If there is ever a case where locks are held and a large allocation
-is needed, then some other technique should be used.
+3/ When removing everything from a list, use
+     while ((x = list_first_entry_or_null()) {
+   as it makes the intent clear
 
-It might be nice to not always blindly zero pages too...
-
-For now, just convert libcfs_kvzalloc() calls to
-kvzalloc(), and let the warning remind us that there is work to do.
+4/ No need to take a spinlock in a structure that is about
+   to be freed - we must have exclusive access at this stage.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    2 -
- drivers/staging/lustre/lnet/libcfs/Makefile        |    1 
- .../staging/lustre/lnet/libcfs/linux/linux-mem.c   |   44 --------------------
- drivers/staging/lustre/lustre/llite/file.c         |    2 -
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    4 +-
- drivers/staging/lustre/lustre/lov/lov_ea.c         |    2 -
- drivers/staging/lustre/lustre/lov/lov_io.c         |    2 -
- drivers/staging/lustre/lustre/lov/lov_lock.c       |    2 -
- drivers/staging/lustre/lustre/lov/lov_object.c     |    4 +-
- drivers/staging/lustre/lustre/lov/lov_pack.c       |    2 -
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |    2 -
- .../lustre/lustre/obdclass/linux/linux-module.c    |    2 -
- drivers/staging/lustre/lustre/obdclass/llog.c      |    4 +-
- .../lustre/lustre/obdclass/lustre_handles.c        |    2 -
- drivers/staging/lustre/lustre/ptlrpc/client.c      |    2 -
- drivers/staging/lustre/lustre/ptlrpc/sec.c         |    4 +-
- drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |    2 -
- drivers/staging/lustre/lustre/ptlrpc/sec_null.c    |    8 ++--
- drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |    8 ++--
- drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 +-
- 20 files changed, 28 insertions(+), 75 deletions(-)
- delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c
+ drivers/staging/lustre/lustre/ptlrpc/client.c  |   89 +++++++-----------------
+ drivers/staging/lustre/lustre/ptlrpc/import.c  |   34 +++------
+ drivers/staging/lustre/lustre/ptlrpc/pinger.c  |    8 +-
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c |   15 +---
+ drivers/staging/lustre/lustre/ptlrpc/recover.c |   26 +++----
+ drivers/staging/lustre/lustre/ptlrpc/service.c |   13 +---
+ 6 files changed, 59 insertions(+), 126 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index 039205763021..392793582956 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -112,8 +112,6 @@ static inline void *__container_of(void *ptr, unsigned long shift)
- 
- #define _LIBCFS_H
- 
--void *libcfs_kvzalloc(size_t size, gfp_t flags);
--
- extern struct miscdevice libcfs_dev;
- /**
-  * The path of debug log dump upcall script.
-diff --git a/drivers/staging/lustre/lnet/libcfs/Makefile b/drivers/staging/lustre/lnet/libcfs/Makefile
-index a51a8b0b9921..b7dc7ac11cc5 100644
---- a/drivers/staging/lustre/lnet/libcfs/Makefile
-+++ b/drivers/staging/lustre/lnet/libcfs/Makefile
-@@ -9,7 +9,6 @@ libcfs-linux-objs += linux-cpu.o
- libcfs-linux-objs += linux-module.o
- libcfs-linux-objs += linux-crypto.o
- libcfs-linux-objs += linux-crypto-adler.o
--libcfs-linux-objs += linux-mem.o
- 
- libcfs-linux-objs := $(addprefix linux/,$(libcfs-linux-objs))
- 
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c
-deleted file mode 100644
-index f2c001bac303..000000000000
---- a/drivers/staging/lustre/lnet/libcfs/linux/linux-mem.c
-+++ /dev/null
-@@ -1,44 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- */
--/*
-- * This file creates a memory allocation primitive for Lustre, that
-- * allows to fallback to vmalloc allocations should regular kernel allocations
-- * fail due to size or system memory fragmentation.
-- *
-- * Author: Oleg Drokin <green@linuxhacker.ru>
-- *
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Seagate Technology.
-- */
--#include <linux/slab.h>
--#include <linux/vmalloc.h>
--
--#include <linux/libcfs/libcfs.h>
--
--void *libcfs_kvzalloc(size_t size, gfp_t flags)
--{
--	void *ret;
--
--	ret = kzalloc(size, flags | __GFP_NOWARN);
--	if (!ret)
--		ret = __vmalloc(size, flags | __GFP_ZERO, PAGE_KERNEL);
--	return ret;
--}
--EXPORT_SYMBOL(libcfs_kvzalloc);
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 002a56793e89..ca5faea13b7e 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -3361,7 +3361,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
- 		goto out;
- 	}
- 
--	lvbdata = libcfs_kvzalloc(lmmsize, GFP_NOFS);
-+	lvbdata = kvzalloc(lmmsize, GFP_NOFS);
- 	if (!lvbdata) {
- 		rc = -ENOMEM;
- 		goto out;
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index c2c57f65431e..179651531862 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1035,7 +1035,7 @@ static int lmv_iocontrol(unsigned int cmd, struct obd_export *exp,
- 				reqlen = offsetof(typeof(*hur),
- 						  hur_user_item[nr])
- 					 + hur->hur_request.hr_data_len;
--				req = libcfs_kvzalloc(reqlen, GFP_NOFS);
-+				req = kvzalloc(reqlen, GFP_NOFS);
- 				if (!req)
- 					return -ENOMEM;
- 
-@@ -2733,7 +2733,7 @@ static int lmv_unpackmd(struct obd_export *exp, struct lmv_stripe_md **lsmp,
- 		lsm_size = lmv_stripe_md_size(0);
- 
- 	if (!lsm) {
--		lsm = libcfs_kvzalloc(lsm_size, GFP_NOFS);
-+		lsm = kvzalloc(lsm_size, GFP_NOFS);
- 		if (!lsm)
- 			return -ENOMEM;
- 		allocated = true;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_ea.c b/drivers/staging/lustre/lustre/lov/lov_ea.c
-index d563dd73343a..c56a971745e8 100644
---- a/drivers/staging/lustre/lustre/lov/lov_ea.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_ea.c
-@@ -89,7 +89,7 @@ struct lov_stripe_md *lsm_alloc_plain(u16 stripe_count)
- 	oinfo_ptrs_size = sizeof(struct lov_oinfo *) * stripe_count;
- 	lsm_size = sizeof(*lsm) + oinfo_ptrs_size;
- 
--	lsm = libcfs_kvzalloc(lsm_size, GFP_NOFS);
-+	lsm = kvzalloc(lsm_size, GFP_NOFS);
- 	if (!lsm)
- 		return NULL;
- 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
-index c5f5d1b106dc..c0dbf6cd53b4 100644
---- a/drivers/staging/lustre/lustre/lov/lov_io.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_io.c
-@@ -243,7 +243,7 @@ static int lov_io_subio_init(const struct lu_env *env, struct lov_io *lio,
- 	 * when writing a page. -jay
- 	 */
- 	lio->lis_subs =
--		libcfs_kvzalloc(lsm->lsm_stripe_count *
-+		kvzalloc(lsm->lsm_stripe_count *
- 				sizeof(lio->lis_subs[0]),
- 				GFP_NOFS);
- 	if (lio->lis_subs) {
-diff --git a/drivers/staging/lustre/lustre/lov/lov_lock.c b/drivers/staging/lustre/lustre/lov/lov_lock.c
-index 2fcdeb707ff9..b0292100bf26 100644
---- a/drivers/staging/lustre/lustre/lov/lov_lock.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_lock.c
-@@ -145,7 +145,7 @@ static struct lov_lock *lov_lock_sub_init(const struct lu_env *env,
- 			nr++;
- 	}
- 	LASSERT(nr > 0);
--	lovlck = libcfs_kvzalloc(offsetof(struct lov_lock, lls_sub[nr]),
-+	lovlck = kvzalloc(offsetof(struct lov_lock, lls_sub[nr]),
- 				 GFP_NOFS);
- 	if (!lovlck)
- 		return ERR_PTR(-ENOMEM);
-diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
-index 86cd4f9fbd0c..16cf9d584bbc 100644
---- a/drivers/staging/lustre/lustre/lov/lov_object.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_object.c
-@@ -242,7 +242,7 @@ static int lov_init_raid0(const struct lu_env *env, struct lov_device *dev,
- 	r0->lo_nr  = lsm->lsm_stripe_count;
- 	LASSERT(r0->lo_nr <= lov_targets_nr(dev));
- 
--	r0->lo_sub = libcfs_kvzalloc(r0->lo_nr * sizeof(r0->lo_sub[0]),
-+	r0->lo_sub = kvzalloc(r0->lo_nr * sizeof(r0->lo_sub[0]),
- 				     GFP_NOFS);
- 	if (r0->lo_sub) {
- 		int psz = 0;
-@@ -1375,7 +1375,7 @@ static int lov_object_fiemap(const struct lu_env *env, struct cl_object *obj,
- 	if (fiemap_count_to_size(fiemap->fm_extent_count) < buffer_size)
- 		buffer_size = fiemap_count_to_size(fiemap->fm_extent_count);
- 
--	fm_local = libcfs_kvzalloc(buffer_size, GFP_NOFS);
-+	fm_local = kvzalloc(buffer_size, GFP_NOFS);
- 	if (!fm_local) {
- 		rc = -ENOMEM;
- 		goto out;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
-index e5b11c4085a9..b1060d02a164 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pack.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
-@@ -333,7 +333,7 @@ int lov_getstripe(struct lov_object *obj, struct lov_stripe_md *lsm,
- 	lmmk_size = lov_mds_md_size(stripe_count, lsm->lsm_magic);
- 
- 
--	lmmk = libcfs_kvzalloc(lmmk_size, GFP_NOFS);
-+	lmmk = kvzalloc(lmmk_size, GFP_NOFS);
- 	if (!lmmk) {
- 		rc = -ENOMEM;
- 		goto out;
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-index 3114907ac5ff..695ef44532cf 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
-@@ -660,7 +660,7 @@ static int mdc_finish_enqueue(struct obd_export *exp,
- 		LDLM_DEBUG(lock, "layout lock returned by: %s, lvb_len: %d",
- 			   ldlm_it2str(it->it_op), lvb_len);
- 
--		lmm = libcfs_kvzalloc(lvb_len, GFP_NOFS);
-+		lmm = kvzalloc(lvb_len, GFP_NOFS);
- 		if (!lmm) {
- 			LDLM_LOCK_PUT(lock);
- 			return -ENOMEM;
-diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-index f8967fd44363..7bceee7f121e 100644
---- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-+++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-@@ -180,7 +180,7 @@ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
- 	 * obdfilter-survey is an example, which relies on ioctl. So we'd
- 	 * better avoid vmalloc on ioctl path. LU-66
- 	 */
--	*buf = libcfs_kvzalloc(hdr.ioc_len, GFP_KERNEL);
-+	*buf = kvzalloc(hdr.ioc_len, GFP_KERNEL);
- 	if (!*buf) {
- 		CERROR("Cannot allocate control buffer of len %d\n",
- 		       hdr.ioc_len);
-diff --git a/drivers/staging/lustre/lustre/obdclass/llog.c b/drivers/staging/lustre/lustre/obdclass/llog.c
-index ed310696a95d..693e1129f1f9 100644
---- a/drivers/staging/lustre/lustre/obdclass/llog.c
-+++ b/drivers/staging/lustre/lustre/obdclass/llog.c
-@@ -155,7 +155,7 @@ int llog_init_handle(const struct lu_env *env, struct llog_handle *handle,
- 	LASSERT(!handle->lgh_hdr);
- 
- 	LASSERT(chunk_size >= LLOG_MIN_CHUNK_SIZE);
--	llh = libcfs_kvzalloc(sizeof(*llh), GFP_KERNEL);
-+	llh = kvzalloc(sizeof(*llh), GFP_KERNEL);
- 	if (!llh)
- 		return -ENOMEM;
- 	handle->lgh_hdr = llh;
-@@ -240,7 +240,7 @@ static int llog_process_thread(void *arg)
- 	/* expect chunk_size to be power of two */
- 	LASSERT(is_power_of_2(chunk_size));
- 
--	buf = libcfs_kvzalloc(chunk_size, GFP_NOFS);
-+	buf = kvzalloc(chunk_size, GFP_NOFS);
- 	if (!buf) {
- 		lpi->lpi_rc = -ENOMEM;
- 		return 0;
-diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-index 9a6377502ae4..f53b1a3c342e 100644
---- a/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lustre_handles.c
-@@ -184,7 +184,7 @@ int class_handle_init(void)
- 
- 	LASSERT(!handle_hash);
- 
--	handle_hash = libcfs_kvzalloc(sizeof(*bucket) * HANDLE_HASH_SIZE,
-+	handle_hash = kvzalloc(sizeof(*bucket) * HANDLE_HASH_SIZE,
- 				      GFP_KERNEL);
- 	if (!handle_hash)
- 		return -ENOMEM;
 diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index 781462621d92..d4c641d2480c 100644
+index d4c641d2480c..ca096fadb9c0 100644
 --- a/drivers/staging/lustre/lustre/ptlrpc/client.c
 +++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -547,7 +547,7 @@ int ptlrpc_add_rqs_to_pool(struct ptlrpc_request_pool *pool, int num_rq)
- 		req = ptlrpc_request_cache_alloc(GFP_KERNEL);
- 		if (!req)
- 			return i;
--		msg = libcfs_kvzalloc(size, GFP_KERNEL);
-+		msg = kvzalloc(size, GFP_KERNEL);
- 		if (!msg) {
- 			ptlrpc_request_cache_free(req);
- 			return i;
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-index 90e3b3022106..f152ba1af0fc 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-@@ -442,7 +442,7 @@ int sptlrpc_req_ctx_switch(struct ptlrpc_request *req,
- 	/* save request message */
- 	reqmsg_size = req->rq_reqlen;
- 	if (reqmsg_size != 0) {
--		reqmsg = libcfs_kvzalloc(reqmsg_size, GFP_NOFS);
-+		reqmsg = kvzalloc(reqmsg_size, GFP_NOFS);
- 		if (!reqmsg)
- 			return -ENOMEM;
- 		memcpy(reqmsg, req->rq_reqmsg, reqmsg_size);
-@@ -1089,7 +1089,7 @@ int sptlrpc_cli_unwrap_early_reply(struct ptlrpc_request *req,
- 
- 	early_size = req->rq_nob_received;
- 	early_bufsz = size_roundup_power2(early_size);
--	early_buf = libcfs_kvzalloc(early_bufsz, GFP_NOFS);
-+	early_buf = kvzalloc(early_bufsz, GFP_NOFS);
- 	if (!early_buf) {
- 		rc = -ENOMEM;
- 		goto err_req;
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-index 134ee727e8b7..2184022ed724 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
-@@ -375,7 +375,7 @@ static inline void enc_pools_alloc(void)
+@@ -504,19 +504,16 @@ void ptlrpc_request_cache_free(struct ptlrpc_request *req)
+  */
+ void ptlrpc_free_rq_pool(struct ptlrpc_request_pool *pool)
  {
- 	LASSERT(page_pools.epp_max_pools);
- 	page_pools.epp_pools =
--		libcfs_kvzalloc(page_pools.epp_max_pools *
-+		kvzalloc(page_pools.epp_max_pools *
- 				sizeof(*page_pools.epp_pools),
- 				GFP_NOFS);
+-	struct list_head *l, *tmp;
+ 	struct ptlrpc_request *req;
+ 
+-	spin_lock(&pool->prp_lock);
+-	list_for_each_safe(l, tmp, &pool->prp_req_list) {
+-		req = list_entry(l, struct ptlrpc_request, rq_list);
++	while ((req = list_first_entry_or_null(&pool->prp_req_list,
++					       struct ptlrpc_request, rq_list))) {
+ 		list_del(&req->rq_list);
+ 		LASSERT(req->rq_reqbuf);
+ 		LASSERT(req->rq_reqbuf_len == pool->prp_rq_size);
+ 		kvfree(req->rq_reqbuf);
+ 		ptlrpc_request_cache_free(req);
+ 	}
+-	spin_unlock(&pool->prp_lock);
+ 	kfree(pool);
  }
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
-index 80cea0b24693..ecc387d1b9b4 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_null.c
-@@ -158,7 +158,7 @@ int null_alloc_reqbuf(struct ptlrpc_sec *sec,
- 		int alloc_size = size_roundup_power2(msgsize);
+ EXPORT_SYMBOL(ptlrpc_free_rq_pool);
+@@ -656,16 +653,13 @@ static void __ptlrpc_free_req_to_pool(struct ptlrpc_request *request)
+ void ptlrpc_add_unreplied(struct ptlrpc_request *req)
+ {
+ 	struct obd_import	*imp = req->rq_import;
+-	struct list_head	*tmp;
+ 	struct ptlrpc_request	*iter;
  
- 		LASSERT(!req->rq_pool);
--		req->rq_reqbuf = libcfs_kvzalloc(alloc_size, GFP_NOFS);
-+		req->rq_reqbuf = kvzalloc(alloc_size, GFP_NOFS);
- 		if (!req->rq_reqbuf)
- 			return -ENOMEM;
+ 	assert_spin_locked(&imp->imp_lock);
+ 	LASSERT(list_empty(&req->rq_unreplied_list));
  
-@@ -201,7 +201,7 @@ int null_alloc_repbuf(struct ptlrpc_sec *sec,
+ 	/* unreplied list is sorted by xid in ascending order */
+-	list_for_each_prev(tmp, &imp->imp_unreplied_list) {
+-		iter = list_entry(tmp, struct ptlrpc_request,
+-				  rq_unreplied_list);
++	list_for_each_entry_reverse(iter, &imp->imp_unreplied_list, rq_unreplied_list) {
  
- 	msgsize = size_roundup_power2(msgsize);
+ 		LASSERT(req->rq_xid != iter->rq_xid);
+ 		if (req->rq_xid < iter->rq_xid)
+@@ -1001,18 +995,14 @@ struct ptlrpc_request_set *ptlrpc_prep_fcset(int max, set_producer_func func,
+  */
+ void ptlrpc_set_destroy(struct ptlrpc_request_set *set)
+ {
+-	struct list_head *tmp;
+-	struct list_head *next;
++	struct ptlrpc_request *req;
+ 	int expected_phase;
+ 	int n = 0;
  
--	req->rq_repbuf = libcfs_kvzalloc(msgsize, GFP_NOFS);
-+	req->rq_repbuf = kvzalloc(msgsize, GFP_NOFS);
- 	if (!req->rq_repbuf)
- 		return -ENOMEM;
+ 	/* Requests on the set should either all be completed, or all be new */
+ 	expected_phase = (atomic_read(&set->set_remaining) == 0) ?
+ 			 RQ_PHASE_COMPLETE : RQ_PHASE_NEW;
+-	list_for_each(tmp, &set->set_requests) {
+-		struct ptlrpc_request *req =
+-			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
+-
++	list_for_each_entry(req, &set->set_requests, rq_set_chain) {
+ 		LASSERT(req->rq_phase == expected_phase);
+ 		n++;
+ 	}
+@@ -1021,9 +1011,9 @@ void ptlrpc_set_destroy(struct ptlrpc_request_set *set)
+ 		 atomic_read(&set->set_remaining) == n, "%d / %d\n",
+ 		 atomic_read(&set->set_remaining), n);
  
-@@ -246,7 +246,7 @@ int null_enlarge_reqbuf(struct ptlrpc_sec *sec,
- 	if (req->rq_reqbuf_len < newmsg_size) {
- 		alloc_size = size_roundup_power2(newmsg_size);
+-	list_for_each_safe(tmp, next, &set->set_requests) {
+-		struct ptlrpc_request *req =
+-			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
++	while ((req = list_first_entry_or_null(&set->set_requests,
++					       struct ptlrpc_request,
++					       rq_set_chain))) {
+ 		list_del_init(&req->rq_set_chain);
  
--		newbuf = libcfs_kvzalloc(alloc_size, GFP_NOFS);
-+		newbuf = kvzalloc(alloc_size, GFP_NOFS);
- 		if (!newbuf)
- 			return -ENOMEM;
+ 		LASSERT(req->rq_phase == expected_phase);
+@@ -1640,7 +1630,7 @@ static inline int ptlrpc_set_producer(struct ptlrpc_request_set *set)
+  */
+ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ {
+-	struct list_head *tmp, *next;
++	struct ptlrpc_request *req, *next;
+ 	struct list_head comp_reqs;
+ 	int force_timer_recalc = 0;
  
-@@ -317,7 +317,7 @@ int null_alloc_rs(struct ptlrpc_request *req, int msgsize)
- 		/* pre-allocated */
- 		LASSERT(rs->rs_size >= rs_size);
- 	} else {
--		rs = libcfs_kvzalloc(rs_size, GFP_NOFS);
-+		rs = kvzalloc(rs_size, GFP_NOFS);
- 		if (!rs)
- 			return -ENOMEM;
+@@ -1648,9 +1638,7 @@ int ptlrpc_check_set(const struct lu_env *env, struct ptlrpc_request_set *set)
+ 		return 1;
  
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-index 44e34056515b..ec3d9af76b17 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
-@@ -562,7 +562,7 @@ int plain_alloc_reqbuf(struct ptlrpc_sec *sec,
- 		LASSERT(!req->rq_pool);
+ 	INIT_LIST_HEAD(&comp_reqs);
+-	list_for_each_safe(tmp, next, &set->set_requests) {
+-		struct ptlrpc_request *req =
+-			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
++	list_for_each_entry_safe(req, next, &set->set_requests, rq_set_chain) {
+ 		struct obd_import *imp = req->rq_import;
+ 		int unregistered = 0;
+ 		int rc = 0;
+@@ -2126,13 +2114,11 @@ int ptlrpc_expire_one_request(struct ptlrpc_request *req, int async_unlink)
+  */
+ void ptlrpc_expired_set(struct ptlrpc_request_set *set)
+ {
+-	struct list_head *tmp;
++	struct ptlrpc_request *req;
+ 	time64_t now = ktime_get_real_seconds();
  
- 		alloc_len = size_roundup_power2(alloc_len);
--		req->rq_reqbuf = libcfs_kvzalloc(alloc_len, GFP_NOFS);
-+		req->rq_reqbuf = kvzalloc(alloc_len, GFP_NOFS);
- 		if (!req->rq_reqbuf)
- 			return -ENOMEM;
+ 	/* A timeout expired. See which reqs it applies to...  */
+-	list_for_each(tmp, &set->set_requests) {
+-		struct ptlrpc_request *req =
+-			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
++	list_for_each_entry(req, &set->set_requests, rq_set_chain) {
  
-@@ -620,7 +620,7 @@ int plain_alloc_repbuf(struct ptlrpc_sec *sec,
+ 		/* don't expire request waiting for context */
+ 		if (req->rq_wait_ctx)
+@@ -2173,13 +2159,10 @@ EXPORT_SYMBOL(ptlrpc_mark_interrupted);
+  */
+ static void ptlrpc_interrupted_set(struct ptlrpc_request_set *set)
+ {
+-	struct list_head *tmp;
+-
++	struct ptlrpc_request *req;
+ 	CDEBUG(D_RPCTRACE, "INTERRUPTED SET %p\n", set);
  
- 	alloc_len = size_roundup_power2(alloc_len);
+-	list_for_each(tmp, &set->set_requests) {
+-		struct ptlrpc_request *req =
+-			list_entry(tmp, struct ptlrpc_request, rq_set_chain);
++	list_for_each_entry(req, &set->set_requests, rq_set_chain) {
  
--	req->rq_repbuf = libcfs_kvzalloc(alloc_len, GFP_NOFS);
-+	req->rq_repbuf = kvzalloc(alloc_len, GFP_NOFS);
- 	if (!req->rq_repbuf)
- 		return -ENOMEM;
+ 		if (req->rq_phase != RQ_PHASE_RPC &&
+ 		    req->rq_phase != RQ_PHASE_UNREG_RPC)
+@@ -2194,14 +2177,12 @@ static void ptlrpc_interrupted_set(struct ptlrpc_request_set *set)
+  */
+ int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set)
+ {
+-	struct list_head *tmp;
+ 	time64_t now = ktime_get_real_seconds();
+ 	int timeout = 0;
+ 	struct ptlrpc_request *req;
+ 	time64_t deadline;
  
-@@ -671,7 +671,7 @@ int plain_enlarge_reqbuf(struct ptlrpc_sec *sec,
- 	if (req->rq_reqbuf_len < newbuf_size) {
- 		newbuf_size = size_roundup_power2(newbuf_size);
+-	list_for_each(tmp, &set->set_requests) {
+-		req = list_entry(tmp, struct ptlrpc_request, rq_set_chain);
++	list_for_each_entry(req, &set->set_requests, rq_set_chain) {
  
--		newbuf = libcfs_kvzalloc(newbuf_size, GFP_NOFS);
-+		newbuf = kvzalloc(newbuf_size, GFP_NOFS);
- 		if (!newbuf)
- 			return -ENOMEM;
+ 		/* Request in-flight? */
+ 		if (!(((req->rq_phase == RQ_PHASE_RPC) && !req->rq_waiting) ||
+@@ -2240,16 +2221,13 @@ int ptlrpc_set_next_timeout(struct ptlrpc_request_set *set)
+  */
+ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
+ {
+-	struct list_head *tmp;
+ 	struct ptlrpc_request *req;
+ 	int rc, timeout;
  
-@@ -808,7 +808,7 @@ int plain_alloc_rs(struct ptlrpc_request *req, int msgsize)
- 		/* pre-allocated */
- 		LASSERT(rs->rs_size >= rs_size);
- 	} else {
--		rs = libcfs_kvzalloc(rs_size, GFP_NOFS);
-+		rs = kvzalloc(rs_size, GFP_NOFS);
- 		if (!rs)
- 			return -ENOMEM;
+ 	if (set->set_producer)
+ 		(void)ptlrpc_set_producer(set);
+ 	else
+-		list_for_each(tmp, &set->set_requests) {
+-			req = list_entry(tmp, struct ptlrpc_request,
+-					 rq_set_chain);
++		list_for_each_entry(req, &set->set_requests, rq_set_chain) {
+ 			if (req->rq_phase == RQ_PHASE_NEW)
+ 				(void)ptlrpc_send_new_req(req);
+ 		}
+@@ -2322,9 +2300,7 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
+ 		 * the error cases -eeb.
+ 		 */
+ 		if (rc == 0 && atomic_read(&set->set_remaining) == 0) {
+-			list_for_each(tmp, &set->set_requests) {
+-				req = list_entry(tmp, struct ptlrpc_request,
+-						 rq_set_chain);
++			list_for_each_entry(req, &set->set_requests, rq_set_chain) {
+ 				spin_lock(&req->rq_lock);
+ 				req->rq_invalid_rqset = 1;
+ 				spin_unlock(&req->rq_lock);
+@@ -2335,9 +2311,7 @@ int ptlrpc_set_wait(struct ptlrpc_request_set *set)
+ 	LASSERT(atomic_read(&set->set_remaining) == 0);
  
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 57e41e2cd30a..79d9f3860022 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -1068,7 +1068,7 @@ static int ptlrpc_at_send_early_reply(struct ptlrpc_request *req)
- 	reqcopy = ptlrpc_request_cache_alloc(GFP_NOFS);
- 	if (!reqcopy)
- 		return -ENOMEM;
--	reqmsg = libcfs_kvzalloc(req->rq_reqlen, GFP_NOFS);
-+	reqmsg = kvzalloc(req->rq_reqlen, GFP_NOFS);
- 	if (!reqmsg) {
- 		rc = -ENOMEM;
- 		goto out_free;
-@@ -2077,7 +2077,7 @@ static int ptlrpc_main(void *arg)
+ 	rc = set->set_rc; /* rq_status of already freed requests if any */
+-	list_for_each(tmp, &set->set_requests) {
+-		req = list_entry(tmp, struct ptlrpc_request, rq_set_chain);
+-
++	list_for_each_entry(req, &set->set_requests, rq_set_chain) {
+ 		LASSERT(req->rq_phase == RQ_PHASE_COMPLETE);
+ 		if (req->rq_status != 0)
+ 			rc = req->rq_status;
+@@ -2716,8 +2690,7 @@ EXPORT_SYMBOL(ptlrpc_request_addref);
+ void ptlrpc_retain_replayable_request(struct ptlrpc_request *req,
+ 				      struct obd_import *imp)
+ {
+-	struct list_head *tmp;
+-
++	struct ptlrpc_request *iter;
+ 	assert_spin_locked(&imp->imp_lock);
+ 
+ 	if (req->rq_transno == 0) {
+@@ -2744,10 +2717,7 @@ void ptlrpc_retain_replayable_request(struct ptlrpc_request *req,
+ 	LASSERT(imp->imp_replayable);
+ 	/* Balanced in ptlrpc_free_committed, usually. */
+ 	ptlrpc_request_addref(req);
+-	list_for_each_prev(tmp, &imp->imp_replay_list) {
+-		struct ptlrpc_request *iter =
+-			list_entry(tmp, struct ptlrpc_request, rq_replay_list);
+-
++	list_for_each_entry_reverse(iter, &imp->imp_replay_list, rq_replay_list) {
+ 		/*
+ 		 * We may have duplicate transnos if we create and then
+ 		 * open a file, or for closes retained if to match creating
+@@ -2955,7 +2925,7 @@ int ptlrpc_replay_req(struct ptlrpc_request *req)
+  */
+ void ptlrpc_abort_inflight(struct obd_import *imp)
+ {
+-	struct list_head *tmp, *n;
++	struct ptlrpc_request *req, *n;
+ 
+ 	/*
+ 	 * Make sure that no new requests get processed for this import.
+@@ -2969,10 +2939,7 @@ void ptlrpc_abort_inflight(struct obd_import *imp)
+ 	 * locked?  Also, how do we know if the requests on the list are
+ 	 * being freed at this time?
+ 	 */
+-	list_for_each_safe(tmp, n, &imp->imp_sending_list) {
+-		struct ptlrpc_request *req =
+-			list_entry(tmp, struct ptlrpc_request, rq_list);
+-
++	list_for_each_entry_safe(req, n, &imp->imp_sending_list, rq_list) {
+ 		DEBUG_REQ(D_RPCTRACE, req, "inflight");
+ 
+ 		spin_lock(&req->rq_lock);
+@@ -2984,10 +2951,7 @@ void ptlrpc_abort_inflight(struct obd_import *imp)
+ 		spin_unlock(&req->rq_lock);
  	}
  
- 	/* Alloc reply state structure for this one */
--	rs = libcfs_kvzalloc(svc->srv_max_reply_size, GFP_NOFS);
-+	rs = kvzalloc(svc->srv_max_reply_size, GFP_NOFS);
- 	if (!rs) {
- 		rc = -ENOMEM;
- 		goto out_srv_fini;
+-	list_for_each_safe(tmp, n, &imp->imp_delayed_list) {
+-		struct ptlrpc_request *req =
+-			list_entry(tmp, struct ptlrpc_request, rq_list);
+-
++	list_for_each_entry_safe(req, n, &imp->imp_delayed_list, rq_list) {
+ 		DEBUG_REQ(D_RPCTRACE, req, "aborting waiting req");
+ 
+ 		spin_lock(&req->rq_lock);
+@@ -3014,12 +2978,9 @@ void ptlrpc_abort_inflight(struct obd_import *imp)
+  */
+ void ptlrpc_abort_set(struct ptlrpc_request_set *set)
+ {
+-	struct list_head *tmp, *pos;
+-
+-	list_for_each_safe(pos, tmp, &set->set_requests) {
+-		struct ptlrpc_request *req =
+-			list_entry(pos, struct ptlrpc_request, rq_set_chain);
++	struct ptlrpc_request *req, *tmp;
+ 
++	list_for_each_entry_safe(req, tmp, &set->set_requests, rq_set_chain) {
+ 		spin_lock(&req->rq_lock);
+ 		if (req->rq_phase != RQ_PHASE_RPC) {
+ 			spin_unlock(&req->rq_lock);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+index faf0f606f013..a2c4fc3488b1 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/import.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+@@ -242,15 +242,13 @@ ptlrpc_inflight_deadline(struct ptlrpc_request *req, time64_t now)
+ static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
+ {
+ 	time64_t now = ktime_get_real_seconds();
+-	struct list_head *tmp, *n;
+-	struct ptlrpc_request *req;
++	struct ptlrpc_request *req, *n;
+ 	unsigned int timeout = 0;
+ 
+ 	spin_lock(&imp->imp_lock);
+-	list_for_each_safe(tmp, n, &imp->imp_sending_list) {
+-		req = list_entry(tmp, struct ptlrpc_request, rq_list);
++	list_for_each_entry_safe(req, n, &imp->imp_sending_list, rq_list)
+ 		timeout = max(ptlrpc_inflight_deadline(req, now), timeout);
+-	}
++
+ 	spin_unlock(&imp->imp_lock);
+ 	return timeout;
+ }
+@@ -263,8 +261,7 @@ static unsigned int ptlrpc_inflight_timeout(struct obd_import *imp)
+  */
+ void ptlrpc_invalidate_import(struct obd_import *imp)
+ {
+-	struct list_head *tmp, *n;
+-	struct ptlrpc_request *req;
++	struct ptlrpc_request *req, *n;
+ 	unsigned int timeout;
+ 	int rc;
+ 
+@@ -336,19 +333,13 @@ void ptlrpc_invalidate_import(struct obd_import *imp)
+ 				 */
+ 				rc = 0;
+ 			} else {
+-				list_for_each_safe(tmp, n,
+-						   &imp->imp_sending_list) {
+-					req = list_entry(tmp,
+-							 struct ptlrpc_request,
+-							 rq_list);
++				list_for_each_entry_safe(req, n,
++							 &imp->imp_sending_list, rq_list) {
+ 					DEBUG_REQ(D_ERROR, req,
+ 						  "still on sending list");
+ 				}
+-				list_for_each_safe(tmp, n,
+-						   &imp->imp_delayed_list) {
+-					req = list_entry(tmp,
+-							 struct ptlrpc_request,
+-							 rq_list);
++				list_for_each_entry_safe(req, n,
++							 &imp->imp_delayed_list, rq_list) {
+ 					DEBUG_REQ(D_ERROR, req,
+ 						  "still on delayed list");
+ 				}
+@@ -557,14 +548,13 @@ static int import_select_connection(struct obd_import *imp)
+ static int ptlrpc_first_transno(struct obd_import *imp, __u64 *transno)
+ {
+ 	struct ptlrpc_request *req;
+-	struct list_head *tmp;
+ 
+ 	/* The requests in committed_list always have smaller transnos than
+ 	 * the requests in replay_list
+ 	 */
+ 	if (!list_empty(&imp->imp_committed_list)) {
+-		tmp = imp->imp_committed_list.next;
+-		req = list_entry(tmp, struct ptlrpc_request, rq_replay_list);
++		req = list_first_entry(&imp->imp_committed_list,
++				       struct ptlrpc_request, rq_replay_list);
+ 		*transno = req->rq_transno;
+ 		if (req->rq_transno == 0) {
+ 			DEBUG_REQ(D_ERROR, req,
+@@ -574,8 +564,8 @@ static int ptlrpc_first_transno(struct obd_import *imp, __u64 *transno)
+ 		return 1;
+ 	}
+ 	if (!list_empty(&imp->imp_replay_list)) {
+-		tmp = imp->imp_replay_list.next;
+-		req = list_entry(tmp, struct ptlrpc_request, rq_replay_list);
++		req = list_first_entry(&imp->imp_replay_list,
++				       struct ptlrpc_request, rq_replay_list);
+ 		*transno = req->rq_transno;
+ 		if (req->rq_transno == 0) {
+ 			DEBUG_REQ(D_ERROR, req, "zero transno in replay_list");
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+index 639070f6e68e..b5f3cfee8e75 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+@@ -230,17 +230,13 @@ static int ptlrpc_pinger_main(void *arg)
+ 		unsigned long this_ping = cfs_time_current();
+ 		long time_to_next_wake;
+ 		struct timeout_item *item;
+-		struct list_head *iter;
++		struct obd_import *imp;
+ 
+ 		mutex_lock(&pinger_mutex);
+ 		list_for_each_entry(item, &timeout_list, ti_chain) {
+ 			item->ti_cb(item, item->ti_cb_data);
+ 		}
+-		list_for_each(iter, &pinger_imports) {
+-			struct obd_import *imp =
+-				list_entry(iter, struct obd_import,
+-					   imp_pinger_chain);
+-
++		list_for_each_entry(imp, &pinger_imports, imp_pinger_chain) {
+ 			ptlrpc_pinger_process_import(imp, this_ping);
+ 			/* obd_timeout might have changed */
+ 			if (imp->imp_pingable && imp->imp_next_ping &&
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index 6ed77521d025..c0fa13942bd8 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -197,17 +197,14 @@ ptlrpcd_select_pc(struct ptlrpc_request *req)
+ static int ptlrpcd_steal_rqset(struct ptlrpc_request_set *des,
+ 			       struct ptlrpc_request_set *src)
+ {
+-	struct list_head *tmp, *pos;
+-	struct ptlrpc_request *req;
++	struct ptlrpc_request *req, *tmp;
+ 	int rc = 0;
+ 
+ 	spin_lock(&src->set_new_req_lock);
+ 	if (likely(!list_empty(&src->set_new_requests))) {
+-		list_for_each_safe(pos, tmp, &src->set_new_requests) {
+-			req = list_entry(pos, struct ptlrpc_request,
+-					 rq_set_chain);
++		list_for_each_entry_safe(req, tmp, &src->set_new_requests, rq_set_chain)
+ 			req->rq_set = des;
+-		}
++
+ 		list_splice_init(&src->set_new_requests, &des->set_requests);
+ 		rc = atomic_read(&src->set_new_count);
+ 		atomic_add(rc, &des->set_remaining);
+@@ -273,8 +270,7 @@ static inline void ptlrpc_reqset_get(struct ptlrpc_request_set *set)
+  */
+ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
+ {
+-	struct list_head *tmp, *pos;
+-	struct ptlrpc_request *req;
++	struct ptlrpc_request *req, *tmp;
+ 	struct ptlrpc_request_set *set = pc->pc_set;
+ 	int rc = 0;
+ 	int rc2;
+@@ -320,8 +316,7 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
+ 	/* NB: ptlrpc_check_set has already moved completed request at the
+ 	 * head of seq::set_requests
+ 	 */
+-	list_for_each_safe(pos, tmp, &set->set_requests) {
+-		req = list_entry(pos, struct ptlrpc_request, rq_set_chain);
++	list_for_each_entry_safe(req, tmp, &set->set_requests, rq_set_chain) {
+ 		if (req->rq_phase != RQ_PHASE_COMPLETE)
+ 			break;
+ 
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/recover.c b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+index 5bb9f9fe91d8..2ea0a7ff87dd 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/recover.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+@@ -66,8 +66,7 @@ void ptlrpc_initiate_recovery(struct obd_import *imp)
+ int ptlrpc_replay_next(struct obd_import *imp, int *inflight)
+ {
+ 	int rc = 0;
+-	struct list_head *tmp, *pos;
+-	struct ptlrpc_request *req = NULL;
++	struct ptlrpc_request *req = NULL, *pos;
+ 	__u64 last_transno;
+ 
+ 	*inflight = 0;
+@@ -86,8 +85,8 @@ int ptlrpc_replay_next(struct obd_import *imp, int *inflight)
+ 
+ 	/* Replay all the committed open requests on committed_list first */
+ 	if (!list_empty(&imp->imp_committed_list)) {
+-		tmp = imp->imp_committed_list.prev;
+-		req = list_entry(tmp, struct ptlrpc_request, rq_replay_list);
++		req = list_last_entry(&imp->imp_committed_list,
++				      struct ptlrpc_request, rq_replay_list);
+ 
+ 		/* The last request on committed_list hasn't been replayed */
+ 		if (req->rq_transno > last_transno) {
+@@ -119,13 +118,13 @@ int ptlrpc_replay_next(struct obd_import *imp, int *inflight)
+ 	 * the imp_replay_list
+ 	 */
+ 	if (!req) {
+-		list_for_each_safe(tmp, pos, &imp->imp_replay_list) {
+-			req = list_entry(tmp, struct ptlrpc_request,
+-					 rq_replay_list);
+-
+-			if (req->rq_transno > last_transno)
++		struct ptlrpc_request *tmp;
++		list_for_each_entry_safe(tmp, pos, &imp->imp_replay_list,
++					 rq_replay_list) {
++			if (tmp->rq_transno > last_transno) {
++				req = tmp;
+ 				break;
+-			req = NULL;
++			}
+ 		}
+ 	}
+ 
+@@ -211,13 +210,10 @@ int ptlrpc_resend(struct obd_import *imp)
+  */
+ void ptlrpc_wake_delayed(struct obd_import *imp)
+ {
+-	struct list_head *tmp, *pos;
+-	struct ptlrpc_request *req;
++	struct ptlrpc_request *req, *pos;
+ 
+ 	spin_lock(&imp->imp_lock);
+-	list_for_each_safe(tmp, pos, &imp->imp_delayed_list) {
+-		req = list_entry(tmp, struct ptlrpc_request, rq_list);
+-
++	list_for_each_entry_safe(req, pos, &imp->imp_delayed_list, rq_list) {
+ 		DEBUG_REQ(D_HA, req, "waking (set %p):", req->rq_set);
+ 		ptlrpc_client_wake_req(req);
+ 	}
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index 99aeb291f3f2..49417228b621 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -726,8 +726,6 @@ static void ptlrpc_server_drop_request(struct ptlrpc_request *req)
+ 	struct ptlrpc_service_part *svcpt = rqbd->rqbd_svcpt;
+ 	struct ptlrpc_service *svc = svcpt->scp_service;
+ 	int refcount;
+-	struct list_head *tmp;
+-	struct list_head *nxt;
+ 
+ 	if (!atomic_dec_and_test(&req->rq_refcount))
+ 		return;
+@@ -776,9 +774,7 @@ static void ptlrpc_server_drop_request(struct ptlrpc_request *req)
+ 			/* remove rqbd's reqs from svc's req history while
+ 			 * I've got the service lock
+ 			 */
+-			list_for_each(tmp, &rqbd->rqbd_reqs) {
+-				req = list_entry(tmp, struct ptlrpc_request,
+-						 rq_list);
++			list_for_each_entry(req, &rqbd->rqbd_reqs, rq_list) {
+ 				/* Track the highest culled req seq */
+ 				if (req->rq_history_seq >
+ 				    svcpt->scp_hist_seq_culled) {
+@@ -790,10 +786,9 @@ static void ptlrpc_server_drop_request(struct ptlrpc_request *req)
+ 
+ 			spin_unlock(&svcpt->scp_lock);
+ 
+-			list_for_each_safe(tmp, nxt, &rqbd->rqbd_reqs) {
+-				req = list_entry(rqbd->rqbd_reqs.next,
+-						 struct ptlrpc_request,
+-						 rq_list);
++			while ((req = list_first_entry_or_null(
++					&rqbd->rqbd_reqs,
++					struct ptlrpc_request, rq_list))) {
+ 				list_del(&req->rq_list);
+ 				ptlrpc_server_free_request(req);
+ 			}
