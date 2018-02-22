@@ -1,34 +1,36 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Thu, 22 Feb 2018 12:15:34 +0300
-Subject: [lustre-devel] [PATCH] staging: lustre: selftest: freeing an error
- pointer
-Message-ID: <20180222091534.GD9883@mwanda>
+From: NeilBrown <neilb@suse.com>
+Date: Fri, 23 Feb 2018 09:09:33 +1100
+Subject: [lustre-devel] [PATCH 0/3] Three lustre bugfixes
+Message-ID: <151933726925.16436.9827896439357574011.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: devel@driverdev.osuosl.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-We should just return directly if memdup_user() fails. The current code
-tries to free "param" which is an error pointer so it will Oops.
+First two patches fix bugs that have been prevented the test suite
+from finished for me - now it completes with about 10% of tests
+failing.
 
-Fixes: 2baddf262e98 ("staging: lustre: use memdup_user to allocate memory and copy from user")
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Third patch fixes a tiny bug I noticed while reviewing another recent
+patch to the same file.
 
-diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-index 3c919a536e91..51497cf9a832 100644
---- a/drivers/staging/lustre/lnet/selftest/conctl.c
-+++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-@@ -650,10 +650,8 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
- 	if (args->lstio_tes_param) {
- 		param = memdup_user(args->lstio_tes_param,
- 				    args->lstio_tes_param_len);
--		if (IS_ERR(param)) {
--			rc = PTR_ERR(param);
--			goto out;
--		}
-+		if (IS_ERR(param))
-+			return PTR_ERR(param);
- 	}
- 
- 	rc = -EFAULT;
+Thanks,
+NeilBrown
+
+---
+
+NeilBrown (3):
+      staging: lustre: lov: use correct env in lov_io_data_version_end()
+      staging: lustre: lmv: correctly iput lmo_root
+      staging: lustre: lnet/selftest: don't ignore status from lstcon_test_add
+
+
+ drivers/staging/lustre/lnet/selftest/conctl.c |    2 +-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c   |    2 +-
+ drivers/staging/lustre/lustre/lov/lov_io.c    |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+--
+Signature
