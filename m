@@ -1,37 +1,58 @@
-From: NeilBrown <neilb@suse.com>
-Date: Fri, 23 Feb 2018 09:09:33 +1100
-Subject: [lustre-devel] [PATCH 3/3] staging: lustre: lnet/selftest: don't
- ignore status from lstcon_test_add
-In-Reply-To: <151933726925.16436.9827896439357574011.stgit@noble>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 26 Feb 2018 14:47:56 +0000 (GMT)
+Subject: [lustre-devel] [PATCH 1/3] staging: lustre: lov: use correct
+ env in lov_io_data_version_end()
+In-Reply-To: <151933737380.16436.3113702074708223689.stgit@noble>
 References: <151933726925.16436.9827896439357574011.stgit@noble>
-Message-ID: <151933737388.16436.11922095105762928334.stgit@noble>
+ <151933737380.16436.3113702074708223689.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1802261447160.13228@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: devel@driverdev.osuosl.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: NeilBrown <neilb@suse.com>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-If lstcon_test_add sets 'ret' (passed by reference) to 1,
-then lst_test_add_ioctl() ignores the return value.
-This isn't justified - the return value must be zero for 'ret'
-to be meaningful.
 
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lnet/selftest/conctl.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> lov - the logical object volume manager - is responsible for
+> striping data across multiple volumes.
+> 
+> So when it is given a request, it creates one or more
+> sub-requests, one for each target volume.  Each sub_io
+> request has a sub_env environment which it operates in.
+> 
+> When lov_io_data_version_end() calls lov_io_end_wrapper() to
+> wait for and close off a sub_io, it passes the wrong
+> environment.
+> 
+> This causes an LINVRNT() to fail in cl2osc_io(), and may
+> cause other problems.
+> 
+> This patch changes the call to use ->sub_env, much like
+> other code in the same file.
+> 
+> Fixes: f0cf21abcccc ("staging: lustre: clio: add CIT_DATA_VERSION and remove IOC_LOV_GETINFO")
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
-diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-index 51497cf9a832..a2d8092bdeb7 100644
---- a/drivers/staging/lustre/lnet/selftest/conctl.c
-+++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-@@ -670,7 +670,7 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
- 			     args->lstio_tes_param_len,
- 			     &ret, args->lstio_tes_resultp);
- 
--	if (ret)
-+	if (!rc && ret)
- 		rc = (copy_to_user(args->lstio_tes_retp, &ret,
- 				   sizeof(ret))) ? -EFAULT : 0;
- out:
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+
+> ---
+>  drivers/staging/lustre/lustre/lov/lov_io.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
+> index c0dbf6cd53b4..b823f8a21856 100644
+> --- a/drivers/staging/lustre/lustre/lov/lov_io.c
+> +++ b/drivers/staging/lustre/lustre/lov/lov_io.c
+> @@ -483,7 +483,7 @@ lov_io_data_version_end(const struct lu_env *env, const struct cl_io_slice *ios)
+>  	struct lov_io_sub *sub;
+>  
+>  	list_for_each_entry(sub, &lio->lis_active, sub_linkage) {
+> -		lov_io_end_wrapper(env, sub->sub_io);
+> +		lov_io_end_wrapper(sub->sub_env, sub->sub_io);
+>  
+>  		parent->u.ci_data_version.dv_data_version +=
+>  			sub->sub_io->u.ci_data_version.dv_data_version;
+> 
+> 
+> 
