@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 02 Mar 2018 10:31:25 +1100
-Subject: [lustre-devel] [PATCH 17/17] Revert "staging: Disable lustre file
- system for MIPS, SH, and XTENSA"
+Subject: [lustre-devel] [PATCH 02/17] staging: lustre: fix bug in
+ osc_enter_cache_try
 In-Reply-To: <151994679573.7628.1024109499321778846.stgit@noble>
 References: <151994679573.7628.1024109499321778846.stgit@noble>
-Message-ID: <151994708565.7628.14283641203455668904.stgit@noble>
+Message-ID: <151994708510.7628.7308229784516417641.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,26 +12,51 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-This reverts commit 16f1eeb660bd2bfd223704ee6350706b39c55a7a.
+The lustre-release patch commit bdc5bb52c554 ("LU-4933 osc:
+Automatically increase the max_dirty_mb") changed
 
-The reason for this patch was that lustre used copy_from_user_page.
-Commit 76133e66b141 ("staging/lustre: Replace jobid acquiring with per
-node setting") removed that usage.
-So the arch restrictions can go.
+-       if (cli->cl_dirty + PAGE_CACHE_SIZE <= cli->cl_dirty_max &&
++       if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
 
+When this patch landed in Linux a couple of years later, it landed as
+
+-       if (cli->cl_dirty + PAGE_SIZE <= cli->cl_dirty_max &&
++       if (cli->cl_dirty_pages <= cli->cl_dirty_max_pages &&
+
+which is clearly different ('<=' vs '<'), and allows cl_dirty_pages to
+increase beyond cl_dirty_max_pages - which causes a latter assertion
+to fails.
+
+Fixes: 3147b268400a ("staging: lustre: osc: Automatically increase the max_dirty_mb")
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/Kconfig |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/staging/lustre/lustre/include/obd.h   |    2 +-
+ drivers/staging/lustre/lustre/osc/osc_cache.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/Kconfig b/drivers/staging/lustre/lustre/Kconfig
-index c669c8fa0cc6..ccb78a945995 100644
---- a/drivers/staging/lustre/lustre/Kconfig
-+++ b/drivers/staging/lustre/lustre/Kconfig
-@@ -1,6 +1,5 @@
- config LUSTRE_FS
- 	tristate "Lustre file system client support"
--	depends on !MIPS && !XTENSA && !SUPERH
- 	depends on LNET
- 	select CRYPTO
- 	select CRYPTO_CRC32
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 4368f4e9f208..f1233ca7d337 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -191,7 +191,7 @@ struct client_obd {
+ 	struct sptlrpc_flavor    cl_flvr_mgc;   /* fixed flavor of mgc->mgs */
+ 
+ 	/* the grant values are protected by loi_list_lock below */
+-	unsigned long		 cl_dirty_pages;	/* all _dirty_ in pahges */
++	unsigned long		 cl_dirty_pages;	/* all _dirty_ in pages */
+ 	unsigned long		 cl_dirty_max_pages;	/* allowed w/o rpc */
+ 	unsigned long		 cl_dirty_transit;	/* dirty synchronous */
+ 	unsigned long		 cl_avail_grant;	/* bytes of credit for ost */
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+index 1c70a504ee89..459503727ce3 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cache.c
++++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+@@ -1529,7 +1529,7 @@ static int osc_enter_cache_try(struct client_obd *cli,
+ 	if (rc < 0)
+ 		return 0;
+ 
+-	if (cli->cl_dirty_pages <= cli->cl_dirty_max_pages &&
++	if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
+ 	    atomic_long_read(&obd_dirty_pages) + 1 <= obd_max_dirty_pages) {
+ 		osc_consume_write_grant(cli, &oap->oap_brw_page);
+ 		if (transient) {
