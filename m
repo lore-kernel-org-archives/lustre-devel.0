@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 02 Mar 2018 10:31:25 +1100
-Subject: [lustre-devel] [PATCH 08/17] staging: lustre: obdclass: use
- workqueue for zombie management.
+Subject: [lustre-devel] [PATCH 09/17] staging: lustre: ldlm: use
+ delayed_work for pools_recalc
 In-Reply-To: <151994679573.7628.1024109499321778846.stgit@noble>
 References: <151994679573.7628.1024109499321778846.stgit@noble>
-Message-ID: <151994708531.7628.4492534610831624607.stgit@noble>
+Message-ID: <151994708534.7628.3824921218925924808.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,369 +12,165 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-obdclass currently maintains two lists of data structures
-(imports and exports), and a kthread which will free
-anything on either list.  The thread is woken whenever
-anything is added to either list.
+ldlm currenty has a kthread which wakes up every so often
+and calls ldlm_pools_recalc().
+The thread is started and stopped, but no other external interactions
+happen.
 
-This is exactly the sort of thing that workqueues exist for.
-
-So discard the zombie kthread and the lists and locks, and
-create a single workqueue.  Each obd_import and obd_export
-gets a work_struct to attach to this workqueue.
-
-This requires a small change to import_sec_validate_get()
-which was testing if an obd_import was on the zombie
-list.  This cannot have every safely found it to be
-on the list (as it could be freed asynchronously)
-so it must be dead code.
-
-We could use system_wq instead of creating a dedicated
-zombie_wq, but as we occasionally want to flush all pending
-work, it is a little nicer to only have to wait for our own
-work items.
+This can trivially be replaced by a delayed_work if we have
+ldlm_pools_recalc() reschedule the work rather than just report
+when to do that.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lustre/include/lustre_export.h  |    2 
- .../staging/lustre/lustre/include/lustre_import.h  |    4 
- drivers/staging/lustre/lustre/obdclass/genops.c    |  193 ++------------------
- drivers/staging/lustre/lustre/ptlrpc/sec.c         |    6 -
- 4 files changed, 30 insertions(+), 175 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/ldlm_pool.c |   99 +++---------------------
+ 1 file changed, 11 insertions(+), 88 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_export.h b/drivers/staging/lustre/lustre/include/lustre_export.h
-index 66ac9dc7302a..40cd168ed2ea 100644
---- a/drivers/staging/lustre/lustre/include/lustre_export.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_export.h
-@@ -87,6 +87,8 @@ struct obd_export {
- 	struct obd_uuid	   exp_client_uuid;
- 	/** To link all exports on an obd device */
- 	struct list_head		exp_obd_chain;
-+	/** work_struct for destruction of export */
-+	struct work_struct	exp_zombie_work;
- 	struct hlist_node	  exp_uuid_hash; /** uuid-export hash*/
- 	/** Obd device of this export */
- 	struct obd_device	*exp_obd;
-diff --git a/drivers/staging/lustre/lustre/include/lustre_import.h b/drivers/staging/lustre/lustre/include/lustre_import.h
-index ea158e0630e2..1731048f1ff2 100644
---- a/drivers/staging/lustre/lustre/include/lustre_import.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_import.h
-@@ -162,8 +162,8 @@ struct obd_import {
- 	struct ptlrpc_client     *imp_client;
- 	/** List element for linking into pinger chain */
- 	struct list_head		imp_pinger_chain;
--	/** List element for linking into chain for destruction */
--	struct list_head		imp_zombie_chain;
-+	/** work struct for destruction of import */
-+	struct work_struct		imp_zombie_work;
- 
- 	/**
- 	 * Lists of requests that are retained for replay, waiting for a reply,
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 8f776a4058a9..63ccbabb4c5a 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -48,10 +48,7 @@ struct kmem_cache *obdo_cachep;
- EXPORT_SYMBOL(obdo_cachep);
- static struct kmem_cache *import_cachep;
- 
--static struct list_head      obd_zombie_imports;
--static struct list_head      obd_zombie_exports;
--static spinlock_t  obd_zombie_impexp_lock;
--static void obd_zombie_impexp_notify(void);
-+static struct workqueue_struct *zombie_wq;
- static void obd_zombie_export_add(struct obd_export *exp);
- static void obd_zombie_import_add(struct obd_import *imp);
- 
-@@ -701,6 +698,13 @@ void class_export_put(struct obd_export *exp)
- }
- EXPORT_SYMBOL(class_export_put);
- 
-+static void obd_zombie_exp_cull(struct work_struct *ws)
-+{
-+	struct obd_export *export = container_of(ws, struct obd_export, exp_zombie_work);
-+
-+	class_export_destroy(export);
-+}
-+
- /* Creates a new export, adds it to the hash table, and returns a
-  * pointer to it. The refcount is 2: one for the hash reference, and
-  * one for the pointer returned by this function.
-@@ -741,6 +745,7 @@ struct obd_export *class_new_export(struct obd_device *obd,
- 	INIT_HLIST_NODE(&export->exp_uuid_hash);
- 	spin_lock_init(&export->exp_bl_list_lock);
- 	INIT_LIST_HEAD(&export->exp_bl_list);
-+	INIT_WORK(&export->exp_zombie_work, obd_zombie_exp_cull);
- 
- 	export->exp_sp_peer = LUSTRE_SP_ANY;
- 	export->exp_flvr.sf_rpc = SPTLRPC_FLVR_INVALID;
-@@ -862,7 +867,6 @@ EXPORT_SYMBOL(class_import_get);
- 
- void class_import_put(struct obd_import *imp)
- {
--	LASSERT(list_empty(&imp->imp_zombie_chain));
- 	LASSERT_ATOMIC_GT_LT(&imp->imp_refcount, 0, LI_POISON);
- 
- 	CDEBUG(D_INFO, "import %p refcount=%d obd=%s\n", imp,
-@@ -894,6 +898,13 @@ static void init_imp_at(struct imp_at *at)
- 	}
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+index a0e486b57e08..53b8f33e54b5 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_pool.c
+@@ -784,9 +784,6 @@ static int ldlm_pool_granted(struct ldlm_pool *pl)
+ 	return atomic_read(&pl->pl_granted);
  }
  
-+static void obd_zombie_imp_cull(struct work_struct *ws)
-+{
-+	struct obd_import *import = container_of(ws, struct obd_import, imp_zombie_work);
+-static struct ptlrpc_thread *ldlm_pools_thread;
+-static struct completion ldlm_pools_comp;
+-
+ /*
+  * count locks from all namespaces (if possible). Returns number of
+  * cached locks.
+@@ -899,8 +896,12 @@ static unsigned long ldlm_pools_cli_scan(struct shrinker *s,
+ 			       sc->gfp_mask);
+ }
+ 
+-static int ldlm_pools_recalc(enum ldlm_side client)
++static void ldlm_pools_recalc(struct work_struct *ws);
++static DECLARE_DELAYED_WORK(ldlm_recalc_pools, ldlm_pools_recalc);
 +
-+	class_import_destroy(import);
-+}
-+
- struct obd_import *class_new_import(struct obd_device *obd)
++static void ldlm_pools_recalc(struct work_struct *ws)
  {
- 	struct obd_import *imp;
-@@ -903,7 +914,6 @@ struct obd_import *class_new_import(struct obd_device *obd)
- 		return NULL;
++	enum ldlm_side client = LDLM_NAMESPACE_CLIENT;
+ 	struct ldlm_namespace *ns;
+ 	struct ldlm_namespace *ns_old = NULL;
+ 	/* seconds of sleep if no active namespaces */
+@@ -982,92 +983,19 @@ static int ldlm_pools_recalc(enum ldlm_side client)
+ 	/* Wake up the blocking threads from time to time. */
+ 	ldlm_bl_thread_wakeup();
  
- 	INIT_LIST_HEAD(&imp->imp_pinger_chain);
--	INIT_LIST_HEAD(&imp->imp_zombie_chain);
- 	INIT_LIST_HEAD(&imp->imp_replay_list);
- 	INIT_LIST_HEAD(&imp->imp_sending_list);
- 	INIT_LIST_HEAD(&imp->imp_delayed_list);
-@@ -917,6 +927,7 @@ struct obd_import *class_new_import(struct obd_device *obd)
- 	imp->imp_obd = class_incref(obd, "import", imp);
- 	mutex_init(&imp->imp_sec_mutex);
- 	init_waitqueue_head(&imp->imp_recovery_waitq);
-+	INIT_WORK(&imp->imp_zombie_work, obd_zombie_imp_cull);
- 
- 	atomic_set(&imp->imp_refcount, 2);
- 	atomic_set(&imp->imp_unregistering, 0);
-@@ -1098,81 +1109,6 @@ EXPORT_SYMBOL(class_fail_export);
- void (*class_export_dump_hook)(struct obd_export *) = NULL;
- #endif
- 
--/* Total amount of zombies to be destroyed */
--static int zombies_count;
--
--/**
-- * kill zombie imports and exports
-- */
--static void obd_zombie_impexp_cull(void)
--{
--	struct obd_import *import;
--	struct obd_export *export;
--
--	do {
--		spin_lock(&obd_zombie_impexp_lock);
--
--		import = NULL;
--		if (!list_empty(&obd_zombie_imports)) {
--			import = list_entry(obd_zombie_imports.next,
--					    struct obd_import,
--					    imp_zombie_chain);
--			list_del_init(&import->imp_zombie_chain);
--		}
--
--		export = NULL;
--		if (!list_empty(&obd_zombie_exports)) {
--			export = list_entry(obd_zombie_exports.next,
--					    struct obd_export,
--					    exp_obd_chain);
--			list_del_init(&export->exp_obd_chain);
--		}
--
--		spin_unlock(&obd_zombie_impexp_lock);
--
--		if (import) {
--			class_import_destroy(import);
--			spin_lock(&obd_zombie_impexp_lock);
--			zombies_count--;
--			spin_unlock(&obd_zombie_impexp_lock);
--		}
--
--		if (export) {
--			class_export_destroy(export);
--			spin_lock(&obd_zombie_impexp_lock);
--			zombies_count--;
--			spin_unlock(&obd_zombie_impexp_lock);
--		}
--
--		cond_resched();
--	} while (import || export);
+-	return time;
 -}
 -
--static struct completion	obd_zombie_start;
--static struct completion	obd_zombie_stop;
--static unsigned long		obd_zombie_flags;
--static wait_queue_head_t		obd_zombie_waitq;
--static pid_t			obd_zombie_pid;
--
--enum {
--	OBD_ZOMBIE_STOP		= 0x0001,
--};
--
--/**
-- * check for work for kill zombie import/export thread.
-- */
--static int obd_zombie_impexp_check(void *arg)
+-static int ldlm_pools_thread_main(void *arg)
 -{
--	int rc;
+-	struct ptlrpc_thread *thread = (struct ptlrpc_thread *)arg;
+-	int c_time;
 -
--	spin_lock(&obd_zombie_impexp_lock);
--	rc = (zombies_count == 0) &&
--	     !test_bit(OBD_ZOMBIE_STOP, &obd_zombie_flags);
--	spin_unlock(&obd_zombie_impexp_lock);
+-	thread_set_flags(thread, SVC_RUNNING);
+-	wake_up(&thread->t_ctl_waitq);
 -
--	return rc;
--}
+-	CDEBUG(D_DLMTRACE, "%s: pool thread starting, process %d\n",
+-	       "ldlm_poold", current_pid());
 -
- /**
-  * Add export to the obd_zombie thread and notify it.
-  */
-@@ -1182,12 +1118,7 @@ static void obd_zombie_export_add(struct obd_export *exp)
- 	LASSERT(!list_empty(&exp->exp_obd_chain));
- 	list_del_init(&exp->exp_obd_chain);
- 	spin_unlock(&exp->exp_obd->obd_dev_lock);
--	spin_lock(&obd_zombie_impexp_lock);
--	zombies_count++;
--	list_add(&exp->exp_obd_chain, &obd_zombie_exports);
--	spin_unlock(&obd_zombie_impexp_lock);
--
--	obd_zombie_impexp_notify();
-+	queue_work(zombie_wq, &exp->exp_zombie_work);
- }
- 
- /**
-@@ -1196,40 +1127,7 @@ static void obd_zombie_export_add(struct obd_export *exp)
- static void obd_zombie_import_add(struct obd_import *imp)
- {
- 	LASSERT(!imp->imp_sec);
--	spin_lock(&obd_zombie_impexp_lock);
--	LASSERT(list_empty(&imp->imp_zombie_chain));
--	zombies_count++;
--	list_add(&imp->imp_zombie_chain, &obd_zombie_imports);
--	spin_unlock(&obd_zombie_impexp_lock);
--
--	obd_zombie_impexp_notify();
--}
--
--/**
-- * notify import/export destroy thread about new zombie.
-- */
--static void obd_zombie_impexp_notify(void)
--{
--	/*
--	 * Make sure obd_zombie_impexp_thread get this notification.
--	 * It is possible this signal only get by obd_zombie_barrier, and
--	 * barrier gulps this notification and sleeps away and hangs ensues
--	 */
--	wake_up_all(&obd_zombie_waitq);
--}
--
--/**
-- * check whether obd_zombie is idle
-- */
--static int obd_zombie_is_idle(void)
--{
--	int rc;
--
--	LASSERT(!test_bit(OBD_ZOMBIE_STOP, &obd_zombie_flags));
--	spin_lock(&obd_zombie_impexp_lock);
--	rc = (zombies_count == 0);
--	spin_unlock(&obd_zombie_impexp_lock);
--	return rc;
-+	queue_work(zombie_wq, &imp->imp_zombie_work);
- }
- 
- /**
-@@ -1237,60 +1135,19 @@ static int obd_zombie_is_idle(void)
-  */
- void obd_zombie_barrier(void)
- {
--	if (obd_zombie_pid == current_pid())
--		/* don't wait for myself */
--		return;
--	wait_event_idle(obd_zombie_waitq, obd_zombie_is_idle());
-+	flush_workqueue(zombie_wq);
- }
- EXPORT_SYMBOL(obd_zombie_barrier);
- 
--/**
-- * destroy zombie export/import thread.
-- */
--static int obd_zombie_impexp_thread(void *unused)
--{
--	unshare_fs_struct();
--	complete(&obd_zombie_start);
--
--	obd_zombie_pid = current_pid();
--
--	while (!test_bit(OBD_ZOMBIE_STOP, &obd_zombie_flags)) {
--		wait_event_idle(obd_zombie_waitq,
--				!obd_zombie_impexp_check(NULL));
--		obd_zombie_impexp_cull();
+-	while (1) {
+-		/*
+-		 * Recal all pools on this tick.
+-		 */
+-		c_time = ldlm_pools_recalc(LDLM_NAMESPACE_CLIENT);
 -
 -		/*
--		 * Notify obd_zombie_barrier callers that queues
--		 * may be empty.
+-		 * Wait until the next check time, or until we're
+-		 * stopped.
 -		 */
--		wake_up(&obd_zombie_waitq);
+-		wait_event_idle_timeout(thread->t_ctl_waitq,
+-					thread_is_stopping(thread) ||
+-					thread_is_event(thread),
+-					c_time * HZ);
+-
+-		if (thread_test_and_clear_flags(thread, SVC_STOPPING))
+-			break;
+-		thread_test_and_clear_flags(thread, SVC_EVENT);
 -	}
 -
--	complete(&obd_zombie_stop);
+-	thread_set_flags(thread, SVC_STOPPED);
+-	wake_up(&thread->t_ctl_waitq);
 -
--	return 0;
--}
+-	CDEBUG(D_DLMTRACE, "%s: pool thread exiting, process %d\n",
+-	       "ldlm_poold", current_pid());
 -
- /**
-  * start destroy zombie import/export thread
-  */
- int obd_zombie_impexp_init(void)
+-	complete_and_exit(&ldlm_pools_comp, 0);
++	schedule_delayed_work(&ldlm_recalc_pools, time * HZ);
+ }
+ 
+ static int ldlm_pools_thread_start(void)
  {
 -	struct task_struct *task;
 -
--	INIT_LIST_HEAD(&obd_zombie_imports);
--	INIT_LIST_HEAD(&obd_zombie_exports);
--	spin_lock_init(&obd_zombie_impexp_lock);
--	init_completion(&obd_zombie_start);
--	init_completion(&obd_zombie_stop);
--	init_waitqueue_head(&obd_zombie_waitq);
--	obd_zombie_pid = 0;
+-	if (ldlm_pools_thread)
+-		return -EALREADY;
 -
--	task = kthread_run(obd_zombie_impexp_thread, NULL, "obd_zombid");
--	if (IS_ERR(task))
--		return PTR_ERR(task);
-+	zombie_wq = alloc_workqueue("obd_zombid", 0, 0);
-+	if (!zombie_wq)
-+		return -ENOMEM;
+-	ldlm_pools_thread = kzalloc(sizeof(*ldlm_pools_thread), GFP_NOFS);
+-	if (!ldlm_pools_thread)
+-		return -ENOMEM;
+-
+-	init_completion(&ldlm_pools_comp);
+-	init_waitqueue_head(&ldlm_pools_thread->t_ctl_waitq);
++	schedule_delayed_work(&ldlm_recalc_pools, 0);
  
--	wait_for_completion(&obd_zombie_start);
+-	task = kthread_run(ldlm_pools_thread_main, ldlm_pools_thread,
+-			   "ldlm_poold");
+-	if (IS_ERR(task)) {
+-		CERROR("Can't start pool thread, error %ld\n", PTR_ERR(task));
+-		kfree(ldlm_pools_thread);
+-		ldlm_pools_thread = NULL;
+-		return PTR_ERR(task);
+-	}
+-	wait_event_idle(ldlm_pools_thread->t_ctl_waitq,
+-			thread_is_running(ldlm_pools_thread));
  	return 0;
  }
  
-@@ -1299,9 +1156,7 @@ int obd_zombie_impexp_init(void)
-  */
- void obd_zombie_impexp_stop(void)
+ static void ldlm_pools_thread_stop(void)
  {
--	set_bit(OBD_ZOMBIE_STOP, &obd_zombie_flags);
--	obd_zombie_impexp_notify();
--	wait_for_completion(&obd_zombie_stop);
-+	destroy_workqueue(zombie_wq);
+-	if (!ldlm_pools_thread)
+-		return;
+-
+-	thread_set_flags(ldlm_pools_thread, SVC_STOPPING);
+-	wake_up(&ldlm_pools_thread->t_ctl_waitq);
+-
+-	/*
+-	 * Make sure that pools thread is finished before freeing @thread.
+-	 * This fixes possible race and oops due to accessing freed memory
+-	 * in pools thread.
+-	 */
+-	wait_for_completion(&ldlm_pools_comp);
+-	kfree(ldlm_pools_thread);
+-	ldlm_pools_thread = NULL;
++	cancel_delayed_work_sync(&ldlm_recalc_pools);
  }
  
- struct obd_request_slot_waiter {
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-index f152ba1af0fc..3cb1e075f077 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
-@@ -339,11 +339,9 @@ static int import_sec_validate_get(struct obd_import *imp,
- 	}
+ static struct shrinker ldlm_pools_cli_shrinker = {
+@@ -1081,20 +1009,15 @@ int ldlm_pools_init(void)
+ 	int rc;
  
- 	*sec = sptlrpc_import_sec_ref(imp);
--	/* Only output an error when the import is still active */
- 	if (!*sec) {
--		if (list_empty(&imp->imp_zombie_chain))
--			CERROR("import %p (%s) with no sec\n",
--			       imp, ptlrpc_import_state_name(imp->imp_state));
-+		CERROR("import %p (%s) with no sec\n",
-+		       imp, ptlrpc_import_state_name(imp->imp_state));
- 		return -EACCES;
- 	}
+ 	rc = ldlm_pools_thread_start();
+-	if (rc)
+-		return rc;
+-
+-	rc = register_shrinker(&ldlm_pools_cli_shrinker);
+-	if (rc)
+-		ldlm_pools_thread_stop();
++	if (!rc)
++		rc = register_shrinker(&ldlm_pools_cli_shrinker);
  
+ 	return rc;
+ }
+ 
+ void ldlm_pools_fini(void)
+ {
+-	if (ldlm_pools_thread)
+-		unregister_shrinker(&ldlm_pools_cli_shrinker);
++	unregister_shrinker(&ldlm_pools_cli_shrinker);
+ 
+ 	ldlm_pools_thread_stop();
+ }
