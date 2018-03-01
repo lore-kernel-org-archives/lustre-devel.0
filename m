@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 02 Mar 2018 10:31:25 +1100
-Subject: [lustre-devel] [PATCH 12/17] staging: lustre: remove unused flag
- from ptlrpc_thread
+Subject: [lustre-devel] [PATCH 16/17] staging: lustre: allow monolithic
+ builds
 In-Reply-To: <151994679573.7628.1024109499321778846.stgit@noble>
 References: <151994679573.7628.1024109499321778846.stgit@noble>
-Message-ID: <151994708545.7628.17939519532029157797.stgit@noble>
+Message-ID: <151994708561.7628.11951662173369388423.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,46 +12,36 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-SVC_EVENT is no longer used.
+Remove restriction the lustre must be built
+as modules.  It now works as a monolithic build.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/lustre_net.h |   11 -----------
- 1 file changed, 11 deletions(-)
+ drivers/staging/lustre/lnet/Kconfig   |    2 +-
+ drivers/staging/lustre/lustre/Kconfig |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-index 5a4434e7c85a..108683c54127 100644
---- a/drivers/staging/lustre/lustre/include/lustre_net.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-@@ -1259,7 +1259,6 @@ enum {
- 	SVC_STOPPING    = 1 << 1,
- 	SVC_STARTING    = 1 << 2,
- 	SVC_RUNNING     = 1 << 3,
--	SVC_EVENT       = 1 << 4,
- };
- 
- #define PTLRPC_THR_NAME_LEN		32
-@@ -1302,11 +1301,6 @@ struct ptlrpc_thread {
- 	char				t_name[PTLRPC_THR_NAME_LEN];
- };
- 
--static inline int thread_is_init(struct ptlrpc_thread *thread)
--{
--	return thread->t_flags == 0;
--}
--
- static inline int thread_is_stopped(struct ptlrpc_thread *thread)
- {
- 	return !!(thread->t_flags & SVC_STOPPED);
-@@ -1327,11 +1321,6 @@ static inline int thread_is_running(struct ptlrpc_thread *thread)
- 	return !!(thread->t_flags & SVC_RUNNING);
- }
- 
--static inline int thread_is_event(struct ptlrpc_thread *thread)
--{
--	return !!(thread->t_flags & SVC_EVENT);
--}
--
- static inline void thread_clear_flags(struct ptlrpc_thread *thread, __u32 flags)
- {
- 	thread->t_flags &= ~flags;
+diff --git a/drivers/staging/lustre/lnet/Kconfig b/drivers/staging/lustre/lnet/Kconfig
+index 6bcb53d0c6f4..ad049e6f24e4 100644
+--- a/drivers/staging/lustre/lnet/Kconfig
++++ b/drivers/staging/lustre/lnet/Kconfig
+@@ -1,6 +1,6 @@
+ config LNET
+ 	tristate "Lustre networking subsystem (LNet)"
+-	depends on INET && m
++	depends on INET
+ 	help
+ 	  The Lustre network layer, also known as LNet, is a networking abstaction
+ 	  level API that was initially created to allow Lustre Filesystem to utilize
+diff --git a/drivers/staging/lustre/lustre/Kconfig b/drivers/staging/lustre/lustre/Kconfig
+index 90d826946c6a..c669c8fa0cc6 100644
+--- a/drivers/staging/lustre/lustre/Kconfig
++++ b/drivers/staging/lustre/lustre/Kconfig
+@@ -1,6 +1,6 @@
+ config LUSTRE_FS
+ 	tristate "Lustre file system client support"
+-	depends on m && !MIPS && !XTENSA && !SUPERH
++	depends on !MIPS && !XTENSA && !SUPERH
+ 	depends on LNET
+ 	select CRYPTO
+ 	select CRYPTO_CRC32
