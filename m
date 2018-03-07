@@ -1,97 +1,44 @@
-From: Kees Cook <keescook@chromium.org>
-Date: Wed, 7 Mar 2018 09:20:31 -0800
+From: Rasmus Villemoes <linux@rasmusvillemoes.dk>
+Date: Wed, 07 Mar 2018 21:48:33 +0100
 Subject: [lustre-devel] [PATCH] staging: lustre: Remove VLA usage
-In-Reply-To: <d5de0034-6f74-5b73-2df8-dbe5b366c2fc@prevas.dk>
+In-Reply-To: <CAGXu5j+OTu84ohuR3f4_xKRw9vikVi-K2TnH3+n_ekX1m1Vv8A@mail.gmail.com>
+ (Kees Cook's message of "Wed, 7 Mar 2018 09:20:31 -0800")
 References: <20180307054608.GA9300@beast>
  <d5de0034-6f74-5b73-2df8-dbe5b366c2fc@prevas.dk>
-Message-ID: <CAGXu5j+OTu84ohuR3f4_xKRw9vikVi-K2TnH3+n_ekX1m1Vv8A@mail.gmail.com>
+ <CAGXu5j+OTu84ohuR3f4_xKRw9vikVi-K2TnH3+n_ekX1m1Vv8A@mail.gmail.com>
+Message-ID: <87ina7ehni.fsf@rasmusvillemoes.dk>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, LKML <linux-kernel@vger.kernel.org>, "Tobin C. Harding" <me@tobin.cc>, Tycho Andersen <tycho@tycho.ws>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Gargi Sharma <gs051095@gmail.com>, Lustre Development List <lustre-devel@lists.lustre.org>, devel@driverdev.osuosl.org, Kernel Hardening <kernel-hardening@lists.openwall.com>
+To: Kees Cook <keescook@chromium.org>
+Cc: Rasmus Villemoes <rasmus.villemoes@prevas.dk>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, LKML <linux-kernel@vger.kernel.org>, "Tobin C. Harding" <me@tobin.cc>, Tycho Andersen <tycho@tycho.ws>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Gargi Sharma <gs051095@gmail.com>, Lustre Development List <lustre-devel@lists.lustre.org>, devel@driverdev.osuosl.org, Kernel Hardening <kernel-hardening@lists.openwall.com>
 
-On Wed, Mar 7, 2018 at 5:10 AM, Rasmus Villemoes
-<rasmus.villemoes@prevas.dk> wrote:
-> On 2018-03-07 06:46, Kees Cook wrote:
->> The kernel would like to remove all VLA usage. This switches to a
->> simple kasprintf() instead.
+On Wed, Mar 07 2018, Kees Cook <keescook@chromium.org> wrote:
+
+> On Wed, Mar 7, 2018 at 5:10 AM, Rasmus Villemoes
+> <rasmus.villemoes@prevas.dk> wrote:
+>> On 2018-03-07 06:46, Kees Cook wrote:
+>>> The kernel would like to remove all VLA usage. This switches to a
+>>> simple kasprintf() instead.
+>>>
 >>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->>  drivers/staging/lustre/lustre/llite/xattr.c | 19 +++++++++++++------
->>  1 file changed, 13 insertions(+), 6 deletions(-)
+>> It's probably worth pointing out that this actually fixes an
+>> unconditional buffer overflow: fullname only has room for the two
+>> strings and the '\n', but vsnprintf() is told that the buffer has
+>> infinite size (well, INT_MAX), so there should be plenty of room to
+>> append the '\0' after the '\n'.
 >>
->> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
->> index 532384c91447..aab4eab64289 100644
->> --- a/drivers/staging/lustre/lustre/llite/xattr.c
->> +++ b/drivers/staging/lustre/lustre/llite/xattr.c
->> @@ -87,7 +87,7 @@ ll_xattr_set_common(const struct xattr_handler *handler,
->>                   const char *name, const void *value, size_t size,
->>                   int flags)
->>  {
->> -     char fullname[strlen(handler->prefix) + strlen(name) + 1];
->> +     char *fullname;
->>       struct ll_sb_info *sbi = ll_i2sbi(inode);
->>       struct ptlrpc_request *req = NULL;
->>       const char *pv = value;
->> @@ -141,10 +141,13 @@ ll_xattr_set_common(const struct xattr_handler *handler,
->>                       return -EPERM;
->>       }
->>
->> -     sprintf(fullname, "%s%s\n", handler->prefix, name);
 >
-> It's probably worth pointing out that this actually fixes an
-> unconditional buffer overflow: fullname only has room for the two
-> strings and the '\n', but vsnprintf() is told that the buffer has
-> infinite size (well, INT_MAX), so there should be plenty of room to
-> append the '\0' after the '\n'.
+> Oh yes, hah. I didn't even see the \n in the string. :P
 >
->> +     fullname = kasprintf(GFP_KERNEL, "%s%s\n", handler->prefix, name);
->> +     if (!fullname)
->> +             return -ENOMEM;
->>       rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
->>                        valid, fullname, pv, size, 0, flags,
->>                        ll_i2suppgid(inode), &req);
->> +     kfree(fullname);
->>       if (rc) {
->>               if (rc == -EOPNOTSUPP && handler->flags == XATTR_USER_T) {
->>                       LCONSOLE_INFO("Disabling user_xattr feature because it is not supported on the server\n");
->> @@ -364,7 +367,7 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
->>                              struct dentry *dentry, struct inode *inode,
->>                              const char *name, void *buffer, size_t size)
->>  {
->> -     char fullname[strlen(handler->prefix) + strlen(name) + 1];
->> +     char *fullname;
->>       struct ll_sb_info *sbi = ll_i2sbi(inode);
->>  #ifdef CONFIG_FS_POSIX_ACL
->>       struct ll_inode_info *lli = ll_i2info(inode);
->> @@ -411,9 +414,13 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
->>       if (handler->flags == XATTR_ACL_DEFAULT_T && !S_ISDIR(inode->i_mode))
->>               return -ENODATA;
->>  #endif
->> -     sprintf(fullname, "%s%s\n", handler->prefix, name);
->
-> Same here.
->
-> I'm a little surprised this hasn't been caugt by static analysis, I
-> thought gcc/coverity/smatch/whatnot had gotten pretty good at computing
-> the size of the output generated by a given format string with "known"
-> arguments and comparing to the size of the output buffer. Though of
-> course it does require the tool to be able to do symbolic manipulations,
-> in this case realizing that
->
-> outsize == strlen(x)+strlen(y)+1+1 > bufsize == strlen(x)+strlen(y)+1
->
-> Rasmus
+> So, both a VLA fix and a buffer over-run fix. Can I add your "Reviewed-by"? :)
 
-Oh yes, hah. I didn't even see the \n in the string. :P
+Sure,
 
-So, both a VLA fix and a buffer over-run fix. Can I add your "Reviewed-by"? :)
+Reviewed-by: Rasmus Villemoes <linux@rasmusvillemoes.dk>
 
--Kees
-
--- 
-Kees Cook
-Pixel Security
+A nit, if you're resending anyway: can you move the "char *fullname"
+declarations down a bit, to between pv,valid, and lli,rc, respectively?
+That keeps the initialized and uninitialized variables nicely together
+and ends up looking better.
