@@ -1,11 +1,11 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Wed, 7 Mar 2018 20:49:03 +0000
-Subject: [lustre-devel] [PATCH 01/17] staging: lustre: obd_mount: use
- correct niduuid suffix.
-In-Reply-To: <151994708505.7628.14486515694497834046.stgit@noble>
+Date: Wed, 7 Mar 2018 20:51:39 +0000
+Subject: [lustre-devel] [PATCH 02/17] staging: lustre: fix bug in
+ osc_enter_cache_try
+In-Reply-To: <151994708510.7628.7308229784516417641.stgit@noble>
 References: <151994679573.7628.1024109499321778846.stgit@noble>
- <151994708505.7628.14486515694497834046.stgit@noble>
-Message-ID: <4F9BD297-F7B5-4F10-B700-2806FAEA9359@intel.com>
+ <151994708510.7628.7308229784516417641.stgit@noble>
+Message-ID: <0512F618-CADE-434F-83F9-0452680BFF33@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,49 +16,57 @@ Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoun
 
 On Mar 1, 2018, at 16:31, NeilBrown <neilb@suse.com> wrote:
 > 
-> Commit 4f016420d368 ("Staging: lustre: obdclass: Use kasprintf") moved
-> some sprintf() calls earlier in the code to combine them with
-> memory allocation and create kasprintf() calls.
+> The lustre-release patch commit bdc5bb52c554 ("LU-4933 osc:
+> Automatically increase the max_dirty_mb") changed
 > 
-> In one case, this code movement moved the sprintf to a location where the
-> values being formatter were different.
-> In particular
->       sprintf(niduuid, "%s_%x", mgcname, i);
-> was move from *after* the line
->        i = 0;
-> to a location where the value of 'i' was at least 1.
+> -       if (cli->cl_dirty + PAGE_CACHE_SIZE <= cli->cl_dirty_max &&
+> +       if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
 > 
-> This cause the wrong name to be formatted, and triggers
+> When this patch landed in Linux a couple of years later, it landed as
 > 
->       CERROR("del MDC UUID %s failed: rc = %d\n",
->              niduuid, rc);
+> -       if (cli->cl_dirty + PAGE_SIZE <= cli->cl_dirty_max &&
+> +       if (cli->cl_dirty_pages <= cli->cl_dirty_max_pages &&
 > 
-> at unmount time.
+> which is clearly different ('<=' vs '<'), and allows cl_dirty_pages to
+> increase beyond cl_dirty_max_pages - which causes a latter assertion
+> to fails.
 > 
-> So use '0' instead of 'i'.
-> 
-> Fixes: 4f016420d368 ("Staging: lustre: obdclass: Use kasprintf")
+> Fixes: 3147b268400a ("staging: lustre: osc: Automatically increase the max_dirty_mb")
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
 > ---
-> drivers/staging/lustre/lustre/obdclass/obd_mount.c |    2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
+> drivers/staging/lustre/lustre/include/obd.h   |    2 +-
+> drivers/staging/lustre/lustre/osc/osc_cache.c |    2 +-
+> 2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> index acc1ea773c9c..f5e8214ac37b 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-> @@ -243,7 +243,7 @@ int lustre_start_mgc(struct super_block *sb)
-> 	libcfs_nid2str_r(nid, nidstr, sizeof(nidstr));
-> 	mgcname = kasprintf(GFP_NOFS,
-> 			    "%s%s", LUSTRE_MGC_OBDNAME, nidstr);
-> -	niduuid = kasprintf(GFP_NOFS, "%s_%x", mgcname, i);
-> +	niduuid = kasprintf(GFP_NOFS, "%s_%x", mgcname, 0);
-> 	if (!mgcname || !niduuid) {
-> 		rc = -ENOMEM;
-> 		goto out_free;
+> diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+> index 4368f4e9f208..f1233ca7d337 100644
+> --- a/drivers/staging/lustre/lustre/include/obd.h
+> +++ b/drivers/staging/lustre/lustre/include/obd.h
+> @@ -191,7 +191,7 @@ struct client_obd {
+> 	struct sptlrpc_flavor    cl_flvr_mgc;   /* fixed flavor of mgc->mgs */
+> 
+> 	/* the grant values are protected by loi_list_lock below */
+> -	unsigned long		 cl_dirty_pages;	/* all _dirty_ in pahges */
+> +	unsigned long		 cl_dirty_pages;	/* all _dirty_ in pages */
+> 	unsigned long		 cl_dirty_max_pages;	/* allowed w/o rpc */
+> 	unsigned long		 cl_dirty_transit;	/* dirty synchronous */
+> 	unsigned long		 cl_avail_grant;	/* bytes of credit for ost */
+> diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+> index 1c70a504ee89..459503727ce3 100644
+> --- a/drivers/staging/lustre/lustre/osc/osc_cache.c
+> +++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+> @@ -1529,7 +1529,7 @@ static int osc_enter_cache_try(struct client_obd *cli,
+> 	if (rc < 0)
+> 		return 0;
+> 
+> -	if (cli->cl_dirty_pages <= cli->cl_dirty_max_pages &&
+> +	if (cli->cl_dirty_pages < cli->cl_dirty_max_pages &&
+> 	    atomic_long_read(&obd_dirty_pages) + 1 <= obd_max_dirty_pages) {
+> 		osc_consume_write_grant(cli, &oap->oap_brw_page);
+> 		if (transient) {
 > 
 > 
 
