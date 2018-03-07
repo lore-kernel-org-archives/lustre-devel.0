@@ -1,44 +1,69 @@
-From: Rasmus Villemoes <linux@rasmusvillemoes.dk>
-Date: Wed, 07 Mar 2018 21:48:33 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: Remove VLA usage
-In-Reply-To: <CAGXu5j+OTu84ohuR3f4_xKRw9vikVi-K2TnH3+n_ekX1m1Vv8A@mail.gmail.com>
- (Kees Cook's message of "Wed, 7 Mar 2018 09:20:31 -0800")
-References: <20180307054608.GA9300@beast>
- <d5de0034-6f74-5b73-2df8-dbe5b366c2fc@prevas.dk>
- <CAGXu5j+OTu84ohuR3f4_xKRw9vikVi-K2TnH3+n_ekX1m1Vv8A@mail.gmail.com>
-Message-ID: <87ina7ehni.fsf@rasmusvillemoes.dk>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Wed, 7 Mar 2018 20:49:03 +0000
+Subject: [lustre-devel] [PATCH 01/17] staging: lustre: obd_mount: use
+ correct niduuid suffix.
+In-Reply-To: <151994708505.7628.14486515694497834046.stgit@noble>
+References: <151994679573.7628.1024109499321778846.stgit@noble>
+ <151994708505.7628.14486515694497834046.stgit@noble>
+Message-ID: <4F9BD297-F7B5-4F10-B700-2806FAEA9359@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Kees Cook <keescook@chromium.org>
-Cc: Rasmus Villemoes <rasmus.villemoes@prevas.dk>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, LKML <linux-kernel@vger.kernel.org>, "Tobin C. Harding" <me@tobin.cc>, Tycho Andersen <tycho@tycho.ws>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Gargi Sharma <gs051095@gmail.com>, Lustre Development List <lustre-devel@lists.lustre.org>, devel@driverdev.osuosl.org, Kernel Hardening <kernel-hardening@lists.openwall.com>
+To: NeilBrown <neilb@suse.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Linux
+ Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Wed, Mar 07 2018, Kees Cook <keescook@chromium.org> wrote:
+On Mar 1, 2018, at 16:31, NeilBrown <neilb@suse.com> wrote:
+> 
+> Commit 4f016420d368 ("Staging: lustre: obdclass: Use kasprintf") moved
+> some sprintf() calls earlier in the code to combine them with
+> memory allocation and create kasprintf() calls.
+> 
+> In one case, this code movement moved the sprintf to a location where the
+> values being formatter were different.
+> In particular
+>       sprintf(niduuid, "%s_%x", mgcname, i);
+> was move from *after* the line
+>        i = 0;
+> to a location where the value of 'i' was at least 1.
+> 
+> This cause the wrong name to be formatted, and triggers
+> 
+>       CERROR("del MDC UUID %s failed: rc = %d\n",
+>              niduuid, rc);
+> 
+> at unmount time.
+> 
+> So use '0' instead of 'i'.
+> 
+> Fixes: 4f016420d368 ("Staging: lustre: obdclass: Use kasprintf")
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
-> On Wed, Mar 7, 2018 at 5:10 AM, Rasmus Villemoes
-> <rasmus.villemoes@prevas.dk> wrote:
->> On 2018-03-07 06:46, Kees Cook wrote:
->>> The kernel would like to remove all VLA usage. This switches to a
->>> simple kasprintf() instead.
->>>
->>
->> It's probably worth pointing out that this actually fixes an
->> unconditional buffer overflow: fullname only has room for the two
->> strings and the '\n', but vsnprintf() is told that the buffer has
->> infinite size (well, INT_MAX), so there should be plenty of room to
->> append the '\0' after the '\n'.
->>
->
-> Oh yes, hah. I didn't even see the \n in the string. :P
->
-> So, both a VLA fix and a buffer over-run fix. Can I add your "Reviewed-by"? :)
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
-Sure,
+> ---
+> drivers/staging/lustre/lustre/obdclass/obd_mount.c |    2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+> index acc1ea773c9c..f5e8214ac37b 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
+> @@ -243,7 +243,7 @@ int lustre_start_mgc(struct super_block *sb)
+> 	libcfs_nid2str_r(nid, nidstr, sizeof(nidstr));
+> 	mgcname = kasprintf(GFP_NOFS,
+> 			    "%s%s", LUSTRE_MGC_OBDNAME, nidstr);
+> -	niduuid = kasprintf(GFP_NOFS, "%s_%x", mgcname, i);
+> +	niduuid = kasprintf(GFP_NOFS, "%s_%x", mgcname, 0);
+> 	if (!mgcname || !niduuid) {
+> 		rc = -ENOMEM;
+> 		goto out_free;
+> 
+> 
 
-Reviewed-by: Rasmus Villemoes <linux@rasmusvillemoes.dk>
-
-A nit, if you're resending anyway: can you move the "char *fullname"
-declarations down a bit, to between pv,valid, and lli,rc, respectively?
-That keeps the initialized and uninitialized variables nicely together
-and ends up looking better.
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
