@@ -1,11 +1,11 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Thu, 8 Mar 2018 00:19:04 +0000
-Subject: [lustre-devel] [PATCH 06/17] staging: lustre: get entropy from
- nid when nid set.
-In-Reply-To: <151994708524.7628.17942703834112140684.stgit@noble>
+Date: Thu, 8 Mar 2018 00:20:00 +0000
+Subject: [lustre-devel] [PATCH 07/17] staging: lustre: ptlrpc: change
+ GFP_NOFS to GFP_KERNEL
+In-Reply-To: <151994708527.7628.4121961365281382022.stgit@noble>
 References: <151994679573.7628.1024109499321778846.stgit@noble>
- <151994708524.7628.17942703834112140684.stgit@noble>
-Message-ID: <DADAE06F-9F73-4C2D-9995-AAD3ABB234CC@intel.com>
+ <151994708527.7628.4121961365281382022.stgit@noble>
+Message-ID: <D522B515-A92B-4169-9B98-31F99ABF1D49@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,90 +16,53 @@ Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoun
 
 On Mar 1, 2018, at 16:31, NeilBrown <neilb@suse.com> wrote:
 > 
-> When the 'lustre' module is loaded, it gets a list of
-> net devices and uses the node ids to  add entropy
-> to the prng.  This means that the network interfaces need
-> to be configured before the module is loaded, which prevents
-> the module from being compiled into a monolithic kernel.
+> These allocations are performed during initialization,
+> so they don't need GFP_NOFS.
 > 
-> So move this entropy addition to the moment when
-> the interface is imported to LNet and the node id is first known.
-
-It took me a while to convince myself this is correct, but this is
-moving the entropy addition earlier in the startup sequence, and
-that is a good thing.  The important factor is to ensure that the
-client UUID (generated at mount time) is unique across all clients,
-and adding the node address to the entropy ensures this, even if many
-thousands of identical diskless nodes boot and mount simultaneously.
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
-> Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
-> drivers/staging/lustre/lnet/lnet/api-ni.c     |    7 +++++++
-> drivers/staging/lustre/lustre/llite/super25.c |   17 +----------------
-> 2 files changed, 8 insertions(+), 16 deletions(-)
+> drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c |    2 +-
+> drivers/staging/lustre/lustre/ptlrpc/service.c  |    4 ++--
+> 2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> index 48d25ccadbb3..90266be0132d 100644
-> --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-> +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> @@ -1214,6 +1214,7 @@ lnet_startup_lndni(struct lnet_ni *ni, struct lnet_ioctl_config_data *conf)
-> 	struct lnet_lnd *lnd;
-> 	struct lnet_tx_queue *tq;
-> 	int i;
-> +	u32 seed;
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> index 577c5822b823..625b9520d78f 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+> @@ -377,7 +377,7 @@ static inline void enc_pools_alloc(void)
+> 	page_pools.epp_pools =
+> 		kvzalloc(page_pools.epp_max_pools *
+> 				sizeof(*page_pools.epp_pools),
+> -				GFP_NOFS);
+> +				GFP_KERNEL);
+> }
 > 
-> 	lnd_type = LNET_NETTYP(LNET_NIDNET(ni->ni_nid));
-> 
-> @@ -1352,6 +1353,12 @@ lnet_startup_lndni(struct lnet_ni *ni, struct lnet_ioctl_config_data *conf)
-> 		tq->tq_credits = lnet_ni_tq_credits(ni);
+> static inline void enc_pools_free(void)
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+> index 49417228b621..f37364e00dfe 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/service.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+> @@ -2046,7 +2046,7 @@ static int ptlrpc_main(void *arg)
+> 			goto out;
 > 	}
 > 
-> +	/* Nodes with small feet have little entropy. The NID for this
-> +	 * node gives the most entropy in the low bits.
-> +	 */
-> +	seed = LNET_NIDADDR(ni->ni_nid);
-> +	add_device_randomness(&seed, sizeof(seed));
-> +
-> 	CDEBUG(D_LNI, "Added LNI %s [%d/%d/%d/%d]\n",
-> 	       libcfs_nid2str(ni->ni_nid), ni->ni_peertxcredits,
-> 	       lnet_ni_tq_credits(ni) * LNET_CPT_NUMBER,
-> diff --git a/drivers/staging/lustre/lustre/llite/super25.c b/drivers/staging/lustre/lustre/llite/super25.c
-> index 9b0bb3541a84..861e7a60f408 100644
-> --- a/drivers/staging/lustre/lustre/llite/super25.c
-> +++ b/drivers/staging/lustre/lustre/llite/super25.c
-> @@ -85,8 +85,7 @@ MODULE_ALIAS_FS("lustre");
-> 
-> static int __init lustre_init(void)
-> {
-> -	struct lnet_process_id lnet_id;
-> -	int i, rc;
-> +	int rc;
-> 
-> 	BUILD_BUG_ON(sizeof(LUSTRE_VOLATILE_HDR) !=
-> 		     LUSTRE_VOLATILE_HDR_LEN + 1);
-> @@ -125,20 +124,6 @@ static int __init lustre_init(void)
-> 		goto out_debugfs;
+> -	env = kzalloc(sizeof(*env), GFP_NOFS);
+> +	env = kzalloc(sizeof(*env), GFP_KERNEL);
+> 	if (!env) {
+> 		rc = -ENOMEM;
+> 		goto out_srv_fini;
+> @@ -2072,7 +2072,7 @@ static int ptlrpc_main(void *arg)
 > 	}
 > 
-> -	/* Nodes with small feet have little entropy. The NID for this
-> -	 * node gives the most entropy in the low bits
-> -	 */
-> -	for (i = 0;; i++) {
-> -		u32 seed;
-> -
-> -		if (LNetGetId(i, &lnet_id) == -ENOENT)
-> -			break;
-> -		if (LNET_NETTYP(LNET_NIDNET(lnet_id.nid)) != LOLND) {
-> -			 seed = LNET_NIDADDR(lnet_id.nid);
-> -			 add_device_randomness(&seed, sizeof(seed));
-> -		}
-> -	}
-> -
-> 	rc = vvp_global_init();
-> 	if (rc != 0)
-> 		goto out_sysfs;
+> 	/* Alloc reply state structure for this one */
+> -	rs = kvzalloc(svc->srv_max_reply_size, GFP_NOFS);
+> +	rs = kvzalloc(svc->srv_max_reply_size, GFP_KERNEL);
+> 	if (!rs) {
+> 		rc = -ENOMEM;
+> 		goto out_srv_fini;
 > 
 > 
 
