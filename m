@@ -1,11 +1,11 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 9 Mar 2018 00:32:39 +0000
-Subject: [lustre-devel] [PATCH 16/17] staging: lustre: allow monolithic
- builds
-In-Reply-To: <151994708561.7628.11951662173369388423.stgit@noble>
+Date: Fri, 9 Mar 2018 00:37:07 +0000
+Subject: [lustre-devel] [PATCH 17/17] Revert "staging: Disable lustre
+ file system for MIPS, SH, and XTENSA"
+In-Reply-To: <151994708565.7628.14283641203455668904.stgit@noble>
 References: <151994679573.7628.1024109499321778846.stgit@noble>
- <151994708561.7628.11951662173369388423.stgit@noble>
-Message-ID: <F1BB7EF9-AFAE-4376-9519-A6C97CB1EE8F@intel.com>
+ <151994708565.7628.14283641203455668904.stgit@noble>
+Message-ID: <607D7FFB-CF2F-43DF-A19A-5A713C959670@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,39 +16,34 @@ Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoun
 
 On Mar 1, 2018, at 16:31, NeilBrown <neilb@suse.com> wrote:
 > 
-> Remove restriction the lustre must be built
-> as modules.  It now works as a monolithic build.
+> This reverts commit 16f1eeb660bd2bfd223704ee6350706b39c55a7a.
 > 
-> Signed-off-by: NeilBrown <neilb@suse.com>
+> The reason for this patch was that lustre used copy_from_user_page.
+> Commit 76133e66b141 ("staging/lustre: Replace jobid acquiring with per
+> node setting") removed that usage.
+> So the arch restrictions can go.
+
+I don't think these platforms will be used with Lustre any time soon,
+but who knows... :-)
+
+In any case, thanks for this patch series, definitely a lot of good
+cleanups in there.
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
+> Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
-> drivers/staging/lustre/lnet/Kconfig   |    2 +-
-> drivers/staging/lustre/lustre/Kconfig |    2 +-
-> 2 files changed, 2 insertions(+), 2 deletions(-)
+> drivers/staging/lustre/lustre/Kconfig |    1 -
+> 1 file changed, 1 deletion(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/Kconfig b/drivers/staging/lustre/lnet/Kconfig
-> index 6bcb53d0c6f4..ad049e6f24e4 100644
-> --- a/drivers/staging/lustre/lnet/Kconfig
-> +++ b/drivers/staging/lustre/lnet/Kconfig
-> @@ -1,6 +1,6 @@
-> config LNET
-> 	tristate "Lustre networking subsystem (LNet)"
-> -	depends on INET && m
-> +	depends on INET
-> 	help
-> 	  The Lustre network layer, also known as LNet, is a networking abstaction
-> 	  level API that was initially created to allow Lustre Filesystem to utilize
 > diff --git a/drivers/staging/lustre/lustre/Kconfig b/drivers/staging/lustre/lustre/Kconfig
-> index 90d826946c6a..c669c8fa0cc6 100644
+> index c669c8fa0cc6..ccb78a945995 100644
 > --- a/drivers/staging/lustre/lustre/Kconfig
 > +++ b/drivers/staging/lustre/lustre/Kconfig
-> @@ -1,6 +1,6 @@
+> @@ -1,6 +1,5 @@
 > config LUSTRE_FS
 > 	tristate "Lustre file system client support"
-> -	depends on m && !MIPS && !XTENSA && !SUPERH
-> +	depends on !MIPS && !XTENSA && !SUPERH
+> -	depends on !MIPS && !XTENSA && !SUPERH
 > 	depends on LNET
 > 	select CRYPTO
 > 	select CRYPTO_CRC32
