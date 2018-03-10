@@ -1,113 +1,76 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 9 Mar 2018 08:54:29 +0000
-Subject: [lustre-devel] [PATCH v2] staging: lustre: Remove VLA usage
-In-Reply-To: <20180307205444.GA11349@beast>
-References: <20180307205444.GA11349@beast>
-Message-ID: <D86B331F-466E-4395-9620-A84349F2DD2E@intel.com>
+From: Doug Oucharek <dougso@me.com>
+Date: Fri, 09 Mar 2018 16:34:14 -0800
+Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: fix race at
+ kiblnd_connect_peer
+In-Reply-To: <8D09A62F-69B3-48CF-BE9B-D3C1ABB70910@me.com>
+References: <8D09A62F-69B3-48CF-BE9B-D3C1ABB70910@me.com>
+Message-ID: <072214EC-91AE-4376-87B5-7CE6A19B23F2@me.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Kees Cook <keescook@chromium.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Tycho Andersen <tycho@tycho.ws>, Kernel Hardening <kernel-hardening@lists.openwall.com>, Rasmus Villemoes <linux@rasmusvillemoes.dk>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, Gargi Sharma <gs051095@gmail.com>, "Drokin,
- Oleg" <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>, "Tobin C. Harding" <me@tobin.cc>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, "Drokin, Oleg" <oleg.drokin@intel.com>, "Dilger, Andreas" <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, alexander.boyko@seagate.com
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Mar 7, 2018, at 13:54, Kees Cook <keescook@chromium.org> wrote:
+Please ignore this patch.  Turns out it depends on a series which has not been submitted yet.  I?ll resend this one once all of those are done.
+
+Doug
+
+> On Mar 9, 2018, at 3:29 PM, Doug Oucharek <dougso@me.com> wrote:
 > 
-> The kernel would like to have all stack VLA usage removed[1]. This switches
-> to a simple kasprintf() instead, and in the process fixes an off-by-one
-> between the allocation and the sprintf (allocation did not include NULL
-> byte in calculation).
+> cmid will be destroyed at OFED if kiblnd_cm_callback return error.
+> if error happen before the end of kiblnd_connect_peer, it will touch
+> destroyed cmid and fail as
+> (o2iblnd_cb.c:1315:kiblnd_connect_peer())
+>           ASSERTION( cmid->device != ((void *)0) ) failed:
 > 
-> [1] https://lkml.org/lkml/2018/3/7/621
-> 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> Reviewed-by: Rasmus Villemoes <linux@rasmusvillemoes.dk>
-
-This seems better than the VLA_SAFE() macro, at the cost of an extra kmalloc.
-I don't think these code paths are super performance critical.
-
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-
+> Signed-off-by: Alexander Boyko <alexander.boyko@seagate.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-10015
+> Reviewed-by: Alexey Lyashkov <c17817@cray.com>
+> Reviewed-by: Doug Oucharek <dougso@me.com>
+> Reviewed-by: John L. Hammond <john.hammond@intel.com>
+> Signed-off-by: Doug Oucharek <dougso@me.com>
 > ---
-> drivers/staging/lustre/lustre/llite/xattr.c | 19 +++++++++++++------
-> 1 file changed, 13 insertions(+), 6 deletions(-)
+> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 18 ++++++++++++------
+> 1 file changed, 12 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-> index 532384c91447..ff6fe81a4ddb 100644
-> --- a/drivers/staging/lustre/lustre/llite/xattr.c
-> +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-> @@ -87,10 +87,10 @@ ll_xattr_set_common(const struct xattr_handler *handler,
-> 		    const char *name, const void *value, size_t size,
-> 		    int flags)
-> {
-> -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
-> 	struct ll_sb_info *sbi = ll_i2sbi(inode);
-> 	struct ptlrpc_request *req = NULL;
-> 	const char *pv = value;
-> +	char *fullname;
-> 	__u64 valid;
-> 	int rc;
-> 
-> @@ -141,10 +141,13 @@ ll_xattr_set_common(const struct xattr_handler *handler,
-> 			return -EPERM;
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> index 6690a6c..080c2a1 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> @@ -1290,11 +1290,6 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+> 		goto failed2;
 > 	}
 > 
-> -	sprintf(fullname, "%s%s\n", handler->prefix, name);
-> +	fullname = kasprintf(GFP_KERNEL, "%s%s\n", handler->prefix, name);
-> +	if (!fullname)
-> +		return -ENOMEM;
-> 	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
-> 			 valid, fullname, pv, size, 0, flags,
-> 			 ll_i2suppgid(inode), &req);
-> +	kfree(fullname);
-> 	if (rc) {
-> 		if (rc == -EOPNOTSUPP && handler->flags == XATTR_USER_T) {
-> 			LCONSOLE_INFO("Disabling user_xattr feature because it is not supported on the server\n");
-> @@ -364,11 +367,11 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
-> 			       struct dentry *dentry, struct inode *inode,
-> 			       const char *name, void *buffer, size_t size)
-> {
-> -	char fullname[strlen(handler->prefix) + strlen(name) + 1];
-> 	struct ll_sb_info *sbi = ll_i2sbi(inode);
-> #ifdef CONFIG_FS_POSIX_ACL
-> 	struct ll_inode_info *lli = ll_i2info(inode);
-> #endif
-> +	char *fullname;
-> 	int rc;
+> -	LASSERT(cmid->device);
+> -	CDEBUG(D_NET, "%s: connection bound to %s:%pI4h:%s\n",
+> -	       libcfs_nid2str(peer->ibp_nid), dev->ibd_ifname,
+> -	       &dev->ibd_ifip, cmid->device->name);
+> -
+> 	return;
 > 
-> 	CDEBUG(D_VFSTRACE, "VFS Op:inode=" DFID "(%p)\n",
-> @@ -411,9 +414,13 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
-> 	if (handler->flags == XATTR_ACL_DEFAULT_T && !S_ISDIR(inode->i_mode))
-> 		return -ENODATA;
-> #endif
-> -	sprintf(fullname, "%s%s\n", handler->prefix, name);
-> -	return ll_xattr_list(inode, fullname, handler->flags, buffer, size,
-> -			     OBD_MD_FLXATTR);
-> +	fullname = kasprintf(GFP_KERNEL, "%s%s\n", handler->prefix, name);
-> +	if (!fullname)
-> +		return -ENOMEM;
-> +	rc = ll_xattr_list(inode, fullname, handler->flags, buffer, size,
-> +			   OBD_MD_FLXATTR);
-> +	kfree(fullname);
-> +	return rc;
-> }
-> 
-> static ssize_t ll_getxattr_lov(struct inode *inode, void *buf, size_t buf_size)
+> failed2:
+> @@ -2996,8 +2991,19 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+> 		} else {
+> 			rc = rdma_resolve_route(
+> 				cmid, *kiblnd_tunables.kib_timeout * 1000);
+> -			if (!rc)
+> +			if (!rc) {
+> +				kib_net_t *net = peer_ni->ibp_ni->ni_data;
+> +				kib_dev_t *dev = net->ibn_dev;
+> +
+> +				CDEBUG(D_NET, "%s: connection bound to "\
+> +				       "%s:%pI4h:%s\n",
+> +				       libcfs_nid2str(peer_ni->ibp_nid),
+> +				       dev->ibd_ifname,
+> +				       &dev->ibd_ifip, cmid->device->name);
+> +
+> 				return 0;
+> +			}
+> +
+> 			/* Can't initiate route resolution */
+> 			CERROR("Can't resolve route for %s: %d\n",
+> 			       libcfs_nid2str(peer->ibp_nid), rc);
 > -- 
-> 2.7.4
+> 1.8.3.1
 > 
-> 
-> -- 
-> Kees Cook
-> Pixel Security
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel Corporation
