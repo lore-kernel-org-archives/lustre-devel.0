@@ -1,54 +1,45 @@
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 13 Mar 2018 14:03:44 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: use module_name() macro for
- debug printf
-Message-ID: <20180313130425.3975930-1-arnd@arndb.de>
+Date: Tue, 13 Mar 2018 14:05:16 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: fid: avoid false-positive
+ uninitialized variable warning
+Message-ID: <20180313130532.4015402-1-arnd@arndb.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Arnd Bergmann <arnd@arndb.de>, NeilBrown <neilb@suse.com>, Aliaksei Karaliou <akaraliou.dev@gmail.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+Cc: devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, NeilBrown <neilb@suse.com>, Arnd Bergmann <arnd@arndb.de>, lustre-devel@lists.lustre.org
 
-We now allow lustre to be built when CONFIG_MODULES is disabled,
-but that causes a build failure:
+One of Neil's recent cleanups apparently has led the code to get
+to a state where gcc tracks the 'seqnr' variable just enough to
+see that it is sometimes initialized in seq_client_alloc_seq(),
+but not enough that it can prove this initialization to be reliable
+before the use of that variable:
 
-In file included from drivers/staging/lustre/include/linux/libcfs/libcfs.h:42,
-                 from drivers/staging/lustre/lustre/obdclass/lu_object.c:44:
-drivers/staging/lustre/lustre/obdclass/lu_object.c: In function 'lu_context_key_degister':
-drivers/staging/lustre/lustre/obdclass/lu_object.c:1410:51: error: dereferencing pointer to incomplete type 'struct module'
+drivers/staging/lustre/lustre/fid/fid_request.c: In function 'seq_client_alloc_fid':
+drivers/staging/lustre/lustre/fid/fid_request.c:245:22: error: 'seqnr' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-This particular case can be avoided by using the module_name()
-macro that was designed exactly to handle printing the name of
-a module in all configurations.
+The code seems to be otherwise correct, and I could not come
+up with a good way to simplify it further, so this adds a fake
+initialization to shut up that warning.
 
 Cc: NeilBrown <neilb@suse.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/staging/lustre/lustre/obdclass/lu_object.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/fid/fid_request.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index 8ddf23b82a2c..3ae16e8501c2 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -1407,7 +1407,7 @@ void lu_context_key_degister(struct lu_context_key *key)
- 	while (atomic_read(&key->lct_used) > 1) {
- 		spin_unlock(&lu_keys_guard);
- 		CDEBUG(D_INFO, "%s: \"%s\" %p, %d\n",
--		       __func__, key->lct_owner ? key->lct_owner->name : "",
-+		       __func__, module_name(key->lct_owner),
- 		       key, atomic_read(&key->lct_used));
- 		schedule();
- 		spin_lock(&lu_keys_guard);
-@@ -1547,7 +1547,7 @@ void lu_context_key_quiesce(struct lu_context_key *key)
- 			spin_unlock(&lu_keys_guard);
- 			CDEBUG(D_INFO, "%s: \"%s\" %p, %d (%d)\n",
- 			       __func__,
--			       key->lct_owner ? key->lct_owner->name : "",
-+			       module_name(key->lct_owner),
- 			       key, atomic_read(&key->lct_used),
- 			atomic_read(&lu_key_initing_cnt));
- 			schedule();
+diff --git a/drivers/staging/lustre/lustre/fid/fid_request.c b/drivers/staging/lustre/lustre/fid/fid_request.c
+index fa23423eb8b3..030680f37c79 100644
+--- a/drivers/staging/lustre/lustre/fid/fid_request.c
++++ b/drivers/staging/lustre/lustre/fid/fid_request.c
+@@ -174,6 +174,7 @@ static int seq_client_alloc_seq(const struct lu_env *env,
+ 		if (rc) {
+ 			CERROR("%s: Can't allocate new meta-sequence, rc %d\n",
+ 			       seq->lcs_name, rc);
++			*seqnr = U64_MAX;
+ 			return rc;
+ 		}
+ 		CDEBUG(D_INFO, "%s: New range - " DRANGE "\n",
 -- 
 2.9.0
