@@ -1,50 +1,49 @@
-From: Randy Dunlap <rdunlap@infradead.org>
-Date: Thu, 15 Mar 2018 10:17:52 -0700
-Subject: [lustre-devel] mmotm 2018-03-14-16-24 uploaded (lustre)
-In-Reply-To: <20180314232442.rL_lhWQqT%akpm@linux-foundation.org>
-References: <20180314232442.rL_lhWQqT%akpm@linux-foundation.org>
-Message-ID: <5c65e935-a6d9-2f80-18ac-470ed38ba439@infradead.org>
+From: Doug Oucharek <dougso@me.com>
+Date: Fri, 16 Mar 2018 16:40:21 -0700
+Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: Stop MLX5
+ triggering a dump_cqe
+Message-ID: <B7D07263-126A-4156-AD60-3A58E8852865@me.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: akpm@linux-foundation.org, broonie@kernel.org, linux-fsdevel@vger.kernel.org, linux-kernel@vger.kernel.org, linux-mm@kvack.org, linux-next@vger.kernel.org, mhocko@suse.cz, mm-commits@vger.kernel.org, sfr@canb.auug.org.au, lustre-devel@lists.lustre.org
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, "Drokin, Oleg" <oleg.drokin@intel.com>, "Dilger, Andreas" <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On 03/14/2018 04:24 PM, akpm at linux-foundation.org wrote:
-> The mm-of-the-moment snapshot 2018-03-14-16-24 has been uploaded to
-> 
->    http://www.ozlabs.org/~akpm/mmotm/
+We have found that MLX5 will trigger a dump_cqe if we don't
+invalidate the rkey on a newly alloated MR for FastReg usage.
 
-(not from the mmotm patches, but in its linux-next.patch)
+This fix just tags the MR as invalid on its creation if we are
+using FastReg and that will force it to do an invalidate of the
+rkey on first usage.
 
-CONFIG_LUSTRE_FS=y
-# CONFIG_LUSTRE_DEBUG_EXPENSIVE_CHECK is not set
+Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8752
+Reviewed-on: https://review.whamcloud.com/24306
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: Doug Oucharek <dougso@me.com>
+---
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c | 5 ++++-
+1 file changed, 4 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 7ae2955..00ebc61 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -1384,7 +1384,10 @@ static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps, struct kib_fmr_po
+			goto out_middle;
+		}
 
-In file included from ../drivers/staging/lustre/include/linux/libcfs/libcfs.h:42:0,
-                 from ../drivers/staging/lustre/lustre/obdclass/lu_object.c:44:
-../drivers/staging/lustre/lustre/obdclass/lu_object.c: In function 'lu_context_key_degister':
-../drivers/staging/lustre/lustre/obdclass/lu_object.c:1410:51: error: dereferencing pointer to incomplete type
-          __func__, key->lct_owner ? key->lct_owner->name : "",
-                                                   ^
-../drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h:123:41: note: in definition of macro '__CDEBUG'
-   libcfs_debug_msg(&msgdata, format, ## __VA_ARGS__); \
-                                         ^
-../drivers/staging/lustre/lustre/obdclass/lu_object.c:1409:3: note: in expansion of macro 'CDEBUG'
-   CDEBUG(D_INFO, "%s: \"%s\" %p, %d\n",
-   ^
-../drivers/staging/lustre/lustre/obdclass/lu_object.c: In function 'lu_context_key_quiesce':
-../drivers/staging/lustre/lustre/obdclass/lu_object.c:1550:42: error: dereferencing pointer to incomplete type
-           key->lct_owner ? key->lct_owner->name : "",
-                                          ^
-../drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h:123:41: note: in definition of macro '__CDEBUG'
-   libcfs_debug_msg(&msgdata, format, ## __VA_ARGS__); \
-                                         ^
-../drivers/staging/lustre/lustre/obdclass/lu_object.c:1548:4: note: in expansion of macro 'CDEBUG'
-    CDEBUG(D_INFO, "%s: \"%s\" %p, %d (%d)\n",
-    ^
+-		frd->frd_valid = true;
++		/* There appears to be a bug in MLX5 code where you must
++		 * invalidate the rkey of a new FastReg pool before first
++		 * using it. Thus, I am marking the FRD invalid here. */
++		frd->frd_valid = false;
 
-
-
+		list_add_tail(&frd->frd_list, &fpo->fast_reg.fpo_pool_list);
+		fpo->fast_reg.fpo_pool_size++;
 -- 
-~Randy
+1.8.3.1
