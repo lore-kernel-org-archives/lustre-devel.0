@@ -1,10 +1,10 @@
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 19 Mar 2018 17:16:18 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: Enable
- Multiple OPA Endpoints between Nodes
-In-Reply-To: <2253BE75-D4ED-4021-BBA1-BCBF2C6770CB@me.com>
-References: <2253BE75-D4ED-4021-BBA1-BCBF2C6770CB@me.com>
-Message-ID: <20180319161618.GA26103@kroah.com>
+Date: Mon, 19 Mar 2018 17:16:32 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: Fix FastReg
+ map/unmap for MLX5
+In-Reply-To: <B5E4E902-16A7-4279-BE5A-8117E23286E9@me.com>
+References: <B5E4E902-16A7-4279-BE5A-8117E23286E9@me.com>
+Message-ID: <20180319161632.GB26103@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,30 +13,32 @@ To: Doug Oucharek <dougso@me.com>
 Cc: devel@driverdev.osuosl.org, "Dilger, Andreas" <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin,
  Oleg" <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Thu, Mar 15, 2018 at 02:53:46PM -0700, Doug Oucharek wrote:
-> OPA driver optimizations are based on the MPI model where it is
-> expected to have multiple endpoints between two given nodes. To
-> enable this optimization for Lustre, we need to make it possible,
-> via an LND-specific tuneable, to create multiple endpoints and to
-> balance the traffic over them.
+On Wed, Mar 14, 2018 at 11:18:30PM -0700, Doug Oucharek wrote:
+> The FastReg support in ko2iblnd was not unmapping pool items
+> causing the items to leak.  In addition, the mapping code
+> is not growing the pool like we do with FMR.
 > 
-> Both sides of a connection must have this patch for it to work.
-> Only the active side of the connection (usually the client)
-> needs to have the new tuneable set > 1.
+> This patch makes sure we are unmapping FastReg pool elements
+> when we are done with them.  It also makes sure the pool
+> will grow when we depleat the pool.
 > 
 > Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8943
-> Reviewed-on: https://review.whamcloud.com/25168
-> Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9472
+> Reviewed-on: https://review.whamcloud.com/27015
+> Reviewed-by: Andrew Perepechko <andrew.perepechko@seagate.com>
 > Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 > Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 > Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 > Signed-off-by: Doug Oucharek <dougso@me.com>
 > ---
-> .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |  3 ++-
-> .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    | 17 ++++++++++++---
-> .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 25 +++++++++++++++-------
-> .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  |  9 ++++++++
-> 4 files changed, 42 insertions(+), 12 deletions(-)
+> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  2 +-
+> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 12 ++++--------
+> 2 files changed, 5 insertions(+), 9 deletions(-)
 
-Does not apply to my tree at all :(
+Also does not apply :(
+
+Please rebase and resend.
+
+thanks,
+
+greg k-h
