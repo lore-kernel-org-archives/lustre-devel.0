@@ -1,44 +1,62 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 19 Mar 2018 17:16:32 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: Fix FastReg
- map/unmap for MLX5
-In-Reply-To: <B5E4E902-16A7-4279-BE5A-8117E23286E9@me.com>
-References: <B5E4E902-16A7-4279-BE5A-8117E23286E9@me.com>
-Message-ID: <20180319161632.GB26103@kroah.com>
+From: NeilBrown <neilb@suse.com>
+Date: Thu, 22 Mar 2018 10:40:08 +1100
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: use correct
+ 'magic' test
+In-Reply-To: <20180321195302.GA9465@tanglefoot>
+References: <20180321195302.GA9465@tanglefoot>
+Message-ID: <87sh8t6lrb.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Doug Oucharek <dougso@me.com>
-Cc: devel@driverdev.osuosl.org, "Dilger, Andreas" <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin,
- Oleg" <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Wed, Mar 14, 2018 at 11:18:30PM -0700, Doug Oucharek wrote:
-> The FastReg support in ko2iblnd was not unmapping pool items
-> causing the items to leak.  In addition, the mapping code
-> is not growing the pool like we do with FMR.
-> 
-> This patch makes sure we are unmapping FastReg pool elements
-> when we are done with them.  It also makes sure the pool
-> will grow when we depleat the pool.
-> 
-> Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9472
-> Reviewed-on: https://review.whamcloud.com/27015
-> Reviewed-by: Andrew Perepechko <andrew.perepechko@seagate.com>
-> Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-> Signed-off-by: Doug Oucharek <dougso@me.com>
-> ---
-> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  2 +-
-> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 12 ++++--------
-> 2 files changed, 5 insertions(+), 9 deletions(-)
+On Wed, Mar 21 2018, Justin Skists wrote:
 
-Also does not apply :(
+> Use the lnet_magic_accept() function to compare 'magic' against
+> LNET_PROTO_TCP_MAGIC for the appropriate string for an error message.
+>
+> The original fix removed an unneeded byte-ordering cast because the define
+> was already CPU byte-ordered and it was assumed that 'magic' was CPU
+> byte-ordered, too.
+>
+> Now modify the if-statement to use the appropriate lnet_accept_magic()
+> function in order to be consistent with similar tests. This will allow
+> the code to be consistent with the general understanding that 'magic'
+> should be in host-byte-order for the peer that sent the message.
+>
+> Fixes: 80782927e3aa ("staging: lustre: Fix unneeded byte-ordering cast")
+> Cc: NeilBrown <neilb@suse.com>
 
-Please rebase and resend.
+Reviewed-by: NeilBrown <neilb@suse.com>
 
 thanks,
+NeilBrown
 
-greg k-h
+> Signed-off-by: Justin Skists <j.skists@gmail.com>
+> ---
+>  drivers/staging/lustre/lnet/lnet/acceptor.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
+> index 13e981781b9a..5648f17eddc0 100644
+> --- a/drivers/staging/lustre/lnet/lnet/acceptor.c
+> +++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
+> @@ -240,7 +240,7 @@ lnet_accept(struct socket *sock, __u32 magic)
+>  			return -EPROTO;
+>  		}
+>  
+> -		if (magic == LNET_PROTO_TCP_MAGIC)
+> +		if (lnet_accept_magic(magic, LNET_PROTO_TCP_MAGIC))
+>  			str = "'old' socknal/tcpnal";
+>  		else
+>  			str = "unrecognised";
+> -- 
+> 2.16.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180322/cc5a0967/attachment.sig>
