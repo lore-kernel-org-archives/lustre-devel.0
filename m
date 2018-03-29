@@ -1,10 +1,9 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 29 Mar 2018 15:26:48 +1100
-Subject: [lustre-devel] [PATCH 02/17] staging: lustre: remove unused
- ldlm_completion_ast_async()
+Subject: [lustre-devel] [PATCH 03/17] staging: lustre: LNET excludes USERIO
 In-Reply-To: <152229732768.27689.4800156943561963977.stgit@noble>
 References: <152229732768.27689.4800156943561963977.stgit@noble>
-Message-ID: <152229760829.27689.12680083968318847851.stgit@noble>
+Message-ID: <152229760832.27689.17304570282712555631.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,57 +11,27 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-This function is unused.
+LNET_MINOR and USERIO_MINOR are the same value, so
+they cannot both be used in the same kernel.
+Until this is resolved, don't allow them to be built
+together.  This saves automatic testing from noticing this
+known problem.
 
+Reported-by: kernel test robot <fengguang.wu@intel.com>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/lustre_dlm.h |    1 -
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   23 --------------------
- 2 files changed, 24 deletions(-)
+ drivers/staging/lustre/lnet/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index 239aa2b1268f..7407acf60cf8 100644
---- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -1227,7 +1227,6 @@ int ldlm_lock_change_resource(struct ldlm_namespace *, struct ldlm_lock *,
-  * processing.
-  * @{
-  */
--int ldlm_completion_ast_async(struct ldlm_lock *lock, __u64 flags, void *data);
- int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data);
- /** @} ldlm_local_ast */
- 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index c3c9186b74ce..be43958e4090 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -191,29 +191,6 @@ static int ldlm_completion_tail(struct ldlm_lock *lock, void *data)
- 	return result;
- }
- 
--/**
-- * Implementation of ->l_completion_ast() for a client, that doesn't wait
-- * until lock is granted. Suitable for locks enqueued through ptlrpcd, of
-- * other threads that cannot block for long.
-- */
--int ldlm_completion_ast_async(struct ldlm_lock *lock, __u64 flags, void *data)
--{
--	if (flags == LDLM_FL_WAIT_NOREPROC) {
--		LDLM_DEBUG(lock, "client-side enqueue waiting on pending lock");
--		return 0;
--	}
--
--	if (!(flags & LDLM_FL_BLOCKED_MASK)) {
--		wake_up(&lock->l_waitq);
--		return ldlm_completion_tail(lock, data);
--	}
--
--	LDLM_DEBUG(lock,
--		   "client-side enqueue returned a blocked lock, going forward");
--	return 0;
--}
--EXPORT_SYMBOL(ldlm_completion_ast_async);
--
- /**
-  * Generic LDLM "completion" AST. This is called in several cases:
-  *
+diff --git a/drivers/staging/lustre/lnet/Kconfig b/drivers/staging/lustre/lnet/Kconfig
+index ad049e6f24e4..fe4b24acf075 100644
+--- a/drivers/staging/lustre/lnet/Kconfig
++++ b/drivers/staging/lustre/lnet/Kconfig
+@@ -1,6 +1,6 @@
+ config LNET
+ 	tristate "Lustre networking subsystem (LNet)"
+-	depends on INET
++	depends on INET && !USERIO
+ 	help
+ 	  The Lustre network layer, also known as LNet, is a networking abstaction
+ 	  level API that was initially created to allow Lustre Filesystem to utilize
