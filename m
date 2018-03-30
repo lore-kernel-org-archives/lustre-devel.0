@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 30 Mar 2018 20:02:24 +0100 (BST)
-Subject: [lustre-devel] [PATCH 14/17] staging: lustre: discard
- cfs_duration_sec()
-In-Reply-To: <152229760877.27689.15086130563636138485.stgit@noble>
+Date: Fri, 30 Mar 2018 20:03:02 +0100 (BST)
+Subject: [lustre-devel] [PATCH 13/17] staging: lustre: libcfs: remove
+ cfs_timeout_cap()
+In-Reply-To: <152229760874.27689.12453214678546053828.stgit@noble>
 References: <152229732768.27689.4800156943561963977.stgit@noble>
- <152229760877.27689.15086130563636138485.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1803302002160.9681@casper.infradead.org>
+ <152229760874.27689.12453214678546053828.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1803302002410.9681@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,191 +14,124 @@ To: NeilBrown <neilb@suse.com>
 Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> cfs_duration_sec() simply divides by HZ.
-> It is mostly used to report durations in debug messages.
-> Remove and just use X/HZ.
+> This wrapper is only used once, so open-code it as max().
+> 
+> This allows us to remove the libcfs_time.h include file.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../lustre/include/linux/libcfs/linux/linux-time.h |    5 -----
->  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    2 +-
->  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    5 ++---
->  .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    4 ++--
->  .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |    4 ++--
->  drivers/staging/lustre/lnet/libcfs/debug.c         |    2 +-
->  drivers/staging/lustre/lnet/lnet/router.c          |    2 +-
->  drivers/staging/lustre/lnet/lnet/router_proc.c     |    6 +++---
->  drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |    2 +-
->  9 files changed, 13 insertions(+), 19 deletions(-)
+>  .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 
+>  .../lustre/include/linux/libcfs/libcfs_time.h      |   50 --------------------
+>  .../lustre/include/linux/libcfs/linux/linux-time.h |    2 -
+>  drivers/staging/lustre/lustre/ptlrpc/import.c      |    4 +-
+>  4 files changed, 3 insertions(+), 54 deletions(-)
+>  delete mode 100644 drivers/staging/lustre/include/linux/libcfs/libcfs_time.h
 > 
-> diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
-> index ecb2126a9e6f..9a353c6cb85a 100644
-> --- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
-> +++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
-> @@ -60,11 +60,6 @@
->   * Generic kernel stuff
->   */
->  
-> -static inline long cfs_duration_sec(long d)
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+> index 3b751c436b3d..3d3fa52858e5 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+> @@ -43,7 +43,6 @@
+>  #include <linux/libcfs/libcfs_private.h>
+>  #include <linux/libcfs/libcfs_cpu.h>
+>  #include <linux/libcfs/libcfs_prim.h>
+> -#include <linux/libcfs/libcfs_time.h>
+>  #include <linux/libcfs/libcfs_string.h>
+>  #include <linux/libcfs/libcfs_hash.h>
+>  #include <linux/libcfs/libcfs_fail.h>
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_time.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_time.h
+> deleted file mode 100644
+> index 172a8872e3f3..000000000000
+> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_time.h
+> +++ /dev/null
+> @@ -1,50 +0,0 @@
+> -// SPDX-License-Identifier: GPL-2.0
+> -/*
+> - * GPL HEADER START
+> - *
+> - * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 only,
+> - * as published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> - * General Public License version 2 for more details (a copy is included
+> - * in the LICENSE file that accompanied this code).
+> - *
+> - * You should have received a copy of the GNU General Public License
+> - * version 2 along with this program; If not, see
+> - * http://www.gnu.org/licenses/gpl-2.0.html
+> - *
+> - * GPL HEADER END
+> - */
+> -/*
+> - * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+> - * Use is subject to license terms.
+> - */
+> -/*
+> - * This file is part of Lustre, http://www.lustre.org/
+> - * Lustre is a trademark of Sun Microsystems, Inc.
+> - *
+> - * libcfs/include/libcfs/libcfs_time.h
+> - *
+> - * Time functions.
+> - *
+> - */
+> -
+> -#ifndef __LIBCFS_TIME_H__
+> -#define __LIBCFS_TIME_H__
+> -/*
+> - * return valid time-out based on user supplied one. Currently we only check
+> - * that time-out is not shorted than allowed.
+> - */
+> -static inline long cfs_timeout_cap(long timeout)
 > -{
-> -	return d / msecs_to_jiffies(MSEC_PER_SEC);
+> -	if (timeout < CFS_TICK)
+> -		timeout = CFS_TICK;
+> -	return timeout;
 > -}
 > -
->  static inline int cfs_time_before_64(u64 t1, u64 t2)
->  {
->  	return (__s64)t2 - (__s64)t1 > 0;
-> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> index d0ce37d72571..959e119384df 100644
-> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> @@ -1068,7 +1068,7 @@ static void kiblnd_query(struct lnet_ni *ni, lnet_nid_t nid,
+> -#endif
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
+> index ff3aae2f1231..ecb2126a9e6f 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
+> @@ -78,7 +78,7 @@ static inline int cfs_time_beforeq_64(u64 t1, u64 t2)
+>  /*
+>   * One jiffy
+>   */
+> -#define CFS_TICK		(1)
+> +#define CFS_TICK		(1UL)
 >  
->  	CDEBUG(D_NET, "Peer %s %p, alive %ld secs ago\n",
->  	       libcfs_nid2str(nid), peer,
-> -	       last_alive ? cfs_duration_sec(now - last_alive) : -1);
-> +	       last_alive ? (now - last_alive) / HZ : -1);
->  }
+>  #define CFS_DURATION_T	  "%ld"
 >  
->  static void kiblnd_free_pages(struct kib_pages *p)
-> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> index 563ff5c972bf..b4a182d87ae7 100644
-> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> @@ -3144,7 +3144,7 @@ kiblnd_check_txs_locked(struct kib_conn *conn, struct list_head *txs)
->  		if (time_after_eq(jiffies, tx->tx_deadline)) {
->  			CERROR("Timed out tx: %s, %lu seconds\n",
->  			       kiblnd_queue2str(conn, txs),
-> -			       cfs_duration_sec(jiffies - tx->tx_deadline));
-> +			       (jiffies - tx->tx_deadline) / HZ);
->  			return 1;
->  		}
->  	}
-> @@ -3206,8 +3206,7 @@ kiblnd_check_conns(int idx)
->  			if (timedout) {
->  				CERROR("Timed out RDMA with %s (%lu): c: %u, oc: %u, rc: %u\n",
->  				       libcfs_nid2str(peer->ibp_nid),
-> -				       cfs_duration_sec(jiffies -
-> -							peer->ibp_last_alive),
-> +				       (jiffies - peer->ibp_last_alive) / HZ,
->  				       conn->ibc_credits,
->  				       conn->ibc_outstanding_credits,
->  				       conn->ibc_reserved_credits);
-> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> index 16c1ab0b0bd9..79b98cdd0f9d 100644
-> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> @@ -1682,7 +1682,7 @@ ksocknal_destroy_conn(struct ksock_conn *conn)
->  		       libcfs_id2str(conn->ksnc_peer->ksnp_id), conn->ksnc_type,
->  		       &conn->ksnc_ipaddr, conn->ksnc_port,
->  		       iov_iter_count(&conn->ksnc_rx_to), conn->ksnc_rx_nob_left,
-> -		       cfs_duration_sec(jiffies - last_rcv));
-> +		       (jiffies - last_rcv) / HZ);
->  		lnet_finalize(conn->ksnc_peer->ksnp_ni,
->  			      conn->ksnc_cookie, -EIO);
->  		break;
-> @@ -1870,7 +1870,7 @@ ksocknal_query(struct lnet_ni *ni, lnet_nid_t nid, unsigned long *when)
->  
->  	CDEBUG(D_NET, "Peer %s %p, alive %ld secs ago, connect %d\n",
->  	       libcfs_nid2str(nid), peer,
-> -	       last_alive ? cfs_duration_sec(now - last_alive) : -1,
-> +	       last_alive ? (now - last_alive) / HZ : -1,
->  	       connect);
->  
->  	if (!connect)
-> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-> index 8ead1e02e854..14450fd5957a 100644
-> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-> @@ -751,7 +751,7 @@ ksocknal_find_connectable_route_locked(struct ksock_peer *peer)
->  			       &route->ksnr_ipaddr,
->  			       route->ksnr_connected,
->  			       route->ksnr_retry_interval,
-> -			       cfs_duration_sec(route->ksnr_timeout - now));
-> +			       (route->ksnr_timeout - now) / HZ);
->  			continue;
->  		}
->  
-> @@ -2439,7 +2439,7 @@ ksocknal_check_peer_timeouts(int idx)
->  
->  		CERROR("Total %d stale ZC_REQs for peer %s detected; the oldest(%p) timed out %ld secs ago, resid: %d, wmem: %d\n",
->  		       n, libcfs_nid2str(peer->ksnp_id.nid), tx_stale,
-> -		       cfs_duration_sec(jiffies - deadline),
-> +		       (jiffies - deadline) / HZ,
->  		       resid, conn->ksnc_sock->sk->sk_wmem_queued);
->  
->  		ksocknal_close_conn_and_siblings(conn, -ETIMEDOUT);
-> diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
-> index 1371224a8cb9..5862f0730dd0 100644
-> --- a/drivers/staging/lustre/lnet/libcfs/debug.c
-> +++ b/drivers/staging/lustre/lnet/libcfs/debug.c
-> @@ -126,7 +126,7 @@ static int param_get_delay(char *buffer, const struct kernel_param *kp)
->  {
->  	unsigned int d = *(unsigned int *)kp->arg;
->  
-> -	return sprintf(buffer, "%u", (unsigned int)cfs_duration_sec(d * 100));
-> +	return sprintf(buffer, "%u", (unsigned int)(d * 100) / HZ);
->  }
->  
->  unsigned int libcfs_console_max_delay;
-> diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-> index 8baf35d56ca7..6267d5e4bbd6 100644
-> --- a/drivers/staging/lustre/lnet/lnet/router.c
-> +++ b/drivers/staging/lustre/lnet/lnet/router.c
-> @@ -1752,7 +1752,7 @@ lnet_notify(struct lnet_ni *ni, lnet_nid_t nid, int alive, unsigned long when)
->  		CWARN("Ignoring prediction from %s of %s %s %ld seconds in the future\n",
->  		      !ni ? "userspace" : libcfs_nid2str(ni->ni_nid),
->  		      libcfs_nid2str(nid), alive ? "up" : "down",
-> -		      cfs_duration_sec(when - now));
-> +		      (when - now) / HZ);
->  		return -EINVAL;
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+> index 4a9d1f189d01..dd4fd54128dd 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+> @@ -1486,7 +1486,7 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
 >  	}
 >  
-> diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-> index e4172311be68..015dccbc4a58 100644
-> --- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-> +++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-> @@ -331,7 +331,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
->  			int alive_cnt = peer->lp_alive_count;
->  			int alive = peer->lp_alive;
->  			int pingsent = !peer->lp_ping_notsent;
-> -			int last_ping = cfs_duration_sec(now - peer->lp_ping_timestamp);
-> +			int last_ping = (now - peer->lp_ping_timestamp) / HZ;
->  			int down_ni = 0;
->  			struct lnet_route *rtr;
+>  	if (ptlrpc_import_in_recovery(imp)) {
+> -		long timeout;
+> +		unsigned long timeout;
 >  
-> @@ -363,7 +363,7 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
->  					      nrefs, nrtrrefs, alive_cnt,
->  					      alive ? "up" : "down", last_ping,
->  					      pingsent,
-> -					      cfs_duration_sec(deadline - now),
-> +					      (deadline - now) / HZ,
->  					      down_ni, libcfs_nid2str(nid));
->  			LASSERT(tmpstr + tmpsiz - s > 0);
->  		}
-> @@ -512,7 +512,7 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
->  				long delta;
+>  		if (AT_OFF) {
+>  			if (imp->imp_server_timeout)
+> @@ -1501,7 +1501,7 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
 >  
->  				delta = now - peer->lp_last_alive;
-> -				lastalive = cfs_duration_sec(delta);
-> +				lastalive = (delta) / HZ;
->  
->  				/* No need to mess up peers contents with
->  				 * arbitrarily long integers - it suffices to
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-> index 187095022fb1..f573de9cf45d 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-> @@ -1181,7 +1181,7 @@ static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
->  
->  	slv = ldlm_pool_get_slv(pl);
->  	lvf = ldlm_pool_get_lvf(pl);
-> -	la = cfs_duration_sec(cur - lock->l_last_used);
-> +	la = (cur - lock->l_last_used) / HZ;
->  	lv = lvf * la * unused;
->  
->  	/* Inform pool about current CLV to see it via debugfs. */
+>  		if (wait_event_idle_timeout(imp->imp_recovery_waitq,
+>  					    !ptlrpc_import_in_recovery(imp),
+> -					    cfs_timeout_cap(timeout)) == 0)
+> +					    max(timeout, CFS_TICK)) == 0)
+>  			l_wait_event_abortable(
+>  				imp->imp_recovery_waitq,
+>  				!ptlrpc_import_in_recovery(imp));
 > 
 > 
 > 
