@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 30 Mar 2018 19:56:45 +0100 (BST)
-Subject: [lustre-devel] [PATCH 01/17] staging: lustre: remove invariant
- in cl_io_read_ahead()
-In-Reply-To: <152229760825.27689.17083243052405696738.stgit@noble>
+Date: Fri, 30 Mar 2018 19:57:08 +0100 (BST)
+Subject: [lustre-devel] [PATCH 02/17] staging: lustre: remove unused
+ ldlm_completion_ast_async()
+In-Reply-To: <152229760829.27689.12680083968318847851.stgit@noble>
 References: <152229732768.27689.4800156943561963977.stgit@noble>
- <152229760825.27689.17083243052405696738.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1803301956160.9681@casper.infradead.org>
+ <152229760829.27689.12680083968318847851.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1803301957010.9681@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,34 +14,62 @@ To: NeilBrown <neilb@suse.com>
 Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> This invariant can fail as ci_type is somtimes CIS_INIT.
-> 
-> According to Jinshan Xiong, or of the most recent significant
-> change to this code, "We should get rid of it."
-> 
-> So do that.
+> This function is unused.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
-> Fixes: 1e1db2a97be5 ("staging: lustre: clio: Revise read ahead implementation")
-> Cc: Jinshan Xiong <jinshan.xiong@intel.com>
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lustre/obdclass/cl_io.c |    1 -
->  1 file changed, 1 deletion(-)
+>  drivers/staging/lustre/lustre/include/lustre_dlm.h |    1 -
+>  drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   23 --------------------
+>  2 files changed, 24 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> index ab84e011b560..fcdae6029258 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
-> @@ -599,7 +599,6 @@ int cl_io_read_ahead(const struct lu_env *env, struct cl_io *io,
->  	int		       result = 0;
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> index 239aa2b1268f..7407acf60cf8 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> @@ -1227,7 +1227,6 @@ int ldlm_lock_change_resource(struct ldlm_namespace *, struct ldlm_lock *,
+>   * processing.
+>   * @{
+>   */
+> -int ldlm_completion_ast_async(struct ldlm_lock *lock, __u64 flags, void *data);
+>  int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data);
+>  /** @} ldlm_local_ast */
 >  
->  	LINVRNT(io->ci_type == CIT_READ || io->ci_type == CIT_FAULT);
-> -	LINVRNT(io->ci_state == CIS_IO_GOING || io->ci_state == CIS_LOCKED);
->  	LINVRNT(cl_io_invariant(io));
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> index c3c9186b74ce..be43958e4090 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> @@ -191,29 +191,6 @@ static int ldlm_completion_tail(struct ldlm_lock *lock, void *data)
+>  	return result;
+>  }
 >  
->  	cl_io_for_each(scan, io) {
+> -/**
+> - * Implementation of ->l_completion_ast() for a client, that doesn't wait
+> - * until lock is granted. Suitable for locks enqueued through ptlrpcd, of
+> - * other threads that cannot block for long.
+> - */
+> -int ldlm_completion_ast_async(struct ldlm_lock *lock, __u64 flags, void *data)
+> -{
+> -	if (flags == LDLM_FL_WAIT_NOREPROC) {
+> -		LDLM_DEBUG(lock, "client-side enqueue waiting on pending lock");
+> -		return 0;
+> -	}
+> -
+> -	if (!(flags & LDLM_FL_BLOCKED_MASK)) {
+> -		wake_up(&lock->l_waitq);
+> -		return ldlm_completion_tail(lock, data);
+> -	}
+> -
+> -	LDLM_DEBUG(lock,
+> -		   "client-side enqueue returned a blocked lock, going forward");
+> -	return 0;
+> -}
+> -EXPORT_SYMBOL(ldlm_completion_ast_async);
+> -
+>  /**
+>   * Generic LDLM "completion" AST. This is called in several cases:
+>   *
 > 
 > 
 > 
