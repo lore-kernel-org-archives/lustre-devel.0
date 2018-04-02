@@ -1,70 +1,88 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 03 Apr 2018 08:26:15 +1000
-Subject: [lustre-devel] [PATCH 11/17] staging: lustre: libcfs: discard
- cfs_time_shift().
-In-Reply-To: <0B6A147C-7E98-4B00-AF32-AF8843484CF9@intel.com>
+Date: Tue, 03 Apr 2018 08:34:00 +1000
+Subject: [lustre-devel] [PATCH 13/17] staging: lustre: libcfs: remove
+ cfs_timeout_cap()
+In-Reply-To: <346B8E2C-5842-4771-86D8-CBB5CEF2DC35@intel.com>
 References: <152229732768.27689.4800156943561963977.stgit@noble>
- <152229760863.27689.4681198496926109808.stgit@noble>
- <alpine.LFD.2.21.1803302001440.9681@casper.infradead.org>
- <0B6A147C-7E98-4B00-AF32-AF8843484CF9@intel.com>
-Message-ID: <87muyl1bzs.fsf@notabene.neil.brown.name>
+ <152229760874.27689.12453214678546053828.stgit@noble>
+ <346B8E2C-5842-4771-86D8-CBB5CEF2DC35@intel.com>
+Message-ID: <87k1tp1bmv.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: "Dilger, Andreas" <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg
- Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: "Dilger, Andreas" <andreas.dilger@intel.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Linux
+ Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 On Mon, Apr 02 2018, Dilger, Andreas wrote:
 
->> On Mar 30, 2018, at 13:02, James Simmons <jsimmons@infradead.org> wrote:
->> 
->> 
->>> This function simply multiplies by HZ and adds jiffies.
->>> This is simple enough to be opencoded, and doing so
->>> makes the code easier to read.
->>> 
->>> Same for cfs_time_shift_64()
->> 
->> Reviewed-by: James Simmons <jsimmons@infradead.org>
+> On Mar 28, 2018, at 22:26, NeilBrown <neilb@suse.com> wrote:
+
+>> diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
+>> index ff3aae2f1231..ecb2126a9e6f 100644
+>> --- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
+>> +++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
+>> @@ -78,7 +78,7 @@ static inline int cfs_time_beforeq_64(u64 t1, u64 t2)
+>> /*
+>>  * One jiffy
+>>  */
+>> -#define CFS_TICK		(1)
+>> +#define CFS_TICK		(1UL)
 >
-> Hmm, I thought we were trying to get rid of direct HZ usage in modules,
-> because of tickless systems, and move to e.g. msecs_to_jiffies() or similar?
+> It seems like CFS_TICK is mostly useless as well and could just be dropped?
 
-Are we?  I hadn't heard but I could easily have missed it.
-Documentation/scheduler/completion.txt does say
+Possibly, but I don't know what its purpose is so I didn't want to just
+drop it in the middle of a patch that is performing an idempotent
+transformation.
 
-    Timeouts are preferably calculated with
-    msecs_to_jiffies() or usecs_to_jiffies().
-
-but is isn't clear what they are preferred to.  Do you remember where
-you heard? or have a reference?
-
-$ git grep ' \* *HZ'  |wc
-   2244   15679  170016
-$ git grep msecs_to_jiffies | wc
-   3301   13151  276725
-
-so msecs_to_jiffies is slightly more popular than "* HZ" (even if you add
-in "HZ *").  But that could just be a preference for using milliseconds
-over using seconds.
-
-$ git grep msecs_to_jiffies   | grep -c '[0-9]000'
-587
-
-so there are only 587 places that msecs_to_jiffies is clearly used in
-place of multiplying by HZ.
-
-If we were to pursue this, I would want to add secs_to_jiffies() to
-include/linux/jiffies.h and use that.
+Do you know why the one place that uses CFS_TICK wants to protect about
+a timeout of zero?  Maybe because the old l_wait_event() treated a
+timeout of zero as meaning no timeout?
+In that case this really is irrelevant now and that
+wait_event_idle_timeout() should just use "timeout" directly.
 
 Thanks,
 NeilBrown
+
+
+>
+>> #define CFS_DURATION_T	  "%ld"
+>> 
+>> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
+>> index 4a9d1f189d01..dd4fd54128dd 100644
+>> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
+>> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
+>> @@ -1486,7 +1486,7 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+>> 	}
+>> 
+>> 	if (ptlrpc_import_in_recovery(imp)) {
+>> -		long timeout;
+>> +		unsigned long timeout;
+>> 
+>> 		if (AT_OFF) {
+>> 			if (imp->imp_server_timeout)
+>> @@ -1501,7 +1501,7 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+>> 
+>> 		if (wait_event_idle_timeout(imp->imp_recovery_waitq,
+>> 					    !ptlrpc_import_in_recovery(imp),
+>> -					    cfs_timeout_cap(timeout)) == 0)
+>> +					    max(timeout, CFS_TICK)) == 0)
+>> 			l_wait_event_abortable(
+>> 				imp->imp_recovery_waitq,
+>> 				!ptlrpc_import_in_recovery(imp));
+>> 
+>> 
+>
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Lustre Principal Architect
+> Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180403/ea62fac9/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180403/d8e8f6a8/attachment.sig>
