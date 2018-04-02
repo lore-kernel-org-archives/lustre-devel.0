@@ -1,140 +1,67 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Mon, 2 Apr 2018 19:38:57 +0000
-Subject: [lustre-devel] [PATCH 13/17] staging: lustre: libcfs: remove
- cfs_timeout_cap()
-In-Reply-To: <152229760874.27689.12453214678546053828.stgit@noble>
-References: <152229732768.27689.4800156943561963977.stgit@noble>
- <152229760874.27689.12453214678546053828.stgit@noble>
-Message-ID: <346B8E2C-5842-4771-86D8-CBB5CEF2DC35@intel.com>
+Date: Mon, 2 Apr 2018 19:43:47 +0000
+Subject: [lustre-devel] lustre and loopback device
+In-Reply-To: <CABoqRjswwgQ5UH72FWKDdTJeaFDnKKe0+18FooZVPFM929B1HA@mail.gmail.com>
+References: <alpine.LFD.2.21.1803222322450.17346@casper.infradead.org>
+ <87d0zr668j.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1803302011110.9681@casper.infradead.org>
+ <CABoqRjswwgQ5UH72FWKDdTJeaFDnKKe0+18FooZVPFM929B1HA@mail.gmail.com>
+Message-ID: <0A9CF639-958A-4548-AAEA-475129AA4393@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Linux
- Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-On Mar 28, 2018, at 22:26, NeilBrown <neilb@suse.com> wrote:
+On Mar 30, 2018, at 14:16, Jinshan Xiong <jinshan.xiong@gmail.com> wrote:
 > 
-> This wrapper is only used once, so open-code it as max().
+> + Andreas.
 > 
-> This allows us to remove the libcfs_time.h include file.
-> 
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
-> .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 
-> .../lustre/include/linux/libcfs/libcfs_time.h      |   50 --------------------
-> .../lustre/include/linux/libcfs/linux/linux-time.h |    2 -
-> drivers/staging/lustre/lustre/ptlrpc/import.c      |    4 +-
-> 4 files changed, 3 insertions(+), 54 deletions(-)
-> delete mode 100644 drivers/staging/lustre/include/linux/libcfs/libcfs_time.h
-> 
-> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> index 3b751c436b3d..3d3fa52858e5 100644
-> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> @@ -43,7 +43,6 @@
-> #include <linux/libcfs/libcfs_private.h>
-> #include <linux/libcfs/libcfs_cpu.h>
-> #include <linux/libcfs/libcfs_prim.h>
-> -#include <linux/libcfs/libcfs_time.h>
-> #include <linux/libcfs/libcfs_string.h>
-> #include <linux/libcfs/libcfs_hash.h>
-> #include <linux/libcfs/libcfs_fail.h>
-> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_time.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_time.h
-> deleted file mode 100644
-> index 172a8872e3f3..000000000000
-> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_time.h
-> +++ /dev/null
-> @@ -1,50 +0,0 @@
-> -// SPDX-License-Identifier: GPL-2.0
-> -/*
-> - * GPL HEADER START
-> - *
-> - * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 only,
-> - * as published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> - * General Public License version 2 for more details (a copy is included
-> - * in the LICENSE file that accompanied this code).
-> - *
-> - * You should have received a copy of the GNU General Public License
-> - * version 2 along with this program; If not, see
-> - * http://www.gnu.org/licenses/gpl-2.0.html
-> - *
-> - * GPL HEADER END
-> - */
-> -/*
-> - * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-> - * Use is subject to license terms.
-> - */
-> -/*
-> - * This file is part of Lustre, http://www.lustre.org/
-> - * Lustre is a trademark of Sun Microsystems, Inc.
-> - *
-> - * libcfs/include/libcfs/libcfs_time.h
-> - *
-> - * Time functions.
-> - *
-> - */
-> -
-> -#ifndef __LIBCFS_TIME_H__
-> -#define __LIBCFS_TIME_H__
-> -/*
-> - * return valid time-out based on user supplied one. Currently we only check
-> - * that time-out is not shorted than allowed.
-> - */
-> -static inline long cfs_timeout_cap(long timeout)
-> -{
-> -	if (timeout < CFS_TICK)
-> -		timeout = CFS_TICK;
-> -	return timeout;
-> -}
-> -
-> -#endif
-> diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
-> index ff3aae2f1231..ecb2126a9e6f 100644
-> --- a/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
-> +++ b/drivers/staging/lustre/include/linux/libcfs/linux/linux-time.h
-> @@ -78,7 +78,7 @@ static inline int cfs_time_beforeq_64(u64 t1, u64 t2)
-> /*
->  * One jiffy
->  */
-> -#define CFS_TICK		(1)
-> +#define CFS_TICK		(1UL)
+> A few problems:
+> 1. Linux loop device won't work upon Lustre with direct IO mode because Lustre direct IO has to be pagesize aligned, and there seems no way of changing sector size to pagesize for Linux loop device;
+> 2. 64KB is not an optimal RPC size for Lustre, so yes eventually we are going to see throughput issue if the RPC size is limited to 64KB;
+> 3. It's hard to do I/O optimization more with Linux loop device. With direct I/O by default, it has to wait for the current I/O to complete before it can send the next one. This is not good. I have revised llite_lloop driver so that it can do async direct I/O. The performance boosts significantly by doing so.
 
-It seems like CFS_TICK is mostly useless as well and could just be dropped?
+Jinshan,
+if you have a patch to implement an improved llite_lloop driver, I think it would be useful to share it.  Originally I'd hoped that the kernel loop driver would allow pluggable backends so that they could be replaced as needed, but that wasn't implemented.  I'd think that this would be an approach that might be more acceptable upstream, rather than copying the loop driver from the kernel and only changing the IO interface.
 
-> #define CFS_DURATION_T	  "%ld"
+Cheers, Andreas
+
+> I tried to increase the sector size of Linux loop device and also max_{hw_}sectors_kb but it didn't work. Please let me know if there exists ways of doing that.
 > 
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-> index 4a9d1f189d01..dd4fd54128dd 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-> @@ -1486,7 +1486,7 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
-> 	}
+> Thanks,
+> Jinshan
 > 
-> 	if (ptlrpc_import_in_recovery(imp)) {
-> -		long timeout;
-> +		unsigned long timeout;
+> On Fri, Mar 30, 2018 at 12:12 PM, James Simmons <jsimmons@infradead.org> wrote:
 > 
-> 		if (AT_OFF) {
-> 			if (imp->imp_server_timeout)
-> @@ -1501,7 +1501,7 @@ int ptlrpc_disconnect_import(struct obd_import *imp, int noclose)
+> > On Fri, Mar 23 2018, James Simmons wrote:
+> >
+> > > Hi Neil
+> > >
+> > >       So once long ago lustre had its own loopback device due to the
+> > > upstream loopback device not supporting Direct I/O. Once it did we
+> > > dropped support for our custom driver. Recently their has been interest
+> > > in using the loopback driver and Jinshan discussed with me about reviving
+> > > our custom driver which I'm not thrilled about. He was seeing problems
+> > > with Direct I/O above 64K. Do you know the details why that limitation
+> > > exist. Perhaps it can be resolved or maybe we are missing something?
+> > > Thanks for your help.
+> >
+> > Hi James, and Jinshan,
+> >  What sort of problems do you see with 64K DIO requests?
+> >  Is it a throughput problem or are you seeing IO errors?
+> >  Would it be easy to demonstrate the problem in a cluster
+> >  comprising a few VMs, or is real hardware needed?  If VMs are OK,
+> >  can you tell me exactly how to duplicate the problem?
+> >
+> >  If loop gets a multi-bio request, it will allocate a bvec array
+> >  to hold all the bio_vecs.  If there are more than 256 pages (1Meg)
+> >  in a request, this could easily fail. 5 consecutive 64K requests on a
+> >  machine without much free memory could hit problems here.
+> >  If that is the problem, it should be easy to fix (request the number
+> >  given to blk_queue_max_hw_sectors).
 > 
-> 		if (wait_event_idle_timeout(imp->imp_recovery_waitq,
-> 					    !ptlrpc_import_in_recovery(imp),
-> -					    cfs_timeout_cap(timeout)) == 0)
-> +					    max(timeout, CFS_TICK)) == 0)
-> 			l_wait_event_abortable(
-> 				imp->imp_recovery_waitq,
-> 				!ptlrpc_import_in_recovery(imp));
-> 
+> Jinshan can you post a reproducer so we can see the problem.
 > 
 
 Cheers, Andreas
