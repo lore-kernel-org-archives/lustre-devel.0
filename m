@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 12 Apr 2018 07:54:49 +1000
-Subject: [lustre-devel] [PATCH 19/20] staging: lustre: convert lu_object
- cache to rhashtable
+Subject: [lustre-devel] [PATCH 20/20] staging: lustre: remove cfs_hash
+ resizeable hashtable implementation.
 In-Reply-To: <152348312863.12394.11915752362061083241.stgit@noble>
 References: <152348312863.12394.11915752362061083241.stgit@noble>
-Message-ID: <152348368919.12394.7505057425201912278.stgit@noble>
+Message-ID: <152348368922.12394.15220353270157149002.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,933 +12,3013 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-The lu_object cache is a little more complex than the other lustre
-hash tables for two reasons.
-1/ there is a debugfs file which displays the contents of the cache,
-  so we need to use rhashtable_walk in a way that works for seq_file.
-
-2/ There is a (shared) lru list for objects which are no longer
-   referenced, so finding an object needs to consider races with the
-   lru as well as with the hash table.
-
-The debugfs file already manages walking the libcfs hash table keeping
-a current-position in the private data.  We can fairly easily convert
-that to a struct rhashtable_iter.  The debugfs file actually reports
-pages, and there are multiple pages per hashtable object.  So as well
-as rhashtable_iter, we need the current page index.
-
-
-For the double-locking, the current code uses direct-access to the
-bucket locks that libcfs_hash provides.  rhashtable doesn't provide
-that access - callers must provide their own locking or use rcu
-techniques.
-
-The lsb_marche_funebre.lock is still used to manage the lru list, but
-with this patch it is no longer nested *inside* the hashtable locks,
-but instead is outside.  It is used to protect an object with a
-refcount of zero.
-
-When purging old objects from an lru, we first set
-LU_OBJECT_HEARD_BANSHEE while holding the lsb_marche_funebre.lock,
-then remove all the entries from the hashtable separately.
-
-When we find an object in the hashtable with a refcount of zero, we
-take the corresponding lsb_marche_funebre.lock and check
-LU_OBJECT_HEARD_BANSHEE isn't set.  If it isn't, we can safely
-increment the refcount.  If it is, the object is gone.
-
-When removing the last reference from an object, we first take the
-lsb_marche_funebre.lock, then decrement the reference and add to the
-lru list.
-
-This way, we only ever manipulate an object with a refcount of zero
-while holding the lsb_marche_funebre.lock.
-
-As there is nothing to stop us using the resizing capabilities of
-rhashtable, the code to try to guess the perfect has size has been
-removed.
+All users of this library have been converted to use rhashtable.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h  |    8 
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |   98 ++---
- drivers/staging/lustre/lustre/obdclass/lu_object.c |  362 +++++++-------------
- 3 files changed, 170 insertions(+), 298 deletions(-)
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 
+ .../lustre/include/linux/libcfs/libcfs_hash.h      |  866 --------
+ drivers/staging/lustre/lnet/libcfs/Makefile        |    2 
+ drivers/staging/lustre/lnet/libcfs/hash.c          | 2064 --------------------
+ drivers/staging/lustre/lnet/libcfs/module.c        |   12 
+ 5 files changed, 1 insertion(+), 2944 deletions(-)
+ delete mode 100644 drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
+ delete mode 100644 drivers/staging/lustre/lnet/libcfs/hash.c
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index 85066ece44d6..fab576687608 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -530,9 +530,9 @@ struct lu_object_header {
- 	 */
- 	__u32		  loh_attr;
- 	/**
--	 * Linkage into per-site hash table. Protected by lu_site::ls_guard.
-+	 * Linkage into per-site hash table.
- 	 */
--	struct hlist_node       loh_hash;
-+	struct rhash_head       loh_hash;
- 	/**
- 	 * Linkage into per-site LRU list. Protected by lu_site::ls_guard.
- 	 * memory shared with lru_head for delayed freeing;
-@@ -579,7 +579,7 @@ struct lu_site {
- 	/**
- 	 * objects hash table
- 	 */
--	struct cfs_hash	       *ls_obj_hash;
-+	struct rhashtable	ls_obj_hash;
- 	/*
- 	 * buckets for summary data
- 	 */
-@@ -655,6 +655,8 @@ int lu_object_init(struct lu_object *o,
- void lu_object_fini(struct lu_object *o);
- void lu_object_add_top(struct lu_object_header *h, struct lu_object *o);
- void lu_object_add(struct lu_object *before, struct lu_object *o);
-+struct lu_object *lu_object_get_first(struct lu_object_header *h,
-+				      struct lu_device *dev);
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+index f183f31da387..62e46aa3c554 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+@@ -44,7 +44,6 @@
+ #include <linux/libcfs/libcfs_cpu.h>
+ #include <linux/libcfs/libcfs_prim.h>
+ #include <linux/libcfs/libcfs_string.h>
+-#include <linux/libcfs/libcfs_hash.h>
+ #include <linux/libcfs/libcfs_fail.h>
+ #include <linux/libcfs/curproc.h>
  
- /**
-  * Helpers to initialize and finalize device types.
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index 64c3fdbbf0eb..da39375ae43d 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -365,21 +365,13 @@ int cl_sb_fini(struct super_block *sb)
-  *
-  ****************************************************************************/
- 
--struct vvp_pgcache_id {
--	unsigned int		 vpi_bucket;
--	unsigned int		 vpi_depth;
--	u32			 vpi_index;
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
+deleted file mode 100644
+index 0506f1d45757..000000000000
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
++++ /dev/null
+@@ -1,866 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.gnu.org/licenses/gpl-2.0.html
+- *
+- * GPL HEADER END
+- */
+-/*
+- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2012, 2015 Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- *
+- * libcfs/include/libcfs/libcfs_hash.h
+- *
+- * Hashing routines
+- *
+- */
 -
--	unsigned int		 vpi_curdep;
--	struct lu_object_header *vpi_obj;
+-#ifndef __LIBCFS_HASH_H__
+-#define __LIBCFS_HASH_H__
+-
+-#include <linux/hash.h>
+-
+-/*
+- * Knuth recommends primes in approximately golden ratio to the maximum
+- * integer representable by a machine word for multiplicative hashing.
+- * Chuck Lever verified the effectiveness of this technique:
+- * http://www.citi.umich.edu/techreports/reports/citi-tr-00-1.pdf
+- *
+- * These primes are chosen to be bit-sparse, that is operations on
+- * them can use shifts and additions instead of multiplications for
+- * machines where multiplications are slow.
+- */
+-/* 2^31 + 2^29 - 2^25 + 2^22 - 2^19 - 2^16 + 1 */
+-#define CFS_GOLDEN_RATIO_PRIME_32 0x9e370001UL
+-/*  2^63 + 2^61 - 2^57 + 2^54 - 2^51 - 2^18 + 1 */
+-#define CFS_GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001ULL
+-
+-/** disable debug */
+-#define CFS_HASH_DEBUG_NONE	0
+-/*
+- * record hash depth and output to console when it's too deep,
+- * computing overhead is low but consume more memory
+- */
+-#define CFS_HASH_DEBUG_1	1
+-/** expensive, check key validation */
+-#define CFS_HASH_DEBUG_2	2
+-
+-#define CFS_HASH_DEBUG_LEVEL	CFS_HASH_DEBUG_NONE
+-
+-struct cfs_hash_ops;
+-struct cfs_hash_lock_ops;
+-struct cfs_hash_hlist_ops;
+-
+-union cfs_hash_lock {
+-	rwlock_t		rw;		/**< rwlock */
+-	spinlock_t		spin;		/**< spinlock */
 -};
 -
- struct seq_private {
- 	struct ll_sb_info	*sbi;
- 	struct lu_env		*env;
- 	u16			refcheck;
- 	struct cl_object	*clob;
--	struct vvp_pgcache_id	id;
-+	struct rhashtable_iter	iter;
-+	u32			page_index;
- 	/*
- 	 * prev_pos is the 'pos' of the last object returned
- 	 * by ->start of ->next.
-@@ -387,79 +379,43 @@ struct seq_private {
- 	loff_t			prev_pos;
- };
- 
--static int vvp_pgcache_obj_get(struct cfs_hash *hs, struct cfs_hash_bd *bd,
--			       struct hlist_node *hnode, void *data)
+-/**
+- * cfs_hash_bucket is a container of:
+- * - lock, counter ...
+- * - array of hash-head starting from hsb_head[0], hash-head can be one of
+- *   . struct cfs_hash_head
+- *   . struct cfs_hash_head_dep
+- *   . struct cfs_hash_dhead
+- *   . struct cfs_hash_dhead_dep
+- *   which depends on requirement of user
+- * - some extra bytes (caller can require it while creating hash)
+- */
+-struct cfs_hash_bucket {
+-	union cfs_hash_lock	hsb_lock;	/**< bucket lock */
+-	u32			hsb_count;	/**< current entries */
+-	u32			hsb_version;	/**< change version */
+-	unsigned int		hsb_index;	/**< index of bucket */
+-	int			hsb_depmax;	/**< max depth on bucket */
+-	long			hsb_head[0];	/**< hash-head array */
+-};
+-
+-/**
+- * cfs_hash bucket descriptor, it's normally in stack of caller
+- */
+-struct cfs_hash_bd {
+-	/* address of bucket */
+-	struct cfs_hash_bucket	*bd_bucket;
+-	/* offset in bucket */
+-	unsigned int		 bd_offset;
+-};
+-
+-#define CFS_HASH_NAME_LEN	16	/**< default name length */
+-#define CFS_HASH_BIGNAME_LEN	64	/**< bigname for param tree */
+-
+-#define CFS_HASH_BKT_BITS	3	/**< default bits of bucket */
+-#define CFS_HASH_BITS_MAX	30	/**< max bits of bucket */
+-#define CFS_HASH_BITS_MIN	CFS_HASH_BKT_BITS
+-
+-/**
+- * common hash attributes.
+- */
+-enum cfs_hash_tag {
+-	/**
+-	 * don't need any lock, caller will protect operations with it's
+-	 * own lock. With this flag:
+-	 *  . CFS_HASH_NO_BKTLOCK, CFS_HASH_RW_BKTLOCK, CFS_HASH_SPIN_BKTLOCK
+-	 *    will be ignored.
+-	 *  . Some functions will be disabled with this flag, i.e:
+-	 *    cfs_hash_for_each_empty, cfs_hash_rehash
+-	 */
+-	CFS_HASH_NO_LOCK	= BIT(0),
+-	/** no bucket lock, use one spinlock to protect the whole hash */
+-	CFS_HASH_NO_BKTLOCK	= BIT(1),
+-	/** rwlock to protect bucket */
+-	CFS_HASH_RW_BKTLOCK	= BIT(2),
+-	/** spinlock to protect bucket */
+-	CFS_HASH_SPIN_BKTLOCK	= BIT(3),
+-	/** always add new item to tail */
+-	CFS_HASH_ADD_TAIL	= BIT(4),
+-	/** hash-table doesn't have refcount on item */
+-	CFS_HASH_NO_ITEMREF	= BIT(5),
+-	/** big name for param-tree */
+-	CFS_HASH_BIGNAME	= BIT(6),
+-	/** track global count */
+-	CFS_HASH_COUNTER	= BIT(7),
+-	/** rehash item by new key */
+-	CFS_HASH_REHASH_KEY	= BIT(8),
+-	/** Enable dynamic hash resizing */
+-	CFS_HASH_REHASH		= BIT(9),
+-	/** can shrink hash-size */
+-	CFS_HASH_SHRINK		= BIT(10),
+-	/** assert hash is empty on exit */
+-	CFS_HASH_ASSERT_EMPTY	= BIT(11),
+-	/** record hlist depth */
+-	CFS_HASH_DEPTH		= BIT(12),
+-	/**
+-	 * rehash is always scheduled in a different thread, so current
+-	 * change on hash table is non-blocking
+-	 */
+-	CFS_HASH_NBLK_CHANGE	= BIT(13),
+-	/**
+-	 * NB, we typed hs_flags as  u16, please change it
+-	 * if you need to extend >=16 flags
+-	 */
+-};
+-
+-/** most used attributes */
+-#define CFS_HASH_DEFAULT	(CFS_HASH_RW_BKTLOCK | \
+-				 CFS_HASH_COUNTER | CFS_HASH_REHASH)
+-
+-/**
+- * cfs_hash is a hash-table implementation for general purpose, it can support:
+- *    . two refcount modes
+- *      hash-table with & without refcount
+- *    . four lock modes
+- *      nolock, one-spinlock, rw-bucket-lock, spin-bucket-lock
+- *    . general operations
+- *      lookup, add(add_tail or add_head), delete
+- *    . rehash
+- *      grows or shrink
+- *    . iteration
+- *      locked iteration and unlocked iteration
+- *    . bigname
+- *      support long name hash
+- *    . debug
+- *      trace max searching depth
+- *
+- * Rehash:
+- * When the htable grows or shrinks, a separate task (cfs_hash_rehash_worker)
+- * is spawned to handle the rehash in the background, it's possible that other
+- * processes can concurrently perform additions, deletions, and lookups
+- * without being blocked on rehash completion, because rehash will release
+- * the global wrlock for each bucket.
+- *
+- * rehash and iteration can't run at the same time because it's too tricky
+- * to keep both of them safe and correct.
+- * As they are relatively rare operations, so:
+- *   . if iteration is in progress while we try to launch rehash, then
+- *     it just giveup, iterator will launch rehash at the end.
+- *   . if rehash is in progress while we try to iterate the hash table,
+- *     then we just wait (shouldn't be very long time), anyway, nobody
+- *     should expect iteration of whole hash-table to be non-blocking.
+- *
+- * During rehashing, a (key,object) pair may be in one of two buckets,
+- * depending on whether the worker task has yet to transfer the object
+- * to its new location in the table. Lookups and deletions need to search both
+- * locations; additions must take care to only insert into the new bucket.
+- */
+-
+-struct cfs_hash {
+-	/**
+-	 * serialize with rehash, or serialize all operations if
+-	 * the hash-table has CFS_HASH_NO_BKTLOCK
+-	 */
+-	union cfs_hash_lock		hs_lock;
+-	/** hash operations */
+-	struct cfs_hash_ops		*hs_ops;
+-	/** hash lock operations */
+-	struct cfs_hash_lock_ops	*hs_lops;
+-	/** hash list operations */
+-	struct cfs_hash_hlist_ops	*hs_hops;
+-	/** hash buckets-table */
+-	struct cfs_hash_bucket		**hs_buckets;
+-	/** total number of items on this hash-table */
+-	atomic_t			hs_count;
+-	/** hash flags, see cfs_hash_tag for detail */
+-	u16				hs_flags;
+-	/** # of extra-bytes for bucket, for user saving extended attributes */
+-	u16				hs_extra_bytes;
+-	/** wants to iterate */
+-	u8				hs_iterating;
+-	/** hash-table is dying */
+-	u8				hs_exiting;
+-	/** current hash bits */
+-	u8				hs_cur_bits;
+-	/** min hash bits */
+-	u8				hs_min_bits;
+-	/** max hash bits */
+-	u8				hs_max_bits;
+-	/** bits for rehash */
+-	u8				hs_rehash_bits;
+-	/** bits for each bucket */
+-	u8				hs_bkt_bits;
+-	/** resize min threshold */
+-	u16				hs_min_theta;
+-	/** resize max threshold */
+-	u16				hs_max_theta;
+-	/** resize count */
+-	u32				hs_rehash_count;
+-	/** # of iterators (caller of cfs_hash_for_each_*) */
+-	u32				hs_iterators;
+-	/** rehash workitem */
+-	struct work_struct		hs_rehash_work;
+-	/** refcount on this hash table */
+-	atomic_t			hs_refcount;
+-	/** rehash buckets-table */
+-	struct cfs_hash_bucket		**hs_rehash_buckets;
+-#if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
+-	/** serialize debug members */
+-	spinlock_t			hs_dep_lock;
+-	/** max depth */
+-	unsigned int			hs_dep_max;
+-	/** id of the deepest bucket */
+-	unsigned int			hs_dep_bkt;
+-	/** offset in the deepest bucket */
+-	unsigned int			hs_dep_off;
+-	/** bits when we found the max depth */
+-	unsigned int			hs_dep_bits;
+-	/** workitem to output max depth */
+-	struct work_struct		hs_dep_work;
+-#endif
+-	/** name of htable */
+-	char				hs_name[0];
+-};
+-
+-struct cfs_hash_lock_ops {
+-	/** lock the hash table */
+-	void    (*hs_lock)(union cfs_hash_lock *lock, int exclusive);
+-	/** unlock the hash table */
+-	void    (*hs_unlock)(union cfs_hash_lock *lock, int exclusive);
+-	/** lock the hash bucket */
+-	void    (*hs_bkt_lock)(union cfs_hash_lock *lock, int exclusive);
+-	/** unlock the hash bucket */
+-	void    (*hs_bkt_unlock)(union cfs_hash_lock *lock, int exclusive);
+-};
+-
+-struct cfs_hash_hlist_ops {
+-	/** return hlist_head of hash-head of @bd */
+-	struct hlist_head *(*hop_hhead)(struct cfs_hash *hs,
+-					struct cfs_hash_bd *bd);
+-	/** return hash-head size */
+-	int (*hop_hhead_size)(struct cfs_hash *hs);
+-	/** add @hnode to hash-head of @bd */
+-	int (*hop_hnode_add)(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			     struct hlist_node *hnode);
+-	/** remove @hnode from hash-head of @bd */
+-	int (*hop_hnode_del)(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			     struct hlist_node *hnode);
+-};
+-
+-struct cfs_hash_ops {
+-	/** return hashed value from @key */
+-	unsigned int (*hs_hash)(struct cfs_hash *hs, const void *key,
+-				unsigned int mask);
+-	/** return key address of @hnode */
+-	void *   (*hs_key)(struct hlist_node *hnode);
+-	/** copy key from @hnode to @key */
+-	void     (*hs_keycpy)(struct hlist_node *hnode, void *key);
+-	/**
+-	 *  compare @key with key of @hnode
+-	 *  returns 1 on a match
+-	 */
+-	int      (*hs_keycmp)(const void *key, struct hlist_node *hnode);
+-	/** return object address of @hnode, i.e: container_of(...hnode) */
+-	void *   (*hs_object)(struct hlist_node *hnode);
+-	/** get refcount of item, always called with holding bucket-lock */
+-	void     (*hs_get)(struct cfs_hash *hs, struct hlist_node *hnode);
+-	/** release refcount of item */
+-	void     (*hs_put)(struct cfs_hash *hs, struct hlist_node *hnode);
+-	/** release refcount of item, always called with holding bucket-lock */
+-	void     (*hs_put_locked)(struct cfs_hash *hs,
+-				  struct hlist_node *hnode);
+-	/** it's called before removing of @hnode */
+-	void     (*hs_exit)(struct cfs_hash *hs, struct hlist_node *hnode);
+-};
+-
+-/** total number of buckets in @hs */
+-#define CFS_HASH_NBKT(hs)	\
+-	BIT((hs)->hs_cur_bits - (hs)->hs_bkt_bits)
+-
+-/** total number of buckets in @hs while rehashing */
+-#define CFS_HASH_RH_NBKT(hs)	\
+-	BIT((hs)->hs_rehash_bits - (hs)->hs_bkt_bits)
+-
+-/** number of hlist for in bucket */
+-#define CFS_HASH_BKT_NHLIST(hs)	BIT((hs)->hs_bkt_bits)
+-
+-/** total number of hlist in @hs */
+-#define CFS_HASH_NHLIST(hs)	BIT((hs)->hs_cur_bits)
+-
+-/** total number of hlist in @hs while rehashing */
+-#define CFS_HASH_RH_NHLIST(hs)	BIT((hs)->hs_rehash_bits)
+-
+-static inline int
+-cfs_hash_with_no_lock(struct cfs_hash *hs)
 -{
--	struct vvp_pgcache_id   *id  = data;
--	struct lu_object_header *hdr = cfs_hash_object(hs, hnode);
--
--	if (lu_object_is_dying(hdr))
--		return 0;
--
--	if (id->vpi_curdep-- > 0)
--		return 0; /* continue */
--
--	cfs_hash_get(hs, hnode);
--	id->vpi_obj = hdr;
--	return 1;
+-	/* caller will serialize all operations for this hash-table */
+-	return hs->hs_flags & CFS_HASH_NO_LOCK;
 -}
 -
--static struct cl_object *vvp_pgcache_obj(const struct lu_env *env,
--					 struct lu_device *dev,
--					 struct vvp_pgcache_id *id)
+-static inline int
+-cfs_hash_with_no_bktlock(struct cfs_hash *hs)
 -{
--	LASSERT(lu_device_is_cl(dev));
+-	/* no bucket lock, one single lock to protect the hash-table */
+-	return hs->hs_flags & CFS_HASH_NO_BKTLOCK;
+-}
 -
--	id->vpi_obj    = NULL;
--	id->vpi_curdep = id->vpi_depth;
+-static inline int
+-cfs_hash_with_rw_bktlock(struct cfs_hash *hs)
+-{
+-	/* rwlock to protect hash bucket */
+-	return hs->hs_flags & CFS_HASH_RW_BKTLOCK;
+-}
 -
--	cfs_hash_hlist_for_each(dev->ld_site->ls_obj_hash, id->vpi_bucket,
--				vvp_pgcache_obj_get, id);
--	if (id->vpi_obj) {
--		struct lu_object *lu_obj;
+-static inline int
+-cfs_hash_with_spin_bktlock(struct cfs_hash *hs)
+-{
+-	/* spinlock to protect hash bucket */
+-	return hs->hs_flags & CFS_HASH_SPIN_BKTLOCK;
+-}
 -
--		lu_obj = lu_object_locate(id->vpi_obj, dev->ld_type);
--		if (lu_obj) {
--			lu_object_ref_add(lu_obj, "dump", current);
--			return lu2cl(lu_obj);
+-static inline int
+-cfs_hash_with_add_tail(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_ADD_TAIL;
+-}
+-
+-static inline int
+-cfs_hash_with_no_itemref(struct cfs_hash *hs)
+-{
+-	/*
+-	 * hash-table doesn't keep refcount on item,
+-	 * item can't be removed from hash unless it's
+-	 * ZERO refcount
+-	 */
+-	return hs->hs_flags & CFS_HASH_NO_ITEMREF;
+-}
+-
+-static inline int
+-cfs_hash_with_bigname(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_BIGNAME;
+-}
+-
+-static inline int
+-cfs_hash_with_counter(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_COUNTER;
+-}
+-
+-static inline int
+-cfs_hash_with_rehash(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_REHASH;
+-}
+-
+-static inline int
+-cfs_hash_with_rehash_key(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_REHASH_KEY;
+-}
+-
+-static inline int
+-cfs_hash_with_shrink(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_SHRINK;
+-}
+-
+-static inline int
+-cfs_hash_with_assert_empty(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_ASSERT_EMPTY;
+-}
+-
+-static inline int
+-cfs_hash_with_depth(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_DEPTH;
+-}
+-
+-static inline int
+-cfs_hash_with_nblk_change(struct cfs_hash *hs)
+-{
+-	return hs->hs_flags & CFS_HASH_NBLK_CHANGE;
+-}
+-
+-static inline int
+-cfs_hash_is_exiting(struct cfs_hash *hs)
+-{
+-	/* cfs_hash_destroy is called */
+-	return hs->hs_exiting;
+-}
+-
+-static inline int
+-cfs_hash_is_rehashing(struct cfs_hash *hs)
+-{
+-	/* rehash is launched */
+-	return !!hs->hs_rehash_bits;
+-}
+-
+-static inline int
+-cfs_hash_is_iterating(struct cfs_hash *hs)
+-{
+-	/* someone is calling cfs_hash_for_each_* */
+-	return hs->hs_iterating || hs->hs_iterators;
+-}
+-
+-static inline int
+-cfs_hash_bkt_size(struct cfs_hash *hs)
+-{
+-	return offsetof(struct cfs_hash_bucket, hsb_head[0]) +
+-	       hs->hs_hops->hop_hhead_size(hs) * CFS_HASH_BKT_NHLIST(hs) +
+-	       hs->hs_extra_bytes;
+-}
+-
+-static inline unsigned
+-cfs_hash_id(struct cfs_hash *hs, const void *key, unsigned int mask)
+-{
+-	return hs->hs_ops->hs_hash(hs, key, mask);
+-}
+-
+-static inline void *
+-cfs_hash_key(struct cfs_hash *hs, struct hlist_node *hnode)
+-{
+-	return hs->hs_ops->hs_key(hnode);
+-}
+-
+-static inline void
+-cfs_hash_keycpy(struct cfs_hash *hs, struct hlist_node *hnode, void *key)
+-{
+-	if (hs->hs_ops->hs_keycpy)
+-		hs->hs_ops->hs_keycpy(hnode, key);
+-}
+-
+-/**
+- * Returns 1 on a match,
+- */
+-static inline int
+-cfs_hash_keycmp(struct cfs_hash *hs, const void *key, struct hlist_node *hnode)
+-{
+-	return hs->hs_ops->hs_keycmp(key, hnode);
+-}
+-
+-static inline void *
+-cfs_hash_object(struct cfs_hash *hs, struct hlist_node *hnode)
+-{
+-	return hs->hs_ops->hs_object(hnode);
+-}
+-
+-static inline void
+-cfs_hash_get(struct cfs_hash *hs, struct hlist_node *hnode)
+-{
+-	return hs->hs_ops->hs_get(hs, hnode);
+-}
+-
+-static inline void
+-cfs_hash_put_locked(struct cfs_hash *hs, struct hlist_node *hnode)
+-{
+-	return hs->hs_ops->hs_put_locked(hs, hnode);
+-}
+-
+-static inline void
+-cfs_hash_put(struct cfs_hash *hs, struct hlist_node *hnode)
+-{
+-	return hs->hs_ops->hs_put(hs, hnode);
+-}
+-
+-static inline void
+-cfs_hash_exit(struct cfs_hash *hs, struct hlist_node *hnode)
+-{
+-	if (hs->hs_ops->hs_exit)
+-		hs->hs_ops->hs_exit(hs, hnode);
+-}
+-
+-static inline void cfs_hash_lock(struct cfs_hash *hs, int excl)
+-{
+-	hs->hs_lops->hs_lock(&hs->hs_lock, excl);
+-}
+-
+-static inline void cfs_hash_unlock(struct cfs_hash *hs, int excl)
+-{
+-	hs->hs_lops->hs_unlock(&hs->hs_lock, excl);
+-}
+-
+-static inline int cfs_hash_dec_and_lock(struct cfs_hash *hs,
+-					atomic_t *condition)
+-{
+-	LASSERT(cfs_hash_with_no_bktlock(hs));
+-	return atomic_dec_and_lock(condition, &hs->hs_lock.spin);
+-}
+-
+-static inline void cfs_hash_bd_lock(struct cfs_hash *hs,
+-				    struct cfs_hash_bd *bd, int excl)
+-{
+-	hs->hs_lops->hs_bkt_lock(&bd->bd_bucket->hsb_lock, excl);
+-}
+-
+-static inline void cfs_hash_bd_unlock(struct cfs_hash *hs,
+-				      struct cfs_hash_bd *bd, int excl)
+-{
+-	hs->hs_lops->hs_bkt_unlock(&bd->bd_bucket->hsb_lock, excl);
+-}
+-
+-/**
+- * operations on cfs_hash bucket (bd: bucket descriptor),
+- * they are normally for hash-table without rehash
+- */
+-void cfs_hash_bd_get(struct cfs_hash *hs, const void *key,
+-		     struct cfs_hash_bd *bd);
+-
+-static inline void
+-cfs_hash_bd_get_and_lock(struct cfs_hash *hs, const void *key,
+-			 struct cfs_hash_bd *bd, int excl)
+-{
+-	cfs_hash_bd_get(hs, key, bd);
+-	cfs_hash_bd_lock(hs, bd, excl);
+-}
+-
+-static inline unsigned
+-cfs_hash_bd_index_get(struct cfs_hash *hs, struct cfs_hash_bd *bd)
+-{
+-	return bd->bd_offset | (bd->bd_bucket->hsb_index << hs->hs_bkt_bits);
+-}
+-
+-static inline void
+-cfs_hash_bd_index_set(struct cfs_hash *hs, unsigned int index,
+-		      struct cfs_hash_bd *bd)
+-{
+-	bd->bd_bucket = hs->hs_buckets[index >> hs->hs_bkt_bits];
+-	bd->bd_offset = index & (CFS_HASH_BKT_NHLIST(hs) - 1U);
+-}
+-
+-static inline void *
+-cfs_hash_bd_extra_get(struct cfs_hash *hs, struct cfs_hash_bd *bd)
+-{
+-	return (void *)bd->bd_bucket +
+-	       cfs_hash_bkt_size(hs) - hs->hs_extra_bytes;
+-}
+-
+-static inline u32
+-cfs_hash_bd_version_get(struct cfs_hash_bd *bd)
+-{
+-	/* need hold cfs_hash_bd_lock */
+-	return bd->bd_bucket->hsb_version;
+-}
+-
+-static inline u32
+-cfs_hash_bd_count_get(struct cfs_hash_bd *bd)
+-{
+-	/* need hold cfs_hash_bd_lock */
+-	return bd->bd_bucket->hsb_count;
+-}
+-
+-static inline int
+-cfs_hash_bd_depmax_get(struct cfs_hash_bd *bd)
+-{
+-	return bd->bd_bucket->hsb_depmax;
+-}
+-
+-static inline int
+-cfs_hash_bd_compare(struct cfs_hash_bd *bd1, struct cfs_hash_bd *bd2)
+-{
+-	if (bd1->bd_bucket->hsb_index != bd2->bd_bucket->hsb_index)
+-		return bd1->bd_bucket->hsb_index - bd2->bd_bucket->hsb_index;
+-
+-	if (bd1->bd_offset != bd2->bd_offset)
+-		return bd1->bd_offset - bd2->bd_offset;
+-
+-	return 0;
+-}
+-
+-void cfs_hash_bd_add_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			    struct hlist_node *hnode);
+-void cfs_hash_bd_del_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			    struct hlist_node *hnode);
+-void cfs_hash_bd_move_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd_old,
+-			     struct cfs_hash_bd *bd_new,
+-			     struct hlist_node *hnode);
+-
+-static inline int
+-cfs_hash_bd_dec_and_lock(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			 atomic_t *condition)
+-{
+-	LASSERT(cfs_hash_with_spin_bktlock(hs));
+-	return atomic_dec_and_lock(condition, &bd->bd_bucket->hsb_lock.spin);
+-}
+-
+-static inline struct hlist_head *
+-cfs_hash_bd_hhead(struct cfs_hash *hs, struct cfs_hash_bd *bd)
+-{
+-	return hs->hs_hops->hop_hhead(hs, bd);
+-}
+-
+-struct hlist_node *
+-cfs_hash_bd_lookup_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			  const void *key);
+-struct hlist_node *
+-cfs_hash_bd_peek_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			const void *key);
+-
+-/**
+- * operations on cfs_hash bucket (bd: bucket descriptor),
+- * they are safe for hash-table with rehash
+- */
+-void cfs_hash_dual_bd_get(struct cfs_hash *hs, const void *key,
+-			  struct cfs_hash_bd *bds);
+-void cfs_hash_dual_bd_lock(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-			   int excl);
+-void cfs_hash_dual_bd_unlock(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-			     int excl);
+-
+-static inline void
+-cfs_hash_dual_bd_get_and_lock(struct cfs_hash *hs, const void *key,
+-			      struct cfs_hash_bd *bds, int excl)
+-{
+-	cfs_hash_dual_bd_get(hs, key, bds);
+-	cfs_hash_dual_bd_lock(hs, bds, excl);
+-}
+-
+-struct hlist_node *
+-cfs_hash_dual_bd_lookup_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-			       const void *key);
+-struct hlist_node *
+-cfs_hash_dual_bd_findadd_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-				const void *key, struct hlist_node *hnode,
+-				int insist_add);
+-struct hlist_node *
+-cfs_hash_dual_bd_finddel_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-				const void *key, struct hlist_node *hnode);
+-
+-/* Hash init/cleanup functions */
+-struct cfs_hash *
+-cfs_hash_create(char *name, unsigned int cur_bits, unsigned int max_bits,
+-		unsigned int bkt_bits, unsigned int extra_bytes,
+-		unsigned int min_theta, unsigned int max_theta,
+-		struct cfs_hash_ops *ops, unsigned int flags);
+-
+-struct cfs_hash *cfs_hash_getref(struct cfs_hash *hs);
+-void cfs_hash_putref(struct cfs_hash *hs);
+-
+-/* Hash addition functions */
+-void cfs_hash_add(struct cfs_hash *hs, const void *key,
+-		  struct hlist_node *hnode);
+-int cfs_hash_add_unique(struct cfs_hash *hs, const void *key,
+-			struct hlist_node *hnode);
+-void *cfs_hash_findadd_unique(struct cfs_hash *hs, const void *key,
+-			      struct hlist_node *hnode);
+-
+-/* Hash deletion functions */
+-void *cfs_hash_del(struct cfs_hash *hs, const void *key,
+-		   struct hlist_node *hnode);
+-void *cfs_hash_del_key(struct cfs_hash *hs, const void *key);
+-
+-/* Hash lookup/for_each functions */
+-#define CFS_HASH_LOOP_HOG       1024
+-
+-typedef int (*cfs_hash_for_each_cb_t)(struct cfs_hash *hs,
+-				      struct cfs_hash_bd *bd,
+-				      struct hlist_node *node,
+-				      void *data);
+-void *
+-cfs_hash_lookup(struct cfs_hash *hs, const void *key);
+-void
+-cfs_hash_for_each(struct cfs_hash *hs, cfs_hash_for_each_cb_t cb, void *data);
+-void
+-cfs_hash_for_each_safe(struct cfs_hash *hs, cfs_hash_for_each_cb_t cb,
+-		       void *data);
+-int
+-cfs_hash_for_each_nolock(struct cfs_hash *hs, cfs_hash_for_each_cb_t cb,
+-			 void *data, int start);
+-int
+-cfs_hash_for_each_empty(struct cfs_hash *hs, cfs_hash_for_each_cb_t cb,
+-			void *data);
+-void
+-cfs_hash_for_each_key(struct cfs_hash *hs, const void *key,
+-		      cfs_hash_for_each_cb_t cb, void *data);
+-typedef int (*cfs_hash_cond_opt_cb_t)(void *obj, void *data);
+-void
+-cfs_hash_cond_del(struct cfs_hash *hs, cfs_hash_cond_opt_cb_t cb, void *data);
+-
+-void
+-cfs_hash_hlist_for_each(struct cfs_hash *hs, unsigned int hindex,
+-			cfs_hash_for_each_cb_t cb, void *data);
+-int  cfs_hash_is_empty(struct cfs_hash *hs);
+-u64 cfs_hash_size_get(struct cfs_hash *hs);
+-
+-/*
+- * Rehash - Theta is calculated to be the average chained
+- * hash depth assuming a perfectly uniform hash function.
+- */
+-void cfs_hash_rehash_cancel_locked(struct cfs_hash *hs);
+-void cfs_hash_rehash_cancel(struct cfs_hash *hs);
+-void cfs_hash_rehash(struct cfs_hash *hs, int do_rehash);
+-void cfs_hash_rehash_key(struct cfs_hash *hs, const void *old_key,
+-			 void *new_key, struct hlist_node *hnode);
+-
+-#if CFS_HASH_DEBUG_LEVEL > CFS_HASH_DEBUG_1
+-/* Validate hnode references the correct key */
+-static inline void
+-cfs_hash_key_validate(struct cfs_hash *hs, const void *key,
+-		      struct hlist_node *hnode)
+-{
+-	LASSERT(cfs_hash_keycmp(hs, key, hnode));
+-}
+-
+-/* Validate hnode is in the correct bucket */
+-static inline void
+-cfs_hash_bucket_validate(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			 struct hlist_node *hnode)
+-{
+-	struct cfs_hash_bd bds[2];
+-
+-	cfs_hash_dual_bd_get(hs, cfs_hash_key(hs, hnode), bds);
+-	LASSERT(bds[0].bd_bucket == bd->bd_bucket ||
+-		bds[1].bd_bucket == bd->bd_bucket);
+-}
+-
+-#else /* CFS_HASH_DEBUG_LEVEL > CFS_HASH_DEBUG_1 */
+-
+-static inline void
+-cfs_hash_key_validate(struct cfs_hash *hs, const void *key,
+-		      struct hlist_node *hnode) {}
+-
+-static inline void
+-cfs_hash_bucket_validate(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			 struct hlist_node *hnode) {}
+-
+-#endif /* CFS_HASH_DEBUG_LEVEL */
+-
+-#define CFS_HASH_THETA_BITS	10
+-#define CFS_HASH_MIN_THETA	BIT(CFS_HASH_THETA_BITS - 1)
+-#define CFS_HASH_MAX_THETA	BIT(CFS_HASH_THETA_BITS + 1)
+-
+-/* Return integer component of theta */
+-static inline int __cfs_hash_theta_int(int theta)
+-{
+-	return (theta >> CFS_HASH_THETA_BITS);
+-}
+-
+-/* Return a fractional value between 0 and 999 */
+-static inline int __cfs_hash_theta_frac(int theta)
+-{
+-	return ((theta * 1000) >> CFS_HASH_THETA_BITS) -
+-	       (__cfs_hash_theta_int(theta) * 1000);
+-}
+-
+-static inline int __cfs_hash_theta(struct cfs_hash *hs)
+-{
+-	return (atomic_read(&hs->hs_count) <<
+-		CFS_HASH_THETA_BITS) >> hs->hs_cur_bits;
+-}
+-
+-static inline void
+-__cfs_hash_set_theta(struct cfs_hash *hs, int min, int max)
+-{
+-	LASSERT(min < max);
+-	hs->hs_min_theta = (u16)min;
+-	hs->hs_max_theta = (u16)max;
+-}
+-
+-/* Generic debug formatting routines mainly for proc handler */
+-struct seq_file;
+-void cfs_hash_debug_header(struct seq_file *m);
+-void cfs_hash_debug_str(struct cfs_hash *hs, struct seq_file *m);
+-
+-/*
+- * Generic djb2 hash algorithm for character arrays.
+- */
+-static inline unsigned
+-cfs_hash_djb2_hash(const void *key, size_t size, unsigned int mask)
+-{
+-	unsigned int i, hash = 5381;
+-
+-	LASSERT(key);
+-
+-	for (i = 0; i < size; i++)
+-		hash = hash * 33 + ((char *)key)[i];
+-
+-	return (hash & mask);
+-}
+-
+-/*
+- * Generic u32 hash algorithm.
+- */
+-static inline unsigned
+-cfs_hash_u32_hash(const u32 key, unsigned int mask)
+-{
+-	return ((key * CFS_GOLDEN_RATIO_PRIME_32) & mask);
+-}
+-
+-/*
+- * Generic u64 hash algorithm.
+- */
+-static inline unsigned
+-cfs_hash_u64_hash(const u64 key, unsigned int mask)
+-{
+-	return ((unsigned int)(key * CFS_GOLDEN_RATIO_PRIME_64) & mask);
+-}
+-
+-/** iterate over all buckets in @bds (array of struct cfs_hash_bd) */
+-#define cfs_hash_for_each_bd(bds, n, i)	\
+-	for (i = 0; i < n && (bds)[i].bd_bucket != NULL; i++)
+-
+-/** iterate over all buckets of @hs */
+-#define cfs_hash_for_each_bucket(hs, bd, pos)			\
+-	for (pos = 0;						\
+-	     pos < CFS_HASH_NBKT(hs) &&				\
+-	     ((bd)->bd_bucket = (hs)->hs_buckets[pos]) != NULL; pos++)
+-
+-/** iterate over all hlist of bucket @bd */
+-#define cfs_hash_bd_for_each_hlist(hs, bd, hlist)		\
+-	for ((bd)->bd_offset = 0;				\
+-	     (bd)->bd_offset < CFS_HASH_BKT_NHLIST(hs) &&	\
+-	     (hlist = cfs_hash_bd_hhead(hs, bd)) != NULL;	\
+-	     (bd)->bd_offset++)
+-
+-/* !__LIBCFS__HASH_H__ */
+-#endif
+diff --git a/drivers/staging/lustre/lnet/libcfs/Makefile b/drivers/staging/lustre/lnet/libcfs/Makefile
+index b7dc7ac11cc5..36b49a6b7b88 100644
+--- a/drivers/staging/lustre/lnet/libcfs/Makefile
++++ b/drivers/staging/lustre/lnet/libcfs/Makefile
+@@ -13,7 +13,7 @@ libcfs-linux-objs += linux-crypto-adler.o
+ libcfs-linux-objs := $(addprefix linux/,$(libcfs-linux-objs))
+ 
+ libcfs-all-objs := debug.o fail.o module.o tracefile.o \
+-		   libcfs_string.o hash.o \
++		   libcfs_string.o \
+ 		   libcfs_cpu.o libcfs_mem.o libcfs_lock.o
+ 
+ libcfs-objs := $(libcfs-linux-objs) $(libcfs-all-objs)
+diff --git a/drivers/staging/lustre/lnet/libcfs/hash.c b/drivers/staging/lustre/lnet/libcfs/hash.c
+deleted file mode 100644
+index f7b3c9306456..000000000000
+--- a/drivers/staging/lustre/lnet/libcfs/hash.c
++++ /dev/null
+@@ -1,2064 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.gnu.org/licenses/gpl-2.0.html
+- *
+- * GPL HEADER END
+- */
+-/*
+- * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2011, 2012, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- *
+- * libcfs/libcfs/hash.c
+- *
+- * Implement a hash class for hash process in lustre system.
+- *
+- * Author: YuZhangyong <yzy@clusterfs.com>
+- *
+- * 2008-08-15: Brian Behlendorf <behlendorf1@llnl.gov>
+- * - Simplified API and improved documentation
+- * - Added per-hash feature flags:
+- *   * CFS_HASH_DEBUG additional validation
+- *   * CFS_HASH_REHASH dynamic rehashing
+- * - Added per-hash statistics
+- * - General performance enhancements
+- *
+- * 2009-07-31: Liang Zhen <zhen.liang@sun.com>
+- * - move all stuff to libcfs
+- * - don't allow cur_bits != max_bits without setting of CFS_HASH_REHASH
+- * - ignore hs_rwlock if without CFS_HASH_REHASH setting
+- * - buckets are allocated one by one(instead of contiguous memory),
+- *   to avoid unnecessary cacheline conflict
+- *
+- * 2010-03-01: Liang Zhen <zhen.liang@sun.com>
+- * - "bucket" is a group of hlist_head now, user can specify bucket size
+- *   by bkt_bits of cfs_hash_create(), all hlist_heads in a bucket share
+- *   one lock for reducing memory overhead.
+- *
+- * - support lockless hash, caller will take care of locks:
+- *   avoid lock overhead for hash tables that are already protected
+- *   by locking in the caller for another reason
+- *
+- * - support both spin_lock/rwlock for bucket:
+- *   overhead of spinlock contention is lower than read/write
+- *   contention of rwlock, so using spinlock to serialize operations on
+- *   bucket is more reasonable for those frequently changed hash tables
+- *
+- * - support one-single lock mode:
+- *   one lock to protect all hash operations to avoid overhead of
+- *   multiple locks if hash table is always small
+- *
+- * - removed a lot of unnecessary addref & decref on hash element:
+- *   addref & decref are atomic operations in many use-cases which
+- *   are expensive.
+- *
+- * - support non-blocking cfs_hash_add() and cfs_hash_findadd():
+- *   some lustre use-cases require these functions to be strictly
+- *   non-blocking, we need to schedule required rehash on a different
+- *   thread on those cases.
+- *
+- * - safer rehash on large hash table
+- *   In old implementation, rehash function will exclusively lock the
+- *   hash table and finish rehash in one batch, it's dangerous on SMP
+- *   system because rehash millions of elements could take long time.
+- *   New implemented rehash can release lock and relax CPU in middle
+- *   of rehash, it's safe for another thread to search/change on the
+- *   hash table even it's in rehasing.
+- *
+- * - support two different refcount modes
+- *   . hash table has refcount on element
+- *   . hash table doesn't change refcount on adding/removing element
+- *
+- * - support long name hash table (for param-tree)
+- *
+- * - fix a bug for cfs_hash_rehash_key:
+- *   in old implementation, cfs_hash_rehash_key could screw up the
+- *   hash-table because @key is overwritten without any protection.
+- *   Now we need user to define hs_keycpy for those rehash enabled
+- *   hash tables, cfs_hash_rehash_key will overwrite hash-key
+- *   inside lock by calling hs_keycpy.
+- *
+- * - better hash iteration:
+- *   Now we support both locked iteration & lockless iteration of hash
+- *   table. Also, user can break the iteration by return 1 in callback.
+- */
+-#include <linux/seq_file.h>
+-#include <linux/log2.h>
+-
+-#include <linux/libcfs/libcfs.h>
+-
+-#if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
+-static unsigned int warn_on_depth = 8;
+-module_param(warn_on_depth, uint, 0644);
+-MODULE_PARM_DESC(warn_on_depth, "warning when hash depth is high.");
+-#endif
+-
+-struct workqueue_struct *cfs_rehash_wq;
+-
+-static inline void
+-cfs_hash_nl_lock(union cfs_hash_lock *lock, int exclusive) {}
+-
+-static inline void
+-cfs_hash_nl_unlock(union cfs_hash_lock *lock, int exclusive) {}
+-
+-static inline void
+-cfs_hash_spin_lock(union cfs_hash_lock *lock, int exclusive)
+-	__acquires(&lock->spin)
+-{
+-	spin_lock(&lock->spin);
+-}
+-
+-static inline void
+-cfs_hash_spin_unlock(union cfs_hash_lock *lock, int exclusive)
+-	__releases(&lock->spin)
+-{
+-	spin_unlock(&lock->spin);
+-}
+-
+-static inline void
+-cfs_hash_rw_lock(union cfs_hash_lock *lock, int exclusive)
+-	__acquires(&lock->rw)
+-{
+-	if (!exclusive)
+-		read_lock(&lock->rw);
+-	else
+-		write_lock(&lock->rw);
+-}
+-
+-static inline void
+-cfs_hash_rw_unlock(union cfs_hash_lock *lock, int exclusive)
+-	__releases(&lock->rw)
+-{
+-	if (!exclusive)
+-		read_unlock(&lock->rw);
+-	else
+-		write_unlock(&lock->rw);
+-}
+-
+-/** No lock hash */
+-static struct cfs_hash_lock_ops cfs_hash_nl_lops = {
+-	.hs_lock	= cfs_hash_nl_lock,
+-	.hs_unlock	= cfs_hash_nl_unlock,
+-	.hs_bkt_lock	= cfs_hash_nl_lock,
+-	.hs_bkt_unlock	= cfs_hash_nl_unlock,
+-};
+-
+-/** no bucket lock, one spinlock to protect everything */
+-static struct cfs_hash_lock_ops cfs_hash_nbl_lops = {
+-	.hs_lock	= cfs_hash_spin_lock,
+-	.hs_unlock	= cfs_hash_spin_unlock,
+-	.hs_bkt_lock	= cfs_hash_nl_lock,
+-	.hs_bkt_unlock	= cfs_hash_nl_unlock,
+-};
+-
+-/** spin bucket lock, rehash is enabled */
+-static struct cfs_hash_lock_ops cfs_hash_bkt_spin_lops = {
+-	.hs_lock	= cfs_hash_rw_lock,
+-	.hs_unlock	= cfs_hash_rw_unlock,
+-	.hs_bkt_lock	= cfs_hash_spin_lock,
+-	.hs_bkt_unlock	= cfs_hash_spin_unlock,
+-};
+-
+-/** rw bucket lock, rehash is enabled */
+-static struct cfs_hash_lock_ops cfs_hash_bkt_rw_lops = {
+-	.hs_lock	= cfs_hash_rw_lock,
+-	.hs_unlock	= cfs_hash_rw_unlock,
+-	.hs_bkt_lock	= cfs_hash_rw_lock,
+-	.hs_bkt_unlock	= cfs_hash_rw_unlock,
+-};
+-
+-/** spin bucket lock, rehash is disabled */
+-static struct cfs_hash_lock_ops cfs_hash_nr_bkt_spin_lops = {
+-	.hs_lock	= cfs_hash_nl_lock,
+-	.hs_unlock	= cfs_hash_nl_unlock,
+-	.hs_bkt_lock	= cfs_hash_spin_lock,
+-	.hs_bkt_unlock	= cfs_hash_spin_unlock,
+-};
+-
+-/** rw bucket lock, rehash is disabled */
+-static struct cfs_hash_lock_ops cfs_hash_nr_bkt_rw_lops = {
+-	.hs_lock	= cfs_hash_nl_lock,
+-	.hs_unlock	= cfs_hash_nl_unlock,
+-	.hs_bkt_lock	= cfs_hash_rw_lock,
+-	.hs_bkt_unlock	= cfs_hash_rw_unlock,
+-};
+-
+-static void
+-cfs_hash_lock_setup(struct cfs_hash *hs)
+-{
+-	if (cfs_hash_with_no_lock(hs)) {
+-		hs->hs_lops = &cfs_hash_nl_lops;
+-
+-	} else if (cfs_hash_with_no_bktlock(hs)) {
+-		hs->hs_lops = &cfs_hash_nbl_lops;
+-		spin_lock_init(&hs->hs_lock.spin);
+-
+-	} else if (cfs_hash_with_rehash(hs)) {
+-		rwlock_init(&hs->hs_lock.rw);
+-
+-		if (cfs_hash_with_rw_bktlock(hs))
+-			hs->hs_lops = &cfs_hash_bkt_rw_lops;
+-		else if (cfs_hash_with_spin_bktlock(hs))
+-			hs->hs_lops = &cfs_hash_bkt_spin_lops;
+-		else
+-			LBUG();
+-	} else {
+-		if (cfs_hash_with_rw_bktlock(hs))
+-			hs->hs_lops = &cfs_hash_nr_bkt_rw_lops;
+-		else if (cfs_hash_with_spin_bktlock(hs))
+-			hs->hs_lops = &cfs_hash_nr_bkt_spin_lops;
+-		else
+-			LBUG();
+-	}
+-}
+-
+-/**
+- * Simple hash head without depth tracking
+- * new element is always added to head of hlist
+- */
+-struct cfs_hash_head {
+-	struct hlist_head	hh_head;	/**< entries list */
+-};
+-
+-static int
+-cfs_hash_hh_hhead_size(struct cfs_hash *hs)
+-{
+-	return sizeof(struct cfs_hash_head);
+-}
+-
+-static struct hlist_head *
+-cfs_hash_hh_hhead(struct cfs_hash *hs, struct cfs_hash_bd *bd)
+-{
+-	struct cfs_hash_head *head;
+-
+-	head = (struct cfs_hash_head *)&bd->bd_bucket->hsb_head[0];
+-	return &head[bd->bd_offset].hh_head;
+-}
+-
+-static int
+-cfs_hash_hh_hnode_add(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		      struct hlist_node *hnode)
+-{
+-	hlist_add_head(hnode, cfs_hash_hh_hhead(hs, bd));
+-	return -1; /* unknown depth */
+-}
+-
+-static int
+-cfs_hash_hh_hnode_del(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		      struct hlist_node *hnode)
+-{
+-	hlist_del_init(hnode);
+-	return -1; /* unknown depth */
+-}
+-
+-/**
+- * Simple hash head with depth tracking
+- * new element is always added to head of hlist
+- */
+-struct cfs_hash_head_dep {
+-	struct hlist_head	hd_head;	/**< entries list */
+-	unsigned int		hd_depth;	/**< list length */
+-};
+-
+-static int
+-cfs_hash_hd_hhead_size(struct cfs_hash *hs)
+-{
+-	return sizeof(struct cfs_hash_head_dep);
+-}
+-
+-static struct hlist_head *
+-cfs_hash_hd_hhead(struct cfs_hash *hs, struct cfs_hash_bd *bd)
+-{
+-	struct cfs_hash_head_dep *head;
+-
+-	head = (struct cfs_hash_head_dep *)&bd->bd_bucket->hsb_head[0];
+-	return &head[bd->bd_offset].hd_head;
+-}
+-
+-static int
+-cfs_hash_hd_hnode_add(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		      struct hlist_node *hnode)
+-{
+-	struct cfs_hash_head_dep *hh;
+-
+-	hh = container_of(cfs_hash_hd_hhead(hs, bd),
+-			  struct cfs_hash_head_dep, hd_head);
+-	hlist_add_head(hnode, &hh->hd_head);
+-	return ++hh->hd_depth;
+-}
+-
+-static int
+-cfs_hash_hd_hnode_del(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		      struct hlist_node *hnode)
+-{
+-	struct cfs_hash_head_dep *hh;
+-
+-	hh = container_of(cfs_hash_hd_hhead(hs, bd),
+-			  struct cfs_hash_head_dep, hd_head);
+-	hlist_del_init(hnode);
+-	return --hh->hd_depth;
+-}
+-
+-/**
+- * double links hash head without depth tracking
+- * new element is always added to tail of hlist
+- */
+-struct cfs_hash_dhead {
+-	struct hlist_head	dh_head;	/**< entries list */
+-	struct hlist_node	*dh_tail;	/**< the last entry */
+-};
+-
+-static int
+-cfs_hash_dh_hhead_size(struct cfs_hash *hs)
+-{
+-	return sizeof(struct cfs_hash_dhead);
+-}
+-
+-static struct hlist_head *
+-cfs_hash_dh_hhead(struct cfs_hash *hs, struct cfs_hash_bd *bd)
+-{
+-	struct cfs_hash_dhead *head;
+-
+-	head = (struct cfs_hash_dhead *)&bd->bd_bucket->hsb_head[0];
+-	return &head[bd->bd_offset].dh_head;
+-}
+-
+-static int
+-cfs_hash_dh_hnode_add(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		      struct hlist_node *hnode)
+-{
+-	struct cfs_hash_dhead *dh;
+-
+-	dh = container_of(cfs_hash_dh_hhead(hs, bd),
+-			  struct cfs_hash_dhead, dh_head);
+-	if (dh->dh_tail) /* not empty */
+-		hlist_add_behind(hnode, dh->dh_tail);
+-	else /* empty list */
+-		hlist_add_head(hnode, &dh->dh_head);
+-	dh->dh_tail = hnode;
+-	return -1; /* unknown depth */
+-}
+-
+-static int
+-cfs_hash_dh_hnode_del(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		      struct hlist_node *hnd)
+-{
+-	struct cfs_hash_dhead *dh;
+-
+-	dh = container_of(cfs_hash_dh_hhead(hs, bd),
+-			  struct cfs_hash_dhead, dh_head);
+-	if (!hnd->next) { /* it's the tail */
+-		dh->dh_tail = (hnd->pprev == &dh->dh_head.first) ? NULL :
+-			      container_of(hnd->pprev, struct hlist_node, next);
+-	}
+-	hlist_del_init(hnd);
+-	return -1; /* unknown depth */
+-}
+-
+-/**
+- * double links hash head with depth tracking
+- * new element is always added to tail of hlist
+- */
+-struct cfs_hash_dhead_dep {
+-	struct hlist_head	dd_head;	/**< entries list */
+-	struct hlist_node	*dd_tail;	/**< the last entry */
+-	unsigned int		dd_depth;	/**< list length */
+-};
+-
+-static int
+-cfs_hash_dd_hhead_size(struct cfs_hash *hs)
+-{
+-	return sizeof(struct cfs_hash_dhead_dep);
+-}
+-
+-static struct hlist_head *
+-cfs_hash_dd_hhead(struct cfs_hash *hs, struct cfs_hash_bd *bd)
+-{
+-	struct cfs_hash_dhead_dep *head;
+-
+-	head = (struct cfs_hash_dhead_dep *)&bd->bd_bucket->hsb_head[0];
+-	return &head[bd->bd_offset].dd_head;
+-}
+-
+-static int
+-cfs_hash_dd_hnode_add(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		      struct hlist_node *hnode)
+-{
+-	struct cfs_hash_dhead_dep *dh;
+-
+-	dh = container_of(cfs_hash_dd_hhead(hs, bd),
+-			  struct cfs_hash_dhead_dep, dd_head);
+-	if (dh->dd_tail) /* not empty */
+-		hlist_add_behind(hnode, dh->dd_tail);
+-	else /* empty list */
+-		hlist_add_head(hnode, &dh->dd_head);
+-	dh->dd_tail = hnode;
+-	return ++dh->dd_depth;
+-}
+-
+-static int
+-cfs_hash_dd_hnode_del(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		      struct hlist_node *hnd)
+-{
+-	struct cfs_hash_dhead_dep *dh;
+-
+-	dh = container_of(cfs_hash_dd_hhead(hs, bd),
+-			  struct cfs_hash_dhead_dep, dd_head);
+-	if (!hnd->next) { /* it's the tail */
+-		dh->dd_tail = (hnd->pprev == &dh->dd_head.first) ? NULL :
+-			      container_of(hnd->pprev, struct hlist_node, next);
+-	}
+-	hlist_del_init(hnd);
+-	return --dh->dd_depth;
+-}
+-
+-static struct cfs_hash_hlist_ops cfs_hash_hh_hops = {
+-	.hop_hhead	= cfs_hash_hh_hhead,
+-	.hop_hhead_size	= cfs_hash_hh_hhead_size,
+-	.hop_hnode_add	= cfs_hash_hh_hnode_add,
+-	.hop_hnode_del	= cfs_hash_hh_hnode_del,
+-};
+-
+-static struct cfs_hash_hlist_ops cfs_hash_hd_hops = {
+-	.hop_hhead	= cfs_hash_hd_hhead,
+-	.hop_hhead_size	= cfs_hash_hd_hhead_size,
+-	.hop_hnode_add	= cfs_hash_hd_hnode_add,
+-	.hop_hnode_del	= cfs_hash_hd_hnode_del,
+-};
+-
+-static struct cfs_hash_hlist_ops cfs_hash_dh_hops = {
+-	.hop_hhead	= cfs_hash_dh_hhead,
+-	.hop_hhead_size	= cfs_hash_dh_hhead_size,
+-	.hop_hnode_add	= cfs_hash_dh_hnode_add,
+-	.hop_hnode_del	= cfs_hash_dh_hnode_del,
+-};
+-
+-static struct cfs_hash_hlist_ops cfs_hash_dd_hops = {
+-	.hop_hhead	= cfs_hash_dd_hhead,
+-	.hop_hhead_size	= cfs_hash_dd_hhead_size,
+-	.hop_hnode_add	= cfs_hash_dd_hnode_add,
+-	.hop_hnode_del	= cfs_hash_dd_hnode_del,
+-};
+-
+-static void
+-cfs_hash_hlist_setup(struct cfs_hash *hs)
+-{
+-	if (cfs_hash_with_add_tail(hs)) {
+-		hs->hs_hops = cfs_hash_with_depth(hs) ?
+-			      &cfs_hash_dd_hops : &cfs_hash_dh_hops;
+-	} else {
+-		hs->hs_hops = cfs_hash_with_depth(hs) ?
+-			      &cfs_hash_hd_hops : &cfs_hash_hh_hops;
+-	}
+-}
+-
+-static void
+-cfs_hash_bd_from_key(struct cfs_hash *hs, struct cfs_hash_bucket **bkts,
+-		     unsigned int bits, const void *key, struct cfs_hash_bd *bd)
+-{
+-	unsigned int index = cfs_hash_id(hs, key, (1U << bits) - 1);
+-
+-	LASSERT(bits == hs->hs_cur_bits || bits == hs->hs_rehash_bits);
+-
+-	bd->bd_bucket = bkts[index & ((1U << (bits - hs->hs_bkt_bits)) - 1)];
+-	bd->bd_offset = index >> (bits - hs->hs_bkt_bits);
+-}
+-
+-void
+-cfs_hash_bd_get(struct cfs_hash *hs, const void *key, struct cfs_hash_bd *bd)
+-{
+-	/* NB: caller should hold hs->hs_rwlock if REHASH is set */
+-	if (likely(!hs->hs_rehash_buckets)) {
+-		cfs_hash_bd_from_key(hs, hs->hs_buckets,
+-				     hs->hs_cur_bits, key, bd);
+-	} else {
+-		LASSERT(hs->hs_rehash_bits);
+-		cfs_hash_bd_from_key(hs, hs->hs_rehash_buckets,
+-				     hs->hs_rehash_bits, key, bd);
+-	}
+-}
+-EXPORT_SYMBOL(cfs_hash_bd_get);
+-
+-static inline void
+-cfs_hash_bd_dep_record(struct cfs_hash *hs, struct cfs_hash_bd *bd, int dep_cur)
+-{
+-	if (likely(dep_cur <= bd->bd_bucket->hsb_depmax))
+-		return;
+-
+-	bd->bd_bucket->hsb_depmax = dep_cur;
+-# if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
+-	if (likely(!warn_on_depth ||
+-		   max(warn_on_depth, hs->hs_dep_max) >= dep_cur))
+-		return;
+-
+-	spin_lock(&hs->hs_dep_lock);
+-	hs->hs_dep_max = dep_cur;
+-	hs->hs_dep_bkt = bd->bd_bucket->hsb_index;
+-	hs->hs_dep_off = bd->bd_offset;
+-	hs->hs_dep_bits = hs->hs_cur_bits;
+-	spin_unlock(&hs->hs_dep_lock);
+-
+-	queue_work(cfs_rehash_wq, &hs->hs_dep_work);
+-# endif
+-}
+-
+-void
+-cfs_hash_bd_add_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		       struct hlist_node *hnode)
+-{
+-	int rc;
+-
+-	rc = hs->hs_hops->hop_hnode_add(hs, bd, hnode);
+-	cfs_hash_bd_dep_record(hs, bd, rc);
+-	bd->bd_bucket->hsb_version++;
+-	if (unlikely(!bd->bd_bucket->hsb_version))
+-		bd->bd_bucket->hsb_version++;
+-	bd->bd_bucket->hsb_count++;
+-
+-	if (cfs_hash_with_counter(hs))
+-		atomic_inc(&hs->hs_count);
+-	if (!cfs_hash_with_no_itemref(hs))
+-		cfs_hash_get(hs, hnode);
+-}
+-EXPORT_SYMBOL(cfs_hash_bd_add_locked);
+-
+-void
+-cfs_hash_bd_del_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-		       struct hlist_node *hnode)
+-{
+-	hs->hs_hops->hop_hnode_del(hs, bd, hnode);
+-
+-	LASSERT(bd->bd_bucket->hsb_count > 0);
+-	bd->bd_bucket->hsb_count--;
+-	bd->bd_bucket->hsb_version++;
+-	if (unlikely(!bd->bd_bucket->hsb_version))
+-		bd->bd_bucket->hsb_version++;
+-
+-	if (cfs_hash_with_counter(hs)) {
+-		LASSERT(atomic_read(&hs->hs_count) > 0);
+-		atomic_dec(&hs->hs_count);
+-	}
+-	if (!cfs_hash_with_no_itemref(hs))
+-		cfs_hash_put_locked(hs, hnode);
+-}
+-EXPORT_SYMBOL(cfs_hash_bd_del_locked);
+-
+-void
+-cfs_hash_bd_move_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd_old,
+-			struct cfs_hash_bd *bd_new, struct hlist_node *hnode)
+-{
+-	struct cfs_hash_bucket *obkt = bd_old->bd_bucket;
+-	struct cfs_hash_bucket *nbkt = bd_new->bd_bucket;
+-	int rc;
+-
+-	if (!cfs_hash_bd_compare(bd_old, bd_new))
+-		return;
+-
+-	/* use cfs_hash_bd_hnode_add/del, to avoid atomic & refcount ops
+-	 * in cfs_hash_bd_del/add_locked
+-	 */
+-	hs->hs_hops->hop_hnode_del(hs, bd_old, hnode);
+-	rc = hs->hs_hops->hop_hnode_add(hs, bd_new, hnode);
+-	cfs_hash_bd_dep_record(hs, bd_new, rc);
+-
+-	LASSERT(obkt->hsb_count > 0);
+-	obkt->hsb_count--;
+-	obkt->hsb_version++;
+-	if (unlikely(!obkt->hsb_version))
+-		obkt->hsb_version++;
+-	nbkt->hsb_count++;
+-	nbkt->hsb_version++;
+-	if (unlikely(!nbkt->hsb_version))
+-		nbkt->hsb_version++;
+-}
+-
+-enum {
+-	/** always set, for sanity (avoid ZERO intent) */
+-	CFS_HS_LOOKUP_MASK_FIND	= BIT(0),
+-	/** return entry with a ref */
+-	CFS_HS_LOOKUP_MASK_REF	= BIT(1),
+-	/** add entry if not existing */
+-	CFS_HS_LOOKUP_MASK_ADD	= BIT(2),
+-	/** delete entry, ignore other masks */
+-	CFS_HS_LOOKUP_MASK_DEL	= BIT(3),
+-};
+-
+-enum cfs_hash_lookup_intent {
+-	/** return item w/o refcount */
+-	CFS_HS_LOOKUP_IT_PEEK	 = CFS_HS_LOOKUP_MASK_FIND,
+-	/** return item with refcount */
+-	CFS_HS_LOOKUP_IT_FIND	 = (CFS_HS_LOOKUP_MASK_FIND |
+-				    CFS_HS_LOOKUP_MASK_REF),
+-	/** return item w/o refcount if existed, otherwise add */
+-	CFS_HS_LOOKUP_IT_ADD	 = (CFS_HS_LOOKUP_MASK_FIND |
+-				    CFS_HS_LOOKUP_MASK_ADD),
+-	/** return item with refcount if existed, otherwise add */
+-	CFS_HS_LOOKUP_IT_FINDADD = (CFS_HS_LOOKUP_IT_FIND |
+-				    CFS_HS_LOOKUP_MASK_ADD),
+-	/** delete if existed */
+-	CFS_HS_LOOKUP_IT_FINDDEL = (CFS_HS_LOOKUP_MASK_FIND |
+-				    CFS_HS_LOOKUP_MASK_DEL)
+-};
+-
+-static struct hlist_node *
+-cfs_hash_bd_lookup_intent(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			  const void *key, struct hlist_node *hnode,
+-			  enum cfs_hash_lookup_intent intent)
+-
+-{
+-	struct hlist_head *hhead = cfs_hash_bd_hhead(hs, bd);
+-	struct hlist_node *ehnode;
+-	struct hlist_node *match;
+-	int intent_add = intent & CFS_HS_LOOKUP_MASK_ADD;
+-
+-	/* with this function, we can avoid a lot of useless refcount ops,
+-	 * which are expensive atomic operations most time.
+-	 */
+-	match = intent_add ? NULL : hnode;
+-	hlist_for_each(ehnode, hhead) {
+-		if (!cfs_hash_keycmp(hs, key, ehnode))
+-			continue;
+-
+-		if (match && match != ehnode) /* can't match */
+-			continue;
+-
+-		/* match and ... */
+-		if (intent & CFS_HS_LOOKUP_MASK_DEL) {
+-			cfs_hash_bd_del_locked(hs, bd, ehnode);
+-			return ehnode;
 -		}
--		lu_object_put(env, lu_object_top(id->vpi_obj));
+-
+-		/* caller wants refcount? */
+-		if (intent & CFS_HS_LOOKUP_MASK_REF)
+-			cfs_hash_get(hs, ehnode);
+-		return ehnode;
+-	}
+-	/* no match item */
+-	if (!intent_add)
+-		return NULL;
+-
+-	LASSERT(hnode);
+-	cfs_hash_bd_add_locked(hs, bd, hnode);
+-	return hnode;
+-}
+-
+-struct hlist_node *
+-cfs_hash_bd_lookup_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			  const void *key)
+-{
+-	return cfs_hash_bd_lookup_intent(hs, bd, key, NULL,
+-					 CFS_HS_LOOKUP_IT_FIND);
+-}
+-EXPORT_SYMBOL(cfs_hash_bd_lookup_locked);
+-
+-struct hlist_node *
+-cfs_hash_bd_peek_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			const void *key)
+-{
+-	return cfs_hash_bd_lookup_intent(hs, bd, key, NULL,
+-					 CFS_HS_LOOKUP_IT_PEEK);
+-}
+-EXPORT_SYMBOL(cfs_hash_bd_peek_locked);
+-
+-static void
+-cfs_hash_multi_bd_lock(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-		       unsigned int n, int excl)
+-{
+-	struct cfs_hash_bucket *prev = NULL;
+-	int i;
+-
+-	/**
+-	 * bds must be ascendantly ordered by bd->bd_bucket->hsb_index.
+-	 * NB: it's possible that several bds point to the same bucket but
+-	 * have different bd::bd_offset, so need take care of deadlock.
+-	 */
+-	cfs_hash_for_each_bd(bds, n, i) {
+-		if (prev == bds[i].bd_bucket)
+-			continue;
+-
+-		LASSERT(!prev || prev->hsb_index < bds[i].bd_bucket->hsb_index);
+-		cfs_hash_bd_lock(hs, &bds[i], excl);
+-		prev = bds[i].bd_bucket;
+-	}
+-}
+-
+-static void
+-cfs_hash_multi_bd_unlock(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-			 unsigned int n, int excl)
+-{
+-	struct cfs_hash_bucket *prev = NULL;
+-	int i;
+-
+-	cfs_hash_for_each_bd(bds, n, i) {
+-		if (prev != bds[i].bd_bucket) {
+-			cfs_hash_bd_unlock(hs, &bds[i], excl);
+-			prev = bds[i].bd_bucket;
+-		}
+-	}
+-}
+-
+-static struct hlist_node *
+-cfs_hash_multi_bd_lookup_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-				unsigned int n, const void *key)
+-{
+-	struct hlist_node *ehnode;
+-	unsigned int i;
+-
+-	cfs_hash_for_each_bd(bds, n, i) {
+-		ehnode = cfs_hash_bd_lookup_intent(hs, &bds[i], key, NULL,
+-						   CFS_HS_LOOKUP_IT_FIND);
+-		if (ehnode)
+-			return ehnode;
 -	}
 -	return NULL;
 -}
 -
- static struct page *vvp_pgcache_current(struct seq_private *priv)
- {
- 	struct lu_device *dev = &priv->sbi->ll_cl->cd_lu_dev;
- 
-+	rhashtable_walk_start(&priv->iter);
- 	while(1) {
- 		struct inode *inode;
- 		int nr;
- 		struct page *vmpage;
- 
- 		if (!priv->clob) {
--			struct cl_object *clob;
+-static struct hlist_node *
+-cfs_hash_multi_bd_findadd_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-				 unsigned int n, const void *key,
+-				 struct hlist_node *hnode, int noref)
+-{
+-	struct hlist_node *ehnode;
+-	int intent;
+-	unsigned int i;
 -
--			while ((clob = vvp_pgcache_obj(priv->env, dev, &priv->id)) == NULL &&
--			       ++(priv->id.vpi_bucket) < CFS_HASH_NHLIST(dev->ld_site->ls_obj_hash))
--				priv->id.vpi_depth = 0;
--			if (!clob)
-+			struct lu_object_header *h;
-+			struct lu_object *lu_obj;
-+
-+			while ((h = rhashtable_walk_next(&priv->iter)) != NULL &&
-+			       (lu_obj = lu_object_get_first(h, dev)) == NULL)
-+				;
-+			if (!h) {
-+				rhashtable_walk_stop(&priv->iter);
- 				return NULL;
--			priv->clob = clob;
--			priv->id.vpi_index = 0;
-+			}
-+			priv->clob = lu2cl(lu_obj);
-+			lu_object_ref_add(lu_obj, "dump", current);
-+			priv->page_index = 0;
- 		}
- 
- 		inode = vvp_object_inode(priv->clob);
--		nr = find_get_pages_contig(inode->i_mapping, priv->id.vpi_index, 1, &vmpage);
-+		nr = find_get_pages_contig(inode->i_mapping, priv->page_index, 1, &vmpage);
- 		if (nr > 0) {
--			priv->id.vpi_index = vmpage->index;
-+			priv->page_index = vmpage->index;
-+			rhashtable_walk_stop(&priv->iter);
- 			return vmpage;
- 		}
- 		lu_object_ref_del(&priv->clob->co_lu, "dump", current);
- 		cl_object_put(priv->env, priv->clob);
- 		priv->clob = NULL;
--		priv->id.vpi_index = 0;
--		priv->id.vpi_depth++;
-+		priv->page_index = 0;
- 	}
- }
- 
-@@ -524,7 +480,9 @@ static int vvp_pgcache_show(struct seq_file *f, void *v)
- static void vvp_pgcache_rewind(struct seq_private *priv)
- {
- 	if (priv->prev_pos) {
--		memset(&priv->id, 0, sizeof(priv->id));
-+		struct lu_site *s = priv->sbi->ll_cl->cd_lu_dev.ld_site;
-+		rhashtable_walk_exit(&priv->iter);
-+		rhashtable_walk_enter(&s->ls_obj_hash, &priv->iter);
- 		priv->prev_pos = 0;
- 		if (priv->clob) {
- 			lu_object_ref_del(&priv->clob->co_lu, "dump", current);
-@@ -536,7 +494,7 @@ static void vvp_pgcache_rewind(struct seq_private *priv)
- 
- static struct page *vvp_pgcache_next_page(struct seq_private *priv)
- {
--	priv->id.vpi_index += 1;
-+	priv->page_index += 1;
- 	return vvp_pgcache_current(priv);
- }
- 
-@@ -550,7 +508,7 @@ static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
- 		/* Return the current item */;
- 	else {
- 		WARN_ON(*pos != priv->prev_pos + 1);
--		priv->id.vpi_index += 1;
-+		priv->page_index += 1;
- 	}
- 
- 	priv->prev_pos = *pos;
-@@ -582,6 +540,7 @@ static const struct seq_operations vvp_pgcache_ops = {
- static int vvp_dump_pgcache_seq_open(struct inode *inode, struct file *filp)
- {
- 	struct seq_private *priv;
-+	struct lu_site *s;
- 
- 	priv = __seq_open_private(filp, &vvp_pgcache_ops, sizeof(*priv));
- 	if (!priv)
-@@ -590,13 +549,16 @@ static int vvp_dump_pgcache_seq_open(struct inode *inode, struct file *filp)
- 	priv->sbi = inode->i_private;
- 	priv->env = cl_env_get(&priv->refcheck);
- 	priv->clob = NULL;
--	memset(&priv->id, 0, sizeof(priv->id));
- 
- 	if (IS_ERR(priv->env)) {
- 		int err = PTR_ERR(priv->env);
- 		seq_release_private(inode, filp);
- 		return err;
- 	}
-+
-+	s = priv->sbi->ll_cl->cd_lu_dev.ld_site;
-+	rhashtable_walk_enter(&s->ls_obj_hash, &priv->iter);
-+
- 	return 0;
- }
- 
-@@ -609,8 +571,8 @@ static int vvp_dump_pgcache_seq_release(struct inode *inode, struct file *file)
- 		lu_object_ref_del(&priv->clob->co_lu, "dump", current);
- 		cl_object_put(priv->env, priv->clob);
- 	}
+-	LASSERT(hnode);
+-	intent = (!noref * CFS_HS_LOOKUP_MASK_REF) | CFS_HS_LOOKUP_IT_PEEK;
 -
- 	cl_env_put(priv->env, &priv->refcheck);
-+	rhashtable_walk_exit(&priv->iter);
- 	return seq_release_private(inode, file);
- }
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index 18019f41c7a8..6ec5b83b3570 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -45,8 +45,6 @@
- 
- #include <linux/module.h>
- 
--/* hash_long() */
--#include <linux/libcfs/libcfs_hash.h>
- #include <obd_class.h>
- #include <obd_support.h>
- #include <lustre_disk.h>
-@@ -88,9 +86,6 @@ enum {
- #define LU_CACHE_NR_LDISKFS_LIMIT	LU_CACHE_NR_UNLIMITED
- #define LU_CACHE_NR_ZFS_LIMIT		256
- 
--#define LU_SITE_BITS_MIN	12
--#define LU_SITE_BITS_MAX	24
--#define LU_SITE_BITS_MAX_CL	19
- /**
-  * max 256 buckets, we don't want too many buckets because:
-  * - consume too much memory (currently max 16K)
-@@ -126,6 +121,13 @@ lu_site_wq_from_fid(struct lu_site *site, struct lu_fid *fid)
- 	return &bkt->lsb_marche_funebre;
- }
- 
-+static const struct rhashtable_params obj_hash_params = {
-+	.key_len	= sizeof(struct lu_fid),
-+	.key_offset	= offsetof(struct lu_object_header, loh_fid),
-+	.head_offset	= offsetof(struct lu_object_header, loh_hash),
-+	.automatic_shrinking = true,
-+};
-+
- /**
-  * Decrease reference counter on object. If last reference is freed, return
-  * object to the cache, unless lu_object_is_dying(o) holds. In the latter
-@@ -137,7 +139,6 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
- 	struct lu_object_header *top;
- 	struct lu_site	  *site;
- 	struct lu_object	*orig;
--	struct cfs_hash_bd	    bd;
- 	const struct lu_fid     *fid;
- 
- 	top  = o->lo_header;
-@@ -151,7 +152,6 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
- 	 */
- 	fid = lu_object_fid(o);
- 	if (fid_is_zero(fid)) {
--		LASSERT(!top->loh_hash.next && !top->loh_hash.pprev);
- 		LASSERT(list_empty(&top->loh_lru));
- 		if (!atomic_dec_and_test(&top->loh_ref))
- 			return;
-@@ -163,9 +163,8 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
- 		return;
- 	}
- 
--	cfs_hash_bd_get(site->ls_obj_hash, &top->loh_fid, &bd);
+-	cfs_hash_for_each_bd(bds, n, i) {
+-		ehnode = cfs_hash_bd_lookup_intent(hs, &bds[i], key,
+-						   NULL, intent);
+-		if (ehnode)
+-			return ehnode;
+-	}
 -
--	if (!cfs_hash_bd_dec_and_lock(site->ls_obj_hash, &bd, &top->loh_ref)) {
-+	if (atomic_add_unless(&top->loh_ref, -1, 1)) {
-+	still_active:
- 		if (lu_object_is_dying(top)) {
- 			/*
- 			 * somebody may be waiting for this, currently only
-@@ -177,6 +176,16 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
- 		return;
- 	}
- 
-+	bkt = &site->ls_bkts[lu_bkt_hash(site, &top->loh_fid)];
-+	spin_lock(&bkt->lsb_marche_funebre.lock);
-+	if (!atomic_dec_and_test(&top->loh_ref)) {
-+		spin_unlock(&bkt->lsb_marche_funebre.lock);
-+		goto still_active;
-+	}
-+	/* refcount is zero, and cannot be incremented without taking the
-+	 * bkt lock, so object is stable.
-+	 */
-+
- 	/*
- 	 * When last reference is released, iterate over object
- 	 * layers, and notify them that object is no longer busy.
-@@ -186,17 +195,13 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
- 			o->lo_ops->loo_object_release(env, o);
- 	}
- 
--	bkt = &site->ls_bkts[lu_bkt_hash(site, &top->loh_fid)];
--	spin_lock(&bkt->lsb_marche_funebre.lock);
+-	if (i == 1) { /* only one bucket */
+-		cfs_hash_bd_add_locked(hs, &bds[0], hnode);
+-	} else {
+-		struct cfs_hash_bd mybd;
 -
- 	if (!lu_object_is_dying(top)) {
- 		LASSERT(list_empty(&top->loh_lru));
- 		list_add_tail(&top->loh_lru, &bkt->lsb_lru);
- 		spin_unlock(&bkt->lsb_marche_funebre.lock);
- 		percpu_counter_inc(&site->ls_lru_len_counter);
--		CDEBUG(D_INODE, "Add %p to site lru. hash: %p, bkt: %p\n",
--		       o, site->ls_obj_hash, bkt);
--		cfs_hash_bd_unlock(site->ls_obj_hash, &bd, 1);
-+		CDEBUG(D_INODE, "Add %p to site lru. bkt: %p\n",
-+		       o, bkt);
- 		return;
- 	}
- 
-@@ -204,16 +209,15 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
- 	 * If object is dying (will not be cached), then removed it
- 	 * from hash table (it is already not on the LRU).
- 	 *
--	 * This is done with hash table list locked. As the only
-+	 * This is done with bucket lock held. As the only
- 	 * way to acquire first reference to previously unreferenced
- 	 * object is through hash-table lookup (lu_object_find())
--	 * which is done under hash-table, no race with concurrent
-+	 * which takes the lock for first reference, no race with concurrent
- 	 * object lookup is possible and we can safely destroy object below.
- 	 */
- 	if (!test_and_set_bit(LU_OBJECT_UNHASHED, &top->loh_flags))
--		cfs_hash_bd_del_locked(site->ls_obj_hash, &bd, &top->loh_hash);
-+		rhashtable_remove_fast(&site->ls_obj_hash, &top->loh_hash, obj_hash_params);
- 	spin_unlock(&bkt->lsb_marche_funebre.lock);
--	cfs_hash_bd_unlock(site->ls_obj_hash, &bd, 1);
- 	/*
- 	 * Object was already removed from hash above, can kill it.
- 	 */
-@@ -233,21 +237,19 @@ void lu_object_unhash(const struct lu_env *env, struct lu_object *o)
- 	set_bit(LU_OBJECT_HEARD_BANSHEE, &top->loh_flags);
- 	if (!test_and_set_bit(LU_OBJECT_UNHASHED, &top->loh_flags)) {
- 		struct lu_site *site = o->lo_dev->ld_site;
--		struct cfs_hash *obj_hash = site->ls_obj_hash;
--		struct cfs_hash_bd bd;
-+		struct rhashtable *obj_hash = &site->ls_obj_hash;
-+		struct lu_site_bkt_data *bkt;
- 
--		cfs_hash_bd_get_and_lock(obj_hash, &top->loh_fid, &bd, 1);
--		if (!list_empty(&top->loh_lru)) {
--			struct lu_site_bkt_data *bkt;
-+		bkt = &site->ls_bkts[lu_bkt_hash(site,&top->loh_fid)];
-+		spin_lock(&bkt->lsb_marche_funebre.lock);
- 
--			bkt = &site->ls_bkts[lu_bkt_hash(site,&top->loh_fid)];
--			spin_lock(&bkt->lsb_marche_funebre.lock);
-+		if (!list_empty(&top->loh_lru)) {
- 			list_del_init(&top->loh_lru);
--			spin_unlock(&bkt->lsb_marche_funebre.lock);
- 			percpu_counter_dec(&site->ls_lru_len_counter);
- 		}
--		cfs_hash_bd_del_locked(obj_hash, &bd, &top->loh_hash);
--		cfs_hash_bd_unlock(obj_hash, &bd, 1);
-+		spin_unlock(&bkt->lsb_marche_funebre.lock);
-+
-+		rhashtable_remove_fast(obj_hash, &top->loh_hash, obj_hash_params);
- 	}
- }
- EXPORT_SYMBOL(lu_object_unhash);
-@@ -419,11 +421,8 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
- 
- 			LINVRNT(lu_bkt_hash(s, &h->loh_fid) == i);
- 
--			/* Cannot remove from hash under current spinlock,
--			 * so set flag to stop object from being found
--			 * by htable_lookup().
--			 */
--			set_bit(LU_OBJECT_HEARD_BANSHEE, &h->loh_flags);
-+			rhashtable_remove_fast(&s->ls_obj_hash, &h->loh_hash,
-+					       obj_hash_params);
- 			list_move(&h->loh_lru, &dispose);
- 			percpu_counter_dec(&s->ls_lru_len_counter);
- 			if (did_sth == 0)
-@@ -445,7 +444,6 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
- 						     struct lu_object_header,
- 						     loh_lru)) != NULL) {
- 			list_del_init(&h->loh_lru);
--			cfs_hash_del(s->ls_obj_hash, &h->loh_fid, &h->loh_hash);
- 			lu_object_free(env, lu_object_top(h));
- 			lprocfs_counter_incr(s->ls_stats, LU_SS_LRU_PURGED);
- 		}
-@@ -555,9 +553,9 @@ void lu_object_header_print(const struct lu_env *env, void *cookie,
- 	(*printer)(env, cookie, "header@%p[%#lx, %d, " DFID "%s%s%s]",
- 		   hdr, hdr->loh_flags, atomic_read(&hdr->loh_ref),
- 		   PFID(&hdr->loh_fid),
--		   hlist_unhashed(&hdr->loh_hash) ? "" : " hash",
--		   list_empty((struct list_head *)&hdr->loh_lru) ? \
--		   "" : " lru",
-+		   test_bit(LU_OBJECT_UNHASHED,
-+			    &hdr->loh_flags) ? "" : " hash",
-+		   list_empty(&hdr->loh_lru) ? "" : " lru",
- 		   hdr->loh_attr & LOHA_EXISTS ? " exist":"");
- }
- EXPORT_SYMBOL(lu_object_header_print);
-@@ -594,39 +592,37 @@ void lu_object_print(const struct lu_env *env, void *cookie,
- EXPORT_SYMBOL(lu_object_print);
- 
- static struct lu_object *htable_lookup(struct lu_site *s,
--				       struct cfs_hash_bd *bd,
-+				       struct lu_site_bkt_data *bkt,
- 				       const struct lu_fid *f,
--				       __u64 *version)
-+				       struct lu_object_header *new)
- {
--	struct cfs_hash		*hs = s->ls_obj_hash;
--	struct lu_site_bkt_data *bkt;
- 	struct lu_object_header *h;
--	struct hlist_node	*hnode;
--	__u64 ver;
- 	wait_queue_entry_t waiter;
- 
- retry:
--	ver = cfs_hash_bd_version_get(bd);
+-		cfs_hash_bd_get(hs, key, &mybd);
+-		cfs_hash_bd_add_locked(hs, &mybd, hnode);
+-	}
 -
--	if (*version == ver) {
-+	rcu_read_lock();
-+	if (new)
-+		h = rhashtable_lookup_get_insert_fast(&s->ls_obj_hash, &new->loh_hash,
-+						      obj_hash_params);
-+	else
-+		h = rhashtable_lookup(&s->ls_obj_hash, f, obj_hash_params);
-+	if (!h) {
-+		/* Not found */
-+		if (!new)
-+			lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_MISS);
-+		rcu_read_unlock();
- 		return ERR_PTR(-ENOENT);
- 	}
--
--	*version = ver;
--	/* cfs_hash_bd_peek_locked is a somehow "internal" function
--	 * of cfs_hash, it doesn't add refcount on object.
--	 */
--	hnode = cfs_hash_bd_peek_locked(s->ls_obj_hash, bd, (void *)f);
--	if (!hnode) {
--		lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_MISS);
--		return ERR_PTR(-ENOENT);
-+	if (atomic_inc_not_zero(&h->loh_ref)) {
-+		rcu_read_unlock();
-+		return lu_object_top(h);
- 	}
- 
--	h = container_of(hnode, struct lu_object_header, loh_hash);
--	bkt = &s->ls_bkts[lu_bkt_hash(s, f)];
- 	spin_lock(&bkt->lsb_marche_funebre.lock);
- 	if (likely(!lu_object_is_dying(h))) {
--		cfs_hash_get(s->ls_obj_hash, hnode);
-+		rcu_read_unlock();
-+		atomic_inc(&h->loh_ref);
-+
- 		lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_HIT);
- 		if (!list_empty(&h->loh_lru)) {
- 			list_del_init(&h->loh_lru);
-@@ -635,7 +631,7 @@ static struct lu_object *htable_lookup(struct lu_site *s,
- 		spin_unlock(&bkt->lsb_marche_funebre.lock);
- 		return lu_object_top(h);
- 	}
--	spin_unlock(&bkt->lsb_marche_funebre.lock);
-+	rcu_read_unlock();
- 
- 	/*
- 	 * Lookup found an object being destroyed this object cannot be
-@@ -647,10 +643,9 @@ static struct lu_object *htable_lookup(struct lu_site *s,
- 	add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
- 	set_current_state(TASK_UNINTERRUPTIBLE);
- 	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_DEATH_RACE);
--	cfs_hash_bd_unlock(hs, bd, 1);
-+	spin_unlock(&bkt->lsb_marche_funebre.lock);
- 	schedule();
- 	remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
--	cfs_hash_bd_lock(hs, bd, 1);
- 	goto retry;
- }
- 
-@@ -681,7 +676,7 @@ static void lu_object_limit(const struct lu_env *env, struct lu_device *dev)
- 	if (lu_cache_nr == LU_CACHE_NR_UNLIMITED)
- 		return;
- 
--	size = cfs_hash_size_get(dev->ld_site->ls_obj_hash);
-+	size = atomic_read(&dev->ld_site->ls_obj_hash.nelems);
- 	nr = (__u64)lu_cache_nr;
- 	if (size <= nr)
- 		return;
-@@ -691,6 +686,35 @@ static void lu_object_limit(const struct lu_env *env, struct lu_device *dev)
- 			      false);
- }
- 
-+/*
-+ * Get a 'first' reference to an object that was found while looking
-+ * through the hash table.
-+ */
-+struct lu_object *lu_object_get_first(struct lu_object_header *h,
-+				      struct lu_device *dev)
-+{
-+	struct lu_object *ret;
-+	struct lu_site	*s = dev->ld_site;
-+
-+	if (IS_ERR_OR_NULL(h) || lu_object_is_dying(h))
-+		return NULL;
-+
-+	ret = lu_object_locate(h, dev->ld_type);
-+	if (!ret)
-+		return ret;
-+	if (!atomic_inc_not_zero(&h->loh_ref)) {
-+		struct lu_site_bkt_data *bkt = &s->ls_bkts[lu_bkt_hash(s, &h->loh_fid)];
-+
-+		spin_lock(&bkt->lsb_marche_funebre.lock);
-+		if (!lu_object_is_dying(h))
-+			atomic_inc(&h->loh_ref);
-+		else
-+			ret = NULL;
-+		spin_unlock(&bkt->lsb_marche_funebre.lock);
-+	}
-+	return ret;
-+}
-+
- /**
-  * Much like lu_object_find(), but top level device of object is specifically
-  * \a dev rather than top level device of the site. This interface allows
-@@ -704,9 +728,8 @@ struct lu_object *lu_object_find_at(const struct lu_env *env,
- 	struct lu_object      *o;
- 	struct lu_object      *shadow;
- 	struct lu_site	*s;
--	struct cfs_hash	    *hs;
--	struct cfs_hash_bd	  bd;
--	__u64		  version = 0;
-+	struct rhashtable	*hs;
-+	struct lu_site_bkt_data	*bkt;
- 
- 	/*
- 	 * This uses standard index maintenance protocol:
-@@ -727,13 +750,11 @@ struct lu_object *lu_object_find_at(const struct lu_env *env,
- 	 *
- 	 */
- 	s  = dev->ld_site;
--	hs = s->ls_obj_hash;
-+	hs = &s->ls_obj_hash;
-+	bkt = &s->ls_bkts[lu_bkt_hash(s, f)];
- 
--	cfs_hash_bd_get(hs, f, &bd);
- 	if (!(conf && conf->loc_flags & LOC_F_NEW)) {
--		cfs_hash_bd_lock(hs, &bd, 0);
--		o = htable_lookup(s, &bd, f, &version);
--		cfs_hash_bd_unlock(hs, &bd, 0);
-+		o = htable_lookup(s, bkt, f, NULL);
- 
- 		if (!IS_ERR(o) || PTR_ERR(o) != -ENOENT)
- 			return o;
-@@ -748,15 +769,20 @@ struct lu_object *lu_object_find_at(const struct lu_env *env,
- 
- 	LASSERT(lu_fid_eq(lu_object_fid(o), f));
- 
--	cfs_hash_bd_lock(hs, &bd, 1);
-+	if (conf && conf->loc_flags & LOC_F_NEW) {
-+		int status = rhashtable_insert_fast(hs, &o->lo_header->loh_hash,
-+						    obj_hash_params);
-+		if (status == -EEXIST)
-+			/* Already existed! go the slow way */
-+			shadow = htable_lookup(s, bkt, f, o->lo_header);
-+		else if (status)
-+			shadow = ERR_PTR(status);
-+		else
-+			shadow = ERR_PTR(-ENOENT);
-+	} else
-+		shadow = htable_lookup(s, bkt, f, o->lo_header);
- 
--	if (conf && conf->loc_flags & LOC_F_NEW)
--		shadow = ERR_PTR(-ENOENT);
--	else
--		shadow = htable_lookup(s, &bd, f, &version);
- 	if (likely(PTR_ERR(shadow) == -ENOENT)) {
--		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
--		cfs_hash_bd_unlock(hs, &bd, 1);
- 
- 		lu_object_limit(env, dev);
- 
-@@ -764,7 +790,6 @@ struct lu_object *lu_object_find_at(const struct lu_env *env,
- 	}
- 
- 	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_RACE);
--	cfs_hash_bd_unlock(hs, &bd, 1);
- 	lu_object_free(env, o);
- 	return shadow;
- }
-@@ -846,14 +871,9 @@ struct lu_site_print_arg {
- 	lu_printer_t     lsp_printer;
- };
- 
--static int
--lu_site_obj_print(struct cfs_hash *hs, struct cfs_hash_bd *bd,
--		  struct hlist_node *hnode, void *data)
-+static void
-+lu_site_obj_print(struct lu_object_header *h, struct lu_site_print_arg *arg)
- {
--	struct lu_site_print_arg *arg = (struct lu_site_print_arg *)data;
--	struct lu_object_header  *h;
--
--	h = hlist_entry(hnode, struct lu_object_header, loh_hash);
- 	if (!list_empty(&h->loh_layers)) {
- 		const struct lu_object *o;
- 
-@@ -864,7 +884,6 @@ lu_site_obj_print(struct cfs_hash *hs, struct cfs_hash_bd *bd,
- 		lu_object_header_print(arg->lsp_env, arg->lsp_cookie,
- 				       arg->lsp_printer, h);
- 	}
--	return 0;
- }
- 
- /**
-@@ -878,115 +897,20 @@ void lu_site_print(const struct lu_env *env, struct lu_site *s, void *cookie,
- 		.lsp_cookie  = cookie,
- 		.lsp_printer = printer,
- 	};
--
--	cfs_hash_for_each(s->ls_obj_hash, lu_site_obj_print, &arg);
+-	return hnode;
 -}
--EXPORT_SYMBOL(lu_site_print);
+-
+-static struct hlist_node *
+-cfs_hash_multi_bd_finddel_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-				 unsigned int n, const void *key,
+-				 struct hlist_node *hnode)
+-{
+-	struct hlist_node *ehnode;
+-	unsigned int i;
+-
+-	cfs_hash_for_each_bd(bds, n, i) {
+-		ehnode = cfs_hash_bd_lookup_intent(hs, &bds[i], key, hnode,
+-						   CFS_HS_LOOKUP_IT_FINDDEL);
+-		if (ehnode)
+-			return ehnode;
+-	}
+-	return NULL;
+-}
+-
+-static void
+-cfs_hash_bd_order(struct cfs_hash_bd *bd1, struct cfs_hash_bd *bd2)
+-{
+-	int rc;
+-
+-	if (!bd2->bd_bucket)
+-		return;
+-
+-	if (!bd1->bd_bucket) {
+-		*bd1 = *bd2;
+-		bd2->bd_bucket = NULL;
+-		return;
+-	}
+-
+-	rc = cfs_hash_bd_compare(bd1, bd2);
+-	if (!rc)
+-		bd2->bd_bucket = NULL;
+-	else if (rc > 0)
+-		swap(*bd1, *bd2); /* swap bd1 and bd2 */
+-}
+-
+-void
+-cfs_hash_dual_bd_get(struct cfs_hash *hs, const void *key,
+-		     struct cfs_hash_bd *bds)
+-{
+-	/* NB: caller should hold hs_lock.rw if REHASH is set */
+-	cfs_hash_bd_from_key(hs, hs->hs_buckets,
+-			     hs->hs_cur_bits, key, &bds[0]);
+-	if (likely(!hs->hs_rehash_buckets)) {
+-		/* no rehash or not rehashing */
+-		bds[1].bd_bucket = NULL;
+-		return;
+-	}
+-
+-	LASSERT(hs->hs_rehash_bits);
+-	cfs_hash_bd_from_key(hs, hs->hs_rehash_buckets,
+-			     hs->hs_rehash_bits, key, &bds[1]);
+-
+-	cfs_hash_bd_order(&bds[0], &bds[1]);
+-}
+-
+-void
+-cfs_hash_dual_bd_lock(struct cfs_hash *hs, struct cfs_hash_bd *bds, int excl)
+-{
+-	cfs_hash_multi_bd_lock(hs, bds, 2, excl);
+-}
+-
+-void
+-cfs_hash_dual_bd_unlock(struct cfs_hash *hs, struct cfs_hash_bd *bds, int excl)
+-{
+-	cfs_hash_multi_bd_unlock(hs, bds, 2, excl);
+-}
+-
+-struct hlist_node *
+-cfs_hash_dual_bd_lookup_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-			       const void *key)
+-{
+-	return cfs_hash_multi_bd_lookup_locked(hs, bds, 2, key);
+-}
+-
+-struct hlist_node *
+-cfs_hash_dual_bd_findadd_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-				const void *key, struct hlist_node *hnode,
+-				int noref)
+-{
+-	return cfs_hash_multi_bd_findadd_locked(hs, bds, 2, key,
+-						hnode, noref);
+-}
+-
+-struct hlist_node *
+-cfs_hash_dual_bd_finddel_locked(struct cfs_hash *hs, struct cfs_hash_bd *bds,
+-				const void *key, struct hlist_node *hnode)
+-{
+-	return cfs_hash_multi_bd_finddel_locked(hs, bds, 2, key, hnode);
+-}
+-
+-static void
+-cfs_hash_buckets_free(struct cfs_hash_bucket **buckets,
+-		      int bkt_size, int prev_size, int size)
+-{
+-	int i;
+-
+-	for (i = prev_size; i < size; i++)
+-		kfree(buckets[i]);
+-
+-	kvfree(buckets);
+-}
+-
+-/*
+- * Create or grow bucket memory. Return old_buckets if no allocation was
+- * needed, the newly allocated buckets if allocation was needed and
+- * successful, and NULL on error.
+- */
+-static struct cfs_hash_bucket **
+-cfs_hash_buckets_realloc(struct cfs_hash *hs, struct cfs_hash_bucket **old_bkts,
+-			 unsigned int old_size, unsigned int new_size)
+-{
+-	struct cfs_hash_bucket **new_bkts;
+-	int i;
+-
+-	LASSERT(!old_size || old_bkts);
+-
+-	if (old_bkts && old_size == new_size)
+-		return old_bkts;
+-
+-	new_bkts = kvmalloc_array(new_size, sizeof(new_bkts[0]), GFP_KERNEL);
+-	if (!new_bkts)
+-		return NULL;
+-
+-	if (old_bkts) {
+-		memcpy(new_bkts, old_bkts,
+-		       min(old_size, new_size) * sizeof(*old_bkts));
+-	}
+-
+-	for (i = old_size; i < new_size; i++) {
+-		struct hlist_head *hhead;
+-		struct cfs_hash_bd bd;
+-
+-		new_bkts[i] = kzalloc(cfs_hash_bkt_size(hs), GFP_KERNEL);
+-		if (!new_bkts[i]) {
+-			cfs_hash_buckets_free(new_bkts, cfs_hash_bkt_size(hs),
+-					      old_size, new_size);
+-			return NULL;
+-		}
+-
+-		new_bkts[i]->hsb_index = i;
+-		new_bkts[i]->hsb_version = 1;	/* shouldn't be zero */
+-		new_bkts[i]->hsb_depmax = -1;	/* unknown */
+-		bd.bd_bucket = new_bkts[i];
+-		cfs_hash_bd_for_each_hlist(hs, &bd, hhead)
+-			INIT_HLIST_HEAD(hhead);
+-
+-		if (cfs_hash_with_no_lock(hs) ||
+-		    cfs_hash_with_no_bktlock(hs))
+-			continue;
+-
+-		if (cfs_hash_with_rw_bktlock(hs))
+-			rwlock_init(&new_bkts[i]->hsb_lock.rw);
+-		else if (cfs_hash_with_spin_bktlock(hs))
+-			spin_lock_init(&new_bkts[i]->hsb_lock.spin);
+-		else
+-			LBUG(); /* invalid use-case */
+-	}
+-	return new_bkts;
+-}
 -
 -/**
-- * Return desired hash table order.
+- * Initialize new libcfs hash, where:
+- * @name     - Descriptive hash name
+- * @cur_bits - Initial hash table size, in bits
+- * @max_bits - Maximum allowed hash table resize, in bits
+- * @ops      - Registered hash table operations
+- * @flags    - CFS_HASH_REHASH enable synamic hash resizing
+- *	     - CFS_HASH_SORT enable chained hash sort
 - */
--static unsigned long lu_htable_order(struct lu_device *top)
+-static void cfs_hash_rehash_worker(struct work_struct *work);
+-
+-#if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
+-static void cfs_hash_dep_print(struct work_struct *work)
 -{
--	unsigned long bits_max = LU_SITE_BITS_MAX;
--	unsigned long cache_size;
--	unsigned long bits;
+-	struct cfs_hash *hs = container_of(work, struct cfs_hash, hs_dep_work);
+-	int dep;
+-	int bkt;
+-	int off;
+-	int bits;
 -
--	if (!strcmp(top->ld_type->ldt_name, LUSTRE_VVP_NAME))
--		bits_max = LU_SITE_BITS_MAX_CL;
+-	spin_lock(&hs->hs_dep_lock);
+-	dep = hs->hs_dep_max;
+-	bkt = hs->hs_dep_bkt;
+-	off = hs->hs_dep_off;
+-	bits = hs->hs_dep_bits;
+-	spin_unlock(&hs->hs_dep_lock);
 -
--	/*
--	 * Calculate hash table size, assuming that we want reasonable
--	 * performance when 20% of total memory is occupied by cache of
--	 * lu_objects.
--	 *
--	 * Size of lu_object is (arbitrary) taken as 1K (together with inode).
+-	LCONSOLE_WARN("#### HASH %s (bits: %d): max depth %d at bucket %d/%d\n",
+-		      hs->hs_name, bits, dep, bkt, off);
+-	spin_lock(&hs->hs_dep_lock);
+-	hs->hs_dep_bits = 0; /* mark as workitem done */
+-	spin_unlock(&hs->hs_dep_lock);
+-	return 0;
+-}
+-
+-static void cfs_hash_depth_wi_init(struct cfs_hash *hs)
+-{
+-	spin_lock_init(&hs->hs_dep_lock);
+-	INIT_WORK(&hs->hs_dep_work, cfs_hash_dep_print);
+-}
+-
+-static void cfs_hash_depth_wi_cancel(struct cfs_hash *hs)
+-{
+-	cancel_work_sync(&hs->hs_dep_work);
+-}
+-
+-#else /* CFS_HASH_DEBUG_LEVEL < CFS_HASH_DEBUG_1 */
+-
+-static inline void cfs_hash_depth_wi_init(struct cfs_hash *hs) {}
+-static inline void cfs_hash_depth_wi_cancel(struct cfs_hash *hs) {}
+-
+-#endif /* CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1 */
+-
+-struct cfs_hash *
+-cfs_hash_create(char *name, unsigned int cur_bits, unsigned int max_bits,
+-		unsigned int bkt_bits, unsigned int extra_bytes,
+-		unsigned int min_theta, unsigned int max_theta,
+-		struct cfs_hash_ops *ops, unsigned int flags)
+-{
+-	struct cfs_hash *hs;
+-	int len;
+-
+-	BUILD_BUG_ON(CFS_HASH_THETA_BITS >= 15);
+-
+-	LASSERT(name);
+-	LASSERT(ops->hs_key);
+-	LASSERT(ops->hs_hash);
+-	LASSERT(ops->hs_object);
+-	LASSERT(ops->hs_keycmp);
+-	LASSERT(ops->hs_get);
+-	LASSERT(ops->hs_put || ops->hs_put_locked);
+-
+-	if (flags & CFS_HASH_REHASH)
+-		flags |= CFS_HASH_COUNTER; /* must have counter */
+-
+-	LASSERT(cur_bits > 0);
+-	LASSERT(cur_bits >= bkt_bits);
+-	LASSERT(max_bits >= cur_bits && max_bits < 31);
+-	LASSERT(ergo(!(flags & CFS_HASH_REHASH), cur_bits == max_bits));
+-	LASSERT(ergo(flags & CFS_HASH_REHASH, !(flags & CFS_HASH_NO_LOCK)));
+-	LASSERT(ergo(flags & CFS_HASH_REHASH_KEY, ops->hs_keycpy));
+-
+-	len = !(flags & CFS_HASH_BIGNAME) ?
+-	      CFS_HASH_NAME_LEN : CFS_HASH_BIGNAME_LEN;
+-	hs = kzalloc(offsetof(struct cfs_hash, hs_name[len]), GFP_KERNEL);
+-	if (!hs)
+-		return NULL;
+-
+-	strlcpy(hs->hs_name, name, len);
+-	hs->hs_flags = flags;
+-
+-	atomic_set(&hs->hs_refcount, 1);
+-	atomic_set(&hs->hs_count, 0);
+-
+-	cfs_hash_lock_setup(hs);
+-	cfs_hash_hlist_setup(hs);
+-
+-	hs->hs_cur_bits = (u8)cur_bits;
+-	hs->hs_min_bits = (u8)cur_bits;
+-	hs->hs_max_bits = (u8)max_bits;
+-	hs->hs_bkt_bits = (u8)bkt_bits;
+-
+-	hs->hs_ops = ops;
+-	hs->hs_extra_bytes = extra_bytes;
+-	hs->hs_rehash_bits = 0;
+-	INIT_WORK(&hs->hs_rehash_work, cfs_hash_rehash_worker);
+-	cfs_hash_depth_wi_init(hs);
+-
+-	if (cfs_hash_with_rehash(hs))
+-		__cfs_hash_set_theta(hs, min_theta, max_theta);
+-
+-	hs->hs_buckets = cfs_hash_buckets_realloc(hs, NULL, 0,
+-						  CFS_HASH_NBKT(hs));
+-	if (hs->hs_buckets)
+-		return hs;
+-
+-	kfree(hs);
+-	return NULL;
+-}
+-EXPORT_SYMBOL(cfs_hash_create);
+-
+-/**
+- * Cleanup libcfs hash @hs.
+- */
+-static void
+-cfs_hash_destroy(struct cfs_hash *hs)
+-{
+-	struct hlist_node *hnode;
+-	struct hlist_node *pos;
+-	struct cfs_hash_bd bd;
+-	int i;
+-
+-	LASSERT(hs);
+-	LASSERT(!cfs_hash_is_exiting(hs) &&
+-		!cfs_hash_is_iterating(hs));
+-
+-	/**
+-	 * prohibit further rehashes, don't need any lock because
+-	 * I'm the only (last) one can change it.
 -	 */
--	cache_size = totalram_pages;
+-	hs->hs_exiting = 1;
+-	if (cfs_hash_with_rehash(hs))
+-		cfs_hash_rehash_cancel(hs);
 -
--#if BITS_PER_LONG == 32
--	/* limit hashtable size for lowmem systems to low RAM */
--	if (cache_size > 1 << (30 - PAGE_SHIFT))
--		cache_size = 1 << (30 - PAGE_SHIFT) * 3 / 4;
--#endif
+-	cfs_hash_depth_wi_cancel(hs);
+-	/* rehash should be done/canceled */
+-	LASSERT(hs->hs_buckets && !hs->hs_rehash_buckets);
 -
--	/* clear off unreasonable cache setting. */
--	if (lu_cache_percent == 0 || lu_cache_percent > LU_CACHE_PERCENT_MAX) {
--		CWARN("obdclass: invalid lu_cache_percent: %u, it must be in the range of (0, %u]. Will use default value: %u.\n",
--		      lu_cache_percent, LU_CACHE_PERCENT_MAX,
--		      LU_CACHE_PERCENT_DEFAULT);
+-	cfs_hash_for_each_bucket(hs, &bd, i) {
+-		struct hlist_head *hhead;
 -
--		lu_cache_percent = LU_CACHE_PERCENT_DEFAULT;
+-		LASSERT(bd.bd_bucket);
+-		/* no need to take this lock, just for consistent code */
+-		cfs_hash_bd_lock(hs, &bd, 1);
+-
+-		cfs_hash_bd_for_each_hlist(hs, &bd, hhead) {
+-			hlist_for_each_safe(hnode, pos, hhead) {
+-				LASSERTF(!cfs_hash_with_assert_empty(hs),
+-					 "hash %s bucket %u(%u) is not empty: %u items left\n",
+-					 hs->hs_name, bd.bd_bucket->hsb_index,
+-					 bd.bd_offset, bd.bd_bucket->hsb_count);
+-				/* can't assert key valicate, because we
+-				 * can interrupt rehash
+-				 */
+-				cfs_hash_bd_del_locked(hs, &bd, hnode);
+-				cfs_hash_exit(hs, hnode);
+-			}
+-		}
+-		LASSERT(!bd.bd_bucket->hsb_count);
+-		cfs_hash_bd_unlock(hs, &bd, 1);
+-		cond_resched();
 -	}
--	cache_size = cache_size / 100 * lu_cache_percent *
--		(PAGE_SIZE / 1024);
 -
--	for (bits = 1; (1 << bits) < cache_size; ++bits)
--		;
--	return clamp_t(typeof(bits), bits, LU_SITE_BITS_MIN, bits_max);
+-	LASSERT(!atomic_read(&hs->hs_count));
+-
+-	cfs_hash_buckets_free(hs->hs_buckets, cfs_hash_bkt_size(hs),
+-			      0, CFS_HASH_NBKT(hs));
+-	i = cfs_hash_with_bigname(hs) ?
+-	    CFS_HASH_BIGNAME_LEN : CFS_HASH_NAME_LEN;
+-	kfree(hs);
 -}
 -
--static unsigned int lu_obj_hop_hash(struct cfs_hash *hs,
--				    const void *key, unsigned int mask)
+-struct cfs_hash *cfs_hash_getref(struct cfs_hash *hs)
 -{
--	struct lu_fid  *fid = (struct lu_fid *)key;
--	__u32	   hash;
+-	if (atomic_inc_not_zero(&hs->hs_refcount))
+-		return hs;
+-	return NULL;
+-}
+-EXPORT_SYMBOL(cfs_hash_getref);
 -
--	hash = fid_flatten32(fid);
--	hash += (hash >> 4) + (hash << 12); /* mixing oid and seq */
--	hash = hash_long(hash, hs->hs_bkt_bits);
+-void cfs_hash_putref(struct cfs_hash *hs)
+-{
+-	if (atomic_dec_and_test(&hs->hs_refcount))
+-		cfs_hash_destroy(hs);
+-}
+-EXPORT_SYMBOL(cfs_hash_putref);
 -
--	/* give me another random factor */
--	hash -= hash_long((unsigned long)hs, fid_oid(fid) % 11 + 3);
+-static inline int
+-cfs_hash_rehash_bits(struct cfs_hash *hs)
+-{
+-	if (cfs_hash_with_no_lock(hs) ||
+-	    !cfs_hash_with_rehash(hs))
+-		return -EOPNOTSUPP;
 -
--	hash <<= hs->hs_cur_bits - hs->hs_bkt_bits;
--	hash |= (fid_seq(fid) + fid_oid(fid)) & (CFS_HASH_NBKT(hs) - 1);
+-	if (unlikely(cfs_hash_is_exiting(hs)))
+-		return -ESRCH;
 -
--	return hash & mask;
+-	if (unlikely(cfs_hash_is_rehashing(hs)))
+-		return -EALREADY;
+-
+-	if (unlikely(cfs_hash_is_iterating(hs)))
+-		return -EAGAIN;
+-
+-	/* XXX: need to handle case with max_theta != 2.0
+-	 *      and the case with min_theta != 0.5
+-	 */
+-	if ((hs->hs_cur_bits < hs->hs_max_bits) &&
+-	    (__cfs_hash_theta(hs) > hs->hs_max_theta))
+-		return hs->hs_cur_bits + 1;
+-
+-	if (!cfs_hash_with_shrink(hs))
+-		return 0;
+-
+-	if ((hs->hs_cur_bits > hs->hs_min_bits) &&
+-	    (__cfs_hash_theta(hs) < hs->hs_min_theta))
+-		return hs->hs_cur_bits - 1;
+-
+-	return 0;
 -}
 -
--static void *lu_obj_hop_object(struct hlist_node *hnode)
+-/**
+- * don't allow inline rehash if:
+- * - user wants non-blocking change (add/del) on hash table
+- * - too many elements
+- */
+-static inline int
+-cfs_hash_rehash_inline(struct cfs_hash *hs)
 -{
--	return hlist_entry(hnode, struct lu_object_header, loh_hash);
+-	return !cfs_hash_with_nblk_change(hs) &&
+-	       atomic_read(&hs->hs_count) < CFS_HASH_LOOP_HOG;
 -}
 -
--static void *lu_obj_hop_key(struct hlist_node *hnode)
+-/**
+- * Add item @hnode to libcfs hash @hs using @key.  The registered
+- * ops->hs_get function will be called when the item is added.
+- */
+-void
+-cfs_hash_add(struct cfs_hash *hs, const void *key, struct hlist_node *hnode)
 -{
- 	struct lu_object_header *h;
+-	struct cfs_hash_bd bd;
+-	int bits;
 -
--	h = hlist_entry(hnode, struct lu_object_header, loh_hash);
--	return &h->loh_fid;
+-	LASSERT(hlist_unhashed(hnode));
+-
+-	cfs_hash_lock(hs, 0);
+-	cfs_hash_bd_get_and_lock(hs, key, &bd, 1);
+-
+-	cfs_hash_key_validate(hs, key, hnode);
+-	cfs_hash_bd_add_locked(hs, &bd, hnode);
+-
+-	cfs_hash_bd_unlock(hs, &bd, 1);
+-
+-	bits = cfs_hash_rehash_bits(hs);
+-	cfs_hash_unlock(hs, 0);
+-	if (bits > 0)
+-		cfs_hash_rehash(hs, cfs_hash_rehash_inline(hs));
+-}
+-EXPORT_SYMBOL(cfs_hash_add);
+-
+-static struct hlist_node *
+-cfs_hash_find_or_add(struct cfs_hash *hs, const void *key,
+-		     struct hlist_node *hnode, int noref)
+-{
+-	struct hlist_node *ehnode;
+-	struct cfs_hash_bd bds[2];
+-	int bits = 0;
+-
+-	LASSERTF(hlist_unhashed(hnode), "hnode = %p\n", hnode);
+-
+-	cfs_hash_lock(hs, 0);
+-	cfs_hash_dual_bd_get_and_lock(hs, key, bds, 1);
+-
+-	cfs_hash_key_validate(hs, key, hnode);
+-	ehnode = cfs_hash_dual_bd_findadd_locked(hs, bds, key,
+-						 hnode, noref);
+-	cfs_hash_dual_bd_unlock(hs, bds, 1);
+-
+-	if (ehnode == hnode)	/* new item added */
+-		bits = cfs_hash_rehash_bits(hs);
+-	cfs_hash_unlock(hs, 0);
+-	if (bits > 0)
+-		cfs_hash_rehash(hs, cfs_hash_rehash_inline(hs));
+-
+-	return ehnode;
 -}
 -
--static int lu_obj_hop_keycmp(const void *key, struct hlist_node *hnode)
+-/**
+- * Add item @hnode to libcfs hash @hs using @key.  The registered
+- * ops->hs_get function will be called if the item was added.
+- * Returns 0 on success or -EALREADY on key collisions.
+- */
+-int
+-cfs_hash_add_unique(struct cfs_hash *hs, const void *key,
+-		    struct hlist_node *hnode)
 -{
--	struct lu_object_header *h;
+-	return cfs_hash_find_or_add(hs, key, hnode, 1) != hnode ?
+-	       -EALREADY : 0;
+-}
+-EXPORT_SYMBOL(cfs_hash_add_unique);
 -
--	h = hlist_entry(hnode, struct lu_object_header, loh_hash);
--	return lu_fid_eq(&h->loh_fid, (struct lu_fid *)key);
+-/**
+- * Add item @hnode to libcfs hash @hs using @key.  If this @key
+- * already exists in the hash then ops->hs_get will be called on the
+- * conflicting entry and that entry will be returned to the caller.
+- * Otherwise ops->hs_get is called on the item which was added.
+- */
+-void *
+-cfs_hash_findadd_unique(struct cfs_hash *hs, const void *key,
+-			struct hlist_node *hnode)
+-{
+-	hnode = cfs_hash_find_or_add(hs, key, hnode, 0);
+-
+-	return cfs_hash_object(hs, hnode);
+-}
+-EXPORT_SYMBOL(cfs_hash_findadd_unique);
+-
+-/**
+- * Delete item @hnode from the libcfs hash @hs using @key.  The @key
+- * is required to ensure the correct hash bucket is locked since there
+- * is no direct linkage from the item to the bucket.  The object
+- * removed from the hash will be returned and obs->hs_put is called
+- * on the removed object.
+- */
+-void *
+-cfs_hash_del(struct cfs_hash *hs, const void *key, struct hlist_node *hnode)
+-{
+-	void *obj = NULL;
+-	int bits = 0;
+-	struct cfs_hash_bd bds[2];
+-
+-	cfs_hash_lock(hs, 0);
+-	cfs_hash_dual_bd_get_and_lock(hs, key, bds, 1);
+-
+-	/* NB: do nothing if @hnode is not in hash table */
+-	if (!hnode || !hlist_unhashed(hnode)) {
+-		if (!bds[1].bd_bucket && hnode) {
+-			cfs_hash_bd_del_locked(hs, &bds[0], hnode);
+-		} else {
+-			hnode = cfs_hash_dual_bd_finddel_locked(hs, bds,
+-								key, hnode);
+-		}
+-	}
+-
+-	if (hnode) {
+-		obj = cfs_hash_object(hs, hnode);
+-		bits = cfs_hash_rehash_bits(hs);
+-	}
+-
+-	cfs_hash_dual_bd_unlock(hs, bds, 1);
+-	cfs_hash_unlock(hs, 0);
+-	if (bits > 0)
+-		cfs_hash_rehash(hs, cfs_hash_rehash_inline(hs));
+-
+-	return obj;
+-}
+-EXPORT_SYMBOL(cfs_hash_del);
+-
+-/**
+- * Delete item given @key in libcfs hash @hs.  The first @key found in
+- * the hash will be removed, if the key exists multiple times in the hash
+- * @hs this function must be called once per key.  The removed object
+- * will be returned and ops->hs_put is called on the removed object.
+- */
+-void *
+-cfs_hash_del_key(struct cfs_hash *hs, const void *key)
+-{
+-	return cfs_hash_del(hs, key, NULL);
+-}
+-EXPORT_SYMBOL(cfs_hash_del_key);
+-
+-/**
+- * Lookup an item using @key in the libcfs hash @hs and return it.
+- * If the @key is found in the hash hs->hs_get() is called and the
+- * matching objects is returned.  It is the callers responsibility
+- * to call the counterpart ops->hs_put using the cfs_hash_put() macro
+- * when when finished with the object.  If the @key was not found
+- * in the hash @hs NULL is returned.
+- */
+-void *
+-cfs_hash_lookup(struct cfs_hash *hs, const void *key)
+-{
+-	void *obj = NULL;
+-	struct hlist_node *hnode;
+-	struct cfs_hash_bd bds[2];
+-
+-	cfs_hash_lock(hs, 0);
+-	cfs_hash_dual_bd_get_and_lock(hs, key, bds, 0);
+-
+-	hnode = cfs_hash_dual_bd_lookup_locked(hs, bds, key);
+-	if (hnode)
+-		obj = cfs_hash_object(hs, hnode);
+-
+-	cfs_hash_dual_bd_unlock(hs, bds, 0);
+-	cfs_hash_unlock(hs, 0);
+-
+-	return obj;
+-}
+-EXPORT_SYMBOL(cfs_hash_lookup);
+-
+-static void
+-cfs_hash_for_each_enter(struct cfs_hash *hs)
+-{
+-	LASSERT(!cfs_hash_is_exiting(hs));
+-
+-	if (!cfs_hash_with_rehash(hs))
+-		return;
+-	/*
+-	 * NB: it's race on cfs_has_t::hs_iterating, but doesn't matter
+-	 * because it's just an unreliable signal to rehash-thread,
+-	 * rehash-thread will try to finish rehash ASAP when seeing this.
+-	 */
+-	hs->hs_iterating = 1;
+-
+-	cfs_hash_lock(hs, 1);
+-	hs->hs_iterators++;
+-	cfs_hash_unlock(hs, 1);
+-
+-	/* NB: iteration is mostly called by service thread,
+-	 * we tend to cancel pending rehash-request, instead of
+-	 * blocking service thread, we will relaunch rehash request
+-	 * after iteration
+-	 */
+-	if (cfs_hash_is_rehashing(hs))
+-		cfs_hash_rehash_cancel(hs);
 -}
 -
--static void lu_obj_hop_get(struct cfs_hash *hs, struct hlist_node *hnode)
+-static void
+-cfs_hash_for_each_exit(struct cfs_hash *hs)
 -{
--	struct lu_object_header *h;
+-	int remained;
+-	int bits;
 -
--	h = hlist_entry(hnode, struct lu_object_header, loh_hash);
--	atomic_inc(&h->loh_ref);
+-	if (!cfs_hash_with_rehash(hs))
+-		return;
+-	cfs_hash_lock(hs, 1);
+-	remained = --hs->hs_iterators;
+-	bits = cfs_hash_rehash_bits(hs);
+-	cfs_hash_unlock(hs, 1);
+-	/* NB: it's race on cfs_has_t::hs_iterating, see above */
+-	if (!remained)
+-		hs->hs_iterating = 0;
+-	if (bits > 0) {
+-		cfs_hash_rehash(hs, atomic_read(&hs->hs_count) <
+-				    CFS_HASH_LOOP_HOG);
+-	}
 -}
 -
--static void lu_obj_hop_put_locked(struct cfs_hash *hs, struct hlist_node *hnode)
+-/**
+- * For each item in the libcfs hash @hs call the passed callback @func
+- * and pass to it as an argument each hash item and the private @data.
+- *
+- * a) the function may sleep!
+- * b) during the callback:
+- *    . the bucket lock is held so the callback must never sleep.
+- *    . if @removal_safe is true, use can remove current item by
+- *      cfs_hash_bd_del_locked
+- */
+-static u64
+-cfs_hash_for_each_tight(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+-			void *data, int remove_safe)
 -{
--	LBUG(); /* we should never called it */
-+	struct rhashtable_iter iter;
-+
-+	rhashtable_walk_enter(&s->ls_obj_hash, &iter);
-+	rhashtable_walk_start(&iter);
-+	while ((h = rhashtable_walk_next(&iter)) != NULL) {
-+		if (IS_ERR(h))
-+			continue;
-+		lu_site_obj_print(h, &arg);
-+	}
-+	rhashtable_walk_stop(&iter);
-+	rhashtable_walk_exit(&iter);
- }
+-	struct hlist_node *hnode;
+-	struct hlist_node *pos;
+-	struct cfs_hash_bd bd;
+-	u64 count = 0;
+-	int excl = !!remove_safe;
+-	int loop = 0;
+-	int i;
 -
--static struct cfs_hash_ops lu_site_hash_ops = {
--	.hs_hash	= lu_obj_hop_hash,
--	.hs_key		= lu_obj_hop_key,
--	.hs_keycmp      = lu_obj_hop_keycmp,
--	.hs_object      = lu_obj_hop_object,
--	.hs_get		= lu_obj_hop_get,
--	.hs_put_locked  = lu_obj_hop_put_locked,
+-	cfs_hash_for_each_enter(hs);
+-
+-	cfs_hash_lock(hs, 0);
+-	LASSERT(!cfs_hash_is_rehashing(hs));
+-
+-	cfs_hash_for_each_bucket(hs, &bd, i) {
+-		struct hlist_head *hhead;
+-
+-		cfs_hash_bd_lock(hs, &bd, excl);
+-		if (!func) { /* only glimpse size */
+-			count += bd.bd_bucket->hsb_count;
+-			cfs_hash_bd_unlock(hs, &bd, excl);
+-			continue;
+-		}
+-
+-		cfs_hash_bd_for_each_hlist(hs, &bd, hhead) {
+-			hlist_for_each_safe(hnode, pos, hhead) {
+-				cfs_hash_bucket_validate(hs, &bd, hnode);
+-				count++;
+-				loop++;
+-				if (func(hs, &bd, hnode, data)) {
+-					cfs_hash_bd_unlock(hs, &bd, excl);
+-					goto out;
+-				}
+-			}
+-		}
+-		cfs_hash_bd_unlock(hs, &bd, excl);
+-		if (loop < CFS_HASH_LOOP_HOG)
+-			continue;
+-		loop = 0;
+-		cfs_hash_unlock(hs, 0);
+-		cond_resched();
+-		cfs_hash_lock(hs, 0);
+-	}
+- out:
+-	cfs_hash_unlock(hs, 0);
+-
+-	cfs_hash_for_each_exit(hs);
+-	return count;
+-}
+-
+-struct cfs_hash_cond_arg {
+-	cfs_hash_cond_opt_cb_t	func;
+-	void			*arg;
 -};
-+EXPORT_SYMBOL(lu_site_print);
- 
- static void lu_dev_add_linkage(struct lu_site *s, struct lu_device *d)
- {
-@@ -1002,9 +926,7 @@ static void lu_dev_add_linkage(struct lu_site *s, struct lu_device *d)
- int lu_site_init(struct lu_site *s, struct lu_device *top)
- {
- 	struct lu_site_bkt_data *bkt;
--	unsigned long bits;
- 	unsigned long i;
--	char name[16];
- 	int rc;
- 
- 	memset(s, 0, sizeof(*s));
-@@ -1014,23 +936,8 @@ int lu_site_init(struct lu_site *s, struct lu_device *top)
- 	if (rc)
- 		return -ENOMEM;
- 
--	snprintf(name, sizeof(name), "lu_site_%s", top->ld_type->ldt_name);
--	for (bits = lu_htable_order(top); bits >= LU_SITE_BITS_MIN; bits--) {
--		s->ls_obj_hash = cfs_hash_create(name, bits, bits,
--						 bits - LU_SITE_BKT_BITS,
--						 0, 0, 0,
--						 &lu_site_hash_ops,
--						 CFS_HASH_SPIN_BKTLOCK |
--						 CFS_HASH_NO_ITEMREF |
--						 CFS_HASH_DEPTH |
--						 CFS_HASH_ASSERT_EMPTY |
--						 CFS_HASH_COUNTER);
--		if (s->ls_obj_hash)
+-
+-static int
+-cfs_hash_cond_del_locked(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-			 struct hlist_node *hnode, void *data)
+-{
+-	struct cfs_hash_cond_arg *cond = data;
+-
+-	if (cond->func(cfs_hash_object(hs, hnode), cond->arg))
+-		cfs_hash_bd_del_locked(hs, bd, hnode);
+-	return 0;
+-}
+-
+-/**
+- * Delete item from the libcfs hash @hs when @func return true.
+- * The write lock being hold during loop for each bucket to avoid
+- * any object be reference.
+- */
+-void
+-cfs_hash_cond_del(struct cfs_hash *hs, cfs_hash_cond_opt_cb_t func, void *data)
+-{
+-	struct cfs_hash_cond_arg arg = {
+-		.func	= func,
+-		.arg	= data,
+-	};
+-
+-	cfs_hash_for_each_tight(hs, cfs_hash_cond_del_locked, &arg, 1);
+-}
+-EXPORT_SYMBOL(cfs_hash_cond_del);
+-
+-void
+-cfs_hash_for_each(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+-		  void *data)
+-{
+-	cfs_hash_for_each_tight(hs, func, data, 0);
+-}
+-EXPORT_SYMBOL(cfs_hash_for_each);
+-
+-void
+-cfs_hash_for_each_safe(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+-		       void *data)
+-{
+-	cfs_hash_for_each_tight(hs, func, data, 1);
+-}
+-EXPORT_SYMBOL(cfs_hash_for_each_safe);
+-
+-static int
+-cfs_hash_peek(struct cfs_hash *hs, struct cfs_hash_bd *bd,
+-	      struct hlist_node *hnode, void *data)
+-{
+-	*(int *)data = 0;
+-	return 1; /* return 1 to break the loop */
+-}
+-
+-int
+-cfs_hash_is_empty(struct cfs_hash *hs)
+-{
+-	int empty = 1;
+-
+-	cfs_hash_for_each_tight(hs, cfs_hash_peek, &empty, 0);
+-	return empty;
+-}
+-EXPORT_SYMBOL(cfs_hash_is_empty);
+-
+-u64
+-cfs_hash_size_get(struct cfs_hash *hs)
+-{
+-	return cfs_hash_with_counter(hs) ?
+-	       atomic_read(&hs->hs_count) :
+-	       cfs_hash_for_each_tight(hs, NULL, NULL, 0);
+-}
+-EXPORT_SYMBOL(cfs_hash_size_get);
+-
+-/*
+- * cfs_hash_for_each_relax:
+- * Iterate the hash table and call @func on each item without
+- * any lock. This function can't guarantee to finish iteration
+- * if these features are enabled:
+- *
+- *  a. if rehash_key is enabled, an item can be moved from
+- *     one bucket to another bucket
+- *  b. user can remove non-zero-ref item from hash-table,
+- *     so the item can be removed from hash-table, even worse,
+- *     it's possible that user changed key and insert to another
+- *     hash bucket.
+- * there's no way for us to finish iteration correctly on previous
+- * two cases, so iteration has to be stopped on change.
+- */
+-static int
+-cfs_hash_for_each_relax(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+-			void *data, int start)
+-{
+-	struct hlist_node *next = NULL;
+-	struct hlist_node *hnode;
+-	struct cfs_hash_bd bd;
+-	u32 version;
+-	int count = 0;
+-	int stop_on_change;
+-	int has_put_locked;
+-	int end = -1;
+-	int rc = 0;
+-	int i;
+-
+-	stop_on_change = cfs_hash_with_rehash_key(hs) ||
+-			 !cfs_hash_with_no_itemref(hs);
+-	has_put_locked = hs->hs_ops->hs_put_locked != NULL;
+-	cfs_hash_lock(hs, 0);
+-again:
+-	LASSERT(!cfs_hash_is_rehashing(hs));
+-
+-	cfs_hash_for_each_bucket(hs, &bd, i) {
+-		struct hlist_head *hhead;
+-
+-		if (i < start)
+-			continue;
+-		else if (end > 0 && i >= end)
+-			break;
+-
+-		cfs_hash_bd_lock(hs, &bd, 0);
+-		version = cfs_hash_bd_version_get(&bd);
+-
+-		cfs_hash_bd_for_each_hlist(hs, &bd, hhead) {
+-			hnode = hhead->first;
+-			if (!hnode)
+-				continue;
+-			cfs_hash_get(hs, hnode);
+-
+-			for (; hnode; hnode = next) {
+-				cfs_hash_bucket_validate(hs, &bd, hnode);
+-				next = hnode->next;
+-				if (next)
+-					cfs_hash_get(hs, next);
+-				cfs_hash_bd_unlock(hs, &bd, 0);
+-				cfs_hash_unlock(hs, 0);
+-
+-				rc = func(hs, &bd, hnode, data);
+-				if (stop_on_change || !has_put_locked)
+-					cfs_hash_put(hs, hnode);
+-				cond_resched();
+-				count++;
+-
+-				cfs_hash_lock(hs, 0);
+-				cfs_hash_bd_lock(hs, &bd, 0);
+-				if (stop_on_change) {
+-					if (version !=
+-					    cfs_hash_bd_version_get(&bd))
+-						rc = -EINTR;
+-				} else if (has_put_locked) {
+-					cfs_hash_put_locked(hs, hnode);
+-				}
+-				if (rc) /* callback wants to break iteration */
+-					break;
+-			}
+-			if (next) {
+-				if (has_put_locked) {
+-					cfs_hash_put_locked(hs, next);
+-					next = NULL;
+-				}
+-				break;
+-			} else if (rc) {
+-				break;
+-			}
+-		}
+-		cfs_hash_bd_unlock(hs, &bd, 0);
+-		if (next && !has_put_locked) {
+-			cfs_hash_put(hs, next);
+-			next = NULL;
+-		}
+-		if (rc) /* callback wants to break iteration */
 -			break;
 -	}
+-	if (start > 0 && !rc) {
+-		end = start;
+-		start = 0;
+-		goto again;
+-	}
 -
--	if (!s->ls_obj_hash) {
--		CERROR("failed to create lu_site hash with bits: %lu\n", bits);
-+	if (rhashtable_init(&s->ls_obj_hash, &obj_hash_params) != 0) {
-+		CERROR("failed to create lu_site hash\n");
- 		return -ENOMEM;
- 	}
- 
-@@ -1038,8 +945,7 @@ int lu_site_init(struct lu_site *s, struct lu_device *top)
- 	s->ls_bkt_cnt = roundup_pow_of_two(s->ls_bkt_cnt);
- 	s->ls_bkts = kvmalloc_array(s->ls_bkt_cnt, sizeof(*bkt), GFP_KERNEL);
- 	if (!s->ls_bkts) {
--		cfs_hash_putref(s->ls_obj_hash);
--		s->ls_obj_hash = NULL;
-+		rhashtable_destroy(&s->ls_obj_hash);
- 		s->ls_bkts = NULL;
- 		return -ENOMEM;
- 	}
-@@ -1052,9 +958,8 @@ int lu_site_init(struct lu_site *s, struct lu_device *top)
- 	s->ls_stats = lprocfs_alloc_stats(LU_SS_LAST_STAT, 0);
- 	if (!s->ls_stats) {
- 		kvfree(s->ls_bkts);
--		cfs_hash_putref(s->ls_obj_hash);
- 		s->ls_bkts = NULL;
--		s->ls_obj_hash = NULL;
-+		rhashtable_destroy(&s->ls_obj_hash);
- 		return -ENOMEM;
- 	}
- 
-@@ -1097,13 +1002,12 @@ void lu_site_fini(struct lu_site *s)
- 
- 	percpu_counter_destroy(&s->ls_lru_len_counter);
- 
--	if (s->ls_obj_hash) {
--		cfs_hash_putref(s->ls_obj_hash);
--		s->ls_obj_hash = NULL;
-+	if (s->ls_bkts) {
-+		rhashtable_destroy(&s->ls_obj_hash);
-+		kvfree(s->ls_bkts);
-+		s->ls_bkts = NULL;
- 	}
- 
--	kvfree(s->ls_bkts);
+-	cfs_hash_unlock(hs, 0);
+-	return count;
+-}
 -
- 	if (s->ls_top_dev) {
- 		s->ls_top_dev->ld_site = NULL;
- 		lu_ref_del(&s->ls_top_dev->ld_reference, "site-top", s);
-@@ -1259,7 +1163,6 @@ int lu_object_header_init(struct lu_object_header *h)
- {
- 	memset(h, 0, sizeof(*h));
- 	atomic_set(&h->loh_ref, 1);
--	INIT_HLIST_NODE(&h->loh_hash);
- 	INIT_LIST_HEAD(&h->loh_lru);
- 	INIT_LIST_HEAD(&h->loh_layers);
- 	lu_ref_init(&h->loh_reference);
-@@ -1274,7 +1177,6 @@ void lu_object_header_fini(struct lu_object_header *h)
- {
- 	LASSERT(list_empty(&h->loh_layers));
- 	LASSERT(list_empty(&h->loh_lru));
--	LASSERT(hlist_unhashed(&h->loh_hash));
- 	lu_ref_fini(&h->loh_reference);
- }
- EXPORT_SYMBOL(lu_object_header_fini);
-@@ -1815,7 +1717,7 @@ struct lu_site_stats {
- static void lu_site_stats_get(const struct lu_site *s,
- 			      struct lu_site_stats *stats)
- {
--	int cnt = cfs_hash_size_get(s->ls_obj_hash);
-+	int cnt = atomic_read(&s->ls_obj_hash.nelems);
- 	/* percpu_counter_read_positive() won't accept a const pointer */
- 	struct lu_site *s2 = (struct lu_site *)s;
+-int
+-cfs_hash_for_each_nolock(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+-			 void *data, int start)
+-{
+-	if (cfs_hash_with_no_lock(hs) ||
+-	    cfs_hash_with_rehash_key(hs) ||
+-	    !cfs_hash_with_no_itemref(hs))
+-		return -EOPNOTSUPP;
+-
+-	if (!hs->hs_ops->hs_get ||
+-	    (!hs->hs_ops->hs_put && !hs->hs_ops->hs_put_locked))
+-		return -EOPNOTSUPP;
+-
+-	cfs_hash_for_each_enter(hs);
+-	cfs_hash_for_each_relax(hs, func, data, start);
+-	cfs_hash_for_each_exit(hs);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(cfs_hash_for_each_nolock);
+-
+-/**
+- * For each hash bucket in the libcfs hash @hs call the passed callback
+- * @func until all the hash buckets are empty.  The passed callback @func
+- * or the previously registered callback hs->hs_put must remove the item
+- * from the hash.  You may either use the cfs_hash_del() or hlist_del()
+- * functions.  No rwlocks will be held during the callback @func it is
+- * safe to sleep if needed.  This function will not terminate until the
+- * hash is empty.  Note it is still possible to concurrently add new
+- * items in to the hash.  It is the callers responsibility to ensure
+- * the required locking is in place to prevent concurrent insertions.
+- */
+-int
+-cfs_hash_for_each_empty(struct cfs_hash *hs, cfs_hash_for_each_cb_t func,
+-			void *data)
+-{
+-	unsigned int i = 0;
+-
+-	if (cfs_hash_with_no_lock(hs))
+-		return -EOPNOTSUPP;
+-
+-	if (!hs->hs_ops->hs_get ||
+-	    (!hs->hs_ops->hs_put && !hs->hs_ops->hs_put_locked))
+-		return -EOPNOTSUPP;
+-
+-	cfs_hash_for_each_enter(hs);
+-	while (cfs_hash_for_each_relax(hs, func, data, 0)) {
+-		CDEBUG(D_INFO, "Try to empty hash: %s, loop: %u\n",
+-		       hs->hs_name, i++);
+-	}
+-	cfs_hash_for_each_exit(hs);
+-	return 0;
+-}
+-EXPORT_SYMBOL(cfs_hash_for_each_empty);
+-
+-void
+-cfs_hash_hlist_for_each(struct cfs_hash *hs, unsigned int hindex,
+-			cfs_hash_for_each_cb_t func, void *data)
+-{
+-	struct hlist_head *hhead;
+-	struct hlist_node *hnode;
+-	struct cfs_hash_bd bd;
+-
+-	cfs_hash_for_each_enter(hs);
+-	cfs_hash_lock(hs, 0);
+-	if (hindex >= CFS_HASH_NHLIST(hs))
+-		goto out;
+-
+-	cfs_hash_bd_index_set(hs, hindex, &bd);
+-
+-	cfs_hash_bd_lock(hs, &bd, 0);
+-	hhead = cfs_hash_bd_hhead(hs, &bd);
+-	hlist_for_each(hnode, hhead) {
+-		if (func(hs, &bd, hnode, data))
+-			break;
+-	}
+-	cfs_hash_bd_unlock(hs, &bd, 0);
+-out:
+-	cfs_hash_unlock(hs, 0);
+-	cfs_hash_for_each_exit(hs);
+-}
+-EXPORT_SYMBOL(cfs_hash_hlist_for_each);
+-
+-/*
+- * For each item in the libcfs hash @hs which matches the @key call
+- * the passed callback @func and pass to it as an argument each hash
+- * item and the private @data. During the callback the bucket lock
+- * is held so the callback must never sleep.
+- */
+-void
+-cfs_hash_for_each_key(struct cfs_hash *hs, const void *key,
+-		      cfs_hash_for_each_cb_t func, void *data)
+-{
+-	struct hlist_node *hnode;
+-	struct cfs_hash_bd bds[2];
+-	unsigned int i;
+-
+-	cfs_hash_lock(hs, 0);
+-
+-	cfs_hash_dual_bd_get_and_lock(hs, key, bds, 0);
+-
+-	cfs_hash_for_each_bd(bds, 2, i) {
+-		struct hlist_head *hlist = cfs_hash_bd_hhead(hs, &bds[i]);
+-
+-		hlist_for_each(hnode, hlist) {
+-			cfs_hash_bucket_validate(hs, &bds[i], hnode);
+-
+-			if (cfs_hash_keycmp(hs, key, hnode)) {
+-				if (func(hs, &bds[i], hnode, data))
+-					break;
+-			}
+-		}
+-	}
+-
+-	cfs_hash_dual_bd_unlock(hs, bds, 0);
+-	cfs_hash_unlock(hs, 0);
+-}
+-EXPORT_SYMBOL(cfs_hash_for_each_key);
+-
+-/**
+- * Rehash the libcfs hash @hs to the given @bits.  This can be used
+- * to grow the hash size when excessive chaining is detected, or to
+- * shrink the hash when it is larger than needed.  When the CFS_HASH_REHASH
+- * flag is set in @hs the libcfs hash may be dynamically rehashed
+- * during addition or removal if the hash's theta value exceeds
+- * either the hs->hs_min_theta or hs->max_theta values.  By default
+- * these values are tuned to keep the chained hash depth small, and
+- * this approach assumes a reasonably uniform hashing function.  The
+- * theta thresholds for @hs are tunable via cfs_hash_set_theta().
+- */
+-void
+-cfs_hash_rehash_cancel(struct cfs_hash *hs)
+-{
+-	LASSERT(cfs_hash_with_rehash(hs));
+-	cancel_work_sync(&hs->hs_rehash_work);
+-}
+-
+-void
+-cfs_hash_rehash(struct cfs_hash *hs, int do_rehash)
+-{
+-	int rc;
+-
+-	LASSERT(cfs_hash_with_rehash(hs) && !cfs_hash_with_no_lock(hs));
+-
+-	cfs_hash_lock(hs, 1);
+-
+-	rc = cfs_hash_rehash_bits(hs);
+-	if (rc <= 0) {
+-		cfs_hash_unlock(hs, 1);
+-		return;
+-	}
+-
+-	hs->hs_rehash_bits = rc;
+-	if (!do_rehash) {
+-		/* launch and return */
+-		queue_work(cfs_rehash_wq, &hs->hs_rehash_work);
+-		cfs_hash_unlock(hs, 1);
+-		return;
+-	}
+-
+-	/* rehash right now */
+-	cfs_hash_unlock(hs, 1);
+-
+-	cfs_hash_rehash_worker(&hs->hs_rehash_work);
+-}
+-
+-static int
+-cfs_hash_rehash_bd(struct cfs_hash *hs, struct cfs_hash_bd *old)
+-{
+-	struct cfs_hash_bd new;
+-	struct hlist_head *hhead;
+-	struct hlist_node *hnode;
+-	struct hlist_node *pos;
+-	void *key;
+-	int c = 0;
+-
+-	/* hold cfs_hash_lock(hs, 1), so don't need any bucket lock */
+-	cfs_hash_bd_for_each_hlist(hs, old, hhead) {
+-		hlist_for_each_safe(hnode, pos, hhead) {
+-			key = cfs_hash_key(hs, hnode);
+-			LASSERT(key);
+-			/* Validate hnode is in the correct bucket. */
+-			cfs_hash_bucket_validate(hs, old, hnode);
+-			/*
+-			 * Delete from old hash bucket; move to new bucket.
+-			 * ops->hs_key must be defined.
+-			 */
+-			cfs_hash_bd_from_key(hs, hs->hs_rehash_buckets,
+-					     hs->hs_rehash_bits, key, &new);
+-			cfs_hash_bd_move_locked(hs, old, &new, hnode);
+-			c++;
+-		}
+-	}
+-
+-	return c;
+-}
+-
+-static void
+-cfs_hash_rehash_worker(struct work_struct *work)
+-{
+-	struct cfs_hash *hs = container_of(work, struct cfs_hash, hs_rehash_work);
+-	struct cfs_hash_bucket **bkts;
+-	struct cfs_hash_bd bd;
+-	unsigned int old_size;
+-	unsigned int new_size;
+-	int bsize;
+-	int count = 0;
+-	int rc = 0;
+-	int i;
+-
+-	LASSERT(hs && cfs_hash_with_rehash(hs));
+-
+-	cfs_hash_lock(hs, 0);
+-	LASSERT(cfs_hash_is_rehashing(hs));
+-
+-	old_size = CFS_HASH_NBKT(hs);
+-	new_size = CFS_HASH_RH_NBKT(hs);
+-
+-	cfs_hash_unlock(hs, 0);
+-
+-	/*
+-	 * don't need hs::hs_rwlock for hs::hs_buckets,
+-	 * because nobody can change bkt-table except me.
+-	 */
+-	bkts = cfs_hash_buckets_realloc(hs, hs->hs_buckets,
+-					old_size, new_size);
+-	cfs_hash_lock(hs, 1);
+-	if (!bkts) {
+-		rc = -ENOMEM;
+-		goto out;
+-	}
+-
+-	if (bkts == hs->hs_buckets) {
+-		bkts = NULL; /* do nothing */
+-		goto out;
+-	}
+-
+-	rc = __cfs_hash_theta(hs);
+-	if ((rc >= hs->hs_min_theta) && (rc <= hs->hs_max_theta)) {
+-		/* free the new allocated bkt-table */
+-		old_size = new_size;
+-		new_size = CFS_HASH_NBKT(hs);
+-		rc = -EALREADY;
+-		goto out;
+-	}
+-
+-	LASSERT(!hs->hs_rehash_buckets);
+-	hs->hs_rehash_buckets = bkts;
+-
+-	rc = 0;
+-	cfs_hash_for_each_bucket(hs, &bd, i) {
+-		if (cfs_hash_is_exiting(hs)) {
+-			rc = -ESRCH;
+-			/* someone wants to destroy the hash, abort now */
+-			if (old_size < new_size) /* OK to free old bkt-table */
+-				break;
+-			/* it's shrinking, need free new bkt-table */
+-			hs->hs_rehash_buckets = NULL;
+-			old_size = new_size;
+-			new_size = CFS_HASH_NBKT(hs);
+-			goto out;
+-		}
+-
+-		count += cfs_hash_rehash_bd(hs, &bd);
+-		if (count < CFS_HASH_LOOP_HOG ||
+-		    cfs_hash_is_iterating(hs)) { /* need to finish ASAP */
+-			continue;
+-		}
+-
+-		count = 0;
+-		cfs_hash_unlock(hs, 1);
+-		cond_resched();
+-		cfs_hash_lock(hs, 1);
+-	}
+-
+-	hs->hs_rehash_count++;
+-
+-	bkts = hs->hs_buckets;
+-	hs->hs_buckets = hs->hs_rehash_buckets;
+-	hs->hs_rehash_buckets = NULL;
+-
+-	hs->hs_cur_bits = hs->hs_rehash_bits;
+-out:
+-	hs->hs_rehash_bits = 0;
+-	bsize = cfs_hash_bkt_size(hs);
+-	cfs_hash_unlock(hs, 1);
+-	/* can't refer to @hs anymore because it could be destroyed */
+-	if (bkts)
+-		cfs_hash_buckets_free(bkts, bsize, new_size, old_size);
+-	if (rc)
+-		CDEBUG(D_INFO, "early quit of rehashing: %d\n", rc);
+-}
+-
+-/**
+- * Rehash the object referenced by @hnode in the libcfs hash @hs.  The
+- * @old_key must be provided to locate the objects previous location
+- * in the hash, and the @new_key will be used to reinsert the object.
+- * Use this function instead of a cfs_hash_add() + cfs_hash_del()
+- * combo when it is critical that there is no window in time where the
+- * object is missing from the hash.  When an object is being rehashed
+- * the registered cfs_hash_get() and cfs_hash_put() functions will
+- * not be called.
+- */
+-void cfs_hash_rehash_key(struct cfs_hash *hs, const void *old_key,
+-			 void *new_key, struct hlist_node *hnode)
+-{
+-	struct cfs_hash_bd bds[3];
+-	struct cfs_hash_bd old_bds[2];
+-	struct cfs_hash_bd new_bd;
+-
+-	LASSERT(!hlist_unhashed(hnode));
+-
+-	cfs_hash_lock(hs, 0);
+-
+-	cfs_hash_dual_bd_get(hs, old_key, old_bds);
+-	cfs_hash_bd_get(hs, new_key, &new_bd);
+-
+-	bds[0] = old_bds[0];
+-	bds[1] = old_bds[1];
+-	bds[2] = new_bd;
+-
+-	/* NB: bds[0] and bds[1] are ordered already */
+-	cfs_hash_bd_order(&bds[1], &bds[2]);
+-	cfs_hash_bd_order(&bds[0], &bds[1]);
+-
+-	cfs_hash_multi_bd_lock(hs, bds, 3, 1);
+-	if (likely(!old_bds[1].bd_bucket)) {
+-		cfs_hash_bd_move_locked(hs, &old_bds[0], &new_bd, hnode);
+-	} else {
+-		cfs_hash_dual_bd_finddel_locked(hs, old_bds, old_key, hnode);
+-		cfs_hash_bd_add_locked(hs, &new_bd, hnode);
+-	}
+-	/* overwrite key inside locks, otherwise may screw up with
+-	 * other operations, i.e: rehash
+-	 */
+-	cfs_hash_keycpy(hs, hnode, new_key);
+-
+-	cfs_hash_multi_bd_unlock(hs, bds, 3, 1);
+-	cfs_hash_unlock(hs, 0);
+-}
+-EXPORT_SYMBOL(cfs_hash_rehash_key);
+-
+-void cfs_hash_debug_header(struct seq_file *m)
+-{
+-	seq_printf(m, "%-*s   cur   min   max theta t-min t-max flags rehash   count  maxdep maxdepb distribution\n",
+-		   CFS_HASH_BIGNAME_LEN, "name");
+-}
+-EXPORT_SYMBOL(cfs_hash_debug_header);
+-
+-static struct cfs_hash_bucket **
+-cfs_hash_full_bkts(struct cfs_hash *hs)
+-{
+-	/* NB: caller should hold hs->hs_rwlock if REHASH is set */
+-	if (!hs->hs_rehash_buckets)
+-		return hs->hs_buckets;
+-
+-	LASSERT(hs->hs_rehash_bits);
+-	return hs->hs_rehash_bits > hs->hs_cur_bits ?
+-	       hs->hs_rehash_buckets : hs->hs_buckets;
+-}
+-
+-static unsigned int
+-cfs_hash_full_nbkt(struct cfs_hash *hs)
+-{
+-	/* NB: caller should hold hs->hs_rwlock if REHASH is set */
+-	if (!hs->hs_rehash_buckets)
+-		return CFS_HASH_NBKT(hs);
+-
+-	LASSERT(hs->hs_rehash_bits);
+-	return hs->hs_rehash_bits > hs->hs_cur_bits ?
+-	       CFS_HASH_RH_NBKT(hs) : CFS_HASH_NBKT(hs);
+-}
+-
+-void cfs_hash_debug_str(struct cfs_hash *hs, struct seq_file *m)
+-{
+-	int dist[8] = { 0, };
+-	int maxdep = -1;
+-	int maxdepb = -1;
+-	int total = 0;
+-	int theta;
+-	int i;
+-
+-	cfs_hash_lock(hs, 0);
+-	theta = __cfs_hash_theta(hs);
+-
+-	seq_printf(m, "%-*s %5d %5d %5d %d.%03d %d.%03d %d.%03d  0x%02x %6d ",
+-		   CFS_HASH_BIGNAME_LEN, hs->hs_name,
+-		   1 << hs->hs_cur_bits, 1 << hs->hs_min_bits,
+-		   1 << hs->hs_max_bits,
+-		   __cfs_hash_theta_int(theta), __cfs_hash_theta_frac(theta),
+-		   __cfs_hash_theta_int(hs->hs_min_theta),
+-		   __cfs_hash_theta_frac(hs->hs_min_theta),
+-		   __cfs_hash_theta_int(hs->hs_max_theta),
+-		   __cfs_hash_theta_frac(hs->hs_max_theta),
+-		   hs->hs_flags, hs->hs_rehash_count);
+-
+-	/*
+-	 * The distribution is a summary of the chained hash depth in
+-	 * each of the libcfs hash buckets.  Each buckets hsb_count is
+-	 * divided by the hash theta value and used to generate a
+-	 * histogram of the hash distribution.  A uniform hash will
+-	 * result in all hash buckets being close to the average thus
+-	 * only the first few entries in the histogram will be non-zero.
+-	 * If you hash function results in a non-uniform hash the will
+-	 * be observable by outlier bucks in the distribution histogram.
+-	 *
+-	 * Uniform hash distribution:		128/128/0/0/0/0/0/0
+-	 * Non-Uniform hash distribution:	128/125/0/0/0/0/2/1
+-	 */
+-	for (i = 0; i < cfs_hash_full_nbkt(hs); i++) {
+-		struct cfs_hash_bd bd;
+-
+-		bd.bd_bucket = cfs_hash_full_bkts(hs)[i];
+-		cfs_hash_bd_lock(hs, &bd, 0);
+-		if (maxdep < bd.bd_bucket->hsb_depmax) {
+-			maxdep  = bd.bd_bucket->hsb_depmax;
+-			maxdepb = ffz(~maxdep);
+-		}
+-		total += bd.bd_bucket->hsb_count;
+-		dist[min(fls(bd.bd_bucket->hsb_count / max(theta, 1)), 7)]++;
+-		cfs_hash_bd_unlock(hs, &bd, 0);
+-	}
+-
+-	seq_printf(m, "%7d %7d %7d ", total, maxdep, maxdepb);
+-	for (i = 0; i < 8; i++)
+-		seq_printf(m, "%d%c",  dist[i], (i == 7) ? '\n' : '/');
+-
+-	cfs_hash_unlock(hs, 0);
+-}
+-EXPORT_SYMBOL(cfs_hash_debug_str);
+diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
+index a03f924f1d7c..4b5a4c1b86c3 100644
+--- a/drivers/staging/lustre/lnet/libcfs/module.c
++++ b/drivers/staging/lustre/lnet/libcfs/module.c
+@@ -547,13 +547,6 @@ static int libcfs_init(void)
+ 		goto cleanup_cpu;
+ 	}
  
-@@ -2001,15 +1903,21 @@ static __u32 ls_stats_read(struct lprocfs_stats *stats, int idx)
- int lu_site_stats_print(const struct lu_site *s, struct seq_file *m)
- {
- 	struct lu_site_stats stats;
-+	const struct bucket_table *tbl;
-+	long chains;
+-	cfs_rehash_wq = alloc_workqueue("cfs_rh", WQ_SYSFS, 4);
+-	if (!cfs_rehash_wq) {
+-		CERROR("Failed to start rehash workqueue.\n");
+-		rc = -ENOMEM;
+-		goto cleanup_deregister;
+-	}
+-
+ 	rc = cfs_crypto_register();
+ 	if (rc) {
+ 		CERROR("cfs_crypto_register: error %d\n", rc);
+@@ -579,11 +572,6 @@ static void libcfs_exit(void)
  
- 	memset(&stats, 0, sizeof(stats));
- 	lu_site_stats_get(s, &stats);
+ 	lustre_remove_debugfs();
  
-+	rcu_read_lock();
-+	tbl = rht_dereference_rcu(s->ls_obj_hash.tbl, &((struct lu_site *)s)->ls_obj_hash);
-+	chains = tbl->size;
-+	rcu_read_unlock();
- 	seq_printf(m, "%d/%d %d/%ld %d %d %d %d %d %d %d\n",
- 		   stats.lss_busy,
- 		   stats.lss_total,
- 		   stats.lss_populated,
--		   CFS_HASH_NHLIST(s->ls_obj_hash),
-+		   chains,
- 		   stats.lss_max_search,
- 		   ls_stats_read(s->ls_stats, LU_SS_CREATED),
- 		   ls_stats_read(s->ls_stats, LU_SS_CACHE_HIT),
+-	if (cfs_rehash_wq) {
+-		destroy_workqueue(cfs_rehash_wq);
+-		cfs_rehash_wq = NULL;
+-	}
+-
+ 	cfs_crypto_unregister();
+ 
+ 	misc_deregister(&libcfs_dev);
