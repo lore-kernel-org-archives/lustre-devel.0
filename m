@@ -1,25 +1,46 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Mon, 9 Apr 2018 22:13:00 -0400
-Subject: [lustre-devel] New tag 2.10.55
-In-Reply-To: <2C5CE580-0280-438B-AEAA-C945D2083700@cray.com>
-References: <AC167227-4CAD-41FD-96E5-3032B3DF15FE@intel.com>
- <2C5CE580-0280-438B-AEAA-C945D2083700@cray.com>
-Message-ID: <71761888-DC8D-4B00-865E-C58C797137D0@intel.com>
+From: NeilBrown <neilb@suse.com>
+Date: Thu, 12 Apr 2018 07:19:57 +1000
+Subject: [lustre-devel] [PATCH 08/17] staging: lustre: add
+ container_of_safe()
+In-Reply-To: <279CCF71-2922-4872-9A4B-0478A4CD061E@cray.com>
+References: <152229732768.27689.4800156943561963977.stgit@noble>
+ <152229760847.27689.4969508646445147289.stgit@noble>
+ <alpine.LFD.2.21.1803301959140.9681@casper.infradead.org>
+ <279CCF71-2922-4872-9A4B-0478A4CD061E@cray.com>
+Message-ID: <87o9iptp8i.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Tue, Apr 10 2018, Cory Spitz wrote:
 
-> On Apr 9, 2018, at 10:11 PM, Cory Spitz <spitzcor@cray.com> wrote:
-> 
-> Oleg,
-> 
-> I've noticed that you've stopped sending out tag notifications with a changelog.  The last I saw was 2.10.55.  Might you resume this practice?  If it is too much work, I get that.  Don't make me do anything that you don't want to do.  I just found your notices useful, even if I didn't understand why some batches of landings from master-next would be tagged and others not.
+> James, you misspelled Lustre!
 
-Hm, yes, it fell by wayside lately, but I will try to resume doing it.
+That wasn't James, that was me - sorry :-)
 
-We aim to tag master every other week or so (or after really big landings).
-master-next merges on the other hand are much more frequent and it does not make sense to tag
-after every one of them.
+NeilBrown
+
+
+>
+>
+>
+> On 3/30/18, 2:00 PM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
+>
+>
+>
+>     > Luster has a container_of0() function which is similar to
+>
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180412/60cc143a/attachment.sig>
