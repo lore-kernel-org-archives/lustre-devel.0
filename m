@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Thu, 12 Apr 2018 07:54:48 +1000
-Subject: [lustre-devel] [PATCH 04/20] staging: lustre: convert osc_quota
- hash to rhashtable
+Subject: [lustre-devel] [PATCH 05/20] staging: lustre: separate buckets from
+ ldlm hash table
 In-Reply-To: <152348312863.12394.11915752362061083241.stgit@noble>
 References: <152348312863.12394.11915752362061083241.stgit@noble>
-Message-ID: <152348368865.12394.3783473894491587885.stgit@noble>
+Message-ID: <152348368868.12394.16648347374686334362.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,273 +12,210 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-As this is indexed by an integer, an extensible array
-or extensible bitmap would be better.
-If/when xarray lands, we should change to use that.
+ldlm maintains a per-namespace hashtable of resources.
+With these hash tables it stores per-bucket 'struct adaptive_timeout'
+structures.
 
-For now, just a simple conversion to rhashtable.
+Presumably having a single struct for the whole table results in too
+much contention while having one per resource results in very little
+adaption.
 
-When removing an entry, we need to hold rcu_read_lock()
-across the lookup and remove in case we race with another thread
-performing a removal.  This means we need to use call_rcu()
-to free the quota info so we need an rcu_head in there, which
-unfortunately doubles the size of the structure.
+A future patch will change ldlm to use rhashtable which does not
+support per-bucket data, so we need to manage the data separately.
+
+There is no need for the multiple adaptive_timeout to align with the
+hash chains, and trying to do this has resulted in a rather complex
+hash function.
+The purpose of ldlm_res_hop_fid_hash() appears to be to keep
+resources with the same fid in the same hash bucket, so they use
+the same adaptive timeout.  However it fails at doing this
+because it puts the fid-specific bits in the wrong part of the hash.
+If that is not the purpose, then I can see no point to the
+complexitiy.
+
+This patch creates a completely separate array of adaptive timeouts
+(and other less interesting data) and uses a hash of the fid to index
+that, meaning that a simple hash can be used for the hash table.
+
+In the previous code, two namespace uses the same value for
+nsd_all_bits and nsd_bkt_bits.  This results in zero bits being
+used to choose a bucket - so there is only one bucket.
+This looks odd and would confuse hash_32(), so I've adjusted the
+numbers so there is always at least 1 bit (2 buckets).
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/obd.h      |    2 
- drivers/staging/lustre/lustre/osc/osc_internal.h |    5 -
- drivers/staging/lustre/lustre/osc/osc_quota.c    |  136 +++++++---------------
- 3 files changed, 48 insertions(+), 95 deletions(-)
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |    2 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   53 ++++++++------------
+ 2 files changed, 23 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 1818fe6a7a2f..682902e744e2 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -333,7 +333,7 @@ struct client_obd {
- 	void		    *cl_writeback_work;
- 	void			*cl_lru_work;
- 	/* hash tables for osc_quota_info */
--	struct cfs_hash	      *cl_quota_hash[MAXQUOTAS];
-+	struct rhashtable	cl_quota_hash[MAXQUOTAS];
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index d668d86423a4..395d50160dcc 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -364,6 +364,8 @@ struct ldlm_namespace {
+ 
+ 	/** Resource hash table for namespace. */
+ 	struct cfs_hash		*ns_rs_hash;
++	struct ldlm_ns_bucket	*ns_rs_buckets;
++	unsigned int		ns_bucket_bits;
+ 
+ 	/** serialize */
+ 	spinlock_t		ns_lock;
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 6c615b6e9bdc..927544f01adc 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -476,10 +476,8 @@ static unsigned int ldlm_res_hop_hash(struct cfs_hash *hs,
+ 	return val & mask;
+ }
+ 
+-static unsigned int ldlm_res_hop_fid_hash(struct cfs_hash *hs,
+-					  const void *key, unsigned int mask)
++static unsigned int ldlm_res_hop_fid_hash(const struct ldlm_res_id *id, unsigned int bits)
+ {
+-	const struct ldlm_res_id *id = key;
+ 	struct lu_fid       fid;
+ 	__u32	       hash;
+ 	__u32	       val;
+@@ -492,18 +490,11 @@ static unsigned int ldlm_res_hop_fid_hash(struct cfs_hash *hs,
+ 	hash += (hash >> 4) + (hash << 12); /* mixing oid and seq */
+ 	if (id->name[LUSTRE_RES_ID_HSH_OFF] != 0) {
+ 		val = id->name[LUSTRE_RES_ID_HSH_OFF];
+-		hash += (val >> 5) + (val << 11);
+ 	} else {
+ 		val = fid_oid(&fid);
+ 	}
+-	hash = hash_long(hash, hs->hs_bkt_bits);
+-	/* give me another random factor */
+-	hash -= hash_long((unsigned long)hs, val % 11 + 3);
+-
+-	hash <<= hs->hs_cur_bits - hs->hs_bkt_bits;
+-	hash |= ldlm_res_hop_hash(hs, key, CFS_HASH_NBKT(hs) - 1);
+-
+-	return hash & mask;
++	hash += (val >> 5) + (val << 11);
++	return hash_32(hash, bits);
+ }
+ 
+ static void *ldlm_res_hop_key(struct hlist_node *hnode)
+@@ -555,16 +546,6 @@ static struct cfs_hash_ops ldlm_ns_hash_ops = {
+ 	.hs_put		= ldlm_res_hop_put
  };
  
- #define obd2cli_tgt(obd) ((char *)(obd)->u.cli.cl_target_uuid.uuid)
-diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
-index be8c7829b3de..fca020568c19 100644
---- a/drivers/staging/lustre/lustre/osc/osc_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
-@@ -188,8 +188,9 @@ extern struct lu_kmem_descr osc_caches[];
- extern struct kmem_cache *osc_quota_kmem;
- struct osc_quota_info {
- 	/** linkage for quota hash table */
--	struct hlist_node oqi_hash;
--	u32	  oqi_id;
-+	struct rhash_head oqi_hash;
-+	u32		  oqi_id;
-+	struct rcu_head	  rcu;
- };
- 
- int osc_quota_setup(struct obd_device *obd);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_quota.c b/drivers/staging/lustre/lustre/osc/osc_quota.c
-index ce1731dc604f..723ec2fb18bf 100644
---- a/drivers/staging/lustre/lustre/osc/osc_quota.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_quota.c
-@@ -27,6 +27,13 @@
- #include <obd_class.h>
- #include "osc_internal.h"
- 
-+static const struct rhashtable_params quota_hash_params = {
-+	.key_len	= sizeof(u32),
-+	.key_offset	= offsetof(struct osc_quota_info, oqi_id),
-+	.head_offset	= offsetof(struct osc_quota_info, oqi_hash),
-+	.automatic_shrinking = true,
-+};
-+
- static inline struct osc_quota_info *osc_oqi_alloc(u32 id)
- {
- 	struct osc_quota_info *oqi;
-@@ -45,9 +52,10 @@ int osc_quota_chkdq(struct client_obd *cli, const unsigned int qid[])
- 	for (type = 0; type < MAXQUOTAS; type++) {
- 		struct osc_quota_info *oqi;
- 
--		oqi = cfs_hash_lookup(cli->cl_quota_hash[type], &qid[type]);
-+		oqi = rhashtable_lookup_fast(&cli->cl_quota_hash[type], &qid[type],
-+					     quota_hash_params);
- 		if (oqi) {
--			/* do not try to access oqi here, it could have been
-+			/* Must not access oqi here, it could have been
- 			 * freed by osc_quota_setdq()
- 			 */
- 
-@@ -63,6 +71,14 @@ int osc_quota_chkdq(struct client_obd *cli, const unsigned int qid[])
- 	return QUOTA_OK;
- }
- 
-+static void osc_quota_free(struct rcu_head *head)
-+{
-+	struct osc_quota_info *oqi = container_of(head, struct osc_quota_info, rcu);
-+
-+	kmem_cache_free(osc_quota_kmem, oqi);
-+}
-+
-+
- #define MD_QUOTA_FLAG(type) ((type == USRQUOTA) ? OBD_MD_FLUSRQUOTA \
- 						: OBD_MD_FLGRPQUOTA)
- #define FL_QUOTA_FLAG(type) ((type == USRQUOTA) ? OBD_FL_NO_USRQUOTA \
-@@ -84,11 +100,14 @@ int osc_quota_setdq(struct client_obd *cli, const unsigned int qid[],
- 			continue;
- 
- 		/* lookup the ID in the per-type hash table */
--		oqi = cfs_hash_lookup(cli->cl_quota_hash[type], &qid[type]);
-+		rcu_read_lock();
-+		oqi = rhashtable_lookup_fast(&cli->cl_quota_hash[type], &qid[type],
-+					     quota_hash_params);
- 		if ((flags & FL_QUOTA_FLAG(type)) != 0) {
- 			/* This ID is getting close to its quota limit, let's
- 			 * switch to sync I/O
- 			 */
-+			rcu_read_unlock();
- 			if (oqi)
- 				continue;
- 
-@@ -98,12 +117,16 @@ int osc_quota_setdq(struct client_obd *cli, const unsigned int qid[],
- 				break;
- 			}
- 
--			rc = cfs_hash_add_unique(cli->cl_quota_hash[type],
--						 &qid[type], &oqi->oqi_hash);
-+			rc = rhashtable_lookup_insert_fast(&cli->cl_quota_hash[type],
-+							   &oqi->oqi_hash, quota_hash_params);
- 			/* race with others? */
--			if (rc == -EALREADY) {
--				rc = 0;
-+			if (rc) {
- 				kmem_cache_free(osc_quota_kmem, oqi);
-+				if (rc != -EEXIST) {
-+					rc = -ENOMEM;
-+					break;
-+				}
-+				rc = 0;
- 			}
- 
- 			CDEBUG(D_QUOTA, "%s: setdq to insert for %s %d (%d)\n",
-@@ -114,14 +137,14 @@ int osc_quota_setdq(struct client_obd *cli, const unsigned int qid[],
- 			/* This ID is now off the hook, let's remove it from
- 			 * the hash table
- 			 */
--			if (!oqi)
-+			if (!oqi) {
-+				rcu_read_unlock();
- 				continue;
--
--			oqi = cfs_hash_del_key(cli->cl_quota_hash[type],
--					       &qid[type]);
--			if (oqi)
--				kmem_cache_free(osc_quota_kmem, oqi);
--
-+			}
-+			if (rhashtable_remove_fast(&cli->cl_quota_hash[type],
-+						   &oqi->oqi_hash, quota_hash_params) == 0)
-+				call_rcu(&oqi->rcu, osc_quota_free);
-+			rcu_read_unlock();
- 			CDEBUG(D_QUOTA, "%s: setdq to remove for %s %d (%p)\n",
- 			       cli_name(cli),
- 			       type == USRQUOTA ? "user" : "group",
-@@ -132,93 +155,21 @@ int osc_quota_setdq(struct client_obd *cli, const unsigned int qid[],
- 	return rc;
- }
- 
--/*
-- * Hash operations for uid/gid <-> osc_quota_info
-- */
--static unsigned int
--oqi_hashfn(struct cfs_hash *hs, const void *key, unsigned int mask)
--{
--	return cfs_hash_u32_hash(*((__u32 *)key), mask);
--}
--
--static int
--oqi_keycmp(const void *key, struct hlist_node *hnode)
--{
--	struct osc_quota_info *oqi;
--	u32 uid;
--
--	LASSERT(key);
--	uid = *((u32 *)key);
--	oqi = hlist_entry(hnode, struct osc_quota_info, oqi_hash);
--
--	return uid == oqi->oqi_id;
--}
--
--static void *
--oqi_key(struct hlist_node *hnode)
--{
--	struct osc_quota_info *oqi;
--
--	oqi = hlist_entry(hnode, struct osc_quota_info, oqi_hash);
--	return &oqi->oqi_id;
--}
--
--static void *
--oqi_object(struct hlist_node *hnode)
--{
--	return hlist_entry(hnode, struct osc_quota_info, oqi_hash);
--}
--
--static void
--oqi_get(struct cfs_hash *hs, struct hlist_node *hnode)
--{
--}
--
--static void
--oqi_put_locked(struct cfs_hash *hs, struct hlist_node *hnode)
--{
--}
--
- static void
--oqi_exit(struct cfs_hash *hs, struct hlist_node *hnode)
-+oqi_exit(void *vquota, void *data)
- {
--	struct osc_quota_info *oqi;
--
--	oqi = hlist_entry(hnode, struct osc_quota_info, oqi_hash);
-+	struct osc_quota_info *oqi = vquota;
- 
--	kmem_cache_free(osc_quota_kmem, oqi);
-+	osc_quota_free(&oqi->rcu);
- }
- 
--#define HASH_QUOTA_BKT_BITS 5
--#define HASH_QUOTA_CUR_BITS 5
--#define HASH_QUOTA_MAX_BITS 15
--
--static struct cfs_hash_ops quota_hash_ops = {
--	.hs_hash	= oqi_hashfn,
--	.hs_keycmp	= oqi_keycmp,
--	.hs_key		= oqi_key,
--	.hs_object	= oqi_object,
--	.hs_get		= oqi_get,
--	.hs_put_locked	= oqi_put_locked,
--	.hs_exit	= oqi_exit,
+-static struct cfs_hash_ops ldlm_ns_fid_hash_ops = {
+-	.hs_hash	= ldlm_res_hop_fid_hash,
+-	.hs_key		= ldlm_res_hop_key,
+-	.hs_keycmp      = ldlm_res_hop_keycmp,
+-	.hs_keycpy      = NULL,
+-	.hs_object      = ldlm_res_hop_object,
+-	.hs_get		= ldlm_res_hop_get_locked,
+-	.hs_put		= ldlm_res_hop_put
 -};
 -
- int osc_quota_setup(struct obd_device *obd)
+ struct ldlm_ns_hash_def {
+ 	enum ldlm_ns_type nsd_type;
+ 	/** hash bucket bits */
+@@ -580,13 +561,13 @@ static struct ldlm_ns_hash_def ldlm_ns_hash_defs[] = {
+ 		.nsd_type       = LDLM_NS_TYPE_MDC,
+ 		.nsd_bkt_bits   = 11,
+ 		.nsd_all_bits   = 16,
+-		.nsd_hops       = &ldlm_ns_fid_hash_ops,
++		.nsd_hops       = &ldlm_ns_hash_ops,
+ 	},
+ 	{
+ 		.nsd_type       = LDLM_NS_TYPE_MDT,
+ 		.nsd_bkt_bits   = 14,
+ 		.nsd_all_bits   = 21,
+-		.nsd_hops       = &ldlm_ns_fid_hash_ops,
++		.nsd_hops       = &ldlm_ns_hash_ops,
+ 	},
+ 	{
+ 		.nsd_type       = LDLM_NS_TYPE_OSC,
+@@ -602,13 +583,13 @@ static struct ldlm_ns_hash_def ldlm_ns_hash_defs[] = {
+ 	},
+ 	{
+ 		.nsd_type       = LDLM_NS_TYPE_MGC,
+-		.nsd_bkt_bits   = 4,
++		.nsd_bkt_bits   = 3,
+ 		.nsd_all_bits   = 4,
+ 		.nsd_hops       = &ldlm_ns_hash_ops,
+ 	},
+ 	{
+ 		.nsd_type       = LDLM_NS_TYPE_MGT,
+-		.nsd_bkt_bits   = 4,
++		.nsd_bkt_bits   = 3,
+ 		.nsd_all_bits   = 4,
+ 		.nsd_hops       = &ldlm_ns_hash_ops,
+ 	},
+@@ -637,9 +618,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 					  enum ldlm_ns_type ns_type)
  {
- 	struct client_obd *cli = &obd->u.cli;
- 	int i, type;
+ 	struct ldlm_namespace *ns = NULL;
+-	struct ldlm_ns_bucket *nsb;
+ 	struct ldlm_ns_hash_def    *nsd;
+-	struct cfs_hash_bd	  bd;
+ 	int		    idx;
+ 	int		    rc;
  
- 	for (type = 0; type < MAXQUOTAS; type++) {
--		cli->cl_quota_hash[type] = cfs_hash_create("QUOTA_HASH",
--							   HASH_QUOTA_CUR_BITS,
--							   HASH_QUOTA_MAX_BITS,
--							   HASH_QUOTA_BKT_BITS,
--							   0,
--							   CFS_HASH_MIN_THETA,
--							   CFS_HASH_MAX_THETA,
--							   &quota_hash_ops,
--							   CFS_HASH_DEFAULT);
--		if (!cli->cl_quota_hash[type])
-+		if (rhashtable_init(&cli->cl_quota_hash[type], &quota_hash_params) != 0)
- 			break;
+@@ -668,7 +647,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 
+ 	ns->ns_rs_hash = cfs_hash_create(name,
+ 					 nsd->nsd_all_bits, nsd->nsd_all_bits,
+-					 nsd->nsd_bkt_bits, sizeof(*nsb),
++					 nsd->nsd_bkt_bits, 0,
+ 					 CFS_HASH_MIN_THETA,
+ 					 CFS_HASH_MAX_THETA,
+ 					 nsd->nsd_hops,
+@@ -678,9 +657,15 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 					 CFS_HASH_NO_ITEMREF);
+ 	if (!ns->ns_rs_hash)
+ 		goto out_ns;
++	ns->ns_bucket_bits = nsd->nsd_all_bits - nsd->nsd_bkt_bits;
++	ns->ns_rs_buckets = kvmalloc_array(1 << ns->ns_bucket_bits,
++					   sizeof(ns->ns_rs_buckets[0]),
++					   GFP_KERNEL);
++	if (!ns->ns_rs_buckets)
++		goto out_hash;
+ 
+-	cfs_hash_for_each_bucket(ns->ns_rs_hash, &bd, idx) {
+-		nsb = cfs_hash_bd_extra_get(ns->ns_rs_hash, &bd);
++	for (idx = 0; idx < (1 << ns->ns_bucket_bits); idx++) {
++		struct ldlm_ns_bucket *nsb = &ns->ns_rs_buckets[idx];
+ 		at_init(&nsb->nsb_at_estimate, ldlm_enqueue_min, 0);
+ 		nsb->nsb_namespace = ns;
  	}
+@@ -730,6 +715,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 	ldlm_namespace_sysfs_unregister(ns);
+ 	ldlm_namespace_cleanup(ns, 0);
+ out_hash:
++	kvfree(ns->ns_rs_buckets);
+ 	cfs_hash_putref(ns->ns_rs_hash);
+ out_ns:
+ 	kfree(ns);
+@@ -993,6 +979,7 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
+ 	ldlm_namespace_debugfs_unregister(ns);
+ 	ldlm_namespace_sysfs_unregister(ns);
+ 	cfs_hash_putref(ns->ns_rs_hash);
++	kvfree(ns->ns_rs_buckets);
+ 	/* Namespace \a ns should be not on list at this time, otherwise
+ 	 * this will cause issues related to using freed \a ns in poold
+ 	 * thread.
+@@ -1098,6 +1085,7 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 	__u64		 version;
+ 	int		      ns_refcount = 0;
+ 	int rc;
++	int hash;
  
-@@ -226,7 +177,7 @@ int osc_quota_setup(struct obd_device *obd)
- 		return 0;
+ 	LASSERT(!parent);
+ 	LASSERT(ns->ns_rs_hash);
+@@ -1122,7 +1110,8 @@ ldlm_resource_get(struct ldlm_namespace *ns, struct ldlm_resource *parent,
+ 	if (!res)
+ 		return ERR_PTR(-ENOMEM);
  
- 	for (i = 0; i < type; i++)
--		cfs_hash_putref(cli->cl_quota_hash[i]);
-+		rhashtable_destroy(&cli->cl_quota_hash[i]);
+-	res->lr_ns_bucket  = cfs_hash_bd_extra_get(ns->ns_rs_hash, &bd);
++	hash = ldlm_res_hop_fid_hash(name, ns->ns_bucket_bits);
++	res->lr_ns_bucket  = &ns->ns_rs_buckets[hash];
+ 	res->lr_name       = *name;
+ 	res->lr_type       = type;
  
- 	return -ENOMEM;
- }
-@@ -237,7 +188,8 @@ int osc_quota_cleanup(struct obd_device *obd)
- 	int type;
- 
- 	for (type = 0; type < MAXQUOTAS; type++)
--		cfs_hash_putref(cli->cl_quota_hash[type]);
-+		rhashtable_free_and_destroy(&cli->cl_quota_hash[type],
-+					    oqi_exit, NULL);
- 
- 	return 0;
- }
