@@ -1,54 +1,66 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Apr 2018 00:15:02 -0400
-Subject: [lustre-devel] [PATCH 13/22] staging: lustre: llite: remove newline
- in fullname strings
+Date: Mon, 16 Apr 2018 00:15:00 -0400
+Subject: [lustre-devel] [PATCH 11/22] staging: lustre: llite: eat -EEXIST on
+ setting trusted.lov
 In-Reply-To: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
 References: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1523852111-17321-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <1523852111-17321-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: James Simmons <uja.ornl@yahoo.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Bobi Jam <bobijam.xu@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-In creating the full name of a xattr a new line was added that
-was seen by the remote MDS server which confused it. Remove the
-newline.
+From: Bobi Jam <bobijam.xu@intel.com>
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9183
-Reviewed-on: https://review.whamcloud.com/27240
+Tools like rsync, tar, cp may copy and restore the xattrs on a file.
+The client previously ignored the setting of trusted.lov/lustre.lov
+if the layout had already been specified, to avoid causing these
+tools to fail for no reason.
+
+For PFL files we still need to silently eat -EEXIST on setting these
+attributes to avoid problems.
+
+Signed-off-by: Bobi Jam <bobijam.xu@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9484
+Reviewed-on: https://review.whamcloud.com/27126
 Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: Sebastien Buisson <sbuisson@ddn.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/xattr.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/llite/xattr.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 42a6fb4..4b1e565 100644
+index 56ac07e..69c5227 100644
 --- a/drivers/staging/lustre/lustre/llite/xattr.c
 +++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -136,7 +136,7 @@ static int xattr_type_filter(struct ll_sb_info *sbi,
- 			return -EPERM;
- 	}
+@@ -254,12 +254,20 @@ static int ll_setstripe_ea(struct dentry *dentry, struct lov_user_md *lump,
  
--	fullname = kasprintf(GFP_KERNEL, "%s%s\n", handler->prefix, name);
-+	fullname = kasprintf(GFP_KERNEL, "%s%s", handler->prefix, name);
- 	if (!fullname)
- 		return -ENOMEM;
- 	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
-@@ -435,7 +435,7 @@ static int ll_xattr_get_common(const struct xattr_handler *handler,
- 	if (handler->flags == XATTR_ACL_DEFAULT_T && !S_ISDIR(inode->i_mode))
- 		return -ENODATA;
- #endif
--	fullname = kasprintf(GFP_KERNEL, "%s%s\n", handler->prefix, name);
-+	fullname = kasprintf(GFP_KERNEL, "%s%s", handler->prefix, name);
- 	if (!fullname)
- 		return -ENOMEM;
- 	rc = ll_xattr_list(inode, fullname, handler->flags, buffer, size,
+ 		lum_size = ll_lov_user_md_size(lump);
+ 		if (lum_size < 0 || size < lum_size)
+-			return 0; /* b=10667: ignore error */
++			return -ERANGE;
+ 
+ 		rc = ll_lov_setstripe_ea_info(inode, dentry, it_flags, lump,
+ 					      lum_size);
+-		/* b=10667: rc always be 0 here for now */
+-		rc = 0;
++		/**
++		 * b=10667: ignore -EEXIST.
++		 * Silently eat error on setting trusted.lov/lustre.lov
++		 * attribute for platforms that added the default option
++		 * to copy all attributes in 'cp' command. Both rsync and
++		 * tar --xattrs also will try to set LOVEA for existing
++		 * files.
++		 */
++		if (rc == -EEXIST)
++			rc = 0;
+ 	} else if (S_ISDIR(inode->i_mode)) {
+ 		rc = ll_dir_setstripe(inode, lump, 0);
+ 	}
 -- 
 1.8.3.1
