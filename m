@@ -1,71 +1,59 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Apr 2018 00:14:49 -0400
-Subject: [lustre-devel] [PATCH 00/22] staging: lustre: llite: fix xattr
- handling
-Message-ID: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
+Date: Mon, 16 Apr 2018 00:14:52 -0400
+Subject: [lustre-devel] [PATCH 03/22] staging: lustre: obd: change debug
+ reporting in lmv_enqueue()
+In-Reply-To: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
+References: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1523852111-17321-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: James Simmons <uja.ornl@yahoo.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Vitaly Fertman <vitaly.fertman@seagate.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: James Simmons <uja.ornl@yahoo.com>
+From: Vitaly Fertman <vitaly.fertman@seagate.com>
 
-Lustre utilities and user land APIs heavly depend on special xattr
-handling. Sadly much of the xattr handling for lustre client has
-been broken for awhile. This is all the fixes needed to make xattr
-handling work properly with the latest kernels.
+Remove LL_IT2STR(it) from debug macros in lmv_enqueue(). The
+removal makes it possible to simplify the md_enqueue() functions.
 
-Bobi Jam (3):
-  staging: lustre: llite: break up ll_setstripe_ea function
-  staging: lustre: llite: return from ll_adjust_lum() if lump is NULL
-  staging: lustre: llite: eat -EEXIST on setting trusted.lov
+Signed-off-by: Vitaly Fertman <vitaly.fertman@seagate.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7433
+Seagate-bug-id: MRP-3072 MRP-3137
+Reviewed-on: http://review.whamcloud.com/17220
+Reviewed-by: Andrew Perepechko <andrew.perepechko@seagate.com>
+Reviewed-by: Andriy Skulysh <andriy.skulysh@seagate.com>
+Tested-by: Elena V. Gryaznova <elena.gryaznova@seagate.com>
+Reviewed-by: John L. Hammond <john.hammond@intel.com>
+Reviewed-by: Lai Siyao <lai.siyao@intel.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Dmitry Eremin (1):
-  staging: lustre: llite: add support set_acl method in inode operations
-
-James Simmons (9):
-  staging: lustre: llite: initialize xattr->xe_namelen
-  staging: lustre: llite: fix invalid size test in ll_setstripe_ea()
-  staging: lustre: llite: remove newline in fullname strings
-  staging: lustre: llite: record in stats attempted removal of lma/link xattr
-  staging: lustre: llite: cleanup posix acl xattr code
-  staging: lustre: llite: use proper types in the xattr code
-  staging: lustre: llite: cleanup xattr code comments
-  staging: lustre: llite: style changes in xattr.c
-  staging: lustre: llite: correct removexattr detection
-
-John L. Hammond (3):
-  staging: lustre: llite: handle xattr cache refill race
-  staging: lustre: llite: use xattr_handler name for ACLs
-  staging: lustre: llite: remove unused parameters from md_{get,set}xattr()
-
-Niu Yawei (2):
-  staging: lustre: llite: refactor lustre.lov xattr handling
-  staging: lustre: llite: add simple comment about lustre.lov xattrs
-
-Robin Humble (1):
-  staging: lustre: llite: Remove filtering of seclabel xattr
-
-Vitaly Fertman (3):
-  staging: lustre: obd: create it_has_reply_body()
-  staging: lustre: obd: change debug reporting in lmv_enqueue()
-  staging: lustre: ldlm: xattr locks are lost on mdt
-
- drivers/staging/lustre/lustre/include/obd.h        |  20 +-
- drivers/staging/lustre/lustre/include/obd_class.h  |  24 +--
- drivers/staging/lustre/lustre/llite/file.c         |  86 ++++++--
- .../staging/lustre/lustre/llite/llite_internal.h   |   4 +
- drivers/staging/lustre/lustre/llite/namei.c        |  10 +-
- drivers/staging/lustre/lustre/llite/xattr.c        | 231 ++++++++++++---------
- drivers/staging/lustre/lustre/llite/xattr_cache.c  |  83 +++-----
- drivers/staging/lustre/lustre/lmv/lmv_intent.c     |  12 +-
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  36 ++--
- drivers/staging/lustre/lustre/mdc/mdc_internal.h   |   4 +-
- drivers/staging/lustre/lustre/mdc/mdc_locks.c      |  68 ++++--
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |  34 +--
- 12 files changed, 364 insertions(+), 248 deletions(-)
-
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 7be9310..e1c93cd 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -1660,15 +1660,14 @@ static int lmv_create(struct obd_export *exp, struct md_op_data *op_data,
+ 	struct lmv_obd	   *lmv = &obd->u.lmv;
+ 	struct lmv_tgt_desc      *tgt;
+ 
+-	CDEBUG(D_INODE, "ENQUEUE '%s' on " DFID "\n",
+-	       LL_IT2STR(it), PFID(&op_data->op_fid1));
++	CDEBUG(D_INODE, "ENQUEUE on " DFID "\n", PFID(&op_data->op_fid1));
+ 
+ 	tgt = lmv_locate_mds(lmv, op_data, &op_data->op_fid1);
+ 	if (IS_ERR(tgt))
+ 		return PTR_ERR(tgt);
+ 
+-	CDEBUG(D_INODE, "ENQUEUE '%s' on " DFID " -> mds #%u\n",
+-	       LL_IT2STR(it), PFID(&op_data->op_fid1), tgt->ltd_idx);
++	CDEBUG(D_INODE, "ENQUEUE on " DFID " -> mds #%u\n",
++	       PFID(&op_data->op_fid1), tgt->ltd_idx);
+ 
+ 	return md_enqueue(tgt->ltd_exp, einfo, policy, it, op_data, lockh,
+ 			extra_lock_flags);
 -- 
 1.8.3.1
