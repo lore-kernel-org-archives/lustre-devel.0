@@ -1,298 +1,186 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Apr 2018 00:09:51 -0400
-Subject: [lustre-devel] [PATCH 09/25] staging: lustre: libcfs: use distance
- in cpu and node handling
+Date: Mon, 16 Apr 2018 00:09:58 -0400
+Subject: [lustre-devel] [PATCH 16/25] staging: lustre: libcfs: rename
+ cpumask_var_t variables to *_mask
 In-Reply-To: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
 References: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1523851807-16573-10-git-send-email-jsimmons@infradead.org>
+Message-ID: <1523851807-16573-17-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Amir Shehata <amir.shehata@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Dmitry Eremin <dmitry.eremin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: Amir Shehata <amir.shehata@intel.com>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Take into consideration the location of NUMA nodes and core
-when calling cfs_cpt_[un]set_cpu() and cfs_cpt_[un]set_node().
-This enables functioning on platforms with 100s of cores and
-NUMA nodes.
+Because we handle both cpu mask as well as core identifiers it can
+easily be confused. To avoid this rename various cpumask_var_t to
+have appended *_mask to their names.
 
-Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7734
-Reviewed-on: http://review.whamcloud.com/18916
-Reviewed-by: Olaf Weber <olaf@sgi.com>
-Reviewed-by: Doug Oucharek <dougso@me.com>
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
+Reviewed-on: https://review.whamcloud.com/23222
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   | 192 +++++++++++++++------
- 1 file changed, 143 insertions(+), 49 deletions(-)
+ .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   | 62 +++++++++++-----------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-index 1e184b1..bbf89b8 100644
+index b985b3d..ae5ff58 100644
 --- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
 +++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-@@ -300,11 +300,134 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
- }
- EXPORT_SYMBOL(cfs_cpt_distance);
- 
-+/*
-+ * Calculate the maximum NUMA distance between all nodes in the
-+ * from_mask and all nodes in the to_mask.
-+ */
-+static unsigned int cfs_cpt_distance_calculate(nodemask_t *from_mask,
-+					       nodemask_t *to_mask)
-+{
-+	unsigned int maximum;
-+	unsigned int distance;
-+	int from;
-+	int to;
-+
-+	maximum = 0;
-+	for_each_node_mask(from, *from_mask) {
-+		for_each_node_mask(to, *to_mask) {
-+			distance = node_distance(from, to);
-+			if (maximum < distance)
-+				maximum = distance;
-+		}
-+	}
-+	return maximum;
-+}
-+
-+static void cfs_cpt_add_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
-+{
-+	cptab->ctb_cpu2cpt[cpu] = cpt;
-+
-+	cpumask_set_cpu(cpu, cptab->ctb_cpumask);
-+	cpumask_set_cpu(cpu, cptab->ctb_parts[cpt].cpt_cpumask);
-+}
-+
-+static void cfs_cpt_del_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
-+{
-+	cpumask_clear_cpu(cpu, cptab->ctb_parts[cpt].cpt_cpumask);
-+	cpumask_clear_cpu(cpu, cptab->ctb_cpumask);
-+
-+	cptab->ctb_cpu2cpt[cpu] = -1;
-+}
-+
-+static void cfs_cpt_add_node(struct cfs_cpt_table *cptab, int cpt, int node)
-+{
-+	struct cfs_cpu_partition *part;
-+
-+	if (!node_isset(node, *cptab->ctb_nodemask)) {
-+		unsigned int dist;
-+
-+		/* first time node is added to the CPT table */
-+		node_set(node, *cptab->ctb_nodemask);
-+		cptab->ctb_node2cpt[node] = cpt;
-+
-+		dist = cfs_cpt_distance_calculate(cptab->ctb_nodemask,
-+						  cptab->ctb_nodemask);
-+		cptab->ctb_distance = dist;
-+	}
-+
-+	part = &cptab->ctb_parts[cpt];
-+	if (!node_isset(node, *part->cpt_nodemask)) {
-+		int cpt2;
-+
-+		/* first time node is added to this CPT */
-+		node_set(node, *part->cpt_nodemask);
-+		for (cpt2 = 0; cpt2 < cptab->ctb_nparts; cpt2++) {
-+			struct cfs_cpu_partition *part2;
-+			unsigned int dist;
-+
-+			part2 = &cptab->ctb_parts[cpt2];
-+			dist = cfs_cpt_distance_calculate(part->cpt_nodemask,
-+							  part2->cpt_nodemask);
-+			part->cpt_distance[cpt2] = dist;
-+			dist = cfs_cpt_distance_calculate(part2->cpt_nodemask,
-+							  part->cpt_nodemask);
-+			part2->cpt_distance[cpt] = dist;
-+		}
-+	}
-+}
-+
-+static void cfs_cpt_del_node(struct cfs_cpt_table *cptab, int cpt, int node)
-+{
-+	struct cfs_cpu_partition *part = &cptab->ctb_parts[cpt];
-+	int cpu;
-+
-+	for_each_cpu(cpu, part->cpt_cpumask) {
-+		/* this CPT has other CPU belonging to this node? */
-+		if (cpu_to_node(cpu) == node)
-+			break;
-+	}
-+
-+	if (cpu >= nr_cpu_ids && node_isset(node,  *part->cpt_nodemask)) {
-+		int cpt2;
-+
-+		/* No more CPUs in the node for this CPT. */
-+		node_clear(node, *part->cpt_nodemask);
-+		for (cpt2 = 0; cpt2 < cptab->ctb_nparts; cpt2++) {
-+			struct cfs_cpu_partition *part2;
-+			unsigned int dist;
-+
-+			part2 = &cptab->ctb_parts[cpt2];
-+			if (node_isset(node, *part2->cpt_nodemask))
-+				cptab->ctb_node2cpt[node] = cpt2;
-+
-+			dist = cfs_cpt_distance_calculate(part->cpt_nodemask,
-+							  part2->cpt_nodemask);
-+			part->cpt_distance[cpt2] = dist;
-+			dist = cfs_cpt_distance_calculate(part2->cpt_nodemask,
-+							  part->cpt_nodemask);
-+			part2->cpt_distance[cpt] = dist;
-+		}
-+	}
-+
-+	for_each_cpu(cpu, cptab->ctb_cpumask) {
-+		/* this CPT-table has other CPUs belonging to this node? */
-+		if (cpu_to_node(cpu) == node)
-+			break;
-+	}
-+
-+	if (cpu >= nr_cpu_ids && node_isset(node, *cptab->ctb_nodemask)) {
-+		/* No more CPUs in the table for this node. */
-+		node_clear(node, *cptab->ctb_nodemask);
-+		cptab->ctb_node2cpt[node] = -1;
-+		cptab->ctb_distance =
-+			cfs_cpt_distance_calculate(cptab->ctb_nodemask,
-+						   cptab->ctb_nodemask);
-+	}
-+}
-+
- int
- cfs_cpt_set_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
+@@ -685,23 +685,23 @@ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
+  * We always prefer to choose CPU in the same core/socket.
+  */
+ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+-				cpumask_t *node, int number)
++				cpumask_t *node_mask, int number)
  {
--	int node;
--
- 	LASSERT(cpt >= 0 && cpt < cptab->ctb_nparts);
+-	cpumask_var_t socket;
+-	cpumask_var_t core;
++	cpumask_var_t socket_mask;
++	cpumask_var_t core_mask;
+ 	int rc = 0;
+ 	int cpu;
  
- 	if (cpu < 0 || cpu >= nr_cpu_ids || !cpu_online(cpu)) {
-@@ -318,23 +441,11 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
+ 	LASSERT(number > 0);
+ 
+-	if (number >= cpumask_weight(node)) {
+-		while (!cpumask_empty(node)) {
+-			cpu = cpumask_first(node);
++	if (number >= cpumask_weight(node_mask)) {
++		while (!cpumask_empty(node_mask)) {
++			cpu = cpumask_first(node_mask);
+ 
+ 			rc = cfs_cpt_set_cpu(cptab, cpt, cpu);
+ 			if (!rc)
+ 				return -EINVAL;
+-			cpumask_clear_cpu(cpu, node);
++			cpumask_clear_cpu(cpu, node_mask);
+ 		}
  		return 0;
  	}
+@@ -711,34 +711,34 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+ 	 * As we cannot initialize a cpumask_var_t, we need
+ 	 * to alloc both before we can risk trying to free either
+ 	 */
+-	if (!zalloc_cpumask_var(&socket, GFP_NOFS))
++	if (!zalloc_cpumask_var(&socket_mask, GFP_NOFS))
+ 		rc = -ENOMEM;
+-	if (!zalloc_cpumask_var(&core, GFP_NOFS))
++	if (!zalloc_cpumask_var(&core_mask, GFP_NOFS))
+ 		rc = -ENOMEM;
+ 	if (rc)
+ 		goto out;
  
--	cptab->ctb_cpu2cpt[cpu] = cpt;
--
- 	LASSERT(!cpumask_test_cpu(cpu, cptab->ctb_cpumask));
- 	LASSERT(!cpumask_test_cpu(cpu, cptab->ctb_parts[cpt].cpt_cpumask));
+-	while (!cpumask_empty(node)) {
+-		cpu = cpumask_first(node);
++	while (!cpumask_empty(node_mask)) {
++		cpu = cpumask_first(node_mask);
  
--	cpumask_set_cpu(cpu, cptab->ctb_cpumask);
--	cpumask_set_cpu(cpu, cptab->ctb_parts[cpt].cpt_cpumask);
--
--	node = cpu_to_node(cpu);
--
--	/* first CPU of @node in this CPT table */
--	if (!node_isset(node, *cptab->ctb_nodemask))
--		node_set(node, *cptab->ctb_nodemask);
--
--	/* first CPU of @node in this partition */
--	if (!node_isset(node, *cptab->ctb_parts[cpt].cpt_nodemask))
--		node_set(node, *cptab->ctb_parts[cpt].cpt_nodemask);
-+	cfs_cpt_add_cpu(cptab, cpt, cpu);
-+	cfs_cpt_add_node(cptab, cpt, cpu_to_node(cpu));
+ 		/* get cpumask for cores in the same socket */
+-		cpumask_copy(socket, topology_core_cpumask(cpu));
+-		cpumask_and(socket, socket, node);
++		cpumask_copy(socket_mask, topology_core_cpumask(cpu));
++		cpumask_and(socket_mask, socket_mask, node_mask);
  
- 	return 1;
- }
-@@ -343,9 +454,6 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
- void
- cfs_cpt_unset_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
- {
--	int node;
--	int i;
--
- 	LASSERT(cpt == CFS_CPT_ANY || (cpt >= 0 && cpt < cptab->ctb_nparts));
+-		LASSERT(!cpumask_empty(socket));
++		LASSERT(!cpumask_empty(socket_mask));
  
- 	if (cpu < 0 || cpu >= nr_cpu_ids) {
-@@ -371,32 +479,8 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
- 	LASSERT(cpumask_test_cpu(cpu, cptab->ctb_parts[cpt].cpt_cpumask));
- 	LASSERT(cpumask_test_cpu(cpu, cptab->ctb_cpumask));
+-		while (!cpumask_empty(socket)) {
++		while (!cpumask_empty(socket_mask)) {
+ 			int i;
  
--	cpumask_clear_cpu(cpu, cptab->ctb_parts[cpt].cpt_cpumask);
--	cpumask_clear_cpu(cpu, cptab->ctb_cpumask);
--	cptab->ctb_cpu2cpt[cpu] = -1;
--
--	node = cpu_to_node(cpu);
--
--	LASSERT(node_isset(node, *cptab->ctb_parts[cpt].cpt_nodemask));
--	LASSERT(node_isset(node, *cptab->ctb_nodemask));
--
--	for_each_cpu(i, cptab->ctb_parts[cpt].cpt_cpumask) {
--		/* this CPT has other CPU belonging to this node? */
--		if (cpu_to_node(i) == node)
--			break;
--	}
--
--	if (i >= nr_cpu_ids)
--		node_clear(node, *cptab->ctb_parts[cpt].cpt_nodemask);
--
--	for_each_cpu(i, cptab->ctb_cpumask) {
--		/* this CPT-table has other CPU belonging to this node? */
--		if (cpu_to_node(i) == node)
--			break;
--	}
--
--	if (i >= nr_cpu_ids)
--		node_clear(node, *cptab->ctb_nodemask);
-+	cfs_cpt_del_cpu(cptab, cpt, cpu);
-+	cfs_cpt_del_node(cptab, cpt, cpu_to_node(cpu));
- }
- EXPORT_SYMBOL(cfs_cpt_unset_cpu);
+ 			/* get cpumask for hts in the same core */
+-			cpumask_copy(core, topology_sibling_cpumask(cpu));
+-			cpumask_and(core, core, node);
++			cpumask_copy(core_mask, topology_sibling_cpumask(cpu));
++			cpumask_and(core_mask, core_mask, node_mask);
  
-@@ -413,8 +497,8 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
+-			LASSERT(!cpumask_empty(core));
++			LASSERT(!cpumask_empty(core_mask));
+ 
+-			for_each_cpu(i, core) {
+-				cpumask_clear_cpu(i, socket);
+-				cpumask_clear_cpu(i, node);
++			for_each_cpu(i, core_mask) {
++				cpumask_clear_cpu(i, socket_mask);
++				cpumask_clear_cpu(i, node_mask);
+ 
+ 				rc = cfs_cpt_set_cpu(cptab, cpt, i);
+ 				if (!rc) {
+@@ -749,13 +749,13 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+ 				if (!--number)
+ 					goto out;
+ 			}
+-			cpu = cpumask_first(socket);
++			cpu = cpumask_first(socket_mask);
+ 		}
  	}
  
- 	for_each_cpu(cpu, mask) {
--		if (!cfs_cpt_set_cpu(cptab, cpt, cpu))
--			return 0;
-+		cfs_cpt_add_cpu(cptab, cpt, cpu);
-+		cfs_cpt_add_node(cptab, cpt, cpu_to_node(cpu));
+ out:
+-	free_cpumask_var(socket);
+-	free_cpumask_var(core);
++	free_cpumask_var(socket_mask);
++	free_cpumask_var(core_mask);
+ 	return rc;
+ }
+ 
+@@ -806,7 +806,7 @@ static int cfs_cpt_num_estimate(void)
+ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
+ {
+ 	struct cfs_cpt_table *cptab = NULL;
+-	cpumask_var_t mask;
++	cpumask_var_t node_mask;
+ 	int cpt = 0;
+ 	int num;
+ 	int rc;
+@@ -839,15 +839,15 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
+ 		goto failed;
  	}
  
- 	return 1;
-@@ -436,6 +520,7 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
- cfs_cpt_set_node(struct cfs_cpt_table *cptab, int cpt, int node)
- {
- 	const cpumask_t *mask;
-+	int cpu;
+-	if (!zalloc_cpumask_var(&mask, GFP_NOFS)) {
++	if (!zalloc_cpumask_var(&node_mask, GFP_NOFS)) {
+ 		CERROR("Failed to allocate scratch cpumask\n");
+ 		goto failed;
+ 	}
  
- 	if (node < 0 || node >= nr_node_ids) {
- 		CDEBUG(D_INFO,
-@@ -445,7 +530,12 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
+ 	for_each_online_node(i) {
+-		cpumask_copy(mask, cpumask_of_node(i));
++		cpumask_copy(node_mask, cpumask_of_node(i));
  
- 	mask = cpumask_of_node(node);
+-		while (!cpumask_empty(mask)) {
++		while (!cpumask_empty(node_mask)) {
+ 			struct cfs_cpu_partition *part;
+ 			int n;
  
--	return cfs_cpt_set_cpumask(cptab, cpt, mask);
-+	for_each_cpu(cpu, mask)
-+		cfs_cpt_add_cpu(cptab, cpt, cpu);
-+
-+	cfs_cpt_add_node(cptab, cpt, node);
-+
-+	return 1;
- }
- EXPORT_SYMBOL(cfs_cpt_set_node);
+@@ -864,7 +864,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
+ 			n = num - cpumask_weight(part->cpt_cpumask);
+ 			LASSERT(n > 0);
  
-@@ -453,6 +543,7 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
- cfs_cpt_unset_node(struct cfs_cpt_table *cptab, int cpt, int node)
- {
- 	const cpumask_t *mask;
-+	int cpu;
+-			rc = cfs_cpt_choose_ncpus(cptab, cpt, mask, n);
++			rc = cfs_cpt_choose_ncpus(cptab, cpt, node_mask, n);
+ 			if (rc < 0)
+ 				goto failed_mask;
  
- 	if (node < 0 || node >= nr_node_ids) {
- 		CDEBUG(D_INFO,
-@@ -462,7 +553,10 @@ unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
+@@ -882,12 +882,12 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
+ 		goto failed_mask;
+ 	}
  
- 	mask = cpumask_of_node(node);
+-	free_cpumask_var(mask);
++	free_cpumask_var(node_mask);
  
--	cfs_cpt_unset_cpumask(cptab, cpt, mask);
-+	for_each_cpu(cpu, mask)
-+		cfs_cpt_del_cpu(cptab, cpt, cpu);
-+
-+	cfs_cpt_del_node(cptab, cpt, node);
- }
- EXPORT_SYMBOL(cfs_cpt_unset_node);
+ 	return cptab;
  
+ failed_mask:
+-	free_cpumask_var(mask);
++	free_cpumask_var(node_mask);
+ failed:
+ 	CERROR("Failed to setup CPU-partition-table with %d CPU-partitions, online HW nodes: %d, HW cpus: %d.\n",
+ 	       ncpt, num_online_nodes(), num_online_cpus());
 -- 
 1.8.3.1
