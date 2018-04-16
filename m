@@ -1,103 +1,63 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Apr 2018 00:09:52 -0400
-Subject: [lustre-devel] [PATCH 10/25] staging: lustre: libcfs: provide
- debugfs files for distance handling
+Date: Mon, 16 Apr 2018 00:09:56 -0400
+Subject: [lustre-devel] [PATCH 14/25] staging: lustre: libcfs: rename i to
+ node for cfs_cpt_set_nodemask
 In-Reply-To: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
 References: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1523851807-16573-11-git-send-email-jsimmons@infradead.org>
+Message-ID: <1523851807-16573-15-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Amir Shehata <amir.shehata@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Dmitry Eremin <dmitry.eremin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: Amir Shehata <amir.shehata@intel.com>
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-On systems with large number of NUMA nodes and cores it is easy
-to incorrectly configure their use with Lustre. Provide debugfs
-files which can help track down any issues.
+Rename variable i to node to make code easier to understand.
 
-Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7734
-Reviewed-on: http://review.whamcloud.com/18916
-Reviewed-by: Olaf Weber <olaf@sgi.com>
-Reviewed-by: Doug Oucharek <dougso@me.com>
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
+Reviewed-on: https://review.whamcloud.com/23222
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/libcfs/module.c | 53 +++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index a03f924..95af000 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -336,6 +336,53 @@ static int proc_cpt_table(struct ctl_table *table, int write,
- 				    __proc_cpt_table);
- }
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+index 1669669..5f2ab30 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+@@ -550,10 +550,10 @@ void cfs_cpt_unset_node(struct cfs_cpt_table *cptab, int cpt, int node)
+ int cfs_cpt_set_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ 			 const nodemask_t *mask)
+ {
+-	int i;
++	int node;
  
-+static int __proc_cpt_distance(void *data, int write,
-+			       loff_t pos, void __user *buffer, int nob)
-+{
-+	char *buf = NULL;
-+	int len = 4096;
-+	int rc = 0;
-+
-+	if (write)
-+		return -EPERM;
-+
-+	LASSERT(cfs_cpt_table);
-+
-+	while (1) {
-+		buf = kzalloc(len, GFP_KERNEL);
-+		if (!buf)
-+			return -ENOMEM;
-+
-+		rc = cfs_cpt_distance_print(cfs_cpt_table, buf, len);
-+		if (rc >= 0)
-+			break;
-+
-+		if (rc == -EFBIG) {
-+			kfree(buf);
-+			len <<= 1;
-+			continue;
-+		}
-+		goto out;
-+	}
-+
-+	if (pos >= rc) {
-+		rc = 0;
-+		goto out;
-+	}
-+
-+	rc = cfs_trace_copyout_string(buffer, nob, buf + pos, NULL);
-+out:
-+	kfree(buf);
-+	return rc;
-+}
-+
-+static int proc_cpt_distance(struct ctl_table *table, int write,
-+			     void __user *buffer, size_t *lenp, loff_t *ppos)
-+{
-+	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
-+				    __proc_cpt_distance);
-+}
-+
- static struct ctl_table lnet_table[] = {
- 	{
- 		.procname = "debug",
-@@ -365,6 +412,12 @@ static int proc_cpt_table(struct ctl_table *table, int write,
- 		.proc_handler = &proc_cpt_table,
- 	},
- 	{
-+		.procname = "cpu_partition_distance",
-+		.maxlen	  = 128,
-+		.mode	  = 0444,
-+		.proc_handler = &proc_cpt_distance,
-+	},
-+	{
- 		.procname = "debug_log_upcall",
- 		.data     = lnet_debug_log_upcall,
- 		.maxlen   = sizeof(lnet_debug_log_upcall),
+-	for_each_node_mask(i, *mask) {
+-		if (!cfs_cpt_set_node(cptab, cpt, i))
++	for_each_node_mask(node, *mask) {
++		if (!cfs_cpt_set_node(cptab, cpt, node))
+ 			return 0;
+ 	}
+ 
+@@ -564,10 +564,10 @@ int cfs_cpt_set_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ 			    const nodemask_t *mask)
+ {
+-	int i;
++	int node;
+ 
+-	for_each_node_mask(i, *mask)
+-		cfs_cpt_unset_node(cptab, cpt, i);
++	for_each_node_mask(node, *mask)
++		cfs_cpt_unset_node(cptab, cpt, node);
+ }
+ EXPORT_SYMBOL(cfs_cpt_unset_nodemask);
+ 
 -- 
 1.8.3.1
