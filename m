@@ -1,11 +1,11 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Mon, 16 Apr 2018 17:27:33 +0300
-Subject: [lustre-devel] [PATCH 07/25] staging: lustre: libcfs: NUMA
- support
-In-Reply-To: <1523851807-16573-8-git-send-email-jsimmons@infradead.org>
+Date: Mon, 16 Apr 2018 17:45:48 +0300
+Subject: [lustre-devel] [PATCH 08/25] staging: lustre: libcfs: add cpu
+ distance handling
+In-Reply-To: <1523851807-16573-9-git-send-email-jsimmons@infradead.org>
 References: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
- <1523851807-16573-8-git-send-email-jsimmons@infradead.org>
-Message-ID: <20180416142733.s3f36jdd56rkbfbb@mwanda>
+ <1523851807-16573-9-git-send-email-jsimmons@infradead.org>
+Message-ID: <20180416144548.xjjcaxivkbvynsux@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,59 +13,59 @@ Content-Transfer-Encoding: 7bit
 To: James Simmons <jsimmons@infradead.org>
 Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Amir Shehata <amir.shehata@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Mon, Apr 16, 2018 at 12:09:49AM -0400, James Simmons wrote:
-> @@ -114,6 +115,15 @@ struct cfs_cpt_table *
->  	memset(cptab->ctb_cpu2cpt, -1,
->  	       nr_cpu_ids * sizeof(cptab->ctb_cpu2cpt[0]));
->  
-> +	cptab->ctb_node2cpt = kvmalloc_array(nr_node_ids,
-> +					     sizeof(cptab->ctb_node2cpt[0]),
-> +					     GFP_KERNEL);
-> +	if (!cptab->ctb_node2cpt)
-> +		goto failed;
+On Mon, Apr 16, 2018 at 12:09:50AM -0400, James Simmons wrote:
+> +int cfs_cpt_distance_print(struct cfs_cpt_table *cptab, char *buf, int len)
+> +{
+> +	char *tmp = buf;
+> +	int rc = -EFBIG;
+> +	int i;
+> +	int j;
 > +
-> +	memset(cptab->ctb_node2cpt, -1,
-> +	       nr_node_ids * sizeof(cptab->ctb_node2cpt[0]));
+> +	for (i = 0; i < cptab->ctb_nparts; i++) {
+> +		if (len <= 0)
+> +			goto err;
 > +
->  	cptab->ctb_parts = kvmalloc_array(ncpt, sizeof(cptab->ctb_parts[0]),
->  					  GFP_KERNEL);
->  	if (!cptab->ctb_parts)
+> +		rc = snprintf(tmp, len, "%d\t:", i);
+> +		len -= rc;
+> +
+> +		if (len <= 0)
+> +			goto err;
 
 
-You didn't introduce this, but I was explaining earlier that you should
-always be suspicious of code which does "goto failed".  The bug here is
-that cptab->ctb_parts is allocated with kvmalloc_array() which
-doesn't zero out the memory.  So if we only initialize it part way
-because art->cpt_nodemask = kzalloc() fails or something then it's
-problem:
+The "goto err" here is sort of an example of a "do-nothing" goto.  There
+are no resources to free or anything like that.
 
-    91  void
-    92  cfs_cpt_table_free(struct cfs_cpt_table *cptab)
-    93  {
-    94          int i;
-    95  
-    96          kvfree(cptab->ctb_cpu2cpt);
-    97  
-    98          for (i = 0; cptab->ctb_parts && i < cptab->ctb_nparts; i++) {
-    99                  struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
-   100  
-   101                  kfree(part->cpt_nodemask);
-                             ^^^^^^^^^^^^^^^^^^^
-   102                  free_cpumask_var(part->cpt_cpumask);
-                                         ^^^^^^^^^^^^^^^^^
-These are uninitialized so it will crash.  It turns out there isn't a
-kvcalloc() or kvzalloc_array() function.  We don't seem to have a
-vcalloc() either...  Very strange.
+I don't like do-nothing gotos because "return -EFBIG;" is self
+documenting code and "goto err;" is totally ambiguous what it does.  The
+second problem is that do-nothing error labels easily turn into
+do-everything one err style error paths which I loath.  And the third
+problem is that they introduce "forgot to set the error code" bugs.
 
-   103          }
-   104  
-   105          kvfree(cptab->ctb_parts);
-   106  
-   107          kfree(cptab->ctb_nodemask);
-   108          free_cpumask_var(cptab->ctb_cpumask);
-   109  
-   110          kfree(cptab);
-   111  }
+It looks like we forgot to set the error code here although it's also
+possible that was intended.  This code is ambiguous.
+
+> +
+> +		tmp += rc;
+> +		for (j = 0; j < cptab->ctb_nparts; j++) {
+> +			rc = snprintf(tmp, len, " %d:%d",
+> +				      j, cptab->ctb_parts[i].cpt_distance[j]);
+> +			len -= rc;
+> +			if (len <= 0)
+> +				goto err;
+> +			tmp += rc;
+> +		}
+> +
+> +		*tmp = '\n';
+> +		tmp++;
+> +		len--;
+> +	}
+> +	rc = 0;
+> +err:
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	return tmp - buf;
+> +}
 
 regards,
 dan carpenter
