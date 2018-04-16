@@ -1,247 +1,75 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Apr 2018 00:15:11 -0400
-Subject: [lustre-devel] [PATCH 22/22] staging: lustre: llite: remove unused
- parameters from md_{get, set}xattr()
-In-Reply-To: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
-References: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1523852111-17321-23-git-send-email-jsimmons@infradead.org>
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Mon, 16 Apr 2018 16:42:03 +0300
+Subject: [lustre-devel] [PATCH 01/25] staging: lustre: libcfs: remove
+ useless CPU partition code
+In-Reply-To: <1523851807-16573-2-git-send-email-jsimmons@infradead.org>
+References: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
+ <1523851807-16573-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <20180416134203.ehtebtyes34p2tsm@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: "John L. Hammond" <john.hammond@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: James Simmons <jsimmons@infradead.org>
+Cc: devel@driverdev.osuosl.org, Dmitry Eremin <dmitry.eremin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: "John L. Hammond" <john.hammond@intel.com>
+On Mon, Apr 16, 2018 at 12:09:43AM -0400, James Simmons wrote:
+> @@ -1033,6 +953,7 @@ static int cfs_cpu_dead(unsigned int cpu)
+>  #endif
+>  	ret = -EINVAL;
+>  
+> +	get_online_cpus();
+>  	if (*cpu_pattern) {
+>  		char *cpu_pattern_dup = kstrdup(cpu_pattern, GFP_KERNEL);
+>  
+> @@ -1058,13 +979,7 @@ static int cfs_cpu_dead(unsigned int cpu)
+>  		}
+>  	}
+>  
+> -	spin_lock(&cpt_data.cpt_lock);
+> -	if (cfs_cpt_table->ctb_version != cpt_data.cpt_version) {
+> -		spin_unlock(&cpt_data.cpt_lock);
+> -		CERROR("CPU hotplug/unplug during setup\n");
+> -		goto failed;
+> -	}
+> -	spin_unlock(&cpt_data.cpt_lock);
+> +	put_online_cpus();
+>  
+>  	LCONSOLE(0, "HW nodes: %d, HW CPU cores: %d, npartitions: %d\n",
+>  		 num_online_nodes(), num_online_cpus(),
+> @@ -1072,6 +987,7 @@ static int cfs_cpu_dead(unsigned int cpu)
+>  	return 0;
+>  
+>   failed:
+> +	put_online_cpus();
+>  	cfs_cpu_fini();
+>  	return ret;
+>  }
 
-md_getxattr() and md_setxattr() each have several unused
-parameters. Remove them and improve the naming or remaining
-parameters.
+When you have a one label called "failed" then I call that "one err"
+style error handling and it's the most bug prone style of error handling
+to use.  Always be suspicious of code that uses a "err:" labels.
 
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-10792
-Reviewed-on: https://review.whamcloud.com/
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/include/obd.h       |  7 ++---
- drivers/staging/lustre/lustre/include/obd_class.h | 21 ++++++--------
- drivers/staging/lustre/lustre/llite/file.c        |  5 ++--
- drivers/staging/lustre/lustre/llite/xattr.c       |  6 ++--
- drivers/staging/lustre/lustre/lmv/lmv_obd.c       | 22 +++++++--------
- drivers/staging/lustre/lustre/mdc/mdc_request.c   | 34 +++++++++++++----------
- 6 files changed, 46 insertions(+), 49 deletions(-)
+The bug here is typical.  We are calling put_online_cpus() on paths
+where we didn't call get_online_cpus().
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 48cf7ab..0f9e5dc 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -935,12 +935,11 @@ struct md_ops {
- 		      struct ptlrpc_request **);
- 
- 	int (*setxattr)(struct obd_export *, const struct lu_fid *,
--			u64, const char *, const char *, int, int, int, __u32,
--			struct ptlrpc_request **);
-+			u64, const char *, const void *, size_t, unsigned int,
-+			u32, struct ptlrpc_request **);
- 
- 	int (*getxattr)(struct obd_export *, const struct lu_fid *,
--			u64, const char *, const char *, int, int, int,
--			struct ptlrpc_request **);
-+			u64, const char *, size_t, struct ptlrpc_request **);
- 
- 	int (*init_ea_size)(struct obd_export *, u32, u32);
- 
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index a76f016..0081578 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -1385,29 +1385,26 @@ static inline int md_merge_attr(struct obd_export *exp,
- }
- 
- static inline int md_setxattr(struct obd_export *exp, const struct lu_fid *fid,
--			      u64 valid, const char *name,
--			      const char *input, int input_size,
--			      int output_size, int flags, __u32 suppgid,
-+			      u64 obd_md_valid, const char *name,
-+			      const char *value, size_t value_size,
-+			      unsigned int xattr_flags, u32 suppgid,
- 			      struct ptlrpc_request **request)
- {
- 	EXP_CHECK_MD_OP(exp, setxattr);
- 	EXP_MD_COUNTER_INCREMENT(exp, setxattr);
--	return MDP(exp->exp_obd, setxattr)(exp, fid, valid, name, input,
--					   input_size, output_size, flags,
-+	return MDP(exp->exp_obd, setxattr)(exp, fid, obd_md_valid, name,
-+					   value, value_size, xattr_flags,
- 					   suppgid, request);
- }
- 
- static inline int md_getxattr(struct obd_export *exp, const struct lu_fid *fid,
--			      u64 valid, const char *name,
--			      const char *input, int input_size,
--			      int output_size, int flags,
--			      struct ptlrpc_request **request)
-+			      u64 obd_md_valid, const char *name,
-+			      size_t buf_size, struct ptlrpc_request **req)
- {
- 	EXP_CHECK_MD_OP(exp, getxattr);
- 	EXP_MD_COUNTER_INCREMENT(exp, getxattr);
--	return MDP(exp->exp_obd, getxattr)(exp, fid, valid, name, input,
--					   input_size, output_size, flags,
--					   request);
-+	return MDP(exp->exp_obd, getxattr)(exp, fid, obd_md_valid, name,
-+					   buf_size, req);
- }
- 
- static inline int md_set_open_replay_data(struct obd_export *exp,
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 35f5bda..9197891 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -3093,7 +3093,7 @@ int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type)
- 
- 	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
- 			 value ? OBD_MD_FLXATTR : OBD_MD_FLXATTRRM,
--			 name, value, value_size, 0, 0, 0, &req);
-+			 name, value, value_size, 0, 0, &req);
- 
- 	ptlrpc_req_finished(req);
- out_value:
-@@ -3405,8 +3405,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
- 	rc = ll_get_default_mdsize(sbi, &lmmsize);
- 	if (rc == 0)
- 		rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode),
--				 OBD_MD_FLXATTR, XATTR_NAME_LOV, NULL, 0,
--				 lmmsize, 0, &req);
-+				 OBD_MD_FLXATTR, XATTR_NAME_LOV, lmmsize, &req);
- 	if (rc < 0)
- 		return rc;
- 
-diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 1a597a6..7fa0a41 100644
---- a/drivers/staging/lustre/lustre/llite/xattr.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -145,7 +145,7 @@ static int ll_xattr_set_common(const struct xattr_handler *handler,
- 		return -ENOMEM;
- 
- 	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode), valid, fullname,
--			 pv, size, 0, flags, ll_i2suppgid(inode), &req);
-+			 pv, size, flags, ll_i2suppgid(inode), &req);
- 	kfree(fullname);
- 	if (rc) {
- 		if (rc == -EOPNOTSUPP && handler->flags == XATTR_USER_T) {
-@@ -344,8 +344,8 @@ int ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
- 		}
- 	} else {
- getxattr_nocache:
--		rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode),
--				 valid, name, NULL, 0, size, 0, &req);
-+		rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode), valid,
-+				 name, size, &req);
- 		if (rc < 0)
- 			goto out_xattr;
- 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 7198a63..1ec42e2 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1398,9 +1398,8 @@ static int lmv_getstatus(struct obd_export *exp,
- }
- 
- static int lmv_getxattr(struct obd_export *exp, const struct lu_fid *fid,
--			u64 valid, const char *name,
--			const char *input, int input_size, int output_size,
--			int flags, struct ptlrpc_request **request)
-+			u64 obd_md_valid, const char *name, size_t buf_size,
-+			struct ptlrpc_request **req)
- {
- 	struct obd_device      *obd = exp->exp_obd;
- 	struct lmv_obd	 *lmv = &obd->u.lmv;
-@@ -1410,15 +1409,15 @@ static int lmv_getxattr(struct obd_export *exp, const struct lu_fid *fid,
- 	if (IS_ERR(tgt))
- 		return PTR_ERR(tgt);
- 
--	return md_getxattr(tgt->ltd_exp, fid, valid, name, input,
--			 input_size, output_size, flags, request);
-+	return md_getxattr(tgt->ltd_exp, fid, obd_md_valid, name, buf_size,
-+			   req);
- }
- 
- static int lmv_setxattr(struct obd_export *exp, const struct lu_fid *fid,
--			u64 valid, const char *name,
--			const char *input, int input_size, int output_size,
--			int flags, __u32 suppgid,
--			struct ptlrpc_request **request)
-+			u64 obd_md_valid, const char *name,
-+			const void *value, size_t value_size,
-+			unsigned int xattr_flags, u32 suppgid,
-+			struct ptlrpc_request **req)
- {
- 	struct obd_device      *obd = exp->exp_obd;
- 	struct lmv_obd	 *lmv = &obd->u.lmv;
-@@ -1428,9 +1427,8 @@ static int lmv_setxattr(struct obd_export *exp, const struct lu_fid *fid,
- 	if (IS_ERR(tgt))
- 		return PTR_ERR(tgt);
- 
--	return md_setxattr(tgt->ltd_exp, fid, valid, name, input,
--			 input_size, output_size, flags, suppgid,
--			 request);
-+	return md_setxattr(tgt->ltd_exp, fid, obd_md_valid, name,
-+			   value, value_size, xattr_flags, suppgid, req);
- }
- 
- static int lmv_getattr(struct obd_export *exp, struct md_op_data *op_data,
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index 266fa90..6e339c3 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -347,26 +347,30 @@ static int mdc_xattr_common(struct obd_export *exp,
- }
- 
- static int mdc_setxattr(struct obd_export *exp, const struct lu_fid *fid,
--			u64 valid, const char *xattr_name,
--			const char *input, int input_size, int output_size,
--			int flags, __u32 suppgid,
--			struct ptlrpc_request **request)
-+			u64 obd_md_valid, const char *name,
-+			const void *value, size_t value_size,
-+			unsigned int xattr_flags, u32 suppgid,
-+			struct ptlrpc_request **req)
- {
-+	LASSERT(obd_md_valid == OBD_MD_FLXATTR ||
-+		obd_md_valid == OBD_MD_FLXATTRRM);
-+
- 	return mdc_xattr_common(exp, &RQF_MDS_REINT_SETXATTR,
--				fid, MDS_REINT, valid, xattr_name,
--				input, input_size, output_size, flags,
--				suppgid, request);
-+				fid, MDS_REINT, obd_md_valid, name,
-+				value, value_size, 0, xattr_flags, suppgid,
-+				req);
- }
- 
- static int mdc_getxattr(struct obd_export *exp, const struct lu_fid *fid,
--			u64 valid, const char *xattr_name,
--			const char *input, int input_size, int output_size,
--			int flags, struct ptlrpc_request **request)
--{
--	return mdc_xattr_common(exp, &RQF_MDS_GETXATTR,
--				fid, MDS_GETXATTR, valid, xattr_name,
--				input, input_size, output_size, flags,
--				-1, request);
-+			u64 obd_md_valid, const char *name, size_t buf_size,
-+			struct ptlrpc_request **req)
-+{
-+	LASSERT(obd_md_valid == OBD_MD_FLXATTR ||
-+		obd_md_valid == OBD_MD_FLXATTRLS);
-+
-+	return mdc_xattr_common(exp, &RQF_MDS_GETXATTR, fid, MDS_GETXATTR,
-+				obd_md_valid, name, NULL, 0, buf_size, 0, -1,
-+				req);
- }
- 
- #ifdef CONFIG_FS_POSIX_ACL
--- 
-1.8.3.1
+The best way to do error handling is to keep track of each resource that
+was allocated and then only free the things that have been allocated.
+Also the label name should indicate what was freed.  Generally avoid
+magic, opaque functions like cfs_cpu_fini().  As a reviewer, it's
+harder for me to check that cfs_cpu_fini() frees everything correctly
+instead of the a normal list of frees like:
+
+free_table:
+	cfs_cpt_table_free(cfs_cpt_table);
+free_hotplug_stuff:
+	cpuhp_remove_state_nocalls(lustre_cpu_online);
+set_state_dead:
+	cpuhp_remove_state_nocalls(CPUHP_LUSTRE_CFS_DEAD);
+
+When I'm reading the code, and I see a "goto free_table;", I only need
+to ask, "Was table the most recently allocated resource?"  If yes, then
+the code is correct, if no then it's buggy.  It's simple review.
+
+regards,
+dan carpenter
