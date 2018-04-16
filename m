@@ -1,62 +1,70 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Apr 2018 00:09:42 -0400
-Subject: [lustre-devel] [PATCH 00/25] staging: lustre: libcfs: SMP rework
-Message-ID: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
+Date: Mon, 16 Apr 2018 00:09:44 -0400
+Subject: [lustre-devel] [PATCH 02/25] staging: lustre: libcfs: rename
+ variable i to cpu
+In-Reply-To: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
+References: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1523851807-16573-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Dmitry Eremin <dmitry.eremin@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Recently lustre support has been expanded to extreme machines with as
-many as a 1000+ cores. On the other end lustre also has been ported
-to platforms like ARM and KNL which have uniquie NUMA and core setup.
-For example some devices exist that have NUMA nodes with no cores.
-With these new platforms the limitations of the Lustre's SMP code
-came to light so a lot of work was needed. This resulted in this
-patch set which has been tested on these platforms.
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Amir Shehata (9):
-  staging: lustre: libcfs: implement cfs_cpt_cpumask for UMP case
-  staging: lustre: libcfs: replace MAX_NUMNODES with nr_node_ids
-  staging: lustre: libcfs: remove excess space
-  staging: lustre: libcfs: replace num_possible_cpus() with nr_cpu_ids
-  staging: lustre: libcfs: NUMA support
-  staging: lustre: libcfs: add cpu distance handling
-  staging: lustre: libcfs: use distance in cpu and node handling
-  staging: lustre: libcfs: provide debugfs files for distance handling
-  staging: lustre: libcfs: invert error handling for cfs_cpt_table_print
+Change the name of the variable i used for for_each_cpu() to cpu
+for code readability.
 
-Dmitry Eremin (15):
-  staging: lustre: libcfs: remove useless CPU partition code
-  staging: lustre: libcfs: rename variable i to cpu
-  staging: lustre: libcfs: fix libcfs_cpu coding style
-  staging: lustre: libcfs: use int type for CPT identification.
-  staging: lustre: libcfs: rename i to node for cfs_cpt_set_nodemask
-  staging: lustre: libcfs: rename i to cpu for cfs_cpt_bind
-  staging: lustre: libcfs: rename cpumask_var_t variables to *_mask
-  staging: lustre: libcfs: rename goto label in cfs_cpt_table_print
-  staging: lustre: libcfs: clear up failure patch in cfs_cpt_*_print
-  staging: lustre: libcfs: update debug messages
-  staging: lustre: libcfs: make tolerant to offline CPUs and empty NUMA nodes
-  staging: lustre: libcfs: report NUMA node instead of just node
-  staging: lustre: libcfs: update debug messages in CPT creation code
-  staging: lustre: libcfs: rework CPU pattern parsing code
-  staging: lustre: libcfs: change CPT estimate algorithm
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
+Reviewed-on: https://review.whamcloud.com/23303
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Doug Oucharek <dougso@me.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-James Simmons (1):
-  staging: lustre: libcfs: merge UMP and SMP libcfs cpu header code
-
- .../lustre/include/linux/libcfs/libcfs_cpu.h       | 135 +--
- .../lustre/include/linux/libcfs/linux/libcfs.h     |   1 -
- .../lustre/include/linux/libcfs/linux/linux-cpu.h  |  78 --
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 126 ++-
- .../staging/lustre/lnet/libcfs/linux/linux-cpu.c   | 912 +++++++++++----------
- drivers/staging/lustre/lnet/libcfs/module.c        |  53 ++
- drivers/staging/lustre/lnet/lnet/lib-msg.c         |   2 +
- 7 files changed, 676 insertions(+), 631 deletions(-)
- delete mode 100644 drivers/staging/lustre/include/linux/libcfs/linux/linux-cpu.h
-
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+index 134b239..d8c190c 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
+@@ -334,7 +334,7 @@ struct cfs_cpt_table *
+ int
+ cfs_cpt_set_cpumask(struct cfs_cpt_table *cptab, int cpt, const cpumask_t *mask)
+ {
+-	int i;
++	int cpu;
+ 
+ 	if (!cpumask_weight(mask) ||
+ 	    cpumask_any_and(mask, cpu_online_mask) >= nr_cpu_ids) {
+@@ -343,8 +343,8 @@ struct cfs_cpt_table *
+ 		return 0;
+ 	}
+ 
+-	for_each_cpu(i, mask) {
+-		if (!cfs_cpt_set_cpu(cptab, cpt, i))
++	for_each_cpu(cpu, mask) {
++		if (!cfs_cpt_set_cpu(cptab, cpt, cpu))
+ 			return 0;
+ 	}
+ 
+@@ -356,10 +356,10 @@ struct cfs_cpt_table *
+ cfs_cpt_unset_cpumask(struct cfs_cpt_table *cptab, int cpt,
+ 		      const cpumask_t *mask)
+ {
+-	int i;
++	int cpu;
+ 
+-	for_each_cpu(i, mask)
+-		cfs_cpt_unset_cpu(cptab, cpt, i);
++	for_each_cpu(cpu, mask)
++		cfs_cpt_unset_cpu(cptab, cpt, cpu);
+ }
+ EXPORT_SYMBOL(cfs_cpt_unset_cpumask);
+ 
 -- 
 1.8.3.1
