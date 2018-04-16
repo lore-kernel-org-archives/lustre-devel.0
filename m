@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 16 Apr 2018 00:09:57 -0400
-Subject: [lustre-devel] [PATCH 15/25] staging: lustre: libcfs: rename i to
- cpu for cfs_cpt_bind
+Date: Mon, 16 Apr 2018 00:09:59 -0400
+Subject: [lustre-devel] [PATCH 17/25] staging: lustre: libcfs: rename goto
+ label in cfs_cpt_table_print
 In-Reply-To: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
 References: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1523851807-16573-16-git-send-email-jsimmons@infradead.org>
+Message-ID: <1523851807-16573-18-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,7 +14,7 @@ Cc: Dmitry Eremin <dmitry.eremin@intel.com>, Linux Kernel Mailing List <linux-ke
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Rename variable i to cpu to make code easier to understand.
+Change goto label out to err.
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
@@ -24,33 +24,45 @@ Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-index 5f2ab30..b985b3d 100644
+index ae5ff58..435ee8e 100644
 --- a/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
 +++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-cpu.c
-@@ -644,8 +644,8 @@ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
- {
- 	cpumask_var_t *cpumask;
- 	nodemask_t *nodemask;
-+	int cpu;
- 	int rc;
--	int i;
+@@ -161,20 +161,20 @@ int cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf, int len)
  
- 	LASSERT(cpt == CFS_CPT_ANY || (cpt >= 0 && cpt < cptab->ctb_nparts));
+ 	for (i = 0; i < cptab->ctb_nparts; i++) {
+ 		if (len <= 0)
+-			goto out;
++			goto err;
  
-@@ -663,8 +663,8 @@ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
- 		return -EINVAL;
+ 		rc = snprintf(tmp, len, "%d\t:", i);
+ 		len -= rc;
+ 
+ 		if (len <= 0)
+-			goto out;
++			goto err;
+ 
+ 		tmp += rc;
+ 		for_each_cpu(j, cptab->ctb_parts[i].cpt_cpumask) {
+ 			rc = snprintf(tmp, len, " %d", j);
+ 			len -= rc;
+ 			if (len <= 0)
+-				goto out;
++				goto err;
+ 			tmp += rc;
+ 		}
+ 
+@@ -184,7 +184,7 @@ int cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf, int len)
  	}
  
--	for_each_online_cpu(i) {
--		if (cpumask_test_cpu(i, *cpumask))
-+	for_each_online_cpu(cpu) {
-+		if (cpumask_test_cpu(cpu, *cpumask))
- 			continue;
+ 	rc = 0;
+-out:
++err:
+ 	if (rc < 0)
+ 		return rc;
  
- 		rc = set_cpus_allowed_ptr(current, *cpumask);
 -- 
 1.8.3.1
