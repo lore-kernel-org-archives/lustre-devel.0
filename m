@@ -1,167 +1,124 @@
-From: Doug Oucharek <doucharek@cray.com>
-Date: Mon, 16 Apr 2018 22:48:40 +0000
-Subject: [lustre-devel] [PATCH 1/6] staging: lustre: move stack-check
- macros to libcfs_debug.h
-In-Reply-To: <alpine.LFD.2.21.1804162336220.14398@casper.infradead.org>
-References: <152383910760.23409.2327082725637657049.stgit@noble>
- <152383935730.23409.6748888065027051683.stgit@noble>
- <alpine.LFD.2.21.1804160438220.16188@casper.infradead.org>
- <6D3C7935-E7ED-4826-B459-0C4888D6048E@cray.com>
- <alpine.LFD.2.21.1804162336220.14398@casper.infradead.org>
-Message-ID: <44671B46-27F6-4CFA-8E3A-7AD62B4C597E@cray.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 17 Apr 2018 04:35:43 +0100 (BST)
+Subject: [lustre-devel] [PATCH 00/20] staging: lustre: convert to
+ rhashtable
+In-Reply-To: <152348312863.12394.11915752362061083241.stgit@noble>
+References: <152348312863.12394.11915752362061083241.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1804170429300.14398@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Patrick Farrell <paf@cray.com>, Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+To: NeilBrown <neilb@suse.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> On Apr 16, 2018, at 3:42 PM, James Simmons <jsimmons@infradead.org> wrote:
+> libcfs in lustre has a resizeable hashtable.
+> Linux already has a resizeable hashtable, rhashtable, which is better
+> is most metrics. See https://lwn.net/Articles/751374/ in a few days
+> for an introduction to rhashtable.
+
+Thansk for starting this work. I was think about cleaning the libcfs
+hash but your port to rhashtables is way better. How did you gather
+metrics to see that rhashtable was better than libcfs hash?
+ 
+> This series converts lustre to use rhashtable.  This affects several
+> different tables, and each is different is various ways.
+> 
+> There are two outstanding issues.  One is that a bug in rhashtable
+> means that we cannot enable auto-shrinking in one of the tables.  That
+> is documented as appropriate and should be fixed soon.
+> 
+> The other is that rhashtable has an atomic_t which counts the elements
+> in a hash table.  At least one table in lustre went to some trouble to
+> avoid any table-wide atomics, so that could lead to a regression.
+> I'm hoping that rhashtable can be enhanced with the option of a
+> per-cpu counter, or similar.
+> 
+
+This doesn't sound quite ready to land just yet. This will have to do some
+soak testing and a larger scope of test to make sure no new regressions
+happen. Believe me I did work to make lustre work better on tickless 
+systems, which I'm preparing for the linux client, and small changes could 
+break things in interesting ways. I will port the rhashtable change to the 
+Intel developement branch and get people more familar with the hash code
+to look at it. 
+
+> I have enabled automatic shrinking on all tables where it makes sense
+> and doesn't trigger the bug.  I have also removed all hints concerning
+> min/max size - I cannot see how these could be useful.
+> 
+> The dump_pgcache debugfs file provided some interesting challenges.  I
+> think I have cleaned it up enough so that it all makes sense.  An
+> extra pair of eyes examining that code in particular would be
+> appreciated.
+> 
+> This series passes all the same tests that pass before the patches are
+> applied.
+> 
+> Thanks,
+> NeilBrown
 > 
 > 
->> James,
->> 
->> If I understand correctly, you're saying you want to be able to build without debug support...?  I'm not convinced that building a client without debug support is interesting or useful.  In fact, I think it would be harmful, and we shouldn't open up the possibility - this is switchable debug with very low overhead when not actually "on".  It would be really awful to get a problem on a running system and discover there's no debug support - that you can't even enable debug without a reinstall.
->> 
->> If I've understood you correctly, then I would want to see proof of a significant performance cost when debug is built but *off* before agreeing to even exposing this option.  (I know it's a choice they'd have to make, but if it's not really useful with a side order of potentially harmful, we shouldn't even give people the choice.)
+> ---
 > 
-> I'm not saying add the option today but this is more for the long game.
-> While the Intel lustre developers deeply love lustre's debugging 
-> infrastructure I see a future where something better will come along to
-> replace it. When that day comes we will have a period where both
-> debugging infrastructurs will exist and some deployers of lustre will
-> want to turn off the old debugging infrastructure and just use the new.
-> That is what I have in mind. A switch to flip between options.
-
-Yes please!!  An option for users which says ?no, you do not have the right to panic my system via LASSERT whenever you like? would be a blessing.
-
-Doug
-
+> NeilBrown (20):
+>       staging: lustre: ptlrpc: convert conn_hash to rhashtable
+>       staging: lustre: convert lov_pool to use rhashtable
+>       staging: lustre: convert obd uuid hash to rhashtable
+>       staging: lustre: convert osc_quota hash to rhashtable
+>       staging: lustre: separate buckets from ldlm hash table
+>       staging: lustre: ldlm: add a counter to the per-namespace data
+>       staging: lustre: ldlm: store name directly in namespace.
+>       staging: lustre: simplify ldlm_ns_hash_defs[]
+>       staging: lustre: convert ldlm_resource hash to rhashtable.
+>       staging: lustre: make struct lu_site_bkt_data private
+>       staging: lustre: lu_object: discard extra lru count.
+>       staging: lustre: lu_object: factor out extra per-bucket data
+>       staging: lustre: lu_object: move retry logic inside htable_lookup
+>       staging: lustre: fold lu_object_new() into lu_object_find_at()
+>       staging: lustre: llite: use more private data in dump_pgcache
+>       staging: lustre: llite: remove redundant lookup in dump_pgcache
+>       staging: lustre: use call_rcu() to free lu_object_headers
+>       staging: lustre: change how "dump_page_cache" walks a hash table
+>       staging: lustre: convert lu_object cache to rhashtable
+>       staging: lustre: remove cfs_hash resizeable hashtable implementation.
 > 
->> - Patrick
->> 
->> ?On 4/15/18, 10:49 PM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
->> 
->> 
->>> CDEBUG_STACK() and CHECK_STACK() are macros to help with
->>> debugging, so move them from
->>>   drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
->>> to
->>>   drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h
->>> 
->>> This seems a more fitting location, and is a step towards
->>> removing linux/libcfs.h and simplifying the include file structure.
->> 
->>    Nak. Currently the lustre client always enables debugging but that
->>    shouldn't be the case. What we do need is the able to turn off the 
->>    crazy debugging stuff. In the development branch of lustre it is
->>    done with CDEBUG_ENABLED. We need something like that in Kconfig
->>    much like we have CONFIG_LUSTRE_DEBUG_EXPENSIVE_CHECK. Since we like
->>    to be able to turn that off this should be moved to just after
->>    LIBCFS_DEBUG_MSG_DATA_DECL. Then from CHECK_STACK down to CWARN()
->>    it can be build out. When CDEBUG_ENABLED is disabled CDEBUG_LIMIT
->>    would be empty.
->> 
->>> Signed-off-by: NeilBrown <neilb@suse.com>
->>> ---
->>> .../lustre/include/linux/libcfs/libcfs_debug.h     |   32 ++++++++++++++++++++
->>> .../lustre/include/linux/libcfs/linux/libcfs.h     |   31 -------------------
->>> 2 files changed, 32 insertions(+), 31 deletions(-)
->>> 
->>> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h
->>> index 9290a19429e7..0dc7b91efe7c 100644
->>> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h
->>> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h
->>> @@ -62,6 +62,38 @@ int libcfs_debug_str2mask(int *mask, const char *str, int is_subsys);
->>> extern unsigned int libcfs_catastrophe;
->>> extern unsigned int libcfs_panic_on_lbug;
->>> 
->>> +/* Enable debug-checks on stack size - except on x86_64 */
->>> +#if !defined(__x86_64__)
->>> +# ifdef __ia64__
->>> +#  define CDEBUG_STACK() (THREAD_SIZE -				 \
->>> +			  ((unsigned long)__builtin_dwarf_cfa() &       \
->>> +			   (THREAD_SIZE - 1)))
->>> +# else
->>> +#  define CDEBUG_STACK() (THREAD_SIZE -				 \
->>> +			  ((unsigned long)__builtin_frame_address(0) &  \
->>> +			   (THREAD_SIZE - 1)))
->>> +# endif /* __ia64__ */
->>> +
->>> +#define __CHECK_STACK(msgdata, mask, cdls)			      \
->>> +do {								    \
->>> +	if (unlikely(CDEBUG_STACK() > libcfs_stack)) {		  \
->>> +		LIBCFS_DEBUG_MSG_DATA_INIT(msgdata, D_WARNING, NULL);   \
->>> +		libcfs_stack = CDEBUG_STACK();			  \
->>> +		libcfs_debug_msg(msgdata,			       \
->>> +				 "maximum lustre stack %lu\n",	  \
->>> +				 CDEBUG_STACK());		       \
->>> +		(msgdata)->msg_mask = mask;			     \
->>> +		(msgdata)->msg_cdls = cdls;			     \
->>> +		dump_stack();					   \
->>> +	      /*panic("LBUG");*/					\
->>> +	}							       \
->>> +} while (0)
->>> +#define CFS_CHECK_STACK(msgdata, mask, cdls)  __CHECK_STACK(msgdata, mask, cdls)
->>> +#else /* __x86_64__ */
->>> +#define CFS_CHECK_STACK(msgdata, mask, cdls) do {} while (0)
->>> +#define CDEBUG_STACK() (0L)
->>> +#endif /* __x86_64__ */
->>> +
->>> #ifndef DEBUG_SUBSYSTEM
->>> # define DEBUG_SUBSYSTEM S_UNDEFINED
->>> #endif
->>> diff --git a/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
->>> index 07d3cb2217d1..83aec9c7698f 100644
->>> --- a/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
->>> +++ b/drivers/staging/lustre/include/linux/libcfs/linux/libcfs.h
->>> @@ -80,35 +80,4 @@
->>> #include <stdarg.h>
->>> #include "linux-cpu.h"
->>> 
->>> -#if !defined(__x86_64__)
->>> -# ifdef __ia64__
->>> -#  define CDEBUG_STACK() (THREAD_SIZE -				 \
->>> -			  ((unsigned long)__builtin_dwarf_cfa() &       \
->>> -			   (THREAD_SIZE - 1)))
->>> -# else
->>> -#  define CDEBUG_STACK() (THREAD_SIZE -				 \
->>> -			  ((unsigned long)__builtin_frame_address(0) &  \
->>> -			   (THREAD_SIZE - 1)))
->>> -# endif /* __ia64__ */
->>> -
->>> -#define __CHECK_STACK(msgdata, mask, cdls)			      \
->>> -do {								    \
->>> -	if (unlikely(CDEBUG_STACK() > libcfs_stack)) {		  \
->>> -		LIBCFS_DEBUG_MSG_DATA_INIT(msgdata, D_WARNING, NULL);   \
->>> -		libcfs_stack = CDEBUG_STACK();			  \
->>> -		libcfs_debug_msg(msgdata,			       \
->>> -				 "maximum lustre stack %lu\n",	  \
->>> -				 CDEBUG_STACK());		       \
->>> -		(msgdata)->msg_mask = mask;			     \
->>> -		(msgdata)->msg_cdls = cdls;			     \
->>> -		dump_stack();					   \
->>> -	      /*panic("LBUG");*/					\
->>> -	}							       \
->>> -} while (0)
->>> -#define CFS_CHECK_STACK(msgdata, mask, cdls)  __CHECK_STACK(msgdata, mask, cdls)
->>> -#else /* __x86_64__ */
->>> -#define CFS_CHECK_STACK(msgdata, mask, cdls) do {} while (0)
->>> -#define CDEBUG_STACK() (0L)
->>> -#endif /* __x86_64__ */
->>> -
->>> #endif /* _LINUX_LIBCFS_H */
->>> 
->>> 
->>> 
->>    _______________________________________________
->>    lustre-devel mailing list
->>    lustre-devel at lists.lustre.org
->>    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->> 
->> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 
+>  .../staging/lustre/include/linux/libcfs/libcfs.h   |    1 
+>  .../lustre/include/linux/libcfs/libcfs_hash.h      |  866 --------
+>  drivers/staging/lustre/lnet/libcfs/Makefile        |    2 
+>  drivers/staging/lustre/lnet/libcfs/hash.c          | 2064 --------------------
+>  drivers/staging/lustre/lnet/libcfs/module.c        |   12 
+>  drivers/staging/lustre/lustre/include/lu_object.h  |   55 -
+>  drivers/staging/lustre/lustre/include/lustre_dlm.h |   19 
+>  .../staging/lustre/lustre/include/lustre_export.h  |    2 
+>  drivers/staging/lustre/lustre/include/lustre_net.h |    4 
+>  drivers/staging/lustre/lustre/include/obd.h        |   11 
+>  .../staging/lustre/lustre/include/obd_support.h    |    9 
+>  drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |   31 
+>  drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  370 +---
+>  drivers/staging/lustre/lustre/llite/lcommon_cl.c   |    8 
+>  drivers/staging/lustre/lustre/llite/vvp_dev.c      |  332 +--
+>  drivers/staging/lustre/lustre/llite/vvp_object.c   |    9 
+>  drivers/staging/lustre/lustre/lov/lov_internal.h   |   11 
+>  drivers/staging/lustre/lustre/lov/lov_obd.c        |   12 
+>  drivers/staging/lustre/lustre/lov/lov_object.c     |    8 
+>  drivers/staging/lustre/lustre/lov/lov_pool.c       |  159 +-
+>  drivers/staging/lustre/lustre/lov/lovsub_object.c  |    9 
+>  drivers/staging/lustre/lustre/obdclass/genops.c    |   34 
+>  drivers/staging/lustre/lustre/obdclass/lu_object.c |  564 ++---
+>  .../staging/lustre/lustre/obdclass/obd_config.c    |  161 +-
+>  .../staging/lustre/lustre/obdecho/echo_client.c    |    8 
+>  drivers/staging/lustre/lustre/osc/osc_internal.h   |    5 
+>  drivers/staging/lustre/lustre/osc/osc_quota.c      |  136 -
+>  drivers/staging/lustre/lustre/osc/osc_request.c    |   12 
+>  drivers/staging/lustre/lustre/ptlrpc/connection.c  |  164 +-
+>  29 files changed, 870 insertions(+), 4208 deletions(-)
+>  delete mode 100644 drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
+>  delete mode 100644 drivers/staging/lustre/lnet/libcfs/hash.c
+> 
+> --
+> Signature
+> 
+> 
