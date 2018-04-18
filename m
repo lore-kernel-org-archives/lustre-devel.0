@@ -1,12 +1,12 @@
 From: NeilBrown <neilb@suse.com>
-Date: Wed, 18 Apr 2018 12:32:01 +1000
-Subject: [lustre-devel] [PATCH 2/6] staging: lustre: remove
- libcfs/linux/libcfs.h
-In-Reply-To: <alpine.LFD.2.21.1804160431550.16188@casper.infradead.org>
+Date: Wed, 18 Apr 2018 12:33:39 +1000
+Subject: [lustre-devel] [PATCH 3/6] staging: lustre: remove
+ include/linux/libcfs/linux/linux-cpu.h
+In-Reply-To: <alpine.LFD.2.21.1804160448410.16188@casper.infradead.org>
 References: <152383910760.23409.2327082725637657049.stgit@noble>
- <152383935734.23409.11654775387996961581.stgit@noble>
- <alpine.LFD.2.21.1804160431550.16188@casper.infradead.org>
-Message-ID: <874lk9s0ri.fsf@notabene.neil.brown.name>
+ <152383935737.23409.2271901486597092772.stgit@noble>
+ <alpine.LFD.2.21.1804160448410.16188@casper.infradead.org>
+Message-ID: <871sfds0os.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,26 +16,22 @@ Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundat
 
 On Mon, Apr 16 2018, James Simmons wrote:
 
->> This include file is only included in one place,
->> and only contains a list of other include directives.
->> So just move all those to the place where this file
->> is included, and discard the file.
+>> This include file contains definitions used when CONFIG_SMP
+>> is in effect.  Other includes contain corresponding definitions
+>> for when it isn't.
+>> This can be hard to follow, so move the definitions to the one place.
 >> 
->> One include directive uses a local name ("linux-cpu.h"), so
->> that needs to be given a proper path.
->> 
->> Probably many of these should be remove from here, and moved to
->> just the files that need them.
+>> As HAVE_LIBCFS_CPT is defined precisely when CONFIG_SMP, we discard
+>> that macro and just use CONFIG_SMP when needed.
 >
-> Nak. Dumping all the extra headers from linux/libcfs.h to libcfs.h is
-> the wrong approach. The one header, libcfs.h, to be the only header
-> in all lustre files is the wrong approach. I have been looking to
-> unroll that mess. I have patch that I need to polish you that I can
-> submit.
+> Nak. The lustre SMP is broken and needed to badly be reworked. I have it 
+> ready and can push it. I was waiting to see if I had to rebase it once
+> the rc1 stuff but since their is a push to get everything out their I will
+> push it.
+>
 
-I think we both have the same goal - maybe just different paths to get
-there.  If you have something nearly ready to submit, I'm happy to wait
-for it, then proceed on top of it.
+Great - thanks for posting those.  I might wait until they land in
+Greg's tree, then see if I there is anything else I want to add.
 
 Thanks,
 NeilBrown
@@ -45,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180418/eacafe88/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180418/588bf89a/attachment.sig>
