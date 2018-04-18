@@ -1,91 +1,69 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 18 Apr 2018 13:17:07 +1000
-Subject: [lustre-devel] [PATCH 00/20] staging: lustre: convert to
- rhashtable
-In-Reply-To: <alpine.LFD.2.21.1804170429300.14398@casper.infradead.org>
-References: <152348312863.12394.11915752362061083241.stgit@noble>
- <alpine.LFD.2.21.1804170429300.14398@casper.infradead.org>
-Message-ID: <87y3hlqk3w.fsf@notabene.neil.brown.name>
+From: Patrick Farrell <paf@cray.com>
+Date: Wed, 18 Apr 2018 04:23:34 +0000
+Subject: [lustre-devel] [PATCH 1/6] staging: lustre: move stack-check
+ macros to libcfs_debug.h
+In-Reply-To: <877ep5s0wb.fsf@notabene.neil.brown.name>
+References: <152383910760.23409.2327082725637657049.stgit@noble>
+ <152383935730.23409.6748888065027051683.stgit@noble>
+ <alpine.LFD.2.21.1804160438220.16188@casper.infradead.org>
+ <6D3C7935-E7ED-4826-B459-0C4888D6048E@cray.com>
+ <alpine.LFD.2.21.1804162336220.14398@casper.infradead.org>,
+ <877ep5s0wb.fsf@notabene.neil.brown.name>
+Message-ID: <BN7PR11MB2674FEA0BF3CFD9F3EC469F6CBB60@BN7PR11MB2674.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: NeilBrown <neilb@suse.com>, James Simmons <jsimmons@infradead.org>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Tue, Apr 17 2018, James Simmons wrote:
 
->> libcfs in lustre has a resizeable hashtable.
->> Linux already has a resizeable hashtable, rhashtable, which is better
->> is most metrics. See https://lwn.net/Articles/751374/ in a few days
->> for an introduction to rhashtable.
+Of course - I?m no fan of keeping the Lustre specific stuff long term.  It has a few pretty powerful tricks embedded in it (others can describe them better but, for example, it has per CPU debug buffers and if configured, it can halt all CPUs but one and write out all the buffers before panicking), but it?s mostly just a set of messages controlled by a pair of message specific and file-level (subsystem_debug) masks.
+
+And it should all use generic kernel infrastructure, absolutely.  There?s been interest in that for a long time but never the right combination of expertise and will.
+
+________________________________
+From: NeilBrown <neilb@suse.com>
+Sent: Tuesday, April 17, 2018 9:29:08 PM
+To: James Simmons; Patrick Farrell
+Cc: Oleg Drokin; Greg Kroah-Hartman; Linux Kernel Mailing List; Lustre Development List
+Subject: Re: [lustre-devel] [PATCH 1/6] staging: lustre: move stack-check macros to libcfs_debug.h
+
+On Mon, Apr 16 2018, James Simmons wrote:
+
+>> James,
+>>
+>> If I understand correctly, you're saying you want to be able to build without debug support...?  I'm not convinced that building a client without debug support is interesting or useful.  In fact, I think it would be harmful, and we shouldn't open up the possibility - this is switchable debug with very low overhead when not actually "on".  It would be really awful to get a problem on a running system and discover there's no debug support - that you can't even enable debug without a reinstall.
+>>
+>> If I've understood you correctly, then I would want to see proof of a significant performance cost when debug is built but *off* before agreeing to even exposing this option.  (I know it's a choice they'd have to make, but if it's not really useful with a side order of potentially harmful, we shouldn't even give people the choice.)
 >
-> Thansk for starting this work. I was think about cleaning the libcfs
-> hash but your port to rhashtables is way better. How did you gather
-> metrics to see that rhashtable was better than libcfs hash?
+> I'm not saying add the option today but this is more for the long game.
+> While the Intel lustre developers deeply love lustre's debugging
+> infrastructure I see a future where something better will come along to
+> replace it. When that day comes we will have a period where both
+> debugging infrastructurs will exist and some deployers of lustre will
+> want to turn off the old debugging infrastructure and just use the new.
+> That is what I have in mind. A switch to flip between options.
 
-Code inspection and reputation.  It is hard to beat inlined lockless
-code for lookups.  And rhashtable is heavily used in the network
-subsystem and they are very focused on latency there.  I'm not sure that
-insertion is as fast as it can be (I have some thoughts on that) but I'm
-sure lookup will be better.
-I haven't done any performance testing myself, only correctness.
+My position on this is that lustre's debugging infrastructure (in
+mainline) *will* be changed to use something that the rest of the kernel
+can and does use.  Quite possibly that "something" will first be
+enhanced so that it is as powerful and useful as what lustre has.
+I suspect this will partly be pr_debug(), partly WARN_ON(), partly trace
+points.  But I'm not very familiar with tracepoints or with lustre
+debugging yet so this is far from certain.
+pr_debug() and tracepoints can be compiled out, but only kernel-wide.
+There is no reason for lustre to be special there.  WARN_ON() and
+BUG_ON() cannot be compiled out, but BUG_ON() must only be used when
+proceeding is unarguably worse than crashing the machine.  In recent
+years a lot of BUG_ON()s have been removed or changed to warnings.  We
+need to maintain that attitude.
 
->  
->> This series converts lustre to use rhashtable.  This affects several
->> different tables, and each is different is various ways.
->> 
->> There are two outstanding issues.  One is that a bug in rhashtable
->> means that we cannot enable auto-shrinking in one of the tables.  That
->> is documented as appropriate and should be fixed soon.
->> 
->> The other is that rhashtable has an atomic_t which counts the elements
->> in a hash table.  At least one table in lustre went to some trouble to
->> avoid any table-wide atomics, so that could lead to a regression.
->> I'm hoping that rhashtable can be enhanced with the option of a
->> per-cpu counter, or similar.
->> 
->
-> This doesn't sound quite ready to land just yet. This will have to do some
-> soak testing and a larger scope of test to make sure no new regressions
-> happen. Believe me I did work to make lustre work better on tickless 
-> systems, which I'm preparing for the linux client, and small changes could 
-> break things in interesting ways. I will port the rhashtable change to the 
-> Intel developement branch and get people more familar with the hash code
-> to look at it.
-
-Whether it is "ready" or not probably depends on perspective and
-priorities.  As I see it, getting lustre cleaned up and out of staging
-is a fairly high priority, and it will require a lot of code change.
-It is inevitable that regressions will slip in (some already have) and
-it is important to keep testing (the test suite is of great benefit, but
-is only part of the story of course).  But to test the code, it needs to
-land.  Testing the code in Intel's devel branch and then porting it
-across doesn't really prove much.  For testing to be meaningful, it
-needs to be tested in a branch that up-to-date with mainline and on
-track to be merged into mainline.
-
-I have no particular desire to rush this in, but I don't see any
-particular benefit in delaying it either.
-
-I guess I see staging as implicitly a 'devel' branch.  You seem to be
-treating it a bit like a 'stable' branch - is that right?
-
-As mentioned, I think there is room for improvement in rhashtable.
-- making the atomic counter optional
-- replacing the separate spinlocks with bit-locks in the hash-chain head
-  so that the lock and chain are in the same cache line
-- for the common case of inserting in an empty chain, a single atomic
-  cmpxchg() should be sufficient
-I think we have a better chance of being heard if we have "skin in the
-game" and have upstream code that would use this.
+I don't like the idea of have two parallel debuging infrastructures that
+you can choose between - it encourages confusion and brings no benefits.
 
 Thanks,
 NeilBrown
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180418/55db7e31/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180418/d5d74aa1/attachment-0001.html>
