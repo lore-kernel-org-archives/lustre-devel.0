@@ -1,99 +1,109 @@
-From: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Date: Thu, 19 Apr 2018 16:35:08 +0300
-Subject: [lustre-devel] [cfs_trace_lock_tcd] BUG: KASAN: null-ptr-deref
- in cfs_trace_lock_tcd+0x25/0xeb
-In-Reply-To: <CA+55aFz=VCq6w=kH5aYavOM0-h130HgzVhVc94JxeYSdbMWbxg@mail.gmail.com>
-References: <20180418133831.uef7d77ejdyjtxgh@wfg-t540p.sh.intel.com>
- <20180418134058.l3orjjxcpv7cxjfw@wfg-t540p.sh.intel.com>
- <CA+55aFz=VCq6w=kH5aYavOM0-h130HgzVhVc94JxeYSdbMWbxg@mail.gmail.com>
-Message-ID: <b66f6034-7631-7fbf-56aa-e8e136e8b636@virtuozzo.com>
+From: Amir Shehata <amir.shehata.whamcloud@gmail.com>
+Date: Thu, 19 Apr 2018 11:04:59 -0700
+Subject: [lustre-devel] LNET Configuration Update/Reconciliation
+In-Reply-To: <DM5PR09MB144900D1B60C2826F06EDA9984B00@DM5PR09MB1449.namprd09.prod.outlook.com>
+References: <D6F62FA9.F7D1%jevans@cray.com>
+ <DM5PR09MB144900D1B60C2826F06EDA9984B00@DM5PR09MB1449.namprd09.prod.outlook.com>
+Message-ID: <CAAqp6i0DKk+NOiR+EcmqX8A9W4YH4q=eJ6=vdjFbxSrtajq9GQ@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Linus Torvalds <torvalds@linux-foundation.org>, Fengguang Wu <fengguang.wu@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Staging subsystem List <devel@driverdev.osuosl.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Denis Petrovic <denis.petrovic@edu.ece.fr>, LKP <lkp@01.org>, Andreas Dilger <andreas.dilger@intel.com>, lustre-devel@lists.lustre.org
+To: lustre-devel@lists.lustre.org
+
+One thing to note is that lnetctl still doesn't cover all the configuration
+that can be done via module params. We're trying to get it there.
+
+There was actually a ticket that was recently opened:
+
+https://jira.hpdd.intel.com/browse/LU-10930
+
+Please look at my comment there. Currently if configuring the system via
+lnetctl it will ignore the module parameters it handles. This was done to
+avoid conflicts with existing module parameter and to give precedence to
+configurations done via lnetctl.
+
+Having a feature like what you're describing would be a good extension to
+lnetctl and allow it to handle conflicts. Would be good if you open an LU
+ticket to track this change.
+
+thanks
+amir
 
 
 
-On 04/18/2018 09:37 PM, Linus Torvalds wrote:
-> Ugh, that lustre code is disgusting.
-> 
-> I thought we were getting rid of it.
-> 
-> Anyway, I started looking at why the stack trace is such an incredible
-> mess, with lots of stale entries.
-> 
-> The reason (well, _one_ reason) seems to be "ksocknal_startup". It has
-> a 500-byte stack frame for some incomprehensible reason. I assume due
-> to excessive inlining, because the function itself doesn't seem to be
-> that bad.
-> 
-> Similarly, LNetNIInit has a 300-byte stack frame. So it gets pretty deep.
-> 
-> I'm getting the feeling that KASAN is making things worse because
-> probably it's disabling all the sane stack frame stuff (ie no merging
-> of stack slot entries, perhaps?).
+On 16 April 2018 at 13:52, Di Natale, Giuseppe <dinatale2@llnl.gov> wrote:
+
+> In theory, lnetctl itself is the exporter. Once modprobe.conf settings are
+> loaded, lnetctl export will get you most of the way there (default values
+> for tunables and such are exported as well). If you're already using
+> lnetctl, it can export the current configuration (again, including
+> tunables, etc).
 >
-
-AFAIR no merging of stack slots policy enabled only if -fsanitize-address-use-after-scope 
-is on (which is CONFIG_KASAN_EXTRA). This feature does cause sometimes significant stack bloat,
-but hasn't been proven to be very useful, so I wouldn't mind disabling it completely.
-
-So far I know only about a single BUG - https://lkml.kernel.org/r/<151238865557.4852.10258661301122491354@mail.alporthouse.com>
-it has found.
-There are also a lot of other 
-
-
-> Without KASAN (but also without a lot of other things, so I might be
-> blaming KASAN incorrectly), the stack usage of ksocknal_startup() is
-> just under 100 bytes, so if it is KASAN, it's really a big difference.
 >
-
-Yes, it's because of KASAN:
-CONFIG_KASAN=n
-socklnd.c:2795:1:ksocknal_startup       144     static
-
-CONFIG_KASAN=y
-CONFIG_KASAN_OUTLINE=y
-CONFIG_KASAN_EXTRA=n
-socklnd.c:2795:1:ksocknal_startup       552     static
-
-CONFIG_KASAN=y
-CONFIG_KASAN_OUTLINE=y
-CONFIG_KASAN_EXTRA=y
-socklnd.c:2795:1:ksocknal_startup       624     static
-
-It's expected that KASAN may cause sometimes significant stack usage growth.
-This is needed to catch out-of-bounds accesses to stack data.
-When compiler can't proof that access to stack variable is valid (e.g. reference to
-stack variable passed to some external function), it will create redzones around such
-stack variable.
-
-E.g. ksocknal_enumerate_interfaces() which is called only from ksocknal_startup(), thus probably
-inlined into ksocknal_startup() does this:
-
-
-	for (i = j = 0; i < n; i++) {
-		int up;
-		__u32 ip;
-		__u32 mask;
-
-		if (!strcmp(names[i], "lo")) /* skip the loopback IF */
-			continue;
-
-		rc = lnet_ipif_query(names[i], &up, &ip, &mask);
-
-
-With KASAN stack might look something like this:
-  [32-byte left redzone of the stack frame] [up (4 bytes)] [28-bytes redzone][ip (4 bytes)] [28-bytes redzone][mask (4 bytes)] [28-bytes redzone][32-byte right redzone of the stack frame]
-
-GCC always use 32-bytes redzones. AFAIK clang is more smart about this, it has adaptive redzone policy - smaller redzones for small variables, and bigger for big.
-
-In this particular case, the best way to reduce stack usage is to refactor the code.
-1) Drop 'int *up' argument from lnet_ipif_query(). When interface is down lnet_ipif_query() sets up to zero and doesn't return error.
-   But all callers treat up == 0 as error. So instead, lnet_ipif_query() should simply return error code, and 'up' won't be needed.
-    This will simplify the code, and should drop the stack usage with KASAN and without KASAN.
-
-2) Instead of using local ip, mask variables, pass pointers '&net->ksnn_interfaces[j].ksni_ipaddr', '&net->ksnn_interfaces[j].ksni_netmask'.
-    As in 1) this should alst drop the stack usage both with KASAN and without KASAN
+> As for migrating from lnetctl back to modprobe.conf, I wasn't planning on
+> tackling that.
+>
+>
+> What I am trying to implement is a method of "reconciling" the current
+> configuration with a newly imported one. So to start, let us assume lnet
+> has some configuration x. Let's say you make changes to the YAML file (add
+> a few new routes, remove a network, maybe remove a route) producing
+> configuration y. I want to implement a feature in lnetctl that will take
+> the currently loaded configuration (in this case, configuration x) and turn
+> it into configuration y without taking down connections unless it's
+> necessary.
+>
+> Giuseppe
+> ------------------------------
+> *From:* Ben Evans <bevans@cray.com>
+> *Sent:* Friday, April 13, 2018 7:01:15 AM
+> *To:* Di Natale, Giuseppe; lustre-devel at lists.lustre.org
+> *Subject:* Re: [lustre-devel] LNET Configuration Update/Reconciliation
+>
+> In LU-4939, I'm working on exporting and importing the parameters set via
+> lctl conf_param and set_param -P.  The output is in yaml, and I've got an
+> importer working in a separate patch that has yet to be accepted upstream.
+>
+> Would you consider having an exporter for the lnetctl and modprobe.conf
+> settings into yaml so that you could migrate between the two methods of
+> setting configuration?
+>
+> From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of
+> "Di Natale, Giuseppe" <dinatale2@llnl.gov>
+> Date: Thursday, April 12, 2018 at 3:53 PM
+> To: "lustre-devel at lists.lustre.org" <lustre-devel@lists.lustre.org>
+> Subject: [lustre-devel] LNET Configuration Update/Reconciliation
+>
+> Greetings Developers,
+>
+>
+> We are currently using modprobe.conf to configure routes, but we are
+> hoping to reach a point where we can push out new LNET configurations to
+> nodes and have lnetctl apply configuration changes on the fly.
+>
+>
+> It would be nice to have the ability to update or "reconcile" the
+> difference between the loaded configuration and an updated configuration
+> being imported. I was exploring how to implement such functionality in
+> lnetctl. Would others find such functionality useful?
+>
+>
+> My current thought is that I'd implement this as a new lnetctl subcommand
+> (i.e. "update"). Does that seem reasonable or would you suggest another
+> interface?
+>
+>
+> Thanks,
+>
+> Giuseppe
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180419/bcb83fb6/attachment.html>
