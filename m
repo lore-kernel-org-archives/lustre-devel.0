@@ -1,27 +1,27 @@
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 23 Apr 2018 14:58:27 +0200
-Subject: [lustre-devel] [PATCH 00/22] staging: lustre: llite: fix xattr
- handling
-In-Reply-To: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
-References: <1523852111-17321-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <20180423125827.GA32162@kroah.com>
+Date: Mon, 23 Apr 2018 14:58:51 +0200
+Subject: [lustre-devel] [PATCH 00/25] staging: lustre: libcfs: SMP rework
+In-Reply-To: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
+References: <1523851807-16573-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <20180423125851.GB32162@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: James Simmons <jsimmons@infradead.org>
-Cc: devel@driverdev.osuosl.org, James Simmons <uja.ornl@yahoo.com>, Andreas Dilger <andreas.dilger@intel.com>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Mon, Apr 16, 2018 at 12:14:49AM -0400, James Simmons wrote:
-> From: James Simmons <uja.ornl@yahoo.com>
-> 
-> Lustre utilities and user land APIs heavly depend on special xattr
-> handling. Sadly much of the xattr handling for lustre client has
-> been broken for awhile. This is all the fixes needed to make xattr
-> handling work properly with the latest kernels.
+On Mon, Apr 16, 2018 at 12:09:42AM -0400, James Simmons wrote:
+> Recently lustre support has been expanded to extreme machines with as
+> many as a 1000+ cores. On the other end lustre also has been ported
+> to platforms like ARM and KNL which have uniquie NUMA and core setup.
+> For example some devices exist that have NUMA nodes with no cores.
+> With these new platforms the limitations of the Lustre's SMP code
+> came to light so a lot of work was needed. This resulted in this
+> patch set which has been tested on these platforms.
 
-Most of these now applied, please rebase and fix up the remaining ones
-when resending.
+I'll wait for v2 of this patchset based on Dan's review before applying
+them.
 
 thanks,
 
