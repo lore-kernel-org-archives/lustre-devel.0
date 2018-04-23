@@ -1,43 +1,35 @@
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Mon, 23 Apr 2018 15:13:59 +0200
-Subject: [lustre-devel] [PATCH 3/6] staging: lustre: remove
- include/linux/libcfs/linux/linux-cpu.h
-In-Reply-To: <alpine.LFD.2.21.1804160448410.16188@casper.infradead.org>
-References: <152383910760.23409.2327082725637657049.stgit@noble>
- <152383935737.23409.2271901486597092772.stgit@noble>
- <alpine.LFD.2.21.1804160448410.16188@casper.infradead.org>
-Message-ID: <20180423131359.GA11836@kroah.com>
+Date: Mon, 23 Apr 2018 15:16:48 +0200
+Subject: [lustre-devel] [PATCH 08/17] staging: lustre: add
+ container_of_safe()
+In-Reply-To: <152229760847.27689.4969508646445147289.stgit@noble>
+References: <152229732768.27689.4800156943561963977.stgit@noble>
+ <152229760847.27689.4969508646445147289.stgit@noble>
+Message-ID: <20180423131648.GA13997@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: NeilBrown <neilb@suse.com>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: NeilBrown <neilb@suse.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Mon, Apr 16, 2018 at 04:52:55AM +0100, James Simmons wrote:
+On Thu, Mar 29, 2018 at 03:26:48PM +1100, NeilBrown wrote:
+> Luster has a container_of0() function which is similar to
+> container_of() but passes an IS_ERR_OR_NULL() pointer through
+> unchanged.
+> This could be generally useful: bcache at last has a similar function.
 > 
-> > This include file contains definitions used when CONFIG_SMP
-> > is in effect.  Other includes contain corresponding definitions
-> > for when it isn't.
-> > This can be hard to follow, so move the definitions to the one place.
-> > 
-> > As HAVE_LIBCFS_CPT is defined precisely when CONFIG_SMP, we discard
-> > that macro and just use CONFIG_SMP when needed.
+> Naming is hard, but the precedent set by hlist_entry_safe() suggests
+> a _safe suffix might be most consistent.
 > 
-> Nak. The lustre SMP is broken and needed to badly be reworked. I have it 
-> ready and can push it. I was waiting to see if I had to rebase it once
-> the rc1 stuff but since their is a push to get everything out their I will
-> push it.
+> So add container_of_safe() to kernel.h, and replace all occurrences of
+> container_of0() with one of
+>   - list_first_entry, list_next_entry, when that is a better fit,
+>   - container_of(), when the pointer is used as a validpointer in
+>     surrounding code,
+>   - container_of_safe() when there is no obviously better alternative.
 
-A NAK on some future code that might show up someday is not how we work
-at all, sorry.  That has caused other open source projects to die.
-First patch submitted "wins".
-
-And these are good patches.  Nothing wrong with them, they clean stuff
-up, remove more lines than they added and that's the proper thing to do
-here.  So I've applied the first 4, the last two didn't apply due to
-changes from you that were accepted.  See, you benifit also from this :)
-
-thanks,
+I'm loath to add a kernel.h define for a staging driver, but this does
+seem sane.  Nice work.
 
 greg k-h
