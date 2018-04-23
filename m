@@ -1,47 +1,46 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 26 Apr 2018 16:14:10 +1000
-Subject: [lustre-devel] [PATCH] staging: kernel.h: Prevent macro
- expantion bug in container_of_safe()
-In-Reply-To: <20180426055827.GA18346@mwanda>
-References: <20180426055827.GA18346@mwanda>
-Message-ID: <87bme6mr4d.fsf@notabene.neil.brown.name>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Mon, 23 Apr 2018 23:38:17 +0530
+Subject: [lustre-devel] [PATCH] staging: lustre: Change return type to
+ vm_fault_t
+In-Reply-To: <20180423173547.GB13383@bombadil.infradead.org>
+References: <20180421221723.GA3054@jordon-HP-15-Notebook-PC>
+ <20180422032052.GH14610@bombadil.infradead.org>
+ <CAFqt6zaomQW5K_OeYUJjbbv2p8=fMRCuBJVvghyskgMVdPQDdQ@mail.gmail.com>
+ <20180423173547.GB13383@bombadil.infradead.org>
+Message-ID: <CAFqt6zbFzUYdvndDy6tcvvsbtpvYrUq5XNSfdB4rmuWy=oLh=Q@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, Apr 26 2018, Dan Carpenter wrote:
-
-> There aren't many users of this so it doesn't cause a problem, but we
-> obviously want to use "__mptr" here instead of "ptr" to prevent the
-> parameter from being executed twice.
+On Mon, Apr 23, 2018 at 11:05 PM, Matthew Wilcox <willy@infradead.org> wrote:
+> On Mon, Apr 23, 2018 at 10:12:30PM +0530, Souptick Joarder wrote:
+>> On Sun, Apr 22, 2018 at 8:50 AM, Matthew Wilcox <willy@infradead.org> wrote:
+>> > On Sun, Apr 22, 2018 at 03:47:24AM +0530, Souptick Joarder wrote:
+>> >> @@ -261,7 +261,7 @@ static inline int to_fault_error(int result)
+>> >>   * \retval VM_FAULT_ERROR on general error
+>> >>   * \retval NOPAGE_OOM not have memory for allocate new page
+>> >>   */
+>> >> -static int ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+>> >> +static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+>> >>  {
+>> >>       struct lu_env      *env;
+>> >>       struct cl_io        *io;
+>> >
+>> > Did you compile-test this with the sparse changes?  Because I can see
+>> > a problem here:
+>>
+>> Yes, compile-tested. Sparse didn't throw any warning/error.
 >
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> I think you need to check your setup ... I get this:
 >
-> diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-> index b5a8e78c6c75..593fb8d250a2 100644
-> --- a/include/linux/kernel.h
-> +++ b/include/linux/kernel.h
-> @@ -978,7 +978,7 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
->  	BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) &&	\
->  			 !__same_type(*(ptr), void),			\
->  			 "pointer type mismatch in container_of()");	\
-> -	IS_ERR_OR_NULL(ptr) ? ERR_CAST(ptr) :				\
-> +	IS_ERR_OR_NULL(__mptr) ? ERR_CAST(__mptr) :			\
->  		((type *)(__mptr - offsetof(type, member))); })
->  
->  /* Rebuild everything on CONFIG_FTRACE_MCOUNT_RECORD */
+> drivers/staging/lustre/lustre/llite/llite_mmap.c:277:31: warning: incorrect type in return expression (different base types)
+> drivers/staging/lustre/lustre/llite/llite_mmap.c:277:31:    expected restricted vm_fault_t
+> drivers/staging/lustre/lustre/llite/llite_mmap.c:277:31:    got long
 
-Arg, of course.  Thanks.
-Acked-by: NeilBrown <neilb@suse.com>
+What I am trying is -
+after applying the patch in 4.17-rc1, enable the configuration
+for this driver and do "make c=1/2 -j8"
 
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180426/374eb610/attachment.sig>
+Let me verify again.
