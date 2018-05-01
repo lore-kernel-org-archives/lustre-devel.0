@@ -1,48 +1,204 @@
-From: Wenwen Wang <wang6495@umn.edu>
-Date: Mon, 30 Apr 2018 17:56:10 -0500
-Subject: [lustre-devel] [PATCH v2] staging: lustre: llite: fix potential
- missing-check bug when copying lumv
-Message-ID: <1525128971-8946-1-git-send-email-wang6495@umn.edu>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Tue, 1 May 2018 08:22:50 +0000
+Subject: [lustre-devel] [PATCH 04/10] staging: lustre: lu_object: move
+ retry logic inside htable_lookup
+In-Reply-To: <152514675897.17843.15112214060540196720.stgit@noble>
+References: <152514658325.17843.11455067361317157487.stgit@noble>
+ <152514675897.17843.15112214060540196720.stgit@noble>
+Message-ID: <EFC6D018-5FB5-4902-AE7A-B91A5E0148FE@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Wenwen Wang <wang6495@umn.edu>
-Cc: "open list:STAGING SUBSYSTEM" <devel@driverdev.osuosl.org>, Aastha Gupta <aastha.gupta4104@gmail.com>, Roman Storozhenko <romeusmeister@gmail.com>, Andreas Dilger <andreas.dilger@intel.com>, Jeff Layton <jlayton@redhat.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Kangjie Lu <kjlu@umn.edu>, NeilBrown <neilb@suse.com>, open list <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, "moderated list:STAGING - LUSTRE PARALLEL FILESYSTEM" <lustre-devel@lists.lustre.org>
+To: NeilBrown <neilb@suse.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Linux
+ Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-In ll_dir_ioctl(), the object lumv3 is firstly copied from the user space
-using Its address, i.e., lumv1 = &lumv3. If the lmm_magic field of lumv3 is
-LOV_USER_MAGIC_V3, lumv3 will be modified by the second copy from the user
-space. The second copy is necessary, because the two versions (i.e.,
-lov_user_md_v1 and lov_user_md_v3) have different data formats and lengths.
-However, given that the user data resides in the user space, a malicious
-user-space process can race to change the data between the two copies. By
-doing so, the attacker can provide a data with an inconsistent version,
-e.g., v1 version + v3 data. This can lead to logical errors in the
-following execution in ll_dir_setstripe(), which performs different actions
-according to the version specified by the field lmm_magic.
+On Apr 30, 2018, at 21:52, NeilBrown <neilb@suse.com> wrote:
+> 
+> The current retry logic, to wait when a 'dying' object is found,
+> spans multiple functions.  The process is attached to a waitqueue
+> and set TASK_UNINTERRUPTIBLE in htable_lookup, and this status
+> is passed back through lu_object_find_try() to lu_object_find_at()
+> where schedule() is called and the process is removed from the queue.
+> 
+> This can be simplified by moving all the logic (including
+> hashtable locking) inside htable_lookup(), which now never returns
+> EAGAIN.
+> 
+> Note that htable_lookup() is called with the hash bucket lock
+> held, and will drop and retake it if it needs to schedule.
+> 
+> I made this a 'goto' loop rather than a 'while(1)' loop as the
+> diff is easier to read.
+> 
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+> drivers/staging/lustre/lustre/obdclass/lu_object.c |   73 +++++++-------------
+> 1 file changed, 27 insertions(+), 46 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> index 2bf089817157..93daa52e2535 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> @@ -586,16 +586,21 @@ EXPORT_SYMBOL(lu_object_print);
+> static struct lu_object *htable_lookup(struct lu_site *s,
 
-This patch rechecks the version field lmm_magic in the second copy.  If the
-version is not as expected, i.e., LOV_USER_MAGIC_V3, an error code will be
-returned: -EINVAL.
+It's probably a good idea to add a comment for this function that it may
+drop and re-acquire the hash bucket lock internally.
 
-Signed-off-by: Wenwen Wang <wang6495@umn.edu>
----
- drivers/staging/lustre/lustre/llite/dir.c | 2 ++
- 1 file changed, 2 insertions(+)
+> 				       struct cfs_hash_bd *bd,
+> 				       const struct lu_fid *f,
+> -				       wait_queue_entry_t *waiter,
+> 				       __u64 *version)
+> {
+> +	struct cfs_hash		*hs = s->ls_obj_hash;
+> 	struct lu_site_bkt_data *bkt;
+> 	struct lu_object_header *h;
+> 	struct hlist_node	*hnode;
+> -	__u64  ver = cfs_hash_bd_version_get(bd);
+> +	__u64 ver;
+> +	wait_queue_entry_t waiter;
+> 
+> -	if (*version == ver)
+> +retry:
+> +	ver = cfs_hash_bd_version_get(bd);
+> +
+> +	if (*version == ver) {
+> 		return ERR_PTR(-ENOENT);
+> +	}
 
-diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
-index d10d272..80d44ca 100644
---- a/drivers/staging/lustre/lustre/llite/dir.c
-+++ b/drivers/staging/lustre/lustre/llite/dir.c
-@@ -1185,6 +1185,8 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 		if (lumv1->lmm_magic == LOV_USER_MAGIC_V3) {
- 			if (copy_from_user(&lumv3, lumv3p, sizeof(lumv3)))
- 				return -EFAULT;
-+			if (lumv3.lmm_magic != LOV_USER_MAGIC_V3)
-+				return -EINVAL;
- 		}
- 
- 		if (is_root_inode(inode))
--- 
-2.7.4
+(style) we don't need the {} around a single-line if statement
+
+> 	*version = ver;
+> 	bkt = cfs_hash_bd_extra_get(s->ls_obj_hash, bd);
+> @@ -625,11 +630,15 @@ static struct lu_object *htable_lookup(struct lu_site *s,
+> 	 * drained), and moreover, lookup has to wait until object is freed.
+> 	 */
+> 
+> -	init_waitqueue_entry(waiter, current);
+> -	add_wait_queue(&bkt->lsb_marche_funebre, waiter);
+> +	init_waitqueue_entry(&waiter, current);
+> +	add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+> 	set_current_state(TASK_UNINTERRUPTIBLE);
+> 	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_DEATH_RACE);
+> -	return ERR_PTR(-EAGAIN);
+> +	cfs_hash_bd_unlock(hs, bd, 1);
+
+This looks like it isn't unlocking and locking the hash bucket in the same
+manner that it was done in the caller.  Here excl = 1, but in the caller
+you changed it to excl = 0?
+
+> +	schedule();
+> +	remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+
+Is it worthwhile to use your new helper function here to get the wq from "s"?
+
+> +	cfs_hash_bd_lock(hs, bd, 1);
+> +	goto retry;
+> }
+> 
+> /**
+> @@ -693,13 +702,14 @@ static struct lu_object *lu_object_new(const struct lu_env *env,
+> }
+> 
+> /**
+> - * Core logic of lu_object_find*() functions.
+> + * Much like lu_object_find(), but top level device of object is specifically
+> + * \a dev rather than top level device of the site. This interface allows
+> + * objects of different "stacking" to be created within the same site.
+>  */
+> -static struct lu_object *lu_object_find_try(const struct lu_env *env,
+> -					    struct lu_device *dev,
+> -					    const struct lu_fid *f,
+> -					    const struct lu_object_conf *conf,
+> -					    wait_queue_entry_t *waiter)
+> +struct lu_object *lu_object_find_at(const struct lu_env *env,
+> +				    struct lu_device *dev,
+> +				    const struct lu_fid *f,
+> +				    const struct lu_object_conf *conf)
+> {
+> 	struct lu_object      *o;
+> 	struct lu_object      *shadow;
+> @@ -725,17 +735,16 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+> 	 * It is unnecessary to perform lookup-alloc-lookup-insert, instead,
+> 	 * just alloc and insert directly.
+> 	 *
+> -	 * If dying object is found during index search, add @waiter to the
+> -	 * site wait-queue and return ERR_PTR(-EAGAIN).
+> 	 */
+> 	if (conf && conf->loc_flags & LOC_F_NEW)
+> 		return lu_object_new(env, dev, f, conf);
+> 
+> 	s  = dev->ld_site;
+> 	hs = s->ls_obj_hash;
+> -	cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 1);
+> -	o = htable_lookup(s, &bd, f, waiter, &version);
+> -	cfs_hash_bd_unlock(hs, &bd, 1);
+> +	cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 0);
+> +	o = htable_lookup(s, &bd, f, &version);
+> +	cfs_hash_bd_unlock(hs, &bd, 0);
+
+Here you changed the locking to a non-exclusive (read) lock instead of an
+exclusive (write) lock?  Why.
+
+> +
+> 	if (!IS_ERR(o) || PTR_ERR(o) != -ENOENT)
+> 		return o;
+> 
+> @@ -751,7 +760,7 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+> 
+> 	cfs_hash_bd_lock(hs, &bd, 1);
+> 
+> -	shadow = htable_lookup(s, &bd, f, waiter, &version);
+> +	shadow = htable_lookup(s, &bd, f, &version);
+> 	if (likely(PTR_ERR(shadow) == -ENOENT)) {
+> 		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
+> 		cfs_hash_bd_unlock(hs, &bd, 1);
+> @@ -766,34 +775,6 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+> 	lu_object_free(env, o);
+> 	return shadow;
+> }
+> -
+> -/**
+> - * Much like lu_object_find(), but top level device of object is specifically
+> - * \a dev rather than top level device of the site. This interface allows
+> - * objects of different "stacking" to be created within the same site.
+> - */
+> -struct lu_object *lu_object_find_at(const struct lu_env *env,
+> -				    struct lu_device *dev,
+> -				    const struct lu_fid *f,
+> -				    const struct lu_object_conf *conf)
+> -{
+> -	wait_queue_head_t	*wq;
+> -	struct lu_object	*obj;
+> -	wait_queue_entry_t	   wait;
+> -
+> -	while (1) {
+> -		obj = lu_object_find_try(env, dev, f, conf, &wait);
+> -		if (obj != ERR_PTR(-EAGAIN))
+> -			return obj;
+> -		/*
+> -		 * lu_object_find_try() already added waiter into the
+> -		 * wait queue.
+> -		 */
+> -		schedule();
+> -		wq = lu_site_wq_from_fid(dev->ld_site, (void *)f);
+> -		remove_wait_queue(wq, &wait);
+> -	}
+> -}
+> EXPORT_SYMBOL(lu_object_find_at);
+> 
+> /**
+> 
+> 
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
