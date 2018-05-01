@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 01 May 2018 13:52:38 +1000
-Subject: [lustre-devel] [PATCH 03/10] staging: lustre: lu_object: discard
- extra lru count.
+Date: Tue, 01 May 2018 13:52:39 +1000
+Subject: [lustre-devel] [PATCH 04/10] staging: lustre: lu_object: move retry
+ logic inside htable_lookup
 In-Reply-To: <152514658325.17843.11455067361317157487.stgit@noble>
 References: <152514658325.17843.11455067361317157487.stgit@noble>
-Message-ID: <152514675893.17843.8396665070911641266.stgit@noble>
+Message-ID: <152514675897.17843.15112214060540196720.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,108 +12,159 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-lu_object maintains 2 lru counts.
-One is a per-bucket lsb_lru_len.
-The other is the per-cpu ls_lru_len_counter.
+The current retry logic, to wait when a 'dying' object is found,
+spans multiple functions.  The process is attached to a waitqueue
+and set TASK_UNINTERRUPTIBLE in htable_lookup, and this status
+is passed back through lu_object_find_try() to lu_object_find_at()
+where schedule() is called and the process is removed from the queue.
 
-The only times the per-bucket counters are use are:
-- a debug message when an object is added
-- in lu_site_stats_get when all the counters are combined.
+This can be simplified by moving all the logic (including
+hashtable locking) inside htable_lookup(), which now never returns
+EAGAIN.
 
-The debug message is not essential, and the per-cpu counter
-can be used to get the combined total.
+Note that htable_lookup() is called with the hash bucket lock
+held, and will drop and retake it if it needs to schedule.
 
-So discard the per-bucket lsb_lru_len.
+I made this a 'goto' loop rather than a 'while(1)' loop as the
+diff is easier to read.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/obdclass/lu_object.c |   24 ++++++++------------
- 1 file changed, 9 insertions(+), 15 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |   73 +++++++-------------
+ 1 file changed, 27 insertions(+), 46 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index 2a8a25d6edb5..2bf089817157 100644
+index 2bf089817157..93daa52e2535 100644
 --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
 +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -57,10 +57,6 @@
- #include <linux/list.h>
- 
- struct lu_site_bkt_data {
--	/**
--	 * number of object in this bucket on the lsb_lru list.
--	 */
--	long			lsb_lru_len;
- 	/**
- 	 * LRU list, updated on each access to object. Protected by
- 	 * bucket lock of lu_site::ls_obj_hash.
-@@ -187,10 +183,9 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
- 	if (!lu_object_is_dying(top)) {
- 		LASSERT(list_empty(&top->loh_lru));
- 		list_add_tail(&top->loh_lru, &bkt->lsb_lru);
--		bkt->lsb_lru_len++;
- 		percpu_counter_inc(&site->ls_lru_len_counter);
--		CDEBUG(D_INODE, "Add %p to site lru. hash: %p, bkt: %p, lru_len: %ld\n",
--		       o, site->ls_obj_hash, bkt, bkt->lsb_lru_len);
-+		CDEBUG(D_INODE, "Add %p to site lru. hash: %p, bkt: %p\n",
-+		       o, site->ls_obj_hash, bkt);
- 		cfs_hash_bd_unlock(site->ls_obj_hash, &bd, 1);
- 		return;
- 	}
-@@ -238,7 +233,6 @@ void lu_object_unhash(const struct lu_env *env, struct lu_object *o)
- 
- 			list_del_init(&top->loh_lru);
- 			bkt = cfs_hash_bd_extra_get(obj_hash, &bd);
--			bkt->lsb_lru_len--;
- 			percpu_counter_dec(&site->ls_lru_len_counter);
- 		}
- 		cfs_hash_bd_del_locked(obj_hash, &bd, &top->loh_hash);
-@@ -422,7 +416,6 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
- 			cfs_hash_bd_del_locked(s->ls_obj_hash,
- 					       &bd2, &h->loh_hash);
- 			list_move(&h->loh_lru, &dispose);
--			bkt->lsb_lru_len--;
- 			percpu_counter_dec(&s->ls_lru_len_counter);
- 			if (did_sth == 0)
- 				did_sth = 1;
-@@ -621,7 +614,6 @@ static struct lu_object *htable_lookup(struct lu_site *s,
- 		lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_HIT);
- 		if (!list_empty(&h->loh_lru)) {
- 			list_del_init(&h->loh_lru);
--			bkt->lsb_lru_len--;
- 			percpu_counter_dec(&s->ls_lru_len_counter);
- 		}
- 		return lu_object_top(h);
-@@ -1834,19 +1826,21 @@ struct lu_site_stats {
- 	unsigned int	lss_busy;
- };
- 
--static void lu_site_stats_get(struct cfs_hash *hs,
-+static void lu_site_stats_get(const struct lu_site *s,
- 			      struct lu_site_stats *stats, int populated)
+@@ -586,16 +586,21 @@ EXPORT_SYMBOL(lu_object_print);
+ static struct lu_object *htable_lookup(struct lu_site *s,
+ 				       struct cfs_hash_bd *bd,
+ 				       const struct lu_fid *f,
+-				       wait_queue_entry_t *waiter,
+ 				       __u64 *version)
  {
-+	struct cfs_hash *hs = s->ls_obj_hash;
- 	struct cfs_hash_bd bd;
- 	unsigned int i;
-+	/* percpu_counter_read_positive() won't accept a const pointer */
-+	struct lu_site *s2 = (struct lu_site *)s;
++	struct cfs_hash		*hs = s->ls_obj_hash;
+ 	struct lu_site_bkt_data *bkt;
+ 	struct lu_object_header *h;
+ 	struct hlist_node	*hnode;
+-	__u64  ver = cfs_hash_bd_version_get(bd);
++	__u64 ver;
++	wait_queue_entry_t waiter;
  
-+	stats->lss_busy += cfs_hash_size_get(hs) -
-+		percpu_counter_read_positive(&s2->ls_lru_len_counter);
- 	cfs_hash_for_each_bucket(hs, &bd, i) {
--		struct lu_site_bkt_data *bkt = cfs_hash_bd_extra_get(hs, &bd);
- 		struct hlist_head	*hhead;
+-	if (*version == ver)
++retry:
++	ver = cfs_hash_bd_version_get(bd);
++
++	if (*version == ver) {
+ 		return ERR_PTR(-ENOENT);
++	}
  
- 		cfs_hash_bd_lock(hs, &bd, 1);
--		stats->lss_busy  +=
--			cfs_hash_bd_count_get(&bd) - bkt->lsb_lru_len;
- 		stats->lss_total += cfs_hash_bd_count_get(&bd);
- 		stats->lss_max_search = max((int)stats->lss_max_search,
- 					    cfs_hash_bd_depmax_get(&bd));
-@@ -2039,7 +2033,7 @@ int lu_site_stats_print(const struct lu_site *s, struct seq_file *m)
- 	struct lu_site_stats stats;
+ 	*version = ver;
+ 	bkt = cfs_hash_bd_extra_get(s->ls_obj_hash, bd);
+@@ -625,11 +630,15 @@ static struct lu_object *htable_lookup(struct lu_site *s,
+ 	 * drained), and moreover, lookup has to wait until object is freed.
+ 	 */
  
- 	memset(&stats, 0, sizeof(stats));
--	lu_site_stats_get(s->ls_obj_hash, &stats, 1);
-+	lu_site_stats_get(s, &stats, 1);
+-	init_waitqueue_entry(waiter, current);
+-	add_wait_queue(&bkt->lsb_marche_funebre, waiter);
++	init_waitqueue_entry(&waiter, current);
++	add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+ 	set_current_state(TASK_UNINTERRUPTIBLE);
+ 	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_DEATH_RACE);
+-	return ERR_PTR(-EAGAIN);
++	cfs_hash_bd_unlock(hs, bd, 1);
++	schedule();
++	remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
++	cfs_hash_bd_lock(hs, bd, 1);
++	goto retry;
+ }
  
- 	seq_printf(m, "%d/%d %d/%ld %d %d %d %d %d %d %d\n",
- 		   stats.lss_busy,
+ /**
+@@ -693,13 +702,14 @@ static struct lu_object *lu_object_new(const struct lu_env *env,
+ }
+ 
+ /**
+- * Core logic of lu_object_find*() functions.
++ * Much like lu_object_find(), but top level device of object is specifically
++ * \a dev rather than top level device of the site. This interface allows
++ * objects of different "stacking" to be created within the same site.
+  */
+-static struct lu_object *lu_object_find_try(const struct lu_env *env,
+-					    struct lu_device *dev,
+-					    const struct lu_fid *f,
+-					    const struct lu_object_conf *conf,
+-					    wait_queue_entry_t *waiter)
++struct lu_object *lu_object_find_at(const struct lu_env *env,
++				    struct lu_device *dev,
++				    const struct lu_fid *f,
++				    const struct lu_object_conf *conf)
+ {
+ 	struct lu_object      *o;
+ 	struct lu_object      *shadow;
+@@ -725,17 +735,16 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+ 	 * It is unnecessary to perform lookup-alloc-lookup-insert, instead,
+ 	 * just alloc and insert directly.
+ 	 *
+-	 * If dying object is found during index search, add @waiter to the
+-	 * site wait-queue and return ERR_PTR(-EAGAIN).
+ 	 */
+ 	if (conf && conf->loc_flags & LOC_F_NEW)
+ 		return lu_object_new(env, dev, f, conf);
+ 
+ 	s  = dev->ld_site;
+ 	hs = s->ls_obj_hash;
+-	cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 1);
+-	o = htable_lookup(s, &bd, f, waiter, &version);
+-	cfs_hash_bd_unlock(hs, &bd, 1);
++	cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 0);
++	o = htable_lookup(s, &bd, f, &version);
++	cfs_hash_bd_unlock(hs, &bd, 0);
++
+ 	if (!IS_ERR(o) || PTR_ERR(o) != -ENOENT)
+ 		return o;
+ 
+@@ -751,7 +760,7 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+ 
+ 	cfs_hash_bd_lock(hs, &bd, 1);
+ 
+-	shadow = htable_lookup(s, &bd, f, waiter, &version);
++	shadow = htable_lookup(s, &bd, f, &version);
+ 	if (likely(PTR_ERR(shadow) == -ENOENT)) {
+ 		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
+ 		cfs_hash_bd_unlock(hs, &bd, 1);
+@@ -766,34 +775,6 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+ 	lu_object_free(env, o);
+ 	return shadow;
+ }
+-
+-/**
+- * Much like lu_object_find(), but top level device of object is specifically
+- * \a dev rather than top level device of the site. This interface allows
+- * objects of different "stacking" to be created within the same site.
+- */
+-struct lu_object *lu_object_find_at(const struct lu_env *env,
+-				    struct lu_device *dev,
+-				    const struct lu_fid *f,
+-				    const struct lu_object_conf *conf)
+-{
+-	wait_queue_head_t	*wq;
+-	struct lu_object	*obj;
+-	wait_queue_entry_t	   wait;
+-
+-	while (1) {
+-		obj = lu_object_find_try(env, dev, f, conf, &wait);
+-		if (obj != ERR_PTR(-EAGAIN))
+-			return obj;
+-		/*
+-		 * lu_object_find_try() already added waiter into the
+-		 * wait queue.
+-		 */
+-		schedule();
+-		wq = lu_site_wq_from_fid(dev->ld_site, (void *)f);
+-		remove_wait_queue(wq, &wait);
+-	}
+-}
+ EXPORT_SYMBOL(lu_object_find_at);
+ 
+ /**
