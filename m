@@ -1,50 +1,93 @@
-From: NeilBrown <neilb@suse.com>
-Date: Tue, 01 May 2018 13:52:39 +1000
-Subject: [lustre-devel] [PATCH 10/10] staging: lustre: fix error deref in
- ll_splice_alias().
-In-Reply-To: <152514658325.17843.11455067361317157487.stgit@noble>
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Tue, 1 May 2018 04:04:24 +0000
+Subject: [lustre-devel] [PATCH 01/10] staging: lustre: ldlm: store name
+ directly in namespace.
+In-Reply-To: <152514675876.17843.12443354625160742215.stgit@noble>
 References: <152514658325.17843.11455067361317157487.stgit@noble>
-Message-ID: <152514675919.17843.11688659715084804936.stgit@noble>
+ <152514675876.17843.12443354625160742215.stgit@noble>
+Message-ID: <74BA6824-9336-47B6-BCD6-A2E91E15A115@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: NeilBrown <neilb@suse.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Linux
+ Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-d_splice_alias() can return an ERR_PTR().
-If it does while debugging is enabled, the following
-CDEBUG() will dereference that error and crash.
+On Apr 30, 2018, at 21:52, NeilBrown <neilb@suse.com> wrote:
+> 
+> Rather than storing the name of a namespace in the
+> hash table, store it directly in the namespace.
+> This will allow the hashtable to be changed to use
+> rhashtable.
+> 
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
-So add appropriate checking, and provide a separate
-debug message for the error case.
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
-Reported-by: James Simmons <jsimmons@infradead.org>
-Fixes: e9d4f0b9f559 ("staging: lustre: llite: use d_splice_alias for directories.")
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lustre/llite/namei.c |    8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+> ---
+> drivers/staging/lustre/lustre/include/lustre_dlm.h |    5 ++++-
+> drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    5 +++++
+> 2 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> index d668d86423a4..b3532adac31c 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> @@ -362,6 +362,9 @@ struct ldlm_namespace {
+> 	/** Flag indicating if namespace is on client instead of server */
+> 	enum ldlm_side		ns_client;
+> 
+> +	/** name of this namespace */
+> +	char			*ns_name;
+> +
+> 	/** Resource hash table for namespace. */
+> 	struct cfs_hash		*ns_rs_hash;
+> 
+> @@ -878,7 +881,7 @@ static inline bool ldlm_has_layout(struct ldlm_lock *lock)
+> static inline char *
+> ldlm_ns_name(struct ldlm_namespace *ns)
+> {
+> -	return ns->ns_rs_hash->hs_name;
+> +	return ns->ns_name;
+> }
+> 
+> static inline struct ldlm_namespace *
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> index 6c615b6e9bdc..43bbc5fd94cc 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> @@ -688,6 +688,9 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+> 	ns->ns_obd      = obd;
+> 	ns->ns_appetite = apt;
+> 	ns->ns_client   = client;
+> +	ns->ns_name     = kstrdup(name, GFP_KERNEL);
+> +	if (!ns->ns_name)
+> +		goto out_hash;
+> 
+> 	INIT_LIST_HEAD(&ns->ns_list_chain);
+> 	INIT_LIST_HEAD(&ns->ns_unused_list);
+> @@ -730,6 +733,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+> 	ldlm_namespace_sysfs_unregister(ns);
+> 	ldlm_namespace_cleanup(ns, 0);
+> out_hash:
+> +	kfree(ns->ns_name);
+> 	cfs_hash_putref(ns->ns_rs_hash);
+> out_ns:
+> 	kfree(ns);
+> @@ -993,6 +997,7 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
+> 	ldlm_namespace_debugfs_unregister(ns);
+> 	ldlm_namespace_sysfs_unregister(ns);
+> 	cfs_hash_putref(ns->ns_rs_hash);
+> +	kfree(ns->ns_name);
+> 	/* Namespace \a ns should be not on list at this time, otherwise
+> 	 * this will cause issues related to using freed \a ns in poold
+> 	 * thread.
+> 
+> 
 
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 6c9ec462eb41..24a6873d86a2 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -442,11 +442,15 @@ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de)
- 	} else {
- 		struct dentry *new = d_splice_alias(inode, de);
- 
-+		if (IS_ERR(new))
-+			CDEBUG(D_DENTRY, "splice inode %p as %pd gives error %lu\n",
-+			       inode, de, PTR_ERR(new));
- 		if (new)
- 			de = new;
- 	}
--	CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
--	       de, d_inode(de), d_count(de), de->d_flags);
-+	if (!IS_ERR(de))
-+		CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
-+		       de, d_inode(de), d_count(de), de->d_flags);
- 	return de;
- }
- 
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
