@@ -1,89 +1,61 @@
 From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 1 May 2018 04:04:24 +0000
-Subject: [lustre-devel] [PATCH 01/10] staging: lustre: ldlm: store name
- directly in namespace.
-In-Reply-To: <152514675876.17843.12443354625160742215.stgit@noble>
-References: <152514658325.17843.11455067361317157487.stgit@noble>
- <152514675876.17843.12443354625160742215.stgit@noble>
-Message-ID: <74BA6824-9336-47B6-BCD6-A2E91E15A115@intel.com>
+Date: Tue, 1 May 2018 04:06:56 +0000
+Subject: [lustre-devel] [PATCH v2] staging: lustre: llite: fix potential
+ missing-check bug when copying lumv
+In-Reply-To: <1525128971-8946-1-git-send-email-wang6495@umn.edu>
+References: <1525128971-8946-1-git-send-email-wang6495@umn.edu>
+Message-ID: <BA97D240-2B0A-4AD4-B83B-201C285E4DEB@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Linux
- Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Wenwen Wang <wang6495@umn.edu>
+Cc: "open list:STAGING SUBSYSTEM" <devel@driverdev.osuosl.org>, Aastha Gupta <aastha.gupta4104@gmail.com>, Roman Storozhenko <romeusmeister@gmail.com>, Jeff Layton <jlayton@redhat.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Kangjie Lu <kjlu@umn.edu>, NeilBrown <neilb@suse.com>, open list <linux-kernel@vger.kernel.org>, "Drokin,
+ Oleg" <oleg.drokin@intel.com>, "moderated list:STAGING - LUSTRE PARALLEL FILESYSTEM" <lustre-devel@lists.lustre.org>
 
-On Apr 30, 2018, at 21:52, NeilBrown <neilb@suse.com> wrote:
+On Apr 30, 2018, at 16:56, Wenwen Wang <wang6495@umn.edu> wrote:
 > 
-> Rather than storing the name of a namespace in the
-> hash table, store it directly in the namespace.
-> This will allow the hashtable to be changed to use
-> rhashtable.
+> In ll_dir_ioctl(), the object lumv3 is firstly copied from the user space
+> using Its address, i.e., lumv1 = &lumv3. If the lmm_magic field of lumv3 is
+> LOV_USER_MAGIC_V3, lumv3 will be modified by the second copy from the user
+> space. The second copy is necessary, because the two versions (i.e.,
+> lov_user_md_v1 and lov_user_md_v3) have different data formats and lengths.
+> However, given that the user data resides in the user space, a malicious
+> user-space process can race to change the data between the two copies. By
+> doing so, the attacker can provide a data with an inconsistent version,
+> e.g., v1 version + v3 data. This can lead to logical errors in the
+> following execution in ll_dir_setstripe(), which performs different actions
+> according to the version specified by the field lmm_magic.
 > 
-> Signed-off-by: NeilBrown <neilb@suse.com>
+> This patch rechecks the version field lmm_magic in the second copy.  If the
+> version is not as expected, i.e., LOV_USER_MAGIC_V3, an error code will be
+> returned: -EINVAL.
+> 
+> Signed-off-by: Wenwen Wang <wang6495@umn.edu>
+
+Thanks for the updated patch.
 
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 
 > ---
-> drivers/staging/lustre/lustre/include/lustre_dlm.h |    5 ++++-
-> drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    5 +++++
-> 2 files changed, 9 insertions(+), 1 deletion(-)
+> drivers/staging/lustre/lustre/llite/dir.c | 2 ++
+> 1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-> index d668d86423a4..b3532adac31c 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-> @@ -362,6 +362,9 @@ struct ldlm_namespace {
-> 	/** Flag indicating if namespace is on client instead of server */
-> 	enum ldlm_side		ns_client;
+> diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+> index d10d272..80d44ca 100644
+> --- a/drivers/staging/lustre/lustre/llite/dir.c
+> +++ b/drivers/staging/lustre/lustre/llite/dir.c
+> @@ -1185,6 +1185,8 @@ static long ll_dir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+> 		if (lumv1->lmm_magic == LOV_USER_MAGIC_V3) {
+> 			if (copy_from_user(&lumv3, lumv3p, sizeof(lumv3)))
+> 				return -EFAULT;
+> +			if (lumv3.lmm_magic != LOV_USER_MAGIC_V3)
+> +				return -EINVAL;
+> 		}
 > 
-> +	/** name of this namespace */
-> +	char			*ns_name;
-> +
-> 	/** Resource hash table for namespace. */
-> 	struct cfs_hash		*ns_rs_hash;
-> 
-> @@ -878,7 +881,7 @@ static inline bool ldlm_has_layout(struct ldlm_lock *lock)
-> static inline char *
-> ldlm_ns_name(struct ldlm_namespace *ns)
-> {
-> -	return ns->ns_rs_hash->hs_name;
-> +	return ns->ns_name;
-> }
-> 
-> static inline struct ldlm_namespace *
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> index 6c615b6e9bdc..43bbc5fd94cc 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> @@ -688,6 +688,9 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
-> 	ns->ns_obd      = obd;
-> 	ns->ns_appetite = apt;
-> 	ns->ns_client   = client;
-> +	ns->ns_name     = kstrdup(name, GFP_KERNEL);
-> +	if (!ns->ns_name)
-> +		goto out_hash;
-> 
-> 	INIT_LIST_HEAD(&ns->ns_list_chain);
-> 	INIT_LIST_HEAD(&ns->ns_unused_list);
-> @@ -730,6 +733,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
-> 	ldlm_namespace_sysfs_unregister(ns);
-> 	ldlm_namespace_cleanup(ns, 0);
-> out_hash:
-> +	kfree(ns->ns_name);
-> 	cfs_hash_putref(ns->ns_rs_hash);
-> out_ns:
-> 	kfree(ns);
-> @@ -993,6 +997,7 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
-> 	ldlm_namespace_debugfs_unregister(ns);
-> 	ldlm_namespace_sysfs_unregister(ns);
-> 	cfs_hash_putref(ns->ns_rs_hash);
-> +	kfree(ns->ns_name);
-> 	/* Namespace \a ns should be not on list at this time, otherwise
-> 	 * this will cause issues related to using freed \a ns in poold
-> 	 * thread.
-> 
+> 		if (is_root_inode(inode))
+> -- 
+> 2.7.4
 > 
 
 Cheers, Andreas
