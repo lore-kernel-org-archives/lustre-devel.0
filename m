@@ -1,59 +1,86 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 2 May 2018 04:05:39 +0100 (BST)
-Subject: [lustre-devel] [PATCH 10/10] staging: lustre: fix error deref
- in ll_splice_alias().
-In-Reply-To: <152514675919.17843.11688659715084804936.stgit@noble>
-References: <152514658325.17843.11455067361317157487.stgit@noble>
- <152514675919.17843.11688659715084804936.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1805020403530.2551@casper.infradead.org>
+From: Doug Oucharek <dougso@me.com>
+Date: Tue, 01 May 2018 23:49:18 -0400
+Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: Fix FastReg
+ map/unmap for MLX5
+Message-ID: <1525232958-7410-1-git-send-email-dougso@me.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Doug Oucharek <dougso@me.com>, Doug Oucharek <doug.s.oucharek@intel.com>
 
+The FastReg support in ko2iblnd was not unmapping pool items
+causing the items to leak.  In addition, the mapping code
+is not growing the pool like we do with FMR.
 
-> d_splice_alias() can return an ERR_PTR().
-> If it does while debugging is enabled, the following
-> CDEBUG() will dereference that error and crash.
-> 
-> So add appropriate checking, and provide a separate
-> debug message for the error case.
+This patch makes sure we are unmapping FastReg pool elements
+when we are done with them.  It also makes sure the pool
+will grow when we depleat the pool.
 
-Yeah!!! It fixed the issues. Thank you.
+Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9472
+Reviewed-on: https://review.whamcloud.com/27015
+Reviewed-by: Andrew Perepechko <andrew.perepechko@seagate.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: Doug Oucharek <dougso@me.com>
+---
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  2 +-
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 12 ++++--------
+ 2 files changed, 5 insertions(+), 9 deletions(-)
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 959e119..cace9ba 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -1702,7 +1702,7 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
+ 				return 0;
+ 			}
+ 			spin_unlock(&fps->fps_lock);
+-			rc = -EBUSY;
++			rc = -EAGAIN;
+ 		}
  
-> Reported-by: James Simmons <jsimmons@infradead.org>
-> Fixes: e9d4f0b9f559 ("staging: lustre: llite: use d_splice_alias for directories.")
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  drivers/staging/lustre/lustre/llite/namei.c |    8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-> index 6c9ec462eb41..24a6873d86a2 100644
-> --- a/drivers/staging/lustre/lustre/llite/namei.c
-> +++ b/drivers/staging/lustre/lustre/llite/namei.c
-> @@ -442,11 +442,15 @@ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de)
->  	} else {
->  		struct dentry *new = d_splice_alias(inode, de);
->  
-> +		if (IS_ERR(new))
-> +			CDEBUG(D_DENTRY, "splice inode %p as %pd gives error %lu\n",
-> +			       inode, de, PTR_ERR(new));
->  		if (new)
->  			de = new;
->  	}
-> -	CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
-> -	       de, d_inode(de), d_count(de), de->d_flags);
-> +	if (!IS_ERR(de))
-> +		CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
-> +		       de, d_inode(de), d_count(de), de->d_flags);
->  	return de;
->  }
->  
-> 
-> 
-> 
+ 		spin_lock(&fps->fps_lock);
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index b4a182d..f245481 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -48,7 +48,7 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+ 			    __u64 dstcookie);
+ static void kiblnd_queue_tx_locked(struct kib_tx *tx, struct kib_conn *conn);
+ static void kiblnd_queue_tx(struct kib_tx *tx, struct kib_conn *conn);
+-static void kiblnd_unmap_tx(struct lnet_ni *ni, struct kib_tx *tx);
++static void kiblnd_unmap_tx(struct kib_tx *tx);
+ static void kiblnd_check_sends_locked(struct kib_conn *conn);
+ 
+ static void
+@@ -66,7 +66,7 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+ 	LASSERT(!tx->tx_waiting);	      /* mustn't be awaiting peer response */
+ 	LASSERT(tx->tx_pool);
+ 
+-	kiblnd_unmap_tx(ni, tx);
++	kiblnd_unmap_tx(tx);
+ 
+ 	/* tx may have up to 2 lnet msgs to finalise */
+ 	lntmsg[0] = tx->tx_lntmsg[0]; tx->tx_lntmsg[0] = NULL;
+@@ -591,13 +591,9 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+ 	return 0;
+ }
+ 
+-static void kiblnd_unmap_tx(struct lnet_ni *ni, struct kib_tx *tx)
++static void kiblnd_unmap_tx(struct kib_tx *tx)
+ {
+-	struct kib_net *net = ni->ni_data;
+-
+-	LASSERT(net);
+-
+-	if (net->ibn_fmr_ps)
++	if (tx->fmr.fmr_pfmr || tx->fmr.fmr_frd)
+ 		kiblnd_fmr_pool_unmap(&tx->fmr, tx->tx_status);
+ 
+ 	if (tx->tx_nfrags) {
+-- 
+1.8.3.1
