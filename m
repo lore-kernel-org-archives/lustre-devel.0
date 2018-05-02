@@ -1,107 +1,86 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 2 May 2018 19:10:15 +0100 (BST)
-Subject: [lustre-devel] [lustre_init] BUG: unable to handle kernel NULL
- pointer dereference at 0000000000000004
-In-Reply-To: <20180502122749.vwak4yuerrzzbme6@wfg-t540p.sh.intel.com>
-References: <20180502122749.vwak4yuerrzzbme6@wfg-t540p.sh.intel.com>
-Message-ID: <alpine.LFD.2.21.1805021907400.24633@casper.infradead.org>
+Date: Wed, 2 May 2018 19:11:33 +0100 (BST)
+Subject: [lustre-devel] [PATCH 01/10] staging: lustre: ldlm: store name
+ directly in namespace.
+In-Reply-To: <152514675876.17843.12443354625160742215.stgit@noble>
+References: <152514658325.17843.11455067361317157487.stgit@noble>
+ <152514675876.17843.12443354625160742215.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1805021910440.24633@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Fengguang Wu <fengguang.wu@intel.com>
-Cc: lustre-devel@lists.lustre.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linus Torvalds <torvalds@linux-foundation.org>, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, lkp@01.org
+To: NeilBrown <neilb@suse.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> Hello,
+> Rather than storing the name of a namespace in the
+> hash table, store it directly in the namespace.
+> This will allow the hashtable to be changed to use
+> rhashtable.
 > 
-> FYI this happens in mainline kernel 4.17.0-rc3.
-> It looks like a new regression since v4.17-rc1.
-> 
-> It occurs in 2 out of 2 boots.
-> 
-> [   54.222599]   Magic number: 14:276:994
-> [   54.223261] tty ttyd7: hash matches
-> [   54.223841] tty ttyaa: hash matches
-> [   54.227288] Lustre: Lustre: Build Version: 2.6.99
-> [   54.232977] LustreError: 1:0:(class_obd.c:465:obdclass_init()) cannot register 241 err -16
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
-This looks like the misc register bug that is now fixed in the 
-staging-test branch. Can you try 
+Reviewed-by: James Simmons <jsimmons@infradead.org>
 
-git commit ba833f145745c5ca4d1d45b1de2541fe34b8f100 (staging: lustre: 
-libcfs: use  dynamic minors for /dev/{lnet, obd})
-
-from the staging-test branch to see if it resolves your problems?
-
-> [   54.236561] BUG: unable to handle kernel NULL pointer dereference at 0000000000000004
-> [   54.237836] PGD 0 P4D 0
-> [   54.238266] Oops: 0000 [#1] SMP
-> [   54.238780] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.17.0-rc3 #1
-> [   54.239775] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.10.2-1 04/01/2014
-> [   54.241214] RIP: 0010:kmem_cache_alloc+0x27/0x2ce:
-> 						slob_alloc_node at mm/slob.c:546
-> 						 (inlined by) kmem_cache_alloc at mm/slob.c:567
-> [   54.241956] RSP: 0000:ffff88001d21bde8 EFLAGS: 00010246
-> [   54.242791] RAX: 0000000000000000 RBX: 0000000001408040 RCX: 0000000000000000
-> [   54.243933] RDX: ffff88001d216000 RSI: 0000000000000000 RDI: ffffffff83752918
-> [   54.245072] RBP: 0000000000000000 R08: 0000000000000000 R09: 0000000000000000
-> [   54.246213] R10: 0000000000000000 R11: 0000000000000020 R12: 00000000a0000000
-> [   54.247337] R13: 0000000000000000 R14: 00000000a0000000 R15: ffffffff8407cb7e
-> [   54.248613] FS:  0000000000000000(0000) GS:ffff88001e400000(0000) knlGS:0000000000000000
-> [   54.249887] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-> [   54.250803] CR2: 0000000000000004 CR3: 0000000003269000 CR4: 00000000000006a0
-> [   54.251939] Call Trace:
-> [   54.252358]  ? native_patch+0x195/0x195:
-> 						__raw_callee_save___native_queued_spin_unlock at ??:?
-> [   54.252976]  ? lustre_init+0x189/0x247:
-> 						IS_ERR at include/linux/err.h:36
-> 						 (inlined by) lustre_init at drivers/staging/lustre/lustre/llite/super25.c:133
-> [   54.253590]  cl_env_new+0x2b/0xb9:
-> 						cl_env_new at drivers/staging/lustre/lustre/obdclass/cl_object.c:597
-> [   54.254126]  cl_env_alloc+0x11/0xae:
-> 						IS_ERR at include/linux/err.h:36
-> 						 (inlined by) cl_env_alloc at drivers/staging/lustre/lustre/obdclass/cl_object.c:718
-> [   54.254713]  ? lmv_init+0x2d/0x2d:
-> 						cfs_cdebug_show at drivers/staging/lustre/include/linux/libcfs/libcfs_debug.h:111
-> 						 (inlined by) lustre_init at drivers/staging/lustre/lustre/llite/super25.c:97
-> [   54.255259]  lustre_init+0x189/0x247:
-> 						IS_ERR at include/linux/err.h:36
-> 						 (inlined by) lustre_init at drivers/staging/lustre/lustre/llite/super25.c:133
-> [   54.255839]  do_one_initcall+0x13d/0x36c:
-> 						__read_once_size at include/linux/compiler.h:188
-> 						 (inlined by) arch_atomic_read at arch/x86/include/asm/atomic.h:31
-> 						 (inlined by) atomic_read at include/asm-generic/atomic-instrumented.h:22
-> 						 (inlined by) static_key_count at include/linux/jump_label.h:194
-> 						 (inlined by) static_key_false at include/linux/jump_label.h:206
-> 						 (inlined by) trace_initcall_finish at include/trace/events/initcall.h:44
-> 						 (inlined by) do_one_initcall at init/main.c:884
-> [   54.256597]  ? parse_args+0x81/0x273:
-> 						arch_local_save_flags at arch/x86/include/asm/paravirt.h:778
-> 						 (inlined by) parse_args at kernel/params.c:190
-> [   54.257177]  ? do_early_param+0x88/0x88:
-> 						repair_env_string at init/main.c:251
-> [   54.257791]  kernel_init_freeable+0x338/0x3d3:
-> 						do_initcall_level at init/main.c:950
-> 						 (inlined by) do_initcalls at init/main.c:959
-> 						 (inlined by) do_basic_setup at init/main.c:977
-> 						 (inlined by) kernel_init_freeable at init/main.c:1127
-> [   54.258492]  ? rest_init+0x13c/0x13c:
-> 						kernel_init at init/main.c:1053
-> [   54.259068]  kernel_init+0x5/0xe6:
-> 						kernel_init at init/main.c:1055
-> [   54.259609]  ret_from_fork+0x1f/0x30:
-> 						ret_from_fork at arch/x86/entry/entry_64.S:418
-> [   54.260189] Code: 0c 31 c0 c3 41 57 41 56 41 55 41 54 55 53 48 89 fd 48 83 ec 18 8b 1d 52 2e 6b 02 21 f3 89 df e8 90 0c fb ff 89 df e8 b9 0c fb ff <8b> 7d 04 81 ff ff 0f 00 00 0f 87 f3 00 00 00 8b 55 08 89 de e8
-> [   54.263237] RIP: kmem_cache_alloc+0x27/0x2ce:
-> 						slob_alloc_node at mm/slob.c:546
-> 						 (inlined by) kmem_cache_alloc at mm/slob.c:567 RSP: ffff88001d21bde8
-> [   54.264322] CR2: 0000000000000004
-> [   54.264865] ---[ end trace 612192cbc2d7395d ]---
-> [   54.265604] Kernel panic - not syncing: Fatal exception
+> ---
+>  drivers/staging/lustre/lustre/include/lustre_dlm.h |    5 ++++-
+>  drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    5 +++++
+>  2 files changed, 9 insertions(+), 1 deletion(-)
 > 
-> Attached the full dmesg, kconfig and reproduce scripts.
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> index d668d86423a4..b3532adac31c 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+> @@ -362,6 +362,9 @@ struct ldlm_namespace {
+>  	/** Flag indicating if namespace is on client instead of server */
+>  	enum ldlm_side		ns_client;
+>  
+> +	/** name of this namespace */
+> +	char			*ns_name;
+> +
+>  	/** Resource hash table for namespace. */
+>  	struct cfs_hash		*ns_rs_hash;
+>  
+> @@ -878,7 +881,7 @@ static inline bool ldlm_has_layout(struct ldlm_lock *lock)
+>  static inline char *
+>  ldlm_ns_name(struct ldlm_namespace *ns)
+>  {
+> -	return ns->ns_rs_hash->hs_name;
+> +	return ns->ns_name;
+>  }
+>  
+>  static inline struct ldlm_namespace *
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> index 6c615b6e9bdc..43bbc5fd94cc 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+> @@ -688,6 +688,9 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+>  	ns->ns_obd      = obd;
+>  	ns->ns_appetite = apt;
+>  	ns->ns_client   = client;
+> +	ns->ns_name     = kstrdup(name, GFP_KERNEL);
+> +	if (!ns->ns_name)
+> +		goto out_hash;
+>  
+>  	INIT_LIST_HEAD(&ns->ns_list_chain);
+>  	INIT_LIST_HEAD(&ns->ns_unused_list);
+> @@ -730,6 +733,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+>  	ldlm_namespace_sysfs_unregister(ns);
+>  	ldlm_namespace_cleanup(ns, 0);
+>  out_hash:
+> +	kfree(ns->ns_name);
+>  	cfs_hash_putref(ns->ns_rs_hash);
+>  out_ns:
+>  	kfree(ns);
+> @@ -993,6 +997,7 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
+>  	ldlm_namespace_debugfs_unregister(ns);
+>  	ldlm_namespace_sysfs_unregister(ns);
+>  	cfs_hash_putref(ns->ns_rs_hash);
+> +	kfree(ns->ns_name);
+>  	/* Namespace \a ns should be not on list at this time, otherwise
+>  	 * this will cause issues related to using freed \a ns in poold
+>  	 * thread.
 > 
-> Thanks,
-> Fengguang
+> 
 > 
