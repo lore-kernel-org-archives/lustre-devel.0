@@ -1,182 +1,188 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  2 May 2018 14:21:45 -0400
-Subject: [lustre-devel] [PATCH 1/4] staging: lustre: obdclass: change
- spinlock of key to rwlock
+Date: Wed,  2 May 2018 14:21:48 -0400
+Subject: [lustre-devel] [PATCH 4/4] staging: lustre: obdclass: change object
+ lookup to no wait mode
 In-Reply-To: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
 References: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1525285308-15347-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1525285308-15347-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Lai Siyao <lai.siyao@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Gu Zheng <gzheng@ddn.com>, Li Xi <lixi@ddn.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: Li Xi <lixi@ddn.com>
+From: Lai Siyao <lai.siyao@intel.com>
 
-Most of the time, keys are never changed. So rwlock might be
-better for the concurrency of key read.
+Currently we set LU_OBJECT_HEARD_BANSHEE on object when we want
+to remove object from cache, but this may lead to deadlock, because
+when other process lookup such object, it needs to wait for this
+object until release (done at last refcount put), while that process
+maybe already hold an LDLM lock.
 
-Signed-off-by: Li Xi <lixi@ddn.com>
-Signed-off-by: Gu Zheng <gzheng@ddn.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6800
-Reviewed-on: http://review.whamcloud.com/15558
-Reviewed-by: Faccini Bruno <bruno.faccini@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Now that current code can handle dying object correctly, we can just
+return such object in lookup, thus the above deadlock can be avoided.
+
+Signed-off-by: Lai Siyao <lai.siyao@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9049
+Reviewed-on: https://review.whamcloud.com/26965
+Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
+Tested-by: Cliff White <cliff.white@intel.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/obdclass/lu_object.c | 38 +++++++++++-----------
- 1 file changed, 19 insertions(+), 19 deletions(-)
+ drivers/staging/lustre/lustre/include/lu_object.h  |  2 +-
+ drivers/staging/lustre/lustre/obdclass/lu_object.c | 82 +++++++++-------------
+ 2 files changed, 36 insertions(+), 48 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index fa986f2..04475e9 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -1317,7 +1317,7 @@ enum {
- 
- static struct lu_context_key *lu_keys[LU_CONTEXT_KEY_NR] = { NULL, };
- 
--static DEFINE_SPINLOCK(lu_keys_guard);
-+static DEFINE_RWLOCK(lu_keys_guard);
- static atomic_t lu_key_initing_cnt = ATOMIC_INIT(0);
+diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
+index f29bbca..232063a 100644
+--- a/drivers/staging/lustre/lustre/include/lu_object.h
++++ b/drivers/staging/lustre/lustre/include/lu_object.h
+@@ -673,7 +673,7 @@ static inline void lu_object_get(struct lu_object *o)
+ }
  
  /**
-@@ -1341,7 +1341,7 @@ int lu_context_key_register(struct lu_context_key *key)
- 	LASSERT(key->lct_tags != 0);
+- * Return true of object will not be cached after last reference to it is
++ * Return true if object will not be cached after last reference to it is
+  * released.
+  */
+ static inline int lu_object_is_dying(const struct lu_object_header *h)
+diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+index 8b507f1..9311703 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
++++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+@@ -589,19 +589,13 @@ static struct lu_object *htable_lookup(struct lu_site *s,
+ 				       const struct lu_fid *f,
+ 				       __u64 *version)
+ {
+-	struct cfs_hash		*hs = s->ls_obj_hash;
+ 	struct lu_site_bkt_data *bkt;
+ 	struct lu_object_header *h;
+ 	struct hlist_node	*hnode;
+-	__u64 ver;
+-	wait_queue_entry_t waiter;
++	u64 ver = cfs_hash_bd_version_get(bd);
  
- 	result = -ENFILE;
--	spin_lock(&lu_keys_guard);
-+	write_lock(&lu_keys_guard);
- 	for (i = 0; i < ARRAY_SIZE(lu_keys); ++i) {
- 		if (!lu_keys[i]) {
- 			key->lct_index = i;
-@@ -1353,7 +1353,7 @@ int lu_context_key_register(struct lu_context_key *key)
- 			break;
- 		}
+-retry:
+-	ver = cfs_hash_bd_version_get(bd);
+-
+-	if (*version == ver) {
++	if (*version == ver)
+ 		return ERR_PTR(-ENOENT);
+-	}
+ 
+ 	*version = ver;
+ 	bkt = cfs_hash_bd_extra_get(s->ls_obj_hash, bd);
+@@ -615,31 +609,13 @@ static struct lu_object *htable_lookup(struct lu_site *s,
  	}
--	spin_unlock(&lu_keys_guard);
-+	write_unlock(&lu_keys_guard);
- 	return result;
+ 
+ 	h = container_of(hnode, struct lu_object_header, loh_hash);
+-	if (likely(!lu_object_is_dying(h))) {
+-		cfs_hash_get(s->ls_obj_hash, hnode);
+-		lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_HIT);
+-		if (!list_empty(&h->loh_lru)) {
+-			list_del_init(&h->loh_lru);
+-			percpu_counter_dec(&s->ls_lru_len_counter);
+-		}
+-		return lu_object_top(h);
++	cfs_hash_get(s->ls_obj_hash, hnode);
++	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_HIT);
++	if (!list_empty(&h->loh_lru)) {
++		list_del_init(&h->loh_lru);
++		percpu_counter_dec(&s->ls_lru_len_counter);
+ 	}
+-
+-	/*
+-	 * Lookup found an object being destroyed this object cannot be
+-	 * returned (to assure that references to dying objects are eventually
+-	 * drained), and moreover, lookup has to wait until object is freed.
+-	 */
+-
+-	init_waitqueue_entry(&waiter, current);
+-	add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+-	set_current_state(TASK_UNINTERRUPTIBLE);
+-	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_DEATH_RACE);
+-	cfs_hash_bd_unlock(hs, bd, 1);
+-	schedule();
+-	remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+-	cfs_hash_bd_lock(hs, bd, 1);
+-	goto retry;
++	return lu_object_top(h);
  }
- EXPORT_SYMBOL(lu_context_key_register);
-@@ -1387,7 +1387,7 @@ void lu_context_key_degister(struct lu_context_key *key)
- 	lu_context_key_quiesce(key);
  
- 	++key_set_version;
--	spin_lock(&lu_keys_guard);
-+	write_lock(&lu_keys_guard);
- 	key_fini(&lu_shrink_env.le_ctx, key->lct_index);
+ /**
+@@ -680,6 +656,8 @@ static void lu_object_limit(const struct lu_env *env, struct lu_device *dev)
+ }
  
- 	/**
-@@ -1395,18 +1395,18 @@ void lu_context_key_degister(struct lu_context_key *key)
- 	 * run lu_context_key::lct_fini() method.
+ /**
++ * Core logic of lu_object_find*() functions.
++ *
+  * Much like lu_object_find(), but top level device of object is specifically
+  * \a dev rather than top level device of the site. This interface allows
+  * objects of different "stacking" to be created within the same site.
+@@ -713,36 +691,46 @@ struct lu_object *lu_object_find_at(const struct lu_env *env,
+ 	 * It is unnecessary to perform lookup-alloc-lookup-insert, instead,
+ 	 * just alloc and insert directly.
+ 	 *
++	 * If dying object is found during index search, add @waiter to the
++	 * site wait-queue and return ERR_PTR(-EAGAIN).
  	 */
- 	while (atomic_read(&key->lct_used) > 1) {
--		spin_unlock(&lu_keys_guard);
-+		write_unlock(&lu_keys_guard);
- 		CDEBUG(D_INFO, "%s: \"%s\" %p, %d\n",
- 		       __func__, module_name(key->lct_owner),
- 		       key, atomic_read(&key->lct_used));
- 		schedule();
--		spin_lock(&lu_keys_guard);
-+		write_lock(&lu_keys_guard);
- 	}
- 	if (lu_keys[key->lct_index]) {
- 		lu_keys[key->lct_index] = NULL;
- 		lu_ref_fini(&key->lct_reference);
- 	}
--	spin_unlock(&lu_keys_guard);
-+	write_unlock(&lu_keys_guard);
+-	s  = dev->ld_site;
+-	hs = s->ls_obj_hash;
++	if (conf && conf->loc_flags & LOC_F_NEW) {
++		o = lu_object_alloc(env, dev, f, conf);
++		if (unlikely(IS_ERR(o)))
++			return o;
++
++		hs = dev->ld_site->ls_obj_hash;
++		cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 1);
++		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
++		cfs_hash_bd_unlock(hs, &bd, 1);
  
- 	LASSERTF(atomic_read(&key->lct_used) == 1,
- 		 "key has instances: %d\n",
-@@ -1526,7 +1526,7 @@ void lu_context_key_quiesce(struct lu_context_key *key)
- 		/*
- 		 * XXX memory barrier has to go here.
- 		 */
--		spin_lock(&lu_keys_guard);
-+		write_lock(&lu_keys_guard);
- 		key->lct_tags |= LCT_QUIESCENT;
+-	cfs_hash_bd_get(hs, f, &bd);
+-	if (!(conf && conf->loc_flags & LOC_F_NEW)) {
+-		cfs_hash_bd_lock(hs, &bd, 0);
+-		o = htable_lookup(s, &bd, f, &version);
+-		cfs_hash_bd_unlock(hs, &bd, 0);
++		lu_object_limit(env, dev);
  
- 		/**
-@@ -1534,19 +1534,19 @@ void lu_context_key_quiesce(struct lu_context_key *key)
- 		 * have completed.
- 		 */
- 		while (atomic_read(&lu_key_initing_cnt) > 0) {
--			spin_unlock(&lu_keys_guard);
-+			write_unlock(&lu_keys_guard);
- 			CDEBUG(D_INFO, "%s: \"%s\" %p, %d (%d)\n",
- 			       __func__,
- 			       module_name(key->lct_owner),
- 			       key, atomic_read(&key->lct_used),
- 			atomic_read(&lu_key_initing_cnt));
- 			schedule();
--			spin_lock(&lu_keys_guard);
-+			write_lock(&lu_keys_guard);
- 		}
- 
- 		list_for_each_entry(ctx, &lu_context_remembered, lc_remember)
- 			key_fini(ctx, key->lct_index);
--		spin_unlock(&lu_keys_guard);
-+		write_unlock(&lu_keys_guard);
- 		++key_set_version;
+-		if (!IS_ERR(o) || PTR_ERR(o) != -ENOENT)
+-			return o;
++		return o;
  	}
- }
-@@ -1584,9 +1584,9 @@ static int keys_fill(struct lu_context *ctx)
- 	 * An atomic_t variable is still used, in order not to reacquire the
- 	 * lock when decrementing the counter.
++
++	s  = dev->ld_site;
++	hs = s->ls_obj_hash;
++	cfs_hash_bd_get_and_lock(hs, f, &bd, 1);
++	o = htable_lookup(s, &bd, f, &version);
++	cfs_hash_bd_unlock(hs, &bd, 0);
++	if (!IS_ERR(o) || PTR_ERR(o) != -ENOENT)
++		return o;
++
+ 	/*
+ 	 * Allocate new object. This may result in rather complicated
+ 	 * operations, including fld queries, inode loading, etc.
  	 */
--	spin_lock(&lu_keys_guard);
-+	read_lock(&lu_keys_guard);
- 	atomic_inc(&lu_key_initing_cnt);
--	spin_unlock(&lu_keys_guard);
-+	read_unlock(&lu_keys_guard);
+ 	o = lu_object_alloc(env, dev, f, conf);
+-	if (IS_ERR(o))
++	if (unlikely(IS_ERR(o)))
+ 		return o;
  
- 	LINVRNT(ctx->lc_value);
- 	for (i = 0; i < ARRAY_SIZE(lu_keys); ++i) {
-@@ -1655,9 +1655,9 @@ int lu_context_init(struct lu_context *ctx, __u32 tags)
- 	ctx->lc_state = LCS_INITIALIZED;
- 	ctx->lc_tags = tags;
- 	if (tags & LCT_REMEMBER) {
--		spin_lock(&lu_keys_guard);
-+		write_lock(&lu_keys_guard);
- 		list_add(&ctx->lc_remember, &lu_context_remembered);
--		spin_unlock(&lu_keys_guard);
-+		write_unlock(&lu_keys_guard);
- 	} else {
- 		INIT_LIST_HEAD(&ctx->lc_remember);
- 	}
-@@ -1683,10 +1683,10 @@ void lu_context_fini(struct lu_context *ctx)
- 		keys_fini(ctx);
+ 	LASSERT(lu_fid_eq(lu_object_fid(o), f));
  
- 	} else { /* could race with key degister */
--		spin_lock(&lu_keys_guard);
-+		write_lock(&lu_keys_guard);
- 		keys_fini(ctx);
- 		list_del_init(&ctx->lc_remember);
--		spin_unlock(&lu_keys_guard);
-+		write_unlock(&lu_keys_guard);
- 	}
- }
- EXPORT_SYMBOL(lu_context_fini);
-@@ -1714,7 +1714,7 @@ void lu_context_exit(struct lu_context *ctx)
- 		for (i = 0; i < ARRAY_SIZE(lu_keys); ++i) {
- 			/* could race with key quiescency */
- 			if (ctx->lc_tags & LCT_REMEMBER)
--				spin_lock(&lu_keys_guard);
-+				read_lock(&lu_keys_guard);
- 			if (ctx->lc_value[i]) {
- 				struct lu_context_key *key;
+ 	cfs_hash_bd_lock(hs, &bd, 1);
  
-@@ -1724,7 +1724,7 @@ void lu_context_exit(struct lu_context *ctx)
- 						      key, ctx->lc_value[i]);
- 			}
- 			if (ctx->lc_tags & LCT_REMEMBER)
--				spin_unlock(&lu_keys_guard);
-+				read_unlock(&lu_keys_guard);
- 		}
- 	}
- }
+-	if (conf && conf->loc_flags & LOC_F_NEW)
+-		shadow = ERR_PTR(-ENOENT);
+-	else
+-		shadow = htable_lookup(s, &bd, f, &version);
+-	if (likely(PTR_ERR(shadow) == -ENOENT)) {
++	shadow = htable_lookup(s, &bd, f, &version);
++	if (likely(IS_ERR(shadow) && PTR_ERR(shadow) == -ENOENT)) {
+ 		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
+ 		cfs_hash_bd_unlock(hs, &bd, 1);
+ 
 -- 
 1.8.3.1
