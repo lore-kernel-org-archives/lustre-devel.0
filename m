@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 2 May 2018 19:11:33 +0100 (BST)
-Subject: [lustre-devel] [PATCH 01/10] staging: lustre: ldlm: store name
- directly in namespace.
-In-Reply-To: <152514675876.17843.12443354625160742215.stgit@noble>
+Date: Wed, 2 May 2018 19:12:35 +0100 (BST)
+Subject: [lustre-devel] [PATCH 08/10] staging: lustre: move misc-device
+ registration closer to related code.
+In-Reply-To: <152514675910.17843.16005951911891583421.stgit@noble>
 References: <152514658325.17843.11455067361317157487.stgit@noble>
- <152514675876.17843.12443354625160742215.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1805021910440.24633@casper.infradead.org>
+ <152514675910.17843.16005951911891583421.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1805021911550.24633@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,73 +14,123 @@ To: NeilBrown <neilb@suse.com>
 Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> Rather than storing the name of a namespace in the
-> hash table, store it directly in the namespace.
-> This will allow the hashtable to be changed to use
-> rhashtable.
+> The ioctl handler for the misc device is in  lnet/libcfs/module.c
+> but is it registered in lnet/libcfs/linux/linux-module.c.
+> 
+> Keeping related code together make maintenance easier, so move the
+> code.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
 
 > ---
->  drivers/staging/lustre/lustre/include/lustre_dlm.h |    5 ++++-
->  drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    5 +++++
->  2 files changed, 9 insertions(+), 1 deletion(-)
+>  .../staging/lustre/include/linux/libcfs/libcfs.h   |    2 -
+>  .../lustre/lnet/libcfs/linux/linux-module.c        |   28 ------------------
+>  drivers/staging/lustre/lnet/libcfs/module.c        |   31 +++++++++++++++++++-
+>  3 files changed, 30 insertions(+), 31 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-> index d668d86423a4..b3532adac31c 100644
-> --- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
-> +++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-> @@ -362,6 +362,9 @@ struct ldlm_namespace {
->  	/** Flag indicating if namespace is on client instead of server */
->  	enum ldlm_side		ns_client;
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+> index 6e7754b2f296..9263e151451b 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+> @@ -141,11 +141,9 @@ int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand);
+>  int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
+>  			 const struct libcfs_ioctl_hdr __user *uparam);
+>  int libcfs_ioctl_data_adjust(struct libcfs_ioctl_data *data);
+> -int libcfs_ioctl(unsigned long cmd, void __user *arg);
 >  
-> +	/** name of this namespace */
-> +	char			*ns_name;
-> +
->  	/** Resource hash table for namespace. */
->  	struct cfs_hash		*ns_rs_hash;
+>  #define _LIBCFS_H
 >  
-> @@ -878,7 +881,7 @@ static inline bool ldlm_has_layout(struct ldlm_lock *lock)
->  static inline char *
->  ldlm_ns_name(struct ldlm_namespace *ns)
+> -extern struct miscdevice libcfs_dev;
+>  /**
+>   * The path of debug log dump upcall script.
+>   */
+> diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+> index c8908e816c4c..954b681f9db7 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+> +++ b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+> @@ -166,31 +166,3 @@ int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
+>  	kvfree(*hdr_pp);
+>  	return err;
+>  }
+> -
+> -static long
+> -libcfs_psdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+> -{
+> -	if (!capable(CAP_SYS_ADMIN))
+> -		return -EACCES;
+> -
+> -	if (_IOC_TYPE(cmd) != IOC_LIBCFS_TYPE ||
+> -	    _IOC_NR(cmd) < IOC_LIBCFS_MIN_NR  ||
+> -	    _IOC_NR(cmd) > IOC_LIBCFS_MAX_NR) {
+> -		CDEBUG(D_IOCTL, "invalid ioctl ( type %d, nr %d, size %d )\n",
+> -		       _IOC_TYPE(cmd), _IOC_NR(cmd), _IOC_SIZE(cmd));
+> -		return -EINVAL;
+> -	}
+> -
+> -	return libcfs_ioctl(cmd, (void __user *)arg);
+> -}
+> -
+> -static const struct file_operations libcfs_fops = {
+> -	.owner		= THIS_MODULE,
+> -	.unlocked_ioctl	= libcfs_psdev_ioctl,
+> -};
+> -
+> -struct miscdevice libcfs_dev = {
+> -	.minor = MISC_DYNAMIC_MINOR,
+> -	.name = "lnet",
+> -	.fops = &libcfs_fops,
+> -};
+> diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
+> index 4b9acd7bc5cf..3fb150a57f49 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/module.c
+> +++ b/drivers/staging/lustre/lnet/libcfs/module.c
+> @@ -95,7 +95,7 @@ int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand)
+>  }
+>  EXPORT_SYMBOL(libcfs_deregister_ioctl);
+>  
+> -int libcfs_ioctl(unsigned long cmd, void __user *uparam)
+> +static int libcfs_ioctl(unsigned long cmd, void __user *uparam)
 >  {
-> -	return ns->ns_rs_hash->hs_name;
-> +	return ns->ns_name;
+>  	struct libcfs_ioctl_data *data = NULL;
+>  	struct libcfs_ioctl_hdr *hdr;
+> @@ -161,6 +161,35 @@ int libcfs_ioctl(unsigned long cmd, void __user *uparam)
+>  	return err;
 >  }
 >  
->  static inline struct ldlm_namespace *
-> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> index 6c615b6e9bdc..43bbc5fd94cc 100644
-> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-> @@ -688,6 +688,9 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
->  	ns->ns_obd      = obd;
->  	ns->ns_appetite = apt;
->  	ns->ns_client   = client;
-> +	ns->ns_name     = kstrdup(name, GFP_KERNEL);
-> +	if (!ns->ns_name)
-> +		goto out_hash;
->  
->  	INIT_LIST_HEAD(&ns->ns_list_chain);
->  	INIT_LIST_HEAD(&ns->ns_unused_list);
-> @@ -730,6 +733,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
->  	ldlm_namespace_sysfs_unregister(ns);
->  	ldlm_namespace_cleanup(ns, 0);
->  out_hash:
-> +	kfree(ns->ns_name);
->  	cfs_hash_putref(ns->ns_rs_hash);
->  out_ns:
->  	kfree(ns);
-> @@ -993,6 +997,7 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
->  	ldlm_namespace_debugfs_unregister(ns);
->  	ldlm_namespace_sysfs_unregister(ns);
->  	cfs_hash_putref(ns->ns_rs_hash);
-> +	kfree(ns->ns_name);
->  	/* Namespace \a ns should be not on list at this time, otherwise
->  	 * this will cause issues related to using freed \a ns in poold
->  	 * thread.
+> +
+> +static long
+> +libcfs_psdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+> +{
+> +	if (!capable(CAP_SYS_ADMIN))
+> +		return -EACCES;
+> +
+> +	if (_IOC_TYPE(cmd) != IOC_LIBCFS_TYPE ||
+> +	    _IOC_NR(cmd) < IOC_LIBCFS_MIN_NR  ||
+> +	    _IOC_NR(cmd) > IOC_LIBCFS_MAX_NR) {
+> +		CDEBUG(D_IOCTL, "invalid ioctl ( type %d, nr %d, size %d )\n",
+> +		       _IOC_TYPE(cmd), _IOC_NR(cmd), _IOC_SIZE(cmd));
+> +		return -EINVAL;
+> +	}
+> +
+> +	return libcfs_ioctl(cmd, (void __user *)arg);
+> +}
+> +
+> +static const struct file_operations libcfs_fops = {
+> +	.owner		= THIS_MODULE,
+> +	.unlocked_ioctl	= libcfs_psdev_ioctl,
+> +};
+> +
+> +struct miscdevice libcfs_dev = {
+> +	.minor = MISC_DYNAMIC_MINOR,
+> +	.name = "lnet",
+> +	.fops = &libcfs_fops,
+> +};
+> +
+>  int lprocfs_call_handler(void *data, int write, loff_t *ppos,
+>  			 void __user *buffer, size_t *lenp,
+>  			 int (*handler)(void *data, int write, loff_t pos,
 > 
 > 
 > 
