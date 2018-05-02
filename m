@@ -1,377 +1,225 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 2 May 2018 19:13:06 +0100 (BST)
-Subject: [lustre-devel] [PATCH 09/10] staging: lustre: move remaining
- code from linux-module.c to module.c
-In-Reply-To: <152514675915.17843.13015150157081908310.stgit@noble>
+Date: Wed, 2 May 2018 19:21:05 +0100 (BST)
+Subject: [lustre-devel] [PATCH 04/10] staging: lustre: lu_object: move
+ retry logic inside htable_lookup
+In-Reply-To: <EFC6D018-5FB5-4902-AE7A-B91A5E0148FE@intel.com>
 References: <152514658325.17843.11455067361317157487.stgit@noble>
- <152514675915.17843.13015150157081908310.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1805021912550.24633@casper.infradead.org>
+ <152514675897.17843.15112214060540196720.stgit@noble>
+ <EFC6D018-5FB5-4902-AE7A-B91A5E0148FE@intel.com>
+Message-ID: <alpine.LFD.2.21.1805021914550.24633@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: "Dilger, Andreas" <andreas.dilger@intel.com>
+Cc: NeilBrown <neilb@suse.com>, "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-> There is no longer any need to keep this code separate,
-> and now we can remove linux-module.c
+> On Apr 30, 2018, at 21:52, NeilBrown <neilb@suse.com> wrote:
+> > 
+> > The current retry logic, to wait when a 'dying' object is found,
+> > spans multiple functions.  The process is attached to a waitqueue
+> > and set TASK_UNINTERRUPTIBLE in htable_lookup, and this status
+> > is passed back through lu_object_find_try() to lu_object_find_at()
+> > where schedule() is called and the process is removed from the queue.
+> > 
+> > This can be simplified by moving all the logic (including
+> > hashtable locking) inside htable_lookup(), which now never returns
+> > EAGAIN.
+> > 
+> > Note that htable_lookup() is called with the hash bucket lock
+> > held, and will drop and retake it if it needs to schedule.
+> > 
+> > I made this a 'goto' loop rather than a 'while(1)' loop as the
+> > diff is easier to read.
+> > 
+> > Signed-off-by: NeilBrown <neilb@suse.com>
+> > ---
+> > drivers/staging/lustre/lustre/obdclass/lu_object.c |   73 +++++++-------------
+> > 1 file changed, 27 insertions(+), 46 deletions(-)
+> > 
+> > diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> > index 2bf089817157..93daa52e2535 100644
+> > --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> > +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+> > @@ -586,16 +586,21 @@ EXPORT_SYMBOL(lu_object_print);
+> > static struct lu_object *htable_lookup(struct lu_site *s,
 > 
-> Signed-off-by: NeilBrown <neilb@suse.com>
-
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-
-> ---
->  .../staging/lustre/include/linux/libcfs/libcfs.h   |    4 
->  drivers/staging/lustre/lnet/libcfs/Makefile        |    1 
->  .../lustre/lnet/libcfs/linux/linux-module.c        |  168 --------------------
->  drivers/staging/lustre/lnet/libcfs/module.c        |  131 ++++++++++++++++
->  4 files changed, 131 insertions(+), 173 deletions(-)
->  delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
+> It's probably a good idea to add a comment for this function that it may
+> drop and re-acquire the hash bucket lock internally.
 > 
-> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> index 9263e151451b..d420449b620e 100644
-> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-> @@ -138,10 +138,6 @@ struct libcfs_ioctl_handler {
->  int libcfs_register_ioctl(struct libcfs_ioctl_handler *hand);
->  int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand);
->  
-> -int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
-> -			 const struct libcfs_ioctl_hdr __user *uparam);
-> -int libcfs_ioctl_data_adjust(struct libcfs_ioctl_data *data);
-> -
->  #define _LIBCFS_H
->  
->  /**
-> diff --git a/drivers/staging/lustre/lnet/libcfs/Makefile b/drivers/staging/lustre/lnet/libcfs/Makefile
-> index e6fda27fdabd..e73515789a11 100644
-> --- a/drivers/staging/lustre/lnet/libcfs/Makefile
-> +++ b/drivers/staging/lustre/lnet/libcfs/Makefile
-> @@ -5,7 +5,6 @@ subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
->  obj-$(CONFIG_LNET) += libcfs.o
->  
->  libcfs-linux-objs := linux-tracefile.o linux-debug.o
-> -libcfs-linux-objs += linux-module.o
->  libcfs-linux-objs += linux-crypto.o
->  libcfs-linux-objs += linux-crypto-adler.o
->  
-> diff --git a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c b/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-> deleted file mode 100644
-> index 954b681f9db7..000000000000
-> --- a/drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-> +++ /dev/null
-> @@ -1,168 +0,0 @@
-> -// SPDX-License-Identifier: GPL-2.0
-> -/*
-> - * GPL HEADER START
-> - *
-> - * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 only,
-> - * as published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> - * General Public License version 2 for more details (a copy is included
-> - * in the LICENSE file that accompanied this code).
-> - *
-> - * You should have received a copy of the GNU General Public License
-> - * version 2 along with this program; If not, see
-> - * http://www.gnu.org/licenses/gpl-2.0.html
-> - *
-> - * GPL HEADER END
-> - */
-> -/*
-> - * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-> - * Use is subject to license terms.
-> - *
-> - * Copyright (c) 2012, Intel Corporation.
-> - */
-> -/*
-> - * This file is part of Lustre, http://www.lustre.org/
-> - * Lustre is a trademark of Sun Microsystems, Inc.
-> - */
-> -
-> -#define DEBUG_SUBSYSTEM S_LNET
-> -
-> -#include <linux/miscdevice.h>
-> -#include <linux/libcfs/libcfs.h>
-> -
-> -static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
-> -{
-> -	size_t len = sizeof(*data);
-> -
-> -	len += cfs_size_round(data->ioc_inllen1);
-> -	len += cfs_size_round(data->ioc_inllen2);
-> -	return len;
-> -}
-> -
-> -static inline bool libcfs_ioctl_is_invalid(struct libcfs_ioctl_data *data)
-> -{
-> -	if (data->ioc_hdr.ioc_len > BIT(30)) {
-> -		CERROR("LIBCFS ioctl: ioc_len larger than 1<<30\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_inllen1 > BIT(30)) {
-> -		CERROR("LIBCFS ioctl: ioc_inllen1 larger than 1<<30\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_inllen2 > BIT(30)) {
-> -		CERROR("LIBCFS ioctl: ioc_inllen2 larger than 1<<30\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_inlbuf1 && !data->ioc_inllen1) {
-> -		CERROR("LIBCFS ioctl: inlbuf1 pointer but 0 length\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_inlbuf2 && !data->ioc_inllen2) {
-> -		CERROR("LIBCFS ioctl: inlbuf2 pointer but 0 length\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_pbuf1 && !data->ioc_plen1) {
-> -		CERROR("LIBCFS ioctl: pbuf1 pointer but 0 length\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_pbuf2 && !data->ioc_plen2) {
-> -		CERROR("LIBCFS ioctl: pbuf2 pointer but 0 length\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_plen1 && !data->ioc_pbuf1) {
-> -		CERROR("LIBCFS ioctl: plen1 nonzero but no pbuf1 pointer\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_plen2 && !data->ioc_pbuf2) {
-> -		CERROR("LIBCFS ioctl: plen2 nonzero but no pbuf2 pointer\n");
-> -		return true;
-> -	}
-> -	if ((u32)libcfs_ioctl_packlen(data) != data->ioc_hdr.ioc_len) {
-> -		CERROR("LIBCFS ioctl: packlen != ioc_len\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_inllen1 &&
-> -	    data->ioc_bulk[data->ioc_inllen1 - 1] != '\0') {
-> -		CERROR("LIBCFS ioctl: inlbuf1 not 0 terminated\n");
-> -		return true;
-> -	}
-> -	if (data->ioc_inllen2 &&
-> -	    data->ioc_bulk[cfs_size_round(data->ioc_inllen1) +
-> -			   data->ioc_inllen2 - 1] != '\0') {
-> -		CERROR("LIBCFS ioctl: inlbuf2 not 0 terminated\n");
-> -		return true;
-> -	}
-> -	return false;
-> -}
-> -
-> -int libcfs_ioctl_data_adjust(struct libcfs_ioctl_data *data)
-> -{
-> -	if (libcfs_ioctl_is_invalid(data)) {
-> -		CERROR("libcfs ioctl: parameter not correctly formatted\n");
-> -		return -EINVAL;
-> -	}
-> -
-> -	if (data->ioc_inllen1)
-> -		data->ioc_inlbuf1 = &data->ioc_bulk[0];
-> -
-> -	if (data->ioc_inllen2)
-> -		data->ioc_inlbuf2 = &data->ioc_bulk[0] +
-> -			cfs_size_round(data->ioc_inllen1);
-> -
-> -	return 0;
-> -}
-> -
-> -int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
-> -			 const struct libcfs_ioctl_hdr __user *uhdr)
-> -{
-> -	struct libcfs_ioctl_hdr hdr;
-> -	int err;
-> -
-> -	if (copy_from_user(&hdr, uhdr, sizeof(hdr)))
-> -		return -EFAULT;
-> -
-> -	if (hdr.ioc_version != LIBCFS_IOCTL_VERSION &&
-> -	    hdr.ioc_version != LIBCFS_IOCTL_VERSION2) {
-> -		CERROR("libcfs ioctl: version mismatch expected %#x, got %#x\n",
-> -		       LIBCFS_IOCTL_VERSION, hdr.ioc_version);
-> -		return -EINVAL;
-> -	}
-> -
-> -	if (hdr.ioc_len < sizeof(hdr)) {
-> -		CERROR("libcfs ioctl: user buffer too small for ioctl\n");
-> -		return -EINVAL;
-> -	}
-> -
-> -	if (hdr.ioc_len > LIBCFS_IOC_DATA_MAX) {
-> -		CERROR("libcfs ioctl: user buffer is too large %d/%d\n",
-> -		       hdr.ioc_len, LIBCFS_IOC_DATA_MAX);
-> -		return -EINVAL;
-> -	}
-> -
-> -	*hdr_pp = kvmalloc(hdr.ioc_len, GFP_KERNEL);
-> -	if (!*hdr_pp)
-> -		return -ENOMEM;
-> -
-> -	if (copy_from_user(*hdr_pp, uhdr, hdr.ioc_len)) {
-> -		err = -EFAULT;
-> -		goto free;
-> -	}
-> -
-> -	if ((*hdr_pp)->ioc_version != hdr.ioc_version ||
-> -	    (*hdr_pp)->ioc_len != hdr.ioc_len) {
-> -		err = -EINVAL;
-> -		goto free;
-> -	}
-> -
-> -	return 0;
-> -
-> -free:
-> -	kvfree(*hdr_pp);
-> -	return err;
-> -}
-> diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-> index 3fb150a57f49..4c4bf09a78dd 100644
-> --- a/drivers/staging/lustre/lnet/libcfs/module.c
-> +++ b/drivers/staging/lustre/lnet/libcfs/module.c
-> @@ -95,6 +95,137 @@ int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand)
->  }
->  EXPORT_SYMBOL(libcfs_deregister_ioctl);
->  
-> +static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
-> +{
-> +	size_t len = sizeof(*data);
-> +
-> +	len += cfs_size_round(data->ioc_inllen1);
-> +	len += cfs_size_round(data->ioc_inllen2);
-> +	return len;
-> +}
-> +
-> +static inline bool libcfs_ioctl_is_invalid(struct libcfs_ioctl_data *data)
-> +{
-> +	if (data->ioc_hdr.ioc_len > BIT(30)) {
-> +		CERROR("LIBCFS ioctl: ioc_len larger than 1<<30\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_inllen1 > BIT(30)) {
-> +		CERROR("LIBCFS ioctl: ioc_inllen1 larger than 1<<30\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_inllen2 > BIT(30)) {
-> +		CERROR("LIBCFS ioctl: ioc_inllen2 larger than 1<<30\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_inlbuf1 && !data->ioc_inllen1) {
-> +		CERROR("LIBCFS ioctl: inlbuf1 pointer but 0 length\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_inlbuf2 && !data->ioc_inllen2) {
-> +		CERROR("LIBCFS ioctl: inlbuf2 pointer but 0 length\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_pbuf1 && !data->ioc_plen1) {
-> +		CERROR("LIBCFS ioctl: pbuf1 pointer but 0 length\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_pbuf2 && !data->ioc_plen2) {
-> +		CERROR("LIBCFS ioctl: pbuf2 pointer but 0 length\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_plen1 && !data->ioc_pbuf1) {
-> +		CERROR("LIBCFS ioctl: plen1 nonzero but no pbuf1 pointer\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_plen2 && !data->ioc_pbuf2) {
-> +		CERROR("LIBCFS ioctl: plen2 nonzero but no pbuf2 pointer\n");
-> +		return true;
-> +	}
-> +	if ((u32)libcfs_ioctl_packlen(data) != data->ioc_hdr.ioc_len) {
-> +		CERROR("LIBCFS ioctl: packlen != ioc_len\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_inllen1 &&
-> +	    data->ioc_bulk[data->ioc_inllen1 - 1] != '\0') {
-> +		CERROR("LIBCFS ioctl: inlbuf1 not 0 terminated\n");
-> +		return true;
-> +	}
-> +	if (data->ioc_inllen2 &&
-> +	    data->ioc_bulk[cfs_size_round(data->ioc_inllen1) +
-> +			   data->ioc_inllen2 - 1] != '\0') {
-> +		CERROR("LIBCFS ioctl: inlbuf2 not 0 terminated\n");
-> +		return true;
-> +	}
-> +	return false;
-> +}
-> +
-> +static int libcfs_ioctl_data_adjust(struct libcfs_ioctl_data *data)
-> +{
-> +	if (libcfs_ioctl_is_invalid(data)) {
-> +		CERROR("libcfs ioctl: parameter not correctly formatted\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (data->ioc_inllen1)
-> +		data->ioc_inlbuf1 = &data->ioc_bulk[0];
-> +
-> +	if (data->ioc_inllen2)
-> +		data->ioc_inlbuf2 = &data->ioc_bulk[0] +
-> +			cfs_size_round(data->ioc_inllen1);
-> +
-> +	return 0;
-> +}
-> +
-> +static int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
-> +			 const struct libcfs_ioctl_hdr __user *uhdr)
-> +{
-> +	struct libcfs_ioctl_hdr hdr;
-> +	int err;
-> +
-> +	if (copy_from_user(&hdr, uhdr, sizeof(hdr)))
-> +		return -EFAULT;
-> +
-> +	if (hdr.ioc_version != LIBCFS_IOCTL_VERSION &&
-> +	    hdr.ioc_version != LIBCFS_IOCTL_VERSION2) {
-> +		CERROR("libcfs ioctl: version mismatch expected %#x, got %#x\n",
-> +		       LIBCFS_IOCTL_VERSION, hdr.ioc_version);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (hdr.ioc_len < sizeof(hdr)) {
-> +		CERROR("libcfs ioctl: user buffer too small for ioctl\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (hdr.ioc_len > LIBCFS_IOC_DATA_MAX) {
-> +		CERROR("libcfs ioctl: user buffer is too large %d/%d\n",
-> +		       hdr.ioc_len, LIBCFS_IOC_DATA_MAX);
-> +		return -EINVAL;
-> +	}
-> +
-> +	*hdr_pp = kvmalloc(hdr.ioc_len, GFP_KERNEL);
-> +	if (!*hdr_pp)
-> +		return -ENOMEM;
-> +
-> +	if (copy_from_user(*hdr_pp, uhdr, hdr.ioc_len)) {
-> +		err = -EFAULT;
-> +		goto free;
-> +	}
-> +
-> +	if ((*hdr_pp)->ioc_version != hdr.ioc_version ||
-> +	    (*hdr_pp)->ioc_len != hdr.ioc_len) {
-> +		err = -EINVAL;
-> +		goto free;
-> +	}
-> +
-> +	return 0;
-> +
-> +free:
-> +	kvfree(*hdr_pp);
-> +	return err;
-> +}
-> +
->  static int libcfs_ioctl(unsigned long cmd, void __user *uparam)
->  {
->  	struct libcfs_ioctl_data *data = NULL;
+> > 				       struct cfs_hash_bd *bd,
+> > 				       const struct lu_fid *f,
+> > -				       wait_queue_entry_t *waiter,
+> > 				       __u64 *version)
+> > {
+> > +	struct cfs_hash		*hs = s->ls_obj_hash;
+> > 	struct lu_site_bkt_data *bkt;
+> > 	struct lu_object_header *h;
+> > 	struct hlist_node	*hnode;
+> > -	__u64  ver = cfs_hash_bd_version_get(bd);
+> > +	__u64 ver;
+> > +	wait_queue_entry_t waiter;
+> > 
+> > -	if (*version == ver)
+> > +retry:
+> > +	ver = cfs_hash_bd_version_get(bd);
+> > +
+> > +	if (*version == ver) {
+> > 		return ERR_PTR(-ENOENT);
+> > +	}
+> 
+> (style) we don't need the {} around a single-line if statement
+
+I hate to be that guy but could you run checkpatch on your patches.
+ 
+> > 	*version = ver;
+> > 	bkt = cfs_hash_bd_extra_get(s->ls_obj_hash, bd);
+> > @@ -625,11 +630,15 @@ static struct lu_object *htable_lookup(struct lu_site *s,
+> > 	 * drained), and moreover, lookup has to wait until object is freed.
+> > 	 */
+> > 
+> > -	init_waitqueue_entry(waiter, current);
+> > -	add_wait_queue(&bkt->lsb_marche_funebre, waiter);
+> > +	init_waitqueue_entry(&waiter, current);
+> > +	add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+> > 	set_current_state(TASK_UNINTERRUPTIBLE);
+> > 	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_DEATH_RACE);
+> > -	return ERR_PTR(-EAGAIN);
+> > +	cfs_hash_bd_unlock(hs, bd, 1);
+> 
+> This looks like it isn't unlocking and locking the hash bucket in the same
+> manner that it was done in the caller.  Here excl = 1, but in the caller
+> you changed it to excl = 0?
+
+This is very much like the work done by Lai. The difference is Lai remove 
+the work queue handling complete in htable_lookup(). You can see the 
+details at https://jira.hpdd.intel.com/browse/LU-9049. I will push the 
+missing lu_object fixes including LU-9049 on top of your patch set so you
+can see the approach Lai did. Form their we can figure out merge the 
+lu_object work and fixing the issues Andreas and I pointed out.
+
+> > +	schedule();
+> > +	remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+> 
+> Is it worthwhile to use your new helper function here to get the wq from "s"?
+> 
+> > +	cfs_hash_bd_lock(hs, bd, 1);
+> > +	goto retry;
+> > }
+> > 
+> > /**
+> > @@ -693,13 +702,14 @@ static struct lu_object *lu_object_new(const struct lu_env *env,
+> > }
+> > 
+> > /**
+> > - * Core logic of lu_object_find*() functions.
+> > + * Much like lu_object_find(), but top level device of object is specifically
+> > + * \a dev rather than top level device of the site. This interface allows
+> > + * objects of different "stacking" to be created within the same site.
+> >  */
+> > -static struct lu_object *lu_object_find_try(const struct lu_env *env,
+> > -					    struct lu_device *dev,
+> > -					    const struct lu_fid *f,
+> > -					    const struct lu_object_conf *conf,
+> > -					    wait_queue_entry_t *waiter)
+> > +struct lu_object *lu_object_find_at(const struct lu_env *env,
+> > +				    struct lu_device *dev,
+> > +				    const struct lu_fid *f,
+> > +				    const struct lu_object_conf *conf)
+> > {
+> > 	struct lu_object      *o;
+> > 	struct lu_object      *shadow;
+> > @@ -725,17 +735,16 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+> > 	 * It is unnecessary to perform lookup-alloc-lookup-insert, instead,
+> > 	 * just alloc and insert directly.
+> > 	 *
+> > -	 * If dying object is found during index search, add @waiter to the
+> > -	 * site wait-queue and return ERR_PTR(-EAGAIN).
+> > 	 */
+> > 	if (conf && conf->loc_flags & LOC_F_NEW)
+> > 		return lu_object_new(env, dev, f, conf);
+> > 
+> > 	s  = dev->ld_site;
+> > 	hs = s->ls_obj_hash;
+> > -	cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 1);
+> > -	o = htable_lookup(s, &bd, f, waiter, &version);
+> > -	cfs_hash_bd_unlock(hs, &bd, 1);
+> > +	cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 0);
+> > +	o = htable_lookup(s, &bd, f, &version);
+> > +	cfs_hash_bd_unlock(hs, &bd, 0);
+> 
+> Here you changed the locking to a non-exclusive (read) lock instead of an
+> exclusive (write) lock?  Why.
+
+I have the same question.
+
+> 
+> > +
+> > 	if (!IS_ERR(o) || PTR_ERR(o) != -ENOENT)
+> > 		return o;
+> > 
+> > @@ -751,7 +760,7 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+> > 
+> > 	cfs_hash_bd_lock(hs, &bd, 1);
+> > 
+> > -	shadow = htable_lookup(s, &bd, f, waiter, &version);
+> > +	shadow = htable_lookup(s, &bd, f, &version);
+> > 	if (likely(PTR_ERR(shadow) == -ENOENT)) {
+> > 		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
+> > 		cfs_hash_bd_unlock(hs, &bd, 1);
+> > @@ -766,34 +775,6 @@ static struct lu_object *lu_object_find_try(const struct lu_env *env,
+> > 	lu_object_free(env, o);
+> > 	return shadow;
+> > }
+> > -
+> > -/**
+> > - * Much like lu_object_find(), but top level device of object is specifically
+> > - * \a dev rather than top level device of the site. This interface allows
+> > - * objects of different "stacking" to be created within the same site.
+> > - */
+> > -struct lu_object *lu_object_find_at(const struct lu_env *env,
+> > -				    struct lu_device *dev,
+> > -				    const struct lu_fid *f,
+> > -				    const struct lu_object_conf *conf)
+> > -{
+> > -	wait_queue_head_t	*wq;
+> > -	struct lu_object	*obj;
+> > -	wait_queue_entry_t	   wait;
+> > -
+> > -	while (1) {
+> > -		obj = lu_object_find_try(env, dev, f, conf, &wait);
+> > -		if (obj != ERR_PTR(-EAGAIN))
+> > -			return obj;
+> > -		/*
+> > -		 * lu_object_find_try() already added waiter into the
+> > -		 * wait queue.
+> > -		 */
+> > -		schedule();
+> > -		wq = lu_site_wq_from_fid(dev->ld_site, (void *)f);
+> > -		remove_wait_queue(wq, &wait);
+> > -	}
+> > -}
+> > EXPORT_SYMBOL(lu_object_find_at);
+> > 
+> > /**
+> > 
+> > 
+> > _______________________________________________
+> > lustre-devel mailing list
+> > lustre-devel at lists.lustre.org
+> > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 
+> Cheers, Andreas
+> --
+> Andreas Dilger
+> Lustre Principal Architect
+> Intel Corporation
+> 
+> 
+> 
+> 
+> 
 > 
 > 
 > 
