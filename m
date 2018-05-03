@@ -1,71 +1,214 @@
 From: NeilBrown <neilb@suse.com>
-Date: Fri, 04 May 2018 09:26:36 +1000
-Subject: [lustre-devel] [PATCH 1/4] staging: lustre: obdclass: change
- spinlock of key to rwlock
-In-Reply-To: <a3594bd7c393418c8fda5150a075ff1a@AcuMS.aculab.com>
-References: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
- <1525285308-15347-2-git-send-email-jsimmons@infradead.org>
- <a3594bd7c393418c8fda5150a075ff1a@AcuMS.aculab.com>
-Message-ID: <87po2cfhhv.fsf@notabene.neil.brown.name>
+Date: Fri, 04 May 2018 09:39:04 +1000
+Subject: [lustre-devel] [PATCH 02/10] staging: lustre: make struct
+ lu_site_bkt_data private
+In-Reply-To: <alpine.LFD.2.21.1805020400400.2551@casper.infradead.org>
+References: <152514658325.17843.11455067361317157487.stgit@noble>
+ <152514675889.17843.8198702967686860985.stgit@noble>
+ <alpine.LFD.2.21.1805020400400.2551@casper.infradead.org>
+Message-ID: <87muxgfgx3.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: David Laight <David.Laight@ACULAB.COM>, 'James Simmons' <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Lai Siyao <lai.siyao@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre
- Development List <lustre-devel@lists.lustre.org>, Li Xi <lixi@ddn.com>, Gu
- Zheng <gzheng@ddn.com>
+To: James Simmons <jsimmons@infradead.org>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Thu, May 03 2018, David Laight wrote:
+On Wed, May 02 2018, James Simmons wrote:
 
-> From: James Simmons
->> Sent: 02 May 2018 19:22
->> From: Li Xi <lixi@ddn.com>
+>> This data structure only needs to be public so that
+>> various modules can access a wait queue to wait for object
+>> destruction.
+>> If we provide a function to get the wait queue, rather than the
+>> whole bucket, the structure can be made private.
 >> 
->> Most of the time, keys are never changed. So rwlock might be
->> better for the concurrency of key read.
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>> ---
+>>  drivers/staging/lustre/lustre/include/lu_object.h  |   36 +-------------
+>>  drivers/staging/lustre/lustre/llite/lcommon_cl.c   |    8 ++-
+>>  drivers/staging/lustre/lustre/lov/lov_object.c     |    8 ++-
+>>  drivers/staging/lustre/lustre/obdclass/lu_object.c |   50 +++++++++++++++++---
+>>  4 files changed, 54 insertions(+), 48 deletions(-)
+>> 
+>> diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
+>> index c3b0ed518819..f29bbca5af65 100644
+>> --- a/drivers/staging/lustre/lustre/include/lu_object.h
+>> +++ b/drivers/staging/lustre/lustre/include/lu_object.h
+>> @@ -549,31 +549,7 @@ struct lu_object_header {
+>>  };
+>>  
+>>  struct fld;
+>> -
+>> -struct lu_site_bkt_data {
+>> -	/**
+>> -	 * number of object in this bucket on the lsb_lru list.
+>> -	 */
+>> -	long			lsb_lru_len;
+>> -	/**
+>> -	 * LRU list, updated on each access to object. Protected by
+>> -	 * bucket lock of lu_site::ls_obj_hash.
+>> -	 *
+>> -	 * "Cold" end of LRU is lu_site::ls_lru.next. Accessed object are
+>> -	 * moved to the lu_site::ls_lru.prev (this is due to the non-existence
+>> -	 * of list_for_each_entry_safe_reverse()).
+>> -	 */
+>> -	struct list_head		lsb_lru;
+>> -	/**
+>> -	 * Wait-queue signaled when an object in this site is ultimately
+>> -	 * destroyed (lu_object_free()). It is used by lu_object_find() to
+>> -	 * wait before re-trying when object in the process of destruction is
+>> -	 * found in the hash table.
+>> -	 *
+>> -	 * \see htable_lookup().
+>> -	 */
+>> -	wait_queue_head_t	       lsb_marche_funebre;
+>> -};
+>> +struct lu_site_bkt_data;
+>>  
+>>  enum {
+>>  	LU_SS_CREATED	 = 0,
+>> @@ -642,14 +618,8 @@ struct lu_site {
+>>  	struct percpu_counter	 ls_lru_len_counter;
+>>  };
+>>  
+>> -static inline struct lu_site_bkt_data *
+>> -lu_site_bkt_from_fid(struct lu_site *site, struct lu_fid *fid)
+>> -{
+>> -	struct cfs_hash_bd bd;
+>> -
+>> -	cfs_hash_bd_get(site->ls_obj_hash, fid, &bd);
+>> -	return cfs_hash_bd_extra_get(site->ls_obj_hash, &bd);
+>> -}
+>> +wait_queue_head_t *
+>> +lu_site_wq_from_fid(struct lu_site *site, struct lu_fid *fid);
+>>  
+>>  static inline struct seq_server_site *lu_site2seq(const struct lu_site *s)
+>>  {
+>> diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+>> index df5c0c0ae703..d5b42fb1d601 100644
+>> --- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+>> +++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+>> @@ -211,12 +211,12 @@ static void cl_object_put_last(struct lu_env *env, struct cl_object *obj)
+>>  
+>>  	if (unlikely(atomic_read(&header->loh_ref) != 1)) {
+>>  		struct lu_site *site = obj->co_lu.lo_dev->ld_site;
+>> -		struct lu_site_bkt_data *bkt;
+>> +		wait_queue_head_t *wq;
+>>  
+>> -		bkt = lu_site_bkt_from_fid(site, &header->loh_fid);
+>> +		wq = lu_site_wq_from_fid(site, &header->loh_fid);
+>>  
+>>  		init_waitqueue_entry(&waiter, current);
+>> -		add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+>> +		add_wait_queue(wq, &waiter);
+>>  
+>>  		while (1) {
+>>  			set_current_state(TASK_UNINTERRUPTIBLE);
+>> @@ -226,7 +226,7 @@ static void cl_object_put_last(struct lu_env *env, struct cl_object *obj)
+>>  		}
+>>  
+>>  		set_current_state(TASK_RUNNING);
+>> -		remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+>> +		remove_wait_queue(wq, &waiter);
+>>  	}
+>>  
+>>  	cl_object_put(env, obj);
+>> diff --git a/drivers/staging/lustre/lustre/lov/lov_object.c b/drivers/staging/lustre/lustre/lov/lov_object.c
+>> index f7c69680cb7d..adc90f310fd7 100644
+>> --- a/drivers/staging/lustre/lustre/lov/lov_object.c
+>> +++ b/drivers/staging/lustre/lustre/lov/lov_object.c
+>> @@ -370,7 +370,7 @@ static void lov_subobject_kill(const struct lu_env *env, struct lov_object *lov,
+>>  	struct cl_object	*sub;
+>>  	struct lov_layout_raid0 *r0;
+>>  	struct lu_site	  *site;
+>> -	struct lu_site_bkt_data *bkt;
+>> +	wait_queue_head_t *wq;
+>>  	wait_queue_entry_t	  *waiter;
+>>  
+>>  	r0  = &lov->u.raid0;
+>> @@ -378,7 +378,7 @@ static void lov_subobject_kill(const struct lu_env *env, struct lov_object *lov,
+>>  
+>>  	sub  = lovsub2cl(los);
+>>  	site = sub->co_lu.lo_dev->ld_site;
+>> -	bkt  = lu_site_bkt_from_fid(site, &sub->co_lu.lo_header->loh_fid);
+>> +	wq   = lu_site_wq_from_fid(site, &sub->co_lu.lo_header->loh_fid);
+>>  
+>>  	cl_object_kill(env, sub);
+>>  	/* release a reference to the sub-object and ... */
+>> @@ -391,7 +391,7 @@ static void lov_subobject_kill(const struct lu_env *env, struct lov_object *lov,
+>>  	if (r0->lo_sub[idx] == los) {
+>>  		waiter = &lov_env_info(env)->lti_waiter;
+>>  		init_waitqueue_entry(waiter, current);
+>> -		add_wait_queue(&bkt->lsb_marche_funebre, waiter);
+>> +		add_wait_queue(wq, waiter);
+>>  		set_current_state(TASK_UNINTERRUPTIBLE);
+>>  		while (1) {
+>>  			/* this wait-queue is signaled at the end of
+>> @@ -408,7 +408,7 @@ static void lov_subobject_kill(const struct lu_env *env, struct lov_object *lov,
+>>  				break;
+>>  			}
+>>  		}
+>> -		remove_wait_queue(&bkt->lsb_marche_funebre, waiter);
+>> +		remove_wait_queue(wq, waiter);
+>>  	}
+>>  	LASSERT(!r0->lo_sub[idx]);
+>>  }
+>> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+>> index 3de7dc0497c4..2a8a25d6edb5 100644
+>> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
+>> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+>> @@ -56,6 +56,31 @@
+>>  #include <lu_ref.h>
+>>  #include <linux/list.h>
+>>  
+>> +struct lu_site_bkt_data {
+>> +	/**
+>> +	 * number of object in this bucket on the lsb_lru list.
+>> +	 */
+>> +	long			lsb_lru_len;
+>> +	/**
+>> +	 * LRU list, updated on each access to object. Protected by
+>> +	 * bucket lock of lu_site::ls_obj_hash.
+>> +	 *
+>> +	 * "Cold" end of LRU is lu_site::ls_lru.next. Accessed object are
+>> +	 * moved to the lu_site::ls_lru.prev (this is due to the non-existence
+>> +	 * of list_for_each_entry_safe_reverse()).
+>> +	 */
+>> +	struct list_head		lsb_lru;
+>> +	/**
+>> +	 * Wait-queue signaled when an object in this site is ultimately
+>> +	 * destroyed (lu_object_free()). It is used by lu_object_find() to
+>> +	 * wait before re-trying when object in the process of destruction is
+>> +	 * found in the hash table.
+>> +	 *
+>> +	 * \see htable_lookup().
+>> +	 */
+>> +	wait_queue_head_t	       lsb_marche_funebre;
+>> +};
+>> +
+>>  enum {
+>>  	LU_CACHE_PERCENT_MAX	 = 50,
+>>  	LU_CACHE_PERCENT_DEFAULT = 20
+>> @@ -88,6 +113,17 @@ MODULE_PARM_DESC(lu_cache_nr, "Maximum number of objects in lu_object cache");
+>>  static void lu_object_free(const struct lu_env *env, struct lu_object *o);
+>>  static __u32 ls_stats_read(struct lprocfs_stats *stats, int idx);
+>>  
+>> +wait_queue_head_t *
+>> +lu_site_wq_from_fid(struct lu_site *site, struct lu_fid *fid)
+>> +{
+>> +	struct cfs_hash_bd bd;
+>> +	struct lu_site_bkt_data *bkt;
+>> +
+>> +	cfs_hash_bd_get(site->ls_obj_hash, fid, &bd);
+>> +	bkt = cfs_hash_bd_extra_get(site->ls_obj_hash, &bd);
+>> +	return &bkt->lsb_marche_funebre;
+>> +}
+>> +
 >
-> OTOH unless there is contention on the spin lock during reads the
-> additional cost of a rwlock (probably double that of a spinlock)
-> will hurt performance.
+> Nak. You forgot the EXPORT_SYMBOL for this. Once I added the export symbol
+> it seems to work so far in my testing.
 
-That's roughly what I was going to say - rwlocks are rarely a win.
-I think the second patch which caused the lock to be taken less often
-would have a bigger impact that the switch to rwlocks.
-
-However I suspect a better approach would be to investigate some sort of
-lockless solution.
-I think the use of the spinlock in lu_context_key_register() could be
-replaced with a careful cmp_xchg().  I'm less sure about
-lu_context_key_degister(), but it might be possible.
-
->
-> ...
->> -	spin_lock(&lu_keys_guard);
->> +	read_lock(&lu_keys_guard);
->>  	atomic_inc(&lu_key_initing_cnt);
->> -	spin_unlock(&lu_keys_guard);
->> +	read_unlock(&lu_keys_guard);
->
-> WTF, seems unlikely that you need to hold any kind of lock
-> over an atomic_inc().
->
-> If this is just ensuring that no code holds the lock then
-> it would need to request the write_lock().
-> (and would need a comment)
-
-There is a comment - that patch showed the last 2 lines of it.
-This is for synchronization with lu_context_key_quiesce().
-That spins(!! calling schedule, but still... not good) until
-the lu_key_initing_cnt is zero while it holds the write lock.
-Then it is sure that the code protected by this counter isn't
-running.
-I'm sure this can be improved!  I would need to study it carefully to
-see how.
-
-Note that I don't object to these patches going in - if they provide a
-measurable improvement which seems likely, then in they go.  But I
-hope the code won't stay like this long term.
+Thanks!  I'll try to remember the occasional build-test with modules.
 
 Thanks,
 NeilBrown
@@ -75,4 +218,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180504/516bfbd4/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180504/d7c519f5/attachment.sig>
