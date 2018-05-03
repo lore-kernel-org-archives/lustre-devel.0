@@ -1,188 +1,230 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Wed,  2 May 2018 14:21:48 -0400
-Subject: [lustre-devel] [PATCH 4/4] staging: lustre: obdclass: change object
- lookup to no wait mode
-In-Reply-To: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
-References: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1525285308-15347-5-git-send-email-jsimmons@infradead.org>
+From: Doug Oucharek <dougso@me.com>
+Date: Thu, 03 May 2018 08:33:05 -0700
+Subject: [lustre-devel] [PATCH v2] staging: lustre: o2iblnd: Enable Multiple
+ OPA Endpoints between Nodes
+Message-ID: <1525361585-13775-1-git-send-email-dougso@me.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, Lai Siyao <lai.siyao@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Doug Oucharek <doug.s.oucharek@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: Lai Siyao <lai.siyao@intel.com>
+OPA driver optimizations are based on the MPI model where it is
+expected to have multiple endpoints between two given nodes. To
+enable this optimization for Lustre, we need to make it possible,
+via an LND-specific tuneable, to create multiple endpoints and to
+balance the traffic over them.
 
-Currently we set LU_OBJECT_HEARD_BANSHEE on object when we want
-to remove object from cache, but this may lead to deadlock, because
-when other process lookup such object, it needs to wait for this
-object until release (done at last refcount put), while that process
-maybe already hold an LDLM lock.
+Both sides of a connection must have this patch for it to work.
+Only the active side of the connection (usually the client)
+needs to have the new tuneable set > 1.
 
-Now that current code can handle dying object correctly, we can just
-return such object in lookup, thus the above deadlock can be avoided.
-
-Signed-off-by: Lai Siyao <lai.siyao@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9049
-Reviewed-on: https://review.whamcloud.com/26965
-Reviewed-by: Alex Zhuravlev <alexey.zhuravlev@intel.com>
-Tested-by: Cliff White <cliff.white@intel.com>
-Reviewed-by: Fan Yong <fan.yong@intel.com>
+Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8943
+Reviewed-on: https://review.whamcloud.com/25168
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: Doug Oucharek <dougso@me.com>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h  |  2 +-
- drivers/staging/lustre/lustre/obdclass/lu_object.c | 82 +++++++++-------------
- 2 files changed, 36 insertions(+), 48 deletions(-)
+ .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |  3 ++-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    | 17 ++++++++++++---
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 25 +++++++++++++++-------
+ .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  |  9 ++++++++
+ 4 files changed, 42 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index f29bbca..232063a 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -673,7 +673,7 @@ static inline void lu_object_get(struct lu_object *o)
- }
+diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
+index e45d828..c1619f4 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
++++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
+@@ -53,7 +53,8 @@ struct lnet_ioctl_config_o2iblnd_tunables {
+ 	__u32 lnd_fmr_pool_size;
+ 	__u32 lnd_fmr_flush_trigger;
+ 	__u32 lnd_fmr_cache;
+-	__u32 pad;
++	__u16 lnd_conns_per_peer;
++	__u16 pad;
+ };
  
- /**
-- * Return true of object will not be cached after last reference to it is
-+ * Return true if object will not be cached after last reference to it is
-  * released.
-  */
- static inline int lu_object_is_dying(const struct lu_object_header *h)
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index 8b507f1..9311703 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -589,19 +589,13 @@ static struct lu_object *htable_lookup(struct lu_site *s,
- 				       const struct lu_fid *f,
- 				       __u64 *version)
+ struct lnet_ioctl_config_lnd_tunables {
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+index ca6e09d..bb663d6 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -568,6 +568,8 @@ struct kib_peer {
+ 	lnet_nid_t       ibp_nid;         /* who's on the other end(s) */
+ 	struct lnet_ni	*ibp_ni;         /* LNet interface */
+ 	struct list_head ibp_conns;       /* all active connections */
++	struct kib_conn	*ibp_next_conn;  /* next connection to send on for
++					  * round robin */
+ 	struct list_head ibp_tx_queue;    /* msgs waiting for a conn */
+ 	__u64            ibp_incarnation; /* incarnation of peer */
+ 	/* when (in jiffies) I was last alive */
+@@ -581,7 +583,7 @@ struct kib_peer {
+ 	/* current active connection attempts */
+ 	unsigned short		ibp_connecting;
+ 	/* reconnect this peer later */
+-	unsigned short		ibp_reconnecting:1;
++	unsigned char		ibp_reconnecting;
+ 	/* counter of how many times we triggered a conn race */
+ 	unsigned char		ibp_races;
+ 	/* # consecutive reconnection attempts to this peer */
+@@ -744,10 +746,19 @@ struct kib_peer {
+ static inline struct kib_conn *
+ kiblnd_get_conn_locked(struct kib_peer *peer)
  {
--	struct cfs_hash		*hs = s->ls_obj_hash;
- 	struct lu_site_bkt_data *bkt;
- 	struct lu_object_header *h;
- 	struct hlist_node	*hnode;
--	__u64 ver;
--	wait_queue_entry_t waiter;
-+	u64 ver = cfs_hash_bd_version_get(bd);
++	struct list_head *next;
++
+ 	LASSERT(!list_empty(&peer->ibp_conns));
  
--retry:
--	ver = cfs_hash_bd_version_get(bd);
--
--	if (*version == ver) {
-+	if (*version == ver)
- 		return ERR_PTR(-ENOENT);
--	}
- 
- 	*version = ver;
- 	bkt = cfs_hash_bd_extra_get(s->ls_obj_hash, bd);
-@@ -615,31 +609,13 @@ static struct lu_object *htable_lookup(struct lu_site *s,
- 	}
- 
- 	h = container_of(hnode, struct lu_object_header, loh_hash);
--	if (likely(!lu_object_is_dying(h))) {
--		cfs_hash_get(s->ls_obj_hash, hnode);
--		lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_HIT);
--		if (!list_empty(&h->loh_lru)) {
--			list_del_init(&h->loh_lru);
--			percpu_counter_dec(&s->ls_lru_len_counter);
--		}
--		return lu_object_top(h);
-+	cfs_hash_get(s->ls_obj_hash, hnode);
-+	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_HIT);
-+	if (!list_empty(&h->loh_lru)) {
-+		list_del_init(&h->loh_lru);
-+		percpu_counter_dec(&s->ls_lru_len_counter);
- 	}
--
--	/*
--	 * Lookup found an object being destroyed this object cannot be
--	 * returned (to assure that references to dying objects are eventually
--	 * drained), and moreover, lookup has to wait until object is freed.
--	 */
--
--	init_waitqueue_entry(&waiter, current);
--	add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
--	set_current_state(TASK_UNINTERRUPTIBLE);
--	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_DEATH_RACE);
--	cfs_hash_bd_unlock(hs, bd, 1);
--	schedule();
--	remove_wait_queue(&bkt->lsb_marche_funebre, &waiter);
--	cfs_hash_bd_lock(hs, bd, 1);
--	goto retry;
-+	return lu_object_top(h);
+-	/* just return the first connection */
+-	return list_entry(peer->ibp_conns.next, struct kib_conn, ibc_list);
++	/* Advance to next connection, be sure to skip the head node */
++	if (!peer->ibp_next_conn ||
++	    peer->ibp_next_conn->ibc_list.next == &peer->ibp_conns)
++		next = peer->ibp_conns.next;
++	else
++		next = peer->ibp_next_conn->ibc_list.next;
++	peer->ibp_next_conn = list_entry(next, struct kib_conn, ibc_list);
++
++	return peer->ibp_next_conn;
  }
  
- /**
-@@ -680,6 +656,8 @@ static void lu_object_limit(const struct lu_env *env, struct lu_device *dev)
- }
+ static inline int
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index b4a182d..77b3ae6 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1250,7 +1250,6 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
  
- /**
-+ * Core logic of lu_object_find*() functions.
-+ *
-  * Much like lu_object_find(), but top level device of object is specifically
-  * \a dev rather than top level device of the site. This interface allows
-  * objects of different "stacking" to be created within the same site.
-@@ -713,36 +691,46 @@ struct lu_object *lu_object_find_at(const struct lu_env *env,
- 	 * It is unnecessary to perform lookup-alloc-lookup-insert, instead,
- 	 * just alloc and insert directly.
- 	 *
-+	 * If dying object is found during index search, add @waiter to the
-+	 * site wait-queue and return ERR_PTR(-EAGAIN).
- 	 */
--	s  = dev->ld_site;
--	hs = s->ls_obj_hash;
-+	if (conf && conf->loc_flags & LOC_F_NEW) {
-+		o = lu_object_alloc(env, dev, f, conf);
-+		if (unlikely(IS_ERR(o)))
-+			return o;
-+
-+		hs = dev->ld_site->ls_obj_hash;
-+		cfs_hash_bd_get_and_lock(hs, (void *)f, &bd, 1);
-+		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
-+		cfs_hash_bd_unlock(hs, &bd, 1);
+ 	LASSERT(net);
+ 	LASSERT(peer->ibp_connecting > 0);
+-	LASSERT(!peer->ibp_reconnecting);
  
--	cfs_hash_bd_get(hs, f, &bd);
--	if (!(conf && conf->loc_flags & LOC_F_NEW)) {
--		cfs_hash_bd_lock(hs, &bd, 0);
--		o = htable_lookup(s, &bd, f, &version);
--		cfs_hash_bd_unlock(hs, &bd, 0);
-+		lu_object_limit(env, dev);
+ 	cmid = kiblnd_rdma_create_id(kiblnd_cm_callback, peer, RDMA_PS_TCP,
+ 				     IB_QPT_RC);
+@@ -1332,7 +1331,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
  
--		if (!IS_ERR(o) || PTR_ERR(o) != -ENOENT)
--			return o;
-+		return o;
- 	}
-+
-+	s  = dev->ld_site;
-+	hs = s->ls_obj_hash;
-+	cfs_hash_bd_get_and_lock(hs, f, &bd, 1);
-+	o = htable_lookup(s, &bd, f, &version);
-+	cfs_hash_bd_unlock(hs, &bd, 0);
-+	if (!IS_ERR(o) || PTR_ERR(o) != -ENOENT)
-+		return o;
-+
+ 	LASSERT(!peer->ibp_accepting && !peer->ibp_connecting &&
+ 		list_empty(&peer->ibp_conns));
+-	peer->ibp_reconnecting = 0;
++	peer->ibp_reconnecting--;
+ 
+ 	if (!kiblnd_peer_active(peer)) {
+ 		list_splice_init(&peer->ibp_tx_queue, &txs);
+@@ -1365,6 +1364,8 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	rwlock_t *g_lock = &kiblnd_data.kib_global_lock;
+ 	unsigned long flags;
+ 	int rc;
++	int		   i;
++	struct lnet_ioctl_config_o2iblnd_tunables *tunables;
+ 
  	/*
- 	 * Allocate new object. This may result in rather complicated
- 	 * operations, including fld queries, inode loading, etc.
+ 	 * If I get here, I've committed to send, so I complete the tx with
+@@ -1461,7 +1462,8 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 
+ 	/* Brand new peer */
+ 	LASSERT(!peer->ibp_connecting);
+-	peer->ibp_connecting = 1;
++	tunables = &peer->ibp_ni->ni_lnd_tunables->lt_tun_u.lt_o2ib;
++	peer->ibp_connecting = tunables->lnd_conns_per_peer;
+ 
+ 	/* always called with a ref on ni, which prevents ni being shutdown */
+ 	LASSERT(!((struct kib_net *)ni->ni_data)->ibn_shutdown);
+@@ -1474,7 +1476,8 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 
+ 	write_unlock_irqrestore(g_lock, flags);
+ 
+-	kiblnd_connect_peer(peer);
++	for (i = 0; i < tunables->lnd_conns_per_peer; i++)
++		kiblnd_connect_peer(peer);
+ 	kiblnd_peer_decref(peer);
+ }
+ 
+@@ -1923,6 +1926,9 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	}
+ 
+ 	dev = ((struct kib_net *)peer->ibp_ni->ni_data)->ibn_dev;
++	if (peer->ibp_next_conn == conn)
++		/* clear next_conn so it won't be used */
++		peer->ibp_next_conn = NULL;
+ 	list_del(&conn->ibc_list);
+ 	/* connd (see below) takes over ibc_list's ref */
+ 
+@@ -2192,7 +2198,11 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	kiblnd_conn_addref(conn);
+ 	write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
+ 
+-	/* Schedule blocked txs */
++	/* Schedule blocked txs
++	 * Note: if we are running with conns_per_peer > 1, these blocked
++	 * txs will all get scheduled to the first connection which gets
++	 * scheduled.  We won't be using round robin on this first batch.
++	 */
+ 	spin_lock(&conn->ibc_lock);
+ 	list_for_each_entry_safe(tx, tmp, &txs, tx_list) {
+ 		list_del(&tx->tx_list);
+@@ -2561,7 +2571,6 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 
+ 	LASSERT(conn->ibc_state == IBLND_CONN_ACTIVE_CONNECT);
+ 	LASSERT(peer->ibp_connecting > 0);     /* 'conn' at least */
+-	LASSERT(!peer->ibp_reconnecting);
+ 
+ 	if (cp) {
+ 		msg_size = cp->ibcp_max_msg_size;
+@@ -2579,7 +2588,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
  	 */
- 	o = lu_object_alloc(env, dev, f, conf);
--	if (IS_ERR(o))
-+	if (unlikely(IS_ERR(o)))
- 		return o;
+ 	reconnect = (!list_empty(&peer->ibp_tx_queue) ||
+ 		     peer->ibp_version != version) &&
+-		    peer->ibp_connecting == 1 &&
++		    peer->ibp_connecting &&
+ 		    !peer->ibp_accepting;
+ 	if (!reconnect) {
+ 		reason = "no need";
+@@ -2640,7 +2649,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	}
  
- 	LASSERT(lu_fid_eq(lu_object_fid(o), f));
+ 	conn->ibc_reconnect = 1;
+-	peer->ibp_reconnecting = 1;
++	peer->ibp_reconnecting++;
+ 	peer->ibp_version = version;
+ 	if (incarnation)
+ 		peer->ibp_incarnation = incarnation;
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
+index b923540..39d0792 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
+@@ -57,6 +57,10 @@
+ module_param(nscheds, int, 0444);
+ MODULE_PARM_DESC(nscheds, "number of threads in each scheduler pool");
  
- 	cfs_hash_bd_lock(hs, &bd, 1);
++static unsigned int conns_per_peer = 1;
++module_param(conns_per_peer, uint, 0444);
++MODULE_PARM_DESC(conns_per_peer, "number of connections per peer");
++
+ /* NB: this value is shared by all CPTs, it can grow at runtime */
+ static int ntx = 512;
+ module_param(ntx, int, 0444);
+@@ -271,6 +275,10 @@ int kiblnd_tunables_setup(struct lnet_ni *ni)
+ 		tunables->lnd_fmr_flush_trigger = fmr_flush_trigger;
+ 	if (!tunables->lnd_fmr_cache)
+ 		tunables->lnd_fmr_cache = fmr_cache;
++	if (!tunables->lnd_conns_per_peer) {
++		tunables->lnd_conns_per_peer = (conns_per_peer) ?
++			conns_per_peer : 1;
++	}
  
--	if (conf && conf->loc_flags & LOC_F_NEW)
--		shadow = ERR_PTR(-ENOENT);
--	else
--		shadow = htable_lookup(s, &bd, f, &version);
--	if (likely(PTR_ERR(shadow) == -ENOENT)) {
-+	shadow = htable_lookup(s, &bd, f, &version);
-+	if (likely(IS_ERR(shadow) && PTR_ERR(shadow) == -ENOENT)) {
- 		cfs_hash_bd_add_locked(hs, &bd, &o->lo_header->loh_hash);
- 		cfs_hash_bd_unlock(hs, &bd, 1);
- 
+ 	return 0;
+ }
+@@ -284,4 +292,5 @@ void kiblnd_tunables_init(void)
+ 	default_tunables.lnd_fmr_pool_size = fmr_pool_size;
+ 	default_tunables.lnd_fmr_flush_trigger = fmr_flush_trigger;
+ 	default_tunables.lnd_fmr_cache = fmr_cache;
++	default_tunables.lnd_conns_per_peer = conns_per_peer;
+ }
 -- 
 1.8.3.1
+
+Changelog: v1)  Original patch v2) Fixed checkpatch issues.
