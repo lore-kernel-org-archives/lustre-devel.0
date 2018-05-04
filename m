@@ -1,27 +1,62 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Fri, 4 May 2018 08:27:32 +0300
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Fri, 4 May 2018 10:08:16 +0000
 Subject: [lustre-devel] [PATCH v2] staging: lustre: llite: fix potential
  missing-check bug when copying lumv
 In-Reply-To: <CAAa=b7dHK9grwfFLOpVv=Wpv32mLS66CxXJDHOzNBNaqsWLXaA@mail.gmail.com>
 References: <1525128971-8946-1-git-send-email-wang6495@umn.edu>
  <20180501084621.jfxrm3qoqfmftnxh@mwanda>
  <CAAa=b7dHK9grwfFLOpVv=Wpv32mLS66CxXJDHOzNBNaqsWLXaA@mail.gmail.com>
-Message-ID: <20180504052731.jkwhs4h4fuia3pft@mwanda>
+Message-ID: <7185D89D-A0FE-4B55-B089-9AF0891A00BF@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Wenwen Wang <wang6495@umn.edu>
-Cc: "open list:STAGING SUBSYSTEM" <devel@driverdev.osuosl.org>, Aastha Gupta <aastha.gupta4104@gmail.com>, Roman Storozhenko <romeusmeister@gmail.com>, Andreas Dilger <andreas.dilger@intel.com>, Jeff Layton <jlayton@redhat.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Kangjie Lu <kjlu@umn.edu>, NeilBrown <neilb@suse.com>, open list <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, "moderated list:STAGING - LUSTRE PARALLEL FILESYSTEM" <lustre-devel@lists.lustre.org>
+Cc: "open list:STAGING SUBSYSTEM" <devel@driverdev.osuosl.org>, Aastha Gupta <aastha.gupta4104@gmail.com>, Roman Storozhenko <romeusmeister@gmail.com>, Jeff Layton <jlayton@redhat.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Kangjie Lu <kjlu@umn.edu>, NeilBrown <neilb@suse.com>, open list <linux-kernel@vger.kernel.org>, "Drokin,
+ Oleg" <oleg.drokin@intel.com>, Dan Carpenter <dan.carpenter@oracle.com>, "moderated list:STAGING - LUSTRE PARALLEL FILESYSTEM" <lustre-devel@lists.lustre.org>
 
-There is no security problem here.  The user is allowed to choose either
-v1 or v3.  Using a double read race condition to choose v1 is not
-going to cause problems.  It's slightly more complicated than just
-choosing it directly but that doesn't make it a security issue.
+On May 3, 2018, at 22:19, Wenwen Wang <wang6495@umn.edu> wrote:
+> 
+> On Tue, May 1, 2018 at 3:46 AM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+>> On Mon, Apr 30, 2018 at 05:56:10PM -0500, Wenwen Wang wrote:
+>>> However, given that the user data resides in the user space, a malicious
+>>> user-space process can race to change the data between the two copies. By
+>>> doing so, the attacker can provide a data with an inconsistent version,
+>>> e.g., v1 version + v3 data. This can lead to logical errors in the
+>>> following execution in ll_dir_setstripe(), which performs different actions
+>>> according to the version specified by the field lmm_magic.
+>> 
+>> This part is misleading.  The fix is to improve readability and make
+>> static checkers happy.  You're over dramatizing it to make people think
+>> it has a security impact when it doesn't.
+>> 
+>> If the user wants to specify v1 data they can just say that on the first
+>> read.  They don't need to do funny tricks and race between the two
+>> reads.  It's allowed.
+>> 
+>> In other words this allows the user to do something in a very
+>> complicated way which they are already allowed to do in a very simple
+>> straight forward way.
+>> 
+>> regards,
+>> dan carpenter
+> 
+> Thanks for your comment, Dan! How about this:
+> 
+> However, given that the user data resides in the user space, a
+> malicious user-space process can race to change the data between the
+> two copies. By doing so, the attacker can provide a data with an
+> inconsistent version, e.g., v1 version + v3 data. The current kernel
+> can handle such inconsistent data. But, it may pose a potential
+> security risk for future implementations. Also, to improve code
+> readability and make static analysis tools happy, which will warn
+> about read-verify-re-read type bugs, this issue should be fixed.
 
-It's a bit like typing with your feet in that just because using your
-toes instead of your fingergs is more complicated, it doesn't make it a
-security issue.
+There is nothing preventing the user from using struct lov_mds_md_v3 but
+filling in lmm_magic = LOV_MAGIC_V1 from the beginning, no need for a race.
 
-regards,
-dan carpenter
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
