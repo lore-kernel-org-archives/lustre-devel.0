@@ -1,59 +1,126 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Fri, 4 May 2018 00:11:54 +0000
-Subject: [lustre-devel] [PATCH 1/4] staging: lustre: obdclass: change
- spinlock of key to rwlock
-In-Reply-To: <a3594bd7c393418c8fda5150a075ff1a@AcuMS.aculab.com>
-References: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
- <1525285308-15347-2-git-send-email-jsimmons@infradead.org>
- <a3594bd7c393418c8fda5150a075ff1a@AcuMS.aculab.com>
-Message-ID: <55458B75-4105-4F4F-BB50-3D506611AB24@intel.com>
+From: NeilBrown <neilb@suse.com>
+Date: Fri, 04 May 2018 10:30:33 +1000
+Subject: [lustre-devel] [PATCH 04/10] staging: lustre: lu_object: move
+ retry logic inside htable_lookup
+In-Reply-To: <alpine.LFD.2.21.1805021914550.24633@casper.infradead.org>
+References: <152514658325.17843.11455067361317157487.stgit@noble>
+ <152514675897.17843.15112214060540196720.stgit@noble>
+ <EFC6D018-5FB5-4902-AE7A-B91A5E0148FE@intel.com>
+ <alpine.LFD.2.21.1805021914550.24633@casper.infradead.org>
+Message-ID: <87fu38feja.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: David Laight <David.Laight@ACULAB.COM>
-Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Gu Zheng <gzheng@ddn.com>, Li Xi <lixi@ddn.com>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin,
- Oleg" <oleg.drokin@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, "Siyao,
- Lai" <lai.siyao@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: James Simmons <jsimmons@infradead.org>, "Dilger, Andreas" <andreas.dilger@intel.com>
+Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On May 3, 2018, at 07:50, David Laight <David.Laight@ACULAB.COM> wrote:
-> 
-> From: James Simmons
->> Sent: 02 May 2018 19:22
->> From: Li Xi <lixi@ddn.com>
+On Wed, May 02 2018, James Simmons wrote:
+
+>> On Apr 30, 2018, at 21:52, NeilBrown <neilb@suse.com> wrote:
+>> > 
+>> > The current retry logic, to wait when a 'dying' object is found,
+>> > spans multiple functions.  The process is attached to a waitqueue
+>> > and set TASK_UNINTERRUPTIBLE in htable_lookup, and this status
+>> > is passed back through lu_object_find_try() to lu_object_find_at()
+>> > where schedule() is called and the process is removed from the queue.
+>> > 
+>> > This can be simplified by moving all the logic (including
+>> > hashtable locking) inside htable_lookup(), which now never returns
+>> > EAGAIN.
+>> > 
+>> > Note that htable_lookup() is called with the hash bucket lock
+>> > held, and will drop and retake it if it needs to schedule.
+>> > 
+>> > I made this a 'goto' loop rather than a 'while(1)' loop as the
+>> > diff is easier to read.
+>> > 
+>> > Signed-off-by: NeilBrown <neilb@suse.com>
+>> > ---
+>> > drivers/staging/lustre/lustre/obdclass/lu_object.c |   73 +++++++-------------
+>> > 1 file changed, 27 insertions(+), 46 deletions(-)
+>> > 
+>> > diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+>> > index 2bf089817157..93daa52e2535 100644
+>> > --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
+>> > +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
+>> > @@ -586,16 +586,21 @@ EXPORT_SYMBOL(lu_object_print);
+>> > static struct lu_object *htable_lookup(struct lu_site *s,
 >> 
->> Most of the time, keys are never changed. So rwlock might be
->> better for the concurrency of key read.
-> 
-> OTOH unless there is contention on the spin lock during reads the
-> additional cost of a rwlock (probably double that of a spinlock)
-> will hurt performance.
-> 
-> ...
->> -	spin_lock(&lu_keys_guard);
->> +	read_lock(&lu_keys_guard);
->> 	atomic_inc(&lu_key_initing_cnt);
->> -	spin_unlock(&lu_keys_guard);
->> +	read_unlock(&lu_keys_guard);
-> 
-> WTF, seems unlikely that you need to hold any kind of lock
-> over an atomic_inc().
-> 
-> If this is just ensuring that no code holds the lock then
-> it would need to request the write_lock().
-> (and would need a comment)
+>> It's probably a good idea to add a comment for this function that it may
+>> drop and re-acquire the hash bucket lock internally.
+>> 
+>> > 				       struct cfs_hash_bd *bd,
+>> > 				       const struct lu_fid *f,
+>> > -				       wait_queue_entry_t *waiter,
+>> > 				       __u64 *version)
+>> > {
+>> > +	struct cfs_hash		*hs = s->ls_obj_hash;
+>> > 	struct lu_site_bkt_data *bkt;
+>> > 	struct lu_object_header *h;
+>> > 	struct hlist_node	*hnode;
+>> > -	__u64  ver = cfs_hash_bd_version_get(bd);
+>> > +	__u64 ver;
+>> > +	wait_queue_entry_t waiter;
+>> > 
+>> > -	if (*version == ver)
+>> > +retry:
+>> > +	ver = cfs_hash_bd_version_get(bd);
+>> > +
+>> > +	if (*version == ver) {
+>> > 		return ERR_PTR(-ENOENT);
+>> > +	}
+>> 
+>> (style) we don't need the {} around a single-line if statement
+>
+> I hate to be that guy but could you run checkpatch on your patches.
+>  
 
-There was a fair amount of benchmarking done for this that shows the
-performance is significantly improved with the patch, which can be
-seen in the ticket that was referenced in the original commit comment:
+Someone's got to be "that guy" - thanks.
+I have (at last) modified my patch-preparation script to run checkpatch
+and show me all the errors that I'm about to post.
 
-https://jira.hpdd.intel.com/browse/LU-6800?focusedCommentId=121776#comment-121776
 
-That said, it might be good to include this information into the
-commit comment itself.
+>> > 	*version = ver;
+>> > 	bkt = cfs_hash_bd_extra_get(s->ls_obj_hash, bd);
+>> > @@ -625,11 +630,15 @@ static struct lu_object *htable_lookup(struct lu_site *s,
+>> > 	 * drained), and moreover, lookup has to wait until object is freed.
+>> > 	 */
+>> > 
+>> > -	init_waitqueue_entry(waiter, current);
+>> > -	add_wait_queue(&bkt->lsb_marche_funebre, waiter);
+>> > +	init_waitqueue_entry(&waiter, current);
+>> > +	add_wait_queue(&bkt->lsb_marche_funebre, &waiter);
+>> > 	set_current_state(TASK_UNINTERRUPTIBLE);
+>> > 	lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_DEATH_RACE);
+>> > -	return ERR_PTR(-EAGAIN);
+>> > +	cfs_hash_bd_unlock(hs, bd, 1);
+>> 
+>> This looks like it isn't unlocking and locking the hash bucket in the same
+>> manner that it was done in the caller.  Here excl = 1, but in the caller
+>> you changed it to excl = 0?
+>
+> This is very much like the work done by Lai. The difference is Lai remove 
+> the work queue handling complete in htable_lookup(). You can see the 
+> details at https://jira.hpdd.intel.com/browse/LU-9049. I will push the 
+> missing lu_object fixes including LU-9049 on top of your patch set so you
+> can see the approach Lai did. Form their we can figure out merge the 
+> lu_object work and fixing the issues Andreas and I pointed out.
 
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel Corporation
+I think I did see that before but didn't feel I understood it enough to
+do anything with, so I deferred it.  Having the patches that you
+provided, I think it is starting the make more sense.  Once I resubmit
+this current series I'll have a closer look.  Probably we can just
+apply the series you sent on top of mine - I might even combine the two
+- and the think about whatever else needs doing.
+
+Thanks,
+NeilBrown
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180504/a1a8b1a4/attachment.sig>
