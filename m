@@ -1,52 +1,48 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 07 May 2018 10:54:48 +1000
-Subject: [lustre-devel] [PATCH 10/10] staging: lustre: fix error deref in
- ll_splice_alias().
-In-Reply-To: <152565436690.30131.2229703651041382739.stgit@noble>
-References: <152565436690.30131.2229703651041382739.stgit@noble>
-Message-ID: <152565448830.30131.6113766424862020086.stgit@noble>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Sun, 6 May 2018 18:35:55 -0700
+Subject: [lustre-devel] [PATCH v2] staging: lustre: o2iblnd: Enable
+ Multiple OPA Endpoints between Nodes
+In-Reply-To: <1525361585-13775-1-git-send-email-dougso@me.com>
+References: <1525361585-13775-1-git-send-email-dougso@me.com>
+Message-ID: <20180507013555.GA29421@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Doug Oucharek <dougso@me.com>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Doug Oucharek <doug.s.oucharek@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-d_splice_alias() can return an ERR_PTR().
-If it does while debugging is enabled, the following
-CDEBUG() will dereference that error and crash.
+On Thu, May 03, 2018 at 08:33:05AM -0700, Doug Oucharek wrote:
+> OPA driver optimizations are based on the MPI model where it is
+> expected to have multiple endpoints between two given nodes. To
+> enable this optimization for Lustre, we need to make it possible,
+> via an LND-specific tuneable, to create multiple endpoints and to
+> balance the traffic over them.
+> 
+> Both sides of a connection must have this patch for it to work.
+> Only the active side of the connection (usually the client)
+> needs to have the new tuneable set > 1.
+> 
+> Signed-off-by: Doug Oucharek <doug.s.oucharek@intel.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8943
+> Reviewed-on: https://review.whamcloud.com/25168
+> Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+> Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> Signed-off-by: Doug Oucharek <dougso@me.com>
+> ---
+>  .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |  3 ++-
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    | 17 ++++++++++++---
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 25 +++++++++++++++-------
+>  .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  |  9 ++++++++
+>  4 files changed, 42 insertions(+), 12 deletions(-)
 
-So add appropriate checking, and provide a separate
-debug message for the error case.
+Always put below the --- line what changed in each version.  I have no
+idea what is different here from v1.
 
-Reported-and-tested-by: James Simmons <jsimmons@infradead.org>
-Fixes: e9d4f0b9f559 ("staging: lustre: llite: use d_splice_alias for directories.")
-Reviewed-by: James Simmons <jsimmons@infradead.org>
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lustre/llite/namei.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+Please fix up and resend v3.
 
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 6c9ec462eb41..9ac7f097802d 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -442,11 +442,16 @@ struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de)
- 	} else {
- 		struct dentry *new = d_splice_alias(inode, de);
- 
-+		if (IS_ERR(new))
-+			CDEBUG(D_DENTRY,
-+			       "splice inode %p as %pd gives error %lu\n",
-+			       inode, de, PTR_ERR(new));
- 		if (new)
- 			de = new;
- 	}
--	CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
--	       de, d_inode(de), d_count(de), de->d_flags);
-+	if (!IS_ERR(de))
-+		CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
-+		       de, d_inode(de), d_count(de), de->d_flags);
- 	return de;
- }
- 
+thanks,
+
+greg k-h
