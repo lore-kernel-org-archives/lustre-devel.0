@@ -1,8 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 07 May 2018 10:54:47 +1000
-Subject: [lustre-devel] [PATCH 00/10 - v2] staging: lustre: assorted
- improvements.
-Message-ID: <152565436690.30131.2229703651041382739.stgit@noble>
+Date: Mon, 07 May 2018 10:54:48 +1000
+Subject: [lustre-devel] [PATCH 01/10] staging: lustre: ldlm: store name
+ directly in namespace.
+In-Reply-To: <152565436690.30131.2229703651041382739.stgit@noble>
+References: <152565436690.30131.2229703651041382739.stgit@noble>
+Message-ID: <152565448797.30131.661528421769812256.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -10,56 +12,68 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-This v2 series contains some fixes for issue found
-during review - particularly the share/exclusive locking
-confusion of the hash table in one place, and a missing
-EXPORT_SYMPOL.  It also adds some reviewed-by tags.
+Rather than storing the name of a namespace in the
+hash table, store it directly in the namespace.
+This will allow the hashtable to be changed to use
+rhashtable.
 
-original intro:
-
-First 6 patches are clean-up patches that I pulled out
-of my rhashtable series.  I think these stand alone as
-good cleanups, and having them upstream makes the rhashtable
-series shorter to ease further review.
-
-Second 2 are revised versions of patches I sent previously that
-had conflicts with other patches that landed first.
-
-Last is a bugfix for an issue James mentioned a while back.
-
-Thanks,
-NeilBrown
-
-
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |    5 ++++-
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    5 +++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-NeilBrown (10):
-      staging: lustre: ldlm: store name directly in namespace.
-      staging: lustre: make struct lu_site_bkt_data private
-      staging: lustre: lu_object: discard extra lru count.
-      staging: lustre: lu_object: move retry logic inside htable_lookup
-      staging: lustre: fold lu_object_new() into lu_object_find_at()
-      staging: lustre: llite: use more private data in dump_pgcache
-      staging: lustre: llite: remove redundant lookup in dump_pgcache
-      staging: lustre: move misc-device registration closer to related code.
-      staging: lustre: move remaining code from linux-module.c to module.c
-      staging: lustre: fix error deref in ll_splice_alias().
-
-
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    6 -
- drivers/staging/lustre/lnet/libcfs/Makefile        |    1 
- .../lustre/lnet/libcfs/linux/linux-module.c        |  196 --------------------
- drivers/staging/lustre/lnet/libcfs/module.c        |  161 ++++++++++++++++
- drivers/staging/lustre/lustre/include/lu_object.h  |   36 ----
- drivers/staging/lustre/lustre/include/lustre_dlm.h |    5 -
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |    5 +
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   |    8 -
- drivers/staging/lustre/lustre/llite/namei.c        |    9 +
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |  166 +++++++----------
- drivers/staging/lustre/lustre/lov/lov_object.c     |    8 -
- drivers/staging/lustre/lustre/obdclass/lu_object.c |  174 +++++++++---------
- 12 files changed, 346 insertions(+), 429 deletions(-)
- delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux/linux-module.c
-
---
-Signature
+diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+index d668d86423a4..b3532adac31c 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
++++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
+@@ -362,6 +362,9 @@ struct ldlm_namespace {
+ 	/** Flag indicating if namespace is on client instead of server */
+ 	enum ldlm_side		ns_client;
+ 
++	/** name of this namespace */
++	char			*ns_name;
++
+ 	/** Resource hash table for namespace. */
+ 	struct cfs_hash		*ns_rs_hash;
+ 
+@@ -878,7 +881,7 @@ static inline bool ldlm_has_layout(struct ldlm_lock *lock)
+ static inline char *
+ ldlm_ns_name(struct ldlm_namespace *ns)
+ {
+-	return ns->ns_rs_hash->hs_name;
++	return ns->ns_name;
+ }
+ 
+ static inline struct ldlm_namespace *
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+index 6c615b6e9bdc..43bbc5fd94cc 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
+@@ -688,6 +688,9 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 	ns->ns_obd      = obd;
+ 	ns->ns_appetite = apt;
+ 	ns->ns_client   = client;
++	ns->ns_name     = kstrdup(name, GFP_KERNEL);
++	if (!ns->ns_name)
++		goto out_hash;
+ 
+ 	INIT_LIST_HEAD(&ns->ns_list_chain);
+ 	INIT_LIST_HEAD(&ns->ns_unused_list);
+@@ -730,6 +733,7 @@ struct ldlm_namespace *ldlm_namespace_new(struct obd_device *obd, char *name,
+ 	ldlm_namespace_sysfs_unregister(ns);
+ 	ldlm_namespace_cleanup(ns, 0);
+ out_hash:
++	kfree(ns->ns_name);
+ 	cfs_hash_putref(ns->ns_rs_hash);
+ out_ns:
+ 	kfree(ns);
+@@ -993,6 +997,7 @@ void ldlm_namespace_free_post(struct ldlm_namespace *ns)
+ 	ldlm_namespace_debugfs_unregister(ns);
+ 	ldlm_namespace_sysfs_unregister(ns);
+ 	cfs_hash_putref(ns->ns_rs_hash);
++	kfree(ns->ns_name);
+ 	/* Namespace \a ns should be not on list at this time, otherwise
+ 	 * this will cause issues related to using freed \a ns in poold
+ 	 * thread.
