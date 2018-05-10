@@ -1,80 +1,38 @@
-From: kbuild test robot <lkp@intel.com>
-Date: Fri, 11 May 2018 03:15:59 +0800
-Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: Fix crash in
- kiblnd_handle_early_rxs()
-In-Reply-To: <1525930679-15227-1-git-send-email-dougso@me.com>
-References: <1525930679-15227-1-git-send-email-dougso@me.com>
-Message-ID: <201805110304.MOAwHAIT%fengguang.wu@intel.com>
+From: Justin Skists <justin.skists@juzza.co.uk>
+Date: Thu, 10 May 2018 20:41:29 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: lnet: add static to
+ libcfs_dev declaration
+Message-ID: <20180510194128.GA19653@tanglefoot>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: linux-kernel@vger.kernel.org
 
-Hi Doug,
+Add a static prefix to the declaration for libcfs_dev. This would fix
+the following sparse warning:
 
-Thank you for the patch! Yet something to improve:
+drivers/staging/lustre/lnet/libcfs/module.c:317:19: warning: symbol
+'libcfs_dev' was not declared. Should it be static?
 
-[auto build test ERROR on staging/staging-testing]
-[also build test ERROR on v4.17-rc4 next-20180510]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Doug-Oucharek/staging-lustre-o2iblnd-Fix-crash-in-kiblnd_handle_early_rxs/20180511-004953
-config: i386-allyesconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
-   drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_handle_early_rxs':
-   drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1974:161: error: 'kib_rx_t' undeclared (first use in this function); did you mean 'kib_rx'?
-      rx = list_entry(conn->ibc_early_rxs.next,
-                                                                                                                                                                    ^       
-                                                                                                                                                                    kib_rx
-   drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1974:161: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1974:171: error: expected expression before ')' token
-      rx = list_entry(conn->ibc_early_rxs.next,
-                                                                                                                                                                              ^
-   drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1974:468: error: expected expression before ')' token
-      rx = list_entry(conn->ibc_early_rxs.next,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ^
-
-vim +1974 drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-
-  1962	
-  1963	static void
-  1964	kiblnd_handle_early_rxs(struct kib_conn *conn)
-  1965	{
-  1966		unsigned long flags;
-  1967		struct kib_rx *rx;
-  1968	
-  1969		LASSERT(!in_interrupt());
-  1970		LASSERT(conn->ibc_state >= IBLND_CONN_ESTABLISHED);
-  1971	
-  1972		write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
-  1973		while (!list_empty(&conn->ibc_early_rxs)) {
-> 1974			rx = list_entry(conn->ibc_early_rxs.next,
-  1975					kib_rx_t, rx_list);
-  1976			list_del(&rx->rx_list);
-  1977			write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
-  1978	
-  1979			kiblnd_handle_rx(rx);
-  1980	
-  1981			write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
-  1982		}
-  1983		write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
-  1984	}
-  1985	
-
+Signed-off-by: Justin Skists <justin.skists@juzza.co.uk>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62264 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180511/af3ab45c/attachment-0001.bin>
+ drivers/staging/lustre/lnet/libcfs/module.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
+index ca942f474a55..e021e439f140 100644
+--- a/drivers/staging/lustre/lnet/libcfs/module.c
++++ b/drivers/staging/lustre/lnet/libcfs/module.c
+@@ -314,7 +314,7 @@ static const struct file_operations libcfs_fops = {
+ 	.unlocked_ioctl	= libcfs_psdev_ioctl,
+ };
+ 
+-struct miscdevice libcfs_dev = {
++static struct miscdevice libcfs_dev = {
+ 	.minor = MISC_DYNAMIC_MINOR,
+ 	.name = "lnet",
+ 	.fops = &libcfs_fops,
+-- 
+2.17.0
