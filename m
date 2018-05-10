@@ -1,38 +1,51 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Tue, 8 May 2018 14:45:00 +0300
-Subject: [lustre-devel] [PATCH 4/4] staging: lustre: obdclass: change
- object lookup to no wait mode
-In-Reply-To: <1525285308-15347-5-git-send-email-jsimmons@infradead.org>
-References: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
- <1525285308-15347-5-git-send-email-jsimmons@infradead.org>
-Message-ID: <20180508114500.qrtnjax4siupgv3n@mwanda>
+From: Doug Oucharek <dougso@me.com>
+Date: Wed, 09 May 2018 22:37:59 -0700
+Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: Fix crash in
+ kiblnd_handle_early_rxs()
+Message-ID: <1525930679-15227-1-git-send-email-dougso@me.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, Lai Siyao <lai.siyao@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
->  	/*
->  	 * Allocate new object. This may result in rather complicated
->  	 * operations, including fld queries, inode loading, etc.
->  	 */
->  	o = lu_object_alloc(env, dev, f, conf);
-> -	if (IS_ERR(o))
-> +	if (unlikely(IS_ERR(o)))
->  		return o;
->  
+Under upstream staging commit 5a2ca43fa54f561c252c2, the list handling
+code in kiblnd_handle_early_rxs() got changed to list_for_each_safe().
+That protects against the current thread from deleting the current entry
+it is looking at. It does not protect against another thread from deleting
+the next item in the list (which the tmp variable points to). The way this
+routine holds then releases a lock opens the door to other threads doing
+just that.
 
-This is an unrelated and totally pointless.  likely/unlikely annotations
-hurt readability, and they should only be added if it's something which
-is going to show up in benchmarking.  lu_object_alloc() is already too
-slow for the unlikely() to make a difference and anyway IS_ERR() has an
-unlikely built in so it's duplicative...
+This patch reverts this commit on this routine.
 
-Anyway, I understand that Intel has been ignoring kernel.org instead of
-sending forwarding their patches properly so you're doing a difficult
-and thankless job...  Thanks for that.  I'm sure it's frustrating to
-look at these patches for you as well.
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9886
+Signed-off-by: Doug Oucharek <dougso@me.com>
+---
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-regards,
-dan carpenter
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 32fa8ca..6148fbb 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -1965,13 +1965,14 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ {
+ 	unsigned long flags;
+ 	struct kib_rx *rx;
+-	struct kib_rx *tmp;
+ 
+ 	LASSERT(!in_interrupt());
+ 	LASSERT(conn->ibc_state >= IBLND_CONN_ESTABLISHED);
+ 
+ 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
+-	list_for_each_entry_safe(rx, tmp, &conn->ibc_early_rxs, rx_list) {
++	while (!list_empty(&conn->ibc_early_rxs)) {
++		rx = list_entry(conn->ibc_early_rxs.next,
++				kib_rx_t, rx_list);
+ 		list_del(&rx->rx_list);
+ 		write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
+ 
+-- 
+1.8.3.1
