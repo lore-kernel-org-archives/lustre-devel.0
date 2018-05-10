@@ -1,54 +1,80 @@
-From: Doug Oucharek <dougso@me.com>
-Date: Thu, 10 May 2018 11:07:01 -0700
-Subject: [lustre-devel] [PATCH v2] staging: lustre: o2iblnd: Fix crash in
+From: kbuild test robot <lkp@intel.com>
+Date: Fri, 11 May 2018 03:15:59 +0800
+Subject: [lustre-devel] [PATCH] staging: lustre: o2iblnd: Fix crash in
  kiblnd_handle_early_rxs()
-Message-ID: <1525975621-4978-1-git-send-email-dougso@me.com>
+In-Reply-To: <1525930679-15227-1-git-send-email-dougso@me.com>
+References: <1525930679-15227-1-git-send-email-dougso@me.com>
+Message-ID: <201805110304.MOAwHAIT%fengguang.wu@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Doug Oucharek <dougso@me.com>
+To: lustre-devel@lists.lustre.org
 
-Under upstream staging commit 5a2ca43fa54f561c252c2, the list handling
-code in kiblnd_handle_early_rxs() got changed to list_for_each_safe().
-That protects against the current thread from deleting the current entry
-it is looking at. It does not protect against another thread from deleting
-the next item in the list (which the tmp variable points to). The way this
-routine holds then releases a lock opens the door to other threads doing
-just that.
+Hi Doug,
 
-This patch reverts this commit on this routine.
+Thank you for the patch! Yet something to improve:
 
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9886
-Signed-off-by: Doug Oucharek <dougso@me.com>
+[auto build test ERROR on staging/staging-testing]
+[also build test ERROR on v4.17-rc4 next-20180510]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Doug-Oucharek/staging-lustre-o2iblnd-Fix-crash-in-kiblnd_handle_early_rxs/20180511-004953
+config: i386-allyesconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_handle_early_rxs':
+   drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1974:161: error: 'kib_rx_t' undeclared (first use in this function); did you mean 'kib_rx'?
+      rx = list_entry(conn->ibc_early_rxs.next,
+                                                                                                                                                                    ^       
+                                                                                                                                                                    kib_rx
+   drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1974:161: note: each undeclared identifier is reported only once for each function it appears in
+>> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1974:171: error: expected expression before ')' token
+      rx = list_entry(conn->ibc_early_rxs.next,
+                                                                                                                                                                              ^
+   drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:1974:468: error: expected expression before ')' token
+      rx = list_entry(conn->ibc_early_rxs.next,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ^
+
+vim +1974 drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+
+  1962	
+  1963	static void
+  1964	kiblnd_handle_early_rxs(struct kib_conn *conn)
+  1965	{
+  1966		unsigned long flags;
+  1967		struct kib_rx *rx;
+  1968	
+  1969		LASSERT(!in_interrupt());
+  1970		LASSERT(conn->ibc_state >= IBLND_CONN_ESTABLISHED);
+  1971	
+  1972		write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
+  1973		while (!list_empty(&conn->ibc_early_rxs)) {
+> 1974			rx = list_entry(conn->ibc_early_rxs.next,
+  1975					kib_rx_t, rx_list);
+  1976			list_del(&rx->rx_list);
+  1977			write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
+  1978	
+  1979			kiblnd_handle_rx(rx);
+  1980	
+  1981			write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
+  1982		}
+  1983		write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
+  1984	}
+  1985	
+
 ---
-Change v2: Fixed list_entry parameter to be proper struct
-Change v1: Initial Patch
-
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 32fa8ca..47eb8b4 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -1965,13 +1965,14 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- {
- 	unsigned long flags;
- 	struct kib_rx *rx;
--	struct kib_rx *tmp;
- 
- 	LASSERT(!in_interrupt());
- 	LASSERT(conn->ibc_state >= IBLND_CONN_ESTABLISHED);
- 
- 	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
--	list_for_each_entry_safe(rx, tmp, &conn->ibc_early_rxs, rx_list) {
-+	while (!list_empty(&conn->ibc_early_rxs)) {
-+		rx = list_entry(conn->ibc_early_rxs.next,
-+				struct kib_rx, rx_list);
- 		list_del(&rx->rx_list);
- 		write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
- 
--- 
-1.8.3.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 62264 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180511/af3ab45c/attachment-0001.bin>
