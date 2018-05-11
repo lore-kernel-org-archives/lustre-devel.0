@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 11 May 2018 10:37:14 +1000
-Subject: [lustre-devel] [PATCH 1/6] staging: lustre: make key_set_version an
- atomic_t
+Subject: [lustre-devel] [PATCH 2/6] staging: lustre: use an rwsem instead of
+ lu_key_initing_cnt.
 In-Reply-To: <152599874625.19824.11344372150811845854.stgit@noble>
 References: <152599874625.19824.11344372150811845854.stgit@noble>
-Message-ID: <152599903422.19824.6448081685151609850.stgit@noble>
+Message-ID: <152599903427.19824.5140207718686100721.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,132 +12,138 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-As a first step to simplifying the locking in lu_object.c,
-change key_set_version to an atomic_t.  This will mean
-we don't need to hold a spinlock when incrementing.
+The main use of lu_key_initing_cnt is to wait for it to be zero, so
+that lu_context_key_quiesce() can continue.  This is a lot
+like the behavior of a semaphore.
 
-It is clear that keys_fill() (and so lu_context_refill())
-cannot race with itself as it holds no locks for the main
-part of the work.  So updates to lc_version, and testing of
-that value cannot need locking either.
-So remove the locking from keys_fill() and lu_context_refill()
-as there is no longer anything to protect.  The locking around
-lu_keys_initing_cnt is preserved for now.
+So use an rwsem instead.
 
-Also, don't increment when deregistering or quiescing a key.
-key_set_version is *only* use to avoid filling new key values
-if there have been no changes to the set of key.
-Deregistering a key does not mean that we need to try filling
-any new value, so the increment is pointless.
+When keys_fill() calls down_read() it will opportunistically spin
+while the writer is running.  As the writer is very short - just
+setting a bit for keys_fill() to see, this is likey to always
+be the case.
+lu_context_key_quiesce() will now, if necessary, go to sleep until
+woken, rather than spin repeatedly calling schedule.
 
-Finally, remove the refill loop in keys_fill().  If a key
-is registered or revived while keys_fill() is running it must be safe
-to ignore it just as we would if it was registered immediately
-after keys_fill() ran.  The important thing is that the
-keys_set_version stored in ctx->lc_version must be sampled
-*before* those unseen keys were added.
-So sample keys_set_version early.
+Code is much more readable this way and lu_keys_guard is no longer
+involved in this locking.
+
+We can remove the write_lock from lu_context_key_revive() as there is
+nothing to protect against.  This already mustn't race with
+lu_context_key_quiesce(), and if keys_fill() runs concurrently and
+doesn't see that LCT_QUIESCENT has been cleared, it hardly matters.
+After it is cleared, lu_context_refill() will need to be run anyway.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/obdclass/lu_object.c |   26 ++++----------------
- 1 file changed, 5 insertions(+), 21 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |   53 +++++++-------------
+ 1 file changed, 18 insertions(+), 35 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index f14e3509f059..b38adf75e8e4 100644
+index b38adf75e8e4..2f7a2589e508 100644
 --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
 +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -1329,7 +1329,7 @@ static atomic_t lu_key_initing_cnt = ATOMIC_INIT(0);
-  * lu_context_refill(). No locking is provided, as initialization and shutdown
-  * are supposed to be externally serialized.
-  */
--static unsigned int key_set_version;
-+static atomic_t key_set_version = ATOMIC_INIT(0);
+@@ -1321,7 +1321,7 @@ enum {
+ static struct lu_context_key *lu_keys[LU_CONTEXT_KEY_NR] = { NULL, };
+ 
+ static DEFINE_RWLOCK(lu_keys_guard);
+-static atomic_t lu_key_initing_cnt = ATOMIC_INIT(0);
++static DECLARE_RWSEM(lu_key_initing);
  
  /**
-  * Register new key.
-@@ -1352,7 +1352,7 @@ int lu_context_key_register(struct lu_context_key *key)
- 			lu_keys[i] = key;
- 			lu_ref_init(&key->lct_reference);
- 			result = 0;
--			++key_set_version;
-+			atomic_inc(&key_set_version);
- 			break;
- 		}
- 	}
-@@ -1390,7 +1390,6 @@ void lu_context_key_degister(struct lu_context_key *key)
- 	lu_context_key_quiesce(key);
+  * Global counter incremented whenever key is registered, unregistered,
+@@ -1526,39 +1526,25 @@ void lu_context_key_quiesce(struct lu_context_key *key)
  
- 	write_lock(&lu_keys_guard);
--	++key_set_version;
- 	key_fini(&lu_shrink_env.le_ctx, key->lct_index);
+ 	if (!(key->lct_tags & LCT_QUIESCENT)) {
+ 		/*
+-		 * XXX memory barrier has to go here.
++		 * The write-lock on lu_key_initing will ensure that any
++		 * keys_fill() which didn't see LCT_QUIESCENT will have
++		 * finished before we call key_fini().
+ 		 */
+-		write_lock(&lu_keys_guard);
++		down_write(&lu_key_initing);
+ 		key->lct_tags |= LCT_QUIESCENT;
++		up_write(&lu_key_initing);
  
- 	/**
-@@ -1550,7 +1549,6 @@ void lu_context_key_quiesce(struct lu_context_key *key)
+-		/**
+-		 * Wait until all lu_context_key::lct_init() methods
+-		 * have completed.
+-		 */
+-		while (atomic_read(&lu_key_initing_cnt) > 0) {
+-			write_unlock(&lu_keys_guard);
+-			CDEBUG(D_INFO, "%s: \"%s\" %p, %d (%d)\n",
+-			       __func__,
+-			       module_name(key->lct_owner),
+-			       key, atomic_read(&key->lct_used),
+-			atomic_read(&lu_key_initing_cnt));
+-			schedule();
+-			write_lock(&lu_keys_guard);
+-		}
+-
++		write_lock(&lu_keys_guard);
  		list_for_each_entry(ctx, &lu_context_remembered, lc_remember)
  			key_fini(ctx, key->lct_index);
- 
--		++key_set_version;
+-
  		write_unlock(&lu_keys_guard);
  	}
  }
-@@ -1559,7 +1557,7 @@ void lu_context_key_revive(struct lu_context_key *key)
+ 
+ void lu_context_key_revive(struct lu_context_key *key)
  {
- 	write_lock(&lu_keys_guard);
+-	write_lock(&lu_keys_guard);
  	key->lct_tags &= ~LCT_QUIESCENT;
--	++key_set_version;
-+	atomic_inc(&key_set_version);
- 	write_unlock(&lu_keys_guard);
+ 	atomic_inc(&key_set_version);
+-	write_unlock(&lu_keys_guard);
  }
  
-@@ -1579,7 +1577,6 @@ static void keys_fini(struct lu_context *ctx)
- 
+ static void keys_fini(struct lu_context *ctx)
+@@ -1578,19 +1564,16 @@ static void keys_fini(struct lu_context *ctx)
  static int keys_fill(struct lu_context *ctx)
  {
--	unsigned int pre_version;
  	unsigned int i;
++	int rc = 0;
  
  	/*
-@@ -1593,10 +1590,9 @@ static int keys_fill(struct lu_context *ctx)
+-	 * A serialisation with lu_context_key_quiesce() is needed, but some
+-	 * "key->lct_init()" are calling kernel memory allocation routine and
+-	 * can't be called while holding a spin_lock.
+-	 * "lu_keys_guard" is held while incrementing "lu_key_initing_cnt"
+-	 * to ensure the start of the serialisation.
+-	 * An atomic_t variable is still used, in order not to reacquire the
+-	 * lock when decrementing the counter.
++	 * A serialisation with lu_context_key_quiesce() is needed, to
++	 * ensure we see LCT_QUIESCENT and don't allocate a new value
++	 * after it freed one.  The rwsem provides this.  As down_read()
++	 * does optimistic spinning while the writer is active, this is
++	 * unlikely to ever sleep.
  	 */
- 	read_lock(&lu_keys_guard);
- 	atomic_inc(&lu_key_initing_cnt);
--	pre_version = key_set_version;
- 	read_unlock(&lu_keys_guard);
-+	ctx->lc_version = atomic_read(&key_set_version);
+-	read_lock(&lu_keys_guard);
+-	atomic_inc(&lu_key_initing_cnt);
+-	read_unlock(&lu_keys_guard);
++	down_read(&lu_key_initing);
+ 	ctx->lc_version = atomic_read(&key_set_version);
  
--refill:
  	LINVRNT(ctx->lc_value);
- 	for (i = 0; i < ARRAY_SIZE(lu_keys); ++i) {
- 		struct lu_context_key *key;
-@@ -1639,15 +1635,7 @@ static int keys_fill(struct lu_context *ctx)
+@@ -1618,8 +1601,8 @@ static int keys_fill(struct lu_context *ctx)
+ 
+ 			value = key->lct_init(ctx, key);
+ 			if (unlikely(IS_ERR(value))) {
+-				atomic_dec(&lu_key_initing_cnt);
+-				return PTR_ERR(value);
++				rc = PTR_ERR(value);
++				break;
+ 			}
+ 
+ 			lu_ref_add_atomic(&key->lct_reference, "ctx", ctx);
+@@ -1635,8 +1618,8 @@ static int keys_fill(struct lu_context *ctx)
  		}
  	}
  
--	read_lock(&lu_keys_guard);
--	if (pre_version != key_set_version) {
--		pre_version = key_set_version;
--		read_unlock(&lu_keys_guard);
--		goto refill;
--	}
--	ctx->lc_version = key_set_version;
- 	atomic_dec(&lu_key_initing_cnt);
--	read_unlock(&lu_keys_guard);
- 	return 0;
+-	atomic_dec(&lu_key_initing_cnt);
+-	return 0;
++	up_read(&lu_key_initing);
++	return rc;
  }
  
-@@ -1756,13 +1744,9 @@ EXPORT_SYMBOL(lu_context_exit);
-  */
- int lu_context_refill(struct lu_context *ctx)
- {
--	read_lock(&lu_keys_guard);
--	if (likely(ctx->lc_version == key_set_version)) {
--		read_unlock(&lu_keys_guard);
-+	if (likely(ctx->lc_version == atomic_read(&key_set_version)))
- 		return 0;
--	}
- 
--	read_unlock(&lu_keys_guard);
- 	return keys_fill(ctx);
- }
- 
+ static int keys_init(struct lu_context *ctx)
