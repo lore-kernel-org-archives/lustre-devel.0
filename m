@@ -1,38 +1,47 @@
-From: Justin Skists <justin.skists@juzza.co.uk>
-Date: Thu, 10 May 2018 20:41:29 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: lnet: add static to
- libcfs_dev declaration
-Message-ID: <20180510194128.GA19653@tanglefoot>
+From: NeilBrown <neilb@suse.com>
+Date: Fri, 11 May 2018 10:37:14 +1000
+Subject: [lustre-devel] RFC: [PATCH 0/6] lustre: Improve locking in
+ lu_object.s
+Message-ID: <152599874625.19824.11344372150811845854.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: devel@driverdev.osuosl.org, lustre-devel@lists.lustre.org, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
-Cc: linux-kernel@vger.kernel.org
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Add a static prefix to the declaration for libcfs_dev. This would fix
-the following sparse warning:
+This is a followup to the patches that James recently posted
+which addressed some locking issues in lu_object.c.
+I said at the time that I thought the locking could be
+improved further.  Here is the result of that thought.
 
-drivers/staging/lustre/lnet/libcfs/module.c:317:19: warning: symbol
-'libcfs_dev' was not declared. Should it be static?
+The lu_keys_guard lock is now gone, replaced by a spin lock, an rwsem,
+and some lockless code.
+The lu_context_exit() function, which appears to have been a
+performance problem at one point, is now completely lockless.
 
-Signed-off-by: Justin Skists <justin.skists@juzza.co.uk>
+This is an RFC at this stage: I haven't included Greg on the email and
+don't expect this to go upstream without some review - and maybe even
+some testing.
+
+Thanks,
+NeilBrown
+
+
 ---
- drivers/staging/lustre/lnet/libcfs/module.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index ca942f474a55..e021e439f140 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -314,7 +314,7 @@ static const struct file_operations libcfs_fops = {
- 	.unlocked_ioctl	= libcfs_psdev_ioctl,
- };
- 
--struct miscdevice libcfs_dev = {
-+static struct miscdevice libcfs_dev = {
- 	.minor = MISC_DYNAMIC_MINOR,
- 	.name = "lnet",
- 	.fops = &libcfs_fops,
--- 
-2.17.0
+NeilBrown (6):
+      staging: lustre: make key_set_version an atomic_t
+      staging: lustre: use an rwsem instead of lu_key_initing_cnt.
+      staging: lustre: remove locking from lu_context_exit()
+      staging: lustre: use wait_event_var() in lu_context_key_degister()
+      staging: lustre: remove lock from key register/degister
+      staging: lustre: rename lu_keys_guard to lu_context_remembered_guard
+
+
+ drivers/staging/lustre/lustre/include/lu_object.h  |    1 
+ drivers/staging/lustre/lustre/obdclass/lu_object.c |  187 ++++++++------------
+ 2 files changed, 78 insertions(+), 110 deletions(-)
+
+--
+Signature
