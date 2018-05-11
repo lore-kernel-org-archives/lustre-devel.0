@@ -1,38 +1,36 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Fri, 11 May 2018 11:47:07 +0200
-Subject: [lustre-devel] [PATCH v2] staging: lustre: o2iblnd: Fix crash
- in kiblnd_handle_early_rxs()
-In-Reply-To: <1525975621-4978-1-git-send-email-dougso@me.com>
-References: <1525975621-4978-1-git-send-email-dougso@me.com>
-Message-ID: <20180511094707.GB18687@kroah.com>
+From: Colin King <colin.king@canonical.com>
+Date: Fri, 11 May 2018 14:38:59 +0100
+Subject: [lustre-devel] [PATCH] staging: lustre: fix spelling mistake:
+ "req_ulinked" -> "req_unlinked"
+Message-ID: <20180511133859.18733-1-colin.king@canonical.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Doug Oucharek <dougso@me.com>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, NeilBrown <neilb@suse.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org
+Cc: kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org
 
-On Thu, May 10, 2018 at 11:07:01AM -0700, Doug Oucharek wrote:
-> Under upstream staging commit 5a2ca43fa54f561c252c2, the list handling
-> code in kiblnd_handle_early_rxs() got changed to list_for_each_safe().
-> That protects against the current thread from deleting the current entry
-> it is looking at. It does not protect against another thread from deleting
-> the next item in the list (which the tmp variable points to). The way this
-> routine holds then releases a lock opens the door to other threads doing
-> just that.
-> 
-> This patch reverts this commit on this routine.
-> 
-> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9886
+From: Colin Ian King <colin.king@canonical.com>
 
-Please add a line like:
-	Fixes: 5a2ca43fa54f ("Staging: lustre: Iterate list using list_for_each_entry")
+Trivial fix to spelling mistake in DEBUG_REQ message text
 
-when you know this information.
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/staging/lustre/lustre/ptlrpc/client.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Also, I'm guessing you want this backported to the stable trees?  Or
-does no one who actually runs lustre run a kernel.org stable kernel?
-
-thanks,
-
-greg k-h
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index eeb281266413..a51feaeb7734 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -2514,7 +2514,7 @@ static int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
+ 		}
+ 
+ 		DEBUG_REQ(D_WARNING, request,
+-			  "Unexpectedly long timeout receiving_reply=%d req_ulinked=%d reply_unlinked=%d",
++			  "Unexpectedly long timeout receiving_reply=%d req_unlinked=%d reply_unlinked=%d",
+ 			  request->rq_receiving_reply,
+ 			  request->rq_req_unlinked,
+ 			  request->rq_reply_unlinked);
+-- 
+2.17.0
