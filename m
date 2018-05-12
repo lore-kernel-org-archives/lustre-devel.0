@@ -1,36 +1,44 @@
-From: Colin King <colin.king@canonical.com>
-Date: Fri, 11 May 2018 14:38:59 +0100
-Subject: [lustre-devel] [PATCH] staging: lustre: fix spelling mistake:
- "req_ulinked" -> "req_unlinked"
-Message-ID: <20180511133859.18733-1-colin.king@canonical.com>
+From: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Date: Sat, 12 May 2018 08:33:05 +0200
+Subject: [lustre-devel] [PATCH] staging: lustre: Fix an error handling path
+ in 'client_common_fill_super()'
+Message-ID: <20180512063305.7339-1-christophe.jaillet@wanadoo.fr>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, NeilBrown <neilb@suse.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org
-Cc: kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org
+To: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, neilb@suse.com, aastha.gupta4104@gmail.com, santhameena13@gmail.com
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, kernel-janitors@vger.kernel.org, Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 
-From: Colin Ian King <colin.king@canonical.com>
+According to error handling path before and after this one, we should go
+to 'out_md_fid' here, instead of 'out_md', if 'obd_connect()' fails.
 
-Trivial fix to spelling mistake in DEBUG_REQ message text
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 ---
- drivers/staging/lustre/lustre/ptlrpc/client.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The last goto 'out_lock_cn_cb' looks spurious but is correct.
+In case of error, 'd_make_root()' performs a 'iput()', so skipping it in
+the error handling path lokks fine to me.
+---
+ drivers/staging/lustre/lustre/llite/llite_lib.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index eeb281266413..a51feaeb7734 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -2514,7 +2514,7 @@ static int ptlrpc_unregister_reply(struct ptlrpc_request *request, int async)
- 		}
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 60dbe888e336..83eb2da2c9ad 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -400,11 +400,11 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
+ 		LCONSOLE_ERROR_MSG(0x150,
+ 				   "An OST (dt %s) is performing recovery, of which this client is not a part.  Please wait for recovery to complete, abort, or time out.\n",
+ 				   dt);
+-		goto out_md;
++		goto out_md_fid;
+ 	} else if (err) {
+ 		CERROR("%s: Cannot connect to %s: rc = %d\n",
+ 		       sbi->ll_dt_exp->exp_obd->obd_name, dt, err);
+-		goto out_md;
++		goto out_md_fid;
+ 	}
  
- 		DEBUG_REQ(D_WARNING, request,
--			  "Unexpectedly long timeout receiving_reply=%d req_ulinked=%d reply_unlinked=%d",
-+			  "Unexpectedly long timeout receiving_reply=%d req_unlinked=%d reply_unlinked=%d",
- 			  request->rq_receiving_reply,
- 			  request->rq_req_unlinked,
- 			  request->rq_reply_unlinked);
+ 	sbi->ll_dt_exp->exp_connect_data = *data;
 -- 
 2.17.0
