@@ -1,9 +1,11 @@
 From: NeilBrown <neilb@suse.com>
-Date: Wed, 16 May 2018 08:22:57 +1000
-Subject: [lustre-devel] Regression with delayed_work in sec_gc
-In-Reply-To: <alpine.LFD.2.21.1805151609430.28403@casper.infradead.org>
-References: <alpine.LFD.2.21.1805151609430.28403@casper.infradead.org>
-Message-ID: <87sh6s5zjy.fsf@notabene.neil.brown.name>
+Date: Wed, 16 May 2018 08:46:51 +1000
+Subject: [lustre-devel] RFC: [PATCH 0/6] lustre: Improve locking in
+ lu_object.s
+In-Reply-To: <alpine.LFD.2.21.1805151622540.28403@casper.infradead.org>
+References: <152599874625.19824.11344372150811845854.stgit@noble>
+ <alpine.LFD.2.21.1805151622540.28403@casper.infradead.org>
+Message-ID: <87po1w5yg4.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,53 +14,74 @@ To: lustre-devel@lists.lustre.org
 
 On Tue, May 15 2018, James Simmons wrote:
 
-> Dmitry has backported your upstream commit 
+>> This is a followup to the patches that James recently posted
+>> which addressed some locking issues in lu_object.c.
+>> I said at the time that I thought the locking could be
+>> improved further.  Here is the result of that thought.
+>> 
+>> The lu_keys_guard lock is now gone, replaced by a spin lock, an rwsem,
+>> and some lockless code.
+>> The lu_context_exit() function, which appears to have been a
+>> performance problem at one point, is now completely lockless.
+>> 
+>> This is an RFC at this stage: I haven't included Greg on the email and
+>> don't expect this to go upstream without some review - and maybe even
+>> some testing.
 >
-> be3c64da248b1ada2bbcfc3855f07536d8087acb ( ptlrpc: use workqueue for 
-> pinger)
+> So I managed to mostly port it to the Intel branch. For testing on RHEL7
+> I had to add:
 >
-> and Sebastien tried out the change which can be seen at 
-> https://review.whamcloud.com/#/c/31724. Sebastien is having issues with 
-> unloading osc, mdc, ost or mdt kernel modules. He writes that he activated 
-> Kerberos for my file system, did some IOs, then tried to unmount the 
-> client and the  targets. Unfortunately, on some occasions, while 
-> unmounting, the mdc module for instance has extra references (as shown by 
-> 'lsmod'), and cannot be unloaded. After a while, the extra references are 
-> dropped, and the  module can be unloaded. It also happens on occasions on 
-> server side, for the mdt or ost modules. I tried destroy_workqueue but
-> that made things worst :-( Do you know what is going on?
+> #ifndef smp_store_mb
+> #define smp_store_mb(var, value)       set_mb(var, value)
+> #endif
+>
+> #ifndef wake_up_var
+> #define wake_up_var(atom)              wake_up_atomic_t(atom)
+> #endif
+>
+> I'm still working out how to support wait_var_event on older kernels.
 
-My guess is that ptlrpc_pinger_main() is looping, so
-cancel_delayed_work_sync() is waiting an unusually long time for it.
-This patch might fix the problem - it certainly makes the usage
-of "this_ping" closer to the original code.
+When wait_var_event() is used to wait for an atomic_t to be zero, like
+I did, it is exactly wait_on_atomic_t().
+
+> Another than that I have it ported so people will look at it. DDN was
+
+Thanks for that!
+
+> very interested in this but they wouldn't work with the upstream client 
+> :-( Any suggestions to help speed up the process.
+
+Cloning?
+The looming monster in my mind is the tracing stuff - not that lustre
+tracing is a monster, but that converting it to use upstream interfaces
+will be a big task.  One of the difficulties I'll have there is
+understanding the requirements.  I've collected various snippets of that
+so it should be manageable, but I'm still putting it off :-)
 
 Thanks,
 NeilBrown
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-index 89eef8ec7df4..131b201541e8 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-@@ -222,12 +222,13 @@ static DECLARE_DELAYED_WORK(ping_work, ptlrpc_pinger_main);
- 
- static void ptlrpc_pinger_main(struct work_struct *ws)
- {
--	unsigned long this_ping = jiffies;
- 	long time_to_next_wake;
- 	struct timeout_item *item;
- 	struct obd_import *imp;
- 
- 	do {
-+		unsigned long this_ping = jiffies;
-+
- 		mutex_lock(&pinger_mutex);
- 		list_for_each_entry(item, &timeout_list, ti_chain) {
- 			item->ti_cb(item, item->ti_cb_data);
+>
+>>       staging: lustre: make key_set_version an atomic_t
+>>       staging: lustre: use an rwsem instead of lu_key_initing_cnt.
+>>       staging: lustre: remove locking from lu_context_exit()
+>>       staging: lustre: use wait_event_var() in lu_context_key_degister()
+>>       staging: lustre: remove lock from key register/degister
+>>       staging: lustre: rename lu_keys_guard to lu_context_remembered_guard
+>> 
+>> 
+>>  drivers/staging/lustre/lustre/include/lu_object.h  |    1 
+>>  drivers/staging/lustre/lustre/obdclass/lu_object.c |  187 ++++++++------------
+>>  2 files changed, 78 insertions(+), 110 deletions(-)
+>> 
+>> --
+>> Signature
+>> 
+>> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180516/4e6c8c37/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180516/97e1bc47/attachment.sig>
