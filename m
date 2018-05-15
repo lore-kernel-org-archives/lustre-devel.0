@@ -1,178 +1,92 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 14 May 2018 22:16:59 -0400
-Subject: [lustre-devel] [PATCH v2 1/5] staging: lustre: llite: add support
- set_acl method in inode operations
+Date: Mon, 14 May 2018 22:17:03 -0400
+Subject: [lustre-devel] [PATCH 5/5] staging: lustre: mdc: use large xattr
+ buffers for old servers
 In-Reply-To: <1526350623-4616-1-git-send-email-jsimmons@infradead.org>
 References: <1526350623-4616-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1526350623-4616-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1526350623-4616-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <uja.ornl@yahoo.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "John L. Hammond" <john.hammond@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+Cc: "John L. Hammond" <john.hammond@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+From: "John L. Hammond" <john.hammond@intel.com>
 
-Linux kernel v3.14 adds set_acl method to inode operations.
-This patch adds support to Lustre for proper acl management.
+Pre 2.10.1 MDTs will crash when they receive a listxattr (MDS_GETXATTR
+with OBD_MD_FLXATTRLS) RPC for an orphan or dead object. So for
+clients connected to these older MDTs, try to avoid sending listxattr
+RPCs by making the bulk getxattr (MDS_GETXATTR with OBD_MD_FLXATTRALL)
+more likely to succeed and thereby reducing the chances of falling
+back to listxattr.
 
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9183
-Reviewed-on: https://review.whamcloud.com/25965
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-10541
-Reviewed-on: https://review.whamcloud.com/31588
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-10926
-Reviewed-on: https://review.whamcloud.com/32045
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-10912
+Reviewed-on: https://review.whamcloud.com/31990
 Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
-Changelog:
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c | 31 +++++++++++++++++++++------
+ 1 file changed, 24 insertions(+), 7 deletions(-)
 
-v1) Initial patch ported to staging tree
-v2) Fixed up goto handling and avoid BUG() when calling
-    forget_cached_acl()with invalid type as pointed out by Dan Carpenter
-
- drivers/staging/lustre/lustre/llite/file.c         | 62 ++++++++++++++++++++++
- .../staging/lustre/lustre/llite/llite_internal.h   |  4 ++
- drivers/staging/lustre/lustre/llite/namei.c        | 10 +++-
- 3 files changed, 74 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 0026fde..64a5698 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -3030,6 +3030,7 @@ static int ll_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
- 	return rc;
- }
- 
-+#ifdef CONFIG_FS_POSIX_ACL
- struct posix_acl *ll_get_acl(struct inode *inode, int type)
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+index a8aa0fa..b991c6f 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+@@ -326,8 +326,10 @@ static void mdc_realloc_openmsg(struct ptlrpc_request *req,
  {
- 	struct ll_inode_info *lli = ll_i2info(inode);
-@@ -3043,6 +3044,64 @@ struct posix_acl *ll_get_acl(struct inode *inode, int type)
- 	return acl;
- }
+ 	struct ptlrpc_request	*req;
+ 	struct ldlm_intent	*lit;
++	u32 min_buf_size = 0;
+ 	int rc, count = 0;
+ 	LIST_HEAD(cancels);
++	u32 buf_size = 0;
  
-+int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type)
-+{
-+	struct ll_sb_info *sbi = ll_i2sbi(inode);
-+	struct ptlrpc_request *req = NULL;
-+	const char *name = NULL;
-+	size_t value_size = 0;
-+	char *value = NULL;
-+	int rc;
-+
-+	switch (type) {
-+	case ACL_TYPE_ACCESS:
-+		name = XATTR_NAME_POSIX_ACL_ACCESS;
-+		if (acl)
-+			rc = posix_acl_update_mode(inode, &inode->i_mode, &acl);
-+		break;
-+
-+	case ACL_TYPE_DEFAULT:
-+		name = XATTR_NAME_POSIX_ACL_DEFAULT;
-+		if (!S_ISDIR(inode->i_mode))
-+			rc = acl ? -EACCES : 0;
-+		break;
-+
-+	default:
-+		rc = -EINVAL;
-+		break;
-+	}
-+	if (rc)
-+		return rc;
-+
-+	if (acl) {
-+		value_size = posix_acl_xattr_size(acl->a_count);
-+		value = kmalloc(value_size, GFP_NOFS);
-+		if (!value) {
-+			rc = -ENOMEM;
-+			goto out;
-+		}
-+
-+		rc = posix_acl_to_xattr(&init_user_ns, acl, value, value_size);
-+		if (rc < 0)
-+			goto out_value;
-+	}
-+
-+	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
-+			 value ? OBD_MD_FLXATTR : OBD_MD_FLXATTRRM,
-+			 name, value, value_size, 0, 0, 0, &req);
-+
-+	ptlrpc_req_finished(req);
-+out_value:
-+	kfree(value);
-+out:
-+	if (rc)
-+		forget_cached_acl(inode, type);
-+	else
-+		set_cached_acl(inode, type, acl);
-+	return rc;
-+}
-+#endif /* CONFIG_FS_POSIX_ACL */
-+
- int ll_inode_permission(struct inode *inode, int mask)
- {
- 	struct ll_sb_info *sbi;
-@@ -3164,7 +3223,10 @@ int ll_inode_permission(struct inode *inode, int mask)
- 	.permission	= ll_inode_permission,
- 	.listxattr	= ll_listxattr,
- 	.fiemap		= ll_fiemap,
-+#ifdef CONFIG_FS_POSIX_ACL
- 	.get_acl	= ll_get_acl,
-+	.set_acl	= ll_set_acl,
-+#endif
- };
+ 	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
+ 				   &RQF_LDLM_INTENT_GETXATTR);
+@@ -344,18 +346,33 @@ static void mdc_realloc_openmsg(struct ptlrpc_request *req,
+ 	lit = req_capsule_client_get(&req->rq_pill, &RMF_LDLM_INTENT);
+ 	lit->opc = IT_GETXATTR;
  
- /* dynamic ioctl number support routines */
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 6504850..2280327 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -754,7 +754,11 @@ enum ldlm_mode ll_take_md_lock(struct inode *inode, __u64 bits,
- int ll_md_real_close(struct inode *inode, fmode_t fmode);
- int ll_getattr(const struct path *path, struct kstat *stat,
- 	       u32 request_mask, unsigned int flags);
-+#ifdef CONFIG_FS_POSIX_ACL
- struct posix_acl *ll_get_acl(struct inode *inode, int type);
-+int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type);
-+#endif /* CONFIG_FS_POSIX_ACL */
++#if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(3, 0, 53, 0)
++	/* If the supplied buffer is too small then the server will
++	 * return -ERANGE and llite will fallback to using non cached
++	 * xattr operations. On servers before 2.10.1 a (non-cached)
++	 * listxattr RPC for an orphan or dead file causes an oops. So
++	 * let's try to avoid sending too small a buffer to too old a
++	 * server. This is effectively undoing the memory conservation
++	 * of LU-9417 when it would be *more* likely to crash the
++	 * server. See LU-9856.
++	 */
++	if (exp->exp_connect_data.ocd_version < OBD_OCD_VERSION(2, 10, 1, 0))
++		min_buf_size = exp->exp_connect_data.ocd_max_easize;
++#endif
++	buf_size = max_t(u32, min_buf_size,
++			 GA_DEFAULT_EA_NAME_LEN * GA_DEFAULT_EA_NUM);
 +
- int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
- 	       const char *name, int namelen);
- int ll_get_fid_by_name(struct inode *parent, const char *name,
-diff --git a/drivers/staging/lustre/lustre/llite/namei.c b/drivers/staging/lustre/lustre/llite/namei.c
-index 9ac7f09..b41f189 100644
---- a/drivers/staging/lustre/lustre/llite/namei.c
-+++ b/drivers/staging/lustre/lustre/llite/namei.c
-@@ -1195,7 +1195,10 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
- 	.getattr	    = ll_getattr,
- 	.permission	 = ll_inode_permission,
- 	.listxattr	  = ll_listxattr,
--	.get_acl	    = ll_get_acl,
-+#ifdef CONFIG_FS_POSIX_ACL
-+	.get_acl	= ll_get_acl,
-+	.set_acl	= ll_set_acl,
-+#endif
- };
+ 	/* pack the intended request */
+-	mdc_pack_body(req, &op_data->op_fid1, op_data->op_valid,
+-		      GA_DEFAULT_EA_NAME_LEN * GA_DEFAULT_EA_NUM, -1, 0);
++	mdc_pack_body(req, &op_data->op_fid1, op_data->op_valid, buf_size,
++		      -1, 0);
  
- const struct inode_operations ll_special_inode_operations = {
-@@ -1203,5 +1206,8 @@ static int ll_rename(struct inode *src, struct dentry *src_dchild,
- 	.getattr	= ll_getattr,
- 	.permission     = ll_inode_permission,
- 	.listxattr      = ll_listxattr,
--	.get_acl	    = ll_get_acl,
-+#ifdef CONFIG_FS_POSIX_ACL
-+	.get_acl	= ll_get_acl,
-+	.set_acl	= ll_set_acl,
-+#endif
- };
+-	req_capsule_set_size(&req->rq_pill, &RMF_EADATA, RCL_SERVER,
+-			     GA_DEFAULT_EA_NAME_LEN * GA_DEFAULT_EA_NUM);
++	req_capsule_set_size(&req->rq_pill, &RMF_EADATA, RCL_SERVER, buf_size);
+ 
+-	req_capsule_set_size(&req->rq_pill, &RMF_EAVALS, RCL_SERVER,
+-			     GA_DEFAULT_EA_NAME_LEN * GA_DEFAULT_EA_NUM);
++	req_capsule_set_size(&req->rq_pill, &RMF_EAVALS, RCL_SERVER, buf_size);
+ 
+ 	req_capsule_set_size(&req->rq_pill, &RMF_EAVALS_LENS, RCL_SERVER,
+-			     sizeof(u32) * GA_DEFAULT_EA_NUM);
++			     max_t(u32, min_buf_size,
++				   sizeof(u32) * GA_DEFAULT_EA_NUM));
+ 
+ 	req_capsule_set_size(&req->rq_pill, &RMF_ACL, RCL_SERVER, 0);
+ 
 -- 
 1.8.3.1
