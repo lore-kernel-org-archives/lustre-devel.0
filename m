@@ -1,72 +1,90 @@
-From: Sebastien Buisson <sbuisson@ddn.com>
-Date: Thu, 17 May 2018 09:10:34 +0000
-Subject: [lustre-devel] Regression with delayed_work in sec_gc
-In-Reply-To: <87sh6s5zjy.fsf@notabene.neil.brown.name>
-References: <alpine.LFD.2.21.1805151609430.28403@casper.infradead.org>
- <87sh6s5zjy.fsf@notabene.neil.brown.name>
-Message-ID: <E4BBDF07-0165-4306-9846-382D2D0A9C3D@ddn.com>
+From: Christoph Hellwig <hch@lst.de>
+Date: Wed, 16 May 2018 07:43:40 +0200
+Subject: [lustre-devel] [PATCH 06/14] btrfs: separate errno from VM_FAULT_*
+ values
+In-Reply-To: <20180516054348.15950-1-hch@lst.de>
+References: <20180516054348.15950-1-hch@lst.de>
+Message-ID: <20180516054348.15950-7-hch@lst.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Souptick Joarder <jrdr.linux@gmail.com>, Matthew Wilcox <willy@infradead.org>
+Cc: linux-arm-kernel@lists.infradead.org, linux-s390@vger.kernel.org, linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org, linux-mm@kvack.org, ocfs2-devel@oss.oracle.com, devel@lists.orangefs.org, linux-fsdevel@vger.kernel.org, linux-mtd@lists.infradead.org, ceph-devel@vger.kernel.org, linux-ext4@vger.kernel.org, linux-btrfs@vger.kernel.org, lustre-devel@lists.lustre.org
 
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+---
+ fs/btrfs/ctree.h |  2 +-
+ fs/btrfs/inode.c | 19 ++++++++++---------
+ 2 files changed, 11 insertions(+), 10 deletions(-)
 
-> Le 16 mai 2018 ? 00:22, NeilBrown <neilb@suse.com> a ?crit :
-> 
-> On Tue, May 15 2018, James Simmons wrote:
-> 
->> Dmitry has backported your upstream commit
->> 
->> be3c64da248b1ada2bbcfc3855f07536d8087acb ( ptlrpc: use workqueue for
->> pinger)
->> 
->> and Sebastien tried out the change which can be seen at
->> https://review.whamcloud.com/#/c/31724. Sebastien is having issues with
->> unloading osc, mdc, ost or mdt kernel modules. He writes that he activated
->> Kerberos for my file system, did some IOs, then tried to unmount the
->> client and the  targets. Unfortunately, on some occasions, while
->> unmounting, the mdc module for instance has extra references (as shown by
->> 'lsmod'), and cannot be unloaded. After a while, the extra references are
->> dropped, and the  module can be unloaded. It also happens on occasions on
->> server side, for the mdt or ost modules. I tried destroy_workqueue but
->> that made things worst :-( Do you know what is going on?
-> 
-> My guess is that ptlrpc_pinger_main() is looping, so
-> cancel_delayed_work_sync() is waiting an unusually long time for it.
-> This patch might fix the problem - it certainly makes the usage
-> of "this_ping" closer to the original code.
-> 
-> Thanks,
-> NeilBrown
-> 
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-> index 89eef8ec7df4..131b201541e8 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
-> @@ -222,12 +222,13 @@ static DECLARE_DELAYED_WORK(ping_work, ptlrpc_pinger_main);
-> 
-> static void ptlrpc_pinger_main(struct work_struct *ws)
-> {
-> -	unsigned long this_ping = jiffies;
-> 	long time_to_next_wake;
-> 	struct timeout_item *item;
-> 	struct obd_import *imp;
-> 
-> 	do {
-> +		unsigned long this_ping = jiffies;
-> +
-> 		mutex_lock(&pinger_mutex);
-> 		list_for_each_entry(item, &timeout_list, ti_chain) {
-> 			item->ti_cb(item, item->ti_cb_data);
-
-Still same problem when testing "ptlrpc: use delayed_work in sec_gc" with patch "ptlrpc: use workqueue for pinger" and modification as suggested above. Kernel module ptlrpc_gss holds extra references, and cannot be unloaded.
-
-However, patch "ptlrpc: use workqueue for pinger" alone does not have the issue.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: Message signed with OpenPGP
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180517/94790452/attachment.sig>
+diff --git a/fs/btrfs/ctree.h b/fs/btrfs/ctree.h
+index 1485cd130e2b..02a0de73c1d1 100644
+--- a/fs/btrfs/ctree.h
++++ b/fs/btrfs/ctree.h
+@@ -3203,7 +3203,7 @@ int btrfs_merge_bio_hook(struct page *page, unsigned long offset,
+ 			 size_t size, struct bio *bio,
+ 			 unsigned long bio_flags);
+ void btrfs_set_range_writeback(void *private_data, u64 start, u64 end);
+-int btrfs_page_mkwrite(struct vm_fault *vmf);
++vm_fault_t btrfs_page_mkwrite(struct vm_fault *vmf);
+ int btrfs_readpage(struct file *file, struct page *page);
+ void btrfs_evict_inode(struct inode *inode);
+ int btrfs_write_inode(struct inode *inode, struct writeback_control *wbc);
+diff --git a/fs/btrfs/inode.c b/fs/btrfs/inode.c
+index ec9db248c499..f4f03f0f4556 100644
+--- a/fs/btrfs/inode.c
++++ b/fs/btrfs/inode.c
+@@ -8824,7 +8824,7 @@ static void btrfs_invalidatepage(struct page *page, unsigned int offset,
+  * beyond EOF, then the page is guaranteed safe against truncation until we
+  * unlock the page.
+  */
+-int btrfs_page_mkwrite(struct vm_fault *vmf)
++vm_fault_t btrfs_page_mkwrite(struct vm_fault *vmf)
+ {
+ 	struct page *page = vmf->page;
+ 	struct inode *inode = file_inode(vmf->vma->vm_file);
+@@ -8836,7 +8836,8 @@ int btrfs_page_mkwrite(struct vm_fault *vmf)
+ 	char *kaddr;
+ 	unsigned long zero_start;
+ 	loff_t size;
+-	int ret;
++	vm_fault_t ret;
++	int err;
+ 	int reserved = 0;
+ 	u64 reserved_space;
+ 	u64 page_start;
+@@ -8858,14 +8859,14 @@ int btrfs_page_mkwrite(struct vm_fault *vmf)
+ 	 * end up waiting indefinitely to get a lock on the page currently
+ 	 * being processed by btrfs_page_mkwrite() function.
+ 	 */
+-	ret = btrfs_delalloc_reserve_space(inode, &data_reserved, page_start,
++	err = btrfs_delalloc_reserve_space(inode, &data_reserved, page_start,
+ 					   reserved_space);
+-	if (!ret) {
+-		ret = file_update_time(vmf->vma->vm_file);
++	if (!err) {
++		err = file_update_time(vmf->vma->vm_file);
+ 		reserved = 1;
+ 	}
+-	if (ret) {
+-		if (ret == -ENOMEM)
++	if (err) {
++		if (err == -ENOMEM)
+ 			ret = VM_FAULT_OOM;
+ 		else /* -ENOSPC, -EIO, etc */
+ 			ret = VM_FAULT_SIGBUS;
+@@ -8927,9 +8928,9 @@ int btrfs_page_mkwrite(struct vm_fault *vmf)
+ 			  EXTENT_DO_ACCOUNTING | EXTENT_DEFRAG,
+ 			  0, 0, &cached_state);
+ 
+-	ret = btrfs_set_extent_delalloc(inode, page_start, end, 0,
++	err = btrfs_set_extent_delalloc(inode, page_start, end, 0,
+ 					&cached_state, 0);
+-	if (ret) {
++	if (err) {
+ 		unlock_extent_cached(io_tree, page_start, page_end,
+ 				     &cached_state);
+ 		ret = VM_FAULT_SIGBUS;
+-- 
+2.17.0
