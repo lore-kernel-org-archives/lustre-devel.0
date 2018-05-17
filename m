@@ -1,67 +1,72 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 17 May 2018 06:07:00 +0100 (BST)
-Subject: [lustre-devel] [PATCH 4/4] staging: lustre: obdclass: change
- object lookup to no wait mode
-In-Reply-To: <20180516165719.GA28434@kroah.com>
-References: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
- <1525285308-15347-5-git-send-email-jsimmons@infradead.org>
- <20180508114500.qrtnjax4siupgv3n@mwanda>
- <alpine.LFD.2.21.1805150207500.576@casper.infradead.org>
- <20180516165719.GA28434@kroah.com>
-Message-ID: <alpine.LFD.2.21.1805161931400.17395@casper.infradead.org>
+From: Sebastien Buisson <sbuisson@ddn.com>
+Date: Thu, 17 May 2018 09:10:34 +0000
+Subject: [lustre-devel] Regression with delayed_work in sec_gc
+In-Reply-To: <87sh6s5zjy.fsf@notabene.neil.brown.name>
+References: <alpine.LFD.2.21.1805151609430.28403@casper.infradead.org>
+ <87sh6s5zjy.fsf@notabene.neil.brown.name>
+Message-ID: <E4BBDF07-0165-4306-9846-382D2D0A9C3D@ddn.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, Lai Siyao <lai.siyao@intel.com>, Dan Carpenter <dan.carpenter@oracle.com>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
 
-> > > Anyway, I understand that Intel has been ignoring kernel.org instead of
-> > > sending forwarding their patches properly so you're doing a difficult
-> > > and thankless job...  Thanks for that.  I'm sure it's frustrating to
-> > > look at these patches for you as well.
-> > 
-> > Thank you for the complement. Also thank you for taking time to review
-> > these patches. Your feedback is most welcomed and benefitical to the
-> > health of the lustre client.
-> > 
-> > Sadly its not just Intel but other vendors that don't directly contribute
-> > to the linux lustre client. I have spoke to the vendors about contributing 
-> > and they all say the same thing. No working with drivers in the staging 
-> > tree. Sadly all the parties involved are very interested in the success 
-> > of the lustre client. No one has ever told me directly why they don't get
-> > involved but I suspect it has to deal with 2 reasons. One is that staging
-> > drivers are not normally enabled by distributions so their clients 
-> > normally will never deal with the staging lustre client. Secondly vendors
-> > just lack the man power to contribute in a meanful way.
+> Le 16 mai 2018 ? 00:22, NeilBrown <neilb@suse.com> a ?crit :
 > 
-> If staging is hurting you, why is it in staging at all?  Why not just
-> drop it, go off and spend a few months to clean up all the issues in
-> your own tree (with none of those pesky requirements of easy-to-review
-> patches) and then submit a "clean" filesystem for inclusion in the
-> "real" part of the kernel tree?
+> On Tue, May 15 2018, James Simmons wrote:
 > 
-> It doesn't sound like anyone is actually using this code in the tree
-> as-is, so why even keep it here?
+>> Dmitry has backported your upstream commit
+>> 
+>> be3c64da248b1ada2bbcfc3855f07536d8087acb ( ptlrpc: use workqueue for
+>> pinger)
+>> 
+>> and Sebastien tried out the change which can be seen at
+>> https://review.whamcloud.com/#/c/31724. Sebastien is having issues with
+>> unloading osc, mdc, ost or mdt kernel modules. He writes that he activated
+>> Kerberos for my file system, did some IOs, then tried to unmount the
+>> client and the  targets. Unfortunately, on some occasions, while
+>> unmounting, the mdc module for instance has extra references (as shown by
+>> 'lsmod'), and cannot be unloaded. After a while, the extra references are
+>> dropped, and the  module can be unloaded. It also happens on occasions on
+>> server side, for the mdt or ost modules. I tried destroy_workqueue but
+>> that made things worst :-( Do you know what is going on?
+> 
+> My guess is that ptlrpc_pinger_main() is looping, so
+> cancel_delayed_work_sync() is waiting an unusually long time for it.
+> This patch might fix the problem - it certainly makes the usage
+> of "this_ping" closer to the original code.
+> 
+> Thanks,
+> NeilBrown
+> 
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+> index 89eef8ec7df4..131b201541e8 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+> @@ -222,12 +222,13 @@ static DECLARE_DELAYED_WORK(ping_work, ptlrpc_pinger_main);
+> 
+> static void ptlrpc_pinger_main(struct work_struct *ws)
+> {
+> -	unsigned long this_ping = jiffies;
+> 	long time_to_next_wake;
+> 	struct timeout_item *item;
+> 	struct obd_import *imp;
+> 
+> 	do {
+> +		unsigned long this_ping = jiffies;
+> +
+> 		mutex_lock(&pinger_mutex);
+> 		list_for_each_entry(item, &timeout_list, ti_chain) {
+> 			item->ti_cb(item, item->ti_cb_data);
 
-I never said being in staging is hurting the progression of Lustre. In 
-fact it is the exact opposite otherwise I wouldn't be active in this work.
-What I was pointing out to Dan was that many vendors are reluctant to 
-partcipate in broader open source development of this type.
+Still same problem when testing "ptlrpc: use delayed_work in sec_gc" with patch "ptlrpc: use workqueue for pinger" and modification as suggested above. Kernel module ptlrpc_gss holds extra references, and cannot be unloaded.
 
-The whole point of this is to evolve Lustre into a proper open source 
-project not dependent on vendors for survival. Several years ago Lustre 
-changed hands several times and the HPC community was worried about its
-survival. Various institutions band togther to raise the resources to 
-keep it alive. Over time Lustre has been migrating to a more open source 
-community effort. An awesome example is the work the University of Indiana 
-did for the sptlrpc layer. Now we see efforts expanding into the realm of 
-the linux lustre client. Actually HPC sites that are community members are 
-testing and running the linux client. In spite of the lack of vendor 
-involvement the linux lustre client is making excellent progress. How 
-often do you see style patches anymore? The headers are properly split
-between userspace UAPI headers and kernel space. One of the major barriers
-to leave staging was the the lack of a strong presence to continue moving
-the lustre client forward. That is no longer the case. The finish line is
-in view.
+However, patch "ptlrpc: use workqueue for pinger" alone does not have the issue.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: Message signed with OpenPGP
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180517/94790452/attachment.sig>
