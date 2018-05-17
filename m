@@ -1,127 +1,67 @@
-From: Oleg Drokin <oleg.drokin@intel.com>
-Date: Wed, 16 May 2018 14:58:04 -0400
-Subject: [lustre-devel] New tag 2.11.52
-Message-ID: <D21A9F6D-2040-4FC0-AF13-9BA47440184A@intel.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Thu, 17 May 2018 06:07:00 +0100 (BST)
+Subject: [lustre-devel] [PATCH 4/4] staging: lustre: obdclass: change
+ object lookup to no wait mode
+In-Reply-To: <20180516165719.GA28434@kroah.com>
+References: <1525285308-15347-1-git-send-email-jsimmons@infradead.org>
+ <1525285308-15347-5-git-send-email-jsimmons@infradead.org>
+ <20180508114500.qrtnjax4siupgv3n@mwanda>
+ <alpine.LFD.2.21.1805150207500.576@casper.infradead.org>
+ <20180516165719.GA28434@kroah.com>
+Message-ID: <alpine.LFD.2.21.1805161931400.17395@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
-
-Hello!
-
-   I just tagged 2.11.52 tag in Lustre master development branch.
-
-   Here?s the changelog:
-
-Alex Zhuravlev (3):
-      LU-10909 utils: enable non-shared libmount_utils_ldiskfs.a
-      LU-10624 tests: conf-sanity needs larger ZFS filesystems
-      LU-10838 tests: replay-single/89 to wait for recovery
-
-Amir Shehata (3):
-      LU-10214 lnet: allow expressions for route config
-      LU-10825 libcfs: generate ip addresses
-      LU-10825 lnet: add ip2nets syntax handling for peer
-
-Andreas Dilger (7):
-      LU-10886 build: fix warnings during autoconf
-      LU-10903 obdecho: use OBD_ALLOC_LARGE for lnb
-      LU-930 doc: include status in "lfs df" man page
-      LU-1644 mgc: remove obsolete IR swabbing workaround
-      LU-6349 mds: remove obsolete MDS_VTX_BYPASS flag
-      LU-10856 tests: remove deprecated lfs getstripe -M usage
-      LU-1644 ptlrpc: fix return type of boolean functions
-
-Artem Blagodarenko (1):
-      LU-10924 tests: conf-sanity test_116 server version check
-
-Ashish Maurya (1):
-      LU-9780 tests: Testing Round-Robin allocation
-
-Bob Glossman (1):
-      LU-10944 kernel: kernel update [SLES12 SP3 4.4.126-94.22]
-
-Bruno Faccini (1):
-      LU-10902 mdd: force disable changelogs early and safely
-
-Chris Horn (1):
-      LU-8293 lnet: Add insserv header to lnet init script
-
-Dmitry Eremin (2):
-      LU-8066 ldlm: move all remaining files from procfs to debugfs
-      LU-4423 ptlrpc: use workqueue for pinger
-
-Elena Gryaznova (1):
-      LU-10857 tests: allow to disable project quotas
-
-Fan Yong (3):
-      LU-10922 osd-zfs: return -ENOENT if object destoryed
-      LU-10992 llite: decrease sa_running if fail to start statahead
-      LU-10988 lfsck: load object attr when prepare LFSCK request
-
-Hongchao Zhang (1):
-      LU-6655 ptlrpc: skip delayed replay requests
-
-James Nunez (1):
-      LU-2711 tests: conf-sanity clean up environment in test
-
-James Simmons (7):
-      LU-10926 llite: avoid panic in ll_set_acl()
-      LU-8066 mgc: migrate away from procfs
-      LU-9019 libcfs: remove the remaining cfs_time wrappers
-      LU-10932 libcfs: properly handle failure cases in SMP code
-      LU-8837 obd: remove linux directory
-      LU-10575 build: make lustre-test dpkg depend on mpi-default-dev
-      LU-8066 fld: move all files from procfs to debugfs
-
-John L. Hammond (2):
-      LU-10699 hsm: simplify mdt_hsm_{add,get}_actions()
-      LU-10850 fld: handle empty ranges in fld_index_init()
-
-Lai Siyao (4):
-      LU-8200 test: improve sanityn.sh 33c
-      LU-4684 ptlrpc: add dir migration connect flag
-      LU-7763 tests: improve sanityn 33d
-      LU-9857 lmv: dir page is released while in use
-
-Li Dongyang (2):
-      LU-10805 ldlm: convert ACCESS_ONCE() to READ_ONCE()
-      LU-10805 libcfs: timer_setup() API changes
-
-Li Xi (1):
-      LU-10900 osd: wrong assertion in osd_transfer_project
-
-Mikhail Pershin (2):
-      LU-10910 mdd: deny layout swap for DoM file
-      LU-10413 ldlm: expose dirty age limit for flush-on-glimpse
-
-Mikhal Pershin (1):
-      LU-10175 ldlm: IBITS lock convert instead of cancel
-
-Nathaniel Clark (1):
-      LU-3665 tests: Cleanup echo client after obdfilter-survey
-
-Oleg Drokin (6):
-      LU-8066 osc: move suitable values from procfs to sysfs
-      LU-8066 lmv: Move suitable entries from procfs to sysfs
-      LU-8066 lov: Move suitable variables from procfs to sysfs
-      LU-10985 mdt: properly handle unknown intent requests
-      LU-8066 mdc: move mdc-specific procfs files to sysfs
-      New tag 2.11.52
-
-Steve Guminski (6):
-      LU-5170 lfs: Standardize error messages in set_time()
-      LU-5170 lfs: Standardize error messages in lfs_mv()
-      LU-5170 lfs: Standardize llapi messages for lfs_find()
-      LU-5170 lfs: Standardize error messages in lfs_data_version()
-      LU-5170 lfs: Standardize error messages in lfs_fid2path()
-      LU-5170 lfs: Standardize error messages in lfs_path2fid()
-
-Yang Sheng (2):
-      LU-10560 osd: bi_bdev is replaced by bi_disk
-      LU-10560 llite: remove assigning f_version in ll_readir.
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Oleg Drokin <oleg.drokin@intel.com>, Jinshan Xiong <jinshan.xiong@intel.com>, Lai Siyao <lai.siyao@intel.com>, Dan Carpenter <dan.carpenter@oracle.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
 
-Bye,
-    Oleg
+> > > Anyway, I understand that Intel has been ignoring kernel.org instead of
+> > > sending forwarding their patches properly so you're doing a difficult
+> > > and thankless job...  Thanks for that.  I'm sure it's frustrating to
+> > > look at these patches for you as well.
+> > 
+> > Thank you for the complement. Also thank you for taking time to review
+> > these patches. Your feedback is most welcomed and benefitical to the
+> > health of the lustre client.
+> > 
+> > Sadly its not just Intel but other vendors that don't directly contribute
+> > to the linux lustre client. I have spoke to the vendors about contributing 
+> > and they all say the same thing. No working with drivers in the staging 
+> > tree. Sadly all the parties involved are very interested in the success 
+> > of the lustre client. No one has ever told me directly why they don't get
+> > involved but I suspect it has to deal with 2 reasons. One is that staging
+> > drivers are not normally enabled by distributions so their clients 
+> > normally will never deal with the staging lustre client. Secondly vendors
+> > just lack the man power to contribute in a meanful way.
+> 
+> If staging is hurting you, why is it in staging at all?  Why not just
+> drop it, go off and spend a few months to clean up all the issues in
+> your own tree (with none of those pesky requirements of easy-to-review
+> patches) and then submit a "clean" filesystem for inclusion in the
+> "real" part of the kernel tree?
+> 
+> It doesn't sound like anyone is actually using this code in the tree
+> as-is, so why even keep it here?
+
+I never said being in staging is hurting the progression of Lustre. In 
+fact it is the exact opposite otherwise I wouldn't be active in this work.
+What I was pointing out to Dan was that many vendors are reluctant to 
+partcipate in broader open source development of this type.
+
+The whole point of this is to evolve Lustre into a proper open source 
+project not dependent on vendors for survival. Several years ago Lustre 
+changed hands several times and the HPC community was worried about its
+survival. Various institutions band togther to raise the resources to 
+keep it alive. Over time Lustre has been migrating to a more open source 
+community effort. An awesome example is the work the University of Indiana 
+did for the sptlrpc layer. Now we see efforts expanding into the realm of 
+the linux lustre client. Actually HPC sites that are community members are 
+testing and running the linux client. In spite of the lack of vendor 
+involvement the linux lustre client is making excellent progress. How 
+often do you see style patches anymore? The headers are properly split
+between userspace UAPI headers and kernel space. One of the major barriers
+to leave staging was the the lack of a strong presence to continue moving
+the lustre client forward. That is no longer the case. The finish line is
+in view.
