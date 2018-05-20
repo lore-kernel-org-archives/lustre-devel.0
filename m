@@ -1,52 +1,27 @@
 From: Greg KH <gregkh@linuxfoundation.org>
-Date: Sun, 20 May 2018 14:41:58 +0200
-Subject: [lustre-devel] [PATCH 1/5] staging: lustre: Fix inclusion of
- local headers
-In-Reply-To: <20180516182636.5137-1-sabin.rapan@gmail.com>
-References: <20180516182636.5137-1-sabin.rapan@gmail.com>
-Message-ID: <20180520124158.GC10031@kroah.com>
+Date: Sun, 20 May 2018 14:42:48 +0200
+Subject: [lustre-devel] [PATCH v2] staging: lustre: Change return type
+ to vm_fault_t
+In-Reply-To: <20180516185711.GA6587@jordon-HP-15-Notebook-PC>
+References: <20180516185711.GA6587@jordon-HP-15-Notebook-PC>
+Message-ID: <20180520124248.GD10031@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Sabin Mihai Rapan <sabin.rapan@gmail.com>
-Cc: jsimmons@infradead.org, andreas.dilger@intel.com, oleg.drokin@intel.com, lustre-devel@lists.lustre.org, kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org
+To: lustre-devel@lists.lustre.org
 
-On Wed, May 16, 2018 at 08:26:36PM +0200, Sabin Mihai Rapan wrote:
-> This patch fixes the checkpatch.pl error:
+On Thu, May 17, 2018 at 12:27:11AM +0530, Souptick Joarder wrote:
+> Use new return type vm_fault_t for fault handler. For
+> now, this is just documenting that the function returns
+> a VM_FAULT value rather than an errno. Once all instances
+> are converted, vm_fault_t will become a distinct type.
 > 
-> ERROR:UAPI_INCLUDE: No #include in ...include/uapi/... should use a uapi/ path
-> prefix
+> Commit 1c8f422059ae ("mm: change return type to vm_fault_t")
 > 
-> Signed-off-by: Sabin Mihai Rapan <sabin.rapan@gmail.com>
-> ---
->  drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h     | 4 ++--
->  drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h      | 2 +-
->  drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h       | 2 +-
->  drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h | 2 +-
->  drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h | 2 +-
->  drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h | 4 ++--
->  .../staging/lustre/include/uapi/linux/lustre/lustre_ioctl.h   | 2 +-
->  .../staging/lustre/include/uapi/linux/lustre/lustre_ostid.h   | 2 +-
->  .../staging/lustre/include/uapi/linux/lustre/lustre_user.h    | 2 +-
->  9 files changed, 11 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-> index c1619f411d81..1530ac26b449 100644
-> --- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-> +++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-> @@ -29,8 +29,8 @@
->  #ifndef LNET_DLC_H
->  #define LNET_DLC_H
->  
-> -#include <uapi/linux/lnet/libcfs_ioctl.h>
-> -#include <uapi/linux/lnet/lnet-types.h>
-> +#include "libcfs_ioctl.h"
-> +#include "lnet-types.h"
 
-Ick, no, please leave as-is, the uapi "rules" are a bit different for
-staging drivers.
+What does that line mean?  Please be more descriptive.
 
-thanks,
+confused,
 
 greg k-h
