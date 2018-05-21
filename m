@@ -1,337 +1,369 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 21 May 2018 14:35:13 +1000
-Subject: [lustre-devel] [PATCH 30/30] staging: lustre: remove libcfs_all.h
-In-Reply-To: <152687724799.24196.7718555295926047576.stgit@noble>
-References: <152687724799.24196.7718555295926047576.stgit@noble>
-Message-ID: <152687731351.24196.8390974804707198399.stgit@noble>
+From: Patrick Farrell <paf@cray.com>
+Date: Mon, 21 May 2018 13:20:30 +0000
+Subject: [lustre-devel] [PATCH 13/30] staging: lustre: replace
+ libcfs_register_ioctl with a blocking notifier_chain
+In-Reply-To: <152687731283.24196.5413466102459843186.stgit@noble>
+References: <152687724799.24196.7718555295926047576.stgit@noble>,
+ <152687731283.24196.5413466102459843186.stgit@noble>
+Message-ID: <DM3PR1101MB12139C3BC443E61A476F95B5CB950@DM3PR1101MB1213.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-In the remaining files that include libcfs_all.h,
-replace it with other include files as necessary,
-then remove libcfs_all.h
+
+Just going through these (thank you, Neal, for more excellent cleanup work), and this one stands out as one someone should look over a bit.  I can do it later if no one who's familiar with this wants to, but I wanted to highlight it.
+
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
+Sent: Sunday, May 20, 2018 11:35:12 PM
+To: Oleg Drokin; Greg Kroah-Hartman; James Simmons; Andreas Dilger
+Cc: Linux Kernel Mailing List; Lustre Development List
+Subject: [lustre-devel] [PATCH 13/30] staging: lustre: replace libcfs_register_ioctl with a blocking notifier_chain
+
+libcfs allows other modules to register handlers for ioctls.
+The implementation it uses for this is nearly identical to a
+blocking notifier chain, so change to use that.
+
+The biggest difference is that the return value from notifier has a
+defined format, where libcfs_register_ioctl uses -EINVAL to mean
+"continue".  This requires a little bit of conversion.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_all.h       |   88 --------------------
- drivers/staging/lustre/lnet/libcfs/debug.c         |    5 +
- drivers/staging/lustre/lnet/libcfs/fail.c          |    6 +
- drivers/staging/lustre/lnet/libcfs/hash.c          |    5 +
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    |   15 ++-
- drivers/staging/lustre/lnet/libcfs/libcfs_lock.c   |    5 +
- drivers/staging/lustre/lnet/libcfs/libcfs_mem.c    |    6 +
- drivers/staging/lustre/lnet/libcfs/libcfs_string.c |    8 ++
- drivers/staging/lustre/lnet/libcfs/linux-crypto.c  |    4 +
- drivers/staging/lustre/lnet/libcfs/linux-debug.c   |    2 
- .../staging/lustre/lnet/libcfs/linux-tracefile.c   |    3 -
- drivers/staging/lustre/lnet/libcfs/module.c        |    1 
- drivers/staging/lustre/lnet/libcfs/tracefile.c     |   10 ++
- 13 files changed, 50 insertions(+), 108 deletions(-)
- delete mode 100644 drivers/staging/lustre/include/linux/libcfs/libcfs_all.h
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |   19 ++----
+ drivers/staging/lustre/lnet/libcfs/module.c        |   64 ++++----------------
+ drivers/staging/lustre/lnet/lnet/module.c          |   38 ++++++++----
+ drivers/staging/lustre/lnet/selftest/conctl.c      |   27 +++++---
+ drivers/staging/lustre/lnet/selftest/console.c     |   10 ++-
+ drivers/staging/lustre/lnet/selftest/console.h     |    3 +
+ 6 files changed, 70 insertions(+), 91 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_all.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_all.h
-deleted file mode 100644
-index c4232c823ac7..000000000000
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_all.h
-+++ /dev/null
-@@ -1,88 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- *
-- * Copyright (c) 2011, 2015, Intel Corporation.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- */
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+index d9002e7424d4..63ea0e99ec58 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+@@ -93,19 +93,14 @@
+ #define LNET_ACCEPTOR_MIN_RESERVED_PORT    512
+ #define LNET_ACCEPTOR_MAX_RESERVED_PORT    1023
+
+-struct libcfs_ioctl_handler {
+-       struct list_head item;
+-       int (*handle_ioctl)(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
+-};
 -
--#ifndef __LIBCFS_LIBCFS_ALL_H__
--#define __LIBCFS_LIBCFS_ALL_H__
--
--#include <linux/gfp.h>
--#include <linux/list.h>
--
--#include <uapi/linux/lnet/libcfs_ioctl.h>
--#include <linux/bitops.h>
--#include <linux/compiler.h>
--#include <linux/ctype.h>
--#include <linux/errno.h>
--#include <linux/file.h>
--#include <linux/fs.h>
--#include <linux/highmem.h>
--#include <linux/interrupt.h>
--#include <linux/kallsyms.h>
--#include <linux/kernel.h>
--#include <linux/kmod.h>
--#include <linux/kthread.h>
--#include <linux/mm.h>
--#include <linux/mm_inline.h>
--#include <linux/module.h>
--#include <linux/moduleparam.h>
--#include <linux/mutex.h>
--#include <linux/notifier.h>
--#include <linux/pagemap.h>
--#include <linux/random.h>
--#include <linux/rbtree.h>
--#include <linux/rwsem.h>
--#include <linux/scatterlist.h>
--#include <linux/sched.h>
--#include <linux/signal.h>
--#include <linux/slab.h>
--#include <linux/smp.h>
--#include <linux/stat.h>
--#include <linux/string.h>
--#include <linux/time.h>
--#include <linux/timer.h>
--#include <linux/types.h>
--#include <linux/unistd.h>
--#include <linux/vmalloc.h>
--#include <net/sock.h>
--#include <linux/atomic.h>
--#include <asm/div64.h>
--#include <linux/timex.h>
--#include <linux/uaccess.h>
--#include <stdarg.h>
--
--#include <linux/libcfs/libcfs.h>
--
--#include <linux/libcfs/libcfs_cpu.h>
--#include <linux/libcfs/libcfs_string.h>
--#include <linux/libcfs/libcfs_hash.h>
--
--#endif /* __LIBCFS_LIBCFS_ALL_H__ */
-diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
-index d59b6243d6bd..06f694f6a28f 100644
---- a/drivers/staging/lustre/lnet/libcfs/debug.c
-+++ b/drivers/staging/lustre/lnet/libcfs/debug.c
-@@ -38,7 +38,10 @@
- 
- # define DEBUG_SUBSYSTEM S_LNET
- 
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/module.h>
-+#include <linux/ctype.h>
-+#include <linux/libcfs/libcfs_string.h>
-+#include <linux/kthread.h>
- #include "tracefile.h"
- 
- static char debug_file_name[1024];
-diff --git a/drivers/staging/lustre/lnet/libcfs/fail.c b/drivers/staging/lustre/lnet/libcfs/fail.c
-index 7385bdf541b6..bd86b3b5bc34 100644
---- a/drivers/staging/lustre/lnet/libcfs/fail.c
-+++ b/drivers/staging/lustre/lnet/libcfs/fail.c
-@@ -30,7 +30,11 @@
-  * Lustre is a trademark of Oracle Corporation, Inc.
-  */
- 
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/libcfs/libcfs.h>
-+#include <linux/random.h>
- 
- unsigned long cfs_fail_loc;
- EXPORT_SYMBOL(cfs_fail_loc);
-diff --git a/drivers/staging/lustre/lnet/libcfs/hash.c b/drivers/staging/lustre/lnet/libcfs/hash.c
-index 88a853f64b89..48be66f0d654 100644
---- a/drivers/staging/lustre/lnet/libcfs/hash.c
-+++ b/drivers/staging/lustre/lnet/libcfs/hash.c
-@@ -105,8 +105,9 @@
-  */
- #include <linux/seq_file.h>
- #include <linux/log2.h>
--
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/slab.h>
-+#include <linux/mm.h>
-+#include <linux/libcfs/libcfs_hash.h>
- 
- #if CFS_HASH_DEBUG_LEVEL >= CFS_HASH_DEBUG_1
- static unsigned int warn_on_depth = 8;
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index 0c9369e4a014..3d1cf457b286 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -31,16 +31,19 @@
- 
- #define DEBUG_SUBSYSTEM S_LNET
- 
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/cpu.h>
-+#include <linux/sched.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/cache.h>
-+
-+#include <linux/libcfs/libcfs_cpu.h>
-+#include <linux/libcfs/libcfs_string.h>
-+#include <linux/libcfs/libcfs.h>
- 
- /** Global CPU partition table */
- struct cfs_cpt_table   *cfs_cpt_tab __read_mostly;
- EXPORT_SYMBOL(cfs_cpt_tab);
--#define DEBUG_SUBSYSTEM S_LNET
--
--#include <linux/cpu.h>
--#include <linux/sched.h>
--#include <linux/libcfs/libcfs_all.h>
- 
- /**
-  * modparam for setting number of partitions
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c b/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
-index 4758cb4bd9d8..223505c37545 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_lock.c
-@@ -28,7 +28,10 @@
- 
- #define DEBUG_SUBSYSTEM S_LNET
- 
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/libcfs/libcfs.h>
-+#include <linux/libcfs/libcfs_cpu.h>
- 
- /** destroy cpu-partition lock, see libcfs_private.h for more detail */
- void
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c b/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-index dcc418528e23..2d533be9bb30 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_mem.c
-@@ -29,7 +29,11 @@
- 
- #define DEBUG_SUBSYSTEM S_LNET
- 
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/libcfs/libcfs_cpu.h>
-+#include <linux/slab.h>
-+#include <linux/mm.h>
- 
- struct cfs_var_array {
- 	unsigned int		va_count;	/* # of buffers */
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_string.c b/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-index bdd3b97e7f65..e1fb1263e3ae 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-@@ -37,7 +37,13 @@
-  * Author: Nathan Rutman <nathan.rutman@sun.com>
-  */
- 
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/ctype.h>
-+#include <linux/string.h>
-+#include <linux/errno.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/libcfs/libcfs.h>
-+#include <linux/libcfs/libcfs_string.h>
- 
- /* Convert a text string to a bitmask */
- int cfs_str2mask(const char *str, const char *(*bit2str)(int bit),
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux-crypto.c b/drivers/staging/lustre/lnet/libcfs/linux-crypto.c
-index c7fc388f81f5..21ff9bf6da47 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux-crypto.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux-crypto.c
-@@ -30,8 +30,10 @@
- 
- #include <crypto/hash.h>
- #include <linux/scatterlist.h>
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/highmem.h>
-+#include <linux/module.h>
- #include <linux/libcfs/libcfs_crypto.h>
-+#include <linux/libcfs/libcfs.h>
- #include "linux-crypto.h"
- 
- /**
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux-debug.c b/drivers/staging/lustre/lnet/libcfs/linux-debug.c
-index cf53f5d0b5ec..15ab849374c2 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux-debug.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux-debug.c
-@@ -51,8 +51,6 @@
- 
- # define DEBUG_SUBSYSTEM S_LNET
- 
--#include <linux/libcfs/libcfs_all.h>
--
- #include "tracefile.h"
- 
- #include <linux/kallsyms.h>
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-index f3ed9f6d86ca..347138409eba 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-@@ -34,7 +34,8 @@
- #define DEBUG_SUBSYSTEM S_LNET
- #define LUSTRE_TRACEFILE_PRIVATE
- 
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/slab.h>
-+#include <linux/mm.h>
- #include "tracefile.h"
- 
- /* percents to share the total debug memory for each type */
+-#define DECLARE_IOCTL_HANDLER(ident, func)                     \
+-       struct libcfs_ioctl_handler ident = {                   \
+-               .item           = LIST_HEAD_INIT(ident.item),   \
+-               .handle_ioctl   = func                          \
+-       }
++extern struct blocking_notifier_head libcfs_ioctl_list;
++static inline int notifier_from_ioctl_errno(int err)
++{
++       if (err == -EINVAL)
++               return NOTIFY_OK;
++       return notifier_from_errno(err) | NOTIFY_STOP_MASK;
++}
+
+-int libcfs_register_ioctl(struct libcfs_ioctl_handler *hand);
+-int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand);
+ int libcfs_setup(void);
+
+ #define _LIBCFS_H
 diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index 45c8db09bf51..5dc7de9e6478 100644
+index 3e51aae751c5..b3a7c1a912ba 100644
 --- a/drivers/staging/lustre/lnet/libcfs/module.c
 +++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -52,7 +52,6 @@
- 
- # define DEBUG_SUBSYSTEM S_LNET
- 
--#include <linux/libcfs/libcfs_all.h>
- #include <asm/div64.h>
- 
- #include <linux/libcfs/libcfs_crypto.h>
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index 828e4d002a16..7ca562e156f0 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -39,9 +39,15 @@
- #define DEBUG_SUBSYSTEM S_LNET
- #define LUSTRE_TRACEFILE_PRIVATE
- #define pr_fmt(fmt) "Lustre: " fmt
--#include "tracefile.h"
- 
--#include <linux/libcfs/libcfs_all.h>
-+#include <linux/ratelimit.h>
-+#include <linux/highmem.h>
-+#include <linux/ctype.h>
-+#include <linux/kthread.h>
-+#include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/uaccess.h>
-+#include "tracefile.h"
- 
- /* XXX move things up to the top, comment */
- union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
+@@ -62,38 +62,8 @@
+
+ static struct dentry *lnet_debugfs_root;
+
+-static DECLARE_RWSEM(ioctl_list_sem);
+-static LIST_HEAD(ioctl_list);
+-
+-int libcfs_register_ioctl(struct libcfs_ioctl_handler *hand)
+-{
+-       int rc = 0;
+-
+-       down_write(&ioctl_list_sem);
+-       if (!list_empty(&hand->item))
+-               rc = -EBUSY;
+-       else
+-               list_add_tail(&hand->item, &ioctl_list);
+-       up_write(&ioctl_list_sem);
+-
+-       return rc;
+-}
+-EXPORT_SYMBOL(libcfs_register_ioctl);
+-
+-int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand)
+-{
+-       int rc = 0;
+-
+-       down_write(&ioctl_list_sem);
+-       if (list_empty(&hand->item))
+-               rc = -ENOENT;
+-       else
+-               list_del_init(&hand->item);
+-       up_write(&ioctl_list_sem);
+-
+-       return rc;
+-}
+-EXPORT_SYMBOL(libcfs_deregister_ioctl);
++BLOCKING_NOTIFIER_HEAD(libcfs_ioctl_list);
++EXPORT_SYMBOL(libcfs_ioctl_list);
+
+ static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
+ {
+@@ -268,24 +238,18 @@ static int libcfs_ioctl(unsigned long cmd, void __user *uparam)
+                 libcfs_debug_mark_buffer(data->ioc_inlbuf1);
+                 break;
+
+-       default: {
+-               struct libcfs_ioctl_handler *hand;
+-
+-               err = -EINVAL;
+-               down_read(&ioctl_list_sem);
+-               list_for_each_entry(hand, &ioctl_list, item) {
+-                       err = hand->handle_ioctl(cmd, hdr);
+-                       if (err == -EINVAL)
+-                               continue;
+-
+-                       if (!err) {
+-                               if (copy_to_user(uparam, hdr, hdr->ioc_len))
+-                                       err = -EFAULT;
+-                       }
+-                       break;
+-               }
+-               up_read(&ioctl_list_sem);
+-               break; }
++       default:
++               err = blocking_notifier_call_chain(&libcfs_ioctl_list,
++                                                  cmd, hdr);
++               if (!(err & NOTIFY_STOP_MASK))
++                       /* No-one claimed the ioctl */
++                       err = -EINVAL;
++               else
++                       err = notifier_to_errno(err);
++               if (!err)
++                       if (copy_to_user(uparam, hdr, hdr->ioc_len))
++                               err = -EFAULT;
++               break;
+         }
+ out:
+         kvfree(hdr);
+diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
+index f6e912e79ca7..9d06664f0c17 100644
+--- a/drivers/staging/lustre/lnet/lnet/module.c
++++ b/drivers/staging/lustre/lnet/lnet/module.c
+@@ -136,30 +136,37 @@ lnet_dyn_unconfigure(struct libcfs_ioctl_hdr *hdr)
+ }
+
+ static int
+-lnet_ioctl(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
++lnet_ioctl(struct notifier_block *nb,
++          unsigned long cmd, void *vdata)
+ {
+         int rc;
++       struct libcfs_ioctl_hdr *hdr = vdata;
+
+         switch (cmd) {
+         case IOC_LIBCFS_CONFIGURE: {
+                 struct libcfs_ioctl_data *data =
+                         (struct libcfs_ioctl_data *)hdr;
+
+-               if (data->ioc_hdr.ioc_len < sizeof(*data))
+-                       return -EINVAL;
+-
+-               the_lnet.ln_nis_from_mod_params = data->ioc_flags;
+-               return lnet_configure(NULL);
++               if (data->ioc_hdr.ioc_len < sizeof(*data)) {
++                       rc = -EINVAL;
++               } else {
++                       the_lnet.ln_nis_from_mod_params = data->ioc_flags;
++                       rc = lnet_configure(NULL);
++               }
++               break;
+         }
+
+         case IOC_LIBCFS_UNCONFIGURE:
+-               return lnet_unconfigure();
++               rc = lnet_unconfigure();
++               break;
+
+         case IOC_LIBCFS_ADD_NET:
+-               return lnet_dyn_configure(hdr);
++               rc = lnet_dyn_configure(hdr);
++               break;
+
+         case IOC_LIBCFS_DEL_NET:
+-               return lnet_dyn_unconfigure(hdr);
++               rc = lnet_dyn_unconfigure(hdr);
++               break;
+
+         default:
+                 /*
+@@ -172,11 +179,14 @@ lnet_ioctl(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
+                         rc = LNetCtl(cmd, hdr);
+                         LNetNIFini();
+                 }
+-               return rc;
++               break;
+         }
++       return notifier_from_ioctl_errno(rc);
+ }
+
+-static DECLARE_IOCTL_HANDLER(lnet_ioctl_handler, lnet_ioctl);
++static struct notifier_block lnet_ioctl_handler = {
++       .notifier_call = lnet_ioctl,
++};
+
+ static int __init lnet_init(void)
+ {
+@@ -194,7 +204,8 @@ static int __init lnet_init(void)
+                 return rc;
+         }
+
+-       rc = libcfs_register_ioctl(&lnet_ioctl_handler);
++       rc = blocking_notifier_chain_register(&libcfs_ioctl_list,
++                                             &lnet_ioctl_handler);
+         LASSERT(!rc);
+
+         if (config_on_load) {
+@@ -212,7 +223,8 @@ static void __exit lnet_exit(void)
+ {
+         int rc;
+
+-       rc = libcfs_deregister_ioctl(&lnet_ioctl_handler);
++       rc = blocking_notifier_chain_unregister(&libcfs_ioctl_list,
++                                               &lnet_ioctl_handler);
+         LASSERT(!rc);
+
+         lnet_lib_exit();
+diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
+index a2d8092bdeb7..f22b01e390d3 100644
+--- a/drivers/staging/lustre/lnet/selftest/conctl.c
++++ b/drivers/staging/lustre/lnet/selftest/conctl.c
+@@ -680,32 +680,34 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
+ }
+
+ int
+-lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
++lstcon_ioctl_entry(struct notifier_block *nb,
++                  unsigned long cmd, void *vdata)
+ {
+-       char *buf;
++       struct libcfs_ioctl_hdr *hdr = vdata;
++       char *buf = NULL;
+         struct libcfs_ioctl_data *data;
+         int opc;
+-       int rc;
++       int rc = -EINVAL;
+
+         if (cmd != IOC_LIBCFS_LNETST)
+-               return -EINVAL;
++               goto err;
+
+         data = container_of(hdr, struct libcfs_ioctl_data, ioc_hdr);
+
+         opc = data->ioc_u32[0];
+
+         if (data->ioc_plen1 > PAGE_SIZE)
+-               return -EINVAL;
++               goto err;
+
+         buf = kmalloc(data->ioc_plen1, GFP_KERNEL);
++       rc = -ENOMEM;
+         if (!buf)
+-               return -ENOMEM;
++               goto err;
+
+         /* copy in parameter */
+-       if (copy_from_user(buf, data->ioc_pbuf1, data->ioc_plen1)) {
+-               kfree(buf);
+-               return -EFAULT;
+-       }
++       rc = -EFAULT;
++       if (copy_from_user(buf, data->ioc_pbuf1, data->ioc_plen1))
++               goto err;
+
+         mutex_lock(&console_session.ses_mutex);
+
+@@ -785,6 +787,7 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
+                 break;
+         default:
+                 rc = -EINVAL;
++               goto out;
+         }
+
+         if (copy_to_user(data->ioc_pbuf2, &console_session.ses_trans_stat,
+@@ -792,8 +795,8 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
+                 rc = -EFAULT;
+ out:
+         mutex_unlock(&console_session.ses_mutex);
+-
++err:
+         kfree(buf);
+
+-       return rc;
++       return notifier_from_ioctl_errno(rc);
+ }
+diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
+index 1889f1e86473..9fd6013354c6 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.c
++++ b/drivers/staging/lustre/lnet/selftest/console.c
+@@ -1996,7 +1996,9 @@ static void lstcon_init_acceptor_service(void)
+         lstcon_acceptor_service.sv_wi_total = SFW_FRWK_WI_MAX;
+ }
+
+-static DECLARE_IOCTL_HANDLER(lstcon_ioctl_handler, lstcon_ioctl_entry);
++static struct notifier_block lstcon_ioctl_handler = {
++       .notifier_call = lstcon_ioctl_entry,
++};
+
+ /* initialize console */
+ int
+@@ -2048,7 +2050,8 @@ lstcon_console_init(void)
+                 goto out;
+         }
+
+-       rc = libcfs_register_ioctl(&lstcon_ioctl_handler);
++       rc = blocking_notifier_chain_register(&libcfs_ioctl_list,
++                                             &lstcon_ioctl_handler);
+
+         if (!rc) {
+                 lstcon_rpc_module_init();
+@@ -2071,7 +2074,8 @@ lstcon_console_fini(void)
+ {
+         int i;
+
+-       libcfs_deregister_ioctl(&lstcon_ioctl_handler);
++       blocking_notifier_chain_unregister(&libcfs_ioctl_list,
++                                          &lstcon_ioctl_handler);
+
+         mutex_lock(&console_session.ses_mutex);
+
+diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
+index 3933ed4cca93..d65b8d942bac 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.h
++++ b/drivers/staging/lustre/lnet/selftest/console.h
+@@ -187,7 +187,8 @@ lstcon_id2hash(struct lnet_process_id id, struct list_head *hash)
+         return &hash[idx];
+ }
+
+-int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
++int lstcon_ioctl_entry(struct notifier_block *nb,
++                      unsigned long cmd, void *vdata);
+ int lstcon_console_init(void);
+ int lstcon_console_fini(void);
+ int lstcon_session_match(struct lst_sid sid);
+
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180521/56c3a35f/attachment-0001.html>
