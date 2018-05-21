@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 21 May 2018 14:35:13 +1000
-Subject: [lustre-devel] [PATCH 25/30] staging: lustre: remove libcfs_all.h
- from remaining .h files.
+Subject: [lustre-devel] [PATCH 26/30] staging: lustre: remove libcfs_all
+ from ptlrpc
 In-Reply-To: <152687724799.24196.7718555295926047576.stgit@noble>
 References: <152687724799.24196.7718555295926047576.stgit@noble>
-Message-ID: <152687731332.24196.2883662038109425292.stgit@noble>
+Message-ID: <152687731336.24196.7585327613618183220.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,157 +12,217 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-Now no *.h files include libcfs_all.h - only *.c files.
+Some files didn't need it at all, others just needed
+one or two includes.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../lustre/include/linux/libcfs/libcfs_hash.h      |    3 +++
- drivers/staging/lustre/lustre/fid/fid_internal.h   |    1 -
- drivers/staging/lustre/lustre/fld/fld_internal.h   |    1 -
- drivers/staging/lustre/lustre/llite/llite_lib.c    |    1 +
- drivers/staging/lustre/lustre/llite/range_lock.c   |    1 +
- drivers/staging/lustre/lustre/llite/range_lock.h   |    2 +-
- drivers/staging/lustre/lustre/llite/vvp_dev.c      |    1 +
- .../staging/lustre/lustre/lov/lov_cl_internal.h    |    2 --
- drivers/staging/lustre/lustre/mgc/mgc_internal.h   |    1 -
- drivers/staging/lustre/lustre/mgc/mgc_request.c    |    1 +
- .../staging/lustre/lustre/osc/osc_cl_internal.h    |    2 --
- 11 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/errno.c       |    1 -
+ drivers/staging/lustre/lustre/ptlrpc/events.c      |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/llog_client.c |    2 --
+ drivers/staging/lustre/lustre/ptlrpc/llog_net.c    |    2 --
+ drivers/staging/lustre/lustre/ptlrpc/nrs.c         |    3 ++-
+ drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c    |    3 ++-
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |    2 --
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    6 ++++--
+ drivers/staging/lustre/lustre/ptlrpc/recover.c     |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec.c         |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_gc.c      |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c   |    2 +-
+ 14 files changed, 15 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-index 0506f1d45757..be315958a4b3 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_hash.h
-@@ -40,6 +40,9 @@
- #define __LIBCFS_HASH_H__
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/errno.c b/drivers/staging/lustre/lustre/ptlrpc/errno.c
+index 9985e0bf4b87..c587fc86fcda 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/errno.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/errno.c
+@@ -26,7 +26,6 @@
+  * Copyright (c) 2013, Intel Corporation.
+  */
  
- #include <linux/hash.h>
-+#include <linux/spinlock.h>
-+#include <linux/workqueue.h>
-+#include <linux/libcfs/libcfs.h>
+-#include <linux/libcfs/libcfs_all.h>
+ #include <lustre_errno.h>
  
  /*
-  * Knuth recommends primes in approximately golden ratio to the maximum
-diff --git a/drivers/staging/lustre/lustre/fid/fid_internal.h b/drivers/staging/lustre/lustre/fid/fid_internal.h
-index 3d0003b2fb4b..14569e969a31 100644
---- a/drivers/staging/lustre/lustre/fid/fid_internal.h
-+++ b/drivers/staging/lustre/lustre/fid/fid_internal.h
-@@ -38,7 +38,6 @@
- #define __FID_INTERNAL_H
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/events.c b/drivers/staging/lustre/lustre/ptlrpc/events.c
+index d9d8d96f6605..130bacc2c891 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/events.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/events.c
+@@ -33,7 +33,7 @@
  
- #include <uapi/linux/lustre/lustre_idl.h>
--#include <linux/libcfs/libcfs_all.h>
- 
- /* Functions used internally in module. */
- 
-diff --git a/drivers/staging/lustre/lustre/fld/fld_internal.h b/drivers/staging/lustre/lustre/fld/fld_internal.h
-index 9485c3d31559..e1d6aaa5c2b4 100644
---- a/drivers/staging/lustre/lustre/fld/fld_internal.h
-+++ b/drivers/staging/lustre/lustre/fld/fld_internal.h
-@@ -59,7 +59,6 @@
- 
- #include <uapi/linux/lustre/lustre_idl.h>
+ #define DEBUG_SUBSYSTEM S_RPC
  
 -#include <linux/libcfs/libcfs_all.h>
- #include <lustre_req_layout.h>
- #include <lustre_fld.h>
- 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index bdb53ab77e58..7097361b3a1a 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -41,6 +41,7 @@
- #include <linux/statfs.h>
- #include <linux/types.h>
- #include <linux/mm.h>
-+#include <linux/random.h>
- 
- #include <uapi/linux/lustre/lustre_ioctl.h>
- #include <lustre_ha.h>
-diff --git a/drivers/staging/lustre/lustre/llite/range_lock.c b/drivers/staging/lustre/lustre/llite/range_lock.c
-index cc9565f6bfe2..008a8874118d 100644
---- a/drivers/staging/lustre/lustre/llite/range_lock.c
-+++ b/drivers/staging/lustre/lustre/llite/range_lock.c
-@@ -36,6 +36,7 @@
-  */
- #include "range_lock.h"
- #include <uapi/linux/lustre/lustre_idl.h>
 +#include <linux/libcfs/libcfs.h>
+ # ifdef __mips64__
+ #  include <linux/kernel.h>
+ # endif
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/llog_client.c b/drivers/staging/lustre/lustre/ptlrpc/llog_client.c
+index 3d8a2e5d2a92..946d538121de 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/llog_client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/llog_client.c
+@@ -39,8 +39,6 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LOG
+ 
+-#include <linux/libcfs/libcfs_all.h>
+-
+ #include <obd_class.h>
+ #include <lustre_log.h>
+ #include <lustre_net.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/llog_net.c b/drivers/staging/lustre/lustre/ptlrpc/llog_net.c
+index 3c6f2f171e41..b871d9e40a9e 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/llog_net.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/llog_net.c
+@@ -43,8 +43,6 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LOG
+ 
+-#include <linux/libcfs/libcfs_all.h>
+-
+ #include <obd_class.h>
+ #include <lustre_log.h>
+ #include <linux/list.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs.c b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
+index 74a5fcf644e5..e09b86529c5d 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/nrs.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/nrs.c
+@@ -37,11 +37,12 @@
+  */
+ 
+ #define DEBUG_SUBSYSTEM S_RPC
++#include <linux/libcfs/libcfs.h>
++#include <linux/libcfs/libcfs_cpu.h>
+ #include <obd_support.h>
+ #include <obd_class.h>
+ #include <lustre_net.h>
+ #include <lprocfs_status.h>
+-#include <linux/libcfs/libcfs_all.h>
+ #include "ptlrpc_internal.h"
  
  /**
-  * Initialize a range lock tree
-diff --git a/drivers/staging/lustre/lustre/llite/range_lock.h b/drivers/staging/lustre/lustre/llite/range_lock.h
-index 4af8781c71d7..9ebac09160f2 100644
---- a/drivers/staging/lustre/lustre/llite/range_lock.h
-+++ b/drivers/staging/lustre/lustre/llite/range_lock.h
-@@ -37,7 +37,7 @@
- #ifndef _RANGE_LOCK_H
- #define _RANGE_LOCK_H
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c b/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
+index 4876d07aed7d..ff630d94dd26 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/nrs_fifo.c
+@@ -44,9 +44,10 @@
+  */
  
+ #define DEBUG_SUBSYSTEM S_RPC
++#include <linux/libcfs/libcfs.h>
++#include <linux/libcfs/libcfs_cpu.h>
+ #include <obd_support.h>
+ #include <obd_class.h>
 -#include <linux/libcfs/libcfs_all.h>
-+#include <linux/spinlock.h>
- #include <interval_tree.h>
+ #include "ptlrpc_internal.h"
  
- struct range_lock {
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-index 8bda51fd97a2..31dc3c0ade01 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-@@ -38,6 +38,7 @@
+ /**
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+index adf3b8c986e9..6ac9bb570663 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+@@ -41,8 +41,6 @@
  
- #define DEBUG_SUBSYSTEM S_LLITE
- 
-+#include <linux/libcfs/libcfs_hash.h>
- #include <obd.h>
- #include "llite_internal.h"
- #include "vvp_internal.h"
-diff --git a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-index d5849051319b..e4f762137a4a 100644
---- a/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_cl_internal.h
-@@ -43,8 +43,6 @@
- #ifndef LOV_CL_INTERNAL_H
- #define LOV_CL_INTERNAL_H
+ #define DEBUG_SUBSYSTEM S_RPC
  
 -#include <linux/libcfs/libcfs_all.h>
 -
- #include <obd.h>
- #include <cl_object.h>
- #include "lov_internal.h"
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_internal.h b/drivers/staging/lustre/lustre/mgc/mgc_internal.h
-index e402898cb28b..9541892b67c7 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_internal.h
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_internal.h
-@@ -34,7 +34,6 @@
- #ifndef _MGC_INTERNAL_H
- #define _MGC_INTERNAL_H
+ #include <uapi/linux/lustre/lustre_fiemap.h>
+ 
+ #include <llog_swab.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index bff14fb778d2..531005411edf 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -52,8 +52,10 @@
+ 
+ #define DEBUG_SUBSYSTEM S_RPC
  
 -#include <linux/libcfs/libcfs_all.h>
+-
++#include <linux/kthread.h>
++#include <linux/libcfs/libcfs.h>
++#include <linux/libcfs/libcfs_cpu.h>
++#include <linux/libcfs/libcfs_string.h>
+ #include <lustre_net.h>
  #include <lustre_lib.h>
- #include <lustre_dlm.h>
- #include <lustre_log.h>
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 36c3f13ab9f4..32df804614d3 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -39,6 +39,7 @@
- #define D_MGC D_CONFIG /*|D_WARNING*/
+ #include <lustre_ha.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/recover.c b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+index 004db1557a1a..2ea0a7ff87dd 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/recover.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/recover.c
+@@ -36,7 +36,7 @@
+  */
  
- #include <linux/module.h>
-+#include <linux/random.h>
+ #define DEBUG_SUBSYSTEM S_RPC
+-#include <linux/libcfs/libcfs_all.h>
++#include <linux/libcfs/libcfs.h>
  
- #include <lprocfs_status.h>
- #include <lustre_dlm.h>
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-index 29f318403328..2d3cba16ef34 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-+++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
-@@ -43,8 +43,6 @@
- #ifndef OSC_CL_INTERNAL_H
- #define OSC_CL_INTERNAL_H
+ #include <obd_support.h>
+ #include <lustre_ha.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+index 4af08b2492da..256421465bcd 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+@@ -37,7 +37,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_SEC
  
 -#include <linux/libcfs/libcfs_all.h>
--
++#include <linux/libcfs/libcfs.h>
+ #include <linux/crypto.h>
+ #include <linux/cred.h>
+ #include <linux/key.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+index 1f35126124fc..625b9520d78f 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c
+@@ -37,7 +37,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_SEC
+ 
+-#include <linux/libcfs/libcfs_all.h>
++#include <linux/libcfs/libcfs.h>
+ 
  #include <obd.h>
- /* osc_build_res_name() */
- #include <cl_object.h>
+ #include <obd_cksum.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
+index 4a37f6e1ac30..2389f9a8f534 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
+@@ -33,7 +33,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_SEC
+ 
+-#include <linux/libcfs/libcfs_all.h>
++#include <linux/libcfs/libcfs.h>
+ #include <linux/crypto.h>
+ #include <linux/key.h>
+ 
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+index fa247d351625..2c8bad7b7877 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_gc.c
+@@ -37,7 +37,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_SEC
+ 
+-#include <linux/libcfs/libcfs_all.h>
++#include <linux/libcfs/libcfs.h>
+ 
+ #include <obd_support.h>
+ #include <obd_class.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c b/drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c
+index c1c862ac0b53..fd609b63d2de 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c
+@@ -35,7 +35,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_SEC
+ 
+-#include <linux/libcfs/libcfs_all.h>
++#include <linux/libcfs/libcfs.h>
+ #include <linux/crypto.h>
+ 
+ #include <obd.h>
