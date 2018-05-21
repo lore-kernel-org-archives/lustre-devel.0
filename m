@@ -1,49 +1,150 @@
-From: Ivan Bornyakov <brnkv.i1@gmail.com>
-Date: Tue, 22 May 2018 16:34:39 +0300
-Subject: [lustre-devel] [PATCH] staging: lustre: libcfs: add parens around
- macros args
-Message-ID: <20180522133439.12338-1-brnkv.i1@gmail.com>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Mon, 21 May 2018 23:39:37 +0530
+Subject: [lustre-devel] [PATCH v3] staging: lustre: Change return type to
+ vm_fault_t
+Message-ID: <20180521180937.GA19605@jordon-HP-15-Notebook-PC>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
-Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Ivan Bornyakov <brnkv.i1@gmail.com>
 
-One may call 'CFS_FAIL_TIMEOUT(id, secs + 5);' and get unexpected result
-after macro substitution, viz., 'secs + 5' will turn into
-'secs + 5 * 1000'
+Use new return type vm_fault_t for fault handler. For
+now, this is just documenting that the function returns
+a VM_FAULT value rather than an errno. Once all instances
+are converted, vm_fault_t will become a distinct type.
 
-Signed-off-by: Ivan Bornyakov <brnkv.i1@gmail.com>
+Ref-> commit 1c8f422059ae ("mm: change return type to
+vm_fault_t") was added in 4.17-rc1 to introduce the new
+typedef vm_fault_t. Currently we are making change to all
+drivers to return vm_fault_t for page fault handlers. As
+part of that lustre driver is also getting changed to
+return vm_fault_t type. 
+
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
 ---
- drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+v2: updated the change log
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h
-index d6fc3164e7e7..f96b9a51554d 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h
-@@ -140,7 +140,7 @@ static inline int cfs_fail_timeout_set(u32 id, u32 value, int ms, int set)
+v3: updated the change log
+
+ drivers/staging/lustre/lustre/llite/llite_mmap.c | 35 ++++++++++++------------
+ 1 file changed, 18 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+index c0533bd..5b8fd10 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
++++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+@@ -231,7 +231,7 @@ static int ll_page_mkwrite0(struct vm_area_struct *vma, struct page *vmpage,
+ 	return result;
+ }
  
- /* If id hit cfs_fail_loc, sleep for seconds or milliseconds */
- #define CFS_FAIL_TIMEOUT(id, secs) \
--	cfs_fail_timeout_set(id, 0, secs * 1000, CFS_FAIL_LOC_NOSET)
-+	cfs_fail_timeout_set(id, 0, (secs) * 1000, CFS_FAIL_LOC_NOSET)
- 
- #define CFS_FAIL_TIMEOUT_MS(id, ms) \
- 	cfs_fail_timeout_set(id, 0, ms, CFS_FAIL_LOC_NOSET)
-@@ -150,10 +150,10 @@ static inline int cfs_fail_timeout_set(u32 id, u32 value, int ms, int set)
-  * sleep seconds or milliseconds
+-static inline int to_fault_error(int result)
++static inline vm_fault_t to_fault_error(int result)
+ {
+ 	switch (result) {
+ 	case 0:
+@@ -261,7 +261,7 @@ static inline int to_fault_error(int result)
+  * \retval VM_FAULT_ERROR on general error
+  * \retval NOPAGE_OOM not have memory for allocate new page
   */
- #define CFS_FAIL_TIMEOUT_ORSET(id, value, secs) \
--	cfs_fail_timeout_set(id, value, secs * 1000, CFS_FAIL_LOC_ORSET)
-+	cfs_fail_timeout_set(id, value, (secs) * 1000, CFS_FAIL_LOC_ORSET)
+-static int ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
++static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+ {
+ 	struct lu_env	   *env;
+ 	struct cl_io	    *io;
+@@ -269,16 +269,16 @@ static int ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 	struct page	     *vmpage;
+ 	unsigned long	    ra_flags;
+ 	int		      result = 0;
+-	int		      fault_ret = 0;
++	vm_fault_t		fault_ret = 0;
+ 	u16 refcheck;
  
- #define CFS_FAIL_TIMEOUT_RESET(id, value, secs) \
--	cfs_fail_timeout_set(id, value, secs * 1000, CFS_FAIL_LOC_RESET)
-+	cfs_fail_timeout_set(id, value, (secs) * 1000, CFS_FAIL_LOC_RESET)
+ 	env = cl_env_get(&refcheck);
+ 	if (IS_ERR(env))
+-		return PTR_ERR(env);
++		return VM_FAULT_ERROR;
  
- #define CFS_FAIL_TIMEOUT_MS_ORSET(id, value, ms) \
- 	cfs_fail_timeout_set(id, value, ms, CFS_FAIL_LOC_ORSET)
+ 	io = ll_fault_io_init(env, vma, vmf->pgoff, &ra_flags);
+ 	if (IS_ERR(io)) {
+-		result = to_fault_error(PTR_ERR(io));
++		fault_ret = to_fault_error(PTR_ERR(io));
+ 		goto out;
+ 	}
+ 
+@@ -319,15 +319,15 @@ static int ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 	if (result != 0 && !(fault_ret & VM_FAULT_RETRY))
+ 		fault_ret |= to_fault_error(result);
+ 
+-	CDEBUG(D_MMAP, "%s fault %d/%d\n", current->comm, fault_ret, result);
++	CDEBUG(D_MMAP, "%s fault %x/%d\n", current->comm, fault_ret, result);
+ 	return fault_ret;
+ }
+ 
+-static int ll_fault(struct vm_fault *vmf)
++static vm_fault_t ll_fault(struct vm_fault *vmf)
+ {
+ 	int count = 0;
+ 	bool printed = false;
+-	int result;
++	vm_fault_t result;
+ 	sigset_t set;
+ 
+ 	/* Only SIGKILL and SIGTERM are allowed for fault/nopage/mkwrite
+@@ -364,18 +364,19 @@ static int ll_fault(struct vm_fault *vmf)
+ 	return result;
+ }
+ 
+-static int ll_page_mkwrite(struct vm_fault *vmf)
++static vm_fault_t ll_page_mkwrite(struct vm_fault *vmf)
+ {
+ 	struct vm_area_struct *vma = vmf->vma;
+ 	int count = 0;
+ 	bool printed = false;
+ 	bool retry;
+-	int result;
++	int err;
++	vm_fault_t ret;
+ 
+ 	file_update_time(vma->vm_file);
+ 	do {
+ 		retry = false;
+-		result = ll_page_mkwrite0(vma, vmf->page, &retry);
++		err = ll_page_mkwrite0(vma, vmf->page, &retry);
+ 
+ 		if (!printed && ++count > 16) {
+ 			const struct dentry *de = vma->vm_file->f_path.dentry;
+@@ -387,25 +388,25 @@ static int ll_page_mkwrite(struct vm_fault *vmf)
+ 		}
+ 	} while (retry);
+ 
+-	switch (result) {
++	switch (err) {
+ 	case 0:
+ 		LASSERT(PageLocked(vmf->page));
+-		result = VM_FAULT_LOCKED;
++		ret = VM_FAULT_LOCKED;
+ 		break;
+ 	case -ENODATA:
+ 	case -EAGAIN:
+ 	case -EFAULT:
+-		result = VM_FAULT_NOPAGE;
++		ret = VM_FAULT_NOPAGE;
+ 		break;
+ 	case -ENOMEM:
+-		result = VM_FAULT_OOM;
++		ret = VM_FAULT_OOM;
+ 		break;
+ 	default:
+-		result = VM_FAULT_SIGBUS;
++		ret = VM_FAULT_SIGBUS;
+ 		break;
+ 	}
+ 
+-	return result;
++	return ret;
+ }
+ 
+ /**
 -- 
-2.16.1
+1.9.1
