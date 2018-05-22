@@ -1,31 +1,49 @@
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Mon, 21 May 2018 23:30:12 +0530
-Subject: [lustre-devel] [PATCH v2] staging: lustre: Change return type
- to vm_fault_t
-In-Reply-To: <20180520124248.GD10031@kroah.com>
-References: <20180516185711.GA6587@jordon-HP-15-Notebook-PC>
- <20180520124248.GD10031@kroah.com>
-Message-ID: <CAFqt6zYUvtagQNuXC1rGdQh7wrjLdrZS-rx5F-nMdRvy7CXBUA@mail.gmail.com>
+From: Ivan Bornyakov <brnkv.i1@gmail.com>
+Date: Tue, 22 May 2018 16:34:39 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: libcfs: add parens around
+ macros args
+Message-ID: <20180522133439.12338-1-brnkv.i1@gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+Cc: oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org, Ivan Bornyakov <brnkv.i1@gmail.com>
 
-On Sun, May 20, 2018 at 6:12 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Thu, May 17, 2018 at 12:27:11AM +0530, Souptick Joarder wrote:
->> Use new return type vm_fault_t for fault handler. For
->> now, this is just documenting that the function returns
->> a VM_FAULT value rather than an errno. Once all instances
->> are converted, vm_fault_t will become a distinct type.
->>
->> Commit 1c8f422059ae ("mm: change return type to vm_fault_t")
->>
->
-> What does that line mean?  Please be more descriptive.
->
-> confused,
->
-> greg k-h
+One may call 'CFS_FAIL_TIMEOUT(id, secs + 5);' and get unexpected result
+after macro substitution, viz., 'secs + 5' will turn into
+'secs + 5 * 1000'
 
-Sure, will send v3 with more description.
+Signed-off-by: Ivan Bornyakov <brnkv.i1@gmail.com>
+---
+ drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h
+index d6fc3164e7e7..f96b9a51554d 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_fail.h
+@@ -140,7 +140,7 @@ static inline int cfs_fail_timeout_set(u32 id, u32 value, int ms, int set)
+ 
+ /* If id hit cfs_fail_loc, sleep for seconds or milliseconds */
+ #define CFS_FAIL_TIMEOUT(id, secs) \
+-	cfs_fail_timeout_set(id, 0, secs * 1000, CFS_FAIL_LOC_NOSET)
++	cfs_fail_timeout_set(id, 0, (secs) * 1000, CFS_FAIL_LOC_NOSET)
+ 
+ #define CFS_FAIL_TIMEOUT_MS(id, ms) \
+ 	cfs_fail_timeout_set(id, 0, ms, CFS_FAIL_LOC_NOSET)
+@@ -150,10 +150,10 @@ static inline int cfs_fail_timeout_set(u32 id, u32 value, int ms, int set)
+  * sleep seconds or milliseconds
+  */
+ #define CFS_FAIL_TIMEOUT_ORSET(id, value, secs) \
+-	cfs_fail_timeout_set(id, value, secs * 1000, CFS_FAIL_LOC_ORSET)
++	cfs_fail_timeout_set(id, value, (secs) * 1000, CFS_FAIL_LOC_ORSET)
+ 
+ #define CFS_FAIL_TIMEOUT_RESET(id, value, secs) \
+-	cfs_fail_timeout_set(id, value, secs * 1000, CFS_FAIL_LOC_RESET)
++	cfs_fail_timeout_set(id, value, (secs) * 1000, CFS_FAIL_LOC_RESET)
+ 
+ #define CFS_FAIL_TIMEOUT_MS_ORSET(id, value, ms) \
+ 	cfs_fail_timeout_set(id, value, ms, CFS_FAIL_LOC_ORSET)
+-- 
+2.16.1
