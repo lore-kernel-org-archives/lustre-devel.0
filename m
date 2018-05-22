@@ -1,91 +1,171 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 23 May 2018 08:55:35 +1000
-Subject: [lustre-devel] lustre and loopback device
-In-Reply-To: <CABoqRjswwgQ5UH72FWKDdTJeaFDnKKe0+18FooZVPFM929B1HA@mail.gmail.com>
-References: <alpine.LFD.2.21.1803222322450.17346@casper.infradead.org>
- <87d0zr668j.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1803302011110.9681@casper.infradead.org>
- <CABoqRjswwgQ5UH72FWKDdTJeaFDnKKe0+18FooZVPFM929B1HA@mail.gmail.com>
-Message-ID: <871se3z4ew.fsf@notabene.neil.brown.name>
+From: Patrick Farrell <paf@cray.com>
+Date: Tue, 22 May 2018 23:01:07 +0000
+Subject: [lustre-devel] Regression with delayed_work in sec_gc
+In-Reply-To: <874lizz6lq.fsf@notabene.neil.brown.name>
+References: <alpine.LFD.2.21.1805151609430.28403@casper.infradead.org>
+ <87sh6s5zjy.fsf@notabene.neil.brown.name>
+ <E4BBDF07-0165-4306-9846-382D2D0A9C3D@ddn.com>
+ <87r2m5ztsr.fsf@notabene.neil.brown.name>
+ <79108C6E-9FC1-44E8-9B3A-AB7FE3A4C5DE@intel.com>,
+ <874lizz6lq.fsf@notabene.neil.brown.name>
+Message-ID: <BN3PR1101MB120293F9E3AA076CA0B339CECB940@BN3PR1101MB1202.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Mar 30 2018, Jinshan Xiong wrote:
+Neil, Andreas,
 
-> + Andreas.
+A few thoughts I?d be curious to see one or both of you speak to.
+
+1. Supporting multiple kernels has historically been important because Lustre is integrated in to various different HPC setups and they value being able to move distribution versions and Lustre versions independently.  Cray, for example, is less interested in upstream than we might be in part BECAUSE we use SLES as the base for our HPC distro and have a need for very recent versions of Lustre.  Long term, how would we square the desire to use enterprise distros and new versions of Lustre?
+
+2. The Lustre server code remains out of tree.  Until it?s in, it?s difficult for me to see development getting fully invested in upstream, since a key component - which is normally distributed as a unified whole, at least for source - is out of tree.  Thoughts on that?
+
+3. This is perhaps not so much a question for either of you, but it?s one I?m curious about anyway.  What?s the route out of staging and what happens after?  Provided we keep cleanliness high and duplication of existing functionality minimal, will the community accept a ton of feature drops?  If we have to dribble in existing features slowly, people will remain reluctant to use the upstream version for as long as that goes on.
+
+Perhaps Greg?s suggestion of going temporarily out of tree, cleaning up, and coming back with everything would be better?  That?s radical, I know, but...
+
+- Patrick
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
+Sent: Tuesday, May 22, 2018 5:08 PM
+To: Dilger, Andreas
+Cc: Lustre Developement
+Subject: Re: [lustre-devel] Regression with delayed_work in sec_gc
+
+On Tue, May 22 2018, Dilger, Andreas wrote:
+
+> On May 20, 2018, at 19:22, NeilBrown <neilb@suse.com> wrote:
+>>
+>> On Thu, May 17 2018, Sebastien Buisson wrote:
+>>
+>>>> Le 16 mai 2018 ? 00:22, NeilBrown <neilb@suse.com> a ?crit :
+>>>>
+>>>> On Tue, May 15 2018, James Simmons wrote:
+>>>>
+>>>>> Dmitry has backported your upstream commit
+>>>>>
+>>>>> be3c64da248b1ada2bbcfc3855f07536d8087acb ( ptlrpc: use workqueue for
+>>>>> pinger)
+>>>>>
+>>>>> and Sebastien tried out the change which can be seen at
+>>>>> https://review.whamcloud.com/#/c/31724. Sebastien is having issues with
+>>>>> unloading osc, mdc, ost or mdt kernel modules. He writes that he activated
+>>>>> Kerberos for my file system, did some IOs, then tried to unmount the
+>>>>> client and the  targets. Unfortunately, on some occasions, while
+>>>>> unmounting, the mdc module for instance has extra references (as shown by
+>>>>> 'lsmod'), and cannot be unloaded. After a while, the extra references are
+>>>>> dropped, and the  module can be unloaded. It also happens on occasions on
+>>>>> server side, for the mdt or ost modules. I tried destroy_workqueue but
+>>>>> that made things worst :-( Do you know what is going on?
+>>>>
+>>>> My guess is that ptlrpc_pinger_main() is looping, so
+>>>> cancel_delayed_work_sync() is waiting an unusually long time for it.
+>>>> This patch might fix the problem - it certainly makes the usage
+>>>> of "this_ping" closer to the original code.
+>>>>
+>>>> Thanks,
+>>>> NeilBrown
+>>>>
+>>>> diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+>>>> index 89eef8ec7df4..131b201541e8 100644
+>>>> --- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+>>>> +++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+>>>> @@ -222,12 +222,13 @@ static DECLARE_DELAYED_WORK(ping_work, ptlrpc_pinger_main);
+>>>>
+>>>> static void ptlrpc_pinger_main(struct work_struct *ws)
+>>>> {
+>>>> -  unsigned long this_ping = jiffies;
+>>>>     long time_to_next_wake;
+>>>>     struct timeout_item *item;
+>>>>     struct obd_import *imp;
+>>>>
+>>>>     do {
+>>>> +          unsigned long this_ping = jiffies;
+>>>> +
+>>>>             mutex_lock(&pinger_mutex);
+>>>>             list_for_each_entry(item, &timeout_list, ti_chain) {
+>>>>                     item->ti_cb(item, item->ti_cb_data);
+>>>
+>>> Still same problem when testing "ptlrpc: use delayed_work in sec_gc" with patch "ptlrpc: use workqueue for pinger" and modification as suggested above. Kernel module ptlrpc_gss holds extra references, and cannot be unloaded.
+>>>
+>>> However, patch "ptlrpc: use workqueue for pinger" alone does not have the issue.
+>>
+>> Thanks for the clear explanation - helps a lot.  I see the problem - I think.
+>>
+>> When (e.g.) ctx_release_kr() is called as part of shutting down a security
+>> context, it calls sptlrpc_gc_add_ctx() which signals the gc-thread to
+>> re-run.
+>> None of this code is in mainline (why isn't the GSS code in
+>> mainline????)
 >
-> A few problems:
+> We are in the un-enviable position that we can't really land new Lustre
+> features into the staging tree, but we can't get out of the staging tree
+> without a lot of code changes.
 
-Sorry that it has been 7 weeks, but I've finally scheduled time to
-have a proper look at this.
+I don't see this as a problem.  "code changes" and "new fetures" are
+largely independent.  There certainly are grey areas, but then the rules
+aren't inflexible.  If something feature-like is needed to achieve clean
+code, I doubt anyone would object.
 
-> 1. Linux loop device won't work upon Lustre with direct IO mode because
-> Lustre direct IO has to be pagesize aligned, and there seems no way of
-> changing sector size to pagesize for Linux loop device;
-
-The sector size for a loop device can be set with the --sector-size
-argument to losetup (or the LOOP_SET_BLOCK_SIZE ioctl).  This is done
-from user-space, not from in the  lustre module of course.
-open(O_DIRECT) is documented as having size/alignment restrictions,
-so I think a good case could be made to change the handling of
-"losetup --raw" to imply a "--sector-size" setting, if we could
-determine an appropriate size automatically.
-The XFS_IOC_DIOINFO ioctl (see man xfsctl) can be used to ask a
-filesystem about alignment requirements, but is currently only
-supported for XFS.  If we added support to lustre, and asked util-linux
-to use it to help configure a loop device, I suspect we could get
-success.
-
-There would probably be a request to hoist the ioctl out of xfs and add
-it to VFS. I cannot predict how that would go, but I think it would be
-good to pursue this approach.
-
-You could try it in you own testing by using
-  losetup -r --sector=size=4096 /dev/loopX  filename
-to create a loop device.
-
-> 2. 64KB is not an optimal RPC size for Lustre, so yes eventually we are
-> going to see throughput issue if the RPC size is limited to 64KB;
-
-So let's find out where the 64KB limit is imposed, and raise it.
-Maybe it comes from
-	lo->tag_set.queue_depth = 128;
-combined with the default sector size of 512.
-If so, then increasing the sector size to 4K should raise the RPC
-size 512K.
-
-> 3. It's hard to do I/O optimization more with Linux loop device. With
-> direct I/O by default, it has to wait for the current I/O to complete
-> before it can send the next one. This is not good. I have revised
-> llite_lloop driver so that it can do async direct I/O. The performance
-> boosts significantly by doing so.
-
-This surprises me.  Looking at the code in loop.c, I see a field
-->use_aio which is set when direct_io is used (->use_dio), except
-for FLUSH DISCARD and WRITE_ZEROES.
-->use_dio is disabled if the filesystem has a block device
-(->i_sb->s_bdev != NULL) and alignment doesn't match, but that
-wouldn't apply to lustre.
-Linux gained aio in loop in Linux 4.4.  What kernel version were you
-looking at?
+I also don't see how your observation explains the lack of gss code in
+the staging tree.
+I've found
+Commit: b78560200d41 ("staging: lustre: ptlrpc: gss: delete unused code")
+and am wondering why all the sec*.c code didn't disappear at the same
+time.
+I guess I'll put 'gss' on my list of things to "fix".
 
 >
-> I tried to increase the sector size of Linux loop device and also
-> max_{hw_}sectors_kb but it didn't work. Please let me know if there exists
-> ways of doing that.
+> It isn't clear to me why Lustre has such a high bar to cross to get out
+> of staging, compared to other filesystems that were added in the past.
 
-If --sector-size option to losetup doesn't work, we will have to make it
-work.
+I don't see the bar as being all that high, but then I haven't seen any
+battles that you might have already fought that seem to show a high bar.
+
+In my mind there are two issues: code quality and maintainership
+quality.
+Lustre was (is) out-of-tree for a long time with little or no apparent
+interesting in going mainline, so that results in a fairly low score for
+maintainership.  Maintainership means working in and with the community.
+While lustre was out-of-tree it developed lot of useful functionality
+which was also independently (and differently) developed in mainline
+linux.  This makes the code look worse than it is - because it seems to
+be unnecessarily different.
+Lustre also previously supported multiple kernels, so it had (has)
+abstraction layers which are now just technical debt.
+So it is coming from a fairly low starting point.  I think it is
+reasonable for the Linux community to want to be able to see lustre clearly
+rising above all that past, clearing the debt with interest (you might
+say).
+This is all quite achievable - it just takes time and effort (and skill
+- I think we have that among us).
+I've been given time by SUSE to work on this and I can clear a lot of
+the technical debt.  The more we work together, the easier it will be.
+James has been a great help and I think momentum is building.
+The community side needs key people to stop thinking of "us vs them" and
+start thinking of lustre as part of the Linux community.  Don't talk
+about "upstream has accepted this" or "upstream have rejected that", but
+get on board with "we've landed this upstream" or "we are working to
+find the best solution for that".
+It might help to start using the mailing list more, rather than
+depending on whamcloud.  The work-flow is different, but is quite
+workable, and shows a willingness to be part of the broader community.
+
+
+> It's not like Lustre is going away any time soon, unlike some no-name
+> ethernet card driver, and we could still continue to improve the Lustre
+> code if we could move out of staging, but it could be done in a more
+> sustainable manner where we also land feature patches and try to bring
+> the kernel and master code closer together over time.
+
+I think we should do one thing at a time.
+Firstly, focus on getting out of staging.  Freeze the current feature
+set and get all existing features into an acceptable form.
+Secondly, add all the fixes and features from master-code into Linux.
+If you also want to move fixes from Linux into master, that's up to you.
 
 Thanks,
 NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180523/e13c4fbe/attachment.sig>
