@@ -1,364 +1,101 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Mon, 21 May 2018 16:06:45 +0000
-Subject: [lustre-devel] [PATCH 13/30] staging: lustre: replace
- libcfs_register_ioctl with a blocking notifier_chain
-In-Reply-To: <152687731283.24196.5413466102459843186.stgit@noble>
-References: <152687724799.24196.7718555295926047576.stgit@noble>
- <152687731283.24196.5413466102459843186.stgit@noble>
-Message-ID: <BE6A1DEE-0CAE-4703-89C5-4722C0319BF9@cray.com>
+From: Sebastien Buisson <sbuisson@ddn.com>
+Date: Tue, 22 May 2018 16:05:17 +0000
+Subject: [lustre-devel] Regression with delayed_work in sec_gc
+In-Reply-To: <87r2m5ztsr.fsf@notabene.neil.brown.name>
+References: <alpine.LFD.2.21.1805151609430.28403@casper.infradead.org>
+ <87sh6s5zjy.fsf@notabene.neil.brown.name>
+ <E4BBDF07-0165-4306-9846-382D2D0A9C3D@ddn.com>
+ <87r2m5ztsr.fsf@notabene.neil.brown.name>
+Message-ID: <723F6C68-55FA-452A-B8EE-4BF88DB4DFDC@ddn.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>, Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
-This, and the rest of the series, look good.  Feel free to add a Reviewed-by.
 
-Thanks, Neil.
+> Le 21 mai 2018 ? 03:22, NeilBrown <neilb@suse.com> a ?crit :
+> 
+> On Thu, May 17 2018, Sebastien Buisson wrote:
+> 
+>>> Le 16 mai 2018 ? 00:22, NeilBrown <neilb@suse.com> a ?crit :
+>>> 
+>>> On Tue, May 15 2018, James Simmons wrote:
+>>> 
+>>>> Dmitry has backported your upstream commit
+>>>> 
+>>>> be3c64da248b1ada2bbcfc3855f07536d8087acb ( ptlrpc: use workqueue for
+>>>> pinger)
+>>>> 
+>>>> and Sebastien tried out the change which can be seen at
+>>>> https://review.whamcloud.com/#/c/31724. Sebastien is having issues with
+>>>> unloading osc, mdc, ost or mdt kernel modules. He writes that he activated
+>>>> Kerberos for my file system, did some IOs, then tried to unmount the
+>>>> client and the  targets. Unfortunately, on some occasions, while
+>>>> unmounting, the mdc module for instance has extra references (as shown by
+>>>> 'lsmod'), and cannot be unloaded. After a while, the extra references are
+>>>> dropped, and the  module can be unloaded. It also happens on occasions on
+>>>> server side, for the mdt or ost modules. I tried destroy_workqueue but
+>>>> that made things worst :-( Do you know what is going on?
+>>> 
+>>> My guess is that ptlrpc_pinger_main() is looping, so
+>>> cancel_delayed_work_sync() is waiting an unusually long time for it.
+>>> This patch might fix the problem - it certainly makes the usage
+>>> of "this_ping" closer to the original code.
+>>> 
+>>> Thanks,
+>>> NeilBrown
+>>> 
+>>> diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+>>> index 89eef8ec7df4..131b201541e8 100644
+>>> --- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+>>> +++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
+>>> @@ -222,12 +222,13 @@ static DECLARE_DELAYED_WORK(ping_work, ptlrpc_pinger_main);
+>>> 
+>>> static void ptlrpc_pinger_main(struct work_struct *ws)
+>>> {
+>>> -	unsigned long this_ping = jiffies;
+>>> 	long time_to_next_wake;
+>>> 	struct timeout_item *item;
+>>> 	struct obd_import *imp;
+>>> 
+>>> 	do {
+>>> +		unsigned long this_ping = jiffies;
+>>> +
+>>> 		mutex_lock(&pinger_mutex);
+>>> 		list_for_each_entry(item, &timeout_list, ti_chain) {
+>>> 			item->ti_cb(item, item->ti_cb_data);
+>> 
+>> Still same problem when testing "ptlrpc: use delayed_work in sec_gc" with patch "ptlrpc: use workqueue for pinger" and modification as suggested above. Kernel module ptlrpc_gss holds extra references, and cannot be unloaded.
+>> 
+>> However, patch "ptlrpc: use workqueue for pinger" alone does not have the issue.
+> 
+> Thanks for the clear explanation - helps a lot.  I see the problem - I think.
+> 
+> When (e.g.) ctx_release_kr() is called as part of shutting down a security
+> context, it calls sptlrpc_gc_add_ctx() which signals the gc-thread to
+> re-run.
+> None of this code is in mainline (why isn't the GSS code in
+> mainline????)
+> So I removed the SVC_SIGNAL flag as it was never being set.
+> So I didn't add matching functionality when porting to delayed-work.
+> 
+> To port  "ptlrpc: use delayed_work in sec_gc" to upstream lustre you
+> need to get sptlrpc_gc_add_ctx() to call
+>  	mod_delayed_work(system_wq, &sec_gc_work, 0);
+> 
+> NeilBrown
 
-?On 5/20/18, 11:39 PM, "lustre-devel on behalf of NeilBrown" <lustre-devel-bounces at lists.lustre.org on behalf of neilb@suse.com> wrote:
+Excellent, no more pending extra references on kernel modules when calling mod_delayed_work() from sptlrpc_gc_add_ctx(), thanks!
 
-    libcfs allows other modules to register handlers for ioctls.
-    The implementation it uses for this is nearly identical to a
-    blocking notifier chain, so change to use that.
-    
-    The biggest difference is that the return value from notifier has a
-    defined format, where libcfs_register_ioctl uses -EINVAL to mean
-    "continue".  This requires a little bit of conversion.
-    
-    Signed-off-by: NeilBrown <neilb@suse.com>
-    ---
-     .../staging/lustre/include/linux/libcfs/libcfs.h   |   19 ++----
-     drivers/staging/lustre/lnet/libcfs/module.c        |   64 ++++----------------
-     drivers/staging/lustre/lnet/lnet/module.c          |   38 ++++++++----
-     drivers/staging/lustre/lnet/selftest/conctl.c      |   27 +++++---
-     drivers/staging/lustre/lnet/selftest/console.c     |   10 ++-
-     drivers/staging/lustre/lnet/selftest/console.h     |    3 +
-     6 files changed, 70 insertions(+), 91 deletions(-)
-    
-    diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-    index d9002e7424d4..63ea0e99ec58 100644
-    --- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-    +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-    @@ -93,19 +93,14 @@
-     #define LNET_ACCEPTOR_MIN_RESERVED_PORT    512
-     #define LNET_ACCEPTOR_MAX_RESERVED_PORT    1023
-     
-    -struct libcfs_ioctl_handler {
-    -	struct list_head item;
-    -	int (*handle_ioctl)(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
-    -};
-    -
-    -#define DECLARE_IOCTL_HANDLER(ident, func)			\
-    -	struct libcfs_ioctl_handler ident = {			\
-    -		.item		= LIST_HEAD_INIT(ident.item),	\
-    -		.handle_ioctl	= func				\
-    -	}
-    +extern struct blocking_notifier_head libcfs_ioctl_list;
-    +static inline int notifier_from_ioctl_errno(int err)
-    +{
-    +	if (err == -EINVAL)
-    +		return NOTIFY_OK;
-    +	return notifier_from_errno(err) | NOTIFY_STOP_MASK;
-    +}
-     
-    -int libcfs_register_ioctl(struct libcfs_ioctl_handler *hand);
-    -int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand);
-     int libcfs_setup(void);
-     
-     #define _LIBCFS_H
-    diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-    index 3e51aae751c5..b3a7c1a912ba 100644
-    --- a/drivers/staging/lustre/lnet/libcfs/module.c
-    +++ b/drivers/staging/lustre/lnet/libcfs/module.c
-    @@ -62,38 +62,8 @@
-     
-     static struct dentry *lnet_debugfs_root;
-     
-    -static DECLARE_RWSEM(ioctl_list_sem);
-    -static LIST_HEAD(ioctl_list);
-    -
-    -int libcfs_register_ioctl(struct libcfs_ioctl_handler *hand)
-    -{
-    -	int rc = 0;
-    -
-    -	down_write(&ioctl_list_sem);
-    -	if (!list_empty(&hand->item))
-    -		rc = -EBUSY;
-    -	else
-    -		list_add_tail(&hand->item, &ioctl_list);
-    -	up_write(&ioctl_list_sem);
-    -
-    -	return rc;
-    -}
-    -EXPORT_SYMBOL(libcfs_register_ioctl);
-    -
-    -int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand)
-    -{
-    -	int rc = 0;
-    -
-    -	down_write(&ioctl_list_sem);
-    -	if (list_empty(&hand->item))
-    -		rc = -ENOENT;
-    -	else
-    -		list_del_init(&hand->item);
-    -	up_write(&ioctl_list_sem);
-    -
-    -	return rc;
-    -}
-    -EXPORT_SYMBOL(libcfs_deregister_ioctl);
-    +BLOCKING_NOTIFIER_HEAD(libcfs_ioctl_list);
-    +EXPORT_SYMBOL(libcfs_ioctl_list);
-     
-     static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
-     {
-    @@ -268,24 +238,18 @@ static int libcfs_ioctl(unsigned long cmd, void __user *uparam)
-     		libcfs_debug_mark_buffer(data->ioc_inlbuf1);
-     		break;
-     
-    -	default: {
-    -		struct libcfs_ioctl_handler *hand;
-    -
-    -		err = -EINVAL;
-    -		down_read(&ioctl_list_sem);
-    -		list_for_each_entry(hand, &ioctl_list, item) {
-    -			err = hand->handle_ioctl(cmd, hdr);
-    -			if (err == -EINVAL)
-    -				continue;
-    -
-    -			if (!err) {
-    -				if (copy_to_user(uparam, hdr, hdr->ioc_len))
-    -					err = -EFAULT;
-    -			}
-    -			break;
-    -		}
-    -		up_read(&ioctl_list_sem);
-    -		break; }
-    +	default:
-    +		err = blocking_notifier_call_chain(&libcfs_ioctl_list,
-    +						   cmd, hdr);
-    +		if (!(err & NOTIFY_STOP_MASK))
-    +			/* No-one claimed the ioctl */
-    +			err = -EINVAL;
-    +		else
-    +			err = notifier_to_errno(err);
-    +		if (!err)
-    +			if (copy_to_user(uparam, hdr, hdr->ioc_len))
-    +				err = -EFAULT;
-    +		break;
-     	}
-     out:
-     	kvfree(hdr);
-    diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
-    index f6e912e79ca7..9d06664f0c17 100644
-    --- a/drivers/staging/lustre/lnet/lnet/module.c
-    +++ b/drivers/staging/lustre/lnet/lnet/module.c
-    @@ -136,30 +136,37 @@ lnet_dyn_unconfigure(struct libcfs_ioctl_hdr *hdr)
-     }
-     
-     static int
-    -lnet_ioctl(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
-    +lnet_ioctl(struct notifier_block *nb,
-    +	   unsigned long cmd, void *vdata)
-     {
-     	int rc;
-    +	struct libcfs_ioctl_hdr *hdr = vdata;
-     
-     	switch (cmd) {
-     	case IOC_LIBCFS_CONFIGURE: {
-     		struct libcfs_ioctl_data *data =
-     			(struct libcfs_ioctl_data *)hdr;
-     
-    -		if (data->ioc_hdr.ioc_len < sizeof(*data))
-    -			return -EINVAL;
-    -
-    -		the_lnet.ln_nis_from_mod_params = data->ioc_flags;
-    -		return lnet_configure(NULL);
-    +		if (data->ioc_hdr.ioc_len < sizeof(*data)) {
-    +			rc = -EINVAL;
-    +		} else {
-    +			the_lnet.ln_nis_from_mod_params = data->ioc_flags;
-    +			rc = lnet_configure(NULL);
-    +		}
-    +		break;
-     	}
-     
-     	case IOC_LIBCFS_UNCONFIGURE:
-    -		return lnet_unconfigure();
-    +		rc = lnet_unconfigure();
-    +		break;
-     
-     	case IOC_LIBCFS_ADD_NET:
-    -		return lnet_dyn_configure(hdr);
-    +		rc = lnet_dyn_configure(hdr);
-    +		break;
-     
-     	case IOC_LIBCFS_DEL_NET:
-    -		return lnet_dyn_unconfigure(hdr);
-    +		rc = lnet_dyn_unconfigure(hdr);
-    +		break;
-     
-     	default:
-     		/*
-    @@ -172,11 +179,14 @@ lnet_ioctl(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
-     			rc = LNetCtl(cmd, hdr);
-     			LNetNIFini();
-     		}
-    -		return rc;
-    +		break;
-     	}
-    +	return notifier_from_ioctl_errno(rc);
-     }
-     
-    -static DECLARE_IOCTL_HANDLER(lnet_ioctl_handler, lnet_ioctl);
-    +static struct notifier_block lnet_ioctl_handler = {
-    +	.notifier_call = lnet_ioctl,
-    +};
-     
-     static int __init lnet_init(void)
-     {
-    @@ -194,7 +204,8 @@ static int __init lnet_init(void)
-     		return rc;
-     	}
-     
-    -	rc = libcfs_register_ioctl(&lnet_ioctl_handler);
-    +	rc = blocking_notifier_chain_register(&libcfs_ioctl_list,
-    +					      &lnet_ioctl_handler);
-     	LASSERT(!rc);
-     
-     	if (config_on_load) {
-    @@ -212,7 +223,8 @@ static void __exit lnet_exit(void)
-     {
-     	int rc;
-     
-    -	rc = libcfs_deregister_ioctl(&lnet_ioctl_handler);
-    +	rc = blocking_notifier_chain_unregister(&libcfs_ioctl_list,
-    +						&lnet_ioctl_handler);
-     	LASSERT(!rc);
-     
-     	lnet_lib_exit();
-    diff --git a/drivers/staging/lustre/lnet/selftest/conctl.c b/drivers/staging/lustre/lnet/selftest/conctl.c
-    index a2d8092bdeb7..f22b01e390d3 100644
-    --- a/drivers/staging/lustre/lnet/selftest/conctl.c
-    +++ b/drivers/staging/lustre/lnet/selftest/conctl.c
-    @@ -680,32 +680,34 @@ static int lst_test_add_ioctl(struct lstio_test_args *args)
-     }
-     
-     int
-    -lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
-    +lstcon_ioctl_entry(struct notifier_block *nb,
-    +		   unsigned long cmd, void *vdata)
-     {
-    -	char *buf;
-    +	struct libcfs_ioctl_hdr *hdr = vdata;
-    +	char *buf = NULL;
-     	struct libcfs_ioctl_data *data;
-     	int opc;
-    -	int rc;
-    +	int rc = -EINVAL;
-     
-     	if (cmd != IOC_LIBCFS_LNETST)
-    -		return -EINVAL;
-    +		goto err;
-     
-     	data = container_of(hdr, struct libcfs_ioctl_data, ioc_hdr);
-     
-     	opc = data->ioc_u32[0];
-     
-     	if (data->ioc_plen1 > PAGE_SIZE)
-    -		return -EINVAL;
-    +		goto err;
-     
-     	buf = kmalloc(data->ioc_plen1, GFP_KERNEL);
-    +	rc = -ENOMEM;
-     	if (!buf)
-    -		return -ENOMEM;
-    +		goto err;
-     
-     	/* copy in parameter */
-    -	if (copy_from_user(buf, data->ioc_pbuf1, data->ioc_plen1)) {
-    -		kfree(buf);
-    -		return -EFAULT;
-    -	}
-    +	rc = -EFAULT;
-    +	if (copy_from_user(buf, data->ioc_pbuf1, data->ioc_plen1))
-    +		goto err;
-     
-     	mutex_lock(&console_session.ses_mutex);
-     
-    @@ -785,6 +787,7 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
-     		break;
-     	default:
-     		rc = -EINVAL;
-    +		goto out;
-     	}
-     
-     	if (copy_to_user(data->ioc_pbuf2, &console_session.ses_trans_stat,
-    @@ -792,8 +795,8 @@ lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
-     		rc = -EFAULT;
-     out:
-     	mutex_unlock(&console_session.ses_mutex);
-    -
-    +err:
-     	kfree(buf);
-     
-    -	return rc;
-    +	return notifier_from_ioctl_errno(rc);
-     }
-    diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
-    index 1889f1e86473..9fd6013354c6 100644
-    --- a/drivers/staging/lustre/lnet/selftest/console.c
-    +++ b/drivers/staging/lustre/lnet/selftest/console.c
-    @@ -1996,7 +1996,9 @@ static void lstcon_init_acceptor_service(void)
-     	lstcon_acceptor_service.sv_wi_total = SFW_FRWK_WI_MAX;
-     }
-     
-    -static DECLARE_IOCTL_HANDLER(lstcon_ioctl_handler, lstcon_ioctl_entry);
-    +static struct notifier_block lstcon_ioctl_handler = {
-    +	.notifier_call = lstcon_ioctl_entry,
-    +};
-     
-     /* initialize console */
-     int
-    @@ -2048,7 +2050,8 @@ lstcon_console_init(void)
-     		goto out;
-     	}
-     
-    -	rc = libcfs_register_ioctl(&lstcon_ioctl_handler);
-    +	rc = blocking_notifier_chain_register(&libcfs_ioctl_list,
-    +					      &lstcon_ioctl_handler);
-     
-     	if (!rc) {
-     		lstcon_rpc_module_init();
-    @@ -2071,7 +2074,8 @@ lstcon_console_fini(void)
-     {
-     	int i;
-     
-    -	libcfs_deregister_ioctl(&lstcon_ioctl_handler);
-    +	blocking_notifier_chain_unregister(&libcfs_ioctl_list,
-    +					   &lstcon_ioctl_handler);
-     
-     	mutex_lock(&console_session.ses_mutex);
-     
-    diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
-    index 3933ed4cca93..d65b8d942bac 100644
-    --- a/drivers/staging/lustre/lnet/selftest/console.h
-    +++ b/drivers/staging/lustre/lnet/selftest/console.h
-    @@ -187,7 +187,8 @@ lstcon_id2hash(struct lnet_process_id id, struct list_head *hash)
-     	return &hash[idx];
-     }
-     
-    -int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
-    +int lstcon_ioctl_entry(struct notifier_block *nb,
-    +		       unsigned long cmd, void *vdata);
-     int lstcon_console_init(void);
-     int lstcon_console_fini(void);
-     int lstcon_session_match(struct lst_sid sid);
-    
-    
-    _______________________________________________
-    lustre-devel mailing list
-    lustre-devel at lists.lustre.org
-    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-    
+I have updated patch at https://review.whamcloud.com/31724 to include this modification.
+
+Cheers,
+Sebastien.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: Message signed with OpenPGP
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180522/11717952/attachment.sig>
