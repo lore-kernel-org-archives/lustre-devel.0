@@ -1,101 +1,34 @@
-From: Sebastien Buisson <sbuisson@ddn.com>
-Date: Tue, 22 May 2018 16:05:17 +0000
-Subject: [lustre-devel] Regression with delayed_work in sec_gc
-In-Reply-To: <87r2m5ztsr.fsf@notabene.neil.brown.name>
-References: <alpine.LFD.2.21.1805151609430.28403@casper.infradead.org>
- <87sh6s5zjy.fsf@notabene.neil.brown.name>
- <E4BBDF07-0165-4306-9846-382D2D0A9C3D@ddn.com>
- <87r2m5ztsr.fsf@notabene.neil.brown.name>
-Message-ID: <723F6C68-55FA-452A-B8EE-4BF88DB4DFDC@ddn.com>
+From: Joe Perches <joe@perches.com>
+Date: Tue, 22 May 2018 12:36:28 -0700
+Subject: [lustre-devel] [PATCH] checkpatch: Fix macro argument precedence
+ test
+In-Reply-To: <20180522133439.12338-1-brnkv.i1@gmail.com>
+References: <20180522133439.12338-1-brnkv.i1@gmail.com>
+Message-ID: <5dd900e9197febc1995604bb33c23c136d8b33ce.camel@perches.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Andrew Morton <akpm@linux-foundation.org>, Andy Whitcroft <apw@canonical.com>, LKML <linux-kernel@vger.kernel.org>
+Cc: Ivan Bornyakov <brnkv.i1@gmail.com>, lustre-devel@lists.lustre.org
 
+checkpatch's macro argument precedence test is broken so fix it.
 
-> Le 21 mai 2018 ? 03:22, NeilBrown <neilb@suse.com> a ?crit :
-> 
-> On Thu, May 17 2018, Sebastien Buisson wrote:
-> 
->>> Le 16 mai 2018 ? 00:22, NeilBrown <neilb@suse.com> a ?crit :
->>> 
->>> On Tue, May 15 2018, James Simmons wrote:
->>> 
->>>> Dmitry has backported your upstream commit
->>>> 
->>>> be3c64da248b1ada2bbcfc3855f07536d8087acb ( ptlrpc: use workqueue for
->>>> pinger)
->>>> 
->>>> and Sebastien tried out the change which can be seen at
->>>> https://review.whamcloud.com/#/c/31724. Sebastien is having issues with
->>>> unloading osc, mdc, ost or mdt kernel modules. He writes that he activated
->>>> Kerberos for my file system, did some IOs, then tried to unmount the
->>>> client and the  targets. Unfortunately, on some occasions, while
->>>> unmounting, the mdc module for instance has extra references (as shown by
->>>> 'lsmod'), and cannot be unloaded. After a while, the extra references are
->>>> dropped, and the  module can be unloaded. It also happens on occasions on
->>>> server side, for the mdt or ost modules. I tried destroy_workqueue but
->>>> that made things worst :-( Do you know what is going on?
->>> 
->>> My guess is that ptlrpc_pinger_main() is looping, so
->>> cancel_delayed_work_sync() is waiting an unusually long time for it.
->>> This patch might fix the problem - it certainly makes the usage
->>> of "this_ping" closer to the original code.
->>> 
->>> Thanks,
->>> NeilBrown
->>> 
->>> diff --git a/drivers/staging/lustre/lustre/ptlrpc/pinger.c b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
->>> index 89eef8ec7df4..131b201541e8 100644
->>> --- a/drivers/staging/lustre/lustre/ptlrpc/pinger.c
->>> +++ b/drivers/staging/lustre/lustre/ptlrpc/pinger.c
->>> @@ -222,12 +222,13 @@ static DECLARE_DELAYED_WORK(ping_work, ptlrpc_pinger_main);
->>> 
->>> static void ptlrpc_pinger_main(struct work_struct *ws)
->>> {
->>> -	unsigned long this_ping = jiffies;
->>> 	long time_to_next_wake;
->>> 	struct timeout_item *item;
->>> 	struct obd_import *imp;
->>> 
->>> 	do {
->>> +		unsigned long this_ping = jiffies;
->>> +
->>> 		mutex_lock(&pinger_mutex);
->>> 		list_for_each_entry(item, &timeout_list, ti_chain) {
->>> 			item->ti_cb(item, item->ti_cb_data);
->> 
->> Still same problem when testing "ptlrpc: use delayed_work in sec_gc" with patch "ptlrpc: use workqueue for pinger" and modification as suggested above. Kernel module ptlrpc_gss holds extra references, and cannot be unloaded.
->> 
->> However, patch "ptlrpc: use workqueue for pinger" alone does not have the issue.
-> 
-> Thanks for the clear explanation - helps a lot.  I see the problem - I think.
-> 
-> When (e.g.) ctx_release_kr() is called as part of shutting down a security
-> context, it calls sptlrpc_gc_add_ctx() which signals the gc-thread to
-> re-run.
-> None of this code is in mainline (why isn't the GSS code in
-> mainline????)
-> So I removed the SVC_SIGNAL flag as it was never being set.
-> So I didn't add matching functionality when porting to delayed-work.
-> 
-> To port  "ptlrpc: use delayed_work in sec_gc" to upstream lustre you
-> need to get sptlrpc_gc_add_ctx() to call
->  	mod_delayed_work(system_wq, &sec_gc_work, 0);
-> 
-> NeilBrown
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ scripts/checkpatch.pl | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Excellent, no more pending extra references on kernel modules when calling mod_delayed_work() from sptlrpc_gc_add_ctx(), thanks!
-
-I have updated patch at https://review.whamcloud.com/31724 to include this modification.
-
-Cheers,
-Sebastien.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: Message signed with OpenPGP
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180522/11717952/attachment.sig>
+diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+index baddac9379f0..68879aa65cfd 100755
+--- a/scripts/checkpatch.pl
++++ b/scripts/checkpatch.pl
+@@ -5041,7 +5041,7 @@ sub process {
+ 				$tmp_stmt =~ s/\b(typeof|__typeof__|__builtin\w+|typecheck\s*\(\s*$Type\s*,|\#+)\s*\(*\s*$arg\s*\)*\b//g;
+ 				$tmp_stmt =~ s/\#+\s*$arg\b//g;
+ 				$tmp_stmt =~ s/\b$arg\s*\#\#//g;
+-				my $use_cnt = $tmp_stmt =~ s/\b$arg\b//g;
++				my $use_cnt = () = $tmp_stmt =~ /\b$arg\b/g;
+ 				if ($use_cnt > 1) {
+ 					CHK("MACRO_ARG_REUSE",
+ 					    "Macro argument reuse '$arg' - possible side-effects?\n" . "$herectx");
