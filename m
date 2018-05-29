@@ -1,161 +1,215 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 May 2018 10:22:04 -0400
-Subject: [lustre-devel] [PATCH v2 24/25] staging: lustre: libcfs: change CPT
- estimate algorithm
+Date: Tue, 29 May 2018 10:21:49 -0400
+Subject: [lustre-devel] [PATCH v2 09/25] staging: lustre: libcfs: add cpu
+ distance handling
 In-Reply-To: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
 References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1527603725-30560-25-git-send-email-jsimmons@infradead.org>
+Message-ID: <1527603725-30560-10-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+From: Amir Shehata <amir.shehata@intel.com>
 
-The main idea to have more CPU partitions is based on KNL experience.
-When a thread submit IO for network communication one of threads from
-current CPT is used for network stack. Whith high parallelization many
-threads become involved in network submission but having less CPU
-partitions they will wait until single thread process them from network
-queue. So, the bottleneck just moves into network layer in case of
-small amount of CPU partitions. My experiments showed that the best
-performance was when for each IO thread we have one network thread.
-This condition can be provided having 2 real HW cores (without hyper
-threads) per CPT. This is exactly what implemented in this patch.
+Add functionality to calculate the distance between two CPTs.
+Expose those distance in debugfs so people deploying a setup
+can debug what is being created for CPTs.
 
-Change CPT estimate algorithm from 2 * (N - 1)^2 < NCPUS <= 2 * N^2
-to 2 HW cores per CPT. This is critical for machines with number of
-cores different from 2^N.
-
-Current algorithm splits CPTs in KNL:
-LNet: HW CPU cores: 272, npartitions: 16
-cpu_partition_table=
-    0       : 0-4,68-71,136-139,204-207
-    1       : 5-9,73-76,141-144,209-212
-    2       : 10-14,78-81,146-149,214-217
-    3       : 15-17,72,77,83-85,140,145,151-153,208,219-221
-    4       : 18-21,82,86-88,150,154-156,213,218,222-224
-    5       : 22-26,90-93,158-161,226-229
-    6       : 27-31,95-98,163-166,231-234
-    7       : 32-35,89,100-103,168-171,236-239
-    8       : 36-38,94,99,104-105,157,162,167,172-173,225,230,235,240-241
-    9       : 39-43,107-110,175-178,243-246
-    10      : 44-48,112-115,180-183,248-251
-    11      : 49-51,106,111,117-119,174,179,185-187,242,253-255
-    12      : 52-55,116,120-122,184,188-190,247,252,256-258
-    13      : 56-60,124-127,192-195,260-263
-    14      : 61-65,129-132,197-200,265-268
-    15      : 66-67,123,128,133-135,191,196,201-203,259,264,269-271
-
-New algorithm will split CPTs in KNL:
-LNet: HW CPU cores: 272, npartitions: 34
-cpu_partition_table=
-    0       : 0-1,68-69,136-137,204-205
-    1       : 2-3,70-71,138-139,206-207
-    2       : 4-5,72-73,140-141,208-209
-    3       : 6-7,74-75,142-143,210-211
-    4       : 8-9,76-77,144-145,212-213
-    5       : 10-11,78-79,146-147,214-215
-    6       : 12-13,80-81,148-149,216-217
-    7       : 14-15,82-83,150-151,218-219
-    8       : 16-17,84-85,152-153,220-221
-    9       : 18-19,86-87,154-155,222-223
-    10      : 20-21,88-89,156-157,224-225
-    11      : 22-23,90-91,158-159,226-227
-    12      : 24-25,92-93,160-161,228-229
-    13      : 26-27,94-95,162-163,230-231
-    14      : 28-29,96-97,164-165,232-233
-    15      : 30-31,98-99,166-167,234-235
-    16      : 32-33,100-101,168-169,236-237
-    17      : 34-35,102-103,170-171,238-239
-    18      : 36-37,104-105,172-173,240-241
-    19      : 38-39,106-107,174-175,242-243
-    20      : 40-41,108-109,176-177,244-245
-    21      : 42-43,110-111,178-179,246-247
-    22      : 44-45,112-113,180-181,248-249
-    23      : 46-47,114-115,182-183,250-251
-    24      : 48-49,116-117,184-185,252-253
-    25      : 50-51,118-119,186-187,254-255
-    26      : 52-53,120-121,188-189,256-257
-    27      : 54-55,122-123,190-191,258-259
-    28      : 56-57,124-125,192-193,260-261
-    29      : 58-59,126-127,194-195,262-263
-    30      : 60-61,128-129,196-197,264-265
-    31      : 62-63,130-131,198-199,266-267
-    32      : 64-65,132-133,200-201,268-269
-    33      : 66-67,134-135,202-203,270-271
-
-'N' pattern in KNL works is not always good.
-in flat mode it will be one CPT with all CPUs inside.
-
-in SNC-4 mode:
-cpu_partition_table=
-    0       : 0-17,68-85,136-153,204-221
-    1       : 18-35,86-103,154-171,222-239
-    2       : 36-51,104-119,172-187,240-255
-    3       : 52-67,120-135,188-203,256-271
-
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
-Reviewed-on: https://review.whamcloud.com/24304
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7734
+Reviewed-on: http://review.whamcloud.com/18916
+Reviewed-by: Olaf Weber <olaf@sgi.com>
+Reviewed-by: Doug Oucharek <dougso@me.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
 Changelog:
 
 v1) Initial patch
-v2) Rebased patch. No changes in code from earlier patch
+v2) Rebased patch to handle recent libcfs changes
 
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 30 +++++--------------------
- 1 file changed, 5 insertions(+), 25 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_cpu.h       | 31 +++++++++++
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 61 ++++++++++++++++++++++
+ 2 files changed, 92 insertions(+)
 
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+index 487625d..d5237d0 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+@@ -87,6 +87,8 @@ struct cfs_cpu_partition {
+ 	cpumask_var_t			cpt_cpumask;
+ 	/* nodes mask for this partition */
+ 	nodemask_t			*cpt_nodemask;
++	/* NUMA distance between CPTs */
++	unsigned int			*cpt_distance;
+ 	/* spread rotor for NUMA allocator */
+ 	unsigned int			cpt_spread_rotor;
+ };
+@@ -97,6 +99,8 @@ struct cfs_cpt_table {
+ #ifdef CONFIG_SMP
+ 	/* spread rotor for NUMA allocator */
+ 	unsigned int			ctb_spread_rotor;
++	/* maximum NUMA distance between all nodes in table */
++	unsigned int			ctb_distance;
+ 	/* # of CPU partitions */
+ 	unsigned int			ctb_nparts;
+ 	/* partitions tables */
+@@ -134,6 +138,10 @@ struct cfs_cpt_table {
+  */
+ int cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf, int len);
+ /**
++ * print distance information of cpt-table
++ */
++int cfs_cpt_distance_print(struct cfs_cpt_table *cptab, char *buf, int len);
++/**
+  * return total number of CPU partitions in \a cptab
+  */
+ int
+@@ -163,6 +171,10 @@ struct cfs_cpt_table {
+  */
+ int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node);
+ /**
++ * NUMA distance between \a cpt1 and \a cpt2 in \a cptab
++ */
++unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2);
++/**
+  * bind current thread on a CPU-partition \a cpt of \a cptab
+  */
+ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt);
+@@ -257,6 +269,19 @@ static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab,
+ 	return rc;
+ }
+ 
++static inline int cfs_cpt_distance_print(struct cfs_cpt_table *cptab,
++					 char *buf, int len)
++{
++	int rc;
++
++	rc = snprintf(buf, len, "0\t: 0:1\n");
++	len -= rc;
++	if (len <= 0)
++		return -EFBIG;
++
++	return rc;
++}
++
+ static inline cpumask_var_t *
+ cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt)
+ {
+@@ -287,6 +312,12 @@ static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab,
+ 	return &cptab->ctb_nodemask;
+ }
+ 
++static inline unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab,
++					    int cpt1, int cpt2)
++{
++	return 1;
++}
++
+ static inline int
+ cfs_cpt_set_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
+ {
 diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index aed48de..ff752d5 100644
+index f616073..2a74e51 100644
 --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
 +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -798,34 +798,14 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+@@ -124,6 +124,15 @@ struct cfs_cpt_table *
+ 					     GFP_NOFS);
+ 		if (!part->cpt_nodemask)
+ 			goto failed_setting_ctb_parts;
++
++		part->cpt_distance = kvmalloc_array(cptab->ctb_nparts,
++						    sizeof(part->cpt_distance[0]),
++						    GFP_KERNEL);
++		if (!part->cpt_distance)
++			goto failed_setting_ctb_parts;
++
++		memset(part->cpt_distance, -1,
++		       cptab->ctb_nparts * sizeof(part->cpt_distance[0]));
+ 	}
  
- static int cfs_cpt_num_estimate(void)
+ 	return cptab;
+@@ -134,6 +143,7 @@ struct cfs_cpt_table *
+ 
+ 		kfree(part->cpt_nodemask);
+ 		free_cpumask_var(part->cpt_cpumask);
++		kvfree(part->cpt_distance);
+ 	}
+ 
+ 	kvfree(cptab->ctb_parts);
+@@ -164,6 +174,7 @@ struct cfs_cpt_table *
+ 
+ 		kfree(part->cpt_nodemask);
+ 		free_cpumask_var(part->cpt_cpumask);
++		kvfree(part->cpt_distance);
+ 	}
+ 
+ 	kvfree(cptab->ctb_parts);
+@@ -218,6 +229,44 @@ struct cfs_cpt_table *
+ }
+ EXPORT_SYMBOL(cfs_cpt_table_print);
+ 
++int cfs_cpt_distance_print(struct cfs_cpt_table *cptab, char *buf, int len)
++{
++	char *tmp = buf;
++	int rc;
++	int i;
++	int j;
++
++	for (i = 0; i < cptab->ctb_nparts; i++) {
++		if (len <= 0)
++			goto err;
++
++		rc = snprintf(tmp, len, "%d\t:", i);
++		len -= rc;
++
++		if (len <= 0)
++			goto err;
++
++		tmp += rc;
++		for (j = 0; j < cptab->ctb_nparts; j++) {
++			rc = snprintf(tmp, len, " %d:%d", j,
++				      cptab->ctb_parts[i].cpt_distance[j]);
++			len -= rc;
++			if (len <= 0)
++				goto err;
++			tmp += rc;
++		}
++
++		*tmp = '\n';
++		tmp++;
++		len--;
++	}
++
++	return tmp - buf;
++err:
++	return -E2BIG;
++}
++EXPORT_SYMBOL(cfs_cpt_distance_print);
++
+ int
+ cfs_cpt_number(struct cfs_cpt_table *cptab)
  {
--	int nnode = num_online_nodes();
-+	int nthr = cpumask_weight(topology_sibling_cpumask(smp_processor_id()));
- 	int ncpu = num_online_cpus();
--	int ncpt;
-+	int ncpt = 1;
+@@ -269,6 +318,18 @@ struct cfs_cpt_table *
+ }
+ EXPORT_SYMBOL(cfs_cpt_nodemask);
  
--	if (ncpu <= CPT_WEIGHT_MIN) {
--		ncpt = 1;
--		goto out;
--	}
--
--	/* generate reasonable number of CPU partitions based on total number
--	 * of CPUs, Preferred N should be power2 and match this condition:
--	 * 2 * (N - 1)^2 < NCPUS <= 2 * N^2
--	 */
--	for (ncpt = 2; ncpu > 2 * ncpt * ncpt; ncpt <<= 1)
--		;
--
--	if (ncpt <= nnode) { /* fat numa system */
--		while (nnode > ncpt)
--			nnode >>= 1;
-+	if (ncpu > CPT_WEIGHT_MIN)
-+		for (ncpt = 2; ncpu > 2 * nthr * ncpt; ncpt++)
-+			; /* nothing */
- 
--	} else { /* ncpt > nnode */
--		while ((nnode << 1) <= ncpt)
--			nnode <<= 1;
--	}
--
--	ncpt = nnode;
--
--out:
- #if (BITS_PER_LONG == 32)
- 	/* config many CPU partitions on 32-bit system could consume
- 	 * too much memory
++unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
++{
++	LASSERT(cpt1 == CFS_CPT_ANY || (cpt1 >= 0 && cpt1 < cptab->ctb_nparts));
++	LASSERT(cpt2 == CFS_CPT_ANY || (cpt2 >= 0 && cpt2 < cptab->ctb_nparts));
++
++	if (cpt1 == CFS_CPT_ANY || cpt2 == CFS_CPT_ANY)
++		return cptab->ctb_distance;
++
++	return cptab->ctb_parts[cpt1].cpt_distance[cpt2];
++}
++EXPORT_SYMBOL(cfs_cpt_distance);
++
+ int
+ cfs_cpt_set_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
+ {
 -- 
 1.8.3.1
