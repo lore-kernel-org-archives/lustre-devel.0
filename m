@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 May 2018 10:22:02 -0400
-Subject: [lustre-devel] [PATCH v2 22/25] staging: lustre: libcfs: update
- debug messages in CPT code
+Date: Tue, 29 May 2018 10:22:01 -0400
+Subject: [lustre-devel] [PATCH v2 21/25] staging: lustre: libcfs: report
+ NUMA node instead of just node
 In-Reply-To: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
 References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1527603725-30560-23-git-send-email-jsimmons@infradead.org>
+Message-ID: <1527603725-30560-22-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,9 +14,8 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Update the debug messages for the CPT table creation code. Place
-the passed in string in quotes to make it clear what it is.
-Captialize cpu in the debug strings.
+Reporting "HW nodes" is too generic. It really is reporting
+"HW NUMA nodes". Update the debug message.
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
@@ -33,85 +32,21 @@ Changelog:
 v1) Initial patch
 v2) Rebased patch. No changes in code from earlier patch
 
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index 0fc102c..649f7f9 100644
+index 99a9494..0fc102c 100644
 --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
 +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -496,7 +496,7 @@ void cfs_cpt_unset_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
+@@ -1138,7 +1138,7 @@ int cfs_cpu_init(void)
  
- 	} else if (cpt != cptab->ctb_cpu2cpt[cpu]) {
- 		CDEBUG(D_INFO,
--		       "CPU %d is not in cpu-partition %d\n", cpu, cpt);
-+		       "CPU %d is not in CPU partition %d\n", cpu, cpt);
- 		return;
- 	}
+ 	put_online_cpus();
  
-@@ -940,14 +940,14 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(char *pattern)
- 	if (!ncpt ||
- 	    (node && ncpt > num_online_nodes()) ||
- 	    (!node && ncpt > num_online_cpus())) {
--		CERROR("Invalid pattern %s, or too many partitions %d\n",
-+		CERROR("Invalid pattern '%s', or too many partitions %d\n",
- 		       pattern, ncpt);
- 		return NULL;
- 	}
- 
- 	cptab = cfs_cpt_table_alloc(ncpt);
- 	if (!cptab) {
--		CERROR("Failed to allocate cpu partition table\n");
-+		CERROR("Failed to allocate CPU partition table\n");
- 		return NULL;
- 	}
- 
-@@ -978,11 +978,11 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(char *pattern)
- 
- 		if (!bracket) {
- 			if (*str) {
--				CERROR("Invalid pattern %s\n", str);
-+				CERROR("Invalid pattern '%s'\n", str);
- 				goto failed;
- 			}
- 			if (c != ncpt) {
--				CERROR("expect %d partitions but found %d\n",
-+				CERROR("Expect %d partitions but found %d\n",
- 				       ncpt, c);
- 				goto failed;
- 			}
-@@ -990,7 +990,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(char *pattern)
- 		}
- 
- 		if (sscanf(str, "%d%n", &cpt, &n) < 1) {
--			CERROR("Invalid cpu pattern %s\n", str);
-+			CERROR("Invalid CPU pattern '%s'\n", str);
- 			goto failed;
- 		}
- 
-@@ -1007,20 +1007,20 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(char *pattern)
- 
- 		str = strim(str + n);
- 		if (str != bracket) {
--			CERROR("Invalid pattern %s\n", str);
-+			CERROR("Invalid pattern '%s'\n", str);
- 			goto failed;
- 		}
- 
- 		bracket = strchr(str, ']');
- 		if (!bracket) {
--			CERROR("Missing right bracket for partition %d, %s\n",
-+			CERROR("Missing right bracket for partition %d in '%s'\n",
- 			       cpt, str);
- 			goto failed;
- 		}
- 
- 		if (cfs_expr_list_parse(str, (bracket - str) + 1,
- 					0, high, &el)) {
--			CERROR("Can't parse number range: %s\n", str);
-+			CERROR("Can't parse number range in '%s'\n", str);
- 			goto failed;
- 		}
- 
+-	LCONSOLE(0, "HW nodes: %d, HW CPU cores: %d, npartitions: %d\n",
++	LCONSOLE(0, "HW NUMA nodes: %d, HW CPU cores: %d, npartitions: %d\n",
+ 		 num_online_nodes(), num_online_cpus(),
+ 		 cfs_cpt_number(cfs_cpt_tab));
+ 	return 0;
 -- 
 1.8.3.1
