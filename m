@@ -1,36 +1,28 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 May 2018 10:22:03 -0400
-Subject: [lustre-devel] [PATCH v2 23/25] staging: lustre: libcfs: rework CPU
- pattern parsing code
+Date: Tue, 29 May 2018 10:21:57 -0400
+Subject: [lustre-devel] [PATCH v2 17/25] staging: lustre: libcfs: rename
+ cpumask_var_t variables to *_mask
 In-Reply-To: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
 References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1527603725-30560-24-git-send-email-jsimmons@infradead.org>
+Message-ID: <1527603725-30560-18-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, Amir Shehata <amir.shehata@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Currently the module param string for CPU pattern can be
-modified which is wrong. Rewrite CPU pattern parsing code
-to avoid the passed buffer from being changed. This change
-also enables us to add real errors propogation to the caller
-functions.
+Because we handle both cpu mask as well as core identifiers it can
+easily be confused. To avoid this rename various cpumask_var_t to
+have appended *_mask to their names.
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Signed-off-by: Andreas Dilger <andreas.dilger@intel.com>
 Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
-Reviewed-on: https://review.whamcloud.com/23306
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-9715
-Reviewed-on: https://review.whamcloud.com/27872
+Reviewed-on: https://review.whamcloud.com/23222
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
 Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
-Reviewed-by: Patrick Farrell <paf@cray.com>
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
@@ -39,340 +31,161 @@ Changelog:
 v1) Initial patch
 v2) Rebased patch. No changes in code from earlier patch
 
- .../lustre/include/linux/libcfs/libcfs_cpu.h       |   2 +-
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 146 ++++++++++++---------
- 2 files changed, 87 insertions(+), 61 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 62 ++++++++++++-------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index c0aa0b3..12ed0a9 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -393,7 +393,7 @@ static inline int cfs_cpu_init(void)
- 
- static inline void cfs_cpu_fini(void)
- {
--	if (cfs_cpt_tab) {
-+	if (!IS_ERR_OR_NULL(cfs_cpt_tab)) {
- 		cfs_cpt_table_free(cfs_cpt_tab);
- 		cfs_cpt_tab = NULL;
- 	}
 diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index 649f7f9..aed48de 100644
+index 1c10529..fb27dac 100644
 --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
 +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -692,11 +692,11 @@ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
- 		nodemask = cptab->ctb_parts[cpt].cpt_nodemask;
+@@ -710,23 +710,23 @@ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
+  * We always prefer to choose CPU in the same core/socket.
+  */
+ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+-				cpumask_t *node, int number)
++				cpumask_t *node_mask, int number)
+ {
+-	cpumask_var_t socket;
+-	cpumask_var_t core;
++	cpumask_var_t socket_mask;
++	cpumask_var_t core_mask;
+ 	int rc = 0;
+ 	int cpu;
+ 
+ 	LASSERT(number > 0);
+ 
+-	if (number >= cpumask_weight(node)) {
+-		while (!cpumask_empty(node)) {
+-			cpu = cpumask_first(node);
++	if (number >= cpumask_weight(node_mask)) {
++		while (!cpumask_empty(node_mask)) {
++			cpu = cpumask_first(node_mask);
+ 
+ 			rc = cfs_cpt_set_cpu(cptab, cpt, cpu);
+ 			if (!rc)
+ 				return -EINVAL;
+-			cpumask_clear_cpu(cpu, node);
++			cpumask_clear_cpu(cpu, node_mask);
+ 		}
+ 		return 0;
+ 	}
+@@ -736,34 +736,34 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+ 	 * As we cannot initialize a cpumask_var_t, we need
+ 	 * to alloc both before we can risk trying to free either
+ 	 */
+-	if (!zalloc_cpumask_var(&socket, GFP_NOFS))
++	if (!zalloc_cpumask_var(&socket_mask, GFP_NOFS))
+ 		rc = -ENOMEM;
+-	if (!zalloc_cpumask_var(&core, GFP_NOFS))
++	if (!zalloc_cpumask_var(&core_mask, GFP_NOFS))
+ 		rc = -ENOMEM;
+ 	if (rc)
+ 		goto out;
+ 
+-	while (!cpumask_empty(node)) {
+-		cpu = cpumask_first(node);
++	while (!cpumask_empty(node_mask)) {
++		cpu = cpumask_first(node_mask);
+ 
+ 		/* get cpumask for cores in the same socket */
+-		cpumask_copy(socket, topology_core_cpumask(cpu));
+-		cpumask_and(socket, socket, node);
++		cpumask_copy(socket_mask, topology_core_cpumask(cpu));
++		cpumask_and(socket_mask, socket_mask, node_mask);
+ 
+-		LASSERT(!cpumask_empty(socket));
++		LASSERT(!cpumask_empty(socket_mask));
+ 
+-		while (!cpumask_empty(socket)) {
++		while (!cpumask_empty(socket_mask)) {
+ 			int i;
+ 
+ 			/* get cpumask for hts in the same core */
+-			cpumask_copy(core, topology_sibling_cpumask(cpu));
+-			cpumask_and(core, core, node);
++			cpumask_copy(core_mask, topology_sibling_cpumask(cpu));
++			cpumask_and(core_mask, core_mask, node_mask);
+ 
+-			LASSERT(!cpumask_empty(core));
++			LASSERT(!cpumask_empty(core_mask));
+ 
+-			for_each_cpu(i, core) {
+-				cpumask_clear_cpu(i, socket);
+-				cpumask_clear_cpu(i, node);
++			for_each_cpu(i, core_mask) {
++				cpumask_clear_cpu(i, socket_mask);
++				cpumask_clear_cpu(i, node_mask);
+ 
+ 				rc = cfs_cpt_set_cpu(cptab, cpt, i);
+ 				if (!rc) {
+@@ -774,13 +774,13 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+ 				if (!--number)
+ 					goto out;
+ 			}
+-			cpu = cpumask_first(socket);
++			cpu = cpumask_first(socket_mask);
+ 		}
  	}
  
--	if (cpumask_any_and(*cpumask, cpu_online_mask) >= nr_cpu_ids) {
-+	if (!cpumask_intersects(*cpumask, cpu_online_mask)) {
- 		CDEBUG(D_INFO,
- 		       "No online CPU found in CPU partition %d, did someone do CPU hotplug on system? You might need to reload Lustre modules to keep system working well.\n",
- 		       cpt);
--		return -EINVAL;
-+		return -ENODEV;
- 	}
- 
- 	for_each_online_cpu(cpu) {
-@@ -860,11 +860,13 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 	cptab = cfs_cpt_table_alloc(ncpt);
- 	if (!cptab) {
- 		CERROR("Failed to allocate CPU map(%d)\n", ncpt);
-+		rc = -ENOMEM;
- 		goto failed;
- 	}
- 
- 	if (!zalloc_cpumask_var(&node_mask, GFP_NOFS)) {
- 		CERROR("Failed to allocate scratch cpumask\n");
-+		rc = -ENOMEM;
- 		goto failed;
- 	}
- 
-@@ -879,8 +881,10 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 
- 			rc = cfs_cpt_choose_ncpus(cptab, cpt, node_mask,
- 						  num - ncpu);
--			if (rc < 0)
-+			if (rc < 0) {
-+				rc = -EINVAL;
- 				goto failed_mask;
-+			}
- 
- 			ncpu = cpumask_weight(part->cpt_cpumask);
- 			if (ncpu == num + !!(rem > 0)) {
-@@ -903,37 +907,51 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 	if (cptab)
- 		cfs_cpt_table_free(cptab);
- 
--	return NULL;
-+	return ERR_PTR(rc);
+ out:
+-	free_cpumask_var(socket);
+-	free_cpumask_var(core);
++	free_cpumask_var(socket_mask);
++	free_cpumask_var(core_mask);
+ 	return rc;
  }
  
--static struct cfs_cpt_table *cfs_cpt_table_create_pattern(char *pattern)
-+static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
+@@ -831,7 +831,7 @@ static int cfs_cpt_num_estimate(void)
+ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
  {
- 	struct cfs_cpt_table *cptab;
-+	char *pattern_dup;
-+	char *bracket;
- 	char *str;
- 	int node = 0;
--	int high;
- 	int ncpt = 0;
--	int cpt;
-+	int cpt = 0;
-+	int high;
+ 	struct cfs_cpt_table *cptab = NULL;
+-	cpumask_var_t mask;
++	cpumask_var_t node_mask;
+ 	int cpt = 0;
+ 	int num;
  	int rc;
- 	int c;
- 	int i;
- 
--	str = strim(pattern);
-+	pattern_dup = kstrdup(pattern, GFP_KERNEL);
-+	if (!pattern_dup) {
-+		CERROR("Failed to duplicate pattern '%s'\n", pattern);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	str = strim(pattern_dup);
- 	if (*str == 'n' || *str == 'N') {
--		pattern = str + 1;
--		if (*pattern != '\0') {
--			node = 1;
--		} else { /* shortcut to create CPT from NUMA & CPU topology */
-+		str++; /* skip 'N' char */
-+		node = 1; /* NUMA pattern */
-+		if (*str == '\0') {
- 			node = -1;
--			ncpt = num_online_nodes();
-+			for_each_online_node(i) {
-+				if (!cpumask_empty(cpumask_of_node(i)))
-+					ncpt++;
-+			}
-+			if (ncpt == 1) { /* single NUMA node */
-+				kfree(pattern_dup);
-+				return cfs_cpt_table_create(cpu_npartitions);
-+			}
- 		}
+@@ -864,15 +864,15 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
+ 		goto failed;
  	}
  
- 	if (!ncpt) { /* scanning bracket which is mark of partition */
--		for (str = pattern;; str++, ncpt++) {
--			str = strchr(str, '[');
--			if (!str)
--				break;
-+		bracket = str;
-+		while ((bracket = strchr(bracket, '['))) {
-+			bracket++;
-+			ncpt++;
- 		}
+-	if (!zalloc_cpumask_var(&mask, GFP_NOFS)) {
++	if (!zalloc_cpumask_var(&node_mask, GFP_NOFS)) {
+ 		CERROR("Failed to allocate scratch cpumask\n");
+ 		goto failed;
  	}
  
-@@ -941,87 +959,96 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(char *pattern)
- 	    (node && ncpt > num_online_nodes()) ||
- 	    (!node && ncpt > num_online_cpus())) {
- 		CERROR("Invalid pattern '%s', or too many partitions %d\n",
--		       pattern, ncpt);
--		return NULL;
-+		       pattern_dup, ncpt);
-+		rc = -EINVAL;
-+		goto err_free_str;
+ 	for_each_online_node(i) {
+-		cpumask_copy(mask, cpumask_of_node(i));
++		cpumask_copy(node_mask, cpumask_of_node(i));
+ 
+-		while (!cpumask_empty(mask)) {
++		while (!cpumask_empty(node_mask)) {
+ 			struct cfs_cpu_partition *part;
+ 			int n;
+ 
+@@ -889,7 +889,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
+ 			n = num - cpumask_weight(part->cpt_cpumask);
+ 			LASSERT(n > 0);
+ 
+-			rc = cfs_cpt_choose_ncpus(cptab, cpt, mask, n);
++			rc = cfs_cpt_choose_ncpus(cptab, cpt, node_mask, n);
+ 			if (rc < 0)
+ 				goto failed_mask;
+ 
+@@ -907,12 +907,12 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
+ 		goto failed_mask;
  	}
  
- 	cptab = cfs_cpt_table_alloc(ncpt);
- 	if (!cptab) {
- 		CERROR("Failed to allocate CPU partition table\n");
--		return NULL;
-+		rc = -ENOMEM;
-+		goto err_free_str;
- 	}
+-	free_cpumask_var(mask);
++	free_cpumask_var(node_mask);
  
- 	if (node < 0) { /* shortcut to create CPT from NUMA & CPU topology */
--		cpt = 0;
--
- 		for_each_online_node(i) {
--			if (cpt >= ncpt) {
--				CERROR("CPU changed while setting CPU partition table, %d/%d\n",
--				       cpt, ncpt);
--				goto failed;
--			}
-+			if (cpumask_empty(cpumask_of_node(i)))
-+				continue;
- 
- 			rc = cfs_cpt_set_node(cptab, cpt++, i);
--			if (!rc)
--				goto failed;
-+			if (!rc) {
-+				rc = -EINVAL;
-+				goto err_free_table;
-+			}
- 		}
-+		kfree(pattern_dup);
- 		return cptab;
- 	}
- 
- 	high = node ? nr_node_ids - 1 : nr_cpu_ids - 1;
- 
--	for (str = strim(pattern), c = 0;; c++) {
-+	for (str = strim(str), c = 0; /* until break */; c++) {
- 		struct cfs_range_expr *range;
- 		struct cfs_expr_list *el;
--		char *bracket = strchr(str, '[');
- 		int n;
- 
-+		bracket = strchr(str, '[');
- 		if (!bracket) {
- 			if (*str) {
- 				CERROR("Invalid pattern '%s'\n", str);
--				goto failed;
-+				rc = -EINVAL;
-+				goto err_free_table;
- 			}
- 			if (c != ncpt) {
- 				CERROR("Expect %d partitions but found %d\n",
- 				       ncpt, c);
--				goto failed;
-+				rc = -EINVAL;
-+				goto err_free_table;
- 			}
- 			break;
- 		}
- 
- 		if (sscanf(str, "%d%n", &cpt, &n) < 1) {
- 			CERROR("Invalid CPU pattern '%s'\n", str);
--			goto failed;
-+			rc = -EINVAL;
-+			goto err_free_table;
- 		}
- 
- 		if (cpt < 0 || cpt >= ncpt) {
- 			CERROR("Invalid partition id %d, total partitions %d\n",
- 			       cpt, ncpt);
--			goto failed;
-+			rc = -EINVAL;
-+			goto err_free_table;
- 		}
- 
- 		if (cfs_cpt_weight(cptab, cpt)) {
- 			CERROR("Partition %d has already been set.\n", cpt);
--			goto failed;
-+			rc = -EPERM;
-+			goto err_free_table;
- 		}
- 
- 		str = strim(str + n);
- 		if (str != bracket) {
- 			CERROR("Invalid pattern '%s'\n", str);
--			goto failed;
-+			rc = -EINVAL;
-+			goto err_free_table;
- 		}
- 
- 		bracket = strchr(str, ']');
- 		if (!bracket) {
- 			CERROR("Missing right bracket for partition %d in '%s'\n",
- 			       cpt, str);
--			goto failed;
-+			rc = -EINVAL;
-+			goto err_free_table;
- 		}
- 
--		if (cfs_expr_list_parse(str, (bracket - str) + 1,
--					0, high, &el)) {
-+		rc = cfs_expr_list_parse(str, (bracket - str) + 1, 0, high,
-+					 &el);
-+		if (rc) {
- 			CERROR("Can't parse number range in '%s'\n", str);
--			goto failed;
-+			rc = -ERANGE;
-+			goto err_free_table;
- 		}
- 
- 		list_for_each_entry(range, &el->el_exprs, re_link) {
-@@ -1033,7 +1060,8 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(char *pattern)
- 					    cfs_cpt_set_cpu(cptab, cpt, i);
- 				if (!rc) {
- 					cfs_expr_list_free(el);
--					goto failed;
-+					rc = -EINVAL;
-+					goto err_free_table;
- 				}
- 			}
- 		}
-@@ -1042,17 +1070,21 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(char *pattern)
- 
- 		if (!cfs_cpt_online(cptab, cpt)) {
- 			CERROR("No online CPU is found on partition %d\n", cpt);
--			goto failed;
-+			rc = -ENODEV;
-+			goto err_free_table;
- 		}
- 
- 		str = strim(bracket + 1);
- 	}
- 
-+	kfree(pattern_dup);
  	return cptab;
  
--failed:
-+err_free_table:
- 	cfs_cpt_table_free(cptab);
--	return NULL;
-+err_free_str:
-+	kfree(pattern_dup);
-+	return ERR_PTR(rc);
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
-@@ -1079,7 +1111,7 @@ static int cfs_cpu_dead(unsigned int cpu)
- 
- void cfs_cpu_fini(void)
- {
--	if (cfs_cpt_tab)
-+	if (!IS_ERR_OR_NULL(cfs_cpt_tab))
- 		cfs_cpt_table_free(cfs_cpt_tab);
- 
- #ifdef CONFIG_HOTPLUG_CPU
-@@ -1112,26 +1144,20 @@ int cfs_cpu_init(void)
- #endif
- 	get_online_cpus();
- 	if (*cpu_pattern) {
--		char *cpu_pattern_dup = kstrdup(cpu_pattern, GFP_KERNEL);
--
--		if (!cpu_pattern_dup) {
--			CERROR("Failed to duplicate cpu_pattern\n");
--			goto failed_alloc_table;
--		}
--
--		cfs_cpt_tab = cfs_cpt_table_create_pattern(cpu_pattern_dup);
--		kfree(cpu_pattern_dup);
--		if (!cfs_cpt_tab) {
--			CERROR("Failed to create cptab from pattern %s\n",
-+		cfs_cpt_tab = cfs_cpt_table_create_pattern(cpu_pattern);
-+		if (IS_ERR(cfs_cpt_tab)) {
-+			CERROR("Failed to create cptab from pattern '%s'\n",
- 			       cpu_pattern);
-+			ret = PTR_ERR(cfs_cpt_tab);
- 			goto failed_alloc_table;
- 		}
- 
- 	} else {
- 		cfs_cpt_tab = cfs_cpt_table_create(cpu_npartitions);
--		if (!cfs_cpt_tab) {
--			CERROR("Failed to create ptable with npartitions %d\n",
-+		if (IS_ERR(cfs_cpt_tab)) {
-+			CERROR("Failed to create cptab with npartitions %d\n",
- 			       cpu_npartitions);
-+			ret = PTR_ERR(cfs_cpt_tab);
- 			goto failed_alloc_table;
- 		}
- 	}
-@@ -1146,7 +1172,7 @@ int cfs_cpu_init(void)
- failed_alloc_table:
- 	put_online_cpus();
- 
--	if (cfs_cpt_tab)
-+	if (!IS_ERR_OR_NULL(cfs_cpt_tab))
- 		cfs_cpt_table_free(cfs_cpt_tab);
- 
- 	ret = -EINVAL;
+ failed_mask:
+-	free_cpumask_var(mask);
++	free_cpumask_var(node_mask);
+ failed:
+ 	CERROR("Failed to setup CPU-partition-table with %d CPU-partitions, online HW nodes: %d, HW cpus: %d.\n",
+ 	       ncpt, num_online_nodes(), num_online_cpus());
 -- 
 1.8.3.1
