@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 May 2018 10:21:57 -0400
-Subject: [lustre-devel] [PATCH v2 17/25] staging: lustre: libcfs: rename
- cpumask_var_t variables to *_mask
+Date: Tue, 29 May 2018 10:22:05 -0400
+Subject: [lustre-devel] [PATCH v2 25/25] staging: lustre: ptlrpc: use
+ current CPU instead of hardcoded 0
 In-Reply-To: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
 References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1527603725-30560-18-git-send-email-jsimmons@infradead.org>
+Message-ID: <1527603725-30560-26-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,178 +14,63 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Because we handle both cpu mask as well as core identifiers it can
-easily be confused. To avoid this rename various cpumask_var_t to
-have appended *_mask to their names.
+fix crash if CPU 0 disabled.
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
-Reviewed-on: https://review.whamcloud.com/23222
-Reviewed-by: Amir Shehata <amir.shehata@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8710
+Reviewed-on: https://review.whamcloud.com/23305
+Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
 Changelog:
 
-v1) Initial patch
-v2) Rebased patch. No changes in code from earlier patch
+v1) New patch to address crash in ptlrpc
 
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 62 ++++++++++++-------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/service.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index 1c10529..fb27dac 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -710,23 +710,23 @@ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
-  * We always prefer to choose CPU in the same core/socket.
-  */
- static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
--				cpumask_t *node, int number)
-+				cpumask_t *node_mask, int number)
- {
--	cpumask_var_t socket;
--	cpumask_var_t core;
-+	cpumask_var_t socket_mask;
-+	cpumask_var_t core_mask;
- 	int rc = 0;
- 	int cpu;
- 
- 	LASSERT(number > 0);
- 
--	if (number >= cpumask_weight(node)) {
--		while (!cpumask_empty(node)) {
--			cpu = cpumask_first(node);
-+	if (number >= cpumask_weight(node_mask)) {
-+		while (!cpumask_empty(node_mask)) {
-+			cpu = cpumask_first(node_mask);
- 
- 			rc = cfs_cpt_set_cpu(cptab, cpt, cpu);
- 			if (!rc)
- 				return -EINVAL;
--			cpumask_clear_cpu(cpu, node);
-+			cpumask_clear_cpu(cpu, node_mask);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index 3fd8c74..8e74a45 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -421,7 +421,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
+ 		 * there are.
+ 		 */
+ 		/* weight is # of HTs */
+-		if (cpumask_weight(topology_sibling_cpumask(0)) > 1) {
++		if (cpumask_weight(topology_sibling_cpumask(smp_processor_id())) > 1) {
+ 			/* depress thread factor for hyper-thread */
+ 			factor = factor - (factor >> 1) + (factor >> 3);
  		}
- 		return 0;
- 	}
-@@ -736,34 +736,34 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
- 	 * As we cannot initialize a cpumask_var_t, we need
- 	 * to alloc both before we can risk trying to free either
- 	 */
--	if (!zalloc_cpumask_var(&socket, GFP_NOFS))
-+	if (!zalloc_cpumask_var(&socket_mask, GFP_NOFS))
- 		rc = -ENOMEM;
--	if (!zalloc_cpumask_var(&core, GFP_NOFS))
-+	if (!zalloc_cpumask_var(&core_mask, GFP_NOFS))
- 		rc = -ENOMEM;
- 	if (rc)
- 		goto out;
- 
--	while (!cpumask_empty(node)) {
--		cpu = cpumask_first(node);
-+	while (!cpumask_empty(node_mask)) {
-+		cpu = cpumask_first(node_mask);
- 
- 		/* get cpumask for cores in the same socket */
--		cpumask_copy(socket, topology_core_cpumask(cpu));
--		cpumask_and(socket, socket, node);
-+		cpumask_copy(socket_mask, topology_core_cpumask(cpu));
-+		cpumask_and(socket_mask, socket_mask, node_mask);
- 
--		LASSERT(!cpumask_empty(socket));
-+		LASSERT(!cpumask_empty(socket_mask));
- 
--		while (!cpumask_empty(socket)) {
-+		while (!cpumask_empty(socket_mask)) {
- 			int i;
- 
- 			/* get cpumask for hts in the same core */
--			cpumask_copy(core, topology_sibling_cpumask(cpu));
--			cpumask_and(core, core, node);
-+			cpumask_copy(core_mask, topology_sibling_cpumask(cpu));
-+			cpumask_and(core_mask, core_mask, node_mask);
- 
--			LASSERT(!cpumask_empty(core));
-+			LASSERT(!cpumask_empty(core_mask));
- 
--			for_each_cpu(i, core) {
--				cpumask_clear_cpu(i, socket);
--				cpumask_clear_cpu(i, node);
-+			for_each_cpu(i, core_mask) {
-+				cpumask_clear_cpu(i, socket_mask);
-+				cpumask_clear_cpu(i, node_mask);
- 
- 				rc = cfs_cpt_set_cpu(cptab, cpt, i);
- 				if (!rc) {
-@@ -774,13 +774,13 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
- 				if (!--number)
- 					goto out;
- 			}
--			cpu = cpumask_first(socket);
-+			cpu = cpumask_first(socket_mask);
- 		}
- 	}
- 
- out:
--	free_cpumask_var(socket);
--	free_cpumask_var(core);
-+	free_cpumask_var(socket_mask);
-+	free_cpumask_var(core_mask);
- 	return rc;
- }
- 
-@@ -831,7 +831,7 @@ static int cfs_cpt_num_estimate(void)
- static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- {
- 	struct cfs_cpt_table *cptab = NULL;
--	cpumask_var_t mask;
-+	cpumask_var_t node_mask;
- 	int cpt = 0;
- 	int num;
+@@ -2221,15 +2221,16 @@ static int ptlrpc_hr_main(void *arg)
+ 	struct ptlrpc_hr_thread	*hrt = arg;
+ 	struct ptlrpc_hr_partition *hrp = hrt->hrt_partition;
+ 	LIST_HEAD(replies);
+-	char threadname[20];
  	int rc;
-@@ -864,15 +864,15 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 		goto failed;
+ 
+-	snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
+-		 hrp->hrp_cpt, hrt->hrt_id);
+ 	unshare_fs_struct();
+ 
+ 	rc = cfs_cpt_bind(ptlrpc_hr.hr_cpt_table, hrp->hrp_cpt);
+ 	if (rc != 0) {
++		char threadname[20];
++
++		snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
++			 hrp->hrp_cpt, hrt->hrt_id);
+ 		CWARN("Failed to bind %s on CPT %d of CPT table %p: rc = %d\n",
+ 		      threadname, hrp->hrp_cpt, ptlrpc_hr.hr_cpt_table, rc);
  	}
+@@ -2528,7 +2529,7 @@ int ptlrpc_hr_init(void)
  
--	if (!zalloc_cpumask_var(&mask, GFP_NOFS)) {
-+	if (!zalloc_cpumask_var(&node_mask, GFP_NOFS)) {
- 		CERROR("Failed to allocate scratch cpumask\n");
- 		goto failed;
- 	}
+ 	init_waitqueue_head(&ptlrpc_hr.hr_waitq);
  
- 	for_each_online_node(i) {
--		cpumask_copy(mask, cpumask_of_node(i));
-+		cpumask_copy(node_mask, cpumask_of_node(i));
+-	weight = cpumask_weight(topology_sibling_cpumask(0));
++	weight = cpumask_weight(topology_sibling_cpumask(smp_processor_id()));
  
--		while (!cpumask_empty(mask)) {
-+		while (!cpumask_empty(node_mask)) {
- 			struct cfs_cpu_partition *part;
- 			int n;
- 
-@@ -889,7 +889,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 			n = num - cpumask_weight(part->cpt_cpumask);
- 			LASSERT(n > 0);
- 
--			rc = cfs_cpt_choose_ncpus(cptab, cpt, mask, n);
-+			rc = cfs_cpt_choose_ncpus(cptab, cpt, node_mask, n);
- 			if (rc < 0)
- 				goto failed_mask;
- 
-@@ -907,12 +907,12 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 		goto failed_mask;
- 	}
- 
--	free_cpumask_var(mask);
-+	free_cpumask_var(node_mask);
- 
- 	return cptab;
- 
- failed_mask:
--	free_cpumask_var(mask);
-+	free_cpumask_var(node_mask);
- failed:
- 	CERROR("Failed to setup CPU-partition-table with %d CPU-partitions, online HW nodes: %d, HW cpus: %d.\n",
- 	       ncpt, num_online_nodes(), num_online_cpus());
+ 	cfs_percpt_for_each(hrp, i, ptlrpc_hr.hr_partitions) {
+ 		hrp->hrp_cpt = i;
 -- 
 1.8.3.1
