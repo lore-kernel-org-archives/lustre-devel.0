@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 May 2018 10:22:05 -0400
-Subject: [lustre-devel] [PATCH v2 25/25] staging: lustre: ptlrpc: use
- current CPU instead of hardcoded 0
+Date: Tue, 29 May 2018 10:21:55 -0400
+Subject: [lustre-devel] [PATCH v2 15/25] staging: lustre: libcfs: rename i
+ to node for cfs_cpt_set_nodemask
 In-Reply-To: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
 References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1527603725-30560-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1527603725-30560-16-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,63 +14,55 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-fix crash if CPU 0 disabled.
+Rename variable i to node to make code easier to understand.
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8710
-Reviewed-on: https://review.whamcloud.com/23305
-Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
-Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
+Reviewed-on: https://review.whamcloud.com/23222
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
 Changelog:
 
-v1) New patch to address crash in ptlrpc
+v1) Initial patch
+v2) Rebased patch. No changes in code
 
- drivers/staging/lustre/lustre/ptlrpc/service.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 3fd8c74..8e74a45 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -421,7 +421,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
- 		 * there are.
- 		 */
- 		/* weight is # of HTs */
--		if (cpumask_weight(topology_sibling_cpumask(0)) > 1) {
-+		if (cpumask_weight(topology_sibling_cpumask(smp_processor_id())) > 1) {
- 			/* depress thread factor for hyper-thread */
- 			factor = factor - (factor >> 1) + (factor >> 3);
- 		}
-@@ -2221,15 +2221,16 @@ static int ptlrpc_hr_main(void *arg)
- 	struct ptlrpc_hr_thread	*hrt = arg;
- 	struct ptlrpc_hr_partition *hrp = hrt->hrt_partition;
- 	LIST_HEAD(replies);
--	char threadname[20];
- 	int rc;
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+index 14d5791..bac5601 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+@@ -575,10 +575,10 @@ void cfs_cpt_unset_node(struct cfs_cpt_table *cptab, int cpt, int node)
+ int cfs_cpt_set_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ 			 const nodemask_t *mask)
+ {
+-	int i;
++	int node;
  
--	snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
--		 hrp->hrp_cpt, hrt->hrt_id);
- 	unshare_fs_struct();
- 
- 	rc = cfs_cpt_bind(ptlrpc_hr.hr_cpt_table, hrp->hrp_cpt);
- 	if (rc != 0) {
-+		char threadname[20];
-+
-+		snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
-+			 hrp->hrp_cpt, hrt->hrt_id);
- 		CWARN("Failed to bind %s on CPT %d of CPT table %p: rc = %d\n",
- 		      threadname, hrp->hrp_cpt, ptlrpc_hr.hr_cpt_table, rc);
+-	for_each_node_mask(i, *mask) {
+-		if (!cfs_cpt_set_node(cptab, cpt, i))
++	for_each_node_mask(node, *mask) {
++		if (!cfs_cpt_set_node(cptab, cpt, node))
+ 			return 0;
  	}
-@@ -2528,7 +2529,7 @@ int ptlrpc_hr_init(void)
  
- 	init_waitqueue_head(&ptlrpc_hr.hr_waitq);
+@@ -589,10 +589,10 @@ int cfs_cpt_set_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ 			    const nodemask_t *mask)
+ {
+-	int i;
++	int node;
  
--	weight = cpumask_weight(topology_sibling_cpumask(0));
-+	weight = cpumask_weight(topology_sibling_cpumask(smp_processor_id()));
+-	for_each_node_mask(i, *mask)
+-		cfs_cpt_unset_node(cptab, cpt, i);
++	for_each_node_mask(node, *mask)
++		cfs_cpt_unset_node(cptab, cpt, node);
+ }
+ EXPORT_SYMBOL(cfs_cpt_unset_nodemask);
  
- 	cfs_percpt_for_each(hrp, i, ptlrpc_hr.hr_partitions) {
- 		hrp->hrp_cpt = i;
 -- 
 1.8.3.1
