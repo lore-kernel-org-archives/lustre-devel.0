@@ -1,124 +1,133 @@
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Tue, 29 May 2018 16:29:39 +0200
-Subject: [lustre-devel] [PATCH 05/13] staging: lustre: no need to check
- debugfs return values
+Date: Tue, 29 May 2018 16:29:40 +0200
+Subject: [lustre-devel] [PATCH 06/13] staging: lustre: remove
+ ldebugfs_add_simple() wrapper
 In-Reply-To: <20180529142947.3250-1-gregkh@linuxfoundation.org>
 References: <20180529142947.3250-1-gregkh@linuxfoundation.org>
-Message-ID: <20180529142947.3250-5-gregkh@linuxfoundation.org>
+Message-ID: <20180529142947.3250-6-gregkh@linuxfoundation.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-When calling debugfs functions, there is no need to ever check the
-return value.  The function can work or not, but the code logic should
-never do something different based on this.
-
-Clean up the lustre core code by not caring about the value of debugfs
-calls.  This ends up removing a number of lines of code that are not
-needed.
-
-Note, more work is needed to remove the unneeded debugfs wrapper
-functions in the future.
+It was only being called in one place, and is an unneeded wrapper
+function around debugfs_create_file() so just call the real debugfs
+function instead.  This ends up cleaning up some unneeded error handling
+logic that was never needed as well.
 
 Cc: Oleg Drokin <oleg.drokin@intel.com>
 Cc: Andreas Dilger <andreas.dilger@intel.com>
 Cc: James Simmons <jsimmons@infradead.org>
-Cc: NeilBrown <neilb@suse.com>
+Cc: Quentin Bouget <quentin.bouget@cea.fr>
 Cc: Ben Evans <bevans@cray.com>
+Cc: NeilBrown <neilb@suse.com>
 Cc: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Cc: "John L. Hammond" <john.hammond@intel.com>
+Cc: Arushi Singhal <arushisinghal19971997@gmail.com>
 Cc: Dafna Hirschfeld <dafna3@gmail.com>
 Cc: Mathias Rav <mathiasrav@gmail.com>
 Cc: "Gustavo A. R. Silva" <garsilva@embeddedor.com>
 Cc: lustre-devel at lists.lustre.org
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- .../lustre/obdclass/linux/linux-module.c      | 19 ++-----------------
- .../lustre/lustre/obdclass/lprocfs_status.c   | 11 -----------
- 2 files changed, 2 insertions(+), 28 deletions(-)
+ .../lustre/lustre/include/lprocfs_status.h    |  5 -----
+ drivers/staging/lustre/lustre/lov/lov_pool.c  | 21 +++++--------------
+ .../lustre/lustre/obdclass/lprocfs_status.c   | 19 -----------------
+ 3 files changed, 5 insertions(+), 40 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-index d3196439985b..9c800580053b 100644
---- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-+++ b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
-@@ -481,7 +481,6 @@ static const struct attribute_group lustre_attr_group = {
- int class_procfs_init(void)
- {
- 	int rc = -ENOMEM;
--	struct dentry *file;
- 
- 	lustre_kobj = kobject_create_and_add("lustre", fs_kobj);
- 	if (!lustre_kobj)
-@@ -495,23 +494,9 @@ int class_procfs_init(void)
+diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+index 1322ecffda13..9eac7dac8c7b 100644
+--- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
++++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+@@ -447,11 +447,6 @@ void lprocfs_counter_init(struct lprocfs_stats *stats, int index,
+ 			  const char *units);
+ struct obd_export;
+ int lprocfs_exp_cleanup(struct obd_export *exp);
+-struct dentry *ldebugfs_add_simple(struct dentry *root,
+-				   char *name,
+-				   void *data,
+-				   const struct file_operations *fops);
+-
+ int ldebugfs_register_stats(struct dentry *parent,
+ 			    const char *name,
+ 			    struct lprocfs_stats *stats);
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
+index 6d2dec9266b6..9ce7038c9b0e 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pool.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
+@@ -80,7 +80,6 @@ void lov_pool_putref(struct pool_desc *pool)
+ 	CDEBUG(D_INFO, "pool %p\n", pool);
+ 	if (atomic_dec_and_test(&pool->pool_refcount)) {
+ 		LASSERT(list_empty(&pool->pool_list));
+-		LASSERT(!pool->pool_debugfs_entry);
+ 		lov_ost_pool_free(&pool->pool_obds);
+ 		kfree_rcu(pool, rcu);
  	}
+@@ -377,18 +376,11 @@ int lov_pool_new(struct obd_device *obd, char *poolname)
  
- 	debugfs_lustre_root = debugfs_create_dir("lustre", NULL);
--	if (IS_ERR_OR_NULL(debugfs_lustre_root)) {
--		rc = debugfs_lustre_root ? PTR_ERR(debugfs_lustre_root)
--					 : -ENOMEM;
--		debugfs_lustre_root = NULL;
--		sysfs_remove_group(lustre_kobj, &lustre_attr_group);
--		kobject_put(lustre_kobj);
--		goto out;
+ 	/* get ref for debugfs file */
+ 	lov_pool_getref(new_pool);
+-	new_pool->pool_debugfs_entry = ldebugfs_add_simple(
++
++	new_pool->pool_debugfs_entry = debugfs_create_file(poolname, 0444,
+ 						lov->lov_pool_debugfs_entry,
+-						poolname, new_pool,
++						new_pool,
+ 						&pool_proc_operations);
+-	if (IS_ERR_OR_NULL(new_pool->pool_debugfs_entry)) {
+-		CWARN("Cannot add debugfs pool entry " LOV_POOLNAMEF "\n",
+-		      poolname);
+-		new_pool->pool_debugfs_entry = NULL;
+-		lov_pool_putref(new_pool);
 -	}
+-	CDEBUG(D_INFO, "pool %p - proc %p\n",
+-	       new_pool, new_pool->pool_debugfs_entry);
  
--	file = debugfs_create_file("devices", 0444, debugfs_lustre_root, NULL,
--				   &obd_device_list_fops);
--	if (IS_ERR_OR_NULL(file)) {
--		rc = file ? PTR_ERR(file) : -ENOMEM;
--		sysfs_remove_group(lustre_kobj, &lustre_attr_group);
--		kobject_put(lustre_kobj);
--		goto out;
+ 	spin_lock(&obd->obd_dev_lock);
+ 	list_add_tail(&new_pool->pool_list, &lov->lov_pool_list);
+@@ -443,11 +435,8 @@ int lov_pool_del(struct obd_device *obd, char *poolname)
+ 	if (!pool)
+ 		return -ENOENT;
+ 
+-	if (!IS_ERR_OR_NULL(pool->pool_debugfs_entry)) {
+-		CDEBUG(D_INFO, "proc entry %p\n", pool->pool_debugfs_entry);
+-		ldebugfs_remove(&pool->pool_debugfs_entry);
+-		lov_pool_putref(pool);
 -	}
-+	debugfs_create_file("devices", 0444, debugfs_lustre_root, NULL,
-+			    &obd_device_list_fops);
- out:
- 	return rc;
- }
++	ldebugfs_remove(&pool->pool_debugfs_entry);
++	lov_pool_putref(pool);
+ 
+ 	spin_lock(&obd->obd_dev_lock);
+ 	list_del_init(&pool->pool_list);
 diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index eb6396add78d..c3f57b025f10 100644
+index c3f57b025f10..68e85f46a146 100644
 --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
 +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -315,10 +315,6 @@ struct dentry *ldebugfs_add_simple(struct dentry *root,
- 	if (fops->write)
- 		mode |= 0200;
- 	entry = debugfs_create_file(name, mode, root, data, fops);
--	if (IS_ERR_OR_NULL(entry)) {
--		CERROR("LprocFS: No memory to create <debugfs> entry %s\n", name);
--		return entry ?: ERR_PTR(-ENOMEM);
--	}
- 	return entry;
- }
- EXPORT_SYMBOL_GPL(ldebugfs_add_simple);
-@@ -348,8 +344,6 @@ int ldebugfs_add_vars(struct dentry *parent,
- 					    list->data ?: data,
- 					    list->fops ?: &lprocfs_generic_fops
- 					   );
--		if (IS_ERR_OR_NULL(entry))
--			return entry ? PTR_ERR(entry) : -ENOMEM;
- 		list++;
- 	}
- 	return 0;
-@@ -1358,9 +1352,6 @@ int ldebugfs_register_stats(struct dentry *parent, const char *name,
+@@ -300,25 +300,6 @@ EXPORT_SYMBOL(lprocfs_seq_release);
  
- 	entry = debugfs_create_file(name, 0644, parent, stats,
- 				    &lprocfs_stats_seq_fops);
--	if (IS_ERR_OR_NULL(entry))
--		return entry ? PTR_ERR(entry) : -ENOMEM;
+ /* lprocfs API calls */
+ 
+-struct dentry *ldebugfs_add_simple(struct dentry *root,
+-				   char *name, void *data,
+-				   const struct file_operations *fops)
+-{
+-	struct dentry *entry;
+-	umode_t mode = 0;
 -
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(ldebugfs_register_stats);
-@@ -1588,8 +1579,6 @@ int ldebugfs_seq_create(struct dentry *parent, const char *name,
- 	LASSERT((!seq_fops->write) == ((mode & 0222) == 0));
+-	if (!root || !name || !fops)
+-		return ERR_PTR(-EINVAL);
+-
+-	if (fops->read)
+-		mode = 0444;
+-	if (fops->write)
+-		mode |= 0200;
+-	entry = debugfs_create_file(name, mode, root, data, fops);
+-	return entry;
+-}
+-EXPORT_SYMBOL_GPL(ldebugfs_add_simple);
+-
+ static const struct file_operations lprocfs_generic_fops = { };
  
- 	entry = debugfs_create_file(name, mode, parent, data, seq_fops);
--	if (IS_ERR_OR_NULL(entry))
--		return entry ? PTR_ERR(entry) : -ENOMEM;
- 
- 	return 0;
- }
+ int ldebugfs_add_vars(struct dentry *parent,
 -- 
 2.17.0
