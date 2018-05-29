@@ -1,52 +1,254 @@
-From: Jason Gunthorpe <jgg@ziepe.ca>
-Date: Mon, 28 May 2018 10:39:49 -0600
-Subject: [lustre-devel] [PATCH] IB: Revert "remove redundant INFINIBAND
- kconfig dependencies"
-In-Reply-To: <CAHH2K0Ysgi30gHPN8EEdDa+PfSFJLo8=6j-aq=SYy=_h6K0kPg@mail.gmail.com>
-References: <20180525213123.2113748-1-arnd@arndb.de>
- <CAHH2K0Ysgi30gHPN8EEdDa+PfSFJLo8=6j-aq=SYy=_h6K0kPg@mail.gmail.com>
-Message-ID: <20180528163949.GA17505@ziepe.ca>
+From: NeilBrown <neilb@suse.com>
+Date: Wed, 30 May 2018 09:45:08 +1000
+Subject: [lustre-devel] [PATCH v2 01/25] staging: lustre: libcfs:
+ restore UMP handling
+In-Reply-To: <1527603725-30560-2-git-send-email-jsimmons@infradead.org>
+References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
+ <1527603725-30560-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <87muwiuiuz.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Thelen <gthelen@google.com>
-Cc: arnd@arndb.de, Doug Ledford <dledford@redhat.com>, Keith Busch <keith.busch@intel.com>, Jens Axboe <axboe@fb.com>, Christoph Hellwig <hch@lst.de>, Sagi Grimberg <sagi@grimberg.me>, oleg.drokin@intel.com, andreas.dilger@intel.com, jsimmons@infradead.org, gregkh@linuxfoundation.org, Steve French <sfrench@samba.org>, ericvh@gmail.com, rminnich@sandia.gov, lucho@ionkov.net, "David S. Miller" <davem@davemloft.net>, santosh.shilimkar@oracle.com, trond.myklebust@hammerspace.com, anna.schumaker@netapp.com, bfields@fieldses.org, jlayton@kernel.org, Bart Van Assche <bart.vanassche@wdc.com>, linux-rdma@vger.kernel.org, LKML <linux-kernel@vger.kernel.org>, linux-nvme@lists.infradead.org, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-cifs@vger.kernel.org, samba-techni
+To: James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <uja.ornl@yahoo.com>, Amir Shehata <amir.shehata@intel.com>
 
-On Fri, May 25, 2018 at 05:32:52PM -0700, Greg Thelen wrote:
-> On Fri, May 25, 2018 at 2:32 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > Several subsystems depend on INFINIBAND_ADDR_TRANS, which in turn depends
-> > on INFINIBAND. However, when with CONFIG_INIFIBAND=m, this leads to a
-> > link error when another driver using it is built-in. The
-> > INFINIBAND_ADDR_TRANS dependency is insufficient here as this is
-> > a 'bool' symbol that does not force anything to be a module in turn.
-> 
-> > fs/cifs/smbdirect.o: In function `smbd_disconnect_rdma_work':
-> > smbdirect.c:(.text+0x1e4): undefined reference to `rdma_disconnect'
-> > net/9p/trans_rdma.o: In function `rdma_request':
-> > trans_rdma.c:(.text+0x7bc): undefined reference to `rdma_disconnect'
-> > net/9p/trans_rdma.o: In function `rdma_destroy_trans':
-> > trans_rdma.c:(.text+0x830): undefined reference to `ib_destroy_qp'
-> > trans_rdma.c:(.text+0x858): undefined reference to `ib_dealloc_pd'
-> 
-> > Fixes: 9533b292a7ac ("IB: remove redundant INFINIBAND kconfig
-> dependencies")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Acked-by: Greg Thelen <gthelen@google.com>
-> 
-> Sorry for the 9533b292a7ac problem.
-> At this point the in release cycle, I think Arnd's revert is best.
-> 
-> If there is interest, I've put a little thought into an alternative fix:
-> making INFINIBAND_ADDR_TRANS tristate.  But it's nontrivial.
-> So I prefer this simple revert for now.
+On Tue, May 29 2018, James Simmons wrote:
 
-Is that a normal thing to do?
+> With the cleanup of the libcfs SMP handling all UMP handling
+> was removed. In the process now various NULL pointers and
+> empty fields are return in the UMP case which causes lustre
+> to crash hard. Restore the proper UMP handling so Lustre can
+> properly function.
 
-> Doug: do you need anything from me on this?
+Can't we just get lustre to handle the NULL pointer?
+Is most cases, the pointer is accessed through an accessor function, and
+on !CONFIG_SMP, that can be a static inline that doesn't even look at
+the pointer.
 
-I can take the revert..
+I really think this is a step backwards.  If you can identify specific
+problems caused by the current code, I'm sure we can fix them.
 
-Jason
+>
+> Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+> Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7734
+
+This bug doesn't seem to mention this patch at all
+
+> Reviewed-on: http://review.whamcloud.com/18916
+
+Nor does this review.
+
+Thanks,
+NeilBrown
+
+
+> Reviewed-by: Olaf Weber <olaf@sgi.com>
+> Reviewed-by: Doug Oucharek <dougso@me.com>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+> Changelog:
+>
+> v1) New patch to handle the disappearence of UMP support
+>
+>  .../lustre/include/linux/libcfs/libcfs_cpu.h       | 87 ++++++++++++++++------
+>  drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    |  4 -
+>  drivers/staging/lustre/lnet/libcfs/module.c        |  4 +
+>  3 files changed, 69 insertions(+), 26 deletions(-)
+>
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> index 61641c4..2ad12a6 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> @@ -74,6 +74,7 @@
+>  
+>  #include <linux/cpu.h>
+>  #include <linux/cpuset.h>
+> +#include <linux/slab.h>
+>  #include <linux/topology.h>
+>  
+>  /* any CPU partition */
+> @@ -89,10 +90,11 @@ struct cfs_cpu_partition {
+>  	/* spread rotor for NUMA allocator */
+>  	unsigned int			cpt_spread_rotor;
+>  };
+> -
+> +#endif /* CONFIG_SMP */
+>  
+>  /** descriptor for CPU partitions */
+>  struct cfs_cpt_table {
+> +#ifdef CONFIG_SMP
+>  	/* version, reserved for hotplug */
+>  	unsigned int			ctb_version;
+>  	/* spread rotor for NUMA allocator */
+> @@ -103,14 +105,26 @@ struct cfs_cpt_table {
+>  	struct cfs_cpu_partition	*ctb_parts;
+>  	/* shadow HW CPU to CPU partition ID */
+>  	int				*ctb_cpu2cpt;
+> -	/* all cpus in this partition table */
+> -	cpumask_var_t			ctb_cpumask;
+>  	/* all nodes in this partition table */
+>  	nodemask_t			*ctb_nodemask;
+> +#else
+> +	nodemask_t			ctb_nodemask;
+> +#endif /* CONFIG_SMP */
+> +	/* all cpus in this partition table */
+> +	cpumask_var_t			ctb_cpumask;
+>  };
+>  
+>  extern struct cfs_cpt_table	*cfs_cpt_tab;
+>  
+> +#ifdef CONFIG_SMP
+> +/**
+> + * destroy a CPU partition table
+> + */
+> +void cfs_cpt_table_free(struct cfs_cpt_table *cptab);
+> +/**
+> + * create a cfs_cpt_table with \a ncpt number of partitions
+> + */
+> +struct cfs_cpt_table *cfs_cpt_table_alloc(unsigned int ncpt);
+>  /**
+>   * return cpumask of CPU partition \a cpt
+>   */
+> @@ -208,20 +222,52 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+>  void cfs_cpu_fini(void);
+>  
+>  #else /* !CONFIG_SMP */
+> -struct cfs_cpt_table;
+> -#define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
+>  
+> -static inline cpumask_var_t *
+> -cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt)
+> +static inline void cfs_cpt_table_free(struct cfs_cpt_table *cptab)
+>  {
+> -	return NULL;
+> +	kfree(cptab);
+>  }
+>  
+> -static inline int
+> -cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf, int len)
+> +static inline struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt)
+>  {
+> -	return 0;
+> +	struct cfs_cpt_table *cptab;
+> +
+> +	if (ncpt != 1)
+> +		return NULL;
+> +
+> +	cptab = kzalloc(sizeof(*cptab), GFP_NOFS);
+> +	if (!cptab)
+> +		return NULL;
+> +
+> +	if (!zalloc_cpumask_var(&cptab->ctb_cpumask, GFP_NOFS)) {
+> +		kfree(cptab);
+> +		return NULL;
+> +	}
+> +	cpumask_set_cpu(0, cptab->ctb_cpumask);
+> +	node_set(0, cptab->ctb_nodemask);
+> +
+> +	return cptab;
+> +}
+> +
+> +static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab,
+> +				      char *buf, int len)
+> +{
+> +	int rc;
+> +
+> +	rc = snprintf(buf, len, "0\t: 0\n");
+> +	len -= rc;
+> +	if (len <= 0)
+> +		return -EFBIG;
+> +
+> +	return rc;
+>  }
+> +
+> +static inline cpumask_var_t *
+> +cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt)
+> +{
+> +	return &cptab->ctb_cpumask;
+> +}
+> +
+>  static inline int
+>  cfs_cpt_number(struct cfs_cpt_table *cptab)
+>  {
+> @@ -243,7 +289,7 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+>  static inline nodemask_t *
+>  cfs_cpt_nodemask(struct cfs_cpt_table *cptab, int cpt)
+>  {
+> -	return NULL;
+> +	return &cptab->ctb_nodemask;
+>  }
+>  
+>  static inline int
+> @@ -328,24 +374,21 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+>  static inline int
+>  cfs_cpu_init(void)
+>  {
+> -	return 0;
+> +	cfs_cpt_tab = cfs_cpt_table_alloc(1);
+> +
+> +	return cfs_cpt_tab ? 0 : -1;
+>  }
+>  
+>  static inline void cfs_cpu_fini(void)
+>  {
+> +	if (cfs_cpt_tab) {
+> +		cfs_cpt_table_free(cfs_cpt_tab);
+> +		cfs_cpt_tab = NULL;
+> +	}
+>  }
+>  
+>  #endif /* CONFIG_SMP */
+>  
+> -/**
+> - * destroy a CPU partition table
+> - */
+> -void cfs_cpt_table_free(struct cfs_cpt_table *cptab);
+> -/**
+> - * create a cfs_cpt_table with \a ncpt number of partitions
+> - */
+> -struct cfs_cpt_table *cfs_cpt_table_alloc(unsigned int ncpt);
+> -
+>  /*
+>   * allocate per-cpu-partition data, returned value is an array of pointers,
+>   * variable can be indexed by CPU ID.
+> diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+> index 3d1cf45..803fc58 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+> +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+> @@ -41,10 +41,6 @@
+>  #include <linux/libcfs/libcfs_string.h>
+>  #include <linux/libcfs/libcfs.h>
+>  
+> -/** Global CPU partition table */
+> -struct cfs_cpt_table   *cfs_cpt_tab __read_mostly;
+> -EXPORT_SYMBOL(cfs_cpt_tab);
+> -
+>  /**
+>   * modparam for setting number of partitions
+>   *
+> diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
+> index 5dc7de9..b438d456 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/module.c
+> +++ b/drivers/staging/lustre/lnet/libcfs/module.c
+> @@ -66,6 +66,10 @@ struct lnet_debugfs_symlink_def {
+>  
+>  static struct dentry *lnet_debugfs_root;
+>  
+> +/** Global CPU partition table */
+> +struct cfs_cpt_table  *cfs_cpt_tab __read_mostly;
+> +EXPORT_SYMBOL(cfs_cpt_tab);
+> +
+>  BLOCKING_NOTIFIER_HEAD(libcfs_ioctl_list);
+>  EXPORT_SYMBOL(libcfs_ioctl_list);
+>  
+> -- 
+> 1.8.3.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180530/a5b6e092/attachment.sig>
