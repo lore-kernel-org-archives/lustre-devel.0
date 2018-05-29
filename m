@@ -1,61 +1,69 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 May 2018 10:21:40 -0400
-Subject: [lustre-devel] [PATCH v2 00/25] staging: lustre: libcfs: SMP rework
-Message-ID: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
+Date: Tue, 29 May 2018 10:21:45 -0400
+Subject: [lustre-devel] [PATCH v2 05/25] staging: lustre: libcfs: replace
+ MAX_NUMNODES with nr_node_ids
+In-Reply-To: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
+References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1527603725-30560-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <uja.ornl@yahoo.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Amir Shehata <amir.shehata@intel.com>, James Simmons <jsimmons@infradead.org>
 
-From: James Simmons <uja.ornl@yahoo.com>
+From: Amir Shehata <amir.shehata@intel.com>
 
-Recently lustre support has been expanded to extreme machines with as
-many as a 1000+ cores. On the other end lustre also has been ported
-to platforms like ARM and KNL which have uniquie NUMA and core setup.
-For example some devices exist that have NUMA nodes with no cores.
-With these new platforms the limitations of the Lustre's SMP code
-came to light so a lot of work was needed. This resulted in this
-patch set which has been tested on these platforms.
+Replace MAX_NUMNODES which is considered deprocated with
+nr_nodes_ids. Looking at page_malloc.c you will see that
+nr_nodes_ids is equal to MAX_NUMNODES. MAX_NUMNODES is
+actually setup with Kconfig.
 
-Amir Shehata (8):
-  staging: lustre: libcfs: replace MAX_NUMNODES with nr_node_ids
-  staging: lustre: libcfs: remove excess space
-  staging: lustre: libcfs: replace num_possible_cpus() with nr_cpu_ids
-  staging: lustre: libcfs: NUMA support
-  staging: lustre: libcfs: add cpu distance handling
-  staging: lustre: libcfs: use distance in cpu and node handling
-  staging: lustre: libcfs: provide debugfs files for distance handling
-  staging: lustre: libcfs: invert error handling for cfs_cpt_table_print
+Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-7734
+Reviewed-on: http://review.whamcloud.com/18916
+Reviewed-by: Olaf Weber <olaf@sgi.com>
+Reviewed-by: Doug Oucharek <dougso@me.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+Changelog:
 
-Dmitry Eremin (15):
-  staging: lustre: libcfs: remove useless CPU partition code
-  staging: lustre: libcfs: rename variable i to cpu
-  staging: lustre: libcfs: fix libcfs_cpu coding style
-  staging: lustre: libcfs: use int type for CPT identification.
-  staging: lustre: libcfs: rename i to node for cfs_cpt_set_nodemask
-  staging: lustre: libcfs: rename i to cpu for cfs_cpt_bind
-  staging: lustre: libcfs: rename cpumask_var_t variables to *_mask
-  staging: lustre: libcfs: rename goto label in cfs_cpt_table_print
-  staging: lustre: libcfs: update debug messages
-  staging: lustre: libcfs: make tolerant to offline CPUs and empty NUMA nodes
-  staging: lustre: libcfs: report NUMA node instead of just node
-  staging: lustre: libcfs: update debug messages in CPT code
-  staging: lustre: libcfs: rework CPU pattern parsing code
-  staging: lustre: libcfs: change CPT estimate algorithm
-  staging: lustre: ptlrpc: use current CPU instead of hardcoded 0
+v1) Initial patch
+v2) Same code but added in more details in commit message
 
-James Simmons (2):
-  staging: lustre: libcfs: restore UMP handling
-  staging: lustre: libcfs: properly handle failure cases in SMP code
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
- .../lustre/include/linux/libcfs/libcfs_cpu.h       | 225 +++--
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 965 +++++++++++----------
- drivers/staging/lustre/lnet/libcfs/module.c        |  57 ++
- drivers/staging/lustre/lnet/lnet/lib-msg.c         |   2 +
- drivers/staging/lustre/lustre/ptlrpc/service.c     |  11 +-
- 5 files changed, 728 insertions(+), 532 deletions(-)
-
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+index b67a60c..d3017e8 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+@@ -395,7 +395,7 @@ struct cfs_cpt_table *
+ {
+ 	const cpumask_t *mask;
+ 
+-	if (node < 0 || node >= MAX_NUMNODES) {
++	if (node < 0 || node >= nr_node_ids) {
+ 		CDEBUG(D_INFO,
+ 		       "Invalid NUMA id %d for CPU partition %d\n", node, cpt);
+ 		return 0;
+@@ -412,7 +412,7 @@ struct cfs_cpt_table *
+ {
+ 	const cpumask_t *mask;
+ 
+-	if (node < 0 || node >= MAX_NUMNODES) {
++	if (node < 0 || node >= nr_node_ids) {
+ 		CDEBUG(D_INFO,
+ 		       "Invalid NUMA id %d for CPU partition %d\n", node, cpt);
+ 		return;
+@@ -836,7 +836,7 @@ struct cfs_cpt_table *
+ 		return cptab;
+ 	}
+ 
+-	high = node ? MAX_NUMNODES - 1 : nr_cpu_ids - 1;
++	high = node ? nr_node_ids - 1 : nr_cpu_ids - 1;
+ 
+ 	for (str = strim(pattern), c = 0;; c++) {
+ 		struct cfs_range_expr *range;
 -- 
 1.8.3.1
