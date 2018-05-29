@@ -1,260 +1,142 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 May 2018 10:21:42 -0400
-Subject: [lustre-devel] [PATCH v2 3/6] staging: lustre: llite: remove unused
- parameters from md_{get, set}xattr()
+Date: Tue, 29 May 2018 10:21:40 -0400
+Subject: [lustre-devel] [PATCH v2 1/6] staging: lustre: llite: create acl.c
+ file
 In-Reply-To: <1527603705-30450-1-git-send-email-jsimmons@infradead.org>
 References: <1527603705-30450-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1527603705-30450-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1527603705-30450-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, "John L. Hammond" <john.hammond@intel.com>, James Simmons <jsimmons@infradead.org>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, James Simmons <jsimmons@infradead.org>
 
-From: "John L. Hammond" <john.hammond@intel.com>
+Move ll_get_acl() to its own file acl.c just like all the other
+linux file systems do.
 
-md_getxattr() and md_setxattr() each have several unused
-parameters. Remove them and improve the naming or remaining
-parameters.
-
-Signed-off-by: John L. Hammond <john.hammond@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-10792
-Reviewed-on: https://review.whamcloud.com/
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-6142
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
 Changelog:
 
-v1) Initial patch
+v1) Initial patch to add acl.c file which contains acl handling
+    for lustre
 
-v2) Rebased to new parent patch
+ drivers/staging/lustre/lustre/llite/Makefile       |  2 +
+ drivers/staging/lustre/lustre/llite/acl.c          | 51 ++++++++++++++++++++++
+ drivers/staging/lustre/lustre/llite/file.c         | 13 ------
+ .../staging/lustre/lustre/llite/llite_internal.h   |  5 +++
+ 4 files changed, 58 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/staging/lustre/lustre/llite/acl.c
 
-v3) Rebased againt to new parent patch using acl.c file
-
- drivers/staging/lustre/lustre/include/obd.h       |  7 ++---
- drivers/staging/lustre/lustre/include/obd_class.h | 21 ++++++--------
- drivers/staging/lustre/lustre/llite/acl.c         |  2 +-
- drivers/staging/lustre/lustre/llite/file.c        |  3 +-
- drivers/staging/lustre/lustre/llite/xattr.c       |  6 ++--
- drivers/staging/lustre/lustre/lmv/lmv_obd.c       | 22 +++++++--------
- drivers/staging/lustre/lustre/mdc/mdc_request.c   | 34 +++++++++++++----------
- 7 files changed, 46 insertions(+), 49 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index da99a0f..b1907bb 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -940,12 +940,11 @@ struct md_ops {
- 		      struct ptlrpc_request **);
- 
- 	int (*setxattr)(struct obd_export *, const struct lu_fid *,
--			u64, const char *, const char *, int, int, int, __u32,
--			struct ptlrpc_request **);
-+			u64, const char *, const void *, size_t, unsigned int,
-+			u32, struct ptlrpc_request **);
- 
- 	int (*getxattr)(struct obd_export *, const struct lu_fid *,
--			u64, const char *, const char *, int, int, int,
--			struct ptlrpc_request **);
-+			u64, const char *, size_t, struct ptlrpc_request **);
- 
- 	int (*init_ea_size)(struct obd_export *, u32, u32);
- 
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index a3b1465..fc9c772 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -1385,29 +1385,26 @@ static inline int md_merge_attr(struct obd_export *exp,
- }
- 
- static inline int md_setxattr(struct obd_export *exp, const struct lu_fid *fid,
--			      u64 valid, const char *name,
--			      const char *input, int input_size,
--			      int output_size, int flags, __u32 suppgid,
-+			      u64 obd_md_valid, const char *name,
-+			      const char *value, size_t value_size,
-+			      unsigned int xattr_flags, u32 suppgid,
- 			      struct ptlrpc_request **request)
- {
- 	EXP_CHECK_MD_OP(exp, setxattr);
- 	EXP_MD_COUNTER_INCREMENT(exp, setxattr);
--	return MDP(exp->exp_obd, setxattr)(exp, fid, valid, name, input,
--					   input_size, output_size, flags,
-+	return MDP(exp->exp_obd, setxattr)(exp, fid, obd_md_valid, name,
-+					   value, value_size, xattr_flags,
- 					   suppgid, request);
- }
- 
- static inline int md_getxattr(struct obd_export *exp, const struct lu_fid *fid,
--			      u64 valid, const char *name,
--			      const char *input, int input_size,
--			      int output_size, int flags,
--			      struct ptlrpc_request **request)
-+			      u64 obd_md_valid, const char *name,
-+			      size_t buf_size, struct ptlrpc_request **req)
- {
- 	EXP_CHECK_MD_OP(exp, getxattr);
- 	EXP_MD_COUNTER_INCREMENT(exp, getxattr);
--	return MDP(exp->exp_obd, getxattr)(exp, fid, valid, name, input,
--					   input_size, output_size, flags,
--					   request);
-+	return MDP(exp->exp_obd, getxattr)(exp, fid, obd_md_valid, name,
-+					   buf_size, req);
- }
- 
- static inline int md_set_open_replay_data(struct obd_export *exp,
+diff --git a/drivers/staging/lustre/lustre/llite/Makefile b/drivers/staging/lustre/lustre/llite/Makefile
+index 519fd74..5200924 100644
+--- a/drivers/staging/lustre/lustre/llite/Makefile
++++ b/drivers/staging/lustre/lustre/llite/Makefile
+@@ -9,3 +9,5 @@ lustre-y := dcache.o dir.o file.o llite_lib.o llite_nfs.o \
+ 	    super25.o statahead.o glimpse.o lcommon_cl.o lcommon_misc.o \
+ 	    vvp_dev.o vvp_page.o vvp_lock.o vvp_io.o vvp_object.o \
+ 	    lproc_llite.o
++
++lustre-$(CONFIG_FS_POSIX_ACL) += acl.o
 diff --git a/drivers/staging/lustre/lustre/llite/acl.c b/drivers/staging/lustre/lustre/llite/acl.c
-index de1499b..2ee9ff9 100644
---- a/drivers/staging/lustre/lustre/llite/acl.c
+new file mode 100644
+index 0000000..d7c3bf9
+--- /dev/null
 +++ b/drivers/staging/lustre/lustre/llite/acl.c
-@@ -94,7 +94,7 @@ int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type)
- 
- 	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode),
- 			 value ? OBD_MD_FLXATTR : OBD_MD_FLXATTRRM,
--			 name, value, value_size, 0, 0, 0, &req);
-+			 name, value, value_size, 0, 0, &req);
- 
- 	ptlrpc_req_finished(req);
- out_value:
+@@ -0,0 +1,51 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
++ * Use is subject to license terms.
++ *
++ * Copyright (c) 2011, 2015, Intel Corporation.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ * Lustre is a trademark of Sun Microsystems, Inc.
++ *
++ * lustre/llite/acl.c
++ */
++
++#define DEBUG_SUBSYSTEM S_LLITE
++
++#include "llite_internal.h"
++
++struct posix_acl *ll_get_acl(struct inode *inode, int type)
++{
++	struct ll_inode_info *lli = ll_i2info(inode);
++	struct posix_acl *acl = NULL;
++
++	spin_lock(&lli->lli_lock);
++	/* VFS' acl_permission_check->check_acl will release the refcount */
++	acl = posix_acl_dup(lli->lli_posix_acl);
++	spin_unlock(&lli->lli_lock);
++
++	return acl;
++}
 diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index ccbf91b..0229593 100644
+index a77cadc..ccbf91b 100644
 --- a/drivers/staging/lustre/lustre/llite/file.c
 +++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -3323,8 +3323,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
- 	rc = ll_get_default_mdsize(sbi, &lmmsize);
- 	if (rc == 0)
- 		rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode),
--				 OBD_MD_FLXATTR, XATTR_NAME_LOV, NULL, 0,
--				 lmmsize, 0, &req);
-+				 OBD_MD_FLXATTR, XATTR_NAME_LOV, lmmsize, &req);
- 	if (rc < 0)
- 		return rc;
- 
-diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
-index 1a597a6..7fa0a41 100644
---- a/drivers/staging/lustre/lustre/llite/xattr.c
-+++ b/drivers/staging/lustre/lustre/llite/xattr.c
-@@ -145,7 +145,7 @@ static int ll_xattr_set_common(const struct xattr_handler *handler,
- 		return -ENOMEM;
- 
- 	rc = md_setxattr(sbi->ll_md_exp, ll_inode2fid(inode), valid, fullname,
--			 pv, size, 0, flags, ll_i2suppgid(inode), &req);
-+			 pv, size, flags, ll_i2suppgid(inode), &req);
- 	kfree(fullname);
- 	if (rc) {
- 		if (rc == -EOPNOTSUPP && handler->flags == XATTR_USER_T) {
-@@ -344,8 +344,8 @@ int ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
- 		}
- 	} else {
- getxattr_nocache:
--		rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode),
--				 valid, name, NULL, 0, size, 0, &req);
-+		rc = md_getxattr(sbi->ll_md_exp, ll_inode2fid(inode), valid,
-+				 name, size, &req);
- 		if (rc < 0)
- 			goto out_xattr;
- 
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 60cdba9..fa5f4e5 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1400,9 +1400,8 @@ static int lmv_getstatus(struct obd_export *exp,
+@@ -3030,19 +3030,6 @@ static int ll_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+ 	return rc;
  }
  
- static int lmv_getxattr(struct obd_export *exp, const struct lu_fid *fid,
--			u64 valid, const char *name,
--			const char *input, int input_size, int output_size,
--			int flags, struct ptlrpc_request **request)
-+			u64 obd_md_valid, const char *name, size_t buf_size,
-+			struct ptlrpc_request **req)
- {
- 	struct obd_device      *obd = exp->exp_obd;
- 	struct lmv_obd	 *lmv = &obd->u.lmv;
-@@ -1412,15 +1411,15 @@ static int lmv_getxattr(struct obd_export *exp, const struct lu_fid *fid,
- 	if (IS_ERR(tgt))
- 		return PTR_ERR(tgt);
- 
--	return md_getxattr(tgt->ltd_exp, fid, valid, name, input,
--			 input_size, output_size, flags, request);
-+	return md_getxattr(tgt->ltd_exp, fid, obd_md_valid, name, buf_size,
-+			   req);
- }
- 
- static int lmv_setxattr(struct obd_export *exp, const struct lu_fid *fid,
--			u64 valid, const char *name,
--			const char *input, int input_size, int output_size,
--			int flags, __u32 suppgid,
--			struct ptlrpc_request **request)
-+			u64 obd_md_valid, const char *name,
-+			const void *value, size_t value_size,
-+			unsigned int xattr_flags, u32 suppgid,
-+			struct ptlrpc_request **req)
- {
- 	struct obd_device      *obd = exp->exp_obd;
- 	struct lmv_obd	 *lmv = &obd->u.lmv;
-@@ -1430,9 +1429,8 @@ static int lmv_setxattr(struct obd_export *exp, const struct lu_fid *fid,
- 	if (IS_ERR(tgt))
- 		return PTR_ERR(tgt);
- 
--	return md_setxattr(tgt->ltd_exp, fid, valid, name, input,
--			 input_size, output_size, flags, suppgid,
--			 request);
-+	return md_setxattr(tgt->ltd_exp, fid, obd_md_valid, name,
-+			   value, value_size, xattr_flags, suppgid, req);
- }
- 
- static int lmv_getattr(struct obd_export *exp, struct md_op_data *op_data,
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index e2f386c..0f33e34 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -349,26 +349,30 @@ static int mdc_xattr_common(struct obd_export *exp,
- }
- 
- static int mdc_setxattr(struct obd_export *exp, const struct lu_fid *fid,
--			u64 valid, const char *xattr_name,
--			const char *input, int input_size, int output_size,
--			int flags, __u32 suppgid,
--			struct ptlrpc_request **request)
-+			u64 obd_md_valid, const char *name,
-+			const void *value, size_t value_size,
-+			unsigned int xattr_flags, u32 suppgid,
-+			struct ptlrpc_request **req)
- {
-+	LASSERT(obd_md_valid == OBD_MD_FLXATTR ||
-+		obd_md_valid == OBD_MD_FLXATTRRM);
-+
- 	return mdc_xattr_common(exp, &RQF_MDS_REINT_SETXATTR,
--				fid, MDS_REINT, valid, xattr_name,
--				input, input_size, output_size, flags,
--				suppgid, request);
-+				fid, MDS_REINT, obd_md_valid, name,
-+				value, value_size, 0, xattr_flags, suppgid,
-+				req);
- }
- 
- static int mdc_getxattr(struct obd_export *exp, const struct lu_fid *fid,
--			u64 valid, const char *xattr_name,
--			const char *input, int input_size, int output_size,
--			int flags, struct ptlrpc_request **request)
+-struct posix_acl *ll_get_acl(struct inode *inode, int type)
 -{
--	return mdc_xattr_common(exp, &RQF_MDS_GETXATTR,
--				fid, MDS_GETXATTR, valid, xattr_name,
--				input, input_size, output_size, flags,
--				-1, request);
-+			u64 obd_md_valid, const char *name, size_t buf_size,
-+			struct ptlrpc_request **req)
-+{
-+	LASSERT(obd_md_valid == OBD_MD_FLXATTR ||
-+		obd_md_valid == OBD_MD_FLXATTRLS);
+-	struct ll_inode_info *lli = ll_i2info(inode);
+-	struct posix_acl *acl = NULL;
+-
+-	spin_lock(&lli->lli_lock);
+-	/* VFS' acl_permission_check->check_acl will release the refcount */
+-	acl = posix_acl_dup(lli->lli_posix_acl);
+-	spin_unlock(&lli->lli_lock);
+-
+-	return acl;
+-}
+-
+ int ll_inode_permission(struct inode *inode, int mask)
+ {
+ 	struct ll_sb_info *sbi;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 379d88e..bdb1564 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -754,7 +754,12 @@ enum ldlm_mode ll_take_md_lock(struct inode *inode, __u64 bits,
+ int ll_md_real_close(struct inode *inode, fmode_t fmode);
+ int ll_getattr(const struct path *path, struct kstat *stat,
+ 	       u32 request_mask, unsigned int flags);
++#ifdef CONFIG_FS_POSIX_ACL
+ struct posix_acl *ll_get_acl(struct inode *inode, int type);
++#else
++#define ll_get_acl NULL
++#endif /* CONFIG_FS_POSIX_ACL */
 +
-+	return mdc_xattr_common(exp, &RQF_MDS_GETXATTR, fid, MDS_GETXATTR,
-+				obd_md_valid, name, NULL, 0, buf_size, 0, -1,
-+				req);
- }
- 
- #ifdef CONFIG_FS_POSIX_ACL
+ int ll_migrate(struct inode *parent, struct file *file, int mdtidx,
+ 	       const char *name, int namelen);
+ int ll_get_fid_by_name(struct inode *parent, const char *name,
 -- 
 1.8.3.1
