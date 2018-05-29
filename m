@@ -1,115 +1,182 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 29 May 2018 10:21:54 -0400
-Subject: [lustre-devel] [PATCH v2 14/25] staging: lustre: libcfs: use int
- type for CPT identification.
-In-Reply-To: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
-References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1527603725-30560-15-git-send-email-jsimmons@infradead.org>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Tue, 29 May 2018 16:29:45 +0200
+Subject: [lustre-devel] [PATCH 11/13] staging: lustre: remove last two users
+ of ldebugfs_register()
+In-Reply-To: <20180529142947.3250-1-gregkh@linuxfoundation.org>
+References: <20180529142947.3250-1-gregkh@linuxfoundation.org>
+Message-ID: <20180529142947.3250-11-gregkh@linuxfoundation.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>, Dmitry Eremin <dmitry.eremin@intel.com>, James Simmons <jsimmons@infradead.org>
+To: lustre-devel@lists.lustre.org
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+ldebugfs_register() is just a call to debugfs_create_dir() and
+ldebugfs_add_vars() if the list option is set.  Fix up the last two
+users of this function to just call these two functions instead, and
+delete the now unused ldebugfs_register() call.
 
-Use int type for CPT identification to match the linux kernel
-CPU identification.
+This ends up cleaning up more code and making things smaller, always a
+good thing.
 
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-8703
-Reviewed-on: https://review.whamcloud.com/23304
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
+Cc: Oleg Drokin <oleg.drokin@intel.com>
+Cc: Andreas Dilger <andreas.dilger@intel.com>
+Cc: James Simmons <jsimmons@infradead.org>
+Cc: NeilBrown <neilb@suse.com>
+Cc: Ben Evans <bevans@cray.com>
+Cc: Quentin Bouget <quentin.bouget@cea.fr>
+Cc: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Cc: Arushi Singhal <arushisinghal19971997@gmail.com>
+Cc: Julia Lawall <julia.lawall@lip6.fr>
+Cc: Mathias Rav <mathiasrav@gmail.com>
+Cc: Dafna Hirschfeld <dafna3@gmail.com>
+Cc: "Gustavo A. R. Silva" <garsilva@embeddedor.com>
+Cc: Patrick Farrell <paf@cray.com>
+Cc: Nadav Amit <namit@vmware.com>
+Cc: lustre-devel at lists.lustre.org
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
-Changelog:
+ .../lustre/lustre/include/lprocfs_status.h    |  5 ---
+ .../lustre/lustre/obdclass/lprocfs_status.c   | 39 ++-----------------
+ .../lustre/lustre/ptlrpc/ptlrpc_internal.h    |  2 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec.c    |  6 +--
+ .../staging/lustre/lustre/ptlrpc/sec_lproc.c  | 17 ++------
+ 5 files changed, 8 insertions(+), 61 deletions(-)
 
-v1) Initial patch
-v2) Rebased patch to handle recent libcfs changes
-
- drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h |  8 ++++----
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c          | 14 +++++++-------
- 2 files changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 2c97adf..9f4ba9d 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -90,7 +90,7 @@ struct cfs_cpu_partition {
- 	/* NUMA distance between CPTs */
- 	unsigned int			*cpt_distance;
- 	/* spread rotor for NUMA allocator */
--	unsigned int			cpt_spread_rotor;
-+	int				cpt_spread_rotor;
- };
- #endif /* CONFIG_SMP */
+diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+index cc230c520189..912c65b2f72b 100644
+--- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
++++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+@@ -454,11 +454,6 @@ int ldebugfs_add_vars(struct dentry *parent,
+ 		      struct lprocfs_vars *var,
+ 		      void *data);
  
-@@ -98,11 +98,11 @@ struct cfs_cpu_partition {
- struct cfs_cpt_table {
- #ifdef CONFIG_SMP
- 	/* spread rotor for NUMA allocator */
--	unsigned int			ctb_spread_rotor;
-+	int				ctb_spread_rotor;
- 	/* maximum NUMA distance between all nodes in table */
- 	unsigned int			ctb_distance;
- 	/* # of CPU partitions */
--	unsigned int			ctb_nparts;
-+	int				ctb_nparts;
- 	/* partitions tables */
- 	struct cfs_cpu_partition	*ctb_parts;
- 	/* shadow HW CPU to CPU partition ID */
-@@ -128,7 +128,7 @@ struct cfs_cpt_table {
- /**
-  * create a cfs_cpt_table with \a ncpt number of partitions
-  */
--struct cfs_cpt_table *cfs_cpt_table_alloc(unsigned int ncpt);
-+struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt);
- /**
-  * return cpumask of CPU partition \a cpt
-  */
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index fab6675..14d5791 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -69,7 +69,7 @@
- module_param(cpu_pattern, charp, 0444);
- MODULE_PARM_DESC(cpu_pattern, "CPU partitions pattern");
+-struct dentry *ldebugfs_register(const char *name,
+-				 struct dentry *parent,
+-				 struct lprocfs_vars *list,
+-				 void *data);
+-
+ void ldebugfs_remove(struct dentry **entryp);
  
--struct cfs_cpt_table *cfs_cpt_table_alloc(unsigned int ncpt)
-+struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt)
- {
- 	struct cfs_cpt_table *cptab;
- 	int i;
-@@ -784,13 +784,13 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+ int lprocfs_obd_setup(struct obd_device *obd, struct lprocfs_vars *list,
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index 6e306cafa95a..91af79facbc0 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -338,32 +338,6 @@ void ldebugfs_remove(struct dentry **entryp)
+ }
+ EXPORT_SYMBOL_GPL(ldebugfs_remove);
+ 
+-struct dentry *ldebugfs_register(const char *name,
+-				 struct dentry *parent,
+-				 struct lprocfs_vars *list, void *data)
+-{
+-	struct dentry *entry;
+-
+-	entry = debugfs_create_dir(name, parent);
+-	if (IS_ERR_OR_NULL(entry)) {
+-		entry = entry ?: ERR_PTR(-ENOMEM);
+-		goto out;
+-	}
+-
+-	if (!IS_ERR_OR_NULL(list)) {
+-		int rc;
+-
+-		rc = ldebugfs_add_vars(entry, list, data);
+-		if (rc != 0) {
+-			debugfs_remove(entry);
+-			entry = ERR_PTR(rc);
+-		}
+-	}
+-out:
+-	return entry;
+-}
+-EXPORT_SYMBOL_GPL(ldebugfs_register);
+-
+ /* Generic callbacks */
+ static ssize_t uuid_show(struct kobject *kobj, struct attribute *attr,
+ 			 char *buf)
+@@ -1026,16 +1000,9 @@ int lprocfs_obd_setup(struct obd_device *obd, struct lprocfs_vars *list,
+ 		}
+ 	}
+ 
+-	obd->obd_debugfs_entry = ldebugfs_register(obd->obd_name,
+-						   obd->obd_type->typ_debugfs_entry,
+-						   list, obd);
+-	if (IS_ERR_OR_NULL(obd->obd_debugfs_entry)) {
+-		rc = obd->obd_debugfs_entry ? PTR_ERR(obd->obd_debugfs_entry)
+-					    : -ENOMEM;
+-		CERROR("error %d setting up lprocfs for %s\n",
+-		       rc, obd->obd_name);
+-		obd->obd_debugfs_entry = NULL;
+-	}
++	obd->obd_debugfs_entry = debugfs_create_dir(obd->obd_name,
++					obd->obd_type->typ_debugfs_entry);
++	ldebugfs_add_vars(obd->obd_debugfs_entry, list, obd);
+ 
  	return rc;
  }
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+index b7a8d7537a66..134b74234519 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpc_internal.h
+@@ -264,7 +264,7 @@ void sptlrpc_enc_pool_fini(void);
+ int sptlrpc_proc_enc_pool_seq_show(struct seq_file *m, void *v);
  
--#define CPT_WEIGHT_MIN  4u
-+#define CPT_WEIGHT_MIN 4
+ /* sec_lproc.c */
+-int  sptlrpc_lproc_init(void);
++void sptlrpc_lproc_init(void);
+ void sptlrpc_lproc_fini(void);
  
--static unsigned int cfs_cpt_num_estimate(void)
-+static int cfs_cpt_num_estimate(void)
+ /* sec_gc.c */
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec.c b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+index 256421465bcd..e193f3346e6f 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec.c
+@@ -2352,14 +2352,10 @@ int sptlrpc_init(void)
+ 	if (rc)
+ 		goto out_null;
+ 
+-	rc = sptlrpc_lproc_init();
+-	if (rc)
+-		goto out_plain;
++	sptlrpc_lproc_init();
+ 
+ 	return 0;
+ 
+-out_plain:
+-	sptlrpc_plain_fini();
+ out_null:
+ 	sptlrpc_null_fini();
+ out_pool:
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c b/drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c
+index cd1bb3dabb63..e8076dc7c950 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_lproc.c
+@@ -158,21 +158,10 @@ static struct lprocfs_vars sptlrpc_lprocfs_vars[] = {
+ 
+ static struct dentry *sptlrpc_debugfs_dir;
+ 
+-int sptlrpc_lproc_init(void)
++void sptlrpc_lproc_init(void)
  {
--	unsigned int nnode = num_online_nodes();
--	unsigned int ncpu = num_online_cpus();
--	unsigned int ncpt;
-+	int nnode = num_online_nodes();
-+	int ncpu = num_online_cpus();
-+	int ncpt;
+-	int rc;
+-
+-	LASSERT(!sptlrpc_debugfs_dir);
+-
+-	sptlrpc_debugfs_dir = ldebugfs_register("sptlrpc", debugfs_lustre_root,
+-						sptlrpc_lprocfs_vars, NULL);
+-	if (IS_ERR_OR_NULL(sptlrpc_debugfs_dir)) {
+-		rc = sptlrpc_debugfs_dir ? PTR_ERR(sptlrpc_debugfs_dir)
+-					 : -ENOMEM;
+-		sptlrpc_debugfs_dir = NULL;
+-		return rc;
+-	}
+-	return 0;
++	sptlrpc_debugfs_dir = debugfs_create_dir("sptlrpc", debugfs_lustre_root);
++	ldebugfs_add_vars(sptlrpc_debugfs_dir, sptlrpc_lprocfs_vars, NULL);
+ }
  
- 	if (ncpu <= CPT_WEIGHT_MIN) {
- 		ncpt = 1;
-@@ -820,7 +820,7 @@ static unsigned int cfs_cpt_num_estimate(void)
- 	/* config many CPU partitions on 32-bit system could consume
- 	 * too much memory
- 	 */
--	ncpt = min(2U, ncpt);
-+	ncpt = min(2, ncpt);
- #endif
- 	while (ncpu % ncpt)
- 		ncpt--; /* worst case is 1 */
+ void sptlrpc_lproc_fini(void)
 -- 
-1.8.3.1
+2.17.0
