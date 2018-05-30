@@ -1,35 +1,29 @@
 From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Wed, 30 May 2018 13:05:29 +0300
-Subject: [lustre-devel] [PATCH v2 01/25] staging: lustre: libcfs:
- restore UMP handling
-In-Reply-To: <1527603725-30560-2-git-send-email-jsimmons@infradead.org>
-References: <1527603725-30560-1-git-send-email-jsimmons@infradead.org>
- <1527603725-30560-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <20180530100529.54jlkfx2q52d7o2a@mwanda>
+Date: Wed, 30 May 2018 15:06:38 +0300
+Subject: [lustre-devel] [PATCH] staging: lustre: libcfs: add parens
+ around macros args
+In-Reply-To: <20180522133439.12338-1-brnkv.i1@gmail.com>
+References: <20180522133439.12338-1-brnkv.i1@gmail.com>
+Message-ID: <20180530120638.lap3libc5nxmzb4o@mwanda>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>, Amir Shehata <amir.shehata@intel.com>, James Simmons <uja.ornl@yahoo.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: Ivan Bornyakov <brnkv.i1@gmail.com>
+Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, gregkh@linuxfoundation.org, linux-kernel@vger.kernel.org, oleg.drokin@intel.com, andreas.dilger@intel.com
 
-On Tue, May 29, 2018 at 10:21:41AM -0400, James Simmons wrote:
-> @@ -208,20 +222,52 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
->  void cfs_cpu_fini(void);
->  
->  #else /* !CONFIG_SMP */
-> -struct cfs_cpt_table;
-> -#define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
->  
-> -static inline cpumask_var_t *
-> -cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt)
-> +static inline void cfs_cpt_table_free(struct cfs_cpt_table *cptab)
->  {
-> -	return NULL;
-> +	kfree(cptab);
->  }
+On Tue, May 22, 2018 at 04:34:39PM +0300, Ivan Bornyakov wrote:
+> One may call 'CFS_FAIL_TIMEOUT(id, secs + 5);' and get unexpected result
+> after macro substitution, viz., 'secs + 5' will turn into
+> 'secs + 5 * 1000'
+> 
 
-This should free cptab->ctb_cpumask?
+We actually do that in ptl_send_rpc() as well so this is a real bug.
+
+It's sort of an interesting coincidence that the code in ptl_send_rpc()
+looks almost exactly like your theoretical code:
+
+	OBD_FAIL_TIMEOUT(OBD_FAIL_PTLRPC_DELAY_SEND, request->rq_timeout + 5);
 
 regards,
 dan carpenter
