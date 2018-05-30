@@ -1,29 +1,48 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Date: Wed, 30 May 2018 15:06:38 +0300
-Subject: [lustre-devel] [PATCH] staging: lustre: libcfs: add parens
- around macros args
-In-Reply-To: <20180522133439.12338-1-brnkv.i1@gmail.com>
-References: <20180522133439.12338-1-brnkv.i1@gmail.com>
-Message-ID: <20180530120638.lap3libc5nxmzb4o@mwanda>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 30 May 2018 23:38:48 +0200
+Subject: [lustre-devel] [PATCH] staging: lustre: include linux/highmem.h
+ when needed
+Message-ID: <20180530213941.772006-1-arnd@arndb.de>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Ivan Bornyakov <brnkv.i1@gmail.com>
-Cc: lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, gregkh@linuxfoundation.org, linux-kernel@vger.kernel.org, oleg.drokin@intel.com, andreas.dilger@intel.com
+To: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Arnd Bergmann <arnd@arndb.de>, Doug Oucharek <dougso@me.com>, NeilBrown <neilb@suse.com>, Dmitry Eremin <dmitry.eremin@intel.com>, Ingo Molnar <mingo@kernel.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-On Tue, May 22, 2018 at 04:34:39PM +0300, Ivan Bornyakov wrote:
-> One may call 'CFS_FAIL_TIMEOUT(id, secs + 5);' and get unexpected result
-> after macro substitution, viz., 'secs + 5' will turn into
-> 'secs + 5 * 1000'
-> 
+Something in recent linux-next kernels caused linux/highmem.h to
+no longer be included implicitly from o2iblnd_cb.c, causing a build
+failure:
 
-We actually do that in ptl_send_rpc() as well so this is a real bug.
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_kvaddr_to_page':
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:549:15: error: 'PKMAP_BASE' undeclared (first use in this function); did you mean 'RTM_BASE'?
+  if (vaddr >= PKMAP_BASE &&
+               ^~~~~~~~~~
+               RTM_BASE
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:549:15: note: each undeclared identifier is reported only once for each function it appears in
+drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:550:28: error: 'LAST_PKMAP' undeclared (first use in this function); did you mean 'AT_HWCAP'?
+      vaddr < (PKMAP_BASE + LAST_PKMAP * PAGE_SIZE)) {
+                            ^~~~~~~~~~
+                            AT_HWCAP
 
-It's sort of an interesting coincidence that the code in ptl_send_rpc()
-looks almost exactly like your theoretical code:
+This adds back an explicit include for the header.
 
-	OBD_FAIL_TIMEOUT(OBD_FAIL_PTLRPC_DELAY_SEND, request->rq_timeout + 5);
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-regards,
-dan carpenter
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index 47eb8b4c28db..65b7a62943ad 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -35,6 +35,7 @@
+  * Author: Eric Barton <eric@bartonsoftware.com>
+  */
+ 
++#include <linux/highmem.h>
+ #include "o2iblnd.h"
+ 
+ #define MAX_CONN_RACES_BEFORE_ABORT 20
+-- 
+2.9.0
