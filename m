@@ -1,70 +1,69 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 31 May 2018 15:17:32 +1000
-Subject: [lustre-devel] [PATCH] staging: lustre: include linux/highmem.h
- when needed
-In-Reply-To: <20180530213941.772006-1-arnd@arndb.de>
-References: <20180530213941.772006-1-arnd@arndb.de>
-Message-ID: <874liov1xv.fsf@notabene.neil.brown.name>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Thu, 31 May 2018 18:54:26 +0200
+Subject: [lustre-devel] [PATCH v2 6/6] staging: lustre: mdc: use large
+ xattr buffers for old servers
+In-Reply-To: <1527603705-30450-7-git-send-email-jsimmons@infradead.org>
+References: <1527603705-30450-1-git-send-email-jsimmons@infradead.org>
+ <1527603705-30450-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <20180531165426.GA23414@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Arnd Bergmann <arnd@arndb.de>, Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Doug Oucharek <dougso@me.com>, Dmitry Eremin <dmitry.eremin@intel.com>, Ingo Molnar <mingo@kernel.org>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: James Simmons <jsimmons@infradead.org>
+Cc: devel@driverdev.osuosl.org, Andreas Dilger <andreas.dilger@intel.com>, Oleg Drokin <oleg.drokin@intel.com>, NeilBrown <neilb@suse.com>, "John L. Hammond" <john.hammond@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Wed, May 30 2018, Arnd Bergmann wrote:
-
-> Something in recent linux-next kernels caused linux/highmem.h to
-> no longer be included implicitly from o2iblnd_cb.c, causing a build
-> failure:
->
-> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c: In function 'kiblnd_kvaddr_to_page':
-> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:549:15: error: 'PKMAP_BASE' undeclared (first use in this function); did you mean 'RTM_BASE'?
->   if (vaddr >= PKMAP_BASE &&
->                ^~~~~~~~~~
->                RTM_BASE
-> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:549:15: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c:550:28: error: 'LAST_PKMAP' undeclared (first use in this function); did you mean 'AT_HWCAP'?
->       vaddr < (PKMAP_BASE + LAST_PKMAP * PAGE_SIZE)) {
->                             ^~~~~~~~~~
->                             AT_HWCAP
->
-> This adds back an explicit include for the header.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Thanks for finding and fixing this.  I did recently reduce the number
-of include files that were automatically included everywhere.  Clearly
-some config combinations didn't get tested properly.
-
-Reviewed-by: NeilBrown <neilb@suse.com>
-
-Thanks,
-NeilBrown
-
-
+On Tue, May 29, 2018 at 10:21:45AM -0400, James Simmons wrote:
+> From: "John L. Hammond" <john.hammond@intel.com>
+> 
+> Pre 2.10.1 MDTs will crash when they receive a listxattr (MDS_GETXATTR
+> with OBD_MD_FLXATTRLS) RPC for an orphan or dead object. So for
+> clients connected to these older MDTs, try to avoid sending listxattr
+> RPCs by making the bulk getxattr (MDS_GETXATTR with OBD_MD_FLXATTRALL)
+> more likely to succeed and thereby reducing the chances of falling
+> back to listxattr.
+> 
+> Signed-off-by: John L. Hammond <john.hammond@intel.com>
+> Intel-bug-id: https://jira.hpdd.intel.com/browse/LU-10912
+> Reviewed-on: https://review.whamcloud.com/31990
+> Reviewed-by: Andreas Dilger <andreas.dilger@intel.com>
+> Reviewed-by: Fan Yong <fan.yong@intel.com>
+> Reviewed-by: Oleg Drokin <oleg.drokin@intel.com>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
->  drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> index 47eb8b4c28db..65b7a62943ad 100644
-> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> @@ -35,6 +35,7 @@
->   * Author: Eric Barton <eric@bartonsoftware.com>
->   */
+> Changelog:
+> 
+> v1) Initial patch
+> v2) Rebased patch. No changes
+> 
+>  drivers/staging/lustre/lustre/mdc/mdc_locks.c | 31 +++++++++++++++++++++------
+>  1 file changed, 24 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_locks.c b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+> index a8aa0fa..b991c6f 100644
+> --- a/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_locks.c
+> @@ -326,8 +326,10 @@ static void mdc_realloc_openmsg(struct ptlrpc_request *req,
+>  {
+>  	struct ptlrpc_request	*req;
+>  	struct ldlm_intent	*lit;
+> +	u32 min_buf_size = 0;
+>  	int rc, count = 0;
+>  	LIST_HEAD(cancels);
+> +	u32 buf_size = 0;
 >  
-> +#include <linux/highmem.h>
->  #include "o2iblnd.h"
+>  	req = ptlrpc_request_alloc(class_exp2cliimp(exp),
+>  				   &RQF_LDLM_INTENT_GETXATTR);
+> @@ -344,18 +346,33 @@ static void mdc_realloc_openmsg(struct ptlrpc_request *req,
+>  	lit = req_capsule_client_get(&req->rq_pill, &RMF_LDLM_INTENT);
+>  	lit->opc = IT_GETXATTR;
 >  
->  #define MAX_CONN_RACES_BEFORE_ABORT 20
-> -- 
-> 2.9.0
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180531/474c0ec7/attachment.sig>
+> +#if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(3, 0, 53, 0)
+
+Why are you adding pointless version checks to mainline?  Please don't
+add new ones of these, you need to be working on removing the existing
+ones.
+
+thanks,
+
+greg k-h
