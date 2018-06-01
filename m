@@ -1,109 +1,70 @@
-From: Weber, Olaf (HPC Data Management & Storage) <olaf.weber@hpe.com>
-Date: Fri, 29 Jun 2018 17:47:27 +0000
-Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
- support
-In-Reply-To: <CAAqp6i0uwmpdFYUJ7mCBz+MH+gVBa6S=P2t5Yn7wcFOtrTD-Fg@mail.gmail.com>
-References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
- <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
- <877emnaed8.fsf@notabene.neil.brown.name>
- <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>
- <87lgb16j8q.fsf@notabene.neil.brown.name>
- <DM3PR1101MB1213FD1001256E565FF011FFCB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <8736x77lrk.fsf@notabene.neil.brown.name>
- <9DE389AB-C7E1-4336-B7E8-604581EFD53E@cray.com>
- <CAAqp6i0uwmpdFYUJ7mCBz+MH+gVBa6S=P2t5Yn7wcFOtrTD-Fg@mail.gmail.com>
-Message-ID: <AT5PR8401MB0900C67FADDF0EF7ED1CDBC4854E0@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+From: NeilBrown <neilb@suse.com>
+Date: Fri, 01 Jun 2018 15:38:15 +1000
+Subject: [lustre-devel] [PATCH v2 6/6] staging: lustre: mdc: use large
+ xattr buffers for old servers
+In-Reply-To: <AE3B1D00-46A8-42FA-9025-2E680C185294@intel.com>
+References: <1527603705-30450-1-git-send-email-jsimmons@infradead.org>
+ <1527603705-30450-7-git-send-email-jsimmons@infradead.org>
+ <20180531165426.GA23414@kroah.com>
+ <AE3B1D00-46A8-42FA-9025-2E680C185294@intel.com>
+Message-ID: <87po1brrqw.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: "Dilger, Andreas" <andreas.dilger@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: James Simmons <jsimmons@infradead.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, "Hammond, John" <john.hammond@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-To add to Amir's point,  Lustre's CPTs are a way to partition a machine. The distance mechanism I added is one way to map the ACPI-reported distances on the Lustre CPT mapping. It tends to assume the worst case applies to the wholes. It is there because the rest of the Lustre code (at least in the tree I had to work on) "thinks" in CPTs.
+On Thu, May 31 2018, Dilger, Andreas wrote:
 
-Other CPT-related stuff that came in with the multi-rail code has the same rationale. If I'd been working against the kernel interfaces themselves it would have looked differently, but that was not an option at the time.
-
-We've found it to be useful, so replacing it would be better than just ripping it out.
-
-That's all there is to it.
-
-Olaf
-
----
-From: Amir Shehata [mailto:amir.shehata.whamcloud at gmail.com] 
-Sent: Friday, June 29, 2018 19:28
-To: Doug Oucharek <doucharek@cray.com>
-Cc: NeilBrown <neilb@suse.com>; Weber, Olaf (HPC Data Management & Storage) <olaf.weber@hpe.com>; Amir Shehata <amir.shehata@intel.com>; Lustre Development List <lustre-devel@lists.lustre.org>
-Subject: Re: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA support
-
-Olaf can add more details, but I believe we are using the linux distance infrastructure. Take a look at cfs_cpt_distance_calculate(). What we're doing is extracting the NUMA distances provided in the kernel and building an internal representation of distances between CPU partitions (CPTs) since that's what's used in the code.
-
-On 29 June 2018 at 10:19, Doug Oucharek <doucharek@cray.com> wrote:
-I?ll leave Olaf of HPE answer questions about the distance code.? I was only an inspector as it relates to the Multi-Rail feature in the community tree.? 
-
-Doug
-
-> On Jun 27, 2018, at 6:17 PM, NeilBrown <neilb@suse.com> wrote:
-> 
-> 
-> I went digging and found that Linux already has a well defined concept
-> of distance between NUMA nodes.
-> On x86 (and amd64?), this is loaded from ACPI.? Other platforms can
-> describe it in devicetree.
-> You can view distance information in
->? /sys/devices/system/node/node*/distance
-> 
-> or using "numactl --hardware".
-> 
-> Why doesn't lustre simple extract and use this information?? Why does
-> lustre need to allow it to be configured?
-> 
-> Thanks,
-> NeilBrown
-> 
-> On Wed, Jun 27 2018, Patrick Farrell wrote:
-> 
->> Neil,
+> On May 31, 2018, at 18:54, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
 >> 
->> I am not the person at Cray for this, but if SUSE does take an interest in this, Cray would probably be interested in weighing in and contributing info if not actually code.? In fact, other HPC vendors like HPE(by which I mostly mean the old SGI) or IBM might as well.? NUMA optimization is a persistent fascination in our area of the industry...
->> 
->> - Patrick
->> 
->> ________________________________
->> From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
->> Sent: Tuesday, June 26, 2018 9:44:37 PM
->> To: Doug Oucharek
->> Cc: Amir Shehata; Lustre Development List
->> Subject: Re: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA support
->> 
->> On Mon, Jun 25 2018, Doug Oucharek wrote:
->> 
->>> Some background on this NUMA change:
+>> On Tue, May 29, 2018 at 10:21:45AM -0400, James Simmons wrote:
+>>> From: "John L. Hammond" <john.hammond@intel.com>
 >>> 
->>> First off, this is just a first step to a bigger set of changes which include changes to the Lustre utilities.? This was done as part of the Multi-Rail feature.? One of the systems that feature is meant to support is the SGI UV system (now HPE) which has a massive number of NUMA nodes connected by a NUMA Link.? There are multiple fabric cards spread throughout the system and Multi-Rail needs to know which fabric cards are nearest to the NUMA node we are running on.? To do that, the ?distance? between NUMA nodes needs to be configured.
+>>> Pre 2.10.1 MDTs will crash when they receive a listxattr (MDS_GETXATTR
+>>> with OBD_MD_FLXATTRLS) RPC for an orphan or dead object. So for
+>>> clients connected to these older MDTs, try to avoid sending listxattr
+>>> RPCs by making the bulk getxattr (MDS_GETXATTR with OBD_MD_FLXATTRALL)
+>>> more likely to succeed and thereby reducing the chances of falling
+>>> back to listxattr.
 >>> 
->>> This patch is preparing the infrastructure for the Multi-Rail feature to support configuring NUMA node distances.? Technically, this patch should be landing with the Multi-Rail feature (still to be pushed) for it to make proper sense.
->>> 
+>>> +#if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(3, 0, 53, 0)
 >> 
->> Thanks a lot for the background.
->> 
->> If these NUMA nodes have a 'distance' between them, and if lustre can
->> benefit from knowing the distance, then is seems likely that other code
->> might also benefit.? In that case it would be best if the distance were
->> encoded in some global state information so that lustre and any other
->> subsystem can extract it.
->> 
->> Do you know if there is any work underway by anyone to make this
->> information generally available?? If there is, we should make sure that
->> lustre works in a compatible way so that once that work lands, lustre
->> can use it directly and not need extra configuration.
->> If no such work is underway, then it would be really good if something
->> were done in that direction.? If no-one here is able to work on this, I
->> can ask around in SUSE and see if anyone here knows anything relevant.
->> 
->> Thanks,
->> NeilBrown
-_______________________________________________
-lustre-devel mailing list
-lustre-devel at lists.lustre.org
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>> Why are you adding pointless version checks to mainline?  Please don't
+>> add new ones of these, you need to be working on removing the existing
+>> ones.
+>
+> These are not Linux kernel version checks, but rather Lustre release version
+> checks.  This allows us to remove workarounds like this in the future when
+> they are no longer needed, rather than accumulating cruft forever.  It's like
+> the separation of NFSv2 vs NFSv3 vs NFSv4.
+
+It looks very different to the separation of NFSv{2,3,4}.  Those are
+conditionally compiled on a whole-file basis.
+If we ever want to remove this code it should be hard to search for
+occurances of OBD_OCD_VERSION() in the code, we don't need the C
+preprocessor to be able to remove them for us.
+In this particular example:
+
++	if (exp->exp_connect_data.ocd_version < OBD_OCD_VERSION(2, 10, 1, 0))
++		min_buf_size = exp->exp_connect_data.ocd_max_easize;
+
+if you want to be able to compile without that one test, you could arrange
+that OBD_OSC_VERSION(2, 10, 1, 0) evaluates to 0.
+As ocd_version is unsigned, the comparison will always be false, and
+the compiler will optimize the code away.
+
+As a general rule, you need a very good reason to have #if or #ifdef in
+.c files.  They are usually OK in .h files.
+
+Thanks,
+NeilBrown
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180601/78892757/attachment.sig>
