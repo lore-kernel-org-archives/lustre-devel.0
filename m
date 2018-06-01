@@ -1,142 +1,57 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Tue, 1 May 2018 04:19:54 +0000
-Subject: [lustre-devel] [PATCH 03/10] staging: lustre: lu_object:
- discard extra lru count.
-In-Reply-To: <152514675893.17843.8396665070911641266.stgit@noble>
-References: <152514658325.17843.11455067361317157487.stgit@noble>
- <152514675893.17843.8396665070911641266.stgit@noble>
-Message-ID: <A3CD6D51-5ADF-41A0-AED2-B1C06935586C@intel.com>
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Date: Fri, 1 Jun 2018 10:12:11 +0200
+Subject: [lustre-devel] [PATCH v2 6/6] staging: lustre: mdc: use large
+ xattr buffers for old servers
+In-Reply-To: <AE3B1D00-46A8-42FA-9025-2E680C185294@intel.com>
+References: <1527603705-30450-1-git-send-email-jsimmons@infradead.org>
+ <1527603705-30450-7-git-send-email-jsimmons@infradead.org>
+ <20180531165426.GA23414@kroah.com>
+ <AE3B1D00-46A8-42FA-9025-2E680C185294@intel.com>
+Message-ID: <20180601081211.GD12809@kroah.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: "Drokin, Oleg" <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Linux
- Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: "Dilger, Andreas" <andreas.dilger@intel.com>
+Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, NeilBrown <neilb@suse.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, "Drokin, Oleg" <oleg.drokin@intel.com>, "Hammond, John" <john.hammond@intel.com>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Apr 30, 2018, at 21:52, NeilBrown <neilb@suse.com> wrote:
+On Thu, May 31, 2018 at 05:30:24PM +0000, Dilger, Andreas wrote:
+> On May 31, 2018, at 18:54, Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+> > 
+> > On Tue, May 29, 2018 at 10:21:45AM -0400, James Simmons wrote:
+> >> From: "John L. Hammond" <john.hammond@intel.com>
+> >> 
+> >> Pre 2.10.1 MDTs will crash when they receive a listxattr (MDS_GETXATTR
+> >> with OBD_MD_FLXATTRLS) RPC for an orphan or dead object. So for
+> >> clients connected to these older MDTs, try to avoid sending listxattr
+> >> RPCs by making the bulk getxattr (MDS_GETXATTR with OBD_MD_FLXATTRALL)
+> >> more likely to succeed and thereby reducing the chances of falling
+> >> back to listxattr.
+> >> 
+> >> +#if LUSTRE_VERSION_CODE < OBD_OCD_VERSION(3, 0, 53, 0)
+> > 
+> > Why are you adding pointless version checks to mainline?  Please don't
+> > add new ones of these, you need to be working on removing the existing
+> > ones.
 > 
-> lu_object maintains 2 lru counts.
-> One is a per-bucket lsb_lru_len.
-> The other is the per-cpu ls_lru_len_counter.
-> 
-> The only times the per-bucket counters are use are:
-> - a debug message when an object is added
-> - in lu_site_stats_get when all the counters are combined.
-> 
-> The debug message is not essential, and the per-cpu counter
-> can be used to get the combined total.
-> 
-> So discard the per-bucket lsb_lru_len.
-> 
-> Signed-off-by: NeilBrown <neilb@suse.com>
+> These are not Linux kernel version checks, but rather Lustre release version
+> checks.  This allows us to remove workarounds like this in the future when
+> they are no longer needed, rather than accumulating cruft forever.  It's like
+> the separation of NFSv2 vs NFSv3 vs NFSv4.
 
-Looks reasonable, though it would also be possible to fix the percpu
-functions rather than adding a workaround in this code.
+As Neil said, this is not like NFS at all.  Those are well-defined
+Kconfig options that are used to compile whole new files and
+include/exclude different functions entirely.
 
-Reviewed-by: Andreas Dilger <andreas.dilger@dilger.ca>
+It is not used to check in the middle of code flow if something should,
+or should not, happen.
 
-> ---
-> drivers/staging/lustre/lustre/obdclass/lu_object.c |   24 ++++++++------------
-> 1 file changed, 9 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> index 2a8a25d6edb5..2bf089817157 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-> @@ -57,10 +57,6 @@
-> #include <linux/list.h>
-> 
-> struct lu_site_bkt_data {
-> -	/**
-> -	 * number of object in this bucket on the lsb_lru list.
-> -	 */
-> -	long			lsb_lru_len;
-> 	/**
-> 	 * LRU list, updated on each access to object. Protected by
-> 	 * bucket lock of lu_site::ls_obj_hash.
-> @@ -187,10 +183,9 @@ void lu_object_put(const struct lu_env *env, struct lu_object *o)
-> 	if (!lu_object_is_dying(top)) {
-> 		LASSERT(list_empty(&top->loh_lru));
-> 		list_add_tail(&top->loh_lru, &bkt->lsb_lru);
-> -		bkt->lsb_lru_len++;
-> 		percpu_counter_inc(&site->ls_lru_len_counter);
-> -		CDEBUG(D_INODE, "Add %p to site lru. hash: %p, bkt: %p, lru_len: %ld\n",
-> -		       o, site->ls_obj_hash, bkt, bkt->lsb_lru_len);
-> +		CDEBUG(D_INODE, "Add %p to site lru. hash: %p, bkt: %p\n",
-> +		       o, site->ls_obj_hash, bkt);
-> 		cfs_hash_bd_unlock(site->ls_obj_hash, &bd, 1);
-> 		return;
-> 	}
-> @@ -238,7 +233,6 @@ void lu_object_unhash(const struct lu_env *env, struct lu_object *o)
-> 
-> 			list_del_init(&top->loh_lru);
-> 			bkt = cfs_hash_bd_extra_get(obj_hash, &bd);
-> -			bkt->lsb_lru_len--;
-> 			percpu_counter_dec(&site->ls_lru_len_counter);
-> 		}
-> 		cfs_hash_bd_del_locked(obj_hash, &bd, &top->loh_hash);
-> @@ -422,7 +416,6 @@ int lu_site_purge_objects(const struct lu_env *env, struct lu_site *s,
-> 			cfs_hash_bd_del_locked(s->ls_obj_hash,
-> 					       &bd2, &h->loh_hash);
-> 			list_move(&h->loh_lru, &dispose);
-> -			bkt->lsb_lru_len--;
-> 			percpu_counter_dec(&s->ls_lru_len_counter);
-> 			if (did_sth == 0)
-> 				did_sth = 1;
-> @@ -621,7 +614,6 @@ static struct lu_object *htable_lookup(struct lu_site *s,
-> 		lprocfs_counter_incr(s->ls_stats, LU_SS_CACHE_HIT);
-> 		if (!list_empty(&h->loh_lru)) {
-> 			list_del_init(&h->loh_lru);
-> -			bkt->lsb_lru_len--;
-> 			percpu_counter_dec(&s->ls_lru_len_counter);
-> 		}
-> 		return lu_object_top(h);
-> @@ -1834,19 +1826,21 @@ struct lu_site_stats {
-> 	unsigned int	lss_busy;
-> };
-> 
-> -static void lu_site_stats_get(struct cfs_hash *hs,
-> +static void lu_site_stats_get(const struct lu_site *s,
-> 			      struct lu_site_stats *stats, int populated)
-> {
-> +	struct cfs_hash *hs = s->ls_obj_hash;
-> 	struct cfs_hash_bd bd;
-> 	unsigned int i;
-> +	/* percpu_counter_read_positive() won't accept a const pointer */
-> +	struct lu_site *s2 = (struct lu_site *)s;
+As Neil also said, if you really have to do this, put it behind
+functions that you properly define in a .h file, do not put #if code in
+a .c file if at all possible (yeah, nfs does not do this everywhere, but
+it is much better than the random checks you all have today in the
+lustre code.)
 
-It would seem worthwhile to change the percpu_counter_read_positive() and
-percpu_counter_read() arguments to be "const struct percpu_counter *fbc",
-rather than doing this cast here.  I can't see any reason that would be bad,
-since both implementations just access fbc->count, and do not modify anything.
+So as-is, I am not taking this patch, sorry, it needs to be reworked.
 
-> +	stats->lss_busy += cfs_hash_size_get(hs) -
-> +		percpu_counter_read_positive(&s2->ls_lru_len_counter);
-> 	cfs_hash_for_each_bucket(hs, &bd, i) {
-> -		struct lu_site_bkt_data *bkt = cfs_hash_bd_extra_get(hs, &bd);
-> 		struct hlist_head	*hhead;
-> 
-> 		cfs_hash_bd_lock(hs, &bd, 1);
-> -		stats->lss_busy  +=
-> -			cfs_hash_bd_count_get(&bd) - bkt->lsb_lru_len;
-> 		stats->lss_total += cfs_hash_bd_count_get(&bd);
-> 		stats->lss_max_search = max((int)stats->lss_max_search,
-> 					    cfs_hash_bd_depmax_get(&bd));
-> @@ -2039,7 +2033,7 @@ int lu_site_stats_print(const struct lu_site *s, struct seq_file *m)
-> 	struct lu_site_stats stats;
-> 
-> 	memset(&stats, 0, sizeof(stats));
-> -	lu_site_stats_get(s->ls_obj_hash, &stats, 1);
-> +	lu_site_stats_get(s, &stats, 1);
-> 
-> 	seq_printf(m, "%d/%d %d/%ld %d %d %d %d %d %d %d\n",
-> 		   stats.lss_busy,
-> 
-> 
-
-Cheers, Andreas
---
-Andreas Dilger
-Lustre Principal Architect
-Intel Corporation
+greg k-h
