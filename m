@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 06 Jun 2018 16:05:19 +1000
-Subject: [lustre-devel] [PATCH 07/11] staging: lustre: fold
- lprocfs_call_handler functionality into lnet_debugfs_*
+Subject: [lustre-devel] [PATCH 08/11] staging: lustre: obdclass: move
+ linux/linux-foo.c to foo.c
 In-Reply-To: <152826510267.16761.14361003167157833896.stgit@noble>
 References: <152826510267.16761.14361003167157833896.stgit@noble>
-Message-ID: <152826511912.16761.6908134754944227444.stgit@noble>
+Message-ID: <152826511916.16761.16388038372000609798.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,293 +12,1409 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-The calling convention for ->proc_handler is rather clumsy,
-as a comment in fs/procfs/proc_sysctl.c confirms.
-lustre has copied this convention to lnet_debugfs_{read,write},
-and then provided a wrapper for handlers - lprocfs_call_handler -
-to work around the clumsiness.
-
-It is cleaner to just fold the functionality of lprocfs_call_handler()
-into lnet_debugfs_* and let them call the final handler directly.
-
-If these files were ever moved to /proc/sys (which seems unlikely) the
-handling in fs/procfs/proc_sysctl.c would need to be fixed to, but
-that would not be a bad thing.
-
-So modify all the functions that did use the wrapper to not need it
-now that a more sane calling convention is available.
+As lustre is now linux-only, having this linux sub-directory
+with files named "linux-something" is just noise.  Move them
+to a more friendly name.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/include/linux/libcfs/libcfs.h   |    4 -
- drivers/staging/lustre/lnet/libcfs/module.c        |   84 +++++++-------------
- drivers/staging/lustre/lnet/lnet/router_proc.c     |   41 +++-------
- 3 files changed, 41 insertions(+), 88 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/Makefile    |    2 
+ .../lustre/lustre/obdclass/linux/linux-module.c    |  514 --------------------
+ .../lustre/lustre/obdclass/linux/linux-sysctl.c    |  162 ------
+ drivers/staging/lustre/lustre/obdclass/module.c    |  514 ++++++++++++++++++++
+ drivers/staging/lustre/lustre/obdclass/sysctl.c    |  162 ++++++
+ 5 files changed, 677 insertions(+), 677 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+ delete mode 100644 drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
+ create mode 100644 drivers/staging/lustre/lustre/obdclass/module.c
+ create mode 100644 drivers/staging/lustre/lustre/obdclass/sysctl.c
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-index edc7ed0dcb94..7ac609328256 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
-@@ -57,10 +57,6 @@ int libcfs_setup(void);
- extern struct workqueue_struct *cfs_rehash_wq;
+diff --git a/drivers/staging/lustre/lustre/obdclass/Makefile b/drivers/staging/lustre/lustre/obdclass/Makefile
+index e3fa9acff4c4..e36ba2167d10 100644
+--- a/drivers/staging/lustre/lustre/obdclass/Makefile
++++ b/drivers/staging/lustre/lustre/obdclass/Makefile
+@@ -4,7 +4,7 @@ subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
  
- void lustre_insert_debugfs(struct ctl_table *table);
--int lprocfs_call_handler(void *data, int write, loff_t *ppos,
--			 void __user *buffer, size_t *lenp,
--			 int (*handler)(void *data, int write, loff_t pos,
--					void __user *buffer, int len));
+ obj-$(CONFIG_LUSTRE_FS) += obdclass.o
  
- /*
-  * Memory
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index 5dc7de9e6478..02c404c6738e 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -290,33 +290,15 @@ static struct miscdevice libcfs_dev = {
- 
- static int libcfs_dev_registered;
- 
--int lprocfs_call_handler(void *data, int write, loff_t *ppos,
--			 void __user *buffer, size_t *lenp,
--			 int (*handler)(void *data, int write, loff_t pos,
--					void __user *buffer, int len))
+-obdclass-y := linux/linux-module.o linux/linux-sysctl.o \
++obdclass-y := module.o sysctl.o \
+ 	      llog.o llog_cat.o llog_obd.o llog_swab.o class_obd.o debug.o \
+ 	      genops.o uuid.o lprocfs_status.o lprocfs_counters.o \
+ 	      lustre_handles.o lustre_peer.o statfs_pack.o linkea.o \
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
+deleted file mode 100644
+index 9c800580053b..000000000000
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-module.c
++++ /dev/null
+@@ -1,514 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.gnu.org/licenses/gpl-2.0.html
+- *
+- * GPL HEADER END
+- */
+-/*
+- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2011, 2012, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- *
+- * lustre/obdclass/linux/linux-module.c
+- *
+- * Object Devices Class Driver
+- * These are the only exported functions, they provide some generic
+- * infrastructure for managing object devices
+- */
+-
+-#define DEBUG_SUBSYSTEM S_CLASS
+-
+-#include <linux/module.h>
+-#include <linux/errno.h>
+-#include <linux/kernel.h>
+-#include <linux/sched.h>
+-#include <linux/lp.h>
+-#include <linux/slab.h>
+-#include <linux/ioport.h>
+-#include <linux/fcntl.h>
+-#include <linux/delay.h>
+-#include <linux/skbuff.h>
+-#include <linux/fs.h>
+-#include <linux/poll.h>
+-#include <linux/list.h>
+-#include <linux/highmem.h>
+-#include <linux/io.h>
+-#include <asm/ioctls.h>
+-#include <linux/uaccess.h>
+-#include <linux/miscdevice.h>
+-#include <linux/seq_file.h>
+-#include <linux/kobject.h>
+-
+-#include <uapi/linux/lnet/lnetctl.h>
+-#include <obd_support.h>
+-#include <obd_class.h>
+-#include <lprocfs_status.h>
+-#include <uapi/linux/lustre/lustre_ioctl.h>
+-#include <uapi/linux/lustre/lustre_ver.h>
+-
+-#define OBD_MAX_IOCTL_BUFFER	8192
+-
+-static int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
 -{
--	int rc = handler(data, write, *ppos, buffer, *lenp);
--
--	if (rc < 0)
--		return rc;
--
--	if (write) {
--		*ppos += *lenp;
--	} else {
--		*lenp = rc;
--		*ppos += rc;
+-	if (data->ioc_len > BIT(30)) {
+-		CERROR("OBD ioctl: ioc_len larger than 1<<30\n");
+-		return 1;
 -	}
+-
+-	if (data->ioc_inllen1 > BIT(30)) {
+-		CERROR("OBD ioctl: ioc_inllen1 larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inllen2 > BIT(30)) {
+-		CERROR("OBD ioctl: ioc_inllen2 larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inllen3 > BIT(30)) {
+-		CERROR("OBD ioctl: ioc_inllen3 larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inllen4 > BIT(30)) {
+-		CERROR("OBD ioctl: ioc_inllen4 larger than 1<<30\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inlbuf1 && data->ioc_inllen1 == 0) {
+-		CERROR("OBD ioctl: inlbuf1 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inlbuf2 && data->ioc_inllen2 == 0) {
+-		CERROR("OBD ioctl: inlbuf2 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inlbuf3 && data->ioc_inllen3 == 0) {
+-		CERROR("OBD ioctl: inlbuf3 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_inlbuf4 && data->ioc_inllen4 == 0) {
+-		CERROR("OBD ioctl: inlbuf4 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_pbuf1 && data->ioc_plen1 == 0) {
+-		CERROR("OBD ioctl: pbuf1 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (data->ioc_pbuf2 && data->ioc_plen2 == 0) {
+-		CERROR("OBD ioctl: pbuf2 pointer but 0 length\n");
+-		return 1;
+-	}
+-
+-	if (!data->ioc_pbuf1 && data->ioc_plen1 != 0) {
+-		CERROR("OBD ioctl: plen1 set but NULL pointer\n");
+-		return 1;
+-	}
+-
+-	if (!data->ioc_pbuf2 && data->ioc_plen2 != 0) {
+-		CERROR("OBD ioctl: plen2 set but NULL pointer\n");
+-		return 1;
+-	}
+-
+-	if (obd_ioctl_packlen(data) > data->ioc_len) {
+-		CERROR("OBD ioctl: packlen exceeds ioc_len (%d > %d)\n",
+-		obd_ioctl_packlen(data), data->ioc_len);
+-		return 1;
+-	}
+-
 -	return 0;
 -}
--EXPORT_SYMBOL(lprocfs_call_handler);
 -
--static int __proc_dobitmasks(void *data, int write,
--			     loff_t pos, void __user *buffer, int nob)
-+static int proc_dobitmasks(struct ctl_table *table, int write,
-+			   void __user *buffer, size_t *lenp, loff_t *ppos)
- {
- 	const int tmpstrlen = 512;
- 	char *tmpstr;
- 	int rc;
--	unsigned int *mask = data;
-+	size_t nob = *lenp;
-+	loff_t pos = *ppos;
-+	unsigned int *mask = table->data;
- 	int is_subsys = (mask == &libcfs_subsystem_debug) ? 1 : 0;
- 	int is_printk = (mask == &libcfs_printk) ? 1 : 0;
- 
-@@ -351,32 +333,23 @@ static int __proc_dobitmasks(void *data, int write,
- 	return rc;
- }
- 
--static int proc_dobitmasks(struct ctl_table *table, int write,
--			   void __user *buffer, size_t *lenp, loff_t *ppos)
-+static int proc_dump_kernel(struct ctl_table *table, int write,
-+			    void __user *buffer, size_t *lenp, loff_t *ppos)
- {
--	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
--				    __proc_dobitmasks);
--}
-+	size_t nob = *lenp;
- 
--static int __proc_dump_kernel(void *data, int write,
--			      loff_t pos, void __user *buffer, int nob)
+-/* buffer MUST be at least the size of obd_ioctl_hdr */
+-int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
 -{
- 	if (!write)
- 		return 0;
- 
- 	return cfs_trace_dump_debug_buffer_usrstr(buffer, nob);
- }
- 
--static int proc_dump_kernel(struct ctl_table *table, int write,
-+static int proc_daemon_file(struct ctl_table *table, int write,
- 			    void __user *buffer, size_t *lenp, loff_t *ppos)
- {
--	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
--				    __proc_dump_kernel);
--}
-+	size_t nob = *lenp;
-+	loff_t pos = *ppos;
- 
--static int __proc_daemon_file(void *data, int write,
--			      loff_t pos, void __user *buffer, int nob)
--{
- 	if (!write) {
- 		int len = strlen(cfs_tracefile);
- 
-@@ -390,13 +363,6 @@ static int __proc_daemon_file(void *data, int write,
- 	return cfs_trace_daemon_command_usrstr(buffer, nob);
- }
- 
--static int proc_daemon_file(struct ctl_table *table, int write,
--			    void __user *buffer, size_t *lenp, loff_t *ppos)
--{
--	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
--				    __proc_daemon_file);
--}
+-	struct obd_ioctl_hdr hdr;
+-	struct obd_ioctl_data *data;
+-	int err;
+-	int offset = 0;
 -
- static int libcfs_force_lbug(struct ctl_table *table, int write,
- 			     void __user *buffer,
- 			     size_t *lenp, loff_t *ppos)
-@@ -419,9 +385,11 @@ static int proc_fail_loc(struct ctl_table *table, int write,
- 	return rc;
- }
- 
--static int __proc_cpt_table(void *data, int write,
--			    loff_t pos, void __user *buffer, int nob)
-+static int proc_cpt_table(struct ctl_table *table, int write,
-+			  void __user *buffer, size_t *lenp, loff_t *ppos)
- {
-+	size_t nob = *lenp;
-+	loff_t pos = *ppos;
- 	char *buf = NULL;
- 	int len = 4096;
- 	int rc  = 0;
-@@ -457,13 +425,6 @@ static int __proc_cpt_table(void *data, int write,
- 	return rc;
- }
- 
--static int proc_cpt_table(struct ctl_table *table, int write,
--			  void __user *buffer, size_t *lenp, loff_t *ppos)
+-	if (copy_from_user(&hdr, arg, sizeof(hdr)))
+-		return -EFAULT;
+-
+-	if (hdr.ioc_version != OBD_IOCTL_VERSION) {
+-		CERROR("Version mismatch kernel (%x) vs application (%x)\n",
+-		       OBD_IOCTL_VERSION, hdr.ioc_version);
+-		return -EINVAL;
+-	}
+-
+-	if (hdr.ioc_len > OBD_MAX_IOCTL_BUFFER) {
+-		CERROR("User buffer len %d exceeds %d max buffer\n",
+-		       hdr.ioc_len, OBD_MAX_IOCTL_BUFFER);
+-		return -EINVAL;
+-	}
+-
+-	if (hdr.ioc_len < sizeof(struct obd_ioctl_data)) {
+-		CERROR("User buffer too small for ioctl (%d)\n", hdr.ioc_len);
+-		return -EINVAL;
+-	}
+-
+-	/* When there are lots of processes calling vmalloc on multi-core
+-	 * system, the high lock contention will hurt performance badly,
+-	 * obdfilter-survey is an example, which relies on ioctl. So we'd
+-	 * better avoid vmalloc on ioctl path. LU-66
+-	 */
+-	*buf = kvzalloc(hdr.ioc_len, GFP_KERNEL);
+-	if (!*buf) {
+-		CERROR("Cannot allocate control buffer of len %d\n",
+-		       hdr.ioc_len);
+-		return -EINVAL;
+-	}
+-	*len = hdr.ioc_len;
+-	data = (struct obd_ioctl_data *)*buf;
+-
+-	if (copy_from_user(*buf, arg, hdr.ioc_len)) {
+-		err = -EFAULT;
+-		goto free_buf;
+-	}
+-	if (hdr.ioc_len != data->ioc_len) {
+-		err = -EINVAL;
+-		goto free_buf;
+-	}
+-
+-	if (obd_ioctl_is_invalid(data)) {
+-		CERROR("ioctl not correctly formatted\n");
+-		err = -EINVAL;
+-		goto free_buf;
+-	}
+-
+-	if (data->ioc_inllen1) {
+-		data->ioc_inlbuf1 = &data->ioc_bulk[0];
+-		offset += cfs_size_round(data->ioc_inllen1);
+-	}
+-
+-	if (data->ioc_inllen2) {
+-		data->ioc_inlbuf2 = &data->ioc_bulk[0] + offset;
+-		offset += cfs_size_round(data->ioc_inllen2);
+-	}
+-
+-	if (data->ioc_inllen3) {
+-		data->ioc_inlbuf3 = &data->ioc_bulk[0] + offset;
+-		offset += cfs_size_round(data->ioc_inllen3);
+-	}
+-
+-	if (data->ioc_inllen4)
+-		data->ioc_inlbuf4 = &data->ioc_bulk[0] + offset;
+-
+-	return 0;
+-
+-free_buf:
+-	kvfree(*buf);
+-	return err;
+-}
+-EXPORT_SYMBOL(obd_ioctl_getdata);
+-
+-/*  opening /dev/obd */
+-static int obd_class_open(struct inode *inode, struct file *file)
 -{
--	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
--				    __proc_cpt_table);
+-	try_module_get(THIS_MODULE);
+-	return 0;
 -}
 -
- static struct ctl_table lnet_table[] = {
- 	{
- 		.procname = "debug",
-@@ -573,10 +534,17 @@ static ssize_t lnet_debugfs_read(struct file *filp, char __user *buf,
- {
- 	struct ctl_table *table = filp->private_data;
- 	int error;
-+	loff_t old_pos = *ppos;
- 
- 	error = table->proc_handler(table, 0, (void __user *)buf, &count, ppos);
--	if (!error)
-+	/*
-+	 * On success, the length read is either in error or in count.
-+	 * If ppos changed, then use count, else use error
-+	 */
-+	if (!error && *ppos != old_pos)
- 		error = count;
-+	else if (error > 0)
-+		*ppos += error;
- 
- 	return error;
- }
-@@ -586,10 +554,14 @@ static ssize_t lnet_debugfs_write(struct file *filp, const char __user *buf,
- {
- 	struct ctl_table *table = filp->private_data;
- 	int error;
-+	loff_t old_pos = *ppos;
- 
- 	error = table->proc_handler(table, 1, (void __user *)buf, &count, ppos);
--	if (!error)
-+	if (!error) {
- 		error = count;
-+		if (*ppos == old_pos)
-+			*ppos += count;
+-/*  closing /dev/obd */
+-static int obd_class_release(struct inode *inode, struct file *file)
+-{
+-	module_put(THIS_MODULE);
+-	return 0;
+-}
+-
+-/* to control /dev/obd */
+-static long obd_class_ioctl(struct file *filp, unsigned int cmd,
+-			    unsigned long arg)
+-{
+-	int err = 0;
+-
+-	/* Allow non-root access for OBD_IOC_PING_TARGET - used by lfs check */
+-	if (!capable(CAP_SYS_ADMIN) && (cmd != OBD_IOC_PING_TARGET))
+-		return err = -EACCES;
+-	if ((cmd & 0xffffff00) == ((int)'T') << 8) /* ignore all tty ioctls */
+-		return err = -ENOTTY;
+-
+-	err = class_handle_ioctl(cmd, (unsigned long)arg);
+-
+-	return err;
+-}
+-
+-/* declare character device */
+-static const struct file_operations obd_psdev_fops = {
+-	.owner	  = THIS_MODULE,
+-	.unlocked_ioctl = obd_class_ioctl, /* unlocked_ioctl */
+-	.open	   = obd_class_open,      /* open */
+-	.release	= obd_class_release,   /* release */
+-};
+-
+-/* modules setup */
+-struct miscdevice obd_psdev = {
+-	.minor = MISC_DYNAMIC_MINOR,
+-	.name  = OBD_DEV_NAME,
+-	.fops  = &obd_psdev_fops,
+-};
+-
+-static ssize_t version_show(struct kobject *kobj, struct attribute *attr,
+-			    char *buf)
+-{
+-	return sprintf(buf, "%s\n", LUSTRE_VERSION_STRING);
+-}
+-
+-static ssize_t pinger_show(struct kobject *kobj, struct attribute *attr,
+-			   char *buf)
+-{
+-	return sprintf(buf, "%s\n", "on");
+-}
+-
+-static ssize_t
+-health_check_show(struct kobject *kobj, struct attribute *attr, char *buf)
+-{
+-	bool healthy = true;
+-	int i;
+-	size_t len = 0;
+-
+-	if (libcfs_catastrophe)
+-		return sprintf(buf, "LBUG\n");
+-
+-	read_lock(&obd_dev_lock);
+-	for (i = 0; i < class_devno_max(); i++) {
+-		struct obd_device *obd;
+-
+-		obd = class_num2obd(i);
+-		if (!obd || !obd->obd_attached || !obd->obd_set_up)
+-			continue;
+-
+-		LASSERT(obd->obd_magic == OBD_DEVICE_MAGIC);
+-		if (obd->obd_stopping)
+-			continue;
+-
+-		class_incref(obd, __func__, current);
+-		read_unlock(&obd_dev_lock);
+-
+-		if (obd_health_check(NULL, obd))
+-			healthy = false;
+-		class_decref(obd, __func__, current);
+-		read_lock(&obd_dev_lock);
+-	}
+-	read_unlock(&obd_dev_lock);
+-
+-	if (healthy)
+-		len = sprintf(buf, "healthy\n");
+-	else
+-		len = sprintf(buf, "NOT HEALTHY\n");
+-
+-	return len;
+-}
+-
+-static ssize_t jobid_var_show(struct kobject *kobj, struct attribute *attr,
+-			      char *buf)
+-{
+-	return snprintf(buf, PAGE_SIZE, "%s\n", obd_jobid_var);
+-}
+-
+-static ssize_t jobid_var_store(struct kobject *kobj, struct attribute *attr,
+-			       const char *buffer,
+-			       size_t count)
+-{
+-	if (!count || count > JOBSTATS_JOBID_VAR_MAX_LEN)
+-		return -EINVAL;
+-
+-	memset(obd_jobid_var, 0, JOBSTATS_JOBID_VAR_MAX_LEN + 1);
+-
+-	memcpy(obd_jobid_var, buffer, count);
+-
+-	/* Trim the trailing '\n' if any */
+-	if (obd_jobid_var[count - 1] == '\n')
+-		obd_jobid_var[count - 1] = 0;
+-
+-	return count;
+-}
+-
+-static ssize_t jobid_name_show(struct kobject *kobj, struct attribute *attr,
+-			       char *buf)
+-{
+-	return snprintf(buf, PAGE_SIZE, "%s\n", obd_jobid_node);
+-}
+-
+-static ssize_t jobid_name_store(struct kobject *kobj, struct attribute *attr,
+-				const char *buffer,
+-				size_t count)
+-{
+-	if (!count || count > LUSTRE_JOBID_SIZE)
+-		return -EINVAL;
+-
+-	memcpy(obd_jobid_node, buffer, count);
+-
+-	obd_jobid_node[count] = 0;
+-
+-	/* Trim the trailing '\n' if any */
+-	if (obd_jobid_node[count - 1] == '\n')
+-		obd_jobid_node[count - 1] = 0;
+-
+-	return count;
+-}
+-
+-/* Root for /sys/kernel/debug/lustre */
+-struct dentry *debugfs_lustre_root;
+-EXPORT_SYMBOL_GPL(debugfs_lustre_root);
+-
+-LUSTRE_RO_ATTR(version);
+-LUSTRE_RO_ATTR(pinger);
+-LUSTRE_RO_ATTR(health_check);
+-LUSTRE_RW_ATTR(jobid_var);
+-LUSTRE_RW_ATTR(jobid_name);
+-
+-static struct attribute *lustre_attrs[] = {
+-	&lustre_attr_version.attr,
+-	&lustre_attr_pinger.attr,
+-	&lustre_attr_health_check.attr,
+-	&lustre_attr_jobid_name.attr,
+-	&lustre_attr_jobid_var.attr,
+-	NULL,
+-};
+-
+-static void *obd_device_list_seq_start(struct seq_file *p, loff_t *pos)
+-{
+-	if (*pos >= class_devno_max())
+-		return NULL;
+-
+-	return pos;
+-}
+-
+-static void obd_device_list_seq_stop(struct seq_file *p, void *v)
+-{
+-}
+-
+-static void *obd_device_list_seq_next(struct seq_file *p, void *v, loff_t *pos)
+-{
+-	++*pos;
+-	if (*pos >= class_devno_max())
+-		return NULL;
+-
+-	return pos;
+-}
+-
+-static int obd_device_list_seq_show(struct seq_file *p, void *v)
+-{
+-	loff_t index = *(loff_t *)v;
+-	struct obd_device *obd = class_num2obd((int)index);
+-	char *status;
+-
+-	if (!obd)
+-		return 0;
+-
+-	LASSERT(obd->obd_magic == OBD_DEVICE_MAGIC);
+-	if (obd->obd_stopping)
+-		status = "ST";
+-	else if (obd->obd_inactive)
+-		status = "IN";
+-	else if (obd->obd_set_up)
+-		status = "UP";
+-	else if (obd->obd_attached)
+-		status = "AT";
+-	else
+-		status = "--";
+-
+-	seq_printf(p, "%3d %s %s %s %s %d\n",
+-		   (int)index, status, obd->obd_type->typ_name,
+-		   obd->obd_name, obd->obd_uuid.uuid,
+-		   atomic_read(&obd->obd_refcount));
+-	return 0;
+-}
+-
+-static const struct seq_operations obd_device_list_sops = {
+-	.start = obd_device_list_seq_start,
+-	.stop = obd_device_list_seq_stop,
+-	.next = obd_device_list_seq_next,
+-	.show = obd_device_list_seq_show,
+-};
+-
+-static int obd_device_list_open(struct inode *inode, struct file *file)
+-{
+-	struct seq_file *seq;
+-	int rc = seq_open(file, &obd_device_list_sops);
+-
+-	if (rc)
+-		return rc;
+-
+-	seq = file->private_data;
+-	seq->private = inode->i_private;
+-
+-	return 0;
+-}
+-
+-static const struct file_operations obd_device_list_fops = {
+-	.owner   = THIS_MODULE,
+-	.open    = obd_device_list_open,
+-	.read    = seq_read,
+-	.llseek  = seq_lseek,
+-	.release = seq_release,
+-};
+-
+-struct kobject *lustre_kobj;
+-EXPORT_SYMBOL_GPL(lustre_kobj);
+-
+-static const struct attribute_group lustre_attr_group = {
+-	.attrs = lustre_attrs,
+-};
+-
+-int class_procfs_init(void)
+-{
+-	int rc = -ENOMEM;
+-
+-	lustre_kobj = kobject_create_and_add("lustre", fs_kobj);
+-	if (!lustre_kobj)
+-		goto out;
+-
+-	/* Create the files associated with this kobject */
+-	rc = sysfs_create_group(lustre_kobj, &lustre_attr_group);
+-	if (rc) {
+-		kobject_put(lustre_kobj);
+-		goto out;
+-	}
+-
+-	debugfs_lustre_root = debugfs_create_dir("lustre", NULL);
+-
+-	debugfs_create_file("devices", 0444, debugfs_lustre_root, NULL,
+-			    &obd_device_list_fops);
+-out:
+-	return rc;
+-}
+-
+-int class_procfs_clean(void)
+-{
+-	debugfs_remove_recursive(debugfs_lustre_root);
+-
+-	debugfs_lustre_root = NULL;
+-
+-	sysfs_remove_group(lustre_kobj, &lustre_attr_group);
+-	kobject_put(lustre_kobj);
+-
+-	return 0;
+-}
+diff --git a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c b/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
+deleted file mode 100644
+index e5e8687784ee..000000000000
+--- a/drivers/staging/lustre/lustre/obdclass/linux/linux-sysctl.c
++++ /dev/null
+@@ -1,162 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
+-/*
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.gnu.org/licenses/gpl-2.0.html
+- *
+- * GPL HEADER END
+- */
+-/*
+- * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2011, 2015, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- */
+-
+-#include <linux/module.h>
+-#include <linux/sysctl.h>
+-#include <linux/sched.h>
+-#include <linux/mm.h>
+-#include <linux/slab.h>
+-#include <linux/stat.h>
+-#include <linux/ctype.h>
+-#include <linux/bitops.h>
+-#include <linux/uaccess.h>
+-#include <linux/utsname.h>
+-
+-#define DEBUG_SUBSYSTEM S_CLASS
+-
+-#include <obd_support.h>
+-#include <lprocfs_status.h>
+-#include <obd_class.h>
+-
+-struct static_lustre_uintvalue_attr {
+-	struct {
+-		struct attribute attr;
+-		ssize_t (*show)(struct kobject *kobj, struct attribute *attr,
+-				char *buf);
+-		ssize_t (*store)(struct kobject *kobj, struct attribute *attr,
+-				 const char *buf, size_t len);
+-	} u;
+-	int *value;
+-};
+-
+-static ssize_t static_uintvalue_show(struct kobject *kobj,
+-				     struct attribute *attr,
+-				     char *buf)
+-{
+-	struct static_lustre_uintvalue_attr *lattr = (void *)attr;
+-
+-	return sprintf(buf, "%d\n", *lattr->value);
+-}
+-
+-static ssize_t static_uintvalue_store(struct kobject *kobj,
+-				      struct attribute *attr,
+-				      const char *buffer, size_t count)
+-{
+-	struct static_lustre_uintvalue_attr *lattr  = (void *)attr;
+-	int rc;
+-	unsigned int val;
+-
+-	rc = kstrtouint(buffer, 10, &val);
+-	if (rc)
+-		return rc;
+-
+-	*lattr->value = val;
+-
+-	return count;
+-}
+-
+-#define LUSTRE_STATIC_UINT_ATTR(name, value) \
+-static struct static_lustre_uintvalue_attr lustre_sattr_##name =	\
+-					{__ATTR(name, 0644,		\
+-						static_uintvalue_show,	\
+-						static_uintvalue_store),\
+-					  value }
+-
+-LUSTRE_STATIC_UINT_ATTR(timeout, &obd_timeout);
+-
+-static ssize_t max_dirty_mb_show(struct kobject *kobj, struct attribute *attr,
+-				 char *buf)
+-{
+-	return sprintf(buf, "%lu\n",
+-		       obd_max_dirty_pages / (1 << (20 - PAGE_SHIFT)));
+-}
+-
+-static ssize_t max_dirty_mb_store(struct kobject *kobj, struct attribute *attr,
+-				  const char *buffer, size_t count)
+-{
+-	int rc;
+-	unsigned long val;
+-
+-	rc = kstrtoul(buffer, 10, &val);
+-	if (rc)
+-		return rc;
+-
+-	val *= 1 << (20 - PAGE_SHIFT); /* convert to pages */
+-
+-	if (val > ((totalram_pages / 10) * 9)) {
+-		/* Somebody wants to assign too much memory to dirty pages */
+-		return -EINVAL;
+-	}
+-
+-	if (val < 4 << (20 - PAGE_SHIFT)) {
+-		/* Less than 4 Mb for dirty cache is also bad */
+-		return -EINVAL;
+-	}
+-
+-	obd_max_dirty_pages = val;
+-
+-	return count;
+-}
+-LUSTRE_RW_ATTR(max_dirty_mb);
+-
+-LUSTRE_STATIC_UINT_ATTR(debug_peer_on_timeout, &obd_debug_peer_on_timeout);
+-LUSTRE_STATIC_UINT_ATTR(dump_on_timeout, &obd_dump_on_timeout);
+-LUSTRE_STATIC_UINT_ATTR(dump_on_eviction, &obd_dump_on_eviction);
+-LUSTRE_STATIC_UINT_ATTR(at_min, &at_min);
+-LUSTRE_STATIC_UINT_ATTR(at_max, &at_max);
+-LUSTRE_STATIC_UINT_ATTR(at_extra, &at_extra);
+-LUSTRE_STATIC_UINT_ATTR(at_early_margin, &at_early_margin);
+-LUSTRE_STATIC_UINT_ATTR(at_history, &at_history);
+-
+-static struct attribute *lustre_attrs[] = {
+-	&lustre_sattr_timeout.u.attr,
+-	&lustre_attr_max_dirty_mb.attr,
+-	&lustre_sattr_debug_peer_on_timeout.u.attr,
+-	&lustre_sattr_dump_on_timeout.u.attr,
+-	&lustre_sattr_dump_on_eviction.u.attr,
+-	&lustre_sattr_at_min.u.attr,
+-	&lustre_sattr_at_max.u.attr,
+-	&lustre_sattr_at_extra.u.attr,
+-	&lustre_sattr_at_early_margin.u.attr,
+-	&lustre_sattr_at_history.u.attr,
+-	NULL,
+-};
+-
+-static const struct attribute_group lustre_attr_group = {
+-	.attrs = lustre_attrs,
+-};
+-
+-int obd_sysctl_init(void)
+-{
+-	return sysfs_create_group(lustre_kobj, &lustre_attr_group);
+-}
+diff --git a/drivers/staging/lustre/lustre/obdclass/module.c b/drivers/staging/lustre/lustre/obdclass/module.c
+new file mode 100644
+index 000000000000..9c800580053b
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/obdclass/module.c
+@@ -0,0 +1,514 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
++ * Use is subject to license terms.
++ *
++ * Copyright (c) 2011, 2012, Intel Corporation.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ * Lustre is a trademark of Sun Microsystems, Inc.
++ *
++ * lustre/obdclass/linux/linux-module.c
++ *
++ * Object Devices Class Driver
++ * These are the only exported functions, they provide some generic
++ * infrastructure for managing object devices
++ */
++
++#define DEBUG_SUBSYSTEM S_CLASS
++
++#include <linux/module.h>
++#include <linux/errno.h>
++#include <linux/kernel.h>
++#include <linux/sched.h>
++#include <linux/lp.h>
++#include <linux/slab.h>
++#include <linux/ioport.h>
++#include <linux/fcntl.h>
++#include <linux/delay.h>
++#include <linux/skbuff.h>
++#include <linux/fs.h>
++#include <linux/poll.h>
++#include <linux/list.h>
++#include <linux/highmem.h>
++#include <linux/io.h>
++#include <asm/ioctls.h>
++#include <linux/uaccess.h>
++#include <linux/miscdevice.h>
++#include <linux/seq_file.h>
++#include <linux/kobject.h>
++
++#include <uapi/linux/lnet/lnetctl.h>
++#include <obd_support.h>
++#include <obd_class.h>
++#include <lprocfs_status.h>
++#include <uapi/linux/lustre/lustre_ioctl.h>
++#include <uapi/linux/lustre/lustre_ver.h>
++
++#define OBD_MAX_IOCTL_BUFFER	8192
++
++static int obd_ioctl_is_invalid(struct obd_ioctl_data *data)
++{
++	if (data->ioc_len > BIT(30)) {
++		CERROR("OBD ioctl: ioc_len larger than 1<<30\n");
++		return 1;
 +	}
- 
- 	return error;
- }
-diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-index ae4b7f5953a0..f135082fec5c 100644
---- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-+++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-@@ -74,11 +74,13 @@
- 
- #define LNET_PROC_VERSION(v)	((unsigned int)((v) & LNET_PROC_VER_MASK))
- 
--static int __proc_lnet_stats(void *data, int write,
--			     loff_t pos, void __user *buffer, int nob)
-+static int proc_lnet_stats(struct ctl_table *table, int write,
-+			   void __user *buffer, size_t *lenp, loff_t *ppos)
- {
- 	int rc;
- 	struct lnet_counters *ctrs;
-+	size_t nob = *lenp;
-+	loff_t pos = *ppos;
- 	int len;
- 	char *tmpstr;
- 	const int tmpsiz = 256; /* 7 %u and 4 %llu */
-@@ -122,13 +124,6 @@ static int __proc_lnet_stats(void *data, int write,
- 	return rc;
- }
- 
--static int proc_lnet_stats(struct ctl_table *table, int write,
--			   void __user *buffer, size_t *lenp, loff_t *ppos)
--{
--	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
--				    __proc_lnet_stats);
--}
--
- static int proc_lnet_routes(struct ctl_table *table, int write,
- 			    void __user *buffer, size_t *lenp, loff_t *ppos)
- {
-@@ -562,9 +557,11 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
- 	return rc;
- }
- 
--static int __proc_lnet_buffers(void *data, int write,
--			       loff_t pos, void __user *buffer, int nob)
-+static int proc_lnet_buffers(struct ctl_table *table, int write,
-+			     void __user *buffer, size_t *lenp, loff_t *ppos)
- {
-+	size_t nob = *lenp;
-+	loff_t pos = *ppos;
- 	char *s;
- 	char *tmpstr;
- 	int tmpsiz;
-@@ -620,13 +617,6 @@ static int __proc_lnet_buffers(void *data, int write,
- 	return rc;
- }
- 
--static int proc_lnet_buffers(struct ctl_table *table, int write,
--			     void __user *buffer, size_t *lenp, loff_t *ppos)
--{
--	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
--				    __proc_lnet_buffers);
--}
--
- static int proc_lnet_nis(struct ctl_table *table, int write,
- 			 void __user *buffer, size_t *lenp, loff_t *ppos)
- {
-@@ -784,10 +774,13 @@ static struct lnet_portal_rotors	portal_rotors[] = {
- 	},
- };
- 
--static int __proc_lnet_portal_rotor(void *data, int write,
--				    loff_t pos, void __user *buffer, int nob)
-+static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
-+				  void __user *buffer, size_t *lenp,
-+				  loff_t *ppos)
- {
- 	const int buf_len = 128;
-+	size_t nob = *lenp;
-+	loff_t pos = *ppos;
- 	char *buf;
- 	char *tmp;
- 	int rc;
-@@ -845,14 +838,6 @@ static int __proc_lnet_portal_rotor(void *data, int write,
- 	return rc;
- }
- 
--static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
--				  void __user *buffer, size_t *lenp,
--				  loff_t *ppos)
--{
--	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
--				    __proc_lnet_portal_rotor);
--}
--
- static struct ctl_table lnet_table[] = {
- 	/*
- 	 * NB No .strategy entries have been provided since sysctl(8) prefers
++
++	if (data->ioc_inllen1 > BIT(30)) {
++		CERROR("OBD ioctl: ioc_inllen1 larger than 1<<30\n");
++		return 1;
++	}
++
++	if (data->ioc_inllen2 > BIT(30)) {
++		CERROR("OBD ioctl: ioc_inllen2 larger than 1<<30\n");
++		return 1;
++	}
++
++	if (data->ioc_inllen3 > BIT(30)) {
++		CERROR("OBD ioctl: ioc_inllen3 larger than 1<<30\n");
++		return 1;
++	}
++
++	if (data->ioc_inllen4 > BIT(30)) {
++		CERROR("OBD ioctl: ioc_inllen4 larger than 1<<30\n");
++		return 1;
++	}
++
++	if (data->ioc_inlbuf1 && data->ioc_inllen1 == 0) {
++		CERROR("OBD ioctl: inlbuf1 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_inlbuf2 && data->ioc_inllen2 == 0) {
++		CERROR("OBD ioctl: inlbuf2 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_inlbuf3 && data->ioc_inllen3 == 0) {
++		CERROR("OBD ioctl: inlbuf3 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_inlbuf4 && data->ioc_inllen4 == 0) {
++		CERROR("OBD ioctl: inlbuf4 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_pbuf1 && data->ioc_plen1 == 0) {
++		CERROR("OBD ioctl: pbuf1 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (data->ioc_pbuf2 && data->ioc_plen2 == 0) {
++		CERROR("OBD ioctl: pbuf2 pointer but 0 length\n");
++		return 1;
++	}
++
++	if (!data->ioc_pbuf1 && data->ioc_plen1 != 0) {
++		CERROR("OBD ioctl: plen1 set but NULL pointer\n");
++		return 1;
++	}
++
++	if (!data->ioc_pbuf2 && data->ioc_plen2 != 0) {
++		CERROR("OBD ioctl: plen2 set but NULL pointer\n");
++		return 1;
++	}
++
++	if (obd_ioctl_packlen(data) > data->ioc_len) {
++		CERROR("OBD ioctl: packlen exceeds ioc_len (%d > %d)\n",
++		obd_ioctl_packlen(data), data->ioc_len);
++		return 1;
++	}
++
++	return 0;
++}
++
++/* buffer MUST be at least the size of obd_ioctl_hdr */
++int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
++{
++	struct obd_ioctl_hdr hdr;
++	struct obd_ioctl_data *data;
++	int err;
++	int offset = 0;
++
++	if (copy_from_user(&hdr, arg, sizeof(hdr)))
++		return -EFAULT;
++
++	if (hdr.ioc_version != OBD_IOCTL_VERSION) {
++		CERROR("Version mismatch kernel (%x) vs application (%x)\n",
++		       OBD_IOCTL_VERSION, hdr.ioc_version);
++		return -EINVAL;
++	}
++
++	if (hdr.ioc_len > OBD_MAX_IOCTL_BUFFER) {
++		CERROR("User buffer len %d exceeds %d max buffer\n",
++		       hdr.ioc_len, OBD_MAX_IOCTL_BUFFER);
++		return -EINVAL;
++	}
++
++	if (hdr.ioc_len < sizeof(struct obd_ioctl_data)) {
++		CERROR("User buffer too small for ioctl (%d)\n", hdr.ioc_len);
++		return -EINVAL;
++	}
++
++	/* When there are lots of processes calling vmalloc on multi-core
++	 * system, the high lock contention will hurt performance badly,
++	 * obdfilter-survey is an example, which relies on ioctl. So we'd
++	 * better avoid vmalloc on ioctl path. LU-66
++	 */
++	*buf = kvzalloc(hdr.ioc_len, GFP_KERNEL);
++	if (!*buf) {
++		CERROR("Cannot allocate control buffer of len %d\n",
++		       hdr.ioc_len);
++		return -EINVAL;
++	}
++	*len = hdr.ioc_len;
++	data = (struct obd_ioctl_data *)*buf;
++
++	if (copy_from_user(*buf, arg, hdr.ioc_len)) {
++		err = -EFAULT;
++		goto free_buf;
++	}
++	if (hdr.ioc_len != data->ioc_len) {
++		err = -EINVAL;
++		goto free_buf;
++	}
++
++	if (obd_ioctl_is_invalid(data)) {
++		CERROR("ioctl not correctly formatted\n");
++		err = -EINVAL;
++		goto free_buf;
++	}
++
++	if (data->ioc_inllen1) {
++		data->ioc_inlbuf1 = &data->ioc_bulk[0];
++		offset += cfs_size_round(data->ioc_inllen1);
++	}
++
++	if (data->ioc_inllen2) {
++		data->ioc_inlbuf2 = &data->ioc_bulk[0] + offset;
++		offset += cfs_size_round(data->ioc_inllen2);
++	}
++
++	if (data->ioc_inllen3) {
++		data->ioc_inlbuf3 = &data->ioc_bulk[0] + offset;
++		offset += cfs_size_round(data->ioc_inllen3);
++	}
++
++	if (data->ioc_inllen4)
++		data->ioc_inlbuf4 = &data->ioc_bulk[0] + offset;
++
++	return 0;
++
++free_buf:
++	kvfree(*buf);
++	return err;
++}
++EXPORT_SYMBOL(obd_ioctl_getdata);
++
++/*  opening /dev/obd */
++static int obd_class_open(struct inode *inode, struct file *file)
++{
++	try_module_get(THIS_MODULE);
++	return 0;
++}
++
++/*  closing /dev/obd */
++static int obd_class_release(struct inode *inode, struct file *file)
++{
++	module_put(THIS_MODULE);
++	return 0;
++}
++
++/* to control /dev/obd */
++static long obd_class_ioctl(struct file *filp, unsigned int cmd,
++			    unsigned long arg)
++{
++	int err = 0;
++
++	/* Allow non-root access for OBD_IOC_PING_TARGET - used by lfs check */
++	if (!capable(CAP_SYS_ADMIN) && (cmd != OBD_IOC_PING_TARGET))
++		return err = -EACCES;
++	if ((cmd & 0xffffff00) == ((int)'T') << 8) /* ignore all tty ioctls */
++		return err = -ENOTTY;
++
++	err = class_handle_ioctl(cmd, (unsigned long)arg);
++
++	return err;
++}
++
++/* declare character device */
++static const struct file_operations obd_psdev_fops = {
++	.owner	  = THIS_MODULE,
++	.unlocked_ioctl = obd_class_ioctl, /* unlocked_ioctl */
++	.open	   = obd_class_open,      /* open */
++	.release	= obd_class_release,   /* release */
++};
++
++/* modules setup */
++struct miscdevice obd_psdev = {
++	.minor = MISC_DYNAMIC_MINOR,
++	.name  = OBD_DEV_NAME,
++	.fops  = &obd_psdev_fops,
++};
++
++static ssize_t version_show(struct kobject *kobj, struct attribute *attr,
++			    char *buf)
++{
++	return sprintf(buf, "%s\n", LUSTRE_VERSION_STRING);
++}
++
++static ssize_t pinger_show(struct kobject *kobj, struct attribute *attr,
++			   char *buf)
++{
++	return sprintf(buf, "%s\n", "on");
++}
++
++static ssize_t
++health_check_show(struct kobject *kobj, struct attribute *attr, char *buf)
++{
++	bool healthy = true;
++	int i;
++	size_t len = 0;
++
++	if (libcfs_catastrophe)
++		return sprintf(buf, "LBUG\n");
++
++	read_lock(&obd_dev_lock);
++	for (i = 0; i < class_devno_max(); i++) {
++		struct obd_device *obd;
++
++		obd = class_num2obd(i);
++		if (!obd || !obd->obd_attached || !obd->obd_set_up)
++			continue;
++
++		LASSERT(obd->obd_magic == OBD_DEVICE_MAGIC);
++		if (obd->obd_stopping)
++			continue;
++
++		class_incref(obd, __func__, current);
++		read_unlock(&obd_dev_lock);
++
++		if (obd_health_check(NULL, obd))
++			healthy = false;
++		class_decref(obd, __func__, current);
++		read_lock(&obd_dev_lock);
++	}
++	read_unlock(&obd_dev_lock);
++
++	if (healthy)
++		len = sprintf(buf, "healthy\n");
++	else
++		len = sprintf(buf, "NOT HEALTHY\n");
++
++	return len;
++}
++
++static ssize_t jobid_var_show(struct kobject *kobj, struct attribute *attr,
++			      char *buf)
++{
++	return snprintf(buf, PAGE_SIZE, "%s\n", obd_jobid_var);
++}
++
++static ssize_t jobid_var_store(struct kobject *kobj, struct attribute *attr,
++			       const char *buffer,
++			       size_t count)
++{
++	if (!count || count > JOBSTATS_JOBID_VAR_MAX_LEN)
++		return -EINVAL;
++
++	memset(obd_jobid_var, 0, JOBSTATS_JOBID_VAR_MAX_LEN + 1);
++
++	memcpy(obd_jobid_var, buffer, count);
++
++	/* Trim the trailing '\n' if any */
++	if (obd_jobid_var[count - 1] == '\n')
++		obd_jobid_var[count - 1] = 0;
++
++	return count;
++}
++
++static ssize_t jobid_name_show(struct kobject *kobj, struct attribute *attr,
++			       char *buf)
++{
++	return snprintf(buf, PAGE_SIZE, "%s\n", obd_jobid_node);
++}
++
++static ssize_t jobid_name_store(struct kobject *kobj, struct attribute *attr,
++				const char *buffer,
++				size_t count)
++{
++	if (!count || count > LUSTRE_JOBID_SIZE)
++		return -EINVAL;
++
++	memcpy(obd_jobid_node, buffer, count);
++
++	obd_jobid_node[count] = 0;
++
++	/* Trim the trailing '\n' if any */
++	if (obd_jobid_node[count - 1] == '\n')
++		obd_jobid_node[count - 1] = 0;
++
++	return count;
++}
++
++/* Root for /sys/kernel/debug/lustre */
++struct dentry *debugfs_lustre_root;
++EXPORT_SYMBOL_GPL(debugfs_lustre_root);
++
++LUSTRE_RO_ATTR(version);
++LUSTRE_RO_ATTR(pinger);
++LUSTRE_RO_ATTR(health_check);
++LUSTRE_RW_ATTR(jobid_var);
++LUSTRE_RW_ATTR(jobid_name);
++
++static struct attribute *lustre_attrs[] = {
++	&lustre_attr_version.attr,
++	&lustre_attr_pinger.attr,
++	&lustre_attr_health_check.attr,
++	&lustre_attr_jobid_name.attr,
++	&lustre_attr_jobid_var.attr,
++	NULL,
++};
++
++static void *obd_device_list_seq_start(struct seq_file *p, loff_t *pos)
++{
++	if (*pos >= class_devno_max())
++		return NULL;
++
++	return pos;
++}
++
++static void obd_device_list_seq_stop(struct seq_file *p, void *v)
++{
++}
++
++static void *obd_device_list_seq_next(struct seq_file *p, void *v, loff_t *pos)
++{
++	++*pos;
++	if (*pos >= class_devno_max())
++		return NULL;
++
++	return pos;
++}
++
++static int obd_device_list_seq_show(struct seq_file *p, void *v)
++{
++	loff_t index = *(loff_t *)v;
++	struct obd_device *obd = class_num2obd((int)index);
++	char *status;
++
++	if (!obd)
++		return 0;
++
++	LASSERT(obd->obd_magic == OBD_DEVICE_MAGIC);
++	if (obd->obd_stopping)
++		status = "ST";
++	else if (obd->obd_inactive)
++		status = "IN";
++	else if (obd->obd_set_up)
++		status = "UP";
++	else if (obd->obd_attached)
++		status = "AT";
++	else
++		status = "--";
++
++	seq_printf(p, "%3d %s %s %s %s %d\n",
++		   (int)index, status, obd->obd_type->typ_name,
++		   obd->obd_name, obd->obd_uuid.uuid,
++		   atomic_read(&obd->obd_refcount));
++	return 0;
++}
++
++static const struct seq_operations obd_device_list_sops = {
++	.start = obd_device_list_seq_start,
++	.stop = obd_device_list_seq_stop,
++	.next = obd_device_list_seq_next,
++	.show = obd_device_list_seq_show,
++};
++
++static int obd_device_list_open(struct inode *inode, struct file *file)
++{
++	struct seq_file *seq;
++	int rc = seq_open(file, &obd_device_list_sops);
++
++	if (rc)
++		return rc;
++
++	seq = file->private_data;
++	seq->private = inode->i_private;
++
++	return 0;
++}
++
++static const struct file_operations obd_device_list_fops = {
++	.owner   = THIS_MODULE,
++	.open    = obd_device_list_open,
++	.read    = seq_read,
++	.llseek  = seq_lseek,
++	.release = seq_release,
++};
++
++struct kobject *lustre_kobj;
++EXPORT_SYMBOL_GPL(lustre_kobj);
++
++static const struct attribute_group lustre_attr_group = {
++	.attrs = lustre_attrs,
++};
++
++int class_procfs_init(void)
++{
++	int rc = -ENOMEM;
++
++	lustre_kobj = kobject_create_and_add("lustre", fs_kobj);
++	if (!lustre_kobj)
++		goto out;
++
++	/* Create the files associated with this kobject */
++	rc = sysfs_create_group(lustre_kobj, &lustre_attr_group);
++	if (rc) {
++		kobject_put(lustre_kobj);
++		goto out;
++	}
++
++	debugfs_lustre_root = debugfs_create_dir("lustre", NULL);
++
++	debugfs_create_file("devices", 0444, debugfs_lustre_root, NULL,
++			    &obd_device_list_fops);
++out:
++	return rc;
++}
++
++int class_procfs_clean(void)
++{
++	debugfs_remove_recursive(debugfs_lustre_root);
++
++	debugfs_lustre_root = NULL;
++
++	sysfs_remove_group(lustre_kobj, &lustre_attr_group);
++	kobject_put(lustre_kobj);
++
++	return 0;
++}
+diff --git a/drivers/staging/lustre/lustre/obdclass/sysctl.c b/drivers/staging/lustre/lustre/obdclass/sysctl.c
+new file mode 100644
+index 000000000000..e5e8687784ee
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/obdclass/sysctl.c
+@@ -0,0 +1,162 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * GPL HEADER START
++ *
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 only,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 for more details (a copy is included
++ * in the LICENSE file that accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 along with this program; If not, see
++ * http://www.gnu.org/licenses/gpl-2.0.html
++ *
++ * GPL HEADER END
++ */
++/*
++ * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
++ * Use is subject to license terms.
++ *
++ * Copyright (c) 2011, 2015, Intel Corporation.
++ */
++/*
++ * This file is part of Lustre, http://www.lustre.org/
++ * Lustre is a trademark of Sun Microsystems, Inc.
++ */
++
++#include <linux/module.h>
++#include <linux/sysctl.h>
++#include <linux/sched.h>
++#include <linux/mm.h>
++#include <linux/slab.h>
++#include <linux/stat.h>
++#include <linux/ctype.h>
++#include <linux/bitops.h>
++#include <linux/uaccess.h>
++#include <linux/utsname.h>
++
++#define DEBUG_SUBSYSTEM S_CLASS
++
++#include <obd_support.h>
++#include <lprocfs_status.h>
++#include <obd_class.h>
++
++struct static_lustre_uintvalue_attr {
++	struct {
++		struct attribute attr;
++		ssize_t (*show)(struct kobject *kobj, struct attribute *attr,
++				char *buf);
++		ssize_t (*store)(struct kobject *kobj, struct attribute *attr,
++				 const char *buf, size_t len);
++	} u;
++	int *value;
++};
++
++static ssize_t static_uintvalue_show(struct kobject *kobj,
++				     struct attribute *attr,
++				     char *buf)
++{
++	struct static_lustre_uintvalue_attr *lattr = (void *)attr;
++
++	return sprintf(buf, "%d\n", *lattr->value);
++}
++
++static ssize_t static_uintvalue_store(struct kobject *kobj,
++				      struct attribute *attr,
++				      const char *buffer, size_t count)
++{
++	struct static_lustre_uintvalue_attr *lattr  = (void *)attr;
++	int rc;
++	unsigned int val;
++
++	rc = kstrtouint(buffer, 10, &val);
++	if (rc)
++		return rc;
++
++	*lattr->value = val;
++
++	return count;
++}
++
++#define LUSTRE_STATIC_UINT_ATTR(name, value) \
++static struct static_lustre_uintvalue_attr lustre_sattr_##name =	\
++					{__ATTR(name, 0644,		\
++						static_uintvalue_show,	\
++						static_uintvalue_store),\
++					  value }
++
++LUSTRE_STATIC_UINT_ATTR(timeout, &obd_timeout);
++
++static ssize_t max_dirty_mb_show(struct kobject *kobj, struct attribute *attr,
++				 char *buf)
++{
++	return sprintf(buf, "%lu\n",
++		       obd_max_dirty_pages / (1 << (20 - PAGE_SHIFT)));
++}
++
++static ssize_t max_dirty_mb_store(struct kobject *kobj, struct attribute *attr,
++				  const char *buffer, size_t count)
++{
++	int rc;
++	unsigned long val;
++
++	rc = kstrtoul(buffer, 10, &val);
++	if (rc)
++		return rc;
++
++	val *= 1 << (20 - PAGE_SHIFT); /* convert to pages */
++
++	if (val > ((totalram_pages / 10) * 9)) {
++		/* Somebody wants to assign too much memory to dirty pages */
++		return -EINVAL;
++	}
++
++	if (val < 4 << (20 - PAGE_SHIFT)) {
++		/* Less than 4 Mb for dirty cache is also bad */
++		return -EINVAL;
++	}
++
++	obd_max_dirty_pages = val;
++
++	return count;
++}
++LUSTRE_RW_ATTR(max_dirty_mb);
++
++LUSTRE_STATIC_UINT_ATTR(debug_peer_on_timeout, &obd_debug_peer_on_timeout);
++LUSTRE_STATIC_UINT_ATTR(dump_on_timeout, &obd_dump_on_timeout);
++LUSTRE_STATIC_UINT_ATTR(dump_on_eviction, &obd_dump_on_eviction);
++LUSTRE_STATIC_UINT_ATTR(at_min, &at_min);
++LUSTRE_STATIC_UINT_ATTR(at_max, &at_max);
++LUSTRE_STATIC_UINT_ATTR(at_extra, &at_extra);
++LUSTRE_STATIC_UINT_ATTR(at_early_margin, &at_early_margin);
++LUSTRE_STATIC_UINT_ATTR(at_history, &at_history);
++
++static struct attribute *lustre_attrs[] = {
++	&lustre_sattr_timeout.u.attr,
++	&lustre_attr_max_dirty_mb.attr,
++	&lustre_sattr_debug_peer_on_timeout.u.attr,
++	&lustre_sattr_dump_on_timeout.u.attr,
++	&lustre_sattr_dump_on_eviction.u.attr,
++	&lustre_sattr_at_min.u.attr,
++	&lustre_sattr_at_max.u.attr,
++	&lustre_sattr_at_extra.u.attr,
++	&lustre_sattr_at_early_margin.u.attr,
++	&lustre_sattr_at_history.u.attr,
++	NULL,
++};
++
++static const struct attribute_group lustre_attr_group = {
++	.attrs = lustre_attrs,
++};
++
++int obd_sysctl_init(void)
++{
++	return sysfs_create_group(lustre_kobj, &lustre_attr_group);
++}
