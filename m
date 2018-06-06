@@ -1,9 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 06 Jun 2018 16:05:19 +1000
-Subject: [lustre-devel] [PATCH 06/11] staging: lustre: remove interval_tree
+Subject: [lustre-devel] [PATCH 07/11] staging: lustre: fold
+ lprocfs_call_handler functionality into lnet_debugfs_*
 In-Reply-To: <152826510267.16761.14361003167157833896.stgit@noble>
 References: <152826510267.16761.14361003167157833896.stgit@noble>
-Message-ID: <152826511909.16761.11573648246807449778.stgit@noble>
+Message-ID: <152826511912.16761.6908134754944227444.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -11,748 +12,293 @@ Content-Transfer-Encoding: 7bit
 To: Oleg Drokin <oleg.drokin@intel.com>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, James Simmons <jsimmons@infradead.org>, Andreas Dilger <andreas.dilger@intel.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-There are no remaining users for this library,
-so discard it.
+The calling convention for ->proc_handler is rather clumsy,
+as a comment in fs/procfs/proc_sysctl.c confirms.
+lustre has copied this convention to lnet_debugfs_{read,write},
+and then provided a wrapper for handlers - lprocfs_call_handler -
+to work around the clumsiness.
+
+It is cleaner to just fold the functionality of lprocfs_call_handler()
+into lnet_debugfs_* and let them call the final handler directly.
+
+If these files were ever moved to /proc/sys (which seems unlikely) the
+handling in fs/procfs/proc_sysctl.c would need to be fixed to, but
+that would not be a bad thing.
+
+So modify all the functions that did use the wrapper to not need it
+now that a more sane calling convention is available.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lustre/include/interval_tree.h  |  119 ----
- drivers/staging/lustre/lustre/ldlm/interval_tree.c |  590 --------------------
- drivers/staging/lustre/lustre/ptlrpc/Makefile      |    1 
- 3 files changed, 710 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/include/interval_tree.h
- delete mode 100644 drivers/staging/lustre/lustre/ldlm/interval_tree.c
+ .../staging/lustre/include/linux/libcfs/libcfs.h   |    4 -
+ drivers/staging/lustre/lnet/libcfs/module.c        |   84 +++++++-------------
+ drivers/staging/lustre/lnet/lnet/router_proc.c     |   41 +++-------
+ 3 files changed, 41 insertions(+), 88 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/interval_tree.h b/drivers/staging/lustre/lustre/include/interval_tree.h
-deleted file mode 100644
-index bcda74fc7875..000000000000
---- a/drivers/staging/lustre/lustre/include/interval_tree.h
-+++ /dev/null
-@@ -1,119 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- *
-- * lustre/include/interval_tree.h
-- *
-- * Author: Huang Wei <huangwei@clusterfs.com>
-- * Author: Jay Xiong <jinshan.xiong@sun.com>
-- */
--
--#ifndef _INTERVAL_H__
--#define _INTERVAL_H__
--
--#include <linux/errno.h>
--#include <linux/string.h>
--#include <linux/types.h>
--
--struct interval_node {
--	struct interval_node   *in_left;
--	struct interval_node   *in_right;
--	struct interval_node   *in_parent;
--	unsigned		in_color:1,
--				in_intree:1, /** set if the node is in tree */
--				in_res1:30;
--	__u8		    in_res2[4];  /** tags, 8-bytes aligned */
--	__u64		   in_max_high;
--	struct interval_node_extent {
--		__u64 start;
--		__u64 end;
--	} in_extent;
--};
--
--enum interval_iter {
--	INTERVAL_ITER_CONT = 1,
--	INTERVAL_ITER_STOP = 2
--};
--
--static inline int interval_is_intree(struct interval_node *node)
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs.h b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+index edc7ed0dcb94..7ac609328256 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs.h
+@@ -57,10 +57,6 @@ int libcfs_setup(void);
+ extern struct workqueue_struct *cfs_rehash_wq;
+ 
+ void lustre_insert_debugfs(struct ctl_table *table);
+-int lprocfs_call_handler(void *data, int write, loff_t *ppos,
+-			 void __user *buffer, size_t *lenp,
+-			 int (*handler)(void *data, int write, loff_t pos,
+-					void __user *buffer, int len));
+ 
+ /*
+  * Memory
+diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
+index 5dc7de9e6478..02c404c6738e 100644
+--- a/drivers/staging/lustre/lnet/libcfs/module.c
++++ b/drivers/staging/lustre/lnet/libcfs/module.c
+@@ -290,33 +290,15 @@ static struct miscdevice libcfs_dev = {
+ 
+ static int libcfs_dev_registered;
+ 
+-int lprocfs_call_handler(void *data, int write, loff_t *ppos,
+-			 void __user *buffer, size_t *lenp,
+-			 int (*handler)(void *data, int write, loff_t pos,
+-					void __user *buffer, int len))
 -{
--	return node->in_intree == 1;
--}
+-	int rc = handler(data, write, *ppos, buffer, *lenp);
 -
--static inline __u64 interval_low(struct interval_node *node)
--{
--	return node->in_extent.start;
--}
+-	if (rc < 0)
+-		return rc;
 -
--static inline __u64 interval_high(struct interval_node *node)
--{
--	return node->in_extent.end;
--}
--
--static inline int interval_set(struct interval_node *node,
--			       __u64 start, __u64 end)
--{
--	if (start > end)
--		return -ERANGE;
--	node->in_extent.start = start;
--	node->in_extent.end = end;
--	node->in_max_high = end;
+-	if (write) {
+-		*ppos += *lenp;
+-	} else {
+-		*lenp = rc;
+-		*ppos += rc;
+-	}
 -	return 0;
 -}
+-EXPORT_SYMBOL(lprocfs_call_handler);
 -
--/*
-- * Rules to write an interval callback.
-- *  - the callback returns INTERVAL_ITER_STOP when it thinks the iteration
-- *    should be stopped. It will then cause the iteration function to return
-- *    immediately with return value INTERVAL_ITER_STOP.
-- *  - callbacks for interval_iterate and interval_iterate_reverse: Every
-- *    nodes in the tree will be set to @node before the callback being called
-- *  - callback for interval_search: Only overlapped node will be set to @node
-- *    before the callback being called.
-- */
--typedef enum interval_iter (*interval_callback_t)(struct interval_node *node,
--						  void *args);
--
--void interval_insert(struct interval_node *node,
--		     struct interval_node **root);
--void interval_erase(struct interval_node *node, struct interval_node **root);
--
--/*
-- * Search the extents in the tree and call @func for each overlapped
-- * extents.
-- */
--enum interval_iter interval_search(struct interval_node *root,
--				   struct interval_node_extent *ex,
--				   interval_callback_t func, void *data);
--
--enum interval_iter interval_iterate_reverse(struct interval_node *root,
--					    interval_callback_t func,
--					    void *data);
--
--#endif
-diff --git a/drivers/staging/lustre/lustre/ldlm/interval_tree.c b/drivers/staging/lustre/lustre/ldlm/interval_tree.c
-deleted file mode 100644
-index f5232059d1b1..000000000000
---- a/drivers/staging/lustre/lustre/ldlm/interval_tree.c
-+++ /dev/null
-@@ -1,590 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- *
-- * lustre/ldlm/interval_tree.c
-- *
-- * Interval tree library used by ldlm extent lock code
-- *
-- * Author: Huang Wei <huangwei@clusterfs.com>
-- * Author: Jay Xiong <jinshan.xiong@sun.com>
-- */
--#include <lustre_dlm.h>
--#include <obd_support.h>
--#include <interval_tree.h>
--
--enum {
--	INTERVAL_RED = 0,
--	INTERVAL_BLACK = 1
--};
--
--static inline int node_is_left_child(struct interval_node *node)
+-static int __proc_dobitmasks(void *data, int write,
+-			     loff_t pos, void __user *buffer, int nob)
++static int proc_dobitmasks(struct ctl_table *table, int write,
++			   void __user *buffer, size_t *lenp, loff_t *ppos)
+ {
+ 	const int tmpstrlen = 512;
+ 	char *tmpstr;
+ 	int rc;
+-	unsigned int *mask = data;
++	size_t nob = *lenp;
++	loff_t pos = *ppos;
++	unsigned int *mask = table->data;
+ 	int is_subsys = (mask == &libcfs_subsystem_debug) ? 1 : 0;
+ 	int is_printk = (mask == &libcfs_printk) ? 1 : 0;
+ 
+@@ -351,32 +333,23 @@ static int __proc_dobitmasks(void *data, int write,
+ 	return rc;
+ }
+ 
+-static int proc_dobitmasks(struct ctl_table *table, int write,
+-			   void __user *buffer, size_t *lenp, loff_t *ppos)
++static int proc_dump_kernel(struct ctl_table *table, int write,
++			    void __user *buffer, size_t *lenp, loff_t *ppos)
+ {
+-	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
+-				    __proc_dobitmasks);
+-}
++	size_t nob = *lenp;
+ 
+-static int __proc_dump_kernel(void *data, int write,
+-			      loff_t pos, void __user *buffer, int nob)
 -{
--	return node == node->in_parent->in_left;
+ 	if (!write)
+ 		return 0;
+ 
+ 	return cfs_trace_dump_debug_buffer_usrstr(buffer, nob);
+ }
+ 
+-static int proc_dump_kernel(struct ctl_table *table, int write,
++static int proc_daemon_file(struct ctl_table *table, int write,
+ 			    void __user *buffer, size_t *lenp, loff_t *ppos)
+ {
+-	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
+-				    __proc_dump_kernel);
+-}
++	size_t nob = *lenp;
++	loff_t pos = *ppos;
+ 
+-static int __proc_daemon_file(void *data, int write,
+-			      loff_t pos, void __user *buffer, int nob)
+-{
+ 	if (!write) {
+ 		int len = strlen(cfs_tracefile);
+ 
+@@ -390,13 +363,6 @@ static int __proc_daemon_file(void *data, int write,
+ 	return cfs_trace_daemon_command_usrstr(buffer, nob);
+ }
+ 
+-static int proc_daemon_file(struct ctl_table *table, int write,
+-			    void __user *buffer, size_t *lenp, loff_t *ppos)
+-{
+-	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
+-				    __proc_daemon_file);
 -}
 -
--static inline int node_is_right_child(struct interval_node *node)
+ static int libcfs_force_lbug(struct ctl_table *table, int write,
+ 			     void __user *buffer,
+ 			     size_t *lenp, loff_t *ppos)
+@@ -419,9 +385,11 @@ static int proc_fail_loc(struct ctl_table *table, int write,
+ 	return rc;
+ }
+ 
+-static int __proc_cpt_table(void *data, int write,
+-			    loff_t pos, void __user *buffer, int nob)
++static int proc_cpt_table(struct ctl_table *table, int write,
++			  void __user *buffer, size_t *lenp, loff_t *ppos)
+ {
++	size_t nob = *lenp;
++	loff_t pos = *ppos;
+ 	char *buf = NULL;
+ 	int len = 4096;
+ 	int rc  = 0;
+@@ -457,13 +425,6 @@ static int __proc_cpt_table(void *data, int write,
+ 	return rc;
+ }
+ 
+-static int proc_cpt_table(struct ctl_table *table, int write,
+-			  void __user *buffer, size_t *lenp, loff_t *ppos)
 -{
--	return node == node->in_parent->in_right;
+-	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
+-				    __proc_cpt_table);
 -}
 -
--static inline int node_is_red(struct interval_node *node)
+ static struct ctl_table lnet_table[] = {
+ 	{
+ 		.procname = "debug",
+@@ -573,10 +534,17 @@ static ssize_t lnet_debugfs_read(struct file *filp, char __user *buf,
+ {
+ 	struct ctl_table *table = filp->private_data;
+ 	int error;
++	loff_t old_pos = *ppos;
+ 
+ 	error = table->proc_handler(table, 0, (void __user *)buf, &count, ppos);
+-	if (!error)
++	/*
++	 * On success, the length read is either in error or in count.
++	 * If ppos changed, then use count, else use error
++	 */
++	if (!error && *ppos != old_pos)
+ 		error = count;
++	else if (error > 0)
++		*ppos += error;
+ 
+ 	return error;
+ }
+@@ -586,10 +554,14 @@ static ssize_t lnet_debugfs_write(struct file *filp, const char __user *buf,
+ {
+ 	struct ctl_table *table = filp->private_data;
+ 	int error;
++	loff_t old_pos = *ppos;
+ 
+ 	error = table->proc_handler(table, 1, (void __user *)buf, &count, ppos);
+-	if (!error)
++	if (!error) {
+ 		error = count;
++		if (*ppos == old_pos)
++			*ppos += count;
++	}
+ 
+ 	return error;
+ }
+diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
+index ae4b7f5953a0..f135082fec5c 100644
+--- a/drivers/staging/lustre/lnet/lnet/router_proc.c
++++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
+@@ -74,11 +74,13 @@
+ 
+ #define LNET_PROC_VERSION(v)	((unsigned int)((v) & LNET_PROC_VER_MASK))
+ 
+-static int __proc_lnet_stats(void *data, int write,
+-			     loff_t pos, void __user *buffer, int nob)
++static int proc_lnet_stats(struct ctl_table *table, int write,
++			   void __user *buffer, size_t *lenp, loff_t *ppos)
+ {
+ 	int rc;
+ 	struct lnet_counters *ctrs;
++	size_t nob = *lenp;
++	loff_t pos = *ppos;
+ 	int len;
+ 	char *tmpstr;
+ 	const int tmpsiz = 256; /* 7 %u and 4 %llu */
+@@ -122,13 +124,6 @@ static int __proc_lnet_stats(void *data, int write,
+ 	return rc;
+ }
+ 
+-static int proc_lnet_stats(struct ctl_table *table, int write,
+-			   void __user *buffer, size_t *lenp, loff_t *ppos)
 -{
--	return node->in_color == INTERVAL_RED;
+-	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
+-				    __proc_lnet_stats);
 -}
 -
--static inline int node_is_black(struct interval_node *node)
+ static int proc_lnet_routes(struct ctl_table *table, int write,
+ 			    void __user *buffer, size_t *lenp, loff_t *ppos)
+ {
+@@ -562,9 +557,11 @@ static int proc_lnet_peers(struct ctl_table *table, int write,
+ 	return rc;
+ }
+ 
+-static int __proc_lnet_buffers(void *data, int write,
+-			       loff_t pos, void __user *buffer, int nob)
++static int proc_lnet_buffers(struct ctl_table *table, int write,
++			     void __user *buffer, size_t *lenp, loff_t *ppos)
+ {
++	size_t nob = *lenp;
++	loff_t pos = *ppos;
+ 	char *s;
+ 	char *tmpstr;
+ 	int tmpsiz;
+@@ -620,13 +617,6 @@ static int __proc_lnet_buffers(void *data, int write,
+ 	return rc;
+ }
+ 
+-static int proc_lnet_buffers(struct ctl_table *table, int write,
+-			     void __user *buffer, size_t *lenp, loff_t *ppos)
 -{
--	return node->in_color == INTERVAL_BLACK;
+-	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
+-				    __proc_lnet_buffers);
 -}
 -
--static inline int extent_compare(struct interval_node_extent *e1,
--				 struct interval_node_extent *e2)
+ static int proc_lnet_nis(struct ctl_table *table, int write,
+ 			 void __user *buffer, size_t *lenp, loff_t *ppos)
+ {
+@@ -784,10 +774,13 @@ static struct lnet_portal_rotors	portal_rotors[] = {
+ 	},
+ };
+ 
+-static int __proc_lnet_portal_rotor(void *data, int write,
+-				    loff_t pos, void __user *buffer, int nob)
++static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
++				  void __user *buffer, size_t *lenp,
++				  loff_t *ppos)
+ {
+ 	const int buf_len = 128;
++	size_t nob = *lenp;
++	loff_t pos = *ppos;
+ 	char *buf;
+ 	char *tmp;
+ 	int rc;
+@@ -845,14 +838,6 @@ static int __proc_lnet_portal_rotor(void *data, int write,
+ 	return rc;
+ }
+ 
+-static int proc_lnet_portal_rotor(struct ctl_table *table, int write,
+-				  void __user *buffer, size_t *lenp,
+-				  loff_t *ppos)
 -{
--	int rc;
--
--	if (e1->start == e2->start) {
--		if (e1->end < e2->end)
--			rc = -1;
--		else if (e1->end > e2->end)
--			rc = 1;
--		else
--			rc = 0;
--	} else {
--		if (e1->start < e2->start)
--			rc = -1;
--		else
--			rc = 1;
--	}
--	return rc;
+-	return lprocfs_call_handler(table->data, write, ppos, buffer, lenp,
+-				    __proc_lnet_portal_rotor);
 -}
 -
--static inline int extent_equal(struct interval_node_extent *e1,
--			       struct interval_node_extent *e2)
--{
--	return (e1->start == e2->start) && (e1->end == e2->end);
--}
--
--static inline int extent_overlapped(struct interval_node_extent *e1,
--				    struct interval_node_extent *e2)
--{
--	return (e1->start <= e2->end) && (e2->start <= e1->end);
--}
--
--static struct interval_node *interval_first(struct interval_node *node)
--{
--	if (!node)
--		return NULL;
--	while (node->in_left)
--		node = node->in_left;
--	return node;
--}
--
--static struct interval_node *interval_last(struct interval_node *node)
--{
--	if (!node)
--		return NULL;
--	while (node->in_right)
--		node = node->in_right;
--	return node;
--}
--
--static struct interval_node *interval_next(struct interval_node *node)
--{
--	if (!node)
--		return NULL;
--	if (node->in_right)
--		return interval_first(node->in_right);
--	while (node->in_parent && node_is_right_child(node))
--		node = node->in_parent;
--	return node->in_parent;
--}
--
--static struct interval_node *interval_prev(struct interval_node *node)
--{
--	if (!node)
--		return NULL;
--
--	if (node->in_left)
--		return interval_last(node->in_left);
--
--	while (node->in_parent && node_is_left_child(node))
--		node = node->in_parent;
--
--	return node->in_parent;
--}
--
--enum interval_iter interval_iterate_reverse(struct interval_node *root,
--					    interval_callback_t func,
--					    void *data)
--{
--	enum interval_iter rc = INTERVAL_ITER_CONT;
--	struct interval_node *node;
--
--	for (node = interval_last(root); node; node = interval_prev(node)) {
--		rc = func(node, data);
--		if (rc == INTERVAL_ITER_STOP)
--			break;
--	}
--
--	return rc;
--}
--EXPORT_SYMBOL(interval_iterate_reverse);
--
--static void __rotate_change_maxhigh(struct interval_node *node,
--				    struct interval_node *rotate)
--{
--	__u64 left_max, right_max;
--
--	rotate->in_max_high = node->in_max_high;
--	left_max = node->in_left ? node->in_left->in_max_high : 0;
--	right_max = node->in_right ? node->in_right->in_max_high : 0;
--	node->in_max_high  = max(interval_high(node),
--				 max(left_max, right_max));
--}
--
--/* The left rotation "pivots" around the link from node to node->right, and
-- * - node will be linked to node->right's left child, and
-- * - node->right's left child will be linked to node's right child.
-- */
--static void __rotate_left(struct interval_node *node,
--			  struct interval_node **root)
--{
--	struct interval_node *right = node->in_right;
--	struct interval_node *parent = node->in_parent;
--
--	node->in_right = right->in_left;
--	if (node->in_right)
--		right->in_left->in_parent = node;
--
--	right->in_left = node;
--	right->in_parent = parent;
--	if (parent) {
--		if (node_is_left_child(node))
--			parent->in_left = right;
--		else
--			parent->in_right = right;
--	} else {
--		*root = right;
--	}
--	node->in_parent = right;
--
--	/* update max_high for node and right */
--	__rotate_change_maxhigh(node, right);
--}
--
--/* The right rotation "pivots" around the link from node to node->left, and
-- * - node will be linked to node->left's right child, and
-- * - node->left's right child will be linked to node's left child.
-- */
--static void __rotate_right(struct interval_node *node,
--			   struct interval_node **root)
--{
--	struct interval_node *left = node->in_left;
--	struct interval_node *parent = node->in_parent;
--
--	node->in_left = left->in_right;
--	if (node->in_left)
--		left->in_right->in_parent = node;
--	left->in_right = node;
--
--	left->in_parent = parent;
--	if (parent) {
--		if (node_is_right_child(node))
--			parent->in_right = left;
--		else
--			parent->in_left = left;
--	} else {
--		*root = left;
--	}
--	node->in_parent = left;
--
--	/* update max_high for node and left */
--	__rotate_change_maxhigh(node, left);
--}
--
--#define interval_swap(a, b) do {			\
--	struct interval_node *c = a; a = b; b = c;      \
--} while (0)
--
--/*
-- * Operations INSERT and DELETE, when run on a tree with n keys,
-- * take O(logN) time.Because they modify the tree, the result
-- * may violate the red-black properties.To restore these properties,
-- * we must change the colors of some of the nodes in the tree
-- * and also change the pointer structure.
-- */
--static void interval_insert_color(struct interval_node *node,
--				  struct interval_node **root)
--{
--	struct interval_node *parent, *gparent;
--
--	while ((parent = node->in_parent) && node_is_red(parent)) {
--		gparent = parent->in_parent;
--		/* Parent is RED, so gparent must not be NULL */
--		if (node_is_left_child(parent)) {
--			struct interval_node *uncle;
--
--			uncle = gparent->in_right;
--			if (uncle && node_is_red(uncle)) {
--				uncle->in_color = INTERVAL_BLACK;
--				parent->in_color = INTERVAL_BLACK;
--				gparent->in_color = INTERVAL_RED;
--				node = gparent;
--				continue;
--			}
--
--			if (parent->in_right == node) {
--				__rotate_left(parent, root);
--				interval_swap(node, parent);
--			}
--
--			parent->in_color = INTERVAL_BLACK;
--			gparent->in_color = INTERVAL_RED;
--			__rotate_right(gparent, root);
--		} else {
--			struct interval_node *uncle;
--
--			uncle = gparent->in_left;
--			if (uncle && node_is_red(uncle)) {
--				uncle->in_color = INTERVAL_BLACK;
--				parent->in_color = INTERVAL_BLACK;
--				gparent->in_color = INTERVAL_RED;
--				node = gparent;
--				continue;
--			}
--
--			if (node_is_left_child(node)) {
--				__rotate_right(parent, root);
--				interval_swap(node, parent);
--			}
--
--			parent->in_color = INTERVAL_BLACK;
--			gparent->in_color = INTERVAL_RED;
--			__rotate_left(gparent, root);
--		}
--	}
--
--	(*root)->in_color = INTERVAL_BLACK;
--}
--
--void interval_insert(struct interval_node *node,
--		     struct interval_node **root)
--
--{
--	struct interval_node **p, *parent = NULL;
--
--	LASSERT(!interval_is_intree(node));
--	p = root;
--	while (*p) {
--		parent = *p;
--
--		/* max_high field must be updated after each iteration */
--		if (parent->in_max_high < interval_high(node))
--			parent->in_max_high = interval_high(node);
--
--		if (extent_compare(&node->in_extent, &parent->in_extent) < 0)
--			p = &parent->in_left;
--		else
--			p = &parent->in_right;
--	}
--
--	/* link node into the tree */
--	node->in_parent = parent;
--	node->in_color = INTERVAL_RED;
--	node->in_left = NULL;
--	node->in_right = NULL;
--	*p = node;
--
--	interval_insert_color(node, root);
--	node->in_intree = 1;
--}
--EXPORT_SYMBOL(interval_insert);
--
--static inline int node_is_black_or_0(struct interval_node *node)
--{
--	return !node || node_is_black(node);
--}
--
--static void interval_erase_color(struct interval_node *node,
--				 struct interval_node *parent,
--				 struct interval_node **root)
--{
--	struct interval_node *tmp;
--
--	while (node_is_black_or_0(node) && node != *root) {
--		if (parent->in_left == node) {
--			tmp = parent->in_right;
--			if (node_is_red(tmp)) {
--				tmp->in_color = INTERVAL_BLACK;
--				parent->in_color = INTERVAL_RED;
--				__rotate_left(parent, root);
--				tmp = parent->in_right;
--			}
--			if (node_is_black_or_0(tmp->in_left) &&
--			    node_is_black_or_0(tmp->in_right)) {
--				tmp->in_color = INTERVAL_RED;
--				node = parent;
--				parent = node->in_parent;
--			} else {
--				if (node_is_black_or_0(tmp->in_right)) {
--					struct interval_node *o_left;
--
--					o_left = tmp->in_left;
--					if (o_left)
--						o_left->in_color = INTERVAL_BLACK;
--					tmp->in_color = INTERVAL_RED;
--					__rotate_right(tmp, root);
--					tmp = parent->in_right;
--				}
--				tmp->in_color = parent->in_color;
--				parent->in_color = INTERVAL_BLACK;
--				if (tmp->in_right)
--					tmp->in_right->in_color = INTERVAL_BLACK;
--				__rotate_left(parent, root);
--				node = *root;
--				break;
--			}
--		} else {
--			tmp = parent->in_left;
--			if (node_is_red(tmp)) {
--				tmp->in_color = INTERVAL_BLACK;
--				parent->in_color = INTERVAL_RED;
--				__rotate_right(parent, root);
--				tmp = parent->in_left;
--			}
--			if (node_is_black_or_0(tmp->in_left) &&
--			    node_is_black_or_0(tmp->in_right)) {
--				tmp->in_color = INTERVAL_RED;
--				node = parent;
--				parent = node->in_parent;
--			} else {
--				if (node_is_black_or_0(tmp->in_left)) {
--					struct interval_node *o_right;
--
--					o_right = tmp->in_right;
--					if (o_right)
--						o_right->in_color = INTERVAL_BLACK;
--					tmp->in_color = INTERVAL_RED;
--					__rotate_left(tmp, root);
--					tmp = parent->in_left;
--				}
--				tmp->in_color = parent->in_color;
--				parent->in_color = INTERVAL_BLACK;
--				if (tmp->in_left)
--					tmp->in_left->in_color = INTERVAL_BLACK;
--				__rotate_right(parent, root);
--				node = *root;
--				break;
--			}
--		}
--	}
--	if (node)
--		node->in_color = INTERVAL_BLACK;
--}
--
--/*
-- * if the @max_high value of @node is changed, this function traverse  a path
-- * from node  up to the root to update max_high for the whole tree.
-- */
--static void update_maxhigh(struct interval_node *node,
--			   __u64  old_maxhigh)
--{
--	__u64 left_max, right_max;
--
--	while (node) {
--		left_max = node->in_left ? node->in_left->in_max_high : 0;
--		right_max = node->in_right ? node->in_right->in_max_high : 0;
--		node->in_max_high = max(interval_high(node),
--					max(left_max, right_max));
--
--		if (node->in_max_high >= old_maxhigh)
--			break;
--		node = node->in_parent;
--	}
--}
--
--void interval_erase(struct interval_node *node,
--		    struct interval_node **root)
--{
--	struct interval_node *child, *parent;
--	int color;
--
--	LASSERT(interval_is_intree(node));
--	node->in_intree = 0;
--	if (!node->in_left) {
--		child = node->in_right;
--	} else if (!node->in_right) {
--		child = node->in_left;
--	} else { /* Both left and right child are not NULL */
--		struct interval_node *old = node;
--
--		node = interval_next(node);
--		child = node->in_right;
--		parent = node->in_parent;
--		color = node->in_color;
--
--		if (child)
--			child->in_parent = parent;
--		if (parent == old)
--			parent->in_right = child;
--		else
--			parent->in_left = child;
--
--		node->in_color = old->in_color;
--		node->in_right = old->in_right;
--		node->in_left = old->in_left;
--		node->in_parent = old->in_parent;
--
--		if (old->in_parent) {
--			if (node_is_left_child(old))
--				old->in_parent->in_left = node;
--			else
--				old->in_parent->in_right = node;
--		} else {
--			*root = node;
--		}
--
--		old->in_left->in_parent = node;
--		if (old->in_right)
--			old->in_right->in_parent = node;
--		update_maxhigh(child ? : parent, node->in_max_high);
--		update_maxhigh(node, old->in_max_high);
--		if (parent == old)
--			parent = node;
--		goto color;
--	}
--	parent = node->in_parent;
--	color = node->in_color;
--
--	if (child)
--		child->in_parent = parent;
--	if (parent) {
--		if (node_is_left_child(node))
--			parent->in_left = child;
--		else
--			parent->in_right = child;
--	} else {
--		*root = child;
--	}
--
--	update_maxhigh(child ? : parent, node->in_max_high);
--
--color:
--	if (color == INTERVAL_BLACK)
--		interval_erase_color(child, parent, root);
--}
--EXPORT_SYMBOL(interval_erase);
--
--static inline int interval_may_overlap(struct interval_node *node,
--				       struct interval_node_extent *ext)
--{
--	return (ext->start <= node->in_max_high &&
--		ext->end >= interval_low(node));
--}
--
--/*
-- * This function finds all intervals that overlap interval ext,
-- * and calls func to handle resulted intervals one by one.
-- * in lustre, this function will find all conflicting locks in
-- * the granted queue and add these locks to the ast work list.
-- *
-- * {
-- *	if (!node)
-- *		return 0;
-- *	if (ext->end < interval_low(node)) {
-- *		interval_search(node->in_left, ext, func, data);
-- *	} else if (interval_may_overlap(node, ext)) {
-- *		if (extent_overlapped(ext, &node->in_extent))
-- *			func(node, data);
-- *		interval_search(node->in_left, ext, func, data);
-- *		interval_search(node->in_right, ext, func, data);
-- *	}
-- *	return 0;
-- * }
-- *
-- */
--enum interval_iter interval_search(struct interval_node *node,
--				   struct interval_node_extent *ext,
--				   interval_callback_t func,
--				   void *data)
--{
--	enum interval_iter rc = INTERVAL_ITER_CONT;
--	struct interval_node *parent;
--
--	LASSERT(ext);
--	LASSERT(func);
--
--	while (node) {
--		if (ext->end < interval_low(node)) {
--			if (node->in_left) {
--				node = node->in_left;
--				continue;
--			}
--		} else if (interval_may_overlap(node, ext)) {
--			if (extent_overlapped(ext, &node->in_extent)) {
--				rc = func(node, data);
--				if (rc == INTERVAL_ITER_STOP)
--					break;
--			}
--
--			if (node->in_left) {
--				node = node->in_left;
--				continue;
--			}
--			if (node->in_right) {
--				node = node->in_right;
--				continue;
--			}
--		}
--
--		parent = node->in_parent;
--		while (parent) {
--			if (node_is_left_child(node) &&
--			    parent->in_right) {
--				/*
--				 * If we ever got the left, it means that the
--				 * parent met ext->end<interval_low(parent), or
--				 * may_overlap(parent). If the former is true,
--				 * we needn't go back. So stop early and check
--				 * may_overlap(parent) after this loop.
--				 */
--				node = parent->in_right;
--				break;
--			}
--			node = parent;
--			parent = parent->in_parent;
--		}
--		if (!parent || !interval_may_overlap(parent, ext))
--			break;
--	}
--
--	return rc;
--}
--EXPORT_SYMBOL(interval_search);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/Makefile b/drivers/staging/lustre/lustre/ptlrpc/Makefile
-index 1deb1971b39e..77f8eabb2e28 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/Makefile
-+++ b/drivers/staging/lustre/lustre/ptlrpc/Makefile
-@@ -11,7 +11,6 @@ ldlm_objs += $(LDLM)ldlm_plain.o $(LDLM)ldlm_extent.o
- ldlm_objs += $(LDLM)ldlm_request.o $(LDLM)ldlm_lockd.o
- ldlm_objs += $(LDLM)ldlm_flock.o $(LDLM)ldlm_inodebits.o
- ldlm_objs += $(LDLM)ldlm_pool.o
--ldlm_objs += $(LDLM)interval_tree.o
- ptlrpc_objs := client.o recover.o connection.o niobuf.o pack_generic.o
- ptlrpc_objs += events.o ptlrpc_module.o service.o pinger.o
- ptlrpc_objs += llog_net.o llog_client.o import.o ptlrpcd.o
+ static struct ctl_table lnet_table[] = {
+ 	/*
+ 	 * NB No .strategy entries have been provided since sysctl(8) prefers
