@@ -1,145 +1,154 @@
-From: Dilger, Andreas <andreas.dilger@intel.com>
-Date: Thu, 7 Jun 2018 23:24:56 +0000
+From: Patrick Farrell <paf@cray.com>
+Date: Thu, 7 Jun 2018 23:27:01 +0000
 Subject: [lustre-devel] A new drivers/staging/lustre
-In-Reply-To: <MWHPR11MB2029D262448ACF23E0275C11D4640@MWHPR11MB2029.namprd11.prod.outlook.com>
+In-Reply-To: <C50F2EA9-AD25-480A-8A05-2541206BA17F@intel.com>
 References: <874lifnxbp.fsf@notabene.neil.brown.name>
- <16129B94-CF52-4E5E-9A5A-2EC0E01BEEE0@intel.com>
- <MWHPR11MB2029D262448ACF23E0275C11D4640@MWHPR11MB2029.namprd11.prod.outlook.com>
-Message-ID: <51E547E3-5876-4AE0-9226-FDE082213650@intel.com>
+ <alpine.LFD.2.21.1806070557300.23188@casper.infradead.org>
+ <87po12ncjv.fsf@notabene.neil.brown.name>
+ <A139C7E5-0406-4078-B579-8DCF5B85F10F@cray.com>
+ <87h8memg4k.fsf@notabene.neil.brown.name>,
+ <C50F2EA9-AD25-480A-8A05-2541206BA17F@intel.com>
+Message-ID: <DM3PR1101MB1213C5B93F78BD84A103EACFCB640@DM3PR1101MB1213.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jun 7, 2018, at 16:53, Doug Oucharek <doucharek@cray.com> wrote:
-> 
-> Does this mean we would be pushing patches to Gerrit rather than having to email them out?  I believe for the test system to work automatically, the answer is yes.
 
-I'm not an expert with Gerrit configuration, so I'm not sure if there is an
-email-to-change gateway plugin for it or not.  I believe it can be configured
-to send the full patch in emails.  I get an email for every patch submitted,
-but I configure it to only deliver the commit message and not the whole patch.
+For what it?s worth, I agree strongly with Andreas about getting this in sync with the current Intel branch FIRST.  There is far more additional code/history there in the form of already complete features and fixes than here in cleanups.
 
-Since everyone is using Git anyway, using "git push" to submit patches to Gerrit
-for review (and forwards them to the list, if that is what people want) isn't
-more effort than "git send-email" to send them to the list directly.
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Dilger, Andreas <andreas.dilger@intel.com>
+Sent: Thursday, June 7, 2018 6:06:23 PM
+To: NeilBrown
+Cc: Drokin, Oleg; lustre-devel
+Subject: Re: [lustre-devel] A new drivers/staging/lustre
 
-I think any branch which just takes patches without adequate testing in a
-variety of configurations (e.g. DNE, ZFS/ldiskfs, TCP/IB, quota, recovery,
-version interop, failover, etc.) is just going to accumulate small or large
-breakages and will not be usable in production.
+On Jun 7, 2018, at 15:38, NeilBrown <neilb@suse.com> wrote:
+>
+> On Thu, Jun 07 2018, Doug Oucharek wrote:
+>
+>> What is the focus of landings in this tree?  There are two things needing to be done for an upstream Lustre:
+>>
+>>
+>>  *   Get the source code to meet the Linux guidelines so it is acceptable to be in mainline.
+>>  *   Get the binary product to have all the features and bug fixes that are in the Intel community tree so end users are interested in using the upstream version (users are unlikely to use a version of Lustre which is not current).
+>>
+>> For the now-deleted staging area, we were supposed to be focusing on the first item but were submitting patches for the second item (syncing with Intel tree).  In my opinion, this is the core reason for never being able to get out of staging and getting deleted.
+>
+> My (undoubtedly biased) perspective on the history of lustre in staging
+> goes like this:
+> There are two things needed for some out-of-tree code to get into
+> mainline Linux:  the code needs to be integrated and the community needs
+> to be integrated (or a new sub-community needs to form).
+> In the case of lustre, the code was never really integrated because the
+> community never really tried to integrate.
 
-James can probably tell you how many times "simple" patches were landed into
-the upstream kernel that ended up breaking something because they weren't
-tested.  I don't expect everyone to be able to test all of those configurations
-themselves, which is why it is good to have automated testing to do this for
-every patch that is submitted.
+One of the issues here was that the group (not Intel) that submitted the
+Lustre code to the staging tree promptly abandoned it for a couple of
+years after they submitted it upstream, after promising the community
+that they were in it for the long run.  That put the upstream integration
+behind the eight-ball from the start.
 
-I'd be *thrilled* if more organizations/developers provided automated testing
-of patches (e.g. PPC, ARM, Cray networking, etc.), so it isn't like I'm trying
-to monopolize the testing (far from it).  However, the reality is that there
-*is* no other automated testing environment beyond what we have with the
-existing Jenkins/Gerrit/autotest/Maloo infrastructure we have today.  It is
-imperfect for sure, but a gigantic leap beyond not having anything at all.
+>  Integrating and becoming
+> part of the Linux community takes time and effort, and it is quite
+> possible that management for various developers didn't allocate enough
+> time over a long enough period.  Integrating also requires a change in
+> attitude and I don't see much evidence of that.  I see clear evidence of
+> an "us and them" attitude among (some) lustre developers - almost as
+> though upstream linux is hostile territory full of unfriendly developers
 
-Cheers, Andreas
+Ah, but it *is* hostile territory, if you are not among the "in crowd".
+Christoph can get any change he wants to be accepted, but if someone else
+tries to push something similar it can be rejected outright or ignored
+for months or years.
 
-> From: Dilger, Andreas <andreas.dilger@intel.com>
-> Sent: Thursday, June 7, 2018 5:46:26 PM
-> To: NeilBrown
-> Cc: lustre-devel
-> Subject: Re: [lustre-devel] A new drivers/staging/lustre
->  
-> On Jun 6, 2018, at 20:29, NeilBrown <neilb@suse.com> wrote:
-> > Greg's patch to remove lustre has now landed in this staging-next tree,
-> > so I suspect it will get to Linus before too long.  So I have to find a
-> > new place to work on lustre.
-> > 
-> > I've added 2 branches to
-> >   git://git.neil.brown.name/linux
-> > 
-> > lustre:
-> >   is based on Greg's patch that removes lustre, and starts with a
-> >   revert of the patch, followed by a merge of v4.17.
-> >   I plan to merge each release and RC from Linus, and also
-> >   add lustre patches that I think are "ready".  That will usually mean
-> >   they have been posted to this list at least a week earlier, and
-> >   have not had a credible negative response (Acks and Reviewed-by
-> >   would be nice).
-> >   I plan to update this branch about once a week, and to never rebase
-> >   it.
-> > 
-> > lustre-testing:
-> >   is based on 'lustre' and has most of my current lustre-related work.
-> >   It includes assorted patches that are not specifically for lustre
-> >   (rhashtables mostly at the moment).  Patches will move from here
-> >   to 'lustre' or to mainline when they are ready.
-> >   I plan to update this branch on most days that I work on Lustre,
-> >   and expect it to rebase frequently.
-> 
-> We also have a clone of Greg's staging branch on our Gerrit server,
-> which could be replaced with a "vanilla" upstream kernel clone that
-> holds a copy of the for-upstream Lustre tree.
-> 
-> One benefit of hosting the tree on the Gerrit server is that it is
-> much easier to get automated testing of the patches (a lot or a little)
-> to ensure that the code doesn't break anything obvious.
-> 
-> > I'm happy to review and, if acceptable, apply patches from other
-> > developers.  I have fairly high standards, but if I don't accept your
-> > patch I'll explain why and possible help fix it.
-> > I'm happy to accept enhancements and new features, but these need
-> > to be of a quality that would be accepted upstream.
-> > I'm only interested in client-side code at present - nothing that is
-> > only used on the server.  I do want to include server-side eventually,
-> > but I need some focus for now.
-> > 
-> > I hope to get to a stage where the code is of suitable quality that I
-> > can submit it to Linux as a new filesystem.  I hope that will happen
-> > this year.
-> 
-> I think one major drawback of starting with the from-staging version of
-> the code is that this is significantly behind the out-of-tree master
-> code and would need a lot of effort to catch up.
-> 
-> I think the only way we are going to make this work is if the cleanups
-> go into the same repo as the ongoing development.  Otherwise, we'll be
-> back in the same situation as we are now where there are two different
-> versions of the code and we need to move patches back and forth between
-> them.
-> 
-> On the plus side, this will avoid code drift, and the extra efforts of
-> porting patches back and forth.  On the minus side, it means (on some
-> fronts) that the code will regress from what is upstream, because we
-> don't have all of the trivial whitespace cleanups and other drive-by
-> kernel newbie patches that went into the upstream client.  However, it
-> does mean that those cleanups would now become part of the single code
-> tree and not be lost again in the future.
-> 
-> This would also mean some restructuring of the current Lustre tree so
-> that it could build as a drop-in at linux/fs/lustre but that is probably
-> a good idea for the long term in any case.
-> 
-> Cheers, Andreas
-> --
-> Andreas Dilger
-> Lustre Principal Architect
-> Intel Corporation
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> who always reject our excellent code (even though they have lots of
+> horrible code themselves).  *We* need to see ourselves as part of the
+> Linux community, and we need to care about all of Linux as though it was
+> all ours (it *is* all ours, but *we* are a much larger group now).
+>
+> Yes, the current code needs to be improved, bugs need to be fixed, and
+> features need to be added.  The order in which these is done is not the
+> most important things - if it were, Greg would have never accepted any
+> new features.  However he *did* accept them, but tried to remind the
+> lustre developers that there was other work to do.
+>
+> Working together in one (single) community requires give-and-take.
+> Greg's behaviour as just described seems to be evidence of
+> give-and-take.  I think he kicked lustre out of staging because he
+> concluded that he was never going to get the matching give-and-take in
+> return.
+>
+> So to answer your opening question, my focus for this tree is to train
+> any lustre developers who wish to engage about how to be part of the
+> Linux community.  As I've already said - I will accept features but I
+> prefer cleanups first.  I don't want to try to explain further than that
+> because it will be too hypothetical and unhelpful.  We - the Linux
+> community - don't work in hypotheticals.  We work with concrete objects
+> like patches.  So send me a patch and I will tell you what I think of
+> that specific patch.  It is up to you to generalise what I say to other
+> patches.  It might also be up to you to argue your case and tell me why
+> I'm wrong.  I'll be patient (because good upstream maintainers are) but
+> patience doesn't last forever (for Greg, it lasted about 5 years - I
+> hope mine won't be tried to that extent).
+
+Like I said in my other email, I think having another fork of the Lustre
+tree, especially one that is starting from two-year-old code is likely to
+fail, because there will be twice as much effort spent to maintain the two
+trees.  I'd rather see the cleanups and features go hand-in-hand into the
+same tree.  I'd be thrilled to have more reviews done on the features before
+they are landed, but we can't just stop all feature development for a year
+or two (or five) while the code is merged into the upstream kernel.
+
+>> There are some very big (as in code size) features missing from
+>> upstream.  For example, Multi-Rail.  When should that be pushed
+>> relative to code cleanups?
+>
+> Never add features to ugly code - fix the code first.
+> The doesn't mean you cannot add any feature to lustre until all of
+> lustre is beautiful.  But it does mean that if I can see in a patch some
+> ugly code and a new feature, then I won't be happy.  First clean up just
+> enough of the ugliness so that it won't be visible in the patch that
+> adds the feature.
+
+The issue is that we _can't_ just stop the development of new code/features
+for such a long time.  There are huge supercomputers being deployed or in
+planning that depend on these new features, or they wouldn't have been
+developed in the first place.
+
+Consider if the NFSv4 spec was written and the code was developed, and you
+were told you needed to go back to NFSv2 and start again?
+
+> But again, this is getting a bit too hypothetical.   If you care about a
+> feature, then post a patch.  We can take it from there.  The fact that
+> you care enough to post a patch cares significant weight - a lot more
+> weight than just asking about some feature.
+
+We definitely aren't at the point of "asking for some feature to be developed".
+At a minimum the starting point of the new upstream code needs to be the
+current release, or any resources that could possibly be put towards improving
+the Lustre code would be squandered on porting all of those patches to the
+upstream tree.  I'm fine with spending time to improve the code that exists
+today, but lets not start with a huge deficit from the outset.
 
 Cheers, Andreas
 --
 Andreas Dilger
 Lustre Principal Architect
 Intel Corporation
+
+
+
+
+
+
+
+_______________________________________________
+lustre-devel mailing list
+lustre-devel at lists.lustre.org
+http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180607/9e4d04a7/attachment-0001.html>
