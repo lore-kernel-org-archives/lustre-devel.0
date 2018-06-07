@@ -1,16 +1,35 @@
-From: Doug Oucharek <doucharek@cray.com>
-Date: Thu, 7 Jun 2018 13:07:44 +0000
+From: Patrick Farrell <paf@cray.com>
+Date: Thu, 7 Jun 2018 13:25:03 +0000
 Subject: [lustre-devel] A new drivers/staging/lustre
-In-Reply-To: <87po12ncjv.fsf@notabene.neil.brown.name>
+In-Reply-To: <A139C7E5-0406-4078-B579-8DCF5B85F10F@cray.com>
 References: <874lifnxbp.fsf@notabene.neil.brown.name>
  <alpine.LFD.2.21.1806070557300.23188@casper.infradead.org>
- <87po12ncjv.fsf@notabene.neil.brown.name>
-Message-ID: <A139C7E5-0406-4078-B579-8DCF5B85F10F@cray.com>
+ <87po12ncjv.fsf@notabene.neil.brown.name>,
+ <A139C7E5-0406-4078-B579-8DCF5B85F10F@cray.com>
+Message-ID: <DM3PR1101MB1213BB514F8D6E25F725BB1DCB640@DM3PR1101MB1213.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+Doug,
+
+Another thought about the core reason.
+
+Commitment to this.  The existing code state (weird, abandoned 2.4.something code) and merge rules seemingly made it impossible to shift development in this direction in any meaningful way, so perhaps it's chicken and egg...  but as long as Lustre is released and developed primarily out of tree, I can't see this working.  Would it just be a "sync everything but still do releases" approach?  Is that viable?  Etc.
+
+Thoughts appreciated.
+
+- Patrick
+
+
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of Doug Oucharek <doucharek@cray.com>
+Sent: Thursday, June 7, 2018 8:07:44 AM
+To: NeilBrown
+Cc: Oleg Drokin; lustre-devel
+Subject: Re: [lustre-devel] A new drivers/staging/lustre
 
 What is the focus of landings in this tree?  There are two things needing to be done for an upstream Lustre:
 
@@ -140,4 +159,4 @@ http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180607/dee00f7d/attachment-0001.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180607/8f0662bb/attachment-0001.html>
