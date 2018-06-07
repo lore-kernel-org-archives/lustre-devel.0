@@ -1,64 +1,87 @@
-From: NeilBrown <neilb@suse.com>
-Date: Fri, 08 Jun 2018 07:50:37 +1000
+From: Dilger, Andreas <andreas.dilger@intel.com>
+Date: Thu, 7 Jun 2018 22:46:26 +0000
 Subject: [lustre-devel] A new drivers/staging/lustre
-In-Reply-To: <DM3PR1101MB1213BB514F8D6E25F725BB1DCB640@DM3PR1101MB1213.namprd11.prod.outlook.com>
+In-Reply-To: <874lifnxbp.fsf@notabene.neil.brown.name>
 References: <874lifnxbp.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1806070557300.23188@casper.infradead.org>
- <87po12ncjv.fsf@notabene.neil.brown.name>
- <A139C7E5-0406-4078-B579-8DCF5B85F10F@cray.com>
- <DM3PR1101MB1213BB514F8D6E25F725BB1DCB640@DM3PR1101MB1213.namprd11.prod.outlook.com>
-Message-ID: <87efhimfki.fsf@notabene.neil.brown.name>
+Message-ID: <16129B94-CF52-4E5E-9A5A-2EC0E01BEEE0@intel.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, Jun 07 2018, Patrick Farrell wrote:
+On Jun 6, 2018, at 20:29, NeilBrown <neilb@suse.com> wrote:
+> Greg's patch to remove lustre has now landed in this staging-next tree,
+> so I suspect it will get to Linus before too long.  So I have to find a
+> new place to work on lustre.
+> 
+> I've added 2 branches to
+>   git://git.neil.brown.name/linux
+> 
+> lustre:
+>   is based on Greg's patch that removes lustre, and starts with a
+>   revert of the patch, followed by a merge of v4.17.
+>   I plan to merge each release and RC from Linus, and also
+>   add lustre patches that I think are "ready".  That will usually mean
+>   they have been posted to this list at least a week earlier, and
+>   have not had a credible negative response (Acks and Reviewed-by
+>   would be nice).
+>   I plan to update this branch about once a week, and to never rebase
+>   it.
+> 
+> lustre-testing:
+>   is based on 'lustre' and has most of my current lustre-related work.
+>   It includes assorted patches that are not specifically for lustre
+>   (rhashtables mostly at the moment).  Patches will move from here
+>   to 'lustre' or to mainline when they are ready.
+>   I plan to update this branch on most days that I work on Lustre,
+>   and expect it to rebase frequently.
 
-> Doug,
->
-> Another thought about the core reason.
->
-> Commitment to this.  The existing code state (weird, abandoned 2.4.something code) and merge rules seemingly made it impossible to shift development in this direction in any meaningful way, so perhaps it's chicken and egg...  but as long as Lustre is released and developed primarily out of tree, I can't see this working.  Would it just be a "sync everything but still do releases" approach?  Is that viable?  Etc.
->
-> Thoughts appreciated.
+We also have a clone of Greg's staging branch on our Gerrit server,
+which could be replaced with a "vanilla" upstream kernel clone that
+holds a copy of the for-upstream Lustre tree.
 
-Yes, commitment is important - from management was well as developers.
-If you think getting lustre upstream is important then make sure you
-manager understands why.
+One benefit of hosting the tree on the Gerrit server is that it is
+much easier to get automated testing of the patches (a lot or a little)
+to ensure that the code doesn't break anything obvious.
 
-Having development in two separate tree  - one heading for upstream
-inclusion, the other used by customers - could be a problem and
-certainly needs an end date, but I think it is our best option at the
-moment (even though Greg claimed it was part of his reason for ejecting
-lustre from staging).
+> I'm happy to review and, if acceptable, apply patches from other
+> developers.  I have fairly high standards, but if I don't accept your
+> patch I'll explain why and possible help fix it.
+> I'm happy to accept enhancements and new features, but these need
+> to be of a quality that would be accepted upstream.
+> I'm only interested in client-side code at present - nothing that is
+> only used on the server.  I do want to include server-side eventually,
+> but I need some focus for now.
+> 
+> I hope to get to a stage where the code is of suitable quality that I
+> can submit it to Linux as a new filesystem.  I hope that will happen
+> this year.
 
-I think that imposing an upstream development module on (what I've
-decided to call) legacy-lustre would be a constant battle with a low
-success rate.  Conversely moving code from legacy-lustre into an
-upstream work-flow should be quite manageable providing time and skills
-are available.
+I think one major drawback of starting with the from-staging version of
+the code is that this is significantly behind the out-of-tree master
+code and would need a lot of effort to catch up.
 
-I would really like to be able to point to a location in the
-legacy-lustre git history and be able to say "linux-lustre has all
-features up to this point", and then to progressively copy features
-across and move that point forward.  As a feature is copied, we make
-sure it conforms with upstream standards.  I won't be doing any of this
-until I'm really happy with what is already in linux-lustre, but I won't
-try to set priorities for other people.
+I think the only way we are going to make this work is if the cleanups
+go into the same repo as the ongoing development.  Otherwise, we'll be
+back in the same situation as we are now where there are two different
+versions of the code and we need to move patches back and forth between
+them.
 
-Once we get to the point where linux-lustre has feature-parity with
-legacy-lustre, then we can discuss doing development in linux-lustre
-first, and copying it across to legacy-lustre only as long as people
-care.
+On the plus side, this will avoid code drift, and the extra efforts of
+porting patches back and forth.  On the minus side, it means (on some
+fronts) that the code will regress from what is upstream, because we
+don't have all of the trivial whitespace cleanups and other drive-by
+kernel newbie patches that went into the upstream client.  However, it
+does mean that those cleanups would now become part of the single code
+tree and not be lost again in the future.
 
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180608/7da00f5f/attachment.sig>
+This would also mean some restructuring of the current Lustre tree so
+that it could build as a drop-in at linux/fs/lustre but that is probably
+a good idea for the long term in any case.
+
+Cheers, Andreas
+--
+Andreas Dilger
+Lustre Principal Architect
+Intel Corporation
