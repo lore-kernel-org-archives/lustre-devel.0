@@ -1,56 +1,127 @@
 From: NeilBrown <neilb@suse.com>
-Date: Thu, 07 Jun 2018 19:48:47 +1000
-Subject: [lustre-devel] [PATCH 10/11] staging: lustre: move ldlm into
- ptlrpc
-In-Reply-To: <alpine.LFD.2.21.1806070546210.23188@casper.infradead.org>
-References: <152826510267.16761.14361003167157833896.stgit@noble>
- <152826511923.16761.9237280635711887801.stgit@noble>
- <alpine.LFD.2.21.1806070546210.23188@casper.infradead.org>
-Message-ID: <87sh5zlyf4.fsf@notabene.neil.brown.name>
+Date: Thu, 07 Jun 2018 19:58:12 +1000
+Subject: [lustre-devel] A new drivers/staging/lustre
+In-Reply-To: <alpine.LFD.2.21.1806070557300.23188@casper.infradead.org>
+References: <874lifnxbp.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1806070557300.23188@casper.infradead.org>
+Message-ID: <87po12ncjv.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: James Simmons <jsimmons@infradead.org>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
 On Thu, Jun 07 2018, James Simmons wrote:
 
->> The ldlm code is built into the ptlrpc module, yet it lived in a
->> separate directory.  This requires filename editing in the Makefile
->> and make it difficult to e.g. build the .s file for code in ldlm.
+>> Greg's patch to remove lustre has now landed in this staging-next tree,
+>> so I suspect it will get to Linus before too long.  So I have to find a
+>> new place to work on lustre.
 >> 
->> All the ldlm files have distinctive names so confusion from having
->> ptlrpc and ldlm in the same directory is unlikely.  So move them all
->> into ptlrpc.
+>> I've added 2 branches to
+>>    git://git.neil.brown.name/linux
+>> 
+>> lustre:
+>>    is based on Greg's patch that removes lustre, and starts with a
+>>    revert of the patch, followed by a merge of v4.17.
+>>    I plan to merge each release and RC from Linus, and also
+>>    add lustre patches that I think are "ready".  That will usually mean
+>>    they have been posted to this list at least a week earlier, and
+>>    have not had a credible negative response (Acks and Reviewed-by
+>>    would be nice).
+>>    I plan to update this branch about once a week, and to never rebase
+>>    it.
 >
-> Nak. The reason is it would be nice to keep the directory structure.
-> What really needs to be done and Oleg has looked into it is to reduced
-> the number of modules created down to two, one for LNet and the other
-> lustre.ko. This also is a step in the right direction to remove the
-> create struct obd_ops and struct md_ops pointer madness. Well their
-> is the issue with obd echo client but we can deal with this at a later 
-> date. Also the number of EXPORT_SYMBOLS and things will greatly reduce.
+> I know Oleg also started to play with a tree but I don't know if he can
+> keep it up like you can. I added the parties interested so they can bless
+> this tree if they want. Mainly Oleg wanted to see what breaks when moving
+> to fs directory and the proper UAPI headers directory as well.
 
-Yeah, you are probably right.
-I had a bit of a look at how to build everything into a
-single module.  You can do with by having a single make
-file that lists parts from other directories - the same way
-that ptlrpc includes files from ldlm - but that is rather ugly.
+I'm certainly happy to contribute to a different tree instead, if
+someone else is working towards getting lustre code suitable for
+upstream.  I created a tree myself because I find that saying "we should"
+is not nearly as effective as saying "I have".
 
-I've very nearly got it working using the lib-y infrastructure.
-I can build lnet as a single module, but the dependency calc isn't
-quite right so things happen in the wrong order.  The build
-fails the first time because some files don't exist, then
-succeeds on the second run.
-Hopefully I'll figure out how to make it work tomorrow.
+>
+> Please be patience with me. I normally do this work on the weekend. I put
+> it into my test bed and try it out. Getting reviews can at times be 
+> challenging to get. Hopefully people at Cray and Intel are willing to
+> step in for this as well. Patrick from Cray has been most helpful.
+>
+>> lustre-testing:
+>>    is based on 'lustre' and has most of my current lustre-related work.
+>>    It includes assorted patches that are not specifically for lustre
+>>    (rhashtables mostly at the moment).  Patches will move from here
+>>    to 'lustre' or to mainline when they are ready.
+>>    I plan to update this branch on most days that I work on Lustre,
+>>    and expect it to rebase frequently.
+>
+> I had question about that. Some things in Lustre could in theory be merged
+> into the linux kernel proper. Can that be done still?
 
-Thanks for the review,
+What things?
+
+If it measurably benefits the kernel proper, then I suspect it might be
+worth submitting.  Things can go direct without going though staging -
+they just have to be of good quality with good justification (and
+sometimes lots of patience).
+
+>  
+>> I'm happy to review and, if acceptable, apply patches from other
+>> developers.  I have fairly high standards, but if I don't accept your
+>> patch I'll explain why and possible help fix it.
+>
+> Also long as you talk to me :-) I'm an easy person to work with. If I 
+> refuse a patch with do the same. I might sometimes seem irrational 
+> but I have valid reasons. Well at least in my head.
+>
+> We need to really layout the roadmap.
+
+I have very little faith in road maps - I prefer to make steps.  Once we
+have made all the steps, we can look back and see what the map looked
+like in retrospect.
+
+The most I'm interested in is "client first, then server".
+But feel free to propose something - it is helps you then it could be
+useful.
+
+>
+>> I'm happy to accept enhancements and new features, but these need
+>> to be of a quality that would be accepted upstream.
+>
+> Absolutely. This should be music to some peoples ears. 
+>
+>> I'm only interested in client-side code at present - nothing that is
+>> only used on the server.  I do want to include server-side eventually,
+>> but I need some focus for now.
+>
+> Make sense. Anyways the backend file systems used are ldiskfs which is
+> a heavily modified ext4 filesystem and ZFS on the server side. I doubt
+> the kernel would accept ZFS backend suppport and the changes Lustre
+> does to ext4 have been mostly merged but a few pieces are missing.
+> So pushing the server code at this point wouldn't benefit us.
+>
+>> I hope to get to a stage where the code is of suitable quality that I
+>> can submit it to Linux as a new filesystem.  I hope that will happen
+>> this year.
+>
+> Are you thinking going back into staging or straight to the fs tree
+
+Greg has said he doesn't want it in staging.  So no, I'm not thinking of
+anything going to staging.  I'm thinking of getting enough of a client
+in reasonable shape that people can review it without feeling sick or
+getting angry.
+
+Thanks,
 NeilBrown
+
+
+>
+>> I hope we can continue to work together to make all this happen.
+>> (That's enough hope for now, time to get back to code).
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180607/ec5325e0/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180607/b3f1a5b3/attachment.sig>
