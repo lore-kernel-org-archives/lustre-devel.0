@@ -1,30 +1,156 @@
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Date: Tue, 12 Jun 2018 08:31:11 +0200
-Subject: [lustre-devel] [PATCH] staging: lustre: add error handling for
- try_module_get
-In-Reply-To: <1528778968-42225-1-git-send-email-jiazhouyang09@gmail.com>
-References: <1528778968-42225-1-git-send-email-jiazhouyang09@gmail.com>
-Message-ID: <20180612063111.GC23073@kroah.com>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Tue, 12 Jun 2018 02:00:47 +0530
+Subject: [lustre-devel] [PATCH v3] staging: lustre: Change return type
+ to vm_fault_t
+In-Reply-To: <20180521180937.GA19605@jordon-HP-15-Notebook-PC>
+References: <20180521180937.GA19605@jordon-HP-15-Notebook-PC>
+Message-ID: <CAFqt6zamp=+adkyM+_4z405hN-9qOn1CsY_BgVtCrAfscBHhWg@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: Zhouyang Jia <jiazhouyang09@gmail.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, NeilBrown <neilb@suse.com>, Haneen Mohammed <hamohammed.sa@gmail.com>, Al Viro <viro@zeniv.linux.org.uk>, "Gustavo A. R. Silva" <garsilva@embeddedor.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
+To: lustre-devel@lists.lustre.org
 
-On Tue, Jun 12, 2018 at 12:49:26PM +0800, Zhouyang Jia wrote:
-> When try_module_get fails, the lack of error-handling code may
-> cause unexpected results.
-> 
-> This patch adds error-handling code after calling try_module_get.
-> 
-> Signed-off-by: Zhouyang Jia <jiazhouyang09@gmail.com>
+On Mon, May 21, 2018 at 11:39 PM, Souptick Joarder <jrdr.linux@gmail.com> wrote:
+> Use new return type vm_fault_t for fault handler. For
+> now, this is just documenting that the function returns
+> a VM_FAULT value rather than an errno. Once all instances
+> are converted, vm_fault_t will become a distinct type.
+>
+> Ref-> commit 1c8f422059ae ("mm: change return type to
+> vm_fault_t") was added in 4.17-rc1 to introduce the new
+> typedef vm_fault_t. Currently we are making change to all
+> drivers to return vm_fault_t for page fault handlers. As
+> part of that lustre driver is also getting changed to
+> return vm_fault_t type.
+>
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
 > ---
->  drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c | 5 ++++-
+> v2: updated the change log
+>
+> v3: updated the change log
+>
+>  drivers/staging/lustre/lustre/llite/llite_mmap.c | 35 ++++++++++++------------
+>  1 file changed, 18 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+> index c0533bd..5b8fd10 100644
+> --- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
+> +++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+> @@ -231,7 +231,7 @@ static int ll_page_mkwrite0(struct vm_area_struct *vma, struct page *vmpage,
+>         return result;
+>  }
+>
+> -static inline int to_fault_error(int result)
+> +static inline vm_fault_t to_fault_error(int result)
+>  {
+>         switch (result) {
+>         case 0:
+> @@ -261,7 +261,7 @@ static inline int to_fault_error(int result)
+>   * \retval VM_FAULT_ERROR on general error
+>   * \retval NOPAGE_OOM not have memory for allocate new page
+>   */
+> -static int ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+> +static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+>  {
+>         struct lu_env      *env;
+>         struct cl_io        *io;
+> @@ -269,16 +269,16 @@ static int ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+>         struct page          *vmpage;
+>         unsigned long       ra_flags;
+>         int                   result = 0;
+> -       int                   fault_ret = 0;
+> +       vm_fault_t              fault_ret = 0;
+>         u16 refcheck;
+>
+>         env = cl_env_get(&refcheck);
+>         if (IS_ERR(env))
+> -               return PTR_ERR(env);
+> +               return VM_FAULT_ERROR;
+>
+>         io = ll_fault_io_init(env, vma, vmf->pgoff, &ra_flags);
+>         if (IS_ERR(io)) {
+> -               result = to_fault_error(PTR_ERR(io));
+> +               fault_ret = to_fault_error(PTR_ERR(io));
+>                 goto out;
+>         }
+>
+> @@ -319,15 +319,15 @@ static int ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+>         if (result != 0 && !(fault_ret & VM_FAULT_RETRY))
+>                 fault_ret |= to_fault_error(result);
+>
+> -       CDEBUG(D_MMAP, "%s fault %d/%d\n", current->comm, fault_ret, result);
+> +       CDEBUG(D_MMAP, "%s fault %x/%d\n", current->comm, fault_ret, result);
+>         return fault_ret;
+>  }
+>
+> -static int ll_fault(struct vm_fault *vmf)
+> +static vm_fault_t ll_fault(struct vm_fault *vmf)
+>  {
+>         int count = 0;
+>         bool printed = false;
+> -       int result;
+> +       vm_fault_t result;
+>         sigset_t set;
+>
+>         /* Only SIGKILL and SIGTERM are allowed for fault/nopage/mkwrite
+> @@ -364,18 +364,19 @@ static int ll_fault(struct vm_fault *vmf)
+>         return result;
+>  }
+>
+> -static int ll_page_mkwrite(struct vm_fault *vmf)
+> +static vm_fault_t ll_page_mkwrite(struct vm_fault *vmf)
+>  {
+>         struct vm_area_struct *vma = vmf->vma;
+>         int count = 0;
+>         bool printed = false;
+>         bool retry;
+> -       int result;
+> +       int err;
+> +       vm_fault_t ret;
+>
+>         file_update_time(vma->vm_file);
+>         do {
+>                 retry = false;
+> -               result = ll_page_mkwrite0(vma, vmf->page, &retry);
+> +               err = ll_page_mkwrite0(vma, vmf->page, &retry);
+>
+>                 if (!printed && ++count > 16) {
+>                         const struct dentry *de = vma->vm_file->f_path.dentry;
+> @@ -387,25 +388,25 @@ static int ll_page_mkwrite(struct vm_fault *vmf)
+>                 }
+>         } while (retry);
+>
+> -       switch (result) {
+> +       switch (err) {
+>         case 0:
+>                 LASSERT(PageLocked(vmf->page));
+> -               result = VM_FAULT_LOCKED;
+> +               ret = VM_FAULT_LOCKED;
+>                 break;
+>         case -ENODATA:
+>         case -EAGAIN:
+>         case -EFAULT:
+> -               result = VM_FAULT_NOPAGE;
+> +               ret = VM_FAULT_NOPAGE;
+>                 break;
+>         case -ENOMEM:
+> -               result = VM_FAULT_OOM;
+> +               ret = VM_FAULT_OOM;
+>                 break;
+>         default:
+> -               result = VM_FAULT_SIGBUS;
+> +               ret = VM_FAULT_SIGBUS;
+>                 break;
+>         }
+>
+> -       return result;
+> +       return ret;
+>  }
+>
+>  /**
+> --
+> 1.9.1
+>
 
-This patch does not apply to Linus's tree.  Always be sure to work
-against linux-next to catch things like this.
-
-thanks,
-
-greg k-h
+If no further comment, we would like to get this patch in 4.18-rc-X.
