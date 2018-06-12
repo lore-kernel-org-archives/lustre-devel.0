@@ -1,44 +1,59 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 12 Jun 2018 11:24:22 +1000
-Subject: [lustre-devel] A new drivers/staging/lustre
-In-Reply-To: <alpine.LFD.2.21.1806081606001.13085@casper.infradead.org>
-References: <874lifnxbp.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1806070557300.23188@casper.infradead.org>
- <87po12ncjv.fsf@notabene.neil.brown.name>
- <A139C7E5-0406-4078-B579-8DCF5B85F10F@cray.com>
- <87h8memg4k.fsf@notabene.neil.brown.name>
- <C50F2EA9-AD25-480A-8A05-2541206BA17F@intel.com>
- <alpine.LFD.2.21.1806081606001.13085@casper.infradead.org>
-Message-ID: <87fu1skda1.fsf@notabene.neil.brown.name>
+Date: Tue, 12 Jun 2018 15:26:38 +1000
+Subject: [lustre-devel] [PATCH] staging: lustre: add error handling for
+ try_module_get
+In-Reply-To: <1528778968-42225-1-git-send-email-jiazhouyang09@gmail.com>
+References: <1528778968-42225-1-git-send-email-jiazhouyang09@gmail.com>
+Message-ID: <87y3fkinht.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: Zhouyang Jia <jiazhouyang09@gmail.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Haneen Mohammed <hamohammed.sa@gmail.com>, Al Viro <viro@zeniv.linux.org.uk>, "Gustavo A. R. Silva" <garsilva@embeddedor.com>, lustre-devel@lists.lustre.org, devel@driverdev.osuosl.org, linux-kernel@vger.kernel.org
 
-On Tue, Jun 12 2018, James Simmons wrote:
+On Tue, Jun 12 2018, Zhouyang Jia wrote:
 
-> The main reason people abandon things in life is feeling unsupported.
-> Even if all you do is act as a cheerleader it can have a big impact
-> on the people doing the work.
+> When try_module_get fails, the lack of error-handling code may
+> cause unexpected results.
+>
+> This patch adds error-handling code after calling try_module_get.
+>
+> Signed-off-by: Zhouyang Jia <jiazhouyang09@gmail.com>
+> ---
+>  drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> index 7086678..72a42bd 100644
+> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> @@ -2422,7 +2422,10 @@ ksocknal_base_startup(void)
+>  
+>  	/* flag lists/ptrs/locks initialised */
+>  	ksocknal_data.ksnd_init = SOCKNAL_INIT_DATA;
+> -	try_module_get(THIS_MODULE);
+> +	if (!try_module_get(THIS_MODULE)) {
+> +		CERROR("%s: cannot get module\n", __func__);
+> +		goto failed;
+> +	}
+>  
+>  	ksocknal_data.ksnd_sched_info = cfs_percpt_alloc(lnet_cpt_table(),
+>  							 sizeof(*info));
 
-So much "yes".
-Receiving feed-back, encouragement, affirmation that the work is valued,
-is a REALLY big thing.  I do this because I'm paid, but also because I
-enjoy the challenge and I value the community involvement.
-A colleague in SUSE recently forwarded a line from an IRC conversation
-that he was part of where someone commended me on my work on Lustre.  It
-was really nice to receive that (though maybe a shame that it didn't
-come more directly).
-Who-ever said that - thanks!  You don't have to be writing patches to be
-supporting this work.
+Thanks for the patch....
+I agree that this is probably a bug, but the code is still buggy after
+you patch, just in a different way.
+Try following through the code and see what happens when you 'goto
+failed'.
 
-Thanks,
 NeilBrown
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180612/2d5cd6e0/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180612/9407950d/attachment.sig>
