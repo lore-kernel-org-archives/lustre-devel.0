@@ -1,73 +1,40 @@
-From: NeilBrown <neilb@suse.com>
-Date: Fri, 15 Jun 2018 17:11:30 +1000
-Subject: [lustre-devel] [PATCH 24/24] lustre: discard TCD_MAX_TYPES
-In-Reply-To: <152904663333.10587.10934053155404014785.stgit@noble>
-References: <152904663333.10587.10934053155404014785.stgit@noble>
-Message-ID: <152904669094.10587.17019477478226952858.stgit@noble>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Wed, 13 Jun 2018 00:41:12 +0530
+Subject: [lustre-devel] [PATCH v3] staging: lustre: Change return type
+ to vm_fault_t
+In-Reply-To: <20180611210714.GB4023@kroah.com>
+References: <20180521180937.GA19605@jordon-HP-15-Notebook-PC>
+ <CAFqt6zamp=+adkyM+_4z405hN-9qOn1CsY_BgVtCrAfscBHhWg@mail.gmail.com>
+ <20180611205058.GA30123@kroah.com>
+ <CAFqt6zZJcN4=FDQSqiSznoEogavV9GBpqxx-onWG5Q3wQEM9cQ@mail.gmail.com>
+ <20180611210714.GB4023@kroah.com>
+Message-ID: <CAFqt6zYyy2yygmU+_KSNydjkW8V7A5oefcpMyMrFDd=2q1Ppdw@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-As well as CFS_TCD_TYPE_CNT we have TCD_MAX_TYPES which has a larger
-value but a similar meaning.  Discard it and just use
-CFS_TCD_TYPE_CNT.
+On Tue, Jun 12, 2018 at 2:37 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Tue, Jun 12, 2018 at 02:30:27AM +0530, Souptick Joarder wrote:
+>> > >
+>> > > If no further comment, we would like to get this patch in 4.18-rc-X.
+>> >
+>> > Why?  Is it a regression fix?  That's all that is allowed after -rc1.
+>>
+>> No, this is not regression fix. We need to get this into 4.18-rc-1.  But
+>> mostly it can't make into linus tree in rc-1 :)
+>
+> Why does it _have_ to get into 4.18-rc1?  My tree is long-closed and
+> Linus already has all of my patches in his tree for the staging section
+> of the kernel.
+>
+>> > And have you tried applying it to Linus's current tree?  :)
+>>
+>> Last tested on 4.17-rc-6 and it worked fine. Let me verify in current tree.
+>
+> Try it, you might be surprised :)
 
-Two places relied on the fact that TCD_MAX_TYPES was larger and so
-there would be NULLs at the end of the array.  Change
-them to check the array size properly.
-
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lnet/libcfs/tracefile.c |    8 ++++----
- drivers/staging/lustre/lnet/libcfs/tracefile.h |    3 +--
- 2 files changed, 5 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index cdef67391a72..555ade0ddafb 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -50,7 +50,7 @@
- #include "tracefile.h"
- 
- /* XXX move things up to the top, comment */
--union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
-+union cfs_trace_data_union (*cfs_trace_data[CFS_TCD_TYPE_CNT])[NR_CPUS] __cacheline_aligned;
- 
- char cfs_tracefile[TRACEFILE_NAME_SIZE];
- long long cfs_tracefile_size = CFS_TRACEFILE_SIZE;
-@@ -145,8 +145,8 @@ void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
- 		spin_unlock(&tcd->tcd_lock);
- }
- 
--#define cfs_tcd_for_each_type_lock(tcd, i, cpu)			   \
--	for (i = 0; cfs_trace_data[i] &&				\
-+#define cfs_tcd_for_each_type_lock(tcd, i, cpu)				\
-+	for (i = 0; i < CFS_TCD_TYPE_CNT && cfs_trace_data[i] &&	\
- 	     (tcd = &(*cfs_trace_data[i])[cpu].tcd) &&			\
- 	     cfs_trace_lock_tcd(tcd, 1); cfs_trace_unlock_tcd(tcd, 1), i++)
- 
-@@ -1381,7 +1381,7 @@ static void cfs_trace_cleanup(void)
- 			cfs_trace_console_buffers[i][j] = NULL;
- 		}
- 
--	for (i = 0; cfs_trace_data[i]; i++) {
-+	for (i = 0; cfs_trace_data[i] && i < CFS_TCD_TYPE_CNT; i++) {
- 		kfree(cfs_trace_data[i]);
- 		cfs_trace_data[i] = NULL;
- 	}
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-index 23faecf886c1..a09d5b9349f0 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-@@ -184,8 +184,7 @@ union cfs_trace_data_union {
- 	char __pad[L1_CACHE_ALIGN(sizeof(struct cfs_trace_cpu_data))];
- };
- 
--#define TCD_MAX_TYPES      8
--extern union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS];
-+extern union cfs_trace_data_union (*cfs_trace_data[CFS_TCD_TYPE_CNT])[NR_CPUS];
- 
- #define cfs_tcd_for_each(tcd, i, j)				       \
- 	for (i = 0; cfs_trace_data[i]; i++)				\
+Yes, got the surprise :)
+Sorry for making noise, I will drop this patch as it is no more valid
+in current Linus's tree.
