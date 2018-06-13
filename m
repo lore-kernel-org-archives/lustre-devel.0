@@ -1,40 +1,46 @@
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Wed, 13 Jun 2018 00:41:12 +0530
-Subject: [lustre-devel] [PATCH v3] staging: lustre: Change return type
- to vm_fault_t
-In-Reply-To: <20180611210714.GB4023@kroah.com>
-References: <20180521180937.GA19605@jordon-HP-15-Notebook-PC>
- <CAFqt6zamp=+adkyM+_4z405hN-9qOn1CsY_BgVtCrAfscBHhWg@mail.gmail.com>
- <20180611205058.GA30123@kroah.com>
- <CAFqt6zZJcN4=FDQSqiSznoEogavV9GBpqxx-onWG5Q3wQEM9cQ@mail.gmail.com>
- <20180611210714.GB4023@kroah.com>
-Message-ID: <CAFqt6zYyy2yygmU+_KSNydjkW8V7A5oefcpMyMrFDd=2q1Ppdw@mail.gmail.com>
+From: David Laight <David.Laight@ACULAB.COM>
+Date: Wed, 13 Jun 2018 10:53:07 +0000
+Subject: [lustre-devel] [PATCH] staging: lustre: add error handling for
+ try_module_get
+In-Reply-To: <1528778968-42225-1-git-send-email-jiazhouyang09@gmail.com>
+References: <1528778968-42225-1-git-send-email-jiazhouyang09@gmail.com>
+Message-ID: <ed5d91f54b5a4776a66df87b645b0ee9@AcuMS.aculab.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: 'Zhouyang Jia' <jiazhouyang09@gmail.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, NeilBrown <neilb@suse.com>, Haneen Mohammed <hamohammed.sa@gmail.com>, Al Viro <viro@zeniv.linux.org.uk>, "Gustavo A. R. Silva" <garsilva@embeddedor.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 
-On Tue, Jun 12, 2018 at 2:37 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Tue, Jun 12, 2018 at 02:30:27AM +0530, Souptick Joarder wrote:
->> > >
->> > > If no further comment, we would like to get this patch in 4.18-rc-X.
->> >
->> > Why?  Is it a regression fix?  That's all that is allowed after -rc1.
->>
->> No, this is not regression fix. We need to get this into 4.18-rc-1.  But
->> mostly it can't make into linus tree in rc-1 :)
->
-> Why does it _have_ to get into 4.18-rc1?  My tree is long-closed and
-> Linus already has all of my patches in his tree for the staging section
-> of the kernel.
->
->> > And have you tried applying it to Linus's current tree?  :)
->>
->> Last tested on 4.17-rc-6 and it worked fine. Let me verify in current tree.
->
-> Try it, you might be surprised :)
+From: Zhouyang Jia
+> Sent: 12 June 2018 05:49
+> 
+> When try_module_get fails, the lack of error-handling code may
+> cause unexpected results.
+> 
+> This patch adds error-handling code after calling try_module_get.
+...
+> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> @@ -2422,7 +2422,10 @@ ksocknal_base_startup(void)
+> 
+>  	/* flag lists/ptrs/locks initialised */
+>  	ksocknal_data.ksnd_init = SOCKNAL_INIT_DATA;
+> -	try_module_get(THIS_MODULE);
+> +	if (!try_module_get(THIS_MODULE)) {
+> +		CERROR("%s: cannot get module\n", __func__);
+> +		goto failed;
+> +	}
 
-Yes, got the surprise :)
-Sorry for making noise, I will drop this patch as it is no more valid
-in current Linus's tree.
+
+Can try_module_get(THIS_MODULE) ever fail?
+Since you are running code in 'THIS_MODULE' the caller must have a
+reference that can't go away.
+So try_module_get() just increments the count that is already greater
+than zero.
+
+Similarly module_put(THIS_MODULE) must never be able to release the
+last reference.
+Any such calls that aren't in error paths after try_module_get() are
+probably buggy.
+
+	David
