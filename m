@@ -1,87 +1,240 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 13 Jun 2018 22:02:55 +1000
-Subject: [lustre-devel] [PATCH] staging: lustre: add error handling for
- try_module_get
-In-Reply-To: <ed5d91f54b5a4776a66df87b645b0ee9@AcuMS.aculab.com>
-References: <1528778968-42225-1-git-send-email-jiazhouyang09@gmail.com>
- <ed5d91f54b5a4776a66df87b645b0ee9@AcuMS.aculab.com>
-Message-ID: <87k1r2j3m8.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 13 Jun 2018 22:38:16 +0100 (BST)
+Subject: [lustre-devel] [PATCH 11/11] staging: lustre: centralize
+ setting of subdir-ccflags-y
+In-Reply-To: <152826511930.16761.12770722873423628004.stgit@noble>
+References: <152826510267.16761.14361003167157833896.stgit@noble>
+ <152826511930.16761.12770722873423628004.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1806132237140.12664@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: David Laight <David.Laight@ACULAB.COM>, 'Zhouyang Jia' <jiazhouyang09@gmail.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, James Simmons <jsimmons@infradead.org>, Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Haneen Mohammed <hamohammed.sa@gmail.com>, Al Viro <viro@zeniv.linux.org.uk>, "Gustavo A. R. Silva" <garsilva@embeddedor.com>, "lustre-devel@lists.lustre.org" <lustre-devel@lists.lustre.org>, "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>, "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+To: NeilBrown <neilb@suse.com>
+Cc: Oleg Drokin <oleg.drokin@intel.com>, Andreas Dilger <andreas.dilger@intel.com>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
-On Wed, Jun 13 2018, David Laight wrote:
 
-> From: Zhouyang Jia
->> Sent: 12 June 2018 05:49
->> 
->> When try_module_get fails, the lack of error-handling code may
->> cause unexpected results.
->> 
->> This patch adds error-handling code after calling try_module_get.
-> ...
->> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
->> @@ -2422,7 +2422,10 @@ ksocknal_base_startup(void)
->> 
->>  	/* flag lists/ptrs/locks initialised */
->>  	ksocknal_data.ksnd_init = SOCKNAL_INIT_DATA;
->> -	try_module_get(THIS_MODULE);
->> +	if (!try_module_get(THIS_MODULE)) {
->> +		CERROR("%s: cannot get module\n", __func__);
->> +		goto failed;
->> +	}
->
->
-> Can try_module_get(THIS_MODULE) ever fail?
+> We don't need to set subdir-ccflags-y in every Makefile.
+> The whole point of the "subdir-" bit is that the setting
+> can go once in the top-level Makefile.
+> 
 
-Yes.
+Nak: When attempting to build individual components I get:
 
-> Since you are running code in 'THIS_MODULE' the caller must have a
-> reference that can't go away.
+~/lustre-upstream$ make SUBDIRS=drivers/staging/lustre/lustre/lmv modules 
+-j 16
 
-Not necessarily, though it does usually work that way.
+  WARNING: Symbol version dump ./Module.symvers
+           is missing; modules will have no dependencies and modversions.
 
-try_module_get() can fail while the exit function is running, but it is
-safe to run code in the module until the exit function completes.
-So if the exit function takes a lock, then other code can safely run
-code in the module while holding the lock, but not holding a reference
-to the module.  If this code calls try_module_get(), it could fail.
+  CC [M]  drivers/staging/lustre/lustre/lmv/lmv_obd.o
+  CC [M]  drivers/staging/lustre/lustre/lmv/lmv_intent.o
+  CC [M]  drivers/staging/lustre/lustre/lmv/lmv_fld.o
+  CC [M]  drivers/staging/lustre/lustre/lmv/lproc_lmv.o
+drivers/staging/lustre/lustre/lmv/lproc_lmv.c:38:28: fatal error: 
+lprocfs_status.h: No such file or directory
+ #include <lprocfs_status.h>
+                            ^
+compilation terminated.
 
-That is exactly what is happening here.
-ksoclnd_exit() calls lnet_unregister_lnd() which takes
-the_lnet.ln_lnd_mutex.
 
-ksocknal_base_startup() is called from ksocknal_startup()
-which is the_ksocklnd.lnd_startup and is called, from
-lnet_startup_lndni(), with that lock held.
-
-> So try_module_get() just increments the count that is already greater
-> than zero.
->
-> Similarly module_put(THIS_MODULE) must never be able to release the
-> last reference.
-
-It can if a suitable lock is held.
-
-> Any such calls that aren't in error paths after try_module_get() are
-> probably buggy.
-Being in an error path doesn't make it safe.
-module_put(THIS_MODULE) can only be safe if a lock is held which
-prevents the exit function from completing.  Some code outside the
-module must release the lock.
-
-Having said that, I don't really like this approach.  I much prefer for
-the module reference to be taken and put outside of the module - it
-seems less error-prone.
-
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180613/d4ecae9b/attachment.sig>
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  drivers/staging/lustre/Makefile                    |    3 +++
+>  drivers/staging/lustre/lnet/klnds/o2iblnd/Makefile |    2 --
+>  drivers/staging/lustre/lnet/klnds/socklnd/Makefile |    2 --
+>  drivers/staging/lustre/lnet/libcfs/Makefile        |    2 --
+>  drivers/staging/lustre/lnet/lnet/Makefile          |    2 --
+>  drivers/staging/lustre/lnet/selftest/Makefile      |    2 --
+>  drivers/staging/lustre/lustre/fid/Makefile         |    2 --
+>  drivers/staging/lustre/lustre/fld/Makefile         |    2 --
+>  drivers/staging/lustre/lustre/llite/Makefile       |    2 --
+>  drivers/staging/lustre/lustre/lmv/Makefile         |    2 --
+>  drivers/staging/lustre/lustre/lov/Makefile         |    2 --
+>  drivers/staging/lustre/lustre/mdc/Makefile         |    2 --
+>  drivers/staging/lustre/lustre/mgc/Makefile         |    2 --
+>  drivers/staging/lustre/lustre/obdclass/Makefile    |    2 --
+>  drivers/staging/lustre/lustre/obdecho/Makefile     |    2 --
+>  drivers/staging/lustre/lustre/osc/Makefile         |    2 --
+>  drivers/staging/lustre/lustre/ptlrpc/Makefile      |    2 --
+>  17 files changed, 3 insertions(+), 32 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/Makefile b/drivers/staging/lustre/Makefile
+> index 95ffe337a80a..a44086fa8668 100644
+> --- a/drivers/staging/lustre/Makefile
+> +++ b/drivers/staging/lustre/Makefile
+> @@ -1,2 +1,5 @@
+> +subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> +subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+> +
+>  obj-$(CONFIG_LNET)		+= lnet/
+>  obj-$(CONFIG_LUSTRE_FS)		+= lustre/
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/Makefile b/drivers/staging/lustre/lnet/klnds/o2iblnd/Makefile
+> index 4affe1d79948..e1a05ece130c 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/Makefile
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LNET_XPRT_IB) += ko2iblnd.o
+>  ko2iblnd-y := o2iblnd.o o2iblnd_cb.o o2iblnd_modparams.o
+> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/Makefile b/drivers/staging/lustre/lnet/klnds/socklnd/Makefile
+> index a7da1abfc804..4d03cad997c1 100644
+> --- a/drivers/staging/lustre/lnet/klnds/socklnd/Makefile
+> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LNET) += ksocklnd.o
+>  
+> diff --git a/drivers/staging/lustre/lnet/libcfs/Makefile b/drivers/staging/lustre/lnet/libcfs/Makefile
+> index 6a1b232da495..3d6b99c6e883 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/Makefile
+> +++ b/drivers/staging/lustre/lnet/libcfs/Makefile
+> @@ -1,6 +1,4 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LNET) += libcfs.o
+>  
+> diff --git a/drivers/staging/lustre/lnet/lnet/Makefile b/drivers/staging/lustre/lnet/lnet/Makefile
+> index 0a9d70924fe0..ba33e90e47ec 100644
+> --- a/drivers/staging/lustre/lnet/lnet/Makefile
+> +++ b/drivers/staging/lustre/lnet/lnet/Makefile
+> @@ -1,6 +1,4 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LNET) += lnet.o
+>  
+> diff --git a/drivers/staging/lustre/lnet/selftest/Makefile b/drivers/staging/lustre/lnet/selftest/Makefile
+> index 3ccc8966b566..16f8efcd1531 100644
+> --- a/drivers/staging/lustre/lnet/selftest/Makefile
+> +++ b/drivers/staging/lustre/lnet/selftest/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LNET_SELFTEST) := lnet_selftest.o
+>  
+> diff --git a/drivers/staging/lustre/lustre/fid/Makefile b/drivers/staging/lustre/lustre/fid/Makefile
+> index 77b65b92667d..11f6e4046e61 100644
+> --- a/drivers/staging/lustre/lustre/fid/Makefile
+> +++ b/drivers/staging/lustre/lustre/fid/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include/
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += fid.o
+>  fid-y := fid_request.o fid_lib.o lproc_fid.o
+> diff --git a/drivers/staging/lustre/lustre/fld/Makefile b/drivers/staging/lustre/lustre/fld/Makefile
+> index 426deba8b815..e7843d7aac9d 100644
+> --- a/drivers/staging/lustre/lustre/fld/Makefile
+> +++ b/drivers/staging/lustre/lustre/fld/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include/
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += fld.o
+>  fld-y := fld_request.o fld_cache.o lproc_fld.o
+> diff --git a/drivers/staging/lustre/lustre/llite/Makefile b/drivers/staging/lustre/lustre/llite/Makefile
+> index 5200924182ae..f46b61770254 100644
+> --- a/drivers/staging/lustre/lustre/llite/Makefile
+> +++ b/drivers/staging/lustre/lustre/llite/Makefile
+> @@ -1,6 +1,4 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += lustre.o
+>  lustre-y := dcache.o dir.o file.o llite_lib.o llite_nfs.o \
+> diff --git a/drivers/staging/lustre/lustre/lmv/Makefile b/drivers/staging/lustre/lustre/lmv/Makefile
+> index 91c99114aa13..7a392c31c508 100644
+> --- a/drivers/staging/lustre/lustre/lmv/Makefile
+> +++ b/drivers/staging/lustre/lustre/lmv/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += lmv.o
+>  lmv-y := lmv_obd.o lmv_intent.o lmv_fld.o lproc_lmv.o
+> diff --git a/drivers/staging/lustre/lustre/lov/Makefile b/drivers/staging/lustre/lustre/lov/Makefile
+> index 1ebf0193f61a..6294769aca95 100644
+> --- a/drivers/staging/lustre/lustre/lov/Makefile
+> +++ b/drivers/staging/lustre/lustre/lov/Makefile
+> @@ -1,6 +1,4 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += lov.o
+>  lov-y := lov_obd.o lov_pack.o lov_offset.o lov_merge.o \
+> diff --git a/drivers/staging/lustre/lustre/mdc/Makefile b/drivers/staging/lustre/lustre/mdc/Makefile
+> index c7bc3351ccb0..c3bc71f6596d 100644
+> --- a/drivers/staging/lustre/lustre/mdc/Makefile
+> +++ b/drivers/staging/lustre/lustre/mdc/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += mdc.o
+>  mdc-y := mdc_request.o mdc_reint.o mdc_lib.o mdc_locks.o lproc_mdc.o
+> diff --git a/drivers/staging/lustre/lustre/mgc/Makefile b/drivers/staging/lustre/lustre/mgc/Makefile
+> index 8abf108dbcf7..301cd7a1fa25 100644
+> --- a/drivers/staging/lustre/lustre/mgc/Makefile
+> +++ b/drivers/staging/lustre/lustre/mgc/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += mgc.o
+>  mgc-y := mgc_request.o lproc_mgc.o
+> diff --git a/drivers/staging/lustre/lustre/obdclass/Makefile b/drivers/staging/lustre/lustre/obdclass/Makefile
+> index e36ba2167d10..be118391b402 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/Makefile
+> +++ b/drivers/staging/lustre/lustre/obdclass/Makefile
+> @@ -1,6 +1,4 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += obdclass.o
+>  
+> diff --git a/drivers/staging/lustre/lustre/obdecho/Makefile b/drivers/staging/lustre/lustre/obdecho/Makefile
+> index 6be66fbab872..4ae346f5ddcd 100644
+> --- a/drivers/staging/lustre/lustre/obdecho/Makefile
+> +++ b/drivers/staging/lustre/lustre/obdecho/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += obdecho.o
+>  obdecho-y := echo_client.o
+> diff --git a/drivers/staging/lustre/lustre/osc/Makefile b/drivers/staging/lustre/lustre/osc/Makefile
+> index 30dec90e64e8..ecdf07e925c7 100644
+> --- a/drivers/staging/lustre/lustre/osc/Makefile
+> +++ b/drivers/staging/lustre/lustre/osc/Makefile
+> @@ -1,5 +1,3 @@
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += osc.o
+>  osc-y := osc_request.o osc_dev.o osc_object.o \
+> diff --git a/drivers/staging/lustre/lustre/ptlrpc/Makefile b/drivers/staging/lustre/lustre/ptlrpc/Makefile
+> index aa152e652002..0fae7de09de2 100644
+> --- a/drivers/staging/lustre/lustre/ptlrpc/Makefile
+> +++ b/drivers/staging/lustre/lustre/ptlrpc/Makefile
+> @@ -1,6 +1,4 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+> -subdir-ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
+>  
+>  obj-$(CONFIG_LUSTRE_FS) += ptlrpc.o
+>  
+> 
+> 
+> 
