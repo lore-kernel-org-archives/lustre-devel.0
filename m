@@ -1,186 +1,181 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 15 Jun 2018 17:11:30 +1000
-Subject: [lustre-devel] [PATCH 17/24] lustre: remove lustre_compat.h
+Subject: [lustre-devel] [PATCH 18/24] lustre/lnet: move tracefile locking
+ from linux-tracefile.c to tracefile.c
 In-Reply-To: <152904663333.10587.10934053155404014785.stgit@noble>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
-Message-ID: <152904669067.10587.14431331340197955105.stgit@noble>
+Message-ID: <152904669072.10587.15169492766245566638.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Only thing it provided was one include file,
-so include that directly where needed.
+There is no value in keeping it separate.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h  |    1 
- .../staging/lustre/lustre/include/lustre_compat.h  |   42 --------------------
- .../staging/lustre/lustre/include/obd_support.h    |    1 
- .../staging/lustre/lustre/llite/llite_internal.h   |    1 
- drivers/staging/lustre/lustre/llite/llite_lib.c    |    1 
- drivers/staging/lustre/lustre/obdclass/llog.c      |    1 
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |    1 
- drivers/staging/lustre/lustre/ptlrpc/import.c      |    1 
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    1 
- drivers/staging/lustre/lustre/ptlrpc/service.c     |    1 
- 10 files changed, 5 insertions(+), 46 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/include/lustre_compat.h
+ .../staging/lustre/lnet/libcfs/linux-tracefile.c   |   22 ------------------
+ drivers/staging/lustre/lnet/libcfs/tracefile.c     |   25 ++++++++++----------
+ drivers/staging/lustre/lnet/libcfs/tracefile.h     |    5 ----
+ 3 files changed, 13 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index caa66763c70d..1491beb2b9a9 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -90,7 +90,6 @@
-  * super-class definitions.
-  */
- #include <lu_object.h>
--#include <lustre_compat.h>
- #include <linux/atomic.h>
- #include <linux/mutex.h>
- #include <linux/radix-tree.h>
-diff --git a/drivers/staging/lustre/lustre/include/lustre_compat.h b/drivers/staging/lustre/lustre/include/lustre_compat.h
-deleted file mode 100644
-index f555391d5ae3..000000000000
---- a/drivers/staging/lustre/lustre/include/lustre_compat.h
-+++ /dev/null
-@@ -1,42 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- *
-- * Copyright (c) 2011, 2012, Intel Corporation.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- */
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+index 347138409eba..9e72220299af 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+@@ -47,8 +47,6 @@ static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
+ 
+ char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
+ 
+-static DECLARE_RWSEM(cfs_tracefile_sem);
 -
--#ifndef _LUSTRE_COMPAT_H
--#define _LUSTRE_COMPAT_H
+ int cfs_tracefile_init_arch(void)
+ {
+ 	int i;
+@@ -109,26 +107,6 @@ void cfs_tracefile_fini_arch(void)
+ 	}
+ }
+ 
+-void cfs_tracefile_read_lock(void)
+-{
+-	down_read(&cfs_tracefile_sem);
+-}
 -
--#include <linux/fs_struct.h>
--#include <linux/namei.h>
--#include <linux/cred.h>
--#include <linux/module.h>
+-void cfs_tracefile_read_unlock(void)
+-{
+-	up_read(&cfs_tracefile_sem);
+-}
 -
--#endif /* _LUSTRE_COMPAT_H */
-diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
-index 9e41633823f7..070a281ebb7d 100644
---- a/drivers/staging/lustre/lustre/include/obd_support.h
-+++ b/drivers/staging/lustre/lustre/include/obd_support.h
-@@ -37,7 +37,6 @@
- #include <linux/slab.h>
- #include <linux/sched/signal.h>
+-void cfs_tracefile_write_lock(void)
+-{
+-	down_write(&cfs_tracefile_sem);
+-}
+-
+-void cfs_tracefile_write_unlock(void)
+-{
+-	up_write(&cfs_tracefile_sem);
+-}
+-
+ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
+ {
+ 	if (in_irq())
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+index 7ca562e156f0..5f319332f60b 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+@@ -59,6 +59,7 @@ static DEFINE_MUTEX(cfs_trace_thread_mutex);
+ static int thread_running;
  
--#include <lustre_compat.h>
- #include <lprocfs_status.h>
+ static atomic_t cfs_tage_allocated = ATOMIC_INIT(0);
++static DECLARE_RWSEM(cfs_tracefile_sem);
  
- /* global variables */
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 91212e608c0b..539ed3b6b64a 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -39,7 +39,6 @@
- #include <lustre_linkea.h>
+ struct page_collection {
+ 	struct list_head	pc_pages;
+@@ -711,7 +712,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
+ 	mm_segment_t __oldfs;
+ 	int rc;
  
- /* for struct cl_lock_descr and struct cl_io */
--#include <lustre_compat.h>
- #include <cl_object.h>
- #include <lustre_lmv.h>
- #include <lustre_mdc.h>
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index e6e02fe7703b..a0a143bf4989 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -42,6 +42,7 @@
- #include <linux/types.h>
- #include <linux/mm.h>
- #include <linux/random.h>
-+#include <linux/fs_struct.h>
+-	cfs_tracefile_write_lock();
++	down_write(&cfs_tracefile_sem);
  
- #include <uapi/linux/lustre/lustre_ioctl.h>
- #include <lustre_ha.h>
-diff --git a/drivers/staging/lustre/lustre/obdclass/llog.c b/drivers/staging/lustre/lustre/obdclass/llog.c
-index 53e723d990e4..f59f89a76c91 100644
---- a/drivers/staging/lustre/lustre/obdclass/llog.c
-+++ b/drivers/staging/lustre/lustre/obdclass/llog.c
-@@ -45,6 +45,7 @@
- #define DEBUG_SUBSYSTEM S_LOG
+ 	filp = filp_open(filename, O_CREAT | O_EXCL | O_WRONLY | O_LARGEFILE,
+ 			 0600);
+@@ -759,7 +760,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
+ close:
+ 	filp_close(filp, NULL);
+ out:
+-	cfs_tracefile_write_unlock();
++	up_write(&cfs_tracefile_sem);
+ 	return rc;
+ }
  
- #include <linux/kthread.h>
-+#include <linux/fs_struct.h>
- #include <llog_swab.h>
- #include <lustre_log.h>
- #include <obd_class.h>
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index 06c38fdef7ba..232bbfa9242c 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -43,7 +43,6 @@
+@@ -873,12 +874,12 @@ int cfs_trace_daemon_command(char *str)
+ {
+ 	int rc = 0;
  
- #include <linux/random.h>
- #include <obd.h>
--#include <lustre_compat.h>
- #include <obd_class.h>
- #include <uapi/linux/lustre/lustre_idl.h>
- #include <lustre_log.h>
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/import.c b/drivers/staging/lustre/lustre/ptlrpc/import.c
-index 1a0f35dfab97..54ceac56c524 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/import.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/import.c
-@@ -38,6 +38,7 @@
- #define DEBUG_SUBSYSTEM S_RPC
+-	cfs_tracefile_write_lock();
++	down_write(&cfs_tracefile_sem);
  
- #include <linux/kthread.h>
-+#include <linux/fs_struct.h>
- #include <obd_support.h>
- #include <lustre_ha.h>
- #include <lustre_net.h>
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-index 531005411edf..66295b4fcdab 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-@@ -53,6 +53,7 @@
- #define DEBUG_SUBSYSTEM S_RPC
+ 	if (!strcmp(str, "stop")) {
+-		cfs_tracefile_write_unlock();
++		up_write(&cfs_tracefile_sem);
+ 		cfs_trace_stop_thread();
+-		cfs_tracefile_write_lock();
++		down_write(&cfs_tracefile_sem);
+ 		memset(cfs_tracefile, 0, sizeof(cfs_tracefile));
  
- #include <linux/kthread.h>
-+#include <linux/fs_struct.h>
- #include <linux/libcfs/libcfs.h>
- #include <linux/libcfs/libcfs_cpu.h>
- #include <linux/libcfs/libcfs_string.h>
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 3fd8c746f460..12442425702a 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -34,6 +34,7 @@
- #define DEBUG_SUBSYSTEM S_RPC
+ 	} else if (!strncmp(str, "size=", 5)) {
+@@ -905,7 +906,7 @@ int cfs_trace_daemon_command(char *str)
+ 		cfs_trace_start_thread();
+ 	}
  
- #include <linux/kthread.h>
-+#include <linux/fs_struct.h>
- #include <obd_support.h>
- #include <obd_class.h>
- #include <lustre_net.h>
+-	cfs_tracefile_write_unlock();
++	up_write(&cfs_tracefile_sem);
+ 	return rc;
+ }
+ 
+@@ -950,12 +951,12 @@ int cfs_trace_set_debug_mb(int mb)
+ 	mb /= num_possible_cpus();
+ 	pages = mb << (20 - PAGE_SHIFT);
+ 
+-	cfs_tracefile_write_lock();
++	down_write(&cfs_tracefile_sem);
+ 
+ 	cfs_tcd_for_each(tcd, i, j)
+ 		tcd->tcd_max_pages = (pages * tcd->tcd_pages_factor) / 100;
+ 
+-	cfs_tracefile_write_unlock();
++	up_write(&cfs_tracefile_sem);
+ 
+ 	return 0;
+ }
+@@ -967,12 +968,12 @@ int cfs_trace_get_debug_mb(void)
+ 	struct cfs_trace_cpu_data *tcd;
+ 	int total_pages = 0;
+ 
+-	cfs_tracefile_read_lock();
++	down_read(&cfs_tracefile_sem);
+ 
+ 	cfs_tcd_for_each(tcd, i, j)
+ 		total_pages += tcd->tcd_max_pages;
+ 
+-	cfs_tracefile_read_unlock();
++	up_read(&cfs_tracefile_sem);
+ 
+ 	return (total_pages >> (20 - PAGE_SHIFT)) + 1;
+ }
+@@ -1002,7 +1003,7 @@ static int tracefiled(void *arg)
+ 			goto end_loop;
+ 
+ 		filp = NULL;
+-		cfs_tracefile_read_lock();
++		down_read(&cfs_tracefile_sem);
+ 		if (cfs_tracefile[0]) {
+ 			filp = filp_open(cfs_tracefile,
+ 					 O_CREAT | O_RDWR | O_LARGEFILE,
+@@ -1014,7 +1015,7 @@ static int tracefiled(void *arg)
+ 					rc);
+ 			}
+ 		}
+-		cfs_tracefile_read_unlock();
++		up_read(&cfs_tracefile_sem);
+ 		if (!filp) {
+ 			put_pages_on_daemon_list(&pc);
+ 			__LASSERT(list_empty(&pc.pc_pages));
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+index 0608240d897f..9f6b73d3b6fd 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+@@ -65,11 +65,6 @@ void libcfs_run_debug_log_upcall(char *file);
+ int  cfs_tracefile_init_arch(void);
+ void cfs_tracefile_fini_arch(void);
+ 
+-void cfs_tracefile_read_lock(void);
+-void cfs_tracefile_read_unlock(void);
+-void cfs_tracefile_write_lock(void);
+-void cfs_tracefile_write_unlock(void);
+-
+ int cfs_tracefile_dump_all_pages(char *filename);
+ void cfs_trace_debug_print(void);
+ void cfs_trace_flush_pages(void);
