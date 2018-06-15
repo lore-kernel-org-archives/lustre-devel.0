@@ -1,70 +1,59 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 15 Jun 2018 17:11:30 +1000
-Subject: [lustre-devel] [PATCH 14/24] lustre: discard ext2* bit operations
+Subject: [lustre-devel] [PATCH 15/24] lustre: centralize TIMES_SET_FLAGS
 In-Reply-To: <152904663333.10587.10934053155404014785.stgit@noble>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
-Message-ID: <152904669056.10587.1595912848911465438.stgit@noble>
+Message-ID: <152904669060.10587.11467294807244836929.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Just use the relevant *_le bit operation directly.
+This macro is only used in llite, so move both definitions to
+llite_internal.h.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lustre/include/lustre_compat.h  |    8 --------
- drivers/staging/lustre/lustre/obdclass/llog.c      |    6 +++---
- 2 files changed, 3 insertions(+), 11 deletions(-)
+ .../staging/lustre/lustre/include/lustre_compat.h  |    2 --
+ .../staging/lustre/lustre/llite/llite_internal.h   |    2 ++
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |    2 --
+ 3 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/lustre_compat.h b/drivers/staging/lustre/lustre/include/lustre_compat.h
-index cb6e2aa35960..534846f5561d 100644
+index 534846f5561d..6d659b696b5f 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_compat.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_compat.h
-@@ -49,14 +49,6 @@
+@@ -49,6 +49,4 @@
  #define module_init(a)     late_initcall(a)
  #endif
  
--#if !defined(_ASM_GENERIC_BITOPS_EXT2_NON_ATOMIC_H_) && !defined(ext2_set_bit)
--# define ext2_set_bit	     __test_and_set_bit_le
--# define ext2_clear_bit	   __test_and_clear_bit_le
--# define ext2_test_bit	    test_bit_le
--# define ext2_find_first_zero_bit find_first_zero_bit_le
--# define ext2_find_next_zero_bit  find_next_zero_bit_le
--#endif
+-#define TIMES_SET_FLAGS (ATTR_MTIME_SET | ATTR_ATIME_SET | ATTR_TIMES_SET)
 -
- #define TIMES_SET_FLAGS (ATTR_MTIME_SET | ATTR_ATIME_SET | ATTR_TIMES_SET)
- 
  #endif /* _LUSTRE_COMPAT_H */
-diff --git a/drivers/staging/lustre/lustre/obdclass/llog.c b/drivers/staging/lustre/lustre/obdclass/llog.c
-index bba84eae1e19..53e723d990e4 100644
---- a/drivers/staging/lustre/lustre/obdclass/llog.c
-+++ b/drivers/staging/lustre/lustre/obdclass/llog.c
-@@ -137,7 +137,7 @@ static int llog_read_header(const struct lu_env *env,
- 		 */
- 		len = llh->llh_hdr.lrh_len - llh->llh_bitmap_offset;
- 		memset(LLOG_HDR_BITMAP(llh), 0, len - sizeof(llh->llh_tail));
--		ext2_set_bit(0, LLOG_HDR_BITMAP(llh));
-+		set_bit_le(0, LLOG_HDR_BITMAP(llh));
- 		LLOG_HDR_TAIL(llh)->lrt_len = llh->llh_hdr.lrh_len;
- 		LLOG_HDR_TAIL(llh)->lrt_index = llh->llh_hdr.lrh_index;
- 		rc = 0;
-@@ -264,7 +264,7 @@ static int llog_process_thread(void *arg)
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 0ae5185a4998..91212e608c0b 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -69,6 +69,8 @@
+ #define LL_IT2STR(it) ((it) ? ldlm_it2str((it)->it_op) : "0")
+ #define LUSTRE_FPRIVATE(file) ((file)->private_data)
  
- 		/* skip records not set in bitmap */
- 		while (index <= last_index &&
--		       !ext2_test_bit(index, LLOG_HDR_BITMAP(llh)))
-+		       !test_bit_le(index, LLOG_HDR_BITMAP(llh)))
- 			++index;
++#define TIMES_SET_FLAGS (ATTR_MTIME_SET | ATTR_ATIME_SET | ATTR_TIMES_SET)
++
+ struct ll_dentry_data {
+ 	struct lookup_intent		*lld_it;
+ 	unsigned int			lld_sa_generation;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index d72674873a70..e6e02fe7703b 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -1353,8 +1353,6 @@ void ll_clear_inode(struct inode *inode)
+ 	cl_inode_fini(inode);
+ }
  
- 		if (index > last_index)
-@@ -365,7 +365,7 @@ static int llog_process_thread(void *arg)
- 						    chunk_offset;
- 
- 			/* if set, process the callback on this record */
--			if (ext2_test_bit(index, LLOG_HDR_BITMAP(llh))) {
-+			if (test_bit_le(index, LLOG_HDR_BITMAP(llh))) {
- 				rc = lpi->lpi_cb(lpi->lpi_env, loghandle, rec,
- 						 lpi->lpi_cbdata);
- 				last_called_index = index;
+-#define TIMES_SET_FLAGS (ATTR_MTIME_SET | ATTR_ATIME_SET | ATTR_TIMES_SET)
+-
+ static int ll_md_setattr(struct dentry *dentry, struct md_op_data *op_data)
+ {
+ 	struct lustre_md md;
