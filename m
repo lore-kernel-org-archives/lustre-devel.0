@@ -1,493 +1,282 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 15 Jun 2018 17:11:30 +1000
-Subject: [lustre-devel] [PATCH 09/24] lustre: don't use spare bits in
- iattr.ia_valid
+Subject: [lustre-devel] [PATCH 10/24] lustre: remove
+ lustre_patchless_compat.h
 In-Reply-To: <152904663333.10587.10934053155404014785.stgit@noble>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
-Message-ID: <152904669036.10587.17899565981649604892.stgit@noble>
+Message-ID: <152904669041.10587.15188275655299631716.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Using spare bits in iattr.ia_valid is not safe as the
-bits might get used for some other purpose without
-us noticing.
-lustre currently used 4 spare bit, but they are all
-defined in different places so this isn't immediately
-obvious.
-
-This patch brings all those bit definitions together
-and defined a new op_data field (op_xvalid) to hold
-the extra validity bits.
-
-It also replaces sa_valid in struct cl_setattr_io
-with sa_avalid and sa_xvalid.  Changing the name is
-helpful as sa_valid already has another use within
-lustre.
+This is now mostly empty.  A few #includes need
+to be added to other files to compensate.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/cl_object.h  |    5 +++-
- .../staging/lustre/lustre/include/lustre_compat.h  |    6 -----
- .../lustre/include/lustre_patchless_compat.h       |    8 -------
- drivers/staging/lustre/lustre/include/obd.h        |    7 ++++++
- drivers/staging/lustre/lustre/llite/file.c         |   12 ++++++----
- drivers/staging/lustre/lustre/llite/lcommon_cl.c   |    5 +++-
- .../staging/lustre/lustre/llite/llite_internal.h   |    5 +++-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   21 ++++++++++--------
- drivers/staging/lustre/lustre/llite/vvp_io.c       |    8 +++----
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |    5 +++-
- drivers/staging/lustre/lustre/lov/lov_io.c         |    3 ++-
- drivers/staging/lustre/lustre/mdc/mdc_lib.c        |   13 ++++++-----
- drivers/staging/lustre/lustre/osc/osc_io.c         |   23 ++++++++++----------
- 13 files changed, 63 insertions(+), 58 deletions(-)
+ drivers/staging/lustre/lustre/fid/lproc_fid.c      |    1 
+ drivers/staging/lustre/lustre/fld/lproc_fld.c      |    1 
+ .../staging/lustre/lustre/include/lustre_compat.h  |    2 -
+ drivers/staging/lustre/lustre/include/lustre_net.h |    1 
+ .../lustre/include/lustre_patchless_compat.h       |   44 --------------------
+ .../staging/lustre/lustre/llite/llite_internal.h   |    1 
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |    2 +
+ drivers/staging/lustre/lustre/lov/lov_pack.c       |    1 
+ drivers/staging/lustre/lustre/lov/lov_page.c       |    1 
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |    1 
+ .../lustre/lustre/obdclass/lprocfs_status.c        |    1 
+ .../staging/lustre/lustre/obdclass/obd_config.c    |    1 
+ .../staging/lustre/lustre/obdecho/echo_client.c    |    1 
+ drivers/staging/lustre/lustre/osc/lproc_osc.c      |    1 
+ drivers/staging/lustre/lustre/osc/osc_request.c    |    1 
+ .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |    1 
+ drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |    1 
+ 17 files changed, 15 insertions(+), 47 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lustre/include/lustre_patchless_compat.h
 
-diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
-index 6f7b991be809..caa66763c70d 100644
---- a/drivers/staging/lustre/lustre/include/cl_object.h
-+++ b/drivers/staging/lustre/lustre/include/cl_object.h
-@@ -1773,7 +1773,8 @@ struct cl_io {
- 		struct cl_setattr_io {
- 			struct ost_lvb   sa_attr;
- 			unsigned int		 sa_attr_flags;
--			unsigned int     sa_valid;
-+			unsigned int     sa_avalid;
-+			unsigned int     sa_xvalid;
- 			int		sa_stripe_index;
- 			const struct lu_fid	*sa_parent_fid;
- 		} ci_setattr;
-@@ -2304,7 +2305,7 @@ static inline int cl_io_is_mkwrite(const struct cl_io *io)
- static inline int cl_io_is_trunc(const struct cl_io *io)
- {
- 	return io->ci_type == CIT_SETATTR &&
--		(io->u.ci_setattr.sa_valid & ATTR_SIZE);
-+		(io->u.ci_setattr.sa_avalid & ATTR_SIZE);
- }
+diff --git a/drivers/staging/lustre/lustre/fid/lproc_fid.c b/drivers/staging/lustre/lustre/fid/lproc_fid.c
+index 0aabf473c9bd..aa2df68d5acd 100644
+--- a/drivers/staging/lustre/lustre/fid/lproc_fid.c
++++ b/drivers/staging/lustre/lustre/fid/lproc_fid.c
+@@ -40,6 +40,7 @@
+ #define DEBUG_SUBSYSTEM S_FID
  
- struct cl_io *cl_io_top(struct cl_io *io);
+ #include <linux/module.h>
++#include <linux/uaccess.h>
+ 
+ #include <obd.h>
+ #include <obd_class.h>
+diff --git a/drivers/staging/lustre/lustre/fld/lproc_fld.c b/drivers/staging/lustre/lustre/fld/lproc_fld.c
+index 0bcfb26ef8aa..c85ef9ec639f 100644
+--- a/drivers/staging/lustre/lustre/fld/lproc_fld.c
++++ b/drivers/staging/lustre/lustre/fld/lproc_fld.c
+@@ -41,6 +41,7 @@
+ #define DEBUG_SUBSYSTEM S_FLD
+ 
+ #include <linux/module.h>
++#include <linux/uaccess.h>
+ 
+ #include <obd.h>
+ #include <obd_class.h>
 diff --git a/drivers/staging/lustre/lustre/include/lustre_compat.h b/drivers/staging/lustre/lustre/include/lustre_compat.h
-index 3c6db0d632dc..6d1a433e32c5 100644
+index 6d1a433e32c5..bf86b0612b50 100644
 --- a/drivers/staging/lustre/lustre/include/lustre_compat.h
 +++ b/drivers/staging/lustre/lustre/include/lustre_compat.h
-@@ -41,12 +41,6 @@
+@@ -39,8 +39,6 @@
+ #include <linux/cred.h>
+ #include <linux/module.h>
  
- #include <lustre_patchless_compat.h>
- 
--/*
-- * set ATTR_BLOCKS to a high value to avoid any risk of collision with other
-- * ATTR_* attributes (see bug 13828)
-- */
--#define ATTR_BLOCKS    (1 << 27)
+-#include <lustre_patchless_compat.h>
 -
  #define current_ngroups current_cred()->group_info->ngroups
  #define current_groups current_cred()->group_info->small_block
  
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 35b43a77eb18..dcad90bc97eb 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -51,6 +51,7 @@
+  * @{
+  */
+ 
++#include <linux/mm.h>
+ #include <linux/uio.h>
+ #include <linux/libcfs/libcfs.h>
+ #include <uapi/linux/lnet/nidstr.h>
 diff --git a/drivers/staging/lustre/lustre/include/lustre_patchless_compat.h b/drivers/staging/lustre/lustre/include/lustre_patchless_compat.h
-index dca1e3dbd183..1bbe1a779ae9 100644
+deleted file mode 100644
+index 1bbe1a779ae9..000000000000
 --- a/drivers/staging/lustre/lustre/include/lustre_patchless_compat.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_patchless_compat.h
-@@ -41,12 +41,4 @@
- #include <linux/hash.h>
- #include <linux/pagemap.h>
- 
--#ifndef ATTR_CTIME_SET
++++ /dev/null
+@@ -1,44 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
 -/*
-- * set ATTR_CTIME_SET to a high value to avoid any risk of collision with other
-- * ATTR_* attributes (see bug 13828)
+- * GPL HEADER START
+- *
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 only,
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 for more details (a copy is included
+- * in the LICENSE file that accompanied this code).
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 along with this program; If not, see
+- * http://www.gnu.org/licenses/gpl-2.0.html
+- *
+- * GPL HEADER END
 - */
--#define ATTR_CTIME_SET (1 << 28)
--#endif
+-/*
+- * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+- * Use is subject to license terms.
+- *
+- * Copyright (c) 2011, 2012, Intel Corporation.
+- */
+-/*
+- * This file is part of Lustre, http://www.lustre.org/
+- * Lustre is a trademark of Sun Microsystems, Inc.
+- */
 -
- #endif /* LUSTRE_PATCHLESS_COMPAT_H */
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index b1907bbffb19..d38b6bc6b246 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -723,6 +723,7 @@ struct md_op_data {
- 
- 	/* iattr fields and blocks. */
- 	struct iattr	    op_attr;
-+	unsigned int		op_xvalid; /* eXtra validity flags */
- 	unsigned int	    op_attr_flags;
- 	__u64		   op_valid;
- 	loff_t		  op_attr_blocks;
-@@ -751,6 +752,12 @@ struct md_op_data {
- 	__u32			op_default_stripe_offset;
- };
- 
-+/* Flags for op_xvalid */
-+#define OP_ATTR_CTIME_SET	(1 << 0)
-+#define OP_ATTR_BLOCKS		(1 << 1)
-+#define OP_ATTR_OWNEROVERRIDE	(1 << 2)
-+#define OP_ATTR_FLAGS		(1 << 3)
-+
- struct md_callback {
- 	int (*md_blocking_ast)(struct ldlm_lock *lock,
- 			       struct ldlm_lock_desc *desc,
-diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index e888ed6e74bc..e642996db53f 100644
---- a/drivers/staging/lustre/lustre/llite/file.c
-+++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -93,9 +93,10 @@ static void ll_prepare_close(struct inode *inode, struct md_op_data *op_data,
- 	op_data->op_attr.ia_mtime = inode->i_mtime;
- 	op_data->op_attr.ia_ctime = inode->i_ctime;
- 	op_data->op_attr.ia_size = i_size_read(inode);
--	op_data->op_attr.ia_valid |= ATTR_MODE | ATTR_ATIME | ATTR_ATIME_SET |
--				     ATTR_MTIME | ATTR_MTIME_SET |
--				     ATTR_CTIME | ATTR_CTIME_SET;
-+	op_data->op_attr.ia_valid |= (ATTR_MODE | ATTR_ATIME | ATTR_ATIME_SET |
-+				      ATTR_MTIME | ATTR_MTIME_SET |
-+				      ATTR_CTIME);
-+	op_data->op_xvalid |= OP_ATTR_CTIME_SET;
- 	op_data->op_attr_blocks = inode->i_blocks;
- 	op_data->op_attr_flags = ll_inode_to_ext_flags(inode->i_flags);
- 	op_data->op_handle = och->och_fh;
-@@ -161,7 +162,8 @@ static int ll_close_inode_openhandle(struct inode *inode,
- 		op_data->op_bias |= MDS_HSM_RELEASE;
- 		op_data->op_data_version = *(__u64 *)data;
- 		op_data->op_lease_handle = och->och_lease_handle;
--		op_data->op_attr.ia_valid |= ATTR_SIZE | ATTR_BLOCKS;
-+		op_data->op_attr.ia_valid |= ATTR_SIZE;
-+		op_data->op_xvalid |= OP_ATTR_BLOCKS;
- 		break;
- 
- 	default:
-@@ -1906,7 +1908,7 @@ static int ll_hsm_import(struct inode *inode, struct file *file,
- 
- 	inode_lock(inode);
- 
--	rc = ll_setattr_raw(file->f_path.dentry, attr, true);
-+	rc = ll_setattr_raw(file->f_path.dentry, attr, 0, true);
- 	if (rc == -ENODATA)
- 		rc = 0;
- 
-diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-index d7ea39ce0cb2..9d1f3881f860 100644
---- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-+++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
-@@ -80,7 +80,7 @@ u16 cl_inode_fini_refcheck;
- static DEFINE_MUTEX(cl_inode_fini_guard);
- 
- int cl_setattr_ost(struct cl_object *obj, const struct iattr *attr,
--		   unsigned int attr_flags)
-+		   unsigned int xvalid, unsigned int attr_flags)
- {
- 	struct lu_env *env;
- 	struct cl_io  *io;
-@@ -100,7 +100,8 @@ int cl_setattr_ost(struct cl_object *obj, const struct iattr *attr,
- 	io->u.ci_setattr.sa_attr.lvb_ctime = LTIME_S(attr->ia_ctime);
- 	io->u.ci_setattr.sa_attr.lvb_size = attr->ia_size;
- 	io->u.ci_setattr.sa_attr_flags = attr_flags;
--	io->u.ci_setattr.sa_valid = attr->ia_valid;
-+	io->u.ci_setattr.sa_avalid = attr->ia_valid;
-+	io->u.ci_setattr.sa_xvalid = xvalid;
- 	io->u.ci_setattr.sa_parent_fid = lu_object_fid(&obj->co_lu);
- 
- again:
+-#ifndef LUSTRE_PATCHLESS_COMPAT_H
+-#define LUSTRE_PATCHLESS_COMPAT_H
+-
+-#include <linux/fs.h>
+-
+-#include <linux/list.h>
+-#include <linux/mm.h>
+-#include <linux/hash.h>
+-#include <linux/pagemap.h>
+-
+-#endif /* LUSTRE_PATCHLESS_COMPAT_H */
 diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 28cff58690d6..b750a48fd0e1 100644
+index b750a48fd0e1..0ae5185a4998 100644
 --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
 +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -805,7 +805,8 @@ void ll_kill_super(struct super_block *sb);
- struct inode *ll_inode_from_resource_lock(struct ldlm_lock *lock);
- void ll_dir_clear_lsm_md(struct inode *inode);
- void ll_clear_inode(struct inode *inode);
--int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import);
-+int ll_setattr_raw(struct dentry *dentry, struct iattr *attr,
-+		   unsigned int xvalid, bool hsm_import);
- int ll_setattr(struct dentry *de, struct iattr *attr);
- int ll_statfs(struct dentry *de, struct kstatfs *sfs);
- int ll_statfs_internal(struct super_block *sb, struct obd_statfs *osfs,
-@@ -1330,7 +1331,7 @@ int ll_getparent(struct file *file, struct getparent __user *arg);
+@@ -39,7 +39,6 @@
+ #include <lustre_linkea.h>
  
- /* lcommon_cl.c */
- int cl_setattr_ost(struct cl_object *obj, const struct iattr *attr,
--		   unsigned int attr_flags);
-+		   unsigned int xvalid, unsigned int attr_flags);
+ /* for struct cl_lock_descr and struct cl_io */
+-#include <lustre_patchless_compat.h>
+ #include <lustre_compat.h>
+ #include <cl_object.h>
+ #include <lustre_lmv.h>
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index 344ff4b20168..ee0898cbd9c9 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -40,6 +40,8 @@
  
- extern struct lu_env *cl_inode_fini_env;
- extern u16 cl_inode_fini_refcheck;
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 36066c839160..cd0f2517a3b3 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -1429,7 +1429,8 @@ static int ll_md_setattr(struct dentry *dentry, struct md_op_data *op_data)
-  *
-  * In case of HSMimport, we only set attr on MDS.
+ #define DEBUG_SUBSYSTEM S_LOV
+ 
++#include <linux/uaccess.h>
++
+ #include <uapi/linux/lustre/lustre_idl.h>
+ #include <uapi/linux/lustre/lustre_ioctl.h>
+ 
+diff --git a/drivers/staging/lustre/lustre/lov/lov_pack.c b/drivers/staging/lustre/lustre/lov/lov_pack.c
+index b1060d02a164..98b114b8e93b 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_pack.c
++++ b/drivers/staging/lustre/lustre/lov/lov_pack.c
+@@ -39,6 +39,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LOV
+ 
++#include <linux/uaccess.h>
+ #include <lustre_net.h>
+ #include <lustre_swab.h>
+ #include <obd.h>
+diff --git a/drivers/staging/lustre/lustre/lov/lov_page.c b/drivers/staging/lustre/lustre/lov/lov_page.c
+index cfae1294d77a..f1c99a2a466e 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_page.c
++++ b/drivers/staging/lustre/lustre/lov/lov_page.c
+@@ -38,6 +38,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_LOV
+ 
++#include <linux/highmem.h>
+ #include "lov_cl_internal.h"
+ 
+ /** \addtogroup lov
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index d6c46858941b..81a4c666bb69 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -36,6 +36,7 @@
+ #include <linux/atomic.h>
+ #include <linux/miscdevice.h>
+ #include <linux/libcfs/libcfs.h>
++#include <linux/uaccess.h>
+ 
+ #include <obd_support.h>
+ #include <obd_class.h>
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index bdbe6f52031a..a40ec42637e6 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -37,6 +37,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_CLASS
+ 
++#include <linux/uaccess.h>
+ #include <obd_class.h>
+ #include <lprocfs_status.h>
+ #include <uapi/linux/lustre/lustre_idl.h>
+diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+index ffc1814398a5..cfcd17e679dd 100644
+--- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
++++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
+@@ -37,6 +37,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_CLASS
+ 
++#include <linux/uaccess.h>
+ #include <linux/string.h>
+ 
+ #include <uapi/linux/lustre/lustre_ioctl.h>
+diff --git a/drivers/staging/lustre/lustre/obdecho/echo_client.c b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+index b692e76e7108..484b8d6db6ef 100644
+--- a/drivers/staging/lustre/lustre/obdecho/echo_client.c
++++ b/drivers/staging/lustre/lustre/obdecho/echo_client.c
+@@ -33,6 +33,7 @@
+ 
+ #define DEBUG_SUBSYSTEM S_ECHO
+ 
++#include <linux/highmem.h>
+ #include <obd.h>
+ #include <obd_support.h>
+ #include <obd_class.h>
+diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
+index 6a705bc5420c..64931b97c887 100644
+--- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
++++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
+@@ -32,6 +32,7 @@
   */
--int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
-+int ll_setattr_raw(struct dentry *dentry, struct iattr *attr,
-+		   unsigned int xvalid, bool hsm_import)
- {
- 	struct inode *inode = d_inode(dentry);
- 	struct ll_inode_info *lli = ll_i2info(inode);
-@@ -1470,7 +1471,7 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
- 	/* We mark all of the fields "set" so MDS/OST does not re-set them */
- 	if (attr->ia_valid & ATTR_CTIME) {
- 		attr->ia_ctime = current_time(inode);
--		attr->ia_valid |= ATTR_CTIME_SET;
-+		xvalid |= OP_ATTR_CTIME_SET;
- 	}
- 	if (!(attr->ia_valid & ATTR_ATIME_SET) &&
- 	    (attr->ia_valid & ATTR_ATIME)) {
-@@ -1506,12 +1507,13 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
- 		 * If we are changing file size, file content is
- 		 * modified, flag it.
- 		 */
--		attr->ia_valid |= MDS_OPEN_OWNEROVERRIDE;
-+		xvalid |= OP_ATTR_OWNEROVERRIDE;
- 		op_data->op_bias |= MDS_DATA_MODIFIED;
- 		clear_bit(LLIF_DATA_MODIFIED, &lli->lli_flags);
- 	}
+ #define DEBUG_SUBSYSTEM S_CLASS
  
- 	op_data->op_attr = *attr;
-+	op_data->op_xvalid = xvalid;
++#include <linux/uaccess.h>
+ #include <linux/statfs.h>
+ #include <obd_cksum.h>
+ #include <obd_class.h>
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 61ef6c8d7a12..bcb9b91aa5e0 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -33,6 +33,7 @@
  
- 	rc = ll_md_setattr(dentry, op_data);
- 	if (rc)
-@@ -1532,7 +1534,8 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
- 		 * setting times to past, but it is necessary due to possible
- 		 * time de-synchronization between MDT inode and OST objects
- 		 */
--		rc = cl_setattr_ost(ll_i2info(inode)->lli_clob, attr, 0);
-+		rc = cl_setattr_ost(ll_i2info(inode)->lli_clob,
-+				    attr, xvalid, 0);
- 	}
+ #define DEBUG_SUBSYSTEM S_OSC
  
- 	/*
-@@ -1589,10 +1592,11 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr, bool hsm_import)
- int ll_setattr(struct dentry *de, struct iattr *attr)
- {
- 	int mode = d_inode(de)->i_mode;
-+	unsigned int xvalid = 0;
++#include <linux/highmem.h>
+ #include <linux/libcfs/libcfs_hash.h>
+ #include <linux/sched/mm.h>
  
- 	if ((attr->ia_valid & (ATTR_CTIME | ATTR_SIZE | ATTR_MODE)) ==
- 			      (ATTR_CTIME | ATTR_SIZE | ATTR_MODE))
--		attr->ia_valid |= MDS_OPEN_OWNEROVERRIDE;
-+		xvalid |= OP_ATTR_OWNEROVERRIDE;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+index 0b638837f88b..a61e800cd2b5 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+@@ -32,6 +32,7 @@
+  */
+ #define DEBUG_SUBSYSTEM S_CLASS
  
- 	if (((attr->ia_valid & (ATTR_MODE | ATTR_FORCE | ATTR_SIZE)) ==
- 			       (ATTR_SIZE | ATTR_MODE)) &&
-@@ -1613,7 +1617,7 @@ int ll_setattr(struct dentry *de, struct iattr *attr)
- 	    !(attr->ia_valid & ATTR_KILL_SGID))
- 		attr->ia_valid |= ATTR_KILL_SGID;
++#include <linux/uaccess.h>
+ #include <obd_support.h>
+ #include <obd.h>
+ #include <lprocfs_status.h>
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+index ec3d9af76b17..ead1df71a909 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/sec_plain.c
+@@ -37,6 +37,7 @@
  
--	return ll_setattr_raw(de, attr, false);
-+	return ll_setattr_raw(de, attr, xvalid, false);
- }
+ #define DEBUG_SUBSYSTEM S_SEC
  
- int ll_statfs_internal(struct super_block *sb, struct obd_statfs *osfs,
-@@ -1946,7 +1950,7 @@ int ll_iocontrol(struct inode *inode, struct file *file,
- 			return PTR_ERR(op_data);
- 
- 		op_data->op_attr_flags = flags;
--		op_data->op_attr.ia_valid |= ATTR_ATTR_FLAG;
-+		op_data->op_xvalid |= OP_ATTR_FLAGS;
- 		rc = md_setattr(sbi->ll_md_exp, op_data, NULL, 0, &req);
- 		ll_finish_md_op_data(op_data);
- 		ptlrpc_req_finished(req);
-@@ -1963,8 +1967,7 @@ int ll_iocontrol(struct inode *inode, struct file *file,
- 		if (!attr)
- 			return -ENOMEM;
- 
--		attr->ia_valid = ATTR_ATTR_FLAG;
--		rc = cl_setattr_ost(obj, attr, flags);
-+		rc = cl_setattr_ost(obj, attr, OP_ATTR_FLAGS, flags);
- 		kfree(attr);
- 		return rc;
- 	}
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-index e7a4778e02e4..e65523f7628d 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-+++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-@@ -556,7 +556,7 @@ static int vvp_io_setattr_lock(const struct lu_env *env,
- 		if (new_size == 0)
- 			enqflags = CEF_DISCARD_DATA;
- 	} else {
--		unsigned int valid = io->u.ci_setattr.sa_valid;
-+		unsigned int valid = io->u.ci_setattr.sa_avalid;
- 
- 		if (!(valid & TIMES_SET_FLAGS))
- 			return 0;
-@@ -603,11 +603,11 @@ static int vvp_io_setattr_time(const struct lu_env *env,
- 
- 	cl_object_attr_lock(obj);
- 	attr->cat_ctime = io->u.ci_setattr.sa_attr.lvb_ctime;
--	if (io->u.ci_setattr.sa_valid & ATTR_ATIME_SET) {
-+	if (io->u.ci_setattr.sa_avalid & ATTR_ATIME_SET) {
- 		attr->cat_atime = io->u.ci_setattr.sa_attr.lvb_atime;
- 		valid |= CAT_ATIME;
- 	}
--	if (io->u.ci_setattr.sa_valid & ATTR_MTIME_SET) {
-+	if (io->u.ci_setattr.sa_avalid & ATTR_MTIME_SET) {
- 		attr->cat_mtime = io->u.ci_setattr.sa_attr.lvb_mtime;
- 		valid |= CAT_MTIME;
- 	}
-@@ -632,7 +632,7 @@ static int vvp_io_setattr_start(const struct lu_env *env,
- 		inode_lock(inode);
- 	}
- 
--	if (io->u.ci_setattr.sa_valid & TIMES_SET_FLAGS)
-+	if (io->u.ci_setattr.sa_avalid & TIMES_SET_FLAGS)
- 		return vvp_io_setattr_time(env, ios);
- 
- 	return 0;
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index 65f94e6ecaad..9f427a7c7b03 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -1983,8 +1983,9 @@ static int lmv_setattr(struct obd_export *exp, struct md_op_data *op_data,
- 	struct lmv_obd	  *lmv = &obd->u.lmv;
- 	struct lmv_tgt_desc     *tgt;
- 
--	CDEBUG(D_INODE, "SETATTR for " DFID ", valid 0x%x\n",
--	       PFID(&op_data->op_fid1), op_data->op_attr.ia_valid);
-+	CDEBUG(D_INODE, "SETATTR for " DFID ", valid 0x%x/0x%x\n",
-+	       PFID(&op_data->op_fid1), op_data->op_attr.ia_valid,
-+		op_data->op_xvalid);
- 
- 	op_data->op_flags |= MF_MDC_CANCEL_FID1;
- 	tgt = lmv_find_target(lmv, &op_data->op_fid1);
-diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
-index b823f8a21856..50982848bca4 100644
---- a/drivers/staging/lustre/lustre/lov/lov_io.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_io.c
-@@ -77,7 +77,8 @@ static void lov_io_sub_inherit(struct cl_io *io, struct lov_io *lio,
- 		io->u.ci_setattr.sa_attr = parent->u.ci_setattr.sa_attr;
- 		io->u.ci_setattr.sa_attr_flags =
- 					parent->u.ci_setattr.sa_attr_flags;
--		io->u.ci_setattr.sa_valid = parent->u.ci_setattr.sa_valid;
-+		io->u.ci_setattr.sa_avalid = parent->u.ci_setattr.sa_avalid;
-+		io->u.ci_setattr.sa_xvalid = parent->u.ci_setattr.sa_xvalid;
- 		io->u.ci_setattr.sa_stripe_index = stripe;
- 		io->u.ci_setattr.sa_parent_fid =
- 					parent->u.ci_setattr.sa_parent_fid;
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_lib.c b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-index d582968987ff..ad7c13be5e3c 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_lib.c
-@@ -234,7 +234,7 @@ void mdc_open_pack(struct ptlrpc_request *req, struct md_op_data *op_data,
- 	set_mrc_cr_flags(rec, cr_flags);
- }
- 
--static inline __u64 attr_pack(unsigned int ia_valid)
-+static inline __u64 attr_pack(unsigned int ia_valid, unsigned int ia_xvalid)
- {
- 	__u64 sa_valid = 0;
- 
-@@ -258,19 +258,19 @@ static inline __u64 attr_pack(unsigned int ia_valid)
- 		sa_valid |= MDS_ATTR_MTIME_SET;
- 	if (ia_valid & ATTR_FORCE)
- 		sa_valid |= MDS_ATTR_FORCE;
--	if (ia_valid & ATTR_ATTR_FLAG)
-+	if (ia_xvalid & OP_ATTR_FLAGS)
- 		sa_valid |= MDS_ATTR_ATTR_FLAG;
- 	if (ia_valid & ATTR_KILL_SUID)
- 		sa_valid |=  MDS_ATTR_KILL_SUID;
- 	if (ia_valid & ATTR_KILL_SGID)
- 		sa_valid |= MDS_ATTR_KILL_SGID;
--	if (ia_valid & ATTR_CTIME_SET)
-+	if (ia_xvalid & OP_ATTR_CTIME_SET)
- 		sa_valid |= MDS_ATTR_CTIME_SET;
- 	if (ia_valid & ATTR_OPEN)
- 		sa_valid |= MDS_ATTR_FROM_OPEN;
--	if (ia_valid & ATTR_BLOCKS)
-+	if (ia_xvalid & OP_ATTR_BLOCKS)
- 		sa_valid |= MDS_ATTR_BLOCKS;
--	if (ia_valid & MDS_OPEN_OWNEROVERRIDE)
-+	if (ia_xvalid & OP_ATTR_OWNEROVERRIDE)
- 		/* NFSD hack (see bug 5781) */
- 		sa_valid |= MDS_OPEN_OWNEROVERRIDE;
- 	return sa_valid;
-@@ -286,7 +286,8 @@ static void mdc_setattr_pack_rec(struct mdt_rec_setattr *rec,
- 	rec->sa_suppgid = -1;
- 
- 	rec->sa_fid    = op_data->op_fid1;
--	rec->sa_valid  = attr_pack(op_data->op_attr.ia_valid);
-+	rec->sa_valid  = attr_pack(op_data->op_attr.ia_valid,
-+				   op_data->op_xvalid);
- 	rec->sa_mode   = op_data->op_attr.ia_mode;
- 	rec->sa_uid    = from_kuid(&init_user_ns, op_data->op_attr.ia_uid);
- 	rec->sa_gid    = from_kgid(&init_user_ns, op_data->op_attr.ia_gid);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
-index 67734a8ed331..955525f69958 100644
---- a/drivers/staging/lustre/lustre/osc/osc_io.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_io.c
-@@ -499,7 +499,8 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 	struct obdo *oa = &oio->oi_oa;
- 	struct osc_async_cbargs *cbargs = &oio->oi_cbarg;
- 	__u64 size = io->u.ci_setattr.sa_attr.lvb_size;
--	unsigned int ia_valid = io->u.ci_setattr.sa_valid;
-+	unsigned int ia_avalid = io->u.ci_setattr.sa_avalid;
-+	unsigned int ia_xvalid = io->u.ci_setattr.sa_xvalid;
- 	int result = 0;
- 
- 	/* truncate cache dirty pages first */
-@@ -514,20 +515,20 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 			struct ost_lvb *lvb = &io->u.ci_setattr.sa_attr;
- 			unsigned int cl_valid = 0;
- 
--			if (ia_valid & ATTR_SIZE) {
-+			if (ia_avalid & ATTR_SIZE) {
- 				attr->cat_size = size;
- 				attr->cat_kms = size;
- 				cl_valid = CAT_SIZE | CAT_KMS;
- 			}
--			if (ia_valid & ATTR_MTIME_SET) {
-+			if (ia_avalid & ATTR_MTIME_SET) {
- 				attr->cat_mtime = lvb->lvb_mtime;
- 				cl_valid |= CAT_MTIME;
- 			}
--			if (ia_valid & ATTR_ATIME_SET) {
-+			if (ia_avalid & ATTR_ATIME_SET) {
- 				attr->cat_atime = lvb->lvb_atime;
- 				cl_valid |= CAT_ATIME;
- 			}
--			if (ia_valid & ATTR_CTIME_SET) {
-+			if (ia_xvalid & OP_ATTR_CTIME_SET) {
- 				attr->cat_ctime = lvb->lvb_ctime;
- 				cl_valid |= CAT_CTIME;
- 			}
-@@ -542,19 +543,19 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 		obdo_set_parent_fid(oa, io->u.ci_setattr.sa_parent_fid);
- 		oa->o_stripe_idx = io->u.ci_setattr.sa_stripe_index;
- 		oa->o_valid |= OBD_MD_FLID | OBD_MD_FLGROUP;
--		if (ia_valid & ATTR_CTIME) {
-+		if (ia_avalid & ATTR_CTIME) {
- 			oa->o_valid |= OBD_MD_FLCTIME;
- 			oa->o_ctime = attr->cat_ctime;
- 		}
--		if (ia_valid & ATTR_ATIME) {
-+		if (ia_avalid & ATTR_ATIME) {
- 			oa->o_valid |= OBD_MD_FLATIME;
- 			oa->o_atime = attr->cat_atime;
- 		}
--		if (ia_valid & ATTR_MTIME) {
-+		if (ia_avalid & ATTR_MTIME) {
- 			oa->o_valid |= OBD_MD_FLMTIME;
- 			oa->o_mtime = attr->cat_mtime;
- 		}
--		if (ia_valid & ATTR_SIZE) {
-+		if (ia_avalid & ATTR_SIZE) {
- 			oa->o_size = size;
- 			oa->o_blocks = OBD_OBJECT_EOF;
- 			oa->o_valid |= OBD_MD_FLSIZE | OBD_MD_FLBLOCKS;
-@@ -566,14 +567,14 @@ static int osc_io_setattr_start(const struct lu_env *env,
- 		} else {
- 			LASSERT(oio->oi_lockless == 0);
- 		}
--		if (ia_valid & ATTR_ATTR_FLAG) {
-+		if (ia_xvalid & OP_ATTR_FLAGS) {
- 			oa->o_flags = io->u.ci_setattr.sa_attr_flags;
- 			oa->o_valid |= OBD_MD_FLFLAGS;
- 		}
- 
- 		init_completion(&cbargs->opc_sync);
- 
--		if (ia_valid & ATTR_SIZE)
-+		if (ia_avalid & ATTR_SIZE)
- 			result = osc_punch_base(osc_export(cl2osc(obj)),
- 						oa, osc_async_upcall,
- 						cbargs, PTLRPCD_SET);
++#include <linux/highmem.h>
+ #include <obd_support.h>
+ #include <obd_cksum.h>
+ #include <obd_class.h>
