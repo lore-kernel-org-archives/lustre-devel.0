@@ -1,181 +1,77 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 15 Jun 2018 17:11:30 +1000
-Subject: [lustre-devel] [PATCH 18/24] lustre/lnet: move tracefile locking
- from linux-tracefile.c to tracefile.c
+Subject: [lustre-devel] [PATCH 19/24] lustre: open code
+ cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
 In-Reply-To: <152904663333.10587.10934053155404014785.stgit@noble>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
-Message-ID: <152904669072.10587.15169492766245566638.stgit@noble>
+Message-ID: <152904669076.10587.12692774514244094201.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-There is no value in keeping it separate.
+This function in used twice.
+In libcfs_debug_init() the usage is pointless as
+the only place that set libcfs_debug_mb ensures
+that it does not exceed the maximum.  So checking
+again can never help.
+
+So open-code the small function into the only
+other place that it is used - in cfs_trace_set_debug_mb(),
+which is used to set libcfs_debug_mb.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/lnet/libcfs/linux-tracefile.c   |   22 ------------------
- drivers/staging/lustre/lnet/libcfs/tracefile.c     |   25 ++++++++++----------
- drivers/staging/lustre/lnet/libcfs/tracefile.h     |    5 ----
- 3 files changed, 13 insertions(+), 39 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/debug.c         |    6 +++---
+ .../staging/lustre/lnet/libcfs/linux-tracefile.c   |    7 -------
+ drivers/staging/lustre/lnet/libcfs/tracefile.c     |    3 ++-
+ 3 files changed, 5 insertions(+), 11 deletions(-)
 
+diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
+index 06f694f6a28f..71effcf3ebe9 100644
+--- a/drivers/staging/lustre/lnet/libcfs/debug.c
++++ b/drivers/staging/lustre/lnet/libcfs/debug.c
+@@ -411,10 +411,10 @@ int libcfs_debug_init(unsigned long bufsize)
+ 			sizeof(libcfs_debug_file_path_arr));
+ 	}
+ 
+-	/* If libcfs_debug_mb is set to an invalid value or uninitialized
+-	 * then just make the total buffers smp_num_cpus * TCD_MAX_PAGES
++	/* If libcfs_debug_mb is uninitialized then just make the
++	 * total buffers smp_num_cpus * TCD_MAX_PAGES
+ 	 */
+-	if (max > cfs_trace_max_debug_mb() || max < num_possible_cpus()) {
++	if (max < num_possible_cpus()) {
+ 		max = TCD_MAX_PAGES;
+ 	} else {
+ 		max = max / num_possible_cpus();
 diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-index 347138409eba..9e72220299af 100644
+index 9e72220299af..64a5bc1e2db8 100644
 --- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
 +++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-@@ -47,8 +47,6 @@ static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
- 
- char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
- 
--static DECLARE_RWSEM(cfs_tracefile_sem);
--
- int cfs_tracefile_init_arch(void)
- {
- 	int i;
-@@ -109,26 +107,6 @@ void cfs_tracefile_fini_arch(void)
+@@ -227,10 +227,3 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
+ 			hdr->ph_line_num, fn, len, buf);
  	}
  }
- 
--void cfs_tracefile_read_lock(void)
--{
--	down_read(&cfs_tracefile_sem);
--}
 -
--void cfs_tracefile_read_unlock(void)
+-int cfs_trace_max_debug_mb(void)
 -{
--	up_read(&cfs_tracefile_sem);
--}
+-	int  total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
 -
--void cfs_tracefile_write_lock(void)
--{
--	down_write(&cfs_tracefile_sem);
+-	return max(512, (total_mb * 80) / 100);
 -}
--
--void cfs_tracefile_write_unlock(void)
--{
--	up_write(&cfs_tracefile_sem);
--}
--
- enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
- {
- 	if (in_irq())
 diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index 7ca562e156f0..5f319332f60b 100644
+index 5f319332f60b..72321ce4c394 100644
 --- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
 +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -59,6 +59,7 @@ static DEFINE_MUTEX(cfs_trace_thread_mutex);
- static int thread_running;
- 
- static atomic_t cfs_tage_allocated = ATOMIC_INIT(0);
-+static DECLARE_RWSEM(cfs_tracefile_sem);
- 
- struct page_collection {
- 	struct list_head	pc_pages;
-@@ -711,7 +712,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
- 	mm_segment_t __oldfs;
- 	int rc;
- 
--	cfs_tracefile_write_lock();
-+	down_write(&cfs_tracefile_sem);
- 
- 	filp = filp_open(filename, O_CREAT | O_EXCL | O_WRONLY | O_LARGEFILE,
- 			 0600);
-@@ -759,7 +760,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
- close:
- 	filp_close(filp, NULL);
- out:
--	cfs_tracefile_write_unlock();
-+	up_write(&cfs_tracefile_sem);
- 	return rc;
- }
- 
-@@ -873,12 +874,12 @@ int cfs_trace_daemon_command(char *str)
- {
- 	int rc = 0;
- 
--	cfs_tracefile_write_lock();
-+	down_write(&cfs_tracefile_sem);
- 
- 	if (!strcmp(str, "stop")) {
--		cfs_tracefile_write_unlock();
-+		up_write(&cfs_tracefile_sem);
- 		cfs_trace_stop_thread();
--		cfs_tracefile_write_lock();
-+		down_write(&cfs_tracefile_sem);
- 		memset(cfs_tracefile, 0, sizeof(cfs_tracefile));
- 
- 	} else if (!strncmp(str, "size=", 5)) {
-@@ -905,7 +906,7 @@ int cfs_trace_daemon_command(char *str)
- 		cfs_trace_start_thread();
- 	}
- 
--	cfs_tracefile_write_unlock();
-+	up_write(&cfs_tracefile_sem);
- 	return rc;
- }
- 
-@@ -950,12 +951,12 @@ int cfs_trace_set_debug_mb(int mb)
- 	mb /= num_possible_cpus();
- 	pages = mb << (20 - PAGE_SHIFT);
- 
--	cfs_tracefile_write_lock();
-+	down_write(&cfs_tracefile_sem);
- 
- 	cfs_tcd_for_each(tcd, i, j)
- 		tcd->tcd_max_pages = (pages * tcd->tcd_pages_factor) / 100;
- 
--	cfs_tracefile_write_unlock();
-+	up_write(&cfs_tracefile_sem);
- 
- 	return 0;
- }
-@@ -967,12 +968,12 @@ int cfs_trace_get_debug_mb(void)
+@@ -933,7 +933,8 @@ int cfs_trace_set_debug_mb(int mb)
+ 	int i;
+ 	int j;
+ 	int pages;
+-	int limit = cfs_trace_max_debug_mb();
++	int total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
++	int limit = max(512, (total_mb * 80) / 100);
  	struct cfs_trace_cpu_data *tcd;
- 	int total_pages = 0;
  
--	cfs_tracefile_read_lock();
-+	down_read(&cfs_tracefile_sem);
- 
- 	cfs_tcd_for_each(tcd, i, j)
- 		total_pages += tcd->tcd_max_pages;
- 
--	cfs_tracefile_read_unlock();
-+	up_read(&cfs_tracefile_sem);
- 
- 	return (total_pages >> (20 - PAGE_SHIFT)) + 1;
- }
-@@ -1002,7 +1003,7 @@ static int tracefiled(void *arg)
- 			goto end_loop;
- 
- 		filp = NULL;
--		cfs_tracefile_read_lock();
-+		down_read(&cfs_tracefile_sem);
- 		if (cfs_tracefile[0]) {
- 			filp = filp_open(cfs_tracefile,
- 					 O_CREAT | O_RDWR | O_LARGEFILE,
-@@ -1014,7 +1015,7 @@ static int tracefiled(void *arg)
- 					rc);
- 			}
- 		}
--		cfs_tracefile_read_unlock();
-+		up_read(&cfs_tracefile_sem);
- 		if (!filp) {
- 			put_pages_on_daemon_list(&pc);
- 			__LASSERT(list_empty(&pc.pc_pages));
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-index 0608240d897f..9f6b73d3b6fd 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-@@ -65,11 +65,6 @@ void libcfs_run_debug_log_upcall(char *file);
- int  cfs_tracefile_init_arch(void);
- void cfs_tracefile_fini_arch(void);
- 
--void cfs_tracefile_read_lock(void);
--void cfs_tracefile_read_unlock(void);
--void cfs_tracefile_write_lock(void);
--void cfs_tracefile_write_unlock(void);
--
- int cfs_tracefile_dump_all_pages(char *filename);
- void cfs_trace_debug_print(void);
- void cfs_trace_flush_pages(void);
+ 	if (mb < num_possible_cpus()) {
