@@ -1,119 +1,79 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 15 Jun 2018 17:11:30 +1000
-Subject: [lustre-devel] [PATCH 05/24] kbuild: Add documentation for modobj-m
+Subject: [lustre-devel] [PATCH 06/24] lustre: build ldlm in the ldlm
+ directory.
 In-Reply-To: <152904663333.10587.10934053155404014785.stgit@noble>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
-Message-ID: <152904669023.10587.4124629758082370663.stgit@noble>
+Message-ID: <152904669026.10587.12104937101821160060.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Add documentation for building modules
-from multiple directories using modobj-m.
+ldlm code is currently build from the ptlrpc directory,
+with files listed in the Makefile of that directory.
+This is because both need to be in the same module.
+This make partial builds such as
+  make drivers/staging/lustre/lustre/ldlm/
+
+ineffective.
+kbuild recently gained the ability to build modules
+from multiple directories.  Use that ability to
+allow ldlm code to be built in the correct directory.
+
+Note that we need to set KBUILD_MODNAME for ldlm to
+build correctly.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- Documentation/kbuild/makefiles.txt |   65 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 61 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lustre/ldlm/Makefile   |   11 +++++++++++
+ drivers/staging/lustre/lustre/ptlrpc/Makefile |   12 +++---------
+ 2 files changed, 14 insertions(+), 9 deletions(-)
+ create mode 100644 drivers/staging/lustre/lustre/ldlm/Makefile
 
-diff --git a/Documentation/kbuild/makefiles.txt b/Documentation/kbuild/makefiles.txt
-index 048fc39a6b91..985a60cf0663 100644
---- a/Documentation/kbuild/makefiles.txt
-+++ b/Documentation/kbuild/makefiles.txt
-@@ -225,17 +225,74 @@ more details, with real examples.
- 	part of the composite object ext2.o if $(CONFIG_EXT2_FS_XATTR)
- 	evaluates to 'y'.
+diff --git a/drivers/staging/lustre/lustre/ldlm/Makefile b/drivers/staging/lustre/lustre/ldlm/Makefile
+new file mode 100644
+index 000000000000..413943230572
+--- /dev/null
++++ b/drivers/staging/lustre/lustre/ldlm/Makefile
+@@ -0,0 +1,11 @@
++# SPDX-License-Identifier: GPL-2.0
++ccflags-y += -I$(srctree)/drivers/staging/lustre/include
++ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
++ccflags-y += -DKBUILD_MODNAME='"ptlrpc"'
++
++modobj-$(CONFIG_LUSTRE_FS) += l_lock.o ldlm_lock.o
++modobj-$(CONFIG_LUSTRE_FS) += ldlm_resource.o ldlm_lib.o
++modobj-$(CONFIG_LUSTRE_FS) += ldlm_plain.o ldlm_extent.o
++modobj-$(CONFIG_LUSTRE_FS) += ldlm_request.o ldlm_lockd.o
++modobj-$(CONFIG_LUSTRE_FS) += ldlm_flock.o ldlm_inodebits.o
++modobj-$(CONFIG_LUSTRE_FS) += ldlm_pool.o
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/Makefile b/drivers/staging/lustre/lustre/ptlrpc/Makefile
+index e0a482712d8e..9c27b850c52d 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/Makefile
++++ b/drivers/staging/lustre/lustre/ptlrpc/Makefile
+@@ -3,20 +3,14 @@ ccflags-y += -I$(srctree)/drivers/staging/lustre/include
+ ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
  
-+	If you wish to include code in some other directory into a
-+	module, that directory should be configured to create a
-+	mod.a target from the relevant code, as described below.
-+	The list of components for the module (e.g. foo-y) should
-+	then contain the name of the directory (with trailing /).
-+	The mod.a from that directory will be built and included
-+	into this module.
-+
- 	Note: Of course, when you are building objects into the kernel,
- 	the syntax above will also work. So, if you have CONFIG_EXT2_FS=y,
- 	kbuild will build an ext2.o file for you out of the individual
- 	parts and then link this into built-in.a, as you would expect.
+ obj-$(CONFIG_LUSTRE_FS) += ptlrpc.o
+-LDLM := ../../lustre/ldlm/
  
----- 3.4 Objects which export symbols
-+--- 3.4 Loadable modules from multiple directories - modobj-m
-+
-+	One way to build modules with source from multiple directories
-+	is to list relative path names of all source files in a
-+	single Makefile.
-+
-+	Example:
-+		btrfs-$(CONFIG_BTRFS_FS_RUN_SANITY_TESTS) += tests/free-space-tests.o \
-+		        tests/extent-buffer-tests.o tests/btrfs-tests.o \
-+		....
-+
-+	This works, but defeats the ability to build individual
-+	directories, or individual target files such as assembly
-+	language targets.
-+
-+	Example:
-+		make btrfs/tests/free-space-tests.s
-+
-+	A more general way is to create a mod.a file using modobj-m
-+
-+	Example:
-+		modobj-$(CONFIG_LUSTRE_FS) += fid_request.o fid_lib.o lproc_fid.o
-+
-+	modobj-y is treated identically to obj-y so if CONFIG_LUSTRE_FS=y
-+	then these objects are built in to the kernel.  If
-+	CONFIG_LUSTRE_FS=m then these objects are gathered into an archive
-+	called mod.a.  Archives from other directories can be included
-+	by listing the directories in modobj-m, so
-+
-+	Example:
-+		modobj-$(CONFIG_LUSTRE_FS) += fid/ fld/
-+
-+	This will create a mod.a in the same directory as the
-+	Makefile, combining the contents of mod.a from the listed
-+	directories.  The mod.a can instead be included into a module
-+	by listing the directory with any other local object files.
-+
-+	Example:
-+		obj-$(CONFIG_LUSTRE_FS) += lustre.o
-+		lustre-y := module.o
-+		lustre-y += obdclass/ ldlm/ ptlrpc/ fld/ osc/ mgc/
-+
-+	When CONFIG_LUSTRE_FS=m, kbuild will build lustre.ko from module.o and
-+	the mod.a archives created in the listed directories.
-+
-+	When components of a module are built in a different directory
-+	kbuild cannot determine the name of the module so the
-+	KBUILD_MODNAME macro is left undefined.
-+
-+--- 3.5 Objects which export symbols
+-ldlm_objs := $(LDLM)l_lock.o $(LDLM)ldlm_lock.o
+-ldlm_objs += $(LDLM)ldlm_resource.o $(LDLM)ldlm_lib.o
+-ldlm_objs += $(LDLM)ldlm_plain.o $(LDLM)ldlm_extent.o
+-ldlm_objs += $(LDLM)ldlm_request.o $(LDLM)ldlm_lockd.o
+-ldlm_objs += $(LDLM)ldlm_flock.o $(LDLM)ldlm_inodebits.o
+-ldlm_objs += $(LDLM)ldlm_pool.o
+-ptlrpc_objs := client.o recover.o connection.o niobuf.o pack_generic.o
++ptlrpc_objs += ../ldlm/
++ptlrpc_objs += client.o recover.o connection.o niobuf.o pack_generic.o
+ ptlrpc_objs += events.o ptlrpc_module.o service.o pinger.o
+ ptlrpc_objs += llog_net.o llog_client.o import.o ptlrpcd.o
+ ptlrpc_objs += pers.o lproc_ptlrpc.o wiretest.o layout.o
+ ptlrpc_objs += sec.o sec_bulk.o sec_gc.o sec_config.o
+ ptlrpc_objs += sec_null.o sec_plain.o nrs.o nrs_fifo.o
  
- 	No special notation is required in the makefiles for
- 	modules exporting symbols.
- 
----- 3.5 Library file goals - lib-y
-+--- 3.6 Library file goals - lib-y
- 
- 	Objects listed with obj-* are used for modules, or
- 	combined in a built-in.a for that specific directory.
-@@ -263,7 +320,7 @@ more details, with real examples.
- 
- 	Use of lib-y is normally restricted to lib/ and arch/*/lib.
- 
----- 3.6 Descending down in directories
-+--- 3.7 Descending down in directories
- 
- 	A Makefile is only responsible for building objects in its own
- 	directory. Files in subdirectories should be taken care of by
-@@ -290,7 +347,7 @@ more details, with real examples.
- 	names. This allows kbuild to totally skip the directory if the
- 	corresponding CONFIG_ option is neither 'y' nor 'm'.
- 
----- 3.7 Compilation flags
-+--- 3.8 Compilation flags
- 
-     ccflags-y, asflags-y and ldflags-y
- 	These three flags apply only to the kbuild makefile in which they
+-ptlrpc-y := $(ldlm_objs) $(ptlrpc_objs) sec_lproc.o
++ptlrpc-y := $(ptlrpc_objs) sec_lproc.o
+ ptlrpc-$(CONFIG_LUSTRE_TRANSLATE_ERRNOS) += errno.o
