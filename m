@@ -1,48 +1,82 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 16 Jun 2018 15:33:59 +0100 (BST)
-Subject: [lustre-devel] testing lustre-testing
-Message-ID: <alpine.LFD.2.21.1806161533400.8039@casper.infradead.org>
+From: NeilBrown <neilb@suse.com>
+Date: Sun, 17 Jun 2018 08:49:40 +1000
+Subject: [lustre-devel] [PATCH 01/11] staging: lustre: simplify use of
+ interval-tree.
+In-Reply-To: <alpine.LFD.2.21.1806160344210.6450@casper.infradead.org>
+References: <152826510267.16761.14361003167157833896.stgit@noble>
+ <152826511890.16761.16115276596203531205.stgit@noble>
+ <alpine.LFD.2.21.1806160344210.6450@casper.infradead.org>
+Message-ID: <87sh5mfit7.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: lustre-devel@lists.lustre.org
+To: James Simmons <jsimmons@infradead.org>
+Cc: Oleg Drokin <green@linuxhacker.ru>, Andreas Dilger <andreas.dilger@whamcloud.io>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
 
+On Sat, Jun 16 2018, James Simmons wrote:
 
-I tried your latest tree and it crash at start up with:
+>> Lustre has a private interval-tree implementation.  This
+>> implementation (inexplicably) refuses to insert an interval if an
+>> identical interval already exists.  It is OK with all sorts of
+>> overlapping intervals, but identical intervals are rejected.
+>
+> I talked to Oleg about this since this changes the behavior. He is worried
+> about having identical items that would end up being merged.  If we can 
+> guarantee by some other means there are no identical nodes, we are 
+> probably fine with the interval tree code allowing this. Oleg can explain 
+> better than me in this case.
 
-2018-06-16 10:16:01 [  150.547229] RIP: 
-0010:deactivate_slab.isra.69+0x170/0x650
-2018-06-16 10:16:01 [  150.553650] RSP: 0018:ffffc90000053a88 EFLAGS: 
-00010082
-2018-06-16 10:16:01 [  150.559871] RAX: 845da87dd009dac1 RBX: 
-ffff8808535c0700 RCX: 000000018040002d
-2018-06-16 10:16:01 [  150.567988] RDX: 000000018040002e RSI: 
-0000000000000000 RDI: 0000000000000000
-2018-06-16 10:16:01 [  150.576071] RBP: ffffc90000053b88 R08: 
-ffff88085fc24050 R09: ffff88085f8000c0
-2018-06-16 10:16:01 [  150.584131] R10: 0000000000000001 R11: 
-0000000000000007 R12: ffffea00214d7000
-2018-06-16 10:16:01 [  150.592163] R13: ffff88085f803800 R14: 
-845da87dd009dac1 R15: 00000000014080c0
-2018-06-16 10:16:01 [  150.600176]  ? deactivate_slab.isra.69+0x595/0x650
-2018-06-16 10:16:01 [  150.605831]  ? deactivate_slab.isra.69+0x595/0x650
-2018-06-16 10:16:01 [  150.611464]  ? get_page_from_freelist+0x335/0x1410
-2018-06-16 10:16:01 [  150.617091]  ? deactivate_slab.isra.69+0x595/0x650
-2018-06-16 10:16:01 [  150.622711]  ___slab_alloc+0x70/0x580
-2018-06-16 10:16:01 [  150.627187]  ? __get_vm_area_node+0x7a/0x160
-2018-06-16 10:16:01 [  150.632275]  ? ___slab_alloc+0x70/0x580
-2018-06-16 10:16:01 [  150.636928]  ? _cond_resched+0x15/0x30
-2018-06-16 10:16:01 [  150.641486]  ? 
-kmem_cache_alloc_node_trace+0x1ab/0x1f0
-2018-06-16 10:16:01 [  150.647439]  ? alloc_vmap_area+0x81/0x370
-2018-06-16 10:16:01 [  150.652248]  __slab_alloc+0xe/0x12
-2018-06-16 10:16:01 [  150.656428]  kmem_cache_alloc_node_trace+0xca/0x1f0
+I don't think this is a change in behaviour.
+In the driver/staging client code, interval tree is being used in two
+places and both of them have clumsy work-arounds for the fact that they
+cannot insert duplicates in the interval tree.
+The patch just cleans his up.
 
-Not the easiest to track down to why its crashing. Also based on other 
-patches in flight it looks like their are questions about that changes.
+However if I have missed something, please provide details.
+What "identical items" might get merged?
 
-For me should I not based my patches on lustre-testing and test it their 
-so it is stable. Would you do testing of the lustre branch in that case
-or do I need to make sure my patches apply to your tree? Note some patches
-I have will collide with what you are doing.
+>  
+>> Both users of interval-tree in lustre would be simpler if this was not
+>> the case.  They need to store all intervals, even if some are
+>> identical.
+>> 
+>> llite/range_lock.c add a rl_next_lock list_head to each lock.
+>> If it cannot insert a new lock because the range is in use, it
+>> attached the new lock to the existing lock using rl_next_lock.
+>> This requires extra code to iterate over the rl_next_lock lists when
+>> iterating over locks, and to update the list when deleting a lock from
+>> the tree.
+>> 
+>> ldlm_extend allocates a separate ldlm_interval which as a list of
+>> ldlm_locks which share the same interval.  This is linked together
+>> by over-loading the l_sl_policy which, for non-extent locks, is used
+>> for linking together locks with the same policy.
+>> This doesn't only require extra code, but also an extra memory
+>> allocation.
+>> 
+>> This patch removes all that complexity.
+>> - interval_insert() now never fails.
+>
+> Its not really a failure. What it does is if it finds a already existing
+> node with the range requested it returns the already existing node 
+> pointer. If not it just creates a new node and returns NULL. Sometimes
+> identical request can happen. A good example of this is with HSM request
+> on the MDS server. In that case sometimes we get identical progress
+> reports which we want to filter out so not add the same data.
+
+This example is server-side code which is not a focus at present.
+Having a quick look, it looks like it would be easy enough to do a
+lookup first and then only insert if the lookup failed.
+I think this is a much nicer approach than never allowing duplicates in
+the interval tree.
+
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180617/87d764cd/attachment.sig>
