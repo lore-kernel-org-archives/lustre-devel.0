@@ -1,47 +1,141 @@
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Thu, 14 Jun 2018 16:43:16 +0530
-Subject: [lustre-devel] [PATCH v3] staging: lustre: Change return type
- to vm_fault_t
-In-Reply-To: <87lgbhhlme.fsf@notabene.neil.brown.name>
-References: <20180521180937.GA19605@jordon-HP-15-Notebook-PC>
- <CAFqt6zamp=+adkyM+_4z405hN-9qOn1CsY_BgVtCrAfscBHhWg@mail.gmail.com>
- <20180611205058.GA30123@kroah.com>
- <CAFqt6zZJcN4=FDQSqiSznoEogavV9GBpqxx-onWG5Q3wQEM9cQ@mail.gmail.com>
- <87lgbhhlme.fsf@notabene.neil.brown.name>
-Message-ID: <CAFqt6zYn2FjX2Sy5CFmMqvwPxys=SamMy+7=14dVNCR0Kt6R7w@mail.gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Sat, 16 Jun 2018 01:17:37 +0100 (BST)
+Subject: [lustre-devel] [PATCH 08/24] lustre: use truncate_inode_page in
+ place of truncate_complete_page
+In-Reply-To: <152904669032.10587.11474850109829193046.stgit@noble>
+References: <152904663333.10587.10934053155404014785.stgit@noble>
+ <152904669032.10587.11474850109829193046.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1806160115430.15679@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, Jun 14, 2018 at 12:59 PM, NeilBrown <neilb@suse.com> wrote:
-> On Tue, Jun 12 2018, Souptick Joarder wrote:
->
->> On 12-Jun-2018 2:21 AM, "Greg KH" <gregkh@linuxfoundation.org> wrote:
->>>
->>> On Tue, Jun 12, 2018 at 02:00:47AM +0530, Souptick Joarder wrote:
->>> > On Mon, May 21, 2018 at 11:39 PM, Souptick Joarder <jrdr.linux@gmail.com>
->>> >
->>> > If no further comment, we would like to get this patch in 4.18-rc-X.
->>>
->>> Why?  Is it a regression fix?  That's all that is allowed after -rc1.
->>
->> No, this is not regression fix. We need to get this into 4.18-rc-1.  But
->> mostly it can't make into linus tree in rc-1 :)
->>>
->>> And have you tried applying it to Linus's current tree?  :)
->>
->> Last tested on 4.17-rc-6 and it worked fine. Let me verify in current tree.
->>
->
-> As you have undoubtedly noticed, lustre is no longer in Linus' tree.
-> I'm experimenting with maintaining a branch which retains the code
-> (lustre/* in github.com/neilbrown/linux) so we can get it ready for
-> merging properly.
-> I've added you patch to my tree.
 
-You need to add this patch in your tree as well.
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?h=next-20180614&id=1c8f422059ae5da07db7406ab916203f9417e396
+> Carrying a local truncate_complete_page() is not good
+> for maintainability.  Linux now used truncate_inode_page,
+> so use that instead.
+> For correct use, we need to pass the mapping to mdc_release_page()
+> rather than trusting page->mapping.
 
-This patch appears to be missing in your github branch.
+Nak: truncate_inode_page is not exported so it fails to build when lustre
+is configured as a module.
+ 
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  .../lustre/include/lustre_patchless_compat.h       |   16 ----------------
+>  drivers/staging/lustre/lustre/llite/dir.c          |    3 +--
+>  .../staging/lustre/lustre/llite/llite_internal.h   |    4 ++--
+>  drivers/staging/lustre/lustre/mdc/mdc_request.c    |   12 ++++++------
+>  4 files changed, 9 insertions(+), 26 deletions(-)
+> 
+> diff --git a/drivers/staging/lustre/lustre/include/lustre_patchless_compat.h b/drivers/staging/lustre/lustre/include/lustre_patchless_compat.h
+> index 298476ea7557..dca1e3dbd183 100644
+> --- a/drivers/staging/lustre/lustre/include/lustre_patchless_compat.h
+> +++ b/drivers/staging/lustre/lustre/include/lustre_patchless_compat.h
+> @@ -41,22 +41,6 @@
+>  #include <linux/hash.h>
+>  #include <linux/pagemap.h>
+>  
+> -#define ll_delete_from_page_cache(page) delete_from_page_cache(page)
+> -
+> -static inline void
+> -truncate_complete_page(struct address_space *mapping, struct page *page)
+> -{
+> -	if (page->mapping != mapping)
+> -		return;
+> -
+> -	if (PagePrivate(page))
+> -		page->mapping->a_ops->invalidatepage(page, 0, PAGE_SIZE);
+> -
+> -	cancel_dirty_page(page);
+> -	ClearPageMappedToDisk(page);
+> -	ll_delete_from_page_cache(page);
+> -}
+> -
+>  #ifndef ATTR_CTIME_SET
+>  /*
+>   * set ATTR_CTIME_SET to a high value to avoid any risk of collision with other
+> diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+> index 688dddf3ca47..cc5869cf9f93 100644
+> --- a/drivers/staging/lustre/lustre/llite/dir.c
+> +++ b/drivers/staging/lustre/lustre/llite/dir.c
+> @@ -167,8 +167,7 @@ void ll_release_page(struct inode *inode, struct page *page, bool remove)
+>  
+>  	if (remove) {
+>  		lock_page(page);
+> -		if (likely(page->mapping))
+> -			truncate_complete_page(page->mapping, page);
+> +		truncate_inode_page(inode->i_mapping, page);
+>  		unlock_page(page);
+>  	}
+>  	put_page(page);
+> diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+> index c08a6e14b6d7..28cff58690d6 100644
+> --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
+> +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+> @@ -938,11 +938,11 @@ static inline void ll_invalidate_page(struct page *vmpage)
+>  		return;
+>  
+>  	/*
+> -	 * truncate_complete_page() calls
+> +	 * truncate_inode_page() calls
+>  	 * a_ops->invalidatepage()->cl_page_delete()->vvp_page_delete().
+>  	 */
+>  	ll_teardown_mmaps(mapping, offset, offset + PAGE_SIZE);
+> -	truncate_complete_page(mapping, vmpage);
+> +	truncate_inode_page(mapping, vmpage);
+>  }
+>  
+>  #define    ll_s2sbi(sb)	(s2lsi(sb)->lsi_llsbi)
+> diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> index cff31cb0a9ac..856e6a376852 100644
+> --- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> +++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+> @@ -922,12 +922,12 @@ static int mdc_getpage(struct obd_export *exp, const struct lu_fid *fid,
+>  	return 0;
+>  }
+>  
+> -static void mdc_release_page(struct page *page, int remove)
+> +static void mdc_release_page(struct address_space *mapping,
+> +			     struct page *page, int remove)
+>  {
+>  	if (remove) {
+>  		lock_page(page);
+> -		if (likely(page->mapping))
+> -			truncate_complete_page(page->mapping, page);
+> +		truncate_inode_page(mapping, page);
+>  		unlock_page(page);
+>  	}
+>  	put_page(page);
+> @@ -981,7 +981,7 @@ static struct page *mdc_page_locate(struct address_space *mapping, __u64 *hash,
+>  			       offset, *start, *end, *hash);
+>  			if (*hash > *end) {
+>  				kunmap(page);
+> -				mdc_release_page(page, 0);
+> +				mdc_release_page(mapping, page, 0);
+>  				page = NULL;
+>  			} else if (*end != *start && *hash == *end) {
+>  				/*
+> @@ -991,7 +991,7 @@ static struct page *mdc_page_locate(struct address_space *mapping, __u64 *hash,
+>  				 * fetch the page we want.
+>  				 */
+>  				kunmap(page);
+> -				mdc_release_page(page,
+> +				mdc_release_page(mapping, page,
+>  						 le32_to_cpu(dp->ldp_flags) & LDF_COLLIDE);
+>  				page = NULL;
+>  			}
+> @@ -1365,7 +1365,7 @@ static int mdc_read_page(struct obd_export *exp, struct md_op_data *op_data,
+>  	return rc;
+>  fail:
+>  	kunmap(page);
+> -	mdc_release_page(page, 1);
+> +	mdc_release_page(mapping, page, 1);
+>  	rc = -EIO;
+>  	goto out_unlock;
+>  }
+> 
+> 
+> 
