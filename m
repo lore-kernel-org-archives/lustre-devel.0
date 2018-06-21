@@ -1,11 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jun 2018 02:37:35 +0100 (BST)
-Subject: [lustre-devel] [PATCH 21/24] lustre: move remainder of
- linux-tracefile.c to tracefile.c
-In-Reply-To: <152904669084.10587.6920959206498193596.stgit@noble>
+Date: Thu, 21 Jun 2018 02:38:28 +0100 (BST)
+Subject: [lustre-devel] [PATCH 24/24] lustre: discard TCD_MAX_TYPES
+In-Reply-To: <152904669094.10587.17019477478226952858.stgit@noble>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
- <152904669084.10587.6920959206498193596.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1806210236200.3886@casper.infradead.org>
+ <152904669094.10587.17019477478226952858.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1806210237500.3886@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,399 +12,71 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> It's good to keep related code together.
+> As well as CFS_TCD_TYPE_CNT we have TCD_MAX_TYPES which has a larger
+> value but a similar meaning.  Discard it and just use
+> CFS_TCD_TYPE_CNT.
+> 
+> Two places relied on the fact that TCD_MAX_TYPES was larger and so
+> there would be NULLs at the end of the array.  Change
+> them to check the array size properly.
 > 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 
-Nak. For some reason this corrupts my dmesg output. Its really strange and
-I haven't figured it out yet.
+Nak: This one really makes my nodes go up in flames when I mount a
+file system.
 
 > ---
->  drivers/staging/lustre/lnet/libcfs/Makefile        |    2 
->  .../staging/lustre/lnet/libcfs/linux-tracefile.c   |  194 --------------------
->  drivers/staging/lustre/lnet/libcfs/tracefile.c     |  155 ++++++++++++++++
->  3 files changed, 156 insertions(+), 195 deletions(-)
->  delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+>  drivers/staging/lustre/lnet/libcfs/tracefile.c |    8 ++++----
+>  drivers/staging/lustre/lnet/libcfs/tracefile.h |    3 +--
+>  2 files changed, 5 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/libcfs/Makefile b/drivers/staging/lustre/lnet/libcfs/Makefile
-> index 1b6937c3deee..22c0e0c2e9cf 100644
-> --- a/drivers/staging/lustre/lnet/libcfs/Makefile
-> +++ b/drivers/staging/lustre/lnet/libcfs/Makefile
-> @@ -3,7 +3,7 @@ ccflags-y += -I$(srctree)/drivers/staging/lustre/include
->  ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
->  ccflags-y += -DKBUILD_MODNAME='"lnet"'
->  
-> -libcfs-obj-y += linux-tracefile.o linux-debug.o
-> +libcfs-obj-y += linux-debug.o
->  libcfs-obj-y += linux-crypto.o
->  libcfs-obj-y += linux-crypto-adler.o
->  
-> diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-> deleted file mode 100644
-> index 3af77228cd7a..000000000000
-> --- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-> +++ /dev/null
-> @@ -1,194 +0,0 @@
-> -// SPDX-License-Identifier: GPL-2.0
-> -/*
-> - * GPL HEADER START
-> - *
-> - * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 only,
-> - * as published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> - * General Public License version 2 for more details (a copy is included
-> - * in the LICENSE file that accompanied this code).
-> - *
-> - * You should have received a copy of the GNU General Public License
-> - * version 2 along with this program; If not, see
-> - * http://www.gnu.org/licenses/gpl-2.0.html
-> - *
-> - * GPL HEADER END
-> - */
-> -/*
-> - * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
-> - * Use is subject to license terms.
-> - *
-> - * Copyright (c) 2012, Intel Corporation.
-> - */
-> -/*
-> - * This file is part of Lustre, http://www.lustre.org/
-> - * Lustre is a trademark of Sun Microsystems, Inc.
-> - */
-> -
-> -#define DEBUG_SUBSYSTEM S_LNET
-> -#define LUSTRE_TRACEFILE_PRIVATE
-> -
-> -#include <linux/slab.h>
-> -#include <linux/mm.h>
-> -#include "tracefile.h"
-> -
-> -/* percents to share the total debug memory for each type */
-> -static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
-> -	80,  /* 80% pages for CFS_TCD_TYPE_PROC */
-> -	10,  /* 10% pages for CFS_TCD_TYPE_SOFTIRQ */
-> -	10   /* 10% pages for CFS_TCD_TYPE_IRQ */
-> -};
-> -
-> -char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
-> -
-> -int cfs_tracefile_init_arch(void)
-> -{
-> -	int i;
-> -	int j;
-> -	struct cfs_trace_cpu_data *tcd;
-> -
-> -	/* initialize trace_data */
-> -	memset(cfs_trace_data, 0, sizeof(cfs_trace_data));
-> -	for (i = 0; i < CFS_TCD_TYPE_MAX; i++) {
-> -		cfs_trace_data[i] =
-> -			kmalloc_array(num_possible_cpus(),
-> -				      sizeof(union cfs_trace_data_union),
-> -				      GFP_KERNEL);
-> -		if (!cfs_trace_data[i])
-> -			goto out;
-> -	}
-> -
-> -	/* arch related info initialized */
-> -	cfs_tcd_for_each(tcd, i, j) {
-> -		spin_lock_init(&tcd->tcd_lock);
-> -		tcd->tcd_pages_factor = pages_factor[i];
-> -		tcd->tcd_type = i;
-> -		tcd->tcd_cpu = j;
-> -	}
-> -
-> -	for (i = 0; i < num_possible_cpus(); i++)
-> -		for (j = 0; j < 3; j++) {
-> -			cfs_trace_console_buffers[i][j] =
-> -				kmalloc(CFS_TRACE_CONSOLE_BUFFER_SIZE,
-> -					GFP_KERNEL);
-> -
-> -			if (!cfs_trace_console_buffers[i][j])
-> -				goto out;
-> -		}
-> -
-> -	return 0;
-> -
-> -out:
-> -	cfs_tracefile_fini_arch();
-> -	pr_err("lnet: Not enough memory\n");
-> -	return -ENOMEM;
-> -}
-> -
-> -void cfs_tracefile_fini_arch(void)
-> -{
-> -	int i;
-> -	int j;
-> -
-> -	for (i = 0; i < num_possible_cpus(); i++)
-> -		for (j = 0; j < 3; j++) {
-> -			kfree(cfs_trace_console_buffers[i][j]);
-> -			cfs_trace_console_buffers[i][j] = NULL;
-> -		}
-> -
-> -	for (i = 0; cfs_trace_data[i]; i++) {
-> -		kfree(cfs_trace_data[i]);
-> -		cfs_trace_data[i] = NULL;
-> -	}
-> -}
-> -
-> -enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
-> -{
-> -	if (in_irq())
-> -		return CFS_TCD_TYPE_IRQ;
-> -	if (in_softirq())
-> -		return CFS_TCD_TYPE_SOFTIRQ;
-> -	return CFS_TCD_TYPE_PROC;
-> -}
-> -
-> -void
-> -cfs_set_ptldebug_header(struct ptldebug_header *header,
-> -			struct libcfs_debug_msg_data *msgdata,
-> -			unsigned long stack)
-> -{
-> -	struct timespec64 ts;
-> -
-> -	ktime_get_real_ts64(&ts);
-> -
-> -	header->ph_subsys = msgdata->msg_subsys;
-> -	header->ph_mask = msgdata->msg_mask;
-> -	header->ph_cpu_id = smp_processor_id();
-> -	header->ph_type = cfs_trace_buf_idx_get();
-> -	/* y2038 safe since all user space treats this as unsigned, but
-> -	 * will overflow in 2106
-> -	 */
-> -	header->ph_sec = (u32)ts.tv_sec;
-> -	header->ph_usec = ts.tv_nsec / NSEC_PER_USEC;
-> -	header->ph_stack = stack;
-> -	header->ph_pid = current->pid;
-> -	header->ph_line_num = msgdata->msg_line;
-> -	header->ph_extern_pid = 0;
-> -}
-> -
-> -static char *
-> -dbghdr_to_err_string(struct ptldebug_header *hdr)
-> -{
-> -	switch (hdr->ph_subsys) {
-> -	case S_LND:
-> -	case S_LNET:
-> -		return "LNetError";
-> -	default:
-> -		return "LustreError";
-> -	}
-> -}
-> -
-> -static char *
-> -dbghdr_to_info_string(struct ptldebug_header *hdr)
-> -{
-> -	switch (hdr->ph_subsys) {
-> -	case S_LND:
-> -	case S_LNET:
-> -		return "LNet";
-> -	default:
-> -		return "Lustre";
-> -	}
-> -}
-> -
-> -void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
-> -			  const char *buf, int len, const char *file,
-> -			  const char *fn)
-> -{
-> -	char *prefix = "Lustre", *ptype = NULL;
-> -
-> -	if (mask & D_EMERG) {
-> -		prefix = dbghdr_to_err_string(hdr);
-> -		ptype = KERN_EMERG;
-> -	} else if (mask & D_ERROR) {
-> -		prefix = dbghdr_to_err_string(hdr);
-> -		ptype = KERN_ERR;
-> -	} else if (mask & D_WARNING) {
-> -		prefix = dbghdr_to_info_string(hdr);
-> -		ptype = KERN_WARNING;
-> -	} else if (mask & (D_CONSOLE | libcfs_printk)) {
-> -		prefix = dbghdr_to_info_string(hdr);
-> -		ptype = KERN_INFO;
-> -	}
-> -
-> -	if (mask & D_CONSOLE) {
-> -		pr_info("%s%s: %.*s", ptype, prefix, len, buf);
-> -	} else {
-> -		pr_info("%s%s: %d:%d:(%s:%d:%s()) %.*s", ptype, prefix,
-> -			hdr->ph_pid, hdr->ph_extern_pid, file,
-> -			hdr->ph_line_num, fn, len, buf);
-> -	}
-> -}
 > diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-> index 6d567a9ad8ea..617edc291035 100644
+> index cdef67391a72..555ade0ddafb 100644
 > --- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
 > +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-> @@ -168,6 +168,161 @@ static inline void cfs_trace_put_tcd(struct cfs_trace_cpu_data *tcd)
->  	put_cpu();
+> @@ -50,7 +50,7 @@
+>  #include "tracefile.h"
+>  
+>  /* XXX move things up to the top, comment */
+> -union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
+> +union cfs_trace_data_union (*cfs_trace_data[CFS_TCD_TYPE_CNT])[NR_CPUS] __cacheline_aligned;
+>  
+>  char cfs_tracefile[TRACEFILE_NAME_SIZE];
+>  long long cfs_tracefile_size = CFS_TRACEFILE_SIZE;
+> @@ -145,8 +145,8 @@ void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
+>  		spin_unlock(&tcd->tcd_lock);
 >  }
 >  
-> +/* percents to share the total debug memory for each type */
-> +static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
-> +	80,  /* 80% pages for CFS_TCD_TYPE_PROC */
-> +	10,  /* 10% pages for CFS_TCD_TYPE_SOFTIRQ */
-> +	10   /* 10% pages for CFS_TCD_TYPE_IRQ */
-> +};
-> +
-> +char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
-> +
-> +int cfs_tracefile_init_arch(void)
-> +{
-> +	int i;
-> +	int j;
-> +	struct cfs_trace_cpu_data *tcd;
-> +
-> +	/* initialize trace_data */
-> +	memset(cfs_trace_data, 0, sizeof(cfs_trace_data));
-> +	for (i = 0; i < CFS_TCD_TYPE_MAX; i++) {
-> +		cfs_trace_data[i] =
-> +			kmalloc_array(num_possible_cpus(),
-> +				      sizeof(union cfs_trace_data_union),
-> +				      GFP_KERNEL);
-> +		if (!cfs_trace_data[i])
-> +			goto out;
-> +	}
-> +
-> +	/* arch related info initialized */
-> +	cfs_tcd_for_each(tcd, i, j) {
-> +		spin_lock_init(&tcd->tcd_lock);
-> +		tcd->tcd_pages_factor = pages_factor[i];
-> +		tcd->tcd_type = i;
-> +		tcd->tcd_cpu = j;
-> +	}
-> +
-> +	for (i = 0; i < num_possible_cpus(); i++)
-> +		for (j = 0; j < 3; j++) {
-> +			cfs_trace_console_buffers[i][j] =
-> +				kmalloc(CFS_TRACE_CONSOLE_BUFFER_SIZE,
-> +					GFP_KERNEL);
-> +
-> +			if (!cfs_trace_console_buffers[i][j])
-> +				goto out;
-> +		}
-> +
-> +	return 0;
-> +
-> +out:
-> +	cfs_tracefile_fini_arch();
-> +	pr_err("lnet: Not enough memory\n");
-> +	return -ENOMEM;
-> +}
-> +
-> +void cfs_tracefile_fini_arch(void)
-> +{
-> +	int i;
-> +	int j;
-> +
-> +	for (i = 0; i < num_possible_cpus(); i++)
-> +		for (j = 0; j < 3; j++) {
-> +			kfree(cfs_trace_console_buffers[i][j]);
-> +			cfs_trace_console_buffers[i][j] = NULL;
-> +		}
-> +
-> +	for (i = 0; cfs_trace_data[i]; i++) {
-> +		kfree(cfs_trace_data[i]);
-> +		cfs_trace_data[i] = NULL;
-> +	}
-> +}
-> +
-> +enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
-> +{
-> +	if (in_irq())
-> +		return CFS_TCD_TYPE_IRQ;
-> +	if (in_softirq())
-> +		return CFS_TCD_TYPE_SOFTIRQ;
-> +	return CFS_TCD_TYPE_PROC;
-> +}
-> +
-> +void
-> +cfs_set_ptldebug_header(struct ptldebug_header *header,
-> +			struct libcfs_debug_msg_data *msgdata,
-> +			unsigned long stack)
-> +{
-> +	struct timespec64 ts;
-> +
-> +	ktime_get_real_ts64(&ts);
-> +
-> +	header->ph_subsys = msgdata->msg_subsys;
-> +	header->ph_mask = msgdata->msg_mask;
-> +	header->ph_cpu_id = smp_processor_id();
-> +	header->ph_type = cfs_trace_buf_idx_get();
-> +	/* y2038 safe since all user space treats this as unsigned, but
-> +	 * will overflow in 2106
-> +	 */
-> +	header->ph_sec = (u32)ts.tv_sec;
-> +	header->ph_usec = ts.tv_nsec / NSEC_PER_USEC;
-> +	header->ph_stack = stack;
-> +	header->ph_pid = current->pid;
-> +	header->ph_line_num = msgdata->msg_line;
-> +	header->ph_extern_pid = 0;
-> +}
-> +
-> +static char *
-> +dbghdr_to_err_string(struct ptldebug_header *hdr)
-> +{
-> +	switch (hdr->ph_subsys) {
-> +	case S_LND:
-> +	case S_LNET:
-> +		return "LNetError";
-> +	default:
-> +		return "LustreError";
-> +	}
-> +}
-> +
-> +static char *
-> +dbghdr_to_info_string(struct ptldebug_header *hdr)
-> +{
-> +	switch (hdr->ph_subsys) {
-> +	case S_LND:
-> +	case S_LNET:
-> +		return "LNet";
-> +	default:
-> +		return "Lustre";
-> +	}
-> +}
-> +
-> +void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
-> +			  const char *buf, int len, const char *file,
-> +			  const char *fn)
-> +{
-> +	char *prefix = "Lustre", *ptype = NULL;
-> +
-> +	if (mask & D_EMERG) {
-> +		prefix = dbghdr_to_err_string(hdr);
-> +		ptype = KERN_EMERG;
-> +	} else if (mask & D_ERROR) {
-> +		prefix = dbghdr_to_err_string(hdr);
-> +		ptype = KERN_ERR;
-> +	} else if (mask & D_WARNING) {
-> +		prefix = dbghdr_to_info_string(hdr);
-> +		ptype = KERN_WARNING;
-> +	} else if (mask & (D_CONSOLE | libcfs_printk)) {
-> +		prefix = dbghdr_to_info_string(hdr);
-> +		ptype = KERN_INFO;
-> +	}
-> +
-> +	if (mask & D_CONSOLE) {
-> +		pr_info("%s%s: %.*s", ptype, prefix, len, buf);
-> +	} else {
-> +		pr_info("%s%s: %d:%d:(%s:%d:%s()) %.*s", ptype, prefix,
-> +			hdr->ph_pid, hdr->ph_extern_pid, file,
-> +			hdr->ph_line_num, fn, len, buf);
-> +	}
-> +}
-> +
->  static inline struct cfs_trace_page *
->  cfs_tage_from_list(struct list_head *list)
->  {
+> -#define cfs_tcd_for_each_type_lock(tcd, i, cpu)			   \
+> -	for (i = 0; cfs_trace_data[i] &&				\
+> +#define cfs_tcd_for_each_type_lock(tcd, i, cpu)				\
+> +	for (i = 0; i < CFS_TCD_TYPE_CNT && cfs_trace_data[i] &&	\
+>  	     (tcd = &(*cfs_trace_data[i])[cpu].tcd) &&			\
+>  	     cfs_trace_lock_tcd(tcd, 1); cfs_trace_unlock_tcd(tcd, 1), i++)
+>  
+> @@ -1381,7 +1381,7 @@ static void cfs_trace_cleanup(void)
+>  			cfs_trace_console_buffers[i][j] = NULL;
+>  		}
+>  
+> -	for (i = 0; cfs_trace_data[i]; i++) {
+> +	for (i = 0; cfs_trace_data[i] && i < CFS_TCD_TYPE_CNT; i++) {
+>  		kfree(cfs_trace_data[i]);
+>  		cfs_trace_data[i] = NULL;
+>  	}
+> diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+> index 23faecf886c1..a09d5b9349f0 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
+> +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+> @@ -184,8 +184,7 @@ union cfs_trace_data_union {
+>  	char __pad[L1_CACHE_ALIGN(sizeof(struct cfs_trace_cpu_data))];
+>  };
+>  
+> -#define TCD_MAX_TYPES      8
+> -extern union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS];
+> +extern union cfs_trace_data_union (*cfs_trace_data[CFS_TCD_TYPE_CNT])[NR_CPUS];
+>  
+>  #define cfs_tcd_for_each(tcd, i, j)				       \
+>  	for (i = 0; cfs_trace_data[i]; i++)				\
 > 
 > 
 > 
