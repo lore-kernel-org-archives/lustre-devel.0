@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 21 Jun 2018 02:38:28 +0100 (BST)
-Subject: [lustre-devel] [PATCH 24/24] lustre: discard TCD_MAX_TYPES
-In-Reply-To: <152904669094.10587.17019477478226952858.stgit@noble>
+Date: Thu, 21 Jun 2018 02:48:07 +0100 (BST)
+Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
+ module reduction.
+In-Reply-To: <152904663333.10587.10934053155404014785.stgit@noble>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
- <152904669094.10587.17019477478226952858.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1806210237500.3886@casper.infradead.org>
+Message-ID: <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,71 +12,145 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> As well as CFS_TCD_TYPE_CNT we have TCD_MAX_TYPES which has a larger
-> value but a similar meaning.  Discard it and just use
-> CFS_TCD_TYPE_CNT.
+> Here are a bunch more cleanups that will appear in my lustre-testing
+> tree shortly.
 > 
-> Two places relied on the fact that TCD_MAX_TYPES was larger and so
-> there would be NULLs at the end of the array.  Change
-> them to check the array size properly.
+> The interesting stuff is some enhancements to kbuild to let us
+> build modules from multiple directories.
+> I've used that to clean up the build of ptlrpc+ldlm and to
+> merge libcfs and lnet into the one module - I've left the lnds
+> separate.
+
+That looks pretty good. It doesn't apply to the stable lustre tree but I
+did try it out on lustre-testing. The module building does seem to 
+function well. Only thing not clear is if do a
+
+make SUBDIRS=drivers/staging/lustre/lustre/lmv modules
+
+do lmv.a and the other *.a files get relinked int lustre.ko ?
+ 
+> I've haven't progressed further in lustre because I'm not sure which -
+> if any - modules are also used by the server.
+> I'd rather shared code was in a separate module to client-only.
+>
+> Which parts of lustre/lustre/* are also used by server?
+
+Basically all the client code is reused on the server except for llite.
+The reason is each server type MDS, MGS, or OSS is treated as a client
+to each other. So in affect the server code is a middle layer level on
+top of the client code.
+
+> After that, it is all fairly simple cleanups.
 > 
-> Signed-off-by: NeilBrown <neilb@suse.com>
-
-Nak: This one really makes my nodes go up in flames when I mount a
-file system.
-
+> I plan to submit the kbuild stuff upstream next week.
+> 
+> Thanks,
+> NeilBrown
+> 
 > ---
->  drivers/staging/lustre/lnet/libcfs/tracefile.c |    8 ++++----
->  drivers/staging/lustre/lnet/libcfs/tracefile.h |    3 +--
->  2 files changed, 5 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-> index cdef67391a72..555ade0ddafb 100644
-> --- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
-> +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-> @@ -50,7 +50,7 @@
->  #include "tracefile.h"
->  
->  /* XXX move things up to the top, comment */
-> -union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
-> +union cfs_trace_data_union (*cfs_trace_data[CFS_TCD_TYPE_CNT])[NR_CPUS] __cacheline_aligned;
->  
->  char cfs_tracefile[TRACEFILE_NAME_SIZE];
->  long long cfs_tracefile_size = CFS_TRACEFILE_SIZE;
-> @@ -145,8 +145,8 @@ void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
->  		spin_unlock(&tcd->tcd_lock);
->  }
->  
-> -#define cfs_tcd_for_each_type_lock(tcd, i, cpu)			   \
-> -	for (i = 0; cfs_trace_data[i] &&				\
-> +#define cfs_tcd_for_each_type_lock(tcd, i, cpu)				\
-> +	for (i = 0; i < CFS_TCD_TYPE_CNT && cfs_trace_data[i] &&	\
->  	     (tcd = &(*cfs_trace_data[i])[cpu].tcd) &&			\
->  	     cfs_trace_lock_tcd(tcd, 1); cfs_trace_unlock_tcd(tcd, 1), i++)
->  
-> @@ -1381,7 +1381,7 @@ static void cfs_trace_cleanup(void)
->  			cfs_trace_console_buffers[i][j] = NULL;
->  		}
->  
-> -	for (i = 0; cfs_trace_data[i]; i++) {
-> +	for (i = 0; cfs_trace_data[i] && i < CFS_TCD_TYPE_CNT; i++) {
->  		kfree(cfs_trace_data[i]);
->  		cfs_trace_data[i] = NULL;
->  	}
-> diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-> index 23faecf886c1..a09d5b9349f0 100644
-> --- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
-> +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-> @@ -184,8 +184,7 @@ union cfs_trace_data_union {
->  	char __pad[L1_CACHE_ALIGN(sizeof(struct cfs_trace_cpu_data))];
->  };
->  
-> -#define TCD_MAX_TYPES      8
-> -extern union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS];
-> +extern union cfs_trace_data_union (*cfs_trace_data[CFS_TCD_TYPE_CNT])[NR_CPUS];
->  
->  #define cfs_tcd_for_each(tcd, i, j)				       \
->  	for (i = 0; cfs_trace_data[i]; i++)				\
+> NeilBrown (24):
+>       kbuild: detect directories in components of a module.
+>       kbuild: treat a directory listed in a composite object as foo/mod.a
+>       kbuild: support building of per-directory mod.a
+>       kbuild: disable KBUILD_MODNAME when building for mod.a
+>       kbuild: Add documentation for modobj-m
+>       lustre: build ldlm in the ldlm directory.
+>       lustre: merge libcfs module into lnet.
+
+This seems to work when I tried the lustre-testing tree. I did see 
+regression to related to this work in that tree.
+
+>       lustre: use truncate_inode_page in place of truncate_complete_page
+>       lustre: don't use spare bits in iattr.ia_valid
+>       lustre: remove lustre_patchless_compat.h
+>       lustre: discard current_n*groups macros.
+>       lustre: discard LTIME_S macro
+>       lustre: discard NO_QUOTA and QUOTA_OK
+>       lustre: discard ext2* bit operations
+>       lustre: centralize TIMES_SET_FLAGS
+>       lustre: remove redefinition of module_init().
+>       lustre: remove lustre_compat.h
+
+The first two patches of the above seem to break things. The first one was 
+pointed out so I avoid issues in my testing by changing the patch to just
+move truncate_inode_page() to lustre_mdc.h for now. The next patch does 
+break things.
+
+>       lustre/lnet: move tracefile locking from linux-tracefile.c to tracefile.c
+>       lustre: open code cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
+>       lustre: move tcd locking across to tracefile.c
+>       lustre: move remainder of linux-tracefile.c to tracefile.c
+>       lustre: fold cfs_tracefile_*_arch into their only callers.
+>       lustre: renamed CFS_TCD_TYPE_MAX to CFS_TCD_TYPE_CNT
+>       lustre: discard TCD_MAX_TYPES
+
+I see breakage in this code as well.
+
+>  Documentation/kbuild/makefiles.txt                 |   65 +++++
+>  drivers/staging/lustre/lnet/Makefile               |    7 -
+>  drivers/staging/lustre/lnet/libcfs/Makefile        |    7 -
+>  drivers/staging/lustre/lnet/libcfs/debug.c         |    6 
+>  .../staging/lustre/lnet/libcfs/linux-tracefile.c   |  258 --------------------
+>  drivers/staging/lustre/lnet/libcfs/module.c        |   26 +-
+>  drivers/staging/lustre/lnet/libcfs/tracefile.c     |  241 +++++++++++++++++--
+>  drivers/staging/lustre/lnet/libcfs/tracefile.h     |   40 ---
+>  drivers/staging/lustre/lnet/lnet/Makefile          |   11 -
+>  drivers/staging/lustre/lnet/lnet/module.c          |    9 +
+>  drivers/staging/lustre/lustre/fid/lproc_fid.c      |    1 
+>  drivers/staging/lustre/lustre/fld/lproc_fld.c      |    1 
+>  drivers/staging/lustre/lustre/include/cl_object.h  |    6 
+>  .../staging/lustre/lustre/include/lustre_compat.h  |   82 ------
+>  drivers/staging/lustre/lustre/include/lustre_net.h |    1 
+>  .../lustre/include/lustre_patchless_compat.h       |   68 -----
+>  drivers/staging/lustre/lustre/include/obd.h        |    7 +
+>  .../staging/lustre/lustre/include/obd_support.h    |    1 
+>  drivers/staging/lustre/lustre/ldlm/Makefile        |   11 +
+>  drivers/staging/lustre/lustre/llite/dir.c          |    3 
+>  drivers/staging/lustre/lustre/llite/file.c         |   36 +--
+>  drivers/staging/lustre/lustre/llite/lcommon_cl.c   |   11 -
+>  .../staging/lustre/lustre/llite/llite_internal.h   |   13 +
+>  drivers/staging/lustre/lustre/llite/llite_lib.c    |   52 ++--
+>  drivers/staging/lustre/lustre/llite/namei.c        |   16 +
+>  drivers/staging/lustre/lustre/llite/vvp_io.c       |    8 -
+>  drivers/staging/lustre/lustre/llite/vvp_object.c   |    6 
+>  drivers/staging/lustre/lustre/lmv/lmv_intent.c     |    6 
+>  drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   21 +-
+>  drivers/staging/lustre/lustre/lov/lov_io.c         |    3 
+>  drivers/staging/lustre/lustre/lov/lov_obd.c        |    2 
+>  drivers/staging/lustre/lustre/lov/lov_pack.c       |    1 
+>  drivers/staging/lustre/lustre/lov/lov_page.c       |    1 
+>  drivers/staging/lustre/lustre/mdc/mdc_lib.c        |   19 +
+>  drivers/staging/lustre/lustre/mdc/mdc_reint.c      |    4 
+>  drivers/staging/lustre/lustre/mdc/mdc_request.c    |   12 -
+>  drivers/staging/lustre/lustre/obdclass/class_obd.c |    1 
+>  drivers/staging/lustre/lustre/obdclass/llog.c      |    7 -
+>  .../lustre/lustre/obdclass/lprocfs_status.c        |    1 
+>  .../staging/lustre/lustre/obdclass/obd_config.c    |    1 
+>  drivers/staging/lustre/lustre/obdclass/obd_mount.c |    1 
+>  drivers/staging/lustre/lustre/obdclass/obdo.c      |   10 -
+>  .../staging/lustre/lustre/obdecho/echo_client.c    |    1 
+>  drivers/staging/lustre/lustre/osc/lproc_osc.c      |    1 
+>  drivers/staging/lustre/lustre/osc/osc_cache.c      |    4 
+>  drivers/staging/lustre/lustre/osc/osc_io.c         |   23 +-
+>  drivers/staging/lustre/lustre/osc/osc_quota.c      |    4 
+>  drivers/staging/lustre/lustre/osc/osc_request.c    |    1 
+>  drivers/staging/lustre/lustre/ptlrpc/Makefile      |   12 -
+>  drivers/staging/lustre/lustre/ptlrpc/import.c      |    1 
+>  .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |    1 
+>  drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    1 
+>  drivers/staging/lustre/lustre/ptlrpc/sec.c         |   15 +
+>  drivers/staging/lustre/lustre/ptlrpc/sec_plain.c   |    1 
+>  drivers/staging/lustre/lustre/ptlrpc/service.c     |    1 
+>  scripts/Makefile.build                             |   57 +++-
+>  scripts/Makefile.lib                               |   63 +++--
+>  57 files changed, 584 insertions(+), 685 deletions(-)
+>  delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+>  delete mode 100644 drivers/staging/lustre/lustre/include/lustre_compat.h
+>  delete mode 100644 drivers/staging/lustre/lustre/include/lustre_patchless_compat.h
+>  create mode 100644 drivers/staging/lustre/lustre/ldlm/Makefile
 > 
+> --
+> Signature
 > 
 > 
