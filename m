@@ -1,17 +1,32 @@
-From: NeilBrown <neilb@suse.com>
-Date: Thu, 21 Jun 2018 13:00:54 +1000
+From: Patrick Farrell <paf@cray.com>
+Date: Thu, 21 Jun 2018 03:42:54 +0000
 Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
  module reduction.
-In-Reply-To: <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
+In-Reply-To: <87o9g4des9.fsf@notabene.neil.brown.name>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
  <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
- <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
-Message-ID: <87o9g4des9.fsf@notabene.neil.brown.name>
+ <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>,
+ <87o9g4des9.fsf@notabene.neil.brown.name>
+Message-ID: <DM3PR1101MB1213A65A088018D497D20FB1CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
+
+
+I?m hoping someone with a better memory or who?s in a position to check this a bit better (no computer access this second) will speak up, but...
+
+To a first approximation, yes, that sounds close.  Probably missing something but...
+
+Also, not sure about fid and fld.  Might be needed on the server...?  But you will of course find you when you try.
+
+________________________________
+From: NeilBrown <neilb@suse.com>
+Sent: Wednesday, June 20, 2018 10:00:54 PM
+To: Patrick Farrell; James Simmons
+Cc: Lustre Development List
+Subject: Re: [lustre-devel] [PATCH 00/24] lustre - more cleanups including module reduction.
 
 On Thu, Jun 21 2018, Patrick Farrell wrote:
 
@@ -215,9 +230,5 @@ NeilBrown
 > lustre-devel at lists.lustre.org
 > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180621/c2bc7f0e/attachment-0001.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180621/75c72d16/attachment-0001.html>
