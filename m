@@ -1,65 +1,62 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:20:48 -0400
-Subject: [lustre-devel] [PATCH v3 24/26] staging: lustre: libcfs: restore
- debugfs table reporting for UMP
+Date: Sun, 24 Jun 2018 17:20:38 -0400
+Subject: [lustre-devel] [PATCH v3 14/26] staging: lustre: libcfs: rename i
+ to node for cfs_cpt_set_nodemask
 In-Reply-To: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1529875250-11531-25-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529875250-11531-15-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-With the cleanup of the libcfs SMP handling the function
-cfs_cpt_table_print() was turned into an empty funciton.
-This function is called by a debugfs reporting function for
-debugging which now means for UMP machines it reports nothing
-which breaks previous behavior exposed to users. Restore the
-original behavior.
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9856
+Rename variable i to node to make code easier to understand.
+
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8703
+Reviewed-on: https://review.whamcloud.com/23222
+Reviewed-by: Amir Shehata <amir.shehata@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/libcfs/libcfs_cpu.h  | 19 +++++++++++++------
- 1 file changed, 13 insertions(+), 6 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 29c5071..32776d2 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -218,6 +218,19 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
- struct cfs_cpt_table;
- #define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
- 
-+static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab,
-+				      char *buf, int len)
-+{
-+	int rc;
-+
-+	rc = snprintf(buf, len, "0\t: 0\n");
-+	len -= rc;
-+	if (len <= 0)
-+		return -EFBIG;
-+
-+	return rc;
-+}
-+
- static inline int cfs_cpt_distance_print(struct cfs_cpt_table *cptab,
- 					 char *buf, int len)
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+index 8f7de59..a2c1068 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+@@ -579,10 +579,10 @@ void cfs_cpt_unset_node(struct cfs_cpt_table *cptab, int cpt, int node)
+ int cfs_cpt_set_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ 			 const nodemask_t *mask)
  {
-@@ -237,12 +250,6 @@ static inline cpumask_var_t *cfs_cpt_cpumask(struct cfs_cpt_table *cptab,
- 	return NULL;
+-	int i;
++	int node;
+ 
+-	for_each_node_mask(i, *mask) {
+-		if (!cfs_cpt_set_node(cptab, cpt, i))
++	for_each_node_mask(node, *mask) {
++		if (!cfs_cpt_set_node(cptab, cpt, node))
+ 			return 0;
+ 	}
+ 
+@@ -593,10 +593,10 @@ int cfs_cpt_set_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab, int cpt,
+ 			    const nodemask_t *mask)
+ {
+-	int i;
++	int node;
+ 
+-	for_each_node_mask(i, *mask)
+-		cfs_cpt_unset_node(cptab, cpt, i);
++	for_each_node_mask(node, *mask)
++		cfs_cpt_unset_node(cptab, cpt, node);
  }
+ EXPORT_SYMBOL(cfs_cpt_unset_nodemask);
  
--static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf,
--				      int len)
--{
--	return 0;
--}
--
- static inline int cfs_cpt_number(struct cfs_cpt_table *cptab)
- {
- 	return 1;
 -- 
 1.8.3.1
