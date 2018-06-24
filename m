@@ -1,503 +1,380 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:20:49 -0400
-Subject: [lustre-devel] [PATCH v3 25/26] staging: lustre: libcfs: make
- cfs_cpt_tab a static structure
+Date: Sun, 24 Jun 2018 17:20:25 -0400
+Subject: [lustre-devel] [PATCH v3 01/26] staging: lustre: libcfs: remove
+ useless CPU partition code
 In-Reply-To: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1529875250-11531-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529875250-11531-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Only one cfs_cpt_tab exist and its created only at libcfs modules
-loading and removal. Instead of dynamically allocating it lets
-statically allocate it. This will help to reenable UMP support.
+From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9856
+* remove scratch buffer and mutex which guard it.
+* remove global cpumask and spinlock which guard it.
+* remove cpt_version for checking CPUs state change during setup
+  because of just disable CPUs state change during setup.
+* remove whole global struct cfs_cpt_data cpt_data.
+* remove few unused APIs.
+
+Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8703
+Reviewed-on: https://review.whamcloud.com/23303
+Reviewed-on: https://review.whamcloud.com/25048
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Doug Oucharek <dougso@me.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Olaf Weber <olaf@sgi.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/linux/libcfs/libcfs_cpu.h       |   4 +-
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 111 ++++++++++-----------
- drivers/staging/lustre/lnet/libcfs/module.c        |  10 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |   4 +-
- drivers/staging/lustre/lnet/selftest/framework.c   |   2 +-
- drivers/staging/lustre/lustre/ptlrpc/client.c      |   4 +-
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |  10 +-
- drivers/staging/lustre/lustre/ptlrpc/service.c     |   4 +-
- 8 files changed, 73 insertions(+), 76 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_cpu.h       |  32 ++----
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 115 +++------------------
+ 2 files changed, 22 insertions(+), 125 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 32776d2..df7e16b 100644
+index 61641c4..1b4333d 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
 +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -115,7 +115,7 @@ struct cfs_cpt_table {
- 	nodemask_t			*ctb_nodemask;
- };
+@@ -93,8 +93,6 @@ struct cfs_cpu_partition {
  
--extern struct cfs_cpt_table	*cfs_cpt_tab;
-+extern struct cfs_cpt_table	cfs_cpt_tab;
- 
+ /** descriptor for CPU partitions */
+ struct cfs_cpt_table {
+-	/* version, reserved for hotplug */
+-	unsigned int			ctb_version;
+ 	/* spread rotor for NUMA allocator */
+ 	unsigned int			ctb_spread_rotor;
+ 	/* # of CPU partitions */
+@@ -162,12 +160,12 @@ struct cfs_cpt_table {
+  * return 1 if successfully set all CPUs, otherwise return 0
+  */
+ int cfs_cpt_set_cpumask(struct cfs_cpt_table *cptab,
+-			int cpt, cpumask_t *mask);
++			int cpt, const cpumask_t *mask);
  /**
-  * return cpumask of CPU partition \a cpt
-@@ -215,8 +215,6 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+  * remove all cpus in \a mask from CPU partition \a cpt
+  */
+ void cfs_cpt_unset_cpumask(struct cfs_cpt_table *cptab,
+-			   int cpt, cpumask_t *mask);
++			   int cpt, const cpumask_t *mask);
+ /**
+  * add all cpus in NUMA node \a node to CPU partition \a cpt
+  * return 1 if successfully set all CPUs, otherwise return 0
+@@ -190,20 +188,11 @@ int cfs_cpt_set_nodemask(struct cfs_cpt_table *cptab,
+ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+ 			    int cpt, nodemask_t *mask);
+ /**
+- * unset all cpus for CPU partition \a cpt
+- */
+-void cfs_cpt_clear(struct cfs_cpt_table *cptab, int cpt);
+-/**
+  * convert partition id \a cpt to numa node id, if there are more than one
+  * nodes in this partition, it might return a different node id each time.
+  */
+ int cfs_cpt_spread_node(struct cfs_cpt_table *cptab, int cpt);
+ 
+-/**
+- * return number of HTs in the same core of \a cpu
+- */
+-int cfs_cpu_ht_nsiblings(int cpu);
+-
+ int  cfs_cpu_init(void);
  void cfs_cpu_fini(void);
  
- #else /* !CONFIG_SMP */
--struct cfs_cpt_table;
--#define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
+@@ -258,13 +247,15 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+ }
  
- static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab,
- 				      char *buf, int len)
+ static inline int
+-cfs_cpt_set_cpumask(struct cfs_cpt_table *cptab, int cpt, cpumask_t *mask)
++cfs_cpt_set_cpumask(struct cfs_cpt_table *cptab, int cpt,
++		    const cpumask_t *mask)
+ {
+ 	return 1;
+ }
+ 
+ static inline void
+-cfs_cpt_unset_cpumask(struct cfs_cpt_table *cptab, int cpt, cpumask_t *mask)
++cfs_cpt_unset_cpumask(struct cfs_cpt_table *cptab, int cpt,
++		      const cpumask_t *mask)
+ {
+ }
+ 
+@@ -290,11 +281,6 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+ {
+ }
+ 
+-static inline void
+-cfs_cpt_clear(struct cfs_cpt_table *cptab, int cpt)
+-{
+-}
+-
+ static inline int
+ cfs_cpt_spread_node(struct cfs_cpt_table *cptab, int cpt)
+ {
+@@ -302,12 +288,6 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+ }
+ 
+ static inline int
+-cfs_cpu_ht_nsiblings(int cpu)
+-{
+-	return 1;
+-}
+-
+-static inline int
+ cfs_cpt_current(struct cfs_cpt_table *cptab, int remap)
+ {
+ 	return 0;
 diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index 3f4a7c7..9fd324d 100644
+index 3d1cf45..b363a3d 100644
 --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
 +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -41,10 +41,6 @@
- #include <linux/libcfs/libcfs_string.h>
- #include <linux/libcfs/libcfs.h>
- 
--/** Global CPU partition table */
--struct cfs_cpt_table   *cfs_cpt_tab __read_mostly;
--EXPORT_SYMBOL(cfs_cpt_tab);
--
- /**
-  * modparam for setting number of partitions
-  *
-@@ -73,15 +69,10 @@
+@@ -73,19 +73,6 @@
  module_param(cpu_pattern, charp, 0444);
  MODULE_PARM_DESC(cpu_pattern, "CPU partitions pattern");
  
--struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt)
-+static int cfs_cpt_table_setup(struct cfs_cpt_table *cptab, int ncpt)
+-static struct cfs_cpt_data {
+-	/* serialize hotplug etc */
+-	spinlock_t		cpt_lock;
+-	/* reserved for hotplug */
+-	unsigned long		cpt_version;
+-	/* mutex to protect cpt_cpumask */
+-	struct mutex		cpt_mutex;
+-	/* scratch buffer for set/unset_node */
+-	cpumask_var_t		cpt_cpumask;
+-} cpt_data;
+-
+-#define CFS_CPU_VERSION_MAGIC	   0xbabecafe
+-
+ struct cfs_cpt_table *
+ cfs_cpt_table_alloc(unsigned int ncpt)
  {
--	struct cfs_cpt_table *cptab;
+@@ -128,11 +115,6 @@ struct cfs_cpt_table *
+ 			goto failed;
+ 	}
+ 
+-	spin_lock(&cpt_data.cpt_lock);
+-	/* Reserved for hotplug */
+-	cptab->ctb_version = cpt_data.cpt_version;
+-	spin_unlock(&cpt_data.cpt_lock);
+-
+ 	return cptab;
+ 
+  failed:
+@@ -207,17 +189,6 @@ struct cfs_cpt_table *
+ }
+ EXPORT_SYMBOL(cfs_cpt_table_print);
+ 
+-static void
+-cfs_node_to_cpumask(int node, cpumask_t *mask)
+-{
+-	const cpumask_t *tmp = cpumask_of_node(node);
+-
+-	if (tmp)
+-		cpumask_copy(mask, tmp);
+-	else
+-		cpumask_clear(mask);
+-}
+-
+ int
+ cfs_cpt_number(struct cfs_cpt_table *cptab)
+ {
+@@ -370,7 +341,8 @@ struct cfs_cpt_table *
+ EXPORT_SYMBOL(cfs_cpt_unset_cpu);
+ 
+ int
+-cfs_cpt_set_cpumask(struct cfs_cpt_table *cptab, int cpt, cpumask_t *mask)
++cfs_cpt_set_cpumask(struct cfs_cpt_table *cptab, int cpt,
++		    const cpumask_t *mask)
+ {
  	int i;
  
--	cptab = kzalloc(sizeof(*cptab), GFP_NOFS);
--	if (!cptab)
--		return NULL;
+@@ -391,7 +363,8 @@ struct cfs_cpt_table *
+ EXPORT_SYMBOL(cfs_cpt_set_cpumask);
+ 
+ void
+-cfs_cpt_unset_cpumask(struct cfs_cpt_table *cptab, int cpt, cpumask_t *mask)
++cfs_cpt_unset_cpumask(struct cfs_cpt_table *cptab, int cpt,
++		      const cpumask_t *mask)
+ {
+ 	int i;
+ 
+@@ -403,7 +376,7 @@ struct cfs_cpt_table *
+ int
+ cfs_cpt_set_node(struct cfs_cpt_table *cptab, int cpt, int node)
+ {
+-	int rc;
++	const cpumask_t *mask;
+ 
+ 	if (node < 0 || node >= MAX_NUMNODES) {
+ 		CDEBUG(D_INFO,
+@@ -411,34 +384,26 @@ struct cfs_cpt_table *
+ 		return 0;
+ 	}
+ 
+-	mutex_lock(&cpt_data.cpt_mutex);
 -
- 	cptab->ctb_nparts = ncpt;
- 
- 	if (!zalloc_cpumask_var(&cptab->ctb_cpumask, GFP_NOFS))
-@@ -138,7 +129,7 @@ struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt)
- 		       cptab->ctb_nparts * sizeof(part->cpt_distance[0]));
- 	}
- 
--	return cptab;
-+	return 0;
- 
- failed_setting_ctb_parts:
- 	while (i-- >= 0) {
-@@ -159,8 +150,24 @@ struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt)
- failed_alloc_nodemask:
- 	free_cpumask_var(cptab->ctb_cpumask);
- failed_alloc_cpumask:
--	kfree(cptab);
--	return NULL;
-+	return -ENOMEM;
-+}
-+
-+struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt)
-+{
-+	struct cfs_cpt_table *cptab;
-+	int rc;
-+
-+	cptab = kzalloc(sizeof(*cptab), GFP_NOFS);
-+	if (!cptab)
-+		return NULL;
-+
-+	rc = cfs_cpt_table_setup(cptab, ncpt);
-+	if (rc) {
-+		kfree(cptab);
-+		cptab = NULL;
-+	}
-+	return cptab;
- }
- EXPORT_SYMBOL(cfs_cpt_table_alloc);
- 
-@@ -183,8 +190,6 @@ void cfs_cpt_table_free(struct cfs_cpt_table *cptab)
- 
- 	kfree(cptab->ctb_nodemask);
- 	free_cpumask_var(cptab->ctb_cpumask);
+-	cfs_node_to_cpumask(node, cpt_data.cpt_cpumask);
 -
--	kfree(cptab);
- }
- EXPORT_SYMBOL(cfs_cpt_table_free);
+-	rc = cfs_cpt_set_cpumask(cptab, cpt, cpt_data.cpt_cpumask);
++	mask = cpumask_of_node(node);
  
-@@ -822,9 +827,8 @@ static int cfs_cpt_num_estimate(void)
- 	return ncpt;
+-	mutex_unlock(&cpt_data.cpt_mutex);
+-
+-	return rc;
++	return cfs_cpt_set_cpumask(cptab, cpt, mask);
  }
+ EXPORT_SYMBOL(cfs_cpt_set_node);
  
--static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
-+static int cfs_cpt_table_create(int ncpt)
+ void
+ cfs_cpt_unset_node(struct cfs_cpt_table *cptab, int cpt, int node)
  {
--	struct cfs_cpt_table *cptab = NULL;
- 	cpumask_var_t node_mask;
- 	int cpt = 0;
- 	int node;
-@@ -841,10 +845,9 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 		      ncpt, num);
- 	}
- 
--	cptab = cfs_cpt_table_alloc(ncpt);
--	if (!cptab) {
--		CERROR("Failed to allocate CPU map(%d)\n", ncpt);
--		rc = -ENOMEM;
-+	rc = cfs_cpt_table_setup(&cfs_cpt_tab, ncpt);
-+	if (rc) {
-+		CERROR("Failed to setup CPU map(%d)\n", ncpt);
- 		goto failed;
- 	}
- 
-@@ -860,10 +863,13 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 		cpumask_copy(node_mask, cpumask_of_node(node));
- 
- 		while (cpt < ncpt && !cpumask_empty(node_mask)) {
--			struct cfs_cpu_partition *part = &cptab->ctb_parts[cpt];
--			int ncpu = cpumask_weight(part->cpt_cpumask);
-+			struct cfs_cpu_partition *part;
-+			int ncpu;
++	const cpumask_t *mask;
 +
-+			part = &cfs_cpt_tab.ctb_parts[cpt];
-+			ncpu = cpumask_weight(part->cpt_cpumask);
+ 	if (node < 0 || node >= MAX_NUMNODES) {
+ 		CDEBUG(D_INFO,
+ 		       "Invalid NUMA id %d for CPU partition %d\n", node, cpt);
+ 		return;
+ 	}
  
--			rc = cfs_cpt_choose_ncpus(cptab, cpt, node_mask,
-+			rc = cfs_cpt_choose_ncpus(&cfs_cpt_tab, cpt, node_mask,
- 						  num - ncpu);
- 			if (rc < 0) {
- 				rc = -EINVAL;
-@@ -880,7 +886,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
+-	mutex_lock(&cpt_data.cpt_mutex);
+-
+-	cfs_node_to_cpumask(node, cpt_data.cpt_cpumask);
+-
+-	cfs_cpt_unset_cpumask(cptab, cpt, cpt_data.cpt_cpumask);
++	mask = cpumask_of_node(node);
  
- 	free_cpumask_var(node_mask);
+-	mutex_unlock(&cpt_data.cpt_mutex);
++	cfs_cpt_unset_cpumask(cptab, cpt, mask);
+ }
+ EXPORT_SYMBOL(cfs_cpt_unset_node);
  
--	return cptab;
-+	return 0;
+@@ -466,26 +431,6 @@ struct cfs_cpt_table *
+ }
+ EXPORT_SYMBOL(cfs_cpt_unset_nodemask);
  
- failed_mask:
- 	free_cpumask_var(node_mask);
-@@ -888,15 +894,13 @@ static struct cfs_cpt_table *cfs_cpt_table_create(int ncpt)
- 	CERROR("Failed (rc = %d) to setup CPU partition table with %d partitions, online HW NUMA nodes: %d, HW CPU cores: %d.\n",
- 	       rc, ncpt, num_online_nodes(), num_online_cpus());
+-void
+-cfs_cpt_clear(struct cfs_cpt_table *cptab, int cpt)
+-{
+-	int last;
+-	int i;
+-
+-	if (cpt == CFS_CPT_ANY) {
+-		last = cptab->ctb_nparts - 1;
+-		cpt = 0;
+-	} else {
+-		last = cpt;
+-	}
+-
+-	for (; cpt <= last; cpt++) {
+-		for_each_cpu(i, cptab->ctb_parts[cpt].cpt_cpumask)
+-			cfs_cpt_unset_cpu(cptab, cpt, i);
+-	}
+-}
+-EXPORT_SYMBOL(cfs_cpt_clear);
+-
+ int
+ cfs_cpt_spread_node(struct cfs_cpt_table *cptab, int cpt)
+ {
+@@ -758,7 +703,7 @@ struct cfs_cpt_table *
+ 	}
  
--	if (cptab)
--		cfs_cpt_table_free(cptab);
-+	cfs_cpt_table_free(&cfs_cpt_tab);
+ 	for_each_online_node(i) {
+-		cfs_node_to_cpumask(i, mask);
++		cpumask_copy(mask, cpumask_of_node(i));
  
--	return ERR_PTR(rc);
-+	return rc;
+ 		while (!cpumask_empty(mask)) {
+ 			struct cfs_cpu_partition *part;
+@@ -964,16 +909,8 @@ struct cfs_cpt_table *
+ #ifdef CONFIG_HOTPLUG_CPU
+ static enum cpuhp_state lustre_cpu_online;
+ 
+-static void cfs_cpu_incr_cpt_version(void)
+-{
+-	spin_lock(&cpt_data.cpt_lock);
+-	cpt_data.cpt_version++;
+-	spin_unlock(&cpt_data.cpt_lock);
+-}
+-
+ static int cfs_cpu_online(unsigned int cpu)
+ {
+-	cfs_cpu_incr_cpt_version();
+ 	return 0;
  }
  
--static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
-+static int cfs_cpt_table_create_pattern(const char *pattern)
+@@ -981,14 +918,9 @@ static int cfs_cpu_dead(unsigned int cpu)
  {
--	struct cfs_cpt_table *cptab;
- 	char *pattern_dup;
- 	char *bracket;
- 	char *str;
-@@ -911,7 +915,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
- 	pattern_dup = kstrdup(pattern, GFP_KERNEL);
- 	if (!pattern_dup) {
- 		CERROR("Failed to duplicate pattern '%s'\n", pattern);
--		return ERR_PTR(-ENOMEM);
-+		return -ENOMEM;
- 	}
+ 	bool warn;
  
- 	str = strim(pattern_dup);
-@@ -948,10 +952,9 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
- 		goto err_free_str;
- 	}
- 
--	cptab = cfs_cpt_table_alloc(ncpt);
--	if (!cptab) {
--		CERROR("Failed to allocate CPU partition table\n");
--		rc = -ENOMEM;
-+	rc = cfs_cpt_table_setup(&cfs_cpt_tab, ncpt);
-+	if (rc) {
-+		CERROR("Failed to setup CPU partition table\n");
- 		goto err_free_str;
- 	}
- 
-@@ -960,14 +963,14 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
- 			if (cpumask_empty(cpumask_of_node(i)))
- 				continue;
- 
--			rc = cfs_cpt_set_node(cptab, cpt++, i);
-+			rc = cfs_cpt_set_node(&cfs_cpt_tab, cpt++, i);
- 			if (!rc) {
- 				rc = -EINVAL;
- 				goto err_free_table;
- 			}
- 		}
- 		kfree(pattern_dup);
--		return cptab;
-+		return 0;
- 	}
- 
- 	high = node ? nr_node_ids - 1 : nr_cpu_ids - 1;
-@@ -1006,7 +1009,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
- 			goto err_free_table;
- 		}
- 
--		if (cfs_cpt_weight(cptab, cpt)) {
-+		if (cfs_cpt_weight(&cfs_cpt_tab, cpt)) {
- 			CERROR("Partition %d has already been set.\n", cpt);
- 			rc = -EPERM;
- 			goto err_free_table;
-@@ -1040,8 +1043,8 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
- 				if ((i - range->re_lo) % range->re_stride)
- 					continue;
- 
--				rc = node ? cfs_cpt_set_node(cptab, cpt, i) :
--					    cfs_cpt_set_cpu(cptab, cpt, i);
-+				rc = node ? cfs_cpt_set_node(&cfs_cpt_tab, cpt, i) :
-+					    cfs_cpt_set_cpu(&cfs_cpt_tab, cpt, i);
- 				if (!rc) {
- 					cfs_expr_list_free(el);
- 					rc = -EINVAL;
-@@ -1052,7 +1055,7 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
- 
- 		cfs_expr_list_free(el);
- 
--		if (!cfs_cpt_online(cptab, cpt)) {
-+		if (!cfs_cpt_online(&cfs_cpt_tab, cpt)) {
- 			CERROR("No online CPU is found on partition %d\n", cpt);
- 			rc = -ENODEV;
- 			goto err_free_table;
-@@ -1062,13 +1065,13 @@ static struct cfs_cpt_table *cfs_cpt_table_create_pattern(const char *pattern)
- 	}
- 
- 	kfree(pattern_dup);
--	return cptab;
-+	return 0;
- 
- err_free_table:
--	cfs_cpt_table_free(cptab);
-+	cfs_cpt_table_free(&cfs_cpt_tab);
- err_free_str:
- 	kfree(pattern_dup);
--	return ERR_PTR(rc);
-+	return rc;
+-	cfs_cpu_incr_cpt_version();
+-
+-	mutex_lock(&cpt_data.cpt_mutex);
+ 	/* if all HTs in a core are offline, it may break affinity */
+-	cpumask_copy(cpt_data.cpt_cpumask, topology_sibling_cpumask(cpu));
+-	warn = cpumask_any_and(cpt_data.cpt_cpumask,
++	warn = cpumask_any_and(topology_sibling_cpumask(cpu),
+ 			       cpu_online_mask) >= nr_cpu_ids;
+-	mutex_unlock(&cpt_data.cpt_mutex);
+ 	CDEBUG(warn ? D_WARNING : D_INFO,
+ 	       "Lustre: can't support CPU plug-out well now, performance and stability could be impacted [CPU %u]\n",
+ 	       cpu);
+@@ -1007,7 +939,6 @@ static int cfs_cpu_dead(unsigned int cpu)
+ 		cpuhp_remove_state_nocalls(lustre_cpu_online);
+ 	cpuhp_remove_state_nocalls(CPUHP_LUSTRE_CFS_DEAD);
+ #endif
+-	free_cpumask_var(cpt_data.cpt_cpumask);
  }
  
- #ifdef CONFIG_HOTPLUG_CPU
-@@ -1095,8 +1098,7 @@ static int cfs_cpu_dead(unsigned int cpu)
+ int
+@@ -1017,16 +948,6 @@ static int cfs_cpu_dead(unsigned int cpu)
  
- void cfs_cpu_fini(void)
- {
--	if (!IS_ERR_OR_NULL(cfs_cpt_tab))
--		cfs_cpt_table_free(cfs_cpt_tab);
-+	cfs_cpt_table_free(&cfs_cpt_tab);
+ 	LASSERT(!cfs_cpt_tab);
  
- #ifdef CONFIG_HOTPLUG_CPU
- 	if (lustre_cpu_online > 0)
-@@ -1109,8 +1111,6 @@ int cfs_cpu_init(void)
- {
- 	int ret;
- 
--	LASSERT(!cfs_cpt_tab);
+-	memset(&cpt_data, 0, sizeof(cpt_data));
+-
+-	if (!zalloc_cpumask_var(&cpt_data.cpt_cpumask, GFP_NOFS)) {
+-		CERROR("Failed to allocate scratch buffer\n");
+-		return -1;
+-	}
+-
+-	spin_lock_init(&cpt_data.cpt_lock);
+-	mutex_init(&cpt_data.cpt_mutex);
 -
  #ifdef CONFIG_HOTPLUG_CPU
  	ret = cpuhp_setup_state_nocalls(CPUHP_LUSTRE_CFS_DEAD,
  					"staging/lustre/cfe:dead", NULL,
-@@ -1128,20 +1128,18 @@ int cfs_cpu_init(void)
+@@ -1042,6 +963,7 @@ static int cfs_cpu_dead(unsigned int cpu)
  #endif
- 	get_online_cpus();
- 	if (*cpu_pattern) {
--		cfs_cpt_tab = cfs_cpt_table_create_pattern(cpu_pattern);
--		if (IS_ERR(cfs_cpt_tab)) {
-+		ret = cfs_cpt_table_create_pattern(cpu_pattern);
-+		if (ret) {
- 			CERROR("Failed to create cptab from pattern '%s'\n",
- 			       cpu_pattern);
--			ret = PTR_ERR(cfs_cpt_tab);
- 			goto failed_alloc_table;
- 		}
+ 	ret = -EINVAL;
  
- 	} else {
--		cfs_cpt_tab = cfs_cpt_table_create(cpu_npartitions);
--		if (IS_ERR(cfs_cpt_tab)) {
-+		ret = cfs_cpt_table_create(cpu_npartitions);
-+		if (ret) {
- 			CERROR("Failed to create cptab with npartitions %d\n",
- 			       cpu_npartitions);
--			ret = PTR_ERR(cfs_cpt_tab);
- 			goto failed_alloc_table;
++	get_online_cpus();
+ 	if (*cpu_pattern) {
+ 		char *cpu_pattern_dup = kstrdup(cpu_pattern, GFP_KERNEL);
+ 
+@@ -1067,13 +989,7 @@ static int cfs_cpu_dead(unsigned int cpu)
  		}
  	}
-@@ -1150,14 +1148,13 @@ int cfs_cpu_init(void)
  
- 	LCONSOLE(0, "HW NUMA nodes: %d, HW CPU cores: %d, npartitions: %d\n",
+-	spin_lock(&cpt_data.cpt_lock);
+-	if (cfs_cpt_tab->ctb_version != cpt_data.cpt_version) {
+-		spin_unlock(&cpt_data.cpt_lock);
+-		CERROR("CPU hotplug/unplug during setup\n");
+-		goto failed;
+-	}
+-	spin_unlock(&cpt_data.cpt_lock);
++	put_online_cpus();
+ 
+ 	LCONSOLE(0, "HW nodes: %d, HW CPU cores: %d, npartitions: %d\n",
  		 num_online_nodes(), num_online_cpus(),
--		 cfs_cpt_number(cfs_cpt_tab));
-+		 cfs_cpt_number(&cfs_cpt_tab));
+@@ -1081,6 +997,7 @@ static int cfs_cpu_dead(unsigned int cpu)
  	return 0;
  
- failed_alloc_table:
- 	put_online_cpus();
- 
--	if (!IS_ERR_OR_NULL(cfs_cpt_tab))
--		cfs_cpt_table_free(cfs_cpt_tab);
-+	cfs_cpt_table_free(&cfs_cpt_tab);
- 
- 	ret = -EINVAL;
- #ifdef CONFIG_HOTPLUG_CPU
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index 2281f08..35c3959 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -66,6 +66,10 @@ struct lnet_debugfs_symlink_def {
- 
- static struct dentry *lnet_debugfs_root;
- 
-+/** Global CPU partition table */
-+struct cfs_cpt_table cfs_cpt_tab __read_mostly;
-+EXPORT_SYMBOL(cfs_cpt_tab);
-+
- BLOCKING_NOTIFIER_HEAD(libcfs_ioctl_list);
- EXPORT_SYMBOL(libcfs_ioctl_list);
- 
-@@ -402,7 +406,7 @@ static int proc_cpt_table(struct ctl_table *table, int write,
- 		if (!buf)
- 			return -ENOMEM;
- 
--		rc = cfs_cpt_table_print(cfs_cpt_tab, buf, len);
-+		rc = cfs_cpt_table_print(&cfs_cpt_tab, buf, len);
- 		if (rc >= 0)
- 			break;
- 
-@@ -437,14 +441,12 @@ static int proc_cpt_distance(struct ctl_table *table, int write,
- 	if (write)
- 		return -EPERM;
- 
--	LASSERT(cfs_cpt_tab);
--
- 	while (1) {
- 		buf = kzalloc(len, GFP_KERNEL);
- 		if (!buf)
- 			return -ENOMEM;
- 
--		rc = cfs_cpt_distance_print(cfs_cpt_tab, buf, len);
-+		rc = cfs_cpt_distance_print(&cfs_cpt_tab, buf, len);
- 		if (rc >= 0)
- 			break;
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index f9ed697..98a4942 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1414,8 +1414,8 @@ int lnet_lib_init(void)
- 	memset(&the_lnet, 0, sizeof(the_lnet));
- 
- 	/* refer to global cfs_cpt_tab for now */
--	the_lnet.ln_cpt_table	= cfs_cpt_tab;
--	the_lnet.ln_cpt_number	= cfs_cpt_number(cfs_cpt_tab);
-+	the_lnet.ln_cpt_table = &cfs_cpt_tab;
-+	the_lnet.ln_cpt_number = cfs_cpt_number(&cfs_cpt_tab);
- 
- 	LASSERT(the_lnet.ln_cpt_number > 0);
- 	if (the_lnet.ln_cpt_number > LNET_CPT_MAX) {
-diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
-index 741af10..939b7ec 100644
---- a/drivers/staging/lustre/lnet/selftest/framework.c
-+++ b/drivers/staging/lustre/lnet/selftest/framework.c
-@@ -588,7 +588,7 @@
- 
- 	CDEBUG(D_NET, "Reserved %d buffers for test %s\n",
- 	       nbuf * (srpc_serv_is_framework(svc) ?
--		       2 : cfs_cpt_number(cfs_cpt_tab)), svc->sv_name);
-+		       2 : cfs_cpt_number(&cfs_cpt_tab)), svc->sv_name);
- 	return 0;
+  failed:
++	put_online_cpus();
+ 	cfs_cpu_fini();
+ 	return ret;
  }
- 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
-index c1b82bf..c569a8b 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/client.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
-@@ -940,9 +940,9 @@ struct ptlrpc_request_set *ptlrpc_prep_set(void)
- 	struct ptlrpc_request_set *set;
- 	int cpt;
- 
--	cpt = cfs_cpt_current(cfs_cpt_tab, 0);
-+	cpt = cfs_cpt_current(&cfs_cpt_tab, 0);
- 	set = kzalloc_node(sizeof(*set), GFP_NOFS,
--			   cfs_cpt_spread_node(cfs_cpt_tab, cpt));
-+			   cfs_cpt_spread_node(&cfs_cpt_tab, cpt));
- 	if (!set)
- 		return NULL;
- 	atomic_set(&set->set_refcount, 1);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-index 5310054..d496521 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-@@ -177,7 +177,7 @@ void ptlrpcd_wake(struct ptlrpc_request *req)
- 	if (req && req->rq_send_state != LUSTRE_IMP_FULL)
- 		return &ptlrpcd_rcv;
- 
--	cpt = cfs_cpt_current(cfs_cpt_tab, 1);
-+	cpt = cfs_cpt_current(&cfs_cpt_tab, 1);
- 	if (!ptlrpcds_cpt_idx)
- 		idx = cpt;
- 	else
-@@ -389,7 +389,7 @@ static int ptlrpcd(void *arg)
- 	int exit = 0;
- 
- 	unshare_fs_struct();
--	if (cfs_cpt_bind(cfs_cpt_tab, pc->pc_cpt) != 0)
-+	if (cfs_cpt_bind(&cfs_cpt_tab, pc->pc_cpt) != 0)
- 		CWARN("Failed to bind %s on CPT %d\n", pc->pc_name, pc->pc_cpt);
- 
- 	/*
-@@ -531,7 +531,7 @@ static int ptlrpcd_partners(struct ptlrpcd *pd, int index)
- 
- 	size = sizeof(struct ptlrpcd_ctl *) * pc->pc_npartners;
- 	pc->pc_partners = kzalloc_node(size, GFP_NOFS,
--				       cfs_cpt_spread_node(cfs_cpt_tab,
-+				       cfs_cpt_spread_node(&cfs_cpt_tab,
- 							   pc->pc_cpt));
- 	if (!pc->pc_partners) {
- 		pc->pc_npartners = 0;
-@@ -677,7 +677,7 @@ static int ptlrpcd_init(void)
- 	/*
- 	 * Determine the CPTs that ptlrpcd threads will run on.
- 	 */
--	cptable = cfs_cpt_tab;
-+	cptable = &cfs_cpt_tab;
- 	ncpts = cfs_cpt_number(cptable);
- 	if (ptlrpcd_cpts) {
- 		struct cfs_expr_list *el;
-@@ -831,7 +831,7 @@ static int ptlrpcd_init(void)
- 
- 		size = offsetof(struct ptlrpcd, pd_threads[nthreads]);
- 		pd = kzalloc_node(size, GFP_NOFS,
--				  cfs_cpt_spread_node(cfs_cpt_tab, cpt));
-+				  cfs_cpt_spread_node(&cfs_cpt_tab, cpt));
- 		if (!pd) {
- 			rc = -ENOMEM;
- 			goto out;
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 8e74a45..853676f 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -565,7 +565,7 @@ struct ptlrpc_service *
- 
- 	cptable = cconf->cc_cptable;
- 	if (!cptable)
--		cptable = cfs_cpt_tab;
-+		cptable = &cfs_cpt_tab;
- 
- 	if (!conf->psc_thr.tc_cpu_affinity) {
- 		ncpts = 1;
-@@ -2520,7 +2520,7 @@ int ptlrpc_hr_init(void)
- 	int weight;
- 
- 	memset(&ptlrpc_hr, 0, sizeof(ptlrpc_hr));
--	ptlrpc_hr.hr_cpt_table = cfs_cpt_tab;
-+	ptlrpc_hr.hr_cpt_table = &cfs_cpt_tab;
- 
- 	ptlrpc_hr.hr_partitions = cfs_percpt_alloc(ptlrpc_hr.hr_cpt_table,
- 						   sizeof(*hrp));
 -- 
 1.8.3.1
