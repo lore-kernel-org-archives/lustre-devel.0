@@ -1,45 +1,46 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 25 Jun 2018 09:40:49 +1000
-Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
- module reduction.
-In-Reply-To: <DM3PR1101MB121322E85FDE1E5310F6F4B7CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
+Date: Mon, 25 Jun 2018 09:50:38 +1000
+Subject: [lustre-devel] [PATCH 09/24] lustre: don't use spare bits in
+ iattr.ia_valid
+In-Reply-To: <alpine.LFD.2.21.1806242129180.28698@casper.infradead.org>
 References: <152904663333.10587.10934053155404014785.stgit@noble>
- <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
- <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <alpine.LFD.2.21.1806210354260.3886@casper.infradead.org>
- <3FD4D051-9C95-449D-8A23-D42B271E55B8@dilger.ca>
- <DM3PR1101MB121322E85FDE1E5310F6F4B7CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
-Message-ID: <87tvprah32.fsf@notabene.neil.brown.name>
+ <152904669036.10587.17899565981649604892.stgit@noble>
+ <alpine.LFD.2.21.1806210233170.3886@casper.infradead.org>
+ <87fu1gdb4w.fsf@notabene.neil.brown.name>
+ <871sczd0fi.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1806242129180.28698@casper.infradead.org>
+Message-ID: <87r2kvagmp.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, Jun 21 2018, Patrick Farrell wrote:
-
-> Ah, thanks Andreas.  Perhaps not coincidentally, Lustre 2.4 is the first release I worked on.
->
-> Neil, I am really unenamored of the idea of the shared ptlrpc ldlm module being named ptlrpc...
-
-Can you say why?  Is it the choice of name that bothers you, or the
-combining of two things into the one kernel module, or something else?
-Currently in  git://git.hpdd.intel.com/fs/lustre-release.git
-(or the git tree that was until recently at the above address),
-the module named "ptlrpc" contains ptlrpc code, ldlm code, and target
-code.  I wonder what "target" means in this context.
+On Sun, Jun 24 2018, James Simmons wrote:
 
 >
-> Also, Lustre currently has a bunch of module parameters which are used for configuration.  Thoughts on that?
+> Okay I did some more testing and found I get this error with or without
+> this patch. Its due to a regression from an earlier patch. Can't figure
+> out where its coming from. I looked at the d_lock usage and it seems
+> balanced. So all but the first patch for the lustre_compact* header
+> changes seem okay. BTW they need a rebasing. Also since I have separated
+> out your libcfs tracefile fixes which I will push your okay with it so
+> it might be best to break the patches into two series.
 
-Yes, the module parameters are an interesting part of the story.
-libcfs has a bunch of module parameters that are symlinked from debugfs.
-It seems that user-space largely uses the debugfs links to access them,
-so they can become part of the "lnet" module with minimal pain.
-Other modules have parameters that I haven't yet looked in to.
+I've changed the problematic lustre_compat patch after a closer look at
+the code.  I'll post the result shortly.
 
-There probably will need to be user-space changes to support reduction
-in the number of modules.
+I don't understand your comment about "break the patches into two
+series".
+The goal for these patches isn't to make series', it is to apply them to
+the "lustre" branch, when they are ready.  Some are ready (thanks for
+the confirmation), some aren't.  The ones that aren't will get revised
+and reposted.
+
+I'm okay with you posting any patches that are useful, whether or not
+they conflict with anything in my lustre-testing branch.  My tendency
+will be to apply your patches first, then rebase my outstanding
+lustre-testing patches on top of them.
 
 Thanks,
 NeilBrown
@@ -49,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180625/0350635b/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180625/f89db3e4/attachment.sig>
