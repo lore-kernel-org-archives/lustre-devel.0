@@ -1,234 +1,305 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:53:45 -0400
-Subject: [lustre-devel] [PATCH 1/8] staging: lustre: lnet: simplify
- lnet_eq_wait_locked
+Date: Sun, 24 Jun 2018 17:53:52 -0400
+Subject: [lustre-devel] [PATCH 8/8] staging: lustre: selftest: fix time
+ reporting
 In-Reply-To: <1529877232-15582-1-git-send-email-jsimmons@infradead.org>
 References: <1529877232-15582-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1529877232-15582-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529877232-15582-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-We can simplify the code by taking advantage of the behavior
-of schedule_timeout_interruptible(). Instead of testing if
-tms is less than zero we can pass in a signed long that
-schedule_timeout_interruptible is expecting and for the case
-of no timeout we can pass in MAX_SCHEDULE_TIMEOUT.
+Migrate crp_stamp to nanoseconds and both timestamps nd_stamp,
+sn_start to ktime. The move away from jiffies, which can vary on
+platforms, to something that is the consistent on every node.
+Currently jiffies data was being transmitted over the wire and
+the other node could have a different HZ value configured which
+lead to incorrect results. This will ensure that the reported
+results to the user will always be correct.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-9019
-Reviewed-on: https://review.whamcloud.com/23147
+Reviewed-on: https://review.whamcloud.com/31041
 Reviewed-by: Doug Oucharek <dougso@me.com>
 Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/linux/lnet/api.h    |  2 +-
- .../lustre/include/uapi/linux/lnet/lnet-types.h    |  2 --
- drivers/staging/lustre/lnet/lnet/api-ni.c          | 38 ++++++++++++++--------
- drivers/staging/lustre/lnet/lnet/lib-eq.c          | 26 +++++----------
- 4 files changed, 33 insertions(+), 35 deletions(-)
+ .../lustre/include/uapi/linux/lnet/lnetst.h        |  2 +-
+ drivers/staging/lustre/lnet/selftest/conrpc.c      | 39 +++++++++++-----------
+ drivers/staging/lustre/lnet/selftest/conrpc.h      |  2 +-
+ drivers/staging/lustre/lnet/selftest/console.c     |  4 +--
+ drivers/staging/lustre/lnet/selftest/console.h     |  2 +-
+ drivers/staging/lustre/lnet/selftest/framework.c   |  4 +--
+ drivers/staging/lustre/lnet/selftest/selftest.h    |  2 +-
+ drivers/staging/lustre/lnet/selftest/timer.c       |  8 ++---
+ 8 files changed, 32 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/api.h b/drivers/staging/lustre/include/linux/lnet/api.h
-index dae2e4f..2242921 100644
---- a/drivers/staging/lustre/include/linux/lnet/api.h
-+++ b/drivers/staging/lustre/include/linux/lnet/api.h
-@@ -168,7 +168,7 @@ int LNetEQAlloc(unsigned int       count_in,
+diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnetst.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnetst.h
+index a4f9ff0..7cfc241 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lnet/lnetst.h
++++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnetst.h
+@@ -71,7 +71,7 @@
  
- int LNetEQPoll(struct lnet_handle_eq *eventqs_in,
- 	       int		 neq_in,
--	       int		 timeout_ms,
-+	       signed long	 timeout,
- 	       int		 interruptible,
- 	       struct lnet_event *event_out,
- 	       int		*which_eq_out);
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
-index 1be9b7a..14715a8 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
-@@ -77,8 +77,6 @@
- #define LNET_PID_USERFLAG 0x80000000 /* set in userspace peers */
- #define LNET_PID_LUSTRE	  12345
+ struct lst_sid {
+ 	lnet_nid_t	ses_nid;	/* nid of console node */
+-	__u64		ses_stamp;	/* time stamp */
++	__s64		ses_stamp;	/* time stamp */
+ };					/*** session id */
  
--#define LNET_TIME_FOREVER (-1)
--
- /* how an LNET NID encodes net:address */
- /** extract the address part of an lnet_nid_t */
+ extern struct lst_sid LST_INVALID_SID;
+diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
+index 0dabade..95cbd1a 100644
+--- a/drivers/staging/lustre/lnet/selftest/conrpc.c
++++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
+@@ -70,11 +70,11 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 	/* not an orphan RPC */
+ 	crpc->crp_finished = 1;
  
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index f9ed697..878c92c 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -59,7 +59,7 @@
- module_param(rnet_htable_size, int, 0444);
- MODULE_PARM_DESC(rnet_htable_size, "size of remote network hash table");
+-	if (!crpc->crp_stamp) {
++	if (!crpc->crp_stamp_ns) {
+ 		/* not aborted */
+ 		LASSERT(!crpc->crp_status);
  
--static int lnet_ping(struct lnet_process_id id, int timeout_ms,
-+static int lnet_ping(struct lnet_process_id id, signed long timeout,
- 		     struct lnet_process_id __user *ids, int n_ids);
- 
- static char *
-@@ -2052,17 +2052,29 @@ void lnet_lib_exit(void)
- 	case IOC_LIBCFS_LNET_FAULT:
- 		return lnet_fault_ctl(data->ioc_flags, data);
- 
--	case IOC_LIBCFS_PING:
-+	case IOC_LIBCFS_PING: {
-+		signed long timeout;
-+
- 		id.nid = data->ioc_nid;
- 		id.pid = data->ioc_u32[0];
--		rc = lnet_ping(id, data->ioc_u32[1], /* timeout */
--			       data->ioc_pbuf1,
-+
-+		/* Don't block longer than 2 minutes */
-+		if (data->ioc_u32[1] > 120 * MSEC_PER_SEC)
-+			return -EINVAL;
-+
-+		/* If timestamp is negative then disable timeout */
-+		if ((s32)data->ioc_u32[1] < 0)
-+			timeout = MAX_SCHEDULE_TIMEOUT;
-+		else
-+			timeout = msecs_to_jiffies(data->ioc_u32[1]);
-+
-+		rc = lnet_ping(id, timeout, data->ioc_pbuf1,
- 			       data->ioc_plen1 / sizeof(struct lnet_process_id));
- 		if (rc < 0)
- 			return rc;
- 		data->ioc_count = rc;
- 		return 0;
--
-+	}
- 	default:
- 		ni = lnet_net2ni(data->ioc_net);
- 		if (!ni)
-@@ -2126,7 +2138,7 @@ void LNetDebugPeer(struct lnet_process_id id)
- }
- EXPORT_SYMBOL(LNetGetId);
- 
--static int lnet_ping(struct lnet_process_id id, int timeout_ms,
-+static int lnet_ping(struct lnet_process_id id, signed long timeout,
- 		     struct lnet_process_id __user *ids, int n_ids)
- {
- 	struct lnet_handle_eq eqh;
-@@ -2136,7 +2148,7 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
- 	int which;
- 	int unlinked = 0;
- 	int replied = 0;
--	const int a_long_time = 60000; /* mS */
-+	const signed long a_long_time = msecs_to_jiffies(60 * MSEC_PER_SEC);
- 	int infosz;
- 	struct lnet_ping_info *info;
- 	struct lnet_process_id tmpid;
-@@ -2147,10 +2159,8 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
- 
- 	infosz = offsetof(struct lnet_ping_info, pi_ni[n_ids]);
- 
--	if (n_ids <= 0 ||
--	    id.nid == LNET_NID_ANY ||
--	    timeout_ms > 500000 ||	      /* arbitrary limit! */
--	    n_ids > 20)			 /* arbitrary limit! */
-+	/* n_ids limit is arbitrary */
-+	if (n_ids <= 0 || n_ids > 20 || id.nid == LNET_NID_ANY)
- 		return -EINVAL;
- 
- 	if (id.pid == LNET_PID_ANY)
-@@ -2194,13 +2204,13 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
- 
- 		/* NB must wait for the UNLINK event below... */
- 		unlinked = 1;
--		timeout_ms = a_long_time;
-+		timeout = a_long_time;
+-		crpc->crp_stamp = jiffies;
++		crpc->crp_stamp_ns = ktime_get_ns();
+ 		crpc->crp_status = rpc->crpc_status;
  	}
  
- 	do {
- 		/* MUST block for unlink to complete */
+@@ -102,7 +102,7 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 	crpc->crp_finished = 0;
+ 	crpc->crp_unpacked = 0;
+ 	crpc->crp_status = 0;
+-	crpc->crp_stamp = 0;
++	crpc->crp_stamp_ns = 0;
+ 	crpc->crp_embedded = embedded;
+ 	INIT_LIST_HEAD(&crpc->crp_link);
  
--		rc2 = LNetEQPoll(&eqh, 1, timeout_ms, !unlinked,
-+		rc2 = LNetEQPoll(&eqh, 1, timeout, !unlinked,
- 				 &event, &which);
+@@ -294,16 +294,16 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 		spin_lock(&rpc->crpc_lock);
  
- 		CDEBUG(D_NET, "poll %d(%d %d)%s\n", rc2,
-@@ -2222,7 +2232,7 @@ static int lnet_ping(struct lnet_process_id id, int timeout_ms,
- 				LNetMDUnlink(mdh);
- 				/* No assertion (racing with network) */
- 				unlinked = 1;
--				timeout_ms = a_long_time;
-+				timeout = a_long_time;
- 			} else if (!rc2) {
- 				/* timed out waiting for unlink */
- 				CWARN("ping %s: late network completion\n",
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-eq.c b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-index c78e703..366ad8a 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-eq.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-eq.c
-@@ -308,13 +308,12 @@
-  */
+ 		if (!crpc->crp_posted || /* not posted */
+-		    crpc->crp_stamp) {	 /* rpc done or aborted already */
+-			if (!crpc->crp_stamp) {
+-				crpc->crp_stamp = jiffies;
++		    crpc->crp_stamp_ns) {	 /* rpc done or aborted already */
++			if (!crpc->crp_stamp_ns) {
++				crpc->crp_stamp_ns = ktime_get_ns();
+ 				crpc->crp_status = -EINTR;
+ 			}
+ 			spin_unlock(&rpc->crpc_lock);
+ 			continue;
+ 		}
+ 
+-		crpc->crp_stamp = jiffies;
++		crpc->crp_stamp_ns = ktime_get_ns();
+ 		crpc->crp_status = error;
+ 
+ 		spin_unlock(&rpc->crpc_lock);
+@@ -314,10 +314,10 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 			continue;
+ 
+ 		nd = crpc->crp_node;
+-		if (time_after(nd->nd_stamp, crpc->crp_stamp))
++		if (ktime_to_ns(nd->nd_stamp) > crpc->crp_stamp_ns)
+ 			continue;
+ 
+-		nd->nd_stamp = crpc->crp_stamp;
++		nd->nd_stamp = ktime_set(0, crpc->crp_stamp_ns);
+ 		nd->nd_state = LST_NODE_DOWN;
+ 	}
+ }
+@@ -390,7 +390,7 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 	struct srpc_generic_reply *rep;
+ 
+ 	LASSERT(nd && rpc);
+-	LASSERT(crpc->crp_stamp);
++	LASSERT(crpc->crp_stamp_ns);
+ 
+ 	if (crpc->crp_status) {
+ 		*msgpp = NULL;
+@@ -403,10 +403,10 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 		crpc->crp_unpacked = 1;
+ 	}
+ 
+-	if (time_after(nd->nd_stamp, crpc->crp_stamp))
++	if (ktime_to_ns(nd->nd_stamp) > crpc->crp_stamp_ns)
+ 		return 0;
+ 
+-	nd->nd_stamp = crpc->crp_stamp;
++	nd->nd_stamp = ktime_set(0, crpc->crp_stamp_ns);
+ 	rep = &(*msgpp)->msg_body.reply;
+ 
+ 	if (rep->sid.ses_nid == LNET_NID_ANY)
+@@ -433,7 +433,7 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 	list_for_each_entry(crpc, &trans->tas_rpcs_list, crp_link) {
+ 		lstcon_rpc_stat_total(stat, 1);
+ 
+-		LASSERT(crpc->crp_stamp);
++		LASSERT(crpc->crp_stamp_ns);
+ 
+ 		error = lstcon_rpc_get_reply(crpc, &rep);
+ 		if (error) {
+@@ -474,9 +474,9 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 	struct lstcon_rpc *crpc;
+ 	struct srpc_msg *msg;
+ 	struct lstcon_node *nd;
+-	long dur;
+ 	struct timeval tv;
+ 	int error;
++	s64 dur;
+ 
+ 	LASSERT(head_up);
+ 
+@@ -493,15 +493,15 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 
+ 		ent = list_entry(next, struct lstcon_rpc_ent, rpe_link);
+ 
+-		LASSERT(crpc->crp_stamp);
++		LASSERT(crpc->crp_stamp_ns);
+ 
+ 		error = lstcon_rpc_get_reply(crpc, &msg);
+ 
+ 		nd = crpc->crp_node;
+ 
+-		dur = (long)(crpc->crp_stamp -
+-			     (unsigned long)console_session.ses_id.ses_stamp);
+-		jiffies_to_timeval(dur, &tv);
++		dur = crpc->crp_stamp_ns -
++		      console_session.ses_id.ses_stamp * NSEC_PER_MSEC;
++		tv = ns_to_timeval(dur);
+ 
+ 		if (copy_to_user(&ent->rpe_peer, &nd->nd_id,
+ 				 sizeof(struct lnet_process_id)) ||
+@@ -1246,7 +1246,8 @@ void lstcon_rpc_stat_reply(struct lstcon_rpc_trans *, struct srpc_msg *,
+ 		if (nd->nd_state != LST_NODE_ACTIVE)
+ 			continue;
+ 
+-		intv = (jiffies - nd->nd_stamp) / msecs_to_jiffies(MSEC_PER_SEC);
++		intv = div_u64(ktime_ms_delta(ktime_get(), nd->nd_stamp),
++			       MSEC_PER_SEC);
+ 		if (intv < nd->nd_timeout / 2)
+ 			continue;
+ 
+diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.h b/drivers/staging/lustre/lnet/selftest/conrpc.h
+index ce2f92d..dfc31b8 100644
+--- a/drivers/staging/lustre/lnet/selftest/conrpc.h
++++ b/drivers/staging/lustre/lnet/selftest/conrpc.h
+@@ -70,7 +70,7 @@ struct lstcon_rpc {
+ 	/** RPC is embedded in other structure and can't free it */
+ 	unsigned int		 crp_embedded:1;
+ 	int			 crp_status;	/* console rpc errors */
+-	unsigned long		 crp_stamp;	/* replied time stamp */
++	s64			 crp_stamp_ns;	/* replied time stamp */
+ };
+ 
+ struct lstcon_rpc_trans {
+diff --git a/drivers/staging/lustre/lnet/selftest/console.c b/drivers/staging/lustre/lnet/selftest/console.c
+index 3c1c1b5..8e6f875 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.c
++++ b/drivers/staging/lustre/lnet/selftest/console.c
+@@ -97,7 +97,7 @@
+ 
+ 	ndl->ndl_node->nd_ref = 1;
+ 	ndl->ndl_node->nd_id = id;
+-	ndl->ndl_node->nd_stamp = jiffies;
++	ndl->ndl_node->nd_stamp = ktime_get();
+ 	ndl->ndl_node->nd_state = LST_NODE_UNKNOWN;
+ 	ndl->ndl_node->nd_timeout = 0;
+ 	memset(&ndl->ndl_node->nd_ping, 0, sizeof(struct lstcon_rpc));
+@@ -1700,7 +1700,7 @@ static void lstcon_group_ndlink_release(struct lstcon_group *,
+ 
+ 	LNetGetId(1, &id);
+ 	sid->ses_nid = id.nid;
+-	sid->ses_stamp = jiffies;
++	sid->ses_stamp = div_u64(ktime_get_ns(), NSEC_PER_MSEC);
+ }
+ 
+ int
+diff --git a/drivers/staging/lustre/lnet/selftest/console.h b/drivers/staging/lustre/lnet/selftest/console.h
+index 2826205..eaad07c 100644
+--- a/drivers/staging/lustre/lnet/selftest/console.h
++++ b/drivers/staging/lustre/lnet/selftest/console.h
+@@ -51,7 +51,7 @@ struct lstcon_node {
+ 	int		  nd_ref;     /* reference count */
+ 	int		  nd_state;   /* state of the node */
+ 	int		  nd_timeout; /* session timeout */
+-	unsigned long	  nd_stamp;   /* timestamp of last replied RPC */
++	ktime_t			nd_stamp;   /* timestamp of last replied RPC */
+ 	struct lstcon_rpc nd_ping;    /* ping rpc */
+ };
+ 
+diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+index 741af10..6768aef 100644
+--- a/drivers/staging/lustre/lnet/selftest/framework.c
++++ b/drivers/staging/lustre/lnet/selftest/framework.c
+@@ -272,7 +272,7 @@
+ 	sn->sn_id = sid;
+ 	sn->sn_features = features;
+ 	sn->sn_timeout = session_timeout;
+-	sn->sn_started = jiffies;
++	sn->sn_started = ktime_get();
+ 
+ 	timer->stt_data = sn;
+ 	timer->stt_func = sfw_session_expired;
+@@ -384,7 +384,7 @@
+ 	 * send over the msecs since the session was started
+ 	 * with 32 bits to send, this is ~49 days
+ 	 */
+-	cnt->running_ms = jiffies_to_msecs(jiffies - sn->sn_started);
++	cnt->running_ms = ktime_ms_delta(ktime_get(), sn->sn_started);
+ 	cnt->brw_errors = atomic_read(&sn->sn_brw_errors);
+ 	cnt->ping_errors = atomic_read(&sn->sn_ping_errors);
+ 	cnt->zombie_sessions = atomic_read(&sfw_data.fw_nzombies);
+diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
+index 8737fa9..76e02cd 100644
+--- a/drivers/staging/lustre/lnet/selftest/selftest.h
++++ b/drivers/staging/lustre/lnet/selftest/selftest.h
+@@ -331,7 +331,7 @@ struct sfw_session {
+ 	atomic_t	 sn_refcount;
+ 	atomic_t	 sn_brw_errors;
+ 	atomic_t	 sn_ping_errors;
+-	unsigned long	 sn_started;
++	ktime_t		 sn_started;
+ };
+ 
+ #define sfw_sid_equal(sid0, sid1)     ((sid0).ses_nid == (sid1).ses_nid && \
+diff --git a/drivers/staging/lustre/lnet/selftest/timer.c b/drivers/staging/lustre/lnet/selftest/timer.c
+index 582f252..c83473e 100644
+--- a/drivers/staging/lustre/lnet/selftest/timer.c
++++ b/drivers/staging/lustre/lnet/selftest/timer.c
+@@ -55,7 +55,7 @@
+ 
+ static struct st_timer_data {
+ 	spinlock_t	  stt_lock;
+-	unsigned long	  stt_prev_slot; /* start time of the slot processed
++	time64_t	  stt_prev_slot; /* start time of the slot processed
+ 					  * previously
+ 					  */
+ 	struct list_head  stt_hash[STTIMER_NSLOTS];
+@@ -144,18 +144,18 @@
+ }
  
  static int
--lnet_eq_wait_locked(int *timeout_ms, long state)
-+lnet_eq_wait_locked(signed long *timeout, long state)
- __must_hold(&the_lnet.ln_eq_wait_lock)
+-stt_check_timers(unsigned long *last)
++stt_check_timers(time64_t *last)
  {
--	int tms = *timeout_ms;
-+	signed long tms = *timeout;
- 	int wait;
- 	wait_queue_entry_t wl;
--	unsigned long now;
+ 	int expired = 0;
+ 	time64_t now;
+-	unsigned long this_slot;
++	time64_t this_slot;
  
- 	if (!tms)
- 		return -ENXIO; /* don't want to wait and no new event */
-@@ -325,18 +324,9 @@
+ 	now = ktime_get_real_seconds();
+ 	this_slot = now & STTIMER_SLOTTIMEMASK;
  
- 	lnet_eq_wait_unlock();
+ 	spin_lock(&stt_data.stt_lock);
  
--	if (tms < 0) {
--		schedule();
--	} else {
--		now = jiffies;
--		schedule_timeout(msecs_to_jiffies(tms));
--		tms -= jiffies_to_msecs(jiffies - now);
--		if (tms < 0) /* no more wait but may have new event */
--			tms = 0;
--	}
--
-+	tms = schedule_timeout_interruptible(tms);
- 	wait = tms; /* might need to call here again */
--	*timeout_ms = tms;
-+	*timeout = tms;
- 
- 	lnet_eq_wait_lock();
- 	remove_wait_queue(&the_lnet.ln_eq_waitq, &wl);
-@@ -356,8 +346,8 @@
-  * fixed period, or block indefinitely.
-  *
-  * \param eventqs,neq An array of EQ handles, and size of the array.
-- * \param timeout_ms Time in milliseconds to wait for an event to occur on
-- * one of the EQs. The constant LNET_TIME_FOREVER can be used to indicate an
-+ * \param timeout Time in jiffies to wait for an event to occur on
-+ * one of the EQs. The constant MAX_SCHEDULE_TIMEOUT can be used to indicate an
-  * infinite timeout.
-  * \param interruptible, if true, use TASK_INTERRUPTIBLE, else TASK_NOLOAD
-  * \param event,which On successful return (1 or -EOVERFLOW), \a event will
-@@ -372,7 +362,7 @@
-  * \retval -ENOENT    If there's an invalid handle in \a eventqs.
-  */
- int
--LNetEQPoll(struct lnet_handle_eq *eventqs, int neq, int timeout_ms,
-+LNetEQPoll(struct lnet_handle_eq *eventqs, int neq, signed long timeout,
- 	   int interruptible,
- 	   struct lnet_event *event, int *which)
- {
-@@ -414,7 +404,7 @@
- 		 *  0 : don't want to wait anymore, but might have new event
- 		 *      so need to call dequeue again
- 		 */
--		wait = lnet_eq_wait_locked(&timeout_ms,
-+		wait = lnet_eq_wait_locked(&timeout,
- 					   interruptible ? TASK_INTERRUPTIBLE
- 					   : TASK_NOLOAD);
- 		if (wait < 0) /* no new event */
+-	while (time_after_eq(this_slot, *last)) {
++	while (this_slot >= *last) {
+ 		expired += stt_expire_list(STTIMER_SLOT(this_slot), now);
+ 		this_slot = this_slot - STTIMER_SLOTTIME;
+ 	}
 -- 
 1.8.3.1
