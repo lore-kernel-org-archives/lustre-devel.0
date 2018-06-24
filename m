@@ -1,61 +1,53 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:53:44 -0400
-Subject: [lustre-devel] [PATCH 0/8] staging: lustre: lnet: resolve time
- handling issues
-Message-ID: <1529877232-15582-1-git-send-email-jsimmons@infradead.org>
+Date: Sun, 24 Jun 2018 17:53:46 -0400
+Subject: [lustre-devel] [PATCH 2/8] staging: lustre: o2iblnd: use
+ ktime_get_real_ns for ibn_incarnation
+In-Reply-To: <1529877232-15582-1-git-send-email-jsimmons@infradead.org>
+References: <1529877232-15582-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529877232-15582-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The migration of lustre to 64 bit time handling exposed various bugs
-which have lead to problems like routers no longer functioning with
-the upstream client. This is due to the complex handling of time by
-lustre with seconds time units and jiffies. Add in the fact that
-jiffies can vary from node to node and you can encounter corner
-case issues in a large node deployment. The solution to resolve this
-was to migrate as much as possible to time64_t when all you needed
-was seconds percision and ktime_t if better percision was required.
-With these changes it is reduced down to using jiffies only for
-schedule_timeout calls.
+Instead of getting the real time using ktime_get_real_ts64() and
+turning it into usecs we can simplify the code and call
+ktime_get_real_ns() instead.
 
-James Simmons (8):
-  staging: lustre: lnet: simplify lnet_eq_wait_locked
-  staging: lustre: o2iblnd: use ktime_get_real_ns for ibn_incarnation
-  staging: lustre: ksocklnd: use ktime_get_real_ns for ksnn_incarnation
-  staging: lustre: ksocklnd: move remaining time handling to 64 bits
-  staging: lustre: lnet: use ktime_get_real_ns for cookie creation
-  staging: lustre: lnet: move ping and delay injection to time64_t
-  staging: lustre: ko2iblnd: remove remaining jiffy use
-  staging: lustre: selftest: fix time reporting
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9019
+Reviewed-on: https://review.whamcloud.com/23267
+Reviewed-by: Doug Oucharek <dougso@me.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
- drivers/staging/lustre/include/linux/lnet/api.h    |   2 +-
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |   8 +-
- .../staging/lustre/include/linux/lnet/lib-types.h  |  13 ++-
- .../lustre/include/uapi/linux/lnet/lnet-types.h    |   2 -
- .../lustre/include/uapi/linux/lnet/lnetst.h        |   2 +-
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  53 +++++-----
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  28 ++---
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |  36 +++----
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |  44 ++++----
- .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |  22 ++--
- .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c | 117 ++++++++++-----------
- drivers/staging/lustre/lnet/lnet/api-ni.c          |  54 ++++++----
- drivers/staging/lustre/lnet/lnet/lib-eq.c          |  26 ++---
- drivers/staging/lustre/lnet/lnet/lib-move.c        |  24 ++---
- drivers/staging/lustre/lnet/lnet/net_fault.c       |  72 ++++++-------
- drivers/staging/lustre/lnet/lnet/peer.c            |   2 +-
- drivers/staging/lustre/lnet/lnet/router.c          |  35 +++---
- drivers/staging/lustre/lnet/lnet/router_proc.c     |  27 +++--
- drivers/staging/lustre/lnet/selftest/conrpc.c      |  39 +++----
- drivers/staging/lustre/lnet/selftest/conrpc.h      |   2 +-
- drivers/staging/lustre/lnet/selftest/console.c     |   4 +-
- drivers/staging/lustre/lnet/selftest/console.h     |   2 +-
- drivers/staging/lustre/lnet/selftest/framework.c   |   4 +-
- drivers/staging/lustre/lnet/selftest/selftest.h    |   2 +-
- drivers/staging/lustre/lnet/selftest/timer.c       |   8 +-
- 25 files changed, 304 insertions(+), 324 deletions(-)
-
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index f0b4eb42..5761e3d 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2822,7 +2822,6 @@ static int kiblnd_startup(struct lnet_ni *ni)
+ 	char *ifname;
+ 	struct kib_dev *ibdev = NULL;
+ 	struct kib_net *net;
+-	struct timespec64 tv;
+ 	unsigned long flags;
+ 	int rc;
+ 	int newdev;
+@@ -2840,9 +2839,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
+ 	if (!net)
+ 		goto net_failed;
+ 
+-	ktime_get_real_ts64(&tv);
+-	net->ibn_incarnation = tv.tv_sec * USEC_PER_SEC +
+-			       tv.tv_nsec / NSEC_PER_USEC;
++	net->ibn_incarnation = ktime_get_real_ns() / NSEC_PER_USEC;
+ 
+ 	rc = kiblnd_tunables_setup(ni);
+ 	if (rc)
 -- 
 1.8.3.1
