@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:20:31 -0400
-Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
- support
+Date: Sun, 24 Jun 2018 17:20:32 -0400
+Subject: [lustre-devel] [PATCH v3 08/26] staging: lustre: libcfs: add cpu
+ distance handling
 In-Reply-To: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529875250-11531-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,11 +13,9 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-This patch adds NUMA node support. NUMA node information is stored
-in the CPT table. A NUMA node mask is maintained for the entire
-table as well as for each CPT to track the NUMA nodes related to
-each of the CPTs. Add new function cfs_cpt_of_node() which returns
-the CPT of a particular NUMA node.
+Add functionality to calculate the distance between two CPTs.
+Expose those distance in debugfs so people deploying a setup
+can debug what is being created for CPTs.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-7734
@@ -26,98 +24,186 @@ Reviewed-by: Olaf Weber <olaf@sgi.com>
 Reviewed-by: Doug Oucharek <dougso@me.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/linux/libcfs/libcfs_cpu.h        | 11 +++++++++++
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c     | 21 +++++++++++++++++++++
- 2 files changed, 32 insertions(+)
+ .../lustre/include/linux/libcfs/libcfs_cpu.h       | 31 +++++++++++
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 61 ++++++++++++++++++++++
+ 2 files changed, 92 insertions(+)
 
 diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 1b4333d..ff3ecf5 100644
+index ff3ecf5..a015ac1 100644
 --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
 +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -103,6 +103,8 @@ struct cfs_cpt_table {
- 	int				*ctb_cpu2cpt;
- 	/* all cpus in this partition table */
- 	cpumask_var_t			ctb_cpumask;
-+	/* shadow HW node to CPU partition ID */
-+	int				*ctb_node2cpt;
- 	/* all nodes in this partition table */
- 	nodemask_t			*ctb_nodemask;
+@@ -86,6 +86,8 @@ struct cfs_cpu_partition {
+ 	cpumask_var_t			cpt_cpumask;
+ 	/* nodes mask for this partition */
+ 	nodemask_t			*cpt_nodemask;
++	/* NUMA distance between CPTs */
++	unsigned int			*cpt_distance;
+ 	/* spread rotor for NUMA allocator */
+ 	unsigned int			cpt_spread_rotor;
  };
-@@ -143,6 +145,10 @@ struct cfs_cpt_table {
+@@ -95,6 +97,8 @@ struct cfs_cpu_partition {
+ struct cfs_cpt_table {
+ 	/* spread rotor for NUMA allocator */
+ 	unsigned int			ctb_spread_rotor;
++	/* maximum NUMA distance between all nodes in table */
++	unsigned int			ctb_distance;
+ 	/* # of CPU partitions */
+ 	unsigned int			ctb_nparts;
+ 	/* partitions tables */
+@@ -120,6 +124,10 @@ struct cfs_cpt_table {
   */
- int cfs_cpt_of_cpu(struct cfs_cpt_table *cptab, int cpu);
+ int cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf, int len);
  /**
-+ * shadow HW node ID \a NODE to CPU-partition ID by \a cptab
++ * print distance information of cpt-table
 + */
-+int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node);
++int cfs_cpt_distance_print(struct cfs_cpt_table *cptab, char *buf, int len);
++/**
+  * return total number of CPU partitions in \a cptab
+  */
+ int
+@@ -149,6 +157,10 @@ struct cfs_cpt_table {
+  */
+ int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node);
+ /**
++ * NUMA distance between \a cpt1 and \a cpt2 in \a cptab
++ */
++unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2);
 +/**
   * bind current thread on a CPU-partition \a cpt of \a cptab
   */
  int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt);
-@@ -299,6 +305,11 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
- 	return 0;
+@@ -206,6 +218,19 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+ struct cfs_cpt_table;
+ #define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
+ 
++static inline int cfs_cpt_distance_print(struct cfs_cpt_table *cptab,
++					 char *buf, int len)
++{
++	int rc;
++
++	rc = snprintf(buf, len, "0\t: 0:1\n");
++	len -= rc;
++	if (len <= 0)
++		return -EFBIG;
++
++	return rc;
++}
++
+ static inline cpumask_var_t *
+ cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt)
+ {
+@@ -241,6 +266,12 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+ 	return NULL;
  }
  
-+static inline int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node)
++static inline unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab,
++					    int cpt1, int cpt2)
 +{
-+	return 0;
++	return 1;
 +}
 +
  static inline int
- cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
+ cfs_cpt_set_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
  {
 diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index 33294da..8c5cf7b 100644
+index 8c5cf7b..b315fb2 100644
 --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
 +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -102,6 +102,15 @@ struct cfs_cpt_table *
- 	memset(cptab->ctb_cpu2cpt, -1,
- 	       nr_cpu_ids * sizeof(cptab->ctb_cpu2cpt[0]));
+@@ -128,6 +128,15 @@ struct cfs_cpt_table *
+ 					     GFP_NOFS);
+ 		if (!part->cpt_nodemask)
+ 			goto failed_setting_ctb_parts;
++
++		part->cpt_distance = kvmalloc_array(cptab->ctb_nparts,
++						    sizeof(part->cpt_distance[0]),
++						    GFP_KERNEL);
++		if (!part->cpt_distance)
++			goto failed_setting_ctb_parts;
++
++		memset(part->cpt_distance, -1,
++		       cptab->ctb_nparts * sizeof(part->cpt_distance[0]));
+ 	}
  
-+	cptab->ctb_node2cpt = kvmalloc_array(nr_node_ids,
-+					     sizeof(cptab->ctb_node2cpt[0]),
-+					     GFP_KERNEL);
-+	if (!cptab->ctb_node2cpt)
-+		goto failed_alloc_node2cpt;
-+
-+	memset(cptab->ctb_node2cpt, -1,
-+	       nr_node_ids * sizeof(cptab->ctb_node2cpt[0]));
-+
- 	cptab->ctb_parts = kvmalloc_array(ncpt, sizeof(cptab->ctb_parts[0]),
- 					  GFP_KERNEL);
- 	if (!cptab->ctb_parts)
-@@ -133,6 +142,8 @@ struct cfs_cpt_table *
+ 	return cptab;
+@@ -138,6 +147,7 @@ struct cfs_cpt_table *
+ 
+ 		kfree(part->cpt_nodemask);
+ 		free_cpumask_var(part->cpt_cpumask);
++		kvfree(part->cpt_distance);
+ 	}
  
  	kvfree(cptab->ctb_parts);
- failed_alloc_ctb_parts:
-+	kvfree(cptab->ctb_node2cpt);
-+failed_alloc_node2cpt:
- 	kvfree(cptab->ctb_cpu2cpt);
- failed_alloc_cpu2cpt:
- 	kfree(cptab->ctb_nodemask);
-@@ -150,6 +161,7 @@ struct cfs_cpt_table *
- 	int i;
+@@ -168,6 +178,7 @@ struct cfs_cpt_table *
  
- 	kvfree(cptab->ctb_cpu2cpt);
-+	kvfree(cptab->ctb_node2cpt);
+ 		kfree(part->cpt_nodemask);
+ 		free_cpumask_var(part->cpt_cpumask);
++		kvfree(part->cpt_distance);
+ 	}
  
- 	for (i = 0; cptab->ctb_parts && i < cptab->ctb_nparts; i++) {
- 		struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
-@@ -515,6 +527,15 @@ struct cfs_cpt_table *
+ 	kvfree(cptab->ctb_parts);
+@@ -222,6 +233,44 @@ struct cfs_cpt_table *
  }
- EXPORT_SYMBOL(cfs_cpt_of_cpu);
+ EXPORT_SYMBOL(cfs_cpt_table_print);
  
-+int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node)
++int cfs_cpt_distance_print(struct cfs_cpt_table *cptab, char *buf, int len)
 +{
-+	if (node < 0 || node > nr_node_ids)
-+		return CFS_CPT_ANY;
++	char *tmp = buf;
++	int rc;
++	int i;
++	int j;
 +
-+	return cptab->ctb_node2cpt[node];
++	for (i = 0; i < cptab->ctb_nparts; i++) {
++		if (len <= 0)
++			goto err;
++
++		rc = snprintf(tmp, len, "%d\t:", i);
++		len -= rc;
++
++		if (len <= 0)
++			goto err;
++
++		tmp += rc;
++		for (j = 0; j < cptab->ctb_nparts; j++) {
++			rc = snprintf(tmp, len, " %d:%d", j,
++				      cptab->ctb_parts[i].cpt_distance[j]);
++			len -= rc;
++			if (len <= 0)
++				goto err;
++			tmp += rc;
++		}
++
++		*tmp = '\n';
++		tmp++;
++		len--;
++	}
++
++	return tmp - buf;
++err:
++	return -E2BIG;
 +}
-+EXPORT_SYMBOL(cfs_cpt_of_node);
++EXPORT_SYMBOL(cfs_cpt_distance_print);
 +
  int
- cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
+ cfs_cpt_number(struct cfs_cpt_table *cptab)
+ {
+@@ -273,6 +322,18 @@ struct cfs_cpt_table *
+ }
+ EXPORT_SYMBOL(cfs_cpt_nodemask);
+ 
++unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
++{
++	LASSERT(cpt1 == CFS_CPT_ANY || (cpt1 >= 0 && cpt1 < cptab->ctb_nparts));
++	LASSERT(cpt2 == CFS_CPT_ANY || (cpt2 >= 0 && cpt2 < cptab->ctb_nparts));
++
++	if (cpt1 == CFS_CPT_ANY || cpt2 == CFS_CPT_ANY)
++		return cptab->ctb_distance;
++
++	return cptab->ctb_parts[cpt1].cpt_distance[cpt2];
++}
++EXPORT_SYMBOL(cfs_cpt_distance);
++
+ int
+ cfs_cpt_set_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
  {
 -- 
 1.8.3.1
