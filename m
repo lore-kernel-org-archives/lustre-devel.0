@@ -1,55 +1,65 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:20:39 -0400
-Subject: [lustre-devel] [PATCH v3 15/26] staging: lustre: libcfs: rename i
- to cpu for cfs_cpt_bind
+Date: Sun, 24 Jun 2018 17:20:48 -0400
+Subject: [lustre-devel] [PATCH v3 24/26] staging: lustre: libcfs: restore
+ debugfs table reporting for UMP
 In-Reply-To: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1529875250-11531-16-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529875250-11531-25-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+With the cleanup of the libcfs SMP handling the function
+cfs_cpt_table_print() was turned into an empty funciton.
+This function is called by a debugfs reporting function for
+debugging which now means for UMP machines it reports nothing
+which breaks previous behavior exposed to users. Restore the
+original behavior.
 
-Rename variable i to cpu to make code easier to understand.
-
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8703
-Reviewed-on: https://review.whamcloud.com/23222
-Reviewed-by: Amir Shehata <amir.shehata@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9856
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ .../staging/lustre/include/linux/libcfs/libcfs_cpu.h  | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index a2c1068..5654fbe 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -673,8 +673,8 @@ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+index 29c5071..32776d2 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+@@ -218,6 +218,19 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+ struct cfs_cpt_table;
+ #define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
+ 
++static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab,
++				      char *buf, int len)
++{
++	int rc;
++
++	rc = snprintf(buf, len, "0\t: 0\n");
++	len -= rc;
++	if (len <= 0)
++		return -EFBIG;
++
++	return rc;
++}
++
+ static inline int cfs_cpt_distance_print(struct cfs_cpt_table *cptab,
+ 					 char *buf, int len)
  {
- 	cpumask_var_t *cpumask;
- 	nodemask_t *nodemask;
-+	int cpu;
- 	int rc;
--	int i;
+@@ -237,12 +250,6 @@ static inline cpumask_var_t *cfs_cpt_cpumask(struct cfs_cpt_table *cptab,
+ 	return NULL;
+ }
  
- 	LASSERT(cpt == CFS_CPT_ANY || (cpt >= 0 && cpt < cptab->ctb_nparts));
- 
-@@ -692,8 +692,8 @@ int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
- 		return -EINVAL;
- 	}
- 
--	for_each_online_cpu(i) {
--		if (cpumask_test_cpu(i, *cpumask))
-+	for_each_online_cpu(cpu) {
-+		if (cpumask_test_cpu(cpu, *cpumask))
- 			continue;
- 
- 		rc = set_cpus_allowed_ptr(current, *cpumask);
+-static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf,
+-				      int len)
+-{
+-	return 0;
+-}
+-
+ static inline int cfs_cpt_number(struct cfs_cpt_table *cptab)
+ {
+ 	return 1;
 -- 
 1.8.3.1
