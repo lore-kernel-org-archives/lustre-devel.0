@@ -1,46 +1,69 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 21:46:22 +0100 (BST)
-Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
- module reduction.
-In-Reply-To: <87r2l0df25.fsf@notabene.neil.brown.name>
-References: <152904663333.10587.10934053155404014785.stgit@noble>
- <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
- <87r2l0df25.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1806242140210.28698@casper.infradead.org>
+Date: Sun, 24 Jun 2018 17:20:24 -0400
+Subject: [lustre-devel] [PATCH v3 00/26] staging: lustre: libcfs: SMP rework
+Message-ID: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Recently lustre support has been expanded to extreme machines with as
+many as a 1000+ cores. On the other end lustre also has been ported
+to platforms like ARM and KNL which have uniquie NUMA and core setup.
+For example some devices exist that have NUMA nodes with no cores.
+With these new platforms the limitations of the Lustre's SMP code
+came to light so a lot of work was needed. This resulted in this
+patch set which has been tested on these platforms.
 
-> >> Here are a bunch more cleanups that will appear in my lustre-testing
-> >> tree shortly.
-> >> 
-> >> The interesting stuff is some enhancements to kbuild to let us
-> >> build modules from multiple directories.
-> >> I've used that to clean up the build of ptlrpc+ldlm and to
-> >> merge libcfs and lnet into the one module - I've left the lnds
-> >> separate.
-> >
-> > That looks pretty good. It doesn't apply to the stable lustre tree but I
-> > did try it out on lustre-testing. The module building does seem to 
-> > function well. Only thing not clear is if do a
-> >
-> > make SUBDIRS=drivers/staging/lustre/lustre/lmv modules
-> 
-> Why would you do that?  SUBDIRS= is for building external modules.
-> What are you trying to achieve?
-> 
-> >
-> > do lmv.a and the other *.a files get relinked int lustre.ko ?
-> 
-> It isn't "lmv.a", it is ".../lustre/lmv/mod.a".
+This is the 3rd version of this patch set with the first two submitted
+to the staging list. This latest patchset is identical to the 2nd one
+expect that the UMP support has been moved to the last patches in this
+collection. The approach to support UMP also has changed with using
+static initialization to greatly simplify the code.
 
-Sorry I forgot the mod.a naming. I was asking to get a feel of how the
-work flow would change. It is common for lustre developers to build
-in tree and test without installing anything. The many module approach
-might of been a way for people to rebuild a module, unload module and
-then reload module quickly to test a change. I don't work this way so
-I can't say. I was looking to see if that work flow could still be
-done.
+Amir Shehata (8):
+  staging: lustre: libcfs: replace MAX_NUMNODES with nr_node_ids
+  staging: lustre: libcfs: remove excess space
+  staging: lustre: libcfs: replace num_possible_cpus() with nr_cpu_ids
+  staging: lustre: libcfs: NUMA support
+  staging: lustre: libcfs: add cpu distance handling
+  staging: lustre: libcfs: use distance in cpu and node handling
+  staging: lustre: libcfs: provide debugfs files for distance handling
+  staging: lustre: libcfs: invert error handling for cfs_cpt_table_print
+
+Dmitry Eremin (14):
+  staging: lustre: libcfs: remove useless CPU partition code
+  staging: lustre: libcfs: rename variable i to cpu
+  staging: lustre: libcfs: fix libcfs_cpu coding style
+  staging: lustre: libcfs: use int type for CPT identification.
+  staging: lustre: libcfs: rename i to node for cfs_cpt_set_nodemask
+  staging: lustre: libcfs: rename i to cpu for cfs_cpt_bind
+  staging: lustre: libcfs: rename cpumask_var_t variables to *_mask
+  staging: lustre: libcfs: update debug messages
+  staging: lustre: libcfs: make tolerant to offline CPUs and empty NUMA nodes
+  staging: lustre: libcfs: report NUMA node instead of just node
+  staging: lustre: libcfs: update debug messages in CPT code
+  staging: lustre: libcfs: rework CPU pattern parsing code
+  staging: lustre: libcfs: change CPT estimate algorithm
+  staging: lustre: ptlrpc: use current CPU instead of hardcoded 0
+
+James Simmons (4):
+  staging: lustre: libcfs: properly handle failure cases in SMP code
+  staging: lustre: libcfs: restore debugfs table reporting for UMP
+  staging: lustre: libcfs: make cfs_cpt_tab a static structure
+  staging: lustre: libcfs: restore UMP support
+
+ .../lustre/include/linux/libcfs/libcfs_cpu.h       |  203 ++--
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 1020 +++++++++++---------
+ drivers/staging/lustre/lnet/libcfs/module.c        |   52 +-
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |    4 +-
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         |    2 +
+ drivers/staging/lustre/lnet/selftest/framework.c   |    2 +-
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |    4 +-
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |   10 +-
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |   15 +-
+ 9 files changed, 750 insertions(+), 562 deletions(-)
+
+-- 
+1.8.3.1
