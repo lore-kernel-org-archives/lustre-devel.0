@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:20:47 -0400
-Subject: [lustre-devel] [PATCH v3 23/26] staging: lustre: ptlrpc: use
- current CPU instead of hardcoded 0
+Date: Sun, 24 Jun 2018 17:20:26 -0400
+Subject: [lustre-devel] [PATCH v3 02/26] staging: lustre: libcfs: rename
+ variable i to cpu
 In-Reply-To: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1529875250-11531-24-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529875250-11531-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,59 +13,57 @@ To: lustre-devel@lists.lustre.org
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-fix crash if CPU 0 disabled.
+Change the name of the variable i used for for_each_cpu() to cpu
+for code readability.
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8710
-Reviewed-on: https://review.whamcloud.com/23305
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8703
+Reviewed-on: https://review.whamcloud.com/23303
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ptlrpc/service.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-index 3fd8c74..8e74a45 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-@@ -421,7 +421,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
- 		 * there are.
- 		 */
- 		/* weight is # of HTs */
--		if (cpumask_weight(topology_sibling_cpumask(0)) > 1) {
-+		if (cpumask_weight(topology_sibling_cpumask(smp_processor_id())) > 1) {
- 			/* depress thread factor for hyper-thread */
- 			factor = factor - (factor >> 1) + (factor >> 3);
- 		}
-@@ -2221,15 +2221,16 @@ static int ptlrpc_hr_main(void *arg)
- 	struct ptlrpc_hr_thread	*hrt = arg;
- 	struct ptlrpc_hr_partition *hrp = hrt->hrt_partition;
- 	LIST_HEAD(replies);
--	char threadname[20];
- 	int rc;
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+index b363a3d..46d3530 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+@@ -344,7 +344,7 @@ struct cfs_cpt_table *
+ cfs_cpt_set_cpumask(struct cfs_cpt_table *cptab, int cpt,
+ 		    const cpumask_t *mask)
+ {
+-	int i;
++	int cpu;
  
--	snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
--		 hrp->hrp_cpt, hrt->hrt_id);
- 	unshare_fs_struct();
- 
- 	rc = cfs_cpt_bind(ptlrpc_hr.hr_cpt_table, hrp->hrp_cpt);
- 	if (rc != 0) {
-+		char threadname[20];
-+
-+		snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
-+			 hrp->hrp_cpt, hrt->hrt_id);
- 		CWARN("Failed to bind %s on CPT %d of CPT table %p: rc = %d\n",
- 		      threadname, hrp->hrp_cpt, ptlrpc_hr.hr_cpt_table, rc);
+ 	if (!cpumask_weight(mask) ||
+ 	    cpumask_any_and(mask, cpu_online_mask) >= nr_cpu_ids) {
+@@ -353,8 +353,8 @@ struct cfs_cpt_table *
+ 		return 0;
  	}
-@@ -2528,7 +2529,7 @@ int ptlrpc_hr_init(void)
  
- 	init_waitqueue_head(&ptlrpc_hr.hr_waitq);
+-	for_each_cpu(i, mask) {
+-		if (!cfs_cpt_set_cpu(cptab, cpt, i))
++	for_each_cpu(cpu, mask) {
++		if (!cfs_cpt_set_cpu(cptab, cpt, cpu))
+ 			return 0;
+ 	}
  
--	weight = cpumask_weight(topology_sibling_cpumask(0));
-+	weight = cpumask_weight(topology_sibling_cpumask(smp_processor_id()));
+@@ -366,10 +366,10 @@ struct cfs_cpt_table *
+ cfs_cpt_unset_cpumask(struct cfs_cpt_table *cptab, int cpt,
+ 		      const cpumask_t *mask)
+ {
+-	int i;
++	int cpu;
  
- 	cfs_percpt_for_each(hrp, i, ptlrpc_hr.hr_partitions) {
- 		hrp->hrp_cpt = i;
+-	for_each_cpu(i, mask)
+-		cfs_cpt_unset_cpu(cptab, cpt, i);
++	for_each_cpu(cpu, mask)
++		cfs_cpt_unset_cpu(cptab, cpt, cpu);
+ }
+ EXPORT_SYMBOL(cfs_cpt_unset_cpumask);
+ 
 -- 
 1.8.3.1
