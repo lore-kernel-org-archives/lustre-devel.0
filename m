@@ -1,69 +1,186 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:20:24 -0400
-Subject: [lustre-devel] [PATCH v3 00/26] staging: lustre: libcfs: SMP rework
-Message-ID: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+Date: Sun, 24 Jun 2018 17:20:27 -0400
+Subject: [lustre-devel] [PATCH v3 03/26] staging: lustre: libcfs: properly
+ handle failure cases in SMP code
+In-Reply-To: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529875250-11531-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Recently lustre support has been expanded to extreme machines with as
-many as a 1000+ cores. On the other end lustre also has been ported
-to platforms like ARM and KNL which have uniquie NUMA and core setup.
-For example some devices exist that have NUMA nodes with no cores.
-With these new platforms the limitations of the Lustre's SMP code
-came to light so a lot of work was needed. This resulted in this
-patch set which has been tested on these platforms.
+While pushing the SMP work some bugs were pointed out by Dan
+Carpenter in the code. Due to single err label in cfs_cpu_init()
+and cfs_cpt_table_alloc() a few items were being cleaned up that
+were never initialized. This can lead to crashed and other problems.
+In those initialization function introduce individual labels to
+jump to only the thing initialized get freed on failure.
 
-This is the 3rd version of this patch set with the first two submitted
-to the staging list. This latest patchset is identical to the 2nd one
-expect that the UMP support has been moved to the last patches in this
-collection. The approach to support UMP also has changed with using
-static initialization to greatly simplify the code.
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10932
+Reviewed-on: https://review.whamcloud.com/32085
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 72 ++++++++++++++++++-------
+ 1 file changed, 52 insertions(+), 20 deletions(-)
 
-Amir Shehata (8):
-  staging: lustre: libcfs: replace MAX_NUMNODES with nr_node_ids
-  staging: lustre: libcfs: remove excess space
-  staging: lustre: libcfs: replace num_possible_cpus() with nr_cpu_ids
-  staging: lustre: libcfs: NUMA support
-  staging: lustre: libcfs: add cpu distance handling
-  staging: lustre: libcfs: use distance in cpu and node handling
-  staging: lustre: libcfs: provide debugfs files for distance handling
-  staging: lustre: libcfs: invert error handling for cfs_cpt_table_print
-
-Dmitry Eremin (14):
-  staging: lustre: libcfs: remove useless CPU partition code
-  staging: lustre: libcfs: rename variable i to cpu
-  staging: lustre: libcfs: fix libcfs_cpu coding style
-  staging: lustre: libcfs: use int type for CPT identification.
-  staging: lustre: libcfs: rename i to node for cfs_cpt_set_nodemask
-  staging: lustre: libcfs: rename i to cpu for cfs_cpt_bind
-  staging: lustre: libcfs: rename cpumask_var_t variables to *_mask
-  staging: lustre: libcfs: update debug messages
-  staging: lustre: libcfs: make tolerant to offline CPUs and empty NUMA nodes
-  staging: lustre: libcfs: report NUMA node instead of just node
-  staging: lustre: libcfs: update debug messages in CPT code
-  staging: lustre: libcfs: rework CPU pattern parsing code
-  staging: lustre: libcfs: change CPT estimate algorithm
-  staging: lustre: ptlrpc: use current CPU instead of hardcoded 0
-
-James Simmons (4):
-  staging: lustre: libcfs: properly handle failure cases in SMP code
-  staging: lustre: libcfs: restore debugfs table reporting for UMP
-  staging: lustre: libcfs: make cfs_cpt_tab a static structure
-  staging: lustre: libcfs: restore UMP support
-
- .../lustre/include/linux/libcfs/libcfs_cpu.h       |  203 ++--
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 1020 +++++++++++---------
- drivers/staging/lustre/lnet/libcfs/module.c        |   52 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |    4 +-
- drivers/staging/lustre/lnet/lnet/lib-msg.c         |    2 +
- drivers/staging/lustre/lnet/selftest/framework.c   |    2 +-
- drivers/staging/lustre/lustre/ptlrpc/client.c      |    4 +-
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |   10 +-
- drivers/staging/lustre/lustre/ptlrpc/service.c     |   15 +-
- 9 files changed, 750 insertions(+), 562 deletions(-)
-
+diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+index 46d3530..bdd71a3 100644
+--- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
++++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+@@ -85,17 +85,19 @@ struct cfs_cpt_table *
+ 
+ 	cptab->ctb_nparts = ncpt;
+ 
++	if (!zalloc_cpumask_var(&cptab->ctb_cpumask, GFP_NOFS))
++		goto failed_alloc_cpumask;
++
+ 	cptab->ctb_nodemask = kzalloc(sizeof(*cptab->ctb_nodemask),
+ 				      GFP_NOFS);
+-	if (!zalloc_cpumask_var(&cptab->ctb_cpumask, GFP_NOFS) ||
+-	    !cptab->ctb_nodemask)
+-		goto failed;
++	if (!cptab->ctb_nodemask)
++		goto failed_alloc_nodemask;
+ 
+ 	cptab->ctb_cpu2cpt = kvmalloc_array(num_possible_cpus(),
+ 					    sizeof(cptab->ctb_cpu2cpt[0]),
+ 					    GFP_KERNEL);
+ 	if (!cptab->ctb_cpu2cpt)
+-		goto failed;
++		goto failed_alloc_cpu2cpt;
+ 
+ 	memset(cptab->ctb_cpu2cpt, -1,
+ 	       num_possible_cpus() * sizeof(cptab->ctb_cpu2cpt[0]));
+@@ -103,22 +105,41 @@ struct cfs_cpt_table *
+ 	cptab->ctb_parts = kvmalloc_array(ncpt, sizeof(cptab->ctb_parts[0]),
+ 					  GFP_KERNEL);
+ 	if (!cptab->ctb_parts)
+-		goto failed;
++		goto failed_alloc_ctb_parts;
++
++	memset(cptab->ctb_parts, -1, ncpt * sizeof(cptab->ctb_parts[0]));
+ 
+ 	for (i = 0; i < ncpt; i++) {
+ 		struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
+ 
++		if (!zalloc_cpumask_var(&part->cpt_cpumask, GFP_NOFS))
++			goto failed_setting_ctb_parts;
++
+ 		part->cpt_nodemask = kzalloc(sizeof(*part->cpt_nodemask),
+ 					     GFP_NOFS);
+-		if (!zalloc_cpumask_var(&part->cpt_cpumask, GFP_NOFS) ||
+-		    !part->cpt_nodemask)
+-			goto failed;
++		if (!part->cpt_nodemask)
++			goto failed_setting_ctb_parts;
+ 	}
+ 
+ 	return cptab;
+ 
+- failed:
+-	cfs_cpt_table_free(cptab);
++failed_setting_ctb_parts:
++	while (i-- >= 0) {
++		struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
++
++		kfree(part->cpt_nodemask);
++		free_cpumask_var(part->cpt_cpumask);
++	}
++
++	kvfree(cptab->ctb_parts);
++failed_alloc_ctb_parts:
++	kvfree(cptab->ctb_cpu2cpt);
++failed_alloc_cpu2cpt:
++	kfree(cptab->ctb_nodemask);
++failed_alloc_nodemask:
++	free_cpumask_var(cptab->ctb_cpumask);
++failed_alloc_cpumask:
++	kfree(cptab);
+ 	return NULL;
+ }
+ EXPORT_SYMBOL(cfs_cpt_table_alloc);
+@@ -944,7 +965,7 @@ static int cfs_cpu_dead(unsigned int cpu)
+ int
+ cfs_cpu_init(void)
+ {
+-	int ret = 0;
++	int ret;
+ 
+ 	LASSERT(!cfs_cpt_tab);
+ 
+@@ -953,23 +974,23 @@ static int cfs_cpu_dead(unsigned int cpu)
+ 					"staging/lustre/cfe:dead", NULL,
+ 					cfs_cpu_dead);
+ 	if (ret < 0)
+-		goto failed;
++		goto failed_cpu_dead;
++
+ 	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
+ 					"staging/lustre/cfe:online",
+ 					cfs_cpu_online, NULL);
+ 	if (ret < 0)
+-		goto failed;
++		goto failed_cpu_online;
++
+ 	lustre_cpu_online = ret;
+ #endif
+-	ret = -EINVAL;
+-
+ 	get_online_cpus();
+ 	if (*cpu_pattern) {
+ 		char *cpu_pattern_dup = kstrdup(cpu_pattern, GFP_KERNEL);
+ 
+ 		if (!cpu_pattern_dup) {
+ 			CERROR("Failed to duplicate cpu_pattern\n");
+-			goto failed;
++			goto failed_alloc_table;
+ 		}
+ 
+ 		cfs_cpt_tab = cfs_cpt_table_create_pattern(cpu_pattern_dup);
+@@ -977,7 +998,7 @@ static int cfs_cpu_dead(unsigned int cpu)
+ 		if (!cfs_cpt_tab) {
+ 			CERROR("Failed to create cptab from pattern %s\n",
+ 			       cpu_pattern);
+-			goto failed;
++			goto failed_alloc_table;
+ 		}
+ 
+ 	} else {
+@@ -985,7 +1006,7 @@ static int cfs_cpu_dead(unsigned int cpu)
+ 		if (!cfs_cpt_tab) {
+ 			CERROR("Failed to create ptable with npartitions %d\n",
+ 			       cpu_npartitions);
+-			goto failed;
++			goto failed_alloc_table;
+ 		}
+ 	}
+ 
+@@ -996,8 +1017,19 @@ static int cfs_cpu_dead(unsigned int cpu)
+ 		 cfs_cpt_number(cfs_cpt_tab));
+ 	return 0;
+ 
+- failed:
++failed_alloc_table:
+ 	put_online_cpus();
+-	cfs_cpu_fini();
++
++	if (cfs_cpt_tab)
++		cfs_cpt_table_free(cfs_cpt_tab);
++
++	ret = -EINVAL;
++#ifdef CONFIG_HOTPLUG_CPU
++	if (lustre_cpu_online > 0)
++		cpuhp_remove_state_nocalls(lustre_cpu_online);
++failed_cpu_online:
++	cpuhp_remove_state_nocalls(CPUHP_LUSTRE_CFS_DEAD);
++failed_cpu_dead:
++#endif
+ 	return ret;
+ }
 -- 
 1.8.3.1
