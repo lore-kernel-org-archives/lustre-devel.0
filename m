@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 24 Jun 2018 17:20:37 -0400
-Subject: [lustre-devel] [PATCH v3 13/26] staging: lustre: libcfs: use int
- type for CPT identification.
+Date: Sun, 24 Jun 2018 17:20:46 -0400
+Subject: [lustre-devel] [PATCH v3 22/26] staging: lustre: libcfs: change CPT
+ estimate algorithm
 In-Reply-To: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1529875250-11531-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529875250-11531-23-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,96 +13,143 @@ To: lustre-devel@lists.lustre.org
 
 From: Dmitry Eremin <dmitry.eremin@intel.com>
 
-Use int type for CPT identification to match the linux kernel
-CPU identification.
+The main idea to have more CPU partitions is based on KNL experience.
+When a thread submit IO for network communication one of threads from
+current CPT is used for network stack. Whith high parallelization many
+threads become involved in network submission but having less CPU
+partitions they will wait until single thread process them from network
+queue. So, the bottleneck just moves into network layer in case of
+small amount of CPU partitions. My experiments showed that the best
+performance was when for each IO thread we have one network thread.
+This condition can be provided having 2 real HW cores (without hyper
+threads) per CPT. This is exactly what implemented in this patch.
+
+Change CPT estimate algorithm from 2 * (N - 1)^2 < NCPUS <= 2 * N^2
+to 2 HW cores per CPT. This is critical for machines with number of
+cores different from 2^N.
+
+Current algorithm splits CPTs in KNL:
+LNet: HW CPU cores: 272, npartitions: 16
+cpu_partition_table=
+    0       : 0-4,68-71,136-139,204-207
+    1       : 5-9,73-76,141-144,209-212
+    2       : 10-14,78-81,146-149,214-217
+    3       : 15-17,72,77,83-85,140,145,151-153,208,219-221
+    4       : 18-21,82,86-88,150,154-156,213,218,222-224
+    5       : 22-26,90-93,158-161,226-229
+    6       : 27-31,95-98,163-166,231-234
+    7       : 32-35,89,100-103,168-171,236-239
+    8       : 36-38,94,99,104-105,157,162,167,172-173,225,230,235,240-241
+    9       : 39-43,107-110,175-178,243-246
+    10      : 44-48,112-115,180-183,248-251
+    11      : 49-51,106,111,117-119,174,179,185-187,242,253-255
+    12      : 52-55,116,120-122,184,188-190,247,252,256-258
+    13      : 56-60,124-127,192-195,260-263
+    14      : 61-65,129-132,197-200,265-268
+    15      : 66-67,123,128,133-135,191,196,201-203,259,264,269-271
+
+New algorithm will split CPTs in KNL:
+LNet: HW CPU cores: 272, npartitions: 34
+cpu_partition_table=
+    0       : 0-1,68-69,136-137,204-205
+    1       : 2-3,70-71,138-139,206-207
+    2       : 4-5,72-73,140-141,208-209
+    3       : 6-7,74-75,142-143,210-211
+    4       : 8-9,76-77,144-145,212-213
+    5       : 10-11,78-79,146-147,214-215
+    6       : 12-13,80-81,148-149,216-217
+    7       : 14-15,82-83,150-151,218-219
+    8       : 16-17,84-85,152-153,220-221
+    9       : 18-19,86-87,154-155,222-223
+    10      : 20-21,88-89,156-157,224-225
+    11      : 22-23,90-91,158-159,226-227
+    12      : 24-25,92-93,160-161,228-229
+    13      : 26-27,94-95,162-163,230-231
+    14      : 28-29,96-97,164-165,232-233
+    15      : 30-31,98-99,166-167,234-235
+    16      : 32-33,100-101,168-169,236-237
+    17      : 34-35,102-103,170-171,238-239
+    18      : 36-37,104-105,172-173,240-241
+    19      : 38-39,106-107,174-175,242-243
+    20      : 40-41,108-109,176-177,244-245
+    21      : 42-43,110-111,178-179,246-247
+    22      : 44-45,112-113,180-181,248-249
+    23      : 46-47,114-115,182-183,250-251
+    24      : 48-49,116-117,184-185,252-253
+    25      : 50-51,118-119,186-187,254-255
+    26      : 52-53,120-121,188-189,256-257
+    27      : 54-55,122-123,190-191,258-259
+    28      : 56-57,124-125,192-193,260-261
+    29      : 58-59,126-127,194-195,262-263
+    30      : 60-61,128-129,196-197,264-265
+    31      : 62-63,130-131,198-199,266-267
+    32      : 64-65,132-133,200-201,268-269
+    33      : 66-67,134-135,202-203,270-271
+
+'N' pattern in KNL works is not always good.
+in flat mode it will be one CPT with all CPUs inside.
+
+in SNC-4 mode:
+cpu_partition_table=
+    0       : 0-17,68-85,136-153,204-221
+    1       : 18-35,86-103,154-171,222-239
+    2       : 36-51,104-119,172-187,240-255
+    3       : 52-67,120-135,188-203,256-271
 
 Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-8703
-Reviewed-on: https://review.whamcloud.com/23304
+Reviewed-on: https://review.whamcloud.com/24304
 Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Doug Oucharek <dougso@me.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h |  8 ++++----
- drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c          | 14 +++++++-------
- 2 files changed, 11 insertions(+), 11 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 30 +++++--------------------
+ 1 file changed, 5 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 9dbb0b1..2bb2140 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -89,18 +89,18 @@ struct cfs_cpu_partition {
- 	/* NUMA distance between CPTs */
- 	unsigned int			*cpt_distance;
- 	/* spread rotor for NUMA allocator */
--	unsigned int			cpt_spread_rotor;
-+	int				cpt_spread_rotor;
- };
- 
- 
- /** descriptor for CPU partitions */
- struct cfs_cpt_table {
- 	/* spread rotor for NUMA allocator */
--	unsigned int			ctb_spread_rotor;
-+	int				ctb_spread_rotor;
- 	/* maximum NUMA distance between all nodes in table */
- 	unsigned int			ctb_distance;
- 	/* # of CPU partitions */
--	unsigned int			ctb_nparts;
-+	int				ctb_nparts;
- 	/* partitions tables */
- 	struct cfs_cpu_partition	*ctb_parts;
- 	/* shadow HW CPU to CPU partition ID */
-@@ -355,7 +355,7 @@ static inline void cfs_cpu_fini(void)
- /**
-  * create a cfs_cpt_table with \a ncpt number of partitions
-  */
--struct cfs_cpt_table *cfs_cpt_table_alloc(unsigned int ncpt);
-+struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt);
- 
- /*
-  * allocate per-cpu-partition data, returned value is an array of pointers,
 diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index aaab7cb..8f7de59 100644
+index 2fdea11..3f4a7c7 100644
 --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
 +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -73,7 +73,7 @@
- module_param(cpu_pattern, charp, 0444);
- MODULE_PARM_DESC(cpu_pattern, "CPU partitions pattern");
+@@ -802,34 +802,14 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
  
--struct cfs_cpt_table *cfs_cpt_table_alloc(unsigned int ncpt)
-+struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt)
+ static int cfs_cpt_num_estimate(void)
  {
- 	struct cfs_cpt_table *cptab;
- 	int i;
-@@ -788,13 +788,13 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
- 	return rc;
- }
+-	int nnode = num_online_nodes();
++	int nthr = cpumask_weight(topology_sibling_cpumask(smp_processor_id()));
+ 	int ncpu = num_online_cpus();
+-	int ncpt;
++	int ncpt = 1;
  
--#define CPT_WEIGHT_MIN  4u
-+#define CPT_WEIGHT_MIN 4
+-	if (ncpu <= CPT_WEIGHT_MIN) {
+-		ncpt = 1;
+-		goto out;
+-	}
+-
+-	/* generate reasonable number of CPU partitions based on total number
+-	 * of CPUs, Preferred N should be power2 and match this condition:
+-	 * 2 * (N - 1)^2 < NCPUS <= 2 * N^2
+-	 */
+-	for (ncpt = 2; ncpu > 2 * ncpt * ncpt; ncpt <<= 1)
+-		;
+-
+-	if (ncpt <= nnode) { /* fat numa system */
+-		while (nnode > ncpt)
+-			nnode >>= 1;
++	if (ncpu > CPT_WEIGHT_MIN)
++		for (ncpt = 2; ncpu > 2 * nthr * ncpt; ncpt++)
++			; /* nothing */
  
--static unsigned int cfs_cpt_num_estimate(void)
-+static int cfs_cpt_num_estimate(void)
- {
--	unsigned int nnode = num_online_nodes();
--	unsigned int ncpu = num_online_cpus();
--	unsigned int ncpt;
-+	int nnode = num_online_nodes();
-+	int ncpu = num_online_cpus();
-+	int ncpt;
- 
- 	if (ncpu <= CPT_WEIGHT_MIN) {
- 		ncpt = 1;
-@@ -824,7 +824,7 @@ static unsigned int cfs_cpt_num_estimate(void)
+-	} else { /* ncpt > nnode */
+-		while ((nnode << 1) <= ncpt)
+-			nnode <<= 1;
+-	}
+-
+-	ncpt = nnode;
+-
+-out:
+ #if (BITS_PER_LONG == 32)
  	/* config many CPU partitions on 32-bit system could consume
  	 * too much memory
- 	 */
--	ncpt = min(2U, ncpt);
-+	ncpt = min(2, ncpt);
- #endif
- 	while (ncpu % ncpt)
- 		ncpt--; /* worst case is 1 */
 -- 
 1.8.3.1
