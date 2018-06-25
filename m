@@ -1,109 +1,149 @@
-From: Oleg Drokin <green@linuxhacker.ru>
-Date: Sun, 24 Jun 2018 20:38:00 -0400
-Subject: [lustre-devel] [PATCH 1/3] lustre: use
- generic_error_remove_page()
-In-Reply-To: <87lgb3ag3k.fsf@notabene.neil.brown.name>
-References: <152904663333.10587.10934053155404014785.stgit@noble>
- <152904669032.10587.11474850109829193046.stgit@noble>
- <alpine.LFD.2.21.1806160115430.15679@casper.infradead.org>
- <87y3ffft80.fsf@notabene.neil.brown.name>
- <61C2F92E-8F88-49C6-83FB-F3013289265C@linuxhacker.ru>
- <877emwg8ao.fsf@notabene.neil.brown.name>
- <87lgb3ag3k.fsf@notabene.neil.brown.name>
-Message-ID: <EAC0696A-9C7F-419A-A360-C352537B1DA2@linuxhacker.ru>
+From: NeilBrown <neilb@suse.com>
+Date: Mon, 25 Jun 2018 10:39:31 +1000
+Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
+ support
+In-Reply-To: <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
+References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+ <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <877emnaed8.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+On Sun, Jun 24 2018, James Simmons wrote:
 
-> On Jun 24, 2018, at 8:02 PM, NeilBrown <neilb@suse.com> wrote:
-> 
-> 
-> lustre's internal ll_invalidate_page() is behaviourally identical to
-> generic_error_remove_page().
-> In the case of lustre it isn't a memory hardware error that requires
-> the page being invalidated, it is the loss of a lock, which will like
-> result in the data changing on the server.
-> In either case, we don't want the page to be accessed any more, so the
-> same removal is appropriate.
-> 
-> Signed-off-by: NeilBrown <neilb@suse.com>
+> From: Amir Shehata <amir.shehata@intel.com>
+>
+> This patch adds NUMA node support. NUMA node information is stored
+> in the CPT table. A NUMA node mask is maintained for the entire
+> table as well as for each CPT to track the NUMA nodes related to
+> each of the CPTs. Add new function cfs_cpt_of_node() which returns
+> the CPT of a particular NUMA node.
+
+I note that you didn't respond to Greg's questions about this patch.
+I'll accept it anyway in the interests of moving forward, but I think
+his comments were probably valid, and need to be considered at some
+stage.
+
+There is a bug though....
+>
+> Signed-off-by: Amir Shehata <amir.shehata@intel.com>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-7734
+> Reviewed-on: http://review.whamcloud.com/18916
+> Reviewed-by: Olaf Weber <olaf@sgi.com>
+> Reviewed-by: Doug Oucharek <dougso@me.com>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
-> 
-> I've replaced
-> [PATCH 08/24] lustre: use truncate_inode_page in place of truncate_complete_page
-> with 3 patches, this and the next two.
+>  .../lustre/include/linux/libcfs/libcfs_cpu.h        | 11 +++++++++++
+>  drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c     | 21 +++++++++++++++++++++
+>  2 files changed, 32 insertions(+)
+>
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> index 1b4333d..ff3ecf5 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> @@ -103,6 +103,8 @@ struct cfs_cpt_table {
+>  	int				*ctb_cpu2cpt;
+>  	/* all cpus in this partition table */
+>  	cpumask_var_t			ctb_cpumask;
+> +	/* shadow HW node to CPU partition ID */
+> +	int				*ctb_node2cpt;
+>  	/* all nodes in this partition table */
+>  	nodemask_t			*ctb_nodemask;
+>  };
+> @@ -143,6 +145,10 @@ struct cfs_cpt_table {
+>   */
+>  int cfs_cpt_of_cpu(struct cfs_cpt_table *cptab, int cpu);
+>  /**
+> + * shadow HW node ID \a NODE to CPU-partition ID by \a cptab
+> + */
+> +int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node);
+> +/**
+>   * bind current thread on a CPU-partition \a cpt of \a cptab
+>   */
+>  int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt);
+> @@ -299,6 +305,11 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+>  	return 0;
+>  }
+>  
+> +static inline int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node)
+> +{
+> +	return 0;
+> +}
+> +
+>  static inline int
+>  cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
+>  {
+> diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+> index 33294da..8c5cf7b 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+> +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
+> @@ -102,6 +102,15 @@ struct cfs_cpt_table *
+>  	memset(cptab->ctb_cpu2cpt, -1,
+>  	       nr_cpu_ids * sizeof(cptab->ctb_cpu2cpt[0]));
+>  
+> +	cptab->ctb_node2cpt = kvmalloc_array(nr_node_ids,
+> +					     sizeof(cptab->ctb_node2cpt[0]),
+> +					     GFP_KERNEL);
+> +	if (!cptab->ctb_node2cpt)
+> +		goto failed_alloc_node2cpt;
+> +
+> +	memset(cptab->ctb_node2cpt, -1,
+> +	       nr_node_ids * sizeof(cptab->ctb_node2cpt[0]));
+> +
+>  	cptab->ctb_parts = kvmalloc_array(ncpt, sizeof(cptab->ctb_parts[0]),
+>  					  GFP_KERNEL);
+>  	if (!cptab->ctb_parts)
+> @@ -133,6 +142,8 @@ struct cfs_cpt_table *
+>  
+>  	kvfree(cptab->ctb_parts);
+>  failed_alloc_ctb_parts:
+> +	kvfree(cptab->ctb_node2cpt);
+> +failed_alloc_node2cpt:
+>  	kvfree(cptab->ctb_cpu2cpt);
+>  failed_alloc_cpu2cpt:
+>  	kfree(cptab->ctb_nodemask);
+> @@ -150,6 +161,7 @@ struct cfs_cpt_table *
+>  	int i;
+>  
+>  	kvfree(cptab->ctb_cpu2cpt);
+> +	kvfree(cptab->ctb_node2cpt);
+>  
+>  	for (i = 0; cptab->ctb_parts && i < cptab->ctb_nparts; i++) {
+>  		struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
+> @@ -515,6 +527,15 @@ struct cfs_cpt_table *
+>  }
+>  EXPORT_SYMBOL(cfs_cpt_of_cpu);
+>  
+> +int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node)
+> +{
+> +	if (node < 0 || node > nr_node_ids)
+> +		return CFS_CPT_ANY;
+> +
+> +	return cptab->ctb_node2cpt[node];
+> +}
 
-This looks reasonable. Are you running any tests on this?
+So if node == nr_node_ids, we access beyond the end of the ctb_node2cpt array.
+Oops.
+I've fixed this before applying.
 
-Acked-by: Oleg Drokin <green@linuxhacker.ru>
+Thanks,
+NeilBrown
 
-> 
-> Thanks,
-> NeilBrown
-> 
-> 
-> drivers/staging/lustre/lustre/llite/llite_internal.h | 17 -----------------
-> drivers/staging/lustre/lustre/llite/vvp_io.c         |  2 +-
-> drivers/staging/lustre/lustre/llite/vvp_page.c       |  2 +-
-> 3 files changed, 2 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-> index c08a6e14b6d7..22dcabf6de0f 100644
-> --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-> +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-> @@ -928,23 +928,6 @@ void policy_from_vma(union ldlm_policy_data *policy, struct vm_area_struct *vma,
-> struct vm_area_struct *our_vma(struct mm_struct *mm, unsigned long addr,
-> 			       size_t count);
-> 
-> -static inline void ll_invalidate_page(struct page *vmpage)
-> -{
-> -	struct address_space *mapping = vmpage->mapping;
-> -	loff_t offset = vmpage->index << PAGE_SHIFT;
-> -
-> -	LASSERT(PageLocked(vmpage));
-> -	if (!mapping)
-> -		return;
-> -
-> -	/*
-> -	 * truncate_complete_page() calls
-> -	 * a_ops->invalidatepage()->cl_page_delete()->vvp_page_delete().
-> -	 */
-> -	ll_teardown_mmaps(mapping, offset, offset + PAGE_SIZE);
-> -	truncate_complete_page(mapping, vmpage);
-> -}
-> -
-> #define    ll_s2sbi(sb)	(s2lsi(sb)->lsi_llsbi)
-> 
-> /* don't need an addref as the sb_info should be holding one */
-> diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
-> index e7a4778e02e4..5a67955974ad 100644
-> --- a/drivers/staging/lustre/lustre/llite/vvp_io.c
-> +++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
-> @@ -1098,7 +1098,7 @@ static int vvp_io_fault_start(const struct lu_env *env,
-> 	LASSERT(PageLocked(vmpage));
-> 
-> 	if (OBD_FAIL_CHECK(OBD_FAIL_LLITE_FAULT_TRUNC_RACE))
-> -		ll_invalidate_page(vmpage);
-> +		generic_error_remove_page(vmpage->mapping, vmpage);
-> 
-> 	size = i_size_read(inode);
-> 	/* Though we have already held a cl_lock upon this page, but
-> diff --git a/drivers/staging/lustre/lustre/llite/vvp_page.c b/drivers/staging/lustre/lustre/llite/vvp_page.c
-> index 6eb0565ddc22..dcc4d8faa0cd 100644
-> --- a/drivers/staging/lustre/lustre/llite/vvp_page.c
-> +++ b/drivers/staging/lustre/lustre/llite/vvp_page.c
-> @@ -147,7 +147,7 @@ static void vvp_page_discard(const struct lu_env *env,
-> 	if (vpg->vpg_defer_uptodate && !vpg->vpg_ra_used)
-> 		ll_ra_stats_inc(vmpage->mapping->host, RA_STAT_DISCARDED);
-> 
-> -	ll_invalidate_page(vmpage);
-> +	generic_error_remove_page(vmpage->mapping, vmpage);
-> }
-> 
-> static void vvp_page_delete(const struct lu_env *env,
+
+> +EXPORT_SYMBOL(cfs_cpt_of_node);
+> +
+>  int
+>  cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
+>  {
 > -- 
-> 2.14.0.rc0.dirty
-> 
+> 1.8.3.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180625/770edf72/attachment.sig>
