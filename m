@@ -1,116 +1,99 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 25 Jun 2018 11:11:17 +1000
-Subject: [lustre-devel] [PATCH v3 19/26] staging: lustre: libcfs: report
- NUMA node instead of just node
-In-Reply-To: <87y3f38ye6.fsf@notabene.neil.brown.name>
+Date: Mon, 25 Jun 2018 11:27:08 +1000
+Subject: [lustre-devel] [PATCH v3 24/26] staging: lustre: libcfs:
+ restore debugfs table reporting for UMP
+In-Reply-To: <1529875250-11531-25-git-send-email-jsimmons@infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
- <1529875250-11531-20-git-send-email-jsimmons@infradead.org>
- <87y3f38ye6.fsf@notabene.neil.brown.name>
-Message-ID: <87vaa78ybu.fsf@notabene.neil.brown.name>
+ <1529875250-11531-25-git-send-email-jsimmons@infradead.org>
+Message-ID: <87r2kv8xlf.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Jun 25 2018, NeilBrown wrote:
+On Sun, Jun 24 2018, James Simmons wrote:
 
-> On Sun, Jun 24 2018, James Simmons wrote:
->
->> From: Dmitry Eremin <dmitry.eremin@intel.com>
->>
->> Reporting "HW nodes" is too generic. It really is reporting
->> "HW NUMA nodes". Update the debug message.
->
-> I'm not happy with this patch description.....
->
->>
->> Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
->> WC-bug-id: https://jira.whamcloud.com/browse/LU-8703
->> Reviewed-on: https://review.whamcloud.com/23306
->> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
->> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
->> Reviewed-by: Patrick Farrell <paf@cray.com>
->> Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
->> Reviewed-by: Oleg Drokin <green@whamcloud.com>
->> Signed-off-by: James Simmons <jsimmons@infradead.org>
->> ---
->>  drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h | 2 ++
->>  drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c          | 2 +-
->>  drivers/staging/lustre/lnet/lnet/lib-msg.c               | 2 ++
->>  3 files changed, 5 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
->> index 2bb2140..29c5071 100644
->> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
->> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
->> @@ -90,6 +90,8 @@ struct cfs_cpu_partition {
->>  	unsigned int			*cpt_distance;
->>  	/* spread rotor for NUMA allocator */
->>  	int				cpt_spread_rotor;
->> +	/* NUMA node if cpt_nodemask is empty */
->> +	int				cpt_node;
->>  };
->
-> It doesn't give any reason why this (unused) field was added.
-> So I've removed it.
+> With the cleanup of the libcfs SMP handling the function
+> cfs_cpt_table_print() was turned into an empty funciton.
+> This function is called by a debugfs reporting function for
+> debugging which now means for UMP machines it reports nothing
+> which breaks previous behavior exposed to users. Restore the
+> original behavior.
 
-Ahhhh. this was meant to be in the previous patch too.
-I've moved it.
+Which cleanup was this?
+cfs_cpt_table_print seems to have been empty on UMP since at least
+
+commit 3867ea5a4bc4d428f8d93557fb0fbc2cac2f2cdf
+Author: Peng Tao <bergwolf@gmail.com>
+Date:   Mon Jul 15 22:27:10 2013 +0800
+
+    staging/lustre: fix build error when !CONFIG_SMP
+    
+    Three functions cfs_cpu_ht_nsiblings, cfs_cpt_cpumask and
+    cfs_cpt_table_print are missing if !CONFIG_SMP.
+
+5 years ago.
+
+>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-9856
+
+This link seems completely irrelevant.
+
+However, the patch looks sensible enough, so I've applied it.
 
 Thanks,
 NeilBrown
 
 
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  .../staging/lustre/include/linux/libcfs/libcfs_cpu.h  | 19 +++++++++++++------
+>  1 file changed, 13 insertions(+), 6 deletions(-)
 >
->
->>  
->>  
->> diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
->> index 18925c7..86afa31 100644
->> --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
->> +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
->> @@ -1142,7 +1142,7 @@ int cfs_cpu_init(void)
->>  
->>  	put_online_cpus();
->>  
->> -	LCONSOLE(0, "HW nodes: %d, HW CPU cores: %d, npartitions: %d\n",
->> +	LCONSOLE(0, "HW NUMA nodes: %d, HW CPU cores: %d, npartitions: %d\n",
->>  		 num_online_nodes(), num_online_cpus(),
->>  		 cfs_cpt_number(cfs_cpt_tab));
->>  	return 0;
->
-> It does explain this hunk, which is fine.
->
->
->> diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
->> index 0091273..27bdefa 100644
->> --- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
->> +++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
->> @@ -568,6 +568,8 @@
->>  
->>  	/* number of CPUs */
->>  	container->msc_nfinalizers = cfs_cpt_weight(lnet_cpt_table(), cpt);
->> +	if (container->msc_nfinalizers == 0)
->> +		container->msc_nfinalizers = 1;
->
-> It doesn't justify this at all.
->
-> I guess this was meant to be in the previous patch, so I've moved it.
->
-> Thanks,
-> NeilBrown
->
->
->>  
->>  	container->msc_finalizers = kvzalloc_cpt(container->msc_nfinalizers *
->>  						 sizeof(*container->msc_finalizers),
->> -- 
->> 1.8.3.1
+> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> index 29c5071..32776d2 100644
+> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> @@ -218,6 +218,19 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
+>  struct cfs_cpt_table;
+>  #define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
+>  
+> +static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab,
+> +				      char *buf, int len)
+> +{
+> +	int rc;
+> +
+> +	rc = snprintf(buf, len, "0\t: 0\n");
+> +	len -= rc;
+> +	if (len <= 0)
+> +		return -EFBIG;
+> +
+> +	return rc;
+> +}
+> +
+>  static inline int cfs_cpt_distance_print(struct cfs_cpt_table *cptab,
+>  					 char *buf, int len)
+>  {
+> @@ -237,12 +250,6 @@ static inline cpumask_var_t *cfs_cpt_cpumask(struct cfs_cpt_table *cptab,
+>  	return NULL;
+>  }
+>  
+> -static inline int cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf,
+> -				      int len)
+> -{
+> -	return 0;
+> -}
+> -
+>  static inline int cfs_cpt_number(struct cfs_cpt_table *cptab)
+>  {
+>  	return 1;
+> -- 
+> 1.8.3.1
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180625/267e618b/attachment-0001.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180625/4454b313/attachment.sig>
