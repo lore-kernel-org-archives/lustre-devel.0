@@ -1,161 +1,81 @@
-From: Doug Oucharek <doucharek@cray.com>
-Date: Mon, 25 Jun 2018 18:22:59 +0000
-Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
- support
-In-Reply-To: <877emnaed8.fsf@notabene.neil.brown.name>
-References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
- <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
- <877emnaed8.fsf@notabene.neil.brown.name>
-Message-ID: <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 25 Jun 2018 17:42:51 -0400
+Subject: [lustre-devel] [PATCH v2 2/7] lustre: libcfs: open code
+ cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
+In-Reply-To: <1529962976-15048-1-git-send-email-jsimmons@infradead.org>
+References: <1529962976-15048-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529962976-15048-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Some background on this NUMA change:
+From: NeilBrown <neilb@suse.com>
 
-First off, this is just a first step to a bigger set of changes which include changes to the Lustre utilities.  This was done as part of the Multi-Rail feature.  One of the systems that feature is meant to support is the SGI UV system (now HPE) which has a massive number of NUMA nodes connected by a NUMA Link.  There are multiple fabric cards spread throughout the system and Multi-Rail needs to know which fabric cards are nearest to the NUMA node we are running on.  To do that, the ?distance? between NUMA nodes needs to be configured.
+This function in used twice.
+In libcfs_debug_init() the usage is pointless as
+the only place that set libcfs_debug_mb ensures
+that it does not exceed the maximum.  So checking
+again can never help.
 
-This patch is preparing the infrastructure for the Multi-Rail feature to support configuring NUMA node distances.  Technically, this patch should be landing with the Multi-Rail feature (still to be pushed) for it to make proper sense.
+So open-code the small function into the only
+other place that it is used - in cfs_trace_set_debug_mb(),
+which is used to set libcfs_debug_mb.
 
-Doug
-
-On Jun 24, 2018, at 5:39 PM, NeilBrown <neilb at suse.com<mailto:neilb@suse.com>> wrote:
-
-On Sun, Jun 24 2018, James Simmons wrote:
-
-From: Amir Shehata <amir.shehata at intel.com<mailto:amir.shehata@intel.com>>
-
-This patch adds NUMA node support. NUMA node information is stored
-in the CPT table. A NUMA node mask is maintained for the entire
-table as well as for each CPT to track the NUMA nodes related to
-each of the CPTs. Add new function cfs_cpt_of_node() which returns
-the CPT of a particular NUMA node.
-
-I note that you didn't respond to Greg's questions about this patch.
-I'll accept it anyway in the interests of moving forward, but I think
-his comments were probably valid, and need to be considered at some
-stage.
-
-There is a bug though....
-
-Signed-off-by: Amir Shehata <amir.shehata at intel.com<mailto:amir.shehata@intel.com>>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-7734
-Reviewed-on: http://review.whamcloud.com/18916
-Reviewed-by: Olaf Weber <olaf at sgi.com<mailto:olaf@sgi.com>>
-Reviewed-by: Doug Oucharek <dougso at me.com<mailto:dougso@me.com>>
-Signed-off-by: James Simmons <jsimmons at infradead.org<mailto:jsimmons@infradead.org>>
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
-.../lustre/include/linux/libcfs/libcfs_cpu.h        | 11 +++++++++++
-drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c     | 21 +++++++++++++++++++++
-2 files changed, 32 insertions(+)
+ drivers/staging/lustre/lnet/libcfs/debug.c           | 6 +++---
+ drivers/staging/lustre/lnet/libcfs/linux-tracefile.c | 7 -------
+ drivers/staging/lustre/lnet/libcfs/tracefile.c       | 3 ++-
+ 3 files changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-index 1b4333d..ff3ecf5 100644
---- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-+++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-@@ -103,6 +103,8 @@ struct cfs_cpt_table {
-int *ctb_cpu2cpt;
-/* all cpus in this partition table */
-cpumask_var_t ctb_cpumask;
-+ /* shadow HW node to CPU partition ID */
-+ int *ctb_node2cpt;
-/* all nodes in this partition table */
-nodemask_t *ctb_nodemask;
-};
-@@ -143,6 +145,10 @@ struct cfs_cpt_table {
- */
-int cfs_cpt_of_cpu(struct cfs_cpt_table *cptab, int cpu);
-/**
-+ * shadow HW node ID \a NODE to CPU-partition ID by \a cptab
-+ */
-+int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node);
-+/**
- * bind current thread on a CPU-partition \a cpt of \a cptab
- */
-int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt);
-@@ -299,6 +305,11 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
-return 0;
-}
-
-+static inline int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node)
-+{
-+ return 0;
-+}
-+
-static inline int
-cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
-{
-diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-index 33294da..8c5cf7b 100644
---- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-+++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-@@ -102,6 +102,15 @@ struct cfs_cpt_table *
-memset(cptab->ctb_cpu2cpt, -1,
-       nr_cpu_ids * sizeof(cptab->ctb_cpu2cpt[0]));
-
-+ cptab->ctb_node2cpt = kvmalloc_array(nr_node_ids,
-+      sizeof(cptab->ctb_node2cpt[0]),
-+      GFP_KERNEL);
-+ if (!cptab->ctb_node2cpt)
-+ goto failed_alloc_node2cpt;
-+
-+ memset(cptab->ctb_node2cpt, -1,
-+        nr_node_ids * sizeof(cptab->ctb_node2cpt[0]));
-+
-cptab->ctb_parts = kvmalloc_array(ncpt, sizeof(cptab->ctb_parts[0]),
-  GFP_KERNEL);
-if (!cptab->ctb_parts)
-@@ -133,6 +142,8 @@ struct cfs_cpt_table *
-
-kvfree(cptab->ctb_parts);
-failed_alloc_ctb_parts:
-+ kvfree(cptab->ctb_node2cpt);
-+failed_alloc_node2cpt:
-kvfree(cptab->ctb_cpu2cpt);
-failed_alloc_cpu2cpt:
-kfree(cptab->ctb_nodemask);
-@@ -150,6 +161,7 @@ struct cfs_cpt_table *
-int i;
-
-kvfree(cptab->ctb_cpu2cpt);
-+ kvfree(cptab->ctb_node2cpt);
-
-for (i = 0; cptab->ctb_parts && i < cptab->ctb_nparts; i++) {
-struct cfs_cpu_partition *part = &cptab->ctb_parts[i];
-@@ -515,6 +527,15 @@ struct cfs_cpt_table *
-}
-EXPORT_SYMBOL(cfs_cpt_of_cpu);
-
-+int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node)
-+{
-+ if (node < 0 || node > nr_node_ids)
-+ return CFS_CPT_ANY;
-+
-+ return cptab->ctb_node2cpt[node];
-+}
-
-So if node == nr_node_ids, we access beyond the end of the ctb_node2cpt array.
-Oops.
-I've fixed this before applying.
-
-Thanks,
-NeilBrown
-
-
-+EXPORT_SYMBOL(cfs_cpt_of_node);
-+
-int
-cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt)
-{
---
+diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
+index 06f694f..71effcf 100644
+--- a/drivers/staging/lustre/lnet/libcfs/debug.c
++++ b/drivers/staging/lustre/lnet/libcfs/debug.c
+@@ -411,10 +411,10 @@ int libcfs_debug_init(unsigned long bufsize)
+ 			sizeof(libcfs_debug_file_path_arr));
+ 	}
+ 
+-	/* If libcfs_debug_mb is set to an invalid value or uninitialized
+-	 * then just make the total buffers smp_num_cpus * TCD_MAX_PAGES
++	/* If libcfs_debug_mb is uninitialized then just make the
++	 * total buffers smp_num_cpus * TCD_MAX_PAGES
+ 	 */
+-	if (max > cfs_trace_max_debug_mb() || max < num_possible_cpus()) {
++	if (max < num_possible_cpus()) {
+ 		max = TCD_MAX_PAGES;
+ 	} else {
+ 		max = max / num_possible_cpus();
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+index 9e72220..64a5bc1 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+@@ -227,10 +227,3 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
+ 			hdr->ph_line_num, fn, len, buf);
+ 	}
+ }
+-
+-int cfs_trace_max_debug_mb(void)
+-{
+-	int  total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
+-
+-	return max(512, (total_mb * 80) / 100);
+-}
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+index 5f31933..72321ce 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+@@ -933,7 +933,8 @@ int cfs_trace_set_debug_mb(int mb)
+ 	int i;
+ 	int j;
+ 	int pages;
+-	int limit = cfs_trace_max_debug_mb();
++	int total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
++	int limit = max(512, (total_mb * 80) / 100);
+ 	struct cfs_trace_cpu_data *tcd;
+ 
+ 	if (mb < num_possible_cpus()) {
+-- 
 1.8.3.1
-_______________________________________________
-lustre-devel mailing list
-lustre-devel at lists.lustre.org<mailto:lustre-devel@lists.lustre.org>
-http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180625/7c60ef32/attachment-0001.html>
