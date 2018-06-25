@@ -1,15 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 Jun 2018 22:52:55 +0100 (BST)
-Subject: [lustre-devel] [PATCH 21/24] lustre: move remainder of
- linux-tracefile.c to tracefile.c
-In-Reply-To: <87zhzjahsd.fsf@notabene.neil.brown.name>
-References: <152904663333.10587.10934053155404014785.stgit@noble>
- <152904669084.10587.6920959206498193596.stgit@noble>
- <alpine.LFD.2.21.1806210236200.3886@casper.infradead.org>
- <87y3f7bj9w.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1806242125460.28698@casper.infradead.org>
- <87zhzjahsd.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1806252243540.31196@casper.infradead.org>
+Date: Mon, 25 Jun 2018 23:51:38 +0100 (BST)
+Subject: [lustre-devel] [PATCH v3 23/26] staging: lustre: ptlrpc: use
+ current CPU instead of hardcoded 0
+In-Reply-To: <87a7rj8ub9.fsf@notabene.neil.brown.name>
+References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+ <1529875250-11531-24-git-send-email-jsimmons@infradead.org>
+ <87a7rj8ub9.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1806252350310.31196@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -17,41 +14,78 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> >> On Thu, Jun 21 2018, James Simmons wrote:
-> >> 
-> >> >> It's good to keep related code together.
-> >> >> 
-> >> >> Signed-off-by: NeilBrown <neilb@suse.com>
-> >> >
-> >> > Nak. For some reason this corrupts my dmesg output. Its really strange and
-> >> > I haven't figured it out yet.
-> >> 
-> >> This patch cannot possibly be the cause of any such behavioural change.
-> >> It purely moves code from one file to another, it doesn't change the
-> >> code at all.
+> > From: Dmitry Eremin <dmitry.eremin@intel.com>
 > >
-> > In a way you are correct. What this patch does is expose how badly messed
-> > up cfs_print_to_console() is. Originally it was a printk() call but some
-> > newbie changed it incorrectly into a pr_info() for all cases. This is 
-> > totally incorrect but it landed anyways :-( For some bizarre reason it
-> > works even with it being completely wrong.
+> > fix crash if CPU 0 disabled.
+> >
+> > Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> > WC-bug-id: https://jira.whamcloud.com/browse/LU-8710
+> > Reviewed-on: https://review.whamcloud.com/23305
+> > Reviewed-by: Doug Oucharek <dougso@me.com>
+> > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > ---
+> >  drivers/staging/lustre/lustre/ptlrpc/service.c | 11 ++++++-----
+> >  1 file changed, 6 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+> > index 3fd8c74..8e74a45 100644
+> > --- a/drivers/staging/lustre/lustre/ptlrpc/service.c
+> > +++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+> > @@ -421,7 +421,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
+> >  		 * there are.
+> >  		 */
+> >  		/* weight is # of HTs */
+> > -		if (cpumask_weight(topology_sibling_cpumask(0)) > 1) {
+> > +		if (cpumask_weight(topology_sibling_cpumask(smp_processor_id())) > 1) {
 > 
-> I see the problem with cfs_print_to_console().  It chooses a message
-> type (KERN_EMERG, KERN_ERR, KERN_WARNING, KERN_INFO) then uses pr_info()
-> to print that, which adds another KERN_INFO.
-> However vprintk_emit() calls printk_get_level() repeatedly while it
-> succeeds, so the extra KERNE_INFO is ignored.
+> This pops a warning for me:
+> [ 1877.516799] BUG: using smp_processor_id() in preemptible [00000000] code: mount.lustre/14077
 > 
-> So while the code is strange and should use printk(), I don't see
-> how it could mess up your dmesg output.
-> 
-> >                                              I did fix this patch up 
-> > and redid the later patches due the changes from the fix up.  Is it 
-> > okay it I push the newer version of these patches with my changes?
-> 
-> I'm not really sure what you are asking here, but the answer is probably 
-> "yes, it is okay".
+> I'll change it to disable preemption, both here and below.
 
-Pushed the updated patches. Sorry I wasn't clear on what I was asking.
-I was weird stuff like Lustre: LNet6: .....
-Well in any case the pushed patch set cleans all that mess up.
+For .config I have:
+
+# CONFIG_PREEMPT_NONE is not set
+CONFIG_PREEMPT_VOLUNTARY=y
+# CONFIG_PREEMPT is not set
+
+What does yours look like? Strange no one has ever reported an error 
+before. Thanks for finding this!!!
+
+> 
+> >  			/* depress thread factor for hyper-thread */
+> >  			factor = factor - (factor >> 1) + (factor >> 3);
+> >  		}
+> > @@ -2221,15 +2221,16 @@ static int ptlrpc_hr_main(void *arg)
+> >  	struct ptlrpc_hr_thread	*hrt = arg;
+> >  	struct ptlrpc_hr_partition *hrp = hrt->hrt_partition;
+> >  	LIST_HEAD(replies);
+> > -	char threadname[20];
+> >  	int rc;
+> >  
+> > -	snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
+> > -		 hrp->hrp_cpt, hrt->hrt_id);
+> >  	unshare_fs_struct();
+> >  
+> >  	rc = cfs_cpt_bind(ptlrpc_hr.hr_cpt_table, hrp->hrp_cpt);
+> >  	if (rc != 0) {
+> > +		char threadname[20];
+> > +
+> > +		snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
+> > +			 hrp->hrp_cpt, hrt->hrt_id);
+> >  		CWARN("Failed to bind %s on CPT %d of CPT table %p: rc = %d\n",
+> >  		      threadname, hrp->hrp_cpt, ptlrpc_hr.hr_cpt_table, rc);
+> >  	}
+> > @@ -2528,7 +2529,7 @@ int ptlrpc_hr_init(void)
+> >  
+> >  	init_waitqueue_head(&ptlrpc_hr.hr_waitq);
+> >  
+> > -	weight = cpumask_weight(topology_sibling_cpumask(0));
+> > +	weight = cpumask_weight(topology_sibling_cpumask(smp_processor_id()));
+> >  
+> >  	cfs_percpt_for_each(hrp, i, ptlrpc_hr.hr_partitions) {
+> >  		hrp->hrp_cpt = i;
+> > -- 
+> > 1.8.3.1
+> 
