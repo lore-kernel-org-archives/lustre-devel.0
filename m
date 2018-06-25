@@ -1,12 +1,13 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 Jun 2018 23:51:38 +0100 (BST)
-Subject: [lustre-devel] [PATCH v3 23/26] staging: lustre: ptlrpc: use
- current CPU instead of hardcoded 0
-In-Reply-To: <87a7rj8ub9.fsf@notabene.neil.brown.name>
+Date: Mon, 25 Jun 2018 23:57:25 +0100 (BST)
+Subject: [lustre-devel] [PATCH v3 19/26] staging: lustre: libcfs: report
+ NUMA node instead of just node
+In-Reply-To: <87vaa78ybu.fsf@notabene.neil.brown.name>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
- <1529875250-11531-24-git-send-email-jsimmons@infradead.org>
- <87a7rj8ub9.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1806252350310.31196@casper.infradead.org>
+ <1529875250-11531-20-git-send-email-jsimmons@infradead.org>
+ <87y3f38ye6.fsf@notabene.neil.brown.name>
+ <87vaa78ybu.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1806252354180.31196@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,78 +15,52 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> > From: Dmitry Eremin <dmitry.eremin@intel.com>
+> > On Sun, Jun 24 2018, James Simmons wrote:
 > >
-> > fix crash if CPU 0 disabled.
+> >> From: Dmitry Eremin <dmitry.eremin@intel.com>
+> >>
+> >> Reporting "HW nodes" is too generic. It really is reporting
+> >> "HW NUMA nodes". Update the debug message.
 > >
-> > Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-> > WC-bug-id: https://jira.whamcloud.com/browse/LU-8710
-> > Reviewed-on: https://review.whamcloud.com/23305
-> > Reviewed-by: Doug Oucharek <dougso@me.com>
-> > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-> > Signed-off-by: James Simmons <jsimmons@infradead.org>
-> > ---
-> >  drivers/staging/lustre/lustre/ptlrpc/service.c | 11 ++++++-----
-> >  1 file changed, 6 insertions(+), 5 deletions(-)
+> > I'm not happy with this patch description.....
 > >
-> > diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
-> > index 3fd8c74..8e74a45 100644
-> > --- a/drivers/staging/lustre/lustre/ptlrpc/service.c
-> > +++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
-> > @@ -421,7 +421,7 @@ static void ptlrpc_at_timer(struct timer_list *t)
-> >  		 * there are.
-> >  		 */
-> >  		/* weight is # of HTs */
-> > -		if (cpumask_weight(topology_sibling_cpumask(0)) > 1) {
-> > +		if (cpumask_weight(topology_sibling_cpumask(smp_processor_id())) > 1) {
+> >>
+> >> Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> >> WC-bug-id: https://jira.whamcloud.com/browse/LU-8703
+> >> Reviewed-on: https://review.whamcloud.com/23306
+> >> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+> >> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+> >> Reviewed-by: Patrick Farrell <paf@cray.com>
+> >> Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
+> >> Reviewed-by: Oleg Drokin <green@whamcloud.com>
+> >> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> >> ---
+> >>  drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h | 2 ++
+> >>  drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c          | 2 +-
+> >>  drivers/staging/lustre/lnet/lnet/lib-msg.c               | 2 ++
+> >>  3 files changed, 5 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> >> index 2bb2140..29c5071 100644
+> >> --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> >> +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
+> >> @@ -90,6 +90,8 @@ struct cfs_cpu_partition {
+> >>  	unsigned int			*cpt_distance;
+> >>  	/* spread rotor for NUMA allocator */
+> >>  	int				cpt_spread_rotor;
+> >> +	/* NUMA node if cpt_nodemask is empty */
+> >> +	int				cpt_node;
+> >>  };
+> >
+> > It doesn't give any reason why this (unused) field was added.
+> > So I've removed it.
 > 
-> This pops a warning for me:
-> [ 1877.516799] BUG: using smp_processor_id() in preemptible [00000000] code: mount.lustre/14077
-> 
-> I'll change it to disable preemption, both here and below.
+> Ahhhh. this was meant to be in the previous patch too.
+> I've moved it.
 
-For .config I have:
-
-# CONFIG_PREEMPT_NONE is not set
-CONFIG_PREEMPT_VOLUNTARY=y
-# CONFIG_PREEMPT is not set
-
-What does yours look like? Strange no one has ever reported an error 
-before. Thanks for finding this!!!
-
-> 
-> >  			/* depress thread factor for hyper-thread */
-> >  			factor = factor - (factor >> 1) + (factor >> 3);
-> >  		}
-> > @@ -2221,15 +2221,16 @@ static int ptlrpc_hr_main(void *arg)
-> >  	struct ptlrpc_hr_thread	*hrt = arg;
-> >  	struct ptlrpc_hr_partition *hrp = hrt->hrt_partition;
-> >  	LIST_HEAD(replies);
-> > -	char threadname[20];
-> >  	int rc;
-> >  
-> > -	snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
-> > -		 hrp->hrp_cpt, hrt->hrt_id);
-> >  	unshare_fs_struct();
-> >  
-> >  	rc = cfs_cpt_bind(ptlrpc_hr.hr_cpt_table, hrp->hrp_cpt);
-> >  	if (rc != 0) {
-> > +		char threadname[20];
-> > +
-> > +		snprintf(threadname, sizeof(threadname), "ptlrpc_hr%02d_%03d",
-> > +			 hrp->hrp_cpt, hrt->hrt_id);
-> >  		CWARN("Failed to bind %s on CPT %d of CPT table %p: rc = %d\n",
-> >  		      threadname, hrp->hrp_cpt, ptlrpc_hr.hr_cpt_table, rc);
-> >  	}
-> > @@ -2528,7 +2529,7 @@ int ptlrpc_hr_init(void)
-> >  
-> >  	init_waitqueue_head(&ptlrpc_hr.hr_waitq);
-> >  
-> > -	weight = cpumask_weight(topology_sibling_cpumask(0));
-> > +	weight = cpumask_weight(topology_sibling_cpumask(smp_processor_id()));
-> >  
-> >  	cfs_percpt_for_each(hrp, i, ptlrpc_hr.hr_partitions) {
-> >  		hrp->hrp_cpt = i;
-> > -- 
-> > 1.8.3.1
-> 
+This is stupid NFS. So my test nodes are NFS root which will
+contain the source tree. The test nodes don't have access to
+the outside world so from another system I do my pulling and
+pushing. What happens is that patches applied will not show
+up right away before I push. By the time the next patch is
+applied it shows up. Sorry about that.
