@@ -1,10 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 25 Jun 2018 17:42:55 -0400
-Subject: [lustre-devel] [PATCH v2 6/7] lustre: libcfs: renamed
- CFS_TCD_TYPE_MAX to CFS_TCD_TYPE_CNT
+Date: Mon, 25 Jun 2018 17:42:56 -0400
+Subject: [lustre-devel] [PATCH v2 7/7] lustre: libcfs: discard TCD_MAX_TYPES
 In-Reply-To: <1529962976-15048-1-git-send-email-jsimmons@infradead.org>
 References: <1529962976-15048-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1529962976-15048-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1529962976-15048-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,95 +12,66 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-The possible TCD types are 0, 1, 2.
-So the MAX is 2.
-The count of the number of types is 3.
+As well as CFS_TCD_TYPE_CNT we have TCD_MAX_TYPES which has a larger
+value but a similar meaning.  Discard it and just use
+CFS_TCD_TYPE_CNT.
 
-CFS_TCD_TYPE_MAX is 3 - obviously wrong.
-
-So rename it to CFS_TCD_TYPE_CNT.
-
-Also there are 2 places where "3" is used rather
-than the macro - fix them.
+Two places relied on the fact that TCD_MAX_TYPES was larger and so
+there would be NULLs at the end of the array.  Change
+them to check the array size properly.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/libcfs/tracefile.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/tracefile.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index b370c56..e9d8b22 100644
+index e9d8b22..47998e8 100644
 --- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
 +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -54,12 +54,12 @@ enum cfs_trace_buf_type {
+@@ -48,7 +48,6 @@
+ #include "tracefile.h"
+ 
+ #define CFS_TRACE_CONSOLE_BUFFER_SIZE	1024
+-#define TCD_MAX_TYPES			8
+ 
+ enum cfs_trace_buf_type {
  	CFS_TCD_TYPE_PROC = 0,
- 	CFS_TCD_TYPE_SOFTIRQ,
- 	CFS_TCD_TYPE_IRQ,
--	CFS_TCD_TYPE_MAX
-+	CFS_TCD_TYPE_CNT
+@@ -57,7 +56,7 @@ enum cfs_trace_buf_type {
+ 	CFS_TCD_TYPE_CNT
  };
  
- union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
+-union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
++union cfs_trace_data_union (*cfs_trace_data[CFS_TCD_TYPE_CNT])[NR_CPUS] __cacheline_aligned;
  
--char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
-+char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_CNT];
+ char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_CNT];
  char cfs_tracefile[TRACEFILE_NAME_SIZE];
- long long cfs_tracefile_size = CFS_TRACEFILE_SIZE;
- static struct tracefiled_ctl trace_tctl;
-@@ -127,7 +127,7 @@ static void put_pages_on_tcd_daemon_list(struct page_collection *pc,
- int cfs_trace_lock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
- 	__acquires(&tcd->tc_lock)
- {
--	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_MAX);
-+	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_CNT);
- 	if (tcd->tcd_type == CFS_TCD_TYPE_IRQ)
- 		spin_lock_irqsave(&tcd->tcd_lock, tcd->tcd_lock_flags);
- 	else if (tcd->tcd_type == CFS_TCD_TYPE_SOFTIRQ)
-@@ -142,7 +142,7 @@ int cfs_trace_lock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
- void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
- 	__releases(&tcd->tcd_lock)
- {
--	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_MAX);
-+	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_CNT);
- 	if (tcd->tcd_type == CFS_TCD_TYPE_IRQ)
- 		spin_unlock_irqrestore(&tcd->tcd_lock, tcd->tcd_lock_flags);
- 	else if (tcd->tcd_type == CFS_TCD_TYPE_SOFTIRQ)
-@@ -1252,7 +1252,7 @@ void cfs_trace_stop_thread(void)
+@@ -154,14 +153,14 @@ void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
  }
  
- /* percents to share the total debug memory for each type */
--static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
-+static unsigned int pages_factor[CFS_TCD_TYPE_CNT] = {
- 	80,  /* 80% pages for CFS_TCD_TYPE_PROC */
- 	10,  /* 10% pages for CFS_TCD_TYPE_SOFTIRQ */
- 	10   /* 10% pages for CFS_TCD_TYPE_IRQ */
-@@ -1266,7 +1266,7 @@ int cfs_tracefile_init(int max_pages)
+ #define cfs_tcd_for_each(tcd, i, j)					\
+-	for (i = 0; cfs_trace_data[i]; i++)				\
++	for (i = 0; i < CFS_TCD_TYPE_CNT && cfs_trace_data[i]; i++)	\
+ 		for (j = 0, ((tcd) = &(*cfs_trace_data[i])[j].tcd);	\
+ 		     j < num_possible_cpus();				\
+ 		     j++, (tcd) = &(*cfs_trace_data[i])[j].tcd)
  
- 	/* initialize trace_data */
- 	memset(cfs_trace_data, 0, sizeof(cfs_trace_data));
--	for (i = 0; i < CFS_TCD_TYPE_MAX; i++) {
-+	for (i = 0; i < CFS_TCD_TYPE_CNT; i++) {
- 		cfs_trace_data[i] =
- 			kmalloc_array(num_possible_cpus(),
- 				      sizeof(union cfs_trace_data_union),
-@@ -1295,7 +1295,7 @@ int cfs_tracefile_init(int max_pages)
- 	}
  
- 	for (i = 0; i < num_possible_cpus(); i++)
--		for (j = 0; j < 3; j++) {
-+		for (j = 0; j < CFS_TCD_TYPE_CNT; j++) {
- 			cfs_trace_console_buffers[i][j] =
- 				kmalloc(CFS_TRACE_CONSOLE_BUFFER_SIZE,
- 					GFP_KERNEL);
-@@ -1355,7 +1355,7 @@ static void cfs_trace_cleanup(void)
- 	trace_cleanup_on_all_cpus();
+ #define cfs_tcd_for_each_type_lock(tcd, i, cpu)				\
+-	for (i = 0; cfs_trace_data[i] &&				\
++	for (i = 0;  i < CFS_TCD_TYPE_CNT && cfs_trace_data[i] &&	\
+ 	     (tcd = &(*cfs_trace_data[i])[cpu].tcd) &&			\
+ 	     cfs_trace_lock_tcd(tcd, 1); cfs_trace_unlock_tcd(tcd, 1), i++)
  
- 	for (i = 0; i < num_possible_cpus(); i++)
--		for (j = 0; j < 3; j++) {
-+		for (j = 0; j < CFS_TCD_TYPE_CNT; j++) {
- 			kfree(cfs_trace_console_buffers[i][j]);
+@@ -1360,7 +1359,7 @@ static void cfs_trace_cleanup(void)
  			cfs_trace_console_buffers[i][j] = NULL;
  		}
+ 
+-	for (i = 0; cfs_trace_data[i]; i++) {
++	for (i = 0; i < CFS_TCD_TYPE_CNT && cfs_trace_data[i]; i++) {
+ 		kfree(cfs_trace_data[i]);
+ 		cfs_trace_data[i] = NULL;
+ 	}
 -- 
 1.8.3.1
