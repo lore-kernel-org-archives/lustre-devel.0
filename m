@@ -1,11 +1,11 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 25 Jun 2018 10:48:56 +1000
-Subject: [lustre-devel] [PATCH v3 08/26] staging: lustre: libcfs: add
- cpu distance handling
-In-Reply-To: <1529875250-11531-9-git-send-email-jsimmons@infradead.org>
+Date: Mon, 25 Jun 2018 10:57:33 +1000
+Subject: [lustre-devel] [PATCH v3 13/26] staging: lustre: libcfs: use
+ int type for CPT identification.
+In-Reply-To: <1529875250-11531-14-git-send-email-jsimmons@infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
- <1529875250-11531-9-git-send-email-jsimmons@infradead.org>
-Message-ID: <874lhradxj.fsf@notabene.neil.brown.name>
+ <1529875250-11531-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <871scvadj6.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,208 +14,119 @@ To: lustre-devel@lists.lustre.org
 
 On Sun, Jun 24 2018, James Simmons wrote:
 
-> From: Amir Shehata <amir.shehata@intel.com>
+> From: Dmitry Eremin <dmitry.eremin@intel.com>
 >
-> Add functionality to calculate the distance between two CPTs.
-> Expose those distance in debugfs so people deploying a setup
-> can debug what is being created for CPTs.
+> Use int type for CPT identification to match the linux kernel
+> CPU identification.
 
-This patch doesn't expose anything in debugfs - a later patch
-does that.
-So I've changed the comment to "Prepare to expose those ...."
+Can someone site evidence for "int" being the dominant choice for CPU
+identification in the kernel?
+I looked in cpumask.h and found plenty of "unsigned int".
+I also found
 
+Commit: 9b130ad5bb82 ("treewide: make "nr_cpu_ids" unsigned")
+
+which makes nr_cpu_ids unsigned.
+
+So I'm dropping this patch for now as the justification is not
+convincing.
+
+If there is a real case to be made, please resubmit.
+
+Thanks,
 NeilBrown
 
 
+
 >
-> Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-7734
-> Reviewed-on: http://review.whamcloud.com/18916
-> Reviewed-by: Olaf Weber <olaf@sgi.com>
+> Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-8703
+> Reviewed-on: https://review.whamcloud.com/23304
+> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 > Reviewed-by: Doug Oucharek <dougso@me.com>
+> Reviewed-by: Oleg Drokin <green@whamcloud.com>
 > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
->  .../lustre/include/linux/libcfs/libcfs_cpu.h       | 31 +++++++++++
->  drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c    | 61 ++++++++++++++++++++++
->  2 files changed, 92 insertions(+)
+>  drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h |  8 ++++----
+>  drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c          | 14 +++++++-------
+>  2 files changed, 11 insertions(+), 11 deletions(-)
 >
 > diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-> index ff3ecf5..a015ac1 100644
+> index 9dbb0b1..2bb2140 100644
 > --- a/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
 > +++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_cpu.h
-> @@ -86,6 +86,8 @@ struct cfs_cpu_partition {
->  	cpumask_var_t			cpt_cpumask;
->  	/* nodes mask for this partition */
->  	nodemask_t			*cpt_nodemask;
-> +	/* NUMA distance between CPTs */
-> +	unsigned int			*cpt_distance;
+> @@ -89,18 +89,18 @@ struct cfs_cpu_partition {
+>  	/* NUMA distance between CPTs */
+>  	unsigned int			*cpt_distance;
 >  	/* spread rotor for NUMA allocator */
->  	unsigned int			cpt_spread_rotor;
+> -	unsigned int			cpt_spread_rotor;
+> +	int				cpt_spread_rotor;
 >  };
-> @@ -95,6 +97,8 @@ struct cfs_cpu_partition {
+>  
+>  
+>  /** descriptor for CPU partitions */
 >  struct cfs_cpt_table {
 >  	/* spread rotor for NUMA allocator */
->  	unsigned int			ctb_spread_rotor;
-> +	/* maximum NUMA distance between all nodes in table */
-> +	unsigned int			ctb_distance;
+> -	unsigned int			ctb_spread_rotor;
+> +	int				ctb_spread_rotor;
+>  	/* maximum NUMA distance between all nodes in table */
+>  	unsigned int			ctb_distance;
 >  	/* # of CPU partitions */
->  	unsigned int			ctb_nparts;
+> -	unsigned int			ctb_nparts;
+> +	int				ctb_nparts;
 >  	/* partitions tables */
-> @@ -120,6 +124,10 @@ struct cfs_cpt_table {
->   */
->  int cfs_cpt_table_print(struct cfs_cpt_table *cptab, char *buf, int len);
+>  	struct cfs_cpu_partition	*ctb_parts;
+>  	/* shadow HW CPU to CPU partition ID */
+> @@ -355,7 +355,7 @@ static inline void cfs_cpu_fini(void)
 >  /**
-> + * print distance information of cpt-table
-> + */
-> +int cfs_cpt_distance_print(struct cfs_cpt_table *cptab, char *buf, int len);
-> +/**
->   * return total number of CPU partitions in \a cptab
+>   * create a cfs_cpt_table with \a ncpt number of partitions
 >   */
->  int
-> @@ -149,6 +157,10 @@ struct cfs_cpt_table {
->   */
->  int cfs_cpt_of_node(struct cfs_cpt_table *cptab, int node);
->  /**
-> + * NUMA distance between \a cpt1 and \a cpt2 in \a cptab
-> + */
-> +unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2);
-> +/**
->   * bind current thread on a CPU-partition \a cpt of \a cptab
->   */
->  int cfs_cpt_bind(struct cfs_cpt_table *cptab, int cpt);
-> @@ -206,6 +218,19 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
->  struct cfs_cpt_table;
->  #define cfs_cpt_tab ((struct cfs_cpt_table *)NULL)
+> -struct cfs_cpt_table *cfs_cpt_table_alloc(unsigned int ncpt);
+> +struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt);
 >  
-> +static inline int cfs_cpt_distance_print(struct cfs_cpt_table *cptab,
-> +					 char *buf, int len)
-> +{
-> +	int rc;
-> +
-> +	rc = snprintf(buf, len, "0\t: 0:1\n");
-> +	len -= rc;
-> +	if (len <= 0)
-> +		return -EFBIG;
-> +
-> +	return rc;
-> +}
-> +
->  static inline cpumask_var_t *
->  cfs_cpt_cpumask(struct cfs_cpt_table *cptab, int cpt)
->  {
-> @@ -241,6 +266,12 @@ void cfs_cpt_unset_nodemask(struct cfs_cpt_table *cptab,
->  	return NULL;
->  }
->  
-> +static inline unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab,
-> +					    int cpt1, int cpt2)
-> +{
-> +	return 1;
-> +}
-> +
->  static inline int
->  cfs_cpt_set_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
->  {
+>  /*
+>   * allocate per-cpu-partition data, returned value is an array of pointers,
 > diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-> index 8c5cf7b..b315fb2 100644
+> index aaab7cb..8f7de59 100644
 > --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
 > +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-> @@ -128,6 +128,15 @@ struct cfs_cpt_table *
->  					     GFP_NOFS);
->  		if (!part->cpt_nodemask)
->  			goto failed_setting_ctb_parts;
-> +
-> +		part->cpt_distance = kvmalloc_array(cptab->ctb_nparts,
-> +						    sizeof(part->cpt_distance[0]),
-> +						    GFP_KERNEL);
-> +		if (!part->cpt_distance)
-> +			goto failed_setting_ctb_parts;
-> +
-> +		memset(part->cpt_distance, -1,
-> +		       cptab->ctb_nparts * sizeof(part->cpt_distance[0]));
->  	}
+> @@ -73,7 +73,7 @@
+>  module_param(cpu_pattern, charp, 0444);
+>  MODULE_PARM_DESC(cpu_pattern, "CPU partitions pattern");
 >  
->  	return cptab;
-> @@ -138,6 +147,7 @@ struct cfs_cpt_table *
->  
->  		kfree(part->cpt_nodemask);
->  		free_cpumask_var(part->cpt_cpumask);
-> +		kvfree(part->cpt_distance);
->  	}
->  
->  	kvfree(cptab->ctb_parts);
-> @@ -168,6 +178,7 @@ struct cfs_cpt_table *
->  
->  		kfree(part->cpt_nodemask);
->  		free_cpumask_var(part->cpt_cpumask);
-> +		kvfree(part->cpt_distance);
->  	}
->  
->  	kvfree(cptab->ctb_parts);
-> @@ -222,6 +233,44 @@ struct cfs_cpt_table *
->  }
->  EXPORT_SYMBOL(cfs_cpt_table_print);
->  
-> +int cfs_cpt_distance_print(struct cfs_cpt_table *cptab, char *buf, int len)
-> +{
-> +	char *tmp = buf;
-> +	int rc;
-> +	int i;
-> +	int j;
-> +
-> +	for (i = 0; i < cptab->ctb_nparts; i++) {
-> +		if (len <= 0)
-> +			goto err;
-> +
-> +		rc = snprintf(tmp, len, "%d\t:", i);
-> +		len -= rc;
-> +
-> +		if (len <= 0)
-> +			goto err;
-> +
-> +		tmp += rc;
-> +		for (j = 0; j < cptab->ctb_nparts; j++) {
-> +			rc = snprintf(tmp, len, " %d:%d", j,
-> +				      cptab->ctb_parts[i].cpt_distance[j]);
-> +			len -= rc;
-> +			if (len <= 0)
-> +				goto err;
-> +			tmp += rc;
-> +		}
-> +
-> +		*tmp = '\n';
-> +		tmp++;
-> +		len--;
-> +	}
-> +
-> +	return tmp - buf;
-> +err:
-> +	return -E2BIG;
-> +}
-> +EXPORT_SYMBOL(cfs_cpt_distance_print);
-> +
->  int
->  cfs_cpt_number(struct cfs_cpt_table *cptab)
+> -struct cfs_cpt_table *cfs_cpt_table_alloc(unsigned int ncpt)
+> +struct cfs_cpt_table *cfs_cpt_table_alloc(int ncpt)
 >  {
-> @@ -273,6 +322,18 @@ struct cfs_cpt_table *
+>  	struct cfs_cpt_table *cptab;
+>  	int i;
+> @@ -788,13 +788,13 @@ static int cfs_cpt_choose_ncpus(struct cfs_cpt_table *cptab, int cpt,
+>  	return rc;
 >  }
->  EXPORT_SYMBOL(cfs_cpt_nodemask);
 >  
-> +unsigned int cfs_cpt_distance(struct cfs_cpt_table *cptab, int cpt1, int cpt2)
-> +{
-> +	LASSERT(cpt1 == CFS_CPT_ANY || (cpt1 >= 0 && cpt1 < cptab->ctb_nparts));
-> +	LASSERT(cpt2 == CFS_CPT_ANY || (cpt2 >= 0 && cpt2 < cptab->ctb_nparts));
-> +
-> +	if (cpt1 == CFS_CPT_ANY || cpt2 == CFS_CPT_ANY)
-> +		return cptab->ctb_distance;
-> +
-> +	return cptab->ctb_parts[cpt1].cpt_distance[cpt2];
-> +}
-> +EXPORT_SYMBOL(cfs_cpt_distance);
-> +
->  int
->  cfs_cpt_set_cpu(struct cfs_cpt_table *cptab, int cpt, int cpu)
+> -#define CPT_WEIGHT_MIN  4u
+> +#define CPT_WEIGHT_MIN 4
+>  
+> -static unsigned int cfs_cpt_num_estimate(void)
+> +static int cfs_cpt_num_estimate(void)
 >  {
+> -	unsigned int nnode = num_online_nodes();
+> -	unsigned int ncpu = num_online_cpus();
+> -	unsigned int ncpt;
+> +	int nnode = num_online_nodes();
+> +	int ncpu = num_online_cpus();
+> +	int ncpt;
+>  
+>  	if (ncpu <= CPT_WEIGHT_MIN) {
+>  		ncpt = 1;
+> @@ -824,7 +824,7 @@ static unsigned int cfs_cpt_num_estimate(void)
+>  	/* config many CPU partitions on 32-bit system could consume
+>  	 * too much memory
+>  	 */
+> -	ncpt = min(2U, ncpt);
+> +	ncpt = min(2, ncpt);
+>  #endif
+>  	while (ncpu % ncpt)
+>  		ncpt--; /* worst case is 1 */
 > -- 
 > 1.8.3.1
 -------------- next part --------------
@@ -224,4 +135,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180625/574935ba/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180625/de069a31/attachment.sig>
