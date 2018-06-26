@@ -1,12 +1,16 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 26 Jun 2018 01:55:41 +0100 (BST)
-Subject: [lustre-devel] [PATCH v3 05/26] staging: lustre: libcfs: remove
- excess space
-In-Reply-To: <87a7rjaek3.fsf@notabene.neil.brown.name>
-References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
- <1529875250-11531-6-git-send-email-jsimmons@infradead.org>
- <87a7rjaek3.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1806260155290.31196@casper.infradead.org>
+Date: Tue, 26 Jun 2018 02:13:22 +0100 (BST)
+Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
+ module reduction.
+In-Reply-To: <87tvprah32.fsf@notabene.neil.brown.name>
+References: <152904663333.10587.10934053155404014785.stgit@noble>
+ <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
+ <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <alpine.LFD.2.21.1806210354260.3886@casper.infradead.org>
+ <3FD4D051-9C95-449D-8A23-D42B271E55B8@dilger.ca>
+ <DM3PR1101MB121322E85FDE1E5310F6F4B7CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <87tvprah32.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1806260206360.31196@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,63 +18,32 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> > From: Amir Shehata <amir.shehata@intel.com>
+> > Ah, thanks Andreas.  Perhaps not coincidentally, Lustre 2.4 is the first release I worked on.
 > >
-> > The function cfs_cpt_table_print() was adding two spaces
-> > to the string buffer. Just add it once.
+> > Neil, I am really unenamored of the idea of the shared ptlrpc ldlm module being named ptlrpc...
 > 
-> No it doesn't.  Maybe it did in the out-of-tree code, but the linux code
-> is different.
-> 
-> The extra space is
-> 
->                        rc = snprintf(tmp, len, " %d", j);
-> 
-> But in Linux that is
-> 
-> 			rc = snprintf(tmp, len, "%d ", j);
-> 
-> Both are wrong, but for different reasons.
-> I've change this patch to be:
-> 
-> 			rc = snprintf(tmp, len, "%d\t:", i);
-> and
-> 			rc = snprintf(tmp, len, " %d", j);
-> and changed the comment to say that we don't need a stray space at the
-> end of the line.
+> Can you say why?  Is it the choice of name that bothers you, or the
+> combining of two things into the one kernel module, or something else?
+> Currently in  git://git.hpdd.intel.com/fs/lustre-release.git
+> (or the git tree that was until recently at the above address),
+> the module named "ptlrpc" contains ptlrpc code, ldlm code, and target
+> code.  I wonder what "target" means in this context.
 
-Thank you.
+target is the server code built into ptlrpc which is for the "Unified 
+Target". Its the shared code that is used by both the MDS and OSS code.
+Andreas or Oleg can add more details than this. BTW also the nodemap
+code also get built into ptlrpc module as well for the server side.
+ 
+> > Also, Lustre currently has a bunch of module parameters which are used for configuration.  Thoughts on that?
+> 
+> Yes, the module parameters are an interesting part of the story.
+> libcfs has a bunch of module parameters that are symlinked from debugfs.
+> It seems that user-space largely uses the debugfs links to access them,
+> so they can become part of the "lnet" module with minimal pain.
+> Other modules have parameters that I haven't yet looked in to.
+> 
+> There probably will need to be user-space changes to support reduction
+> in the number of modules.
 
-> 
-> NeilBrown
-> 
-> 
-> 
-> >
-> > Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-> > WC-bug-id: https://jira.whamcloud.com/browse/LU-7734
-> > Reviewed-on: http://review.whamcloud.com/18916
-> > Reviewed-by: Olaf Weber <olaf@sgi.com>
-> > Reviewed-by: Doug Oucharek <dougso@me.com>
-> > Reviewed-by: Oleg Drokin <green@whamcloud.com>
-> > Signed-off-by: James Simmons <jsimmons@infradead.org>
-> > ---
-> >  drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-> > index ea8d55c..680a2b1 100644
-> > --- a/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-> > +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_cpu.c
-> > @@ -177,7 +177,7 @@ struct cfs_cpt_table *
-> >  
-> >  	for (i = 0; i < cptab->ctb_nparts; i++) {
-> >  		if (len > 0) {
-> > -			rc = snprintf(tmp, len, "%d\t: ", i);
-> > +			rc = snprintf(tmp, len, "%d\t:", i);
-> >  			len -= rc;
-> >  		}
-> >  
-> > -- 
-> > 1.8.3.1
-> 
+The test suite will need some changes since it loads the modules. We
+need to handle the case if its built into the kernel as well.
