@@ -1,61 +1,185 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Wed, 27 Jun 2018 12:42:37 +0000
-Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
- support
-In-Reply-To: <87lgb16j8q.fsf@notabene.neil.brown.name>
-References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
- <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
- <877emnaed8.fsf@notabene.neil.brown.name>
- <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>,
- <87lgb16j8q.fsf@notabene.neil.brown.name>
-Message-ID: <DM3PR1101MB1213FD1001256E565FF011FFCB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 27 Jun 2018 15:38:30 -0400
+Subject: [lustre-devel] [PATCH v3 01/13] lustre: libcfs: move tracefile
+ locking from linux-tracefile.c to tracefile.c
+In-Reply-To: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
+References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530128322-32535-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+From: NeilBrown <neilb@suse.com>
 
-Neil,
+There is no value in keeping it separate.
 
-I am not the person at Cray for this, but if SUSE does take an interest in this, Cray would probably be interested in weighing in and contributing info if not actually code.  In fact, other HPC vendors like HPE(by which I mostly mean the old SGI) or IBM might as well.  NUMA optimization is a persistent fascination in our area of the industry...
+Signed-off-by: NeilBrown <neilb@suse.com>
+---
+ .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 22 -------------------
+ drivers/staging/lustre/lnet/libcfs/tracefile.c     | 25 +++++++++++-----------
+ drivers/staging/lustre/lnet/libcfs/tracefile.h     |  5 -----
+ 3 files changed, 13 insertions(+), 39 deletions(-)
 
-- Patrick
-
-________________________________
-From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
-Sent: Tuesday, June 26, 2018 9:44:37 PM
-To: Doug Oucharek
-Cc: Amir Shehata; Lustre Development List
-Subject: Re: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA support
-
-On Mon, Jun 25 2018, Doug Oucharek wrote:
-
-> Some background on this NUMA change:
->
-> First off, this is just a first step to a bigger set of changes which include changes to the Lustre utilities.  This was done as part of the Multi-Rail feature.  One of the systems that feature is meant to support is the SGI UV system (now HPE) which has a massive number of NUMA nodes connected by a NUMA Link.  There are multiple fabric cards spread throughout the system and Multi-Rail needs to know which fabric cards are nearest to the NUMA node we are running on.  To do that, the ?distance? between NUMA nodes needs to be configured.
->
-> This patch is preparing the infrastructure for the Multi-Rail feature to support configuring NUMA node distances.  Technically, this patch should be landing with the Multi-Rail feature (still to be pushed) for it to make proper sense.
->
-
-Thanks a lot for the background.
-
-If these NUMA nodes have a 'distance' between them, and if lustre can
-benefit from knowing the distance, then is seems likely that other code
-might also benefit.  In that case it would be best if the distance were
-encoded in some global state information so that lustre and any other
-subsystem can extract it.
-
-Do you know if there is any work underway by anyone to make this
-information generally available?  If there is, we should make sure that
-lustre works in a compatible way so that once that work lands, lustre
-can use it directly and not need extra configuration.
-If no such work is underway, then it would be really good if something
-were done in that direction.  If no-one here is able to work on this, I
-can ask around in SUSE and see if anyone here knows anything relevant.
-
-Thanks,
-NeilBrown
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180627/5fb02a73/attachment-0001.html>
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+index 3471384..9e72220 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+@@ -47,8 +47,6 @@
+ 
+ char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
+ 
+-static DECLARE_RWSEM(cfs_tracefile_sem);
+-
+ int cfs_tracefile_init_arch(void)
+ {
+ 	int i;
+@@ -109,26 +107,6 @@ void cfs_tracefile_fini_arch(void)
+ 	}
+ }
+ 
+-void cfs_tracefile_read_lock(void)
+-{
+-	down_read(&cfs_tracefile_sem);
+-}
+-
+-void cfs_tracefile_read_unlock(void)
+-{
+-	up_read(&cfs_tracefile_sem);
+-}
+-
+-void cfs_tracefile_write_lock(void)
+-{
+-	down_write(&cfs_tracefile_sem);
+-}
+-
+-void cfs_tracefile_write_unlock(void)
+-{
+-	up_write(&cfs_tracefile_sem);
+-}
+-
+ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
+ {
+ 	if (in_irq())
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+index 7ca562e..5f31933 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+@@ -59,6 +59,7 @@
+ static int thread_running;
+ 
+ static atomic_t cfs_tage_allocated = ATOMIC_INIT(0);
++static DECLARE_RWSEM(cfs_tracefile_sem);
+ 
+ struct page_collection {
+ 	struct list_head	pc_pages;
+@@ -711,7 +712,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
+ 	mm_segment_t __oldfs;
+ 	int rc;
+ 
+-	cfs_tracefile_write_lock();
++	down_write(&cfs_tracefile_sem);
+ 
+ 	filp = filp_open(filename, O_CREAT | O_EXCL | O_WRONLY | O_LARGEFILE,
+ 			 0600);
+@@ -759,7 +760,7 @@ int cfs_tracefile_dump_all_pages(char *filename)
+ close:
+ 	filp_close(filp, NULL);
+ out:
+-	cfs_tracefile_write_unlock();
++	up_write(&cfs_tracefile_sem);
+ 	return rc;
+ }
+ 
+@@ -873,12 +874,12 @@ int cfs_trace_daemon_command(char *str)
+ {
+ 	int rc = 0;
+ 
+-	cfs_tracefile_write_lock();
++	down_write(&cfs_tracefile_sem);
+ 
+ 	if (!strcmp(str, "stop")) {
+-		cfs_tracefile_write_unlock();
++		up_write(&cfs_tracefile_sem);
+ 		cfs_trace_stop_thread();
+-		cfs_tracefile_write_lock();
++		down_write(&cfs_tracefile_sem);
+ 		memset(cfs_tracefile, 0, sizeof(cfs_tracefile));
+ 
+ 	} else if (!strncmp(str, "size=", 5)) {
+@@ -905,7 +906,7 @@ int cfs_trace_daemon_command(char *str)
+ 		cfs_trace_start_thread();
+ 	}
+ 
+-	cfs_tracefile_write_unlock();
++	up_write(&cfs_tracefile_sem);
+ 	return rc;
+ }
+ 
+@@ -950,12 +951,12 @@ int cfs_trace_set_debug_mb(int mb)
+ 	mb /= num_possible_cpus();
+ 	pages = mb << (20 - PAGE_SHIFT);
+ 
+-	cfs_tracefile_write_lock();
++	down_write(&cfs_tracefile_sem);
+ 
+ 	cfs_tcd_for_each(tcd, i, j)
+ 		tcd->tcd_max_pages = (pages * tcd->tcd_pages_factor) / 100;
+ 
+-	cfs_tracefile_write_unlock();
++	up_write(&cfs_tracefile_sem);
+ 
+ 	return 0;
+ }
+@@ -967,12 +968,12 @@ int cfs_trace_get_debug_mb(void)
+ 	struct cfs_trace_cpu_data *tcd;
+ 	int total_pages = 0;
+ 
+-	cfs_tracefile_read_lock();
++	down_read(&cfs_tracefile_sem);
+ 
+ 	cfs_tcd_for_each(tcd, i, j)
+ 		total_pages += tcd->tcd_max_pages;
+ 
+-	cfs_tracefile_read_unlock();
++	up_read(&cfs_tracefile_sem);
+ 
+ 	return (total_pages >> (20 - PAGE_SHIFT)) + 1;
+ }
+@@ -1002,7 +1003,7 @@ static int tracefiled(void *arg)
+ 			goto end_loop;
+ 
+ 		filp = NULL;
+-		cfs_tracefile_read_lock();
++		down_read(&cfs_tracefile_sem);
+ 		if (cfs_tracefile[0]) {
+ 			filp = filp_open(cfs_tracefile,
+ 					 O_CREAT | O_RDWR | O_LARGEFILE,
+@@ -1014,7 +1015,7 @@ static int tracefiled(void *arg)
+ 					rc);
+ 			}
+ 		}
+-		cfs_tracefile_read_unlock();
++		up_read(&cfs_tracefile_sem);
+ 		if (!filp) {
+ 			put_pages_on_daemon_list(&pc);
+ 			__LASSERT(list_empty(&pc.pc_pages));
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+index 0608240..9f6b73d 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+@@ -65,11 +65,6 @@ enum cfs_trace_buf_type {
+ int  cfs_tracefile_init_arch(void);
+ void cfs_tracefile_fini_arch(void);
+ 
+-void cfs_tracefile_read_lock(void);
+-void cfs_tracefile_read_unlock(void);
+-void cfs_tracefile_write_lock(void);
+-void cfs_tracefile_write_unlock(void);
+-
+ int cfs_tracefile_dump_all_pages(char *filename);
+ void cfs_trace_debug_print(void);
+ void cfs_trace_flush_pages(void);
+-- 
+1.8.3.1
