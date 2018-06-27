@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Jun 2018 15:38:39 -0400
-Subject: [lustre-devel] [PATCH v3 10/13] lustre: libcfs: fold
- cfs_tracefile_*_arch into their only callers.
+Date: Wed, 27 Jun 2018 15:38:41 -0400
+Subject: [lustre-devel] [PATCH v3 12/13] lustre: libcfs: discard
+ TCD_MAX_TYPES
 In-Reply-To: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
 References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530128322-32535-11-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530128322-32535-13-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,232 +13,66 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-There is no need to separate "arch" init/fini from
-the rest, so fold it all in.
-This requires some slightly subtle changes to clean-up
-to make sure we don't walk lists before they are
-initialized.
+As well as CFS_TCD_TYPE_CNT we have TCD_MAX_TYPES which has a larger
+value but a similar meaning.  Discard it and just use
+CFS_TCD_TYPE_CNT.
+
+Two places relied on the fact that TCD_MAX_TYPES was larger and so
+there would be NULLs at the end of the array.  Change
+them to check the array size properly.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/libcfs/tracefile.c | 147 +++++++++++--------------
- drivers/staging/lustre/lnet/libcfs/tracefile.h |   3 -
- 2 files changed, 63 insertions(+), 87 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/tracefile.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index 5095e66..a2b5004 100644
+index b102465..0f64fa2 100644
 --- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
 +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -200,82 +200,6 @@ static inline void cfs_trace_put_tcd(struct cfs_trace_cpu_data *tcd)
- 	put_cpu();
+@@ -48,7 +48,6 @@
+ #include "tracefile.h"
+ 
+ #define CFS_TRACE_CONSOLE_BUFFER_SIZE	1024
+-#define TCD_MAX_TYPES			8
+ 
+ enum cfs_trace_buf_type {
+ 	CFS_TCD_TYPE_PROC = 0,
+@@ -57,7 +56,7 @@ enum cfs_trace_buf_type {
+ 	CFS_TCD_TYPE_CNT
+ };
+ 
+-union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
++union cfs_trace_data_union (*cfs_trace_data[CFS_TCD_TYPE_CNT])[NR_CPUS] __cacheline_aligned;
+ 
+ char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_CNT];
+ char cfs_tracefile[TRACEFILE_NAME_SIZE];
+@@ -154,14 +153,14 @@ void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
  }
  
--/* percents to share the total debug memory for each type */
--static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
--	80,  /* 80% pages for CFS_TCD_TYPE_PROC */
--	10,  /* 10% pages for CFS_TCD_TYPE_SOFTIRQ */
--	10   /* 10% pages for CFS_TCD_TYPE_IRQ */
--};
--
--int cfs_tracefile_init_arch(void)
--{
--	struct cfs_trace_cpu_data *tcd;
--	int i;
--	int j;
--
--	/* initialize trace_data */
--	memset(cfs_trace_data, 0, sizeof(cfs_trace_data));
--	for (i = 0; i < CFS_TCD_TYPE_MAX; i++) {
--		cfs_trace_data[i] =
--			kmalloc_array(num_possible_cpus(),
--				      sizeof(union cfs_trace_data_union),
--				      GFP_KERNEL);
--		if (!cfs_trace_data[i])
--			goto out_trace_data;
--	}
--
--	/* arch related info initialized */
--	cfs_tcd_for_each(tcd, i, j) {
--		spin_lock_init(&tcd->tcd_lock);
--		tcd->tcd_pages_factor = pages_factor[i];
--		tcd->tcd_type = i;
--		tcd->tcd_cpu = j;
--	}
--
--	for (i = 0; i < num_possible_cpus(); i++)
--		for (j = 0; j < 3; j++) {
--			cfs_trace_console_buffers[i][j] =
--				kmalloc(CFS_TRACE_CONSOLE_BUFFER_SIZE,
--					GFP_KERNEL);
--
--			if (!cfs_trace_console_buffers[i][j])
--				goto out_buffers;
--		}
--
--	return 0;
--
--out_buffers:
--	for (i = 0; i < num_possible_cpus(); i++)
--		for (j = 0; j < 3; j++) {
--			kfree(cfs_trace_console_buffers[i][j]);
--			cfs_trace_console_buffers[i][j] = NULL;
--		}
--out_trace_data:
+ #define cfs_tcd_for_each(tcd, i, j)					\
+-	for (i = 0; cfs_trace_data[i]; i++)				\
++	for (i = 0; i < CFS_TCD_TYPE_CNT && cfs_trace_data[i]; i++)	\
+ 		for (j = 0, ((tcd) = &(*cfs_trace_data[i])[j].tcd);	\
+ 		     j < num_possible_cpus();				\
+ 		     j++, (tcd) = &(*cfs_trace_data[i])[j].tcd)
+ 
+ 
+ #define cfs_tcd_for_each_type_lock(tcd, i, cpu)				\
+-	for (i = 0; cfs_trace_data[i] &&				\
++	for (i = 0;  i < CFS_TCD_TYPE_CNT && cfs_trace_data[i] &&	\
+ 	     (tcd = &(*cfs_trace_data[i])[cpu].tcd) &&			\
+ 	     cfs_trace_lock_tcd(tcd, 1); cfs_trace_unlock_tcd(tcd, 1), i++)
+ 
+@@ -1361,7 +1360,7 @@ static void cfs_trace_cleanup(void)
+ 			cfs_trace_console_buffers[i][j] = NULL;
+ 		}
+ 
 -	for (i = 0; cfs_trace_data[i]; i++) {
--		kfree(cfs_trace_data[i]);
--		cfs_trace_data[i] = NULL;
--	}
--	pr_err("lnet: Not enough memory\n");
--	return -ENOMEM;
--}
--
--void cfs_tracefile_fini_arch(void)
--{
--	int i;
--	int j;
--
--	for (i = 0; i < num_possible_cpus(); i++)
--		for (j = 0; j < 3; j++) {
--			kfree(cfs_trace_console_buffers[i][j]);
--			cfs_trace_console_buffers[i][j] = NULL;
--		}
--
--	for (i = 0; cfs_trace_data[i]; i++) {
--		kfree(cfs_trace_data[i]);
--		cfs_trace_data[i] = NULL;
--	}
--}
--
- static inline struct cfs_trace_page *
- cfs_tage_from_list(struct list_head *list)
- {
-@@ -1324,21 +1248,38 @@ void cfs_trace_stop_thread(void)
- 	mutex_unlock(&cfs_trace_thread_mutex);
- }
- 
-+/* percents to share the total debug memory for each type */
-+static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
-+	80,  /* 80% pages for CFS_TCD_TYPE_PROC */
-+	10,  /* 10% pages for CFS_TCD_TYPE_SOFTIRQ */
-+	10   /* 10% pages for CFS_TCD_TYPE_IRQ */
-+};
-+
- int cfs_tracefile_init(int max_pages)
- {
- 	struct cfs_trace_cpu_data *tcd;
- 	int i;
- 	int j;
--	int rc;
--	int factor;
- 
--	rc = cfs_tracefile_init_arch();
--	if (rc)
--		return rc;
-+	/* initialize trace_data */
-+	memset(cfs_trace_data, 0, sizeof(cfs_trace_data));
-+	for (i = 0; i < CFS_TCD_TYPE_MAX; i++) {
-+		cfs_trace_data[i] =
-+			kmalloc_array(num_possible_cpus(),
-+				      sizeof(union cfs_trace_data_union),
-+				      GFP_KERNEL);
-+		if (!cfs_trace_data[i])
-+			goto out_trace_data;
-+	}
- 
-+	/* arch related info initialized */
- 	cfs_tcd_for_each(tcd, i, j) {
--		/* tcd_pages_factor is initialized int tracefile_init_arch. */
--		factor = tcd->tcd_pages_factor;
-+		int factor = pages_factor[i];
-+
-+		spin_lock_init(&tcd->tcd_lock);
-+		tcd->tcd_pages_factor = factor;
-+		tcd->tcd_type = i;
-+		tcd->tcd_cpu = j;
- 		INIT_LIST_HEAD(&tcd->tcd_pages);
- 		INIT_LIST_HEAD(&tcd->tcd_stock_pages);
- 		INIT_LIST_HEAD(&tcd->tcd_daemon_pages);
-@@ -1350,7 +1291,31 @@ int cfs_tracefile_init(int max_pages)
- 		tcd->tcd_shutting_down = 0;
++	for (i = 0; i < CFS_TCD_TYPE_CNT && cfs_trace_data[i]; i++) {
+ 		kfree(cfs_trace_data[i]);
+ 		cfs_trace_data[i] = NULL;
  	}
- 
-+	for (i = 0; i < num_possible_cpus(); i++)
-+		for (j = 0; j < 3; j++) {
-+			cfs_trace_console_buffers[i][j] =
-+				kmalloc(CFS_TRACE_CONSOLE_BUFFER_SIZE,
-+					GFP_KERNEL);
-+
-+			if (!cfs_trace_console_buffers[i][j])
-+				goto out_buffers;
-+		}
-+
- 	return 0;
-+
-+out_buffers:
-+	for (i = 0; i < num_possible_cpus(); i++)
-+		for (j = 0; j < 3; j++) {
-+			kfree(cfs_trace_console_buffers[i][j]);
-+			cfs_trace_console_buffers[i][j] = NULL;
-+		}
-+out_trace_data:
-+	for (i = 0; cfs_trace_data[i]; i++) {
-+		kfree(cfs_trace_data[i]);
-+		cfs_trace_data[i] = NULL;
-+	}
-+	pr_err("lnet: Not enough memory\n");
-+	return -ENOMEM;
- }
- 
- static void trace_cleanup_on_all_cpus(void)
-@@ -1362,6 +1327,9 @@ static void trace_cleanup_on_all_cpus(void)
- 
- 	for_each_possible_cpu(cpu) {
- 		cfs_tcd_for_each_type_lock(tcd, i, cpu) {
-+			if (!tcd->tcd_pages_factor)
-+				/* Not initialised */
-+				continue;
- 			tcd->tcd_shutting_down = 1;
- 
- 			list_for_each_entry_safe(tage, tmp, &tcd->tcd_pages,
-@@ -1380,12 +1348,23 @@ static void trace_cleanup_on_all_cpus(void)
- static void cfs_trace_cleanup(void)
- {
- 	struct page_collection pc;
-+	int i;
-+	int j;
- 
- 	INIT_LIST_HEAD(&pc.pc_pages);
- 
- 	trace_cleanup_on_all_cpus();
- 
--	cfs_tracefile_fini_arch();
-+	for (i = 0; i < num_possible_cpus(); i++)
-+		for (j = 0; j < 3; j++) {
-+			kfree(cfs_trace_console_buffers[i][j]);
-+			cfs_trace_console_buffers[i][j] = NULL;
-+		}
-+
-+	for (i = 0; cfs_trace_data[i]; i++) {
-+		kfree(cfs_trace_data[i]);
-+		cfs_trace_data[i] = NULL;
-+	}
- }
- 
- void cfs_tracefile_exit(void)
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-index 3e7b6fa..dc782a6 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-@@ -53,9 +53,6 @@
- 
- void libcfs_run_debug_log_upcall(char *file);
- 
--int  cfs_tracefile_init_arch(void);
--void cfs_tracefile_fini_arch(void);
--
- int cfs_tracefile_dump_all_pages(char *filename);
- void cfs_trace_debug_print(void);
- void cfs_trace_flush_pages(void);
 -- 
 1.8.3.1
