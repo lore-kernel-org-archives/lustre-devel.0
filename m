@@ -1,202 +1,101 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Jun 2018 15:38:32 -0400
-Subject: [lustre-devel] [PATCH v3 03/13] lustre: libcfs: move tcd locking
- across to tracefile.c
+Date: Wed, 27 Jun 2018 15:38:33 -0400
+Subject: [lustre-devel] [PATCH v3 04/13] lustre: libcfs: fix
+ cfs_print_to_console()
 In-Reply-To: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
 References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530128322-32535-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530128322-32535-5-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.com>
+The original code for cfs_print_to_console() used printk() and
+used tricks to select which printk level to use. Later a cleanup
+patch landed the just converted printk directly to pr_info which
+is not exactly correct. Instead of converting back to printk lets
+move everything to pr_* type functions which simplify the code.
+This allows us to fold both dbghdr_to_err_string() and the
+function dbghdr_to_info_string() into cfs_print_to_console().
 
-No need to have this in linux-tracefile.c
-
-Signed-off-by: NeilBrown <neilb@suse.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 35 -------------
- drivers/staging/lustre/lnet/libcfs/tracefile.c     | 59 ++++++++++++++++++++++
- drivers/staging/lustre/lnet/libcfs/tracefile.h     | 28 ----------
- 3 files changed, 59 insertions(+), 63 deletions(-)
+ .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 55 ++++++----------------
+ 1 file changed, 14 insertions(+), 41 deletions(-)
 
 diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-index 64a5bc1..3af7722 100644
+index 3af7722..c1747c4 100644
 --- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
 +++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-@@ -116,41 +116,6 @@ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
- 	return CFS_TCD_TYPE_PROC;
+@@ -140,54 +140,27 @@ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
+ 	header->ph_extern_pid = 0;
  }
  
--/*
-- * The walking argument indicates the locking comes from all tcd types
-- * iterator and we must lock it and dissable local irqs to avoid deadlocks
-- * with other interrupt locks that might be happening. See LU-1311
-- * for details.
-- */
--int cfs_trace_lock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
--	__acquires(&tcd->tc_lock)
+-static char *
+-dbghdr_to_err_string(struct ptldebug_header *hdr)
 -{
--	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_MAX);
--	if (tcd->tcd_type == CFS_TCD_TYPE_IRQ)
--		spin_lock_irqsave(&tcd->tcd_lock, tcd->tcd_lock_flags);
--	else if (tcd->tcd_type == CFS_TCD_TYPE_SOFTIRQ)
--		spin_lock_bh(&tcd->tcd_lock);
--	else if (unlikely(walking))
--		spin_lock_irq(&tcd->tcd_lock);
--	else
--		spin_lock(&tcd->tcd_lock);
--	return 1;
+-	switch (hdr->ph_subsys) {
+-	case S_LND:
+-	case S_LNET:
+-		return "LNetError";
+-	default:
+-		return "LustreError";
+-	}
 -}
 -
--void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
--	__releases(&tcd->tcd_lock)
+-static char *
+-dbghdr_to_info_string(struct ptldebug_header *hdr)
 -{
--	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_MAX);
--	if (tcd->tcd_type == CFS_TCD_TYPE_IRQ)
--		spin_unlock_irqrestore(&tcd->tcd_lock, tcd->tcd_lock_flags);
--	else if (tcd->tcd_type == CFS_TCD_TYPE_SOFTIRQ)
--		spin_unlock_bh(&tcd->tcd_lock);
--	else if (unlikely(walking))
--		spin_unlock_irq(&tcd->tcd_lock);
--	else
--		spin_unlock(&tcd->tcd_lock);
+-	switch (hdr->ph_subsys) {
+-	case S_LND:
+-	case S_LNET:
+-		return "LNet";
+-	default:
+-		return "Lustre";
+-	}
 -}
 -
- void
- cfs_set_ptldebug_header(struct ptldebug_header *header,
- 			struct libcfs_debug_msg_data *msgdata,
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index 72321ce..6d567a9 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -109,6 +109,65 @@ struct cfs_trace_page {
- static void put_pages_on_tcd_daemon_list(struct page_collection *pc,
- 					 struct cfs_trace_cpu_data *tcd);
- 
-+/* trace file lock routines */
-+/*
-+ * The walking argument indicates the locking comes from all tcd types
-+ * iterator and we must lock it and dissable local irqs to avoid deadlocks
-+ * with other interrupt locks that might be happening. See LU-1311
-+ * for details.
-+ */
-+int cfs_trace_lock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
-+	__acquires(&tcd->tc_lock)
-+{
-+	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_MAX);
-+	if (tcd->tcd_type == CFS_TCD_TYPE_IRQ)
-+		spin_lock_irqsave(&tcd->tcd_lock, tcd->tcd_lock_flags);
-+	else if (tcd->tcd_type == CFS_TCD_TYPE_SOFTIRQ)
-+		spin_lock_bh(&tcd->tcd_lock);
-+	else if (unlikely(walking))
-+		spin_lock_irq(&tcd->tcd_lock);
-+	else
-+		spin_lock(&tcd->tcd_lock);
-+	return 1;
-+}
-+
-+void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
-+	__releases(&tcd->tcd_lock)
-+{
-+	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_MAX);
-+	if (tcd->tcd_type == CFS_TCD_TYPE_IRQ)
-+		spin_unlock_irqrestore(&tcd->tcd_lock, tcd->tcd_lock_flags);
-+	else if (tcd->tcd_type == CFS_TCD_TYPE_SOFTIRQ)
-+		spin_unlock_bh(&tcd->tcd_lock);
-+	else if (unlikely(walking))
-+		spin_unlock_irq(&tcd->tcd_lock);
-+	else
-+		spin_unlock(&tcd->tcd_lock);
-+}
-+
-+#define cfs_tcd_for_each_type_lock(tcd, i, cpu)			   \
-+	for (i = 0; cfs_trace_data[i] &&				\
-+	     (tcd = &(*cfs_trace_data[i])[cpu].tcd) &&			\
-+	     cfs_trace_lock_tcd(tcd, 1); cfs_trace_unlock_tcd(tcd, 1), i++)
-+
-+static inline struct cfs_trace_cpu_data *
-+cfs_trace_get_tcd(void)
-+{
-+	struct cfs_trace_cpu_data *tcd =
-+		&(*cfs_trace_data[cfs_trace_buf_idx_get()])[get_cpu()].tcd;
-+
-+	cfs_trace_lock_tcd(tcd, 0);
-+
-+	return tcd;
-+}
-+
-+static inline void cfs_trace_put_tcd(struct cfs_trace_cpu_data *tcd)
-+{
-+	cfs_trace_unlock_tcd(tcd, 0);
-+
-+	put_cpu();
-+}
-+
- static inline struct cfs_trace_page *
- cfs_tage_from_list(struct list_head *list)
- {
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-index bd1a1ef..91968cf 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-@@ -49,8 +49,6 @@ enum cfs_trace_buf_type {
- 	CFS_TCD_TYPE_MAX
- };
- 
--/* trace file lock routines */
--
- #define TRACEFILE_NAME_SIZE 1024
- extern char cfs_tracefile[TRACEFILE_NAME_SIZE];
- extern long long cfs_tracefile_size;
-@@ -194,11 +192,6 @@ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
- 		     j < num_possible_cpus();				 \
- 		     j++, (tcd) = &(*cfs_trace_data[i])[j].tcd)
- 
--#define cfs_tcd_for_each_type_lock(tcd, i, cpu)			   \
--	for (i = 0; cfs_trace_data[i] &&				\
--	     (tcd = &(*cfs_trace_data[i])[cpu].tcd) &&			\
--	     cfs_trace_lock_tcd(tcd, 1); cfs_trace_unlock_tcd(tcd, 1), i++)
--
- void cfs_set_ptldebug_header(struct ptldebug_header *header,
- 			     struct libcfs_debug_msg_data *m,
- 			     unsigned long stack);
-@@ -206,9 +199,6 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
+ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
  			  const char *buf, int len, const char *file,
- 			  const char *fn);
+ 			  const char *fn)
+ {
+-	char *prefix = "Lustre", *ptype = NULL;
++	char *prefix = "Lustre";
++
++	if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
++		prefix = "LNet";
  
--int cfs_trace_lock_tcd(struct cfs_trace_cpu_data *tcd, int walking);
--void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking);
+-	if (mask & D_EMERG) {
+-		prefix = dbghdr_to_err_string(hdr);
+-		ptype = KERN_EMERG;
++	if (mask & (D_CONSOLE | libcfs_printk)) {
++		pr_info("%s: %.*s", prefix, len, buf);
++	} else if (mask & D_EMERG) {
++		pr_emerg("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
++			 hdr->ph_pid, hdr->ph_extern_pid, file,
++			 hdr->ph_line_num, fn, len, buf);
+ 	} else if (mask & D_ERROR) {
+-		prefix = dbghdr_to_err_string(hdr);
+-		ptype = KERN_ERR;
++		pr_err("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
++		       hdr->ph_pid, hdr->ph_extern_pid, file,
++		       hdr->ph_line_num, fn, len, buf);
+ 	} else if (mask & D_WARNING) {
+-		prefix = dbghdr_to_info_string(hdr);
+-		ptype = KERN_WARNING;
+-	} else if (mask & (D_CONSOLE | libcfs_printk)) {
+-		prefix = dbghdr_to_info_string(hdr);
+-		ptype = KERN_INFO;
+-	}
 -
- extern char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
- enum cfs_trace_buf_type cfs_trace_buf_idx_get(void);
- 
-@@ -221,24 +211,6 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
- 	return cfs_trace_console_buffers[i][j];
- }
- 
--static inline struct cfs_trace_cpu_data *
--cfs_trace_get_tcd(void)
--{
--	struct cfs_trace_cpu_data *tcd =
--		&(*cfs_trace_data[cfs_trace_buf_idx_get()])[get_cpu()].tcd;
--
--	cfs_trace_lock_tcd(tcd, 0);
--
--	return tcd;
--}
--
--static inline void cfs_trace_put_tcd(struct cfs_trace_cpu_data *tcd)
--{
--	cfs_trace_unlock_tcd(tcd, 0);
--
--	put_cpu();
--}
--
- int cfs_trace_refill_stock(struct cfs_trace_cpu_data *tcd, gfp_t gfp,
- 			   struct list_head *stock);
- 
+-	if (mask & D_CONSOLE) {
+-		pr_info("%s%s: %.*s", ptype, prefix, len, buf);
+-	} else {
+-		pr_info("%s%s: %d:%d:(%s:%d:%s()) %.*s", ptype, prefix,
++		pr_warn("%s: %d:%d:(%s:%d:%s()) %.*s", prefix,
+ 			hdr->ph_pid, hdr->ph_extern_pid, file,
+ 			hdr->ph_line_num, fn, len, buf);
+ 	}
 -- 
 1.8.3.1
