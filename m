@@ -1,101 +1,107 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Jun 2018 15:38:33 -0400
-Subject: [lustre-devel] [PATCH v3 04/13] lustre: libcfs: fix
- cfs_print_to_console()
+Date: Wed, 27 Jun 2018 15:38:40 -0400
+Subject: [lustre-devel] [PATCH v3 11/13] lustre: libcfs: renamed
+ CFS_TCD_TYPE_MAX to CFS_TCD_TYPE_CNT
 In-Reply-To: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
 References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530128322-32535-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530128322-32535-12-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The original code for cfs_print_to_console() used printk() and
-used tricks to select which printk level to use. Later a cleanup
-patch landed the just converted printk directly to pr_info which
-is not exactly correct. Instead of converting back to printk lets
-move everything to pr_* type functions which simplify the code.
-This allows us to fold both dbghdr_to_err_string() and the
-function dbghdr_to_info_string() into cfs_print_to_console().
+From: NeilBrown <neilb@suse.com>
 
+The possible TCD types are 0, 1, 2.
+So the MAX is 2.
+The count of the number of types is 3.
+
+CFS_TCD_TYPE_MAX is 3 - obviously wrong.
+
+So rename it to CFS_TCD_TYPE_CNT.
+
+Also there are 2 places where "3" is used rather
+than the macro - fix them.
+
+Signed-off-by: NeilBrown <neilb@suse.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 55 ++++++----------------
- 1 file changed, 14 insertions(+), 41 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/tracefile.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-index 3af7722..c1747c4 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-@@ -140,54 +140,27 @@ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
- 	header->ph_extern_pid = 0;
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+index a2b5004..b102465 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+@@ -54,12 +54,12 @@ enum cfs_trace_buf_type {
+ 	CFS_TCD_TYPE_PROC = 0,
+ 	CFS_TCD_TYPE_SOFTIRQ,
+ 	CFS_TCD_TYPE_IRQ,
+-	CFS_TCD_TYPE_MAX
++	CFS_TCD_TYPE_CNT
+ };
+ 
+ union cfs_trace_data_union (*cfs_trace_data[TCD_MAX_TYPES])[NR_CPUS] __cacheline_aligned;
+ 
+-char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_MAX];
++char *cfs_trace_console_buffers[NR_CPUS][CFS_TCD_TYPE_CNT];
+ char cfs_tracefile[TRACEFILE_NAME_SIZE];
+ long long cfs_tracefile_size = CFS_TRACEFILE_SIZE;
+ static struct tracefiled_ctl trace_tctl;
+@@ -127,7 +127,7 @@ static void put_pages_on_tcd_daemon_list(struct page_collection *pc,
+ int cfs_trace_lock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
+ 	__acquires(&tcd->tc_lock)
+ {
+-	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_MAX);
++	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_CNT);
+ 	if (tcd->tcd_type == CFS_TCD_TYPE_IRQ)
+ 		spin_lock_irqsave(&tcd->tcd_lock, tcd->tcd_lock_flags);
+ 	else if (tcd->tcd_type == CFS_TCD_TYPE_SOFTIRQ)
+@@ -142,7 +142,7 @@ int cfs_trace_lock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
+ void cfs_trace_unlock_tcd(struct cfs_trace_cpu_data *tcd, int walking)
+ 	__releases(&tcd->tcd_lock)
+ {
+-	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_MAX);
++	__LASSERT(tcd->tcd_type < CFS_TCD_TYPE_CNT);
+ 	if (tcd->tcd_type == CFS_TCD_TYPE_IRQ)
+ 		spin_unlock_irqrestore(&tcd->tcd_lock, tcd->tcd_lock_flags);
+ 	else if (tcd->tcd_type == CFS_TCD_TYPE_SOFTIRQ)
+@@ -1249,7 +1249,7 @@ void cfs_trace_stop_thread(void)
  }
  
--static char *
--dbghdr_to_err_string(struct ptldebug_header *hdr)
--{
--	switch (hdr->ph_subsys) {
--	case S_LND:
--	case S_LNET:
--		return "LNetError";
--	default:
--		return "LustreError";
--	}
--}
--
--static char *
--dbghdr_to_info_string(struct ptldebug_header *hdr)
--{
--	switch (hdr->ph_subsys) {
--	case S_LND:
--	case S_LNET:
--		return "LNet";
--	default:
--		return "Lustre";
--	}
--}
--
- void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
- 			  const char *buf, int len, const char *file,
- 			  const char *fn)
- {
--	char *prefix = "Lustre", *ptype = NULL;
-+	char *prefix = "Lustre";
-+
-+	if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
-+		prefix = "LNet";
+ /* percents to share the total debug memory for each type */
+-static unsigned int pages_factor[CFS_TCD_TYPE_MAX] = {
++static unsigned int pages_factor[CFS_TCD_TYPE_CNT] = {
+ 	80,  /* 80% pages for CFS_TCD_TYPE_PROC */
+ 	10,  /* 10% pages for CFS_TCD_TYPE_SOFTIRQ */
+ 	10   /* 10% pages for CFS_TCD_TYPE_IRQ */
+@@ -1263,7 +1263,7 @@ int cfs_tracefile_init(int max_pages)
  
--	if (mask & D_EMERG) {
--		prefix = dbghdr_to_err_string(hdr);
--		ptype = KERN_EMERG;
-+	if (mask & (D_CONSOLE | libcfs_printk)) {
-+		pr_info("%s: %.*s", prefix, len, buf);
-+	} else if (mask & D_EMERG) {
-+		pr_emerg("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
-+			 hdr->ph_pid, hdr->ph_extern_pid, file,
-+			 hdr->ph_line_num, fn, len, buf);
- 	} else if (mask & D_ERROR) {
--		prefix = dbghdr_to_err_string(hdr);
--		ptype = KERN_ERR;
-+		pr_err("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
-+		       hdr->ph_pid, hdr->ph_extern_pid, file,
-+		       hdr->ph_line_num, fn, len, buf);
- 	} else if (mask & D_WARNING) {
--		prefix = dbghdr_to_info_string(hdr);
--		ptype = KERN_WARNING;
--	} else if (mask & (D_CONSOLE | libcfs_printk)) {
--		prefix = dbghdr_to_info_string(hdr);
--		ptype = KERN_INFO;
--	}
--
--	if (mask & D_CONSOLE) {
--		pr_info("%s%s: %.*s", ptype, prefix, len, buf);
--	} else {
--		pr_info("%s%s: %d:%d:(%s:%d:%s()) %.*s", ptype, prefix,
-+		pr_warn("%s: %d:%d:(%s:%d:%s()) %.*s", prefix,
- 			hdr->ph_pid, hdr->ph_extern_pid, file,
- 			hdr->ph_line_num, fn, len, buf);
+ 	/* initialize trace_data */
+ 	memset(cfs_trace_data, 0, sizeof(cfs_trace_data));
+-	for (i = 0; i < CFS_TCD_TYPE_MAX; i++) {
++	for (i = 0; i < CFS_TCD_TYPE_CNT; i++) {
+ 		cfs_trace_data[i] =
+ 			kmalloc_array(num_possible_cpus(),
+ 				      sizeof(union cfs_trace_data_union),
+@@ -1292,7 +1292,7 @@ int cfs_tracefile_init(int max_pages)
  	}
+ 
+ 	for (i = 0; i < num_possible_cpus(); i++)
+-		for (j = 0; j < 3; j++) {
++		for (j = 0; j < CFS_TCD_TYPE_CNT; j++) {
+ 			cfs_trace_console_buffers[i][j] =
+ 				kmalloc(CFS_TRACE_CONSOLE_BUFFER_SIZE,
+ 					GFP_KERNEL);
+@@ -1356,7 +1356,7 @@ static void cfs_trace_cleanup(void)
+ 	trace_cleanup_on_all_cpus();
+ 
+ 	for (i = 0; i < num_possible_cpus(); i++)
+-		for (j = 0; j < 3; j++) {
++		for (j = 0; j < CFS_TCD_TYPE_CNT; j++) {
+ 			kfree(cfs_trace_console_buffers[i][j]);
+ 			cfs_trace_console_buffers[i][j] = NULL;
+ 		}
 -- 
 1.8.3.1
