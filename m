@@ -1,94 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Jun 2018 15:38:31 -0400
-Subject: [lustre-devel] [PATCH v3 02/13] lustre: libcfs: open code
- cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
-In-Reply-To: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
-References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530128322-32535-3-git-send-email-jsimmons@infradead.org>
+Date: Wed, 27 Jun 2018 15:38:29 -0400
+Subject: [lustre-devel] [PATCH v3 00/13] lustre: libcfs: tracefile cleanups
+Message-ID: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.com>
+The first three patches in this series are a repost of Neil's patches.
+I updated the 4th patch but it contained to many changes so I broke
+it into 6 smaller patches for easier review. It address all the
+brokeness of cfs_print_to_console() which shows up in my testing.
+Besides the fixing more cleanups of tracefile.h was done in the
+new patches. The rest of the patches are Neil's work rebased due
+the changes I introduced.
 
-This function in used twice.
-In libcfs_debug_init() the usage is pointless as
-the only place that set libcfs_debug_mb ensures
-that it does not exceed the maximum.  So checking
-again can never help.
+James Simmons (6):
+  lustre: libcfs: fix cfs_print_to_console()
+  lustre: libcfs: properly handle failure paths in cfs_tracefile_init_arch()
+  lustre: libcfs: remove cfs_trace_refill_stack()
+  lustre: libcfs: move cfs_trace_data data to tracefile.c
+  lustre: libcfs: cleanup tracefile.h
+  lustre: libcfs: format macros in tracefile.h
 
-So open-code the small function into the only
-other place that it is used - in cfs_trace_set_debug_mb(),
-which is used to set libcfs_debug_mb.
+NeilBrown (7):
+  lustre: libcfs: move tracefile locking from linux-tracefile.c to tracefile.c
+  lustre: libcfs: open code cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
+  lustre: libcfs: move tcd locking across to tracefile.c
+  lustre: libcfs: merge linux-tracefile.c into tracefile.c
+  lustre: libcfs: fold cfs_tracefile_*_arch into their only callers.
+  lustre: libcfs: renamed CFS_TCD_TYPE_MAX to CFS_TCD_TYPE_CNT
+  lustre: libcfs: discard TCD_MAX_TYPES
 
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- drivers/staging/lustre/lnet/libcfs/debug.c           | 6 +++---
- drivers/staging/lustre/lnet/libcfs/linux-tracefile.c | 7 -------
- drivers/staging/lustre/lnet/libcfs/tracefile.c       | 3 ++-
- drivers/staging/lustre/lnet/libcfs/tracefile.h       | 1 -
- 4 files changed, 5 insertions(+), 12 deletions(-)
+-------------
+Changelog
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
-index 06f694f..71effcf 100644
---- a/drivers/staging/lustre/lnet/libcfs/debug.c
-+++ b/drivers/staging/lustre/lnet/libcfs/debug.c
-@@ -411,10 +411,10 @@ int libcfs_debug_init(unsigned long bufsize)
- 			sizeof(libcfs_debug_file_path_arr));
- 	}
- 
--	/* If libcfs_debug_mb is set to an invalid value or uninitialized
--	 * then just make the total buffers smp_num_cpus * TCD_MAX_PAGES
-+	/* If libcfs_debug_mb is uninitialized then just make the
-+	 * total buffers smp_num_cpus * TCD_MAX_PAGES
- 	 */
--	if (max > cfs_trace_max_debug_mb() || max < num_possible_cpus()) {
-+	if (max < num_possible_cpus()) {
- 		max = TCD_MAX_PAGES;
- 	} else {
- 		max = max / num_possible_cpus();
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-index 9e72220..64a5bc1 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-@@ -227,10 +227,3 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
- 			hdr->ph_line_num, fn, len, buf);
- 	}
- }
--
--int cfs_trace_max_debug_mb(void)
--{
--	int  total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
--
--	return max(512, (total_mb * 80) / 100);
--}
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index 5f31933..72321ce 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -933,7 +933,8 @@ int cfs_trace_set_debug_mb(int mb)
- 	int i;
- 	int j;
- 	int pages;
--	int limit = cfs_trace_max_debug_mb();
-+	int total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
-+	int limit = max(512, (total_mb * 80) / 100);
- 	struct cfs_trace_cpu_data *tcd;
- 
- 	if (mb < num_possible_cpus()) {
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-index 9f6b73d..bd1a1ef 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-@@ -88,7 +88,6 @@ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
- void libcfs_register_panic_notifier(void);
- void libcfs_unregister_panic_notifier(void);
- extern int libcfs_panic_in_progress;
--int cfs_trace_max_debug_mb(void);
- 
- #define TCD_MAX_PAGES (5 << (20 - PAGE_SHIFT))
- #define TCD_STOCK_PAGES (TCD_MAX_PAGES)
+1) Initial patches from Neil Brown
+
+2) Neil's patches pushed with the 4th patch heavly updated.
+
+3) Broke up the 4th patch I pushed into smaller patches for
+   easier review.
+
+ drivers/staging/lustre/lnet/libcfs/Makefile        |   2 +-
+ drivers/staging/lustre/lnet/libcfs/debug.c         |   6 +-
+ .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 258 --------------------
+ drivers/staging/lustre/lnet/libcfs/tracefile.c     | 267 +++++++++++++++++----
+ drivers/staging/lustre/lnet/libcfs/tracefile.h     | 117 +--------
+ 5 files changed, 237 insertions(+), 413 deletions(-)
+ delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+
 -- 
 1.8.3.1
