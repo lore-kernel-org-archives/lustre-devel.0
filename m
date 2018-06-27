@@ -1,65 +1,50 @@
-From: Patrick Farrell <paf@cray.com>
-Date: Tue, 26 Jun 2018 13:51:13 +0000
-Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
- module reduction.
-In-Reply-To: <alpine.LFD.2.21.1806260206360.31196@casper.infradead.org>
-References: <152904663333.10587.10934053155404014785.stgit@noble>
- <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
- <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <alpine.LFD.2.21.1806210354260.3886@casper.infradead.org>
- <3FD4D051-9C95-449D-8A23-D42B271E55B8@dilger.ca>
- <DM3PR1101MB121322E85FDE1E5310F6F4B7CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <87tvprah32.fsf@notabene.neil.brown.name>,
- <alpine.LFD.2.21.1806260206360.31196@casper.infradead.org>
-Message-ID: <DM3PR1101MB121358672276198B843DE5A7CB490@DM3PR1101MB1213.namprd11.prod.outlook.com>
+From: NeilBrown <neilb@suse.com>
+Date: Wed, 27 Jun 2018 12:44:37 +1000
+Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
+ support
+In-Reply-To: <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>
+References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+ <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
+ <877emnaed8.fsf@notabene.neil.brown.name>
+ <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>
+Message-ID: <87lgb16j8q.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Ah, sorry, lost your mail in the shuffle, Neil.
+On Mon, Jun 25 2018, Doug Oucharek wrote:
 
-The name, mostly.  ptlrpc is one subdirectory and one subsystem, so I don?t want to use it for a module that explicitly includes all of several.  I?m not sure of a better name immediately - is this module intended to be shared between client and server?
-
-
-________________________________
-From: James Simmons <jsimmons@infradead.org>
-Sent: Monday, June 25, 2018 8:13:22 PM
-To: NeilBrown
-Cc: Patrick Farrell; Andreas Dilger; Oleg Drokin; Lustre Development List
-Subject: Re: [lustre-devel] [PATCH 00/24] lustre - more cleanups including module reduction.
-
-
-> > Ah, thanks Andreas.  Perhaps not coincidentally, Lustre 2.4 is the first release I worked on.
-> >
-> > Neil, I am really unenamored of the idea of the shared ptlrpc ldlm module being named ptlrpc...
+> Some background on this NUMA change:
 >
-> Can you say why?  Is it the choice of name that bothers you, or the
-> combining of two things into the one kernel module, or something else?
-> Currently in  git://git.hpdd.intel.com/fs/lustre-release.git
-> (or the git tree that was until recently at the above address),
-> the module named "ptlrpc" contains ptlrpc code, ldlm code, and target
-> code.  I wonder what "target" means in this context.
-
-target is the server code built into ptlrpc which is for the "Unified
-Target". Its the shared code that is used by both the MDS and OSS code.
-Andreas or Oleg can add more details than this. BTW also the nodemap
-code also get built into ptlrpc module as well for the server side.
-
-> > Also, Lustre currently has a bunch of module parameters which are used for configuration.  Thoughts on that?
+> First off, this is just a first step to a bigger set of changes which include changes to the Lustre utilities.  This was done as part of the Multi-Rail feature.  One of the systems that feature is meant to support is the SGI UV system (now HPE) which has a massive number of NUMA nodes connected by a NUMA Link.  There are multiple fabric cards spread throughout the system and Multi-Rail needs to know which fabric cards are nearest to the NUMA node we are running on.  To do that, the ?distance? between NUMA nodes needs to be configured.
 >
-> Yes, the module parameters are an interesting part of the story.
-> libcfs has a bunch of module parameters that are symlinked from debugfs.
-> It seems that user-space largely uses the debugfs links to access them,
-> so they can become part of the "lnet" module with minimal pain.
-> Other modules have parameters that I haven't yet looked in to.
+> This patch is preparing the infrastructure for the Multi-Rail feature to support configuring NUMA node distances.  Technically, this patch should be landing with the Multi-Rail feature (still to be pushed) for it to make proper sense.
 >
-> There probably will need to be user-space changes to support reduction
-> in the number of modules.
 
-The test suite will need some changes since it loads the modules. We
-need to handle the case if its built into the kernel as well.
+Thanks a lot for the background.
+
+If these NUMA nodes have a 'distance' between them, and if lustre can
+benefit from knowing the distance, then is seems likely that other code
+might also benefit.  In that case it would be best if the distance were
+encoded in some global state information so that lustre and any other
+subsystem can extract it.
+
+Do you know if there is any work underway by anyone to make this
+information generally available?  If there is, we should make sure that
+lustre works in a compatible way so that once that work lands, lustre
+can use it directly and not need extra configuration.
+If no such work is underway, then it would be really good if something
+were done in that direction.  If no-one here is able to work on this, I
+can ask around in SUSE and see if anyone here knows anything relevant.
+
+Thanks,
+NeilBrown
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180626/bc8c6124/attachment.html>
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180627/6b26a3de/attachment.sig>
