@@ -1,75 +1,94 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Wed, 27 Jun 2018 15:38:34 -0400
-Subject: [lustre-devel] [PATCH v3 05/13] lustre: libcfs: properly handle
- failure paths in cfs_tracefile_init_arch()
+Date: Wed, 27 Jun 2018 15:38:31 -0400
+Subject: [lustre-devel] [PATCH v3 02/13] lustre: libcfs: open code
+ cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
 In-Reply-To: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
 References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530128322-32535-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530128322-32535-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-It is considered poor coding style in the linux kernel to call a
-catch all for cleanup in the initialization function. Also their
-is no reason to cleanup cfs_trace_console_buffers if they never
-been allocated. Lets unroll the error handling.
+From: NeilBrown <neilb@suse.com>
 
-Signed-off-by: James Simmons <jsimmons@infradead.org>
+This function in used twice.
+In libcfs_debug_init() the usage is pointless as
+the only place that set libcfs_debug_mb ensures
+that it does not exceed the maximum.  So checking
+again can never help.
+
+So open-code the small function into the only
+other place that it is used - in cfs_trace_set_debug_mb(),
+which is used to set libcfs_debug_mb.
+
+Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lnet/libcfs/linux-tracefile.c | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/debug.c           | 6 +++---
+ drivers/staging/lustre/lnet/libcfs/linux-tracefile.c | 7 -------
+ drivers/staging/lustre/lnet/libcfs/tracefile.c       | 3 ++-
+ drivers/staging/lustre/lnet/libcfs/tracefile.h       | 1 -
+ 4 files changed, 5 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-index f100cb9..a334b63 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-@@ -49,9 +49,9 @@
- 
- int cfs_tracefile_init_arch(void)
- {
-+	struct cfs_trace_cpu_data *tcd;
- 	int i;
- 	int j;
--	struct cfs_trace_cpu_data *tcd;
- 
- 	/* initialize trace_data */
- 	memset(cfs_trace_data, 0, sizeof(cfs_trace_data));
-@@ -61,7 +61,7 @@ int cfs_tracefile_init_arch(void)
- 				      sizeof(union cfs_trace_data_union),
- 				      GFP_KERNEL);
- 		if (!cfs_trace_data[i])
--			goto out;
-+			goto out_trace_data;
+diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
+index 06f694f..71effcf 100644
+--- a/drivers/staging/lustre/lnet/libcfs/debug.c
++++ b/drivers/staging/lustre/lnet/libcfs/debug.c
+@@ -411,10 +411,10 @@ int libcfs_debug_init(unsigned long bufsize)
+ 			sizeof(libcfs_debug_file_path_arr));
  	}
  
- 	/* arch related info initialized */
-@@ -79,13 +79,22 @@ int cfs_tracefile_init_arch(void)
- 					GFP_KERNEL);
- 
- 			if (!cfs_trace_console_buffers[i][j])
--				goto out;
-+				goto out_buffers;
- 		}
- 
- 	return 0;
- 
--out:
--	cfs_tracefile_fini_arch();
-+out_buffers:
-+	for (i = 0; i < num_possible_cpus(); i++)
-+		for (j = 0; j < 3; j++) {
-+			kfree(cfs_trace_console_buffers[i][j]);
-+			cfs_trace_console_buffers[i][j] = NULL;
-+		}
-+out_trace_data:
-+	for (i = 0; cfs_trace_data[i]; i++) {
-+		kfree(cfs_trace_data[i]);
-+		cfs_trace_data[i] = NULL;
-+	}
- 	pr_err("lnet: Not enough memory\n");
- 	return -ENOMEM;
+-	/* If libcfs_debug_mb is set to an invalid value or uninitialized
+-	 * then just make the total buffers smp_num_cpus * TCD_MAX_PAGES
++	/* If libcfs_debug_mb is uninitialized then just make the
++	 * total buffers smp_num_cpus * TCD_MAX_PAGES
+ 	 */
+-	if (max > cfs_trace_max_debug_mb() || max < num_possible_cpus()) {
++	if (max < num_possible_cpus()) {
+ 		max = TCD_MAX_PAGES;
+ 	} else {
+ 		max = max / num_possible_cpus();
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+index 9e72220..64a5bc1 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+@@ -227,10 +227,3 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
+ 			hdr->ph_line_num, fn, len, buf);
+ 	}
  }
+-
+-int cfs_trace_max_debug_mb(void)
+-{
+-	int  total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
+-
+-	return max(512, (total_mb * 80) / 100);
+-}
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+index 5f31933..72321ce 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+@@ -933,7 +933,8 @@ int cfs_trace_set_debug_mb(int mb)
+ 	int i;
+ 	int j;
+ 	int pages;
+-	int limit = cfs_trace_max_debug_mb();
++	int total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
++	int limit = max(512, (total_mb * 80) / 100);
+ 	struct cfs_trace_cpu_data *tcd;
+ 
+ 	if (mb < num_possible_cpus()) {
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+index 9f6b73d..bd1a1ef 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+@@ -88,7 +88,6 @@ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
+ void libcfs_register_panic_notifier(void);
+ void libcfs_unregister_panic_notifier(void);
+ extern int libcfs_panic_in_progress;
+-int cfs_trace_max_debug_mb(void);
+ 
+ #define TCD_MAX_PAGES (5 << (20 - PAGE_SHIFT))
+ #define TCD_STOCK_PAGES (TCD_MAX_PAGES)
 -- 
 1.8.3.1
