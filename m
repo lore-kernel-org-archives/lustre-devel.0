@@ -1,683 +1,549 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  2 Jul 2018 19:24:18 -0400
-Subject: [lustre-devel] [PATCH 01/18] lustre: grant: add support for
- OBD_CONNECT_GRANT_PARAM
+Date: Mon,  2 Jul 2018 19:24:22 -0400
+Subject: [lustre-devel] [PATCH 05/18] lustre: llite: fast read implementation
 In-Reply-To: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
 References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530573875-20465-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530573875-20465-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Johann Lombardi <jlombardi@whamcloud.com>
+From: Jinshan Xiong <jinshan.xiong@gmail.com>
 
-Add support for grant overhead calculation on the client side.
-To do so, clients track usage on a per-extent basis. An extent is
-composed of contiguous blocks.
-The OST now returns to the OSC layer several parameters to consume
-grant more accurately:
+For read operation, if a page is already in cache, it must be covered
+by a DLM lock. We can take advantage of this by reading cached page
+without interacting with Lustre. Traditional read will go on if fast
+read fails.
 
-- the backend filesystem block size which is the minimal grant
-  allocation unit;
-- the maximum extent size;
-- the extent insertion cost.
-  Clients now pack in bulk write how much grant space was consumed for
-  the RPC. Dirty data accounting also adopts the same scheme.
+This patch can improve small read performance significantly.
+These are the performance data I collected:
 
-Moreover, each backend OSD now reports its own set of parameters:
-- For ldiskfs, we usually have a 4KB block size with a maximum extent
-  size of 32MB (theoretical limit of 128MB) and an extent insertion
-  cost of 6 x 4KB = 24KB
-- For ZFS, we report a block size of 128KB, an extent size of 128
-  blocks (i.e. 16MB with 128KB block size) and a block insertion cost
-  of 112KB.
++------------+----------------+-----------------+
+|            | read bs=4k     | read bs=1M      |
++------------+----------------+-----------------+
+| w/o patch  | 257 MB/s       | 1.1 GB/s        |
++------------+----------------+-----------------+
+| w/ patch   | 1.2 GB/s       | 1.4 GB/s        |
++------------+----------------+-----------------+
 
-Besides, there is now no more generic metadata overhead reservation
-done inside each OSD. Instead grant space is inflated for clients
-that do not support the new grant parameters. That said, a tiny
-percentage (typically 0.76%) of the free space is still reserved
-inside each OSD to avoid fragmentation which might hurt performance
-and impact our grant calculation (e.g. extents are broken due to
-fragmentation).
-
-This patch also fixes several other issues:
-
-- Bulk write resent by ptlrpc after reconnection could trigger
-  spurious error messages related to broken dirty accounting.
-  The issue was that oa_dirty is discarded for resent requests
-  (grant flag cleared in ost_brw_write()), so we can legitimately
-  have grant > fed_dirty in ofd_grant_check().
-  This was fixed by resetting fed_dirty on reconnection and skipping
-  the dirty accounting check in ofd_grant_check() in the case of
-  ptlrpc resend.
-
-- In obd_connect_data_seqprint(), the connection flags cannot fit
-  in a 32-bit integer.
-
-- When merging two OSC extents, an extent tax should be released
-  in both the merged extent and in the grant accounting.
-
-Signed-off-by: Johann Lombardi <jlombardi@whamcloud.com>
 Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-WC-bug-id: https://jira.whamcloud.com/browse/2049
-Reviewed-on: http://review.whamcloud.com/7793
+WC-bug-id: https://jira.whamcloud.com/browse/LU-4257
+Reviewed-on: http://review.whamcloud.com/20255
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/uapi/linux/lustre/lustre_idl.h  |  8 +-
- drivers/staging/lustre/lustre/include/obd.h        |  9 ++-
- .../staging/lustre/lustre/include/obd_support.h    |  1 +
- drivers/staging/lustre/lustre/llite/llite_lib.c    |  9 +++
- .../lustre/lustre/obdclass/lprocfs_status.c        | 10 ++-
- drivers/staging/lustre/lustre/osc/lproc_osc.c      | 18 +++++
- drivers/staging/lustre/lustre/osc/osc_cache.c      | 84 +++++++++++++++------
- drivers/staging/lustre/lustre/osc/osc_request.c    | 85 ++++++++++++++++------
- .../staging/lustre/lustre/ptlrpc/pack_generic.c    |  4 +-
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 32 ++++----
- 10 files changed, 191 insertions(+), 69 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c         | 104 +++++++++++++++++++--
+ .../staging/lustre/lustre/llite/llite_internal.h   |  23 ++++-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |   1 +
+ drivers/staging/lustre/lustre/llite/llite_mmap.c   |  34 ++++++-
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |  38 ++++++++
+ drivers/staging/lustre/lustre/llite/rw.c           |  68 ++++++++++++--
+ drivers/staging/lustre/lustre/llite/vvp_internal.h |   1 +
+ 7 files changed, 252 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-index 6c7e399..3d77ed6 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-@@ -732,10 +732,10 @@ struct obd_connect_data {
- 	__u32 ocd_index;	 /* LOV index to connect to */
- 	__u32 ocd_brw_size;	 /* Maximum BRW size in bytes */
- 	__u64 ocd_ibits_known;   /* inode bits this client understands */
--	__u8  ocd_blocksize;     /* log2 of the backend filesystem blocksize */
--	__u8  ocd_inodespace;    /* log2 of the per-inode space consumption */
--	__u16 ocd_grant_extent;  /* per-extent grant overhead, in 1K blocks */
--	__u32 ocd_unused;	 /* also fix lustre_swab_connect */
-+	__u8  ocd_grant_blkbits; /* log2 of the backend filesystem blocksize */
-+	__u8  ocd_grant_inobits; /* log2 of the per-inode space consumption */
-+	__u16 ocd_grant_tax_kb;  /* extent grant overhead, in 1K blocks */
-+	__u32 ocd_grant_max_blks;/* maximum number of blocks per extent */
- 	__u64 ocd_transno;       /* first transno from client to be replayed */
- 	__u32 ocd_group;	 /* MDS group on OST */
- 	__u32 ocd_cksum_types;   /* supported checksum algorithms */
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index d38b6bc..d6fd1ea 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -198,6 +198,8 @@ struct client_obd {
- 	unsigned long		 cl_dirty_transit;	/* dirty synchronous */
- 	unsigned long		 cl_avail_grant;	/* bytes of credit for ost */
- 	unsigned long		 cl_lost_grant;		/* lost credits (trunc) */
-+	/* grant consumed for dirty pages */
-+	unsigned long		 cl_dirty_grant;
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 5f944ca..db18d1d 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -953,10 +953,21 @@ int ll_merge_attr(const struct lu_env *env, struct inode *inode)
  
- 	/* since we allocate grant by blocks, we don't know how many grant will
- 	 * be used to add a page into cache. As a solution, we reserve maximum
-@@ -214,7 +216,12 @@ struct client_obd {
- 	 * the extent size. A chunk is max(PAGE_SIZE, OST block size)
+ 	ll_inode_size_lock(inode);
+ 
+-	/* merge timestamps the most recently obtained from mds with
+-	 * timestamps obtained from osts
++	/*
++	 * merge timestamps the most recently obtained from MDS with
++	 * timestamps obtained from OSTSs.
++	 *
++	 * Do not overwrite atime of inode because it may be refreshed
++	 * by file_accessed() function. If the read was served by cache
++	 * data, there is no RPC to be sent so that atime may not be
++	 * transferred to OSTs at all. MDT only updates atime at close time
++	 * if it's at least 'mdd.*.atime_diff' older.
++	 * All in all, the atime in Lustre does not strictly comply with
++	 * POSIX. Solving this problem needs to send an RPC to MDT for each
++	 * read, this will hurt performance.
  	 */
- 	int		  cl_chunkbits;
--	unsigned int	  cl_extent_tax; /* extent overhead, by bytes */
-+	/* extent insertion metadata overhead to be accounted in grant,
-+	 * in bytes
+-	inode->i_atime.tv_sec = lli->lli_atime;
++	if (inode->i_atime.tv_sec < lli->lli_atime)
++		inode->i_atime.tv_sec = lli->lli_atime;
+ 	inode->i_mtime.tv_sec = lli->lli_mtime;
+ 	inode->i_ctime.tv_sec = lli->lli_ctime;
+ 
+@@ -1096,7 +1107,7 @@ static void ll_io_init(struct cl_io *io, const struct file *file, int write)
+ 
+ 			range_locked = true;
+ 		}
+-		ll_cl_add(file, env, io);
++		ll_cl_add(file, env, io, LCC_RW);
+ 		rc = cl_io_loop(env, io);
+ 		ll_cl_remove(file, env);
+ 		if (range_locked) {
+@@ -1155,23 +1166,104 @@ static void ll_io_init(struct cl_io *io, const struct file *file, int write)
+ 	return result > 0 ? result : rc;
+ }
+ 
++/**
++ * The purpose of fast read is to overcome per I/O overhead and improve IOPS
++ * especially for small I/O.
++ *
++ * To serve a read request, CLIO has to create and initialize a cl_io and
++ * then request DLM lock. This has turned out to have siginificant overhead
++ * and affects the performance of small I/O dramatically.
++ *
++ * It's not necessary to create a cl_io for each I/O. Under the help of read
++ * ahead, most of the pages being read are already in memory cache and we can
++ * read those pages directly because if the pages exist, the corresponding DLM
++ * lock must exist so that page content must be valid.
++ *
++ * In fast read implementation, the llite speculatively finds and reads pages
++ * in memory cache. There are three scenarios for fast read:
++ *   - If the page exists and is uptodate, kernel VM will provide the data and
++ *     CLIO won't be intervened;
++ *   - If the page was brought into memory by read ahead, it will be exported
++ *     and read ahead parameters will be updated;
++ *   - Otherwise the page is not in memory, we can't do fast read. Therefore,
++ *     it will go back and invoke normal read, i.e., a cl_io will be created
++ *     and DLM lock will be requested.
++ *
++ * POSIX compliance: posix standard states that read is intended to be atomic.
++ * Lustre read implementation is in line with Linux kernel read implementation
++ * and neither of them complies with POSIX standard in this matter. Fast read
++ * doesn't make the situation worse on single node but it may interleave write
++ * results from multiple nodes due to short read handling in ll_file_aio_read().
++ *
++ * @env   - lu_env
++ * @iocb  - kiocb from kernel
++ * @iter  - user space buffers where the data will be copied
++ *
++ * RETURN - number of bytes have been read, or error code if error occurred.
++ */
++static ssize_t
++ll_do_fast_read(const struct lu_env *env, struct kiocb *iocb,
++		struct iov_iter *iter)
++{
++	ssize_t result;
++
++	if (!ll_sbi_has_fast_read(ll_i2sbi(file_inode(iocb->ki_filp))))
++		return 0;
++
++	/*
++	 * NB: we can't do direct IO for fast read because it will need a lock
++	 * to make IO engine happy.
 +	 */
-+	unsigned int	 cl_grant_extent_tax;
-+	/* maximum extent size, in number of pages */
-+	unsigned int	 cl_max_extent_pages;
++	if (iocb->ki_filp->f_flags & O_DIRECT)
++		return 0;
++
++	ll_cl_add(iocb->ki_filp, env, NULL, LCC_RW);
++	result = generic_file_read_iter(iocb, iter);
++	ll_cl_remove(iocb->ki_filp, env);
++
++	/*
++	 * If the first page is not in cache, generic_file_aio_read() will be
++	 * returned with -ENODATA.
++	 * See corresponding code in ll_readpage().
++	 */
++	if (result == -ENODATA)
++		result = 0;
++
++	if (result > 0)
++		ll_stats_ops_tally(ll_i2sbi(file_inode(iocb->ki_filp)),
++				   LPROC_LL_READ_BYTES, result);
++
++	return result;
++}
++
+ static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ {
+ 	struct lu_env      *env;
+ 	struct vvp_io_args *args;
+ 	ssize_t	     result;
+ 	u16 refcheck;
++	ssize_t rc2;
  
- 	/* keep track of objects that have lois that contain pages which
- 	 * have been queued for async brw.  this lock also protects the
-diff --git a/drivers/staging/lustre/lustre/include/obd_support.h b/drivers/staging/lustre/lustre/include/obd_support.h
-index 070a281..ca28caf 100644
---- a/drivers/staging/lustre/lustre/include/obd_support.h
-+++ b/drivers/staging/lustre/lustre/include/obd_support.h
-@@ -320,6 +320,7 @@
- #define OBD_FAIL_OSC_CP_ENQ_RACE	 0x410
- #define OBD_FAIL_OSC_NO_GRANT	    0x411
- #define OBD_FAIL_OSC_DELAY_SETTIME	 0x412
-+#define OBD_FAIL_OSC_CONNECT_GRANT_PARAM 0x413
- #define OBD_FAIL_OSC_DELAY_IO		 0x414
+ 	env = cl_env_get(&refcheck);
+ 	if (IS_ERR(env))
+ 		return PTR_ERR(env);
  
- #define OBD_FAIL_PTLRPC		  0x500
++	result = ll_do_fast_read(env, iocb, to);
++	if (result < 0 || iov_iter_count(to) == 0)
++		goto out;
++
+ 	args = ll_env_args(env);
+ 	args->u.normal.via_iter = to;
+ 	args->u.normal.via_iocb = iocb;
+ 
+-	result = ll_file_io_generic(env, args, iocb->ki_filp, CIT_READ,
+-				    &iocb->ki_pos, iov_iter_count(to));
++	rc2 = ll_file_io_generic(env, args, iocb->ki_filp, CIT_READ,
++				 &iocb->ki_pos, iov_iter_count(to));
++	if (rc2 > 0)
++		result += rc2;
++	else if (result == 0)
++		result = rc2;
++
++out:
+ 	cl_env_put(env, &refcheck);
+ 	return result;
+ }
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index 8770d10..86914c9 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -395,6 +395,7 @@ enum stats_track_type {
+ #define LL_SBI_ALWAYS_PING	0x200000 /* always ping even if server
+ 					  * suppress_pings
+ 					  */
++#define LL_SBI_FAST_READ	0x400000 /* fast read support */
+ 
+ #define LL_SBI_FLAGS {	\
+ 	"nolck",	\
+@@ -419,6 +420,7 @@ enum stats_track_type {
+ 	"xattr_cache",	\
+ 	"norootsquash",	\
+ 	"always_ping",	\
++	"fast_read",    \
+ }
+ 
+ /*
+@@ -646,6 +648,11 @@ static inline int ll_need_32bit_api(struct ll_sb_info *sbi)
+ #endif
+ }
+ 
++static inline bool ll_sbi_has_fast_read(struct ll_sb_info *sbi)
++{
++	return !!(sbi->ll_flags & LL_SBI_FAST_READ);
++}
++
+ void ll_ras_enter(struct file *f);
+ 
+ /* llite/lcommon_misc.c */
+@@ -678,6 +685,8 @@ enum {
+ 	LPROC_LL_OPEN,
+ 	LPROC_LL_RELEASE,
+ 	LPROC_LL_MAP,
++	LPROC_LL_FAULT,
++	LPROC_LL_MKWRITE,
+ 	LPROC_LL_LLSEEK,
+ 	LPROC_LL_FSYNC,
+ 	LPROC_LL_READDIR,
+@@ -732,9 +741,12 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
+ int ll_readpage(struct file *file, struct page *page);
+ void ll_readahead_init(struct inode *inode, struct ll_readahead_state *ras);
+ int vvp_io_write_commit(const struct lu_env *env, struct cl_io *io);
+-struct ll_cl_context *ll_cl_find(struct file *file);
+-void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io);
++
++enum lcc_type;
++void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io,
++	       enum lcc_type type);
+ void ll_cl_remove(struct file *file, const struct lu_env *env);
++struct ll_cl_context *ll_cl_find(struct file *file);
+ 
+ extern const struct address_space_operations ll_aops;
+ 
+@@ -891,15 +903,22 @@ struct vvp_io_args {
+ 	} u;
+ };
+ 
++enum lcc_type {
++	LCC_RW = 1,
++	LCC_MMAP
++};
++
+ struct ll_cl_context {
+ 	struct list_head	 lcc_list;
+ 	void	   *lcc_cookie;
+ 	const struct lu_env	*lcc_env;
+ 	struct cl_io   *lcc_io;
+ 	struct cl_page *lcc_page;
++	enum lcc_type		 lcc_type;
+ };
+ 
+ struct ll_thread_info {
++	struct iov_iter		lti_iter;
+ 	struct vvp_io_args   lti_args;
+ 	struct ra_io_arg     lti_ria;
+ 	struct ll_cl_context lti_io_ctx;
 diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 9f6f061..df5bc0a 100644
+index 90dff0a..6e47e5b 100644
 --- a/drivers/staging/lustre/lustre/llite/llite_lib.c
 +++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -178,6 +178,12 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
- 		return -ENOMEM;
- 	}
+@@ -122,6 +122,7 @@ static struct ll_sb_info *ll_init_sbi(struct super_block *sb)
+ 	atomic_set(&sbi->ll_sa_running, 0);
+ 	atomic_set(&sbi->ll_agl_total, 0);
+ 	sbi->ll_flags |= LL_SBI_AGL_ENABLED;
++	sbi->ll_flags |= LL_SBI_FAST_READ;
  
-+	/*
-+	 * pass client page size via ocd_grant_blkbits, the server should report
-+	 * back its backend blocksize for grant calculation purpose
-+	 */
-+	data->ocd_grant_blkbits = PAGE_SHIFT;
+ 	/* root squash */
+ 	sbi->ll_squash.rsi_uid = 0;
+diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+index 8cb8036..023d62e 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
++++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
+@@ -277,6 +277,28 @@ static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 	if (IS_ERR(env))
+ 		return VM_FAULT_ERROR;
+ 
++	if (ll_sbi_has_fast_read(ll_i2sbi(file_inode(vma->vm_file)))) {
++		/* do fast fault */
++		ll_cl_add(vma->vm_file, env, NULL, LCC_MMAP);
++		fault_ret = filemap_fault(vmf);
++		ll_cl_remove(vma->vm_file, env);
 +
- 	/* indicate the features supported by this client */
- 	data->ocd_connect_flags = OBD_CONNECT_IBITS    | OBD_CONNECT_NODEVOH  |
- 				  OBD_CONNECT_ATTRFID  |
-@@ -367,6 +373,9 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
- 				  OBD_CONNECT_PINGLESS | OBD_CONNECT_LFSCK |
- 				  OBD_CONNECT_BULK_MBITS;
- 
-+	if (!OBD_FAIL_CHECK(OBD_FAIL_OSC_CONNECT_GRANT_PARAM))
-+		data->ocd_connect_flags |= OBD_CONNECT_GRANT_PARAM;
-+
- 	if (!OBD_FAIL_CHECK(OBD_FAIL_OSC_CONNECT_CKSUM)) {
- 		/* OBD_CONNECT_CKSUM should always be set, even if checksums are
- 		 * disabled by default, because it can still be enabled on the
-diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index a40ec42..dd88179 100644
---- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -163,10 +163,12 @@ static void obd_connect_data_seqprint(struct seq_file *m,
- 	if (flags & OBD_CONNECT_GRANT_PARAM)
- 		seq_printf(m, "       grant_block_size: %d\n"
- 			   "       grant_inode_size: %d\n"
--			   "       grant_extent_overhead: %d\n",
--			   ocd->ocd_blocksize,
--			   ocd->ocd_inodespace,
--			   ocd->ocd_grant_extent);
-+			   "       grant_max_extent_size: %d\n"
-+			   "       grant_extent_tax: %d\n",
-+			   1 << ocd->ocd_grant_blkbits,
-+			   1 << ocd->ocd_grant_inobits,
-+			   ocd->ocd_grant_max_blks << ocd->ocd_grant_blkbits,
-+			   ocd->ocd_grant_tax_kb << 10);
- 	if (flags & OBD_CONNECT_TRANSNO)
- 		seq_printf(m, "       first_transno: %llx\n",
- 			   ocd->ocd_transno);
-diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-index 64931b9..81adf54 100644
---- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
-+++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-@@ -326,6 +326,23 @@ static ssize_t cur_lost_grant_bytes_show(struct kobject *kobj,
- }
- LUSTRE_RO_ATTR(cur_lost_grant_bytes);
- 
-+static ssize_t cur_dirty_grant_bytes_show(struct kobject *kobj,
-+					  struct attribute *attr,
-+					  char *buf)
-+{
-+	struct obd_device *dev = container_of(kobj, struct obd_device,
-+					      obd_kobj);
-+	struct client_obd *cli = &dev->u.cli;
-+	int len;
-+
-+	spin_lock(&cli->cl_loi_list_lock);
-+	len = sprintf(buf, "%lu\n", cli->cl_dirty_grant);
-+	spin_unlock(&cli->cl_loi_list_lock);
-+
-+	return len;
-+}
-+LUSTRE_RO_ATTR(cur_dirty_grant_bytes);
-+
- static ssize_t grant_shrink_interval_show(struct kobject *kobj,
- 					  struct attribute *attr,
- 					  char *buf)
-@@ -817,6 +834,7 @@ void lproc_osc_attach_seqstat(struct obd_device *dev)
- 	&lustre_attr_cur_dirty_bytes.attr,
- 	&lustre_attr_cur_grant_bytes.attr,
- 	&lustre_attr_cur_lost_grant_bytes.attr,
-+	&lustre_attr_cur_dirty_grant_bytes.attr,
- 	&lustre_attr_destroys_in_flight.attr,
- 	&lustre_attr_grant_shrink_interval.attr,
- 	&lustre_attr_lockless_truncate.attr,
-diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
-index 99de672..8d3f501 100644
---- a/drivers/staging/lustre/lustre/osc/osc_cache.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
-@@ -55,13 +55,16 @@ static int osc_refresh_count(const struct lu_env *env,
- static int osc_io_unplug_async(const struct lu_env *env,
- 			       struct client_obd *cli, struct osc_object *osc);
- static void osc_free_grant(struct client_obd *cli, unsigned int nr_pages,
--			   unsigned int lost_grant);
-+			   unsigned int lost_grant, unsigned int dirty_grant);
- 
- static void osc_extent_tree_dump0(int level, struct osc_object *obj,
- 				  const char *func, int line);
- #define osc_extent_tree_dump(lvl, obj) \
- 	osc_extent_tree_dump0(lvl, obj, __func__, __LINE__)
- 
-+static void osc_unreserve_grant(struct client_obd *cli, unsigned int reserved,
-+				unsigned int unused);
-+
- /** \addtogroup osc
-  *  @{
-  */
-@@ -532,12 +535,13 @@ static void osc_extent_remove(struct osc_extent *ext)
- 
- /**
-  * This function is used to merge extents to get better performance. It checks
-- * if @cur and @victim are contiguous at chunk level.
-+ * if @cur and @victim are contiguous at block level.
-  */
- static int osc_extent_merge(const struct lu_env *env, struct osc_extent *cur,
- 			    struct osc_extent *victim)
- {
- 	struct osc_object *obj = cur->oe_obj;
-+	struct client_obd *cli = osc_cli(obj);
- 	pgoff_t chunk_start;
- 	pgoff_t chunk_end;
- 	int ppc_bits;
-@@ -561,11 +565,20 @@ static int osc_extent_merge(const struct lu_env *env, struct osc_extent *cur,
- 	    chunk_end + 1 != victim->oe_start >> ppc_bits)
- 		return -ERANGE;
- 
-+	/*
-+	 * overall extent size should not exceed the max supported limit
-+	 * reported by the server
-+	 */
-+	if (cur->oe_end - cur->oe_start + 1 +
-+	    victim->oe_end - victim->oe_start + 1 > cli->cl_max_extent_pages)
-+		return -ERANGE;
-+
- 	OSC_EXTENT_DUMP(D_CACHE, victim, "will be merged by %p.\n", cur);
- 
- 	cur->oe_start = min(cur->oe_start, victim->oe_start);
- 	cur->oe_end = max(cur->oe_end, victim->oe_end);
--	cur->oe_grants += victim->oe_grants;
-+	/* per-extent tax should be accounted only once for the whole extent */
-+	cur->oe_grants += victim->oe_grants - cli->cl_grant_extent_tax;
- 	cur->oe_nr_pages += victim->oe_nr_pages;
- 	/* only the following bits are needed to merge */
- 	cur->oe_urgent |= victim->oe_urgent;
-@@ -588,6 +601,7 @@ static int osc_extent_merge(const struct lu_env *env, struct osc_extent *cur,
- void osc_extent_release(const struct lu_env *env, struct osc_extent *ext)
- {
- 	struct osc_object *obj = ext->oe_obj;
-+	struct client_obd *cli = osc_cli(obj);
- 
- 	LASSERT(atomic_read(&ext->oe_users) > 0);
- 	LASSERT(sanity_check(ext) == 0);
-@@ -603,13 +617,19 @@ void osc_extent_release(const struct lu_env *env, struct osc_extent *ext)
- 			osc_extent_state_set(ext, OES_TRUNC);
- 			ext->oe_trunc_pending = 0;
- 		} else {
-+			int grant = 0;
-+
- 			osc_extent_state_set(ext, OES_CACHE);
- 			osc_update_pending(obj, OBD_BRW_WRITE,
- 					   ext->oe_nr_pages);
- 
- 			/* try to merge the previous and next extent. */
--			osc_extent_merge(env, ext, prev_extent(ext));
--			osc_extent_merge(env, ext, next_extent(ext));
-+			if (!osc_extent_merge(env, ext, prev_extent(ext)))
-+				grant += cli->cl_grant_extent_tax;
-+			if (!osc_extent_merge(env, ext, next_extent(ext)))
-+				grant += cli->cl_grant_extent_tax;
-+			if (grant > 0)
-+				osc_unreserve_grant(cli, 0, grant);
- 
- 			if (ext->oe_urgent)
- 				list_move_tail(&ext->oe_link,
-@@ -617,7 +637,7 @@ void osc_extent_release(const struct lu_env *env, struct osc_extent *ext)
- 		}
- 		osc_object_unlock(obj);
- 
--		osc_io_unplug_async(env, osc_cli(obj), obj);
-+		osc_io_unplug_async(env, cli, obj);
- 	}
- 	osc_extent_put(env, ext);
- }
-@@ -690,8 +710,8 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
- 	}
- 
- 	/* grants has been allocated by caller */
--	LASSERTF(*grants >= chunksize + cli->cl_extent_tax,
--		 "%u/%u/%u.\n", *grants, chunksize, cli->cl_extent_tax);
-+	LASSERTF(*grants >= chunksize + cli->cl_grant_extent_tax,
-+		 "%u/%u/%u.\n", *grants, chunksize, cli->cl_grant_extent_tax);
- 	LASSERTF((max_end - cur->oe_start) < max_pages, EXTSTR "\n",
- 		 EXTPARA(cur));
- 
-@@ -770,6 +790,13 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
- 			continue;
- 		}
- 
-+		/* check whether maximum extent size will be hit */
-+		if ((ext_chk_end - ext_chk_start + 1) << ppc_bits >
-+		    cli->cl_max_extent_pages) {
-+			ext = next_extent(ext);
-+			continue;
++		/*
++		 * - If there is no error, then the page was found in cache and
++		 *   uptodate;
++		 * - If VM_FAULT_RETRY is set, the page existed but failed to
++		 *   lock. It will return to kernel and retry;
++		 * - Otherwise, it should try normal fault under DLM lock.
++		 */
++		if ((fault_ret & VM_FAULT_RETRY) ||
++		    !(fault_ret & VM_FAULT_ERROR)) {
++			result = 0;
++			goto out;
 +		}
 +
- 		/* it's required that an extent must be contiguous at chunk
- 		 * level so that we know the whole extent is covered by grant
- 		 * (the pages in the extent are NOT required to be contiguous).
-@@ -801,7 +828,7 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
- 			 */
- 			if (osc_extent_merge(env, ext, next_extent(ext)) == 0)
- 				/* we can save extent tax from next extent */
--				*grants += cli->cl_extent_tax;
-+				*grants += cli->cl_grant_extent_tax;
- 
- 			found = osc_extent_hold(ext);
- 		}
-@@ -822,7 +849,7 @@ static struct osc_extent *osc_extent_find(const struct lu_env *env,
- 	} else if (!conflict) {
- 		/* create a new extent */
- 		EASSERT(osc_extent_is_overlapped(obj, cur) == 0, cur);
--		cur->oe_grants = chunksize + cli->cl_extent_tax;
-+		cur->oe_grants = chunksize + cli->cl_grant_extent_tax;
- 		LASSERT(*grants >= cur->oe_grants);
- 		*grants -= cur->oe_grants;
- 
-@@ -908,7 +935,7 @@ int osc_extent_finish(const struct lu_env *env, struct osc_extent *ext,
- 		lost_grant = PAGE_SIZE - count;
- 	}
- 	if (ext->oe_grants > 0)
--		osc_free_grant(cli, nr_pages, lost_grant);
-+		osc_free_grant(cli, nr_pages, lost_grant, ext->oe_grants);
- 
- 	osc_extent_remove(ext);
- 	/* put the refcount for RPC */
-@@ -1084,7 +1111,7 @@ static int osc_extent_truncate(struct osc_extent *ext, pgoff_t trunc_index,
- 	osc_object_unlock(obj);
- 
- 	if (grants > 0 || nr_pages > 0)
--		osc_free_grant(cli, nr_pages, grants);
-+		osc_free_grant(cli, nr_pages, grants, grants);
- 
- out:
- 	cl_io_fini(env, io);
-@@ -1207,9 +1234,16 @@ static int osc_extent_expand(struct osc_extent *ext, pgoff_t index,
- 	}
- 
- 	LASSERT(end_chunk + 1 == chunk);
-+
- 	/* try to expand this extent to cover @index */
- 	end_index = min(ext->oe_max_end, ((chunk + 1) << ppc_bits) - 1);
- 
-+	/* don't go over the maximum extent size reported by server */
-+	if (end_index - ext->oe_start + 1 > cli->cl_max_extent_pages) {
-+		rc = -ERANGE;
-+		goto out;
++		fault_ret = 0;
 +	}
 +
- 	next = next_extent(ext);
- 	if (next && next->oe_start <= end_index) {
- 		/* complex mode - overlapped with the next extent,
-@@ -1374,13 +1408,15 @@ static int osc_completion(const struct lu_env *env, struct osc_async_page *oap,
+ 	io = ll_fault_io_init(env, vma, vmf->pgoff, &ra_flags);
+ 	if (IS_ERR(io)) {
+ 		fault_ret = to_fault_error(PTR_ERR(io));
+@@ -293,7 +315,7 @@ static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 		vio->u.fault.ft_flags_valid = false;
  
- #define OSC_DUMP_GRANT(lvl, cli, fmt, args...) do {			      \
- 	struct client_obd *__tmp = (cli);				      \
--	CDEBUG(lvl, "%s: grant { dirty: %lu/%lu dirty_pages: %ld/%lu "	      \
--	       "dropped: %ld avail: %ld, reserved: %ld, flight: %d }"	      \
--	       "lru {in list: %ld, left: %ld, waiters: %d }" fmt "\n",	      \
-+	CDEBUG(lvl, "%s: grant { dirty: %ld/%ld dirty_pages: %ld/%lu "	\
-+	       "dropped: %ld avail: %ld, dirty_grant: %ld, "		\
-+	       "reserved: %ld, flight: %d } lru {in list: %ld, "	\
-+	       "left: %ld, waiters: %d }" fmt "\n",			\
- 	       cli_name(__tmp),						      \
- 	       __tmp->cl_dirty_pages, __tmp->cl_dirty_max_pages,	      \
- 	       atomic_long_read(&obd_dirty_pages), obd_max_dirty_pages,	      \
- 	       __tmp->cl_lost_grant, __tmp->cl_avail_grant,		      \
-+	       __tmp->cl_dirty_grant,					\
- 	       __tmp->cl_reserved_grant, __tmp->cl_w_in_flight,		      \
- 	       atomic_long_read(&__tmp->cl_lru_in_list),		      \
- 	       atomic_long_read(&__tmp->cl_lru_busy),			      \
-@@ -1451,8 +1487,10 @@ static void __osc_unreserve_grant(struct client_obd *cli,
- 	if (unused > reserved) {
- 		cli->cl_avail_grant += reserved;
- 		cli->cl_lost_grant  += unused - reserved;
-+		cli->cl_dirty_grant -= unused - reserved;
- 	} else {
- 		cli->cl_avail_grant += unused;
-+		cli->cl_dirty_grant += reserved - unused;
- 	}
- }
+ 		/* May call ll_readpage() */
+-		ll_cl_add(vma->vm_file, env, io);
++		ll_cl_add(vma->vm_file, env, io, LCC_MMAP);
  
-@@ -1480,14 +1518,17 @@ static void osc_unreserve_grant(struct client_obd *cli,
-  *    See filter_grant_check() for details.
-  */
- static void osc_free_grant(struct client_obd *cli, unsigned int nr_pages,
--			   unsigned int lost_grant)
-+			   unsigned int lost_grant, unsigned int dirty_grant)
+ 		result = cl_io_loop(env, io);
+ 
+@@ -326,6 +348,7 @@ static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 
+ static vm_fault_t ll_fault(struct vm_fault *vmf)
  {
--	unsigned long grant = (1 << cli->cl_chunkbits) + cli->cl_extent_tax;
-+	unsigned long grant;
-+
-+	grant = (1 << cli->cl_chunkbits) + cli->cl_grant_extent_tax;
++	struct vm_area_struct *vma = vmf->vma;
+ 	int count = 0;
+ 	bool printed = false;
+ 	vm_fault_t result;
+@@ -338,10 +361,12 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
+ 	siginitsetinv(&new, sigmask(SIGKILL) | sigmask(SIGTERM));
+ 	sigprocmask(SIG_BLOCK, &new, &old);
  
- 	spin_lock(&cli->cl_loi_list_lock);
- 	atomic_long_sub(nr_pages, &obd_dirty_pages);
- 	cli->cl_dirty_pages -= nr_pages;
- 	cli->cl_lost_grant += lost_grant;
-+	cli->cl_dirty_grant -= dirty_grant;
- 	if (cli->cl_avail_grant < grant && cli->cl_lost_grant >= grant) {
- 		/* borrow some grant from truncate to avoid the case that
- 		 * truncate uses up all avail grant
-@@ -1497,9 +1538,10 @@ static void osc_free_grant(struct client_obd *cli, unsigned int nr_pages,
- 	}
- 	osc_wake_cache_waiters(cli);
- 	spin_unlock(&cli->cl_loi_list_lock);
--	CDEBUG(D_CACHE, "lost %u grant: %lu avail: %lu dirty: %lu\n",
-+	CDEBUG(D_CACHE, "lost %u grant: %lu avail: %lu dirty: %lu/%lu\n",
- 	       lost_grant, cli->cl_lost_grant,
--	       cli->cl_avail_grant, cli->cl_dirty_pages << PAGE_SHIFT);
-+	       cli->cl_avail_grant, cli->cl_dirty_pages << PAGE_SHIFT,
-+	       cli->cl_dirty_grant);
++	ll_stats_ops_tally(ll_i2sbi(file_inode(vma->vm_file)),
++			   LPROC_LL_FAULT, 1);
++
+ restart:
+ 	result = ll_fault0(vmf->vma, vmf);
+-	LASSERT(!(result & VM_FAULT_LOCKED));
+-	if (result == 0) {
++	if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
+ 		struct page *vmpage = vmf->page;
+ 
+ 		/* check if this page has been truncated */
+@@ -375,6 +400,9 @@ static vm_fault_t ll_page_mkwrite(struct vm_fault *vmf)
+ 	int err;
+ 	vm_fault_t ret;
+ 
++	ll_stats_ops_tally(ll_i2sbi(file_inode(vma->vm_file)),
++			   LPROC_LL_MKWRITE, 1);
++
+ 	file_update_time(vma->vm_file);
+ 	do {
+ 		retry = false;
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index 49bf1b7..9dcbe64 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -872,6 +872,41 @@ static ssize_t xattr_cache_store(struct kobject *kobj,
+ }
+ LUSTRE_RW_ATTR(xattr_cache);
+ 
++static ssize_t fast_read_show(struct kobject *kobj,
++			      struct attribute *attr,
++			      char *buf)
++{
++	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
++					      ll_kobj);
++
++	return sprintf(buf, "%u\n", !!(sbi->ll_flags & LL_SBI_FAST_READ));
++}
++
++static ssize_t fast_read_store(struct kobject *kobj,
++			       struct attribute *attr,
++			       const char *buffer,
++			       size_t count)
++{
++	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
++					      ll_kobj);
++	bool val;
++	int rc;
++
++	rc = kstrtobool(buffer, &val);
++	if (rc)
++		return rc;
++
++	spin_lock(&sbi->ll_lock);
++	if (val)
++		sbi->ll_flags |= LL_SBI_FAST_READ;
++	else
++		sbi->ll_flags &= ~LL_SBI_FAST_READ;
++	spin_unlock(&sbi->ll_lock);
++
++	return count;
++}
++LUSTRE_RW_ATTR(fast_read);
++
+ static int ll_unstable_stats_seq_show(struct seq_file *m, void *v)
+ {
+ 	struct super_block     *sb    = m->private;
+@@ -1032,6 +1067,7 @@ static ssize_t ll_nosquash_nids_seq_write(struct file *file,
+ 	&lustre_attr_max_easize.attr,
+ 	&lustre_attr_default_easize.attr,
+ 	&lustre_attr_xattr_cache.attr,
++	&lustre_attr_fast_read.attr,
+ 	NULL,
+ };
+ 
+@@ -1068,6 +1104,8 @@ static void llite_sb_release(struct kobject *kobj)
+ 	{ LPROC_LL_OPEN,	   LPROCFS_TYPE_REGS, "open" },
+ 	{ LPROC_LL_RELEASE,	LPROCFS_TYPE_REGS, "close" },
+ 	{ LPROC_LL_MAP,	    LPROCFS_TYPE_REGS, "mmap" },
++	{ LPROC_LL_FAULT,		LPROCFS_TYPE_REGS, "page_fault" },
++	{ LPROC_LL_MKWRITE,		LPROCFS_TYPE_REGS, "page_mkwrite" },
+ 	{ LPROC_LL_LLSEEK,	 LPROCFS_TYPE_REGS, "seek" },
+ 	{ LPROC_LL_FSYNC,	  LPROCFS_TYPE_REGS, "fsync" },
+ 	{ LPROC_LL_READDIR,	LPROCFS_TYPE_REGS, "readdir" },
+diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
+index 3e008ce..59747da 100644
+--- a/drivers/staging/lustre/lustre/llite/rw.c
++++ b/drivers/staging/lustre/lustre/llite/rw.c
+@@ -1067,7 +1067,8 @@ struct ll_cl_context *ll_cl_find(struct file *file)
+ 	return found;
  }
  
- /**
-@@ -2437,7 +2479,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
- 		/* one chunk plus extent overhead must be enough to write this
- 		 * page
- 		 */
--		grants = (1 << cli->cl_chunkbits) + cli->cl_extent_tax;
-+		grants = (1 << cli->cl_chunkbits) + cli->cl_grant_extent_tax;
- 		if (ext->oe_end >= index)
- 			grants = 0;
+-void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io)
++void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io,
++	       enum lcc_type type)
+ {
+ 	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
+ 	struct ll_cl_context *lcc = &ll_env_info(env)->lti_io_ctx;
+@@ -1077,6 +1078,7 @@ void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io)
+ 	lcc->lcc_cookie = current;
+ 	lcc->lcc_env = env;
+ 	lcc->lcc_io = io;
++	lcc->lcc_type = type;
  
-@@ -2474,7 +2516,7 @@ int osc_queue_async_io(const struct lu_env *env, struct cl_io *io,
- 	}
+ 	write_lock(&fd->fd_lock);
+ 	list_add(&lcc->lcc_list, &fd->fd_lccs);
+@@ -1094,10 +1096,10 @@ void ll_cl_remove(struct file *file, const struct lu_env *env)
+ }
  
- 	if (!ext) {
--		tmp = (1 << cli->cl_chunkbits) + cli->cl_extent_tax;
-+		tmp = (1 << cli->cl_chunkbits) + cli->cl_grant_extent_tax;
+ static int ll_io_read_page(const struct lu_env *env, struct cl_io *io,
+-			   struct cl_page *page)
++			   struct cl_page *page, struct file *file)
+ {
+ 	struct inode *inode = vvp_object_inode(page->cp_obj);
+-	struct ll_file_data *fd = vvp_env_io(env)->vui_fd;
++	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
+ 	struct ll_readahead_state *ras = &fd->fd_ras;
+ 	struct cl_2queue *queue  = &io->ci_queue;
+ 	struct ll_sb_info *sbi = ll_i2sbi(inode);
+@@ -1109,7 +1111,8 @@ static int ll_io_read_page(const struct lu_env *env, struct cl_io *io,
+ 	uptodate = vpg->vpg_defer_uptodate;
  
- 		/* try to find new extent to cover this page */
- 		LASSERT(!oio->oi_active);
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index bcb9b91..ce073b6 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -576,7 +576,10 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
+ 	if (sbi->ll_ra_info.ra_max_pages_per_file > 0 &&
+-	    sbi->ll_ra_info.ra_max_pages > 0) {
++	    sbi->ll_ra_info.ra_max_pages > 0 &&
++	    !vpg->vpg_ra_updated) {
+ 		struct vvp_io *vio = vvp_env_io(env);
+ 		enum ras_update_flags flags = 0;
  
- 	oa->o_valid |= bits;
- 	spin_lock(&cli->cl_loi_list_lock);
--	oa->o_dirty = cli->cl_dirty_pages << PAGE_SHIFT;
-+	if (OCD_HAS_FLAG(&cli->cl_import->imp_connect_data, GRANT_PARAM))
-+		oa->o_dirty = cli->cl_dirty_grant;
-+	else
-+		oa->o_dirty = cli->cl_dirty_pages << PAGE_SHIFT;
- 	if (unlikely(cli->cl_dirty_pages - cli->cl_dirty_transit >
- 		     cli->cl_dirty_max_pages)) {
- 		CERROR("dirty %lu - %lu > dirty_max %lu\n",
-@@ -601,12 +604,24 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
- 		       cli->cl_dirty_pages, cli->cl_dirty_max_pages);
- 		oa->o_undirty = 0;
- 	} else {
--		unsigned long max_in_flight;
--
--		max_in_flight = (cli->cl_max_pages_per_rpc << PAGE_SHIFT) *
--				(cli->cl_max_rpcs_in_flight + 1);
--		oa->o_undirty = max(cli->cl_dirty_max_pages << PAGE_SHIFT,
--				    max_in_flight);
-+		unsigned long nrpages;
+@@ -1168,13 +1171,66 @@ int ll_readpage(struct file *file, struct page *vmpage)
+ 
+ 	env = lcc->lcc_env;
+ 	io = lcc->lcc_io;
+-	LASSERT(io->ci_state == CIS_IO_GOING);
++	if (!io) { /* fast read */
++		struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
++		struct ll_readahead_state *ras = &fd->fd_ras;
++		struct inode *inode = file_inode(file);
++		struct vvp_page *vpg;
 +
-+		nrpages = cli->cl_max_pages_per_rpc;
-+		nrpages *= cli->cl_max_rpcs_in_flight + 1;
-+		nrpages = max(nrpages, cli->cl_dirty_max_pages);
-+		oa->o_undirty = nrpages << PAGE_SHIFT;
-+		if (OCD_HAS_FLAG(&cli->cl_import->imp_connect_data,
-+				 GRANT_PARAM)) {
-+			int nrextents;
++		result = -ENODATA;
++
++		/*
++		 * TODO: need to verify the layout version to make sure
++		 * the page is not invalid due to layout change.
++		 */
++		page = cl_vmpage_page(vmpage, clob);
++		if (!page) {
++			unlock_page(vmpage);
++			return result;
++		}
++
++		vpg = cl2vvp_page(cl_object_page_slice(page->cp_obj, page));
++		if (vpg->vpg_defer_uptodate) {
++			enum ras_update_flags flags = LL_RAS_HIT;
++
++			if (lcc->lcc_type == LCC_MMAP)
++				flags |= LL_RAS_MMAP;
 +
 +			/*
-+			 * take extent tax into account when asking for more
-+			 * grant space
++			 * For fast read, it updates read ahead state only
++			 * if the page is hit in cache because non cache page
++			 * case will be handled by slow read later.
 +			 */
-+			nrextents = (nrpages + cli->cl_max_extent_pages - 1)  /
-+				     cli->cl_max_extent_pages;
-+			oa->o_undirty += nrextents * cli->cl_grant_extent_tax;
++			ras_update(ll_i2sbi(inode), inode, ras, vvp_index(vpg),
++				   flags);
++			/* avoid duplicate ras_update() call */
++			vpg->vpg_ra_updated = 1;
++
++			/*
++			 * Check if we can issue a readahead RPC, if that is
++			 * the case, we can't do fast IO because we will need
++			 * a cl_io to issue the RPC.
++			 */
++			if (ras->ras_window_start + ras->ras_window_len <
++			    ras->ras_next_readahead + PTLRPC_MAX_BRW_PAGES) {
++				/* export the page and skip io stack */
++				vpg->vpg_ra_used = 1;
++				cl_page_export(env, page, 1);
++				result = 0;
++			}
 +		}
- 	}
- 	oa->o_grant = cli->cl_avail_grant + cli->cl_reserved_grant;
- 	oa->o_dropped = cli->cl_lost_grant;
-@@ -811,20 +826,40 @@ static void osc_init_grant(struct client_obd *cli, struct obd_connect_data *ocd)
- 	 * race is tolerable here: if we're evicted, but imp_state already
- 	 * left EVICTED state, then cl_dirty_pages must be 0 already.
- 	 */
-+	cli->cl_avail_grant = ocd->ocd_grant;
- 	spin_lock(&cli->cl_loi_list_lock);
--	if (cli->cl_import->imp_state == LUSTRE_IMP_EVICTED)
--		cli->cl_avail_grant = ocd->ocd_grant;
--	else
--		cli->cl_avail_grant = ocd->ocd_grant -
--				      (cli->cl_dirty_pages << PAGE_SHIFT);
--
--	/* determine the appropriate chunk size used by osc_extent. */
--	cli->cl_chunkbits = max_t(int, PAGE_SHIFT, ocd->ocd_blocksize);
-+	if (cli->cl_import->imp_state != LUSTRE_IMP_EVICTED) {
-+		cli->cl_avail_grant -= cli->cl_reserved_grant;
-+		if (OCD_HAS_FLAG(ocd, GRANT_PARAM))
-+			cli->cl_avail_grant -= cli->cl_dirty_grant;
-+		else
-+			cli->cl_avail_grant -= cli->cl_dirty_pages << PAGE_SHIFT;
++
++		unlock_page(vmpage);
++		cl_page_put(env, page);
++		return result;
 +	}
 +
-+	if (OCD_HAS_FLAG(ocd, GRANT_PARAM)) {
-+		u64 size;
-+
-+		/* overhead for each extent insertion */
-+		cli->cl_grant_extent_tax = ocd->ocd_grant_tax_kb << 10;
-+		/* determine the appropriate chunk size used by osc_extent. */
-+		cli->cl_chunkbits = max_t(int, PAGE_SHIFT,
-+					  ocd->ocd_grant_blkbits);
-+		/* determine maximum extent size, in #pages */
-+		size = (u64)ocd->ocd_grant_max_blks << ocd->ocd_grant_blkbits;
-+		cli->cl_max_extent_pages = size >> PAGE_SHIFT;
-+		if (!cli->cl_max_extent_pages)
-+			cli->cl_max_extent_pages = 1;
-+	} else {
-+		cli->cl_grant_extent_tax = 0;
-+		cli->cl_chunkbits = PAGE_SHIFT;
-+		cli->cl_max_extent_pages = DT_MAX_BRW_PAGES;
-+	}
- 	spin_unlock(&cli->cl_loi_list_lock);
- 
--	CDEBUG(D_CACHE, "%s, setting cl_avail_grant: %ld cl_lost_grant: %ld chunk bits: %d\n",
-+	CDEBUG(D_CACHE,
-+	       "%s, setting cl_avail_grant: %ld cl_lost_grant: %ld chunk bits: %d cl_max_extent_pages: %d\n",
- 	       cli_name(cli), cli->cl_avail_grant, cli->cl_lost_grant,
--	       cli->cl_chunkbits);
-+	       cli->cl_chunkbits, cli->cl_max_extent_pages);
- 
- 	if (ocd->ocd_connect_flags & OBD_CONNECT_GRANT_SHRINK &&
- 	    list_empty(&cli->cl_grant_shrink_list))
-@@ -1661,6 +1696,7 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
- 	int page_count = 0;
- 	bool soft_sync = false;
- 	bool interrupted = false;
-+	int grant = 0;
- 	int i;
- 	int rc;
- 	struct ost_body *body;
-@@ -1672,6 +1708,7 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
- 	list_for_each_entry(ext, ext_list, oe_link) {
- 		LASSERT(ext->oe_state == OES_RPC);
- 		mem_tight |= ext->oe_memalloc;
-+		grant += ext->oe_grants;
- 		page_count += ext->oe_nr_pages;
- 		if (!obj)
- 			obj = ext->oe_obj;
-@@ -1732,6 +1769,9 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
- 	crattr->cra_oa = oa;
- 	cl_req_attr_set(env, osc2cl(obj), crattr);
- 
-+	if (cmd == OBD_BRW_WRITE)
-+		oa->o_grant_used = grant;
-+
- 	sort_brw_pages(pga, page_count);
- 	rc = osc_brw_prep_request(cmd, cli, oa, page_count, pga, &req, 1, 0);
- 	if (rc != 0) {
-@@ -2435,12 +2475,15 @@ static int osc_reconnect(const struct lu_env *env,
- 	struct client_obd *cli = &obd->u.cli;
- 
- 	if (data && (data->ocd_connect_flags & OBD_CONNECT_GRANT)) {
--		long lost_grant;
-+		long lost_grant, grant;
- 
- 		spin_lock(&cli->cl_loi_list_lock);
--		data->ocd_grant = (cli->cl_avail_grant +
--				   (cli->cl_dirty_pages << PAGE_SHIFT)) ?:
--				   2 * cli_brw_size(obd);
-+		grant = cli->cl_avail_grant + cli->cl_reserved_grant;
-+		if (data->ocd_connect_flags & OBD_CONNECT_GRANT_PARAM)
-+			grant += cli->cl_dirty_grant;
-+		else
-+			grant += cli->cl_dirty_pages << PAGE_SHIFT;
-+		data->ocd_grant = grant ? : 2 * cli_brw_size(obd);
- 		lost_grant = cli->cl_lost_grant;
- 		cli->cl_lost_grant = 0;
- 		spin_unlock(&cli->cl_loi_list_lock);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-index 6ac9bb5..0337b33 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
-@@ -1551,8 +1551,8 @@ void lustre_swab_connect(struct obd_connect_data *ocd)
- 	/* ocd_blocksize and ocd_inodespace don't need to be swabbed because
- 	 * they are 8-byte values
- 	 */
--	__swab16s(&ocd->ocd_grant_extent);
--	__swab32s(&ocd->ocd_unused);
-+	__swab16s(&ocd->ocd_grant_tax_kb);
-+	__swab32s(&ocd->ocd_grant_max_blks);
- 	__swab64s(&ocd->ocd_transno);
- 	__swab32s(&ocd->ocd_group);
- 	__swab32s(&ocd->ocd_cksum_types);
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index f9394c3..2b3608c 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -884,22 +884,22 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct obd_connect_data, ocd_ibits_known));
- 	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_ibits_known) == 8, "found %lld\n",
- 		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_ibits_known));
--	LASSERTF((int)offsetof(struct obd_connect_data, ocd_blocksize) == 32, "found %lld\n",
--		 (long long)(int)offsetof(struct obd_connect_data, ocd_blocksize));
--	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_blocksize) == 1, "found %lld\n",
--		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_blocksize));
--	LASSERTF((int)offsetof(struct obd_connect_data, ocd_inodespace) == 33, "found %lld\n",
--		 (long long)(int)offsetof(struct obd_connect_data, ocd_inodespace));
--	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_inodespace) == 1, "found %lld\n",
--		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_inodespace));
--	LASSERTF((int)offsetof(struct obd_connect_data, ocd_grant_extent) == 34, "found %lld\n",
--		 (long long)(int)offsetof(struct obd_connect_data, ocd_grant_extent));
--	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_grant_extent) == 2, "found %lld\n",
--		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_grant_extent));
--	LASSERTF((int)offsetof(struct obd_connect_data, ocd_unused) == 36, "found %lld\n",
--		 (long long)(int)offsetof(struct obd_connect_data, ocd_unused));
--	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_unused) == 4, "found %lld\n",
--		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_unused));
-+	LASSERTF((int)offsetof(struct obd_connect_data, ocd_grant_blkbits) == 32, "found %lld\n",
-+		 (long long)(int)offsetof(struct obd_connect_data, ocd_grant_blkbits));
-+	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_grant_blkbits) == 1, "found %lld\n",
-+		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_grant_blkbits));
-+	LASSERTF((int)offsetof(struct obd_connect_data, ocd_grant_inobits) == 33, "found %lld\n",
-+		 (long long)(int)offsetof(struct obd_connect_data, ocd_grant_inobits));
-+	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_grant_inobits) == 1, "found %lld\n",
-+		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_grant_inobits));
-+	LASSERTF((int)offsetof(struct obd_connect_data, ocd_grant_tax_kb) == 34, "found %lld\n",
-+		 (long long)(int)offsetof(struct obd_connect_data, ocd_grant_tax_kb));
-+	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_grant_tax_kb) == 2, "found %lld\n",
-+		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_grant_tax_kb));
-+	LASSERTF((int)offsetof(struct obd_connect_data, ocd_grant_max_blks) == 36, "found %lld\n",
-+		 (long long)(int)offsetof(struct obd_connect_data, ocd_grant_max_blks));
-+	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_grant_max_blks) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct obd_connect_data *)0)->ocd_grant_max_blks));
- 	LASSERTF((int)offsetof(struct obd_connect_data, ocd_transno) == 40, "found %lld\n",
- 		 (long long)(int)offsetof(struct obd_connect_data, ocd_transno));
- 	LASSERTF((int)sizeof(((struct obd_connect_data *)0)->ocd_transno) == 8, "found %lld\n",
+ 	page = cl_page_find(env, clob, vmpage->index, vmpage, CPT_CACHEABLE);
+ 	if (!IS_ERR(page)) {
+ 		LASSERT(page->cp_type == CPT_CACHEABLE);
+ 		if (likely(!PageUptodate(vmpage))) {
+ 			cl_page_assume(env, io, page);
+-			result = ll_io_read_page(env, io, page);
++			result = ll_io_read_page(env, io, page, file);
+ 		} else {
+ 			/* Page from a non-object file. */
+ 			unlock_page(vmpage);
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_internal.h b/drivers/staging/lustre/lustre/llite/vvp_internal.h
+index 7d3abb4..70d62bf 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_internal.h
++++ b/drivers/staging/lustre/lustre/llite/vvp_internal.h
+@@ -225,6 +225,7 @@ struct vvp_object {
+ struct vvp_page {
+ 	struct cl_page_slice vpg_cl;
+ 	unsigned int	vpg_defer_uptodate:1,
++			vpg_ra_updated:1,
+ 			vpg_ra_used:1;
+ 	/** VM page */
+ 	struct page	  *vpg_page;
 -- 
 1.8.3.1
