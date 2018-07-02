@@ -1,549 +1,836 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  2 Jul 2018 19:24:22 -0400
-Subject: [lustre-devel] [PATCH 05/18] lustre: llite: fast read implementation
+Date: Mon,  2 Jul 2018 19:24:19 -0400
+Subject: [lustre-devel] [PATCH 02/18] lustre: ladvise: Add feature of giving
+ file access advices
 In-Reply-To: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
 References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530573875-20465-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530573875-20465-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Jinshan Xiong <jinshan.xiong@gmail.com>
+From: Li Xi <lixi@ddn.com>
 
-For read operation, if a page is already in cache, it must be covered
-by a DLM lock. We can take advantage of this by reading cached page
-without interacting with Lustre. Traditional read will go on if fast
-read fails.
+The fadvise() system call provided by Linux kernel enables
+applications to give advices or hints about how a file will be
+accessed. However, It is only a client side mechanism which is
+not enough for distributed file systems like Lustre, because in
+order to tune system-wide cache or read-ahead policies, servers
+need to understand the advices too.
 
-This patch can improve small read performance significantly.
-These are the performance data I collected:
+This patch adds a new feature named ladvise which provides new
+APIs and utils to give advices about the access pattern of Lustre
+files with the purpose of performance improvement. It is similar
+to Linux fadvise() system call, except it forwards the advices
+directly from Lustre client to server. The server side codes will
+apply appropriate read-ahead and caching techniques for the
+corresponding files.
 
-+------------+----------------+-----------------+
-|            | read bs=4k     | read bs=1M      |
-+------------+----------------+-----------------+
-| w/o patch  | 257 MB/s       | 1.1 GB/s        |
-+------------+----------------+-----------------+
-| w/ patch   | 1.2 GB/s       | 1.4 GB/s        |
-+------------+----------------+-----------------+
+A typical workload for ladvise is e.g. a bunch of different
+clients are doing small random reads of a file, so prefetching
+pages into OSS cache with big linear reads before the random IO
+is a net benefit. Fetching all that data into each client cache
+with fadvise() may not be, due to much more data being sent to
+the client.
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-4257
-Reviewed-on: http://review.whamcloud.com/20255
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Signed-off-by: Li Xi <lixi@ddn.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-4931
+Reviewed-on: http://review.whamcloud.com/10029
+Reviewed-by: Wang Shilong <wshilong@ddn.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/file.c         | 104 +++++++++++++++++++--
- .../staging/lustre/lustre/llite/llite_internal.h   |  23 ++++-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   1 +
- drivers/staging/lustre/lustre/llite/llite_mmap.c   |  34 ++++++-
- drivers/staging/lustre/lustre/llite/lproc_llite.c  |  38 ++++++++
- drivers/staging/lustre/lustre/llite/rw.c           |  68 ++++++++++++--
- drivers/staging/lustre/lustre/llite/vvp_internal.h |   1 +
- 7 files changed, 252 insertions(+), 17 deletions(-)
+ .../lustre/include/uapi/linux/lustre/lustre_idl.h  |   3 +-
+ .../lustre/include/uapi/linux/lustre/lustre_user.h |  32 +++++++
+ drivers/staging/lustre/lustre/include/cl_object.h  |  13 +++
+ .../lustre/lustre/include/lustre_req_layout.h      |   4 +
+ .../staging/lustre/lustre/include/lustre_swab.h    |   2 +
+ drivers/staging/lustre/lustre/llite/file.c         | 106 +++++++++++++++++++++
+ drivers/staging/lustre/lustre/llite/vvp_io.c       |   3 +
+ drivers/staging/lustre/lustre/lov/lov_io.c         |  28 ++++++
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     |   2 +
+ .../staging/lustre/lustre/osc/osc_cl_internal.h    |   1 +
+ drivers/staging/lustre/lustre/osc/osc_dev.c        |   1 +
+ drivers/staging/lustre/lustre/osc/osc_internal.h   |   4 +
+ drivers/staging/lustre/lustre/osc/osc_io.c         |  79 +++++++++++++++
+ drivers/staging/lustre/lustre/osc/osc_request.c    |  94 ++++++++++++++++++
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      |  24 +++++
+ .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |   1 +
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |  19 ++++
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |  54 ++++++++++-
+ 18 files changed, 468 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+index 3d77ed6..5fab107 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+@@ -812,7 +812,8 @@ enum ost_cmd {
+ 	OST_QUOTACHECK = 18, /* not used since 2.4 */
+ 	OST_QUOTACTL   = 19,
+ 	OST_QUOTA_ADJUST_QUNIT = 20, /* not used since 2.4 */
+-	OST_LAST_OPC
++	OST_LADVISE		= 21,
++	OST_LAST_OPC /* must be < 33 to avoid MDS_GETATTR */
+ };
+ #define OST_FIRST_OPC  OST_REPLY
+ 
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
+index 69387f3..fc33a43 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
+@@ -276,6 +276,7 @@ struct ost_id {
+ #define LL_IOC_MIGRATE			_IOR('f', 247, int)
+ #define LL_IOC_FID2MDTIDX		_IOWR('f', 248, struct lu_fid)
+ #define LL_IOC_GETPARENT		_IOWR('f', 249, struct getparent)
++#define LL_IOC_LADVISE			_IOR('f', 250, struct lu_ladvise)
+ 
+ /* Lease types for use as arg and return of LL_IOC_{GET,SET}_LEASE ioctl. */
+ enum ll_lease_type {
+@@ -1322,6 +1323,37 @@ struct hsm_copy {
+ 	struct hsm_action_item	hc_hai;
+ };
+ 
++enum lu_ladvise_type {
++	LU_LADVISE_INVALID	= 0,
++};
++
++#define LU_LADVISE_NAMES { }
++
++struct lu_ladvise {
++	__u64			lla_advice;
++	__u64			lla_start;
++	__u64			lla_end;
++	__u64			lla_padding;
++};
++
++enum ladvise_flag {
++	LF_ASYNC	= 0x00000001,
++};
++
++#define LADVISE_MAGIC 0x1ADF1CE0
++#define LF_MASK LF_ASYNC
++
++struct ladvise_hdr {
++	__u32			lah_magic;	/* LADVISE_MAGIC */
++	__u32			lah_count;	/* number of advices */
++	__u64			lah_flags;	/* from enum ladvise_flag */
++	__u64			lah_padding1;	/* unused */
++	__u64			lah_padding2;	/* unused */
++	struct lu_ladvise	lah_advise[0];
++};
++
++#define LAH_COUNT_MAX		1024
++
+ /** @} lustreuser */
+ 
+ #endif /* _LUSTRE_USER_H */
+diff --git a/drivers/staging/lustre/lustre/include/cl_object.h b/drivers/staging/lustre/lustre/include/cl_object.h
+index 1491beb..58af22e 100644
+--- a/drivers/staging/lustre/lustre/include/cl_object.h
++++ b/drivers/staging/lustre/lustre/include/cl_object.h
+@@ -1394,6 +1394,11 @@ enum cl_io_type {
+ 	 * cl_io_loop() is never called for it.
+ 	 */
+ 	CIT_MISC,
++	/**
++	 * ladvise handling
++	 * To give advice about access of a file
++	 */
++	CIT_LADVISE,
+ 	CIT_OP_NR
+ };
+ 
+@@ -1804,6 +1809,14 @@ struct cl_io {
+ 			/* how many pages were written/discarded */
+ 			unsigned int       fi_nr_written;
+ 		} ci_fsync;
++		struct cl_ladvise_io {
++			u64			li_start;
++			u64			li_end;
++			/** file system level fid */
++			struct lu_fid	       *li_fid;
++			enum lu_ladvise_type	li_advice;
++			u64			li_flags;
++		} ci_ladvise;
+ 	} u;
+ 	struct cl_2queue     ci_queue;
+ 	size_t	       ci_nob;
+diff --git a/drivers/staging/lustre/lustre/include/lustre_req_layout.h b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+index 213d0a0..db6d8ed 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_req_layout.h
++++ b/drivers/staging/lustre/lustre/include/lustre_req_layout.h
+@@ -190,6 +190,7 @@ void req_capsule_shrink(struct req_capsule *pill,
+ extern struct req_format RQF_OST_GET_INFO_LAST_FID;
+ extern struct req_format RQF_OST_SET_INFO_LAST_FID;
+ extern struct req_format RQF_OST_GET_INFO_FIEMAP;
++extern struct req_format RQF_OST_LADVISE;
+ 
+ /* LDLM req_format */
+ extern struct req_format RQF_LDLM_ENQUEUE;
+@@ -299,6 +300,9 @@ void req_capsule_shrink(struct req_capsule *pill,
+ extern struct req_msg_field RMF_MGS_CONFIG_BODY;
+ extern struct req_msg_field RMF_MGS_CONFIG_RES;
+ 
++extern struct req_msg_field RMF_OST_LADVISE_HDR;
++extern struct req_msg_field RMF_OST_LADVISE;
++
+ /* generic uint32 */
+ extern struct req_msg_field RMF_U32;
+ 
+diff --git a/drivers/staging/lustre/lustre/include/lustre_swab.h b/drivers/staging/lustre/lustre/include/lustre_swab.h
+index 9d786bb..e09a3dc 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_swab.h
++++ b/drivers/staging/lustre/lustre/include/lustre_swab.h
+@@ -99,6 +99,8 @@ void lustre_swab_lov_user_md_objects(struct lov_user_ost_data *lod,
+ void lustre_swab_swap_layouts(struct mdc_swap_layouts *msl);
+ void lustre_swab_close_data(struct close_data *data);
+ void lustre_swab_lmv_user_md(struct lmv_user_md *lum);
++void lustre_swab_ladvise(struct lu_ladvise *ladvise);
++void lustre_swab_ladvise_hdr(struct ladvise_hdr *ladvise_hdr);
+ 
+ /* Functions for dumping PTLRPC fields */
+ void dump_rniobuf(struct niobuf_remote *rnb);
 diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
-index 5f944ca..db18d1d 100644
+index 59b5fbc..44bec1d 100644
 --- a/drivers/staging/lustre/lustre/llite/file.c
 +++ b/drivers/staging/lustre/lustre/llite/file.c
-@@ -953,10 +953,21 @@ int ll_merge_attr(const struct lu_env *env, struct inode *inode)
- 
- 	ll_inode_size_lock(inode);
- 
--	/* merge timestamps the most recently obtained from mds with
--	 * timestamps obtained from osts
-+	/*
-+	 * merge timestamps the most recently obtained from MDS with
-+	 * timestamps obtained from OSTSs.
-+	 *
-+	 * Do not overwrite atime of inode because it may be refreshed
-+	 * by file_accessed() function. If the read was served by cache
-+	 * data, there is no RPC to be sent so that atime may not be
-+	 * transferred to OSTs at all. MDT only updates atime at close time
-+	 * if it's at least 'mdd.*.atime_diff' older.
-+	 * All in all, the atime in Lustre does not strictly comply with
-+	 * POSIX. Solving this problem needs to send an RPC to MDT for each
-+	 * read, this will hurt performance.
- 	 */
--	inode->i_atime.tv_sec = lli->lli_atime;
-+	if (inode->i_atime.tv_sec < lli->lli_atime)
-+		inode->i_atime.tv_sec = lli->lli_atime;
- 	inode->i_mtime.tv_sec = lli->lli_mtime;
- 	inode->i_ctime.tv_sec = lli->lli_ctime;
- 
-@@ -1096,7 +1107,7 @@ static void ll_io_init(struct cl_io *io, const struct file *file, int write)
- 
- 			range_locked = true;
- 		}
--		ll_cl_add(file, env, io);
-+		ll_cl_add(file, env, io, LCC_RW);
- 		rc = cl_io_loop(env, io);
- 		ll_cl_remove(file, env);
- 		if (range_locked) {
-@@ -1155,23 +1166,104 @@ static void ll_io_init(struct cl_io *io, const struct file *file, int write)
- 	return result > 0 ? result : rc;
+@@ -1926,6 +1926,54 @@ static inline long ll_lease_type_from_fmode(fmode_t fmode)
+ 	       ((fmode & FMODE_WRITE) ? LL_LEASE_WRLCK : 0);
  }
  
-+/**
-+ * The purpose of fast read is to overcome per I/O overhead and improve IOPS
-+ * especially for small I/O.
++/*
++ * Give file access advices
 + *
-+ * To serve a read request, CLIO has to create and initialize a cl_io and
-+ * then request DLM lock. This has turned out to have siginificant overhead
-+ * and affects the performance of small I/O dramatically.
++ * The ladvise interface is similar to Linux fadvise() system call, except it
++ * forwards the advices directly from Lustre client to server. The server side
++ * codes will apply appropriate read-ahead and caching techniques for the
++ * corresponding files.
 + *
-+ * It's not necessary to create a cl_io for each I/O. Under the help of read
-+ * ahead, most of the pages being read are already in memory cache and we can
-+ * read those pages directly because if the pages exist, the corresponding DLM
-+ * lock must exist so that page content must be valid.
-+ *
-+ * In fast read implementation, the llite speculatively finds and reads pages
-+ * in memory cache. There are three scenarios for fast read:
-+ *   - If the page exists and is uptodate, kernel VM will provide the data and
-+ *     CLIO won't be intervened;
-+ *   - If the page was brought into memory by read ahead, it will be exported
-+ *     and read ahead parameters will be updated;
-+ *   - Otherwise the page is not in memory, we can't do fast read. Therefore,
-+ *     it will go back and invoke normal read, i.e., a cl_io will be created
-+ *     and DLM lock will be requested.
-+ *
-+ * POSIX compliance: posix standard states that read is intended to be atomic.
-+ * Lustre read implementation is in line with Linux kernel read implementation
-+ * and neither of them complies with POSIX standard in this matter. Fast read
-+ * doesn't make the situation worse on single node but it may interleave write
-+ * results from multiple nodes due to short read handling in ll_file_aio_read().
-+ *
-+ * @env   - lu_env
-+ * @iocb  - kiocb from kernel
-+ * @iter  - user space buffers where the data will be copied
-+ *
-+ * RETURN - number of bytes have been read, or error code if error occurred.
++ * A typical workload for ladvise is e.g. a bunch of different clients are
++ * doing small random reads of a file, so prefetching pages into OSS cache
++ * with big linear reads before the random IO is a net benefit. Fetching
++ * all that data into each client cache with fadvise() may not be, due to
++ * much more data being sent to the client.
 + */
-+static ssize_t
-+ll_do_fast_read(const struct lu_env *env, struct kiocb *iocb,
-+		struct iov_iter *iter)
++static int ll_ladvise(struct inode *inode, struct file *file, __u64 flags,
++		      struct lu_ladvise *ladvise)
 +{
-+	ssize_t result;
++	struct cl_ladvise_io *lio;
++	struct lu_env *env;
++	struct cl_io *io;
++	u16 refcheck;
++	int rc;
 +
-+	if (!ll_sbi_has_fast_read(ll_i2sbi(file_inode(iocb->ki_filp))))
-+		return 0;
++	env = cl_env_get(&refcheck);
++	if (IS_ERR(env))
++		return PTR_ERR(env);
 +
-+	/*
-+	 * NB: we can't do direct IO for fast read because it will need a lock
-+	 * to make IO engine happy.
-+	 */
-+	if (iocb->ki_filp->f_flags & O_DIRECT)
-+		return 0;
++	io = vvp_env_thread_io(env);
++	io->ci_obj = ll_i2info(inode)->lli_clob;
 +
-+	ll_cl_add(iocb->ki_filp, env, NULL, LCC_RW);
-+	result = generic_file_read_iter(iocb, iter);
-+	ll_cl_remove(iocb->ki_filp, env);
++	/* initialize parameters for ladvise */
++	lio = &io->u.ci_ladvise;
++	lio->li_start = ladvise->lla_start;
++	lio->li_end = ladvise->lla_end;
++	lio->li_fid = ll_inode2fid(inode);
++	lio->li_advice = ladvise->lla_advice;
++	lio->li_flags = flags;
 +
-+	/*
-+	 * If the first page is not in cache, generic_file_aio_read() will be
-+	 * returned with -ENODATA.
-+	 * See corresponding code in ll_readpage().
-+	 */
-+	if (result == -ENODATA)
-+		result = 0;
++	if (!cl_io_init(env, io, CIT_LADVISE, io->ci_obj))
++		rc = cl_io_loop(env, io);
++	else
++		rc = io->ci_result;
 +
-+	if (result > 0)
-+		ll_stats_ops_tally(ll_i2sbi(file_inode(iocb->ki_filp)),
-+				   LPROC_LL_READ_BYTES, result);
++	cl_io_fini(env, io);
++	cl_env_put(env, &refcheck);
++	return rc;
++}
 +
+ static long
+ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ {
+@@ -2248,6 +2296,64 @@ static inline long ll_lease_type_from_fmode(fmode_t fmode)
+ 		kfree(hui);
+ 		return rc;
+ 	}
++	case LL_IOC_LADVISE: {
++		struct ladvise_hdr *ladvise_hdr;
++		int alloc_size = sizeof(*ladvise_hdr);
++		int num_advise;
++		int i;
++
++		rc = 0;
++		ladvise_hdr = kzalloc(alloc_size, GFP_NOFS);
++		if (!ladvise_hdr)
++			return -ENOMEM;
++
++		if (copy_from_user(ladvise_hdr,
++				   (const struct ladvise_hdr __user *)arg,
++				   alloc_size)) {
++			rc = -EFAULT;
++			goto out_ladvise;
++		}
++
++		if (ladvise_hdr->lah_magic != LADVISE_MAGIC ||
++		    ladvise_hdr->lah_count < 1) {
++			rc = -EINVAL;
++			goto out_ladvise;
++		}
++
++		num_advise = ladvise_hdr->lah_count;
++		if (num_advise >= LAH_COUNT_MAX) {
++			rc = -EFBIG;
++			goto out_ladvise;
++		}
++
++		kfree(ladvise_hdr);
++		alloc_size = offsetof(typeof(*ladvise_hdr),
++				      lah_advise[num_advise]);
++		ladvise_hdr = kzalloc(alloc_size, GFP_NOFS);
++		if (!ladvise_hdr)
++			return -ENOMEM;
++
++		/*
++		 * TODO: submit multiple advices to one server in a single RPC
++		 */
++		if (copy_from_user(ladvise_hdr,
++				   (const struct ladvise_hdr __user *)arg,
++				   alloc_size)) {
++			rc = -EFAULT;
++			goto out_ladvise;
++		}
++
++		for (i = 0; i < num_advise; i++) {
++			rc = ll_ladvise(inode, file, ladvise_hdr->lah_flags,
++					&ladvise_hdr->lah_advise[i]);
++			if (rc)
++				break;
++		}
++
++out_ladvise:
++		kfree(ladvise_hdr);
++		return rc;
++	}
+ 	default: {
+ 		int err;
+ 
+diff --git a/drivers/staging/lustre/lustre/llite/vvp_io.c b/drivers/staging/lustre/lustre/llite/vvp_io.c
+index df47ed9..70d2387 100644
+--- a/drivers/staging/lustre/lustre/llite/vvp_io.c
++++ b/drivers/staging/lustre/lustre/llite/vvp_io.c
+@@ -1302,6 +1302,9 @@ static int vvp_io_read_ahead(const struct lu_env *env,
+ 		},
+ 		[CIT_MISC] = {
+ 			.cio_fini   = vvp_io_fini
++		},
++		[CIT_LADVISE] = {
++			.cio_fini	= vvp_io_fini
+ 		}
+ 	},
+ 	.cio_read_ahead	= vvp_io_read_ahead,
+diff --git a/drivers/staging/lustre/lustre/lov/lov_io.c b/drivers/staging/lustre/lustre/lov/lov_io.c
+index 5098284..6537ba3 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_io.c
++++ b/drivers/staging/lustre/lustre/lov/lov_io.c
+@@ -123,6 +123,14 @@ static void lov_io_sub_inherit(struct cl_io *io, struct lov_io *lio,
+ 		}
+ 		break;
+ 	}
++	case CIT_LADVISE: {
++		io->u.ci_ladvise.li_start = start;
++		io->u.ci_ladvise.li_end = end;
++		io->u.ci_ladvise.li_fid = parent->u.ci_ladvise.li_fid;
++		io->u.ci_ladvise.li_advice = parent->u.ci_ladvise.li_advice;
++		io->u.ci_ladvise.li_flags = parent->u.ci_ladvise.li_flags;
++		break;
++	}
+ 	default:
+ 		break;
+ 	}
+@@ -315,6 +323,12 @@ static int lov_io_slice_init(struct lov_io *lio, struct lov_object *obj,
+ 		break;
+ 	}
+ 
++	case CIT_LADVISE: {
++		lio->lis_pos = io->u.ci_ladvise.li_start;
++		lio->lis_endpos = io->u.ci_ladvise.li_end;
++		break;
++	}
++
+ 	case CIT_MISC:
+ 		lio->lis_pos = 0;
+ 		lio->lis_endpos = OBD_OBJECT_EOF;
+@@ -837,6 +851,15 @@ static void lov_io_fsync_end(const struct lu_env *env,
+ 			.cio_start     = lov_io_start,
+ 			.cio_end       = lov_io_fsync_end
+ 		},
++		[CIT_LADVISE] = {
++			.cio_fini	= lov_io_fini,
++			.cio_iter_init	= lov_io_iter_init,
++			.cio_iter_fini	= lov_io_iter_fini,
++			.cio_lock	= lov_io_lock,
++			.cio_unlock	= lov_io_unlock,
++			.cio_start	= lov_io_start,
++			.cio_end	= lov_io_end
++		},
+ 		[CIT_MISC] = {
+ 			.cio_fini   = lov_io_fini
+ 		}
+@@ -908,6 +931,9 @@ static void lov_empty_impossible(const struct lu_env *env,
+ 		[CIT_FSYNC] = {
+ 			.cio_fini   = lov_empty_io_fini
+ 		},
++		[CIT_LADVISE] = {
++			.cio_fini	= lov_empty_io_fini
++		},
+ 		[CIT_MISC] = {
+ 			.cio_fini   = lov_empty_io_fini
+ 		}
+@@ -950,6 +976,7 @@ int lov_io_init_empty(const struct lu_env *env, struct cl_object *obj,
+ 		result = 0;
+ 		break;
+ 	case CIT_FSYNC:
++	case CIT_LADVISE:
+ 	case CIT_SETATTR:
+ 	case CIT_DATA_VERSION:
+ 		result = 1;
+@@ -989,6 +1016,7 @@ int lov_io_init_released(const struct lu_env *env, struct cl_object *obj,
+ 		break;
+ 	case CIT_MISC:
+ 	case CIT_FSYNC:
++	case CIT_LADVISE:
+ 	case CIT_DATA_VERSION:
+ 		result = 1;
+ 		break;
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index fcdae60..2c77e72 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -140,6 +140,8 @@ void cl_io_fini(const struct lu_env *env, struct cl_io *io)
+ 		LASSERT(ergo(io->ci_ignore_layout || !io->ci_verify_layout,
+ 			     !io->ci_need_restart));
+ 		break;
++	case CIT_LADVISE:
++		break;
+ 	default:
+ 		LBUG();
+ 	}
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+index 2d3cba1..d86d3f7 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+@@ -110,6 +110,7 @@ struct osc_thread_info {
+ 	pgoff_t			oti_fn_index; /* first non-overlapped index */
+ 	struct cl_sync_io	oti_anchor;
+ 	struct cl_req_attr	oti_req_attr;
++	struct lu_buf		oti_ladvise_buf;
+ };
+ 
+ struct osc_object {
+diff --git a/drivers/staging/lustre/lustre/osc/osc_dev.c b/drivers/staging/lustre/lustre/osc/osc_dev.c
+index 2b5f324..c767a3c 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_dev.c
++++ b/drivers/staging/lustre/lustre/osc/osc_dev.c
+@@ -122,6 +122,7 @@ static void osc_key_fini(const struct lu_context *ctx,
+ {
+ 	struct osc_thread_info *info = data;
+ 
++	kvfree(info->oti_ladvise_buf.lb_buf);
+ 	kmem_cache_free(osc_thread_kmem, info);
+ }
+ 
+diff --git a/drivers/staging/lustre/lustre/osc/osc_internal.h b/drivers/staging/lustre/lustre/osc/osc_internal.h
+index 4ddba13..02e8318 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_internal.h
+@@ -129,6 +129,10 @@ int osc_sync_base(struct osc_object *exp, struct obdo *oa,
+ 		  obd_enqueue_update_f upcall, void *cookie,
+ 		  struct ptlrpc_request_set *rqset);
+ 
++int osc_ladvise_base(struct obd_export *exp, struct obdo *oa,
++		     struct ladvise_hdr *ladvise_hdr,
++		     obd_enqueue_update_f upcall, void *cookie,
++		     struct ptlrpc_request_set *rqset);
+ int osc_process_config_base(struct obd_device *obd, struct lustre_cfg *cfg);
+ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
+ 		  struct list_head *ext_list, int cmd);
+diff --git a/drivers/staging/lustre/lustre/osc/osc_io.c b/drivers/staging/lustre/lustre/osc/osc_io.c
+index 955525f..628743b 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_io.c
++++ b/drivers/staging/lustre/lustre/osc/osc_io.c
+@@ -843,6 +843,80 @@ static void osc_io_fsync_end(const struct lu_env *env,
+ 	slice->cis_io->ci_result = result;
+ }
+ 
++static int osc_io_ladvise_start(const struct lu_env *env,
++				const struct cl_io_slice *slice)
++{
++	struct cl_io *io = slice->cis_io;
++	struct osc_io *oio = cl2osc_io(env, slice);
++	struct cl_object *obj = slice->cis_obj;
++	struct lov_oinfo *loi = cl2osc(obj)->oo_oinfo;
++	struct cl_ladvise_io *lio = &io->u.ci_ladvise;
++	struct obdo *oa = &oio->oi_oa;
++	struct osc_async_cbargs *cbargs = &oio->oi_cbarg;
++	struct ladvise_hdr *ladvise_hdr;
++	struct lu_ladvise *ladvise;
++	int num_advise = 1;
++	int result = 0;
++	int buf_size;
++
++	/* TODO: add multiple ladvise support in CLIO */
++	buf_size = offsetof(typeof(*ladvise_hdr), lah_advise[num_advise]);
++	if (osc_env_info(env)->oti_ladvise_buf.lb_len < buf_size) {
++		kvfree(osc_env_info(env)->oti_ladvise_buf.lb_buf);
++		osc_env_info(env)->oti_ladvise_buf.lb_buf = kvzalloc(buf_size,
++								     GFP_NOFS);
++		if (likely(osc_env_info(env)->oti_ladvise_buf.lb_buf))
++			osc_env_info(env)->oti_ladvise_buf.lb_len = buf_size;
++	}
++
++	ladvise_hdr = osc_env_info(env)->oti_ladvise_buf.lb_buf;
++	if (!ladvise_hdr)
++		return -ENOMEM;
++
++	memset(ladvise_hdr, 0, buf_size);
++	ladvise_hdr->lah_magic = LADVISE_MAGIC;
++	ladvise_hdr->lah_count = num_advise;
++	ladvise_hdr->lah_flags = lio->li_flags;
++
++	memset(oa, 0, sizeof(*oa));
++	oa->o_oi = loi->loi_oi;
++	oa->o_valid = OBD_MD_FLID;
++	obdo_set_parent_fid(oa, lio->li_fid);
++
++	ladvise = ladvise_hdr->lah_advise;
++	ladvise->lla_start = lio->li_start;
++	ladvise->lla_end = lio->li_end;
++	ladvise->lla_advice = lio->li_advice;
++
++	if (lio->li_flags & LF_ASYNC) {
++		result = osc_ladvise_base(osc_export(cl2osc(obj)), oa,
++					  ladvise_hdr, NULL, NULL, NULL);
++	} else {
++		init_completion(&cbargs->opc_sync);
++		result = osc_ladvise_base(osc_export(cl2osc(obj)), oa,
++					  ladvise_hdr, osc_async_upcall,
++					  cbargs, PTLRPCD_SET);
++		cbargs->opc_rpc_sent = !result;
++	}
 +	return result;
 +}
 +
- static ssize_t ll_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
- {
- 	struct lu_env      *env;
- 	struct vvp_io_args *args;
- 	ssize_t	     result;
- 	u16 refcheck;
-+	ssize_t rc2;
- 
- 	env = cl_env_get(&refcheck);
- 	if (IS_ERR(env))
- 		return PTR_ERR(env);
- 
-+	result = ll_do_fast_read(env, iocb, to);
-+	if (result < 0 || iov_iter_count(to) == 0)
-+		goto out;
-+
- 	args = ll_env_args(env);
- 	args->u.normal.via_iter = to;
- 	args->u.normal.via_iocb = iocb;
- 
--	result = ll_file_io_generic(env, args, iocb->ki_filp, CIT_READ,
--				    &iocb->ki_pos, iov_iter_count(to));
-+	rc2 = ll_file_io_generic(env, args, iocb->ki_filp, CIT_READ,
-+				 &iocb->ki_pos, iov_iter_count(to));
-+	if (rc2 > 0)
-+		result += rc2;
-+	else if (result == 0)
-+		result = rc2;
-+
-+out:
- 	cl_env_put(env, &refcheck);
- 	return result;
- }
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 8770d10..86914c9 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -395,6 +395,7 @@ enum stats_track_type {
- #define LL_SBI_ALWAYS_PING	0x200000 /* always ping even if server
- 					  * suppress_pings
- 					  */
-+#define LL_SBI_FAST_READ	0x400000 /* fast read support */
- 
- #define LL_SBI_FLAGS {	\
- 	"nolck",	\
-@@ -419,6 +420,7 @@ enum stats_track_type {
- 	"xattr_cache",	\
- 	"norootsquash",	\
- 	"always_ping",	\
-+	"fast_read",    \
- }
- 
- /*
-@@ -646,6 +648,11 @@ static inline int ll_need_32bit_api(struct ll_sb_info *sbi)
- #endif
- }
- 
-+static inline bool ll_sbi_has_fast_read(struct ll_sb_info *sbi)
++static void osc_io_ladvise_end(const struct lu_env *env,
++			       const struct cl_io_slice *slice)
 +{
-+	return !!(sbi->ll_flags & LL_SBI_FAST_READ);
++	struct cl_io *io = slice->cis_io;
++	struct osc_io *oio = cl2osc_io(env, slice);
++	struct osc_async_cbargs *cbargs = &oio->oi_cbarg;
++	struct cl_ladvise_io *lio = &io->u.ci_ladvise;
++	int result = 0;
++
++	if ((!(lio->li_flags & LF_ASYNC)) && cbargs->opc_rpc_sent) {
++		wait_for_completion(&cbargs->opc_sync);
++		result = cbargs->opc_rc;
++	}
++	slice->cis_io->ci_result = result;
 +}
 +
- void ll_ras_enter(struct file *f);
- 
- /* llite/lcommon_misc.c */
-@@ -678,6 +685,8 @@ enum {
- 	LPROC_LL_OPEN,
- 	LPROC_LL_RELEASE,
- 	LPROC_LL_MAP,
-+	LPROC_LL_FAULT,
-+	LPROC_LL_MKWRITE,
- 	LPROC_LL_LLSEEK,
- 	LPROC_LL_FSYNC,
- 	LPROC_LL_READDIR,
-@@ -732,9 +741,12 @@ int ll_md_blocking_ast(struct ldlm_lock *lock, struct ldlm_lock_desc *desc,
- int ll_readpage(struct file *file, struct page *page);
- void ll_readahead_init(struct inode *inode, struct ll_readahead_state *ras);
- int vvp_io_write_commit(const struct lu_env *env, struct cl_io *io);
--struct ll_cl_context *ll_cl_find(struct file *file);
--void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io);
-+
-+enum lcc_type;
-+void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io,
-+	       enum lcc_type type);
- void ll_cl_remove(struct file *file, const struct lu_env *env);
-+struct ll_cl_context *ll_cl_find(struct file *file);
- 
- extern const struct address_space_operations ll_aops;
- 
-@@ -891,15 +903,22 @@ struct vvp_io_args {
- 	} u;
+ static void osc_io_end(const struct lu_env *env,
+ 		       const struct cl_io_slice *slice)
+ {
+@@ -891,6 +965,11 @@ static void osc_io_end(const struct lu_env *env,
+ 			.cio_end    = osc_io_fsync_end,
+ 			.cio_fini   = osc_io_fini
+ 		},
++		[CIT_LADVISE] = {
++			.cio_start	= osc_io_ladvise_start,
++			.cio_end	= osc_io_ladvise_end,
++			.cio_fini	= osc_io_fini
++		},
+ 		[CIT_MISC] = {
+ 			.cio_fini   = osc_io_fini
+ 		}
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index ce073b6..0286f25 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -91,6 +91,12 @@ struct osc_fsync_args {
+ 	void		*fa_cookie;
  };
  
-+enum lcc_type {
-+	LCC_RW = 1,
-+	LCC_MMAP
++struct osc_ladvise_args {
++	struct obdo		*la_oa;
++	obd_enqueue_update_f	 la_upcall;
++	void			*la_cookie;
 +};
 +
- struct ll_cl_context {
- 	struct list_head	 lcc_list;
- 	void	   *lcc_cookie;
- 	const struct lu_env	*lcc_env;
- 	struct cl_io   *lcc_io;
- 	struct cl_page *lcc_page;
-+	enum lcc_type		 lcc_type;
- };
+ struct osc_enqueue_args {
+ 	struct obd_export	*oa_exp;
+ 	enum ldlm_type		oa_type;
+@@ -269,6 +275,94 @@ int osc_setattr_async(struct obd_export *exp, struct obdo *oa,
+ 	return 0;
+ }
  
- struct ll_thread_info {
-+	struct iov_iter		lti_iter;
- 	struct vvp_io_args   lti_args;
- 	struct ra_io_arg     lti_ria;
- 	struct ll_cl_context lti_io_ctx;
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 90dff0a..6e47e5b 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -122,6 +122,7 @@ static struct ll_sb_info *ll_init_sbi(struct super_block *sb)
- 	atomic_set(&sbi->ll_sa_running, 0);
- 	atomic_set(&sbi->ll_agl_total, 0);
- 	sbi->ll_flags |= LL_SBI_AGL_ENABLED;
-+	sbi->ll_flags |= LL_SBI_FAST_READ;
- 
- 	/* root squash */
- 	sbi->ll_squash.rsi_uid = 0;
-diff --git a/drivers/staging/lustre/lustre/llite/llite_mmap.c b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-index 8cb8036..023d62e 100644
---- a/drivers/staging/lustre/lustre/llite/llite_mmap.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_mmap.c
-@@ -277,6 +277,28 @@ static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
- 	if (IS_ERR(env))
- 		return VM_FAULT_ERROR;
- 
-+	if (ll_sbi_has_fast_read(ll_i2sbi(file_inode(vma->vm_file)))) {
-+		/* do fast fault */
-+		ll_cl_add(vma->vm_file, env, NULL, LCC_MMAP);
-+		fault_ret = filemap_fault(vmf);
-+		ll_cl_remove(vma->vm_file, env);
++static int osc_ladvise_interpret(const struct lu_env *env,
++				 struct ptlrpc_request *req,
++				 void *arg, int rc)
++{
++	struct osc_ladvise_args *la = arg;
++	struct ost_body *body;
 +
-+		/*
-+		 * - If there is no error, then the page was found in cache and
-+		 *   uptodate;
-+		 * - If VM_FAULT_RETRY is set, the page existed but failed to
-+		 *   lock. It will return to kernel and retry;
-+		 * - Otherwise, it should try normal fault under DLM lock.
-+		 */
-+		if ((fault_ret & VM_FAULT_RETRY) ||
-+		    !(fault_ret & VM_FAULT_ERROR)) {
-+			result = 0;
-+			goto out;
-+		}
++	if (rc)
++		goto out;
 +
-+		fault_ret = 0;
++	body = req_capsule_server_get(&req->rq_pill, &RMF_OST_BODY);
++	if (!body) {
++		rc = -EPROTO;
++		goto out;
 +	}
 +
- 	io = ll_fault_io_init(env, vma, vmf->pgoff, &ra_flags);
- 	if (IS_ERR(io)) {
- 		fault_ret = to_fault_error(PTR_ERR(io));
-@@ -293,7 +315,7 @@ static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
- 		vio->u.fault.ft_flags_valid = false;
- 
- 		/* May call ll_readpage() */
--		ll_cl_add(vma->vm_file, env, io);
-+		ll_cl_add(vma->vm_file, env, io, LCC_MMAP);
- 
- 		result = cl_io_loop(env, io);
- 
-@@ -326,6 +348,7 @@ static vm_fault_t ll_fault0(struct vm_area_struct *vma, struct vm_fault *vmf)
- 
- static vm_fault_t ll_fault(struct vm_fault *vmf)
- {
-+	struct vm_area_struct *vma = vmf->vma;
- 	int count = 0;
- 	bool printed = false;
- 	vm_fault_t result;
-@@ -338,10 +361,12 @@ static vm_fault_t ll_fault(struct vm_fault *vmf)
- 	siginitsetinv(&new, sigmask(SIGKILL) | sigmask(SIGTERM));
- 	sigprocmask(SIG_BLOCK, &new, &old);
- 
-+	ll_stats_ops_tally(ll_i2sbi(file_inode(vma->vm_file)),
-+			   LPROC_LL_FAULT, 1);
-+
- restart:
- 	result = ll_fault0(vmf->vma, vmf);
--	LASSERT(!(result & VM_FAULT_LOCKED));
--	if (result == 0) {
-+	if (!(result & (VM_FAULT_RETRY | VM_FAULT_ERROR | VM_FAULT_LOCKED))) {
- 		struct page *vmpage = vmf->page;
- 
- 		/* check if this page has been truncated */
-@@ -375,6 +400,9 @@ static vm_fault_t ll_page_mkwrite(struct vm_fault *vmf)
- 	int err;
- 	vm_fault_t ret;
- 
-+	ll_stats_ops_tally(ll_i2sbi(file_inode(vma->vm_file)),
-+			   LPROC_LL_MKWRITE, 1);
-+
- 	file_update_time(vma->vm_file);
- 	do {
- 		retry = false;
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 49bf1b7..9dcbe64 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -872,6 +872,41 @@ static ssize_t xattr_cache_store(struct kobject *kobj,
- }
- LUSTRE_RW_ATTR(xattr_cache);
- 
-+static ssize_t fast_read_show(struct kobject *kobj,
-+			      struct attribute *attr,
-+			      char *buf)
-+{
-+	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
-+					      ll_kobj);
-+
-+	return sprintf(buf, "%u\n", !!(sbi->ll_flags & LL_SBI_FAST_READ));
++	*la->la_oa = body->oa;
++out:
++	rc = la->la_upcall(la->la_cookie, rc);
++	return rc;
 +}
 +
-+static ssize_t fast_read_store(struct kobject *kobj,
-+			       struct attribute *attr,
-+			       const char *buffer,
-+			       size_t count)
++/**
++ * If rqset is NULL, do not wait for response. Upcall and cookie could also
++ * be NULL in this case
++ */
++int osc_ladvise_base(struct obd_export *exp, struct obdo *oa,
++		     struct ladvise_hdr *ladvise_hdr,
++		     obd_enqueue_update_f upcall, void *cookie,
++		     struct ptlrpc_request_set *rqset)
 +{
-+	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
-+					      ll_kobj);
-+	bool val;
++	struct lu_ladvise *ladvise = ladvise_hdr->lah_advise;
++	int num_advise = ladvise_hdr->lah_count;
++	struct ladvise_hdr *req_ladvise_hdr;
++	struct lu_ladvise *req_ladvise;
++	struct osc_ladvise_args *la;
++	struct ptlrpc_request *req;
++	struct ost_body *body;
 +	int rc;
 +
-+	rc = kstrtobool(buffer, &val);
-+	if (rc)
++	req = ptlrpc_request_alloc(class_exp2cliimp(exp), &RQF_OST_LADVISE);
++	if (!req)
++		return -ENOMEM;
++
++	req_capsule_set_size(&req->rq_pill, &RMF_OST_LADVISE, RCL_CLIENT,
++			     num_advise * sizeof(*ladvise));
++	rc = ptlrpc_request_pack(req, LUSTRE_OST_VERSION, OST_LADVISE);
++	if (rc) {
++		ptlrpc_request_free(req);
 +		return rc;
++	}
++	req->rq_request_portal = OST_IO_PORTAL;
++	ptlrpc_at_set_req_timeout(req);
 +
-+	spin_lock(&sbi->ll_lock);
-+	if (val)
-+		sbi->ll_flags |= LL_SBI_FAST_READ;
-+	else
-+		sbi->ll_flags &= ~LL_SBI_FAST_READ;
-+	spin_unlock(&sbi->ll_lock);
++	body = req_capsule_client_get(&req->rq_pill, &RMF_OST_BODY);
++	LASSERT(body);
++	lustre_set_wire_obdo(&req->rq_import->imp_connect_data, &body->oa,
++			     oa);
 +
-+	return count;
-+}
-+LUSTRE_RW_ATTR(fast_read);
++	req_ladvise_hdr = req_capsule_client_get(&req->rq_pill,
++						 &RMF_OST_LADVISE_HDR);
++	memcpy(req_ladvise_hdr, ladvise_hdr, sizeof(*ladvise_hdr));
 +
- static int ll_unstable_stats_seq_show(struct seq_file *m, void *v)
- {
- 	struct super_block     *sb    = m->private;
-@@ -1032,6 +1067,7 @@ static ssize_t ll_nosquash_nids_seq_write(struct file *file,
- 	&lustre_attr_max_easize.attr,
- 	&lustre_attr_default_easize.attr,
- 	&lustre_attr_xattr_cache.attr,
-+	&lustre_attr_fast_read.attr,
- 	NULL,
- };
- 
-@@ -1068,6 +1104,8 @@ static void llite_sb_release(struct kobject *kobj)
- 	{ LPROC_LL_OPEN,	   LPROCFS_TYPE_REGS, "open" },
- 	{ LPROC_LL_RELEASE,	LPROCFS_TYPE_REGS, "close" },
- 	{ LPROC_LL_MAP,	    LPROCFS_TYPE_REGS, "mmap" },
-+	{ LPROC_LL_FAULT,		LPROCFS_TYPE_REGS, "page_fault" },
-+	{ LPROC_LL_MKWRITE,		LPROCFS_TYPE_REGS, "page_mkwrite" },
- 	{ LPROC_LL_LLSEEK,	 LPROCFS_TYPE_REGS, "seek" },
- 	{ LPROC_LL_FSYNC,	  LPROCFS_TYPE_REGS, "fsync" },
- 	{ LPROC_LL_READDIR,	LPROCFS_TYPE_REGS, "readdir" },
-diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
-index 3e008ce..59747da 100644
---- a/drivers/staging/lustre/lustre/llite/rw.c
-+++ b/drivers/staging/lustre/lustre/llite/rw.c
-@@ -1067,7 +1067,8 @@ struct ll_cl_context *ll_cl_find(struct file *file)
- 	return found;
- }
- 
--void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io)
-+void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io,
-+	       enum lcc_type type)
- {
- 	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
- 	struct ll_cl_context *lcc = &ll_env_info(env)->lti_io_ctx;
-@@ -1077,6 +1078,7 @@ void ll_cl_add(struct file *file, const struct lu_env *env, struct cl_io *io)
- 	lcc->lcc_cookie = current;
- 	lcc->lcc_env = env;
- 	lcc->lcc_io = io;
-+	lcc->lcc_type = type;
- 
- 	write_lock(&fd->fd_lock);
- 	list_add(&lcc->lcc_list, &fd->fd_lccs);
-@@ -1094,10 +1096,10 @@ void ll_cl_remove(struct file *file, const struct lu_env *env)
- }
- 
- static int ll_io_read_page(const struct lu_env *env, struct cl_io *io,
--			   struct cl_page *page)
-+			   struct cl_page *page, struct file *file)
- {
- 	struct inode *inode = vvp_object_inode(page->cp_obj);
--	struct ll_file_data *fd = vvp_env_io(env)->vui_fd;
-+	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
- 	struct ll_readahead_state *ras = &fd->fd_ras;
- 	struct cl_2queue *queue  = &io->ci_queue;
- 	struct ll_sb_info *sbi = ll_i2sbi(inode);
-@@ -1109,7 +1111,8 @@ static int ll_io_read_page(const struct lu_env *env, struct cl_io *io,
- 	uptodate = vpg->vpg_defer_uptodate;
- 
- 	if (sbi->ll_ra_info.ra_max_pages_per_file > 0 &&
--	    sbi->ll_ra_info.ra_max_pages > 0) {
-+	    sbi->ll_ra_info.ra_max_pages > 0 &&
-+	    !vpg->vpg_ra_updated) {
- 		struct vvp_io *vio = vvp_env_io(env);
- 		enum ras_update_flags flags = 0;
- 
-@@ -1168,13 +1171,66 @@ int ll_readpage(struct file *file, struct page *vmpage)
- 
- 	env = lcc->lcc_env;
- 	io = lcc->lcc_io;
--	LASSERT(io->ci_state == CIS_IO_GOING);
-+	if (!io) { /* fast read */
-+		struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
-+		struct ll_readahead_state *ras = &fd->fd_ras;
-+		struct inode *inode = file_inode(file);
-+		struct vvp_page *vpg;
++	req_ladvise = req_capsule_client_get(&req->rq_pill, &RMF_OST_LADVISE);
++	memcpy(req_ladvise, ladvise, sizeof(*ladvise) * num_advise);
++	ptlrpc_request_set_replen(req);
 +
-+		result = -ENODATA;
-+
-+		/*
-+		 * TODO: need to verify the layout version to make sure
-+		 * the page is not invalid due to layout change.
-+		 */
-+		page = cl_vmpage_page(vmpage, clob);
-+		if (!page) {
-+			unlock_page(vmpage);
-+			return result;
-+		}
-+
-+		vpg = cl2vvp_page(cl_object_page_slice(page->cp_obj, page));
-+		if (vpg->vpg_defer_uptodate) {
-+			enum ras_update_flags flags = LL_RAS_HIT;
-+
-+			if (lcc->lcc_type == LCC_MMAP)
-+				flags |= LL_RAS_MMAP;
-+
-+			/*
-+			 * For fast read, it updates read ahead state only
-+			 * if the page is hit in cache because non cache page
-+			 * case will be handled by slow read later.
-+			 */
-+			ras_update(ll_i2sbi(inode), inode, ras, vvp_index(vpg),
-+				   flags);
-+			/* avoid duplicate ras_update() call */
-+			vpg->vpg_ra_updated = 1;
-+
-+			/*
-+			 * Check if we can issue a readahead RPC, if that is
-+			 * the case, we can't do fast IO because we will need
-+			 * a cl_io to issue the RPC.
-+			 */
-+			if (ras->ras_window_start + ras->ras_window_len <
-+			    ras->ras_next_readahead + PTLRPC_MAX_BRW_PAGES) {
-+				/* export the page and skip io stack */
-+				vpg->vpg_ra_used = 1;
-+				cl_page_export(env, page, 1);
-+				result = 0;
-+			}
-+		}
-+
-+		unlock_page(vmpage);
-+		cl_page_put(env, page);
-+		return result;
++	if (!rqset) {
++		/* Do not wait for response. */
++		ptlrpcd_add_req(req);
++		return 0;
 +	}
 +
- 	page = cl_page_find(env, clob, vmpage->index, vmpage, CPT_CACHEABLE);
- 	if (!IS_ERR(page)) {
- 		LASSERT(page->cp_type == CPT_CACHEABLE);
- 		if (likely(!PageUptodate(vmpage))) {
- 			cl_page_assume(env, io, page);
--			result = ll_io_read_page(env, io, page);
-+			result = ll_io_read_page(env, io, page, file);
- 		} else {
- 			/* Page from a non-object file. */
- 			unlock_page(vmpage);
-diff --git a/drivers/staging/lustre/lustre/llite/vvp_internal.h b/drivers/staging/lustre/lustre/llite/vvp_internal.h
-index 7d3abb4..70d62bf 100644
---- a/drivers/staging/lustre/lustre/llite/vvp_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/vvp_internal.h
-@@ -225,6 +225,7 @@ struct vvp_object {
- struct vvp_page {
- 	struct cl_page_slice vpg_cl;
- 	unsigned int	vpg_defer_uptodate:1,
-+			vpg_ra_updated:1,
- 			vpg_ra_used:1;
- 	/** VM page */
- 	struct page	  *vpg_page;
++	req->rq_interpret_reply = osc_ladvise_interpret;
++	BUILD_BUG_ON(sizeof(*la) > sizeof(req->rq_async_args));
++	la = ptlrpc_req_async_args(req);
++	la->la_oa = oa;
++	la->la_upcall = upcall;
++	la->la_cookie = cookie;
++
++	if (rqset == PTLRPCD_SET)
++		ptlrpcd_add_req(req);
++	else
++		ptlrpc_set_add_req(rqset, req);
++
++	return 0;
++}
++
+ static int osc_create(const struct lu_env *env, struct obd_export *exp,
+ 		      struct obdo *oa)
+ {
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/layout.c b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+index 417d4a1..6ef8789 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/layout.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/layout.c
+@@ -605,6 +605,13 @@
+ 	&RMF_FIEMAP_VAL
+ };
+ 
++static const struct req_msg_field *ost_ladvise[] = {
++	&RMF_PTLRPC_BODY,
++	&RMF_OST_BODY,
++	&RMF_OST_LADVISE_HDR,
++	&RMF_OST_LADVISE,
++};
++
+ static const struct req_msg_field *ost_get_fiemap_server[] = {
+ 	&RMF_PTLRPC_BODY,
+ 	&RMF_FIEMAP_VAL
+@@ -716,6 +723,7 @@
+ 	&RQF_OST_GET_INFO_LAST_FID,
+ 	&RQF_OST_SET_INFO_LAST_FID,
+ 	&RQF_OST_GET_INFO_FIEMAP,
++	&RQF_OST_LADVISE,
+ 	&RQF_LDLM_ENQUEUE,
+ 	&RQF_LDLM_ENQUEUE_LVB,
+ 	&RQF_LDLM_CONVERT,
+@@ -1110,6 +1118,18 @@ struct req_msg_field RMF_SWAP_LAYOUTS =
+ 	DEFINE_MSGF("swap_layouts", 0, sizeof(struct  mdc_swap_layouts),
+ 		    lustre_swab_swap_layouts, NULL);
+ EXPORT_SYMBOL(RMF_SWAP_LAYOUTS);
++
++struct req_msg_field RMF_OST_LADVISE_HDR =
++	DEFINE_MSGF("ladvise_request", 0, sizeof(struct ladvise_hdr),
++		    lustre_swab_ladvise_hdr, NULL);
++EXPORT_SYMBOL(RMF_OST_LADVISE_HDR);
++
++struct req_msg_field RMF_OST_LADVISE =
++	DEFINE_MSGF("ladvise_request", RMF_F_STRUCT_ARRAY,
++		    sizeof(struct lu_ladvise),
++		    lustre_swab_ladvise, NULL);
++EXPORT_SYMBOL(RMF_OST_LADVISE);
++
+ /*
+  * Request formats.
+  */
+@@ -1552,6 +1572,10 @@ struct req_format RQF_OST_GET_INFO_FIEMAP =
+ 			ost_get_fiemap_server);
+ EXPORT_SYMBOL(RQF_OST_GET_INFO_FIEMAP);
+ 
++struct req_format RQF_OST_LADVISE =
++	DEFINE_REQ_FMT0("OST_LADVISE", ost_ladvise, ost_body_only);
++EXPORT_SYMBOL(RQF_OST_LADVISE);
++
+ /* Convenience macro */
+ #define FMT_FIELD(fmt, i, j) ((fmt)->rf_fields[(i)].d[(j)])
+ 
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+index a61e800..52b980c 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c
+@@ -66,6 +66,7 @@
+ 	{ OST_QUOTACHECK,   "ost_quotacheck" },
+ 	{ OST_QUOTACTL,     "ost_quotactl" },
+ 	{ OST_QUOTA_ADJUST_QUNIT, "ost_quota_adjust_qunit" },
++	{ OST_LADVISE,			"ost_ladvise" },
+ 	{ MDS_GETATTR,      "mds_getattr" },
+ 	{ MDS_GETATTR_NAME, "mds_getattr_lock" },
+ 	{ MDS_CLOSE,	"mds_close" },
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+index 0337b33..468fa69 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/pack_generic.c
+@@ -2309,3 +2309,22 @@ void lustre_swab_close_data(struct close_data *cd)
+ 	lustre_swab_lu_fid(&cd->cd_fid);
+ 	__swab64s(&cd->cd_data_version);
+ }
++
++void lustre_swab_ladvise(struct lu_ladvise *ladvise)
++{
++	swab64s(&ladvise->lla_start);
++	swab64s(&ladvise->lla_end);
++	swab64s(&ladvise->lla_advice);
++	BUILD_BUG_ON(!offsetof(typeof(*ladvise), lla_padding));
++}
++EXPORT_SYMBOL(lustre_swab_ladvise);
++
++void lustre_swab_ladvise_hdr(struct ladvise_hdr *ladvise_hdr)
++{
++	swab32s(&ladvise_hdr->lah_magic);
++	swab32s(&ladvise_hdr->lah_count);
++	swab64s(&ladvise_hdr->lah_flags);
++	BUILD_BUG_ON(!offsetof(typeof(*ladvise_hdr), lah_padding1));
++	BUILD_BUG_ON(!offsetof(typeof(*ladvise_hdr), lah_padding2));
++}
++EXPORT_SYMBOL(lustre_swab_ladvise_hdr);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+index 2b3608c..5a68de5 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+@@ -101,7 +101,9 @@ void lustre_assert_wire_constants(void)
+ 		 (long long)OST_QUOTACTL);
+ 	LASSERTF(OST_QUOTA_ADJUST_QUNIT == 20, "found %lld\n",
+ 		 (long long)OST_QUOTA_ADJUST_QUNIT);
+-	LASSERTF(OST_LAST_OPC == 21, "found %lld\n",
++	LASSERTF(OST_LADVISE == 21, "found %lld\n",
++		 (long long)OST_LADVISE);
++	LASSERTF(OST_LAST_OPC == 22, "found %lld\n",
+ 		 (long long)OST_LAST_OPC);
+ 	LASSERTF(OBD_OBJECT_EOF == 0xffffffffffffffffULL, "found 0x%.16llxULL\n",
+ 		 OBD_OBJECT_EOF);
+@@ -4207,4 +4209,54 @@ void lustre_assert_wire_constants(void)
+ 	LASSERTF(sizeof(((struct hsm_user_import *)0)->hui_archive_id) == 4,
+ 		 "found %lld\n",
+ 	      (long long)sizeof(((struct hsm_user_import *)0)->hui_archive_id));
++
++	/* Checks for struct lu_ladvise */
++	LASSERTF((int)sizeof(struct lu_ladvise) == 32, "found %lld\n",
++		 (long long)(int)sizeof(struct lu_ladvise));
++	LASSERTF((int)offsetof(struct lu_ladvise, lla_advice) == 0, "found %lld\n",
++		 (long long)(int)offsetof(struct lu_ladvise, lla_advice));
++	LASSERTF((int)sizeof(((struct lu_ladvise *)0)->lla_advice) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct lu_ladvise *)0)->lla_advice));
++	LASSERTF((int)offsetof(struct lu_ladvise, lla_start) == 8, "found %lld\n",
++		 (long long)(int)offsetof(struct lu_ladvise, lla_start));
++	LASSERTF((int)sizeof(((struct lu_ladvise *)0)->lla_start) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct lu_ladvise *)0)->lla_start));
++	LASSERTF((int)offsetof(struct lu_ladvise, lla_end) == 16, "found %lld\n",
++		 (long long)(int)offsetof(struct lu_ladvise, lla_end));
++	LASSERTF((int)sizeof(((struct lu_ladvise *)0)->lla_end) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct lu_ladvise *)0)->lla_end));
++	LASSERTF((int)offsetof(struct lu_ladvise, lla_padding) == 24, "found %lld\n",
++		 (long long)(int)offsetof(struct lu_ladvise, lla_padding));
++	LASSERTF((int)sizeof(((struct lu_ladvise *)0)->lla_padding) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct lu_ladvise *)0)->lla_padding));
++
++	/* Checks for struct ladvise_hdr */
++	LASSERTF(LADVISE_MAGIC == 0x1ADF1CE0, "found 0x%.8x\n",
++		 LADVISE_MAGIC);
++	LASSERTF((int)sizeof(struct ladvise_hdr) == 32, "found %lld\n",
++		 (long long)(int)sizeof(struct ladvise_hdr));
++	LASSERTF((int)offsetof(struct ladvise_hdr, lah_magic) == 0, "found %lld\n",
++		 (long long)(int)offsetof(struct ladvise_hdr, lah_magic));
++	LASSERTF((int)sizeof(((struct ladvise_hdr *)0)->lah_magic) == 4, "found %lld\n",
++		 (long long)(int)sizeof(((struct ladvise_hdr *)0)->lah_magic));
++	LASSERTF((int)offsetof(struct ladvise_hdr, lah_count) == 4, "found %lld\n",
++		 (long long)(int)offsetof(struct ladvise_hdr, lah_count));
++	LASSERTF((int)sizeof(((struct ladvise_hdr *)0)->lah_count) == 4, "found %lld\n",
++		 (long long)(int)sizeof(((struct ladvise_hdr *)0)->lah_count));
++	LASSERTF((int)offsetof(struct ladvise_hdr, lah_flags) == 8, "found %lld\n",
++		 (long long)(int)offsetof(struct ladvise_hdr, lah_flags));
++	LASSERTF((int)sizeof(((struct ladvise_hdr *)0)->lah_flags) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct ladvise_hdr *)0)->lah_flags));
++	LASSERTF((int)offsetof(struct ladvise_hdr, lah_padding1) == 16, "found %lld\n",
++		 (long long)(int)offsetof(struct ladvise_hdr, lah_padding1));
++	LASSERTF((int)sizeof(((struct ladvise_hdr *)0)->lah_padding1) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct ladvise_hdr *)0)->lah_padding1));
++	LASSERTF((int)offsetof(struct ladvise_hdr, lah_padding2) == 24, "found %lld\n",
++		 (long long)(int)offsetof(struct ladvise_hdr, lah_padding2));
++	LASSERTF((int)sizeof(((struct ladvise_hdr *)0)->lah_padding2) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct ladvise_hdr *)0)->lah_padding2));
++	LASSERTF((int)offsetof(struct ladvise_hdr, lah_advise) == 32, "found %lld\n",
++		 (long long)(int)offsetof(struct ladvise_hdr, lah_advise));
++	LASSERTF((int)sizeof(((struct ladvise_hdr *)0)->lah_advise) == 0, "found %lld\n",
++		 (long long)(int)sizeof(((struct ladvise_hdr *)0)->lah_advise));
+ }
 -- 
 1.8.3.1
