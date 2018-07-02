@@ -1,120 +1,116 @@
-From: NeilBrown <neilb@suse.com>
-Date: Mon, 02 Jul 2018 12:27:24 +1000
-Subject: [lustre-devel] [PATCH v3 04/13] lustre: libcfs: fix
- cfs_print_to_console()
-In-Reply-To: <alpine.LFD.2.21.1806291716050.26339@casper.infradead.org>
-References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
- <1530128322-32535-5-git-send-email-jsimmons@infradead.org>
- <FD87D2B8-27A8-45DF-9C7C-BA33CF940C1D@whamcloud.com>
- <alpine.LFD.2.21.1806291716050.26339@casper.infradead.org>
-Message-ID: <87h8li2wz7.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon,  2 Jul 2018 19:24:17 -0400
+Subject: [lustre-devel] [PATCH 00/18] lustre: missing updates from lustre 2.9
+Message-ID: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Jun 29 2018, James Simmons wrote:
+This patch set fills in the known missing pieces from the Lustre
+2.9 release. With these patches this brings us to the pre-2.10
+development cycle. The grant allocation fixes were missing as
+well as security hole closes. The rest are small changes in
+addition to support for filesets and ladvise feature.
 
->> > The original code for cfs_print_to_console() used printk() and
->> > used tricks to select which printk level to use. Later a cleanup
->> > patch landed the just converted printk directly to pr_info which
->> > is not exactly correct. Instead of converting back to printk lets
->> > move everything to pr_* type functions which simplify the code.
->> > This allows us to fold both dbghdr_to_err_string() and the
->> > function dbghdr_to_info_string() into cfs_print_to_console().
->> > 
->> > Signed-off-by: James Simmons <jsimmons@infradead.org>
->> > ---
->> > .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 55 ++++++----------------
->> > 1 file changed, 14 insertions(+), 41 deletions(-)
->> > 
->> > diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
->> > index 3af7722..c1747c4 100644
->> > --- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
->> > +++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
->> > @@ -140,54 +140,27 @@ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
->> > void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
->> > 			  const char *buf, int len, const char *file,
->> > 			  const char *fn)
->> > {
->> > +	char *prefix = "Lustre";
->> > +
->> > +	if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
->> > +		prefix = "LNet";
->> > 
->> > -	if (mask & D_EMERG) {
->> > -		prefix = dbghdr_to_err_string(hdr);
->> > -		ptype = KERN_EMERG;
->> > +	if (mask & (D_CONSOLE | libcfs_printk)) {
->> 
->> This check is broken.  The default value of libcfs_printk (the mask
->> that controls which messages should be printed to the console, and
->> which ones should only be logged into the internal buffer) is:
->> 
->>     #define D_CANTMASK (D_ERROR | D_EMERG | D_WARNING | D_CONSOLE)
->> 
->> so that means virtually every console message will be printed with
->> pr_info() because this is matched first, instead of pr_emerg() or
->> pr_err() below.
->> 
->> That is why the previous code was matching D_EMERG and D_ERROR first,
->> then D_WARNING, and (D_CONSOLE | libcfs_printk) at the end.
->
-> So to do this right we need:
->
-> static void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
->                                  const char *buf, int len, const char 
-> *file,
->                                  const char *fn)
-> {
->         char *prefix = "Lustre";
->
->         if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
->                 prefix = "LNet";
->
->         if (mask & D_CONSOLE) {
->                 if (mask & D_EMERG) {
->                         pr_emerg("%sError: %.*s", prefix, len, buf);
->                 } else if (mask & D_ERROR) {
->                         pr_err("%sError: %.*s", prefix, len, buf);
->                 } else if (mask & D_WARNING) {
->                         pr_warn("%s: %.*s", prefix, len, buf);
->                 } else if (mask & libcfs_printk) {
->                         pr_info("%s: %.*s", prefix, len, buf);
->                 }
->         } else {
->                 if (mask & D_EMERG) {
->                         pr_emerg("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
->                                  hdr->ph_pid, hdr->ph_extern_pid, file,
->                                  hdr->ph_line_num, fn, len, buf);
->                 } else if (mask & D_ERROR) {
->                         pr_err("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
->                                hdr->ph_pid, hdr->ph_extern_pid, file,
->                                hdr->ph_line_num, fn, len, buf);
->                 } else if (mask & D_WARNING) {
->                         pr_warn("%s: %d:%d:(%s:%d:%s()) %.*s", prefix,
->                                 hdr->ph_pid, hdr->ph_extern_pid, file,
->                                 hdr->ph_line_num, fn, len, buf);
->                 } else if (mask & libcfs_printk) {
->                         pr_info("%s: %.*s", prefix, len, buf);
->                 }
->         }
-> }
+Alexander Boyko (1):
+  lustre: obd: add callback for llog_cat_process_or_fork
 
-That doesn't look right either.
-The original code would *always* print something.
-This code looks like it might not (e.g. for mask == 0).
+Bobi Jam (1):
+  lustre: osc: max_pages_per_rpc should be chunk size aligned
 
-What is "D_CONSOLE" suppose to mean?  It seems to me "make the messages
-less verbose" and it isn't clear to me that what is called "D_CONSOLE".
+Fan Yong (1):
+  lustre: ptlrpc: properly set "rq_xid" for 4MB IO
 
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180702/de30cd2c/attachment.sig>
+Henri Doreau (1):
+  lustre: llite: restore fd_och when putting lease
+
+James Simmons (2):
+  lustre: libcfs: restore original behavior in cfs_str2num_check
+  lustre: update version to 2.8.99
+
+Jian Yu (1):
+  lustre: mount: fix lmd_parse() to handle new delimiters
+
+Jinshan Xiong (1):
+  lustre: llite: fast read implementation
+
+Johann Lombardi (1):
+  lustre: grant: add support for OBD_CONNECT_GRANT_PARAM
+
+John L. Hammond (3):
+  lustre: obd: rename md_getstatus() to md_get_root()
+  lustre: obd: reserve connection flag OBD_CONNECT2_FILE_SECCTX
+  lustre: security: send file security context for creates
+
+Lai Siyao (1):
+  lustre: fileset: add fileset mount support
+
+Li Xi (3):
+  lustre: ladvise: Add feature of giving file access advices
+  lustre: ladvise: Add willread advice support for ladvise
+  lustre: ladvise: Add dontneed advice support for ladvise
+
+Niu Yawei (1):
+  lustre: ldlm: reduce mem footprint of ldlm_resource
+
+Patrick Farrell (1):
+  lustre: llite: ladvise protocol changes
+
+ .../lustre/include/uapi/linux/lustre/lustre_idl.h  |  52 ++-
+ .../lustre/include/uapi/linux/lustre/lustre_user.h |  51 +++
+ .../lustre/include/uapi/linux/lustre/lustre_ver.h  |   4 +-
+ drivers/staging/lustre/lnet/libcfs/libcfs_string.c |  17 +-
+ drivers/staging/lustre/lustre/include/cl_object.h  |  13 +
+ .../staging/lustre/lustre/include/lustre_disk.h    |   2 +
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |  24 +-
+ .../staging/lustre/lustre/include/lustre_import.h  |   1 +
+ .../lustre/lustre/include/lustre_req_layout.h      |  10 +-
+ .../staging/lustre/lustre/include/lustre_swab.h    |   2 +
+ drivers/staging/lustre/lustre/include/obd.h        |  17 +-
+ drivers/staging/lustre/lustre/include/obd_class.h  |  16 +-
+ .../staging/lustre/lustre/include/obd_support.h    |   5 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |   1 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |   1 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |  20 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  32 +-
+ drivers/staging/lustre/lustre/llite/dir.c          |  54 +++-
+ drivers/staging/lustre/lustre/llite/file.c         | 360 ++++++++++++++++++---
+ .../staging/lustre/lustre/llite/llite_internal.h   |  34 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  37 ++-
+ drivers/staging/lustre/lustre/llite/llite_mmap.c   |  34 +-
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |  38 +++
+ drivers/staging/lustre/lustre/llite/namei.c        |  40 ++-
+ drivers/staging/lustre/lustre/llite/rw.c           |  68 +++-
+ drivers/staging/lustre/lustre/llite/vvp_internal.h |   1 +
+ drivers/staging/lustre/lustre/llite/vvp_io.c       |   3 +
+ .../staging/lustre/lustre/llite/xattr_security.c   |  38 ++-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  34 +-
+ drivers/staging/lustre/lustre/lov/lov_io.c         |  28 ++
+ drivers/staging/lustre/lustre/mdc/mdc_internal.h   |   4 +
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c        |  32 ++
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c      |   7 +
+ drivers/staging/lustre/lustre/mdc/mdc_reint.c      |   7 +
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |  50 ++-
+ drivers/staging/lustre/lustre/obdclass/cl_io.c     |   2 +
+ drivers/staging/lustre/lustre/obdclass/llog_cat.c  |  16 +-
+ .../lustre/lustre/obdclass/lprocfs_status.c        |  72 ++++-
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c | 135 +++++++-
+ drivers/staging/lustre/lustre/osc/lproc_osc.c      |  18 ++
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |  95 ++++--
+ .../staging/lustre/lustre/osc/osc_cl_internal.h    |   1 +
+ drivers/staging/lustre/lustre/osc/osc_dev.c        |   1 +
+ drivers/staging/lustre/lustre/osc/osc_internal.h   |   4 +
+ drivers/staging/lustre/lustre/osc/osc_io.c         |  79 +++++
+ drivers/staging/lustre/lustre/osc/osc_request.c    | 184 +++++++++--
+ drivers/staging/lustre/lustre/ptlrpc/client.c      |   9 +-
+ drivers/staging/lustre/lustre/ptlrpc/import.c      |  10 +
+ drivers/staging/lustre/lustre/ptlrpc/layout.c      |  66 +++-
+ .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |   3 +-
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    |  27 +-
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 122 +++++--
+ 52 files changed, 1722 insertions(+), 259 deletions(-)
+
+-- 
+1.8.3.1
