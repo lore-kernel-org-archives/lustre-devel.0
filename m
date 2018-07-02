@@ -1,42 +1,39 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  2 Jul 2018 19:24:52 -0400
-Subject: [lustre-devel] [PATCH 08/10] lustre: libcfs: test if table is NULL
- for lnet_insert_debugfs
-In-Reply-To: <1530573894-20592-1-git-send-email-jsimmons@infradead.org>
-References: <1530573894-20592-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530573894-20592-9-git-send-email-jsimmons@infradead.org>
+Date: Mon,  2 Jul 2018 19:24:35 -0400
+Subject: [lustre-devel] [PATCH 18/18] lustre: update version to 2.8.99
+In-Reply-To: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
+References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530573875-20465-19-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-It is possible to call lnet_insert_debugfs() with table being NULL.
-We can avoid a potential oops by adding a test to see if table is
-not NULL.
+With the missing patches from the lustre 2.9 release merged
+upstream its time to update the upstream client's version.
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
-Reviewed-on: https://review.whamcloud.com/24688
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/libcfs/module.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/module.c b/drivers/staging/lustre/lnet/libcfs/module.c
-index 2c4268b..0d36121 100644
---- a/drivers/staging/lustre/lnet/libcfs/module.c
-+++ b/drivers/staging/lustre/lnet/libcfs/module.c
-@@ -659,7 +659,7 @@ void lnet_insert_debugfs(struct ctl_table *table)
- 	 * We don't save the dentry returned because we don't call
- 	 * debugfs_remove() but rather remove_recursive()
- 	 */
--	for (; table->procname; table++)
-+	for (; table && table->procname; table++)
- 		debugfs_create_file(table->procname, table->mode,
- 				    lnet_debugfs_root, table,
- 				    lnet_debugfs_fops_select(table->mode));
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h
+index 19c9135..1428fdd 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h
+@@ -2,10 +2,10 @@
+ #define _LUSTRE_VER_H_
+ 
+ #define LUSTRE_MAJOR 2
+-#define LUSTRE_MINOR 6
++#define LUSTRE_MINOR 8
+ #define LUSTRE_PATCH 99
+ #define LUSTRE_FIX 0
+-#define LUSTRE_VERSION_STRING "2.6.99"
++#define LUSTRE_VERSION_STRING "2.8.99"
+ 
+ #define OBD_OCD_VERSION(major, minor, patch, fix)			\
+ 	(((major) << 24) + ((minor) << 16) + ((patch) << 8) + (fix))
 -- 
 1.8.3.1
