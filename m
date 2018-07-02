@@ -1,69 +1,72 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon,  2 Jul 2018 19:24:27 -0400
-Subject: [lustre-devel] [PATCH 10/18] lustre: ladvise: Add willread advice
- support for ladvise
+Date: Mon,  2 Jul 2018 19:24:30 -0400
+Subject: [lustre-devel] [PATCH 13/18] lustre: ptlrpc: properly set "rq_xid"
+ for 4MB IO
 In-Reply-To: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
 References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1530573875-20465-11-git-send-email-jsimmons@infradead.org>
+Message-ID: <1530573875-20465-14-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Li Xi <lixi@ddn.com>
+From: Fan Yong <fyong@whamcloud.com>
 
-This patch adds WILLREAD advice to ladvise framework. OSS will
-prefetch data into memory when this hint is provided. It is not
-garanteed how long the cached pages will be kept in memory.
+The commit 8bcaef92664f ("staging: lustre: ptlrpc: mbits is sent
+within ptlrpc_body") replaced the "rq_xid" with "rq_mbits"
+as the matchbits of bulk data transferring. To be interoperable
+with old servers, it introduced the new connection flag:
+OBD_CONNECT_BULK_MBITS. If the server does not support such
+feature, then the "rq_xid" would be set the same value as
+"rq_mbits". Unfortunately, it forgot to handle multiple bulk
+operations, for example 4MB IO. If the new client wants to
+make 4MB IO with old server, it may send a small "rq_xid" to
+the old server, as to the old server will regard it as an 1MB
+IO or 2MB IO. So the data transfer will not complete because
+of only part of data transferred. Then the client will timeout
+failure and retry again and again.
 
-Signed-off-by: Li Xi <lixi@ddn.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-4931
-Reviewed-on: http://review.whamcloud.com/12458
-Reviewed-by: Gu Zheng <gzheng@ddn.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Fixes: 8bcaef92664f ("staging: lustre: ptlrpc: mbits is sent within ptlrpc_body)
+Signed-off-by: Fan Yong <fyong@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-6808
+Reviewed-on: http://review.whamcloud.com/22373
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Liang Zhen <liang.zhen@intel.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: Tyson Whitehead <twhitehead@gmail.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h | 2 ++
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c                | 4 ++++
- 2 files changed, 6 insertions(+)
+ drivers/staging/lustre/lustre/ptlrpc/client.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-index 063a7db..02b51ca 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_user.h
-@@ -1325,9 +1325,11 @@ struct hsm_copy {
- 
- enum lu_ladvise_type {
- 	LU_LADVISE_INVALID	= 0,
-+	LU_LADVISE_WILLREAD	= 1,
- };
- 
- #define LU_LADVISE_NAMES {				\
-+	[LU_LADVISE_WILLREAD]	= "willread",		\
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/client.c b/drivers/staging/lustre/lustre/ptlrpc/client.c
+index c1b82bf..fee4e49 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/client.c
+@@ -3084,8 +3084,7 @@ void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req)
+ 		 * 'resend for the -EINPROGRESS resend'. To make it simple,
+ 		 * we opt to generate mbits for all resend cases.
+ 		 */
+-		if ((bd->bd_import->imp_connect_data.ocd_connect_flags &
+-		     OBD_CONNECT_BULK_MBITS)) {
++		if (OCD_HAS_FLAG(&bd->bd_import->imp_connect_data, BULK_MBITS)) {
+ 			req->rq_mbits = ptlrpc_next_xid();
+ 		} else {
+ 			/* old version transfers rq_xid to peer as matchbits */
+@@ -3115,6 +3114,12 @@ void ptlrpc_set_bulk_mbits(struct ptlrpc_request *req)
+ 	 * see LU-1431
+ 	 */
+ 	req->rq_mbits += DIV_ROUND_UP(bd->bd_iov_count, LNET_MAX_IOV) - 1;
++
++	/* Set rq_xid as rq_mbits to indicate the final bulk for the old
++	 * server which does not support OBD_CONNECT_BULK_MBITS. LU-6808
++	 */
++	if (!OCD_HAS_FLAG(&bd->bd_import->imp_connect_data, BULK_MBITS))
++		req->rq_xid = req->rq_mbits;
  }
  
- /*
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index a1895cb..aa17d01 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -4243,6 +4243,8 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct lu_ladvise, lla_value4));
- 	LASSERTF((int)sizeof(((struct lu_ladvise *)0)->lla_value4) == 4, "found %lld\n",
- 		 (long long)(int)sizeof(((struct lu_ladvise *)0)->lla_value4));
-+	LASSERTF(LU_LADVISE_WILLREAD == 1, "found %lld\n",
-+		 (long long)LU_LADVISE_WILLREAD);
- 
- 	/* Checks for struct ladvise_hdr */
- 	LASSERTF(LADVISE_MAGIC == 0x1ADF1CE0, "found 0x%.8x\n",
-@@ -4277,4 +4279,6 @@ void lustre_assert_wire_constants(void)
- 		 (long long)(int)offsetof(struct ladvise_hdr, lah_advise));
- 	LASSERTF((int)sizeof(((struct ladvise_hdr *)0)->lah_advise) == 0, "found %lld\n",
- 		 (long long)(int)sizeof(((struct ladvise_hdr *)0)->lah_advise));
-+	LASSERTF(LF_ASYNC == 0x00000001UL, "found 0x%.8xUL\n",
-+		 (unsigned int)LF_ASYNC);
- }
+ /**
 -- 
 1.8.3.1
