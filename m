@@ -1,131 +1,60 @@
 From: Patrick Farrell <paf@cray.com>
-Date: Tue, 3 Jul 2018 12:43:46 +0000
-Subject: [lustre-devel] [PATCH 01/18] lustre: grant: add support for
- OBD_CONNECT_GRANT_PARAM
-In-Reply-To: <87601x2f5b.fsf@notabene.neil.brown.name>
+Date: Tue, 3 Jul 2018 12:46:53 +0000
+Subject: [lustre-devel] [PATCH 05/18] lustre: llite: fast read
+ implementation
+In-Reply-To: <87woud0xip.fsf@notabene.neil.brown.name>
 References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
- <1530573875-20465-2-git-send-email-jsimmons@infradead.org>,
- <87601x2f5b.fsf@notabene.neil.brown.name>
-Message-ID: <DM3PR1101MB1213CBD340C2EC3D7BECF557CB420@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <1530573875-20465-6-git-send-email-jsimmons@infradead.org>,
+ <87woud0xip.fsf@notabene.neil.brown.name>
+Message-ID: <DM3PR1101MB121395BDC6EC6AA3130F42EFCB420@DM3PR1101MB1213.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Neil,
 
-Compute vs consume: Honestly either would work.  The client consumes grant when it writes data, this fix to the calculation allows it to consume more accurately. *shrugs*
-
-- Patrick
-
+They do.  It?s probably gone unnoticed because those updates are mostly directly triggered by users or one time only during initialization, so there?s little risk of colliding.
 
 ________________________________
 From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
-Sent: Monday, July 2, 2018 10:04:48 PM
+Sent: Monday, July 2, 2018 11:10:54 PM
 To: James Simmons; Andreas Dilger; Oleg Drokin
-Cc: Johann Lombardi; Lustre Development List
-Subject: Re: [lustre-devel] [PATCH 01/18] lustre: grant: add support for OBD_CONNECT_GRANT_PARAM
+Cc: Lustre Development List
+Subject: Re: [lustre-devel] [PATCH 05/18] lustre: llite: fast read implementation
 
 On Mon, Jul 02 2018, James Simmons wrote:
 
-> From: Johann Lombardi <jlombardi@whamcloud.com>
->
-> Add support for grant overhead calculation on the client side.
-> To do so, clients track usage on a per-extent basis. An extent is
-> composed of contiguous blocks.
-> The OST now returns to the OSC layer several parameters to consume
-> grant more accurately:
-
-Just to be sure that I'm understanding correctly, should "consume"
-above be "compute" ??
-
->
-> - the backend filesystem block size which is the minimal grant
->   allocation unit;
-> - the maximum extent size;
-> - the extent insertion cost.
->   Clients now pack in bulk write how much grant space was consumed for
->   the RPC. Dirty data accounting also adopts the same scheme.
->
-> Moreover, each backend OSD now reports its own set of parameters:
-> - For ldiskfs, we usually have a 4KB block size with a maximum extent
->   size of 32MB (theoretical limit of 128MB) and an extent insertion
->   cost of 6 x 4KB = 24KB
-> - For ZFS, we report a block size of 128KB, an extent size of 128
->   blocks (i.e. 16MB with 128KB block size) and a block insertion cost
->   of 112KB.
->
-> Besides, there is now no more generic metadata overhead reservation
-> done inside each OSD. Instead grant space is inflated for clients
-> that do not support the new grant parameters. That said, a tiny
-> percentage (typically 0.76%) of the free space is still reserved
-> inside each OSD to avoid fragmentation which might hurt performance
-> and impact our grant calculation (e.g. extents are broken due to
-> fragmentation).
->
-> This patch also fixes several other issues:
->
-> - Bulk write resent by ptlrpc after reconnection could trigger
->   spurious error messages related to broken dirty accounting.
->   The issue was that oa_dirty is discarded for resent requests
->   (grant flag cleared in ost_brw_write()), so we can legitimately
->   have grant > fed_dirty in ofd_grant_check().
->   This was fixed by resetting fed_dirty on reconnection and skipping
->   the dirty accounting check in ofd_grant_check() in the case of
->   ptlrpc resend.
-
-ofd_grant_check doesn't appear in this patch.  Presumably it was part of
-the server code that was stripped from the patch.
-
->
-> - In obd_connect_data_seqprint(), the connection flags cannot fit
->   in a 32-bit integer.
-
-I cannot see what this might refer to either.
-
->
-> - When merging two OSC extents, an extent tax should be released
->   in both the merged extent and in the grant accounting.
-
-I think I might see what this relates to.
-
-> +static ssize_t cur_dirty_grant_bytes_show(struct kobject *kobj,
-> +                                       struct attribute *attr,
-> +                                       char *buf)
+> +static ssize_t fast_read_store(struct kobject *kobj,
+> +                            struct attribute *attr,
+> +                            const char *buffer,
+> +                            size_t count)
 > +{
-> +     struct obd_device *dev = container_of(kobj, struct obd_device,
-> +                                           obd_kobj);
-> +     struct client_obd *cli = &dev->u.cli;
-> +     int len;
+> +     struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+> +                                           ll_kobj);
+> +     bool val;
+> +     int rc;
 > +
-> +     spin_lock(&cli->cl_loi_list_lock);
-> +     len = sprintf(buf, "%lu\n", cli->cl_dirty_grant);
-> +     spin_unlock(&cli->cl_loi_list_lock);
-
-Why take the spinlock?? cl_dirty_grant is 'long', so reading it is
-atomic.
-
-
-> +             if (OCD_HAS_FLAG(&cli->cl_import->imp_connect_data,
-> +                              GRANT_PARAM)) {
-> +                     int nrextents;
+> +     rc = kstrtobool(buffer, &val);
+> +     if (rc)
+> +             return rc;
 > +
-> +                     /*
-> +                      * take extent tax into account when asking for more
-> +                      * grant space
-> +                      */
-> +                     nrextents = (nrpages + cli->cl_max_extent_pages - 1)  /
-> +                                  cli->cl_max_extent_pages;
+> +     spin_lock(&sbi->ll_lock);
+> +     if (val)
+> +             sbi->ll_flags |= LL_SBI_FAST_READ;
+> +     else
+> +             sbi->ll_flags &= ~LL_SBI_FAST_READ;
+> +     spin_unlock(&sbi->ll_lock);
 
-I generally prefer DIV_ROUND_UP() for this.
+This is a little odd... no other code uses ll_lock to protect updates to
+ll_flags.  Various other places (e.g. checksum_pages_store()) updates it
+unprotected.
+
+Maybe there all need to use ll_lock for protection.
 
 
-I don't think any of the above will stop me from applying the patch,
-though I might edit the description, and may add a fix-up patch afterwards.
-
-Thanks.
+Thanks,
 NeilBrown
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180703/dc5329ff/attachment-0001.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180703/4a1bdce9/attachment.html>
