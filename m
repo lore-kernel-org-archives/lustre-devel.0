@@ -1,11 +1,11 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 03 Jul 2018 13:04:48 +1000
-Subject: [lustre-devel] [PATCH 01/18] lustre: grant: add support for
- OBD_CONNECT_GRANT_PARAM
-In-Reply-To: <1530573875-20465-2-git-send-email-jsimmons@infradead.org>
+Date: Tue, 03 Jul 2018 13:32:45 +1000
+Subject: [lustre-devel] [PATCH 02/18] lustre: ladvise: Add feature of
+ giving file access advices
+In-Reply-To: <1530573875-20465-3-git-send-email-jsimmons@infradead.org>
 References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
- <1530573875-20465-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <87601x2f5b.fsf@notabene.neil.brown.name>
+ <1530573875-20465-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <8736x12duq.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,102 +14,61 @@ To: lustre-devel@lists.lustre.org
 
 On Mon, Jul 02 2018, James Simmons wrote:
 
-> From: Johann Lombardi <jlombardi@whamcloud.com>
+> From: Li Xi <lixi@ddn.com>
 >
-> Add support for grant overhead calculation on the client side.
-> To do so, clients track usage on a per-extent basis. An extent is
-> composed of contiguous blocks.
-> The OST now returns to the OSC layer several parameters to consume
-> grant more accurately:
-
-Just to be sure that I'm understanding correctly, should "consume"
-above be "compute" ??
-
+> The fadvise() system call provided by Linux kernel enables
+> applications to give advices or hints about how a file will be
+> accessed. However, It is only a client side mechanism which is
+> not enough for distributed file systems like Lustre, because in
+> order to tune system-wide cache or read-ahead policies, servers
+> need to understand the advices too.
 >
-> - the backend filesystem block size which is the minimal grant
->   allocation unit;
-> - the maximum extent size;
-> - the extent insertion cost.
->   Clients now pack in bulk write how much grant space was consumed for
->   the RPC. Dirty data accounting also adopts the same scheme.
+> This patch adds a new feature named ladvise which provides new
+> APIs and utils to give advices about the access pattern of Lustre
+> files with the purpose of performance improvement. It is similar
+> to Linux fadvise() system call, except it forwards the advices
+> directly from Lustre client to server. The server side codes will
+> apply appropriate read-ahead and caching techniques for the
+> corresponding files.
 >
-> Moreover, each backend OSD now reports its own set of parameters:
-> - For ldiskfs, we usually have a 4KB block size with a maximum extent
->   size of 32MB (theoretical limit of 128MB) and an extent insertion
->   cost of 6 x 4KB = 24KB
-> - For ZFS, we report a block size of 128KB, an extent size of 128
->   blocks (i.e. 16MB with 128KB block size) and a block insertion cost
->   of 112KB.
+> A typical workload for ladvise is e.g. a bunch of different
+> clients are doing small random reads of a file, so prefetching
+> pages into OSS cache with big linear reads before the random IO
+> is a net benefit. Fetching all that data into each client cache
+> with fadvise() may not be, due to much more data being sent to
+> the client.
 >
-> Besides, there is now no more generic metadata overhead reservation
-> done inside each OSD. Instead grant space is inflated for clients
-> that do not support the new grant parameters. That said, a tiny
-> percentage (typically 0.76%) of the free space is still reserved
-> inside each OSD to avoid fragmentation which might hurt performance
-> and impact our grant calculation (e.g. extents are broken due to
-> fragmentation).
->
-> This patch also fixes several other issues:
->
-> - Bulk write resent by ptlrpc after reconnection could trigger
->   spurious error messages related to broken dirty accounting.
->   The issue was that oa_dirty is discarded for resent requests
->   (grant flag cleared in ost_brw_write()), so we can legitimately
->   have grant > fed_dirty in ofd_grant_check().
->   This was fixed by resetting fed_dirty on reconnection and skipping
->   the dirty accounting check in ofd_grant_check() in the case of
->   ptlrpc resend.
-
-ofd_grant_check doesn't appear in this patch.  Presumably it was part of
-the server code that was stripped from the patch.
-
->
-> - In obd_connect_data_seqprint(), the connection flags cannot fit
->   in a 32-bit integer.
-
-I cannot see what this might refer to either.
-
->
-> - When merging two OSC extents, an extent tax should be released
->   in both the merged extent and in the grant accounting.
-
-I think I might see what this relates to.
-
-> +static ssize_t cur_dirty_grant_bytes_show(struct kobject *kobj,
-> +					  struct attribute *attr,
-> +					  char *buf)
-> +{
-> +	struct obd_device *dev = container_of(kobj, struct obd_device,
-> +					      obd_kobj);
-> +	struct client_obd *cli = &dev->u.cli;
-> +	int len;
+...
+> +	case LL_IOC_LADVISE: {
+> +		struct ladvise_hdr *ladvise_hdr;
+> +		int alloc_size = sizeof(*ladvise_hdr);
+> +		int num_advise;
+> +		int i;
 > +
-> +	spin_lock(&cli->cl_loi_list_lock);
-> +	len = sprintf(buf, "%lu\n", cli->cl_dirty_grant);
-> +	spin_unlock(&cli->cl_loi_list_lock);
+> +		rc = 0;
+> +		ladvise_hdr = kzalloc(alloc_size, GFP_NOFS);
 
-Why take the spinlock?? cl_dirty_grant is 'long', so reading it is
-atomic.
+Lustre really needs to get more sensible about when to use GFP_NOFS and
+when to use GFP_KERNEL.
+NOFS is only needed when the allocation cannot wait while reclaim enters
+the filesystem, due to possible deadlock.  So if you are holding a lock
+or some other resource that writeout might need, use NOFS.
+In this case, there is no possible conflict with writeout, so GFP_KERNEL
+should be used.
+
+In this case, alloc_size is 32, so I wonder why it is allocating memory
+at all rather than just using the stack.
+
+Below the memory is freed and allocated again (why not realloc?) so an
+allocation is justified there.  That should be GFP_KERNEL as well.
+
+Later in osc_io_ladvise_start() there is a kvzalloc() with GFP_NOFS.
+I suspect that should be GFP_KERNEL as well, especially as vmalloc
+doesn't properly support GFP_NOFS and never has.
 
 
-> +		if (OCD_HAS_FLAG(&cli->cl_import->imp_connect_data,
-> +				 GRANT_PARAM)) {
-> +			int nrextents;
-> +
-> +			/*
-> +			 * take extent tax into account when asking for more
-> +			 * grant space
-> +			 */
-> +			nrextents = (nrpages + cli->cl_max_extent_pages - 1)  /
-> +				     cli->cl_max_extent_pages;
+Again, I'll probably apply this anyway...
 
-I generally prefer DIV_ROUND_UP() for this.
-
-
-I don't think any of the above will stop me from applying the patch,
-though I might edit the description, and may add a fix-up patch afterwards.
-
-Thanks.
 NeilBrown
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -117,4 +76,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180703/348eec1f/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180703/1f610b00/attachment.sig>
