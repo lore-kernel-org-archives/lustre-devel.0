@@ -1,145 +1,131 @@
-From: NeilBrown <neilb@suse.com>
-Date: Tue, 03 Jul 2018 14:57:33 +1000
-Subject: [lustre-devel] [PATCH 00/18] lustre: missing updates from
- lustre 2.9
-In-Reply-To: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
+From: Patrick Farrell <paf@cray.com>
+Date: Tue, 3 Jul 2018 12:43:46 +0000
+Subject: [lustre-devel] [PATCH 01/18] lustre: grant: add support for
+ OBD_CONNECT_GRANT_PARAM
+In-Reply-To: <87601x2f5b.fsf@notabene.neil.brown.name>
 References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <87lgas29xe.fsf@notabene.neil.brown.name>
+ <1530573875-20465-2-git-send-email-jsimmons@infradead.org>,
+ <87601x2f5b.fsf@notabene.neil.brown.name>
+Message-ID: <DM3PR1101MB1213CBD340C2EC3D7BECF557CB420@DM3PR1101MB1213.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Neil,
+
+Compute vs consume: Honestly either would work.  The client consumes grant when it writes data, this fix to the calculation allows it to consume more accurately. *shrugs*
+
+- Patrick
+
+
+________________________________
+From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
+Sent: Monday, July 2, 2018 10:04:48 PM
+To: James Simmons; Andreas Dilger; Oleg Drokin
+Cc: Johann Lombardi; Lustre Development List
+Subject: Re: [lustre-devel] [PATCH 01/18] lustre: grant: add support for OBD_CONNECT_GRANT_PARAM
+
 On Mon, Jul 02 2018, James Simmons wrote:
 
-> This patch set fills in the known missing pieces from the Lustre
-> 2.9 release. With these patches this brings us to the pre-2.10
-> development cycle. The grant allocation fixes were missing as
-> well as security hole closes. The rest are small changes in
-> addition to support for filesets and ladvise feature.
+> From: Johann Lombardi <jlombardi@whamcloud.com>
 >
-> Alexander Boyko (1):
->   lustre: obd: add callback for llog_cat_process_or_fork
->
-> Bobi Jam (1):
->   lustre: osc: max_pages_per_rpc should be chunk size aligned
->
-> Fan Yong (1):
->   lustre: ptlrpc: properly set "rq_xid" for 4MB IO
->
-> Henri Doreau (1):
->   lustre: llite: restore fd_och when putting lease
->
-> James Simmons (2):
->   lustre: libcfs: restore original behavior in cfs_str2num_check
+> Add support for grant overhead calculation on the client side.
+> To do so, clients track usage on a per-extent basis. An extent is
+> composed of contiguous blocks.
+> The OST now returns to the OSC layer several parameters to consume
+> grant more accurately:
 
-Apart from this patch which I couldn't bring myself to apply, I've
-applied all these patches - making changes to only one as mentioned
-below.
-I'll probably add some cleanups later as separately described.
+Just to be sure that I'm understanding correctly, should "consume"
+above be "compute" ??
 
->   lustre: update version to 2.8.99
 >
-> Jian Yu (1):
->   lustre: mount: fix lmd_parse() to handle new delimiters
+> - the backend filesystem block size which is the minimal grant
+>   allocation unit;
+> - the maximum extent size;
+> - the extent insertion cost.
+>   Clients now pack in bulk write how much grant space was consumed for
+>   the RPC. Dirty data accounting also adopts the same scheme.
 >
-> Jinshan Xiong (1):
->   lustre: llite: fast read implementation
+> Moreover, each backend OSD now reports its own set of parameters:
+> - For ldiskfs, we usually have a 4KB block size with a maximum extent
+>   size of 32MB (theoretical limit of 128MB) and an extent insertion
+>   cost of 6 x 4KB = 24KB
+> - For ZFS, we report a block size of 128KB, an extent size of 128
+>   blocks (i.e. 16MB with 128KB block size) and a block insertion cost
+>   of 112KB.
 >
-> Johann Lombardi (1):
->   lustre: grant: add support for OBD_CONNECT_GRANT_PARAM
+> Besides, there is now no more generic metadata overhead reservation
+> done inside each OSD. Instead grant space is inflated for clients
+> that do not support the new grant parameters. That said, a tiny
+> percentage (typically 0.76%) of the free space is still reserved
+> inside each OSD to avoid fragmentation which might hurt performance
+> and impact our grant calculation (e.g. extents are broken due to
+> fragmentation).
 >
-> John L. Hammond (3):
->   lustre: obd: rename md_getstatus() to md_get_root()
->   lustre: obd: reserve connection flag OBD_CONNECT2_FILE_SECCTX
->   lustre: security: send file security context for creates
+> This patch also fixes several other issues:
 >
-> Lai Siyao (1):
->   lustre: fileset: add fileset mount support
+> - Bulk write resent by ptlrpc after reconnection could trigger
+>   spurious error messages related to broken dirty accounting.
+>   The issue was that oa_dirty is discarded for resent requests
+>   (grant flag cleared in ost_brw_write()), so we can legitimately
+>   have grant > fed_dirty in ofd_grant_check().
+>   This was fixed by resetting fed_dirty on reconnection and skipping
+>   the dirty accounting check in ofd_grant_check() in the case of
+>   ptlrpc resend.
 
-When I removed the union name as promised, this went from
- 14 files changed, 135 insertions(+), 43 deletions(-)
-to
- 14 files changed, 120 insertions(+), 28 deletions(-)
+ofd_grant_check doesn't appear in this patch.  Presumably it was part of
+the server code that was stripped from the patch.
 
-Not an enormous change, but worthwhile I think.
+>
+> - In obd_connect_data_seqprint(), the connection flags cannot fit
+>   in a 32-bit integer.
 
-Thanks
+I cannot see what this might refer to either.
+
+>
+> - When merging two OSC extents, an extent tax should be released
+>   in both the merged extent and in the grant accounting.
+
+I think I might see what this relates to.
+
+> +static ssize_t cur_dirty_grant_bytes_show(struct kobject *kobj,
+> +                                       struct attribute *attr,
+> +                                       char *buf)
+> +{
+> +     struct obd_device *dev = container_of(kobj, struct obd_device,
+> +                                           obd_kobj);
+> +     struct client_obd *cli = &dev->u.cli;
+> +     int len;
+> +
+> +     spin_lock(&cli->cl_loi_list_lock);
+> +     len = sprintf(buf, "%lu\n", cli->cl_dirty_grant);
+> +     spin_unlock(&cli->cl_loi_list_lock);
+
+Why take the spinlock?? cl_dirty_grant is 'long', so reading it is
+atomic.
+
+
+> +             if (OCD_HAS_FLAG(&cli->cl_import->imp_connect_data,
+> +                              GRANT_PARAM)) {
+> +                     int nrextents;
+> +
+> +                     /*
+> +                      * take extent tax into account when asking for more
+> +                      * grant space
+> +                      */
+> +                     nrextents = (nrpages + cli->cl_max_extent_pages - 1)  /
+> +                                  cli->cl_max_extent_pages;
+
+I generally prefer DIV_ROUND_UP() for this.
+
+
+I don't think any of the above will stop me from applying the patch,
+though I might edit the description, and may add a fix-up patch afterwards.
+
+Thanks.
 NeilBrown
-
->
-> Li Xi (3):
->   lustre: ladvise: Add feature of giving file access advices
->   lustre: ladvise: Add willread advice support for ladvise
->   lustre: ladvise: Add dontneed advice support for ladvise
->
-> Niu Yawei (1):
->   lustre: ldlm: reduce mem footprint of ldlm_resource
->
-> Patrick Farrell (1):
->   lustre: llite: ladvise protocol changes
->
->  .../lustre/include/uapi/linux/lustre/lustre_idl.h  |  52 ++-
->  .../lustre/include/uapi/linux/lustre/lustre_user.h |  51 +++
->  .../lustre/include/uapi/linux/lustre/lustre_ver.h  |   4 +-
->  drivers/staging/lustre/lnet/libcfs/libcfs_string.c |  17 +-
->  drivers/staging/lustre/lustre/include/cl_object.h  |  13 +
->  .../staging/lustre/lustre/include/lustre_disk.h    |   2 +
->  drivers/staging/lustre/lustre/include/lustre_dlm.h |  24 +-
->  .../staging/lustre/lustre/include/lustre_import.h  |   1 +
->  .../lustre/lustre/include/lustre_req_layout.h      |  10 +-
->  .../staging/lustre/lustre/include/lustre_swab.h    |   2 +
->  drivers/staging/lustre/lustre/include/obd.h        |  17 +-
->  drivers/staging/lustre/lustre/include/obd_class.h  |  16 +-
->  .../staging/lustre/lustre/include/obd_support.h    |   5 +-
->  drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |   1 +
->  drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |   1 +
->  drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |  20 +-
->  drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  32 +-
->  drivers/staging/lustre/lustre/llite/dir.c          |  54 +++-
->  drivers/staging/lustre/lustre/llite/file.c         | 360 ++++++++++++++++++---
->  .../staging/lustre/lustre/llite/llite_internal.h   |  34 +-
->  drivers/staging/lustre/lustre/llite/llite_lib.c    |  37 ++-
->  drivers/staging/lustre/lustre/llite/llite_mmap.c   |  34 +-
->  drivers/staging/lustre/lustre/llite/lproc_llite.c  |  38 +++
->  drivers/staging/lustre/lustre/llite/namei.c        |  40 ++-
->  drivers/staging/lustre/lustre/llite/rw.c           |  68 +++-
->  drivers/staging/lustre/lustre/llite/vvp_internal.h |   1 +
->  drivers/staging/lustre/lustre/llite/vvp_io.c       |   3 +
->  .../staging/lustre/lustre/llite/xattr_security.c   |  38 ++-
->  drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  34 +-
->  drivers/staging/lustre/lustre/lov/lov_io.c         |  28 ++
->  drivers/staging/lustre/lustre/mdc/mdc_internal.h   |   4 +
->  drivers/staging/lustre/lustre/mdc/mdc_lib.c        |  32 ++
->  drivers/staging/lustre/lustre/mdc/mdc_locks.c      |   7 +
->  drivers/staging/lustre/lustre/mdc/mdc_reint.c      |   7 +
->  drivers/staging/lustre/lustre/mdc/mdc_request.c    |  50 ++-
->  drivers/staging/lustre/lustre/obdclass/cl_io.c     |   2 +
->  drivers/staging/lustre/lustre/obdclass/llog_cat.c  |  16 +-
->  .../lustre/lustre/obdclass/lprocfs_status.c        |  72 ++++-
->  drivers/staging/lustre/lustre/obdclass/obd_mount.c | 135 +++++++-
->  drivers/staging/lustre/lustre/osc/lproc_osc.c      |  18 ++
->  drivers/staging/lustre/lustre/osc/osc_cache.c      |  95 ++++--
->  .../staging/lustre/lustre/osc/osc_cl_internal.h    |   1 +
->  drivers/staging/lustre/lustre/osc/osc_dev.c        |   1 +
->  drivers/staging/lustre/lustre/osc/osc_internal.h   |   4 +
->  drivers/staging/lustre/lustre/osc/osc_io.c         |  79 +++++
->  drivers/staging/lustre/lustre/osc/osc_request.c    | 184 +++++++++--
->  drivers/staging/lustre/lustre/ptlrpc/client.c      |   9 +-
->  drivers/staging/lustre/lustre/ptlrpc/import.c      |  10 +
->  drivers/staging/lustre/lustre/ptlrpc/layout.c      |  66 +++-
->  .../staging/lustre/lustre/ptlrpc/lproc_ptlrpc.c    |   3 +-
->  .../staging/lustre/lustre/ptlrpc/pack_generic.c    |  27 +-
->  drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 122 +++++--
->  52 files changed, 1722 insertions(+), 259 deletions(-)
->
-> -- 
-> 1.8.3.1
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180703/51b3eeb3/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180703/dc5329ff/attachment-0001.html>
