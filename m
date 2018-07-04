@@ -1,85 +1,120 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 04 Jul 2018 14:43:50 +1000
-Subject: [lustre-devel] [PATCH 07/11] lustre: simplify some parsing in
- lmd_parse().
+Subject: [lustre-devel] [PATCH 08/11] lustre: protect updates to ll_flags.
 In-Reply-To: <153067941050.30111.13691201276059352926.stgit@noble>
 References: <153067941050.30111.13691201276059352926.stgit@noble>
-Message-ID: <153067943079.30111.1400570516954800906.stgit@noble>
+Message-ID: <153067943083.30111.5879041126521058346.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-1/ use kstrdup() or kstrndup() where appropriate.
-2/ use kasprintf() where appropriate.
-3/ use GFP_KERNEL because GFP_NOFS is not needed here.
-4/ use strchrnul() instead of open-coding it.
-5/ don't kfree() on error, that is done in lustre_free_lsi().
+While individual flags in sbi->ll_flags are rarely
+updates after the superblocks in initialised, it
+is possible for these updates to race.
+This could cause an update to be lost.
+
+So protect all updates with a spinlock.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |   24 +++++++-------------
- 1 file changed, 8 insertions(+), 16 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_lib.c   |    4 ++++
+ drivers/staging/lustre/lustre/llite/lproc_llite.c |    6 ++++++
+ drivers/staging/lustre/lustre/llite/xattr.c       |    4 ++++
+ 3 files changed, 14 insertions(+)
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index 708c5802ddc5..1a668874a165 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -1170,37 +1170,30 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
- 		/* Remove leading /s from fsname */
- 		while (*++s1 == '/')
- 			;
--		s2 = s1;
--		while (*s2 != '/' && *s2 != '\0')
--			s2++;
-+		s2 = strchrnul(s1, '/');
- 		/* Freed in lustre_free_lsi */
--		lmd->lmd_profile = kzalloc(s2 - s1 + 8, GFP_NOFS);
-+		lmd->lmd_profile = kasprintf(GFP_KERNEL, "%.*s-client",
-+					     (int)(s2 - s1), s1);
- 		if (!lmd->lmd_profile)
- 			return -ENOMEM;
- 
--		strncat(lmd->lmd_profile, s1, s2 - s1);
--		strncat(lmd->lmd_profile, "-client", 7);
--
- 		s1 = s2;
- 		s2 = s1 + strlen(s1) - 1;
- 		/* Remove padding /s from fileset */
- 		while (*s2 == '/')
- 			s2--;
- 		if (s2 > s1) {
--			lmd->lmd_fileset = kzalloc(s2 - s1 + 2, GFP_NOFS);
--			if (!lmd->lmd_fileset) {
--				kfree(lmd->lmd_profile);
-+			lmd->lmd_fileset = kstrndup(s1, s2 - s1 + 1,
-+						    GFP_KERNEL);
-+			if (!lmd->lmd_fileset)
- 				return -ENOMEM;
--			}
--			strncat(lmd->lmd_fileset, s1, s2 - s1 + 1);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index 7a414e2238a3..64cd69cb493d 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -2549,7 +2549,9 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
+ 	/* Update norootsquash flag */
+ 	down_write(&squash->rsi_sem);
+ 	if (list_empty(&squash->rsi_nosquash_nids)) {
++		spin_lock(&sbi->ll_lock);
+ 		sbi->ll_flags &= ~LL_SBI_NOROOTSQUASH;
++		spin_unlock(&sbi->ll_lock);
+ 	} else {
+ 		/*
+ 		 * Do not apply root squash as soon as one of our NIDs is
+@@ -2566,10 +2568,12 @@ void ll_compute_rootsquash_state(struct ll_sb_info *sbi)
+ 				break;
+ 			}
  		}
++		spin_lock(&sbi->ll_lock);
+ 		if (matched)
+ 			sbi->ll_flags |= LL_SBI_NOROOTSQUASH;
+ 		else
+ 			sbi->ll_flags &= ~LL_SBI_NOROOTSQUASH;
++		spin_unlock(&sbi->ll_lock);
  	}
+ 	up_write(&squash->rsi_sem);
+ }
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index 9dcbe648777e..617aabb1b59a 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -514,10 +514,12 @@ static ssize_t checksum_pages_store(struct kobject *kobj,
+ 	rc = kstrtoul(buffer, 10, &val);
+ 	if (rc)
+ 		return rc;
++	spin_lock(&sbi->ll_lock);
+ 	if (val)
+ 		sbi->ll_flags |= LL_SBI_CHECKSUM;
+ 	else
+ 		sbi->ll_flags &= ~LL_SBI_CHECKSUM;
++	spin_unlock(&sbi->ll_lock);
  
- 	/* Freed in lustre_free_lsi */
--	lmd->lmd_dev = kzalloc(strlen(devname) + 1, GFP_NOFS);
-+	lmd->lmd_dev = kstrdup(devname, GFP_KERNEL);
- 	if (!lmd->lmd_dev)
- 		return -ENOMEM;
--	strcpy(lmd->lmd_dev, devname);
+ 	rc = obd_set_info_async(NULL, sbi->ll_dt_exp, sizeof(KEY_CHECKSUM),
+ 				KEY_CHECKSUM, sizeof(val), &val, NULL);
+@@ -669,10 +671,12 @@ static ssize_t statahead_agl_store(struct kobject *kobj,
+ 	if (rc)
+ 		return rc;
  
- 	/* Save mount options */
- 	s1 = options + strlen(options) - 1;
-@@ -1208,10 +1201,9 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
- 		*s1-- = 0;
- 	if (*options != 0) {
- 		/* Freed in lustre_free_lsi */
--		lmd->lmd_opts = kzalloc(strlen(options) + 1, GFP_NOFS);
-+		lmd->lmd_opts = kstrdup(options, GFP_KERNEL);
- 		if (!lmd->lmd_opts)
- 			return -ENOMEM;
--		strcpy(lmd->lmd_opts, options);
++	spin_lock(&sbi->ll_lock);
+ 	if (val)
+ 		sbi->ll_flags |= LL_SBI_AGL_ENABLED;
+ 	else
+ 		sbi->ll_flags &= ~LL_SBI_AGL_ENABLED;
++	spin_unlock(&sbi->ll_lock);
+ 
+ 	return count;
+ }
+@@ -719,10 +723,12 @@ static ssize_t lazystatfs_store(struct kobject *kobj,
+ 	if (rc)
+ 		return rc;
+ 
++	spin_lock(&sbi->ll_lock);
+ 	if (val)
+ 		sbi->ll_flags |= LL_SBI_LAZYSTATFS;
+ 	else
+ 		sbi->ll_flags &= ~LL_SBI_LAZYSTATFS;
++	spin_unlock(&sbi->ll_lock);
+ 
+ 	return count;
+ }
+diff --git a/drivers/staging/lustre/lustre/llite/xattr.c b/drivers/staging/lustre/lustre/llite/xattr.c
+index 7fa0a419c094..5e27c85f104f 100644
+--- a/drivers/staging/lustre/lustre/llite/xattr.c
++++ b/drivers/staging/lustre/lustre/llite/xattr.c
+@@ -150,7 +150,9 @@ static int ll_xattr_set_common(const struct xattr_handler *handler,
+ 	if (rc) {
+ 		if (rc == -EOPNOTSUPP && handler->flags == XATTR_USER_T) {
+ 			LCONSOLE_INFO("Disabling user_xattr feature because it is not supported on the server\n");
++			spin_lock(&sbi->ll_lock);
+ 			sbi->ll_flags &= ~LL_SBI_USER_XATTR;
++			spin_unlock(&sbi->ll_lock);
+ 		}
+ 		return rc;
  	}
- 
- 	lmd_print(lmd);
+@@ -387,7 +389,9 @@ int ll_xattr_list(struct inode *inode, const char *name, int type, void *buffer,
+ 		LCONSOLE_INFO(
+ 			"%s: disabling user_xattr feature because it is not supported on the server: rc = %d\n",
+ 			ll_get_fsname(inode->i_sb, NULL, 0), rc);
++		spin_lock(&sbi->ll_lock);
+ 		sbi->ll_flags &= ~LL_SBI_USER_XATTR;
++		spin_unlock(&sbi->ll_lock);
+ 	}
+ out:
+ 	ptlrpc_req_finished(req);
