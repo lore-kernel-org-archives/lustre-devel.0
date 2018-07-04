@@ -1,192 +1,113 @@
-From: NeilBrown <neilb@suse.com>
-Date: Fri, 06 Jul 2018 16:13:31 +1000
-Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
- support
-In-Reply-To: <02B7B718-E496-46CF-B55D-86EAB98381B6@cray.com>
-References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
- <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
- <877emnaed8.fsf@notabene.neil.brown.name>
- <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>
- <87lgb16j8q.fsf@notabene.neil.brown.name>
- <DM3PR1101MB1213FD1001256E565FF011FFCB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <8736x77lrk.fsf@notabene.neil.brown.name>
- <9DE389AB-C7E1-4336-B7E8-604581EFD53E@cray.com>
- <CAAqp6i0uwmpdFYUJ7mCBz+MH+gVBa6S=P2t5Yn7wcFOtrTD-Fg@mail.gmail.com>
- <AT5PR8401MB0900C67FADDF0EF7ED1CDBC4854E0@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
- <87va9vziay.fsf@notabene.neil.brown.name>
- <AT5PR8401MB0900A5406BF0CB8C87B80EEC85410@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
- <alpine.LFD.2.21.1807060052470.12665@casper.infradead.org>
- <87zhz5xdld.fsf@notabene.neil.brown.name>
- <02B7B718-E496-46CF-B55D-86EAB98381B6@cray.com>
-Message-ID: <87o9fkyjqs.fsf@notabene.neil.brown.name>
+From: Alexey Lyashkov <c17817@cray.com>
+Date: Wed, 4 Jul 2018 17:54:35 +0000
+Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
+ module reduction.
+In-Reply-To: <5993F8BE-E55C-4E75-BB1B-E7C25B79D73A@cray.com>
+References: <152904663333.10587.10934053155404014785.stgit@noble>
+ <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
+ <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <alpine.LFD.2.21.1806210354260.3886@casper.infradead.org>
+ <3FD4D051-9C95-449D-8A23-D42B271E55B8@dilger.ca>
+ <DM3PR1101MB121322E85FDE1E5310F6F4B7CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <87tvprah32.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1806260206360.31196@casper.infradead.org>
+ <DM3PR1101MB121358672276198B843DE5A7CB490@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <87d0wd6i4m.fsf@notabene.neil.brown.name>
+ <44633E99-07CB-4C40-967C-0B4FE206F29A@whamcloud.com>
+ <DM3PR1101MB12132AC3E33E7D7C8FBE4536CB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <87tvpn6592.fsf@notabene.neil.brown.name>
+ <E70889E4-794F-495D-B40C-97BA4F05EBB0@cray.com>
+ <5993F8BE-E55C-4E75-BB1B-E7C25B79D73A@cray.com>
+Message-ID: <7FEEDB12-2000-4399-BB5F-573F64A14D0E@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Jul 06 2018, Doug Oucharek wrote:
+Doug,
 
-> When the CPT code was added to LNet back in 2012, it was to address
-> one primary case: a need for finer grained locking on metadata
-> servers.  LNet used to have global locks and metadata servers, which
-> do many small messages (high IOPS), much time in the worker threads
-> was spent in spinlocks.  So, CPT configuration was added so
-> locks/resources could be allocated per CPT.  This way, users have
-> control over how they want CPTs to be configured and how they want
-> resources/locks to be divided.  For example, users may want finer
-> grained locking on the metadata servers but not on clients.  Leaving
-> this to be automatically configured by Linux API calls would take this
-> flexibility away from the users who, for HPC, are very knowledgable
-> about what they want (i.e. we do not want to protect them from
-> themselves).
->
-> The CPT support in LNet and LNDs has morphed to encompass more
-> traditional NUMA and core affinity performance improvements.  For
-> example, you can restrict a network interface to a socket (NUMA node)
-> which has better affinity to the PCIe lanes that interface is
-> connected to.  Rather than try to do this sort of thing automatically,
-> we have left it to the user to know what they are doing and configure
-> the CPTs accordingly.
->
-> I think the many changes to the CPT code has realty clouded its
-> purpose.  In summary, the original purpose was finer grained locking
-> and that needs to be maintained as the IOPS requirements of metadata
-> servers is paramount.
+What about LNet API change to use sge list? It's more natively  structure for variable page list, which is may a short sized for MDC links and full sized for OST links.
 
-Thanks for the explanation.
-I definitely get that fine-grained locking is a good thing.  Lustre is
-not alone in this of course.
-Even better than fine-grained locking is no locking.  That is not often
-possible, but this
-  https://github.com/neilbrown/linux/commit/ac3f8fd6e61b245fa9c14e3164203c1211c5ef6b
+?On 28/06/2018, 20:04, "Doug Oucharek" <doucharek@cray.com> wrote:
 
-is an example of doing exactly that.
-
-For the read/writer usage of CPT locks, RCU is a better approach if it
-can be made to work (usually it can) - and it scales even better.
-
-When I was digging through the usage of locks I saw some hash tables.
-It seems that a lock protected a whole table.  It is usually sufficient
-for the lock to just protect a single chain (bit spin-locks can easily
-store one lock per chain) and then only for writes - RCU discipline can
-allow reads to proceed with only rcu_read_lock().
-Would we still need per-CPT tables once that was in place?  I don't know
-yet, though per-node seems likely to be sufficient when locking is per-chain.
-
-I certainly wouldn't discard CPTs without replacing them with something
-better.  Near the top of my list for when I return from vacation
-(leaving in a couple of days) will be to look closely at the current
-fine-grained locking that you have helped me to see more clearly, and
-see if I can make it even better.
-
-Thanks,
-NeilBrown
-
->
-> James: The Verbs RDMA interface has very poor support for NUMA/core affinity.  I was going to try to devise some patches to address that but have been too busy on other things.  Perhaps the RDMA maintainer could consider updating it?
->
-> Doug
->
-> On Jul 5, 2018, at 8:11 PM, NeilBrown <neilb at suse.com<mailto:neilb@suse.com>> wrote:
->
-> On Fri, Jul 06 2018, James Simmons wrote:
->
-> NeilBrown [mailto:neilb at suse.com] wrote:
->
-> To help contextualize things: the Lustre code can be decomposed into three parts:
->
-> 1) The filesystem proper: Lustre.
-> 2) The communication protocol it uses: LNet.
-> 3) Supporting code used by Lustre and LNet: CFS.
->
-> Part of the supporting code is the CPT mechanism, which provides a way to
-> partition the CPUs of a system. These partitions are used to distribute queues,
-> locks, and threads across the system. It was originally introduced years ago, as
-> far as I can tell mainly to deal with certain hot locks: these were converted into
-> read/write locks with one spinlock per CPT.
->
-> As a general rule, CPT boundaries should respect node and socket boundaries,
-> but at the higher end, where CPUs have 20+ cores, it may make sense to split
-> a CPUs cores across several CPTs.
->
-> Thanks everyone for your patience in explaining things to me.
-> I'm beginning to understand what to look for and where to find it.
->
-> So the answers to Greg's questions:
->
->  Where are you reading the host memory NUMA information from?
->
->  And why would a filesystem care about this type of thing?  Are you
->  going to now mirror what the scheduler does with regards to NUMA
->  topology issues?  How are you going to handle things when the topology
->  changes?  What systems did you test this on?  What performance
->  improvements were seen?  What downsides are there with all of this?
->
->
-> Are:
->
->  - NUMA info comes from ACPI or device-tree just like for every one
->      else.  Lustre just uses node_distance().
->
-> Correct, the standard kernel interfaces for this information are used to
-> obtain it, so ultimately Lustre/LNet uses the same source of truth as
-> everyone else.
->
->  - The filesystem cares about this because...  It has service
->    thread that does part of the work of some filesystem operations
->    (handling replies for example) and these are best handled "near"
->    the CPU the initiated the request.  Lustre partitions
->    all CPUs into "partitions" (cpt) each with a few cores.
->    If the request thread and the reply thread are on different
->    CPUs but in the same partition, then we get best throughput
->    (is that close?)
->
-> At the filesystem level, it does indeed seem to help to have the service
-> threads that do work for requests run on a different core that is close to
-> the core that originated the request. So preferably on the same CPU, and
-> on certain multi-core CPUs there are also distance effects between cores.
-> That too is one of the things the CPT mechanism handles.
->
-> Their is another very important aspect to why Lustre has a CPU partition
-> layer. At least at the place I work at. While the Linux kernel manages all
-> the NUMA nodes and CPU cores Lustre adds the ability for us to specify a
-> subset of everything on the system. The reason is to limit the impact of
-> noise on the compute nodes. Noise has a heavy impact on large scale HP
-> work loads that can run days or even weeks at a time. Lets take an
-> example system:
->
->               |-------------|     |-------------|
->   |-------|   | NUMA  0     |     | NUMA  1     |   |-------|
->   | eth0  | - |             | --- |             | - | eth1  |
->   |_______|   | CPU0  CPU1  |     | CPU2  CPU3  |   |_______|
->               |_____________|     |_____________|
->
-> In such a system it is possible with the right job schedular to start a
-> large parallel application on NUMA 0/ (CPU0 and CPU1). Normally such
-> large parallel applications will communicate between nodes using MPI,
-> such as openmpi, which can be configured to use eth0 only. Using the
-> CPT layer in lustre we can isolate lustre to NUMA 1 and use only eth1.
-> This greatly reducess the noise impact on the application running.
->
-> BTW this is one of the reasons ko2iblnd for lustre doesn't use the
-> generic RDMA api. The core IB layer doesn't support such isolation.
-> At least to my knowledge.
->
-> Thanks for that background (and for the separate explanation of how
-> jitter multiplies when jobs needs to synchronize periodically).
->
-> I can see that setting CPU affinity for lustre/lnet worker threads could
-> be important, and that it can be valuable to tie services to a
-> particular interface.  I cannot yet see why we need partitions for this,
-> rather that doing it at the CPU (or NODE) level.
->
-> Thanks,
-> NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180706/e1e273c6/attachment.sig>
+    Yes, Al Viro had started the process of getting Lustre in the upstream staging area to use iov_iter and, I believe, biovec.  A very good change in my opinion as it gets rid of the duality.  Unfortunately, those changes have not made their way into the Whamcloud tree yet so there is a disconnect when working between the two trees.  James Simmons might know more, but I don?t believe Al?s changes are complete so there is still a need to support iovec and kvec.  Could we replace these two with biovecs?  James?
+    
+    As Cory says, lets make the right architectural decisions and let companies (Whamcloud, Cray, etc) absorb the improvements.  We can adapt DVS as required.
+    
+    As for LNet as a module: please keep it as a separate module.  Merging it into Lustre would create a dependency for DVS to have Lustre installed and possibly running.  This would also stand in the way of any potential future users of LNet.  Andreas pointed out one, Zest (search for LNET in this paper: https://www.psc.edu/images/zest/zest-pdsw08-paper.pdf), but there may be others developing.  LNet could become its own project at some point because of multiple users.
+    
+    Doug
+     
+    > On Jun 28, 2018, at 8:03 AM, Cory Spitz <spitzcor@cray.com> wrote:
+    > 
+    > I know that Doug follows this list closely, but I'm going to flag him here directly, because I know that he has an opinion about kiov / iovec (and a 3rd if I recall correctly).
+    > 
+    > Doug told me that (possibly) Al Viro had a proposal or submitted code to simply the kiov usage and that Doug was in favor of it.  Let's choose to make the right architectural call for Lustre/LNet and let Cray worry about keeping our out-of-tree code working.  As Patrick said, Cray pays the price of keeping DVS off to the side (we're wising up, which is why it is now GPL... but don't expect us to publish it on the Internet necessarily... baby-steps).
+    > 
+    > Doug, can you weigh-in on this case?
+    > 
+    > Thanks,
+    > -Cory
+    > 
+    > -- 
+    > 
+    > On 6/27/18, 8:59 PM, "lustre-devel on behalf of NeilBrown" <lustre-devel-bounces at lists.lustre.org on behalf of neilb@suse.com> wrote:
+    > 
+    >    On Wed, Jun 27 2018, Patrick Farrell wrote:
+    > 
+    >> Neil,
+    >> 
+    >> We do indeed have such functionality (it?s called DVS and it?s
+    >> basically a high speed file system projection framework, ala NFS but
+    >> faster), so the ability to build lnet separately is valuable to us.
+    >> While it is being open sourced under the GPL, I don?t think there?s
+    >> any intention to try to upstream it.  The current code isn?t even
+    >> usable off of Cray systems as it depends on info from user space (that
+    >> is provided, in the end, from Cray proprietary hardware) to keep its
+    >> connection/routing tables up to date.  That?s supposedly in the
+    >> pipeline to get fixed, but it?s still pretty far from generally
+    >> usable.
+    >> 
+    >> But we?d still really appreciate it if lnet stayed separate.  Don?t
+    >> know if that?s enough for you - I know sometimes *small* stuff is done
+    >> for out of tree users.  Hopefully this meets that standard.
+    >> 
+    > 
+    >    Ahh - DVS.  That answers a question I just asked in another email.
+    >    My google-skills don't seem to be up to locating the source code though
+    >    :-(
+    > 
+    >    While I wouldn't knowingly break an interface used by some out-of-tree
+    >    code without good reason, it is hard to avoid if you don't know what the
+    >    out-of-tree code does.  It can be very tempting to remove something that
+    >    isn't being used, but that can certainly hurt out-of-tree code
+    >    sometimes.
+    > 
+    >    A particular example I'm exploring at present is the dual data paths in
+    >    LNet.  Or maybe it is dual types of Memory Descriptors.
+    >    There is 'kiov' which uses kernel-virtual addresses and 'iovec' which
+    >    uses page+offset.
+    >    The kiov option isn't used in the client code and it seems likely that
+    >    the server-side code could be converted to use iovec without problems.
+    > 
+    >    I'd like to remove the kiov as I wouldn't be able to justify its
+    >    existence when submitting the client-only code upstream.  But I don't
+    >    want to remove the option of having an alternate MD type if it really is
+    >    significantly more efficient in some context.
+    >    If I know whether DVS used kiov or iovec - and in what way - that would
+    >    help me to know if I might break something, and to be able to assess the
+    >    cost.
+    > 
+    >    In my mind, the "standard" that you mention is always about
+    >    practicality.   Code needs to be maintainable - easy to understand and
+    >    hard to break.  If the LNet interface is clean and well documented in
+    >    the kernel, then I don't see why we would not at least attempt to
+    >    preserve it.
+    > 
+    >    Thanks,
+    >    NeilBrown
+    > 
+    > 
+    
+    
