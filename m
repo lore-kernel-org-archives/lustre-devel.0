@@ -1,112 +1,177 @@
 From: NeilBrown <neilb@suse.com>
 Date: Wed, 04 Jul 2018 14:43:50 +1000
-Subject: [lustre-devel] [PATCH 02/11] lustre: osc: don't take spinlock to
- read a "long"
+Subject: [lustre-devel] [PATCH 03/11] lustre: llite: replace several
+ GFP_NOFS with GFP_KERNEL
 In-Reply-To: <153067941050.30111.13691201276059352926.stgit@noble>
 References: <153067941050.30111.13691201276059352926.stgit@noble>
-Message-ID: <153067943061.30111.10303681433910918365.stgit@noble>
+Message-ID: <153067943065.30111.11608217600471180041.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Reading a long is always atomic, so there is no
-need to take a spinlock - the value read will always
-be internally consistent and in none of these places
-is consistency with another value relevant.
+GFP_KERNEL should be used preferentially unless there is
+good reason to use something else.
+
+GFP_NOFS is appropriate when the code holds some resource
+that could blocks writeout triggered by memory reclaim.
+So it is appropriate to us it in the writeout path, or anything
+that could interact with the writeout paths.
+
+The memory allocations affected here are either ioctl, or open/close
+handling.  These can never block writeout, so GFP_NOFS is not needed.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/osc/lproc_osc.c |   36 +++----------------------
- 1 file changed, 5 insertions(+), 31 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c |   32 ++++++++++++++--------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-index 81adf548f426..54a303e4e046 100644
---- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
-+++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
-@@ -138,10 +138,7 @@ static ssize_t max_dirty_mb_show(struct kobject *kobj,
- 	long val;
- 	int mult;
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 614588c365df..54da6f19da21 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -64,7 +64,7 @@ static struct ll_file_data *ll_file_data_get(void)
+ {
+ 	struct ll_file_data *fd;
  
--	spin_lock(&cli->cl_loi_list_lock);
- 	val = cli->cl_dirty_max_pages;
--	spin_unlock(&cli->cl_loi_list_lock);
--
- 	mult = 1 << (20 - PAGE_SHIFT);
- 	return lprocfs_read_frac_helper(buf, PAGE_SIZE, val, mult);
- }
-@@ -252,13 +249,9 @@ static ssize_t cur_dirty_bytes_show(struct kobject *kobj,
- 	struct obd_device *dev = container_of(kobj, struct obd_device,
- 					      obd_kobj);
- 	struct client_obd *cli = &dev->u.cli;
--	int len;
+-	fd = kmem_cache_zalloc(ll_file_data_slab, GFP_NOFS);
++	fd = kmem_cache_zalloc(ll_file_data_slab, GFP_KERNEL);
+ 	if (!fd)
+ 		return NULL;
+ 	fd->fd_write_failed = false;
+@@ -137,7 +137,7 @@ static int ll_close_inode_openhandle(struct inode *inode,
+ 		goto out;
+ 	}
  
--	spin_lock(&cli->cl_loi_list_lock);
--	len = sprintf(buf, "%lu\n", cli->cl_dirty_pages << PAGE_SHIFT);
--	spin_unlock(&cli->cl_loi_list_lock);
-+	return sprintf(buf, "%lu\n", cli->cl_dirty_pages << PAGE_SHIFT);
+-	op_data = kzalloc(sizeof(*op_data), GFP_NOFS);
++	op_data = kzalloc(sizeof(*op_data), GFP_KERNEL);
+ 	/*
+ 	 * We leak openhandle and request here on error, but not much to be
+ 	 * done in OOM case since app won't retry close on error either.
+@@ -615,7 +615,7 @@ int ll_file_open(struct inode *inode, struct file *file)
  
--	return len;
- }
- LUSTRE_RO_ATTR(cur_dirty_bytes);
+ 			goto restart;
+ 		}
+-		*och_p = kzalloc(sizeof(struct obd_client_handle), GFP_NOFS);
++		*och_p = kzalloc(sizeof(struct obd_client_handle), GFP_KERNEL);
+ 		if (!*och_p) {
+ 			rc = -ENOMEM;
+ 			goto out_och_free;
+@@ -823,7 +823,7 @@ ll_lease_open(struct inode *inode, struct file *file, fmode_t fmode,
+ 			return ERR_PTR(rc);
+ 	}
  
-@@ -269,13 +262,8 @@ static ssize_t cur_grant_bytes_show(struct kobject *kobj,
- 	struct obd_device *dev = container_of(kobj, struct obd_device,
- 					      obd_kobj);
- 	struct client_obd *cli = &dev->u.cli;
--	int len;
+-	och = kzalloc(sizeof(*och), GFP_NOFS);
++	och = kzalloc(sizeof(*och), GFP_KERNEL);
+ 	if (!och)
+ 		return ERR_PTR(-ENOMEM);
  
--	spin_lock(&cli->cl_loi_list_lock);
--	len = sprintf(buf, "%lu\n", cli->cl_avail_grant);
--	spin_unlock(&cli->cl_loi_list_lock);
--
--	return len;
-+	return sprintf(buf, "%lu\n", cli->cl_avail_grant);
- }
+@@ -1470,7 +1470,7 @@ static int ll_lov_setea(struct inode *inode, struct file *file,
+ 	if (!capable(CAP_SYS_ADMIN))
+ 		return -EPERM;
  
- static ssize_t cur_grant_bytes_store(struct kobject *kobj,
-@@ -294,12 +282,8 @@ static ssize_t cur_grant_bytes_store(struct kobject *kobj,
- 		return rc;
+-	lump = kzalloc(lum_size, GFP_NOFS);
++	lump = kzalloc(lum_size, GFP_KERNEL);
+ 	if (!lump)
+ 		return -ENOMEM;
  
- 	/* this is only for shrinking grant */
--	spin_lock(&cli->cl_loi_list_lock);
--	if (val >= cli->cl_avail_grant) {
--		spin_unlock(&cli->cl_loi_list_lock);
-+	if (val >= cli->cl_avail_grant)
+@@ -1637,7 +1637,7 @@ int ll_release_openhandle(struct inode *inode, struct lookup_intent *it)
+ 
+ 	LASSERT(it_open_error(DISP_OPEN_OPEN, it) == 0);
+ 
+-	och = kzalloc(sizeof(*och), GFP_NOFS);
++	och = kzalloc(sizeof(*och), GFP_KERNEL);
+ 	if (!och) {
+ 		rc = -ENOMEM;
+ 		goto out;
+@@ -1735,7 +1735,7 @@ int ll_fid2path(struct inode *inode, void __user *arg)
+ 
+ 	outsize = sizeof(*gfout) + pathlen;
+ 
+-	gfout = kzalloc(outsize, GFP_NOFS);
++	gfout = kzalloc(outsize, GFP_KERNEL);
+ 	if (!gfout)
+ 		return -ENOMEM;
+ 
+@@ -1885,7 +1885,7 @@ static int ll_swap_layouts(struct file *file1, struct file *file2,
+ 	struct ll_swap_stack	*llss = NULL;
+ 	int			 rc;
+ 
+-	llss = kzalloc(sizeof(*llss), GFP_NOFS);
++	llss = kzalloc(sizeof(*llss), GFP_KERNEL);
+ 	if (!llss)
+ 		return -ENOMEM;
+ 
+@@ -2031,7 +2031,7 @@ static int ll_hsm_import(struct inode *inode, struct file *file,
  		return -EINVAL;
--	}
--	spin_unlock(&cli->cl_loi_list_lock);
  
- 	if (cli->cl_import->imp_state == LUSTRE_IMP_FULL)
- 		rc = osc_shrink_grant_to_target(cli, val);
-@@ -316,13 +300,8 @@ static ssize_t cur_lost_grant_bytes_show(struct kobject *kobj,
- 	struct obd_device *dev = container_of(kobj, struct obd_device,
- 					      obd_kobj);
- 	struct client_obd *cli = &dev->u.cli;
--	int len;
--
--	spin_lock(&cli->cl_loi_list_lock);
--	len = sprintf(buf, "%lu\n", cli->cl_lost_grant);
--	spin_unlock(&cli->cl_loi_list_lock);
+ 	/* set HSM flags */
+-	hss = kzalloc(sizeof(*hss), GFP_NOFS);
++	hss = kzalloc(sizeof(*hss), GFP_KERNEL);
+ 	if (!hss)
+ 		return -ENOMEM;
  
--	return len;
-+	return sprintf(buf, "%lu\n", cli->cl_lost_grant);
- }
- LUSTRE_RO_ATTR(cur_lost_grant_bytes);
+@@ -2042,7 +2042,7 @@ static int ll_hsm_import(struct inode *inode, struct file *file,
+ 	if (rc != 0)
+ 		goto free_hss;
  
-@@ -333,13 +312,8 @@ static ssize_t cur_dirty_grant_bytes_show(struct kobject *kobj,
- 	struct obd_device *dev = container_of(kobj, struct obd_device,
- 					      obd_kobj);
- 	struct client_obd *cli = &dev->u.cli;
--	int len;
+-	attr = kzalloc(sizeof(*attr), GFP_NOFS);
++	attr = kzalloc(sizeof(*attr), GFP_KERNEL);
+ 	if (!attr) {
+ 		rc = -ENOMEM;
+ 		goto free_hss;
+@@ -2298,7 +2298,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		struct hsm_user_state	*hus;
+ 		int			 rc;
  
--	spin_lock(&cli->cl_loi_list_lock);
--	len = sprintf(buf, "%lu\n", cli->cl_dirty_grant);
--	spin_unlock(&cli->cl_loi_list_lock);
--
--	return len;
-+	return sprintf(buf, "%lu\n", cli->cl_dirty_grant);
- }
- LUSTRE_RO_ATTR(cur_dirty_grant_bytes);
+-		hus = kzalloc(sizeof(*hus), GFP_NOFS);
++		hus = kzalloc(sizeof(*hus), GFP_KERNEL);
+ 		if (!hus)
+ 			return -ENOMEM;
  
+@@ -2337,7 +2337,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		struct hsm_current_action	*hca;
+ 		int				 rc;
+ 
+-		hca = kzalloc(sizeof(*hca), GFP_NOFS);
++		hca = kzalloc(sizeof(*hca), GFP_KERNEL);
+ 		if (!hca)
+ 			return -ENOMEM;
+ 
+@@ -2464,7 +2464,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		int i;
+ 
+ 		rc = 0;
+-		ladvise_hdr = kzalloc(alloc_size, GFP_NOFS);
++		ladvise_hdr = kzalloc(alloc_size, GFP_KERNEL);
+ 		if (!ladvise_hdr)
+ 			return -ENOMEM;
+ 
+@@ -2490,7 +2490,7 @@ ll_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		kfree(ladvise_hdr);
+ 		alloc_size = offsetof(typeof(*ladvise_hdr),
+ 				      lah_advise[num_advise]);
+-		ladvise_hdr = kzalloc(alloc_size, GFP_NOFS);
++		ladvise_hdr = kzalloc(alloc_size, GFP_KERNEL);
+ 		if (!ladvise_hdr)
+ 			return -ENOMEM;
+ 
+@@ -3458,7 +3458,7 @@ void *ll_iocontrol_register(llioc_callback_t cb, int count, unsigned int *cmd)
+ 		return NULL;
+ 
+ 	size = sizeof(*in_data) + count * sizeof(unsigned int);
+-	in_data = kzalloc(size, GFP_NOFS);
++	in_data = kzalloc(size, GFP_KERNEL);
+ 	if (!in_data)
+ 		return NULL;
+ 
+@@ -3625,7 +3625,7 @@ static int ll_layout_fetch(struct inode *inode, struct ldlm_lock *lock)
+ 		goto out;
+ 	}
+ 
+-	lvbdata = kvzalloc(lmmsize, GFP_NOFS);
++	lvbdata = kvzalloc(lmmsize, GFP_KERNEL);
+ 	if (!lvbdata) {
+ 		rc = -ENOMEM;
+ 		goto out;
