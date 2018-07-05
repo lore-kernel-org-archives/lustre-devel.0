@@ -1,12 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 5 Jul 2018 23:50:39 +0100 (BST)
-Subject: [lustre-devel] [PATCH 16/18] lustre: libcfs: restore original
- behavior in cfs_str2num_check
-In-Reply-To: <87o9fp0vx1.fsf@notabene.neil.brown.name>
-References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
- <1530573875-20465-17-git-send-email-jsimmons@infradead.org>
- <87o9fp0vx1.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1807052316160.12665@casper.infradead.org>
+Date: Thu, 5 Jul 2018 23:53:15 +0100 (BST)
+Subject: [lustre-devel] [PATCH 18/18] lustre: update version to 2.8.99
+In-Reply-To: <29BE954A-B97C-4EED-8CE0-70FD0B14AE9E@whamcloud.com>
+References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>,
+ <1530573875-20465-19-git-send-email-jsimmons@infradead.org>
+ <29BE954A-B97C-4EED-8CE0-70FD0B14AE9E@whamcloud.com>
+Message-ID: <alpine.LFD.2.21.1807052351370.12665@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,87 +13,46 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> On Mon, Jul 02 2018, James Simmons wrote:
+> James, thanks for pushing up these patches.
 > 
-> > When cfs_str2num_check() moved from simple_strtoul to kstrtoul
-> > some of the functionality got lost. Restore handling hexidecimal
-> > number as well as '+' and '-'. Also handle any trailing spaces.
-> >
-> > Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-> > WC-bug-id: https://jira.whamcloud.com/browse/LU-9325
-> > Reviewed-on: https://review.whamcloud.com/32217
-> > Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
-> > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-> > Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-> > Reviewed-by: Oleg Drokin <green@whamcloud.com>
+> Why not use 2.9.0? Are there still patches missing, or do you want this
+> version to distinguish it from the actual 2.9.0 release?
+
+Oleg asked that I use a version number never used by an offical release.
+Should we can that policy? Anyways their might be stuff missing still.
+Once we reach the 2.10 LTS release we can do a scan of the code to see 
+if this is the case.
+ 
+> Cheers, Andreas
+> 
+> > On Jul 2, 2018, at 17:36, James Simmons <jsimmons@infradead.org> wrote:
+> > 
+> > With the missing patches from the lustre 2.9 release merged
+> > upstream its time to update the upstream client's version.
+> > 
 > > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > > ---
-> >  drivers/staging/lustre/lnet/libcfs/libcfs_string.c | 17 ++++++++++++++---
-> >  1 file changed, 14 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/staging/lustre/lnet/libcfs/libcfs_string.c b/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-> > index e1fb126..e390b0b 100644
-> > --- a/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-> > +++ b/drivers/staging/lustre/lnet/libcfs/libcfs_string.c
-> > @@ -214,8 +214,10 @@ char *cfs_firststr(char *str, size_t size)
-> >  {
-> >  	bool all_numbers = true;
-> >  	char *endp, cache;
-> > +	int len;
-> >  	int rc;
-> >  
-> > +	endp = strim(str);
+> > drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h | 4 ++--
+> > 1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h
+> > index 19c9135..1428fdd 100644
+> > --- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h
+> > +++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ver.h
+> > @@ -2,10 +2,10 @@
+> > #define _LUSTRE_VER_H_
+> > 
+> > #define LUSTRE_MAJOR 2
+> > -#define LUSTRE_MINOR 6
+> > +#define LUSTRE_MINOR 8
+> > #define LUSTRE_PATCH 99
+> > #define LUSTRE_FIX 0
+> > -#define LUSTRE_VERSION_STRING "2.6.99"
+> > +#define LUSTRE_VERSION_STRING "2.8.99"
+> > 
+> > #define OBD_OCD_VERSION(major, minor, patch, fix)            \
+> >    (((major) << 24) + ((minor) << 16) + ((patch) << 8) + (fix))
+> > -- 
+> > 1.8.3.1
+> > 
 > 
-> This looks bad.  The function now changes the string buffer, where it
-> didn't before.
-
-So original this code uses simple_strtoul() which always parsed the string 
-for numbers and succeded even if non digits existed in the string. In fact
-you could get pointer to the first non-digit. That was also used to trim
-the string. This behavior is very different from kstroul. I guess I will
-need to duplicate the string and free it at the end.
- 
-> >  	/**
-> >  	 * kstrouint can only handle strings composed
-> >  	 * of only numbers. We need to scan the string
-> > @@ -228,16 +230,25 @@ char *cfs_firststr(char *str, size_t size)
-> >  	 * After we are done the character at the
-> >  	 * position we placed '\0' must be restored.
-> >  	 */
-> > -	for (endp = str; endp < str + nob; endp++) {
-> > -		if (!isdigit(*endp)) {
-> > +	len = min((int)strlen(endp), nob);
-> 
-> As endp might be different from 'str, 'nob' is not meaningful in the
-> context of endp.
-
-I believe nob is supposed to be the string length of "str" itself. We
-could error on the side caution and make that
-
-len = min(strlen(endp), strlen(str));
-  
-> I'm guessing that mainline commit
-> 
-> Commit: c948390f10cc ("staging: lustre: llite: fix inconsistencies of root squash feature")
-> 
-> is related to this.
-
-Actually it is commit ae0246da1603be7e7374621741515c2b6f2d6332 which ended 
-up breaking my setup. I later debugged it and pushed the patch:
-
-3ad6152d766039cb8ffd8633d971fb79402e5464
-
-Later I pushed that patch to the OpenSFS branch and Hammond pointed out 
-that some supported behaviors were lost. You can see this at:
-
-https://review.whamcloud.com/#/c/32217/
- 
-> I cannot apply this patch as-is.  It is broken.  Possibly changing
->    endp = strim(str);
-> to
->    endp = str;
-> 
-> will fix it.
-
-I do see that the trim thing was removed in the root squash handling.
-We might of returned a bug by mistake. 
