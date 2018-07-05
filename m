@@ -1,8 +1,8 @@
-From: Weber, Olaf (HPC Data Management & Storage) <olaf.weber@hpe.com>
-Date: Wed, 4 Jul 2018 08:40:38 +0000
+From: NeilBrown <neilb@suse.com>
+Date: Thu, 05 Jul 2018 11:57:32 +1000
 Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
  support
-In-Reply-To: <87va9vziay.fsf@notabene.neil.brown.name>
+In-Reply-To: <AT5PR8401MB0900A5406BF0CB8C87B80EEC85410@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
  <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
  <877emnaed8.fsf@notabene.neil.brown.name>
@@ -14,134 +14,100 @@ References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
  <CAAqp6i0uwmpdFYUJ7mCBz+MH+gVBa6S=P2t5Yn7wcFOtrTD-Fg@mail.gmail.com>
  <AT5PR8401MB0900C67FADDF0EF7ED1CDBC4854E0@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
  <87va9vziay.fsf@notabene.neil.brown.name>
-Message-ID: <AT5PR8401MB0900A5406BF0CB8C87B80EEC85410@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+ <AT5PR8401MB0900A5406BF0CB8C87B80EEC85410@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+Message-ID: <87k1qazboz.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-NeilBrown [mailto:neilb at suse.com] wrote:
+On Wed, Jul 04 2018, Weber, Olaf (HPC Data Management & Storage) wrote:
 
-To help contextualize things: the Lustre code can be decomposed into three parts:
+> NeilBrown [mailto:neilb at suse.com] wrote:
+>
+> To help contextualize things: the Lustre code can be decomposed into three parts:
+>
+> 1) The filesystem proper: Lustre.
+> 2) The communication protocol it uses: LNet.
+> 3) Supporting code used by Lustre and LNet: CFS.
+>
+> Part of the supporting code is the CPT mechanism, which provides a way to
+> partition the CPUs of a system. These partitions are used to distribute queues,
+> locks, and threads across the system. It was originally introduced years ago, as
+> far as I can tell mainly to deal with certain hot locks: these were converted into
+> read/write locks with one spinlock per CPT.
 
-1) The filesystem proper: Lustre.
-2) The communication protocol it uses: LNet.
-3) Supporting code used by Lustre and LNet: CFS.
+Thanks for this context.
+Looking in the client code there are 2 per-cpt locks: ln_res_lock and
+ln_net_lock.
 
-Part of the supporting code is the CPT mechanism, which provides a way to
-partition the CPUs of a system. These partitions are used to distribute queues,
-locks, and threads across the system. It was originally introduced years ago, as
-far as I can tell mainly to deal with certain hot locks: these were converted into
-read/write locks with one spinlock per CPT.
+ln_res_lock protects:
+ lnet_res_container -> rec_lh_hash hash chains.
 
-As a general rule, CPT boundaries should respect node and socket boundaries,
-but at the higher end, where CPUs have 20+ cores, it may make sense to split
-a CPUs cores across several CPTs.
+ the_lnet.ln_eq_container.rec_active list of lnet_eq
 
-> Thanks everyone for your patience in explaining things to me.
-> I'm beginning to understand what to look for and where to find it.
-> 
-> So the answers to Greg's questions:
-> 
->   Where are you reading the host memory NUMA information from?
-> 
->   And why would a filesystem care about this type of thing?  Are you
->   going to now mirror what the scheduler does with regards to NUMA
->   topology issues?  How are you going to handle things when the topology
->   changes?  What systems did you test this on?  What performance
->   improvements were seen?  What downsides are there with all of this?
-> 
-> 
-> Are:
+ lists of memory descriptors (rec_active)
 
->   - NUMA info comes from ACPI or device-tree just like for every one
->       else.  Lustre just uses node_distance().
+ lists of match entries - one table per cpt.
+     Some match entries follow cpu affinity, some are global and hashed
+     to choose a table (I think).
 
-Correct, the standard kernel interfaces for this information are used to
-obtain it, so ultimately Lustre/LNet uses the same source of truth as
-everyone else.
+  lib-move seems to use the lock to protect the md itself,
+  rather than just the list of md.... not sure.
 
->   - The filesystem cares about this because...  It has service
->     thread that does part of the work of some filesystem operations
->     (handling replies for example) and these are best handled "near"
->     the CPU the initiated the request.  Lustre partitions
->     all CPUs into "partitions" (cpt) each with a few cores.
->     If the request thread and the reply thread are on different
->     CPUs but in the same partition, then we get best throughput
->     (is that close?)
+  ptl_mt_maps (??) (rather inefficient ordered-insertion in
+  		lnet_ptl_enable_mt())
 
-At the filesystem level, it does indeed seem to help to have the service
-threads that do work for requests run on a different core that is close to
-the core that originated the request. So preferably on the same CPU, and
-on certain multi-core CPUs there are also distance effects between cores.
-That too is one of the things the CPT mechanism handles.
+  proc_lnet_portal_rotor() uses lnet_res_lock(0) to protect
+     portal_rotos[]. I wonder why.
 
->   - Not really mirroring the scheduler, maybe mirroring parts of the
->     network layer(?)
 
-The LNet code, which is derived from Portals 3.x, is mostly an easier-to-use
-abstraction of RDMA interfaces provided by Infiniband and other similar
-hardware. It can also use TCP/IP, but that's not the primary use case.
+ln_net_lock protects:
 
-As a communication layer that builds on top of RDMA-capable hardware,
-LNet cares about such things as whether the CPU driving communication
-is close to the memory used, and also whether it is close to the interface
-used. Even in a 2-socket machine, there are measurable performance
-differences depending on whether the memory an interface connect
-to the same socket or to different sockets. On bigger hardware, like a
-32-socket machine, the penalties are much more pronounced. At the
-time we found that the QPI links between sockets were a bottleneck
-and that performance cratered if they had to handle too much traffic.
+   ni->ni_refs counter (why not atomic_t I wonder)
+   the_lnet.ln_testprotocompat - I guess we don't want that changing
+          while a per-cpt lock is held?
 
-UPI, the successor to QPI is better -- has more bandwidth -- but with
-the CPUs having more and more cores I expect the scaling issues to
-remain similar.
+   the_lnet.ln_counters - keep them stable while reading.
+   the_lnet.ln_nis ??
+   the_lnet.ln_nis_cpt list of lnet_ni... list of network interfaces I guess.
+     Locking a per-cpt lock stops updates as all locks are needed to
+     change.  These days RCU is often used for this sort of thing.
 
->   - We don't handle topology changes yet except in very minimal ways
->     (cpts *can* become empty, and that can cause problems).
+   lnet_ping_info
+   ... and maybe lots more.
 
-Yes, this is a known deficiency.
 
->   - This has been tested on .... great big things.
+So ln_net_lock seems to be  "read/write locks with one spinlock per
+CPT." that you described.  I wonder how much of that could be converted
+to use RCU - with just a single spinlock to protect updates, and
+rcu_read_lock() to make reads safe.
 
-The basic CPT mechanism predates my involvement with Lustre. I did
-work on making it more NUMA-aware. A 32-socket system was one of
-the primary test beds.
+ln_res_lock is quite different - it protects a selection of different
+resources that are distributed across multiple cpts.
+I wonder why we don't have one lock per resource...
+I also wonder how import having these things per-cpt is.
+Lots of other code in the kernel has per-CPU lists etc, and
+some have per-numa-node, but no other code seems to be need an
+intermediate granularity.
 
->   - When multi-rails configurations are used (like ethernet-bonding,
->     but for RDMA), we get ??? closer to theoretical bandwidth.
->     Without these changes it scales poorly (??)
+I might try to drill down into some of this code a bit more and see what
+I can find.  There is probably something I'm still missing.
 
-The basic idea behind muti-rail configurations is that we use several
-Infiniband interfaces and LNet presents them as a single logical interface
-to Lustre. For each message, LNet picks the IB interface it should go across
-using several criteria, including NUMA distance of the interface and how
-busy it is.
+Thanks,
+NeilBrown
 
-With these changes we could get pretty much linear scaling of LNet
-throughput by adding more interfaces.
+   
 
->   - The down-sides primarily are that we don't auto-configure
->     perfectly.  This particularly affects hot-plug, but without
->     hotplug the grouping of cpus and interfaces are focussed
->     on .... avoiding worst case rather than achieving best case.
-
-Without hotplug the CPT grouping should be tuned to achieve a best
-case in a static configuration.
-
-Adding simple-minded hotplug tolerance (let's not call it support) would
-focus on avoiding truly pathological behaviour.
-
-> I've made up a lot of stuff there.  I'm happy not to pursue this further at the
-> moment, but if anyone would like to enhance my understanding by
-> correcting the worst errors in the above, I wouldn't object :-)
-> 
-> Thanks,
-> NeilBrown
-
-PS: the NUMA effects I've mentioned above have been making the news
-lately under other names: they are part of the side channels used in various
-timing based attacks.
-
-Olaf
+>
+> As a general rule, CPT boundaries should respect node and socket boundaries,
+> but at the higher end, where CPUs have 20+ cores, it may make sense to split
+> a CPUs cores across several CPTs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180705/d978b412/attachment.sig>
