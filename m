@@ -1,14 +1,24 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 6 Jul 2018 00:35:26 +0100 (BST)
-Subject: [lustre-devel] [PATCH v3 04/13] lustre: libcfs: fix
- cfs_print_to_console()
-In-Reply-To: <87h8li2wz7.fsf@notabene.neil.brown.name>
-References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
- <1530128322-32535-5-git-send-email-jsimmons@infradead.org>
- <FD87D2B8-27A8-45DF-9C7C-BA33CF940C1D@whamcloud.com>
- <alpine.LFD.2.21.1806291716050.26339@casper.infradead.org>
- <87h8li2wz7.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1807060034020.12665@casper.infradead.org>
+Date: Fri, 6 Jul 2018 00:47:44 +0100 (BST)
+Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
+ module reduction.
+In-Reply-To: <D6CA5D91-2344-446F-9621-935A52E47A24@whamcloud.com>
+References: <152904663333.10587.10934053155404014785.stgit@noble>
+ <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
+ <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <alpine.LFD.2.21.1806210354260.3886@casper.infradead.org>
+ <3FD4D051-9C95-449D-8A23-D42B271E55B8@dilger.ca>
+ <DM3PR1101MB121322E85FDE1E5310F6F4B7CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <87tvprah32.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1806260206360.31196@casper.infradead.org>
+ <DM3PR1101MB121358672276198B843DE5A7CB490@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <87d0wd6i4m.fsf@notabene.neil.brown.name>
+ <44633E99-07CB-4C40-967C-0B4FE206F29A@whamcloud.com>
+ <DM3PR1101MB12132AC3E33E7D7C8FBE4536CB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <87tvpn6592.fsf@notabene.neil.brown.name>
+ <DM3PR1101MB12139B5B51BCE76A79DEC383CB4F0@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <D6CA5D91-2344-446F-9621-935A52E47A24@whamcloud.com>
+Message-ID: <alpine.LFD.2.21.1807060043430.12665@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,105 +26,91 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> >> > The original code for cfs_print_to_console() used printk() and
-> >> > used tricks to select which printk level to use. Later a cleanup
-> >> > patch landed the just converted printk directly to pr_info which
-> >> > is not exactly correct. Instead of converting back to printk lets
-> >> > move everything to pr_* type functions which simplify the code.
-> >> > This allows us to fold both dbghdr_to_err_string() and the
-> >> > function dbghdr_to_info_string() into cfs_print_to_console().
-> >> > 
-> >> > Signed-off-by: James Simmons <jsimmons@infradead.org>
-> >> > ---
-> >> > .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 55 ++++++----------------
-> >> > 1 file changed, 14 insertions(+), 41 deletions(-)
-> >> > 
-> >> > diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-> >> > index 3af7722..c1747c4 100644
-> >> > --- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-> >> > +++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-> >> > @@ -140,54 +140,27 @@ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
-> >> > void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
-> >> > 			  const char *buf, int len, const char *file,
-> >> > 			  const char *fn)
-> >> > {
-> >> > +	char *prefix = "Lustre";
-> >> > +
-> >> > +	if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
-> >> > +		prefix = "LNet";
-> >> > 
-> >> > -	if (mask & D_EMERG) {
-> >> > -		prefix = dbghdr_to_err_string(hdr);
-> >> > -		ptype = KERN_EMERG;
-> >> > +	if (mask & (D_CONSOLE | libcfs_printk)) {
-> >> 
-> >> This check is broken.  The default value of libcfs_printk (the mask
-> >> that controls which messages should be printed to the console, and
-> >> which ones should only be logged into the internal buffer) is:
-> >> 
-> >>     #define D_CANTMASK (D_ERROR | D_EMERG | D_WARNING | D_CONSOLE)
-> >> 
-> >> so that means virtually every console message will be printed with
-> >> pr_info() because this is matched first, instead of pr_emerg() or
-> >> pr_err() below.
-> >> 
-> >> That is why the previous code was matching D_EMERG and D_ERROR first,
-> >> then D_WARNING, and (D_CONSOLE | libcfs_printk) at the end.
-> >
-> > So to do this right we need:
-> >
-> > static void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
-> >                                  const char *buf, int len, const char 
-> > *file,
-> >                                  const char *fn)
-> > {
-> >         char *prefix = "Lustre";
-> >
-> >         if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
-> >                 prefix = "LNet";
-> >
-> >         if (mask & D_CONSOLE) {
-> >                 if (mask & D_EMERG) {
-> >                         pr_emerg("%sError: %.*s", prefix, len, buf);
-> >                 } else if (mask & D_ERROR) {
-> >                         pr_err("%sError: %.*s", prefix, len, buf);
-> >                 } else if (mask & D_WARNING) {
-> >                         pr_warn("%s: %.*s", prefix, len, buf);
-> >                 } else if (mask & libcfs_printk) {
-> >                         pr_info("%s: %.*s", prefix, len, buf);
-> >                 }
-> >         } else {
-> >                 if (mask & D_EMERG) {
-> >                         pr_emerg("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
-> >                                  hdr->ph_pid, hdr->ph_extern_pid, file,
-> >                                  hdr->ph_line_num, fn, len, buf);
-> >                 } else if (mask & D_ERROR) {
-> >                         pr_err("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
-> >                                hdr->ph_pid, hdr->ph_extern_pid, file,
-> >                                hdr->ph_line_num, fn, len, buf);
-> >                 } else if (mask & D_WARNING) {
-> >                         pr_warn("%s: %d:%d:(%s:%d:%s()) %.*s", prefix,
-> >                                 hdr->ph_pid, hdr->ph_extern_pid, file,
-> >                                 hdr->ph_line_num, fn, len, buf);
-> >                 } else if (mask & libcfs_printk) {
-> >                         pr_info("%s: %.*s", prefix, len, buf);
-> >                 }
-> >         }
-> > }
+> > I would say about the acceptor and sock lnd: I believe Lustre assumes some IP transport is available for configuration, but does NOT necessarily use it for primary communication.  Fabrics - Like infiniband or Cray Aries - are more or less always configured to provide IP transport, to enable the panoply of tools and apps that rely on it.  But they perform better if their native protocols are used, which is of course what the other LNDs do.
 > 
-> That doesn't look right either.
-> The original code would *always* print something.
-> This code looks like it might not (e.g. for mask == 0).
+> It is worthwhile to clarify this a bit - LNet uses IP for *addressing* of the nodes at connection time, but I don't think it even uses the TCP interface for any communication itself (though I could be mistaken, as LNet isn't my specialty).  After the initial connection, the only other thing the IP addresses are used for is printing in error messages.
+> 
+> At one time or another we've discussed how we might get rid of the need for IPoIB on client nodes, since some sites don't want any IP connectivity to the client nodes for security and performance reasons.  That said, I don't think we've come up with a good solution yet.  LNet itself allows alternate addressing schemes to be used.  The former qswlnd (for Quadrics Elan networks) just used an integer node number, like 1 at elan for the NID, but I don't think there is any such alternative for IB node addresses except using a MAC hardware address or similar.
 
-Is that correct behavior? A mask of zero means don't do anything.
-Also if you look at the original in the OpenSFS branch you can see
-if mask was to be 0 then ptype would be NULl :-( 
+The challenge to moving away from IP address for addressing is the NID 
+address itself. Currently it is 64 bits which is composed for two parts.
 
-Note a D_CANT_MASK prevents some fields in the mask from being disabled.
+static inline lnet_nid_t LNET_MKNID(__u32 net, __u32 addr)
+{
+        return (((__u64)net) << 32) | addr;
+}
 
-> What is "D_CONSOLE" suppose to mean?  It seems to me "make the messages
-> less verbose" and it isn't clear to me that what is called "D_CONSOLE".
+To use IB harware addressing would require a full 64 bit space so
+lnet_nid_t is to small. This is reason IPv6 is not supported. Ideas
+have floated around on how to get around this but nothing yet.
+It would be a massive API change currently.
 
-It means two things. If by itself then it means use pr_info. If it is one
-field in the mask then it means less detail. Confusing no :-( That is my
-understanding of it. Maybe someone else can clarify if I'm wrong.
+> > Neil Brown <neilb@suse.com> wrote:
+> >> 
+> >> On Wed, Jun 27 2018, Patrick Farrell wrote:
+> >> 
+> >> > Neil,
+> >> >
+> >> > We do indeed have such functionality (it?s called DVS and it?s
+> >> > basically a high speed file system projection framework, ala NFS but
+> >> > faster), so the ability to build lnet separately is valuable to us.
+> >> > While it is being open sourced under the GPL, I don?t think there?s
+> >> > any intention to try to upstream it.  The current code isn?t even
+> >> > usable off of Cray systems as it depends on info from user space (that
+> >> > is provided, in the end, from Cray proprietary hardware) to keep its
+> >> > connection/routing tables up to date.  That?s supposedly in the
+> >> > pipeline to get fixed, but it?s still pretty far from generally
+> >> > usable.
+> >> >
+> >> > But we?d still really appreciate it if lnet stayed separate.  Don?t
+> >> > know if that?s enough for you - I know sometimes *small* stuff is done
+> >> > for out of tree users.  Hopefully this meets that standard.
+> >> >
+> >> 
+> >> Ahh - DVS.  That answers a question I just asked in another email.
+> >> My google-skills don't seem to be up to locating the source code though
+> >> :-(
+> >> 
+> >> While I wouldn't knowingly break an interface used by some out-of-tree
+> >> code without good reason, it is hard to avoid if you don't know what the
+> >> out-of-tree code does.  It can be very tempting to remove something that
+> >> isn't being used, but that can certainly hurt out-of-tree code
+> >> sometimes.
+> >> 
+> >> A particular example I'm exploring at present is the dual data paths in
+> >> LNet.  Or maybe it is dual types of Memory Descriptors.
+> >> There is 'kiov' which uses kernel-virtual addresses and 'iovec' which
+> >> uses page+offset.
+> >> The kiov option isn't used in the client code and it seems likely that
+> >> the server-side code could be converted to use iovec without problems.
+> >> 
+> >> I'd like to remove the kiov as I wouldn't be able to justify its
+> >> existence when submitting the client-only code upstream.  But I don't
+> >> want to remove the option of having an alternate MD type if it really is
+> >> significantly more efficient in some context.
+> >> If I know whether DVS used kiov or iovec - and in what way - that would
+> >> help me to know if I might break something, and to be able to assess the
+> >> cost.
+> >> 
+> >> In my mind, the "standard" that you mention is always about
+> >> practicality.   Code needs to be maintainable - easy to understand and
+> >> hard to break.  If the LNet interface is clean and well documented in
+> >> the kernel, then I don't see why we would not at least attempt to
+> >> preserve it.
+> >> 
+> >> Thanks,
+> >> NeilBrown
+> 
+> Cheers, Andreas
+> ---
+> Andreas Dilger
+> Principal Lustre Architect
+> Whamcloud
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
