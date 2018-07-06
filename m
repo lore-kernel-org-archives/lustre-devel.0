@@ -1,12 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 6 Jul 2018 15:28:14 +0100 (BST)
+Date: Fri, 6 Jul 2018 15:29:24 +0100 (BST)
 Subject: [lustre-devel] [PATCH 01/18] lustre: grant: add support for
  OBD_CONNECT_GRANT_PARAM
 In-Reply-To: <0F41C25D-E055-489A-82B6-CF4728AFF905@cray.com>
 References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
  <1530573875-20465-2-git-send-email-jsimmons@infradead.org>
  <0F41C25D-E055-489A-82B6-CF4728AFF905@cray.com>
-Message-ID: <alpine.LFD.2.21.1807061523210.15728@casper.infradead.org>
+Message-ID: <alpine.LFD.2.21.1807061528170.15728@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -31,7 +31,7 @@ To: lustre-devel@lists.lustre.org
 > https://jira.whamcloud.com/browse/LU-2049 .
 
 This is tricky one. The reason I updated the email address to avoid 
-bouncing emails. Also this allows the original author the change to
+bouncing emails. Also this allows the original author the chance to
 still reply. Does that seem reasonable? It is still in the air for
 some people what their email address is to me. Ah you are right I
 dropped the s. Its should be https://jira.whamcloud.com/....
