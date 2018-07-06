@@ -1,78 +1,125 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 6 Jul 2018 02:36:06 +0100 (BST)
-Subject: [lustre-devel] [PATCH 01/11] staging: lustre: simplify use of
- interval-tree.
-In-Reply-To: <87sh5mfit7.fsf@notabene.neil.brown.name>
-References: <152826510267.16761.14361003167157833896.stgit@noble>
- <152826511890.16761.16115276596203531205.stgit@noble>
- <alpine.LFD.2.21.1806160344210.6450@casper.infradead.org>
- <87sh5mfit7.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1807060235330.12665@casper.infradead.org>
+From: NeilBrown <neilb@suse.com>
+Date: Fri, 06 Jul 2018 13:11:42 +1000
+Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
+ support
+In-Reply-To: <alpine.LFD.2.21.1807060052470.12665@casper.infradead.org>
+References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+ <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
+ <877emnaed8.fsf@notabene.neil.brown.name>
+ <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>
+ <87lgb16j8q.fsf@notabene.neil.brown.name>
+ <DM3PR1101MB1213FD1001256E565FF011FFCB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <8736x77lrk.fsf@notabene.neil.brown.name>
+ <9DE389AB-C7E1-4336-B7E8-604581EFD53E@cray.com>
+ <CAAqp6i0uwmpdFYUJ7mCBz+MH+gVBa6S=P2t5Yn7wcFOtrTD-Fg@mail.gmail.com>
+ <AT5PR8401MB0900C67FADDF0EF7ED1CDBC4854E0@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+ <87va9vziay.fsf@notabene.neil.brown.name>
+ <AT5PR8401MB0900A5406BF0CB8C87B80EEC85410@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+ <alpine.LFD.2.21.1807060052470.12665@casper.infradead.org>
+Message-ID: <87zhz5xdld.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-To: NeilBrown <neilb@suse.com>
-Cc: Oleg Drokin <green@linuxhacker.ru>, Andreas Dilger <andreas.dilger@whamcloud.io>, Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, Lustre Development List <lustre-devel@lists.lustre.org>
+To: lustre-devel@lists.lustre.org
 
+On Fri, Jul 06 2018, James Simmons wrote:
 
-> >> Lustre has a private interval-tree implementation.  This
-> >> implementation (inexplicably) refuses to insert an interval if an
-> >> identical interval already exists.  It is OK with all sorts of
-> >> overlapping intervals, but identical intervals are rejected.
-> >
-> > I talked to Oleg about this since this changes the behavior. He is worried
-> > about having identical items that would end up being merged.  If we can 
-> > guarantee by some other means there are no identical nodes, we are 
-> > probably fine with the interval tree code allowing this. Oleg can explain 
-> > better than me in this case.
-> 
-> I don't think this is a change in behaviour.
-> In the driver/staging client code, interval tree is being used in two
-> places and both of them have clumsy work-arounds for the fact that they
-> cannot insert duplicates in the interval tree.
-> The patch just cleans his up.
-> 
-> However if I have missed something, please provide details.
-> What "identical items" might get merged?
+>> NeilBrown [mailto:neilb at suse.com] wrote:
+>> 
+>> To help contextualize things: the Lustre code can be decomposed into three parts:
+>> 
+>> 1) The filesystem proper: Lustre.
+>> 2) The communication protocol it uses: LNet.
+>> 3) Supporting code used by Lustre and LNet: CFS.
+>> 
+>> Part of the supporting code is the CPT mechanism, which provides a way to
+>> partition the CPUs of a system. These partitions are used to distribute queues,
+>> locks, and threads across the system. It was originally introduced years ago, as
+>> far as I can tell mainly to deal with certain hot locks: these were converted into
+>> read/write locks with one spinlock per CPT.
+>> 
+>> As a general rule, CPT boundaries should respect node and socket boundaries,
+>> but at the higher end, where CPUs have 20+ cores, it may make sense to split
+>> a CPUs cores across several CPTs.
+>> 
+>> > Thanks everyone for your patience in explaining things to me.
+>> > I'm beginning to understand what to look for and where to find it.
+>> > 
+>> > So the answers to Greg's questions:
+>> > 
+>> >   Where are you reading the host memory NUMA information from?
+>> > 
+>> >   And why would a filesystem care about this type of thing?  Are you
+>> >   going to now mirror what the scheduler does with regards to NUMA
+>> >   topology issues?  How are you going to handle things when the topology
+>> >   changes?  What systems did you test this on?  What performance
+>> >   improvements were seen?  What downsides are there with all of this?
+>> > 
+>> > 
+>> > Are:
+>> 
+>> >   - NUMA info comes from ACPI or device-tree just like for every one
+>> >       else.  Lustre just uses node_distance().
+>> 
+>> Correct, the standard kernel interfaces for this information are used to
+>> obtain it, so ultimately Lustre/LNet uses the same source of truth as
+>> everyone else.
+>> 
+>> >   - The filesystem cares about this because...  It has service
+>> >     thread that does part of the work of some filesystem operations
+>> >     (handling replies for example) and these are best handled "near"
+>> >     the CPU the initiated the request.  Lustre partitions
+>> >     all CPUs into "partitions" (cpt) each with a few cores.
+>> >     If the request thread and the reply thread are on different
+>> >     CPUs but in the same partition, then we get best throughput
+>> >     (is that close?)
+>> 
+>> At the filesystem level, it does indeed seem to help to have the service
+>> threads that do work for requests run on a different core that is close to
+>> the core that originated the request. So preferably on the same CPU, and
+>> on certain multi-core CPUs there are also distance effects between cores.
+>> That too is one of the things the CPT mechanism handles.
+>
+> Their is another very important aspect to why Lustre has a CPU partition 
+> layer. At least at the place I work at. While the Linux kernel manages all
+> the NUMA nodes and CPU cores Lustre adds the ability for us to specify a 
+> subset of everything on the system. The reason is to limit the impact of
+> noise on the compute nodes. Noise has a heavy impact on large scale HP
+> work loads that can run days or even weeks at a time. Lets take an 
+> example system:
+>
+>                |-------------|     |-------------|
+>    |-------|   | NUMA  0     |     | NUMA  1     |   |-------|
+>    | eth0  | - |             | --- |             | - | eth1  |      
+>    |_______|   | CPU0  CPU1  |     | CPU2  CPU3  |   |_______|
+>                |_____________|     |_____________|
+>
+> In such a system it is possible with the right job schedular to start a 
+> large parallel application on NUMA 0/ (CPU0 and CPU1). Normally such
+> large parallel applications will communicate between nodes using MPI,
+> such as openmpi, which can be configured to use eth0 only. Using the
+> CPT layer in lustre we can isolate lustre to NUMA 1 and use only eth1.
+> This greatly reducess the noise impact on the application running.
+>
+> BTW this is one of the reasons ko2iblnd for lustre doesn't use the
+> generic RDMA api. The core IB layer doesn't support such isolation.
+> At least to my knowledge.
 
-Oleg could you fill in detail what your concerns are?
- 
-> >  
-> >> Both users of interval-tree in lustre would be simpler if this was not
-> >> the case.  They need to store all intervals, even if some are
-> >> identical.
-> >> 
-> >> llite/range_lock.c add a rl_next_lock list_head to each lock.
-> >> If it cannot insert a new lock because the range is in use, it
-> >> attached the new lock to the existing lock using rl_next_lock.
-> >> This requires extra code to iterate over the rl_next_lock lists when
-> >> iterating over locks, and to update the list when deleting a lock from
-> >> the tree.
-> >> 
-> >> ldlm_extend allocates a separate ldlm_interval which as a list of
-> >> ldlm_locks which share the same interval.  This is linked together
-> >> by over-loading the l_sl_policy which, for non-extent locks, is used
-> >> for linking together locks with the same policy.
-> >> This doesn't only require extra code, but also an extra memory
-> >> allocation.
-> >> 
-> >> This patch removes all that complexity.
-> >> - interval_insert() now never fails.
-> >
-> > Its not really a failure. What it does is if it finds a already existing
-> > node with the range requested it returns the already existing node 
-> > pointer. If not it just creates a new node and returns NULL. Sometimes
-> > identical request can happen. A good example of this is with HSM request
-> > on the MDS server. In that case sometimes we get identical progress
-> > reports which we want to filter out so not add the same data.
-> 
-> This example is server-side code which is not a focus at present.
-> Having a quick look, it looks like it would be easy enough to do a
-> lookup first and then only insert if the lookup failed.
-> I think this is a much nicer approach than never allowing duplicates in
-> the interval tree.
-> 
-> Thanks,
-> NeilBrown
-> 
+Thanks for that background (and for the separate explanation of how
+jitter multiplies when jobs needs to synchronize periodically).
+
+I can see that setting CPU affinity for lustre/lnet worker threads could
+be important, and that it can be valuable to tie services to a
+particular interface.  I cannot yet see why we need partitions for this,
+rather that doing it at the CPU (or NODE) level.
+
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180706/b207f4ab/attachment.sig>
