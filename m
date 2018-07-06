@@ -1,32 +1,141 @@
-From: Cory Spitz <spitzcor@cray.com>
-Date: Fri, 6 Jul 2018 04:02:29 +0000
-Subject: [lustre-devel] [PATCH 01/18] lustre: grant: add support for
- OBD_CONNECT_GRANT_PARAM
-In-Reply-To: <1530573875-20465-2-git-send-email-jsimmons@infradead.org>
-References: <1530573875-20465-1-git-send-email-jsimmons@infradead.org>
- <1530573875-20465-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <0F41C25D-E055-489A-82B6-CF4728AFF905@cray.com>
+From: NeilBrown <neilb@suse.com>
+Date: Fri, 06 Jul 2018 14:19:41 +1000
+Subject: [lustre-devel] [PATCH v3 04/13] lustre: libcfs: fix
+ cfs_print_to_console()
+In-Reply-To: <alpine.LFD.2.21.1807060034020.12665@casper.infradead.org>
+References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
+ <1530128322-32535-5-git-send-email-jsimmons@infradead.org>
+ <FD87D2B8-27A8-45DF-9C7C-BA33CF940C1D@whamcloud.com>
+ <alpine.LFD.2.21.1806291716050.26339@casper.infradead.org>
+ <87h8li2wz7.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1807060034020.12665@casper.infradead.org>
+Message-ID: <87tvpdxag2.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-James,
+On Fri, Jul 06 2018, James Simmons wrote:
 
-?On 7/2/18, 6:25 PM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
+>> >> > The original code for cfs_print_to_console() used printk() and
+>> >> > used tricks to select which printk level to use. Later a cleanup
+>> >> > patch landed the just converted printk directly to pr_info which
+>> >> > is not exactly correct. Instead of converting back to printk lets
+>> >> > move everything to pr_* type functions which simplify the code.
+>> >> > This allows us to fold both dbghdr_to_err_string() and the
+>> >> > function dbghdr_to_info_string() into cfs_print_to_console().
+>> >> > 
+>> >> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+>> >> > ---
+>> >> > .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 55 ++++++----------------
+>> >> > 1 file changed, 14 insertions(+), 41 deletions(-)
+>> >> > 
+>> >> > diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+>> >> > index 3af7722..c1747c4 100644
+>> >> > --- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+>> >> > +++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+>> >> > @@ -140,54 +140,27 @@ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
+>> >> > void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
+>> >> > 			  const char *buf, int len, const char *file,
+>> >> > 			  const char *fn)
+>> >> > {
+>> >> > +	char *prefix = "Lustre";
+>> >> > +
+>> >> > +	if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
+>> >> > +		prefix = "LNet";
+>> >> > 
+>> >> > -	if (mask & D_EMERG) {
+>> >> > -		prefix = dbghdr_to_err_string(hdr);
+>> >> > -		ptype = KERN_EMERG;
+>> >> > +	if (mask & (D_CONSOLE | libcfs_printk)) {
+>> >> 
+>> >> This check is broken.  The default value of libcfs_printk (the mask
+>> >> that controls which messages should be printed to the console, and
+>> >> which ones should only be logged into the internal buffer) is:
+>> >> 
+>> >>     #define D_CANTMASK (D_ERROR | D_EMERG | D_WARNING | D_CONSOLE)
+>> >> 
+>> >> so that means virtually every console message will be printed with
+>> >> pr_info() because this is matched first, instead of pr_emerg() or
+>> >> pr_err() below.
+>> >> 
+>> >> That is why the previous code was matching D_EMERG and D_ERROR first,
+>> >> then D_WARNING, and (D_CONSOLE | libcfs_printk) at the end.
+>> >
+>> > So to do this right we need:
+>> >
+>> > static void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
+>> >                                  const char *buf, int len, const char 
+>> > *file,
+>> >                                  const char *fn)
+>> > {
+>> >         char *prefix = "Lustre";
+>> >
+>> >         if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
+>> >                 prefix = "LNet";
+>> >
+>> >         if (mask & D_CONSOLE) {
+>> >                 if (mask & D_EMERG) {
+>> >                         pr_emerg("%sError: %.*s", prefix, len, buf);
+>> >                 } else if (mask & D_ERROR) {
+>> >                         pr_err("%sError: %.*s", prefix, len, buf);
+>> >                 } else if (mask & D_WARNING) {
+>> >                         pr_warn("%s: %.*s", prefix, len, buf);
+>> >                 } else if (mask & libcfs_printk) {
+>> >                         pr_info("%s: %.*s", prefix, len, buf);
+>> >                 }
+>> >         } else {
+>> >                 if (mask & D_EMERG) {
+>> >                         pr_emerg("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
+>> >                                  hdr->ph_pid, hdr->ph_extern_pid, file,
+>> >                                  hdr->ph_line_num, fn, len, buf);
+>> >                 } else if (mask & D_ERROR) {
+>> >                         pr_err("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
+>> >                                hdr->ph_pid, hdr->ph_extern_pid, file,
+>> >                                hdr->ph_line_num, fn, len, buf);
+>> >                 } else if (mask & D_WARNING) {
+>> >                         pr_warn("%s: %d:%d:(%s:%d:%s()) %.*s", prefix,
+>> >                                 hdr->ph_pid, hdr->ph_extern_pid, file,
+>> >                                 hdr->ph_line_num, fn, len, buf);
+>> >                 } else if (mask & libcfs_printk) {
+>> >                         pr_info("%s: %.*s", prefix, len, buf);
+>> >                 }
+>> >         }
+>> > }
+>> 
+>> That doesn't look right either.
+>> The original code would *always* print something.
+>> This code looks like it might not (e.g. for mask == 0).
+>
+> Is that correct behavior? A mask of zero means don't do anything.
+> Also if you look at the original in the OpenSFS branch you can see
+> if mask was to be 0 then ptype would be NULl :-( 
 
-    From: Johann Lombardi <jlombardi@whamcloud.com>
-    Signed-off-by: Johann Lombardi <jlombardi@whamcloud.com>
-    Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-    WC-bug-id: https://jira.whamcloud.com/browse/2049
-    Reviewed-on: http://review.whamcloud.com/7793
-    Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-    Reviewed-by: Nathaniel Clark <nathaniel.l.clark@intel.com>
- 
-James, can you fix this up?  I'm not sure how historical patches should be attributed, but Johann's address seems wrong.
+True... so it would print something, but the something would have (null)
+in it.  So it probably never happens.
 
-From should be attributed to Johann Lombardi <johann.lombardi@intel.com> .  Also, the Bug URL should be https://jira.whamcloud.com/browse/LU-2049 .
+>
+> Note a D_CANT_MASK prevents some fields in the mask from being disabled.
+>
+>> What is "D_CONSOLE" suppose to mean?  It seems to me "make the messages
+>> less verbose" and it isn't clear to me that what is called "D_CONSOLE".
+>
+> It means two things. If by itself then it means use pr_info. If it is one
+> field in the mask then it means less detail. Confusing no :-( That is my
+> understanding of it. Maybe someone else can clarify if I'm wrong.
+
+Yes, "confusing" seems an accurate description.  But if that is what it
+is, then that is what it is.
+If you send you new version as a patch, either against the original or
+against the buggy version, I'll apply it.
 
 Thanks,
--Cory
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180706/2cadd2aa/attachment-0001.sig>
