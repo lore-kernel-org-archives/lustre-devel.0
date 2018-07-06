@@ -1,8 +1,8 @@
-From: James Simmons <jsimmons@infradead.org>
-Date: Fri, 6 Jul 2018 16:57:00 +0100 (BST)
+From: Patrick Farrell <paf@cray.com>
+Date: Fri, 6 Jul 2018 16:04:42 +0000
 Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
  support
-In-Reply-To: <87o9fkyjqs.fsf@notabene.neil.brown.name>
+In-Reply-To: <alpine.LFD.2.21.1807061650320.15728@casper.infradead.org>
 References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
  <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
  <877emnaed8.fsf@notabene.neil.brown.name>
@@ -19,74 +19,90 @@ References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
  <87zhz5xdld.fsf@notabene.neil.brown.name>
  <02B7B718-E496-46CF-B55D-86EAB98381B6@cray.com>
  <87o9fkyjqs.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1807061650320.15728@casper.infradead.org>
+ <alpine.LFD.2.21.1807061650320.15728@casper.infradead.org>
+Message-ID: <994B573E-4C9E-4A2D-AE20-2C682097C74D@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+Yeah, but they still won't really care much about noise.  Noise is really only a big problem if you're compounding it like HPC jobs do, otherwise it's negligible.  You worry about average time and maybe worst case - Not how noisy the average is, unless it suffers from wide excursions.  Lots of small excursions in execution time ("noise/jitter") don't matter.  (Unless you're an HPC job.)
 
-> > When the CPT code was added to LNet back in 2012, it was to address
-> > one primary case: a need for finer grained locking on metadata
-> > servers.  LNet used to have global locks and metadata servers, which
-> > do many small messages (high IOPS), much time in the worker threads
-> > was spent in spinlocks.  So, CPT configuration was added so
-> > locks/resources could be allocated per CPT.  This way, users have
-> > control over how they want CPTs to be configured and how they want
-> > resources/locks to be divided.  For example, users may want finer
-> > grained locking on the metadata servers but not on clients.  Leaving
-> > this to be automatically configured by Linux API calls would take this
-> > flexibility away from the users who, for HPC, are very knowledgable
-> > about what they want (i.e. we do not want to protect them from
-> > themselves).
-> >
-> > The CPT support in LNet and LNDs has morphed to encompass more
-> > traditional NUMA and core affinity performance improvements.  For
-> > example, you can restrict a network interface to a socket (NUMA node)
-> > which has better affinity to the PCIe lanes that interface is
-> > connected to.  Rather than try to do this sort of thing automatically,
-> > we have left it to the user to know what they are doing and configure
-> > the CPTs accordingly.
-> >
-> > I think the many changes to the CPT code has realty clouded its
-> > purpose.  In summary, the original purpose was finer grained locking
-> > and that needs to be maintained as the IOPS requirements of metadata
-> > servers is paramount.
-> 
-> Thanks for the explanation.
-> I definitely get that fine-grained locking is a good thing.  Lustre is
-> not alone in this of course.
-> Even better than fine-grained locking is no locking.  That is not often
-> possible, but this
->   https://github.com/neilbrown/linux/commit/ac3f8fd6e61b245fa9c14e3164203c1211c5ef6b
-> 
-> is an example of doing exactly that.
-> 
-> For the read/writer usage of CPT locks, RCU is a better approach if it
-> can be made to work (usually it can) - and it scales even better.
-> 
-> When I was digging through the usage of locks I saw some hash tables.
-> It seems that a lock protected a whole table.  It is usually sufficient
-> for the lock to just protect a single chain (bit spin-locks can easily
-> store one lock per chain) and then only for writes - RCU discipline can
-> allow reads to proceed with only rcu_read_lock().
-> Would we still need per-CPT tables once that was in place?  I don't know
-> yet, though per-node seems likely to be sufficient when locking is per-chain.
-> 
-> I certainly wouldn't discard CPTs without replacing them with something
-> better.  Near the top of my list for when I return from vacation
-> (leaving in a couple of days) will be to look closely at the current
-> fine-grained locking that you have helped me to see more clearly, and
-> see if I can make it even better.
+The real time people care more about noise, though I believe they're still more concerned about worst cases and bounds than jitter.  Maybe some real time people are intensely worried about jitter for some use cases.
 
-If RCU can provide better scaling then its best to replace CPT handling in
-those cases. Lets land the Mult-Rail stuff first since it makes the most
-heavy use of the CPT code. From there we can get a good idea of how to
-move forward. I don't think we can easily abandon the CPT infrastructure
-in general since we need it for partitioning to reduce noise. What would
-be ideal is integrate the partitoning work to the general linux kernel.
-While lustre attempts to reduce noise on nodes the rest of the kernel 
-doesn't. If the linux kernel supported this it would be a big win for
-HPC systems. The monster HPC systems today will be general hardware 5+
-years down the road.
+So this concern is not going mainstream even if the systems do, and the scheduler behavior required to minimize noise is sometimes not the same behavior required to improve responsiveness, reduce power consumption, etc.
+
+Just food for thought.
+
+?On 7/6/18, 10:57 AM, "lustre-devel on behalf of James Simmons" <lustre-devel-bounces at lists.lustre.org on behalf of jsimmons@infradead.org> wrote:
+
+    
+    > > When the CPT code was added to LNet back in 2012, it was to address
+    > > one primary case: a need for finer grained locking on metadata
+    > > servers.  LNet used to have global locks and metadata servers, which
+    > > do many small messages (high IOPS), much time in the worker threads
+    > > was spent in spinlocks.  So, CPT configuration was added so
+    > > locks/resources could be allocated per CPT.  This way, users have
+    > > control over how they want CPTs to be configured and how they want
+    > > resources/locks to be divided.  For example, users may want finer
+    > > grained locking on the metadata servers but not on clients.  Leaving
+    > > this to be automatically configured by Linux API calls would take this
+    > > flexibility away from the users who, for HPC, are very knowledgable
+    > > about what they want (i.e. we do not want to protect them from
+    > > themselves).
+    > >
+    > > The CPT support in LNet and LNDs has morphed to encompass more
+    > > traditional NUMA and core affinity performance improvements.  For
+    > > example, you can restrict a network interface to a socket (NUMA node)
+    > > which has better affinity to the PCIe lanes that interface is
+    > > connected to.  Rather than try to do this sort of thing automatically,
+    > > we have left it to the user to know what they are doing and configure
+    > > the CPTs accordingly.
+    > >
+    > > I think the many changes to the CPT code has realty clouded its
+    > > purpose.  In summary, the original purpose was finer grained locking
+    > > and that needs to be maintained as the IOPS requirements of metadata
+    > > servers is paramount.
+    > 
+    > Thanks for the explanation.
+    > I definitely get that fine-grained locking is a good thing.  Lustre is
+    > not alone in this of course.
+    > Even better than fine-grained locking is no locking.  That is not often
+    > possible, but this
+    >   https://github.com/neilbrown/linux/commit/ac3f8fd6e61b245fa9c14e3164203c1211c5ef6b
+    > 
+    > is an example of doing exactly that.
+    > 
+    > For the read/writer usage of CPT locks, RCU is a better approach if it
+    > can be made to work (usually it can) - and it scales even better.
+    > 
+    > When I was digging through the usage of locks I saw some hash tables.
+    > It seems that a lock protected a whole table.  It is usually sufficient
+    > for the lock to just protect a single chain (bit spin-locks can easily
+    > store one lock per chain) and then only for writes - RCU discipline can
+    > allow reads to proceed with only rcu_read_lock().
+    > Would we still need per-CPT tables once that was in place?  I don't know
+    > yet, though per-node seems likely to be sufficient when locking is per-chain.
+    > 
+    > I certainly wouldn't discard CPTs without replacing them with something
+    > better.  Near the top of my list for when I return from vacation
+    > (leaving in a couple of days) will be to look closely at the current
+    > fine-grained locking that you have helped me to see more clearly, and
+    > see if I can make it even better.
+    
+    If RCU can provide better scaling then its best to replace CPT handling in
+    those cases. Lets land the Mult-Rail stuff first since it makes the most
+    heavy use of the CPT code. From there we can get a good idea of how to
+    move forward. I don't think we can easily abandon the CPT infrastructure
+    in general since we need it for partitioning to reduce noise. What would
+    be ideal is integrate the partitoning work to the general linux kernel.
+    While lustre attempts to reduce noise on nodes the rest of the kernel 
+    doesn't. If the linux kernel supported this it would be a big win for
+    HPC systems. The monster HPC systems today will be general hardware 5+
+    years down the road.
+    _______________________________________________
+    lustre-devel mailing list
+    lustre-devel at lists.lustre.org
+    http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+    
