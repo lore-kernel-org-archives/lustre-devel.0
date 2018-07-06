@@ -1,141 +1,135 @@
-From: NeilBrown <neilb@suse.com>
-Date: Fri, 06 Jul 2018 14:19:41 +1000
-Subject: [lustre-devel] [PATCH v3 04/13] lustre: libcfs: fix
- cfs_print_to_console()
-In-Reply-To: <alpine.LFD.2.21.1807060034020.12665@casper.infradead.org>
-References: <1530128322-32535-1-git-send-email-jsimmons@infradead.org>
- <1530128322-32535-5-git-send-email-jsimmons@infradead.org>
- <FD87D2B8-27A8-45DF-9C7C-BA33CF940C1D@whamcloud.com>
- <alpine.LFD.2.21.1806291716050.26339@casper.infradead.org>
- <87h8li2wz7.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1807060034020.12665@casper.infradead.org>
-Message-ID: <87tvpdxag2.fsf@notabene.neil.brown.name>
+From: Doug Oucharek <doucharek@cray.com>
+Date: Fri, 6 Jul 2018 05:36:03 +0000
+Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
+ support
+In-Reply-To: <87zhz5xdld.fsf@notabene.neil.brown.name>
+References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+ <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
+ <877emnaed8.fsf@notabene.neil.brown.name>
+ <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>
+ <87lgb16j8q.fsf@notabene.neil.brown.name>
+ <DM3PR1101MB1213FD1001256E565FF011FFCB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <8736x77lrk.fsf@notabene.neil.brown.name>
+ <9DE389AB-C7E1-4336-B7E8-604581EFD53E@cray.com>
+ <CAAqp6i0uwmpdFYUJ7mCBz+MH+gVBa6S=P2t5Yn7wcFOtrTD-Fg@mail.gmail.com>
+ <AT5PR8401MB0900C67FADDF0EF7ED1CDBC4854E0@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+ <87va9vziay.fsf@notabene.neil.brown.name>
+ <AT5PR8401MB0900A5406BF0CB8C87B80EEC85410@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+ <alpine.LFD.2.21.1807060052470.12665@casper.infradead.org>
+ <87zhz5xdld.fsf@notabene.neil.brown.name>
+Message-ID: <02B7B718-E496-46CF-B55D-86EAB98381B6@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
+When the CPT code was added to LNet back in 2012, it was to address one primary case: a need for finer grained locking on metadata servers.  LNet used to have global locks and metadata servers, which do many small messages (high IOPS), much time in the worker threads was spent in spinlocks.  So, CPT configuration was added so locks/resources could be allocated per CPT.  This way, users have control over how they want CPTs to be configured and how they want resources/locks to be divided.  For example, users may want finer grained locking on the metadata servers but not on clients.  Leaving this to be automatically configured by Linux API calls would take this flexibility away from the users who, for HPC, are very knowledgable about what they want (i.e. we do not want to protect them from themselves).
+
+The CPT support in LNet and LNDs has morphed to encompass more traditional NUMA and core affinity performance improvements.  For example, you can restrict a network interface to a socket (NUMA node) which has better affinity to the PCIe lanes that interface is connected to.  Rather than try to do this sort of thing automatically, we have left it to the user to know what they are doing and configure the CPTs accordingly.
+
+I think the many changes to the CPT code has realty clouded its purpose.  In summary, the original purpose was finer grained locking and that needs to be maintained as the IOPS requirements of metadata servers is paramount.
+
+James: The Verbs RDMA interface has very poor support for NUMA/core affinity.  I was going to try to devise some patches to address that but have been too busy on other things.  Perhaps the RDMA maintainer could consider updating it?
+
+Doug
+
+On Jul 5, 2018, at 8:11 PM, NeilBrown <neilb at suse.com<mailto:neilb@suse.com>> wrote:
+
 On Fri, Jul 06 2018, James Simmons wrote:
 
->> >> > The original code for cfs_print_to_console() used printk() and
->> >> > used tricks to select which printk level to use. Later a cleanup
->> >> > patch landed the just converted printk directly to pr_info which
->> >> > is not exactly correct. Instead of converting back to printk lets
->> >> > move everything to pr_* type functions which simplify the code.
->> >> > This allows us to fold both dbghdr_to_err_string() and the
->> >> > function dbghdr_to_info_string() into cfs_print_to_console().
->> >> > 
->> >> > Signed-off-by: James Simmons <jsimmons@infradead.org>
->> >> > ---
->> >> > .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 55 ++++++----------------
->> >> > 1 file changed, 14 insertions(+), 41 deletions(-)
->> >> > 
->> >> > diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
->> >> > index 3af7722..c1747c4 100644
->> >> > --- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
->> >> > +++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
->> >> > @@ -140,54 +140,27 @@ enum cfs_trace_buf_type cfs_trace_buf_idx_get(void)
->> >> > void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
->> >> > 			  const char *buf, int len, const char *file,
->> >> > 			  const char *fn)
->> >> > {
->> >> > +	char *prefix = "Lustre";
->> >> > +
->> >> > +	if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
->> >> > +		prefix = "LNet";
->> >> > 
->> >> > -	if (mask & D_EMERG) {
->> >> > -		prefix = dbghdr_to_err_string(hdr);
->> >> > -		ptype = KERN_EMERG;
->> >> > +	if (mask & (D_CONSOLE | libcfs_printk)) {
->> >> 
->> >> This check is broken.  The default value of libcfs_printk (the mask
->> >> that controls which messages should be printed to the console, and
->> >> which ones should only be logged into the internal buffer) is:
->> >> 
->> >>     #define D_CANTMASK (D_ERROR | D_EMERG | D_WARNING | D_CONSOLE)
->> >> 
->> >> so that means virtually every console message will be printed with
->> >> pr_info() because this is matched first, instead of pr_emerg() or
->> >> pr_err() below.
->> >> 
->> >> That is why the previous code was matching D_EMERG and D_ERROR first,
->> >> then D_WARNING, and (D_CONSOLE | libcfs_printk) at the end.
->> >
->> > So to do this right we need:
->> >
->> > static void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
->> >                                  const char *buf, int len, const char 
->> > *file,
->> >                                  const char *fn)
->> > {
->> >         char *prefix = "Lustre";
->> >
->> >         if (hdr->ph_subsys == S_LND || hdr->ph_subsys == S_LNET)
->> >                 prefix = "LNet";
->> >
->> >         if (mask & D_CONSOLE) {
->> >                 if (mask & D_EMERG) {
->> >                         pr_emerg("%sError: %.*s", prefix, len, buf);
->> >                 } else if (mask & D_ERROR) {
->> >                         pr_err("%sError: %.*s", prefix, len, buf);
->> >                 } else if (mask & D_WARNING) {
->> >                         pr_warn("%s: %.*s", prefix, len, buf);
->> >                 } else if (mask & libcfs_printk) {
->> >                         pr_info("%s: %.*s", prefix, len, buf);
->> >                 }
->> >         } else {
->> >                 if (mask & D_EMERG) {
->> >                         pr_emerg("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
->> >                                  hdr->ph_pid, hdr->ph_extern_pid, file,
->> >                                  hdr->ph_line_num, fn, len, buf);
->> >                 } else if (mask & D_ERROR) {
->> >                         pr_err("%sError: %d:%d:(%s:%d:%s()) %.*s", prefix,
->> >                                hdr->ph_pid, hdr->ph_extern_pid, file,
->> >                                hdr->ph_line_num, fn, len, buf);
->> >                 } else if (mask & D_WARNING) {
->> >                         pr_warn("%s: %d:%d:(%s:%d:%s()) %.*s", prefix,
->> >                                 hdr->ph_pid, hdr->ph_extern_pid, file,
->> >                                 hdr->ph_line_num, fn, len, buf);
->> >                 } else if (mask & libcfs_printk) {
->> >                         pr_info("%s: %.*s", prefix, len, buf);
->> >                 }
->> >         }
->> > }
->> 
->> That doesn't look right either.
->> The original code would *always* print something.
->> This code looks like it might not (e.g. for mask == 0).
->
-> Is that correct behavior? A mask of zero means don't do anything.
-> Also if you look at the original in the OpenSFS branch you can see
-> if mask was to be 0 then ptype would be NULl :-( 
+NeilBrown [mailto:neilb at suse.com] wrote:
 
-True... so it would print something, but the something would have (null)
-in it.  So it probably never happens.
+To help contextualize things: the Lustre code can be decomposed into three parts:
 
->
-> Note a D_CANT_MASK prevents some fields in the mask from being disabled.
->
->> What is "D_CONSOLE" suppose to mean?  It seems to me "make the messages
->> less verbose" and it isn't clear to me that what is called "D_CONSOLE".
->
-> It means two things. If by itself then it means use pr_info. If it is one
-> field in the mask then it means less detail. Confusing no :-( That is my
-> understanding of it. Maybe someone else can clarify if I'm wrong.
+1) The filesystem proper: Lustre.
+2) The communication protocol it uses: LNet.
+3) Supporting code used by Lustre and LNet: CFS.
 
-Yes, "confusing" seems an accurate description.  But if that is what it
-is, then that is what it is.
-If you send you new version as a patch, either against the original or
-against the buggy version, I'll apply it.
+Part of the supporting code is the CPT mechanism, which provides a way to
+partition the CPUs of a system. These partitions are used to distribute queues,
+locks, and threads across the system. It was originally introduced years ago, as
+far as I can tell mainly to deal with certain hot locks: these were converted into
+read/write locks with one spinlock per CPT.
+
+As a general rule, CPT boundaries should respect node and socket boundaries,
+but at the higher end, where CPUs have 20+ cores, it may make sense to split
+a CPUs cores across several CPTs.
+
+Thanks everyone for your patience in explaining things to me.
+I'm beginning to understand what to look for and where to find it.
+
+So the answers to Greg's questions:
+
+ Where are you reading the host memory NUMA information from?
+
+ And why would a filesystem care about this type of thing?  Are you
+ going to now mirror what the scheduler does with regards to NUMA
+ topology issues?  How are you going to handle things when the topology
+ changes?  What systems did you test this on?  What performance
+ improvements were seen?  What downsides are there with all of this?
+
+
+Are:
+
+ - NUMA info comes from ACPI or device-tree just like for every one
+     else.  Lustre just uses node_distance().
+
+Correct, the standard kernel interfaces for this information are used to
+obtain it, so ultimately Lustre/LNet uses the same source of truth as
+everyone else.
+
+ - The filesystem cares about this because...  It has service
+   thread that does part of the work of some filesystem operations
+   (handling replies for example) and these are best handled "near"
+   the CPU the initiated the request.  Lustre partitions
+   all CPUs into "partitions" (cpt) each with a few cores.
+   If the request thread and the reply thread are on different
+   CPUs but in the same partition, then we get best throughput
+   (is that close?)
+
+At the filesystem level, it does indeed seem to help to have the service
+threads that do work for requests run on a different core that is close to
+the core that originated the request. So preferably on the same CPU, and
+on certain multi-core CPUs there are also distance effects between cores.
+That too is one of the things the CPT mechanism handles.
+
+Their is another very important aspect to why Lustre has a CPU partition
+layer. At least at the place I work at. While the Linux kernel manages all
+the NUMA nodes and CPU cores Lustre adds the ability for us to specify a
+subset of everything on the system. The reason is to limit the impact of
+noise on the compute nodes. Noise has a heavy impact on large scale HP
+work loads that can run days or even weeks at a time. Lets take an
+example system:
+
+              |-------------|     |-------------|
+  |-------|   | NUMA  0     |     | NUMA  1     |   |-------|
+  | eth0  | - |             | --- |             | - | eth1  |
+  |_______|   | CPU0  CPU1  |     | CPU2  CPU3  |   |_______|
+              |_____________|     |_____________|
+
+In such a system it is possible with the right job schedular to start a
+large parallel application on NUMA 0/ (CPU0 and CPU1). Normally such
+large parallel applications will communicate between nodes using MPI,
+such as openmpi, which can be configured to use eth0 only. Using the
+CPT layer in lustre we can isolate lustre to NUMA 1 and use only eth1.
+This greatly reducess the noise impact on the application running.
+
+BTW this is one of the reasons ko2iblnd for lustre doesn't use the
+generic RDMA api. The core IB layer doesn't support such isolation.
+At least to my knowledge.
+
+Thanks for that background (and for the separate explanation of how
+jitter multiplies when jobs needs to synchronize periodically).
+
+I can see that setting CPU affinity for lustre/lnet worker threads could
+be important, and that it can be valuable to tie services to a
+particular interface.  I cannot yet see why we need partitions for this,
+rather that doing it at the CPU (or NODE) level.
 
 Thanks,
 NeilBrown
+
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180706/2cadd2aa/attachment-0001.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180706/ba357d68/attachment-0001.html>
