@@ -1,128 +1,180 @@
-From: Doug Oucharek <doucharek@cray.com>
-Date: Fri, 6 Jul 2018 00:01:46 +0000
-Subject: [lustre-devel] [PATCH 00/24] lustre - more cleanups including
- module reduction.
-In-Reply-To: <alpine.LFD.2.21.1807060043430.12665@casper.infradead.org>
-References: <152904663333.10587.10934053155404014785.stgit@noble>
- <alpine.LFD.2.21.1806210239190.3886@casper.infradead.org>
- <DM3PR1101MB1213DDB7FC857EE6B1444153CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <alpine.LFD.2.21.1806210354260.3886@casper.infradead.org>
- <3FD4D051-9C95-449D-8A23-D42B271E55B8@dilger.ca>
- <DM3PR1101MB121322E85FDE1E5310F6F4B7CB760@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <87tvprah32.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1806260206360.31196@casper.infradead.org>
- <DM3PR1101MB121358672276198B843DE5A7CB490@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <87d0wd6i4m.fsf@notabene.neil.brown.name>
- <44633E99-07CB-4C40-967C-0B4FE206F29A@whamcloud.com>
- <DM3PR1101MB12132AC3E33E7D7C8FBE4536CB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <87tvpn6592.fsf@notabene.neil.brown.name>
- <DM3PR1101MB12139B5B51BCE76A79DEC383CB4F0@DM3PR1101MB1213.namprd11.prod.outlook.com>
- <D6CA5D91-2344-446F-9621-935A52E47A24@whamcloud.com>
- <alpine.LFD.2.21.1807060043430.12665@casper.infradead.org>
-Message-ID: <D654AFAE-B860-4BE8-B988-57C481597AD5@cray.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Fri, 6 Jul 2018 01:20:37 +0100 (BST)
+Subject: [lustre-devel] [PATCH v3 07/26] staging: lustre: libcfs: NUMA
+ support
+In-Reply-To: <AT5PR8401MB0900A5406BF0CB8C87B80EEC85410@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+References: <1529875250-11531-1-git-send-email-jsimmons@infradead.org>
+ <1529875250-11531-8-git-send-email-jsimmons@infradead.org>
+ <877emnaed8.fsf@notabene.neil.brown.name>
+ <A764DED1-A9A8-4FA5-A0F1-922C3E2D822A@cray.com>
+ <87lgb16j8q.fsf@notabene.neil.brown.name>
+ <DM3PR1101MB1213FD1001256E565FF011FFCB480@DM3PR1101MB1213.namprd11.prod.outlook.com>
+ <8736x77lrk.fsf@notabene.neil.brown.name>
+ <9DE389AB-C7E1-4336-B7E8-604581EFD53E@cray.com>
+ <CAAqp6i0uwmpdFYUJ7mCBz+MH+gVBa6S=P2t5Yn7wcFOtrTD-Fg@mail.gmail.com>
+ <AT5PR8401MB0900C67FADDF0EF7ED1CDBC4854E0@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+ <87va9vziay.fsf@notabene.neil.brown.name>
+ <AT5PR8401MB0900A5406BF0CB8C87B80EEC85410@AT5PR8401MB0900.NAMPRD84.PROD.OUTLOOK.COM>
+Message-ID: <alpine.LFD.2.21.1807060052470.12665@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Unfortunately, NIDs get stored outside of LNet in the Lustre configuration.  That?s why changing the nature of NIDs requires a lot of changes in many places in and out of LNet.  
 
-In my opinion, the best gameplay is to get Lustre to stop even knowing what a NID is.  Have Lustre identify nodes via a name which LNet converts to a NID (sort of like how DNS works).  At that point, LNet can make the NID be anything you want: IPv6, IB address, etc.  This also means you don?t have to run writeconf (or something like that) when the network changes.  Only LNet needs to be updated.
+> NeilBrown [mailto:neilb at suse.com] wrote:
+> 
+> To help contextualize things: the Lustre code can be decomposed into three parts:
+> 
+> 1) The filesystem proper: Lustre.
+> 2) The communication protocol it uses: LNet.
+> 3) Supporting code used by Lustre and LNet: CFS.
+> 
+> Part of the supporting code is the CPT mechanism, which provides a way to
+> partition the CPUs of a system. These partitions are used to distribute queues,
+> locks, and threads across the system. It was originally introduced years ago, as
+> far as I can tell mainly to deal with certain hot locks: these were converted into
+> read/write locks with one spinlock per CPT.
+> 
+> As a general rule, CPT boundaries should respect node and socket boundaries,
+> but at the higher end, where CPUs have 20+ cores, it may make sense to split
+> a CPUs cores across several CPTs.
+> 
+> > Thanks everyone for your patience in explaining things to me.
+> > I'm beginning to understand what to look for and where to find it.
+> > 
+> > So the answers to Greg's questions:
+> > 
+> >   Where are you reading the host memory NUMA information from?
+> > 
+> >   And why would a filesystem care about this type of thing?  Are you
+> >   going to now mirror what the scheduler does with regards to NUMA
+> >   topology issues?  How are you going to handle things when the topology
+> >   changes?  What systems did you test this on?  What performance
+> >   improvements were seen?  What downsides are there with all of this?
+> > 
+> > 
+> > Are:
+> 
+> >   - NUMA info comes from ACPI or device-tree just like for every one
+> >       else.  Lustre just uses node_distance().
+> 
+> Correct, the standard kernel interfaces for this information are used to
+> obtain it, so ultimately Lustre/LNet uses the same source of truth as
+> everyone else.
+> 
+> >   - The filesystem cares about this because...  It has service
+> >     thread that does part of the work of some filesystem operations
+> >     (handling replies for example) and these are best handled "near"
+> >     the CPU the initiated the request.  Lustre partitions
+> >     all CPUs into "partitions" (cpt) each with a few cores.
+> >     If the request thread and the reply thread are on different
+> >     CPUs but in the same partition, then we get best throughput
+> >     (is that close?)
+> 
+> At the filesystem level, it does indeed seem to help to have the service
+> threads that do work for requests run on a different core that is close to
+> the core that originated the request. So preferably on the same CPU, and
+> on certain multi-core CPUs there are also distance effects between cores.
+> That too is one of the things the CPT mechanism handles.
 
-Doug
+Their is another very important aspect to why Lustre has a CPU partition 
+layer. At least at the place I work at. While the Linux kernel manages all
+the NUMA nodes and CPU cores Lustre adds the ability for us to specify a 
+subset of everything on the system. The reason is to limit the impact of
+noise on the compute nodes. Noise has a heavy impact on large scale HP
+work loads that can run days or even weeks at a time. Lets take an 
+example system:
 
-> On Jul 5, 2018, at 4:47 PM, James Simmons <jsimmons@infradead.org> wrote:
+	       |-------------|	   |-------------|
+   |-------|   | NUMA  0     |	   | NUMA  1	 |   |-------|
+   | eth0  | - |	     | --- |		 | - | eth1  |      
+   |_______|   | CPU0  CPU1  |	   | CPU2  CPU3  |   |_______|
+	       |_____________|	   |_____________|
+
+In such a system it is possible with the right job schedular to start a 
+large parallel application on NUMA 0/ (CPU0 and CPU1). Normally such
+large parallel applications will communicate between nodes using MPI,
+such as openmpi, which can be configured to use eth0 only. Using the
+CPT layer in lustre we can isolate lustre to NUMA 1 and use only eth1.
+This greatly reducess the noise impact on the application running.
+
+BTW this is one of the reasons ko2iblnd for lustre doesn't use the
+generic RDMA api. The core IB layer doesn't support such isolation.
+At least to my knowledge.
+
+> >   - Not really mirroring the scheduler, maybe mirroring parts of the
+> >     network layer(?)
 > 
+> The LNet code, which is derived from Portals 3.x, is mostly an easier-to-use
+> abstraction of RDMA interfaces provided by Infiniband and other similar
+> hardware. It can also use TCP/IP, but that's not the primary use case.
 > 
->>> I would say about the acceptor and sock lnd: I believe Lustre assumes some IP transport is available for configuration, but does NOT necessarily use it for primary communication.  Fabrics - Like infiniband or Cray Aries - are more or less always configured to provide IP transport, to enable the panoply of tools and apps that rely on it.  But they perform better if their native protocols are used, which is of course what the other LNDs do.
->> 
->> It is worthwhile to clarify this a bit - LNet uses IP for *addressing* of the nodes at connection time, but I don't think it even uses the TCP interface for any communication itself (though I could be mistaken, as LNet isn't my specialty).  After the initial connection, the only other thing the IP addresses are used for is printing in error messages.
->> 
->> At one time or another we've discussed how we might get rid of the need for IPoIB on client nodes, since some sites don't want any IP connectivity to the client nodes for security and performance reasons.  That said, I don't think we've come up with a good solution yet.  LNet itself allows alternate addressing schemes to be used.  The former qswlnd (for Quadrics Elan networks) just used an integer node number, like 1 at elan for the NID, but I don't think there is any such alternative for IB node addresses except using a MAC hardware address or similar.
+> As a communication layer that builds on top of RDMA-capable hardware,
+> LNet cares about such things as whether the CPU driving communication
+> is close to the memory used, and also whether it is close to the interface
+> used. Even in a 2-socket machine, there are measurable performance
+> differences depending on whether the memory an interface connect
+> to the same socket or to different sockets. On bigger hardware, like a
+> 32-socket machine, the penalties are much more pronounced. At the
+> time we found that the QPI links between sockets were a bottleneck
+> and that performance cratered if they had to handle too much traffic.
 > 
-> The challenge to moving away from IP address for addressing is the NID 
-> address itself. Currently it is 64 bits which is composed for two parts.
+> UPI, the successor to QPI is better -- has more bandwidth -- but with
+> the CPUs having more and more cores I expect the scaling issues to
+> remain similar.
 > 
-> static inline lnet_nid_t LNET_MKNID(__u32 net, __u32 addr)
-> {
->        return (((__u64)net) << 32) | addr;
-> }
+> >   - We don't handle topology changes yet except in very minimal ways
+> >     (cpts *can* become empty, and that can cause problems).
 > 
-> To use IB harware addressing would require a full 64 bit space so
-> lnet_nid_t is to small. This is reason IPv6 is not supported. Ideas
-> have floated around on how to get around this but nothing yet.
-> It would be a massive API change currently.
+> Yes, this is a known deficiency.
 > 
->>> Neil Brown <neilb@suse.com> wrote:
->>>> 
->>>> On Wed, Jun 27 2018, Patrick Farrell wrote:
->>>> 
->>>>> Neil,
->>>>> 
->>>>> We do indeed have such functionality (it?s called DVS and it?s
->>>>> basically a high speed file system projection framework, ala NFS but
->>>>> faster), so the ability to build lnet separately is valuable to us.
->>>>> While it is being open sourced under the GPL, I don?t think there?s
->>>>> any intention to try to upstream it.  The current code isn?t even
->>>>> usable off of Cray systems as it depends on info from user space (that
->>>>> is provided, in the end, from Cray proprietary hardware) to keep its
->>>>> connection/routing tables up to date.  That?s supposedly in the
->>>>> pipeline to get fixed, but it?s still pretty far from generally
->>>>> usable.
->>>>> 
->>>>> But we?d still really appreciate it if lnet stayed separate.  Don?t
->>>>> know if that?s enough for you - I know sometimes *small* stuff is done
->>>>> for out of tree users.  Hopefully this meets that standard.
->>>>> 
->>>> 
->>>> Ahh - DVS.  That answers a question I just asked in another email.
->>>> My google-skills don't seem to be up to locating the source code though
->>>> :-(
->>>> 
->>>> While I wouldn't knowingly break an interface used by some out-of-tree
->>>> code without good reason, it is hard to avoid if you don't know what the
->>>> out-of-tree code does.  It can be very tempting to remove something that
->>>> isn't being used, but that can certainly hurt out-of-tree code
->>>> sometimes.
->>>> 
->>>> A particular example I'm exploring at present is the dual data paths in
->>>> LNet.  Or maybe it is dual types of Memory Descriptors.
->>>> There is 'kiov' which uses kernel-virtual addresses and 'iovec' which
->>>> uses page+offset.
->>>> The kiov option isn't used in the client code and it seems likely that
->>>> the server-side code could be converted to use iovec without problems.
->>>> 
->>>> I'd like to remove the kiov as I wouldn't be able to justify its
->>>> existence when submitting the client-only code upstream.  But I don't
->>>> want to remove the option of having an alternate MD type if it really is
->>>> significantly more efficient in some context.
->>>> If I know whether DVS used kiov or iovec - and in what way - that would
->>>> help me to know if I might break something, and to be able to assess the
->>>> cost.
->>>> 
->>>> In my mind, the "standard" that you mention is always about
->>>> practicality.   Code needs to be maintainable - easy to understand and
->>>> hard to break.  If the LNet interface is clean and well documented in
->>>> the kernel, then I don't see why we would not at least attempt to
->>>> preserve it.
->>>> 
->>>> Thanks,
->>>> NeilBrown
->> 
->> Cheers, Andreas
->> ---
->> Andreas Dilger
->> Principal Lustre Architect
->> Whamcloud
->> 
->> 
->> 
->> 
->> 
->> 
->> 
+> >   - This has been tested on .... great big things.
+> 
+> The basic CPT mechanism predates my involvement with Lustre. I did
+> work on making it more NUMA-aware. A 32-socket system was one of
+> the primary test beds.
+> 
+> >   - When multi-rails configurations are used (like ethernet-bonding,
+> >     but for RDMA), we get ??? closer to theoretical bandwidth.
+> >     Without these changes it scales poorly (??)
+> 
+> The basic idea behind muti-rail configurations is that we use several
+> Infiniband interfaces and LNet presents them as a single logical interface
+> to Lustre. For each message, LNet picks the IB interface it should go across
+> using several criteria, including NUMA distance of the interface and how
+> busy it is.
+> 
+> With these changes we could get pretty much linear scaling of LNet
+> throughput by adding more interfaces.
+> 
+> >   - The down-sides primarily are that we don't auto-configure
+> >     perfectly.  This particularly affects hot-plug, but without
+> >     hotplug the grouping of cpus and interfaces are focussed
+> >     on .... avoiding worst case rather than achieving best case.
+> 
+> Without hotplug the CPT grouping should be tuned to achieve a best
+> case in a static configuration.
+> 
+> Adding simple-minded hotplug tolerance (let's not call it support) would
+> focus on avoiding truly pathological behaviour.
+> 
+> > I've made up a lot of stuff there.  I'm happy not to pursue this further at the
+> > moment, but if anyone would like to enhance my understanding by
+> > correcting the worst errors in the above, I wouldn't object :-)
+> > 
+> > Thanks,
+> > NeilBrown
+> 
+> PS: the NUMA effects I've mentioned above have been making the news
+> lately under other names: they are part of the side channels used in various
+> timing based attacks.
+> 
+> Olaf
+> 
 > _______________________________________________
 > lustre-devel mailing list
 > lustre-devel at lists.lustre.org
 > http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+> 
