@@ -1,94 +1,70 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat,  7 Jul 2018 20:14:17 -0400
-Subject: [lustre-devel] [PATCH v4 03/14] lustre: libcfs: open code
- cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
+Date: Sat,  7 Jul 2018 20:14:22 -0400
+Subject: [lustre-devel] [PATCH v4 08/14] lustre: libcfs: remove
+ cfs_trace_refill_stack()
 In-Reply-To: <1531008868-4194-1-git-send-email-jsimmons@infradead.org>
 References: <1531008868-4194-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1531008868-4194-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1531008868-4194-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: NeilBrown <neilb@suse.com>
+The function cfs_trace_refill_stack() is not used anywhere so
+remove it.
 
-This function in used twice.
-In libcfs_debug_init() the usage is pointless as
-the only place that set libcfs_debug_mb ensures
-that it does not exceed the maximum.  So checking
-again can never help.
-
-So open-code the small function into the only
-other place that it is used - in cfs_trace_set_debug_mb(),
-which is used to set libcfs_debug_mb.
-
-Signed-off-by: NeilBrown <neilb@suse.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/libcfs/debug.c           | 6 +++---
- drivers/staging/lustre/lnet/libcfs/linux-tracefile.c | 7 -------
- drivers/staging/lustre/lnet/libcfs/tracefile.c       | 3 ++-
- drivers/staging/lustre/lnet/libcfs/tracefile.h       | 1 -
- 4 files changed, 5 insertions(+), 12 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/tracefile.c | 21 ---------------------
+ drivers/staging/lustre/lnet/libcfs/tracefile.h |  3 ---
+ 2 files changed, 24 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
-index 50c2995..3ec4adf 100644
---- a/drivers/staging/lustre/lnet/libcfs/debug.c
-+++ b/drivers/staging/lustre/lnet/libcfs/debug.c
-@@ -409,10 +409,10 @@ int libcfs_debug_init(unsigned long bufsize)
- 			sizeof(libcfs_debug_file_path_arr));
- 	}
- 
--	/* If libcfs_debug_mb is set to an invalid value or uninitialized
--	 * then just make the total buffers smp_num_cpus * TCD_MAX_PAGES
-+	/* If libcfs_debug_mb is uninitialized then just make the
-+	 * total buffers smp_num_cpus * TCD_MAX_PAGES
- 	 */
--	if (max > cfs_trace_max_debug_mb() || max < num_possible_cpus()) {
-+	if (max < num_possible_cpus()) {
- 		max = TCD_MAX_PAGES;
- 	} else {
- 		max = max / num_possible_cpus();
-diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-index 9e72220..64a5bc1 100644
---- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
-@@ -227,10 +227,3 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
- 			hdr->ph_line_num, fn, len, buf);
- 	}
- }
--
--int cfs_trace_max_debug_mb(void)
--{
--	int  total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
--
--	return max(512, (total_mb * 80) / 100);
--}
 diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index 3b92fd7..ae1a89c 100644
+index 066476d..ec90b36 100644
 --- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
 +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -933,7 +933,8 @@ int cfs_trace_set_debug_mb(int mb)
- 	int i;
- 	int j;
- 	int pages;
--	int limit = cfs_trace_max_debug_mb();
-+	int total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
-+	int limit = max(512, (total_mb * 80) / 100);
- 	struct cfs_trace_cpu_data *tcd;
+@@ -302,27 +302,6 @@ static void cfs_tage_to_tail(struct cfs_trace_page *tage,
+ 	list_move_tail(&tage->linkage, queue);
+ }
  
- 	if (mb < num_possible_cpus()) {
+-int cfs_trace_refill_stock(struct cfs_trace_cpu_data *tcd, gfp_t gfp,
+-			   struct list_head *stock)
+-{
+-	int i;
+-
+-	/*
+-	 * XXX nikita: do NOT call portals_debug_msg() (CDEBUG/ENTRY/EXIT)
+-	 * from here: this will lead to infinite recursion.
+-	 */
+-
+-	for (i = 0; i + tcd->tcd_cur_stock_pages < TCD_STOCK_PAGES ; ++i) {
+-		struct cfs_trace_page *tage;
+-
+-		tage = cfs_tage_alloc(gfp);
+-		if (!tage)
+-			break;
+-		list_add_tail(&tage->linkage, stock);
+-	}
+-	return i;
+-}
+-
+ /* return a page that has 'len' bytes left at the end */
+ static struct cfs_trace_page *
+ cfs_trace_get_tage_try(struct cfs_trace_cpu_data *tcd, unsigned long len)
 diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-index 9f6b73d..bd1a1ef 100644
+index 399e0bf..b9e4a8e 100644
 --- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
 +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
-@@ -88,7 +88,6 @@ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
- void libcfs_register_panic_notifier(void);
- void libcfs_unregister_panic_notifier(void);
- extern int libcfs_panic_in_progress;
--int cfs_trace_max_debug_mb(void);
+@@ -204,9 +204,6 @@ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
+ 	return cfs_trace_console_buffers[i][j];
+ }
  
- #define TCD_MAX_PAGES (5 << (20 - PAGE_SHIFT))
- #define TCD_STOCK_PAGES (TCD_MAX_PAGES)
+-int cfs_trace_refill_stock(struct cfs_trace_cpu_data *tcd, gfp_t gfp,
+-			   struct list_head *stock);
+-
+ void cfs_trace_assertion_failed(const char *str,
+ 				struct libcfs_debug_msg_data *m);
+ 
 -- 
 1.8.3.1
