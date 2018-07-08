@@ -1,47 +1,80 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat,  7 Jul 2018 20:14:14 -0400
-Subject: [lustre-devel] [PATCH v4 00/14] lustre: libcfs: tracefile cleanups
-Message-ID: <1531008868-4194-1-git-send-email-jsimmons@infradead.org>
+Date: Sat,  7 Jul 2018 20:14:16 -0400
+Subject: [lustre-devel] [PATCH v4 02/14] lustre: libcfs: always range-check
+ libcfs_debug_mb setting.
+In-Reply-To: <1531008868-4194-1-git-send-email-jsimmons@infradead.org>
+References: <1531008868-4194-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1531008868-4194-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The 4th version of a patch series aimed to cleanup the lustre tracefile
-handling. This set is mainly a repost of the 3rd set with the addition
-of a bug fix, patch number 2, that added proper range checking for the
-debugfs parameter debug_mb. The 6th patch has been updated based on
-Andreas Dilger's feedback to resolve the brokeness of cfs_print_to_console().
-This patch series has been reposted to allow anyone interested in testing
-the the major changes are in the 6th and 7th patch which was rebased due
-to changes in the code.
+From: NeilBrown <neilb@suse.com>
 
-James Simmons (6):
-  lustre: libcfs: properly handle failure paths in cfs_tracefile_init_arch()
-  lustre: libcfs: fix cfs_print_to_console()
-  lustre: libcfs: remove cfs_trace_refill_stack()
-  lustre: libcfs: move cfs_trace_data data to tracefile.c
-  lustre: libcfs: cleanup tracefile.h
-  lustre: libcfs: format macros in tracefile.h
+When the libcfs_debug_mb module parameter is set
+at module-load time it isn't range-checked.  When
+it is set via sysfs it is.  This inconsistency
+makes the code harder to follow.
 
-NeilBrown (8):
-  lustre: libcfs: move tracefile locking from linux-tracefile.c to tracefile.c
-  lustre: libcfs: always range-check libcfs_debug_mb setting.
-  lustre: libcfs: open code cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
-  lustre: libcfs: move tcd locking across to tracefile.c
-  lustre: libcfs: merge linux-tracefile.c into tracefile.c
-  lustre: libcfs: fold cfs_tracefile_*_arch into their only callers.
-  lustre: libcfs: renamed CFS_TCD_TYPE_MAX to CFS_TCD_TYPE_CNT
-  lustre: libcfs: discard TCD_MAX_TYPES
+It is quite safe to call cfs_trace_set_debug_mb()
+and cfs_trace_get_debug_mb() before the module
+is initialized as cfs_tcd_for_each() does nothing
+before initializtion.
 
- drivers/staging/lustre/lnet/libcfs/Makefile        |   2 +-
- drivers/staging/lustre/lnet/libcfs/debug.c         |  22 +-
- .../staging/lustre/lnet/libcfs/linux-tracefile.c   | 258 -------------------
- drivers/staging/lustre/lnet/libcfs/tracefile.c     | 279 +++++++++++++++++----
- drivers/staging/lustre/lnet/libcfs/tracefile.h     | 117 +--------
- 5 files changed, 255 insertions(+), 423 deletions(-)
- delete mode 100644 drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+So change cfs_trace_set_debug_mb() - which does
+range checking - to returned the ranged checked number (it currently
+always returns zero) and use that as the new value, unless
+cfs_trace_get_debug_mb() now returns a non-zero value.
 
+Signed-off-by: NeilBrown <neilb@suse.com>
+---
+ drivers/staging/lustre/lnet/libcfs/debug.c     | 16 +++++++---------
+ drivers/staging/lustre/lnet/libcfs/tracefile.c |  2 +-
+ 2 files changed, 8 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
+index 06f694f..50c2995 100644
+--- a/drivers/staging/lustre/lnet/libcfs/debug.c
++++ b/drivers/staging/lustre/lnet/libcfs/debug.c
+@@ -67,17 +67,15 @@ static int libcfs_param_debug_mb_set(const char *val,
+ 	if (rc < 0)
+ 		return rc;
+ 
+-	if (!*((unsigned int *)kp->arg)) {
+-		*((unsigned int *)kp->arg) = num;
+-		return 0;
+-	}
+-
+-	rc = cfs_trace_set_debug_mb(num);
++	num = cfs_trace_set_debug_mb(num);
+ 
+-	if (!rc)
+-		*((unsigned int *)kp->arg) = cfs_trace_get_debug_mb();
++	*((unsigned int *)kp->arg) = num;
++	num = cfs_trace_get_debug_mb();
++	if (num)
++		/* This value is more precise */
++		*((unsigned int *)kp->arg) = num;
+ 
+-	return rc;
++	return 0;
+ }
+ 
+ /* While debug_mb setting look like unsigned int, in fact
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+index 5f31933..3b92fd7 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+@@ -958,7 +958,7 @@ int cfs_trace_set_debug_mb(int mb)
+ 
+ 	up_write(&cfs_tracefile_sem);
+ 
+-	return 0;
++	return mb;
+ }
+ 
+ int cfs_trace_get_debug_mb(void)
 -- 
 1.8.3.1
