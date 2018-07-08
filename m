@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat,  7 Jul 2018 20:14:16 -0400
-Subject: [lustre-devel] [PATCH v4 02/14] lustre: libcfs: always range-check
- libcfs_debug_mb setting.
+Date: Sat,  7 Jul 2018 20:14:17 -0400
+Subject: [lustre-devel] [PATCH v4 03/14] lustre: libcfs: open code
+ cfs_trace_max_debug_mb() into cfs_trace_set_debug_mb()
 In-Reply-To: <1531008868-4194-1-git-send-email-jsimmons@infradead.org>
 References: <1531008868-4194-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1531008868-4194-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1531008868-4194-4-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,68 +13,82 @@ To: lustre-devel@lists.lustre.org
 
 From: NeilBrown <neilb@suse.com>
 
-When the libcfs_debug_mb module parameter is set
-at module-load time it isn't range-checked.  When
-it is set via sysfs it is.  This inconsistency
-makes the code harder to follow.
+This function in used twice.
+In libcfs_debug_init() the usage is pointless as
+the only place that set libcfs_debug_mb ensures
+that it does not exceed the maximum.  So checking
+again can never help.
 
-It is quite safe to call cfs_trace_set_debug_mb()
-and cfs_trace_get_debug_mb() before the module
-is initialized as cfs_tcd_for_each() does nothing
-before initializtion.
-
-So change cfs_trace_set_debug_mb() - which does
-range checking - to returned the ranged checked number (it currently
-always returns zero) and use that as the new value, unless
-cfs_trace_get_debug_mb() now returns a non-zero value.
+So open-code the small function into the only
+other place that it is used - in cfs_trace_set_debug_mb(),
+which is used to set libcfs_debug_mb.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lnet/libcfs/debug.c     | 16 +++++++---------
- drivers/staging/lustre/lnet/libcfs/tracefile.c |  2 +-
- 2 files changed, 8 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lnet/libcfs/debug.c           | 6 +++---
+ drivers/staging/lustre/lnet/libcfs/linux-tracefile.c | 7 -------
+ drivers/staging/lustre/lnet/libcfs/tracefile.c       | 3 ++-
+ drivers/staging/lustre/lnet/libcfs/tracefile.h       | 1 -
+ 4 files changed, 5 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/staging/lustre/lnet/libcfs/debug.c b/drivers/staging/lustre/lnet/libcfs/debug.c
-index 06f694f..50c2995 100644
+index 50c2995..3ec4adf 100644
 --- a/drivers/staging/lustre/lnet/libcfs/debug.c
 +++ b/drivers/staging/lustre/lnet/libcfs/debug.c
-@@ -67,17 +67,15 @@ static int libcfs_param_debug_mb_set(const char *val,
- 	if (rc < 0)
- 		return rc;
+@@ -409,10 +409,10 @@ int libcfs_debug_init(unsigned long bufsize)
+ 			sizeof(libcfs_debug_file_path_arr));
+ 	}
  
--	if (!*((unsigned int *)kp->arg)) {
--		*((unsigned int *)kp->arg) = num;
--		return 0;
--	}
--
--	rc = cfs_trace_set_debug_mb(num);
-+	num = cfs_trace_set_debug_mb(num);
- 
--	if (!rc)
--		*((unsigned int *)kp->arg) = cfs_trace_get_debug_mb();
-+	*((unsigned int *)kp->arg) = num;
-+	num = cfs_trace_get_debug_mb();
-+	if (num)
-+		/* This value is more precise */
-+		*((unsigned int *)kp->arg) = num;
- 
--	return rc;
-+	return 0;
+-	/* If libcfs_debug_mb is set to an invalid value or uninitialized
+-	 * then just make the total buffers smp_num_cpus * TCD_MAX_PAGES
++	/* If libcfs_debug_mb is uninitialized then just make the
++	 * total buffers smp_num_cpus * TCD_MAX_PAGES
+ 	 */
+-	if (max > cfs_trace_max_debug_mb() || max < num_possible_cpus()) {
++	if (max < num_possible_cpus()) {
+ 		max = TCD_MAX_PAGES;
+ 	} else {
+ 		max = max / num_possible_cpus();
+diff --git a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+index 9e72220..64a5bc1 100644
+--- a/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
++++ b/drivers/staging/lustre/lnet/libcfs/linux-tracefile.c
+@@ -227,10 +227,3 @@ void cfs_print_to_console(struct ptldebug_header *hdr, int mask,
+ 			hdr->ph_line_num, fn, len, buf);
+ 	}
  }
- 
- /* While debug_mb setting look like unsigned int, in fact
+-
+-int cfs_trace_max_debug_mb(void)
+-{
+-	int  total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
+-
+-	return max(512, (total_mb * 80) / 100);
+-}
 diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index 5f31933..3b92fd7 100644
+index 3b92fd7..ae1a89c 100644
 --- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
 +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -958,7 +958,7 @@ int cfs_trace_set_debug_mb(int mb)
+@@ -933,7 +933,8 @@ int cfs_trace_set_debug_mb(int mb)
+ 	int i;
+ 	int j;
+ 	int pages;
+-	int limit = cfs_trace_max_debug_mb();
++	int total_mb = (totalram_pages >> (20 - PAGE_SHIFT));
++	int limit = max(512, (total_mb * 80) / 100);
+ 	struct cfs_trace_cpu_data *tcd;
  
- 	up_write(&cfs_tracefile_sem);
+ 	if (mb < num_possible_cpus()) {
+diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.h b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+index 9f6b73d..bd1a1ef 100644
+--- a/drivers/staging/lustre/lnet/libcfs/tracefile.h
++++ b/drivers/staging/lustre/lnet/libcfs/tracefile.h
+@@ -88,7 +88,6 @@ int cfs_trace_copyout_string(char __user *usr_buffer, int usr_buffer_nob,
+ void libcfs_register_panic_notifier(void);
+ void libcfs_unregister_panic_notifier(void);
+ extern int libcfs_panic_in_progress;
+-int cfs_trace_max_debug_mb(void);
  
--	return 0;
-+	return mb;
- }
- 
- int cfs_trace_get_debug_mb(void)
+ #define TCD_MAX_PAGES (5 << (20 - PAGE_SHIFT))
+ #define TCD_STOCK_PAGES (TCD_MAX_PAGES)
 -- 
 1.8.3.1
