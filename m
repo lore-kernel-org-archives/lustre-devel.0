@@ -1,239 +1,109 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 23 Jul 2018 16:23:04 +1000
-Subject: [lustre-devel] [PATCH 3/9] lustre: move server_name2index to
+Subject: [lustre-devel] [PATCH 4/9] lustre: move lustre_check_exclusion to
  obd_config.c
 In-Reply-To: <153232696720.26222.9658151633697867322.stgit@noble>
 References: <153232696720.26222.9658151633697867322.stgit@noble>
-Message-ID: <153232698486.26222.18197471449250973608.stgit@noble>
+Message-ID: <153232698489.26222.11036165790183672424.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This is preparation for moving filesystem mounting
-into llite/.
-server_name2index belongs in obdclass, but the rest
-of obd_mount.c fits better in llite.  So move
-it and server_name2fsname() across to obd_config.c,
-and expect it for later using by llite.
+lustre_check_exclusion is only used in obd_config.c, so
+move the code there
+Note that a CDEBUG is changed from D_MOUNT to D_INFO.
+This prepares for obd_mount to move to llite/
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lustre/include/obd_class.h  |    2 
- .../staging/lustre/lustre/obdclass/obd_config.c    |   86 ++++++++++++++++++++
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |   84 --------------------
- 3 files changed, 88 insertions(+), 84 deletions(-)
+ drivers/staging/lustre/lustre/include/obd_class.h  |    1 -
+ .../staging/lustre/lustre/obdclass/obd_config.c    |   25 ++++++++++++++++++++
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |   25 --------------------
+ 3 files changed, 25 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index adfe2abdf7bc..ef8c46cb9bee 100644
+index ef8c46cb9bee..90dbafd38d71 100644
 --- a/drivers/staging/lustre/lustre/include/obd_class.h
 +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -134,6 +134,8 @@ int class_config_llog_handler(const struct lu_env *env,
- 			      struct llog_handle *handle,
- 			      struct llog_rec_hdr *rec, void *data);
- int class_add_uuid(const char *uuid, __u64 nid);
-+int server_name2index(const char *svname, __u32 *idx,
-+		      const char **endptr);
+@@ -1559,7 +1559,6 @@ extern int (*ptlrpc_put_connection_superhack)(struct ptlrpc_connection *c);
+ /* obd_mount.c */
+ int lustre_unregister_fs(void);
+ int lustre_register_fs(void);
+-int lustre_check_exclusion(struct super_block *sb, char *svname);
  
- /* obdecho */
- void lprocfs_echo_init_vars(struct lprocfs_static_vars *lvars);
+ /* sysctl.c */
+ int obd_sysctl_init(void);
 diff --git a/drivers/staging/lustre/lustre/obdclass/obd_config.c b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-index cfcd17e679dd..382522fa1993 100644
+index 382522fa1993..f3dd020d04ef 100644
 --- a/drivers/staging/lustre/lustre/obdclass/obd_config.c
 +++ b/drivers/staging/lustre/lustre/obdclass/obd_config.c
-@@ -46,6 +46,7 @@
- #include <lustre_log.h>
- #include <uapi/linux/lustre/lustre_param.h>
- #include <obd_class.h>
-+#include <lustre_disk.h>
- 
- #include "llog_internal.h"
- 
-@@ -1172,6 +1173,91 @@ int class_process_proc_param(char *prefix, struct lprocfs_vars *lvars,
+@@ -1258,6 +1258,31 @@ int server_name2index(const char *svname, __u32 *idx,
  }
- EXPORT_SYMBOL(class_process_proc_param);
+ EXPORT_SYMBOL(server_name2index);
  
-+/*** SERVER NAME ***
-+ * <FSNAME><SEPARATOR><TYPE><INDEX>
-+ * FSNAME is between 1 and 8 characters (inclusive).
-+ *	Excluded characters are '/' and ':'
-+ * SEPARATOR is either ':' or '-'
-+ * TYPE: "OST", "MDT", etc.
-+ * INDEX: Hex representation of the index
-+ */
-+
-+/** Get the fsname ("lustre") from the server name ("lustre-OST003F").
-+ * @param [in] svname server name including type and index
-+ * @param [out] fsname Buffer to copy filesystem name prefix into.
-+ *  Must have at least 'strlen(fsname) + 1' chars.
-+ * @param [out] endptr if endptr isn't NULL it is set to end of fsname
-+ * rc < 0  on error
-+ */
-+static int server_name2fsname(const char *svname, char *fsname,
-+			      const char **endptr)
++/* Is this server on the exclusion list */
++static int lustre_check_exclusion(struct super_block *sb, char *svname)
 +{
-+	const char *dash;
++	struct lustre_sb_info *lsi = s2lsi(sb);
++	struct lustre_mount_data *lmd = lsi->lsi_lmd;
++	__u32 index;
++	int i, rc;
 +
-+	dash = svname + strnlen(svname, 8); /* max fsname length is 8 */
-+	for (; dash > svname && *dash != '-' && *dash != ':'; dash--)
-+		;
-+	if (dash == svname)
-+		return -EINVAL;
++	rc = server_name2index(svname, &index, NULL);
++	if (rc != LDD_F_SV_TYPE_OST)
++		/* Only exclude OSTs */
++		return 0;
 +
-+	if (fsname) {
-+		strncpy(fsname, svname, dash - svname);
-+		fsname[dash - svname] = '\0';
++	CDEBUG(D_INFO, "Check exclusion %s (%d) in %d of %s\n", svname,
++	       index, lmd->lmd_exclude_count, lmd->lmd_dev);
++
++	for (i = 0; i < lmd->lmd_exclude_count; i++) {
++		if (index == lmd->lmd_exclude[i]) {
++			CWARN("Excluding %s (on exclusion list)\n", svname);
++			return 1;
++		}
 +	}
-+
-+	if (endptr)
-+		*endptr = dash;
-+
 +	return 0;
 +}
-+
-+/* Get the index from the obd name.
-+ *  rc = server type, or
-+ * rc < 0  on error
-+ * if endptr isn't NULL it is set to end of name
-+ */
-+int server_name2index(const char *svname, __u32 *idx,
-+		      const char **endptr)
-+{
-+	unsigned long index;
-+	int rc;
-+	const char *dash;
-+
-+	/* We use server_name2fsname() just for parsing */
-+	rc = server_name2fsname(svname, NULL, &dash);
-+	if (rc != 0)
-+		return rc;
-+
-+	dash++;
-+
-+	if (strncmp(dash, "MDT", 3) == 0)
-+		rc = LDD_F_SV_TYPE_MDT;
-+	else if (strncmp(dash, "OST", 3) == 0)
-+		rc = LDD_F_SV_TYPE_OST;
-+	else
-+		return -EINVAL;
-+
-+	dash += 3;
-+
-+	if (strncmp(dash, "all", 3) == 0) {
-+		if (endptr)
-+			*endptr = dash + 3;
-+		return rc | LDD_F_SV_ALL;
-+	}
-+
-+	index = simple_strtoul(dash, (char **)endptr, 16);
-+	if (idx)
-+		*idx = index;
-+
-+	/* Account for -mdc after index that is possible when specifying mdt */
-+	if (endptr && strncmp(LUSTRE_MDC_NAME, *endptr + 1,
-+			      sizeof(LUSTRE_MDC_NAME) - 1) == 0)
-+		*endptr += sizeof(LUSTRE_MDC_NAME);
-+
-+	return rc;
-+}
-+EXPORT_SYMBOL(server_name2index);
 +
  /** Parse a configuration llog, doing various manipulations on them
   * for various reasons, (modifications for compatibility, skip obsolete
   * records, change uuids, etc), then class_process_config() resulting
 diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index 1a668874a165..3420e87ad0cd 100644
+index 3420e87ad0cd..4e4a8c35105b 100644
 --- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
 +++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -579,90 +579,6 @@ static int lustre_put_lsi(struct super_block *sb)
- 	return 0;
+@@ -633,31 +633,6 @@ static void lmd_print(struct lustre_mount_data *lmd)
+ 	}
  }
  
--/*** SERVER NAME ***
-- * <FSNAME><SEPARATOR><TYPE><INDEX>
-- * FSNAME is between 1 and 8 characters (inclusive).
-- *	Excluded characters are '/' and ':'
-- * SEPARATOR is either ':' or '-'
-- * TYPE: "OST", "MDT", etc.
-- * INDEX: Hex representation of the index
-- */
--
--/** Get the fsname ("lustre") from the server name ("lustre-OST003F").
-- * @param [in] svname server name including type and index
-- * @param [out] fsname Buffer to copy filesystem name prefix into.
-- *  Must have at least 'strlen(fsname) + 1' chars.
-- * @param [out] endptr if endptr isn't NULL it is set to end of fsname
-- * rc < 0  on error
-- */
--static int server_name2fsname(const char *svname, char *fsname,
--			      const char **endptr)
+-/* Is this server on the exclusion list */
+-int lustre_check_exclusion(struct super_block *sb, char *svname)
 -{
--	const char *dash;
+-	struct lustre_sb_info *lsi = s2lsi(sb);
+-	struct lustre_mount_data *lmd = lsi->lsi_lmd;
+-	__u32 index;
+-	int i, rc;
 -
--	dash = svname + strnlen(svname, 8); /* max fsname length is 8 */
--	for (; dash > svname && *dash != '-' && *dash != ':'; dash--)
--		;
--	if (dash == svname)
--		return -EINVAL;
+-	rc = server_name2index(svname, &index, NULL);
+-	if (rc != LDD_F_SV_TYPE_OST)
+-		/* Only exclude OSTs */
+-		return 0;
 -
--	if (fsname) {
--		strncpy(fsname, svname, dash - svname);
--		fsname[dash - svname] = '\0';
+-	CDEBUG(D_MOUNT, "Check exclusion %s (%d) in %d of %s\n", svname,
+-	       index, lmd->lmd_exclude_count, lmd->lmd_dev);
+-
+-	for (i = 0; i < lmd->lmd_exclude_count; i++) {
+-		if (index == lmd->lmd_exclude[i]) {
+-			CWARN("Excluding %s (on exclusion list)\n", svname);
+-			return 1;
+-		}
 -	}
--
--	if (endptr)
--		*endptr = dash;
--
 -	return 0;
 -}
 -
--/* Get the index from the obd name.
-- *  rc = server type, or
-- * rc < 0  on error
-- * if endptr isn't NULL it is set to end of name
-- */
--static int server_name2index(const char *svname, __u32 *idx,
--			     const char **endptr)
--{
--	unsigned long index;
--	int rc;
--	const char *dash;
--
--	/* We use server_name2fsname() just for parsing */
--	rc = server_name2fsname(svname, NULL, &dash);
--	if (rc != 0)
--		return rc;
--
--	dash++;
--
--	if (strncmp(dash, "MDT", 3) == 0)
--		rc = LDD_F_SV_TYPE_MDT;
--	else if (strncmp(dash, "OST", 3) == 0)
--		rc = LDD_F_SV_TYPE_OST;
--	else
--		return -EINVAL;
--
--	dash += 3;
--
--	if (strncmp(dash, "all", 3) == 0) {
--		if (endptr)
--			*endptr = dash + 3;
--		return rc | LDD_F_SV_ALL;
--	}
--
--	index = simple_strtoul(dash, (char **)endptr, 16);
--	if (idx)
--		*idx = index;
--
--	/* Account for -mdc after index that is possible when specifying mdt */
--	if (endptr && strncmp(LUSTRE_MDC_NAME, *endptr + 1,
--			      sizeof(LUSTRE_MDC_NAME) - 1) == 0)
--		*endptr += sizeof(LUSTRE_MDC_NAME);
--
--	return rc;
--}
--
- /*************** mount common between server and client ***************/
- 
- /* Common umount */
+ /* mount -v  -o exclude=lustre-OST0001:lustre-OST0002 -t lustre ... */
+ static int lmd_make_exclusion(struct lustre_mount_data *lmd, const char *ptr)
+ {
