@@ -1,11 +1,11 @@
 From: Doug Oucharek <doucharek@cray.com>
-Date: Wed, 25 Jul 2018 22:39:12 +0000
-Subject: [lustre-devel] [PATCH 3/5] lustre: change
- lnet_ipaddr_enumerate() to use for_each_netdev()
-In-Reply-To: <153247363640.25051.8583622796462340468.stgit@noble>
+Date: Wed, 25 Jul 2018 22:43:00 +0000
+Subject: [lustre-devel] [PATCH 4/5] lustre: o2iblnd: get IP address more
+ directly.
+In-Reply-To: <153247363644.25051.16677553336215434742.stgit@noble>
 References: <153247352950.25051.3479450943810758169.stgit@noble>
- <153247363640.25051.8583622796462340468.stgit@noble>
-Message-ID: <2D7F51A3-AE1F-4BBE-BF52-C3EFA99DF5B4@cray.com>
+ <153247363644.25051.16677553336215434742.stgit@noble>
+Message-ID: <9016B622-1E72-4A5A-9CC1-8D460AE7BA1E@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,142 +14,108 @@ To: lustre-devel@lists.lustre.org
 
 Reviewed-by: Doug Oucharek <dougso at me.com<mailto:dougso@me.com>>
 
-Note:
-I did not think your changes would collide with Multi-Rail.  Unfortunately, it looks like this one does.  This config code was changed quite a bit by the Multi-Rail feature.  However, it is ok as landing this change now will prompt the Multi-Rail changes to utilize the better way of getting interface information.  Just a heads up to Multi-Rail porters.
-
 Doug
 
 On Jul 24, 2018, at 4:07 PM, NeilBrown <neilb at suse.com<mailto:neilb@suse.com>> wrote:
 
-for_each_netdev() is a more direct interface than
-lnet_ipif_enumerate(), so use it instead.  Also get
-address and 'up' status directly from the device.
-
-This means we need to possible re-allocate the storage
-space if there are lots of IP addresses.
-
-However there is no need to resize the allocation down if we
-over-allocated.  This is only used once, and is freed soon
-after it is allocated, so that is a false optimization.
+Use dev_get_by_name() and for_primary_ifa() to
+get IP address for a named device.  This is more
+direct.
 
 Signed-off-by: NeilBrown <neilb at suse.com<mailto:neilb@suse.com>>
 ---
-drivers/staging/lustre/lnet/lnet/config.c |   78 +++++++++++++----------------
-1 file changed, 35 insertions(+), 43 deletions(-)
+.../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   48 +++++++++++++-------
+1 file changed, 30 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index 55ecc1998b7e..136905db2746 100644
---- a/drivers/staging/lustre/lnet/lnet/config.c
-+++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -36,6 +36,7 @@
-#include <net/net_namespace.h>
-#include <linux/ctype.h>
-#include <linux/lnet/lib-lnet.h>
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 9f3fef5da38c..05835cc0f0a5 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -38,6 +38,7 @@
+#include <asm/div64.h>
+#include <asm/page.h>
+#include "o2iblnd.h"
 +#include <linux/inetdevice.h>
 
-struct lnet_text_buf {    /* tmp struct for parsing routes */
-struct list_head ltb_list; /* stash on lists */
-@@ -1134,66 +1135,57 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
-static int
-lnet_ipaddr_enumerate(__u32 **ipaddrsp)
+static struct lnet_lnd the_o2iblnd;
+
+@@ -2450,40 +2451,48 @@ void kiblnd_destroy_dev(struct kib_dev *dev)
+static struct kib_dev *kiblnd_create_dev(char *ifname)
 {
-- int up;
-- __u32 netmask;
-+ struct net_device *dev;
-__u32 *ipaddrs;
-- __u32 *ipaddrs2;
-+ int nalloc = 64;
-int nip;
-- char **ifnames;
-- int nif = lnet_ipif_enumerate(&ifnames);
-- int i;
-- int rc;
-
-- if (nif <= 0)
-- return nif;
--
-- ipaddrs = kcalloc(nif, sizeof(*ipaddrs), GFP_KERNEL);
-+ ipaddrs = kcalloc(nalloc, sizeof(*ipaddrs), GFP_KERNEL);
-if (!ipaddrs) {
-- CERROR("Can't allocate ipaddrs[%d]\n", nif);
-- lnet_ipif_free_enumeration(ifnames, nif);
-+ CERROR("Can't allocate ipaddrs[%d]\n", nalloc);
-return -ENOMEM;
-}
-
-- for (i = nip = 0; i < nif; i++) {
-- if (!strcmp(ifnames[i], "lo"))
-+ rtnl_lock();
-+ for_each_netdev(&init_net, dev) {
+struct net_device *netdev;
 + struct in_device *in_dev;
-+
-+ if (strcmp(dev->name, "lo") == 0)
-continue;
+struct kib_dev *dev;
+- __u32 netmask;
+- __u32 ip;
+- int up;
++ int flags;
+int rc;
 
-- rc = lnet_ipif_query(ifnames[i], &up, &ipaddrs[nip], &netmask);
+- rc = lnet_ipif_query(ifname, &up, &ip, &netmask);
 - if (rc) {
-- CWARN("Can't query interface %s: %d\n",
--      ifnames[i], rc);
-+ if (!(dev_get_flags(dev) & IFF_UP)) {
-+ CWARN("Ignoring interface %s: it's down\n", dev->name);
-continue;
-}
--
-- if (!up) {
-- CWARN("Ignoring interface %s: it's down\n",
--      ifnames[i]);
-+ in_dev = __in_dev_get_rtnl(dev);
-+ if (!in_dev) {
-+ CWARN("Interface %s has no IPv4 status.\n", dev->name);
-continue;
+- CERROR("Can't query IPoIB interface %s: %d\n",
+-       ifname, rc);
+- return NULL;
++ rtnl_lock();
++ netdev = dev_get_by_name(&init_net, ifname);
++ if (!netdev) {
++ CERROR("Can't find IPoIB interface %s\n",
++       ifname);
++ goto unlock;
 }
 
-- nip++;
+- if (!up) {
++ flags = dev_get_flags(netdev);
++ if (!(flags & IFF_UP)) {
+CERROR("Can't query IPoIB interface %s: it's down\n", ifname);
++ rtnl_unlock();
+return NULL;
+}
+
+dev = kzalloc(sizeof(*dev), GFP_NOFS);
+if (!dev)
+- return NULL;
++ goto unlock;
+
+- netdev = dev_get_by_name(&init_net, ifname);
+- if (!netdev) {
+- dev->ibd_can_failover = 0;
+- } else {
+- dev->ibd_can_failover = !!(netdev->flags & IFF_MASTER);
+- dev_put(netdev);
 - }
--
-- lnet_ipif_free_enumeration(ifnames, nif);
--
-- if (nip == nif) {
-- *ipaddrsp = ipaddrs;
-- } else {
-- if (nip > 0) {
-- ipaddrs2 = kcalloc(nip, sizeof(*ipaddrs2),
--   GFP_KERNEL);
-- if (!ipaddrs2) {
-- CERROR("Can't allocate ipaddrs[%d]\n", nip);
-- nip = -ENOMEM;
-- } else {
-- memcpy(ipaddrs2, ipaddrs,
--       nip * sizeof(*ipaddrs));
-- *ipaddrsp = ipaddrs2;
-- rc = nip;
-+ if (nip >= nalloc) {
-+ __u32 *ipaddrs2;
-+ nalloc += nalloc;
-+ ipaddrs2 = krealloc(ipaddrs, nalloc * sizeof(*ipaddrs2),
-+    GFP_KERNEL);
-+ if (ipaddrs2 == NULL) {
-+ kfree(ipaddrs);
-+ CERROR("Can't allocate ipaddrs[%d]\n", nalloc);
-+ return -ENOMEM;
-}
-+ ipaddrs = ipaddrs2;
-}
-- kfree(ipaddrs);
-+
++ dev->ibd_can_failover = !!(flags & IFF_MASTER);
+
+INIT_LIST_HEAD(&dev->ibd_nets);
+INIT_LIST_HEAD(&dev->ibd_list); /* not yet in kib_devs */
+INIT_LIST_HEAD(&dev->ibd_fail_list);
+- dev->ibd_ifip = ip;
 + for_primary_ifa(in_dev)
-+ if (strcmp(ifa->ifa_label, dev->name) == 0) {
-+ ipaddrs[nip++] = ifa->ifa_local;
++ if (strcmp(ifa->ifa_label, ifname) == 0) {
++ dev->ibd_ifip = ifa->ifa_local;
 + break;
 + }
 + endfor_ifa(in_dev);
-}
 + rtnl_unlock();
 +
-+ *ipaddrsp = ipaddrs;
-return nip;
++ if (dev->ibd_ifip == 0) {
++ CERROR("Can't initialize device: no IP address\n");
++ kfree(dev);
++ return NULL;
++ }
+strcpy(&dev->ibd_ifname[0], ifname);
+
+/* initialize the device */
+@@ -2496,6 +2505,9 @@ static struct kib_dev *kiblnd_create_dev(char *ifname)
+
+list_add_tail(&dev->ibd_list, &kiblnd_data.kib_devs);
+return dev;
++unlock:
++ rtnl_unlock();
++ return NULL;
 }
 
+static void kiblnd_base_shutdown(void)
 
 
 _______________________________________________
@@ -159,4 +125,4 @@ http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180725/e7ceb368/attachment-0001.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180725/618c236d/attachment.html>
