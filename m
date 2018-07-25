@@ -1,11 +1,11 @@
 From: Doug Oucharek <doucharek@cray.com>
-Date: Wed, 25 Jul 2018 22:28:52 +0000
-Subject: [lustre-devel] [PATCH 2/5] lustre: socklnd: use
- ksocknal_enumerate_interfaces for individual interfaces.
-In-Reply-To: <153247363637.25051.1816811991601800158.stgit@noble>
+Date: Wed, 25 Jul 2018 22:39:12 +0000
+Subject: [lustre-devel] [PATCH 3/5] lustre: change
+ lnet_ipaddr_enumerate() to use for_each_netdev()
+In-Reply-To: <153247363640.25051.8583622796462340468.stgit@noble>
 References: <153247352950.25051.3479450943810758169.stgit@noble>
- <153247363637.25051.1816811991601800158.stgit@noble>
-Message-ID: <36D26881-EC61-4CFF-B655-EB8EA1FCD609@cray.com>
+ <153247363640.25051.8583622796462340468.stgit@noble>
+Message-ID: <2D7F51A3-AE1F-4BBE-BF52-C3EFA99DF5B4@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,106 +14,142 @@ To: lustre-devel@lists.lustre.org
 
 Reviewed-by: Doug Oucharek <dougso at me.com<mailto:dougso@me.com>>
 
-With regards to the FIXME comment:
-That does seem to be a bug.  There is an assumption that we will only get one address back from the enumerate call.  That has probably been true in the field thus far.  Should be safe to change it to rc as the comment indicates.
+Note:
+I did not think your changes would collide with Multi-Rail.  Unfortunately, it looks like this one does.  This config code was changed quite a bit by the Multi-Rail feature.  However, it is ok as landing this change now will prompt the Multi-Rail changes to utilize the better way of getting interface information.  Just a heads up to Multi-Rail porters.
 
 Doug
 
 On Jul 24, 2018, at 4:07 PM, NeilBrown <neilb at suse.com<mailto:neilb@suse.com>> wrote:
 
-When individual interfaces are listed, such a via a module parameter,
-it is easy to use ksocknal_enumerate_interfaces() to find them, and
-save duplicating code.
+for_each_netdev() is a more direct interface than
+lnet_ipif_enumerate(), so use it instead.  Also get
+address and 'up' status directly from the device.
+
+This means we need to possible re-allocate the storage
+space if there are lots of IP addresses.
+
+However there is no need to resize the allocation down if we
+over-allocated.  This is only used once, and is freed soon
+after it is allocated, so that is a false optimization.
 
 Signed-off-by: NeilBrown <neilb at suse.com<mailto:neilb@suse.com>>
 ---
-.../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   37 ++++++--------------
-1 file changed, 12 insertions(+), 25 deletions(-)
+drivers/staging/lustre/lnet/lnet/config.c |   78 +++++++++++++----------------
+1 file changed, 35 insertions(+), 43 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 895f744bb959..d37f7134b31d 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -2613,7 +2613,7 @@ ksocknal_shutdown(struct lnet_ni *ni)
-}
+diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
+index 55ecc1998b7e..136905db2746 100644
+--- a/drivers/staging/lustre/lnet/lnet/config.c
++++ b/drivers/staging/lustre/lnet/lnet/config.c
+@@ -36,6 +36,7 @@
+#include <net/net_namespace.h>
+#include <linux/ctype.h>
+#include <linux/lnet/lib-lnet.h>
++#include <linux/inetdevice.h>
 
+struct lnet_text_buf {    /* tmp struct for parsing routes */
+struct list_head ltb_list; /* stash on lists */
+@@ -1134,66 +1135,57 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
 static int
--ksocknal_enumerate_interfaces(struct ksock_net *net)
-+ksocknal_enumerate_interfaces(struct ksock_net *net, char *iname)
+lnet_ipaddr_enumerate(__u32 **ipaddrsp)
 {
-int j = 0;
-struct net_device *dev;
-@@ -2622,10 +2622,13 @@ ksocknal_enumerate_interfaces(struct ksock_net *net)
-for_each_netdev(&init_net, dev) {
-const char *name = dev->name;
-struct in_device *in_dev;
-- struct ksock_interface *ksi = &net->ksnn_interfaces[j];
-+ struct ksock_interface *ksi =
-+ &net->ksnn_interfaces[net->ksnn_ninterfaces + j];
-
-if (strcmp(name, "lo") == 0) /* skip the loopback IF */
-continue;
-+ if (iname && strcmp(name, iname) != 0)
-+ continue;
-
-if (!(dev_get_flags(dev) & IFF_UP)) {
-CWARN("Ignoring interface %s (down)\n", name);
-@@ -2655,7 +2658,7 @@ ksocknal_enumerate_interfaces(struct ksock_net *net)
-}
-rtnl_unlock();
-
-- if (!j)
-+ if (!iname && !j)
-CERROR("Can't find any usable interfaces\n");
-
-return j;
-@@ -2802,40 +2805,24 @@ ksocknal_startup(struct lnet_ni *ni)
-ni->ni_peertxcredits  = *ksocknal_tunables.ksnd_peertxcredits;
-ni->ni_peerrtrcredits = *ksocknal_tunables.ksnd_peerrtrcredits;
-
-+ net->ksnn_ninterfaces = 0;
-if (!ni->ni_interfaces[0]) {
-- rc = ksocknal_enumerate_interfaces(net);
-+ rc = ksocknal_enumerate_interfaces(net, NULL);
-if (rc <= 0)
-goto fail_1;
-
-+ /* FIXME why is this 1, not rc ?? */
-net->ksnn_ninterfaces = 1;
-} else {
-for (i = 0; i < LNET_MAX_INTERFACES; i++) {
 - int up;
--
-if (!ni->ni_interfaces[i])
-break;
-+ rc = ksocknal_enumerate_interfaces(net, ni->ni_interfaces[i]);
+- __u32 netmask;
++ struct net_device *dev;
+__u32 *ipaddrs;
+- __u32 *ipaddrs2;
++ int nalloc = 64;
+int nip;
+- char **ifnames;
+- int nif = lnet_ipif_enumerate(&ifnames);
+- int i;
+- int rc;
 
-- rc = lnet_ipif_query(ni->ni_interfaces[i], &up,
--     &net->ksnn_interfaces[i].ksni_ipaddr,
--     &net->ksnn_interfaces[i].ksni_netmask);
+- if (nif <= 0)
+- return nif;
 -
+- ipaddrs = kcalloc(nif, sizeof(*ipaddrs), GFP_KERNEL);
++ ipaddrs = kcalloc(nalloc, sizeof(*ipaddrs), GFP_KERNEL);
+if (!ipaddrs) {
+- CERROR("Can't allocate ipaddrs[%d]\n", nif);
+- lnet_ipif_free_enumeration(ifnames, nif);
++ CERROR("Can't allocate ipaddrs[%d]\n", nalloc);
+return -ENOMEM;
+}
+
+- for (i = nip = 0; i < nif; i++) {
+- if (!strcmp(ifnames[i], "lo"))
++ rtnl_lock();
++ for_each_netdev(&init_net, dev) {
++ struct in_device *in_dev;
++
++ if (strcmp(dev->name, "lo") == 0)
+continue;
+
+- rc = lnet_ipif_query(ifnames[i], &up, &ipaddrs[nip], &netmask);
 - if (rc) {
-- CERROR("Can't get interface %s info: %d\n",
--       ni->ni_interfaces[i], rc);
-- goto fail_1;
-- }
+- CWARN("Can't query interface %s: %d\n",
+-      ifnames[i], rc);
++ if (!(dev_get_flags(dev) & IFF_UP)) {
++ CWARN("Ignoring interface %s: it's down\n", dev->name);
+continue;
+}
 -
 - if (!up) {
-- CERROR("Interface %s is down\n",
--       ni->ni_interfaces[i]);
-+ if (rc <= 0)
-goto fail_1;
-- }
--
-- strlcpy(net->ksnn_interfaces[i].ksni_name,
-- ni->ni_interfaces[i],
-- sizeof(net->ksnn_interfaces[i].ksni_name));
-+ net->ksnn_ninterfaces += rc;
-}
-- net->ksnn_ninterfaces = i;
+- CWARN("Ignoring interface %s: it's down\n",
+-      ifnames[i]);
++ in_dev = __in_dev_get_rtnl(dev);
++ if (!in_dev) {
++ CWARN("Interface %s has no IPv4 status.\n", dev->name);
+continue;
 }
 
-/* call it before add it to ksocknal_data.ksnd_nets */
+- nip++;
+- }
+-
+- lnet_ipif_free_enumeration(ifnames, nif);
+-
+- if (nip == nif) {
+- *ipaddrsp = ipaddrs;
+- } else {
+- if (nip > 0) {
+- ipaddrs2 = kcalloc(nip, sizeof(*ipaddrs2),
+-   GFP_KERNEL);
+- if (!ipaddrs2) {
+- CERROR("Can't allocate ipaddrs[%d]\n", nip);
+- nip = -ENOMEM;
+- } else {
+- memcpy(ipaddrs2, ipaddrs,
+-       nip * sizeof(*ipaddrs));
+- *ipaddrsp = ipaddrs2;
+- rc = nip;
++ if (nip >= nalloc) {
++ __u32 *ipaddrs2;
++ nalloc += nalloc;
++ ipaddrs2 = krealloc(ipaddrs, nalloc * sizeof(*ipaddrs2),
++    GFP_KERNEL);
++ if (ipaddrs2 == NULL) {
++ kfree(ipaddrs);
++ CERROR("Can't allocate ipaddrs[%d]\n", nalloc);
++ return -ENOMEM;
+}
++ ipaddrs = ipaddrs2;
+}
+- kfree(ipaddrs);
++
++ for_primary_ifa(in_dev)
++ if (strcmp(ifa->ifa_label, dev->name) == 0) {
++ ipaddrs[nip++] = ifa->ifa_local;
++ break;
++ }
++ endfor_ifa(in_dev);
+}
++ rtnl_unlock();
++
++ *ipaddrsp = ipaddrs;
+return nip;
+}
+
 
 
 _______________________________________________
@@ -123,4 +159,4 @@ http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180725/65b89749/attachment-0001.html>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180725/e7ceb368/attachment-0001.html>
