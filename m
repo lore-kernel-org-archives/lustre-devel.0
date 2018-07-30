@@ -1,103 +1,79 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Mon, 30 Jul 2018 20:02:08 +0000
-Subject: [lustre-devel] [PATCH 00/22] Lustre: use while loop when
- emptying a list
-In-Reply-To: <153292153459.13840.17465048403476297915.stgit@noble>
-References: <153292153459.13840.17465048403476297915.stgit@noble>
-Message-ID: <F1535323-C137-4BF7-B1FA-D0858FFA619B@whamcloud.com>
+Date: Mon, 30 Jul 2018 20:42:05 +0000
+Subject: [lustre-devel] [PATCH 2/6] lustre: lnet/config: convert
+ list_for_each to list_for_each_entry
+In-Reply-To: <153292233958.26104.10972399803477314475.stgit@noble>
+References: <153292233170.26104.16164388413209501300.stgit@noble>
+ <153292233958.26104.10972399803477314475.stgit@noble>
+Message-ID: <C85DBB0B-C6EC-4D59-B0EA-5A8A94C96051@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Jul 29, 2018, at 21:37, NeilBrown <neilb@suse.com> wrote:
+
+
+> On Jul 29, 2018, at 21:45, NeilBrown <neilb@suse.com> wrote:
 > 
-> If you have a list that needs to be emptied, it is best to have a loop
-> like
->  while (!list_empty(...))
+> This conversion to list_for_each_entry isn't quite trivial
+> as the 'tmp' loop variables are used elsewhere in the function.
+> This means we cannot just delete them, and so must inspect the
+> code to ensure the values aren't used elsewhere - they aren't.
 > 
-> because then it is obvious what the purpose of the loop is.
-> Many places in lustre use
->  list_for_each_entry_safe()
-> instead, which obscures the purpose.
-> Several of these were from patches which deliberately converted from
-> the while loop the list list_for_each_entry_safe() loop, at least some
-> of which introduced real bugs.
+> Also we need to introduce new loop variables: ltb1 and ltb2 as
+> the lnet_text_buf was the some for both the original (nested) loops.
 > 
-> This series reverts all those patches, and then makes other
-> conversions.
-> There are still several places which could be converted, but I got
-> bored...
-> I've particularly converted all where the list_head is a local
-> variable. In these cases it is obviously wrong not to empty the
-> list completely.
-> 
-> For those conversions that I did manual (not reverts) I use
->  list_first_entry()
-> to get the first entry, rather then list_entry(head->next).
-> Others could be converted as well.
-> 
-> NeilBrown
+> Signed-off-by: NeilBrown <neilb@suse.com>
 
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 
 > ---
+> drivers/staging/lustre/lnet/lnet/config.c |   11 +++++------
+> 1 file changed, 5 insertions(+), 6 deletions(-)
 > 
-> NeilBrown (22):
->      Revert "staging: lustre: lnet: api-ni: Use list_for_each_entry_safe"
->      Revert "staging: lustre: o2iblnd: Use list_for_each_entry_safe in kiblnd_destroy_fmr_pool_list"
->      Revert "staging: lustre: lnet: o2iblnd: Use list_for_each_entry_safe"
->      Revert "staging: lustre: lnet: socklnd: Use list_for_each_entry_safe"
->      Revert "staging: lustre: lnet: socklnd_proto: Use list_for_each_entry_safe"
->      Revert "staging: lustre: osc_cache: Use list_for_each_entry_safe"
->      Revert "staging: lustre: lnet: peer: Use list_for_each_entry_safe"
->      Revert "staging: lustre: lnet: config: Use list_for_each_entry_safe"
->      Revert "staging: lustre: lnet: router: Use list_for_each_entry_safe"
->      Revert "staging: lustre: lnet: conrpc: Use list_for_each_entry_safe"
->      Revert "staging: lustre: lnet: lib-move: Use list_for_each_entry_safe"
->      Revert "staging: lustre: obdclass: Use list_for_each_entry_safe"
->      Revert "staging: lustre: lnet: Use list_for_each_entry_safe"
->      Revert: Staging: lustre: Iterate list using list_for_each_entry
->      lustre: o2iblnd: convert list_for_each_entry_safe() to while(!list_empty())
->      lustre: tracefile: convert list_for_each_entry_safe() to while(!list_empty())
->      lustre: lib-move:  convert list_for_each_entry_safe() to while(!list_empty())
->      lustre: net_fault: convert list_for_each_entry_safe() to while(!list_empty())
->      lustre: fld_request: convert list_for_each_entry_safe() to while(!list_empty())
->      lustre: lov_obd: convert list_for_each_entry_safe() to while(!list_empty())
->      lustre: ldlm_request: convert list_for_each_entry_safe() to while(!list_empty())
->      lustre: sec_config: convert list_for_each_entry_safe() to while(!list_empty())
+> diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
+> index 96336ecdacaf..091c4f714e84 100644
+> --- a/drivers/staging/lustre/lnet/lnet/config.c
+> +++ b/drivers/staging/lustre/lnet/lnet/config.c
+> @@ -662,6 +662,7 @@ lnet_parse_route(char *str, int *im_a_router)
+> 	__u32 net;
+> 	lnet_nid_t nid;
+> 	struct lnet_text_buf *ltb;
+> +	struct lnet_text_buf *ltb1, *ltb2;
+> 	int rc;
+> 	char *sep;
+> 	char *token = str;
+> @@ -760,14 +761,12 @@ lnet_parse_route(char *str, int *im_a_router)
+> 	LASSERT(!list_empty(&nets));
+> 	LASSERT(!list_empty(&gateways));
 > 
+> -	list_for_each(tmp1, &nets) {
+> -		ltb = list_entry(tmp1, struct lnet_text_buf, ltb_list);
+> -		net = libcfs_str2net(ltb->ltb_text);
+> +	list_for_each_entry(ltb1, &nets, ltb_list) {
+> +		net = libcfs_str2net(ltb1->ltb_text);
+> 		LASSERT(net != LNET_NIDNET(LNET_NID_ANY));
 > 
-> .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   21 ++++++++++++--------
-> .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   12 ++++++-----
-> .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    9 +++++----
-> .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |    5 +++--
-> .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |    4 ++--
-> drivers/staging/lustre/lnet/libcfs/tracefile.c     |   12 +++++++----
-> drivers/staging/lustre/lnet/lnet/api-ni.c          |   10 ++++++----
-> drivers/staging/lustre/lnet/lnet/config.c          |    5 +++--
-> drivers/staging/lustre/lnet/lnet/lib-move.c        |   13 +++++++-----
-> drivers/staging/lustre/lnet/lnet/net_fault.c       |    7 +++++--
-> drivers/staging/lustre/lnet/lnet/peer.c            |    4 ++--
-> drivers/staging/lustre/lnet/lnet/router.c          |    4 ++--
-> drivers/staging/lustre/lnet/selftest/conrpc.c      |    5 +++--
-> drivers/staging/lustre/lustre/fld/fld_request.c    |    6 ++++--
-> drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |    6 ++++--
-> drivers/staging/lustre/lustre/lov/lov_obd.c        |    5 +++--
-> .../staging/lustre/lustre/obdclass/lustre_peer.c   |    5 +++--
-> drivers/staging/lustre/lustre/osc/osc_cache.c      |    9 +++++----
-> drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |    7 ++++---
-> 19 files changed, 87 insertions(+), 62 deletions(-)
+> -		list_for_each(tmp2, &gateways) {
+> -			ltb = list_entry(tmp2, struct lnet_text_buf, ltb_list);
+> -			nid = libcfs_str2nid(ltb->ltb_text);
+> +		list_for_each_entry(ltb2, &gateways, ltb_list) {
+> +			nid = libcfs_str2nid(ltb2->ltb_text);
+> 			LASSERT(nid != LNET_NID_ANY);
 > 
-> --
-> Signature
+> 			if (lnet_islocalnid(nid)) {
+> 
 > 
 
 Cheers, Andreas
 ---
 Andreas Dilger
-CTO Whamcloud
+Principal Lustre Architect
+Whamcloud
+
+
+
 
 
 
@@ -108,4 +84,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 235 bytes
 Desc: Message signed with OpenPGP
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180730/d82a84f4/attachment-0001.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180730/db409863/attachment.sig>
