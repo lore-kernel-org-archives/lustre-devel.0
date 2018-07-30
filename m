@@ -1,10 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Mon, 30 Jul 2018 13:37:41 +1000
-Subject: [lustre-devel] [PATCH 16/22] lustre: tracefile: convert
+Subject: [lustre-devel] [PATCH 17/22] lustre: lib-move: convert
  list_for_each_entry_safe() to while(!list_empty())
 In-Reply-To: <153292153459.13840.17465048403476297915.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
-Message-ID: <153292186126.13840.13964285941561581566.stgit@noble>
+Message-ID: <153292186130.13840.15403228991288155064.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,46 +16,28 @@ So using while(!list_empty()) makes the intent clearer.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lnet/libcfs/tracefile.c |   12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/staging/lustre/lnet/lnet/lib-move.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-index 07242d4ed41b..a4768e930021 100644
---- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
-+++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
-@@ -896,11 +896,12 @@ void cfs_trace_flush_pages(void)
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index 2756e91b34bb..19cab374b6bc 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -853,7 +853,6 @@ lnet_drop_routed_msgs_locked(struct list_head *list, int cpt)
  {
- 	struct page_collection pc;
- 	struct cfs_trace_page *tage;
--	struct cfs_trace_page *tmp;
+ 	struct list_head drop;
+ 	struct lnet_msg *msg;
+-	struct lnet_msg *tmp;
  
- 	pc.pc_want_daemon_pages = 1;
- 	collect_pages(&pc);
--	list_for_each_entry_safe(tage, tmp, &pc.pc_pages, linkage) {
-+	while (!list_empty(&pc.pc_pages)) {
-+		tage = list_first_entry(&pc.pc_pages,
-+					struct cfs_trace_page, linkage);
- 		__LASSERT_TAGE_INVARIANT(tage);
+ 	INIT_LIST_HEAD(&drop);
  
- 		list_del(&tage->linkage);
-@@ -1331,7 +1332,6 @@ static void trace_cleanup_on_all_cpus(void)
- {
- 	struct cfs_trace_cpu_data *tcd;
- 	struct cfs_trace_page *tage;
--	struct cfs_trace_page *tmp;
- 	int i, cpu;
+@@ -861,7 +860,8 @@ lnet_drop_routed_msgs_locked(struct list_head *list, int cpt)
  
- 	for_each_possible_cpu(cpu) {
-@@ -1341,8 +1341,10 @@ static void trace_cleanup_on_all_cpus(void)
- 				continue;
- 			tcd->tcd_shutting_down = 1;
+ 	lnet_net_unlock(cpt);
  
--			list_for_each_entry_safe(tage, tmp, &tcd->tcd_pages,
--						 linkage) {
-+			while (!list_empty(&tcd->tcd_pages)) {
-+				tage = list_first_entry(&tcd->tcd_pages,
-+							struct cfs_trace_page,
-+							linkage);
- 				__LASSERT_TAGE_INVARIANT(tage);
- 
- 				list_del(&tage->linkage);
+-	list_for_each_entry_safe(msg, tmp, &drop, msg_list) {
++	while(!list_empty(&drop)) {
++		msg = list_first_entry(&drop, struct lnet_msg, msg_list);
+ 		lnet_ni_recv(msg->msg_rxpeer->lp_ni, msg->msg_private, NULL,
+ 			     0, 0, 0, msg->msg_hdr.payload_length);
+ 		list_del_init(&msg->msg_list);
