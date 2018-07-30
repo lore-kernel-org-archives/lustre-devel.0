@@ -1,17 +1,17 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 30 Jul 2018 13:37:40 +1000
-Subject: [lustre-devel] [PATCH 09/22] Revert "staging: lustre: lnet: router:
+Date: Mon, 30 Jul 2018 13:37:41 +1000
+Subject: [lustre-devel] [PATCH 10/22] Revert "staging: lustre: lnet: conrpc:
  Use list_for_each_entry_safe"
 In-Reply-To: <153292153459.13840.17465048403476297915.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
-Message-ID: <153292186096.13840.6296110306335811050.stgit@noble>
+Message-ID: <153292186099.13840.6595803769201521471.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-This reverts commit 37cce1bcb750ac12773f1c53afe88a8433f53eb3.
+This reverts commit a9a6cb4f4693253349358f8163d826eb0cfecfbc.
 
 These loops really want to remove everything, and using a
   while(!list_empty())
@@ -19,28 +19,29 @@ loop makes this more obvious.
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lnet/lnet/router.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lnet/selftest/conrpc.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index 3f84df6cb3b1..965087b7359c 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -1340,7 +1340,6 @@ lnet_rtrpool_free_bufs(struct lnet_rtrbufpool *rbp, int cpt)
- 	int npages = rbp->rbp_npages;
- 	struct list_head tmp;
- 	struct lnet_rtrbuf *rb;
--	struct lnet_rtrbuf *temp;
+diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
+index 95cbd1a14e1b..3afde0141db5 100644
+--- a/drivers/staging/lustre/lnet/selftest/conrpc.c
++++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
+@@ -1327,7 +1327,6 @@ lstcon_rpc_cleanup_wait(void)
+ {
+ 	struct lstcon_rpc_trans *trans;
+ 	struct lstcon_rpc *crpc;
+-	struct lstcon_rpc *temp;
+ 	struct list_head *pacer;
+ 	struct list_head zlist;
  
- 	if (!rbp->rbp_nbuffers) /* not initialized or already freed */
- 		return;
-@@ -1357,7 +1356,8 @@ lnet_rtrpool_free_bufs(struct lnet_rtrbufpool *rbp, int cpt)
- 	lnet_net_unlock(cpt);
+@@ -1367,7 +1366,9 @@ lstcon_rpc_cleanup_wait(void)
  
- 	/* Free buffers on the free list. */
--	list_for_each_entry_safe(rb, temp, &tmp, rb_list) {
-+	while (!list_empty(&tmp)) {
-+		rb = list_entry(tmp.next, struct lnet_rtrbuf, rb_list);
- 		list_del(&rb->rb_list);
- 		lnet_destroy_rtrbuf(rb, npages);
+ 	spin_unlock(&console_session.ses_rpc_lock);
+ 
+-	list_for_each_entry_safe(crpc, temp, &zlist, crp_link) {
++	while (!list_empty(&zlist)) {
++		crpc = list_entry(zlist.next, lstcon_rpc_t, crp_link);
++
+ 		list_del(&crpc->crp_link);
+ 		kfree(crpc);
  	}
