@@ -1,107 +1,184 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Jul 2018 22:25:59 -0400
-Subject: [lustre-devel] [PATCH 07/31] lustre: lnet: change positional struct
- initializers to C99
+Date: Mon, 30 Jul 2018 22:25:53 -0400
+Subject: [lustre-devel] [PATCH 01/31] lustre: osc: Send RPCs when extents
+ are full
 In-Reply-To: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
 References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1533003983-29311-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1533003983-29311-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Steve Guminski <stephenx.guminski@intel.com>
+From: Patrick Farrell <paf@cray.com>
 
-This patch makes no functional changes. Struct initializers in the
-lnet directory that use C89 or GCC-only syntax are updated to C99
-syntax. Whitespace is corrected to match coding style guidelines.
+Currently, Lustre decides to send an RPC under a number of
+conditions (such as memory pressure or lock cancellcation);
+one of the conditions it looks for is "enough dirty pages
+to fill an RPC". This worked fine when only one process
+could be dirtying pages at a time, but in newer Lustre
+versions, more than one process can write to the same
+file (and the same osc object) at once.
 
-C89 positional initializers require values to be placed in the
-correct order. This will cause errors if the fields of the struct
-definition are reordered or fields are added or removed. C99 named
-initializers avoid this problem, and also automatically clear any
-values that are not explicitly set.
+In this case, the "count dirty pages method" will see there
+are enough dirty pages to fill an RPC, but since the dirty
+pages are being created by multiple writers, they are not
+contiguous and will not fit in to one RPC. This resulted in
+many RPCs of less than full size being sent, despite a
+good I/O pattern. (Earlier versions of Lustre usually
+send only full RPCs when presented with this pattern.)
 
-The following struct initializers have been updated:
+Instead, we remove this check and add extents to a special
+full extent list when they reach max pages per RPC, then
+send from that list. (This is similar to high priority
+and urgent extents.)
 
-lnet/lnet/api-ni.c:
-        lnet_process_id_t id
-lnet/lnet/lo.c:
-        lnd_t the_lolnd
-lnet/selftest/framework.c:
-        struct lst_sid LST_INVALID_SID
+With a good I/O pattern, like usually used in benchmarking,
+it should be possible to send only full size RPCs. This
+patch achieves that without degrading performance in other
+cases.
 
-Signed-off-by: Steve Guminski <stephenx.guminski@intel.com>
-WC-id: https://jira.whamcloud.com/browse/LU-6210
-Reviewed-on: https://review.whamcloud.com/23493
-Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: Olaf Weber <olaf@sgi.com>
-Reviewed-by: Frank Zago <fzago@cray.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+In IOR tests with multiple writers to a single file,
+this patch improves performance by several times, and
+returns performance to equal levels (single striped files)
+or much greater levels (very high speed OSTs, files
+with many stripes) vs earlier versions.
+
+Supporting data is provided in LU-8515.
+
+Signed-off-by: Patrick Farrell <paf@cray.com>
+Intel-bug-id: https://jira.whamcloud.com/browse/LU-8515
+Reviewed-on: https://review.whamcloud.com/22012
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/lnet/api-ni.c        |  3 ++-
- drivers/staging/lustre/lnet/lnet/lo.c            | 20 +++++++++-----------
- drivers/staging/lustre/lnet/selftest/framework.c |  2 +-
- 3 files changed, 12 insertions(+), 13 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_cache.c      | 45 ++++++++++++++--------
+ .../staging/lustre/lustre/osc/osc_cl_internal.h    |  2 +-
+ drivers/staging/lustre/lustre/osc/osc_object.c     |  4 +-
+ 3 files changed, 32 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index fea0373..e517893 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -884,7 +884,8 @@ struct lnet_ni  *
- 		     struct lnet_handle_md *md_handle,
- 		     int ni_count, bool set_eq)
- {
--	struct lnet_process_id id = {LNET_NID_ANY, LNET_PID_ANY};
-+	struct lnet_process_id id = { .nid = LNET_NID_ANY,
-+				      .pid = LNET_PID_ANY };
- 	struct lnet_handle_me me_handle;
- 	struct lnet_md md = { NULL };
- 	int rc, rc2;
-diff --git a/drivers/staging/lustre/lnet/lnet/lo.c b/drivers/staging/lustre/lnet/lnet/lo.c
-index 7456b98..dd16cdf 100644
---- a/drivers/staging/lustre/lnet/lnet/lo.c
-+++ b/drivers/staging/lustre/lnet/lnet/lo.c
-@@ -91,15 +91,13 @@
- }
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cache.c b/drivers/staging/lustre/lustre/osc/osc_cache.c
+index 87d0d16..e44822a 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cache.c
++++ b/drivers/staging/lustre/lustre/osc/osc_cache.c
+@@ -634,6 +634,10 @@ void osc_extent_release(const struct lu_env *env, struct osc_extent *ext)
+ 			if (ext->oe_urgent)
+ 				list_move_tail(&ext->oe_link,
+ 					       &obj->oo_urgent_exts);
++			else if (ext->oe_nr_pages == ext->oe_mppr) {
++				list_move_tail(&ext->oe_link,
++					       &obj->oo_full_exts);
++			}
+ 		}
+ 		osc_object_unlock(obj);
  
- struct lnet_lnd the_lolnd = {
--	/* .lnd_list       = */ {&the_lolnd.lnd_list, &the_lolnd.lnd_list},
--	/* .lnd_refcount   = */ 0,
--	/* .lnd_type       = */ LOLND,
--	/* .lnd_startup    = */ lolnd_startup,
--	/* .lnd_shutdown   = */ lolnd_shutdown,
--	/* .lnt_ctl        = */ NULL,
--	/* .lnd_send       = */ lolnd_send,
--	/* .lnd_recv       = */ lolnd_recv,
--	/* .lnd_eager_recv = */ NULL,
--	/* .lnd_notify     = */ NULL,
--	/* .lnd_accept     = */ NULL
-+	.lnd_list	= {
-+				.next	= &the_lolnd.lnd_list,
-+				.prev	= &the_lolnd.lnd_list
-+			},
-+	.lnd_type	= LOLND,
-+	.lnd_startup	= lolnd_startup,
-+	.lnd_shutdown	= lolnd_shutdown,
-+	.lnd_send	= lolnd_send,
-+	.lnd_recv	= lolnd_recv,
- };
-diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
-index 03a64e3..944a2a6 100644
---- a/drivers/staging/lustre/lnet/selftest/framework.c
-+++ b/drivers/staging/lustre/lnet/selftest/framework.c
-@@ -40,7 +40,7 @@
+@@ -1790,9 +1794,10 @@ static int osc_makes_rpc(struct client_obd *cli, struct osc_object *osc,
+ 			CDEBUG(D_CACHE, "cache waiters forcing RPC\n");
+ 			return 1;
+ 		}
+-		if (atomic_read(&osc->oo_nr_writes) >=
+-		    cli->cl_max_pages_per_rpc)
++		if (!list_empty(&osc->oo_full_exts)) {
++			CDEBUG(D_CACHE, "full extent ready, make an RPC\n");
+ 			return 1;
++		}
+ 	} else {
+ 		if (atomic_read(&osc->oo_nr_reads) == 0)
+ 			return 0;
+@@ -1963,6 +1968,7 @@ static int try_to_add_extent_for_io(struct client_obd *cli,
  
- #include "selftest.h"
+ 	EASSERT((ext->oe_state == OES_CACHE || ext->oe_state == OES_LOCK_DONE),
+ 		ext);
++	OSC_EXTENT_DUMP(D_CACHE, ext, "trying to add this extent\n");
  
--struct lst_sid LST_INVALID_SID = {LNET_NID_ANY, -1};
-+struct lst_sid LST_INVALID_SID = { .ses_nid = LNET_NID_ANY, .ses_stamp = -1 };
+ 	if (!data->erd_max_extents)
+ 		return 0;
+@@ -2085,19 +2091,22 @@ static unsigned int get_write_extents(struct osc_object *obj,
+ 				 struct osc_extent, oe_link);
+ 		if (!try_to_add_extent_for_io(cli, ext, &data))
+ 			return data.erd_page_count;
++	}
++	if (data.erd_page_count == data.erd_max_pages)
++		return data.erd_page_count;
  
- static int session_timeout = 100;
- module_param(session_timeout, int, 0444);
+-		if (!ext->oe_intree)
+-			continue;
+-
+-		while ((ext = next_extent(ext)) != NULL) {
+-			if ((ext->oe_state != OES_CACHE) ||
+-			    (!list_empty(&ext->oe_link) &&
+-			     ext->oe_owner))
+-				continue;
+-
+-			if (!try_to_add_extent_for_io(cli, ext, &data))
+-				return data.erd_page_count;
+-		}
++	/*
++	 * One key difference between full extents and other extents: full
++	 * extents can usually only be added if the rpclist was empty, so if we
++	 * can't add one, we continue on to trying to add normal extents.  This
++	 * is so we don't miss adding extra extents to an RPC containing high
++	 * priority or urgent extents.
++	 */
++	while (!list_empty(&obj->oo_full_exts)) {
++		ext = list_entry(obj->oo_full_exts.next,
++				 struct osc_extent, oe_link);
++		if (!try_to_add_extent_for_io(cli, ext, &data))
++			break;
+ 	}
+ 	if (data.erd_page_count == data.erd_max_pages)
+ 		return data.erd_page_count;
+@@ -2879,8 +2888,12 @@ int osc_cache_truncate_start(const struct lu_env *env, struct osc_object *obj,
+ 			osc_update_pending(obj, OBD_BRW_WRITE,
+ 					   -ext->oe_nr_pages);
+ 		}
+-		EASSERT(list_empty(&ext->oe_link), ext);
+-		list_add_tail(&ext->oe_link, &list);
++		/* This extent could be on the full extents list, that's OK */
++		EASSERT(!ext->oe_hp && !ext->oe_urgent, ext);
++		if (!list_empty(&ext->oe_link))
++			list_move_tail(&ext->oe_link, &list);
++		else
++			list_add_tail(&ext->oe_link, &list);
+ 
+ 		ext = next_extent(ext);
+ 	}
+diff --git a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+index d86d3f7..da04c2c 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
++++ b/drivers/staging/lustre/lustre/osc/osc_cl_internal.h
+@@ -139,7 +139,7 @@ struct osc_object {
+ 	 */
+ 	struct list_head	   oo_hp_exts; /* list of hp extents */
+ 	struct list_head	   oo_urgent_exts; /* list of writeback extents */
+-	struct list_head	   oo_rpc_exts;
++	struct list_head	   oo_full_exts;
+ 
+ 	struct list_head	   oo_reading_exts;
+ 
+diff --git a/drivers/staging/lustre/lustre/osc/osc_object.c b/drivers/staging/lustre/lustre/osc/osc_object.c
+index 8424018..b9bf2b8 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_object.c
++++ b/drivers/staging/lustre/lustre/osc/osc_object.c
+@@ -85,7 +85,7 @@ static int osc_object_init(const struct lu_env *env, struct lu_object *obj,
+ 	osc->oo_root.rb_node = NULL;
+ 	INIT_LIST_HEAD(&osc->oo_hp_exts);
+ 	INIT_LIST_HEAD(&osc->oo_urgent_exts);
+-	INIT_LIST_HEAD(&osc->oo_rpc_exts);
++	INIT_LIST_HEAD(&osc->oo_full_exts);
+ 	INIT_LIST_HEAD(&osc->oo_reading_exts);
+ 	atomic_set(&osc->oo_nr_reads, 0);
+ 	atomic_set(&osc->oo_nr_writes, 0);
+@@ -111,7 +111,7 @@ static void osc_object_free(const struct lu_env *env, struct lu_object *obj)
+ 	LASSERT(!osc->oo_root.rb_node);
+ 	LASSERT(list_empty(&osc->oo_hp_exts));
+ 	LASSERT(list_empty(&osc->oo_urgent_exts));
+-	LASSERT(list_empty(&osc->oo_rpc_exts));
++	LASSERT(list_empty(&osc->oo_full_exts));
+ 	LASSERT(list_empty(&osc->oo_reading_exts));
+ 	LASSERT(atomic_read(&osc->oo_nr_reads) == 0);
+ 	LASSERT(atomic_read(&osc->oo_nr_writes) == 0);
 -- 
 1.8.3.1
