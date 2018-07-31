@@ -1,150 +1,60 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Jul 2018 22:26:05 -0400
-Subject: [lustre-devel] [PATCH 13/31] lustre: config: don't attach sub logs
- for LWP
+Date: Mon, 30 Jul 2018 22:25:57 -0400
+Subject: [lustre-devel] [PATCH 05/31] lustre: llite: return small device
+ numbers for compat stat()
 In-Reply-To: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
 References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1533003983-29311-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <1533003983-29311-6-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: "John L. Hammond" <jhammond@whamcloud.com>
 
-Lustre target processes client log to retrieve MDT NIDs and start
-LWPs, it goes the same code path of mgc_process_config() just like
-processing the target config log, so that sub clds for security,
-nodemap, param & recovery will be attached unnecessarily.
+The compat_sys_*stat*() syscalls will fail unless the devices majors
+and minors are both less than 256. So in ll_getattr_it(), if we are in
+32 bit compat mode then coerce the device numbers in to the expected
+format.
 
-The mgc subsystem is used by both server and client. This change
-allows us to cleanly handle the future case when the mgc layer
-would be built with server code. This way server specific config
-logs will only be processed when a server mount occurs.
-
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-WC-id: https://jira.whamcloud.com/browse/LU-9081
-Reviewed-on: https://review.whamcloud.com/25293
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+WC-id: https://jira.whamcloud.com/browse/LU-8855
+Reviewed-on: https://review.whamcloud.com/23877
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd_class.h | 19 +++++++-----
- drivers/staging/lustre/lustre/llite/llite_lib.c   |  1 +
- drivers/staging/lustre/lustre/mgc/mgc_request.c   | 37 +++++++++++++----------
- 3 files changed, 34 insertions(+), 23 deletions(-)
+ drivers/staging/lustre/lustre/llite/file.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index adfe2ab..e772e3d 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -153,17 +153,22 @@ struct config_llog_instance {
- 	llog_cb_t	    cfg_callback;
- 	int		    cfg_last_idx; /* for partial llog processing */
- 	int		    cfg_flags;
-+	u32		    cfg_sub_clds;
- };
+diff --git a/drivers/staging/lustre/lustre/llite/file.c b/drivers/staging/lustre/lustre/llite/file.c
+index 3f0f379..684877c 100644
+--- a/drivers/staging/lustre/lustre/llite/file.c
++++ b/drivers/staging/lustre/lustre/llite/file.c
+@@ -3248,14 +3248,20 @@ int ll_getattr(const struct path *path, struct kstat *stat,
+ 	OBD_FAIL_TIMEOUT(OBD_FAIL_GETATTR_DELAY, 30);
  
- int class_config_parse_llog(const struct lu_env *env, struct llog_ctxt *ctxt,
- 			    char *name, struct config_llog_instance *cfg);
--enum {
--	CONFIG_T_CONFIG  = 0,
--	CONFIG_T_SPTLRPC = 1,
--	CONFIG_T_RECOVER = 2,
--	CONFIG_T_PARAMS  = 3,
--	CONFIG_T_MAX     = 4
--};
-+
-+#define CONFIG_T_CONFIG		BIT(0)
-+#define CONFIG_T_SPTLRPC	BIT(1)
-+#define CONFIG_T_RECOVER	BIT(2)
-+#define CONFIG_T_PARAMS		BIT(3)
-+
-+/* Sub clds should be attached to the config_llog_data when processing
-+ * config log for client or server target.
-+ */
-+#define CONFIG_SUB_CLIENT	(CONFIG_T_SPTLRPC | CONFIG_T_RECOVER | \
-+				 CONFIG_T_PARAMS)
- 
- #define PARAMS_FILENAME	"params"
- #define LCTL_UPCALL	"lctl"
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 72b118a..71eb42d 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -949,6 +949,7 @@ int ll_fill_super(struct super_block *sb)
- 	cfg->cfg_instance = sb;
- 	cfg->cfg_uuid = lsi->lsi_llsbi->ll_sb_uuid;
- 	cfg->cfg_callback = class_config_llog_handler;
-+	cfg->cfg_sub_clds = CONFIG_SUB_CLIENT;
- 	/* set up client obds */
- 	err = lustre_process_log(sb, profilenm, cfg);
- 	if (err < 0)
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 82acac0..06fcc7e 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -293,8 +293,8 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
- {
- 	struct lustre_sb_info *lsi = s2lsi(sb);
- 	struct config_llog_data *cld;
--	struct config_llog_data *sptlrpc_cld;
--	struct config_llog_data *params_cld;
-+	struct config_llog_data *sptlrpc_cld = NULL;
-+	struct config_llog_data *params_cld = NULL;
- 	struct config_llog_data *recover_cld = NULL;
- 	char			seclogname[32];
- 	char			*ptr;
-@@ -315,21 +315,25 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
- 	memcpy(seclogname, logname, ptr - logname);
- 	strcpy(seclogname + (ptr - logname), "-sptlrpc");
- 
--	sptlrpc_cld = config_log_find_or_add(obd, seclogname, NULL,
--					     CONFIG_T_SPTLRPC, cfg);
--	if (IS_ERR(sptlrpc_cld)) {
--		CERROR("can't create sptlrpc log: %s\n", seclogname);
--		rc = PTR_ERR(sptlrpc_cld);
--		goto out_err;
-+	if (cfg->cfg_sub_clds & CONFIG_T_SPTLRPC) {
-+		sptlrpc_cld = config_log_find_or_add(obd, seclogname, NULL,
-+						     CONFIG_T_SPTLRPC, cfg);
-+		if (IS_ERR(sptlrpc_cld)) {
-+			CERROR("can't create sptlrpc log: %s\n", seclogname);
-+			rc = PTR_ERR(sptlrpc_cld);
-+			goto out_err;
-+		}
- 	}
- 
--	params_cld = config_log_find_or_add(obd, PARAMS_FILENAME, sb,
--					    CONFIG_T_PARAMS, cfg);
--	if (IS_ERR(params_cld)) {
--		rc = PTR_ERR(params_cld);
--		CERROR("%s: can't create params log: rc = %d\n",
--		       obd->obd_name, rc);
--		goto out_sptlrpc;
-+	if (cfg->cfg_sub_clds & CONFIG_T_PARAMS) {
-+		params_cld = config_log_find_or_add(obd, PARAMS_FILENAME, sb,
-+						    CONFIG_T_PARAMS, cfg);
-+		if (IS_ERR(params_cld)) {
-+			rc = PTR_ERR(params_cld);
-+			CERROR("%s: can't create params log: rc = %d\n",
-+			       obd->obd_name, rc);
-+			goto out_sptlrpc;
-+		}
- 	}
- 
- 	cld = do_config_log_add(obd, logname, CONFIG_T_CONFIG, cfg, sb);
-@@ -340,7 +344,8 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
- 	}
- 
- 	LASSERT(lsi->lsi_lmd);
--	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)) {
-+	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR) &&
-+	    cfg->cfg_sub_clds & CONFIG_T_RECOVER) {
- 		ptr = strrchr(seclogname, '-');
- 		if (ptr) {
- 			*ptr = 0;
+ 	stat->dev = inode->i_sb->s_dev;
+-	if (ll_need_32bit_api(sbi))
++	if (ll_need_32bit_api(sbi)) {
+ 		stat->ino = cl_fid_build_ino(&lli->lli_fid, 1);
+-	else
++		stat->dev = MKDEV(MAJOR(inode->i_sb->s_dev) & 0xff,
++				  MINOR(inode->i_sb->s_dev) & 0xff);
++		stat->rdev = MKDEV(MAJOR(inode->i_rdev) & 0xff,
++				   MINOR(inode->i_rdev) & 0xff);
++	} else {
++		stat->dev = inode->i_sb->s_dev;
++		stat->rdev = inode->i_rdev;
+ 		stat->ino = inode->i_ino;
++	}
+ 	stat->mode = inode->i_mode;
+ 	stat->uid = inode->i_uid;
+ 	stat->gid = inode->i_gid;
+-	stat->rdev = inode->i_rdev;
+ 	stat->atime = inode->i_atime;
+ 	stat->mtime = inode->i_mtime;
+ 	stat->ctime = inode->i_ctime;
 -- 
 1.8.3.1
