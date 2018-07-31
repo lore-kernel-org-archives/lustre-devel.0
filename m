@@ -1,258 +1,218 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Jul 2018 22:26:16 -0400
-Subject: [lustre-devel] [PATCH 24/31] lustre: obdclass: use static
- initializer macros where possible
+Date: Mon, 30 Jul 2018 22:26:17 -0400
+Subject: [lustre-devel] [PATCH 25/31] lustre: config: move config types into
+ lustre_idl.h
 In-Reply-To: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
 References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1533003983-29311-25-git-send-email-jsimmons@infradead.org>
+Message-ID: <1533003983-29311-26-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+From: Niu Yawei <yawei.niu@intel.com>
 
-In obdclass replace module load time initialization of several
-atomics, lists, locks, mutexes, wait queues, etc with static
-initialization using the kernel provided macros.
+Move config type values CONFIG_T_XXX into lustre_idl.h since they
+will be put on wire when reading config logs.
 
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-WC-id: https://jira.whamcloud.com/browse/LU-9010
-Reviewed-on: https://review.whamcloud.com/24827
-Reviewed-by: Steve Guminski <stephenx.guminski@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Add missing wire checks for mgs_nidtbl_entry, mgs_config_body and
+mgs_config_res.
+
+Redefine CONFIG_SUB_XXX for the sub clds attached on config log.
+
+Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+WC-id: https://jira.whamcloud.com/browse/LU-9216
+Reviewed-on: https://review.whamcloud.com/26022
+Reviewed-by: Fan Yong <fan.yong@intel.com>
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lu_object.h  |  6 -----
- drivers/staging/lustre/lustre/include/obd_class.h  |  6 -----
- drivers/staging/lustre/lustre/obdclass/class_obd.c | 26 +++++-----------------
- drivers/staging/lustre/lustre/obdclass/genops.c    |  5 ++++-
- drivers/staging/lustre/lustre/obdclass/lu_object.c | 15 -------------
- .../staging/lustre/lustre/obdclass/lustre_peer.c   | 16 ++-----------
- 6 files changed, 12 insertions(+), 62 deletions(-)
+ .../lustre/include/uapi/linux/lustre/lustre_idl.h  | 10 ++-
+ drivers/staging/lustre/lustre/include/obd_class.h  | 12 +--
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |  6 +-
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 85 ++++++++++++++++++++++
+ 4 files changed, 103 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lu_object.h b/drivers/staging/lustre/lustre/include/lu_object.h
-index 4153db7..47f8021 100644
---- a/drivers/staging/lustre/lustre/include/lu_object.h
-+++ b/drivers/staging/lustre/lustre/include/lu_object.h
-@@ -330,12 +330,6 @@ struct lu_device_type {
- 	 * Number of existing device type instances.
- 	 */
- 	atomic_t				ldt_device_nr;
--	/**
--	 * Linkage into a global list of all device types.
--	 *
--	 * \see lu_device_types.
--	 */
--	struct list_head			      ldt_linkage;
+diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+index c9b32ef..bd3b45a 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
++++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+@@ -2111,11 +2111,19 @@ struct mgs_nidtbl_entry {
+ 	} u;
  };
  
- /**
++enum {
++	CONFIG_T_CONFIG  = 0,
++	CONFIG_T_SPTLRPC = 1,
++	CONFIG_T_RECOVER = 2,
++	CONFIG_T_PARAMS  = 3,
++	CONFIG_T_MAX
++};
++
+ struct mgs_config_body {
+ 	char		mcb_name[MTI_NAME_MAXLEN]; /* logname */
+ 	__u64		mcb_offset;    /* next index of config log to request */
+ 	__u16		mcb_type;      /* type of log: CONFIG_T_[CONFIG|RECOVER] */
+-	__u8		mcb_reserved;
++	__u8		mcb_nm_cur_pass;
+ 	__u8		mcb_bits;      /* bits unit size of config log */
+ 	__u32		mcb_units;     /* # of units for bulk transfer */
+ };
 diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index e772e3d..184da99 100644
+index 184da99..647cc22 100644
 --- a/drivers/staging/lustre/lustre/include/obd_class.h
 +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -48,7 +48,6 @@
- #define OBD_STATFS_FOR_MDT0	0x0004
+@@ -156,16 +156,16 @@ struct config_llog_instance {
+ int class_config_parse_llog(const struct lu_env *env, struct llog_ctxt *ctxt,
+ 			    char *name, struct config_llog_instance *cfg);
  
- /* OBD Device Declarations */
--extern struct obd_device *obd_devs[MAX_OBD_DEVICES];
- extern rwlock_t obd_dev_lock;
+-#define CONFIG_T_CONFIG		BIT(0)
+-#define CONFIG_T_SPTLRPC	BIT(1)
+-#define CONFIG_T_RECOVER	BIT(2)
+-#define CONFIG_T_PARAMS		BIT(3)
++#define CONFIG_SUB_CONFIG	BIT(0)
++#define CONFIG_SUB_SPTLRPC	BIT(1)
++#define CONFIG_SUB_RECOVER	BIT(2)
++#define CONFIG_SUB_PARAMS	BIT(3)
  
- /* OBD Operations Declarations */
-@@ -59,7 +58,6 @@
- struct lu_device_type;
+ /* Sub clds should be attached to the config_llog_data when processing
+  * config log for client or server target.
+  */
+-#define CONFIG_SUB_CLIENT	(CONFIG_T_SPTLRPC | CONFIG_T_RECOVER | \
+-				 CONFIG_T_PARAMS)
++#define CONFIG_SUB_CLIENT	(CONFIG_SUB_SPTLRPC | CONFIG_SUB_RECOVER | \
++				 CONFIG_SUB_PARAMS)
  
- /* genops.c */
--extern struct list_head obd_types;
- struct obd_export *class_conn2export(struct lustre_handle *conn);
- int class_register_type(struct obd_ops *dt_ops, struct md_ops *md_ops,
- 			const char *name, struct lu_device_type *ldt);
-@@ -133,7 +131,6 @@ void class_decref(struct obd_device *obd,
- int class_config_llog_handler(const struct lu_env *env,
- 			      struct llog_handle *handle,
- 			      struct llog_rec_hdr *rec, void *data);
--int class_add_uuid(const char *uuid, __u64 nid);
+ #define PARAMS_FILENAME	"params"
+ #define LCTL_UPCALL	"lctl"
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index 06fcc7e..833e6a0 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -315,7 +315,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
+ 	memcpy(seclogname, logname, ptr - logname);
+ 	strcpy(seclogname + (ptr - logname), "-sptlrpc");
  
- /* obdecho */
- void lprocfs_echo_init_vars(struct lprocfs_static_vars *lvars);
-@@ -1576,13 +1573,10 @@ struct lwp_register_item {
- int class_add_uuid(const char *uuid, __u64 nid);
- int class_del_uuid(const char *uuid);
- int class_check_uuid(struct obd_uuid *uuid, __u64 nid);
--void class_init_uuidlist(void);
--void class_exit_uuidlist(void);
- 
- /* class_obd.c */
- extern char obd_jobid_node[];
- extern struct miscdevice obd_psdev;
--extern spinlock_t obd_types_lock;
- int class_procfs_init(void);
- int class_procfs_clean(void);
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 04e55fc..05ae6e1 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -49,10 +49,6 @@
- #include <uapi/linux/lnet/libcfs_ioctl.h>
- #include "llog_internal.h"
- 
--struct obd_device *obd_devs[MAX_OBD_DEVICES];
--struct list_head obd_types;
--DEFINE_RWLOCK(obd_dev_lock);
--
- /* The following are visible and mutable through /sys/fs/lustre. */
- unsigned int obd_debug_peer_on_timeout;
- EXPORT_SYMBOL(obd_debug_peer_on_timeout);
-@@ -455,28 +451,25 @@ static int obd_init_checks(void)
- 
- static int __init obdclass_init(void)
- {
--	int i, err;
-+	int err;
- 
- 	LCONSOLE_INFO("Lustre: Build Version: " LUSTRE_VERSION_STRING "\n");
- 
--	spin_lock_init(&obd_types_lock);
--
- 	err = libcfs_setup();
- 	if (err)
- 		return err;
- 
--	obd_zombie_impexp_init();
-+	err = obd_zombie_impexp_init();
-+	if (err)
-+		return err;
- 
- 	err = obd_init_checks();
- 	if (err)
- 		goto cleanup_zombie_impexp;
- 
--	class_init_uuidlist();
- 	err = class_handle_init();
- 	if (err)
--		goto cleanup_uuidlist;
--
--	INIT_LIST_HEAD(&obd_types);
-+		goto cleanup_zombie_impexp;
- 
- 	err = misc_register(&obd_psdev);
- 	if (err) {
-@@ -484,10 +477,6 @@ static int __init obdclass_init(void)
- 		goto cleanup_class_handle;
+-	if (cfg->cfg_sub_clds & CONFIG_T_SPTLRPC) {
++	if (cfg->cfg_sub_clds & CONFIG_SUB_SPTLRPC) {
+ 		sptlrpc_cld = config_log_find_or_add(obd, seclogname, NULL,
+ 						     CONFIG_T_SPTLRPC, cfg);
+ 		if (IS_ERR(sptlrpc_cld)) {
+@@ -325,7 +325,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
+ 		}
  	}
  
--	/* This struct is already zeroed for us (static global) */
--	for (i = 0; i < class_devno_max(); i++)
--		obd_devs[i] = NULL;
--
- 	/* Default the dirty page cache cap to 1/2 of system memory.
- 	 * For clients with less memory, a larger fraction is needed
- 	 * for other purposes (mostly for BGL).
-@@ -550,9 +539,6 @@ static int __init obdclass_init(void)
- cleanup_class_handle:
- 	class_handle_cleanup();
+-	if (cfg->cfg_sub_clds & CONFIG_T_PARAMS) {
++	if (cfg->cfg_sub_clds & CONFIG_SUB_PARAMS) {
+ 		params_cld = config_log_find_or_add(obd, PARAMS_FILENAME, sb,
+ 						    CONFIG_T_PARAMS, cfg);
+ 		if (IS_ERR(params_cld)) {
+@@ -345,7 +345,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
  
--cleanup_uuidlist:
--	class_exit_uuidlist();
--
- cleanup_zombie_impexp:
- 	obd_zombie_impexp_stop();
+ 	LASSERT(lsi->lsi_lmd);
+ 	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR) &&
+-	    cfg->cfg_sub_clds & CONFIG_T_RECOVER) {
++	    cfg->cfg_sub_clds & CONFIG_SUB_RECOVER) {
+ 		ptr = strrchr(seclogname, '-');
+ 		if (ptr) {
+ 			*ptr = 0;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+index 2f081ed..09b1298 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+@@ -3629,6 +3629,91 @@ void lustre_assert_wire_constants(void)
+ 	LASSERTF((int)sizeof(((struct mgs_target_info *)0)->mti_params) == 4096, "found %lld\n",
+ 		 (long long)(int)sizeof(((struct mgs_target_info *)0)->mti_params));
  
-@@ -571,7 +557,7 @@ static void obdclass_exit(void)
- 	class_procfs_clean();
- 
- 	class_handle_cleanup();
--	class_exit_uuidlist();
-+	class_del_uuid(NULL); /* Delete all UUIDs. */
- 	obd_zombie_impexp_stop();
- }
- 
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 8454b44..532418e 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -41,7 +41,10 @@
- #include <lprocfs_status.h>
- #include <lustre_kernelcomm.h>
- 
--spinlock_t obd_types_lock;
-+static DEFINE_SPINLOCK(obd_types_lock);
-+static LIST_HEAD(obd_types);
-+DEFINE_RWLOCK(obd_dev_lock);
-+static struct obd_device *obd_devs[MAX_OBD_DEVICES];
- 
- static struct kmem_cache *obd_device_cachep;
- struct kmem_cache *obdo_cachep;
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index 2d24eb6..cb57abf 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -764,35 +764,20 @@ struct lu_object *lu_object_find_slice(const struct lu_env *env,
- }
- EXPORT_SYMBOL(lu_object_find_slice);
- 
--/**
-- * Global list of all device types.
-- */
--static LIST_HEAD(lu_device_types);
--
- int lu_device_type_init(struct lu_device_type *ldt)
- {
- 	int result = 0;
- 
- 	atomic_set(&ldt->ldt_device_nr, 0);
--	INIT_LIST_HEAD(&ldt->ldt_linkage);
- 	if (ldt->ldt_ops->ldto_init)
- 		result = ldt->ldt_ops->ldto_init(ldt);
- 
--	if (!result) {
--		spin_lock(&obd_types_lock);
--		list_add(&ldt->ldt_linkage, &lu_device_types);
--		spin_unlock(&obd_types_lock);
--	}
--
- 	return result;
- }
- EXPORT_SYMBOL(lu_device_type_init);
- 
- void lu_device_type_fini(struct lu_device_type *ldt)
- {
--	spin_lock(&obd_types_lock);
--	list_del_init(&ldt->ldt_linkage);
--	spin_unlock(&obd_types_lock);
- 	if (ldt->ldt_ops->ldto_fini)
- 		ldt->ldt_ops->ldto_fini(ldt);
- }
-diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_peer.c b/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
-index 7fc62b7..5705b0a 100644
---- a/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
-@@ -51,20 +51,8 @@ struct uuid_nid_data {
- };
- 
- /* FIXME: This should probably become more elegant than a global linked list */
--static struct list_head	g_uuid_list;
--static spinlock_t	g_uuid_lock;
--
--void class_init_uuidlist(void)
--{
--	INIT_LIST_HEAD(&g_uuid_list);
--	spin_lock_init(&g_uuid_lock);
--}
--
--void class_exit_uuidlist(void)
--{
--	/* delete all */
--	class_del_uuid(NULL);
--}
-+static LIST_HEAD(g_uuid_list);
-+static DEFINE_SPINLOCK(g_uuid_lock);
- 
- int lustre_uuid_to_peer(const char *uuid, lnet_nid_t *peer_nid, int index)
- {
++	/* Checks for struct mgs_nidtbl_entry */
++	LASSERTF((int)sizeof(struct mgs_nidtbl_entry) == 24, "found %lld\n",
++		 (long long)(int)sizeof(struct mgs_nidtbl_entry));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_version) == 0, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_version));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_version) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_version));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_instance) == 8, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_instance));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_instance) == 4, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_instance));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_index) == 12, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_index));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_index) == 4, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_index));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_length) == 16, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_length));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_length) == 4, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_length));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_type) == 20, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_type));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_type) == 1, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_type));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_type) == 21, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_type));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_type) == 1, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_type));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_size) == 22, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_size));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_size) == 1, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_size));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_count) == 23, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_count));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_count) == 1, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_count));
++	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, u.nids[0]) == 24, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_nidtbl_entry, u.nids[0]));
++	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->u.nids[0]) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->u.nids[0]));
++
++	/* Checks for struct mgs_config_body */
++	LASSERTF((int)sizeof(struct mgs_config_body) == 80, "found %lld\n",
++		 (long long)(int)sizeof(struct mgs_config_body));
++	LASSERTF((int)offsetof(struct mgs_config_body, mcb_name) == 0, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_config_body, mcb_name));
++	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_name) == 64, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_name));
++	LASSERTF((int)offsetof(struct mgs_config_body, mcb_offset) == 64, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_config_body, mcb_offset));
++	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_offset) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_offset));
++	LASSERTF((int)offsetof(struct mgs_config_body, mcb_type) == 72, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_config_body, mcb_type));
++	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_type) == 2, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_type));
++	LASSERTF((int)offsetof(struct mgs_config_body, mcb_nm_cur_pass) == 74, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_config_body, mcb_nm_cur_pass));
++	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_nm_cur_pass) == 1, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_nm_cur_pass));
++	LASSERTF((int)offsetof(struct mgs_config_body, mcb_bits) == 75, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_config_body, mcb_bits));
++	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_bits) == 1, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_bits));
++	LASSERTF((int)offsetof(struct mgs_config_body, mcb_units) == 76, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_config_body, mcb_units));
++	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_units) == 4, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_units));
++
++	BUILD_BUG_ON(CONFIG_T_CONFIG != 0);
++	BUILD_BUG_ON(CONFIG_T_SPTLRPC != 1);
++	BUILD_BUG_ON(CONFIG_T_RECOVER != 2);
++	BUILD_BUG_ON(CONFIG_T_PARAMS != 3);
++
++	/* Checks for struct mgs_config_res */
++	LASSERTF((int)sizeof(struct mgs_config_res) == 16, "found %lld\n",
++		 (long long)(int)sizeof(struct mgs_config_res));
++	LASSERTF((int)offsetof(struct mgs_config_res, mcr_offset) == 0, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_config_res, mcr_offset));
++	LASSERTF((int)sizeof(((struct mgs_config_res *)0)->mcr_offset) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_config_res *)0)->mcr_offset));
++	LASSERTF((int)offsetof(struct mgs_config_res, mcr_size) == 8, "found %lld\n",
++		 (long long)(int)offsetof(struct mgs_config_res, mcr_size));
++	LASSERTF((int)sizeof(((struct mgs_config_res *)0)->mcr_size) == 8, "found %lld\n",
++		 (long long)(int)sizeof(((struct mgs_config_res *)0)->mcr_size));
++
+ 	/* Checks for struct lustre_capa */
+ 	LASSERTF((int)sizeof(struct lustre_capa) == 120, "found %lld\n",
+ 		 (long long)(int)sizeof(struct lustre_capa));
 -- 
 1.8.3.1
