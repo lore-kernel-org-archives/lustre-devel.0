@@ -1,218 +1,137 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Jul 2018 22:26:17 -0400
-Subject: [lustre-devel] [PATCH 25/31] lustre: config: move config types into
- lustre_idl.h
+Date: Mon, 30 Jul 2018 22:26:08 -0400
+Subject: [lustre-devel] [PATCH 16/31] lustre: obd: remove OBD_NOTIFY_SYNC{,
+ _NONBLOCK}
 In-Reply-To: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
 References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1533003983-29311-26-git-send-email-jsimmons@infradead.org>
+Message-ID: <1533003983-29311-17-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Niu Yawei <yawei.niu@intel.com>
+From: "John L. Hammond" <jhammond@whamcloud.com>
 
-Move config type values CONFIG_T_XXX into lustre_idl.h since they
-will be put on wire when reading config logs.
+None of the OBD notify handlers listen for OBD_NOTIFY_SYNC{,_NONBLOCK}
+events so remove them and related code in lov_notify().
 
-Add missing wire checks for mgs_nidtbl_entry, mgs_config_body and
-mgs_config_res.
-
-Redefine CONFIG_SUB_XXX for the sub clds attached on config log.
-
-Signed-off-by: Niu Yawei <yawei.niu@intel.com>
-WC-id: https://jira.whamcloud.com/browse/LU-9216
-Reviewed-on: https://review.whamcloud.com/26022
-Reviewed-by: Fan Yong <fan.yong@intel.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+WC-id: https://jira.whamcloud.com/browse/LU-8403
+Reviewed-on: https://review.whamcloud.com/21421
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/uapi/linux/lustre/lustre_idl.h  | 10 ++-
- drivers/staging/lustre/lustre/include/obd_class.h  | 12 +--
- drivers/staging/lustre/lustre/mgc/mgc_request.c    |  6 +-
- drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 85 ++++++++++++++++++++++
- 4 files changed, 103 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h |  3 --
+ drivers/staging/lustre/lustre/lov/lov_obd.c | 52 +++++------------------------
+ 2 files changed, 9 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-index c9b32ef..bd3b45a 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
-@@ -2111,11 +2111,19 @@ struct mgs_nidtbl_entry {
- 	} u;
- };
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 62f85a1..5bf2be8 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -491,9 +491,6 @@ enum obd_notify_event {
+ 	OBD_NOTIFY_INACTIVE,
+ 	/* Connect data for import were changed */
+ 	OBD_NOTIFY_OCD,
+-	/* Sync request */
+-	OBD_NOTIFY_SYNC_NONBLOCK,
+-	OBD_NOTIFY_SYNC,
+ 	/* Configuration event */
+ 	OBD_NOTIFY_CONFIG,
+ 	/* Administratively deactivate/activate event */
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index 0dd471c..85d3b29 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -429,10 +429,8 @@ static int lov_notify(struct obd_device *obd, struct obd_device *watched,
+ 	struct lov_obd *lov = &obd->u.lov;
  
-+enum {
-+	CONFIG_T_CONFIG  = 0,
-+	CONFIG_T_SPTLRPC = 1,
-+	CONFIG_T_RECOVER = 2,
-+	CONFIG_T_PARAMS  = 3,
-+	CONFIG_T_MAX
-+};
-+
- struct mgs_config_body {
- 	char		mcb_name[MTI_NAME_MAXLEN]; /* logname */
- 	__u64		mcb_offset;    /* next index of config log to request */
- 	__u16		mcb_type;      /* type of log: CONFIG_T_[CONFIG|RECOVER] */
--	__u8		mcb_reserved;
-+	__u8		mcb_nm_cur_pass;
- 	__u8		mcb_bits;      /* bits unit size of config log */
- 	__u32		mcb_units;     /* # of units for bulk transfer */
- };
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 184da99..647cc22 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -156,16 +156,16 @@ struct config_llog_instance {
- int class_config_parse_llog(const struct lu_env *env, struct llog_ctxt *ctxt,
- 			    char *name, struct config_llog_instance *cfg);
+ 	down_read(&lov->lov_notify_lock);
+-	if (!lov->lov_connects) {
+-		up_read(&lov->lov_notify_lock);
+-		return rc;
+-	}
++	if (!lov->lov_connects)
++		goto out_notify_lock;
  
--#define CONFIG_T_CONFIG		BIT(0)
--#define CONFIG_T_SPTLRPC	BIT(1)
--#define CONFIG_T_RECOVER	BIT(2)
--#define CONFIG_T_PARAMS		BIT(3)
-+#define CONFIG_SUB_CONFIG	BIT(0)
-+#define CONFIG_SUB_SPTLRPC	BIT(1)
-+#define CONFIG_SUB_RECOVER	BIT(2)
-+#define CONFIG_SUB_PARAMS	BIT(3)
+ 	if (ev == OBD_NOTIFY_ACTIVE || ev == OBD_NOTIFY_INACTIVE ||
+ 	    ev == OBD_NOTIFY_ACTIVATE || ev == OBD_NOTIFY_DEACTIVATE) {
+@@ -441,12 +439,13 @@ static int lov_notify(struct obd_device *obd, struct obd_device *watched,
+ 		LASSERT(watched);
  
- /* Sub clds should be attached to the config_llog_data when processing
-  * config log for client or server target.
-  */
--#define CONFIG_SUB_CLIENT	(CONFIG_T_SPTLRPC | CONFIG_T_RECOVER | \
--				 CONFIG_T_PARAMS)
-+#define CONFIG_SUB_CLIENT	(CONFIG_SUB_SPTLRPC | CONFIG_SUB_RECOVER | \
-+				 CONFIG_SUB_PARAMS)
- 
- #define PARAMS_FILENAME	"params"
- #define LCTL_UPCALL	"lctl"
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 06fcc7e..833e6a0 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -315,7 +315,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
- 	memcpy(seclogname, logname, ptr - logname);
- 	strcpy(seclogname + (ptr - logname), "-sptlrpc");
- 
--	if (cfg->cfg_sub_clds & CONFIG_T_SPTLRPC) {
-+	if (cfg->cfg_sub_clds & CONFIG_SUB_SPTLRPC) {
- 		sptlrpc_cld = config_log_find_or_add(obd, seclogname, NULL,
- 						     CONFIG_T_SPTLRPC, cfg);
- 		if (IS_ERR(sptlrpc_cld)) {
-@@ -325,7 +325,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
+ 		if (strcmp(watched->obd_type->typ_name, LUSTRE_OSC_NAME)) {
+-			up_read(&lov->lov_notify_lock);
+ 			CERROR("unexpected notification of %s %s!\n",
+ 			       watched->obd_type->typ_name,
+ 			       watched->obd_name);
+-			return -EINVAL;
++			rc = -EINVAL;
++			goto out_notify_lock;
  		}
++
+ 		uuid = &watched->u.cli.cl_target_uuid;
+ 
+ 		/* Set OSC as active before notifying the observer, so the
+@@ -454,53 +453,20 @@ static int lov_notify(struct obd_device *obd, struct obd_device *watched,
+ 		 */
+ 		rc = lov_set_osc_active(obd, uuid, ev);
+ 		if (rc < 0) {
+-			up_read(&lov->lov_notify_lock);
+ 			CERROR("event(%d) of %s failed: %d\n", ev,
+ 			       obd_uuid2str(uuid), rc);
+-			return rc;
++			goto out_notify_lock;
+ 		}
+ 		/* active event should be pass lov target index as data */
+ 		data = &rc;
  	}
  
--	if (cfg->cfg_sub_clds & CONFIG_T_PARAMS) {
-+	if (cfg->cfg_sub_clds & CONFIG_SUB_PARAMS) {
- 		params_cld = config_log_find_or_add(obd, PARAMS_FILENAME, sb,
- 						    CONFIG_T_PARAMS, cfg);
- 		if (IS_ERR(params_cld)) {
-@@ -345,7 +345,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
+ 	/* Pass the notification up the chain. */
+-	if (watched) {
+-		rc = obd_notify_observer(obd, watched, ev, data);
+-	} else {
+-		/* NULL watched means all osc's in the lov (only for syncs) */
+-		/* sync event should be send lov idx as data */
+-		struct lov_obd *lov = &obd->u.lov;
+-		int i, is_sync;
+-
+-		data = &i;
+-		is_sync = (ev == OBD_NOTIFY_SYNC) ||
+-			  (ev == OBD_NOTIFY_SYNC_NONBLOCK);
+-
+-		obd_getref(obd);
+-		for (i = 0; i < lov->desc.ld_tgt_count; i++) {
+-			if (!lov->lov_tgts[i])
+-				continue;
+-
+-			/* don't send sync event if target not
+-			 * connected/activated
+-			 */
+-			if (is_sync &&  !lov->lov_tgts[i]->ltd_active)
+-				continue;
+-
+-			rc = obd_notify_observer(obd, lov->lov_tgts[i]->ltd_obd,
+-						 ev, data);
+-			if (rc) {
+-				CERROR("%s: notify %s of %s failed %d\n",
+-				       obd->obd_name,
+-				       obd->obd_observer->obd_name,
+-				       lov->lov_tgts[i]->ltd_obd->obd_name,
+-				       rc);
+-			}
+-		}
+-		obd_putref(obd);
+-	}
++	rc = obd_notify_observer(obd, watched, ev, data);
  
- 	LASSERT(lsi->lsi_lmd);
- 	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR) &&
--	    cfg->cfg_sub_clds & CONFIG_T_RECOVER) {
-+	    cfg->cfg_sub_clds & CONFIG_SUB_RECOVER) {
- 		ptr = strrchr(seclogname, '-');
- 		if (ptr) {
- 			*ptr = 0;
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-index 2f081ed..09b1298 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
-@@ -3629,6 +3629,91 @@ void lustre_assert_wire_constants(void)
- 	LASSERTF((int)sizeof(((struct mgs_target_info *)0)->mti_params) == 4096, "found %lld\n",
- 		 (long long)(int)sizeof(((struct mgs_target_info *)0)->mti_params));
++out_notify_lock:
+ 	up_read(&lov->lov_notify_lock);
++
+ 	return rc;
+ }
  
-+	/* Checks for struct mgs_nidtbl_entry */
-+	LASSERTF((int)sizeof(struct mgs_nidtbl_entry) == 24, "found %lld\n",
-+		 (long long)(int)sizeof(struct mgs_nidtbl_entry));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_version) == 0, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_version));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_version) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_version));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_instance) == 8, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_instance));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_instance) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_instance));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_index) == 12, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_index));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_index) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_index));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_length) == 16, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_length));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_length) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_length));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_type) == 20, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_type));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_type) == 1, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_type));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_type) == 21, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_type));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_type) == 1, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_type));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_size) == 22, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_size));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_size) == 1, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_size));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_count) == 23, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_count));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_count) == 1, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_count));
-+	LASSERTF((int)offsetof(struct mgs_nidtbl_entry, u.nids[0]) == 24, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_nidtbl_entry, u.nids[0]));
-+	LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->u.nids[0]) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->u.nids[0]));
-+
-+	/* Checks for struct mgs_config_body */
-+	LASSERTF((int)sizeof(struct mgs_config_body) == 80, "found %lld\n",
-+		 (long long)(int)sizeof(struct mgs_config_body));
-+	LASSERTF((int)offsetof(struct mgs_config_body, mcb_name) == 0, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_config_body, mcb_name));
-+	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_name) == 64, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_name));
-+	LASSERTF((int)offsetof(struct mgs_config_body, mcb_offset) == 64, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_config_body, mcb_offset));
-+	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_offset) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_offset));
-+	LASSERTF((int)offsetof(struct mgs_config_body, mcb_type) == 72, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_config_body, mcb_type));
-+	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_type) == 2, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_type));
-+	LASSERTF((int)offsetof(struct mgs_config_body, mcb_nm_cur_pass) == 74, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_config_body, mcb_nm_cur_pass));
-+	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_nm_cur_pass) == 1, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_nm_cur_pass));
-+	LASSERTF((int)offsetof(struct mgs_config_body, mcb_bits) == 75, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_config_body, mcb_bits));
-+	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_bits) == 1, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_bits));
-+	LASSERTF((int)offsetof(struct mgs_config_body, mcb_units) == 76, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_config_body, mcb_units));
-+	LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_units) == 4, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_units));
-+
-+	BUILD_BUG_ON(CONFIG_T_CONFIG != 0);
-+	BUILD_BUG_ON(CONFIG_T_SPTLRPC != 1);
-+	BUILD_BUG_ON(CONFIG_T_RECOVER != 2);
-+	BUILD_BUG_ON(CONFIG_T_PARAMS != 3);
-+
-+	/* Checks for struct mgs_config_res */
-+	LASSERTF((int)sizeof(struct mgs_config_res) == 16, "found %lld\n",
-+		 (long long)(int)sizeof(struct mgs_config_res));
-+	LASSERTF((int)offsetof(struct mgs_config_res, mcr_offset) == 0, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_config_res, mcr_offset));
-+	LASSERTF((int)sizeof(((struct mgs_config_res *)0)->mcr_offset) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_config_res *)0)->mcr_offset));
-+	LASSERTF((int)offsetof(struct mgs_config_res, mcr_size) == 8, "found %lld\n",
-+		 (long long)(int)offsetof(struct mgs_config_res, mcr_size));
-+	LASSERTF((int)sizeof(((struct mgs_config_res *)0)->mcr_size) == 8, "found %lld\n",
-+		 (long long)(int)sizeof(((struct mgs_config_res *)0)->mcr_size));
-+
- 	/* Checks for struct lustre_capa */
- 	LASSERTF((int)sizeof(struct lustre_capa) == 120, "found %lld\n",
- 		 (long long)(int)sizeof(struct lustre_capa));
 -- 
 1.8.3.1
