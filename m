@@ -1,10 +1,11 @@
 From: NeilBrown <neilb@suse.com>
-Date: Wed, 01 Aug 2018 08:38:50 +1000
-Subject: [lustre-devel] [PATCH 11/31] lustre: lnet: Fix route hops print
-In-Reply-To: <1533003983-29311-12-git-send-email-jsimmons@infradead.org>
+Date: Wed, 01 Aug 2018 08:41:34 +1000
+Subject: [lustre-devel] [PATCH 13/31] lustre: config: don't attach sub
+ logs for LWP
+In-Reply-To: <1533003983-29311-14-git-send-email-jsimmons@infradead.org>
 References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
- <1533003983-29311-12-git-send-email-jsimmons@infradead.org>
-Message-ID: <877elbrpxh.fsf@notabene.neil.brown.name>
+ <1533003983-29311-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <874lgfrpsx.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,55 +14,73 @@ To: lustre-devel@lists.lustre.org
 
 On Mon, Jul 30 2018, James Simmons wrote:
 
-> From: Amir Shehata <ashehata@whamcloud.com>
+> From: Niu Yawei <yawei.niu@intel.com>
 >
-> The default number of hops for  a route is -1. This is
-> currently being printed as %u. Change that to %d to
-> make it print out properly.
-
--1 hops???  I wish I could hop -1 times - it would be a good party
-trick!!
-
-What does -1 mean?  Unlimited (just a guess).  If so, could we print
-"unlimited"??
-
-I'm fine with having magic numbers in the code, but I don't like them to
-leak out.
-
-NeilBrown
-
+> Lustre target processes client log to retrieve MDT NIDs and start
+> LWPs, it goes the same code path of mgc_process_config() just like
+> processing the target config log, so that sub clds for security,
+> nodemap, param & recovery will be attached unnecessarily.
 >
-> Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-> WC-id: https://jira.whamcloud.com/browse/LU-9078
-> Reviewed-on: https://review.whamcloud.com/25250
-> Reviewed-by: Olaf Weber <olaf@sgi.com>
-> Reviewed-by: Doug Oucharek <dougso@me.com>
-> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+> The mgc subsystem is used by both server and client. This change
+> allows us to cleanly handle the future case when the mgc layer
+> would be built with server code. This way server specific config
+> logs will only be processed when a server mount occurs.
+>
+> Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+> WC-id: https://jira.whamcloud.com/browse/LU-9081
+> Reviewed-on: https://review.whamcloud.com/25293
+> Reviewed-by: Fan Yong <fan.yong@intel.com>
+> Reviewed-by: Hongchao Zhang <hongchao@whamcloud.com>
 > Reviewed-by: Oleg Drokin <green@whamcloud.com>
 > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
->  drivers/staging/lustre/lnet/lnet/router_proc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/staging/lustre/lustre/include/obd_class.h | 19 +++++++-----
+>  drivers/staging/lustre/lustre/llite/llite_lib.c   |  1 +
+>  drivers/staging/lustre/lustre/mgc/mgc_request.c   | 37 +++++++++++++----------
+>  3 files changed, 34 insertions(+), 23 deletions(-)
 >
-> diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-> index 8856798..aa98ce5 100644
-> --- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-> +++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-> @@ -218,7 +218,7 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
->  			int alive = lnet_is_route_alive(route);
+> diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+> index adfe2ab..e772e3d 100644
+> --- a/drivers/staging/lustre/lustre/include/obd_class.h
+> +++ b/drivers/staging/lustre/lustre/include/obd_class.h
+> @@ -153,17 +153,22 @@ struct config_llog_instance {
+>  	llog_cb_t	    cfg_callback;
+>  	int		    cfg_last_idx; /* for partial llog processing */
+>  	int		    cfg_flags;
+> +	u32		    cfg_sub_clds;
+>  };
 >  
->  			s += snprintf(s, tmpstr + tmpsiz - s,
-> -				      "%-8s %4u %8u %7s %s\n",
-> +				      "%-8s %4d %8u %7s %s\n",
->  				      libcfs_net2str(net), hops,
->  				      priority,
->  				      alive ? "up" : "down",
-> -- 
-> 1.8.3.1
+>  int class_config_parse_llog(const struct lu_env *env, struct llog_ctxt *ctxt,
+>  			    char *name, struct config_llog_instance *cfg);
+> -enum {
+> -	CONFIG_T_CONFIG  = 0,
+> -	CONFIG_T_SPTLRPC = 1,
+> -	CONFIG_T_RECOVER = 2,
+> -	CONFIG_T_PARAMS  = 3,
+> -	CONFIG_T_MAX     = 4
+> -};
+> +
+> +#define CONFIG_T_CONFIG		BIT(0)
+> +#define CONFIG_T_SPTLRPC	BIT(1)
+> +#define CONFIG_T_RECOVER	BIT(2)
+> +#define CONFIG_T_PARAMS		BIT(3)
+
+This could still be an enum:
+
+enum {
+	CONFIG_T_CONFIG  = BIT(0),
+	CONFIG_T_SPTLRPC = BIT(1),
+	CONFIG_T_RECOVER = BIT(2),
+	CONFIG_T_PARAMS  = BIT(3),
+};
+
+and I'm glad "CONFIG_T_MAX" is gone - as the MAX was clearly '3', not '4'.
+
+NeilBrown
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180801/ce9b5960/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180801/167df322/attachment.sig>
