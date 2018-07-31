@@ -1,137 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Jul 2018 22:26:08 -0400
-Subject: [lustre-devel] [PATCH 16/31] lustre: obd: remove OBD_NOTIFY_SYNC{,
- _NONBLOCK}
+Date: Mon, 30 Jul 2018 22:26:09 -0400
+Subject: [lustre-devel] [PATCH 17/31] lustre: obdclass: handle early
+ requests vs CT registering
 In-Reply-To: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
 References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1533003983-29311-17-git-send-email-jsimmons@infradead.org>
+Message-ID: <1533003983-29311-18-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+From: Bruno Faccini <bruno.faccini@intel.com>
 
-None of the OBD notify handlers listen for OBD_NOTIFY_SYNC{,_NONBLOCK}
-events so remove them and related code in lov_notify().
+This patch addresses cases where CDT may start to send requests
+before CT has fully registered with all MDTs and thus when the KUC
+pipe kernel side has still not been initialized in
+lmv_hsm_ct_register().
 
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-WC-id: https://jira.whamcloud.com/browse/LU-8403
-Reviewed-on: https://review.whamcloud.com/21421
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+This will avoid Oops'es due to kkuc_groups[KUC_GRP_HSM] being
+uninitialized/zero'ed and we rely on CDT to later retry.
+
+Signed-off-by: Bruno Faccini <bruno.faccini@intel.com>
+WC-id: https://jira.whamcloud.com/browse/LU-9038
+Reviewed-on: https://review.whamcloud.com/25050
+Reviewed-by: Quentin Bouget <quentin.bouget@cea.fr>
+Reviewed-by: Henri Doreau <henri.doreau@cea.fr>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h |  3 --
- drivers/staging/lustre/lustre/lov/lov_obd.c | 52 +++++------------------------
- 2 files changed, 9 insertions(+), 46 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/kernelcomm.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 62f85a1..5bf2be8 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -491,9 +491,6 @@ enum obd_notify_event {
- 	OBD_NOTIFY_INACTIVE,
- 	/* Connect data for import were changed */
- 	OBD_NOTIFY_OCD,
--	/* Sync request */
--	OBD_NOTIFY_SYNC_NONBLOCK,
--	OBD_NOTIFY_SYNC,
- 	/* Configuration event */
- 	OBD_NOTIFY_CONFIG,
- 	/* Administratively deactivate/activate event */
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index 0dd471c..85d3b29 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -429,10 +429,8 @@ static int lov_notify(struct obd_device *obd, struct obd_device *watched,
- 	struct lov_obd *lov = &obd->u.lov;
+diff --git a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
+index 63067a7..304288d 100644
+--- a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
++++ b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
+@@ -183,6 +183,14 @@ int libcfs_kkuc_group_put(unsigned int group, void *payload)
+ 	int one_success = 0;
  
- 	down_read(&lov->lov_notify_lock);
--	if (!lov->lov_connects) {
--		up_read(&lov->lov_notify_lock);
--		return rc;
--	}
-+	if (!lov->lov_connects)
-+		goto out_notify_lock;
- 
- 	if (ev == OBD_NOTIFY_ACTIVE || ev == OBD_NOTIFY_INACTIVE ||
- 	    ev == OBD_NOTIFY_ACTIVATE || ev == OBD_NOTIFY_DEACTIVATE) {
-@@ -441,12 +439,13 @@ static int lov_notify(struct obd_device *obd, struct obd_device *watched,
- 		LASSERT(watched);
- 
- 		if (strcmp(watched->obd_type->typ_name, LUSTRE_OSC_NAME)) {
--			up_read(&lov->lov_notify_lock);
- 			CERROR("unexpected notification of %s %s!\n",
- 			       watched->obd_type->typ_name,
- 			       watched->obd_name);
--			return -EINVAL;
-+			rc = -EINVAL;
-+			goto out_notify_lock;
- 		}
+ 	down_write(&kg_sem);
 +
- 		uuid = &watched->u.cli.cl_target_uuid;
- 
- 		/* Set OSC as active before notifying the observer, so the
-@@ -454,53 +453,20 @@ static int lov_notify(struct obd_device *obd, struct obd_device *watched,
- 		 */
- 		rc = lov_set_osc_active(obd, uuid, ev);
- 		if (rc < 0) {
--			up_read(&lov->lov_notify_lock);
- 			CERROR("event(%d) of %s failed: %d\n", ev,
- 			       obd_uuid2str(uuid), rc);
--			return rc;
-+			goto out_notify_lock;
- 		}
- 		/* active event should be pass lov target index as data */
- 		data = &rc;
- 	}
- 
- 	/* Pass the notification up the chain. */
--	if (watched) {
--		rc = obd_notify_observer(obd, watched, ev, data);
--	} else {
--		/* NULL watched means all osc's in the lov (only for syncs) */
--		/* sync event should be send lov idx as data */
--		struct lov_obd *lov = &obd->u.lov;
--		int i, is_sync;
--
--		data = &i;
--		is_sync = (ev == OBD_NOTIFY_SYNC) ||
--			  (ev == OBD_NOTIFY_SYNC_NONBLOCK);
--
--		obd_getref(obd);
--		for (i = 0; i < lov->desc.ld_tgt_count; i++) {
--			if (!lov->lov_tgts[i])
--				continue;
--
--			/* don't send sync event if target not
--			 * connected/activated
--			 */
--			if (is_sync &&  !lov->lov_tgts[i]->ltd_active)
--				continue;
--
--			rc = obd_notify_observer(obd, lov->lov_tgts[i]->ltd_obd,
--						 ev, data);
--			if (rc) {
--				CERROR("%s: notify %s of %s failed %d\n",
--				       obd->obd_name,
--				       obd->obd_observer->obd_name,
--				       lov->lov_tgts[i]->ltd_obd->obd_name,
--				       rc);
--			}
--		}
--		obd_putref(obd);
--	}
-+	rc = obd_notify_observer(obd, watched, ev, data);
- 
-+out_notify_lock:
- 	up_read(&lov->lov_notify_lock);
++	if (unlikely(!kkuc_groups[group].next) ||
++	    unlikely(OBD_FAIL_CHECK(OBD_FAIL_MDS_HSM_CT_REGISTER_NET))) {
++		/* no agent have fully registered, CDT will retry */
++		up_write(&kg_sem);
++		return -EAGAIN;
++	}
 +
- 	return rc;
- }
- 
+ 	list_for_each_entry(reg, &kkuc_groups[group], kr_chain) {
+ 		if (reg->kr_fp) {
+ 			rc = libcfs_kkuc_msg_put(reg->kr_fp, payload);
 -- 
 1.8.3.1
