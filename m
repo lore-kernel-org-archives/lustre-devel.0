@@ -1,77 +1,149 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Jul 2018 22:26:21 -0400
-Subject: [lustre-devel] [PATCH 29/31] lustre: llite: ignore layout for
- ll_writepages()
+Date: Mon, 30 Jul 2018 22:26:22 -0400
+Subject: [lustre-devel] [PATCH 30/31] lustre: fid: race between
+ client_fid_fini and seq_client_flush
 In-Reply-To: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
 References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1533003983-29311-30-git-send-email-jsimmons@infradead.org>
+Message-ID: <1533003983-29311-31-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Jinshan Xiong <jinshan.xiong@gmail.com>
+From: Fan Yong <fan.yong@intel.com>
 
-ll_writepages() would be called inside the direct IO context and
-if the layout has been changed during this time, the layout_conf()
-has to wait for active IO to complete before applying the layout
-change, this is a case of deadlock.
+When the client mount failed or umount, the client_fid_fini() will
+be called. At that time, the async connection failure will trigger
+seq_client_flush() which parameter may have been released by the
+client_fid_fini() by race.
 
-It should ignore layout to avoid this problem. This is safe as long
-as pages exist, the layout won't be changed on this client.
+Introduce client_obd::cl_seq_rwsem to protect client_obd::cl_seq.
 
-Signed-off-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-WC-id: https://jira.whamcloud.com/browse/LU-9129
-Reviewed-on: https://review.whamcloud.com/25474
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Signed-off-by: Fan Yong <fan.yong@intel.com>
+WC-id: https://jira.whamcloud.com/browse/LU-9224
+Reviewed-on: https://review.whamcloud.com/26079
 Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/rw.c | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+ drivers/staging/lustre/lustre/fid/fid_request.c | 21 +++++++++++++++------
+ drivers/staging/lustre/lustre/include/obd.h     |  1 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c   |  2 ++
+ drivers/staging/lustre/lustre/mdc/mdc_request.c | 11 +++++++++--
+ 4 files changed, 27 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/rw.c b/drivers/staging/lustre/lustre/llite/rw.c
-index 59747da..49ac723 100644
---- a/drivers/staging/lustre/lustre/llite/rw.c
-+++ b/drivers/staging/lustre/lustre/llite/rw.c
-@@ -1000,13 +1000,11 @@ int ll_writepage(struct page *vmpage, struct writeback_control *wbc)
- int ll_writepages(struct address_space *mapping, struct writeback_control *wbc)
+diff --git a/drivers/staging/lustre/lustre/fid/fid_request.c b/drivers/staging/lustre/lustre/fid/fid_request.c
+index a34fd90..f91242c 100644
+--- a/drivers/staging/lustre/lustre/fid/fid_request.c
++++ b/drivers/staging/lustre/lustre/fid/fid_request.c
+@@ -343,11 +343,14 @@ int client_fid_init(struct obd_device *obd,
  {
- 	struct inode *inode = mapping->host;
--	struct ll_sb_info *sbi = ll_i2sbi(inode);
- 	loff_t start;
- 	loff_t end;
- 	enum cl_fsync_mode mode;
- 	int range_whole = 0;
- 	int result;
--	int ignore_layout = 0;
+ 	struct client_obd *cli = &obd->u.cli;
+ 	char *prefix;
+-	int rc;
++	int rc = 0;
  
- 	if (wbc->range_cyclic) {
- 		start = mapping->writeback_index << PAGE_SHIFT;
-@@ -1024,17 +1022,14 @@ int ll_writepages(struct address_space *mapping, struct writeback_control *wbc)
- 	if (wbc->sync_mode == WB_SYNC_ALL)
- 		mode = CL_FSYNC_LOCAL;
++	down_write(&cli->cl_seq_rwsem);
+ 	cli->cl_seq = kzalloc(sizeof(*cli->cl_seq), GFP_NOFS);
+-	if (!cli->cl_seq)
+-		return -ENOMEM;
++	if (!cli->cl_seq) {
++		rc = -ENOMEM;
++		goto out_free_lock;
++	}
  
--	if (sbi->ll_umounting)
--		/* if the mountpoint is being umounted, all pages have to be
--		 * evicted to avoid hitting LBUG when truncate_inode_pages()
--		 * is called later on.
--		 */
--		ignore_layout = 1;
--
- 	if (!ll_i2info(inode)->lli_clob)
- 		return 0;
+ 	prefix = kzalloc(MAX_OBD_NAME + 5, GFP_NOFS);
+ 	if (!prefix) {
+@@ -361,10 +364,14 @@ int client_fid_init(struct obd_device *obd,
+ 	seq_client_init(cli->cl_seq, exp, type, prefix);
+ 	kfree(prefix);
  
--	result = cl_sync_file_range(inode, start, end, mode, ignore_layout);
-+	/* for directio, it would call writepages() to evict cached pages
-+	 * inside the IO context of write, which will cause deadlock at
-+	 * layout_conf since it waits for active IOs to complete.
-+	 */
-+	result = cl_sync_file_range(inode, start, end, mode, 1);
- 	if (result > 0) {
- 		wbc->nr_to_write -= result;
- 		result = 0;
+-	return 0;
+ out_free_seq:
+-	kfree(cli->cl_seq);
+-	cli->cl_seq = NULL;
++	if (rc) {
++		kfree(cli->cl_seq);
++		cli->cl_seq = NULL;
++	}
++out_free_lock:
++	up_write(&cli->cl_seq_rwsem);
++
+ 	return rc;
+ }
+ EXPORT_SYMBOL(client_fid_init);
+@@ -373,11 +380,13 @@ int client_fid_fini(struct obd_device *obd)
+ {
+ 	struct client_obd *cli = &obd->u.cli;
+ 
++	down_write(&cli->cl_seq_rwsem);
+ 	if (cli->cl_seq) {
+ 		seq_client_fini(cli->cl_seq);
+ 		kfree(cli->cl_seq);
+ 		cli->cl_seq = NULL;
+ 	}
++	up_write(&cli->cl_seq_rwsem);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 333c703..3c0dbb6 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -333,6 +333,7 @@ struct client_obd {
+ 
+ 	/* sequence manager */
+ 	struct lu_client_seq    *cl_seq;
++	struct rw_semaphore	 cl_seq_rwsem;
+ 
+ 	atomic_t	     cl_resends; /* resend count */
+ 
+diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+index c36d1e4..32eda4f 100644
+--- a/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
++++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lib.c
+@@ -308,6 +308,8 @@ int client_obd_setup(struct obd_device *obddev, struct lustre_cfg *lcfg)
+ 	}
+ 
+ 	init_rwsem(&cli->cl_sem);
++	cli->cl_seq = NULL;
++	init_rwsem(&cli->cl_seq_rwsem);
+ 	cli->cl_conn_count = 0;
+ 	memcpy(server_uuid.uuid, lustre_cfg_buf(lcfg, 2),
+ 	       min_t(unsigned int, LUSTRE_CFG_BUFLEN(lcfg, 2),
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index c2f0a54..a759da2 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -2517,8 +2517,10 @@ static int mdc_import_event(struct obd_device *obd, struct obd_import *imp,
+ 		 * Flush current sequence to make client obtain new one
+ 		 * from server in case of disconnect/reconnect.
+ 		 */
++		down_read(&cli->cl_seq_rwsem);
+ 		if (cli->cl_seq)
+ 			seq_client_flush(cli->cl_seq);
++		up_read(&cli->cl_seq_rwsem);
+ 
+ 		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_INACTIVE);
+ 		break;
+@@ -2557,9 +2559,14 @@ int mdc_fid_alloc(const struct lu_env *env, struct obd_export *exp,
+ 		  struct lu_fid *fid, struct md_op_data *op_data)
+ {
+ 	struct client_obd *cli = &exp->exp_obd->u.cli;
+-	struct lu_client_seq *seq = cli->cl_seq;
++	int rc = -EIO;
+ 
+-	return seq_client_alloc_fid(env, seq, fid);
++	down_read(&cli->cl_seq_rwsem);
++	if (cli->cl_seq)
++		rc = seq_client_alloc_fid(env, cli->cl_seq, fid);
++	up_read(&cli->cl_seq_rwsem);
++
++	return rc;
+ }
+ 
+ static struct obd_uuid *mdc_get_uuid(struct obd_export *exp)
 -- 
 1.8.3.1
