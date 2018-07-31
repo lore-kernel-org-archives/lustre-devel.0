@@ -1,318 +1,99 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 30 Jul 2018 22:26:18 -0400
-Subject: [lustre-devel] [PATCH 26/31] lustre: obd: remove unused data
- parameter from obd_notify()
+Date: Mon, 30 Jul 2018 22:25:58 -0400
+Subject: [lustre-devel] [PATCH 06/31] lustre: llite: reduce jobstats race
+ window
 In-Reply-To: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
 References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1533003983-29311-27-git-send-email-jsimmons@infradead.org>
+Message-ID: <1533003983-29311-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+From: Patrick Farrell <paf@cray.com>
 
-Remove the unused data parameter from obd_notify() and related
-functions.
+In the current code, lli_jobid is set to zero on every call
+to lustre_get_jobid.  This causes problems, because it's
+used asynchronously to set the job id in RPCs, and some
+RPCs will falsely get no jobid set.  (For small IO sizes,
+this can be up to 60% of RPCs.)
 
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-WC-id: https://jira.whamcloud.com/browse/LU-8403
-Reviewed-on: https://review.whamcloud.com/24428
-Reviewed-by: Steve Guminski <stephenx.guminski@intel.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+It would be very expensive to put hard synchronization
+between this and every outbound RPC, and it's OK to very
+rarely get an RPC without correct job stats info.
+
+This patch only updates the lli_jobid when the job id has
+changed, which leaves only a very small window for reading
+an inconsistent job id.
+
+Signed-off-by: Patrick Farrell <paf@cray.com>
+WC-id: https://jira.whamcloud.com/browse/LU-8926
+Reviewed-on: https://review.whamcloud.com/24253
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Reviewed-by: Chris Horn <hornc@cray.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h        |  4 ++--
- drivers/staging/lustre/lustre/include/obd_class.h  | 25 ++++++++--------------
- drivers/staging/lustre/lustre/llite/lcommon_misc.c | 12 +++++------
- .../staging/lustre/lustre/llite/llite_internal.h   |  5 ++---
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  7 +++---
- drivers/staging/lustre/lustre/lov/lov_obd.c        | 13 +++++------
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |  6 +++---
- drivers/staging/lustre/lustre/osc/osc_request.c    | 10 ++++-----
- 8 files changed, 34 insertions(+), 48 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  1 +
+ drivers/staging/lustre/lustre/obdclass/class_obd.c | 20 ++++++++++++++------
+ 2 files changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 10e3bb8..333c703 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -502,7 +502,7 @@ enum obd_notify_event {
-  */
- struct obd_notify_upcall {
- 	int (*onu_upcall)(struct obd_device *host, struct obd_device *watched,
--			  enum obd_notify_event ev, void *owner, void *data);
-+			  enum obd_notify_event ev, void *owner);
- 	/* Opaque datum supplied by upper layer listener */
- 	void *onu_owner;
- };
-@@ -861,7 +861,7 @@ struct obd_ops {
- 			    enum obd_import_event);
- 
- 	int (*notify)(struct obd_device *obd, struct obd_device *watched,
--		      enum obd_notify_event ev, void *data);
-+		      enum obd_notify_event ev);
- 
- 	int (*health_check)(const struct lu_env *env, struct obd_device *);
- 	struct obd_uuid *(*get_uuid)(struct obd_export *exp);
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 647cc22..50d5ddb 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -1074,8 +1074,7 @@ static inline void obd_import_event(struct obd_device *obd,
- 
- static inline int obd_notify(struct obd_device *obd,
- 			     struct obd_device *watched,
--			     enum obd_notify_event ev,
--			     void *data)
-+			     enum obd_notify_event ev)
- {
- 	int rc;
- 
-@@ -1094,35 +1093,29 @@ static inline int obd_notify(struct obd_device *obd,
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index c0861b9..72b118a 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -894,6 +894,7 @@ void ll_lli_init(struct ll_inode_info *lli)
+ 		lli->lli_async_rc = 0;
  	}
- 
- 	OBD_COUNTER_INCREMENT(obd, notify);
--	rc = OBP(obd, notify)(obd, watched, ev, data);
-+	rc = OBP(obd, notify)(obd, watched, ev);
- 	return rc;
+ 	mutex_init(&lli->lli_layout_mutex);
++	memset(lli->lli_jobid, 0, LUSTRE_JOBID_SIZE);
  }
  
- static inline int obd_notify_observer(struct obd_device *observer,
- 				      struct obd_device *observed,
--				      enum obd_notify_event ev,
--				      void *data)
-+				      enum obd_notify_event ev)
+ int ll_fill_super(struct super_block *sb)
+diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+index cdaf729..87327ef 100644
+--- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
++++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
+@@ -95,26 +95,34 @@
+  */
+ int lustre_get_jobid(char *jobid)
  {
--	int rc1;
--	int rc2;
--
- 	struct obd_notify_upcall *onu;
-+	int rc = 0;
-+	int rc2 = 0;
- 
- 	if (observer->obd_observer)
--		rc1 = obd_notify(observer->obd_observer, observed, ev, data);
--	else
--		rc1 = 0;
-+		rc = obd_notify(observer->obd_observer, observed, ev);
+-	memset(jobid, 0, LUSTRE_JOBID_SIZE);
++	char tmp_jobid[LUSTRE_JOBID_SIZE] = { 0 };
 +
- 	/*
- 	 * Also, call non-obd listener, if any
- 	 */
- 	onu = &observer->obd_upcall;
- 	if (onu->onu_upcall)
--		rc2 = onu->onu_upcall(observer, observed, ev,
--				      onu->onu_owner, NULL);
--	else
--		rc2 = 0;
-+		rc2 = onu->onu_upcall(observer, observed, ev, onu->onu_owner);
+ 	/* Jobstats isn't enabled */
+ 	if (strcmp(obd_jobid_var, JOBSTATS_DISABLE) == 0)
+-		return 0;
++		goto out_cache_jobid;
  
--	return rc1 ? rc1 : rc2;
-+	return rc ? rc : rc2;
+ 	/* Use process name + fsuid as jobid */
+ 	if (strcmp(obd_jobid_var, JOBSTATS_PROCNAME_UID) == 0) {
+-		snprintf(jobid, LUSTRE_JOBID_SIZE, "%s.%u",
++		snprintf(tmp_jobid, LUSTRE_JOBID_SIZE, "%s.%u",
+ 			 current->comm,
+ 			 from_kuid(&init_user_ns, current_fsuid()));
+-		return 0;
++		goto out_cache_jobid;
+ 	}
+ 
+ 	/* Whole node dedicated to single job */
+ 	if (strcmp(obd_jobid_var, JOBSTATS_NODELOCAL) == 0) {
+-		strcpy(jobid, obd_jobid_node);
+-		return 0;
++		strcpy(tmp_jobid, obd_jobid_node);
++		goto out_cache_jobid;
+ 	}
+ 
+ 	return -ENOENT;
++
++out_cache_jobid:
++	/* Only replace the job ID if it changed. */
++	if (strcmp(jobid, tmp_jobid) != 0)
++		strcpy(jobid, tmp_jobid);
++
++	return 0;
  }
+ EXPORT_SYMBOL(lustre_get_jobid);
  
- static inline int obd_quotactl(struct obd_export *exp,
-diff --git a/drivers/staging/lustre/lustre/llite/lcommon_misc.c b/drivers/staging/lustre/lustre/llite/lcommon_misc.c
-index a246b95..80563a2 100644
---- a/drivers/staging/lustre/lustre/llite/lcommon_misc.c
-+++ b/drivers/staging/lustre/lustre/llite/lcommon_misc.c
-@@ -76,14 +76,12 @@ int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp)
- }
- 
- /**
-- * This function is used as an upcall-callback hooked by liblustre and llite
-- * clients into obd_notify() listeners chain to handle notifications about
-- * change of import connect_flags. See llu_fsswop_mount() and
-- * lustre_common_fill_super().
-+ * This function is used as an upcall-callback hooked llite clients
-+ * into obd_notify() listeners chain to handle notifications about
-+ * change of import connect_flags. See lustre_common_fill_super().
-  */
--int cl_ocd_update(struct obd_device *host,
--		  struct obd_device *watched,
--		  enum obd_notify_event ev, void *owner, void *data)
-+int cl_ocd_update(struct obd_device *host, struct obd_device *watched,
-+		  enum obd_notify_event ev, void *owner)
- {
- 	struct lustre_client_ocd *lco;
- 	struct client_obd	*cli;
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index f6c8daf..00fe706 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -669,9 +669,8 @@ static inline bool ll_sbi_has_fast_read(struct ll_sb_info *sbi)
- 
- /* llite/lcommon_misc.c */
- int cl_init_ea_size(struct obd_export *md_exp, struct obd_export *dt_exp);
--int cl_ocd_update(struct obd_device *host,
--		  struct obd_device *watched,
--		  enum obd_notify_event ev, void *owner, void *data);
-+int cl_ocd_update(struct obd_device *host, struct obd_device *watched,
-+		  enum obd_notify_event ev, void *owner);
- int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
- 		     struct ll_grouplock *cg);
- void cl_put_grouplock(struct ll_grouplock *cg);
-diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-index bbb1ddf..55db904 100644
---- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-+++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
-@@ -140,7 +140,7 @@ static struct obd_uuid *lmv_get_uuid(struct obd_export *exp)
- }
- 
- static int lmv_notify(struct obd_device *obd, struct obd_device *watched,
--		      enum obd_notify_event ev, void *data)
-+		      enum obd_notify_event ev)
- {
- 	struct obd_connect_data *conn_data;
- 	struct lmv_obd	  *lmv = &obd->u.lmv;
-@@ -182,7 +182,7 @@ static int lmv_notify(struct obd_device *obd, struct obd_device *watched,
- 	 * Pass the notification up the chain.
- 	 */
- 	if (obd->obd_observer)
--		rc = obd_notify(obd->obd_observer, watched, ev, data);
-+		rc = obd_notify(obd->obd_observer, watched, ev);
- 
- 	return rc;
- }
-@@ -330,8 +330,7 @@ static int lmv_connect_mdc(struct obd_device *obd, struct lmv_tgt_desc *tgt)
- 		 * Tell the observer about the new target.
- 		 */
- 		rc = obd_notify(obd->obd_observer, mdc_exp->exp_obd,
--				OBD_NOTIFY_ACTIVE,
--				(void *)(tgt - lmv->tgts[0]));
-+				OBD_NOTIFY_ACTIVE);
- 		if (rc) {
- 			obd_disconnect(mdc_exp);
- 			return rc;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index 85d3b29..07f6b1b 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -121,7 +121,7 @@ static void lov_putref(struct obd_device *obd)
- static int lov_set_osc_active(struct obd_device *obd, struct obd_uuid *uuid,
- 			      enum obd_notify_event ev);
- static int lov_notify(struct obd_device *obd, struct obd_device *watched,
--		      enum obd_notify_event ev, void *data);
-+		      enum obd_notify_event ev);
- 
- int lov_connect_obd(struct obd_device *obd, __u32 index, int activate,
- 		    struct obd_connect_data *data)
-@@ -244,7 +244,7 @@ static int lov_connect(const struct lu_env *env,
- 			continue;
- 
- 		rc = lov_notify(obd, lov->lov_tgts[i]->ltd_exp->exp_obd,
--				OBD_NOTIFY_CONNECT, (void *)&i);
-+				OBD_NOTIFY_CONNECT);
- 		if (rc) {
- 			CERROR("%s error sending notify %d\n",
- 			       obd->obd_name, rc);
-@@ -423,7 +423,7 @@ static int lov_set_osc_active(struct obd_device *obd, struct obd_uuid *uuid,
- }
- 
- static int lov_notify(struct obd_device *obd, struct obd_device *watched,
--		      enum obd_notify_event ev, void *data)
-+		      enum obd_notify_event ev)
- {
- 	int rc = 0;
- 	struct lov_obd *lov = &obd->u.lov;
-@@ -457,12 +457,10 @@ static int lov_notify(struct obd_device *obd, struct obd_device *watched,
- 			       obd_uuid2str(uuid), rc);
- 			goto out_notify_lock;
- 		}
--		/* active event should be pass lov target index as data */
--		data = &rc;
- 	}
- 
- 	/* Pass the notification up the chain. */
--	rc = obd_notify_observer(obd, watched, ev, data);
-+	rc = obd_notify_observer(obd, watched, ev);
- 
- out_notify_lock:
- 	up_read(&lov->lov_notify_lock);
-@@ -590,8 +588,7 @@ static int lov_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
- 	}
- 
- 	rc = lov_notify(obd, tgt->ltd_exp->exp_obd,
--			active ? OBD_NOTIFY_CONNECT : OBD_NOTIFY_INACTIVE,
--			(void *)&index);
-+			active ? OBD_NOTIFY_CONNECT : OBD_NOTIFY_INACTIVE);
- 
- out:
- 	if (rc) {
-diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-index bfa07d7..c2f0a54 100644
---- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
-+++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
-@@ -2520,7 +2520,7 @@ static int mdc_import_event(struct obd_device *obd, struct obd_import *imp,
- 		if (cli->cl_seq)
- 			seq_client_flush(cli->cl_seq);
- 
--		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_INACTIVE, NULL);
-+		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_INACTIVE);
- 		break;
- 	}
- 	case IMP_EVENT_INVALIDATE: {
-@@ -2531,7 +2531,7 @@ static int mdc_import_event(struct obd_device *obd, struct obd_import *imp,
- 		break;
- 	}
- 	case IMP_EVENT_ACTIVE:
--		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_ACTIVE, NULL);
-+		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_ACTIVE);
- 		/* redo the kuc registration after reconnecting */
- 		if (rc == 0)
- 			/* re-register HSM agents */
-@@ -2540,7 +2540,7 @@ static int mdc_import_event(struct obd_device *obd, struct obd_import *imp,
- 						       (void *)imp);
- 		break;
- 	case IMP_EVENT_OCD:
--		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_OCD, NULL);
-+		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_OCD);
- 		break;
- 	case IMP_EVENT_DISCON:
- 	case IMP_EVENT_DEACTIVATE:
-diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
-index b7f8e07..b2b55a7 100644
---- a/drivers/staging/lustre/lustre/osc/osc_request.c
-+++ b/drivers/staging/lustre/lustre/osc/osc_request.c
-@@ -2678,7 +2678,7 @@ static int osc_import_event(struct obd_device *obd,
- 		break;
- 	}
- 	case IMP_EVENT_INACTIVE: {
--		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_INACTIVE, NULL);
-+		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_INACTIVE);
- 		break;
- 	}
- 	case IMP_EVENT_INVALIDATE: {
-@@ -2704,7 +2704,7 @@ static int osc_import_event(struct obd_device *obd,
- 		break;
- 	}
- 	case IMP_EVENT_ACTIVE: {
--		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_ACTIVE, NULL);
-+		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_ACTIVE);
- 		break;
- 	}
- 	case IMP_EVENT_OCD: {
-@@ -2717,15 +2717,15 @@ static int osc_import_event(struct obd_device *obd,
- 		if (ocd->ocd_connect_flags & OBD_CONNECT_REQPORTAL)
- 			imp->imp_client->cli_request_portal = OST_REQUEST_PORTAL;
- 
--		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_OCD, NULL);
-+		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_OCD);
- 		break;
- 	}
- 	case IMP_EVENT_DEACTIVATE: {
--		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_DEACTIVATE, NULL);
-+		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_DEACTIVATE);
- 		break;
- 	}
- 	case IMP_EVENT_ACTIVATE: {
--		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_ACTIVATE, NULL);
-+		rc = obd_notify_observer(obd, obd, OBD_NOTIFY_ACTIVATE);
- 		break;
- 	}
- 	default:
 -- 
 1.8.3.1
