@@ -1,477 +1,365 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 01 Aug 2018 13:17:22 +1000
-Subject: [lustre-devel] [PATCH 1/3] lustre: obd: migrate
- lustre_fill_super() to llite
-In-Reply-To: <87tvogrtbj.fsf@notabene.neil.brown.name>
-References: <1532992594-2576-1-git-send-email-jsimmons@infradead.org>
- <1532992594-2576-2-git-send-email-jsimmons@infradead.org>
- <87tvogrtbj.fsf@notabene.neil.brown.name>
-Message-ID: <8736vyrd19.fsf@notabene.neil.brown.name>
+From: Patrick Farrell <paf@cray.com>
+Date: Wed, 1 Aug 2018 03:23:30 +0000
+Subject: [lustre-devel] [PATCH 25/31] lustre: config: move config types
+ into lustre_idl.h
+In-Reply-To: <87bmamrg49.fsf@notabene.neil.brown.name>
+References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
+ <1533003983-29311-26-git-send-email-jsimmons@infradead.org>
+ <871sbjrpj3.fsf@notabene.neil.brown.name>
+ <BN3PR1101MB1202DBDAC4159FA431E0D676CB2E0@BN3PR1101MB1202.namprd11.prod.outlook.com>
+ <87va8vq6iu.fsf@notabene.neil.brown.name>
+ <BN3PR1101MB1202B1FF25AEFA192F3657F8CB2D0@BN3PR1101MB1202.namprd11.prod.outlook.com>,
+ <87bmamrg49.fsf@notabene.neil.brown.name>
+Message-ID: <BN3PR1101MB120243C2D287C440AABFA318CB2D0@BN3PR1101MB1202.namprd11.prod.outlook.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Jul 31 2018, NeilBrown wrote:
+Ah, that last one is a good example.
 
-> On Mon, Jul 30 2018, James Simmons wrote:
+
+All right, I'm converted.  Thanks.
+
+
+- Patrick
+
+________________________________
+From: NeilBrown <neilb@suse.com>
+Sent: Tuesday, July 31, 2018 9:10:46 PM
+To: Patrick Farrell; James Simmons; Andreas Dilger; Oleg Drokin
+Cc: Lustre Development List
+Subject: Re: [lustre-devel] [PATCH 25/31] lustre: config: move config types into lustre_idl.h
+
+On Wed, Aug 01 2018, Patrick Farrell wrote:
+
+> Huh.  I see your point, and the logic of it is obviously sound, but I'm curious - I don't think I've ever seen names like those you gave used.  I've only seen MAX.
+
+uses "count":
+  enum acpi_bus_device_type
+  include/linux/acpi.h
+  enum cgroup_subsys_id
+
+uses "reserved" as in "this number as larger are reserved"
+   include/apci/actbl*
+   enum bh_state_bits (uses "BH_PrivateStart, which is similar)
+
+uses "last" (just as bad as max)
+   enum amd_asic_type
+   enum req_opf
+   include/linux/ccp.h
+
+
+
+uses "max"
+   include/drm/bridge/dw_hdmi.h
+   enum drm_color_encoding
+   enum drm_color_range
+   enum drm_sched_priority
+   enum wb_reason
+   enum backlight_type
+   enum rdmacg_resource_type
+   include/linux/clk/ti.h
+   include/linux/crypto.h
+
+uses "size" (as good as 'num' or 'count')
+   include/drm/bridge/mhl.h
+
+uses "num"
+   enum drm_global_types
+   enum ttm_ref_type
+   ans1_ber_bytecode.h (actually 'nr' not 'num')
+   enum wb_stat_item (actually uses "NR" prefix)
+   enum bcm963xx_nvram_nand_part (__..._NR_PARTS)
+   enum blkg_rwstat_type
+   enum req_flag_bits
+
+I was looking at all matches of "git grep -w 'enum.*{' include/" and
+gave up when I had done include/[a-k]* and include/linux/[a-c]*. about
+55 of the way.l
+
+Clearly havin a name to represent the number of names in the enum is a
+common need.  There are several alternatives people use.  "max" might be
+a little more common than "num", but I don't think it is a clear winner.
+Count, cnt, size, reserved, private, num, nr are all good and meaningful.
+max and last are wrong - unless the number actually is the max or the
+last, which it usually isn't.
+
 >
->> Currently both obdclass and ptlrpc are built as separate modules
->> with ptlrpc being a child of obdclass. A recent change placed
->> ptlrpc_[inc|dec]_ref() into the obdclass code i.e obd_mount.c
->> which now causes a curricular module dependency. Examining the
+> Am I wrong about that, or is MAX indeed the dominant choice?
 >
-> Oops, that was careless - sorry about that.
-> Maybe I should just revert that patch .... but that probably
-> doesn't actually make things easier.  Let's go with your fix.
+> I also think in context, used in caps, MAX is clearly a special value
+> without other meaning.
 
-Actually, I changed my mind - sorry.
+"clearly" except where it isn't clear.
+Not that long ago:
 
-I've reverted the offending patch, and written a patch that just
-moves the minimum from obdclass to llite.
-There is room for further cleaning up...
+http://driverdev.linuxdriverproject.org/pipermail/driverdev-devel/2018-May/120870.html
 
-Thanks,
+The code *looked* right - it is an error if the id number is larger than
+the MAX.  That makes sense.
+But it was wrong, because the MAX wasn't the maximum, it was one more.
+
 NeilBrown
 
-From cb6578971fd9e1d1dedb6e88629741dcf8e31318 Mon Sep 17 00:00:00 2001
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 1 Aug 2018 10:09:39 +1000
-Subject: [PATCH] lustre: move client mounting from obdclass to llite.
 
-Mounting a lustre client is currently handled
-in obdclass, using services from llite.
-This requires obdclass to load the llite module
-and set up inter-module linkage.
-
-The purpose of this was for common code to support both
-client and server mounts.  This isn't really a good idea
-and need to go.  When we add the server, it will use a
-separate filesystem type.
-
-So move the mounting code from obdclass/obd_mount to llite/super25
-and remove the inter-module linkages.
-Add some EXPORT_SYMBOL() so that llite can access some helpers
-that remain in obdclass.
-
-Signed-off-by: NeilBrown <neilb@suse.com>
----
- .../staging/lustre/lustre/include/lustre_disk.h    |   7 +-
- drivers/staging/lustre/lustre/llite/super25.c      | 116 +++++++++++++++-
- drivers/staging/lustre/lustre/obdclass/class_obd.c |   4 -
- drivers/staging/lustre/lustre/obdclass/obd_mount.c | 152 +--------------------
- 4 files changed, 125 insertions(+), 154 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/include/lustre_disk.h b/drivers/staging/lustre/lustre/include/lustre_disk.h
-index 1a6d421ea64b..1d18b2fd210d 100644
---- a/drivers/staging/lustre/lustre/include/lustre_disk.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_disk.h
-@@ -142,13 +142,14 @@ struct lustre_sb_info {
- /* obd_mount.c */
- 
- int lustre_start_mgc(struct super_block *sb);
--void lustre_register_super_ops(struct module *mod,
--			       int (*cfs)(struct super_block *sb),
--			       void (*ksc)(struct super_block *sb));
- int lustre_common_put_super(struct super_block *sb);
- 
- int mgc_fsname2resid(char *fsname, struct ldlm_res_id *res_id, int type);
- 
-+struct lustre_sb_info *lustre_init_lsi(struct super_block *sb);
-+int lustre_put_lsi(struct super_block *sb);
-+int lmd_parse(char *options, struct lustre_mount_data *lmd);
-+
- /** @} disk */
- 
- #endif /* _LUSTRE_DISK_H */
-diff --git a/drivers/staging/lustre/lustre/llite/super25.c b/drivers/staging/lustre/lustre/llite/super25.c
-index d335f29556c2..966b0564c952 100644
---- a/drivers/staging/lustre/lustre/llite/super25.c
-+++ b/drivers/staging/lustre/lustre/llite/super25.c
-@@ -32,6 +32,7 @@
-  */
- 
- #define DEBUG_SUBSYSTEM S_LLITE
-+#define D_MOUNT (D_SUPER | D_CONFIG/*|D_WARNING */)
- 
- #include <linux/module.h>
- #include <linux/types.h>
-@@ -81,8 +82,115 @@ struct super_operations lustre_super_operations = {
- 	.remount_fs    = ll_remount_fs,
- 	.show_options  = ll_show_options,
- };
-+
-+/** This is the entry point for the mount call into Lustre.
-+ * This is called when a server or client is mounted,
-+ * and this is where we start setting things up.
-+ * @param data Mount options (e.g. -o flock,abort_recov)
-+ */
-+static int lustre_fill_super(struct super_block *sb, void *lmd2_data, int silent)
-+{
-+	struct lustre_mount_data *lmd;
-+	struct lustre_sb_info *lsi;
-+	int rc;
-+
-+	CDEBUG(D_MOUNT | D_VFSTRACE, "VFS Op: sb %p\n", sb);
-+
-+	lsi = lustre_init_lsi(sb);
-+	if (!lsi)
-+		return -ENOMEM;
-+	lmd = lsi->lsi_lmd;
-+
-+	/*
-+	 * Disable lockdep during mount, because mount locking patterns are
-+	 * `special'.
-+	 */
-+	lockdep_off();
-+
-+	/*
-+	 * LU-639: the obd cleanup of last mount may not finish yet, wait here.
-+	 */
-+	obd_zombie_barrier();
-+
-+	/* Figure out the lmd from the mount options */
-+	if (lmd_parse(lmd2_data, lmd)) {
-+		lustre_put_lsi(sb);
-+		rc = -EINVAL;
-+		goto out;
-+	}
-+
-+	if (lmd_is_client(lmd)) {
-+		CDEBUG(D_MOUNT, "Mounting client %s\n", lmd->lmd_profile);
-+
-+		rc = lustre_start_mgc(sb);
-+		if (rc) {
-+			lustre_common_put_super(sb);
-+			goto out;
-+		}
-+		/* Connect and start */
-+		rc = ll_fill_super(sb);
-+		/*
-+		 * c_f_s will call lustre_common_put_super on failure, otherwise
-+		 * c_f_s will have taken another reference to the module
-+		 */
-+	} else {
-+		CERROR("This is client-side-only module, cannot handle server mount.\n");
-+		rc = -EINVAL;
-+	}
-+
-+	/* If error happens in fill_super() call, @lsi will be killed there.
-+	 * This is why we do not put it here.
-+	 */
-+	goto out;
-+out:
-+	if (rc) {
-+		CERROR("Unable to mount %s (%d)\n",
-+		       s2lsi(sb) ? lmd->lmd_dev : "", rc);
-+	} else {
-+		CDEBUG(D_SUPER, "Mount %s complete\n",
-+		       lmd->lmd_dev);
-+	}
-+	lockdep_on();
-+	return rc;
-+}
-+
-+/***************** FS registration ******************/
-+static struct dentry *lustre_mount(struct file_system_type *fs_type, int flags,
-+				   const char *devname, void *data)
-+{
-+	return mount_nodev(fs_type, flags, data, lustre_fill_super);
-+}
-+
-+static void lustre_kill_super(struct super_block *sb)
-+{
-+	struct lustre_sb_info *lsi = s2lsi(sb);
-+
-+	if (lsi)
-+		ll_kill_super(sb);
-+
-+	kill_anon_super(sb);
-+}
-+
-+/** Register the "lustre" fs type
-+ */
-+static struct file_system_type lustre_fs_type = {
-+	.owner		= THIS_MODULE,
-+	.name		= "lustre",
-+	.mount		= lustre_mount,
-+	.kill_sb	= lustre_kill_super,
-+	.fs_flags	= FS_RENAME_DOES_D_MOVE,
-+};
- MODULE_ALIAS_FS("lustre");
- 
-+int lustre_register_fs(void)
-+{
-+	return register_filesystem(&lustre_fs_type);
-+}
-+
-+int lustre_unregister_fs(void)
-+{
-+	return unregister_filesystem(&lustre_fs_type);
-+}
- static int __init lustre_init(void)
- {
- 	int rc;
-@@ -145,7 +253,10 @@ static int __init lustre_init(void)
- 	if (rc != 0)
- 		goto out_inode_fini_env;
- 
--	lustre_register_super_ops(THIS_MODULE, ll_fill_super, ll_kill_super);
-+	rc = lustre_register_fs();
-+	if (rc)
-+		goto out_inode_fini_env;
-+
- 	lustre_register_client_process_config(ll_process_config);
- 
- 	return 0;
-@@ -166,7 +277,8 @@ static int __init lustre_init(void)
- 
- static void __exit lustre_exit(void)
- {
--	lustre_register_super_ops(NULL, NULL, NULL);
-+	lustre_unregister_fs();
-+
- 	lustre_register_client_process_config(NULL);
- 
- 	debugfs_remove(llite_root);
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 81a4c666bb69..9d389288bea4 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -513,15 +513,11 @@ static int __init obdclass_init(void)
- 	if (err)
- 		return err;
- 
--	err = lustre_register_fs();
--
- 	return err;
- }
- 
- static void obdclass_exit(void)
- {
--	lustre_unregister_fs();
--
- 	misc_deregister(&obd_psdev);
- 	llog_info_fini();
- 	cl_global_fini();
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index 39911dcb0fd9..f0f00b779cf1 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -49,11 +49,6 @@
- #include <lustre_disk.h>
- #include <uapi/linux/lustre/lustre_param.h>
- 
--static DEFINE_SPINLOCK(client_lock);
--static struct module *client_mod;
--static int (*client_fill_super)(struct super_block *sb);
--static void (*kill_super_cb)(struct super_block *sb);
--
- /**************** config llog ********************/
- 
- /** Get a config log from the MGS and process it.
-@@ -430,6 +425,7 @@ int lustre_start_mgc(struct super_block *sb)
- 	kfree(niduuid);
- 	return rc;
- }
-+EXPORT_SYMBOL(lustre_start_mgc);
- 
- static int lustre_stop_mgc(struct super_block *sb)
- {
-@@ -507,7 +503,7 @@ static int lustre_stop_mgc(struct super_block *sb)
- 
- /***************** lustre superblock **************/
- 
--static struct lustre_sb_info *lustre_init_lsi(struct super_block *sb)
-+struct lustre_sb_info *lustre_init_lsi(struct super_block *sb)
- {
- 	struct lustre_sb_info *lsi;
- 
-@@ -532,6 +528,7 @@ static struct lustre_sb_info *lustre_init_lsi(struct super_block *sb)
- 
- 	return lsi;
- }
-+EXPORT_SYMBOL(lustre_init_lsi);
- 
- static int lustre_free_lsi(struct super_block *sb)
- {
-@@ -567,7 +564,7 @@ static int lustre_free_lsi(struct super_block *sb)
- /* The lsi has one reference for every server that is using the disk -
-  * e.g. MDT, MGS, and potentially MGC
-  */
--static int lustre_put_lsi(struct super_block *sb)
-+int lustre_put_lsi(struct super_block *sb)
- {
- 	struct lustre_sb_info *lsi = s2lsi(sb);
- 
-@@ -578,6 +575,7 @@ static int lustre_put_lsi(struct super_block *sb)
- 	}
- 	return 0;
- }
-+EXPORT_SYMBOL(lustre_put_lsi);
- 
- /*** SERVER NAME ***
-  * <FSNAME><SEPARATOR><TYPE><INDEX>
-@@ -991,7 +989,7 @@ static int lmd_parse_nidlist(char *buf, char **endh)
-  * e.g. mount -v -t lustre -o abort_recov uml1:uml2:/lustre-client /mnt/lustre
-  * dev is passed as device=uml1:/lustre by mount.lustre
-  */
--static int lmd_parse(char *options, struct lustre_mount_data *lmd)
-+int lmd_parse(char *options, struct lustre_mount_data *lmd)
- {
- 	char *s1, *s2, *devname = NULL;
- 	struct lustre_mount_data *raw = (struct lustre_mount_data *)options;
-@@ -1215,141 +1213,5 @@ static int lmd_parse(char *options, struct lustre_mount_data *lmd)
- 	CERROR("Bad mount options %s\n", options);
- 	return -EINVAL;
- }
-+EXPORT_SYMBOL(lmd_parse);
- 
--/** This is the entry point for the mount call into Lustre.
-- * This is called when a server or client is mounted,
-- * and this is where we start setting things up.
-- * @param data Mount options (e.g. -o flock,abort_recov)
-- */
--static int lustre_fill_super(struct super_block *sb, void *lmd2_data, int silent)
--{
--	struct lustre_mount_data *lmd;
--	struct lustre_sb_info *lsi;
--	int rc;
--
--	CDEBUG(D_MOUNT | D_VFSTRACE, "VFS Op: sb %p\n", sb);
--
--	lsi = lustre_init_lsi(sb);
--	if (!lsi)
--		return -ENOMEM;
--	lmd = lsi->lsi_lmd;
--
--	/*
--	 * Disable lockdep during mount, because mount locking patterns are
--	 * `special'.
--	 */
--	lockdep_off();
--
--	/*
--	 * LU-639: the obd cleanup of last mount may not finish yet, wait here.
--	 */
--	obd_zombie_barrier();
--
--	/* Figure out the lmd from the mount options */
--	if (lmd_parse(lmd2_data, lmd)) {
--		lustre_put_lsi(sb);
--		rc = -EINVAL;
--		goto out;
--	}
--
--	if (lmd_is_client(lmd)) {
--		bool have_client = false;
--		CDEBUG(D_MOUNT, "Mounting client %s\n", lmd->lmd_profile);
--		if (!client_fill_super)
--			request_module("lustre");
--		spin_lock(&client_lock);
--		if (client_fill_super && try_module_get(client_mod))
--			have_client = true;
--		spin_unlock(&client_lock);
--		if (!have_client) {
--			LCONSOLE_ERROR_MSG(0x165, "Nothing registered for client mount! Is the 'lustre' module loaded?\n");
--			lustre_put_lsi(sb);
--			rc = -ENODEV;
--		} else {
--			rc = lustre_start_mgc(sb);
--			if (rc) {
--				lustre_common_put_super(sb);
--				goto out;
--			}
--			/* Connect and start */
--			/* (should always be ll_fill_super) */
--			rc = (*client_fill_super)(sb);
--			/*
--			 * c_f_s will call lustre_common_put_super on failure, otherwise
--			 * c_f_s will have taken another reference to the module
--			 */
--			module_put(client_mod);
--		}
--	} else {
--		CERROR("This is client-side-only module, cannot handle server mount.\n");
--		rc = -EINVAL;
--	}
--
--	/* If error happens in fill_super() call, @lsi will be killed there.
--	 * This is why we do not put it here.
--	 */
--	goto out;
--out:
--	if (rc) {
--		CERROR("Unable to mount %s (%d)\n",
--		       s2lsi(sb) ? lmd->lmd_dev : "", rc);
--	} else {
--		CDEBUG(D_SUPER, "Mount %s complete\n",
--		       lmd->lmd_dev);
--	}
--	lockdep_on();
--	return rc;
--}
--
--/* We can't call ll_fill_super by name because it lives in a module that
-- * must be loaded after this one.
-- */
--void lustre_register_super_ops(struct module *mod,
--			       int (*cfs)(struct super_block *sb),
--			       void (*ksc)(struct super_block *sb))
--{
--	spin_lock(&client_lock);
--	client_mod = mod;
--	client_fill_super = cfs;
--	kill_super_cb = ksc;
--	spin_unlock(&client_lock);
--}
--EXPORT_SYMBOL(lustre_register_super_ops);
--
--/***************** FS registration ******************/
--static struct dentry *lustre_mount(struct file_system_type *fs_type, int flags,
--				   const char *devname, void *data)
--{
--	return mount_nodev(fs_type, flags, data, lustre_fill_super);
--}
--
--static void lustre_kill_super(struct super_block *sb)
--{
--	struct lustre_sb_info *lsi = s2lsi(sb);
--
--	if (kill_super_cb && lsi)
--		(*kill_super_cb)(sb);
--
--	kill_anon_super(sb);
--}
--
--/** Register the "lustre" fs type
-- */
--static struct file_system_type lustre_fs_type = {
--	.owner		= THIS_MODULE,
--	.name		= "lustre",
--	.mount		= lustre_mount,
--	.kill_sb	= lustre_kill_super,
--	.fs_flags	= FS_RENAME_DOES_D_MOVE,
--};
--MODULE_ALIAS_FS("lustre");
--
--int lustre_register_fs(void)
--{
--	return register_filesystem(&lustre_fs_type);
--}
--
--int lustre_unregister_fs(void)
--{
--	return unregister_filesystem(&lustre_fs_type);
--}
--- 
-2.14.0.rc0.dirty
-
+> ________________________________
+> From: NeilBrown <neilb@suse.com>
+> Sent: Tuesday, July 31, 2018 7:23:21 PM
+> To: Patrick Farrell; James Simmons; Andreas Dilger; Oleg Drokin
+> Cc: Lustre Development List
+> Subject: Re: [lustre-devel] [PATCH 25/31] lustre: config: move config types into lustre_idl.h
+>
+> On Tue, Jul 31 2018, Patrick Farrell wrote:
+>
+>> Neil,
+>>
+>> Do you have an objection to the concept, or just because this one's not used?
+>> Having a MAX makes it easy to write things like < MYENUM_MAX as sanity checking code, and then if the enum is added to, it still works.  Seems useful to me.
+>
+> I object to the name.  "MAX" is short for "MAXIMUM" which means the
+> highest value that is actually used.  When comparing something to the
+> maximum it makes sense to say
+>    if (foo <= maximum)
+>
+> but it rarely makes sense to say
+>    if (foo < maximum)
+>
+> If you want a count of the number of values, use MYENUM_CNT or
+> MYENUM_NUM. This can sensibly be one more than the maximum value.
+> But if you have MYSENUM_MAX, make sure it is the maximum meaningful
+> value for the enum.
+> </rant>
+>
+> Thanks,
+> NeilBrown
+>
+>
+>>
+>> - Patrick
+>> ________________________________
+>> From: lustre-devel <lustre-devel-bounces@lists.lustre.org> on behalf of NeilBrown <neilb@suse.com>
+>> Sent: Tuesday, July 31, 2018 5:47:28 PM
+>> To: James Simmons; Andreas Dilger; Oleg Drokin
+>> Cc: Lustre Development List
+>> Subject: Re: [lustre-devel] [PATCH 25/31] lustre: config: move config types into lustre_idl.h
+>>
+>> On Mon, Jul 30 2018, James Simmons wrote:
+>>
+>>> From: Niu Yawei <yawei.niu@intel.com>
+>>>
+>>> Move config type values CONFIG_T_XXX into lustre_idl.h since they
+>>> will be put on wire when reading config logs.
+>>>
+>>> Add missing wire checks for mgs_nidtbl_entry, mgs_config_body and
+>>> mgs_config_res.
+>>>
+>>> Redefine CONFIG_SUB_XXX for the sub clds attached on config log.
+>>>
+>>> Signed-off-by: Niu Yawei <yawei.niu@intel.com>
+>>> WC-id: https://jira.whamcloud.com/browse/LU-9216
+>>> Reviewed-on: https://review.whamcloud.com/26022
+>>> Reviewed-by: Fan Yong <fan.yong@intel.com>
+>>> Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+>>> Reviewed-by: Oleg Drokin <green@whamcloud.com>
+>>> Signed-off-by: James Simmons <jsimmons@infradead.org>
+>>> ---
+>>>  .../lustre/include/uapi/linux/lustre/lustre_idl.h  | 10 ++-
+>>>  drivers/staging/lustre/lustre/include/obd_class.h  | 12 +--
+>>>  drivers/staging/lustre/lustre/mgc/mgc_request.c    |  6 +-
+>>>  drivers/staging/lustre/lustre/ptlrpc/wiretest.c    | 85 ++++++++++++++++++++++
+>>>  4 files changed, 103 insertions(+), 10 deletions(-)
+>>>
+>>> diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+>>> index c9b32ef..bd3b45a 100644
+>>> --- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+>>> +++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_idl.h
+>>> @@ -2111,11 +2111,19 @@ struct mgs_nidtbl_entry {
+>>>        } u;
+>>>  };
+>>>
+>>> +enum {
+>>> +     CONFIG_T_CONFIG  = 0,
+>>> +     CONFIG_T_SPTLRPC = 1,
+>>> +     CONFIG_T_RECOVER = 2,
+>>> +     CONFIG_T_PARAMS  = 3,
+>>> +     CONFIG_T_MAX
+>>
+>> Arrrgggh.  It's back.  I thought we had killed CONFIG_T_MAX (which isn't
+>> a MAX).
+>> It's never used, so it'll have to go.
+>>
+>> NeilBrown
+>>
+>>
+>>> +};
+>>> +
+>>>  struct mgs_config_body {
+>>>        char            mcb_name[MTI_NAME_MAXLEN]; /* logname */
+>>>        __u64           mcb_offset;    /* next index of config log to request */
+>>>        __u16           mcb_type;      /* type of log: CONFIG_T_[CONFIG|RECOVER] */
+>>> -     __u8            mcb_reserved;
+>>> +     __u8            mcb_nm_cur_pass;
+>>>        __u8            mcb_bits;      /* bits unit size of config log */
+>>>        __u32           mcb_units;     /* # of units for bulk transfer */
+>>>  };
+>>> diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
+>>> index 184da99..647cc22 100644
+>>> --- a/drivers/staging/lustre/lustre/include/obd_class.h
+>>> +++ b/drivers/staging/lustre/lustre/include/obd_class.h
+>>> @@ -156,16 +156,16 @@ struct config_llog_instance {
+>>>  int class_config_parse_llog(const struct lu_env *env, struct llog_ctxt *ctxt,
+>>>                            char *name, struct config_llog_instance *cfg);
+>>>
+>>> -#define CONFIG_T_CONFIG              BIT(0)
+>>> -#define CONFIG_T_SPTLRPC     BIT(1)
+>>> -#define CONFIG_T_RECOVER     BIT(2)
+>>> -#define CONFIG_T_PARAMS              BIT(3)
+>>> +#define CONFIG_SUB_CONFIG    BIT(0)
+>>> +#define CONFIG_SUB_SPTLRPC   BIT(1)
+>>> +#define CONFIG_SUB_RECOVER   BIT(2)
+>>> +#define CONFIG_SUB_PARAMS    BIT(3)
+>>>
+>>>  /* Sub clds should be attached to the config_llog_data when processing
+>>>   * config log for client or server target.
+>>>   */
+>>> -#define CONFIG_SUB_CLIENT    (CONFIG_T_SPTLRPC | CONFIG_T_RECOVER | \
+>>> -                              CONFIG_T_PARAMS)
+>>> +#define CONFIG_SUB_CLIENT    (CONFIG_SUB_SPTLRPC | CONFIG_SUB_RECOVER | \
+>>> +                              CONFIG_SUB_PARAMS)
+>>>
+>>>  #define PARAMS_FILENAME      "params"
+>>>  #define LCTL_UPCALL  "lctl"
+>>> diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+>>> index 06fcc7e..833e6a0 100644
+>>> --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
+>>> +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+>>> @@ -315,7 +315,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
+>>>        memcpy(seclogname, logname, ptr - logname);
+>>>        strcpy(seclogname + (ptr - logname), "-sptlrpc");
+>>>
+>>> -     if (cfg->cfg_sub_clds & CONFIG_T_SPTLRPC) {
+>>> +     if (cfg->cfg_sub_clds & CONFIG_SUB_SPTLRPC) {
+>>>                sptlrpc_cld = config_log_find_or_add(obd, seclogname, NULL,
+>>>                                                     CONFIG_T_SPTLRPC, cfg);
+>>>                if (IS_ERR(sptlrpc_cld)) {
+>>> @@ -325,7 +325,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
+>>>                }
+>>>        }
+>>>
+>>> -     if (cfg->cfg_sub_clds & CONFIG_T_PARAMS) {
+>>> +     if (cfg->cfg_sub_clds & CONFIG_SUB_PARAMS) {
+>>>                params_cld = config_log_find_or_add(obd, PARAMS_FILENAME, sb,
+>>>                                                    CONFIG_T_PARAMS, cfg);
+>>>                if (IS_ERR(params_cld)) {
+>>> @@ -345,7 +345,7 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
+>>>
+>>>        LASSERT(lsi->lsi_lmd);
+>>>        if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR) &&
+>>> -         cfg->cfg_sub_clds & CONFIG_T_RECOVER) {
+>>> +         cfg->cfg_sub_clds & CONFIG_SUB_RECOVER) {
+>>>                ptr = strrchr(seclogname, '-');
+>>>                if (ptr) {
+>>>                        *ptr = 0;
+>>> diff --git a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+>>> index 2f081ed..09b1298 100644
+>>> --- a/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+>>> +++ b/drivers/staging/lustre/lustre/ptlrpc/wiretest.c
+>>> @@ -3629,6 +3629,91 @@ void lustre_assert_wire_constants(void)
+>>>        LASSERTF((int)sizeof(((struct mgs_target_info *)0)->mti_params) == 4096, "found %lld\n",
+>>>                 (long long)(int)sizeof(((struct mgs_target_info *)0)->mti_params));
+>>>
+>>> +     /* Checks for struct mgs_nidtbl_entry */
+>>> +     LASSERTF((int)sizeof(struct mgs_nidtbl_entry) == 24, "found %lld\n",
+>>> +              (long long)(int)sizeof(struct mgs_nidtbl_entry));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_version) == 0, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_version));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_version) == 8, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_version));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_instance) == 8, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_instance));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_instance) == 4, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_instance));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_index) == 12, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_index));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_index) == 4, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_index));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_length) == 16, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_length));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_length) == 4, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_length));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_type) == 20, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_type));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_type) == 1, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_type));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_type) == 21, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_type));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_type) == 1, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_type));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_size) == 22, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_size));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_size) == 1, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_size));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, mne_nid_count) == 23, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, mne_nid_count));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_count) == 1, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->mne_nid_count));
+>>> +     LASSERTF((int)offsetof(struct mgs_nidtbl_entry, u.nids[0]) == 24, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_nidtbl_entry, u.nids[0]));
+>>> +     LASSERTF((int)sizeof(((struct mgs_nidtbl_entry *)0)->u.nids[0]) == 8, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_nidtbl_entry *)0)->u.nids[0]));
+>>> +
+>>> +     /* Checks for struct mgs_config_body */
+>>> +     LASSERTF((int)sizeof(struct mgs_config_body) == 80, "found %lld\n",
+>>> +              (long long)(int)sizeof(struct mgs_config_body));
+>>> +     LASSERTF((int)offsetof(struct mgs_config_body, mcb_name) == 0, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_config_body, mcb_name));
+>>> +     LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_name) == 64, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_name));
+>>> +     LASSERTF((int)offsetof(struct mgs_config_body, mcb_offset) == 64, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_config_body, mcb_offset));
+>>> +     LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_offset) == 8, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_offset));
+>>> +     LASSERTF((int)offsetof(struct mgs_config_body, mcb_type) == 72, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_config_body, mcb_type));
+>>> +     LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_type) == 2, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_type));
+>>> +     LASSERTF((int)offsetof(struct mgs_config_body, mcb_nm_cur_pass) == 74, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_config_body, mcb_nm_cur_pass));
+>>> +     LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_nm_cur_pass) == 1, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_nm_cur_pass));
+>>> +     LASSERTF((int)offsetof(struct mgs_config_body, mcb_bits) == 75, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_config_body, mcb_bits));
+>>> +     LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_bits) == 1, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_bits));
+>>> +     LASSERTF((int)offsetof(struct mgs_config_body, mcb_units) == 76, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_config_body, mcb_units));
+>>> +     LASSERTF((int)sizeof(((struct mgs_config_body *)0)->mcb_units) == 4, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_config_body *)0)->mcb_units));
+>>> +
+>>> +     BUILD_BUG_ON(CONFIG_T_CONFIG != 0);
+>>> +     BUILD_BUG_ON(CONFIG_T_SPTLRPC != 1);
+>>> +     BUILD_BUG_ON(CONFIG_T_RECOVER != 2);
+>>> +     BUILD_BUG_ON(CONFIG_T_PARAMS != 3);
+>>> +
+>>> +     /* Checks for struct mgs_config_res */
+>>> +     LASSERTF((int)sizeof(struct mgs_config_res) == 16, "found %lld\n",
+>>> +              (long long)(int)sizeof(struct mgs_config_res));
+>>> +     LASSERTF((int)offsetof(struct mgs_config_res, mcr_offset) == 0, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_config_res, mcr_offset));
+>>> +     LASSERTF((int)sizeof(((struct mgs_config_res *)0)->mcr_offset) == 8, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_config_res *)0)->mcr_offset));
+>>> +     LASSERTF((int)offsetof(struct mgs_config_res, mcr_size) == 8, "found %lld\n",
+>>> +              (long long)(int)offsetof(struct mgs_config_res, mcr_size));
+>>> +     LASSERTF((int)sizeof(((struct mgs_config_res *)0)->mcr_size) == 8, "found %lld\n",
+>>> +              (long long)(int)sizeof(((struct mgs_config_res *)0)->mcr_size));
+>>> +
+>>>        /* Checks for struct lustre_capa */
+>>>        LASSERTF((int)sizeof(struct lustre_capa) == 120, "found %lld\n",
+>>>                 (long long)(int)sizeof(struct lustre_capa));
+>>> --
+>>> 1.8.3.1
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180801/37c46d70/attachment-0001.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180801/8e7dbf93/attachment-0001.html>
