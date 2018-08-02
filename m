@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 03:54:33 +0100 (BST)
+Date: Thu, 2 Aug 2018 03:56:24 +0100 (BST)
 Subject: [lustre-devel] [PATCH 04/22] Revert "staging: lustre: lnet:
  socklnd: Use list_for_each_entry_safe"
 In-Reply-To: <153292186077.13840.2365613926140981649.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
  <153292186077.13840.2365613926140981649.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020354160.5677@casper.infradead.org>
+Message-ID: <alpine.LFD.2.21.1808020354340.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
