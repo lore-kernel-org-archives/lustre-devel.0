@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:04:18 +0100 (BST)
-Subject: [lustre-devel] [PATCH 08/22] Revert "staging: lustre: lnet:
- config: Use list_for_each_entry_safe"
-In-Reply-To: <153292186091.13840.114221205536468808.stgit@noble>
+Date: Thu, 2 Aug 2018 04:04:56 +0100 (BST)
+Subject: [lustre-devel] [PATCH 09/22] Revert "staging: lustre: lnet:
+ router: Use list_for_each_entry_safe"
+In-Reply-To: <153292186096.13840.6296110306335811050.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
- <153292186091.13840.114221205536468808.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020404070.5677@casper.infradead.org>
+ <153292186096.13840.6296110306335811050.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1808020404440.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,7 +13,7 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> This reverts commit cb734cf73eaed9b9bb7f190cceaafc15af0d8815.
+> This reverts commit 37cce1bcb750ac12773f1c53afe88a8433f53eb3.
 > 
 > These loops really want to remove everything, and using a
 >   while(!list_empty())
@@ -23,32 +23,31 @@ Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lnet/lnet/config.c |    5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+>  drivers/staging/lustre/lnet/lnet/router.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-> index 136905db2746..26b799e66e53 100644
-> --- a/drivers/staging/lustre/lnet/lnet/config.c
-> +++ b/drivers/staging/lustre/lnet/lnet/config.c
-> @@ -1026,7 +1026,6 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
->  	struct list_head *t;
->  	struct list_head *t2;
->  	struct lnet_text_buf *tb;
-> -	struct lnet_text_buf *temp;
->  	struct lnet_text_buf *tb2;
->  	__u32 net1;
->  	__u32 net2;
-> @@ -1049,7 +1048,9 @@ lnet_match_networks(char **networksp, char *ip2nets, __u32 *ipaddrs, int nip)
->  	len = 0;
->  	rc = 0;
+> diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+> index 3f84df6cb3b1..965087b7359c 100644
+> --- a/drivers/staging/lustre/lnet/lnet/router.c
+> +++ b/drivers/staging/lustre/lnet/lnet/router.c
+> @@ -1340,7 +1340,6 @@ lnet_rtrpool_free_bufs(struct lnet_rtrbufpool *rbp, int cpt)
+>  	int npages = rbp->rbp_npages;
+>  	struct list_head tmp;
+>  	struct lnet_rtrbuf *rb;
+> -	struct lnet_rtrbuf *temp;
 >  
-> -	list_for_each_entry_safe(tb, temp, &raw_entries, ltb_list) {
-> +	while (!list_empty(&raw_entries)) {
-> +		tb = list_entry(raw_entries.next, struct lnet_text_buf,
-> +				ltb_list);
->  		strncpy(source, tb->ltb_text, sizeof(source));
->  		source[sizeof(source) - 1] = '\0';
+>  	if (!rbp->rbp_nbuffers) /* not initialized or already freed */
+>  		return;
+> @@ -1357,7 +1356,8 @@ lnet_rtrpool_free_bufs(struct lnet_rtrbufpool *rbp, int cpt)
+>  	lnet_net_unlock(cpt);
 >  
+>  	/* Free buffers on the free list. */
+> -	list_for_each_entry_safe(rb, temp, &tmp, rb_list) {
+> +	while (!list_empty(&tmp)) {
+> +		rb = list_entry(tmp.next, struct lnet_rtrbuf, rb_list);
+>  		list_del(&rb->rb_list);
+>  		lnet_destroy_rtrbuf(rb, npages);
+>  	}
 > 
 > 
 > 
