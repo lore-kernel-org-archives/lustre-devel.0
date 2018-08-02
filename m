@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 03:49:51 +0100 (BST)
-Subject: [lustre-devel] [PATCH 10/22] Revert "staging: lustre: lnet:
- conrpc: Use list_for_each_entry_safe"
-In-Reply-To: <153292186099.13840.6595803769201521471.stgit@noble>
+Date: Thu, 2 Aug 2018 03:52:58 +0100 (BST)
+Subject: [lustre-devel] [PATCH 01/22] Revert "staging: lustre: lnet:
+ api-ni: Use list_for_each_entry_safe"
+In-Reply-To: <153292186042.13840.10901014935265304451.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
- <153292186099.13840.6595803769201521471.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020348550.5677@casper.infradead.org>
+ <153292186042.13840.10901014935265304451.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1808020352160.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,44 +13,64 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> This reverts commit a9a6cb4f4693253349358f8163d826eb0cfecfbc.
+> This reverts commit c997866cd27495ae28bc07596457e2bd83fb3275.
 > 
 > These loops really want to remove everything, and using a
 >   while(!list_empty())
-> loop makes this more obvious.
-> 
+> loop makes this more obvious.  In this case, the first loop is
+> currently buggy.
+
+Reviewed-by: James Simmons <jsimmons@infradead.org>
+ 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lnet/selftest/conrpc.c |    5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+>  drivers/staging/lustre/lnet/lnet/api-ni.c |   10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
-> index 95cbd1a14e1b..3afde0141db5 100644
-> --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
-> +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
-> @@ -1327,7 +1327,6 @@ lstcon_rpc_cleanup_wait(void)
+> diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+> index d21bceeaceda..51a81075f8d5 100644
+> --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
+> +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+> @@ -1077,17 +1077,18 @@ lnet_clear_zombies_nis_locked(void)
+>  	int i;
+>  	int islo;
+>  	struct lnet_ni *ni;
+> -	struct lnet_ni *temp;
+>  
+>  	/*
+>  	 * Now wait for the NI's I just nuked to show up on ln_zombie_nis
+>  	 * and shut them down in guaranteed thread context
+>  	 */
+>  	i = 2;
+> -	list_for_each_entry_safe(ni, temp, &the_lnet.ln_nis_zombie, ni_list) {
+> +	while (!list_empty(&the_lnet.ln_nis_zombie)) {
+>  		int *ref;
+>  		int j;
+>  
+> +		ni = list_entry(the_lnet.ln_nis_zombie.next,
+> +				struct lnet_ni, ni_list);
+>  		list_del_init(&ni->ni_list);
+>  		cfs_percpt_for_each(ref, j, ni->ni_refs) {
+>  			if (!*ref)
+> @@ -1137,7 +1138,6 @@ static void
+>  lnet_shutdown_lndnis(void)
 >  {
->  	struct lstcon_rpc_trans *trans;
->  	struct lstcon_rpc *crpc;
-> -	struct lstcon_rpc *temp;
->  	struct list_head *pacer;
->  	struct list_head zlist;
+>  	struct lnet_ni *ni;
+> -	struct lnet_ni *temp;
+>  	int i;
 >  
-> @@ -1367,7 +1366,9 @@ lstcon_rpc_cleanup_wait(void)
+>  	/* NB called holding the global mutex */
+> @@ -1151,7 +1151,9 @@ lnet_shutdown_lndnis(void)
+>  	the_lnet.ln_shutdown = 1;	/* flag shutdown */
 >  
->  	spin_unlock(&console_session.ses_rpc_lock);
->  
-> -	list_for_each_entry_safe(crpc, temp, &zlist, crp_link) {
-> +	while (!list_empty(&zlist)) {
-> +		crpc = list_entry(zlist.next, lstcon_rpc_t, crp_link);
-> +
-
-Nak. This one needs to be updated to. The typedef lstcon_rpc_t no longer
-exist. Now you need to use struct lstcon_rpc.
-
->  		list_del(&crpc->crp_link);
->  		kfree(crpc);
+>  	/* Unlink NIs from the global table */
+> -	list_for_each_entry_safe(ni, temp, &the_lnet.ln_nis, ni_list) {
+> +	while (!list_empty(&the_lnet.ln_nis)) {
+> +		ni = list_entry(the_lnet.ln_nis.next,
+> +				struct lnet_ni, ni_list);
+>  		lnet_ni_unlink_locked(ni);
 >  	}
+>  
 > 
 > 
 > 
