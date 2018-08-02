@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:07:17 +0100 (BST)
-Subject: [lustre-devel] [PATCH 14/22] Revert: Staging: lustre: Iterate
- list using list_for_each_entry
-In-Reply-To: <153292186117.13840.9041811734708835901.stgit@noble>
+Date: Thu, 2 Aug 2018 04:07:41 +0100 (BST)
+Subject: [lustre-devel] [PATCH 15/22] lustre: o2iblnd: convert
+ list_for_each_entry_safe() to while(!list_empty())
+In-Reply-To: <153292186122.13840.1195251525324756487.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
- <153292186117.13840.9041811734708835901.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020407080.5677@casper.infradead.org>
+ <153292186122.13840.1195251525324756487.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1808020407310.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,59 +13,59 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> This reverts (what is left of) 5a2ca43fa54f561c252c2ceb986daa49e258ab13
-> 
-> These loops really want to remove everything, and using a
->   while(!list_empty())
-> loop makes this more obvious.
+> These loops are removing all element from a list.
+> So using while(!list_empty()) makes the intent clearer.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   16 ++++++++++------
+>  1 file changed, 10 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> index 9cf1f64e3d76..bda67d49597d 100644
-> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-> @@ -2106,7 +2106,6 @@ kiblnd_connreq_done(struct kib_conn *conn, int status)
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> index 124870ada28b..830a5bf34c16 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> @@ -1283,11 +1283,13 @@ static void kiblnd_destroy_fmr_pool(struct kib_fmr_pool *fpo)
+>  		if (fpo->fmr.fpo_fmr_pool)
+>  			ib_destroy_fmr_pool(fpo->fmr.fpo_fmr_pool);
+>  	} else {
+> -		struct kib_fast_reg_descriptor *frd, *tmp;
+> +		struct kib_fast_reg_descriptor *frd;
+>  		int i = 0;
+>  
+> -		list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
+> -					 frd_list) {
+> +		while (!list_empty(&fpo->fast_reg.fpo_pool_list)) {
+> +			frd = list_first_entry(&fpo->fast_reg.fpo_pool_list,
+> +					       struct kib_fast_reg_descriptor,
+> +					       frd_list);
+>  			list_del(&frd->frd_list);
+>  			ib_dereg_mr(frd->frd_mr);
+>  			kfree(frd);
+> @@ -1362,7 +1364,7 @@ static int kiblnd_alloc_fmr_pool(struct kib_fmr_poolset *fps, struct kib_fmr_poo
+>  
+>  static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps, struct kib_fmr_pool *fpo)
 >  {
->  	struct kib_peer *peer = conn->ibc_peer;
->  	struct kib_tx *tx;
-> -	struct kib_tx *tmp;
->  	struct list_head txs;
->  	unsigned long flags;
->  	int active;
-> @@ -2197,7 +2196,8 @@ kiblnd_connreq_done(struct kib_conn *conn, int status)
->  	 * scheduled.  We won't be using round robin on this first batch.
->  	 */
->  	spin_lock(&conn->ibc_lock);
-> -	list_for_each_entry_safe(tx, tmp, &txs, tx_list) {
-> +	while (!list_empty(&txs)) {
-> +		tx = list_first_entry(&txs, struct kib_tx, tx_list);
->  		list_del(&tx->tx_list);
+> -	struct kib_fast_reg_descriptor *frd, *tmp;
+> +	struct kib_fast_reg_descriptor *frd;
+>  	int i, rc;
 >  
->  		kiblnd_queue_tx_locked(tx, conn);
-> @@ -3185,7 +3185,6 @@ kiblnd_check_conns(int idx)
->  	struct list_head *ptmp;
->  	struct kib_peer *peer;
->  	struct kib_conn *conn;
-> -	struct kib_conn *tmp;
->  	struct list_head *ctmp;
->  	unsigned long flags;
+>  	INIT_LIST_HEAD(&fpo->fast_reg.fpo_pool_list);
+> @@ -1399,8 +1401,10 @@ static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps, struct kib_fmr_po
+>  	kfree(frd);
 >  
-> @@ -3241,7 +3240,8 @@ kiblnd_check_conns(int idx)
->  	 * connection. We can only be sure RDMA activity
->  	 * has ceased once the QP has been modified.
->  	 */
-> -	list_for_each_entry_safe(conn, tmp, &closes, ibc_connd_list) {
-> +	while (!list_empty(&closes)) {
-> +		conn = list_first_entry(&closes, struct kib_conn, ibc_connd_list);
->  		list_del(&conn->ibc_connd_list);
->  		kiblnd_close_conn(conn, -ETIMEDOUT);
->  		kiblnd_conn_decref(conn);
+>  out:
+> -	list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
+> -				 frd_list) {
+> +	while (!list_empty(&fpo->fast_reg.fpo_pool_list)) {
+> +		frd = list_first_entry(&fpo->fast_reg.fpo_pool_list,
+> +				       struct kib_fast_reg_descriptor,
+> +				       frd_list);
+>  		list_del(&frd->frd_list);
+>  		ib_dereg_mr(frd->frd_mr);
+>  		kfree(frd);
 > 
 > 
 > 
