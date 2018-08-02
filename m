@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:07:41 +0100 (BST)
-Subject: [lustre-devel] [PATCH 15/22] lustre: o2iblnd: convert
+Date: Thu, 2 Aug 2018 04:08:13 +0100 (BST)
+Subject: [lustre-devel] [PATCH 16/22] lustre: tracefile: convert
  list_for_each_entry_safe() to while(!list_empty())
-In-Reply-To: <153292186122.13840.1195251525324756487.stgit@noble>
+In-Reply-To: <153292186126.13840.13964285941561581566.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
- <153292186122.13840.1195251525324756487.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020407310.5677@casper.infradead.org>
+ <153292186126.13840.13964285941561581566.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1808020408030.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,59 +13,56 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> These loops are removing all element from a list.
+> These loops are removing all elements from a list.
 > So using while(!list_empty()) makes the intent clearer.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
+>  drivers/staging/lustre/lnet/libcfs/tracefile.c |   12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> index 124870ada28b..830a5bf34c16 100644
-> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-> @@ -1283,11 +1283,13 @@ static void kiblnd_destroy_fmr_pool(struct kib_fmr_pool *fpo)
->  		if (fpo->fmr.fpo_fmr_pool)
->  			ib_destroy_fmr_pool(fpo->fmr.fpo_fmr_pool);
->  	} else {
-> -		struct kib_fast_reg_descriptor *frd, *tmp;
-> +		struct kib_fast_reg_descriptor *frd;
->  		int i = 0;
->  
-> -		list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
-> -					 frd_list) {
-> +		while (!list_empty(&fpo->fast_reg.fpo_pool_list)) {
-> +			frd = list_first_entry(&fpo->fast_reg.fpo_pool_list,
-> +					       struct kib_fast_reg_descriptor,
-> +					       frd_list);
->  			list_del(&frd->frd_list);
->  			ib_dereg_mr(frd->frd_mr);
->  			kfree(frd);
-> @@ -1362,7 +1364,7 @@ static int kiblnd_alloc_fmr_pool(struct kib_fmr_poolset *fps, struct kib_fmr_poo
->  
->  static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps, struct kib_fmr_pool *fpo)
+> diff --git a/drivers/staging/lustre/lnet/libcfs/tracefile.c b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+> index 07242d4ed41b..a4768e930021 100644
+> --- a/drivers/staging/lustre/lnet/libcfs/tracefile.c
+> +++ b/drivers/staging/lustre/lnet/libcfs/tracefile.c
+> @@ -896,11 +896,12 @@ void cfs_trace_flush_pages(void)
 >  {
-> -	struct kib_fast_reg_descriptor *frd, *tmp;
-> +	struct kib_fast_reg_descriptor *frd;
->  	int i, rc;
+>  	struct page_collection pc;
+>  	struct cfs_trace_page *tage;
+> -	struct cfs_trace_page *tmp;
 >  
->  	INIT_LIST_HEAD(&fpo->fast_reg.fpo_pool_list);
-> @@ -1399,8 +1401,10 @@ static int kiblnd_alloc_freg_pool(struct kib_fmr_poolset *fps, struct kib_fmr_po
->  	kfree(frd);
+>  	pc.pc_want_daemon_pages = 1;
+>  	collect_pages(&pc);
+> -	list_for_each_entry_safe(tage, tmp, &pc.pc_pages, linkage) {
+> +	while (!list_empty(&pc.pc_pages)) {
+> +		tage = list_first_entry(&pc.pc_pages,
+> +					struct cfs_trace_page, linkage);
+>  		__LASSERT_TAGE_INVARIANT(tage);
 >  
->  out:
-> -	list_for_each_entry_safe(frd, tmp, &fpo->fast_reg.fpo_pool_list,
-> -				 frd_list) {
-> +	while (!list_empty(&fpo->fast_reg.fpo_pool_list)) {
-> +		frd = list_first_entry(&fpo->fast_reg.fpo_pool_list,
-> +				       struct kib_fast_reg_descriptor,
-> +				       frd_list);
->  		list_del(&frd->frd_list);
->  		ib_dereg_mr(frd->frd_mr);
->  		kfree(frd);
+>  		list_del(&tage->linkage);
+> @@ -1331,7 +1332,6 @@ static void trace_cleanup_on_all_cpus(void)
+>  {
+>  	struct cfs_trace_cpu_data *tcd;
+>  	struct cfs_trace_page *tage;
+> -	struct cfs_trace_page *tmp;
+>  	int i, cpu;
+>  
+>  	for_each_possible_cpu(cpu) {
+> @@ -1341,8 +1341,10 @@ static void trace_cleanup_on_all_cpus(void)
+>  				continue;
+>  			tcd->tcd_shutting_down = 1;
+>  
+> -			list_for_each_entry_safe(tage, tmp, &tcd->tcd_pages,
+> -						 linkage) {
+> +			while (!list_empty(&tcd->tcd_pages)) {
+> +				tage = list_first_entry(&tcd->tcd_pages,
+> +							struct cfs_trace_page,
+> +							linkage);
+>  				__LASSERT_TAGE_INVARIANT(tage);
+>  
+>  				list_del(&tage->linkage);
 > 
 > 
 > 
