@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:09:55 +0100 (BST)
-Subject: [lustre-devel] [PATCH 20/22] lustre: lov_obd: convert
+Date: Thu, 2 Aug 2018 04:10:15 +0100 (BST)
+Subject: [lustre-devel] [PATCH 21/22] lustre: ldlm_request: convert
  list_for_each_entry_safe() to while(!list_empty())
-In-Reply-To: <153292186143.13840.16227510388221165130.stgit@noble>
+In-Reply-To: <153292186147.13840.314584204805282590.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
- <153292186143.13840.16227510388221165130.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020409470.5677@casper.infradead.org>
+ <153292186147.13840.314584204805282590.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1808020410070.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -20,32 +20,33 @@ Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lustre/lov/lov_obd.c |    5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+>  drivers/staging/lustre/lustre/ldlm/ldlm_request.c |    6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-> index ee0898cbd9c9..0dd471cfe9a1 100644
-> --- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-> +++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-> @@ -83,7 +83,7 @@ static void lov_putref(struct obd_device *obd)
->  	if (atomic_dec_and_test(&lov->lov_refcount) && lov->lov_death_row) {
->  		LIST_HEAD(kill);
->  		int i;
-> -		struct lov_tgt_desc *tgt, *n;
-> +		struct lov_tgt_desc *tgt;
+> diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> index cdc52eed6d85..80260b07f0f0 100644
+> --- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> @@ -2000,7 +2000,7 @@ int ldlm_replay_locks(struct obd_import *imp)
+>  {
+>  	struct ldlm_namespace *ns = imp->imp_obd->obd_namespace;
+>  	LIST_HEAD(list);
+> -	struct ldlm_lock *lock, *next;
+> +	struct ldlm_lock *lock;
+>  	int rc = 0;
 >  
->  		CDEBUG(D_CONFIG, "destroying %d lov targets\n",
->  		       lov->lov_death_row);
-> @@ -103,7 +103,8 @@ static void lov_putref(struct obd_device *obd)
->  		}
->  		mutex_unlock(&lov->lov_lock);
+>  	LASSERT(atomic_read(&imp->imp_replay_inflight) == 0);
+> @@ -2017,7 +2017,9 @@ int ldlm_replay_locks(struct obd_import *imp)
 >  
-> -		list_for_each_entry_safe(tgt, n, &kill, ltd_kill) {
-> +		while (!list_empty(&kill)) {
-> +			tgt = list_first_entry(&kill, struct lov_tgt_desc, ltd_kill);
->  			list_del(&tgt->ltd_kill);
->  			/* Disconnect */
->  			__lov_del_obd(obd, tgt);
+>  	ldlm_namespace_foreach(ns, ldlm_chain_lock_for_replay, &list);
+>  
+> -	list_for_each_entry_safe(lock, next, &list, l_pending_chain) {
+> +	while (!list_empty(&list)) {
+> +		lock = list_first_entry(&list, struct ldlm_lock,
+> +					l_pending_chain);
+>  		list_del_init(&lock->l_pending_chain);
+>  		if (rc) {
+>  			LDLM_LOCK_RELEASE(lock);
 > 
 > 
 > 
