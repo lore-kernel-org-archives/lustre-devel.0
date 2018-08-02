@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:09:09 +0100 (BST)
-Subject: [lustre-devel] [PATCH 18/22] lustre: net_fault: convert
+Date: Thu, 2 Aug 2018 04:09:34 +0100 (BST)
+Subject: [lustre-devel] [PATCH 19/22] lustre: fld_request: convert
  list_for_each_entry_safe() to while(!list_empty())
-In-Reply-To: <153292186135.13840.3626019723821443531.stgit@noble>
+In-Reply-To: <153292186139.13840.14587588638167610162.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
- <153292186135.13840.3626019723821443531.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020408590.5677@casper.infradead.org>
+ <153292186139.13840.14587588638167610162.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1808020409240.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,39 +15,34 @@ To: lustre-devel@lists.lustre.org
 
 > These loops are removing all elements from a list.
 > So using while(!list_empty()) makes the intent clearer.
+> 
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lnet/lnet/net_fault.c |    7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+>  drivers/staging/lustre/lustre/fld/fld_request.c |    6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/lnet/net_fault.c b/drivers/staging/lustre/lnet/lnet/net_fault.c
-> index cb1f9053ef48..41d6131ee15a 100644
-> --- a/drivers/staging/lustre/lnet/lnet/net_fault.c
-> +++ b/drivers/staging/lustre/lnet/lnet/net_fault.c
-> @@ -216,7 +216,8 @@ lnet_drop_rule_del(lnet_nid_t src, lnet_nid_t dst)
->  	}
->  	lnet_net_unlock(LNET_LOCK_EX);
+> diff --git a/drivers/staging/lustre/lustre/fld/fld_request.c b/drivers/staging/lustre/lustre/fld/fld_request.c
+> index 97f7ea632346..7b0365b3e413 100644
+> --- a/drivers/staging/lustre/lustre/fld/fld_request.c
+> +++ b/drivers/staging/lustre/lustre/fld/fld_request.c
+> @@ -280,10 +280,12 @@ EXPORT_SYMBOL(fld_client_init);
 >  
-> -	list_for_each_entry_safe(rule, tmp, &zombies, dr_link) {
-> +	while (!list_empty(&zombies)) {
-> +		rule = list_first_entry(&zombies, struct lnet_drop_rule, dr_link);
->  		CDEBUG(D_NET, "Remove drop rule: src %s->dst: %s (1/%d, %d)\n",
->  		       libcfs_nid2str(rule->dr_attr.fa_src),
->  		       libcfs_nid2str(rule->dr_attr.fa_dst),
-> @@ -841,7 +842,9 @@ lnet_delay_rule_del(lnet_nid_t src, lnet_nid_t dst, bool shutdown)
->  		  !list_empty(&rule_list);
->  	lnet_net_unlock(LNET_LOCK_EX);
+>  void fld_client_fini(struct lu_client_fld *fld)
+>  {
+> -	struct lu_fld_target *target, *tmp;
+> +	struct lu_fld_target *target;
 >  
-> -	list_for_each_entry_safe(rule, tmp, &rule_list, dl_link) {
-> +	while (!list_empty(&rule_list)) {
-> +		rule = list_first_entry(&rule_list,
-> +					struct lnet_delay_rule, dl_link);
->  		list_del_init(&rule->dl_link);
->  
->  		del_timer_sync(&rule->dl_timer);
+>  	spin_lock(&fld->lcf_lock);
+> -	list_for_each_entry_safe(target, tmp, &fld->lcf_targets, ft_chain) {
+> +	while (!list_empty(&fld->lcf_targets)) {
+> +		target = list_first_entry(&fld->lcf_targets,
+> +					  struct lu_fld_target, ft_chain);
+>  		fld->lcf_count--;
+>  		list_del(&target->ft_chain);
+>  		if (target->ft_exp)
 > 
 > 
 > 
