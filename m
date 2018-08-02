@@ -1,11 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:14:56 +0100 (BST)
-Subject: [lustre-devel] [PATCH 6/6] lustre: convert list_for_each() in
- ksocknal_debug_peerhash()
-In-Reply-To: <153292233972.26104.9739049020807431895.stgit@noble>
+Date: Thu, 2 Aug 2018 04:16:06 +0100 (BST)
+Subject: [lustre-devel] [PATCH 0/6] lustre: convert list_for_each() to
+ list_for_each_entry()
+In-Reply-To: <153292233170.26104.16164388413209501300.stgit@noble>
 References: <153292233170.26104.16164388413209501300.stgit@noble>
- <153292233972.26104.9739049020807431895.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020414450.5677@casper.infradead.org>
+Message-ID: <alpine.LFD.2.21.1808020415100.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,111 +12,47 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> This list_for_each() loop searches for a particular entry,
-> then acts of in.  It currently acts after the loop by testing
-> if the variable is NULL.  When we convert to list_for_each_entry()
-> it won't be NULL.
+> list_for_each_entry(foo) is generally preferred to
+>   list_for_each(l,...)
+>      foo = list_entry(l,...)
 > 
-> Change the code so the acting happens inside the loop.
->  list_for_each_entry() {
->     if (this isn't it)
->         continue;
->     act on entry;
->     goto done; // break out of 2 loops
-> }
+> as there is less noise in the code.
+> The first patch contains seveveral trivial conversions.
+> The remaining patches are less obvious and are separate
+> so they are easier to review.
+> 
+> NeilBrown
+> 
+> The following series implements...
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
+Looks good and testing shows no problems. I will poke the LNet
+guys to look at these as well.
  
-> Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   64 +++++++++-----------
->  1 file changed, 28 insertions(+), 36 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> index 33335713b371..f0b0480686dc 100644
-> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-> @@ -2462,52 +2462,44 @@ static void
->  ksocknal_debug_peerhash(struct lnet_ni *ni)
->  {
->  	struct ksock_peer *peer = NULL;
-> -	struct list_head *tmp;
->  	int i;
->  
->  	read_lock(&ksocknal_data.ksnd_global_lock);
->  
->  	for (i = 0; i < ksocknal_data.ksnd_peer_hash_size; i++) {
-> -		list_for_each(tmp, &ksocknal_data.ksnd_peers[i]) {
-> -			peer = list_entry(tmp, struct ksock_peer, ksnp_list);
-> -
-> -			if (peer->ksnp_ni == ni)
-> -				break;
-> +		list_for_each_entry(peer, &ksocknal_data.ksnd_peers[i], ksnp_list) {
-> +			struct ksock_route *route;
-> +			struct ksock_conn  *conn;
->  
-> -			peer = NULL;
-> -		}
-> -	}
-> +			if (peer->ksnp_ni != ni)
-> +				continue;
->  
-> -	if (peer) {
-> -		struct ksock_route *route;
-> -		struct ksock_conn  *conn;
-> -
-> -		CWARN("Active peer on shutdown: %s, ref %d, scnt %d, closing %d, accepting %d, err %d, zcookie %llu, txq %d, zc_req %d\n",
-> -		      libcfs_id2str(peer->ksnp_id),
-> -		      atomic_read(&peer->ksnp_refcount),
-> -		      peer->ksnp_sharecount, peer->ksnp_closing,
-> -		      peer->ksnp_accepting, peer->ksnp_error,
-> -		      peer->ksnp_zc_next_cookie,
-> -		      !list_empty(&peer->ksnp_tx_queue),
-> -		      !list_empty(&peer->ksnp_zc_req_list));
-> -
-> -		list_for_each(tmp, &peer->ksnp_routes) {
-> -			route = list_entry(tmp, struct ksock_route, ksnr_list);
-> -			CWARN("Route: ref %d, schd %d, conn %d, cnted %d, del %d\n",
-> -			      atomic_read(&route->ksnr_refcount),
-> -			      route->ksnr_scheduled, route->ksnr_connecting,
-> -			      route->ksnr_connected, route->ksnr_deleted);
-> -		}
-> +			CWARN("Active peer on shutdown: %s, ref %d, scnt %d, closing %d, accepting %d, err %d, zcookie %llu, txq %d, zc_req %d\n",
-> +			      libcfs_id2str(peer->ksnp_id),
-> +			      atomic_read(&peer->ksnp_refcount),
-> +			      peer->ksnp_sharecount, peer->ksnp_closing,
-> +			      peer->ksnp_accepting, peer->ksnp_error,
-> +			      peer->ksnp_zc_next_cookie,
-> +			      !list_empty(&peer->ksnp_tx_queue),
-> +			      !list_empty(&peer->ksnp_zc_req_list));
-> +
-> +			list_for_each_entry(route, &peer->ksnp_routes, ksnr_list) {
-> +				CWARN("Route: ref %d, schd %d, conn %d, cnted %d, del %d\n",
-> +				      atomic_read(&route->ksnr_refcount),
-> +				      route->ksnr_scheduled, route->ksnr_connecting,
-> +				      route->ksnr_connected, route->ksnr_deleted);
-> +			}
->  
-> -		list_for_each(tmp, &peer->ksnp_conns) {
-> -			conn = list_entry(tmp, struct ksock_conn, ksnc_list);
-> -			CWARN("Conn: ref %d, sref %d, t %d, c %d\n",
-> -			      atomic_read(&conn->ksnc_conn_refcount),
-> -			      atomic_read(&conn->ksnc_sock_refcount),
-> -			      conn->ksnc_type, conn->ksnc_closing);
-> +			list_for_each_entry(conn, &peer->ksnp_conns, ksnc_list) {
-> +				CWARN("Conn: ref %d, sref %d, t %d, c %d\n",
-> +				      atomic_read(&conn->ksnc_conn_refcount),
-> +				      atomic_read(&conn->ksnc_sock_refcount),
-> +				      conn->ksnc_type, conn->ksnc_closing);
-> +			}
-> +			goto done;
->  		}
->  	}
-> -
-> +done:
->  	read_unlock(&ksocknal_data.ksnd_global_lock);
->  }
->  
+> NeilBrown (6):
+>       lustre: convert list_for_each() to list_for_each_entry().
+>       lustre: lnet/config: convert list_for_each to list_for_each_entry
+>       lustre: convert list_for_each in ksocknal_create_routes
+>       lustre: convert list_for_each in ksocknal_close_conn_locked()
+>       lustre: convert list_for_each() in ksocknal_push_peer()
+>       lustre: convert list_for_each() in ksocknal_debug_peerhash()
 > 
+> 
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   17 --
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   20 +-
+>  .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |  166 +++++++-------------
+>  .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |   20 +-
+>  drivers/staging/lustre/lnet/lnet/api-ni.c          |   29 +--
+>  drivers/staging/lustre/lnet/lnet/config.c          |   28 +--
+>  drivers/staging/lustre/lnet/lnet/lib-move.c        |    9 -
+>  drivers/staging/lustre/lnet/lnet/router.c          |   47 +-----
+>  drivers/staging/lustre/lnet/selftest/conrpc.c      |    7 -
+>  drivers/staging/lustre/lustre/obdclass/genops.c    |    4 
+>  .../staging/lustre/lustre/obdecho/echo_client.c    |    4 
+>  11 files changed, 99 insertions(+), 252 deletions(-)
+> 
+> --
+> Signature
 > 
 > 
