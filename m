@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:05:55 +0100 (BST)
-Subject: [lustre-devel] [PATCH 11/22] Revert "staging: lustre: lnet:
- lib-move: Use list_for_each_entry_safe"
-In-Reply-To: <153292186104.13840.12696227873574036682.stgit@noble>
+Date: Thu, 2 Aug 2018 04:06:31 +0100 (BST)
+Subject: [lustre-devel] [PATCH 12/22] Revert "staging: lustre: obdclass:
+ Use list_for_each_entry_safe"
+In-Reply-To: <153292186108.13840.4929208218603720715.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
- <153292186104.13840.12696227873574036682.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020405440.5677@casper.infradead.org>
+ <153292186108.13840.4929208218603720715.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1808020406200.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,7 +13,7 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> This reverts commit 24f695909440b79b04bb75205384c9772e4c7d0a.
+> This reverts commit 6069f756d42160e454f49286183712514db3ca6b.
 > 
 > These loops really want to remove everything, and using a
 >   while(!list_empty())
@@ -23,50 +23,32 @@ Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lnet/lnet/lib-move.c |    9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
+>  .../staging/lustre/lustre/obdclass/lustre_peer.c   |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> index e8092b1b6b27..2756e91b34bb 100644
-> --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> @@ -49,7 +49,6 @@ int
->  lnet_fail_nid(lnet_nid_t nid, unsigned int threshold)
+> diff --git a/drivers/staging/lustre/lustre/obdclass/lustre_peer.c b/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
+> index e286a2665423..7fc62b7e95b4 100644
+> --- a/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
+> +++ b/drivers/staging/lustre/lustre/obdclass/lustre_peer.c
+> @@ -146,7 +146,6 @@ int class_del_uuid(const char *uuid)
 >  {
->  	struct lnet_test_peer *tp;
-> -	struct lnet_test_peer *temp;
->  	struct list_head *el;
->  	struct list_head *next;
->  	struct list_head cull;
-> @@ -88,7 +87,9 @@ lnet_fail_nid(lnet_nid_t nid, unsigned int threshold)
+>  	LIST_HEAD(deathrow);
+>  	struct uuid_nid_data *data;
+> -	struct uuid_nid_data *temp;
 >  
->  	lnet_net_unlock(0);
->  
-> -	list_for_each_entry_safe(tp, temp, &cull, tp_list) {
-> +	while (!list_empty(&cull)) {
-> +		tp = list_entry(cull.next, struct lnet_test_peer, tp_list);
-> +
->  		list_del(&tp->tp_list);
->  		kfree(tp);
+>  	spin_lock(&g_uuid_lock);
+>  	if (uuid) {
+> @@ -169,7 +168,9 @@ int class_del_uuid(const char *uuid)
+>  		return -EINVAL;
 >  	}
-> @@ -99,7 +100,6 @@ static int
->  fail_peer(lnet_nid_t nid, int outgoing)
->  {
->  	struct lnet_test_peer *tp;
-> -	struct lnet_test_peer *temp;
->  	struct list_head *el;
->  	struct list_head *next;
->  	struct list_head cull;
-> @@ -146,7 +146,8 @@ fail_peer(lnet_nid_t nid, int outgoing)
 >  
->  	lnet_net_unlock(0);
+> -	list_for_each_entry_safe(data, temp, &deathrow, un_list) {
+> +	while (!list_empty(&deathrow)) {
+> +		data = list_entry(deathrow.next, struct uuid_nid_data,
+> +				  un_list);
+>  		list_del(&data->un_list);
 >  
-> -	list_for_each_entry_safe(tp, temp, &cull, tp_list) {
-> +	while (!list_empty(&cull)) {
-> +		tp = list_entry(cull.next, struct lnet_test_peer, tp_list);
->  		list_del(&tp->tp_list);
->  
->  		kfree(tp);
+>  		CDEBUG(D_INFO, "del uuid %s %s/%d\n",
 > 
 > 
 > 
