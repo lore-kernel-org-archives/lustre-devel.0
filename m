@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:13:09 +0100 (BST)
-Subject: [lustre-devel] [PATCH 2/6] lustre: lnet/config: convert
- list_for_each to list_for_each_entry
-In-Reply-To: <153292233958.26104.10972399803477314475.stgit@noble>
+Date: Thu, 2 Aug 2018 04:13:32 +0100 (BST)
+Subject: [lustre-devel] [PATCH 3/6] lustre: convert list_for_each in
+ ksocknal_create_routes
+In-Reply-To: <153292233962.26104.2678883514539213796.stgit@noble>
 References: <153292233170.26104.16164388413209501300.stgit@noble>
- <153292233958.26104.10972399803477314475.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020412580.5677@casper.infradead.org>
+ <153292233962.26104.2678883514539213796.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1808020413220.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,52 +13,91 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> This conversion to list_for_each_entry isn't quite trivial
-> as the 'tmp' loop variables are used elsewhere in the function.
-> This means we cannot just delete them, and so must inspect the
-> code to ensure the values aren't used elsewhere - they aren't.
+> The two list_for_each() loops in ksocknal_create_routes() cannot be
+> trivially converted to list_for_each_entry() as the new loop variable
+> is expected to be NULL after the loop, if the loop completed normally.
 > 
-> Also we need to introduce new loop variables: ltb1 and ltb2 as
-> the lnet_text_buf was the some for both the original (nested) loops.
+> If the loop did not complete normally - if an interesting entry was
+> found - a 'continue' is required in the higher level loop.  Change
+> this 'continue' to a 'goto' so it can be called in the inner loop, and
+> we don't need to check for a variable being NULL.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  drivers/staging/lustre/lnet/lnet/config.c |   11 +++++------
->  1 file changed, 5 insertions(+), 6 deletions(-)
+>  .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   29 +++++---------------
+>  1 file changed, 7 insertions(+), 22 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-> index 96336ecdacaf..091c4f714e84 100644
-> --- a/drivers/staging/lustre/lnet/lnet/config.c
-> +++ b/drivers/staging/lustre/lnet/lnet/config.c
-> @@ -662,6 +662,7 @@ lnet_parse_route(char *str, int *im_a_router)
->  	__u32 net;
->  	lnet_nid_t nid;
->  	struct lnet_text_buf *ltb;
-> +	struct lnet_text_buf *ltb1, *ltb2;
->  	int rc;
->  	char *sep;
->  	char *token = str;
-> @@ -760,14 +761,12 @@ lnet_parse_route(char *str, int *im_a_router)
->  	LASSERT(!list_empty(&nets));
->  	LASSERT(!list_empty(&gateways));
+> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> index 491d2ed5b673..f495e0faeac4 100644
+> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> @@ -846,7 +846,6 @@ ksocknal_create_routes(struct ksock_peer *peer, int port,
+>  	rwlock_t *global_lock = &ksocknal_data.ksnd_global_lock;
+>  	struct lnet_ni *ni = peer->ksnp_ni;
+>  	struct ksock_net *net = ni->ni_data;
+> -	struct list_head *rtmp;
+>  	struct ksock_route *route;
+>  	struct ksock_interface *iface;
+>  	struct ksock_interface *best_iface;
+> @@ -894,17 +893,9 @@ ksocknal_create_routes(struct ksock_peer *peer, int port,
+>  		}
 >  
-> -	list_for_each(tmp1, &nets) {
-> -		ltb = list_entry(tmp1, struct lnet_text_buf, ltb_list);
-> -		net = libcfs_str2net(ltb->ltb_text);
-> +	list_for_each_entry(ltb1, &nets, ltb_list) {
-> +		net = libcfs_str2net(ltb1->ltb_text);
->  		LASSERT(net != LNET_NIDNET(LNET_NID_ANY));
+>  		/* Already got a route? */
+> -		route = NULL;
+> -		list_for_each(rtmp, &peer->ksnp_routes) {
+> -			route = list_entry(rtmp, struct ksock_route, ksnr_list);
+> -
+> -			if (route->ksnr_ipaddr == newroute->ksnr_ipaddr)
+> -				break;
+> -
+> -			route = NULL;
+> -		}
+> -		if (route)
+> -			continue;
+> +		list_for_each_entry(route, &peer->ksnp_routes, ksnr_list)
+> +			if (route->ksnr_ipaddr != newroute->ksnr_ipaddr)
+> +				goto next_ipaddr;
 >  
-> -		list_for_each(tmp2, &gateways) {
-> -			ltb = list_entry(tmp2, struct lnet_text_buf, ltb_list);
-> -			nid = libcfs_str2nid(ltb->ltb_text);
-> +		list_for_each_entry(ltb2, &gateways, ltb_list) {
-> +			nid = libcfs_str2nid(ltb2->ltb_text);
->  			LASSERT(nid != LNET_NID_ANY);
+>  		best_iface = NULL;
+>  		best_nroutes = 0;
+> @@ -917,17 +908,9 @@ ksocknal_create_routes(struct ksock_peer *peer, int port,
+>  			iface = &net->ksnn_interfaces[j];
 >  
->  			if (lnet_islocalnid(nid)) {
+>  			/* Using this interface already? */
+> -			list_for_each(rtmp, &peer->ksnp_routes) {
+> -				route = list_entry(rtmp, struct ksock_route,
+> -						   ksnr_list);
+> -
+> +			list_for_each_entry(route, &peer->ksnp_routes, ksnr_list)
+>  				if (route->ksnr_myipaddr == iface->ksni_ipaddr)
+> -					break;
+> -
+> -				route = NULL;
+> -			}
+> -			if (route)
+> -				continue;
+> +					goto next_iface;
+>  
+>  			this_netmatch = (!((iface->ksni_ipaddr ^
+>  					   newroute->ksnr_ipaddr) &
+> @@ -942,6 +925,7 @@ ksocknal_create_routes(struct ksock_peer *peer, int port,
+>  			best_iface = iface;
+>  			best_netmatch = this_netmatch;
+>  			best_nroutes = iface->ksni_nroutes;
+> +		next_iface:;
+>  		}
+>  
+>  		if (!best_iface)
+> @@ -952,6 +936,7 @@ ksocknal_create_routes(struct ksock_peer *peer, int port,
+>  
+>  		ksocknal_add_route_locked(peer, newroute);
+>  		newroute = NULL;
+> +	next_ipaddr:;
+>  	}
+>  
+>  	write_unlock_bh(global_lock);
 > 
 > 
 > 
