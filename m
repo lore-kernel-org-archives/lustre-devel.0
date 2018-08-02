@@ -1,11 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 2 Aug 2018 04:10:34 +0100 (BST)
-Subject: [lustre-devel] [PATCH 22/22] lustre: sec_config: convert
- list_for_each_entry_safe() to while(!list_empty())
-In-Reply-To: <153292186151.13840.8095964948258952076.stgit@noble>
+Date: Thu, 2 Aug 2018 04:12:10 +0100 (BST)
+Subject: [lustre-devel] [PATCH 00/22] Lustre: use while loop when
+ emptying a list
+In-Reply-To: <153292153459.13840.17465048403476297915.stgit@noble>
 References: <153292153459.13840.17465048403476297915.stgit@noble>
- <153292186151.13840.8095964948258952076.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1808020410250.5677@casper.infradead.org>
+Message-ID: <alpine.LFD.2.21.1808020410500.5677@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,37 +12,88 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> These loops are removing all elements from a list.
-> So using while(!list_empty()) makes the intent clearer.
+> If you have a list that needs to be emptied, it is best to have a loop
+> like
+>   while (!list_empty(...))
+> 
+> because then it is obvious what the purpose of the loop is.
+> Many places in lustre use
+>   list_for_each_entry_safe()
+> instead, which obscures the purpose.
+> Several of these were from patches which deliberately converted from
+> the while loop the list list_for_each_entry_safe() loop, at least some
+> of which introduced real bugs.
+> 
+> This series reverts all those patches, and then makes other
+> conversions.
+> There are still several places which could be converted, but I got
+> bored...
+> I've particularly converted all where the list_head is a local
+> variable. In these cases it is obviously wrong not to empty the
+> list completely.
+> 
+> For those conversions that I did manual (not reverts) I use
+>   list_first_entry()
+> to get the first entry, rather then list_entry(head->next).
+> Others could be converted as well.
 
-Reviewed-by: James Simmons <jsimmons@infradead.org>
- 
-> Signed-off-by: NeilBrown <neilb@suse.com>
+So much heart burn with these patches. Nice to see them reverted.
+I have tested this patch series but I like Doug or another Lnet
+to review these patches as well.
+
+> 
+> NeilBrown
+> 
+> 
 > ---
->  drivers/staging/lustre/lustre/ptlrpc/sec_config.c |    7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-> index 2389f9a8f534..1844ada6780f 100644
-> --- a/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-> +++ b/drivers/staging/lustre/lustre/ptlrpc/sec_config.c
-> @@ -839,12 +839,13 @@ int sptlrpc_conf_init(void)
->  
->  void sptlrpc_conf_fini(void)
->  {
-> -	struct sptlrpc_conf *conf, *conf_next;
-> +	struct sptlrpc_conf *conf;
->  
->  	mutex_lock(&sptlrpc_conf_lock);
-> -	list_for_each_entry_safe(conf, conf_next, &sptlrpc_confs, sc_list) {
-> +	while (!list_empty(&sptlrpc_confs)) {
-> +		conf = list_first_entry(&sptlrpc_confs,
-> +					struct sptlrpc_conf, sc_list);
->  		sptlrpc_conf_free(conf);
->  	}
-> -	LASSERT(list_empty(&sptlrpc_confs));
->  	mutex_unlock(&sptlrpc_conf_lock);
->  }
+> NeilBrown (22):
+>       Revert "staging: lustre: lnet: api-ni: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: o2iblnd: Use list_for_each_entry_safe in kiblnd_destroy_fmr_pool_list"
+>       Revert "staging: lustre: lnet: o2iblnd: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: lnet: socklnd: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: lnet: socklnd_proto: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: osc_cache: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: lnet: peer: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: lnet: config: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: lnet: router: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: lnet: conrpc: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: lnet: lib-move: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: obdclass: Use list_for_each_entry_safe"
+>       Revert "staging: lustre: lnet: Use list_for_each_entry_safe"
+>       Revert: Staging: lustre: Iterate list using list_for_each_entry
+>       lustre: o2iblnd: convert list_for_each_entry_safe() to while(!list_empty())
+>       lustre: tracefile: convert list_for_each_entry_safe() to while(!list_empty())
+>       lustre: lib-move:  convert list_for_each_entry_safe() to while(!list_empty())
+>       lustre: net_fault: convert list_for_each_entry_safe() to while(!list_empty())
+>       lustre: fld_request: convert list_for_each_entry_safe() to while(!list_empty())
+>       lustre: lov_obd: convert list_for_each_entry_safe() to while(!list_empty())
+>       lustre: ldlm_request: convert list_for_each_entry_safe() to while(!list_empty())
+>       lustre: sec_config: convert list_for_each_entry_safe() to while(!list_empty())
 > 
+> 
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   21 ++++++++++++--------
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   12 ++++++-----
+>  .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    9 +++++----
+>  .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |    5 +++--
+>  .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |    4 ++--
+>  drivers/staging/lustre/lnet/libcfs/tracefile.c     |   12 +++++++----
+>  drivers/staging/lustre/lnet/lnet/api-ni.c          |   10 ++++++----
+>  drivers/staging/lustre/lnet/lnet/config.c          |    5 +++--
+>  drivers/staging/lustre/lnet/lnet/lib-move.c        |   13 +++++++-----
+>  drivers/staging/lustre/lnet/lnet/net_fault.c       |    7 +++++--
+>  drivers/staging/lustre/lnet/lnet/peer.c            |    4 ++--
+>  drivers/staging/lustre/lnet/lnet/router.c          |    4 ++--
+>  drivers/staging/lustre/lnet/selftest/conrpc.c      |    5 +++--
+>  drivers/staging/lustre/lustre/fld/fld_request.c    |    6 ++++--
+>  drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |    6 ++++--
+>  drivers/staging/lustre/lustre/lov/lov_obd.c        |    5 +++--
+>  .../staging/lustre/lustre/obdclass/lustre_peer.c   |    5 +++--
+>  drivers/staging/lustre/lustre/osc/osc_cache.c      |    9 +++++----
+>  drivers/staging/lustre/lustre/ptlrpc/sec_config.c  |    7 ++++---
+>  19 files changed, 87 insertions(+), 62 deletions(-)
+> 
+> --
+> Signature
 > 
 > 
