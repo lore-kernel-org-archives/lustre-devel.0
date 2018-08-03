@@ -1,59 +1,58 @@
 From: NeilBrown <neilb@suse.com>
-Date: Fri, 03 Aug 2018 11:58:12 +1000
-Subject: [lustre-devel] [PATCH 11/31] lustre: lnet: Fix route hops print
-In-Reply-To: <B2852889-F87E-4778-A930-917CD9EB69FF@whamcloud.com>
-References: <1533003983-29311-1-git-send-email-jsimmons@infradead.org>
- <1533003983-29311-12-git-send-email-jsimmons@infradead.org>
- <877elbrpxh.fsf@notabene.neil.brown.name>
- <3C0BF267DA2B2343B6A8D6013E6C43381AAE2A@LAX-EX-MB3.datadirect.datadirectnet.com>
- <87sh3zq634.fsf@notabene.neil.brown.name>
- <3C0BF267DA2B2343B6A8D6013E6C43381AAE41@LAX-EX-MB3.datadirect.datadirectnet.com>
- <878t5qrea2.fsf@notabene.neil.brown.name>
- <3C0BF267DA2B2343B6A8D6013E6C43381AAE75@LAX-EX-MB3.datadirect.datadirectnet.com>
- <87o9elplht.fsf@notabene.neil.brown.name>
- <B2852889-F87E-4778-A930-917CD9EB69FF@whamcloud.com>
-Message-ID: <87a7q4p5xn.fsf@notabene.neil.brown.name>
+Date: Fri, 03 Aug 2018 12:36:26 +1000
+Subject: [lustre-devel] [PATCH 10/22] Revert "staging: lustre: lnet:
+ conrpc: Use list_for_each_entry_safe"
+In-Reply-To: <alpine.LFD.2.21.1808020348550.5677@casper.infradead.org>
+References: <153292153459.13840.17465048403476297915.stgit@noble>
+ <153292186099.13840.6595803769201521471.stgit@noble>
+ <alpine.LFD.2.21.1808020348550.5677@casper.infradead.org>
+Message-ID: <871sbgp45x.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Aug 03 2018, Andreas Dilger wrote:
+On Thu, Aug 02 2018, James Simmons wrote:
 
-> On Aug 1, 2018, at 20:09, NeilBrown <neilb@suse.com> wrote:
+>> This reverts commit a9a6cb4f4693253349358f8163d826eb0cfecfbc.
 >> 
+>> These loops really want to remove everything, and using a
+>>   while(!list_empty())
+>> loop makes this more obvious.
 >> 
->> Once lustre and lnet are part of upstream Linux, what is the value of
->> keeping any of it in the master repo?
->> There would be be a need to keep it only to support old versions of
->> Linux, which will hopefully be less and less over time.
->> It might make sense to backport the upstream-linux code those particular
->> versions where it is needed, and do all development work in upstream
->> Linux, and just backport.
+>> Signed-off-by: NeilBrown <neilb@suse.com>
+>> ---
+>>  drivers/staging/lustre/lnet/selftest/conrpc.c |    5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/drivers/staging/lustre/lnet/selftest/conrpc.c b/drivers/staging/lustre/lnet/selftest/conrpc.c
+>> index 95cbd1a14e1b..3afde0141db5 100644
+>> --- a/drivers/staging/lustre/lnet/selftest/conrpc.c
+>> +++ b/drivers/staging/lustre/lnet/selftest/conrpc.c
+>> @@ -1327,7 +1327,6 @@ lstcon_rpc_cleanup_wait(void)
+>>  {
+>>  	struct lstcon_rpc_trans *trans;
+>>  	struct lstcon_rpc *crpc;
+>> -	struct lstcon_rpc *temp;
+>>  	struct list_head *pacer;
+>>  	struct list_head zlist;
+>>  
+>> @@ -1367,7 +1366,9 @@ lstcon_rpc_cleanup_wait(void)
+>>  
+>>  	spin_unlock(&console_session.ses_rpc_lock);
+>>  
+>> -	list_for_each_entry_safe(crpc, temp, &zlist, crp_link) {
+>> +	while (!list_empty(&zlist)) {
+>> +		crpc = list_entry(zlist.next, lstcon_rpc_t, crp_link);
+>> +
 >
-> I think the main reason is that none of the distros (which is what our
-> customers use) will be running an upstream kernel for years after the
-> client and later the server have landed upsteam.  Also, since the
-> upstream kernel doesn't allow any kind of interoperability code,
-> backporting the upstream client to the older kernels will essentially
-> involve recreating all of the interop code that lives in the out-of-tree
-> client and server today, since there are a thousand small API changes
-> going into the kernel that affect the Lustre code.
->
-> I suspect there will be at least a couple of years of overlap, until
-> we start seeing the distro kernels including a version of Lustre, then
-> we can deprecate to out-of-tree code and only keep it maintained for
-> older kernels, as happens today for older Lustre releases.
+> Nak. This one needs to be updated to. The typedef lstcon_rpc_t no longer
+> exist. Now you need to use struct lstcon_rpc.
 
-Yes, there will be overlap.  It would be worth some effort to minimize
-that if we can.
-Once we have something credible in mainline, I'd like to encourage
-vendors to take a back-port of that, at least for their next SP.
-Hopefully we can then do development against mainline, and backport that
-to whatever still needs to be supported by out-of-tree code.
+Clearly I wasn't compiled with CONFIG_LNET_SELFTEST enabled.  I am now.
+Thanks - I've added all your Reviewed-bys.
 
-Thanks,
 NeilBrown
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -61,4 +60,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180803/2f9475c5/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180803/dfa2a1d9/attachment.sig>
