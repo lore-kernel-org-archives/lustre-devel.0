@@ -1,11 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Fri, 17 Aug 2018 14:24:09 +1000
-Subject: [lustre-devel] [PATCH 01/38] lustre: llite: rename
- ldebugfs_[un]register_mountpoint
-In-Reply-To: <1534475441-15543-2-git-send-email-jsimmons@infradead.org>
+Date: Fri, 17 Aug 2018 14:27:00 +1000
+Subject: [lustre-devel] [PATCH 04/38] lustre: llite: remove ll_sb
+In-Reply-To: <1534475441-15543-5-git-send-email-jsimmons@infradead.org>
 References: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
- <1534475441-15543-2-git-send-email-jsimmons@infradead.org>
-Message-ID: <87d0uhsjrq.fsf@notabene.neil.brown.name>
+ <1534475441-15543-5-git-send-email-jsimmons@infradead.org>
+Message-ID: <87a7plsjmz.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,32 +13,43 @@ To: lustre-devel@lists.lustre.org
 
 On Thu, Aug 16 2018, James Simmons wrote:
 
-> Rename from ldebugfs_[un]register_mountpoint() to
-> ll_debugfs_[un]register_super().
+> The only user of ll_sb in struct ll_sb_info is used to query the
+> name locate in the file_system_type. We can get that information
+> from using the super block located in struct path instead. This
+> enables us to use struct ll_sb_info directly for every sysfs or
+> debugfs entry.
+>
+....
 
-I really helps with review if I am told *why* something is happening.
+> @@ -215,7 +216,7 @@ static ssize_t fstype_show(struct kobject *kobj, struct attribute *attr,
+>  	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+>  					      ll_kobj);
+>  
+> -	return sprintf(buf, "%s\n", sbi->ll_sb->s_type->name);
+> +	return sprintf(buf, "%s\n", sbi->ll_mnt.mnt->mnt_sb->s_type->name);
 
-I can guess, but being told means I'm less concerned that I might have
-missed something.
+ll_mnt ??? What is that, why is it a better thing to keep than ll_sb.
+(looks at code).
 
-I can see that "mountpoint" is an inappropriate name, though I'm not
-entired sure that "super" is a better now.  Surely this code is
-registering an filesystem (instance) with debugfs.... maybe a "super" is
-exactly a "filesystem instance"....
-
-Why is ll_debugfs better than ldebugfs?  More typing doesn't usually
-thrill me.
-
-
-I don't really care about this particular change - it seems innocuous.
-I do really care about good change logs.
+The code takes a copy of a vfsmnt and a dentry (a path) without
+increasing the refcount on either??? Why did someone think that was a
+sane thing to do?
+Have you plans to get rid of ll_mnt too (I hope)??
 
 Thanks,
 NeilBrown
+
+
+
+>  }
+>  LUSTRE_RO_ATTR(fstype);
+>  
+> -- 
+> 1.8.3.1
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180817/81ed97d5/attachment-0001.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180817/1375c9bf/attachment.sig>
