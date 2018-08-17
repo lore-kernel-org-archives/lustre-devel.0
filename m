@@ -1,94 +1,108 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 16 Aug 2018 23:10:04 -0400
-Subject: [lustre-devel] [PATCH 01/38] lustre: llite: rename
- ldebugfs_[un]register_mountpoint
-In-Reply-To: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
-References: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1534475441-15543-2-git-send-email-jsimmons@infradead.org>
+Date: Thu, 16 Aug 2018 23:10:03 -0400
+Subject: [lustre-devel] [PATCH 00/38] lustre: fixes for sysfs handling
+Message-ID: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Rename from ldebugfs_[un]register_mountpoint() to
-ll_debugfs_[un]register_super().
+The port to sysfs upstream was done in haste and without any support
+in the utilies to even test it. Now the user land tools do work with
+the sysfs / debugfs port and many problems were exposed. This patch
+series fixes some of the largest holes which brings back some basic
+lustre functionality for the users. One special note to users you
+need to add the following udev rule to allowing tuning to work
+automatically with testing.
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
-Reviewed-on: https://review.whamcloud.com/24031
-Reviewed-by: Bobi Jam <bobijam@hotmail.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- drivers/staging/lustre/lustre/llite/llite_internal.h | 6 +++---
- drivers/staging/lustre/lustre/llite/llite_lib.c      | 4 ++--
- drivers/staging/lustre/lustre/llite/lproc_llite.c    | 6 +++---
- 3 files changed, 8 insertions(+), 8 deletions(-)
+SUBSYSTEM=="lustre", ACTION=="change", ENV{PARAM}=="?*", RUN+="/usr/sbin/lctl set_param '$env{PARAM}=$env{SETTING}'"
 
-diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 6ed7034..b2cdf75 100644
---- a/drivers/staging/lustre/lustre/llite/llite_internal.h
-+++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -675,9 +675,9 @@ int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
- void cl_put_grouplock(struct ll_grouplock *cg);
- 
- /* llite/lproc_llite.c */
--int ldebugfs_register_mountpoint(struct dentry *parent,
--				 struct super_block *sb, char *osc, char *mdc);
--void ldebugfs_unregister_mountpoint(struct ll_sb_info *sbi);
-+int ll_debugfs_register_super(struct dentry *parent,
-+			      struct super_block *sb, char *osc, char *mdc);
-+void ll_debugfs_unregister_super(struct ll_sb_info *sbi);
- void ll_stats_ops_tally(struct ll_sb_info *sbi, int op, int count);
- void lprocfs_llite_init_vars(struct lprocfs_static_vars *lvars);
- void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index fb3bc16..50ea5fb 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -573,7 +573,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
- 	kfree(osfs);
- 
- 	if (llite_root) {
--		err = ldebugfs_register_mountpoint(llite_root, sb, dt, md);
-+		err = ll_debugfs_register_super(llite_root, sb, dt, md);
- 		if (err < 0) {
- 			CERROR("%s: could not register mount in debugfs: "
- 			       "rc = %d\n", ll_get_fsname(sb, NULL, 0), err);
-@@ -679,7 +679,7 @@ static void client_common_put_super(struct super_block *sb)
- 	obd_disconnect(sbi->ll_dt_exp);
- 	sbi->ll_dt_exp = NULL;
- 
--	ldebugfs_unregister_mountpoint(sbi);
-+	ll_debugfs_unregister_super(sbi);
- 
- 	obd_fid_fini(sbi->ll_md_exp->exp_obd);
- 	obd_disconnect(sbi->ll_md_exp);
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 617aabb..996703d 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -1175,8 +1175,8 @@ void ll_stats_ops_tally(struct ll_sb_info *sbi, int op, int count)
- 	[RA_STAT_FAILED_REACH_END] = "failed to reach end"
- };
- 
--int ldebugfs_register_mountpoint(struct dentry *parent,
--				 struct super_block *sb, char *osc, char *mdc)
-+int ll_debugfs_register_super(struct dentry *parent,
-+			      struct super_block *sb, char *osc, char *mdc)
- {
- 	struct lustre_sb_info *lsi = s2lsi(sb);
- 	struct ll_sb_info *sbi = ll_s2sbi(sb);
-@@ -1285,7 +1285,7 @@ int ldebugfs_register_mountpoint(struct dentry *parent,
- 	return err;
- }
- 
--void ldebugfs_unregister_mountpoint(struct ll_sb_info *sbi)
-+void ll_debugfs_unregister_super(struct ll_sb_info *sbi)
- {
- 	debugfs_remove_recursive(sbi->ll_debugfs_entry);
- 	kobject_put(&sbi->ll_kobj);
+Andreas Dilger (1):
+  lustre: llite: add newline to llite.*.offset_stats
+
+Bruno Faccini (1):
+  lustre: osc: enhance end to end bulk cksum error report
+
+Emoly Liu (1):
+  lustre: llite: register mountpoint before process llog
+
+James Simmons (33):
+  lustre: llite: rename ldebugfs_[un]register_mountpoint
+  lustre: llite: change ll_statfs_internal to use struct ll_sb_info
+  lustre: llite: move llite_root and llite_kset to lproc_llite.c
+  lustre: llite: remove ll_sb
+  lustre: llite: change top kobject for llite into a kset
+  lustre: llite: rename llite_sb_release
+  lustre: llite: move lmd_profile handling
+  lustre: llite: add proper error handling for
+    ll_debugfs_register_super()
+  lustre: llite: use C99 for struct lprocfs_llite_obd_vars
+  lustre: llite: don't handle success case for blocksize sysfs code
+  lustre: llite: don't handle success case for kbyte* sysfs code
+  lustre: llite: don't handle success case for file* sysfs code
+  lustre: llite: user kstrtobool for some sysfs handling
+  lustre: obd: embedded struct lprocfs_vars in obd device
+  lustre: obdclass: swap obd device attrs and default_attrs
+  lustre: obdclass: embedded attributes in struct obd_device
+  lustre: obdclass: add light weight obd_def_uuid_attrs
+  lustre: obd: migrate to ksets
+  lustre: obd: create class_setup_tunables() function
+  lustre: obd: create conn_uuid sysfs file
+  lustre: obd: enhance print_lustre_cfg()
+  lustre: obd: merge both top lustre sysfs attributes
+  lustre: obd: resolve config log sysfs issues
+  lustre: obd: move ioctl handling to class_obd.c
+  lustre: llite: replace ll_process_config with class_modify_config
+  lustre: mgc: update sysfs handling
+  lustre: osc: fixup kstrto* for sysfs handling
+  lustre: osc: restore cl_loi_list_lock
+  lustre: osc: make unstable_stats a debugfs file
+  lustre: osc: update sysfs handling
+  lustre: lmv: update sysfs handling
+  lustre: lov: update sysfs handling
+  lustre: mdc: update sysfs handling
+
+Steve Guminski (2):
+  lustre: llite: create ll_stats_pid_write()
+  lustre: llite: improve sysfs file text in lproc_llite.c
+
+ drivers/staging/lustre/lnet/libcfs/debug.c         |   1 +
+ .../staging/lustre/lustre/include/lprocfs_status.h |  12 +-
+ .../staging/lustre/lustre/include/lustre_disk.h    |   2 +
+ drivers/staging/lustre/lustre/include/obd.h        |  17 +-
+ drivers/staging/lustre/lustre/include/obd_class.h  |  10 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    |   2 +-
+ .../staging/lustre/lustre/llite/llite_internal.h   |  21 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    | 137 ++++---
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  | 442 +++++++++++----------
+ drivers/staging/lustre/lustre/llite/super25.c      |  28 +-
+ drivers/staging/lustre/lustre/lmv/lmv_internal.h   |   4 +-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  26 +-
+ drivers/staging/lustre/lustre/lmv/lproc_lmv.c      |  58 +--
+ drivers/staging/lustre/lustre/lov/lov_internal.h   |   3 +-
+ drivers/staging/lustre/lustre/lov/lov_obd.c        |  51 +--
+ drivers/staging/lustre/lustre/lov/lproc_lov.c      | 219 +++++-----
+ drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |  94 +++--
+ drivers/staging/lustre/lustre/mdc/mdc_internal.h   |   2 +-
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    |  37 +-
+ drivers/staging/lustre/lustre/mgc/lproc_mgc.c      |  45 ++-
+ drivers/staging/lustre/lustre/mgc/mgc_internal.h   |   2 +-
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    |  11 +-
+ drivers/staging/lustre/lustre/obdclass/Makefile    |   2 +-
+ drivers/staging/lustre/lustre/obdclass/class_obd.c | 209 +++++++++-
+ drivers/staging/lustre/lustre/obdclass/genops.c    |  47 ++-
+ drivers/staging/lustre/lustre/obdclass/llog_swab.c |  12 +-
+ .../lustre/lustre/obdclass/lprocfs_status.c        | 111 ++++--
+ .../staging/lustre/lustre/obdclass/obd_config.c    | 213 +++++++---
+ .../lustre/obdclass/{module.c => obd_sysfs.c}      | 293 +++++---------
+ drivers/staging/lustre/lustre/obdclass/sysctl.c    | 162 --------
+ drivers/staging/lustre/lustre/osc/lproc_osc.c      | 252 ++++++++----
+ drivers/staging/lustre/lustre/osc/osc_internal.h   |   3 +-
+ drivers/staging/lustre/lustre/osc/osc_request.c    | 174 +++++---
+ 33 files changed, 1503 insertions(+), 1199 deletions(-)
+ rename drivers/staging/lustre/lustre/obdclass/{module.c => obd_sysfs.c} (57%)
+ delete mode 100644 drivers/staging/lustre/lustre/obdclass/sysctl.c
+
 -- 
 1.8.3.1
