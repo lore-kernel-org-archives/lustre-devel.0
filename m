@@ -1,20 +1,19 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 16 Aug 2018 23:10:05 -0400
-Subject: [lustre-devel] [PATCH 02/38] lustre: llite: change
- ll_statfs_internal to use struct ll_sb_info
+Date: Thu, 16 Aug 2018 23:10:11 -0400
+Subject: [lustre-devel] [PATCH 08/38] lustre: llite: move lmd_profile
+ handling
 In-Reply-To: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
 References: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1534475441-15543-3-git-send-email-jsimmons@infradead.org>
+Message-ID: <1534475441-15543-9-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The only reason ll_statfs_internal() needs struct super_block is
-for the super block magic. We can use LL_SUPER_MAGIC directly
-thus removing the need to pass in struct super_block. This will
-help to remove ll_sb in struct ll_sb_info.
+The function ll_debugfs_register_super() should only handling
+sysfs related things so move the lmd_profile parsing out of
+that function.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
@@ -24,118 +23,103 @@ Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/llite_internal.h |  4 ++--
- drivers/staging/lustre/lustre/llite/llite_lib.c      |  9 ++++-----
- drivers/staging/lustre/lustre/llite/lproc_llite.c    | 12 ++++++------
- 3 files changed, 12 insertions(+), 13 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_internal.h |  2 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c      | 17 ++++++++++++++++-
+ drivers/staging/lustre/lustre/llite/lproc_llite.c    | 18 ++----------------
+ 3 files changed, 19 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index b2cdf75..4053314 100644
+index 9e60c5e..1130ea3 100644
 --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
 +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -832,8 +832,8 @@ int ll_setattr_raw(struct dentry *dentry, struct iattr *attr,
- 		   unsigned int xvalid, bool hsm_import);
- int ll_setattr(struct dentry *de, struct iattr *attr);
- int ll_statfs(struct dentry *de, struct kstatfs *sfs);
--int ll_statfs_internal(struct super_block *sb, struct obd_statfs *osfs,
--		       __u64 max_age, __u32 flags);
-+int ll_statfs_internal(struct ll_sb_info *sbi, struct obd_statfs *osfs,
-+		       u64 max_age, u32 flags);
- int ll_update_inode(struct inode *inode, struct lustre_md *md);
- int ll_read_inode2(struct inode *inode, void *opaque);
- void ll_delete_inode(struct inode *inode);
+@@ -677,7 +677,7 @@ int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
+ void cl_put_grouplock(struct ll_grouplock *cg);
+ 
+ /* llite/lproc_llite.c */
+-int ll_debugfs_register_super(struct super_block *sb);
++int ll_debugfs_register_super(struct super_block *sb, const char *name);
+ void ll_debugfs_unregister_super(struct ll_sb_info *sbi);
+ void ll_stats_ops_tally(struct ll_sb_info *sbi, int op, int count);
+ void lprocfs_llite_init_vars(struct lprocfs_static_vars *lvars);
 diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 50ea5fb..437f4cc 100644
+index 95568b7..ce072da 100644
 --- a/drivers/staging/lustre/lustre/llite/llite_lib.c
 +++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -1643,10 +1643,9 @@ int ll_setattr(struct dentry *de, struct iattr *attr)
- 	return ll_setattr_raw(de, attr, xvalid, false);
+@@ -909,6 +909,8 @@ void ll_lli_init(struct ll_inode_info *lli)
+ 	memset(lli->lli_jobid, 0, LUSTRE_JOBID_SIZE);
  }
  
--int ll_statfs_internal(struct super_block *sb, struct obd_statfs *osfs,
--		       __u64 max_age, __u32 flags)
-+int ll_statfs_internal(struct ll_sb_info *sbi, struct obd_statfs *osfs,
-+		       u64 max_age, u32 flags)
++#define MAX_STRING_SIZE 128
++
+ int ll_fill_super(struct super_block *sb)
  {
--	struct ll_sb_info *sbi = ll_s2sbi(sb);
- 	struct obd_statfs obd_osfs;
- 	int rc;
+ 	struct lustre_profile *lprof = NULL;
+@@ -917,6 +919,9 @@ int ll_fill_super(struct super_block *sb)
+ 	char  *dt = NULL, *md = NULL;
+ 	char  *profilenm = get_profile_name(sb);
+ 	struct config_llog_instance *cfg;
++	char name[MAX_STRING_SIZE];
++	char *ptr;
++	int len;
+ 	int    err;
+ 	static atomic_t ll_bdi_num = ATOMIC_INIT(0);
  
-@@ -1656,7 +1655,7 @@ int ll_statfs_internal(struct super_block *sb, struct obd_statfs *osfs,
- 		return rc;
- 	}
+@@ -951,10 +956,20 @@ int ll_fill_super(struct super_block *sb)
+ 	/* kernel >= 2.6.38 store dentry operations in sb->s_d_op. */
+ 	sb->s_d_op = &ll_d_ops;
  
--	osfs->os_type = sb->s_magic;
-+	osfs->os_type = LL_SUPER_MAGIC;
- 
- 	CDEBUG(D_SUPER, "MDC blocks %llu/%llu objects %llu/%llu\n",
- 	       osfs->os_bavail, osfs->os_blocks, osfs->os_ffree,
-@@ -1703,7 +1702,7 @@ int ll_statfs(struct dentry *de, struct kstatfs *sfs)
- 	ll_stats_ops_tally(ll_s2sbi(sb), LPROC_LL_STAFS, 1);
- 
- 	/* Some amount of caching on the client is allowed */
--	rc = ll_statfs_internal(sb, &osfs,
-+	rc = ll_statfs_internal(ll_s2sbi(sb), &osfs,
- 				get_jiffies_64() - OBD_STATFS_CACHE_SECONDS * HZ,
- 				0);
- 	if (rc)
++	/* Get fsname */
++	len = strlen(lsi->lsi_lmd->lmd_profile);
++	ptr = strrchr(lsi->lsi_lmd->lmd_profile, '-');
++	if (ptr && (strcmp(ptr, "-client") == 0))
++		len -= 7;
++
++	/* Mount info */
++	snprintf(name, MAX_STRING_SIZE, "%.*s-%p", len,
++		 lsi->lsi_lmd->lmd_profile, sb);
++
+ 	/* Call ll_debugsfs_register_super() before lustre_process_log()
+ 	 * so that "llite.*.*" params can be processed correctly.
+ 	 */
+-	err = ll_debugfs_register_super(sb);
++	err = ll_debugfs_register_super(sb, name);
+ 	if (err < 0) {
+ 		CERROR("%s: could not register mountpoint in llite: rc = %d\n",
+ 		       ll_get_fsname(sb, NULL, 0), err);
 diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 996703d..cae483f 100644
+index 868c9b0..4186a8d 100644
 --- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
 +++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -52,7 +52,7 @@ static ssize_t blocksize_show(struct kobject *kobj, struct attribute *attr,
- 	struct obd_statfs osfs;
- 	int rc;
+@@ -1227,28 +1227,14 @@ void ll_stats_ops_tally(struct ll_sb_info *sbi, int op, int count)
+ 	[RA_STAT_FAILED_REACH_END] = "failed to reach end"
+ };
  
--	rc = ll_statfs_internal(sbi->ll_sb, &osfs,
-+	rc = ll_statfs_internal(sbi, &osfs,
- 				get_jiffies_64() - OBD_STATFS_CACHE_SECONDS * HZ,
- 				OBD_STATFS_NODELAY);
- 	if (!rc)
-@@ -70,7 +70,7 @@ static ssize_t kbytestotal_show(struct kobject *kobj, struct attribute *attr,
- 	struct obd_statfs osfs;
- 	int rc;
+-int ll_debugfs_register_super(struct super_block *sb)
++int ll_debugfs_register_super(struct super_block *sb, const char *name)
+ {
+-	struct lustre_sb_info *lsi = s2lsi(sb);
+ 	struct ll_sb_info *sbi = ll_s2sbi(sb);
+ 	struct dentry *dir;
+-	char name[MAX_STRING_SIZE + 1], *ptr;
+-	int err, id, len;
+-
+-	name[MAX_STRING_SIZE] = '\0';
++	int err, id;
  
--	rc = ll_statfs_internal(sbi->ll_sb, &osfs,
-+	rc = ll_statfs_internal(sbi, &osfs,
- 				get_jiffies_64() - OBD_STATFS_CACHE_SECONDS * HZ,
- 				OBD_STATFS_NODELAY);
- 	if (!rc) {
-@@ -95,7 +95,7 @@ static ssize_t kbytesfree_show(struct kobject *kobj, struct attribute *attr,
- 	struct obd_statfs osfs;
- 	int rc;
+ 	LASSERT(sbi);
  
--	rc = ll_statfs_internal(sbi->ll_sb, &osfs,
-+	rc = ll_statfs_internal(sbi, &osfs,
- 				get_jiffies_64() - OBD_STATFS_CACHE_SECONDS * HZ,
- 				OBD_STATFS_NODELAY);
- 	if (!rc) {
-@@ -120,7 +120,7 @@ static ssize_t kbytesavail_show(struct kobject *kobj, struct attribute *attr,
- 	struct obd_statfs osfs;
- 	int rc;
+-	/* Get fsname */
+-	len = strlen(lsi->lsi_lmd->lmd_profile);
+-	ptr = strrchr(lsi->lsi_lmd->lmd_profile, '-');
+-	if (ptr && (strcmp(ptr, "-client") == 0))
+-		len -= 7;
+-
+-	/* Mount info */
+-	snprintf(name, MAX_STRING_SIZE, "%.*s-%p", len,
+-		 lsi->lsi_lmd->lmd_profile, sb);
+-
+ 	dir = debugfs_create_dir(name, llite_root);
+ 	sbi->ll_debugfs_entry = dir;
  
--	rc = ll_statfs_internal(sbi->ll_sb, &osfs,
-+	rc = ll_statfs_internal(sbi, &osfs,
- 				get_jiffies_64() - OBD_STATFS_CACHE_SECONDS * HZ,
- 				OBD_STATFS_NODELAY);
- 	if (!rc) {
-@@ -145,7 +145,7 @@ static ssize_t filestotal_show(struct kobject *kobj, struct attribute *attr,
- 	struct obd_statfs osfs;
- 	int rc;
- 
--	rc = ll_statfs_internal(sbi->ll_sb, &osfs,
-+	rc = ll_statfs_internal(sbi, &osfs,
- 				get_jiffies_64() - OBD_STATFS_CACHE_SECONDS * HZ,
- 				OBD_STATFS_NODELAY);
- 	if (!rc)
-@@ -163,7 +163,7 @@ static ssize_t filesfree_show(struct kobject *kobj, struct attribute *attr,
- 	struct obd_statfs osfs;
- 	int rc;
- 
--	rc = ll_statfs_internal(sbi->ll_sb, &osfs,
-+	rc = ll_statfs_internal(sbi, &osfs,
- 				get_jiffies_64() - OBD_STATFS_CACHE_SECONDS * HZ,
- 				OBD_STATFS_NODELAY);
- 	if (!rc)
 -- 
 1.8.3.1
