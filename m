@@ -1,141 +1,166 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Thu, 16 Aug 2018 23:10:19 -0400
-Subject: [lustre-devel] [PATCH 16/38] lustre: llite: user kstrtobool for
- some sysfs handling
+Date: Thu, 16 Aug 2018 23:10:24 -0400
+Subject: [lustre-devel] [PATCH 21/38] lustre: obdclass: add light weight
+ obd_def_uuid_attrs
 In-Reply-To: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
 References: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1534475441-15543-17-git-send-email-jsimmons@infradead.org>
+Message-ID: <1534475441-15543-22-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Some of the llite sysfs files only allow 1 or 0 which was
-retrieved with kstrtoul(). A much better fit would be to
-use kstrtobool(). This adds 'Y' or 'N' as valid options
-as well.
+It was assumed that all obd devices supported every attribute
+in obd_def_attrs but that is not true. Several obd devices only
+have a uuid sysfs file. Add an option to lprocfs_obd_setup()
+to select the proper obd_def_attrs.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9325
-Reviewed-on: https://review.whamcloud.com/30539
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Ben Evans <bevans@cray.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
+Reviewed-on: https://review.whamcloud.com/26020
+Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Reviewed-by: Fan Yong <fan.yong@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/llite/lproc_llite.c | 33 ++++++++++++-----------
- 1 file changed, 17 insertions(+), 16 deletions(-)
+ .../staging/lustre/lustre/include/lprocfs_status.h    |  2 +-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c           |  2 +-
+ drivers/staging/lustre/lustre/lov/lov_obd.c           |  2 +-
+ drivers/staging/lustre/lustre/mdc/mdc_request.c       |  2 +-
+ drivers/staging/lustre/lustre/mgc/mgc_request.c       |  2 +-
+ .../staging/lustre/lustre/obdclass/lprocfs_status.c   | 19 ++++++++++++++++---
+ drivers/staging/lustre/lustre/osc/osc_request.c       |  2 +-
+ 7 files changed, 22 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 02a09e7..e35b3ea 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -593,25 +593,28 @@ static ssize_t checksum_pages_store(struct kobject *kobj,
- {
- 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
- 					      ll_kset.kobj);
-+	bool val;
-+	int tmp;
- 	int rc;
--	unsigned long val;
+diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+index 358ace3..f428ce0 100644
+--- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
++++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+@@ -453,7 +453,7 @@ void lprocfs_counter_init(struct lprocfs_stats *stats, int index,
+ void ldebugfs_add_vars(struct dentry *parent, struct lprocfs_vars *var,
+ 		       void *data);
  
- 	if (!sbi->ll_dt_exp)
- 		/* Not set up yet */
- 		return -EAGAIN;
+-int lprocfs_obd_setup(struct obd_device *obd);
++int lprocfs_obd_setup(struct obd_device *obd, bool uuid_only);
+ int lprocfs_obd_cleanup(struct obd_device *obd);
  
--	rc = kstrtoul(buffer, 10, &val);
-+	rc = kstrtobool(buffer, &val);
- 	if (rc)
- 		return rc;
+ /* Generic callbacks */
+diff --git a/drivers/staging/lustre/lustre/lmv/lmv_obd.c b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+index 212ca31..c36ecb7 100644
+--- a/drivers/staging/lustre/lustre/lmv/lmv_obd.c
++++ b/drivers/staging/lustre/lustre/lmv/lmv_obd.c
+@@ -1255,7 +1255,7 @@ static int lmv_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 
+ 	lprocfs_lmv_init_vars(obd);
+ 
+-	lprocfs_obd_setup(obd);
++	lprocfs_obd_setup(obd, true);
+ 	debugfs_create_file("target_obd", 0444, obd->obd_debugfs_entry, obd,
+ 			    &lmv_proc_target_fops);
+ 	rc = fld_client_init(&lmv->lmv_fld, obd->obd_name,
+diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
+index 43ebec6..751bf64 100644
+--- a/drivers/staging/lustre/lustre/lov/lov_obd.c
++++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
+@@ -769,7 +769,7 @@ int lov_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 		goto out;
+ 
+ 	lprocfs_lov_init_vars(obd);
+-	lprocfs_obd_setup(obd);
++	lprocfs_obd_setup(obd, false);
+ 
+ 	debugfs_create_file("target_obd", 0444, obd->obd_debugfs_entry, obd,
+ 			    &lov_proc_target_fops);
+diff --git a/drivers/staging/lustre/lustre/mdc/mdc_request.c b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+index a3c0461f..fcba599 100644
+--- a/drivers/staging/lustre/lustre/mdc/mdc_request.c
++++ b/drivers/staging/lustre/lustre/mdc/mdc_request.c
+@@ -2648,7 +2648,7 @@ static int mdc_setup(struct obd_device *obd, struct lustre_cfg *cfg)
+ 		goto err_ptlrpcd_decref;
+ 
+ 	lprocfs_mdc_init_vars(obd);
+-	lprocfs_obd_setup(obd);
++	lprocfs_obd_setup(obd, false);
+ 	sptlrpc_lprocfs_cliobd_attach(obd);
+ 	ptlrpc_lprocfs_register_obd(obd);
+ 
+diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+index 46b1e36..50da9cf 100644
+--- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
++++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
+@@ -748,7 +748,7 @@ static int mgc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 	}
+ 
+ 	lprocfs_mgc_init_vars(obd);
+-	lprocfs_obd_setup(obd);
++	lprocfs_obd_setup(obd, true);
+ 	sptlrpc_lprocfs_cliobd_attach(obd);
+ 
+ 	if (atomic_inc_return(&mgc_count) == 1) {
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index a5676ff..91d37fc 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -989,6 +989,11 @@ int lprocfs_rd_connect_flags(struct seq_file *m, void *data)
+ }
+ EXPORT_SYMBOL(lprocfs_rd_connect_flags);
+ 
++static const struct attribute *obd_def_uuid_attrs[] = {
++	&lustre_attr_uuid.attr,
++	NULL,
++};
 +
- 	spin_lock(&sbi->ll_lock);
- 	if (val)
- 		sbi->ll_flags |= LL_SBI_CHECKSUM;
- 	else
- 		sbi->ll_flags &= ~LL_SBI_CHECKSUM;
- 	spin_unlock(&sbi->ll_lock);
-+	tmp = val;
+ static const struct attribute *obd_def_attrs[] = {
+ 	&lustre_attr_blocksize.attr,
+ 	&lustre_attr_kbytestotal.attr,
+@@ -1008,7 +1013,7 @@ static void obd_sysfs_release(struct kobject *kobj)
+ 	complete(&obd->obd_kobj_unregister);
+ }
  
- 	rc = obd_set_info_async(NULL, sbi->ll_dt_exp, sizeof(KEY_CHECKSUM),
--				KEY_CHECKSUM, sizeof(val), &val, NULL);
-+				KEY_CHECKSUM, sizeof(tmp), &tmp, NULL);
- 	if (rc)
- 		CWARN("Failed to set OSC checksum flags: %d\n", rc);
- 
-@@ -753,10 +756,10 @@ static ssize_t statahead_agl_store(struct kobject *kobj,
+-int lprocfs_obd_setup(struct obd_device *obd)
++int lprocfs_obd_setup(struct obd_device *obd, bool uuid_only)
  {
- 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
- 					      ll_kset.kobj);
-+	bool val;
  	int rc;
--	unsigned long val;
  
--	rc = kstrtoul(buffer, 10, &val);
-+	rc = kstrtobool(buffer, &val);
+@@ -1022,7 +1027,12 @@ int lprocfs_obd_setup(struct obd_device *obd)
  	if (rc)
  		return rc;
  
-@@ -805,10 +808,10 @@ static ssize_t lazystatfs_store(struct kobject *kobj,
- {
- 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
- 					      ll_kset.kobj);
-+	bool val;
- 	int rc;
--	unsigned long val;
- 
--	rc = kstrtoul(buffer, 10, &val);
-+	rc = kstrtobool(buffer, &val);
- 	if (rc)
+-	rc = sysfs_create_files(&obd->obd_kobj, obd_def_attrs);
++	if (uuid_only)
++		obd->obd_attrs = obd_def_uuid_attrs;
++	else
++		obd->obd_attrs = obd_def_attrs;
++
++	rc = sysfs_create_files(&obd->obd_kobj, obd->obd_attrs);
+ 	if (rc) {
+ 		kobject_put(&obd->obd_kobj);
  		return rc;
+@@ -1043,7 +1053,10 @@ int lprocfs_obd_cleanup(struct obd_device *obd)
  
-@@ -948,17 +951,14 @@ static ssize_t xattr_cache_store(struct kobject *kobj,
- {
- 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
- 					      ll_kset.kobj);
-+	bool val;
- 	int rc;
--	unsigned long val;
+ 	debugfs_remove_recursive(obd->obd_debugfs_entry);
  
--	rc = kstrtoul(buffer, 10, &val);
-+	rc = kstrtobool(buffer, &val);
- 	if (rc)
- 		return rc;
+-	sysfs_remove_files(&obd->obd_kobj, obd_def_attrs);
++	if (obd->obd_attrs) {
++		sysfs_remove_files(&obd->obd_kobj, obd->obd_attrs);
++		obd->obd_attrs = NULL;
++	}
  
--	if (val != 0 && val != 1)
--		return -ERANGE;
--
--	if (val == 1 && !(sbi->ll_flags & LL_SBI_XATTR_CACHE))
-+	if (val && !(sbi->ll_flags & LL_SBI_XATTR_CACHE))
- 		return -ENOTSUPP;
+ 	kobject_put(&obd->obd_kobj);
+ 	wait_for_completion(&obd->obd_kobj_unregister);
+diff --git a/drivers/staging/lustre/lustre/osc/osc_request.c b/drivers/staging/lustre/lustre/osc/osc_request.c
+index 0472165..4f57a8e 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_request.c
++++ b/drivers/staging/lustre/lustre/osc/osc_request.c
+@@ -2804,7 +2804,7 @@ int osc_setup(struct obd_device *obd, struct lustre_cfg *lcfg)
+ 	cli->cl_grant_shrink_interval = GRANT_SHRINK_INTERVAL;
  
- 	sbi->ll_xattr_cache_enabled = val;
-@@ -1030,7 +1030,8 @@ static ssize_t ll_unstable_stats_seq_write(struct file *file,
- 	struct super_block *sb = ((struct seq_file *)file->private_data)->private;
- 	struct ll_sb_info *sbi = ll_s2sbi(sb);
- 	char kernbuf[128];
--	int val, rc;
-+	bool val;
-+	int rc;
- 
- 	if (!count)
- 		return 0;
-@@ -1043,13 +1044,13 @@ static ssize_t ll_unstable_stats_seq_write(struct file *file,
- 
- 	buffer += lprocfs_find_named_value(kernbuf, "unstable_check:", &count) -
- 		  kernbuf;
--	rc = lprocfs_write_helper(buffer, count, &val);
-+	rc = kstrtobool_from_user(buffer, count, &val);
- 	if (rc < 0)
- 		return rc;
- 
- 	/* borrow lru lock to set the value */
- 	spin_lock(&sbi->ll_cache->ccc_lru_lock);
--	sbi->ll_cache->ccc_unstable_check = !!val;
-+	sbi->ll_cache->ccc_unstable_check = val;
- 	spin_unlock(&sbi->ll_cache->ccc_lru_lock);
- 
- 	return count;
+ 	lprocfs_osc_init_vars(obd);
+-	if (lprocfs_obd_setup(obd) == 0) {
++	if (lprocfs_obd_setup(obd, false) == 0) {
+ 		lproc_osc_attach_seqstat(obd);
+ 		sptlrpc_lprocfs_cliobd_attach(obd);
+ 		ptlrpc_lprocfs_register_obd(obd);
 -- 
 1.8.3.1
