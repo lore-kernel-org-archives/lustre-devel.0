@@ -1,75 +1,52 @@
 From: Andreas Dilger <adilger@whamcloud.com>
-Date: Sat, 18 Aug 2018 05:10:05 +0000
-Subject: [lustre-devel] [PATCH 32/38] lustre: osc: restore
- cl_loi_list_lock
-In-Reply-To: <483E9D1A-7BC8-4492-B3F4-1E4D572C3562@whamcloud.com>
+Date: Sat, 18 Aug 2018 05:12:57 +0000
+Subject: [lustre-devel] [PATCH 04/38] lustre: llite: remove ll_sb
+In-Reply-To: <alpine.LFD.2.21.1808180123580.2829@casper.infradead.org>
 References: <1534475441-15543-1-git-send-email-jsimmons@infradead.org>
- <1534475441-15543-33-git-send-email-jsimmons@infradead.org>
- <87sh3dqwkm.fsf@notabene.neil.brown.name>
- <alpine.LFD.2.21.1808180136341.2829@casper.infradead.org>
- <483E9D1A-7BC8-4492-B3F4-1E4D572C3562@whamcloud.com>
-Message-ID: <93D762CF-52EE-4514-A422-C48A0448C78D@whamcloud.com>
+ <1534475441-15543-5-git-send-email-jsimmons@infradead.org>
+ <87a7plsjmz.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1808180123580.2829@casper.infradead.org>
+Message-ID: <A694D2FB-02A4-4643-B37F-DAE9127FBBF2@whamcloud.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Aug 17, 2018, at 23:08, Andreas Dilger <adilger@whamcloud.com> wrote:
+On Aug 17, 2018, at 18:35, James Simmons <jsimmons@infradead.org> wrote:
 > 
-> Signed PGP part
-> On Aug 17, 2018, at 18:59, James Simmons <jsimmons@infradead.org> wrote:
 >> 
+>> On Thu, Aug 16 2018, James Simmons wrote:
 >> 
->>>> Access to struct client_obd should be protected with the spinlock
->>>> cl_loi_list_lock. This was dropped during the port to sysfs so
->>>> restore the proper locking.
->>>> 
->>>> Signed-off-by: James Simmons <jsimmons@infradead.org>
->>>> ---
->>>> drivers/staging/lustre/lustre/osc/lproc_osc.c | 36 +++++++++++++++++++++++----
->>>> 1 file changed, 31 insertions(+), 5 deletions(-)
->>>> 
->>>> diff --git a/drivers/staging/lustre/lustre/osc/lproc_osc.c b/drivers/staging/lustre/lustre/osc/lproc_osc.c
->>>> index 3c31e98..5fb7a16 100644
->>>> --- a/drivers/staging/lustre/lustre/osc/lproc_osc.c
->>>> +++ b/drivers/staging/lustre/lustre/osc/lproc_osc.c
->>>> @@ -80,8 +80,13 @@ static ssize_t max_rpcs_in_flight_show(struct kobject *kobj,
->>>> 	struct obd_device *dev = container_of(kobj, struct obd_device,
->>>> 					      obd_kset.kobj);
->>>> 	struct client_obd *cli = &dev->u.cli;
->>>> +	ssize_t len;
->>>> 
->>>> -	return sprintf(buf, "%u\n", cli->cl_max_rpcs_in_flight);
->>>> +	spin_lock(&cli->cl_loi_list_lock);
->>>> +	len = sprintf(buf, "%u\n", cli->cl_max_rpcs_in_flight);
->>>> +	spin_unlock(&cli->cl_loi_list_lock);
+>>> The only user of ll_sb in struct ll_sb_info is used to query the
+>>> name locate in the file_system_type. We can get that information
+>>> from using the super block located in struct path instead. This
+>>> enables us to use struct ll_sb_info directly for every sysfs or
+>>> debugfs entry.
 >>> 
->>> Why do you think a spinlock is needed here?
->>> How could you even end up with an incorrect value?
+>> ....
 >> 
->> I see both mdc sysfs and the osc sysfs layer being able to
->> modify cl_max_rpcs_in_flight. Andreas is the struct client_obd
->> shared between both the osc and mdc layer or does each subsystem
->> contain a unique cli in struct obd_device?
+>>> @@ -215,7 +216,7 @@ static ssize_t fstype_show(struct kobject *kobj, struct attribute *attr,
+>>> 	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+>>> 					      ll_kobj);
+>>> 
+>>> -	return sprintf(buf, "%s\n", sbi->ll_sb->s_type->name);
+>>> +	return sprintf(buf, "%s\n", sbi->ll_mnt.mnt->mnt_sb->s_type->name);
+>> 
+>> ll_mnt ??? What is that, why is it a better thing to keep than ll_sb.
+>> (looks at code).
 > 
-> Each OBD device (OSC, MDC, MGC, etc) has its own struct obd_device
-> with an embedded struct client_obd, so it is not shared between the
-> OSC and MDC.  These tunables could potentially be set differently
-> for each filesystem, or even for each target within a single filesystem
-> (e.g. if some flash OSTs need more RPCs in flight to keep busy than
-> HDD-based OSTs).
-> 
-> Since this is just printing the value, it doesn't make sense to have
-> locking in any case.  At worst the cl_max_rpcs_in_flight value used
-> may ne nanoseconds out of date when accessed, and microseconds old
-> when printed.  That race exists whether the locking is here or not
-> (i.e. the value could be changed immediately after it is printed into
-> the buffer and the lock is dropped).
+> At first I was thinking that the name was of the format $FSNAME-$UUID but
+> now that I look at what its requesting that is not the case. The 'name'
+> returned looks to be always "lustre". Yet for some reason its does this
+> long winded way to get this info. Andreas or Oleg is their a reason for
+> this?
 
-The only reason to keep this locking might be to make static code
-analysis tools happy, so that they always see cl_max_rpcs_in_flight
-access protected by a spinlock, instead of inconsistent locking.
+In the ancient past the filesystem type was named either "llite" or
+"lustre", so this was used to print the filesystem type consistently.
+It has been "lustre" for quite a while now.  I recently discussed with
+you about changing the server-side mounts to use "lustre-mdt" and
+"lustre-ost", but I don't think this applies to this code here.
 
 Cheers, Andreas
 ---
@@ -89,4 +66,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 235 bytes
 Desc: Message signed with OpenPGP
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180818/7cda47b1/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180818/8981e77d/attachment-0001.sig>
