@@ -1,104 +1,96 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 19 Aug 2018 22:39:25 -0400
-Subject: [lustre-devel] [PATCH v2 01/38] lustre: llite: rename
- ldebugfs_[un]register_mountpoint
-Message-ID: <1534732765-22828-1-git-send-email-jsimmons@infradead.org>
+Date: Sun, 19 Aug 2018 22:39:49 -0400
+Subject: [lustre-devel] [PATCH v2 04/38] lustre: llite: remove ll_sb
+Message-ID: <1534732789-22934-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Rename ldebugfs_[un]register_mountpoint() to
-ll_debugfs_[un]register_super(). This first
-aligns the functions name with the major of
-the llite function prototypes by starting
-with the ll_* prefix. The use of mountpoint
-is not the best way to describe the functions
-who's name are being changed. Since this is
-managed by struct ll_sb_info, which is the
-lustre private instance for struct super_block,
-so rename to *_super() instead.
+The only user of ll_sb in struct ll_sb_info is used to query the
+name locate in the file_system_type. We can get that information
+from using the super block located in struct path instead. This
+enables us to use struct ll_sb_info directly for every sysfs or
+debugfs entry.
 
 Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
 Reviewed-on: https://review.whamcloud.com/24031
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10824
+Reviewed-on: https://review.whamcloud.com/33025
 Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
-
-Changelog)
-v1) Initial patch
-v2) Improved changelog message
 ---
- drivers/staging/lustre/lustre/llite/llite_internal.h | 6 +++---
- drivers/staging/lustre/lustre/llite/llite_lib.c      | 4 ++--
- drivers/staging/lustre/lustre/llite/lproc_llite.c    | 6 +++---
- 3 files changed, 8 insertions(+), 8 deletions(-)
+Changelog)
+v1) initial patch
+v2) Remove use of ll_mnt in fstype sysfs file
+
+ drivers/staging/lustre/lustre/llite/llite_internal.h | 1 -
+ drivers/staging/lustre/lustre/llite/llite_lib.c      | 6 ++----
+ drivers/staging/lustre/lustre/llite/lproc_llite.c    | 5 +----
+ 3 files changed, 3 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
-index 6ed7034..b2cdf75 100644
+index 2719bc53..92dc05d 100644
 --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
 +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
-@@ -675,9 +675,9 @@ int cl_get_grouplock(struct cl_object *obj, unsigned long gid, int nonblock,
- void cl_put_grouplock(struct ll_grouplock *cg);
+@@ -524,7 +524,6 @@ struct ll_sb_info {
  
- /* llite/lproc_llite.c */
--int ldebugfs_register_mountpoint(struct dentry *parent,
--				 struct super_block *sb, char *osc, char *mdc);
--void ldebugfs_unregister_mountpoint(struct ll_sb_info *sbi);
-+int ll_debugfs_register_super(struct dentry *parent,
-+			      struct super_block *sb, char *osc, char *mdc);
-+void ll_debugfs_unregister_super(struct ll_sb_info *sbi);
- void ll_stats_ops_tally(struct ll_sb_info *sbi, int op, int count);
- void lprocfs_llite_init_vars(struct lprocfs_static_vars *lvars);
- void ll_rw_stats_tally(struct ll_sb_info *sbi, pid_t pid,
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index fb3bc16..50ea5fb 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -573,7 +573,7 @@ static int client_common_fill_super(struct super_block *sb, char *md, char *dt)
- 	kfree(osfs);
- 
- 	if (llite_root) {
--		err = ldebugfs_register_mountpoint(llite_root, sb, dt, md);
-+		err = ll_debugfs_register_super(llite_root, sb, dt, md);
- 		if (err < 0) {
- 			CERROR("%s: could not register mount in debugfs: "
- 			       "rc = %d\n", ll_get_fsname(sb, NULL, 0), err);
-@@ -679,7 +679,7 @@ static void client_common_put_super(struct super_block *sb)
- 	obd_disconnect(sbi->ll_dt_exp);
- 	sbi->ll_dt_exp = NULL;
- 
--	ldebugfs_unregister_mountpoint(sbi);
-+	ll_debugfs_unregister_super(sbi);
- 
- 	obd_fid_fini(sbi->ll_md_exp->exp_obd);
- 	obd_disconnect(sbi->ll_md_exp);
-diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-index 617aabb..996703d 100644
---- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
-+++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
-@@ -1175,8 +1175,8 @@ void ll_stats_ops_tally(struct ll_sb_info *sbi, int op, int count)
- 	[RA_STAT_FAILED_REACH_END] = "failed to reach end"
+ 	__kernel_fsid_t		  ll_fsid;
+ 	struct kobject		 ll_kobj; /* sysfs object */
+-	struct super_block	*ll_sb; /* struct super_block (for sysfs code)*/
+ 	struct completion	 ll_kobj_unregister;
  };
  
--int ldebugfs_register_mountpoint(struct dentry *parent,
--				 struct super_block *sb, char *osc, char *mdc)
-+int ll_debugfs_register_super(struct dentry *parent,
-+			      struct super_block *sb, char *osc, char *mdc)
+diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
+index d16f5d1..d352287 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_lib.c
++++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
+@@ -62,7 +62,7 @@
+ #define log2(n) ffz(~(n))
+ #endif
+ 
+-static struct ll_sb_info *ll_init_sbi(struct super_block *sb)
++static struct ll_sb_info *ll_init_sbi(void)
  {
- 	struct lustre_sb_info *lsi = s2lsi(sb);
- 	struct ll_sb_info *sbi = ll_s2sbi(sb);
-@@ -1285,7 +1285,7 @@ int ldebugfs_register_mountpoint(struct dentry *parent,
- 	return err;
+ 	struct ll_sb_info *sbi = NULL;
+ 	unsigned long pages;
+@@ -129,8 +129,6 @@ static struct ll_sb_info *ll_init_sbi(struct super_block *sb)
+ 	INIT_LIST_HEAD(&sbi->ll_squash.rsi_nosquash_nids);
+ 	init_rwsem(&sbi->ll_squash.rsi_sem);
+ 
+-	sbi->ll_sb = sb;
+-
+ 	return sbi;
  }
  
--void ldebugfs_unregister_mountpoint(struct ll_sb_info *sbi)
-+void ll_debugfs_unregister_super(struct ll_sb_info *sbi)
+@@ -912,7 +910,7 @@ int ll_fill_super(struct super_block *sb)
+ 	try_module_get(THIS_MODULE);
+ 
+ 	/* client additional sb info */
+-	sbi = ll_init_sbi(sb);
++	sbi = ll_init_sbi();
+ 	lsi->lsi_llsbi = sbi;
+ 	if (!sbi) {
+ 		module_put(THIS_MODULE);
+diff --git a/drivers/staging/lustre/lustre/llite/lproc_llite.c b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+index a9ad328..858d276 100644
+--- a/drivers/staging/lustre/lustre/llite/lproc_llite.c
++++ b/drivers/staging/lustre/lustre/llite/lproc_llite.c
+@@ -212,10 +212,7 @@ static ssize_t client_type_show(struct kobject *kobj, struct attribute *attr,
+ static ssize_t fstype_show(struct kobject *kobj, struct attribute *attr,
+ 			   char *buf)
  {
- 	debugfs_remove_recursive(sbi->ll_debugfs_entry);
- 	kobject_put(&sbi->ll_kobj);
+-	struct ll_sb_info *sbi = container_of(kobj, struct ll_sb_info,
+-					      ll_kobj);
+-
+-	return sprintf(buf, "%s\n", sbi->ll_sb->s_type->name);
++	return sprintf(buf, "lustre\n");
+ }
+ LUSTRE_RO_ATTR(fstype);
+ 
 -- 
 1.8.3.1
