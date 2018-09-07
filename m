@@ -1,16 +1,18 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 07 Sep 2018 10:49:32 +1000
-Subject: [lustre-devel] [PATCH 19/34] lnet: simplify lnet_islocalnet()
+Subject: [lustre-devel] [PATCH 20/34] lnet: discard ni_cpt_list
 In-Reply-To: <153628058697.8267.6056114844033479774.stgit@noble>
 References: <153628058697.8267.6056114844033479774.stgit@noble>
-Message-ID: <153628137199.8267.13740900509571445302.stgit@noble>
+Message-ID: <153628137203.8267.14277020278461943610.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Having lnet_get_net_locked() makes this (a little) simpler.
+This isn't used any more.
+The new comment is odd - this is no net_ni_cpt !!
+The ni_cptlist linkage is no longer used - should it go too?
 
 This is part of
     8cbb8cd3e771e7f7e0f99cafc19fad32770dc015
@@ -18,36 +20,61 @@ This is part of
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lnet/lnet/api-ni.c |   14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-types.h  |    4 +---
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |    7 -------
+ 2 files changed, 1 insertion(+), 10 deletions(-)
 
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+index 6c34ecf22021..dc15fa75a9d2 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+@@ -305,7 +305,7 @@ struct lnet_net {
+ struct lnet_ni {
+ 	/* chain on the lnet_net structure */
+ 	struct list_head	  ni_netlist;
+-	/* chain on ln_nis_cpt */
++	/* chain on net_ni_cpt */
+ 	struct list_head	ni_cptlist;
+ 
+ 	spinlock_t		ni_lock;
+@@ -671,8 +671,6 @@ struct lnet {
+ 
+ 	/* LND instances */
+ 	struct list_head		ln_nets;
+-	/* NIs bond on specific CPT(s) */
+-	struct list_head		ln_nis_cpt;
+ 	/* the loopback NI */
+ 	struct lnet_ni			*ln_loni;
+ 	/* network zombie list */
 diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 618fdf8141f0..546d5101360f 100644
+index 546d5101360f..960f235df5e7 100644
 --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
 +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -764,20 +764,16 @@ lnet_cpt_of_nid(lnet_nid_t nid, struct lnet_ni *ni)
- EXPORT_SYMBOL(lnet_cpt_of_nid);
+@@ -538,7 +538,6 @@ lnet_prepare(lnet_pid_t requested_pid)
  
- int
--lnet_islocalnet(__u32 net)
-+lnet_islocalnet(__u32 net_id)
- {
--	struct lnet_ni *ni;
--	int cpt;
-+	struct lnet_net *net;
-+	int		cpt;
+ 	INIT_LIST_HEAD(&the_lnet.ln_test_peers);
+ 	INIT_LIST_HEAD(&the_lnet.ln_nets);
+-	INIT_LIST_HEAD(&the_lnet.ln_nis_cpt);
+ 	INIT_LIST_HEAD(&the_lnet.ln_routers);
+ 	INIT_LIST_HEAD(&the_lnet.ln_drop_rules);
+ 	INIT_LIST_HEAD(&the_lnet.ln_delay_rules);
+@@ -616,7 +615,6 @@ lnet_unprepare(void)
+ 	LASSERT(!the_lnet.ln_refcount);
+ 	LASSERT(list_empty(&the_lnet.ln_test_peers));
+ 	LASSERT(list_empty(&the_lnet.ln_nets));
+-	LASSERT(list_empty(&the_lnet.ln_nis_cpt));
  
- 	cpt = lnet_net_lock_current();
+ 	lnet_portals_destroy();
+ 
+@@ -1294,11 +1292,6 @@ lnet_startup_lndni(struct lnet_ni *ni, struct lnet_lnd_tunables *tun)
+ 	/* refcount for ln_nis */
+ 	lnet_ni_addref_locked(ni, 0);
+ 	list_add_tail(&ni->ni_net->net_list, &the_lnet.ln_nets);
+-	if (ni->ni_cpts) {
+-		lnet_ni_addref_locked(ni, 0);
+-		list_add_tail(&ni->ni_cptlist, &the_lnet.ln_nis_cpt);
+-	}
 -
--	ni = lnet_net2ni_locked(net, cpt);
--	if (ni)
--		lnet_ni_decref_locked(ni, cpt);
--
-+	net = lnet_get_net_locked(net_id);
- 	lnet_net_unlock(cpt);
+ 	lnet_net_unlock(LNET_LOCK_EX);
  
--	return !!ni;
-+	return !!net;
- }
- 
- bool
+ 	ni->ni_state = LNET_NI_STATE_ACTIVE;
