@@ -1,122 +1,72 @@
 From: NeilBrown <neilb@suse.com>
 Date: Fri, 07 Sep 2018 10:49:31 +1000
-Subject: [lustre-devel] [PATCH 00/34] Beginning of multi-rail support for
- drivers/staging/lustre
-Message-ID: <153628058697.8267.6056114844033479774.stgit@noble>
+Subject: [lustre-devel] [PATCH 01/34] struct lnet_ni - reformat comments.
+In-Reply-To: <153628058697.8267.6056114844033479774.stgit@noble>
+References: <153628058697.8267.6056114844033479774.stgit@noble>
+Message-ID: <153628137125.8267.7825080417267355121.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The following series implements the first patch in the
-multi-rail series:
-Commit: 8cbb8cd3e771 ("LU-7734 lnet: Multi-Rail local NI split")
+This is part of
 
-I split that commit up into 40 individual commits which can be found
-at
-  https://github.com/neilbrown/lustre/commits/multirail
-though you need to scroll down a bit, as that contains all the
-multi-rail series.
-
-I then ported most of these patches to my mainline tree.
-Some that I haven't included are:
-- lnet: Move lnet_msg_alloc/free down a bit.
-    lnet_msg_alloc/free don't exist any more
-- lnet: lib-types: change some tabs to spaces
-- lnet - assorted whitespace changes.
-- lnet: change ni_last_alive from time64_t to long
-- lnet: add lnet_net_state
-    net_state is never used.
-- lnet: remove 'static' from lnet_get_net_config()
-
-I've also made a couple of minor changes to individual patches not
-strictly related to porting (the net_prio field is never used, so I
-never added it - I should have made that a separate patch).
-
-This series compiles, but doesn't work.  I get a NULL pointer
-reference, then an assertion failure.  If I fix those, it hangs.
-The NULL pointer ref and the failing assertion are gone with
-later patches, so I hope the other problems are too.
-
-Some of these patches have very poor descriptions, such as "I have no
-idea what this does".  If someone would like to explain - or maybe say
-"Oh, we really shouldn't have done that", I'd be very happy to
-receive that, and update the description or patch accordingly.
-
-These will all appear in my lustre-testing branch, but won't migrate
-to 'lustre' until I, at least, have enough other patches that I can
-get a successful test run.
-
-Review and comments always welcome.
-
-Thanks,
-NeilBrown
-
-
+8cbb8cd3e771e7f7e0f99cafc19fad32770dc015 LU-7734 lnet: Multi-Rail
+local NI split
 ---
+ .../staging/lustre/include/linux/lnet/lib-types.h  |   38 +++++++++++++++-----
+ 1 file changed, 29 insertions(+), 9 deletions(-)
 
-Amir Shehata (1):
-      Completely re-write lnet_parse_networks().
-
-NeilBrown (33):
-      struct lnet_ni - reformat comments.
-      lnet: Create struct lnet_net
-      lnet: struct lnet_ni: move ni_lnd to lnet_net
-      lnet: embed lnd_tunables in lnet_ni
-      lnet: begin separating "networks" from "network interfaces".
-      lnet: store separate xmit/recv net-interface in each message.
-      lnet: change lnet_peer to reference the net, rather than ni.
-      lnet: add cpt to lnet_match_info.
-      lnet: add list of cpts to lnet_net.
-      lnet: add ni arg to lnet_cpt_of_nid()
-      lnet: pass tun to lnet_startup_lndni, instead of full conf
-      lnet: split lnet_startup_lndni
-      lnet: reverse order of lnet_startup_lnd{net,ni}
-      lnet: rename lnet_find_net_locked to lnet_find_rnet_locked
-      lnet: extend zombie handling to nets and nis
-      lnet: lnet_shutdown_lndnets - remove some cleanup code.
-      lnet: move lnet_shutdown_lndnets down to after first use
-      lnet: add ni_state
-      lnet: simplify lnet_islocalnet()
-      lnet: discard ni_cpt_list
-      lnet: add net_ni_added
-      lnet: don't take reference in lnet_XX2ni_locked()
-      lnet: don't need lock to test ln_shutdown.
-      lnet: don't take lock over lnet_net_unique()
-      lnet: swap 'then' and 'else' branches in lnet_startup_lndnet
-      lnet: only valid lnd_type when net_id is unique.
-      lnet: make it possible to add a new interface to a network
-      lnet: add checks to ensure network interface names are unique.
-      lnet: track tunables in lnet_startup_lndnet()
-      lnet: fix typo
-      lnet: lnet_dyn_add_ni: fix ping_info count
-      lnet: lnet_dyn_del_ni: fix ping_info count
-      lnet: introduce use_tcp_bonding mod param
-
-
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |   31 -
- .../staging/lustre/include/linux/lnet/lib-types.h  |  142 ++-
- .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |   18 
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |   10 
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |    6 
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |   12 
- .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  |   74 +-
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   25 -
- drivers/staging/lustre/lnet/lnet/acceptor.c        |    8 
- drivers/staging/lustre/lnet/lnet/api-ni.c          |  939 +++++++++++++-------
- drivers/staging/lustre/lnet/lnet/config.c          |  688 +++++++++++----
- drivers/staging/lustre/lnet/lnet/lib-move.c        |  132 ++-
- drivers/staging/lustre/lnet/lnet/lib-ptl.c         |    6 
- drivers/staging/lustre/lnet/lnet/lo.c              |    2 
- drivers/staging/lustre/lnet/lnet/net_fault.c       |    3 
- drivers/staging/lustre/lnet/lnet/peer.c            |   31 -
- drivers/staging/lustre/lnet/lnet/router.c          |   51 +
- drivers/staging/lustre/lnet/lnet/router_proc.c     |   24 -
- drivers/staging/lustre/lnet/selftest/brw_test.c    |    2 
- drivers/staging/lustre/lnet/selftest/framework.c   |    3 
- drivers/staging/lustre/lnet/selftest/selftest.h    |    2 
- 21 files changed, 1507 insertions(+), 702 deletions(-)
-
---
-Signature
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+index 6d4106fd9039..078bc97a9ebf 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+@@ -263,18 +263,38 @@ struct lnet_ni {
+ 	int			  ni_peerrtrcredits;
+ 	/* seconds to consider peer dead */
+ 	int			  ni_peertimeout;
+-	int			  ni_ncpts;	/* number of CPTs */
+-	__u32			 *ni_cpts;	/* bond NI on some CPTs */
+-	lnet_nid_t		  ni_nid;	/* interface's NID */
+-	void			 *ni_data;	/* instance-specific data */
++	/* number of CPTs */
++	int			ni_ncpts;
++
++	/* bond NI on some CPTs */
++	__u32			*ni_cpts;
++
++	/* interface's NID */
++	lnet_nid_t		ni_nid;
++
++	/* instance-specific data */
++	void			*ni_data;
++
+ 	struct lnet_lnd		 *ni_lnd;	/* procedural interface */
+-	struct lnet_tx_queue	**ni_tx_queues;	/* percpt TX queues */
+-	int			**ni_refs;	/* percpt reference count */
+-	time64_t		  ni_last_alive;/* when I was last alive */
+-	struct lnet_ni_status	 *ni_status;	/* my health status */
++
++	/* percpt TX queues */
++	struct lnet_tx_queue	**ni_tx_queues;
++
++	/* percpt reference count */
++	int			**ni_refs;
++
++	/* when I was last alive */
++	time64_t		ni_last_alive;
++
++	/* my health status */
++	struct lnet_ni_status	*ni_status;
++
+ 	/* per NI LND tunables */
+ 	struct lnet_ioctl_config_lnd_tunables *ni_lnd_tunables;
+-	/* equivalent interfaces to use */
++	/*
++	 * equivalent interfaces to use
++	 * This is an array because socklnd bonding can still be configured
++	 */
+ 	char			 *ni_interfaces[LNET_MAX_INTERFACES];
+ 	/* original net namespace */
+ 	struct net		 *ni_net_ns;
