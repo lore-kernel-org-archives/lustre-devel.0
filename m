@@ -1,12 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 11 Sep 2018 00:19:17 +0100 (BST)
+Date: Tue, 11 Sep 2018 00:19:37 +0100 (BST)
 Subject: [lustre-devel] [PATCH 03/34] lnet: struct lnet_ni: move ni_lnd
  to lnet_net
 In-Reply-To: <861CBCA6-75FF-4741-8507-00D891533522@cray.com>
 References: <153628058697.8267.6056114844033479774.stgit@noble>
  <153628137133.8267.15885218437939976879.stgit@noble>
  <861CBCA6-75FF-4741-8507-00D891533522@cray.com>
-Message-ID: <alpine.LFD.2.21.1809110018430.29662@casper.infradead.org>
+Message-ID: <alpine.LFD.2.21.1809110019190.29662@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
