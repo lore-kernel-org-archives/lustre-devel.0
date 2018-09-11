@@ -1,10 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 11 Sep 2018 02:02:58 +0100 (BST)
-Subject: [lustre-devel] [PATCH 09/34] lnet: add list of cpts to lnet_net.
-In-Reply-To: <153628137159.8267.921309094971745898.stgit@noble>
+Date: Tue, 11 Sep 2018 02:03:37 +0100 (BST)
+Subject: [lustre-devel] [PATCH 10/34] lnet: add ni arg to
+ lnet_cpt_of_nid()
+In-Reply-To: <153628137163.8267.8668023630519839070.stgit@noble>
 References: <153628058697.8267.6056114844033479774.stgit@noble>
- <153628137159.8267.921309094971745898.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1809110202160.29662@casper.infradead.org>
+ <153628137163.8267.8668023630519839070.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1809110203220.29662@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,233 +13,332 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-> struct lnet_net now has a list of cpts, which is the union
-> of the cpts for each lnet_ni.
+> When choosing a cpt to use for a given network (identified by nid),
+> the choice might depend on a particular interface which has
+> already been identified - different interfaces can have different
+> sets of cpts.
+> 
+> So add an 'ni' arg to lnet_cpt_of_nid(). If given, choose a cpt
+> from the cpts of that interface. If not given, choose one from
+> the set of all cpts associated with any interface on the network.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
+
 The below needs fixing based on response to cover letter.
- 
+
 > This is part of
 >     8cbb8cd3e771e7f7e0f99cafc19fad32770dc015
 >        LU-7734 lnet: Multi-Rail local NI split
->
+> 
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../staging/lustre/include/linux/lnet/lib-types.h  |    6 +
->  drivers/staging/lustre/lnet/lnet/config.c          |  164 ++++++++++++++++++++
->  2 files changed, 170 insertions(+)
+>  .../staging/lustre/include/linux/lnet/lib-lnet.h   |    4 +-
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    4 +-
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    2 -
+>  .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    4 +-
+>  drivers/staging/lustre/lnet/lnet/api-ni.c          |   41 ++++++++++++--------
+>  drivers/staging/lustre/lnet/lnet/lib-move.c        |   12 +++---
+>  drivers/staging/lustre/lnet/lnet/lib-ptl.c         |    2 -
+>  drivers/staging/lustre/lnet/lnet/peer.c            |    4 +-
+>  drivers/staging/lustre/lnet/lnet/router.c          |    4 +-
+>  drivers/staging/lustre/lnet/selftest/brw_test.c    |    2 -
+>  drivers/staging/lustre/lnet/selftest/framework.c   |    3 +
+>  drivers/staging/lustre/lnet/selftest/selftest.h    |    2 -
+>  12 files changed, 48 insertions(+), 36 deletions(-)
 > 
-> diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> index 2d2c066a11ba..22957d142cc0 100644
-> --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> @@ -266,6 +266,12 @@ struct lnet_net {
->  	 * lnet/include/lnet/nidstr.h */
->  	__u32			net_id;
+> diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> index 34509e52bac7..e32dbb854d80 100644
+> --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> @@ -395,8 +395,8 @@ lnet_net2rnethash(__u32 net)
+>  extern struct lnet_lnd the_lolnd;
+>  extern int avoid_asym_router_failure;
 >  
-> +	/* total number of CPTs in the array */
-> +	__u32			net_ncpts;
-> +
-> +	/* cumulative CPTs of all NIs in this net */
-> +	__u32			*net_cpts;
-> +
->  	/* network tunables */
->  	struct lnet_ioctl_config_lnd_cmn_tunables net_tunables;
+> -int lnet_cpt_of_nid_locked(lnet_nid_t nid);
+> -int lnet_cpt_of_nid(lnet_nid_t nid);
+> +int lnet_cpt_of_nid_locked(lnet_nid_t nid, struct lnet_ni *ni);
+> +int lnet_cpt_of_nid(lnet_nid_t nid, struct lnet_ni *ni);
+>  struct lnet_ni *lnet_nid2ni_locked(lnet_nid_t nid, int cpt);
+>  struct lnet_ni *lnet_net2ni_locked(__u32 net, int cpt);
+>  struct lnet_ni *lnet_net2ni(__u32 net);
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> index ade566d20c69..958ac9a99045 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> @@ -320,7 +320,7 @@ int kiblnd_create_peer(struct lnet_ni *ni, struct kib_peer **peerp,
+>  {
+>  	struct kib_peer *peer;
+>  	struct kib_net *net = ni->ni_data;
+> -	int cpt = lnet_cpt_of_nid(nid);
+> +	int cpt = lnet_cpt_of_nid(nid, ni);
+>  	unsigned long flags;
 >  
-> diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-> index e83bdbec11e3..380a3fb1caba 100644
-> --- a/drivers/staging/lustre/lnet/lnet/config.c
-> +++ b/drivers/staging/lustre/lnet/lnet/config.c
-> @@ -91,11 +91,169 @@ lnet_net_unique(__u32 net, struct list_head *netlist)
->  	return true;
+>  	LASSERT(net);
+> @@ -643,7 +643,7 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer *peer, struct rdma_cm_id *cm
+>  
+>  	dev = net->ibn_dev;
+>  
+> -	cpt = lnet_cpt_of_nid(peer->ibp_nid);
+> +	cpt = lnet_cpt_of_nid(peer->ibp_nid, peer->ibp_ni);
+>  	sched = kiblnd_data.kib_scheds[cpt];
+>  
+>  	LASSERT(sched->ibs_nthreads > 0);
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> index c266940cb2ae..e64c14914924 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> @@ -119,7 +119,7 @@ kiblnd_get_idle_tx(struct lnet_ni *ni, lnet_nid_t target)
+>  	struct kib_tx *tx;
+>  	struct kib_tx_poolset *tps;
+>  
+> -	tps = net->ibn_tx_ps[lnet_cpt_of_nid(target)];
+> +	tps = net->ibn_tx_ps[lnet_cpt_of_nid(target, ni)];
+>  	node = kiblnd_pool_alloc_node(&tps->tps_poolset);
+>  	if (!node)
+>  		return NULL;
+> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> index 2036a0ae5917..ba68bcee90bc 100644
+> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> @@ -101,7 +101,7 @@ static int
+>  ksocknal_create_peer(struct ksock_peer **peerp, struct lnet_ni *ni,
+>  		     struct lnet_process_id id)
+>  {
+> -	int cpt = lnet_cpt_of_nid(id.nid);
+> +	int cpt = lnet_cpt_of_nid(id.nid, ni);
+>  	struct ksock_net *net = ni->ni_data;
+>  	struct ksock_peer *peer;
+>  
+> @@ -1099,7 +1099,7 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_route *route,
+>  	LASSERT(conn->ksnc_proto);
+>  	LASSERT(peerid.nid != LNET_NID_ANY);
+>  
+> -	cpt = lnet_cpt_of_nid(peerid.nid);
+> +	cpt = lnet_cpt_of_nid(peerid.nid, ni);
+>  
+>  	if (active) {
+>  		ksocknal_peer_addref(peer);
+> diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+> index c21aef32cdde..6e0b8310574d 100644
+> --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
+> +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+> @@ -713,31 +713,41 @@ lnet_nid_cpt_hash(lnet_nid_t nid, unsigned int number)
 >  }
 >  
-> +static bool
-> +in_array(__u32 *array, __u32 size, __u32 value)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < size; i++) {
-> +		if (array[i] == value)
-> +			return false;
-> +	}
-> +
-> +	return true;
-> +}
-> +
-> +static int
-> +lnet_net_append_cpts(__u32 *cpts, __u32 ncpts, struct lnet_net *net)
-> +{
-> +	__u32 *added_cpts = NULL;
-> +	int i, j = 0, rc = 0;
-> +
-> +	/*
-> +	 * no need to go futher since a subset of the NIs already exist on
-> +	 * all CPTs
-> +	 */
-> +	if (net->net_ncpts == LNET_CPT_NUMBER)
-> +		return 0;
-> +
-> +	if (cpts == NULL) {
-> +		/* there is an NI which will exist on all CPTs */
-> +		if (net->net_cpts != NULL)
-> +			kvfree(net->net_cpts);
-> +		net->net_cpts = NULL;
-> +		net->net_ncpts = LNET_CPT_NUMBER;
-> +		return 0;
-> +	}
-> +
-> +	if (net->net_cpts == NULL) {
-> +		net->net_cpts = kmalloc_array(ncpts, sizeof(net->net_cpts),
-> +					      GFP_KERNEL);
-> +		if (net->net_cpts == NULL)
-> +			return -ENOMEM;
-> +		memcpy(net->net_cpts, cpts, ncpts);
-> +		return 0;
-> +	}
-> +
-> +	added_cpts = kmalloc_array(LNET_CPT_NUMBER, sizeof(*added_cpts),
-> +				   GFP_KERNEL);
-> +	if (added_cpts == NULL)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < ncpts; i++) {
-> +		if (!in_array(net->net_cpts, net->net_ncpts, cpts[i])) {
-> +			added_cpts[j] = cpts[i];
-> +			j++;
-> +		}
-> +	}
-> +
-> +	/* append the new cpts if any to the list of cpts in the net */
-> +	if (j > 0) {
-> +		__u32 *array = NULL, *loc;
-> +		__u32 total_entries = j + net->net_ncpts;
-> +
-> +		array = kmalloc_array(total_entries, sizeof(*net->net_cpts),
-> +				      GFP_KERNEL);
-> +		if (array == NULL) {
-> +			rc = -ENOMEM;
-> +			goto failed;
-> +		}
-> +
-> +		memcpy(array, net->net_cpts,
-> +		       net->net_ncpts * sizeof(*net->net_cpts));
-> +		loc = array + net->net_ncpts;
-> +		memcpy(loc, added_cpts, j * sizeof(*net->net_cpts));
-> +
-> +		kfree(net->net_cpts);
-> +		net->net_ncpts = total_entries;
-> +		net->net_cpts = array;
-> +	}
-> +
-> +failed:
-> +	kfree(added_cpts);
-> +
-> +	return rc;
-> +}
-> +
-> +static void
-> +lnet_net_remove_cpts(__u32 *cpts, __u32 ncpts, struct lnet_net *net)
-> +{
-> +	struct lnet_ni *ni;
-> +	int rc;
-> +
-> +	/*
-> +	 * Operation Assumption:
-> +	 *	This function is called after an NI has been removed from
-> +	 *	its parent net.
-> +	 *
-> +	 * if we're removing an NI which exists on all CPTs then
-> +	 * we have to check if any of the other NIs on this net also
-> +	 * exists on all CPTs. If none, then we need to build our Net CPT
-> +	 * list based on the remaining NIs.
-> +	 *
-> +	 * If the NI being removed exist on a subset of the CPTs then we
-> +	 * alo rebuild the Net CPT list based on the remaining NIs, which
-> +	 * should resutl in the expected Net CPT list.
-> +	 */
-> +
-> +	/*
-> +	 * sometimes this function can be called due to some failure
-> +	 * creating an NI, before any of the cpts are allocated, so check
-> +	 * for that case and don't do anything
-> +	 */
-> +	if (ncpts == 0)
-> +		return;
-> +
-> +	if (ncpts == LNET_CPT_NUMBER) {
-> +		/*
-> +		 * first iteration through the NI list in the net to see
-> +		 * if any of the NIs exist on all the CPTs. If one is
-> +		 * found then our job is done.
-> +		 */
-> +		list_for_each_entry(ni, &net->net_ni_list, ni_netlist) {
-> +			if (ni->ni_ncpts == LNET_CPT_NUMBER)
-> +				return;
-> +		}
-> +	}
-> +
-> +	/*
-> +	 * Rebuild the Net CPT list again, thereby only including only the
-> +	 * CPTs which the remaining NIs are associated with.
-> +	 */
-> +	if (net->net_cpts != NULL) {
-> +		kfree(net->net_cpts);
-> +		net->net_cpts = NULL;
-> +	}
-> +
-> +	list_for_each_entry(ni, &net->net_ni_list, ni_netlist) {
-> +		rc = lnet_net_append_cpts(ni->ni_cpts, ni->ni_ncpts,
-> +					  net);
-> +		if (rc != 0) {
-> +			CERROR("Out of Memory\n");
-> +			/*
-> +			 * do our best to keep on going. Delete
-> +			 * the net cpts and set it to NULL. This
-> +			 * way we can keep on going but less
-> +			 * efficiently, since memory accesses might be
-> +			 * accross CPT lines.
-> +			 */
-> +			if (net->net_cpts != NULL) {
-> +				kfree(net->net_cpts);
-> +				net->net_cpts = NULL;
-> +				net->net_ncpts = LNET_CPT_NUMBER;
-> +			}
-> +			return;
-> +		}
-> +	}
-> +}
-> +
->  void
->  lnet_ni_free(struct lnet_ni *ni)
+>  int
+> -lnet_cpt_of_nid_locked(lnet_nid_t nid)
+> +lnet_cpt_of_nid_locked(lnet_nid_t nid, struct lnet_ni *ni)
 >  {
->  	int i;
+> -	struct lnet_ni *ni;
+> +	struct lnet_net *net;
 >  
-> +	lnet_net_remove_cpts(ni->ni_cpts, ni->ni_ncpts, ni->ni_net);
+>  	/* must called with hold of lnet_net_lock */
+>  	if (LNET_CPT_NUMBER == 1)
+>  		return 0; /* the only one */
+>  
+> -	/* take lnet_net_lock(any) would be OK */
+> -	if (!list_empty(&the_lnet.ln_nis_cpt)) {
+> -		list_for_each_entry(ni, &the_lnet.ln_nis_cpt, ni_cptlist) {
+> -			if (LNET_NIDNET(ni->ni_nid) != LNET_NIDNET(nid))
+> -				continue;
+> +	/*
+> +	 * If NI is provided then use the CPT identified in the NI cpt
+> +	 * list if one exists. If one doesn't exist, then that NI is
+> +	 * associated with all CPTs and it follows that the net it belongs
+> +	 * to is implicitly associated with all CPTs, so just hash the nid
+> +	 * and return that.
+> +	 */
+> +	if (ni != NULL) {
+> +		if (ni->ni_cpts != NULL)
+> +			return ni->ni_cpts[lnet_nid_cpt_hash(nid,
+> +							     ni->ni_ncpts)];
+> +		else
+> +			return lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
+> +	}
+>  
+> -			LASSERT(ni->ni_cpts);
+> -			return ni->ni_cpts[lnet_nid_cpt_hash
+> -					   (nid, ni->ni_ncpts)];
+> -		}
+> +	/* no NI provided so look at the net */
+> +	net = lnet_get_net_locked(LNET_NIDNET(nid));
 > +
->  	if (ni->ni_refs)
->  		cfs_percpt_free(ni->ni_refs);
->  
-> @@ -128,6 +286,9 @@ lnet_net_free(struct lnet_net *net)
->  		lnet_ni_free(ni);
+> +	if (net != NULL && net->net_cpts) {
+> +		return net->net_cpts[lnet_nid_cpt_hash(nid, net->net_ncpts)];
 >  	}
 >  
-> +	if (net->net_cpts != NULL)
-> +		kfree(net->net_cpts);
-> +
->  	kfree(net);
+>  	return lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
 >  }
 >  
-> @@ -229,6 +390,9 @@ lnet_ni_alloc(struct lnet_net *net, struct cfs_expr_list *el, char *iface)
->  		ni->ni_net_ns = NULL;
+>  int
+> -lnet_cpt_of_nid(lnet_nid_t nid)
+> +lnet_cpt_of_nid(lnet_nid_t nid, struct lnet_ni *ni)
+>  {
+>  	int cpt;
+>  	int cpt2;
+> @@ -745,11 +755,10 @@ lnet_cpt_of_nid(lnet_nid_t nid)
+>  	if (LNET_CPT_NUMBER == 1)
+>  		return 0; /* the only one */
 >  
->  	ni->ni_last_alive = ktime_get_real_seconds();
-> +	rc = lnet_net_append_cpts(ni->ni_cpts, ni->ni_ncpts, net);
-> +	if (rc != 0)
-> +		goto failed;
->  	list_add_tail(&ni->ni_netlist, &net->net_ni_list);
+> -	if (list_empty(&the_lnet.ln_nis_cpt))
+> -		return lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
+> -
+>  	cpt = lnet_net_lock_current();
+> -	cpt2 = lnet_cpt_of_nid_locked(nid);
+> +
+> +	cpt2 = lnet_cpt_of_nid_locked(nid, ni);
+> +
+>  	lnet_net_unlock(cpt);
 >  
->  	return ni;
+>  	return cpt2;
+> diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+> index b6e81a693fc3..02cd1a5a466f 100644
+> --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
+> +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+> @@ -1095,7 +1095,9 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
+>  	msg->msg_sending = 1;
+>  
+>  	LASSERT(!msg->msg_tx_committed);
+> -	cpt = lnet_cpt_of_nid(rtr_nid == LNET_NID_ANY ? dst_nid : rtr_nid);
+> +	local_ni = lnet_net2ni(LNET_NIDNET(dst_nid));
+> +	cpt = lnet_cpt_of_nid(rtr_nid == LNET_NID_ANY ? dst_nid : rtr_nid,
+> +			      local_ni);
+>   again:
+>  	lnet_net_lock(cpt);
+>  
+> @@ -1188,7 +1190,7 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
+>  		 * was changed when we release the lock
+>  		 */
+>  		if (rtr_nid != lp->lp_nid) {
+> -			cpt2 = lnet_cpt_of_nid_locked(lp->lp_nid);
+> +			cpt2 = lp->lp_cpt;
+>  			if (cpt2 != cpt) {
+>  				if (src_ni)
+>  					lnet_ni_decref_locked(src_ni, cpt);
+> @@ -1677,7 +1679,7 @@ lnet_parse(struct lnet_ni *ni, struct lnet_hdr *hdr, lnet_nid_t from_nid,
+>  	payload_length = le32_to_cpu(hdr->payload_length);
+>  
+>  	for_me = (ni->ni_nid == dest_nid);
+> -	cpt = lnet_cpt_of_nid(from_nid);
+> +	cpt = lnet_cpt_of_nid(from_nid, ni);
+>  
+>  	switch (type) {
+>  	case LNET_MSG_ACK:
+> @@ -2149,7 +2151,7 @@ lnet_create_reply_msg(struct lnet_ni *ni, struct lnet_msg *getmsg)
+>  	lnet_msg_attach_md(msg, getmd, getmd->md_offset, getmd->md_length);
+>  	lnet_res_unlock(cpt);
+>  
+> -	cpt = lnet_cpt_of_nid(peer_id.nid);
+> +	cpt = lnet_cpt_of_nid(peer_id.nid, ni);
+>  
+>  	lnet_net_lock(cpt);
+>  	lnet_msg_commit(msg, cpt);
+> @@ -2160,7 +2162,7 @@ lnet_create_reply_msg(struct lnet_ni *ni, struct lnet_msg *getmsg)
+>  	return msg;
+>  
+>   drop:
+> -	cpt = lnet_cpt_of_nid(peer_id.nid);
+> +	cpt = lnet_cpt_of_nid(peer_id.nid, ni);
+>  
+>  	lnet_net_lock(cpt);
+>  	the_lnet.ln_counters[cpt]->drop_count++;
+> diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+> index 90ce51801726..c8d8162cc706 100644
+> --- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+> +++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+> @@ -220,7 +220,7 @@ lnet_match2mt(struct lnet_portal *ptl, struct lnet_process_id id, __u64 mbits)
+>  
+>  	/* if it's a unique portal, return match-table hashed by NID */
+>  	return lnet_ptl_is_unique(ptl) ?
+> -	       ptl->ptl_mtables[lnet_cpt_of_nid(id.nid)] : NULL;
+> +	       ptl->ptl_mtables[lnet_cpt_of_nid(id.nid, NULL)] : NULL;
+>  }
+>  
+>  struct lnet_match_table *
+> diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
+> index ed29124ebded..808ce25f1f00 100644
+> --- a/drivers/staging/lustre/lnet/lnet/peer.c
+> +++ b/drivers/staging/lustre/lnet/lnet/peer.c
+> @@ -270,7 +270,7 @@ lnet_nid2peer_locked(struct lnet_peer **lpp, lnet_nid_t nid, int cpt)
+>  		return -ESHUTDOWN;
+>  
+>  	/* cpt can be LNET_LOCK_EX if it's called from router functions */
+> -	cpt2 = cpt != LNET_LOCK_EX ? cpt : lnet_cpt_of_nid_locked(nid);
+> +	cpt2 = cpt != LNET_LOCK_EX ? cpt : lnet_cpt_of_nid_locked(nid, NULL);
+>  
+>  	ptable = the_lnet.ln_peer_tables[cpt2];
+>  	lp = lnet_find_peer_locked(ptable, nid);
+> @@ -362,7 +362,7 @@ lnet_debug_peer(lnet_nid_t nid)
+>  	int rc;
+>  	int cpt;
+>  
+> -	cpt = lnet_cpt_of_nid(nid);
+> +	cpt = lnet_cpt_of_nid(nid, NULL);
+>  	lnet_net_lock(cpt);
+>  
+>  	rc = lnet_nid2peer_locked(&lp, nid, cpt);
+> diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
+> index 72b8ca2b0fc6..5493d13de6d9 100644
+> --- a/drivers/staging/lustre/lnet/lnet/router.c
+> +++ b/drivers/staging/lustre/lnet/lnet/router.c
+> @@ -1207,7 +1207,7 @@ lnet_router_checker(void *arg)
+>  		version = the_lnet.ln_routers_version;
+>  
+>  		list_for_each_entry(rtr, &the_lnet.ln_routers, lp_rtr_list) {
+> -			cpt2 = lnet_cpt_of_nid_locked(rtr->lp_nid);
+> +			cpt2 = rtr->lp_cpt;
+>  			if (cpt != cpt2) {
+>  				lnet_net_unlock(cpt);
+>  				cpt = cpt2;
+> @@ -1693,7 +1693,7 @@ lnet_notify(struct lnet_ni *ni, lnet_nid_t nid, int alive, time64_t when)
+>  {
+>  	struct lnet_peer *lp = NULL;
+>  	time64_t now = ktime_get_seconds();
+> -	int cpt = lnet_cpt_of_nid(nid);
+> +	int cpt = lnet_cpt_of_nid(nid, ni);
+>  
+>  	LASSERT(!in_interrupt());
+>  
+> diff --git a/drivers/staging/lustre/lnet/selftest/brw_test.c b/drivers/staging/lustre/lnet/selftest/brw_test.c
+> index f1ee219bc8f3..e372ff3044c8 100644
+> --- a/drivers/staging/lustre/lnet/selftest/brw_test.c
+> +++ b/drivers/staging/lustre/lnet/selftest/brw_test.c
+> @@ -124,7 +124,7 @@ brw_client_init(struct sfw_test_instance *tsi)
+>  		return -EINVAL;
+>  
+>  	list_for_each_entry(tsu, &tsi->tsi_units, tsu_list) {
+> -		bulk = srpc_alloc_bulk(lnet_cpt_of_nid(tsu->tsu_dest.nid),
+> +		bulk = srpc_alloc_bulk(lnet_cpt_of_nid(tsu->tsu_dest.nid, NULL),
+>  				       off, npg, len, opc == LST_BRW_READ);
+>  		if (!bulk) {
+>  			brw_client_fini(tsi);
+> diff --git a/drivers/staging/lustre/lnet/selftest/framework.c b/drivers/staging/lustre/lnet/selftest/framework.c
+> index 944a2a6598fa..a82efc394659 100644
+> --- a/drivers/staging/lustre/lnet/selftest/framework.c
+> +++ b/drivers/staging/lustre/lnet/selftest/framework.c
+> @@ -1013,7 +1013,8 @@ sfw_run_batch(struct sfw_batch *tsb)
+>  			tsu->tsu_loop = tsi->tsi_loop;
+>  			wi = &tsu->tsu_worker;
+>  			swi_init_workitem(wi, sfw_run_test,
+> -					  lst_test_wq[lnet_cpt_of_nid(tsu->tsu_dest.nid)]);
+> +					  lst_test_wq[lnet_cpt_of_nid(tsu->tsu_dest.nid,
+> +							  NULL)]);
+>  			swi_schedule_workitem(wi);
+>  		}
+>  	}
+> diff --git a/drivers/staging/lustre/lnet/selftest/selftest.h b/drivers/staging/lustre/lnet/selftest/selftest.h
+> index 9dbb0a51d430..edf783af90e8 100644
+> --- a/drivers/staging/lustre/lnet/selftest/selftest.h
+> +++ b/drivers/staging/lustre/lnet/selftest/selftest.h
+> @@ -527,7 +527,7 @@ srpc_init_client_rpc(struct srpc_client_rpc *rpc, struct lnet_process_id peer,
+>  
+>  	INIT_LIST_HEAD(&rpc->crpc_list);
+>  	swi_init_workitem(&rpc->crpc_wi, srpc_send_rpc,
+> -			  lst_test_wq[lnet_cpt_of_nid(peer.nid)]);
+> +			  lst_test_wq[lnet_cpt_of_nid(peer.nid, NULL)]);
+>  	spin_lock_init(&rpc->crpc_lock);
+>  	atomic_set(&rpc->crpc_refcount, 1); /* 1 ref for caller */
+>  
 > 
 > 
 > 
