@@ -1,79 +1,103 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 12 Sep 2018 15:54:41 +1000
-Subject: [lustre-devel] [PATCH 23/34] lnet: don't need lock to test
- ln_shutdown.
-In-Reply-To: <41CB4483-3CFE-4EC2-9980-CBCBE6B3FE88@cray.com>
+From: Amir Shehata <amir.shehata.whamcloud@gmail.com>
+Date: Wed, 12 Sep 2018 09:29:20 -0700
+Subject: [lustre-devel] [PATCH 20/34] lnet: discard ni_cpt_list
+In-Reply-To: <153628137203.8267.14277020278461943610.stgit@noble>
 References: <153628058697.8267.6056114844033479774.stgit@noble>
- <153628137216.8267.15666994772553520296.stgit@noble>
- <41CB4483-3CFE-4EC2-9980-CBCBE6B3FE88@cray.com>
-Message-ID: <871s9zqmzi.fsf@notabene.neil.brown.name>
+ <153628137203.8267.14277020278461943610.stgit@noble>
+Message-ID: <CAAqp6i3Xjf2hyr5-4UzHy4CcO-17gJhKgKSkTK6=kNMqJWW1TA@mail.gmail.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Wed, Sep 12 2018, Doug Oucharek wrote:
+This area was re-implemented. There is no need for ni_cptlist any longer. I
+looked at the current code and it's not being used.
+Originally it was being used to place the the ni on a global list:
+ln_nis_cpt. Which was traversed when attempting to calculate the cpt for a
+NID using lnet_cpt_of_nid_locked(). However that latter function has been
+re-implemented due to how MR works now. So there is not need for ni_cptlist.
 
-> It seems the selection code being affected by this patch later gets moved to its own routine called lnet_select_pathway().  The logic is completely re-written so it may not be important to fix the use of locks here.  However,  it is not good that the lock is not being held while checking for shutdown.
+On Thu, 6 Sep 2018 at 18:05, NeilBrown <neilb@suse.com> wrote:
 
-Thanks... I might drop the patch here, and probably fold it into which
-ever subsequent patch changes this code can gets rid of lnet_send().
-
-I'll try that anyway.
-
-NeilBrown
-
-
+> This isn't used any more.
+> The new comment is odd - this is no net_ni_cpt !!
+> The ni_cptlist linkage is no longer used - should it go too?
 >
-> Reviewed-by: Doug Oucharek <dougso@me.com>
+> This is part of
+>     8cbb8cd3e771e7f7e0f99cafc19fad32770dc015
+>        LU-7734 lnet: Multi-Rail local NI split
 >
-> Doug
+> Signed-off-by: NeilBrown <neilb@suse.com>
+> ---
+>  .../staging/lustre/include/linux/lnet/lib-types.h  |    4 +---
+>  drivers/staging/lustre/lnet/lnet/api-ni.c          |    7 -------
+>  2 files changed, 1 insertion(+), 10 deletions(-)
 >
-> ?On 9/6/18, 5:54 PM, "NeilBrown" <neilb@suse.com> wrote:
+> diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h
+> b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+> index 6c34ecf22021..dc15fa75a9d2 100644
+> --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
+> +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+> @@ -305,7 +305,7 @@ struct lnet_net {
+>  struct lnet_ni {
+>         /* chain on the lnet_net structure */
+>         struct list_head          ni_netlist;
+> -       /* chain on ln_nis_cpt */
+> +       /* chain on net_ni_cpt */
+>         struct list_head        ni_cptlist;
 >
->     ln_shutdown returns -ESHUTDOWN if ln_shutdown
->     is already set.
->     The lock is always taken to set ln_shutdown, but apparently
->     we don't need to hold the lock for this test.
->     I guess if it is set immediately after the test, and before
->     we take the lock then.... can anything bad happen?
->     
->     This is part of
->         8cbb8cd3e771e7f7e0f99cafc19fad32770dc015
->            LU-7734 lnet: Multi-Rail local NI split
->     
->     Signed-off-by: NeilBrown <neilb@suse.com>
->     ---
->      drivers/staging/lustre/lnet/lnet/lib-move.c |    7 ++-----
->      1 file changed, 2 insertions(+), 5 deletions(-)
->     
->     diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
->     index 60f34c4b85d3..46e593fbb44f 100644
->     --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
->     +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
->     @@ -1099,12 +1099,9 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
->      	cpt = lnet_cpt_of_nid(rtr_nid == LNET_NID_ANY ? dst_nid : rtr_nid,
->      			      local_ni);
->       again:
->     -	lnet_net_lock(cpt);
->     -
->     -	if (the_lnet.ln_shutdown) {
->     -		lnet_net_unlock(cpt);
->     +	if (the_lnet.ln_shutdown)
->      		return -ESHUTDOWN;
->     -	}
->     +	lnet_net_lock(cpt);
->      
->      	if (src_nid == LNET_NID_ANY) {
->      		src_ni = NULL;
->     
->     
->     
+>         spinlock_t              ni_lock;
+> @@ -671,8 +671,6 @@ struct lnet {
+>
+>         /* LND instances */
+>         struct list_head                ln_nets;
+> -       /* NIs bond on specific CPT(s) */
+> -       struct list_head                ln_nis_cpt;
+>         /* the loopback NI */
+>         struct lnet_ni                  *ln_loni;
+>         /* network zombie list */
+> diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c
+> b/drivers/staging/lustre/lnet/lnet/api-ni.c
+> index 546d5101360f..960f235df5e7 100644
+> --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
+> +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+> @@ -538,7 +538,6 @@ lnet_prepare(lnet_pid_t requested_pid)
+>
+>         INIT_LIST_HEAD(&the_lnet.ln_test_peers);
+>         INIT_LIST_HEAD(&the_lnet.ln_nets);
+> -       INIT_LIST_HEAD(&the_lnet.ln_nis_cpt);
+>         INIT_LIST_HEAD(&the_lnet.ln_routers);
+>         INIT_LIST_HEAD(&the_lnet.ln_drop_rules);
+>         INIT_LIST_HEAD(&the_lnet.ln_delay_rules);
+> @@ -616,7 +615,6 @@ lnet_unprepare(void)
+>         LASSERT(!the_lnet.ln_refcount);
+>         LASSERT(list_empty(&the_lnet.ln_test_peers));
+>         LASSERT(list_empty(&the_lnet.ln_nets));
+> -       LASSERT(list_empty(&the_lnet.ln_nis_cpt));
+>
+>         lnet_portals_destroy();
+>
+> @@ -1294,11 +1292,6 @@ lnet_startup_lndni(struct lnet_ni *ni, struct
+> lnet_lnd_tunables *tun)
+>         /* refcount for ln_nis */
+>         lnet_ni_addref_locked(ni, 0);
+>         list_add_tail(&ni->ni_net->net_list, &the_lnet.ln_nets);
+> -       if (ni->ni_cpts) {
+> -               lnet_ni_addref_locked(ni, 0);
+> -               list_add_tail(&ni->ni_cptlist, &the_lnet.ln_nis_cpt);
+> -       }
+> -
+>         lnet_net_unlock(LNET_LOCK_EX);
+>
+>         ni->ni_state = LNET_NI_STATE_ACTIVE;
+>
+>
+> _______________________________________________
+> lustre-devel mailing list
+> lustre-devel at lists.lustre.org
+> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
+>
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180912/7108a7a7/attachment.sig>
+An HTML attachment was scrubbed...
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180912/9562f938/attachment-0001.html>
