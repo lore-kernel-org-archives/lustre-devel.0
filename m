@@ -1,90 +1,125 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 12 Sep 2018 12:56:06 +1000
-Subject: [lustre-devel] [PATCH 07/34] lnet: change lnet_peer to
- reference the net, rather than ni.
-In-Reply-To: <alpine.LFD.2.21.1809110010510.29662@casper.infradead.org>
+From: Doug Oucharek <doucharek@cray.com>
+Date: Wed, 12 Sep 2018 03:30:58 +0000
+Subject: [lustre-devel] [PATCH 11/34] lnet: pass tun to
+ lnet_startup_lndni, instead of full conf
+In-Reply-To: <153628137168.8267.1167942220741712684.stgit@noble>
 References: <153628058697.8267.6056114844033479774.stgit@noble>
- <153628137151.8267.3943711043829439593.stgit@noble>
- <alpine.LFD.2.21.1809110010510.29662@casper.infradead.org>
-Message-ID: <87ftyfqv95.fsf@notabene.neil.brown.name>
+ <153628137168.8267.1167942220741712684.stgit@noble>
+Message-ID: <83C2283B-AFA7-47D6-925D-D2E4ECD95FF0@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, Sep 11 2018, James Simmons wrote:
->> @@ -1164,10 +1164,12 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
->>  			/* ENOMEM or shutting down */
->>  			return rc;
->>  		}
->> -		LASSERT(lp->lp_ni == src_ni);
->> +		LASSERT(lp->lp_net == src_ni->ni_net);
->>  	} else {
->>  		/* sending to a remote network */
->> -		lp = lnet_find_route_locked(src_ni, dst_nid, rtr_nid);
->> +		lp = lnet_find_route_locked(src_ni != NULL ?
->> +					    src_ni->ni_net : NULL,
->> +					    dst_nid, rtr_nid);
->>  		if (!lp) {
->>  			if (src_ni)
->>  				lnet_ni_decref_locked(src_ni, cpt);
->> @@ -1203,10 +1205,11 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
->>  		       lnet_msgtyp2str(msg->msg_type), msg->msg_len);
->>  
->>  		if (!src_ni) {
->> -			src_ni = lp->lp_ni;
->> +			src_ni = lnet_get_next_ni_locked(lp->lp_net, NULL);
->> +			LASSERT(src_ni != NULL);
->
-> Checkpatch will not like the above.
+With the suggested commit message from Amir:
 
-I think checkpatch is sometimes wrong.  However I went through the
-series removing all "== NULL" and "!= NULL".
+Reviewed-by: Doug Oucharek <dougso@me.com>
 
+Doug
 
->>  
->> -	lp->lp_ni = lnet_net2ni_locked(LNET_NIDNET(nid), cpt2);
->> -	if (!lp->lp_ni) {
->> -		rc = -EHOSTUNREACH;
->> -		goto out;
->> -	}
->> -
->> -	lp->lp_txcredits = lp->lp_ni->ni_net->net_tunables.lct_peer_tx_credits;
->> -	lp->lp_mintxcredits = lp->lp_ni->ni_net->net_tunables.lct_peer_tx_credits;
->> -	lp->lp_rtrcredits = lnet_peer_buffer_credits(lp->lp_ni);
->> -	lp->lp_minrtrcredits = lnet_peer_buffer_credits(lp->lp_ni);
->> +	lp->lp_net = lnet_get_net_locked(LNET_NIDNET(!lp->lp_nid));
->
-> This is the single error in your port that broke stuff. The correct code 
-> is:
->
-> lp->lp_net = lnet_get_net_locked(LNET_NIDNET(lp->lp_nid));
->
+?On 9/6/18, 5:53 PM, "NeilBrown" <neilb@suse.com> wrote:
 
-Thanks for spotting that!!
-
->> @@ -952,6 +950,7 @@ lnet_ping_router_locked(struct lnet_peer *rtr)
->>  	struct lnet_rc_data *rcd = NULL;
->>  	time64_t now = ktime_get_seconds();
->>  	time64_t secs;
->> +	struct lnet_ni  *ni;
->
-> Another grep from Greg was the spacing in declared variables. As I port
-> patches new code removes the spacing. Newer lustre code no long does
-> this kind of spacing. Well most of it :-)
->
-
-I went through the series are removed all the stray space in local
-variable decls.
-
-Thanks,
-NeilBrown
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180912/0b5bb37a/attachment.sig>
+    I don't understand parts of this change.
+    Particularly the removal for
+           /* If given some LND tunable parameters, parse those now to
+            * override the values in the NI structure. */
+    
+    isn't clear to me.
+    
+    This is part of
+        8cbb8cd3e771e7f7e0f99cafc19fad32770dc015
+           LU-7734 lnet: Multi-Rail local NI split
+    
+    Signed-off-by: NeilBrown <neilb@suse.com>
+    ---
+     drivers/staging/lustre/lnet/lnet/api-ni.c |   41 ++++++++---------------------
+     1 file changed, 12 insertions(+), 29 deletions(-)
+    
+    diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+    index 6e0b8310574d..53ecfd700db3 100644
+    --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
+    +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+    @@ -1240,10 +1240,8 @@ lnet_shutdown_lndni(struct lnet_ni *ni)
+     }
+     
+     static int
+    -lnet_startup_lndni(struct lnet_ni *ni, struct lnet_ioctl_config_data *conf)
+    +lnet_startup_lndni(struct lnet_ni *ni, struct lnet_lnd_tunables *tun)
+     {
+    -	struct lnet_ioctl_config_lnd_tunables *lnd_tunables = NULL;
+    -	struct lnet_lnd_tunables *tun = NULL;
+     	int rc = -EINVAL;
+     	int lnd_type;
+     	struct lnet_lnd *lnd;
+    @@ -1296,36 +1294,12 @@ lnet_startup_lndni(struct lnet_ni *ni, struct lnet_ioctl_config_data *conf)
+     
+     	ni->ni_net->net_lnd = lnd;
+     
+    -	if (conf && conf->cfg_hdr.ioc_len > sizeof(*conf)) {
+    -		lnd_tunables = (struct lnet_ioctl_config_lnd_tunables *)conf->cfg_bulk;
+    -		tun = &lnd_tunables->lt_tun;
+    -	}
+    -
+     	if (tun) {
+     		memcpy(&ni->ni_lnd_tunables, tun,
+     		       sizeof(*tun));
+     		ni->ni_lnd_tunables_set = true;
+     	}
+     
+    -	/*
+    -	 * If given some LND tunable parameters, parse those now to
+    -	 * override the values in the NI structure.
+    -	 */
+    -	if (conf) {
+    -		if (conf->cfg_config_u.cfg_net.net_peer_rtr_credits >= 0)
+    -			ni->ni_net->net_tunables.lct_peer_rtr_credits =
+    -				conf->cfg_config_u.cfg_net.net_peer_rtr_credits;
+    -		if (conf->cfg_config_u.cfg_net.net_peer_timeout >= 0)
+    -			ni->ni_net->net_tunables.lct_peer_timeout =
+    -				conf->cfg_config_u.cfg_net.net_peer_timeout;
+    -		if (conf->cfg_config_u.cfg_net.net_peer_tx_credits != -1)
+    -			ni->ni_net->net_tunables.lct_peer_tx_credits =
+    -				conf->cfg_config_u.cfg_net.net_peer_tx_credits;
+    -		if (conf->cfg_config_u.cfg_net.net_max_tx_credits >= 0)
+    -			ni->ni_net->net_tunables.lct_max_tx_credits =
+    -				conf->cfg_config_u.cfg_net.net_max_tx_credits;
+    -	}
+    -
+     	rc = lnd->lnd_startup(ni);
+     
+     	mutex_unlock(&the_lnet.ln_lnd_mutex);
+    @@ -1861,9 +1835,13 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, struct lnet_ioctl_config_data *conf)
+     	struct list_head net_head;
+     	struct lnet_remotenet *rnet;
+     	int rc;
+    +	struct lnet_ioctl_config_lnd_tunables *lnd_tunables = NULL;
+     
+     	INIT_LIST_HEAD(&net_head);
+     
+    +	if (conf && conf->cfg_hdr.ioc_len > sizeof(*conf))
+    +		lnd_tunables = (struct lnet_ioctl_config_lnd_tunables *)conf->cfg_bulk;
+    +
+     	/* Create a net/ni structures for the network string */
+     	rc = lnet_parse_networks(&net_head, nets);
+     	if (rc <= 0)
+    @@ -1898,9 +1876,14 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, struct lnet_ioctl_config_data *conf)
+     		goto failed0;
+     
+     	list_del_init(&net->net_list);
+    +	if (lnd_tunables)
+    +		memcpy(&net->net_tunables,
+    +		       &lnd_tunables->lt_cmn, sizeof(lnd_tunables->lt_cmn));
+    +
+     	ni = list_first_entry(&net->net_ni_list, struct lnet_ni, ni_netlist);
+    -	rc = lnet_startup_lndni(ni, conf);
+    -	if (rc)
+    +	rc = lnet_startup_lndni(ni, (lnd_tunables ?
+    +				     &lnd_tunables->lt_tun : NULL));
+    +	if (rc < 0)
+     		goto failed1;
+     
+     	if (ni->ni_net->net_lnd->lnd_accept) {
+    
+    
+    
