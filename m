@@ -1,17 +1,16 @@
 From: Doug Oucharek <doucharek@cray.com>
-Date: Wed, 12 Sep 2018 04:15:06 +0000
-Subject: [lustre-devel] [PATCH 21/34] lnet: add net_ni_added
-In-Reply-To: <153628137207.8267.8628833457984431545.stgit@noble>
+Date: Wed, 12 Sep 2018 04:18:21 +0000
+Subject: [lustre-devel] [PATCH 22/34] lnet: don't take reference in
+ lnet_XX2ni_locked()
+In-Reply-To: <153628137211.8267.6066882916704220570.stgit@noble>
 References: <153628058697.8267.6056114844033479774.stgit@noble>
- <153628137207.8267.8628833457984431545.stgit@noble>
-Message-ID: <09A41DB4-EC94-472F-B511-7EBD5FBCE018@cray.com>
+ <153628137211.8267.6066882916704220570.stgit@noble>
+Message-ID: <3D26740D-2ABC-4596-BDF1-D3E2F186608A@cray.com>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
-
-I have to say, there are way too many lists being managed in LNet.  I'm confusing myself looking at this code again.  Wish there was a better way.
 
 Reviewed-by: Doug Oucharek <dougso@me.com>
 
@@ -19,9 +18,13 @@ Doug
 
 ?On 9/6/18, 5:54 PM, "NeilBrown" <neilb@suse.com> wrote:
 
-    When we allocate an ni, it is now added to the new net_ni_added
-    list of unstarted interfaces.
-    lnet_startup_lndnet() now starts all those added interfaces.
+    lnet_net2ni_locked() and lnet_nid2ni_locked() no longer take
+    a reference - as the lock is held, a ref isn't always needed.
+    
+    Instead, introduce lnet_nid2ni_addref() which does take the reference
+    (but doesn't need the lock).
+    Various places which called lnet_net2ni_locked() or
+    lnet_nid2ni_locked() no longer need to drop the ref afterwards.
     
     This is part of
         8cbb8cd3e771e7f7e0f99cafc19fad32770dc015
@@ -29,126 +32,191 @@ Doug
     
     Signed-off-by: NeilBrown <neilb@suse.com>
     ---
-     .../staging/lustre/include/linux/lnet/lib-types.h  |    3 ++
-     drivers/staging/lustre/lnet/lnet/api-ni.c          |   39 +++++++++++++++++---
-     drivers/staging/lustre/lnet/lnet/config.c          |   13 ++++++-
-     3 files changed, 48 insertions(+), 7 deletions(-)
+     .../staging/lustre/include/linux/lnet/lib-lnet.h   |    1 +
+     .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |    2 +
+     drivers/staging/lustre/lnet/lnet/acceptor.c        |    2 +
+     drivers/staging/lustre/lnet/lnet/api-ni.c          |   27 +++++++++++++-------
+     drivers/staging/lustre/lnet/lnet/lib-move.c        |   17 +------------
+     5 files changed, 21 insertions(+), 28 deletions(-)
     
-    diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-    index dc15fa75a9d2..1faa247a93b8 100644
-    --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-    +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-    @@ -298,6 +298,9 @@ struct lnet_net {
-     	/* list of NIs on this net */
-     	struct list_head	net_ni_list;
+    diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+    index 54a93235834c..6401d9a37b23 100644
+    --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+    +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+    @@ -398,6 +398,7 @@ extern int avoid_asym_router_failure;
+     int lnet_cpt_of_nid_locked(lnet_nid_t nid, struct lnet_ni *ni);
+     int lnet_cpt_of_nid(lnet_nid_t nid, struct lnet_ni *ni);
+     struct lnet_ni *lnet_nid2ni_locked(lnet_nid_t nid, int cpt);
+    +struct lnet_ni *lnet_nid2ni_addref(lnet_nid_t nid);
+     struct lnet_ni *lnet_net2ni_locked(__u32 net, int cpt);
+     struct lnet_ni *lnet_net2ni(__u32 net);
+     bool lnet_is_ni_healthy_locked(struct lnet_ni *ni);
+    diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+    index e64c14914924..af8f863b6a68 100644
+    --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+    +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+    @@ -2294,7 +2294,7 @@ kiblnd_passive_connect(struct rdma_cm_id *cmid, void *priv, int priv_nob)
+     	}
      
-    +	/* list of NIs being added, but not started yet */
-    +	struct list_head	net_ni_added;
-    +
-     	/* dying LND instances */
-     	struct list_head	net_ni_zombie;
-     };
+     	nid = reqmsg->ibm_srcnid;
+    -	ni = lnet_net2ni(LNET_NIDNET(reqmsg->ibm_dstnid));
+    +	ni = lnet_nid2ni_addref(reqmsg->ibm_dstnid);
+     
+     	if (ni) {
+     		net = (struct kib_net *)ni->ni_data;
+    diff --git a/drivers/staging/lustre/lnet/lnet/acceptor.c b/drivers/staging/lustre/lnet/lnet/acceptor.c
+    index 88b90c1fdbaf..25205f686801 100644
+    --- a/drivers/staging/lustre/lnet/lnet/acceptor.c
+    +++ b/drivers/staging/lustre/lnet/lnet/acceptor.c
+    @@ -296,7 +296,7 @@ lnet_accept(struct socket *sock, __u32 magic)
+     	if (flip)
+     		__swab64s(&cr.acr_nid);
+     
+    -	ni = lnet_net2ni(LNET_NIDNET(cr.acr_nid));
+    +	ni = lnet_nid2ni_addref(cr.acr_nid);
+     	if (!ni ||	       /* no matching net */
+     	    ni->ni_nid != cr.acr_nid) { /* right NET, wrong NID! */
+     		if (ni)
     diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-    index 960f235df5e7..ce3dd0f32e12 100644
+    index ce3dd0f32e12..42e775e2a669 100644
     --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
     +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-    @@ -1350,12 +1350,15 @@ static int
-     lnet_startup_lndnet(struct lnet_net *net, struct lnet_lnd_tunables *tun)
+    @@ -655,7 +655,6 @@ lnet_net2ni_locked(__u32 net_id, int cpt)
+     		if (net->net_id == net_id) {
+     			ni = list_entry(net->net_ni_list.next, struct lnet_ni,
+     					ni_netlist);
+    -			lnet_ni_addref_locked(ni, cpt);
+     			return ni;
+     		}
+     	}
+    @@ -794,16 +793,29 @@ lnet_nid2ni_locked(lnet_nid_t nid, int cpt)
+     
+     	list_for_each_entry(net, &the_lnet.ln_nets, net_list) {
+     		list_for_each_entry(ni, &net->net_ni_list, ni_netlist) {
+    -			if (ni->ni_nid == nid) {
+    -				lnet_ni_addref_locked(ni, cpt);
+    +			if (ni->ni_nid == nid)
+     				return ni;
+    -			}
+     		}
+     	}
+     
+     	return NULL;
+     }
+     
+    +struct lnet_ni *
+    +lnet_nid2ni_addref(lnet_nid_t nid)
+    +{
+    +	struct lnet_ni *ni;
+    +
+    +	lnet_net_lock(0);
+    +	ni = lnet_nid2ni_locked(nid, 0);
+    +	if (ni)
+    +		lnet_ni_addref_locked(ni, 0);
+    +	lnet_net_unlock(0);
+    +
+    +	return ni;
+    +}
+    +EXPORT_SYMBOL(lnet_nid2ni_addref);
+    +
+     int
+     lnet_islocalnid(lnet_nid_t nid)
      {
-     	struct lnet_ni		*ni;
-    +	struct list_head	local_ni_list;
-    +	int			rc;
-    +	int			ni_count = 0;
-     	__u32			lnd_type;
-     	struct lnet_lnd		*lnd;
-    -	int			rc;
+    @@ -812,8 +824,6 @@ lnet_islocalnid(lnet_nid_t nid)
      
-     	lnd_type = LNET_NETTYP(net->net_id);
+     	cpt = lnet_net_lock_current();
+     	ni = lnet_nid2ni_locked(nid, cpt);
+    -	if (ni)
+    -		lnet_ni_decref_locked(ni, cpt);
+     	lnet_net_unlock(cpt);
      
-    +	INIT_LIST_HEAD(&local_ni_list);
-     	LASSERT(libcfs_isknown_lnd(lnd_type));
+     	return !!ni;
+    @@ -1412,6 +1422,7 @@ lnet_startup_lndnet(struct lnet_net *net, struct lnet_lnd_tunables *tun)
+     		if (rc < 0)
+     			goto failed1;
      
-     	/* Make sure this new NI is unique. */
-    @@ -1399,12 +1402,36 @@ lnet_startup_lndnet(struct lnet_net *net, struct lnet_lnd_tunables *tun)
-     	net->net_lnd = lnd;
-     	mutex_unlock(&the_lnet.ln_lnd_mutex);
+    +		lnet_ni_addref(ni);
+     		list_add_tail(&ni->ni_netlist, &local_ni_list);
      
-    -	ni = list_first_entry(&net->net_ni_list, struct lnet_ni, ni_netlist);
-    +	while (!list_empty(&net->net_ni_added)) {
-    +		ni = list_entry(net->net_ni_added.next, struct lnet_ni,
-    +				ni_netlist);
-    +		list_del_init(&ni->ni_netlist);
-     
-    -	rc = lnet_startup_lndni(ni, tun);
-    -	if (rc < 0)
-    -		return rc;
-    -	return 1;
-    +		rc = lnet_startup_lndni(ni, tun);
-    +
-    +		if (rc < 0)
-    +			goto failed1;
-    +
-    +		list_add_tail(&ni->ni_netlist, &local_ni_list);
-    +
-    +		ni_count++;
-    +	}
-    +	lnet_net_lock(LNET_LOCK_EX);
-    +	list_splice_tail(&local_ni_list, &net->net_ni_list);
-    +	lnet_net_unlock(LNET_LOCK_EX);
-    +	return ni_count;
-    +
-    +failed1:
-    +	/*
-    +	 * shutdown the new NIs that are being started up
-    +	 * free the NET being started
-    +	 */
-    +	while (!list_empty(&local_ni_list)) {
-    +		ni = list_entry(local_ni_list.next, struct lnet_ni,
-    +				ni_netlist);
-    +
-    +		lnet_shutdown_lndni(ni);
-    +	}
-     
-     failed0:
-     	lnet_net_free(net);
-    diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-    index 081812e19b13..f886dcfc6d6e 100644
-    --- a/drivers/staging/lustre/lnet/lnet/config.c
-    +++ b/drivers/staging/lustre/lnet/lnet/config.c
-    @@ -281,6 +281,16 @@ lnet_net_free(struct lnet_net *net)
-     
-     	LASSERT(list_empty(&net->net_ni_zombie));
-     
-    +	/*
-    +	 * delete any nis that haven't been added yet. This could happen
-    +	 * if there is a failure on net startup
-    +	 */
-    +	list_for_each_safe(tmp, tmp2, &net->net_ni_added) {
-    +		ni = list_entry(tmp, struct lnet_ni, ni_netlist);
-    +		list_del_init(&ni->ni_netlist);
-    +		lnet_ni_free(ni);
-    +	}
-    +
-     	/* delete any nis which have been started. */
-     	list_for_each_safe(tmp, tmp2, &net->net_ni_list) {
-     		ni = list_entry(tmp, struct lnet_ni, ni_netlist);
-    @@ -314,6 +324,7 @@ lnet_net_alloc(__u32 net_id, struct list_head *net_list)
-     
-     	INIT_LIST_HEAD(&net->net_list);
-     	INIT_LIST_HEAD(&net->net_ni_list);
-    +	INIT_LIST_HEAD(&net->net_ni_added);
-     	INIT_LIST_HEAD(&net->net_ni_zombie);
-     
-     	net->net_id = net_id;
-    @@ -397,7 +408,7 @@ lnet_ni_alloc(struct lnet_net *net, struct cfs_expr_list *el, char *iface)
-     	rc = lnet_net_append_cpts(ni->ni_cpts, ni->ni_ncpts, net);
-     	if (rc != 0)
+     		ni_count++;
+    @@ -2032,9 +2043,6 @@ lnet_dyn_del_ni(__u32 net)
      		goto failed;
-    -	list_add_tail(&ni->ni_netlist, &net->net_ni_list);
-    +	list_add_tail(&ni->ni_netlist, &net->net_ni_added);
+     	}
      
-     	return ni;
-     failed:
+    -	/* decrement the reference counter taken by lnet_net2ni() */
+    -	lnet_ni_decref_locked(ni, 0);
+    -
+     	lnet_shutdown_lndni(ni);
+     
+     	if (!lnet_count_acceptor_nets())
+    @@ -2264,7 +2272,6 @@ LNetCtl(unsigned int cmd, void *arg)
+     		else
+     			rc = ni->ni_net->net_lnd->lnd_ctl(ni, cmd, arg);
+     
+    -		lnet_ni_decref(ni);
+     		return rc;
+     	}
+     	/* not reached */
+    diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+    index 00a89221c9b3..60f34c4b85d3 100644
+    --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
+    +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+    @@ -1127,11 +1127,7 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
+     		if (!src_ni) {
+     			src_ni = local_ni;
+     			src_nid = src_ni->ni_nid;
+    -		} else if (src_ni == local_ni) {
+    -			lnet_ni_decref_locked(local_ni, cpt);
+    -		} else {
+    -			lnet_ni_decref_locked(local_ni, cpt);
+    -			lnet_ni_decref_locked(src_ni, cpt);
+    +		} else if (src_ni != local_ni) {
+     			lnet_net_unlock(cpt);
+     			LCONSOLE_WARN("No route to %s via from %s\n",
+     				      libcfs_nid2str(dst_nid),
+    @@ -1149,16 +1145,10 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
+     			/* No send credit hassles with LOLND */
+     			lnet_net_unlock(cpt);
+     			lnet_ni_send(src_ni, msg);
+    -
+    -			lnet_net_lock(cpt);
+    -			lnet_ni_decref_locked(src_ni, cpt);
+    -			lnet_net_unlock(cpt);
+     			return 0;
+     		}
+     
+     		rc = lnet_nid2peer_locked(&lp, dst_nid, cpt);
+    -		/* lp has ref on src_ni; lose mine */
+    -		lnet_ni_decref_locked(src_ni, cpt);
+     		if (rc) {
+     			lnet_net_unlock(cpt);
+     			LCONSOLE_WARN("Error %d finding peer %s\n", rc,
+    @@ -1173,8 +1163,6 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
+     					    src_ni->ni_net : NULL,
+     					    dst_nid, rtr_nid);
+     		if (!lp) {
+    -			if (src_ni)
+    -				lnet_ni_decref_locked(src_ni, cpt);
+     			lnet_net_unlock(cpt);
+     
+     			LCONSOLE_WARN("No route to %s via %s (all routers down)\n",
+    @@ -1192,8 +1180,6 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
+     		if (rtr_nid != lp->lp_nid) {
+     			cpt2 = lp->lp_cpt;
+     			if (cpt2 != cpt) {
+    -				if (src_ni)
+    -					lnet_ni_decref_locked(src_ni, cpt);
+     				lnet_net_unlock(cpt);
+     
+     				rtr_nid = lp->lp_nid;
+    @@ -1212,7 +1198,6 @@ lnet_send(lnet_nid_t src_nid, struct lnet_msg *msg, lnet_nid_t rtr_nid)
+     			src_nid = src_ni->ni_nid;
+     		} else {
+     			LASSERT(src_ni->ni_net == lp->lp_net);
+    -			lnet_ni_decref_locked(src_ni, cpt);
+     		}
+     
+     		lnet_peer_addref_locked(lp);
     
     
     
