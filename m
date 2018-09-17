@@ -1,341 +1,655 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Sep 2018 13:31:16 -0400
-Subject: [lustre-devel] [PATCH 3/8] lustre: obdclass: Code cleanup
+Date: Mon, 17 Sep 2018 13:31:20 -0400
+Subject: [lustre-devel] [PATCH 7/8] lustre: obdclass: restore md_stats code
 In-Reply-To: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
 References: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537205481-6899-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537205481-6899-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Ben Evans <bevans@cray.com>
+Originally the linux lustre client contained the md_stats code
+but no one used it at that time so some parts of the code was
+removed. The remaining md_stats code is layered in many levels
+of macros that make the code difficult to read as well as
+introduce undetected errors. This patch peels away the macro
+wrappers by replacing it with the function lprocfs_count_incr()
+which doesn't care about the order of the function pointers in
+struct md_ops as the original code did.
 
-Remove uuid.c, and unroll class_uuid_unparse
-Rewrite CL_ENV_INC and DEC
-Remove D_KUC #define
-
-Signed-off-by: Ben Evans <bevans@cray.com>
+Signed-off-by: James Simmons <uja.ornl@yahoo.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-9855
-Reviewed-on: https://review.whamcloud.com/28458
+Reviewed-on: https://review.whamcloud.com/32822
+Reviewed-by: Ben Evans <bevans@cray.com>
 Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Patrick Farrell <paf@cray.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd_class.h  | 40 +++++++------------
- drivers/staging/lustre/lustre/llite/llite_lib.c    |  3 +-
- drivers/staging/lustre/lustre/obdclass/Makefile    |  5 +--
- drivers/staging/lustre/lustre/obdclass/cl_object.c | 21 ++++++----
- drivers/staging/lustre/lustre/obdclass/class_obd.c |  1 -
- .../staging/lustre/lustre/obdclass/kernelcomm.c    |  7 ++--
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |  2 +-
- drivers/staging/lustre/lustre/obdclass/uuid.c      | 45 ----------------------
- 8 files changed, 34 insertions(+), 90 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/obdclass/uuid.c
+ .../staging/lustre/lustre/include/lprocfs_status.h |   5 +-
+ drivers/staging/lustre/lustre/include/obd.h        |   8 +-
+ drivers/staging/lustre/lustre/include/obd_class.h  | 233 +++++++++++----------
+ drivers/staging/lustre/lustre/obdclass/genops.c    |   3 -
+ .../lustre/lustre/obdclass/lprocfs_status.c        |  66 +++++-
+ 5 files changed, 192 insertions(+), 123 deletions(-)
 
+diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+index 5da26e3..c22ae3d 100644
+--- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
++++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
+@@ -442,11 +442,12 @@ __u64 lprocfs_stats_collector(struct lprocfs_stats *stats, int idx,
+ lprocfs_alloc_stats(unsigned int num, enum lprocfs_stats_flags flags);
+ void lprocfs_clear_stats(struct lprocfs_stats *stats);
+ void lprocfs_free_stats(struct lprocfs_stats **stats);
++int ldebugfs_alloc_md_stats(struct obd_device *obddev,
++			    unsigned int num_private_stats);
++void ldebugfs_free_md_stats(struct obd_device *obddev);
+ void lprocfs_counter_init(struct lprocfs_stats *stats, int index,
+ 			  unsigned int conf, const char *name,
+ 			  const char *units);
+-struct obd_export;
+-int lprocfs_exp_cleanup(struct obd_export *exp);
+ extern const struct file_operations lprocfs_stats_seq_fops;
+ 
+ /* lprocfs_status.c */
+diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
+index 8691aec..6e78c50 100644
+--- a/drivers/staging/lustre/lustre/include/obd.h
++++ b/drivers/staging/lustre/lustre/include/obd.h
+@@ -599,8 +599,7 @@ struct obd_device {
+ 	/* Fields used by LProcFS */
+ 	struct lprocfs_stats	*obd_stats;
+ 
+-	struct lprocfs_stats	*md_stats;
+-	unsigned int		 md_cntr_base;
++	struct lprocfs_stats	*obd_md_stats;
+ 
+ 	struct dentry		*obd_debugfs_entry;
+ 	struct dentry		*obd_svc_debugfs_entry;
+@@ -1000,11 +999,6 @@ struct md_ops {
+ 
+ 	int (*unpackmd)(struct obd_export *exp, struct lmv_stripe_md **plsm,
+ 			const union lmv_mds_md *lmv, size_t lmv_size);
+-	/*
+-	 * NOTE: If adding ops, add another LPROCFS_MD_OP_INIT() line to
+-	 * lprocfs_alloc_md_stats() in obdclass/lprocfs_status.c. Also, add a
+-	 * wrapper function in include/linux/obd_class.h.
+-	 */
+ };
+ 
+ static inline struct md_open_data *obd_mod_alloc(void)
 diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 39a5eca..c6fb2e1 100644
+index 0c1922e..2514b39 100644
 --- a/drivers/staging/lustre/lustre/include/obd_class.h
 +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -497,9 +497,9 @@ static inline int obd_set_info_async(const struct lu_env *env,
- 
- static inline int obd_setup(struct obd_device *obd, struct lustre_cfg *cfg)
- {
--	int rc;
- 	struct lu_device_type *ldt;
- 	struct lu_device *d;
-+	int rc;
- 
- 	ldt = obd->obd_type->typ_lu;
- 	if (ldt) {
-@@ -536,15 +536,10 @@ static inline int obd_setup(struct obd_device *obd, struct lustre_cfg *cfg)
- 
- static inline int obd_precleanup(struct obd_device *obd)
- {
-+	struct lu_device_type *ldt = obd->obd_type->typ_lu;
-+	struct lu_device *d = obd->obd_lu_dev;
- 	int rc;
--	struct lu_device_type *ldt;
--	struct lu_device *d;
- 
--	rc = obd_check_dev(obd);
--	if (rc)
--		return rc;
--	ldt = obd->obd_type->typ_lu;
--	d = obd->obd_lu_dev;
- 	if (ldt && d) {
- 		struct lu_env env;
- 
-@@ -563,16 +558,10 @@ static inline int obd_precleanup(struct obd_device *obd)
- 
- static inline int obd_cleanup(struct obd_device *obd)
- {
-+	struct lu_device_type *ldt = obd->obd_type->typ_lu;
-+	struct lu_device *d = obd->obd_lu_dev;
- 	int rc;
--	struct lu_device_type *ldt;
--	struct lu_device *d;
- 
--	rc = obd_check_dev(obd);
--	if (rc)
--		return rc;
--
--	ldt = obd->obd_type->typ_lu;
--	d = obd->obd_lu_dev;
- 	if (ldt && d) {
- 		struct lu_env env;
- 
-@@ -613,17 +602,11 @@ static inline void obd_cleanup_client_import(struct obd_device *obd)
- static inline int
- obd_process_config(struct obd_device *obd, int datalen, void *data)
- {
-+	struct lu_device_type *ldt = obd->obd_type->typ_lu;
-+	struct lu_device *d = obd->obd_lu_dev;
- 	int rc;
--	struct lu_device_type *ldt;
--	struct lu_device *d;
--
--	rc = obd_check_dev(obd);
--	if (rc)
--		return rc;
- 
- 	obd->obd_process_conf = 1;
--	ldt = obd->obd_type->typ_lu;
--	d = obd->obd_lu_dev;
- 	if (ldt && d) {
- 		struct lu_env env;
- 
-@@ -1554,9 +1537,12 @@ struct lwp_register_item {
- /* obd_mount.c */
- int lustre_check_exclusion(struct super_block *sb, char *svname);
- 
--/* uuid.c  */
--typedef __u8 class_uuid_t[16];
--void class_uuid_unparse(class_uuid_t in, struct obd_uuid *out);
-+typedef u8 class_uuid_t[16];
-+
-+static inline void class_uuid_unparse(class_uuid_t uu, struct obd_uuid *out)
-+{
-+	sprintf(out->uuid, "%pU", uu);
-+}
- 
- /* lustre_peer.c    */
- int lustre_uuid_to_peer(const char *uuid, lnet_nid_t *peer_nid, int index);
-diff --git a/drivers/staging/lustre/lustre/llite/llite_lib.c b/drivers/staging/lustre/lustre/llite/llite_lib.c
-index 3de6e886..22b545e 100644
---- a/drivers/staging/lustre/lustre/llite/llite_lib.c
-+++ b/drivers/staging/lustre/lustre/llite/llite_lib.c
-@@ -98,7 +98,8 @@ static struct ll_sb_info *ll_init_sbi(void)
- 					   SBI_DEFAULT_READAHEAD_WHOLE_MAX;
- 
- 	ll_generate_random_uuid(uuid);
--	class_uuid_unparse(uuid, &sbi->ll_sb_uuid);
-+	sprintf(sbi->ll_sb_uuid.uuid, "%pU", uuid);
-+
- 	CDEBUG(D_CONFIG, "generated uuid: %s\n", sbi->ll_sb_uuid.uuid);
- 
- 	sbi->ll_flags |= LL_SBI_VERBOSE;
-diff --git a/drivers/staging/lustre/lustre/obdclass/Makefile b/drivers/staging/lustre/lustre/obdclass/Makefile
-index 19c8bd9..b1fac48 100644
---- a/drivers/staging/lustre/lustre/obdclass/Makefile
-+++ b/drivers/staging/lustre/lustre/obdclass/Makefile
-@@ -4,9 +4,8 @@ ccflags-y += -I$(srctree)/drivers/staging/lustre/lustre/include
- 
- obj-$(CONFIG_LUSTRE_FS) += obdclass.o
- 
--obdclass-y := obd_sysfs.o \
--	      llog.o llog_cat.o llog_obd.o llog_swab.o class_obd.o debug.o \
--	      genops.o uuid.o lprocfs_status.o lprocfs_counters.o \
-+obdclass-y := llog.o llog_cat.o llog_obd.o llog_swab.o class_obd.o debug.o \
-+	      genops.o obd_sysfs.o lprocfs_status.o lprocfs_counters.o \
- 	      lustre_handles.o lustre_peer.o statfs_pack.o linkea.o \
- 	      obdo.o obd_config.o obd_mount.o lu_object.o lu_ref.o \
- 	      cl_object.o cl_page.o cl_lock.o cl_io.o kernelcomm.o
-diff --git a/drivers/staging/lustre/lustre/obdclass/cl_object.c b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-index d1d7bec..09fc7e7 100644
---- a/drivers/staging/lustre/lustre/obdclass/cl_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/cl_object.c
-@@ -572,8 +572,13 @@ struct cl_env {
- 	void	     *ce_debug;
- };
- 
--#define CL_ENV_INC(counter)
--#define CL_ENV_DEC(counter)
-+static void cl_env_inc(enum cache_stats_item item)
-+{
-+}
-+
-+static void cl_env_dec(enum cache_stats_item item)
-+{
-+}
- 
- static void cl_env_init0(struct cl_env *cle, void *debug)
- {
-@@ -583,7 +588,7 @@ static void cl_env_init0(struct cl_env *cle, void *debug)
- 
- 	cle->ce_ref = 1;
- 	cle->ce_debug = debug;
--	CL_ENV_INC(busy);
-+	cl_env_inc(CS_busy);
- }
- 
- static struct lu_env *cl_env_new(__u32 ctx_tags, __u32 ses_tags, void *debug)
-@@ -614,8 +619,8 @@ static struct lu_env *cl_env_new(__u32 ctx_tags, __u32 ses_tags, void *debug)
- 			kmem_cache_free(cl_env_kmem, cle);
- 			env = ERR_PTR(rc);
- 		} else {
--			CL_ENV_INC(create);
--			CL_ENV_INC(total);
-+			cl_env_inc(CS_create);
-+			cl_env_inc(CS_total);
- 		}
- 	} else {
- 		env = ERR_PTR(-ENOMEM);
-@@ -625,7 +630,7 @@ static struct lu_env *cl_env_new(__u32 ctx_tags, __u32 ses_tags, void *debug)
- 
- static void cl_env_fini(struct cl_env *cle)
- {
--	CL_ENV_DEC(total);
-+	cl_env_dec(CS_total);
- 	lu_context_fini(&cle->ce_lu.le_ctx);
- 	lu_context_fini(&cle->ce_ses);
- 	kmem_cache_free(cl_env_kmem, cle);
-@@ -781,7 +786,7 @@ void cl_env_put(struct lu_env *env, u16 *refcheck)
- 	if (--cle->ce_ref == 0) {
- 		int cpu = get_cpu();
- 
--		CL_ENV_DEC(busy);
-+		cl_env_dec(CS_busy);
- 		cle->ce_debug = NULL;
- 		cl_env_exit(cle);
- 		/*
-@@ -902,7 +907,7 @@ void cl_env_percpu_put(struct lu_env *env)
- 	cle->ce_ref--;
- 	LASSERT(cle->ce_ref == 0);
- 
--	CL_ENV_DEC(busy);
-+	cl_env_dec(CS_busy);
- 	cle->ce_debug = NULL;
- 
- 	put_cpu();
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 2d23608..2103d2a 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -585,7 +585,6 @@ static long obd_class_ioctl(struct file *filp, unsigned int cmd,
- 	.fops	= &obd_psdev_fops,
- };
- 
--#define OBD_INIT_CHECK
- static int obd_init_checks(void)
- {
- 	__u64 u64val, div64val;
-diff --git a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-index 0fcfecf..3b006df 100644
---- a/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-+++ b/drivers/staging/lustre/lustre/obdclass/kernelcomm.c
-@@ -37,7 +37,6 @@
-  */
- 
- #define DEBUG_SUBSYSTEM S_CLASS
--#define D_KUC D_OTHER
- 
- #include <linux/file.h>
- #include <linux/libcfs/libcfs.h>
-@@ -77,7 +76,7 @@ int libcfs_kkuc_msg_put(struct file *filp, void *payload)
- 	if (rc < 0)
- 		CWARN("message send failed (%d)\n", rc);
- 	else
--		CDEBUG(D_KUC, "Sent message rc=%d, fp=%p\n", rc, filp);
-+		CDEBUG(D_HSM, "Sent message rc=%d, fp=%p\n", rc, filp);
- 
+@@ -334,36 +334,6 @@ static inline int obd_check_dev_active(struct obd_device *obd)
  	return rc;
  }
-@@ -146,7 +145,7 @@ int libcfs_kkuc_group_add(struct file *filp, int uid, unsigned int group,
- 	list_add(&reg->kr_chain, &kkuc_groups[group]);
- 	up_write(&kg_sem);
  
--	CDEBUG(D_KUC, "Added uid=%d fp=%p to group %d\n", uid, filp, group);
-+	CDEBUG(D_HSM, "Added uid=%d fp=%p to group %d\n", uid, filp, group);
+-#define MD_COUNTER_OFFSET(op)					\
+-	((offsetof(struct md_ops, op) -				\
+-		offsetof(struct md_ops, get_root))		\
+-		/ sizeof(((struct md_ops *)(0))->get_root))
+-
+-#define MD_COUNTER_INCREMENT(obdx, op)				 \
+-do {								 \
+-	if ((obd)->md_stats) {					 \
+-		unsigned int coffset;				 \
+-		coffset = (unsigned int)((obdx)->md_cntr_base) + \
+-			MD_COUNTER_OFFSET(op);			 \
+-		LASSERT(coffset < (obdx)->md_stats->ls_num);	 \
+-		lprocfs_counter_incr((obdx)->md_stats, coffset); \
+-	}							 \
+-} while (0)
+-
+-#define EXP_MD_COUNTER_INCREMENT(export, op)				    \
+-do {									    \
+-	if ((export)->exp_obd->obd_stats) {				    \
+-		unsigned int coffset;					    \
+-		coffset = (unsigned int)((export)->exp_obd->md_cntr_base) + \
+-			MD_COUNTER_OFFSET(op);				    \
+-		LASSERT(coffset < (export)->exp_obd->md_stats->ls_num);	    \
+-		lprocfs_counter_incr((export)->exp_obd->md_stats, coffset); \
+-		if ((export)->exp_md_stats)				    \
+-			lprocfs_counter_incr(				    \
+-				(export)->exp_md_stats, coffset);	    \
+-	}								    \
+-} while (0)
+-
+ static inline int exp_check_ops(struct obd_export *exp)
+ {
+ 	if (!exp)
+@@ -1186,6 +1156,25 @@ static inline int obd_register_observer(struct obd_device *obd,
+ }
  
+ /* metadata helpers */
++enum mps_stat_idx {
++	LPROC_MD_CLOSE,
++	LPROC_MD_CREATE,
++	LPROC_MD_ENQUEUE,
++	LPROC_MD_GETATTR,
++	LPROC_MD_INTENT_LOCK,
++	LPROC_MD_LINK,
++	LPROC_MD_RENAME,
++	LPROC_MD_SETATTR,
++	LPROC_MD_FSYNC,
++	LPROC_MD_READ_PAGE,
++	LPROC_MD_UNLINK,
++	LPROC_MD_SETXATTR,
++	LPROC_MD_GETXATTR,
++	LPROC_MD_INTENT_GETATTR_ASYNC,
++	LPROC_MD_REVALIDATE_LOCK,
++	LPROC_MD_LAST_OPC,
++};
++
+ static inline int md_get_root(struct obd_export *exp, const char *fileset,
+ 			      struct lu_fid *fid)
+ {
+@@ -1194,9 +1183,8 @@ static inline int md_get_root(struct obd_export *exp, const char *fileset,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, get_root);
+-	rc = MDP(exp->exp_obd, get_root)(exp, fileset, fid);
+-	return rc;
++
++	return MDP(exp->exp_obd, get_root)(exp, fileset, fid);
+ }
+ 
+ static inline int md_getattr(struct obd_export *exp, struct md_op_data *op_data,
+@@ -1207,9 +1195,11 @@ static inline int md_getattr(struct obd_export *exp, struct md_op_data *op_data,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, getattr);
+-	rc = MDP(exp->exp_obd, getattr)(exp, op_data, request);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_GETATTR);
++
++	return MDP(exp->exp_obd, getattr)(exp, op_data, request);
+ }
+ 
+ static inline int md_null_inode(struct obd_export *exp,
+@@ -1220,9 +1210,8 @@ static inline int md_null_inode(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, null_inode);
+-	rc = MDP(exp->exp_obd, null_inode)(exp, fid);
+-	return rc;
++
++	return MDP(exp->exp_obd, null_inode)(exp, fid);
+ }
+ 
+ static inline int md_close(struct obd_export *exp, struct md_op_data *op_data,
+@@ -1234,25 +1223,29 @@ static inline int md_close(struct obd_export *exp, struct md_op_data *op_data,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, close);
+-	rc = MDP(exp->exp_obd, close)(exp, op_data, mod, request);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_CLOSE);
++
++	return MDP(exp->exp_obd, close)(exp, op_data, mod, request);
+ }
+ 
+ static inline int md_create(struct obd_export *exp, struct md_op_data *op_data,
+ 			    const void *data, size_t datalen, umode_t mode,
+ 			    uid_t uid, gid_t gid, kernel_cap_t cap_effective,
+-			    __u64 rdev, struct ptlrpc_request **request)
++			    u64 rdev, struct ptlrpc_request **request)
+ {
+ 	int rc;
+ 
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, create);
+-	rc = MDP(exp->exp_obd, create)(exp, op_data, data, datalen, mode,
+-				       uid, gid, cap_effective, rdev, request);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_CREATE);
++
++	return MDP(exp->exp_obd, create)(exp, op_data, data, datalen, mode,
++					 uid, gid, cap_effective, rdev, request);
+ }
+ 
+ static inline int md_enqueue(struct obd_export *exp,
+@@ -1260,17 +1253,19 @@ static inline int md_enqueue(struct obd_export *exp,
+ 			     const union ldlm_policy_data *policy,
+ 			     struct md_op_data *op_data,
+ 			     struct lustre_handle *lockh,
+-			     __u64 extra_lock_flags)
++			     u64 extra_lock_flags)
+ {
+ 	int rc;
+ 
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, enqueue);
+-	rc = MDP(exp->exp_obd, enqueue)(exp, einfo, policy, op_data, lockh,
+-					extra_lock_flags);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_ENQUEUE);
++
++	return MDP(exp->exp_obd, enqueue)(exp, einfo, policy, op_data, lockh,
++					  extra_lock_flags);
+ }
+ 
+ static inline int md_getattr_name(struct obd_export *exp,
+@@ -1282,9 +1277,8 @@ static inline int md_getattr_name(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, getattr_name);
+-	rc = MDP(exp->exp_obd, getattr_name)(exp, op_data, request);
+-	return rc;
++
++	return MDP(exp->exp_obd, getattr_name)(exp, op_data, request);
+ }
+ 
+ static inline int md_intent_lock(struct obd_export *exp,
+@@ -1292,17 +1286,19 @@ static inline int md_intent_lock(struct obd_export *exp,
+ 				 struct lookup_intent *it,
+ 				 struct ptlrpc_request **reqp,
+ 				 ldlm_blocking_callback cb_blocking,
+-				 __u64 extra_lock_flags)
++				 u64 extra_lock_flags)
+ {
+ 	int rc;
+ 
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, intent_lock);
+-	rc = MDP(exp->exp_obd, intent_lock)(exp, op_data, it, reqp,
+-					    cb_blocking, extra_lock_flags);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_INTENT_LOCK);
++
++	return MDP(exp->exp_obd, intent_lock)(exp, op_data, it, reqp,
++					      cb_blocking, extra_lock_flags);
+ }
+ 
+ static inline int md_link(struct obd_export *exp, struct md_op_data *op_data,
+@@ -1313,24 +1309,29 @@ static inline int md_link(struct obd_export *exp, struct md_op_data *op_data,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, link);
+-	rc = MDP(exp->exp_obd, link)(exp, op_data, request);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_LINK);
++
++	return MDP(exp->exp_obd, link)(exp, op_data, request);
+ }
+ 
+ static inline int md_rename(struct obd_export *exp, struct md_op_data *op_data,
+-			    const char *old, size_t oldlen, const char *new,
+-			    size_t newlen, struct ptlrpc_request **request)
++			    const char *old_name, size_t oldlen,
++			    const char *new_name, size_t newlen,
++			    struct ptlrpc_request **request)
+ {
+ 	int rc;
+ 
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, rename);
+-	rc = MDP(exp->exp_obd, rename)(exp, op_data, old, oldlen, new,
+-				       newlen, request);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_RENAME);
++
++	return MDP(exp->exp_obd, rename)(exp, op_data, old_name, oldlen,
++					 new_name, newlen, request);
+ }
+ 
+ static inline int md_setattr(struct obd_export *exp, struct md_op_data *op_data,
+@@ -1342,9 +1343,11 @@ static inline int md_setattr(struct obd_export *exp, struct md_op_data *op_data,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, setattr);
+-	rc = MDP(exp->exp_obd, setattr)(exp, op_data, ea, ealen, request);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_SETATTR);
++
++	return MDP(exp->exp_obd, setattr)(exp, op_data, ea, ealen, request);
+ }
+ 
+ static inline int md_sync(struct obd_export *exp, const struct lu_fid *fid,
+@@ -1355,15 +1358,17 @@ static inline int md_sync(struct obd_export *exp, const struct lu_fid *fid,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, sync);
+-	rc = MDP(exp->exp_obd, sync)(exp, fid, request);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_FSYNC);
++
++	return MDP(exp->exp_obd, sync)(exp, fid, request);
+ }
+ 
+ static inline int md_read_page(struct obd_export *exp,
+ 			       struct md_op_data *op_data,
+ 			       struct md_callback *cb_op,
+-			       __u64  hash_offset,
++			       u64 hash_offset,
+ 			       struct page **ppage)
+ {
+ 	int rc;
+@@ -1371,10 +1376,12 @@ static inline int md_read_page(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, read_page);
+-	rc = MDP(exp->exp_obd, read_page)(exp, op_data, cb_op, hash_offset,
+-					  ppage);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_READ_PAGE);
++
++	return MDP(exp->exp_obd, read_page)(exp, op_data, cb_op, hash_offset,
++					    ppage);
+ }
+ 
+ static inline int md_unlink(struct obd_export *exp, struct md_op_data *op_data,
+@@ -1385,9 +1392,11 @@ static inline int md_unlink(struct obd_export *exp, struct md_op_data *op_data,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, unlink);
+-	rc = MDP(exp->exp_obd, unlink)(exp, op_data, request);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_UNLINK);
++
++	return MDP(exp->exp_obd, unlink)(exp, op_data, request);
+ }
+ 
+ static inline int md_get_lustre_md(struct obd_export *exp,
+@@ -1401,7 +1410,7 @@ static inline int md_get_lustre_md(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, get_lustre_md);
++
+ 	return MDP(exp->exp_obd, get_lustre_md)(exp, req, dt_exp, md_exp, md);
+ }
+ 
+@@ -1413,7 +1422,7 @@ static inline int md_free_lustre_md(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, free_lustre_md);
++
+ 	return MDP(exp->exp_obd, free_lustre_md)(exp, md);
+ }
+ 
+@@ -1427,7 +1436,7 @@ static inline int md_merge_attr(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, merge_attr);
++
+ 	return MDP(exp->exp_obd, merge_attr)(exp, lsm, attr, cb);
+ }
+ 
+@@ -1442,7 +1451,10 @@ static inline int md_setxattr(struct obd_export *exp, const struct lu_fid *fid,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, setxattr);
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_SETXATTR);
++
+ 	return MDP(exp->exp_obd, setxattr)(exp, fid, obd_md_valid, name,
+ 					   value, value_size, xattr_flags,
+ 					   suppgid, request);
+@@ -1457,7 +1469,10 @@ static inline int md_getxattr(struct obd_export *exp, const struct lu_fid *fid,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, getxattr);
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_GETXATTR);
++
+ 	return MDP(exp->exp_obd, getxattr)(exp, fid, obd_md_valid, name,
+ 					   buf_size, req);
+ }
+@@ -1471,7 +1486,7 @@ static inline int md_set_open_replay_data(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, set_open_replay_data);
++
+ 	return MDP(exp->exp_obd, set_open_replay_data)(exp, och, it);
+ }
+ 
+@@ -1483,7 +1498,7 @@ static inline int md_clear_open_replay_data(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, clear_open_replay_data);
++
+ 	return MDP(exp->exp_obd, clear_open_replay_data)(exp, och);
+ }
+ 
+@@ -1496,7 +1511,7 @@ static inline int md_set_lock_data(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, set_lock_data);
++
+ 	return MDP(exp->exp_obd, set_lock_data)(exp, lockh, data, bits);
+ }
+ 
+@@ -1512,11 +1527,9 @@ static inline int md_cancel_unused(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, cancel_unused);
+ 
+-	rc = MDP(exp->exp_obd, cancel_unused)(exp, fid, policy, mode,
+-					      flags, opaque);
+-	return rc;
++	return MDP(exp->exp_obd, cancel_unused)(exp, fid, policy, mode,
++						flags, opaque);
+ }
+ 
+ static inline enum ldlm_mode md_lock_match(struct obd_export *exp, __u64 flags,
+@@ -1531,7 +1544,7 @@ static inline enum ldlm_mode md_lock_match(struct obd_export *exp, __u64 flags,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, lock_match);
++
+ 	return MDP(exp->exp_obd, lock_match)(exp, flags, fid, type,
+ 					     policy, mode, lockh);
+ }
+@@ -1544,7 +1557,7 @@ static inline int md_init_ea_size(struct obd_export *exp, u32 easize,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, init_ea_size);
++
+ 	return MDP(exp->exp_obd, init_ea_size)(exp, easize, def_asize);
+ }
+ 
+@@ -1556,9 +1569,11 @@ static inline int md_intent_getattr_async(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, intent_getattr_async);
+-	rc = MDP(exp->exp_obd, intent_getattr_async)(exp, minfo);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_INTENT_GETATTR_ASYNC);
++
++	return MDP(exp->exp_obd, intent_getattr_async)(exp, minfo);
+ }
+ 
+ static inline int md_revalidate_lock(struct obd_export *exp,
+@@ -1570,9 +1585,11 @@ static inline int md_revalidate_lock(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, revalidate_lock);
+-	rc = MDP(exp->exp_obd, revalidate_lock)(exp, it, fid, bits);
+-	return rc;
++
++	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
++			     LPROC_MD_REVALIDATE_LOCK);
++
++	return MDP(exp->exp_obd, revalidate_lock)(exp, it, fid, bits);
+ }
+ 
+ static inline int md_get_fid_from_lsm(struct obd_export *exp,
+@@ -1585,9 +1602,8 @@ static inline int md_get_fid_from_lsm(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, get_fid_from_lsm);
+-	rc = MDP(exp->exp_obd, get_fid_from_lsm)(exp, lsm, name, namelen, fid);
+-	return rc;
++
++	return MDP(exp->exp_obd, get_fid_from_lsm)(exp, lsm, name, namelen, fid);
+ }
+ 
+ /*
+@@ -1606,9 +1622,8 @@ static inline int md_unpackmd(struct obd_export *exp,
+ 	rc = exp_check_ops(exp);
+ 	if (rc)
+ 		return rc;
+-	EXP_MD_COUNTER_INCREMENT(exp, unpackmd);
+-	rc = MDP(exp->exp_obd, unpackmd)(exp, plsm, lmm, lmm_size);
+-	return rc;
++
++	return MDP(exp->exp_obd, unpackmd)(exp, plsm, lmm, lmm_size);
+ }
+ 
+ /* OBD Metadata Support */
+diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
+index 29ed498..59891a8 100644
+--- a/drivers/staging/lustre/lustre/obdclass/genops.c
++++ b/drivers/staging/lustre/lustre/obdclass/genops.c
+@@ -712,9 +712,6 @@ void class_export_put(struct obd_export *exp)
+ 		CDEBUG(D_IOCTL, "final put %p/%s\n",
+ 		       exp, exp->exp_client_uuid.uuid);
+ 
+-		/* release nid stat refererence */
+-		lprocfs_exp_cleanup(exp);
+-
+ 		obd_zombie_export_add(exp);
+ 	}
+ }
+diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+index a540abb..dc1d540 100644
+--- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
++++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
+@@ -1403,11 +1403,73 @@ void lprocfs_counter_init(struct lprocfs_stats *stats, int index,
+ }
+ EXPORT_SYMBOL(lprocfs_counter_init);
+ 
+-int lprocfs_exp_cleanup(struct obd_export *exp)
++static const char * const mps_stats[] = {
++	[LPROC_MD_CLOSE]		= "close",
++	[LPROC_MD_CREATE]		= "create",
++	[LPROC_MD_ENQUEUE]		= "enqueue",
++	[LPROC_MD_GETATTR]		= "getattr",
++	[LPROC_MD_INTENT_LOCK]		= "intent_lock",
++	[LPROC_MD_LINK]			= "link",
++	[LPROC_MD_RENAME]		= "rename",
++	[LPROC_MD_SETATTR]		= "setattr",
++	[LPROC_MD_FSYNC]		= "fsync",
++	[LPROC_MD_READ_PAGE]		= "read_page",
++	[LPROC_MD_UNLINK]		= "unlink",
++	[LPROC_MD_SETXATTR]		= "setxattr",
++	[LPROC_MD_GETXATTR]		= "getxattr",
++	[LPROC_MD_INTENT_GETATTR_ASYNC]	= "intent_getattr_async",
++	[LPROC_MD_REVALIDATE_LOCK]	= "revalidate_lock",
++};
++
++int ldebugfs_alloc_md_stats(struct obd_device *obd,
++			    unsigned int num_private_stats)
+ {
++	struct lprocfs_stats *stats;
++	unsigned int num_stats;
++	int i;
++
++	/* No obd device debugfs tree to attach too */
++	if (!obd->obd_debugfs_entry) {
++		CWARN("%s: missing debugfs tree for registering md_stats.\n",
++		      obd->obd_name);
++		return 0;
++	}
++
++	if (obd->obd_md_stats)
++		return -EINVAL;
++
++	num_stats = ARRAY_SIZE(mps_stats) + num_private_stats;
++	stats = lprocfs_alloc_stats(num_stats, 0);
++	if (!stats)
++		return -ENOMEM;
++
++	for (i = 0; i < ARRAY_SIZE(mps_stats); i++) {
++		lprocfs_counter_init(stats, i, 0, mps_stats[i], "reqs");
++		if (!stats->ls_cnt_header[i].lc_name) {
++			CERROR("Missing md_stat initializer md_op operation at offset %d. Aborting.\n",
++			       i);
++			LBUG();
++		}
++	}
++	obd->obd_md_stats = stats;
++
++	debugfs_create_file("md_stats", 0644, obd->obd_debugfs_entry,
++			    obd->obd_md_stats, &lprocfs_stats_seq_fops);
  	return 0;
  }
-@@ -176,7 +175,7 @@ int libcfs_kkuc_group_rem(int uid, unsigned int group)
- 	list_for_each_entry_safe(reg, next, &kkuc_groups[group], kr_chain) {
- 		if (!uid || (uid == reg->kr_uid)) {
- 			list_del(&reg->kr_chain);
--			CDEBUG(D_KUC, "Removed uid=%d fp=%p from group %d\n",
-+			CDEBUG(D_HSM, "Removed uid=%d fp=%p from group %d\n",
- 			       reg->kr_uid, reg->kr_fp, group);
- 			if (reg->kr_fp)
- 				fput(reg->kr_fp);
-diff --git a/drivers/staging/lustre/lustre/obdclass/obd_mount.c b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-index f59e7c4..33a67fd 100644
---- a/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-+++ b/drivers/staging/lustre/lustre/obdclass/obd_mount.c
-@@ -336,7 +336,7 @@ int lustre_start_mgc(struct super_block *sb)
- 	}
+-EXPORT_SYMBOL(lprocfs_exp_cleanup);
++EXPORT_SYMBOL(ldebugfs_alloc_md_stats);
++
++void ldebugfs_free_md_stats(struct obd_device *obd)
++{
++	struct lprocfs_stats *stats = obd->obd_md_stats;
++
++	if (!stats)
++		return;
++
++	obd->obd_md_stats = NULL;
++	lprocfs_free_stats(&stats);
++}
++EXPORT_SYMBOL(ldebugfs_free_md_stats);
  
- 	ll_generate_random_uuid(uuidc);
--	class_uuid_unparse(uuidc, uuid);
-+	sprintf(uuid->uuid, "%pU", uuidc);
- 
- 	/* Start the MGC */
- 	rc = lustre_start_simple(mgcname, LUSTRE_MGC_NAME,
-diff --git a/drivers/staging/lustre/lustre/obdclass/uuid.c b/drivers/staging/lustre/lustre/obdclass/uuid.c
-deleted file mode 100644
-index ec8c6dc..0000000
---- a/drivers/staging/lustre/lustre/obdclass/uuid.c
-+++ /dev/null
-@@ -1,45 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * GPL HEADER START
-- *
-- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 only,
-- * as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License version 2 for more details (a copy is included
-- * in the LICENSE file that accompanied this code).
-- *
-- * You should have received a copy of the GNU General Public License
-- * version 2 along with this program; If not, see
-- * http://www.gnu.org/licenses/gpl-2.0.html
-- *
-- * GPL HEADER END
-- */
--/*
-- * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
-- * Use is subject to license terms.
-- */
--/*
-- * This file is part of Lustre, http://www.lustre.org/
-- * Lustre is a trademark of Sun Microsystems, Inc.
-- *
-- * lustre/obdclass/uuid.c
-- *
-- * Public include file for the UUID library
-- */
--
--#define DEBUG_SUBSYSTEM S_CLASS
--
--#include <obd_support.h>
--#include <obd_class.h>
--
--void class_uuid_unparse(class_uuid_t uu, struct obd_uuid *out)
--{
--	sprintf(out->uuid, "%pU", uu);
--}
--EXPORT_SYMBOL(class_uuid_unparse);
+ __s64 lprocfs_read_helper(struct lprocfs_counter *lc,
+ 			  struct lprocfs_counter_header *header,
 -- 
 1.8.3.1
