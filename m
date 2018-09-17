@@ -1,62 +1,147 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Sep 2018 13:31:13 -0400
-Subject: [lustre-devel] [PATCH 0/8] lustre: obd: preprocessor cleanups
-Message-ID: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
+Date: Mon, 17 Sep 2018 13:31:15 -0400
+Subject: [lustre-devel] [PATCH 2/8] lustre: obdclass: remove cl_for_each
+ defines
+In-Reply-To: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
+References: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537205481-6899-3-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-The obd.h, obd_class.h, and clio headers are littered with complex
-macros that are difficult to read. These macros existed to handle the
-obd stats and md stats which are lacking in the linux client. Newer
-versions do support md_stats so lets restore them as well as cleanup
-the ugly macros. This patch set is order dependent and is based
-on the first batch patch set for lustre 2.10 applied against the
-lustre-testing branch.
+From: Ben Evans <bevans@cray.com>
 
-Ben Evans (4):
-  lustre: obdclass: remove CL_PAGE_INVOKE et. al.
-  lustre: obdclass: remove cl_for_each defines
-  lustre: obdclass: Code cleanup
-  lustre: obdclass: cleanup obd_class.h defines
+cl_for_each and cl_for_each_reverse are simply aliases
+for list_for_each_entry and list_for_each_entry_reverse
+There is no point to them so just get rid of them and
+eliminate any confusion.
 
-James Simmons (1):
-  lustre: obdclass: restore md_stats code
+Signed-off-by: Ben Evans <bevans@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9575
+Reviewed-on: https://review.whamcloud.com/27385
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Jinshan Xiong <jinshan.xiong@.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Signed-off-by: James Simmons <jsimmons@infradead.org>
+---
+ drivers/staging/lustre/lustre/obdclass/cl_io.c | 26 +++++++++++---------------
+ 1 file changed, 11 insertions(+), 15 deletions(-)
 
-John L. Hammond (3):
-  lustre: obd: remove obd_{get,put}ref()
-  lustre: obd: remove OBD ops based stats
-  lustre: obd: add md_stats to MDC and LMV devices
-
- .../staging/lustre/lustre/include/lprocfs_status.h |   5 +-
- drivers/staging/lustre/lustre/include/obd.h        |  20 +-
- drivers/staging/lustre/lustre/include/obd_class.h  | 788 ++++++++++++---------
- drivers/staging/lustre/lustre/llite/file.c         |   2 +-
- drivers/staging/lustre/lustre/llite/llite_lib.c    |   3 +-
- drivers/staging/lustre/lustre/lmv/lmv_obd.c        |   9 +-
- drivers/staging/lustre/lustre/lmv/lproc_lmv.c      |   6 +
- drivers/staging/lustre/lustre/lov/lov_dev.c        |  12 +-
- drivers/staging/lustre/lustre/lov/lov_internal.h   |   2 +
- drivers/staging/lustre/lustre/lov/lov_obd.c        |  44 +-
- drivers/staging/lustre/lustre/lov/lov_pool.c       |  10 +-
- drivers/staging/lustre/lustre/lov/lov_request.c    |   4 +-
- drivers/staging/lustre/lustre/mdc/lproc_mdc.c      |   7 +
- drivers/staging/lustre/lustre/mdc/mdc_request.c    |   8 +-
- drivers/staging/lustre/lustre/obdclass/Makefile    |   5 +-
- drivers/staging/lustre/lustre/obdclass/cl_io.c     |  26 +-
- drivers/staging/lustre/lustre/obdclass/cl_object.c |  21 +-
- drivers/staging/lustre/lustre/obdclass/cl_page.c   | 275 +++----
- drivers/staging/lustre/lustre/obdclass/class_obd.c |   1 -
- drivers/staging/lustre/lustre/obdclass/genops.c    |   3 -
- .../staging/lustre/lustre/obdclass/kernelcomm.c    |   7 +-
- drivers/staging/lustre/lustre/obdclass/llog_obd.c  |   4 +-
- .../lustre/lustre/obdclass/lprocfs_status.c        |  66 +-
- drivers/staging/lustre/lustre/obdclass/obd_mount.c |   2 +-
- drivers/staging/lustre/lustre/obdclass/uuid.c      |  45 --
- 25 files changed, 753 insertions(+), 622 deletions(-)
- delete mode 100644 drivers/staging/lustre/lustre/obdclass/uuid.c
-
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_io.c b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+index 3a96d4a..879383ae 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_io.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_io.c
+@@ -52,11 +52,6 @@
+  *
+  */
+ 
+-#define cl_io_for_each(slice, io) \
+-	list_for_each_entry((slice), &io->ci_layers, cis_linkage)
+-#define cl_io_for_each_reverse(slice, io)		 \
+-	list_for_each_entry_reverse((slice), &io->ci_layers, cis_linkage)
+-
+ static inline int cl_io_type_is_valid(enum cl_io_type type)
+ {
+ 	return CIT_READ <= type && type < CIT_OP_NR;
+@@ -343,13 +338,14 @@ int cl_io_lock(const struct lu_env *env, struct cl_io *io)
+ 	LINVRNT(io->ci_state == CIS_IT_STARTED);
+ 	LINVRNT(cl_io_invariant(io));
+ 
+-	cl_io_for_each(scan, io) {
++	list_for_each_entry(scan, &io->ci_layers, cis_linkage) {
+ 		if (!scan->cis_iop->op[io->ci_type].cio_lock)
+ 			continue;
+ 		result = scan->cis_iop->op[io->ci_type].cio_lock(env, scan);
+ 		if (result != 0)
+ 			break;
+ 	}
++
+ 	if (result == 0) {
+ 		cl_io_locks_sort(io);
+ 		result = cl_lockset_lock(env, io, &io->ci_lockset);
+@@ -391,7 +387,7 @@ void cl_io_unlock(const struct lu_env *env, struct cl_io *io)
+ 			link->cill_fini(env, link);
+ 	}
+ 
+-	cl_io_for_each_reverse(scan, io) {
++	list_for_each_entry_reverse(scan, &io->ci_layers, cis_linkage) {
+ 		if (scan->cis_iop->op[io->ci_type].cio_unlock)
+ 			scan->cis_iop->op[io->ci_type].cio_unlock(env, scan);
+ 	}
+@@ -416,7 +412,7 @@ int cl_io_iter_init(const struct lu_env *env, struct cl_io *io)
+ 	LINVRNT(cl_io_invariant(io));
+ 
+ 	result = 0;
+-	cl_io_for_each(scan, io) {
++	list_for_each_entry(scan, &io->ci_layers, cis_linkage) {
+ 		if (!scan->cis_iop->op[io->ci_type].cio_iter_init)
+ 			continue;
+ 		result = scan->cis_iop->op[io->ci_type].cio_iter_init(env,
+@@ -443,7 +439,7 @@ void cl_io_iter_fini(const struct lu_env *env, struct cl_io *io)
+ 	LINVRNT(io->ci_state == CIS_UNLOCKED);
+ 	LINVRNT(cl_io_invariant(io));
+ 
+-	cl_io_for_each_reverse(scan, io) {
++	list_for_each_entry_reverse(scan, &io->ci_layers, cis_linkage) {
+ 		if (scan->cis_iop->op[io->ci_type].cio_iter_fini)
+ 			scan->cis_iop->op[io->ci_type].cio_iter_fini(env, scan);
+ 	}
+@@ -468,7 +464,7 @@ static void cl_io_rw_advance(const struct lu_env *env, struct cl_io *io,
+ 	io->u.ci_rw.crw_count -= nob;
+ 
+ 	/* layers have to be notified. */
+-	cl_io_for_each_reverse(scan, io) {
++	list_for_each_entry_reverse(scan, &io->ci_layers, cis_linkage) {
+ 		if (scan->cis_iop->op[io->ci_type].cio_advance)
+ 			scan->cis_iop->op[io->ci_type].cio_advance(env, scan,
+ 								   nob);
+@@ -536,7 +532,7 @@ int cl_io_start(const struct lu_env *env, struct cl_io *io)
+ 	LINVRNT(cl_io_invariant(io));
+ 
+ 	io->ci_state = CIS_IO_GOING;
+-	cl_io_for_each(scan, io) {
++	list_for_each_entry(scan, &io->ci_layers, cis_linkage) {
+ 		if (!scan->cis_iop->op[io->ci_type].cio_start)
+ 			continue;
+ 		result = scan->cis_iop->op[io->ci_type].cio_start(env, scan);
+@@ -561,7 +557,7 @@ void cl_io_end(const struct lu_env *env, struct cl_io *io)
+ 	LINVRNT(io->ci_state == CIS_IO_GOING);
+ 	LINVRNT(cl_io_invariant(io));
+ 
+-	cl_io_for_each_reverse(scan, io) {
++	list_for_each_entry_reverse(scan, &io->ci_layers, cis_linkage) {
+ 		if (scan->cis_iop->op[io->ci_type].cio_end)
+ 			scan->cis_iop->op[io->ci_type].cio_end(env, scan);
+ 		/* TODO: error handling. */
+@@ -584,7 +580,7 @@ int cl_io_read_ahead(const struct lu_env *env, struct cl_io *io,
+ 	LINVRNT(io->ci_type == CIT_READ || io->ci_type == CIT_FAULT);
+ 	LINVRNT(cl_io_invariant(io));
+ 
+-	cl_io_for_each(scan, io) {
++	list_for_each_entry(scan, &io->ci_layers, cis_linkage) {
+ 		if (!scan->cis_iop->cio_read_ahead)
+ 			continue;
+ 
+@@ -609,7 +605,7 @@ int cl_io_commit_async(const struct lu_env *env, struct cl_io *io,
+ 	const struct cl_io_slice *scan;
+ 	int result = 0;
+ 
+-	cl_io_for_each(scan, io) {
++	list_for_each_entry(scan, &io->ci_layers, cis_linkage) {
+ 		if (!scan->cis_iop->cio_commit_async)
+ 			continue;
+ 		result = scan->cis_iop->cio_commit_async(env, scan, queue,
+@@ -637,7 +633,7 @@ int cl_io_submit_rw(const struct lu_env *env, struct cl_io *io,
+ 	const struct cl_io_slice *scan;
+ 	int result = 0;
+ 
+-	cl_io_for_each(scan, io) {
++	list_for_each_entry(scan, &io->ci_layers, cis_linkage) {
+ 		if (!scan->cis_iop->cio_submit)
+ 			continue;
+ 		result = scan->cis_iop->cio_submit(env, scan, crt, queue);
 -- 
 1.8.3.1
