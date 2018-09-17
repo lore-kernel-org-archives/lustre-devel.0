@@ -1,137 +1,133 @@
-From: Amir Shehata <amir.shehata.whamcloud@gmail.com>
-Date: Thu, 13 Sep 2018 12:33:01 -0700
-Subject: [lustre-devel] [PATCH 20/34] lnet: discard ni_cpt_list
-In-Reply-To: <874levqn9z.fsf@notabene.neil.brown.name>
-References: <153628058697.8267.6056114844033479774.stgit@noble>
- <153628137203.8267.14277020278461943610.stgit@noble>
- <C21D7B70-F41C-473E-8FD3-956078896EAE@cray.com>
- <874levqn9z.fsf@notabene.neil.brown.name>
-Message-ID: <CAAqp6i3CZTW_YbqeLc6p955AbKgbZbxNw2LCmA53-LoJ0JXDKg@mail.gmail.com>
+From: James Simmons <jsimmons@infradead.org>
+Date: Mon, 17 Sep 2018 13:30:10 -0400
+Subject: [lustre-devel] [PATCH 00/30] lustre: first batch of fixes from
+ lustre 2.10
+Message-ID: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-did you read my response to that question? Pasted below:
+First collection of patches to address various cleanups and bugs in the
+lustre 2.10 release that are missing for the lustre linux client. These
+patches can be applied in any order.
 
----
-This area was re-implemented. There is no need for ni_cptlist any longer. I
-looked at the current code and it's not being used.
-Originally it was being used to place the the ni on a global list:
-ln_nis_cpt. Which was traversed when attempting to calculate the cpt for a
-NID using lnet_cpt_of_nid_locked(). However that latter function has been
-re-implemented due to how MR works now. So there is not need for ni_cptlist.
-___
+Alexander Boyko (2):
+  lustre: osc: fix for cl_env_get in low memory
+  lustre: ptlrpc: fix wrong error handlers
 
-thanks
-amir
+Alexandr Boyko (1):
+  lustre: osc: adds radix_tree_preload
 
-On Wed, 12 Sep 2018 at 17:35, NeilBrown <neilb@suse.com> wrote:
+Andreas Dilger (2):
+  lustre: llog: update llog print format to use FIDs
+  lustre: mdc: allow setting readdir RPC size parameter
 
-> On Wed, Sep 12 2018, Doug Oucharek wrote:
->
-> > I'm assuming that a future patch will be chaining the NI structure on to
-> the NET structure it belongs to.  This patch is just not chaining the NIs
-> on a global NIS list anymore.  As such, ni_cptlist is being "repurposed".
->
-> The NI is already chained onto the NET through
->  lnet_net.net_ni_list and lnet_ni.ni_netlist
->
-> ni_cptlist is not used even in current master.
-> It is never added to any list, but lnet_ni_unlink_locked() does remove
-> it from a list.  Is that code wrong (should be checking ni_netlist), or
-> is it cruft that should be removed?
->
-> Thanks,
-> NeilBrown
->
-> >
-> > Reviewed-by: Doug Oucharek <dougso@me.com>
-> >
-> > Doug
-> >
-> > ?On 9/6/18, 5:54 PM, "NeilBrown" <neilb@suse.com> wrote:
-> >
-> >     This isn't used any more.
-> >     The new comment is odd - this is no net_ni_cpt !!
-> >     The ni_cptlist linkage is no longer used - should it go too?
-> >
-> >     This is part of
-> >         8cbb8cd3e771e7f7e0f99cafc19fad32770dc015
-> >            LU-7734 lnet: Multi-Rail local NI split
-> >
-> >     Signed-off-by: NeilBrown <neilb@suse.com>
-> >     ---
-> >      .../staging/lustre/include/linux/lnet/lib-types.h  |    4 +---
-> >      drivers/staging/lustre/lnet/lnet/api-ni.c          |    7 -------
-> >      2 files changed, 1 insertion(+), 10 deletions(-)
-> >
-> >     diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> >     index 6c34ecf22021..dc15fa75a9d2 100644
-> >     --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> >     +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> >     @@ -305,7 +305,7 @@ struct lnet_net {
-> >      struct lnet_ni {
-> >       /* chain on the lnet_net structure */
-> >       struct list_head          ni_netlist;
-> >     - /* chain on ln_nis_cpt */
-> >     + /* chain on net_ni_cpt */
-> >       struct list_head        ni_cptlist;
-> >
-> >       spinlock_t              ni_lock;
-> >     @@ -671,8 +671,6 @@ struct lnet {
-> >
-> >       /* LND instances */
-> >       struct list_head                ln_nets;
-> >     - /* NIs bond on specific CPT(s) */
-> >     - struct list_head                ln_nis_cpt;
-> >       /* the loopback NI */
-> >       struct lnet_ni                  *ln_loni;
-> >       /* network zombie list */
-> >     diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c
-> b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> >     index 546d5101360f..960f235df5e7 100644
-> >     --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-> >     +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> >     @@ -538,7 +538,6 @@ lnet_prepare(lnet_pid_t requested_pid)
-> >
-> >       INIT_LIST_HEAD(&the_lnet.ln_test_peers);
-> >       INIT_LIST_HEAD(&the_lnet.ln_nets);
-> >     - INIT_LIST_HEAD(&the_lnet.ln_nis_cpt);
-> >       INIT_LIST_HEAD(&the_lnet.ln_routers);
-> >       INIT_LIST_HEAD(&the_lnet.ln_drop_rules);
-> >       INIT_LIST_HEAD(&the_lnet.ln_delay_rules);
-> >     @@ -616,7 +615,6 @@ lnet_unprepare(void)
-> >       LASSERT(!the_lnet.ln_refcount);
-> >       LASSERT(list_empty(&the_lnet.ln_test_peers));
-> >       LASSERT(list_empty(&the_lnet.ln_nets));
-> >     - LASSERT(list_empty(&the_lnet.ln_nis_cpt));
-> >
-> >       lnet_portals_destroy();
-> >
-> >     @@ -1294,11 +1292,6 @@ lnet_startup_lndni(struct lnet_ni *ni, struct
-> lnet_lnd_tunables *tun)
-> >       /* refcount for ln_nis */
-> >       lnet_ni_addref_locked(ni, 0);
-> >       list_add_tail(&ni->ni_net->net_list, &the_lnet.ln_nets);
-> >     - if (ni->ni_cpts) {
-> >     -         lnet_ni_addref_locked(ni, 0);
-> >     -         list_add_tail(&ni->ni_cptlist, &the_lnet.ln_nis_cpt);
-> >     - }
-> >     -
-> >       lnet_net_unlock(LNET_LOCK_EX);
-> >
-> >       ni->ni_state = LNET_NI_STATE_ACTIVE;
-> >
-> >
-> >
-> _______________________________________________
-> lustre-devel mailing list
-> lustre-devel at lists.lustre.org
-> http://lists.lustre.org/listinfo.cgi/lustre-devel-lustre.org
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180913/3e1b2e4f/attachment.html>
+Andrew Perepechko (1):
+  lustre: llite: llite.stat_blocksize param for fixed st_blksize
+
+Andriy Skulysh (3):
+  lustre: osc: GPF while doing ELC with no_wait_policy
+  lustre: ldlm: GPF in _ldlm_lock_debug()
+  lustre: llite: protect ll_dentry_data modification
+
+Bobi Jam (2):
+  lustre: osc: osc page lru list race
+  lustre: llite: check the return value of cl_file_inode_init()
+
+Bruno Faccini (1):
+  lustre: ptlrpc: drain "ptlrpc_request_buffer_desc" objects
+
+Doug Oucharek (1):
+  lustre: lnet: Change sock_create() to sock_create_kern()
+
+Fan Yong (1):
+  lustre: ptlrpc: free reply buffer earlier for open RPC
+
+James Simmons (2):
+  lustre: lnd: resolve IP query code in LND drivers
+  lustre: clio: fix spare bit handling
+
+John L. Hammond (3):
+  lustre: ptlrpc: set rq_sent when send fails due to -ENOMEM
+  lustre: kuc: initialize kkuc_groups at module init time
+  lustre: ldlm: use static initializer macros where possible
+
+Niu Yawei (3):
+  lustre: uapi: add documentation about FIDs
+  lustre: osc: update timestamps on write only
+  lustre: ptlrpc: add replay request into unreplied list
+
+Patrick Farrell (1):
+  lustre: ldlm: cond_resched in ldlm_bl_thread_main
+
+Sebastien Buisson (1):
+  lustre: llite: set sec ctx on client's inode at create time
+
+Steve Guminski (3):
+  lustre: ptlrpc: Prevent possible dereference of NULL pointers
+  lustre: mgc: Remove unnecessary checks for config_log_put()
+  lustre: llite: rcu-walk check should not depend on statahead
+
+Vitaly Fertman (1):
+  lustre: ptlrpc: increase sleep time in ptlrpc_request_bufs_pack()
+
+Wang Shilong (1):
+  lustre: obd: remove obsolete OBD_FL_LOCAL_MASK
+
+Yang Sheng (1):
+  lustre: libcfs: use save_stack_trace for stack dump
+
+ .../lustre/include/linux/libcfs/libcfs_debug.h     |  1 +
+ .../lustre/include/uapi/linux/lustre/lustre_idl.h  | 88 +++++++++++++++++++++-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    | 12 ++-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |  2 +-
+ drivers/staging/lustre/lnet/libcfs/debug.c         | 46 ++++++++++-
+ drivers/staging/lustre/lnet/lnet/lib-socket.c      |  2 +-
+ .../staging/lustre/lustre/include/lprocfs_status.h |  5 ++
+ drivers/staging/lustre/lustre/include/lustre_dlm.h |  4 +-
+ .../lustre/lustre/include/lustre_kernelcomm.h      |  1 +
+ drivers/staging/lustre/lustre/include/lustre_net.h | 14 ++--
+ drivers/staging/lustre/lustre/include/obd.h        |  5 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 13 +++-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lockd.c    | 12 +--
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  6 +-
+ drivers/staging/lustre/lustre/llite/dcache.c       |  7 +-
+ drivers/staging/lustre/lustre/llite/dir.c          | 22 +++---
+ drivers/staging/lustre/lustre/llite/file.c         |  2 +-
+ drivers/staging/lustre/lustre/llite/lcommon_cl.c   | 19 ++---
+ .../staging/lustre/lustre/llite/llite_internal.h   |  8 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    | 24 +++---
+ drivers/staging/lustre/lustre/llite/llite_nfs.c    |  4 +-
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  | 33 ++++++++
+ drivers/staging/lustre/lustre/llite/namei.c        | 59 ++++++++++++---
+ drivers/staging/lustre/lustre/llite/statahead.c    |  4 -
+ drivers/staging/lustre/lustre/mdc/lproc_mdc.c      | 20 +----
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    | 35 ++++++---
+ drivers/staging/lustre/lustre/mgc/mgc_request.c    | 36 ++++-----
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |  3 +
+ .../staging/lustre/lustre/obdclass/kernelcomm.c    | 38 +++++++---
+ drivers/staging/lustre/lustre/obdclass/llog_cat.c  | 28 +++----
+ drivers/staging/lustre/lustre/obdclass/llog_swab.c |  4 +-
+ .../lustre/lustre/obdclass/lprocfs_status.c        | 54 +++++++++++++
+ drivers/staging/lustre/lustre/obdclass/obdo.c      | 11 ---
+ drivers/staging/lustre/lustre/osc/lproc_osc.c      | 46 -----------
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |  3 +
+ drivers/staging/lustre/lustre/osc/osc_io.c         |  2 +-
+ drivers/staging/lustre/lustre/osc/osc_lock.c       | 13 +++-
+ drivers/staging/lustre/lustre/osc/osc_object.c     |  2 +-
+ drivers/staging/lustre/lustre/osc/osc_page.c       | 43 ++++++-----
+ drivers/staging/lustre/lustre/osc/osc_request.c    |  7 +-
+ drivers/staging/lustre/lustre/ptlrpc/client.c      | 67 +++++++++++-----
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c      | 20 ++---
+ .../staging/lustre/lustre/ptlrpc/pack_generic.c    | 26 +++++--
+ .../staging/lustre/lustre/ptlrpc/ptlrpc_internal.h |  1 +
+ drivers/staging/lustre/lustre/ptlrpc/recover.c     | 12 +--
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |  2 +-
+ drivers/staging/lustre/lustre/ptlrpc/service.c     | 14 +++-
+ drivers/staging/lustre/lustre/ptlrpc/wiretest.c    |  1 -
+ 48 files changed, 585 insertions(+), 296 deletions(-)
+
+-- 
+1.8.3.1
