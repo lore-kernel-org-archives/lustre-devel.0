@@ -1,116 +1,48 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Sep 2018 13:30:18 -0400
-Subject: [lustre-devel] [PATCH 08/30] lustre: mgc: Remove unnecessary checks
- for config_log_put()
+Date: Mon, 17 Sep 2018 13:30:27 -0400
+Subject: [lustre-devel] [PATCH 17/30] lustre: llite: protect ll_dentry_data
+ modification
 In-Reply-To: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
 References: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537205440-6656-9-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537205440-6656-18-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Steve Guminski <stephenx.guminski@intel.com>
+From: Andriy Skulysh <c17819@cray.com>
 
-Make config_log_put() check if its parameter is NULL, which makes
-it is unnecessary to perform the check prior to calling it.
-This patch removes the redundant checks.
+The ll_dentry_data bitfields modification should be protected by
+a spinlock.
 
-Signed-off-by: Steve Guminski <stephenx.guminski@intel.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9152
-Reviewed-on: https://review.whamcloud.com/25854
-Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Signed-off-by: Andriy Skulysh <c17819@cray.com>
+Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9241
+Seagate-bug-id: MRP-4257
+Reviewed-on: https://review.whamcloud.com/26109
+Reviewed-by: Niu Yawei <yawei.niu@intel.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
+Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/mgc/mgc_request.c | 36 +++++++++++--------------
- 1 file changed, 16 insertions(+), 20 deletions(-)
+ drivers/staging/lustre/lustre/llite/llite_nfs.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-index 4552cc5..e6f8d9e 100644
---- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-+++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-@@ -131,6 +131,9 @@ static int config_log_get(struct config_llog_data *cld)
-  */
- static void config_log_put(struct config_llog_data *cld)
- {
-+	if (unlikely(!cld))
-+		return;
-+
- 	CDEBUG(D_INFO, "log %s refs %d\n", cld->cld_logname,
- 	       atomic_read(&cld->cld_refcount));
- 	LASSERT(atomic_read(&cld->cld_refcount) > 0);
-@@ -142,12 +145,9 @@ static void config_log_put(struct config_llog_data *cld)
+diff --git a/drivers/staging/lustre/lustre/llite/llite_nfs.c b/drivers/staging/lustre/lustre/llite/llite_nfs.c
+index c66072a..5e91e83 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_nfs.c
++++ b/drivers/staging/lustre/lustre/llite/llite_nfs.c
+@@ -171,8 +171,9 @@ struct lustre_nfs_fid {
+ 	 * we came from NFS and so opencache needs to be
+ 	 * enabled for this one
+ 	 */
++	spin_lock(&result->d_lock);
+ 	ll_d2d(result)->lld_nfs_dentry = 1;
+-
++	spin_unlock(&result->d_lock);
+ 	return result;
+ }
  
- 		CDEBUG(D_MGC, "dropping config log %s\n", cld->cld_logname);
- 
--		if (cld->cld_recover)
--			config_log_put(cld->cld_recover);
--		if (cld->cld_params)
--			config_log_put(cld->cld_params);
--		if (cld->cld_sptlrpc)
--			config_log_put(cld->cld_sptlrpc);
-+		config_log_put(cld->cld_recover);
-+		config_log_put(cld->cld_params);
-+		config_log_put(cld->cld_sptlrpc);
- 		if (cld_is_sptlrpc(cld))
- 			sptlrpc_conf_log_stop(cld->cld_logname);
- 
-@@ -387,6 +387,9 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
- 
- static inline void config_mark_cld_stop(struct config_llog_data *cld)
- {
-+	if (!cld)
-+		return;
-+
- 	mutex_lock(&cld->cld_lock);
- 	spin_lock(&config_list_lock);
- 	cld->cld_stopping = 1;
-@@ -436,18 +439,13 @@ static int config_log_end(char *logname, struct config_llog_instance *cfg)
- 	cld->cld_sptlrpc = NULL;
- 	mutex_unlock(&cld->cld_lock);
- 
--	if (cld_recover) {
--		config_mark_cld_stop(cld_recover);
--		config_log_put(cld_recover);
--	}
-+	config_mark_cld_stop(cld_recover);
-+	config_log_put(cld_recover);
- 
--	if (cld_params) {
--		config_mark_cld_stop(cld_params);
--		config_log_put(cld_params);
--	}
-+	config_mark_cld_stop(cld_params);
-+	config_log_put(cld_params);
- 
--	if (cld_sptlrpc)
--		config_log_put(cld_sptlrpc);
-+	config_log_put(cld_sptlrpc);
- 
- 	/* drop the ref from the find */
- 	config_log_put(cld);
-@@ -593,8 +591,7 @@ static int mgc_requeue_thread(void *data)
- 			cld->cld_lostlock = 0;
- 			spin_unlock(&config_list_lock);
- 
--			if (cld_prev)
--				config_log_put(cld_prev);
-+			config_log_put(cld_prev);
- 			cld_prev = cld;
- 
- 			if (likely(!(rq_state & RQ_STOP))) {
-@@ -606,8 +603,7 @@ static int mgc_requeue_thread(void *data)
- 			}
- 		}
- 		spin_unlock(&config_list_lock);
--		if (cld_prev)
--			config_log_put(cld_prev);
-+		config_log_put(cld_prev);
- 
- 		/* Wait a bit to see if anyone else needs a requeue */
- 		wait_event_idle(rq_waitq, rq_state & (RQ_NOW | RQ_STOP));
 -- 
 1.8.3.1
