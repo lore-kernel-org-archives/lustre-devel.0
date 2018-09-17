@@ -1,72 +1,60 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Sep 2018 13:30:20 -0400
-Subject: [lustre-devel] [PATCH 10/30] lustre: ptlrpc: set rq_sent when send
- fails due to -ENOMEM
+Date: Mon, 17 Sep 2018 13:30:30 -0400
+Subject: [lustre-devel] [PATCH 20/30] lustre: osc: osc page lru list race
 In-Reply-To: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
 References: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537205440-6656-11-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537205440-6656-21-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: "John L. Hammond" <jhammond@whamcloud.com>
+From: Bobi Jam <bobijam@hotmail.com>
 
-In ptl_send_rpc() set rq_sent when we fail to send the RPC due
-to insufficient memory, since this is what the upper layers expect.
+In osc_lru_use() the osc page's ops_lru access is not protected, which
+could race with osc_lru_del() and ensuing that
+client_obd::cl_lru_in_list counter decreased twice for a single page.
 
-Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9296
-Reviewed-on: https://review.whamcloud.com/26470
+Signed-off-by: Bobi Jam <bobijam@hotmail.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9229
+Reviewed-on: https://review.whamcloud.com/26086
 Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
-Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
+Reviewed-by: Li Xi <lixi@ddn.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ptlrpc/niobuf.c | 20 +++++++++++---------
- 1 file changed, 11 insertions(+), 9 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_page.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-index 0e13fb9..3cfd7b8 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
-@@ -571,15 +571,8 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
- 		mpflag = memalloc_noreclaim_save();
- 
- 	rc = sptlrpc_cli_wrap_request(request);
--	if (rc) {
--		/*
--		 * set rq_sent so that this request is treated
--		 * as a delayed send in the upper layers
--		 */
--		if (rc == -ENOMEM)
--			request->rq_sent = ktime_get_seconds();
-+	if (rc)
- 		goto out;
--	}
- 
- 	/* bulk register should be done after wrap_request() */
- 	if (request->rq_bulk) {
-@@ -724,9 +717,18 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
- 	 * the chance to have long unlink to sluggish net is smaller here.
- 	 */
- 	ptlrpc_unregister_bulk(request, 0);
-- out:
-+out:
-+	if (rc == -ENOMEM) {
-+		/*
-+		 * set rq_sent so that this request is treated
-+		 * as a delayed send in the upper layers
-+		 */
-+		request->rq_sent = ktime_get_seconds();
-+	}
-+
- 	if (request->rq_memalloc)
- 		memalloc_noreclaim_restore(mpflag);
-+
- 	return rc;
+diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
+index 20c553e..189e3e78 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_page.c
++++ b/drivers/staging/lustre/lustre/osc/osc_page.c
+@@ -478,18 +478,20 @@ static void osc_lru_del(struct client_obd *cli, struct osc_page *opg)
  }
- EXPORT_SYMBOL(ptl_send_rpc);
+ 
+ /**
+- * Delete page from LRUlist for redirty.
++ * Delete page from LRU list for redirty.
+  */
+ static void osc_lru_use(struct client_obd *cli, struct osc_page *opg)
+ {
+ 	/* If page is being transferred for the first time,
+ 	 * ops_lru should be empty
+ 	 */
+-	if (opg->ops_in_lru && !list_empty(&opg->ops_lru)) {
++	if (opg->ops_in_lru) {
+ 		spin_lock(&cli->cl_lru_list_lock);
+-		__osc_lru_del(cli, opg);
++		if (!list_empty(&opg->ops_lru)) {
++			__osc_lru_del(cli, opg);
++			atomic_long_inc(&cli->cl_lru_busy);
++		}
+ 		spin_unlock(&cli->cl_lru_list_lock);
+-		atomic_long_inc(&cli->cl_lru_busy);
+ 	}
+ }
+ 
 -- 
 1.8.3.1
