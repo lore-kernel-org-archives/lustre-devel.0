@@ -1,655 +1,496 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Sep 2018 13:31:20 -0400
-Subject: [lustre-devel] [PATCH 7/8] lustre: obdclass: restore md_stats code
+Date: Mon, 17 Sep 2018 13:31:14 -0400
+Subject: [lustre-devel] [PATCH 1/8] lustre: obdclass: remove CL_PAGE_INVOKE
+ et. al.
 In-Reply-To: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
 References: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537205481-6899-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537205481-6899-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Originally the linux lustre client contained the md_stats code
-but no one used it at that time so some parts of the code was
-removed. The remaining md_stats code is layered in many levels
-of macros that make the code difficult to read as well as
-introduce undetected errors. This patch peels away the macro
-wrappers by replacing it with the function lprocfs_count_incr()
-which doesn't care about the order of the function pointers in
-struct md_ops as the original code did.
+From: Ben Evans <bevans@cray.com>
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9855
-Reviewed-on: https://review.whamcloud.com/32822
-Reviewed-by: Ben Evans <bevans@cray.com>
-Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
+CL_PAGE_INVOKE, CL_PAGE_INVOID and CL_PAGE_INVOKE_REVERSE
+merely obscure the list_for_each_entry calls to various virtual
+functions specified by CL_PAGE_OP, and arguments stuck into va_args.
+
+These defines and their equivalent functions have been removed,
+and the list_for_each_entry has been put in place. CL_PAGE_OP
+has also been removed.
+
+Signed-off-by: Ben Evans <bevans@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9523
+Reviewed-on: https://review.whamcloud.com/27168
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/lustre/include/lprocfs_status.h |   5 +-
- drivers/staging/lustre/lustre/include/obd.h        |   8 +-
- drivers/staging/lustre/lustre/include/obd_class.h  | 233 +++++++++++----------
- drivers/staging/lustre/lustre/obdclass/genops.c    |   3 -
- .../lustre/lustre/obdclass/lprocfs_status.c        |  66 +++++-
- 5 files changed, 192 insertions(+), 123 deletions(-)
+ drivers/staging/lustre/lustre/obdclass/cl_page.c | 275 ++++++++++++-----------
+ 1 file changed, 140 insertions(+), 135 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lprocfs_status.h b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-index 5da26e3..c22ae3d 100644
---- a/drivers/staging/lustre/lustre/include/lprocfs_status.h
-+++ b/drivers/staging/lustre/lustre/include/lprocfs_status.h
-@@ -442,11 +442,12 @@ __u64 lprocfs_stats_collector(struct lprocfs_stats *stats, int idx,
- lprocfs_alloc_stats(unsigned int num, enum lprocfs_stats_flags flags);
- void lprocfs_clear_stats(struct lprocfs_stats *stats);
- void lprocfs_free_stats(struct lprocfs_stats **stats);
-+int ldebugfs_alloc_md_stats(struct obd_device *obddev,
-+			    unsigned int num_private_stats);
-+void ldebugfs_free_md_stats(struct obd_device *obddev);
- void lprocfs_counter_init(struct lprocfs_stats *stats, int index,
- 			  unsigned int conf, const char *name,
- 			  const char *units);
--struct obd_export;
--int lprocfs_exp_cleanup(struct obd_export *exp);
- extern const struct file_operations lprocfs_stats_seq_fops;
- 
- /* lprocfs_status.c */
-diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 8691aec..6e78c50 100644
---- a/drivers/staging/lustre/lustre/include/obd.h
-+++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -599,8 +599,7 @@ struct obd_device {
- 	/* Fields used by LProcFS */
- 	struct lprocfs_stats	*obd_stats;
- 
--	struct lprocfs_stats	*md_stats;
--	unsigned int		 md_cntr_base;
-+	struct lprocfs_stats	*obd_md_stats;
- 
- 	struct dentry		*obd_debugfs_entry;
- 	struct dentry		*obd_svc_debugfs_entry;
-@@ -1000,11 +999,6 @@ struct md_ops {
- 
- 	int (*unpackmd)(struct obd_export *exp, struct lmv_stripe_md **plsm,
- 			const union lmv_mds_md *lmv, size_t lmv_size);
--	/*
--	 * NOTE: If adding ops, add another LPROCFS_MD_OP_INIT() line to
--	 * lprocfs_alloc_md_stats() in obdclass/lprocfs_status.c. Also, add a
--	 * wrapper function in include/linux/obd_class.h.
--	 */
- };
- 
- static inline struct md_open_data *obd_mod_alloc(void)
-diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index 0c1922e..2514b39 100644
---- a/drivers/staging/lustre/lustre/include/obd_class.h
-+++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -334,36 +334,6 @@ static inline int obd_check_dev_active(struct obd_device *obd)
- 	return rc;
+diff --git a/drivers/staging/lustre/lustre/obdclass/cl_page.c b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+index 916cf81..00df94b 100644
+--- a/drivers/staging/lustre/lustre/obdclass/cl_page.c
++++ b/drivers/staging/lustre/lustre/obdclass/cl_page.c
+@@ -363,82 +363,6 @@ const struct cl_page_slice *cl_page_at(const struct cl_page *page,
  }
+ EXPORT_SYMBOL(cl_page_at);
  
--#define MD_COUNTER_OFFSET(op)					\
--	((offsetof(struct md_ops, op) -				\
--		offsetof(struct md_ops, get_root))		\
--		/ sizeof(((struct md_ops *)(0))->get_root))
+-#define CL_PAGE_OP(opname) offsetof(struct cl_page_operations, opname)
 -
--#define MD_COUNTER_INCREMENT(obdx, op)				 \
--do {								 \
--	if ((obd)->md_stats) {					 \
--		unsigned int coffset;				 \
--		coffset = (unsigned int)((obdx)->md_cntr_base) + \
--			MD_COUNTER_OFFSET(op);			 \
--		LASSERT(coffset < (obdx)->md_stats->ls_num);	 \
--		lprocfs_counter_incr((obdx)->md_stats, coffset); \
--	}							 \
+-#define CL_PAGE_INVOKE(_env, _page, _op, _proto, ...)		   \
+-({								      \
+-	const struct lu_env	*__env  = (_env);		    \
+-	struct cl_page	     *__page = (_page);		   \
+-	const struct cl_page_slice *__scan;			     \
+-	int			 __result;			   \
+-	ptrdiff_t		   __op   = (_op);		     \
+-	int		       (*__method)_proto;		    \
+-									\
+-	__result = 0;						   \
+-	list_for_each_entry(__scan, &__page->cp_layers, cpl_linkage) {  \
+-		__method = *(void **)((char *)__scan->cpl_ops +  __op); \
+-		if (__method) {						\
+-			__result = (*__method)(__env, __scan, ## __VA_ARGS__); \
+-			if (__result != 0)				\
+-				break;					\
+-		}							\
+-	}								\
+-	if (__result > 0)					       \
+-		__result = 0;					   \
+-	__result;						       \
+-})
+-
+-#define CL_PAGE_INVOID(_env, _page, _op, _proto, ...)		   \
+-do {								    \
+-	const struct lu_env	*__env  = (_env);		    \
+-	struct cl_page	     *__page = (_page);		   \
+-	const struct cl_page_slice *__scan;			     \
+-	ptrdiff_t		   __op   = (_op);		     \
+-	void		      (*__method)_proto;		    \
+-									\
+-	list_for_each_entry(__scan, &__page->cp_layers, cpl_linkage) {	\
+-		__method = *(void **)((char *)__scan->cpl_ops + __op);	\
+-		if (__method)						\
+-			(*__method)(__env, __scan, ## __VA_ARGS__);	\
+-	}								\
 -} while (0)
 -
--#define EXP_MD_COUNTER_INCREMENT(export, op)				    \
--do {									    \
--	if ((export)->exp_obd->obd_stats) {				    \
--		unsigned int coffset;					    \
--		coffset = (unsigned int)((export)->exp_obd->md_cntr_base) + \
--			MD_COUNTER_OFFSET(op);				    \
--		LASSERT(coffset < (export)->exp_obd->md_stats->ls_num);	    \
--		lprocfs_counter_incr((export)->exp_obd->md_stats, coffset); \
--		if ((export)->exp_md_stats)				    \
--			lprocfs_counter_incr(				    \
--				(export)->exp_md_stats, coffset);	    \
--	}								    \
+-#define CL_PAGE_INVOID_REVERSE(_env, _page, _op, _proto, ...)	       \
+-do {									\
+-	const struct lu_env	*__env  = (_env);			\
+-	struct cl_page	     *__page = (_page);		       \
+-	const struct cl_page_slice *__scan;				 \
+-	ptrdiff_t		   __op   = (_op);			 \
+-	void		      (*__method)_proto;			\
+-									    \
+-	list_for_each_entry_reverse(__scan, &__page->cp_layers, cpl_linkage) { \
+-		__method = *(void **)((char *)__scan->cpl_ops + __op);	\
+-		if (__method)						\
+-			(*__method)(__env, __scan, ## __VA_ARGS__);	\
+-	}								\
 -} while (0)
 -
- static inline int exp_check_ops(struct obd_export *exp)
- {
- 	if (!exp)
-@@ -1186,6 +1156,25 @@ static inline int obd_register_observer(struct obd_device *obd,
- }
- 
- /* metadata helpers */
-+enum mps_stat_idx {
-+	LPROC_MD_CLOSE,
-+	LPROC_MD_CREATE,
-+	LPROC_MD_ENQUEUE,
-+	LPROC_MD_GETATTR,
-+	LPROC_MD_INTENT_LOCK,
-+	LPROC_MD_LINK,
-+	LPROC_MD_RENAME,
-+	LPROC_MD_SETATTR,
-+	LPROC_MD_FSYNC,
-+	LPROC_MD_READ_PAGE,
-+	LPROC_MD_UNLINK,
-+	LPROC_MD_SETXATTR,
-+	LPROC_MD_GETXATTR,
-+	LPROC_MD_INTENT_GETATTR_ASYNC,
-+	LPROC_MD_REVALIDATE_LOCK,
-+	LPROC_MD_LAST_OPC,
-+};
-+
- static inline int md_get_root(struct obd_export *exp, const char *fileset,
- 			      struct lu_fid *fid)
- {
-@@ -1194,9 +1183,8 @@ static inline int md_get_root(struct obd_export *exp, const char *fileset,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, get_root);
--	rc = MDP(exp->exp_obd, get_root)(exp, fileset, fid);
--	return rc;
-+
-+	return MDP(exp->exp_obd, get_root)(exp, fileset, fid);
- }
- 
- static inline int md_getattr(struct obd_export *exp, struct md_op_data *op_data,
-@@ -1207,9 +1195,11 @@ static inline int md_getattr(struct obd_export *exp, struct md_op_data *op_data,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, getattr);
--	rc = MDP(exp->exp_obd, getattr)(exp, op_data, request);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_GETATTR);
-+
-+	return MDP(exp->exp_obd, getattr)(exp, op_data, request);
- }
- 
- static inline int md_null_inode(struct obd_export *exp,
-@@ -1220,9 +1210,8 @@ static inline int md_null_inode(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, null_inode);
--	rc = MDP(exp->exp_obd, null_inode)(exp, fid);
--	return rc;
-+
-+	return MDP(exp->exp_obd, null_inode)(exp, fid);
- }
- 
- static inline int md_close(struct obd_export *exp, struct md_op_data *op_data,
-@@ -1234,25 +1223,29 @@ static inline int md_close(struct obd_export *exp, struct md_op_data *op_data,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, close);
--	rc = MDP(exp->exp_obd, close)(exp, op_data, mod, request);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_CLOSE);
-+
-+	return MDP(exp->exp_obd, close)(exp, op_data, mod, request);
- }
- 
- static inline int md_create(struct obd_export *exp, struct md_op_data *op_data,
- 			    const void *data, size_t datalen, umode_t mode,
- 			    uid_t uid, gid_t gid, kernel_cap_t cap_effective,
--			    __u64 rdev, struct ptlrpc_request **request)
-+			    u64 rdev, struct ptlrpc_request **request)
- {
- 	int rc;
- 
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, create);
--	rc = MDP(exp->exp_obd, create)(exp, op_data, data, datalen, mode,
--				       uid, gid, cap_effective, rdev, request);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_CREATE);
-+
-+	return MDP(exp->exp_obd, create)(exp, op_data, data, datalen, mode,
-+					 uid, gid, cap_effective, rdev, request);
- }
- 
- static inline int md_enqueue(struct obd_export *exp,
-@@ -1260,17 +1253,19 @@ static inline int md_enqueue(struct obd_export *exp,
- 			     const union ldlm_policy_data *policy,
- 			     struct md_op_data *op_data,
- 			     struct lustre_handle *lockh,
--			     __u64 extra_lock_flags)
-+			     u64 extra_lock_flags)
- {
- 	int rc;
- 
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, enqueue);
--	rc = MDP(exp->exp_obd, enqueue)(exp, einfo, policy, op_data, lockh,
--					extra_lock_flags);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_ENQUEUE);
-+
-+	return MDP(exp->exp_obd, enqueue)(exp, einfo, policy, op_data, lockh,
-+					  extra_lock_flags);
- }
- 
- static inline int md_getattr_name(struct obd_export *exp,
-@@ -1282,9 +1277,8 @@ static inline int md_getattr_name(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, getattr_name);
--	rc = MDP(exp->exp_obd, getattr_name)(exp, op_data, request);
--	return rc;
-+
-+	return MDP(exp->exp_obd, getattr_name)(exp, op_data, request);
- }
- 
- static inline int md_intent_lock(struct obd_export *exp,
-@@ -1292,17 +1286,19 @@ static inline int md_intent_lock(struct obd_export *exp,
- 				 struct lookup_intent *it,
- 				 struct ptlrpc_request **reqp,
- 				 ldlm_blocking_callback cb_blocking,
--				 __u64 extra_lock_flags)
-+				 u64 extra_lock_flags)
- {
- 	int rc;
- 
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, intent_lock);
--	rc = MDP(exp->exp_obd, intent_lock)(exp, op_data, it, reqp,
--					    cb_blocking, extra_lock_flags);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_INTENT_LOCK);
-+
-+	return MDP(exp->exp_obd, intent_lock)(exp, op_data, it, reqp,
-+					      cb_blocking, extra_lock_flags);
- }
- 
- static inline int md_link(struct obd_export *exp, struct md_op_data *op_data,
-@@ -1313,24 +1309,29 @@ static inline int md_link(struct obd_export *exp, struct md_op_data *op_data,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, link);
--	rc = MDP(exp->exp_obd, link)(exp, op_data, request);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_LINK);
-+
-+	return MDP(exp->exp_obd, link)(exp, op_data, request);
- }
- 
- static inline int md_rename(struct obd_export *exp, struct md_op_data *op_data,
--			    const char *old, size_t oldlen, const char *new,
--			    size_t newlen, struct ptlrpc_request **request)
-+			    const char *old_name, size_t oldlen,
-+			    const char *new_name, size_t newlen,
-+			    struct ptlrpc_request **request)
- {
- 	int rc;
- 
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, rename);
--	rc = MDP(exp->exp_obd, rename)(exp, op_data, old, oldlen, new,
--				       newlen, request);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_RENAME);
-+
-+	return MDP(exp->exp_obd, rename)(exp, op_data, old_name, oldlen,
-+					 new_name, newlen, request);
- }
- 
- static inline int md_setattr(struct obd_export *exp, struct md_op_data *op_data,
-@@ -1342,9 +1343,11 @@ static inline int md_setattr(struct obd_export *exp, struct md_op_data *op_data,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, setattr);
--	rc = MDP(exp->exp_obd, setattr)(exp, op_data, ea, ealen, request);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_SETATTR);
-+
-+	return MDP(exp->exp_obd, setattr)(exp, op_data, ea, ealen, request);
- }
- 
- static inline int md_sync(struct obd_export *exp, const struct lu_fid *fid,
-@@ -1355,15 +1358,17 @@ static inline int md_sync(struct obd_export *exp, const struct lu_fid *fid,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, sync);
--	rc = MDP(exp->exp_obd, sync)(exp, fid, request);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_FSYNC);
-+
-+	return MDP(exp->exp_obd, sync)(exp, fid, request);
- }
- 
- static inline int md_read_page(struct obd_export *exp,
- 			       struct md_op_data *op_data,
- 			       struct md_callback *cb_op,
--			       __u64  hash_offset,
-+			       u64 hash_offset,
- 			       struct page **ppage)
- {
- 	int rc;
-@@ -1371,10 +1376,12 @@ static inline int md_read_page(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, read_page);
--	rc = MDP(exp->exp_obd, read_page)(exp, op_data, cb_op, hash_offset,
--					  ppage);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_READ_PAGE);
-+
-+	return MDP(exp->exp_obd, read_page)(exp, op_data, cb_op, hash_offset,
-+					    ppage);
- }
- 
- static inline int md_unlink(struct obd_export *exp, struct md_op_data *op_data,
-@@ -1385,9 +1392,11 @@ static inline int md_unlink(struct obd_export *exp, struct md_op_data *op_data,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, unlink);
--	rc = MDP(exp->exp_obd, unlink)(exp, op_data, request);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_UNLINK);
-+
-+	return MDP(exp->exp_obd, unlink)(exp, op_data, request);
- }
- 
- static inline int md_get_lustre_md(struct obd_export *exp,
-@@ -1401,7 +1410,7 @@ static inline int md_get_lustre_md(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, get_lustre_md);
-+
- 	return MDP(exp->exp_obd, get_lustre_md)(exp, req, dt_exp, md_exp, md);
- }
- 
-@@ -1413,7 +1422,7 @@ static inline int md_free_lustre_md(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, free_lustre_md);
-+
- 	return MDP(exp->exp_obd, free_lustre_md)(exp, md);
- }
- 
-@@ -1427,7 +1436,7 @@ static inline int md_merge_attr(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, merge_attr);
-+
- 	return MDP(exp->exp_obd, merge_attr)(exp, lsm, attr, cb);
- }
- 
-@@ -1442,7 +1451,10 @@ static inline int md_setxattr(struct obd_export *exp, const struct lu_fid *fid,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, setxattr);
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_SETXATTR);
-+
- 	return MDP(exp->exp_obd, setxattr)(exp, fid, obd_md_valid, name,
- 					   value, value_size, xattr_flags,
- 					   suppgid, request);
-@@ -1457,7 +1469,10 @@ static inline int md_getxattr(struct obd_export *exp, const struct lu_fid *fid,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, getxattr);
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_GETXATTR);
-+
- 	return MDP(exp->exp_obd, getxattr)(exp, fid, obd_md_valid, name,
- 					   buf_size, req);
- }
-@@ -1471,7 +1486,7 @@ static inline int md_set_open_replay_data(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, set_open_replay_data);
-+
- 	return MDP(exp->exp_obd, set_open_replay_data)(exp, och, it);
- }
- 
-@@ -1483,7 +1498,7 @@ static inline int md_clear_open_replay_data(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, clear_open_replay_data);
-+
- 	return MDP(exp->exp_obd, clear_open_replay_data)(exp, och);
- }
- 
-@@ -1496,7 +1511,7 @@ static inline int md_set_lock_data(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, set_lock_data);
-+
- 	return MDP(exp->exp_obd, set_lock_data)(exp, lockh, data, bits);
- }
- 
-@@ -1512,11 +1527,9 @@ static inline int md_cancel_unused(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, cancel_unused);
- 
--	rc = MDP(exp->exp_obd, cancel_unused)(exp, fid, policy, mode,
--					      flags, opaque);
--	return rc;
-+	return MDP(exp->exp_obd, cancel_unused)(exp, fid, policy, mode,
-+						flags, opaque);
- }
- 
- static inline enum ldlm_mode md_lock_match(struct obd_export *exp, __u64 flags,
-@@ -1531,7 +1544,7 @@ static inline enum ldlm_mode md_lock_match(struct obd_export *exp, __u64 flags,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, lock_match);
-+
- 	return MDP(exp->exp_obd, lock_match)(exp, flags, fid, type,
- 					     policy, mode, lockh);
- }
-@@ -1544,7 +1557,7 @@ static inline int md_init_ea_size(struct obd_export *exp, u32 easize,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, init_ea_size);
-+
- 	return MDP(exp->exp_obd, init_ea_size)(exp, easize, def_asize);
- }
- 
-@@ -1556,9 +1569,11 @@ static inline int md_intent_getattr_async(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, intent_getattr_async);
--	rc = MDP(exp->exp_obd, intent_getattr_async)(exp, minfo);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_INTENT_GETATTR_ASYNC);
-+
-+	return MDP(exp->exp_obd, intent_getattr_async)(exp, minfo);
- }
- 
- static inline int md_revalidate_lock(struct obd_export *exp,
-@@ -1570,9 +1585,11 @@ static inline int md_revalidate_lock(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, revalidate_lock);
--	rc = MDP(exp->exp_obd, revalidate_lock)(exp, it, fid, bits);
--	return rc;
-+
-+	lprocfs_counter_incr(exp->exp_obd->obd_md_stats,
-+			     LPROC_MD_REVALIDATE_LOCK);
-+
-+	return MDP(exp->exp_obd, revalidate_lock)(exp, it, fid, bits);
- }
- 
- static inline int md_get_fid_from_lsm(struct obd_export *exp,
-@@ -1585,9 +1602,8 @@ static inline int md_get_fid_from_lsm(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, get_fid_from_lsm);
--	rc = MDP(exp->exp_obd, get_fid_from_lsm)(exp, lsm, name, namelen, fid);
--	return rc;
-+
-+	return MDP(exp->exp_obd, get_fid_from_lsm)(exp, lsm, name, namelen, fid);
- }
- 
- /*
-@@ -1606,9 +1622,8 @@ static inline int md_unpackmd(struct obd_export *exp,
- 	rc = exp_check_ops(exp);
- 	if (rc)
- 		return rc;
--	EXP_MD_COUNTER_INCREMENT(exp, unpackmd);
--	rc = MDP(exp->exp_obd, unpackmd)(exp, plsm, lmm, lmm_size);
--	return rc;
-+
-+	return MDP(exp->exp_obd, unpackmd)(exp, plsm, lmm, lmm_size);
- }
- 
- /* OBD Metadata Support */
-diff --git a/drivers/staging/lustre/lustre/obdclass/genops.c b/drivers/staging/lustre/lustre/obdclass/genops.c
-index 29ed498..59891a8 100644
---- a/drivers/staging/lustre/lustre/obdclass/genops.c
-+++ b/drivers/staging/lustre/lustre/obdclass/genops.c
-@@ -712,9 +712,6 @@ void class_export_put(struct obd_export *exp)
- 		CDEBUG(D_IOCTL, "final put %p/%s\n",
- 		       exp, exp->exp_client_uuid.uuid);
- 
--		/* release nid stat refererence */
--		lprocfs_exp_cleanup(exp);
+-static int cl_page_invoke(const struct lu_env *env,
+-			  struct cl_io *io, struct cl_page *page, ptrdiff_t op)
 -
- 		obd_zombie_export_add(exp);
+-{
+-	PINVRNT(env, page, cl_object_same(page->cp_obj, io->ci_obj));
+-	return CL_PAGE_INVOKE(env, page, op,
+-			      (const struct lu_env *,
+-			       const struct cl_page_slice *, struct cl_io *),
+-			      io);
+-}
+-
+-static void cl_page_invoid(const struct lu_env *env,
+-			   struct cl_io *io, struct cl_page *page, ptrdiff_t op)
+-
+-{
+-	PINVRNT(env, page, cl_object_same(page->cp_obj, io->ci_obj));
+-	CL_PAGE_INVOID(env, page, op,
+-		       (const struct lu_env *,
+-			const struct cl_page_slice *, struct cl_io *), io);
+-}
+-
+ static void cl_page_owner_clear(struct cl_page *page)
+ {
+ 	if (page->cp_owner) {
+@@ -456,6 +380,7 @@ static void cl_page_owner_set(struct cl_page *page)
+ void cl_page_disown0(const struct lu_env *env,
+ 		     struct cl_io *io, struct cl_page *pg)
+ {
++	const struct cl_page_slice *slice;
+ 	enum cl_page_state state;
+ 
+ 	state = pg->cp_state;
+@@ -470,10 +395,10 @@ void cl_page_disown0(const struct lu_env *env,
+ 	 * uppermost layer (llite), responsible for VFS/VM interaction runs
+ 	 * last and can release locks safely.
+ 	 */
+-	CL_PAGE_INVOID_REVERSE(env, pg, CL_PAGE_OP(cpo_disown),
+-			       (const struct lu_env *,
+-				const struct cl_page_slice *, struct cl_io *),
+-			       io);
++	list_for_each_entry_reverse(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_disown)
++			(*slice->cpl_ops->cpo_disown)(env, slice, io);
++	}
+ }
+ 
+ /**
+@@ -511,7 +436,8 @@ int cl_page_is_owned(const struct cl_page *pg, const struct cl_io *io)
+ static int cl_page_own0(const struct lu_env *env, struct cl_io *io,
+ 			struct cl_page *pg, int nonblock)
+ {
+-	int result;
++	const struct cl_page_slice *slice;
++	int result = 0;
+ 
+ 	PINVRNT(env, pg, !cl_page_is_owned(pg, io));
+ 
+@@ -519,24 +445,31 @@ static int cl_page_own0(const struct lu_env *env, struct cl_io *io,
+ 
+ 	if (pg->cp_state == CPS_FREEING) {
+ 		result = -ENOENT;
+-	} else {
+-		result = CL_PAGE_INVOKE(env, pg, CL_PAGE_OP(cpo_own),
+-					(const struct lu_env *,
+-					 const struct cl_page_slice *,
+-					 struct cl_io *, int),
+-					io, nonblock);
+-		if (result == 0) {
+-			PASSERT(env, pg, !pg->cp_owner);
+-			pg->cp_owner = cl_io_top(io);
+-			cl_page_owner_set(pg);
+-			if (pg->cp_state != CPS_FREEING) {
+-				cl_page_state_set(env, pg, CPS_OWNED);
+-			} else {
+-				cl_page_disown0(env, io, pg);
+-				result = -ENOENT;
+-			}
++		goto out;
++	}
++
++	list_for_each_entry(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_own)
++			result = (*slice->cpl_ops->cpo_own)(env, slice,
++							    io, nonblock);
++		if (result != 0)
++			break;
++	}
++	if (result > 0)
++		result = 0;
++
++	if (result == 0) {
++		PASSERT(env, pg, !pg->cp_owner);
++		pg->cp_owner = cl_io_top(io);
++		cl_page_owner_set(pg);
++		if (pg->cp_state != CPS_FREEING) {
++			cl_page_state_set(env, pg, CPS_OWNED);
++		} else {
++			cl_page_disown0(env, io, pg);
++			result = -ENOENT;
+ 		}
  	}
++out:
+ 	PINVRNT(env, pg, ergo(result == 0, cl_page_invariant(pg)));
+ 	return result;
  }
-diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-index a540abb..dc1d540 100644
---- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-@@ -1403,11 +1403,73 @@ void lprocfs_counter_init(struct lprocfs_stats *stats, int index,
- }
- EXPORT_SYMBOL(lprocfs_counter_init);
- 
--int lprocfs_exp_cleanup(struct obd_export *exp)
-+static const char * const mps_stats[] = {
-+	[LPROC_MD_CLOSE]		= "close",
-+	[LPROC_MD_CREATE]		= "create",
-+	[LPROC_MD_ENQUEUE]		= "enqueue",
-+	[LPROC_MD_GETATTR]		= "getattr",
-+	[LPROC_MD_INTENT_LOCK]		= "intent_lock",
-+	[LPROC_MD_LINK]			= "link",
-+	[LPROC_MD_RENAME]		= "rename",
-+	[LPROC_MD_SETATTR]		= "setattr",
-+	[LPROC_MD_FSYNC]		= "fsync",
-+	[LPROC_MD_READ_PAGE]		= "read_page",
-+	[LPROC_MD_UNLINK]		= "unlink",
-+	[LPROC_MD_SETXATTR]		= "setxattr",
-+	[LPROC_MD_GETXATTR]		= "getxattr",
-+	[LPROC_MD_INTENT_GETATTR_ASYNC]	= "intent_getattr_async",
-+	[LPROC_MD_REVALIDATE_LOCK]	= "revalidate_lock",
-+};
-+
-+int ldebugfs_alloc_md_stats(struct obd_device *obd,
-+			    unsigned int num_private_stats)
+@@ -577,11 +510,17 @@ int cl_page_own_try(const struct lu_env *env, struct cl_io *io,
+ void cl_page_assume(const struct lu_env *env,
+ 		    struct cl_io *io, struct cl_page *pg)
  {
-+	struct lprocfs_stats *stats;
-+	unsigned int num_stats;
-+	int i;
++	const struct cl_page_slice *slice;
 +
-+	/* No obd device debugfs tree to attach too */
-+	if (!obd->obd_debugfs_entry) {
-+		CWARN("%s: missing debugfs tree for registering md_stats.\n",
-+		      obd->obd_name);
-+		return 0;
-+	}
-+
-+	if (obd->obd_md_stats)
-+		return -EINVAL;
-+
-+	num_stats = ARRAY_SIZE(mps_stats) + num_private_stats;
-+	stats = lprocfs_alloc_stats(num_stats, 0);
-+	if (!stats)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < ARRAY_SIZE(mps_stats); i++) {
-+		lprocfs_counter_init(stats, i, 0, mps_stats[i], "reqs");
-+		if (!stats->ls_cnt_header[i].lc_name) {
-+			CERROR("Missing md_stat initializer md_op operation at offset %d. Aborting.\n",
-+			       i);
-+			LBUG();
-+		}
-+	}
-+	obd->obd_md_stats = stats;
-+
-+	debugfs_create_file("md_stats", 0644, obd->obd_debugfs_entry,
-+			    obd->obd_md_stats, &lprocfs_stats_seq_fops);
- 	return 0;
- }
--EXPORT_SYMBOL(lprocfs_exp_cleanup);
-+EXPORT_SYMBOL(ldebugfs_alloc_md_stats);
-+
-+void ldebugfs_free_md_stats(struct obd_device *obd)
-+{
-+	struct lprocfs_stats *stats = obd->obd_md_stats;
-+
-+	if (!stats)
-+		return;
-+
-+	obd->obd_md_stats = NULL;
-+	lprocfs_free_stats(&stats);
-+}
-+EXPORT_SYMBOL(ldebugfs_free_md_stats);
+ 	PINVRNT(env, pg, cl_object_same(pg->cp_obj, io->ci_obj));
  
- __s64 lprocfs_read_helper(struct lprocfs_counter *lc,
- 			  struct lprocfs_counter_header *header,
+ 	io = cl_io_top(io);
+ 
+-	cl_page_invoid(env, io, pg, CL_PAGE_OP(cpo_assume));
++	list_for_each_entry(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_assume)
++			(*slice->cpl_ops->cpo_assume)(env, slice, io);
++	}
++
+ 	PASSERT(env, pg, !pg->cp_owner);
+ 	pg->cp_owner = cl_io_top(io);
+ 	cl_page_owner_set(pg);
+@@ -603,16 +542,19 @@ void cl_page_assume(const struct lu_env *env,
+ void cl_page_unassume(const struct lu_env *env,
+ 		      struct cl_io *io, struct cl_page *pg)
+ {
++	const struct cl_page_slice *slice;
++
+ 	PINVRNT(env, pg, cl_page_is_owned(pg, io));
+ 	PINVRNT(env, pg, cl_page_invariant(pg));
+ 
+ 	io = cl_io_top(io);
+ 	cl_page_owner_clear(pg);
+ 	cl_page_state_set(env, pg, CPS_CACHED);
+-	CL_PAGE_INVOID_REVERSE(env, pg, CL_PAGE_OP(cpo_unassume),
+-			       (const struct lu_env *,
+-				const struct cl_page_slice *, struct cl_io *),
+-			       io);
++
++	list_for_each_entry_reverse(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_unassume)
++			(*slice->cpl_ops->cpo_unassume)(env, slice, io);
++	}
+ }
+ EXPORT_SYMBOL(cl_page_unassume);
+ 
+@@ -651,10 +593,15 @@ void cl_page_disown(const struct lu_env *env,
+ void cl_page_discard(const struct lu_env *env,
+ 		     struct cl_io *io, struct cl_page *pg)
+ {
++	const struct cl_page_slice *slice;
++
+ 	PINVRNT(env, pg, cl_page_is_owned(pg, io));
+ 	PINVRNT(env, pg, cl_page_invariant(pg));
+ 
+-	cl_page_invoid(env, io, pg, CL_PAGE_OP(cpo_discard));
++	list_for_each_entry(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_discard)
++			(*slice->cpl_ops->cpo_discard)(env, slice, io);
++	}
+ }
+ EXPORT_SYMBOL(cl_page_discard);
+ 
+@@ -665,18 +612,20 @@ void cl_page_discard(const struct lu_env *env,
+  */
+ static void cl_page_delete0(const struct lu_env *env, struct cl_page *pg)
+ {
++	const struct cl_page_slice *slice;
++
+ 	PASSERT(env, pg, pg->cp_state != CPS_FREEING);
+ 
+ 	/*
+ 	 * Sever all ways to obtain new pointers to @pg.
+ 	 */
+ 	cl_page_owner_clear(pg);
+-
+ 	cl_page_state_set0(env, pg, CPS_FREEING);
+ 
+-	CL_PAGE_INVOID_REVERSE(env, pg, CL_PAGE_OP(cpo_delete),
+-			       (const struct lu_env *,
+-				const struct cl_page_slice *));
++	list_for_each_entry_reverse(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_delete)
++			(*slice->cpl_ops->cpo_delete)(env, slice);
++	}
+ }
+ 
+ /**
+@@ -721,10 +670,14 @@ void cl_page_delete(const struct lu_env *env, struct cl_page *pg)
+  */
+ void cl_page_export(const struct lu_env *env, struct cl_page *pg, int uptodate)
+ {
++	const struct cl_page_slice *slice;
++
+ 	PINVRNT(env, pg, cl_page_invariant(pg));
+-	CL_PAGE_INVOID(env, pg, CL_PAGE_OP(cpo_export),
+-		       (const struct lu_env *,
+-			const struct cl_page_slice *, int), uptodate);
++
++	list_for_each_entry(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_export)
++			(*slice->cpl_ops->cpo_export)(env, slice, uptodate);
++	}
+ }
+ EXPORT_SYMBOL(cl_page_export);
+ 
+@@ -734,8 +687,8 @@ void cl_page_export(const struct lu_env *env, struct cl_page *pg, int uptodate)
+  */
+ int cl_page_is_vmlocked(const struct lu_env *env, const struct cl_page *pg)
+ {
+-	int result;
+ 	const struct cl_page_slice *slice;
++	int result;
+ 
+ 	slice = container_of(pg->cp_layers.next,
+ 			     const struct cl_page_slice, cpl_linkage);
+@@ -776,7 +729,8 @@ static void cl_page_io_start(const struct lu_env *env,
+ int cl_page_prep(const struct lu_env *env, struct cl_io *io,
+ 		 struct cl_page *pg, enum cl_req_type crt)
+ {
+-	int result;
++	const struct cl_page_slice *slice;
++	int result = 0;
+ 
+ 	PINVRNT(env, pg, cl_page_is_owned(pg, io));
+ 	PINVRNT(env, pg, cl_page_invariant(pg));
+@@ -789,9 +743,19 @@ int cl_page_prep(const struct lu_env *env, struct cl_io *io,
+ 	 */
+ 	if (crt >= CRT_NR)
+ 		return -EINVAL;
+-	result = cl_page_invoke(env, io, pg, CL_PAGE_OP(io[crt].cpo_prep));
+-	if (result == 0)
++
++	list_for_each_entry(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_own)
++			result = (*slice->cpl_ops->io[crt].cpo_prep)(env, slice,
++								     io);
++		if (result != 0)
++			break;
++	}
++
++	if (result >= 0) {
++		result = 0;
+ 		cl_page_io_start(env, pg, crt);
++	}
+ 
+ 	CL_PAGE_HEADER(D_TRACE, env, pg, "%d %d\n", crt, result);
+ 	return result;
+@@ -817,6 +781,7 @@ void cl_page_completion(const struct lu_env *env,
+ 			struct cl_page *pg, enum cl_req_type crt, int ioret)
+ {
+ 	struct cl_sync_io *anchor = pg->cp_sync_io;
++	const struct cl_page_slice *slice;
+ 
+ 	PASSERT(env, pg, crt < CRT_NR);
+ 	PASSERT(env, pg, pg->cp_state == cl_req_type_state(crt));
+@@ -826,9 +791,13 @@ void cl_page_completion(const struct lu_env *env,
+ 	cl_page_state_set(env, pg, CPS_CACHED);
+ 	if (crt >= CRT_NR)
+ 		return;
+-	CL_PAGE_INVOID_REVERSE(env, pg, CL_PAGE_OP(io[crt].cpo_completion),
+-			       (const struct lu_env *,
+-				const struct cl_page_slice *, int), ioret);
++
++	list_for_each_entry_reverse(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->io[crt].cpo_completion)
++			(*slice->cpl_ops->io[crt].cpo_completion)(env, slice,
++								  ioret);
++	}
++
+ 	if (anchor) {
+ 		LASSERT(pg->cp_sync_io == anchor);
+ 		pg->cp_sync_io = NULL;
+@@ -849,18 +818,26 @@ void cl_page_completion(const struct lu_env *env,
+ int cl_page_make_ready(const struct lu_env *env, struct cl_page *pg,
+ 		       enum cl_req_type crt)
+ {
+-	int result;
++	const struct cl_page_slice *sli;
++	int result = 0;
+ 
+ 	PINVRNT(env, pg, crt < CRT_NR);
+ 
+ 	if (crt >= CRT_NR)
+ 		return -EINVAL;
+-	result = CL_PAGE_INVOKE(env, pg, CL_PAGE_OP(io[crt].cpo_make_ready),
+-				(const struct lu_env *,
+-				 const struct cl_page_slice *));
+-	if (result == 0) {
++
++	list_for_each_entry(sli, &pg->cp_layers, cpl_linkage) {
++		if (sli->cpl_ops->io[crt].cpo_make_ready)
++			result = (*sli->cpl_ops->io[crt].cpo_make_ready)(env,
++									 sli);
++		if (result != 0)
++			break;
++	}
++
++	if (result >= 0) {
+ 		PASSERT(env, pg, pg->cp_state == CPS_CACHED);
+ 		cl_page_io_start(env, pg, crt);
++		result = 0;
+ 	}
+ 	CL_PAGE_HEADER(D_TRACE, env, pg, "%d %d\n", crt, result);
+ 	return result;
+@@ -878,12 +855,20 @@ int cl_page_make_ready(const struct lu_env *env, struct cl_page *pg,
+ int cl_page_flush(const struct lu_env *env, struct cl_io *io,
+ 		  struct cl_page *pg)
+ {
+-	int result;
++	const struct cl_page_slice *slice;
++	int result = 0;
+ 
+ 	PINVRNT(env, pg, cl_page_is_owned(pg, io));
+ 	PINVRNT(env, pg, cl_page_invariant(pg));
+ 
+-	result = cl_page_invoke(env, io, pg, CL_PAGE_OP(cpo_flush));
++	 list_for_each_entry(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_flush)
++			result = (*slice->cpl_ops->cpo_flush)(env, slice, io);
++		if (result != 0)
++			break;
++	}
++	if (result > 0)
++		result = 0;
+ 
+ 	CL_PAGE_HEADER(D_TRACE, env, pg, "%d\n", result);
+ 	return result;
+@@ -898,13 +883,16 @@ int cl_page_flush(const struct lu_env *env, struct cl_io *io,
+ void cl_page_clip(const struct lu_env *env, struct cl_page *pg,
+ 		  int from, int to)
+ {
++	const struct cl_page_slice *slice;
++
+ 	PINVRNT(env, pg, cl_page_invariant(pg));
+ 
+ 	CL_PAGE_HEADER(D_TRACE, env, pg, "%d %d\n", from, to);
+-	CL_PAGE_INVOID(env, pg, CL_PAGE_OP(cpo_clip),
+-		       (const struct lu_env *,
+-			const struct cl_page_slice *, int, int),
+-		       from, to);
++
++	list_for_each_entry(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_clip)
++			(*slice->cpl_ops->cpo_clip)(env, slice, from, to);
++	}
+ }
+ EXPORT_SYMBOL(cl_page_clip);
+ 
+@@ -928,11 +916,18 @@ void cl_page_header_print(const struct lu_env *env, void *cookie,
+ void cl_page_print(const struct lu_env *env, void *cookie,
+ 		   lu_printer_t printer, const struct cl_page *pg)
+ {
++	const struct cl_page_slice *slice;
++	int result = 0;
++
+ 	cl_page_header_print(env, cookie, printer, pg);
+-	CL_PAGE_INVOKE(env, (struct cl_page *)pg, CL_PAGE_OP(cpo_print),
+-		       (const struct lu_env *env,
+-			const struct cl_page_slice *slice,
+-			void *cookie, lu_printer_t p), cookie, printer);
++
++	list_for_each_entry(slice, &pg->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_print)
++			result = (*slice->cpl_ops->cpo_print)(env, slice,
++							      cookie, printer);
++		if (result != 0)
++			break;
++	}
+ 	(*printer)(env, cookie, "end page@%p\n", pg);
+ }
+ EXPORT_SYMBOL(cl_page_print);
+@@ -942,9 +937,19 @@ void cl_page_print(const struct lu_env *env, void *cookie,
+  */
+ int cl_page_cancel(const struct lu_env *env, struct cl_page *page)
+ {
+-	return CL_PAGE_INVOKE(env, page, CL_PAGE_OP(cpo_cancel),
+-			      (const struct lu_env *,
+-			       const struct cl_page_slice *));
++	const struct cl_page_slice *slice;
++	int result = 0;
++
++	list_for_each_entry(slice, &page->cp_layers, cpl_linkage) {
++		if (slice->cpl_ops->cpo_cancel)
++			result = (*slice->cpl_ops->cpo_cancel)(env, slice);
++		if (result != 0)
++			break;
++	}
++	if (result > 0)
++		result = 0;
++
++	return result;
+ }
+ 
+ /**
 -- 
 1.8.3.1
