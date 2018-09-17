@@ -1,9 +1,9 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Sep 2018 13:31:18 -0400
-Subject: [lustre-devel] [PATCH 5/8] lustre: obd: remove obd_{get,put}ref()
+Date: Mon, 17 Sep 2018 13:31:19 -0400
+Subject: [lustre-devel] [PATCH 6/8] lustre: obd: remove OBD ops based stats
 In-Reply-To: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
 References: <1537205481-6899-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537205481-6899-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537205481-6899-7-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,391 +12,331 @@ To: lustre-devel@lists.lustre.org
 
 From: "John L. Hammond" <jhammond@whamcloud.com>
 
-obd_getref() and obd_putref() are only used in the lov layer and only
-implemented by the lov layer. So they can be removed in favor of
-direct calls. Rename lov_{get,put}ref() to lov_tgts_{get,put}ref()
-since they do not manage references on the lov device but on its
-targets array.
+Stats maintained via the OBD operations wrappers (obd_setup(),
+obd_cleanup(), ...) are less and less interesting to the point that we
+should remove them. The only stats files affected by this are
+obdfilter.*.stats, obdfilter.*.exports.*.stats and
+obdecho.*.stats which are server side only.
 
 Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-11051
-Reviewed-on: https://review.whamcloud.com/32529
+WC-bug-id: https://jira.whamcloud.com/browse/LU-11052
+Reviewed-on: https://review.whamcloud.com/32602
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: James Simmons <uja.ornl@yahoo.com>
+Reviewed-by: Jesse Hanley <hanleyja@ornl.gov>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/obd.h       |  7 ----
- drivers/staging/lustre/lustre/include/obd_class.h | 16 ---------
- drivers/staging/lustre/lustre/lov/lov_dev.c       | 12 ++++---
- drivers/staging/lustre/lustre/lov/lov_internal.h  |  2 ++
- drivers/staging/lustre/lustre/lov/lov_obd.c       | 44 +++++++++++------------
- drivers/staging/lustre/lustre/lov/lov_pool.c      | 10 +++---
- drivers/staging/lustre/lustre/lov/lov_request.c   |  4 +--
- 7 files changed, 39 insertions(+), 56 deletions(-)
+ drivers/staging/lustre/lustre/include/obd.h       |  1 -
+ drivers/staging/lustre/lustre/include/obd_class.h | 66 +----------------------
+ 2 files changed, 2 insertions(+), 65 deletions(-)
 
 diff --git a/drivers/staging/lustre/lustre/include/obd.h b/drivers/staging/lustre/lustre/include/obd.h
-index 50e97b4..44f9b10 100644
+index 44f9b10..8691aec 100644
 --- a/drivers/staging/lustre/lustre/include/obd.h
 +++ b/drivers/staging/lustre/lustre/include/obd.h
-@@ -882,13 +882,6 @@ struct obd_ops {
- 			char *ostname);
- 	int (*pool_rem)(struct obd_device *obd, char *poolname,
- 			char *ostname);
--	void (*getref)(struct obd_device *obd);
--	void (*putref)(struct obd_device *obd);
--	/*
--	 * NOTE: If adding ops, add another LPROCFS_OBD_OP_INIT() line
--	 * to lprocfs_alloc_obd_stats() in obdclass/lprocfs_status.c.
--	 * Also, add a wrapper function in include/linux/obd_class.h.
--	 */
- };
+@@ -598,7 +598,6 @@ struct obd_device {
  
- /* lmv structures */
+ 	/* Fields used by LProcFS */
+ 	struct lprocfs_stats	*obd_stats;
+-	unsigned int		 obd_cntr_base;
+ 
+ 	struct lprocfs_stats	*md_stats;
+ 	unsigned int		 md_cntr_base;
 diff --git a/drivers/staging/lustre/lustre/include/obd_class.h b/drivers/staging/lustre/lustre/include/obd_class.h
-index aab1092..eb0a53d 100644
+index eb0a53d..0c1922e 100644
 --- a/drivers/staging/lustre/lustre/include/obd_class.h
 +++ b/drivers/staging/lustre/lustre/include/obd_class.h
-@@ -927,22 +927,6 @@ static inline int obd_pool_rem(struct obd_device *obd,
+@@ -334,33 +334,6 @@ static inline int obd_check_dev_active(struct obd_device *obd)
  	return rc;
  }
  
--static inline void obd_getref(struct obd_device *obd)
--{
--	if (obd->obd_type && OBP(obd, getref)) {
--		OBD_COUNTER_INCREMENT(obd, getref);
--		OBP(obd, getref)(obd);
--	}
--}
+-#define OBD_COUNTER_OFFSET(op)					\
+-	((offsetof(struct obd_ops, op) -			\
+-		offsetof(struct obd_ops, iocontrol))		\
+-		/ sizeof(((struct obd_ops *)(0))->iocontrol))
 -
--static inline void obd_putref(struct obd_device *obd)
--{
--	if (obd->obd_type && OBP(obd, putref)) {
--		OBD_COUNTER_INCREMENT(obd, putref);
--		OBP(obd, putref)(obd);
--	}
--}
+-#define OBD_COUNTER_INCREMENT(obdx, op)					\
+-do {									\
+-	if ((obdx)->obd_stats) {					\
+-		unsigned int coffset;					\
+-		coffset = (unsigned int)((obdx)->obd_cntr_base) +	\
+-			OBD_COUNTER_OFFSET(op);				\
+-		LASSERT(coffset < (obdx)->obd_stats->ls_num);		\
+-		lprocfs_counter_incr((obdx)->obd_stats, coffset);	\
+-	}								\
+-} while (0)
 -
- static inline int obd_init_export(struct obd_export *exp)
- {
- 	int rc = 0;
-diff --git a/drivers/staging/lustre/lustre/lov/lov_dev.c b/drivers/staging/lustre/lustre/lov/lov_dev.c
-index c7db234..abf2ede 100644
---- a/drivers/staging/lustre/lustre/lov/lov_dev.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_dev.c
-@@ -266,7 +266,7 @@ static int lov_cl_add_target(const struct lu_env *env, struct lu_device *dev,
- 	struct cl_device     *cl;
- 	int rc;
- 
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 
- 	tgt = obd->u.lov.lov_tgts[index];
- 
-@@ -291,7 +291,9 @@ static int lov_cl_add_target(const struct lu_env *env, struct lu_device *dev,
- 			rc = PTR_ERR(cl);
- 		}
+-#define EXP_COUNTER_INCREMENT(export, op)				     \
+-do {									     \
+-	if ((export)->exp_obd->obd_stats) {				     \
+-		unsigned int coffset;					     \
+-		coffset = (unsigned int)((export)->exp_obd->obd_cntr_base) + \
+-			OBD_COUNTER_OFFSET(op);				     \
+-		LASSERT(coffset < (export)->exp_obd->obd_stats->ls_num);     \
+-		lprocfs_counter_incr((export)->exp_obd->obd_stats, coffset); \
+-	}								     \
+-} while (0)
+-
+ #define MD_COUNTER_OFFSET(op)					\
+ 	((offsetof(struct md_ops, op) -				\
+ 		offsetof(struct md_ops, get_root))		\
+@@ -422,7 +395,6 @@ static inline int obd_get_info(const struct lu_env *env,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -ENOTSUPP;
  	}
--	obd_putref(obd);
-+
-+	lov_tgts_putref(obd);
-+
+-	EXP_COUNTER_INCREMENT(exp, get_info);
+ 
+ 	rc = OBP(exp->exp_obd, get_info)(env, exp, keylen, key, vallen, val);
  	return rc;
- }
- 
-@@ -304,7 +306,7 @@ static int lov_process_config(const struct lu_env *env,
- 	int gen;
- 	__u32 index;
- 
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 
- 	cmd = cfg->lcfg_command;
- 	rc = lov_process_config_base(d->ld_obd, cfg, &index, &gen);
-@@ -321,7 +323,9 @@ static int lov_process_config(const struct lu_env *env,
- 			break;
- 		}
+@@ -444,7 +416,6 @@ static inline int obd_set_info_async(const struct lu_env *env,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -ENOTSUPP;
  	}
--	obd_putref(obd);
-+
-+	lov_tgts_putref(obd);
-+
+-	EXP_COUNTER_INCREMENT(exp, set_info_async);
+ 
+ 	rc = OBP(exp->exp_obd, set_info_async)(env, exp, keylen, key, vallen,
+ 					       val, set);
+@@ -506,7 +477,6 @@ static inline int obd_setup(struct obd_device *obd, struct lustre_cfg *cfg)
+ 			       __func__);
+ 			return -EOPNOTSUPP;
+ 		}
+-		OBD_COUNTER_INCREMENT(obd, setup);
+ 		rc = OBP(obd, setup)(obd, cfg);
+ 	}
  	return rc;
- }
- 
-diff --git a/drivers/staging/lustre/lustre/lov/lov_internal.h b/drivers/staging/lustre/lustre/lov/lov_internal.h
-index dbb79d4..44a997e 100644
---- a/drivers/staging/lustre/lustre/lov/lov_internal.h
-+++ b/drivers/staging/lustre/lustre/lov/lov_internal.h
-@@ -207,6 +207,8 @@ int lov_prep_statfs_set(struct obd_device *obd, struct obd_info *oinfo,
- int lov_fini_statfs_set(struct lov_request_set *set);
- 
- /* lov_obd.c */
-+void lov_tgts_getref(struct obd_device *obd);
-+void lov_tgts_putref(struct obd_device *obd);
- void lov_stripe_lock(struct lov_stripe_md *md);
- void lov_stripe_unlock(struct lov_stripe_md *md);
- void lov_fix_desc(struct lov_desc *desc);
-diff --git a/drivers/staging/lustre/lustre/lov/lov_obd.c b/drivers/staging/lustre/lustre/lov/lov_obd.c
-index 3483f9b..6959b91 100644
---- a/drivers/staging/lustre/lustre/lov/lov_obd.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_obd.c
-@@ -62,7 +62,7 @@
- /* Keep a refcount of lov->tgt usage to prevent racing with addition/deletion.
-  * Any function that expects lov_tgts to remain stationary must take a ref.
-  */
--static void lov_getref(struct obd_device *obd)
-+void lov_tgts_getref(struct obd_device *obd)
- {
- 	struct lov_obd *lov = &obd->u.lov;
- 
-@@ -74,7 +74,7 @@ static void lov_getref(struct obd_device *obd)
- 
- static void __lov_del_obd(struct obd_device *obd, struct lov_tgt_desc *tgt);
- 
--static void lov_putref(struct obd_device *obd)
-+void lov_tgts_putref(struct obd_device *obd)
- {
- 	struct lov_obd *lov = &obd->u.lov;
- 
-@@ -231,7 +231,7 @@ static int lov_connect(const struct lu_env *env,
- 	if (data)
- 		lov->lov_ocd = *data;
- 
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 
- 	lov->lov_tgts_kobj = kobject_create_and_add("target_obds",
- 						    &obd->obd_kset.kobj);
-@@ -258,7 +258,7 @@ static int lov_connect(const struct lu_env *env,
- 			       obd->obd_name, rc);
- 		}
- 	}
--	obd_putref(obd);
-+	lov_tgts_putref(obd);
- 
- 	return 0;
- }
-@@ -326,7 +326,7 @@ static int lov_disconnect(struct obd_export *exp)
- 	/* Let's hold another reference so lov_del_obd doesn't spin through
- 	 * putref every time
- 	 */
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 
- 	for (i = 0; i < lov->desc.ld_tgt_count; i++) {
- 		if (lov->lov_tgts[i] && lov->lov_tgts[i]->ltd_exp) {
-@@ -335,7 +335,7 @@ static int lov_disconnect(struct obd_export *exp)
- 		}
- 	}
- 
--	obd_putref(obd);
-+	lov_tgts_putref(obd);
- 
- out:
- 	rc = class_disconnect(exp); /* bz 9811 */
-@@ -359,7 +359,7 @@ static int lov_set_osc_active(struct obd_device *obd, struct obd_uuid *uuid,
- 	CDEBUG(D_INFO, "Searching in lov %p for uuid %s event(%d)\n",
- 	       lov, uuid->uuid, ev);
- 
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 	for (index = 0; index < lov->desc.ld_tgt_count; index++) {
- 		tgt = lov->lov_tgts[index];
- 		if (!tgt)
-@@ -426,7 +426,7 @@ static int lov_set_osc_active(struct obd_device *obd, struct obd_uuid *uuid,
- 	}
- 
-  out:
--	obd_putref(obd);
-+	lov_tgts_putref(obd);
- 	return index;
- }
- 
-@@ -574,7 +574,7 @@ static int lov_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
+@@ -530,8 +500,6 @@ static inline int obd_precleanup(struct obd_device *obd)
+ 	if (!obd->obd_type->typ_dt_ops->precleanup)
  		return 0;
- 	}
  
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 
- 	rc = lov_connect_obd(obd, index, active, &lov->lov_ocd);
- 	if (rc)
-@@ -604,7 +604,7 @@ static int lov_add_target(struct obd_device *obd, struct obd_uuid *uuidp,
- 		       obd_uuid2str(&tgt->ltd_uuid));
- 		lov_del_target(obd, index, NULL, 0);
- 	}
--	obd_putref(obd);
-+	lov_tgts_putref(obd);
+-	OBD_COUNTER_INCREMENT(obd, precleanup);
+-
+ 	rc = OBP(obd, precleanup)(obd);
  	return rc;
  }
+@@ -555,8 +523,6 @@ static inline int obd_cleanup(struct obd_device *obd)
+ 	if (!obd->obd_type->typ_dt_ops->cleanup)
+ 		return 0;
  
-@@ -624,7 +624,7 @@ int lov_del_target(struct obd_device *obd, __u32 index,
- 
- 	/* to make sure there's no ongoing lov_notify() now */
- 	down_write(&lov->lov_notify_lock);
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 
- 	if (!lov->lov_tgts[index]) {
- 		CERROR("LOV target at index %d is not setup.\n", index);
-@@ -647,9 +647,9 @@ int lov_del_target(struct obd_device *obd, __u32 index,
- 
- 	lov->lov_tgts[index]->ltd_reap = 1;
- 	lov->lov_death_row++;
--	/* we really delete it from obd_putref */
-+	/* we really delete it from lov_tgts_putref */
- out:
--	obd_putref(obd);
-+	lov_tgts_putref(obd);
- 	up_write(&lov->lov_notify_lock);
- 
+-	OBD_COUNTER_INCREMENT(obd, cleanup);
+-
+ 	rc = OBP(obd, cleanup)(obd);
  	return rc;
-@@ -812,7 +812,7 @@ static int lov_cleanup(struct obd_device *obd)
- 	if (lov->lov_tgts) {
- 		int i;
- 
--		obd_getref(obd);
-+		lov_tgts_getref(obd);
- 		for (i = 0; i < lov->desc.ld_tgt_count; i++) {
- 			if (!lov->lov_tgts[i])
- 				continue;
-@@ -829,7 +829,7 @@ static int lov_cleanup(struct obd_device *obd)
- 				       atomic_read(&lov->lov_refcount));
- 			lov_del_target(obd, i, NULL, 0);
+ }
+@@ -605,7 +571,6 @@ static inline int obd_process_config(struct obd_device *obd, int datalen,
  		}
--		obd_putref(obd);
-+		lov_tgts_putref(obd);
- 		kfree(lov->lov_tgts);
- 		lov->lov_tgt_size = 0;
+ 		rc = OBP(obd, process_config)(obd, datalen, data);
  	}
-@@ -1182,7 +1182,7 @@ static int lov_get_info(const struct lu_env *env, struct obd_export *exp,
- 	if (!vallen || !val)
- 		return -EFAULT;
+-	OBD_COUNTER_INCREMENT(obd, process_config);
+ 	obd->obd_process_conf = 0;
  
--	obd_getref(obddev);
-+	lov_tgts_getref(obddev);
- 
- 	if (KEY_IS(KEY_MAX_EASIZE)) {
- 		u32 max_stripe_count = min_t(u32, ld->ld_active_tgt_count,
-@@ -1200,7 +1200,7 @@ static int lov_get_info(const struct lu_env *env, struct obd_export *exp,
- 		rc = -EINVAL;
- 	}
- 
--	obd_putref(obddev);
-+	lov_tgts_putref(obddev);
  	return rc;
+@@ -625,7 +590,6 @@ static inline int obd_create(const struct lu_env *env, struct obd_export *exp,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	EXP_COUNTER_INCREMENT(exp, create);
+ 
+ 	rc = OBP(exp->exp_obd, create)(env, exp, obdo);
+ 	return rc;
+@@ -645,7 +609,6 @@ static inline int obd_destroy(const struct lu_env *env, struct obd_export *exp,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	EXP_COUNTER_INCREMENT(exp, destroy);
+ 
+ 	rc = OBP(exp->exp_obd, destroy)(env, exp, obdo);
+ 	return rc;
+@@ -665,7 +628,6 @@ static inline int obd_getattr(const struct lu_env *env, struct obd_export *exp,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	EXP_COUNTER_INCREMENT(exp, getattr);
+ 
+ 	rc = OBP(exp->exp_obd, getattr)(env, exp, oa);
+ 	return rc;
+@@ -685,7 +647,6 @@ static inline int obd_setattr(const struct lu_env *env, struct obd_export *exp,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	EXP_COUNTER_INCREMENT(exp, setattr);
+ 
+ 	rc = OBP(exp->exp_obd, setattr)(env, exp, oa);
+ 	return rc;
+@@ -705,7 +666,6 @@ static inline int obd_add_conn(struct obd_import *imp, struct obd_uuid *uuid,
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	OBD_COUNTER_INCREMENT(obd, add_conn);
+ 
+ 	rc = OBP(obd, add_conn)(imp, uuid, priority);
+ 	return rc;
+@@ -724,7 +684,6 @@ static inline int obd_del_conn(struct obd_import *imp, struct obd_uuid *uuid)
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	OBD_COUNTER_INCREMENT(obd, del_conn);
+ 
+ 	rc = OBP(obd, del_conn)(imp, uuid);
+ 	return rc;
+@@ -738,8 +697,6 @@ static inline struct obd_uuid *obd_get_uuid(struct obd_export *exp)
+ 	    !exp->exp_obd->obd_type->typ_dt_ops->get_uuid)
+ 		return NULL;
+ 
+-	EXP_COUNTER_INCREMENT(exp, get_uuid);
+-
+ 	uuid = OBP(exp->exp_obd, get_uuid)(exp);
+ 	return uuid;
  }
- 
-@@ -1222,7 +1222,7 @@ static int lov_set_info_async(const struct lu_env *env, struct obd_export *exp,
- 			return -ENOMEM;
+@@ -768,7 +725,6 @@ static inline int obd_connect(const struct lu_env *env,
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
  	}
+-	OBD_COUNTER_INCREMENT(obd, connect);
  
--	obd_getref(obddev);
-+	lov_tgts_getref(obddev);
- 	count = lov->desc.ld_tgt_count;
+ 	rc = OBP(obd, connect)(env, exp, obd, cluuid, data, localdata);
+ 	/* check that only subset is granted */
+@@ -794,8 +750,6 @@ static inline int obd_reconnect(const struct lu_env *env,
+ 	if (!obd->obd_type || !obd->obd_type->typ_dt_ops->reconnect)
+ 		return 0;
  
- 	if (KEY_IS(KEY_CHECKSUM)) {
-@@ -1251,7 +1251,7 @@ static int lov_set_info_async(const struct lu_env *env, struct obd_export *exp,
- 			rc = err;
+-	OBD_COUNTER_INCREMENT(obd, reconnect);
+-
+ 	rc = OBP(obd, reconnect)(env, exp, obd, cluuid, d, localdata);
+ 	/* check that only subset is granted */
+ 	LASSERT(ergo(d, (d->ocd_connect_flags & ocf) == d->ocd_connect_flags));
+@@ -815,7 +769,6 @@ static inline int obd_disconnect(struct obd_export *exp)
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -ENOTSUPP;
  	}
+-	EXP_COUNTER_INCREMENT(exp, disconnect);
  
--	obd_putref(obddev);
-+	lov_tgts_putref(obddev);
- 	if (no_set) {
- 		err = ptlrpc_set_wait(set);
- 		if (!rc)
-@@ -1294,7 +1294,7 @@ static int lov_quotactl(struct obd_device *obd, struct obd_export *exp,
+ 	rc = OBP(exp->exp_obd, disconnect)(exp);
+ 	return rc;
+@@ -828,7 +781,6 @@ static inline int obd_fid_init(struct obd_device *obd, struct obd_export *exp,
+ 
+ 	if (!obd->obd_type || !obd->obd_type->typ_dt_ops->fid_init)
+ 		return 0;
+-	OBD_COUNTER_INCREMENT(obd, fid_init);
+ 
+ 	rc = OBP(obd, fid_init)(obd, exp, type);
+ 	return rc;
+@@ -840,7 +792,6 @@ static inline int obd_fid_fini(struct obd_device *obd)
+ 
+ 	if (!obd->obd_type || !obd->obd_type->typ_dt_ops->fid_fini)
+ 		return 0;
+-	OBD_COUNTER_INCREMENT(obd, fid_fini);
+ 
+ 	rc = OBP(obd, fid_fini)(obd);
+ 	return rc;
+@@ -862,7 +813,6 @@ static inline int obd_fid_alloc(const struct lu_env *env,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -ENOTSUPP;
  	}
+-	EXP_COUNTER_INCREMENT(exp, fid_alloc);
  
- 	/* for lov tgt */
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 	for (i = 0; i < lov->desc.ld_tgt_count; i++) {
- 		int err;
- 
-@@ -1326,7 +1326,7 @@ static int lov_quotactl(struct obd_device *obd, struct obd_export *exp,
- 			bhardlimit += oqctl->qc_dqblk.dqb_bhardlimit;
- 		}
+ 	rc = OBP(exp->exp_obd, fid_alloc)(env, exp, fid, op_data);
+ 	return rc;
+@@ -876,7 +826,6 @@ static inline int obd_pool_new(struct obd_device *obd, char *poolname)
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
  	}
--	obd_putref(obd);
-+	lov_tgts_putref(obd);
+-	OBD_COUNTER_INCREMENT(obd, pool_new);
  
- 	if (oqctl->qc_cmd == Q_GETOQUOTA) {
- 		oqctl->qc_dqblk.dqb_curspace = curspace;
-@@ -1352,8 +1352,6 @@ static int lov_quotactl(struct obd_device *obd, struct obd_export *exp,
- 	.pool_rem       = lov_pool_remove,
- 	.pool_add       = lov_pool_add,
- 	.pool_del       = lov_pool_del,
--	.getref         = lov_getref,
--	.putref         = lov_putref,
- 	.quotactl       = lov_quotactl,
- };
+ 	rc = OBP(obd, pool_new)(obd, poolname);
+ 	return rc;
+@@ -890,7 +839,6 @@ static inline int obd_pool_del(struct obd_device *obd, char *poolname)
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	OBD_COUNTER_INCREMENT(obd, pool_del);
  
-diff --git a/drivers/staging/lustre/lustre/lov/lov_pool.c b/drivers/staging/lustre/lustre/lov/lov_pool.c
-index b2a88ba..c79c2ae 100644
---- a/drivers/staging/lustre/lustre/lov/lov_pool.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_pool.c
-@@ -470,7 +470,7 @@ int lov_pool_add(struct obd_device *obd, char *poolname, char *ostname)
- 	obd_str2uuid(&ost_uuid, ostname);
+ 	rc = OBP(obd, pool_del)(obd, poolname);
+ 	return rc;
+@@ -905,7 +853,6 @@ static inline int obd_pool_add(struct obd_device *obd, char *poolname,
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	OBD_COUNTER_INCREMENT(obd, pool_add);
  
- 	/* search ost in lov array */
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 	for (lov_idx = 0; lov_idx < lov->desc.ld_tgt_count; lov_idx++) {
- 		if (!lov->lov_tgts[lov_idx])
- 			continue;
-@@ -492,8 +492,9 @@ int lov_pool_add(struct obd_device *obd, char *poolname, char *ostname)
- 	       ostname, poolname,  pool_tgt_count(pool));
+ 	rc = OBP(obd, pool_add)(obd, poolname, ostname);
+ 	return rc;
+@@ -921,7 +868,6 @@ static inline int obd_pool_rem(struct obd_device *obd,
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	OBD_COUNTER_INCREMENT(obd, pool_rem);
  
- out:
--	obd_putref(obd);
-+	lov_tgts_putref(obd);
- 	lov_pool_putref(pool);
+ 	rc = OBP(obd, pool_rem)(obd, poolname, ostname);
+ 	return rc;
+@@ -966,7 +912,6 @@ static inline int obd_statfs_async(struct obd_export *exp,
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	OBD_COUNTER_INCREMENT(obd, statfs);
+ 
+ 	CDEBUG(D_SUPER, "%s: osfs %p age %llu, max_age %llu\n",
+ 	       obd->obd_name, &obd->obd_osfs, obd->obd_osfs_age, max_age);
+@@ -1029,7 +974,6 @@ static inline int obd_statfs(const struct lu_env *env, struct obd_export *exp,
+ 		CERROR("%s: no %s operation\n", obd->obd_name, __func__);
+ 		return -EOPNOTSUPP;
+ 	}
+-	OBD_COUNTER_INCREMENT(obd, statfs);
+ 
+ 	CDEBUG(D_SUPER, "osfs %llu, max_age %llu\n",
+ 	       obd->obd_osfs_age, max_age);
+@@ -1071,7 +1015,6 @@ static inline int obd_preprw(const struct lu_env *env, int cmd,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -ENOTSUPP;
+ 	}
+-	EXP_COUNTER_INCREMENT(exp, preprw);
+ 
+ 	rc = OBP(exp->exp_obd, preprw)(env, cmd, exp, oa, objcount, obj, remote,
+ 				       pages, local);
+@@ -1095,7 +1038,6 @@ static inline int obd_commitrw(const struct lu_env *env, int cmd,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -ENOTSUPP;
+ 	}
+-	EXP_COUNTER_INCREMENT(exp, commitrw);
+ 
+ 	rc = OBP(exp->exp_obd, commitrw)(env, cmd, exp, oa, objcount, obj,
+ 					 rnb, pages, local, orig_rc);
+@@ -1116,7 +1058,6 @@ static inline int obd_iocontrol(unsigned int cmd, struct obd_export *exp,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -ENOTSUPP;
+ 	}
+-	EXP_COUNTER_INCREMENT(exp, iocontrol);
+ 
+ 	rc = OBP(exp->exp_obd, iocontrol)(cmd, exp, len, karg, uarg);
+ 	return rc;
+@@ -1130,10 +1071,9 @@ static inline void obd_import_event(struct obd_device *obd,
+ 		CERROR("NULL device\n");
+ 		return;
+ 	}
+-	if (obd->obd_set_up && OBP(obd, import_event)) {
+-		OBD_COUNTER_INCREMENT(obd, import_event);
 +
++	if (obd->obd_set_up && OBP(obd, import_event))
+ 		OBP(obd, import_event)(obd, imp, event);
+-	}
+ }
+ 
+ static inline int obd_notify(struct obd_device *obd,
+@@ -1156,7 +1096,6 @@ static inline int obd_notify(struct obd_device *obd,
+ 		return -ENOSYS;
+ 	}
+ 
+-	OBD_COUNTER_INCREMENT(obd, notify);
+ 	rc = OBP(obd, notify)(obd, watched, ev);
  	return rc;
  }
+@@ -1196,7 +1135,6 @@ static inline int obd_quotactl(struct obd_export *exp,
+ 		       exp->exp_obd->obd_name, __func__);
+ 		return -ENOTSUPP;
+ 	}
+-	EXP_COUNTER_INCREMENT(exp, quotactl);
  
-@@ -517,7 +518,7 @@ int lov_pool_remove(struct obd_device *obd, char *poolname, char *ostname)
- 
- 	obd_str2uuid(&ost_uuid, ostname);
- 
--	obd_getref(obd);
-+	lov_tgts_getref(obd);
- 	/* search ost in lov array, to get index */
- 	for (lov_idx = 0; lov_idx < lov->desc.ld_tgt_count; lov_idx++) {
- 		if (!lov->lov_tgts[lov_idx])
-@@ -540,7 +541,8 @@ int lov_pool_remove(struct obd_device *obd, char *poolname, char *ostname)
- 	       poolname);
- 
- out:
--	obd_putref(obd);
-+	lov_tgts_putref(obd);
- 	lov_pool_putref(pool);
-+
+ 	rc = OBP(exp->exp_obd, quotactl)(exp->exp_obd, exp, oqctl);
  	return rc;
- }
-diff --git a/drivers/staging/lustre/lustre/lov/lov_request.c b/drivers/staging/lustre/lustre/lov/lov_request.c
-index cb8567f..8ca13ed 100644
---- a/drivers/staging/lustre/lustre/lov/lov_request.c
-+++ b/drivers/staging/lustre/lustre/lov/lov_request.c
-@@ -266,7 +266,7 @@ static int cb_statfs_update(void *cookie, int rc)
- 	if (rc)
- 		goto out;
- 
--	obd_getref(lovobd);
-+	lov_tgts_getref(lovobd);
- 	tgt = lov->lov_tgts[lovreq->rq_idx];
- 	if (!tgt || !tgt->ltd_active)
- 		goto out_update;
-@@ -280,7 +280,7 @@ static int cb_statfs_update(void *cookie, int rc)
- 
- out_update:
- 	lov_update_statfs(osfs, lov_sfs, success);
--	obd_putref(lovobd);
-+	lov_tgts_putref(lovobd);
- out:
- 	return 0;
- }
 -- 
 1.8.3.1
