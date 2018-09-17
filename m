@@ -1,88 +1,90 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Mon, 17 Sep 2018 13:30:23 -0400
-Subject: [lustre-devel] [PATCH 13/30] lustre: ldlm: GPF in _ldlm_lock_debug()
+Date: Mon, 17 Sep 2018 13:30:33 -0400
+Subject: [lustre-devel] [PATCH 23/30] lustre: osc: adds radix_tree_preload
 In-Reply-To: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
 References: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537205440-6656-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537205440-6656-24-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andriy Skulysh <c17819@cray.com>
+From: Alexandr Boyko <c17825@cray.com>
 
-Lock's resource can change on a client. Take a resource reference
-under spinlock to print debug information.
+The client fail with next error osc_page_init())
+ASSERTION( result == 0 ) in low memory conditions.
 
-Signed-off-by: Andriy Skulysh <c17819@cray.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-7062
-Xyratex-bug-id: MRP-2760
-Reviewed-on: https://review.whamcloud.com/16139
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Alex Zhuravlev <bzzz@whamcloud.com>
+The patch fixes the problem above by adding
+radix_tree_preload.
+
+Signed-off-by: Alexandr Boyko <c17825@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9579
+Seagate-bug-id: MRP-4424
+Reviewed-on: https://review.whamcloud.com/27372
+Reviewed-by: Jinshan Xiong <jinshan.xiong@gmail.com>
+Reviewed-by: Bobi Jam <bobijam@hotmail.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/include/lustre_dlm.h |  1 +
- drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     | 11 +++++++++--
- drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |  2 +-
- 3 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/staging/lustre/lustre/osc/osc_page.c | 33 ++++++++++++++++------------
+ 1 file changed, 19 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/include/lustre_dlm.h b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-index 2a05ab8..a68c7a4 100644
---- a/drivers/staging/lustre/lustre/include/lustre_dlm.h
-+++ b/drivers/staging/lustre/lustre/include/lustre_dlm.h
-@@ -1186,6 +1186,7 @@ struct ldlm_resource *ldlm_resource_get(struct ldlm_namespace *ns,
- 					struct ldlm_resource *parent,
- 					const struct ldlm_res_id *,
- 					enum ldlm_type type, int create);
-+struct ldlm_resource *ldlm_resource_getref(struct ldlm_resource *res);
- void ldlm_resource_putref(struct ldlm_resource *res);
- void ldlm_resource_add_lock(struct ldlm_resource *res,
- 			    struct list_head *head,
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-index 2fb2e08..3cbdc81 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_lock.c
-@@ -1981,10 +1981,16 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 		      struct libcfs_debug_msg_data *msgdata,
- 		      const char *fmt, ...)
+diff --git a/drivers/staging/lustre/lustre/osc/osc_page.c b/drivers/staging/lustre/lustre/osc/osc_page.c
+index 189e3e78..ada1eda 100644
+--- a/drivers/staging/lustre/lustre/osc/osc_page.c
++++ b/drivers/staging/lustre/lustre/osc/osc_page.c
+@@ -256,32 +256,37 @@ int osc_page_init(const struct lu_env *env, struct cl_object *obj,
  {
--	va_list args;
- 	struct obd_export *exp = lock->l_export;
--	struct ldlm_resource *resource = lock->l_resource;
-+	struct ldlm_resource *resource = NULL;
- 	char *nid = "local";
-+	va_list args;
+ 	struct osc_object *osc = cl2osc(obj);
+ 	struct osc_page *opg = cl_object_page_slice(obj, page);
++	struct osc_io *oio = osc_env_io(env);
+ 	int result;
+ 
+ 	opg->ops_from = 0;
+ 	opg->ops_to = PAGE_SIZE;
++	INIT_LIST_HEAD(&opg->ops_lru);
+ 
+ 	result = osc_prep_async_page(osc, opg, page->cp_vmpage,
+ 				     cl_offset(obj, index));
+-	if (result == 0) {
+-		struct osc_io *oio = osc_env_io(env);
++	if (result != 0)
++		return result;
+ 
+-		opg->ops_srvlock = osc_io_srvlock(oio);
+-		cl_page_slice_add(page, &opg->ops_cl, obj, index,
+-				  &osc_page_ops);
+-	}
+-	INIT_LIST_HEAD(&opg->ops_lru);
++	opg->ops_srvlock = osc_io_srvlock(oio);
++	cl_page_slice_add(page, &opg->ops_cl, obj, index,
++			  &osc_page_ops);
+ 
+ 	/* reserve an LRU space for this page */
+-	if (page->cp_type == CPT_CACHEABLE && result == 0) {
++	if (page->cp_type == CPT_CACHEABLE) {
+ 		result = osc_lru_alloc(env, osc_cli(osc), opg);
+ 		if (result == 0) {
+-			spin_lock(&osc->oo_tree_lock);
+-			result = radix_tree_insert(&osc->oo_tree, index, opg);
+-			if (result == 0)
+-				++osc->oo_npages;
+-			spin_unlock(&osc->oo_tree_lock);
+-			LASSERT(result == 0);
++			result = radix_tree_preload(GFP_KERNEL);
++			if (result == 0) {
++				spin_lock(&osc->oo_tree_lock);
++				result = radix_tree_insert(&osc->oo_tree,
++							   index, opg);
++				if (result == 0)
++					++osc->oo_npages;
++				spin_unlock(&osc->oo_tree_lock);
 +
-+	if (spin_trylock(&lock->l_lock)) {
-+		if (lock->l_resource)
-+			resource = ldlm_resource_getref(lock->l_resource);
-+		spin_unlock(&lock->l_lock);
-+	}
- 
- 	va_start(args, fmt);
- 
-@@ -2099,5 +2105,6 @@ void _ldlm_lock_debug(struct ldlm_lock *lock,
- 		break;
++				radix_tree_preload_end();
++			}
+ 		}
  	}
- 	va_end(args);
-+	ldlm_resource_putref(resource);
- }
- EXPORT_SYMBOL(_ldlm_lock_debug);
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-index 33d73fa..1907a5a 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_resource.c
-@@ -402,7 +402,7 @@ static int ldlm_namespace_debugfs_register(struct ldlm_namespace *ns)
  
- #undef MAX_STRING_SIZE
- 
--static struct ldlm_resource *ldlm_resource_getref(struct ldlm_resource *res)
-+struct ldlm_resource *ldlm_resource_getref(struct ldlm_resource *res)
- {
- 	LASSERT(res);
- 	LASSERT(res != LP_POISON);
 -- 
 1.8.3.1
