@@ -1,121 +1,112 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 24 Sep 2018 13:35:36 +1000
-Subject: [lustre-devel] [PATCH 08/30] lustre: mgc: Remove unnecessary
- checks for config_log_put()
-In-Reply-To: <1537205440-6656-9-git-send-email-jsimmons@infradead.org>
+Date: Mon, 24 Sep 2018 13:50:32 +1000
+Subject: [lustre-devel] [PATCH 11/30] lustre: mdc: allow setting readdir
+ RPC size parameter
+In-Reply-To: <7503F4FB-D93E-4CD1-9DF3-C00C51528E93@whamcloud.com>
 References: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
- <1537205440-6656-9-git-send-email-jsimmons@infradead.org>
-Message-ID: <878t3r5zzr.fsf@notabene.neil.brown.name>
+ <1537205440-6656-12-git-send-email-jsimmons@infradead.org>
+ <8736u76j7g.fsf@notabene.neil.brown.name>
+ <7503F4FB-D93E-4CD1-9DF3-C00C51528E93@whamcloud.com>
+Message-ID: <875zyv5zav.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Sep 17 2018, James Simmons wrote:
+On Thu, Sep 20 2018, Andreas Dilger wrote:
 
-> From: Steve Guminski <stephenx.guminski@intel.com>
+> On Sep 18, 2018, at 09:14, NeilBrown <neilb@suse.com> wrote:
+>> 
+>> On Mon, Sep 17 2018, James Simmons wrote:
+>> 
+>>> From: Andreas Dilger <adilger@whamcloud.com>
+>>> 
+>>> diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+>>> index 2dbd208..cf630db 100644
+>>> --- a/drivers/staging/lustre/lustre/include/lustre_net.h
+>>> +++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+>>> @@ -104,15 +104,15 @@
+>>>  * currently supported maximum between peers at connect via ocd_brw_size.
+>>>  */
+>>> #define PTLRPC_MAX_BRW_BITS	(LNET_MTU_BITS + PTLRPC_BULK_OPS_BITS)
+>>> -#define PTLRPC_MAX_BRW_SIZE	(1 << PTLRPC_MAX_BRW_BITS)
+>>> +#define PTLRPC_MAX_BRW_SIZE	BIT(PTLRPC_MAX_BRW_BITS)
+>>> #define PTLRPC_MAX_BRW_PAGES	(PTLRPC_MAX_BRW_SIZE >> PAGE_SHIFT)
+>>> 
+>>> -#define ONE_MB_BRW_SIZE		(1 << LNET_MTU_BITS)
+>>> -#define MD_MAX_BRW_SIZE		(1 << LNET_MTU_BITS)
+>>> +#define ONE_MB_BRW_SIZE		BIT(LNET_MTU_BITS)
+>>> +#define MD_MAX_BRW_SIZE		BIT(LNET_MTU_BITS)
+>>> #define MD_MAX_BRW_PAGES	(MD_MAX_BRW_SIZE >> PAGE_SHIFT)
+>>> #define DT_MAX_BRW_SIZE		PTLRPC_MAX_BRW_SIZE
+>>> #define DT_MAX_BRW_PAGES	(DT_MAX_BRW_SIZE >> PAGE_SHIFT)
+>>> -#define OFD_MAX_BRW_SIZE	(1 << LNET_MTU_BITS)
+>>> +#define OFD_MAX_BRW_SIZE	BIT(LNET_MTU_BITS)
+>> 
+>> Argg!!  No!!  Names are important.
+>> "SIZE" means the value is a size, a number.  The bit-representation is
+>> largely irrelevant, it is the number that is important.
+>> BIT(x) returns a single bit - lots of zeros and just one '1' bit.  This
+>> is not a number, it is a bit pattern.
+>> 
+>> So settings FOO_SIZE to BIT(bar) is wrong.  It is a type error.  It uses
+>> a bit pattern when a number is expected.  The C compiler won't notice, but I will.
+>> 
+>> When I apply this (which probably won't be until next week), I'll just
+>> remove this section of the patch.
 >
-> Make config_log_put() check if its parameter is NULL, which makes
-> it is unnecessary to perform the check prior to calling it.
-> This patch removes the redundant checks.
+> Just to confirm, my original patch didn't have these BIT() macros in it,
+> and I agree with your statements, so I'm fine with you removing them
+> again.
+
+Good.  They are gone.
+
+
 >
-> Signed-off-by: Steve Guminski <stephenx.guminski@intel.com>
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-9152
-> Reviewed-on: https://review.whamcloud.com/25854
-> Reviewed-by: Bob Glossman <bob.glossman@intel.com>
-> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-> Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> ---
->  drivers/staging/lustre/lustre/mgc/mgc_request.c | 36 +++++++++++--------------
->  1 file changed, 16 insertions(+), 20 deletions(-)
+>>> diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+>>> index 6c9fe49..d3b0445 100644
+>>> --- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+>>> +++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+>>> @@ -267,27 +267,22 @@ void cl_inode_fini(struct inode *inode)
+>>> /**
+>>>  * build inode number from passed @fid
+>>>  */
+>>> -__u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
+>>> +u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
+>>> {
+>>> 	if (BITS_PER_LONG == 32 || api32)
+>>> 		return fid_flatten32(fid);
+>>> -	else
+>>> -		return fid_flatten(fid);
+>>> +
+>>> +	return fid_flatten(fid);
+>> 
+>> I preferred that as it was - it makes the either/or nature more obvious.
 >
-> diff --git a/drivers/staging/lustre/lustre/mgc/mgc_request.c b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-> index 4552cc5..e6f8d9e 100644
-> --- a/drivers/staging/lustre/lustre/mgc/mgc_request.c
-> +++ b/drivers/staging/lustre/lustre/mgc/mgc_request.c
-> @@ -131,6 +131,9 @@ static int config_log_get(struct config_llog_data *cld)
->   */
->  static void config_log_put(struct config_llog_data *cld)
->  {
-> +	if (unlikely(!cld))
-> +		return;
-> +
+> Kernel style generally recommends no "else" after a return, and checkpatch.pl will complain in this case.
 
-I've removed the "unlikely()" call.
-
-Partly because use of likely/unlikely is discouraged where the
-difference cannot be measured (or clearly justified some other way),
-and partly because .....
-
-> @@ -387,6 +387,9 @@ struct config_llog_data *do_config_log_add(struct obd_device *obd,
->  
->  static inline void config_mark_cld_stop(struct config_llog_data *cld)
->  {
-> +	if (!cld)
-> +		return;
-> +
-
-.... there is no "unlikely()" here, and I like consistency.
+I just ran
+ checkpatch.pl --file drivers/staging/lustre/lustre/llite/lcommon_cl.c
+without this patch applied, and it didn't complain.
+I've removed this section of the patch because it seems to be unrelated
+to the rest of the patch, and because I don't like it.
 
 Thanks,
 NeilBrown
 
 
->  	mutex_lock(&cld->cld_lock);
->  	spin_lock(&config_list_lock);
->  	cld->cld_stopping = 1;
-> @@ -436,18 +439,13 @@ static int config_log_end(char *logname, struct config_llog_instance *cfg)
->  	cld->cld_sptlrpc = NULL;
->  	mutex_unlock(&cld->cld_lock);
->  
-> -	if (cld_recover) {
-> -		config_mark_cld_stop(cld_recover);
-> -		config_log_put(cld_recover);
-> -	}
-> +	config_mark_cld_stop(cld_recover);
-> +	config_log_put(cld_recover);
->  
-> -	if (cld_params) {
-> -		config_mark_cld_stop(cld_params);
-> -		config_log_put(cld_params);
-> -	}
-> +	config_mark_cld_stop(cld_params);
-> +	config_log_put(cld_params);
->  
-> -	if (cld_sptlrpc)
-> -		config_log_put(cld_sptlrpc);
-> +	config_log_put(cld_sptlrpc);
->  
->  	/* drop the ref from the find */
->  	config_log_put(cld);
-> @@ -593,8 +591,7 @@ static int mgc_requeue_thread(void *data)
->  			cld->cld_lostlock = 0;
->  			spin_unlock(&config_list_lock);
->  
-> -			if (cld_prev)
-> -				config_log_put(cld_prev);
-> +			config_log_put(cld_prev);
->  			cld_prev = cld;
->  
->  			if (likely(!(rq_state & RQ_STOP))) {
-> @@ -606,8 +603,7 @@ static int mgc_requeue_thread(void *data)
->  			}
->  		}
->  		spin_unlock(&config_list_lock);
-> -		if (cld_prev)
-> -			config_log_put(cld_prev);
-> +		config_log_put(cld_prev);
->  
->  		/* Wait a bit to see if anyone else needs a requeue */
->  		wait_event_idle(rq_waitq, rq_state & (RQ_NOW | RQ_STOP));
-> -- 
-> 1.8.3.1
+
+>
+> Cheers, Andreas
+> ---
+> Andreas Dilger
+> Principal Lustre Architect
+> Whamcloud
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180924/14be13eb/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180924/a702ecf6/attachment.sig>
