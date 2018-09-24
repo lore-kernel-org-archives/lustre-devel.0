@@ -1,99 +1,96 @@
-From: Andreas Dilger <adilger@whamcloud.com>
-Date: Thu, 20 Sep 2018 05:42:09 +0000
-Subject: [lustre-devel] [PATCH 11/30] lustre: mdc: allow setting readdir
- RPC size parameter
-In-Reply-To: <8736u76j7g.fsf@notabene.neil.brown.name>
+From: NeilBrown <neilb@suse.com>
+Date: Mon, 24 Sep 2018 13:20:50 +1000
+Subject: [lustre-devel] [PATCH 01/30] lustre: lnd: resolve IP query code
+ in LND drivers
+In-Reply-To: <1537205440-6656-2-git-send-email-jsimmons@infradead.org>
 References: <1537205440-6656-1-git-send-email-jsimmons@infradead.org>
- <1537205440-6656-12-git-send-email-jsimmons@infradead.org>
- <8736u76j7g.fsf@notabene.neil.brown.name>
-Message-ID: <7503F4FB-D93E-4CD1-9DF3-C00C51528E93@whamcloud.com>
+ <1537205440-6656-2-git-send-email-jsimmons@infradead.org>
+Message-ID: <87bm8n60od.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sep 18, 2018, at 09:14, NeilBrown <neilb@suse.com> wrote:
-> 
-> On Mon, Sep 17 2018, James Simmons wrote:
-> 
->> From: Andreas Dilger <adilger@whamcloud.com>
->> 
->> diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
->> index 2dbd208..cf630db 100644
->> --- a/drivers/staging/lustre/lustre/include/lustre_net.h
->> +++ b/drivers/staging/lustre/lustre/include/lustre_net.h
->> @@ -104,15 +104,15 @@
->>  * currently supported maximum between peers at connect via ocd_brw_size.
->>  */
->> #define PTLRPC_MAX_BRW_BITS	(LNET_MTU_BITS + PTLRPC_BULK_OPS_BITS)
->> -#define PTLRPC_MAX_BRW_SIZE	(1 << PTLRPC_MAX_BRW_BITS)
->> +#define PTLRPC_MAX_BRW_SIZE	BIT(PTLRPC_MAX_BRW_BITS)
->> #define PTLRPC_MAX_BRW_PAGES	(PTLRPC_MAX_BRW_SIZE >> PAGE_SHIFT)
->> 
->> -#define ONE_MB_BRW_SIZE		(1 << LNET_MTU_BITS)
->> -#define MD_MAX_BRW_SIZE		(1 << LNET_MTU_BITS)
->> +#define ONE_MB_BRW_SIZE		BIT(LNET_MTU_BITS)
->> +#define MD_MAX_BRW_SIZE		BIT(LNET_MTU_BITS)
->> #define MD_MAX_BRW_PAGES	(MD_MAX_BRW_SIZE >> PAGE_SHIFT)
->> #define DT_MAX_BRW_SIZE		PTLRPC_MAX_BRW_SIZE
->> #define DT_MAX_BRW_PAGES	(DT_MAX_BRW_SIZE >> PAGE_SHIFT)
->> -#define OFD_MAX_BRW_SIZE	(1 << LNET_MTU_BITS)
->> +#define OFD_MAX_BRW_SIZE	BIT(LNET_MTU_BITS)
-> 
-> Argg!!  No!!  Names are important.
-> "SIZE" means the value is a size, a number.  The bit-representation is
-> largely irrelevant, it is the number that is important.
-> BIT(x) returns a single bit - lots of zeros and just one '1' bit.  This
-> is not a number, it is a bit pattern.
-> 
-> So settings FOO_SIZE to BIT(bar) is wrong.  It is a type error.  It uses
-> a bit pattern when a number is expected.  The C compiler won't notice, but I will.
-> 
-> When I apply this (which probably won't be until next week), I'll just
-> remove this section of the patch.
+On Mon, Sep 17 2018, James Simmons wrote:
 
-Just to confirm, my original patch didn't have these BIT() macros in it,
-and I agree with your statements, so I'm fine with you removing them again.
+> The recent IP querying code that landed to both ksocklnd and
+> ko2iblnd have some bugs that prevent proper setup. The first
+> bug in both drivers is that the IP address of ifa_local is in
+> big endian format so on little endian systems the IP address
+> is incorrect. Calling ntohl() on ifa_local gets the real IP
+> address. The second bug located in ko2iblnd is that in_dev is
+> always NULL. Add the call __in_dev_get_rtnl() to get in_dev
+> and use that information to query the IP address.
 
->> diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
->> index 6c9fe49..d3b0445 100644
->> --- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
->> +++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
->> @@ -267,27 +267,22 @@ void cl_inode_fini(struct inode *inode)
->> /**
->>  * build inode number from passed @fid
->>  */
->> -__u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
->> +u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
->> {
->> 	if (BITS_PER_LONG == 32 || api32)
->> 		return fid_flatten32(fid);
->> -	else
->> -		return fid_flatten(fid);
->> +
->> +	return fid_flatten(fid);
-> 
-> I preferred that as it was - it makes the either/or nature more obvious.
+Thanks!
+I've added:
+Fixes: 10e138e41a43 ("lustre: o2iblnd: get IP address more directly.")
+Fixes: f703f71afd98 ("lustre: socklnd:  use for_each_netdev() instead of lnet_ipif_enumerate()")
 
-Kernel style generally recommends no "else" after a return, and checkpatch.pl will complain in this case.
+and applied this.
 
-Cheers, Andreas
----
-Andreas Dilger
-Principal Lustre Architect
-Whamcloud
+NeilBrown
 
 
-
-
-
-
-
+>
+> Signed-off-by: James Simmons <jsimmons@infradead.org>
+> ---
+>  drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c | 12 +++++++++---
+>  drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c |  2 +-
+>  2 files changed, 10 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> index 15953e4..6874e53 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> @@ -2468,8 +2468,7 @@ static struct kib_dev *kiblnd_create_dev(char *ifname)
+>  	flags = dev_get_flags(netdev);
+>  	if (!(flags & IFF_UP)) {
+>  		CERROR("Can't query IPoIB interface %s: it's down\n", ifname);
+> -		rtnl_unlock();
+> -		return NULL;
+> +		goto unlock;
+>  	}
+>  
+>  	dev = kzalloc(sizeof(*dev), GFP_NOFS);
+> @@ -2481,9 +2480,16 @@ static struct kib_dev *kiblnd_create_dev(char *ifname)
+>  	INIT_LIST_HEAD(&dev->ibd_nets);
+>  	INIT_LIST_HEAD(&dev->ibd_list); /* not yet in kib_devs */
+>  	INIT_LIST_HEAD(&dev->ibd_fail_list);
+> +
+> +	in_dev = __in_dev_get_rtnl(netdev);
+> +	if (!in_dev) {
+> +		kfree(dev);
+> +		goto unlock;
+> +	}
+> +
+>  	for_primary_ifa(in_dev)
+>  		if (strcmp(ifa->ifa_label, ifname) == 0) {
+> -			dev->ibd_ifip = ifa->ifa_local;
+> +			dev->ibd_ifip = ntohl(ifa->ifa_local);
+>  			break;
+>  		}
+>  	endfor_ifa(in_dev);
+> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> index 5b81040..750a7ce 100644
+> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> @@ -2589,7 +2589,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
+>  		}
+>  		for_primary_ifa(in_dev)
+>  			if (strcmp(ifa->ifa_label, name) == 0) {
+> -				ksi->ksni_ipaddr = ifa->ifa_local;
+> +				ksi->ksni_ipaddr = ntohl(ifa->ifa_local);
+>  				ksi->ksni_netmask = ifa->ifa_mask;
+>  				strlcpy(ksi->ksni_name,
+>  					name, sizeof(ksi->ksni_name));
+> -- 
+> 1.8.3.1
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 235 bytes
-Desc: Message signed with OpenPGP
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180920/8d434fe1/attachment.sig>
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180924/08db0d01/attachment.sig>
