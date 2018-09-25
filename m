@@ -1,9 +1,9 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 25 Sep 2018 11:07:15 +1000
-Subject: [lustre-devel] [PATCH 26/34] LU-7734 lnet: Routing fixes part 2
+Subject: [lustre-devel] [PATCH 27/34] LU-7734 lnet: fix routing selection
 In-Reply-To: <153783752960.32103.8394391715843917125.stgit@noble>
 References: <153783752960.32103.8394391715843917125.stgit@noble>
-Message-ID: <153783763587.32103.5037367646271689437.stgit@noble>
+Message-ID: <153783763590.32103.13916552051734764199.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,430 +12,395 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-Fix lnet_select_pathway() to handle the routing cases correctly.
-The following general cases are handled:
-. Non-MR directly connected
-. Non-MR not directly connected
-. MR Directly connected
-. MR Not directly connected
-  . No gateway
-  . Gateway is non-mr
-  . Gateway is mr
+Always prefer locally connected networks over routed networks.
+If there are multiple routed networks and no connected networks
+pick the best gateway to use. If all gateways are equal then
+round robin through them.
+
+Renamed dev_cpt to ni_dev_cpt to maintain naming convention.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Change-Id: If2d16b797b94421e78a9f2a254a250a440f8b244
-Reviewed-on: http://review.whamcloud.com/21167
+Change-Id: Ie6a3aaa7a9ec4f5474baf5e1ec0258d481418cb1
+Reviewed-on: http://review.whamcloud.com/21326
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- drivers/staging/lustre/lnet/lnet/lib-move.c |  214 ++++++++++++++++++---------
- drivers/staging/lustre/lnet/lnet/peer.c     |   29 +++-
- 2 files changed, 167 insertions(+), 76 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-types.h  |    4 
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    2 
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    4 
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |    2 
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |  217 +++++++++++---------
+ 5 files changed, 131 insertions(+), 98 deletions(-)
 
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+index 0761fd533f8d..2d73aa1a121c 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
+@@ -361,7 +361,7 @@ struct lnet_ni {
+ 	struct lnet_element_stats ni_stats;
+ 
+ 	/* physical device CPT */
+-	int			dev_cpt;
++	int			ni_dev_cpt;
+ 
+ 	/* sequence number used to round robin over nis within a net */
+ 	u32			ni_seq;
+@@ -464,6 +464,8 @@ struct lnet_peer_ni {
+ 	int			 lpni_rtr_refcount;
+ 	/* sequence number used to round robin over peer nis within a net */
+ 	u32			lpni_seq;
++	/* sequence number used to round robin over gateways */
++	__u32			lpni_gw_seq;
+ 	/* health flag */
+ 	bool			lpni_healthy;
+ 	/* returned RC ping features. Protected with lpni_lock */
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index 71256500f245..0ed29177819a 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2891,7 +2891,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
+ 		goto failed;
+ 
+ 	node_id = dev_to_node(ibdev->ibd_hdev->ibh_ibdev->dma_device);
+-	ni->dev_cpt = cfs_cpt_of_node(lnet_cpt_table(), node_id);
++	ni->ni_dev_cpt = cfs_cpt_of_node(lnet_cpt_table(), node_id);
+ 
+ 	net->ibn_dev = ibdev;
+ 	ni->ni_nid = LNET_MKNID(LNET_NIDNET(ni->ni_nid), ibdev->ibd_ifip);
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+index c14711804d7b..2ec84a73c522 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+@@ -2798,10 +2798,10 @@ ksocknal_startup(struct lnet_ni *ni)
+ 				  net->ksnn_interfaces[0].ksni_name);
+ 	if (net_dev) {
+ 		node_id = dev_to_node(&net_dev->dev);
+-		ni->dev_cpt = cfs_cpt_of_node(lnet_cpt_table(), node_id);
++		ni->ni_dev_cpt = cfs_cpt_of_node(lnet_cpt_table(), node_id);
+ 		dev_put(net_dev);
+ 	} else {
+-		ni->dev_cpt = CFS_CPT_ANY;
++		ni->ni_dev_cpt = CFS_CPT_ANY;
+ 	}
+ 
+ 	/* call it before add it to ksocknal_data.ksnd_nets */
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index 60176d05d34a..f57200eab746 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -1910,7 +1910,7 @@ lnet_fill_ni_info(struct lnet_ni *ni, struct lnet_ioctl_config_ni *cfg_ni,
+ 	cfg_ni->lic_nid = ni->ni_nid;
+ 	cfg_ni->lic_status = ni->ni_status->ns_status;
+ 	cfg_ni->lic_tcp_bonding = use_tcp_bonding;
+-	cfg_ni->lic_dev_cpt = ni->dev_cpt;
++	cfg_ni->lic_dev_cpt = ni->ni_dev_cpt;
+ 
+ 	memcpy(&tun->lt_cmn, &ni->ni_net->net_tunables, sizeof(tun->lt_cmn));
+ 
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 58521b014ef3..12bc80d060e9 100644
+index 12bc80d060e9..141983f0ef83 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -1145,6 +1145,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+@@ -1130,6 +1130,69 @@ lnet_find_route_locked(struct lnet_net *net, lnet_nid_t target,
+ 	return lpni_best;
+ }
+ 
++static struct lnet_ni *
++lnet_get_best_ni(struct lnet_net *local_net, struct lnet_ni *cur_ni,
++		 int md_cpt)
++{
++	struct lnet_ni *ni = NULL, *best_ni = cur_ni;
++	unsigned int shortest_distance;
++	int best_credits;
++
++	if (!best_ni) {
++		shortest_distance = UINT_MAX;
++		best_credits = INT_MIN;
++	} else {
++		shortest_distance = cfs_cpt_distance(lnet_cpt_table(), md_cpt,
++						     best_ni->ni_dev_cpt);
++		best_credits = atomic_read(&best_ni->ni_tx_credits);
++	}
++
++	while ((ni = lnet_get_next_ni_locked(local_net, ni))) {
++		unsigned int distance;
++		int ni_credits;
++
++		if (!lnet_is_ni_healthy_locked(ni))
++			continue;
++
++		ni_credits = atomic_read(&ni->ni_tx_credits);
++
++		/*
++		 * calculate the distance from the CPT on which
++		 * the message memory is allocated to the CPT of
++		 * the NI's physical device
++		 */
++		distance = cfs_cpt_distance(lnet_cpt_table(),
++					    md_cpt,
++					    ni->ni_dev_cpt);
++
++		/*
++		 * All distances smaller than the NUMA range
++		 * are treated equally.
++		 */
++		if (distance < lnet_numa_range)
++			distance = lnet_numa_range;
++
++		/*
++		 * Select on shorter distance, then available
++		 * credits, then round-robin.
++		 */
++		if (distance > shortest_distance) {
++			continue;
++		} else if (distance < shortest_distance) {
++			shortest_distance = distance;
++		} else if (ni_credits < best_credits) {
++			continue;
++		} else if (ni_credits == best_credits) {
++			if (best_ni && (best_ni)->ni_seq <= ni->ni_seq)
++				continue;
++		}
++		best_ni = ni;
++		best_credits = ni_credits;
++	}
++
++	return best_ni;
++}
++
+ static int
+ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+ 		    struct lnet_msg *msg, lnet_nid_t rtr_nid)
+@@ -1138,20 +1201,19 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+ 	struct lnet_peer_ni *best_lpni = NULL;
+ 	struct lnet_peer_ni *best_gw = NULL;
+ 	struct lnet_peer_ni *lpni;
++	struct lnet_peer_ni *final_dst;
+ 	struct lnet_peer *peer;
+ 	struct lnet_peer_net *peer_net;
+ 	struct lnet_net *local_net;
+-	struct lnet_ni *ni;
  	__u32 seq;
  	int cpt, cpt2, rc;
  	bool routing;
-+	bool routing2;
+ 	bool routing2;
  	bool ni_is_pref;
  	bool preferred;
- 	int best_credits;
-@@ -1168,6 +1169,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+-	int best_credits;
++	bool local_found;
+ 	int best_lpni_credits;
+ 	int md_cpt;
+-	unsigned int shortest_distance;
+ 
+ 	/*
+ 	 * get an initial CPT to use for locking. The idea here is not to
+@@ -1167,9 +1229,11 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+ 	best_ni = NULL;
+ 	best_lpni = NULL;
  	best_gw = NULL;
++	final_dst = NULL;
  	local_net = NULL;
  	routing = false;
-+	routing2 = false;
+ 	routing2 = false;
++	local_found = false;
  
  	seq = lnet_get_dlc_seq_locked();
  
-@@ -1201,7 +1203,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 	}
+@@ -1334,62 +1398,68 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+ 		goto pick_peer;
  
  	/*
--	 * STEP 1: first jab at determineing best_ni
-+	 * STEP 1: first jab at determining best_ni
- 	 * if src_nid is explicitly specified, then best_ni is already
- 	 * pre-determiend for us. Otherwise we need to select the best
- 	 * one to use later on
-@@ -1215,17 +1217,122 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 				      libcfs_nid2str(src_nid));
- 			return -EINVAL;
- 		}
-+	}
-+
-+	if (msg->msg_type == LNET_MSG_REPLY ||
-+	    msg->msg_type == LNET_MSG_ACK ||
-+	    !peer->lp_multi_rail) {
-+		/*
-+		 * for replies we want to respond on the same peer_ni we
-+		 * received the message on if possible. If not, then pick
-+		 * a peer_ni to send to
-+		 *
-+		 * if the peer is non-multi-rail then you want to send to
-+		 * the dst_nid provided as well.
-+		 *
-+		 * It is expected to find the lpni using dst_nid, since we
-+		 * created it earlier.
-+		 */
-+		best_lpni = lnet_find_peer_ni_locked(dst_nid);
-+		if (best_lpni)
-+			lnet_peer_ni_decref_locked(best_lpni);
- 
--		if (best_ni->ni_net->net_id != LNET_NIDNET(dst_nid)) {
-+		if (best_lpni && !lnet_get_net_locked(LNET_NIDNET(dst_nid))) {
-+			/*
-+			 * this lpni is not on a local network so we need
-+			 * to route this reply.
-+			 */
-+			best_gw = lnet_find_route_locked(NULL,
-+							 best_lpni->lpni_nid,
-+							 rtr_nid);
-+			if (best_gw) {
-+				/*
-+				 * RULE: Each node considers only the next-hop
-+				 *
-+				 * We're going to route the message,
-+				 * so change the peer to the router.
-+				 */
-+				LASSERT(best_gw->lpni_peer_net);
-+				LASSERT(best_gw->lpni_peer_net->lpn_peer);
-+				peer = best_gw->lpni_peer_net->lpn_peer;
-+
-+				/*
-+				 * if the router is not multi-rail
-+				 * then use the best_gw found to send
-+				 * the message to
-+				 */
-+				if (!peer->lp_multi_rail)
-+					best_lpni = best_gw;
-+				else
-+					best_lpni = NULL;
-+
-+				routing = true;
-+			} else {
-+				best_lpni = NULL;
-+			}
-+		} else if (!best_lpni) {
- 			lnet_net_unlock(cpt);
--			LCONSOLE_WARN("No route to %s via from %s\n",
--				      libcfs_nid2str(dst_nid),
--				      libcfs_nid2str(src_nid));
-+			CERROR("unable to send msg_type %d to originating %s. Destination NID not in DB\n",
-+			       msg->msg_type, libcfs_nid2str(dst_nid));
- 			return -EINVAL;
- 		}
--		goto pick_peer;
- 	}
- 
-+	/*
-+	 * if the peer is not MR capable, then we should always send to it
-+	 * using the first NI in the NET we determined.
-+	 */
-+	if (!peer->lp_multi_rail) {
-+		if (!best_lpni) {
-+			lnet_net_unlock(cpt);
-+			CERROR("no route to %s\n",
-+			       libcfs_nid2str(dst_nid));
-+			return -EHOSTUNREACH;
-+		}
-+
-+		/* best ni could be set because src_nid was provided */
-+		if (!best_ni) {
-+			best_ni = lnet_net2ni_locked(
-+				best_lpni->lpni_net->net_id, cpt);
-+			if (!best_ni) {
-+				lnet_net_unlock(cpt);
-+				CERROR("no path to %s from net %s\n",
-+				       libcfs_nid2str(best_lpni->lpni_nid),
-+				       libcfs_net2str(best_lpni->lpni_net->net_id));
-+				return -EHOSTUNREACH;
-+			}
-+		}
-+	}
-+
-+	if (best_ni == the_lnet.ln_loni) {
-+		/* No send credit hassles with LOLND */
-+		lnet_ni_addref_locked(best_ni, cpt);
-+		msg->msg_hdr.dest_nid = cpu_to_le64(best_ni->ni_nid);
-+		if (!msg->msg_routing)
-+			msg->msg_hdr.src_nid = cpu_to_le64(best_ni->ni_nid);
-+		msg->msg_target.nid = best_ni->ni_nid;
-+		lnet_msg_commit(msg, cpt);
-+		msg->msg_txni = best_ni;
-+		lnet_net_unlock(cpt);
-+
-+		return LNET_CREDIT_OK;
-+	}
-+
-+	/*
-+	 * if we already found a best_ni because src_nid is specified and
-+	 * best_lpni because we are replying to a message then just send
-+	 * the message
-+	 */
-+	if (best_ni && best_lpni)
-+		goto send;
-+
-+	/*
-+	 * If we already found a best_ni because src_nid is specified then
-+	 * pick the peer then send the message
-+	 */
-+	if (best_ni)
-+		goto pick_peer;
-+
- 	/*
- 	 * Decide whether we need to route to peer_ni.
- 	 * Get the local net that I need to be on to be able to directly
-@@ -1242,7 +1349,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+-	 * Decide whether we need to route to peer_ni.
+-	 * Get the local net that I need to be on to be able to directly
+-	 * send to that peer.
++	 * pick the best_ni by going through all the possible networks of
++	 * that peer and see which local NI is best suited to talk to that
++	 * peer.
+ 	 *
+-	 * a. Find the peer which the dst_nid belongs to.
+-	 * b. Iterate through each of the peer_nets/nis to decide
+-	 * the best peer/local_ni pair to use
++	 * Locally connected networks will always be preferred over
++	 * a routed network. If there are only routed paths to the peer,
++	 * then the best route is chosen. If all routes are equal then
++	 * they are used in round robin.
+ 	 */
+-	shortest_distance = UINT_MAX;
+-	best_credits = INT_MIN;
+ 	list_for_each_entry(peer_net, &peer->lp_peer_nets, lpn_on_peer_list) {
+ 		if (!lnet_is_peer_net_healthy_locked(peer_net))
  			continue;
  
  		local_net = lnet_get_net_locked(peer_net->lpn_net_id);
--		if (!local_net) {
-+		if (!local_net && !routing) {
+-		if (!local_net && !routing) {
++		if (!local_net && !routing && !local_found) {
  			struct lnet_peer_ni *net_gw;
- 			/*
- 			 * go through each peer_ni on that peer_net and
-@@ -1263,14 +1370,11 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+-			/*
+-			 * go through each peer_ni on that peer_net and
+-			 * determine the best possible gw to go through
+-			 */
+-			list_for_each_entry(lpni, &peer_net->lpn_peer_nis,
+-					    lpni_on_peer_net_list) {
+-				net_gw = lnet_find_route_locked(NULL,
+-								lpni->lpni_nid,
+-								rtr_nid);
  
- 				if (!best_gw) {
- 					best_gw = net_gw;
--					best_lpni = lpni;
- 				} else  {
- 					rc = lnet_compare_peers(net_gw,
- 								best_gw);
--					if (rc > 0) {
-+					if (rc > 0)
- 						best_gw = net_gw;
--						best_lpni = lpni;
--					}
- 				}
++			lpni = list_entry(peer_net->lpn_peer_nis.next,
++					  struct lnet_peer_ni,
++					  lpni_on_peer_net_list);
++
++			net_gw = lnet_find_route_locked(NULL,
++							lpni->lpni_nid,
++							rtr_nid);
++			if (!net_gw)
++				continue;
++
++			if (best_gw) {
+ 				/*
+-				 * if no route is found for that network then
+-				 * move onto the next peer_ni in the peer
++				 * lnet_find_route_locked() call
++				 * will return the best_Gw on the
++				 * lpni->lpni_nid network.
++				 * However, best_gw and net_gw can
++				 * be on different networks.
++				 * Therefore need to compare them
++				 * to pick the better of either.
+ 				 */
+-				if (!net_gw)
++				if (lnet_compare_peers(best_gw, net_gw) > 0)
++					continue;
++				if (best_gw->lpni_gw_seq <= net_gw->lpni_gw_seq)
+ 					continue;
+-
+-				if (!best_gw) {
+-					best_gw = net_gw;
+-				} else  {
+-					rc = lnet_compare_peers(net_gw,
+-								best_gw);
+-					if (rc > 0)
+-						best_gw = net_gw;
+-				}
  			}
++			best_gw = net_gw;
++			final_dst = lpni;
  
-@@ -1279,9 +1383,9 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 
- 			local_net = lnet_get_net_locked
- 					(LNET_NIDNET(best_gw->lpni_nid));
--			routing = true;
-+			routing2 = true;
+-			if (!best_gw)
+-				continue;
+-
+-			local_net = lnet_get_net_locked
+-					(LNET_NIDNET(best_gw->lpni_nid));
+ 			routing2 = true;
  		} else {
--			routing = false;
-+			routing2 = false;
+-			routing2 = false;
  			best_gw = NULL;
++			final_dst = NULL;
++			routing2 = false;
++			local_found = true;
  		}
  
-@@ -1342,12 +1446,17 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 		}
- 	}
- 
--	/*
--	 * if the peer is not MR capable, then we should always send to it
--	 * using the first NI in the NET we determined.
--	 */
--	if (!peer->lp_multi_rail && local_net)
--		best_ni = lnet_net2ni_locked(local_net->net_id, cpt);
-+	if (routing2) {
+-		/* no routable net found go on to a different net */
 +		/*
-+		 * RULE: Each node considers only the next-hop
-+		 *
-+		 * We're going to route the message, so change the peer to
-+		 * the router.
++		 * a gw on this network is found, but there could be
++		 * other better gateways on other networks. So don't pick
++		 * the best_ni until we determine the best_gw.
 +		 */
-+		LASSERT(best_gw->lpni_peer_net);
-+		LASSERT(best_gw->lpni_peer_net->lpn_peer);
-+		peer = best_gw->lpni_peer_net->lpn_peer;
-+	}
- 
- 	if (!best_ni) {
- 		lnet_net_unlock(cpt);
-@@ -1363,43 +1472,11 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 	 */
- 	best_ni->ni_seq++;
- 
--	if (routing)
--		goto send;
--
- pick_peer:
--	if (best_ni == the_lnet.ln_loni) {
--		/* No send credit hassles with LOLND */
--		lnet_ni_addref_locked(best_ni, cpt);
--		msg->msg_hdr.dest_nid = cpu_to_le64(best_ni->ni_nid);
--		if (!msg->msg_routing)
--			msg->msg_hdr.src_nid = cpu_to_le64(best_ni->ni_nid);
--		msg->msg_target.nid = best_ni->ni_nid;
--		lnet_msg_commit(msg, cpt);
--		msg->msg_txni = best_ni;
--		lnet_net_unlock(cpt);
--
--		return LNET_CREDIT_OK;
--	}
--
--	if (msg->msg_type == LNET_MSG_REPLY ||
--	    msg->msg_type == LNET_MSG_ACK) {
--		/*
--		 * for replies we want to respond on the same peer_ni we
--		 * received the message on if possible. If not, then pick
--		 * a peer_ni to send to
--		 */
--		best_lpni = lnet_find_peer_ni_locked(dst_nid);
--		if (best_lpni) {
--			lnet_peer_ni_decref_locked(best_lpni);
--			goto send;
--		} else {
--			CDEBUG(D_NET,
--			       "unable to send msg_type %d to originating %s\n",
--			       msg->msg_type,
--			       libcfs_nid2str(dst_nid));
--		}
--	}
--
-+	/*
-+	 * At this point the best_ni is on a local network on which
-+	 * the peer has a peer_ni as well
-+	 */
- 	peer_net = lnet_peer_get_net_locked(peer,
- 					    best_ni->ni_net->net_id);
- 	/*
-@@ -1429,13 +1506,16 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 			libcfs_nid2str(best_gw->lpni_nid),
- 			lnet_msgtyp2str(msg->msg_type), msg->msg_len);
- 
--		best_lpni = lnet_find_peer_ni_locked(dst_nid);
--		LASSERT(best_lpni);
--		lnet_peer_ni_decref_locked(best_lpni);
--
--		routing = true;
--
--		goto send;
-+		routing2 = true;
-+		/*
-+		 * RULE: Each node considers only the next-hop
-+		 *
-+		 * We're going to route the message, so change the peer to
-+		 * the router.
-+		 */
-+		LASSERT(best_gw->lpni_peer_net);
-+		LASSERT(best_gw->lpni_peer_net->lpn_peer);
-+		peer = best_gw->lpni_peer_net->lpn_peer;
- 	} else if (!lnet_is_peer_net_healthy_locked(peer_net)) {
- 		/*
- 		 * this peer_net is unhealthy but we still have an opportunity
-@@ -1459,6 +1539,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 	lpni = NULL;
- 	best_lpni_credits = INT_MIN;
- 	preferred = false;
-+	best_lpni = NULL;
- 	while ((lpni = lnet_get_next_peer_ni_locked(peer, peer_net, lpni))) {
- 		/*
- 		 * if this peer ni is not healthy just skip it, no point in
-@@ -1513,19 +1594,14 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 	}
- 
- send:
-+	routing = routing || routing2;
++		if (best_gw)
++			continue;
 +
- 	/*
- 	 * Increment sequence number of the peer selected so that we
- 	 * pick the next one in Round Robin.
- 	 */
- 	best_lpni->lpni_seq++;
++		/* if no local_net found continue */
+ 		if (!local_net)
+ 			continue;
  
--	/*
--	 * When routing the best gateway found acts as the best peer
--	 * NI to send to.
--	 */
--	if (routing)
--		best_lpni = best_gw;
--
- 	/*
- 	 * grab a reference on the peer_ni so it sticks around even if
- 	 * we need to drop and relock the lnet_net_lock below.
-diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-index 9cecfb49db87..d757f4df1f39 100644
---- a/drivers/staging/lustre/lnet/lnet/peer.c
-+++ b/drivers/staging/lustre/lnet/lnet/peer.c
-@@ -225,11 +225,18 @@ lnet_try_destroy_peer_hierarchy_locked(struct lnet_peer_ni *lpni)
- }
- 
- /* called with lnet_net_lock LNET_LOCK_EX held */
--static void
-+static int
- lnet_peer_ni_del_locked(struct lnet_peer_ni *lpni)
- {
- 	struct lnet_peer_table *ptable = NULL;
- 
-+	/* don't remove a peer_ni if it's also a gateway */
-+	if (lpni->lpni_rtr_refcount > 0) {
-+		CERROR("Peer NI %s is a gateway. Can not delete it\n",
-+		       libcfs_nid2str(lpni->lpni_nid));
-+		return -EBUSY;
-+	}
-+
- 	lnet_peer_remove_from_remote_list(lpni);
- 
- 	/* remove peer ni from the hash list. */
-@@ -260,6 +267,8 @@ lnet_peer_ni_del_locked(struct lnet_peer_ni *lpni)
- 
- 	/* decrement reference on peer */
- 	lnet_peer_ni_decref_locked(lpni);
-+
-+	return 0;
- }
- 
- void lnet_peer_uninit(void)
-@@ -313,17 +322,22 @@ lnet_peer_tables_create(void)
- 	return 0;
- }
- 
--static void
-+static int
- lnet_peer_del_locked(struct lnet_peer *peer)
- {
- 	struct lnet_peer_ni *lpni = NULL, *lpni2;
-+	int rc = 0, rc2 = 0;
- 
- 	lpni = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
- 	while (lpni) {
- 		lpni2 = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
--		lnet_peer_ni_del_locked(lpni);
-+		rc = lnet_peer_ni_del_locked(lpni);
-+		if (rc != 0)
-+			rc2 = rc;
- 		lpni = lpni2;
- 	}
-+
-+	return rc2;
- }
- 
- static void
-@@ -899,6 +913,7 @@ lnet_del_peer_ni_from_peer(lnet_nid_t key_nid, lnet_nid_t nid)
- 	lnet_nid_t local_nid;
- 	struct lnet_peer *peer;
- 	struct lnet_peer_ni *lpni;
-+	int rc;
- 
- 	if (key_nid == LNET_NID_ANY)
- 		return -EINVAL;
-@@ -919,17 +934,17 @@ lnet_del_peer_ni_from_peer(lnet_nid_t key_nid, lnet_nid_t nid)
- 		 * entire peer
+@@ -1401,70 +1471,30 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+ 		 *	2. NI available credits
+ 		 *	3. Round Robin
  		 */
- 		lnet_net_lock(LNET_LOCK_EX);
--		lnet_peer_del_locked(peer);
-+		rc = lnet_peer_del_locked(peer);
- 		lnet_net_unlock(LNET_LOCK_EX);
+-		ni = NULL;
+-		while ((ni = lnet_get_next_ni_locked(local_net, ni))) {
+-			int ni_credits;
+-			unsigned int distance;
+-
+-			if (!lnet_is_ni_healthy_locked(ni))
+-				continue;
+-
+-			ni_credits = atomic_read(&ni->ni_tx_credits);
+-
+-			/*
+-			 * calculate the distance from the CPT on which
+-			 * the message memory is allocated to the CPT of
+-			 * the NI's physical device
+-			 */
+-			distance = cfs_cpt_distance(lnet_cpt_table(),
+-						    md_cpt,
+-						    ni->dev_cpt);
+-
+-			/*
+-			 * All distances smaller than the NUMA range
+-			 * are treated equally.
+-			 */
+-			if (distance < lnet_numa_range)
+-				distance = lnet_numa_range;
++		best_ni = lnet_get_best_ni(local_net, best_ni, md_cpt);
++	}
  
--		return 0;
-+		return rc;
+-			/*
+-			 * Select on shorter distance, then available
+-			 * credits, then round-robin.
+-			 */
+-			if (distance > shortest_distance) {
+-				continue;
+-			} else if (distance < shortest_distance) {
+-				shortest_distance = distance;
+-			} else if (ni_credits < best_credits) {
+-				continue;
+-			} else if (ni_credits == best_credits) {
+-				if (best_ni && best_ni->ni_seq <= ni->ni_seq)
+-					continue;
+-			}
+-			best_ni = ni;
+-			best_credits = ni_credits;
+-		}
++	if (!best_ni && !best_gw) {
++		lnet_net_unlock(cpt);
++		LCONSOLE_WARN("No local ni found to send from to %s\n",
++			      libcfs_nid2str(dst_nid));
++		return -EINVAL;
  	}
  
- 	lnet_net_lock(LNET_LOCK_EX);
--	lnet_peer_ni_del_locked(lpni);
-+	rc = lnet_peer_ni_del_locked(lpni);
- 	lnet_net_unlock(LNET_LOCK_EX);
+-	if (routing2) {
++	if (!best_ni) {
++		best_ni = lnet_get_best_ni(best_gw->lpni_net, best_ni, md_cpt);
++		LASSERT(best_gw && best_ni);
++
+ 		/*
+-		 * RULE: Each node considers only the next-hop
+-		 *
+ 		 * We're going to route the message, so change the peer to
+ 		 * the router.
+ 		 */
+ 		LASSERT(best_gw->lpni_peer_net);
+ 		LASSERT(best_gw->lpni_peer_net->lpn_peer);
++		best_gw->lpni_gw_seq++;
+ 		peer = best_gw->lpni_peer_net->lpn_peer;
+ 	}
  
--	return 0;
-+	return rc;
- }
- 
- void
+-	if (!best_ni) {
+-		lnet_net_unlock(cpt);
+-		LCONSOLE_WARN("No local ni found to send from to %s\n",
+-			      libcfs_nid2str(dst_nid));
+-		return -EINVAL;
+-	}
+-
+ 	/*
+ 	 * Now that we selected the NI to use increment its sequence
+ 	 * number so the Round Robin algorithm will detect that it has
+@@ -1674,7 +1704,8 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+ 		 * the router receives this message it knows how to route
+ 		 * it.
+ 		 */
+-		msg->msg_hdr.dest_nid = cpu_to_le64(dst_nid);
++		msg->msg_hdr.dest_nid =
++			cpu_to_le64(final_dst ? final_dst->lpni_nid : dst_nid);
+ 	} else {
+ 		/*
+ 		 * if we're not routing set the dest_nid to the best peer
