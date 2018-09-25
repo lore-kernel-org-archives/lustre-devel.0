@@ -1,17 +1,17 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 25 Sep 2018 11:07:15 +1000
-Subject: [lustre-devel] [PATCH 06/34] lnet: introduce
- lnet_find_peer_ni_locked()
+Subject: [lustre-devel] [PATCH 07/34] lnet: lnet_peer_tables_cleanup: use an
+ exclusive lock.
 In-Reply-To: <153783752960.32103.8394391715843917125.stgit@noble>
 References: <153783752960.32103.8394391715843917125.stgit@noble>
-Message-ID: <153783763508.32103.13303107512736711408.stgit@noble>
+Message-ID: <153783763511.32103.5073326313518943569.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-Use in place of lnet_find_peer_locked()
+Why?? surely this will deadlock.
 
 This is part of
     Commit: 58091af960fe ("LU-7734 lnet: Multi-Rail peer split")
@@ -24,75 +24,44 @@ from upstream lustre, where it is marked:
 
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |    1 +
- drivers/staging/lustre/lnet/lnet/peer.c            |   31 ++++++++++++++++++++
- drivers/staging/lustre/lnet/lnet/router.c          |    2 +
- 3 files changed, 33 insertions(+), 1 deletion(-)
+ drivers/staging/lustre/lnet/lnet/peer.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index f925e3cd64ca..656177b64336 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -639,6 +639,7 @@ bool lnet_ni_unique_net(struct list_head *nilist, char *iface);
- int lnet_nid2peerni_locked(struct lnet_peer_ni **lpp, lnet_nid_t nid, int cpt);
- struct lnet_peer_ni *lnet_find_peer_locked(struct lnet_peer_table *ptable,
- 					   lnet_nid_t nid);
-+struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid, int cpt);
- void lnet_peer_tables_cleanup(struct lnet_ni *ni);
- void lnet_peer_tables_destroy(void);
- int lnet_peer_tables_create(void);
 diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-index fcfad77b9f2c..53b0ca0a2021 100644
+index 53b0ca0a2021..376e3459fa92 100644
 --- a/drivers/staging/lustre/lnet/lnet/peer.c
 +++ b/drivers/staging/lustre/lnet/lnet/peer.c
-@@ -216,6 +216,37 @@ lnet_peer_tables_cleanup(struct lnet_ni *ni)
- 	}
- }
- 
-+static struct lnet_peer_ni *
-+lnet_get_peer_ni_locked(struct lnet_peer_table *ptable, lnet_nid_t nid)
-+{
-+	struct list_head	*peers;
-+	struct lnet_peer_ni	*lp;
-+
-+	LASSERT(!the_lnet.ln_shutdown);
-+
-+	peers = &ptable->pt_hash[lnet_nid2peerhash(nid)];
-+	list_for_each_entry(lp, peers, lpni_hashlist) {
-+		if (lp->lpni_nid == nid) {
-+			lnet_peer_ni_addref_locked(lp);
-+			return lp;
-+		}
-+	}
-+
-+	return NULL;
-+}
-+
-+struct lnet_peer_ni *
-+lnet_find_peer_ni_locked(lnet_nid_t nid, int cpt)
-+{
-+	struct lnet_peer_ni *lpni;
-+	struct lnet_peer_table *ptable;
-+
-+	ptable = the_lnet.ln_peer_tables[cpt];
-+	lpni = lnet_get_peer_ni_locked(ptable, nid);
-+
-+	return lpni;
-+}
-+
- void
- lnet_destroy_peer_ni_locked(struct lnet_peer_ni *lp)
- {
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index ba2b2b930576..de037a77671d 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -1734,7 +1734,7 @@ lnet_notify(struct lnet_ni *ni, lnet_nid_t nid, int alive, time64_t when)
- 		return -ESHUTDOWN;
+@@ -185,9 +185,9 @@ lnet_peer_tables_cleanup(struct lnet_ni *ni)
+ 	 * peers are gateways for.
+ 	 */
+ 	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
+-		lnet_net_lock(i);
++		lnet_net_lock(LNET_LOCK_EX);
+ 		lnet_peer_table_del_rtrs_locked(ni, ptable, i);
+-		lnet_net_unlock(i);
++		lnet_net_unlock(LNET_LOCK_EX);
  	}
  
--	lp = lnet_find_peer_locked(the_lnet.ln_peer_tables[cpt], nid);
-+	lp = lnet_find_peer_ni_locked(nid, cpt);
- 	if (!lp) {
- 		/* nid not found */
- 		lnet_net_unlock(cpt);
+ 	/*
+@@ -195,17 +195,17 @@ lnet_peer_tables_cleanup(struct lnet_ni *ni)
+ 	 * deathrow.
+ 	 */
+ 	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
+-		lnet_net_lock(i);
++		lnet_net_lock(LNET_LOCK_EX);
+ 		lnet_peer_table_cleanup_locked(ni, ptable);
+-		lnet_net_unlock(i);
++		lnet_net_unlock(LNET_LOCK_EX);
+ 	}
+ 
+ 	/* Cleanup all entries on deathrow. */
+ 	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
+-		lnet_net_lock(i);
++		lnet_net_lock(LNET_LOCK_EX);
+ 		lnet_peer_table_deathrow_wait_locked(ptable, i);
+ 		list_splice_init(&ptable->pt_deathrow, &deathrow);
+-		lnet_net_unlock(i);
++		lnet_net_unlock(LNET_LOCK_EX);
+ 	}
+ 
+ 	while (!list_empty(&deathrow)) {
