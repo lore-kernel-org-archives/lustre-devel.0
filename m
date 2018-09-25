@@ -1,9 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 25 Sep 2018 11:07:15 +1000
-Subject: [lustre-devel] [PATCH 10/34] LU-7734 lnet: configure peers from DLC
+Subject: [lustre-devel] [PATCH 11/34] LU-7734 lnet: configure local NI from
+ DLC
 In-Reply-To: <153783752960.32103.8394391715843917125.stgit@noble>
 References: <153783752960.32103.8394391715843917125.stgit@noble>
-Message-ID: <153783763522.32103.731439682287514589.stgit@noble>
+Message-ID: <153783763527.32103.6166409833321456335.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,747 +13,1192 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-This patch adds the ability to configure peers from the DLC
-interface.
+This patch adds the ability to configure multiple network interfaces
+on the same network. This can be done via the lnetctl CLI interface
+or through a YAML configuration. Refer to the multi-rail HLD for
+more details on the syntax.
 
-When a peer is added a primary NID should be provided. If none is
-provided then the first NID in the list of NIDs will be used
-as the primary NID.
+It also deprecates ip2nets kernel parsing. All string parsing and
+network maching now happens in the DLC userspace library.
 
-Basic error checking is done at the DLC level to ensure properly
-formatted NIDs. However, if a NID is a duplicate, this will be
-detected when adding it in the kernel. Operation is halted, which
-means some peer NIDs might have already been added, but not the
-entire set. It's the role of the caller to backtrack and remove that
-peer that failed to add.
+New IOCTLs are added for adding/deleting local NIs, to keep backwards
+compatibility with older version of the DLC and lnetctl.
 
-When deleting a peer a primary NID or a normal NID can be provided.
-If a standard NID is provided, then the peer is found, and the
-primary NID is compared to the peer ni. If they are the same the
-entire peer is deleted. Otherwise, only the identified peer ni is
-deleted. If a set of NIDs are provided each one will be removed
-from the peer identified by the peer NID in turn.
-
-The existing show peer credits API can be used to show peer
-information.
+The changes also include parsing and matching ip2nets syntax at the
+user level and then passing down the network interfaces down to the
+kernel to be configured.
 
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Change-Id: Iaf588a062b44d74305aa9aa7d31c7341c6c384b9
-Reviewed-on: http://review.whamcloud.com/18476
-Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
+Change-Id: I19ee7dc76514beb6f34de6517d19654d6468bcec
+Reviewed-on: http://review.whamcloud.com/18886
 Tested-by: Maloo <hpdd-maloo@intel.com>
-Reviewed-by: Olaf Weber <olaf@sgi.com>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
- .../staging/lustre/include/linux/lnet/lib-lnet.h   |   20 +
- .../staging/lustre/include/linux/lnet/lib-types.h  |    4 
- .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |    5 
- .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |   32 +-
- drivers/staging/lustre/lnet/lnet/api-ni.c          |   39 ++
- drivers/staging/lustre/lnet/lnet/lib-move.c        |    4 
- drivers/staging/lustre/lnet/lnet/peer.c            |  387 ++++++++++++++++++--
- drivers/staging/lustre/lnet/lnet/router.c          |    2 
- 8 files changed, 433 insertions(+), 60 deletions(-)
+ .../lustre/include/linux/libcfs/libcfs_string.h    |   12 -
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |   13 -
+ .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |    6 
+ .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |   57 ++
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    3 
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |  479 +++++++++++++++++---
+ drivers/staging/lustre/lnet/lnet/config.c          |  107 +++-
+ drivers/staging/lustre/lnet/lnet/module.c          |   70 ++-
+ drivers/staging/lustre/lnet/lnet/peer.c            |   21 +
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    2 
+ drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 
+ 11 files changed, 650 insertions(+), 124 deletions(-)
 
+diff --git a/drivers/staging/lustre/include/linux/libcfs/libcfs_string.h b/drivers/staging/lustre/include/linux/libcfs/libcfs_string.h
+index cd7c3ccb2dc0..3117708b9ebb 100644
+--- a/drivers/staging/lustre/include/linux/libcfs/libcfs_string.h
++++ b/drivers/staging/lustre/include/linux/libcfs/libcfs_string.h
+@@ -83,20 +83,10 @@ int cfs_expr_list_print(char *buffer, int count,
+ 			struct cfs_expr_list *expr_list);
+ int cfs_expr_list_values(struct cfs_expr_list *expr_list,
+ 			 int max, u32 **values);
+-static inline void
+-cfs_expr_list_values_free(u32 *values, int num)
+-{
+-	/*
+-	 * This array is allocated by kvalloc(), so it shouldn't be freed
+-	 * by OBD_FREE() if it's called by module other than libcfs & LNet,
+-	 * otherwise we will see fake memory leak
+-	 */
+-	kvfree(values);
+-}
+-
+ void cfs_expr_list_free(struct cfs_expr_list *expr_list);
+ int cfs_expr_list_parse(char *str, int len, unsigned int min, unsigned int max,
+ 			struct cfs_expr_list **elpp);
++void cfs_expr_list_free(struct cfs_expr_list *expr_list);
+ void cfs_expr_list_free_list(struct list_head *list);
+ 
+ #endif
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index 6ffe5c1c9925..11642f8aee90 100644
+index 11642f8aee90..a7cff6426ad8 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -645,21 +645,25 @@ struct lnet_peer_ni *lnet_get_next_peer_ni_locked(struct lnet_peer *peer,
- int lnet_find_or_create_peer_locked(lnet_nid_t dst_nid, int cpt,
+@@ -377,6 +377,9 @@ lnet_net_alloc(__u32 net_type, struct list_head *netlist);
+ struct lnet_ni *
+ lnet_ni_alloc(struct lnet_net *net, struct cfs_expr_list *el,
+ 	      char *iface);
++struct lnet_ni *
++lnet_ni_alloc_w_cpt_array(struct lnet_net *net, __u32 *cpts, __u32 ncpts,
++			  char *iface);
+ 
+ static inline int
+ lnet_nid2peerhash(lnet_nid_t nid)
+@@ -401,7 +404,7 @@ int lnet_cpt_of_nid(lnet_nid_t nid, struct lnet_ni *ni);
+ struct lnet_ni *lnet_nid2ni_locked(lnet_nid_t nid, int cpt);
+ struct lnet_ni *lnet_nid2ni_addref(lnet_nid_t nid);
+ struct lnet_ni *lnet_net2ni_locked(__u32 net, int cpt);
+-struct lnet_ni *lnet_net2ni(__u32 net);
++struct lnet_ni *lnet_net2ni_addref(__u32 net);
+ bool lnet_is_ni_healthy_locked(struct lnet_ni *ni);
+ struct lnet_net *lnet_get_net_locked(u32 net_id);
+ 
+@@ -435,9 +438,10 @@ int lnet_rtrpools_enable(void);
+ void lnet_rtrpools_disable(void);
+ void lnet_rtrpools_free(int keep_pools);
+ struct lnet_remotenet *lnet_find_rnet_locked(__u32 net);
+-int lnet_dyn_add_ni(lnet_pid_t requested_pid,
+-		    struct lnet_ioctl_config_data *conf);
+-int lnet_dyn_del_ni(__u32 net);
++int lnet_dyn_add_net(struct lnet_ioctl_config_data *conf);
++int lnet_dyn_del_net(__u32 net);
++int lnet_dyn_add_ni(struct lnet_ioctl_config_ni *conf);
++int lnet_dyn_del_ni(struct lnet_ioctl_config_ni *conf);
+ int lnet_clear_lazy_portal(struct lnet_ni *ni, int portal, char *reason);
+ struct lnet_net *lnet_get_net_locked(__u32 net_id);
+ 
+@@ -646,6 +650,7 @@ int lnet_find_or_create_peer_locked(lnet_nid_t dst_nid, int cpt,
  				    struct lnet_peer **peer);
  int lnet_nid2peerni_locked(struct lnet_peer_ni **lpp, lnet_nid_t nid, int cpt);
--struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid, int cpt);
-+struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid);
+ struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid);
++void lnet_peer_net_added(struct lnet_net *net);
  void lnet_peer_tables_cleanup(struct lnet_ni *ni);
--void lnet_peer_tables_destroy(void);
-+void lnet_peer_uninit(void);
+ void lnet_peer_uninit(void);
  int lnet_peer_tables_create(void);
- void lnet_debug_peer(lnet_nid_t nid);
- struct lnet_peer_net *lnet_peer_get_net_locked(struct lnet_peer *peer,
- 					       u32 net_id);
- bool lnet_peer_is_ni_pref_locked(struct lnet_peer_ni *lpni,
- 				 struct lnet_ni *ni);
--int lnet_get_peer_info(__u32 peer_index, __u64 *nid,
--		       char alivness[LNET_MAX_STR_LEN],
--		       __u32 *cpt_iter, __u32 *refcount,
--		       __u32 *ni_peer_tx_credits, __u32 *peer_tx_credits,
--		       __u32 *peer_rtr_credits, __u32 *peer_min_rtr_credtis,
--		       __u32 *peer_tx_qnob);
-+int lnet_add_peer_ni_to_peer(lnet_nid_t key_nid, lnet_nid_t nid);
-+int lnet_del_peer_ni_from_peer(lnet_nid_t key_nid, lnet_nid_t nid);
-+int lnet_get_peer_info(__u32 idx, lnet_nid_t *primary_nid, lnet_nid_t *nid,
-+		       struct lnet_peer_ni_credit_info *peer_ni_info);
-+int lnet_get_peer_ni_info(__u32 peer_index, __u64 *nid,
-+			  char alivness[LNET_MAX_STR_LEN],
-+			  __u32 *cpt_iter, __u32 *refcount,
-+			  __u32 *ni_peer_tx_credits, __u32 *peer_tx_credits,
-+			  __u32 *peer_rtr_credits, __u32 *peer_min_rtr_credtis,
-+			  __u32 *peer_tx_qnob);
- 
- static inline bool
- lnet_is_peer_ni_healthy_locked(struct lnet_peer_ni *lpni)
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index d935d273716d..22b141cb6cff 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -388,6 +388,8 @@ struct lnet_rc_data {
- 
- struct lnet_peer_ni {
- 	struct list_head	lpni_on_peer_net_list;
-+	/* chain on remote peer list */
-+	struct list_head	lpni_on_remote_peer_ni_list;
- 	/* chain on peer hash */
- 	struct list_head	 lpni_hashlist;
- 	/* messages blocking for tx credits */
-@@ -732,6 +734,8 @@ struct lnet {
- 	struct lnet_peer_table		**ln_peer_tables;
- 	/* list of configured or discovered peers */
- 	struct list_head		ln_peers;
-+	/* list of peer nis not on a local network */
-+	struct list_head		ln_remote_peer_ni_list;
- 	/* failure simulation */
- 	struct list_head		  ln_test_peers;
- 	struct list_head		  ln_drop_rules;
 diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
-index cce6b58e3682..d5a3e7c85aa4 100644
+index d5a3e7c85aa4..fa58aaf6ad9d 100644
 --- a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
 +++ b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
-@@ -136,6 +136,9 @@ struct libcfs_debug_ioctl_data {
- #define IOC_LIBCFS_GET_BUF		_IOWR(IOC_LIBCFS_TYPE, 89, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_GET_PEER_INFO	_IOWR(IOC_LIBCFS_TYPE, 90, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_GET_LNET_STATS	_IOWR(IOC_LIBCFS_TYPE, 91, IOCTL_CONFIG_SIZE)
--#define IOC_LIBCFS_MAX_NR		91
-+#define IOC_LIBCFS_ADD_PEER_NI		_IOWR(IOC_LIBCFS_TYPE, 92, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_DEL_PEER_NI		_IOWR(IOC_LIBCFS_TYPE, 93, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_GET_PEER_NI		_IOWR(IOC_LIBCFS_TYPE, 94, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_MAX_NR		94
+@@ -139,6 +139,10 @@ struct libcfs_debug_ioctl_data {
+ #define IOC_LIBCFS_ADD_PEER_NI		_IOWR(IOC_LIBCFS_TYPE, 92, IOCTL_CONFIG_SIZE)
+ #define IOC_LIBCFS_DEL_PEER_NI		_IOWR(IOC_LIBCFS_TYPE, 93, IOCTL_CONFIG_SIZE)
+ #define IOC_LIBCFS_GET_PEER_NI		_IOWR(IOC_LIBCFS_TYPE, 94, IOCTL_CONFIG_SIZE)
+-#define IOC_LIBCFS_MAX_NR		94
++#define IOC_LIBCFS_ADD_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 95, IOCTL_CONFIG_SIZE)
++#define IOC_LIBCFS_DEL_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 96, IOCTL_CONFIG_SIZE)
++#define IOC_LIBCFS_GET_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 97, IOCTL_CONFIG_SIZE)
++#define IOC_LIBCFS_DBG			_IOWR(IOC_LIBCFS_TYPE, 98, IOCTL_CONFIG_SIZE)
++#define IOC_LIBCFS_MAX_NR		98
  
  #endif /* __LIBCFS_IOCTL_H__ */
 diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-index ac29f9d24d5d..9c4e05e1b683 100644
+index 9c4e05e1b683..bfd9fc6bc4df 100644
 --- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
 +++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-@@ -126,26 +126,36 @@ struct lnet_ioctl_config_data {
+@@ -37,6 +37,18 @@
+ #define LNET_MAX_SHOW_NUM_CPT	128
+ #define LNET_UNDEFINED_HOPS	((__u32)(-1))
+ 
++/*
++ * To allow for future enhancements to extend the tunables
++ * add a hdr to this structure, so that the version can be set
++ * and checked for backwards compatibility. Newer versions of LNet
++ * can still work with older versions of lnetctl. The restriction is
++ * that the structure can be added to and not removed from in order
++ * to not invalidate older lnetctl utilities. Moreover, the order of
++ * fields must remain the same, and new fields appended to the structure
++ *
++ * That said all existing LND tunables will be added in this structure
++ * to avoid future changes.
++ */
+ struct lnet_ioctl_config_lnd_cmn_tunables {
+ 	__u32 lct_version;
+ 	__s32 lct_peer_timeout;
+@@ -82,6 +94,10 @@ struct lnet_ioctl_net_config {
+ /* # different router buffer pools */
+ #define LNET_NRBPOOLS		(LNET_LARGE_BUF_IDX + 1)
+ 
++enum lnet_dbg_task {
++	LNET_DBG_INCR_DLC_SEQ = 0
++};
++
+ struct lnet_ioctl_pool_cfg {
+ 	struct {
+ 		__u32 pl_npages;
+@@ -126,6 +142,29 @@ struct lnet_ioctl_config_data {
  	char cfg_bulk[0];
  };
  
-+struct lnet_peer_ni_credit_info {
-+	char cr_aliveness[LNET_MAX_STR_LEN];
-+	__u32 cr_refcount;
-+	__s32 cr_ni_peer_tx_credits;
-+	__s32 cr_peer_tx_credits;
-+	__s32 cr_peer_rtr_credits;
-+	__s32 cr_peer_min_rtr_credits;
-+	__u32 cr_peer_tx_qnob;
-+	__u32 cr_ncpt;
++/*
++ * lnet_ioctl_config_ni
++ *  This structure describes an NI configuration. There are multiple components
++ *  when configuring an NI: Net, Interfaces, CPT list and LND tunables
++ *  A network is passed as a string to the DLC and translated using
++ *  libcfs_str2net()
++ *  An interface is the name of the system configured interface
++ *  (ex eth0, ib1)
++ *  CPT is the list of CPTS LND tunables are passed in the lic_bulk area
++ */
++struct lnet_ioctl_config_ni {
++	struct libcfs_ioctl_hdr lic_cfg_hdr;
++	lnet_nid_t		lic_nid;
++	char			lic_ni_intf[LNET_MAX_INTERFACES][LNET_MAX_STR_LEN];
++	char			lic_legacy_ip2nets[LNET_MAX_STR_LEN];
++	__u32			lic_cpts[LNET_MAX_SHOW_NUM_CPT];
++	__u32			lic_ncpts;
++	__u32			lic_status;
++	__u32			lic_tcp_bonding;
++	__u32			lic_idx;
++	char			lic_bulk[0];
 +};
 +
- struct lnet_ioctl_peer {
- 	struct libcfs_ioctl_hdr pr_hdr;
- 	__u32 pr_count;
- 	__u32 pr_pad;
--	__u64 pr_nid;
-+	lnet_nid_t pr_nid;
- 
- 	union {
--		struct {
--			char cr_aliveness[LNET_MAX_STR_LEN];
--			__u32 cr_refcount;
--			__u32 cr_ni_peer_tx_credits;
--			__u32 cr_peer_tx_credits;
--			__u32 cr_peer_rtr_credits;
--			__u32 cr_peer_min_rtr_credits;
--			__u32 cr_peer_tx_qnob;
--			__u32 cr_ncpt;
--		} pr_peer_credits;
-+		struct lnet_peer_ni_credit_info  pr_peer_credits;
+ struct lnet_peer_ni_credit_info {
+ 	char cr_aliveness[LNET_MAX_STR_LEN];
+ 	__u32 cr_refcount;
+@@ -148,6 +187,24 @@ struct lnet_ioctl_peer {
  	} pr_lnd_u;
  };
  
-+struct lnet_ioctl_peer_cfg {
-+	struct libcfs_ioctl_hdr prcfg_hdr;
-+	lnet_nid_t prcfg_key_nid;
-+	lnet_nid_t prcfg_cfg_nid;
-+	__u32 prcfg_idx;
-+	char prcfg_bulk[0];
++struct lnet_dbg_task_info {
++	/*
++	 * TODO: a union can be added if the task requires more
++	 * information from user space to be carried out in kernel space.
++	 */
 +};
 +
- struct lnet_ioctl_lnet_stats {
- 	struct libcfs_ioctl_hdr st_hdr;
- 	struct lnet_counters st_cntrs;
++/*
++ * This structure is intended to allow execution of debugging tasks. This
++ * is not intended to be backwards compatible. Extra tasks can be added in
++ * the future
++ */
++struct lnet_ioctl_dbg {
++	struct libcfs_ioctl_hdr dbg_hdr;
++	enum lnet_dbg_task dbg_task;
++	char dbg_bulk[0];
++};
++
+ struct lnet_ioctl_peer_cfg {
+ 	struct libcfs_ioctl_hdr prcfg_hdr;
+ 	lnet_nid_t prcfg_key_nid;
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+index 766f0d525661..9df66c6d160f 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+@@ -2700,7 +2700,8 @@ ksocknal_net_start_threads(struct ksock_net *net, __u32 *cpts, int ncpts)
+ 	int rc;
+ 	int i;
+ 
+-	LASSERT(ncpts > 0 && ncpts <= cfs_cpt_number(lnet_cpt_table()));
++	if (ncpts > 0 && ncpts > cfs_cpt_number(lnet_cpt_table()))
++		return -EINVAL;
+ 
+ 	for (i = 0; i < ncpts; i++) {
+ 		struct ksock_sched_info *info;
 diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index e8e0bc45d8aa..710f8a0be934 100644
+index 710f8a0be934..1ef9a39b517d 100644
 --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
 +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -552,6 +552,7 @@ lnet_prepare(lnet_pid_t requested_pid)
+@@ -679,17 +679,19 @@ lnet_net2ni_locked(__u32 net_id, int cpt)
+ }
  
- 	INIT_LIST_HEAD(&the_lnet.ln_test_peers);
- 	INIT_LIST_HEAD(&the_lnet.ln_peers);
-+	INIT_LIST_HEAD(&the_lnet.ln_remote_peer_ni_list);
- 	INIT_LIST_HEAD(&the_lnet.ln_nets);
- 	INIT_LIST_HEAD(&the_lnet.ln_routers);
- 	INIT_LIST_HEAD(&the_lnet.ln_drop_rules);
-@@ -646,7 +647,7 @@ lnet_unprepare(void)
- 	lnet_res_container_cleanup(&the_lnet.ln_eq_container);
+ struct lnet_ni *
+-lnet_net2ni(__u32 net)
++lnet_net2ni_addref(__u32 net)
+ {
+ 	struct lnet_ni *ni;
  
- 	lnet_msg_containers_destroy();
--	lnet_peer_tables_destroy();
-+	lnet_peer_uninit();
- 	lnet_rtrpools_free(0);
+ 	lnet_net_lock(0);
+ 	ni = lnet_net2ni_locked(net, 0);
++	if (ni)
++		lnet_ni_addref_locked(ni, 0);
+ 	lnet_net_unlock(0);
  
- 	if (the_lnet.ln_counters) {
-@@ -2318,13 +2319,33 @@ LNetCtl(unsigned int cmd, void *arg)
- 		return lnet_get_rtr_pool_cfg(config->cfg_count, pool_cfg);
- 	}
+ 	return ni;
+ }
+-EXPORT_SYMBOL(lnet_net2ni);
++EXPORT_SYMBOL(lnet_net2ni_addref);
  
-+	case IOC_LIBCFS_ADD_PEER_NI: {
-+		struct lnet_ioctl_peer_cfg *cfg = arg;
-+
-+		if (cfg->prcfg_hdr.ioc_len < sizeof(*cfg))
-+			return -EINVAL;
-+
-+		return lnet_add_peer_ni_to_peer(cfg->prcfg_key_nid,
-+						cfg->prcfg_cfg_nid);
-+	}
-+
-+	case IOC_LIBCFS_DEL_PEER_NI: {
-+		struct lnet_ioctl_peer_cfg *cfg = arg;
-+
-+		if (cfg->prcfg_hdr.ioc_len < sizeof(*cfg))
-+			return -EINVAL;
-+
-+		return lnet_del_peer_ni_from_peer(cfg->prcfg_key_nid,
-+						  cfg->prcfg_cfg_nid);
-+	}
-+
- 	case IOC_LIBCFS_GET_PEER_INFO: {
- 		struct lnet_ioctl_peer *peer_info = arg;
+ struct lnet_net *
+ lnet_get_net_locked(__u32 net_id)
+@@ -897,6 +899,18 @@ lnet_get_net_ni_count_locked(struct lnet_net *net)
+ 	return count;
+ }
  
- 		if (peer_info->pr_hdr.ioc_len < sizeof(*peer_info))
- 			return -EINVAL;
- 
--		return lnet_get_peer_info(peer_info->pr_count,
-+		return lnet_get_peer_ni_info(peer_info->pr_count,
- 			&peer_info->pr_nid,
- 			peer_info->pr_lnd_u.pr_peer_credits.cr_aliveness,
- 			&peer_info->pr_lnd_u.pr_peer_credits.cr_ncpt,
-@@ -2336,6 +2357,20 @@ LNetCtl(unsigned int cmd, void *arg)
- 			&peer_info->pr_lnd_u.pr_peer_credits.cr_peer_tx_qnob);
- 	}
- 
-+	case IOC_LIBCFS_GET_PEER_NI: {
-+		struct lnet_ioctl_peer_cfg *cfg = arg;
-+		struct lnet_peer_ni_credit_info *lpni_cri;
-+		size_t total = sizeof(*cfg) + sizeof(*lpni_cri);
-+
-+		if (cfg->prcfg_hdr.ioc_len < total)
-+			return -EINVAL;
-+
-+		lpni_cri = (struct lnet_peer_ni_credit_info *)cfg->prcfg_bulk;
-+
-+		return lnet_get_peer_info(cfg->prcfg_idx, &cfg->prcfg_key_nid,
-+					  &cfg->prcfg_cfg_nid, lpni_cri);
-+	}
-+
- 	case IOC_LIBCFS_NOTIFY_ROUTER: {
- 		time64_t deadline = ktime_get_real_seconds() - data->ioc_u64[0];
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 54e3093355c2..fbf209610ff9 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -1307,7 +1307,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 		 * received the message on if possible. If not, then pick
- 		 * a peer_ni to send to
- 		 */
--		best_lpni = lnet_find_peer_ni_locked(dst_nid, cpt);
-+		best_lpni = lnet_find_peer_ni_locked(dst_nid);
- 		if (best_lpni) {
- 			lnet_peer_ni_decref_locked(best_lpni);
- 			goto send;
-@@ -1348,7 +1348,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 			libcfs_nid2str(best_gw->lpni_nid),
- 			lnet_msgtyp2str(msg->msg_type), msg->msg_len);
- 
--		best_lpni = lnet_find_peer_ni_locked(dst_nid, cpt);
-+		best_lpni = lnet_find_peer_ni_locked(dst_nid);
- 		LASSERT(best_lpni);
- 		lnet_peer_ni_decref_locked(best_lpni);
- 
-diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-index edba1b1d87cc..d081440579e0 100644
---- a/drivers/staging/lustre/lnet/lnet/peer.c
-+++ b/drivers/staging/lustre/lnet/lnet/peer.c
-@@ -38,6 +38,65 @@
- #include <linux/lnet/lib-lnet.h>
- #include <uapi/linux/lnet/lnet-dlc.h>
- 
-+static void
-+lnet_peer_remove_from_remote_list(struct lnet_peer_ni *lpni)
++static inline int
++lnet_get_net_ni_count_pre(struct lnet_net *net)
 +{
-+	if (!list_empty(&lpni->lpni_on_remote_peer_ni_list)) {
-+		list_del_init(&lpni->lpni_on_remote_peer_ni_list);
-+		lnet_peer_ni_decref_locked(lpni);
-+	}
++	struct lnet_ni *ni;
++	int count = 0;
++
++	list_for_each_entry(ni, &net->net_ni_added, ni_netlist)
++		count++;
++
++	return count;
 +}
 +
-+void
-+lnet_peer_tables_destroy(void)
+ static inline int
+ lnet_get_ni_count(void)
+ {
+@@ -1839,15 +1853,91 @@ LNetNIFini(void)
+ }
+ EXPORT_SYMBOL(LNetNIFini);
+ 
++static int lnet_handle_dbg_task(struct lnet_ioctl_dbg *dbg,
++				struct lnet_dbg_task_info *dbg_info)
 +{
-+	struct lnet_peer_table *ptable;
-+	struct list_head *hash;
-+	int i;
-+	int j;
++	switch (dbg->dbg_task) {
++	case LNET_DBG_INCR_DLC_SEQ:
++		lnet_incr_dlc_seq();
++	}
 +
-+	if (!the_lnet.ln_peer_tables)
++	return 0;
++}
++
+ /**
+  * Grabs the ni data from the ni structure and fills the out
+  * parameters
+  *
+- * \param[in] ni network       interface structure
+- * \param[out] config	       NI configuration
++ * \param[in] ni network	interface structure
++ * \param[out] cfg_ni		NI config information
++ * \param[out] tun		network and LND tunables
+  */
+ static void
+-lnet_fill_ni_info(struct lnet_ni *ni, struct lnet_ioctl_config_data *config)
++lnet_fill_ni_info(struct lnet_ni *ni, struct lnet_ioctl_config_ni *cfg_ni,
++		  struct lnet_ioctl_config_lnd_tunables *tun,
++		  __u32 tun_size)
++{
++	size_t min_size = 0;
++	int i;
++
++	if (!ni || !cfg_ni || !tun)
 +		return;
 +
-+	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
-+		hash = ptable->pt_hash;
-+		if (!hash) /* not initialized */
-+			break;
-+
-+		ptable->pt_hash = NULL;
-+		for (j = 0; j < LNET_PEER_HASH_SIZE; j++)
-+			LASSERT(list_empty(&hash[j]));
-+
-+		kvfree(hash);
-+	}
-+
-+	cfs_percpt_free(the_lnet.ln_peer_tables);
-+	the_lnet.ln_peer_tables = NULL;
-+}
-+
-+void lnet_peer_uninit(void)
-+{
-+	int cpt;
-+	struct lnet_peer_ni *lpni, *tmp;
-+	struct lnet_peer_table *ptable = NULL;
-+
-+	/* remove all peer_nis from the remote peer and he hash list */
-+	list_for_each_entry_safe(lpni, tmp, &the_lnet.ln_remote_peer_ni_list,
-+				 lpni_on_remote_peer_ni_list) {
-+		list_del_init(&lpni->lpni_on_remote_peer_ni_list);
-+		lnet_peer_ni_decref_locked(lpni);
-+
-+		cpt = lnet_cpt_of_nid_locked(lpni->lpni_nid, NULL);
-+		ptable = the_lnet.ln_peer_tables[cpt];
-+		ptable->pt_zombies++;
-+
-+		list_del_init(&lpni->lpni_hashlist);
-+		lnet_peer_ni_decref_locked(lpni);
-+	}
-+
-+	lnet_peer_tables_destroy();
-+}
-+
- int
- lnet_peer_tables_create(void)
- {
-@@ -70,33 +129,6 @@ lnet_peer_tables_create(void)
- 	return 0;
- }
- 
--void
--lnet_peer_tables_destroy(void)
--{
--	struct lnet_peer_table *ptable;
--	struct list_head *hash;
--	int i;
--	int j;
--
--	if (!the_lnet.ln_peer_tables)
--		return;
--
--	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
--		hash = ptable->pt_hash;
--		if (!hash) /* not initialized */
--			break;
--
--		ptable->pt_hash = NULL;
--		for (j = 0; j < LNET_PEER_HASH_SIZE; j++)
--			LASSERT(list_empty(&hash[j]));
--
--		kvfree(hash);
--	}
--
--	cfs_percpt_free(the_lnet.ln_peer_tables);
--	the_lnet.ln_peer_tables = NULL;
--}
--
- static void
- lnet_peer_table_cleanup_locked(struct lnet_ni *ni,
- 			       struct lnet_peer_table *ptable)
-@@ -219,10 +251,13 @@ lnet_get_peer_ni_locked(struct lnet_peer_table *ptable, lnet_nid_t nid)
- }
- 
- struct lnet_peer_ni *
--lnet_find_peer_ni_locked(lnet_nid_t nid, int cpt)
-+lnet_find_peer_ni_locked(lnet_nid_t nid)
- {
- 	struct lnet_peer_ni *lpni;
- 	struct lnet_peer_table *ptable;
-+	int cpt;
-+
-+	cpt = lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
- 
- 	ptable = the_lnet.ln_peer_tables[cpt];
- 	lpni = lnet_get_peer_ni_locked(ptable, nid);
-@@ -236,7 +271,7 @@ lnet_find_or_create_peer_locked(lnet_nid_t dst_nid, int cpt,
- {
- 	struct lnet_peer_ni *lpni;
- 
--	lpni = lnet_find_peer_ni_locked(dst_nid, cpt);
-+	lpni = lnet_find_peer_ni_locked(dst_nid);
- 	if (!lpni) {
- 		int rc;
- 
-@@ -251,6 +286,25 @@ lnet_find_or_create_peer_locked(lnet_nid_t dst_nid, int cpt,
- 	return 0;
- }
- 
-+struct lnet_peer_ni *
-+lnet_get_peer_ni_idx_locked(int idx, struct lnet_peer_net **lpn,
-+			    struct lnet_peer **lp)
-+{
-+	struct lnet_peer_ni	*lpni;
-+
-+	list_for_each_entry((*lp), &the_lnet.ln_peers, lp_on_lnet_peer_list) {
-+		list_for_each_entry((*lpn), &((*lp)->lp_peer_nets),
-+				    lpn_on_peer_list) {
-+			list_for_each_entry(lpni, &((*lpn)->lpn_peer_nis),
-+					    lpni_on_peer_net_list)
-+				if (idx-- == 0)
-+					return lpni;
++	if (ni->ni_interfaces[0]) {
++		for (i = 0; i < ARRAY_SIZE(ni->ni_interfaces); i++) {
++			if (ni->ni_interfaces[i]) {
++				strncpy(cfg_ni->lic_ni_intf[i],
++					ni->ni_interfaces[i],
++					sizeof(cfg_ni->lic_ni_intf[i]));
++			}
 +		}
 +	}
 +
++	cfg_ni->lic_nid = ni->ni_nid;
++	cfg_ni->lic_status = ni->ni_status->ns_status;
++	cfg_ni->lic_tcp_bonding = use_tcp_bonding;
++
++	memcpy(&tun->lt_cmn, &ni->ni_net->net_tunables, sizeof(tun->lt_cmn));
++
++	/*
++	 * tun->lt_tun will always be present, but in order to be
++	 * backwards compatible, we need to deal with the cases when
++	 * tun->lt_tun is smaller than what the kernel has, because it
++	 * comes from an older version of a userspace program, then we'll
++	 * need to copy as much information as we have available space.
++	 */
++	min_size = tun_size - sizeof(tun->lt_cmn);
++	memcpy(&tun->lt_tun, &ni->ni_lnd_tunables, min_size);
++
++	/* copy over the cpts */
++	if (ni->ni_ncpts == LNET_CPT_NUMBER &&
++	    !ni->ni_cpts) {
++		for (i = 0; i < ni->ni_ncpts; i++)
++			cfg_ni->lic_cpts[i] = i;
++	} else {
++		for (i = 0;
++		     ni->ni_cpts && i < ni->ni_ncpts &&
++		     i < LNET_MAX_SHOW_NUM_CPT;
++		     i++)
++			cfg_ni->lic_cpts[i] = ni->ni_cpts[i];
++	}
++	cfg_ni->lic_ncpts = ni->ni_ncpts;
++}
++
++/**
++ * NOTE: This is a legacy function left in the code to be backwards
++ * compatible with older userspace programs. It should eventually be
++ * removed.
++ *
++ * Grabs the ni data from the ni structure and fills the out
++ * parameters
++ *
++ * \param[in] ni network	interface structure
++ * \param[out] config		config information
++ */
++static void
++lnet_fill_ni_info_legacy(struct lnet_ni *ni,
++			 struct lnet_ioctl_config_data *config)
+ {
+ 	struct lnet_ioctl_config_lnd_tunables *lnd_cfg = NULL;
+ 	struct lnet_ioctl_net_config *net_config;
+@@ -1994,7 +2084,7 @@ lnet_get_net_config(struct lnet_ioctl_config_data *config)
+ 	if (ni) {
+ 		rc = 0;
+ 		lnet_ni_lock(ni);
+-		lnet_fill_ni_info(ni, config);
++		lnet_fill_ni_info_legacy(ni, config);
+ 		lnet_ni_unlock(ni);
+ 	}
+ 
+@@ -2003,38 +2093,43 @@ lnet_get_net_config(struct lnet_ioctl_config_data *config)
+ }
+ 
+ int
+-lnet_dyn_add_ni(lnet_pid_t requested_pid, struct lnet_ioctl_config_data *conf)
++lnet_get_ni_config(struct lnet_ioctl_config_ni *cfg_ni,
++		   struct lnet_ioctl_config_lnd_tunables *tun,
++		   __u32 tun_size)
+ {
+-	char *nets = conf->cfg_config_u.cfg_net.net_intf;
+-	struct lnet_ping_info *pinfo;
+-	struct lnet_handle_md md_handle;
+-	struct lnet_net *net;
+-	struct list_head net_head;
+-	struct lnet_remotenet *rnet;
+-	int rc;
+-	int net_ni_count;
+-	int num_acceptor_nets;
+-	u32 net_type;
+-	struct lnet_ioctl_config_lnd_tunables *lnd_tunables = NULL;
+-
+-	INIT_LIST_HEAD(&net_head);
++	struct lnet_ni *ni;
++	int cpt;
++	int rc = -ENOENT;
+ 
+-	if (conf && conf->cfg_hdr.ioc_len > sizeof(*conf))
+-		lnd_tunables = (struct lnet_ioctl_config_lnd_tunables *)conf->cfg_bulk;
++	if (!cfg_ni || !tun)
++		return -EINVAL;
+ 
+-	/* Create a net/ni structures for the network string */
+-	rc = lnet_parse_networks(&net_head, nets, use_tcp_bonding);
+-	if (rc <= 0)
+-		return !rc ? -EINVAL : rc;
++	cpt = lnet_net_lock_current();
+ 
+-	mutex_lock(&the_lnet.ln_api_mutex);
++	ni = lnet_get_ni_idx_locked(cfg_ni->lic_idx);
+ 
+-	if (rc > 1) {
+-		rc = -EINVAL; /* only add one network per call */
+-		goto failed0;
++	if (ni) {
++		rc = 0;
++		lnet_ni_lock(ni);
++		lnet_fill_ni_info(ni, cfg_ni, tun, tun_size);
++		lnet_ni_unlock(ni);
+ 	}
+ 
+-	net = list_entry(net_head.next, struct lnet_net, net_list);
++	lnet_net_unlock(cpt);
++	return rc;
++}
++
++static int lnet_add_net_common(struct lnet_net *net,
++			       struct lnet_ioctl_config_lnd_tunables *tun)
++{
++	struct lnet_net *netl = NULL;
++	u32 net_id;
++	struct lnet_ping_info *pinfo;
++	struct lnet_handle_md md_handle;
++	int rc;
++	struct lnet_remotenet *rnet;
++	int net_ni_count;
++	int num_acceptor_nets;
+ 
+ 	lnet_net_lock(LNET_LOCK_EX);
+ 	rnet = lnet_find_rnet_locked(net->net_id);
+@@ -2045,9 +2140,9 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, struct lnet_ioctl_config_data *conf)
+ 	 */
+ 	if (rnet) {
+ 		CERROR("Adding net %s will invalidate routing configuration\n",
+-		       nets);
++		       libcfs_net2str(net->net_id));
+ 		rc = -EUSERS;
+-		goto failed0;
++		goto failed1;
+ 	}
+ 
+ 	/*
+@@ -2056,21 +2151,21 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, struct lnet_ioctl_config_data *conf)
+ 	 * we should allocate enough slots to accomodate the number of NIs
+ 	 * which will be added.
+ 	 *
+-	 * We can use lnet_get_net_ni_count_locked() since the net is not
+-	 * on a public list yet, so locking is not a problem
++	 * since ni hasn't been configured yet, use
++	 * lnet_get_net_ni_count_pre() which checks the net_ni_added list
+ 	 */
+-	net_ni_count = lnet_get_net_ni_count_locked(net);
++	net_ni_count = lnet_get_net_ni_count_pre(net);
+ 
+ 	rc = lnet_ping_info_setup(&pinfo, &md_handle,
+ 				  net_ni_count + lnet_get_ni_count(),
+ 				  false);
+-	if (rc)
+-		goto failed0;
+-
+-	list_del_init(&net->net_list);
+-	if (lnd_tunables)
++	if (rc < 0)
++		goto failed1;
++	if (tun)
+ 		memcpy(&net->net_tunables,
+-		       &lnd_tunables->lt_cmn, sizeof(lnd_tunables->lt_cmn));
++		       &tun->lt_cmn, sizeof(net->net_tunables));
++	else
++		memset(&net->net_tunables, -1, sizeof(net->net_tunables));
+ 
+ 	/*
+ 	 * before starting this network get a count of the current TCP
+@@ -2080,47 +2175,269 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, struct lnet_ioctl_config_data *conf)
+ 	 */
+ 	num_acceptor_nets = lnet_count_acceptor_nets();
+ 
+-	/*
+-	 * lnd_startup_lndnet() can deallocate 'net' even if it it returns
+-	 * success, because we endded up adding interfaces to an existing
+-	 * network. So grab the net_type now
+-	 */
+-	net_type = LNET_NETTYP(net->net_id);
++	net_id = net->net_id;
+ 
+-	rc = lnet_startup_lndnet(net, (lnd_tunables ?
+-				     &lnd_tunables->lt_tun : NULL));
++	rc = lnet_startup_lndnet(net, (tun ?
++				     &tun->lt_tun : NULL));
+ 	if (rc < 0)
+-		goto failed1;
++		goto failed;
++
++	lnet_net_lock(LNET_LOCK_EX);
++	netl = lnet_get_net_locked(net_id);
++	lnet_net_unlock(LNET_LOCK_EX);
++
++	LASSERT(netl);
+ 
+ 	/*
+ 	 * Start the acceptor thread if this is the first network
+ 	 * being added that requires the thread.
+ 	 */
+-	if (net_type == SOCKLND && num_acceptor_nets == 0) {
++	if (netl->net_lnd->lnd_accept &&
++	    num_acceptor_nets == 0) {
+ 		rc = lnet_acceptor_start();
+ 		if (rc < 0) {
+ 			/* shutdown the net that we just started */
+ 			CERROR("Failed to start up acceptor thread\n");
+-			/*
+-			 * Note that if we needed to start the acceptor
+-			 * thread, then 'net' must have been the first TCP
+-			 * network, therefore was unique, and therefore
+-			 * wasn't deallocated by lnet_startup_lndnet()
+-			 */
+ 			lnet_shutdown_lndnet(net);
+-			goto failed1;
++			goto failed;
+ 		}
+ 	}
+ 
++	lnet_net_lock(LNET_LOCK_EX);
++	lnet_peer_net_added(netl);
++	lnet_net_unlock(LNET_LOCK_EX);
++
+ 	lnet_ping_target_update(pinfo, md_handle);
+-	mutex_unlock(&the_lnet.ln_api_mutex);
+ 
+ 	return 0;
+ 
+-failed1:
++failed:
+ 	lnet_ping_md_unlink(pinfo, &md_handle);
+ 	lnet_ping_info_free(pinfo);
+-failed0:
++failed1:
++	lnet_net_free(net);
++	return rc;
++}
++
++static int lnet_handle_legacy_ip2nets(char *ip2nets,
++				      struct lnet_ioctl_config_lnd_tunables *tun)
++{
++	struct lnet_net *net;
++	char *nets;
++	int rc;
++	struct list_head net_head;
++
++	INIT_LIST_HEAD(&net_head);
++
++	rc = lnet_parse_ip2nets(&nets, ip2nets);
++	if (rc < 0)
++		return rc;
++
++	rc = lnet_parse_networks(&net_head, nets, use_tcp_bonding);
++	if (rc < 0)
++		return rc;
++
++	mutex_lock(&the_lnet.ln_api_mutex);
++	while (!list_empty(&net_head)) {
++		net = list_entry(net_head.next, struct lnet_net, net_list);
++		list_del_init(&net->net_list);
++		rc = lnet_add_net_common(net, tun);
++		if (rc < 0)
++			goto out;
++	}
++
++out:
++	mutex_unlock(&the_lnet.ln_api_mutex);
++
++	while (!list_empty(&net_head)) {
++		net = list_entry(net_head.next, struct lnet_net, net_list);
++		list_del_init(&net->net_list);
++		lnet_net_free(net);
++	}
++	return rc;
++}
++
++int lnet_dyn_add_ni(struct lnet_ioctl_config_ni *conf)
++{
++	struct lnet_net *net;
++	struct lnet_ni *ni;
++	struct lnet_ioctl_config_lnd_tunables *tun = NULL;
++	int rc;
++	u32 net_id;
++
++	/* get the tunables if they are available */
++	if (conf->lic_cfg_hdr.ioc_len >=
++	    sizeof(*conf) + sizeof(*tun))
++		tun = (struct lnet_ioctl_config_lnd_tunables *)
++			conf->lic_bulk;
++
++	/* handle legacy ip2nets from DLC */
++	if (conf->lic_legacy_ip2nets[0] != '\0')
++		return lnet_handle_legacy_ip2nets(conf->lic_legacy_ip2nets,
++						  tun);
++
++	net_id = LNET_NIDNET(conf->lic_nid);
++
++	net = lnet_net_alloc(net_id, NULL);
++	if (!net)
++		return -ENOMEM;
++
++	ni = lnet_ni_alloc_w_cpt_array(net, conf->lic_cpts, conf->lic_ncpts,
++				       conf->lic_ni_intf[0]);
++	if (!ni)
++		return -ENOMEM;
++
++	mutex_lock(&the_lnet.ln_api_mutex);
++
++	rc = lnet_add_net_common(net, tun);
++
++	mutex_unlock(&the_lnet.ln_api_mutex);
++
++	return rc;
++}
++
++int lnet_dyn_del_ni(struct lnet_ioctl_config_ni *conf)
++{
++	struct lnet_net *net;
++	struct lnet_ni *ni;
++	u32 net_id = LNET_NIDNET(conf->lic_nid);
++	struct lnet_ping_info *pinfo;
++	struct lnet_handle_md md_handle;
++	int rc;
++	int net_count;
++	u32 addr;
++
++	/* don't allow userspace to shutdown the LOLND */
++	if (LNET_NETTYP(net_id) == LOLND)
++		return -EINVAL;
++
++	mutex_lock(&the_lnet.ln_api_mutex);
++
++	lnet_net_lock(0);
++
++	net = lnet_get_net_locked(net_id);
++	if (!net) {
++		CERROR("net %s not found\n",
++		       libcfs_net2str(net_id));
++		rc = -ENOENT;
++		goto net_unlock;
++	}
++
++	addr = LNET_NIDADDR(conf->lic_nid);
++	if (addr == 0) {
++		/* remove the entire net */
++		net_count = lnet_get_net_ni_count_locked(net);
++
++		lnet_net_unlock(0);
++
++		/* create and link a new ping info, before removing the old one */
++		rc = lnet_ping_info_setup(&pinfo, &md_handle,
++					  lnet_get_ni_count() - net_count,
++					  false);
++		if (rc != 0)
++			goto out;
++
++		lnet_shutdown_lndnet(net);
++
++		if (lnet_count_acceptor_nets() == 0)
++			lnet_acceptor_stop();
++
++		lnet_ping_target_update(pinfo, md_handle);
++
++		goto out;
++	}
++
++	ni = lnet_nid2ni_locked(conf->lic_nid, 0);
++	if (!ni) {
++		CERROR("nid %s not found\n",
++		       libcfs_nid2str(conf->lic_nid));
++		rc = -ENOENT;
++		goto net_unlock;
++	}
++
++	net_count = lnet_get_net_ni_count_locked(net);
++
++	lnet_net_unlock(0);
++
++	/* create and link a new ping info, before removing the old one */
++	rc = lnet_ping_info_setup(&pinfo, &md_handle,
++				  lnet_get_ni_count() - 1, false);
++	if (rc != 0)
++		goto out;
++
++	lnet_shutdown_lndni(ni);
++
++	if (lnet_count_acceptor_nets() == 0)
++		lnet_acceptor_stop();
++
++	lnet_ping_target_update(pinfo, md_handle);
++
++	/* check if the net is empty and remove it if it is */
++	if (net_count == 1)
++		lnet_shutdown_lndnet(net);
++
++	goto out;
++
++net_unlock:
++	lnet_net_unlock(0);
++out:
++	mutex_unlock(&the_lnet.ln_api_mutex);
++
++	return rc;
++}
++
++/*
++ * lnet_dyn_add_net and lnet_dyn_del_net are now deprecated.
++ * They are only expected to be called for unique networks.
++ * That can be as a result of older DLC library
++ * calls. Multi-Rail DLC and beyond no longer uses these APIs.
++ */
++int
++lnet_dyn_add_net(struct lnet_ioctl_config_data *conf)
++{
++	struct lnet_net *net;
++	struct list_head net_head;
++	int rc;
++	struct lnet_ioctl_config_lnd_tunables tun;
++	char *nets = conf->cfg_config_u.cfg_net.net_intf;
++
++	INIT_LIST_HEAD(&net_head);
++
++	/* Create a net/ni structures for the network string */
++	rc = lnet_parse_networks(&net_head, nets, use_tcp_bonding);
++	if (rc <= 0)
++		return rc == 0 ? -EINVAL : rc;
++
++	mutex_lock(&the_lnet.ln_api_mutex);
++
++	if (rc > 1) {
++		rc = -EINVAL; /* only add one network per call */
++		goto failed;
++	}
++
++	net = list_entry(net_head.next, struct lnet_net, net_list);
++	list_del_init(&net->net_list);
++
++	LASSERT(lnet_net_unique(net->net_id, &the_lnet.ln_nets, NULL));
++
++	memset(&tun, 0, sizeof(tun));
++
++	tun.lt_cmn.lct_peer_timeout =
++		conf->cfg_config_u.cfg_net.net_peer_timeout;
++	tun.lt_cmn.lct_peer_tx_credits =
++		conf->cfg_config_u.cfg_net.net_peer_tx_credits;
++	tun.lt_cmn.lct_peer_rtr_credits =
++		conf->cfg_config_u.cfg_net.net_peer_rtr_credits;
++	tun.lt_cmn.lct_max_tx_credits =
++		conf->cfg_config_u.cfg_net.net_max_tx_credits;
++
++	rc = lnet_add_net_common(net, &tun);
++	if (rc != 0)
++		goto failed;
++
++	return 0;
++
++failed:
+ 	mutex_unlock(&the_lnet.ln_api_mutex);
+ 	while (!list_empty(&net_head)) {
+ 		net = list_entry(net_head.next, struct lnet_net, net_list);
+@@ -2131,7 +2448,7 @@ lnet_dyn_add_ni(lnet_pid_t requested_pid, struct lnet_ioctl_config_data *conf)
+ }
+ 
+ int
+-lnet_dyn_del_ni(__u32 net_id)
++lnet_dyn_del_net(__u32 net_id)
+ {
+ 	struct lnet_net *net;
+ 	struct lnet_ping_info *pinfo;
+@@ -2256,6 +2573,25 @@ LNetCtl(unsigned int cmd, void *arg)
+ 				      &config->cfg_config_u.cfg_route.rtr_flags,
+ 				      &config->cfg_config_u.cfg_route.rtr_priority);
+ 
++	case IOC_LIBCFS_GET_LOCAL_NI: {
++		struct lnet_ioctl_config_ni *cfg_ni;
++		struct lnet_ioctl_config_lnd_tunables *tun = NULL;
++		__u32 tun_size;
++
++		cfg_ni = arg;
++		/* get the tunables if they are available */
++		if (cfg_ni->lic_cfg_hdr.ioc_len <
++		    sizeof(*cfg_ni) + sizeof(*tun))
++			return -EINVAL;
++
++		tun = (struct lnet_ioctl_config_lnd_tunables *)
++				cfg_ni->lic_bulk;
++
++		tun_size = cfg_ni->lic_cfg_hdr.ioc_len - sizeof(*cfg_ni);
++
++		return lnet_get_ni_config(cfg_ni, tun, tun_size);
++	}
++
+ 	case IOC_LIBCFS_GET_NET: {
+ 		size_t total = sizeof(*config) +
+ 			       sizeof(struct lnet_ioctl_net_config);
+@@ -2423,8 +2759,22 @@ LNetCtl(unsigned int cmd, void *arg)
+ 		data->ioc_count = rc;
+ 		return 0;
+ 	}
++
++	case IOC_LIBCFS_DBG: {
++		struct lnet_ioctl_dbg *dbg = arg;
++		struct lnet_dbg_task_info *dbg_info;
++		size_t total = sizeof(*dbg) + sizeof(*dbg_info);
++
++		if (dbg->dbg_hdr.ioc_len < total)
++			return -EINVAL;
++
++		dbg_info = (struct lnet_dbg_task_info *)dbg->dbg_bulk;
++
++		return lnet_handle_dbg_task(dbg, dbg_info);
++	}
++
+ 	default:
+-		ni = lnet_net2ni(data->ioc_net);
++		ni = lnet_net2ni_addref(data->ioc_net);
+ 		if (!ni)
+ 			return -EINVAL;
+ 
+@@ -2433,6 +2783,7 @@ LNetCtl(unsigned int cmd, void *arg)
+ 		else
+ 			rc = ni->ni_net->net_lnd->lnd_ctl(ni, cmd, arg);
+ 
++		lnet_ni_decref(ni);
+ 		return rc;
+ 	}
+ 	/* not reached */
+diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
+index 9539ce07ae05..c11821a5838c 100644
+--- a/drivers/staging/lustre/lnet/lnet/config.c
++++ b/drivers/staging/lustre/lnet/lnet/config.c
+@@ -87,6 +87,9 @@ lnet_net_unique(__u32 net_id, struct list_head *netlist,
+ {
+ 	struct lnet_net *net_l;
+ 
++	if (!netlist)
++		return true;
++
+ 	list_for_each_entry(net_l, netlist, net_list) {
+ 		if (net_l->net_id == net_id) {
+ 			if (net)
+@@ -172,6 +175,7 @@ lnet_net_append_cpts(__u32 *cpts, __u32 ncpts, struct lnet_net *net)
+ 		if (!net->net_cpts)
+ 			return -ENOMEM;
+ 		memcpy(net->net_cpts, cpts, ncpts);
++		net->net_ncpts = ncpts;
+ 		return 0;
+ 	}
+ 
+@@ -298,8 +302,7 @@ lnet_ni_free(struct lnet_ni *ni)
+ 	if (ni->ni_tx_queues)
+ 		cfs_percpt_free(ni->ni_tx_queues);
+ 
+-	if (ni->ni_cpts)
+-		cfs_expr_list_values_free(ni->ni_cpts, ni->ni_ncpts);
++	kfree(ni->ni_cpts);
+ 
+ 	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++)
+ 		kfree(ni->ni_interfaces[i]);
+@@ -371,7 +374,8 @@ lnet_net_alloc(__u32 net_id, struct list_head *net_list)
+ 	net->net_tunables.lct_peer_tx_credits = -1;
+ 	net->net_tunables.lct_peer_rtr_credits = -1;
+ 
+-	list_add_tail(&net->net_list, net_list);
++	if (net_list)
++		list_add_tail(&net->net_list, net_list);
+ 
+ 	return net;
+ }
+@@ -414,13 +418,11 @@ lnet_ni_add_interface(struct lnet_ni *ni, char *iface)
+ 	return 0;
+ }
+ 
+-/* allocate and add to the provided network */
+-struct lnet_ni *
+-lnet_ni_alloc(struct lnet_net *net, struct cfs_expr_list *el, char *iface)
++static struct lnet_ni *
++lnet_ni_alloc_common(struct lnet_net *net, char *iface)
+ {
+ 	struct lnet_tx_queue *tq;
+ 	struct lnet_ni *ni;
+-	int rc;
+ 	int i;
+ 
+ 	if (iface)
+@@ -452,6 +454,45 @@ lnet_ni_alloc(struct lnet_net *net, struct cfs_expr_list *el, char *iface)
+ 	cfs_percpt_for_each(tq, i, ni->ni_tx_queues)
+ 		INIT_LIST_HEAD(&tq->tq_delayed);
+ 
++	ni->ni_net = net;
++	/* LND will fill in the address part of the NID */
++	ni->ni_nid = LNET_MKNID(net->net_id, 0);
++
++	/* Store net namespace in which current ni is being created */
++	if (current->nsproxy->net_ns)
++		ni->ni_net_ns = get_net(current->nsproxy->net_ns);
++	else
++		ni->ni_net_ns = NULL;
++
++	ni->ni_last_alive = ktime_get_real_seconds();
++	ni->ni_state = LNET_NI_STATE_INIT;
++	list_add_tail(&ni->ni_netlist, &net->net_ni_added);
++
++	/*
++	 * if an interface name is provided then make sure to add in that
++	 * interface name in NI
++	 */
++	if (iface)
++		if (lnet_ni_add_interface(ni, iface) != 0)
++			goto failed;
++
++	return ni;
++failed:
++	lnet_ni_free(ni);
 +	return NULL;
 +}
 +
- struct lnet_peer_ni *
- lnet_get_next_peer_ni_locked(struct lnet_peer *peer,
- 			     struct lnet_peer_net *peer_net,
-@@ -403,6 +457,223 @@ lnet_peer_get_net_locked(struct lnet_peer *peer, u32 net_id)
- 	return NULL;
- }
- 
-+/*
-+ * given the key nid find the peer to add the new peer NID to. If the key
-+ * nid is NULL, then create a new peer, but first make sure that the NID
-+ * is unique
-+ */
-+int
-+lnet_add_peer_ni_to_peer(lnet_nid_t key_nid, lnet_nid_t nid)
++/* allocate and add to the provided network */
++struct lnet_ni *
++lnet_ni_alloc(struct lnet_net *net, struct cfs_expr_list *el, char *iface)
 +{
-+	struct lnet_peer_ni *lpni, *lpni2;
-+	struct lnet_peer *peer;
-+	struct lnet_peer_net *peer_net, *pn;
-+	int cpt, cpt2, rc;
-+	struct lnet_peer_table *ptable = NULL;
-+	__u32 net_id = LNET_NIDNET(nid);
++	struct lnet_ni *ni;
++	int rc;
 +
-+	if (nid == LNET_NID_ANY)
-+		return -EINVAL;
++	ni = lnet_ni_alloc_common(net, iface);
++	if (!ni)
++		return NULL;
 +
-+	/* check that nid is unique */
-+	cpt = lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
-+	lnet_net_lock(cpt);
-+	lpni = lnet_find_peer_ni_locked(nid);
-+	if (lpni) {
-+		lnet_peer_ni_decref_locked(lpni);
-+		lnet_net_unlock(cpt);
-+		return -EEXIST;
-+	}
-+	lnet_net_unlock(cpt);
-+
-+	if (key_nid != LNET_NID_ANY) {
-+		cpt2 = lnet_nid_cpt_hash(key_nid, LNET_CPT_NUMBER);
-+		lnet_net_lock(cpt2);
-+		lpni = lnet_find_peer_ni_locked(key_nid);
-+		if (!lpni) {
-+			lnet_net_unlock(cpt2);
-+			/* key_nid refers to a non-existent peer_ni.*/
-+			return -EINVAL;
-+		}
-+		peer = lpni->lpni_peer_net->lpn_peer;
-+		peer->lp_multi_rail = true;
-+		lnet_peer_ni_decref_locked(lpni);
-+		lnet_net_unlock(cpt2);
-+	} else {
-+		lnet_net_lock(LNET_LOCK_EX);
-+		rc = lnet_nid2peerni_locked(&lpni, nid, LNET_LOCK_EX);
-+		if (rc == 0) {
-+			lpni->lpni_peer_net->lpn_peer->lp_multi_rail = true;
-+			lnet_peer_ni_decref_locked(lpni);
-+		}
-+		lnet_net_unlock(LNET_LOCK_EX);
-+		return rc;
-+	}
-+
-+	lpni = kzalloc_cpt(sizeof(*lpni), GFP_KERNEL, cpt);
-+	if (!lpni)
-+		return -ENOMEM;
-+
-+	INIT_LIST_HEAD(&lpni->lpni_txq);
-+	INIT_LIST_HEAD(&lpni->lpni_rtrq);
-+	INIT_LIST_HEAD(&lpni->lpni_routes);
-+	INIT_LIST_HEAD(&lpni->lpni_hashlist);
-+	INIT_LIST_HEAD(&lpni->lpni_on_peer_net_list);
-+	INIT_LIST_HEAD(&lpni->lpni_on_remote_peer_ni_list);
-+
-+	lpni->lpni_alive = !lnet_peers_start_down(); /* 1 bit!! */
-+	lpni->lpni_last_alive = ktime_get_seconds(); /* assumes alive */
-+	lpni->lpni_ping_feats = LNET_PING_FEAT_INVAL;
-+	lpni->lpni_nid = nid;
-+	lpni->lpni_cpt = cpt;
-+	lnet_set_peer_ni_health_locked(lpni, true);
-+
-+	/* allocate here in case we need to add a new peer_net */
-+	peer_net = NULL;
-+	peer_net = kzalloc(sizeof(*peer_net), GFP_KERNEL);
-+	if (!peer_net) {
-+		rc = -ENOMEM;
-+		kfree(lpni);
-+		return rc;
-+	}
-+
-+	lnet_net_lock(LNET_LOCK_EX);
-+
-+	ptable = the_lnet.ln_peer_tables[cpt];
-+	ptable->pt_number++;
-+
-+	lpni2 = lnet_find_peer_ni_locked(nid);
-+	if (lpni2) {
-+		lnet_peer_ni_decref_locked(lpni2);
-+		/* sanity check that lpni2's peer is what we expect */
-+		if (lpni2->lpni_peer_net->lpn_peer != peer)
-+			rc = -EEXIST;
-+		else
-+			rc = -EINVAL;
-+
-+		ptable->pt_number--;
-+		/* another thread has already added it */
-+		lnet_net_unlock(LNET_LOCK_EX);
-+		kfree(peer_net);
-+		return rc;
-+	}
-+
-+	lpni->lpni_net = lnet_get_net_locked(LNET_NIDNET(lpni->lpni_nid));
-+	if (lpni->lpni_net) {
-+		lpni->lpni_txcredits =
-+			lpni->lpni_mintxcredits =
-+			lpni->lpni_net->net_tunables.lct_peer_tx_credits;
-+		lpni->lpni_rtrcredits =
-+			lpni->lpni_minrtrcredits =
-+			lnet_peer_buffer_credits(lpni->lpni_net);
-+	} else {
-+		/*
-+		 * if you're adding a peer which is not on a local network
-+		 * then we can't assign any of the credits. It won't be
-+		 * picked for sending anyway. Eventually a network can be
-+		 * added, in this case we need to revisit this peer and
-+		 * update its credits.
-+		 */
-+
-+		/* increment refcount for remote peer list */
-+		atomic_inc(&lpni->lpni_refcount);
-+		list_add_tail(&lpni->lpni_on_remote_peer_ni_list,
-+			      &the_lnet.ln_remote_peer_ni_list);
-+	}
-+
-+	/* increment refcount for peer on hash list */
-+	atomic_inc(&lpni->lpni_refcount);
-+
-+	list_add_tail(&lpni->lpni_hashlist,
-+		      &ptable->pt_hash[lnet_nid2peerhash(nid)]);
-+	ptable->pt_version++;
-+
-+	/* add the lpni to a net */
-+	list_for_each_entry(pn, &peer->lp_peer_nets, lpn_on_peer_list) {
-+		if (pn->lpn_net_id == net_id) {
-+			list_add_tail(&lpni->lpni_on_peer_net_list,
-+				      &pn->lpn_peer_nis);
-+			lpni->lpni_peer_net = pn;
-+			lnet_net_unlock(LNET_LOCK_EX);
-+			kfree(peer_net);
-+			return 0;
-+		}
-+	}
-+
-+	INIT_LIST_HEAD(&peer_net->lpn_on_peer_list);
-+	INIT_LIST_HEAD(&peer_net->lpn_peer_nis);
-+
-+	/* build the hierarchy */
-+	peer_net->lpn_net_id = net_id;
-+	peer_net->lpn_peer = peer;
-+	lpni->lpni_peer_net = peer_net;
-+	list_add_tail(&lpni->lpni_on_peer_net_list, &peer_net->lpn_peer_nis);
-+	list_add_tail(&peer_net->lpn_on_peer_list, &peer->lp_peer_nets);
-+
-+	lnet_net_unlock(LNET_LOCK_EX);
-+	return 0;
+ 	if (!el) {
+ 		ni->ni_cpts  = NULL;
+ 		ni->ni_ncpts = LNET_CPT_NUMBER;
+@@ -466,35 +507,51 @@ lnet_ni_alloc(struct lnet_net *net, struct cfs_expr_list *el, char *iface)
+ 
+ 		LASSERT(rc <= LNET_CPT_NUMBER);
+ 		if (rc == LNET_CPT_NUMBER) {
+-			cfs_expr_list_values_free(ni->ni_cpts, LNET_CPT_NUMBER);
++			kfree(ni->ni_cpts);
+ 			ni->ni_cpts = NULL;
+ 		}
+ 
+ 		ni->ni_ncpts = rc;
+ 	}
+ 
+-	ni->ni_net = net;
+-	/* LND will fill in the address part of the NID */
+-	ni->ni_nid = LNET_MKNID(net->net_id, 0);
+-
+-	/* Store net namespace in which current ni is being created */
+-	if (current->nsproxy->net_ns)
+-		ni->ni_net_ns = get_net(current->nsproxy->net_ns);
+-	else
+-		ni->ni_net_ns = NULL;
+-
+-	ni->ni_last_alive = ktime_get_real_seconds();
+-	ni->ni_state = LNET_NI_STATE_INIT;
+ 	rc = lnet_net_append_cpts(ni->ni_cpts, ni->ni_ncpts, net);
+ 	if (rc != 0)
+ 		goto failed;
+-	list_add_tail(&ni->ni_netlist, &net->net_ni_added);
+ 
+-	/* if an interface name is provided then make sure to add in that
+-	 * interface name in NI */
+-	if (iface)
+-		if (lnet_ni_add_interface(ni, iface) != 0)
++	return ni;
++failed:
++	lnet_ni_free(ni);
++	return NULL;
 +}
 +
-+int
-+lnet_del_peer_ni_from_peer(lnet_nid_t key_nid, lnet_nid_t nid)
++struct lnet_ni *
++lnet_ni_alloc_w_cpt_array(struct lnet_net *net, __u32 *cpts, __u32 ncpts,
++			  char *iface)
 +{
-+	int cpt;
-+	lnet_nid_t local_nid;
-+	struct lnet_peer *peer;
-+	struct lnet_peer_ni *lpni, *lpni2;
-+	struct lnet_peer_table *ptable = NULL;
++	struct lnet_ni *ni;
++	int rc;
 +
-+	if (key_nid == LNET_NID_ANY)
-+		return -EINVAL;
++	ni = lnet_ni_alloc_common(net, iface);
++	if (!ni)
++		return NULL;
 +
-+	local_nid = (nid != LNET_NID_ANY) ? nid : key_nid;
-+	cpt = lnet_nid_cpt_hash(local_nid, LNET_CPT_NUMBER);
-+	lnet_net_lock(LNET_LOCK_EX);
++	if (ncpts == 0) {
++		ni->ni_cpts  = NULL;
++		ni->ni_ncpts = LNET_CPT_NUMBER;
++	} else {
++		size_t array_size = ncpts * sizeof(ni->ni_cpts[0]);
 +
-+	lpni = lnet_find_peer_ni_locked(local_nid);
-+	if (!lpni) {
-+		lnet_net_unlock(cpt);
-+		return -EINVAL;
++		ni->ni_cpts = kmalloc_array(ncpts, sizeof(ni->ni_cpts[0]),
++					    GFP_KERNEL);
++		if (!ni->ni_cpts)
+ 			goto failed;
++		memcpy(ni->ni_cpts, cpts, array_size);
++		ni->ni_ncpts = ncpts;
 +	}
-+	lnet_peer_ni_decref_locked(lpni);
 +
-+	peer = lpni->lpni_peer_net->lpn_peer;
-+	LASSERT(peer);
++	rc = lnet_net_append_cpts(ni->ni_cpts, ni->ni_ncpts, net);
++	if (rc != 0)
++		goto failed;
+ 
+ 	return ni;
+  failed:
+diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
+index 9d06664f0c17..c82d27592391 100644
+--- a/drivers/staging/lustre/lnet/lnet/module.c
++++ b/drivers/staging/lustre/lnet/lnet/module.c
+@@ -92,7 +92,7 @@ lnet_unconfigure(void)
+ }
+ 
+ static int
+-lnet_dyn_configure(struct libcfs_ioctl_hdr *hdr)
++lnet_dyn_configure_net(struct libcfs_ioctl_hdr *hdr)
+ {
+ 	struct lnet_ioctl_config_data *conf =
+ 		(struct lnet_ioctl_config_data *)hdr;
+@@ -102,19 +102,17 @@ lnet_dyn_configure(struct libcfs_ioctl_hdr *hdr)
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&lnet_config_mutex);
+-	if (!the_lnet.ln_niinit_self) {
++	if (the_lnet.ln_niinit_self)
++		rc = lnet_dyn_add_net(conf);
++	else
+ 		rc = -EINVAL;
+-		goto out_unlock;
+-	}
+-	rc = lnet_dyn_add_ni(LNET_PID_LUSTRE, conf);
+-out_unlock:
+ 	mutex_unlock(&lnet_config_mutex);
+ 
+ 	return rc;
+ }
+ 
+ static int
+-lnet_dyn_unconfigure(struct libcfs_ioctl_hdr *hdr)
++lnet_dyn_unconfigure_net(struct libcfs_ioctl_hdr *hdr)
+ {
+ 	struct lnet_ioctl_config_data *conf =
+ 		(struct lnet_ioctl_config_data *)hdr;
+@@ -124,12 +122,50 @@ lnet_dyn_unconfigure(struct libcfs_ioctl_hdr *hdr)
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&lnet_config_mutex);
+-	if (!the_lnet.ln_niinit_self) {
++	if (the_lnet.ln_niinit_self)
++		rc = lnet_dyn_del_net(conf->cfg_net);
++	else
++		rc = -EINVAL;
++	mutex_unlock(&lnet_config_mutex);
 +
-+	if (peer->lp_primary_nid == lpni->lpni_nid) {
-+		/*
-+		 * deleting the primary ni is equivalent to deleting the
-+		 * entire peer
-+		 */
-+		lpni = NULL;
-+		lpni = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
-+		while (lpni) {
-+			lpni2 = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
-+			cpt = lnet_nid_cpt_hash(lpni->lpni_nid,
-+						LNET_CPT_NUMBER);
++	return rc;
++}
++
++static int
++lnet_dyn_configure_ni(struct libcfs_ioctl_hdr *hdr)
++{
++	struct lnet_ioctl_config_ni *conf =
++		(struct lnet_ioctl_config_ni *)hdr;
++	int rc;
++
++	if (conf->lic_cfg_hdr.ioc_len < sizeof(*conf))
++		return -EINVAL;
++
++	mutex_lock(&lnet_config_mutex);
++	if (the_lnet.ln_niinit_self)
++		rc = lnet_dyn_add_ni(conf);
++	else
++		rc = -EINVAL;
++	mutex_unlock(&lnet_config_mutex);
++
++	return rc;
++}
++
++static int
++lnet_dyn_unconfigure_ni(struct libcfs_ioctl_hdr *hdr)
++{
++	struct lnet_ioctl_config_ni *conf =
++		(struct lnet_ioctl_config_ni *)hdr;
++	int rc;
++
++	if (conf->lic_cfg_hdr.ioc_len < sizeof(*conf))
++		return -EINVAL;
++
++	mutex_lock(&lnet_config_mutex);
++	if (the_lnet.ln_niinit_self)
++		rc = lnet_dyn_del_ni(conf);
++	else
+ 		rc = -EINVAL;
+-		goto out_unlock;
+-	}
+-	rc = lnet_dyn_del_ni(conf->cfg_net);
+-out_unlock:
+ 	mutex_unlock(&lnet_config_mutex);
+ 
+ 	return rc;
+@@ -161,11 +197,17 @@ lnet_ioctl(struct notifier_block *nb,
+ 		break;
+ 
+ 	case IOC_LIBCFS_ADD_NET:
+-		rc = lnet_dyn_configure(hdr);
++		rc = lnet_dyn_configure_net(hdr);
+ 		break;
+ 
+ 	case IOC_LIBCFS_DEL_NET:
+-		rc = lnet_dyn_unconfigure(hdr);
++		rc = lnet_dyn_unconfigure_net(hdr);
++
++	case IOC_LIBCFS_ADD_LOCAL_NI:
++		return lnet_dyn_configure_ni(hdr);
++
++	case IOC_LIBCFS_DEL_LOCAL_NI:
++		return lnet_dyn_unconfigure_ni(hdr);
+ 		break;
+ 
+ 	default:
+diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
+index d081440579e0..a760e43bcf7e 100644
+--- a/drivers/staging/lustre/lnet/lnet/peer.c
++++ b/drivers/staging/lustre/lnet/lnet/peer.c
+@@ -47,6 +47,27 @@ lnet_peer_remove_from_remote_list(struct lnet_peer_ni *lpni)
+ 	}
+ }
+ 
++void
++lnet_peer_net_added(struct lnet_net *net)
++{
++	struct lnet_peer_ni *lpni, *tmp;
++
++	list_for_each_entry_safe(lpni, tmp, &the_lnet.ln_remote_peer_ni_list,
++				 lpni_on_remote_peer_ni_list) {
++		if (LNET_NIDNET(lpni->lpni_nid) == net->net_id) {
++			lpni->lpni_net = net;
++			lpni->lpni_txcredits =
++				lpni->lpni_mintxcredits =
++				lpni->lpni_net->net_tunables.lct_peer_tx_credits;
++			lpni->lpni_rtrcredits =
++				lpni->lpni_minrtrcredits =
++				lnet_peer_buffer_credits(lpni->lpni_net);
++
 +			lnet_peer_remove_from_remote_list(lpni);
-+			ptable = the_lnet.ln_peer_tables[cpt];
-+			ptable->pt_zombies++;
-+			list_del_init(&lpni->lpni_hashlist);
-+			lnet_peer_ni_decref_locked(lpni);
-+			lpni = lpni2;
 +		}
-+		lnet_net_unlock(LNET_LOCK_EX);
-+
-+		return 0;
 +	}
-+
-+	lnet_peer_remove_from_remote_list(lpni);
-+	cpt = lnet_nid_cpt_hash(lpni->lpni_nid, LNET_CPT_NUMBER);
-+	ptable = the_lnet.ln_peer_tables[cpt];
-+	ptable->pt_zombies++;
-+	list_del_init(&lpni->lpni_hashlist);
-+	lnet_peer_ni_decref_locked(lpni);
-+	lnet_net_unlock(LNET_LOCK_EX);
-+
-+	return 0;
 +}
 +
  void
- lnet_destroy_peer_ni_locked(struct lnet_peer_ni *lpni)
+ lnet_peer_tables_destroy(void)
  {
-@@ -487,6 +758,9 @@ lnet_nid2peerni_locked(struct lnet_peer_ni **lpnip, lnet_nid_t nid, int cpt)
- 	INIT_LIST_HEAD(&lpni->lpni_txq);
- 	INIT_LIST_HEAD(&lpni->lpni_rtrq);
- 	INIT_LIST_HEAD(&lpni->lpni_routes);
-+	INIT_LIST_HEAD(&lpni->lpni_hashlist);
-+	INIT_LIST_HEAD(&lpni->lpni_on_peer_net_list);
-+	INIT_LIST_HEAD(&lpni->lpni_on_remote_peer_ni_list);
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index 66295b4fcdab..c201a8871943 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -726,7 +726,7 @@ static int ptlrpcd_init(void)
+ 			ptlrpcds_cpt_idx[cpt] = i;
+ 		}
  
- 	lpni->lpni_alive = !lnet_peers_start_down(); /* 1 bit!! */
- 	lpni->lpni_last_alive = ktime_get_seconds(); /* assumes alive */
-@@ -521,8 +795,20 @@ lnet_nid2peerni_locked(struct lnet_peer_ni **lpnip, lnet_nid_t nid, int cpt)
- 			lpni->lpni_minrtrcredits =
- 			lnet_peer_buffer_credits(lpni->lpni_net);
- 	} else {
-+		/*
-+		 * if you're adding a peer which is not on a local network
-+		 * then we can't assign any of the credits. It won't be
-+		 * picked for sending anyway. Eventually a network can be
-+		 * added, in this case we need to revisit this peer and
-+		 * update its credits.
-+		 */
-+
- 		CDEBUG(D_NET, "peer_ni %s is not directly connected\n",
- 		       libcfs_nid2str(nid));
-+		/* increment refcount for remote peer list */
-+		atomic_inc(&lpni->lpni_refcount);
-+		list_add_tail(&lpni->lpni_on_remote_peer_ni_list,
-+			      &the_lnet.ln_remote_peer_ni_list);
+-		cfs_expr_list_values_free(cpts, rc);
++		kfree(cpts);
+ 		ncpts = rc;
  	}
+ 	ptlrpcds_num = ncpts;
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/service.c b/drivers/staging/lustre/lustre/ptlrpc/service.c
+index 55f68b9b3818..79baadc0d09f 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/service.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/service.c
+@@ -2780,9 +2780,7 @@ ptlrpc_service_free(struct ptlrpc_service *svc)
+ 	ptlrpc_service_for_each_part(svcpt, i, svc)
+ 		kfree(svcpt);
  
- 	lnet_set_peer_ni_health_locked(lpni, true);
-@@ -584,12 +870,12 @@ lnet_debug_peer(lnet_nid_t nid)
+-	if (svc->srv_cpts)
+-		cfs_expr_list_values_free(svc->srv_cpts, svc->srv_ncpts);
+-
++	kfree(svc->srv_cpts);
+ 	kfree(svc);
  }
  
- int
--lnet_get_peer_info(__u32 peer_index, __u64 *nid,
--		   char aliveness[LNET_MAX_STR_LEN],
--		   __u32 *cpt_iter, __u32 *refcount,
--		   __u32 *ni_peer_tx_credits, __u32 *peer_tx_credits,
--		   __u32 *peer_rtr_credits, __u32 *peer_min_rtr_credits,
--		   __u32 *peer_tx_qnob)
-+lnet_get_peer_ni_info(__u32 peer_index, __u64 *nid,
-+		      char aliveness[LNET_MAX_STR_LEN],
-+		      __u32 *cpt_iter, __u32 *refcount,
-+		      __u32 *ni_peer_tx_credits, __u32 *peer_tx_credits,
-+		      __u32 *peer_rtr_credits, __u32 *peer_min_rtr_credits,
-+		      __u32 *peer_tx_qnob)
- {
- 	struct lnet_peer_table *peer_table;
- 	struct lnet_peer_ni *lp;
-@@ -645,3 +931,34 @@ lnet_get_peer_info(__u32 peer_index, __u64 *nid,
- 
- 	return found ? 0 : -ENOENT;
- }
-+
-+int lnet_get_peer_info(__u32 idx, lnet_nid_t *primary_nid, lnet_nid_t *nid,
-+		       struct lnet_peer_ni_credit_info *peer_ni_info)
-+{
-+	struct lnet_peer_ni *lpni = NULL;
-+	struct lnet_peer_net *lpn = NULL;
-+	struct lnet_peer *lp = NULL;
-+
-+	lpni = lnet_get_peer_ni_idx_locked(idx, &lpn, &lp);
-+
-+	if (!lpni)
-+		return -ENOENT;
-+
-+	*primary_nid = lp->lp_primary_nid;
-+	*nid = lpni->lpni_nid;
-+	snprintf(peer_ni_info->cr_aliveness, LNET_MAX_STR_LEN, "NA");
-+	if (lnet_isrouter(lpni) ||
-+	    lnet_peer_aliveness_enabled(lpni))
-+		snprintf(peer_ni_info->cr_aliveness, LNET_MAX_STR_LEN,
-+			 lpni->lpni_alive ? "up" : "down");
-+
-+	peer_ni_info->cr_refcount = atomic_read(&lpni->lpni_refcount);
-+	peer_ni_info->cr_ni_peer_tx_credits = lpni->lpni_net ?
-+		lpni->lpni_net->net_tunables.lct_peer_tx_credits : 0;
-+	peer_ni_info->cr_peer_tx_credits = lpni->lpni_txcredits;
-+	peer_ni_info->cr_peer_rtr_credits = lpni->lpni_rtrcredits;
-+	peer_ni_info->cr_peer_min_rtr_credits = lpni->lpni_mintxcredits;
-+	peer_ni_info->cr_peer_tx_qnob = lpni->lpni_txqnob;
-+
-+	return 0;
-+}
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index de037a77671d..7913914620f3 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -1734,7 +1734,7 @@ lnet_notify(struct lnet_ni *ni, lnet_nid_t nid, int alive, time64_t when)
- 		return -ESHUTDOWN;
- 	}
- 
--	lp = lnet_find_peer_ni_locked(nid, cpt);
-+	lp = lnet_find_peer_ni_locked(nid);
- 	if (!lp) {
- 		/* nid not found */
- 		lnet_net_unlock(cpt);
