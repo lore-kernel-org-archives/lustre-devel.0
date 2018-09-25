@@ -1,9 +1,10 @@
 From: NeilBrown <neilb@suse.com>
 Date: Tue, 25 Sep 2018 11:07:15 +1000
-Subject: [lustre-devel] [PATCH 12/34] LU-7734 lnet: NUMA support
+Subject: [lustre-devel] [PATCH 13/34] LU-7734 lnet: Primary NID and traffic
+ distribution
 In-Reply-To: <153783752960.32103.8394391715843917125.stgit@noble>
 References: <153783752960.32103.8394391715843917125.stgit@noble>
-Message-ID: <153783763531.32103.14595088461405832909.stgit@noble>
+Message-ID: <153783763535.32103.1496474509485326901.stgit@noble>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,458 +13,366 @@ To: lustre-devel@lists.lustre.org
 
 From: Amir Shehata <amir.shehata@intel.com>
 
-This patch adds NUMA node support. NUMA node information is stored
-in the CPT table. A NUMA node mask is maintained for the entire table
-as well as for each CPT to track the NUMA nodes related to each of
-the CPTs. Following key APIs added:
+When receiving messages from a multi-rail peer we must keep track of
+both the source NID and the primary NID of the peer. When sending a
+reply message or RPC respone, the source NID is preferred. But most
+other uses require identifcation of the peer regardless of which
+source NID the message came from, and so the primary NID of the peer
+must then be used.
 
-cfs_cpt_of_node(): returns the CPT of particular NUMA node
-cfs_cpt_distance(): calculates the distance between two CPTs
+An example for this is the creation of match entries. Another occurs
+when an event is created: the initiator should be the primary NID, to
+ensure upper layers (PtlRPC and Lustre) always see the same NID for
+that peer.
 
-When the LND device is started it finds the NUMA node of the physical
-device and then from there it finds the CPT, which is subsequently
-stored in the NI structure.
+This change also contains code to have PtlRPC use LNET_NID_ANY for
+the 'self' parameter of LNetPut() and LNetGet() when it doesn't care
+which NI it sends from, and to provide a local/peer NID pair when it
+does. This can be broken out into a separate change.
 
-When selecting the NI, the MD CPT is determined and the distance
-between the MD CPT and the device CPT is calculated. The NI
-with the shortest distance is preferred.
-
-If the device or system is not NUMA aware then the CPT for the
-device will default to CFS_CPT_ANY and the distance calculated
-when CFS_CPT_ANY is used is largest in the system. IE, none
-NUMA aware devices are least preferred.
-
-A NUMA range value can be set. If the value is large enough
-it amounts to basically turning off NUMA criterion completely.
-
+Signed-off-by: Olaf Weber <olaf@sgi.com>
 Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-Change-Id: I2d7c63f8e8fc8e8a6a249b0d6bfdd08fd090a837
-Reviewed-on: http://review.whamcloud.com/18916
-Tested-by: Jenkins
+Change-Id: If4391f2537a94f5784e8c61ae03aad266b2f8e7d
+Reviewed-on: http://review.whamcloud.com/18938
 Tested-by: Maloo <hpdd-maloo@intel.com>
-Reviewed-by: Olaf Weber <olaf@sgi.com>
 Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
 Signed-off-by: NeilBrown <neilb@suse.com>
 ---
  .../staging/lustre/include/linux/lnet/lib-lnet.h   |    1 
- .../staging/lustre/include/linux/lnet/lib-types.h  |    3 
- .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |    6 +
- .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |    6 +
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    4 +
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   13 ++
- drivers/staging/lustre/lnet/lnet/api-ni.c          |   27 +++
- drivers/staging/lustre/lnet/lnet/lib-move.c        |  160 +++++++++++++++++---
- 8 files changed, 195 insertions(+), 25 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-types.h  |    2 +
+ .../lustre/include/uapi/linux/lnet/lnet-types.h    |    4 +-
+ drivers/staging/lustre/lnet/lnet/lib-move.c        |   49 ++++++++++++--------
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         |   10 +++-
+ drivers/staging/lustre/lnet/lnet/lib-ptl.c         |    3 +
+ drivers/staging/lustre/lnet/lnet/peer.c            |   18 +++++++
+ drivers/staging/lustre/lustre/include/lustre_net.h |    2 +
+ drivers/staging/lustre/lustre/ptlrpc/events.c      |    5 ++
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |   16 +++----
+ 10 files changed, 77 insertions(+), 33 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-index a7cff6426ad8..c338e31b2cdd 100644
+index c338e31b2cdd..0259cd2251ed 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-@@ -408,6 +408,7 @@ struct lnet_ni *lnet_net2ni_addref(__u32 net);
- bool lnet_is_ni_healthy_locked(struct lnet_ni *ni);
- struct lnet_net *lnet_get_net_locked(u32 net_id);
- 
-+extern unsigned int lnet_numa_range;
- extern int portal_rotor;
- 
- int lnet_lib_init(void);
+@@ -652,6 +652,7 @@ int lnet_find_or_create_peer_locked(lnet_nid_t dst_nid, int cpt,
+ int lnet_nid2peerni_locked(struct lnet_peer_ni **lpp, lnet_nid_t nid, int cpt);
+ struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid);
+ void lnet_peer_net_added(struct lnet_net *net);
++lnet_nid_t lnet_peer_primary_nid(lnet_nid_t nid);
+ void lnet_peer_tables_cleanup(struct lnet_ni *ni);
+ void lnet_peer_uninit(void);
+ int lnet_peer_tables_create(void);
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 22b141cb6cff..5083b72ca20f 100644
+index 5083b72ca20f..dbcd9b3da914 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -346,6 +346,9 @@ struct lnet_ni {
- 	/* lnd tunables set explicitly */
- 	bool ni_lnd_tunables_set;
+@@ -61,6 +61,8 @@ struct lnet_msg {
+ 	struct list_head	msg_list;	   /* Q for credits/MD */
  
-+	/* physical device CPT */
-+	int			dev_cpt;
-+
- 	/* sequence number used to round robin over nis within a net */
- 	u32			ni_seq;
- 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
-index fa58aaf6ad9d..a231f6d89e95 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
-@@ -142,7 +142,9 @@ struct libcfs_debug_ioctl_data {
- #define IOC_LIBCFS_ADD_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 95, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_DEL_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 96, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_GET_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 97, IOCTL_CONFIG_SIZE)
--#define IOC_LIBCFS_DBG			_IOWR(IOC_LIBCFS_TYPE, 98, IOCTL_CONFIG_SIZE)
--#define IOC_LIBCFS_MAX_NR		98
-+#define IOC_LIBCFS_SET_NUMA_RANGE	_IOWR(IOC_LIBCFS_TYPE, 98, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_GET_NUMA_RANGE	_IOWR(IOC_LIBCFS_TYPE, 99, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_DBG			_IOWR(IOC_LIBCFS_TYPE, 100, IOCTL_CONFIG_SIZE)
-+#define IOC_LIBCFS_MAX_NR		100
- 
- #endif /* __LIBCFS_IOCTL_H__ */
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-index bfd9fc6bc4df..5eaaf0eae470 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-@@ -162,6 +162,7 @@ struct lnet_ioctl_config_ni {
- 	__u32			lic_status;
- 	__u32			lic_tcp_bonding;
- 	__u32			lic_idx;
-+	__s32			lic_dev_cpt;
- 	char			lic_bulk[0];
- };
- 
-@@ -213,6 +214,11 @@ struct lnet_ioctl_peer_cfg {
- 	char prcfg_bulk[0];
- };
- 
-+struct lnet_ioctl_numa_range {
-+	struct libcfs_ioctl_hdr nr_hdr;
-+	__u32 nr_range;
-+};
-+
- struct lnet_ioctl_lnet_stats {
- 	struct libcfs_ioctl_hdr st_hdr;
- 	struct lnet_counters st_cntrs;
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index 958ac9a99045..2e71abbf8a0c 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -2829,6 +2829,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
- 	unsigned long flags;
- 	int rc;
- 	int newdev;
-+	int node_id;
- 
- 	LASSERT(ni->ni_net->net_lnd == &the_o2iblnd);
- 
-@@ -2878,6 +2879,9 @@ static int kiblnd_startup(struct lnet_ni *ni)
- 	if (!ibdev)
- 		goto failed;
- 
-+	node_id = dev_to_node(ibdev->ibd_hdev->ibh_ibdev->dma_device);
-+	ni->dev_cpt = cfs_cpt_of_node(lnet_cpt_table(), node_id);
-+
- 	net->ibn_dev = ibdev;
- 	ni->ni_nid = LNET_MKNID(LNET_NIDNET(ni->ni_nid), ibdev->ibd_ifip);
- 
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 9df66c6d160f..ba1ec35a017a 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -38,6 +38,7 @@
-  * Author: Eric Barton <eric@bartonsoftware.com>
-  */
- 
-+#include <linux/pci.h>
- #include "socklnd.h"
- #include <linux/inetdevice.h>
- 
-@@ -2726,6 +2727,8 @@ ksocknal_startup(struct lnet_ni *ni)
- 	struct ksock_net *net;
- 	int rc;
- 	int i;
-+	struct net_device *net_dev;
-+	int node_id;
- 
- 	LASSERT(ni->ni_net->net_lnd == &the_ksocklnd);
- 
-@@ -2773,6 +2776,16 @@ ksocknal_startup(struct lnet_ni *ni)
- 		}
- 	}
- 
-+	net_dev = dev_get_by_name(&init_net,
-+				  net->ksnn_interfaces[0].ksni_name);
-+	if (net_dev) {
-+		node_id = dev_to_node(&net_dev->dev);
-+		ni->dev_cpt = cfs_cpt_of_node(lnet_cpt_table(), node_id);
-+		dev_put(net_dev);
-+	} else {
-+		ni->dev_cpt = CFS_CPT_ANY;
-+	}
-+
- 	/* call it before add it to ksocknal_data.ksnd_nets */
- 	rc = ksocknal_net_start_threads(net, ni->ni_cpts, ni->ni_ncpts);
- 	if (rc)
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 1ef9a39b517d..67a3301258d4 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -64,6 +64,12 @@ module_param(use_tcp_bonding, int, 0444);
- MODULE_PARM_DESC(use_tcp_bonding,
- 		 "Set to 1 to use socklnd bonding. 0 to use Multi-Rail");
- 
-+unsigned int lnet_numa_range;
-+EXPORT_SYMBOL(lnet_numa_range);
-+module_param(lnet_numa_range, uint, 0444);
-+MODULE_PARM_DESC(lnet_numa_range,
-+		 "NUMA range to consider during Multi-Rail selection");
-+
- /*
-  * This sequence number keeps track of how many times DLC was used to
-  * update the configuration. It is incremented on any DLC update and
-@@ -1896,6 +1902,7 @@ lnet_fill_ni_info(struct lnet_ni *ni, struct lnet_ioctl_config_ni *cfg_ni,
- 	cfg_ni->lic_nid = ni->ni_nid;
- 	cfg_ni->lic_status = ni->ni_status->ns_status;
- 	cfg_ni->lic_tcp_bonding = use_tcp_bonding;
-+	cfg_ni->lic_dev_cpt = ni->dev_cpt;
- 
- 	memcpy(&tun->lt_cmn, &ni->ni_net->net_tunables, sizeof(tun->lt_cmn));
- 
-@@ -2642,6 +2649,26 @@ LNetCtl(unsigned int cmd, void *arg)
- 		mutex_unlock(&the_lnet.ln_api_mutex);
- 		return rc;
- 
-+	case IOC_LIBCFS_SET_NUMA_RANGE: {
-+		struct lnet_ioctl_numa_range *numa;
-+
-+		numa = arg;
-+		if (numa->nr_hdr.ioc_len != sizeof(*numa))
-+			return -EINVAL;
-+		lnet_numa_range = numa->nr_range;
-+		return 0;
-+	}
-+
-+	case IOC_LIBCFS_GET_NUMA_RANGE: {
-+		struct lnet_ioctl_numa_range *numa;
-+
-+		numa = arg;
-+		if (numa->nr_hdr.ioc_len != sizeof(*numa))
-+			return -EINVAL;
-+		numa->nr_range = lnet_numa_range;
-+		return 0;
-+	}
-+
- 	case IOC_LIBCFS_GET_BUF: {
- 		struct lnet_ioctl_pool_cfg *pool_cfg;
- 		size_t total = sizeof(*config) + sizeof(*pool_cfg);
+ 	struct lnet_process_id	msg_target;
++	/* Primary NID of the source. */
++	lnet_nid_t		msg_initiator;
+ 	/* where is it from, it's only for building event */
+ 	lnet_nid_t		msg_from;
+ 	__u32			msg_type;
+diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
+index 5770876201c8..e80ef4182e5d 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
++++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
+@@ -563,10 +563,12 @@ struct lnet_event {
+ 	struct lnet_process_id	target;
+ 	/** The identifier (nid, pid) of the initiator. */
+ 	struct lnet_process_id	initiator;
++	/** The source NID on the initiator. */
++	struct lnet_process_id	source;
+ 	/**
+ 	 * The NID of the immediate sender. If the request has been forwarded
+ 	 * by routers, this is the NID of the last hop; otherwise it's the
+-	 * same as the initiator.
++	 * same as the source.
+ 	 */
+ 	lnet_nid_t		sender;
+ 	/** Indicates the type of the event. */
 diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index fbf209610ff9..bf2256da6122 100644
+index bf2256da6122..5153de984ede 100644
 --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
 +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -1109,6 +1109,10 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 	int best_credits = 0;
- 	u32 seq, seq2;
- 	int best_lpni_credits = INT_MIN;
-+	int md_cpt = 0;
-+	unsigned int shortest_distance = UINT_MAX;
-+	unsigned int distance = 0;
-+	bool found_ir = false;
- 
- again:
- 	/*
-@@ -1127,12 +1131,20 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 	routing = false;
- 	local_net = NULL;
- 	best_ni = NULL;
-+	shortest_distance = UINT_MAX;
-+	found_ir = false;
- 
- 	if (the_lnet.ln_shutdown) {
- 		lnet_net_unlock(cpt);
- 		return -ESHUTDOWN;
+@@ -1189,23 +1189,6 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+ 		}
  	}
  
-+	if (msg->msg_md)
-+		/* get the cpt of the MD, used during NUMA based selection */
-+		md_cpt = lnet_cpt_of_cookie(msg->msg_md->md_lh.lh_cookie);
-+	else
-+		md_cpt = CFS_CPT_ANY;
-+
- 	/*
- 	 * initialize the variables which could be reused if we go to
- 	 * again
-@@ -1258,34 +1270,113 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 			continue;
- 
- 		/*
--		 * Second jab at determining best_ni
--		 * if we get here then the peer we're trying to send
--		 * to is on a directly connected network, and we'll
--		 * need to pick the local_ni on that network to send
--		 * from
-+		 * Iterate through the NIs in this local Net and select
-+		 * the NI to send from. The selection is determined by
-+		 * these 3 criterion in the following priority:
-+		 *	1. NUMA
-+		 *	2. NI available credits
-+		 *	3. Round Robin
- 		 */
- 		while ((ni = lnet_get_next_ni_locked(local_net, ni))) {
- 			if (!lnet_is_ni_healthy_locked(ni))
- 				continue;
--			/* TODO: compare NUMA distance */
--			if (ni->ni_tx_queues[cpt]->tq_credits <=
--			    best_credits) {
-+
-+			/*
-+			 * calculate the distance from the cpt on which
-+			 * the message memory is allocated to the CPT of
-+			 * the NI's physical device
-+			 */
-+			distance = cfs_cpt_distance(lnet_cpt_table(),
-+						    md_cpt,
-+						    ni->dev_cpt);
-+
-+			/*
-+			 * If we already have a closer NI within the NUMA
-+			 * range provided, then there is no need to
-+			 * consider the current NI. Move on to the next
-+			 * one.
-+			 */
-+			if (distance > shortest_distance &&
-+			    distance > lnet_numa_range)
-+				continue;
-+
-+			if (distance < shortest_distance &&
-+			    distance > lnet_numa_range) {
- 				/*
--				 * all we want is to read tq_credits
--				 * value as an approximation of how
--				 * busy the NI is. No need to grab a lock
-+				 * The current NI is the closest one that we
-+				 * have found, even though it's not in the
-+				 * NUMA range specified. This occurs if
-+				 * the NUMA range is less than the least
-+				 * of the distances in the system.
-+				 * In effect NUMA range consideration is
-+				 * turned off.
- 				 */
--				continue;
--			} else if (best_ni) {
--				if ((best_ni)->ni_seq - ni->ni_seq <= 0)
-+				shortest_distance = distance;
-+			} else if ((distance <= shortest_distance &&
-+				    distance < lnet_numa_range) ||
-+				   distance == shortest_distance) {
-+				/*
-+				 * This NI is either within range or it's
-+				 * equidistant. In both of these cases we
-+				 * would want to select the NI based on
-+				 * its available credits first, and then
-+				 * via Round Robin.
-+				 */
-+				if (distance <= shortest_distance &&
-+				    distance < lnet_numa_range) {
-+					/*
-+					 * If this is the first NI that's
-+					 * within range, then set the
-+					 * shortest distance to the range
-+					 * specified by the user. In
-+					 * effect we're saying that all
-+					 * NIs that fall within this NUMA
-+					 * range shall be dealt with as
-+					 * having equal NUMA weight. Which
-+					 * will mean that we should select
-+					 * through that set by their
-+					 * available credits first
-+					 * followed by Round Robin.
-+					 *
-+					 * And since this is the first NI
-+					 * in the range, let's just set it
-+					 * as our best_ni for now. The
-+					 * following NIs found in the
-+					 * range will be dealt with as
-+					 * mentioned previously.
-+					 */
-+					shortest_distance = lnet_numa_range;
-+					if (!found_ir) {
-+						found_ir = true;
-+						goto set_ni;
-+					}
-+				}
-+				/*
-+				 * This NI is NUMA equidistant let's
-+				 * select using credits followed by Round
-+				 * Robin.
-+				 */
-+				if (ni->ni_tx_queues[cpt]->tq_credits <
-+				    best_credits) {
- 					continue;
--				(best_ni)->ni_seq = ni->ni_seq + 1;
-+				} else if (ni->ni_tx_queues[cpt]->tq_credits ==
-+					   best_credits) {
-+					if (best_ni &&
-+					    best_ni->ni_seq <= ni->ni_seq)
-+						continue;
-+				}
- 			}
+-	if (best_ni == the_lnet.ln_loni) {
+-		/* No send credit hassles with LOLND */
+-		msg->msg_hdr.dest_nid = cpu_to_le64(best_ni->ni_nid);
+-		if (!msg->msg_routing)
+-			msg->msg_hdr.src_nid = cpu_to_le64(best_ni->ni_nid);
+-		msg->msg_target.nid = best_ni->ni_nid;
+-		lnet_msg_commit(msg, cpt);
 -
-+set_ni:
- 			best_ni = ni;
- 			best_credits = ni->ni_tx_queues[cpt]->tq_credits;
- 		}
- 	}
-+	/*
-+	 * Now that we selected the NI to use increment its sequence
-+	 * number so the Round Robin algorithm will detect that it has
-+	 * been used and pick the next NI.
-+	 */
-+	best_ni->ni_seq++;
+-		lnet_ni_addref_locked(best_ni, cpt);
+-		lnet_net_unlock(cpt);
+-		msg->msg_txni = best_ni;
+-		lnet_ni_send(best_ni, msg);
+-
+-		*lo_sent = true;
+-		return 0;
+-	}
+-
+ 	if (best_ni)
+ 		goto pick_peer;
  
- 	if (!best_ni) {
- 		lnet_net_unlock(cpt);
-@@ -1372,29 +1463,52 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 	best_lpni = NULL;
- 	while ((lpni = lnet_get_next_peer_ni_locked(peer, peer_net, lpni))) {
- 		/*
--		 * if this peer ni is not healty just skip it, no point in
-+		 * if this peer ni is not healthy just skip it, no point in
- 		 * examining it further
- 		 */
- 		if (!lnet_is_peer_ni_healthy_locked(lpni))
- 			continue;
- 		ni_is_pref = lnet_peer_is_ni_pref_locked(lpni, best_ni);
+@@ -1389,6 +1372,23 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+ 		goto send;
  
-+		/* if this is a preferred peer use it */
- 		if (!preferred && ni_is_pref) {
- 			preferred = true;
- 		} else if (preferred && !ni_is_pref) {
-+			/*
-+			 * this is not the preferred peer so let's ignore
-+			 * it.
-+			 */
- 			continue;
--		} else if (lpni->lpni_txcredits <= best_lpni_credits) {
-+		} else if (lpni->lpni_txcredits < best_lpni_credits) {
-+			/*
-+			 * We already have a peer that has more credits
-+			 * available than this one. No need to consider
-+			 * this peer further.
-+			 */
- 			continue;
--		} else if (best_lpni) {
--			if (best_lpni->lpni_seq - lpni->lpni_seq <= 0)
--				continue;
--			best_lpni->lpni_seq = lpni->lpni_seq + 1;
-+		} else if (lpni->lpni_txcredits == best_lpni_credits) {
-+			/*
-+			 * The best peer found so far and the current peer
-+			 * have the same number of available credits let's
-+			 * make sure to select between them using Round
-+			 * Robin
-+			 */
-+			if (best_lpni) {
-+				if (best_lpni->lpni_seq <= lpni->lpni_seq)
-+					continue;
-+			}
- 		}
- 
- 		best_lpni = lpni;
- 		best_lpni_credits = lpni->lpni_txcredits;
- 	}
- 
-+	/*
-+	 * Increment sequence number of the peer selected so that we can
-+	 * pick the next one in Round Robin.
-+	 */
-+	best_lpni->lpni_seq++;
+ pick_peer:
++	if (best_ni == the_lnet.ln_loni) {
++		/* No send credit hassles with LOLND */
++		lnet_ni_addref_locked(best_ni, cpt);
++		msg->msg_hdr.dest_nid = cpu_to_le64(best_ni->ni_nid);
++		if (!msg->msg_routing)
++			msg->msg_hdr.src_nid = cpu_to_le64(best_ni->ni_nid);
++		msg->msg_target.nid = best_ni->ni_nid;
++		lnet_msg_commit(msg, cpt);
 +
- 	/* if we still can't find a peer ni then we can't reach it */
- 	if (!best_lpni) {
- 		u32 net_id = peer_net ? peer_net->lpn_net_id :
-@@ -1403,7 +1517,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
- 		lnet_net_unlock(cpt);
- 		LCONSOLE_WARN("no peer_ni found on peer net %s\n",
- 			      libcfs_net2str(net_id));
--		goto again;
-+		return -EHOSTUNREACH;
- 	}
++		lnet_net_unlock(cpt);
++		msg->msg_txni = best_ni;
++		lnet_ni_send(best_ni, msg);
++
++		*lo_sent = true;
++		return 0;
++	}
++
+ 	lpni = NULL;
  
- send:
+ 	if (msg->msg_type == LNET_MSG_REPLY ||
+@@ -1674,7 +1674,8 @@ lnet_parse_put(struct lnet_ni *ni, struct lnet_msg *msg)
+ 	le32_to_cpus(&hdr->msg.put.ptl_index);
+ 	le32_to_cpus(&hdr->msg.put.offset);
+ 
+-	info.mi_id.nid	= hdr->src_nid;
++	/* Primary peer NID. */
++	info.mi_id.nid	= msg->msg_initiator;
+ 	info.mi_id.pid	= hdr->src_pid;
+ 	info.mi_opc	= LNET_MD_OP_PUT;
+ 	info.mi_portal	= hdr->msg.put.ptl_index;
+@@ -1725,6 +1726,7 @@ lnet_parse_get(struct lnet_ni *ni, struct lnet_msg *msg, int rdma_get)
+ {
+ 	struct lnet_match_info info;
+ 	struct lnet_hdr *hdr = &msg->msg_hdr;
++	struct lnet_process_id source_id;
+ 	struct lnet_handle_wire reply_wmd;
+ 	int rc;
+ 
+@@ -1734,7 +1736,10 @@ lnet_parse_get(struct lnet_ni *ni, struct lnet_msg *msg, int rdma_get)
+ 	le32_to_cpus(&hdr->msg.get.sink_length);
+ 	le32_to_cpus(&hdr->msg.get.src_offset);
+ 
+-	info.mi_id.nid  = hdr->src_nid;
++	source_id.nid   = hdr->src_nid;
++	source_id.pid   = hdr->src_pid;
++	/* Primary peer NID */
++	info.mi_id.nid  = msg->msg_initiator;
+ 	info.mi_id.pid  = hdr->src_pid;
+ 	info.mi_opc     = LNET_MD_OP_GET;
+ 	info.mi_portal  = hdr->msg.get.ptl_index;
+@@ -1756,7 +1761,7 @@ lnet_parse_get(struct lnet_ni *ni, struct lnet_msg *msg, int rdma_get)
+ 
+ 	reply_wmd = hdr->msg.get.return_wmd;
+ 
+-	lnet_prep_send(msg, LNET_MSG_REPLY, info.mi_id,
++	lnet_prep_send(msg, LNET_MSG_REPLY, source_id,
+ 		       msg->msg_offset, msg->msg_wanted);
+ 
+ 	msg->msg_hdr.msg.reply.dst_wmd = reply_wmd;
+@@ -2200,6 +2205,8 @@ lnet_parse(struct lnet_ni *ni, struct lnet_hdr *hdr, lnet_nid_t from_nid,
+ 		msg->msg_hdr.dest_pid	= dest_pid;
+ 		msg->msg_hdr.payload_length = payload_length;
+ 	}
++	/* Multi-Rail: Primary NID of source. */
++	msg->msg_initiator = lnet_peer_primary_nid(src_nid);
+ 
+ 	lnet_net_lock(cpt);
+ 	rc = lnet_nid2peerni_locked(&msg->msg_rxpeer, from_nid, cpt);
+@@ -2518,6 +2525,8 @@ lnet_create_reply_msg(struct lnet_ni *ni, struct lnet_msg *getmsg)
+ 	       libcfs_nid2str(ni->ni_nid), libcfs_id2str(peer_id), getmd);
+ 
+ 	/* setup information for lnet_build_msg_event */
++	msg->msg_initiator = lnet_peer_primary_nid(peer_id.nid);
++	/* Cheaper: msg->msg_initiator = getmsg->msg_txpeer->lp_nid; */
+ 	msg->msg_from = peer_id.nid;
+ 	msg->msg_type = LNET_MSG_GET; /* flag this msg as an "optimized" GET */
+ 	msg->msg_hdr.src_nid = peer_id.nid;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+index 27bdefa161cc..8628899e1631 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+@@ -70,13 +70,19 @@ lnet_build_msg_event(struct lnet_msg *msg, enum lnet_event_kind ev_type)
+ 		ev->target.pid    = le32_to_cpu(hdr->dest_pid);
+ 		ev->initiator.nid = LNET_NID_ANY;
+ 		ev->initiator.pid = the_lnet.ln_pid;
++		ev->source.nid	  = LNET_NID_ANY;
++		ev->source.pid    = the_lnet.ln_pid;
+ 		ev->sender        = LNET_NID_ANY;
+ 	} else {
+ 		/* event for passive message */
+ 		ev->target.pid    = hdr->dest_pid;
+ 		ev->target.nid    = hdr->dest_nid;
+ 		ev->initiator.pid = hdr->src_pid;
+-		ev->initiator.nid = hdr->src_nid;
++		/* Multi-Rail: resolve src_nid to "primary" peer NID */
++		ev->initiator.nid = msg->msg_initiator;
++		/* Multi-Rail: track source NID. */
++		ev->source.pid	  = hdr->src_pid;
++		ev->source.nid	  = hdr->src_nid;
+ 		ev->rlength       = hdr->payload_length;
+ 		ev->sender        = msg->msg_from;
+ 		ev->mlength       = msg->msg_wanted;
+@@ -381,7 +387,7 @@ lnet_complete_msg_locked(struct lnet_msg *msg, int cpt)
+ 
+ 		ack_wmd = msg->msg_hdr.msg.put.ack_wmd;
+ 
+-		lnet_prep_send(msg, LNET_MSG_ACK, msg->msg_ev.initiator, 0, 0);
++		lnet_prep_send(msg, LNET_MSG_ACK, msg->msg_ev.source, 0, 0);
+ 
+ 		msg->msg_hdr.msg.ack.dst_wmd = ack_wmd;
+ 		msg->msg_hdr.msg.ack.match_bits = msg->msg_ev.match_bits;
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+index c8d8162cc706..d4033530112e 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
+@@ -687,7 +687,8 @@ lnet_ptl_attach_md(struct lnet_me *me, struct lnet_libmd *md,
+ 		LASSERT(msg->msg_rx_delayed || head == &ptl->ptl_msg_stealing);
+ 
+ 		hdr = &msg->msg_hdr;
+-		info.mi_id.nid  = hdr->src_nid;
++		/* Multi-Rail: Primary peer NID */
++		info.mi_id.nid  = msg->msg_initiator;
+ 		info.mi_id.pid  = hdr->src_pid;
+ 		info.mi_opc     = LNET_MD_OP_PUT;
+ 		info.mi_portal  = hdr->msg.put.ptl_index;
+diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
+index a760e43bcf7e..bde7b6214668 100644
+--- a/drivers/staging/lustre/lnet/lnet/peer.c
++++ b/drivers/staging/lustre/lnet/lnet/peer.c
+@@ -394,6 +394,24 @@ lnet_peer_is_ni_pref_locked(struct lnet_peer_ni *lpni, struct lnet_ni *ni)
+ 	return false;
+ }
+ 
++lnet_nid_t
++lnet_peer_primary_nid(lnet_nid_t nid)
++{
++	struct lnet_peer_ni *lpni;
++	lnet_nid_t primary_nid = nid;
++	int cpt;
++
++	cpt = lnet_net_lock_current();
++	lpni = lnet_find_peer_ni_locked(nid);
++	if (lpni) {
++		primary_nid = lpni->lpni_peer_net->lpn_peer->lp_primary_nid;
++		lnet_peer_ni_decref_locked(lpni);
++	}
++	lnet_net_unlock(cpt);
++
++	return primary_nid;
++}
++
+ static void
+ lnet_try_destroy_peer_hierarchy_locked(struct lnet_peer_ni *lpni)
+ {
+diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
+index 361b8970368e..2dbd20851b39 100644
+--- a/drivers/staging/lustre/lustre/include/lustre_net.h
++++ b/drivers/staging/lustre/lustre/include/lustre_net.h
+@@ -882,6 +882,8 @@ struct ptlrpc_request {
+ 	lnet_nid_t	   rq_self;
+ 	/** Peer description (the other side) */
+ 	struct lnet_process_id	rq_peer;
++	/** Descriptor for the NID from which the peer sent the request. */
++	struct lnet_process_id	rq_source;
+ 	/**
+ 	 * service time estimate (secs)
+ 	 * If the request is not served by this time, it is marked as timed out.
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/events.c b/drivers/staging/lustre/lustre/ptlrpc/events.c
+index ebf985ec17a1..ab6dd74d0ae3 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/events.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/events.c
+@@ -342,7 +342,9 @@ void request_in_callback(struct lnet_event *ev)
+ 	if (ev->type == LNET_EVENT_PUT && ev->status == 0)
+ 		req->rq_reqdata_len = ev->mlength;
+ 	ktime_get_real_ts64(&req->rq_arrival_time);
++	/* Multi-Rail: keep track of both initiator and source NID. */
+ 	req->rq_peer = ev->initiator;
++	req->rq_source = ev->source;
+ 	req->rq_self = ev->target.nid;
+ 	req->rq_rqbd = rqbd;
+ 	req->rq_phase = RQ_PHASE_NEW;
+@@ -350,7 +352,8 @@ void request_in_callback(struct lnet_event *ev)
+ 		CDEBUG(D_INFO, "incoming req@%p x%llu msgsize %u\n",
+ 		       req, req->rq_xid, ev->mlength);
+ 
+-	CDEBUG(D_RPCTRACE, "peer: %s\n", libcfs_id2str(req->rq_peer));
++	CDEBUG(D_RPCTRACE, "peer: %s (source: %s)\n",
++	       libcfs_id2str(req->rq_peer), libcfs_id2str(req->rq_source));
+ 
+ 	spin_lock(&svcpt->scp_lock);
+ 
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+index 2897afb8806c..d0bcd8827f8a 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+@@ -47,14 +47,14 @@
+  */
+ static int ptl_send_buf(struct lnet_handle_md *mdh, void *base, int len,
+ 			enum lnet_ack_req ack, struct ptlrpc_cb_id *cbid,
+-			struct ptlrpc_connection *conn, int portal, __u64 xid,
+-			unsigned int offset)
++			lnet_nid_t self, struct lnet_process_id peer_id,
++			int portal, __u64 xid, unsigned int offset)
+ {
+ 	int rc;
+ 	struct lnet_md md;
+ 
+ 	LASSERT(portal != 0);
+-	CDEBUG(D_INFO, "conn=%p id %s\n", conn, libcfs_id2str(conn->c_peer));
++	CDEBUG(D_INFO, "peer_id %s\n", libcfs_id2str(peer_id));
+ 	md.start = base;
+ 	md.length = len;
+ 	md.threshold = (ack == LNET_ACK_REQ) ? 2 : 1;
+@@ -79,8 +79,8 @@ static int ptl_send_buf(struct lnet_handle_md *mdh, void *base, int len,
+ 	CDEBUG(D_NET, "Sending %d bytes to portal %d, xid %lld, offset %u\n",
+ 	       len, portal, xid, offset);
+ 
+-	rc = LNetPut(conn->c_self, *mdh, ack,
+-		     conn->c_peer, portal, xid, offset, 0);
++	rc = LNetPut(self, *mdh, ack,
++		     peer_id, portal, xid, offset, 0);
+ 	if (unlikely(rc != 0)) {
+ 		int rc2;
+ 		/* We're going to get an UNLINK event when I unlink below,
+@@ -88,7 +88,7 @@ static int ptl_send_buf(struct lnet_handle_md *mdh, void *base, int len,
+ 		 * I fall through and return success here!
+ 		 */
+ 		CERROR("LNetPut(%s, %d, %lld) failed: %d\n",
+-		       libcfs_id2str(conn->c_peer), portal, xid, rc);
++		       libcfs_id2str(peer_id), portal, xid, rc);
+ 		rc2 = LNetMDUnlink(*mdh);
+ 		LASSERTF(rc2 == 0, "rc2 = %d\n", rc2);
+ 	}
+@@ -415,7 +415,7 @@ int ptlrpc_send_reply(struct ptlrpc_request *req, int flags)
+ 	rc = ptl_send_buf(&rs->rs_md_h, rs->rs_repbuf, rs->rs_repdata_len,
+ 			  (rs->rs_difficult && !rs->rs_no_ack) ?
+ 			  LNET_ACK_REQ : LNET_NOACK_REQ,
+-			  &rs->rs_cb_id, conn,
++			  &rs->rs_cb_id, req->rq_self, req->rq_source,
+ 			  ptlrpc_req2svc(req)->srv_rep_portal,
+ 			  req->rq_xid, req->rq_reply_off);
+ out:
+@@ -683,7 +683,7 @@ int ptl_send_rpc(struct ptlrpc_request *request, int noreply)
+ 	rc = ptl_send_buf(&request->rq_req_md_h,
+ 			  request->rq_reqbuf, request->rq_reqdata_len,
+ 			  LNET_NOACK_REQ, &request->rq_req_cbid,
+-			  connection,
++			  LNET_NID_ANY, connection->c_peer,
+ 			  request->rq_request_portal,
+ 			  request->rq_xid, 0);
+ 	if (likely(rc == 0))
