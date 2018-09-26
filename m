@@ -1,41 +1,61 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 25 Sep 2018 22:48:03 -0400
-Subject: [lustre-devel] [PATCH 11/25] lustre: lnet: Fix lost lock
+Date: Tue, 25 Sep 2018 22:48:04 -0400
+Subject: [lustre-devel] [PATCH 12/25] lustre: lnet: correct locking in
+ legacy add net
 In-Reply-To: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
 References: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537930097-11624-12-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537930097-11624-13-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Dmitry Eremin <dmitry.eremin@intel.com>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-Unlock lnet_net_lock in case of error in function lnet_select_pathway().
+Make sure to unlock the api mutex properly
+in lnet_dyn_add_net()
 
-Signed-off-by: Dmitry Eremin <dmitry.eremin@intel.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9607
-Reviewed-on: https://review.whamcloud.com/27455
-Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9729
+Reviewed-on: https://review.whamcloud.com/27907
+Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
+Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/lnet/lib-move.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/staging/lustre/lnet/lnet/api-ni.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 275e8a9..f2bc97d 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -1260,6 +1260,7 @@
+diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
+index 7c907a3..b37abde 100644
+--- a/drivers/staging/lustre/lnet/lnet/api-ni.c
++++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
+@@ -2435,7 +2435,7 @@ int lnet_dyn_del_ni(struct lnet_ioctl_config_ni *conf)
+ 
+ 	if (rc > 1) {
+ 		rc = -EINVAL; /* only add one network per call */
+-		goto failed;
++		goto out_unlock_clean;
  	}
  
- 	if (!peer->lp_multi_rail && lnet_get_num_peer_nis(peer) > 1) {
-+		lnet_net_unlock(cpt);
- 		CERROR("peer %s is declared to be non MR capable, yet configured with more than one NID\n",
- 		       libcfs_nid2str(dst_nid));
- 		return -EINVAL;
+ 	net = list_entry(net_head.next, struct lnet_net, net_list);
+@@ -2455,14 +2455,11 @@ int lnet_dyn_del_ni(struct lnet_ioctl_config_ni *conf)
+ 		conf->cfg_config_u.cfg_net.net_max_tx_credits;
+ 
+ 	rc = lnet_add_net_common(net, &tun);
+-	if (rc != 0)
+-		goto failed;
+ 
+-	return 0;
+-
+-failed:
++out_unlock_clean:
+ 	mutex_unlock(&the_lnet.ln_api_mutex);
+ 	while (!list_empty(&net_head)) {
++		/* net_head list is empty in success case */
+ 		net = list_entry(net_head.next, struct lnet_net, net_list);
+ 		list_del_init(&net->net_list);
+ 		lnet_net_free(net);
 -- 
 1.8.3.1
