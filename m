@@ -1,73 +1,53 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 25 Sep 2018 22:48:07 -0400
-Subject: [lustre-devel] [PATCH 15/25] lustre: o2iblnd: reconnect peer for
- REJ_INVALID_SERVICE_ID
+Date: Tue, 25 Sep 2018 22:48:15 -0400
+Subject: [lustre-devel] [PATCH 23/25] lustre: lnd: pending transmits dropped
+ silently
 In-Reply-To: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
 References: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537930097-11624-16-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537930097-11624-24-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Sergey Cheremencev <c17829@cray.com>
+From: Amir Shehata <ashehata@whamcloud.com>
 
-Don't kill the peer in case of INVALID_SERVICE_ID. This produces
-huge number of peers for the same nid and may cause an OOM.
+list_add was being used erroneously. The logic should be to move
+the txs on ibp_tx_queue on a local list which is then processed.
+The code, however, did the reverse, which would result in the
+pending txs not processed and thus dropped silently. This in turn
+would lead to peers reference counts at the LNet layer not
+decremented since lnet_finalize() might not be called for a message.
 
-The OOM was frequently seen with mlnx-ofa-kernel-2.3 where used
-RCU mechanism in mlx4_cq_free. In older mlnx4 versions to mitigate
-the issue RCU was changed with spin locks.
+Initialize local list and use list_splice_init() to move
+transmits on the ibp_tx_queue to the local list.
 
-Signed-off-by: Sergey Cheremencev <c17829@cray.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9094
-Seagate-bug-id: MRP-4056
-Reviewed-on: https://review.whamcloud.com/25378
+Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10682
+Reviewed-on: https://review.whamcloud.com/31374
 Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
+Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    | 1 +
- drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 6 ++++++
- 2 files changed, 7 insertions(+)
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index a3d89ec..de04355 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -460,6 +460,7 @@ struct kib_rej {
- #define IBLND_REJECT_RDMA_FRAGS	    6
- /* peer_ni's msg queue size doesn't match mine */
- #define IBLND_REJECT_MSG_QUEUE_SIZE 7
-+#define IBLND_REJECT_INVALID_SRV_ID 8
- 
- /***********************************************************************/
- 
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index a6b261a..dc71554 100644
+index 346d368..f2a01eb 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -2611,6 +2611,10 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 	case IBLND_REJECT_CONN_UNCOMPAT:
- 		reason = "version negotiation";
- 		break;
-+
-+	case IBLND_REJECT_INVALID_SRV_ID:
-+		reason = "invalid service id";
-+		break;
+@@ -2150,8 +2150,8 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
  	}
  
- 	conn->ibc_reconnect = 1;
-@@ -2648,6 +2652,8 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
- 		break;
+ 	/* grab pending txs while I have the lock */
+-	list_add(&txs, &peer_ni->ibp_tx_queue);
+-	list_del_init(&peer_ni->ibp_tx_queue);
++	INIT_LIST_HEAD(&txs);
++	list_splice_init(&peer_ni->ibp_tx_queue, &txs);
  
- 	case IB_CM_REJ_INVALID_SERVICE_ID:
-+		kiblnd_check_reconnect(conn, IBLND_MSG_VERSION, 0,
-+				       IBLND_REJECT_INVALID_SRV_ID, NULL);
- 		CNETERR("%s rejected: no listener at %d\n",
- 			libcfs_nid2str(peer_ni->ibp_nid),
- 			*kiblnd_tunables.kib_service);
+ 	if (!kiblnd_peer_active(peer_ni) ||	/* peer_ni has been deleted */
+ 	    conn->ibc_comms_error) {       /* error has happened already */
 -- 
 1.8.3.1
