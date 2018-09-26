@@ -1,128 +1,84 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 25 Sep 2018 22:47:55 -0400
-Subject: [lustre-devel] [PATCH 03/25] lustre: lnet: remove debug ioctl
+Date: Tue, 25 Sep 2018 22:48:08 -0400
+Subject: [lustre-devel] [PATCH 16/25] lustre: o2iblnd: kill timedout txs
+ from ibp_tx_queue
 In-Reply-To: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
 References: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537930097-11624-4-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537930097-11624-17-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Olaf Weber <olaf.weber@hpe.com>
+From: Sergey Cheremencev <c17829@cray.com>
 
-Remove a debug ioctl that was added to allow for debug
-messages from user space. However, the code is currently
-not being used.
+Sometimes connection can't be established for a long time
+due to rejections and produces cycle of reconnections.
+Peer is not removed in each iteration unlike connection.
+Thus until connection becomes established txs live in
+peer->ibp_tx_queue. This patch adds tx_deadline checking
+for txs from peer tx_queue.
 
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-Signed-off-by: Olaf Weber <olaf.weber@hpe.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9119
-Reviewed-on: https://review.whamcloud.com/26688
+Signed-off-by: Sergey Cheremencev <c17829@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9094
+Seagate-bug-id: MRP-4056
+Reviewed-on: https://review.whamcloud.com/25376
 Reviewed-by: Doug Oucharek <dougso@me.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |  3 +--
- .../lustre/include/uapi/linux/lnet/lnet-dlc.h      | 22 --------------------
- drivers/staging/lustre/lnet/lnet/api-ni.c          | 24 ----------------------
- 3 files changed, 1 insertion(+), 48 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c    | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
-index a231f6d..2a9beed 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
-@@ -144,7 +144,6 @@ struct libcfs_debug_ioctl_data {
- #define IOC_LIBCFS_GET_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 97, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_SET_NUMA_RANGE	_IOWR(IOC_LIBCFS_TYPE, 98, IOCTL_CONFIG_SIZE)
- #define IOC_LIBCFS_GET_NUMA_RANGE	_IOWR(IOC_LIBCFS_TYPE, 99, IOCTL_CONFIG_SIZE)
--#define IOC_LIBCFS_DBG			_IOWR(IOC_LIBCFS_TYPE, 100, IOCTL_CONFIG_SIZE)
--#define IOC_LIBCFS_MAX_NR		100
-+#define IOC_LIBCFS_MAX_NR		99
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index dc71554..3218999 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -3159,8 +3159,10 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ {
+ 	LIST_HEAD(closes);
+ 	LIST_HEAD(checksends);
++	LIST_HEAD(timedout_txs);
+ 	struct list_head *peers = &kiblnd_data.kib_peers[idx];
+ 	struct kib_peer_ni *peer_ni;
++	struct kib_tx *tx_tmp, *tx;
+ 	struct kib_conn *conn;
+ 	unsigned long flags;
  
- #endif /* __LIBCFS_IOCTL_H__ */
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-index d1e2911..2594642 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-@@ -94,10 +94,6 @@ struct lnet_ioctl_net_config {
- /* # different router buffer pools */
- #define LNET_NRBPOOLS		(LNET_LARGE_BUF_IDX + 1)
+@@ -3169,9 +3171,19 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	 * RDMAs to time out, so we just use a shared lock while we
+ 	 * take a look...
+ 	 */
+-	read_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
++	write_lock_irqsave(&kiblnd_data.kib_global_lock, flags);
  
--enum lnet_dbg_task {
--	LNET_DBG_INCR_DLC_SEQ = 0
--};
--
- struct lnet_ioctl_pool_cfg {
- 	struct {
- 		__u32 pl_npages;
-@@ -196,24 +192,6 @@ struct lnet_ioctl_peer {
- 	} pr_lnd_u;
- };
+ 	list_for_each_entry(peer_ni, peers, ibp_list) {
++		/* Check tx_deadline */
++		list_for_each_entry_safe(tx, tx_tmp, &peer_ni->ibp_tx_queue, tx_list) {
++			if (ktime_compare(ktime_get(), tx->tx_deadline) >= 0) {
++				CWARN("Timed out tx for %s: %lld seconds\n",
++				      libcfs_nid2str(peer_ni->ibp_nid),
++				      ktime_ms_delta(ktime_get(),
++						     tx->tx_deadline) / MSEC_PER_SEC);
++				list_move(&tx->tx_list, &timedout_txs);
++			}
++		}
  
--struct lnet_dbg_task_info {
--	/*
--	 * TODO: a union can be added if the task requires more
--	 * information from user space to be carried out in kernel space.
--	 */
--};
--
--/*
-- * This structure is intended to allow execution of debugging tasks. This
-- * is not intended to be backwards compatible. Extra tasks can be added in
-- * the future
-- */
--struct lnet_ioctl_dbg {
--	struct libcfs_ioctl_hdr dbg_hdr;
--	enum lnet_dbg_task dbg_task;
--	char dbg_bulk[0];
--};
--
- struct lnet_ioctl_peer_cfg {
- 	struct libcfs_ioctl_hdr prcfg_hdr;
- 	lnet_nid_t prcfg_prim_nid;
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 9a09927..43e8db1 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1866,17 +1866,6 @@ void lnet_lib_exit(void)
- }
- EXPORT_SYMBOL(LNetNIFini);
- 
--static int lnet_handle_dbg_task(struct lnet_ioctl_dbg *dbg,
--				struct lnet_dbg_task_info *dbg_info)
--{
--	switch (dbg->dbg_task) {
--	case LNET_DBG_INCR_DLC_SEQ:
--		lnet_incr_dlc_seq();
--	}
--
--	return 0;
--}
--
- /**
-  * Grabs the ni data from the ni structure and fills the out
-  * parameters
-@@ -2845,19 +2834,6 @@ u32 lnet_get_dlc_seq_locked(void)
- 		return 0;
+ 		list_for_each_entry(conn, &peer_ni->ibp_conns, ibc_list) {
+ 			int timedout;
+@@ -3207,7 +3219,10 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		}
  	}
  
--	case IOC_LIBCFS_DBG: {
--		struct lnet_ioctl_dbg *dbg = arg;
--		struct lnet_dbg_task_info *dbg_info;
--		size_t total = sizeof(*dbg) + sizeof(*dbg_info);
--
--		if (dbg->dbg_hdr.ioc_len < total)
--			return -EINVAL;
--
--		dbg_info = (struct lnet_dbg_task_info *)dbg->dbg_bulk;
--
--		return lnet_handle_dbg_task(dbg, dbg_info);
--	}
--
- 	default:
- 		ni = lnet_net2ni_addref(data->ioc_net);
- 		if (!ni)
+-	read_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
++	write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
++
++	if (!list_empty(&timedout_txs))
++		kiblnd_txlist_done(&timedout_txs, -ETIMEDOUT);
+ 
+ 	/*
+ 	 * Handle timeout by closing the whole
 -- 
 1.8.3.1
