@@ -1,296 +1,504 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 25 Sep 2018 22:47:59 -0400
-Subject: [lustre-devel] [PATCH 07/25] lustre: lnet: rename
- LNET_MAX_INTERFACES
+Date: Tue, 25 Sep 2018 22:47:53 -0400
+Subject: [lustre-devel] [PATCH 01/25] lustre: lnet: remove ni from
+ lnet_finalize
 In-Reply-To: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
 References: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537930097-11624-8-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537930097-11624-2-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Olaf Weber <olaf.weber@hpe.com>
+From: Sergey Cheremencev <c17829@cray.com>
 
-LNET_MAX_INTERFACES is the number of interfaces supported by
-interface bonding in the ksocknal LND. It shows up in LNet
-because a number of data structures are shared between LNDs.
+Remove ni from lnet_finalize and kiblnd_txlist_done
+input arguments. Also small code cleanup by introducing
+ibprm_cookie to avoid checkpatch issues.
 
-Rename it to LNET_NUM_INTERFACES to reduce the confusion of
-what it does. Also it allows us to build the userland tools.
-
-Signed-off-by: Olaf Weber <olaf.weber@hpe.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9119
-Reviewed-on: https://review.whamcloud.com/26693
+Signed-off-by: Sergey Cheremencev <c17829@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9094
+Seagate-bug-id: MRP-4056
+Reviewed-on: https://review.whamcloud.com/25375
 Reviewed-by: Doug Oucharek <dougso@me.com>
+Reviewed-by: Amir Shehata <ashehata@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- .../staging/lustre/include/linux/lnet/lib-types.h  |  2 +-
- .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |  4 ++--
- .../lustre/include/uapi/linux/lnet/lnet-types.h    |  2 +-
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |  2 +-
  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  2 +-
- .../staging/lustre/lnet/klnds/socklnd/socklnd.c    | 22 +++++++++++-----------
- .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |  4 ++--
- .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |  2 +-
- .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |  4 ++--
- drivers/staging/lustre/lnet/lnet/config.c          | 10 +++++-----
- 9 files changed, 26 insertions(+), 26 deletions(-)
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  3 +-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 65 ++++++++++------------
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |  3 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |  4 +-
+ drivers/staging/lustre/lnet/lnet/lib-move.c        | 20 +++----
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         |  2 +-
+ drivers/staging/lustre/lnet/lnet/lo.c              |  4 +-
+ drivers/staging/lustre/lnet/lnet/net_fault.c       |  2 +-
+ 10 files changed, 50 insertions(+), 57 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 6abac19..90f7577 100644
---- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-+++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -371,7 +371,7 @@ struct lnet_ni {
- 	 * equivalent interfaces to use
- 	 * This is an array because socklnd bonding can still be configured
- 	 */
--	char			 *ni_interfaces[LNET_MAX_INTERFACES];
-+	char			 *ni_interfaces[LNET_NUM_INTERFACES];
- 	/* original net namespace */
- 	struct net		 *ni_net_ns;
- };
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-index e603455..07516fd 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
-@@ -81,7 +81,7 @@ struct lnet_ioctl_config_lnd_tunables {
- };
+diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+index aedc88c..53cbf6d 100644
+--- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
++++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+@@ -537,7 +537,7 @@ struct lnet_msg *lnet_create_reply_msg(struct lnet_ni *ni,
+ void lnet_set_reply_msg_len(struct lnet_ni *ni, struct lnet_msg *msg,
+ 			    unsigned int len);
  
- struct lnet_ioctl_net_config {
--	char ni_interfaces[LNET_MAX_INTERFACES][LNET_MAX_STR_LEN];
-+	char ni_interfaces[LNET_NUM_INTERFACES][LNET_MAX_STR_LEN];
- 	__u32 ni_status;
- 	__u32 ni_cpts[LNET_MAX_SHOW_NUM_CPT];
- 	char cfg_bulk[0];
-@@ -184,7 +184,7 @@ struct lnet_ioctl_element_msg_stats {
- struct lnet_ioctl_config_ni {
- 	struct libcfs_ioctl_hdr lic_cfg_hdr;
- 	lnet_nid_t		lic_nid;
--	char			lic_ni_intf[LNET_MAX_INTERFACES][LNET_MAX_STR_LEN];
-+	char			lic_ni_intf[LNET_NUM_INTERFACES][LNET_MAX_STR_LEN];
- 	char			lic_legacy_ip2nets[LNET_MAX_STR_LEN];
- 	__u32			lic_cpts[LNET_MAX_SHOW_NUM_CPT];
- 	__u32			lic_ncpts;
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
-index 837e5fe..a373b9c 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
-@@ -264,7 +264,7 @@ struct lnet_counters {
- #define LNET_NI_STATUS_DOWN    0xdeadface
- #define LNET_NI_STATUS_INVALID 0x00000000
+-void lnet_finalize(struct lnet_ni *ni, struct lnet_msg *msg, int rc);
++void lnet_finalize(struct lnet_msg *msg, int rc);
  
--#define LNET_MAX_INTERFACES    16
-+#define LNET_NUM_INTERFACES    16
- 
- /**
-  * Objects maintained by the LNet are accessed through handles. Handle types
+ void lnet_drop_message(struct lnet_ni *ni, int cpt, void *private,
+ 		       unsigned int nob);
 diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-index b3a4344..aea83a5 100644
+index 75a7e96..b3a4344 100644
 --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
 +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
-@@ -2870,7 +2870,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
- 	if (ni->ni_interfaces[0]) {
- 		/* Use the IPoIB interface specified in 'networks=' */
+@@ -521,7 +521,7 @@ static int kiblnd_del_peer(struct lnet_ni *ni, lnet_nid_t nid)
  
--		BUILD_BUG_ON(LNET_MAX_INTERFACES <= 1);
-+		BUILD_BUG_ON(LNET_NUM_INTERFACES <= 1);
- 		if (ni->ni_interfaces[1]) {
- 			CERROR("Multiple interfaces not supported\n");
- 			goto failed;
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-index 9b9cc87..ad94837 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
-@@ -53,7 +53,7 @@
- 	struct ksock_interface *iface;
+ 	write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
  
- 	for (i = 0; i < net->ksnn_ninterfaces; i++) {
--		LASSERT(i < LNET_MAX_INTERFACES);
-+		LASSERT(i < LNET_NUM_INTERFACES);
- 		iface = &net->ksnn_interfaces[i];
+-	kiblnd_txlist_done(ni, &zombies, -EIO);
++	kiblnd_txlist_done(&zombies, -EIO);
  
- 		if (iface->ksni_ipaddr == ip)
-@@ -221,7 +221,7 @@ struct ksock_peer *
- 	struct ksock_interface *iface;
+ 	return rc;
+ }
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+index b1851b5..a3d89ec 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -1034,8 +1034,7 @@ struct kib_conn *kiblnd_create_conn(struct kib_peer_ni *peer_ni,
+ void kiblnd_close_conn_locked(struct kib_conn *conn, int error);
  
- 	for (i = 0; i < peer_ni->ksnp_n_passive_ips; i++) {
--		LASSERT(i < LNET_MAX_INTERFACES);
-+		LASSERT(i < LNET_NUM_INTERFACES);
- 		ip = peer_ni->ksnp_passive_ips[i];
+ void kiblnd_launch_tx(struct lnet_ni *ni, struct kib_tx *tx, lnet_nid_t nid);
+-void kiblnd_txlist_done(struct lnet_ni *ni, struct list_head *txlist,
+-			int status);
++void kiblnd_txlist_done(struct list_head *txlist, int status);
  
- 		iface = ksocknal_ip2iface(peer_ni->ksnp_ni, ip);
-@@ -678,7 +678,7 @@ struct ksock_peer *
- 	read_lock(&ksocknal_data.ksnd_global_lock);
+ void kiblnd_qp_event(struct ib_event *event, void *arg);
+ void kiblnd_cq_event(struct ib_event *event, void *arg);
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+index cb752dc..debed17 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+@@ -54,14 +54,12 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+ static void kiblnd_check_sends_locked(struct kib_conn *conn);
  
- 	nip = net->ksnn_ninterfaces;
--	LASSERT(nip <= LNET_MAX_INTERFACES);
-+	LASSERT(nip <= LNET_NUM_INTERFACES);
+ static void
+-kiblnd_tx_done(struct lnet_ni *ni, struct kib_tx *tx)
++kiblnd_tx_done(struct kib_tx *tx)
+ {
+ 	struct lnet_msg *lntmsg[2];
+-	struct kib_net *net = ni->ni_data;
+ 	int rc;
+ 	int i;
  
- 	/*
- 	 * Only offer interfaces for additional connections if I have
-@@ -759,8 +759,8 @@ struct ksock_peer *
- 	 */
- 	write_lock_bh(global_lock);
+-	LASSERT(net);
+ 	LASSERT(!in_interrupt());
+ 	LASSERT(!tx->tx_queued);     /* mustn't be queued for sending */
+ 	LASSERT(!tx->tx_sending);    /* mustn't be awaiting sent callback */
+@@ -76,8 +74,6 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+ 	rc = tx->tx_status;
  
--	LASSERT(n_peerips <= LNET_MAX_INTERFACES);
--	LASSERT(net->ksnn_ninterfaces <= LNET_MAX_INTERFACES);
-+	LASSERT(n_peerips <= LNET_NUM_INTERFACES);
-+	LASSERT(net->ksnn_ninterfaces <= LNET_NUM_INTERFACES);
+ 	if (tx->tx_conn) {
+-		LASSERT(ni == tx->tx_conn->ibc_peer->ibp_ni);
+-
+ 		kiblnd_conn_decref(tx->tx_conn);
+ 		tx->tx_conn = NULL;
+ 	}
+@@ -92,12 +88,12 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+ 		if (!lntmsg[i])
+ 			continue;
  
- 	/*
- 	 * Only match interfaces for additional connections
-@@ -879,7 +879,7 @@ struct ksock_peer *
+-		lnet_finalize(ni, lntmsg[i], rc);
++		lnet_finalize(lntmsg[i], rc);
+ 	}
+ }
+ 
+ void
+-kiblnd_txlist_done(struct lnet_ni *ni, struct list_head *txlist, int status)
++kiblnd_txlist_done(struct list_head *txlist, int status)
+ {
+ 	struct kib_tx *tx;
+ 
+@@ -108,7 +104,7 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+ 		/* complete now */
+ 		tx->tx_waiting = 0;
+ 		tx->tx_status = status;
+-		kiblnd_tx_done(ni, tx);
++		kiblnd_tx_done(tx);
+ 	}
+ }
+ 
+@@ -281,7 +277,7 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+ 	spin_unlock(&conn->ibc_lock);
+ 
+ 	if (idle)
+-		kiblnd_tx_done(ni, tx);
++		kiblnd_tx_done(tx);
+ }
+ 
+ static void
+@@ -794,7 +790,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 		 * posted NOOPs complete
+ 		 */
+ 		spin_unlock(&conn->ibc_lock);
+-		kiblnd_tx_done(peer_ni->ibp_ni, tx);
++		kiblnd_tx_done(tx);
+ 		spin_lock(&conn->ibc_lock);
+ 		CDEBUG(D_NET, "%s(%d): redundant or enough NOOP\n",
+ 		       libcfs_nid2str(peer_ni->ibp_nid),
+@@ -888,7 +884,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	kiblnd_close_conn(conn, rc);
+ 
+ 	if (done)
+-		kiblnd_tx_done(peer_ni->ibp_ni, tx);
++		kiblnd_tx_done(tx);
+ 
+ 	spin_lock(&conn->ibc_lock);
+ 
+@@ -1007,7 +1003,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
+ 	spin_unlock(&conn->ibc_lock);
+ 
+ 	if (idle)
+-		kiblnd_tx_done(conn->ibc_peer->ibp_ni, tx);
++		kiblnd_tx_done(tx);
+ }
+ 
+ static void
+@@ -1343,7 +1339,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 
+ 	CWARN("Abort reconnection of %s: %s\n",
+ 	      libcfs_nid2str(peer_ni->ibp_nid), reason);
+-	kiblnd_txlist_done(peer_ni->ibp_ni, &txs, -ECONNABORTED);
++	kiblnd_txlist_done(&txs, -ECONNABORTED);
+ 	return false;
+ }
+ 
+@@ -1421,7 +1417,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		if (tx) {
+ 			tx->tx_status = -EHOSTUNREACH;
+ 			tx->tx_waiting = 0;
+-			kiblnd_tx_done(ni, tx);
++			kiblnd_tx_done(tx);
+ 		}
  		return;
  	}
- 
--	LASSERT(npeer_ipaddrs <= LNET_MAX_INTERFACES);
-+	LASSERT(npeer_ipaddrs <= LNET_NUM_INTERFACES);
- 
- 	for (i = 0; i < npeer_ipaddrs; i++) {
- 		if (newroute) {
-@@ -908,7 +908,7 @@ struct ksock_peer *
- 		best_nroutes = 0;
- 		best_netmatch = 0;
- 
--		LASSERT(net->ksnn_ninterfaces <= LNET_MAX_INTERFACES);
-+		LASSERT(net->ksnn_ninterfaces <= LNET_NUM_INTERFACES);
- 
- 		/* Select interface to connect from */
- 		for (j = 0; j < net->ksnn_ninterfaces; j++) {
-@@ -1048,7 +1048,7 @@ struct ksock_peer *
- 	atomic_set(&conn->ksnc_tx_nob, 0);
- 
- 	hello = kvzalloc(offsetof(struct ksock_hello_msg,
--				  kshm_ips[LNET_MAX_INTERFACES]),
-+				  kshm_ips[LNET_NUM_INTERFACES]),
- 			 GFP_KERNEL);
- 	if (!hello) {
- 		rc = -ENOMEM;
-@@ -1956,7 +1956,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- 	if (iface) {
- 		/* silently ignore dups */
- 		rc = 0;
--	} else if (net->ksnn_ninterfaces == LNET_MAX_INTERFACES) {
-+	} else if (net->ksnn_ninterfaces == LNET_NUM_INTERFACES) {
- 		rc = -ENOSPC;
- 	} else {
- 		iface = &net->ksnn_interfaces[net->ksnn_ninterfaces++];
-@@ -2594,7 +2594,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
- 			continue;
+@@ -1557,7 +1553,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		if (rc) {
+ 			CERROR("Can't setup GET sink for %s: %d\n",
+ 			       libcfs_nid2str(target.nid), rc);
+-			kiblnd_tx_done(ni, tx);
++			kiblnd_tx_done(tx);
+ 			return -EIO;
  		}
  
--		if (j == LNET_MAX_INTERFACES) {
-+		if (j == LNET_NUM_INTERFACES) {
- 			CWARN("Ignoring interface %s (too many interfaces)\n",
- 			      name);
- 			continue;
-@@ -2782,7 +2782,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
+@@ -1571,7 +1567,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		if (!tx->tx_lntmsg[1]) {
+ 			CERROR("Can't create reply for GET -> %s\n",
+ 			       libcfs_nid2str(target.nid));
+-			kiblnd_tx_done(ni, tx);
++			kiblnd_tx_done(tx);
+ 			return -EIO;
+ 		}
  
- 		net->ksnn_ninterfaces = rc;
+@@ -1606,7 +1602,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		if (rc) {
+ 			CERROR("Can't setup PUT src for %s: %d\n",
+ 			       libcfs_nid2str(target.nid), rc);
+-			kiblnd_tx_done(ni, tx);
++			kiblnd_tx_done(tx);
+ 			return -EIO;
+ 		}
+ 
+@@ -1697,7 +1693,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 
+ 	if (!nob) {
+ 		/* No RDMA: local completion may happen now! */
+-		lnet_finalize(ni, lntmsg, 0);
++		lnet_finalize(lntmsg, 0);
  	} else {
--		for (i = 0; i < LNET_MAX_INTERFACES; i++) {
-+		for (i = 0; i < LNET_NUM_INTERFACES; i++) {
- 			if (!ni->ni_interfaces[i])
- 				break;
- 			rc = ksocknal_enumerate_interfaces(net, ni->ni_interfaces[i]);
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-index cc813e4..95ca2aa 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
-@@ -173,7 +173,7 @@ struct ksock_net {
- 	int		  ksnn_npeers;		/* # peers */
- 	int		  ksnn_shutdown;	/* shutting down? */
- 	int		  ksnn_ninterfaces;	/* IP interfaces */
--	struct ksock_interface ksnn_interfaces[LNET_MAX_INTERFACES];
-+	struct ksock_interface ksnn_interfaces[LNET_NUM_INTERFACES];
- };
+ 		/* RDMA: lnet_finalize(lntmsg) when it completes */
+ 		tx->tx_lntmsg[0] = lntmsg;
+@@ -1707,9 +1703,9 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	return;
  
- /** connd timeout */
-@@ -441,7 +441,7 @@ struct ksock_peer {
- 	int                ksnp_n_passive_ips;  /* # of... */
+  failed_1:
+-	kiblnd_tx_done(ni, tx);
++	kiblnd_tx_done(tx);
+  failed_0:
+-	lnet_finalize(ni, lntmsg, -EIO);
++	lnet_finalize(lntmsg, -EIO);
+ }
  
- 	/* preferred local interfaces */
--	__u32              ksnp_passive_ips[LNET_MAX_INTERFACES];
-+	u32		   ksnp_passive_ips[LNET_NUM_INTERFACES];
- };
+ int
+@@ -1722,6 +1718,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	struct kib_tx *tx;
+ 	int nob;
+ 	int post_credit = IBLND_POSTRX_PEER_CREDIT;
++	u64 ibprm_cookie;
+ 	int rc = 0;
  
- struct ksock_connreq {
+ 	LASSERT(iov_iter_count(to) <= rlen);
+@@ -1750,17 +1747,18 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		}
+ 
+ 		rc = 0;
+-		lnet_finalize(ni, lntmsg, 0);
++		lnet_finalize(lntmsg, 0);
+ 		break;
+ 
+ 	case IBLND_MSG_PUT_REQ: {
++		u64 ibprm_cookie = rxmsg->ibm_u.putreq.ibprm_cookie;
+ 		struct kib_msg	*txmsg;
+ 		struct kib_rdma_desc *rd;
+ 
+ 		if (!iov_iter_count(to)) {
+-			lnet_finalize(ni, lntmsg, 0);
+-			kiblnd_send_completion(rx->rx_conn, IBLND_MSG_PUT_NAK, 0,
+-					       rxmsg->ibm_u.putreq.ibprm_cookie);
++			lnet_finalize(lntmsg, 0);
++			kiblnd_send_completion(rx->rx_conn, IBLND_MSG_PUT_NAK,
++					       0, ibprm_cookie);
+ 			break;
+ 		}
+ 
+@@ -1788,15 +1786,15 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		if (rc) {
+ 			CERROR("Can't setup PUT sink for %s: %d\n",
+ 			       libcfs_nid2str(conn->ibc_peer->ibp_nid), rc);
+-			kiblnd_tx_done(ni, tx);
++			kiblnd_tx_done(tx);
+ 			/* tell peer_ni it's over */
+-			kiblnd_send_completion(rx->rx_conn, IBLND_MSG_PUT_NAK, rc,
+-					       rxmsg->ibm_u.putreq.ibprm_cookie);
++			kiblnd_send_completion(rx->rx_conn, IBLND_MSG_PUT_NAK,
++					       rc, ibprm_cookie);
+ 			break;
+ 		}
+ 
+ 		nob = offsetof(struct kib_putack_msg, ibpam_rd.rd_frags[rd->rd_nfrags]);
+-		txmsg->ibm_u.putack.ibpam_src_cookie = rxmsg->ibm_u.putreq.ibprm_cookie;
++		txmsg->ibm_u.putack.ibpam_src_cookie = ibprm_cookie;
+ 		txmsg->ibm_u.putack.ibpam_dst_cookie = tx->tx_cookie;
+ 
+ 		kiblnd_init_tx_msg(ni, tx, IBLND_MSG_PUT_ACK, nob);
+@@ -1817,8 +1815,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 		} else {
+ 			/* GET didn't match anything */
+ 			kiblnd_send_completion(rx->rx_conn, IBLND_MSG_GET_DONE,
+-					       -ENODATA,
+-					       rxmsg->ibm_u.get.ibgm_cookie);
++					       -ENODATA, ibprm_cookie);
+ 		}
+ 		break;
+ 	}
+@@ -2016,7 +2013,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 
+ 	spin_unlock(&conn->ibc_lock);
+ 
+-	kiblnd_txlist_done(conn->ibc_peer->ibp_ni, &zombies, -ECONNABORTED);
++	kiblnd_txlist_done(&zombies, -ECONNABORTED);
+ }
+ 
+ static void
+@@ -2098,7 +2095,7 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 	CNETERR("Deleting messages for %s: connection failed\n",
+ 		libcfs_nid2str(peer_ni->ibp_nid));
+ 
+-	kiblnd_txlist_done(peer_ni->ibp_ni, &zombies, -EHOSTUNREACH);
++	kiblnd_txlist_done(&zombies, -EHOSTUNREACH);
+ }
+ 
+ static void
+@@ -2170,13 +2167,11 @@ static int kiblnd_resolve_addr(struct rdma_cm_id *cmid,
+ 
+ 	if (!kiblnd_peer_active(peer_ni) ||	/* peer_ni has been deleted */
+ 	    conn->ibc_comms_error) {       /* error has happened already */
+-		struct lnet_ni *ni = peer_ni->ibp_ni;
+-
+ 		/* start to shut down connection */
+ 		kiblnd_close_conn_locked(conn, -ECONNABORTED);
+ 		write_unlock_irqrestore(&kiblnd_data.kib_global_lock, flags);
+ 
+-		kiblnd_txlist_done(ni, &txs, -ECONNABORTED);
++		kiblnd_txlist_done(&txs, -ECONNABORTED);
+ 
+ 		return;
+ 	}
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+index 534ba84..9b9cc87 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+@@ -1653,8 +1653,7 @@ struct ksock_peer *
+ 		       &conn->ksnc_ipaddr, conn->ksnc_port,
+ 		       iov_iter_count(&conn->ksnc_rx_to), conn->ksnc_rx_nob_left,
+ 		       ktime_get_seconds() - last_rcv);
+-		lnet_finalize(conn->ksnc_peer->ksnp_ni,
+-			      conn->ksnc_cookie, -EIO);
++		lnet_finalize(conn->ksnc_cookie, -EIO);
+ 		break;
+ 	case SOCKNAL_RX_LNET_HEADER:
+ 		if (conn->ksnc_rx_started)
 diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-index 2e99a17..73321a7 100644
+index 1bf0170..2e99a17 100644
 --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
 +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
-@@ -1580,7 +1580,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
- 	/* CAVEAT EMPTOR: this byte flips 'ipaddrs' */
- 	struct ksock_net *net = (struct ksock_net *)ni->ni_data;
+@@ -343,7 +343,7 @@ struct ksock_tx *
  
--	LASSERT(hello->kshm_nips <= LNET_MAX_INTERFACES);
-+	LASSERT(hello->kshm_nips <= LNET_NUM_INTERFACES);
+ 	ksocknal_free_tx(tx);
+ 	if (lnetmsg) /* KSOCK_MSG_NOOP go without lnetmsg */
+-		lnet_finalize(ni, lnetmsg, rc);
++		lnet_finalize(lnetmsg, rc);
+ }
  
- 	/* rely on caller to hold a ref on socket so it wouldn't disappear */
- 	LASSERT(conn->ksnc_proto);
-diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-index 8c10eda..10a2757 100644
---- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-+++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
-@@ -614,7 +614,7 @@
- 	hello->kshm_nips            = le32_to_cpu(hdr->payload_length) /
- 						  sizeof(__u32);
+ void
+@@ -1226,7 +1226,7 @@ struct ksock_route *
+ 					le64_to_cpu(lhdr->src_nid) != id->nid);
+ 		}
  
--	if (hello->kshm_nips > LNET_MAX_INTERFACES) {
-+	if (hello->kshm_nips > LNET_NUM_INTERFACES) {
- 		CERROR("Bad nips %d from ip %pI4h\n",
- 		       hello->kshm_nips, &conn->ksnc_ipaddr);
- 		rc = -EPROTO;
-@@ -684,7 +684,7 @@
- 		__swab32s(&hello->kshm_nips);
+-		lnet_finalize(conn->ksnc_peer->ksnp_ni, conn->ksnc_cookie, rc);
++		lnet_finalize(conn->ksnc_cookie, rc);
+ 
+ 		if (rc) {
+ 			ksocknal_new_packet(conn, 0);
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+index d39331f..a213387 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-move.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+@@ -408,7 +408,7 @@
+ 	}
+ 	rc = ni->ni_net->net_lnd->lnd_recv(ni, private, msg, delayed, &to, rlen);
+ 	if (rc < 0)
+-		lnet_finalize(ni, msg, rc);
++		lnet_finalize(msg, rc);
+ }
+ 
+ static void
+@@ -462,7 +462,7 @@
+ 
+ 	rc = ni->ni_net->net_lnd->lnd_send(ni, priv, msg);
+ 	if (rc < 0)
+-		lnet_finalize(ni, msg, rc);
++		lnet_finalize(msg, rc);
+ }
+ 
+ static int
+@@ -637,7 +637,7 @@
+ 		CNETERR("Dropping message for %s: peer not alive\n",
+ 			libcfs_id2str(msg->msg_target));
+ 		if (do_send)
+-			lnet_finalize(ni, msg, -EHOSTUNREACH);
++			lnet_finalize(msg, -EHOSTUNREACH);
+ 
+ 		lnet_net_lock(cpt);
+ 		return -EHOSTUNREACH;
+@@ -650,7 +650,7 @@
+ 		CNETERR("Aborting message for %s: LNetM[DE]Unlink() already called on the MD/ME.\n",
+ 			libcfs_id2str(msg->msg_target));
+ 		if (do_send)
+-			lnet_finalize(ni, msg, -ECANCELED);
++			lnet_finalize(msg, -ECANCELED);
+ 
+ 		lnet_net_lock(cpt);
+ 		return -ECANCELED;
+@@ -915,7 +915,7 @@
+ 		lnet_ni_recv(msg->msg_rxni, msg->msg_private, NULL,
+ 			     0, 0, 0, msg->msg_hdr.payload_length);
+ 		list_del_init(&msg->msg_list);
+-		lnet_finalize(NULL, msg, -ECANCELED);
++		lnet_finalize(msg, -ECANCELED);
  	}
  
--	if (hello->kshm_nips > LNET_MAX_INTERFACES) {
-+	if (hello->kshm_nips > LNET_NUM_INTERFACES) {
- 		CERROR("Bad nips %d from ip %pI4h\n",
- 		       hello->kshm_nips, &conn->ksnc_ipaddr);
- 		return -EPROTO;
-diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-index 4c22416..3ea56c8 100644
---- a/drivers/staging/lustre/lnet/lnet/config.c
-+++ b/drivers/staging/lustre/lnet/lnet/config.c
-@@ -123,10 +123,10 @@ struct lnet_text_buf {	    /* tmp struct for parsing routes */
- /* check that the NI is unique to the interfaces with in the same NI.
-  * This is only a consideration if use_tcp_bonding is set */
- static bool
--lnet_ni_unique_ni(char *iface_list[LNET_MAX_INTERFACES], char *iface)
-+lnet_ni_unique_ni(char *iface_list[LNET_NUM_INTERFACES], char *iface)
+ 	lnet_net_lock(cpt);
+@@ -1914,7 +1914,7 @@
+ 		       libcfs_nid2str(ni->ni_nid),
+ 		       libcfs_id2str(info.mi_id), rc);
+ 
+-		lnet_finalize(ni, msg, rc);
++		lnet_finalize(msg, rc);
+ 	}
+ 
+ 	return 0;
+@@ -2402,7 +2402,7 @@
+ 
+  free_drop:
+ 	LASSERT(!msg->msg_md);
+-	lnet_finalize(ni, msg, rc);
++	lnet_finalize(msg, rc);
+ 
+  drop:
+ 	lnet_drop_message(ni, cpt, private, payload_length);
+@@ -2447,7 +2447,7 @@
+ 		 * but we still should give error code so lnet_msg_decommit()
+ 		 * can skip counters operations and other checks.
+ 		 */
+-		lnet_finalize(msg->msg_rxni, msg, -ENOENT);
++		lnet_finalize(msg, -ENOENT);
+ 	}
+ }
+ 
+@@ -2605,7 +2605,7 @@
+ 	if (rc) {
+ 		CNETERR("Error sending PUT to %s: %d\n",
+ 			libcfs_id2str(target), rc);
+-		lnet_finalize(NULL, msg, rc);
++		lnet_finalize(msg, rc);
+ 	}
+ 
+ 	/* completion will be signalled by an event */
+@@ -2804,7 +2804,7 @@ struct lnet_msg *
+ 	if (rc < 0) {
+ 		CNETERR("Error sending GET to %s: %d\n",
+ 			libcfs_id2str(target), rc);
+-		lnet_finalize(NULL, msg, rc);
++		lnet_finalize(msg, rc);
+ 	}
+ 
+ 	/* completion will be signalled by an event */
+diff --git a/drivers/staging/lustre/lnet/lnet/lib-msg.c b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+index aa28b6a..00be9ab 100644
+--- a/drivers/staging/lustre/lnet/lnet/lib-msg.c
++++ b/drivers/staging/lustre/lnet/lnet/lib-msg.c
+@@ -452,7 +452,7 @@
+ }
+ 
+ void
+-lnet_finalize(struct lnet_ni *ni, struct lnet_msg *msg, int status)
++lnet_finalize(struct lnet_msg *msg, int status)
  {
- 	int i;
--	for (i = 0; i < LNET_MAX_INTERFACES; i++) {
-+	for (i = 0; i < LNET_NUM_INTERFACES; i++) {
- 		if (iface_list[i] &&
- 		    strncmp(iface_list[i], iface, strlen(iface)) == 0)
- 			return false;
-@@ -304,7 +304,7 @@ struct lnet_text_buf {	    /* tmp struct for parsing routes */
+ 	struct lnet_msg_container *container;
+ 	int my_slot;
+diff --git a/drivers/staging/lustre/lnet/lnet/lo.c b/drivers/staging/lustre/lnet/lnet/lo.c
+index 8167980..c8a1eb62 100644
+--- a/drivers/staging/lustre/lnet/lnet/lo.c
++++ b/drivers/staging/lustre/lnet/lnet/lo.c
+@@ -62,10 +62,10 @@
+ 					    sendmsg->msg_offset,
+ 					    iov_iter_count(to));
  
- 	kfree(ni->ni_cpts);
+-		lnet_finalize(ni, lntmsg, 0);
++		lnet_finalize(lntmsg, 0);
+ 	}
  
--	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++)
-+	for (i = 0; i < LNET_NUM_INTERFACES && ni->ni_interfaces[i]; i++)
- 		kfree(ni->ni_interfaces[i]);
+-	lnet_finalize(ni, sendmsg, 0);
++	lnet_finalize(sendmsg, 0);
+ 	return 0;
+ }
  
- 	/* release reference to net namespace */
-@@ -397,11 +397,11 @@ struct lnet_net *
- 	 * can free the tokens at the end of the function.
- 	 * The newly allocated ni_interfaces[] can be
- 	 * freed when freeing the NI */
--	while (niface < LNET_MAX_INTERFACES &&
-+	while (niface < LNET_NUM_INTERFACES &&
- 	       ni->ni_interfaces[niface])
- 		niface++;
+diff --git a/drivers/staging/lustre/lnet/lnet/net_fault.c b/drivers/staging/lustre/lnet/lnet/net_fault.c
+index 17891f6..3841bac 100644
+--- a/drivers/staging/lustre/lnet/lnet/net_fault.c
++++ b/drivers/staging/lustre/lnet/lnet/net_fault.c
+@@ -633,7 +633,7 @@ struct delay_daemon_data {
+ 		}
  
--	if (niface >= LNET_MAX_INTERFACES) {
-+	if (niface >= LNET_NUM_INTERFACES) {
- 		LCONSOLE_ERROR_MSG(0x115, "Too many interfaces "
- 				   "for net %s\n",
- 				   libcfs_net2str(LNET_NIDNET(ni->ni_nid)));
+ 		lnet_drop_message(ni, cpt, msg->msg_private, msg->msg_len);
+-		lnet_finalize(ni, msg, rc);
++		lnet_finalize(msg, rc);
+ 	}
+ }
+ 
 -- 
 1.8.3.1
