@@ -1,68 +1,84 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 26 Sep 2018 09:36:30 +1000
-Subject: [lustre-devel] [PATCH] lustre: lnet: copy the correct amountof
- cpts to lnet_cpts
-In-Reply-To: <1537846650-8490-1-git-send-email-jsimmons@infradead.org>
-References: <1537846650-8490-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <87h8idi1z5.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Tue, 25 Sep 2018 22:47:52 -0400
+Subject: [lustre-devel] [PATCH 00/25] lustre: lnet: remaining fixes for
+ multi-rail
+Message-ID: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Mon, Sep 24 2018, James Simmons wrote:
+This is the remaining patches to land to 2.10 to resolve issues
+found in MR testing. These patches are based on lustre-testing
+commit 18c9cf20ec376d5b3d432aa3923645a12636d14b. A few fixes for
+o2iblnd is also pushed.
 
-> The incorrect size was used in the memory copy of the requested
-> cpts to net->lnet_cpts. This lead to the following in testing
-> RIP: 0010:lnet_match2mt.isra.8+0x2b/0x40 [lnet]
->
-> lnet_mt_of_attach+0x72/0x1b0 [lnet]
-> LNetMEAttach+0x60/0x1f0 [lnet]
-> ptl_send_rpc+0x26f/0xbb0 [ptlrpc]
-> libcfs_debug_msg+0x57/0x80 [libcfs]
-> ptlrpc_send_new_req+0x4c9/0x860 [ptlrpc]
-> ptlrpc_check_set.part.21+0x855/0x18b0 [ptlrpc]
-> ? try_to_del_timer_sync+0x4d/0x80
-> ? del_timer_sync+0x35/0x40
-> ptlrpcd_check+0x3ae/0x3f0 [ptlrpc]
-> ptlrpcd+0x2be/0x320 [ptlrpc]
-> ? wait_woken+0x80/0x80
->
-> Changing the size from ncpts to ncpts * sizeof(*net->net_cpts)
->
-> Signed-off-by: James Simmons <jsimmons@infradead.org>
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-11424
-> Reviewed-on: https://review.whamcloud.com/33229
+Amir Shehata (10):
+  lustre: lnet: Normalize ioctl interface
+  lustre: lnet: selftest MR fix
+  lustre: lnet: prevent assert on ln_state
+  lustre: lnet: increment per NI stats
+  lustre: lnet: correct locking in legacy add net
+  lustre: lnet: fix lnet_cpt_of_md()
+  lustre: lnet: safe access to msg
+  lustre: lnet: handle empty CPTs
+  lustre: lnet: set LND tunables properly
+  lustre: lnd: pending transmits dropped silently
 
-Thanks.  Applied.
+Dmitry Eremin (1):
+  lustre: lnet: Fix lost lock
 
-NeilBrown
+Doug Oucharek (4):
+  lustre: lnet: Allow min stats to be reset in peers and nis
+  lustre: lnd: Turn on 2 sges by default
+  lustre: lnd: Don't Assert On Reconnect with MultiQP
+  lustre: lnd: Don't Page Align remote_addr with FastReg
 
+John L. Hammond (1):
+  lustre: ko2iblnd: allow for discontiguous fragments
 
-> ---
->  drivers/staging/lustre/lnet/lnet/config.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
-> index c11821a..4c22416 100644
-> --- a/drivers/staging/lustre/lnet/lnet/config.c
-> +++ b/drivers/staging/lustre/lnet/lnet/config.c
-> @@ -174,7 +174,7 @@ struct lnet_text_buf {	    /* tmp struct for parsing routes */
->  					      GFP_KERNEL);
->  		if (!net->net_cpts)
->  			return -ENOMEM;
-> -		memcpy(net->net_cpts, cpts, ncpts);
-> +		memcpy(net->net_cpts, cpts, ncpts * sizeof(*net->net_cpts));
->  		net->net_ncpts = ncpts;
->  		return 0;
->  	}
-> -- 
-> 1.8.3.1
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180926/aa18bb64/attachment.sig>
+Liang Zhen (1):
+  lustre: o2iblnd: multiple sges for work request
+
+Olaf Weber (5):
+  lustre: lnet: remove debug ioctl
+  lustre: lnet: fix race in lnet shutdown path
+  lustre: lnet: loopback NID in lnet_select_pathway()
+  lustre: lnet: rename LNET_MAX_INTERFACES
+  lustre: socklnd: propagate errors on send failure
+
+Sergey Cheremencev (3):
+  lustre: lnet: remove ni from lnet_finalize
+  lustre: o2iblnd: reconnect peer for REJ_INVALID_SERVICE_ID
+  lustre: o2iblnd: kill timedout txs from ibp_tx_queue
+
+ .../staging/lustre/include/linux/lnet/lib-lnet.h   |  12 +-
+ .../staging/lustre/include/linux/lnet/lib-types.h  |  11 +-
+ .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |   3 +-
+ .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |  67 ++++---
+ .../lustre/include/uapi/linux/lnet/lnet-types.h    |   2 +-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  79 ++++++--
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  11 +-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 212 +++++++++++----------
+ .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  |  11 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |  61 ++++--
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |   8 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |  21 +-
+ .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |   4 +-
+ drivers/staging/lustre/lnet/lnet/api-ni.c          |  69 +++----
+ drivers/staging/lustre/lnet/lnet/config.c          |  10 +-
+ drivers/staging/lustre/lnet/lnet/lib-md.c          |  96 ++++++++--
+ drivers/staging/lustre/lnet/lnet/lib-move.c        | 100 ++++++----
+ drivers/staging/lustre/lnet/lnet/lib-msg.c         |  10 +-
+ drivers/staging/lustre/lnet/lnet/lib-ptl.c         |   4 +-
+ drivers/staging/lustre/lnet/lnet/lo.c              |   4 +-
+ drivers/staging/lustre/lnet/lnet/net_fault.c       |   2 +-
+ drivers/staging/lustre/lnet/lnet/peer.c            |  60 +++---
+ drivers/staging/lustre/lnet/lnet/router.c          |   6 +-
+ drivers/staging/lustre/lnet/lnet/router_proc.c     |  69 ++++++-
+ drivers/staging/lustre/lnet/selftest/rpc.c         |   2 +-
+ 25 files changed, 593 insertions(+), 341 deletions(-)
+
+-- 
+1.8.3.1
