@@ -1,10 +1,10 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 25 Sep 2018 22:47:57 -0400
-Subject: [lustre-devel] [PATCH 05/25] lustre: lnet: fix race in lnet
- shutdown path
+Date: Tue, 25 Sep 2018 22:47:59 -0400
+Subject: [lustre-devel] [PATCH 07/25] lustre: lnet: rename
+ LNET_MAX_INTERFACES
 In-Reply-To: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
 References: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537930097-11624-6-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537930097-11624-8-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,219 +13,284 @@ To: lustre-devel@lists.lustre.org
 
 From: Olaf Weber <olaf.weber@hpe.com>
 
-The locking changes for the lnet_net_lock made for Multi-Rail
-introduce a race in the LNet shutdown path. The code keeps two
-states in the_lnet.ln_shutdown: 0 means LNet is either up and
-running or shut down, while 1 means lnet is shutting down. In
-lnet_select_pathway() if we need to restart and drop and relock
-the lnet_net_lock we can find that LNet went from running to
-stopped, and not be able to tell the difference.
+LNET_MAX_INTERFACES is the number of interfaces supported by
+interface bonding in the ksocknal LND. It shows up in LNet
+because a number of data structures are shared between LNDs.
 
-Replace ln_shutdown with a three-state ln_state patterned on
-ln_rc_state: states are LNET_STATE_SHUTDOWN, LNET_STATE_RUNNING,
-and LNET_STATE_STOPPING. Most checks against ln_shutdown now test
-ln_state against LNET_STATE_RUNNING. LNet moves to RUNNING state
-in lnet_startup_lndnets().
+Rename it to LNET_NUM_INTERFACES to reduce the confusion of
+what it does. Also it allows us to build the userland tools.
 
 Signed-off-by: Olaf Weber <olaf.weber@hpe.com>
 WC-bug-id: https://jira.whamcloud.com/browse/LU-9119
-Reviewed-on: https://review.whamcloud.com/26690
+Reviewed-on: https://review.whamcloud.com/26693
 Reviewed-by: Doug Oucharek <dougso@me.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/linux/lnet/lib-types.h |  9 +++++++--
- drivers/staging/lustre/lnet/lnet/api-ni.c             | 15 ++++++++++++---
- drivers/staging/lustre/lnet/lnet/lib-move.c           |  2 +-
- drivers/staging/lustre/lnet/lnet/lib-ptl.c            |  4 ++--
- drivers/staging/lustre/lnet/lnet/peer.c               | 10 +++++-----
- drivers/staging/lustre/lnet/lnet/router.c             |  6 +++---
- 6 files changed, 30 insertions(+), 16 deletions(-)
+ .../staging/lustre/include/linux/lnet/lib-types.h  |  2 +-
+ .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |  4 ++--
+ .../lustre/include/uapi/linux/lnet/lnet-types.h    |  2 +-
+ .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |  2 +-
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.c    | 22 +++++++++++-----------
+ .../staging/lustre/lnet/klnds/socklnd/socklnd.h    |  4 ++--
+ .../staging/lustre/lnet/klnds/socklnd/socklnd_cb.c |  2 +-
+ .../lustre/lnet/klnds/socklnd/socklnd_proto.c      |  4 ++--
+ drivers/staging/lustre/lnet/lnet/config.c          | 10 +++++-----
+ 9 files changed, 26 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-index 18e2665..6abac19 100644
+index 6abac19..90f7577 100644
 --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-@@ -726,6 +726,11 @@ struct lnet_msg_container {
- #define LNET_RC_STATE_RUNNING		1	/* started up OK */
- #define LNET_RC_STATE_STOPPING		2	/* telling thread to stop */
- 
-+/* LNet states */
-+#define LNET_STATE_SHUTDOWN		0	/* not started */
-+#define LNET_STATE_RUNNING		1	/* started up OK */
-+#define LNET_STATE_STOPPING		2	/* telling thread to stop */
-+
- struct lnet {
- 	/* CPU partition table of LNet */
- 	struct cfs_cpt_table		 *ln_cpt_table;
-@@ -805,8 +810,8 @@ struct lnet {
- 	int				  ln_niinit_self;
- 	/* LNetNIInit/LNetNIFini counter */
- 	int				  ln_refcount;
--	/* shutdown in progress */
--	int				  ln_shutdown;
-+	/* SHUTDOWN/RUNNING/STOPPING */
-+	int				  ln_state;
- 
- 	int				  ln_routing;	/* am I a router? */
- 	lnet_pid_t			  ln_pid;	/* requested pid */
-diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-index 2d430d0..7c907a3 100644
---- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-+++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-@@ -1277,11 +1277,11 @@ struct lnet_ni *
- 	/* NB called holding the global mutex */
- 
- 	/* All quiet on the API front */
--	LASSERT(!the_lnet.ln_shutdown);
-+	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
- 	LASSERT(!the_lnet.ln_refcount);
- 
- 	lnet_net_lock(LNET_LOCK_EX);
--	the_lnet.ln_shutdown = 1;	/* flag shutdown */
-+	the_lnet.ln_state = LNET_STATE_STOPPING;
- 
- 	while (!list_empty(&the_lnet.ln_nets)) {
- 		/*
-@@ -1309,7 +1309,7 @@ struct lnet_ni *
- 	}
- 
- 	lnet_net_lock(LNET_LOCK_EX);
--	the_lnet.ln_shutdown = 0;
-+	the_lnet.ln_state = LNET_STATE_SHUTDOWN;
- 	lnet_net_unlock(LNET_LOCK_EX);
- }
- 
-@@ -1583,6 +1583,15 @@ struct lnet_ni *
- 	int rc;
- 	int ni_count = 0;
- 
-+	/*
-+	 * Change to running state before bringing up the LNDs. This
-+	 * allows lnet_shutdown_lndnets() to assert that we've passed
-+	 * through here.
-+	 */
-+	lnet_net_lock(LNET_LOCK_EX);
-+	the_lnet.ln_state = LNET_STATE_RUNNING;
-+	lnet_net_unlock(LNET_LOCK_EX);
-+
- 	while (!list_empty(netlist)) {
- 		net = list_entry(netlist->next, struct lnet_net, net_list);
- 		list_del_init(&net->net_list);
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index a213387..ea7e2c3 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -1242,7 +1242,7 @@
- 
- 	seq = lnet_get_dlc_seq_locked();
- 
--	if (the_lnet.ln_shutdown) {
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
- 		lnet_net_unlock(cpt);
- 		return -ESHUTDOWN;
- 	}
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-index d403353..6fa5bbf 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-@@ -589,7 +589,7 @@ struct list_head *
- 	mtable = lnet_mt_of_match(info, msg);
- 	lnet_res_lock(mtable->mt_cpt);
- 
--	if (the_lnet.ln_shutdown) {
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
- 		rc = LNET_MATCHMD_DROP;
- 		goto out1;
- 	}
-@@ -951,7 +951,7 @@ struct list_head *
- 				list_move(&msg->msg_list, &zombies);
- 		}
- 	} else {
--		if (the_lnet.ln_shutdown)
-+		if (the_lnet.ln_state != LNET_STATE_RUNNING)
- 			CWARN("Active lazy portal %d on exit\n", portal);
- 		else
- 			CDEBUG(D_NET, "clearing portal %d lazy\n", portal);
-diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-index ae3ffca..2fbf93a 100644
---- a/drivers/staging/lustre/lnet/lnet/peer.c
-+++ b/drivers/staging/lustre/lnet/lnet/peer.c
-@@ -428,7 +428,7 @@ void lnet_peer_uninit(void)
- 	struct lnet_peer_table *ptable;
- 	int i;
- 
--	LASSERT(the_lnet.ln_shutdown || net);
-+	LASSERT(the_lnet.ln_state != LNET_STATE_SHUTDOWN || net);
- 	/*
- 	 * If just deleting the peers for a NI, get rid of any routes these
- 	 * peers are gateways for.
-@@ -458,7 +458,7 @@ void lnet_peer_uninit(void)
- 	struct list_head	*peers;
- 	struct lnet_peer_ni	*lp;
- 
--	LASSERT(!the_lnet.ln_shutdown);
-+	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
- 
- 	peers = &ptable->pt_hash[lnet_nid2peerhash(nid)];
- 	list_for_each_entry(lp, peers, lpni_hashlist) {
-@@ -1000,7 +1000,7 @@ struct lnet_peer_ni *
- 	struct lnet_peer_ni *lpni = NULL;
- 	int rc;
- 
--	if (the_lnet.ln_shutdown) /* it's shutting down */
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING)
- 		return ERR_PTR(-ESHUTDOWN);
- 
- 	/*
-@@ -1034,7 +1034,7 @@ struct lnet_peer_ni *
- 	struct lnet_peer_ni *lpni = NULL;
- 	int rc;
- 
--	if (the_lnet.ln_shutdown) /* it's shutting down */
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING)
- 		return ERR_PTR(-ESHUTDOWN);
- 
- 	/*
-@@ -1063,7 +1063,7 @@ struct lnet_peer_ni *
- 	 * Shutdown is only set under the ln_api_lock, so a single
- 	 * check here is sufficent.
+@@ -371,7 +371,7 @@ struct lnet_ni {
+ 	 * equivalent interfaces to use
+ 	 * This is an array because socklnd bonding can still be configured
  	 */
--	if (the_lnet.ln_shutdown) {
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
- 		lpni = ERR_PTR(-ESHUTDOWN);
- 		goto out_mutex_unlock;
+-	char			 *ni_interfaces[LNET_MAX_INTERFACES];
++	char			 *ni_interfaces[LNET_NUM_INTERFACES];
+ 	/* original net namespace */
+ 	struct net		 *ni_net_ns;
+ };
+diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
+index e603455..07516fd 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
++++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
+@@ -81,7 +81,7 @@ struct lnet_ioctl_config_lnd_tunables {
+ };
+ 
+ struct lnet_ioctl_net_config {
+-	char ni_interfaces[LNET_MAX_INTERFACES][LNET_MAX_STR_LEN];
++	char ni_interfaces[LNET_NUM_INTERFACES][LNET_MAX_STR_LEN];
+ 	__u32 ni_status;
+ 	__u32 ni_cpts[LNET_MAX_SHOW_NUM_CPT];
+ 	char cfg_bulk[0];
+@@ -184,7 +184,7 @@ struct lnet_ioctl_element_msg_stats {
+ struct lnet_ioctl_config_ni {
+ 	struct libcfs_ioctl_hdr lic_cfg_hdr;
+ 	lnet_nid_t		lic_nid;
+-	char			lic_ni_intf[LNET_MAX_INTERFACES][LNET_MAX_STR_LEN];
++	char			lic_ni_intf[LNET_NUM_INTERFACES][LNET_MAX_STR_LEN];
+ 	char			lic_legacy_ip2nets[LNET_MAX_STR_LEN];
+ 	__u32			lic_cpts[LNET_MAX_SHOW_NUM_CPT];
+ 	__u32			lic_ncpts;
+diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
+index 837e5fe..a373b9c 100644
+--- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
++++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
+@@ -264,7 +264,7 @@ struct lnet_counters {
+ #define LNET_NI_STATUS_DOWN    0xdeadface
+ #define LNET_NI_STATUS_INVALID 0x00000000
+ 
+-#define LNET_MAX_INTERFACES    16
++#define LNET_NUM_INTERFACES    16
+ 
+ /**
+  * Objects maintained by the LNet are accessed through handles. Handle types
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+index b3a4344..aea83a5 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+@@ -2870,7 +2870,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
+ 	if (ni->ni_interfaces[0]) {
+ 		/* Use the IPoIB interface specified in 'networks=' */
+ 
+-		BUILD_BUG_ON(LNET_MAX_INTERFACES <= 1);
++		BUILD_BUG_ON(LNET_NUM_INTERFACES <= 1);
+ 		if (ni->ni_interfaces[1]) {
+ 			CERROR("Multiple interfaces not supported\n");
+ 			goto failed;
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+index 9b9cc87..ad94837 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+@@ -53,7 +53,7 @@
+ 	struct ksock_interface *iface;
+ 
+ 	for (i = 0; i < net->ksnn_ninterfaces; i++) {
+-		LASSERT(i < LNET_MAX_INTERFACES);
++		LASSERT(i < LNET_NUM_INTERFACES);
+ 		iface = &net->ksnn_interfaces[i];
+ 
+ 		if (iface->ksni_ipaddr == ip)
+@@ -221,7 +221,7 @@ struct ksock_peer *
+ 	struct ksock_interface *iface;
+ 
+ 	for (i = 0; i < peer_ni->ksnp_n_passive_ips; i++) {
+-		LASSERT(i < LNET_MAX_INTERFACES);
++		LASSERT(i < LNET_NUM_INTERFACES);
+ 		ip = peer_ni->ksnp_passive_ips[i];
+ 
+ 		iface = ksocknal_ip2iface(peer_ni->ksnp_ni, ip);
+@@ -678,7 +678,7 @@ struct ksock_peer *
+ 	read_lock(&ksocknal_data.ksnd_global_lock);
+ 
+ 	nip = net->ksnn_ninterfaces;
+-	LASSERT(nip <= LNET_MAX_INTERFACES);
++	LASSERT(nip <= LNET_NUM_INTERFACES);
+ 
+ 	/*
+ 	 * Only offer interfaces for additional connections if I have
+@@ -759,8 +759,8 @@ struct ksock_peer *
+ 	 */
+ 	write_lock_bh(global_lock);
+ 
+-	LASSERT(n_peerips <= LNET_MAX_INTERFACES);
+-	LASSERT(net->ksnn_ninterfaces <= LNET_MAX_INTERFACES);
++	LASSERT(n_peerips <= LNET_NUM_INTERFACES);
++	LASSERT(net->ksnn_ninterfaces <= LNET_NUM_INTERFACES);
+ 
+ 	/*
+ 	 * Only match interfaces for additional connections
+@@ -879,7 +879,7 @@ struct ksock_peer *
+ 		return;
  	}
-diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-index a0483f9..d3aef8b 100644
---- a/drivers/staging/lustre/lnet/lnet/router.c
-+++ b/drivers/staging/lustre/lnet/lnet/router.c
-@@ -252,7 +252,7 @@ struct lnet_remotenet *
- 	struct lnet_remotenet *rnet;
- 	struct list_head *rn_list;
  
--	LASSERT(!the_lnet.ln_shutdown);
-+	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
+-	LASSERT(npeer_ipaddrs <= LNET_MAX_INTERFACES);
++	LASSERT(npeer_ipaddrs <= LNET_NUM_INTERFACES);
  
- 	rn_list = lnet_net2rnethash(net);
- 	list_for_each_entry(rnet, rn_list, lrn_list) {
-@@ -374,7 +374,7 @@ static void lnet_shuffle_seed(void)
- 		return rc;
+ 	for (i = 0; i < npeer_ipaddrs; i++) {
+ 		if (newroute) {
+@@ -908,7 +908,7 @@ struct ksock_peer *
+ 		best_nroutes = 0;
+ 		best_netmatch = 0;
+ 
+-		LASSERT(net->ksnn_ninterfaces <= LNET_MAX_INTERFACES);
++		LASSERT(net->ksnn_ninterfaces <= LNET_NUM_INTERFACES);
+ 
+ 		/* Select interface to connect from */
+ 		for (j = 0; j < net->ksnn_ninterfaces; j++) {
+@@ -1048,7 +1048,7 @@ struct ksock_peer *
+ 	atomic_set(&conn->ksnc_tx_nob, 0);
+ 
+ 	hello = kvzalloc(offsetof(struct ksock_hello_msg,
+-				  kshm_ips[LNET_MAX_INTERFACES]),
++				  kshm_ips[LNET_NUM_INTERFACES]),
+ 			 GFP_KERNEL);
+ 	if (!hello) {
+ 		rc = -ENOMEM;
+@@ -1956,7 +1956,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
+ 	if (iface) {
+ 		/* silently ignore dups */
+ 		rc = 0;
+-	} else if (net->ksnn_ninterfaces == LNET_MAX_INTERFACES) {
++	} else if (net->ksnn_ninterfaces == LNET_NUM_INTERFACES) {
+ 		rc = -ENOSPC;
+ 	} else {
+ 		iface = &net->ksnn_interfaces[net->ksnn_ninterfaces++];
+@@ -2594,7 +2594,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
+ 			continue;
+ 		}
+ 
+-		if (j == LNET_MAX_INTERFACES) {
++		if (j == LNET_NUM_INTERFACES) {
+ 			CWARN("Ignoring interface %s (too many interfaces)\n",
+ 			      name);
+ 			continue;
+@@ -2782,7 +2782,7 @@ static int ksocknal_push(struct lnet_ni *ni, struct lnet_process_id id)
+ 
+ 		net->ksnn_ninterfaces = rc;
+ 	} else {
+-		for (i = 0; i < LNET_MAX_INTERFACES; i++) {
++		for (i = 0; i < LNET_NUM_INTERFACES; i++) {
+ 			if (!ni->ni_interfaces[i])
+ 				break;
+ 			rc = ksocknal_enumerate_interfaces(net, ni->ni_interfaces[i]);
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
+index cc813e4..95ca2aa 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.h
+@@ -173,7 +173,7 @@ struct ksock_net {
+ 	int		  ksnn_npeers;		/* # peers */
+ 	int		  ksnn_shutdown;	/* shutting down? */
+ 	int		  ksnn_ninterfaces;	/* IP interfaces */
+-	struct ksock_interface ksnn_interfaces[LNET_MAX_INTERFACES];
++	struct ksock_interface ksnn_interfaces[LNET_NUM_INTERFACES];
+ };
+ 
+ /** connd timeout */
+@@ -441,7 +441,7 @@ struct ksock_peer {
+ 	int                ksnp_n_passive_ips;  /* # of... */
+ 
+ 	/* preferred local interfaces */
+-	__u32              ksnp_passive_ips[LNET_MAX_INTERFACES];
++	u32		   ksnp_passive_ips[LNET_NUM_INTERFACES];
+ };
+ 
+ struct ksock_connreq {
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+index 2e99a17..73321a7 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_cb.c
+@@ -1580,7 +1580,7 @@ void ksocknal_write_callback(struct ksock_conn *conn)
+ 	/* CAVEAT EMPTOR: this byte flips 'ipaddrs' */
+ 	struct ksock_net *net = (struct ksock_net *)ni->ni_data;
+ 
+-	LASSERT(hello->kshm_nips <= LNET_MAX_INTERFACES);
++	LASSERT(hello->kshm_nips <= LNET_NUM_INTERFACES);
+ 
+ 	/* rely on caller to hold a ref on socket so it wouldn't disappear */
+ 	LASSERT(conn->ksnc_proto);
+diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
+index 8c10eda..10a2757 100644
+--- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
++++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd_proto.c
+@@ -614,7 +614,7 @@
+ 	hello->kshm_nips            = le32_to_cpu(hdr->payload_length) /
+ 						  sizeof(__u32);
+ 
+-	if (hello->kshm_nips > LNET_MAX_INTERFACES) {
++	if (hello->kshm_nips > LNET_NUM_INTERFACES) {
+ 		CERROR("Bad nips %d from ip %pI4h\n",
+ 		       hello->kshm_nips, &conn->ksnc_ipaddr);
+ 		rc = -EPROTO;
+@@ -684,7 +684,7 @@
+ 		__swab32s(&hello->kshm_nips);
  	}
- 	route->lr_gateway = lpni;
--	LASSERT(!the_lnet.ln_shutdown);
-+	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
  
- 	rnet2 = lnet_find_rnet_locked(net);
- 	if (!rnet2) {
-@@ -1775,7 +1775,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
+-	if (hello->kshm_nips > LNET_MAX_INTERFACES) {
++	if (hello->kshm_nips > LNET_NUM_INTERFACES) {
+ 		CERROR("Bad nips %d from ip %pI4h\n",
+ 		       hello->kshm_nips, &conn->ksnc_ipaddr);
+ 		return -EPROTO;
+diff --git a/drivers/staging/lustre/lnet/lnet/config.c b/drivers/staging/lustre/lnet/lnet/config.c
+index 4c22416..3ea56c8 100644
+--- a/drivers/staging/lustre/lnet/lnet/config.c
++++ b/drivers/staging/lustre/lnet/lnet/config.c
+@@ -123,10 +123,10 @@ struct lnet_text_buf {	    /* tmp struct for parsing routes */
+ /* check that the NI is unique to the interfaces with in the same NI.
+  * This is only a consideration if use_tcp_bonding is set */
+ static bool
+-lnet_ni_unique_ni(char *iface_list[LNET_MAX_INTERFACES], char *iface)
++lnet_ni_unique_ni(char *iface_list[LNET_NUM_INTERFACES], char *iface)
+ {
+ 	int i;
+-	for (i = 0; i < LNET_MAX_INTERFACES; i++) {
++	for (i = 0; i < LNET_NUM_INTERFACES; i++) {
+ 		if (iface_list[i] &&
+ 		    strncmp(iface_list[i], iface, strlen(iface)) == 0)
+ 			return false;
+@@ -304,7 +304,7 @@ struct lnet_text_buf {	    /* tmp struct for parsing routes */
  
- 	lnet_net_lock(cpt);
+ 	kfree(ni->ni_cpts);
  
--	if (the_lnet.ln_shutdown) {
-+	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
- 		lnet_net_unlock(cpt);
- 		return -ESHUTDOWN;
- 	}
+-	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++)
++	for (i = 0; i < LNET_NUM_INTERFACES && ni->ni_interfaces[i]; i++)
+ 		kfree(ni->ni_interfaces[i]);
+ 
+ 	/* release reference to net namespace */
+@@ -397,11 +397,11 @@ struct lnet_net *
+ 	 * can free the tokens at the end of the function.
+ 	 * The newly allocated ni_interfaces[] can be
+ 	 * freed when freeing the NI */
+-	while (niface < LNET_MAX_INTERFACES &&
++	while (niface < LNET_NUM_INTERFACES &&
+ 	       ni->ni_interfaces[niface])
+ 		niface++;
+ 
+-	if (niface >= LNET_MAX_INTERFACES) {
++	if (niface >= LNET_NUM_INTERFACES) {
+ 		LCONSOLE_ERROR_MSG(0x115, "Too many interfaces "
+ 				   "for net %s\n",
+ 				   libcfs_net2str(LNET_NIDNET(ni->ni_nid)));
 -- 
 1.8.3.1
