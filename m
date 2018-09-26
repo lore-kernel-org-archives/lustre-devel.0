@@ -1,81 +1,45 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Tue, 25 Sep 2018 22:48:06 -0400
-Subject: [lustre-devel] [PATCH 14/25] lustre: lnet: safe access to msg
+Date: Tue, 25 Sep 2018 22:48:10 -0400
+Subject: [lustre-devel] [PATCH 18/25] lustre: lnd: Turn on 2 sges by default
 In-Reply-To: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
 References: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1537930097-11624-15-git-send-email-jsimmons@infradead.org>
+Message-ID: <1537930097-11624-19-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+From: Doug Oucharek <dougso@me.com>
 
-When tx credits are returned if there are pending messages they
-need to be sent. Messages could have different tx_cpts, so the
-correct one needs to be locked. After lnet_post_send_locked(),
-if we locked a different CPT then we need to relock the correct one
-However, as part of lnet_post_send_locked(), lnet_finalze() can
-be called which can free the message. Therefore, the cpt of the
-message being passed must be cached in order to prevent access to
-freed memory.
+Currently, the fix in LU-5718 which allows for multiple sges
+to deal with RDMA fragmentation is turned off by default
+(set to 1). This patch changes the default to 2 so
+RDMA fragmentation is fixed by default.
 
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9817
-Reviewed-on: https://review.whamcloud.com/28308
-Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
-Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+Signed-off-by: Doug Oucharek <dougso@me.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9425
+Reviewed-on: https://review.whamcloud.com/26911
+Reviewed-by: Ned Bass <bass6@llnl.gov>
+Reviewed-by: James Simmons <uja.ornl@yahoo.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lnet/lnet/lib-move.c | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+ drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-index 4d74421..e8c0216 100644
---- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-+++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-@@ -847,6 +847,8 @@
+diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
+index 891708e..3bb537e 100644
+--- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
++++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
+@@ -147,7 +147,7 @@
+ module_param(use_privileged_port, int, 0644);
+ MODULE_PARM_DESC(use_privileged_port, "use privileged port when initiating connection");
  
- 		txpeer->lpni_txcredits++;
- 		if (txpeer->lpni_txcredits <= 0) {
-+			int msg2_cpt;
-+
- 			msg2 = list_entry(txpeer->lpni_txq.next,
- 					  struct lnet_msg, msg_list);
- 			list_del(&msg2->msg_list);
-@@ -855,13 +857,26 @@
- 			LASSERT(msg2->msg_txpeer == txpeer);
- 			LASSERT(msg2->msg_tx_delayed);
+-static unsigned int wrq_sge = 1;
++static unsigned int wrq_sge = 2;
+ module_param(wrq_sge, uint, 0444);
+ MODULE_PARM_DESC(wrq_sge, "# scatter/gather element per work request");
  
--			if (msg2->msg_tx_cpt != msg->msg_tx_cpt) {
-+			msg2_cpt = msg2->msg_tx_cpt;
-+
-+			/*
-+			 * The msg_cpt can be different from the msg2_cpt
-+			 * so we need to make sure we lock the correct cpt
-+			 * for msg2.
-+			 * Once we call lnet_post_send_locked() it is no
-+			 * longer safe to access msg2, since it could've
-+			 * been freed by lnet_finalize(), but we still
-+			 * need to relock the correct cpt, so we cache the
-+			 * msg2_cpt for the purpose of the check that
-+			 * follows the call to lnet_pose_send_locked().
-+			 */
-+			if (msg2_cpt != msg->msg_tx_cpt) {
- 				lnet_net_unlock(msg->msg_tx_cpt);
--				lnet_net_lock(msg2->msg_tx_cpt);
-+				lnet_net_lock(msg2_cpt);
- 			}
- 			(void)lnet_post_send_locked(msg2, 1);
--			if (msg2->msg_tx_cpt != msg->msg_tx_cpt) {
--				lnet_net_unlock(msg2->msg_tx_cpt);
-+			if (msg2_cpt != msg->msg_tx_cpt) {
-+				lnet_net_unlock(msg2_cpt);
- 				lnet_net_lock(msg->msg_tx_cpt);
- 			}
- 		} else {
 -- 
 1.8.3.1
