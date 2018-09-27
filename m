@@ -1,11 +1,10 @@
 From: NeilBrown <neilb@suse.com>
-Date: Thu, 27 Sep 2018 10:03:10 +1000
-Subject: [lustre-devel] [PATCH 05/25] lustre: lnet: fix race in lnet
- shutdown path
-In-Reply-To: <1537930097-11624-6-git-send-email-jsimmons@infradead.org>
+Date: Thu, 27 Sep 2018 11:03:19 +1000
+Subject: [lustre-devel] [PATCH 13/25] lustre: lnet: fix lnet_cpt_of_md()
+In-Reply-To: <1537930097-11624-14-git-send-email-jsimmons@infradead.org>
 References: <1537930097-11624-1-git-send-email-jsimmons@infradead.org>
- <1537930097-11624-6-git-send-email-jsimmons@infradead.org>
-Message-ID: <87zhw3hkn5.fsf@notabene.neil.brown.name>
+ <1537930097-11624-14-git-send-email-jsimmons@infradead.org>
+Message-ID: <87wor7hhuw.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -14,228 +13,262 @@ To: lustre-devel@lists.lustre.org
 
 On Tue, Sep 25 2018, James Simmons wrote:
 
-> From: Olaf Weber <olaf.weber@hpe.com>
+> From: Amir Shehata <ashehata@whamcloud.com>
 >
-> The locking changes for the lnet_net_lock made for Multi-Rail
-> introduce a race in the LNet shutdown path. The code keeps two
-> states in the_lnet.ln_shutdown: 0 means LNet is either up and
-> running or shut down, while 1 means lnet is shutting down. In
-> lnet_select_pathway() if we need to restart and drop and relock
-> the lnet_net_lock we can find that LNet went from running to
-> stopped, and not be able to tell the difference.
+> The intent of this function is to get the cpt nearest to the
+> memory described by the MD.
 >
-> Replace ln_shutdown with a three-state ln_state patterned on
-> ln_rc_state: states are LNET_STATE_SHUTDOWN, LNET_STATE_RUNNING,
-> and LNET_STATE_STOPPING. Most checks against ln_shutdown now test
-> ln_state against LNET_STATE_RUNNING. LNet moves to RUNNING state
-> in lnet_startup_lndnets().
+> There are three scenarios that must be handled:
+> 1. The memory is described by an lnet_kiov_t structure
+>  -> this describes kernel pages
+> 2. The memory is described by a struct kvec
+>  -> this describes kernel logical addresses
+> 3. The memory is a contiguous buffer allocated via vmalloc
 >
-> Signed-off-by: Olaf Weber <olaf.weber@hpe.com>
-> WC-bug-id: https://jira.whamcloud.com/browse/LU-9119
-> Reviewed-on: https://review.whamcloud.com/26690
-> Reviewed-by: Doug Oucharek <dougso@me.com>
+> For case 1 and 2 we look at the first vector which contains
+> the data to be DMAed, taking into consideration the msg offset.
+>
+> For case 2 we have to take the extra step of translating the kernel
+> logical address to a physical page using virt_to_page() macro.
+>
+> For case 3 we need to use is_vmalloc_addr() and vmalloc_to_page to
+> get the associated page to be able to identify the CPT.
+>
+> o2iblnd uses the same strategy when it's mapping the memory into
+> a scatter/gather list. Therefore, lnet_kvaddr_to_page() common
+> function was created to be used by both the o2iblnd and
+> lnet_cpt_of_md()
+>
+> kmap_to_page() performs the high memory check which
+> lnet_kvaddr_to_page() does. However, unlike the latter it handles
+> the highmem case properly instead of calling LBUG. It's not
+> 100% clear why the code was written that way. Since the legacy
+> code will need to still be maintained, adding kmap_to_page() will
+> not simplify the code.  At worst calling kmap_to_page() might mask
+> some problems which would've been caught by the LBUG earlier on.
+> However, at the time of this fix, that LBUG has never been observed.
+>
+> Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
+> WC-bug-id: https://jira.whamcloud.com/browse/LU-9203
+> Reviewed-on: https://review.whamcloud.com/28165
+> Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
+> Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 > Reviewed-by: Oleg Drokin <green@whamcloud.com>
 > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > ---
->  drivers/staging/lustre/include/linux/lnet/lib-types.h |  9 +++++++--
->  drivers/staging/lustre/lnet/lnet/api-ni.c             | 15 ++++++++++++---
->  drivers/staging/lustre/lnet/lnet/lib-move.c           |  2 +-
->  drivers/staging/lustre/lnet/lnet/lib-ptl.c            |  4 ++--
->  drivers/staging/lustre/lnet/lnet/peer.c               | 10 +++++-----
->  drivers/staging/lustre/lnet/lnet/router.c             |  6 +++---
->  6 files changed, 30 insertions(+), 16 deletions(-)
+>  .../staging/lustre/include/linux/lnet/lib-lnet.h   |  3 +-
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 25 +-----
+>  drivers/staging/lustre/lnet/lnet/lib-md.c          | 96 ++++++++++++++++++----
+>  drivers/staging/lustre/lnet/lnet/lib-move.c        |  2 +-
+>  4 files changed, 82 insertions(+), 44 deletions(-)
 >
-> diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> index 18e2665..6abac19 100644
-> --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> @@ -726,6 +726,11 @@ struct lnet_msg_container {
->  #define LNET_RC_STATE_RUNNING		1	/* started up OK */
->  #define LNET_RC_STATE_STOPPING		2	/* telling thread to stop */
+> diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> index 6bfdc9b..16e64d8 100644
+> --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
+> @@ -595,7 +595,8 @@ void lnet_copy_kiov2iter(struct iov_iter *to,
 >  
-> +/* LNet states */
-> +#define LNET_STATE_SHUTDOWN		0	/* not started */
-> +#define LNET_STATE_RUNNING		1	/* started up OK */
-> +#define LNET_STATE_STOPPING		2	/* telling thread to stop */
+>  void lnet_md_unlink(struct lnet_libmd *md);
+>  void lnet_md_deconstruct(struct lnet_libmd *lmd, struct lnet_md *umd);
+> -int lnet_cpt_of_md(struct lnet_libmd *md);
+> +struct page *lnet_kvaddr_to_page(unsigned long vaddr);
+> +int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset);
+>  
+>  void lnet_register_lnd(struct lnet_lnd *lnd);
+>  void lnet_unregister_lnd(struct lnet_lnd *lnd);
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> index debed17..a6b261a 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
+> @@ -531,29 +531,6 @@ static int kiblnd_init_rdma(struct kib_conn *conn, struct kib_tx *tx, int type,
+>  	kiblnd_drop_rx(rx);		     /* Don't re-post rx. */
+>  }
+>  
+> -static struct page *
+> -kiblnd_kvaddr_to_page(unsigned long vaddr)
+> -{
+> -	struct page *page;
+> -
+> -	if (is_vmalloc_addr((void *)vaddr)) {
+> -		page = vmalloc_to_page((void *)vaddr);
+> -		LASSERT(page);
+> -		return page;
+> -	}
+> -#ifdef CONFIG_HIGHMEM
+> -	if (vaddr >= PKMAP_BASE &&
+> -	    vaddr < (PKMAP_BASE + LAST_PKMAP * PAGE_SIZE)) {
+> -		/* No highmem pages only used for bulk (kiov) I/O */
+> -		CERROR("find page for address in highmem\n");
+> -		LBUG();
+> -	}
+> -#endif
+> -	page = virt_to_page(vaddr);
+> -	LASSERT(page);
 
-This would be nicer as an enum ...
+I think this would look cleaner as:
+
+  page = kmap_to_page(vaddr);
+  LASSERT(page);
+  if (PageHighMem(page) {
+		/* No highmem pages only used for bulk (kiov) I/O */
+		CERROR("find page for address in highmem\n");
+		LBUG();
+  }
+
+This avoids the #ifdef, and make the intention obvious.
 
 NeilBrown
 
 
-> +
->  struct lnet {
->  	/* CPU partition table of LNet */
->  	struct cfs_cpt_table		 *ln_cpt_table;
-> @@ -805,8 +810,8 @@ struct lnet {
->  	int				  ln_niinit_self;
->  	/* LNetNIInit/LNetNIFini counter */
->  	int				  ln_refcount;
-> -	/* shutdown in progress */
-> -	int				  ln_shutdown;
-> +	/* SHUTDOWN/RUNNING/STOPPING */
-> +	int				  ln_state;
+> -	return page;
+> -}
+> -
+>  static int
+>  kiblnd_fmr_map_tx(struct kib_net *net, struct kib_tx *tx, struct kib_rdma_desc *rd, __u32 nob)
+>  {
+> @@ -660,7 +637,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
 >  
->  	int				  ln_routing;	/* am I a router? */
->  	lnet_pid_t			  ln_pid;	/* requested pid */
-> diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> index 2d430d0..7c907a3 100644
-> --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
-> +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> @@ -1277,11 +1277,11 @@ struct lnet_ni *
->  	/* NB called holding the global mutex */
->  
->  	/* All quiet on the API front */
-> -	LASSERT(!the_lnet.ln_shutdown);
-> +	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
->  	LASSERT(!the_lnet.ln_refcount);
->  
->  	lnet_net_lock(LNET_LOCK_EX);
-> -	the_lnet.ln_shutdown = 1;	/* flag shutdown */
-> +	the_lnet.ln_state = LNET_STATE_STOPPING;
->  
->  	while (!list_empty(&the_lnet.ln_nets)) {
->  		/*
-> @@ -1309,7 +1309,7 @@ struct lnet_ni *
->  	}
->  
->  	lnet_net_lock(LNET_LOCK_EX);
-> -	the_lnet.ln_shutdown = 0;
-> +	the_lnet.ln_state = LNET_STATE_SHUTDOWN;
->  	lnet_net_unlock(LNET_LOCK_EX);
+>  		vaddr = ((unsigned long)iov->iov_base) + offset;
+>  		page_offset = vaddr & (PAGE_SIZE - 1);
+> -		page = kiblnd_kvaddr_to_page(vaddr);
+> +		page = lnet_kvaddr_to_page(vaddr);
+>  		if (!page) {
+>  			CERROR("Can't find page\n");
+>  			return -EFAULT;
+> diff --git a/drivers/staging/lustre/lnet/lnet/lib-md.c b/drivers/staging/lustre/lnet/lnet/lib-md.c
+> index 9e26911..db5425e 100644
+> --- a/drivers/staging/lustre/lnet/lnet/lib-md.c
+> +++ b/drivers/staging/lustre/lnet/lnet/lib-md.c
+> @@ -84,33 +84,93 @@
+>  	kfree(md);
 >  }
 >  
-> @@ -1583,6 +1583,15 @@ struct lnet_ni *
->  	int rc;
->  	int ni_count = 0;
+> -int
+> -lnet_cpt_of_md(struct lnet_libmd *md)
+> +struct page *lnet_kvaddr_to_page(unsigned long vaddr)
+>  {
+> -	int cpt = CFS_CPT_ANY;
+> +	if (is_vmalloc_addr((void *)vaddr))
+> +		return vmalloc_to_page((void *)vaddr);
+> +
+> +#ifdef CONFIG_HIGHMEM
+> +	return kmap_to_page((void *)vaddr);
+> +#else
+> +	return virt_to_page(vaddr);
+> +#endif /* CONFIG_HIGHMEM */
+> +}
+
+if !CONFIG_HIGHMEM, kmap_to_page is exactly virt_to_page, so this code
+should just use kmap_to_page();
+
+> +EXPORT_SYMBOL(lnet_kvaddr_to_page);
+>  
+> -	if (!md)
+> -		return CFS_CPT_ANY;
+> +int lnet_cpt_of_md(struct lnet_libmd *md, unsigned int offset)
+> +{
+> +	int cpt = CFS_CPT_ANY;
+> +	unsigned int niov;
+>  
+> -	if ((md->md_options & LNET_MD_BULK_HANDLE) != 0 &&
+> -	    md->md_bulk_handle.cookie != LNET_WIRE_HANDLE_COOKIE_NONE) {
+> +	/*
+> +	 * if the md_options has a bulk handle then we want to look at the
+> +	 * bulk md because that's the data which we will be DMAing
+> +	 */
+> +	if (md && (md->md_options & LNET_MD_BULK_HANDLE) != 0 &&
+> +	    md->md_bulk_handle.cookie != LNET_WIRE_HANDLE_COOKIE_NONE)
+>  		md = lnet_handle2md(&md->md_bulk_handle);
+>  
+> -		if (!md)
+> -			return CFS_CPT_ANY;
+> -	}
+> +	if (!md || md->md_niov == 0)
+> +		return CFS_CPT_ANY;
+> +
+> +	niov = md->md_niov;
 >  
 > +	/*
-> +	 * Change to running state before bringing up the LNDs. This
-> +	 * allows lnet_shutdown_lndnets() to assert that we've passed
-> +	 * through here.
+> +	 * There are three cases to handle:
+> +	 *  1. The MD is using lnet_kiov_t
+> +	 *  2. The MD is using struct kvec
+> +	 *  3. Contiguous buffer allocated via vmalloc
+> +	 *
+> +	 *  in case 2 we can use virt_to_page() macro to get the page
+> +	 *  address of the memory kvec describes.
+> +	 *
+> +	 *  in case 3 use is_vmalloc_addr() and vmalloc_to_page()
+> +	 *
+> +	 * The offset provided can be within the first iov/kiov entry or
+> +	 * it could go beyond it. In that case we need to make sure to
+> +	 * look at the page which actually contains the data that will be
+> +	 * DMAed.
 > +	 */
-> +	lnet_net_lock(LNET_LOCK_EX);
-> +	the_lnet.ln_state = LNET_STATE_RUNNING;
-> +	lnet_net_unlock(LNET_LOCK_EX);
+>  	if ((md->md_options & LNET_MD_KIOV) != 0) {
+> -		if (md->md_iov.kiov[0].bv_page)
+> -			cpt = cfs_cpt_of_node(
+> -				lnet_cpt_table(),
+> -				page_to_nid(md->md_iov.kiov[0].bv_page));
+> -	} else if (md->md_iov.iov[0].iov_base) {
+> -		cpt = cfs_cpt_of_node(
+> -			lnet_cpt_table(),
+> -			page_to_nid(virt_to_page(md->md_iov.iov[0].iov_base)));
+> +		struct bio_vec *kiov = md->md_iov.kiov;
 > +
->  	while (!list_empty(netlist)) {
->  		net = list_entry(netlist->next, struct lnet_net, net_list);
->  		list_del_init(&net->net_list);
+> +		while (offset >= kiov->bv_len) {
+> +			offset -= kiov->bv_len;
+> +			niov--;
+> +			kiov++;
+> +			if (niov == 0) {
+> +				CERROR("offset %d goes beyond kiov\n", offset);
+> +				goto out;
+> +			}
+> +		}
+> +
+> +		cpt = cfs_cpt_of_node(lnet_cpt_table(),
+> +				      page_to_nid(kiov->bv_page));
+> +	} else {
+> +		struct kvec *iov = md->md_iov.iov;
+> +		unsigned long vaddr;
+> +		struct page *page;
+> +
+> +		while (offset >= iov->iov_len) {
+> +			offset -= iov->iov_len;
+> +			niov--;
+> +			iov++;
+> +			if (niov == 0) {
+> +				CERROR("offset %d goes beyond iov\n", offset);
+> +				goto out;
+> +			}
+> +		}
+> +
+> +		vaddr = ((unsigned long)iov->iov_base) + offset;
+> +		page = lnet_kvaddr_to_page(vaddr);
+> +		if (!page) {
+> +			CERROR("Couldn't resolve vaddr 0x%lx to page\n", vaddr);
+> +			goto out;
+> +		}
+> +		cpt = cfs_cpt_of_node(lnet_cpt_table(), page_to_nid(page));
+>  	}
+>  
+> +out:
+>  	return cpt;
+>  }
+>  
 > diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> index a213387..ea7e2c3 100644
+> index f2bc97d..4d74421 100644
 > --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
 > +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> @@ -1242,7 +1242,7 @@
->  
->  	seq = lnet_get_dlc_seq_locked();
->  
-> -	if (the_lnet.ln_shutdown) {
-> +	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
->  		lnet_net_unlock(cpt);
->  		return -ESHUTDOWN;
->  	}
-> diff --git a/drivers/staging/lustre/lnet/lnet/lib-ptl.c b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-> index d403353..6fa5bbf 100644
-> --- a/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-ptl.c
-> @@ -589,7 +589,7 @@ struct list_head *
->  	mtable = lnet_mt_of_match(info, msg);
->  	lnet_res_lock(mtable->mt_cpt);
->  
-> -	if (the_lnet.ln_shutdown) {
-> +	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
->  		rc = LNET_MATCHMD_DROP;
->  		goto out1;
->  	}
-> @@ -951,7 +951,7 @@ struct list_head *
->  				list_move(&msg->msg_list, &zombies);
->  		}
->  	} else {
-> -		if (the_lnet.ln_shutdown)
-> +		if (the_lnet.ln_state != LNET_STATE_RUNNING)
->  			CWARN("Active lazy portal %d on exit\n", portal);
->  		else
->  			CDEBUG(D_NET, "clearing portal %d lazy\n", portal);
-> diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-> index ae3ffca..2fbf93a 100644
-> --- a/drivers/staging/lustre/lnet/lnet/peer.c
-> +++ b/drivers/staging/lustre/lnet/lnet/peer.c
-> @@ -428,7 +428,7 @@ void lnet_peer_uninit(void)
->  	struct lnet_peer_table *ptable;
->  	int i;
->  
-> -	LASSERT(the_lnet.ln_shutdown || net);
-> +	LASSERT(the_lnet.ln_state != LNET_STATE_SHUTDOWN || net);
->  	/*
->  	 * If just deleting the peers for a NI, get rid of any routes these
->  	 * peers are gateways for.
-> @@ -458,7 +458,7 @@ void lnet_peer_uninit(void)
->  	struct list_head	*peers;
->  	struct lnet_peer_ni	*lp;
->  
-> -	LASSERT(!the_lnet.ln_shutdown);
-> +	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
->  
->  	peers = &ptable->pt_hash[lnet_nid2peerhash(nid)];
->  	list_for_each_entry(lp, peers, lpni_hashlist) {
-> @@ -1000,7 +1000,7 @@ struct lnet_peer_ni *
->  	struct lnet_peer_ni *lpni = NULL;
->  	int rc;
->  
-> -	if (the_lnet.ln_shutdown) /* it's shutting down */
-> +	if (the_lnet.ln_state != LNET_STATE_RUNNING)
->  		return ERR_PTR(-ESHUTDOWN);
->  
->  	/*
-> @@ -1034,7 +1034,7 @@ struct lnet_peer_ni *
->  	struct lnet_peer_ni *lpni = NULL;
->  	int rc;
->  
-> -	if (the_lnet.ln_shutdown) /* it's shutting down */
-> +	if (the_lnet.ln_state != LNET_STATE_RUNNING)
->  		return ERR_PTR(-ESHUTDOWN);
->  
->  	/*
-> @@ -1063,7 +1063,7 @@ struct lnet_peer_ni *
->  	 * Shutdown is only set under the ln_api_lock, so a single
->  	 * check here is sufficent.
+> @@ -1226,7 +1226,7 @@
 >  	 */
-> -	if (the_lnet.ln_shutdown) {
-> +	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
->  		lpni = ERR_PTR(-ESHUTDOWN);
->  		goto out_mutex_unlock;
->  	}
-> diff --git a/drivers/staging/lustre/lnet/lnet/router.c b/drivers/staging/lustre/lnet/lnet/router.c
-> index a0483f9..d3aef8b 100644
-> --- a/drivers/staging/lustre/lnet/lnet/router.c
-> +++ b/drivers/staging/lustre/lnet/lnet/router.c
-> @@ -252,7 +252,7 @@ struct lnet_remotenet *
->  	struct lnet_remotenet *rnet;
->  	struct list_head *rn_list;
+>  	cpt = lnet_net_lock_current();
 >  
-> -	LASSERT(!the_lnet.ln_shutdown);
-> +	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
+> -	md_cpt = lnet_cpt_of_md(msg->msg_md);
+> +	md_cpt = lnet_cpt_of_md(msg->msg_md, msg->msg_offset);
+>  	if (md_cpt == CFS_CPT_ANY)
+>  		md_cpt = cpt;
 >  
->  	rn_list = lnet_net2rnethash(net);
->  	list_for_each_entry(rnet, rn_list, lrn_list) {
-> @@ -374,7 +374,7 @@ static void lnet_shuffle_seed(void)
->  		return rc;
->  	}
->  	route->lr_gateway = lpni;
-> -	LASSERT(!the_lnet.ln_shutdown);
-> +	LASSERT(the_lnet.ln_state == LNET_STATE_RUNNING);
->  
->  	rnet2 = lnet_find_rnet_locked(net);
->  	if (!rnet2) {
-> @@ -1775,7 +1775,7 @@ int lnet_get_rtr_pool_cfg(int idx, struct lnet_ioctl_pool_cfg *pool_cfg)
->  
->  	lnet_net_lock(cpt);
->  
-> -	if (the_lnet.ln_shutdown) {
-> +	if (the_lnet.ln_state != LNET_STATE_RUNNING) {
->  		lnet_net_unlock(cpt);
->  		return -ESHUTDOWN;
->  	}
 > -- 
 > 1.8.3.1
 -------------- next part --------------
@@ -244,4 +277,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180927/f8acef4a/attachment-0001.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20180927/906fdc17/attachment.sig>
