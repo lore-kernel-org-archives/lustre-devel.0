@@ -1,546 +1,477 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 30 Sep 2018 00:01:38 +0100 (BST)
-Subject: [lustre-devel] [PATCH 08/34] LU-7734 lnet: Multi-Rail peer split
-In-Reply-To: <153783763514.32103.5823547209878409504.stgit@noble>
+Date: Sun, 30 Sep 2018 02:49:59 +0100 (BST)
+Subject: [lustre-devel] [PATCH 12/34] LU-7734 lnet: NUMA support
+In-Reply-To: <153783763531.32103.14595088461405832909.stgit@noble>
 References: <153783752960.32103.8394391715843917125.stgit@noble>
- <153783763514.32103.5823547209878409504.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1809292354290.25547@casper.infradead.org>
+ <153783763531.32103.14595088461405832909.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1809300249350.25547@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Tue, 25 Sep 2018, NeilBrown wrote:
 
 > From: Amir Shehata <amir.shehata@intel.com>
 > 
-> [[Note, the preceding few patches are part of this
->   in the upstream lustre code - they were split
->   for easier merging into linux.
->   ]]
+> This patch adds NUMA node support. NUMA node information is stored
+> in the CPT table. A NUMA node mask is maintained for the entire table
+> as well as for each CPT to track the NUMA nodes related to each of
+> the CPTs. Following key APIs added:
 > 
-> Split the peer structure into peer/peer_net/peer_ni, as
-> described in the Multi-Rail HLD.
+> cfs_cpt_of_node(): returns the CPT of particular NUMA node
+> cfs_cpt_distance(): calculates the distance between two CPTs
 > 
-> Removed deathrow list in peers, instead peers are immediately
-> deleted. deathrow complicates memory management for peers to
-> little gain.
+> When the LND device is started it finds the NUMA node of the physical
+> device and then from there it finds the CPT, which is subsequently
+> stored in the NI structure.
 > 
-> Moved to LNET_LOCK_EX for any operations which will modify the
-> peer tables. And CPT locks for any operatios which read the peer
-> tables. Therefore there is no need to use lnet_cpt_of_nid() to
-> calculate the CPT of the peer NID, instead we use lnet_nid_cpt_hash()
-> to distribute peers across multiple CPTs.
+> When selecting the NI, the MD CPT is determined and the distance
+> between the MD CPT and the device CPT is calculated. The NI
+> with the shortest distance is preferred.
 > 
-> It is no longe true that peers and NIs would exist on
-> the same CPT. In the new design peers and NIs don't have a 1-1
-> relationship. You can send to the same peer from several NIs, which
-> can exist on separate CPTs
+> If the device or system is not NUMA aware then the CPT for the
+> device will default to CFS_CPT_ANY and the distance calculated
+> when CFS_CPT_ANY is used is largest in the system. IE, none
+> NUMA aware devices are least preferred.
+> 
+> A NUMA range value can be set. If the value is large enough
+> it amounts to basically turning off NUMA criterion completely.
 > 
 > Signed-off-by: Amir Shehata <amir.shehata@intel.com>
-> Change-Id: Ida41d830d38d0ab2bb551476e4a8866d52a25fe2
-> Reviewed-on: http://review.whamcloud.com/18293
+> Change-Id: I2d7c63f8e8fc8e8a6a249b0d6bfdd08fd090a837
+> Reviewed-on: http://review.whamcloud.com/18916
+> Tested-by: Jenkins
+> Tested-by: Maloo <hpdd-maloo@intel.com>
+
+We can remove the Test-by: as well. 
+
 > Reviewed-by: Olaf Weber <olaf@sgi.com>
 > Reviewed-by: Doug Oucharek <doug.s.oucharek@intel.com>
 > Signed-off-by: NeilBrown <neilb@suse.com>
-
-The patch is fine but the commit message needs to be properly formatted.
-While patches to OpenSFS tree are titled with "LU-7743 lnet:" for the
-linux client we changed that to be more inline with what the kernel does.
-
-LU-7734 lnet: Multi-Rail peer split  --->>> lustre: lnet: Multi-Rail peer split
-
-To the outsider reviewer LU-7734 doesn't mean much. Also please replace
-Change-Id: to the URL link for the work which in turn explains LU-7734.
-
-WC-bug-id: https://jira.whamcloud.com/browse/LU-7734
-
-Same for the other patches this series. Seem reasonable?
-
 > ---
->  .../staging/lustre/include/linux/lnet/lib-lnet.h   |    2 
->  .../staging/lustre/include/linux/lnet/lib-types.h  |   29 ++
->  drivers/staging/lustre/lnet/lnet/api-ni.c          |    1 
->  drivers/staging/lustre/lnet/lnet/peer.c            |  260 ++++++++++++--------
->  drivers/staging/lustre/lnet/lnet/router_proc.c     |    3 
->  5 files changed, 191 insertions(+), 104 deletions(-)
+>  .../staging/lustre/include/linux/lnet/lib-lnet.h   |    1 
+>  .../staging/lustre/include/linux/lnet/lib-types.h  |    3 
+>  .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |    6 +
+>  .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |    6 +
+>  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    |    4 +
+>  .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |   13 ++
+>  drivers/staging/lustre/lnet/lnet/api-ni.c          |   27 +++
+>  drivers/staging/lustre/lnet/lnet/lib-move.c        |  160 +++++++++++++++++---
+>  8 files changed, 195 insertions(+), 25 deletions(-)
 > 
 > diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-> index 656177b64336..bf076298de71 100644
+> index a7cff6426ad8..c338e31b2cdd 100644
 > --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 > +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-> @@ -637,8 +637,6 @@ bool lnet_net_unique(__u32 net_id, struct list_head *nilist,
->  bool lnet_ni_unique_net(struct list_head *nilist, char *iface);
+> @@ -408,6 +408,7 @@ struct lnet_ni *lnet_net2ni_addref(__u32 net);
+>  bool lnet_is_ni_healthy_locked(struct lnet_ni *ni);
+>  struct lnet_net *lnet_get_net_locked(u32 net_id);
 >  
->  int lnet_nid2peerni_locked(struct lnet_peer_ni **lpp, lnet_nid_t nid, int cpt);
-> -struct lnet_peer_ni *lnet_find_peer_locked(struct lnet_peer_table *ptable,
-> -					   lnet_nid_t nid);
->  struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid, int cpt);
->  void lnet_peer_tables_cleanup(struct lnet_ni *ni);
->  void lnet_peer_tables_destroy(void);
+> +extern unsigned int lnet_numa_range;
+>  extern int portal_rotor;
+>  
+>  int lnet_lib_init(void);
 > diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> index 9a2cf319dba9..9f70c094cc4c 100644
+> index 22b141cb6cff..5083b72ca20f 100644
 > --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 > +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> @@ -384,6 +384,7 @@ struct lnet_rc_data {
+> @@ -346,6 +346,9 @@ struct lnet_ni {
+>  	/* lnd tunables set explicitly */
+>  	bool ni_lnd_tunables_set;
+>  
+> +	/* physical device CPT */
+> +	int			dev_cpt;
+> +
+>  	/* sequence number used to round robin over nis within a net */
+>  	u32			ni_seq;
+>  
+> diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
+> index fa58aaf6ad9d..a231f6d89e95 100644
+> --- a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
+> +++ b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_ioctl.h
+> @@ -142,7 +142,9 @@ struct libcfs_debug_ioctl_data {
+>  #define IOC_LIBCFS_ADD_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 95, IOCTL_CONFIG_SIZE)
+>  #define IOC_LIBCFS_DEL_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 96, IOCTL_CONFIG_SIZE)
+>  #define IOC_LIBCFS_GET_LOCAL_NI		_IOWR(IOC_LIBCFS_TYPE, 97, IOCTL_CONFIG_SIZE)
+> -#define IOC_LIBCFS_DBG			_IOWR(IOC_LIBCFS_TYPE, 98, IOCTL_CONFIG_SIZE)
+> -#define IOC_LIBCFS_MAX_NR		98
+> +#define IOC_LIBCFS_SET_NUMA_RANGE	_IOWR(IOC_LIBCFS_TYPE, 98, IOCTL_CONFIG_SIZE)
+> +#define IOC_LIBCFS_GET_NUMA_RANGE	_IOWR(IOC_LIBCFS_TYPE, 99, IOCTL_CONFIG_SIZE)
+> +#define IOC_LIBCFS_DBG			_IOWR(IOC_LIBCFS_TYPE, 100, IOCTL_CONFIG_SIZE)
+> +#define IOC_LIBCFS_MAX_NR		100
+>  
+>  #endif /* __LIBCFS_IOCTL_H__ */
+> diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
+> index bfd9fc6bc4df..5eaaf0eae470 100644
+> --- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
+> +++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-dlc.h
+> @@ -162,6 +162,7 @@ struct lnet_ioctl_config_ni {
+>  	__u32			lic_status;
+>  	__u32			lic_tcp_bonding;
+>  	__u32			lic_idx;
+> +	__s32			lic_dev_cpt;
+>  	char			lic_bulk[0];
 >  };
 >  
->  struct lnet_peer_ni {
-> +	struct list_head	lpni_on_peer_net_list;
->  	/* chain on peer hash */
->  	struct list_head	 lpni_hashlist;
->  	/* messages blocking for tx credits */
-> @@ -394,6 +395,7 @@ struct lnet_peer_ni {
->  	struct list_head	 lpni_rtr_list;
->  	/* # tx credits available */
->  	int			 lpni_txcredits;
-> +	struct lnet_peer_net	*lpni_peer_net;
->  	/* low water mark */
->  	int			 lpni_mintxcredits;
->  	/* # router credits */
-> @@ -442,6 +444,31 @@ struct lnet_peer_ni {
->  	struct lnet_rc_data	*lpni_rcd;
+> @@ -213,6 +214,11 @@ struct lnet_ioctl_peer_cfg {
+>  	char prcfg_bulk[0];
 >  };
 >  
-> +struct lnet_peer {
-> +	/* chain on global peer list */
-> +	struct list_head	lp_on_lnet_peer_list;
-> +
-> +	/* list of peer nets */
-> +	struct list_head	lp_peer_nets;
-> +
-> +	/* primary NID of the peer */
-> +	lnet_nid_t		lp_primary_nid;
+> +struct lnet_ioctl_numa_range {
+> +	struct libcfs_ioctl_hdr nr_hdr;
+> +	__u32 nr_range;
 > +};
 > +
-> +struct lnet_peer_net {
-> +	/* chain on peer block */
-> +	struct list_head	lpn_on_peer_list;
+>  struct lnet_ioctl_lnet_stats {
+>  	struct libcfs_ioctl_hdr st_hdr;
+>  	struct lnet_counters st_cntrs;
+> diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> index 958ac9a99045..2e71abbf8a0c 100644
+> --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c
+> @@ -2829,6 +2829,7 @@ static int kiblnd_startup(struct lnet_ni *ni)
+>  	unsigned long flags;
+>  	int rc;
+>  	int newdev;
+> +	int node_id;
+>  
+>  	LASSERT(ni->ni_net->net_lnd == &the_o2iblnd);
+>  
+> @@ -2878,6 +2879,9 @@ static int kiblnd_startup(struct lnet_ni *ni)
+>  	if (!ibdev)
+>  		goto failed;
+>  
+> +	node_id = dev_to_node(ibdev->ibd_hdev->ibh_ibdev->dma_device);
+> +	ni->dev_cpt = cfs_cpt_of_node(lnet_cpt_table(), node_id);
 > +
-> +	/* list of peer_nis on this network */
-> +	struct list_head	lpn_peer_nis;
+>  	net->ibn_dev = ibdev;
+>  	ni->ni_nid = LNET_MKNID(LNET_NIDNET(ni->ni_nid), ibdev->ibd_ifip);
+>  
+> diff --git a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> index 9df66c6d160f..ba1ec35a017a 100644
+> --- a/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> +++ b/drivers/staging/lustre/lnet/klnds/socklnd/socklnd.c
+> @@ -38,6 +38,7 @@
+>   * Author: Eric Barton <eric@bartonsoftware.com>
+>   */
+>  
+> +#include <linux/pci.h>
+>  #include "socklnd.h"
+>  #include <linux/inetdevice.h>
+>  
+> @@ -2726,6 +2727,8 @@ ksocknal_startup(struct lnet_ni *ni)
+>  	struct ksock_net *net;
+>  	int rc;
+>  	int i;
+> +	struct net_device *net_dev;
+> +	int node_id;
+>  
+>  	LASSERT(ni->ni_net->net_lnd == &the_ksocklnd);
+>  
+> @@ -2773,6 +2776,16 @@ ksocknal_startup(struct lnet_ni *ni)
+>  		}
+>  	}
+>  
+> +	net_dev = dev_get_by_name(&init_net,
+> +				  net->ksnn_interfaces[0].ksni_name);
+> +	if (net_dev) {
+> +		node_id = dev_to_node(&net_dev->dev);
+> +		ni->dev_cpt = cfs_cpt_of_node(lnet_cpt_table(), node_id);
+> +		dev_put(net_dev);
+> +	} else {
+> +		ni->dev_cpt = CFS_CPT_ANY;
+> +	}
 > +
-> +	/* pointer to the peer I'm part of */
-> +	struct lnet_peer	*lpn_peer;
-> +
-> +	/* Net ID */
-> +	__u32			lpn_net_id;
-> +};
-> +
->  /* peer hash size */
->  #define LNET_PEER_HASH_BITS	9
->  #define LNET_PEER_HASH_SIZE	(1 << LNET_PEER_HASH_BITS)
-> @@ -686,6 +713,8 @@ struct lnet {
->  	struct lnet_msg_container	**ln_msg_containers;
->  	struct lnet_counters		**ln_counters;
->  	struct lnet_peer_table		**ln_peer_tables;
-> +	/* list of configured or discovered peers */
-> +	struct list_head		ln_peers;
->  	/* failure simulation */
->  	struct list_head		  ln_test_peers;
->  	struct list_head		  ln_drop_rules;
+>  	/* call it before add it to ksocknal_data.ksnd_nets */
+>  	rc = ksocknal_net_start_threads(net, ni->ni_cpts, ni->ni_ncpts);
+>  	if (rc)
 > diff --git a/drivers/staging/lustre/lnet/lnet/api-ni.c b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> index 20fa3fea04b9..821b030f9621 100644
+> index 1ef9a39b517d..67a3301258d4 100644
 > --- a/drivers/staging/lustre/lnet/lnet/api-ni.c
 > +++ b/drivers/staging/lustre/lnet/lnet/api-ni.c
-> @@ -542,6 +542,7 @@ lnet_prepare(lnet_pid_t requested_pid)
->  	the_lnet.ln_pid = requested_pid;
+> @@ -64,6 +64,12 @@ module_param(use_tcp_bonding, int, 0444);
+>  MODULE_PARM_DESC(use_tcp_bonding,
+>  		 "Set to 1 to use socklnd bonding. 0 to use Multi-Rail");
 >  
->  	INIT_LIST_HEAD(&the_lnet.ln_test_peers);
-> +	INIT_LIST_HEAD(&the_lnet.ln_peers);
->  	INIT_LIST_HEAD(&the_lnet.ln_nets);
->  	INIT_LIST_HEAD(&the_lnet.ln_routers);
->  	INIT_LIST_HEAD(&the_lnet.ln_drop_rules);
-> diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-> index 376e3459fa92..97ee1f5cfd2f 100644
-> --- a/drivers/staging/lustre/lnet/lnet/peer.c
-> +++ b/drivers/staging/lustre/lnet/lnet/peer.c
-> @@ -54,8 +54,6 @@ lnet_peer_tables_create(void)
->  	}
->  
->  	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
-> -		INIT_LIST_HEAD(&ptable->pt_deathrow);
-> -
->  		hash = kvmalloc_cpt(LNET_PEER_HASH_SIZE * sizeof(*hash),
->  				    GFP_KERNEL, i);
->  		if (!hash) {
-> @@ -88,8 +86,6 @@ lnet_peer_tables_destroy(void)
->  		if (!hash) /* not initialized */
->  			break;
->  
-> -		LASSERT(list_empty(&ptable->pt_deathrow));
-> -
->  		ptable->pt_hash = NULL;
->  		for (j = 0; j < LNET_PEER_HASH_SIZE; j++)
->  			LASSERT(list_empty(&hash[j]));
-> @@ -123,7 +119,7 @@ lnet_peer_table_cleanup_locked(struct lnet_ni *ni,
->  }
->  
->  static void
-> -lnet_peer_table_deathrow_wait_locked(struct lnet_peer_table *ptable,
-> +lnet_peer_table_finalize_wait_locked(struct lnet_peer_table *ptable,
->  				     int cpt_locked)
->  {
->  	int i;
-> @@ -173,12 +169,8 @@ void
->  lnet_peer_tables_cleanup(struct lnet_ni *ni)
->  {
->  	struct lnet_peer_table *ptable;
-> -	struct list_head deathrow;
-> -	struct lnet_peer_ni *lp;
->  	int i;
->  
-> -	INIT_LIST_HEAD(&deathrow);
-> -
->  	LASSERT(the_lnet.ln_shutdown || ni);
->  	/*
->  	 * If just deleting the peers for a NI, get rid of any routes these
-> @@ -191,8 +183,7 @@ lnet_peer_tables_cleanup(struct lnet_ni *ni)
->  	}
->  
->  	/*
-> -	 * Start the process of moving the applicable peers to
-> -	 * deathrow.
-> +	 * Start the cleanup process
->  	 */
->  	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
->  		lnet_net_lock(LNET_LOCK_EX);
-> @@ -200,20 +191,12 @@ lnet_peer_tables_cleanup(struct lnet_ni *ni)
->  		lnet_net_unlock(LNET_LOCK_EX);
->  	}
->  
-> -	/* Cleanup all entries on deathrow. */
-> +	/* Wait until all peers have been destroyed. */
->  	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
->  		lnet_net_lock(LNET_LOCK_EX);
-> -		lnet_peer_table_deathrow_wait_locked(ptable, i);
-> -		list_splice_init(&ptable->pt_deathrow, &deathrow);
-> +		lnet_peer_table_finalize_wait_locked(ptable, i);
->  		lnet_net_unlock(LNET_LOCK_EX);
->  	}
-> -
-> -	while (!list_empty(&deathrow)) {
-> -		lp = list_entry(deathrow.next, struct lnet_peer_ni,
-> -				lpni_hashlist);
-> -		list_del(&lp->lpni_hashlist);
-> -		kfree(lp);
-> -	}
->  }
->  
->  static struct lnet_peer_ni *
-> @@ -247,74 +230,143 @@ lnet_find_peer_ni_locked(lnet_nid_t nid, int cpt)
->  	return lpni;
->  }
->  
-> -void
-> -lnet_destroy_peer_ni_locked(struct lnet_peer_ni *lp)
-> +static void
-> +lnet_try_destroy_peer_hierarchy_locked(struct lnet_peer_ni *lpni)
->  {
-> -	struct lnet_peer_table *ptable;
-> +	struct lnet_peer_net *peer_net;
-> +	struct lnet_peer *peer;
->  
-> -	LASSERT(atomic_read(&lp->lpni_refcount) == 0);
-> -	LASSERT(!lp->lpni_rtr_refcount);
-> -	LASSERT(list_empty(&lp->lpni_txq));
-> -	LASSERT(list_empty(&lp->lpni_hashlist));
-> -	LASSERT(!lp->lpni_txqnob);
-> +	/* TODO: could the below situation happen? accessing an already
-> +	 * destroyed peer?
-> +	 */
-> +	if (!lpni->lpni_peer_net ||
-> +	    !lpni->lpni_peer_net->lpn_peer)
-> +		return;
->  
-> -	ptable = the_lnet.ln_peer_tables[lp->lpni_cpt];
-> -	LASSERT(ptable->pt_number > 0);
-> -	ptable->pt_number--;
-> +	peer_net = lpni->lpni_peer_net;
-> +	peer = lpni->lpni_peer_net->lpn_peer;
->  
-> -	lp->lpni_net = NULL;
-> +	list_del_init(&lpni->lpni_on_peer_net_list);
-> +	lpni->lpni_peer_net = NULL;
->  
-> -	list_add(&lp->lpni_hashlist, &ptable->pt_deathrow);
-> -	LASSERT(ptable->pt_zombies > 0);
-> -	ptable->pt_zombies--;
-> +	/* if peer_net is empty, then remove it from the peer */
-> +	if (list_empty(&peer_net->lpn_peer_nis)) {
-> +		list_del_init(&peer_net->lpn_on_peer_list);
-> +		peer_net->lpn_peer = NULL;
-> +		kfree(peer_net);
+> +unsigned int lnet_numa_range;
+> +EXPORT_SYMBOL(lnet_numa_range);
+> +module_param(lnet_numa_range, uint, 0444);
+> +MODULE_PARM_DESC(lnet_numa_range,
+> +		 "NUMA range to consider during Multi-Rail selection");
 > +
-> +		/* If the peer is empty then remove it from the
-> +		 * the_lnet.ln_peers
-> +		 */
-> +		if (list_empty(&peer->lp_peer_nets)) {
-> +			list_del_init(&peer->lp_on_lnet_peer_list);
-> +			kfree(peer);
-> +		}
-> +	}
->  }
+>  /*
+>   * This sequence number keeps track of how many times DLC was used to
+>   * update the configuration. It is incremented on any DLC update and
+> @@ -1896,6 +1902,7 @@ lnet_fill_ni_info(struct lnet_ni *ni, struct lnet_ioctl_config_ni *cfg_ni,
+>  	cfg_ni->lic_nid = ni->ni_nid;
+>  	cfg_ni->lic_status = ni->ni_status->ns_status;
+>  	cfg_ni->lic_tcp_bonding = use_tcp_bonding;
+> +	cfg_ni->lic_dev_cpt = ni->dev_cpt;
 >  
-> -struct lnet_peer_ni *
-> -lnet_find_peer_locked(struct lnet_peer_table *ptable, lnet_nid_t nid)
-> +static int
-> +lnet_build_peer_hierarchy(struct lnet_peer_ni *lpni)
->  {
-> -	struct list_head *peers;
-> -	struct lnet_peer_ni *lp;
-> +	struct lnet_peer *peer;
-> +	struct lnet_peer_net *peer_net;
-> +	__u32 lpni_net = LNET_NIDNET(lpni->lpni_nid);
+>  	memcpy(&tun->lt_cmn, &ni->ni_net->net_tunables, sizeof(tun->lt_cmn));
 >  
-> -	LASSERT(!the_lnet.ln_shutdown);
-> +	peer = NULL;
-> +	peer_net = NULL;
+> @@ -2642,6 +2649,26 @@ LNetCtl(unsigned int cmd, void *arg)
+>  		mutex_unlock(&the_lnet.ln_api_mutex);
+>  		return rc;
 >  
-> -	peers = &ptable->pt_hash[lnet_nid2peerhash(nid)];
-> -	list_for_each_entry(lp, peers, lpni_hashlist) {
-> -		if (lp->lpni_nid == nid) {
-> -			lnet_peer_ni_addref_locked(lp);
-> -			return lp;
-> -		}
-> +	peer = kzalloc(sizeof(*peer), GFP_KERNEL);
-> +	if (!peer)
-> +		return -ENOMEM;
+> +	case IOC_LIBCFS_SET_NUMA_RANGE: {
+> +		struct lnet_ioctl_numa_range *numa;
 > +
-> +	peer_net = kzalloc(sizeof(*peer_net), GFP_KERNEL);
-> +	if (!peer_net) {
-> +		kfree(peer);
-> +		return -ENOMEM;
->  	}
->  
-> -	return NULL;
-> +	INIT_LIST_HEAD(&peer->lp_on_lnet_peer_list);
-> +	INIT_LIST_HEAD(&peer->lp_peer_nets);
-> +	INIT_LIST_HEAD(&peer_net->lpn_on_peer_list);
-> +	INIT_LIST_HEAD(&peer_net->lpn_peer_nis);
-> +
-> +	/* build the hierarchy */
-> +	peer_net->lpn_net_id = lpni_net;
-> +	peer_net->lpn_peer = peer;
-> +	lpni->lpni_peer_net = peer_net;
-> +	peer->lp_primary_nid = lpni->lpni_nid;
-> +	list_add_tail(&peer_net->lpn_on_peer_list, &peer->lp_peer_nets);
-> +	list_add_tail(&lpni->lpni_on_peer_net_list, &peer_net->lpn_peer_nis);
-> +	list_add_tail(&peer->lp_on_lnet_peer_list, &the_lnet.ln_peers);
-> +
-> +	return 0;
-> +}
-> +
-> +void
-> +lnet_destroy_peer_ni_locked(struct lnet_peer_ni *lpni)
-> +{
-> +	struct lnet_peer_table *ptable;
-> +
-> +	LASSERT(atomic_read(&lpni->lpni_refcount) == 0);
-> +	LASSERT(lpni->lpni_rtr_refcount == 0);
-> +	LASSERT(list_empty(&lpni->lpni_txq));
-> +	LASSERT(list_empty(&lpni->lpni_hashlist));
-> +	LASSERT(lpni->lpni_txqnob == 0);
-> +	LASSERT(lpni->lpni_peer_net);
-> +	LASSERT(lpni->lpni_peer_net->lpn_peer);
-> +
-> +	ptable = the_lnet.ln_peer_tables[lpni->lpni_cpt];
-> +	LASSERT(ptable->pt_number > 0);
-> +	ptable->pt_number--;
-> +
-> +	lpni->lpni_net = NULL;
-> +
-> +	lnet_try_destroy_peer_hierarchy_locked(lpni);
-> +
-> +	kfree(lpni);
-> +
-> +	LASSERT(ptable->pt_zombies > 0);
-> +	ptable->pt_zombies--;
->  }
->  
->  int
-> -lnet_nid2peerni_locked(struct lnet_peer_ni **lpp, lnet_nid_t nid, int cpt)
-> +lnet_nid2peerni_locked(struct lnet_peer_ni **lpnip, lnet_nid_t nid, int cpt)
->  {
->  	struct lnet_peer_table *ptable;
-> -	struct lnet_peer_ni *lp = NULL;
-> -	struct lnet_peer_ni *lp2;
-> +	struct lnet_peer_ni *lpni = NULL;
-> +	struct lnet_peer_ni *lpni2;
->  	int cpt2;
->  	int rc = 0;
->  
-> -	*lpp = NULL;
-> +	*lpnip = NULL;
->  	if (the_lnet.ln_shutdown) /* it's shutting down */
->  		return -ESHUTDOWN;
->  
-> -	/* cpt can be LNET_LOCK_EX if it's called from router functions */
-> -	cpt2 = cpt != LNET_LOCK_EX ? cpt : lnet_cpt_of_nid_locked(nid, NULL);
-> +	/*
-> +	 * calculate cpt2 with the standard hash function
-> +	 * This cpt2 becomes the slot where we'll find or create the peer.
-> +	 */
-> +	cpt2 = lnet_nid_cpt_hash(nid, LNET_CPT_NUMBER);
->  
-> -	ptable = the_lnet.ln_peer_tables[cpt2];
-> -	lp = lnet_find_peer_locked(ptable, nid);
-> -	if (lp) {
-> -		*lpp = lp;
-> -		return 0;
-> +	/*
-> +	 * Any changes to the peer tables happen under exclusive write
-> +	 * lock. Any reads to the peer tables can be done via a standard
-> +	 * CPT read lock.
-> +	 */
-> +	if (cpt != LNET_LOCK_EX) {
-> +		lnet_net_unlock(cpt);
-> +		lnet_net_lock(LNET_LOCK_EX);
->  	}
->  
-> -	if (!list_empty(&ptable->pt_deathrow)) {
-> -		lp = list_entry(ptable->pt_deathrow.next,
-> -				struct lnet_peer_ni, lpni_hashlist);
-> -		list_del(&lp->lpni_hashlist);
-> +	ptable = the_lnet.ln_peer_tables[cpt2];
-> +	lpni = lnet_get_peer_ni_locked(ptable, nid);
-> +	if (lpni) {
-> +		*lpnip = lpni;
-> +		if (cpt != LNET_LOCK_EX) {
-> +			lnet_net_unlock(LNET_LOCK_EX);
-> +			lnet_net_lock(cpt);
-> +		}
+> +		numa = arg;
+> +		if (numa->nr_hdr.ioc_len != sizeof(*numa))
+> +			return -EINVAL;
+> +		lnet_numa_range = numa->nr_range;
 > +		return 0;
->  	}
+> +	}
+> +
+> +	case IOC_LIBCFS_GET_NUMA_RANGE: {
+> +		struct lnet_ioctl_numa_range *numa;
+> +
+> +		numa = arg;
+> +		if (numa->nr_hdr.ioc_len != sizeof(*numa))
+> +			return -EINVAL;
+> +		numa->nr_range = lnet_numa_range;
+> +		return 0;
+> +	}
+> +
+>  	case IOC_LIBCFS_GET_BUF: {
+>  		struct lnet_ioctl_pool_cfg *pool_cfg;
+>  		size_t total = sizeof(*config) + sizeof(*pool_cfg);
+> diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
+> index fbf209610ff9..bf2256da6122 100644
+> --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
+> +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
+> @@ -1109,6 +1109,10 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+>  	int best_credits = 0;
+>  	u32 seq, seq2;
+>  	int best_lpni_credits = INT_MIN;
+> +	int md_cpt = 0;
+> +	unsigned int shortest_distance = UINT_MAX;
+> +	unsigned int distance = 0;
+> +	bool found_ir = false;
 >  
+>  again:
 >  	/*
-> @@ -322,68 +374,72 @@ lnet_nid2peerni_locked(struct lnet_peer_ni **lpp, lnet_nid_t nid, int cpt)
->  	 * and destroyed locks and peer-table before I finish the allocation
->  	 */
->  	ptable->pt_number++;
-> -	lnet_net_unlock(cpt);
-> +	lnet_net_unlock(LNET_LOCK_EX);
->  
-> -	if (lp)
-> -		memset(lp, 0, sizeof(*lp));
-> -	else
-> -		lp = kzalloc_cpt(sizeof(*lp), GFP_NOFS, cpt2);
-> -
-> -	if (!lp) {
-> +	lpni = kzalloc_cpt(sizeof(*lpni), GFP_KERNEL, cpt2);
-> +	if (!lpni) {
->  		rc = -ENOMEM;
->  		lnet_net_lock(cpt);
->  		goto out;
->  	}
->  
-> -	INIT_LIST_HEAD(&lp->lpni_txq);
-> -	INIT_LIST_HEAD(&lp->lpni_rtrq);
-> -	INIT_LIST_HEAD(&lp->lpni_routes);
-> -
-> -	lp->lpni_notify = 0;
-> -	lp->lpni_notifylnd = 0;
-> -	lp->lpni_notifying = 0;
-> -	lp->lpni_alive_count = 0;
-> -	lp->lpni_timestamp = 0;
-> -	lp->lpni_alive = !lnet_peers_start_down(); /* 1 bit!! */
-> -	lp->lpni_last_alive = ktime_get_seconds(); /* assumes alive */
-> -	lp->lpni_last_query = 0; /* haven't asked NI yet */
-> -	lp->lpni_ping_timestamp = 0;
-> -	lp->lpni_ping_feats = LNET_PING_FEAT_INVAL;
-> -	lp->lpni_nid = nid;
-> -	lp->lpni_cpt = cpt2;
-> -	atomic_set(&lp->lpni_refcount, 2);	/* 1 for caller; 1 for hash */
-> -	lp->lpni_rtr_refcount = 0;
-> +	INIT_LIST_HEAD(&lpni->lpni_txq);
-> +	INIT_LIST_HEAD(&lpni->lpni_rtrq);
-> +	INIT_LIST_HEAD(&lpni->lpni_routes);
->  
-> -	lnet_net_lock(cpt);
-> +	lpni->lpni_alive = !lnet_peers_start_down(); /* 1 bit!! */
-> +	lpni->lpni_last_alive = ktime_get_seconds(); /* assumes alive */
-> +	lpni->lpni_ping_feats = LNET_PING_FEAT_INVAL;
-> +	lpni->lpni_nid = nid;
-> +	lpni->lpni_cpt = cpt2;
-> +	atomic_set(&lpni->lpni_refcount, 2);	/* 1 for caller; 1 for hash */
-> +
-> +	rc = lnet_build_peer_hierarchy(lpni);
-> +	if (rc != 0)
-> +		goto out;
-> +
-> +	lnet_net_lock(LNET_LOCK_EX);
+> @@ -1127,12 +1131,20 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+>  	routing = false;
+>  	local_net = NULL;
+>  	best_ni = NULL;
+> +	shortest_distance = UINT_MAX;
+> +	found_ir = false;
 >  
 >  	if (the_lnet.ln_shutdown) {
->  		rc = -ESHUTDOWN;
->  		goto out;
+>  		lnet_net_unlock(cpt);
+>  		return -ESHUTDOWN;
 >  	}
 >  
-> -	lp2 = lnet_find_peer_locked(ptable, nid);
-> -	if (lp2) {
-> -		*lpp = lp2;
-> +	lpni2 = lnet_get_peer_ni_locked(ptable, nid);
-> +	if (lpni2) {
-> +		*lpnip = lpni2;
->  		goto out;
->  	}
->  
-> -	lp->lpni_net = lnet_get_net_locked(LNET_NIDNET(lp->lpni_nid));
-> -	lp->lpni_txcredits =
-> -		lp->lpni_mintxcredits =
-> -		lp->lpni_net->net_tunables.lct_peer_tx_credits;
-> -	lp->lpni_rtrcredits =
-> -		lp->lpni_minrtrcredits = lnet_peer_buffer_credits(lp->lpni_net);
-> +	lpni->lpni_net = lnet_get_net_locked(LNET_NIDNET(lpni->lpni_nid));
-> +	lpni->lpni_txcredits =
-> +		lpni->lpni_mintxcredits =
-> +		lpni->lpni_net->net_tunables.lct_peer_tx_credits;
-> +	lpni->lpni_rtrcredits =
-> +		lpni->lpni_minrtrcredits =
-> +		lnet_peer_buffer_credits(lpni->lpni_net);
->  
-> -	list_add_tail(&lp->lpni_hashlist,
-> +	list_add_tail(&lpni->lpni_hashlist,
->  		      &ptable->pt_hash[lnet_nid2peerhash(nid)]);
->  	ptable->pt_version++;
-> -	*lpp = lp;
-> +	*lpnip = lpni;
+> +	if (msg->msg_md)
+> +		/* get the cpt of the MD, used during NUMA based selection */
+> +		md_cpt = lnet_cpt_of_cookie(msg->msg_md->md_lh.lh_cookie);
+> +	else
+> +		md_cpt = CFS_CPT_ANY;
 > +
-> +	if (cpt != LNET_LOCK_EX) {
-> +		lnet_net_unlock(LNET_LOCK_EX);
-> +		lnet_net_lock(cpt);
-> +	}
+>  	/*
+>  	 * initialize the variables which could be reused if we go to
+>  	 * again
+> @@ -1258,34 +1270,113 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+>  			continue;
 >  
->  	return 0;
->  out:
-> -	if (lp)
-> -		list_add(&lp->lpni_hashlist, &ptable->pt_deathrow);
-> +	if (lpni) {
-> +		lnet_try_destroy_peer_hierarchy_locked(lpni);
-> +		kfree(lpni);
-> +	}
->  	ptable->pt_number--;
-> +	if (cpt != LNET_LOCK_EX) {
-> +		lnet_net_unlock(LNET_LOCK_EX);
-> +		lnet_net_lock(cpt);
-> +	}
->  	return rc;
->  }
+>  		/*
+> -		 * Second jab at determining best_ni
+> -		 * if we get here then the peer we're trying to send
+> -		 * to is on a directly connected network, and we'll
+> -		 * need to pick the local_ni on that network to send
+> -		 * from
+> +		 * Iterate through the NIs in this local Net and select
+> +		 * the NI to send from. The selection is determined by
+> +		 * these 3 criterion in the following priority:
+> +		 *	1. NUMA
+> +		 *	2. NI available credits
+> +		 *	3. Round Robin
+>  		 */
+>  		while ((ni = lnet_get_next_ni_locked(local_net, ni))) {
+>  			if (!lnet_is_ni_healthy_locked(ni))
+>  				continue;
+> -			/* TODO: compare NUMA distance */
+> -			if (ni->ni_tx_queues[cpt]->tq_credits <=
+> -			    best_credits) {
+> +
+> +			/*
+> +			 * calculate the distance from the cpt on which
+> +			 * the message memory is allocated to the CPT of
+> +			 * the NI's physical device
+> +			 */
+> +			distance = cfs_cpt_distance(lnet_cpt_table(),
+> +						    md_cpt,
+> +						    ni->dev_cpt);
+> +
+> +			/*
+> +			 * If we already have a closer NI within the NUMA
+> +			 * range provided, then there is no need to
+> +			 * consider the current NI. Move on to the next
+> +			 * one.
+> +			 */
+> +			if (distance > shortest_distance &&
+> +			    distance > lnet_numa_range)
+> +				continue;
+> +
+> +			if (distance < shortest_distance &&
+> +			    distance > lnet_numa_range) {
+>  				/*
+> -				 * all we want is to read tq_credits
+> -				 * value as an approximation of how
+> -				 * busy the NI is. No need to grab a lock
+> +				 * The current NI is the closest one that we
+> +				 * have found, even though it's not in the
+> +				 * NUMA range specified. This occurs if
+> +				 * the NUMA range is less than the least
+> +				 * of the distances in the system.
+> +				 * In effect NUMA range consideration is
+> +				 * turned off.
+>  				 */
+> -				continue;
+> -			} else if (best_ni) {
+> -				if ((best_ni)->ni_seq - ni->ni_seq <= 0)
+> +				shortest_distance = distance;
+> +			} else if ((distance <= shortest_distance &&
+> +				    distance < lnet_numa_range) ||
+> +				   distance == shortest_distance) {
+> +				/*
+> +				 * This NI is either within range or it's
+> +				 * equidistant. In both of these cases we
+> +				 * would want to select the NI based on
+> +				 * its available credits first, and then
+> +				 * via Round Robin.
+> +				 */
+> +				if (distance <= shortest_distance &&
+> +				    distance < lnet_numa_range) {
+> +					/*
+> +					 * If this is the first NI that's
+> +					 * within range, then set the
+> +					 * shortest distance to the range
+> +					 * specified by the user. In
+> +					 * effect we're saying that all
+> +					 * NIs that fall within this NUMA
+> +					 * range shall be dealt with as
+> +					 * having equal NUMA weight. Which
+> +					 * will mean that we should select
+> +					 * through that set by their
+> +					 * available credits first
+> +					 * followed by Round Robin.
+> +					 *
+> +					 * And since this is the first NI
+> +					 * in the range, let's just set it
+> +					 * as our best_ni for now. The
+> +					 * following NIs found in the
+> +					 * range will be dealt with as
+> +					 * mentioned previously.
+> +					 */
+> +					shortest_distance = lnet_numa_range;
+> +					if (!found_ir) {
+> +						found_ir = true;
+> +						goto set_ni;
+> +					}
+> +				}
+> +				/*
+> +				 * This NI is NUMA equidistant let's
+> +				 * select using credits followed by Round
+> +				 * Robin.
+> +				 */
+> +				if (ni->ni_tx_queues[cpt]->tq_credits <
+> +				    best_credits) {
+>  					continue;
+> -				(best_ni)->ni_seq = ni->ni_seq + 1;
+> +				} else if (ni->ni_tx_queues[cpt]->tq_credits ==
+> +					   best_credits) {
+> +					if (best_ni &&
+> +					    best_ni->ni_seq <= ni->ni_seq)
+> +						continue;
+> +				}
+>  			}
+> -
+> +set_ni:
+>  			best_ni = ni;
+>  			best_credits = ni->ni_tx_queues[cpt]->tq_credits;
+>  		}
+>  	}
+> +	/*
+> +	 * Now that we selected the NI to use increment its sequence
+> +	 * number so the Round Robin algorithm will detect that it has
+> +	 * been used and pick the next NI.
+> +	 */
+> +	best_ni->ni_seq++;
 >  
-> diff --git a/drivers/staging/lustre/lnet/lnet/router_proc.c b/drivers/staging/lustre/lnet/lnet/router_proc.c
-> index 12a4b1708d3c..977a937f261c 100644
-> --- a/drivers/staging/lustre/lnet/lnet/router_proc.c
-> +++ b/drivers/staging/lustre/lnet/lnet/router_proc.c
-> @@ -385,6 +385,9 @@ static int proc_lnet_routers(struct ctl_table *table, int write,
->  	return rc;
->  }
+>  	if (!best_ni) {
+>  		lnet_net_unlock(cpt);
+> @@ -1372,29 +1463,52 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+>  	best_lpni = NULL;
+>  	while ((lpni = lnet_get_next_peer_ni_locked(peer, peer_net, lpni))) {
+>  		/*
+> -		 * if this peer ni is not healty just skip it, no point in
+> +		 * if this peer ni is not healthy just skip it, no point in
+>  		 * examining it further
+>  		 */
+>  		if (!lnet_is_peer_ni_healthy_locked(lpni))
+>  			continue;
+>  		ni_is_pref = lnet_peer_is_ni_pref_locked(lpni, best_ni);
 >  
-> +/* TODO: there should be no direct access to ptable. We should add a set
-> + * of APIs that give access to the ptable and its members
-> + */
->  static int proc_lnet_peers(struct ctl_table *table, int write,
->  			   void __user *buffer, size_t *lenp, loff_t *ppos)
->  {
+> +		/* if this is a preferred peer use it */
+>  		if (!preferred && ni_is_pref) {
+>  			preferred = true;
+>  		} else if (preferred && !ni_is_pref) {
+> +			/*
+> +			 * this is not the preferred peer so let's ignore
+> +			 * it.
+> +			 */
+>  			continue;
+> -		} else if (lpni->lpni_txcredits <= best_lpni_credits) {
+> +		} else if (lpni->lpni_txcredits < best_lpni_credits) {
+> +			/*
+> +			 * We already have a peer that has more credits
+> +			 * available than this one. No need to consider
+> +			 * this peer further.
+> +			 */
+>  			continue;
+> -		} else if (best_lpni) {
+> -			if (best_lpni->lpni_seq - lpni->lpni_seq <= 0)
+> -				continue;
+> -			best_lpni->lpni_seq = lpni->lpni_seq + 1;
+> +		} else if (lpni->lpni_txcredits == best_lpni_credits) {
+> +			/*
+> +			 * The best peer found so far and the current peer
+> +			 * have the same number of available credits let's
+> +			 * make sure to select between them using Round
+> +			 * Robin
+> +			 */
+> +			if (best_lpni) {
+> +				if (best_lpni->lpni_seq <= lpni->lpni_seq)
+> +					continue;
+> +			}
+>  		}
+>  
+>  		best_lpni = lpni;
+>  		best_lpni_credits = lpni->lpni_txcredits;
+>  	}
+>  
+> +	/*
+> +	 * Increment sequence number of the peer selected so that we can
+> +	 * pick the next one in Round Robin.
+> +	 */
+> +	best_lpni->lpni_seq++;
+> +
+>  	/* if we still can't find a peer ni then we can't reach it */
+>  	if (!best_lpni) {
+>  		u32 net_id = peer_net ? peer_net->lpn_net_id :
+> @@ -1403,7 +1517,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
+>  		lnet_net_unlock(cpt);
+>  		LCONSOLE_WARN("no peer_ni found on peer net %s\n",
+>  			      libcfs_net2str(net_id));
+> -		goto again;
+> +		return -EHOSTUNREACH;
+>  	}
+>  
+>  send:
 > 
 > 
 > 
