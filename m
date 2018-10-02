@@ -1,202 +1,85 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 02 Oct 2018 13:19:36 +1000
-Subject: [lustre-devel] [PATCH 11/34] LU-7734 lnet: configure local NI
- from DLC
-In-Reply-To: <alpine.LFD.2.21.1809292150580.25547@casper.infradead.org>
+Date: Tue, 02 Oct 2018 13:31:59 +1000
+Subject: [lustre-devel] [PATCH 33/34] lnet: use BIT() macro for
+ LNET_MD_* flags
+In-Reply-To: <alpine.LFD.2.21.1809281724200.19403@casper.infradead.org>
 References: <153783752960.32103.8394391715843917125.stgit@noble>
- <153783763527.32103.6166409833321456335.stgit@noble>
- <alpine.LFD.2.21.1809292150580.25547@casper.infradead.org>
-Message-ID: <87k1n1rq5z.fsf@notabene.neil.brown.name>
+ <153783763611.32103.14845537928418369718.stgit@noble>
+ <alpine.LFD.2.21.1809281724200.19403@casper.infradead.org>
+Message-ID: <87h8i5rplc.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Sat, Sep 29 2018, James Simmons wrote:
+On Fri, Sep 28 2018, James Simmons wrote:
 
->> From: Amir Shehata <amir.shehata@intel.com>
->> 
->> This patch adds the ability to configure multiple network interfaces
->> on the same network. This can be done via the lnetctl CLI interface
->> or through a YAML configuration. Refer to the multi-rail HLD for
->> more details on the syntax.
->> 
->> It also deprecates ip2nets kernel parsing. All string parsing and
->> network maching now happens in the DLC userspace library.
->> 
->> New IOCTLs are added for adding/deleting local NIs, to keep backwards
->> compatibility with older version of the DLC and lnetctl.
->> 
->> The changes also include parsing and matching ip2nets syntax at the
->> user level and then passing down the network interfaces down to the
->> kernel to be configured.
+>> As these are bit flags, it aids clarity to use the BIT()
+>> macro.
 >
-> Nak. This patch introduces a regression in lnet_ioctl() found in
-> module.c
+> Nak. BIT is not for UAPI headers. Including this will break building
+> userland applications.
+
+Apparently not everyone knows this:
+
+$ git grep  '[^A-Z_]BIT(' include/uapi/ | wc -l
+11
+
+However, it makes sense - thanks.
+I've removed all the BITs that I added.
+
+NeilBrown
+
 >  
->> Signed-off-by: Amir Shehata <amir.shehata@intel.com>
->> Change-Id: I19ee7dc76514beb6f34de6517d19654d6468bcec
->> Reviewed-on: http://review.whamcloud.com/18886
->> Tested-by: Maloo <hpdd-maloo@intel.com>
 >> Signed-off-by: NeilBrown <neilb@suse.com>
 >> ---
->>  .../lustre/include/linux/libcfs/libcfs_string.h    |   12 -
->>  .../staging/lustre/include/linux/lnet/lib-lnet.h   |   13 -
->>  .../lustre/include/uapi/linux/lnet/libcfs_ioctl.h  |    6 
->>  .../lustre/include/uapi/linux/lnet/lnet-dlc.h      |   57 ++
->>  .../staging/lustre/lnet/klnds/socklnd/socklnd.c    |    3 
->>  drivers/staging/lustre/lnet/lnet/api-ni.c          |  479 +++++++++++++++++---
->>  drivers/staging/lustre/lnet/lnet/config.c          |  107 +++-
->>  drivers/staging/lustre/lnet/lnet/module.c          |   70 ++-
->>  drivers/staging/lustre/lnet/lnet/peer.c            |   21 +
->>  drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |    2 
->>  drivers/staging/lustre/lustre/ptlrpc/service.c     |    4 
->>  11 files changed, 650 insertions(+), 124 deletions(-)
->
-> .....
->
->> diff --git a/drivers/staging/lustre/lnet/lnet/module.c b/drivers/staging/lustre/lnet/lnet/module.c
->> index 9d06664f0c17..c82d27592391 100644
->> --- a/drivers/staging/lustre/lnet/lnet/module.c
->> +++ b/drivers/staging/lustre/lnet/lnet/module.c
->> @@ -92,7 +92,7 @@ lnet_unconfigure(void)
->>  }
+>>  .../lustre/include/uapi/linux/lnet/lnet-types.h    |   18 +++++++++---------
+>>  1 file changed, 9 insertions(+), 9 deletions(-)
+>> 
+>> diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
+>> index e80ef4182e5d..62f062c0d1bf 100644
+>> --- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
+>> +++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
+>> @@ -483,22 +483,22 @@ struct lnet_md {
+>>  /**
+>>   * Options for the MD structure. See lnet_md::options.
+>>   */
+>> -#define LNET_MD_OP_PUT		(1 << 0)
+>> +#define LNET_MD_OP_PUT		BIT(0)
+>>  /** See lnet_md::options. */
+>> -#define LNET_MD_OP_GET		(1 << 1)
+>> +#define LNET_MD_OP_GET		BIT(1)
+>>  /** See lnet_md::options. */
+>> -#define LNET_MD_MANAGE_REMOTE	(1 << 2)
+>> -/* unused			(1 << 3) */
+>> +#define LNET_MD_MANAGE_REMOTE	BIT(2)
+>> +/* unused			BIT(3) */
+>>  /** See lnet_md::options. */
+>> -#define LNET_MD_TRUNCATE	(1 << 4)
+>> +#define LNET_MD_TRUNCATE	BIT(4)
+>>  /** See lnet_md::options. */
+>> -#define LNET_MD_ACK_DISABLE	(1 << 5)
+>> +#define LNET_MD_ACK_DISABLE	BIT(5)
+>>  /** See lnet_md::options. */
+>> -#define LNET_MD_IOVEC		(1 << 6)
+>> +#define LNET_MD_IOVEC		BIT(6)
+>>  /** See lnet_md::options. */
+>> -#define LNET_MD_MAX_SIZE	(1 << 7)
+>> +#define LNET_MD_MAX_SIZE	BIT(7)
+>>  /** See lnet_md::options. */
+>> -#define LNET_MD_KIOV		(1 << 8)
+>> +#define LNET_MD_KIOV		BIT(8)
 >>  
->>  static int
->> -lnet_dyn_configure(struct libcfs_ioctl_hdr *hdr)
->> +lnet_dyn_configure_net(struct libcfs_ioctl_hdr *hdr)
->>  {
->>  	struct lnet_ioctl_config_data *conf =
->>  		(struct lnet_ioctl_config_data *)hdr;
->> @@ -102,19 +102,17 @@ lnet_dyn_configure(struct libcfs_ioctl_hdr *hdr)
->>  		return -EINVAL;
->>  
->>  	mutex_lock(&lnet_config_mutex);
->> -	if (!the_lnet.ln_niinit_self) {
->> +	if (the_lnet.ln_niinit_self)
->> +		rc = lnet_dyn_add_net(conf);
->> +	else
->>  		rc = -EINVAL;
->> -		goto out_unlock;
->> -	}
->> -	rc = lnet_dyn_add_ni(LNET_PID_LUSTRE, conf);
->> -out_unlock:
->>  	mutex_unlock(&lnet_config_mutex);
->>  
->>  	return rc;
->>  }
->>  
->>  static int
->> -lnet_dyn_unconfigure(struct libcfs_ioctl_hdr *hdr)
->> +lnet_dyn_unconfigure_net(struct libcfs_ioctl_hdr *hdr)
->>  {
->>  	struct lnet_ioctl_config_data *conf =
->>  		(struct lnet_ioctl_config_data *)hdr;
->> @@ -124,12 +122,50 @@ lnet_dyn_unconfigure(struct libcfs_ioctl_hdr *hdr)
->>  		return -EINVAL;
->>  
->>  	mutex_lock(&lnet_config_mutex);
->> -	if (!the_lnet.ln_niinit_self) {
->> +	if (the_lnet.ln_niinit_self)
->> +		rc = lnet_dyn_del_net(conf->cfg_net);
->> +	else
->> +		rc = -EINVAL;
->> +	mutex_unlock(&lnet_config_mutex);
->> +
->> +	return rc;
->> +}
->> +
->> +static int
->> +lnet_dyn_configure_ni(struct libcfs_ioctl_hdr *hdr)
->> +{
->> +	struct lnet_ioctl_config_ni *conf =
->> +		(struct lnet_ioctl_config_ni *)hdr;
->> +	int rc;
->> +
->> +	if (conf->lic_cfg_hdr.ioc_len < sizeof(*conf))
->> +		return -EINVAL;
->> +
->> +	mutex_lock(&lnet_config_mutex);
->> +	if (the_lnet.ln_niinit_self)
->> +		rc = lnet_dyn_add_ni(conf);
->> +	else
->> +		rc = -EINVAL;
->> +	mutex_unlock(&lnet_config_mutex);
->> +
->> +	return rc;
->> +}
->> +
->> +static int
->> +lnet_dyn_unconfigure_ni(struct libcfs_ioctl_hdr *hdr)
->> +{
->> +	struct lnet_ioctl_config_ni *conf =
->> +		(struct lnet_ioctl_config_ni *)hdr;
->> +	int rc;
->> +
->> +	if (conf->lic_cfg_hdr.ioc_len < sizeof(*conf))
->> +		return -EINVAL;
->> +
->> +	mutex_lock(&lnet_config_mutex);
->> +	if (the_lnet.ln_niinit_self)
->> +		rc = lnet_dyn_del_ni(conf);
->> +	else
->>  		rc = -EINVAL;
->> -		goto out_unlock;
->> -	}
->> -	rc = lnet_dyn_del_ni(conf->cfg_net);
->> -out_unlock:
->>  	mutex_unlock(&lnet_config_mutex);
->>  
->>  	return rc;
->> @@ -161,11 +197,17 @@ lnet_ioctl(struct notifier_block *nb,
->>  		break;
->>  
->>  	case IOC_LIBCFS_ADD_NET:
->> -		rc = lnet_dyn_configure(hdr);
->> +		rc = lnet_dyn_configure_net(hdr);
->>  		break;
->>  
->>  	case IOC_LIBCFS_DEL_NET:
->> -		rc = lnet_dyn_unconfigure(hdr);
->> +		rc = lnet_dyn_unconfigure_net(hdr);
->> +
->> +	case IOC_LIBCFS_ADD_LOCAL_NI:
->> +		return lnet_dyn_configure_ni(hdr);
->> +
->> +	case IOC_LIBCFS_DEL_LOCAL_NI:
->> +		return lnet_dyn_unconfigure_ni(hdr);
->>  		break;
->>  
->>  	default:
->
-> While the above is mostly correct for the OpenSFS branch that is
-> not the case for the linux client version. The above code assumes
-> we are using libc_register_ioctl() but that was replace by the
-> block_notifier handling for ioctls instead. What we want instead is
->
->         case IOC_LIBCFS_DEL_NET:
->                 rc = lnet_dyn_unconfigure_net(hdr);
->                 break;
->
->         case IOC_LIBCFS_ADD_LOCAL_NI:
->                 rc = lnet_dyn_configure_ni(hdr);
->                 break;
->
->         case IOC_LIBCFS_DEL_LOCAL_NI:
->                 rc = lnet_dyn_unconfigure_ni(hdr);
->                 break;
->
-> that way the return value is generated by notifier_from_ioctl_errno(rc).
-> This resolves the last bug in see in this patch set with my testing.
-
-Darn - I should have noticed that !  I've fixed it now.
-Thanks a lot,
-NeilBrown
+>>  /* For compatibility with Cray Portals */
+>>  #define LNET_MD_PHYS		0
+>> 
+>> 
+>> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181002/bb579732/attachment-0001.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181002/ac115ffd/attachment.sig>
