@@ -1,85 +1,69 @@
 From: NeilBrown <neilb@suse.com>
-Date: Tue, 02 Oct 2018 13:31:59 +1000
-Subject: [lustre-devel] [PATCH 33/34] lnet: use BIT() macro for
- LNET_MD_* flags
-In-Reply-To: <alpine.LFD.2.21.1809281724200.19403@casper.infradead.org>
+Date: Tue, 02 Oct 2018 13:41:26 +1000
+Subject: [lustre-devel] [PATCH 00/34] lustre: remainder of multi-rail
+ series.
+In-Reply-To: <alpine.LFD.2.21.1809300305290.25547@casper.infradead.org>
 References: <153783752960.32103.8394391715843917125.stgit@noble>
- <153783763611.32103.14845537928418369718.stgit@noble>
- <alpine.LFD.2.21.1809281724200.19403@casper.infradead.org>
-Message-ID: <87h8i5rplc.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1809300305290.25547@casper.infradead.org>
+Message-ID: <87efd9rp5l.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Fri, Sep 28 2018, James Simmons wrote:
+On Sun, Sep 30 2018, James Simmons wrote:
 
->> As these are bit flags, it aids clarity to use the BIT()
->> macro.
+>> Hi,
+>>  following is the remainder of the Multi-Rail series, ported
+>>  to drivers/staging.
+>>  The previous series was only the first patch from upstream.
+>>  This series is mostly the individual patches from upstream,
+>>  though I did split some up a bit, and merged at least one bugfix back
+>>  to where the bug was introduced.
+>> 
+>>  Comments, review, and explanations of bits I didn't understand, are
+>>  most welcome.  I confess that I haven't looked at the code very
+>>  closely, just a superficially scan for things that look odd (there
+>>  weren't many).
 >
-> Nak. BIT is not for UAPI headers. Including this will break building
-> userland applications.
+> Thanks for doing this. It makes my life easier. With the patches:
+>
+> lustre: lnet: copy the correct amount of cpts to lnet_cpts
+> lustre: lnd: resolve IP query code in LND drivers
 
-Apparently not everyone knows this:
+I've moved these two to the top of the series.
 
-$ git grep  '[^A-Z_]BIT(' include/uapi/ | wc -l
-11
+>
+> and the fixup in patch 11 it runs flawless in my testing. I do recommend
+> land the two above patches first so no git bisect will end up blowing up
+> someones nodes :-)
+>
+> Just have a bunch of commit recommendations. I noticed some MR patches
+> landed to the main lustre branch. Perhaps those should be fixed as well.
+> The only reason I ask is that I worry about kernel developers might not
+> like that style of commit messages. In the past Greg pointed such things
+> out to me. Thanks for hearing me out about that concern.
 
-However, it makes sense - thanks.
-I've removed all the BITs that I added.
+While I hope that this will eventually get merged by Linus pulling my
+tree, complete with history, that might not work out.  New clean patches
+might be required.
+But if pulling my tree is an option, Greg (at least) cannot in good
+faith complain about the commit messages or patch breakdown as he
+explicitly said that we would be freed from that requirement by working
+out-of-tree.  So I'm inclined not to put much effort into things that
+don't benefit us now.
 
+>
+> I will poke Doug about looking at some of the commit messages you had
+> concern about.
+
+Thanks,
 NeilBrown
-
->  
->> Signed-off-by: NeilBrown <neilb@suse.com>
->> ---
->>  .../lustre/include/uapi/linux/lnet/lnet-types.h    |   18 +++++++++---------
->>  1 file changed, 9 insertions(+), 9 deletions(-)
->> 
->> diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
->> index e80ef4182e5d..62f062c0d1bf 100644
->> --- a/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
->> +++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnet-types.h
->> @@ -483,22 +483,22 @@ struct lnet_md {
->>  /**
->>   * Options for the MD structure. See lnet_md::options.
->>   */
->> -#define LNET_MD_OP_PUT		(1 << 0)
->> +#define LNET_MD_OP_PUT		BIT(0)
->>  /** See lnet_md::options. */
->> -#define LNET_MD_OP_GET		(1 << 1)
->> +#define LNET_MD_OP_GET		BIT(1)
->>  /** See lnet_md::options. */
->> -#define LNET_MD_MANAGE_REMOTE	(1 << 2)
->> -/* unused			(1 << 3) */
->> +#define LNET_MD_MANAGE_REMOTE	BIT(2)
->> +/* unused			BIT(3) */
->>  /** See lnet_md::options. */
->> -#define LNET_MD_TRUNCATE	(1 << 4)
->> +#define LNET_MD_TRUNCATE	BIT(4)
->>  /** See lnet_md::options. */
->> -#define LNET_MD_ACK_DISABLE	(1 << 5)
->> +#define LNET_MD_ACK_DISABLE	BIT(5)
->>  /** See lnet_md::options. */
->> -#define LNET_MD_IOVEC		(1 << 6)
->> +#define LNET_MD_IOVEC		BIT(6)
->>  /** See lnet_md::options. */
->> -#define LNET_MD_MAX_SIZE	(1 << 7)
->> +#define LNET_MD_MAX_SIZE	BIT(7)
->>  /** See lnet_md::options. */
->> -#define LNET_MD_KIOV		(1 << 8)
->> +#define LNET_MD_KIOV		BIT(8)
->>  
->>  /* For compatibility with Cray Portals */
->>  #define LNET_MD_PHYS		0
->> 
->> 
->> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181002/ac115ffd/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181002/2e4a2df7/attachment.sig>
