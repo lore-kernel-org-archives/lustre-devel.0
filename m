@@ -1,166 +1,125 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 14 Oct 2018 14:55:29 -0400
-Subject: [lustre-devel] [PATCH 07/10] lustre: lnd: remove concurrent_sends
- tunable
-In-Reply-To: <1539543332-28679-1-git-send-email-jsimmons@infradead.org>
-References: <1539543332-28679-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1539543332-28679-8-git-send-email-jsimmons@infradead.org>
+Date: Sun, 14 Oct 2018 14:57:50 -0400
+Subject: [lustre-devel] [PATCH 00/28] lustre: more assorted fixes for lustre
+ 2.10
+Message-ID: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Amir Shehata <ashehata@whamcloud.com>
+Another bacth of assorted fixes missing in the linux client from
+lustre 2.10. All of these should be order independent and don't
+collide with the PFL work that will land at a later date.
 
-Concurrent sends tunable was intended to limit the number of in-flight
-transfers per connection. However queue depth does the exact same job.
-So for example if the queue depth is negotiated to 16 and
-concurrent_sends is set to 32, the maximum number of in-flight
-transfers doesn't exceed 16. There is no need to keep concurrent_sends
-around since it doesn't add any unique functionality
+Alex Zhuravlev (2):
+  lustre: llite: use security context if it's enabled in the kernel
+  lustre: ptlrpc: do not wakeup every second
 
-Signed-off-by: Amir Shehata <ashehata@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10291
-Reviewed-on: https://review.whamcloud.com/30312
-WC-bug-id: https://jira.whamcloud.com/browse/LU-10459
-Reviewed-on: https://review.whamcloud.com/30751
-Reviewed-by: Alexey Lyashkov <c17817@cray.com>
-Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
-Reviewed-by: Doug Oucharek <dougso@me.com>
-Reviewed-by: James Simmons <uja.ornl@yahoo.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
-Signed-off-by: James Simmons <jsimmons@infradead.org>
----
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    | 23 +----------------
- .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c |  5 ++--
- .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  | 29 +---------------------
- 3 files changed, 4 insertions(+), 53 deletions(-)
+Andreas Dilger (2):
+  lustre: mdc: improve mdc_enqueue() error message
+  lustre: obdclass: deprecate OBD_GET_VERSION ioctl
 
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-index c6c8106..c882345 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
-@@ -141,8 +141,7 @@ struct kib_tunables {
- #define IBLND_RECV_WRS(c)	IBLND_RX_MSGS(c)
- 
- #define IBLND_CQ_ENTRIES(c)	\
--	(IBLND_RECV_WRS(c) + 2 * kiblnd_concurrent_sends(c->ibc_version, \
--							 c->ibc_peer->ibp_ni))
-+	(IBLND_RECV_WRS(c) + 2 * c->ibc_queue_depth)
- 
- struct kib_hca_dev;
- 
-@@ -617,26 +616,6 @@ struct kib_peer_ni {
- 
- int kiblnd_msg_queue_size(int version, struct lnet_ni *ni);
- 
--static inline int
--kiblnd_concurrent_sends(int version, struct lnet_ni *ni)
--{
--	struct lnet_ioctl_config_o2iblnd_tunables *tunables;
--	int concurrent_sends;
--
--	tunables = &ni->ni_lnd_tunables.lnd_tun_u.lnd_o2ib;
--	concurrent_sends = tunables->lnd_concurrent_sends;
--
--	if (version == IBLND_MSG_VERSION_1) {
--		if (concurrent_sends > IBLND_MSG_QUEUE_SIZE_V1 * 2)
--			return IBLND_MSG_QUEUE_SIZE_V1 * 2;
--
--		if (concurrent_sends < IBLND_MSG_QUEUE_SIZE_V1 / 2)
--			return IBLND_MSG_QUEUE_SIZE_V1 / 2;
--	}
--
--	return concurrent_sends;
--}
--
- static inline void
- kiblnd_hdev_addref_locked(struct kib_hca_dev *hdev)
- {
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-index 9d30f31..1f31798 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c
-@@ -787,7 +787,6 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- {
- 	struct kib_msg *msg = tx->tx_msg;
- 	struct kib_peer_ni *peer_ni = conn->ibc_peer;
--	struct lnet_ni *ni = peer_ni->ibp_ni;
- 	int ver = conn->ibc_version;
- 	int rc;
- 	int done;
-@@ -803,7 +802,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 	LASSERT(conn->ibc_credits >= 0);
- 	LASSERT(conn->ibc_credits <= conn->ibc_queue_depth);
- 
--	if (conn->ibc_nsends_posted == kiblnd_concurrent_sends(ver, ni)) {
-+	if (conn->ibc_nsends_posted == conn->ibc_queue_depth) {
- 		/* tx completions outstanding... */
- 		CDEBUG(D_NET, "%s: posted enough\n",
- 		       libcfs_nid2str(peer_ni->ibp_nid));
-@@ -953,7 +952,7 @@ static int kiblnd_map_tx(struct lnet_ni *ni, struct kib_tx *tx,
- 		return;
- 	}
- 
--	LASSERT(conn->ibc_nsends_posted <= kiblnd_concurrent_sends(ver, ni));
-+	LASSERT(conn->ibc_nsends_posted <= conn->ibc_queue_depth);
- 	LASSERT(!IBLND_OOB_CAPABLE(ver) ||
- 		conn->ibc_noops_posted <= IBLND_OOB_MSGS(ver));
- 	LASSERT(conn->ibc_reserved_credits >= 0);
-diff --git a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-index 7fc6a8a..47e8a60 100644
---- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-+++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c
-@@ -109,7 +109,7 @@
- 
- static int concurrent_sends;
- module_param(concurrent_sends, int, 0444);
--MODULE_PARM_DESC(concurrent_sends, "send work-queue sizing");
-+MODULE_PARM_DESC(concurrent_sends, "send work-queue sizing (obsolete)");
- 
- static bool use_fastreg_gaps;
- module_param(use_fastreg_gaps, bool, 0444);
-@@ -277,32 +277,6 @@ int kiblnd_tunables_setup(struct lnet_ni *ni)
- 	if (tunables->lnd_peercredits_hiw >= net_tunables->lct_peer_tx_credits)
- 		tunables->lnd_peercredits_hiw = net_tunables->lct_peer_tx_credits - 1;
- 
--	if (tunables->lnd_concurrent_sends == 0)
--		tunables->lnd_concurrent_sends = net_tunables->lct_peer_tx_credits;
--
--	if (!tunables->lnd_concurrent_sends) {
--		if (tunables->lnd_map_on_demand > 0 &&
--		    tunables->lnd_map_on_demand <= IBLND_MAX_RDMA_FRAGS / 8) {
--			tunables->lnd_concurrent_sends =
--					net_tunables->lct_peer_tx_credits * 2;
--		} else {
--			tunables->lnd_concurrent_sends =
--				net_tunables->lct_peer_tx_credits;
--		}
--	}
--
--	if (tunables->lnd_concurrent_sends > net_tunables->lct_peer_tx_credits * 2)
--		tunables->lnd_concurrent_sends = net_tunables->lct_peer_tx_credits * 2;
--
--	if (tunables->lnd_concurrent_sends < net_tunables->lct_peer_tx_credits / 2)
--		tunables->lnd_concurrent_sends = net_tunables->lct_peer_tx_credits / 2;
--
--	if (tunables->lnd_concurrent_sends < net_tunables->lct_peer_tx_credits) {
--		CWARN("Concurrent sends %d is lower than message queue size: %d, performance may drop slightly.\n",
--		      tunables->lnd_concurrent_sends,
--		      net_tunables->lct_peer_tx_credits);
--	}
--
- 	if (!tunables->lnd_fmr_pool_size)
- 		tunables->lnd_fmr_pool_size = fmr_pool_size;
- 	if (!tunables->lnd_fmr_flush_trigger)
-@@ -324,7 +298,6 @@ void kiblnd_tunables_init(void)
- 	default_tunables.lnd_version = 0;
- 	default_tunables.lnd_peercredits_hiw = peer_credits_hiw;
- 	default_tunables.lnd_map_on_demand = map_on_demand;
--	default_tunables.lnd_concurrent_sends = concurrent_sends;
- 	default_tunables.lnd_fmr_pool_size = fmr_pool_size;
- 	default_tunables.lnd_fmr_flush_trigger = fmr_flush_trigger;
- 	default_tunables.lnd_fmr_cache = fmr_cache;
+Andrew Perepechko (1):
+  lustre: osc: osc_extent_tree_dump0() implementation is suboptimal
+
+Andriy Skulysh (1):
+  lustre: ldlm: ELC shouldn't wait on lock flush
+
+Bob Glossman (1):
+  lustre: ptlrpc: handle case of epp_free_pages <= PTLRPC_MAX_BRW_PAGES
+
+Doug Oucharek (1):
+  lustre: ptlrpc: Do not assert when bd_nob_transferred != 0
+
+Fan Yong (1):
+  lustre: llite: control concurrent statahead instances
+
+Frank Zago (1):
+  lustre: llite: fix for stat under kthread and X86_X32
+
+Henri Doreau (2):
+  lustre: hsm: add kkuc before sending registration RPCs
+  lustre: mdc: expose changelog through char devices
+
+Hongchao Zhang (1):
+  lustre: llite: IO accounting of page read
+
+James Simmons (5):
+  lustre: uapi: add back LUSTRE_MAXFSNAME to lustre_user.h
+  lustre: uapi: add missing headers in lustre UAPI headers
+  lustre: llite: enhance vvp_dev data structure naming
+  lustre: clio: update spare bit handling
+  lustre: llite: restore lld_nfs_dentry handling
+
+Jinshan Xiong (2):
+  lustre: llite: pipeline readahead better with large I/O
+  lustre: ldlm: check lock cancellation in ldlm_cli_cancel()
+
+John L. Hammond (2):
+  lustre: llog: fix EOF handling in llog_client_next_block()
+  lustre: mdc: set correct body eadatasize for getxattr()
+
+Lai Siyao (3):
+  lustre: ptlrpc: missing barrier before wake_up
+  lustre: statahead: missing barrier before wake_up
+  lustre: llite: disable statahead if starting statahead fail
+
+Patrick Farrell (3):
+  lustre: llite: Read ahead should return pages read
+  lustre: llite: Update i_nlink on unlink
+  lustre: ldlm: Make lru clear always discard read lock pages
+
+ .../lustre/include/uapi/linux/lnet/libcfs_debug.h  |   2 +
+ .../lustre/include/uapi/linux/lnet/lnetctl.h       |   1 +
+ .../lustre/include/uapi/linux/lnet/nidstr.h        |   1 +
+ .../lustre/include/uapi/linux/lustre/lustre_cfg.h  |   1 +
+ .../lustre/include/uapi/linux/lustre/lustre_fid.h  |   1 +
+ .../include/uapi/linux/lustre/lustre_fiemap.h      |   1 +
+ .../include/uapi/linux/lustre/lustre_ioctl.h       |   2 +-
+ .../include/uapi/linux/lustre/lustre_kernelcomm.h  |   3 -
+ .../include/uapi/linux/lustre/lustre_ostid.h       |   1 +
+ .../lustre/include/uapi/linux/lustre/lustre_user.h |   9 +-
+ drivers/staging/lustre/lustre/include/cl_object.h  |   2 +-
+ .../lustre/lustre/include/lustre_dlm_flags.h       |   2 +-
+ drivers/staging/lustre/lustre/include/lustre_net.h |   2 +
+ drivers/staging/lustre/lustre/include/obd.h        |  18 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |  20 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_lib.c      |   2 +
+ drivers/staging/lustre/lustre/ldlm/ldlm_lock.c     |  13 -
+ drivers/staging/lustre/lustre/ldlm/ldlm_request.c  |  66 +-
+ drivers/staging/lustre/lustre/ldlm/ldlm_resource.c |   6 +-
+ drivers/staging/lustre/lustre/llite/dir.c          |  14 +-
+ drivers/staging/lustre/lustre/llite/file.c         |  25 +-
+ drivers/staging/lustre/lustre/llite/lcommon_cl.c   |   4 +-
+ .../staging/lustre/lustre/llite/llite_internal.h   |  39 +-
+ drivers/staging/lustre/lustre/llite/llite_lib.c    |  22 +-
+ drivers/staging/lustre/lustre/llite/lproc_llite.c  |  37 ++
+ drivers/staging/lustre/lustre/llite/namei.c        |  12 +-
+ drivers/staging/lustre/lustre/llite/rw.c           |  57 +-
+ drivers/staging/lustre/lustre/llite/statahead.c    |  39 +-
+ drivers/staging/lustre/lustre/llite/vvp_dev.c      |  54 +-
+ drivers/staging/lustre/lustre/lmv/lmv_obd.c        |  57 +-
+ drivers/staging/lustre/lustre/mdc/Makefile         |   2 +-
+ drivers/staging/lustre/lustre/mdc/mdc_changelog.c  | 722 +++++++++++++++++++++
+ drivers/staging/lustre/lustre/mdc/mdc_internal.h   |   4 +
+ drivers/staging/lustre/lustre/mdc/mdc_lib.c        |  10 +-
+ drivers/staging/lustre/lustre/mdc/mdc_locks.c      |  11 +-
+ drivers/staging/lustre/lustre/mdc/mdc_request.c    | 198 +-----
+ drivers/staging/lustre/lustre/obdclass/class_obd.c |  18 +-
+ drivers/staging/lustre/lustre/obdclass/obd_mount.c |   2 +-
+ drivers/staging/lustre/lustre/osc/osc_cache.c      |   7 +-
+ .../staging/lustre/lustre/osc/osc_cl_internal.h    |   2 +-
+ drivers/staging/lustre/lustre/osc/osc_io.c         |   6 +-
+ drivers/staging/lustre/lustre/osc/osc_lock.c       |  10 +-
+ drivers/staging/lustre/lustre/osc/osc_object.c     |   2 +-
+ drivers/staging/lustre/lustre/ptlrpc/llog_client.c |  24 +-
+ drivers/staging/lustre/lustre/ptlrpc/niobuf.c      |   8 +-
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c     |   4 +-
+ drivers/staging/lustre/lustre/ptlrpc/sec_bulk.c    |  11 +-
+ 47 files changed, 1150 insertions(+), 404 deletions(-)
+ create mode 100644 drivers/staging/lustre/lustre/mdc/mdc_changelog.c
+
 -- 
 1.8.3.1
