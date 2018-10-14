@@ -1,55 +1,136 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 14 Oct 2018 14:58:02 -0400
-Subject: [lustre-devel] [PATCH 12/28] lustre: ptlrpc: do not wakeup every
- second
+Date: Sun, 14 Oct 2018 14:58:05 -0400
+Subject: [lustre-devel] [PATCH 15/28] lustre: llite: fix for stat under
+ kthread and X86_X32
 In-Reply-To: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
 References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1539543498-29105-13-git-send-email-jsimmons@infradead.org>
+Message-ID: <1539543498-29105-16-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Alex Zhuravlev <bzzz@whamcloud.com>
+From: Frank Zago <fzago@cray.com>
 
-Even if there are no RPC requests on the set, there is no need to
-wake up every second. The thread is woken up when a request is added
-to the set or when the STOP bit is set, so it is sufficient to only
-wake up when there are requests on the set to worry about.
+Under the following conditions, ll_getattr will flatten the inode
+number when it shouldn't:
 
-Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-9660
-Reviewed-on: https://review.whamcloud.com/28776
+ - the X86_X32 architecture is defined CONFIG_X86_X32, and not even
+   used,
+ - ll_getattr is called from a kernel thread (though vfs_getattr for
+   instance.)
+
+This has the result that inode numbers are different whether the same
+file is stat'ed from a kernel thread, or from a syscall. For instance,
+4198401 vs. 144115205272502273.
+
+ll_getattr calls ll_need_32bit_api to determine whether the task is 32
+bits. When the combination is kthread+X86_X32, that function returns
+that the task is 32 bits, which is incorrect, as the kernel is 64
+bits.
+
+The solution is to check whether the call is from a kernel thread
+(which is 64 bits) and act consequently.
+
+Signed-off-by: Frank Zago <fzago@cray.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9468
+Reviewed-on: https://review.whamcloud.com/26992
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: Patrick Farrell <paf@cray.com>
-Reviewed-by: Oleg Drokin <green@whamcloud.com>
+Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/lustre/lustre/llite/dir.c          |  6 +++---
+ drivers/staging/lustre/lustre/llite/lcommon_cl.c   |  2 +-
+ .../staging/lustre/lustre/llite/llite_internal.h   | 22 +++++++++++++++++-----
+ 3 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-index c201a88..5b4977b 100644
---- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-+++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
-@@ -371,7 +371,7 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
- 		}
- 	}
+diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
+index 231b351..19c5e9c 100644
+--- a/drivers/staging/lustre/lustre/llite/dir.c
++++ b/drivers/staging/lustre/lustre/llite/dir.c
+@@ -202,7 +202,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
+ {
+ 	struct ll_sb_info    *sbi	= ll_i2sbi(inode);
+ 	__u64		   pos		= *ppos;
+-	int		   is_api32 = ll_need_32bit_api(sbi);
++	bool is_api32 = ll_need_32bit_api(sbi);
+ 	int		   is_hash64 = sbi->ll_flags & LL_SBI_64BIT_HASH;
+ 	struct page	  *page;
+ 	bool		   done = false;
+@@ -296,7 +296,7 @@ static int ll_readdir(struct file *filp, struct dir_context *ctx)
+ 	struct ll_sb_info	*sbi	= ll_i2sbi(inode);
+ 	__u64 pos = lfd ? lfd->lfd_pos : 0;
+ 	int			hash64	= sbi->ll_flags & LL_SBI_64BIT_HASH;
+-	int			api32	= ll_need_32bit_api(sbi);
++	bool api32 = ll_need_32bit_api(sbi);
+ 	struct md_op_data *op_data;
+ 	int			rc;
  
--	return rc;
-+	return rc || test_bit(LIOD_STOP, &pc->pc_flags);
- }
+@@ -1674,7 +1674,7 @@ static loff_t ll_dir_seek(struct file *file, loff_t offset, int origin)
+ 	struct inode *inode = file->f_mapping->host;
+ 	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
+ 	struct ll_sb_info *sbi = ll_i2sbi(inode);
+-	int api32 = ll_need_32bit_api(sbi);
++	bool api32 = ll_need_32bit_api(sbi);
+ 	loff_t ret = -EINVAL;
  
+ 	switch (origin) {
+diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+index 30f17ea..20a3c74 100644
+--- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
++++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
+@@ -267,7 +267,7 @@ void cl_inode_fini(struct inode *inode)
  /**
-@@ -441,7 +441,7 @@ static int ptlrpcd(void *arg)
- 		lu_context_enter(env.le_ses);
- 		if (wait_event_idle_timeout(set->set_waitq,
- 					    ptlrpcd_check(&env, pc),
--					    (timeout ? timeout : 1) * HZ) == 0)
-+					    timeout * HZ) == 0)
- 			ptlrpc_expired_set(set);
+  * build inode number from passed @fid
+  */
+-__u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
++u64 cl_fid_build_ino(const struct lu_fid *fid, bool api32)
+ {
+ 	if (BITS_PER_LONG == 32 || api32)
+ 		return fid_flatten32(fid);
+diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
+index dcb2fed..796a8ae 100644
+--- a/drivers/staging/lustre/lustre/llite/llite_internal.h
++++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
+@@ -651,13 +651,25 @@ static inline struct inode *ll_info2i(struct ll_inode_info *lli)
+ __u32 ll_i2suppgid(struct inode *i);
+ void ll_i2gids(__u32 *suppgids, struct inode *i1, struct inode *i2);
  
- 		lu_context_exit(&env.le_ctx);
+-static inline int ll_need_32bit_api(struct ll_sb_info *sbi)
++static inline bool ll_need_32bit_api(struct ll_sb_info *sbi)
+ {
+ #if BITS_PER_LONG == 32
+-	return 1;
++	return true;
+ #elif defined(CONFIG_COMPAT)
+-	return unlikely(in_compat_syscall() ||
+-			(sbi->ll_flags & LL_SBI_32BIT_API));
++	if (unlikely(sbi->ll_flags & LL_SBI_32BIT_API))
++		return true;
++
++#ifdef CONFIG_X86_X32
++	/* in_compat_syscall() returns true when called from a kthread
++	 * and CONFIG_X86_X32 is enabled, which is wrong. So check
++	 * whether the caller comes from a syscall (ie. not a kthread)
++	 * before calling in_compat_syscall().
++	 */
++	if (current->flags & PF_KTHREAD)
++		return false;
++#endif
++
++	return unlikely(in_compat_syscall());
+ #else
+ 	return unlikely(sbi->ll_flags & LL_SBI_32BIT_API);
+ #endif
+@@ -1353,7 +1365,7 @@ int cl_setattr_ost(struct cl_object *obj, const struct iattr *attr,
+ int cl_file_inode_init(struct inode *inode, struct lustre_md *md);
+ void cl_inode_fini(struct inode *inode);
+ 
+-__u64 cl_fid_build_ino(const struct lu_fid *fid, int api32);
++u64 cl_fid_build_ino(const struct lu_fid *fid, bool api32);
+ __u32 cl_fid_build_gen(const struct lu_fid *fid);
+ 
+ #endif /* LLITE_INTERNAL_H */
 -- 
 1.8.3.1
