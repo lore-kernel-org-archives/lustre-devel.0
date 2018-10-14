@@ -1,11 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 14 Oct 2018 21:20:15 +0100 (BST)
-Subject: [lustre-devel] [PATCH 12/24] lustre: lnet: preferred NIs for
- non-Multi-Rail peers
-In-Reply-To: <153895437800.16383.15417431282816541221.stgit@noble>
+Date: Sun, 14 Oct 2018 21:32:07 +0100 (BST)
+Subject: [lustre-devel] [PATCH 13/24] lustre: lnet: add
+ LNET_PEER_CONFIGURED flag
+In-Reply-To: <153895437804.16383.1008375422641070080.stgit@noble>
 References: <153895417139.16383.3791701638653772865.stgit@noble>
- <153895437800.16383.15417431282816541221.stgit@noble>
-Message-ID: <alpine.LFD.2.21.1810142119520.9543@casper.infradead.org>
+ <153895437804.16383.1008375422641070080.stgit@noble>
+Message-ID: <alpine.LFD.2.21.1810142131510.9543@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -15,566 +15,692 @@ To: lustre-devel@lists.lustre.org
 
 > From: Olaf Weber <olaf@sgi.com>
 > 
-> When a node sends a message to a peer NI, there may be
-> a preferred local NI that should be the source of the
-> message. This is in particular the case for non-Multi-
-> Rail (NMR) peers, as an NMR peer depends in some cases
-> on the source address of a message to correctly identify
-> its origin. (This as opposed to using a UUID provided by
-> a higher protocol layer.)
+> Add the LNET_PEER_CONFIGURED flag, which indicates that a peer
+> has been configured by DLC. This is used to enforce that only
+> DLC can modify such a peer.
 > 
-> Implement this by keeping an array of preferred local
-> NIDs in the lnet_peer_ni structure. The case where only
-> a single NID needs to be stored is optimized so that this
-> can be done without needing to allocate any memory.
-> 
-> A flag in the lnet_peer_ni, LNET_PEER_NI_NON_MR_PREF,
-> indicates that the preferred NI was automatically added
-> for an NMR peer. Note that a peer which has not been
-> explicitly configured as Multi-Rail will be treated as
-> non-Multi-Rail until proven otherwise. These automatic
-> preferences will be cleared if the peer is changed to
-> Multi-Rail.
-> 
-> - lnet_peer_ni_set_non_mr_pref_nid()
->   set NMR preferred NI for peer_ni
-> - lnet_peer_ni_clr_non_mr_pref_nid()
->   clear NMR preferred NI for peer_ni
-> - lnet_peer_clr_non_mr_pref_nids()
->   clear NMR preferred NIs for all peer_ni
-> 
-> - lnet_peer_add_pref_nid()
->   add a preferred NID
-> - lnet_peer_del_pref_nid()
->   delete a preferred NID
+> This includes some further refactoring of the code that creates
+> or modifies peers to ensure that the flag is properly passed
+> through, set, and cleared.
 
 Reviewed-by: James Simmons <jsimmons@infradead.org>
  
 > WC-bug-id: https://jira.whamcloud.com/browse/LU-9480
 > Signed-off-by: Olaf Weber <olaf@sgi.com>
-> Reviewed-on: https://review.whamcloud.com/25782
+> Reviewed-on: https://review.whamcloud.com/25783
 > Reviewed-by: Olaf Weber <olaf.weber@hpe.com>
 > Reviewed-by: Amir Shehata <amir.shehata@intel.com>
 > Tested-by: Amir Shehata <amir.shehata@intel.com>
 > Signed-off-by: NeilBrown <neilb@suse.com>
 > ---
->  .../staging/lustre/include/linux/lnet/lib-lnet.h   |    7 -
->  .../staging/lustre/include/linux/lnet/lib-types.h  |   10 +
->  drivers/staging/lustre/lnet/lnet/lib-move.c        |   49 +++-
->  drivers/staging/lustre/lnet/lnet/peer.c            |  257 +++++++++++++++++++-
->  4 files changed, 285 insertions(+), 38 deletions(-)
+>  .../staging/lustre/include/linux/lnet/lib-lnet.h   |   12 +
+>  .../staging/lustre/include/linux/lnet/lib-types.h  |    1 
+>  drivers/staging/lustre/lnet/lnet/peer.c            |  426 +++++++++++++-------
+>  3 files changed, 290 insertions(+), 149 deletions(-)
 > 
 > diff --git a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-> index 75b47628c70e..2864bd8a403b 100644
+> index 2864bd8a403b..563417510722 100644
 > --- a/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
 > +++ b/drivers/staging/lustre/include/linux/lnet/lib-lnet.h
-> @@ -668,7 +668,8 @@ u32 lnet_get_dlc_seq_locked(void);
->  struct lnet_peer_ni *lnet_get_next_peer_ni_locked(struct lnet_peer *peer,
->  						  struct lnet_peer_net *peer_net,
->  						  struct lnet_peer_ni *prev);
-> -struct lnet_peer_ni *lnet_nid2peerni_locked(lnet_nid_t nid, int cpt);
-> +struct lnet_peer_ni *lnet_nid2peerni_locked(lnet_nid_t nid, lnet_nid_t pref,
-> +					    int cpt);
->  struct lnet_peer_ni *lnet_nid2peerni_ex(lnet_nid_t nid, int cpt);
->  struct lnet_peer_ni *lnet_find_peer_ni_locked(lnet_nid_t nid);
->  void lnet_peer_net_added(struct lnet_net *net);
-> @@ -679,8 +680,8 @@ int lnet_peer_tables_create(void);
->  void lnet_debug_peer(lnet_nid_t nid);
->  struct lnet_peer_net *lnet_peer_get_net_locked(struct lnet_peer *peer,
->  					       u32 net_id);
-> -bool lnet_peer_is_ni_pref_locked(struct lnet_peer_ni *lpni,
-> -				 struct lnet_ni *ni);
-> +bool lnet_peer_is_pref_nid_locked(struct lnet_peer_ni *lpni, lnet_nid_t nid);
-> +int lnet_peer_ni_set_non_mr_pref_nid(struct lnet_peer_ni *lpni, lnet_nid_t nid);
->  int lnet_add_peer_ni(lnet_nid_t key_nid, lnet_nid_t nid, bool mr);
->  int lnet_del_peer_ni(lnet_nid_t key_nid, lnet_nid_t nid);
->  int lnet_get_peer_info(__u32 idx, lnet_nid_t *primary_nid, lnet_nid_t *nid,
+> @@ -764,4 +764,16 @@ lnet_peer_is_multi_rail(struct lnet_peer *lp)
+>  	return lp->lp_state & LNET_PEER_MULTI_RAIL;
+>  }
+>  
+> +static inline bool
+> +lnet_peer_ni_is_configured(struct lnet_peer_ni *lpni)
+> +{
+> +	return lpni->lpni_peer_net->lpn_peer->lp_state & LNET_PEER_CONFIGURED;
+> +}
+> +
+> +static inline bool
+> +lnet_peer_ni_is_primary(struct lnet_peer_ni *lpni)
+> +{
+> +	return lpni->lpni_nid == lpni->lpni_peer_net->lpn_peer->lp_primary_nid;
+> +}
+> +
+>  #endif
 > diff --git a/drivers/staging/lustre/include/linux/lnet/lib-types.h b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> index 602978a1c86e..eff2aed5e5c1 100644
+> index eff2aed5e5c1..d1721fd01d93 100644
 > --- a/drivers/staging/lustre/include/linux/lnet/lib-types.h
 > +++ b/drivers/staging/lustre/include/linux/lnet/lib-types.h
-> @@ -481,14 +481,20 @@ struct lnet_peer_ni {
->  	unsigned int		 lpni_ping_feats;
->  	/* routers on this peer */
->  	struct list_head	 lpni_routes;
-> -	/* array of preferred local nids */
-> -	lnet_nid_t		*lpni_pref_nids;
-> +	/* preferred local nids: if only one, use lpni_pref.nid */
-> +	union lpni_pref {
-> +		lnet_nid_t	nid;
-> +		lnet_nid_t	*nids;
-> +	} lpni_pref;
->  	/* number of preferred NIDs in lnpi_pref_nids */
->  	u32			lpni_pref_nnids;
->  	/* router checker state */
->  	struct lnet_rc_data	*lpni_rcd;
+> @@ -513,6 +513,7 @@ struct lnet_peer {
 >  };
 >  
-> +/* Preferred path added due to traffic on non-MR peer_ni */
-> +#define LNET_PEER_NI_NON_MR_PREF	BIT(0)
-> +
->  struct lnet_peer {
->  	/* chain on global peer list */
->  	struct list_head	lp_on_lnet_peer_list;
-> diff --git a/drivers/staging/lustre/lnet/lnet/lib-move.c b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> index 0d0ad30bb164..99d8b22356bb 100644
-> --- a/drivers/staging/lustre/lnet/lnet/lib-move.c
-> +++ b/drivers/staging/lustre/lnet/lnet/lib-move.c
-> @@ -1267,7 +1267,7 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
->  	 * existing peer_ni, or create one and mark it as having been
->  	 * created due to network traffic.
->  	 */
-> -	lpni = lnet_nid2peerni_locked(dst_nid, cpt);
-> +	lpni = lnet_nid2peerni_locked(dst_nid, LNET_NID_ANY, cpt);
->  	if (IS_ERR(lpni)) {
->  		lnet_net_unlock(cpt);
->  		return PTR_ERR(lpni);
-> @@ -1281,14 +1281,6 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
->  		return -EHOSTUNREACH;
->  	}
+>  #define LNET_PEER_MULTI_RAIL	BIT(0)
+> +#define LNET_PEER_CONFIGURED	BIT(1)
 >  
-> -	if (!lnet_peer_is_multi_rail(peer) &&
-> -	    lnet_get_num_peer_nis(peer) > 1) {
-> -		lnet_net_unlock(cpt);
-> -		CERROR("peer %s is declared to be non MR capable, yet configured with more than one NID\n",
-> -		       libcfs_nid2str(dst_nid));
-> -		return -EINVAL;
-> -	}
-> -
->  	/*
->  	 * STEP 1: first jab at determining best_ni
->  	 * if src_nid is explicitly specified, then best_ni is already
-> @@ -1373,8 +1365,14 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
->  	}
->  
->  	/*
-> -	 * if the peer is not MR capable, then we should always send to it
-> -	 * using the first NI in the NET we determined.
-> +	 * We must use a consistent source address when sending to a
-> +	 * non-MR peer. However, a non-MR peer can have multiple NIDs
-> +	 * on multiple networks, and we may even need to talk to this
-> +	 * peer on multiple networks -- certain types of
-> +	 * load-balancing configuration do this.
-> +	 *
-> +	 * So we need to pick the NI the peer prefers for this
-> +	 * particular network.
->  	 */
->  	if (!lnet_peer_is_multi_rail(peer)) {
->  		if (!best_lpni) {
-> @@ -1384,10 +1382,26 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
->  			return -EHOSTUNREACH;
->  		}
->  
-> -		/* best ni could be set because src_nid was provided */
-> +		/* best ni is already set if src_nid was provided */
-> +		if (!best_ni) {
-> +			/* Get the target peer_ni */
-> +			peer_net = lnet_peer_get_net_locked(
-> +				peer, LNET_NIDNET(best_lpni->lpni_nid));
-> +			list_for_each_entry(lpni, &peer_net->lpn_peer_nis,
-> +					    lpni_on_peer_net_list) {
-> +				if (lpni->lpni_pref_nnids == 0)
-> +					continue;
-> +				LASSERT(lpni->lpni_pref_nnids == 1);
-> +				best_ni = lnet_nid2ni_locked(
-> +					lpni->lpni_pref.nid, cpt);
-> +				break;
-> +			}
-> +		}
-> +		/* if best_ni is still not set just pick one */
->  		if (!best_ni) {
->  			best_ni = lnet_net2ni_locked(
->  				best_lpni->lpni_net->net_id, cpt);
-> +			/* If there is no best_ni we don't have a route */
->  			if (!best_ni) {
->  				lnet_net_unlock(cpt);
->  				CERROR("no path to %s from net %s\n",
-> @@ -1395,7 +1409,13 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
->  				       libcfs_net2str(best_lpni->lpni_net->net_id));
->  				return -EHOSTUNREACH;
->  			}
-> +			lpni = list_entry(peer_net->lpn_peer_nis.next,
-> +					  struct lnet_peer_ni,
-> +					  lpni_on_peer_net_list);
->  		}
-> +		/* Set preferred NI if necessary. */
-> +		if (lpni->lpni_pref_nnids == 0)
-> +			lnet_peer_ni_set_non_mr_pref_nid(lpni, best_ni->ni_nid);
->  	}
->  
->  	/*
-> @@ -1593,7 +1613,8 @@ lnet_select_pathway(lnet_nid_t src_nid, lnet_nid_t dst_nid,
->  		 */
->  		if (!lnet_is_peer_ni_healthy_locked(lpni))
->  			continue;
-> -		ni_is_pref = lnet_peer_is_ni_pref_locked(lpni, best_ni);
-> +		ni_is_pref = lnet_peer_is_pref_nid_locked(lpni,
-> +							  best_ni->ni_nid);
->  
->  		/* if this is a preferred peer use it */
->  		if (!preferred && ni_is_pref) {
-> @@ -2380,7 +2401,7 @@ lnet_parse(struct lnet_ni *ni, struct lnet_hdr *hdr, lnet_nid_t from_nid,
->  	}
->  
->  	lnet_net_lock(cpt);
-> -	lpni = lnet_nid2peerni_locked(from_nid, cpt);
-> +	lpni = lnet_nid2peerni_locked(from_nid, ni->ni_nid, cpt);
->  	if (IS_ERR(lpni)) {
->  		lnet_net_unlock(cpt);
->  		CERROR("%s, src %s: Dropping %s (error %ld looking up sender)\n",
+>  struct lnet_peer_net {
+>  	/* chain on peer block */
 > diff --git a/drivers/staging/lustre/lnet/lnet/peer.c b/drivers/staging/lustre/lnet/lnet/peer.c
-> index cc2b926b76e4..44a2bf641260 100644
+> index 44a2bf641260..09c1b5516f6b 100644
 > --- a/drivers/staging/lustre/lnet/lnet/peer.c
 > +++ b/drivers/staging/lustre/lnet/lnet/peer.c
-> @@ -617,18 +617,233 @@ lnet_get_next_peer_ni_locked(struct lnet_peer *peer,
->  	return lpni;
+> @@ -191,10 +191,10 @@ lnet_peer_alloc(lnet_nid_t nid)
 >  }
 >  
-> +/*
-> + * Test whether a ni is a preferred ni for this peer_ni, e.g, whether
-> + * this is a preferred point-to-point path. Call with lnet_net_lock in
-> + * shared mmode.
-> + */
->  bool
-> -lnet_peer_is_ni_pref_locked(struct lnet_peer_ni *lpni, struct lnet_ni *ni)
-> +lnet_peer_is_pref_nid_locked(struct lnet_peer_ni *lpni, lnet_nid_t nid)
+>  static void
+> -lnet_try_destroy_peer_hierarchy_locked(struct lnet_peer_ni *lpni)
+> +lnet_peer_detach_peer_ni(struct lnet_peer_ni *lpni)
 >  {
->  	int i;
+> -	struct lnet_peer_net *peer_net;
+> -	struct lnet_peer *peer;
+> +	struct lnet_peer_net *lpn;
+> +	struct lnet_peer *lp;
 >  
-> +	if (lpni->lpni_pref_nnids == 0)
-> +		return false;
-> +	if (lpni->lpni_pref_nnids == 1)
-> +		return lpni->lpni_pref.nid == nid;
->  	for (i = 0; i < lpni->lpni_pref_nnids; i++) {
-> -		if (lpni->lpni_pref_nids[i] == ni->ni_nid)
-> +		if (lpni->lpni_pref.nids[i] == nid)
->  			return true;
+>  	/* TODO: could the below situation happen? accessing an already
+>  	 * destroyed peer?
+> @@ -203,24 +203,28 @@ lnet_try_destroy_peer_hierarchy_locked(struct lnet_peer_ni *lpni)
+>  	    !lpni->lpni_peer_net->lpn_peer)
+>  		return;
+>  
+> -	peer_net = lpni->lpni_peer_net;
+> -	peer = lpni->lpni_peer_net->lpn_peer;
+> +	lpn = lpni->lpni_peer_net;
+> +	lp = lpni->lpni_peer_net->lpn_peer;
+> +
+> +	CDEBUG(D_NET, "peer %s NID %s\n",
+> +	       libcfs_nid2str(lp->lp_primary_nid),
+> +	       libcfs_nid2str(lpni->lpni_nid));
+>  
+>  	list_del_init(&lpni->lpni_on_peer_net_list);
+>  	lpni->lpni_peer_net = NULL;
+>  
+> -	/* if peer_net is empty, then remove it from the peer */
+> -	if (list_empty(&peer_net->lpn_peer_nis)) {
+> -		list_del_init(&peer_net->lpn_on_peer_list);
+> -		peer_net->lpn_peer = NULL;
+> -		kfree(peer_net);
+> +	/* if lpn is empty, then remove it from the peer */
+> +	if (list_empty(&lpn->lpn_peer_nis)) {
+> +		list_del_init(&lpn->lpn_on_peer_list);
+> +		lpn->lpn_peer = NULL;
+> +		kfree(lpn);
+>  
+>  		/* If the peer is empty then remove it from the
+>  		 * the_lnet.ln_peers.
+>  		 */
+> -		if (list_empty(&peer->lp_peer_nets)) {
+> -			list_del_init(&peer->lp_on_lnet_peer_list);
+> -			kfree(peer);
+> +		if (list_empty(&lp->lp_peer_nets)) {
+> +			list_del_init(&lp->lp_on_lnet_peer_list);
+> +			kfree(lp);
+>  		}
 >  	}
->  	return false;
+>  }
+> @@ -263,10 +267,10 @@ lnet_peer_ni_del_locked(struct lnet_peer_ni *lpni)
+>  	ptable->pt_zombies++;
+>  	spin_unlock(&ptable->pt_zombie_lock);
+>  
+> -	/* no need to keep this peer on the hierarchy anymore */
+> -	lnet_try_destroy_peer_hierarchy_locked(lpni);
+> +	/* no need to keep this peer_ni on the hierarchy anymore */
+> +	lnet_peer_detach_peer_ni(lpni);
+>  
+> -	/* decrement reference on peer */
+> +	/* decrement reference on peer_ni */
+>  	lnet_peer_ni_decref_locked(lpni);
+>  
+>  	return 0;
+> @@ -329,6 +333,8 @@ lnet_peer_del_locked(struct lnet_peer *peer)
+>  	struct lnet_peer_ni *lpni = NULL, *lpni2;
+>  	int rc = 0, rc2 = 0;
+>  
+> +	CDEBUG(D_NET, "peer %s\n", libcfs_nid2str(peer->lp_primary_nid));
+> +
+>  	lpni = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
+>  	while (lpni) {
+>  		lpni2 = lnet_get_next_peer_ni_locked(peer, NULL, lpni);
+> @@ -352,31 +358,36 @@ lnet_peer_del(struct lnet_peer *peer)
 >  }
 >  
-> +/*
-> + * Set a single ni as preferred, provided no preferred ni is already
-> + * defined. Only to be used for non-multi-rail peer_ni.
-> + */
-> +int
-> +lnet_peer_ni_set_non_mr_pref_nid(struct lnet_peer_ni *lpni, lnet_nid_t nid)
-> +{
+>  /*
+> - * Delete a NID from a peer.
+> - * Implements a few sanity checks.
+> - * Call with ln_api_mutex held.
+> + * Delete a NID from a peer. Call with ln_api_mutex held.
+> + *
+> + * Error codes:
+> + *  -EPERM:  Non-DLC deletion from DLC-configured peer.
+> + *  -ENOENT: No lnet_peer_ni corresponding to the nid.
+> + *  -ECHILD: The lnet_peer_ni isn't connected to the peer.
+> + *  -EBUSY:  The lnet_peer_ni is the primary, and not the only peer_ni.
+>   */
+>  static int
+> -lnet_peer_del_nid(struct lnet_peer *lp, lnet_nid_t nid)
+> +lnet_peer_del_nid(struct lnet_peer *lp, lnet_nid_t nid, unsigned int flags)
+>  {
+> -	struct lnet_peer *lp2;
+>  	struct lnet_peer_ni *lpni;
+> +	lnet_nid_t primary_nid = lp->lp_primary_nid;
 > +	int rc = 0;
-> +
-> +	spin_lock(&lpni->lpni_lock);
-> +	if (nid == LNET_NID_ANY) {
-> +		rc = -EINVAL;
-> +	} else if (lpni->lpni_pref_nnids > 0) {
-> +		rc = -EPERM;
-> +	} else if (lpni->lpni_pref_nnids == 0) {
-> +		lpni->lpni_pref.nid = nid;
-> +		lpni->lpni_pref_nnids = 1;
-> +		lpni->lpni_state |= LNET_PEER_NI_NON_MR_PREF;
-> +	}
-> +	spin_unlock(&lpni->lpni_lock);
-> +
-> +	CDEBUG(D_NET, "peer %s nid %s: %d\n",
-> +	       libcfs_nid2str(lpni->lpni_nid), libcfs_nid2str(nid), rc);
-> +	return rc;
-> +}
-> +
-> +/*
-> + * Clear the preferred NID from a non-multi-rail peer_ni, provided
-> + * this preference was set by lnet_peer_ni_set_non_mr_pref_nid().
-> + */
-> +int
-> +lnet_peer_ni_clr_non_mr_pref_nid(struct lnet_peer_ni *lpni)
-> +{
-> +	int rc = 0;
-> +
-> +	spin_lock(&lpni->lpni_lock);
-> +	if (lpni->lpni_state & LNET_PEER_NI_NON_MR_PREF) {
-> +		lpni->lpni_pref_nnids = 0;
-> +		lpni->lpni_state &= ~LNET_PEER_NI_NON_MR_PREF;
-> +	} else if (lpni->lpni_pref_nnids == 0) {
-> +		rc = -ENOENT;
-> +	} else {
-> +		rc = -EPERM;
-> +	}
-> +	spin_unlock(&lpni->lpni_lock);
-> +
-> +	CDEBUG(D_NET, "peer %s: %d\n",
-> +	       libcfs_nid2str(lpni->lpni_nid), rc);
-> +	return rc;
-> +}
-> +
-> +/*
-> + * Clear the preferred NIDs from a non-multi-rail peer.
-> + */
-> +void
-> +lnet_peer_clr_non_mr_pref_nids(struct lnet_peer *lp)
-> +{
-> +	struct lnet_peer_ni *lpni = NULL;
-> +
-> +	while ((lpni = lnet_get_next_peer_ni_locked(lp, NULL, lpni)) != NULL)
-> +		lnet_peer_ni_clr_non_mr_pref_nid(lpni);
-> +}
-> +
-> +int
-> +lnet_peer_add_pref_nid(struct lnet_peer_ni *lpni, lnet_nid_t nid)
-> +{
-> +	lnet_nid_t *nids = NULL;
-> +	lnet_nid_t *oldnids = NULL;
-> +	struct lnet_peer *lp = lpni->lpni_peer_net->lpn_peer;
-> +	int size;
-> +	int i;
-> +	int rc = 0;
-> +
-> +	if (nid == LNET_NID_ANY) {
-> +		rc = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	if (lpni->lpni_pref_nnids == 1 && lpni->lpni_pref.nid == nid) {
-> +		rc = -EEXIST;
-> +		goto out;
-> +	}
-> +
-> +	/* A non-MR node may have only one preferred NI per peer_ni */
-> +	if (lpni->lpni_pref_nnids > 0) {
-> +		if (!(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+>  
+> +	if (!(flags & LNET_PEER_CONFIGURED)) {
+> +		if (lp->lp_state & LNET_PEER_CONFIGURED) {
 > +			rc = -EPERM;
 > +			goto out;
 > +		}
 > +	}
-> +
-> +	if (lpni->lpni_pref_nnids != 0) {
-> +		size = sizeof(*nids) * (lpni->lpni_pref_nnids + 1);
-> +		nids = kzalloc_cpt(size, GFP_KERNEL, lpni->lpni_cpt);
-> +		if (!nids) {
-> +			rc = -ENOMEM;
-> +			goto out;
-> +		}
-> +		for (i = 0; i < lpni->lpni_pref_nnids; i++) {
-> +			if (lpni->lpni_pref.nids[i] == nid) {
-> +				kfree(nids);
-> +				rc = -EEXIST;
-> +				goto out;
-> +			}
-> +			nids[i] = lpni->lpni_pref.nids[i];
-> +		}
-> +		nids[i] = nid;
-> +	}
-> +
-> +	lnet_net_lock(LNET_LOCK_EX);
-> +	spin_lock(&lpni->lpni_lock);
-> +	if (lpni->lpni_pref_nnids == 0) {
-> +		lpni->lpni_pref.nid = nid;
-> +	} else {
-> +		oldnids = lpni->lpni_pref.nids;
-> +		lpni->lpni_pref.nids = nids;
-> +	}
-> +	lpni->lpni_pref_nnids++;
-> +	lpni->lpni_state &= ~LNET_PEER_NI_NON_MR_PREF;
-> +	spin_unlock(&lpni->lpni_lock);
-> +	lnet_net_unlock(LNET_LOCK_EX);
-> +
-> +	kfree(oldnids);
-> +out:
-> +	if (rc == -EEXIST && (lpni->lpni_state & LNET_PEER_NI_NON_MR_PREF)) {
-> +		spin_lock(&lpni->lpni_lock);
-> +		lpni->lpni_state &= ~LNET_PEER_NI_NON_MR_PREF;
-> +		spin_unlock(&lpni->lpni_lock);
-> +	}
-> +	CDEBUG(D_NET, "peer %s nid %s: %d\n",
-> +	       libcfs_nid2str(lp->lp_primary_nid), libcfs_nid2str(nid), rc);
-> +	return rc;
-> +}
-> +
-> +int
-> +lnet_peer_del_pref_nid(struct lnet_peer_ni *lpni, lnet_nid_t nid)
-> +{
-> +	lnet_nid_t *nids = NULL;
-> +	lnet_nid_t *oldnids = NULL;
-> +	struct lnet_peer *lp = lpni->lpni_peer_net->lpn_peer;
-> +	int size;
-> +	int i, j;
-> +	int rc = 0;
-> +
-> +	if (lpni->lpni_pref_nnids == 0) {
+>  	lpni = lnet_find_peer_ni_locked(nid);
+>  	if (!lpni) {
+> -		CERROR("Cannot remove unknown nid %s from peer %s\n",
+> -		       libcfs_nid2str(nid),
+> -		       libcfs_nid2str(lp->lp_primary_nid));
+> -		return -ENOENT;
 > +		rc = -ENOENT;
 > +		goto out;
-> +	}
-> +
-> +	if (lpni->lpni_pref_nnids == 1) {
-> +		if (lpni->lpni_pref.nid != nid) {
-> +			rc = -ENOENT;
-> +			goto out;
-> +		}
-> +	} else if (lpni->lpni_pref_nnids == 2) {
-> +		if (lpni->lpni_pref.nids[0] != nid &&
-> +		    lpni->lpni_pref.nids[1] != nid) {
-> +			rc = -ENOENT;
-> +			goto out;
-> +		}
-> +	} else {
-> +		size = sizeof(*nids) * (lpni->lpni_pref_nnids - 1);
-> +		nids = kzalloc_cpt(size, GFP_KERNEL, lpni->lpni_cpt);
-> +		if (!nids) {
-> +			rc = -ENOMEM;
-> +			goto out;
-> +		}
-> +		for (i = 0, j = 0; i < lpni->lpni_pref_nnids; i++) {
-> +			if (lpni->lpni_pref.nids[i] != nid)
-> +				continue;
-> +			nids[j++] = lpni->lpni_pref.nids[i];
-> +		}
-> +		/* Check if we actually removed a nid. */
-> +		if (j == lpni->lpni_pref_nnids) {
-> +			kfree(nids);
-> +			rc = -ENOENT;
-> +			goto out;
-> +		}
-> +	}
-> +
-> +	lnet_net_lock(LNET_LOCK_EX);
-> +	spin_lock(&lpni->lpni_lock);
-> +	if (lpni->lpni_pref_nnids == 1) {
-> +		lpni->lpni_pref.nid = LNET_NID_ANY;
-> +	} else if (lpni->lpni_pref_nnids == 2) {
-> +		oldnids = lpni->lpni_pref.nids;
-> +		if (oldnids[0] == nid)
-> +			lpni->lpni_pref.nid = oldnids[1];
-> +		else
-> +			lpni->lpni_pref.nid = oldnids[2];
-> +	} else {
-> +		oldnids = lpni->lpni_pref.nids;
-> +		lpni->lpni_pref.nids = nids;
-> +	}
-> +	lpni->lpni_pref_nnids--;
-> +	lpni->lpni_state &= ~LNET_PEER_NI_NON_MR_PREF;
-> +	spin_unlock(&lpni->lpni_lock);
-> +	lnet_net_unlock(LNET_LOCK_EX);
-> +
-> +	kfree(oldnids);
+>  	}
+>  	lnet_peer_ni_decref_locked(lpni);
+> -	lp2 = lpni->lpni_peer_net->lpn_peer;
+> -	if (lp2 != lp) {
+> -		CERROR("Nid %s is attached to peer %s, not peer %s\n",
+> -		       libcfs_nid2str(nid),
+> -		       libcfs_nid2str(lp2->lp_primary_nid),
+> -		       libcfs_nid2str(lp->lp_primary_nid));
+> -		return -EINVAL;
+> +	if (lp != lpni->lpni_peer_net->lpn_peer) {
+> +		rc = -ECHILD;
+> +		goto out;
+>  	}
+>  
+>  	/*
+> @@ -384,16 +395,19 @@ lnet_peer_del_nid(struct lnet_peer *lp, lnet_nid_t nid)
+>  	 * is the only NID.
+>  	 */
+>  	if (nid == lp->lp_primary_nid && lnet_get_num_peer_nis(lp) != 1) {
+> -		CERROR("Cannot delete primary NID %s from multi-NID peer\n",
+> -		       libcfs_nid2str(nid));
+> -		return -EINVAL;
+> +		rc = -EBUSY;
+> +		goto out;
+>  	}
+>  
+>  	lnet_net_lock(LNET_LOCK_EX);
+>  	lnet_peer_ni_del_locked(lpni);
+>  	lnet_net_unlock(LNET_LOCK_EX);
+>  
+> -	return 0;
 > +out:
-> +	CDEBUG(D_NET, "peer %s nid %s: %d\n",
-> +	       libcfs_nid2str(lp->lp_primary_nid), libcfs_nid2str(nid), rc);
-> +	return rc;
-> +}
+> +	CDEBUG(D_NET, "peer %s NID %s flags %#x: %d\n",
+> +	       libcfs_nid2str(primary_nid), libcfs_nid2str(nid), flags, rc);
 > +
->  lnet_nid_t
->  lnet_peer_primary_nid_locked(lnet_nid_t nid)
->  {
-> @@ -653,7 +868,7 @@ LNetPrimaryNID(lnet_nid_t nid)
->  	int cpt;
+> +	return rc;
+>  }
 >  
->  	cpt = lnet_net_lock_current();
-> -	lpni = lnet_nid2peerni_locked(nid, cpt);
-> +	lpni = lnet_nid2peerni_locked(nid, LNET_NID_ANY, cpt);
->  	if (IS_ERR(lpni)) {
->  		rc = PTR_ERR(lpni);
->  		goto out_unlock;
-> @@ -802,6 +1017,7 @@ lnet_peer_add(lnet_nid_t nid, bool mr)
->  	spin_lock(&lp->lp_lock);
->  	if (mr && !(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
->  		lp->lp_state |= LNET_PEER_MULTI_RAIL;
-> +		lnet_peer_clr_non_mr_pref_nids(lp);
->  	} else if (!mr && (lp->lp_state & LNET_PEER_MULTI_RAIL)) {
->  		/* The mr state is sticky. */
->  		CDEBUG(D_NET, "Cannot clear multi-rail flag from peer %s\n",
-> @@ -829,8 +1045,10 @@ lnet_peer_add_nid(struct lnet_peer *lp, lnet_nid_t nid, bool mr)
->  		return -EPERM;
->  	}
+>  static void
+> @@ -895,46 +909,27 @@ lnet_peer_get_net_locked(struct lnet_peer *peer, u32 net_id)
+>  	return NULL;
+>  }
 >  
-> -	if (!(lp->lp_state & LNET_PEER_MULTI_RAIL))
-> +	if (!(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
->  		lp->lp_state |= LNET_PEER_MULTI_RAIL;
-> +		lnet_peer_clr_non_mr_pref_nids(lp);
-> +	}
->  	spin_unlock(&lp->lp_lock);
->  
->  	lpni = lnet_find_peer_ni_locked(nid);
-> @@ -856,28 +1074,27 @@ lnet_peer_add_nid(struct lnet_peer *lp, lnet_nid_t nid, bool mr)
->   * lpni creation initiated due to traffic either sending or receiving.
->   */
+> +/*
+> + * Always returns 0, but it the last function called from functions
+> + * that do return an int, so returning 0 here allows the compiler to
+> + * do a tail call.
+> + */
 >  static int
-> -lnet_peer_ni_traffic_add(lnet_nid_t nid)
-> +lnet_peer_ni_traffic_add(lnet_nid_t nid, lnet_nid_t pref)
+> -lnet_peer_setup_hierarchy(struct lnet_peer *lp, struct lnet_peer_ni
+> -	 *lpni,
+> -			  lnet_nid_t nid)
+> +lnet_peer_attach_peer_ni(struct lnet_peer *lp,
+> +			 struct lnet_peer_net *lpn,
+> +			 struct lnet_peer_ni *lpni,
+> +			 unsigned int flags)
 >  {
->  	struct lnet_peer_ni *lpni;
-> -	int rc = 0;
-> +	int rc;
->  
->  	if (nid == LNET_NID_ANY)
->  		return -EINVAL;
->  
->  	/* lnet_net_lock is not needed here because ln_api_lock is held */
->  	lpni = lnet_find_peer_ni_locked(nid);
-> -	if (lpni) {
-> -		/*
-> -		 * TODO: lnet_update_primary_nid() but not all of it
-> -		 * only indicate if we're converting this to MR capable
-> -		 * Can happen due to DD
-> -		 */
-> -		lnet_peer_ni_decref_locked(lpni);
+> -	struct lnet_peer_net *lpn = NULL;
+>  	struct lnet_peer_table *ptable;
+> -	u32 net_id = LNET_NIDNET(nid);
+> -
+> -	/*
+> -	 * Create the peer_ni, peer_net, and peer if they don't exist
+> -	 * yet.
+> -	 */
+> -	if (lp) {
+> -		lpn = lnet_peer_get_net_locked(lp, net_id);
 > -	} else {
-> +	if (!lpni) {
->  		rc = lnet_peer_setup_hierarchy(NULL, NULL, nid);
-> +		if (rc)
-> +			return rc;
-> +		lpni = lnet_find_peer_ni_locked(nid);
->  	}
-> +	if (pref != LNET_NID_ANY)
-> +		lnet_peer_ni_set_non_mr_pref_nid(lpni, pref);
-> +	lnet_peer_ni_decref_locked(lpni);
+> -		lp = lnet_peer_alloc(nid);
+> -		if (!lp)
+> -			goto out_enomem;
+> -	}
+> -
+> -	if (!lpn) {
+> -		lpn = lnet_peer_net_alloc(net_id);
+> -		if (!lpn)
+> -			goto out_maybe_free_lp;
+> -	}
+> -
+> -	if (!lpni) {
+> -		lpni = lnet_peer_ni_alloc(nid);
+> -		if (!lpni)
+> -			goto out_maybe_free_lpn;
+> -	}
 >  
-> -	return rc;
+>  	/* Install the new peer_ni */
+>  	lnet_net_lock(LNET_LOCK_EX);
+>  	/* Add peer_ni to global peer table hash, if necessary. */
+>  	if (list_empty(&lpni->lpni_hashlist)) {
+> +		int hash = lnet_nid2peerhash(lpni->lpni_nid);
+> +
+>  		ptable = the_lnet.ln_peer_tables[lpni->lpni_cpt];
+> -		list_add_tail(&lpni->lpni_hashlist,
+> -			      &ptable->pt_hash[lnet_nid2peerhash(nid)]);
+> +		list_add_tail(&lpni->lpni_hashlist, &ptable->pt_hash[hash]);
+>  		ptable->pt_version++;
+>  		atomic_inc(&ptable->pt_number);
+>  		atomic_inc(&lpni->lpni_refcount);
+> @@ -942,7 +937,7 @@ lnet_peer_setup_hierarchy(struct lnet_peer *lp, struct lnet_peer_ni
+>  
+>  	/* Detach the peer_ni from an existing peer, if necessary. */
+>  	if (lpni->lpni_peer_net && lpni->lpni_peer_net->lpn_peer != lp)
+> -		lnet_try_destroy_peer_hierarchy_locked(lpni);
+> +		lnet_peer_detach_peer_ni(lpni);
+>  
+>  	/* Add peer_ni to peer_net */
+>  	lpni->lpni_peer_net = lpn;
+> @@ -957,33 +952,42 @@ lnet_peer_setup_hierarchy(struct lnet_peer *lp, struct lnet_peer_ni
+>  	/* Add peer to global peer list */
+>  	if (list_empty(&lp->lp_on_lnet_peer_list))
+>  		list_add_tail(&lp->lp_on_lnet_peer_list, &the_lnet.ln_peers);
+> +
+> +	/* Update peer state */
+> +	spin_lock(&lp->lp_lock);
+> +	if (flags & LNET_PEER_CONFIGURED) {
+> +		if (!(lp->lp_state & LNET_PEER_CONFIGURED))
+> +			lp->lp_state |= LNET_PEER_CONFIGURED;
+> +	}
+> +	if (flags & LNET_PEER_MULTI_RAIL) {
+> +		if (!(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+> +			lp->lp_state |= LNET_PEER_MULTI_RAIL;
+> +			lnet_peer_clr_non_mr_pref_nids(lp);
+> +		}
+> +	}
+> +	spin_unlock(&lp->lp_lock);
+> +
+>  	lnet_net_unlock(LNET_LOCK_EX);
+>  
+> -	return 0;
+> +	CDEBUG(D_NET, "peer %s NID %s flags %#x\n",
+> +	       libcfs_nid2str(lp->lp_primary_nid),
+> +	       libcfs_nid2str(lpni->lpni_nid), flags);
+>  
+> -out_maybe_free_lpn:
+> -	if (list_empty(&lpn->lpn_on_peer_list))
+> -		kfree(lpn);
+> -out_maybe_free_lp:
+> -	if (list_empty(&lp->lp_on_lnet_peer_list))
+> -		kfree(lp);
+> -out_enomem:
+> -	return -ENOMEM;
 > +	return 0;
 >  }
 >  
 >  /*
-> @@ -984,6 +1201,8 @@ lnet_destroy_peer_ni_locked(struct lnet_peer_ni *lpni)
->  	ptable->pt_zombies--;
->  	spin_unlock(&ptable->pt_zombie_lock);
->  
-> +	if (lpni->lpni_pref_nnids > 1)
-> +		kfree(lpni->lpni_pref.nids);
->  	kfree(lpni);
->  }
->  
-> @@ -1006,7 +1225,7 @@ lnet_nid2peerni_ex(lnet_nid_t nid, int cpt)
->  
->  	lnet_net_unlock(cpt);
->  
-> -	rc = lnet_peer_ni_traffic_add(nid);
-> +	rc = lnet_peer_ni_traffic_add(nid, LNET_NID_ANY);
->  	if (rc) {
->  		lpni = ERR_PTR(rc);
->  		goto out_net_relock;
-> @@ -1022,7 +1241,7 @@ lnet_nid2peerni_ex(lnet_nid_t nid, int cpt)
->  }
->  
->  struct lnet_peer_ni *
-> -lnet_nid2peerni_locked(lnet_nid_t nid, int cpt)
-> +lnet_nid2peerni_locked(lnet_nid_t nid, lnet_nid_t pref, int cpt)
+>   * Create a new peer, with nid as its primary nid.
+>   *
+> - * It is not an error if the peer already exists, provided that the
+> - * given nid is the primary NID.
+> - *
+>   * Call with the lnet_api_mutex held.
+>   */
+>  static int
+> -lnet_peer_add(lnet_nid_t nid, bool mr)
+> +lnet_peer_add(lnet_nid_t nid, unsigned int flags)
 >  {
->  	struct lnet_peer_ni *lpni = NULL;
->  	int rc;
-> @@ -1061,7 +1280,7 @@ lnet_nid2peerni_locked(lnet_nid_t nid, int cpt)
->  		goto out_mutex_unlock;
+>  	struct lnet_peer *lp;
+> +	struct lnet_peer_net *lpn;
+>  	struct lnet_peer_ni *lpni;
+> +	int rc = 0;
+>  
+>  	LASSERT(nid != LNET_NID_ANY);
+>  
+> @@ -992,82 +996,153 @@ lnet_peer_add(lnet_nid_t nid, bool mr)
+>  	 * lnet_api_mutex is held.
+>  	 */
+>  	lpni = lnet_find_peer_ni_locked(nid);
+> -	if (!lpni) {
+> -		int rc = lnet_peer_setup_hierarchy(NULL, NULL, nid);
+> -		if (rc != 0)
+> -			return rc;
+> -		lpni = lnet_find_peer_ni_locked(nid);
+> -		LASSERT(lpni);
+> +	if (lpni) {
+> +		/* A peer with this NID already exists. */
+> +		lp = lpni->lpni_peer_net->lpn_peer;
+> +		lnet_peer_ni_decref_locked(lpni);
+> +		/*
+> +		 * This is an error if the peer was configured and the
+> +		 * primary NID differs or an attempt is made to change
+> +		 * the Multi-Rail flag. Otherwise the assumption is
+> +		 * that an existing peer is being modified.
+> +		 */
+> +		if (lp->lp_state & LNET_PEER_CONFIGURED) {
+> +			if (lp->lp_primary_nid != nid)
+> +				rc = -EEXIST;
+> +			else if ((lp->lp_state ^ flags) & LNET_PEER_MULTI_RAIL)
+> +				rc = -EPERM;
+> +			goto out;
+> +		}
+> +		/* Delete and recreate as a configured peer. */
+> +		lnet_peer_del(lp);
+>  	}
+> -	lp = lpni->lpni_peer_net->lpn_peer;
+> -	lnet_peer_ni_decref_locked(lpni);
+>  
+> -	/* A found peer must have this primary NID */
+> -	if (lp->lp_primary_nid != nid)
+> -		return -EEXIST;
+> +	/* Create peer, peer_net, and peer_ni. */
+> +	rc = -ENOMEM;
+> +	lp = lnet_peer_alloc(nid);
+> +	if (!lp)
+> +		goto out;
+> +	lpn = lnet_peer_net_alloc(LNET_NIDNET(nid));
+> +	if (!lpn)
+> +		goto out_free_lp;
+> +	lpni = lnet_peer_ni_alloc(nid);
+> +	if (!lpni)
+> +		goto out_free_lpn;
+>  
+> -	/*
+> -	 * If we found an lpni that is not a multi-rail, which could occur
+> -	 * if lpni is already created as a non-mr lpni or we just created
+> -	 * it, then make sure you indicate that this lpni is a primary mr
+> -	 * capable peer.
+> -	 *
+> -	 * TODO: update flags if necessary
+> -	 */
+> -	spin_lock(&lp->lp_lock);
+> -	if (mr && !(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+> -		lp->lp_state |= LNET_PEER_MULTI_RAIL;
+> -		lnet_peer_clr_non_mr_pref_nids(lp);
+> -	} else if (!mr && (lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+> -		/* The mr state is sticky. */
+> -		CDEBUG(D_NET, "Cannot clear multi-rail flag from peer %s\n",
+> -		       libcfs_nid2str(nid));
+> -	}
+> -	spin_unlock(&lp->lp_lock);
+> +	return lnet_peer_attach_peer_ni(lp, lpn, lpni, flags);
+>  
+> -	return 0;
+> +out_free_lpn:
+> +	kfree(lpn);
+> +out_free_lp:
+> +	kfree(lp);
+> +out:
+> +	CDEBUG(D_NET, "peer %s NID flags %#x: %d\n",
+> +	       libcfs_nid2str(nid), flags, rc);
+> +	return rc;
+>  }
+>  
+> +/*
+> + * Add a NID to a peer. Call with ln_api_mutex held.
+> + *
+> + * Error codes:
+> + *  -EPERM:    Non-DLC addition to a DLC-configured peer.
+> + *  -EEXIST:   The NID was configured by DLC for a different peer.
+> + *  -ENOMEM:   Out of memory.
+> + *  -ENOTUNIQ: Adding a second peer NID on a single network on a
+> + *             non-multi-rail peer.
+> + */
+>  static int
+> -lnet_peer_add_nid(struct lnet_peer *lp, lnet_nid_t nid, bool mr)
+> +lnet_peer_add_nid(struct lnet_peer *lp, lnet_nid_t nid, unsigned int flags)
+>  {
+> +	struct lnet_peer_net *lpn;
+>  	struct lnet_peer_ni *lpni;
+> +	int rc = 0;
+>  
+>  	LASSERT(lp);
+>  	LASSERT(nid != LNET_NID_ANY);
+>  
+> -	spin_lock(&lp->lp_lock);
+> -	if (!mr && !(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+> -		spin_unlock(&lp->lp_lock);
+> -		CERROR("Cannot add nid %s to non-multi-rail peer %s\n",
+> -		       libcfs_nid2str(nid),
+> -		       libcfs_nid2str(lp->lp_primary_nid));
+> -		return -EPERM;
+> +	/* A configured peer can only be updated through configuration. */
+> +	if (!(flags & LNET_PEER_CONFIGURED)) {
+> +		if (lp->lp_state & LNET_PEER_CONFIGURED) {
+> +			rc = -EPERM;
+> +			goto out;
+> +		}
 >  	}
 >  
-> -	rc = lnet_peer_ni_traffic_add(nid);
-> +	rc = lnet_peer_ni_traffic_add(nid, pref);
->  	if (rc) {
->  		lpni = ERR_PTR(rc);
->  		goto out_mutex_unlock;
-> @@ -1087,7 +1306,7 @@ lnet_debug_peer(lnet_nid_t nid)
->  	cpt = lnet_cpt_of_nid(nid, NULL);
->  	lnet_net_lock(cpt);
+> -	if (!(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+> -		lp->lp_state |= LNET_PEER_MULTI_RAIL;
+> -		lnet_peer_clr_non_mr_pref_nids(lp);
+> +	/*
+> +	 * The MULTI_RAIL flag can be set but not cleared, because
+> +	 * that would leave the peer struct in an invalid state.
+> +	 */
+> +	if (flags & LNET_PEER_MULTI_RAIL) {
+> +		spin_lock(&lp->lp_lock);
+> +		if (!(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+> +			lp->lp_state |= LNET_PEER_MULTI_RAIL;
+> +			lnet_peer_clr_non_mr_pref_nids(lp);
+> +		}
+> +		spin_unlock(&lp->lp_lock);
+> +	} else if (lp->lp_state & LNET_PEER_MULTI_RAIL) {
+> +		rc = -EPERM;
+> +		goto out;
+>  	}
+> -	spin_unlock(&lp->lp_lock);
 >  
-> -	lp = lnet_nid2peerni_locked(nid, cpt);
-> +	lp = lnet_nid2peerni_locked(nid, LNET_NID_ANY, cpt);
->  	if (IS_ERR(lp)) {
->  		lnet_net_unlock(cpt);
->  		CDEBUG(D_WARNING, "No peer %s\n", libcfs_nid2str(nid));
+>  	lpni = lnet_find_peer_ni_locked(nid);
+> -	if (!lpni)
+> -		return lnet_peer_setup_hierarchy(lp, NULL, nid);
+> +	if (lpni) {
+> +		/*
+> +		 * A peer_ni already exists. This is only a problem if
+> +		 * it is not connected to this peer and was configured
+> +		 * by DLC.
+> +		 */
+> +		lnet_peer_ni_decref_locked(lpni);
+> +		if (lpni->lpni_peer_net->lpn_peer == lp)
+> +			goto out;
+> +		if (lnet_peer_ni_is_configured(lpni)) {
+> +			rc = -EEXIST;
+> +			goto out;
+> +		}
+> +		/* If this is the primary NID, destroy the peer. */
+> +		if (lnet_peer_ni_is_primary(lpni)) {
+> +			lnet_peer_del(lpni->lpni_peer_net->lpn_peer);
+> +			lpni = lnet_peer_ni_alloc(nid);
+> +			if (!lpni) {
+> +				rc = -ENOMEM;
+> +				goto out;
+> +			}
+> +		}
+> +	} else {
+> +		lpni = lnet_peer_ni_alloc(nid);
+> +		if (!lpni) {
+> +			rc = -ENOMEM;
+> +			goto out;
+> +		}
+> +	}
+>  
+> -	if (lpni->lpni_peer_net->lpn_peer != lp) {
+> -		struct lnet_peer *lp2 = lpni->lpni_peer_net->lpn_peer;
+> -		CERROR("Cannot add NID %s owned by peer %s to peer %s\n",
+> -		       libcfs_nid2str(lpni->lpni_nid),
+> -		       libcfs_nid2str(lp2->lp_primary_nid),
+> -		       libcfs_nid2str(lp->lp_primary_nid));
+> -		return -EEXIST;
+> +	/*
+> +	 * Get the peer_net. Check that we're not adding a second
+> +	 * peer_ni on a peer_net of a non-multi-rail peer.
+> +	 */
+> +	lpn = lnet_peer_get_net_locked(lp, LNET_NIDNET(nid));
+> +	if (!lpn) {
+> +		lpn = lnet_peer_net_alloc(LNET_NIDNET(nid));
+> +		if (!lpn) {
+> +			rc = -ENOMEM;
+> +			goto out_free_lpni;
+> +		}
+> +	} else if (!(lp->lp_state & LNET_PEER_MULTI_RAIL)) {
+> +		rc = -ENOTUNIQ;
+> +		goto out_free_lpni;
+>  	}
+>  
+> -	CDEBUG(D_NET, "NID %s is already owned by peer %s\n",
+> -	       libcfs_nid2str(lpni->lpni_nid),
+> -	       libcfs_nid2str(lp->lp_primary_nid));
+> -	return 0;
+> +	return lnet_peer_attach_peer_ni(lp, lpn, lpni, flags);
+> +
+> +out_free_lpni:
+> +	/* If the peer_ni was allocated above its peer_net pointer is NULL */
+> +	if (!lpni->lpni_peer_net)
+> +		kfree(lpni);
+> +out:
+> +	CDEBUG(D_NET, "peer %s NID %s flags %#x: %d\n",
+> +	       libcfs_nid2str(lp->lp_primary_nid), libcfs_nid2str(nid),
+> +	       flags, rc);
+> +	return rc;
+>  }
+>  
+>  /*
+> @@ -1076,25 +1151,53 @@ lnet_peer_add_nid(struct lnet_peer *lp, lnet_nid_t nid, bool mr)
+>  static int
+>  lnet_peer_ni_traffic_add(lnet_nid_t nid, lnet_nid_t pref)
+>  {
+> +	struct lnet_peer *lp;
+> +	struct lnet_peer_net *lpn;
+>  	struct lnet_peer_ni *lpni;
+> -	int rc;
+> +	unsigned int flags = 0;
+> +	int rc = 0;
+>  
+> -	if (nid == LNET_NID_ANY)
+> -		return -EINVAL;
+> +	if (nid == LNET_NID_ANY) {
+> +		rc = -EINVAL;
+> +		goto out;
+> +	}
+>  
+>  	/* lnet_net_lock is not needed here because ln_api_lock is held */
+>  	lpni = lnet_find_peer_ni_locked(nid);
+> -	if (!lpni) {
+> -		rc = lnet_peer_setup_hierarchy(NULL, NULL, nid);
+> -		if (rc)
+> -			return rc;
+> -		lpni = lnet_find_peer_ni_locked(nid);
+> +	if (lpni) {
+> +		/*
+> +		 * We must have raced with another thread. Since we
+> +		 * know next to nothing about a peer_ni created by
+> +		 * traffic, we just assume everything is ok and
+> +		 * return.
+> +		 */
+> +		lnet_peer_ni_decref_locked(lpni);
+> +		goto out;
+>  	}
+> +
+> +	/* Create peer, peer_net, and peer_ni. */
+> +	rc = -ENOMEM;
+> +	lp = lnet_peer_alloc(nid);
+> +	if (!lp)
+> +		goto out;
+> +	lpn = lnet_peer_net_alloc(LNET_NIDNET(nid));
+> +	if (!lpn)
+> +		goto out_free_lp;
+> +	lpni = lnet_peer_ni_alloc(nid);
+> +	if (!lpni)
+> +		goto out_free_lpn;
+>  	if (pref != LNET_NID_ANY)
+>  		lnet_peer_ni_set_non_mr_pref_nid(lpni, pref);
+> -	lnet_peer_ni_decref_locked(lpni);
+>  
+> -	return 0;
+> +	return lnet_peer_attach_peer_ni(lp, lpn, lpni, flags);
+> +
+> +out_free_lpn:
+> +	kfree(lpn);
+> +out_free_lp:
+> +	kfree(lp);
+> +out:
+> +	CDEBUG(D_NET, "peer %s: %d\n", libcfs_nid2str(nid), rc);
+> +	return rc;
+>  }
+>  
+>  /*
+> @@ -1114,17 +1217,22 @@ lnet_add_peer_ni(lnet_nid_t prim_nid, lnet_nid_t nid, bool mr)
+>  {
+>  	struct lnet_peer *lp = NULL;
+>  	struct lnet_peer_ni *lpni;
+> +	unsigned int flags;
+>  
+>  	/* The prim_nid must always be specified */
+>  	if (prim_nid == LNET_NID_ANY)
+>  		return -EINVAL;
+>  
+> +	flags = LNET_PEER_CONFIGURED;
+> +	if (mr)
+> +		flags |= LNET_PEER_MULTI_RAIL;
+> +
+>  	/*
+>  	 * If nid isn't specified, we must create a new peer with
+>  	 * prim_nid as its primary nid.
+>  	 */
+>  	if (nid == LNET_NID_ANY)
+> -		return lnet_peer_add(prim_nid, mr);
+> +		return lnet_peer_add(prim_nid, flags);
+>  
+>  	/* Look up the prim_nid, which must exist. */
+>  	lpni = lnet_find_peer_ni_locked(prim_nid);
+> @@ -1133,6 +1241,14 @@ lnet_add_peer_ni(lnet_nid_t prim_nid, lnet_nid_t nid, bool mr)
+>  	lnet_peer_ni_decref_locked(lpni);
+>  	lp = lpni->lpni_peer_net->lpn_peer;
+>  
+> +	/* Peer must have been configured. */
+> +	if (!(lp->lp_state & LNET_PEER_CONFIGURED)) {
+> +		CDEBUG(D_NET, "peer %s was not configured\n",
+> +		       libcfs_nid2str(prim_nid));
+> +		return -ENOENT;
+> +	}
+> +
+> +	/* Primary NID must match */
+>  	if (lp->lp_primary_nid != prim_nid) {
+>  		CDEBUG(D_NET, "prim_nid %s is not primary for peer %s\n",
+>  		       libcfs_nid2str(prim_nid),
+> @@ -1140,7 +1256,14 @@ lnet_add_peer_ni(lnet_nid_t prim_nid, lnet_nid_t nid, bool mr)
+>  		return -ENODEV;
+>  	}
+>  
+> -	return lnet_peer_add_nid(lp, nid, mr);
+> +	/* Multi-Rail flag must match. */
+> +	if ((lp->lp_state ^ flags) & LNET_PEER_MULTI_RAIL) {
+> +		CDEBUG(D_NET, "multi-rail state mismatch for peer %s\n",
+> +		       libcfs_nid2str(prim_nid));
+> +		return -EPERM;
+> +	}
+> +
+> +	return lnet_peer_add_nid(lp, nid, flags);
+>  }
+>  
+>  /*
+> @@ -1159,6 +1282,7 @@ lnet_del_peer_ni(lnet_nid_t prim_nid, lnet_nid_t nid)
+>  {
+>  	struct lnet_peer *lp;
+>  	struct lnet_peer_ni *lpni;
+> +	unsigned int flags;
+>  
+>  	if (prim_nid == LNET_NID_ANY)
+>  		return -EINVAL;
+> @@ -1179,7 +1303,11 @@ lnet_del_peer_ni(lnet_nid_t prim_nid, lnet_nid_t nid)
+>  	if (nid == LNET_NID_ANY || nid == lp->lp_primary_nid)
+>  		return lnet_peer_del(lp);
+>  
+> -	return lnet_peer_del_nid(lp, nid);
+> +	flags = LNET_PEER_CONFIGURED;
+> +	if (lp->lp_state & LNET_PEER_MULTI_RAIL)
+> +		flags |= LNET_PEER_MULTI_RAIL;
+> +
+> +	return lnet_peer_del_nid(lp, nid, flags);
+>  }
+>  
+>  void
 > 
 > 
 > 
