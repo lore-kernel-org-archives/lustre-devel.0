@@ -1,122 +1,83 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 14 Oct 2018 14:58:09 -0400
-Subject: [lustre-devel] [PATCH 19/28] lustre: uapi: add missing headers in
- lustre UAPI headers
+Date: Sun, 14 Oct 2018 14:58:13 -0400
+Subject: [lustre-devel] [PATCH 23/28] lustre: llog: fix EOF handling in
+ llog_client_next_block()
 In-Reply-To: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
 References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1539543498-29105-20-git-send-email-jsimmons@infradead.org>
+Message-ID: <1539543498-29105-24-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-A test move was done in the linux kernel that moved the UAPI headers
-to their proper place. Errors were reported mainly due to
-linux/types.h being missing. Add in linux/types.h to prepare for the
-move out of staging.
+From: "John L. Hammond" <jhammond@whamcloud.com>
 
-Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-WC-bug-id: https://jira.whamcloud.com/browse/
-Reviewed-on: https://review.whamcloud.com/31737
+In llog_client_next_block() update *cur_idx and *cur_offset in the
+special case that the handler has returned -EIO after reaching the end
+of the log without finding the desired record. This fixes client side
+EOF detection in llog_process_thread().
+
+Signed-off-by: John L. Hammond <jhammond@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-10267
+Reviewed-on: https://review.whamcloud.com/30313
+Reviewed-by: Mike Pershin <mpershin@whamcloud.com>
 Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-Reviewed-by: James Nunez <jnunez@whamcloud.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/include/uapi/linux/lnet/libcfs_debug.h    | 2 ++
- drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h         | 1 +
- drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h          | 1 +
- drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h    | 1 +
- drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h    | 1 +
- drivers/staging/lustre/include/uapi/linux/lustre/lustre_fiemap.h | 1 +
- drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h  | 1 +
- 7 files changed, 8 insertions(+)
+ drivers/staging/lustre/lustre/ptlrpc/llog_client.c | 24 ++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_debug.h b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_debug.h
-index c4d9472..2672fe7 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_debug.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/libcfs_debug.h
-@@ -38,6 +38,8 @@
- #ifndef __UAPI_LIBCFS_DEBUG_H__
- #define __UAPI_LIBCFS_DEBUG_H__
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/llog_client.c b/drivers/staging/lustre/lustre/ptlrpc/llog_client.c
+index 946d538..6ddd93c 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/llog_client.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/llog_client.c
+@@ -171,8 +171,21 @@ static int llog_client_next_block(const struct lu_env *env,
+ 	req_capsule_set_size(&req->rq_pill, &RMF_EADATA, RCL_SERVER, len);
+ 	ptlrpc_request_set_replen(req);
+ 	rc = ptlrpc_queue_wait(req);
+-	if (rc)
++	/* -EIO has a special meaning here. If llog_osd_next_block()
++	 * reaches the end of the log without finding the desired
++	 * record then it updates *cur_offset and *cur_idx and returns
++	 * -EIO. In llog_process_thread() we use this to detect
++	 * EOF. But we must be careful to distinguish between -EIO
++	 * coming from llog_osd_next_block() and -EIO coming from
++	 * ptlrpc or below.
++	 */
++	if (rc == -EIO) {
++		if (!req->rq_repmsg ||
++		    lustre_msg_get_status(req->rq_repmsg) != -EIO)
++			goto out;
++	} else if (rc < 0) {
+ 		goto out;
++	}
  
-+#include <linux/types.h>
+ 	body = req_capsule_server_get(&req->rq_pill, &RMF_LLOGD_BODY);
+ 	if (!body) {
+@@ -180,6 +193,12 @@ static int llog_client_next_block(const struct lu_env *env,
+ 		goto out;
+ 	}
+ 
++	*cur_idx = body->lgd_saved_index;
++	*cur_offset = body->lgd_cur_offset;
 +
- /**
-  * Format for debug message headers
-  */
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-index cccb32d..9d53c51 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/lnetctl.h
-@@ -15,6 +15,7 @@
- #ifndef _LNETCTL_H_
- #define _LNETCTL_H_
++	if (rc < 0)
++		goto out;
++
+ 	/* The log records are swabbed as they are processed */
+ 	ptr = req_capsule_server_get(&req->rq_pill, &RMF_EADATA);
+ 	if (!ptr) {
+@@ -187,9 +206,6 @@ static int llog_client_next_block(const struct lu_env *env,
+ 		goto out;
+ 	}
  
-+#include <linux/types.h>
- #include <uapi/linux/lnet/lnet-types.h>
- 
- /** \addtogroup lnet_fault_simulation
-diff --git a/drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h b/drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h
-index 3354e5a..3c5901d 100644
---- a/drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lnet/nidstr.h
-@@ -28,6 +28,7 @@
- #ifndef _LNET_NIDSTRINGS_H
- #define _LNET_NIDSTRINGS_H
- 
-+#include <linux/types.h>
- #include <uapi/linux/lnet/lnet-types.h>
- 
- /**
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
-index 11b51d9..0620e49 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_cfg.h
-@@ -35,6 +35,7 @@
- 
- #include <linux/errno.h>
- #include <linux/kernel.h>
-+#include <linux/types.h>
- #include <uapi/linux/lustre/lustre_user.h>
- 
- /** \defgroup cfg cfg
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
-index 2e7a8d1..746bf7a 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fid.h
-@@ -37,6 +37,7 @@
- #ifndef _UAPI_LUSTRE_FID_H_
- #define _UAPI_LUSTRE_FID_H_
- 
-+#include <linux/types.h>
- #include <uapi/linux/lustre/lustre_idl.h>
- 
- /** returns fid object sequence */
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fiemap.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fiemap.h
-index d375a47..d24a93e 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fiemap.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_fiemap.h
-@@ -41,6 +41,7 @@
- 
- #include <stddef.h>
- #include <linux/fiemap.h>
-+#include <linux/types.h>
- 
- /* XXX: We use fiemap_extent::fe_reserved[0] */
- #define fe_device	fe_reserved[0]
-diff --git a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
-index 3343b60..4b5f110 100644
---- a/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
-+++ b/drivers/staging/lustre/include/uapi/linux/lustre/lustre_ostid.h
-@@ -35,6 +35,7 @@
- #define _UAPI_LUSTRE_OSTID_H_
- 
- #include <linux/errno.h>
-+#include <linux/types.h>
- #include <uapi/linux/lustre/lustre_fid.h>
- 
- static inline __u64 lmm_oi_id(const struct ost_id *oi)
+-	*cur_idx = body->lgd_saved_index;
+-	*cur_offset = body->lgd_cur_offset;
+-
+ 	memcpy(buf, ptr, len);
+ out:
+ 	ptlrpc_req_finished(req);
 -- 
 1.8.3.1
