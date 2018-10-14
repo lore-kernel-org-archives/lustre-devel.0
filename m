@@ -1,139 +1,55 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 14 Oct 2018 14:57:56 -0400
-Subject: [lustre-devel] [PATCH 06/28] lustre: ldlm: ELC shouldn't wait on
- lock flush
+Date: Sun, 14 Oct 2018 14:58:02 -0400
+Subject: [lustre-devel] [PATCH 12/28] lustre: ptlrpc: do not wakeup every
+ second
 In-Reply-To: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
 References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
-Message-ID: <1539543498-29105-7-git-send-email-jsimmons@infradead.org>
+Message-ID: <1539543498-29105-13-git-send-email-jsimmons@infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-From: Andriy Skulysh <c17819@cray.com>
+From: Alex Zhuravlev <bzzz@whamcloud.com>
 
-The commit 08fd034670b5 ("staging: lustre: ldlm: revert the changes
-for lock canceling policy") removed the fix for LU-4300 when lru_resize
-is disabled.
+Even if there are no RPC requests on the set, there is no need to
+wake up every second. The thread is woken up when a request is added
+to the set or when the STOP bit is set, so it is sufficient to only
+wake up when there are requests on the set to worry about.
 
-Introduce ldlm_cancel_aged_no_wait_policy to be used by ELC.
-
-Signed-off-by: Andriy Skulysh <c17819@cray.com>
-WC-bug-id: https://jira.whamcloud.com/browse/LU-8578
-Seagate-bug-id: MRP-3662
-Reviewed-on: https://review.whamcloud.com/22286
-Reviewed-by: Vitaly Fertman <c17818@cray.com>
+Signed-off-by: Alex Zhuravlev <bzzz@whamcloud.com>
+WC-bug-id: https://jira.whamcloud.com/browse/LU-9660
+Reviewed-on: https://review.whamcloud.com/28776
+Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
 Reviewed-by: Patrick Farrell <paf@cray.com>
 Reviewed-by: Oleg Drokin <green@whamcloud.com>
 Signed-off-by: James Simmons <jsimmons@infradead.org>
 ---
- drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |  1 -
- drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 51 +++++++++++++++-------
- 2 files changed, 35 insertions(+), 17 deletions(-)
+ drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-index 1d7c727..709c527 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
-@@ -96,7 +96,6 @@ enum {
- 	LDLM_LRU_FLAG_NO_WAIT	= BIT(4), /* Cancel locks w/o blocking (neither
- 					   * sending nor waiting for any rpcs)
- 					   */
--	LDLM_LRU_FLAG_LRUR_NO_WAIT = BIT(5), /* LRUR + NO_WAIT */
- };
- 
- int ldlm_cancel_lru(struct ldlm_namespace *ns, int nr,
-diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-index 80260b07..3eb5036 100644
---- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-+++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
-@@ -579,8 +579,8 @@ int ldlm_prep_elc_req(struct obd_export *exp, struct ptlrpc_request *req,
- 		req_capsule_filled_sizes(pill, RCL_CLIENT);
- 		avail = ldlm_capsule_handles_avail(pill, RCL_CLIENT, canceloff);
- 
--		flags = ns_connect_lru_resize(ns) ?
--			LDLM_LRU_FLAG_LRUR_NO_WAIT : LDLM_LRU_FLAG_AGED;
-+		flags = LDLM_LRU_FLAG_NO_WAIT | ns_connect_lru_resize(ns) ?
-+			LDLM_LRU_FLAG_LRUR : LDLM_LRU_FLAG_AGED;
- 		to_free = !ns_connect_lru_resize(ns) &&
- 			  opc == LDLM_ENQUEUE ? 1 : 0;
- 
-@@ -1254,6 +1254,20 @@ static enum ldlm_policy_res ldlm_cancel_aged_policy(struct ldlm_namespace *ns,
- 	return ldlm_cancel_no_wait_policy(ns, lock, unused, added, count);
- }
- 
-+static enum ldlm_policy_res
-+ldlm_cancel_aged_no_wait_policy(struct ldlm_namespace *ns,
-+				struct ldlm_lock *lock,
-+				int unused, int added, int count)
-+{
-+	enum ldlm_policy_res result;
-+
-+	result = ldlm_cancel_aged_policy(ns, lock, unused, added, count);
-+	if (result == LDLM_POLICY_KEEP_LOCK)
-+		return result;
-+
-+	return ldlm_cancel_no_wait_policy(ns, lock, unused, added, count);
-+}
-+
- /**
-  * Callback function for default policy. Makes decision whether to keep \a lock
-  * in LRU for current LRU size \a unused, added in current scan \a added and
-@@ -1280,26 +1294,32 @@ typedef enum ldlm_policy_res (*ldlm_cancel_lru_policy_t)(
- 						      int, int);
- 
- static ldlm_cancel_lru_policy_t
--ldlm_cancel_lru_policy(struct ldlm_namespace *ns, int flags)
-+ldlm_cancel_lru_policy(struct ldlm_namespace *ns, int lru_flags)
- {
--	if (flags & LDLM_LRU_FLAG_NO_WAIT)
--		return ldlm_cancel_no_wait_policy;
--
- 	if (ns_connect_lru_resize(ns)) {
--		if (flags & LDLM_LRU_FLAG_SHRINK)
-+		if (lru_flags & LDLM_LRU_FLAG_SHRINK) {
- 			/* We kill passed number of old locks. */
- 			return ldlm_cancel_passed_policy;
--		else if (flags & LDLM_LRU_FLAG_LRUR)
--			return ldlm_cancel_lrur_policy;
--		else if (flags & LDLM_LRU_FLAG_PASSED)
-+		} else if (lru_flags & LDLM_LRU_FLAG_LRUR) {
-+			if (lru_flags & LDLM_LRU_FLAG_NO_WAIT)
-+				return ldlm_cancel_lrur_no_wait_policy;
-+			else
-+				return ldlm_cancel_lrur_policy;
-+		} else if (lru_flags & LDLM_LRU_FLAG_PASSED) {
- 			return ldlm_cancel_passed_policy;
--		else if (flags & LDLM_LRU_FLAG_LRUR_NO_WAIT)
--			return ldlm_cancel_lrur_no_wait_policy;
-+		}
- 	} else {
--		if (flags & LDLM_LRU_FLAG_AGED)
--			return ldlm_cancel_aged_policy;
-+		if (lru_flags & LDLM_LRU_FLAG_AGED) {
-+			if (lru_flags & LDLM_LRU_FLAG_NO_WAIT)
-+				return ldlm_cancel_aged_no_wait_policy;
-+			else
-+				return ldlm_cancel_aged_policy;
-+		}
+diff --git a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+index c201a88..5b4977b 100644
+--- a/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
++++ b/drivers/staging/lustre/lustre/ptlrpc/ptlrpcd.c
+@@ -371,7 +371,7 @@ static int ptlrpcd_check(struct lu_env *env, struct ptlrpcd_ctl *pc)
+ 		}
  	}
  
-+	if (lru_flags & LDLM_LRU_FLAG_NO_WAIT)
-+		return ldlm_cancel_no_wait_policy;
-+
- 	return ldlm_cancel_default_policy;
+-	return rc;
++	return rc || test_bit(LIOD_STOP, &pc->pc_flags);
  }
  
-@@ -1344,8 +1364,7 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
- 	ldlm_cancel_lru_policy_t pf;
- 	struct ldlm_lock *lock, *next;
- 	int added = 0, unused, remained;
--	int no_wait = flags &
--		(LDLM_LRU_FLAG_NO_WAIT | LDLM_LRU_FLAG_LRUR_NO_WAIT);
-+	int no_wait = flags & LDLM_LRU_FLAG_NO_WAIT;
+ /**
+@@ -441,7 +441,7 @@ static int ptlrpcd(void *arg)
+ 		lu_context_enter(env.le_ses);
+ 		if (wait_event_idle_timeout(set->set_waitq,
+ 					    ptlrpcd_check(&env, pc),
+-					    (timeout ? timeout : 1) * HZ) == 0)
++					    timeout * HZ) == 0)
+ 			ptlrpc_expired_set(set);
  
- 	spin_lock(&ns->ns_lock);
- 	unused = ns->ns_nr_unused;
+ 		lu_context_exit(&env.le_ctx);
 -- 
 1.8.3.1
