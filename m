@@ -1,12 +1,11 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 20 Oct 2018 19:55:41 +0100 (BST)
-Subject: [lustre-devel] [PATCH 21/28] lustre: llite: enhance vvp_dev
- data structure naming
-In-Reply-To: <877eigc85g.fsf@notabene.neil.brown.name>
-References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
- <1539543498-29105-22-git-send-email-jsimmons@infradead.org>
- <877eigc85g.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1810201952370.16676@casper.infradead.org>
+Date: Sat, 20 Oct 2018 20:00:52 +0100 (BST)
+Subject: [lustre-devel] [PATCH 00/10] lustre: lnet: fixes for non-x86
+ systems
+In-Reply-To: <87va5zc12b.fsf@notabene.neil.brown.name>
+References: <1539543332-28679-1-git-send-email-jsimmons@infradead.org>
+ <87va5zc12b.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1810202000050.16676@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,163 +15,56 @@ To: lustre-devel@lists.lustre.org
 
 > On Sun, Oct 14 2018, James Simmons wrote:
 > 
-> > The new code that added struct seq_private to the vvp_dev.c code
-> > has very generic naming which doesn't fit the lustre / kernel style.
-> > See http://wiki.lustre.org/Lustre_Coding_Style_Guidelines for the
-> > naming conventions. Rename the struct seq_private and it fields.
+> > These are the required patches to make LNet work with non-x86
+> > platforms like ARM or Power8. The tunables map_on_demand and
+> > concurrent_sends assumed pages were 4K in size which is not
+> > correct. Massively reworked to basically defunct those tunables.
+> > Also the size of the LNet packet was always 256 pages but when
+> > the page size is 64K like some ARM or Power8 systems the maximum
+> > LNet message sent was 16MB not 1MB which is what is expected.
+> > Fixing up the RDMA handling in the ko2iblnd driver also resolved
+> > some performance issues.
 > 
-> The guidelines say:
-> 
->   unique member names for global structures, using a prefix to identify
->   the parent structure type, helps readability.
-> 
-> As this structure is local to vvp_dev.c, I don't think of it as a
-> "global structure" and so I don't think the rule applies.
-> 
-> But I don't really care.
+> Thanks.
+> I've applied this series, but I've still suspicious of that little
+> section in patch 3.
+> I hope that can be clarified, or fixed, before I feel the need to  move
+> the series from 'lustre-testing' to 'lustre'.
 
-The gudeline needs to be updated to state "member names for all 
-structures". Some lustre developers handle style issues as strictly
-as Greg did in staging. It's just a different flavor :-) 
+Thank you. Yes as I pointed out that code in patch 3 is wrong. I pushed
+a fix to the OpenSFS branch already. You can drop that change in patch 3.
 
-To let you know your dump cache tree walk patch in lustre-wip landed
-to OpenSFS tree. I plan to push another set of patches and I can
-included it with the reviews.
 
-> > Signed-off-by: James Simmons <uja.ornl@yahoo.com>
-> > WC-bug-id: https://jira.whamcloud.com/browse/LU-8066
-> > Reviewed-on: https://review.whamcloud.com/33009
-> > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-> > Reviewed-by: John L. Hammond <jhammond@whamcloud.com>
-> > Signed-off-by: James Simmons <jsimmons@infradead.org>
-> > ---
-> >  drivers/staging/lustre/lustre/llite/vvp_dev.c | 54 ++++++++++++++-------------
-> >  1 file changed, 28 insertions(+), 26 deletions(-)
+> > Alexey Lyashkov (1):
+> >   lustre: lnd: use less CQ entries for each connection
 > >
-> > diff --git a/drivers/staging/lustre/lustre/llite/vvp_dev.c b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-> > index 31dc3c0..8cc981b 100644
-> > --- a/drivers/staging/lustre/lustre/llite/vvp_dev.c
-> > +++ b/drivers/staging/lustre/lustre/llite/vvp_dev.c
-> > @@ -391,11 +391,11 @@ struct vvp_pgcache_id {
-> >  	struct lu_object_header *vpi_obj;
-> >  };
-> >  
-> > -struct seq_private {
-> > -	struct ll_sb_info	*sbi;
-> > -	struct lu_env		*env;
-> > -	u16			refcheck;
-> > -	struct cl_object	*clob;
-> > +struct vvp_seq_private {
-> > +	struct ll_sb_info	*vsp_sbi;
-> > +	struct lu_env		*vsp_env;
-> > +	u16			vsp_refcheck;
-> > +	struct cl_object	*vsp_clob;
-> >  };
-> >  
-> >  static void vvp_pgcache_id_unpack(loff_t pos, struct vvp_pgcache_id *id)
-> > @@ -542,52 +542,54 @@ static void vvp_pgcache_page_show(const struct lu_env *env,
-> >  
-> >  static int vvp_pgcache_show(struct seq_file *f, void *v)
-> >  {
-> > -	struct seq_private	*priv = f->private;
-> > +	struct vvp_seq_private *priv = f->private;
-> >  	struct page		*vmpage = v;
-> >  	struct cl_page		*page;
-> >  
-> >  	seq_printf(f, "%8lx@" DFID ": ", vmpage->index,
-> > -		   PFID(lu_object_fid(&priv->clob->co_lu)));
-> > +		   PFID(lu_object_fid(&priv->vsp_clob->co_lu)));
-> >  	lock_page(vmpage);
-> > -	page = cl_vmpage_page(vmpage, priv->clob);
-> > +	page = cl_vmpage_page(vmpage, priv->vsp_clob);
-> >  	unlock_page(vmpage);
-> >  	put_page(vmpage);
-> >  
-> >  	if (page) {
-> > -		vvp_pgcache_page_show(priv->env, f, page);
-> > -		cl_page_put(priv->env, page);
-> > +		vvp_pgcache_page_show(priv->vsp_env, f, page);
-> > +		cl_page_put(priv->vsp_env, page);
-> >  	} else {
-> >  		seq_puts(f, "missing\n");
-> >  	}
-> > -	lu_object_ref_del(&priv->clob->co_lu, "dump", current);
-> > -	cl_object_put(priv->env, priv->clob);
-> > +	lu_object_ref_del(&priv->vsp_clob->co_lu, "dump", current);
-> > +	cl_object_put(priv->vsp_env, priv->vsp_clob);
-> >  
-> >  	return 0;
-> >  }
-> >  
-> >  static void *vvp_pgcache_start(struct seq_file *f, loff_t *pos)
-> >  {
-> > -	struct seq_private	*priv = f->private;
-> > +	struct vvp_seq_private *priv = f->private;
-> >  	struct page *ret;
-> >  
-> > -	if (priv->sbi->ll_site->ls_obj_hash->hs_cur_bits >
-> > +	if (priv->vsp_sbi->ll_site->ls_obj_hash->hs_cur_bits >
-> >  	    64 - PGC_OBJ_SHIFT)
-> >  		ret = ERR_PTR(-EFBIG);
-> >  	else
-> > -		ret = vvp_pgcache_find(priv->env, &priv->sbi->ll_cl->cd_lu_dev,
-> > -				       &priv->clob, pos);
-> > +		ret = vvp_pgcache_find(priv->vsp_env,
-> > +				       &priv->vsp_sbi->ll_cl->cd_lu_dev,
-> > +				       &priv->vsp_clob, pos);
-> >  
-> >  	return ret;
-> >  }
-> >  
-> >  static void *vvp_pgcache_next(struct seq_file *f, void *v, loff_t *pos)
-> >  {
-> > -	struct seq_private *priv = f->private;
-> > +	struct vvp_seq_private *priv = f->private;
-> >  	struct page *ret;
-> >  
-> >  	*pos += 1;
-> > -	ret = vvp_pgcache_find(priv->env, &priv->sbi->ll_cl->cd_lu_dev,
-> > -			       &priv->clob, pos);
-> > +	ret = vvp_pgcache_find(priv->vsp_env,
-> > +			       &priv->vsp_sbi->ll_cl->cd_lu_dev,
-> > +			       &priv->vsp_clob, pos);
-> >  	return ret;
-> >  }
-> >  
-> > @@ -605,16 +607,16 @@ static void vvp_pgcache_stop(struct seq_file *f, void *v)
-> >  
-> >  static int vvp_dump_pgcache_seq_open(struct inode *inode, struct file *filp)
-> >  {
-> > -	struct seq_private *priv;
-> > +	struct vvp_seq_private *priv;
-> >  
-> >  	priv = __seq_open_private(filp, &vvp_pgcache_ops, sizeof(*priv));
-> >  	if (!priv)
-> >  		return -ENOMEM;
-> >  
-> > -	priv->sbi = inode->i_private;
-> > -	priv->env = cl_env_get(&priv->refcheck);
-> > -	if (IS_ERR(priv->env)) {
-> > -		int err = PTR_ERR(priv->env);
-> > +	priv->vsp_sbi = inode->i_private;
-> > +	priv->vsp_env = cl_env_get(&priv->vsp_refcheck);
-> > +	if (IS_ERR(priv->vsp_env)) {
-> > +		int err = PTR_ERR(priv->vsp_env);
-> >  
-> >  		seq_release_private(inode, filp);
-> >  		return err;
-> > @@ -625,9 +627,9 @@ static int vvp_dump_pgcache_seq_open(struct inode *inode, struct file *filp)
-> >  static int vvp_dump_pgcache_seq_release(struct inode *inode, struct file *file)
-> >  {
-> >  	struct seq_file *seq = file->private_data;
-> > -	struct seq_private *priv = seq->private;
-> > +	struct vvp_seq_private *priv = seq->private;
-> >  
-> > -	cl_env_put(priv->env, &priv->refcheck);
-> > +	cl_env_put(priv->vsp_env, &priv->vsp_refcheck);
-> >  	return seq_release_private(inode, file);
-> >  }
-> >  
+> > Amir Shehata (6):
+> >   lustre: lnd: set device capabilities
+> >   lustre: o2iblnd: use IB_MR_TYPE_SG_GAPS
+> >   lustre: lnd: rework map_on_demand behavior
+> >   lustre: lnd: calculate qp max_send_wrs properly
+> >   lustre: lnd: remove concurrent_sends tunable
+> >   lustre: lnd: correct WR fast reg accounting
+> >
+> > Dmitry Eremin (1):
+> >   lustre: o2iblnd: limit cap.max_send_wr for MLX5
+> >
+> > James Simmons (1):
+> >   lustre: lnet: make LNET_MAX_IOV dependent on page size
+> >
+> > John L. Hammond (1):
+> >   lustre: o2ib: use splice in kiblnd_peer_connect_failed()
+> >
+> >  .../staging/lustre/include/linux/lnet/lib-types.h  |  10 +-
+> >  .../lustre/include/uapi/linux/lnet/lnet-types.h    |   3 -
+> >  drivers/staging/lustre/lnet/Kconfig                |  10 --
+> >  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.c    | 138 +++++++++++++++------
+> >  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h    |  68 +++-------
+> >  .../staging/lustre/lnet/klnds/o2iblnd/o2iblnd_cb.c | 133 ++++++++++++++------
+> >  .../lustre/lnet/klnds/o2iblnd/o2iblnd_modparams.c  |  85 ++++++-------
+> >  drivers/staging/lustre/lustre/include/lustre_net.h |   1 +
+> >  8 files changed, 256 insertions(+), 192 deletions(-)
+> >
 > > -- 
 > > 1.8.3.1
 > 
