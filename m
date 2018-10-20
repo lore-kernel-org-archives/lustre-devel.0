@@ -1,12 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 20 Oct 2018 18:06:13 +0100 (BST)
-Subject: [lustre-devel] [PATCH 03/10] lustre: lnd: rework map_on_demand
- behavior
-In-Reply-To: <87bm7tdrvu.fsf@notabene.neil.brown.name>
-References: <1539543332-28679-1-git-send-email-jsimmons@infradead.org>
- <1539543332-28679-4-git-send-email-jsimmons@infradead.org>
- <87bm7tdrvu.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1810201758590.16676@casper.infradead.org>
+Date: Sat, 20 Oct 2018 18:09:33 +0100 (BST)
+Subject: [lustre-devel] [PATCH 06/28] lustre: ldlm: ELC shouldn't wait
+ on lock flush
+In-Reply-To: <87sh14cg8q.fsf@notabene.neil.brown.name>
+References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
+ <1539543498-29105-7-git-send-email-jsimmons@infradead.org>
+ <87sh14cg8q.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1810201808100.16676@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -16,46 +16,65 @@ To: lustre-devel@lists.lustre.org
 
 > On Sun, Oct 14 2018, James Simmons wrote:
 > 
-> > @@ -1320,9 +1324,8 @@ static void kiblnd_destroy_fmr_pool(struct kib_fmr_pool *fpo)
-> >  {
-> >  	LASSERT(!fpo->fpo_map_count);
+> > From: Andriy Skulysh <c17819@cray.com>
+> >
+> > The commit 08fd034670b5 ("staging: lustre: ldlm: revert the changes
+> > for lock canceling policy") removed the fix for LU-4300 when lru_resize
+> > is disabled.
+> >
+> > Introduce ldlm_cancel_aged_no_wait_policy to be used by ELC.
+> >
+> > Signed-off-by: Andriy Skulysh <c17819@cray.com>
+> > WC-bug-id: https://jira.whamcloud.com/browse/LU-8578
+> > Seagate-bug-id: MRP-3662
+> > Reviewed-on: https://review.whamcloud.com/22286
+> > Reviewed-by: Vitaly Fertman <c17818@cray.com>
+> > Reviewed-by: Patrick Farrell <paf@cray.com>
+> > Reviewed-by: Oleg Drokin <green@whamcloud.com>
+> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > ---
+> >  drivers/staging/lustre/lustre/ldlm/ldlm_internal.h |  1 -
+> >  drivers/staging/lustre/lustre/ldlm/ldlm_request.c  | 51 +++++++++++++++-------
+> >  2 files changed, 35 insertions(+), 17 deletions(-)
+> >
+> > diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+> > index 1d7c727..709c527 100644
+> > --- a/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+> > +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_internal.h
+> > @@ -96,7 +96,6 @@ enum {
+> >  	LDLM_LRU_FLAG_NO_WAIT	= BIT(4), /* Cancel locks w/o blocking (neither
+> >  					   * sending nor waiting for any rpcs)
+> >  					   */
+> > -	LDLM_LRU_FLAG_LRUR_NO_WAIT = BIT(5), /* LRUR + NO_WAIT */
+> >  };
 > >  
-> > -	if (fpo->fpo_is_fmr) {
-> > -		if (fpo->fmr.fpo_fmr_pool)
-> > -			ib_destroy_fmr_pool(fpo->fmr.fpo_fmr_pool);
-> > +	if (fpo->fpo_is_fmr && fpo->fmr.fpo_fmr_pool) {
-> > +		ib_destroy_fmr_pool(fpo->fmr.fpo_fmr_pool);
-> >  	} else {
-> >  		struct kib_fast_reg_descriptor *frd;
-> >  		int i = 0;
+> >  int ldlm_cancel_lru(struct ldlm_namespace *ns, int nr,
+> > diff --git a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> > index 80260b07..3eb5036 100644
+> > --- a/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> > +++ b/drivers/staging/lustre/lustre/ldlm/ldlm_request.c
+> > @@ -579,8 +579,8 @@ int ldlm_prep_elc_req(struct obd_export *exp, struct ptlrpc_request *req,
+> >  		req_capsule_filled_sizes(pill, RCL_CLIENT);
+> >  		avail = ldlm_capsule_handles_avail(pill, RCL_CLIENT, canceloff);
+> >  
+> > -		flags = ns_connect_lru_resize(ns) ?
+> > -			LDLM_LRU_FLAG_LRUR_NO_WAIT : LDLM_LRU_FLAG_AGED;
+> > +		flags = LDLM_LRU_FLAG_NO_WAIT | ns_connect_lru_resize(ns) ?
+> > +			LDLM_LRU_FLAG_LRUR : LDLM_LRU_FLAG_AGED;
+> >  		to_free = !ns_connect_lru_resize(ns) &&
+> >  			  opc == LDLM_ENQUEUE ? 1 : 0;
 > 
-> This change looks strange.
-> With the new code: if fpo_fmr_pool is NULL, then the fpo_pool_list is
-> destroyed, even though fpo_is_fmr.
+> Bug.
+> The commit in SFS-lustre (7ca60f33893) is correct, but you dropped the
+> parentheses which introduces a bug.
 > 
-> Are we sure that is correct??
-> I don't really understand this code so it might be correct, but the
-> change looks wrong.
+> While the SFS code is correct, it is formatted badly.
+> It should be
 > 
-> Can someone please confirm that it really is right - and maybe explain
-> why?
+> 	lru_flags = LDLM_LRU_FLAG_NO_WAIT |
+>         	(ns_connect_lru_resize(ns) ?
+>                  LDLM_LRU_FLAG_LRUR : LDLM_LRU_FLAG_AGED);
+> or similar.
 
-It is wrong!!! The only reason it didn't show up is that fp_fmr_pool is
-very unlikely to NULL. I understand why this bug was introduced since
-its desirable to reduce the indentation. This is the fault of how the
-code is written. To avoid this in the future it should be written:
-
-if (!fpo->fpo_is_fmr) {
-	struct kib_fast_reg_descriptor *frd, *tmp;
-	....
-} else if (fpo->fmr.fpo_fmr_pool) {
-	ib_destroy_fmr_pool(fpo->fmr.fpo_fmr_pool);
-}
-
-I opened a ticket for https://jira.whamcloud.com/browse/LU-11552 and 
-submitted a patch - https://review.whamcloud.com/#/c/33408. To address
-this.
-
-So please remove this part from the change. We could redo the patch to
-include the above or I could just send a follow up patch to make this
-code clearer. I leave that up to you.
+Thanks for finding that. Shall I submit another patch to fix that or will
+you fix it up when you apply it to lustre-testing?
