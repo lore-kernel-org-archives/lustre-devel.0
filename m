@@ -1,12 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sun, 21 Oct 2018 23:48:16 +0100 (BST)
-Subject: [lustre-devel] [PATCH 03/28] lustre: ptlrpc: missing barrier
+Date: Sun, 21 Oct 2018 23:52:37 +0100 (BST)
+Subject: [lustre-devel] [PATCH 16/28] lustre: statahead: missing barrier
  before wake_up
-In-Reply-To: <87y3awchze.fsf@notabene.neil.brown.name>
+In-Reply-To: <87d0s8c8tp.fsf@notabene.neil.brown.name>
 References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
- <1539543498-29105-4-git-send-email-jsimmons@infradead.org>
- <87y3awchze.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1810212345040.6249@casper.infradead.org>
+ <1539543498-29105-17-git-send-email-jsimmons@infradead.org>
+ <87d0s8c8tp.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1810212348370.6249@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -18,65 +18,70 @@ To: lustre-devel@lists.lustre.org
 > 
 > > From: Lai Siyao <lai.siyao@whamcloud.com>
 > >
-> > ptlrpc_client_wake_req() misses a memory barrier, which may cause
-> > strange errors.
+> > A barrier is missing before wake_up() in ll_statahead_interpret(),
+> > which may cause 'ls' hang. Under the right conditions a basic 'ls'
+> > can fail. The debug logs show:
+> >
+> > statahead.c:683:ll_statahead_interpret()) sa_entry software rc -13
+> > statahead.c:1666:ll_statahead()) revalidate statahead software: -11.
+> >
+> > Obviously statahead failure didn't notify 'ls' process in time.
+> > The mi_cbdata can be stale so add a barrier before calling
+> > wake_up().
 > >
 > > Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
-> > WC-bug-id: https://jira.whamcloud.com/browse/LU-8935
-> > Reviewed-on: https://review.whamcloud.com/26583
-> > Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
-> > Reviewed-by: Wang Shilong <wshilong@ddn.com>
+> > Signed-off-by: Bob Glossman <bob.glossman@intel.com>
+> > WC-bug-id: https://jira.whamcloud.com/browse/LU-9210
+> > Reviewed-on: https://review.whamcloud.com/27330
+> > Reviewed-by: Nathaniel Clark <nclark@whamcloud.com>
 > > Reviewed-by: Oleg Drokin <green@whamcloud.com>
 > > Signed-off-by: James Simmons <jsimmons@infradead.org>
 > > ---
-> >  drivers/staging/lustre/lustre/include/lustre_net.h | 2 ++
-> >  1 file changed, 2 insertions(+)
+> >  drivers/staging/lustre/lustre/llite/statahead.c | 8 +++++++-
+> >  1 file changed, 7 insertions(+), 1 deletion(-)
 > >
-> > diff --git a/drivers/staging/lustre/lustre/include/lustre_net.h b/drivers/staging/lustre/lustre/include/lustre_net.h
-> > index ce7e98c..468a03e 100644
-> > --- a/drivers/staging/lustre/lustre/include/lustre_net.h
-> > +++ b/drivers/staging/lustre/lustre/include/lustre_net.h
-> > @@ -2211,6 +2211,8 @@ static inline int ptlrpc_status_ntoh(int n)
-> >  static inline void
-> >  ptlrpc_client_wake_req(struct ptlrpc_request *req)
-> >  {
-> > +	/* ensure ptlrpc_register_bulk see rq_resend as set. */
-> > +	smp_mb();
-> >  	if (!req->rq_set)
-> >  		wake_up(&req->rq_reply_waitq);
-> >  	else
-> 
-> It is good that this memory barrier has a comment, but the comment isn't
-> very helpful.
-> There is no matching memory barrier in ptlrpc_register_bulk(), so it
-> isn't clear what sequencing is important.
-> 
-> And ptl_send_rpc() tests ->rq_resend *before* ptlrpc_register_bulk() is
-> called (which also tests it).  Presumably these should see that same
-> value?  So why does the comment refer to ptlrpc_register_bulk() instead
-> of ptl_send_rpc() ??
-> 
-> It all seems rather confusing, so it is very hard to be sure that the
-> code is now correct.
-> Is someone able to explain?
-
-I wasn't going on much here. While the linux kernel request comments to
-place with memory barriers lustre developers tend to never leave an
-explaination on why a memory barrier was needed. In this case I examined
-the original JIRA ticket to find in one of the comments:
-
-"It looks like ptlrpc_client_wake_req() misses a memory barrier, which may 
-cause ptlrpc_resend_req() wake up ptlrpc_send_rpc -> ptlrpc_register_bulk, 
-while the latter doesn't see rq_resend set."
-
-I attempted to add that as a comment. This is all I had to go one. Now
-Lai is CC to this email so maybe he remembers what it was all about.
- 
-> Thanks,
-> NeilBrown
-> 
-> 
-> 
+> > diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
+> > index 1ad308c..0174a4c 100644
+> > --- a/drivers/staging/lustre/lustre/llite/statahead.c
+> > +++ b/drivers/staging/lustre/lustre/llite/statahead.c
+> > @@ -680,8 +680,14 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+> >  
+> >  	spin_lock(&lli->lli_sa_lock);
+> >  	if (rc) {
+> > -		if (__sa_make_ready(sai, entry, rc))
+> > +		if (__sa_make_ready(sai, entry, rc)) {
+> > +			/* LU-9210 : Under the right conditions even 'ls'
+> > +			 * can cause the statahead to fail. Using a memory
+> > +			 * barrier resolves this issue.
+> > +			 */
+> > +			smp_mb();
+> >  			wake_up(&sai->sai_waitq);
+> > +		}
+> >  	} else {
+> >  		int first = 0;
+> >  		entry->se_minfo = minfo;
 > > -- 
 > > 1.8.3.1
 > 
+> Again, this is a fairly lame comment to justify the smp_mb().
+> It appears to me that the issue is most likely the value of
+> entry->se_state.
+> __sa_make_ready() sets this and revalidate_statahead_dentry tests it
+> after waiting on sai_waitq.
+> So I think it would be best if we changed __sa_make_ready() to
+> 
+> 	smp_store_release(&entry->se_state, ret < 0 ? SA_ENTRY_INVA : SA_ENTRY_SUCC)
+> 
+> and in ll_statahead_interpret() have
+> 
+> 	if (smp_load_acquire(&entry->se_state) == SA_ENTRY_SUCC &&
+>             entry->se_inode) {
+> 
+> This would make it obvious which variable was important, and would show
+> the paired synchronization points.
+
+If you think this is lame you should be the JIRA ticket and the original 
+patch. It had zero info so I attempted to extract what I could out of the
+ticket. Hopefully Lai can fill in the details. I have no problems fixing 
+this another way. I don't see a way in the ticket to easily reproduce this
+problem to see the new approach would fix it :-(
