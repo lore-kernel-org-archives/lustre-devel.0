@@ -1,10 +1,12 @@
 From: James Simmons <jsimmons@infradead.org>
-Date: Sat, 20 Oct 2018 20:06:24 +0100 (BST)
-Subject: [lustre-devel] [PATCH] lustre: lprocfs: fix return value of
- lprocfs_read_helper
-In-Reply-To: <87y3avc1fp.fsf@notabene.neil.brown.name>
-References: <87y3avc1fp.fsf@notabene.neil.brown.name>
-Message-ID: <alpine.LFD.2.21.1810202003470.16676@casper.infradead.org>
+Date: Sun, 21 Oct 2018 23:44:49 +0100 (BST)
+Subject: [lustre-devel] [PATCH 04/28] lustre: ptlrpc: Do not assert when
+ bd_nob_transferred != 0
+In-Reply-To: <87va60cgjx.fsf@notabene.neil.brown.name>
+References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
+ <1539543498-29105-5-git-send-email-jsimmons@infradead.org>
+ <87va60cgjx.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1810212339590.6249@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -12,34 +14,58 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
- 
-> This should be 'ret', not zero.
-
-I bet that was one of my first patches to the linux lustre client since 
-its a really old patch. Thanks for figuring that out.
-
-Reviewed-by: James Simmons <jsimmons@infradead.org>
- 
-> Fixes: fdedd94509fd ("staging/lustre/lvfs: remove the lvfs layer")
-> Signed-off-by: NeilBrown <neilb@suse.com>
-> ---
->  drivers/staging/lustre/lustre/obdclass/lprocfs_status.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On Sun, Oct 14 2018, James Simmons wrote:
 > 
-> diff --git a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> index dc1d540e05c7..edac88440b41 100644
-> --- a/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> +++ b/drivers/staging/lustre/lustre/obdclass/lprocfs_status.c
-> @@ -1509,7 +1509,7 @@ __s64 lprocfs_read_helper(struct lprocfs_counter *lc,
->  		break;
->  	}
->  
-> -	return 0;
-> +	return ret;
->  }
->  EXPORT_SYMBOL(lprocfs_read_helper);
->  
-> -- 
-> 2.14.0.rc0.dirty
+> > From: Doug Oucharek <dougso@me.com>
+> >
+> > There is a case in the routine ptlrpc_register_bulk() where we were
+> > asserting if bd_nob_transferred != 0 when not resending.  There is
+> > evidence that network errors can create a situation where
+> > this does happen. So we should not be asserting!
+> >
+> > This patch changes that assert to an error return code of -EIO.
+> >
+> > Signed-off-by: Doug Oucharek <dougso@me.com>
+> > WC-bug-id: https://jira.whamcloud.com/browse/LU-9828
+> > Reviewed-on: https://review.whamcloud.com/28491
+> > Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
+> > Reviewed-by: Sonia Sharma <sharmaso@whamcloud.com>
+> > Reviewed-by: Oleg Drokin <green@whamcloud.com>
+> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+> > ---
+> >  drivers/staging/lustre/lustre/ptlrpc/niobuf.c | 8 ++++++--
+> >  1 file changed, 6 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+> > index 27eb1c0..7e7db24 100644
+> > --- a/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+> > +++ b/drivers/staging/lustre/lustre/ptlrpc/niobuf.c
+> > @@ -139,8 +139,12 @@ static int ptlrpc_register_bulk(struct ptlrpc_request *req)
+> >  	/* cleanup the state of the bulk for it will be reused */
+> >  	if (req->rq_resend || req->rq_send_state == LUSTRE_IMP_REPLAY)
+> >  		desc->bd_nob_transferred = 0;
+> > -	else
+> > -		LASSERT(desc->bd_nob_transferred == 0);
+> > +	else if (desc->bd_nob_transferred != 0)
+> > +		/* If the network failed after an RPC was sent, this condition
+> > +		 * could happen.  Rather than assert (was here before), return
+> > +		 * an EIO error.
+> > +		 */
+> > +		return -EIO;
 > 
+> This looks weird, and the justification is rather lame.
+> I wonder if this is an attempt to fix the same problem that the smp_mb()
+> in the previous patch was attempting to fix (and I'm not yet convinced
+> that either is the correct fix).
+
+When the above condition happens the LASSERT ends up taking out the 
+node with a panic which in turn kills the application running on the cluster.
+When replaced with reporting an EIO error the node survives as well as the 
+job. The job might fail at its IO but it wouldn't fail performing its work 
+flow which is way more important.
+
+> >  	desc->bd_failure = 0;
+> >  
+> > -- 
+> > 1.8.3.1
 > 
