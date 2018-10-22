@@ -1,179 +1,131 @@
 From: NeilBrown <neilb@suse.com>
-Date: Mon, 22 Oct 2018 14:58:01 +1100
-Subject: [lustre-devel] [PATCH 15/28] lustre: llite: fix for stat under
- kthread and X86_X32
-In-Reply-To: <87ftx4c9e6.fsf@notabene.neil.brown.name>
+Date: Mon, 22 Oct 2018 15:04:37 +1100
+Subject: [lustre-devel] [PATCH 16/28] lustre: statahead: missing barrier
+ before wake_up
+In-Reply-To: <alpine.LFD.2.21.1810212348370.6249@casper.infradead.org>
 References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
- <1539543498-29105-16-git-send-email-jsimmons@infradead.org>
- <87ftx4c9e6.fsf@notabene.neil.brown.name>
-Message-ID: <87h8he8wfq.fsf@notabene.neil.brown.name>
+ <1539543498-29105-17-git-send-email-jsimmons@infradead.org>
+ <87d0s8c8tp.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1810212348370.6249@casper.infradead.org>
+Message-ID: <87efci8w4q.fsf@notabene.neil.brown.name>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
-On Thu, Oct 18 2018, NeilBrown wrote:
+On Sun, Oct 21 2018, James Simmons wrote:
 
-> On Sun, Oct 14 2018, James Simmons wrote:
+>> On Sun, Oct 14 2018, James Simmons wrote:
+>> 
+>> > From: Lai Siyao <lai.siyao@whamcloud.com>
+>> >
+>> > A barrier is missing before wake_up() in ll_statahead_interpret(),
+>> > which may cause 'ls' hang. Under the right conditions a basic 'ls'
+>> > can fail. The debug logs show:
+>> >
+>> > statahead.c:683:ll_statahead_interpret()) sa_entry software rc -13
+>> > statahead.c:1666:ll_statahead()) revalidate statahead software: -11.
+>> >
+>> > Obviously statahead failure didn't notify 'ls' process in time.
+>> > The mi_cbdata can be stale so add a barrier before calling
+>> > wake_up().
+>> >
+>> > Signed-off-by: Lai Siyao <lai.siyao@whamcloud.com>
+>> > Signed-off-by: Bob Glossman <bob.glossman@intel.com>
+>> > WC-bug-id: https://jira.whamcloud.com/browse/LU-9210
+>> > Reviewed-on: https://review.whamcloud.com/27330
+>> > Reviewed-by: Nathaniel Clark <nclark@whamcloud.com>
+>> > Reviewed-by: Oleg Drokin <green@whamcloud.com>
+>> > Signed-off-by: James Simmons <jsimmons@infradead.org>
+>> > ---
+>> >  drivers/staging/lustre/lustre/llite/statahead.c | 8 +++++++-
+>> >  1 file changed, 7 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/drivers/staging/lustre/lustre/llite/statahead.c b/drivers/staging/lustre/lustre/llite/statahead.c
+>> > index 1ad308c..0174a4c 100644
+>> > --- a/drivers/staging/lustre/lustre/llite/statahead.c
+>> > +++ b/drivers/staging/lustre/lustre/llite/statahead.c
+>> > @@ -680,8 +680,14 @@ static int ll_statahead_interpret(struct ptlrpc_request *req,
+>> >  
+>> >  	spin_lock(&lli->lli_sa_lock);
+>> >  	if (rc) {
+>> > -		if (__sa_make_ready(sai, entry, rc))
+>> > +		if (__sa_make_ready(sai, entry, rc)) {
+>> > +			/* LU-9210 : Under the right conditions even 'ls'
+>> > +			 * can cause the statahead to fail. Using a memory
+>> > +			 * barrier resolves this issue.
+>> > +			 */
+>> > +			smp_mb();
+>> >  			wake_up(&sai->sai_waitq);
+>> > +		}
+>> >  	} else {
+>> >  		int first = 0;
+>> >  		entry->se_minfo = minfo;
+>> > -- 
+>> > 1.8.3.1
+>> 
+>> Again, this is a fairly lame comment to justify the smp_mb().
+>> It appears to me that the issue is most likely the value of
+>> entry->se_state.
+>> __sa_make_ready() sets this and revalidate_statahead_dentry tests it
+>> after waiting on sai_waitq.
+>> So I think it would be best if we changed __sa_make_ready() to
+>> 
+>> 	smp_store_release(&entry->se_state, ret < 0 ? SA_ENTRY_INVA : SA_ENTRY_SUCC)
+>> 
+>> and in ll_statahead_interpret() have
+>> 
+>> 	if (smp_load_acquire(&entry->se_state) == SA_ENTRY_SUCC &&
+>>             entry->se_inode) {
+>> 
+>> This would make it obvious which variable was important, and would show
+>> the paired synchronization points.
 >
->> From: Frank Zago <fzago@cray.com>
->>
->> Under the following conditions, ll_getattr will flatten the inode
->> number when it shouldn't:
->>
->>  - the X86_X32 architecture is defined CONFIG_X86_X32, and not even
->>    used,
->>  - ll_getattr is called from a kernel thread (though vfs_getattr for
->>    instance.)
->>
->> This has the result that inode numbers are different whether the same
->> file is stat'ed from a kernel thread, or from a syscall. For instance,
->> 4198401 vs. 144115205272502273.
->>
->> ll_getattr calls ll_need_32bit_api to determine whether the task is 32
->> bits. When the combination is kthread+X86_X32, that function returns
->> that the task is 32 bits, which is incorrect, as the kernel is 64
->> bits.
->>
->> The solution is to check whether the call is from a kernel thread
->> (which is 64 bits) and act consequently.
->>
->> Signed-off-by: Frank Zago <fzago@cray.com>
->> WC-bug-id: https://jira.whamcloud.com/browse/LU-9468
->> Reviewed-on: https://review.whamcloud.com/26992
->> Reviewed-by: Andreas Dilger <adilger@whamcloud.com>
->> Reviewed-by: Dmitry Eremin <dmitry.eremin@intel.com>
->> Signed-off-by: James Simmons <jsimmons@infradead.org>
->> ---
->>  drivers/staging/lustre/lustre/llite/dir.c          |  6 +++---
->>  drivers/staging/lustre/lustre/llite/lcommon_cl.c   |  2 +-
->>  .../staging/lustre/lustre/llite/llite_internal.h   | 22 +++++++++++++++++-----
->>  3 files changed, 21 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/staging/lustre/lustre/llite/dir.c b/drivers/staging/lustre/lustre/llite/dir.c
->> index 231b351..19c5e9c 100644
->> --- a/drivers/staging/lustre/lustre/llite/dir.c
->> +++ b/drivers/staging/lustre/lustre/llite/dir.c
->> @@ -202,7 +202,7 @@ int ll_dir_read(struct inode *inode, __u64 *ppos, struct md_op_data *op_data,
->>  {
->>  	struct ll_sb_info    *sbi	= ll_i2sbi(inode);
->>  	__u64		   pos		= *ppos;
->> -	int		   is_api32 = ll_need_32bit_api(sbi);
->> +	bool is_api32 = ll_need_32bit_api(sbi);
->>  	int		   is_hash64 = sbi->ll_flags & LL_SBI_64BIT_HASH;
->>  	struct page	  *page;
->>  	bool		   done = false;
->> @@ -296,7 +296,7 @@ static int ll_readdir(struct file *filp, struct dir_context *ctx)
->>  	struct ll_sb_info	*sbi	= ll_i2sbi(inode);
->>  	__u64 pos = lfd ? lfd->lfd_pos : 0;
->>  	int			hash64	= sbi->ll_flags & LL_SBI_64BIT_HASH;
->> -	int			api32	= ll_need_32bit_api(sbi);
->> +	bool api32 = ll_need_32bit_api(sbi);
->>  	struct md_op_data *op_data;
->>  	int			rc;
->>  
->> @@ -1674,7 +1674,7 @@ static loff_t ll_dir_seek(struct file *file, loff_t offset, int origin)
->>  	struct inode *inode = file->f_mapping->host;
->>  	struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
->>  	struct ll_sb_info *sbi = ll_i2sbi(inode);
->> -	int api32 = ll_need_32bit_api(sbi);
->> +	bool api32 = ll_need_32bit_api(sbi);
->>  	loff_t ret = -EINVAL;
->>  
->>  	switch (origin) {
->> diff --git a/drivers/staging/lustre/lustre/llite/lcommon_cl.c b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
->> index 30f17ea..20a3c74 100644
->> --- a/drivers/staging/lustre/lustre/llite/lcommon_cl.c
->> +++ b/drivers/staging/lustre/lustre/llite/lcommon_cl.c
->> @@ -267,7 +267,7 @@ void cl_inode_fini(struct inode *inode)
->>  /**
->>   * build inode number from passed @fid
->>   */
->> -__u64 cl_fid_build_ino(const struct lu_fid *fid, int api32)
->> +u64 cl_fid_build_ino(const struct lu_fid *fid, bool api32)
->>  {
->>  	if (BITS_PER_LONG == 32 || api32)
->>  		return fid_flatten32(fid);
->> diff --git a/drivers/staging/lustre/lustre/llite/llite_internal.h b/drivers/staging/lustre/lustre/llite/llite_internal.h
->> index dcb2fed..796a8ae 100644
->> --- a/drivers/staging/lustre/lustre/llite/llite_internal.h
->> +++ b/drivers/staging/lustre/lustre/llite/llite_internal.h
->> @@ -651,13 +651,25 @@ static inline struct inode *ll_info2i(struct ll_inode_info *lli)
->>  __u32 ll_i2suppgid(struct inode *i);
->>  void ll_i2gids(__u32 *suppgids, struct inode *i1, struct inode *i2);
->>  
->> -static inline int ll_need_32bit_api(struct ll_sb_info *sbi)
->> +static inline bool ll_need_32bit_api(struct ll_sb_info *sbi)
->>  {
->>  #if BITS_PER_LONG == 32
->> -	return 1;
->> +	return true;
->>  #elif defined(CONFIG_COMPAT)
->> -	return unlikely(in_compat_syscall() ||
->> -			(sbi->ll_flags & LL_SBI_32BIT_API));
->> +	if (unlikely(sbi->ll_flags & LL_SBI_32BIT_API))
->> +		return true;
->> +
->> +#ifdef CONFIG_X86_X32
->> +	/* in_compat_syscall() returns true when called from a kthread
->> +	 * and CONFIG_X86_X32 is enabled, which is wrong. So check
->> +	 * whether the caller comes from a syscall (ie. not a kthread)
->> +	 * before calling in_compat_syscall().
->> +	 */
->> +	if (current->flags & PF_KTHREAD)
->> +		return false;
->> +#endif
->
-> This is wrong.  We should fix in_compat_syscall(), not work around it
-> here.
-> (and then there is that fact that the patch changes 'int' to 'bool'
-> without explaining that in the change description).
->
-> I've sent a query to some relevant people (Cc:ed to James) to ask about
-> fixing in_compat_syscall().
+> If you think this is lame you should be the JIRA ticket and the original 
+> patch. It had zero info so I attempted to extract what I could out of the
+> ticket. Hopefully Lai can fill in the details. I have no problems fixing 
+> this another way. I don't see a way in the ticket to easily reproduce this
+> problem to see the new approach would fix it :-(
 
-Upstream say in_compat_syscall() should only be called from a syscall,
-so I have change the patch to the below.
+I have imposed the version that I think is correct.  See below.
 
-We probably need to remove this in_compat_syscall() before going
-mainline.
-
+Thanks,
 NeilBrown
 
--static inline int ll_need_32bit_api(struct ll_sb_info *sbi)
-+static inline bool ll_need_32bit_api(struct ll_sb_info *sbi)
- {
- #if BITS_PER_LONG == 32
--	return 1;
--#elif defined(CONFIG_COMPAT)
--	return unlikely(in_compat_syscall() ||
--			(sbi->ll_flags & LL_SBI_32BIT_API));
-+	return true;
-+#else
-+	if (unlikely(sbi->ll_flags & LL_SBI_32BIT_API))
-+		return true;
-+
-+#if defined(CONFIG_COMPAT)
-+	/* in_compat_syscall() is only meaningful inside a syscall.
-+	 * As this can be called from a kthread (e.g. nfsd), we
-+	 * need to catch that case first.  kthreads never need the
-+	 * 32bit api.
+--- a/drivers/staging/lustre/lustre/llite/statahead.c
++++ b/drivers/staging/lustre/lustre/llite/statahead.c
+@@ -322,7 +322,11 @@ __sa_make_ready(struct ll_statahead_info *sai, struct sa_entry *entry, int ret)
+ 		}
+ 	}
+ 	list_add(&entry->se_list, pos);
+-	entry->se_state = ret < 0 ? SA_ENTRY_INVA : SA_ENTRY_SUCC;
++	/*
++	 * LU-9210: ll_statahead_interpet must be able to see this before
++	 * we wake it up
 +	 */
-+	if (current->flags & PF_KTHREAD)
-+		return false;
-+
-+	return unlikely(in_compat_syscall());
- #else
--	return unlikely(sbi->ll_flags & LL_SBI_32BIT_API);
-+	return false;
-+#endif
- #endif
++	smp_store_release(&entry->se_state, ret < 0 ? SA_ENTRY_INVA : SA_ENTRY_SUCC);
+ 
+ 	return (index == sai->sai_index_wait);
  }
+@@ -1390,7 +1394,12 @@ static int revalidate_statahead_dentry(struct inode *dir,
+ 		}
+ 	}
+ 
+-	if (entry->se_state == SA_ENTRY_SUCC && entry->se_inode) {
++	/*
++	 * We need to see the value that was set immediately before we
++	 * were woken up.
++	 */
++	if (smp_load_acquire(&entry->se_state) == SA_ENTRY_SUCC &&
++	    entry->se_inode) {
+ 		struct inode *inode = entry->se_inode;
+ 		struct lookup_intent it = { .it_op = IT_GETATTR,
+ 					    .it_lock_handle = entry->se_handle };
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181022/0fb4bbc9/attachment.sig>
+URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181022/6bdf8044/attachment-0001.sig>
