@@ -1,11 +1,14 @@
-From: NeilBrown <neilb@suse.com>
-Date: Wed, 24 Oct 2018 09:34:17 +1100
-Subject: [lustre-devel] [PATCH] lustre: lu_object: fix possible hang waiting
- for LCS_LEAVING
-In-Reply-To: <878t2q8unf.fsf@notabene.neil.brown.name>
-References: <1539543498-29105-1-git-send-email-jsimmons@infradead.org>
- <878t2q8unf.fsf@notabene.neil.brown.name>
-Message-ID: <87d0s070nq.fsf@notabene.neil.brown.name>
+From: James Simmons <jsimmons@infradead.org>
+Date: Wed, 24 Oct 2018 00:04:37 +0100 (BST)
+Subject: [lustre-devel] [PATCH 01/10] lustre: lnd: set device
+ capabilities
+In-Reply-To: <87va5u8znw.fsf@notabene.neil.brown.name>
+References: <1539543332-28679-1-git-send-email-jsimmons@infradead.org>
+ <1539543332-28679-2-git-send-email-jsimmons@infradead.org>
+ <87efcpdsnz.fsf@notabene.neil.brown.name>
+ <alpine.LFD.2.21.1810201748160.16676@casper.infradead.org>
+ <87va5u8znw.fsf@notabene.neil.brown.name>
+Message-ID: <alpine.LFD.2.21.1810240003090.25521@casper.infradead.org>
 List-Id: <lustre-devel-lustre.org>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -13,73 +16,47 @@ Content-Transfer-Encoding: 7bit
 To: lustre-devel@lists.lustre.org
 
 
-As lu_context_key_quiesce() spins waiting for LCS_LEAVING to
-change, it is important the we set and then clear in within a
-non-preemptible region.  If the thread that spins pre-empty the
-thread that sets-and-clears the state while the state is LCS_LEAVING,
-then it can spin indefinitely, particularly on a single-CPU machine.
+> >> > index a4438d2..9f0a47d 100644
+> >> > --- a/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+> >> > +++ b/drivers/staging/lustre/lnet/klnds/o2iblnd/o2iblnd.h
+> >> > @@ -73,6 +73,10 @@
+> >> >  #define IBLND_N_SCHED			2
+> >> >  #define IBLND_N_SCHED_HIGH		4
+> >> >  
+> >> > +#define IBLND_DEV_CAPS_FASTREG_ENABLED		0x1
+> >> > +#define IBLND_DEV_CAPS_FASTREG_GAPS_SUPPORT	0x2
+> >> > +#define IBLND_DEV_CAPS_FMR_ENABLED		0x4
+> >> > +
+> >> 
+> >> BIT(0), BIT(1), .... ???
+> >> 
+> >> >  struct kib_tunables {
+> >> >  	int *kib_dev_failover;           /* HCA failover */
+> >> >  	unsigned int *kib_service;       /* IB service number */
+> >> > @@ -162,6 +166,7 @@ struct kib_dev {
+> >> >  	unsigned int ibd_can_failover; /* IPoIB interface is a bonding master */
+> >> >  	struct list_head   ibd_nets;
+> >> >  	struct kib_hca_dev *ibd_hdev;
+> >> > +	u32			ibd_dev_caps;
+> >> 
+> >> "unsigned int" would be better I think, but it isn't very important.
+> >
+> > Actually better yet it could be changed to an enum. Move the below to
+> > just above struct kib_dev {
+> >
+> > enum ibd_dev_caps {
+> > 	IBLND_DEV_CAPS_FASTREG_ENABLED		= BIT(0),
+> > 	IBLND_DEV_CAPS_FASTREG_GAPS_SUPPORT	= BIT(1),
+> > 	IBLND_DEV_CAPS_FMR_ENABLED		= BIT(2),
+> > }
+> >
+> > and change ibd_dev_caps from u32 to enum ibd_dev_caps.
+> >
+> > Do you mind if that is a follow on patch?
+> >
+> 
+> Yes, that would be good, thanks.
+> I'll apply this patch as it is.
 
-Also update the comment to explain this dependency.
-
-Fixes: ac3f8fd6e61b ("staging: lustre: remove locking from lu_context_exit()")
----
-
-This is the cause of the "something" that went wrong in my recent
-testing that I mentioned.  I wonder if preempt_enable() has recently
-been enhanced to encourage a preempt, to make this sort of bug easier to
-see.
-
-
- drivers/staging/lustre/lustre/obdclass/lu_object.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/staging/lustre/lustre/obdclass/lu_object.c b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-index cb57abf03644..51497c144dd6 100644
---- a/drivers/staging/lustre/lustre/obdclass/lu_object.c
-+++ b/drivers/staging/lustre/lustre/obdclass/lu_object.c
-@@ -1654,17 +1654,20 @@ void lu_context_exit(struct lu_context *ctx)
- 	unsigned int i;
- 
- 	LINVRNT(ctx->lc_state == LCS_ENTERED);
--	/*
--	 * Ensure lu_context_key_quiesce() sees LCS_LEAVING
--	 * or we see LCT_QUIESCENT
--	 */
--	smp_store_mb(ctx->lc_state, LCS_LEAVING);
- 	/*
- 	 * Disable preempt to ensure we get a warning if
- 	 * any lct_exit ever tries to sleep.  That would hurt
- 	 * lu_context_key_quiesce() which spins waiting for us.
-+	 * This also ensure we aren't preempted while the state
-+	 * is LCS_LEAVING, as that too would cause problems for
-+	 * lu_context_key_quiesce().
- 	 */
- 	preempt_disable();
-+	/*
-+	 * Ensure lu_context_key_quiesce() sees LCS_LEAVING
-+	 * or we see LCT_QUIESCENT
-+	 */
-+	smp_store_mb(ctx->lc_state, LCS_LEAVING);
- 	if (ctx->lc_tags & LCT_HAS_EXIT && ctx->lc_value) {
- 		for (i = 0; i < ARRAY_SIZE(lu_keys); ++i) {
- 			struct lu_context_key *key;
-@@ -1677,8 +1680,8 @@ void lu_context_exit(struct lu_context *ctx)
- 		}
- 	}
- 
--	preempt_enable();
- 	smp_store_release(&ctx->lc_state, LCS_LEFT);
-+	preempt_enable();
- }
- EXPORT_SYMBOL(lu_context_exit);
- 
--- 
-2.14.0.rc0.dirty
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.lustre.org/pipermail/lustre-devel-lustre.org/attachments/20181024/a789b872/attachment.sig>
+New patch at https://review.whamcloud.com/#/c/33409
+I will push shortly to linux client.
